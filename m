@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6AE2AC282C5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:23:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 47927C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:23:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 396C520855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:23:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F239320855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:23:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G4LuWb2F";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="IRjXiJpl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 396C520855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rmMw1ri4";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="DvEItE1N"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F239320855
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,63 +27,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=OVqf68aHhgXhPpJvyDmuwMKABsXjCnTk1Mhabhi9J9I=; b=G4LuWb2Fkxon2Sse0aDzu/eIXM
-	XfVagApUyFAkID6Am7pjc9IlZdLWDlhCfPzv2hwj9exF/WgzU1EEOe6OgviPqIQPokLMb2J7RoDwC
-	Z7fYP8rv+Lq0Unqi97THOV4vJcLhugZGLr3Y38gen/HmZJpGSDN9o5NgeQOBvUxwhlrBrtaf+FGw9
-	X7gTbo18CnLcX89dLIlBUhn8D0JSnaurIU9WDeVPQqSFaRhaIUSX1lT5sJd2k6JmW3rNffjwe2eZg
-	0XYsXNcRsZxmu9hiFJquEFN30FtJjbClD2gVu8bU6gOzYapdtdofyjWRQbfepUbcTpRbYWIM01Hsr
-	bQxVMYXg==;
+	bh=AFAED4m2+EV38xrlaC+NIuOs2LllNs6A/AQmTkrBoGQ=; b=rmMw1ri4dwFtnef6katG8T4M85
+	gZtHvBRKfugr7RfqbHuEaWozR5bebJ5xlrUp5CElsybE88Xa3DFHpy1Fwsxm55bJPf1eQZy2bJDMl
+	f3grDQi9WQZOC7zIWOBSyHO1p7m4Rm9LgVe59AaWhM19/N/fvmcEdncSqsNHB3Dy9tpclGBAFMrq1
+	YmlHHxqb/39s+lnmKwWAXnb0z+KLpNRlnQL7dRHUSlyWlbL4EmPX9Z8rlEMVjq9o5HpSF0nm0HySP
+	UwQhuIT5zW8TmpLp2g4ngVPo904bwh7Pow0jh8KSJCUG5dhPfSuN72BuvP52ByKZCHnpNdkuQkFFo
+	1MG9OTTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glnaU-0001nk-Fm; Tue, 22 Jan 2019 04:22:58 +0000
-Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
+	id 1glnam-00020E-7d; Tue, 22 Jan 2019 04:23:16 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glnZn-0001Ct-8H
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 04:22:17 +0000
-Received: by mail-pl1-x643.google.com with SMTP id b5so10807045plr.4
+ id 1glnZs-0001Hp-R5
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 04:22:30 +0000
+Received: by mail-pf1-x444.google.com with SMTP id g62so11092036pfd.12
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 20:22:15 -0800 (PST)
+ Mon, 21 Jan 2019 20:22:20 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=cmQKGebSmYlEhX3wS0v8qxCgnG+jTMlO7/QfZGmiwZM=;
- b=IRjXiJpl4uBg12TBCSEcYEEe8zNLgJE7fL2fTd/uxbKTOWP2JeA9xsggqOOMpnaSbm
- i5Iaht0A8rjCxY9mCqU53OPKa35u7R7/Y7JD/bQg1B3qOEQtVrNXoq5qppmt8kGNTIlj
- Lz4UTlNSxfktgxkUmSnSBgedauyisvGRhYvqU=
+ bh=z8BYTp8mhM/pilsodAKivXfXoRjeqU3Tj9aOBeEVYqE=;
+ b=DvEItE1NiPV7p/vSyCBMjpexW+q0uRczQQLq0s75ULzh413ZovsWdPBMAsEhPzK9SK
+ 4WuWYl5H83Ou4mDtYAQK4aE4M67LfklMKcMu1BP+JhwfggJ55vcvnYEDX1ypP1Qe+7BD
+ o/dbTwt5pNEvlgjDc421pBNC8VaixHFlIRqOA=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=cmQKGebSmYlEhX3wS0v8qxCgnG+jTMlO7/QfZGmiwZM=;
- b=jtPVnEIh7odb4HWkKgNgbrm54czqakSUEKgdwDagwl8k1syCo3jo3sU1kbbbIg8JJz
- sRmEGfjZnp4M7MlmzhM91TxadxCyKOvm9VOxnzdbPuW4XwVBt8179k0iuR9VBnCK4MCn
- hJgRAqLXhf6UL/rn+fXqEVR9lPETzcWSeyDZtrv6M4kklY6M1b4s66O92p4W9YqfigZ5
- j7jA/rLnY/Agb/7j34ViO9E5YKYl0rgr81M4D1SfRbWU3FEjBH3YP8c5/k2K6d6QNL5G
- G/9YtLtGJt2dr0NclyfbCCbsHIqSH1mnWYHdz/Fq4QFcgK6UEocbuiAS+dQOdBoKGwKN
- Ng/Q==
-X-Gm-Message-State: AJcUukfiuZ77vqKSQOAOkUS+gUjbXbRNH6IipqMADLL7IAdcrKddOkXR
- XWW56hAvZ29jemWimrKQmiya
-X-Google-Smtp-Source: ALg8bN4ONaQX3pyCELUDzLLOvIJwuPAy54B+U+smYGOPAQYfDoCNM74kuGFJ+AdrzqSAbmtOV5Mwaw==
-X-Received: by 2002:a17:902:30a3:: with SMTP id
- v32mr32996277plb.26.1548130934796; 
- Mon, 21 Jan 2019 20:22:14 -0800 (PST)
+ bh=z8BYTp8mhM/pilsodAKivXfXoRjeqU3Tj9aOBeEVYqE=;
+ b=BA0zwsi5D8T+0EOAk6ThY+MqggQ0S0vzM6K4BusV81UisPI5l3+HZb087Rzdv3OdgY
+ hXLzhQ8CujfIMJvHYNDSRCIkZ5pZElD5gntUuR6MTKmAlKadf2+VVVH5Ol5NHekl2VWm
+ YSLkMaNOMGjBTkTtvIJ0vT9slKNdDLsZaQzW455wOy1feQZ8qB+xrmQR+MzV6e8VBg+/
+ oMBBFUKmHFQvbR8JMJS4FrK4xi7MQKSISP7j8E5gu7QqspUTrnslslutgjlhy+Q2OAun
+ LG8fs+6vcn5/835CZtdWqHdL83ZRoMeuHeHdFTdtGqocbP2oHMu9PL7XSK9kQUwQIrIt
+ /umg==
+X-Gm-Message-State: AJcUukdkycmPURG8NC1X90HgA2cbg5AyR0He7NcfT7l8hhMeFGF2lcqq
+ BgQU48bnvcdht/nm+MpZGlED
+X-Google-Smtp-Source: ALg8bN5aVRMENZwWODam+9GBXodJhtO1QXkbGFKxoyR3b+ubqSaDT2avkxozUJ575izNZjKdx67xKQ==
+X-Received: by 2002:a62:da5a:: with SMTP id w26mr32240493pfl.106.1548130940258; 
+ Mon, 21 Jan 2019 20:22:20 -0800 (PST)
 Received: from localhost.localdomain ([2405:204:7344:8fd1:3551:e475:9265:ab6d])
- by smtp.gmail.com with ESMTPSA id q199sm25083953pfc.97.2019.01.21.20.22.09
+ by smtp.gmail.com with ESMTPSA id q199sm25083953pfc.97.2019.01.21.20.22.15
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 21 Jan 2019 20:22:14 -0800 (PST)
+ Mon, 21 Jan 2019 20:22:19 -0800 (PST)
 From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 To: shawnguo@kernel.org,
 	leoyang.li@nxp.com,
 	robh+dt@kernel.org
-Subject: [PATCH v3 3/5] dt-bindings: vendor-prefixes: Add EBS-SYSTART GmbH
- Vendor Prefix
-Date: Tue, 22 Jan 2019 09:51:45 +0530
-Message-Id: <20190122042147.5424-4-manivannan.sadhasivam@linaro.org>
+Subject: [PATCH v3 4/5] dt-bindings: arm: fsl: Add devicetree binding for
+ Oxalis
+Date: Tue, 22 Jan 2019 09:51:46 +0530
+Message-Id: <20190122042147.5424-5-manivannan.sadhasivam@linaro.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190122042147.5424-1-manivannan.sadhasivam@linaro.org>
 References: <20190122042147.5424-1-manivannan.sadhasivam@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_202215_326972_D7420999 
-X-CRM114-Status: GOOD (  10.60  )
+X-CRM114-CacheID: sfid-20190121_202221_251930_02F46DF5 
+X-CRM114-Status: GOOD (  10.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,26 +105,25 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add vendor prefix for EBS-SYSTART GmbH.
+Add devicetree binding for LS1012A SoC based Oxalis board.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ Documentation/devicetree/bindings/arm/fsl.yaml | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 389508584f48..38693105b5c6 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -108,6 +108,7 @@ dongwoon	Dongwoon Anatech
- dptechnics	DPTechnics
- dragino	Dragino Technology Co., Limited
- ea	Embedded Artists AB
-+ebs-systart EBS-SYSTART GmbH
- ebv	EBV Elektronik
- eckelmann	Eckelmann AG
- edt	Emerging Display Technologies
+diff --git a/Documentation/devicetree/bindings/arm/fsl.yaml b/Documentation/devicetree/bindings/arm/fsl.yaml
+index 20fb61006f2b..6f85965e9fb4 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.yaml
++++ b/Documentation/devicetree/bindings/arm/fsl.yaml
+@@ -176,6 +176,7 @@ properties:
+       - description: LS1012A based Boards
+         items:
+           - enum:
++              - ebs-systart,oxalis
+               - fsl,ls1012a-rdb
+               - fsl,ls1012a-frdm
+               - fsl,ls1012a-qds
 -- 
 2.17.1
 
