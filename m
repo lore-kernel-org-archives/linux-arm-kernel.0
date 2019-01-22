@@ -2,91 +2,64 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5356BC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 21:53:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 05F8FC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 22:10:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1D3D020866
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 21:53:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C0DC720870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 22:10:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tSyVLtbD";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=poorly.run header.i=@poorly.run header.b="AHvKGUc1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D3D020866
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=poorly.run
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cZwe2IoQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C0DC720870
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wTMSXKPYCIbHXvUNagnQO/Ww7yr5q9vPdv9N/zJ688w=; b=tSyVLtbDQi3LsQ
-	hd5NJ342fckt3zYduBqjO7tj5piYo4A0PeUeDjAtsSIHpiHtn9gQSDapVpCRu2IM5+AqdSJyLPQmE
-	RkCFu0yCLdrZy3z8/7XOOw9FuDS9r2H2XP82X2p+W7+edX0nQr2bPJbJZ5G/rMRAVDoIO01cr7YaJ
-	/6MHw3c1Kcsj3f7suiP1E0VYRKGVtiLddIK0kb2KYn3Fhf0UtqARzPZsrxgIV9+Zq+6VOJrajlujT
-	k82rNntiAexiP5lCbtr/PjRSFBQs5bgU9fl5dfKW6MVBSGa8LH3FTuZ4oFbAVQjDvfaZp8A/wUCbl
-	IN/1NsKzqtLFT7t2vs/g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=ugLmCgdU+cKI/vqlhm0cAwmd1SA8TgrgHnened5YXyA=; b=cZwe2IoQH3H8L2FzPd06PCNa2
+	SgCPyvYwe1WZK6EUXznZRL9RzYHanEbvn8S6aZxPxzHuVqMpUIyInxIIfLl0I2Na+lDmTnEoKvWn/
+	NJsAJJS3noNiSoCNoqT1nUsZvhkdn2aEhIPq8NjDWNVWWZnFCY7107dwh4RhKY2kk2xkTtJLnQOc1
+	bJBkXjTDg3YQi+xGMA5WFoOi1abd5RyMoM20bKb0cvgcvae86wvvLgct4LJJSi8TYl0FVcAFojnV4
+	AMwxV+7WwSXDzTKJNSMIdQx3GC691kl+KxfuSFzUeDTRY5FrJPx5P2UUsiTmmJv0LXKDGt0iIxjDL
+	2KnkhRk4w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gm3yl-00007d-O1; Tue, 22 Jan 2019 21:53:07 +0000
-Received: from mail-yb1-xb44.google.com ([2607:f8b0:4864:20::b44])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gm3yh-00006m-ST
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 21:53:05 +0000
-Received: by mail-yb1-xb44.google.com with SMTP id y63so28916ybc.8
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 13:53:01 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=poorly.run; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=AGImLWKSXyqcZe7nveg/7vkgivfZ2ayznn3rwDCE8FY=;
- b=AHvKGUc1yOVBQIXBFh5sY1o9v6Vm3IX0sfgcGrTG34kaFzlxf1Jm8AVan2dh507cGI
- ygYgYsNvIhwq7FlmpQGjt7HdKurdL57SPlrCPaGP81/nFKDVEqWEvcR2G9pUVj41TaEI
- f+EYZsEK5+fylSuCVIyAD5L4I8fbl0DWoyLf99bBl1JbckxrmMUBMBelq0KeNXxUQ2Qe
- zfcnnCOGt6DmByNpeJFXR3bEmCMWomuGSAZ7WmfpVGkcfMnHyZ36k0Ebpy2RDVV37zwN
- oRNf3Fcwl9Ecw1FMoc7Cgpxn5Hztk7gRaf6LyV3wGPZ+djf6oCq1CWw0JtuJV+lD7dNz
- 8iCw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=AGImLWKSXyqcZe7nveg/7vkgivfZ2ayznn3rwDCE8FY=;
- b=JGMM3HiJI4Vd8EaIhUSIhMq4R+DaNHWcmTyr+QXCAITj+YWyw4lyhJiZ5LytxmpuM2
- Gh1GlqHeV1jBITyKQVcCvo86SjK94rQJHMNp9JF7Mdo7CFlDEbdMmrHb3wJ6IT+oKAtp
- hy2SVxp74glFnjh0O5QdQ+kevhtA6hhHb+Vt3bRy/K4E8/FABk3SJ8F2vmlltMafIN8i
- h5SG6UaWT0fv0z0LOw9AUFTJl7LizRtAqxRAJU8sPZVlwWBjXR1DH5VU2fgrTO1NcP2E
- UbnzIq3jutd3LHX7YaiVAcBOTGBgls6CDRJkgdgdfdG9cy3mYnU2+EeW1D2OqUAOYIZz
- vQtw==
-X-Gm-Message-State: AJcUukckgoUYpgp4pZnoRAI6D9XVzgAtHsWaq/EVhcvkuP3FDA0LBUGW
- 6vDfCrpN+MONW92/PYvQLLsUVA==
-X-Google-Smtp-Source: ALg8bN5UNJJkma6ODmjgOp5ajWZ643xJYjRhSPm0CyAqEy+6i7UzkoQS05f2gvmSgQitqKvDujro4A==
-X-Received: by 2002:a25:3455:: with SMTP id b82mr22727920yba.402.1548193980378; 
- Tue, 22 Jan 2019 13:53:00 -0800 (PST)
-Received: from localhost ([2620:0:1013:11:89c6:2139:5435:371d])
- by smtp.gmail.com with ESMTPSA id w2sm6327173ywe.62.2019.01.22.13.52.59
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 22 Jan 2019 13:52:59 -0800 (PST)
-Date: Tue, 22 Jan 2019 16:52:59 -0500
-From: Sean Paul <sean@poorly.run>
-To: Sean Paul <seanpaul@chromium.org>
-Subject: Re: [PATCH resend] drm/panel: panel-innolux: set display off in
- innolux_panel_unprepare
-Message-ID: <20190122215259.GN114153@art_vandelay>
-References: <20190109065922.231753-1-hsinyi@chromium.org>
- <CAOw6vb+a2SAq+=xfL9RZyA6R7zn-HYFQbDnDaK28TD8yrh+wLg@mail.gmail.com>
+	id 1gm4Fi-0000Qp-CV; Tue, 22 Jan 2019 22:10:38 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gm4Ff-0000QN-3W
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 22:10:36 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E5725A78;
+ Tue, 22 Jan 2019 14:10:33 -0800 (PST)
+Received: from [10.37.10.44] (unknown [10.37.10.44])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9B7D33F5C1;
+ Tue, 22 Jan 2019 14:10:32 -0800 (PST)
+Subject: Re: [PATCH 3/4] KVM: arm/arm64: lazily create perf events on enable
+To: andrew.murray@arm.com, christoffer.dall@arm.com, marc.zyngier@arm.com
+References: <1548154197-5470-1-git-send-email-andrew.murray@arm.com>
+ <1548154197-5470-4-git-send-email-andrew.murray@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <82bb5635-0bca-8326-03e1-084792dd939d@arm.com>
+Date: Tue, 22 Jan 2019 22:12:22 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.7.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAOw6vb+a2SAq+=xfL9RZyA6R7zn-HYFQbDnDaK28TD8yrh+wLg@mail.gmail.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <1548154197-5470-4-git-send-email-andrew.murray@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_135304_072453_4721082C 
-X-CRM114-Status: GOOD (  21.47  )
+X-CRM114-CacheID: sfid-20190122_141035_158533_3ECBF0DD 
+X-CRM114-Status: GOOD (  28.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,97 +71,207 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: David Airlie <airlied@linux.ie>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Thierry Reding <thierry.reding@gmail.com>, "Hsin-Yi,
- Wang" <hsinyi@chromium.org>,
- Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 18, 2019 at 12:58:10PM -0500, Sean Paul wrote:
-> On Wed, Jan 9, 2019 at 1:59 AM Hsin-Yi, Wang <hsinyi@chromium.org> wrote:
-> >
-> > Move mipi_dsi_dcs_set_display_off() from innolux_panel_disable()
-> > to innolux_panel_unprepare(), so they are consistent with
-> > innolux_panel_enable() and innolux_panel_prepare().
-> >
-> > This also fixes some mode check and irq timeout issue in MTK dsi code.
-> >
-> > Since some dsi code (e.g. mtk_dsi) have following call trace:
-> > 1. drm_panel_disable(), which calls innolux_panel_disable()
-> > 2. switch to cmd mode
-> > 3. drm_panel_unprepare(), which calls innolux_panel_unprepare()
-> >
-> > However, mtk_dsi needs to be in cmd mode to be able to send commands
-> > (e.g. mipi_dsi_dcs_set_display_off() and mipi_dsi_dcs_enter_sleep_mode()),
-> > so we need these functions to be called after the switch to cmd mode happens,
-> > i.e. in innolux_panel_unprepare.
-> >
-> >
-> > Signed-off-by: Hsin-Yi, Wang <hsinyi@chromium.org>
+Hi Andrew,
+
+On 01/22/2019 10:49 AM, Andrew Murray wrote:
+> To prevent re-creating perf events everytime the counter registers
+> are changed, let's instead lazily create the event when the event
+> is first enabled and destroy it when it changes.
 > 
-> Reviewed-by: Sean Paul <seanpaul@chromium.org>
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 
-Applied to drm-misc-next, thanks for your patch.
 
-Sean
-
+> ---
+>   virt/kvm/arm/pmu.c | 114 ++++++++++++++++++++++++++++++++++++-----------------
+>   1 file changed, 78 insertions(+), 36 deletions(-)
 > 
-> > ---
-> > Resend for review.
-> > ---
-> >  drivers/gpu/drm/panel/panel-innolux-p079zca.c | 11 +++++------
-> >  1 file changed, 5 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/panel/panel-innolux-p079zca.c b/drivers/gpu/drm/panel/panel-innolux-p079zca.c
-> > index ca4ae45dd307..8e5724b63f1f 100644
-> > --- a/drivers/gpu/drm/panel/panel-innolux-p079zca.c
-> > +++ b/drivers/gpu/drm/panel/panel-innolux-p079zca.c
-> > @@ -70,18 +70,12 @@ static inline struct innolux_panel *to_innolux_panel(struct drm_panel *panel)
-> >  static int innolux_panel_disable(struct drm_panel *panel)
-> >  {
-> >         struct innolux_panel *innolux = to_innolux_panel(panel);
-> > -       int err;
-> >
-> >         if (!innolux->enabled)
-> >                 return 0;
-> >
-> >         backlight_disable(innolux->backlight);
-> >
-> > -       err = mipi_dsi_dcs_set_display_off(innolux->link);
-> > -       if (err < 0)
-> > -               DRM_DEV_ERROR(panel->dev, "failed to set display off: %d\n",
-> > -                             err);
-> > -
-> >         innolux->enabled = false;
-> >
-> >         return 0;
-> > @@ -95,6 +89,11 @@ static int innolux_panel_unprepare(struct drm_panel *panel)
-> >         if (!innolux->prepared)
-> >                 return 0;
-> >
-> > +       err = mipi_dsi_dcs_set_display_off(innolux->link);
-> > +       if (err < 0)
-> > +               DRM_DEV_ERROR(panel->dev, "failed to set display off: %d\n",
-> > +                             err);
-> > +
-> >         err = mipi_dsi_dcs_enter_sleep_mode(innolux->link);
-> >         if (err < 0) {
-> >                 DRM_DEV_ERROR(panel->dev, "failed to enter sleep mode: %d\n",
-> > --
-> > 2.18.1
-> >
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel@lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 4464899..1921ca9 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -24,8 +24,11 @@
+>   #include <kvm/arm_pmu.h>
+>   #include <kvm/arm_vgic.h>
+>   
+> -static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 data,
+> -				      u64 select_idx);
+> +static void kvm_pmu_reenable_enabled_single(struct kvm_vcpu *vcpu, u64 pair);
 
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+I find the approach good. However the function names are a bit odd and
+it makes the code read a bit difficult.
+
+I think we could :
+
+1) Rename the existing
+  kvm_pmu_{enable/disable}_counter => kvm_pmu_{enable/disable}_[mask or 
+counters ]
+as they operate on a set of counters (as a mask) instead of a single
+counter.
+And then you may be able to drop "_single" from
+kvm_pmu_{enable/disable}_counter"_single() functions below, which makes
+better sense for what they do.
+
+> +static void kvm_pmu_counter_create_enabled_perf_event(struct kvm_vcpu *vcpu,
+> +						      u64 select_idx);
+
+Could we simply keep kvm_pmu_counter_create_event() and add a comment 
+above the function explaining that the events are enabled as they are
+created lazily ?
+
+> +static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc);
+> +
+>   /**
+>    * kvm_pmu_get_counter_value - get PMU counter value
+>    * @vcpu: The vcpu pointer
+> @@ -59,18 +62,16 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
+>    */
+>   void kvm_pmu_set_counter_value(struct kvm_vcpu *vcpu, u64 select_idx, u64 val)
+>   {
+> -	u64 reg, data;
+> +	u64 reg;
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+>   
+>   	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
+>   	      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx;
+>   	__vcpu_sys_reg(vcpu, reg) += (s64)val - kvm_pmu_get_counter_value(vcpu, select_idx);
+>   
+> -	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
+> -	      ? PMCCFILTR_EL0 : PMEVTYPER0_EL0 + select_idx;
+> -	data = __vcpu_sys_reg(vcpu, reg + select_idx);
+> -
+> -	/* Recreate the perf event to reflect the updated sample_period */
+> -	kvm_pmu_create_perf_event(vcpu, data, select_idx);
+> +	kvm_pmu_stop_counter(vcpu, pmc);
+> +	kvm_pmu_reenable_enabled_single(vcpu, select_idx);
+>   }
+>   
+>   /**
+> @@ -88,6 +89,7 @@ static void kvm_pmu_release_perf_event(struct kvm_pmc *pmc)
+>   
+>   /**
+>    * kvm_pmu_stop_counter - stop PMU counter
+> + * @vcpu: The vcpu pointer
+>    * @pmc: The PMU counter pointer
+>    *
+>    * If this counter has been configured to monitor some event, release it here.
+> @@ -150,6 +152,25 @@ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+>   }
+>   
+>   /**
+> + * kvm_pmu_enable_counter_single - create/enable a unpaired counter
+> + * @vcpu: The vcpu pointer
+> + * @select_idx: The counter index
+> + */
+> +static void kvm_pmu_enable_counter_single(struct kvm_vcpu *vcpu, u64 select_idx)
+> +{
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+> +
+> +	if (!pmc->perf_event) {
+> +		kvm_pmu_counter_create_enabled_perf_event(vcpu, select_idx);
+> +	} else if (pmc->perf_event) {
+> +		perf_event_enable(pmc->perf_event);
+> +		if (pmc->perf_event->state != PERF_EVENT_STATE_ACTIVE)
+> +			kvm_debug("fail to enable perf event\n");
+
+nit: failed
+
+> +	}
+> +}
+> +
+> +/**
+>    * kvm_pmu_enable_counter - enable selected PMU counter
+
+nit: This is a bit misleading. We could be enabling a set of counters.
+Please could we update the comment.
+
+>    * @vcpu: The vcpu pointer
+>    * @val: the value guest writes to PMCNTENSET register
+> @@ -159,8 +180,6 @@ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+>   void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val)
+>   {
+>   	int i;
+> -	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> -	struct kvm_pmc *pmc;
+>   
+>   	if (!(__vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E) || !val)
+>   		return;
+> @@ -169,16 +188,44 @@ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val)
+>   		if (!(val & BIT(i)))
+>   			continue;
+>   
+> -		pmc = &pmu->pmc[i];
+> -		if (pmc->perf_event) {
+> -			perf_event_enable(pmc->perf_event);
+> -			if (pmc->perf_event->state != PERF_EVENT_STATE_ACTIVE)
+> -				kvm_debug("fail to enable perf event\n");
+> -		}
+> +		kvm_pmu_enable_counter_single(vcpu, i);
+>   	}
+>   }
+>   
+>   /**
+> + * kvm_pmu_reenable_enabled_single - reenable a counter if it should be enabled
+> + * @vcpu: The vcpu pointer
+> + * @select_idx: The counter index
+> + */
+> +static void kvm_pmu_reenable_enabled_single(struct kvm_vcpu *vcpu,
+> +					    u64 select_idx)
+> +{
+> +	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
+> +	u64 set = __vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & mask;
+> +
+> +	if (!(__vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E))
+> +		return;
+> +
+> +	if (set & BIT(select_idx))
+> +		kvm_pmu_enable_counter_single(vcpu, select_idx);
+
+Could we not reuse kvm_pmu_enable_counter() here :
+	i.e,
+static inline void kvm_pmu_reenable_counter(struct kvm_vcpu *vcpu, u64
+						select_idx)
+{
+	kvm_pmu_enable_counter(vcpu, BIT(select_idx));
+}
+
+> +}
+> +
+> +/**
+> + * kvm_pmu_disable_counter - disable selected PMU counter
+
+Stale comment
+
+> + * @vcpu: The vcpu pointer
+> + * @pmc: The counter to dissable
+
+nit: s/dissable/disable/
+
+> + */
+> +static void kvm_pmu_disable_counter_single(struct kvm_vcpu *vcpu,
+> +					   u64 select_idx)
+> +{
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+> +
+> +	if (pmc->perf_event)
+> +		perf_event_disable(pmc->perf_event);
+> +}
+> +
+> +/**
+>    * kvm_pmu_disable_counter - disable selected PMU counter
+
+While you are at this, please could you make the comment a bit more
+clear. i.e, we disable a set of PMU counters not a single one.
+
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
