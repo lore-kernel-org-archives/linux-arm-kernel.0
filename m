@@ -2,128 +2,72 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 35FE5C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 08:21:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A3730C282C5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 08:25:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0462720861
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 08:21:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 71B8120879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 08:25:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R2wiMl53";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="BH1qTI7c"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0462720861
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lWLy98uD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 71B8120879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vALD915PlAmrFJume8BYyYNGnnT6J7W81hyjpu9t/nQ=; b=R2wiMl533JFh+H
-	v9rWHVF/4pm/zcKn30bt22SRB+ok2yHpAX18sA1pzojF3VuU5p+fCsYP9idsviXBQmOvY/SH3sUbb
-	/0dxJG0gfjU6wmREAx4vZfb5wTbmBcH6qgBhVHtIaA1+6h2OpUv/NGExBlZRGyzj1k7b87I4DSz4Y
-	A5Ws8PJNM5CONuCyTgFhkzlyLDNbXmzyiICBAW4bYWtyExvX7j8/b9dOE+PmmHlTeQc/7v5vV1dsD
-	nXf9zSOxNFxMpO1AZk/JPHl+j0KSOl0a4ln/UB06BXefUU5ioEarC/P9dno+YNX/+/IsvWAsMsePx
-	/HSAJsLN8KZswHurlVpA==;
+	List-Owner; bh=1MS5G9cS1X1dHeqgvebcwmOQUpGJO57TsD1orBOEXEI=; b=lWLy98uDpOKInm
+	MLIBx15KCFF0BtZQaVCDpeoNo7o1u3/CzgtZWEeei59PyoZVXFE0FVhpmW6yczk/8dSPQ4Iao/Su4
+	jkGlg1i3v0mthQlsv5FURPhKbc0xwwMkJejQHUiyohDYOJIN5ze7I0TdhP59Q5Twq/SZs5JrW5CaQ
+	7lbKl2Ql/ZyR9Ea30kVUuAZ3Ra7iSp6DNr/MBsZ/RWV6jkVlp2m4oJTTwgGP3HcJLEe44gUJ5/8ec
+	IvQHfVhA0qc1v02y9y8l/Y7EzY1O6MpwPMYTdYfljpqDGq/zL+XqrD7vf7VDq5KeNWctFPiOchnxj
+	4zvJXHGrj8BO+y2+y/6g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glrIw-0003mF-FY; Tue, 22 Jan 2019 08:21:06 +0000
-Received: from mailout1.w1.samsung.com ([210.118.77.11])
+	id 1glrNX-0005My-5E; Tue, 22 Jan 2019 08:25:51 +0000
+Received: from mail-vs1-f66.google.com ([209.85.217.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glrIt-0003lU-4n
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 08:21:05 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
- by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190122082059euoutp01fa454747ba5300d28dc51a2ab74a2d7f~8Hekhh8PU3017430174euoutp01U
+ id 1glrNS-0005Ma-RA
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 08:25:48 +0000
+Received: by mail-vs1-f66.google.com with SMTP id u11so14172951vsp.11
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 08:20:59 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
- 20190122082059euoutp01fa454747ba5300d28dc51a2ab74a2d7f~8Hekhh8PU3017430174euoutp01U
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1548145259;
- bh=ygU/l36li2oqtxJPf2FiPkYKY5wHwP6shXzalp/5FxY=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=BH1qTI7cCQjcVRazZpqhU9UfoSj9MWAIF0qL7qG72KRpzYenELXKe1azYe+AjYMKE
- yzXFzOw8Zrmt8FR8KlImgSTGVl7O5mz1frPeZr2UQZB1mIDf1l17bqbV6n4T1U4ZWz
- XWCWMB1OFeV87n7wEquYiqIgxopnT2NCxIsVCD9E=
-Received: from eusmges3new.samsung.com (unknown [203.254.199.245]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20190122082058eucas1p15b1faa8d1619592e082b86f855342af2~8Hej_YsNH1718017180eucas1p1W;
- Tue, 22 Jan 2019 08:20:58 +0000 (GMT)
-Received: from eucas1p2.samsung.com ( [182.198.249.207]) by
- eusmges3new.samsung.com (EUCPMTA) with SMTP id C8.4F.04806.A62D64C5; Tue, 22
- Jan 2019 08:20:58 +0000 (GMT)
-Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTPA id
- 20190122082057eucas1p1533e37ce5ab90d422b6155e479c174a3~8HejA4Qen1689116891eucas1p1U;
- Tue, 22 Jan 2019 08:20:57 +0000 (GMT)
-Received: from eusmgms1.samsung.com (unknown [182.198.249.179]) by
- eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
- 20190122082057eusmtrp1f2cec3efd56e3e3251bcae484dc3f5cd~8HeiyU_0m1234612346eusmtrp1J;
- Tue, 22 Jan 2019 08:20:57 +0000 (GMT)
-X-AuditID: cbfec7f5-367ff700000012c6-c2-5c46d26a93a0
-Received: from eusmtip1.samsung.com ( [203.254.199.221]) by
- eusmgms1.samsung.com (EUCPMTA) with SMTP id 7C.EB.04284.962D64C5; Tue, 22
- Jan 2019 08:20:57 +0000 (GMT)
-Received: from [106.116.147.30] (unknown [106.116.147.30]) by
- eusmtip1.samsung.com (KnoxPortal) with ESMTPA id
- 20190122082056eusmtip14189c28794cc1123a69cce8b437f4ce1~8HeiWdVPB1685016850eusmtip1I;
- Tue, 22 Jan 2019 08:20:56 +0000 (GMT)
-Subject: Re: [PATCH v2] usb: dwc3: exynos: Fix error handling of
- clk_prepare_enable
-To: Alexey Khoroshilov <khoroshilov@ispras.ru>, Felipe Balbi <balbi@kernel.org>
-From: Marek Szyprowski <m.szyprowski@samsung.com>
-Message-ID: <c781bb2f-aad0-84c5-3d6e-1c7ce93bc57f@samsung.com>
-Date: Tue, 22 Jan 2019 09:20:56 +0100
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ Tue, 22 Jan 2019 00:25:46 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=hGyal59jfKp30RrP9BL3MHd18FnsPFo4l6O1GeXCIq8=;
+ b=gmro566hax4d9BZr03lRKhMX5oWkesziNm6hWp0bm8Iw2tf35b4Xz6AGkMR60yN+2e
+ YolNp0Fx+5uwZgZGgzTL2QDwM6+2w3Imjd3oKEcwgqEjlWrKuwtPIECjo1JczyLgVDUp
+ PzEn6MeKCzBRShkboWrZ1lCWHHtjUIkUDRu17g125iOB+UarI+sJifBjiaWA6qBwt+8J
+ S0bjPmBEQ+xPCgTBxP2jHS0BdsIgMD2IThJpleKAmEX5cxY0A5fpXBT4WqUbNDnFDxZA
+ hEjnn0M+K5UTqZwCPLq2pIjuic72QY4LOggyylOZpbXzdCtL3VDqGFDzRxgVbmTcRtJZ
+ 9zng==
+X-Gm-Message-State: AJcUukfCmLApGpJ5t1nbA29n2X4d/vs2mZaskzU6yGZoZoblsjQbfAx7
+ nfjQaF5n6AVW5jFF5wGiL1oBJhUAAJno9GPLMqzpOQ==
+X-Google-Smtp-Source: ALg8bN6YhawHudCm6F/ZdRFYEzIKR8e7cGFCRztjkd2dXkzrFm97O4ErANctsVhqDghE+HFX9cQW1xM1vnddndLprPw=
+X-Received: by 2002:a67:c202:: with SMTP id i2mr13167796vsj.11.1548145545282; 
+ Tue, 22 Jan 2019 00:25:45 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <1548105830-26376-1-git-send-email-khoroshilov@ispras.ru>
-Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA02Sa0gUYRSG+3ZmdmeXXflcNQ9mCUsJRd7IH5OFFKnsr9AuRLqhU06r5Y0d
- 7xUZodmmKJakk5VUaBhama5mZt5wM6P1gmJhGmkXvGR5RTCtdbT895xz3vO974GPJtTVlBMd
- GRPPGWLYKI1UQZraFixuZ7oDdJ5ppVKmLWNExuQMjxFMbcVzGWOxPJExpdeMJFM53EcxPXVF
- UqbA0iBh7pWkE/vk2oKlfKStLLsq1Q6M/aa0zx5c1E5XbgmkghV7w7moyETO4OEbpogYfPyT
- iutRJjcVT5FpSFAYkZwG7A39r+4TRqSg1fghguzRbEosZhC8br8tE4tpBMtZndTaynjXr9WV
- UgR35upWVZMI2t7/JK0qO3wUjFWthJXtcRAsDJmQVUTgHwgyKnpXBlLsBcYJo9TKKuwLwren
- yMok3gaDBeMSI6JpB6yD9B6FKLGF9sKRlfflOABMfeUSKxPYBWomigiRHeHDyF2J1Qtwgwxe
- 3JiTiLH94O2XYUJkOxg1V8lEdoaO61mkuHAZwZUCQSYWWQiqi2qlomoPtJi7KGsiAm+Hx3Ue
- Yns/5E5PrQQFbAP9E7ZiCBvIM90kxLYKMjPUotoVBHPFP9umzm4iF2mEdacJ684R1p0j/Pct
- RmQZcuQS+Gg9x++K4ZLceTaaT4jRu5+Kja5Efz9Tx5J5thY1LJ5sRphGGqWKfuevU1NsIp8S
- 3YyAJjT2Kv+uAJ1aFc6mpHKG2FBDQhTHN6NNNKlxVJ3b8ClEjfVsPHeW4+I4w9pUQsud0pCP
- c9hGT/ekG/VfzytLlD4XhovLL+lYz8PsjFtQgqC/bnlZdShHWb9Y6Bdyy1WfISyPL7dUByK2
- 1zR/upN3UTRmT+6MD7CrHdj6PenjAeRavPnRfD5zML2vrTE3NPhNa/nx1nJvB92x5MyhE0e8
- z9nMBu/+nJcUe/eRL5uqwXSNhuQjWK8dhIFn/wD9K4xsSAMAAA==
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFjrOIsWRmVeSWpSXmKPExsVy+t/xu7qZl9xiDHo2c1gca3vCbtH/+DWz
- xY51O9ktzp/fwG6xvLuLxWLT42usFpd3zWGzmHF+H5PFomWtzA6cHjP+TWX02LSqk83jzuu/
- rB6bl9R7fN4kF8AapWdTlF9akqqQkV9cYqsUbWhhpGdoaaFnZGKpZ2hsHmtlZKqkb2eTkpqT
- WZZapG+XoJdxb/0H1oLLPBUHF3xiaWCcxdXFyMkhIWAi8ebiR+YuRi4OIYGljBLbVzxlgUjI
- SJyc1sAKYQtL/LnWxQZR9JZR4k/zD0aQhLBAqETXliPMILaIQKDE/Fc32EFsZoF3jBLzbkhB
- NMxklLgx6z/YJDYBQ4mutyCTODl4BewkZj3fCDaIRUBV4t6MN0wgtqhAjMSsJ33sEDWCEidn
- PgG7iFPATWLbtbVMEAvUJf7Mu8QMYctLbH87B8oWl7j1ZD7TBEahWUjaZyFpmYWkZRaSlgWM
- LKsYRVJLi3PTc4sN9YoTc4tL89L1kvNzNzECI3HbsZ+bdzBe2hh8iFGAg1GJh5fjnGuMEGti
- WXFl7iFGCQ5mJRFe14tuMUK8KYmVValF+fFFpTmpxYcYTYGem8gsJZqcD0wSeSXxhqaG5haW
- hubG5sZmFkrivOcNKqOEBNITS1KzU1MLUotg+pg4OKUaGCd+EBe9VXTi6vnw4kcXA87rfBeY
- xVW9Q8fq4ue78ZuYrfItvf83rxftn1JzwaybnWnTOc5NfF1GrxR5GGbMk5NuFk/aMcNfoGuz
- 6z+XzTWPBe6vs/jcbuz26MTjLnV3Jj6zGSd/McY/neX6xZp5rVnV87d9atyvO8tZ7r9pYDvy
- /uebzyfSVJVYijMSDbWYi4oTAW0GkqzaAgAA
-X-CMS-MailID: 20190122082057eucas1p1533e37ce5ab90d422b6155e479c174a3
-X-Msg-Generator: CA
-X-RootMTR: 20190121212507epcas1p1f2b689e91046a2736ed26a84367c210a
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20190121212507epcas1p1f2b689e91046a2736ed26a84367c210a
-References: <CGME20190121212507epcas1p1f2b689e91046a2736ed26a84367c210a@epcas1p1.samsung.com>
- <1548105830-26376-1-git-send-email-khoroshilov@ispras.ru>
+References: <20190118155938.12124-1-geert+renesas@glider.be>
+ <20190121165600.2lavtrk2djj4adgb@verge.net.au>
+In-Reply-To: <20190121165600.2lavtrk2djj4adgb@verge.net.au>
+From: Geert Uytterhoeven <geert@linux-m68k.org>
+Date: Tue, 22 Jan 2019 09:25:33 +0100
+Message-ID: <CAMuHMdV-AM9GNnDo7W55Mv-uLtWn-nTBtmh3jn30tRSEDLNfTQ@mail.gmail.com>
+Subject: Re: [PATCH] ARM: shmobile: defconfig: Refresh for v5.0-rc2
+To: Simon Horman <horms@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_002103_526338_13DC7A32 
-X-CRM114-Status: GOOD (  17.26  )
+X-CRM114-CacheID: sfid-20190122_002546_880439_EF668B2D 
+X-CRM114-Status: GOOD (  14.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -135,61 +79,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: ldv-project@linuxtesting.org, linux-samsung-soc@vger.kernel.org,
- linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org,
- Krzysztof Kozlowski <krzk@kernel.org>, Kukjin Kim <kgene@kernel.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ Magnus Damm <magnus.damm@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Geert Uytterhoeven <geert+renesas@glider.be>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Alexey,
+Hi Simon,
 
-On 2019-01-21 22:23, Alexey Khoroshilov wrote:
-> If clk_prepare_enable() fails in dwc3_exynos_probe() or in
-> dwc3_exynos_resume(), exynos->clks[0] is left undisabled
-> because of usage preincrement in while condition.
+On Mon, Jan 21, 2019 at 5:56 PM Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Jan 18, 2019 at 04:59:38PM +0100, Geert Uytterhoeven wrote:
+> >   - Move SoC config options (moved in commit 062887bf5ef73313 ("ARM:
+> >     shmobile: Move SoC Kconfig symbols to drivers/soc/renesas/")),
+> >   - Move PCI config options (moved in commit eb01d42a77785ff9 ("PCI:
+> >     consolidate PCI config entry in drivers/pci")),
+> >   - Drop CONFIG_I2C_MUX=y (auto-enabled since commit ea6b13e9fed0fda9
+> >     ("drm/bridge/sii902x: Add missing dependency on I2C_MUX")),
+> >   - Drop CONFIG_SH_DMAE=y (no longer selectable since commit
+> >     a19788612f51b787 ("dmaengine: sh: Remove R-Mobile APE6 support")),
+> >   - Drop CONFIG_ARM_UNWIND (auto-enabled since commit f9b58e8c7d031b0d
+> >     ("ARM: 8800/1: use choice for kernel unwinders")).
+> >
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 >
-> Found by Linux Driver Verification project (linuxtesting.org).
->
-> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
-> Fixes: 9f2168367a0a ("usb: dwc3: exynos: Rework clock handling and prepare for new variants")
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
-> v2: Add fix for the second instance in dwc3_exynos_resume() per Marek Szyprowski note.
->
->  drivers/usb/dwc3/dwc3-exynos.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
-> index cb7fcd7c0ad8..c1e9ea621f41 100644
-> --- a/drivers/usb/dwc3/dwc3-exynos.c
-> +++ b/drivers/usb/dwc3/dwc3-exynos.c
-> @@ -78,7 +78,7 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
->  	for (i = 0; i < exynos->num_clks; i++) {
->  		ret = clk_prepare_enable(exynos->clks[i]);
->  		if (ret) {
-> -			while (--i > 0)
-> +			while (i-- > 0)
->  				clk_disable_unprepare(exynos->clks[i]);
->  			return ret;
->  		}
-> @@ -223,7 +223,7 @@ static int dwc3_exynos_resume(struct device *dev)
->  	for (i = 0; i < exynos->num_clks; i++) {
->  		ret = clk_prepare_enable(exynos->clks[i]);
->  		if (ret) {
-> -			while (--i > 0)
-> +			while (i-- > 0)
->  				clk_disable_unprepare(exynos->clks[i]);
->  			return ret;
->  		}
+> Would this change be any different if it was a refresh for v5.0-rc1?
 
-Best regards
+No it wouldn't. Same for rc3.
+
+> I ask because the ARM-SoC maintainers prefer the oldest possible of
+> the current rc series to be used as a base.
+
+Hence feel free to s/rc2/rc1/g or s/rc2/rc3/g.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
 
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
 
 _______________________________________________
 linux-arm-kernel mailing list
