@@ -2,86 +2,74 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1365AC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:23:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3CF44C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 05:26:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D47A420855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:23:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0CC4220870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 05:26:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z1Ps4GrB";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="H4qG3Pxw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D47A420855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jlYuLG5P"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CC4220870
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=denx.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=P3ddFKEo3uEzlCp3Q8UnBijb4NKv9maj8c4we37VViI=; b=Z1Ps4GrBqPyVC0FRVGb1BG9Iuw
-	Xqsr0W2seIO/1kHhmUNbiANMoSUYowfsLgIzd2nMz2A9Ub0n9l0M8cOBjG7WW2XJRbF1hgH/JpT3W
-	EtHc3+K6ArvGMpMDuuBdrMWj5dWn2yKCq9ZreCXcI5l11KqKc/e4FtB6oT3pGhy0thU1R7TNE6EYm
-	yf6NRmstLM+rZUql/VQucK0OwIPJKirxvy97xdkQzt1R90BaMrcJ8UhhRxhRsdZSZYZc8a/uDKb2P
-	BLvUgm8BbsvA5m7Dwoxwz8apfpCwe7KRCeuU0wol+Uov3fInvKry9QtRYcQAUYsRwn2cyO7wpNQF/
-	aJtHeSLA==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=by0DXWAz+6tlnLIUaLrQ1aT0rx77mFxKuvTAGtelhEM=; b=jlY
+	uLG5PeI5PdfVIT3V19rm6F8cu7VKL3ipGZaa1dFhw94OPUhn0WRzLm9nDbm6YY0Ii8zflAeZ8hol7
+	YMOlOD6Nt3sc4xqrO8dkNFLY6ee9tCjrrF+/4pu7vhG1Yr7mrr0wFqwqK/aZrPw4uWGQ17cshLmhs
+	CcPtUkoGROg0giFtR4816lCyH++iXPJb7Ko2p/i5jkufL2A8khPwKJzKVb+JFNQ7WHWQf+vmQfHrV
+	b/ejrwqeSOHbJiHyviDmjI3Yk3SuL/iYig0N4HM1TjA81Vm6IL7vylyogl1vBUGVxFf0fCS+9XsCp
+	U+LFsP33WC6AUlVCOiDx0F1AYQAYYJA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glnb4-0002GB-IH; Tue, 22 Jan 2019 04:23:34 +0000
-Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+	id 1gloaB-0001nn-L8; Tue, 22 Jan 2019 05:26:43 +0000
+Received: from mail-out.m-online.net ([212.18.0.10])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glna0-0001OD-Na
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 04:22:41 +0000
-Received: by mail-pg1-x542.google.com with SMTP id j10so10440950pga.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 20:22:27 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=8ySRluh8UnQNx0w0kOBma0DodxOKHroSYUhNhVj/8Uo=;
- b=H4qG3Pxw3GuM2FQUpr/htirtCGys1NP2JsDeCvOWzLVz+I6R9/rPIxERk4WNst9jwe
- iV0F83gw40ucBCcQgLmJ4DhK092gHV0uOiwELilHJ6unHFV9Ozbs0Qhv7r/9OXx2Ifyb
- nlmHCmBCSf4Z7k1ofT7AvE/KC2Xgh4e6X9+DY=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=8ySRluh8UnQNx0w0kOBma0DodxOKHroSYUhNhVj/8Uo=;
- b=i1NVP7YHpPDQXiLgviObZxHQYYaQgWeEupmZDlkbV2rsqVCtw6UUdmVRWTma/9DZwI
- lnI+IcclYsJbkicvEQVbPJkmCNiIP8NuWQ99VWLyFYPhAoVAKp+45n7/FzxOV+b5el2j
- C5iQNYXN7xCeHCwviOOZf2Ze0d8/LBiF6WdK3djtypl7fEIwQtIDJFktYLutra3S2yaL
- GtErFYBVj+FHrt6u5T6HZOjN2G21k8U/x3ZP6NGUsRIYVcMhlM1J5ldjioW6xFOH1ju6
- h4qkgTFYvKRoGH9r3m3qigN+P7vYjBOwTeu+GOLLNCdgVwTMbW3uIedvqaWmLEX+AQgw
- 2+mA==
-X-Gm-Message-State: AJcUukeHRlTmk/TgqaRCfwe3RsNjU4B3X9zAPbIyBC0DqBVBgrVgsh89
- Zje/vRxOX4JUX2+17m0ll50+
-X-Google-Smtp-Source: ALg8bN5DUBDakDdApjwY/HUFxu0GgUpUbp7wc+TBJsHYoE3I9AVtjQyDPpL0QC6/rKdRbXzLvM9owA==
-X-Received: by 2002:a62:2e46:: with SMTP id u67mr31548723pfu.3.1548130946623; 
- Mon, 21 Jan 2019 20:22:26 -0800 (PST)
-Received: from localhost.localdomain ([2405:204:7344:8fd1:3551:e475:9265:ab6d])
- by smtp.gmail.com with ESMTPSA id q199sm25083953pfc.97.2019.01.21.20.22.20
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 21 Jan 2019 20:22:26 -0800 (PST)
-From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-To: shawnguo@kernel.org,
-	leoyang.li@nxp.com,
-	robh+dt@kernel.org
-Subject: [PATCH v3 5/5] arm64: dts: freescale: Add devicetree for Oxalis
-Date: Tue, 22 Jan 2019 09:51:47 +0530
-Message-Id: <20190122042147.5424-6-manivannan.sadhasivam@linaro.org>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190122042147.5424-1-manivannan.sadhasivam@linaro.org>
-References: <20190122042147.5424-1-manivannan.sadhasivam@linaro.org>
+ id 1gloa7-0001nI-GB
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 05:26:42 +0000
+Received: from frontend01.mail.m-online.net (unknown [192.168.8.182])
+ by mail-out.m-online.net (Postfix) with ESMTP id 43kH2x4GG8z1qvNf;
+ Tue, 22 Jan 2019 06:26:33 +0100 (CET)
+Received: from localhost (dynscan1.mnet-online.de [192.168.6.70])
+ by mail.m-online.net (Postfix) with ESMTP id 43kH2x3yJyz1qsn1;
+ Tue, 22 Jan 2019 06:26:33 +0100 (CET)
+X-Virus-Scanned: amavisd-new at mnet-online.de
+Received: from mail.mnet-online.de ([192.168.8.182])
+ by localhost (dynscan1.mail.m-online.net [192.168.6.70]) (amavisd-new,
+ port 10024)
+ with ESMTP id LQtFMCJdfIqf; Tue, 22 Jan 2019 06:26:33 +0100 (CET)
+X-Auth-Info: m7WgfxMwe0RP2YdFmr36mZBHsjO3OpAfBpXEDwAzmgQ=
+Received: from mail-internal.denx.de (p578adb1c.dip0.t-ipconnect.de
+ [87.138.219.28])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.mnet-online.de (Postfix) with ESMTPSA;
+ Tue, 22 Jan 2019 06:26:33 +0100 (CET)
+Received: from pollux.denx.de (pollux [192.168.1.1])
+ by mail-internal.denx.de (Postfix) with ESMTP id 420F6180759;
+ Tue, 22 Jan 2019 06:26:25 +0100 (CET)
+Received: by pollux.denx.de (Postfix, from userid 515)
+ id 11A6A37A6; Tue, 22 Jan 2019 06:26:24 +0100 (CET)
+From: Heiko Schocher <hs@denx.de>
+To: devicetree@vger.kernel.org
+Subject: [PATCH v1 0/2] ARM: dts: am335x-shc.dts: small updates for shc board
+Date: Tue, 22 Jan 2019 06:26:21 +0100
+Message-Id: <20190122052623.1779840-1-hs@denx.de>
+X-Mailer: git-send-email 2.17.2
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_202229_096845_8DEB16C9 
-X-CRM114-Status: GOOD (  15.98  )
+X-CRM114-CacheID: sfid-20190121_212639_694289_1249B6A7 
+X-CRM114-Status: UNSURE (   8.81  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,156 +81,31 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, a.tropschug@ebs-systart.com,
- m.bittner@ebs-systart.com, linux-kernel@vger.kernel.org,
- amit.kucheria@linaro.org,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, linux-omap@vger.kernel.org,
+ Tony Lindgren <tony@atomide.com>, linux-kernel@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>,
+ =?UTF-8?q?Beno=C3=AEt=20Cousson?= <bcousson@baylibre.com>,
+ Heiko Schocher <hs@denx.de>, linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add devicetree support for Oxalis SoM board from EBS-SYSTART. This
-board is one of the 96Boards Enterprise Edition platform. Below are some
-of the key features of this board:
+small updates for am335x based shc board:
+- switch DTS to SPDX identifier
+- fix wrong gpio level for mmc1 cd pin
 
-* SoC: NXP Layerscape LS1012A
-* RAM: 1GB DDR3L
-* PMU: NXP VR5100
-* Storage: 64MByte SPI Flash for bootloader and RCW, MicroSD Card, SATA
-* Connectivity: 2x Ethernet
-* USB: 2x USB3.0
 
-More information about this board can be found in 96Boards product
-page: https://www.96boards.org/product/oxalis/
+Heiko Schocher (2):
+  ARM: dts: am335x-shc.dts: Switch to SPDX identifier
+  ARM: dts: am335x-shc.dts: fix wrong cd pin level
 
-Ethernet and SPI flash are not supported yet!
+ arch/arm/boot/dts/am335x-shc.dts | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- arch/arm64/boot/dts/freescale/Makefile        |  1 +
- .../boot/dts/freescale/fsl-ls1012a-oxalis.dts | 96 +++++++++++++++++++
- 2 files changed, 97 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-oxalis.dts
-
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index f9be2426f83c..d8152cc06b3f 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -1,6 +1,7 @@
- # SPDX-License-Identifier: GPL-2.0
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frdm.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frwy.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-oxalis.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1028a-qds.dtb
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-oxalis.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-oxalis.dts
-new file mode 100644
-index 000000000000..7c726267ec8f
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-oxalis.dts
-@@ -0,0 +1,96 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Device Tree file for Oxalis
-+ *
-+ * Copyright (c) 2019 Manivannan Sadhasivam
-+ *
-+ */
-+
-+/dts-v1/;
-+
-+#include "fsl-ls1012a.dtsi"
-+
-+/ {
-+	model = "Oxalis";
-+	compatible = "ebs-systart,oxalis", "fsl,ls1012a";
-+
-+	sys_mclk: clock-mclk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <25000000>;
-+	};
-+
-+	reg_1p8v: regulator-1p8v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "1P8V";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,widgets =
-+			"Microphone", "Microphone Jack",
-+			"Headphone", "Headphone Jack",
-+			"Speaker", "Speaker Ext",
-+			"Line", "Line In Jack";
-+		simple-audio-card,routing =
-+			"MIC_IN", "Microphone Jack",
-+			"Microphone Jack", "Mic Bias",
-+			"LINE_IN", "Line In Jack",
-+			"Headphone Jack", "HP_OUT",
-+			"Speaker Ext", "LINE_OUT";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&sai2>;
-+			frame-master;
-+			bitclock-master;
-+		};
-+
-+		simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+			frame-master;
-+			bitclock-master;
-+			system-clock-frequency = <25000000>;
-+		};
-+	};
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	codec: audio-codec@a {
-+		#sound-dai-cells = <0>;
-+		compatible = "fsl,sgtl5000";
-+		reg = <0xa>;
-+		VDDA-supply = <&reg_1p8v>;
-+		VDDIO-supply = <&reg_1p8v>;
-+		clocks = <&sys_mclk>;
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&sai2 {
-+	status = "okay";
-+};
-+
-+&sata {
-+	status = "okay";
-+};
 -- 
-2.17.1
+2.17.2
 
 
 _______________________________________________
