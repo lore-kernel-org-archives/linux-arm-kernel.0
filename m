@@ -6,62 +6,58 @@ X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 378ADC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 19:08:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5DAF2C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 19:16:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0C45B20856
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 19:08:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2EBD521019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 19:16:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fLcXPsKi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C45B20856
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MEz2GeJp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2EBD521019
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=h6z4qyckhiPQoENrRMagsIr29vR8oR6FQVg+pMaf6Fs=; b=fLcXPsKiiB4gwC
-	+TpJQG6s85moLyC2r0a2vr5uYxvnZ68e9QqhKDxoN4oe6GLHRu+GynGo+AVwGeACQVQgqXRCN+4gH
-	gPxEgGHD2bo66jx+Cu7a8g2NX+hHn21/yyvShKbMhmAZ8TMj3fG+LfN8bGF5j0eYh2MtR+zDVuKFc
-	zuC8T/lUMCTpP5g3TVkzneymzL5GV2M5r07HrrWACVvNKrH/mx6Ov5HD4AD3vniRYYXseEplIAtHf
-	+9FkBqlY5XXlSB7P8/HK18N1rtCVHBwnH0OrsiTf+WWg8CsnvGWKm5gyC05Fjl0n3gE0kmTtdgVId
-	z0v91kfe4DAwPqWpsLrA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=flhBRf7IkxvcAQ0kTmDYTxZO0PHouTJSqPwbom2K5XU=; b=MEz2GeJpJ8MEQl
+	yPpy0MAxdt4zvi5nEs5iAUSiNjYx0bPMW2JP53pCqYK8S8gcFAfbHJ9ecgTmjrtYPzRBPSwNB1Z51
+	5TZv9cR8z8pvBdZP+B2DBGF1jSal4iIA1qdUrWFDNK8Kzhy4RaIGHTlw8B+ajfAaQ6ubzFUI445/9
+	w5ZHeWiMU5lIqpVDdVyHK9gCXSLRGlgKnN73x7A6LHgCyfeiNZw5biKLl5RQwYCuC0sVGIhmBE/ID
+	e9MttbqRFWYKAObk1hoe+qhPG01mnDyXVPvBy04Rx7cuvnauAfzVCuMfjb/J227RseNtjFlkrSyHb
+	384WXQof+8T2Wv5K/yug==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gm1PT-00027a-Vb; Tue, 22 Jan 2019 19:08:31 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gm1Xd-00073h-7w; Tue, 22 Jan 2019 19:16:57 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gm1PQ-00027D-3L
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 19:08:29 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B5B45EBD;
- Tue, 22 Jan 2019 11:08:27 -0800 (PST)
-Received: from [10.1.197.21] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- A4BF33F5C1; Tue, 22 Jan 2019 11:08:26 -0800 (PST)
-From: Kristina Martsenko <kristina.martsenko@arm.com>
-Subject: Re: [PATCH v2] arm64: add ptrace regsets for ptrauth key management
-To: Dave Martin <Dave.Martin@arm.com>
-References: <20190110193508.31888-1-kristina.martsenko@arm.com>
- <d2bcfb3a-3668-693c-2fd4-3814b473375c@arm.com>
- <20190111135842.GB3547@e103592.cambridge.arm.com>
- <911e27a9-d199-9a64-8a2e-597733af5854@arm.com>
- <20190116151254.GA3578@e103592.cambridge.arm.com>
-Message-ID: <b8afbda4-c782-ceee-8294-a96a1fec02df@arm.com>
-Date: Tue, 22 Jan 2019 19:08:25 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gm1XX-0006vh-43
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 19:16:55 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id DA7E520955; Tue, 22 Jan 2019 20:16:47 +0100 (CET)
+Received: from xps13 (unknown [91.224.148.103])
+ by mail.bootlin.com (Postfix) with ESMTPSA id EEA45207A3;
+ Tue, 22 Jan 2019 20:16:36 +0100 (CET)
+Date: Tue, 22 Jan 2019 20:16:35 +0100
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Subject: Re: [PATCH v3 06/10] dt-bindings: phy: mvebu-utmi: add UTMI PHY
+ bindings
+Message-ID: <20190122201635.4a6c28d0@xps13>
+In-Reply-To: <20190122183833.40077d7a@windsurf>
+References: <20190121112336.23489-1-miquel.raynal@bootlin.com>
+ <20190121112336.23489-7-miquel.raynal@bootlin.com>
+ <20190122183833.40077d7a@windsurf>
+Organization: Bootlin
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-In-Reply-To: <20190116151254.GA3578@e103592.cambridge.arm.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_110828_144789_D2E1FA2C 
-X-CRM114-Status: GOOD (  20.33  )
+X-CRM114-CacheID: sfid-20190122_111652_598791_72686FDE 
+X-CRM114-Status: GOOD (  17.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,79 +69,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Amit Kachhap <amit.kachhap@arm.com>,
- Will Deacon <will.deacon@arm.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Jason Cooper <jason@lakedaemon.net>, Mathias Nyman <mathias.nyman@intel.com>,
+ devicetree@vger.kernel.org, Antoine Tenart <antoine.tenart@bootlin.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-usb@vger.kernel.org,
+ Kishon Vijay Abraham I <kishon@ti.com>, Nadav Haklai <nadavh@marvell.com>,
+ Rob Herring <robh+dt@kernel.org>, Alan Stern <stern@rowland.harvard.edu>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 16/01/2019 15:13, Dave Martin wrote:
-> On Tue, Jan 15, 2019 at 07:32:30PM +0000, Kristina Martsenko wrote:
->> On 11/01/2019 13:58, Dave Martin wrote:
->>> On Thu, Jan 10, 2019 at 07:41:15PM +0000, Kristina Martsenko wrote:
->>>> On 10/01/2019 19:35, Kristina Martsenko wrote:
->>>> @@ -80,12 +65,12 @@ static inline unsigned long ptrauth_strip_insn_pac(unsigned long ptr)
->>>>  #define ptrauth_thread_init_user(tsk)					\
->>>>  do {									\
->>>>  	struct task_struct *__ptiu_tsk = (tsk);				\
->>>
->>> Not added by this patch, but __ptiu_tsk doesn't seem to do anything
->>> except make the subsquent lines more verbose than otherwise (and pollute
->>> the identifier namespace -- though unlikely to be a problem).
->>>
->>> It may not be worth dropping it now that it's there though.
->>
->> Using __ptiu_tsk prevents the argument (tsk) from being evaluated twice,
->> which could have side effects.
-> 
-> Ah, right.
-> 
-> Actually, could this be a function instead?  That would avoid multiple-
-> evaulation a clean way.
-
-If it were a function, then this file (pointer_auth.h) would need to
-#include <linux/sched.h> (for the struct task_struct definition), which
-would create a circular header dependency, since sched.h #includes
-asm/processor.h, which #includes pointer_auth.h. Alternatively the
-function could be moved to pointer_auth.c, but that would prevent it
-from being inlined, so I'd prefer to keep it as a macro for now.
-
->>>> -	ptrauth_keys_init(&__ptiu_tsk->thread.keys_user);		\
->>>> -	ptrauth_keys_switch(&__ptiu_tsk->thread.keys_user);		\
->>>> +	ptrauth_keys_init(&__ptiu_tsk->thread.uw.keys_user);		\
->>>> +	ptrauth_keys_switch(&__ptiu_tsk->thread.uw.keys_user);		\
->>>>  } while (0)
->>>>  
->>>>  #define ptrauth_thread_switch(tsk)	\
->>>> -	ptrauth_keys_switch(&(tsk)->thread.keys_user)
->>>> +	ptrauth_keys_switch(&(tsk)->thread.uw.keys_user)
-> 
-> Similarly, can this be a function?
-
-Same reasons as above.
-
-> (Technically tsk may be evaulated twice in this macro.  Given the way
-> these macros are used, I'm not sure that matters though.)
-
-tsk is only used once here, so I think it's only evaluated once.
-
->> Also note that with this patch we have struct "user_pac_address_keys" in
->> struct ptrauth_keys, which may be confusing once we start using pointer
->> authentication in the kernel and use struct ptrauth_keys for kernel keys
->> as well, not just user keys.
-> 
-> Not a big deal either way.
-> 
-> The main thing to freeze now are the user ABI and the UAPI header.  We
-> can refactor the kernel's internal implementation later if we want.
-
-Ok.
-
-Kristina
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgVGhvbWFzLAoKVGhvbWFzIFBldGF6em9uaSA8dGhvbWFzLnBldGF6em9uaUBib290bGluLmNv
+bT4gd3JvdGUgb24gVHVlLCAyMiBKYW4KMjAxOSAxODozODozMyArMDEwMDoKCj4gSGVsbG8sCj4g
+Cj4gT24gTW9uLCAyMSBKYW4gMjAxOSAxMjoyMzozMiArMDEwMCwgTWlxdWVsIFJheW5hbCB3cm90
+ZToKPiAKPiA+ICstIGNvbXBhdGlibGU6IFNob3VsZCBiZSBvbmUgb2Y6Cj4gPiArCSAgICAgICog
+Im1hcnZlbGwsYTM3MDAtdXRtaS1ob3N0LXBoeSIgZm9yIHRoZSBQSFkgY29ubmVjdGVkIHRvCj4g
+PiArCSAgICAgICAgdGhlIFVTQjIgaG9zdC1vbmx5IGNvbnRyb2xsZXIuCj4gPiArCSAgICAgICog
+Im1hcnZlbGwsYTM3MDAtdXRtaS1vdGctcGh5IiBmb3IgdGhlIFBIWSBjb25uZWN0ZWQgdG8KPiA+
+ICsJICAgICAgICB0aGUgVVNCMyBhbmQgVVNCMiBPVEcgY2FwYWJsZSBjb250cm9sbGVyLiAgCj4g
+Cj4gRG8gd2UgcmVhbGx5IG5lZWQgZGlmZmVyZW50IGNvbXBhdGlibGUgc3RyaW5ncyBmb3IgdGhv
+c2UgPyBJIGFzc3VtZSB0aGUKPiBJUCBibG9jayBpcyBleGFjdGx5IHRoZSBzYW1lIGZvciB0aGUg
+dHdvIFBIWXMsIHJpZ2h0ID8gSWYgc28sIHdlIHNob3VsZAo+IHVzZSB0aGUgc2FtZSBjb21wYXRp
+YmxlIHN0cmluZy4KCkZvciB3aGF0IEkgdW5kZXJzdGFuZCwgdGhlIFBIWXMgYXJlIGRpZmZlcmVu
+dC4gQXQgbGVhc3QgdGhpcyBpcyBob3cKdGhleSBhcmUgZGVzY3JpYmVkIGluIHRoZSBzcGVjaWZp
+Y2F0aW9uLiBJIGNhbiBsaXN0IGF0IGxlYXN0IHR3bwpkaWZmZXJlbmNlcyB2aXNpYmxlIGluIHRo
+ZSByZWdpc3RlciBzZXQ6Ciogb25lIGhhcyBPVEcgcmVnaXN0ZXJzLCB0aGUgb3RoZXIgZG9lcyBu
+b3QuCiogb25lIGhhcyBjaGFyZ2VyIGRldGVjdGlvbiBjYXBhYmlsaXRpZXMgKGFuZCByZWdpc3Rl
+cnMpLCB0aGUgb3RoZXIKICBkb2VzIG5vdC4KCj4gCj4gRGlkbid0IHdlIGRpc2N1c3MgdGhhdCB3
+ZSBjYW4gbG9va3VwIGZyb20gdGhlIFBIWSB3aGV0aGVyIHRoZSBVU0IKPiBjb250cm9sbGVyIGl0
+IGlzIGNvbm5lY3RlZCB0byBpcyBpbiBob3N0IG1vZGUgb3Igb3RnIG1vZGUgPwoKWWVzLCBidXQg
+aGF2aW5nIHR3byBkaWZmZXJlbnQgUEhZcyBtZWFudCBoYXZpbmcgdHdvIGRpZmZlcmVudApjb21w
+YXRpYmxlcywgaGVuY2UgdGhlcmUgd2FzIG5vIG5lZWQgaW4gdGhlIGRyaXZlciB0byB1c2UgdGhp
+cwpsb29rdXAgYXBwcm9hY2guIEFueXdheSB0aGlzIGlzIGFuIGltcGxlbWVudGF0aW9uIGRldGFp
+bCBhbmQgaXQgaXMKYWx3YXlzIHBvc3NpYmxlIHRvIGdvIGJhY2suIAoKPiAKPiA+ICtFeGFtcGxl
+Ogo+ID4gKwo+ID4gKwl1c2IyX3V0bWlfaG9zdF9waHk6IHBoeUA1ZjAwMCB7Cj4gPiArCQljb21w
+YXRpYmxlID0gIm1hcnZlbGwsYXJtYWRhLTM3MDAtdXRtaS1ob3N0LXBoeSI7Cj4gPiArCQlyZWcg
+PSA8MHg1ZjAwMCAweDgwMD47Cj4gPiArCQltYXJ2ZWxsLHVzYi1taXNjLXJlZyA9IDwmdXNiMl9z
+eXNjb24+Owo+ID4gKwkJI3BoeS1jZWxscyA9IDwwPjsKPiA+ICsJfTsKPiA+ICsKPiA+ICsJdXNi
+Ml9zeXNjb246IHN5c3RlbS1jb250cm9sbGVyQDVmODAwIHsKPiA+ICsJCWNvbXBhdGlibGUgPSAi
+bWFydmVsbCx1c2IyLWhvc3QtbWlzY2VsbGFuZW91cyIsICJzeXNjb24iOwo+ID4gKwkJcmVnID0g
+PDB4NWY4MDAgMHg4MDA+Owo+ID4gKwl9OyAgCj4gCj4gVGhvc2UgcmVnaXN0ZXJzIGFyZSBjb250
+aWd1b3VzIHRvIHRoZSByZWdpc3RlciByYW5nZSBvZiB0aGUgUEhZIGl0c2VsZi4KPiBXaGF0IHdh
+cyB0aGUgY3JpdGVyaWEgdXNlZCB0byBkZWNpZGUgdGhhdCB3ZSBuZWVkIHR3byBzZXBhcmF0ZSBE
+VCBub2Rlcwo+IGZvciB0aGVzZSA/CgpCZWNhdXNlIHRoaXMgYXJlYSBjb250YWlucyBhIGJ1bmNo
+IG9mIHJlZ2lzdGVycywgbW9zdCBvZiB0aGVtIGFyZQp0aGVyZSB0byBtYW5hZ2UgdGhlIFBIWSwg
+YnV0IG90aGVycyBhcmUgcmVsYXRlZCB0byB0aGUgVVNCIGNvbnRyb2xsZXIKKGllLiBhIHNvZnR3
+YXJlIHJlc2V0KS4gSSBrbm93IHRoZSBjdXJyZW50IFVTQiBjb250cm9sbGVyIGRyaXZlciBkb2Vz
+Cm5vdCBhY2Nlc3MgdGhpcyBhcmVhIGJ1dCB3aGF0IGlmIG9uZSBkYXkgd2UgZGVjaWRlIHRvIGRv
+IGl0PwoKClRoYW5rcywKTWlxdcOobAoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtl
+cm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxt
+YW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
