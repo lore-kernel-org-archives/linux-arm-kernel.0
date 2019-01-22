@@ -2,70 +2,64 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B7CFDC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 14:42:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7AD36C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 14:43:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 872A121019
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 14:42:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4B7DE21019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 14:43:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ruiUjhdo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Oc9LH+bw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 872A121019
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R8Zvx3fT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B7DE21019
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QD7nFcrqxZxWc3TJC87eK+h1lEZ1rD129EgSt/Jd20E=; b=ruiUjhdoZfc/KC
-	PQL5hW0j7dGwbjtt31lBkWrwJglpMmcj1RjNryi547fuuUZcQ7iOY61lQo+vM5J24mcEoz6IB3Ob2
-	dT1EzN+Tva7SPdg9Ux1ENiik2Q+/zo7G2cGybRYUZiajyN1kJVYof9d+wmBXL67TUAjFaq4AstAVO
-	fw0Ahcs55ZBiGZ4nMlpca2M8OnHhnQBG6a8DZFmNZnnuyPtRR71AXhhxXuI4x64FM77lJQpeiOXyO
-	yJPotpDKsTW03TzK+Tt1XHABqPRZyUUcPe8DEqq1zn/I6HdAHc+xnUTat2BR6zE0chHCUMu9sBcHp
-	oCQBokKVao4gWg9Y7NAw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=8vVOqBJzZ28gTIBaqFAf6g/OgjU6cjYODxE5T5cgCKU=; b=R8Zvx3fTnlvFq6
+	ufuIgwnhZQe5Gmtu8M1Q1/vm0uE4oNmYP5EPijjkKktVknSPCFcOpG5nYBSwd0iFsuxMjJNQ6+dno
+	bz02BrP0H79QoTciRYMB2/ovMVw01JVxs/85B45limTTX9yWgv8iYv5C8BRx3KmH3YELJlxy7+S38
+	mkkKxwJaujeKdHMtjLCWPh7+ITi+iAtOhUYSqNnCrt93o7eGNOQ9SeLJ1cK/8I8Zv2n1eJf6ATD4D
+	+PdGBTD+TjQiBlxN5moGPuQKfmVBch89DVfpGsrY0IHpq/eXXwbUNXUK4lcypNyO3i4Z+6KXhPZUs
+	XlTVdjg4urRPm6Q8rCyA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glxG4-0007UY-UZ; Tue, 22 Jan 2019 14:42:32 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glxFA-0006a7-2G
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 14:41:41 +0000
-Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 45B4F217D6;
- Tue, 22 Jan 2019 14:41:35 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548168095;
- bh=JBjLL9TSk/DcRzx3WlQjotQ/M37jVyqq/YrBoWKS0Hw=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=Oc9LH+bwETYqPMMPYduzLxssl/TIEgtp1+BPNOdaigJ/2Qk+2eUcIg8Im/wWtq0e2
- r3xFsDBRre/lXreJUM/3KLk9Za1Xd03RyhtglET+bVURiYw668ijKBA3s+WofCQwRg
- qLnFk7n22/489T8Tw4C6D0bz0arDhf5qdO9eJAkY=
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-To: Catalin Marinas <catalin.marinas@arm.com>,
- Kevin Hilman <khilman@kernel.org>, Russell King <linux@armlinux.org.uk>,
- Will Deacon <will.deacon@arm.com>
-Subject: [PATCH 4/4] arm: omap2: no need to check return value of
- debugfs_create functions
-Date: Tue, 22 Jan 2019 15:41:14 +0100
-Message-Id: <20190122144114.9816-5-gregkh@linuxfoundation.org>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190122144114.9816-1-gregkh@linuxfoundation.org>
-References: <20190122144114.9816-1-gregkh@linuxfoundation.org>
+	id 1glxGa-0007q0-Te; Tue, 22 Jan 2019 14:43:05 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glxFw-0007Kg-2T
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 14:42:54 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A2268A78;
+ Tue, 22 Jan 2019 06:42:21 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 8788B3F589;
+ Tue, 22 Jan 2019 06:42:20 -0800 (PST)
+Subject: Re: [PATCH] arm64 memory accesses may cause undefined fault on
+ Fujitsu-A64FX
+To: "Zhang, Lei" <zhang.lei@jp.fujitsu.com>
+References: <8898674D84E3B24BA3A2D289B872026A6A29FA8F@G01JPEXMBKW03>
+ <20190118141758.GC12256@lakrids.cambridge.arm.com>
+ <8898674D84E3B24BA3A2D289B872026A6A2A2F44@G01JPEXMBKW03>
+From: James Morse <james.morse@arm.com>
+Message-ID: <d8a8107c-cd31-2517-79df-2ebfbbedb7da@arm.com>
+Date: Tue, 22 Jan 2019 14:42:18 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
+In-Reply-To: <8898674D84E3B24BA3A2D289B872026A6A2A2F44@G01JPEXMBKW03>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_064136_137187_5E3825C0 
-X-CRM114-Status: GOOD (  12.28  )
+X-CRM114-CacheID: sfid-20190122_064224_454253_05EEFF5D 
+X-CRM114-Status: GOOD (  16.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,68 +71,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Tony Lindgren <tony@atomide.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-omap@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: 'Mark Rutland' <mark.rutland@arm.com>,
+ "'catalin.marinas@arm.com'" <catalin.marinas@arm.com>,
+ "'will.deacon@arm.com'" <will.deacon@arm.com>,
+ "'linux-kernel@vger.kernel.org'" <linux-kernel@vger.kernel.org>,
+ "'linux-arm-kernel@lists.infradead.org'"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-When calling debugfs functions, there is no need to ever check the
-return value.  The function can work or not, but the code logic should
-never do something different based on this.
+Hello,
 
-Cc: Kevin Hilman <khilman@kernel.org>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: linux-omap@vger.kernel.org
-Cc: linux-arm-kernel@lists.infradead.org
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
- arch/arm/mach-omap2/pm-debug.c | 15 ++++++---------
- 1 file changed, 6 insertions(+), 9 deletions(-)
+On 22/01/2019 02:05, Zhang, Lei wrote:
+> Mark Rutland wrote:
+>> * How often does this fault occur?
+> In my test, this fault occurs once every several times
+> in the OS boot sequence, and after the completion of OS boot,
+> this fault have never occurred.
+> In my opinion, this fault rarely occurs
+> after the completion of OS boot.
 
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index 5a8839203958..1f9334a3d611 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -193,9 +193,8 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *dir)
- 		return 0;
- 
- 	d = debugfs_create_dir(pwrdm->name, (struct dentry *)dir);
--	if (d)
--		(void) debugfs_create_file("suspend", S_IRUGO|S_IWUSR, d,
--			(void *)pwrdm, &pwrdm_suspend_fops);
-+	debugfs_create_file("suspend", S_IRUGO|S_IWUSR, d, pwrdm,
-+			    &pwrdm_suspend_fops);
- 
- 	return 0;
- }
-@@ -233,16 +232,14 @@ static int __init pm_dbg_init(void)
- 		return 0;
- 
- 	d = debugfs_create_dir("pm_debug", NULL);
--	if (!d)
--		return -EINVAL;
- 
--	(void) debugfs_create_file("count", 0444, d, NULL, &pm_dbg_counters_fops);
--	(void) debugfs_create_file("time", 0444, d, NULL, &pm_dbg_timers_fops);
-+	debugfs_create_file("count", 0444, d, NULL, &pm_dbg_counters_fops);
-+	debugfs_create_file("time", 0444, d, NULL, &pm_dbg_timers_fops);
- 
- 	pwrdm_for_each(pwrdms_setup, (void *)d);
- 
--	(void) debugfs_create_file("enable_off_mode", S_IRUGO | S_IWUSR, d,
--				   &enable_off_mode, &pm_dbg_option_fops);
-+	debugfs_create_file("enable_off_mode", S_IRUGO | S_IWUSR, d,
-+			    &enable_off_mode, &pm_dbg_option_fops);
- 	pm_dbg_init_done = 1;
- 
- 	return 0;
--- 
-2.20.1
+Can you share anything about why this is? You mention a hardware-condition
+that is reset at exception entry....
 
+
+>> I'm a bit surprised by the single retry. Is there any guarantee that a
+>> thread will eventually stop delivering this fault code?
+
+> I guarantee that a thread will stop delivering this 
+> fault code by the this patch.
+> The hardware condition which cause this fault is 
+> reset at exception entry, therefore execution of at 
+> least one instruction is guaranteed by this single retry.
+
+... so its possible to take this fault during kernel_entry when we've taken an irq?
+
+This will overwrite the ELR and SPSR, (and possibly the FAR and ESR), meaning we've
+ lost that information and can't return to the point in the kernel that took the
+irq.
+
+If we try, we might end up spinning through the irq handler, as the ELR might
+now point
+to el1_irq's kernel_entry.
+
+We can spot we took an exception from the entry text ... but all we can do then
+is panic().
+I'm not sure its worth working around this if its just a matter of time before this
+happens. (you mention its less likely after boot, it would be good to know why...)
+
+
+Thanks,
+
+James
 
 _______________________________________________
 linux-arm-kernel mailing list
