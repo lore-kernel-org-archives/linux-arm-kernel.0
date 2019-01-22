@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E664C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:40:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A5126C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:48:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 70B1E20879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:40:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 734D620870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:48:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hqGXCrt4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 70B1E20879
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YeeI40y7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 734D620870
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,46 +24,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=U3yV2PHW/TIbCs78o3XP2RuNiSt995PXQJztaHeKD2E=; b=hqGXCrt4JRqQQC
-	J1i40av2m3Qnx3mPWgE0IRGUvFgudlKQY1TRPjiObO/TWSVugKjxNncLjA6awVReroOFPasKs52GD
-	clAhLbZeFgdNYlMPhNrrXi8As0XFbNTYS4904axGP+Fx0rYPFYSc2o6ev9OB3TTwUFJJjEH0u90iy
-	roYS5o38W2TaZIRKMGNUc6dSEYtePDs7Q6V3eukzo15TE29mIXVCxBbB0W17f3eky9TxfwG16q+yz
-	g62TWGe2qu498oBvxYl7gbYNglR9an+hUu/2sQukNa4APF6tJak22CdL6yE+AJTRjCZc0DTfWbu/W
-	U2FoeudQE0B1He2vDehw==;
+	List-Owner; bh=CvH4w1SjySt9aVPtH6Km/S4pOBEbzhMTxlDpStbSJsE=; b=YeeI40y7WV6EAg
+	olyjeniUHFz1Kk/ZQwGH5QAc3pVzYKpB71rfD+ko7cGLJsdMjrFi55VLnPQkzVXXWC8EolV1VPz2t
+	CxOmzHr7g4hwwXmYQMqydI7r0U8szNTSmSlwhNqq+iGhKToADHNJyJkduHNy5y9mqZywBkD3daB7U
+	jiyKL+GcokKG8A06BjkAfMbsJRgUqdirJTcvZWkZrBUSy+Rbd/h+wrXwriYWBK1jXMcpTCgFXCkDL
+	tW61Gord6NfMzzBm254POt8sTnWjKRkeRD5H48SNTRhe69il2Sa5Et4xkG3k6apySY6fWk384TnxR
+	g8e1a2ZYCPiyicdpwJsg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gluQ1-0004fp-9G; Tue, 22 Jan 2019 11:40:37 +0000
+	id 1gluXp-0000Td-Dv; Tue, 22 Jan 2019 11:48:41 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gluPx-0004fH-Mk
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 11:40:35 +0000
+ id 1gluXk-0000Sw-Qz
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 11:48:39 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0DA8DA78;
- Tue, 22 Jan 2019 03:40:33 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2CDE3A78;
+ Tue, 22 Jan 2019 03:48:36 -0800 (PST)
 Received: from big-swifty.misterjones.org (big-swifty.copenhagen.arm.com
  [10.32.148.139])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B3DEE3F6A8;
- Tue, 22 Jan 2019 03:40:25 -0800 (PST)
-Date: Tue, 22 Jan 2019 11:40:17 +0000
-Message-ID: <867eewapjy.wl-marc.zyngier@arm.com>
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6EEF83F6A8;
+ Tue, 22 Jan 2019 03:48:27 -0800 (PST)
+Date: Tue, 22 Jan 2019 11:48:19 +0000
+Message-ID: <864la0ap6k.wl-marc.zyngier@arm.com>
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Aisheng Dong <aisheng.dong@nxp.com>
-Subject: Re: [PATCH 1/1] irqchip: gpcv2: make config option visible
-In-Reply-To: <AM0PR04MB4211ACC01F82236A7A34944780980@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1547796918-29790-1-git-send-email-aisheng.dong@nxp.com>
- <25cd3e29-e365-f0d4-65a3-b3af69acd9cd@arm.com>
- <AM0PR04MB421158B2E042D623792A296E809C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <77ecfcfa-16fe-a3e2-3d6b-90cdf999b316@arm.com>
- <AM0PR04MB4211ACC01F82236A7A34944780980@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Subject: Re: [PATCH 1/4] dt-binding: irq: imx-irqsteer: use irq number per
+ channel instead of group number
+In-Reply-To: <AM0PR04MB421189505D3F196A82DEF19A80980@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1547797668-30342-1-git-send-email-aisheng.dong@nxp.com>
+ <1547797668-30342-2-git-send-email-aisheng.dong@nxp.com>
+ <1547801291.2626.3.camel@pengutronix.de>
+ <45c7e5b6-26bb-81b1-093b-96312a1788ec@arm.com>
+ <AM0PR04MB42114D5B25B23C0D7FFF95BA809C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <ef6eb38d-8e74-a55d-6d78-516d81fa957f@arm.com>
+ <AM0PR04MB421189505D3F196A82DEF19A80980@AM0PR04MB4211.eurprd04.prod.outlook.com>
 User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
  FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
  (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
 Organization: ARM Ltd
 MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_034033_756030_AFF06C24 
-X-CRM114-Status: GOOD (  24.28  )
+X-CRM114-CacheID: sfid-20190122_034837_905813_B4272212 
+X-CRM114-Status: GOOD (  24.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,80 +78,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jason Cooper <jason@lakedaemon.net>,
- Andrey Smirnov <andrew.smirnov@gmail.com>,
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>, Thomas Gleixner <tglx@linutronix.de>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "tglx@linutronix.de" <tglx@linutronix.de>,
  "shawnguo@kernel.org" <shawnguo@kernel.org>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+ Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 22 Jan 2019 11:04:48 +0000,
+On Tue, 22 Jan 2019 10:56:42 +0000,
 Aisheng Dong <aisheng.dong@nxp.com> wrote:
 > 
-> 
-> 
 > > From: Marc Zyngier [mailto:marc.zyngier@arm.com]
-> > Sent: Friday, January 18, 2019 6:10 PM
+> > Sent: Friday, January 18, 2019 6:12 PM
 > [...]
+> > >> From: Marc Zyngier [mailto:marc.zyngier@arm.com]
+> > >> Sent: Friday, January 18, 2019 5:39 PM On 18/01/2019 08:48, Lucas
+> > >> Stach wrote:
+> > >>> Am Freitag, den 18.01.2019, 07:53 +0000 schrieb Aisheng Dong:
+> > >>>> Not all 64 interrupts may be used in one group. e.g. most irqsteer
+> > >>>> in imx8qxp and imx8qm subsystems supports only 32 interrupts.
+> > >>>>
+> > >>>> As the IP integration parameters are Channel number and interrupts
+> > >>>> number, let's use fsl,irqs-per-chan to represents how many
+> > >>>> interrupts supported by this irqsteer channel.
 > > >>>
-> > >>>  config IMX_GPCV2
-> > >>> -	bool
-> > >>> +	bool "i.MX GPCv2 IRQ chip"
-> > >>> +	depends on ARCH_MXC || (COMPILE_TEST && OF)
-> > >>>  	select IRQ_DOMAIN
-> > >>>  	help
-> > >>>  	  Enables the wakeup IRQs for IMX platforms with GPCv2 block
-> > >>>
+> > >>> Sorry, but total NACK. I've got to great lengths with dumping the
+> > >>> actually implemented register layout on i.MX8M and AFAICS the IRQs
+> > >>> are always managed in groups of 64 IRQs, even if less than that are
+> > >>> connected as input IRQs. This is what the actually present register
+> > >>> set on i.MX8M tells us.
 > > >>
-> > >> How does it help exactly? It is pretty difficult for a user to know
-> > >> exactly what they need. I'd rather see it selected by ARCH_MXC, which
-> > >> makes it
+> > >> Also, I'd really like the DT bindings not to change at every release.
+> > >> So whatever change (if any) has to be done for this driver to support
+> > >> existing HW, please make sure that the DT bindings are kept as stable as
+> > possible.
+> > >>
 > > >
-> > > ARM64 SoC maintainers suggest not add more driver specific options
-> > > except an Generic ARCH option.
-> > >
-> > > As GPCv2 is also used in MX8MQ. So we may select it in armv8 defconfig.
-> > > If this option is invisible, we can't select it.
+> > > Sorry I should clarify it a bit.
+> > > There's still no users in Devicetree.
+> > > So I guess we can update it, right? Or not?
 > > 
-> > And conversely, users have no idea of what letter soup they have to select to
-> > make their HW work properly. Selecting the driver when the platform is
-> > supposed to be supported is the right way to solve this problem.
+> > What do you mean by no users? This driver is in 5.0, and I assume people are
+> > using it one way or another. Not having a platform in the kernel tree is pretty
+> > much irrelevant, as the kernel tree is not a canonical repository of existing
+> > platforms.
 > > 
 > 
-> I think the problem is that we have no platform specific CONFIGs for arm v8 platforms.
-> We have only one CONFIG_ARCH_MXC for all MX8 SoCs, e.g. mx8qxp, mx8mq...
-> Only MX8MQ needs to use GPCv2. Selecting GPCv2 under ARCH_MXC means users
-> have no chance to disable it for mx8qxp which does not need it.
-
-And where is the problem to select this on platforms that do not
-strictly require it? Code bloat?
-
-If you want fine grained selection for people dealing with a single
-SoC, make it depend on CONFIG_EXPERT. Don't force this on unsuspecting
-users who expect their HW to just work.
-
-Something like:
-
-config IMX_GPCV2
-       	bool "i.MX GPCv2 IRQ chip" if EXPERT
-	def_bool ARCH_MXC
-	select IRQ_DOMAIN
-	help
-	  Enables the wakeup IRQs for IMX platforms with GPCv2 block
-
+> I understand the concern.
+> Theoretically yes, but it's very unlikely that there's already an out of tree users
+> wants to use it for a long term as we're still at the very initial stage.
 > 
-> We probably could introduce SOC option under drivers/soc/ to do the default configs
-> selection. But we've already handled all other driver selections in defconfig
-> e.g. firmware, clk, pinctrl, power domain and etc.
-> Not sure whether GPCv2 should be an exception.
+> And the most important reason is that current using actually is wrong.
+> We can also choose to mark it as 'depreciated' and keep the backward compatibility in driver,
+> but I'm not sure whether it's worthy to do it as we may add a lot ugly code in driver
+> benefits no users.
+> 
+> Ideas?
 
-I think something like the above should be the rule. Configuration
-feature creep is not helping anyone.
+At this stage, and given that there is no consensus on how this driver
+should work, I'm tempted to just rip it out entirely by reverting
+0136afa08967 and be done with it until people work out a way forward.
 
 	M.
 
