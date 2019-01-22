@@ -2,64 +2,74 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 224E1C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:51:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 74700C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:52:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E3F4720684
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:51:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 40B8B20684
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:52:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d+cUsqDn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E3F4720684
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pPKoWYuU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 40B8B20684
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4/GjOquU6UPQBE3xISlkXzgawxiqtKwulqNYZQpw9F4=; b=d+cUsqDnG/5F0I
-	xPBA02kBuCxF7DMzrIyTHwiWvNYKGYuwFhtNbu/MSzcCCbV/AGzwHTL2VUCS7HQPeAOjcQi3+j7Ke
-	LKXJOoUVQMfEHtRWny5eV442VS2tFAV6tKdpqlwiHmlX6tOiRyqgjc7x5tS7bxUEbIQkqJ3UM9vMV
-	omlfIEc9Vf+x/FAqpNN5wrY7fAtePSm/kGtQvWy2BtfqCm1wiBG7z7U7yEPxDqVB3InznsJt3HYki
-	s+UDjx/XLU00iNpT1KPgLvTHN/mCswqAOWMqpUmwNGNxpYLlloZUI/dlbMiR1c0yiykJqoBkReSfD
-	0RGU+gJVGvL3Cy44Zdzw==;
+	List-Owner; bh=ovfRqBAPiXX6b9CZkTCCQEK/WSGfHX0hS5VXwE+bg9E=; b=pPKoWYuU4masla
+	d7yFyVIn4JH9xY8Q1W7/HaZ4Y1f9C3+xopPtQgzfcZH3q54wauE2dJetKGi6D2L9YbToigCBwEx0C
+	npq7MpgALgqX5c90NZv78gV86tYs9DrLIlcAsCZkN0elJq3yhNTQzFBmATLwv+mfb1TTv17SRmDQa
+	O0vpFB7R/tZnBbHszdHre3dYDkrynmNz2BM6TsCY3EIxlzVEftFNtO08kQAOAthCxtdLf1SfNuzBu
+	Jqz0Z6lmx+GDMUAlx56M3QzmipsP8l2uLqbS+2iNuAxluk6L/qDkajfb+AbnH69GLcHBcRc2djkke
+	Zro8LtqmqjNginF5P+9A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glwSO-0005u2-M8; Tue, 22 Jan 2019 13:51:12 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glwSL-0005ti-GL
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 13:51:10 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id F0FD1EBD;
- Tue, 22 Jan 2019 05:51:08 -0800 (PST)
-Received: from e107155-lin (e107155-lin.cambridge.arm.com [10.1.196.42])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 582B93F614;
- Tue, 22 Jan 2019 05:51:08 -0800 (PST)
-Date: Tue, 22 Jan 2019 13:51:05 +0000
-From: Sudeep Holla <sudeep.holla@arm.com>
-To: Vladimir Murzin <vladimir.murzin@arm.com>
-Subject: Re: [PATCH] ARM: dts: mps2: use list instead of tuple for uart
- interrupts
-Message-ID: <20190122135105.GB18606@e107155-lin>
-References: <1548066939-20880-1-git-send-email-vladimir.murzin@arm.com>
- <20190122115517.GB2656@e107155-lin>
- <3de06852-597b-06dd-a2d1-8b0830a7869f@arm.com>
+	id 1glwTO-0006WN-J4; Tue, 22 Jan 2019 13:52:14 +0000
+Received: from mail-vs1-f68.google.com ([209.85.217.68])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glwTL-0006Vk-VK
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 13:52:13 +0000
+Received: by mail-vs1-f68.google.com with SMTP id e7so14732487vsc.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 22 Jan 2019 05:52:11 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=KcDFAfFc7EsqJTg783tpvFYSuv3o+l1WYw+Ppm1hEvI=;
+ b=UD6t05hnY/jvL6VE5wHpRoo9mGAfo0JW3RAg/HnnHxFfAeQkjO1coU9YD8AcZpU663
+ VJHd/10huGjP9AwOkRs1LyIDQkS/qP8JvsurRwXxM6LmazIULtzNVEgqZK+PDytPnM/M
+ XWAc5g86u5Ypf20Pg+3gi3iIcKIGigL2sqYl051xdcHKP/e5B/uxCnqYoMd2w9QjnALm
+ wRrFQ8aSIPE0XblPguXQ2DDjMClaGltOxlrBn/HjSwgM29xLKqFxQaEhMNDWAA0b5Btk
+ Ydae0g8nu6fSthW8uoImlpxKBcfm6YHn2LwSeOD4VGLLOEAP/pw6cbLqm9KQOVKxZEMS
+ Jicw==
+X-Gm-Message-State: AJcUukcupVIu3UC+u6XeyA3/DmM4GhY+efguD2aU4TLoyK2H6Vtki5SB
+ SCp5n6c0mMuKaCxMEnIeVdqKmfiS4s+usyXKUuM=
+X-Google-Smtp-Source: ALg8bN6c22dYFsVRGpMa59s/KE5nkBHTAEWeY7ZXm0O6YfV0fhNcm/uNPbKipDrSQyf15xnpm7+wc8n56TswjgTcVvQ=
+X-Received: by 2002:a67:c202:: with SMTP id i2mr13578963vsj.11.1548165130536; 
+ Tue, 22 Jan 2019 05:52:10 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <3de06852-597b-06dd-a2d1-8b0830a7869f@arm.com>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+References: <CAJKOXPdHhUGoQmrX8_23MfbibozipkAzXA_5woVSFJSK9BvbXw@mail.gmail.com>
+ <CAJKOXPe7ot9TLajErKJjSAkbs2vObMJfATzEFwxpT16aFdXHqg@mail.gmail.com>
+ <67560e58-93b3-2bfa-9d5d-5956dae47806@gmail.com>
+In-Reply-To: <67560e58-93b3-2bfa-9d5d-5956dae47806@gmail.com>
+From: Geert Uytterhoeven <geert@linux-m68k.org>
+Date: Tue, 22 Jan 2019 14:51:58 +0100
+Message-ID: <CAMuHMdUz6J2cG-NCYPTRyS=1QZHGBWUFZPqj4ShEdioQLqu9qw@mail.gmail.com>
+Subject: Re: [BUG bisect] Missing Micrel driver on VF50 (net: phy: check
+ return code when requesting PHY driver module)
+To: Heiner Kallweit <hkallweit1@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_055109_547436_B448D1D1 
-X-CRM114-Status: GOOD (  15.72  )
+X-CRM114-CacheID: sfid-20190122_055212_009367_0A083B0F 
+X-CRM114-Status: GOOD (  23.54  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,37 +81,125 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org
+Cc: Andrew Lunn <andrew@lunn.ch>, Florian Fainelli <f.fainelli@gmail.com>,
+ netdev <netdev@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Krzysztof Kozlowski <krzk@kernel.org>,
+ Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ Stefan Agner <stefan@agner.ch>, "David S. Miller" <davem@davemloft.net>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 22, 2019 at 01:32:26PM +0000, Vladimir Murzin wrote:
-> On 1/22/19 11:55 AM, Sudeep Holla wrote:
-> > On Mon, Jan 21, 2019 at 10:35:39AM +0000, Vladimir Murzin wrote:
-> >> MPS2 UART requires dedicated interrupts for RX, TX and overflow, which
-> >> obviously should be expressed as a list. Current form uses tuple and
-> >> it has worked so far because NVIC has interrupt-cells equal to 1.
-> >
-> > Applied for v5.1
-> >
-> > Just saw couple of other instances that can be fixed to elsewhere in
-> > vexpress DTS files. Will post it soon with your reported by(though
-> > you didn't report them directly but this patch made me look around)
->
-> Thanks!
->
-> Now I'm wondering if it is something dtc can warn about?
->
+Hi Heiner,
 
-Not sure if it's already in place at different warning level.
-I generally try W=1 which itself produces quite a lot of warning, but
-yes good if this can be detected by compiler.
+On Fri, Jan 18, 2019 at 9:58 PM Heiner Kallweit <hkallweit1@gmail.com> wrote:
+> On 18.01.2019 09:48, Krzysztof Kozlowski wrote:
+> > On Fri, 18 Jan 2019 at 09:39, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> >> On today's next (next-20190118) my Colibri VF50 board fails to boot up
+> >> from network (DHCP, NFSv4 root). Looks like missing network adapter.
+> >> Expected:
+> >> [ 3.041773] Micrel KSZ8041 400d1000.ethernet-1:00: attached PHY driver
+> >> [Micrel KSZ8041] (mii_bus:phy_addr=400d1000.ethernet-1:00, irq=POLL)
+> >>
+> >> Result:
+> >> [ 15.614964] Root-NFS: no NFS server address
+> >> [ 15.619353] VFS: Unable to mount root fs via NFS, trying floppy.
+> >> [ 15.626762] VFS: Cannot open root device "nfs" or unknown-block(2,0): error -6
+> >> [ 15.634252] Please append a correct "root=" boot option; here are the
+> >> available partitions:
+> >> [ 15.642791] 0100 16384 ram0
+> >> [ 15.642804] (driver?)
+> >> [ 15.649076] Kernel panic - not syncing: VFS: Unable to mount root fs
+> >> on unknown-block(2,0)
+> >> [ 15.657423] ---[ end Kernel panic - not syncing: VFS: Unable to mount
+> >> root fs on unknown-block(2,0) ]---
+> >>
+> >> Bisect pointed to:
+> >>     net: phy: check return code when requesting PHY driver module
+> >
+> > I see now in the logs:
+> > [ 2.436822] mdio_bus 400d1000.ethernet-1:00: error -2 loading PHY
+> > driver module for ID 0x00221513
+> > which is kind of misleading. There is no initramfs so there is no
+> > usermod library at this point. It is not needed. This seems to break
+> > all DHCP/NFS root boots without initrd/initramfs.
+> >
+> Thanks for the report. Could you please provide your kernel config
+> and the syslog of a boot before or w/o the patch in question?
+>
+> If you boot via nfs then I'd expect that the PHY driver is built-in and
+> not a module. Therefore it's not fully clear to me yet why
+> request_module() returns -ENOENT.
 
---
-Regards,
-Sudeep
+I'm seeing the same booting nfsroot on several Renesas boards.
+E.g. on r8a7791/koelsch:
+
+    mdio_bus ee700000.ethernet-ffffffff:01: error -2 loading PHY
+driver module for ID 0x00221537
+    sh-eth ee700000.ethernet: MDIO init failed: -2
+
+This failure happens only when CONFIG_MODULES=y.
+Reverting commit 13d0ab6750b20957 ("net: phy: check return code when
+requesting PHY driver module") fixes the issue.
+
+phy_request_driver_module() tries to load module
+"mdio:00000000001000100001010100110111", which fails.
+When CONFIG_MODULES=n, the error is ignored, and everything works fine.
+
+0b00000000001000100001010100110111 == 0x00221537 == PHY_ID_KSZ8041RNLI,
+which is served by drivers/net/phy/micrel.c.
+Interestingly, CONFIG_MICREL_PHY=y, so I'm wondering why the PHY subsystem
+tries to load a module for a driver which is already present in the first
+place?
+
+Oh, the following comment tries to explain:
+
+        /* Request the appropriate module unconditionally; don't
+         * bother trying to do so only if it isn't already loaded,
+         * because that gets complicated. A hotplug event would have
+         * done an unconditional modprobe anyway.
+
+Hence request_module() failures are normal.
+
+       ret = request_module(MDIO_MODULE_PREFIX MDIO_ID_FMT,
+                            MDIO_ID_ARGS(phy_id));
+       /* we only check for failures in executing the usermode binary,
+        * not whether a PHY driver module exists for the PHY ID
+        */
+       if (IS_ENABLED(CONFIG_MODULES) && ret < 0) {
+               phydev_err(dev, "error %d loading PHY driver module for
+ID 0x%08x\n",
+                          ret, phy_id);
+               return ret;
+       }
+
+However:
+
+    /**
+     * __request_module - try to load a kernel module
+     * @wait: wait (or not) for the operation to complete
+     * @fmt: printf style format string for the name of the module
+     * @...: arguments as specified in the format string
+     *
+     * Load a module using the user mode module loader. The function returns
+     * zero on success or a negative errno code or positive exit code from
+     * "modprobe" on failure.
+
+So perhaps the check should be for "ret > 0"?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
 
 _______________________________________________
 linux-arm-kernel mailing list
