@@ -2,72 +2,71 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4E504C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 06:40:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A937CC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 06:41:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1AC3A205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 06:40:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 78B6E20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 06:41:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gN/A5sX3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1AC3A205C9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="toLqegH+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 78B6E20879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=qDYK6BnJcs+6+80Qp7pndOawwemZXt46qWI5W9MGaU4=; b=gN/A5sX3WTrU1qmcqT3WdhUGHA
-	CCGEA+Heg4eajMHxHQP4s13wW/9J35UVN1kpk5THD3upduA6J96sLj1HUEsFl7DI/bqbosvnAiyYf
-	LT5mPBhgbjCQJm9bz+Kh5wr4kqy0Jg/BAyv9KmM499WSLIFdqt84ADH1ZNJ4w5ggvqIrc3jRLvOVT
-	AnfJ1v4t6a8mxiVAfWJDI8bpqEZUZryOAT3uoLN/cGwgj1ZpwR88m0ouXF7PtbFWNdmebkO2mIHB4
-	FjA64JMXLZUwDbUfy79XfnSStWpnDUBk0P1WvHAf7BPIqUB5UII3QtwuANjLBlI3wMUUkuxH0nqcd
-	CM00Fdrw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=7UFM0EvwDFTI6QwH5DpUL7ZZDa2f/LIzkZ9JVZAOAW8=; b=toLqegH+p6kCQA
+	zhbyw9yz0xHo7RAPHWSCCr/+Bps+6UIxjdrChPklwIIhLpNwmWkpokqT2p2cfspVu4Wfp+JSyOObM
+	NZ0VJcuioqpaXmjPkgrHKeeMmzzdUzaQN/5NL0+Ksc3uFadXKyyewWGsGkBgCFDN0sv6jGNwCcfcV
+	OGmaoCFePpagWXFjePx3EzZL56gMrW44VsQ4Ycjg5hYk1tBp+4oddu2yyJV/9m/OlJEMlA1hzdHY2
+	oVkD7c8PkElWSL1paSWelL77cqd1kfKoB9VOW0QAIPTkgdo94mJ2H6L9R07n5YjYIXm0rF9Is01tA
+	lMl4OTElJjlAh3bJ3Wnw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glpjK-0002x2-Sj; Tue, 22 Jan 2019 06:40:14 +0000
-Received: from inva021.nxp.com ([92.121.34.21])
+	id 1glpky-00053W-Hp; Tue, 22 Jan 2019 06:41:56 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glpiQ-0001jT-Ru
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 06:39:21 +0000
-Received: from inva021.nxp.com (localhost [127.0.0.1])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id A673F200211;
- Tue, 22 Jan 2019 07:39:17 +0100 (CET)
-Received: from invc005.ap-rdc01.nxp.com (invc005.ap-rdc01.nxp.com
- [165.114.16.14])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id AE1D42001F2;
- Tue, 22 Jan 2019 07:39:07 +0100 (CET)
-Received: from titan.ap.freescale.net (TITAN.ap.freescale.net [10.192.208.233])
- by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id 34A84402B5;
- Tue, 22 Jan 2019 14:38:54 +0800 (SGT)
-From: Xiaowei Bao <xiaowei.bao@nxp.com>
-To: bhelgaas@google.com, robh+dt@kernel.org, mark.rutland@arm.com,
- shawnguo@kernel.org, leoyang.li@nxp.com, kishon@ti.com,
- lorenzo.pieralisi@arm.com, arnd@arndb.de, gregkh@linuxfoundation.org,
- minghuan.Lian@nxp.com, mingkai.hu@nxp.com, roy.zang@nxp.com,
- kstewart@linuxfoundation.org, cyrille.pitchen@free-electrons.com,
- pombredanne@nexb.com, shawn.lin@rock-chips.com, linux-pci@vger.kernel.org,
- devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linuxppc-dev@lists.ozlabs.org
-Subject: [PATCHv6 3/4] pci: layerscape: Add the EP mode support.
-Date: Tue, 22 Jan 2019 14:33:27 +0800
-Message-Id: <20190122063328.25228-3-xiaowei.bao@nxp.com>
-X-Mailer: git-send-email 2.14.1
-In-Reply-To: <20190122063328.25228-1-xiaowei.bao@nxp.com>
-References: <20190122063328.25228-1-xiaowei.bao@nxp.com>
-X-Virus-Scanned: ClamAV using ClamSMTP
+ id 1glpki-0004vD-Aq; Tue, 22 Jan 2019 06:41:53 +0000
+X-UUID: a41fe38ee5124b33a80ab730cbbf6fe3-20190121
+X-UUID: a41fe38ee5124b33a80ab730cbbf6fe3-20190121
+Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
+ (envelope-from <jitao.shi@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 857406126; Mon, 21 Jan 2019 22:41:21 -0800
+Received: from mtkmbs08n1.mediatek.inc (172.21.101.55) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 21 Jan 2019 22:41:19 -0800
+Received: from MTKCAS36.mediatek.inc (172.27.4.186) by mtkmbs08n1.mediatek.inc
+ (172.21.101.55) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Tue, 22 Jan 2019 14:41:11 +0800
+Received: from [10.16.6.141] (10.16.6.141) by MTKCAS36.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Tue, 22 Jan 2019 14:41:10 +0800
+Message-ID: <1548139270.1697.1.camel@mszsdaap41>
+Subject: Re: [PATCH 9/9] drm/mediatek: add dpi dual edge support
+From: Jitao Shi <jitao.shi@mediatek.com>
+To: CK Hu =?UTF-8?Q?=28=E8=83=A1=E4=BF=8A=E5=85=89=29?= <ck.hu@mediatek.com>
+Date: Tue, 22 Jan 2019 14:41:10 +0800
+In-Reply-To: <6021c8950c3146bb941ed1355391106d@mtkmbs01n1.mediatek.inc>
+References: <1546585439-30455-1-git-send-email-chunhui.dai@mediatek.com>
+ <1546585439-30455-10-git-send-email-chunhui.dai@mediatek.com>
+ <6021c8950c3146bb941ed1355391106d@mtkmbs01n1.mediatek.inc>
+X-Mailer: Evolution 3.10.4-0ubuntu2 
+MIME-Version: 1.0
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_223919_514864_F4812E7D 
-X-CRM114-Status: GOOD (  14.45  )
+X-CRM114-CacheID: sfid-20190121_224140_715220_0F3693C9 
+X-CRM114-Status: GOOD (  21.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,219 +78,100 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Xiaowei Bao <xiaowei.bao@nxp.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: JamesJJ Liao =?UTF-8?Q?=28=E5=BB=96=E5=BB=BA=E6=99=BA=29?=
+ <jamesjj.liao@mediatek.com>,
+ Ryder Lee =?UTF-8?Q?=28=E6=9D=8E=E5=BA=9A=E8=AB=BA=29?=
+ <Ryder.Lee@mediatek.com>,
+ Bibby Hsieh =?UTF-8?Q?=28=E8=AC=9D=E6=BF=9F=E9=81=A0=29?=
+ <Bibby.Hsieh@mediatek.com>, srv_heupstream <srv_heupstream@mediatek.com>,
+ Chunhui Dai =?UTF-8?Q?=28=E6=88=B4=E6=98=A5=E6=99=96=29?=
+ <Chunhui.Dai@mediatek.com>, Stephen Boyd <sboyd@kernel.org>,
+ --to=Michael Turquette <mturquette@baylibre.com>,
+ Sean Wang <Sean.Wang@mediatek.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "dri-devel@lists.freedesktop.org" <dri-devel@lists.freedesktop.org>,
+ David Airlie <airlied@linux.ie>,
+ "linux-mediatek@lists.infradead.org" <linux-mediatek@lists.infradead.org>,
+ Philipp Zabel <p.zabel@pengutronix.de>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ Colin Ian King <colin.king@canonical.com>,
+ "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add the PCIe EP mode support for layerscape platform.
-
-Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
-Reviewed-by: Minghuan Lian <minghuan.lian@nxp.com>
-Reviewed-by: Zhiqiang Hou <zhiqiang.hou@nxp.com>
-Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
----
-depends on: https://patchwork.kernel.org/project/linux-pci/list/?series=66177
-
-v2:
- - remove the EP mode check function.
-v3:
- - modif the return value when enter default case.
-v4:
- - no change.
-v5:
- - no change.
-v6:
- - modify the code base on the submit patch of the EP framework.
-
- drivers/pci/controller/dwc/Makefile            |    2 +-
- drivers/pci/controller/dwc/pci-layerscape-ep.c |  157 ++++++++++++++++++++++++
- 2 files changed, 158 insertions(+), 1 deletions(-)
- create mode 100644 drivers/pci/controller/dwc/pci-layerscape-ep.c
-
-diff --git a/drivers/pci/controller/dwc/Makefile b/drivers/pci/controller/dwc/Makefile
-index 7bcdcdf..b5f3b83 100644
---- a/drivers/pci/controller/dwc/Makefile
-+++ b/drivers/pci/controller/dwc/Makefile
-@@ -8,7 +8,7 @@ obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
- obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
- obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
- obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone.o
--obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
-+obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o pci-layerscape-ep.o
- obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
- obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
- obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o
-diff --git a/drivers/pci/controller/dwc/pci-layerscape-ep.c b/drivers/pci/controller/dwc/pci-layerscape-ep.c
-new file mode 100644
-index 0000000..ddc2dbb
---- /dev/null
-+++ b/drivers/pci/controller/dwc/pci-layerscape-ep.c
-@@ -0,0 +1,157 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * PCIe controller EP driver for Freescale Layerscape SoCs
-+ *
-+ * Copyright (C) 2018 NXP Semiconductor.
-+ *
-+ * Author: Xiaowei Bao <xiaowei.bao@nxp.com>
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/of_pci.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_address.h>
-+#include <linux/pci.h>
-+#include <linux/platform_device.h>
-+#include <linux/resource.h>
-+
-+#include "pcie-designware.h"
-+
-+#define PCIE_DBI2_OFFSET		0x1000	/* DBI2 base address*/
-+
-+struct ls_pcie_ep {
-+	struct dw_pcie		*pci;
-+};
-+
-+#define to_ls_pcie_ep(x)	dev_get_drvdata((x)->dev)
-+
-+static int ls_pcie_establish_link(struct dw_pcie *pci)
-+{
-+	return 0;
-+}
-+
-+static const struct dw_pcie_ops ls_pcie_ep_ops = {
-+	.start_link = ls_pcie_establish_link,
-+};
-+
-+static const struct of_device_id ls_pcie_ep_of_match[] = {
-+	{ .compatible = "fsl,ls-pcie-ep",},
-+	{ },
-+};
-+
-+static const struct pci_epc_features ls_pcie_epc_features = {
-+	.linkup_notifier = false,
-+	.msi_capable = true,
-+	.msix_capable = false,
-+};
-+
-+static const struct pci_epc_features*
-+ls_pcie_ep_get_features(struct dw_pcie_ep *ep)
-+{
-+	return &ls_pcie_epc_features;
-+}
-+
-+static void ls_pcie_ep_init(struct dw_pcie_ep *ep)
-+{
-+	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
-+	struct pci_epc *epc = ep->epc;
-+	enum pci_barno bar;
-+
-+	for (bar = BAR_0; bar <= BAR_5; bar++)
-+		dw_pcie_ep_reset_bar(pci, bar);
-+}
-+
-+static int ls_pcie_ep_raise_irq(struct dw_pcie_ep *ep, u8 func_no,
-+				  enum pci_epc_irq_type type, u16 interrupt_num)
-+{
-+	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
-+
-+	switch (type) {
-+	case PCI_EPC_IRQ_LEGACY:
-+		return dw_pcie_ep_raise_legacy_irq(ep, func_no);
-+	case PCI_EPC_IRQ_MSI:
-+		return dw_pcie_ep_raise_msi_irq(ep, func_no, interrupt_num);
-+	case PCI_EPC_IRQ_MSIX:
-+		return dw_pcie_ep_raise_msix_irq(ep, func_no, interrupt_num);
-+	default:
-+		dev_err(pci->dev, "UNKNOWN IRQ type\n");
-+		return -EINVAL;
-+	}
-+}
-+
-+static struct dw_pcie_ep_ops pcie_ep_ops = {
-+	.ep_init = ls_pcie_ep_init,
-+	.raise_irq = ls_pcie_ep_raise_irq,
-+	.get_features = ls_pcie_ep_get_features,
-+};
-+
-+static int __init ls_add_pcie_ep(struct ls_pcie_ep *pcie,
-+					struct platform_device *pdev)
-+{
-+	struct dw_pcie *pci = pcie->pci;
-+	struct device *dev = pci->dev;
-+	struct dw_pcie_ep *ep;
-+	struct resource *res;
-+	int ret;
-+
-+	ep = &pci->ep;
-+	ep->ops = &pcie_ep_ops;
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "addr_space");
-+	if (!res)
-+		return -EINVAL;
-+
-+	ep->phys_base = res->start;
-+	ep->addr_size = resource_size(res);
-+
-+	ret = dw_pcie_ep_init(ep);
-+	if (ret) {
-+		dev_err(dev, "failed to initialize endpoint\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init ls_pcie_ep_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct dw_pcie *pci;
-+	struct ls_pcie_ep *pcie;
-+	struct resource *dbi_base;
-+	int ret;
-+
-+	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
-+	if (!pcie)
-+		return -ENOMEM;
-+
-+	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-+	if (!pci)
-+		return -ENOMEM;
-+
-+	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
-+	pci->dbi_base = devm_pci_remap_cfg_resource(dev, dbi_base);
-+	if (IS_ERR(pci->dbi_base))
-+		return PTR_ERR(pci->dbi_base);
-+
-+	pci->dbi_base2 = pci->dbi_base + PCIE_DBI2_OFFSET;
-+	pci->dev = dev;
-+	pci->ops = &ls_pcie_ep_ops;
-+	pcie->pci = pci;
-+
-+	platform_set_drvdata(pdev, pcie);
-+
-+	ret = ls_add_pcie_ep(pcie, pdev);
-+
-+	return ret;
-+}
-+
-+static struct platform_driver ls_pcie_ep_driver = {
-+	.driver = {
-+		.name = "layerscape-pcie-ep",
-+		.of_match_table = ls_pcie_ep_of_match,
-+		.suppress_bind_attrs = true,
-+	},
-+};
-+builtin_platform_driver_probe(ls_pcie_ep_driver, ls_pcie_ep_probe);
--- 
-1.7.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgQ0ssCgpPaywgSSdsbCBzZW5kIGl0IGFnYWluIGluIGFuIGluZGVwZW5kZW50IHBhdGNoLgoK
+QmVzdCBSZWdhcmRzCkppdGFvCgpPbiBXZWQsIDIwMTktMDEtMTYgYXQgMTQ6NTIgKzA4MDAsIENL
+IEh1ICjog6Hkv4rlhYkpIHdyb3RlOgo+IEhpLCBDaHVuaHVpOgo+IAo+ID4gLS0tLS1PcmlnaW5h
+bCBNZXNzYWdlLS0tLS0KPiA+IEZyb206IGNodW5odWkgZGFpIFttYWlsdG86Y2h1bmh1aS5kYWlA
+bWVkaWF0ZWsuY29tXQo+ID4gU2VudDogRnJpZGF5LCBKYW51YXJ5IDA0LCAyMDE5IDM6MDQgUE0K
+PiA+IFRvOiAtLXRvPU1pY2hhZWwgVHVycXVldHRlOyBTdGVwaGVuIEJveWQ7IENLIEh1ICjog6Hk
+v4rlhYkpCj4gPiBDYzogTWF0dGhpYXMgQnJ1Z2dlcjsgUGhpbGlwcCBaYWJlbDsgRGF2aWQgQWly
+bGllOyBDaHVuaHVpIERhaSAo5oi05pil5pmWKTsgU2Vhbgo+ID4gV2FuZzsgUnlkZXIgTGVlICjm
+nY7luproq7opOyBDb2xpbiBJYW4gS2luZzsgbGludXgtY2xrQHZnZXIua2VybmVsLm9yZzsKPiA+
+IGxpbnV4LWtlcm5lbEB2Z2VyLmtlcm5lbC5vcmc7IGxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5m
+cmFkZWFkLm9yZzsKPiA+IGxpbnV4LW1lZGlhdGVrQGxpc3RzLmluZnJhZGVhZC5vcmc7IGRyaS1k
+ZXZlbEBsaXN0cy5mcmVlZGVza3RvcC5vcmc7Cj4gPiBzcnZfaGV1cHN0cmVhbTsgQmliYnkgSHNp
+ZWggKOisnea/n+mBoCk7IEphbWVzSkogTGlhbyAo5buW5bu65pm6KTsgSml0YW8gU2hpICjnn7Po
+rrAKPiA+IOa2mykKPiA+IFN1YmplY3Q6IFtQQVRDSCA5LzldIGRybS9tZWRpYXRlazogYWRkIGRw
+aSBkdWFsIGVkZ2Ugc3VwcG9ydAo+ID4gCj4gPiBEUEkgc2FtcGxlIG9uIHJpc2luZyBhbmQgZmFs
+bGluZyBlZGdlLiBJdCBjYW4gcmVkdWNlIGhhbGYgZGF0YSBpby4KPiAKPiBUaGlzIHBhdGNoIGxv
+b2tzIGxpa2UgYSBwYXRjaCBmb3IgTVQ4MTgzLiBGb3IgTVQ4MTczIGFuZCBNVDI3MDEsIGR1YWxf
+ZWRnZSBpcyBmYWxzZS4KPiBGb3Igbm93LCB3ZSBoYXZlIG5vdCBzdXBwb3J0IE1UODE4MyB5ZXQu
+Cj4gU28geW91IGNvdWxkIGp1c3Qgc2V0IGR1YWxfZWRnZSB0byBmYWxzZSBhbmQgcmVtb3ZlIE1U
+ODE4MyBwYXJ0IGluIHRoaXMgcGF0Y2guCj4gWW91IGNvdWxkIHNlbmQgdGhlIE1UODE4MyBwYXJ0
+IGluIGFuIGluZGVwZW5kZW50IHBhdGNoLCBub3QgaW4gYSBzZXJpZXMgb2YgTVQyNzAxLgo+IAo+
+IFJlZ2FyZHMsCj4gQ0sKPiAKPiA+IAo+ID4gU2lnbmVkLW9mZi1ieTogSml0YW8gU2hpIDxqaXRh
+by5zaGlAbWVkaWF0ZWsuY29tPgo+ID4gU2lnbmVkLW9mZi1ieTogY2h1bmh1aSBkYWkgPGNodW5o
+dWkuZGFpQG1lZGlhdGVrLmNvbT4KPiA+IC0tLQo+ID4gIGRyaXZlcnMvZ3B1L2RybS9tZWRpYXRl
+ay9tdGtfZHBpLmMgfCAzMAo+ID4gKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrCj4gPiAg
+MSBmaWxlIGNoYW5nZWQsIDMwIGluc2VydGlvbnMoKykKPiA+IAo+ID4gZGlmZiAtLWdpdCBhL2Ry
+aXZlcnMvZ3B1L2RybS9tZWRpYXRlay9tdGtfZHBpLmMKPiA+IGIvZHJpdmVycy9ncHUvZHJtL21l
+ZGlhdGVrL210a19kcGkuYwo+ID4gaW5kZXggNGEyZjRhNi4uYWNiNGY0NyAxMDA2NDQKPiA+IC0t
+LSBhL2RyaXZlcnMvZ3B1L2RybS9tZWRpYXRlay9tdGtfZHBpLmMKPiA+ICsrKyBiL2RyaXZlcnMv
+Z3B1L2RybS9tZWRpYXRlay9tdGtfZHBpLmMKPiA+IEBAIC0xMTcsNiArMTE3LDcgQEAgc3RydWN0
+IG10a19kcGlfY29uZiB7Cj4gPiAgCXVuc2lnbmVkIGludCAoKmNhbF9mYWN0b3IpKGludCBjbG9j
+ayk7Cj4gPiAgCXUzMiByZWdfaF9mcmVfY29uOwo+ID4gIAlib29sIGVkZ2Vfc2VsX2VuOwo+ID4g
+Kwlib29sIGR1YWxfZWRnZTsKPiA+ICB9Owo+ID4gCj4gPiAgc3RhdGljIHZvaWQgbXRrX2RwaV9t
+YXNrKHN0cnVjdCBtdGtfZHBpICpkcGksIHUzMiBvZmZzZXQsIHUzMiB2YWwsIHUzMiBtYXNrKQo+
+ID4gQEAgLTM1Myw2ICszNTQsMTUgQEAgc3RhdGljIHZvaWQgbXRrX2RwaV9jb25maWdfZGlzYWJs
+ZV9lZGdlKHN0cnVjdAo+ID4gbXRrX2RwaSAqZHBpKQo+ID4gIAkJbXRrX2RwaV9tYXNrKGRwaSwg
+ZHBpLT5jb25mLT5yZWdfaF9mcmVfY29uLCAwLCBFREdFX1NFTF9FTik7ICB9Cj4gPiAKPiA+ICtz
+dGF0aWMgdm9pZCBtdGtfZHBpX2NvbmZpZ19kdWFsX2VkZ2Uoc3RydWN0IG10a19kcGkgKmRwaSkg
+ewo+ID4gKwlpZiAoZHBpLT5jb25mLT5kdWFsX2VkZ2UpIHsKPiA+ICsJCW10a19kcGlfbWFzayhk
+cGksIERQSV9ERFJfU0VUVElORywgRERSX0VOIHwKPiA+ICsJCQkJRERSXzRQSEFTRSwgRERSX0VO
+IHwgRERSXzRQSEFTRSk7Cj4gPiArCQltdGtfZHBpX21hc2soZHBpLCBEUElfT1VUUFVUX1NFVFRJ
+TkcsIEVER0VfU0VMLCBFREdFX1NFTCk7Cj4gPiArCX0KPiA+ICt9Cj4gPiArCj4gPiAgc3RhdGlj
+IHZvaWQgbXRrX2RwaV9jb25maWdfY29sb3JfZm9ybWF0KHN0cnVjdCBtdGtfZHBpICpkcGksCj4g
+PiAgCQkJCQllbnVtIG10a19kcGlfb3V0X2NvbG9yX2Zvcm1hdCBmb3JtYXQpICB7IEBACj4gPiAt
+NTA5LDYgKzUxOSw3IEBAIHN0YXRpYyBpbnQgbXRrX2RwaV9zZXRfZGlzcGxheV9tb2RlKHN0cnVj
+dCBtdGtfZHBpICpkcGksCj4gPiAgCW10a19kcGlfY29uZmlnX2NvbG9yX2Zvcm1hdChkcGksIGRw
+aS0+Y29sb3JfZm9ybWF0KTsKPiA+ICAJbXRrX2RwaV9jb25maWdfMm5faF9mcmUoZHBpKTsKPiA+
+ICAJbXRrX2RwaV9jb25maWdfZGlzYWJsZV9lZGdlKGRwaSk7Cj4gPiArCW10a19kcGlfY29uZmln
+X2R1YWxfZWRnZShkcGkpOwo+ID4gIAltdGtfZHBpX3N3X3Jlc2V0KGRwaSwgZmFsc2UpOwo+ID4g
+Cj4gPiAgCXJldHVybiAwOwo+ID4gQEAgLTY2OSw2ICs2ODAsMTYgQEAgc3RhdGljIHVuc2lnbmVk
+IGludCBtdDI3MDFfY2FsY3VsYXRlX2ZhY3RvcihpbnQKPiA+IGNsb2NrKQo+ID4gIAkJcmV0dXJu
+IDE7Cj4gPiAgfQo+ID4gCj4gPiArc3RhdGljIHVuc2lnbmVkIGludCBtdDgxODNfY2FsY3VsYXRl
+X2ZhY3RvcihpbnQgY2xvY2spIHsKPiA+ICsJaWYgKGNsb2NrIDw9IDI3MDAwKQo+ID4gKwkJcmV0
+dXJuIDg7Cj4gPiArCWVsc2UgaWYgKGNsb2NrIDw9IDE2NzAwMCkKPiA+ICsJCXJldHVybiA0Owo+
+ID4gKwllbHNlCj4gPiArCQlyZXR1cm4gMjsKPiA+ICt9Cj4gPiArCj4gPiAgc3RhdGljIGNvbnN0
+IHN0cnVjdCBtdGtfZHBpX2NvbmYgbXQ4MTczX2NvbmYgPSB7Cj4gPiAgCS5jYWxfZmFjdG9yID0g
+bXQ4MTczX2NhbGN1bGF0ZV9mYWN0b3IsCj4gPiAgCS5yZWdfaF9mcmVfY29uID0gMHhlMCwKPiA+
+IEBAIC02ODAsNiArNzAxLDEyIEBAIHN0YXRpYyB1bnNpZ25lZCBpbnQgbXQyNzAxX2NhbGN1bGF0
+ZV9mYWN0b3IoaW50Cj4gPiBjbG9jaykKPiA+ICAJLmVkZ2Vfc2VsX2VuID0gdHJ1ZSwKPiA+ICB9
+Owo+ID4gCj4gPiArc3RhdGljIGNvbnN0IHN0cnVjdCBtdGtfZHBpX2NvbmYgbXQ4MTgzX2NvbmYg
+PSB7Cj4gPiArCS5jYWxfZmFjdG9yID0gbXQ4MTgzX2NhbGN1bGF0ZV9mYWN0b3IsCj4gPiArCS5y
+ZWdfaF9mcmVfY29uID0gMHhlMCwKPiA+ICsJLmR1YWxfZWRnZSA9IHRydWUsCj4gPiArfTsKPiA+
+ICsKPiA+ICBzdGF0aWMgaW50IG10a19kcGlfcHJvYmUoc3RydWN0IHBsYXRmb3JtX2RldmljZSAq
+cGRldikgIHsKPiA+ICAJc3RydWN0IGRldmljZSAqZGV2ID0gJnBkZXYtPmRldjsKPiA+IEBAIC03
+NzUsNiArODAyLDkgQEAgc3RhdGljIGludCBtdGtfZHBpX3JlbW92ZShzdHJ1Y3QgcGxhdGZvcm1f
+ZGV2aWNlCj4gPiAqcGRldikKPiA+ICAJeyAuY29tcGF0aWJsZSA9ICJtZWRpYXRlayxtdDgxNzMt
+ZHBpIiwKPiA+ICAJICAuZGF0YSA9ICZtdDgxNzNfY29uZiwKPiA+ICAJfSwKPiA+ICsJeyAuY29t
+cGF0aWJsZSA9ICJtZWRpYXRlayxtdDgxODMtZHBpIiwKPiA+ICsJICAuZGF0YSA9ICZtdDgxODNf
+Y29uZiwKPiA+ICsJfSwKPiA+ICAJeyB9LAo+ID4gIH07Cj4gPiAKPiA+IC0tCj4gPiAxLjkuMQo+
+IAoKCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51
+eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVh
+ZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1h
+cm0ta2VybmVsCg==
