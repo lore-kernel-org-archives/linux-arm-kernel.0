@@ -2,80 +2,86 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 48E9AC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:41:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E9E1EC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:41:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0FB7F20870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:41:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BB67A21726
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:41:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RvRPV5Ny";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="BOQ4ycYl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0FB7F20870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QF4JLlfV";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="l8pmlR7C";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="SrpzHPSy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB67A21726
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=U4TBOMqS/o3aH1qTmN9kAauxj9J9O2XkdxO4kVsslWA=; b=RvRPV5NyLK8LV1
-	f6B6UKx6xssiX666uyBODUWXTG+tkrW9UydXF1QBtt519iXPQZ2hPeWiHMOURI1+5K7xVgoD48Ec8
-	diIJ5X00lU2OBoeXYQPBKFR28sMCiu49kpiQeFS4dS9+ECRcArEEqYMOJ/IhrIxFMZW6wGEdYKtup
-	J/q744GB6vGOVbzIvkC2rqXJF3w8we02TLe61BFqL6x8YfDaBkGHbrODKUKkPT03pGum2R1d7sNZR
-	E0XcpfsbrqdFiTeCeTtum+QP65aunz9Af98b7Rz0maHOxEdNs5HR31SGEfNUPSCUgqUQdnm91swxn
-	42eToI3K6em3VeaeRF5g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=NflYiSlvOFnTkmtiE+QhxMF5fqF5xziVV8hhVSmE08Y=; b=QF4JLlfVFaxEAHM8ynxh6QZqW
+	GqzVyUVPbdaNc/0s+fk3UiWB2M9EyrjWonc9Ewuc+rWfv9XdVjt8Rb7vMl96CCcp9JLbi55paGWc2
+	J3WsMDsdxe2VQOm6ZGOSZXYbVq+LkjWXcub6Zg7RJuAAeszS45pLATptC0zpqfa+9Ow6KGVZ/u86B
+	xsSQ7C0XQ5Ga00Q9ijv/GScv1n52jXgtUNeLOIPDyww1Co2+pywzYmwnm2h0ji85vl1FQCiUMjNMf
+	2Sog0n5bPr1yC0s4ai9QHSw2a6eL/DJWPY+2Vt8gxSjBV7FhtZFh/S5JAsuQ7jUsbOSzh5bmz9xFX
+	eyoYI9Mfg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glwIo-0007oi-NC; Tue, 22 Jan 2019 13:41:18 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1glwJJ-00084n-Et; Tue, 22 Jan 2019 13:41:49 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glwIl-0007oN-4J
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 13:41:16 +0000
-Received: from mail-qt1-f177.google.com (mail-qt1-f177.google.com
- [209.85.160.177])
+ id 1glwJG-00084T-Fn
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 13:41:47 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id 0773F6092B; Tue, 22 Jan 2019 13:41:44 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1548164506;
+ bh=IgSFqLdlqQwQpy0++An3pk22QDbSE/HmoAiwGNuADag=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=l8pmlR7CApU4iTgqxZGSntD9khPxRdvi671gf1Ra5ZXRf0XcjZ0r0UxY11zXzJs3u
+ oFqt72nLCad99aVcTm7gvYNfqy73U3S1xBHcBCs3iSlGIhdj7A/p38S6dx3LuB6XXP
+ mA37wclLr8A7BOtE4AZt7w6bgfzvSH20AJQyZdqw=
+Received: from [192.168.1.100] (unknown [157.49.207.12])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id AD25220870
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 13:41:14 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548164474;
- bh=prFZcRP2SYee4GKipvHLC7KZ4SliP42MtaVyeVdlh2A=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=BOQ4ycYlTLpc5uezYKUMOrfAXHswWDBGXLvrEItfClni52ctYZ3ku+tGxWE3R5D/R
- 2HQw3j3kKgTMt7rAMeCTJqbTydKGnWHtkywb7Vc9t4ii/UUVcGRUuQrku/Y9g8EifT
- O+MduOUFFlrmHjm7zJyBXowCguQEWv1pzoRIIUcQ=
-Received: by mail-qt1-f177.google.com with SMTP id i7so27510493qtj.10
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 05:41:14 -0800 (PST)
-X-Gm-Message-State: AJcUukfoqjlYu+Ml8fSm9G10puRl+eOT1AtbYRXbL0deErltTw4iUUxJ
- 8arXoNJujMUjPwjD1uBZeEe9SEopUDxneycCCA==
-X-Google-Smtp-Source: ALg8bN695c+L8pmAwWxgWUmilJnYICCOItILluOzhBlnIdnXOahwthK245Edsf20/kfKy9PIhPJMGlZImkUi73OcWwQ=
-X-Received: by 2002:ac8:6b18:: with SMTP id w24mr31349294qts.144.1548164473958; 
- Tue, 22 Jan 2019 05:41:13 -0800 (PST)
+ (Authenticated sender: saiprakash.ranjan@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id E368260E7A;
+ Tue, 22 Jan 2019 13:41:36 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1548164503;
+ bh=IgSFqLdlqQwQpy0++An3pk22QDbSE/HmoAiwGNuADag=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=SrpzHPSyUvF5x+nV0ANAcRJPS1iE8tXS8f+TwZwKkfQwVnPZQTDzkRk82ALJxsdGm
+ 075re9lTu7Qwj9c4HtFp73T3zvcOaYLEoAG47flCWejiBljI9OWcftEl5MCOHOCfDG
+ FkkeeM4MlQmyaAQwkbrF/w6kaqWPdCXMTz6cdj+4=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org E368260E7A
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
+ smtp.mailfrom=saiprakash.ranjan@codeaurora.org
+Subject: Re: [PATCHv3 1/4] arm64: dts: qcom: sdm845: Add Coresight support
+To: Mathieu Poirier <mathieu.poirier@linaro.org>
+References: <cover.1547813804.git.saiprakash.ranjan@codeaurora.org>
+ <73bf137fd5d6cb6bddecdf13026156afcf9d473b.1547813804.git.saiprakash.ranjan@codeaurora.org>
+ <20190121183731.GA14049@xps15>
+From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+Message-ID: <91bcd4cc-9f66-0ca3-43bf-d912c6080b49@codeaurora.org>
+Date: Tue, 22 Jan 2019 19:11:34 +0530
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <cover.1547629763.git.nicolas.ferre@microchip.com>
- <0005c2ef28b985c663e0cd058bbc6d3856e05ec2.1547629763.git.nicolas.ferre@microchip.com>
- <20190122011014.GA25211@bogus>
- <be8ba0bf-993e-d38c-61e8-af422ff3c636@microchip.com>
-In-Reply-To: <be8ba0bf-993e-d38c-61e8-af422ff3c636@microchip.com>
-From: Rob Herring <robh@kernel.org>
-Date: Tue, 22 Jan 2019 07:41:02 -0600
-X-Gmail-Original-Message-ID: <CAL_Jsq+31C2KXNy_GeVU9g7mZ_aSw3yqdjU-V5mV2Xdc200TuA@mail.gmail.com>
-Message-ID: <CAL_Jsq+31C2KXNy_GeVU9g7mZ_aSw3yqdjU-V5mV2Xdc200TuA@mail.gmail.com>
-Subject: Re: [PATCH 4/8] net/macb: bindings doc/trivial: fix documentation for
- sama5d3 10/100 interface
-To: Nicolas Ferre <Nicolas.Ferre@microchip.com>
+In-Reply-To: <20190121183731.GA14049@xps15>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_054115_208734_C713F58C 
-X-CRM114-Status: GOOD (  19.30  )
+X-CRM114-CacheID: sfid-20190122_054146_555213_F7E9FD50 
+X-CRM114-Status: GOOD (  20.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,60 +93,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- "open list:THERMAL" <linux-pm@vger.kernel.org>,
- netdev <netdev@vger.kernel.org>, Linux USB List <linux-usb@vger.kernel.org>,
- Sebastian Reichel <sre@kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Ludovic Desroches <Ludovic.Desroches@microchip.com>,
- Alan Stern <stern@rowland.harvard.edu>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- David Miller <davem@davemloft.net>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Rajendra Nayak <rnayak@codeaurora.org>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ linux-kernel@vger.kernel.org, linux-arm-msm@vger.kernel.org,
+ Doug Anderson <dianders@chromium.org>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ David Brown <david.brown@linaro.org>, Rob Herring <robh+dt@kernel.org>,
+ Sibi Sankar <sibis@codeaurora.org>, Vivek Gautam <vivek.gautam@codeaurora.org>,
+ Leo Yan <leo.yan@linaro.org>, Andy Gross <andy.gross@linaro.org>,
+ Stephen Boyd <sboyd@kernel.org>, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 22, 2019 at 3:09 AM <Nicolas.Ferre@microchip.com> wrote:
->
-> Hi Rob,
->
-> On 22/01/2019 at 02:10, Rob Herring wrote:
-> > On Wed, Jan 16, 2019 at 10:57:40AM +0100, Nicolas Ferre wrote:
-> >> This removes a line left while adding the correct compatibility string for
-> >> sama5d3 10/100 interface. Now use the "atmel,sama5d3-macb" string.
-> >>
-> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> >> ---
-> >>   Documentation/devicetree/bindings/net/macb.txt | 3 +--
-> >>   1 file changed, 1 insertion(+), 2 deletions(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
-> >> index 3e17ac1d5d58..f5c414b10e27 100644
-> >> --- a/Documentation/devicetree/bindings/net/macb.txt
-> >> +++ b/Documentation/devicetree/bindings/net/macb.txt
-> >> @@ -3,8 +3,7 @@
-> >>   Required properties:
-> >>   - compatible: Should be "cdns,[<chip>-]{macb|gem}"
-> >>     Use "cdns,at91rm9200-emac" Atmel at91rm9200 SoC.
-> >> -  Use "cdns,at91sam9260-macb" for Atmel at91sam9 SoCs or the 10/100Mbit IP
-> >> -  available on sama5d3 SoCs.
-> >> +  Use "cdns,at91sam9260-macb" for Atmel at91sam9 SoCs.
-> >
-> > Where is "atmel,sama5d3-macb"?
->
-> It's actually a couple of line below: line 13 of the resulting macb.txt
-> file. It was already in the file when I removed the leftovers.
->
-> Do you advice to try to better sort entries in this file? Is there a
-> common pattern?
+Hi Mathieu,
 
-Okay, it's fine.
+On 1/22/2019 12:07 AM, Mathieu Poirier wrote:
+> Hi Sai,
+> 
+> On Fri, Jan 18, 2019 at 05:52:53PM +0530, Sai Prakash Ranjan wrote:
+>> Add coresight components found on Qualcomm SDM845 SoC.
+>>
+>> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+>>
+>> ---
+>> This depends on AMBA bus pclk change by Bjorn Andersson [1].
+>> Also depends on patch ("arm64: dts: qcom: sdm845: Increase address
+>> and size cells for soc") [2].
+>>
+>> [1] https://lore.kernel.org/lkml/20190106080915.4493-7-bjorn.andersson@linaro.org/
+>> [2] https://lore.kernel.org/lkml/20190117042940.25487-2-bjorn.andersson@linaro.org/
+> 
+> Thank you for making modifications to this patch - I am happy with how it stands
+> now.  I tried to compile it on my side on a 5.0-rc3 kernel and even after
+> applying the above two patches you pointed out I get the following error:
+> 
+> Error: /home/mpoirier/work/coresight/kernel-maint/arch/arm64/boot/dts/qcom/sdm845.dtsi:1356.31-32 syntax error
+> FATAL ERROR: Unable to parse input tree
+> 
+>  From what I see neither aoss_qmp or AOSS_QMP_QDSS_CLK are defined.  Are there
+> more patches that need to be applied?
+> 
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Sorry, I added all the dependent patches in the cover letter, but
+forgot to add the main dependent patch here, now added in v4.
+
+Thanks,
+Sai
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
 
 _______________________________________________
 linux-arm-kernel mailing list
