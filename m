@@ -2,67 +2,115 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D12B6C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 12:42:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B7DEC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 12:50:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7FCD421019
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 12:42:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3ADCF20855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 12:50:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V/13mfCT";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="v06nkiHy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FCD421019
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Yor4Uskm";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="t4UeGkHr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3ADCF20855
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0mOyRYQaf3k7Oj4DBI/viosRJfRn5h3DTejLCpd5sp4=; b=V/13mfCTwqugsW
-	VYq62Ac13a6jA7GBrw5Zg2+ejV8VQLQK7u3ppd/PZF73W572FcKazVbpJG+qEwVqjlTVnxk4j/CZo
-	LHooPe01PVotAOkOg4XLcW55DlQ3nEPSPUTSVIDVTlQJtzVoXJbw6teNoG/Shsdt5WNeXa4tdkyMD
-	t9ExgbT9cxHs882zWMdhG2PhTFcRtLZzFYb7o4jpt2HBk8YBE6SyrU0ABwREiesWTyfhGYY2NARb+
-	rJZ1LywcFPXCVANUSNQIAXT/iUHPDIttzSeXfHCEZ7meZkkTpolTQU5yIdRu/+I/zoqeHGttGBiiI
-	N8KsyOkpPGcDtYDfk/+Q==;
+	List-Owner; bh=W7v/8qcYg8jS8KxZA1PNn2NVzIdlV4GoVLHz6WPbc2k=; b=Yor4Uskmhn80Ei
+	jWNHionvr/PYILlGtbRjKLApeVchb6eFtf6MWD8Ud5BXRX/OYSwuAJZ68VZByth4feojgdnanPqb9
+	qOk+/6CQy26IzxxgNmv16r1tKNmKB6hKLm229IuWTTfA43gJNePtli8esb8+rpemxfTcFIMbTu78I
+	FuPZobFk9xOBp3xtv4LDWxUrU1uncY2JrAhFYl1n5WFYD5Nld2r3xMT3kc0KoqoxQIaKnL69w1xiL
+	/9IN2QQuv7xbSp8Q7CPWuWgla9XRqjzDh7qhQuObuGc93tvB/i2I/80zT/Ptj/UtAiUgtUZSart5i
+	wsI0At5Toe33qmhRtTpg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glvNo-0008Ju-OX; Tue, 22 Jan 2019 12:42:24 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1glvVj-0004e5-GN; Tue, 22 Jan 2019 12:50:35 +0000
+Received: from mail-eopbgr20075.outbound.protection.outlook.com ([40.107.2.75]
+ helo=EUR02-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glvNc-00086e-Sr; Tue, 22 Jan 2019 12:42:19 +0000
-Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id C3AD420855;
- Tue, 22 Jan 2019 12:42:11 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548160932;
- bh=dp15uKwqwdlEj1uUFXimVhvyYY5t4Ul7E+PFaOKJkoA=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=v06nkiHyaPeoIMyTCPKrOe0E3suQWdz5XaVnRvgqHQqejAIhdf1LusImEJb/HeY7r
- dEIcS4FE27SVcYh5S78YKMW6b0xUIrzkB8W6uFtCT7wpldEVi5WDF7c6LcWKgKKtQm
- HrV03GJ4xaJ4AYHMoirEP7Y/w7o5tYO/Lwsczmas=
-Date: Tue, 22 Jan 2019 13:42:04 +0100
-From: Greg KH <gregkh@linuxfoundation.org>
-To: Georgi Djakov <georgi.djakov@linaro.org>
-Subject: Re: [PATCH v13 0/8] Introduce on-chip interconnect API
-Message-ID: <20190122124204.GA26969@kroah.com>
-References: <20190116161103.6937-1-georgi.djakov@linaro.org>
+ id 1glvVf-0004dg-De
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 12:50:33 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=Yg2TEGRg9ckmg2GBoj3NntO2cs3DNJQpXMZeuO/k8Qc=;
+ b=t4UeGkHrekWpL+U2B31OybllcgCDvkkWxbpmkSw1CDmE13TuX28mIGLRVvvdEGhFJZxR40a0RIl2a7WHVdv/Y132TKbNOwHQc516vAdmqbhMYkTKvSSj+buUPyl8Tw6KIZ5TPr/SpElDZWo54oOBpjCIKu8uY4dj8LZTKqirzTM=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB5155.eurprd04.prod.outlook.com (20.177.40.216) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1537.29; Tue, 22 Jan 2019 12:50:26 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::c4d2:7dfd:4576:bdd5]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::c4d2:7dfd:4576:bdd5%5]) with mapi id 15.20.1558.016; Tue, 22 Jan 2019
+ 12:50:26 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: Lucas Stach <l.stach@pengutronix.de>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Subject: RE: [PATCH 4/4] irq: imx: irqsteer: add multi output interrupts
+ support
+Thread-Topic: [PATCH 4/4] irq: imx: irqsteer: add multi output interrupts
+ support
+Thread-Index: AQHUrwL34aHTasx2wUetvBoWoE17FaW0uIqAgAAPyPCAAAkjAIAGQGdggAATKACAABvAMA==
+Date: Tue, 22 Jan 2019 12:50:26 +0000
+Message-ID: <AM0PR04MB42115D7A2A3BB5505771BD3880980@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1547797668-30342-1-git-send-email-aisheng.dong@nxp.com>
+ <1547797668-30342-5-git-send-email-aisheng.dong@nxp.com>
+ <1547801609.2626.5.camel@pengutronix.de>
+ <AM0PR04MB42111D634F28492434AA9309809C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <1547806960.2626.9.camel@pengutronix.de>
+ <AM0PR04MB42111FE266342A2C2EAECC3580980@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <1548154758.2465.20.camel@pengutronix.de>
+In-Reply-To: <1548154758.2465.20.camel@pengutronix.de>
+Accept-Language: zh-CN, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB5155;
+ 6:Guq/bZu9c3+PYGoE5H0YrhrixBV8/k6BE4dDSByZ3BtAyREao3iu1oKnK8RaCBKA3OyrRFk4neXyWxOMino5p3e3Hmkhn3k5aq3+jBIXs0fCZcB5ZPfUJfuCdTlVqO8AvQLHS4xg0dFc9C93tnHn/6Ceeu+En2VqIlHma7YCCPJiN1088CJG6AbDQ5jG/yHcgEbZL6SX+Hy3zAGB0DN1XL28Z9s+n96QQiksi+EukcUS0nflqgPPxMjOI59xjZuDPsEYojzjPdLM5MyUbj/MUMQ0sISQrSr9+Or8s206Ne/bljQZk5u91FouOa1ooXj7PPmBT6RAC845/U0VeyvND3Mmz9MF3ni1wbEMG77jlDUAgt05qnrG7Gar4nc/DFSatuD5bDvJQ8F1Tvu3IxUIyQxw72ydOAoJ4kOeJka3TqtExMakaxyX6sY9WUmr56Ai8YJi9u5C3doyxdR9ql86Dg==;
+ 5:GHS1aDcvde4KFLl+i1BfkfeIWYUHmlAuy/j8RR4Zb79d15Pzfj3/tpf+PK48v1oPuylHM3XZjY6CUTxC7tGlAvdf4ewpT9eiH7VAtJBbyW80eWn0oyWcn+PJrQbpIGCR+CCu7bJpSvO1/VV4JPjgGR3bWEYbVVMoTfCI1fWWzf2VttCcWlcXkjYHB5G/O1NbJ4ASOgAosgXdNASRRMaaUQ==;
+ 7:Cn22olSvYQq8yLOyTu4aNNRkqNSm7Jybf7NmISc47hDpaQhEKCD7CdagEme8hGoi2cyujCr9AQ7i74COXD/+bdfni98SF1c+PHj7G1bo+mtfdx4/O+YxB11P+Dqtp2wH5yH4BEIBfKElTPktCV/4Dg==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 6bbaa41c-3f7c-4d99-a15c-08d680682ec1
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600109)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB5155; 
+x-ms-traffictypediagnostic: AM0PR04MB5155:
+x-microsoft-antispam-prvs: <AM0PR04MB51551F3E74C31C316B9944BC80980@AM0PR04MB5155.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0925081676
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(346002)(376002)(136003)(39860400002)(366004)(189003)(199004)(229853002)(256004)(3846002)(14444005)(25786009)(106356001)(44832011)(68736007)(102836004)(105586002)(8676002)(66066001)(2906002)(33656002)(6436002)(71190400001)(71200400001)(6116002)(4326008)(14454004)(6246003)(478600001)(316002)(55016002)(93886005)(110136005)(53936002)(486006)(305945005)(9686003)(99286004)(8936002)(26005)(53546011)(11346002)(86362001)(81166006)(2501003)(81156014)(476003)(186003)(6506007)(97736004)(54906003)(74316002)(76176011)(7736002)(446003)(7696005);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5155;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: mxOcieAyyFv/h5H+7otBjBTe1759wHXH6jes4kYX99CGfwYwilv7AyPy+4QxAM6NEktBN1ZpabTHpMS1p9eNJ7C46zaKB+OAWXuxtOr3j1J8mzahWTcqgcEsDpigOxUaMVa0fl98/GsOYzsdUuNZ2Zxx7qebOH7YHAsgRxIq5IIsdS0JBcD69sc7IKOs16Sm6DU1lSlN7w5xHRxZRMf0zcp068YvIEWwxPxsrmTD6m2e31mRepwWNvorSeXsrwTLyk2OxykZW+t6a43EKNFuB1eGvjBGXmA5xmbtLdYPr1+AOHVXu7AnkaSkhd+53nqHcbi9h0vJMvXiys+SWurAq1u00gEAP7rhq31fbNqmWCiWkqs4dr0DE8fX7MQsFdZ5+6xDuYqGluDIHdAPBuOvfB99aUK899p0WfKWiBQxXas=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190116161103.6937-1-georgi.djakov@linaro.org>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 6bbaa41c-3f7c-4d99-a15c-08d680682ec1
+X-MS-Exchange-CrossTenant-originalarrivaltime: 22 Jan 2019 12:50:26.8069 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5155
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_044213_594476_FF5C3081 
-X-CRM114-Status: GOOD (  19.48  )
+X-CRM114-CacheID: sfid-20190122_045031_775896_41BB8D1D 
+X-CRM114-Status: GOOD (  36.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,107 +122,152 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: sanjayc@nvidia.com, maxime.ripard@bootlin.com, mturquette@baylibre.com,
- daidavid1@codeaurora.org, bjorn.andersson@linaro.org, skannan@codeaurora.org,
- abailon@baylibre.com, vincent.guittot@linaro.org, seansw@qti.qualcomm.com,
- khilman@baylibre.com, evgreen@chromium.org, ksitaraman@nvidia.com,
- devicetree@vger.kernel.org, arnd@arndb.de, linux-pm@vger.kernel.org,
- linux-arm-msm@vger.kernel.org, henryc.chen@mediatek.com, andy.gross@linaro.org,
- robh+dt@kernel.org, linux-mediatek@lists.infradead.org,
- linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- rjw@rjwysocki.net, dianders@chromium.org, amit.kucheria@linaro.org,
- linux-kernel@vger.kernel.org, thierry.reding@gmail.com, olof@lixom.net
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>, "tglx@linutronix.de" <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 16, 2019 at 06:10:55PM +0200, Georgi Djakov wrote:
-> Modern SoCs have multiple processors and various dedicated cores (video, gpu,
-> graphics, modem). These cores are talking to each other and can generate a
-> lot of data flowing through the on-chip interconnects. These interconnect
-> buses could form different topologies such as crossbar, point to point buses,
-> hierarchical buses or use the network-on-chip concept.
-> 
-> These buses have been sized usually to handle use cases with high data
-> throughput but it is not necessary all the time and consume a lot of power.
-> Furthermore, the priority between masters can vary depending on the running
-> use case like video playback or CPU intensive tasks.
-> 
-> Having an API to control the requirement of the system in terms of bandwidth
-> and QoS, so we can adapt the interconnect configuration to match those by
-> scaling the frequencies, setting link priority and tuning QoS parameters.
-> This configuration can be a static, one-time operation done at boot for some
-> platforms or a dynamic set of operations that happen at run-time.
-> 
-> This patchset introduce a new API to get the requirement and configure the
-> interconnect buses across the entire chipset to fit with the current demand.
-> The API is NOT for changing the performance of the endpoint devices, but only
-> the interconnect path in between them.
-> 
-> The API is using a consumer/provider-based model, where the providers are
-> the interconnect buses and the consumers could be various drivers.
-> The consumers request interconnect resources (path) to an endpoint and set
-> the desired constraints on this data flow path. The provider(s) receive
-> requests from consumers and aggregate these requests for all master-slave
-> pairs on that path. Then the providers configure each participating in the
-> topology node according to the requested data flow path, physical links and
-> constraints. The topology could be complicated and multi-tiered and is SoC
-> specific.
-> 
-> Below is a simplified diagram of a real-world SoC topology. The interconnect
-> providers are the NoCs.
-> 
-> +----------------+    +----------------+
-> | HW Accelerator |--->|      M NoC     |<---------------+
-> +----------------+    +----------------+                |
->                         |      |                    +------------+
->  +-----+  +-------------+      V       +------+     |            |
->  | DDR |  |                +--------+  | PCIe |     |            |
->  +-----+  |                | Slaves |  +------+     |            |
->    ^ ^    |                +--------+     |         |   C NoC    |
->    | |    V                               V         |            |
-> +------------------+   +------------------------+   |            |   +-----+
-> |                  |-->|                        |-->|            |-->| CPU |
-> |                  |-->|                        |<--|            |   +-----+
-> |     Mem NoC      |   |         S NoC          |   +------------+
-> |                  |<--|                        |---------+    |
-> |                  |<--|                        |<------+ |    |   +--------+
-> +------------------+   +------------------------+       | |    +-->| Slaves |
->   ^  ^    ^    ^          ^                             | |        +--------+
->   |  |    |    |          |                             | V
-> +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
-> | CPUs |  |  | GPU |   | DSP |  | Masters |-->|       P NoC    |-->| Slaves |
-> +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
->           |
->       +-------+
->       | Modem |
->       +-------+
-> 
-> It's important to note that the interconnect API, in contrast with devfreq,
-> is allowing drivers to express their needs in advance and be proactive.
-> Devfreq is using a reactive approach (e.g. monitor performance counters and
-> reconfigure bandwidth when the bottleneck had already occurred), which is
-> suboptimal and might not work well. The interconnect API is designed to
-> deal with multi-tiered bus topologies and aggregating constraints provided
-> by drivers, while the devfreq is more oriented towards a device like GPU
-> or CPU, that controls the power/performance of itself and not other devices.
-> 
-> Some examples of how interconnect API is used by consumers:
-> https://lkml.org/lkml/2018/12/20/811
-> https://lkml.org/lkml/2019/1/9/740
-> https://lkml.org/lkml/2018/10/11/499
-> https://lkml.org/lkml/2018/9/20/986
-> 
-> Platform drivers for different SoCs are available:
-> https://lkml.org/lkml/2018/11/17/368
-> https://lkml.org/lkml/2018/8/10/380
-
-All now queued up, thanks.
-
-greg k-h
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+PiBGcm9tOiBMdWNhcyBTdGFjaCBbbWFpbHRvOmwuc3RhY2hAcGVuZ3V0cm9uaXguZGVdDQo+IFNl
+bnQ6IFR1ZXNkYXksIEphbnVhcnkgMjIsIDIwMTkgNjo1OSBQTQ0KPiBUbzogQWlzaGVuZyBEb25n
+IDxhaXNoZW5nLmRvbmdAbnhwLmNvbT47IGxpbnV4LWtlcm5lbEB2Z2VyLmtlcm5lbC5vcmcNCj4g
+Q2M6IGxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZzsgc2hhd25ndW9Aa2VybmVs
+Lm9yZzsgZGwtbGludXgtaW14DQo+IDxsaW51eC1pbXhAbnhwLmNvbT47IHJvYmgrZHRAa2VybmVs
+Lm9yZzsgZGV2aWNldHJlZUB2Z2VyLmtlcm5lbC5vcmc7DQo+IHRnbHhAbGludXRyb25peC5kZTsg
+TWFyYyBaeW5naWVyIDxtYXJjLnp5bmdpZXJAYXJtLmNvbT4NCj4gU3ViamVjdDogUmU6IFtQQVRD
+SCA0LzRdIGlycTogaW14OiBpcnFzdGVlcjogYWRkIG11bHRpIG91dHB1dCBpbnRlcnJ1cHRzIHN1
+cHBvcnQNCj4gDQo+IEFtIERpZW5zdGFnLCBkZW4gMjIuMDEuMjAxOSwgMTA6MzkgKzAwMDAgc2No
+cmllYiBBaXNoZW5nIERvbmc6DQo+ID4gPiA+ID4gRnJvbTogTHVjYXMgU3RhY2ggW21haWx0bzps
+LnN0YWNoQHBlbmd1dHJvbml4LmRlXQ0KPiA+ID4gU2VudDogRnJpZGF5LCBKYW51YXJ5IDE4LCAy
+MDE5IDY6MjMgUE0NCj4gPg0KPiA+IFsuLi5dDQo+ID4gPiA+ID4gVGhpcyBoYXMgYmVlbiBkaXNj
+dXNzZWQgd2hlbiB1cHN0cmVhbWluZyB0aGUgZHJpdmVyLiBUaGUNCj4gPiA+ID4gPiBjb250cm9s
+bGVyIG1heSBzdXBwb3J0IG11bHRpcGxlIG91dHB1dCBJUlFzLCBidXQgb25seSBvbmUgdGhlbQ0K
+PiA+ID4gPiA+IGlzIGFjdHVhbGx5IHVzZWQgZGVwZW5kaW5nIG9uIHRoZSBDSEFOQ1RSTCBjb25m
+aWcuIFRoZXJlIGlzIG5vDQo+ID4gPiA+ID4gdXNlIGluIGhvb2tpbmcgdXAgYWxsIHRoZSBvdXRw
+dXQgSVJRcyBpbiBEVCwgaWYgb25seSBvbmUgb2YgdGhlbQ0KPiA+ID4gPiA+IGlzIGFjdHVhbGx5
+IHVzZWQuIFNvbWUgb2YgdGhlIG91dHB1dHMgbWF5IG5vdCBldmVuIGJlIHZpc2libGUgdG8NCj4g
+PiA+ID4gPiB0aGUgTGludXggc3lzdGVtLCBidXQgbWF5IGJlbG9uZyB0byBhIENvcnRleCBNNCBz
+dWJzeXN0ZW0uIEFsbA0KPiA+ID4gPiA+IG9mIHRob3NlIGNvbmZpZ3VyYXRpb25zIGNhbiBiZSBk
+ZXNjcmliZWQgaW4gRFQgYnkgY2hhbmdpbmcgdGhlDQo+ID4gPiA+ID4gdXBzdHJlYW0gaW50ZXJy
+dXB0IGFuZCAiZnNsLGNoYW5uZWwiIGluIGENCj4gPiA+DQo+ID4gPiBjb2hlcmVudCB3YXkuDQo+
+ID4gPiA+ID4NCj4gPiA+ID4gPiBQbGVhc2UgY29ycmVjdCBtZSBpZiBteSB1bmRlcnN0YW5kaW5n
+IGlzIHRvdGFsbHkgd3JvbmcuDQo+ID4gPiA+DQo+ID4gPiA+IEknbSBhZnJhaWQgeW91ciB1bmRl
+cnN0YW5kaW5nIG9mIENIQU4gc2VlbXMgd3JvbmcuDQo+ID4gPiA+IChCaW5kaW5nIGRvYyBvZiB0
+aGF0IHByb3BlcnR5IG5lZWRzIGNoYW5nZSBhcyB3ZWxsKS4NCj4gPiA+ID4NCj4gPiA+ID4gT24g
+UVhQIERDIFNTLCB0aGUgSVJRU1RFRVIgc3VwcG9ydHMgNTEyIGludGVycnVwdHMgd2l0aCA4DQo+
+ID4gPiA+IGludGVycnVwdCBvdXRwdXQgQ29ubnRlY3RlZCB0byBHSUMuDQo+ID4gPiA+IFRoZSBj
+dXJyZW50IGRyaXZlciBkb2VzIG5vdCBzdXBwb3J0IGl0IGFzIGl0IGFzc3VtZXMgb25seSBvbmUN
+Cj4gPiA+ID4gaW50ZXJydXB0DQo+ID4gPg0KPiA+ID4gb3V0cHV0IHVzZWQuDQo+ID4gPg0KPiA+
+ID4gT2theSwgc28gbGV0J3MgdGFrZSBhIHN0ZXAgYmFjay4gVGhlIGRlc2NyaXB0aW9uIGluIHRo
+ZSBRWFAgUk0gaXMNCj4gPiA+IGFjdHVhbGx5IGJldHRlciB0aGFuIHdoYXQgSSd2ZSBzZWVuIHVu
+dGlsIG5vdy4gU3RpbGwgaXQncyB0b3RhbGx5IGNvbmZ1c2luZyB0aGF0DQo+IHRoZSAiY2hhbm5l
+bCINCj4gPiA+IHRlcm1pbm9sb2d5IHVzZWQgd2l0aCBkaWZmZXJlbnQgbWVhbmluZ3MgaW4gZG9j
+cy4gTGV0J3MgdHJ5IHRvIGF2b2lkDQo+ID4gPiB0aGlzIGFzIG11Y2ggYXMgcG9zc2libGUuDQo+
+ID4gPg0KPiA+ID4gU28gdG8gZ2V0IHRoaW5ncyBzdHJhaWdodDogRWFjaCBpcnFzdGVlciBjb250
+cm9sbGVyIGhhcyBhIG51bWJlciBvZiBJUlENCj4gZ3JvdXBzLg0KPiA+ID4gQWxsIHRoZSBpbnB1
+dCBJUlFzIG9mIG9uZSBncm91cCBhcmUgT1JlZCB0b2dldGhlciB0byBmb3JtIG9uIG91dHB1dCBJ
+UlEuDQo+ID4gPiBEZXBlbmRpbmcgb24gdGhlIFNvQyBpbnRlZ3JhdGlvbiwgYSBncm91cCBjYW4g
+Y29udGFpbiAzMiBvcg0KPiA+ID4gNjQgSVJRcywgd2hlcmUgRENTUyBpcnFzdGVlciBvbiBNWDhN
+IGFuZCB0aGUgYmlnIDUxMiBpbnB1dA0KPiA+ID4gY29udHJvbGxlcnMgb24gUVhQIGFuZCBRTSBi
+b3RoIHVzZSA2NCBJUlFzIHBlciBncm91cC4gWW91IGFyZQ0KPiA+ID4gY2xhaW1pbmcgdGhhdCB0
+aGUgc21hbGxlciBjb250cm9sbGVycyBvbiBib3RoIFFYUCBhbSBRTSBoYXZlIG9ubHkgMzINCj4g
+SVJRcyBwZXIgZ3JvdXAsIHJpZ2h0Pw0KPiA+ID4NCj4gPiA+IFNvIHRoZSBvbmx5IGNoYW5nZSB0
+aGF0IGlzIG5lZWRlZCBpcyB0aGF0IHRoZSBkcml2ZXIgbmVlZHMgdG8ga25vdw0KPiA+ID4gdGhl
+IG51bWJlciBvZiBpbnB1dCBJUlFzIHBlciBncm91cCwgd2l0aCBhIGRlZmF1bHQgb2YgNjQgdG8g
+bm90IGJyZWFrIERUDQo+IGNvbXBhdGliaWxpdHkuDQo+ID4gPg0KPiA+DQo+ID4gTm90IGV4YWN0
+bHkuDQo+ID4gZnJvbSBIVyBwb2ludCBvZiB2aWV3ICwgdGhlcmUncmUgdHdvIHBhcmFtZXRlcnMg
+ZHVyaW5nIElSUVNURUVSDQo+IGludGVncmF0aW9uLg0KPiA+IEZvciBleGFtcGxlLA0KPiA+IERD
+IGluIFFYUDoNCj4gPiA+ID4gcGFyYW1ldGVywqDCoElSUUNIQU4JCT3CoMKgMTvCoAkvL051bWJl
+ciBvZiBJUlEgQ2hhbm5lbHMvU2xvdHMNCj4gPiA+ID4gcGFyYW1ldGVywqDCoE5JTlQzMgkJPcKg
+wqA4OwkvL051bWJlciBvZiBpbnRlcnJ1cHRzIGluIG11bHRpcGxlDQo+IG9mIDMyDQo+IA0KPiBJ
+ZiB0aGlzIGlzIGFsd2F5cyBpbiBtdWx0aXBsZXMgb2YgMzIsIHRoZSBvbmx5IGNoYW5nZSB3ZSBu
+ZWVkIHRvIG1ha2UgdG8gdGhlDQo+IGRyaXZlciBpcyB0byBmaXggRFQgYmluZGluZyBhbmQgaW50
+ZXJwcmV0YXRpb24gb2YgdGhlICJmc2wsaXJxLWdyb3VwcyIgcHJvcGVydHkgdG8NCj4gYmUgaW4g
+bXVsdGlwbGVzIG9mIDMyLg0KPiANCj4gVGhpcyBtZWFucyBpLk1YOE1RIERDU1MgaXJxc3RlZXIg
+d291bGQgbmVlZCB0byBjaGFuZ2UgdG8gMiBpcnEtZ3JvdXBzLCBidXQNCj4gYXMgdGhpcyBpc24n
+dCB1c2VkIHVwc3RyZWFtIHlldCB3ZSBjYW4gc3RpbGwgZG8gdGhpcyBjaGFuZ2Ugd2l0aG91dCBi
+cmVha2luZyB0b28NCj4gbXVjaCBzdHVmZiBhbmQgSSB3b3VsZCByYXRoZXIgY29ycmVjdCB0aGlz
+IG5vdyB0aGFuIGtlZXBpbmcgYSBEVCBiaW5kaW5nDQo+IGFyb3VuZCB0aGF0IGRvZXNuJ3QgbWF0
+Y2ggdGhlIEhXLg0KPiANCj4gPiBNSVBJIENTSSBpbiBNUToNCj4gPiA+IFBhcmFtZXRlcsKgwqBJ
+UlFDSEFOCQk9IDENCj4gPiA+IFBhcmFtZXRlcsKgwqBOSU5UMzIJCT0gMQ0KPiA+DQo+ID4gWW91
+IHdpbGwgc2VlIG5vIGdyb3VwIGNvbmNlcHQgdXNlZCBoZXJlLiBPbmx5IGNoYW5uZWwgbnVtYmVy
+IGFuZA0KPiBpbnRlcnJ1cHRzIG51bWJlci4NCj4gPiBUaGUgZ3JvdXAgaXMgYW4gSVAgaW50ZXJu
+YWwgY29uY2VwdCB0aGF0IE9SZWQgYSBncm91cCBvZiA2NCBpbnRlcnJ1cHRzDQo+ID4gaW50byBh
+biBvdXRwdXQgaW50ZXJydXB0LiBCdXQgaXQgbWF5IGFsc28gb25seSB1c2UgMzIgaW50ZXJydXB0
+cyBpbiB0aGUgc2FtZQ0KPiBncm91cC4NCj4gDQo+IEkgc3VwcG9zZSB0aGF0IHRoZSBPUiBncm91
+cCBzaXplIGF0IHRoYXQgcG9pbnQgaXMgYWx3YXlzIDY0IGlucHV0IElSUXMgcGVyDQo+IG91dHB1
+dCBJUlEsIHJpZ2h0PyBTbyB3aXRoIE5JTlQzMiA9PSAxIHlvdSBlbmQgdXAgd2l0aCAxIG91dHB1
+dCBJUlEsIGJ1dCBmb3INCj4gTklOVDMyID09IDMgeW91IGdldCAyIG91dHB1dCBJUlFzLCBjb3Jy
+ZWN0Pw0KPiANCj4gPiA+IEFsc28gaWYgdGhlIGNvbm5lY3Rpb24gYmV0d2VlbiBJUlEgZ3JvdXAg
+YW5kIG91dHB1dCBJUlEgaXMgZml4ZWQsDQo+ID4gPiB0aGUgZHJpdmVyIHNob3VsZCBiZSBtb3Jl
+IGNsZXZlciBhYm91dCBoYW5kbGluZyB0aGUgY2hhaW5lZCBJUlEuIElmDQo+ID4gPiB5b3Uga25v
+dyB3aGljaCBvZiB0aGUgdXBzdHJlYW0gSVJRcyBmaXJlZCB5b3Ugb25seSBuZWVkIHRvIGxvb2sg
+YXQNCj4gPiA+IHRoZSAzMiBvciA2NCBJUlEgc3RhdHVzIHJlZ2lzdGVycyBvZiB0aGF0IHNwZWNp
+ZmljIGdyb3VwLCBub3QgYWxsIG9mIHRoZW0uDQo+ID4NCj4gPiBZZXMsIHRoYXQncyByaWdodC4N
+Cj4gPiBJIHBsYW5uZWQgdG8gZG8gdGhhdCBsYXRlciB3aXRoIGEgc2VwYXJhdGUgcGF0Y2ggYmVm
+b3JlLg0KPiANCj4gTGV0J3MgZG8gaXQgcmlnaHQgd2l0aCB0aGUgZmlyc3QgcGF0Y2guIFRoaXMg
+ZG9lc24ndCBzZWVtIGxpa2UgYSBiaWcgY2hhbmdlLg0KPiANCj4gPg0KPiA+ID4NCj4gPiA+IENh
+biB5b3UgcGxlYXNlIGNsYXJpZnkgd2hhdCB0aGUgQ0hBTkNUUkwgc2V0dGluZyBjaGFuZ2VzIGlu
+IHRoaXMgc2V0dXA/DQo+ID4gPg0KPiA+DQo+ID4gSVJRc3RlZXIgc3VwcG9ydHMgdXAgdG8gNSBz
+ZXBhcmF0ZSBDQUhOTkVMUyB3aGljaCBlYWNoIG9mIHRoZW0NCj4gPiBzdXBwb3J0cyB1cCB0byA1
+MTIgaW50ZXJydXB0cy4gQ0hBTkNUTCBpcyB1c2VkIHRvIGVuYWJsZSB0aG9zZSByZXNwZWN0aXZl
+DQo+IENIQU4gb3V0cHV0IGludGVycnVwdHMuDQo+ID4gZS5nLg0KPiA+IDF+OCBvdXRwdXQgaW50
+ZXJydXB0cyBvZiBDSEFOMC4NCj4gPg0KPiA+IE9uZSBub3RhYmxlIHRoaW5nIGlzIHRoZSBlYWNo
+IGNoYW5uZWwgaGFzIGEgc2VwYXJhdGUgYWRkcmVzcyBzcGFjZS4NCj4gPiBUaGF0IG1lYW5zIHRo
+ZSBjaGFuMSByZWcgYWRkcmVzcyBpcyBub3QgdGhlIG9uZSB3ZSBzcGVjaWZpZWQgaW4gZGVmYXVs
+dCByZWcNCj4gcHJvcGVydHkuDQo+ID4gU28gdGhlIGNvcnJlY3QgZHRzIG1heSBiZSBsaWtlIGZv
+ciBtdWx0aSBjaGFubmVscyBjYXNlcy4NCj4gPiBpbnRlcnJ1cHQtY29udHJvbGxlckAzMmUyZDAw
+MCB7DQo+ID4gwqDCoMKgwqDCoMKgwqDCoGNvbXBhdGlibGUgPSAiZnNsLGlteDhtLWlycXN0ZWVy
+IiwgImZzbCxpbXgtaXJxc3RlZXIiOw0KPiA+IMKgwqDCoMKgwqDCoMKgwqByZWcgPSA8MHgzMmUy
+ZDAwMCAweDEwMDA+LA0KPiA+IMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqA8MHgzMmUyZTAw
+MCAweDEwMDA+LA0KPiA+IMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqA8MHgzMmUyZjAwMCAw
+eDEwMDA+Ow0KPiA+IMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAuLi4NCj4gPiDCoMKgwqDC
+oMKgwqDCoMKgcmVnLW5hbWVzID0gImNoMCIsICJjaDEiLCAiY2gyIiwgLi4uOw0KPiA+IMKgwqDC
+oMKgwqDCoMKgwqBpbnRlcnJ1cHRzID0gPEdJQ19TUEkgMTggSVJRX1RZUEVfTEVWRUxfSElHSD47
+DQo+ID4gwqDCoMKgwqDCoMKgwqDCoGZzbCxpcnFzLXBlci1jaGFuPSA8NjQ+Ow0KPiA+IMKgwqDC
+oMKgwqDCoMKgwqBpbnRlcnJ1cHQtY29udHJvbGxlcjsNCj4gPiDCoMKgwqDCoMKgwqDCoMKgI2lu
+dGVycnVwdC1jZWxscyA9IDwyPjsgLy9jZWxsIDA6IGNoYW4gaW5kZXggY2VsbCAyOiBpbnRlcnJ1
+cHQNCj4gPiBudW1iZXIgfTsgVGhpcyBtYWtlcyB0aGUgdGhpbmdzIHF1aXRlIGNvbXBsaWNhdGVk
+Lg0KPiANCj4gV2l0aCB0aGUgY3VycmVudCBiaW5kaW5nLCB3aGF0IGtlZXBzIHVzIGZyb20gZGVz
+Y3JpYmluZyBzdWNoIGEgbXVsdGktIGNoYW5uZWwNCj4gaXJxc3RlZXIgd2l0aCBtdWx0aXBsZSBE
+VCBub2RlcyBhbmQgaGF2ZSBtdWx0aXBsZSBkcml2ZXIgaW5zdGFuY2VzPyBJIGRvbid0IHNlZQ0K
+PiB3aHkgd2Ugd291bGQgbmVlZCB0byBtaXggdGhpcyBhbGwgaW50byBvbmUgZHJpdmVyIGluc3Rh
+bmNlLiBTbyBmb3IgeW91ciBhYm92ZQ0KPiBleGFtcGxlLCBzb21ldGhpbmcgbGlrZToNCj4gDQo+
+IGludGVycnVwdC1jb250cm9sbGVyQDMyZTJkMDAwIHsNCj4gCWNvbXBhdGlibGUgPSAiZnNsLGlt
+eDhtLWlycXN0ZWVyIiwgImZzbCxpbXgtaXJxc3RlZXIiOz4NCj4gCXJlZyA9IDwweDMyZTJkMDAw
+IDB4MTAwMD47DQo+IAlpbnRlcnJ1cHRzID0gPEdJQ19TUEkgMTggSVJRX1RZUEVfTEVWRUxfSElH
+SD47DQo+IAlmc2wsY2hhbm5lbCA9IDwwPjsNCj4gfTsNCj4gDQo+IGludGVycnVwdC1jb250cm9s
+bGVyQDMyZTJlMDAwIHsNCj4gCWNvbXBhdGlibGUgPSAiZnNsLGlteDhtLWlycXN0ZWVyIiwgImZz
+bCxpbXgtaXJxc3RlZXIiOz4NCj4gCXJlZyA9IDwweDMyZTJlMDAwIDB4MTAwMD47DQo+IAlpbnRl
+cnJ1cHRzID0gPEdJQ19TUEkgMjYgSVJRX1RZUEVfTEVWRUxfSElHSD47DQo+IAlmc2wsY2hhbm5l
+bCA9IDwxPjsNCj4gfTsNCj4gDQoNCkFmdGVyIGEgYml0IG1vcmUgdGhpbmtpbmcsIEkgZ3Vlc3Mg
+dGhpcyBtaWdodCB3b3JrIGFzIHdlIGhhdmUgc2VwYXJhdGUgcmVnaXN0ZXIgc3BhY2UNCldlIGFs
+c28gaGF2ZSBtaW5pb3JlZCBDSEFOQ1RMIGZvciBlYWNoIGNoYW5uZWwsIGFsbCB0aGluZ3MgbWFr
+ZSB0aGVtIGxvb2sgbGlrZQ0Kc2VwYXJhdGUgSVJRU1RFRVJzLg0KZS5nLg0KQUlQUyDigJMgc2xv
+dCA5CTY0S0IJSVJRU1RSLlNDVTINCkFJUFMg4oCTIHNsb3QgOAk2NEtCCUlSUVNUUi5EU1ANCkFJ
+UFMg4oCTIHNsb3QgNwk2NEtCCUlSUVNUUi5DTTRfMA0KQUlQUyDigJMgc2xvdCA2CTY0S0IJSVJR
+U1RSLlNDVQ0KDQpJIG5lZWQgdGFsayB0byB0aGUgSVAgbW9kdWxlIGRlc2lnbmVyIHRvIG1ha2Ug
+c3VyZSB0aGUgbWlycm9yIGNoYW5jdGwgY2FuIHdvcmsgd2VsbA0KQW5kIGdldCBiYWNrIHRvIHlv
+dSBsYXRlciBvbmNlIGhhdmUgYW4gY29uY2x1c2lvbi4NCg0KSWYgdGhhdCdzIG9rLCB0aGVuIHdl
+IG1heSBvbmx5IG5lZWQgdXBkYXRlIGZzbCxpcnEtZ3JvdXBzIHRvIGZzbCxpcnFzLXBlci1jaGFu
+Lg0KDQooQlRXLCB0aG9zZSBpcnFzdGVlcnMgYWN0dWFsbHkgYXJlIG5vdCB1c2VkIGJ5IEEgY29y
+ZSwgdGhleSdyZSB1c2QgYnkgU0NVLCBNNCBhbmQgRFNQLg0KU28gdGhpcyBhY3R1YWxseSBkb2Vz
+IG5vdCBhZmZlY3QgQSBjb3JlIHNpZGUgd29yay4gRS5nLiBMaW51eCkNCg0KUmVnYXJkcw0KRG9u
+ZyBBaXNoZW5nDQoNCj4gPiBJbiByZWFsaXR5LCB3ZSBzdGlsbCBkb24ndCBoYXZlIHN1Y2ggdXNp
+bmcgY2FzZXMgc28gZmFyIGFzIGFzIG11bHRpDQo+ID4gY2hhbm5lbHMgdXN1YWxseSBhcmUgdXNl
+ZCB0byBkZWxpdmVyIHRoZSBpbnRlcnJ1cHRzIHRvIGRpZmZlcmVudA0KPiA+IGNvcmVzLCBlLmcu
+IE00LCBTQ1UsIG9yIERTUCwgQSBjb3JlIGRvbid0IGhhbmRsZSBpdC4NCj4gPiBTbyBJIGRpZCBu
+b3QgY2hhbmdlIGl0IGN1cnJlbnRseSBhcyBpdCdzIGFub3RoZXIgc3RvcnkuDQo+ID4gVGhpcyBw
+YXRjaCBzZXJpZXMgbWFpbmx5IGFpbXMgdG8gYWRkIHN1cHBvcnQgZm9yIDMyIG9yIDUxMiBpbnRl
+cnJ1cHRzDQo+ID4gY2hhbm5lbCBhbmQgbXVsdGlwbGUgT3V0cHV0cyBmb3IgYSBzaW5nbGUgQ0hB
+Tk5FTCBjYXNlLg0KPiANCj4gVGhlIHRoaW5nIGlzLCBpZiB3ZSB3YW50IHRvIGV2ZW4gdHJ5IHRv
+IGtlZXAgRFQgc3RhYmlsaXR5IHdlIG5lZWQgdG8gdW5kZXJzdGFuZA0KPiBob3cgdGhpcyBIVyBi
+bG9jayBjYW4gYmUgdXNlZCBhbmQgaG93IHdlIGNhbiBkZXNjcmliZSB0aGlzIGluIHRoZSBEVC4N
+Cj4gDQo+IFJlZ2FyZHMsDQo+IEx1Y2FzDQpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0t
+a2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFp
+bG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
