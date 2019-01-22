@@ -2,65 +2,93 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3E854C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 16:28:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 58E8AC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 16:48:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0620D2085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 16:28:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2724D21019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 16:48:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gvZBnb1z"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0620D2085A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SPTlq+9S";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="O2N0aNf5";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="UTO6FxKs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2724D21019
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Upo0r3MXrkn7ZEPxIK6woPeR14eSTo80nW3E/CmWwb8=; b=gvZBnb1z17AGwm
-	IwvZyxTIiEbs3UQ9mw2GbX6ybmUMjsUEwtOS9m9+RylR/zGMrzk6AQnUPFnqGdkw38M9AgJYRTTtQ
-	GhtW14wsWQYd0YCBXS06jTJKmgjzo3ngz0d3u/b4MPqYKZMvFrMPo4bsCyGz18BTOgHF7i0PRJroY
-	l8Jsk0SZZ32ipjCMfOXnwmJCvgzHA+7oC9AAmM7iuvJalmEgxCcHYe/tAz5NQFOotJAKFvFD3m3us
-	tXB3kjJonul+Fnq7Q9hhNAfR3l6uIW0J5Nv4E7Z+JgD+A2UED7ekneEKvIi6arzLj8zAhToYZQGuq
-	w028M2zgDZyqfYTrxngg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=+6joawM6nAgos7ynNgCUA4oAsyIvMKocaULjKCcTZlI=; b=SPTlq+9SyxB23SFZEztPvhDlj
+	jh49om18Mp4U0J7MDx7ESvwlZBnzYeYXfQ0eoDkzxYiGqyan396wY4tEz39b8TUxAKioFGWfuBr0R
+	q1TMaCOTFt4GymBnwR+FghSOQLACJPDhwAos908By6i9TEp/jT8yVA52noBs2nyomsS/0MiRnaXLN
+	MKuh7NPUC2wgk0mPoWG3qItP9T5mnd276rCoLGcQgOwnB7bCrGLBBaNBa4CwEIK9f9S8OVoCOK3WH
+	ptdG6yFweGCfSb2qTw/6NkE9C+7VN51yk+IBbhhlc2UeC07eP0IM4oaaDjVFXr5/uVvenq9lyXKQ1
+	aeVc+4D1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glyu9-00061b-3o; Tue, 22 Jan 2019 16:28:01 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glyu5-0005u5-PV
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 16:27:59 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3E622A78;
- Tue, 22 Jan 2019 08:27:57 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B55AB3F6A8;
- Tue, 22 Jan 2019 08:27:55 -0800 (PST)
-Date: Tue, 22 Jan 2019 16:27:53 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Marc Zyngier <marc.zyngier@arm.com>
-Subject: Re: [PATCH v4 13/25] KVM: arm64/sve: System register context switch
- and access support
-Message-ID: <20190122162752.GI3578@e103592.cambridge.arm.com>
-References: <1547757219-19439-1-git-send-email-Dave.Martin@arm.com>
- <1547757219-19439-14-git-send-email-Dave.Martin@arm.com>
- <3d6da606-d7ae-5232-8317-4c550370b469@arm.com>
+	id 1glzEG-0006Ru-20; Tue, 22 Jan 2019 16:48:48 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glzEC-0006RU-FF
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 16:48:45 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id AC61360795; Tue, 22 Jan 2019 16:48:43 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1548175723;
+ bh=eP2k8C/TWcMco/1C7Pz9d07P0ZKYfLgyo4TtCUaWb3o=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=O2N0aNf59MRngS49WBCvadWzxu+57ZmDEQOx4wXf8ttQel1I08KMEOS8lk5AAXjxN
+ /9SgML3St6z0f9Z5JDDvjR+/cGJjUjv7SPvzgPoK0NaAUXmCvami6DLo+A/ZTUYJRa
+ UyNY+Enh4vnTHMYeh1mTq8sqQmIdwD4I0CCuFOEk=
+Received: from [192.168.1.100] (unknown [157.49.207.12])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ (Authenticated sender: saiprakash.ranjan@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 158736024C;
+ Tue, 22 Jan 2019 16:48:34 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1548175722;
+ bh=eP2k8C/TWcMco/1C7Pz9d07P0ZKYfLgyo4TtCUaWb3o=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=UTO6FxKssWDy7V5uPfYO6e0XTr3b8t3R3PB7G38CYMIW5+nzFFD2X0juqhfRgpCQm
+ Dg3fZH01y2hmywiut0kmLGh8WO8y/osiWx+sNjZ/8OeVi/QsQ0co4DS2HccCpe4T1h
+ +hbWeCf+kwIlyKsBHFmP+ynGnFdgLvKrcZxlyv9o=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 158736024C
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
+ smtp.mailfrom=saiprakash.ranjan@codeaurora.org
+Subject: Re: [PATCHv4 1/4] arm64: dts: qcom: sdm845: Add Coresight support
+To: Suzuki K Poulose <suzuki.poulose@arm.com>, robh+dt@kernel.org,
+ mathieu.poirier@linaro.org, leo.yan@linaro.org,
+ alexander.shishkin@linux.intel.com, andy.gross@linaro.org,
+ david.brown@linaro.org, vivek.gautam@codeaurora.org, dianders@chromium.org,
+ sboyd@kernel.org, bjorn.andersson@linaro.org, devicetree@vger.kernel.org,
+ mark.rutland@arm.com
+References: <cover.1548133311.git.saiprakash.ranjan@codeaurora.org>
+ <ad16cfb9b6f5efb85149458d5f5a1abf43fa027c.1548133311.git.saiprakash.ranjan@codeaurora.org>
+ <1bd39862-0725-70ce-6535-fdb59569f683@arm.com>
+ <75ed74af-6946-b86d-092e-42dc16e55308@codeaurora.org>
+ <91a90daa-9e14-2d2e-e633-2ddfdc0955bf@arm.com>
+From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+Message-ID: <3906faf1-abbd-9c28-ad55-ed3800f06352@codeaurora.org>
+Date: Tue, 22 Jan 2019 22:18:31 +0530
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <3d6da606-d7ae-5232-8317-4c550370b469@arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <91a90daa-9e14-2d2e-e633-2ddfdc0955bf@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_082757_856680_00A670A3 
-X-CRM114-Status: GOOD (  33.06  )
+X-CRM114-CacheID: sfid-20190122_084844_547462_5857F01D 
+X-CRM114-Status: GOOD (  24.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,121 +100,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
- Christoffer Dall <cdall@kernel.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-arm-msm@vger.kernel.org, rnayak@codeaurora.org, sibis@codeaurora.org,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 18, 2019 at 04:42:07PM +0000, Marc Zyngier wrote:
-> On 17/01/2019 20:33, Dave Martin wrote:
-> > This patch adds the necessary support for context switching ZCR_EL1
-> > for each vcpu.
-> > 
-> > ZCR_EL1 is trapped alongside the FPSIMD/SVE registers, so it makes
-> > sense for it to be handled as part of the guest FPSIMD/SVE context
-> > for context switch purposes instead of handling it as a general
-> > system register.  This means that it can be switched in lazily at
-> > the appropriate time.  No effort is made to track host context for
-> > this register, since SVE requires VHE: thus the hosts's value for
-> > this register lives permanently in ZCR_EL2 and does not alias the
-> > guest's value at any time.
-> > 
-> > The Hyp switch and fpsimd context handling code is extended
-> > appropriately.
-> > 
-> > Accessors are added in sys_regs.c to expose the SVE system
-> > registers and ID register fields.  Because these need to be
-> > conditionally visible based on the guest configuration, they are
-> > implemented separately for now rather than by use of the generic
-> > system register helpers.  This may be abstracted better later on
-> > when/if there are more features requiring this model.
-> > 
-> > ID_AA64ZFR0_EL1 is RO-RAZ for MRS/MSR when SVE is disabled for the
-> > guest, but for compatibility with non-SVE aware KVM implementations
-> > the register should not be enumerated at all for KVM_GET_REG_LIST
-> > in this case.  For consistency we also reject ioctl access to the
-> > register.  This ensures that a non-SVE-enabled guest looks the same
-> > to userspace, irrespective of whether the kernel KVM implementation
-> > supports SVE.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
-[...]
-
-> > diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
-> > index 1cf4f02..5ff2d90 100644
-> > --- a/arch/arm64/kvm/fpsimd.c
-> > +++ b/arch/arm64/kvm/fpsimd.c
-> > @@ -103,6 +103,8 @@ void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu)
-> >  void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
-> >  {
-> >  	unsigned long flags;
-> > +	bool host_has_sve = system_supports_sve();
-> > +	bool guest_has_sve = vcpu_has_sve(vcpu);
-> >  
-> >  	local_irq_save(flags);
-> >  
-> > @@ -110,7 +112,11 @@ void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
-> >  		/* Clean guest FP state to memory and invalidate cpu view */
-> >  		fpsimd_save();
-> >  		fpsimd_flush_cpu_state();
-> > -	} else if (system_supports_sve()) {
-> > +
-> > +		if (guest_has_sve)
-> > +			vcpu->arch.ctxt.sys_regs[ZCR_EL1] =
-> > +				read_sysreg_s(SYS_ZCR_EL12);
-> 
-> nit: Please keep assignments on a single line.
-
-My antipathy for long lines got the better of me here.
-
-If I can come up with a non-ridiculous way of shortening this line I'll
-do that, otherwise I'm can join these lines and live with it.
-
-> 
-> > +	} else if (host_has_sve) {
-> >  		/*
-> >  		 * The FPSIMD/SVE state in the CPU has not been touched, and we
-> >  		 * have SVE (and VHE): CPACR_EL1 (alias CPTR_EL2) has been
-
-[...]
-
-> >  /*
-> >   * cpufeature ID register user accessors
-> >   *
-> > @@ -1278,7 +1374,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
-> >  	ID_SANITISED(ID_AA64PFR1_EL1),
-> >  	ID_UNALLOCATED(4,2),
-> >  	ID_UNALLOCATED(4,3),
-> > +#ifdef CONFIG_ARM64_SVE
-> > +	{ SYS_DESC(SYS_ID_AA64ZFR0_EL1), access_id_aa64zfr0_el1, .get_user = get_id_aa64zfr0_el1, .set_user = set_id_aa64zfr0_el1, .check_present = sve_check_present },
-> > +#else
-> >  	ID_UNALLOCATED(4,4),
-> > +#endif
-> 
-> Can't we always have this code present and fallback to the "unallocated"
-> behaviour at runtime?
-
-This may actually be preferable, since "check_present()" sounds like it
-ought to be used to check whether the register is present for all
-purposes, whereas right now it's only called to check whether to
-enumerate the register in KVM_GET_REG_LIST.  This behaviour may confuse
-us later on...
-
-There may have been some difficulty with this, but if so I can't
-remember what.  I'll take a look.
-
-[...]
-
-Cheers
----Dave
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgU3V6dWtpLAoKT24gMS8yMi8yMDE5IDk6MzggUE0sIFN1enVraSBLIFBvdWxvc2Ugd3JvdGU6
+Cj4gCj4gQnkgaW5jb25zaXN0ZW50LCBJIG1lYW50IHRoZSByZWdpc3RlcnMgcHJvdmlkZXMgdmFs
+dWVzIHdoaWNoIGFyZSBub3QKPiB0aGUgc2FtZSBvbiB0d28gZGlmZmVyZW50IENQVXMgb2YgdGhl
+ICpzYW1lIHR5cGUqLiBBbmQgaXQgaXMgZXhwZWN0ZWQKPiB0aGF0IHR3byBkaWZmZXJlbnQgQ1BV
+L0VUTSBpbXBsZW1lbnRhdGlvbnMgd2lsbCBoYXZlIGRpZmZlcmVudCBQSURzLgo+IAoKU0RNODQ1
+IGhhcyA0IEtyeW8gMzg1IEdvbGQgKEFSTSBBNzUpICsgNCBLcnlvIDM4NSBTaWx2ZXIgKEFSTSBB
+NTUpLApzbyB0aGUgUElEIHZhbHVlcyBzaG91bGQgYmUgc2FtZSBmb3IgNCBFVE1zIGF0bGVhc3Qu
+IEJ1dCBoZXJlIG9uZQpwaWQgdmFsdWUoMDAxYmI4MDMpIGlzIHNhbWUgZm9yIDYgRVRNcyBhbmQg
+b3RoZXIgb25lIGZvciAyCkVUTXMoMDAxYmI4MDIpIHdoaWNoIHNlZW1zIG9kZCBhbmQgaGVuY2Ug
+dGhlIGRvdWJ0IGlmIHRoZXNlIHBpZHMKYXJlIGV2ZW4gdmFsaWQgb25lcy4KCj4+Cj4+IEJlbG93
+IGFyZSB0aGUgUElEcyByZWFkIGZvciBTRE04NDU6Cj4+Cj4+IFvCoMKgwqAgNS45OTY0NDhdIHJl
+c25hbWU9ZXRtQDcwNDAwMDAgcGlkPTAwMWJiODAzCj4+IFvCoMKgwqAgNi4wNTI4OTFdIHJlc25h
+bWU9ZXRtQDcxNDAwMDAgcGlkPTAwMWJiODAzCj4+Cj4+IDxzbmlwPiAuLiAoU2FtZSBwaWQ9MDAx
+YmI4MDMgZm9yIGV0bUA3MjQwMDAwIHRvIGV0bUA3NTQwMDAwIGJ1dCBkaWZmZXJzCj4+IGZvciBv
+dGhlciAyIGNwdXMgYXMgc2hvd24gYmVsb3cpCj4+Cj4+IFvCoMKgwqAgNi4yNjY2ODddIHJlc25h
+bWU9ZXRtQDc2NDAwMDAgcGlkPTAwMWJiODAyCj4+IFvCoMKgwqAgNi4zMjkxNzFdIHJlc25hbWU9
+ZXRtQDc3NDAwMDAgcGlkPTAwMWJiODAyCj4+Cj4+IFRoaXMgaXMgdGhlIGNhc2UgZm9yIE1TTTg5
+OTYgYWxzbyBhcyBzaG93biBiZWxvdyB3aGVyZSBQSUQKPj4gdmFsdWUgaXMgbm90IGNvcnJlY3Qg
+YW5kIGhhcyB0byBiZSBoYXJkY29kZWQuCj4gCj4gVGhleSBkaWZmZXIgYmVjYXVzZSB0aGV5IGFy
+ZSB0d28gZGlmZmVyZW50IHR5cGVzIG9mIENQVSBjb3JlcyAoYW5kIHRodXMgCj4gZGlmZmVyZW50
+IEVUTSBQSURzKS4gV2hhdCBkb2VzIHRoZSBSZWdpc3RlciBkZXNjcmlwdGlvbnMgc2F5IGZvcgo+
+IHRoZSBDb3JlcyA/Cj4gCj4gVG8gbWUgaXQgbG9va3MgbGlrZSB0aGVyZSBhcmUgdHdvIGRpZmZl
+cmVudCB0eXBlcyBvZiBRdWFsY29tbQo+IENvcmVzIHdpdGggdGhlaXIgcmVzcGVjdGl2ZSBFVE1z
+IHdoaWNoIGFyZSBtaXNzaW5nIGluIHRoZSBFVE00eAo+IGRyaXZlciBhbmQgd2UgYXJlIHRyeWlu
+ZyB0byAibWFrZSB0aGUgRVRNIiB3b3JrIGJ5IGZha2luZyBpdCBhcwo+IHNvbWV0aGluZyBlbHNl
+LCB3aGljaCBpcyBub3QgbmljZS4gSSB3b3VsZCByYXRoZXIgcHJlZmVyCj4gdG8gYWRkIHRoZSBh
+cHByb3ByaWF0ZSBtYXNrcyBhbmQgdGhlIGV4cGVjdGVkIHZhbHVlIGZvciB0aGVzZQo+IHR3byBk
+aWZmZXJlbnQgRVRNIGltcGxlbWVudGF0aW9ucyBhbmQgYmUgZG9uZSB3aXRoIGl0LCBpbnN0ZWFk
+Cj4gb2YgZmFraW5nIGl0IGluIGFsbCB0aGUgRFRzIHdoZXJlIHRoZXNlIGNvcmVzIGFwcGVhci4K
+PiAKCkVUTTR4IGRyaXZlciBkb2VzIG5vdCBoYXZlIGVudHJpZXMgZm9yIEE1NSBhbmQgQTc1LiBD
+b3VsZCB5b3UgcGxlYXNlCmxldCBtZSBrbm93IHRoZSBQSURzIGZvciB0aGVzZSBDUFVzIHNvIHRo
+YXQgd2UgY2FuIGNvbXBhcmU/Cgo+Pgo+PiBGb3IgTVNNODk5NjoKPj4KPj4gcmVzbmFtZT1ldG1A
+M2I0MDAwMCBwaWQ9MTAyZjAyMDUKPiAKPiBJIGRvbid0IGtub3cgd2hhdCBDUFVzIHRoZSBNU004
+OTk2IGhhdmUuIElmIHRoZXkgZG9uJ3QgaGF2ZSBBNTMsIHlvdQo+IG11c3QgYWRkIHRoZSBhY3R1
+YWwgUElEcyB0byB0aGUgdGFibGUgb25jZSBhbmQgZm9yIGFsbC4KPiAKCkJ1dCBhZ2FpbiwgdGhp
+cyBQSUQgaXMgc29tZSBpbnZhbGlkIHZhbHVlLiBBbmQgZG9lcyBub3QgY29ycmVzcG9uZAp0byBh
+bnkgb2YgdGhlIEFSTSBDUFUgY29yZXMgYW5kIHdvdWxkIGJlIE1TTTg5OTYgc3BlY2lmaWMuCk1T
+TTg5OTYgaGFzIDIrMiBLcnlvIGNvcmVzIHdoaWNoIGFyZSBub3QgQVJNIGRlcml2YXRpdmUgYXMg
+U0RNODQ1CmlmIEkgYW0gcmlnaHQuCgo+Pgo+Pj4+ICvCoMKgwqDCoMKgwqDCoCBldG1ANzA0MDAw
+MCB7Cj4+Pj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgY29tcGF0aWJsZSA9ICJhcm0sY29yZXNp
+Z2h0LWV0bTR4IiwgImFybSxwcmltZWNlbGwiOwo+Pj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
+IGFybSxwcmltZWNlbGwtcGVyaXBoaWQgPSA8MHgwMDBiYjk1ZD4gPiArICAgICAgICAgICAgCj4+
+Pj4gcmVnID0gPDAgMHgwNzA0MDAwMCAwIDB4MTAwMD47Cj4+Pj4gKwo+Pj4+ICvCoMKgwqDCoMKg
+wqDCoMKgwqDCoMKgIGNwdSA9IDwmQ1BVMD47Cj4+Pj4gKwo+Pj4KPj4+IFlvdSBzZWVtIHRvIGJl
+IHNwZWNpZnlpbmcgdGhlIFBJRCBvZiBBNTMgRVRNIGFsbCBvdmVyLCB3aGlsZSBhdCBsZWFzdAo+
+Pj4gb25lIG9mIHlvdXIgY29yZXMgaXMgRVRNdjQuMiAoZnJvbSB0aGUgb3RoZXIgcGF0Y2gpIGFu
+ZCBBNTMgaXMgbm90Cj4+PiBFVE12NC4yLiBBcyBhYm92ZSwgaXQgd291bGQgYmUgZ29vZCB0byBh
+ZGQgdGhlIFBJRCB0byB0aGUgdGFibGUuCj4+Pgo+Pgo+PiBBcyBleHBsYWluZWQgaW4gYWJvdmUg
+Y29tbWVudCwgUElEIHZhbHVlcyByZWFkIGFyZSBub3QgY29ycmVjdC4gUGxlYXNlIAo+PiBsZXQg
+bWUga25vdyBpZiBJIGFtIG5vdCBjbGVhci4KPiAKPiBUaGVyZSBpcyBubyBtZWFzdXJlIGZvciAi
+Y29ycmVjdG5lc3MiIGhlcmUuIElmIHRoZSBFVE0gZXhwb3NlcyBkaWZmZXJlbnQKPiBQSUQgdGhh
+biB3aGF0IHlvdSBleHBlY3QgZnJvbSB0aGUgVFJNLCB0aGVuIHdlIGNvdWxkIHRoaW5rIG9mIG92
+ZXJyaWRpbmcKPiBpdC4gT3RoZXJ3aXNlIHBsZWFzZSBhZGQgdGhlIFBJRHMgdG8gdGhlIHRhYmxl
+Lgo+IAoKVGhpcyBpcyBleGFjdGx5IHRoZSBjYXNlLCBFVE0gUElEIHJlZ2lzdGVycyBhcmUgZXhw
+b3Npbmcgc29tZSBpbnZhbGlkCnZhbHVlIGFuZCBoZW5jZSB3ZSBvdmVycmlkZSBpbiBEVC4KClRo
+YW5rcywKU2FpCgotLSAKUVVBTENPTU0gSU5ESUEsIG9uIGJlaGFsZiBvZiBRdWFsY29tbSBJbm5v
+dmF0aW9uIENlbnRlciwgSW5jLiBpcyBhIG1lbWJlcgpvZiBDb2RlIEF1cm9yYSBGb3J1bSwgaG9z
+dGVkIGJ5IFRoZSBMaW51eCBGb3VuZGF0aW9uCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1h
+cm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcv
+bWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
