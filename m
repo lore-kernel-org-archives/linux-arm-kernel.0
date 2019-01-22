@@ -2,93 +2,80 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 64767C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:40:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1456BC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:40:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 30E4421721
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:40:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DA12C20870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:40:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QThmFtw4";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="Kj5+XX6I";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="ouw7TaHA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 30E4421721
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="vDNrQURK";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="NPH9i+oU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA12C20870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mVPNGg+zH9GkpnBzsuH2LzCdw8ANaECv8z9LriyihIk=; b=QThmFtw4ZWMIeK
-	XainQtDClFCQ2/2YFd2yRPOBoQJslYWagV/XLxwApZweoWpMDjjZyCr/co4Du3uZCxNTiYASvJGCk
-	Slh9lp74zhd3fGZPN12mtxE9HLGj4FozSqqqh7RKrKxfO8lrlprdfv8x5FeWUCYOurR4dbSbvZpRT
-	WD5wvi2zJ/gLHNpMJPw8OR6Mq2M6eS6GV/Fo/mubdO19TXeaDT6UKURVqn1AgHhauLFhuFGhMMmRA
-	bNBfgoppHMd1Uq+h3BsTMeas1u5B/TlCb/zo1aIMu7L4GeuzDuk7sLarGkZOwsZiKebSlk8CCUxNz
-	9HlofVI6RkhJCGSKRiAA==;
+	List-Owner; bh=ysYvJy4ZqRN7symu+P5TWCrzWt7GCzAJvdLISRv89Uo=; b=vDNrQURKHn+VlH
+	5A4qr3RwdSRMXvB77BFANnqYaFth3WuzVOSGIgYEGipYDHW763L6/tm2lngvvDkFhMbcrgWQcQeSb
+	JTYYwcWlU0ZtA8y226IF9er/fJVa79DynX4shwGGK6/OEkzYZOcP4oh5Ia28xy8zhxNVLclvn6pHd
+	xnb32f5MCZVY0v0BDUbGGc5lINRZOKjI/LcaN7tthXXcVBFWDxpySj90Z9zByMORMT8doHr461Y+9
+	UY29iG5dtiE/AyPmH5cXWo99lwHoZotz0cLIyVR0HNWji5BcNyJItlAuzWzOAXKL3TeBttJ2eKjNd
+	f6RI5GvPmhO4XhrCwh9w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glwHu-00078M-Fd; Tue, 22 Jan 2019 13:40:22 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1glwIN-0007Yo-1Q; Tue, 22 Jan 2019 13:40:51 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glwH1-0005TG-B7
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 13:39:48 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 7B4536034E; Tue, 22 Jan 2019 13:39:08 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548164366;
- bh=9Fu5Jdr53QglcM4lIrZSiw3D+X1QCqYiAmr8c70t4P4=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=Kj5+XX6IIno0ffsb82kXOMCTog1hg9zTG8/RhvYL3hGT+gHjbzRgRiGKIBbgsjSwZ
- ZzSwE540In8rV0ukhWQbGZJH2ZzNzIW0hjxwVJW3jesdMw+T/S0A7Vu6g+jRuu2KB6
- tzkNGP8ACJ8qs22ME2DqkSfh6mJGIPWt1nL4OsRI=
-Received: from blr-ubuntu-253.qualcomm.com
- (blr-bdr-fw-01_globalnat_allzones-outside.qualcomm.com [103.229.18.19])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-SHA256 (128/128 bits))
+ id 1glwIC-0007XF-KJ
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 13:40:48 +0000
+Received: from mail-qt1-f179.google.com (mail-qt1-f179.google.com
+ [209.85.160.179])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- (Authenticated sender: saiprakash.ranjan@codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 7D88E60B11;
- Tue, 22 Jan 2019 13:39:01 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548164347;
- bh=9Fu5Jdr53QglcM4lIrZSiw3D+X1QCqYiAmr8c70t4P4=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=ouw7TaHAR9s54D9b+zg24DzIFucDYY4UgtTx07gV07g7DUCTu+bTpwLN7mnhT/Q2i
- mds/MBJwxmMFnFsgod3qeCUGNYQXm+k4T/qwhCfYXlpz3zCMh58v8Ohx3HVKc2uWNh
- anIk27JachJkHqOsR/ullRU6QbGOvWd4x95HVuPA=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 7D88E60B11
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
- smtp.mailfrom=saiprakash.ranjan@codeaurora.org
-From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-To: Rob Herring <robh+dt@kernel.org>,
- Mathieu Poirier <mathieu.poirier@linaro.org>,
- Suzuki K Poulose <suzuki.poulose@arm.com>, Leo Yan <leo.yan@linaro.org>,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Andy Gross <andy.gross@linaro.org>, David Brown <david.brown@linaro.org>,
- Vivek Gautam <vivek.gautam@codeaurora.org>,
- Doug Anderson <dianders@chromium.org>, Stephen Boyd <sboyd@kernel.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>, devicetree@vger.kernel.org,
- Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCHv4 4/4] arm64: dts: qcom: sdm845: Remove the duplicate header
- inclusion
-Date: Tue, 22 Jan 2019 19:07:57 +0530
-Message-Id: <75e897bed99f5e1901d357d40ff576d21dbce5ee.1548133311.git.saiprakash.ranjan@codeaurora.org>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <cover.1548133311.git.saiprakash.ranjan@codeaurora.org>
-References: <cover.1548133311.git.saiprakash.ranjan@codeaurora.org>
+ by mail.kernel.org (Postfix) with ESMTPSA id 27DFE217D6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 22 Jan 2019 13:40:40 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548164440;
+ bh=esbp9yipemWFMphPhojg5duibYbaUh0JWxIadTVP0vY=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=NPH9i+oUre4ZzBzURZisLcgijhVu68l0fyNbD1HBoOYXzIBIM2F8oi+ISdjS3rZcO
+ 6kNGyXcHK7ABrzq6aKJxQrBU3B1MsVYRyWgN+9WM02/EavoUThA3n7Uhcw0eC3uOCD
+ 7FIeWBPZzEaDam+sNvgHhyMenn0uW6ompduZsIb0=
+Received: by mail-qt1-f179.google.com with SMTP id l11so27637178qtp.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 22 Jan 2019 05:40:40 -0800 (PST)
+X-Gm-Message-State: AJcUukeyFVBr16VP3huFMTf5dBsqpzMaUdsyem7BWxoAfviu2VJfNR51
+ dYue7oWt15Mojof5oqpRUKzweLpWKeUpWnY5rw==
+X-Google-Smtp-Source: ALg8bN6VWQGgEZg/m39bTZGl5i9AbykXudTG4rdsmuBKNFX7AihzzCAkCGIaaG+cZcAC9tqIVmkzewOr+lMujKnbjoI=
+X-Received: by 2002:ac8:2d2b:: with SMTP id n40mr30157262qta.38.1548164439355; 
+ Tue, 22 Jan 2019 05:40:39 -0800 (PST)
 MIME-Version: 1.0
+References: <cover.1547629763.git.nicolas.ferre@microchip.com>
+ <ed46005be5beff6efc47d40cea304185efa2bcc0.1547629763.git.nicolas.ferre@microchip.com>
+ <20190122010733.GA21139@bogus>
+ <24a53365-1a8c-51cd-dcd4-db4a69d5256a@microchip.com>
+In-Reply-To: <24a53365-1a8c-51cd-dcd4-db4a69d5256a@microchip.com>
+From: Rob Herring <robh@kernel.org>
+Date: Tue, 22 Jan 2019 07:40:26 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqLb3W=UG5VRFheGd2CfS+8rb5pJpHmHNq2bb1zrR3mEwA@mail.gmail.com>
+Message-ID: <CAL_JsqLb3W=UG5VRFheGd2CfS+8rb5pJpHmHNq2bb1zrR3mEwA@mail.gmail.com>
+Subject: Re: [PATCH 2/8] dt-bindings: arm: atmel: add new sam9x60 reset
+ controller binding
+To: Nicolas Ferre <Nicolas.Ferre@microchip.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_053927_563319_91460249 
-X-CRM114-Status: GOOD (  10.65  )
+X-CRM114-CacheID: sfid-20190122_054040_824867_73E218DF 
+X-CRM114-Status: GOOD (  18.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,41 +87,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>,
- Rajendra Nayak <rnayak@codeaurora.org>, linux-arm-msm@vger.kernel.org,
- linux-kernel@vger.kernel.org, Sibi Sankar <sibis@codeaurora.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ "open list:THERMAL" <linux-pm@vger.kernel.org>,
+ netdev <netdev@vger.kernel.org>, Linux USB List <linux-usb@vger.kernel.org>,
+ Sebastian Reichel <sre@kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Ludovic Desroches <Ludovic.Desroches@microchip.com>,
+ Alan Stern <stern@rowland.harvard.edu>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ David Miller <davem@davemloft.net>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Remove the duplicate inclusion of qcom,gcc-sdm845.h
-mistakenly introduced by commit 6e17f8140521 ("arm64:
-dts: sdm845: add prng-ee node").
+On Tue, Jan 22, 2019 at 3:00 AM <Nicolas.Ferre@microchip.com> wrote:
+>
+> Hi Rob,
+>
+> On 22/01/2019 at 02:07, Rob Herring wrote:
+> > On Wed, Jan 16, 2019 at 10:57:38AM +0100, Nicolas Ferre wrote:
+> >> Update the Reset Controller's binding to add new SoC compatibility string.
+> >>
+> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> >> ---
+> >>   Documentation/devicetree/bindings/arm/atmel-sysregs.txt | 1 +
+> >>   1 file changed, 1 insertion(+)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
+> >> index 36952cc39993..badce6ef3ab3 100644
+> >> --- a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
+> >> +++ b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
+> >> @@ -22,6 +22,7 @@ Its subnodes can be:
+> >>   RSTC Reset Controller required properties:
+> >>   - compatible: Should be "atmel,<chip>-rstc".
+> >>     <chip> can be "at91sam9260", "at91sam9g45", "sama5d3" or "samx7"
+> >> +  it also can be "microchip,sam9x60-rstc"
+> >
+> > How is this related to at91sam9260-rstc?
+>
+> at91sam9260 and sam9x60 are completely different products (they share
+> the same core though...). I know the naming could be misleading but it
+> is like it is...
+>
+> > The 'x' is a wildcard? We generally avoid wildcards.
+>
+> Here, the 'x' is definitively not a wildcard nor a kind of "family"
+> name, it's included in the (upcoming) single product's name.
+>
+> I hope it clarifies.
 
-Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
----
- arch/arm64/boot/dts/qcom/sdm845.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+Yes, thanks.
 
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index 2c589f7f13a8..fc124aeb57e5 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -12,7 +12,6 @@
- #include <dt-bindings/phy/phy-qcom-qusb2.h>
- #include <dt-bindings/reset/qcom,sdm845-aoss.h>
- #include <dt-bindings/soc/qcom,rpmh-rsc.h>
--#include <dt-bindings/clock/qcom,gcc-sdm845.h>
- 
- / {
- 	interrupt-parent = <&intc>;
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
-
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
