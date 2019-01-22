@@ -2,93 +2,91 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A908C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 21:26:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5356BC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 21:53:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2A34920870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 21:26:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D3D020866
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 21:53:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bF/gtli0";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="nnYtZQKI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2A34920870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tSyVLtbD";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=poorly.run header.i=@poorly.run header.b="AHvKGUc1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D3D020866
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=poorly.run
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jaa3G11ZhE0o9yx+0QX+1ZGMiaCoB1IW2yV3VEi/Cpk=; b=bF/gtli0Fen18b
-	3qQzaCHTBFzRWW/f23YpN018cMtTUHkmInemWwFjRX5FzwbmTOPlRvOROtDFgU1bBJ5fQrb9UOAdJ
-	a+d2WLVUg8TkPJ0tL7T9cbuJ0PPIn3PoLlnIW0AeE6jCwZ1owjTwzNJFA1Z+yrvLhRbwviiSdSj+H
-	xwD5mqGEeCGxaX5rmPCIJpbxOUzJCXIhaizLeBW2Fw4DbkpKczx36AP1fQiTNZ2B+3yikMuXZNMFf
-	jvRF+LzFMHY3Ohj82emWP+02GS1VZU+kIgvtJ2cz3T2XHtVYxg213imXVgO5yV8Qam58zhs9uIwJj
-	XaDya5zgHrJSoQnoxTFw==;
+	List-Owner; bh=wTMSXKPYCIbHXvUNagnQO/Ww7yr5q9vPdv9N/zJ688w=; b=tSyVLtbDQi3LsQ
+	hd5NJ342fckt3zYduBqjO7tj5piYo4A0PeUeDjAtsSIHpiHtn9gQSDapVpCRu2IM5+AqdSJyLPQmE
+	RkCFu0yCLdrZy3z8/7XOOw9FuDS9r2H2XP82X2p+W7+edX0nQr2bPJbJZ5G/rMRAVDoIO01cr7YaJ
+	/6MHw3c1Kcsj3f7suiP1E0VYRKGVtiLddIK0kb2KYn3Fhf0UtqARzPZsrxgIV9+Zq+6VOJrajlujT
+	k82rNntiAexiP5lCbtr/PjRSFBQs5bgU9fl5dfKW6MVBSGa8LH3FTuZ4oFbAVQjDvfaZp8A/wUCbl
+	IN/1NsKzqtLFT7t2vs/g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gm3Ym-0005i9-2D; Tue, 22 Jan 2019 21:26:16 +0000
-Received: from mail-vs1-xe41.google.com ([2607:f8b0:4864:20::e41])
+	id 1gm3yl-00007d-O1; Tue, 22 Jan 2019 21:53:07 +0000
+Received: from mail-yb1-xb44.google.com ([2607:f8b0:4864:20::b44])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gm3Yi-0005hl-1C
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 21:26:13 +0000
-Received: by mail-vs1-xe41.google.com with SMTP id v205so16990vsc.3
+ id 1gm3yh-00006m-ST
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 21:53:05 +0000
+Received: by mail-yb1-xb44.google.com with SMTP id y63so28916ybc.8
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 13:26:10 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=qA73U3orqts/aQvhT/E9hNnoUEIPSLYn2QJd+UKDOHA=;
- b=nnYtZQKIEw2X+lcZ7kxyFOE1X6P+2PGFEMJ/kFQKu+qPYt5cDrw9QYFujLbhzq/H5N
- ixJpF8CVtwbN/n/fiVb5Z68y7iUVBapOuCjDbmz5NxPlOY9/Dxgm8BLLv/R+h1XC5cNL
- cEjSCkCGm6EnG0T8KY3vRbxOOQ3ncK9o1HsJw=
+ Tue, 22 Jan 2019 13:53:01 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=poorly.run; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=AGImLWKSXyqcZe7nveg/7vkgivfZ2ayznn3rwDCE8FY=;
+ b=AHvKGUc1yOVBQIXBFh5sY1o9v6Vm3IX0sfgcGrTG34kaFzlxf1Jm8AVan2dh507cGI
+ ygYgYsNvIhwq7FlmpQGjt7HdKurdL57SPlrCPaGP81/nFKDVEqWEvcR2G9pUVj41TaEI
+ f+EYZsEK5+fylSuCVIyAD5L4I8fbl0DWoyLf99bBl1JbckxrmMUBMBelq0KeNXxUQ2Qe
+ zfcnnCOGt6DmByNpeJFXR3bEmCMWomuGSAZ7WmfpVGkcfMnHyZ36k0Ebpy2RDVV37zwN
+ oRNf3Fcwl9Ecw1FMoc7Cgpxn5Hztk7gRaf6LyV3wGPZ+djf6oCq1CWw0JtuJV+lD7dNz
+ 8iCw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=qA73U3orqts/aQvhT/E9hNnoUEIPSLYn2QJd+UKDOHA=;
- b=b/pRU/GszH3/3uql3SIsKMjGs4r6mSiTF4D2gDmnaP9bdE6TXuGfe7xzSDdyEvscCF
- a/aRkvqUOAgyP2fmWJ6WlS7lkfQTBsfwxD/UPHd3mpMKXb941h2K0XrPCvwy17V/M2pC
- oIybKazK013QrXp4HaZ9/C1ArBgS4Zme1kA987n5es4CQSM4/ModjQ5YWM9nIPCQl0Fd
- AP5x8yMkjgZ3K86YanNiu3BHAM7ymfrH3Bdo98V9b5FcP726QhOVZWKi9liYa5SmDpSE
- 9p4f6HJgSeHYJF44xdyvbORM87HhuPHHlzsjudD4CAIV8YD7FxPTzZiilmt5530pXjbB
- g03w==
-X-Gm-Message-State: AJcUukfzGgwtLq1X2RmJ44pzkw/8LJWz80v1DUK6/w+bePjr0RwDZytq
- hkbJYSBfFthrbjEe2WE3eJGQvvEyMr0=
-X-Google-Smtp-Source: ALg8bN6PcFqUKCtEvMRt4nFumo9A1hd7F11QlNNKrbv6WrArnQWUv95oeArT/D/pdMjbIdbOJqcRvQ==
-X-Received: by 2002:a67:4985:: with SMTP id d5mr14839158vsg.41.1548192369732; 
- Tue, 22 Jan 2019 13:26:09 -0800 (PST)
-Received: from mail-vs1-f50.google.com (mail-vs1-f50.google.com.
- [209.85.217.50])
- by smtp.gmail.com with ESMTPSA id e67sm24668489vsd.32.2019.01.22.13.26.07
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 22 Jan 2019 13:26:08 -0800 (PST)
-Received: by mail-vs1-f50.google.com with SMTP id x28so15620815vsh.12
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 13:26:07 -0800 (PST)
-X-Received: by 2002:a67:2c13:: with SMTP id s19mr14586369vss.172.1548192366962; 
- Tue, 22 Jan 2019 13:26:06 -0800 (PST)
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=AGImLWKSXyqcZe7nveg/7vkgivfZ2ayznn3rwDCE8FY=;
+ b=JGMM3HiJI4Vd8EaIhUSIhMq4R+DaNHWcmTyr+QXCAITj+YWyw4lyhJiZ5LytxmpuM2
+ Gh1GlqHeV1jBITyKQVcCvo86SjK94rQJHMNp9JF7Mdo7CFlDEbdMmrHb3wJ6IT+oKAtp
+ hy2SVxp74glFnjh0O5QdQ+kevhtA6hhHb+Vt3bRy/K4E8/FABk3SJ8F2vmlltMafIN8i
+ h5SG6UaWT0fv0z0LOw9AUFTJl7LizRtAqxRAJU8sPZVlwWBjXR1DH5VU2fgrTO1NcP2E
+ UbnzIq3jutd3LHX7YaiVAcBOTGBgls6CDRJkgdgdfdG9cy3mYnU2+EeW1D2OqUAOYIZz
+ vQtw==
+X-Gm-Message-State: AJcUukckgoUYpgp4pZnoRAI6D9XVzgAtHsWaq/EVhcvkuP3FDA0LBUGW
+ 6vDfCrpN+MONW92/PYvQLLsUVA==
+X-Google-Smtp-Source: ALg8bN5UNJJkma6ODmjgOp5ajWZ643xJYjRhSPm0CyAqEy+6i7UzkoQS05f2gvmSgQitqKvDujro4A==
+X-Received: by 2002:a25:3455:: with SMTP id b82mr22727920yba.402.1548193980378; 
+ Tue, 22 Jan 2019 13:53:00 -0800 (PST)
+Received: from localhost ([2620:0:1013:11:89c6:2139:5435:371d])
+ by smtp.gmail.com with ESMTPSA id w2sm6327173ywe.62.2019.01.22.13.52.59
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 22 Jan 2019 13:52:59 -0800 (PST)
+Date: Tue, 22 Jan 2019 16:52:59 -0500
+From: Sean Paul <sean@poorly.run>
+To: Sean Paul <seanpaul@chromium.org>
+Subject: Re: [PATCH resend] drm/panel: panel-innolux: set display off in
+ innolux_panel_unprepare
+Message-ID: <20190122215259.GN114153@art_vandelay>
+References: <20190109065922.231753-1-hsinyi@chromium.org>
+ <CAOw6vb+a2SAq+=xfL9RZyA6R7zn-HYFQbDnDaK28TD8yrh+wLg@mail.gmail.com>
 MIME-Version: 1.0
-References: <20190122144114.9816-1-gregkh@linuxfoundation.org>
- <20190122144114.9816-3-gregkh@linuxfoundation.org>
-In-Reply-To: <20190122144114.9816-3-gregkh@linuxfoundation.org>
-From: Kees Cook <keescook@chromium.org>
-Date: Wed, 23 Jan 2019 10:25:53 +1300
-X-Gmail-Original-Message-ID: <CAGXu5jJPyKwM3E=-pnRBJ0NCb4kMB7EtLdS-+5khE76qnEhcdQ@mail.gmail.com>
-Message-ID: <CAGXu5jJPyKwM3E=-pnRBJ0NCb4kMB7EtLdS-+5khE76qnEhcdQ@mail.gmail.com>
-Subject: Re: [PATCH 2/4] arm: dump: no need to check return value of
- debugfs_create functions
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Content-Disposition: inline
+In-Reply-To: <CAOw6vb+a2SAq+=xfL9RZyA6R7zn-HYFQbDnDaK28TD8yrh+wLg@mail.gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_132612_074165_7A968082 
-X-CRM114-Status: GOOD (  19.15  )
+X-CRM114-CacheID: sfid-20190122_135304_072453_4721082C 
+X-CRM114-Status: GOOD (  21.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,103 +98,97 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Kevin Hilman <khilman@kernel.org>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- Russell King <linux@armlinux.org.uk>, LKML <linux-kernel@vger.kernel.org>,
- Jinbum Park <jinb.park7@gmail.com>, Laura Abbott <labbott@redhat.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: David Airlie <airlied@linux.ie>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Thierry Reding <thierry.reding@gmail.com>, "Hsin-Yi,
+ Wang" <hsinyi@chromium.org>,
+ Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 23, 2019 at 3:41 AM Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
->
-> When calling debugfs functions, there is no need to ever check the
-> return value.  The function can work or not, but the code logic should
-> never do something different based on this.
->
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Jinbum Park <jinb.park7@gmail.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: linux-arm-kernel@lists.infradead.org
-> Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+On Fri, Jan 18, 2019 at 12:58:10PM -0500, Sean Paul wrote:
+> On Wed, Jan 9, 2019 at 1:59 AM Hsin-Yi, Wang <hsinyi@chromium.org> wrote:
+> >
+> > Move mipi_dsi_dcs_set_display_off() from innolux_panel_disable()
+> > to innolux_panel_unprepare(), so they are consistent with
+> > innolux_panel_enable() and innolux_panel_prepare().
+> >
+> > This also fixes some mode check and irq timeout issue in MTK dsi code.
+> >
+> > Since some dsi code (e.g. mtk_dsi) have following call trace:
+> > 1. drm_panel_disable(), which calls innolux_panel_disable()
+> > 2. switch to cmd mode
+> > 3. drm_panel_unprepare(), which calls innolux_panel_unprepare()
+> >
+> > However, mtk_dsi needs to be in cmd mode to be able to send commands
+> > (e.g. mipi_dsi_dcs_set_display_off() and mipi_dsi_dcs_enter_sleep_mode()),
+> > so we need these functions to be called after the switch to cmd mode happens,
+> > i.e. in innolux_panel_unprepare.
+> >
+> >
+> > Signed-off-by: Hsin-Yi, Wang <hsinyi@chromium.org>
+> 
+> Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
-Do you mean that it bubbles up to an initcall, and the return value is
-meaningless there? This seems fine to me...
+Applied to drm-misc-next, thanks for your patch.
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
+Sean
 
--Kees
-
-> ---
->  arch/arm/include/asm/ptdump.h | 9 +++------
->  arch/arm/mm/dump.c            | 4 ++--
->  arch/arm/mm/ptdump_debugfs.c  | 8 ++------
->  3 files changed, 7 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/arm/include/asm/ptdump.h b/arch/arm/include/asm/ptdump.h
-> index 3ebf9718288d..0c2d3d0d4cc6 100644
-> --- a/arch/arm/include/asm/ptdump.h
-> +++ b/arch/arm/include/asm/ptdump.h
-> @@ -21,13 +21,10 @@ struct ptdump_info {
->
->  void ptdump_walk_pgd(struct seq_file *s, struct ptdump_info *info);
->  #ifdef CONFIG_ARM_PTDUMP_DEBUGFS
-> -int ptdump_debugfs_register(struct ptdump_info *info, const char *name);
-> +void ptdump_debugfs_register(struct ptdump_info *info, const char *name);
->  #else
-> -static inline int ptdump_debugfs_register(struct ptdump_info *info,
-> -                                       const char *name)
-> -{
-> -       return 0;
-> -}
-> +static inline void ptdump_debugfs_register(struct ptdump_info *info,
-> +                                          const char *name) { }
->  #endif /* CONFIG_ARM_PTDUMP_DEBUGFS */
->
->  void ptdump_check_wx(void);
-> diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
-> index 084779c5c893..eb385a500ed0 100644
-> --- a/arch/arm/mm/dump.c
-> +++ b/arch/arm/mm/dump.c
-> @@ -450,7 +450,7 @@ void ptdump_check_wx(void)
->  static int ptdump_init(void)
->  {
->         ptdump_initialize();
-> -       return ptdump_debugfs_register(&kernel_ptdump_info,
-> -                                       "kernel_page_tables");
-> +       ptdump_debugfs_register(&kernel_ptdump_info, "kernel_page_tables");
-> +       return 0;
->  }
->  __initcall(ptdump_init);
-> diff --git a/arch/arm/mm/ptdump_debugfs.c b/arch/arm/mm/ptdump_debugfs.c
-> index be8d87be4b93..598b636615a2 100644
-> --- a/arch/arm/mm/ptdump_debugfs.c
-> +++ b/arch/arm/mm/ptdump_debugfs.c
-> @@ -24,11 +24,7 @@ static const struct file_operations ptdump_fops = {
->         .release        = single_release,
->  };
->
-> -int ptdump_debugfs_register(struct ptdump_info *info, const char *name)
-> +void ptdump_debugfs_register(struct ptdump_info *info, const char *name)
->  {
-> -       struct dentry *pe;
-> -
-> -       pe = debugfs_create_file(name, 0400, NULL, info, &ptdump_fops);
-> -       return pe ? 0 : -ENOMEM;
-> -
-> +       debugfs_create_file(name, 0400, NULL, info, &ptdump_fops);
->  }
-> --
-> 2.20.1
->
-
+> 
+> > ---
+> > Resend for review.
+> > ---
+> >  drivers/gpu/drm/panel/panel-innolux-p079zca.c | 11 +++++------
+> >  1 file changed, 5 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/panel/panel-innolux-p079zca.c b/drivers/gpu/drm/panel/panel-innolux-p079zca.c
+> > index ca4ae45dd307..8e5724b63f1f 100644
+> > --- a/drivers/gpu/drm/panel/panel-innolux-p079zca.c
+> > +++ b/drivers/gpu/drm/panel/panel-innolux-p079zca.c
+> > @@ -70,18 +70,12 @@ static inline struct innolux_panel *to_innolux_panel(struct drm_panel *panel)
+> >  static int innolux_panel_disable(struct drm_panel *panel)
+> >  {
+> >         struct innolux_panel *innolux = to_innolux_panel(panel);
+> > -       int err;
+> >
+> >         if (!innolux->enabled)
+> >                 return 0;
+> >
+> >         backlight_disable(innolux->backlight);
+> >
+> > -       err = mipi_dsi_dcs_set_display_off(innolux->link);
+> > -       if (err < 0)
+> > -               DRM_DEV_ERROR(panel->dev, "failed to set display off: %d\n",
+> > -                             err);
+> > -
+> >         innolux->enabled = false;
+> >
+> >         return 0;
+> > @@ -95,6 +89,11 @@ static int innolux_panel_unprepare(struct drm_panel *panel)
+> >         if (!innolux->prepared)
+> >                 return 0;
+> >
+> > +       err = mipi_dsi_dcs_set_display_off(innolux->link);
+> > +       if (err < 0)
+> > +               DRM_DEV_ERROR(panel->dev, "failed to set display off: %d\n",
+> > +                             err);
+> > +
+> >         err = mipi_dsi_dcs_enter_sleep_mode(innolux->link);
+> >         if (err < 0) {
+> >                 DRM_DEV_ERROR(panel->dev, "failed to enter sleep mode: %d\n",
+> > --
+> > 2.18.1
+> >
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel@lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-Kees Cook
+Sean Paul, Software Engineer, Google / Chromium OS
 
 _______________________________________________
 linux-arm-kernel mailing list
