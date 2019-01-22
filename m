@@ -2,82 +2,89 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3191CC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:38:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 22C27C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:38:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D9F4820870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:38:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CF4A921721
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 13:38:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rzmsaXmX";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="p6P9jCix"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D9F4820870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rwU93352";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="e7Fa5WMz";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="c2G+umDO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF4A921721
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=b45YrGqO+uvCgUBK3YDmh+QFrTmMfQXp/eonNY6yxqE=; b=rzmsaXmXqI6BbU
-	SG5NbkpAnZV8GwtWbcrxXgbvDX37qB1vB/73Q/kNIjx/7rLrB8Agq0pyLykc6/GVI7O9Hvn7whIiX
-	QzB2tPppNhW2fwKX8LuSEA+biAjCsvHmtui4SKHp/2jL524IUwwx1NeancsQBGHm68UTX3orB9weP
-	yRL2RHCjEhnfvljTkkjAFLGoj58w2iFXeVPpld5OHEkgjphAhyUI0Usb8h+6HITCQyx7p0HXM/I4o
-	yylVdROsRZZqkwv3IeuzTK9/vXeYSAsYDmgBqSdUgCOB4fdLZSAk1meNYg2zQMwmuokqE1+Zi+a8C
-	hNmIBLGIaL4JWcmH+Cvg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=Rw2hmfcDpUbPVqEHPEVkl5H3Z4p5cqebBLs1stCQQBc=; b=rwU933520D3hdh
+	s99kPITSxylmkwbKqSVPrHdY8Rmv3EoBXnCHbP60SJTn7J+7QdpOvp389BYYXYCglmJWm6a/NXhUB
+	BvRYn/tX8xJtd7ZRQg5DBnjbM+KI7Jn6DiAXAwhhjKCwDLc/w99D3MYmsHIsu4UHapMxc4zej5Kg2
+	CxOW4MGi6U5c0rUD0q4xPjWfQDptsIQOmbZT0movCUD6AvtM5KG0/D9FHecBkxIHjFqceGtTCzqef
+	JRH5uu5n5+4sAYiRLYiTBFuDF3sNK5SpTn/s4Jhcw4G/6CNZQsphirR0n1vfXM1tApg1UodUEYsGz
+	BefjwH/+b5vvdaaoEhMA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glwFn-0004VS-E6; Tue, 22 Jan 2019 13:38:11 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1glwGV-0004xM-Po; Tue, 22 Jan 2019 13:38:55 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glwFg-0004Tn-Rw
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 13:38:07 +0000
-Received: from mail-qt1-f177.google.com (mail-qt1-f177.google.com
- [209.85.160.177])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ id 1glwGH-0004vR-4R
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 13:38:49 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id CE0FA60878; Tue, 22 Jan 2019 13:38:39 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1548164320;
+ bh=AeO6YVrXQaCQWMaqoJ3T+dWsP92lPbRoPKBgMrnDzUg=;
+ h=From:To:Cc:Subject:Date:From;
+ b=e7Fa5WMzXzE+ny5JAJEPTXrTWKLQY1WBL1janH9JD+AzaX7z/YTwi1DBzL8//cSiU
+ sfbpVk3oaFcfKiDqtZst4QGx1pKuHriv9zs2cVJw22KJLKq+HhKHuwWZusSiv39YTH
+ Wth9MFLn7dZ/bovEx9aJ6EUq9faKXxkMUifeEXzw=
+Received: from blr-ubuntu-253.qualcomm.com
+ (blr-bdr-fw-01_globalnat_allzones-outside.qualcomm.com [103.229.18.19])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id DE21C21721
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 13:38:03 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548164284;
- bh=jodr6i6s3jvg2nhf0kijRpn+bTr+EGnPky61yayyNdU=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=p6P9jCixubpZqW9mQ9FjNqhZFrMnRzLp5ynzREMTh8/uSUtAePuOsv8uKy5l+Sgo/
- LELpzJWUSSF5w6N2yFOUyfUkzVDkL/zWL9sP/vSlMZap+3XllIO+aUhtYB2hmyrl12
- etYfCwZuEHYfaVsJfqQ11c1/w//DdrHkW3AiyT10=
-Received: by mail-qt1-f177.google.com with SMTP id v11so27595107qtc.2
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 05:38:03 -0800 (PST)
-X-Gm-Message-State: AJcUukdS+hvCM0/jqcF3pIYQIW0QBRtopVJLYnsR0/T9GRYfMMnjrhVX
- xd5FYOjFVNKfqIxY6Ck72XyYHchAEkhy7JIFpA==
-X-Google-Smtp-Source: ALg8bN4etqq10Dl4Ve0aHvgW7iUFq/uRu0ytKakxodDc1gBLnyubvCHhqLHe7MWZZ23Nm1vbcopo7UiQdvK1GbtoFO8=
-X-Received: by 2002:ac8:1712:: with SMTP id w18mr30740377qtj.76.1548164283123; 
- Tue, 22 Jan 2019 05:38:03 -0800 (PST)
+ (Authenticated sender: saiprakash.ranjan@codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id C0DDC609C1;
+ Tue, 22 Jan 2019 13:38:25 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1548164311;
+ bh=AeO6YVrXQaCQWMaqoJ3T+dWsP92lPbRoPKBgMrnDzUg=;
+ h=From:To:Cc:Subject:Date:From;
+ b=c2G+umDODiNSjuTnRJq+57g/v9OfoLB+fheexS/X1H3v0lgeNcdOM3opmG8AvkYCC
+ pST+tfmFMPsgad2JvPoEOsrWFkTETbMe1VaNgJIMrLDtymnigKi7XJSelodI1/CHtH
+ QIOS77grnT2qJoAfnioUEvwvyeS9E83NK88wS6gs=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org C0DDC609C1
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
+ smtp.mailfrom=saiprakash.ranjan@codeaurora.org
+From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+To: Rob Herring <robh+dt@kernel.org>,
+ Mathieu Poirier <mathieu.poirier@linaro.org>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>, Leo Yan <leo.yan@linaro.org>,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ Andy Gross <andy.gross@linaro.org>, David Brown <david.brown@linaro.org>,
+ Vivek Gautam <vivek.gautam@codeaurora.org>,
+ Doug Anderson <dianders@chromium.org>, Stephen Boyd <sboyd@kernel.org>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>, devicetree@vger.kernel.org,
+ Mark Rutland <mark.rutland@arm.com>
+Subject: [PATCHv4 0/4] Add coresight support for SDM845 and MSM8996 
+Date: Tue, 22 Jan 2019 19:07:53 +0530
+Message-Id: <cover.1548133311.git.saiprakash.ranjan@codeaurora.org>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
-References: <20190111173015.12119-1-jernej.skrabec@siol.net>
- <20190111173015.12119-2-jernej.skrabec@siol.net>
- <CAGb2v66DiqK9sL-hQev4Wy08d9T7f1Yc2DFWJ0gYOnqChJyBRw@mail.gmail.com>
- <20190121095014.b6iq5dubfi7x2pi4@flea>
- <CAGb2v66d0wM8Yt2uS4MMhU6PP02h8CKwKjinasO6jtZ4ue1CAQ@mail.gmail.com>
- <20190122001917.GA31407@bogus>
- <CAGb2v67YsevDvjvTSh67wJNSJSUBuZ613hQWyorEiSzCUqjjkQ@mail.gmail.com>
-In-Reply-To: <CAGb2v67YsevDvjvTSh67wJNSJSUBuZ613hQWyorEiSzCUqjjkQ@mail.gmail.com>
-From: Rob Herring <robh@kernel.org>
-Date: Tue, 22 Jan 2019 07:37:51 -0600
-X-Gmail-Original-Message-ID: <CAL_Jsq+u2PdLK3YaYMERHndNpN_PprksPF9gVF+V76c343yrMg@mail.gmail.com>
-Message-ID: <CAL_Jsq+u2PdLK3YaYMERHndNpN_PprksPF9gVF+V76c343yrMg@mail.gmail.com>
-Subject: Re: [PATCH 1/3] media: dt: bindings: sunxi-ir: Add A64 compatible
-To: Chen-Yu Tsai <wens@csie.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_053805_172841_B8D768CB 
-X-CRM114-Status: GOOD (  30.27  )
+X-CRM114-CacheID: sfid-20190122_053841_394116_44908D81 
+X-CRM114-Status: GOOD (  12.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,87 +96,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Jernej Skrabec <jernej.skrabec@siol.net>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Linux Media Mailing List <linux-media@vger.kernel.org>
+Cc: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>,
+ Rajendra Nayak <rnayak@codeaurora.org>, linux-arm-msm@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Sibi Sankar <sibis@codeaurora.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 21, 2019 at 8:16 PM Chen-Yu Tsai <wens@csie.org> wrote:
->
-> On Tue, Jan 22, 2019 at 8:19 AM Rob Herring <robh@kernel.org> wrote:
-> >
-> > On Mon, Jan 21, 2019 at 05:57:57PM +0800, Chen-Yu Tsai wrote:
-> > > On Mon, Jan 21, 2019 at 5:50 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > >
-> > > > Hi,
-> > > >
-> > > > I'm a bit late to the party, sorry for that.
-> > > >
-> > > > On Sat, Jan 12, 2019 at 09:56:11AM +0800, Chen-Yu Tsai wrote:
-> > > > > On Sat, Jan 12, 2019 at 1:30 AM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
-> > > > > >
-> > > > > > A64 IR is compatible with A13, so add A64 compatible with A13 as a
-> > > > > > fallback.
-> > > > >
-> > > > > We ask people to add the SoC-specific compatible as a contigency,
-> > > > > in case things turn out to be not so "compatible".
-> > > > >
-> > > > > To be consistent with all the other SoCs and other peripherals,
-> > > > > unless you already spotted a "compatible" difference in the
-> > > > > hardware, i.e. the hardware isn't completely the same, this
-> > > > > patch isn't needed. On the other hand, if you did, please mention
-> > > > > the differences in the commit log.
-> > > >
-> > > > Even if we don't spot things, since we have the stable DT now, if we
-> > > > ever had that compatible in the DT from day 1, it's much easier to
-> > > > deal with.
-> > > >
-> > > > I'd really like to have that pattern for all the IPs even if we didn't
-> > > > spot any issue, since we can't really say that the datasheet are
-> > > > complete, and one can always make a mistake and overlook something.
-> > > >
-> > > > I'm fine with this version, and can apply it as is if we all agree.
-> > >
-> > > I'm OK with having the fallback compatible. I'm just pointing out
-> > > that there are and will be a whole bunch of them, and we don't need
-> > > to document all of them unless we are actually doing something to
-> > > support them.
-> >
-> > Yes, you do. Otherwise, how will we validate what is and isn't a valid
-> > set of compatible strings? It's not required yet, but bindings are
-> > moving to json-schema.
->
-> Ideally, if we knew which IP blocks in each SoC were compatible with
-> each other, we wouldn't need "per-SoC" compatible strings for each
-> block. However in reality this doesn't happen, due to a combination
-> of lack of time, lack of / uncertainty of documentation, and lack of
-> hardware for testing by the contributors.
->
-> The per-SoC compatible we ask people to add are a contigency plan,
-> for when things don't actually work, and we need some way to support
-> that specific piece of hardware on old DTs.
+This patch series adds support for coresight on SDM845 and MSM8996.
 
-You are right up to here.
+* Patch 1 adds device tree nodes for SDM845 coresight components.
 
-> At which point we will
-> add that SoC-specific compatible as a new compatible string to the
-> bindings. But not before.
+* Patch 2 adds device tree nodes for MSM8996 coresight components.
 
-No, the point SoC-specific compatibles is they are already present in
-the DT and you only have to update the OS to fix issues. The SoC
-specific compatible has to be documented when first used in dts files,
-not when the OS uses them. That is the rule.
+* Patch 3 enables support for ETMv4.2 and enables SDM845 to make
+  use of same driver(etm4x).
 
-Rob
+* Patch 4 is a trivial removal of duplicate header file.
+
+Patch 1 and 3 depends on below AOSS QMP patches by Bjorn:
+ https://patchwork.kernel.org/patch/10749469/
+ https://patchwork.kernel.org/patch/10749481/
+ https://patchwork.kernel.org/patch/10749479/
+ https://patchwork.kernel.org/patch/10749475/
+
+This patch series has been tested on SDM845 MTP and MSM8996
+based Dragonboard 820c.
+
+v4:
+ * Mask out the minor version as suggested by Mathieu.
+ * Add the dependent patch description in patch 1.
+
+v3:
+ * Added arm,scatter-gather property as suggested by Suzuki.
+
+v2:
+ * Added coresight support for msm8996 based on Vivek's patch.
+   Cleaned up and added coresight cpu debug nodes for msm8996.
+ * Merged coresight dtsi file into sdm845.dtsi as suggested by Bjorn
+ * Addressed Mathieu's feedback about masking the minor version in
+   etm4_arch_supported() and added a comment for reason to bypass
+   the AMBA bus discovery method.
+
+Sai Prakash Ranjan (3):
+  arm64: dts: qcom: sdm845: Add Coresight support
+  coresight: etm4x: Add support to enable ETMv4.2
+  arm64: dts: qcom: sdm845: Remove the duplicate header inclusion
+
+Vivek Gautam (1):
+  arm64: dts: qcom: msm8996: Add Coresight support
+
+ arch/arm64/boot/dts/qcom/msm8996.dtsi         | 448 +++++++++++++++++
+ arch/arm64/boot/dts/qcom/sdm845.dtsi          | 449 +++++++++++++++++-
+ drivers/hwtracing/coresight/coresight-etm4x.c |   3 +-
+ 3 files changed, 898 insertions(+), 2 deletions(-)
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
+
 
 _______________________________________________
 linux-arm-kernel mailing list
