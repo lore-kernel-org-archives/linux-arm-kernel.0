@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 96111C282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:22:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DA18EC282C5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:22:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6303E20855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:22:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9329520855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:22:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VItY7r1V";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ICkeb7HR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6303E20855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="seJWLKE8";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="HCRgEPob"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9329520855
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,63 +27,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=BJzzTRqCNnQ8JjV1uPZ/GR38f0cOxqd4O1ghOIG56IE=; b=VItY7r1V/oxpgp/k6S1AvZZT9b
-	1szG0QN0SYARdc9P8D1D8kKC7oAWHDsI5JaUJC4sluLT7xgIUJ9IYXUw5XQAM1NwWxHs8+0+9R8Kh
-	I8He4bo23ZlVaXyZ4VPUDgwQcVDOd3vN0Dxf1+VXAMMc+6lzozYg3VohiYmGhLKygA4YvJ8bWiyCc
-	zDnwS/SuBE3U8O2j3CCB4FCrXC//MdK9OtFraeNM+zPOOnSzSDHRrFEnilCJvohpzxuSkQQfxVcnr
-	Lzegh4FqX0yx+D33L/W7Qk//lC32aVvpk/ZIzuZ2/aCphjzpP8QAhZiLMySi/+T9OzqXj0w79p+Ox
-	yRvafELg==;
+	bh=uUa0a3FREadnoYxERJ4SoFMy6JdRudSMpEvUNW7/3hE=; b=seJWLKE8Xnn0/NOdW0MEIYmA3h
+	4L2ooKh95RtgA7mghtg+XybktFySLM5h11TlrlSBXlW0ptc9qhhnTtObUqh6vhTVv7wByD/QXRV3Q
+	MSH1zVqfVcOFFd5rbzYeObuyVPbnE0VuW16elZVK7qk31VrfRinD825W2yFnc59HSst5HAeVWsxeI
+	esQJrVUaRDIx41ZOg74oydiguywOnwo1+dSYHcc2szgY6qAsnyVNff/5Z3AQsaSgKJvW+MfaW3Ur5
+	xnrOxRK8MlmCB2SroZnlMOk1midO8o1BOqlpXe3BkVJeyMmxqEtL5uvBDQQdkFMMi1wo8nxJ1ofX3
+	/xtHknOg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glnZq-0001Er-87; Tue, 22 Jan 2019 04:22:18 +0000
-Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
+	id 1glna6-0001Th-6V; Tue, 22 Jan 2019 04:22:34 +0000
+Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glnZd-00010f-4t
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 04:22:09 +0000
-Received: by mail-pl1-x641.google.com with SMTP id t13so10783391ply.13
+ id 1glnZh-00016E-Ui
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 04:22:15 +0000
+Received: by mail-pf1-x443.google.com with SMTP id b7so11104020pfi.8
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 20:22:04 -0800 (PST)
+ Mon, 21 Jan 2019 20:22:09 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=qh9OH2ewndXqi7LmYpIulU5BfBE/yUMVvx34aUuKYu0=;
- b=ICkeb7HRNIH9VLfwNSH+e9HuXwGT5x7DgnnfjwxgUJrUM17uD5HgT73ahqxLOeGTHu
- FLJhMxTvCnvZ510Ay3ZCHeXKDuJSGqcJWBpmLDnc7woc9NR0FUbO9DvlvMFu6UG15fl1
- XcLpLTRg3AQVGIpgn6ZWXYRnrKm9GJZF7q16E=
+ bh=Cru5fUZcAQInENZrdcyg+x0Ztwsn5ae0UMz5WQRLO18=;
+ b=HCRgEPobXdqHttzbeiuJnCe85Tmytm+W+vD2MDcZINqbJRvpu1Y08HUArUb1Rb3pSr
+ tTFP6VbfnKNxzbG59b0NvN91Ln6i20TdUdbuUwkwoPhQnRKbmzN6+Bp0mWb4angAhvUT
+ j3+NWw8M0eAkCCipI/lS9upxh7sWFBzbY9aEw=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=qh9OH2ewndXqi7LmYpIulU5BfBE/yUMVvx34aUuKYu0=;
- b=V99w/BbA2i+3W6SXNfNMi/UJwNjmlg9ywK0y66OU7dp5RT2UjyPxqSorcJCc6BwFZk
- k1/0b+V2b1RIESh/5l0NcQo0GqZYJmQtgMdHWmbBdTjo78bhdiWTz3eo/kOpp05D94Bm
- WDjRtdpmMIiaSYIlPrDHe8W8XWajNJoIYlAcz8NKhmc2Vg3vdZkyUR0izgwwtCiBJYSa
- wSS673HAmQVspcWbXuDEtvxYeEkzY3K0I/9kRrZQ09cxFt6SOs7gEF/HUjFpcL6Q8+z4
- S7EU18bgz0iNx5p7qpOr5XxKKbxYK3aVPxjPS0C97XfV4zfIF1/g9wBB/jcsgdKEk/YM
- DauA==
-X-Gm-Message-State: AJcUukdvCwtDM3DHYPqtK5ea9ZKzkse44FSnmw9ip1x8JI7GDke3PMrZ
- qtodY+hpw5zCwDx3mdB+jYhF
-X-Google-Smtp-Source: ALg8bN6+W9kfH9ubBJQ+oNWmtl6QwFd+5/vhMV/fvcYNf3EekCAbeAmIvchON8qbdu0113MEFRwU2g==
-X-Received: by 2002:a17:902:850c:: with SMTP id
- bj12mr32192473plb.46.1548130924334; 
- Mon, 21 Jan 2019 20:22:04 -0800 (PST)
+ bh=Cru5fUZcAQInENZrdcyg+x0Ztwsn5ae0UMz5WQRLO18=;
+ b=JeyOHGJATnlblUcqvFbF4kx0ksxguSywqQVb+Ltm1CHswgktQAOaa71BCBQPGWr22f
+ +cwZ+m/nqgvY22gIJuCX1RaieOrHF1wb6CkqA6o6qPB95AYYzpBCzHh4dUO2Jy58crN1
+ OTPOZ2mjnedFgvbLT7TrdM8fz6cWRR/rXBafLBCAfULbnDgS53H8LDFHNniYgW6QGpVg
+ LpUNXcnvoWGSoAeIacERSg2mlb2FbqgEyhk/xDTbE7TTqQi1r4qsMcbPJ2O7iNoqt36d
+ hDIIos4B0xXDmZw+WOwym8Jwp0P21oogLh1/3wyd5Ul8djNqDug6M/tLDZjMI/nRuyiZ
+ 4lNQ==
+X-Gm-Message-State: AJcUukdaxe0ner/3oAm/1vuLvtXgwXzjLt/gEFSNIfgMQE/e9jr6/9Mp
+ hCqVriU/vrVoSmKkDarrTLi+
+X-Google-Smtp-Source: ALg8bN4ioSoUadOHvZuwQ6WlKjt/aHoSgxworlT/2TT7kHDoD+zoTCW5BHU5r2bdOtWIOx/cxiN0tw==
+X-Received: by 2002:a63:88c7:: with SMTP id
+ l190mr30006124pgd.110.1548130929254; 
+ Mon, 21 Jan 2019 20:22:09 -0800 (PST)
 Received: from localhost.localdomain ([2405:204:7344:8fd1:3551:e475:9265:ab6d])
- by smtp.gmail.com with ESMTPSA id q199sm25083953pfc.97.2019.01.21.20.21.58
+ by smtp.gmail.com with ESMTPSA id q199sm25083953pfc.97.2019.01.21.20.22.04
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 21 Jan 2019 20:22:03 -0800 (PST)
+ Mon, 21 Jan 2019 20:22:08 -0800 (PST)
 From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 To: shawnguo@kernel.org,
 	leoyang.li@nxp.com,
 	robh+dt@kernel.org
-Subject: [PATCH v3 1/5] dt-bindings: arm: fsl: Fix bindings for LS1012A and
- LS1021A based boards
-Date: Tue, 22 Jan 2019 09:51:43 +0530
-Message-Id: <20190122042147.5424-2-manivannan.sadhasivam@linaro.org>
+Subject: [PATCH v3 2/5] ARM: dts: Add devicetree compatibles for LS1021A based
+ boards
+Date: Tue, 22 Jan 2019 09:51:44 +0530
+Message-Id: <20190122042147.5424-3-manivannan.sadhasivam@linaro.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190122042147.5424-1-manivannan.sadhasivam@linaro.org>
 References: <20190122042147.5424-1-manivannan.sadhasivam@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_202205_311319_E77FCA59 
-X-CRM114-Status: GOOD (  11.52  )
+X-CRM114-CacheID: sfid-20190121_202211_251186_85273E05 
+X-CRM114-Status: GOOD (  13.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,40 +106,56 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Fix devicetree bindings for Freescale LS1012A and LS1021A SoC based boards.
+Add missing devicetree compatibles for the following LS1021A based
+boards:
 
-Fixes: a1a38e1f4d1d ("dt-bindings: arm: Convert FSL board/soc bindings to json-schema")
+ls1021a-moxa-uc-8410a.dts
+ls1021a-qds.dts
+ls1021a-twr.dts
+
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/fsl.yaml | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts | 1 +
+ arch/arm/boot/dts/ls1021a-qds.dts           | 1 +
+ arch/arm/boot/dts/ls1021a-twr.dts           | 1 +
+ 3 files changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.yaml b/Documentation/devicetree/bindings/arm/fsl.yaml
-index d34fe0749199..20fb61006f2b 100644
---- a/Documentation/devicetree/bindings/arm/fsl.yaml
-+++ b/Documentation/devicetree/bindings/arm/fsl.yaml
-@@ -173,12 +173,20 @@ properties:
-               - fsl,vf610
-               - fsl,vf610m4
+diff --git a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+index 6a83f30029ea..ba1ddd93b8f8 100644
+--- a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
++++ b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+@@ -18,6 +18,7 @@
  
--      - description: LS1021A based Boards
-+      - description: LS1012A based Boards
-         items:
-           - enum:
-               - fsl,ls1012a-rdb
-               - fsl,ls1012a-frdm
-               - fsl,ls1012a-qds
-+          - const: fsl,ls1012a
-+
-+      - description: LS1021A based Boards
-+        items:
-+          - enum:
-+              - fsl,ls1021a-moxa-uc-8410a
-+              - fsl,ls1021a-qds
-+              - fsl,ls1021a-twr
-           - const: fsl,ls1021a
+ / {
+ 	model = "Moxa UC-8410A";
++	compatible = "fsl,ls1021a-moxa-uc-8410a", "fsl,ls1021a";
  
-       - description: LS1043A based Boards
+ 	aliases {
+ 		enet0_rgmii_phy = &rgmii_phy0;
+diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
+index 923a25760516..ca60730dda40 100644
+--- a/arch/arm/boot/dts/ls1021a-qds.dts
++++ b/arch/arm/boot/dts/ls1021a-qds.dts
+@@ -51,6 +51,7 @@
+ 
+ / {
+ 	model = "LS1021A QDS Board";
++	compatible = "fsl,ls1021a-qds", "fsl,ls1021a";
+ 
+ 	aliases {
+ 		enet0_rgmii_phy = &rgmii_phy1;
+diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
+index 8b48c3c7cd21..97e1fb7ea932 100644
+--- a/arch/arm/boot/dts/ls1021a-twr.dts
++++ b/arch/arm/boot/dts/ls1021a-twr.dts
+@@ -51,6 +51,7 @@
+ 
+ / {
+ 	model = "LS1021A TWR Board";
++	compatible = "fsl,ls1021a-twr", "fsl,ls1021a";
+ 
+ 	aliases {
+ 		enet2_rgmii_phy = &rgmii_phy1;
 -- 
 2.17.1
 
