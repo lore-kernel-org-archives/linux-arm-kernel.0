@@ -2,85 +2,64 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C10AC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:06:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5DE41C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:17:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C97F420879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:06:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1758B20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:17:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fJ5kM092";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="b2Li2h6b"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C97F420879
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N+ab4C2T"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1758B20879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=bcJy9Cd+oVljPa1qIV30XfhS9TLhfK2GvbLWRni9paA=; b=fJ5kM092EN7G78
-	QkKs8I9Mld9677bhjl9NQN3WKMY+A9nySlpOd6fzTvygO2bL6UAjCUWWOfpXqhLVBqQ4mMa7H8xTG
-	RKzbN54imo4OtPTpnDEX1dHr1nQkWPsLoGyJR5FtOI/xaAdpy7WWGtT2xsX6vehMgf1Pi7m6ryNew
-	VmAC4FE3/z7B2KLDyBjBPhEwWlOFpCyHnNDRUzZxLAodPyOw5qwWhj7nE1eghPlVZ4VcwWz17h//H
-	0tATyncJQKaVPxmXx98tLmYJNDqukJWlRUgPaCDPI3KDP9IafAkuskCZ/+fBGXnGChdnO2or2ANRA
-	TSqcTzQT0mWmgxaEq9ag==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=2DDq3g7cjxcFYqwATfSEyq11FXME1NcFqxPTnUWHlkQ=; b=N+ab4C2T66yhnm
+	98ZIO3vAXwYpOsMv80wj5fYcWML/vgeF18ls4EWVI+GEM7y/ylop1MheQvJx8mnkt+89FWeuPVz20
+	MmQ5QtNZusJin8fEQBEi88sFvfCBKh+oDSPXuqF+plMKf8fdhW15F/mPMFaxPVk3yzT57DA6oRPyH
+	DIJTK/1gyXf1pXUy6qKlDf0Do0XZhHJpt88fd8XTmACqJ5tHnkLf+EXpiTPT5XKLVFYO1pFjAh4G8
+	kXj6Rf+T1sZ+ercYkyi9Tw0h8WIxJEKFRjy4x9YYCg1rlMXjbtE5X9z671rVsDnp20W5SInEVxVXe
+	aerYxGsqe1cGyevbzbdw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glxdM-0004p6-IS; Tue, 22 Jan 2019 15:06:36 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glxdJ-0004ok-4h
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 15:06:34 +0000
-Received: by mail-wm1-x341.google.com with SMTP id b11so14493584wmj.1
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 07:06:32 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=UOYKuSL5Mc3+i6V5yuN8VGLaRYUHqSjx2EoNQxQQYCw=;
- b=b2Li2h6bMiShx34TjIsFU/nm1RM4QxumLNL/RbWat606XkA11x17nbXRzYoh5KGPPA
- ORLFLzGm7kBro+GJ40vArFXa2F1z3/NQ8shK0F17NzNtrWfZSKsETzMF7acQGhDcU+pI
- Oxzfu3Znc93LtjyebaEon3IrQkpIQurTiFjlo=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=UOYKuSL5Mc3+i6V5yuN8VGLaRYUHqSjx2EoNQxQQYCw=;
- b=bv894KLnwBy+asWxdzt/tfDoTOgqZn50w6dDPubTwFZBkA7cONAG15ZWqPU3itMkD6
- hhd329I6kviEw9mEiP2tdaYgJl3EqddorPmlr+3CNOop/t1GSXzKV8TLCbsewv1+MI0U
- xTM1LD+JGNJO0vTtyhflNmxmGj/k8CqSvQKWktkwbUl571TyFf4eEnxK90JSIgw78rFB
- N6lCqro1tUUYKJWWpFBF9qzm9UkvSGHdr8Za4NooxJe5ZYmhxuaBQs41Hc5LqKvA0xIo
- b/8gOZFeebhjSKQwK8/9xR3BF+EzAtCYPslKc4zFhRVEV/SpH4zF8aU7W6g8yQZqbkLr
- 3Vew==
-X-Gm-Message-State: AJcUukf+2rIA3nEgzAmjEISQQ6E57lbmYGhpuxBmp1CDyWVDcIT4DQa+
- NWBrV6S/X0e6UPp/AsfIL+Bgtw==
-X-Google-Smtp-Source: ALg8bN778/QAvszzjrPefLp7Sg27rTv6cYDlCMvQUL7TtD/bAxqlieXj/VXRity2byy0v3PrEgcF+Q==
-X-Received: by 2002:a7b:c399:: with SMTP id s25mr4264519wmj.90.1548169590997; 
- Tue, 22 Jan 2019 07:06:30 -0800 (PST)
-Received: from localhost.localdomain
- (laubervilliers-657-1-83-120.w92-154.abo.wanadoo.fr. [92.154.90.120])
- by smtp.gmail.com with ESMTPSA id b7sm88575484wrs.47.2019.01.22.07.06.29
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 22 Jan 2019 07:06:30 -0800 (PST)
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-To: linux-acpi@vger.kernel.org
-Subject: [PATCH] acpi: bgrt: parse BGRT to obtain BMP address before it gets
- clobbered
-Date: Tue, 22 Jan 2019 16:06:16 +0100
-Message-Id: <20190122150616.850-1-ard.biesheuvel@linaro.org>
-X-Mailer: git-send-email 2.20.1
+	id 1glxno-0001qA-Oh; Tue, 22 Jan 2019 15:17:24 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glxnk-0001pE-9i
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 15:17:22 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 80397A78;
+ Tue, 22 Jan 2019 07:17:18 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4BF253F589;
+ Tue, 22 Jan 2019 07:17:17 -0800 (PST)
+Date: Tue, 22 Jan 2019 15:17:14 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Andre Przywara <andre.przywara@arm.com>
+Subject: Re: [PATCH 1/2] KVM: arm/arm64: Add save/restore support for
+ firmware workaround state
+Message-ID: <20190122151714.GG3578@e103592.cambridge.arm.com>
+References: <20190107120537.184252-1-andre.przywara@arm.com>
+ <20190107120537.184252-2-andre.przywara@arm.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190107120537.184252-2-andre.przywara@arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_070633_190013_BE0DEC34 
-X-CRM114-Status: GOOD (  21.11  )
+X-CRM114-CacheID: sfid-20190122_071720_350550_884BC80B 
+X-CRM114-Status: GOOD (  22.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,251 +71,163 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: lorenzo.pieralisi@arm.com, graeme.gregory@linaro.org,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, Peter Jones <pjones@redhat.com>,
- rjw@rjwysocki.net, leif.lindholm@linaro.org, astone@redhat.com,
- linux-efi@vger.kernel.org, harry.l.hsiung@intel.com,
- linux-arm-kernel@lists.infradead.org, lenb@kernel.org
+Cc: Marc Zyngier <marc.zyngier@arm.com>, kvm@vger.kernel.org,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The bitmap left in the framebuffer by the firmware is described by an
-ACPI table called "BGRT", which describes the size, pixel format and
-the address of a BMP image in memory. While the BGRT ACPI table is
-guaranteed to reside in a "ACPI reclaim" memory region, which is
-never touched by Linux. The BMP image, however, typically resides
-in EFI Boot Services Memory, which may have been overwritten by the
-time the BGRT discovery routine runs.
+On Mon, Jan 07, 2019 at 12:05:36PM +0000, Andre Przywara wrote:
+> KVM implements the firmware interface for mitigating cache speculation
+> vulnerabilities. Guests may use this interface to ensure mitigation is
+> active.
+> If we want to migrate such a guest to a host with a different support
+> level for those workarounds, migration might need to fail, to ensure that
+> critical guests don't loose their protection.
+> 
+> Introduce a way for userland to save and restore the workarounds state.
+> On restoring we do checks that make sure we don't downgrade our
+> mitigation level.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_emulate.h   |  10 ++
+>  arch/arm/include/uapi/asm/kvm.h      |   9 ++
+>  arch/arm64/include/asm/kvm_emulate.h |  14 +++
+>  arch/arm64/include/uapi/asm/kvm.h    |   9 ++
+>  virt/kvm/arm/psci.c                  | 138 ++++++++++++++++++++++++++-
+>  5 files changed, 178 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> index 77121b713bef..2255c50debab 100644
+> --- a/arch/arm/include/asm/kvm_emulate.h
+> +++ b/arch/arm/include/asm/kvm_emulate.h
+> @@ -275,6 +275,16 @@ static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
+>  	return vcpu_cp15(vcpu, c0_MPIDR) & MPIDR_HWID_BITMASK;
+>  }
+>  
+> +static inline bool kvm_arm_get_vcpu_workaround_2_flag(struct kvm_vcpu *vcpu)
+> +{
+> +	return false;
+> +}
+> +
+> +static inline void kvm_arm_set_vcpu_workaround_2_flag(struct kvm_vcpu *vcpu,
+> +						      bool flag)
+> +{
+> +}
+> +
+>  static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
+>  {
+>  	*vcpu_cpsr(vcpu) |= PSR_E_BIT;
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index 4602464ebdfb..02c93b1d8f6d 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -214,6 +214,15 @@ struct kvm_vcpu_events {
+>  #define KVM_REG_ARM_FW_REG(r)		(KVM_REG_ARM | KVM_REG_SIZE_U64 | \
+>  					 KVM_REG_ARM_FW | ((r) & 0xffff))
+>  #define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1	KVM_REG_ARM_FW_REG(1)
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_NOT_AVAIL	0
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_AVAIL	1
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2	KVM_REG_ARM_FW_REG(2)
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_MASK	0x3
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL	0
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_AVAIL	1
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNAFFECTED	2
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_ENABLED	4
+>  
+>  /* Device Control API: ARM VGIC */
+>  #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index 506386a3edde..a44f07f68da4 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -336,6 +336,20 @@ static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
+>  	return vcpu_read_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
+>  }
+>  
+> +static inline bool kvm_arm_get_vcpu_workaround_2_flag(struct kvm_vcpu *vcpu)
+> +{
+> +	return vcpu->arch.workaround_flags & VCPU_WORKAROUND_2_FLAG;
+> +}
+> +
+> +static inline void kvm_arm_set_vcpu_workaround_2_flag(struct kvm_vcpu *vcpu,
+> +						      bool flag)
+> +{
+> +	if (flag)
+> +		vcpu->arch.workaround_flags |= VCPU_WORKAROUND_2_FLAG;
+> +	else
+> +		vcpu->arch.workaround_flags &= ~VCPU_WORKAROUND_2_FLAG;
+> +}
+> +
+>  static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
+>  {
+>  	if (vcpu_mode_is_32bit(vcpu)) {
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 97c3478ee6e7..4a19ef199a99 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -225,6 +225,15 @@ struct kvm_vcpu_events {
+>  #define KVM_REG_ARM_FW_REG(r)		(KVM_REG_ARM64 | KVM_REG_SIZE_U64 | \
+>  					 KVM_REG_ARM_FW | ((r) & 0xffff))
+>  #define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1	KVM_REG_ARM_FW_REG(1)
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_NOT_AVAIL	0
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_AVAIL	1
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2	KVM_REG_ARM_FW_REG(2)
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_MASK	0x3
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL	0
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_AVAIL	1
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNAFFECTED	2
+> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_ENABLED	4
 
-So instead, drop the handling from the ACPI init code, and call the
-BGRT parsing code immediately after going over the EFI configuration
-table array, at which time no memory has been touched yet except for
-the .data/.bss regions covered by the static kernel image.
+If this is the first exposure of this information to userspace, I wonder
+if we can come up with some common semantics that avoid having to add
+new ad-hoc code (and bugs) every time a new vulnerability/workaround is
+defined.
 
-Unfortunately, this involves a non-trivial amount of ACPI entry
-point and root table parsing, but we cannot rely on the normal
-ACPI infrastructure yet this early in the boot.
+We seem to have at least the two following independent properties
+for a vulnerability, with the listed values for each:
 
-Also note that we cannot take the 'acpi_disabled' global variable
-into account, since it may not have assumed the correct value yet
-(on arm64, the default value is '1' which is overridden to '0' if
-no DT description has been made available by the firmware)
+ * vulnerability (Vulnerable, Unknown, Not Vulnerable)
 
-Cc: Peter Jones <pjones@redhat.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/acpi.c        |  2 -
- arch/x86/kernel/acpi/boot.c     |  2 -
- drivers/acpi/bgrt.c             |  6 --
- drivers/firmware/efi/efi-bgrt.c | 80 ++++++++++++++++++--
- drivers/firmware/efi/efi.c      | 13 ++++
- include/linux/efi-bgrt.h        |  4 +-
- 6 files changed, 89 insertions(+), 18 deletions(-)
+ * mitigation support (Not Requestable, Requestable)
 
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 44e3c351e1ea..7429a811f76d 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -230,8 +230,6 @@ void __init acpi_boot_table_init(void)
- 			early_init_dt_scan_chosen_stdout();
- 	} else {
- 		acpi_parse_spcr(earlycon_acpi_spcr_enable, true);
--		if (IS_ENABLED(CONFIG_ACPI_BGRT))
--			acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
- 	}
- }
- 
-diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
-index 2624de16cd7a..2d3535b62752 100644
---- a/arch/x86/kernel/acpi/boot.c
-+++ b/arch/x86/kernel/acpi/boot.c
-@@ -1633,8 +1633,6 @@ int __init acpi_boot_init(void)
- 	acpi_process_madt();
- 
- 	acpi_table_parse(ACPI_SIG_HPET, acpi_parse_hpet);
--	if (IS_ENABLED(CONFIG_ACPI_BGRT))
--		acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
- 
- 	if (!acpi_noirq)
- 		x86_init.pci.init = pci_acpi_init;
-diff --git a/drivers/acpi/bgrt.c b/drivers/acpi/bgrt.c
-index 75af78361ce5..048413e06898 100644
---- a/drivers/acpi/bgrt.c
-+++ b/drivers/acpi/bgrt.c
-@@ -81,12 +81,6 @@ static const struct attribute_group bgrt_attribute_group = {
- 	.bin_attrs = bgrt_bin_attributes,
- };
- 
--int __init acpi_parse_bgrt(struct acpi_table_header *table)
--{
--	efi_bgrt_init(table);
--	return 0;
--}
--
- static int __init bgrt_init(void)
- {
- 	int ret;
-diff --git a/drivers/firmware/efi/efi-bgrt.c b/drivers/firmware/efi/efi-bgrt.c
-index b22ccfb0c991..8bd9b96942d2 100644
---- a/drivers/firmware/efi/efi-bgrt.c
-+++ b/drivers/firmware/efi/efi-bgrt.c
-@@ -27,24 +27,92 @@ struct bmp_header {
- 	u32 size;
- } __packed;
- 
--void __init efi_bgrt_init(struct acpi_table_header *table)
-+void __init efi_bgrt_init(unsigned long rsdp_phys)
- {
- 	void *image;
- 	struct bmp_header bmp_header;
- 	struct acpi_table_bgrt *bgrt = &bgrt_tab;
-+	struct acpi_table_bgrt *table = NULL;
-+	struct acpi_table_rsdp *rsdp;
-+	struct acpi_table_header *hdr;
-+	u64 xsdt_phys;
-+	u32 rsdt_phys;
-+	unsigned int len;
- 
--	if (acpi_disabled)
-+	if (!efi_enabled(EFI_MEMMAP))
- 		return;
- 
--	if (!efi_enabled(EFI_MEMMAP))
-+	/* map the root pointer table to find the xsdt/rsdt values */
-+	rsdp = early_memremap(rsdp_phys, sizeof(*rsdp));
-+	if (rsdp && ACPI_VALIDATE_RSDP_SIG(rsdp->signature)) {
-+		xsdt_phys = rsdp->xsdt_physical_address;
-+		rsdt_phys = rsdp->rsdt_physical_address;
-+	} else {
-+		WARN_ON(1);
-+		return;
-+	}
-+	early_memunmap(rsdp, sizeof(*rsdp));
-+
-+	/* obtain the length of whichever table we will be using */
-+	hdr = early_memremap(xsdt_phys ?: rsdt_phys, sizeof(*hdr));
-+	if (WARN_ON(!hdr))
-+		return;
-+	len = hdr->length;
-+	early_memunmap(hdr, sizeof(*hdr));
-+
-+	if (xsdt_phys) {
-+		struct acpi_table_xsdt *xsdt = early_memremap(xsdt_phys, len);
-+		int i;
-+
-+		if (WARN_ON(!xsdt))
-+			return;
-+
-+		for (i = 0; i < (len - sizeof(*hdr)) / sizeof(u64); i++) {
-+			table = early_memremap(xsdt->table_offset_entry[i],
-+					       sizeof(*table));
-+			if (WARN_ON(!table))
-+				break;
-+
-+			if (ACPI_COMPARE_NAME(table->header.signature,
-+					      ACPI_SIG_BGRT))
-+				break;
-+			early_memunmap(table, sizeof(*table));
-+			table = NULL;
-+		}
-+		early_memunmap(xsdt, len);
-+	} else if (rsdt_phys) {
-+		struct acpi_table_rsdt *rsdt = early_memremap(rsdt_phys, len);
-+		int i;
-+
-+		if (WARN_ON(!rsdt))
-+			return;
-+
-+		for (i = 0; i < (len - sizeof(*hdr)) / sizeof(u32); i++) {
-+			table = early_memremap(rsdt->table_offset_entry[i],
-+					       sizeof(*table));
-+			if (WARN_ON(!table))
-+				break;
-+
-+			if (ACPI_COMPARE_NAME(table->header.signature,
-+					      ACPI_SIG_BGRT))
-+				break;
-+			early_memunmap(table, sizeof(*table));
-+			table = NULL;
-+		}
-+		early_memunmap(rsdt, len);
-+	}
-+
-+	if (!table)
- 		return;
- 
--	if (table->length < sizeof(bgrt_tab)) {
-+	if (table->header.length < sizeof(bgrt_tab)) {
- 		pr_notice("Ignoring BGRT: invalid length %u (expected %zu)\n",
--		       table->length, sizeof(bgrt_tab));
-+		       table->header.length, sizeof(bgrt_tab));
- 		return;
- 	}
--	*bgrt = *(struct acpi_table_bgrt *)table;
-+	*bgrt = *table;
-+	early_memunmap(table, sizeof(*table));
-+
- 	if (bgrt->version != 1) {
- 		pr_notice("Ignoring BGRT: invalid version %u (expected 1)\n",
- 		       bgrt->version);
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index 4c46ff6f2242..e5ef5c0eacc1 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -20,6 +20,7 @@
- #include <linux/init.h>
- #include <linux/device.h>
- #include <linux/efi.h>
-+#include <linux/efi-bgrt.h>
- #include <linux/of.h>
- #include <linux/of_fdt.h>
- #include <linux/io.h>
-@@ -592,6 +593,18 @@ int __init efi_config_parse_tables(void *config_tables, int count, int sz,
- 
- 		early_memunmap(tbl, sizeof(*tbl));
- 	}
-+
-+	/*
-+	 * We need to parse the BGRT table (which is an ACPI table not a UEFI
-+	 * configuration table) by hand and figure out where the bitmap it
-+	 * describes lives in memory so we can reserve it early on. Otherwise,
-+	 * it may be clobbered by the time we get to it during the ordinary ACPI
-+	 * table init sequence.
-+	 */
-+	if (IS_ENABLED(CONFIG_ACPI_BGRT) &&
-+	    efi.acpi20 != EFI_INVALID_TABLE_ADDR)
-+		efi_bgrt_init(efi.acpi20);
-+
- 	return 0;
- }
- 
-diff --git a/include/linux/efi-bgrt.h b/include/linux/efi-bgrt.h
-index e6cd51005633..528ea62d99ec 100644
---- a/include/linux/efi-bgrt.h
-+++ b/include/linux/efi-bgrt.h
-@@ -6,7 +6,7 @@
- 
- #ifdef CONFIG_ACPI_BGRT
- 
--void efi_bgrt_init(struct acpi_table_header *table);
-+void efi_bgrt_init(unsigned long rsdp_phys);
- int __init acpi_parse_bgrt(struct acpi_table_header *table);
- 
- /* The BGRT data itself; only valid if bgrt_image != NULL. */
-@@ -15,7 +15,7 @@ extern struct acpi_table_bgrt bgrt_tab;
- 
- #else /* !CONFIG_ACPI_BGRT */
- 
--static inline void efi_bgrt_init(struct acpi_table_header *table) {}
-+static inline void efi_bgrt_init(unsigned long rsdp_phys) {}
- static inline int __init acpi_parse_bgrt(struct acpi_table_header *table)
- {
- 	return 0;
--- 
-2.20.1
+Migrations must not move to the left in _either_ list for any
+vulnerability.
 
+If we want to hedge out bets we could follow the style of the ID
+registers and allocate to each theoretical vulnerability a pair of
+signed 2- or (for more expansion room if we think we might need it)
+4-bit fields.
+
+We could perhaps allocate as follows:
+
+ * -1=Vulnerable, 0=Unknown, 1=Not Vulnerable
+ *  0=Mitigation not requestable, 1=Mitigation requestable
+
+
+Checking code wouldn't need to know which fields describe mitigation
+mechanisms and which describe vulnerabilities: we'd just do a strict >=
+comparison on each.
+
+Further, if a register is never written before the vcpu is first run,
+we should imply a write of 0 to it as part of KVM_RUN (so that if the
+destination node has a negative value anywhere, KVM_RUN barfs cleanly.
+
+
+(Those semantics should apply equally to the CPU ID registers, though
+we don't currently do that.)
+
+Thoughts?
+
+[...]
+
+Cheers
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
