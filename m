@@ -2,93 +2,92 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 95636C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 08:38:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0E0C3C282C5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 08:48:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5A4C620823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 08:38:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C5B322084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 08:48:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P57gBw23";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="HKqDE8LF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A4C620823
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eHsfZAIi";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="uM6MvBg2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C5B322084C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=C6qEsSwX5xBFjjSBCYGX+qFiaEoU39NRWBbxlTWxNys=; b=P57gBw237tX9wO
-	flBjPbgt8qEOFs/snsRkOo3GSn2AkhKDmSk8wCN56XGox9C1H61DmmfXELcXE5Y/Sjvnr60N0Cu7Y
-	HPRKWlq7UuqlmN+EpXSZg6EpfDGID9YuygJfcUGP0/0i7C6vji8iouAUifqIP48M/fk55GmzPm9eP
-	tVWMtQYMZe4s/Ul99Gxbqn4IAWscPKIeKMh8lPkbTmgQWrCuSR+B7PWdYtGwbPzHnhRalbFGVS/ut
-	+qeBlNKfe7mGWVKjxyYf5/j/gAm4qTrbjBvcUT/+CpvOVTPVPFsxKXJO+2cr+vl3G+T4AuzkVi8ap
-	kyjvw0VdvWWl0mG0umbQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:In-reply-to:Subject:To:
+	From:References:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=imsNweWSXCsbrVNxEMfJM/ptvUpJR6lB3QNKjobTyLQ=; b=eHsfZAIiivToj7yeG718Tjk2w
+	x4tb5tooYlJ2AE7YT66hPQuIstjOozCLx3oqbH4miFKia2/G1X0dRBHpHfsFs1NUGw8ApuZbKelVV
+	7Nin8A8uNc7N8oqfgH98C57uUoaFJeoZd1dKXGejM0fvq5LLsjfqcULWiYkLmm+uqt7a1Dy38iwc2
+	vjIYqB9v/DfYyMtsfQss5mZ+BiZkaEuXx0Iw9o4g1YZjCiEt6QrNGbuZqcag9/LCh86x2TsjTdAj0
+	GYpxf8vFMXfC+y/4xvXpgo57ZXIGO+O4iKVgjLHfzc84Ocj3U0iwMrXQcqSeHKAn6NAmRc79nv5Mf
+	+1l4utiUQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glrZi-0002lE-SS; Tue, 22 Jan 2019 08:38:26 +0000
-Received: from mail-io1-xd44.google.com ([2607:f8b0:4864:20::d44])
+	id 1glriz-0007GE-DI; Tue, 22 Jan 2019 08:48:01 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glrZe-0002bn-J1
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 08:38:25 +0000
-Received: by mail-io1-xd44.google.com with SMTP id b16so18527873ior.1
+ id 1glrir-0007D0-1u
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 08:47:57 +0000
+Received: by mail-wm1-x341.google.com with SMTP id p6so13264474wmc.1
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 00:38:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=qUQTqUpTVURbew+RiiCt5ESE99xTjivED68SiV0jtLM=;
- b=HKqDE8LFlR4bcntUCzw5MakCFvbeNDgvCsz4iSgo1AZv4MlXU3MWDlW2eoMxt5jPgl
- B1WLHHhoFo0U/ljemI8Z4J4693JULpk2nLHxNNhEdhr5Wm/Y8xKiI2BaLpwYMhTOBWQe
- g/1w+snMb6corjU4aB7Pr3WUQDzxnbACZ13FM=
+ Tue, 22 Jan 2019 00:47:52 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=references:user-agent:from:to:cc:subject:in-reply-to:date
+ :message-id:mime-version;
+ bh=kZr0fYXLTDuQhA7Idwn8AXJc8cbOUQt42CeU5kkGDzM=;
+ b=uM6MvBg20Qq29jwM8GsPMKR9cmQ2IwbVjzJWQRJbIKtfHk/YMlI/y9l2jhdRxNrUqC
+ W8DULMM40djroBFBgxiSzwKtAEHM3HMJC3JaL45AS3w2xxCzGUv3A0oifxCuWiLK2Lmv
+ Rvq1fZlE4RVqfoKaWZSXhGUa8dkkSF1pNCxqqf/S4UrRR+XJPeSXF3ydYKeZFbNLph85
+ cUMAIK23+V846EyJbzly4lQp24CGWg94vAIqxxM9qSZUqGLkiBdpXyblmiQnwdRXgNwl
+ WhZ1vvWDD8hZ3zhq1Xn2kHiR1ojSw3FvHROCgcNMjoRBKCToJG6N9tB/J2FynqZWpg8o
+ crtg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=qUQTqUpTVURbew+RiiCt5ESE99xTjivED68SiV0jtLM=;
- b=RAOEkY41ao4+gpHC5cH1sjxFXCY3y2PtmIFzOfXmzbZ51iAUDGSDTZOm62X3su0tF8
- 93PMC2KGCJtbUB0EMKNpDJDDEPx6hbV0/TzMedFuV5h7gaDxozSsjnfkUAeZvh7F01hk
- SBIP4a0im9rDCzK7ZV3AkGeVkw74LXOf6hi0OLGC99AADKoYo+hPW6FCZC012ytsPOfc
- K1o1S6NDNLphao9PcjkiqGSYc7O33o/uF8NTBg8bpUHwv4DiYYhfPQ6JdFE138ZPRPO2
- uLFoV1Aj4DKeHqz3QxYmIftuUZLSerZ6j/U4lrHamJ1XbgR3Tl/ujH6buOnEbzyk+wgF
- eiAQ==
-X-Gm-Message-State: AJcUukcpsNShL5/F54U2ON8qKGtEcUW2ajc97KOdkRtHe3Jw8qDldURW
- HPBD/KiwhC7UL+5cGE6Pi3ER9tJ5NBJP05ta4oUXsw==
-X-Google-Smtp-Source: ALg8bN6UvlN0HUsOrry0u8K9wytWJ4FDuwAh2ipb28YCqe64kcItCGxwzZPOOJMwUUhEfDTU7KX/UKP05UpnCoB0EkA=
-X-Received: by 2002:a5e:c206:: with SMTP id v6mr19395883iop.60.1548146301581; 
- Tue, 22 Jan 2019 00:38:21 -0800 (PST)
+ h=x-gm-message-state:references:user-agent:from:to:cc:subject
+ :in-reply-to:date:message-id:mime-version;
+ bh=kZr0fYXLTDuQhA7Idwn8AXJc8cbOUQt42CeU5kkGDzM=;
+ b=ZiCkpaw+kWVycJbgSBgoBXcD8lEZM7J4JhPvn9y9fIr+VxeqRTbGhT7xsThmzWeIZq
+ ipHBvau/49tI5sIdc8ys54rZkPzemenE8zmopFJ5kBNw47hg6uC5yImn/gbYg5GNpSDK
+ zYk0z63nvsLkJneV1FUIw/U42nMTgjlxhKkk+5cXBG9hgFMGXYrhVDqIm31Z6197URG+
+ 3p2vwGhZFKSQayUHp8KxO/ofBRRnZtpyM7apbNh4H2IFFLliH2gAQ17h1hnexPPAxodK
+ zplRd75g4zxGiF75ao+4LPcZybFPzQN701bsRBcoRrpIPl8GGFg+Tu101ES5+vduTn2Q
+ l6BA==
+X-Gm-Message-State: AJcUuke+nvXOyiwz07wvPv7Qolrlcp9o8tiEW+EHqqcis9W/xJ254da6
+ 5vhsnCErOwX16VJs+hveMO4xSGvOTmNVwy9UkKw=
+X-Google-Smtp-Source: ALg8bN4hP9cUm8TfDSALBx3GgvgF7ZFeOYtqq7C86ZxIP4jA64gAuD4khKmkql26XdrLqVWmVWmNRA==
+X-Received: by 2002:a1c:13d1:: with SMTP id 200mr2654672wmt.4.1548146870859;
+ Tue, 22 Jan 2019 00:47:50 -0800 (PST)
+Received: from localhost (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
+ [90.63.244.31])
+ by smtp.gmail.com with ESMTPSA id f191sm9370369wmg.12.2019.01.22.00.47.49
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 22 Jan 2019 00:47:50 -0800 (PST)
+References: <1547744074-28308-1-git-send-email-lollivier@baylibre.com>
+ <1547744074-28308-3-git-send-email-lollivier@baylibre.com>
+ <20190121171019.GA2903@bogus> <86imyhapl9.fsf@baylibre.com>
+ <CAGp9LzpgZDEdKFH4ZLqxtO60unxXRJoXNsGugNT=oojHDMp+3g@mail.gmail.com>
+User-agent: mu4e 1.0; emacs 25.3.2
+From: Loys Ollivier <lollivier@baylibre.com>
+To: Sean Wang <sean.wang@kernel.org>
+Subject: Re: [PATCH v2 2/4] dt-bindings: gnss: add mediatek binding
+In-reply-to: <CAGp9LzpgZDEdKFH4ZLqxtO60unxXRJoXNsGugNT=oojHDMp+3g@mail.gmail.com>
+Date: Tue, 22 Jan 2019 09:47:48 +0100
+Message-ID: <86imyh13kb.fsf@baylibre.com>
 MIME-Version: 1.0
-References: <20190121100617.2311-1-ard.biesheuvel@linaro.org>
- <20190121150734.GA30582@infradead.org>
- <CAKv+Gu-hR=uieOeg7QheA5yfAycUoi2vjZsDUvROKVjW4eUNqw@mail.gmail.com>
- <20190121155908.GA8084@infradead.org>
- <CAKv+Gu8LzS9OgvVnzUT8BZWVgDmx4OfqNiPSf+8=riY_LByN-g@mail.gmail.com>
- <20190121162238.GA17651@infradead.org>
- <CAKv+Gu-5V-UjP_YzZBCEsa+o_G6BRSVw2ZimYGNEfRGf-aRPNg@mail.gmail.com>
- <59ccf85d-b99d-b5c8-ea87-66c2a892e197@daenzer.net>
- <CAKv+Gu8OkbHwY5UBxahpQpM_gKh2331pQ6o-4YyJdLurbFNHvw@mail.gmail.com>
- <ccc775d3-3053-ab79-dac8-4feb28e8e690@daenzer.net>
- <CAKv+Gu-9VKL5RjScbKss4YfH1Cb8WbXmzU_0UsStnoXJcML7Rg@mail.gmail.com>
- <850b6aee-0040-c333-b125-45211c18ada5@daenzer.net>
- <CAKv+Gu99zHqcQtj6TiOXAr3Qa6WWhKem+DHVA_mAQ0-Bc0Vbqw@mail.gmail.com>
- <047667fd-17be-1c37-5d2a-26768cfd6ab8@daenzer.net>
-In-Reply-To: <047667fd-17be-1c37-5d2a-26768cfd6ab8@daenzer.net>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Tue, 22 Jan 2019 09:38:10 +0100
-Message-ID: <CAKv+Gu_VBd8agHASc5RS0eCgyXP64Lt_i4yPuBjKwGQ+5Lpd5Q@mail.gmail.com>
-Subject: Re: [RFC PATCH] drm: disable WC optimization for cache coherent
- devices on non-x86
-To: =?UTF-8?Q?Michel_D=C3=A4nzer?= <michel@daenzer.net>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_003822_622741_6E6E31CA 
-X-CRM114-Status: GOOD (  21.41  )
+X-CRM114-CacheID: sfid-20190122_004753_160643_7F919C2C 
+X-CRM114-Status: GOOD (  15.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,87 +99,83 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: David Zhou <David1.Zhou@amd.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- amd-gfx@lists.freedesktop.org, Christoph Hellwig <hch@infradead.org>,
- David Airlie <airlied@linux.ie>, Huang Rui <ray.huang@amd.com>,
- dri-devel <dri-devel@lists.freedesktop.org>, Daniel Vetter <daniel@ffwll.ch>,
- Michael Ellerman <mpe@ellerman.id.au>, Junwei Zhang <Jerry.Zhang@amd.com>,
- Alex Deucher <alexander.deucher@amd.com>, Sean Paul <sean@poorly.run>,
- Christian Koenig <christian.koenig@amd.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
+ devicetree@vger.kernel.org,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Kevin Hilman <khilman@baylibre.com>, Loys Ollivier <lollivier@baylibre.com>,
+ Johan Hovold <johan@kernel.org>, linux-kernel@vger.kernel.org,
+ linux-mediatek@lists.infradead.org, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gTW9uLCAyMSBKYW4gMjAxOSBhdCAyMDowNCwgTWljaGVsIETDpG56ZXIgPG1pY2hlbEBkYWVu
-emVyLm5ldD4gd3JvdGU6Cj4KPiBPbiAyMDE5LTAxLTIxIDc6MjggcC5tLiwgQXJkIEJpZXNoZXV2
-ZWwgd3JvdGU6Cj4gPiBPbiBNb24sIDIxIEphbiAyMDE5IGF0IDE5OjI0LCBNaWNoZWwgRMOkbnpl
-ciA8bWljaGVsQGRhZW56ZXIubmV0PiB3cm90ZToKPiA+PiBPbiAyMDE5LTAxLTIxIDc6MjAgcC5t
-LiwgQXJkIEJpZXNoZXV2ZWwgd3JvdGU6Cj4gPj4+IE9uIE1vbiwgMjEgSmFuIDIwMTkgYXQgMTk6
-MDQsIE1pY2hlbCBEw6RuemVyIDxtaWNoZWxAZGFlbnplci5uZXQ+IHdyb3RlOgo+ID4+Pj4gT24g
-MjAxOS0wMS0yMSA2OjU5IHAubS4sIEFyZCBCaWVzaGV1dmVsIHdyb3RlOgo+ID4+Pj4+IE9uIE1v
-biwgMjEgSmFuIDIwMTkgYXQgMTg6NTUsIE1pY2hlbCBEw6RuemVyIDxtaWNoZWxAZGFlbnplci5u
-ZXQ+IHdyb3RlOgo+ID4+Pj4+PiBPbiAyMDE5LTAxLTIxIDU6MzAgcC5tLiwgQXJkIEJpZXNoZXV2
-ZWwgd3JvdGU6Cj4gPj4+Pj4+PiBPbiBNb24sIDIxIEphbiAyMDE5IGF0IDE3OjIyLCBDaHJpc3Rv
-cGggSGVsbHdpZyA8aGNoQGluZnJhZGVhZC5vcmc+IHdyb3RlOgo+ID4+Pj4+Pj4KPiA+Pj4+Pj4+
-PiBVbnRpbCB0aGF0IGhhcHBlbnMgd2Ugc2hvdWxkIGp1c3QgY2hhbmdlIHRoZSBkcml2ZXIgaWZk
-ZWZzIHRvIGRlZmF1bHQKPiA+Pj4+Pj4+PiB0aGUgaGFja3MgdG8gb2ZmIGFuZCBvbmx5IGVuYWJs
-ZSB0aGVtIG9uIHNldHVwcyB3aGVyZSB3ZSAxMDAlCj4gPj4+Pj4+Pj4gcG9zaXRpdmVseSBrbm93
-IHRoYXQgdGhleSBhY3R1YWxseSB3b3JrLiAgQW5kIGRvY3VtZW50IHRoYXQgZmFjdAo+ID4+Pj4+
-Pj4+IGluIGJpZyBmYXQgY29tbWVudHMuCj4gPj4+Pj4+Pgo+ID4+Pj4+Pj4gV2VsbCwgYXMgSSBt
-ZW50aW9uZWQgaW4gbXkgY29tbWl0IGxvZyBhcyB3ZWxsLCBpZiB3ZSBkZWZhdWx0IHRvIG9mZgo+
-ID4+Pj4+Pj4gdW5sZXNzIENPTkZJR19YODYsIHdlIG1heSBicmVhayB3b3JraW5nIHNldHVwcyBv
-biBNSVBTIGFuZCBQb3dlciB3aGVyZQo+ID4+Pj4+Pj4gdGhlIGRldmljZSBpcyBpbiBmYWN0IG5v
-bi1jYWNoZSBjb2hlcmVudCwgYW5kIHJlbGllcyBvbiB0aGlzCj4gPj4+Pj4+PiAnb3B0aW1pemF0
-aW9uJyB0byBnZXQgdGhpbmdzIHdvcmtpbmcuCj4gPj4+Pj4+Cj4gPj4+Pj4+IEZXSVcsIHRoZSBh
-bWRncHUgZHJpdmVyIGRvZXNuJ3QgcmVseSBvbiBub24tc25vb3BlZCB0cmFuc2ZlcnMgZm9yCj4g
-Pj4+Pj4+IGNvcnJlY3QgYmFzaWMgb3BlcmF0aW9uICh0aGUgc2NlbmFyaW8gQ2hyaXN0aWFuIGJy
-b3VnaHQgdXAgaXMgYSB2ZXJ5Cj4gPj4+Pj4+IHNwZWNpYWxpemVkIHVzZS1jYXNlKSwgc28gdGhh
-dCBzaG91bGRuJ3QgYmUgYW4gaXNzdWUuCj4gPj4+Pj4KPiA+Pj4+PiBUaGUgcG9pbnQgaXMgdGhh
-dCB0aGlzIGlzIG9ubHkgdHJ1ZSBmb3IgeDg2Lgo+ID4+Pj4+Cj4gPj4+Pj4gT24gb3RoZXIgYXJj
-aGl0ZWN0dXJlcywgdGhlIHVzZSBvZiBub24tY2FjaGVkIG1hcHBpbmdzIG9uIHRoZSBDUFUgc2lk
-ZQo+ID4+Pj4+IG1lYW5zIHRoYXQgeW91IC9kby8gcmVseSBvbiBub24tc25vb3BlZCB0cmFuc2Zl
-cnMsIHNpbmNlIGlmIHRob3NlCj4gPj4+Pj4gdHJhbnNmZXJzIHR1cm4gb3V0IG5vdCB0byBzbm9v
-cCBpbmFkdmVydGVudGx5LCB0aGUgYWNjZXNzZXMgYXJlCj4gPj4+Pj4gaW5jb2hlcmVudCB3aXRo
-IHRoZSBDUFUncyB2aWV3IG9mIG1lbW9yeS4KPiA+Pj4+Cj4gPj4+PiBUaGUgZHJpdmVyIGdlbmVy
-YWxseSBvbmx5IHVzZXMgbm9uLWNhY2hlZCBtYXBwaW5ncyBpZgo+ID4+Pj4gZHJtX2FyY2gvZGV2
-aWNlX2Nhbl93Y19tZW1vcnkgcmV0dXJucyB0cnVlLgo+ID4+Pgo+ID4+PiBJbmRlZWQuIEFuZCBz
-byB3ZSBzaG91bGQgdGFrZSBjYXJlIHRvIG9ubHkgcmV0dXJuICd0cnVlJyBmcm9tIHRoYXQKPiA+
-Pj4gZnVuY3Rpb24gaWYgaXQgaXMgZ3VhcmFudGVlZCB0aGF0IG5vbi1jYWNoZWQgQ1BVIG1hcHBp
-bmdzIGFyZSBjb2hlcmVudAo+ID4+PiB3aXRoIHRoZSBtYXBwaW5ncyB1c2VkIGJ5IHRoZSBHUFUs
-IGVpdGhlciBiZWNhdXNlIHRoYXQgaXMgYWx3YXlzIHRoZQo+ID4+PiBjYXNlIChsaWtlIG9uIHg4
-NiksIG9yIGJlY2F1c2Ugd2Uga25vdyB0aGF0IHRoZSBwbGF0Zm9ybSBpbiBxdWVzdGlvbgo+ID4+
-PiBpbXBsZW1lbnRzIE5vU25vb3AgY29ycmVjdGx5IHRocm91Z2hvdXQgdGhlIGludGVyY29ubmVj
-dC4KPiA+Pj4KPiA+Pj4gV2hhdCBzZWVtcyB0byBiZSBjb21wbGljYXRpbmcgbWF0dGVycyBpcyB0
-aGF0IGluIHNvbWUgY2FzZXMsIHRoZQo+ID4+PiBkZXZpY2UgaXMgbm9uLWNhY2hlIGNvaGVyZW50
-IHRvIGJlZ2luIHdpdGgsIHNvIHJlZ2FyZGxlc3Mgb2Ygd2hldGhlcgo+ID4+PiB0aGUgTm9Tbm9v
-cCBhdHRyaWJ1dGUgaXMgdXNlZCBvciBub3QsIHRob3NlIGFjY2Vzc2VzIHdpbGwgbm90IHNub29w
-IGluCj4gPj4+IHRoZSBjYWNoZXMgYW5kIGJlIGNvaGVyZW50IHdpdGggdGhlIG5vbi1jYWNoZWQg
-bWFwcGluZ3MgdXNlZCBieSB0aGUKPiA+Pj4gQ1BVLiBTbyBpZiB3ZSByZXN0cmljdCB0aGlzIG9w
-dGltaXphdGlvbiBbb24gbm9uLVg4Nl0gdG8gcGxhdGZvcm1zCj4gPj4+IHRoYXQgYXJlIGtub3du
-IHRvIGltcGxlbWVudCBOb1Nub29wIGNvcnJlY3RseSwgd2UgbWF5IGJyZWFrIHBsYXRmb3Jtcwo+
-ID4+PiB0aGF0IGFyZSBpbXBsaWNpdGx5IE5vU25vb3AgYWxsIHRoZSB0aW1lLgo+ID4+Cj4gPj4g
-U2luY2UgdGhlIGRyaXZlciBnZW5lcmFsbHkgZG9lc24ndCByZWx5IG9uIG5vbi1zbm9vcGVkIGFj
-Y2Vzc2VzIGZvcgo+ID4+IGNvcnJlY3RuZXNzLCB0aGF0IGNvdWxkbid0ICJicmVhayIgYW55dGhp
-bmcgdGhhdCBoYXNuJ3QgYWx3YXlzIGJlZW4gYnJva2VuLgo+ID4KPiA+IEFnYWluLCB0aGF0IGlz
-IG9ubHkgdHJ1ZSBvbiB4ODYuCj4gPgo+ID4gT24gb3RoZXIgYXJjaGl0ZWN0dXJlcywgRE1BIHdy
-aXRlcyBmcm9tIHRoZSBkZXZpY2UgbWF5IGFsbG9jYXRlIGluIHRoZQo+ID4gY2FjaGVzLCBhbmQg
-YmUgaW52aXNpYmxlIHRvIHRoZSBDUFUgd2hlbiBpdCB1c2VzIG5vbi1jYWNoZWQgbWFwcGluZ3Mu
-Cj4KPiBMZXQgbWUgdHJ5IG9uZSBsYXN0IHRpbWU6Cj4KPiBJZiBkcm1fYXJjaF9jYW5fd2NfbWVt
-b3J5IHJldHVybnMgZmFsc2UsIHRoZSBkcml2ZXIgZmFsbHMgYmFjayB0byB0aGUKPiBub3JtYWwg
-bW9kZSBvZiBvcGVyYXRpb24sIHVzaW5nIGEgY2FjaGVhYmxlIENQVSBtYXBwaW5nIGFuZCBzbm9v
-cGVkIEdQVQo+IHRyYW5zZmVycywgZXZlbiBpZiB1c2Vyc3BhY2UgYXNrcyAoYXMgYSBwZXJmb3Jt
-YW5jZSBvcHRpbWl6YXRpb24pIGZvciBhCj4gd3JpdGUtY29tYmluZWQgQ1BVIG1hcHBpbmcgYW5k
-IG5vbi1zbm9vcGVkIEdQVSB0cmFuc2ZlcnMgdmlhCj4gQU1ER1BVX0dFTV9DUkVBVEVfQ1BVX0dU
-VF9VU1dDLgoKQW5vdGhlciBxdWVzdGlvbjogd2hlbiB1c2Vyc3BhY2UgcmVxdWVzdHMgZm9yIHN1
-Y2ggYSBtYXBwaW5nIHRvIGJlCmNyZWF0ZWQsIGRvZXMgdGhpcyBpbnZvbHZlIHBhZ2VzIHRoYXQg
-YXJlIG1hcHBlZCBjYWNoZWFibGUgaW50byB0aGUKdXNlcmxhbmQgcHJvY2Vzcz8KCl9fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwg
-bWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8v
-bGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+
+On Mon 21 Jan 2019 at 18:44, Sean Wang wrote:
+
+> On Mon, Jan 21, 2019 at 9:29 AM Loys Ollivier <lollivier@baylibre.com> 
+> wrote:
+>>
+>>
+>> On Mon 21 Jan 2019 at 17:10, Rob Herring wrote:
+>>
+>> > On Thu, 17 Jan 2019 17:54:32 +0100, Loys Ollivier wrote:
+>> >> Add binding for Mediatek-based GNSS receivers.
+>> >>
+>> >> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+>> >> ---
+>> >>
+>> >> v2:
+>> >> Renamed bindings from Globaltop/gtop to Mediatek/mtk.
+>> >> Moved current-speed as an optional propertie.
+>> >> Removed the status line in the example.
+>> >> Added "mediatek,mt3339" compatible.
+>> >>
+>> >>  .../devicetree/bindings/gnss/mediatek.txt          | 39
+>> >>  ++++++++++++++++++++++
+>> >>  1 file changed, 39 insertions(+)
+>> >>  create mode 100644 Documentation/devicetree/bindings/gnss/mediatek.txt
+>> >>
+>> >
+>> > Reviewed-by: Rob Herring <robh@kernel.org>
+>>
+>> Thanks Rob,
+>> If there are no objections by others, I'll stop sending these two patch
+>> (1/4 and 2/4) and reference any new patch serie for 3 and 4 as depending
+>> on those two.
+>>
+>
+> Hi Loys,
+>
+> Thanks for adding the first GPS device driver. It's really nice to see
+> more device drivers added to upstream support.
+>
+Hi Sean,
+
+Glad to know you're supporting this initiative.
+
+> Do you mind send the series again with Cc linux-mediatek@lists.infradead.org 
+> ?
+>
+The series already has linux-mediatek@lists.infradead.org in Cc. Does it
+need a resend ?
+
+> Sean
+>
+>> --
+>> -L
+>>
+>> _______________________________________________
+>> Linux-mediatek mailing list
+>> Linux-mediatek@lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+
+
+-- 
+-L
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
