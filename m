@@ -4,68 +4,108 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 607B7C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:00:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5CDB8C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:00:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 30E4F20854
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:00:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2847320870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 09:00:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mlFNp/J1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="Gyl0oqkS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 30E4F20854
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J8uBKp6O";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="PgpATUnx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2847320870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:
-	Subject:To:From:Date:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=K2hV5dqD7c9wT3/k83lioiDGlbjVcLP6WbgjtPRBxC0=; b=mlFNp/J13yKBja
-	rAQYayzwMGA3qdny2/1QwxUOGpQEF//DkT+a7gC5osfI4yF/Hn4aPv3H7oeJFBnCQBC/grDToo2x5
-	AC268cVQFl852UknijOgiwiMFw0A2HIHLW7BL11WfUdiNxPCK6U/z9m42lLM7ApGZKla2rdotFl6d
-	IR9SSlUWn5a7rrorXxGrGRN1UpOGkOYNkedEROhNgAmF8Q1NomehzQrNntsYiZVhPBfqkWRrLlY6Y
-	M4j4ZARia/tduR64g07x28vYLsv+++PQQGeGp725S6ExYLX+CA6X2/KmMssFpbtyjBzJinvQjg/l8
-	zWkgDidUFXMXILx/yXcA==;
+	List-Owner; bh=gkzTxmOYuFIX7oGQKcE+uDF5nhcnsQ1B/NOscQlVXZI=; b=J8uBKp6Op5CV1g
+	hC10wFFMdoPeBcpoSp5WYHm5pI+K2o4FkNnBvtq0LNZOSVc0CP8rc4q4pPUi7RZmLfYa9SsofdZbn
+	Fh+PnHAivMIbNIb2QTgu/3f9wr4J7hCzEWR8bTod1CdFVvKGIqGL7GrVbKyNPgpDkq0CA35dOgIYF
+	z2TlvEqWqerddFVv8nqt2/5r3ue9UEpWr8b+OmaE0JbDnUOOi6LYxX91Afx5RSZcZZ+NgMsBeR3/6
+	go+CztQ0sitGj8vIuBs60WIjZrqgWV5SpXmw1hfZDP4Uvdp0mJlnxYH7h/5NsDeRE/mik+TvrdYQ5
+	ViCphSAIC6aygPK2sz1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glrub-0005cV-5U; Tue, 22 Jan 2019 09:00:01 +0000
-Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
+	id 1glrv0-000777-HN; Tue, 22 Jan 2019 09:00:26 +0000
+Received: from mail-eopbgr50080.outbound.protection.outlook.com ([40.107.5.80]
+ helo=EUR03-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glruX-0005bf-HA
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 08:59:59 +0000
-Received: from webmail.kmu-office.ch (unknown [IPv6:2a02:418:6a02::a3])
- by mail.kmu-office.ch (Postfix) with ESMTPSA id 65AFE5C1869;
- Tue, 22 Jan 2019 09:59:52 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
- t=1548147592;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:content-transfer-encoding:
- in-reply-to:in-reply-to:references:references;
- bh=34pKV0yV+V0SIokoQwQR8ivL4IXCi+WSHju/feFhZrA=;
- b=Gyl0oqkSEjjq1B6MJpa5CuCjmGB5RPr+eLz42q8smIbpo4WD36JZHjgayX1m9DSKva/4eN
- jobvgw7VDNNchrWwMQBEia0QlovN+3iFcwavGNokfQFITx8FoyKncSPaGba5bwD/UkkrCp
- pw6HK1ygUtoDSOe/OELozVT99Zq1Vfo=
+ id 1glrut-0006vR-72; Tue, 22 Jan 2019 09:00:24 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=9qYIIYTOOznDQ4/3HghsaBaj0pY9Qq5+Lw31HEGnjMg=;
+ b=PgpATUnxxQ1lfx0BtFBoYaP0ZUXqh+gNQyAelhwBXLuwpf9avu/0HJLuWuvdFpzXfzBU7YMleANnhM21tgCjsPFPzveAh8ivHhMTDdLsQmAsXa4ZWmof+9etZcaancl2s8cNwYrMe8qYmunHVq1nOrJHRqO8xTv6lsvOOlMZMgk=
+Received: from VI1PR04MB5726.eurprd04.prod.outlook.com (20.178.127.24) by
+ VI1PR04MB5597.eurprd04.prod.outlook.com (20.178.125.74) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1537.29; Tue, 22 Jan 2019 09:00:15 +0000
+Received: from VI1PR04MB5726.eurprd04.prod.outlook.com
+ ([fe80::a1c2:cc79:80f3:3bcb]) by VI1PR04MB5726.eurprd04.prod.outlook.com
+ ([fe80::a1c2:cc79:80f3:3bcb%5]) with mapi id 15.20.1537.031; Tue, 22 Jan 2019
+ 09:00:15 +0000
+From: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+To: "robh@kernel.org" <robh@kernel.org>, "shawnguo@kernel.org"
+ <shawnguo@kernel.org>
+Subject: RE: [PATCH v8 2/5] dt-bindings: spi: add binding file for NXP FlexSPI
+ controller
+Thread-Topic: [PATCH v8 2/5] dt-bindings: spi: add binding file for NXP
+ FlexSPI controller
+Thread-Index: AQHUrMnj2HaRDCPgY0i5ihL9RBjnkaW7Bz/Q
+Date: Tue, 22 Jan 2019 09:00:14 +0000
+Message-ID: <VI1PR04MB57266D861937B99899F3C1C699980@VI1PR04MB5726.eurprd04.prod.outlook.com>
+References: <1547553487-9936-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1547553487-9936-3-git-send-email-yogeshnarayan.gaur@nxp.com>
+In-Reply-To: <1547553487-9936-3-git-send-email-yogeshnarayan.gaur@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=yogeshnarayan.gaur@nxp.com; 
+x-originating-ip: [92.120.0.7]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR04MB5597;
+ 6:R0LWJS49JyXQtBN4Immo8TGvYoR+7eijCH/5L1iuhIXmKfoLS00IFfocPhArSHq8l84bwOAMXlptaNTapCB1545zkv4vv8WOGU8I8zGkgIY5TCtZSmqTUKZ91Q62aE3ZmnUS5Ww6KYw+knXD3gUc0CLytNWRF7cI/UBcug/qRuO9m4wnHFNcx5V99WdYVv69HSBi9HlKufWi/qclY92Tm0PtG5zLo/X4eX41Tv3cYUwwqsSEkz5LOZhVADzml7yf9NBKC+t7C6jxISk+kMOefWVnm4O1YRnFKDLcy3MRTx+nNYHR/LqxT9K1sSK3wJ3j+IQymh7VP2hGjEkJ7JVP1+KxFXHzcXdNvq8QFoGnDgRpJwH/DjO5bGOHtJSobEV6/At/iSOtVFf4HXIj/M+YIk27mt6XaiyR5DZY2naQ44u2SU0Zb5L+cFpCVH485qfDdcq2u73vsMXXOQ8fW5ZUtg==;
+ 5:U0Zqb2P4ej/c7PT/Xv8AkXoyBcy029rCjRkreU3Hmori3nzEEh41tzZ9CxxfbqwYh1m7T5w6n4En4H3sgigasIlZ1OFbo9PfZC8hZ8cqT2S8xTo7C9E+CqUrdCDcrwCn8zAlrj0zn4M+H4eOuAyffssAlYI1485md1clZGcazg+6edfM+kiPhTmF4ag4MScGN2IcVW7Y/O2imMadbMar0A==;
+ 7:Zt7KJdCTAYCiiUkp5n6WTlohkem7D07sAn4pMndDvIzY0+vMTrxTsFmAjU4DkkZxNiq/G5btrVNJFZQoCL8ooBSbcbmEGb5BO3NuPZ1B/SYJPac4No8pSMRc/q86XD3n1EeYgrnF6CA10gzpsY8gLg==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: a579b8b5-3618-406c-910e-08d68048064e
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600109)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB5597; 
+x-ms-traffictypediagnostic: VI1PR04MB5597:
+x-microsoft-antispam-prvs: <VI1PR04MB55972372CEDAD8CEFB5881AD99980@VI1PR04MB5597.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0925081676
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(366004)(39860400002)(396003)(136003)(346002)(13464003)(189003)(199004)(26005)(68736007)(97736004)(186003)(476003)(102836004)(4326008)(39060400002)(6246003)(53936002)(7416002)(74316002)(71200400001)(71190400001)(25786009)(256004)(229853002)(76176011)(11346002)(86362001)(2501003)(446003)(6436002)(53546011)(6506007)(7696005)(2906002)(55016002)(81156014)(81166006)(7736002)(305945005)(66066001)(8936002)(105586002)(33656002)(3846002)(99286004)(478600001)(486006)(8676002)(316002)(110136005)(54906003)(14454004)(966005)(106356001)(6116002)(6306002)(9686003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB5597;
+ H:VI1PR04MB5726.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: +LiDDg5r7Cf5vIEkfsKD0fqHYxGRnAimV37SF6owSiJnxGYkEDet5eRVbCU9B8QQe8tHANLkwENmlzwRtJ0CProisl5nxssjA73FWGnemdlkduj2z2V2ath1D9K0nkRGphn7gpsTVOZv1l2Bi7fC0V1IpdXXrvZ6wblbtEd1i7l0Q1wuNCQU1xxCyYWwiIff2GPkiNhD4w33/jcadSSh7Q3dArDheNwnGJsHr9DtsjA4Odel/+E2a75w+ey7CePnJGp7vzFOW6T3HzLImFemOCtd9dNXI8BdcR+TiXXqr8bgd7zPLO+dV9WqWsJGuKrYkQ9wRzCxox7iuu8ReA0Fz+RaMe8M14gnVbTzuepbUigMzF8jRcnpuqXpp2VEWoPP54eG6EBMwYgA3wM3EvioZHU/NGqyXne1bsx9GuRxUE8=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-Date: Tue, 22 Jan 2019 09:59:49 +0100
-From: Stefan Agner <stefan@agner.ch>
-To: Mark Rutland <mark.rutland@arm.com>
-Subject: Re: [PATCH] drivers/perf: handle multiple CPUs with single interrupts
-In-Reply-To: <20190121172325.GD47506@lakrids.cambridge.arm.com>
-References: <20190121144111.22716-1-stefan@agner.ch>
- <20190121172325.GD47506@lakrids.cambridge.arm.com>
-Message-ID: <730dcd70a60efc0756570153b6ea84d2@agner.ch>
-X-Sender: stefan@agner.ch
-User-Agent: Roundcube Webmail/1.3.7
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: a579b8b5-3618-406c-910e-08d68048064e
+X-MS-Exchange-CrossTenant-originalarrivaltime: 22 Jan 2019 09:00:14.9755 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB5597
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_005957_862282_6F7E7F62 
-X-CRM114-Status: GOOD (  29.94  )
+X-CRM114-CacheID: sfid-20190122_010019_264504_4F04DA93 
+X-CRM114-Status: GOOD (  18.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,178 +117,122 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: will.deacon@arm.com, linux-kernel@vger.kernel.org, linux-imx@nxp.com,
- kernel@pengutronix.de, fabio.estevam@nxp.com, shawnguo@kernel.org,
- linux-arm-kernel@lists.infradead.org, l.stach@pengutronix.de
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "bbrezillon@kernel.org" <bbrezillon@kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "frieder.schrempf@kontron.de" <frieder.schrempf@kontron.de>,
+ "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
+ "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
+ "broonie@kernel.org" <broonie@kernel.org>,
+ "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 21.01.2019 18:23, Mark Rutland wrote:
-> Hi Stefan,
-> 
-> On Mon, Jan 21, 2019 at 03:41:11PM +0100, Stefan Agner wrote:
->> Currently, if only a single interrupt is available, the code assigns
->> this single interrupt to the first CPU. All other CPUs are left
->> unsupported. This allows to use perf events only on processes using
->> the first CPU. This is not obvious to the user.
->>
->> Instead, disable interrupts but support all CPUs. This allows to use
->> the PMU on all CPUs for all events other than sampling events which do
->> require interrupt support.
-> 
-> Even for non-sampling events we use the overflow interrupt to ensure
-> that we don't lose count across overflows, and without that interrupt,
-> we cannot guarantee that the results are accurate.
-> 
-> For example:
-> 
-> 	Program counter to 0
-> 	Start program
-> 	< counter overflows, no interrupt >
-> 	< counter overflows, no interrupt >
-> 	Stop program
-> 	Counter reads as 5
-> 
-> 
-> ... which we cannot distinguish from:
-> 
-> 	Program counter to 0
-> 	Start program
-> 	< counter overflows, no interrupt >
-> 	< counter overflows, no interrupt >
-> 	< counter overflows, no interrupt >
-> 	< counter overflows, no interrupt >
-> 	< counter overflows, no interrupt >
-> 	< counter overflows, no interrupt >
-> 	Stop program
-> 	Counter reads as 5
-> 
-> ... and thus cannot provide any reasonable confidence in results.
+Hi Rob / Shawn,
 
-Oh ok I see, this is not what we want at all!
-
-Currently we register that one IRQ for CPU0. So what happens today is:
-
- 	Program counter to 0
- 	Start program
-        < program scheduled on CPU0 >
- 	< counter overflows, interrupt >
-        < program scheduled on CPU1 >
- 	< counter overflows, no interrupt >
- 	< counter overflows, no interrupt >
- 	Stop program
- 	Counter reads as 5
-
-Which is off too...
-
-I could also reproduce this by manually moving the process between
-CPU0/1...
-
-We probably should not probe the driver at all then? It seems rather
-unwise to provide users PMU data which might be plain wrong.
-
-> 
-> In theory, we could use a hrtimer to periodically refresh the events to
-> prevent this, but this would need to be set at some very high frequency
-> to account for the fastest potential counter, and would significantly
-> degrade performance.
-> 
-> I don't think that's going to be reliable, and given that, I don't think
-> that we can support muxed IRQs in this way.
-
-Is it possible to get the overflow interrupts as well as read the PMU
-counters for another CPU?
-
-If not, I assume the interrupt bounce mechanism from ux500 is the only
-way?
+Can you please apply patches [1] [2].
 
 --
-Stefan
+Regards,
+Yogesh Gaur
 
+[1] https://patchwork.ozlabs.org/patch/1025136/
+[2] https://patchwork.ozlabs.org/patch/1025137/
+
+
+
+> -----Original Message-----
+> From: Yogesh Narayan Gaur
+> Sent: Tuesday, January 15, 2019 5:30 PM
+> To: linux-mtd@lists.infradead.org; bbrezillon@kernel.org;
+> marek.vasut@gmail.com; broonie@kernel.org; linux-spi@vger.kernel.org;
+> devicetree@vger.kernel.org
+> Cc: robh@kernel.org; mark.rutland@arm.com; shawnguo@kernel.org; linux-
+> arm-kernel@lists.infradead.org; computersforpeace@gmail.com;
+> frieder.schrempf@kontron.de; linux-kernel@vger.kernel.org; Yogesh Narayan
+> Gaur <yogeshnarayan.gaur@nxp.com>
+> Subject: [PATCH v8 2/5] dt-bindings: spi: add binding file for NXP FlexSPI
+> controller
 > 
-> Thanks,
-> Mark.
+> Add binding file for NXP FlexSPI controller
 > 
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->> This has been observed and tested on a i.MX 6DualLite, but is probably
->> valid for i.MX 6Quad as well.
->>
->> It seems that ux500 once had support for single IRQ on a SMP system,
->> however this got removed with:
->> Commit 2b05f6ae1ee5 ("ARM: ux500: remove PMU IRQ bouncer")
->>
->> I noticed that with this patch I get an error when trying to use perf stat:
->>   # perf top
->>   Error:
->>   cycles: PMU Hardware doesn't support sampling/overflow-interrupts. Try 'perf stat'
->>
->> Without this patch perf top seems to work, but it seems not to use any
->> sampling events (?):
->>   # perf top
->> PerfTop:    7215 irqs/sec  kernel:100.0%  exact:  0.0% [4000Hz cpu-clock:pppH], (all, 2 CPUs)
->> ....
->>
->> Also starting perf top and explicitly selecting cpu-clock seems to work
->> and show the same data as before this change.
->>   # perf top -e cpu-clock:pppH
->> PerfTop:    7214 irqs/sec  kernel:100.0%  exact:  0.0% [4000Hz cpu-clock:pppH], (all, 2 CPUs)
->>
->> It seems that perf top falls back to cpu-clock in the old case, but not
->> once sampling events are not supported...
->>
->> --
->> Stefan
->>
->>
->>  drivers/perf/arm_pmu_platform.c | 19 +++++++++++--------
->>  1 file changed, 11 insertions(+), 8 deletions(-)
->>
->> diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
->> index 933bd8410fc2..80b991417b6e 100644
->> --- a/drivers/perf/arm_pmu_platform.c
->> +++ b/drivers/perf/arm_pmu_platform.c
->> @@ -105,23 +105,26 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
->>  		return num_irqs;
->>  	}
->>
->> +	if (num_irqs == 1) {
->> +		int irq = platform_get_irq(pdev, 0);
->> +		if (irq && irq_is_percpu_devid(irq))
->> +			return pmu_parse_percpu_irq(pmu, irq);
->> +	}
->> +
->>  	/*
->>  	 * In this case we have no idea which CPUs are covered by the PMU.
->>  	 * To match our prior behaviour, we assume all CPUs in this case.
->> +	 * Multiple CPUs with a single PMU irq are currently not handled.
->> +	 * Rather than supporting only the first CPU, support all CPUs but
->> +	 * without interrupt capability.
->>  	 */
->> -	if (num_irqs == 0) {
->> -		pr_warn("no irqs for PMU, sampling events not supported\n");
->> +	if (num_irqs == 0 || (nr_cpu_ids > 1 && num_irqs == 1)) {
->> +		pr_info("No per CPU irqs for PMU, sampling events not supported\n");
->>  		pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
->>  		cpumask_setall(&pmu->supported_cpus);
->>  		return 0;
->>  	}
->>
->> -	if (num_irqs == 1) {
->> -		int irq = platform_get_irq(pdev, 0);
->> -		if (irq && irq_is_percpu_devid(irq))
->> -			return pmu_parse_percpu_irq(pmu, irq);
->> -	}
->> -
->>  	if (nr_cpu_ids != 1 && !pmu_has_irq_affinity(pdev->dev.of_node)) {
->>  		pr_warn("no interrupt-affinity property for %pOF, guessing.\n",
->>  			pdev->dev.of_node);
->> --
->> 2.20.1
->>
+> Signed-off-by: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> ---
+> Changes for v8:
+> - None
+> Changes for v7:
+> - None
+> Changes for v6:
+> - None
+> Changes for v5:
+> - None
+> Changes for v4:
+> - Incorporated Rob review comments.
+> Changes for v3:
+> - Removed node property 'big-endian'.
+> Changes for v2:
+> - Incorporated Rob review comments.
+> 
+>  .../devicetree/bindings/spi/spi-nxp-fspi.txt  | 39 +++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+> b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+> new file mode 100644
+> index 000000000000..2cd67eb727d4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+> @@ -0,0 +1,39 @@
+> +* NXP Flex Serial Peripheral Interface (FSPI)
+> +
+> +Required properties:
+> +  - compatible : Should be "nxp,lx2160a-fspi"
+> +  - reg :        First contains the register location and length,
+> +                 Second contains the memory mapping address and length
+> +  - reg-names :  Should contain the resource reg names:
+> +	         - fspi_base: configuration register address space
+> +                 - fspi_mmap: memory mapped address space
+> +  - interrupts : Should contain the interrupt for the device
+> +
+> +Required SPI slave node properties:
+> +  - reg :        There are two buses (A and B) with two chip selects each.
+> +                 This encodes to which bus and CS the flash is connected:
+> +                 - <0>: Bus A, CS 0
+> +                 - <1>: Bus A, CS 1
+> +                 - <2>: Bus B, CS 0
+> +                 - <3>: Bus B, CS 1
+> +
+> +Example showing the usage of two SPI NOR slave devices on bus A:
+> +
+> +fspi0: spi@20c0000 {
+> +	compatible = "nxp,lx2160a-fspi";
+> +	reg = <0x0 0x20c0000 0x0 0x10000>, <0x0 0x20000000 0x0
+> 0x10000000>;
+> +	reg-names = "fspi_base", "fspi_mmap";
+> +	interrupts = <0 25 0x4>; /* Level high type */
+> +	clocks = <&clockgen 4 3>, <&clockgen 4 3>;
+> +	clock-names = "fspi_en", "fspi";
+> +
+> +	mt35xu512aba0: flash@0 {
+> +		reg = <0>;
+> +		....
+> +	};
+> +
+> +	mt35xu512aba1: flash@1 {
+> +		reg = <1>;
+> +		....
+> +	};
+> +};
+> --
+> 2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
