@@ -2,20 +2,20 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F287DC37122
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 00:48:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BA02DC37122
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 00:48:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C14D32085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 00:48:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6A32B217D4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 00:48:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HOj2IWuc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C14D32085A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VMuP53rk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A32B217D4
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,57 +24,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tfOsIrV9Bm42DfjROddDWJJtppWFOmMYiOjQXauD9oA=; b=HOj2IWucZIj9xm
-	wlRJvgdpreUA7eE0pnEsU2ROSihrsdAz29Wspf2ZULElFRVZfpNirUUtpNxQVx01XYjR1zlbCUYj5
-	gyKqsmds9Munb6lquagSK8MVS1jlazgWskbL+kNd83Y5Cnmo4LIvMyqTG7Sj1Td9w9sE6ciDtAUpG
-	YXaWymyIqt+lZlWd31Zql66FJR3PDqMlEsx/mHPZN3fV2w4bV1FzE6Lkvd6pp9n0VxUbck8QJyodE
-	kfvgZQ4qrE0fUs21jJxkvSS8rF6NESD36R1EAeg4NL8J8nV8OX6jKlb7tfp/fKEoGSMWZvAjCfKlG
-	LJFPE3C0iLkJVjYsn0jg==;
+	List-Owner; bh=WEHW087I2rz2MP2mWxP59do0DUDToOlE3I+sFoD9MNE=; b=VMuP53rkmV0Eih
+	EKtRYNwpBYRnVC5l6iOKKYDI8Ng32e2J6M3zAir/nAwCamGz3XNEI1t2tAODmEULaspRSv6Hz6Lv8
+	UaXH/65iuB5Tn7p7Om5vuDzYuUkcuWq1+BNwRv/6Pdv2KW5eWE23J6r+UOgbIvzja7My/QnwKP13T
+	DXI9P5MsMrPoWSe/Ooic/5jrf0lX7yGPABEpdoaTPL8c79nxcv/MuSshDX8ODDAWTOOTh4YeXfh8d
+	IJqgle7l+d09U1NSoGDZLvijckTSikvFGxoEZgDOzS00C/uU9IAWo3aRddc0eqxxIdlUXT7IWCTg+
+	OfGjo+PpgmRYCivUaZXQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glkEe-0005hT-6a; Tue, 22 Jan 2019 00:48:12 +0000
-Received: from mail-oi1-f194.google.com ([209.85.167.194])
+	id 1glkFJ-0005xn-U1; Tue, 22 Jan 2019 00:48:53 +0000
+Received: from mail-oi1-f195.google.com ([209.85.167.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glkEa-0005h8-TT
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 00:48:10 +0000
-Received: by mail-oi1-f194.google.com with SMTP id x23so16057359oix.3
+ id 1glkFG-0005xP-TS
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 00:48:52 +0000
+Received: by mail-oi1-f195.google.com with SMTP id v6so16058970oif.2
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 16:48:08 -0800 (PST)
+ Mon, 21 Jan 2019 16:48:50 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=xdz3AySOWc37zBjAyPNQE0AtCWFwpBdKiIR9Wnn8T0k=;
- b=AbJv8838++eG0xhtSP9rftD5+OPCGMbt6yfNyFfTx3Iolik+kbAoS/NPw2zbfCWHVg
- ZCC/qvw2pZJBSe8OpLvohgKsl08+ZMypWo34w9WSCkkfUc1tuwtvLYaE2EB9XmRsxMS2
- SB0OAGBBSE6puajt4cR77WwQuh/oipDle3zG/Yd3jSmFkhIkiUGGd0zZu2a+NLHYz7yA
- nJw87Hwi6YtgNAeR070S3qK1itco/LNH2mQlu1iEs4nzJJ8tUHtqiqc9FxTg2uJJytdU
- GH6v/ccaRO5R2fnZaRmhpBfQwaQ8XBYoyBu6Wyj39Zyec7JgSbL4uOrnyimEK69EQWum
- Bihg==
-X-Gm-Message-State: AJcUuke6Q8A1KBvqKlX4lgpy1BrbUZyeryLaIwH5+riktU1LjwRjrDnU
- WmEtbAOCXslfVbW0a0u+TA==
-X-Google-Smtp-Source: ALg8bN4meCILV1rwD9Ze0PSruuOmQHSm7866wqkZ90BVvM8+qY7l/POl0NVHJPyg4nUEIr9+VQQjZQ==
-X-Received: by 2002:aca:5205:: with SMTP id g5mr7192901oib.149.1548118087942; 
- Mon, 21 Jan 2019 16:48:07 -0800 (PST)
+ bh=apg/K9vsqOLZb/5a+8Dv5Qcyv+LHOSOj0Lx4oMOMONE=;
+ b=IwI7leMGnKg9HnCvyAi7hwXmoK3HlhvJtn8MYuX5gYzhFQBviJ7pnD92u4mJ3lYAwR
+ dnUMK/4uwYDfmBfC4Yd3taZCsrb5Zg5SePCwqZc6qUUqTCPOUWBb/8EQAs/IvumHOGNq
+ zHQY5RDtVj5qB1TriOPDFm6HicIyjl/Zc1CuFFzT1VUJ/yaGr1Z6sxk89YIJ9Vc1hYob
+ apVQ0R+1DKlM5Djjyk3Q6x+1Tn66/ihILf2IJaO0jntRhm3Xnv4fIRp+SpodJ/qgALLY
+ ECJ2iU8sJDkvZhHnZT68UE7S54fWyUDMlPLsWTAWX6dKSE2YYPYBhLVge5Drnp9grz2E
+ ir2w==
+X-Gm-Message-State: AJcUukeGXgcs6NXwHv+0mLDZ38eeqvfAqPOBdmOze8hv4yg9F0vpg1U7
+ 9iuiXROzMvo3avwQ7STPTQ==
+X-Google-Smtp-Source: ALg8bN7m/yeMIcgXjYHLYG/V1Ig0h8QVNKS+hiEd1RWtWxC2pcdZTNUnb5YUfek+johVISHf4b3R4A==
+X-Received: by 2002:aca:3a83:: with SMTP id h125mr6661746oia.308.1548118129926; 
+ Mon, 21 Jan 2019 16:48:49 -0800 (PST)
 Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
  [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id s186sm6959854oif.0.2019.01.21.16.48.07
+ by smtp.gmail.com with ESMTPSA id z7sm6536909otm.63.2019.01.21.16.48.49
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 21 Jan 2019 16:48:07 -0800 (PST)
-Date: Mon, 21 Jan 2019 18:48:06 -0600
+ Mon, 21 Jan 2019 16:48:49 -0800 (PST)
+Date: Mon, 21 Jan 2019 18:48:48 -0600
 From: Rob Herring <robh@kernel.org>
 To: Kishon Vijay Abraham I <kishon@ti.com>
-Subject: Re: [PATCH 09/24] dt-bindings: PCI: Document "atu" reg-names
-Message-ID: <20190122004806.GA32204@bogus>
+Subject: Re: [PATCH 13/24] dt-bindings: PCI: Add PCI RC dt binding
+ documentation for AM654
+Message-ID: <20190122004848.GA26023@bogus>
 References: <20190114132424.6445-1-kishon@ti.com>
- <20190114132424.6445-10-kishon@ti.com>
+ <20190114132424.6445-14-kishon@ti.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190114132424.6445-10-kishon@ti.com>
+In-Reply-To: <20190114132424.6445-14-kishon@ti.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_164808_947820_D1EB27CF 
-X-CRM114-Status: GOOD (  18.77  )
+X-CRM114-CacheID: sfid-20190121_164850_945826_29179EA8 
+X-CRM114-Status: GOOD (  12.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,9 +91,11 @@ Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
  Jesper Nilsson <jesper.nilsson@axis.com>,
  Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>, Arnd Bergmann <arnd@arndb.de>,
  Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>, linux-pci@vger.kernel.org,
+ Jingoo Han <jingoohan1@gmail.com>, linux-pci@vger.kernel.org,
  linux-kernel@vger.kernel.org, linux-arm-kernel@axis.com,
- Murali Karicheri <m-karicheri2@ti.com>, Jingoo Han <jingoohan1@gmail.com>,
+ Kishon Vijay Abraham I <kishon@ti.com>, Rob Herring <robh+dt@kernel.org>,
+ Murali Karicheri <m-karicheri2@ti.com>,
+ Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
  Bjorn Helgaas <bhelgaas@google.com>, linux-omap@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
@@ -100,42 +103,17 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 14, 2019 at 06:54:09PM +0530, Kishon Vijay Abraham I wrote:
-> Document "atu" reg-names required to get the register space for ATU in
-> Synopsys designware core version >= 4.80.
+On Mon, 14 Jan 2019 18:54:13 +0530, Kishon Vijay Abraham I wrote:
+> Add devicetree binding documentation for PCIe in RC mode present in
+> AM654 SoC.
 > 
 > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
->  Documentation/devicetree/bindings/pci/designware-pcie.txt | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
+>  Documentation/devicetree/bindings/pci/pci-keystone.txt | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> index c124f9bc11f3..5561a1c060d0 100644
-> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> @@ -4,8 +4,11 @@ Required properties:
->  - compatible:
->  	"snps,dw-pcie" for RC mode;
->  	"snps,dw-pcie-ep" for EP mode;
-> -- reg: Should contain the configuration address space.
-> -- reg-names: Must be "config" for the PCIe configuration space.
-> +- reg: For designware cores version < 4.80 contains the configuration
-> +       address space. For designware core version >= 4.80, contains
-> +       the configuration and ATU address space
-> +- reg-names: Must be "config" for the PCIe configuration space and "atu" for
-> +	     the ATU address space.
 
-I'm pretty sure we already have other platforms with an ATU. Those all 
-just represent it with the other ctrl registers? So maybe this is TI 
-specific that it is separate. Or should have some conditional like 'if 
-the ATU space is separate, the reg-name should be atu'.
-
->      (The old way of getting the configuration address space from "ranges"
->      is deprecated and should be avoided.)
->  - num-lanes: number of lanes to use
-> -- 
-> 2.17.1
-> 
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
