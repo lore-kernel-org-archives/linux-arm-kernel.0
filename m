@@ -2,80 +2,67 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 13D47C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 12:10:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DDABCC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 12:13:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D92E720855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 12:10:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A490C20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 12:13:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lczd89mO";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Mn8L1SAm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D92E720855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hnS2QqVw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A490C20879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ikI5ulwNnsJyjYaflXRqyL1VJDIyNqlOCTbbYTTYpXU=; b=lczd89mOo2EYui
-	0ex6wuC3ZdMPvWbAtgwk7sq5SyO2A8IHq4JPGhhSldalE3tajALL216Q3h6vOrBuYYlE7N+0t7X+I
-	4iSIZwD1pzNQXX2igSmSgKuOtvk9nYIzhHuvY3IFCF9YdtLaoCCxly+zHJr4RfJRnxe0FlKCvtWcf
-	kcp2sKZ8jLPgHpi+hf2StWv4AhLXLV56f427SCBlmOKl0m9U+t1ghDql9RQSONyMXwlM7rs4iUe1c
-	MQMSp8HXd0AEJPHf8bb2V1pkdvbN1kMMI7O2ulcSuU4lAFX+dsoOgd6za6BA8VJX8McYSkaL5B4AP
-	32oIN1MYLqxloWY1sMRg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=aVD1U0zgYAfVuGePgyWy/u7HEkpKLNcTLimN13cW6O0=; b=hnS2QqVwyDEzof
+	YU8ez2JK3ZT3kHc2k0ZxwjSSRrYr1iMMNio9kEZEcRf9kGBFK1naky5fRb99jUz0xJL2HVIOyM0xS
+	QdNA7khiJYLF3kh+W0PfA0qqwPXlAbU2KRI2BKIMbuVKkRf2bi7KqJTj3baRwmwGjsttkkzUnzFyU
+	8Dr7D1K+QXj5t2nuTqPLSVjvu7yEeDKYUm2I9dTlIMSgr5UnqLyKbrpUOTDjvB72D3xDApEHlD3i/
+	OFqESvkmjXJvIY7Q5ozFBEMZ/Oaru4CE5KFqM3eAb0pWJJ94hTNPXov1NVSV+va7fRXlpMI9+ikei
+	huh2cAxuF/Cg9QrwNpgw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glutJ-0002S0-KJ; Tue, 22 Jan 2019 12:10:53 +0000
-Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glutG-0002Re-8R
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 12:10:51 +0000
-Received: by mail-it1-x142.google.com with SMTP id a6so19734221itl.4
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 04:10:49 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=fgyviMJw6/fPmrPcsOmHINfDRRWihUQ9XsgPMv+R9UQ=;
- b=Mn8L1SAmGyRhB3IMB973O5xqjUDdnHpKGJvh/MXTC/ACbFLv9NhDqCmqI3Km41z6Ji
- XyWzzrDRsRnNteT3B/Y8UK0a+Vcb2xcdBBmrkpFulwc2sFUVx9NoJoCj9BL0F/0cn64f
- Yq2i2MSOe2J3xbsLrBeSo18H+Z9bdCYw+UWF4=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=fgyviMJw6/fPmrPcsOmHINfDRRWihUQ9XsgPMv+R9UQ=;
- b=q0DoRwpLvEwWCq0VHXhlB7RnB2q8l0AYtqyF0/IElA7pb2DSbD7dLBBAvD8y7nD10p
- 1sjoJ1z8mFTyP4hkyCeZVwILSiHMCP/r0VgaeihB5zEaT+kOA/mpWLCwH4+Sd12XoIT3
- +yWWAw0bYpSKuKmLcRI6hehlhQttwXuAy36FuOMWldkC7ih+cUeGLGtPCza0ebC4xG8q
- yKuTkuLOaNP/x7jHQY1m48GBkEa+lGx9IYqHdvLY9jdpYaOlTA947HqYv0RKafF4+MAk
- uj8rk0JCCzeBOzeV9qinYFGbnkA+byxskX81e32PG26EW2iXLTB2QWxp2jjDHQqq65AY
- ZVJw==
-X-Gm-Message-State: AJcUukcEBdgx38xGJoBOH27NgycY2Z3TmFfjjSuggwK+IjNKgXeYxpSn
- 4/hgor2WeGRuOvjp+ZOL3iG2xM1b6gnZ2ng1CO1UCw==
-X-Google-Smtp-Source: ALg8bN6vCB1/YFqCqDYnITCQrFMsMe81p/IjbGhBFMa+S8huw2sEbxviwj93eQAnjSYWvEmOyJSMkI/baZjqSn8aK40=
-X-Received: by 2002:a02:4c9:: with SMTP id 192mr19768753jab.2.1548159048561;
- Tue, 22 Jan 2019 04:10:48 -0800 (PST)
+	id 1gluvL-0002lg-I6; Tue, 22 Jan 2019 12:12:59 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gluvH-0002lL-Jj
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 12:12:57 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 001E0A78;
+ Tue, 22 Jan 2019 04:12:55 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 11B8E3F614;
+ Tue, 22 Jan 2019 04:12:53 -0800 (PST)
+Subject: Re: [PATCH 2/4] KVM: arm/arm64: re-create event when setting counter
+ value
+To: Andrew Murray <andrew.murray@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Marc Zyngier <marc.zyngier@arm.com>
+References: <1548154197-5470-1-git-send-email-andrew.murray@arm.com>
+ <1548154197-5470-3-git-send-email-andrew.murray@arm.com>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <a53b470c-f82c-0070-b2b9-61f30d7d01bb@arm.com>
+Date: Tue, 22 Jan 2019 12:12:51 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-References: <20190118174324.24715-1-ard.biesheuvel@linaro.org>
- <abe25b84-4327-c927-6d91-629291a62b69@arm.com>
-In-Reply-To: <abe25b84-4327-c927-6d91-629291a62b69@arm.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Tue, 22 Jan 2019 13:10:37 +0100
-Message-ID: <CAKv+Gu81ZRn5pTDyHeVSR4A=WmspC3aWtFyfRpzdH7gASRQH-g@mail.gmail.com>
-Subject: Re: [RFC PATCH] arm64: efi: fix chicken-and-egg problem in memreserve
- code
-To: James Morse <james.morse@arm.com>
+In-Reply-To: <1548154197-5470-3-git-send-email-andrew.murray@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_041050_309764_4D95F01C 
-X-CRM114-Status: GOOD (  23.24  )
+X-CRM114-CacheID: sfid-20190122_041255_653411_3D1A189D 
+X-CRM114-Status: GOOD (  18.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,84 +74,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, linux-efi <linux-efi@vger.kernel.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 22 Jan 2019 at 12:32, James Morse <james.morse@arm.com> wrote:
->
-> Hi Ard,
->
-> On 18/01/2019 17:43, Ard Biesheuvel wrote:
-> > Unfortunately, it appears that the recently introduced and repaired
-> > EFI memreserve code is still broken.
-> >
-> > Originally, we applied all memory reservation passed via the EFI table
-> > before doing any memblock allocations. However, this turned out to be
-> > problematic, given that the number of reservations is unbounded, and
-> > a GICv3 system will reserve a block of memory for each CPU, resulting
-> > in hundreds of reservations.
-> >
-> > We 'fixed' this by deferring the reservations in the memblock table
-> > until after we enabled memblock resizing. However, to reach this
-> > point, we must have mapped DRAM and the kernel, which itself relies
-> > on some memblock allocations for page tables. Also, memblock resizing
-> > itself relies on the ability to invoke memblock_alloc() to reallocate
-> > those tables themselves.
-> >
-> > So this is a nice chicken-and-egg problem which is rather difficult
-> > to fix cleanly. So instead of a clean solution, I came up with the
-> > patch below.
-> >
-> > The idea is to set a memblock allocation limit below the lowest
-> > reservation entry that occurs in the memreserve table. This way,
-> > we can map DRAM and the kernel and enable memblock resizing without
-> > running the risk of clobbering those reserved regions. After applying
-> > all the reservations, the memblock limit restriction is lifted again,
-> > allowing the boot to proceed normally.
->
-> .... how does this interact with kdump? Is it possible the crash-kernel region
-> is above the lowest reservation entry, meaning there is no usable memory?
->
+Hi Andrew,
 
-I suppose that is possible, yes ...
+On 22/01/2019 10:49, Andrew Murray wrote:
+> The perf event sample_period is currently set based upon the current
+> counter value, when PMXEVTYPER is written to and the perf event is created.
+> However the user may choose to write the type before the counter value in
+> which case sample_period will be set incorrectly. Let's instead decouple
+> event creation from PMXEVTYPER and (re)create the event in either
+> suitation.
+> 
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> ---
+>  virt/kvm/arm/pmu.c | 39 ++++++++++++++++++++++++++++++---------
+>  1 file changed, 30 insertions(+), 9 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 531d27f..4464899 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -24,6 +24,8 @@
+>  #include <kvm/arm_pmu.h>
+>  #include <kvm/arm_vgic.h>
+>  
+> +static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 data,
+> +				      u64 select_idx);
+>  /**
+>   * kvm_pmu_get_counter_value - get PMU counter value
+>   * @vcpu: The vcpu pointer
+> @@ -57,11 +59,18 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
+>   */
+>  void kvm_pmu_set_counter_value(struct kvm_vcpu *vcpu, u64 select_idx, u64 val)
+>  {
+> -	u64 reg;
+> +	u64 reg, data;
+>  
+>  	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
+>  	      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx;
+>  	__vcpu_sys_reg(vcpu, reg) += (s64)val - kvm_pmu_get_counter_value(vcpu, select_idx);
+> +
+> +	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
+> +	      ? PMCCFILTR_EL0 : PMEVTYPER0_EL0 + select_idx;
+> +	data = __vcpu_sys_reg(vcpu, reg + select_idx);
 
->
-> > The problem with this approach is that it is not guaranteed that the
-> > temporary limit will leave enough memory to allocate the page tables
-> > and resize the memblock reserved array. Since this is only 10s of KBs,
-> > it is unlikely to break in practice, but some pathological behavior
-> > may still occur, which is rather nasty :-(
->
-> As I understand it, the in-kernel-image memblock_reserved_init_regions is used
-> early on, because we don't know where the reserved regions of memory are, but
-> INIT_MEMBLOCK_REGIONS should be big enough to describe them. We trip up when it
-> isn't big enough, and we can't resize it yet.
->
+I think this should be just "reg" instead of "reg + select_idx".
 
-Indeed. If we could establish a reasonable upper bound for the
-statically allocated size, the issue would not exist.
+Cheers,
 
-> ... thinking out loud ...
->
-> Does reserve_regions() know how big that array needs to be?
-> (it can count the nomap and persistent reservations, as well as the gaps between
-> memory banks).
->
-> Could we 'allocate' that array to be big enough for everything learnt via EFI in
-> reserve_regions()? It memblock_remove()s all existing memory, so we know at this
-> point there aren't existing reservations/allocations.
->
-
-I am not sure I follow. Re-allocating the memblock array involves
-allocating some memory and moving the array into it. The complicating
-factor is that that memory has to be mapped at that point, which is
-not the case when reserve_regions() executes.
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
