@@ -2,60 +2,77 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9BBD6C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:35:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BC27BC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:36:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5F59720879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:35:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 89F6E20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 11:36:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BboTZLW3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F59720879
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R///YtY8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89F6E20879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=tty+ZmBRP1fV3xfEOs/jIvwuJFDzWlK/ZhtI6CR3Euw=; b=Bbo
-	TZLW3fR7vHInvkT8vNg8oU93Ic9rGDho06HPTne6FVQWw7mS35ZLDTPKGqXGh9qbM8EfO5/GP4V/c
-	+pwomH6PdwenO2mNWIJVjs4F0sGT4RkCjOvtk4HQK7U4xU365vhm006sDtSIPhP5ziK96/3mAH26I
-	Xpsm81z0LiZ8KUJ7V+5mvW6ZsDOTW2PABL9BC7/Ac+n9ctFsxwkSaotNSpotT0uTPRHvabi18FQij
-	4J5ga5avlHd+E7pZuR0bEtjBPeQN6yTTKq5sCShYPVkfi1iNl7QQm+fzOaYdsKszK9i4GrS3au7dH
-	YW9Eob3cNG638fiQY3HdPseLK+lZUXA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=lRQZo5clwh+I4d2b4uuDe6a6IHMbWWmmsAFm4A4WZHE=; b=R///YtY8WjkNgq17QOzjgVnNB
+	nD2fVEp8/PJqzhUqbLeeDe+vNttUde8Ryoyy0VPbvQ6oRdPDoQ8tAcxGUg7BexfOqXaBE4oi7e7OJ
+	fOM7euBLaaN+WKJX97GK+30D1eGQeusZxOVRyChP0H8mJh+dShZNxzihe2HqFKXBMvZQ2QCMtyiJn
+	JAOscOrGA0A/x4KhODt9CRvCQQkyhQkuJPIpNk4srwXo2duzHDS12E93WWGO8PE1u5RrKGsoctQqM
+	KCIOKG5Uor33H37wOsGJ/v23GHW1wMhg9tTry92c8+rINzbfF6BtDSr0oYQqdtxmbdMpHVRcNGHQ1
+	cNTVWgpEQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gluLE-0002P6-QF; Tue, 22 Jan 2019 11:35:40 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gluLk-0002fh-2l; Tue, 22 Jan 2019 11:36:12 +0000
+Received: from mx.socionext.com ([202.248.49.38])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gluLB-0002Of-R7
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 11:35:39 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 19A78A78;
- Tue, 22 Jan 2019 03:35:36 -0800 (PST)
-Received: from usa.arm.com (e107155-lin.cambridge.arm.com [10.1.196.42])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id B6F4B3F6A8;
- Tue, 22 Jan 2019 03:35:34 -0800 (PST)
-From: Sudeep Holla <sudeep.holla@arm.com>
-To: linux-arm-kernel@lists.infradead.org,
-	ARM SoC Team <arm@kernel.org>
-Subject: [PATCH] firmware: arm_scmi: provide the mandatory device release
- callback
-Date: Tue, 22 Jan 2019 11:35:25 +0000
-Message-Id: <20190122113525.13705-1-sudeep.holla@arm.com>
-X-Mailer: git-send-email 2.17.1
+ id 1gluLg-0002fF-Vi
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 11:36:10 +0000
+Received: from unknown (HELO iyokan-ex.css.socionext.com) ([172.31.9.54])
+ by mx.socionext.com with ESMTP; 22 Jan 2019 20:36:04 +0900
+Received: from mail.mfilter.local (m-filter-2 [10.213.24.62])
+ by iyokan-ex.css.socionext.com (Postfix) with ESMTP id C70D360062;
+ Tue, 22 Jan 2019 20:36:04 +0900 (JST)
+Received: from 172.31.9.51 (172.31.9.51) by m-FILTER with ESMTP;
+ Tue, 22 Jan 2019 20:36:04 +0900
+Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
+ by kinkan.css.socionext.com (Postfix) with ESMTP id 880281A04E1;
+ Tue, 22 Jan 2019 20:36:04 +0900 (JST)
+Received: from [127.0.0.1] (unknown [10.213.119.83])
+ by yuzu.css.socionext.com (Postfix) with ESMTP id 6552F1210BF;
+ Tue, 22 Jan 2019 20:36:04 +0900 (JST)
+Subject: Re: [PATCH 02/14] dt-bindings: soc: milbeaut: Add Milbeaut trampoline
+ description
+To: Rob Herring <robh+dt@kernel.org>
+References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
+ <1542589274-13878-3-git-send-email-sugaya.taichi@socionext.com>
+ <154337047410.88331.9696178601340675631@swboyd.mtv.corp.google.com>
+ <c746a3de-a9e3-9f25-ecb9-703ceb7e62d0@socionext.com>
+ <154356579701.88331.5043467509900444879@swboyd.mtv.corp.google.com>
+ <f5917f71-f15b-a92d-649c-e3f5f5f10698@socionext.com>
+ <CAL_Jsq+dnKht3TwCh1qB1H4pYFhQJmSN0nAayU+=PJLAvq0bbQ@mail.gmail.com>
+ <90b00858-6e9e-8f7c-f6d4-b35e5daa6eee@socionext.com>
+ <CAL_JsqJ=FRfzVFiOJ0wvoV5iZV+Gx3ft9pGyhb-GoKnOAQgPtQ@mail.gmail.com>
+From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
+Message-ID: <daa5f00a-1d9c-69b0-ed2d-8ff6a64251cc@socionext.com>
+Date: Tue, 22 Jan 2019 20:36:03 +0900
+User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.3
+MIME-Version: 1.0
+In-Reply-To: <CAL_JsqJ=FRfzVFiOJ0wvoV5iZV+Gx3ft9pGyhb-GoKnOAQgPtQ@mail.gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_033537_885142_D87F53A2 
-X-CRM114-Status: GOOD (  11.18  )
+X-CRM114-CacheID: sfid-20190122_033609_355290_5A6D723E 
+X-CRM114-Status: GOOD (  27.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,106 +84,125 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Olof Johansson <olof@lixom.net>, Kevin Hilman <khilman@linaro.org>,
- linux-kernel@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
- Sudeep Holla <sudeep.holla@arm.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Stephen Boyd <sboyd@kernel.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
+ "open list:SERIAL DRIVERS" <linux-serial@vger.kernel.org>,
+ Jiri Slaby <jslaby@suse.com>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-clk <linux-clk@vger.kernel.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The device/driver model clearly mandates that bus driver that discover
-and allocate the device must set the release callback. This callback
-will be used to free the device after all references have gone away.
+Hi
 
-scmi bus driver is missing the obvious callback which will result in
-the following warning if the device is unregistered:
+On 2018/12/04 22:32, Rob Herring wrote:
+> On Tue, Dec 4, 2018 at 5:30 AM Sugaya, Taichi
+> <sugaya.taichi@socionext.com> wrote:
+>>
+>> Hi
+>>
+>> On 2018/12/04 0:49, Rob Herring wrote:
+>>> On Mon, Dec 3, 2018 at 1:42 AM Sugaya, Taichi
+>>> <sugaya.taichi@socionext.com> wrote:
+>>>>
+>>>> Hi,
+>>>>
+>>>> On 2018/11/30 17:16, Stephen Boyd wrote:
+>>>>> Quoting Sugaya, Taichi (2018-11-29 04:24:51)
+>>>>>> On 2018/11/28 11:01, Stephen Boyd wrote:
+>>>>>>> Quoting Sugaya Taichi (2018-11-18 17:01:07)
+>>>>>>>>      create mode 100644 Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
+>>>>>>>>
+>>>>>>>> diff --git a/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt b/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
+>>>>>>>> new file mode 100644
+>>>>>>>> index 0000000..f5d906c
+>>>>>>>> --- /dev/null
+>>>>>>>> +++ b/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
+>>>>>>>> @@ -0,0 +1,12 @@
+>>>>>>>> +Socionext M10V SMP trampoline driver binding
+>>>>>>>> +
+>>>>>>>> +This is a driver to wait for sub-cores while boot process.
+>>>>>>>> +
+>>>>>>>> +- compatible: should be "socionext,smp-trampoline"
+>>>>>>>> +- reg: should be <0x4C000100 0x100>
+>>>>>>>> +
+>>>>>>>> +EXAMPLE
+>>>>>>>> +       trampoline: trampoline@0x4C000100 {
+>>>>>>> Drop the 0x part of unit addresses.
+>>>>>>
+>>>>>> Okay.
+>>>>>>
+>>>>>>
+>>>>>>>> +               compatible = "socionext,smp-trampoline";
+>>>>>>>> +               reg = <0x4C000100 0x100>;
+>>>>>>> Looks like a software construct, which we wouldn't want to put into DT
+>>>>>>> this way. DT doesn't describe drivers.
+>>>>>> We would like to use this node only getting the address of the
+>>>>>> trampoline area
+>>>>>> in which sub-cores wait.  (They have finished to go to this area in previous
+>>>>>> bootloader process.)
+>>>>>
+>>>>> Is this area part of memory, or a special SRAM? If it's part of memory,
+>>>>> I would expect this node to be under the reserved-memory node and
+>>>>> pointed to by some other node that uses this region. Could even be the
+>>>>> CPU nodes.
+>>>>
+>>>> Yes, 0x4C000100 is a part of memory under the reserved-memory node. So
+>>>> we would like to use the SRAM ( allocated 0x00000000 ) area instead.
+>>>> BTW, sorry, the trampoline address of this example is simply wrong.  We
+>>>> were going to use a part of the SRAM from the beginning.
+>>>>
+>>>>>
+>>>>>>
+>>>>>> So should we embed the constant value in source codes instead of getting
+>>>>>> from
+>>>>>> DT because the address is constant at the moment? Or is there other
+>>>>>> approach?
+>>>>>>
+>>>>>
+>>>>> If it's constant then that also works. Why does it need to come from DT
+>>>>> at all then?
+>>>>
+>>>> We think it is not good to embed constant value in driver codes and do
+>>>> not have another way...
+>>>> Are there better ways?
+>>>
+>>> If this is just memory, can you use the standard spin-table binding in
+>>> the DT spec? There are some requirements like 64-bit values even on
+>>> 32-bit machines (though this gets violated).
+>>
+>> The spin-table seems to be used on only 64-bit arch. Have it ever worked
+>> on 32-bit machine?
+> 
+> Yes.
+> 
+>> And I would like not to use it because avoid violation.
+> 
+> The issue now that I remember is cpu-release-addr is defined to always
+> be a 64-bit value while some platforms made it a 32-bit value.
+> 'cpu-release-addr' is also used for some other enable-methods.
 
-Device 'scmi_dev.1' does not have a release() function, it is broken and
-must be fixed. See Documentation/kobject.txt.
-WARNING at drivers/base/core.c:922 device_release+0x8c/0xa0
-Hardware name: ARM LTD Juno Development Platform BIOS EDK II Jan 21 2019
-Workqueue: events deferred_probe_work_func
-pstate: 60000005 (nZCv daif -PAN -UAO)
-pc : device_release+0x8c/0xa0
-lr : device_release+0x8c/0xa0
-Call trace:
- device_release+0x8c/0xa0
- kobject_put+0x8c/0x208
- device_unregister+0x30/0x78
- scmi_device_destroy+0x28/0x50
- scmi_probe+0x354/0x5b0
- platform_drv_probe+0x58/0xa8
- really_probe+0x2c4/0x3e8
- driver_probe_device+0x12c/0x148
- __device_attach_driver+0xac/0x150
- bus_for_each_drv+0x78/0xd8
- __device_attach+0xe0/0x168
- device_initial_probe+0x24/0x30
- bus_probe_device+0xa0/0xa8
- deferred_probe_work_func+0x8c/0xe0
- process_one_work+0x1f0/0x478
- worker_thread+0x22c/0x450
- kthread+0x134/0x138
- ret_from_fork+0x10/0x1c
----[ end trace 420bdb7f6af50937 ]---
+I have a question about the spin-table.
+The code "smp_spin_table.c" is only in "arch/arm64/kernel" directory so 
+can not be compiled in arm-v7 arch. That means the spin-table can not be 
+used arm-v7 arch..? , or is there the way to compile the code in arm-v7 
+arch?
 
-Fix the issue by providing scmi_device_release callback. We have
-everything required for device release already in scmi_device_destroy,
-so we just need to move freeing of the device to scmi_device_release.
+Thanks,
+Sugaya Taichi
 
-Fixes: 933c504424a2 ("firmware: arm_scmi: add scmi protocol bus to enumerate protocol devices")
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/firmware/arm_scmi/bus.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
-
-Hi ARM-SoC team,
-
-Can you apply this one patch directly or I can send pull request if you
-prefer ?
-
-Regards,
-Sudeep
-
-diff --git a/drivers/firmware/arm_scmi/bus.c b/drivers/firmware/arm_scmi/bus.c
-index 472c88ae1c0f..92f843eaf1e0 100644
---- a/drivers/firmware/arm_scmi/bus.c
-+++ b/drivers/firmware/arm_scmi/bus.c
-@@ -119,6 +119,11 @@ void scmi_driver_unregister(struct scmi_driver *driver)
- }
- EXPORT_SYMBOL_GPL(scmi_driver_unregister);
-
-+static void scmi_device_release(struct device *dev)
-+{
-+	kfree(to_scmi_dev(dev));
-+}
-+
- struct scmi_device *
- scmi_device_create(struct device_node *np, struct device *parent, int protocol)
- {
-@@ -138,6 +143,7 @@ scmi_device_create(struct device_node *np, struct device *parent, int protocol)
- 	scmi_dev->dev.parent = parent;
- 	scmi_dev->dev.of_node = np;
- 	scmi_dev->dev.bus = &scmi_bus_type;
-+	scmi_dev->dev.release = scmi_device_release;
- 	dev_set_name(&scmi_dev->dev, "scmi_dev.%d", id);
-
- 	retval = device_register(&scmi_dev->dev);
-@@ -156,9 +162,8 @@ scmi_device_create(struct device_node *np, struct device *parent, int protocol)
- void scmi_device_destroy(struct scmi_device *scmi_dev)
- {
- 	scmi_handle_put(scmi_dev->handle);
--	device_unregister(&scmi_dev->dev);
- 	ida_simple_remove(&scmi_bus_id, scmi_dev->id);
--	kfree(scmi_dev);
-+	device_unregister(&scmi_dev->dev);
- }
-
- void scmi_set_handle(struct scmi_device *scmi_dev)
---
-2.17.1
+> 
+> Rob
+> 
 
 
 _______________________________________________
