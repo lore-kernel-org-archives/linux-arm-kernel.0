@@ -2,23 +2,21 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B0503C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 05:36:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5C240C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 05:43:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7E04120861
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 05:36:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2523E20879
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 05:43:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Gc9XzeOE";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="xlP5+WWq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E04120861
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qX6b2nnw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2523E20879
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,44 +24,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BGT4jNh/z91p+TL5kWqkK6Y3BPxVkMHuWILebcaruvU=; b=Gc9XzeOEOy3cWw
-	CSt2VrKsucS/DWDQ/i+4msUtWuS7LEwieitY393gq0Dgf1YNVlLmpXueZtxZfpAW3YXuW2vWsiGEr
-	wYZ/Uvx5rHBogfbE1iclInaRomRHoILn+OYkThTlVEbMhdwQyCUXn9Ip1Iw1jAIrQ5Ovde3t0hKF7
-	QdPmYrxx4S8n9jn3+aC+SwMC1tL++9mkXU6TMO+SI9nlBmx+7xGT2XI2vxE4fylM6YY8fnW729u/c
-	Kit+Hzve7/XTEP9UBtePS7nFSwo/2dMj+7qRsLecNMYGhF1sNoH/FhOUWTBYE5xvDXhn4AORs7tHt
-	gpPNyDxShKzO/sAKDYjA==;
+	List-Owner; bh=WWUNlRs9i+9dS9Ee9XdJTsphXtbmwDGyYaHYqUgplu4=; b=qX6b2nnwGthWgU
+	mQXIjlhAYwXal7BkymwblgZr2wlJuTFxXQsuVVmax4fZUmMcASysnyHQsKblPnSy4vbkrWWbb8PsW
+	niTvb1Mrf7CWspmXyu2KJHAo5EdP7o9r8eRuXI72yYwBR8xPwpoJsUETynDQLAPFQ3rHU6f7VNCcz
+	+4ySmK3vNmHe7KY/g0mWxB8ByfwZRly+IokhcSGCmXj50TqAUpbRrX0CZNfZ8MT5b6daRNrBxJbku
+	ssMAPm5/LVaytofwE4nIV/roAO6v78Sbg2jguOuCgtz9JZdoTqm39de0AO9hRQ91qGSK0EhUAAF4x
+	iQT2Dad5jjnXNUogJ0OA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glojh-0007BY-7v; Tue, 22 Jan 2019 05:36:33 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gloje-0007BD-Qa
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 05:36:32 +0000
-Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
- (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 1CED420861;
- Tue, 22 Jan 2019 05:36:27 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548135390;
- bh=dAAkPQ3gOmuzStx+LnylDQEjHYPNOTVeO1hQ2mmNb9s=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=xlP5+WWq3fS1UuaX2gpR7FBrvXSOY6TkRKIlHMzE6cV23VAz4amFfgLHALd6EEg2v
- wCzj03ag08TdsYdgyX1d41l9Y9IrLMS9tETBNzKM+OBD91qdPVHVkJSVO3AoVFa3Eu
- xuHpXwNnboYB1BEs7AJXS/OB/MZFqQe2GlJDtU4I=
-Date: Tue, 22 Jan 2019 13:35:53 +0800
-From: Shawn Guo <shawnguo@kernel.org>
-To: Peng Ma <peng.ma@nxp.com>
-Subject: Re: [v3] arm64: dts: lx2160a: add sata node support
-Message-ID: <20190122053552.GF19233@dragon>
-References: <20190117021224.19021-1-peng.ma@nxp.com>
+	id 1gloqg-0001uS-M9; Tue, 22 Jan 2019 05:43:46 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gloqd-0001ty-Fd
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 05:43:44 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CDD37A78;
+ Mon, 21 Jan 2019 21:43:40 -0800 (PST)
+Received: from brain-police (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4C31E3F6A8;
+ Mon, 21 Jan 2019 21:43:39 -0800 (PST)
+Date: Tue, 22 Jan 2019 05:43:28 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Vivek Gautam <vivek.gautam@codeaurora.org>
+Subject: Re: [PATCH 2/2] iommu/arm-smmu: Add support for non-coherent page
+ table mappings
+Message-ID: <20190122054326.GA6445@brain-police>
+References: <20190117092718.1396-1-vivek.gautam@codeaurora.org>
+ <20190117092718.1396-3-vivek.gautam@codeaurora.org>
+ <20190120000117.GH26876@brain-police>
+ <CAFp+6iFh26JgBUx1jkm4EHNY1vs93Uz2qngxP27D0f7dcpX2GQ@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190117021224.19021-1-peng.ma@nxp.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
+In-Reply-To: <CAFp+6iFh26JgBUx1jkm4EHNY1vs93Uz2qngxP27D0f7dcpX2GQ@mail.gmail.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_213630_903135_5C092925 
-X-CRM114-Status: GOOD (  15.08  )
+X-CRM114-CacheID: sfid-20190121_214343_526950_2D4C8D08 
+X-CRM114-Status: GOOD (  16.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,145 +71,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, andy.tang@nxp.com,
- linux-kernel@vger.kernel.org, leoyang.li@nxp.com, robh+dt@kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,
+ Joerg Roedel <joro@8bytes.org>, " <iommu@lists.linux-foundation.org>,
+ Robin Murphy <robin.murphy@arm.com>, open list <linux-kernel@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 17, 2019 at 02:12:24AM +0000, Peng Ma wrote:
-> Add SATA device nodes for fsl-lx2160a and enable support
-> for QDS and RDB boards.
+On Mon, Jan 21, 2019 at 11:35:30AM +0530, Vivek Gautam wrote:
+> On Sun, Jan 20, 2019 at 5:31 AM Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Jan 17, 2019 at 02:57:18PM +0530, Vivek Gautam wrote:
+> > > Adding a device tree option for arm smmu to enable non-cacheable
+> > > memory for page tables.
+> > > We already enable a smmu feature for coherent walk based on
+> > > whether the smmu device is dma-coherent or not. Have an option
+> > > to enable non-cacheable page table memory to force set it for
+> > > particular smmu devices.
+> >
+> > Hmm, I must be missing something here. What is the difference between this
+> > new property, and simply omitting dma-coherent on the SMMU?
 > 
-> Signed-off-by: Peng Ma <peng.ma@nxp.com>
-> ---
-> changed for V3:
-> 	- updated the commit log 
-> 
->  arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts |   16 +++++++
->  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |   16 +++++++
->  arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi    |   44 +++++++++++++++++++++
->  3 files changed, 76 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-> index 99a22ab..1a5acf6 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-> @@ -95,6 +95,22 @@
->  	};
->  };
->  
-> +&sata0 {
-> +	status = "okay";
-> +};
-> +
-> +&sata1 {
-> +	status = "okay";
-> +};
-> +
-> +&sata2 {
-> +	status = "okay";
-> +};
-> +
-> +&sata3 {
-> +	status = "okay";
-> +};
-> +
->  &uart0 {
->  	status = "okay";
->  };
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> index 6481e5f..5b6799e 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> @@ -102,6 +102,22 @@
->  	};
->  };
->  
-> +&sata0 {
-> +	status = "okay";
-> +};
-> +
-> +&sata1 {
-> +	status = "okay";
-> +};
-> +
-> +&sata2 {
-> +	status = "okay";
-> +};
-> +
-> +&sata3 {
-> +	status = "okay";
-> +};
-> +
->  &uart0 {
->  	status = "okay";
->  };
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-> index a79f5c1..592034b 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-> @@ -671,6 +671,50 @@
->  			status = "disabled";
->  		};
->  
-> +		sata0: sata@3200000 {
-> +			compatible = "fsl,lx2160a-ahci";
+> So, this is what I understood from the email thread for Last level
+> cache support -
+> Robin pointed to the fact that we may need to add support for setting
+> non-cacheable
+> mappings in the TCR.
+> Currently, we don't do that for SMMUs that omit dma-coherent.
+> We rely on the interconnect to handle the configuration set in TCR,
+> and let interconnect
+> ignore the cacheability if it can't support.
 
-I can not find this compatible in any bindings doc.
+I think that's a bug. With that fixed, can you get what you want by omitting
+"dma-coherent"?
 
-Shawn
-
-> +			reg = <0x0 0x3200000 0x0 0x10000>,
-> +			      <0x7 0x100520 0x0 0x4>;
-> +			reg-names = "ahci", "sata-ecc";
-> +			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clockgen 4 3>;
-> +			dma-coherent;
-> +			status = "disabled";
-> +		};
-> +
-> +		sata1: sata@3210000 {
-> +			compatible = "fsl,lx2160a-ahci";
-> +			reg = <0x0 0x3210000 0x0 0x10000>,
-> +			      <0x7 0x100520 0x0 0x4>;
-> +			reg-names = "ahci", "sata-ecc";
-> +			interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clockgen 4 3>;
-> +			dma-coherent;
-> +			status = "disabled";
-> +		};
-> +
-> +		sata2: sata@3220000 {
-> +			compatible = "fsl,lx2160a-ahci";
-> +			reg = <0x0 0x3220000 0x0 0x10000>,
-> +			      <0x7 0x100520 0x0 0x4>;
-> +			reg-names = "ahci", "sata-ecc";
-> +			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clockgen 4 3>;
-> +			dma-coherent;
-> +			status = "disabled";
-> +		};
-> +
-> +		sata3: sata@3230000 {
-> +			compatible = "fsl,lx2160a-ahci";
-> +			reg = <0x0 0x3230000 0x0 0x10000>,
-> +			      <0x7 0x100520 0x0 0x4>;
-> +			reg-names = "ahci", "sata-ecc";
-> +			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&clockgen 4 3>;
-> +			dma-coherent;
-> +			status = "disabled";
-> +		};
-> +
->  		smmu: iommu@5000000 {
->  			compatible = "arm,mmu-500";
->  			reg = <0 0x5000000 0 0x800000>;
-> -- 
-> 1.7.1
-> 
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
