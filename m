@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 47927C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:23:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1365AC282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:23:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F239320855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:23:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D47A420855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 04:23:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rmMw1ri4";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="DvEItE1N"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F239320855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z1Ps4GrB";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="H4qG3Pxw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D47A420855
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,62 +27,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=AFAED4m2+EV38xrlaC+NIuOs2LllNs6A/AQmTkrBoGQ=; b=rmMw1ri4dwFtnef6katG8T4M85
-	gZtHvBRKfugr7RfqbHuEaWozR5bebJ5xlrUp5CElsybE88Xa3DFHpy1Fwsxm55bJPf1eQZy2bJDMl
-	f3grDQi9WQZOC7zIWOBSyHO1p7m4Rm9LgVe59AaWhM19/N/fvmcEdncSqsNHB3Dy9tpclGBAFMrq1
-	YmlHHxqb/39s+lnmKwWAXnb0z+KLpNRlnQL7dRHUSlyWlbL4EmPX9Z8rlEMVjq9o5HpSF0nm0HySP
-	UwQhuIT5zW8TmpLp2g4ngVPo904bwh7Pow0jh8KSJCUG5dhPfSuN72BuvP52ByKZCHnpNdkuQkFFo
-	1MG9OTTw==;
+	bh=P3ddFKEo3uEzlCp3Q8UnBijb4NKv9maj8c4we37VViI=; b=Z1Ps4GrBqPyVC0FRVGb1BG9Iuw
+	Xqsr0W2seIO/1kHhmUNbiANMoSUYowfsLgIzd2nMz2A9Ub0n9l0M8cOBjG7WW2XJRbF1hgH/JpT3W
+	EtHc3+K6ArvGMpMDuuBdrMWj5dWn2yKCq9ZreCXcI5l11KqKc/e4FtB6oT3pGhy0thU1R7TNE6EYm
+	yf6NRmstLM+rZUql/VQucK0OwIPJKirxvy97xdkQzt1R90BaMrcJ8UhhRxhRsdZSZYZc8a/uDKb2P
+	BLvUgm8BbsvA5m7Dwoxwz8apfpCwe7KRCeuU0wol+Uov3fInvKry9QtRYcQAUYsRwn2cyO7wpNQF/
+	aJtHeSLA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glnam-00020E-7d; Tue, 22 Jan 2019 04:23:16 +0000
-Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+	id 1glnb4-0002GB-IH; Tue, 22 Jan 2019 04:23:34 +0000
+Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glnZs-0001Hp-R5
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 04:22:30 +0000
-Received: by mail-pf1-x444.google.com with SMTP id g62so11092036pfd.12
+ id 1glna0-0001OD-Na
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 04:22:41 +0000
+Received: by mail-pg1-x542.google.com with SMTP id j10so10440950pga.1
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 20:22:20 -0800 (PST)
+ Mon, 21 Jan 2019 20:22:27 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=z8BYTp8mhM/pilsodAKivXfXoRjeqU3Tj9aOBeEVYqE=;
- b=DvEItE1NiPV7p/vSyCBMjpexW+q0uRczQQLq0s75ULzh413ZovsWdPBMAsEhPzK9SK
- 4WuWYl5H83Ou4mDtYAQK4aE4M67LfklMKcMu1BP+JhwfggJ55vcvnYEDX1ypP1Qe+7BD
- o/dbTwt5pNEvlgjDc421pBNC8VaixHFlIRqOA=
+ bh=8ySRluh8UnQNx0w0kOBma0DodxOKHroSYUhNhVj/8Uo=;
+ b=H4qG3Pxw3GuM2FQUpr/htirtCGys1NP2JsDeCvOWzLVz+I6R9/rPIxERk4WNst9jwe
+ iV0F83gw40ucBCcQgLmJ4DhK092gHV0uOiwELilHJ6unHFV9Ozbs0Qhv7r/9OXx2Ifyb
+ nlmHCmBCSf4Z7k1ofT7AvE/KC2Xgh4e6X9+DY=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=z8BYTp8mhM/pilsodAKivXfXoRjeqU3Tj9aOBeEVYqE=;
- b=BA0zwsi5D8T+0EOAk6ThY+MqggQ0S0vzM6K4BusV81UisPI5l3+HZb087Rzdv3OdgY
- hXLzhQ8CujfIMJvHYNDSRCIkZ5pZElD5gntUuR6MTKmAlKadf2+VVVH5Ol5NHekl2VWm
- YSLkMaNOMGjBTkTtvIJ0vT9slKNdDLsZaQzW455wOy1feQZ8qB+xrmQR+MzV6e8VBg+/
- oMBBFUKmHFQvbR8JMJS4FrK4xi7MQKSISP7j8E5gu7QqspUTrnslslutgjlhy+Q2OAun
- LG8fs+6vcn5/835CZtdWqHdL83ZRoMeuHeHdFTdtGqocbP2oHMu9PL7XSK9kQUwQIrIt
- /umg==
-X-Gm-Message-State: AJcUukdkycmPURG8NC1X90HgA2cbg5AyR0He7NcfT7l8hhMeFGF2lcqq
- BgQU48bnvcdht/nm+MpZGlED
-X-Google-Smtp-Source: ALg8bN5aVRMENZwWODam+9GBXodJhtO1QXkbGFKxoyR3b+ubqSaDT2avkxozUJ575izNZjKdx67xKQ==
-X-Received: by 2002:a62:da5a:: with SMTP id w26mr32240493pfl.106.1548130940258; 
- Mon, 21 Jan 2019 20:22:20 -0800 (PST)
+ bh=8ySRluh8UnQNx0w0kOBma0DodxOKHroSYUhNhVj/8Uo=;
+ b=i1NVP7YHpPDQXiLgviObZxHQYYaQgWeEupmZDlkbV2rsqVCtw6UUdmVRWTma/9DZwI
+ lnI+IcclYsJbkicvEQVbPJkmCNiIP8NuWQ99VWLyFYPhAoVAKp+45n7/FzxOV+b5el2j
+ C5iQNYXN7xCeHCwviOOZf2Ze0d8/LBiF6WdK3djtypl7fEIwQtIDJFktYLutra3S2yaL
+ GtErFYBVj+FHrt6u5T6HZOjN2G21k8U/x3ZP6NGUsRIYVcMhlM1J5ldjioW6xFOH1ju6
+ h4qkgTFYvKRoGH9r3m3qigN+P7vYjBOwTeu+GOLLNCdgVwTMbW3uIedvqaWmLEX+AQgw
+ 2+mA==
+X-Gm-Message-State: AJcUukeHRlTmk/TgqaRCfwe3RsNjU4B3X9zAPbIyBC0DqBVBgrVgsh89
+ Zje/vRxOX4JUX2+17m0ll50+
+X-Google-Smtp-Source: ALg8bN5DUBDakDdApjwY/HUFxu0GgUpUbp7wc+TBJsHYoE3I9AVtjQyDPpL0QC6/rKdRbXzLvM9owA==
+X-Received: by 2002:a62:2e46:: with SMTP id u67mr31548723pfu.3.1548130946623; 
+ Mon, 21 Jan 2019 20:22:26 -0800 (PST)
 Received: from localhost.localdomain ([2405:204:7344:8fd1:3551:e475:9265:ab6d])
- by smtp.gmail.com with ESMTPSA id q199sm25083953pfc.97.2019.01.21.20.22.15
+ by smtp.gmail.com with ESMTPSA id q199sm25083953pfc.97.2019.01.21.20.22.20
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 21 Jan 2019 20:22:19 -0800 (PST)
+ Mon, 21 Jan 2019 20:22:26 -0800 (PST)
 From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 To: shawnguo@kernel.org,
 	leoyang.li@nxp.com,
 	robh+dt@kernel.org
-Subject: [PATCH v3 4/5] dt-bindings: arm: fsl: Add devicetree binding for
- Oxalis
-Date: Tue, 22 Jan 2019 09:51:46 +0530
-Message-Id: <20190122042147.5424-5-manivannan.sadhasivam@linaro.org>
+Subject: [PATCH v3 5/5] arm64: dts: freescale: Add devicetree for Oxalis
+Date: Tue, 22 Jan 2019 09:51:47 +0530
+Message-Id: <20190122042147.5424-6-manivannan.sadhasivam@linaro.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190122042147.5424-1-manivannan.sadhasivam@linaro.org>
 References: <20190122042147.5424-1-manivannan.sadhasivam@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_202221_251930_02F46DF5 
-X-CRM114-Status: GOOD (  10.73  )
+X-CRM114-CacheID: sfid-20190121_202229_096845_8DEB16C9 
+X-CRM114-Status: GOOD (  15.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,25 +104,143 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add devicetree binding for LS1012A SoC based Oxalis board.
+Add devicetree support for Oxalis SoM board from EBS-SYSTART. This
+board is one of the 96Boards Enterprise Edition platform. Below are some
+of the key features of this board:
+
+* SoC: NXP Layerscape LS1012A
+* RAM: 1GB DDR3L
+* PMU: NXP VR5100
+* Storage: 64MByte SPI Flash for bootloader and RCW, MicroSD Card, SATA
+* Connectivity: 2x Ethernet
+* USB: 2x USB3.0
+
+More information about this board can be found in 96Boards product
+page: https://www.96boards.org/product/oxalis/
+
+Ethernet and SPI flash are not supported yet!
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/fsl.yaml | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/freescale/Makefile        |  1 +
+ .../boot/dts/freescale/fsl-ls1012a-oxalis.dts | 96 +++++++++++++++++++
+ 2 files changed, 97 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-oxalis.dts
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.yaml b/Documentation/devicetree/bindings/arm/fsl.yaml
-index 20fb61006f2b..6f85965e9fb4 100644
---- a/Documentation/devicetree/bindings/arm/fsl.yaml
-+++ b/Documentation/devicetree/bindings/arm/fsl.yaml
-@@ -176,6 +176,7 @@ properties:
-       - description: LS1012A based Boards
-         items:
-           - enum:
-+              - ebs-systart,oxalis
-               - fsl,ls1012a-rdb
-               - fsl,ls1012a-frdm
-               - fsl,ls1012a-qds
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index f9be2426f83c..d8152cc06b3f 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: GPL-2.0
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frdm.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frwy.dtb
++dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-oxalis.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-qds.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-rdb.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1028a-qds.dtb
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-oxalis.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-oxalis.dts
+new file mode 100644
+index 000000000000..7c726267ec8f
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-oxalis.dts
+@@ -0,0 +1,96 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Device Tree file for Oxalis
++ *
++ * Copyright (c) 2019 Manivannan Sadhasivam
++ *
++ */
++
++/dts-v1/;
++
++#include "fsl-ls1012a.dtsi"
++
++/ {
++	model = "Oxalis";
++	compatible = "ebs-systart,oxalis", "fsl,ls1012a";
++
++	sys_mclk: clock-mclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <25000000>;
++	};
++
++	reg_1p8v: regulator-1p8v {
++		compatible = "regulator-fixed";
++		regulator-name = "1P8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,widgets =
++			"Microphone", "Microphone Jack",
++			"Headphone", "Headphone Jack",
++			"Speaker", "Speaker Ext",
++			"Line", "Line In Jack";
++		simple-audio-card,routing =
++			"MIC_IN", "Microphone Jack",
++			"Microphone Jack", "Mic Bias",
++			"LINE_IN", "Line In Jack",
++			"Headphone Jack", "HP_OUT",
++			"Speaker Ext", "LINE_OUT";
++
++		simple-audio-card,cpu {
++			sound-dai = <&sai2>;
++			frame-master;
++			bitclock-master;
++		};
++
++		simple-audio-card,codec {
++			sound-dai = <&codec>;
++			frame-master;
++			bitclock-master;
++			system-clock-frequency = <25000000>;
++		};
++	};
++};
++
++&duart0 {
++	status = "okay";
++};
++
++&duart1 {
++	status = "okay";
++};
++
++&esdhc1 {
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++
++	codec: audio-codec@a {
++		#sound-dai-cells = <0>;
++		compatible = "fsl,sgtl5000";
++		reg = <0xa>;
++		VDDA-supply = <&reg_1p8v>;
++		VDDIO-supply = <&reg_1p8v>;
++		clocks = <&sys_mclk>;
++	};
++};
++
++&i2c1 {
++	status = "okay";
++};
++
++&sai2 {
++	status = "okay";
++};
++
++&sata {
++	status = "okay";
++};
 -- 
 2.17.1
 
