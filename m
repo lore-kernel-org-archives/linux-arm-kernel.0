@@ -2,126 +2,66 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 492FEC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:26:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BB49CC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:28:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0FA63217D6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:26:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8AB3E217D6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 15:28:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dQECCyQc";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="jIpmGcO1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0FA63217D6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=partner.samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WAiFUHzs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8AB3E217D6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:MIME-Version:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FuNnGAmQ+J72vD9mXPt79KPzOcifdgVCO97XkFjIq/U=; b=dQECCyQcT5crWQ
-	N0zbn8hHQrdiK4/Th2DJUaid3Z+PF3Arx4CUYoDZPMukFQTONSXkAJmeHRjoiiOySCledgP7hH6va
-	kFLWL59QBGUDAZAiAqXnR6O9+g9D64sCPhI3ycR0Mo+womHl4zMHS8j9FixHilGB4m9/Uq/inFaFA
-	BjwKsRl7phDRCB+KIzX/w+S3vKBCk2sAXOIqb1Boz5iraWHGKleRgiXBjbXSj9wln/JdmGfAjdfRZ
-	WZBQZUkGmXaPKuZ0x5SbEF6rIEpbavrvIlRoXuKBIorUqyXK1wIxVNZYpXim7jd209VUaMbFCJwBz
-	cng69DwqkmeP39vNPxVw==;
+	List-Owner; bh=73jHPHeNBxMwQvi64JFQmKWywzH2cgDzTp+ljjZRSdk=; b=WAiFUHzsh8kNRL
+	apg8gbPrS/kryW/OwgK+nondwEmxHavsA1lkmQH3c4hbdV6yrtrnV+z4YsUbxrZEu9mj7U8rA4puJ
+	7RVe7wCr79qY/Y/TzQ49U/c0TNmNzOm5gszIz0/t4q/Ri1aJyu+nXA+fgN3tAqcgBoJz0vJabQeFR
+	m1RAKy2e30Fydy1h61tz9yQ4BOBAr3h/jFhjQfDr9qV/oPQhuHoKnM/AD5kx1D26VPz8jA/qiLfkh
+	WIpJtZYhtWsFBrExZulcWjQ4cCMq/2A8oS0oyFElw+zITmok9kVHOH0xj09cgL+8V/bSjgVWrFefn
+	oOscAmtn52W13q2++now==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glxwW-0006zR-T2; Tue, 22 Jan 2019 15:26:24 +0000
-Received: from mailout2.w1.samsung.com ([210.118.77.12])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glxwK-0006ok-1X
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 15:26:13 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
- by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190122152609euoutp02f6559132203a9bf110043946ec2b803b~8NRzTpQNh2913729137euoutp02_
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 15:26:09 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
- 20190122152609euoutp02f6559132203a9bf110043946ec2b803b~8NRzTpQNh2913729137euoutp02_
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1548170769;
- bh=PzMg4GV1XDi6Y5SAe2HJT0Zvt3QmVJ+RidOcaZENDo4=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=jIpmGcO1uPHy/45/TYRufXJg19oShxlcbt3CiMnUQBChD83eCzRGBNXzu5AVoT58d
- o/8e+GQ+V5ODU8Cftl6VY7KsxDWra+EznNyExjEkZV1yOnh3L0h16DxW10UtkmAqga
- 4j9xNt4fYIdkPUC1FYKt0ZEHMeoPPnQLBQgMe4gA=
-Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20190122152609eucas1p103a9a571fc41292b09fde7fa3aea0051~8NRy10WV20988509885eucas1p1B;
- Tue, 22 Jan 2019 15:26:09 +0000 (GMT)
-Received: from eucas1p2.samsung.com ( [182.198.249.207]) by
- eusmges2new.samsung.com (EUCPMTA) with SMTP id C1.69.04294.016374C5; Tue, 22
- Jan 2019 15:26:08 +0000 (GMT)
-Received: from eusmtrp2.samsung.com (unknown [182.198.249.139]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
- 20190122152608eucas1p298d06d6b1232a37be8c1679b7a626811~8NRyCKGhr1516415164eucas1p2q;
- Tue, 22 Jan 2019 15:26:08 +0000 (GMT)
-Received: from eusmgms1.samsung.com (unknown [182.198.249.179]) by
- eusmtrp2.samsung.com (KnoxPortal) with ESMTP id
- 20190122152608eusmtrp2b595d28960f2e91462f7dc6a187ae25a~8NRxzLEdf0539205392eusmtrp2U;
- Tue, 22 Jan 2019 15:26:08 +0000 (GMT)
-X-AuditID: cbfec7f4-84fff700000010c6-e4-5c4736106842
-Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
- eusmgms1.samsung.com (EUCPMTA) with SMTP id 69.89.04284.016374C5; Tue, 22
- Jan 2019 15:26:08 +0000 (GMT)
-Received: from AMDC3218.DIGITAL.local (unknown [106.120.51.18]) by
- eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20190122152607eusmtip26678e806b1a425d762ce8cf308001c7a~8NRxQ2SVb0472704727eusmtip27;
- Tue, 22 Jan 2019 15:26:07 +0000 (GMT)
-From: Kamil Konieczny <k.konieczny@partner.samsung.com>
-To: k.konieczny@partner.samsung.com
-Subject: [PATCH v1 1/3] arm64: dts: exynos: add SlimSSS for Exynos5433
-Date: Tue, 22 Jan 2019 16:25:51 +0100
-Message-Id: <20190122152553.1537-2-k.konieczny@partner.samsung.com>
-X-Mailer: git-send-email 2.20.0
-In-Reply-To: <20190122152553.1537-1-k.konieczny@partner.samsung.com>
+	id 1glxyd-0008On-Ng; Tue, 22 Jan 2019 15:28:35 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1glxyZ-0008OA-AF
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 15:28:32 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 91389A78;
+ Tue, 22 Jan 2019 07:28:30 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 810B73F589;
+ Tue, 22 Jan 2019 07:28:29 -0800 (PST)
+Date: Tue, 22 Jan 2019 15:28:27 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Marc Zyngier <marc.zyngier@arm.com>
+Subject: Re: [PATCH 0/2] KVM: arm/arm64: Add VCPU workarounds firmware register
+Message-ID: <20190122152826.GH3578@e103592.cambridge.arm.com>
+References: <20190107120537.184252-1-andre.przywara@arm.com>
+ <20190122101657.GE3578@e103592.cambridge.arm.com>
+ <86a7jt9cc2.wl-marc.zyngier@arm.com>
+ <20190122135632.GF3578@e103592.cambridge.arm.com>
+ <8636pkagps.wl-marc.zyngier@arm.com>
 MIME-Version: 1.0
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFtrKKsWRmVeSWpSXmKPExsWy7djP87oCZu4xBv+eWVpsnLGe1WL+kXOs
- Fn37/jNa9D9+zWxx/vwGdotNj6+xWlzeNYfNYsb5fUwWa4/cZbdYev0ik0Xr3iPsDtwea+at
- YfTYtKqTzWPzknqPg+/2MHn0bVnF6PF5k1wAWxSXTUpqTmZZapG+XQJXxrzpuxgL+jkqWq8u
- Ym1gfMrWxcjJISFgInHl62XWLkYuDiGBFYwSEzqmMoEkhAS+MErcfGsOkfjMKDG99wArTMf8
- Z6tZIBLLGSX+HTjPDOEAdXx91g/WziZgLvFo+xkwW0RAWWLyvelgRcwC/5kkFt5ZArScg0NY
- wE2i+2IOSA2LgKrE9U1rwep5BZwl/r3uZ4bYJi8xbXUXWJxTwEXi/KlVrBA1ghInZz5hAbGZ
- gWqat84Gmy8hsIld4mnbArD5EkANN47UQMwRlnh1fAs7hC0j8X/nfCYIu1xi99Zn7BC9LYwS
- cycvgkpYSxw+fpEVZA6zgKbE+l36EGFHiRWbZzJCjOeTuPFWEOIEPolJ20BeBAnzSnS0CUFU
- 60rM+38GGm7SEl3/10HZHhK7rx5gmsCoOAvJM7OQPDMLYe8CRuZVjOKppcW56anFRnmp5XrF
- ibnFpXnpesn5uZsYgYnp9L/jX3Yw7vqTdIhRgINRiYc34YJrjBBrYllxZe4hRgkOZiURXteL
- bjFCvCmJlVWpRfnxRaU5qcWHGKU5WJTEeasZHkQLCaQnlqRmp6YWpBbBZJk4OKUaGKMj3x9r
- +HOi+W+niuuzuNDmPQERd7lb5qtEqs1dwyJkyFfCV1uSWrj3ydUGdZYpv5ZHfjn86g9/8drl
- f5f94bbvtWZ502DQ1rfgjpqrYJ7TPV+7lMdTovcc0WS3UV1wNTZJ60dt1Xb778KqG/XNeKfL
- Xi/bs9bn/pfo3if+UVd1WaMsr5znVWIpzkg01GIuKk4EAEbUAAhIAwAA
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFlrKIsWRmVeSWpSXmKPExsVy+t/xe7oCZu4xBmcfcFlsnLGe1WL+kXOs
- Fn37/jNa9D9+zWxx/vwGdotNj6+xWlzeNYfNYsb5fUwWa4/cZbdYev0ik0Xr3iPsDtwea+at
- YfTYtKqTzWPzknqPg+/2MHn0bVnF6PF5k1wAW5SeTVF+aUmqQkZ+cYmtUrShhZGeoaWFnpGJ
- pZ6hsXmslZGpkr6dTUpqTmZZapG+XYJexrzpuxgL+jkqWq8uYm1gfMrWxcjJISFgIjH/2WqW
- LkYuDiGBpYwSK+f9YYJISEs0nl4NZQtL/LnWxQZR9IlR4sXCY2DdbALmEo+2nwErEhFQlph8
- bzozSBGzQDuzxJrd24CKODiEBdwkui/mgNSwCKhKXN+0FqyeV8BZ4t/rfmaIBfIS01Z3gcU5
- BVwkzp9axQpiCwHVPJ4whxWiXlDi5MwnLCA2M1B989bZzBMYBWYhSc1CklrAyLSKUSS1tDg3
- PbfYUK84Mbe4NC9dLzk/dxMjMIq2Hfu5eQfjpY3BhxgFOBiVeHg5zrnGCLEmlhVX5h5ilOBg
- VhLhdb3oFiPEm5JYWZValB9fVJqTWnyI0RToiYnMUqLJ+cAIzyuJNzQ1NLewNDQ3Njc2s1AS
- 5z1vUBklJJCeWJKanZpakFoE08fEwSnVwDi5q3o976O5ilbLhfcm7l975V3v9yW+ZQ6x/Mmq
- ks3u2yt83iypNTxlxfjxXf5ylUKjpwcMwpp6En6xKlqebpBVD68O2yB0e87sBzPXFjjJOa+S
- b0wolH9Q9ELae9azvVFln9Lu7vDXfmhXFfNQmuuJZfCD4LqX8x+rmT8LvzdlbfJzDhaZhUos
- xRmJhlrMRcWJAH8RkzG4AgAA
-X-CMS-MailID: 20190122152608eucas1p298d06d6b1232a37be8c1679b7a626811
-X-Msg-Generator: CA
-X-RootMTR: 20190122152608eucas1p298d06d6b1232a37be8c1679b7a626811
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20190122152608eucas1p298d06d6b1232a37be8c1679b7a626811
-References: <20190122152553.1537-1-k.konieczny@partner.samsung.com>
- <CGME20190122152608eucas1p298d06d6b1232a37be8c1679b7a626811@eucas1p2.samsung.com>
+Content-Disposition: inline
+In-Reply-To: <8636pkagps.wl-marc.zyngier@arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_072612_214833_3B2E3FF1 
-X-CRM114-Status: GOOD (  12.18  )
+X-CRM114-CacheID: sfid-20190122_072831_368523_C558738F 
+X-CRM114-Status: GOOD (  26.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -133,49 +73,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- linux-samsung-soc@vger.kernel.org,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- linux-kernel@vger.kernel.org, Krzysztof Kozlowski <krzk@kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Kukjin Kim <kgene@kernel.org>,
- linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Andre Przywara <andre.przywara@arm.com>, kvm@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add DT node for SlimSSS (aka Slim SecuritySubSystem) in Exynos5433 SoC.
-The users can use compatibility "samsung,exynos5433-slim-sss".
+On Tue, Jan 22, 2019 at 02:51:11PM +0000, Marc Zyngier wrote:
+> On Tue, 22 Jan 2019 13:56:34 +0000,
+> Dave Martin <Dave.Martin@arm.com> wrote:
+> > 
+> > On Tue, Jan 22, 2019 at 11:11:09AM +0000, Marc Zyngier wrote:
+> > > On Tue, 22 Jan 2019 10:17:00 +0000,
+> > > Dave Martin <Dave.Martin@arm.com> wrote:
+> > > > 
+> > > > On Mon, Jan 07, 2019 at 12:05:35PM +0000, Andre Przywara wrote:
+> > > > > Workarounds for Spectre variant 2 or 4 vulnerabilities require some help
+> > > > > from the firmware, so KVM implements an interface to provide that for
+> > > > > guests. When such a guest is migrated, we want to make sure we don't
+> > > > > loose the protection the guest relies on.
+> > > > > 
+> > > > > This introduces two new firmware registers in KVM's GET/SET_ONE_REG
+> > > > > interface, so userland can save the level of protection implemented by
+> > > > > the hypervisor and used by the guest. Upon restoring these registers,
+> > > > > we make sure we don't downgrade and reject any values that would mean
+> > > > > weaker protection.
+> > > > 
+> > > > Just trolling here, but could we treat these as immutable, like the ID
+> > > > registers?  
+> > > > 
+> > > > We don't support migration between nodes that are "too different" in any
+> > > > case, so I wonder if adding complex logic to compare vulnerabilities and
+> > > > workarounds is liable to create more problems than it solves...
+> > > 
+> > > And that's exactly the case we're trying to avoid. Two instances of
+> > > the same HW. One with firmware mitigations, one without. Migrating in
+> > > one direction is perfectly safe, migrating in the other isn't.
+> > > 
+> > > It is not about migrating to different HW at all.
+> > 
+> > So this is a realistic scenario when deploying a firmware update across
+> > a cluter that has homogeneous hardware -- there will temporarly be
+> > different firmware versions running on different nodes?
+> 
+> Case in point: I have on my desk two AMD Seattle systems. One with an
+> ancient firmware that doesn't mitigate anything, and one that has all
+> the mitigations applied (and correctly advertised). I can migrate
+> stuff back and forth, and that's really bad.
 
-Signed-off-by: Kamil Konieczny <k.konieczny@partner.samsung.com>
----
- arch/arm64/boot/dts/exynos/exynos5433.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Agreed.
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index e7cd3b67d818..9e5fcb6c7776 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -559,6 +559,15 @@
- 				<&cmu_top CLK_DIV_ACLK_IMEM_200>;
- 		};
- 
-+		slim_sss: slim-sss@11140000 {
-+			compatible = "samsung,exynos5433-slim-sss";
-+			reg = <0x11140000 0x1000>;
-+			interrupts = <GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-names = "aclk", "pclk";
-+			clocks = <&cmu_imem CLK_ACLK_SLIMSSS>,
-+				 <&cmu_imem CLK_PCLK_SLIMSSS>;
-+		};
-+
- 		pd_gscl: power-domain@105c4000 {
- 			compatible = "samsung,exynos5433-pd";
- 			reg = <0x105c4000 0x20>;
--- 
-2.20.0
+> What people do in their data centre is none of my business,
+> really. What concerns me is that there is a potential for something
+> bad to happen without people noticing. And it is KVM's job to do the
+> right thing in this case.
 
+Fair enough.
+
+> > My concern is really "will the checking be too buggy / untested in
+> > practice to be justified by the use case".
+> 
+> Not doing anything is not going to make the current situation "less
+> buggy". We have all the stuff we need to test this. We can even
+> artificially create the various scenarios on a model.
+
+Agreed.  My concern is about how this will scale if future
+vulnerabilities are added to the mix.  We might ultimately end up in a
+worse mess, but I may be being paranoid.
+
+> > I'll take a closer look at the checking logic.
+
+See the other thread.  I have an idea there for exposing the information
+in a different way that may simplfy things (or be totally misguided...)
+
+Cheers
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
