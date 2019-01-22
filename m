@@ -2,20 +2,20 @@ Return-Path: <SRS0=B2vk=P6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 46DD9C37124
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 01:05:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 70E40C41518
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 01:07:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 14D2D20870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 01:05:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 378FF217F4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 22 Jan 2019 01:07:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="djS1bYj3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 14D2D20870
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S5wqjYb1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 378FF217F4
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,58 +24,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kRgFXanBVPkdHJQHFQ6yINugMZXt4EPdXZm26PGv4hU=; b=djS1bYj3HXEBkA
-	P/s4vXbu2aWl80nxiicEI1ILfWBUYNrQNnpXgHzVuP3AAIpRSUyQI8po57Ut+nypgK6XnJYJuZxYG
-	K4JwcNfEYYoe9dIV9Fz1ZohpxiosnsYD33BOi3bTPOElsQZBawJgBaeqf9aFUElC8+Z/T5plXeg7t
-	JlzUKRH05uPpzNArbmHJlDQVcBU2Cdg6n/ox2BcFJGAJTqVYdR2w6HLsYpWYzXPJhwewfWFFjYIVP
-	Q381qguvdTFOZ+S5yAnOIuOvKD/JmyqzkiUxpQhuXp6IUAv9BPWpT6YGUyLPzGOdYr6tOwU7VhmEs
-	rlIvjoGggXdl6mkKRQLA==;
+	List-Owner; bh=n8H7wGEnhSkVFGWEneOh4/3pMStI/XurNFFyssgVIko=; b=S5wqjYb1VfTo1s
+	fZG02lp32oQiOQxIMtV4OPHdVxB/bLq704vk9w+tq/MRbuwkhSvjTDAz/dccmvfk1UnQbuSVcW3Q2
+	gurxBZKUNrAPQu43UjMAkgMhSZ68VIUJS4JWaBirOVU8XCpIjm3aoV3tPMj85YNxiTxEcfpEg98JW
+	wXggDEJ5CbW+fNvVJ5jk0lF9w1IMAXY5uIU+McHdho9d/VTi5dJIXB5OXbSWOyWJ1ccYTAQNN8HcG
+	G4ZI1nQMZThzkioVFmdjJdVWg6TPgvdIOjP+Xj6p98x42bzUraKBFBrT5GxRNKKMBFzFMHrDvAG/q
+	KhKft2Y2TfKRfewTpbCA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1glkVT-0004mh-Ck; Tue, 22 Jan 2019 01:05:35 +0000
+	id 1glkXR-0005FA-Vg; Tue, 22 Jan 2019 01:07:37 +0000
 Received: from mail-ot1-f68.google.com ([209.85.210.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1glkVQ-0004m8-05
- for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 01:05:33 +0000
-Received: by mail-ot1-f68.google.com with SMTP id v23so22172570otk.9
+ id 1glkXP-0005El-8f
+ for linux-arm-kernel@lists.infradead.org; Tue, 22 Jan 2019 01:07:36 +0000
+Received: by mail-ot1-f68.google.com with SMTP id i20so22254389otl.0
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 21 Jan 2019 17:05:30 -0800 (PST)
+ Mon, 21 Jan 2019 17:07:35 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=Gxl0VBPO7E+5K/VBg1k064AKPgPuNyZ3QDJgA/cl13E=;
- b=T1bDXxlUpgxiRWytaR3bAaLkdefG8AD1zp4K1K/fZSJ05jembFyyiqGNxgxUDffyOK
- 2uSpejoqzTEHhHwaGqNAQ1ori4ecxB8p9770YYw6ytJ0Q+2p1pXHa79u20r3Q2iPFGrK
- +5BUqVBDOlajfTFkVW6dyD6OhtW5gS+4YMHxyj3blKE6QJEp5BhTQY//iuC4jxDBpYwa
- 9fw4zY+NHjg6zYItpBGb8aAvDn9ttObPEqRKLUY3PBnnfFohOlpplV9dsAMX6nPKP+hm
- SYRGdHnNrQKIxVwt1rh/dOsBNg6c86foiEUGMGiSnWyoH8DSl87hIEKSeSdeajph6xLx
- VMmA==
-X-Gm-Message-State: AJcUukfELvsoVw+Tu/85XHKM6NHeJANGDHlo9d28qmQqBEgWtwu3jMWT
- hDmjPla3snPDsXmp1tnuZg==
-X-Google-Smtp-Source: ALg8bN6RDyQxrnw2O99C8eF2VvDyPMoFMJ09B6GINUOIQ+dqC8pyHPH3HPonpWPmVtuwYfbTfKqTXw==
-X-Received: by 2002:a9d:70d5:: with SMTP id w21mr8012993otj.301.1548119130119; 
- Mon, 21 Jan 2019 17:05:30 -0800 (PST)
+ bh=T/nRio5fAD0pW+N4ivHGzHMVFGGptuHDxNgOgJeP7bI=;
+ b=N6Zqv6ZGTXMSoswty9k5eqIRO/KIJ8qZcdSjysTDheSqLsolND39IjIf04iTo5e2af
+ E4uc9pGovpKxCsjjcpfJjK5FUEE70ydN7MKW1qN+SZZ7NseoOXoT+PzMiIKRdXHq8LVC
+ TQQ2At2aYg1CoDQ9SLvZS3SWupERga5XPsCWqeh2doOXL0uGUbOiFvPSxGbBIJlVrd2y
+ Q4Xcrv3Os2ijyYJ+3Wi/VALFgsrLkPRv6bgrMTYHJRDxE1YuMfrXliFKaS5EEo6F0LnK
+ KHJMd/vE+G+A9TCM1H9bKN0FsVksOGAi5pyxtgvRUYvWP+GzoZNyJqoQBlpdWBbN6ID4
+ G3Dw==
+X-Gm-Message-State: AJcUukcvzqA/wPLG9nTiQpBEQ3li2Hpf20Odk+936kHGLwYkGFMr0qmp
+ IhmAk4scKAWpuVtdhEqm+g==
+X-Google-Smtp-Source: ALg8bN7MI+OIsDNpY+m/U1nuHHeYT0ce6NJzeh5KVfkcmtdXBafyy+F8aQkA+NV3zFrLtjwxnt4Jrw==
+X-Received: by 2002:a9d:6297:: with SMTP id x23mr19478201otk.63.1548119254572; 
+ Mon, 21 Jan 2019 17:07:34 -0800 (PST)
 Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
  [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id n185sm6967674oih.18.2019.01.21.17.05.29
+ by smtp.gmail.com with ESMTPSA id z15sm6468070oib.23.2019.01.21.17.07.33
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 21 Jan 2019 17:05:29 -0800 (PST)
-Date: Mon, 21 Jan 2019 19:05:28 -0600
+ Mon, 21 Jan 2019 17:07:33 -0800 (PST)
+Date: Mon, 21 Jan 2019 19:07:33 -0600
 From: Rob Herring <robh@kernel.org>
 To: Nicolas Ferre <nicolas.ferre@microchip.com>
-Subject: Re: [PATCH 1/8] dt-bindings: arm: atmel: add missing samx7 to reset
- controller
-Message-ID: <20190122010528.GA20975@bogus>
+Subject: Re: [PATCH 2/8] dt-bindings: arm: atmel: add new sam9x60 reset
+ controller binding
+Message-ID: <20190122010733.GA21139@bogus>
 References: <cover.1547629763.git.nicolas.ferre@microchip.com>
- <b073b46ab85e9c855640e674f12f2a0801876140.1547629763.git.nicolas.ferre@microchip.com>
+ <ed46005be5beff6efc47d40cea304185efa2bcc0.1547629763.git.nicolas.ferre@microchip.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <b073b46ab85e9c855640e674f12f2a0801876140.1547629763.git.nicolas.ferre@microchip.com>
+In-Reply-To: <ed46005be5beff6efc47d40cea304185efa2bcc0.1547629763.git.nicolas.ferre@microchip.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190121_170532_094252_7C22B955 
-X-CRM114-Status: GOOD (  11.19  )
+X-CRM114-CacheID: sfid-20190121_170735_306663_C6B153BA 
+X-CRM114-Status: GOOD (  15.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,7 +92,7 @@ Cc: devicetree@vger.kernel.org,
  netdev@vger.kernel.org, linux-usb@vger.kernel.org,
  Sebastian Reichel <sre@kernel.org>, linux-kernel@vger.kernel.org,
  Ludovic Desroches <ludovic.desroches@microchip.com>,
- Rob Herring <robh+dt@kernel.org>, Alan Stern <stern@rowland.harvard.edu>,
+ Alan Stern <stern@rowland.harvard.edu>,
  Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
  "David S . Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
@@ -100,17 +100,34 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 16 Jan 2019 10:57:37 +0100, Nicolas Ferre wrote:
-> Add this missing compatibility string to the Reset Controller
-> compatible string chip list.
+On Wed, Jan 16, 2019 at 10:57:38AM +0100, Nicolas Ferre wrote:
+> Update the Reset Controller's binding to add new SoC compatibility string.
 > 
 > Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 > ---
->  Documentation/devicetree/bindings/arm/atmel-sysregs.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  Documentation/devicetree/bindings/arm/atmel-sysregs.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
+> index 36952cc39993..badce6ef3ab3 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
+> @@ -22,6 +22,7 @@ Its subnodes can be:
+>  RSTC Reset Controller required properties:
+>  - compatible: Should be "atmel,<chip>-rstc".
+>    <chip> can be "at91sam9260", "at91sam9g45", "sama5d3" or "samx7"
+> +  it also can be "microchip,sam9x60-rstc"
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+How is this related to at91sam9260-rstc?
+
+The 'x' is a wildcard? We generally avoid wildcards.
+
+>  - reg: Should contain registers location and length
+>  - clocks: phandle to input clock.
+>  
+> -- 
+> 2.17.1
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
