@@ -2,88 +2,61 @@ Return-Path: <SRS0=uP4V=P7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 37718C282C5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 10:39:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 05E11C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 10:40:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F30D121019
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 10:39:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C64A521019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 10:40:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fAYAKhOf";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="MBXmFMG/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F30D121019
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f47dZkAO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C64A521019
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SD7gi/ywQ4tJ+xlQBUZLwEbHSDKE6WliBGhQqrlFFIU=; b=fAYAKhOf57/t1i
-	yWEJjeiJzv12GtXIQjAMJFe3Fs2LZRsmsryaC21Wrga85LMhyTtXl88oR0in+9ke87bybCbk8z2iR
-	wDuFGMBpBW4I/K84iwbz75CzlxG1X1iTD05VXfy/I1QmuC5+Mau9DoFhHNovyXigv1IS34SfNIedN
-	a2cJETvZNmE4I5WR8NZOmmRNcFQT39aGBGnGYX/AlYbj7UMCdB55C476Y6FTkYeggb3B7GbIPobEv
-	SxRsPjH1zKod4+uMatOGX/GAvwDMjQFuEzjT+oj9OHYKJsCjffhiNiW5VldR5FPDdkrRGg+O5otPr
-	RD4Gc9EOtg4R9OONZ4EQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=vrlSr0CZQWsvSQvbHafcmKnUrdVA6H+2hXTMl8AdWKg=; b=f47dZkAOMuaPksKHo07DJHBVT
+	vkGDMtW338F1SHv7E6SdQ3pEnbtVhrqtN5EQSNiNJXwb/uIrQb/dIh5FB0e5Swa0QuChLYaQUh/ou
+	yaO5CyNnXuBLoo+RSbhHVRG4N3y2IiihzRc4X9uYAgObP0p/JPmwQz5vPCOy/n4WFvEeF8KAAIHOW
+	opE+fFpQ6JdniNAwlCR0KmepYmTECAA7bjQzy1dOId3mBpm7LGX10gBIh+eglVZ1kJb4XYmaRYsdu
+	ArRg3cr3jFD3EhWmuXMpKYjP+yolDlCgeJM8An0zGopwe8Phjm4whOIsqTbeLaxl2V0LVIlfdtHGf
+	QFBE9VUjw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmFwK-0004nb-7P; Wed, 23 Jan 2019 10:39:24 +0000
-Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmFwG-0004nG-Od
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 10:39:22 +0000
-Received: by mail-lj1-x243.google.com with SMTP id l15-v6so1454945lja.9
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 23 Jan 2019 02:39:19 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=JNpQ+/5iwZyTvORBp3CtrwihaTdurJBDQSvMmysi55Q=;
- b=MBXmFMG/qdjgPNRoI52FDu9AtF3UzC31yd0HImQHdbkqkRt+niWYOAf1WL4F4l3uko
- drrOO9C11JLOjK6hhkwV/RuObeyi/sHze3ii8uLcEr1Y/Srt4h90Zw6kYUAVZuROsMDD
- WN2wEkvqDlt52/7rl1f2jl8n2KPZXDU96f7wU=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=JNpQ+/5iwZyTvORBp3CtrwihaTdurJBDQSvMmysi55Q=;
- b=SX2H+f/ybdo0Hz7Zu1YYhtZuCweU7OoWwL3WfzmCSDahI2RqAxVx8/Ta6aQ4QFihF0
- 5AX0/qBLuCFEigt0IorFw+oRseh/HWKLPuF8QYd1DJ84jsl2P9byQqUH6vxSn6g0Er7m
- br6gcupyOrjtut30kjB01QGCMdpusGSUc5fJMtBjOdQtE2jQ4Lw+NcOvw4JzpRMdlaMp
- 44e4SMKup9VvOG5vMjmVK3sac0Pel49QwyGi0YFKUswZfba/YenbzxO16lji2KFezEu/
- sTqHA0oaejhDD3kVO3+IvlB7UkOmbizQsCd5g/CBivcuyQ784DAGQMeDjUKYMvAvmiKf
- pYXw==
-X-Gm-Message-State: AJcUukcizDVPMwhmUl5bz1EzKpK3jGT1f+FV0aNTKNSwwOZwU69iMw29
- cXm9VWqIMGQVcVat5MR3depQA2OKLFE=
-X-Google-Smtp-Source: ALg8bN4e+TmTMymXuBlMst/uhjKRf2kDvrVOeBslE8bGY+MOrLqFt+SGD3cZHLgb1hvcWmXNr8L9gg==
-X-Received: by 2002:a2e:8187:: with SMTP id e7-v6mr1446575ljg.67.1548239958143; 
- Wed, 23 Jan 2019 02:39:18 -0800 (PST)
-Received: from centauri.lan (h-229-118.A785.priv.bahnhof.se. [5.150.229.118])
- by smtp.gmail.com with ESMTPSA id
- o17sm412116lff.77.2019.01.23.02.39.17
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 23 Jan 2019 02:39:17 -0800 (PST)
-Date: Wed, 23 Jan 2019 11:39:15 +0100
-From: Niklas Cassel <niklas.cassel@linaro.org>
-To: Wei Yongjun <weiyongjun1@huawei.com>
-Subject: Re: [PATCH net-next] net: stmmac: Fix return value check in
- qcom_ethqos_probe()
-Message-ID: <20190123103915.GA20558@centauri.lan>
-References: <1548224358-83281-1-git-send-email-weiyongjun1@huawei.com>
+	id 1gmFxH-0006J1-P8; Wed, 23 Jan 2019 10:40:23 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmFxE-0006IQ-Pf
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 10:40:22 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 6350A207AB; Wed, 23 Jan 2019 11:40:19 +0100 (CET)
+Received: from localhost (aaubervilliers-681-1-87-206.w90-88.abo.wanadoo.fr
+ [90.88.29.206])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 33DED20714;
+ Wed, 23 Jan 2019 11:40:09 +0100 (CET)
+Date: Wed, 23 Jan 2019 11:40:09 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Corentin Labbe <clabbe@baylibre.com>
+Subject: Re: [PATCH v2] arm: sun8i-h3-nanopi-m1-plus: enable HDMI
+Message-ID: <20190123104009.zf5xxsbxacmftwwt@flea>
+References: <1548143206-11404-1-git-send-email-clabbe@baylibre.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1548224358-83281-1-git-send-email-weiyongjun1@huawei.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <1548143206-11404-1-git-send-email-clabbe@baylibre.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_023920_802526_029B4057 
-X-CRM114-Status: GOOD (  16.13  )
+X-CRM114-CacheID: sfid-20190123_024020_971899_2A8CA31A 
+X-CRM114-Status: UNSURE (   8.91  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,48 +68,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alexandre Torgue <alexandre.torgue@st.com>, netdev@vger.kernel.org,
- kernel-janitors@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
- Jose Abreu <joabreu@synopsys.com>, Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- Giuseppe Cavallaro <peppe.cavallaro@st.com>,
- linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org, wens@csie.org,
+ robh+dt@kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============7534844037797964741=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 23, 2019 at 06:19:18AM +0000, Wei Yongjun wrote:
-> In case of error, the function devm_clk_get() returns ERR_PTR() and
-> never returns NULL. The NULL test in the return value check should be
-> replaced with IS_ERR().
-> 
-> Fixes: a7c30e62d4b8 ("net: stmmac: Add driver for Qualcomm ethqos")
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-> ---
->  drivers/net/ethernet/stmicro/stmmac/dwmac-qcom-ethqos.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-qcom-ethqos.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-qcom-ethqos.c
-> index 30724bd..7ec8954 100644
-> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-qcom-ethqos.c
-> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-qcom-ethqos.c
-> @@ -473,8 +473,8 @@ static int qcom_ethqos_probe(struct platform_device *pdev)
->  	ethqos->por = of_device_get_match_data(&pdev->dev);
->  
->  	ethqos->rgmii_clk = devm_clk_get(&pdev->dev, "rgmii");
-> -	if (!ethqos->rgmii_clk) {
-> -		ret = -ENOMEM;
-> +	if (IS_ERR(ethqos->rgmii_clk)) {
-> +		ret = PTR_ERR(ethqos->rgmii_clk);
->  		goto err_mem;
->  	}
-> 
-> 
-> 
 
-Acked-by: Niklas Cassel <niklas.cassel@linaro.org>
+--===============7534844037797964741==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="7sfrqbci6lvwmlro"
+Content-Disposition: inline
+
+
+--7sfrqbci6lvwmlro
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Tue, Jan 22, 2019 at 07:46:46AM +0000, Corentin Labbe wrote:
+> This patch enable HDMI output on sun8i-h3-nanopi-m1-plus.
+>=20
+> Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+
+The prefix must be "ARM: dts:"
+
+I've fixed it and applied, thanks!
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--7sfrqbci6lvwmlro
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXEhEiQAKCRDj7w1vZxhR
+xZ3pAQCJSE2FzvWr/4NVrljqNm+TQECoB/TPbuuY6UmGvzAo/QD/WmPY8QpFB2o2
+VzrlhG6RqaIhvq8dRquVzMxb5Y6zVww=
+=wXRH
+-----END PGP SIGNATURE-----
+
+--7sfrqbci6lvwmlro--
+
+
+--===============7534844037797964741==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============7534844037797964741==--
+
