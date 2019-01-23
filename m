@@ -2,69 +2,68 @@ Return-Path: <SRS0=uP4V=P7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 76012C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:40:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 220B3C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:43:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 479552184C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:40:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E40CF21871
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:43:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QFq+YZsK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 479552184C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qpkTW9wE";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=akkea.ca header.i=@akkea.ca header.b="T+xOpF1c"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E40CF21871
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=akkea.ca
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zEVKOecPqMjq9u2OQVZFfD9pfNnqOdfEIOUj4zbfmsA=; b=QFq+YZsKk46hTt
-	L5LrBFf8qN8vckUZW+a7q1OW26AbsTj+bJrFSDJ5Z2XXsUpN4H6DvzlLByqUvc1wQrU4SQvjuc3Am
-	IsSa+Anp4PWpr1r/PFK9VvCb/fJLOdWLlk10Q2vvi3Ek+7IVk2IqBPwGdiqBaxBhC0f96EMS1LK4t
-	XWFBFfOQQ6osC3L7d4SHLmw4DTEP9w5uAaBjIyI4qA01q4D3pJXr6syL+Q1qaKgQzdPAb+GNMf3im
-	e9197l0SwUb3CRNNoK+yAp4VMYldvBdk20sf6mPu35jCqwHbUSQZZsqXiR2LmEcwsPUntIeyCt6cF
-	AQcnlRMURUK5QviN8Wrg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:From:Date:
+	MIME-Version:Subject:To:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=bHHc3lAXfGQjczMSxxaAuOQ3SJhnKveTE+xta+cboBo=; b=qpkTW9wEThLTiZsgqJGun3oc8
+	DEu1TC1Zw5bRjD29omgS1dil1Y0SIpUFc+M6Onm58sUXrMDWBwsCx0e6BTMIblX7DmXKKk5fZ4ASE
+	GfhLpi0Yk8SUk9+OzSuzCINGqqqItJvdL2P2O8cLe/H07DzTdnFNMknmHOAgAvDlKS3k/bEtyRAoe
+	2osxRNzS2UjP+fsQHu0xYvVOfgM2zaRaovPqdRCwhPqi9UloUJCStA/ebzs9Kgp2t+N5p2yb6Zn5N
+	iNjv1xId/TsNf3FEt2myiFsaMVLcluwpiSKZctt0jQjL5iIhyg/mh5bPtBH6ZRdNwIf3yHTxYR/Kc
+	UILRtoHBw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmKdn-0008Pz-VL; Wed, 23 Jan 2019 15:40:35 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmKdl-0008P2-62; Wed, 23 Jan 2019 15:40:34 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 67B05A78;
- Wed, 23 Jan 2019 07:40:31 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 01FC73F5C1;
- Wed, 23 Jan 2019 07:40:28 -0800 (PST)
-Date: Wed, 23 Jan 2019 15:40:24 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Jianjun Wang <jianjun.wang@mediatek.com>
-Subject: Re: [PATCH 2/2] PCI: mediatek: Add controller support for MT7629
-Message-ID: <20190123154023.GA1157@e107981-ln.cambridge.arm.com>
-References: <1544058553-10936-1-git-send-email-jianjun.wang@mediatek.com>
- <1544058553-10936-3-git-send-email-jianjun.wang@mediatek.com>
- <20181213145517.GB4701@google.com>
- <1545034779.8528.8.camel@mhfsdcap03>
- <20181217143247.GK20725@google.com>
- <20181217154645.GA24864@e107981-ln.cambridge.arm.com>
- <1545124764.25199.3.camel@mhfsdcap03>
- <20181220182043.GC183878@google.com>
- <1545651628.5634.57.camel@mhfsdcap03>
+	id 1gmKgC-00010Q-6Z; Wed, 23 Jan 2019 15:43:04 +0000
+Received: from node.akkea.ca ([192.155.83.177])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmKg8-0000yZ-QQ
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 15:43:02 +0000
+Received: by node.akkea.ca (Postfix, from userid 33)
+ id C26884E204B; Wed, 23 Jan 2019 15:42:56 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=akkea.ca; s=mail;
+ t=1548258176; bh=hpydxlUbPNVTFjaIeaR+9n70cc5NfFN03bvjQEo1UbU=;
+ h=To:Subject:Date:From:Cc:In-Reply-To:References;
+ b=T+xOpF1cXj7CVamez22PIzRepOMR9AHCkbPhlxwb7DeHfTYFjDH6nCIrfMbQLaTmc
+ 6G5vEFFUOJuhnl8hyLebeHO5Xp3hlPXeqiipnX0qXaJTH/POHSuY3GUGoX9NATuDUj
+ 7IS8xQFtsCqYEKpvUEKuMS7zt3ki9NWIvxXVy5Ug=
+To: Lucas Stach <l.stach@pengutronix.de>
+Subject: Re: [PATCH v3 4/5] dma: imx-sdma: add an index for imx8mq multi sdma
+ devices
+X-PHP-Originating-Script: 1000:rcube.php
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1545651628.5634.57.camel@mhfsdcap03>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+Date: Wed, 23 Jan 2019 08:42:56 -0700
+From: Angus Ainslie <angus@akkea.ca>
+In-Reply-To: <1548257514.28802.3.camel@pengutronix.de>
+References: <20190120023150.17138-1-angus@akkea.ca>
+ <20190123152310.11680-1-angus@akkea.ca>
+ <20190123152310.11680-5-angus@akkea.ca>
+ <1548257514.28802.3.camel@pengutronix.de>
+Message-ID: <d5f73096cf62ef379e27c11e024c52ff@www.akkea.ca>
+X-Sender: angus@akkea.ca
+User-Agent: Roundcube Webmail/1.1.3
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_074033_241009_693567E6 
-X-CRM114-Status: GOOD (  30.44  )
+X-CRM114-CacheID: sfid-20190123_074301_078450_DB60C41C 
+X-CRM114-Status: GOOD (  18.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,92 +75,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, ryder.lee@mediatek.com,
- linux-pci@vger.kernel.org, youlin.pei@mediatek.com,
- linux-kernel@vger.kernel.org, robh+dt@kernel.org,
- Bjorn Helgaas <helgaas@kernel.org>, honghui.zhang@mediatek.com,
- matthias.bgg@gmail.com, linux-mediatek@lists.infradead.org,
+Cc: Daniel Baluta <daniel.baluta@gmail.com>, linux-kernel@vger.kernel.org,
+ dmaengine@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
+ NXP Linux Team <linux-imx@nxp.com>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>, angus.ainslie@puri.sm,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 24, 2018 at 07:40:28PM +0800, Jianjun Wang wrote:
-> On Thu, 2018-12-20 at 12:20 -0600, Bjorn Helgaas wrote:
-> > On Tue, Dec 18, 2018 at 05:19:24PM +0800, Jianjun Wang wrote:
-> > > On Mon, 2018-12-17 at 15:46 +0000, Lorenzo Pieralisi wrote:
-> > > > On Mon, Dec 17, 2018 at 08:32:47AM -0600, Bjorn Helgaas wrote:
-> > > > > On Mon, Dec 17, 2018 at 04:19:39PM +0800, Jianjun Wang wrote:
-> > > > > > On Thu, 2018-12-13 at 08:55 -0600, Bjorn Helgaas wrote:
-> > > > > > > On Thu, Dec 06, 2018 at 09:09:13AM +0800, Jianjun Wang wrote:
-> > > > > > > > The read value of BAR0 is 0xffff_ffff, it's size will be
-> > > > > > > > calculated as 4GB in arm64 but bogus alignment values at
-> > > > > > > > arm32, the pcie device and devices behind this bridge will
-> > > > > > > > not be enabled. Fix it's BAR0 resource size to guarantee
-> > > > > > > > the pcie devices will be enabled correctly.
-> > > > > > > 
-> > > > > > > So this is a hardware erratum?  Per spec, a memory BAR has
-> > > > > > > bit 0 hardwired to 0, and an IO BAR has bit 1 hardwired to
-> > > > > > > 0.
-> > > > > > 
-> > > > > > Yes, it only works properly on 64bit platform.
-> > > > > 
-> > > > > I don't understand.  BARs are supposed to work the same
-> > > > > regardless of whether it's a 32- or 64-bit platform.  If this is
-> > > > > a workaround for a hardware defect, please just say that
-> > > > > explicitly.
-> > > > 
-> > > > I do not understand this either. First thing to do is to describe
-> > > > the problem properly so that we can actually find a solution to
-> > > > it.
-> > > 
-> > > This BAR0 is a 64-bit memory BAR, the HW default values for this BAR
-> > > is 0xffff_ffff_0000_0000 and it could not be changed except by
-> > > config write operation.
-> > 
-> > If you literally get 0xffff_ffff_0000_0000 when reading the BAR, that
-> > is out of spec because the low-order 4 bits of a 64-bit memory BAR
-> > cannot all be zero.
-> > 
-> > A 64-bit BAR consumes two DWORDS in config space.  For a 64-bit BAR0,
-> > the DWORD at 0x10 contains the low-order bits, and the DWORD at 0x14
-> > contains the upper 32 bits.  Bits 0-3 of the low-order DWORD (the
-> > one at 0x10) are read-only, and in this case should contain the value
-> > 0b1100 (0xc).  That means the range is prefetchable (bit 3 == 1) and
-> > the BAR is 64 bits (bits 2:1 == 10).
-> 
-> Sorry, I have confused the HW default value and the read value of BAR
-> size. The hardware default value is 0xffff_ffff_0000_000c, it's a 64-bit
-> BAR with prefetchable range.
-> 
-> When we start to decoding the BAR, the read value of BAR0 at 0x10 is
-> 0x0c, and the value at 0x14 is 0xffff_ffff, so the read value of BAR
-> size is 0xffff_ffff_0000_0000, which will be decoded to 0xffff_ffff, and
-> it will be set to the end value of BAR0 resource in the pci_dev.
-> > 
-> > > The calculated BAR size will be 0 in 32-bit platform since the
-> > > phys_addr_t is a 32bit value in 32-bit platform.
-> > 
-> > Either (1) this is a hardware defect that feeds incorrect data to the
-> > BAR size calculation, or (2) there's a problem in the BAR size
-> > calculation code.  We need to figure out which one and work around or
-> > fix it correctly.
-> 
-> The BAR size is calculated by the code (res->end - res->start + 1) is
-> fine, I think it's a hardware defect because that we can not change the
-> hardware default value or just disable it since we don't using it.
-
-Apologies for the delay in getting back to this.
-
-This looks like a kernel defect, not a HW defect.
-
-I need some time to make up my mind on what the right fix for this
-but it is most certainly not this patch.
-
-Lorenzo
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMjAxOS0wMS0yMyAwODozMSwgTHVjYXMgU3RhY2ggd3JvdGU6Cj4gSGkgQW5ndXMsCj4gCj4g
+QW0gTWl0dHdvY2gsIGRlbiAyMy4wMS4yMDE5LCAwODoyMyAtMDcwMCBzY2hyaWViIEFuZ3VzIEFp
+bnNsaWUgCj4gKFB1cmlzbSk6Cj4+IE9uIGkubXg4bXEsIHRoZXJlIGFyZSB0d28gc2RtYSBpbnN0
+YW5jZXMsIGFuZCB0aGUgY29tbW9uIGRtYSBmcmFtZXdvcmsKPj4gd2lsbCBnZXQgYSBjaGFubmVs
+IGR5bmFtaWNhbGx5IGZyb20gYW55IGF2YWlsYWJsZSBzZG1hIGluc3RhbmNlIAo+PiB3aGV0aGVy
+Cj4+IGl0J3MgdGhlIGZpcnN0IHNkbWEgZGV2aWNlIG9yIHRoZSBzZWNvbmQgc2RtYSBkZXZpY2Uu
+IFNvbWUgSVBzIGxpa2UKPj4gU0FJIG9ubHkgd29yayB3aXRoIHNkbWEyIG5vdCBzZG1hMS4gVG8g
+bWFrZSBzdXJlIHRoZSBzZG1hIGNoYW5uZWwgaXMgCj4+IGZyb20KPj4gdGhlIGNvcnJlY3Qgc2Rt
+YSBkZXZpY2UsIHVzZSBhbiBpbmRleCB0byBtYXRjaC4KPj4gCj4+IEJhc2VkIG9uIE1MSy0xNjEw
+NC0yIGJ5IFJvYmluIEdvbmcgPHlpYmluLmdvbmdAbnhwLmNvbT4KPiAKPiBUaGlzIHJlbGllcyBv
+biB0aGUgcHJvYmUgb3JkZXIgb2YgdGhlIGRldmljZXMgKHdoaWNoIHNob3VsZCBiZSB0cmVhdGVk
+Cj4gYXMgcmFuZG9tKSBmb3IgdGhlIG1hdGNoIHRvIGZpbmQgdGhlIHJpZ2h0IGRldmljZS4gVGhp
+cyBpcyBub3QKPiBhY2NlcHRhYmxlIHVwc3RyZWFtLgo+IAo+IFRoZSBEVCAiZG1hcyIgcHJvcGVy
+dHkgYWxyZWFkeSBzcGVjaWZpZXMgdGhlIGNvcnJlY3QgU0RNQSBkZXZpY2UgdG8gdXNlCj4gIGZv
+ciBhIGNvbnN1bWVyLCBzbyB0aGUgZmlsdGVyIGZ1bmN0aW9uIHNob3VsZCByZWFsbHkgbWF0Y2gg
+dGhlIE9GIG5vZGUKPiBvZiB0aGUgU0RNQSBkZXZpY2Ugd2l0aCB0aGUgbm9kZSBzcGVjaWZpZWQg
+aW4gdGhlIGRtYXMgcGhhbmRsZSBpbiBvcmRlcgo+IHRvIHBpY2sgdGhlIHJpZ2h0IFNETUEgZW5n
+aW5lLgo+IAoKVGhhbmtzIEx1Y2FzLCBJJ2xsIGZpeCBpdCBmb3IgcmV2IDQKCj4gUmVnYXJkcywK
+PiBMdWNhcwo+IAo+PiAKPj4gPiBTaWduZWQtb2ZmLWJ5OiBBbmd1cyBBaW5zbGllIChQdXJpc20p
+IDxhbmd1c0Bha2tlYS5jYT4KPj4gLS0tCj4+IMKgZHJpdmVycy9kbWEvaW14LXNkbWEuY8KgwqDC
+oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgfCAxMiArKysrKysrKysrKysKPj4gwqBpbmNsdWRl
+L2xpbnV4L3BsYXRmb3JtX2RhdGEvZG1hLWlteC5oIHzCoMKgMSArCj4+IMKgMiBmaWxlcyBjaGFu
+Z2VkLCAxMyBpbnNlcnRpb25zKCspCj4+IAo+PiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9kbWEvaW14
+LXNkbWEuYyBiL2RyaXZlcnMvZG1hL2lteC1zZG1hLmMKPj4gaW5kZXggMmU2OTFiMWNkMGViLi5i
+ZjM3NTJhNmE2NGYgMTAwNjQ0Cj4+IC0tLSBhL2RyaXZlcnMvZG1hL2lteC1zZG1hLmMKPj4gKysr
+IGIvZHJpdmVycy9kbWEvaW14LXNkbWEuYwo+PiBAQCAtNDQyLDYgKzQ0Miw3IEBAIHN0cnVjdCBz
+ZG1hX2VuZ2luZSB7Cj4+ID4gPiDCoAlzdHJ1Y3Qgc2RtYV9idWZmZXJfZGVzY3JpcHRvcgkqYmQw
+Owo+PiA+IMKgCS8qIGNsb2NrIHJhdGlvIGZvciBBSEI6U0RNQSBjb3JlLiAxOjEgaXMgMSwgMjox
+IGlzIDAqLwo+PiA+ID4gwqAJYm9vbAkJCQljbGtfcmF0aW87Cj4+ID4gPiArCWludAkJCQlpZHg7
+Cj4+IMKgfTsKPj4gwqAKPj4gwqBzdGF0aWMgaW50IHNkbWFfY29uZmlnX3dyaXRlKHN0cnVjdCBk
+bWFfY2hhbiAqY2hhbiwKPj4gQEAgLTYwNiw2ICs2MDcsOCBAQCBzdGF0aWMgY29uc3Qgc3RydWN0
+IG9mX2RldmljZV9pZCBzZG1hX2R0X2lkc1tdID0gewo+PiDCoH07Cj4+IMKgTU9EVUxFX0RFVklD
+RV9UQUJMRShvZiwgc2RtYV9kdF9pZHMpOwo+PiDCoAo+PiArc3RhdGljIGludCBzZG1hX2Rldl9p
+ZHg7Cj4+ICsKPj4gPiDCoCNkZWZpbmUgU0RNQV9IX0NPTkZJR19EU1BETUEJQklUKDEyKSAvKiBp
+bmRpY2F0ZXMgaWYgdGhlIERTUERNQSBpcyB1c2VkICovCj4+ID4gwqAjZGVmaW5lIFNETUFfSF9D
+T05GSUdfUlREX1BJTlMJQklUKDExKSAvKiBpbmRpY2F0ZXMgaWYgUmVhbC1UaW1lIERlYnVnIHBp
+bnMgYXJlIGVuYWJsZWQgKi8KPj4gPiDCoCNkZWZpbmUgU0RNQV9IX0NPTkZJR19BQ1IJQklUKDQp
+wqDCoC8qIGluZGljYXRlcyBpZiBBSEIgZnJlcSAvY29yZSBmcmVxID0gMiBvciAxICovCj4+IEBA
+IC0xOTM0LDYgKzE5MzcsMTEgQEAgc3RhdGljIGJvb2wgc2RtYV9maWx0ZXJfZm4oc3RydWN0IGRt
+YV9jaGFuIAo+PiAqY2hhbiwgdm9pZCAqZm5fcGFyYW0pCj4+ID4gwqAJaWYgKCFpbXhfZG1hX2lz
+X2dlbmVyYWxfcHVycG9zZShjaGFuKSkKPj4gPiDCoAkJcmV0dXJuIGZhbHNlOwo+PiDCoAo+PiA+
+ICsJLyogcmV0dXJuIGZhbHNlIGlmIGl0J3Mgbm90IHRoZSByaWdodCBkZXZpY2UgKi8KPj4gPiAr
+CWlmICgoc2RtYWMtPnNkbWEtPmRydmRhdGEgPT0gJnNkbWFfaW14OG1xKQo+PiA+ICsJCSYmIChz
+ZG1hYy0+c2RtYS0+aWR4ICE9IGRhdGEtPmlkeCkpCj4+ID4gKwkJcmV0dXJuIGZhbHNlOwo+PiAr
+Cj4+ID4gwqAJc2RtYWMtPmRhdGEgPSAqZGF0YTsKPj4gPiDCoAljaGFuLT5wcml2YXRlID0gJnNk
+bWFjLT5kYXRhOwo+PiDCoAo+PiBAQCAtMTk2MSw2ICsxOTY5LDcgQEAgc3RhdGljIHN0cnVjdCBk
+bWFfY2hhbiAqc2RtYV94bGF0ZShzdHJ1Y3QgCj4+IG9mX3BoYW5kbGVfYXJncyAqZG1hX3NwZWMs
+Cj4+ID4gwqAJwqAqIGJlIHNldCB0byBzZG1hYy0+ZXZlbnRfaWQxLgo+PiA+IMKgCcKgKi8KPj4g
+PiDCoAlkYXRhLmRtYV9yZXF1ZXN0MiA9IDA7Cj4+ID4gKwlkYXRhLmlkeCA9IHNkbWEtPmlkeDsK
+Pj4gwqAKPj4gPiDCoAlyZXR1cm4gZG1hX3JlcXVlc3RfY2hhbm5lbChtYXNrLCBzZG1hX2ZpbHRl
+cl9mbiwgJmRhdGEpOwo+PiDCoH0KPj4gQEAgLTIxNDksNiArMjE1OCw5IEBAIHN0YXRpYyBpbnQg
+c2RtYV9wcm9iZShzdHJ1Y3QgcGxhdGZvcm1fZGV2aWNlIAo+PiAqcGRldikKPj4gPiDCoAkJb2Zf
+bm9kZV9wdXQoc3BiYV9idXMpOwo+PiA+IMKgCX0KPj4gwqAKPj4gPiArCS8qIFRoZXJlIG1heWJl
+IG11bHRpIHNkbWEgZGV2aWNlcyBzdWNoIGFzIGkubXg4bXEgKi8KPj4gPiArCXNkbWEtPmlkeCA9
+IHNkbWFfZGV2X2lkeCsrOwo+PiArCj4+ID4gwqAJcmV0dXJuIDA7Cj4+IMKgCj4+IMKgZXJyX3Jl
+Z2lzdGVyOgo+PiBkaWZmIC0tZ2l0IGEvaW5jbHVkZS9saW51eC9wbGF0Zm9ybV9kYXRhL2RtYS1p
+bXguaCAKPj4gYi9pbmNsdWRlL2xpbnV4L3BsYXRmb3JtX2RhdGEvZG1hLWlteC5oCj4+IGluZGV4
+IDdkOTY0ZTc4NzI5OS4uODQzZmFmMDgxMjgyIDEwMDY0NAo+PiAtLS0gYS9pbmNsdWRlL2xpbnV4
+L3BsYXRmb3JtX2RhdGEvZG1hLWlteC5oCj4+ICsrKyBiL2luY2x1ZGUvbGludXgvcGxhdGZvcm1f
+ZGF0YS9kbWEtaW14LmgKPj4gQEAgLTU1LDYgKzU1LDcgQEAgc3RydWN0IGlteF9kbWFfZGF0YSB7
+Cj4+ID4gwqAJaW50IGRtYV9yZXF1ZXN0MjsgLyogc2Vjb25kYXJ5IERNQSByZXF1ZXN0IGxpbmUg
+Ki8KPj4gPiDCoAllbnVtIHNkbWFfcGVyaXBoZXJhbF90eXBlIHBlcmlwaGVyYWxfdHlwZTsKPj4g
+PiDCoAlpbnQgcHJpb3JpdHk7Cj4+ID4gKwlpbnQgaWR4Owo+PiDCoH07Cj4+IMKgCj4+IMKgc3Rh
+dGljIGlubGluZSBpbnQgaW14X2RtYV9pc19pcHUoc3RydWN0IGRtYV9jaGFuICpjaGFuKQoKCl9f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1r
+ZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpo
+dHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJu
+ZWwK
