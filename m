@@ -2,89 +2,126 @@ Return-Path: <SRS0=uP4V=P7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B778DC282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 16:53:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 04971C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 16:56:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 84D662085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 16:53:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C8D8E2085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 16:56:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sGHpVuew";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Qwp4sV2g"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84D662085A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G8Xx4ZEI";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="I5VEf+i5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C8D8E2085A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=partner.samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:References:MIME-Version:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Bz/vFNs0BDkpWN+BanszF2pDFPb17REWMsuswT03A2Q=; b=sGHpVuewM9jtab
-	FmnBFmvoznmATky1UaRo1tILfpoYVaSHWB6ypvCgjwRVGGssdICtt2XcqGV0DjblWLh3GPaHEHGdP
-	dfQAbdevA2WK7tG7ZTIG1TK2Dk/65pATlA3CTgPZ8N5O7+M+QD4FDe3CEI9Z/MM2cJ03XeFGRxcxf
-	9QSMHqZN4ppIz3QGBDzbkDhZTpA2OVcYnWYwbyzT5qS0s3pV32bRuvian4K3a8x2WWlw28Qgsl/mG
-	oSztcps12PDsjQ7fJXPcM5AS+oRc6kA8NeQ+LZtW8CJjRp6AR4qNBT32w1s3MHHhXk0AMCiRsnPBR
-	V07hQ+awKyU+T5y1Hz6Q==;
+	List-Owner; bh=FuNnGAmQ+J72vD9mXPt79KPzOcifdgVCO97XkFjIq/U=; b=G8Xx4ZEIVbanRX
+	pqxyogV/8VpuFUAaxkFWM9w6O3/OnGraTl1TXsWN70SojXEx1HFQiBF5bJ5sAAUv7FITKkxXRmczd
+	3wIjCY6RxCODY0JH/z4O/PalexKkqiBhPCU5nL5S23CE7KgfARk0O+NZ+vqoafFPGXhE6KtKxmA6Q
+	UQhqPQjcw1yq7z8zeNukU00qRi/wOMTgmVrkBUrs0TdNfpLTnR6N0mmxmpzWf3ym4FlYd1d+hTfqW
+	h5wsTGi1PGEQE4GrELOAcx32hb9YSQCkUIajyLBh3AvoRPME7MvQyEb4yIu2B9vhvMeBjutg8Xb1n
+	hap3e6I3YsboJDvMCMHw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmLlz-0007ls-DZ; Wed, 23 Jan 2019 16:53:07 +0000
-Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+	id 1gmLom-0001KF-OE; Wed, 23 Jan 2019 16:56:00 +0000
+Received: from mailout2.w1.samsung.com ([210.118.77.12])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmLlv-0007km-H3
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 16:53:05 +0000
-Received: by mail-it1-x141.google.com with SMTP id h193so65436ita.5
+ id 1gmLoj-0001Ig-5G
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 16:55:59 +0000
+Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
+ by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
+ 20190123165552euoutp0293175cc6ecd954faea50b76c6c77aca6~8iJavNVXR1410514105euoutp02P
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 23 Jan 2019 08:53:03 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=L1JadXm3gI7vuj3pOPP2vToMpxP3v/bmNdWI/GD7ZDE=;
- b=Qwp4sV2gW5k+CC/kpgsYJlEbT40wZztTQ9qcpOCl5sO/nk7LcmaZbe6Mm8TbFTZCIp
- OKhb0hTr32ResG4wdV09rJv4PX1fU+8pDLF1VoveHqup0Hn9183nHwT2/XNNnEcaEoX7
- pur30OvUFe1oqjAp01ayEA1NeQ1d3ROkLAC5M=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=L1JadXm3gI7vuj3pOPP2vToMpxP3v/bmNdWI/GD7ZDE=;
- b=XnOOF6gv6OFlit1YNszfsdOrDA8bPgBv6cKOAVCePDYhNYkRRv6YuXGq3XHuOcF8fd
- W16sRfigQfw8Z29zTVijn/evZmEvnnaIs+mcB8IC1uF5vKaQAkMssBiA7FiM7tXNMcw9
- GG/zbI2VvjOPm4w0drHb1LlTQZ/OBqNuAemqwEBWxaKBGlV6DFvDXd2PwuHHCPoreF2/
- RrEhQocy3Deg0xG/zy+rTUgGu2xIa2gEfGkBRtsd7AE3FjMNr8Ppx30kjfRfyYghTKZ6
- xNKafW+tbTHAqTDUVGFtxL+LHobnI7xKuLY+F3AsCeKidgRaDQb1vM/fGO9LVR8LgHYy
- i7Tw==
-X-Gm-Message-State: AJcUukd0sWbUsH9vJx517+tokFTouY+rHcUtB4Ri99c3AXubyPYPiC/p
- zU7sgRRlGXr6f9waVreNbgJtS/bhVmfu5klR0QavQg==
-X-Google-Smtp-Source: ALg8bN43cqtnAk758IT2QWYIax59jaGfRHK8IMhmhPmNy5zjVaCzT94TMb7R+eZnHZconZW2Xup6sVPuaNFlkmBe6NE=
-X-Received: by 2002:a24:710:: with SMTP id f16mr1797362itf.121.1548262382384; 
- Wed, 23 Jan 2019 08:53:02 -0800 (PST)
+ Wed, 23 Jan 2019 16:55:52 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
+ 20190123165552euoutp0293175cc6ecd954faea50b76c6c77aca6~8iJavNVXR1410514105euoutp02P
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1548262552;
+ bh=PzMg4GV1XDi6Y5SAe2HJT0Zvt3QmVJ+RidOcaZENDo4=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=I5VEf+i5T94R4VphrY2TtCQ6Z/e3NHZpR89R6WCP4fIfgdT5vFgwZUOmY69TH8dCV
+ h98n1cQRqpkAR3lV8BoPFnYDVhyV3UJyXsn7M4ujCgd30rM6jS3WsLfupnLZ9Vj0Tt
+ Acnb6WKdu51OlwoT9eyJ7xQWW3lk+QAmhJ1al5BM=
+Received: from eusmges3new.samsung.com (unknown [203.254.199.245]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTP id
+ 20190123165551eucas1p1efaadcf042c497005404751179695382~8iJZnypc72033420334eucas1p1o;
+ Wed, 23 Jan 2019 16:55:51 +0000 (GMT)
+Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
+ eusmges3new.samsung.com (EUCPMTA) with SMTP id 3C.42.04806.79C984C5; Wed, 23
+ Jan 2019 16:55:51 +0000 (GMT)
+Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTPA id
+ 20190123165550eucas1p1ab8721d90007c689f887d315c926a267~8iJY5rwk11659116591eucas1p1V;
+ Wed, 23 Jan 2019 16:55:50 +0000 (GMT)
+Received: from eusmgms1.samsung.com (unknown [182.198.249.179]) by
+ eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
+ 20190123165550eusmtrp1bc9b197397d15b335c8313f9568f3d17~8iJYq8_nf0321203212eusmtrp1K;
+ Wed, 23 Jan 2019 16:55:50 +0000 (GMT)
+X-AuditID: cbfec7f5-34dff700000012c6-82-5c489c973bd5
+Received: from eusmtip1.samsung.com ( [203.254.199.221]) by
+ eusmgms1.samsung.com (EUCPMTA) with SMTP id 78.32.04284.69C984C5; Wed, 23
+ Jan 2019 16:55:50 +0000 (GMT)
+Received: from AMDC3218.DIGITAL.local (unknown [106.120.51.18]) by
+ eusmtip1.samsung.com (KnoxPortal) with ESMTPA id
+ 20190123165549eusmtip1b5c1646435565180271e97619785c5cb~8iJYE9P840754507545eusmtip14;
+ Wed, 23 Jan 2019 16:55:49 +0000 (GMT)
+From: Kamil Konieczny <k.konieczny@partner.samsung.com>
+To: k.konieczny@partner.samsung.com
+Subject: [PATCH v2 1/3] arm64: dts: exynos: add SlimSSS for Exynos5433
+Date: Wed, 23 Jan 2019 17:55:31 +0100
+Message-Id: <20190123165533.29645-2-k.konieczny@partner.samsung.com>
+X-Mailer: git-send-email 2.20.0
+In-Reply-To: <20190123165533.29645-1-k.konieczny@partner.samsung.com>
 MIME-Version: 1.0
-References: <ccc775d3-3053-ab79-dac8-4feb28e8e690@daenzer.net>
- <CAKv+Gu-9VKL5RjScbKss4YfH1Cb8WbXmzU_0UsStnoXJcML7Rg@mail.gmail.com>
- <850b6aee-0040-c333-b125-45211c18ada5@daenzer.net>
- <CAKv+Gu99zHqcQtj6TiOXAr3Qa6WWhKem+DHVA_mAQ0-Bc0Vbqw@mail.gmail.com>
- <047667fd-17be-1c37-5d2a-26768cfd6ab8@daenzer.net>
- <CAKv+Gu_VBd8agHASc5RS0eCgyXP64Lt_i4yPuBjKwGQ+5Lpd5Q@mail.gmail.com>
- <CADnq5_O1uxCrSksfF127AZTfbmdukxmqGdh2Ee0zM6CqgG_Mhg@mail.gmail.com>
- <CAKv+Gu-4uYh_HD_5Ry_L80Nf5zpRhT4oJYhhG5_8g3gSzBs2tg@mail.gmail.com>
- <20190123071521.GB20526@infradead.org>
- <CAKv+Gu8+77uZHJ6ZYjGNcKQL8C3cT5Ree+TcTVmkQXAHV-ADyg@mail.gmail.com>
- <20190123164428.GA9367@infradead.org>
-In-Reply-To: <20190123164428.GA9367@infradead.org>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Wed, 23 Jan 2019 17:52:50 +0100
-Message-ID: <CAKv+Gu-9vEKu8mG-o+-4M1ZcgZmTTJVfEdNS9R27AFX8P5sqyQ@mail.gmail.com>
-Subject: Re: [RFC PATCH] drm: disable WC optimization for cache coherent
- devices on non-x86
-To: Christoph Hellwig <hch@infradead.org>
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFtrCKsWRmVeSWpSXmKPExsWy7djPc7rT53jEGNyYzWuxccZ6Vov5R86x
+ WvTt+89o0f/4NbPF+fMb2C02Pb7GanF51xw2ixnn9zFZrD1yl91i6fWLTBate4+wO3B7rJm3
+ htFj06pONo/NS+o9Dr7bw+TRt2UVo8fnTXIBbFFcNimpOZllqUX6dglcGfOm72Is6OeoaL26
+ iLWB8SlbFyMnh4SAicTqO1vZuxi5OIQEVjBKrLz0hRXC+cIocfbKNKjMZ6DMh/3sMC3LV15k
+ BbGFBJYzSjzbbwzXce36NxaQBJuAucSj7WeYQGwRAWWJyfemM4MUMQv8Z5JYeGcJ2HJhATeJ
+ l5dBpnJwsAioSixeyAcS5hVwkdjz9gsLxDJ5iWmru5hASjgFXCU6f4VBlAhKnJz5BKyEGaik
+ eetssPESAtvYJT6saGCF6HWR2D+3BcoWlnh1fAvUAzISpyf3QM0vl9i99Rk7RHMLo8TcyYuY
+ IBLWEoePg3zJAbRBU2L9Ln0QU0LAUaLpWwmEySdx460gxAl8EpO2gXwIEuaV6GgTgpihKzHv
+ /xmoA6Qluv6vg7I9JJq71rFMYFScheSZWUiemYWwdgEj8ypG8dTS4tz01GLjvNRyveLE3OLS
+ vHS95PzcTYzAtHT63/GvOxj3/Uk6xCjAwajEw7shzyNGiDWxrLgy9xCjBAezkgiv60W3GCHe
+ lMTKqtSi/Pii0pzU4kOM0hwsSuK81QwPooUE0hNLUrNTUwtSi2CyTBycUg2MKpZFb60tPRfl
+ ThbUuXrwF2dKs9Ce+M2zX84TneXUeJnvw/7/wuxaHNdeZk/Pl6rZFjnfPHC79fa01/FbZkfI
+ M+V7M3iKdEnPOr333dUn1vfN+r5tS7a1evCAOWiuoeBBb81pzvHTr9ZkL9gQb+ATuP/d0cs+
+ L7/9idqrFhTXw//a5wuzxitzJZbijERDLeai4kQATru5mEcDAAA=
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFlrCIsWRmVeSWpSXmKPExsVy+t/xu7rT5njEGLReFrfYOGM9q8X8I+dY
+ Lfr2/We06H/8mtni/PkN7BabHl9jtbi8aw6bxYzz+5gs1h65y26x9PpFJovWvUfYHbg91sxb
+ w+ixaVUnm8fmJfUeB9/tYfLo27KK0ePzJrkAtig9m6L80pJUhYz84hJbpWhDCyM9Q0sLPSMT
+ Sz1DY/NYKyNTJX07m5TUnMyy1CJ9uwS9jHnTdzEW9HNUtF5dxNrA+JSti5GTQ0LARGL5yous
+ XYxcHEICSxklTq75wQ6RkJZoPL2aCcIWlvhzrYsNougTo8TjLcvAitgEzCUebT8DViQioCwx
+ +d50ZpAiZoF2Zok1u7eBrRAWcJN4eXk/UAMHB4uAqsTihXwgYV4BF4k9b7+wQCyQl5i2uosJ
+ pIRTwFWi81cYSFgIqOT5gS+sEOWCEidnPgErZwYqb946m3kCo8AsJKlZSFILGJlWMYqklhbn
+ pucWG+oVJ+YWl+al6yXn525iBMbQtmM/N+9gvLQx+BCjAAejEg/vhjyPGCHWxLLiytxDjBIc
+ zEoivK4X3WKEeFMSK6tSi/Lji0pzUosPMZoCvTCRWUo0OR8Y33kl8YamhuYWlobmxubGZhZK
+ 4rznDSqjhATSE0tSs1NTC1KLYPqYODilGhh1V5fce1I4vTuJ7yl32affN2btOlrZy2T1YGIc
+ Q2aICrfpTE8PN96OV4dErscu360ZYSeUdGvP2mkn/A0EOGXzRNUnrGLXM6xJ/MB7pMBoQmjW
+ lzdrP9WyGd2u2mDf3KdwsCv+hE6i0D/GZRqbFBe63Vx4s6jxZuFc3ttG/luv1190nb/KRVyJ
+ pTgj0VCLuag4EQB8ujhdtwIAAA==
+X-CMS-MailID: 20190123165550eucas1p1ab8721d90007c689f887d315c926a267
+X-Msg-Generator: CA
+X-RootMTR: 20190123165550eucas1p1ab8721d90007c689f887d315c926a267
+X-EPHeader: CA
+CMS-TYPE: 201P
+X-CMS-RootMailID: 20190123165550eucas1p1ab8721d90007c689f887d315c926a267
+References: <20190123165533.29645-1-k.konieczny@partner.samsung.com>
+ <CGME20190123165550eucas1p1ab8721d90007c689f887d315c926a267@eucas1p1.samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_085303_577169_0266B63A 
-X-CRM114-Status: GOOD (  20.91  )
+X-CRM114-CacheID: sfid-20190123_085557_504535_88792E7F 
+X-CRM114-Status: GOOD (  12.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,164 +133,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
- Michael Ellerman <mpe@ellerman.id.au>,
- =?UTF-8?Q?Michel_D=C3=A4nzer?= <michel@daenzer.net>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- amd-gfx list <amd-gfx@lists.freedesktop.org>,
- Junwei Zhang <Jerry.Zhang@amd.com>, David Airlie <airlied@linux.ie>,
- Huang Rui <ray.huang@amd.com>, dri-devel <dri-devel@lists.freedesktop.org>,
- Alex Deucher <alexdeucher@gmail.com>, Alex Deucher <alexander.deucher@amd.com>,
- Sean Paul <sean@poorly.run>, Christian Koenig <christian.koenig@amd.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ linux-samsung-soc@vger.kernel.org,
+ Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+ linux-kernel@vger.kernel.org, Krzysztof Kozlowski <krzk@kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, Kukjin Kim <kgene@kernel.org>,
+ linux-arm-kernel@lists.infradead.org,
+ Marek Szyprowski <m.szyprowski@samsung.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 23 Jan 2019 at 17:44, Christoph Hellwig <hch@infradead.org> wrote:
->
-> I think we just want a driver-local check for those combinations
-> where we know this hack actually works, which really just seems
-> to be x86-64 with PAT. Something like the patch below, but maybe with
-> even more strong warnings to not do something like this elsewhere:
->
+Add DT node for SlimSSS (aka Slim SecuritySubSystem) in Exynos5433 SoC.
+The users can use compatibility "samsung,exynos5433-slim-sss".
 
-I agree that your patch seems like the right way to ensure that the WC
-optimization hack is only used where we know it works.
+Signed-off-by: Kamil Konieczny <k.konieczny@partner.samsung.com>
+---
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-But my concern is that it seems likely that non-cache coherent
-implementations are relying on this hack as well. There must be a
-reason that this hack is only disabled for PowerPC platforms if they
-are cache coherent, for instance, and I suspect that that reason is
-that the hack is the only thing ensuring that the CPU mapping
-attributes match the device ones used for these buffers (the vmap()ed
-ones), whereas the rings and other consistent data structures are
-using the DMA API as intended, and thus getting uncached attributes in
-the correct way.
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+index e7cd3b67d818..9e5fcb6c7776 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+@@ -559,6 +559,15 @@
+ 				<&cmu_top CLK_DIV_ACLK_IMEM_200>;
+ 		};
+ 
++		slim_sss: slim-sss@11140000 {
++			compatible = "samsung,exynos5433-slim-sss";
++			reg = <0x11140000 0x1000>;
++			interrupts = <GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH>;
++			clock-names = "aclk", "pclk";
++			clocks = <&cmu_imem CLK_ACLK_SLIMSSS>,
++				 <&cmu_imem CLK_PCLK_SLIMSSS>;
++		};
++
+ 		pd_gscl: power-domain@105c4000 {
+ 			compatible = "samsung,exynos5433-pd";
+ 			reg = <0x105c4000 0x20>;
+-- 
+2.20.0
 
-Given that the same concern applies to ARM (and arm64 to some extent),
-I'd be cautious to disable this optimization entirely, and this is why
-I ended up disabling it only for cache coherent devices.
-
-
-
-
-> diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_object.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_object.c
-> index 728e15e5d68a..5fe657f20232 100644
-> --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_object.c
-> +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_object.c
-> @@ -456,33 +456,16 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
->
->         bo->flags = bp->flags;
->
-> -#ifdef CONFIG_X86_32
-> -       /* XXX: Write-combined CPU mappings of GTT seem broken on 32-bit
-> -        * See https://bugs.freedesktop.org/show_bug.cgi?id=84627
-> -        */
-> -       bo->flags &= ~AMDGPU_GEM_CREATE_CPU_GTT_USWC;
-> -#elif defined(CONFIG_X86) && !defined(CONFIG_X86_PAT)
-> -       /* Don't try to enable write-combining when it can't work, or things
-> -        * may be slow
-> -        * See https://bugs.freedesktop.org/show_bug.cgi?id=88758
-> -        */
-> -
-> -#ifndef CONFIG_COMPILE_TEST
-> -#warning Please enable CONFIG_MTRR and CONFIG_X86_PAT for better performance \
-> -        thanks to write-combining
-> -#endif
-> -
-> -       if (bo->flags & AMDGPU_GEM_CREATE_CPU_GTT_USWC)
-> -               DRM_INFO_ONCE("Please enable CONFIG_MTRR and CONFIG_X86_PAT for "
-> -                             "better performance thanks to write-combining\n");
-> -       bo->flags &= ~AMDGPU_GEM_CREATE_CPU_GTT_USWC;
-> -#else
-> -       /* For architectures that don't support WC memory,
-> -        * mask out the WC flag from the BO
-> +       /*
-> +        * Don't try to enable write-combined CPU mappings unless we 100%
-> +        * positively know it works, otherwise there may be dragons.
-> +        *
-> +        * See:
-> +        *  - https://bugs.freedesktop.org/show_bug.cgi?id=88758
-> +        *  - https://bugs.freedesktop.org/show_bug.cgi?id=84627
->          */
-> -       if (!drm_arch_can_wc_memory())
-> +       if (!(IS_ENABLED(CONFIG_X86_64) && IS_ENABLED(CONFIG_X86_PAT)))
->                 bo->flags &= ~AMDGPU_GEM_CREATE_CPU_GTT_USWC;
-> -#endif
->
->         bo->tbo.bdev = &adev->mman.bdev;
->         amdgpu_bo_placement_from_domain(bo, bp->domain);
-> diff --git a/drivers/gpu/drm/radeon/radeon_object.c b/drivers/gpu/drm/radeon/radeon_object.c
-> index 833e909706a9..c1fb5ad4ab9a 100644
-> --- a/drivers/gpu/drm/radeon/radeon_object.c
-> +++ b/drivers/gpu/drm/radeon/radeon_object.c
-> @@ -226,32 +226,17 @@ int radeon_bo_create(struct radeon_device *rdev,
->         if (rdev->family >= CHIP_RV610 && rdev->family <= CHIP_RV635)
->                 bo->flags &= ~(RADEON_GEM_GTT_WC | RADEON_GEM_GTT_UC);
->
-> -#ifdef CONFIG_X86_32
-> -       /* XXX: Write-combined CPU mappings of GTT seem broken on 32-bit
-> -        * See https://bugs.freedesktop.org/show_bug.cgi?id=84627
-> -        */
-> -       bo->flags &= ~(RADEON_GEM_GTT_WC | RADEON_GEM_GTT_UC);
-> -#elif defined(CONFIG_X86) && !defined(CONFIG_X86_PAT)
-> -       /* Don't try to enable write-combining when it can't work, or things
-> -        * may be slow
-> -        * See https://bugs.freedesktop.org/show_bug.cgi?id=88758
-> -        */
-> -#ifndef CONFIG_COMPILE_TEST
-> -#warning Please enable CONFIG_MTRR and CONFIG_X86_PAT for better performance \
-> -        thanks to write-combining
-> -#endif
->
-> -       if (bo->flags & RADEON_GEM_GTT_WC)
-> -               DRM_INFO_ONCE("Please enable CONFIG_MTRR and CONFIG_X86_PAT for "
-> -                             "better performance thanks to write-combining\n");
-> -       bo->flags &= ~(RADEON_GEM_GTT_WC | RADEON_GEM_GTT_UC);
-> -#else
-> -       /* For architectures that don't support WC memory,
-> -        * mask out the WC flag from the BO
-> +       /*
-> +        * Don't try to enable write-combined CPU mappings unless we 100%
-> +        * positively know it works, otherwise there may be dragons.
-> +        *
-> +        * See:
-> +        *  - https://bugs.freedesktop.org/show_bug.cgi?id=88758
-> +        *  - https://bugs.freedesktop.org/show_bug.cgi?id=84627
->          */
-> -       if (!drm_arch_can_wc_memory())
-> -               bo->flags &= ~RADEON_GEM_GTT_WC;
-> -#endif
-> +       if (!(IS_ENABLED(CONFIG_X86_64) && IS_ENABLED(CONFIG_X86_PAT)))
-> +               bo->flags &= ~(RADEON_GEM_GTT_WC | RADEON_GEM_GTT_UC);
->
->         radeon_ttm_placement_from_domain(bo, domain);
->         /* Kernel allocation are uninterruptible */
-> diff --git a/include/drm/drm_cache.h b/include/drm/drm_cache.h
-> index bfe1639df02d..6c3960f4c477 100644
-> --- a/include/drm/drm_cache.h
-> +++ b/include/drm/drm_cache.h
-> @@ -40,16 +40,4 @@ void drm_clflush_sg(struct sg_table *st);
->  void drm_clflush_virt_range(void *addr, unsigned long length);
->  u64 drm_get_max_iomem(void);
->
-> -
-> -static inline bool drm_arch_can_wc_memory(void)
-> -{
-> -#if defined(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
-> -       return false;
-> -#elif defined(CONFIG_MIPS) && defined(CONFIG_CPU_LOONGSON3)
-> -       return false;
-> -#else
-> -       return true;
-> -#endif
-> -}
-> -
->  #endif
->
 
 _______________________________________________
 linux-arm-kernel mailing list
