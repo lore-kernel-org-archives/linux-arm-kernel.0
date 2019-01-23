@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 95968C282C5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 08:17:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BC6EFC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 08:17:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 61F7D21726
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 08:17:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7F613217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 08:17:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M9GYW+Qq";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="K6EBjYH4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 61F7D21726
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FTNtdi0V";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="sksD1Jfy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7F613217F5
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,42 +26,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NwXe0Bg4OMAqSLbCYPoA3TgKLzyxO/ofQ6QY7GnTrf4=; b=M9GYW+QqG1nh2U
-	7RtqPHiMAXCw+6qdDv1Z1Iz7eGBnpYuorBtYHQyqhHAMjtGfgm55k52ku8AQ5tzqySbfa1qUgGSXG
-	clAmv8E7jNzYSXehrxD/0n0M0b6hiE3ZfAXXH3+D8JvZAHRShpvXqIM+91C4Y+qqn9Ehjah/+9YKr
-	K6RXnldfSjIVpafAlBDeS1591/zhzw94EcwEWcSs99fic+zpQAaKMmUnXpNXK4DqNfs9hIB+bI7Qw
-	6X8nIN4Z1Wp4wh8T43J+/g0pQy44mpw44f1g6IBDJEQMY+c3d1tQ5j2XH2StSWIMSgi784m726ZZz
-	2XNutZU7+J80DdOrubJA==;
+	List-Owner; bh=HPsmR2VuGmVKypmKHjir05W/f1Pgi/HmpdPC0Pu86EM=; b=FTNtdi0VGAkBZH
+	hCqpXcy/ctrV+9nPB91c/GrcgfPxKElF0SZxwL1cdGQ2cYPMbPAZGc6Rw5nt/LpeUz8kMSFAJyaMW
+	Seh2PVOr+RtBTWfHK1yVqJELCQBxcwqbQg7mkimJZQ/2qHXuUAb9cy43E2j+YI40riaoIMltZ2jNT
+	k6wW7cH2aJ4zDXoJvnlOShfgxhavC7xMHuoaDxIPkIfh3gtEY39LLVx9Ve2ipy65ef2dlOSnmVvTg
+	kdnLVib7kNOjA2uFqhWsEbdn8r3lJcb3CkfEd3MRXhdcHxmxaLBu4U2RslOyFq8omrbBnn4RIFaoh
+	7WagORbLyc62pUtbcEbw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmDiZ-0004qh-9L; Wed, 23 Jan 2019 08:17:03 +0000
-Received: from mail-ve1eur01on0606.outbound.protection.outlook.com
- ([2a01:111:f400:fe1f::606]
- helo=EUR01-VE1-obe.outbound.protection.outlook.com)
+	id 1gmDin-000549-4w; Wed, 23 Jan 2019 08:17:17 +0000
+Received: from mail-ve1eur03on061b.outbound.protection.outlook.com
+ ([2a01:111:f400:fe09::61b]
+ helo=EUR03-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmDiH-0004LZ-RV
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 08:16:47 +0000
+ id 1gmDiO-0004YX-WA
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 08:16:57 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=my6PkXqEDL51lPUB4QH1PsIQooA6ziS1Wj4ZvbZdUnM=;
- b=K6EBjYH46kXNJv+Ara6Yhkr7flG0Fo1+Po095FO0SfI6hanGeBG7ktgkZ6f5IEORAXyPzgUZA8Np7yOiMTZGRb+vbxXylB+GSYfsacgkLXWpFfSazv6eoYtIcpmLONaDH8CYFcBajiIMNYBJtWFBYugPovdhI8D7xN9bQUKY2aM=
+ bh=ys6mu1Ibz5SI6qFInUSDmmjwhAHT2+USmTN32C3cG2o=;
+ b=sksD1Jfyr3dn6VYJAX59BeoBbm331ySF7bMK/Obno9Jg2rZLXHlZ0Hb46DT8oI4dscVpaJiiwTfdCI1AY8HNYNv6iw7u02tEqukbcf/sCUoyMFEnTvyuRJWrbL89pnqtjf/Cc9yITr2Z+blBWU72SyRPiFRFXioizDl2ZaBVDrI=
 Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
- AM0PR04MB4482.eurprd04.prod.outlook.com (52.135.148.144) with Microsoft SMTP
+ AM0PR04MB5027.eurprd04.prod.outlook.com (20.177.40.144) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1537.30; Wed, 23 Jan 2019 08:16:44 +0000
+ 15.20.1537.29; Wed, 23 Jan 2019 08:16:48 +0000
 Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
  ([fe80::c4d2:7dfd:4576:bdd5]) by AM0PR04MB4211.eurprd04.prod.outlook.com
  ([fe80::c4d2:7dfd:4576:bdd5%5]) with mapi id 15.20.1558.016; Wed, 23 Jan 2019
- 08:16:44 +0000
+ 08:16:48 +0000
 From: Aisheng Dong <aisheng.dong@nxp.com>
 To: "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>
-Subject: [PATCH V2 1/5] dt-bindings: fsl: scu: add fallback compatible string
- for clock
-Thread-Topic: [PATCH V2 1/5] dt-bindings: fsl: scu: add fallback compatible
- string for clock
-Thread-Index: AQHUsvP5vkju9pZWG0y0vnLUJ2sC7A==
-Date: Wed, 23 Jan 2019 08:16:43 +0000
-Message-ID: <1548231044-4344-2-git-send-email-aisheng.dong@nxp.com>
+Subject: [PATCH V2 2/5] dt-bindings: fsl: scu: add imx8qm scu clock support
+Thread-Topic: [PATCH V2 2/5] dt-bindings: fsl: scu: add imx8qm scu clock
+ support
+Thread-Index: AQHUsvP8X/dhlMUaA0qet1jV/9hRHg==
+Date: Wed, 23 Jan 2019 08:16:48 +0000
+Message-ID: <1548231044-4344-3-git-send-email-aisheng.dong@nxp.com>
 References: <1548231044-4344-1-git-send-email-aisheng.dong@nxp.com>
 In-Reply-To: <1548231044-4344-1-git-send-email-aisheng.dong@nxp.com>
 Accept-Language: zh-CN, en-US
@@ -72,42 +71,44 @@ x-mailer: git-send-email 2.7.4
 x-clientproxiedby: HK2PR0302CA0020.apcprd03.prod.outlook.com
  (2603:1096:202::30) To AM0PR04MB4211.eurprd04.prod.outlook.com
  (2603:10a6:208:66::21)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
 x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM0PR04MB4482;
- 6:7NgtfLy45HsZbDr+x2jEdj6rOrtCcmiCmRM43+2zSIzrx6eki1q5gu1Ny8yw71iTJ+NMZrb41DWgibL+YTj+Xb7WCEUHl4Bxf23LQS4TJY4JpituKUv7YAgdLotLKoVRLvr/5fcMWaQk/I8sFBImrADKiM277KlHPkYhBoxLcXWc4QF4qJrL4/tNc1ZN8lOQjEgtLQq8W7t2X4qKwiW//evJKM+kdfGTF/BYCXJBeno9LieXgYW3LwG8XwwOi2ZoI9VE6ZDsgA9XT8ED3EWtPGK+1u+0hFLSsL9dLoIpxBIeSKO7jWlPlkHK/mAp3Bk/QGs+9OiP9FWvHzGxmM/GP/e/8rATW6I7WyIUuaOS5/eObp4xiovgmrH+VVDiF3TQaGWHnPJQY2CWiqtBsqSPOjhWHBukWPNZFqxWIaKUQvl1ZADFr/8blt7C2hohWzexAk+2MhfsVOHuTLBiVaJJPw==;
- 5:KXZ7NALBSfUh5vLd3rkbfWqQvSsihSeIgmt3Z2QyouvSuz+G+5OPQ1xnZZWEkNMB0Bsq2WbsCpd0xGU6nK9vxlPgCtm4BaZNkYAMeyOzITaj4cxgIboXwWJH2AezU55lyHbvmuBV5hHaTvFi41W7Mz5IbyhWPNWNyUS613hBAA8G90PldpCEW+0V1RIXuhn6JMyH68/tyBbbJDUG5Y3vbw==;
- 7:Sy6TdyHt08vaq6WFf/qdpWC9DHx2l/Ml3nEBDHuioBv4dApCMkc19ZPklCT4zmEaze6Z0XODi7ukVp5Y9rmHbj1wqBBeittEu81CvkTknrOkknXTayAtvvPmOQZgdidEdgWWavGVtbtTfHxobSA83A==
-x-ms-office365-filtering-correlation-id: 76582ca3-7188-4cf2-3573-08d6810b1c35
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB5027;
+ 6:KPxnFgE7cVQhx6DaL0DoGXwZbjxCxAoG0QwU5TG57CuWik9j5KgK9Hm8UQBSm8hrQ+bAWbvS+qDSJoVRTVv/EqaPj2mQ4TLgp5gA/EEmBrXagws6jgAVZE6ypvyehn8MHDd8KtXej2v2AWISmnNzGkGwEZ0IioYG9tlH52mkjIpTiuFL9TcEqfoixYljkY2TebDrEAA26aPUi2mH0QrnxzIinWbxUWoMEE6UQx6w5SpLnkv38h1JGjWfLyGCn9KhbfETvuoDLj/7ZVrAdbSnstCrs1zMzRWn9t51ZnV+02paM5576DMtezDYg6Qu0Jv5/MVB1Cq9Gmc/ujlTT8DQ8q0TmLgODLPMaw/9t4D+auWI3lGQGUoH3Agte1lOlPK3WPMm/Ub+095FGkBE/P2s/n3fXKg+YSqS4jDoO8XbEyHjH/QO5EsUnx+A8hKZCnQzxzSHJlKoUKM+DwYQVR5Wmw==;
+ 5:pQMRP7q4ebqA/zOXEyyB1A7+8N56ZVu/Hdj76bPXFQAryiEWDE0UV6n00slxY6g+QIvWgvUjUfAJVQd8hRpdSWza7BS6LzrWQyjqd9+02Of5chS/dKnGqH4vX685P8zsxsyKX2RddFi+qrakBut2W9Mqsgblsfc+i/2mCobQfgwwS95JHXt1xm9HHWz17RIIC9Fyoz32f5S+hiMaSXVwkg==;
+ 7:4jVYsc6Zzi8elva84xbjwgi+yJAdTfeTzl1BaKH9d84yp0omJOcPlfOJ6e0LwjAH5Qk84OC3ChNN9XKNAbx4NzD1kq+prurl8bUby0SwtXAUX9FRHNqDJ+eBdcso3QlOZsNStBLbEBPWeYBQkbpY9Q==
+x-ms-office365-filtering-correlation-id: 3e2742fc-435f-4b89-cbea-08d6810b1eb1
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605077)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:AM0PR04MB4482; 
-x-ms-traffictypediagnostic: AM0PR04MB4482:
-x-microsoft-antispam-prvs: <AM0PR04MB4482C60FAFD90417FD2F426980990@AM0PR04MB4482.eurprd04.prod.outlook.com>
+ SRVR:AM0PR04MB5027; 
+x-ms-traffictypediagnostic: AM0PR04MB5027:
+x-microsoft-antispam-prvs: <AM0PR04MB50272902FEF92DD4C6C93B3E80990@AM0PR04MB5027.eurprd04.prod.outlook.com>
 x-forefront-prvs: 0926B0E013
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(39860400002)(346002)(376002)(396003)(366004)(189003)(199004)(8936002)(2501003)(50226002)(86362001)(81166006)(81156014)(8676002)(305945005)(7736002)(478600001)(14454004)(66066001)(25786009)(4326008)(97736004)(6916009)(6512007)(53936002)(106356001)(6116002)(3846002)(386003)(6506007)(105586002)(2351001)(26005)(102836004)(54906003)(68736007)(256004)(99286004)(446003)(2616005)(6346003)(76176011)(71200400001)(71190400001)(52116002)(6436002)(476003)(6486002)(316002)(44832011)(2906002)(486006)(11346002)(36756003)(5640700003)(186003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB4482;
+ SFS:(10009020)(346002)(376002)(366004)(136003)(39860400002)(396003)(189003)(199004)(478600001)(8936002)(50226002)(11346002)(106356001)(105586002)(2906002)(486006)(99286004)(97736004)(44832011)(68736007)(36756003)(305945005)(54906003)(446003)(81166006)(81156014)(66066001)(102836004)(316002)(5640700003)(6436002)(8676002)(26005)(7736002)(186003)(2616005)(386003)(6506007)(6486002)(86362001)(4326008)(3846002)(6116002)(53936002)(14454004)(52116002)(71200400001)(256004)(6512007)(76176011)(2501003)(71190400001)(4744005)(25786009)(6916009)(476003)(2351001)(32563001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5027;
  H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=aisheng.dong@nxp.com; 
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: lhMr/XSPUFLZrQQLrVaoLpXgS/gBlM0G3ys0LebYWl5stLvxEvPNBBgr8KtioIgVbQED/Z7JYDS4EtqUrnrlvNGfKKmqrGVFaP3H7elOD2hXRyjcThXEQYGziOH89njOiyuU7qcWiAUyRede9YLTkSrRiceIZJj9dzUx3PJVPHXnY/izcUGUYQ5PqZdRT/yMHGO06QL8ufiDVVEIgjClKEwAHY9EC6pVXIEFakaAV/0A0HsC1rmxEu8J83lta4w8IMGjAGwuomEH6Ar0w4YrJIAe9ZjXEVWhAnxjtGFbiu87D49YQ92q/SjLq06bI21AEe6VpBOUH8C/hLMm+2mZD4wv4TDiCAG8fnQZXlgAfIYHEzmJGEhvin80UpWVKVLYU/2hsQoHY4ZovP89FkSyFZq4t1Z1CUt8ODiVTNnS/TU=
+x-microsoft-antispam-message-info: Ohxa50whz/2G5qAA7vXGfjbQk9SG6Rwy8Sr/l3My2VAtUl7g9vvLWT0u97RHa6lBa9mBeyJ1dbAW/FvEE5CZbI0IiINd9Jnkqp1FUATZaL+/JWiuR5+qwaDyJBtyHzbBFRYfUD/5Mr4QSwtisd2yVZZYfIK5peBAt99OHibPoIaJt6MYP9IYz0tNFR1V5AXG72OLF6oyObcaH/DyXtTPrQL/Wkth6upEHqGg+pdEiu0iX+Swq4zGUfd2RsDjT2QwJaySEzEt0J1vsN/PC28lU2YUECUfUiqdRBt7gXmPvAUVS7RGBiMZYWiDK6HEqPvL/lNv9pauiWk48gYHjzG/hBURabRFCfDScBFvEPaJwi9ploWISw+Y4UlbGzH24mdtMnrMREqCKEIFbYaAZtUtFdStwuE3LfTRsDrMZ8ecWfk=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 76582ca3-7188-4cf2-3573-08d6810b1c35
-X-MS-Exchange-CrossTenant-originalarrivaltime: 23 Jan 2019 08:16:39.8979 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 3e2742fc-435f-4b89-cbea-08d6810b1eb1
+X-MS-Exchange-CrossTenant-originalarrivaltime: 23 Jan 2019 08:16:44.3090 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB4482
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5027
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_001645_887876_F1736450 
-X-CRM114-Status: GOOD (  12.32  )
+X-CRM114-CacheID: sfid-20190123_001653_580154_5FDA4A8C 
+X-CRM114-Status: GOOD (  11.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -133,9 +134,7 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SCU clock can be used in a similar way by IMX8QXP and IMX8QM SoCs.
-Let's add a "fsl,scu-clk" fallback compatible string to allow other
-SoCs to reuse the common part.
+Add imx8qm scu clock support
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Sascha Hauer <kernel@pengutronix.de>
@@ -145,33 +144,21 @@ Acked-by: Stephen Boyd <sboyd@kernel.org>
 Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-index fd2bed2..6b4e24a 100644
+index 6b4e24a..72d481c 100644
 --- a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
 +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-@@ -74,7 +74,9 @@ Clock bindings based on SCU Message Protocol
- This binding uses the common clock binding[1].
+@@ -75,6 +75,7 @@ This binding uses the common clock binding[1].
  
  Required properties:
--- compatible:		Should be "fsl,imx8qxp-clock".
-+- compatible:		Should be one of:
-+			  "fsl,imx8qxp-clock"
-+			followed by "fsl,scu-clk"
+ - compatible:		Should be one of:
++			  "fsl,imx8qm-clock"
+ 			  "fsl,imx8qxp-clock"
+ 			followed by "fsl,scu-clk"
  - #clock-cells:		Should be 1. Contains the Clock ID value.
- - clocks:		List of clock specifiers, must contain an entry for
- 			each required entry in clock-names
-@@ -141,7 +143,7 @@ firmware {
- 			  &lsio_mu1 1 3>;
- 
- 		clk: clk {
--			compatible = "fsl,imx8qxp-clk";
-+			compatible = "fsl,imx8qxp-clk", "fsl,scu-clk";
- 			#clock-cells = <1>;
- 		};
- 
 -- 
 2.7.4
 
