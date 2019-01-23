@@ -2,83 +2,84 @@ Return-Path: <SRS0=uP4V=P7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 00A86C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 09:46:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 961E1C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 10:05:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C020E21726
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 09:46:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 62C5A20870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 10:05:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SJV3lAgQ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="M+JVMwYz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C020E21726
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XEbXhTff";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="mMpXGkUh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 62C5A20870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=Hbj40sqD5nwhVehhKqEjzCwDWCyaw1Im70RdyDlhKsI=; b=SJV3lAgQO3bbx2
-	7Gx6zXxiDH+015HlzKeMP1M840Ad/T3OyvtotRYiUDqYj6StN6781q4fFEvzeI7z4h794/NrWDfpA
-	4xneBE0ND9gyldRADzrj5SGMHD5Dnsck7M3jH8yQg6m+vAnTFygltuA9XmzyW8V/O9LK+EcQJbReD
-	bC7rnf7yCA7NqDH6ZR/DxdUmjY1XQfLdTcJvWaAl/LOlREaW5UJ802iv/HKhSraplgeEtL4WdFhW0
-	d89opWKgeoMShAIRVQIOJco5yZYryXUlQ9xXAMJSBht5cZXKyB8ac9MtNjl/XTHTcuAqVW/x/F5Sx
-	RoQ0KDOqz/CkMpw7L9ZA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=AHXDRKLuwkYcjfZXbO7hA3rdH67uxtfOOQG84mR4TCw=; b=XEbXhTffzvsV37
+	dSp/EbbexWWw/ZOsOoEkL7coGRYr7NZekyu69AQa9oJLIqxFSPTx/rpcSOGqlBX3oUvKsUuCWZBDS
+	pgpWKWxW8Q76AwuWXKXcUCi+atAcDFy2io8w5jfpFK6QeaRLNyHZI9pLPaHzj6n64vhFrNuya/X6z
+	lx8Dg/YwuSSQpwoXkdr6z4XXdBo+Bgnal4BtNxmEK+2SC0W3Kxum5fxi0NQOFB1WIXHySoPZ+taeO
+	J5vEBYfpc9/TCfRtnRx2OvDvTtLuXWe+hQVCqEILaGw4KL4WS19G1Xg5A6HPuM4HmJQ5/qtkk4qdh
+	Ae3fbkx94PFxUBdjVwWA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmF6u-0000ox-21; Wed, 23 Jan 2019 09:46:16 +0000
-Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+	id 1gmFPP-0008E6-Kq; Wed, 23 Jan 2019 10:05:23 +0000
+Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmF61-0008M2-R6
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 09:45:44 +0000
-Received: by mail-lf1-x143.google.com with SMTP id p6so1113900lfc.1
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 23 Jan 2019 01:45:21 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=jCwy19gvONCms0Iip74vbO+jVOpw+NqoLYi9ctNdD84=;
- b=M+JVMwYzNFcvaW2UmJXch4SIv+pUI7xwv8I+MKNrE+dL0/MY1rqRfihGKefST+5Gds
- xfUlitQkyd/KAjQ0h10K1q0GKNf3MSVwlg+PuYscFZSIc5lM2F9R7VulUWrfwCuhuoef
- pR0flO+ww22pXu50qpNisY/EhRYFXKZ28sUDg=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=jCwy19gvONCms0Iip74vbO+jVOpw+NqoLYi9ctNdD84=;
- b=Ytbn+QW9ucT9XnGun9KkLiULDsnyYgvtjDRxR+/oIXDaggl9vGc+5QyTzfBHo8yXik
- XdQ0IZ2DBU5uHWSF/oIeMTSkTspLtfE4v0dQeLwINCHewZo8Mco6M766+ZX2fbrAgi5+
- WHr1ozbr5fgThpnto2UyfMo2hbsZVCLboko+UyMKiBO/akLYFSlyzDuu57toLTFkUc9S
- vneK6pUL/3Z1xjfv9G/dZ3s2ThaN7BV+zH8elQJPS4y6qXdevzZd8SeGcJ1aT1gfDYU9
- tqM1xWkm1Wo6pfAXQShvMcpx99ICLbX6tKsR8EQ3VCN72aZqk40ErPPE7Z15ZwcKDfle
- ZRdw==
-X-Gm-Message-State: AJcUukck3dZUYGFz41cBmPWI9MI5bHcDt4b8jMHmBTdDQmLAE5MlIqf4
- VdigC44F6LlmYMIvDfAR9BB5GA==
-X-Google-Smtp-Source: ALg8bN5pxlZ0JyBwes3eI7eQE3pF6X7n6thfkPb6fCgAIoFqgW8ZnlILG97adQY/K3wFnByaZjTG1w==
-X-Received: by 2002:a19:c4cc:: with SMTP id u195mr1306421lff.141.1548236719613; 
- Wed, 23 Jan 2019 01:45:19 -0800 (PST)
-Received: from genomnajs.ideon.se ([85.235.10.227])
- by smtp.gmail.com with ESMTPSA id 12-v6sm421604ljs.29.2019.01.23.01.45.18
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 23 Jan 2019 01:45:18 -0800 (PST)
-From: Linus Walleij <linus.walleij@linaro.org>
-To: arm@kernel.org
-Subject: [PATCH] ARM: defconfig: Enable PL11x DRM driver on multi_v7
-Date: Wed, 23 Jan 2019 10:45:15 +0100
-Message-Id: <20190123094515.15284-1-linus.walleij@linaro.org>
-X-Mailer: git-send-email 2.20.1
+ id 1gmFPJ-0007uI-Bf
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 10:05:21 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0NA53uE099338;
+ Wed, 23 Jan 2019 04:05:03 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1548237903;
+ bh=LIwR+BIZfvM7UkpbXRiq2HxtOBot3cOhlo/4etvby+U=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=mMpXGkUhXlhsKFxov8yQr/bykLN2q9Jnzi9Hcip4j0QMf3e4kKR8mOjIbqVUwAB6/
+ mCZd2L7sqOw/xFRqi3OROKrsKMHsHRhLULOdLX90lP/FntqfrQc7/ZTxQKGklKpPSI
+ 2mroLUY3jgNjC5EiDe/Ow7cNKYuzDYwnMOyU4C+I=
+Received: from DLEE112.ent.ti.com (dlee112.ent.ti.com [157.170.170.23])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0NA52MW052300
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Wed, 23 Jan 2019 04:05:02 -0600
+Received: from DLEE104.ent.ti.com (157.170.170.34) by DLEE112.ent.ti.com
+ (157.170.170.23) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 23
+ Jan 2019 04:05:01 -0600
+Received: from dflp33.itg.ti.com (10.64.6.16) by DLEE104.ent.ti.com
+ (157.170.170.34) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Wed, 23 Jan 2019 04:05:01 -0600
+Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0NA4tiL008717;
+ Wed, 23 Jan 2019 04:04:57 -0600
+Subject: Re: [PATCH 09/24] dt-bindings: PCI: Document "atu" reg-names
+To: Rob Herring <robh@kernel.org>
+References: <20190114132424.6445-1-kishon@ti.com>
+ <20190114132424.6445-10-kishon@ti.com> <20190122004806.GA32204@bogus>
+From: Kishon Vijay Abraham I <kishon@ti.com>
+Message-ID: <5f2fa7cd-b5a3-e466-6cbc-305f15836241@ti.com>
+Date: Wed, 23 Jan 2019 15:34:28 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <20190122004806.GA32204@bogus>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_014523_264544_E94A7DB1 
-X-CRM114-Status: GOOD (  11.72  )
+X-CRM114-CacheID: sfid-20190123_020517_560950_F1E4CDD8 
+X-CRM114-Status: GOOD (  20.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,49 +91,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linus Walleij <linus.walleij@linaro.org>,
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Jesper Nilsson <jesper.nilsson@axis.com>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>, Arnd Bergmann <arnd@arndb.de>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Gustavo Pimentel <gustavo.pimentel@synopsys.com>, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@axis.com,
+ Murali Karicheri <m-karicheri2@ti.com>, Jingoo Han <jingoohan1@gmail.com>,
+ Bjorn Helgaas <bhelgaas@google.com>, linux-omap@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This switches the ARMv7 defconfig away from the old
-fbdev driver to the new DRM driver. All machines are
-now supported by the new driver.
+Hi Rob,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: please apply this directly where applicable
-for v5.1 if you are fine with the change.
----
- arch/arm/configs/multi_v7_defconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+On 22/01/19 6:18 AM, Rob Herring wrote:
+> On Mon, Jan 14, 2019 at 06:54:09PM +0530, Kishon Vijay Abraham I wrote:
+>> Document "atu" reg-names required to get the register space for ATU in
+>> Synopsys designware core version >= 4.80.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/pci/designware-pcie.txt | 7 +++++--
+>>  1 file changed, 5 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>> index c124f9bc11f3..5561a1c060d0 100644
+>> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+>> @@ -4,8 +4,11 @@ Required properties:
+>>  - compatible:
+>>  	"snps,dw-pcie" for RC mode;
+>>  	"snps,dw-pcie-ep" for EP mode;
+>> -- reg: Should contain the configuration address space.
+>> -- reg-names: Must be "config" for the PCIe configuration space.
+>> +- reg: For designware cores version < 4.80 contains the configuration
+>> +       address space. For designware core version >= 4.80, contains
+>> +       the configuration and ATU address space
+>> +- reg-names: Must be "config" for the PCIe configuration space and "atu" for
+>> +	     the ATU address space.
+> 
+> I'm pretty sure we already have other platforms with an ATU. Those all 
+> just represent it with the other ctrl registers? So maybe this is TI 
+> specific that it is separate. Or should have some conditional like 'if 
+> the ATU space is separate, the reg-name should be atu'.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 5bee34a7ff2e..aa8d43c9b7f4 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -631,6 +631,7 @@ CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
- CONFIG_DRM_DUMB_VGA_DAC=m
- CONFIG_DRM_NXP_PTN3460=m
- CONFIG_DRM_PARADE_PS8622=m
-+CONFIG_DRM_SII902X=m
- CONFIG_DRM_SII9234=m
- CONFIG_DRM_TOSHIBA_TC358764=m
- CONFIG_DRM_I2C_ADV7511=m
-@@ -641,7 +642,7 @@ CONFIG_DRM_STM_DSI=m
- CONFIG_DRM_VC4=m
- CONFIG_DRM_ETNAVIV=m
- CONFIG_DRM_MXSFB=m
--CONFIG_FB_ARMCLCD=y
-+CONFIG_DRM_PL111=m
- CONFIG_FB_EFI=y
- CONFIG_FB_WM8505=y
- CONFIG_FB_SH_MOBILE_LCDC=y
--- 
-2.20.1
+This is specific to Synopsys Designware version >= 4.80 and not to TI. The
+first platform used a fixed offset to get the atu_base which is incorrect.
 
+In the "reg" binding I've noted this dependency.
+
+Thanks
+Kishon
 
 _______________________________________________
 linux-arm-kernel mailing list
