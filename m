@@ -2,58 +2,64 @@ Return-Path: <SRS0=uP4V=P7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5E5B2C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 01:01:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BC517C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 01:37:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 237A0217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 01:01:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8602A20868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 01:37:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H7iK1Rp0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 237A0217F5
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uKxVvK+W"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8602A20868
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davemloft.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=17bhXkxMMMjyuPwZXso43RxCnHExzY8ti9+0qyMIYW4=; b=H7i
-	K1Rp0Ap1SDThQ4x80U/ZRpeTWbm/0xP72/FgAdSfEQ19nzF7a6LaqO0nhZ+9caeCSFU6oBIOzkYEt
-	E8e64371eiec9MLWqY1WvMj4nwQcXo5hUynj3agwr1GUmMu/KDJFnmUPbh9EHigm19YXsgg7fXFLg
-	Kb473JGLcHWax3FlFxu9miVax5qI+UVV/7VFtEt+QcXzesRS8BfWOBRbRM1xwwhAXBHdYxxoFEZmH
-	vCGDnY+8+Ly7QUYASZa90iqpIk7HGzzSovXGt9AWs4oKF4EMm6ZHqupaz6OVsnS6GwKes6ZfJJt0v
-	j0X1McNLKm87yGyD1F7YU/GURzObnig==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	From:Subject:To:Message-Id:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=BwsYw76hlX9q0AcZScNlz8T4rlMf/0Y6CL9eBq/AlCk=; b=uKxVvK+WxZGJgB
+	9U6xHA50cEtql5PNPYiug1XfyBF946DnyY61LNmylFNlVxT/cUaB/bTP3JTMZC7kzd2lSYtjGxxze
+	7op1XeNUAgR0aE8gLX5HeDmeEtCsowyTyuNlB/OE62264KmjqN65LUCtoKAV8vsZCF++u9w2pU/iJ
+	TDzcymuD/BK1+MQyH5PFzUNR7QkBrukpAXuyTyURGet35X28Ynez8E5kCfHwv9mdcboIWQpT16nRI
+	K8CuST8BCaAcHL+Aoom/hOo5IvVSiR9iiQ6wOITHRIUVH/A04JPhLeDTB/3RE5q/UkyrnAgFW9Dok
+	WfSbblQeYAE4FpqvoLsQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gm6uZ-0002PD-Ie; Wed, 23 Jan 2019 01:00:59 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gm6uW-0002Oq-IF
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 01:00:57 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 69AD115AB;
- Tue, 22 Jan 2019 17:00:51 -0800 (PST)
-Received: from localhost.localdomain (usa-sjc-mx-foss1.foss.arm.com
- [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id AAE253F5C1;
- Tue, 22 Jan 2019 17:00:49 -0800 (PST)
-From: Andre Przywara <andre.przywara@arm.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH] clk: sunxi: A31: Fix wrong AHB gate number
-Date: Wed, 23 Jan 2019 00:59:11 +0000
-Message-Id: <20190123005911.27913-1-andre.przywara@arm.com>
-X-Mailer: git-send-email 2.14.1
+	id 1gm7Tx-0001Dc-Eo; Wed, 23 Jan 2019 01:37:33 +0000
+Received: from shards.monkeyblade.net ([2620:137:e000::1:9])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gm7Tv-0001DC-4I
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 01:37:32 +0000
+Received: from localhost (unknown [IPv6:2601:601:9f80:35cd::bf5])
+ (using TLSv1 with cipher AES256-SHA (256/256 bits))
+ (Client did not present a certificate)
+ (Authenticated sender: davem-davemloft)
+ by shards.monkeyblade.net (Postfix) with ESMTPSA id E421B14D63A88;
+ Tue, 22 Jan 2019 17:37:23 -0800 (PST)
+Date: Tue, 22 Jan 2019 17:37:23 -0800 (PST)
+Message-Id: <20190122.173723.1609622837834592384.davem@davemloft.net>
+To: panfilov.artyom@gmail.com
+Subject: Re: [PATCH net-next 1/1] net: stmmac: implement the SIOCGHWTSTAMP
+ ioctl
+From: David Miller <davem@davemloft.net>
+In-Reply-To: <20190120160515.26473-1-panfilov.artyom@gmail.com>
+References: <20190120160515.26473-1-panfilov.artyom@gmail.com>
+X-Mailer: Mew version 6.8 on Emacs 26.1
+Mime-Version: 1.0
+X-Greylist: Sender succeeded SMTP AUTH, not delayed by milter-greylist-4.5.12
+ (shards.monkeyblade.net [149.20.54.216]);
+ Tue, 22 Jan 2019 17:37:24 -0800 (PST)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_170056_611706_FD6FEA79 
-X-CRM114-Status: GOOD (  11.70  )
+X-CRM114-CacheID: sfid-20190122_173731_173575_D03E7B93 
+X-CRM114-Status: UNSURE (   6.51  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,45 +71,25 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stephen Boyd <sboyd@kernel.org>,
- Michael Turquette <mturquette@baylibre.com>, linux-sunxi@googlegroups.com,
- Chen-Yu Tsai <wens@csie.org>, Jagan Teki <jagan@openedev.com>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: alexandre.torgue@st.com, netdev@vger.kernel.org,
+ linux-kernel@vger.kernel.org, joabreu@synopsys.com, mcoquelin.stm32@gmail.com,
+ peppe.cavallaro@st.com, linux-stm32@st-md-mailman.stormreply.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-According to the manual the gate clock for MMC3 is at bit 11, and NAND1
-is controlled by bit 12.
+From: Artem Panfilov <panfilov.artyom@gmail.com>
+Date: Sun, 20 Jan 2019 19:05:15 +0300
 
-Fix the gate bit definitions in the clock driver.
+> This patch adds support for the SIOCGHWTSTAMP ioctl which enables user
+> processes to read the current hwtstamp_config settings
+> non-destructively.
+> 
+> Signed-off-by: Artem Panfilov <panfilov.artyom@gmail.com>
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- drivers/clk/sunxi-ng/ccu-sun6i-a31.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
-index 3b97f60540ad..609970c0b666 100644
---- a/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun6i-a31.c
-@@ -264,9 +264,9 @@ static SUNXI_CCU_GATE(ahb1_mmc1_clk,	"ahb1-mmc1",	"ahb1",
- static SUNXI_CCU_GATE(ahb1_mmc2_clk,	"ahb1-mmc2",	"ahb1",
- 		      0x060, BIT(10), 0);
- static SUNXI_CCU_GATE(ahb1_mmc3_clk,	"ahb1-mmc3",	"ahb1",
--		      0x060, BIT(12), 0);
-+		      0x060, BIT(11), 0);
- static SUNXI_CCU_GATE(ahb1_nand1_clk,	"ahb1-nand1",	"ahb1",
--		      0x060, BIT(13), 0);
-+		      0x060, BIT(12), 0);
- static SUNXI_CCU_GATE(ahb1_nand0_clk,	"ahb1-nand0",	"ahb1",
- 		      0x060, BIT(13), 0);
- static SUNXI_CCU_GATE(ahb1_sdram_clk,	"ahb1-sdram",	"ahb1",
--- 
-2.14.5
-
+Applied, thanks.
 
 _______________________________________________
 linux-arm-kernel mailing list
