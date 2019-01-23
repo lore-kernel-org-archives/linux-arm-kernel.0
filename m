@@ -2,22 +2,23 @@ Return-Path: <SRS0=uP4V=P7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80E6CC282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:24:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2476EC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:24:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4AABC2184C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:24:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E7C0A2184C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:24:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u8Sz1YTI";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=akkea.ca header.i=@akkea.ca header.b="Pb/VTSN0";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=akkea.ca header.i=@akkea.ca header.b="Pb/VTSN0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4AABC2184C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Gwqw75tw";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=akkea.ca header.i=@akkea.ca header.b="NFOSey2f";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=akkea.ca header.i=@akkea.ca header.b="NFOSey2f"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E7C0A2184C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=akkea.ca
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,54 +28,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=99p/SsYG1ouQDH8dhjrP/kY2eFPlOajmqwVZ3dEC1Vk=; b=u8Sz1YTIXo1MZ3g10Y2pHG7NeZ
-	kGLYFsoPZB15urAA1Ec9VrSM8jOM/XOp85bZ7p2zbnF4L1fxVsrE4QlNKLkNWIN3Era9flz8mmDFq
-	zFN6gc/ZWaG+Rb62i0CIZKsl61VqV4I7Ros5xc4B6pNAsOZJSVgPGlRlIkb4WBBk+h9Z2N8pBtdWc
-	w+3D6o4J7rOQBrmBiYUUdZVH+elTCvYfo9IUnjeyn4UqEpOW/gi1Eb2Lku54gW4LV3rYaV5gCdUb+
-	ZMxYQGSGTyr6DYM64fPr2i7id3XK3ykZ720B9UPSN/lG0mVq+CDFy0x5pJvON/9y3fkM+RjB8uLRl
-	xGcHBPRg==;
+	bh=9V48aMkl/gaCgwV93uaqwHjDmgNyoVYtdidtWG4WkQI=; b=Gwqw75twS1KTqfzVDTA3DgpjfJ
+	JK451sBqlJD9/uuJO/3/kg2D1llahy/+SsNu4ZsMYxlK98aoCcY6bVg/vam+RglEkH4/0hD/WTaNW
+	O66E7XaLzYrGqp/b+V7KDxyva5HJnw58R1TE8qsRJ0DuWGf5C+2KyijqvTL+9XzLQxsL5nTVg8ayD
+	NGLj7r9DyVACekZ6xSfaDhP7pTvYZbcQX6Dw0sczYfn97OAoLsTNb8XWer+4rG5ID0Lu1pI3+w0DX
+	FkxmompVHE82dpWyKDi88Q99lMjoitT5k2f2qgAnwEyDbJl8oY79k7qVwzJ1vmNgWuJMC0HRk0Bjd
+	XZFyWb9A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmKOP-0000vC-1I; Wed, 23 Jan 2019 15:24:41 +0000
+	id 1gmKOc-0001AN-6P; Wed, 23 Jan 2019 15:24:54 +0000
 Received: from node.akkea.ca ([192.155.83.177])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmKNW-00005S-GV
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 15:23:48 +0000
+ id 1gmKNW-00006K-Qy
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 15:23:49 +0000
 Received: from localhost (localhost [127.0.0.1])
- by node.akkea.ca (Postfix) with ESMTP id D43704E2050;
- Wed, 23 Jan 2019 15:23:43 +0000 (UTC)
+ by node.akkea.ca (Postfix) with ESMTP id B41F34E2062;
+ Wed, 23 Jan 2019 15:23:46 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=akkea.ca; s=mail;
- t=1548257023; bh=AKnivERQKU1x5vC9EhfVn3Srj4A6L5LICNTbEtiPN3E=;
+ t=1548257026; bh=1lElNF08mp9a3DZ/4zcDEhQNOkQuIGLji0OR564dzrM=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References;
- b=Pb/VTSN0XG7T+AI9uVwwUXY9xX0hE8KEkmVCIvjJjkvNjZTf3IqeRKJE7+p8TGyKN
- tNYSmm+gKrADuyRgiPLBgRdBIpU6L7f+BqPZsa7rZhR+KkYlVaCEfgbwXUwIZmfZHV
- 0tVSFQkST+UbRM8uFWgmwe0tfRSHbKf8f/yNMlkQ=
+ b=NFOSey2fO3EXGvDMhqZQRXLx2sZZ3LBGMHmeNE9CUukyJY8J0zsWlxRqwCwPOyVLS
+ 5kpc1GmooWOwIRURuB5L5hBMboRl8wZaaPgzTgn7zSQih++sK2+CstufmH4ILXAsMm
+ CP2LYkUCYSwWVkC6Qt639gbXY54cCvlBGd9xAK54=
 X-Virus-Scanned: Debian amavisd-new at mail.akkea.ca
 Received: from node.akkea.ca ([127.0.0.1])
  by localhost (mail.akkea.ca [127.0.0.1]) (amavisd-new, port 10024)
- with ESMTP id L1lW991LxVdu; Wed, 23 Jan 2019 15:23:43 +0000 (UTC)
+ with ESMTP id mTilSCM7ID1V; Wed, 23 Jan 2019 15:23:46 +0000 (UTC)
 Received: from localhost.localdomain (198-48-167-13.cpe.pppoe.ca
  [198.48.167.13])
- by node.akkea.ca (Postfix) with ESMTPSA id B610D4E204B;
- Wed, 23 Jan 2019 15:23:42 +0000 (UTC)
+ by node.akkea.ca (Postfix) with ESMTPSA id B448F4E204E;
+ Wed, 23 Jan 2019 15:23:45 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=akkea.ca; s=mail;
- t=1548257023; bh=AKnivERQKU1x5vC9EhfVn3Srj4A6L5LICNTbEtiPN3E=;
+ t=1548257026; bh=1lElNF08mp9a3DZ/4zcDEhQNOkQuIGLji0OR564dzrM=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References;
- b=Pb/VTSN0XG7T+AI9uVwwUXY9xX0hE8KEkmVCIvjJjkvNjZTf3IqeRKJE7+p8TGyKN
- tNYSmm+gKrADuyRgiPLBgRdBIpU6L7f+BqPZsa7rZhR+KkYlVaCEfgbwXUwIZmfZHV
- 0tVSFQkST+UbRM8uFWgmwe0tfRSHbKf8f/yNMlkQ=
+ b=NFOSey2fO3EXGvDMhqZQRXLx2sZZ3LBGMHmeNE9CUukyJY8J0zsWlxRqwCwPOyVLS
+ 5kpc1GmooWOwIRURuB5L5hBMboRl8wZaaPgzTgn7zSQih++sK2+CstufmH4ILXAsMm
+ CP2LYkUCYSwWVkC6Qt639gbXY54cCvlBGd9xAK54=
 From: "Angus Ainslie (Purism)" <angus@akkea.ca>
 To: angus@akkea.ca
-Subject: [PATCH v3 0/5] dma: imx-sdma: add the sdma engine to the imx8mq
-Date: Wed, 23 Jan 2019 08:23:05 -0700
-Message-Id: <20190123152310.11680-1-angus@akkea.ca>
+Subject: [PATCH v3 4/5] dma: imx-sdma: add an index for imx8mq multi sdma
+ devices
+Date: Wed, 23 Jan 2019 08:23:09 -0700
+Message-Id: <20190123152310.11680-5-angus@akkea.ca>
 X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190120023150.17138-1-angus@akkea.ca>
+In-Reply-To: <20190123152310.11680-1-angus@akkea.ca>
 References: <20190120023150.17138-1-angus@akkea.ca>
+ <20190123152310.11680-1-angus@akkea.ca>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_072346_610569_8AE6AB2C 
-X-CRM114-Status: UNSURE (   6.57  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190123_072346_895269_057FBB6A 
+X-CRM114-Status: GOOD (  13.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,31 +99,83 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add sdma support for the imx8mq
+On i.mx8mq, there are two sdma instances, and the common dma framework
+will get a channel dynamically from any available sdma instance whether
+it's the first sdma device or the second sdma device. Some IPs like
+SAI only work with sdma2 not sdma1. To make sure the sdma channel is from
+the correct sdma device, use an index to match.
 
-Changes since V2
+Based on MLK-16104-2 by Robin Gong <yibin.gong@nxp.com>
 
-Dropped device tree bindings and added clock ratio check.
-Fixed bug where incorrect sdma device was selected.
-Added new compatible string for "fsl,imx8mq-sdma"
+Signed-off-by: Angus Ainslie (Purism) <angus@akkea.ca>
+---
+ drivers/dma/imx-sdma.c                | 12 ++++++++++++
+ include/linux/platform_data/dma-imx.h |  1 +
+ 2 files changed, 13 insertions(+)
 
-Changes since V1
-
-Fixed to build against v5.0-rc2
-
-Angus Ainslie (Purism) (5):
-  dma: imx-sdma: add clock ratio 1:1 check
-  dma: imx-sdma: add imx8mq sdma compatible parts
-  dt-bindings: dma: fsl-imx-sdma: add imx8mq compatible string
-  dma: imx-sdma: add an index for imx8mq multi sdma devices
-  imx8mq.dtsi: add the sdma nodes
-
- .../devicetree/bindings/dma/fsl-imx-sdma.txt  |  1 +
- arch/arm64/boot/dts/freescale/imx8mq.dtsi     | 31 +++++++++++++
- drivers/dma/imx-sdma.c                        | 45 +++++++++++++++++--
- include/linux/platform_data/dma-imx.h         |  1 +
- 4 files changed, 74 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index 2e691b1cd0eb..bf3752a6a64f 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -442,6 +442,7 @@ struct sdma_engine {
+ 	struct sdma_buffer_descriptor	*bd0;
+ 	/* clock ratio for AHB:SDMA core. 1:1 is 1, 2:1 is 0*/
+ 	bool				clk_ratio;
++	int				idx;
+ };
+ 
+ static int sdma_config_write(struct dma_chan *chan,
+@@ -606,6 +607,8 @@ static const struct of_device_id sdma_dt_ids[] = {
+ };
+ MODULE_DEVICE_TABLE(of, sdma_dt_ids);
+ 
++static int sdma_dev_idx;
++
+ #define SDMA_H_CONFIG_DSPDMA	BIT(12) /* indicates if the DSPDMA is used */
+ #define SDMA_H_CONFIG_RTD_PINS	BIT(11) /* indicates if Real-Time Debug pins are enabled */
+ #define SDMA_H_CONFIG_ACR	BIT(4)  /* indicates if AHB freq /core freq = 2 or 1 */
+@@ -1934,6 +1937,11 @@ static bool sdma_filter_fn(struct dma_chan *chan, void *fn_param)
+ 	if (!imx_dma_is_general_purpose(chan))
+ 		return false;
+ 
++	/* return false if it's not the right device */
++	if ((sdmac->sdma->drvdata == &sdma_imx8mq)
++		&& (sdmac->sdma->idx != data->idx))
++		return false;
++
+ 	sdmac->data = *data;
+ 	chan->private = &sdmac->data;
+ 
+@@ -1961,6 +1969,7 @@ static struct dma_chan *sdma_xlate(struct of_phandle_args *dma_spec,
+ 	 * be set to sdmac->event_id1.
+ 	 */
+ 	data.dma_request2 = 0;
++	data.idx = sdma->idx;
+ 
+ 	return dma_request_channel(mask, sdma_filter_fn, &data);
+ }
+@@ -2149,6 +2158,9 @@ static int sdma_probe(struct platform_device *pdev)
+ 		of_node_put(spba_bus);
+ 	}
+ 
++	/* There maybe multi sdma devices such as i.mx8mq */
++	sdma->idx = sdma_dev_idx++;
++
+ 	return 0;
+ 
+ err_register:
+diff --git a/include/linux/platform_data/dma-imx.h b/include/linux/platform_data/dma-imx.h
+index 7d964e787299..843faf081282 100644
+--- a/include/linux/platform_data/dma-imx.h
++++ b/include/linux/platform_data/dma-imx.h
+@@ -55,6 +55,7 @@ struct imx_dma_data {
+ 	int dma_request2; /* secondary DMA request line */
+ 	enum sdma_peripheral_type peripheral_type;
+ 	int priority;
++	int idx;
+ };
+ 
+ static inline int imx_dma_is_ipu(struct dma_chan *chan)
 -- 
 2.17.1
 
