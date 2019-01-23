@@ -2,22 +2,23 @@ Return-Path: <SRS0=uP4V=P7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5775BC282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 21:09:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3FD38C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 21:13:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 246A621855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 21:09:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0EAC72184C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 21:13:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hFZSqjc6";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="WPSmr92C"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 246A621855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pbTBDA8g";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="VC/niUSq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0EAC72184C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,47 +26,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pkNDQZowKlmMmuoT7qjzH7wom6PG8/5+63HV341vu4o=; b=hFZSqjc60aGAVy
-	zXsjn67hd5BpSAOJTL3xa3dau76Fr92L8uuBuWYkNpF+N5kivMYqYO7V0mBsjoH7zYG8Z0EnJ6l3j
-	8vFUz/A1dpWKu1K8lJTxNBV0rw1jtQ6P+G9kvPSgVm+byMYWo1Qmi2xh+WNuQvJoe1jPrq9McpFdY
-	T5JwkYSl8//RYJsLGxUNWsMmNrx0iAIZ6Ea4gpPc95dotk0+WP1aDI6A5kibpciRo1R27s+XKsLeE
-	mOO3gqNBrnpvnbU5hiDYY7mEIxdfmPMogGw3qvx/9xOiP6T+IOa73DsNk6oc7GplsFZr9Jc1RfQnZ
-	aefTh6qbyduAT8zLG82w==;
+	List-Owner; bh=h5x7Kant+Yh1J8PAEvBO4ynLWmzfgqXfk8HqHxBcuQw=; b=pbTBDA8gU1L8hf
+	Wk/CNuGEnIUduVogJeXou2LMQOLkho6iuM66+/GrUm1scUC/hfzrj5vXmLVO5rkeAz/RuHXr5EXr7
+	EfdT3/Dnbf5VdfJKGEyAqZDiykT/e8SXAJZNerYxXmAPM3jkBGycMd/qIwU3Owzq3J3yHrezXEwQD
+	qXle7ZCFc9emNLyHwFuRvzNeQxvv4hMcHw4xQTh+xzteiJ1cAvNzkzM/lIu4xYPlExGbUfKoXnfrH
+	pBXcGQGINFPAtm54Ui9Y2mw5YEHdPjKW+mtOVIJTGpg5MCzhEy64mJNRmhMKrnChxvvhkZRpcmzRv
+	NuUTpk3BY7Q3lACtrWkg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmPli-0001Ln-Cw; Wed, 23 Jan 2019 21:09:06 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gmPpc-000376-4C; Wed, 23 Jan 2019 21:13:08 +0000
+Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmPlf-0001LH-Sv
- for linux-arm-kernel@bombadil.infradead.org; Wed, 23 Jan 2019 21:09:03 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=PzEEtvq+ZFIfdohoCxqGSejXKNUndYefJYH09iMapkQ=; b=WPSmr92Ck9WtUCUTlRaOi2o8p
- fvF6N6VxA7TIQSdC7bssukEMNAvkCby4Uusq4sy3rKZYOhx06M1PI6YXpegoXv3rXPvYoJqja1nLc
- qX1xCnEAxiQp6fvbwxjgogBqTP0DBsUFlndLHgxHPYaaXW+ytZ+Cym+iNqKDhVGPQP0m8UAGvzk33
- QZoYkl4l4F3kjud+X2zmJDejvXOinV436PemqURZ+rN0X/hKvvZ2TzCMc4R5i3zIF341fdakfXp57
- gH1MTB86xBNhKMzJCRbdJdg4UVzSm+5RkjO+U2zAj/wq1FigN1hbyJyP3s13epVeyrhNdvaLyPQ4P
- KNje0EWrA==;
-Received: from j217100.upc-j.chello.nl ([24.132.217.100]
- helo=hirez.programming.kicks-ass.net)
- by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmPlW-0000bJ-TY; Wed, 23 Jan 2019 21:08:55 +0000
-Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
- id 59C8520F51B1C; Wed, 23 Jan 2019 22:08:52 +0100 (CET)
-Date: Wed, 23 Jan 2019 22:08:52 +0100
-From: Peter Zijlstra <peterz@infradead.org>
-To: Mathieu Poirier <mathieu.poirier@linaro.org>
-Subject: Re: [PATCH v2 0/7] perf: Communicate sink via event::attr:config2
-Message-ID: <20190123210852.GA27931@hirez.programming.kicks-ass.net>
-References: <20190122181144.26645-1-mathieu.poirier@linaro.org>
+ id 1gmPpY-00036h-Ls
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 21:13:06 +0000
+Received: by mail-pf1-x442.google.com with SMTP id i12so1799773pfo.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 23 Jan 2019 13:13:04 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=IxanYgtUOPCOkbm1a5YRJ/rVtHNJStuZDvNxnCjMVDw=;
+ b=VC/niUSqQj3Jq8Yw42YGLqD9evNZg7SSdxm34TrKdsqjcIuRAN//e31Vf7nNiYy4zC
+ UZQqOgXoHeUnwv9jEnLjoT2FCd2ZqEnxDbnjDDly3vwKb9I38jr4XU/VN3AlUOidxVTb
+ lvT21H0elKF5AzFqcnNADL2duX4M1sX2r0TQs=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=IxanYgtUOPCOkbm1a5YRJ/rVtHNJStuZDvNxnCjMVDw=;
+ b=CHTEsxt8xAqcnRgi6IKAvnUs4eYcwYz8W2Z6rjwG+6s1q6ZB/HWP+UzZEo/0PLRvTr
+ DVo198pImvqKEV0eDbIqDf5RizQPiJSM1oY/1YDQMlcUiPZJm3KZEQIpx3QnF9fwt06N
+ r058VgUcTBdyq5k/nuO0BuW0tsloFrTcvzeWTFCPAQSeFfakr0Cy+8bXs1ncdD5zp03d
+ 6mhgyYZLAQpAPqQ2ItVwG2CImZi/UFJxhGNxujhGGniQcS9kV2eWI5fm84muQvu8ulz+
+ kFBxxZXU0yXoRstwP+/gTSLjqm9zEIYoLEsrvPTPmG1KLb26EYnV7tj12nZomeUnABMk
+ R3hw==
+X-Gm-Message-State: AJcUukfmdIJmM0z25PbX9Oelp41hQxwtDHlD4r39DCs2b9tF2qTaMhlc
+ uF45msd5JoBg7BiLBBcYjU6+Pg==
+X-Google-Smtp-Source: ALg8bN5RVVfO9OOxTaB8zus+ZmzYBMmX4oY/p+E+0ocK1mceNuVlekoB+JV1kjzHuyvl8tDdyKaElw==
+X-Received: by 2002:a62:938f:: with SMTP id r15mr3622958pfk.27.1548277983842; 
+ Wed, 23 Jan 2019 13:13:03 -0800 (PST)
+Received: from xps15 (S0106002369de4dac.cg.shawcable.net. [68.147.8.254])
+ by smtp.gmail.com with ESMTPSA id 19sm52774824pfs.108.2019.01.23.13.13.02
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 23 Jan 2019 13:13:03 -0800 (PST)
+Date: Wed, 23 Jan 2019 14:13:00 -0700
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
+To: Leo Yan <leo.yan@linaro.org>
+Subject: Re: [PATCH v6 5/8] perf cs-etm: Change tuple from traceID-CPU# to
+ traceID-metadata
+Message-ID: <20190123211300.GE620@xps15>
+References: <20190119014347.27441-1-leo.yan@linaro.org>
+ <20190119014347.27441-6-leo.yan@linaro.org>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190122181144.26645-1-mathieu.poirier@linaro.org>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20190119014347.27441-6-leo.yan@linaro.org>
+User-Agent: Mutt/1.9.4 (2018-02-28)
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190123_131304_718574_38C3EE49 
+X-CRM114-Status: GOOD (  30.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,32 +95,183 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, linux-s390@vger.kernel.org, suzuki.poulose@arm.com,
- alexander.shishkin@linux.intel.com, gregkh@linuxfoundation.org,
- heiko.carstens@de.ibm.com, adrian.hunter@intel.com, acme@kernel.org,
- ast@kernel.org, mingo@redhat.com, will.deacon@arm.com, hpa@zytor.com,
- schwidefsky@de.ibm.com, namhyung@kernel.org, tglx@linutronix.de,
- jolsa@redhat.com, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ Coresight ML <coresight@lists.linaro.org>, linux-kernel@vger.kernel.org,
+ Arnaldo Carvalho de Melo <acme@kernel.org>, Namhyung Kim <namhyung@kernel.org>,
+ Robert Walker <robert.walker@arm.com>, Jiri Olsa <jolsa@redhat.com>,
+ linux-arm-kernel@lists.infradead.org, Mike Leach <mike.leach@linaro.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 22, 2019 at 11:11:37AM -0700, Mathieu Poirier wrote:
+On Sat, Jan 19, 2019 at 09:43:44AM +0800, Leo Yan wrote:
+> If packet processing wants to know the packet is bound with which ETM
+> version, it needs to access metadata to decide that based on metadata
+> magic number; but we cannot simply to use CPU logic ID number as index
+> to access metadata sequential array, especially when system have
+> hotplugged off CPUs, the metadata array are only allocated for online
+> CPUs but not offline CPUs, so the CPU logic number doesn't match with
+> its index in the array.
+> 
+> For this reason, a reliable way for accessing metadata array is to use
+> traceID to find associated metadata; by accessing metadata content we
+> can know not only the CPU number but also for ETM version, which can be
+> used for sequential change for setting sample flags for exception
+> packets.
 
-> Mathieu Poirier (7):
->   perf/aux: Make perf_event accessible to setup_aux()
->   coresight: perf: Add "sinks" group to PMU directory
->   coresight: Use event attributes for sink selection
+This paragraph is not needed to understand why this patch is needed.  Please
+remove.
 
-Them looks good to me,
+> 
+> This patch is to change tuple from traceID-CPU# to traceID-metadata,
+> thus it can use the tuple to retrieve metadata pointer according to
+> traceID.
+> 
+> For safe accessing metadata fields, this patch provides helper function
+> cs_etm__get_cpu() which is used to return CPU number according to
+> traceID; cs_etm_decoder__buffer_packet() is the first consumer for this
+> helper function.
+> 
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  .../perf/util/cs-etm-decoder/cs-etm-decoder.c |  8 ++--
+>  tools/perf/util/cs-etm.c                      | 37 ++++++++++++++++---
+>  tools/perf/util/cs-etm.h                      |  4 +-
+>  3 files changed, 37 insertions(+), 12 deletions(-)
+> 
+> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> index 294efa76c9e3..cdd38ffd10d2 100644
+> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> @@ -305,14 +305,12 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
+>  			      enum cs_etm_sample_type sample_type)
+>  {
+>  	u32 et = 0;
+> -	struct int_node *inode = NULL;
+> +	int cpu;
+>  
+>  	if (decoder->packet_count >= MAX_BUFFER - 1)
+>  		return OCSD_RESP_FATAL_SYS_ERR;
+>  
+> -	/* Search the RB tree for the cpu associated with this traceID */
+> -	inode = intlist__find(traceid_list, trace_chan_id);
+> -	if (!inode)
+> +	if (cs_etm__get_cpu(trace_chan_id, &cpu) < 0)
+>  		return OCSD_RESP_FATAL_SYS_ERR;
+>  
+>  	et = decoder->tail;
+> @@ -322,7 +320,7 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
+>  
+>  	decoder->packet_buffer[et].sample_type = sample_type;
+>  	decoder->packet_buffer[et].isa = CS_ETM_ISA_UNKNOWN;
+> -	decoder->packet_buffer[et].cpu = *((int *)inode->priv);
+> +	decoder->packet_buffer[et].cpu = cpu;
+>  	decoder->packet_buffer[et].start_addr = CS_ETM_INVAL_ADDR;
+>  	decoder->packet_buffer[et].end_addr = CS_ETM_INVAL_ADDR;
+>  	decoder->packet_buffer[et].instr_count = 0;
+> diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+> index 1aa29633ce77..e89989fe0a5c 100644
+> --- a/tools/perf/util/cs-etm.c
+> +++ b/tools/perf/util/cs-etm.c
+> @@ -97,6 +97,20 @@ static u32 cs_etm__get_v7_protocol_version(u32 etmidr)
+>  	return CS_ETM_PROTO_ETMV3;
+>  }
+>  
+> +int cs_etm__get_cpu(u8 trace_chan_id, int *cpu)
+> +{
+> +	struct int_node *inode;
+> +	u64 *metadata;
+> +
+> +	inode = intlist__find(traceid_list, trace_chan_id);
+> +	if (!inode)
+> +		return -EINVAL;
+> +
+> +	metadata = inode->priv;
+> +	*cpu = (int)metadata[CS_ETM_CPU];
+> +	return 0;
+> +}
+> +
+>  static void cs_etm__packet_dump(const char *pkt_string)
+>  {
+>  	const char *color = PERF_COLOR_BLUE;
+> @@ -252,7 +266,7 @@ static void cs_etm__free(struct perf_session *session)
+>  	cs_etm__free_events(session);
+>  	session->auxtrace = NULL;
+>  
+> -	/* First remove all traceID/CPU# nodes for the RB tree */
+> +	/* First remove all traceID/metadata nodes for the RB tree */
+>  	intlist__for_each_entry_safe(inode, tmp, traceid_list)
+>  		intlist__remove(traceid_list, inode);
+>  	/* Then the RB tree itself */
+> @@ -1519,9 +1533,20 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
+>  				    0xffffffff);
+>  
+>  	/*
+> -	 * Create an RB tree for traceID-CPU# tuple. Since the conversion has
+> -	 * to be made for each packet that gets decoded, optimizing access in
+> -	 * anything other than a sequential array is worth doing.
+> +	 * Create an RB tree for traceID-metadata tuple.
+> +	 *
+> +	 * The conversion between traceID and CPU logic ID number has to
+> +	 * be made for each packet that gets decoded: firstly retrieve
+> +	 * metadata pointer from trace ID by using traceID-metadata tuple,
+> +	 * then read CPU logic ID number in metadata.
+> +	 *
+> +	 * It's not safe to directly use CPU logic ID number as index to
+> +	 * access metadata sequential array, e.g. when system have
+> +	 * hotplugged out CPUs, the metadata array are only allocated for
+> +	 * online CPUs but not offline CPUs, thus the CPU logic number is
+> +	 * not consistent with its index in the arrary.  For this reason,
+> +	 * we need to fallback to use TraceID-metadata tuple as a reliable
+> +	 * method to access metadata.
 
-Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+Why adding this long comment?  To me all that is needed is
+s/traceID-CPU#/traceID-metadata .
 
-Acme, since the majority is (4 of 7) is userspace patches, will you pick
-them up once you deem that part good?
+>  	 */
+>  	traceid_list = intlist__new(NULL);
+>  	if (!traceid_list) {
+> @@ -1587,8 +1612,8 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
+>  			err = -EINVAL;
+>  			goto err_free_metadata;
+>  		}
+> -		/* All good, associate the traceID with the CPU# */
+> -		inode->priv = &metadata[j][CS_ETM_CPU];
+> +		/* All good, associate the traceID with the metadata pointer */
+> +		inode->priv = metadata[j];
+>  	}
+>  
+>  	/*
+> diff --git a/tools/perf/util/cs-etm.h b/tools/perf/util/cs-etm.h
+> index 37f8d48179ca..5d70d10f3907 100644
+> --- a/tools/perf/util/cs-etm.h
+> +++ b/tools/perf/util/cs-etm.h
+> @@ -53,7 +53,7 @@ enum {
+>  	CS_ETMV4_PRIV_MAX,
+>  };
+>  
+> -/* RB tree for quick conversion between traceID and CPUs */
+> +/* RB tree for quick conversion between traceID and metadata pointers */
+>  struct intlist *traceid_list;
+>  
+>  #define KiB(x) ((x) * 1024)
+> @@ -78,4 +78,6 @@ cs_etm__process_auxtrace_info(union perf_event *event __maybe_unused,
+>  }
+>  #endif
+>  
+> +int cs_etm__get_cpu(u8 trace_chan_id, int *cpu);
 
+This function is part of a public header that can theoretically be included by
+any other file.  As such it has to be defined within the HAVE_CSTRACE_SUPPORT
+define.
+
+> +
+>  #endif
+> -- 
+> 2.17.1
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
