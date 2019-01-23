@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_MUTT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 056C3C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 14:25:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D4BBC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 14:57:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C8FC320870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 14:25:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5BE1620870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 14:57:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ml2F4U1v";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="tQ50ZO0m"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C8FC320870
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ndmL+Z/m";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="h8tCjVnR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5BE1620870
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dtQqunLO6uxfC7v8N5mhIDank7pSzMzesg2F9zr6vm4=; b=Ml2F4U1vrVUYqM
-	xolZNdzx5CSU4AT82CJ+1vgiMpIh1kou/TE7zLcmjrGZMwHEiu9RmNVcAFwazchaGb6KOF9qWLAX8
-	1i1Us9Gn1bMg+bYIvwX1105fmK8egtqdGIRPWy0cA+ukHToETNXKCTsL+WxRFbSv867AmrJm/7QaZ
-	s1W4RGB98BeOrqprH45klTqz3XU1q4pu8Do+WoCpcTBh23uaUUBJJihUKVbWvlmbt5f3H59oabXEJ
-	kW30OuO/BU3uKN8uMHETTq2TMLC17IENZKxfJb8fw97t2GQHrNWeXjVy/Rd/g4lGTVzSoYLIJO+Zh
-	I0PgAX+3X+qqw2hqFYWg==;
+	List-Owner; bh=31yaxmFgOhTA1LMUQ7TFN3xPJNBVe6YHf4XtU8hOMpk=; b=ndmL+Z/mVfjlLM
+	FHoYI2jvoQCGkX+2SDYwtnANxsAeMRrAKcMMQs6AOQ/oJl9HPp64PbCo011oLKZSPcky0Dp/BzFDL
+	Kh+tsQ0vffxqllyURlbFDlV30W035EcpmcJukGeUkkrwF8keXEY8WHbjp/KfnemF6B4B+4D2j5L46
+	gUlNxAJ/9UokOa7mNR6hyCO4kG2DHu9MTlP+MiHbHaHcjzRYqB7gPMQ9WN7GUa9GvjB52GDVLHbwk
+	mAB+cLprzEe7Y/QcDrlu172AElkTvAKqNO3NWWuBYJxH9EGsORJYfqD+MfjYnS3DKpx802mmZyAdT
+	TNjKGArkw5eZLP3CTrag==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmJTF-0001qS-IK; Wed, 23 Jan 2019 14:25:37 +0000
-Received: from aserp2130.oracle.com ([141.146.126.79])
+	id 1gmJxt-0005l2-L5; Wed, 23 Jan 2019 14:57:17 +0000
+Received: from userp2120.oracle.com ([156.151.31.85])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmJTB-0001q4-Of
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 14:25:35 +0000
-Received: from pps.filterd (aserp2130.oracle.com [127.0.0.1])
- by aserp2130.oracle.com (8.16.0.22/8.16.0.22) with SMTP id x0NEO5Bj058309;
- Wed, 23 Jan 2019 14:25:15 GMT
+ id 1gmJxm-0005kc-Ji
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 14:57:12 +0000
+Received: from pps.filterd (userp2120.oracle.com [127.0.0.1])
+ by userp2120.oracle.com (8.16.0.22/8.16.0.22) with SMTP id x0NErfH7103115;
+ Wed, 23 Jan 2019 14:56:48 GMT
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
  h=date : from : to : cc
  : subject : message-id : references : mime-version : content-type :
  in-reply-to; s=corp-2018-07-02;
- bh=3/BHDXBDjwaMslYodL58H902nHYtHgdrjeSHAL9Rim4=;
- b=tQ50ZO0mMFU/r47bPEQw09c+k8zRY002JWSjxdoFz6jjfI2kVAe4dtv/Oa9NMJ3LNuJA
- gfKMxVe0/l67rEURRsAA7nMGmQFg1affh+xbZs1Z23E/FsDe3lrb59pgZsu4deTnt2x3
- H9lMuiHBKZWm1uU3k+oWUfumK5HLfchyj6ZsuFCp66e/DEygmkvc0ieRfH8CnPMn9J68
- IPWyPOeb2tvs2g7AXVFOu2uilgkqGXcwul1xpzCXlzYIWnWqx8nMf+RAogbiTzZ6OrqH
- qoXHgRb8QtRllcVjNZb/Wyi21NztmuUommixCTz9WTbS2KsdYXkY+ojtTyEjKnrWzKN4 EQ== 
-Received: from userv0021.oracle.com (userv0021.oracle.com [156.151.31.71])
- by aserp2130.oracle.com with ESMTP id 2q3sdej9fe-1
+ bh=0WzAEL2+nx+ZLQHNgNtnqhO5Hl0kbzE3M/nBLj6qrvo=;
+ b=h8tCjVnRme9dM+Wk135i8T/ZfmOBbswLUeguuWpA476j8jFGsnZYs2oEI/ixYZVL1Ban
+ P1l7dnMO3no3e+sjrPqGaFIWJj2VWogjSnZEADpX9usnhhmollS6uwuanJyXG3KlU3AL
+ oqfUq7xJP+ME3KQlpyKiEauGeU3LvavXC0RnPaQBwoq71Gv6QVIcSQ2Xcmh9hQl+z85P
+ ERSOdPyEqpNy1vjJPGYzKxfNHFQxkro5810rwERhvOFqbcCx/mOqBonAptGqOjz6xDfi
+ w1sxaaxiLw3SWq3iUxfWjZA14q+TimKxbumIj4bm42M9B4pfe2fLEuK7/5IKLV1q58LP wg== 
+Received: from aserv0022.oracle.com (aserv0022.oracle.com [141.146.126.234])
+ by userp2120.oracle.com with ESMTP id 2q3vhrt6u8-1
  (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Wed, 23 Jan 2019 14:25:15 +0000
+ Wed, 23 Jan 2019 14:56:47 +0000
 Received: from userv0122.oracle.com (userv0122.oracle.com [156.151.31.75])
- by userv0021.oracle.com (8.14.4/8.14.4) with ESMTP id x0NEP9f5017026
+ by aserv0022.oracle.com (8.14.4/8.14.4) with ESMTP id x0NEukfS015615
  (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Wed, 23 Jan 2019 14:25:09 GMT
-Received: from abhmp0015.oracle.com (abhmp0015.oracle.com [141.146.116.21])
- by userv0122.oracle.com (8.14.4/8.14.4) with ESMTP id x0NEP6wA014770;
- Wed, 23 Jan 2019 14:25:06 GMT
+ Wed, 23 Jan 2019 14:56:46 GMT
+Received: from abhmp0002.oracle.com (abhmp0002.oracle.com [141.146.116.8])
+ by userv0122.oracle.com (8.14.4/8.14.4) with ESMTP id x0NEuhbu032386;
+ Wed, 23 Jan 2019 14:56:43 GMT
 Received: from Konrads-MacBook-Pro.local (/75.104.64.133)
  by default (Oracle Beehive Gateway v4.0)
- with ESMTP ; Wed, 23 Jan 2019 06:25:05 -0800
-Date: Wed, 23 Jan 2019 09:24:13 -0500
+ with ESMTP ; Wed, 23 Jan 2019 06:56:42 -0800
+Date: Wed, 23 Jan 2019 09:56:03 -0500
 From: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 To: Khalid Aziz <khalid.aziz@oracle.com>
-Subject: Re: [RFC PATCH v7 05/16] arm64/mm: Add support for XPFO
-Message-ID: <20190123142410.GC19289@Konrads-MacBook-Pro.local>
+Subject: Re: [RFC PATCH v7 07/16] arm64/mm, xpfo: temporarily map dcache
+ regions
+Message-ID: <20190123145551.GD19289@Konrads-MacBook-Pro.local>
 References: <cover.1547153058.git.khalid.aziz@oracle.com>
- <89f03091af87f5ab27bd6cafb032236d5bd81d65.1547153058.git.khalid.aziz@oracle.com>
+ <eba179acbfdea5a646c5548cb82138c1c3b74aa2.1547153058.git.khalid.aziz@oracle.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <89f03091af87f5ab27bd6cafb032236d5bd81d65.1547153058.git.khalid.aziz@oracle.com>
+In-Reply-To: <eba179acbfdea5a646c5548cb82138c1c3b74aa2.1547153058.git.khalid.aziz@oracle.com>
 User-Agent: Mutt/1.9.4 (2018-02-28)
 X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9144
  signatures=668682
 X-Proofpoint-Spam-Details: rule=notspam policy=default score=0 suspectscore=0
  malwarescore=0
- phishscore=0 bulkscore=0 spamscore=0 mlxscore=0 mlxlogscore=999
+ phishscore=0 bulkscore=0 spamscore=0 mlxscore=0 mlxlogscore=839
  adultscore=0 classifier=spam adjust=0 reason=mlx scancount=1
- engine=8.0.1-1810050000 definitions=main-1901230108
+ engine=8.0.1-1810050000 definitions=main-1901230112
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_062533_890513_CB91F8C5 
-X-CRM114-Status: GOOD (  29.30  )
+X-CRM114-CacheID: sfid-20190123_065710_784904_85546323 
+X-CRM114-Status: GOOD (  22.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -114,121 +115,56 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 10, 2019 at 02:09:37PM -0700, Khalid Aziz wrote:
+On Thu, Jan 10, 2019 at 02:09:39PM -0700, Khalid Aziz wrote:
 > From: Juerg Haefliger <juerg.haefliger@canonical.com>
 > 
-> Enable support for eXclusive Page Frame Ownership (XPFO) for arm64 and
-> provide a hook for updating a single kernel page table entry (which is
-> required by the generic XPFO code).
+> If the page is unmapped by XPFO, a data cache flush results in a fatal
+> page fault, so let's temporarily map the region, flush the cache, and then
+> unmap it.
 > 
-> v6: use flush_tlb_kernel_range() instead of __flush_tlb_one()
+> v6: actually flush in the face of xpfo, and temporarily map the underlying
+>     memory so it can be flushed correctly
 > 
 > CC: linux-arm-kernel@lists.infradead.org
 > Signed-off-by: Juerg Haefliger <juerg.haefliger@canonical.com>
 > Signed-off-by: Tycho Andersen <tycho@docker.com>
 > Signed-off-by: Khalid Aziz <khalid.aziz@oracle.com>
 > ---
->  arch/arm64/Kconfig     |  1 +
->  arch/arm64/mm/Makefile |  2 ++
->  arch/arm64/mm/xpfo.c   | 58 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 61 insertions(+)
->  create mode 100644 arch/arm64/mm/xpfo.c
+>  arch/arm64/mm/flush.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index ea2ab0330e3a..f0a9c0007d23 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -171,6 +171,7 @@ config ARM64
->  	select SWIOTLB
->  	select SYSCTL_EXCEPTION_TRACE
->  	select THREAD_INFO_IN_TASK
-> +	select ARCH_SUPPORTS_XPFO
->  	help
->  	  ARM 64-bit (AArch64) Linux support.
+> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+> index 30695a868107..f12f26b60319 100644
+> --- a/arch/arm64/mm/flush.c
+> +++ b/arch/arm64/mm/flush.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/export.h>
+>  #include <linux/mm.h>
+>  #include <linux/pagemap.h>
+> +#include <linux/xpfo.h>
 >  
-> diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
-> index 849c1df3d214..cca3808d9776 100644
-> --- a/arch/arm64/mm/Makefile
-> +++ b/arch/arm64/mm/Makefile
-> @@ -12,3 +12,5 @@ KASAN_SANITIZE_physaddr.o	+= n
+>  #include <asm/cacheflush.h>
+>  #include <asm/cache.h>
+> @@ -28,9 +29,15 @@
+>  void sync_icache_aliases(void *kaddr, unsigned long len)
+>  {
+>  	unsigned long addr = (unsigned long)kaddr;
+> +	unsigned long num_pages = XPFO_NUM_PAGES(addr, len);
+
+Is it possible that the 'len' is more than 32 pages? Or say 1000's
+of pages? Which would blow away your stack.
+
+> +	void *mapping[num_pages];
 >  
->  obj-$(CONFIG_KASAN)		+= kasan_init.o
->  KASAN_SANITIZE_kasan_init.o	:= n
-> +
-> +obj-$(CONFIG_XPFO)		+= xpfo.o
-> diff --git a/arch/arm64/mm/xpfo.c b/arch/arm64/mm/xpfo.c
-> new file mode 100644
-> index 000000000000..678e2be848eb
-> --- /dev/null
-> +++ b/arch/arm64/mm/xpfo.c
-> @@ -0,0 +1,58 @@
-> +/*
-> + * Copyright (C) 2017 Hewlett Packard Enterprise Development, L.P.
-> + * Copyright (C) 2016 Brown University. All rights reserved.
-> + *
-> + * Authors:
-> + *   Juerg Haefliger <juerg.haefliger@hpe.com>
-> + *   Vasileios P. Kemerlis <vpk@cs.brown.edu>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published by
-> + * the Free Software Foundation.
-> + */
-> +
-> +#include <linux/mm.h>
-> +#include <linux/module.h>
-> +
-> +#include <asm/tlbflush.h>
-> +
-> +/*
-> + * Lookup the page table entry for a virtual address and return a pointer to
-> + * the entry. Based on x86 tree.
-> + */
-> +static pte_t *lookup_address(unsigned long addr)
-> +{
-> +	pgd_t *pgd;
-> +	pud_t *pud;
-> +	pmd_t *pmd;
-> +
-> +	pgd = pgd_offset_k(addr);
-> +	if (pgd_none(*pgd))
-> +		return NULL;
-> +
-> +	pud = pud_offset(pgd, addr);
-> +	if (pud_none(*pud))
-> +		return NULL;
-> +
-> +	pmd = pmd_offset(pud, addr);
-> +	if (pmd_none(*pmd))
-> +		return NULL;
-> +
-> +	return pte_offset_kernel(pmd, addr);
-> +}
-> +
-> +/* Update a single kernel page table entry */
-> +inline void set_kpte(void *kaddr, struct page *page, pgprot_t prot)
-> +{
-> +	pte_t *pte = lookup_address((unsigned long)kaddr);
-> +
-> +	set_pte(pte, pfn_pte(page_to_pfn(page), prot));
-
-Thought on the other hand.. what if the page is PMD? Do you really want
-to do this?
-
-What if 'pte' is NULL?
-> +}
-> +
-> +inline void xpfo_flush_kernel_tlb(struct page *page, int order)
-> +{
-> +	unsigned long kaddr = (unsigned long)page_address(page);
-> +	unsigned long size = PAGE_SIZE;
-> +
-> +	flush_tlb_kernel_range(kaddr, kaddr + (1 << order) * size);
-
-Ditto here. You are assuming it is PTE, but it may be PMD or such.
-Or worts - the lookup_address could be NULL.
-
-> +}
+>  	if (icache_is_aliasing()) {
+> +		xpfo_temp_map(kaddr, len, mapping,
+> +			      sizeof(mapping[0]) * num_pages);
+>  		__clean_dcache_area_pou(kaddr, len);
+> +		xpfo_temp_unmap(kaddr, len, mapping,
+> +			        sizeof(mapping[0]) * num_pages);
+>  		__flush_icache_all();
+>  	} else {
+>  		flush_icache_range(addr, addr + len);
 > -- 
 > 2.17.1
 > 
