@@ -4,88 +4,63 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EA2E3C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 16:50:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 99548C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 16:50:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B2C7A2085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 16:50:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 699A82085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 16:50:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LTq+sSJV";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="MkFYpkYc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B2C7A2085A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RELgJY1b"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 699A82085A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
-	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=d4lyzFUh71dtBYpGWnyepratZWeCLEoByJKEWCVwijw=; b=LTq+sSJVATr5Vy
-	p/EK/dstZ/cuEVsen+aSHg06YdEQ1LgFVQzgIJqurHY4x68XcyuMo+V5p4dalUmANpiILsdPFYlik
-	j/pCLwiHBw1cX8fUNSgwvbfwugnqKyQqWqemDZclJFQdDNfptljnxFpBILEfwe15MoU5YC2iQASmZ
-	QNgtYqgDbArzDawatbRhmyholg6WfFdgW0Rerp0MOlVcEPbJjEgK/abbn8OXzDelMbJh3vRet84JL
-	aWBtBsYk9MpD7ReER6beuk/rvWjv1gUvwXTp/4EC4mQ6Rt+0XLzVamtL7UV3VF/UfQKMDEDpwuu0G
-	xWVdldO4UT3kUpEb9nXQ==;
+	List-Owner; bh=TY4bWgCz5ebhDaT4toWNpucId6szk+vW3yC0Cqnlf6w=; b=RELgJY1bDtfMej
+	ZEHEnIWVMJEv+YhV2hpuSFK3CG8cmnbPJoLnOM77nELTAWGfSQ/BiVwYGso1a8a5qDBpeDBJd9kbM
+	ZYk3ykRU2qVexNb++pv2AZvYdwKfQ5IMdbV3dtS1xcqYap3zaNNdwJSp60l9nh9/w8SXqOm0PzJPu
+	9Wd65MqV+1AGi8cUL0GtqMSZ3lh9RqwmARH3jfVChqtXSBLZOqfM+tNG2yvuWWRQP4KsAVTt6yEV+
+	u7YggsKEMU88FDxXbLLGPr7qkPtKp/kuyhwjO37dd3Hc+DDC236kD8OR21sZdamMiWeW6qYo+afOL
+	iXP1PYWmZBwW9pKmXdjg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmLjA-0006cO-CA; Wed, 23 Jan 2019 16:50:12 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gmLjb-0006wi-I0; Wed, 23 Jan 2019 16:50:39 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmLj1-0005OD-GY
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 16:50:10 +0000
-Received: by mail-wm1-x342.google.com with SMTP id f188so29151wmf.5
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 23 Jan 2019 08:50:03 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:in-reply-to:references:date:message-id
- :mime-version; bh=MsjGYbxSdxohzPgNJOgdJcG5Xj2r796U0cFued0EXik=;
- b=MkFYpkYcy4oZXYly9/PLBg0jVdJIwt2EkEgfCCBs4OgSLnZ1m7i0I/Re8efOfK1XBu
- KDs6M2KBa8KkT9/n0UFf85qJBXTgKnwAnJsoJf6TlN7pKUN+PXqTg4wvcwJKoM6PgIKO
- o0jyfroMpUlrGomUOztBa2EkmPO8f7JS9W1FpNSKFTskZrv2K0+0eBX7nRxk49zwf+aJ
- 6RAJbpXuwCu6e6LECVBVvJUvVsCUivaVlhqev87+Og09ADRjZHacvR+D/eBHcbXd4BOK
- Tx498HcF/WhITEgMKO8Rvnxr92jSYcFdniqPXZhfBRqyBaW19LmSbqh5aLLZQcWzIb6r
- xRcQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
- :message-id:mime-version;
- bh=MsjGYbxSdxohzPgNJOgdJcG5Xj2r796U0cFued0EXik=;
- b=b0SitHEJ9kNlRUCD+K+rJpauI5H4LlRxCBhqF0Ls5jRnicCyMHj3ToPVcc/U1sOFdP
- uvkOQj3NngvNxLcPqViYGMrwAJwj1z07XbUNkyxIS+tfS3ArpUz4qIfp2yrA0f7jA5A6
- 412lC7UVmwAqBUl1MK0rfqmle7t56KYxodMQTG/8DpAq1meoHJfo4BPJD56rsb87EOxX
- /5LO+Q3sqvwoh2eHEl4ybzGO8fuq73X5XC10lCVdKVmLeXURwfRkVDRg0XpZ3jriFsLn
- f3CWRXynEZfxw0Fsju7ZD+GqJOqtKs5sOmChd5BLyj1LE5Dp1ZstIPU27uZsEwX7G0C4
- ixFQ==
-X-Gm-Message-State: AJcUukcK2ydNma0cJ9wKru5I3NTWDjSmlr7klPNiMIL4Bjt40J/pjpNm
- JVY6LrT7Uf0qQQgQ8YPCz8fQjw==
-X-Google-Smtp-Source: ALg8bN76rDDh7Px17wGR3jvzg2ppwIBh0L0vXaAN8wCsbgjUfITkZQkDQLkP35IkeNSZGCxoQNH0vg==
-X-Received: by 2002:a1c:43:: with SMTP id 64mr3612223wma.72.1548262201461;
- Wed, 23 Jan 2019 08:50:01 -0800 (PST)
-Received: from localhost (aputeaux-684-1-20-21.w90-86.abo.wanadoo.fr.
- [90.86.223.21])
- by smtp.googlemail.com with ESMTPSA id w80sm82727567wme.38.2019.01.23.08.50.00
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 23 Jan 2019 08:50:00 -0800 (PST)
-From: Kevin Hilman <khilman@baylibre.com>
-To: Anand Moon <linux.amoon@gmail.com>, devicetree@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-amlogic@lists.infradead.org,
- linux-kernel@vger.kernel.org
-Subject: Re: [PATCH 1/2] ARM: dts: meson8b: odroidc1: Enable usb phy node
-In-Reply-To: <20190113181808.5768-1-linux.amoon@gmail.com>
-References: <20190113181808.5768-1-linux.amoon@gmail.com>
-Date: Wed, 23 Jan 2019 08:49:59 -0800
-Message-ID: <7hef93mi88.fsf@baylibre.com>
-MIME-Version: 1.0
+ id 1gmLjX-0006vX-Fc
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 16:50:37 +0000
+Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <l.stach@pengutronix.de>)
+ id 1gmLjR-000789-4F; Wed, 23 Jan 2019 17:50:29 +0100
+Message-ID: <1548262227.28802.7.camel@pengutronix.de>
+Subject: Re: [PATCH v3 5/5] imx8mq.dtsi: add the sdma nodes
+From: Lucas Stach <l.stach@pengutronix.de>
+To: "Angus Ainslie (Purism)" <angus@akkea.ca>
+Date: Wed, 23 Jan 2019 17:50:27 +0100
+In-Reply-To: <20190123152310.11680-6-angus@akkea.ca>
+References: <20190120023150.17138-1-angus@akkea.ca>
+ <20190123152310.11680-1-angus@akkea.ca>
+ <20190123152310.11680-6-angus@akkea.ca>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
+X-SA-Exim-Mail-From: l.stach@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_085003_563964_221E805E 
-X-CRM114-Status: GOOD (  15.59  )
+X-CRM114-CacheID: sfid-20190123_085035_674905_BAF5EE71 
+X-CRM114-Status: GOOD (  14.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,112 +72,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Neil Armstrong <narmstrong@baylibre.com>, Rob Herring <robh+dt@kernel.org>,
- Emiliano Ingrassia <ingrassia@epigenesys.com>,
- Jerome Brunet <jbrunet@baylibre.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Daniel Baluta <daniel.baluta@gmail.com>, linux-kernel@vger.kernel.org,
+ dmaengine@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
+ NXP Linux Team <linux-imx@nxp.com>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>, angus.ainslie@puri.sm,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Anand Moon <linux.amoon@gmail.com> writes:
-
-> Add missing vbus-supply link to phy controller for usb_phy0
-> and usb_phy1 nodes, this changes fixed the power issue
-> on usb ports usb, changes help fix usb reset warning.
->
-> [  821.991470] usb 1-1.2: reset high-speed USB device number 3 using dwc2
-> [  825.243385] usb 1-1.2: reset high-speed USB device number 3 using dwc2
-> [  828.151310] usb 1-1.2: reset high-speed USB device number 3 using dwc2
-> [  830.991241] usb 1-1.2: reset high-speed USB device number 3 using dwc2
->
-> Fixes: 2eb79a4d15ff (ARM: dts: meson: enabling the USB Host controller on Odroid-C1/C1+ board)
-> Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Cc: Jerome Brunet <jbrunet@baylibre.com>
-> Cc: Neil Armstrong <narmstrong@baylibre.com>
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> ---
-> Rebased on Kevin's amlogic/v5.0/fixes branch
-
-As requested, dropping this series from the fixes branch pending further
-debug and testing.
-
-Kevin
-
-> [alarm@archl-c1t ~]$ lsusb -t
-> /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
->     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
->         |__ Port 1: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
->         |__ Port 3: Dev 3, If 0, Class=Video, Driver=uvcvideo, 480M
->         |__ Port 3: Dev 3, If 1, Class=Video, Driver=uvcvideo, 480M
->         |__ Port 3: Dev 3, If 2, Class=Audio, Driver=snd-usb-audio, 480M
->         |__ Port 3: Dev 3, If 3, Class=Audio, Driver=snd-usb-audio, 480M
-> [alarm@archl-c1t ~]$
-> [alarm@archl-c1t ~]$ lsusb -v|egrep "^Bus|MaxPower"
-> Couldn't open device, some information will be missing
-> Bus 001 Device 003: ID 1b71:0056 Fushicai
->     MaxPower              500mA
-> Couldn't open device, some information will be missing
-> Bus 001 Device 004: ID 152d:0578 JMicron Technology Corp. / JMicron USA Technology Corp. JMS567 SATA 6Gb/s bridge
->     MaxPower               30mA
-> Couldn't open device, some information will be missing
-> Couldn't open device, some information will be missing
-> Bus 001 Device 002: ID 05e3:0610 Genesys Logic, Inc. 4-port hub
->     MaxPower              100mA
-> Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
->     MaxPower                0mA
-> ---
->  arch/arm/boot/dts/meson8b-odroidc1.dts | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/meson8b-odroidc1.dts b/arch/arm/boot/dts/meson8b-odroidc1.dts
-> index 0f0a46ddf3ff..a49a8509b288 100644
-> --- a/arch/arm/boot/dts/meson8b-odroidc1.dts
-> +++ b/arch/arm/boot/dts/meson8b-odroidc1.dts
-> @@ -83,6 +83,19 @@
->  		regulator-max-microvolt = <5000000>;
->  	};
->  
-> +	usb_vbus: regulator-usb-vbus {
-> +		compatible = "regulator-fixed";
-> +
-> +		regulator-name = "USB_VBUS";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +
-> +		vin-supply = <&p5v0>;
-> +
-> +		gpio = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
-> +		enable-active-high;
-> +	};
-> +
->  	tflash_vdd: regulator-tflash_vdd {
->  		/*
->  		 * signal name from schematics: TFLASH_VDD_EN
-> @@ -293,8 +306,18 @@
->  	pinctrl-names = "default";
->  };
->  
-> +&usb0_phy {
-> +	status = "okay";
-> +	vbus-supply = <&usb_vbus>;
-> +};
-> +
->  &usb1_phy {
->  	status = "okay";
-> +	vbus-supply = <&usb_vbus>;
-> +};
-> +
-> +&usb0 {
-> +	status = "okay";
->  };
->  
->  &usb1 {
-> -- 
-> 2.20.1
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+QW0gTWl0dHdvY2gsIGRlbiAyMy4wMS4yMDE5LCAwODoyMyAtMDcwMCBzY2hyaWViIEFuZ3VzIEFp
+bnNsaWUgKFB1cmlzbSk6Cj4gQWRkIHRoZSBzZG1hIG5vZGVzIHRvIHRoZSBiYXNlIGRldmljZXRy
+ZWUgZm9yIHRoZSBpbXg4bXEKPiAKPiA+IFNpZ25lZC1vZmYtYnk6IEFuZ3VzIEFpbnNsaWUgKFB1
+cmlzbSkgPGFuZ3VzQGFra2VhLmNhPgo+IC0tLQo+IMKgYXJjaC9hcm02NC9ib290L2R0cy9mcmVl
+c2NhbGUvaW14OG1xLmR0c2kgfCAzMSArKysrKysrKysrKysrKysrKysrKysrKwo+IMKgMSBmaWxl
+IGNoYW5nZWQsIDMxIGluc2VydGlvbnMoKykKPiAKPiBkaWZmIC0tZ2l0IGEvYXJjaC9hcm02NC9i
+b290L2R0cy9mcmVlc2NhbGUvaW14OG1xLmR0c2kgYi9hcmNoL2FybTY0L2Jvb3QvZHRzL2ZyZWVz
+Y2FsZS9pbXg4bXEuZHRzaQo+IGluZGV4IGMwNDAyMzc1ZTdjMS4uNDM5Nzk5MmZkMDIxIDEwMDY0
+NAo+IC0tLSBhL2FyY2gvYXJtNjQvYm9vdC9kdHMvZnJlZXNjYWxlL2lteDhtcS5kdHNpCj4gKysr
+IGIvYXJjaC9hcm02NC9ib290L2R0cy9mcmVlc2NhbGUvaW14OG1xLmR0c2kKPiBAQCAtMzM2LDYg
+KzMzNiwxOSBAQAo+ID4gwqAJCQkJY2xvY2tzID0gPCZjbGsgSU1YOE1RX0NMS19XRE9HM19ST09U
+PjsKPiA+IMKgCQkJCXN0YXR1cyA9ICJkaXNhYmxlZCI7Cj4gPiDCoAkJCX07Cj4gKwo+ID4gPiAr
+CQkJc2RtYTI6IHNkbWFAMzAyYzAwMDAgewo+ID4gKwkJCQljb21wYXRpYmxlID0gImZzbCxpbXg4
+bXEtc2RtYSIsICJmc2wsaW14N2Qtc2RtYSI7Cj4gPiArCQkJCXJlZyA9IDwweDMwMmMwMDAwIDB4
+MTAwMDA+Owo+ID4gKwkJCQlpbnRlcnJ1cHRzID0gPEdJQ19TUEkgMTAzIElSUV9UWVBFX0xFVkVM
+X0hJR0g+Owo+ID4gKwkJCQljbG9ja3MgPSA8JmNsayBJTVg4TVFfQ0xLX1NETUEyX1JPT1Q+LAo+
+ID4gKwkJCQkJPCZjbGsgSU1YOE1RX0NMS19TRE1BMl9ST09UPjsKPiA+ICsJCQkJY2xvY2stbmFt
+ZXMgPSAiaXBnIiwgImFoYiI7Cj4gPiArCQkJCSNkbWEtY2VsbHMgPSA8Mz47Cj4gPiArCQkJCWZz
+bCxzZG1hLXJhbS1zY3JpcHQtbmFtZSA9ICJpbXgvc2RtYS9zZG1hLWlteDdkLmJpbiI7Cj4gKwkJ
+CQlmc2wscmF0aW8tMS0xOwoKUHJvcGVydHkgZG9lcyBub3QgZXhpc3QgYW55bW9yZS4KCj4gKwkJ
+CQlzdGF0dXMgPSAiZGlzYWJsZWQiOwoKU29DIHBlcmlwaGVyYWxzIHRoYXQgaGF2ZSBubyBvdXRz
+aWRlIGNvbm5lY3Rpb24gYW5kIHRodXMgZG9uJ3QgZGVwZW5kCm9uIGFueSBib2FyZCBsZXZlbCBj
+b25maWd1cmF0aW9uIHNob3VsZCBhbHdheXMgYmUgZW5hYmxlZC4gUGxlYXNlIGRyb3AKdGhpcyBz
+dGF0dXMgcHJvcGVydHkuCgo+ICsJCQl9Owo+ID4gwqAJCX07Cj4gwqAKPiA+IMKgCQlidXNAMzA0
+MDAwMDAgeyAvKiBBSVBTMiAqLwo+IEBAIC0zNzAsNiArMzgzLDggQEAKPiA+IMKgCQkJCWNsb2Nr
+cyA9IDwmY2xrIElNWDhNUV9DTEtfVUFSVDNfUk9PVD4sCj4gPiDCoAkJCQnCoMKgwqDCoMKgwqDC
+oMKgwqA8JmNsayBJTVg4TVFfQ0xLX1VBUlQzX1JPT1Q+Owo+ID4gwqAJCQkJY2xvY2stbmFtZXMg
+PSAiaXBnIiwgInBlciI7Cj4gPiArCQkJCWRtYXMgPSA8JnNkbWExIDI2IDQgMD4sIDwmc2RtYTEg
+MjcgNCAwPjsKPiA+ICsJCQkJZG1hLW5hbWVzID0gInJ4IiwgInR4IjsKPiA+IMKgCQkJCXN0YXR1
+cyA9ICJkaXNhYmxlZCI7Cj4gPiDCoAkJCX07Cj4gwqAKPiBAQCAtMzgxLDYgKzM5Niw4IEBACj4g
+PiDCoAkJCQljbG9ja3MgPSA8JmNsayBJTVg4TVFfQ0xLX1VBUlQyX1JPT1Q+LAo+ID4gwqAJCQkJ
+wqDCoMKgwqDCoMKgwqDCoMKgPCZjbGsgSU1YOE1RX0NMS19VQVJUMl9ST09UPjsKPiA+IMKgCQkJ
+CWNsb2NrLW5hbWVzID0gImlwZyIsICJwZXIiOwo+ID4gKwkJCQlkbWFzID0gPCZzZG1hMSAyNCA0
+IDA+LCA8JnNkbWExIDI1IDQgMD47Cj4gPiArCQkJCWRtYS1uYW1lcyA9ICJyeCIsICJ0eCI7Cj4g
+PiDCoAkJCQlzdGF0dXMgPSAiZGlzYWJsZWQiOwo+ID4gwqAJCQl9Owo+IMKgCj4gQEAgLTQzMiw2
+ICs0NDksOCBAQAo+ID4gwqAJCQkJY2xvY2tzID0gPCZjbGsgSU1YOE1RX0NMS19VQVJUNF9ST09U
+PiwKPiA+IMKgCQkJCcKgwqDCoMKgwqDCoMKgwqDCoDwmY2xrIElNWDhNUV9DTEtfVUFSVDRfUk9P
+VD47Cj4gPiDCoAkJCQljbG9jay1uYW1lcyA9ICJpcGciLCAicGVyIjsKPiA+ICsJCQkJZG1hcyA9
+IDwmc2RtYTEgMjggNCAwPiwgPCZzZG1hMSAyOSA0IDA+Owo+ID4gKwkJCQlkbWEtbmFtZXMgPSAi
+cngiLCAidHgiOwo+ID4gwqAJCQkJc3RhdHVzID0gImRpc2FibGVkIjsKPiA+IMKgCQkJfTsKPiDC
+oAo+IEBAIC00NjUsNiArNDg0LDE4IEBACj4gPiDCoAkJCQlzdGF0dXMgPSAiZGlzYWJsZWQiOwo+
+ID4gwqAJCQl9Owo+IMKgCj4gPiA+ICsJCQlzZG1hMTogc2RtYUAzMGJkMDAwMCB7Cj4gPiArCQkJ
+CWNvbXBhdGlibGUgPSAiZnNsLGlteDhtcS1zZG1hIiwgImZzbCxpbXg3ZC1zZG1hIjsKPiA+ICsJ
+CQkJcmVnID0gPDB4MzBiZDAwMDAgMHgxMDAwMD47Cj4gPiArCQkJCWludGVycnVwdHMgPSA8R0lD
+X1NQSSAyIElSUV9UWVBFX0xFVkVMX0hJR0g+Owo+ID4gKwkJCQljbG9ja3MgPSA8JmNsayBJTVg4
+TVFfQ0xLX1NETUExX1JPT1Q+LAo+ID4gKwkJCQkJPCZjbGsgSU1YOE1RX0NMS19BSEI+Owo+ID4g
+KwkJCQljbG9jay1uYW1lcyA9ICJpcGciLCAiYWhiIjsKPiA+ICsJCQkJI2RtYS1jZWxscyA9IDwz
+PjsKPiA+ICsJCQkJZnNsLHNkbWEtcmFtLXNjcmlwdC1uYW1lID0gImlteC9zZG1hL3NkbWEtaW14
+N2QuYmluIjsKPiArCQkJCXN0YXR1cyA9ICJkaXNhYmxlZCI7CgpTYW1lIGNvbW1lbnQgYXMgYWJv
+dmUsIHRoaXMgbm9kZSBzaG91bGQgYmUgZW5hYmxlZCBieSBkZWZhdWx0LgoKUmVnYXJkcywKTHVj
+YXMKCj4gKwkJCX07Cj4gKwo+ID4gPiDCoAkJCWZlYzE6IGV0aGVybmV0QDMwYmUwMDAwIHsKPiA+
+IMKgCQkJCWNvbXBhdGlibGUgPSAiZnNsLGlteDhtcS1mZWMiLCAiZnNsLGlteDZzeC1mZWMiOwo+
+ID4gwqAJCQkJcmVnID0gPDB4MzBiZTAwMDAgMHgxMDAwMD47CgpfX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlz
+dApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJh
+ZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
