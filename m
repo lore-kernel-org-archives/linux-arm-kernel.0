@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3FD38C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 21:13:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DFC1CC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 21:23:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0EAC72184C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 21:13:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B04992184C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 21:23:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pbTBDA8g";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="VC/niUSq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0EAC72184C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b9NK9cHW";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="VpVK4CnM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B04992184C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,64 +26,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=h5x7Kant+Yh1J8PAEvBO4ynLWmzfgqXfk8HqHxBcuQw=; b=pbTBDA8gU1L8hf
-	Wk/CNuGEnIUduVogJeXou2LMQOLkho6iuM66+/GrUm1scUC/hfzrj5vXmLVO5rkeAz/RuHXr5EXr7
-	EfdT3/Dnbf5VdfJKGEyAqZDiykT/e8SXAJZNerYxXmAPM3jkBGycMd/qIwU3Owzq3J3yHrezXEwQD
-	qXle7ZCFc9emNLyHwFuRvzNeQxvv4hMcHw4xQTh+xzteiJ1cAvNzkzM/lIu4xYPlExGbUfKoXnfrH
-	pBXcGQGINFPAtm54Ui9Y2mw5YEHdPjKW+mtOVIJTGpg5MCzhEy64mJNRmhMKrnChxvvhkZRpcmzRv
-	NuUTpk3BY7Q3lACtrWkg==;
+	List-Owner; bh=TIgoAb+tnIIPsczSk+VRHMDrO+ibtLvo9CVE3Db0zOw=; b=b9NK9cHWLeRrxK
+	So5ZCXKLCf7ICVmspULo2JEFP4nEK5AFNv4TgdTvrX73hYJ9rPeo5sv8cOS5CtEpmTswBpkWpBWBb
+	4goqIlirHIRUviUKxIOUTiG0kzXS53uY5XsgbCgUTvcQxnVOzLR3dgPRz44BR0OEM6Lyp7/zkWujh
+	naMvKLnA4xrDYfv4mXjFebK32xsz7FAoOsuMu7OsFw7NIsPdHOHLGwXBTEPXCmaqB/hwHgQ3sPkN+
+	gTKrttBzGrqCPGyAGF0at6mF6UvEf8sGQ/xxNzskIOLBQj6yROrESilzbvD5jrxWLsN603/YjnMP4
+	5MNd+gYxB2Qr/JCrFuzg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmPpc-000376-4C; Wed, 23 Jan 2019 21:13:08 +0000
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
+	id 1gmPzq-0006GH-1T; Wed, 23 Jan 2019 21:23:42 +0000
+Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmPpY-00036h-Ls
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 21:13:06 +0000
-Received: by mail-pf1-x442.google.com with SMTP id i12so1799773pfo.7
+ id 1gmPzn-0006Fu-B1
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 21:23:40 +0000
+Received: by mail-pl1-x641.google.com with SMTP id e11so1785573plt.11
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 23 Jan 2019 13:13:04 -0800 (PST)
+ Wed, 23 Jan 2019 13:23:38 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=IxanYgtUOPCOkbm1a5YRJ/rVtHNJStuZDvNxnCjMVDw=;
- b=VC/niUSqQj3Jq8Yw42YGLqD9evNZg7SSdxm34TrKdsqjcIuRAN//e31Vf7nNiYy4zC
- UZQqOgXoHeUnwv9jEnLjoT2FCd2ZqEnxDbnjDDly3vwKb9I38jr4XU/VN3AlUOidxVTb
- lvT21H0elKF5AzFqcnNADL2duX4M1sX2r0TQs=
+ bh=kMvEGohdbgzHXLbqMasWVSocy33cwNII+RxYNB+qKAs=;
+ b=VpVK4CnMrfetk2FX7kRbZ6T/xoin0s/8Y7ilAFk3ysZ0fWiE+GfGoY5VQ4JMiVCffc
+ LG3k6UlZvXNhcHcofyf2PquRq+3I+OifoV6+r4giy/iBCGIP8ANPz1DA8Chhc0VdXuVj
+ yGw2qg8H7jXbpTSG24SXr+ns7PKT1/5xNIuFI=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=IxanYgtUOPCOkbm1a5YRJ/rVtHNJStuZDvNxnCjMVDw=;
- b=CHTEsxt8xAqcnRgi6IKAvnUs4eYcwYz8W2Z6rjwG+6s1q6ZB/HWP+UzZEo/0PLRvTr
- DVo198pImvqKEV0eDbIqDf5RizQPiJSM1oY/1YDQMlcUiPZJm3KZEQIpx3QnF9fwt06N
- r058VgUcTBdyq5k/nuO0BuW0tsloFrTcvzeWTFCPAQSeFfakr0Cy+8bXs1ncdD5zp03d
- 6mhgyYZLAQpAPqQ2ItVwG2CImZi/UFJxhGNxujhGGniQcS9kV2eWI5fm84muQvu8ulz+
- kFBxxZXU0yXoRstwP+/gTSLjqm9zEIYoLEsrvPTPmG1KLb26EYnV7tj12nZomeUnABMk
- R3hw==
-X-Gm-Message-State: AJcUukfmdIJmM0z25PbX9Oelp41hQxwtDHlD4r39DCs2b9tF2qTaMhlc
- uF45msd5JoBg7BiLBBcYjU6+Pg==
-X-Google-Smtp-Source: ALg8bN5RVVfO9OOxTaB8zus+ZmzYBMmX4oY/p+E+0ocK1mceNuVlekoB+JV1kjzHuyvl8tDdyKaElw==
-X-Received: by 2002:a62:938f:: with SMTP id r15mr3622958pfk.27.1548277983842; 
- Wed, 23 Jan 2019 13:13:03 -0800 (PST)
+ bh=kMvEGohdbgzHXLbqMasWVSocy33cwNII+RxYNB+qKAs=;
+ b=Fro6/PdkYrFQWIIVyad7EyW96pvxama5u+zhUvZbXez0sfeIna6x/2dN+bKeB+MOTc
+ D0XFUWB5CJTKqIAXbOQQJvke96N89ddF3azfQgnKh6CdzjatUdQaiXmmaALoSNm4JOFL
+ NkJQwwBD0reEC+KWJBUN6kdZgb3vbKMP+lVW27EhLWpynuuTkHGL8gLZVa6geeJT+FpR
+ kGppX6WjXWwGG2i68oL5Iw57xu0sFuXQW39mlnwna1COoy5eW9TvFigL8KEpH1VrrHum
+ rfU6AC90/kQomPO/lCby3TbsxDGohpa5oOckr0kruEVi+cl67bGMGpbFpHnem81bhhYy
+ +5rQ==
+X-Gm-Message-State: AJcUuke2mLRhKe9UFT/0EK97WzDdGiUVqKeCdapmtJ6C83IU0We87pc+
+ LzqBsZHJEfPiEurhGL0ox/fOWw==
+X-Google-Smtp-Source: ALg8bN5rnthAxS//lzD29sMzwZmud4gLRPS4Kcfadbk0154OFPD9WVwMYiBHxw85qZ7vx9TZKqPCLA==
+X-Received: by 2002:a17:902:7201:: with SMTP id
+ ba1mr3884772plb.105.1548278617984; 
+ Wed, 23 Jan 2019 13:23:37 -0800 (PST)
 Received: from xps15 (S0106002369de4dac.cg.shawcable.net. [68.147.8.254])
- by smtp.gmail.com with ESMTPSA id 19sm52774824pfs.108.2019.01.23.13.13.02
+ by smtp.gmail.com with ESMTPSA id k24sm28483745pfj.13.2019.01.23.13.23.36
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 23 Jan 2019 13:13:03 -0800 (PST)
-Date: Wed, 23 Jan 2019 14:13:00 -0700
+ Wed, 23 Jan 2019 13:23:37 -0800 (PST)
+Date: Wed, 23 Jan 2019 14:23:34 -0700
 From: Mathieu Poirier <mathieu.poirier@linaro.org>
 To: Leo Yan <leo.yan@linaro.org>
-Subject: Re: [PATCH v6 5/8] perf cs-etm: Change tuple from traceID-CPU# to
- traceID-metadata
-Message-ID: <20190123211300.GE620@xps15>
+Subject: Re: [PATCH v6 6/8] perf cs-etm: Add traceID in packet
+Message-ID: <20190123212334.GF620@xps15>
 References: <20190119014347.27441-1-leo.yan@linaro.org>
- <20190119014347.27441-6-leo.yan@linaro.org>
+ <20190119014347.27441-7-leo.yan@linaro.org>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190119014347.27441-6-leo.yan@linaro.org>
+In-Reply-To: <20190119014347.27441-7-leo.yan@linaro.org>
 User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_131304_718574_38C3EE49 
-X-CRM114-Status: GOOD (  30.76  )
+X-CRM114-CacheID: sfid-20190123_132339_377814_27146ABC 
+X-CRM114-Status: GOOD (  15.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,169 +106,51 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Jan 19, 2019 at 09:43:44AM +0800, Leo Yan wrote:
-> If packet processing wants to know the packet is bound with which ETM
-> version, it needs to access metadata to decide that based on metadata
-> magic number; but we cannot simply to use CPU logic ID number as index
-> to access metadata sequential array, especially when system have
-> hotplugged off CPUs, the metadata array are only allocated for online
-> CPUs but not offline CPUs, so the CPU logic number doesn't match with
-> its index in the array.
-> 
-> For this reason, a reliable way for accessing metadata array is to use
-> traceID to find associated metadata; by accessing metadata content we
-> can know not only the CPU number but also for ETM version, which can be
-> used for sequential change for setting sample flags for exception
-> packets.
-
-This paragraph is not needed to understand why this patch is needed.  Please
-remove.
-
-> 
-> This patch is to change tuple from traceID-CPU# to traceID-metadata,
-> thus it can use the tuple to retrieve metadata pointer according to
-> traceID.
-> 
-> For safe accessing metadata fields, this patch provides helper function
-> cs_etm__get_cpu() which is used to return CPU number according to
-> traceID; cs_etm_decoder__buffer_packet() is the first consumer for this
-> helper function.
+On Sat, Jan 19, 2019 at 09:43:45AM +0800, Leo Yan wrote:
+> Add traceID in packet, thus we can use traceID to retrieve metadata
+> pointer from traceID-metadata tuple.
 > 
 > Signed-off-by: Leo Yan <leo.yan@linaro.org>
 > ---
->  .../perf/util/cs-etm-decoder/cs-etm-decoder.c |  8 ++--
->  tools/perf/util/cs-etm.c                      | 37 ++++++++++++++++---
->  tools/perf/util/cs-etm.h                      |  4 +-
->  3 files changed, 37 insertions(+), 12 deletions(-)
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 2 ++
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.h | 1 +
+>  2 files changed, 3 insertions(+)
 > 
 > diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> index 294efa76c9e3..cdd38ffd10d2 100644
+> index cdd38ffd10d2..ba4c623cd8de 100644
 > --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
 > +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> @@ -305,14 +305,12 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
->  			      enum cs_etm_sample_type sample_type)
->  {
->  	u32 et = 0;
-> -	struct int_node *inode = NULL;
-> +	int cpu;
->  
->  	if (decoder->packet_count >= MAX_BUFFER - 1)
->  		return OCSD_RESP_FATAL_SYS_ERR;
->  
-> -	/* Search the RB tree for the cpu associated with this traceID */
-> -	inode = intlist__find(traceid_list, trace_chan_id);
-> -	if (!inode)
-> +	if (cs_etm__get_cpu(trace_chan_id, &cpu) < 0)
->  		return OCSD_RESP_FATAL_SYS_ERR;
->  
->  	et = decoder->tail;
-> @@ -322,7 +320,7 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
->  
->  	decoder->packet_buffer[et].sample_type = sample_type;
->  	decoder->packet_buffer[et].isa = CS_ETM_ISA_UNKNOWN;
-> -	decoder->packet_buffer[et].cpu = *((int *)inode->priv);
-> +	decoder->packet_buffer[et].cpu = cpu;
->  	decoder->packet_buffer[et].start_addr = CS_ETM_INVAL_ADDR;
->  	decoder->packet_buffer[et].end_addr = CS_ETM_INVAL_ADDR;
->  	decoder->packet_buffer[et].instr_count = 0;
-> diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-> index 1aa29633ce77..e89989fe0a5c 100644
-> --- a/tools/perf/util/cs-etm.c
-> +++ b/tools/perf/util/cs-etm.c
-> @@ -97,6 +97,20 @@ static u32 cs_etm__get_v7_protocol_version(u32 etmidr)
->  	return CS_ETM_PROTO_ETMV3;
->  }
->  
-> +int cs_etm__get_cpu(u8 trace_chan_id, int *cpu)
-> +{
-> +	struct int_node *inode;
-> +	u64 *metadata;
-> +
-> +	inode = intlist__find(traceid_list, trace_chan_id);
-> +	if (!inode)
-> +		return -EINVAL;
-> +
-> +	metadata = inode->priv;
-> +	*cpu = (int)metadata[CS_ETM_CPU];
-> +	return 0;
-> +}
-> +
->  static void cs_etm__packet_dump(const char *pkt_string)
->  {
->  	const char *color = PERF_COLOR_BLUE;
-> @@ -252,7 +266,7 @@ static void cs_etm__free(struct perf_session *session)
->  	cs_etm__free_events(session);
->  	session->auxtrace = NULL;
->  
-> -	/* First remove all traceID/CPU# nodes for the RB tree */
-> +	/* First remove all traceID/metadata nodes for the RB tree */
->  	intlist__for_each_entry_safe(inode, tmp, traceid_list)
->  		intlist__remove(traceid_list, inode);
->  	/* Then the RB tree itself */
-> @@ -1519,9 +1533,20 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
->  				    0xffffffff);
->  
->  	/*
-> -	 * Create an RB tree for traceID-CPU# tuple. Since the conversion has
-> -	 * to be made for each packet that gets decoded, optimizing access in
-> -	 * anything other than a sequential array is worth doing.
-> +	 * Create an RB tree for traceID-metadata tuple.
-> +	 *
-> +	 * The conversion between traceID and CPU logic ID number has to
-> +	 * be made for each packet that gets decoded: firstly retrieve
-> +	 * metadata pointer from trace ID by using traceID-metadata tuple,
-> +	 * then read CPU logic ID number in metadata.
-> +	 *
-> +	 * It's not safe to directly use CPU logic ID number as index to
-> +	 * access metadata sequential array, e.g. when system have
-> +	 * hotplugged out CPUs, the metadata array are only allocated for
-> +	 * online CPUs but not offline CPUs, thus the CPU logic number is
-> +	 * not consistent with its index in the arrary.  For this reason,
-> +	 * we need to fallback to use TraceID-metadata tuple as a reliable
-> +	 * method to access metadata.
-
-Why adding this long comment?  To me all that is needed is
-s/traceID-CPU#/traceID-metadata .
-
->  	 */
->  	traceid_list = intlist__new(NULL);
->  	if (!traceid_list) {
-> @@ -1587,8 +1612,8 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
->  			err = -EINVAL;
->  			goto err_free_metadata;
->  		}
-> -		/* All good, associate the traceID with the CPU# */
-> -		inode->priv = &metadata[j][CS_ETM_CPU];
-> +		/* All good, associate the traceID with the metadata pointer */
-> +		inode->priv = metadata[j];
+> @@ -295,6 +295,7 @@ static void cs_etm_decoder__clear_buffer(struct cs_etm_decoder *decoder)
+>  		decoder->packet_buffer[i].last_instr_cond = 0;
+>  		decoder->packet_buffer[i].flags = 0;
+>  		decoder->packet_buffer[i].exception_number = UINT32_MAX;
+> +		decoder->packet_buffer[i].trace_chan_id = UINT8_MAX;
+>  		decoder->packet_buffer[i].cpu = INT_MIN;
 >  	}
+>  }
+> @@ -331,6 +332,7 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
+>  	decoder->packet_buffer[et].last_instr_cond = 0;
+>  	decoder->packet_buffer[et].flags = 0;
+>  	decoder->packet_buffer[et].exception_number = UINT32_MAX;
+> +	decoder->packet_buffer[et].trace_chan_id = trace_chan_id;
 >  
->  	/*
-> diff --git a/tools/perf/util/cs-etm.h b/tools/perf/util/cs-etm.h
-> index 37f8d48179ca..5d70d10f3907 100644
-> --- a/tools/perf/util/cs-etm.h
-> +++ b/tools/perf/util/cs-etm.h
-> @@ -53,7 +53,7 @@ enum {
->  	CS_ETMV4_PRIV_MAX,
+>  	if (decoder->packet_count == MAX_BUFFER - 1)
+>  		return OCSD_RESP_WAIT;
+> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+> index 012b4728a46f..7e6a8850be4a 100644
+> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+> @@ -50,6 +50,7 @@ struct cs_etm_packet {
+>  	u8 last_instr_cond;
+>  	u8 last_instr_taken_branch;
+>  	u8 last_instr_size;
+> +	u8 trace_chan_id;
+>  	int cpu;
+
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+
 >  };
 >  
-> -/* RB tree for quick conversion between traceID and CPUs */
-> +/* RB tree for quick conversion between traceID and metadata pointers */
->  struct intlist *traceid_list;
->  
->  #define KiB(x) ((x) * 1024)
-> @@ -78,4 +78,6 @@ cs_etm__process_auxtrace_info(union perf_event *event __maybe_unused,
->  }
->  #endif
->  
-> +int cs_etm__get_cpu(u8 trace_chan_id, int *cpu);
-
-This function is part of a public header that can theoretically be included by
-any other file.  As such it has to be defined within the HAVE_CSTRACE_SUPPORT
-define.
-
-> +
->  #endif
 > -- 
 > 2.17.1
 > 
