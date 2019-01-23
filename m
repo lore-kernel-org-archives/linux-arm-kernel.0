@@ -2,149 +2,69 @@ Return-Path: <SRS0=uP4V=P7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9525DC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 22:57:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 59677C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 22:57:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 61F5D218A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 22:57:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 262D3218AE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 22:57:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Bb6ukhpb";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="jfG2nESF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 61F5D218A2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AtgfSOFL";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="SIH7Rh9U"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 262D3218AE
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=WbpCFhDum33Pw6dkbQ3OfQ93GMbFCbza19Wy9L0Rk40=; b=Bb6ukhpbuqXJTJ
-	yujZlxmEVdPeguw1pMVQQdIg3q5HCY26OY+JLb43HNkCFfQfCO9XdxfAv/tXUNtKWNX4W9X8OzuHO
-	BsvzyJqMyMBX50l7ddh5ZZ9gP4gc5ewsefGlg0RQXl/yrQ6iUstzDneOv1eR8MmNdRQtO41tRy3wR
-	fsXXEBx+PndSfOvch7NelP9DgarED5Itoh/zpMDH2acXqwlHAWO3mFoV3/bDK8STSb8b2JzzuL3FX
-	ERSUZrD++1Vr4+w5uc3hn0IbRLWCwtYhh08u4Ev4MkZ8ghh2rFRfaxGqdTiPit46RYAC/w5h+qHDF
-	igg7WnZyUh+vbcIyZ5mg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:
+	References:In-Reply-To:Subject:To:From:Date:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=rtk6ij5wujMPMNF2PutQoZdcXQcJOIYTRjm8GmGMp6Y=; b=AtgfSOFLp5GAJCGsY/idH25OeC
+	vDjkcpJBlA9HyPnMDmokK7Nc/bkCxlnKUofX7kmZUwPXhLG/zCS27UsL4ozpdde/FRSkWe+hu8lcf
+	7ZE0T+Qrm1iBJaKYiRmc9aWKLKYD7b/ISH/r3SjwbYAbFS/zXLfnK5iIKLnIufdmYQvY+JBzUYuqU
+	VaBEAYMsUmfiK91XTrAeqXk9F593KYcTURrWhbQUV6Xh0OxTFOeTPKS3XgF7FUyiNAIi1Qo5+pFvZ
+	lAPHbzFCRjq8Hm0CnjuSIGAQNXXTEgwTibwIq7Tt7WOPrc9dw7bGo8WjnqsSwqhe4fcKXIatByG/9
+	PSkE1uAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmRSO-0005o5-Hf; Wed, 23 Jan 2019 22:57:16 +0000
-Received: from mail-yb1-xb41.google.com ([2607:f8b0:4864:20::b41])
+	id 1gmRSu-00069e-On; Wed, 23 Jan 2019 22:57:48 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmRSK-0005nR-Jj
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 22:57:13 +0000
-Received: by mail-yb1-xb41.google.com with SMTP id i6so1595388ybo.7
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 23 Jan 2019 14:57:12 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=sZgEdcq5fmLfYmetOzbNK+yPH9jSwQVUvwB9lgRNcR0=;
- b=jfG2nESF4wKds/FC+KiiM/WHqKMlutOc7U+INbmswHVaaTrMou3k66X6HpePVa+d24
- uHI+c8OR46Ynsa+cxYg7GwEc8O7HalBRf0POAbKBUKvRgC+sJpnja5iafTxeLmS371dq
- pF5J8jbeOb5SSwSrfO/OU7Sm4K0BK6ENegnZhUPZBPl19njqjWF6P+i0hJicwRep7AHw
- 3fNdyzuqYLfiyCmKnOHELnjSOl/+LpFkmANx/e7XPLRTZdgqmVp/kbLWuGBm6Vl0zdy8
- yOKNVdeKkrvQNkDS+lHMuKLfAe7attyJOwPFSSuBCgU/7jeKj5fGwpe9Y/wBU0jIRY5K
- IbPw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=sZgEdcq5fmLfYmetOzbNK+yPH9jSwQVUvwB9lgRNcR0=;
- b=hD/ny8neAdVVqZvpYLsVoXvZFvQA3BJc6PRwx0CKT/e4IJ3AWkVRI+Lbi+D6A9l2PM
- McZkcuSz18rpQ1armW3NRTKAgWbEPKxS2nMBWhsIumraQjxohVZCdg6daHaxzvRbFIpG
- jz3lGznsuq96FH/FU49BnKqlcTw2zv+xHhV9/H1dBgR9laYNzQftsHN1/vAX8ZetT5nV
- pcJB0IVINUglBgm8tAeghnKIxYKtqV/8LWLTyi6EEgP4cxVj/nwVq7/sTVCXhG86AaTr
- VqM7yzhE24iBsBiYUIy6xunA6OUASaPWanha8DS4etDuC7Qdb0IuUueJPq5hlUT9You0
- UaNw==
-X-Gm-Message-State: AJcUukdxG0rc1UA6eXfzGXPrOmlDbEWBkzTSfm63a7+1MNTT5fqQn8CJ
- y0anLjEvbyybm0FLlQJMLnSNaUiN
-X-Google-Smtp-Source: ALg8bN74pybSHWtUNKr7sIavAH1WA6y+DxO5nlxUe9CPbdes92/fttYYNFPEK4/w0FKs/6XHsFQ1Wg==
-X-Received: by 2002:a25:16c6:: with SMTP id 189mr3952297ybw.17.1548284231281; 
- Wed, 23 Jan 2019 14:57:11 -0800 (PST)
-Received: from [10.67.49.9] ([192.19.223.250])
- by smtp.googlemail.com with ESMTPSA id l7sm7410722ywk.24.2019.01.23.14.57.05
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 23 Jan 2019 14:57:09 -0800 (PST)
-Subject: Re: [PATCH reset-next 0/2] reset: brcmstb: Misc fixes
-To: Philipp Zabel <p.zabel@pengutronix.de>,
- Florian Fainelli <f.fainelli@gmail.com>, linux-kernel@vger.kernel.org
-References: <20190123003345.13750-1-f.fainelli@gmail.com>
- <1548236510.3904.3.camel@pengutronix.de>
-From: Florian Fainelli <f.fainelli@gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=f.fainelli@gmail.com; prefer-encrypt=mutual; keydata=
- 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
- M5kY0ACeNhCZJvZ5g4C2Lc9fcTHu8jxmEkI=
-Message-ID: <759cd990-75a3-d7cc-94a6-c62714c85f0e@gmail.com>
-Date: Wed, 23 Jan 2019 14:56:57 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <1548236510.3904.3.camel@pengutronix.de>
-Content-Language: en-US
+ id 1gmRSq-00069C-Pf
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 22:57:46 +0000
+Received: from localhost (unknown [23.100.24.84])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id B814420856;
+ Wed, 23 Jan 2019 22:57:43 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548284264;
+ bh=RBBQYyushjJZUsXxefbvW1saQZJFLafTPDWXfaXwRks=;
+ h=Date:From:To:To:To:Cc:Cc:Cc:Cc:Cc:Cc:Cc:Cc:Cc:Subject:In-Reply-To:
+ References:From;
+ b=SIH7Rh9UzFDI1DTIZp/DxNzycSIcppa2OVDZd5GZAe76q92JZkc6fgon/gCw/WBkD
+ NNDXVwCvFxi6mpU3hxCxMHJGnR5H+ApOC67MKUbQf7Qe2pL6QM6tyExJzPucYqN7cY
+ bMzi5uokBh38fCoO1iB5rTAHe31Sl/uMllcgSxXc=
+Date: Wed, 23 Jan 2019 22:57:42 +0000
+From: Sasha Levin <sashal@kernel.org>
+To: Sasha Levin <sashal@kernel.org>
+To: Julien Thierry <julien.thierry@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: Re: [PATCH v9 01/26] arm64: Fix HCR.TGE status for NMI contexts
+In-Reply-To: <1548084825-8803-2-git-send-email-julien.thierry@arm.com>
+References: <1548084825-8803-2-git-send-email-julien.thierry@arm.com>
+Message-Id: <20190123225743.B814420856@mail.kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_145712_651141_69DE4D2F 
-X-CRM114-Status: GOOD (  14.88  )
+X-CRM114-CacheID: sfid-20190123_145744_861704_08C2574B 
+X-CRM114-Status: UNSURE (   9.48  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -156,38 +76,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, sfr@canb.auug.org.au, rdunlap@infradead.org,
- paul.gortmaker@windriver.com, Rob Herring <robh+dt@kernel.org>,
- "maintainer:BROADCOM BCM7XXX ARM ARCHITECTURE"
- <bcm-kernel-feedback-list@broadcom.com>, linux-next@vger.kernel.org,
- Gregory Fong <gregory.0xf0@gmail.com>,
- Brian Norris <computersforpeace@gmail.com>,
- "moderated list:BROADCOM BCM7XXX ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: , linux-arch@vger.kernel.org, daniel.thompson@linaro.org,
+ Arnd Bergmann <arnd@arndb.de>, Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, stable@vger.kernel.org,
+ James Morse <james.morse@arm.com>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/23/19 1:41 AM, Philipp Zabel wrote:
-> On Tue, 2019-01-22 at 16:33 -0800, Florian Fainelli wrote:
->> Hi Philipp,
->>
->> These two patches fix some recent issues brought up by Paul and Randy,
->> feel free to squash into c196cdc7659d ("reset: Add Broadcom STB SW_INIT
->> reset controller driver") since this is only in reset/next and
->> linux-next so far.
-> 
-> If you want this squashed, feel free to submit an updated version of the
-> original patches and I'll replace them. That way I don't have to decide
-> how to stitch (or drop) the commit messages.
+Hi,
 
-Thanks, I sent you a replacement version for the second patch only, hope
-that is alright.
--- 
-Florian
+[This is an automated email]
+
+This commit has been processed because it contains a -stable tag.
+The stable tag indicates that it's relevant for the following trees: all
+
+The bot has tested the following trees: v4.20.3, v4.19.16, v4.14.94, v4.9.151, v4.4.171, v3.18.132.
+
+v4.20.3: Build OK!
+v4.19.16: Build OK!
+v4.14.94: Build OK!
+v4.9.151: Failed to apply! Possible dependencies:
+    096683724cb2 ("arm64: unwind: avoid percpu indirection for irq stack")
+    34be98f4944f ("arm64: kernel: remove {THREAD,IRQ_STACK}_START_SP")
+    a9ea0017ebe8 ("arm64: factor out current_stack_pointer")
+    c02433dd6de3 ("arm64: split thread_info from task stack")
+    c7365330753c ("arm64: unwind: disregard frame.sp when validating frame pointer")
+    dbc9344a68e5 ("arm64: clean up THREAD_* definitions")
+    f60ad4edcf07 ("arm64: clean up irq stack definitions")
+    f60fe78f1332 ("arm64: use an irq stack pointer")
+
+v4.4.171: Failed to apply! Possible dependencies:
+    096683724cb2 ("arm64: unwind: avoid percpu indirection for irq stack")
+    0a8ea52c3eb1 ("arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature")
+    132cd887b5c5 ("arm64: Modify stack trace and dump for use with irq_stack")
+    1ffe199b1c9b ("arm64: when walking onto the task stack, check sp & fp are in current->stack")
+    20380bb390a4 ("arm64: ftrace: fix a stack tracer's output under function graph tracer")
+    7596abf2e566 ("arm64: irq: fix walking from irq stack to task stack")
+    8e23dacd12a4 ("arm64: Add do_softirq_own_stack() and enable irq_stacks")
+    971c67ce37cf ("arm64: reduce stack use in irq_handler")
+    a80a0eb70c35 ("arm64: make irq_stack_ptr more robust")
+    c7365330753c ("arm64: unwind: disregard frame.sp when validating frame pointer")
+    f60ad4edcf07 ("arm64: clean up irq stack definitions")
+    f60fe78f1332 ("arm64: use an irq stack pointer")
+    fe13f95b7200 ("arm64: pass a task parameter to unwind_frame()")
+
+v3.18.132: Failed to apply! Possible dependencies:
+    020295b4cb5b ("ACPI / processor: Make it possible to get CPU hardware ID via GICC")
+    132cd887b5c5 ("arm64: Modify stack trace and dump for use with irq_stack")
+    13ca62b243f6 ("ACPI: Fix minor syntax issues in processor_core.c")
+    37655163ce1a ("ARM64 / ACPI: Get RSDP and ACPI boot-time tables")
+    587064b610c7 ("arm64: Add framework for legacy instruction emulation")
+    652261a7a86c ("ACPI: fix acpi_os_ioremap for arm64")
+    828aef376d7a ("ACPI / processor: Introduce phys_cpuid_t for CPU hardware ID")
+    96f0e00378d4 ("ARM: add basic support for on-demand backtrace of other CPUs")
+    af2c632e234f ("arm64/include/asm: Fixed a warning about 'struct pt_regs'")
+    af8f3f514d19 ("ACPI / processor: Convert apic_id to phys_id to make it arch agnostic")
+    b4ff8389ed14 ("xen/events: Always allocate legacy interrupts on PV guests")
+    d02dc27db0dc ("ACPI / processor: Rename acpi_(un)map_lsapic() to acpi_(un)map_cpu()")
+    d60fc3892c4d ("irqchip: Add GICv2 specific ACPI boot support")
+    ecf5636dcd59 ("ACPI: Add interfaces to parse IOAPIC ID for IOAPIC hotplug")
+    f60ad4edcf07 ("arm64: clean up irq stack definitions")
+    f60fe78f1332 ("arm64: use an irq stack pointer")
+
+
+How should we proceed with this patch?
+
+--
+Thanks,
+Sasha
 
 _______________________________________________
 linux-arm-kernel mailing list
