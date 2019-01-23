@@ -2,69 +2,112 @@ Return-Path: <SRS0=uP4V=P7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DAE9EC282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 11:03:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1ECEBC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 11:06:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 806AE21019
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 11:03:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E147421019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 11:06:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cM1oknGB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 806AE21019
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PZEtQtH+";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=Mellanox.com header.i=@Mellanox.com header.b="pBf+7BDP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E147421019
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=mellanox.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=h2lPDqR0aPCYfQhurbiB628UJFEEy7DfuY5y2vLplyA=; b=cM1oknGBKOPqgX
-	RZ6xe9pm5M46W4yGVif1Rwds9kvDXQCJDT5N1lOi60no/Z7kPgTB7TWWbkrFGoT9tVl08zvNaKfZd
-	CfZhr4bPJrR5nLlJ/78yDdf4B1359c4WQepStrvs/jXd0TDlOCAeV14VcTEKgmOm5jks0CDco0xSL
-	Cy9QJh3ZKRee64hPuAQnTKigJojMTbVIWuXjJJZm7vbW0etinyNSnCPdkXbs1zrY81+UQSNx3FCzF
-	A0plvePrmRmLzc4adawFbL1bOfiEVux7s4SyIoSgxN74Ux7UONaK6ZUkMESOST4H+KkdLd021/nkY
-	W/+CTUACVX9KWQElOgNQ==;
+	List-Owner; bh=c6AHjN5GbS4K3Hh/wQXDKsEtMzUIdsBqs+OBg3pzDl4=; b=PZEtQtH+ruC63T
+	wCIrB4/MYmNcGoPJ8BE+031V6X1PaqmWbnWlAVxuEFicOcoO7r8e1GJMPdheM2WGNAbiL2axmrwfn
+	hBA35YsYFer4kYR77DFGQy2ouak+lhq7nmfP1l/HoMVQokV9V27kNXHsOGfdCudJpLdwCaEI+RAcF
+	jHkxq9O8Q/kImhA2KGCArhFNA6baZlFIuKjT1xGokqgmp7YF75Q5mAOLd+bKXuuaidcG/WJ6fChXJ
+	LyFUe30njZRm+7vuCK3+3Q7Nph+/nOT7ifmlPJYW/tp00xjiKZcAhZ4I9i8hi0jku0x4HfQ5yKPar
+	RMuefDY9SXG+UElVyJKA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmGJL-0005gH-Ah; Wed, 23 Jan 2019 11:03:11 +0000
-Received: from lhrrgout.huawei.com ([185.176.76.210] helo=huawei.com)
+	id 1gmGMU-0007P2-IK; Wed, 23 Jan 2019 11:06:26 +0000
+Received: from mail-eopbgr60080.outbound.protection.outlook.com ([40.107.6.80]
+ helo=EUR04-DB3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmGJD-0005f2-Rf
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 11:03:08 +0000
-Received: from LHREML710-CAH.china.huawei.com (unknown [172.18.7.107])
- by Forcepoint Email with ESMTP id 110CA88E94A8DD5A75A6;
- Wed, 23 Jan 2019 11:03:00 +0000 (GMT)
-Received: from LHREML524-MBS.china.huawei.com ([169.254.2.138]) by
- LHREML710-CAH.china.huawei.com ([10.201.108.33]) with mapi id 14.03.0415.000; 
- Wed, 23 Jan 2019 11:02:49 +0000
-From: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
-To: Andrew Murray <andrew.murray@arm.com>
-Subject: RE: [PATCH v5 2/4] perf: add arm64 smmuv3 pmu driver
-Thread-Topic: [PATCH v5 2/4] perf: add arm64 smmuv3 pmu driver
-Thread-Index: AQHUiMReCYaliznTZUOBIOWTrrVwNqW7zC+AgAEf2sA=
-Date: Wed, 23 Jan 2019 11:02:48 +0000
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA83929855B@lhreml524-mbs.china.huawei.com>
-References: <20181130154751.28580-1-shameerali.kolothum.thodi@huawei.com>
- <20181130154751.28580-3-shameerali.kolothum.thodi@huawei.com>
- <20190122162351.GE8120@e119886-lin.cambridge.arm.com>
-In-Reply-To: <20190122162351.GE8120@e119886-lin.cambridge.arm.com>
-Accept-Language: en-GB, en-US
+ id 1gmGMP-0007OQ-VV
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 11:06:24 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=Mellanox.com;
+ s=selector1;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=nvN4xtKgmmt4kfD3iavyv4MSDRoRUNR8dYEiu1ZVdWk=;
+ b=pBf+7BDPwQeOoqT9EjX3+z1Jua/9NLpZwKHx0C8Uy4Kl9Bvl3qxwZ4crbrMr4XdCU8s1sASvbtNmyFRfoMfHGEAq/shRX1RJ/O0FvSGzbFTecZtS6kqwjYPgqd/2NLYwVWlrn02rsxVOacMubeXZ93uC5s6mST52vp41RXrl8Hw=
+Received: from AM0PR0502MB4068.eurprd05.prod.outlook.com (52.133.41.24) by
+ AM0SPR01MB0025.eurprd05.prod.outlook.com (52.133.59.158) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1558.16; Wed, 23 Jan 2019 11:06:17 +0000
+Received: from AM0PR0502MB4068.eurprd05.prod.outlook.com
+ ([fe80::c5a8:ab5d:6acb:408d]) by AM0PR0502MB4068.eurprd05.prod.outlook.com
+ ([fe80::c5a8:ab5d:6acb:408d%4]) with mapi id 15.20.1537.031; Wed, 23 Jan 2019
+ 11:06:17 +0000
+From: Eran Ben Elisha <eranbe@mellanox.com>
+To: Maxim Kuvyrkov <maxim.kuvyrkov@linaro.org>
+Subject: Re: [BUG] Linux-next fails to link on ARM in allyesconfig
+Thread-Topic: [BUG] Linux-next fails to link on ARM in allyesconfig
+Thread-Index: AQHUswO7mwbjylU7BkmpK9OZcZxi56W8sUcA
+Date: Wed, 23 Jan 2019 11:06:17 +0000
+Message-ID: <43777a0c-8c04-0216-496b-e1025c7f97b8@mellanox.com>
+References: <0B66524E-5E31-4B9A-BFA5-B7F77264C967@linaro.org>
+In-Reply-To: <0B66524E-5E31-4B9A-BFA5-B7F77264C967@linaro.org>
+Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
-x-originating-ip: [10.202.227.237]
+x-clientproxiedby: AM6P191CA0046.EURP191.PROD.OUTLOOK.COM
+ (2603:10a6:209:7f::23) To AM0PR0502MB4068.eurprd05.prod.outlook.com
+ (2603:10a6:208:12::24)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=eranbe@mellanox.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [193.47.165.251]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0SPR01MB0025;
+ 6:JN8Pjv+t94D+RWK7nrKaSxRnRXvG/LQkM+pdGwhexGjrr631KFy+W3WG/zRGjRe26KDY89wptheYR9X1awu8P9/phw68voOxYTssk4/X6GCoIXtYJAQ0+0K945+CdUCwCfsO099kULVsrHSgKb4G3pjXLm7C6JgBI7vDwYHWHN6x7uLNtQ05YSOOpP72pPvh4UYDjBBjGYAX2i0v5+xmU1G/yciGxFwL9M7k4Hzlr/7z/H0GiODelJdt5kiCWhZufkgyZ15MdJ5vah6V6Dfn5Y7mRW9QhK6cbT0In1nUQjN2rDo8rNSp8MDptaWL99CG14LXDyZfkGfs2ePGuX4Rd4dQvx4VeQw2zcdUX0vvIED0my2oXdG+kMDHo4urLRWX4sT0C5AZ5JHTLciDdcP3jruiFcwPgRhnCQY8fA95q1ra3pbUuFaGPothEF2DUonpf6lqixu8chjtfQtks1ooAA==;
+ 5:3Ggq9uuUL9IYnGCOoUMUV/SiRDs/pj8WnD4VM5TIC57xbKE25fLH0dtCgeiyo0iIcrB3ZLCY2qbB1xzgDQE8mnj8uzwnuAt/hygriSpD5MGSILeui2UWJqz4moLZszWNt0LqHToQJtG/RqXHwomMYSxwk0t3PAPSDLbNTaxHdStyNUws0777NyYqRbEPeSint7dX/SZ2utt2ZfVfLRwnhw==;
+ 7:S2gUrWJIfJ5BVbXj/xj6pjxYrOGyrvkkTgJwRYGzBp7ZUSerN3SpL4T5nxvg0j12ZIzmFpCbHHzDlL+yc5ohBoZG4A5xLPDErNWBgPfjOhgXxOybWVE1AWU+LGgDJ0/lMGoaxHLK2l5ams1VTiJCjw==
+x-ms-office365-filtering-correlation-id: 63fd2a44-b17a-43cd-7765-08d68122cbe7
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605077)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:AM0SPR01MB0025; 
+x-ms-traffictypediagnostic: AM0SPR01MB0025:
+x-microsoft-antispam-prvs: <AM0SPR01MB00250ADA4DDA498D2D29C6A3BA990@AM0SPR01MB0025.eurprd05.prod.outlook.com>
+x-forefront-prvs: 0926B0E013
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(366004)(39860400002)(346002)(136003)(376002)(199004)(189003)(106356001)(31686004)(105586002)(71200400001)(186003)(26005)(71190400001)(86362001)(6916009)(3846002)(6116002)(31696002)(486006)(4326008)(11346002)(446003)(54906003)(6246003)(229853002)(76176011)(53546011)(53936002)(305945005)(6506007)(386003)(97736004)(2616005)(316002)(66066001)(6436002)(6486002)(14454004)(8936002)(81166006)(36756003)(8676002)(81156014)(25786009)(6512007)(2906002)(68736007)(478600001)(7736002)(45080400002)(966005)(99286004)(256004)(52116002)(14444005)(6306002)(476003)(102836004);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0SPR01MB0025;
+ H:AM0PR0502MB4068.eurprd05.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: mellanox.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: mcEX88O58inrTm6BLM1bM/UvtYSyMLQj8gssqvgmonEaig11yHAxJSNEEsCZv0iOfwJ4EhzjVlhT3QgqELlh1cbzm4e+smE2vzvq8yurqNf540S+rA7AgxuzShKtTVQQIj47OKQM0PImvsEzam+lKmoHdNaBIWqw273q7kMKKTAOOvWiwkvcYXmJrbxhooj8SW6Okh/BsLZXZvgU5a7FdEyqd1zLNsbhI/wbY6TdqgHkAB1FJuIJv/u8h4Zlx7rqzs3fBeI8m5Y41ZZ/lKGBgR2kwMqhD2c9SN3fFCcMSQuGvWI4dutcu2S2Jd+I7m0TKTnNozbVDXO7p3iZPblXmsRjRK3zNooR+eMvhXLGKy0oxDqGYeNZnRBwhNjH0alyiVrSwkokIF59UKN9Vtsg2ECUqFFvUfL3Lp2YwO6g3m4=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+Content-ID: <D7DE9D53FD6DD943BE8DAEEEEE5AAEEB@eurprd05.prod.outlook.com>
 MIME-Version: 1.0
-X-CFilter-Loop: Reflected
+X-OriginatorOrg: Mellanox.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 63fd2a44-b17a-43cd-7765-08d68122cbe7
+X-MS-Exchange-CrossTenant-originalarrivaltime: 23 Jan 2019 11:06:16.4425 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: a652971c-7d2e-4d9b-a6a4-d149256f461b
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0SPR01MB0025
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_030304_411436_FE551126 
-X-CRM114-Status: GOOD (  32.99  )
+X-CRM114-CacheID: sfid-20190123_030622_252228_5390A6F2 
+X-CRM114-Status: GOOD (  17.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,1026 +119,134 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "vkilari@codeaurora.org" <vkilari@codeaurora.org>,
- "lorenzo.pieralisi@arm.com" <lorenzo.pieralisi@arm.com>,
- "neil.m.leeder@gmail.com" <neil.m.leeder@gmail.com>,
- "jean-philippe.brucker@arm.com" <jean-philippe.brucker@arm.com>,
- "pabba@codeaurora.org" <pabba@codeaurora.org>,
- John Garry <john.garry@huawei.com>,
- "will.deacon@arm.com" <will.deacon@arm.com>,
- "rruigrok@codeaurora.org" <rruigrok@codeaurora.org>,
- Linuxarm <linuxarm@huawei.com>,
- "linux-acpi@vger.kernel.org" <linux-acpi@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "Guohanjun \(Hanjun Guo\)" <guohanjun@huawei.com>,
- "robin.murphy@arm.com" <robin.murphy@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+Cc: Mark Brown <mark.brown@linaro.org>, Arnd Bergmann <arnd@linaro.org>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Andrew,
 
-Thanks for taking a look at this.
 
-> -----Original Message-----
-> From: Andrew Murray [mailto:andrew.murray@arm.com]
-> Sent: 22 January 2019 16:24
-> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
-> Cc: lorenzo.pieralisi@arm.com; robin.murphy@arm.com;
-> mark.rutland@arm.com; vkilari@codeaurora.org; neil.m.leeder@gmail.com;
-> jean-philippe.brucker@arm.com; pabba@codeaurora.org; John Garry
-> <john.garry@huawei.com>; will.deacon@arm.com; rruigrok@codeaurora.org;
-> Linuxarm <linuxarm@huawei.com>; linux-kernel@vger.kernel.org;
-> linux-acpi@vger.kernel.org; Guohanjun (Hanjun Guo)
-> <guohanjun@huawei.com>; linux-arm-kernel@lists.infradead.org
-> Subject: Re: [PATCH v5 2/4] perf: add arm64 smmuv3 pmu driver
+On 1/23/2019 12:09 PM, Maxim Kuvyrkov wrote:
+> Hi Eran,
 > 
-> On Fri, Nov 30, 2018 at 03:47:49PM +0000, Shameer Kolothum wrote:
-> > From: Neil Leeder <nleeder@codeaurora.org>
-> >
-> > Adds a new driver to support the SMMUv3 PMU and add it into the
-> > perf events framework.
-> >
-> > Each SMMU node may have multiple PMUs associated with it, each of
-> > which may support different events.
-> >
-> > SMMUv3 PMCG devices are named as smmuv3_pmcg_<phys_addr_page>
-> where
-> > <phys_addr_page> is the physical page address of the SMMU PMCG
-> > wrapped to 4K boundary. For example, the PMCG at 0xff88840000 is
-> > named smmuv3_pmcg_ff88840
-> >
-> > Filtering by stream id is done by specifying filtering parameters
-> > with the event. options are:
-> >    filter_enable    - 0 = no filtering, 1 = filtering enabled
-> >    filter_span      - 0 = exact match, 1 = pattern match
-> >    filter_stream_id - pattern to filter against
-> >
-> > Example: perf stat -e smmuv3_pmcg_ff88840/transaction,filter_enable=1,
-> >                        filter_span=1,filter_stream_id=0x42/ -a netperf
-> >
-> > Applies filter pattern 0x42 to transaction events, which means events
-> > matching stream ids 0x42 & 0x43 are counted as only upper StreamID
-> > bits are required to match the given filter. Further filtering
-> > information is available in the SMMU documentation.
-> >
-> > SMMU events are not attributable to a CPU, so task mode and sampling
-> > are not supported.
-> >
-> > Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
-> > Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-> > ---
-> >  drivers/perf/Kconfig          |   9 +
-> >  drivers/perf/Makefile         |   1 +
-> >  drivers/perf/arm_smmuv3_pmu.c | 778
-> ++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 788 insertions(+)
-> >  create mode 100644 drivers/perf/arm_smmuv3_pmu.c
-> >
-> > diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-> > index 08ebaf7..92be6a3 100644
-> > --- a/drivers/perf/Kconfig
-> > +++ b/drivers/perf/Kconfig
-> > @@ -52,6 +52,15 @@ config ARM_PMU_ACPI
-> >  	depends on ARM_PMU && ACPI
-> >  	def_bool y
-> >
-> > +config ARM_SMMU_V3_PMU
-> > +	 bool "ARM SMMUv3 Performance Monitors Extension"
-> > +	 depends on ARM64 && ACPI && ARM_SMMU_V3
-> > +	   help
-> > +	   Provides support for the SMMU version 3 performance monitor unit
-> (PMU)
-> > +	   on ARM-based systems.
-> > +	   Adds the SMMU PMU into the perf events subsystem for
-> > +	   monitoring SMMU performance events.
-> > +
-> >  config ARM_DSU_PMU
-> >  	tristate "ARM DynamIQ Shared Unit (DSU) PMU"
-> >  	depends on ARM64
-> > diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
-> > index b3902bd..f10a932 100644
-> > --- a/drivers/perf/Makefile
-> > +++ b/drivers/perf/Makefile
-> > @@ -4,6 +4,7 @@ obj-$(CONFIG_ARM_CCN) += arm-ccn.o
-> >  obj-$(CONFIG_ARM_DSU_PMU) += arm_dsu_pmu.o
-> >  obj-$(CONFIG_ARM_PMU) += arm_pmu.o arm_pmu_platform.o
-> >  obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
-> > +obj-$(CONFIG_ARM_SMMU_V3_PMU) += arm_smmuv3_pmu.o
-> >  obj-$(CONFIG_HISI_PMU) += hisilicon/
-> >  obj-$(CONFIG_QCOM_L2_PMU)	+= qcom_l2_pmu.o
-> >  obj-$(CONFIG_QCOM_L3_PMU) += qcom_l3_pmu.o
-> > diff --git a/drivers/perf/arm_smmuv3_pmu.c
-> b/drivers/perf/arm_smmuv3_pmu.c
-> > new file mode 100644
-> > index 0000000..fb9dcd8
-> > --- /dev/null
-> > +++ b/drivers/perf/arm_smmuv3_pmu.c
-> > @@ -0,0 +1,778 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +
-> > +/*
-> > + * This driver adds support for perf events to use the Performance
-> > + * Monitor Counter Groups (PMCG) associated with an SMMUv3 node
-> > + * to monitor that node.
-> > + *
-> > + * SMMUv3 PMCG devices are named as smmuv3_pmcg_<phys_addr_page>
-> where
-> > + * <phys_addr_page> is the physical page address of the SMMU PMCG
-> wrapped
-> > + * to 4K boundary. For example, the PMCG at 0xff88840000 is named
-> > + * smmuv3_pmcg_ff88840
-> > + *
-> > + * Filtering by stream id is done by specifying filtering parameters
-> > + * with the event. options are:
-> > + *   filter_enable    - 0 = no filtering, 1 = filtering enabled
-> > + *   filter_span      - 0 = exact match, 1 = pattern match
-> > + *   filter_stream_id - pattern to filter against
-> > + *
-> > + * To match a partial StreamID where the X most-significant bits must match
-> > + * but the Y least-significant bits might differ, STREAMID is programmed
-> > + * with a value that contains:
-> > + *  STREAMID[Y - 1] == 0.
-> > + *  STREAMID[Y - 2:0] == 1 (where Y > 1).
-> > + * The remainder of implemented bits of STREAMID (X bits, from bit Y
-> upwards)
-> > + * contain a value to match from the corresponding bits of event StreamID.
-> > + *
-> > + * Example: perf stat -e
-> smmuv3_pmcg_ff88840/transaction,filter_enable=1,
-> > + *                    filter_span=1,filter_stream_id=0x42/ -a netperf
-> > + * Applies filter pattern 0x42 to transaction events, which means events
-> > + * matching stream ids 0x42 and 0x43 are counted. Further filtering
-> > + * information is available in the SMMU documentation.
-> > + *
-> > + * SMMU events are not attributable to a CPU, so task mode and sampling
-> > + * are not supported.
-> > + */
-> > +
-> > +#include <linux/acpi.h>
-> > +#include <linux/bitfield.h>
-> > +#include <linux/bitops.h>
-> > +#include <linux/cpuhotplug.h>
-> > +#include <linux/cpumask.h>
-> > +#include <linux/device.h>
-> > +#include <linux/errno.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/irq.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/list.h>
-> > +#include <linux/msi.h>
-> > +#include <linux/perf_event.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/smp.h>
-> > +#include <linux/sysfs.h>
-> > +#include <linux/types.h>
-> > +
-> > +#define SMMU_PMCG_EVCNTR0               0x0
-> > +#define SMMU_PMCG_EVCNTR(n, stride)     (SMMU_PMCG_EVCNTR0 +
-> (n) * (stride))
-> > +#define SMMU_PMCG_EVTYPER0              0x400
-> > +#define SMMU_PMCG_EVTYPER(n)
-> (SMMU_PMCG_EVTYPER0 + (n) * 4)
-> > +#define SMMU_PMCG_SID_SPAN_SHIFT        29
-> > +#define SMMU_PMCG_SID_SPAN_MASK         GENMASK(29, 29)
-> > +#define SMMU_PMCG_SMR0                  0xA00
-> > +#define SMMU_PMCG_SMR(n)                (SMMU_PMCG_SMR0 +
-> (n) * 4)
-> > +#define SMMU_PMCG_CNTENSET0             0xC00
-> > +#define SMMU_PMCG_CNTENCLR0             0xC20
-> > +#define SMMU_PMCG_INTENSET0             0xC40
-> > +#define SMMU_PMCG_INTENCLR0             0xC60
-> > +#define SMMU_PMCG_OVSCLR0               0xC80
-> > +#define SMMU_PMCG_OVSSET0               0xCC0
-> > +#define SMMU_PMCG_CFGR                  0xE00
-> > +#define SMMU_PMCG_CFGR_RELOC_CTRS       BIT(20)
-> > +#define SMMU_PMCG_CFGR_SID_FILTER_TYPE  BIT(23)
-> > +#define SMMU_PMCG_CFGR_SIZE_MASK        GENMASK(13, 8)
-> > +#define SMMU_PMCG_CFGR_NCTR_MASK        GENMASK(5, 0)
-> > +#define SMMU_PMCG_CR                    0xE04
-> > +#define SMMU_PMCG_CR_ENABLE             BIT(0)
-> > +#define SMMU_PMCG_CEID0                 0xE20
-> > +#define SMMU_PMCG_CEID1                 0xE28
-> > +#define SMMU_PMCG_IRQ_CTRL              0xE50
-> > +#define SMMU_PMCG_IRQ_CTRL_IRQEN        BIT(0)
-> > +#define SMMU_PMCG_IRQ_CFG0              0xE58
-> > +
-> > +#define SMMU_DEFAULT_FILTER_SPAN        1
-> > +#define SMMU_DEFAULT_FILTER_STREAM_ID   GENMASK(31, 0)
-> > +
-> > +#define SMMU_MAX_COUNTERS               64
-> > +#define SMMU_ARCH_MAX_EVENT_ID          0x7F
-> > +#define SMMU_IMPDEF_MAX_EVENT_ID        0xFFFF
-> > +#define SMMU_ARCH_MAX_EVENTS
-> (SMMU_ARCH_MAX_EVENT_ID + 1)
-> > +
-> > +#define SMMU_PA_SHIFT                   12
-> > +
-> > +static int cpuhp_state_num;
-> > +
-> > +struct smmu_pmu {
-> > +	bool sid_filter_global;
-> > +	struct hlist_node node;
-> > +	struct perf_event *events[SMMU_MAX_COUNTERS];
-> > +	DECLARE_BITMAP(used_counters, SMMU_MAX_COUNTERS);
-> > +	DECLARE_BITMAP(supported_events, SMMU_ARCH_MAX_EVENTS);
-> > +	unsigned int irq;
-> > +	unsigned int on_cpu;
-> > +	struct pmu pmu;
-> > +	unsigned int num_counters;
-> > +	struct device *dev;
-> > +	void __iomem *reg_base;
-> > +	void __iomem *reloc_base;
-> > +	u64 counter_present_mask;
-> > +	u64 counter_mask;
-> > +};
-> > +
-> > +#define to_smmu_pmu(p) (container_of(p, struct smmu_pmu, pmu))
-> > +
-> > +#define SMMU_PMU_EVENT_ATTR_EXTRACTOR(_name, _config, _start,
-> _end)        \
-> > +	static inline u32 get_##_name(struct perf_event *event)            \
-> > +
-> 	{
->        \
-> > +		return FIELD_GET(GENMASK_ULL(_end, _start),                \
-> > +				 event->attr._config);                     \
-> > +	}
-> \
-> > +
-> > +SMMU_PMU_EVENT_ATTR_EXTRACTOR(event, config, 0, 15);
-> > +SMMU_PMU_EVENT_ATTR_EXTRACTOR(filter_stream_id, config1, 0, 31);
-> > +SMMU_PMU_EVENT_ATTR_EXTRACTOR(filter_span, config1, 32, 32);
-> > +SMMU_PMU_EVENT_ATTR_EXTRACTOR(filter_enable, config1, 33, 33);
-> > +
-> > +static inline void smmu_pmu_enable(struct pmu *pmu)
-> > +{
-> > +	struct smmu_pmu *smmu_pmu = to_smmu_pmu(pmu);
-> > +
-> > +	writel(SMMU_PMCG_CR_ENABLE, smmu_pmu->reg_base +
-> SMMU_PMCG_CR);
-> > +	writel(SMMU_PMCG_IRQ_CTRL_IRQEN,
-> > +	       smmu_pmu->reg_base + SMMU_PMCG_IRQ_CTRL);
+> It seems that your commit 880ee82f0313453ec5a6cb122866ac057263066b causes a link failure for ARM in allyesconfig.  This happens for at least gcc-8 and gcc-master compilers.
+> ===
+> arm-linux-gnueabihf-ld: net/core/devlink.o: in function `devlink_health_buffers_create':
+> devlink.c:(.text+0x4eac): undefined reference to `__aeabi_uldivmod'
+
+This one shall solve the issue:
+https://patchwork.ozlabs.org/patch/1029047/
+
+> ===
 > 
-> Should the interrupts be enabled before enabling the PMU?
-
-Yes, it make sense to do so.
-
-> > +}
-> > +
-> > +static inline void smmu_pmu_disable(struct pmu *pmu)
-> > +{
-> > +	struct smmu_pmu *smmu_pmu = to_smmu_pmu(pmu);
-> > +
-> > +	writel(0, smmu_pmu->reg_base + SMMU_PMCG_CR);
-> > +	writel(0, smmu_pmu->reg_base + SMMU_PMCG_IRQ_CTRL);
-> > +}
-> > +
-> > +static inline void smmu_pmu_counter_set_value(struct smmu_pmu
-> *smmu_pmu,
-> > +					      u32 idx, u64 value)
-> > +{
-> > +	if (smmu_pmu->counter_mask & BIT(32))
-> > +		writeq(value, smmu_pmu->reloc_base + SMMU_PMCG_EVCNTR(idx,
-> 8));
-> > +	else
-> > +		writel(value, smmu_pmu->reloc_base + SMMU_PMCG_EVCNTR(idx,
-> 4));
+> Would you please investigate?  Below is diagnostics from Linaro's automated bisection job.
 > 
-> The arm64 IO macros use __force u32 and so it's probably OK to provide a 64
-> bit
-> value to writel. But you could use something like lower_32_bits for clarity.
-
-Yes, macro uses __force u32. I will change it to make it more clear though.
-
-> > +}
-> > +
-> > +static inline u64 smmu_pmu_counter_get_value(struct smmu_pmu
-> *smmu_pmu, u32 idx)
-> > +{
-> > +	u64 value;
-> > +
-> > +	if (smmu_pmu->counter_mask & BIT(32))
-> > +		value = readq(smmu_pmu->reloc_base + SMMU_PMCG_EVCNTR(idx,
-> 8));
-> > +	else
-> > +		value = readl(smmu_pmu->reloc_base + SMMU_PMCG_EVCNTR(idx,
-> 4));
-> > +
-> > +	return value;
-> > +}
-> > +
-> > +static inline void smmu_pmu_counter_enable(struct smmu_pmu
-> *smmu_pmu, u32 idx)
-> > +{
-> > +	writeq(BIT(idx), smmu_pmu->reg_base + SMMU_PMCG_CNTENSET0);
-> > +}
-> > +
-> > +static inline void smmu_pmu_counter_disable(struct smmu_pmu
-> *smmu_pmu, u32 idx)
-> > +{
-> > +	writeq(BIT(idx), smmu_pmu->reg_base + SMMU_PMCG_CNTENCLR0);
-> > +}
-> > +
-> > +static inline void smmu_pmu_interrupt_enable(struct smmu_pmu
-> *smmu_pmu, u32 idx)
-> > +{
-> > +	writeq(BIT(idx), smmu_pmu->reg_base + SMMU_PMCG_INTENSET0);
-> > +}
-> > +
-> > +static inline void smmu_pmu_interrupt_disable(struct smmu_pmu
-> *smmu_pmu,
-> > +					      u32 idx)
-> > +{
-> > +	writeq(BIT(idx), smmu_pmu->reg_base + SMMU_PMCG_INTENCLR0);
-> > +}
-> > +
-> > +static inline void smmu_pmu_set_evtyper(struct smmu_pmu *smmu_pmu,
-> u32 idx,
-> > +					u32 val)
-> > +{
-> > +	writel(val, smmu_pmu->reg_base + SMMU_PMCG_EVTYPER(idx));
-> > +}
-> > +
-> > +static inline void smmu_pmu_set_smr(struct smmu_pmu *smmu_pmu, u32
-> idx, u32 val)
-> > +{
-> > +	writel(val, smmu_pmu->reg_base + SMMU_PMCG_SMR(idx));
-> > +}
-> > +
-> > +static void smmu_pmu_event_update(struct perf_event *event)
-> > +{
-> > +	struct hw_perf_event *hwc = &event->hw;
-> > +	struct smmu_pmu *smmu_pmu = to_smmu_pmu(event->pmu);
-> > +	u64 delta, prev, now;
-> > +	u32 idx = hwc->idx;
-> > +
-> > +	do {
-> > +		prev = local64_read(&hwc->prev_count);
-> > +		now = smmu_pmu_counter_get_value(smmu_pmu, idx);
-> > +	} while (local64_cmpxchg(&hwc->prev_count, prev, now) != prev);
-> > +
-> > +	/* handle overflow. */
-> > +	delta = now - prev;
-> > +	delta &= smmu_pmu->counter_mask;
-> > +
-> > +	local64_add(delta, &event->count);
-> > +}
-> > +
-> > +static void smmu_pmu_set_period(struct smmu_pmu *smmu_pmu,
-> > +				struct hw_perf_event *hwc)
-> > +{
-> > +	u32 idx = hwc->idx;
-> > +	u64 new;
-> > +
-> > +	/*
-> > +	 * We limit the max period to half the max counter value of the counter
-> > +	 * size, so that even in the case of extreme interrupt latency the
-> > +	 * counter will (hopefully) not wrap past its initial value.
-> > +	 */
-> > +	new = smmu_pmu->counter_mask >> 1;
-> > +
-> > +	local64_set(&hwc->prev_count, new);
-> > +	smmu_pmu_counter_set_value(smmu_pmu, idx, new);
-> > +}
-> > +
-> > +static void smmu_pmu_get_event_filter(struct perf_event *event, u32
-> *span,
-> > +				      u32 *stream_id)
-> > +{
-> > +	bool filter_en = !!get_filter_enable(event);
-> > +
-> > +	*span = filter_en ? get_filter_span(event) :
-> SMMU_DEFAULT_FILTER_SPAN;
-> > +	*stream_id = filter_en ? get_filter_stream_id(event) :
-> > +				 SMMU_DEFAULT_FILTER_STREAM_ID;
-> > +}
-> > +
-> > +static bool smmu_pmu_event_filter_valid(struct smmu_pmu *smmu_pmu,
-> > +				  struct perf_event *event, int idx)
-> > +{
-> > +	u32 filter_span, filter_sid;
-> > +	u32 curr_span, curr_sid;
-> > +
-> > +	if (!idx  || !smmu_pmu->sid_filter_global)
-> > +		return true;
-> > +
-> > +	smmu_pmu_get_event_filter(event, &filter_span, &filter_sid);
-> > +
-> > +	/* Read the current global filter setting */
-> > +	curr_span = FIELD_GET(SMMU_PMCG_SID_SPAN_MASK,
-> > +			      readl(smmu_pmu->reg_base +
-> SMMU_PMCG_EVTYPER0));
-> > +	curr_sid = readl(smmu_pmu->reg_base + SMMU_PMCG_SMR0);
-> > +
-> > +	if (filter_span != curr_span || filter_sid != curr_sid)
-> > +		return false;
-> > +
-> > +	return true;
-> > +}
-> > +
-> > +static int smmu_pmu_get_event_idx(struct smmu_pmu *smmu_pmu,
-> > +				  struct perf_event *event)
-> > +{
-> > +	unsigned int idx;
-> > +	unsigned int num_ctrs = smmu_pmu->num_counters;
-> > +
-> > +	idx = find_first_zero_bit(smmu_pmu->used_counters, num_ctrs);
-> > +	if (idx == num_ctrs)
-> > +		/* The counters are all in use. */
-> > +		return -EAGAIN;
-> > +
-> > +	if (!smmu_pmu_event_filter_valid(smmu_pmu, event, idx))
-> > +		return -EAGAIN;
-> > +
-> > +	set_bit(idx, smmu_pmu->used_counters);
-> > +
-> > +	return idx;
-> > +}
-> > +
-> > +/*
-> > + * Implementation of abstract pmu functionality required by
-> > + * the core perf events code.
-> > + */
-> > +
-> > +static int smmu_pmu_event_init(struct perf_event *event)
-> > +{
-> > +	struct hw_perf_event *hwc = &event->hw;
-> > +	struct smmu_pmu *smmu_pmu = to_smmu_pmu(event->pmu);
-> > +	struct device *dev = smmu_pmu->dev;
-> > +	struct perf_event *sibling;
-> > +	u32 event_id;
-> > +
-> > +	if (event->attr.type != event->pmu->type)
-> > +		return -ENOENT;
-> > +
-> > +	if (hwc->sample_period) {
-> > +		dev_dbg(dev, "Sampling not supported\n");
-> > +		return -EOPNOTSUPP;
-> > +	}
-> > +
-> > +	if (event->cpu < 0) {
-> > +		dev_dbg(dev, "Per-task mode not supported\n");
-> > +		return -EOPNOTSUPP;
-> > +	}
-> > +
-> > +	/* We cannot filter accurately so we just don't allow it. */
-> > +	if (event->attr.exclude_user || event->attr.exclude_kernel ||
-> > +	    event->attr.exclude_hv || event->attr.exclude_idle) {
-> > +		dev_dbg(dev, "Can't exclude execution levels\n");
-> > +		return -EOPNOTSUPP;
-> > +	}
 > 
-> You should also test for attr.exclude_host and attr.exclude_guest, unless
-> it makes sense to stop counting these events when entering guest/host?
-
-TBH, I haven't considered that scenario yet and don't think we have to stop the 
-counters. I will check that.
-
+> Successfully identified regression in CI configuration gnu-release-arm-next-allyesconfig for linux between bad_rev 5b22549b8c0011b8cc81b6f4fcd082e5545c3225 and baseline_rev a37d50ca3b837c19a297f349365d11a20c1087d0 .
 > 
-> Also returning -EINVAL may be more desirable than -EOPNOTSUPP. If a user
-> makes use of the perf utility and attempts to filter one of the above
-> exclusion flags - then perf will retry opening the event but without some
-> of the unsupported flags, but it will only do this if you return -EINVAL.
+> Culprit:
+> <cut>
+> commit 880ee82f0313453ec5a6cb122866ac057263066b
+> Author: Eran Ben Elisha <eranbe@mellanox.com>
+> Date:   Thu Jan 17 23:59:11 2019 +0200
 > 
-> (See line 1927 of tools/perf/util/evsel.c and run the perf stat tool with
-> the verbose flag to see this in action.)
-
-Ok. I will take a look.
-
-> > +
-> > +	/* Verify specified event is supported on this PMU */
-> > +	event_id = get_event(event);
-> > +	if (((event_id <= SMMU_ARCH_MAX_EVENT_ID) &&
-> > +	    (!test_bit(event_id, smmu_pmu->supported_events))) ||
-> > +	    (event_id > SMMU_IMPDEF_MAX_EVENT_ID)) {
-> > +		dev_dbg(dev, "Invalid event %d for this PMU\n", event_id);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	/* Don't allow groups with mixed PMUs, except for s/w events */
-> > +	if (event->group_leader->pmu != event->pmu &&
-> > +	    !is_software_event(event->group_leader)) {
-> > +		dev_dbg(dev, "Can't create mixed PMU group\n");
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	list_for_each_entry(sibling, &event->group_leader->sibling_list,
-> > +			    sibling_list)
-> > +		if (sibling->pmu != event->pmu &&
-> > +		    !is_software_event(sibling)) {
-> > +			dev_dbg(dev, "Can't create mixed PMU group\n");
-> > +			return -EINVAL;
-> > +		}
-> > +
-> > +	/* Ensure all events in a group are on the same cpu */
-> > +	if ((event->group_leader != event) &&
-> > +	    (event->cpu != event->group_leader->cpu)) {
-> > +		dev_dbg(dev, "Can't create group on CPUs %d and %d\n",
-> > +			event->cpu, event->group_leader->cpu);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	hwc->idx = -1;
-> > +
-> > +	/*
-> > +	 * Ensure all events are on the same cpu so all events are in the
-> > +	 * same cpu context, to avoid races on pmu_enable etc.
-> > +	 */
-> > +	event->cpu = smmu_pmu->on_cpu;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static void smmu_pmu_event_start(struct perf_event *event, int flags)
-> > +{
-> > +	struct smmu_pmu *smmu_pmu = to_smmu_pmu(event->pmu);
-> > +	struct hw_perf_event *hwc = &event->hw;
-> > +	int idx = hwc->idx;
-> > +	u32 filter_span, filter_sid;
-> > +	u32 evtyper;
-> > +
-> > +	hwc->state = 0;
-> > +
-> > +	smmu_pmu_set_period(smmu_pmu, hwc);
-> > +
-> > +	smmu_pmu_get_event_filter(event, &filter_span, &filter_sid);
-> > +
-> > +	evtyper = get_event(event) |
-> > +		  filter_span << SMMU_PMCG_SID_SPAN_SHIFT;
-> > +
-> > +	smmu_pmu_set_evtyper(smmu_pmu, idx, evtyper);
-> > +	smmu_pmu_set_smr(smmu_pmu, idx, filter_sid);
-> > +	smmu_pmu_interrupt_enable(smmu_pmu, idx);
-> > +	smmu_pmu_counter_enable(smmu_pmu, idx);
-> > +}
-> > +
-> > +static void smmu_pmu_event_stop(struct perf_event *event, int flags)
-> > +{
-> > +	struct smmu_pmu *smmu_pmu = to_smmu_pmu(event->pmu);
-> > +	struct hw_perf_event *hwc = &event->hw;
-> > +	int idx = hwc->idx;
-> > +
-> > +	if (hwc->state & PERF_HES_STOPPED)
-> > +		return;
-> > +
-> > +	smmu_pmu_counter_disable(smmu_pmu, idx);
+>     devlink: Add health reporter create/destroy functionality
 > 
-> Is it intentional not to call smmu_pmu_interrupt_disable here?
-
-Yes, it is. Earlier patch had the interrupt toggling and Robin pointed out that
-it is not really needed as counters are anyway stopped and explicitly disabling
-may not solve the spurious interrupt case as well.
-
-> > +
-> > +	if (flags & PERF_EF_UPDATE)
-> > +		smmu_pmu_event_update(event);
-> > +	hwc->state |= PERF_HES_STOPPED | PERF_HES_UPTODATE;
+>     Devlink health reporter is an instance for reporting, diagnosing and
+>     recovering from run time errors discovered by the reporters.
+>     Define it's data structure and supported operations.
+>     In addition, expose devlink API to create and destroy a reporter.
+>     Each devlink instance will hold it's own reporters list.
 > 
-> Shouldn't we only set PERF_HES_UPTODATE if we've updated the count (e.g.
-> when PERF_EF_UPDATE was set?)
-
-Hmm..I had a look at couple of other drivers(arm-cci.c/arm_dsu_pmu.c etc) and those 
-ones always call update ignoring PERF_EF_UPDATE and sets PERF_HES_UPTODATE. I
-think the reason being the counter is always reprogrammed on start. Do you think
-changing to that logic is a better way?
-
-> This may be a nit, but shouldn't smmu_pmu_event_update come before the
-> test for PERF_HES_STOPPED? I guess in the odd case where stop is called
-> without the PERF_EF_UPDATE flag (to stop the counter) and then called
-> a second time with PERF_EF_UPDATE to update the count.
-
-Not sure such a scenario exists. I think most of the ones I checked has the logic -its
-already stopped, nothing to do. 
-
-> > +}
-> > +
-> > +static int smmu_pmu_event_add(struct perf_event *event, int flags)
-> > +{
-> > +	struct hw_perf_event *hwc = &event->hw;
-> > +	int idx;
-> > +	struct smmu_pmu *smmu_pmu = to_smmu_pmu(event->pmu);
-> > +
-> > +	idx = smmu_pmu_get_event_idx(smmu_pmu, event);
-> > +	if (idx < 0)
-> > +		return idx;
-> > +
-> > +	hwc->idx = idx;
-> > +	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
-> > +	smmu_pmu->events[idx] = event;
-> > +	local64_set(&hwc->prev_count, 0);
-> > +
-> > +	if (flags & PERF_EF_START)
-> > +		smmu_pmu_event_start(event, flags);
-> > +
-> > +	/* Propagate changes to the userspace mapping. */
-> > +	perf_event_update_userpage(event);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static void smmu_pmu_event_del(struct perf_event *event, int flags)
-> > +{
-> > +	struct hw_perf_event *hwc = &event->hw;
-> > +	struct smmu_pmu *smmu_pmu = to_smmu_pmu(event->pmu);
-> > +	int idx = hwc->idx;
-> > +
-> > +	smmu_pmu_event_stop(event, flags | PERF_EF_UPDATE);
-> > +	smmu_pmu->events[idx] = NULL;
-> > +	clear_bit(idx, smmu_pmu->used_counters);
-> > +
-> > +	perf_event_update_userpage(event);
-> > +}
-> > +
-> > +static void smmu_pmu_event_read(struct perf_event *event)
-> > +{
-> > +	smmu_pmu_event_update(event);
-> > +}
-> > +
-> > +/* cpumask */
-> > +
-> > +static ssize_t smmu_pmu_cpumask_show(struct device *dev,
-> > +				     struct device_attribute *attr,
-> > +				     char *buf)
-> > +{
-> > +	struct smmu_pmu *smmu_pmu = to_smmu_pmu(dev_get_drvdata(dev));
-> > +
-> > +	return cpumap_print_to_pagebuf(true, buf,
-> cpumask_of(smmu_pmu->on_cpu));
-> > +}
-> > +
-> > +static struct device_attribute smmu_pmu_cpumask_attr =
-> > +		__ATTR(cpumask, 0444, smmu_pmu_cpumask_show, NULL);
-> > +
-> > +static struct attribute *smmu_pmu_cpumask_attrs[] = {
-> > +	&smmu_pmu_cpumask_attr.attr,
-> > +	NULL
-> > +};
-> > +
-> > +static struct attribute_group smmu_pmu_cpumask_group = {
-> > +	.attrs = smmu_pmu_cpumask_attrs,
-> > +};
-> > +
-> > +/* Events */
-> > +
-> > +ssize_t smmu_pmu_event_show(struct device *dev,
-> > +			    struct device_attribute *attr, char *page)
-> > +{
-> > +	struct perf_pmu_events_attr *pmu_attr;
-> > +
-> > +	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr);
-> > +
-> > +	return sprintf(page, "event=0x%02llx\n", pmu_attr->id);
-> > +}
-> > +
-> > +#define SMMU_EVENT_ATTR(_name, _id)					  \
-> > +	(&((struct perf_pmu_events_attr[]) {				  \
-> > +		{ .attr = __ATTR(_name, 0444, smmu_pmu_event_show, NULL), \
-> > +		  .id = _id, }						  \
-> > +	})[0].attr.attr)
+>     As part of the allocation, driver shall provide a set of callbacks which
+>     will be used the devlink in order to handle health reports and user
+>     commands related to this reporter. In addition, driver is entitled to
+>     provide some priv pointer, which can be fetched from the reporter by
+>     devlink_health_reporter_priv function.
 > 
-> This is very similar to PMU_EVENT_ATTR, have you considered taking an
-> approach
-> similar to the ARMV8_EVENT_ATTR macro that wraps up PMU_EVENT_ATTR.
-> It may
-> be more readable if we define these attributes consistently across PMUs.
-
-Ok. I will take a look at that.
-
-Thanks,
-Shameer
-
-> Thanks,
+>     For each reporter, devlink will hold a metadata of statistics,
+>     buffers and status.
 > 
-> Andrew Murray
+>     Signed-off-by: Eran Ben Elisha <eranbe@mellanox.com>
+>     Reviewed-by: Moshe Shemesh <moshe@mellanox.com>
+>     Signed-off-by: David S. Miller <davem@davemloft.net>
+> </cut>
 > 
-> > +
-> > +static struct attribute *smmu_pmu_events[] = {
-> > +	SMMU_EVENT_ATTR(cycles, 0),
-> > +	SMMU_EVENT_ATTR(transaction, 1),
-> > +	SMMU_EVENT_ATTR(tlb_miss, 2),
-> > +	SMMU_EVENT_ATTR(config_cache_miss, 3),
-> > +	SMMU_EVENT_ATTR(trans_table_walk_access, 4),
-> > +	SMMU_EVENT_ATTR(config_struct_access, 5),
-> > +	SMMU_EVENT_ATTR(pcie_ats_trans_rq, 6),
-> > +	SMMU_EVENT_ATTR(pcie_ats_trans_passed, 7),
-> > +	NULL
-> > +};
-> > +
-> > +static umode_t smmu_pmu_event_is_visible(struct kobject *kobj,
-> > +					 struct attribute *attr, int unused)
-> > +{
-> > +	struct device *dev = kobj_to_dev(kobj);
-> > +	struct smmu_pmu *smmu_pmu = to_smmu_pmu(dev_get_drvdata(dev));
-> > +	struct perf_pmu_events_attr *pmu_attr;
-> > +
-> > +	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr.attr);
-> > +
-> > +	if (test_bit(pmu_attr->id, smmu_pmu->supported_events))
-> > +		return attr->mode;
-> > +
-> > +	return 0;
-> > +}
-> > +static struct attribute_group smmu_pmu_events_group = {
-> > +	.name = "events",
-> > +	.attrs = smmu_pmu_events,
-> > +	.is_visible = smmu_pmu_event_is_visible,
-> > +};
-> > +
-> > +/* Formats */
-> > +PMU_FORMAT_ATTR(event,		   "config:0-15");
-> > +PMU_FORMAT_ATTR(filter_stream_id,  "config1:0-31");
-> > +PMU_FORMAT_ATTR(filter_span,	   "config1:32");
-> > +PMU_FORMAT_ATTR(filter_enable,	   "config1:33");
-> > +
-> > +static struct attribute *smmu_pmu_formats[] = {
-> > +	&format_attr_event.attr,
-> > +	&format_attr_filter_stream_id.attr,
-> > +	&format_attr_filter_span.attr,
-> > +	&format_attr_filter_enable.attr,
-> > +	NULL
-> > +};
-> > +
-> > +static struct attribute_group smmu_pmu_format_group = {
-> > +	.name = "format",
-> > +	.attrs = smmu_pmu_formats,
-> > +};
-> > +
-> > +static const struct attribute_group *smmu_pmu_attr_grps[] = {
-> > +	&smmu_pmu_cpumask_group,
-> > +	&smmu_pmu_events_group,
-> > +	&smmu_pmu_format_group,
-> > +	NULL
-> > +};
-> > +
-> > +/*
-> > + * Generic device handlers
-> > + */
-> > +
-> > +static int smmu_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
-> > +{
-> > +	struct smmu_pmu *smmu_pmu;
-> > +	unsigned int target;
-> > +
-> > +	smmu_pmu = hlist_entry_safe(node, struct smmu_pmu, node);
-> > +	if (cpu != smmu_pmu->on_cpu)
-> > +		return 0;
-> > +
-> > +	target = cpumask_any_but(cpu_online_mask, cpu);
-> > +	if (target >= nr_cpu_ids)
-> > +		return 0;
-> > +
-> > +	perf_pmu_migrate_context(&smmu_pmu->pmu, cpu, target);
-> > +	smmu_pmu->on_cpu = target;
-> > +	WARN_ON(irq_set_affinity(smmu_pmu->irq, cpumask_of(target)));
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static irqreturn_t smmu_pmu_handle_irq(int irq_num, void *data)
-> > +{
-> > +	struct smmu_pmu *smmu_pmu = data;
-> > +	u64 ovsr;
-> > +	unsigned int idx;
-> > +
-> > +	ovsr = readq(smmu_pmu->reloc_base + SMMU_PMCG_OVSSET0);
-> > +	if (!ovsr)
-> > +		return IRQ_NONE;
-> > +
-> > +	writeq(ovsr, smmu_pmu->reloc_base + SMMU_PMCG_OVSCLR0);
-> > +
-> > +	for_each_set_bit(idx, (unsigned long *)&ovsr, smmu_pmu->num_counters)
-> {
-> > +		struct perf_event *event = smmu_pmu->events[idx];
-> > +		struct hw_perf_event *hwc;
-> > +
-> > +		if (WARN_ON_ONCE(!event))
-> > +			continue;
-> > +
-> > +		smmu_pmu_event_update(event);
-> > +		hwc = &event->hw;
-> > +
-> > +		smmu_pmu_set_period(smmu_pmu, hwc);
-> > +	}
-> > +
-> > +	return IRQ_HANDLED;
-> > +}
-> > +
-> > +static int smmu_pmu_setup_irq(struct smmu_pmu *pmu)
-> > +{
-> > +	unsigned long flags = IRQF_NOBALANCING | IRQF_SHARED |
-> IRQF_NO_THREAD;
-> > +	int irq, ret = -ENXIO;
-> > +
-> > +	irq = pmu->irq;
-> > +	if (irq)
-> > +		ret = devm_request_irq(pmu->dev, irq, smmu_pmu_handle_irq,
-> > +				       flags, "smmuv3-pmu", pmu);
-> > +	return ret;
-> > +}
-> > +
-> > +static void smmu_pmu_reset(struct smmu_pmu *smmu_pmu)
-> > +{
-> > +	smmu_pmu_disable(&smmu_pmu->pmu);
-> > +
-> > +	/* Disable counter and interrupt */
-> > +	writeq_relaxed(smmu_pmu->counter_present_mask,
-> > +		       smmu_pmu->reg_base + SMMU_PMCG_CNTENCLR0);
-> > +	writeq_relaxed(smmu_pmu->counter_present_mask,
-> > +		       smmu_pmu->reg_base + SMMU_PMCG_INTENCLR0);
-> > +	writeq_relaxed(smmu_pmu->counter_present_mask,
-> > +		       smmu_pmu->reloc_base + SMMU_PMCG_OVSCLR0);
-> > +}
-> > +
-> > +static int smmu_pmu_probe(struct platform_device *pdev)
-> > +{
-> > +	struct smmu_pmu *smmu_pmu;
-> > +	struct resource *res_0, *res_1;
-> > +	u32 cfgr, reg_size;
-> > +	u64 ceid_64[2];
-> > +	int irq, err;
-> > +	char *name;
-> > +	struct device *dev = &pdev->dev;
-> > +
-> > +	smmu_pmu = devm_kzalloc(dev, sizeof(*smmu_pmu), GFP_KERNEL);
-> > +	if (!smmu_pmu)
-> > +		return -ENOMEM;
-> > +
-> > +	smmu_pmu->dev = dev;
-> > +	platform_set_drvdata(pdev, smmu_pmu);
-> > +
-> > +	smmu_pmu->pmu = (struct pmu) {
-> > +		.task_ctx_nr    = perf_invalid_context,
-> > +		.pmu_enable	= smmu_pmu_enable,
-> > +		.pmu_disable	= smmu_pmu_disable,
-> > +		.event_init	= smmu_pmu_event_init,
-> > +		.add		= smmu_pmu_event_add,
-> > +		.del		= smmu_pmu_event_del,
-> > +		.start		= smmu_pmu_event_start,
-> > +		.stop		= smmu_pmu_event_stop,
-> > +		.read		= smmu_pmu_event_read,
-> > +		.attr_groups	= smmu_pmu_attr_grps,
-> > +	};
-> > +
-> > +	res_0 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	smmu_pmu->reg_base = devm_ioremap_resource(dev, res_0);
-> > +	if (IS_ERR(smmu_pmu->reg_base))
-> > +		return PTR_ERR(smmu_pmu->reg_base);
-> > +
-> > +	cfgr = readl_relaxed(smmu_pmu->reg_base + SMMU_PMCG_CFGR);
-> > +
-> > +	/* Determine if page 1 is present */
-> > +	if (cfgr & SMMU_PMCG_CFGR_RELOC_CTRS) {
-> > +		res_1 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> > +		smmu_pmu->reloc_base = devm_ioremap_resource(dev, res_1);
-> > +		if (IS_ERR(smmu_pmu->reloc_base))
-> > +			return PTR_ERR(smmu_pmu->reloc_base);
-> > +	} else {
-> > +		smmu_pmu->reloc_base = smmu_pmu->reg_base;
-> > +	}
-> > +
-> > +	irq = platform_get_irq(pdev, 0);
-> > +	if (irq > 0)
-> > +		smmu_pmu->irq = irq;
-> > +
-> > +	ceid_64[0] = readq_relaxed(smmu_pmu->reg_base +
-> SMMU_PMCG_CEID0);
-> > +	ceid_64[1] = readq_relaxed(smmu_pmu->reg_base +
-> SMMU_PMCG_CEID1);
-> > +	bitmap_from_arr32(smmu_pmu->supported_events, (u32 *)ceid_64,
-> > +			  SMMU_ARCH_MAX_EVENTS);
-> > +
-> > +	smmu_pmu->num_counters =
-> FIELD_GET(SMMU_PMCG_CFGR_NCTR_MASK, cfgr) + 1;
-> > +	smmu_pmu->counter_present_mask =
-> GENMASK(smmu_pmu->num_counters - 1, 0);
-> > +
-> > +	smmu_pmu->sid_filter_global = !!(cfgr &
-> SMMU_PMCG_CFGR_SID_FILTER_TYPE);
-> > +
-> > +	reg_size = FIELD_GET(SMMU_PMCG_CFGR_SIZE_MASK, cfgr);
-> > +	smmu_pmu->counter_mask = GENMASK_ULL(reg_size, 0);
-> > +
-> > +	smmu_pmu_reset(smmu_pmu);
-> > +
-> > +	err = smmu_pmu_setup_irq(smmu_pmu);
-> > +	if (err) {
-> > +		dev_err(dev, "Setup irq failed, PMU @%pa\n", &res_0->start);
-> > +		return err;
-> > +	}
-> > +
-> > +	name = devm_kasprintf(&pdev->dev, GFP_KERNEL,
-> "smmuv3_pmcg_%llx",
-> > +			      (res_0->start) >> SMMU_PA_SHIFT);
-> > +	if (!name) {
-> > +		dev_err(dev, "Create name failed, PMU @%pa\n", &res_0->start);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	/* Pick one CPU to be the preferred one to use */
-> > +	smmu_pmu->on_cpu = get_cpu();
-> > +	WARN_ON(irq_set_affinity(smmu_pmu->irq,
-> cpumask_of(smmu_pmu->on_cpu)));
-> > +
-> > +	err = cpuhp_state_add_instance_nocalls(cpuhp_state_num,
-> > +					       &smmu_pmu->node);
-> > +	if (err) {
-> > +		dev_err(dev, "Error %d registering hotplug, PMU @%pa\n",
-> > +			err, &res_0->start);
-> > +		goto out_cpuhp_err;
-> > +	}
-> > +
-> > +	err = perf_pmu_register(&smmu_pmu->pmu, name, -1);
-> > +	if (err) {
-> > +		dev_err(dev, "Error %d registering PMU @%pa\n",
-> > +			err, &res_0->start);
-> > +		goto out_unregister;
-> > +	}
-> > +
-> > +	put_cpu();
-> > +	dev_info(dev, "Registered PMU @ %pa using %d counters with %s filter
-> settings\n",
-> > +		 &res_0->start, smmu_pmu->num_counters,
-> > +		 smmu_pmu->sid_filter_global ? "Global(Counter0)" :
-> > +		 "Individual");
-> > +
-> > +	return 0;
-> > +
-> > +out_unregister:
-> > +	cpuhp_state_remove_instance_nocalls(cpuhp_state_num,
-> &smmu_pmu->node);
-> > +out_cpuhp_err:
-> > +	put_cpu();
-> > +	return err;
-> > +}
-> > +
-> > +static int smmu_pmu_remove(struct platform_device *pdev)
-> > +{
-> > +	struct smmu_pmu *smmu_pmu = platform_get_drvdata(pdev);
-> > +
-> > +	perf_pmu_unregister(&smmu_pmu->pmu);
-> > +	cpuhp_state_remove_instance_nocalls(cpuhp_state_num,
-> &smmu_pmu->node);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static void smmu_pmu_shutdown(struct platform_device *pdev)
-> > +{
-> > +	struct smmu_pmu *smmu_pmu = platform_get_drvdata(pdev);
-> > +
-> > +	smmu_pmu_disable(&smmu_pmu->pmu);
-> > +}
-> > +
-> > +static struct platform_driver smmu_pmu_driver = {
-> > +	.driver = {
-> > +		.name = "arm-smmu-v3-pmu",
-> > +	},
-> > +	.probe = smmu_pmu_probe,
-> > +	.remove = smmu_pmu_remove,
-> > +	.shutdown = smmu_pmu_shutdown,
-> > +};
-> > +
-> > +static int __init arm_smmu_pmu_init(void)
-> > +{
-> > +	cpuhp_state_num = cpuhp_setup_state_multi(CPUHP_AP_ONLINE_DYN,
-> > +				      "perf/arm/pmcg:online",
-> > +				      NULL,
-> > +				      smmu_pmu_offline_cpu);
-> > +	if (cpuhp_state_num < 0)
-> > +		return cpuhp_state_num;
-> > +
-> > +	return platform_driver_register(&smmu_pmu_driver);
-> > +}
-> > +module_init(arm_smmu_pmu_init);
-> > +
-> > +static void __exit arm_smmu_pmu_exit(void)
-> > +{
-> > +	platform_driver_unregister(&smmu_pmu_driver);
-> > +	cpuhp_remove_multi_state(cpuhp_state_num);
-> > +}
-> > +
-> > +module_exit(arm_smmu_pmu_exit);
-> > +
-> > +MODULE_DESCRIPTION("PMU driver for ARM SMMUv3 Performance
-> Monitors Extension");
-> > +MODULE_AUTHOR("Neil Leeder <nleeder@codeaurora.org>");
-> > +MODULE_AUTHOR("Shameer Kolothum
-> <shameerali.kolothum.thodi@huawei.com>");
-> > +MODULE_LICENSE("GPL v2");
-> > --
-> > 2.7.4
-> >
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel@lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+> Results regressed from (for last_good == cb5ccfbe73b389470e1dc11061bb185ef4bc9aec)
+> 
+> <cut>
+> reset_artifacts:
+> -10
+> build_abe binutils:
+> -9
+> build_abe stage1:
+> -8
+> linux_n_obj:
+> all
+> </cut>
+> 
+> to (for first_bad == 880ee82f0313453ec5a6cb122866ac057263066b)
+> 
+> <cut>
+> reset_artifacts:
+> -10
+> build_abe binutils:
+> -9
+> build_abe stage1:
+> -8
+> linux_n_obj:
+> 17403
+> </cut>
+> 
+> Artifacts of last_good build: https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fci.linaro.org%2Fjob%2Ftcwg_kernel-bisect-gnu-release-arm-next-allyesconfig%2F12%2Fartifact%2Fartifacts%2Fbuild-cb5ccfbe73b389470e1dc11061bb185ef4bc9aec%2F&amp;data=02%7C01%7Ceranbe%40mellanox.com%7Cf644c95171f34a044bf508d6811adc79%7Ca652971c7d2e4d9ba6a4d149256f461b%7C0%7C0%7C636838349704100824&amp;sdata=vnw3DbcmXDmLsGUAGHA2049UrZC8mSmdLBaFarb7788%3D&amp;reserved=0
+> Artifacts of first_bad build: https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fci.linaro.org%2Fjob%2Ftcwg_kernel-bisect-gnu-release-arm-next-allyesconfig%2F12%2Fartifact%2Fartifacts%2Fbuild-880ee82f0313453ec5a6cb122866ac057263066b%2F&amp;data=02%7C01%7Ceranbe%40mellanox.com%7Cf644c95171f34a044bf508d6811adc79%7Ca652971c7d2e4d9ba6a4d149256f461b%7C0%7C0%7C636838349704100824&amp;sdata=dROJYaVNnfMkvW%2FH4g9s2fk2AZYhfn9Ix8L1rqiLyGM%3D&amp;reserved=0
+> 
+> Reproduce builds:
+> <cut>
+> mkdir investigate-linux-880ee82f0313453ec5a6cb122866ac057263066b
+> cd investigate-linux-880ee82f0313453ec5a6cb122866ac057263066b
+> 
+> git clone https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fgit.linaro.org%2Ftoolchain%2Fjenkins-scripts&amp;data=02%7C01%7Ceranbe%40mellanox.com%7Cf644c95171f34a044bf508d6811adc79%7Ca652971c7d2e4d9ba6a4d149256f461b%7C0%7C0%7C636838349704100824&amp;sdata=H2kp%2B48EjDTWQ5sBEQV4gpI97dIKEMDXRQglmy4lQv0%3D&amp;reserved=0
+> 
+> mkdir -p artifacts/manifests
+> curl -o artifacts/manifests/build-baseline.sh https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fci.linaro.org%2Fjob%2Ftcwg_kernel-bisect-gnu-release-arm-next-allyesconfig%2F12%2Fartifact%2Fartifacts%2Fmanifests%2Fbuild-baseline.sh&amp;data=02%7C01%7Ceranbe%40mellanox.com%7Cf644c95171f34a044bf508d6811adc79%7Ca652971c7d2e4d9ba6a4d149256f461b%7C0%7C0%7C636838349704100824&amp;sdata=APPLad%2FPA8p1mQDculq7nKjqxQhEkVjqFsRdfcxJ5Ig%3D&amp;reserved=0
+> curl -o artifacts/manifests/build-parameters.sh https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fci.linaro.org%2Fjob%2Ftcwg_kernel-bisect-gnu-release-arm-next-allyesconfig%2F12%2Fartifact%2Fartifacts%2Fmanifests%2Fbuild-parameters.sh&amp;data=02%7C01%7Ceranbe%40mellanox.com%7Cf644c95171f34a044bf508d6811adc79%7Ca652971c7d2e4d9ba6a4d149256f461b%7C0%7C0%7C636838349704100824&amp;sdata=nPZNkN7qJKh6VkVWRdgy%2F3rAn4hu45Y8TsKzyJ9dKpU%3D&amp;reserved=0
+> curl -o artifacts/test.sh https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fci.linaro.org%2Fjob%2Ftcwg_kernel-bisect-gnu-release-arm-next-allyesconfig%2F12%2Fartifact%2Fartifacts%2Ftest.sh&amp;data=02%7C01%7Ceranbe%40mellanox.com%7Cf644c95171f34a044bf508d6811adc79%7Ca652971c7d2e4d9ba6a4d149256f461b%7C0%7C0%7C636838349704100824&amp;sdata=hhgapeTncxxom59LkMMKW5h4iAfSMHwMMWPByf5h67E%3D&amp;reserved=0
+> chmod +x artifacts/test.sh
+> 
+> # Reproduce the baseline build (build all pre-requisites)
+> ./jenkins-scripts/tcwg_kernel-build.sh @@ artifacts/manifests/build-baseline.sh
+> 
+> cd linux
+> 
+> # Reproduce first_bad build
+> git checkout --detach 880ee82f0313453ec5a6cb122866ac057263066b
+> ../artifacts/test.sh
+> 
+> # Reproduce last_good build
+> git checkout --detach cb5ccfbe73b389470e1dc11061bb185ef4bc9aec
+> ../artifacts/test.sh
+> 
+> cd ..
+> </cut>
+> 
+> History of pending regressions and results: https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fgit.linaro.org%2Ftoolchain%2Fci%2Fbase-artifacts.git%2Flog%2F%3Fh%3Dlinaro-local%2Fci%2Ftcwg_kernel%2Fgnu-release-arm-next-allyesconfig&amp;data=02%7C01%7Ceranbe%40mellanox.com%7Cf644c95171f34a044bf508d6811adc79%7Ca652971c7d2e4d9ba6a4d149256f461b%7C0%7C0%7C636838349704100824&amp;sdata=oUjVRjdaqwSAU%2FfEanP3sypSLm6yPZgO6R%2BpsAjy308%3D&amp;reserved=0
+> 
+> Bisect log: https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fci.linaro.org%2Fjob%2Ftcwg_kernel-bisect-gnu-release-arm-next-allyesconfig%2F12%2Fartifact%2Fartifacts%2Fbisect.log%2F*view*%2F&amp;data=02%7C01%7Ceranbe%40mellanox.com%7Cf644c95171f34a044bf508d6811adc79%7Ca652971c7d2e4d9ba6a4d149256f461b%7C0%7C0%7C636838349704100824&amp;sdata=5y6EyveTvr4fiXyRAWL%2F1y51Rj6uRoISn1D%2B4aOGyfs%3D&amp;reserved=0
+> Artifacts: https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fci.linaro.org%2Fjob%2Ftcwg_kernel-bisect-gnu-release-arm-next-allyesconfig%2F12%2Fartifact%2Fartifacts%2F&amp;data=02%7C01%7Ceranbe%40mellanox.com%7Cf644c95171f34a044bf508d6811adc79%7Ca652971c7d2e4d9ba6a4d149256f461b%7C0%7C0%7C636838349704100824&amp;sdata=0oEekMKLbQ%2FiPvjQpKkSG7o8nvc5ye%2Bv8zVbAxit9jA%3D&amp;reserved=0
+> Build URL: https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fci.linaro.org%2Fjob%2Ftcwg_kernel-bisect-gnu-release-arm-next-allyesconfig%2F12%2F&amp;data=02%7C01%7Ceranbe%40mellanox.com%7Cf644c95171f34a044bf508d6811adc79%7Ca652971c7d2e4d9ba6a4d149256f461b%7C0%7C0%7C636838349704100824&amp;sdata=t%2Bf17lejwkaWMqSElFR1X8mUqkV7xFRBOByCGraJ30A%3D&amp;reserved=0
+> Build log: https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fci.linaro.org%2Fjob%2Ftcwg_kernel-bisect-gnu-release-arm-next-allyesconfig%2F12%2FconsoleText&amp;data=02%7C01%7Ceranbe%40mellanox.com%7Cf644c95171f34a044bf508d6811adc79%7Ca652971c7d2e4d9ba6a4d149256f461b%7C0%7C0%7C636838349704100824&amp;sdata=jmHZihJwblQaMDoBJH764Jce0zgnhNwAkdnOdcEWWao%3D&amp;reserved=0
+> 
+> --
+> Maxim Kuvyrkov
+> https://emea01.safelinks.protection.outlook.com/?url=www.linaro.org&amp;data=02%7C01%7Ceranbe%40mellanox.com%7Cf644c95171f34a044bf508d6811adc79%7Ca652971c7d2e4d9ba6a4d149256f461b%7C0%7C0%7C636838349704100824&amp;sdata=CqoP5P5yS0Z0ByANRZiS63TxaWUjp515YcxoQV8ojRY%3D&amp;reserved=0
+> 
+> 
+> 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
