@@ -2,61 +2,58 @@ Return-Path: <SRS0=uP4V=P7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 14C28C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:55:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E41BAC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:55:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CEE7221019
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:55:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7FDD921019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:55:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s8byADa9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CEE7221019
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Trixt+Qb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FDD921019
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/5OD0ka1xdtLddcEl2fJpO2FxFuqfbyfef6SP6j1aQs=; b=s8byADa9tH29Vp
-	8rTFt8i6ufGhKHSFB1DP+NKjO/oVX8rGcq0kQ+jyvcrvz299WPS7XrqgAMnQdEmLVyIFdBJeSQAas
-	9INzCdUe43AaiNOyMhuf/Je8mWwycZZ4r7UIiwTFJGUE+ueNIVpiBM5CtCcBKACtaEwHCfx9FB1ti
-	v5ehdiGw76FY3Qhsg6CWmMyOj7s2cOcV1BCYyQT0dHzXsZd2Ny2ug8MLXvgg3l0HJ4M2tOMRdT4lJ
-	AxQCdt+mgaHsIgqVBYdpVdW03QoE0RDt3yCipIaC0P4lyACO5jGhaOzAA9Q7jKkMMdTUyd4SqGxNA
-	WM5SOtD+9IIs6d4ZPkww==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=uD1s4AFGBI0eaaQi3ZKock3uQeblhdiEAGIpW0Eg9q0=; b=Trixt+Qb0VMAmh
+	0Y+1vvXijxLxqOgxZxqwlw2YBW5ghmF50WZ3hYR1nE+g0f154RXY1Zzr5zZv6KYSbRkYz5d4PFD72
+	O3U+cSCJemHVPaBrZLwvkm9oCEivHACtH4Cu3Fxss2PSLZGXmF7JVawSzWl3s4oJGAVI3F+2dUoSg
+	VAks8EpPXed4l94XaNmzW+rGfBM9jyNAT5fOPBvbE4kqxsd4h4NF8uGlHM7kFATxEaHwGgaBRiYbz
+	5+3Sx+Dl6uPcu3HVUN7tKEeCDDFkJ4FpJgim4be/W+m3JEVWfCVKgXXj887wBYTixqIMVXewM7jxc
+	lltFwU77Z6XICq3iz24w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmKre-0005Bl-Cs; Wed, 23 Jan 2019 15:54:54 +0000
+	id 1gmKrt-0005h3-U2; Wed, 23 Jan 2019 15:55:09 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmKrP-0004yT-DR
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 15:54:40 +0000
+ id 1gmKrQ-0004yw-Dq
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 15:54:41 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 0F58C209BE; Wed, 23 Jan 2019 16:54:38 +0100 (CET)
+ id 603E3209BF; Wed, 23 Jan 2019 16:54:36 +0100 (CET)
 Received: from localhost (unknown [185.94.189.187])
- by mail.bootlin.com (Postfix) with ESMTPSA id C09F12084E;
- Wed, 23 Jan 2019 16:54:27 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id 22DAE207AC;
+ Wed, 23 Jan 2019 16:54:26 +0100 (CET)
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
  Sean Paul <seanpaul@chromium.org>,
  Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH 2/4] drm/sun4i: dsi: Change the start delay calculation
-Date: Wed, 23 Jan 2019 16:54:22 +0100
-Message-Id: <624512bb9665e0b15244c2bdf230bcfada3a3b98.1548236066.git-series.maxime.ripard@bootlin.com>
+Subject: [PATCH 0/4] drm/sun4i: dsi: Add burst mode support
+Date: Wed, 23 Jan 2019 16:54:20 +0100
+Message-Id: <cover.f7a136448029ab87c498d68164670712639748e7.1548236066.git-series.maxime.ripard@bootlin.com>
 X-Mailer: git-send-email 2.20.1
-In-Reply-To: <cover.f7a136448029ab87c498d68164670712639748e7.1548236066.git-series.maxime.ripard@bootlin.com>
-References: <cover.f7a136448029ab87c498d68164670712639748e7.1548236066.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_075439_585552_3DBECFB1 
-X-CRM114-Status: GOOD (  14.79  )
+X-CRM114-CacheID: sfid-20190123_075440_598208_EC1E494F 
+X-CRM114-Status: GOOD (  10.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,42 +74,34 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The current calculation for the video start delay in the current DSI driver
-is that it is the total vertical size, minus the backporch and sync length,
-plus 1.
+Hi,
 
-However, the Allwinner code has it as the active vertical size, plus the
-back porch and the sync length. This doesn't make any difference on the
-only panel it has been tested with so far, since in that particular case
-the front porch is equal to the sum of the back porch and sync length.
+Here is a series implementing the burst mode support for DSI.
 
-This is not the case for all panels, obviously, so we need to fix it. Since
-the Allwinner code has a bunch of extra code to deal with out of bounds
-values, so let's add them as well.
+It's been tested on an A33 board with the panel supported on the 4th patch,
+which should remove all quirks due to a different SoC from the equation.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+Let me know what you think,
+Maxime
 
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 380fc527a707..e3e4ba90c059 100644
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -357,7 +357,12 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
- static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
- 					   struct drm_display_mode *mode)
- {
--	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
-+	u16 delay = (mode->vsync_end + 1) % mode->vtotal;
-+
-+	if (!delay)
-+		delay = 1;
-+
-+	return delay;
- }
- 
- static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
+Konstantin Sudakov (2):
+  drm/sun4i: dsi: Add burst support
+  drm/panel: Add Rondo RB070D30 panel
+
+Maxime Ripard (2):
+  drm/sun4i: dsi: Restrict DSI tcon clock divider
+  drm/sun4i: dsi: Change the start delay calculation
+
+ drivers/gpu/drm/panel/Kconfig                |   9 +-
+ drivers/gpu/drm/panel/Makefile               |   1 +-
+ drivers/gpu/drm/panel/panel-rondo-rb070d30.c | 258 ++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c           |   4 +-
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c       | 185 ++++++++++----
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h       |   2 +-
+ 6 files changed, 414 insertions(+), 45 deletions(-)
+ create mode 100644 drivers/gpu/drm/panel/panel-rondo-rb070d30.c
+
+base-commit: f6028e7e48b0f3865b0837d400ca783d3d200b62
 -- 
 git-series 0.9.1
 
