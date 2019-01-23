@@ -2,78 +2,67 @@ Return-Path: <SRS0=uP4V=P7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 79CABC282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 16:16:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 09C08C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 16:27:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3C5552184C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 16:16:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CF83321855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 16:27:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uNcP/3TZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C5552184C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GKMOFBp7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF83321855
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:References:
-	In-Reply-To:Message-ID:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kICtkV79LqcQ4gyD/kmdJcLAUH9iw8zMZWVGHEJHGG8=; b=uNcP/3TZPMtefe
-	fwUJ+FcMUzk99F2QGOUppcvIwSGurOBcM4jlz1ELauiWDudmWxII/c9vZdmlj6K/WfeSiopt3fOvH
-	Ep/DIHEOtiU9GUOf/sQJvJUD12pH7VdVB5lgY4YjfB/dnUm0oI9dlTp7Ljz2FqEhRs8FqvGQxcdjz
-	Y3lHvLXdQPo5OMG4uxAMPxMbwoXZWkQ+lnDhKrUtRj/hCRUbHFpmZC0BvRitoV9Ot8Q6cCHX7mFL3
-	c+LHU9wlJF5ZZiphL1EAgZPvGmBKpOhh5d/+rBtFohS9ysu5W4nvSzA08+qeJ9hz6EKAS/VdN9PJg
-	cvXhwlifEqLaySJEL50w==;
+	List-Owner; bh=fef+dXXgD5bT4+HdU+IusmWHWzVGdaLaYY8s1IWPH1M=; b=GKMOFBp7gl6zc/
+	dgGPkkOA6J5kdG0y583smNP0z639wBV8QUY0+Wnvv66IzzulK31atV/jFBnedCfXqQGVA+SG2/ycm
+	yYYVKi3VdlR+yfiSQX3lC4c81J8IOCKimywoB+H4Cgyf5WbID4wXQMUbz2s+DLKqx+GwFX2ZkXqFm
+	l8o+s8p+A5aOTX6a+HejRpKiAtBHOORKDEHpU5dvImWIcDZ69P5KNqO0jSvDD1tjg2wWoTIggKAfB
+	X67odM7DvKZwhc90jcKsn1z1G4nNVv7mgef7KXHWJhyN9HFv8Hl5HU2ndUd0Q3Z7iALuELQ4ZeKhj
+	oz3cKrl1kbEaP+NcRfFQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmLCT-0005z1-HM; Wed, 23 Jan 2019 16:16:25 +0000
-Received: from mout.kundenserver.de ([212.227.126.133])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmLCQ-0005ya-0t; Wed, 23 Jan 2019 16:16:23 +0000
-Received: from oxbsltgw08.schlund.de ([212.227.220.152]) by
- mrelayeu.kundenserver.de (mreue009 [213.165.67.97]) with ESMTPSA (Nemesis) id
- 1M3DBd-1glWmZ3IOD-003dxv; Wed, 23 Jan 2019 17:16:06 +0100
-Date: Wed, 23 Jan 2019 17:16:05 +0100 (CET)
-From: Stefan Wahren <stefan.wahren@i2se.com>
-To: YueHaibing <yuehaibing@huawei.com>, broonie@kernel.org, eric@anholt.net,
- f.fainelli@gmail.com, rjui@broadcom.com, sbranden@broadcom.com,
- bcm-kernel-feedback-list@broadcom.com
-Message-ID: <2064917135.710926.1548260165940@email.ionos.de>
-In-Reply-To: <20190123070507.15404-1-yuehaibing@huawei.com>
-References: <20190123070507.15404-1-yuehaibing@huawei.com>
-Subject: Re: [PATCH -next] spi: bcm2835aux: remove unneeded NULL check of
- devm_clk_get
+	id 1gmLN0-0001rl-8O; Wed, 23 Jan 2019 16:27:18 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmLMx-0001qa-A8
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 16:27:16 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CF1E3A78;
+ Wed, 23 Jan 2019 08:27:10 -0800 (PST)
+Received: from e107155-lin (e107155-lin.cambridge.arm.com [10.1.196.42])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 963F53F237;
+ Wed, 23 Jan 2019 08:27:08 -0800 (PST)
+Date: Wed, 23 Jan 2019 16:27:03 +0000
+From: Sudeep Holla <sudeep.holla@arm.com>
+To: Pramod Kumar <pramod.kumar@broadcom.com>
+Subject: Re: [PATCH RFC 1/1] arm64: Use PSCI calls for CPU stop when hotplug
+ is supported
+Message-ID: <20190123162514.GA22147@e107155-lin>
+References: <1547790380-6276-1-git-send-email-pramod.kumar@broadcom.com>
+ <20190118113242.GA8928@e107155-lin>
+ <CAJ+tv6+6yqT1xkmkY3x6SNQ83K+J6zqKZr7PV5A_ffvyEzceqg@mail.gmail.com>
+ <20190121112248.GA27784@e107155-lin>
+ <CAJ+tv6++eXwu7Ez-GW62Avgaj+h0aPhyL0K-n3mBgwM2RtXXjQ@mail.gmail.com>
 MIME-Version: 1.0
-X-Priority: 3
-Importance: Medium
-X-Mailer: Open-Xchange Mailer v7.8.4-Rev47
-X-Originating-Client: open-xchange-appsuite
-X-Provags-ID: V03:K1:9mabrZGoQKRSZQr9I6ZiP+0AnSc72EVBNLh84GmHZAfIEIf/sqX
- eMZcGcgGn2Q1dtLEB7Ix9raatAf7ELEJCBQjUaAkYVFENuVPgu9I1B5imDoVCoiId5YSJKO
- qH4JFhNGf7OWbkJBYkZA5S0NPcx5Q1LAKQPvz4xOIqjjn+eDp0tIc6M7JguPVfAnzCPcypa
- 95IDmoW/yV3ujprIBYQ5w==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:6ReyfGeQ0ng=:SMw/zddT1TPelJJ9vHqAiC
- 8nUzBPzPXqUgZ+HUDDcYYoBOLRqoWIS6Dm8vDxH1D85qP/KyUNFFCJ2K7csHsFomg0+As4XWJ
- 715ZEaljr2j46Tpu+BW3/M+s9+wI1DRSGoIytr5FrP3lPo77+GNl6wcuwpVqb4VUwPp1niDBV
- tesgyhckN15ugYE/SAMszS3YxSOIcCo4ewHFA11z1pXKJ3X9dvwue5wVwTo/7mohtQhmbhiir
- isGp4E4OhdqoFAYpQrbocjjdYeRxtG9l8IXkc3GVFtP7pi9UnX9FtOWp8UPFLqEZ1wKQmgVPw
- KQPdiCq7ukhkuPqp4Lg3QH0TsXoyV3EOZRi7zs0BctSGWXZl7I1K/GtO/dnTF7OsqyfQtYXKH
- K/17L8oAGJ/dWZ7miVLuR3qdre2fVDU/uehcVEv4VvkKwZLj1DK8fCpUDfWQkC0U6nA9InsfB
- w8pgsdWZ1mqCtGgbTNeHvCmvxwmyYBVGcjONWhUeF0WKnV+CPYnc8TG/cqKvTd5giWMupd82B
- X/5SEwTsdslrqqCA0yYNBweVuTmX0z6up77ACUIu8ZHiy62H/OOfVGFCv6hcdxjY47J++qbxQ
- 4UXn8cYJlc7LYRp+o5BEG2wcKjk3RIvaKYynLxzHInc5iCYJ8IN/YGfGT8LYX9c+AelPCBXx8
- ADdreqXqu9JqhvMXreHLJVZufaYLG0j2zAYipyyIdJdp9G03OUBWMyr6yVqTPg9Y62ziI7isa
- 0+YKjwrzEQwKL0UfDdpXMc8sjPH8+4ScHUxcLSGDFg9zBdlGTU6PRScCbx8=
+Content-Disposition: inline
+In-Reply-To: <CAJ+tv6++eXwu7Ez-GW62Avgaj+h0aPhyL0K-n3mBgwM2RtXXjQ@mail.gmail.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_081622_366481_EA5B749F 
-X-CRM114-Status: UNSURE (   8.21  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190123_082715_359131_8A1CA521 
+X-CRM114-Status: GOOD (  24.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,26 +74,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-rpi-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-spi@vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Suzuki K Poulose <Suzuki.Poulose@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Steve Capper <steve.capper@arm.com>,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ BCM Kernel Feedback <bcm-kernel-feedback-list@broadcom.com>,
+ Sudeep Holla <sudeep.holla@arm.com>, Dave Martin <dave.martin@arm.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> YueHaibing <yuehaibing@huawei.com> hat am 23. Januar 2019 um 08:05 geschrieben:
-> 
-> 
-> Fix a static code checker warning:
-> drivers/spi/spi-bcm2835aux.c:460
->  bcm2835aux_spi_probe() warn: passing zero to 'PTR_ERR'
-> 
-> In case of error, the function devm_clk_get() returns ERR_PTR()
-> and not returns NULL.
-> 
-> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+On Wed, Jan 23, 2019 at 10:21:05AM +0530, Pramod Kumar wrote:
+> Thanks Sudeep for reviewing. Please see my comment inline below.
+>
+> On Mon, Jan 21, 2019 at 4:52 PM Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+[...]
+
+> >
+> > OK, but I was expecting the complete call path for this use-case.
+>
+> OK. Once power loss happens, Application processor gets interrupt and
+> it has to switch to MCU asap so that it can switch-off all irrelevant
+> power domain to reduce battery drain.
+> flow is like this-
+> Power loss interrupt --> interrupt handler -> send IPI to stop all
+> secondary CPUs-> switch primary CPU to ATF which ultimately transition
+> to MCU where all power off action is taken.
+>
+
+So does the entire AP domain get powered off or is that the intention ?
+If so, just stopping secondaries through IPI is not sufficient. What
+happens to all the running tasks and other operations going on in the
+system.
+
+> >
+> > > Since battery can provide limited power for a very short time hence need to
+> > > transition to lowest power. As per the transition process , CPUs power
+> > > domain has to be off but before that it needs to flush out its content to
+> > > system memory(L3) so that content could be backed-up by a MCU, a controller
+> > > consuming very less power. Since we can not afford plugging-out every
+> > > individual CPUs in sequence hence uses  ipi_cpu_stop for all other CPUs
+> >
+> > So, you are randomly using ipi_cpu_stop for something it's not supposed to
+> > be used. What do you exactly want to achieve in that context where you need
+> > to save power ?
+>
+> Need to back-up DDR from MCU which will require L1/L2 content gets
+> flushed before CPUs getting shutdown.
+>
+
+Understood.
+
+> >Why system off or reset not sufficient ?
+> System off or reset is not sufficient as we can not afford that much
+> delay in transition.
+>
+
+But who will save the system state ? You may corrupt data at the cost
+of saving transition delay. So IMO, you don't have a valid use-case or
+you are failing to present one properly.
+
+> Flushing L1/L2 contents to System memory and Bringing out CPUs
+> Clusters out of coherency domain before shutting down Clusters puts
+> rest of system in sane state.  If cluster are not being taken out
+> properly from coherency domain before shutting down, it could lead
+> system un-reliable for rest parts.
+>
+
+Looks like you are concerned only with CPUs in this scenario, but what
+about other devices in the domain. So suspend-to-{ram,idle} are only
+sane options to make sure you don't loose/corrupt any data/state.
+
+Further point me to the code either part of this series or upstream
+handling the "Power loss interrupt" explained above.
+
+--
+Regards,
+Sudeep
 
 _______________________________________________
 linux-arm-kernel mailing list
