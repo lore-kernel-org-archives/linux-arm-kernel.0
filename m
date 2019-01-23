@@ -2,85 +2,66 @@ Return-Path: <SRS0=uP4V=P7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 37FD4C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:25:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C59D9C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:32:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 028652184C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:25:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 982072184C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 15:32:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Od827QVn";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="KML8GqdS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 028652184C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZYeuvK93"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 982072184C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Z7SxWblYNjsBDGILF06f6ZjQuBP+3wXL6gRL7rMDiWc=; b=Od827QVnqh6b6L
-	OfOIQngcEgny/UVgVGt2sFPEcdps6TFgyyl8Ew0ahIDkIu6TstdsuJnEMfaptSVT/58N6elUBT3Bc
-	0HhIjx7zBnukYg+MUnDOxYJIq7shy8i/4fiX+q8tdXUCZx9PP6MMGe49pPOfjwBg454RHS3tuUFOB
-	bJBq1dFGESgUNUdzne/YppelCwl/NmI+18emQZDXOMw1uBa57iwUFF9rO9urLLkmDj89QGH4UsbCg
-	ATiQX6d22dzJDOWJRDfpX4+Q7fU4VWOnG24Mo6vIcgYA6wku42zsJo7/B6L8SLdWt13idAMD8cixY
-	4Ol/Q3qduwvV8pjGU3cA==;
+	List-Owner; bh=zzjFNvmMti3rDcWtxwl2zi28f/Hl3ckZKzldpgm0dwk=; b=ZYeuvK9349ZZII
+	f3KaLYkTJp9nWoAhj800xxn3WKyfRQ2oMx2qKG/5N5lSvLJPjZ3vcuCOz9zzkeuy8EViYol9NqMZz
+	Z+ss2jfk0vV4f6HCHvfkdmthKLFCsY2zk8x6VrdP5GiF+tVXXCkqxyyMMmyrNz+PQ7StN7lWxaXvE
+	cf67CE1ie7Z+7S3JzL/OZHf+/SAxsdcudcxUOSCM3x6FV1Lwg2GWbC9DJuG9EcOx5EckSWU03R1wQ
+	In+tvaxrzTgrrNloOQAppk4NTNd9fQUn/qONos86MofpKjE7vOKwnlS7a9SZhle0CjNV0VO/ereV7
+	1IKAIeNANGvYhqKAyiZg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmKPc-00033S-Qi; Wed, 23 Jan 2019 15:25:56 +0000
-Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
+	id 1gmKVh-0004gF-4N; Wed, 23 Jan 2019 15:32:13 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmKPH-00030t-7k; Wed, 23 Jan 2019 15:25:46 +0000
-Received: by mail-ot1-x341.google.com with SMTP id a11so2203124otr.10;
- Wed, 23 Jan 2019 07:25:34 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=PeJ1lzHyz15Q+LQw+4xFJCCYkmt41gRzhJUcmx397lo=;
- b=KML8GqdSLOIxG7OjxbwNZCcYQgovMt28NiQKf/VrU5oaaOFkrhJsbAOuhIKr932LNE
- vTRcm1Qv/1MCpannQaZt3BiAVMkNUTOpbaeblCapIcCZW8aG/tm9q291+WYeYecIliqT
- 3p/UL/xdXKYcFSY5drz/sYWs+wRKu0lESoIIREpQgBoSCC2jTH6IllXkD8yvg0KXqRkH
- 9OtMxpN0TinppFUQ7NZhVEh9BMDvy8c3tkJ/2X67ISXaWzOi0JUkSC/ownN+ywZepIvQ
- QEuftmb+vUL5aaRmEP3tX/OQsc3eLewb/MMYn+a2TIXDb8V8JBZ8rEn8gth1ZWzzwsMx
- rP+Q==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=PeJ1lzHyz15Q+LQw+4xFJCCYkmt41gRzhJUcmx397lo=;
- b=tHi76pJKji7On8NUPqpvu+FOSSLq8MbHrI8kwmJGpI0DMOipuLKnRK9NGtP61ry+J5
- hswiRgAkeRt9eMxjAo3ebnc/uYFVc/aYWoMbVXwHH5rXDHYPJpV/zMxiY7TBhVICZzhE
- vEcyeuGoevn3htOyizpq1p+TGIwrvBHhWt77FIWS1mBLvWUewfeJenTJ3ee4Qw5RCmOg
- xTGlY4uPK6EAQY9rCFV8MvNx5OKdp27IuyvoxIHWA8zW9+egcseN72KxMZeaqrI9/cRx
- a3pydhtOXEOMM+5DGTCYytXMAnWzBKMhVJSCvo9qhz6MudY3UOt1wiiZSkNeMYmwmDYK
- 3L0Q==
-X-Gm-Message-State: AJcUukdYprFRk89U+JVC7bvb+Y2GlGgU7EJmMNJnsMZqeFWMd3l/eYwN
- 224JfVtRjNoIL08Bet0CKB4gR5jq3EgGcufFWD0f0w==
-X-Google-Smtp-Source: ALg8bN5qPK3pLuDMdw/Oxpsa83PWCxXHCfURZRJncWze3dqKkYww1ZUPXNhue8LyfETNhHKcYPx/4+bSh0bZIgckqTc=
-X-Received: by 2002:a9d:3424:: with SMTP id v33mr1625714otb.167.1548257134167; 
- Wed, 23 Jan 2019 07:25:34 -0800 (PST)
-MIME-Version: 1.0
-References: <20190113181808.5768-1-linux.amoon@gmail.com>
- <CAFBinCCD4o0cXEht_7bgV6moCK2WfVRvZq8UUZD3gDo-TaRKbQ@mail.gmail.com>
- <CANAwSgQNNRqr3rZRgr71iy7+0zuuYykd+4-1W3LB+Voux6KioQ@mail.gmail.com>
- <CAFBinCCXufowepJaHgkPwhhNrogXDP-0x0ZS09OGCM=ua-=5MQ@mail.gmail.com>
- <CANAwSgR6gGGx6RgAszwHp+FYeJTdBvMAzc4p4TNpWnFXdxDf4w@mail.gmail.com>
- <CAFBinCBuQx+JVXzs4=+Ko++1CsEc5GqUX6+xUym=c25ZtLz3BA@mail.gmail.com>
-In-Reply-To: <CAFBinCBuQx+JVXzs4=+Ko++1CsEc5GqUX6+xUym=c25ZtLz3BA@mail.gmail.com>
-From: Anand Moon <linux.amoon@gmail.com>
-Date: Wed, 23 Jan 2019 20:55:21 +0530
-Message-ID: <CANAwSgSURxQm2=d5gcRnuDHcQVdnWgoLkP-FWPMSueh4NNAOQA@mail.gmail.com>
-Subject: Re: [PATCH 1/2] ARM: dts: meson8b: odroidc1: Enable usb phy node
-To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+ id 1gmKVc-0004ft-Kb
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 15:32:11 +0000
+Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <l.stach@pengutronix.de>)
+ id 1gmKVR-0007Az-AG; Wed, 23 Jan 2019 16:31:57 +0100
+Message-ID: <1548257514.28802.3.camel@pengutronix.de>
+Subject: Re: [PATCH v3 4/5] dma: imx-sdma: add an index for imx8mq multi
+ sdma devices
+From: Lucas Stach <l.stach@pengutronix.de>
+To: "Angus Ainslie (Purism)" <angus@akkea.ca>
+Date: Wed, 23 Jan 2019 16:31:54 +0100
+In-Reply-To: <20190123152310.11680-5-angus@akkea.ca>
+References: <20190120023150.17138-1-angus@akkea.ca>
+ <20190123152310.11680-1-angus@akkea.ca>
+ <20190123152310.11680-5-angus@akkea.ca>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
+X-SA-Exim-Mail-From: l.stach@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_072535_479331_59C90249 
-X-CRM114-Status: GOOD (  44.60  )
+X-CRM114-CacheID: sfid-20190123_073208_840266_6E605B6F 
+X-CRM114-Status: GOOD (  20.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,213 +73,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree <devicetree@vger.kernel.org>,
- Neil Armstrong <narmstrong@baylibre.com>, Kevin Hilman <khilman@baylibre.com>,
- Linux Kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
- Emiliano Ingrassia <ingrassia@epigenesys.com>,
- linux-amlogic@lists.infradead.org,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Jerome Brunet <jbrunet@baylibre.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Daniel Baluta <daniel.baluta@gmail.com>, linux-kernel@vger.kernel.org,
+ dmaengine@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
+ NXP Linux Team <linux-imx@nxp.com>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>, angus.ainslie@puri.sm,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Martin,
-
-On Tue, 22 Jan 2019 at 00:22, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
->
-> Hi Anand,
->
-> On Mon, Jan 21, 2019 at 7:37 AM Anand Moon <linux.amoon@gmail.com> wrote:
-> >
-> > Hi Martin,
-> >
-> > Thanks for you comments.
-> >
-> > On Mon, 21 Jan 2019 at 03:21, Martin Blumenstingl
-> > <martin.blumenstingl@googlemail.com> wrote:
-> > >
-> > > Hi Anand,
-> > >
-> > > On Sun, Jan 20, 2019 at 7:44 PM Anand Moon <linux.amoon@gmail.com> wrote:
-> > > >
-> > > > Hi Martin,
-> > > >
-> > > > Thanks for your review comments.
-> > > >
-> > > > On Sat, 19 Jan 2019 at 03:59, Martin Blumenstingl
-> > > > <martin.blumenstingl@googlemail.com> wrote:
-> > > > >
-> > > > > Hi Anand,
-> > > > >
-> > > > > thank you for this patch!
-> > > > >
-> > > > > On Sun, Jan 13, 2019 at 7:18 PM Anand Moon <linux.amoon@gmail.com> wrote:
-> > > > > >
-> > > > > > Add missing vbus-supply link to phy controller for usb_phy0
-> > > > > > and usb_phy1 nodes, this changes fixed the power issue
-> > > > > > on usb ports usb, changes help fix usb reset warning.
-> > > > > I trust you on the fact that GPIOAO_5 controls VBUS of USB0 and USB1
-> > > > >
-> > > > > to me the schematics are not 100% clear or I'm bad at interpreting them:
-> > > > > - I'll refer to odroid-c1+_rev0.4_20150615.pdf
-> > > > > - page 1 lists GPIOAO.BIT5 as input for the PWREN signal of the
-> > > > > USB_OTG controller (usb0)
-> > > > > - page 1 also shows a PWREN signal in the USB_HOST controller (usb1)
-> > > > > but not it's input
-> > > > > - based on your patch I assume that PWREN is the same signal for both
-> > > > > USB controllers
-> > > > >
-> > > > As per the schematics odroid-c1+_rev0.4_20150615.pdf
-> > > >
-> > > > It seem that their  vbus setting for *OTG* port. *Bus 01.Port 1* using
-> > > > *GPIOAO.BIT5* gpio
-> > > that matches my interpretation of the schematics
-> >
-> > Yep, I feel that GPIOAO.BIT5 enable the PWREN power on  Bus 02.Port (usb1)
-> > But I could not get this to enable on Bus 01.Port (usb0).
-> >
-> > usb hot-plug of devices is working fine on *usb1* but not on *usb0*.
-> > I have tried different combination but it's not working for me.
-> >
-> > I am attaching small changes to phy which enables the Bus 01.Port
-> > (usb0) on Odroid C1+/Odroidc2.
-> > we need to set dr_mode="otg" to enable this bus in dts.
-> I need to get my multimeter out and measure on my own Odroid-C1
-> I *believe* to have observed that toggling GPIOAO.BIT5 changes the
-> voltage at at the OTG port, but it's been a few weeks since then...
-> let me know if you want me to do the measurements on my Odroid-C1+ again
->
-> > > > But we also need set power supply for *USB_B* port. *Bus 02.Port 1* ?
-> > > > I don't know but I will try to find solution.
-> > > I assume we also have to enable VBUS for the host only port, but I
-> > > don't know how
-> > >
-> > > > We need to enable some bit in phy driver ?
-> > > I'm not aware of any bit in the PHY driver which can toggle VBUS
-> > >
-> > > (trying to be creative here) maybe the GPIO is incorrectly configured
-> > > to pull up or down?
-> >
-> > I have tried this but no luck.
-> OK, too bad
->
-> [...]
-> > > > After fix the phy driver code and dts changes I am getting this changes.
-> > > > # cat /sys/kernel/debug/regulator/regulator_summary | grep USB_VBUS
-> > > >     USB_VBUS                      1    2      0 unknown  5000mV
-> > > > 0mA  5000mV  5000mV
-> > > >
-> > > > Now I am able to enable both *Bus 01.Port 1* and *Bus 02.Port 1*
-> > > >
-> > > > # lsusb -t
-> > > > /:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
-> > > >     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
-> > > >         |__ Port 1: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
-> > > >         |__ Port 3: Dev 3, If 0, Class=Video, Driver=uvcvideo, 480M
-> > > >         |__ Port 3: Dev 3, If 1, Class=Video, Driver=uvcvideo, 480M
-> > > >         |__ Port 3: Dev 3, If 2, Class=Audio, Driver=snd-usb-audio, 480M
-> > > >         |__ Port 3: Dev 3, If 3, Class=Audio, Driver=snd-usb-audio, 480M
-> > > so this is the host-only controller (usb1) and it's working fine for
-> > > you - very nice!
-> > >
-> > > > /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
-> > > >
-> > > > But not usb device are getting enable on *Bus 01.Port 1*
-> > > so you have something plugged into the OTG capable controller (usb0)
-> > > using an OTG cable?
-> >
-> > Yes I have connected USB-OTG cable with storage device attached,
-> > led lights on the device is blinking, but no power to the port is enable.
-> > so not hotplug of device is working on this port.
-> thanks for confirming this!
-> can you please send an updated version of both patches? if you want
-> someone else to test and/or review the patches before they are applied
-> you can use the subject prefix "RFT PATCH n/m" or "RFC PATCH n/m" (RFT
-> means "request for testing", "RFC" means "request for comments")
->
-
-I have tried to address the issue in the next series of patches.
-
-> > > I've not tried this before on my Odroid-C1 because I'm using the micro
-> > > USB connector to power the board
-> >
-> > Correct me if I am wrong, we need to tune USB phy driver to enable as
-> > power the board ?
-> so far I have seen two designs on Amlogic boards:
-> - VBUS is hardwired to +5V
-> - VBUS is controlled by a regulator/current limiting switch/etc. which
-> can be toggled using a GPIO
->
-> the PHY is involved in this because for the OTG port it senses the ID
-> line to decide whether the controller has to go into host or device
-> (peripheral) mode.
-> however, this part is not implemented in the mainline phy-meson8b-usb2
-> driver yet
->
-> in case someone is interested in *why* dwc2 doesn't do OTG on the
-> Amlogic SoCs yet - here are the notes from the top of my head:
-> - the dwc2 controller doesn't get an interrupt when switching between
-> host and peripheral mode
-> - instead the Amlogic vendor kernel has a timer which polls the PHY registers
-> - if the timer handler detects a "mode change" in the PHY registers it
-> changes the dwc2 mode
-> - however, in mainline the PHY can't notify the USB controller driver
-> (dwc2) to change the mode (yet)
->
-Thanks for your input.
-
-Yep I tired to study the code changes in the u-boot from amlogic.
-I tried to enable few bit in the phy to test enable of usb otg port
-but no success.
-I have tested that otg port is used to power on the board.
-
-> > >
-> > > do you get VBUS (maybe you have a USB thumb drive with an LED which
-> > > lights up when you connect it)?
-> > > do you get any errors or warnings from the dwc2 driver during boot?
-> > >
-> >
-> > Please find the boot log of my Odroid C1+ here
-> > [0]: https://pastebin.com/PiDmVmEC
-> >
-> > I dont see any major error on usb side.
-> that looks very good indeed. as I already mentioned above: please send
-> an updated version of the patches so I can try to reproduce your test
-> results!
->
-> > > > > on which board revision have you tested this patch?
-> > > > >
-> > > >
-> > > > I have with me for testing
-> > > >
-> > > > ODROID-C0 REV 0.4 20151217
-> > > > ODROID-C1+ REV 0.4 20150615 ----> current testing on
-> > > I have the exact same Odroid-C1+ board revision
-> > > this is my u-boot version:
-> > > U-boot-00000-gb7b8dc2-dirty(odroidc@b7b8dc21) (Sep 01 2017 - 01:18:22)
-> > > -> b7b8dc21 is the lastest commit of the hardkernel odroidc-v2011.03
-> > > u-boot branch at the time of writing
-> > >
-> >
-> > I am using the the u-boot from archlinux.
-> > If their is another u-boot for Odroid c1 plz let me know, I will try
-> > to install this on my system.
-> I don't remember where I got my u-boot version from.
-> maybe I should switch to the Arch Linux ARM one instead (so I'm back
-> to a well-known state). but let's wait for the test results from your
-> updated patches first.
->
->
-> Regards
-> Martin
-
-Best Regards
--Anand
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgQW5ndXMsCgpBbSBNaXR0d29jaCwgZGVuIDIzLjAxLjIwMTksIDA4OjIzIC0wNzAwIHNjaHJp
+ZWIgQW5ndXMgQWluc2xpZSAoUHVyaXNtKToKPiBPbiBpLm14OG1xLCB0aGVyZSBhcmUgdHdvIHNk
+bWEgaW5zdGFuY2VzLCBhbmQgdGhlIGNvbW1vbiBkbWEgZnJhbWV3b3JrCj4gd2lsbCBnZXQgYSBj
+aGFubmVsIGR5bmFtaWNhbGx5IGZyb20gYW55IGF2YWlsYWJsZSBzZG1hIGluc3RhbmNlIHdoZXRo
+ZXIKPiBpdCdzIHRoZSBmaXJzdCBzZG1hIGRldmljZSBvciB0aGUgc2Vjb25kIHNkbWEgZGV2aWNl
+LiBTb21lIElQcyBsaWtlCj4gU0FJIG9ubHkgd29yayB3aXRoIHNkbWEyIG5vdCBzZG1hMS4gVG8g
+bWFrZSBzdXJlIHRoZSBzZG1hIGNoYW5uZWwgaXMgZnJvbQo+IHRoZSBjb3JyZWN0IHNkbWEgZGV2
+aWNlLCB1c2UgYW4gaW5kZXggdG8gbWF0Y2guCj4gCj4gQmFzZWQgb24gTUxLLTE2MTA0LTIgYnkg
+Um9iaW4gR29uZyA8eWliaW4uZ29uZ0BueHAuY29tPgoKVGhpcyByZWxpZXMgb24gdGhlIHByb2Jl
+IG9yZGVyIG9mIHRoZSBkZXZpY2VzICh3aGljaCBzaG91bGQgYmUgdHJlYXRlZAphcyByYW5kb20p
+IGZvciB0aGUgbWF0Y2ggdG8gZmluZCB0aGUgcmlnaHQgZGV2aWNlLiBUaGlzIGlzIG5vdAphY2Nl
+cHRhYmxlIHVwc3RyZWFtLgoKVGhlIERUICJkbWFzIiBwcm9wZXJ0eSBhbHJlYWR5IHNwZWNpZmll
+cyB0aGUgY29ycmVjdCBTRE1BIGRldmljZSB0byB1c2UKIGZvciBhIGNvbnN1bWVyLCBzbyB0aGUg
+ZmlsdGVyIGZ1bmN0aW9uIHNob3VsZCByZWFsbHkgbWF0Y2ggdGhlIE9GIG5vZGUKb2YgdGhlIFNE
+TUEgZGV2aWNlIHdpdGggdGhlIG5vZGUgc3BlY2lmaWVkIGluIHRoZSBkbWFzIHBoYW5kbGUgaW4g
+b3JkZXIKdG8gcGljayB0aGUgcmlnaHQgU0RNQSBlbmdpbmUuCgpSZWdhcmRzLApMdWNhcwoKPiAK
+PiA+IFNpZ25lZC1vZmYtYnk6IEFuZ3VzIEFpbnNsaWUgKFB1cmlzbSkgPGFuZ3VzQGFra2VhLmNh
+Pgo+IC0tLQo+IMKgZHJpdmVycy9kbWEvaW14LXNkbWEuY8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
+oMKgwqDCoMKgfCAxMiArKysrKysrKysrKysKPiDCoGluY2x1ZGUvbGludXgvcGxhdGZvcm1fZGF0
+YS9kbWEtaW14LmggfMKgwqAxICsKPiDCoDIgZmlsZXMgY2hhbmdlZCwgMTMgaW5zZXJ0aW9ucygr
+KQo+IAo+IGRpZmYgLS1naXQgYS9kcml2ZXJzL2RtYS9pbXgtc2RtYS5jIGIvZHJpdmVycy9kbWEv
+aW14LXNkbWEuYwo+IGluZGV4IDJlNjkxYjFjZDBlYi4uYmYzNzUyYTZhNjRmIDEwMDY0NAo+IC0t
+LSBhL2RyaXZlcnMvZG1hL2lteC1zZG1hLmMKPiArKysgYi9kcml2ZXJzL2RtYS9pbXgtc2RtYS5j
+Cj4gQEAgLTQ0Miw2ICs0NDIsNyBAQCBzdHJ1Y3Qgc2RtYV9lbmdpbmUgewo+ID4gPiDCoAlzdHJ1
+Y3Qgc2RtYV9idWZmZXJfZGVzY3JpcHRvcgkqYmQwOwo+ID4gwqAJLyogY2xvY2sgcmF0aW8gZm9y
+IEFIQjpTRE1BIGNvcmUuIDE6MSBpcyAxLCAyOjEgaXMgMCovCj4gPiA+IMKgCWJvb2wJCQkJY2xr
+X3JhdGlvOwo+ID4gPiArCWludAkJCQlpZHg7Cj4gwqB9Owo+IMKgCj4gwqBzdGF0aWMgaW50IHNk
+bWFfY29uZmlnX3dyaXRlKHN0cnVjdCBkbWFfY2hhbiAqY2hhbiwKPiBAQCAtNjA2LDYgKzYwNyw4
+IEBAIHN0YXRpYyBjb25zdCBzdHJ1Y3Qgb2ZfZGV2aWNlX2lkIHNkbWFfZHRfaWRzW10gPSB7Cj4g
+wqB9Owo+IMKgTU9EVUxFX0RFVklDRV9UQUJMRShvZiwgc2RtYV9kdF9pZHMpOwo+IMKgCj4gK3N0
+YXRpYyBpbnQgc2RtYV9kZXZfaWR4Owo+ICsKPiA+IMKgI2RlZmluZSBTRE1BX0hfQ09ORklHX0RT
+UERNQQlCSVQoMTIpIC8qIGluZGljYXRlcyBpZiB0aGUgRFNQRE1BIGlzIHVzZWQgKi8KPiA+IMKg
+I2RlZmluZSBTRE1BX0hfQ09ORklHX1JURF9QSU5TCUJJVCgxMSkgLyogaW5kaWNhdGVzIGlmIFJl
+YWwtVGltZSBEZWJ1ZyBwaW5zIGFyZSBlbmFibGVkICovCj4gPiDCoCNkZWZpbmUgU0RNQV9IX0NP
+TkZJR19BQ1IJQklUKDQpwqDCoC8qIGluZGljYXRlcyBpZiBBSEIgZnJlcSAvY29yZSBmcmVxID0g
+MiBvciAxICovCj4gQEAgLTE5MzQsNiArMTkzNywxMSBAQCBzdGF0aWMgYm9vbCBzZG1hX2ZpbHRl
+cl9mbihzdHJ1Y3QgZG1hX2NoYW4gKmNoYW4sIHZvaWQgKmZuX3BhcmFtKQo+ID4gwqAJaWYgKCFp
+bXhfZG1hX2lzX2dlbmVyYWxfcHVycG9zZShjaGFuKSkKPiA+IMKgCQlyZXR1cm4gZmFsc2U7Cj4g
+wqAKPiA+ICsJLyogcmV0dXJuIGZhbHNlIGlmIGl0J3Mgbm90IHRoZSByaWdodCBkZXZpY2UgKi8K
+PiA+ICsJaWYgKChzZG1hYy0+c2RtYS0+ZHJ2ZGF0YSA9PSAmc2RtYV9pbXg4bXEpCj4gPiArCQkm
+JiAoc2RtYWMtPnNkbWEtPmlkeCAhPSBkYXRhLT5pZHgpKQo+ID4gKwkJcmV0dXJuIGZhbHNlOwo+
+ICsKPiA+IMKgCXNkbWFjLT5kYXRhID0gKmRhdGE7Cj4gPiDCoAljaGFuLT5wcml2YXRlID0gJnNk
+bWFjLT5kYXRhOwo+IMKgCj4gQEAgLTE5NjEsNiArMTk2OSw3IEBAIHN0YXRpYyBzdHJ1Y3QgZG1h
+X2NoYW4gKnNkbWFfeGxhdGUoc3RydWN0IG9mX3BoYW5kbGVfYXJncyAqZG1hX3NwZWMsCj4gPiDC
+oAnCoCogYmUgc2V0IHRvIHNkbWFjLT5ldmVudF9pZDEuCj4gPiDCoAnCoCovCj4gPiDCoAlkYXRh
+LmRtYV9yZXF1ZXN0MiA9IDA7Cj4gPiArCWRhdGEuaWR4ID0gc2RtYS0+aWR4Owo+IMKgCj4gPiDC
+oAlyZXR1cm4gZG1hX3JlcXVlc3RfY2hhbm5lbChtYXNrLCBzZG1hX2ZpbHRlcl9mbiwgJmRhdGEp
+Owo+IMKgfQo+IEBAIC0yMTQ5LDYgKzIxNTgsOSBAQCBzdGF0aWMgaW50IHNkbWFfcHJvYmUoc3Ry
+dWN0IHBsYXRmb3JtX2RldmljZSAqcGRldikKPiA+IMKgCQlvZl9ub2RlX3B1dChzcGJhX2J1cyk7
+Cj4gPiDCoAl9Cj4gwqAKPiA+ICsJLyogVGhlcmUgbWF5YmUgbXVsdGkgc2RtYSBkZXZpY2VzIHN1
+Y2ggYXMgaS5teDhtcSAqLwo+ID4gKwlzZG1hLT5pZHggPSBzZG1hX2Rldl9pZHgrKzsKPiArCj4g
+PiDCoAlyZXR1cm4gMDsKPiDCoAo+IMKgZXJyX3JlZ2lzdGVyOgo+IGRpZmYgLS1naXQgYS9pbmNs
+dWRlL2xpbnV4L3BsYXRmb3JtX2RhdGEvZG1hLWlteC5oIGIvaW5jbHVkZS9saW51eC9wbGF0Zm9y
+bV9kYXRhL2RtYS1pbXguaAo+IGluZGV4IDdkOTY0ZTc4NzI5OS4uODQzZmFmMDgxMjgyIDEwMDY0
+NAo+IC0tLSBhL2luY2x1ZGUvbGludXgvcGxhdGZvcm1fZGF0YS9kbWEtaW14LmgKPiArKysgYi9p
+bmNsdWRlL2xpbnV4L3BsYXRmb3JtX2RhdGEvZG1hLWlteC5oCj4gQEAgLTU1LDYgKzU1LDcgQEAg
+c3RydWN0IGlteF9kbWFfZGF0YSB7Cj4gPiDCoAlpbnQgZG1hX3JlcXVlc3QyOyAvKiBzZWNvbmRh
+cnkgRE1BIHJlcXVlc3QgbGluZSAqLwo+ID4gwqAJZW51bSBzZG1hX3BlcmlwaGVyYWxfdHlwZSBw
+ZXJpcGhlcmFsX3R5cGU7Cj4gPiDCoAlpbnQgcHJpb3JpdHk7Cj4gPiArCWludCBpZHg7Cj4gwqB9
+Owo+IMKgCj4gwqBzdGF0aWMgaW5saW5lIGludCBpbXhfZG1hX2lzX2lwdShzdHJ1Y3QgZG1hX2No
+YW4gKmNoYW4pCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+XwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmlu
+ZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9s
+aW51eC1hcm0ta2VybmVsCg==
