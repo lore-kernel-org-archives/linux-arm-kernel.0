@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4325EC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 00:34:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B1D13C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 00:34:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 115D7217D4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 00:34:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7FF99217D4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 00:34:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RXfjudD1";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="AWe9AOIk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 115D7217D4
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BoY0e6Sn";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ugNh42NH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FF99217D4
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -28,62 +28,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=r4CCLHWKzch+94zz+kaeOxcRGv8HJet0qmYWfHNcRvE=; b=RXfjudD1wkkGVkc+yqKu/x/El1
-	22CuLdV6WOofY1+HnsMvee5lkUym3ANYF3dokh1nio9WiK++WLPXiqQr4bfZTMmtxLOZhpD69cpN9
-	g8eUAQQIesubrGDkzrGU7hFR3s4Cp9u0j5RNRmNoADJBd97P1u/Y6l+C7Zc4OSsI+ImgApIpkTGU8
-	+heHkKeLrh8xGLy74T4DkHXga1r0QDJIrZSH7QthaChcIDjySBR06pceDsbUrLhe2pZjB0Lzwu3B2
-	+FToS2ysrTrs9x+JjP0wApJn25NpRq8TfrSDIZTls5tJl2YrC5YUyNPby45veG+njmxRFKRMJ6WPo
-	ARvUa17w==;
+	bh=yjnR0iDuuVhhHhxLJNQ09xmasbAj277082E6BBm1hE0=; b=BoY0e6SnmWa4HY56Ig0PvxB1hV
+	EUPgxdmuAL8/CYG2kKcfirpCWxb6SlsIYjTbYbs1KLxI1S+vx149XOfX2gQL78I1aoLv4pc6BGi5I
+	UZG05QI22eipS7BPerkkwkBQF8gHvfO3linpwdZJFoVpyzh3H+cpbPFEbHkipLwpv3/eT1Lj/m84Z
+	bdKpDZJ04IPAgbZCg/DP3CvD3GE1XVHXATmafElK3y8H5uH5Fttm8gHnZiepdcNRkEUndYkDZK2VQ
+	vLhvMrmSzXfO8R0UfYWJZe+KocVdD3RNv6igpJk1cf0Xayfqv4J0dGqcRVgiRmE7904OhZ/crZd33
+	nRv1jXAw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gm6Uc-0004pX-BV; Wed, 23 Jan 2019 00:34:10 +0000
-Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+	id 1gm6Un-00051A-Am; Wed, 23 Jan 2019 00:34:21 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gm6UK-0004ZV-FH
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 00:33:53 +0000
-Received: by mail-pl1-x644.google.com with SMTP id y1so202129plp.9
+ id 1gm6UL-0004Zv-CQ
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 00:33:54 +0000
+Received: by mail-pl1-x643.google.com with SMTP id b5so213436plr.4
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 22 Jan 2019 16:33:51 -0800 (PST)
+ Tue, 22 Jan 2019 16:33:52 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=VqOzV70nxn1aW4YfYzttzB6N0VuBYDY1Aq/89e4xjMU=;
- b=AWe9AOIkv9l1RZqN62H7Kq/OQ3+m3b+nwSJGFdCtsD2hWxr2SH/qrS+AkJz4Q5X48j
- kVIpYm4ClBd0baxCP+wOw9GvQEdi1HK+iKa8vVoUHj9xY0c7p8w8xmDL0FO6QCdmfwjO
- Xo3D6m/1OWdZ/fEU1BWBzPdW2i0iM0b8wh1uwFSLmMgPZc9p2+ksaYTKDgJaB3iqZyf5
- WTPgNC7ihnCSo5gW0O57jCsOMEuxfJyLg/s4kUgT0S0Hey9d2w2vUeKrRLkGBOLA2bnu
- zya8z2Pg9ckp9IVknWH3+da40NVWIjNB1kDhh3QlUuVLlz4pcVjuYLZItkusWxnn0ZHO
- lGuw==
+ bh=tfGTIJO5m8NWQURx9g+bU65yV8N/3DpbsVgcNTCxXUQ=;
+ b=ugNh42NHKJ4iuhT/CHr1m6eYLE8RjkCAjsWmnDTdjvh8eUgjuTa1ZYXyFKt7MpkPRp
+ 98VcQyMqN1iyydW+quiBl80XY6bUaTkgkdpA2+yb7QKFUAQAqXQch9loQVX/y60x5+ur
+ 6JFblbgbhFucwXuaypL2eY2hA5a7FH4Q10U0mTtH30m2ANuM1JlkB1hj6UdmBwbG3dRI
+ aPvVvvwD93bw/zruuyZTsAzm5DS1SuDo9eeBuD9ZSqi0Ie2XHceGd5ecCiV176ixAOw5
+ 94LqTvnTDS0QTgxVfHnU81JJabz87rceMbJ+1cMxmHKUjVVcCGj9s1o1vNBtJlEWyXVa
+ 6wBQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=VqOzV70nxn1aW4YfYzttzB6N0VuBYDY1Aq/89e4xjMU=;
- b=cj1aJjydp/VBhVGaP3nv1tWeC780YjUEGFx1kSjmgZ8IrOdCjUzVRjAnDFnTsjosDM
- oefaMqxoL1k5gF0lqFSkhFTIQlHLPiHug3MVzaCX84J+7tgeBtH7smCwxnBAQ4HC+NuC
- fgYffK/hiSonkr/lcjOwf8mXvXQZpdP4f7onOhyszKk/2TvwEoJbrPargpI0ox6/UBpL
- pAvdFeeffJkfuTilLTcIrujS73x9yL6modeKIifllws8XadmHJg+lvvGJSjZkftY0EJA
- GmuGnhKiXi0AuX3csmNkQSYr9Qv8i9da9P+teKLsPVp8K4OuBEkbeCrgNZB+UV8M/P/5
- GHvg==
-X-Gm-Message-State: AJcUukfEZSm3M7r0UCnHg7zrf5vWwjO/VMT4umYeLsPcoIYZ1RUiOiDf
- 2emilKufhgaBKenipOOMr7Q=
-X-Google-Smtp-Source: ALg8bN6l8JdqmLtMFRJekrpeUWsbzJiGZHxNvPvvu5yMskwWQ2j3uRemVufdSEJs3e7/B3mrCwryCw==
-X-Received: by 2002:a17:902:a5c3:: with SMTP id t3mr92596plq.117.1548203630540; 
- Tue, 22 Jan 2019 16:33:50 -0800 (PST)
+ bh=tfGTIJO5m8NWQURx9g+bU65yV8N/3DpbsVgcNTCxXUQ=;
+ b=WihmhgOijWAHlKdfqXz7GTeimDMFUUPEARYffuN/9fgs4BBffu6wuaTgJBd9abX1tB
+ 7n7lJLMk/rJqqTYqcWp5xEn7LOWgOTFsPHPuHfN9RiBgt+Z20x0Q41dNO3Uz6kfBeUF5
+ f/0ld4ecuJhITK/VS5Of+p3JfLWSNCf/WhQJptEcaIijfGUh/QCn46YM7eYB0TRKHg0d
+ kPT0NVliC8oSUsbEip0D0YVdu5B3R71wmy4I1H5zN+jocFTPAxlTPDxqjGNiORLkzxWK
+ CdrJGTaNT5l33d1HTUEicUgQvl1oG89sDPatoF/gZBERiauG0bbdPESYy/Jml3QloUVU
+ D+fA==
+X-Gm-Message-State: AJcUukfsd6dLznuHL8Y7kE8SNXd/wx3v+xXawIo2LQc41Ws9bAwJq0cq
+ lLUW5Q9P8CEzAAh52E2jehqmuFOU
+X-Google-Smtp-Source: ALg8bN6D3u/lHxf23Y6GYqAbjBgb885VrYySsIy73j6QMoNSyHSAZ6EuoFY+qDgkn+v7+nleb7gYVw==
+X-Received: by 2002:a17:902:32c3:: with SMTP id
+ z61mr113791plb.114.1548203632158; 
+ Tue, 22 Jan 2019 16:33:52 -0800 (PST)
 Received: from fainelli-desktop.igp.broadcom.net ([192.19.223.250])
- by smtp.gmail.com with ESMTPSA id e86sm25465257pfb.6.2019.01.22.16.33.48
+ by smtp.gmail.com with ESMTPSA id e86sm25465257pfb.6.2019.01.22.16.33.50
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 22 Jan 2019 16:33:49 -0800 (PST)
+ Tue, 22 Jan 2019 16:33:51 -0800 (PST)
 From: Florian Fainelli <f.fainelli@gmail.com>
 To: linux-kernel@vger.kernel.org
-Subject: [PATCH reset-next 1/2] reset: brcmstb: Make it tristate
-Date: Tue, 22 Jan 2019 16:33:44 -0800
-Message-Id: <20190123003345.13750-2-f.fainelli@gmail.com>
+Subject: [PATCH reset-next 2/2] reset: brcmstb: Fix 32-bit build with 64-bit
+ resource_size_t
+Date: Tue, 22 Jan 2019 16:33:45 -0800
+Message-Id: <20190123003345.13750-3-f.fainelli@gmail.com>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190123003345.13750-1-f.fainelli@gmail.com>
 References: <20190123003345.13750-1-f.fainelli@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190122_163352_506940_C83AEF26 
-X-CRM114-Status: GOOD (  13.35  )
+X-CRM114-CacheID: sfid-20190122_163353_418764_742B435C 
+X-CRM114-Status: GOOD (  14.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -113,29 +115,43 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The driver can be built as a module just fine, so let's make it
-selectable as such.
+On 32-bit architectures defining resource_size_t as 64-bit (because of
+PAE), we can run into a linker failure because of the modulo and the
+division against resource_size(), replace the two problematic operations
+with an alignment check on the register resource (instead of modulo),
+and the division with DIV_ROUND_CLOSEST_ULL().
 
-Reported-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Reported-by: Randy Dunlap <rdunlap@infradead.org>
+Fixes: c196cdc7659d ("reset: Add Broadcom STB SW_INIT reset controller driver")
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/reset/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/reset/reset-brcmstb.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index 1ca03c57e049..d9a02b7f90cf 100644
---- a/drivers/reset/Kconfig
-+++ b/drivers/reset/Kconfig
-@@ -41,7 +41,8 @@ config RESET_BERLIN
- 	  This enables the reset controller driver for Marvell Berlin SoCs.
+diff --git a/drivers/reset/reset-brcmstb.c b/drivers/reset/reset-brcmstb.c
+index 01ab1f71518b..c4cab8b5052d 100644
+--- a/drivers/reset/reset-brcmstb.c
++++ b/drivers/reset/reset-brcmstb.c
+@@ -91,7 +91,8 @@ static int brcmstb_reset_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
- config RESET_BRCMSTB
--	bool "Broadcom STB reset controller" if COMPILE_TEST
-+	tristate "Broadcom STB reset controller"
-+	depends on ARCH_BRCMSTB || COMPILE_TEST
- 	default ARCH_BRCMSTB
- 	help
- 	  This enables the reset controller driver for Broadcom STB SoCs using
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (resource_size(res) % SW_INIT_BANK_SIZE) {
++	if (!IS_ALIGNED(res->start, SW_INIT_BANK_SIZE) ||
++	    !IS_AGLINED(resource_size(res), SW_INIT_BANK_SIZE)) {
+ 		dev_err(kdev, "incorrect register range\n");
+ 		return -EINVAL;
+ 	}
+@@ -103,7 +104,8 @@ static int brcmstb_reset_probe(struct platform_device *pdev)
+ 	dev_set_drvdata(kdev, priv);
+ 
+ 	priv->rcdev.owner = THIS_MODULE;
+-	priv->rcdev.nr_resets = (resource_size(res) / SW_INIT_BANK_SIZE) * 32;
++	priv->rcdev.nr_resets = DIV_ROUND_CLOSEST_ULL(resource_size(res),
++						      SW_INIT_BANK_SIZE) * 32;
+ 	priv->rcdev.ops = &brcmstb_reset_ops;
+ 	priv->rcdev.of_node = kdev->of_node;
+ 	/* Use defaults: 1 cell and simple xlate function */
 -- 
 2.17.1
 
