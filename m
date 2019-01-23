@@ -2,84 +2,86 @@ Return-Path: <SRS0=uP4V=P7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8AB87C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 09:42:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D9B3C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 09:44:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 59D0A20861
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 09:42:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0437821726
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 09:44:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P1zOiQHh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59D0A20861
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YX/1eLGS";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lusticky.cz header.i=@lusticky.cz header.b="sclRXA5B"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0437821726
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lusticky.cz
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=emaro60XaUgmxgfsU/AyFhZev3cGKantY3HqZjME1g4=; b=P1zOiQHhSaS5Ikp/ml+Lb87EJ
-	tTj1YZDKmqAohGOAfjKz2GbUhr8T+vGBbCzEWXDK+E+Rwvj4jPwfznc6bQbNa3JNlkeekr0++e3DI
-	/JMVfmPaaW2pGvNY8fOSgJ73gfF6HoXsE2YfGtIO2OBFhTRZ8VdIH4xZ4+XIssIJd5quCvBgIOByH
-	wBrJFpN8H9MgZK1hir84O8BIjE3VAg4HYLrzQHelq9zgHp2E86g4+lxeNv1NA7v3Qg5aNogf3QvFU
-	uWPYqwxds9QtoLgFCuNzVMjAn7IEZpWruC4HT4Bsb/Kd5qs2eV3oHHUoxtGSQcAAzuu9M/0fO/jhe
-	EgWOkFLMA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=GxnB0BPc3ffQGDcxjKFxLR1sTUjgaX4L+vXkEIHFzvs=; b=YX/1eLGSXcMKzk
+	HJisK83FMglfOaN8S/25UlLzqVAcFf/bhNIR/2dbOVNeGm16CHePrCrVPmAOx2//y5vMrS4h2uX0K
+	Yh7YBy8Mnt5rmo8nSq3w6NhM0JsMh0YZctKnl3n/QXeIRChXDD4k2A1QEFTzhVOEKbc6FVrtAOBZ8
+	/XJcj7kp/q2CWpQKS1UJjT6LjrVcU4JrvXRFkc0XIsDoJSMk+VY27uDQluIbi5W6HdKXZGAFgcWzD
+	3RL5IGUy4XDMwwBGctRLYqSX8v9KCnzWBpTp6ZV5nribdmIWIWn3KXFV32T15lBp7Hz31p7H1gOBZ
+	uA6hWZrCkjoW+oB+0l7w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmF36-0005Zz-9X; Wed, 23 Jan 2019 09:42:20 +0000
-Received: from mail-wr1-f68.google.com ([209.85.221.68])
+	id 1gmF57-0006fK-VD; Wed, 23 Jan 2019 09:44:25 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmF32-0005Z9-Kh
- for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 09:42:19 +0000
-Received: by mail-wr1-f68.google.com with SMTP id x10so1574782wrs.8
+ id 1gmF51-0006Yt-De
+ for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 09:44:22 +0000
+Received: by mail-wr1-x443.google.com with SMTP id r10so1567610wrs.10
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 23 Jan 2019 01:42:15 -0800 (PST)
+ Wed, 23 Jan 2019 01:44:18 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=lusticky.cz; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=AydP9t33tB1yC2IZu2iAyACKAMVurm8qbYf2rmcYqx4=;
+ b=sclRXA5BuemBFTtSRwX/xP5IBiaLnzeCpiRvlr535xQ7XjrroO7W4Xp3i3OEV/s7rh
+ YKLnj+EP0IiK9HOvojcfwoAhYX348Crsi5vq6rNn6dxq7FjpWcC2PfIGKjifntdc9AfY
+ Afo0D6Tj5o+rnAnh1QtnPIL+fQG2upaIvTMjC6aZhvF/Y+ojA9+2fpq5b2Y8aQeYqhET
+ MSv8enYTACYGoo8hNoZYN0VsDx291Y1s6aUJ+ZWaRowxXDBnEH8DIHlDkYm0AG6dNqk7
+ IlV1hgF1HHg0CBZ2T7jjpS6Hako0z8rVNroeY3m2V2/n/Lszfbv6Z/e5Jawio/iYSdrS
+ ZFcA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
  :content-transfer-encoding;
- bh=LwAAqvJT9N3NStH/aQvsXyjV9S5c+31FqNJh677rm8w=;
- b=sthzT8jH+/x5lmw33mkGrbgpIYIX/m7ZYmNjncaMAgaYIT2AkmmoigQPUHrFjYmKM+
- gTBV5caKDn2FqmEEg1tU5l2yPPBynQoLXmJ6g6EczRePZ43Sy/rW0kqXQ1MYt9gNkcnK
- cJvWE7orqZPpExYKZsaWYYQnE7OH2yWMRi3OUY7rnf7K2zeiHxKdEs62GVfHSjw7DZJn
- APZkQGAK/r4ck6Vh70E4rqB/9S8HNiCnR5mHRAwkA8+l9ugy2vb8Pc6svqPtXlBIy+Ke
- gCRahgyjhda0SfC5A41V7At7XsOPtF1kk47xqIJ85uHJswTRw2ZxQuGq4XR4uoS2+Qu/
- aOig==
-X-Gm-Message-State: AJcUukdujGip0Rx91N/Q4Bk5Fo6rWX7VJd+PCGlGxlMy4OMtSWWWuM5y
- tdoHmWEjURCa7yuIG4tWeVXx4g==
-X-Google-Smtp-Source: ALg8bN6Z8xYEd94pbnVQW2xw+r9i6sbB1rON1vRhzANgRjLt+xlHjWidTs1ed1fitLjVoOCRInrJJQ==
-X-Received: by 2002:a5d:5182:: with SMTP id k2mr1843831wrv.121.1548236534444; 
- Wed, 23 Jan 2019 01:42:14 -0800 (PST)
-Received: from [10.200.139.106] (ovpn-brq.redhat.com. [213.175.37.11])
- by smtp.gmail.com with ESMTPSA id w18sm95376173wru.54.2019.01.23.01.42.12
+ bh=AydP9t33tB1yC2IZu2iAyACKAMVurm8qbYf2rmcYqx4=;
+ b=Rlj07zD4yAm08+/+BV892WG/7KaWswHVvcSe8B1+KvnL/gpFJ/ZuSjHOidoqTCAiOU
+ xIzFuuPm9x2+70ivhKB9LUyjp7lan0T2KrOibmr+nn/KDSmdAF0Ex2LutDqnpmVTelXI
+ 72z3jPjQNrits62n4gHGlB038et7i8Hi9ks0wO4mVJ6W04i3JJLSIowfjDyujwQ6lqUG
+ Ow53nvmyskwdq3IrhrYqqtS7a2D8tFAQRVG4HD4DZmTb468d4so75+opM6NBnjOX9MrG
+ e+LFOwaEFXBdhhY8AK4lLuA1RwoxMa/AwBwgNtxujyYzbhBNXdp1dLkqbfjrH9Q4/BUA
+ hmKg==
+X-Gm-Message-State: AJcUukcJW0bxgOg4d/KeInlsA3W1jK1G9jf8pbAt3DblB/qhmt24J22I
+ O7ltnGY23EzLQbAj3xIGVhuxFHhV88CqnA==
+X-Google-Smtp-Source: ALg8bN626MnlGVYg4LNW+jMah/a2lBioAfFx79REHUjmyufBNGNGiVG+xw0EA8xSghN3mwazXZcjIw==
+X-Received: by 2002:adf:9c01:: with SMTP id f1mr1900520wrc.286.1548236656861; 
+ Wed, 23 Jan 2019 01:44:16 -0800 (PST)
+Received: from e430.riomail.cz (188-175-152-238.client.rionet.cz.
+ [188.175.152.238])
+ by smtp.gmail.com with ESMTPSA id y1sm71939131wme.1.2019.01.23.01.44.16
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 23 Jan 2019 01:42:13 -0800 (PST)
-Subject: Re: [PATCH 2/4] arm: dump: no need to check return value of
- debugfs_create functions
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Catalin Marinas <catalin.marinas@arm.com>, Kevin Hilman
- <khilman@kernel.org>, Russell King <linux@armlinux.org.uk>,
- Will Deacon <will.deacon@arm.com>
-References: <20190122144114.9816-1-gregkh@linuxfoundation.org>
- <20190122144114.9816-3-gregkh@linuxfoundation.org>
-From: Laura Abbott <labbott@redhat.com>
-Message-ID: <7022c531-e3df-73e9-824f-11a623252045@redhat.com>
-Date: Wed, 23 Jan 2019 10:42:12 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ Wed, 23 Jan 2019 01:44:16 -0800 (PST)
+From: Josef Lusticky <josef@lusticky.cz>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH 0/3] Add SPI pinctrl nodes to sun5i SoCs.
+Date: Wed, 23 Jan 2019 10:43:31 +0100
+Message-Id: <20190123094334.11030-1-josef@lusticky.cz>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-In-Reply-To: <20190122144114.9816-3-gregkh@linuxfoundation.org>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_014216_678173_B2C0818B 
-X-CRM114-Status: GOOD (  20.65  )
+X-CRM114-CacheID: sfid-20190123_014420_718581_8B2FB00C 
+X-CRM114-Status: GOOD (  10.54  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,87 +93,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jinbum Park <jinb.park7@gmail.com>, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, Kees Cook <keescook@chromium.org>
+Cc: maxime.ripard@bootlin.com, wens@csie.org,
+ Josef Lusticky <josef@lusticky.cz>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/22/19 6:41 AM, Greg Kroah-Hartman wrote:
-> When calling debugfs functions, there is no need to ever check the
-> return value.  The function can work or not, but the code logic should
-> never do something different based on this.
-> 
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Jinbum Park <jinb.park7@gmail.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Laura Abbott <labbott@redhat.com>
+This patch series adds SPI pinctrl nodes to sun5i SoCs.
 
-Acked-by: Laura Abbott <labbott@redhat.com>
+While spi0 is common to all A10s, A13 and GR8 (PATCH 1/3),
+spi2 has alternate pins on the PB bank only on A10s (already in sun5i-a10s.dtsi) and GR8 (PATCH 2/3).
 
-> Cc: linux-arm-kernel@lists.infradead.org
-> Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> ---
->   arch/arm/include/asm/ptdump.h | 9 +++------
->   arch/arm/mm/dump.c            | 4 ++--
->   arch/arm/mm/ptdump_debugfs.c  | 8 ++------
->   3 files changed, 7 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/ptdump.h b/arch/arm/include/asm/ptdump.h
-> index 3ebf9718288d..0c2d3d0d4cc6 100644
-> --- a/arch/arm/include/asm/ptdump.h
-> +++ b/arch/arm/include/asm/ptdump.h
-> @@ -21,13 +21,10 @@ struct ptdump_info {
->   
->   void ptdump_walk_pgd(struct seq_file *s, struct ptdump_info *info);
->   #ifdef CONFIG_ARM_PTDUMP_DEBUGFS
-> -int ptdump_debugfs_register(struct ptdump_info *info, const char *name);
-> +void ptdump_debugfs_register(struct ptdump_info *info, const char *name);
->   #else
-> -static inline int ptdump_debugfs_register(struct ptdump_info *info,
-> -					const char *name)
-> -{
-> -	return 0;
-> -}
-> +static inline void ptdump_debugfs_register(struct ptdump_info *info,
-> +					   const char *name) { }
->   #endif /* CONFIG_ARM_PTDUMP_DEBUGFS */
->   
->   void ptdump_check_wx(void);
-> diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
-> index 084779c5c893..eb385a500ed0 100644
-> --- a/arch/arm/mm/dump.c
-> +++ b/arch/arm/mm/dump.c
-> @@ -450,7 +450,7 @@ void ptdump_check_wx(void)
->   static int ptdump_init(void)
->   {
->   	ptdump_initialize();
-> -	return ptdump_debugfs_register(&kernel_ptdump_info,
-> -					"kernel_page_tables");
-> +	ptdump_debugfs_register(&kernel_ptdump_info, "kernel_page_tables");
-> +	return 0;
->   }
->   __initcall(ptdump_init);
-> diff --git a/arch/arm/mm/ptdump_debugfs.c b/arch/arm/mm/ptdump_debugfs.c
-> index be8d87be4b93..598b636615a2 100644
-> --- a/arch/arm/mm/ptdump_debugfs.c
-> +++ b/arch/arm/mm/ptdump_debugfs.c
-> @@ -24,11 +24,7 @@ static const struct file_operations ptdump_fops = {
->   	.release	= single_release,
->   };
->   
-> -int ptdump_debugfs_register(struct ptdump_info *info, const char *name)
-> +void ptdump_debugfs_register(struct ptdump_info *info, const char *name)
->   {
-> -	struct dentry *pe;
-> -
-> -	pe = debugfs_create_file(name, 0400, NULL, info, &ptdump_fops);
-> -	return pe ? 0 : -ENOMEM;
-> -
-> +	debugfs_create_file(name, 0400, NULL, info, &ptdump_fops);
->   }
-> 
+The spi1_cs1 is only available on A10s (PATCH 3/3).
+
+The spi1_cs1 is potentially available on GR8 as well
+(at least it is specified in drivers/pinctrl/sunxi/pinctrl-sun5i.c),
+but I was not able to find it in the datasheet.
+The same applies to spi2_cs1.
+
+Both spi1_cs1 and spi2_cs1 can be added later to sun5i-gr8.dtsi.
+
+Josef Lusticky (3):
+  ARM: dts: sun5i: Add SPI0 pins
+  ARM: dts: sun5i: GR8: Add SPI2 PB pins
+  ARM: dts: sun5i: A10s: Add SPI1_CS1 PG13 pin
+
+ arch/arm/boot/dts/sun5i-a10s.dtsi |  5 +++++
+ arch/arm/boot/dts/sun5i-gr8.dtsi  | 10 ++++++++++
+ arch/arm/boot/dts/sun5i.dtsi      | 10 ++++++++++
+ 3 files changed, 25 insertions(+)
+
+-- 
+2.20.1
 
 
 _______________________________________________
