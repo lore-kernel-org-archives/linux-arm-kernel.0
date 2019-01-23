@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2F8A6C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 08:01:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3FA48C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 08:01:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EF38521019
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 08:01:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 09F1B21019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 23 Jan 2019 08:01:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V48/oG0J";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Zd/biH39"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF38521019
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qc82SJ4x";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="uSHYxRPK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 09F1B21019
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,32 +26,32 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2W3mePWsP4qvr1P90XBw2rbq9GBQbLQ6CE9kHmknyfQ=; b=V48/oG0JZw9amc
-	V/1qKF8wLid3nzQZ3DmJtoL6aU0LEDwh/LshCiXrcr2sxXt4tIMUZ6URBz7gDkyfCueTTX9venCOQ
-	jXqM+UHsfNsiGOkfXaCv8oRHtVQOAKgjRp5uqiQKCjpdKIX0wAEkuwATiHvde0+RleyNM69PoIHxw
-	QwHBcmGj519G4Ph95x/xkNi0/Du9fTpRl4fZOXaLNv8AEs/513qre329YwQy4cF9kmO01HHbJ7OFk
-	X1hEltr6vXNbKo8hqQngEMewBtVhMNyT6DNbEvE1pwKffFyRNyzXTfx9b4bDz8DpT5pGcHrjpKOrJ
-	/OzlFnYAw+SXMV+adIfg==;
+	List-Owner; bh=/kKUlskG213NtFg34ofndYkRfEd2Q5NyHFXI35axcN4=; b=Qc82SJ4xLXGLbA
+	IKUzLoYsLdUqPmgMkfSBD5/bnPvUnMEI4lXO5pGzXyfdJYx6BQga2OojCnyXtAGXWq3SwrJXkdFkW
+	3k7HMtdVnUVEm9xrc50Gkg81hzLB/OKfqN79z6C+S/35RkNpYvfqfG/3U3HMLgkkAqoh+qjBQYaxR
+	JzzW3LMQQbChUOR4nvl86LTGnPg88bClnKlCqMoCSkwV69wLo4veSQLQjvjqL2KeTR09naifGqU3c
+	Xn1sBlWyY78aBINqXhZb5JbpebZF9jP1vPBzjWzPhocZowUXwcyBt3i5lQu73EgzIY1vykHpxCdtD
+	T1F8DbAaQzy9uUH/L2gQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmDTj-0006uG-F5; Wed, 23 Jan 2019 08:01:43 +0000
-Received: from mail-eopbgr60047.outbound.protection.outlook.com ([40.107.6.47]
- helo=EUR04-DB3-obe.outbound.protection.outlook.com)
+	id 1gmDTv-00074w-0t; Wed, 23 Jan 2019 08:01:55 +0000
+Received: from mail-eopbgr30078.outbound.protection.outlook.com ([40.107.3.78]
+ helo=EUR03-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmDTV-0006fh-AO
+ id 1gmDTU-0006fC-L3
  for linux-arm-kernel@lists.infradead.org; Wed, 23 Jan 2019 08:01:32 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=9SUU8VHtQZsmWZLKbrAciB6qXVY8vYAWGI6nntnWvo8=;
- b=Zd/biH39l++MSy1aXLIs/X7qFHirTNRpko2ShqPwcVUeAOr6E70Cw6sXstQO3IADB9WnxWzfrFQBhWUovPTm+STRtmn1f9z3a0dpX1Ri2CZRu5+1HWfZkv51UehXijK+KCRz91Gewmf/FJLsUl0v2tKEDWE2FOESqGlH54YqeCA=
+ bh=SAdDEoXk0f/CP5Ggd1Nnff1SqHPuZxmgBFDT4AgAo3M=;
+ b=uSHYxRPKAXdzzoN6t6FaCsb9BtXNf2y8ogy3S5EZrIjRODz1dk0xM37VDElSDjjOPWHs/GE6MowxZ/G/Dp1TfaIbE4Z8w92xmTBjJyNTgCPj/IFBB9zBhjGWPnlfZiNTnR7m/HsOEXOFqfqOekEnvf7eyu/D2D02h/jvPyZbvyk=
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3882.eurprd04.prod.outlook.com (52.134.72.33) with Microsoft SMTP
+ DB3PR0402MB3851.eurprd04.prod.outlook.com (52.134.73.16) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1537.26; Wed, 23 Jan 2019 08:01:26 +0000
+ 15.20.1537.27; Wed, 23 Jan 2019 08:01:16 +0000
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1537.031; Wed, 23 Jan 2019
- 08:01:26 +0000
+ 08:01:16 +0000
 From: Anson Huang <anson.huang@nxp.com>
 To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
@@ -62,13 +62,11 @@ To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH 3/3] arm64: dts: freescale: imx8qxp: enable scu general irq
- channel
-Thread-Topic: [PATCH 3/3] arm64: dts: freescale: imx8qxp: enable scu general
- irq channel
-Thread-Index: AQHUsvHUdPc3T/5XfkGbvS3LZCHmiA==
-Date: Wed, 23 Jan 2019 08:01:21 +0000
-Message-ID: <1548230179-26076-3-git-send-email-Anson.Huang@nxp.com>
+Subject: [PATCH 2/3] firmware: imx: enable imx scu general irq function
+Thread-Topic: [PATCH 2/3] firmware: imx: enable imx scu general irq function
+Thread-Index: AQHUsvHRXuytUps5mk6GTK7yeDAbWQ==
+Date: Wed, 23 Jan 2019 08:01:16 +0000
+Message-ID: <1548230179-26076-2-git-send-email-Anson.Huang@nxp.com>
 References: <1548230179-26076-1-git-send-email-Anson.Huang@nxp.com>
 In-Reply-To: <1548230179-26076-1-git-send-email-Anson.Huang@nxp.com>
 Accept-Language: en-US
@@ -84,39 +82,39 @@ authentication-results: spf=none (sender IP is )
 x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3882;
- 6:fIH7PQazgy5rIpOl/ckIo6UDG4SOjZP0U2OJjnLex4q9zeD0UXzk6mydz0CIWNC48R68mZnn/8uBfBPTwj0XdrnjqhmWGFjVUyulemEuGUA1njXG57Po6W2dO126Y1SA8BZbstbgLdqW82m1MV0z/tM00EFrdVK+2Lw9Sqp5SrzrgvvRm7CJhWOTcP4tTVH5hrMY5eXsXmx09+w2IqCLEpWpClcBd0DOaFfMfHiO+a9I1bymI081s1vT9JwHDwWXouMq4TRQTuJ61lTgb/iu9ssBnlo/H0fqwQvQWEgaN5dhBs9eHs7UYIUh9YGmarVVSyDLv9jUv6FhOMha7ioLt0+wvvywgtcRc8opqZ8SgdfBNE6qcmkFsML5fAXtSSU8rPHRpnVtYfib5/dKdhylMhiFjq0lzfJXtewlr1UXupnPDZSGVWdElKLedYBpiAVfYwQaiD/7MV/HG27I4wDZXg==;
- 5:IBIvTCfiNs4hj8EmlDrGB+MO9sDfMww/tQlrx7qDPT1zM47+5jNatPiY2BjLSihEcrsYVKxePZqJ4tAqncSGLIAQWvpYphUI5z1BOvGKVBfGgnG+QBTwSd8B+I/Zb47OAQi15KwfCg0Vuwh80CTRilsEEnSh0j8KcVb1SU1C5gkEL30fVVjXG8ilordbKjRdeDmFJhW7hrC6vKDV+3OipQ==;
- 7:6hUwhQkn3aWUopChcCD55fLHCAbD0za+wTU5UIWObSaJfmjVS4u3RVFmIAw7buS9cW7nPOVorEiiKj68sv0/+0mxSF1Hrx3Vk2yU74R2DhVSBAHPV3rozhBkVVOI1aJ/BdCE0K9epO224rwRdHYz2g==
-x-ms-office365-filtering-correlation-id: 67084ca0-eb19-4508-0216-08d68108f68b
+x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3851;
+ 6:vkJefNddgCWwCynIIYXX2qFTljJxIeZKZ9Oqmj/Z2rTXBHb1ng3B0iITTUM3xjRt7zZs4EJqZUVkXT/KqjK//1Epp7924rFNI9uoXxjmc4DHT4tXLVMZytfzoSsZBtKYjxak/gRmERMOlN1bgvSI4dA8eKYwtfG0XEWRTgX7XsgcuFfgeFB9kAjSMQqa+obcWKjhI2XWmcDMQQA0zQ+NCAWnwLE+F0b/UcFHia8qhnT5E5c+hNaKkBYPAJKkzKwSY5X7ERA4n8SMheAfNvDb8KbVcoskV6CEsJRGs2OMEaHcG3FpdM729QDUNdzJHZeNHfS/0++qy2/9QY0ZwygLAVt8eoHpCMk3GduR456pxgLZBX9rOIKhgaTrix8M+g0Kp42orNXHZ/zTli0rWoxV/jUESNXvb1Ua9edyxarDFsFEy73xwuK5jp9faCiDtWR39M3Bgn0wdfu3bbqUPf8upg==;
+ 5:18j4r2QiYAL7KmYM7cSDWwibQc+M95qMgS/zXpXXcFGJtaK1wjuWC0CRLxk1RzDo2l/pGpPFdb0Gdo9O7DSeYlt4soOkngqdW3RmOFznXnZQbOqxjpCfuNcQ9FAg3zZzwvnL6uwUV4wyir9I5UKJX+oGn02IdpsTNMheH1DQ1fTDUJdMD3XCVDacrwpfPyp4IDd4m8Xm8n/QxXD+QHvoDQ==;
+ 7:XU78+iiSfyEQ4qnVvY8RI43U2aii8J/0Dka/qtTMAuEyWHSPDRzCxsbOU1QHDA/y/mtaYMFcQZCxiZm05Onh+R1SpHMeMPIHBWNdODZqiMLfCbtgpLj4ssip45pMV2lDeAZZ/ZDbbivxbpdRSCMoJw==
+x-ms-office365-filtering-correlation-id: ae96021c-63c7-4478-998a-08d68108f399
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605077)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3882; 
-x-ms-traffictypediagnostic: DB3PR0402MB3882:
-x-microsoft-antispam-prvs: <DB3PR0402MB3882A368F88FA438151B6A36F5990@DB3PR0402MB3882.eurprd04.prod.outlook.com>
+ SRVR:DB3PR0402MB3851; 
+x-ms-traffictypediagnostic: DB3PR0402MB3851:
+x-microsoft-antispam-prvs: <DB3PR0402MB3851FBC6CB916BFFBAA75A02F5990@DB3PR0402MB3851.eurprd04.prod.outlook.com>
 x-forefront-prvs: 0926B0E013
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(396003)(376002)(39860400002)(366004)(136003)(346002)(189003)(199004)(186003)(2616005)(66066001)(3846002)(446003)(52116002)(476003)(11346002)(256004)(4744005)(86362001)(39060400002)(76176011)(6486002)(7416002)(26005)(2906002)(102836004)(4326008)(53936002)(2201001)(7736002)(25786009)(6512007)(8676002)(81166006)(305945005)(81156014)(8936002)(6506007)(6116002)(486006)(386003)(2501003)(36756003)(6436002)(106356001)(50226002)(97736004)(99286004)(105586002)(68736007)(6666004)(316002)(71200400001)(71190400001)(14454004)(110136005)(478600001)(921003)(32563001)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3882;
+ SFS:(10009020)(346002)(396003)(39860400002)(136003)(376002)(366004)(189003)(199004)(39060400002)(14454004)(106356001)(25786009)(6512007)(4326008)(478600001)(6486002)(68736007)(105586002)(36756003)(6436002)(53936002)(97736004)(7416002)(6506007)(66066001)(86362001)(102836004)(386003)(6116002)(11346002)(2616005)(476003)(3846002)(186003)(2906002)(305945005)(71200400001)(256004)(81166006)(316002)(81156014)(110136005)(8676002)(99286004)(50226002)(8936002)(71190400001)(26005)(52116002)(14444005)(76176011)(2501003)(486006)(7736002)(2201001)(446003)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3851;
  H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: 9Kqiq8MzD464NOLkgPOM3LwaATzmRvABFmHhzFWcZe6U/Opmjdkgzlmt6vAiQwSP9PvZvSFWod0BOdghcposwGDBkfZEN4AxjswhJVbls7x3K+JWBHPvPTpb9KarKYXjgvxLCJlkvfPz7EPHuYiqUOZqhW8jwvHLUF96WOIcG9q/2WS26C6LJbtVMSxwXtP5n3dg9ZRPrUpwUsgm9iKN/ipFDz+3EoB6KOfuwIpiomL/QnlxmubY7P64G7TaJ93+wCVGdMEJTqr+JiS5Rh+Db7GgEcE+WKZ7N2PLxXS1p/uJ5cBJuUA5MRNkWkOpwHpuhvnqW0N3GstptlaqiPC/l7hMDF7CIDfNGrwuUiVtsWmRSJPNVsmqY+cKmfAvQsvbLQC56bgPRoUPkbq2XeFILlDAna29kIHxxJPttyDGSyA=
+x-microsoft-antispam-message-info: B/t4Y9eOVRzYA4/muE+A/HNdTKnfm3lavHxU6veYu3ORg2RdjaM8cax+e7lYd6nDVPLQB2jk8iHTX/VF4hT35M5axaHTQMTNAu+r8EQrr22RcuJQT6nsjnVdKSfMaNRunILSnfiZa5eEoHsJ4fpM1M2b9ZVRMfyrqVlfZa0gVGNOKNynV3cDKX+xakBzPPvpse0Kju1aL7TXKTGNNKaf4Cq99DoBAux3mGePPLrcWPAiYzfceYzOG+4SGnHxuyvm/qlUxebmchQkYyqfxMtzYIUaxxAznEY3QFE2+GCp5QYHiwF+oQ8m8ziaVd0Fg1/rankX3bxkJ9IdEECyOx8HhZoJxOxg8WQ6QprlxJU+oSSetjAG5X5Cpw0ucg1dND3dKiM76E0WPcIKxwiyYRNEs7ohVcVOkOuTPH/13rlXO8A=
 spamdiagnosticoutput: 1:99
 spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 67084ca0-eb19-4508-0216-08d68108f68b
-X-MS-Exchange-CrossTenant-originalarrivaltime: 23 Jan 2019 08:01:17.2092 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: ae96021c-63c7-4478-998a-08d68108f399
+X-MS-Exchange-CrossTenant-originalarrivaltime: 23 Jan 2019 08:01:12.3029 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3882
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3851
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_000129_729243_547CE449 
-X-CRM114-Status: GOOD (  12.11  )
+X-CRM114-CacheID: sfid-20190123_000129_110119_68F7EE74 
+X-CRM114-Status: GOOD (  16.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -134,40 +132,176 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On i.MX8QXP, SCU uses MU1 general interrupt channel #3 to notify
-user for IRQs of RTC alarm, thermal alarm and WDOG etc., mailbox
-RX doorbell mode is used for this function, this patch adds
-support for it.
+The System Controller Firmware (SCFW) controls RTC, thermal
+and WDOG etc., these resources' interrupt function are managed
+by SCU. When any IRQ pending, SCU will notify Linux via MU general
+interrupt channel #3, and Linux kernel needs to call SCU APIs
+to get IRQ status and notify each module to handle the interrupt.
+
+Since there is no data transmission for SCU IRQ notification, so
+doorbell mode is used for this MU channel, and SCU driver will
+use notifier mechanism to broadcast to every module which registers
+the SCU block notifier.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/firmware/imx/imx-scu.c   | 101 +++++++++++++++++++++++++++++++++++++++
+ include/linux/firmware/imx/sci.h |   3 ++
+ 2 files changed, 104 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-index 4c3dd95..4021f25 100644
---- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-@@ -87,7 +87,8 @@
- 	scu {
- 		compatible = "fsl,imx-scu";
- 		mbox-names = "tx0", "tx1", "tx2", "tx3",
--			     "rx0", "rx1", "rx2", "rx3";
-+			     "rx0", "rx1", "rx2", "rx3",
-+			     "gi3";
- 		mboxes = <&lsio_mu1 0 0
- 			  &lsio_mu1 0 1
- 			  &lsio_mu1 0 2
-@@ -95,7 +96,8 @@
- 			  &lsio_mu1 1 0
- 			  &lsio_mu1 1 1
- 			  &lsio_mu1 1 2
--			  &lsio_mu1 1 3>;
-+			  &lsio_mu1 1 3
-+			  &lsio_mu1 3 3>;
+diff --git a/drivers/firmware/imx/imx-scu.c b/drivers/firmware/imx/imx-scu.c
+index 2bb1a19..e93bea5 100644
+--- a/drivers/firmware/imx/imx-scu.c
++++ b/drivers/firmware/imx/imx-scu.c
+@@ -7,6 +7,7 @@
+  *
+  */
  
- 		clk: clock-controller {
- 			compatible = "fsl,imx8qxp-clk";
++#include <dt-bindings/firmware/imx/rsrc.h>
+ #include <linux/err.h>
+ #include <linux/firmware/imx/types.h>
+ #include <linux/firmware/imx/ipc.h>
+@@ -21,6 +22,8 @@
+ 
+ #define SCU_MU_CHAN_NUM		8
+ #define MAX_RX_TIMEOUT		(msecs_to_jiffies(30))
++#define IMX_SC_IRQ_FUNC_STATUS	2
++#define IMX_SC_IRQ_NUM_GROUP	6
+ 
+ struct imx_sc_chan {
+ 	struct imx_sc_ipc *sc_ipc;
+@@ -77,7 +80,23 @@ static int imx_sc_linux_errmap[IMX_SC_ERR_LAST] = {
+ 	-EIO,	 /* IMX_SC_ERR_FAIL */
+ };
+ 
++struct imx_sc_msg_irq_get_status {
++	struct imx_sc_rpc_msg hdr;
++	union {
++		struct {
++			u16 resource;
++			u8 group;
++			u8 reserved;
++		} send;
++		struct {
++			u32 status;
++		} receive;
++	} data;
++} __packed;
++
+ static struct imx_sc_ipc *imx_sc_ipc_handle;
++static struct work_struct imx_sc_general_irq_work;
++static BLOCKING_NOTIFIER_HEAD(imx_scu_notifier_chain);
+ 
+ static inline int imx_sc_to_linux_errno(int errno)
+ {
+@@ -194,6 +213,86 @@ int imx_scu_call_rpc(struct imx_sc_ipc *sc_ipc, void *msg, bool have_resp)
+ }
+ EXPORT_SYMBOL(imx_scu_call_rpc);
+ 
++int imx_scu_register_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_register(&imx_scu_notifier_chain, nb);
++}
++EXPORT_SYMBOL(imx_scu_register_notifier);
++
++int imx_scu_unregister_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_unregister(&imx_scu_notifier_chain, nb);
++}
++EXPORT_SYMBOL(imx_scu_unregister_notifier);
++
++static int imx_scu_notifier_call_chain(unsigned long status, u8 *group)
++{
++	return blocking_notifier_call_chain(&imx_scu_notifier_chain,
++					    status, (void *)group);
++}
++
++static void imx_scu_general_irq_work_handler(struct work_struct *work)
++{
++	struct imx_sc_msg_irq_get_status msg;
++	struct imx_sc_rpc_msg *hdr = &msg.hdr;
++	u32 irq_status;
++	int ret;
++	u8 i;
++
++	for (i = 0; i < IMX_SC_IRQ_NUM_GROUP; i++) {
++		hdr->ver = IMX_SC_RPC_VERSION;
++		hdr->svc = IMX_SC_RPC_SVC_IRQ;
++		hdr->func = IMX_SC_IRQ_FUNC_STATUS;
++		hdr->size = 2;
++
++		msg.data.send.resource = IMX_SC_R_MU_1A;
++		msg.data.send.group = i;
++
++		ret = imx_scu_call_rpc(imx_sc_ipc_handle, &msg, true);
++		if (ret) {
++			pr_err("get irq status failed, ret %d\n", ret);
++			return;
++		}
++
++		irq_status = msg.data.receive.status;
++		if (!irq_status)
++			continue;
++
++		imx_scu_notifier_call_chain(irq_status, &i);
++	}
++}
++
++static void imx_scu_rxdb_callback(struct mbox_client *c, void *msg)
++{
++	schedule_work(&imx_sc_general_irq_work);
++}
++
++static int imx_scu_enable_general_irq_channel(struct device *dev)
++{
++	struct mbox_client *cl;
++	struct mbox_chan *ch;
++	int ret = 0;
++
++	cl = devm_kzalloc(dev, sizeof(*cl), GFP_KERNEL);
++	if (!cl)
++		return -ENOMEM;
++
++	cl->dev = dev;
++	cl->rx_callback = imx_scu_rxdb_callback;
++
++	/* SCU general IRQ uses general interrupt channel 3 */
++	ch = mbox_request_channel_byname(cl, "gi3");
++	if (IS_ERR(ch)) {
++		ret = PTR_ERR(ch);
++		dev_err(dev, "failed to request mbox chan gi3, ret %d\n", ret);
++		return ret;
++	}
++
++	INIT_WORK(&imx_sc_general_irq_work, imx_scu_general_irq_work_handler);
++
++	return ret;
++}
++
+ static int imx_scu_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -246,6 +345,8 @@ static int imx_scu_probe(struct platform_device *pdev)
+ 
+ 	imx_sc_ipc_handle = sc_ipc;
+ 
++	imx_scu_enable_general_irq_channel(dev);
++
+ 	dev_info(dev, "NXP i.MX SCU Initialized\n");
+ 
+ 	return devm_of_platform_populate(dev);
+diff --git a/include/linux/firmware/imx/sci.h b/include/linux/firmware/imx/sci.h
+index ebc5509..9d608db 100644
+--- a/include/linux/firmware/imx/sci.h
++++ b/include/linux/firmware/imx/sci.h
+@@ -15,4 +15,7 @@
+ 
+ #include <linux/firmware/imx/svc/misc.h>
+ #include <linux/firmware/imx/svc/pm.h>
++
++int imx_scu_register_notifier(struct notifier_block *nb);
++int imx_scu_unregister_notifier(struct notifier_block *nb);
+ #endif /* _SC_SCI_H */
 -- 
 2.7.4
 
