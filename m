@@ -2,86 +2,70 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C4C7C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 17:42:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BA482C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 18:05:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 12D0721855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 17:42:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 870A92082C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 18:05:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WU4FPYxT";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="QWCG39jA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 12D0721855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oSKAlXRV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 870A92082C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VnMwZNYOisROiCMf6MsfBpPodBv+49pJV6DmwnXZGN4=; b=WU4FPYxTEWfNY+
-	c/PhngCUIoYdBeqK105bdXRPHSFZTRJzBVgd/h6yIO2bWYDYqxg0YN9wq32vkBZkixr4yMPPVVORt
-	hW84ZShO3sMZk0FGabWS42TqLHv5pL42WUxVd9xe1Ti7zGWsHYSXglkmMBNmLOBB6JRbh35HueeWk
-	6OHBc8A8K2AECDs0Bo5ZSmvhpRnmlHDXIJ4H3qu86Pm1mU0Yfmq/N5o4B64ICLYkDfFyw5no5+I3T
-	/2O6nevsOrF5yRXrmimoSsGNI+UJaa+bcxd+/s6ld1xrUXxAUveDUc8Tx6s9QlChs8VcULb4yJnDi
-	s4rv0uyNZae6xZMIF1PA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=DMwqgYfrnxF6bP7CM8dFO80Ekj2qsptX/fx0gUwGjwQ=; b=oSK
+	AlXRVpe15Loost4BWIOpwg4G6ZtzpdhUiO9qCv8/p/D6Zq5gBSvFJSSQn30XtI+jhz+CCap1/zfaX
+	/jKgqducetZ60xFpl4qNyAbLSJNEPjflk0SxSdUqH8522nE8ZlCNXHPMNGfEM8OXWJ1lv7ZqEnqys
+	sRit7eNRvt9GuJSRlDfHeXFbKOedyPLvzs+9gFDU/COU2ifeqkz9aXPofSnPD6sLuVawCcSaNF3Hl
+	Ub7ctYrVto7PzEEwas/Q/fBIlVR7apKFfPnicQTWV4asYyXu7GvI3IvTTp4hFw4gdBKf+7kr9wMX0
+	82lwvBTY+XCGkUMZ0lWRrUdDIVz3dUA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmj0w-0001JG-6e; Thu, 24 Jan 2019 17:42:06 +0000
-Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
+	id 1gmjN8-0008Ew-TM; Thu, 24 Jan 2019 18:05:02 +0000
+Received: from mout.kundenserver.de ([212.227.126.133])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmj0s-0001Is-KZ
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 17:42:04 +0000
-Received: by mail-oi1-x242.google.com with SMTP id y23so5534829oia.4
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 24 Jan 2019 09:42:02 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=zVlpwDq2bUYnqIcPuWsHMoDWtsRGpomjGG4g/5R0dM8=;
- b=QWCG39jAFAo8Aun5eByoOu1JO+eGYtbyKiP2A6UOv+pkO+0VEKEh2k2i9Wxx3I+0bP
- Egu2eFS2/W4LhmRN/Vk6ks+QqX5o9uwJfxUcOgUX17egvNaIIZmOtm3gng+TtXIAJq/A
- 2ZX4FrGd0zxErUGecbeAOAG9XTx+6RZWT/ugdR3cwoVArr9rAil59I95uPy11qpD+hrs
- b5AmE9KfhN+kC0frlRG2EWLfyCdPrYZErdM9FEUZv/jmuAJZzl6pX8MqBWtlgR0ThEnV
- bzXvU3yPbcnS/jEr5RjnS39UNfDSZqQTeMHbQ5ypEo/hcfNBXHTy0WLSOAU2nXJkqnLu
- ib1g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=zVlpwDq2bUYnqIcPuWsHMoDWtsRGpomjGG4g/5R0dM8=;
- b=g7W30XUFNQ89OnOIkZ5Sti+Smk7vVev4f2tAEIjQeCyQDegZ0oNKMAIA6PN8oSz27+
- UiN6LWBTiKyWyZm1HE05rNSv21F3Aw2xQZX2h7v8XQMtqM9cP+c6rONhBa9u9r+jC0b/
- 384IElocLziIGGidyPcWQIZVGslinUQjikAO4aRpJp38a90QAfPyYll61tCc8Wl48koP
- oi7ZuGm7e5ln+hjYydfSdGLszn/C6sSys+snROKpmH44+oOaqQjzgVXlnw+x+3Tz1bar
- x6C2dXcACHp9yM8q0k6YyDA2jWiDPCxdESuD6dCpaZw+QB4jHNtQtmhPOP5T3G90aOyt
- N/Bg==
-X-Gm-Message-State: AJcUukf4Kx7AsemxOZ+R4c/R9g9Tn9xoN512U54bvu3L5FdkyMmfE7xU
- f9sPXX4XIz9E4sRyyMAr4CuFGBYH+SG2auFHUf4=
-X-Google-Smtp-Source: ALg8bN5Ae0yBuSPvHzI1NMaHXmffRwpfsRkd70RgSDyd7KaTnwYQrCP5qswpKSgSwC8l8naacCSgJVgynAdXv7VFpdg=
-X-Received: by 2002:aca:6155:: with SMTP id v82mr1815489oib.259.1548351720991; 
- Thu, 24 Jan 2019 09:42:00 -0800 (PST)
-MIME-Version: 1.0
-References: <20180912152702.14640-1-l.stach@pengutronix.de>
- <20180926023937.GD22238@dragon>
- <CAOMZO5CeOxzyEG0tTKHfrNjY8WRKs=s5nBvxqZuFuJjR62eXOA@mail.gmail.com>
- <1548340471.28802.23.camel@pengutronix.de>
-In-Reply-To: <1548340471.28802.23.camel@pengutronix.de>
-From: Fabio Estevam <festevam@gmail.com>
-Date: Thu, 24 Jan 2019 15:41:58 -0200
-Message-ID: <CAOMZO5B8mAvziRdUdsddpPvH9=kHk4VQe5_J7Uq8t000aPiveA@mail.gmail.com>
-Subject: Re: [PATCH] soc: imx: gpc: set DMA mask for PD platform devices
-To: Lucas Stach <l.stach@pengutronix.de>
+ id 1gmjN5-00085n-09; Thu, 24 Jan 2019 18:05:00 +0000
+Received: from localhost.localdomain ([37.4.249.120]) by
+ mrelayeu.kundenserver.de (mreue009 [212.227.15.167]) with ESMTPSA (Nemesis)
+ id 1Moewz-1hWSMp0gXJ-00p8Ds; Thu, 24 Jan 2019 19:04:46 +0100
+From: Stefan Wahren <stefan.wahren@i2se.com>
+To: Florian Fainelli <f.fainelli@gmail.com>, Ray Jui <rjui@broadcom.com>,
+ Scott Branden <sbranden@broadcom.com>, Eric Anholt <eric@anholt.net>
+Subject: [PATCH V2] soc: bcm: Make PM driver default for BCM2835
+Date: Thu, 24 Jan 2019 19:04:20 +0100
+Message-Id: <1548353060-4900-1-git-send-email-stefan.wahren@i2se.com>
+X-Mailer: git-send-email 2.7.4
+X-Provags-ID: V03:K1:Uyp7qWMRttDBEQxKAssbi/Mzdvd0eWI8cdufGXgmYcKZSIwU0QG
+ /0C1hPAu9lrDnw9EihwSFQwbd/PQ0xRft1V2FWiiwSHJgLFAy8Lf5EVofq/Vu+DHS9dLQqY
+ ERPmz6/zMo6RIQXRMOsO5WJC1QGO0yG/vCeKkf1eTP3+MYIRDn89Y8aL85ZdcGwGST/qYhw
+ 28oo8NvWVfbxWYBB4Q0QA==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:sSQL4TdlRes=:7S+6ao/v2I48/YNrFDr8W9
+ 9yJvdzTdCU6jfGfOh2JlvitPZHsrtPf/3zDk+Wahyih5vyIn+pzofCFrO7FeGHyk5xWEDM5n4
+ LXC67FaWOSFZRB2JrLW2CZ5xYr8HqSokM2izRc6pTsL++b2IJtFQ2yCpsDbrXBWnXS0+OWSge
+ kCenbRCAQOpxKUvFNGwNSDaEKaedNcJTcLmtccAuVv5RoigIdL6FD5tR3BaI+Q7VF9DMuMZJ+
+ 2vz1Tz6sdAptEoH4urDe5nAJpIcMr8/ipFUDKcqPT9Wp/P8Vj1ZKQrL5ucgM2ucnTeXszIeJ6
+ B6nQil14yWdv9JB+OO4ElDVu5okAMFevQLSluKHmE9YIf7RC0jXtnC6dU13ulOToiZDaINsCL
+ oVxpZoNPixhcQuzdm+4VXrQdcp5KS15oCMCbBlLXSBpqPo+furmnUQ8oIH4WsIRhs8KPtvuHs
+ feAsN9W9J5AMqDlGHRRjfrGiftRMP7l8cFDSf4qsDQDV8k8puN0vfcVX/9KhuVavTs7DANlhr
+ UCPAcNyewu7M7wDt7osVXJKMs4hftxslfXOgbBlzZHRQeN3zYsuO53fsSzI9oApQiv8ZQPULV
+ Jv9pgcDbLWR5yMCHJYzsHZpANIMGeyulCk3OGiSNWbhPRtaeUJXtwLV18IEgTpbpkhUrDCXBA
+ DQWlnvqg4oX6WEEjDczFGNjKO5A0EP9lOgCFBsFF1p+H7hK4rpMWRj59l99azm8jJotbGUK5g
+ 1rAitwo5y+JPW4XaI2tJ57MaYK62pj5vueUh+pHnLdDxZSwOUIYYFGh5jfk=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_094202_679558_4E64F7A4 
-X-CRM114-Status: UNSURE (   7.89  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190124_100459_339649_FEE9A6A8 
+X-CRM114-Status: GOOD (  13.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,28 +77,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: patchwork-lst@pengutronix.de, NXP Linux Team <linux-imx@nxp.com>,
- Sascha Hauer <kernel@pengutronix.de>, Fabio Estevam <fabio.estevam@nxp.com>,
- Shawn Guo <shawnguo@kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: Stefan Wahren <stefan.wahren@i2se.com>, Arnd Bergmann <arnd@arndb.de>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ bcm-kernel-feedback-list@broadcom.com, linux-rpi-kernel@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Lucas,
+Since commit 52a4adbaebcc ("ARM: bcm283x: Switch V3D over to using the
+PM driver instead of firmware.") VC4 on BCM2835 requires the power driver.
 
-On Thu, Jan 24, 2019 at 12:34 PM Lucas Stach <l.stach@pengutronix.de> wrote:
+Otherwise the driver won't probe and HDMI output stays black:
+vc4_v3d 20c00000.v3d: ignoring dependency for device, assuming no driver
 
-> It was dropped due to discussion in the pull request:
->
-> https://patchwork.kernel.org/patch/10621589/
->
-> It seems we are stuck there and I don't have the bandwidth to follow up
-> with this currently.
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ drivers/soc/bcm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Understood. Thanks for the clarification.
+Changes in V2:
+- make driver default for BCM2835 instead of selecting in platform Kconfig
+  as suggested by Scott Branden
+
+diff --git a/drivers/soc/bcm/Kconfig b/drivers/soc/bcm/Kconfig
+index fe1af29..03fa91f 100644
+--- a/drivers/soc/bcm/Kconfig
++++ b/drivers/soc/bcm/Kconfig
+@@ -3,6 +3,7 @@ menu "Broadcom SoC drivers"
+ config BCM2835_POWER
+ 	bool "BCM2835 power domain driver"
+ 	depends on ARCH_BCM2835 || (COMPILE_TEST && OF)
++	default y if ARCH_BCM2835
+ 	select PM_GENERIC_DOMAINS if PM
+ 	select RESET_CONTROLLER
+ 	help
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
