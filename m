@@ -2,90 +2,69 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 30F81C282C5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 10:20:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AC56AC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 10:27:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EECFC218AD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 10:20:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7B22721872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 10:27:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WTxNH96t";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="Ptyo01/0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EECFC218AD
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Pd5Ymv8+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7B22721872
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SuQPz7XVUWnYcT7aI+FpBVoHOyt3WaqvFrNVtBiYQbw=; b=WTxNH96tCn8WiH
-	wwTbzZA4zi6QiHq6prr8YH8Bk1rL3FUfyhcNZdCcGReTCs15Vh3qmVGleaFIW9iyxllU+b+LsdJ5T
-	L7FCRYH1kYYwuZ9u9qt9XrzsrBxgDv78Zw7OV6t9zS2DeEmryTrEAxHCiDa14cn6TWhOSHijv0KCh
-	U/G5kiFUNqKkYThMISzfDqQBcc6hj9X5GwGnMQtjUQfI2cZdOXkg9TukQLNhS2Cjqcc0aD1b3wWGt
-	NanQqueX9RWxmoGxgzUddVfcqn454N6XJqZ1zEvuKBHH2SP6r0NZXm8fpjxvkFUVBmWNf/07C1+jc
-	bfeaF4MffyHR/ZincZpQ==;
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=sGiWASFQteDFRiKApyevCElCHrodjqgzP0g9SJZEPEU=; b=Pd5Ymv8+LyWF/4
+	0dBmy0Q07AOVLaPy8/+LGS7DU+WbbskSNCtU6GyGbtsnWer95VH504xkP2heOAZUmq/HSw5mxW7SH
+	Fw58HiZkGkIrOJCcwpFtBuhomUnzQ8MQm1nn4T5M9NHD9BPCEkp1rAFvDRfyZF2Px2j10NDbHv1bD
+	p2cEAo1j+RwK7LivRe+o7FVk4VxsXuEaWUQJcj6oPZRkSmEyKdfTuyAzIWYBznBD/suSeK70w/qj0
+	+9mnC10nqyDYrA4ZhAR8JqOHYUAw7/i+XPGo7QFKEQNuUsmFdaR7AcPf/G1FrUt3GSzN0Hz464Bd9
+	b5yhlFMyxY+aFhTnmvlw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmc7l-0006pB-EL; Thu, 24 Jan 2019 10:20:41 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmc7W-0006hm-AZ
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 10:20:37 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0OAKA4o008860;
- Thu, 24 Jan 2019 04:20:10 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1548325210;
- bh=sMpid0ncOfF9FcWdZn8Lw9uXKdtgwNJPTIi6wnV1Z+U=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=Ptyo01/038EPCHb9vb+13X2N88IWaYAUt4i11NhinJccX2XdaH5wV+Qw3J8ZkBzUx
- AvkQgyX44BbmIdpnpAlguLqaTDwaAvtr+M5sKfV3WxqP3Y6bm3VKJO++cj7xPh9Qe6
- hykWXFZd19aGPzuXVkiCvd1xe9XcZyuRgPkM+Gso=
-Received: from DFLE104.ent.ti.com (dfle104.ent.ti.com [10.64.6.25])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0OAKA71122070
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 24 Jan 2019 04:20:10 -0600
-Received: from DFLE106.ent.ti.com (10.64.6.27) by DFLE104.ent.ti.com
- (10.64.6.25) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 24
- Jan 2019 04:20:10 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DFLE106.ent.ti.com
- (10.64.6.27) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 24 Jan 2019 04:20:09 -0600
-Received: from [172.24.190.117] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0OAK6Ot001613;
- Thu, 24 Jan 2019 04:20:06 -0600
-Subject: Re: [PATCH v4 07/13] irqchip: ti-sci-intr: Add support for Interrupt
- Router driver
-To: Marc Zyngier <marc.zyngier@arm.com>, Nishanth Menon <nm@ti.com>, Santosh
- Shilimkar <ssantosh@kernel.org>,
- Rob Herring <robh+dt@kernel.org>, <tglx@linutronix.de>,
- <jason@lakedaemon.net>
-References: <20181227060829.5080-1-lokeshvutla@ti.com>
- <20181227061313.5451-1-lokeshvutla@ti.com>
- <20181227061313.5451-7-lokeshvutla@ti.com>
- <96ae4b44-0331-b11d-c67a-515afd88dee5@arm.com>
-From: Lokesh Vutla <lokeshvutla@ti.com>
-Message-ID: <2f41b033-bee7-34b8-5290-9509b21b6ace@ti.com>
-Date: Thu, 24 Jan 2019 15:49:52 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <96ae4b44-0331-b11d-c67a-515afd88dee5@arm.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+	id 1gmcEG-0000M3-Be; Thu, 24 Jan 2019 10:27:24 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmcE7-0000LF-Ta; Thu, 24 Jan 2019 10:27:21 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 47D02207B0; Thu, 24 Jan 2019 11:27:14 +0100 (CET)
+Received: from aptenodytes (aaubervilliers-681-1-87-206.w90-88.abo.wanadoo.fr
+ [90.88.29.206])
+ by mail.bootlin.com (Postfix) with ESMTPSA id D8CE920654;
+ Thu, 24 Jan 2019 11:27:13 +0100 (CET)
+Message-ID: <bdf14f97e98f2fd06307545ab9038ac3c2086ae7.camel@bootlin.com>
+Subject: Re: [linux-sunxi] [PATCH v2 1/2] media: v4l: Add definitions for
+ the HEVC slice format and controls
+From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+To: ayaka <ayaka@soulik.info>
+Date: Thu, 24 Jan 2019 11:27:14 +0100
+In-Reply-To: <c3619a00-17e7-fb92-a427-a7478b96f356@soulik.info>
+References: <20181123130209.11696-1-paul.kocialkowski@bootlin.com>
+ <20181123130209.11696-2-paul.kocialkowski@bootlin.com>
+ <5515174.7lFZcYkk85@jernej-laptop>
+ <ffe9c81db34b599f675ca5bbf02de360bf0a1608.camel@bootlin.com>
+ <776e63c9-d4a5-342a-e0f7-200ef144ffc4@rock-chips.com>
+ <64c793e08d61181b78125b3956ec38623fa5d261.camel@bootlin.com>
+ <D8005130-F7FD-4CBD-8396-1BB08BB08E81@soulik.info>
+ <f982ef378a8ade075bc7077b93640e20ecebf9f4.camel@bootlin.com>
+ <82FA0C3F-BC54-4D89-AECB-90D81B89B1CE@soulik.info>
+ <c3619a00-17e7-fb92-a427-a7478b96f356@soulik.info>
+Organization: Bootlin
+User-Agent: Evolution 3.30.4 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_022026_808872_F7256027 
-X-CRM114-Status: GOOD (  36.17  )
+X-CRM114-CacheID: sfid-20190124_022717_078334_9485BFE1 
+X-CRM114-Status: GOOD (  40.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,352 +76,209 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Device Tree Mailing List <devicetree@vger.kernel.org>,
- Peter Ujfalusi <peter.ujfalusi@ti.com>, Sekhar Nori <nsekhar@ti.com>,
- linux-kernel@vger.kernel.org, Tero Kristo <t-kristo@ti.com>,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devel@driverdev.osuosl.org, Alexandre Courbot <acourbot@chromium.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Randy Li <randy.li@rock-chips.com>,
+ linux-kernel@vger.kernel.org,
+ Jernej =?UTF-8?Q?=C5=A0krabec?= <jernej.skrabec@gmail.com>,
+ Tomasz Figa <tfiga@chromium.org>, Hans Verkuil <hverkuil@xs4all.nl>,
+ linux-rockchip@lists.infradead.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ Ezequiel Garcia <ezequiel@collabora.com>, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Marc,
-
-On 16/01/19 10:46 PM, Marc Zyngier wrote:
-> [Still in the process of sorting out my email - don't ask]
-> 
-> On 27/12/2018 06:13, Lokesh Vutla wrote:
->> Texas Instruments' K3 generation SoCs has an IP Interrupt Router
->> that does allows for redirection of input interrupts to host
->> interrupt controller. Interrupt Router inputs are either from a
->> peripheral or from an Interrupt Aggregator which is another
->> interrupt controller.
->>
->> Configuration of the interrupt router registers can only be done by
->> a system co-processor and the driver needs to send a message to this
->> co processor over TISCI protocol.
->>
->> Add support for Interrupt Router driver over TISCI protocol.
->>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> ---
->>  MAINTAINERS                       |   1 +
->>  drivers/irqchip/Kconfig           |  11 ++
->>  drivers/irqchip/Makefile          |   1 +
->>  drivers/irqchip/irq-ti-sci-intr.c | 310 ++++++++++++++++++++++++++++++
->>  4 files changed, 323 insertions(+)
->>  create mode 100644 drivers/irqchip/irq-ti-sci-intr.c
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 8c7513b02d50..4480eb2fe851 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -15024,6 +15024,7 @@ F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
->>  F:	drivers/clk/keystone/sci-clk.c
->>  F:	drivers/reset/reset-ti-sci.c
->>  F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
->> +F:	drivers/irqchip/irq-ti-sci-intr.c
->>  
->>  Texas Instruments ASoC drivers
->>  M:	Peter Ujfalusi <peter.ujfalusi@ti.com>
->> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
->> index 3d1e60779078..a8d9bed0254b 100644
->> --- a/drivers/irqchip/Kconfig
->> +++ b/drivers/irqchip/Kconfig
->> @@ -406,6 +406,17 @@ config IMX_IRQSTEER
->>  	help
->>  	  Support for the i.MX IRQSTEER interrupt multiplexer/remapper.
->>  
->> +config TI_SCI_INTR_IRQCHIP
->> +	bool
->> +	depends on TI_SCI_PROTOCOL && ARCH_K3
->> +	select IRQ_DOMAIN
->> +	select IRQ_DOMAIN_HIERARCHY
->> +	help
->> +	  This enables the irqchip driver support for K3 Interrupt router
->> +	  over TI System Control Interface available on some new TI's SoCs.
->> +	  If you wish to use interrupt router irq resources managed by the
->> +	  TI System Controller, say Y here. Otherwise, say N.
->> +
->>  endmenu
->>  
->>  config SIFIVE_PLIC
->> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
->> index c93713d24b86..b4ff376a08ef 100644
->> --- a/drivers/irqchip/Makefile
->> +++ b/drivers/irqchip/Makefile
->> @@ -94,3 +94,4 @@ obj-$(CONFIG_CSKY_APB_INTC)		+= irq-csky-apb-intc.o
->>  obj-$(CONFIG_SIFIVE_PLIC)		+= irq-sifive-plic.o
->>  obj-$(CONFIG_IMX_IRQSTEER)		+= irq-imx-irqsteer.o
->>  obj-$(CONFIG_MADERA_IRQ)		+= irq-madera.o
->> +obj-$(CONFIG_TI_SCI_INTR_IRQCHIP)	+= irq-ti-sci-intr.o
->> diff --git a/drivers/irqchip/irq-ti-sci-intr.c b/drivers/irqchip/irq-ti-sci-intr.c
->> new file mode 100644
->> index 000000000000..a5396e08412c
->> --- /dev/null
->> +++ b/drivers/irqchip/irq-ti-sci-intr.c
->> @@ -0,0 +1,310 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * Texas Instruments' K3 Interrupt Router irqchip driver
->> + *
->> + * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com/
->> + *	Lokesh Vutla <lokeshvutla@ti.com>
->> + */
->> +
->> +#include <linux/err.h>
->> +#include <linux/io.h>
->> +#include <linux/irqchip.h>
->> +#include <linux/of_platform.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/module.h>
->> +#include <linux/moduleparam.h>
->> +#include <linux/irqdomain.h>
->> +#include <linux/soc/ti/ti_sci_protocol.h>
->> +
->> +#define TI_SCI_DEV_ID_MASK	0xffff
->> +#define TI_SCI_DEV_ID_SHIFT	16
->> +#define TI_SCI_IRQ_ID_MASK	0xffff
->> +#define TI_SCI_IRQ_ID_SHIFT	0
->> +#define TI_SCI_EVENT_IRQ	BIT(0)
->> +
->> +#define HWIRQ_TO_DEVID(hwirq)	(((hwirq) >> (TI_SCI_DEV_ID_SHIFT)) & \
->> +				 (TI_SCI_DEV_ID_MASK))
->> +#define HWIRQ_TO_IRQID(hwirq)	((hwirq) & (TI_SCI_IRQ_ID_MASK))
->> +#define FWSPEC_TO_HWIRQ(fwspec)	(((fwspec->param[0] & TI_SCI_DEV_ID_MASK) << \
->> +				 TI_SCI_DEV_ID_SHIFT) | \
->> +				(fwspec->param[1] & TI_SCI_IRQ_ID_MASK))
->> +
->> +/**
->> + * struct ti_sci_intr_irq_domain - Structure representing a TISCI based
->> + *				   Interrupt Router IRQ domain.
->> + * @sci:	Pointer to TISCI handle
->> + * @dst_irq:	TISCI resource pointer representing destination irq controller.
->> + * @dst_id:	TISCI device ID of the destination irq controller.
->> + */
->> +struct ti_sci_intr_irq_domain {
->> +	const struct ti_sci_handle *sci;
->> +	struct ti_sci_resource *dst_irq;
->> +	u16 dst_id;
->> +};
->> +
->> +static struct irq_chip ti_sci_intr_irq_chip = {
->> +	.name			= "INTR",
->> +	.irq_eoi		= irq_chip_eoi_parent,
->> +	.irq_mask		= irq_chip_mask_parent,
->> +	.irq_unmask		= irq_chip_unmask_parent,
->> +	.irq_retrigger		= irq_chip_retrigger_hierarchy,
->> +	.irq_set_type		= irq_chip_set_type_parent,
->> +	.irq_set_affinity	= irq_chip_set_affinity_parent,
->> +};
->> +
->> +/**
->> + * ti_sci_intr_irq_domain_translate() - Retrieve hwirq and type from
->> + *					IRQ firmware specific handler.
->> + * @domain:	Pointer to IRQ domain
->> + * @fwspec:	Pointer to IRQ specific firmware structure
->> + * @hwirq:	IRQ number identified by hardware
->> + * @type:	IRQ type
->> + *
->> + * Return 0 if all went ok else appropriate error.
->> + */
->> +static int ti_sci_intr_irq_domain_translate(struct irq_domain *domain,
->> +					    struct irq_fwspec *fwspec,
->> +					    unsigned long *hwirq,
->> +					    unsigned int *type)
->> +{
->> +	if (is_of_node(fwspec->fwnode)) {
->> +		if (fwspec->param_count != 4)
->> +			return -EINVAL;
->> +
->> +		*hwirq = FWSPEC_TO_HWIRQ(fwspec);
->> +		*type = fwspec->param[2];
->> +
->> +		return 0;
->> +	}
-> 
-> From what I can see in the code used by this platform, there is
-> absolutely no chance this will ever support any firmware interface other
-> than DT. So I think you can loose the is_of_node check here.
-
-Sure will drop it in next version.
-
-> 
-> Another thing is that you do not seem to use the 4th parameter to the
-> intspec. So what is it used for here?
-> 
->> +
->> +	return -EINVAL;
->> +}
->> +
->> +static inline void ti_sci_intr_delete_desc(struct ti_sci_intr_irq_domain *intr,
-> 
-> So this is called "delete desc". What is desc? It seems to free an irq
-> in the resource manager, so please call it something that matches what
-> this does.
-
-will change it to delete_irq.
-
-> 
->> +					   u16 src_id, u16 src_index,
->> +					   u16 dst_irq)
->> +{
->> +	intr->sci->ops.rm_irq_ops.free_direct_irq(intr->sci, src_id, src_index,
->> +						  intr->dst_id, dst_irq);
->> +}
->> +
->> +/**
->> + * ti_sci_intr_irq_domain_free() - Free the specified IRQs from the domain.
->> + * @domain:	Domain to which the irqs belong
->> + * @virq:	Linux virtual IRQ to be freed.
->> + * @nr_irqs:	Number of continuous irqs to be freed
->> + */
->> +static void ti_sci_intr_irq_domain_free(struct irq_domain *domain,
->> +					unsigned int virq, unsigned int nr_irqs)
->> +{
->> +	struct ti_sci_intr_irq_domain *intr = domain->host_data;
->> +	struct irq_data *data, *parent_data;
->> +	u64 flags;
->> +	int i;
->> +
->> +	intr = domain->host_data;
->> +
->> +	for (i = 0; i < nr_irqs; i++) {
->> +		data = irq_domain_get_irq_data(domain, virq + i);
->> +		flags = (u64)irq_data_get_irq_chip_data(data);
-> 
-> Are you guaranteed that this will only exist on a 64bit architecture?
-
-most likely yes. But will use phys_addr_t to be more specific
-
-> 
->> +		parent_data = irq_domain_get_irq_data(domain->parent, virq + i);
->> +
->> +		if (!(flags & TI_SCI_EVENT_IRQ))
->> +			ti_sci_intr_delete_desc(intr,
->> +						HWIRQ_TO_DEVID(data->hwirq),
->> +						HWIRQ_TO_IRQID(data->hwirq),
->> +						parent_data->hwirq);
->> +		ti_sci_release_resource(intr->dst_irq, parent_data->hwirq);
->> +		irq_domain_free_irqs_parent(domain, virq + i, 1);
-> 
-> Couldn't this be moved out of the loop so that you free nr_irqs directly
-> since you seem to be assuming that they are continuous? But are they?
-> 
-> Also, and depending on the context this is called from, it is pretty
-> unlikely that you'll see nr_irqs!=1, the only case I know about being
-> the PCI Multi-MSI train-wreck.
-
-okay, ill drop the loop and consider only the case nr_irqs == 1
-
-> 
->> +		irq_domain_reset_irq_data(data);
->> +	}
->> +}
->> +
->> +/**
->> + * ti_sci_intr_allocate_gic_irq() - Allocate GIC specific IRQ
->> + * @domain:	Point to the interrupt router IRQ domain
->> + * @dev:	TISCI device IRQ generating the IRQ
->> + * @irq:	IRQ offset within the device
->> + * @flags:	Corresponding flags to the IRQ
->> + * @event_irq:	Flag to tell if requested irq is from interrupt aggregator.
->> + *
->> + * Returns 0 if all went well else appropriate error pointer.
->> + */
->> +static int ti_sci_intr_allocate_gic_irq(struct irq_domain *domain,
->> +					unsigned int virq, u16 dev, u16 irq,
->> +					u32 flags, u8 event_irq)
->> +{
->> +	struct ti_sci_intr_irq_domain *intr = domain->host_data;
->> +	struct irq_fwspec fwspec;
->> +	u16 dst_irq;
->> +	int err;
->> +
->> +	if (!irq_domain_get_of_node(domain->parent))
->> +		return -EINVAL;
->> +
->> +	dst_irq = ti_sci_get_free_resource(intr->dst_irq);
->> +	if (dst_irq == TI_SCI_RESOURCE_NULL)
->> +		return -EINVAL;
->> +
->> +	fwspec.fwnode = domain->parent->fwnode;
->> +	fwspec.param_count = 3;
->> +	fwspec.param[0] = 0;	/* SPI */
->> +	fwspec.param[1] = dst_irq - 32; /* SPI offset */
->> +	fwspec.param[2] = flags & IRQ_TYPE_SENSE_MASK;
->> +
->> +	err = irq_domain_alloc_irqs_parent(domain, virq, 1, &fwspec);
->> +	if (err)
->> +		goto err_irqs;
->> +
->> +	/* If event is requested then return */
->> +	if (event_irq == TI_SCI_EVENT_IRQ)
->> +		return 0;
->> +
->> +	err = intr->sci->ops.rm_irq_ops.set_direct_irq(intr->sci, dev, irq,
->> +						       intr->dst_id, dst_irq);
->> +	if (err) {
->> +		pr_err("%s: IRQ allocation failed from src = %d, src_index = %d to dst_id = %d, dst_irq = %d",
->> +		       __func__, dev, irq, intr->dst_id, dst_irq);
-> 
-> Do we really needs this error message? It doesn't seem to provide any
-> useful information at this stage. I'd rather the terrible callback does
-> the screaming if required.
-
-okay will drop this error message.
-
-> 
->> +		goto err_msg;
->> +	}
->> +
->> +	return 0;
->> +
->> +err_msg:
->> +	irq_domain_free_irqs_parent(domain, virq, 1);
->> +err_irqs:
->> +	ti_sci_release_resource(intr->dst_irq, dst_irq);
->> +	return err;
->> +}
->> +
->> +/**
->> + * ti_sci_intr_irq_domain_alloc() - Allocate Interrupt router IRQs
->> + * @domain:	Point to the interrupt router IRQ domain
->> + * @virq:	Corresponding Linux virtual IRQ number
->> + * @nr_irqs:	Continuous irqs to be allocated
->> + * @data:	Pointer to firmware specifier
->> + *
->> + * Return 0 if all went well else appropriate error value.
->> + */
->> +static int ti_sci_intr_irq_domain_alloc(struct irq_domain *domain,
->> +					unsigned int virq, unsigned int nr_irqs,
->> +					void *data)
->> +{
->> +	struct irq_fwspec *fwspec = data;
->> +	u16 src_id, src_index;
->> +	unsigned long hwirq;
->> +	u8 event_irq;
->> +	int i, err;
->> +	u32 type;
->> +
->> +	err = ti_sci_intr_irq_domain_translate(domain, fwspec, &hwirq, &type);
->> +	if (err)
->> +		return err;
->> +
->> +	src_id = HWIRQ_TO_DEVID(hwirq);
->> +	src_index = HWIRQ_TO_IRQID(hwirq);
->> +	event_irq = fwspec->param[3];
-> 
-> Ah, so this is where it is used. You could perform some sanitization,
-> given that you're feeding this to other part of the system.
-
-sure will add a check for fwspec->param[3].
-
-Thanks and regards,
-Lokesh
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGksCgpPbiBUaHUsIDIwMTktMDEtMTAgYXQgMjE6MzIgKzA4MDAsIGF5YWthIHdyb3RlOgo+IEkg
+Zm9yZ2V0IGEgaW1wb3J0YW50IHRoaW5nLCBmb3IgdGhlIHJrdmRlYyBhbmQgcmsgaGV2YyBkZWNv
+ZGVyLCBpdCB3b3VsZCAKPiByZXF1ZXN0cyBjYWJhYyB0YWJsZSwgc2NhbGluZyBsaXN0LCBwaWN0
+dXJlIHBhcmFtZXRlciBzZXQgYW5kIHJlZmVyZW5jZSAKPiBwaWN0dXJlIHN0b3JpbmcgaW4gb25l
+IG9yIHZhcmlvdXMgb2YgRE1BIGJ1ZmZlcnMuIEkgYW0gbm90IHRhbGtpbmcgYWJvdXQgCj4gdGhl
+IGRhdGEgYmVlbiBwYXJzZWQsIHRoZSBkZWNvZGVyIHdvdWxkIHJlcXVlc3RzIGEgcmF3IGRhdGEu
+Cj4gCj4gRm9yIHRoZSBwcHMgYW5kIHJwcywgaXQgaXMgcG9zc2libGUgdG8gcmV1c2UgdGhlIHNs
+aWNlIGhlYWRlciwganVzdCBsZXQgCj4gdGhlIGRlY29kZXIga25vdyB0aGUgb2Zmc2V0IGZyb20g
+dGhlIGJpdHN0cmVhbSBidWZlciwgSSB3b3VsZCBzdWdnZXN0IHRvIAo+IGFkZCB0aHJlZSBwcm9w
+ZXJ0aWVzKHdpdGggc3BzKSBmb3IgdGhlbS4gQnV0IEkgdGhpbmsgd2UgbmVlZCBhIG1ldGhvZCB0
+byAKPiBtYXJrIGEgT1VUUFVUIHNpZGUgYnVmZmVyIGZvciB0aG9zZSBhdXggZGF0YS4KCkknbSBx
+dWl0ZSBjb25mdXNlZCBhYm91dCB0aGUgaGFyZHdhcmUgaW1wbGVtZW50YXRpb24gdGhlbi4gRnJv
+bSB3aGF0CnlvdSdyZSBzYXlpbmcsIGl0IHNlZW1zIHRoYXQgaXQgdGFrZXMgdGhlIHJhdyBiaXRz
+dHJlYW0gZWxlbWVudHMgcmF0aGVyCnRoYW4gcGFyc2VkIGVsZW1lbnRzLiBJcyBpdCByZWFsbHkg
+YSBzdGF0ZWxlc3MgaW1wbGVtZW50YXRpb24/CgpUaGUgc3RhdGVsZXNzIGltcGxlbWVudGF0aW9u
+IHdhcyBkZXNpZ25lZCB3aXRoIHRoZSBpZGVhIHRoYXQgb25seSB0aGUKcmF3IHNsaWNlIGRhdGEg
+c2hvdWxkIGJlIHBhc3NlZCBpbiBiaXRzdHJlYW0gZm9ybSB0byB0aGUgZGVjb2Rlci4gRm9yCkgu
+MjY0LCBpdCBzZWVtcyB0aGF0IHNvbWUgZGVjb2RlcnMgYWxzbyBuZWVkIHRoZSBzbGljZSBoZWFk
+ZXIgaW4gcmF3CmJpdHN0cmVhbSBmb3JtIChiZWNhdXNlIHRoZXkgdGFrZSB0aGUgZnVsbCBzbGlj
+ZSBOQUwgdW5pdCksIHNlZSB0aGUKZGlzY3Vzc2lvbnMgaW4gdGhpcyB0aHJlYWQ6Cm1lZGlhOiBk
+b2NzLXJzdDogRG9jdW1lbnQgbTJtIHN0YXRlbGVzcyB2aWRlbyBkZWNvZGVyIGludGVyZmFjZQoK
+Q2FuIHlvdSBkZXRhaWwgZXhhY3RseSB3aGF0IHRoZSByb2NrY2hpcCBkZWNvZGVyIGFic29sdXRl
+bHkgbmVlZHMgaW4KcmF3IGJpdHN0cmVhbSBmb3JtYXQ/CgpDaGVlcnMsCgpQYXVsCgo+IE9uIDEv
+OC8xOSA2OjAwIFBNLCBBeWFrYSB3cm90ZToKPiA+IFNlbnQgZnJvbSBteSBpUGFkCj4gPiAKPiA+
+ID4gT24gSmFuIDgsIDIwMTksIGF0IDQ6MzggUE0sIFBhdWwgS29jaWFsa293c2tpIDxwYXVsLmtv
+Y2lhbGtvd3NraUBib290bGluLmNvbT4gd3JvdGU6Cj4gPiA+IAo+ID4gPiBIaSwKPiA+ID4gCj4g
+PiA+ID4gT24gVHVlLCAyMDE5LTAxLTA4IGF0IDA5OjE2ICswODAwLCBBeWFrYSB3cm90ZToKPiA+
+ID4gPiAKPiA+ID4gPiBTZW50IGZyb20gbXkgaVBhZAo+ID4gPiA+IAo+ID4gPiA+ID4gT24gSmFu
+IDcsIDIwMTksIGF0IDU6NTcgUE0sIFBhdWwgS29jaWFsa293c2tpIDxwYXVsLmtvY2lhbGtvd3Nr
+aUBib290bGluLmNvbT4gd3JvdGU6Cj4gPiA+ID4gPiAKPiA+ID4gPiA+IEhpLAo+ID4gPiA+ID4g
+Cj4gPiA+ID4gPiA+ID4gT24gTW9uLCAyMDE5LTAxLTA3IGF0IDExOjQ5ICswODAwLCBSYW5keSBM
+aSB3cm90ZToKPiA+ID4gPiA+ID4gPiBPbiAxMi8xMi8xOCA4OjUxIFBNLCBQYXVsIEtvY2lhbGtv
+d3NraSB3cm90ZToKPiA+ID4gPiA+ID4gPiBIaSwKPiA+ID4gPiA+ID4gPiAKPiA+ID4gPiA+ID4g
+PiBPbiBXZWQsIDIwMTgtMTItMDUgYXQgMjE6NTkgKzAxMDAsIEplcm5laiDFoGtyYWJlYyB3cm90
+ZToKPiA+ID4gPiA+ID4gPiAKPiA+ID4gPiA+ID4gPiA+ID4gKwo+ID4gPiA+ID4gPiA+ID4gPiAr
+I2RlZmluZSBWNEwyX0hFVkNfRFBCX0VOVFJZX1JQU19TVF9DVVJSX0JFRk9SRSAgICAweDAxCj4g
+PiA+ID4gPiA+ID4gPiA+ICsjZGVmaW5lIFY0TDJfSEVWQ19EUEJfRU5UUllfUlBTX1NUX0NVUlJf
+QUZURVIgICAgMHgwMgo+ID4gPiA+ID4gPiA+ID4gPiArI2RlZmluZSBWNEwyX0hFVkNfRFBCX0VO
+VFJZX1JQU19MVF9DVVJSICAgICAgICAweDAzCj4gPiA+ID4gPiA+ID4gPiA+ICsKPiA+ID4gPiA+
+ID4gPiA+ID4gKyNkZWZpbmUgVjRMMl9IRVZDX0RQQl9FTlRSSUVTX05VTV9NQVggICAgICAgIDE2
+Cj4gPiA+ID4gPiA+ID4gPiA+ICsKPiA+ID4gPiA+ID4gPiA+ID4gK3N0cnVjdCB2NGwyX2hldmNf
+ZHBiX2VudHJ5IHsKPiA+ID4gPiA+ID4gPiA+ID4gKyAgICBfX3UzMiAgICBidWZmZXJfdGFnOwo+
+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fdTggICAgcnBzOwo+ID4gPiA+ID4gPiA+ID4gPiArICAg
+IF9fdTggICAgZmllbGRfcGljOwo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fdTE2ICAgIHBpY19v
+cmRlcl9jbnRbMl07Cj4gPiA+ID4gPiA+ID4gPiA+ICt9Owo+ID4gPiA+ID4gPiBQbGVhc2UgYWRk
+IGEgcHJvcGVydHkgZm9yIHJlZmVyZW5jZSBpbmRleCwgaWYgdGhhdCBycHMgaXMgbm90IHVzZWQg
+Zm9yCj4gPiA+ID4gPiA+IHRoaXMsIHNvbWUgZGV2aWNlIHdvdWxkIHJlcXVlc3QgdGhhdChub3Qg
+dGhlIHJvY2tjaGlwIG9uZSkuIEFuZAo+ID4gPiA+ID4gPiBSb2NrY2hpcCdzIFZEUFUxIGFuZCBW
+RFBVMiBmb3IgQVZDIHdvdWxkIHJlcXVlc3QgYSBzaW1pbGFyIHByb3BlcnR5Lgo+ID4gPiA+ID4g
+V2hhdCBleGFjdGx5IGlzIHRoYXQgcmVmZXJlbmNlIGluZGV4PyBJcyBpdCBhIGJpdHN0cmVhbSBl
+bGVtZW50IG9yCj4gPiA+ID4gPiBzb21ldGhpbmcgZGVkdWNlZCBmcm9tIHRoZSBiaXRzdHJlYW0/
+Cj4gPiA+ID4gPiAKPiA+ID4gPiBwaWN0dXJlIG9yZGVyIGNvdW50KFBPQykgZm9yIEhFVkMgYW5k
+IGZyYW1lX251bSBpbiBBVkMuIEkgdGhpbmsgaXQgaXMKPiA+ID4gPiB0aGUgbnVtYmVyIHVzZWQg
+aW4gbGlzdDAoUCBzbGljZSBhbmQgQiBzbGljZSkgYW5kIGxpc3QxKEIgc2xpY2UpLgo+ID4gPiBU
+aGUgcGljdHVyZSBvcmRlciBjb3VudCBpcyBhbHJlYWR5IHRoZSBsYXN0IGZpZWxkIG9mIHRoZSBE
+UEIgZW50cnkKPiA+ID4gc3RydWN0dXJlLiBUaGVyZSBpcyBvbmUgZm9yIGVhY2ggZmllbGQgcGlj
+dHVyZS4KPiA+IEFzIHdlIGFyZSBub3Qgc3VyZSB3aGV0aGVyIHRoZXJlIGlzIGEgZmllbGQgY29k
+ZWQgc2xpY2Ugb3IgQ1RVLCBJIHdvdWxkIGhvbGQgdGhpcyBwYXJ0IGFuZCBlbHNlIGFib3V0IHRo
+ZSBmaWVsZC4KPiA+ID4gPiA+ID4gQWRkaW5nIGFub3RoZXIgYnVmZmVyX3RhZyBmb3IgcmVmZXJy
+aW5nIHRoZSBtZW1vcnkgb2YgdGhlIG1vdGlvbiB2ZWN0b3JzCj4gPiA+ID4gPiA+IGZvciBlYWNo
+IGZyYW1lcy4gT3IgYSBiZXR0ZXIgbWV0aG9kIGlzIGFkZCBhIG1ldGEgZGF0YSB0byBlY2hvIHBp
+Y3R1cmUKPiA+ID4gPiA+ID4gYnVmZmVyLCAgc2luY2UgdGhlIHBpY3R1cmUgb3V0cHV0IGlzIGp1
+c3QgdGhlIHNhbWUgYXMgdGhlIG9yaWdpbmFsLAo+ID4gPiA+ID4gPiBkaXNwbGF5IHdvbid0IGNh
+cmUgd2hldGhlciB0aGUgbW90aW9uIHZlY3RvcnMgYXJlIHdyaXR0ZW4gdGhlIGJ1dHRvbiBvZgo+
+ID4gPiA+ID4gPiBwaWN0dXJlIG9yIHNvbWV3aGVyZSBlbHNlLgo+ID4gPiA+ID4gVGhlIG1vdGlv
+biB2ZWN0b3JzIGFyZSBwYXNzZWQgYXMgcGFydCBvZiB0aGUgcmF3IGJpdHN0cmVhbSBkYXRhLCBp
+biB0aGUKPiA+ID4gPiA+IHNsaWNlcy4gSXMgdGhlcmUgYSBjYXNlIHdoZXJlIHRoZSBtb3Rpb24g
+dmVjdG9ycyBhcmUgY29kZWQgZGlmZmVyZW50bHk/Cj4gPiA+ID4gTm8sIGl0IGlzIGFuIGFkZGl0
+aW9uYWwgY2FjaGUgZm9yIGRlY29kZXIsIGV2ZW4gRkZtcGVnIGhhdmluZyBzdWNoCj4gPiA+ID4g
+ZGF0YSwgSSB0aGluayBhbGx3aW5uZXIgbXVzdCBvdXRwdXQgaXQgaW50byBzb21ld2hlcmUuCj4g
+PiA+IEFoIHllcyBJIHNlZSB3aGF0IHlvdSBtZWFuISBUaGlzIGlzIGhhbmRsZWQgaW50ZXJuYWxs
+eSBieSBvdXIgZHJpdmVyCj4gPiA+IGFuZCBub3QgZXhwb3NlZCB0byB1c2Vyc3BhY2UuIEkgZG9u
+J3QgdGhpbmsgaXQgd291bGQgYmUgYSBnb29kIGlkZWEgdG8KPiA+ID4gZXhwb3NlIHRoaXMgY2Fj
+aGUgb3IgcmVxdWVzdCB0aGF0IHVzZXJzcGFjZSBhbGxvY2F0ZXMgaXQgbGlrZSBhIHZpZGVvCj4g
+PiA+IGJ1ZmZlci4KPiA+ID4gCj4gPiBObywgdXN1YWxseSB0aGUgZHJpdmVyIHNob3VsZCBhbGxv
+Y2F0ZSwgYXMgdGhlIHVzZXIgc3BhY2UgaGF2ZSBubyBpZGVhIG9uIHNpemUgb2YgZWFjaCBkZXZp
+Y2VzLgo+ID4gQnV0IGZvciBhZHZhbnRhZ2UgdXNlciwgYXBwbGljYXRpb24gY2FuIGZpeCBhIGJy
+b2tlbiBwaWN0dXJlIHdpdGggYSBwcm9wZXIgZGF0YSBvciBhbmFseXNpcyBhIG9iamVjdCBtb3Rp
+b24gZnJvbSB0aGF0Lgo+ID4gU28gSSB3b3VsZCBzdWdnZXN0IGF0dGFjaGluZyB0aGlzIGluZm9y
+bWF0aW9uIHRvIGEgcGljdHVyZSBidWZmZXIgYXMgYSBtZXRhIGRhdGEuCj4gPiA+ID4gPiA+ID4g
+PiA+ICsKPiA+ID4gPiA+ID4gPiA+ID4gK3N0cnVjdCB2NGwyX2hldmNfcHJlZF93ZWlnaHRfdGFi
+bGUgewo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fdTggICAgbHVtYV9sb2cyX3dlaWdodF9kZW5v
+bTsKPiA+ID4gPiA+ID4gPiA+ID4gKyAgICBfX3M4ICAgIGRlbHRhX2Nocm9tYV9sb2cyX3dlaWdo
+dF9kZW5vbTsKPiA+ID4gPiA+ID4gPiA+ID4gKwo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fczgg
+ICAgZGVsdGFfbHVtYV93ZWlnaHRfbDBbVjRMMl9IRVZDX0RQQl9FTlRSSUVTX05VTV9NQVhdOwo+
+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fczggICAgbHVtYV9vZmZzZXRfbDBbVjRMMl9IRVZDX0RQ
+Ql9FTlRSSUVTX05VTV9NQVhdOwo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fczggICAgZGVsdGFf
+Y2hyb21hX3dlaWdodF9sMFtWNEwyX0hFVkNfRFBCX0VOVFJJRVNfTlVNX01BWF1bMl07Cj4gPiA+
+ID4gPiA+ID4gPiA+ICsgICAgX19zOCAgICBjaHJvbWFfb2Zmc2V0X2wwW1Y0TDJfSEVWQ19EUEJf
+RU5UUklFU19OVU1fTUFYXVsyXTsKPiA+ID4gPiA+ID4gPiA+ID4gKwo+ID4gPiA+ID4gPiA+ID4g
+PiArICAgIF9fczggICAgZGVsdGFfbHVtYV93ZWlnaHRfbDFbVjRMMl9IRVZDX0RQQl9FTlRSSUVT
+X05VTV9NQVhdOwo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fczggICAgbHVtYV9vZmZzZXRfbDFb
+VjRMMl9IRVZDX0RQQl9FTlRSSUVTX05VTV9NQVhdOwo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9f
+czggICAgZGVsdGFfY2hyb21hX3dlaWdodF9sMVtWNEwyX0hFVkNfRFBCX0VOVFJJRVNfTlVNX01B
+WF1bMl07Cj4gPiA+ID4gPiA+ID4gPiA+ICsgICAgX19zOCAgICBjaHJvbWFfb2Zmc2V0X2wxW1Y0
+TDJfSEVWQ19EUEJfRU5UUklFU19OVU1fTUFYXVsyXTsKPiA+ID4gPiA+ID4gPiA+ID4gK307Cj4g
+PiA+ID4gPiA+ID4gPiA+ICsKPiA+ID4gPiA+ID4gVGhvc2UgcHJvcGVydGllcyBJIHRoaW5rIGFy
+ZSBub3QgbmVjZXNzYXJ5IGFyZSBhcHBseWluZyBmb3IgdGhlCj4gPiA+ID4gPiA+IFJvY2tjaGlw
+J3MgZGV2aWNlLCBtYXkgbm90IHdvcmsgZm9yIHRoZSBvdGhlcnMuCj4gPiA+ID4gPiBZZXMsIGl0
+J3MgcG9zc2libGUgdGhhdCBzb21lIG9mIHRoZSBlbGVtZW50cyBhcmUgbm90IG5lY2Vzc2FyeSBm
+b3Igc29tZQo+ID4gPiA+ID4gZGVjb2RlcnMuIFdoYXQgd2Ugd2FudCBpcyB0byBjb3ZlciBhbGwg
+dGhlIGVsZW1lbnRzIHRoYXQgbWlnaHQgYmUKPiA+ID4gPiA+IHJlcXVpcmVkIGZvciBhIGRlY29k
+ZXIuCj4gPiA+ID4gSSB3b25kZXIgd2hldGhlciBhbGx3aW5uZXIgbmVlZCB0aGF0LCB0aG9zZSBz
+YW8gZmxhZyB1c3VhbGx5IGlnbm9yZWQKPiA+ID4gPiBieSBkZWNvZGVyIGluIGRlc2lnbi4gQnV0
+IG1vcmUgaXMgYmV0dGVyIHRoYW4gbGVzcywgaXQgaXMgaGFyZCB0bwo+ID4gPiA+IGV4dGVuZCBh
+IHY0bDIgc3RydWN0dXJlICBpbiB0aGUgZnV0dXJlLCBtYXliZSBhIG5ldyBIRVZDIHByb2ZpbGUK
+PiA+ID4gPiB3b3VsZCBicmluZyBhIG5ldyBwcm9wZXJ0eSwgaXQgaXMgc3RpbGwgdG9vIGVhcmx5
+IGZvciBIRVZDLgo+ID4gPiBZZXMgdGhpcyBpcyB1c2VkIGJ5IG91ciBkZWNvZGVyLiBUaGUgaWRl
+YSBpcyB0byBoYXZlIGFsbCB0aGUgYmFzaWMKPiA+ID4gYml0c3RyZWFtIGVsZW1lbnRzIGluIHRo
+ZSBzdHJ1Y3R1cmVzIChldmVuIGlmIHNvbWUgZGVjb2RlcnMgZG9uJ3QgdXNlCj4gPiA+IHRoZW0g
+YWxsKSBhbmQgYWRkIG90aGVycyBmb3IgZXh0ZW5zaW9uIGFzIHNlcGFyYXRlIGNvbnRyb2xzIGxh
+dGVyLgo+ID4gPiAKPiA+ID4gPiA+ID4gPiA+ID4gK3N0cnVjdCB2NGwyX2N0cmxfaGV2Y19zbGlj
+ZV9wYXJhbXMgewo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fdTMyICAgIGJpdF9zaXplOwo+ID4g
+PiA+ID4gPiA+ID4gPiArICAgIF9fdTMyICAgIGRhdGFfYml0X29mZnNldDsKPiA+ID4gPiA+ID4g
+PiA+ID4gKwo+ID4gPiA+ID4gPiA+ID4gPiArICAgIC8qIElTTy9JRUMgMjMwMDgtMiwgSVRVLVQg
+UmVjLiBILjI2NTogTkFMIHVuaXQgaGVhZGVyICovCj4gPiA+ID4gPiA+ID4gPiA+ICsgICAgX191
+OCAgICBuYWxfdW5pdF90eXBlOwo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fdTggICAgbnVoX3Rl
+bXBvcmFsX2lkX3BsdXMxOwo+ID4gPiA+ID4gPiA+ID4gPiArCj4gPiA+ID4gPiA+ID4gPiA+ICsg
+ICAgLyogSVNPL0lFQyAyMzAwOC0yLCBJVFUtVCBSZWMuIEguMjY1OiBHZW5lcmFsIHNsaWNlIHNl
+Z21lbnQgaGVhZGVyICovCj4gPiA+ID4gPiA+ID4gPiA+ICsgICAgX191OCAgICBzbGljZV90eXBl
+Owo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fdTggICAgY29sb3VyX3BsYW5lX2lkOwo+ID4gPiA+
+ID4gPiAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tCj4gPiA+ID4gPiA+ID4gPiA+ICsgICAgX191MTYgICAg
+c2xpY2VfcGljX29yZGVyX2NudDsKPiA+ID4gPiA+ID4gPiA+ID4gKyAgICBfX3U4ICAgIHNsaWNl
+X3Nhb19sdW1hX2ZsYWc7Cj4gPiA+ID4gPiA+ID4gPiA+ICsgICAgX191OCAgICBzbGljZV9zYW9f
+Y2hyb21hX2ZsYWc7Cj4gPiA+ID4gPiA+ID4gPiA+ICsgICAgX191OCAgICBzbGljZV90ZW1wb3Jh
+bF9tdnBfZW5hYmxlZF9mbGFnOwo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fdTggICAgbnVtX3Jl
+Zl9pZHhfbDBfYWN0aXZlX21pbnVzMTsKPiA+ID4gPiA+ID4gPiA+ID4gKyAgICBfX3U4ICAgIG51
+bV9yZWZfaWR4X2wxX2FjdGl2ZV9taW51czE7Cj4gPiA+ID4gPiA+IFJvY2tjaGlwJ3MgZGVjb2Rl
+ciBkb2Vzbid0IHVzZSB0aGlzIHBhcnQuCj4gPiA+ID4gPiA+ID4gPiA+ICsgICAgX191OCAgICBt
+dmRfbDFfemVyb19mbGFnOwo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fdTggICAgY2FiYWNfaW5p
+dF9mbGFnOwo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fdTggICAgY29sbG9jYXRlZF9mcm9tX2ww
+X2ZsYWc7Cj4gPiA+ID4gPiA+ID4gPiA+ICsgICAgX191OCAgICBjb2xsb2NhdGVkX3JlZl9pZHg7
+Cj4gPiA+ID4gPiA+ID4gPiA+ICsgICAgX191OCAgICBmaXZlX21pbnVzX21heF9udW1fbWVyZ2Vf
+Y2FuZDsKPiA+ID4gPiA+ID4gPiA+ID4gKyAgICBfX3U4ICAgIHVzZV9pbnRlZ2VyX212X2ZsYWc7
+Cj4gPiA+ID4gPiA+ID4gPiA+ICsgICAgX19zOCAgICBzbGljZV9xcF9kZWx0YTsKPiA+ID4gPiA+
+ID4gPiA+ID4gKyAgICBfX3M4ICAgIHNsaWNlX2NiX3FwX29mZnNldDsKPiA+ID4gPiA+ID4gPiA+
+ID4gKyAgICBfX3M4ICAgIHNsaWNlX2NyX3FwX29mZnNldDsKPiA+ID4gPiA+ID4gPiA+ID4gKyAg
+ICBfX3M4ICAgIHNsaWNlX2FjdF95X3FwX29mZnNldDsKPiA+ID4gPiA+ID4gPiA+ID4gKyAgICBf
+X3M4ICAgIHNsaWNlX2FjdF9jYl9xcF9vZmZzZXQ7Cj4gPiA+ID4gPiA+ID4gPiA+ICsgICAgX19z
+OCAgICBzbGljZV9hY3RfY3JfcXBfb2Zmc2V0Owo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fdTgg
+ICAgc2xpY2VfZGVibG9ja2luZ19maWx0ZXJfZGlzYWJsZWRfZmxhZzsKPiA+ID4gPiA+ID4gPiA+
+ID4gKyAgICBfX3M4ICAgIHNsaWNlX2JldGFfb2Zmc2V0X2RpdjI7Cj4gPiA+ID4gPiA+ID4gPiA+
+ICsgICAgX19zOCAgICBzbGljZV90Y19vZmZzZXRfZGl2MjsKPiA+ID4gPiA+ID4gPiA+ID4gKyAg
+ICBfX3U4ICAgIHNsaWNlX2xvb3BfZmlsdGVyX2Fjcm9zc19zbGljZXNfZW5hYmxlZF9mbGFnOwo+
+ID4gPiA+ID4gPiA+ID4gPiArCj4gPiA+ID4gPiA+ID4gPiA+ICsgICAgLyogSVNPL0lFQyAyMzAw
+OC0yLCBJVFUtVCBSZWMuIEguMjY1OiBQaWN0dXJlIHRpbWluZyBTRUkgbWVzc2FnZSAqLwo+ID4g
+PiA+ID4gPiA+ID4gPiArICAgIF9fdTggICAgcGljX3N0cnVjdDsKPiA+ID4gPiA+ID4gSSB0aGlu
+ayB0aGUgZGVjb2RlciBkb2Vzbid0IGNhcmUgYWJvdXQgdGhpcywgaXQgaXMgdXNlZCBmb3IgZGlz
+cGxheS4KPiA+ID4gPiA+IFRoZSBwdXJwb3NlIG9mIHRoaXMgZmllbGQgaXMgdG8gaW5kaWNhdGUg
+d2hldGhlciB0aGUgY3VycmVudCBwaWN0dXJlIGlzCj4gPiA+ID4gPiBhIHByb2dyZXNzaXZlIGZy
+YW1lIG9yIGFuIGludGVybGFjZWQgZmllbGQgcGljdHVyZSwgd2hpY2ggaXMgdXNlZnVsIGZvcgo+
+ID4gPiA+ID4gZGVjb2RpbmcuCj4gPiA+ID4gPiAKPiA+ID4gPiA+IEF0IGxlYXN0IG91ciBkZWNv
+ZGVyIGhhcyBhIHJlZ2lzdGVyIGZpZWxkIHRvIGluZGljYXRlIGZyYW1lL3RvcAo+ID4gPiA+ID4g
+ZmllbGQvYm90dG9tIGZpZWxkLCBzbyB3ZSBjZXJ0YWlubHkgbmVlZCB0byBrZWVwIHRoZSBpbmZv
+IGFyb3VuZC4KPiA+ID4gPiA+IExvb2tpbmcgYXQgdGhlIHNwZWMgYW5kIHRoZSBmZm1wZWcgaW1w
+bGVtZW50YXRpb24sIGl0IGxvb2tzIGxpa2UgdGhpcwo+ID4gPiA+ID4gZmxhZyBvZiB0aGUgYml0
+c3RyZWFtIGlzIHRoZSB1c3VhbCB3YXkgdG8gcmVwb3J0IGZpZWxkIGNvZGluZy4KPiA+ID4gPiBJ
+dCBkZXBlbmRzIHdoZXRoZXIgdGhlIGRlY29kZXIgY2FyZXMgYWJvdXQgc2NhbiB0eXBlIG9yIG1v
+cmUsIEkKPiA+ID4gPiB3b25kZXIgcHJlZmVyIGdlbmVyYWxfaW50ZXJsYWNlZF9zb3VyY2VfZmxh
+ZyBmb3IganVzdCBzY2FuIHR5cGUsIGl0Cj4gPiA+ID4gd291bGQgYmUgYmV0dGVyIHRoYW4gcmVh
+ZGluZyBhbm90aGVyIFNFTC4KPiA+ID4gV2VsbCB3ZSBzdGlsbCBuZWVkIGEgd2F5IHRvIGluZGlj
+YXRlIGlmIHRoZSBjdXJyZW50IGRhdGEgaXMgdG9wIG9yCj4gPiA+IGJvdHRvbSBmaWVsZCBmb3Ig
+aW50ZXJsYWNlZC4gSSBkb24ndCB0aGluayB0aGF0IGtub3dpbmcgdGhhdCB0aGUgd2hvbGUKPiA+
+ID4gdmlkZW8gaXMgaW50ZXJsYWNlZCB3b3VsZCBiZSBwcmVjaXNlIGVub3VnaC4KPiA+ID4gCj4g
+PiA+IENoZWVycywKPiA+ID4gCj4gPiA+IFBhdWwKPiA+ID4gCj4gPiA+ID4gPiA+ID4gPiA+ICsK
+PiA+ID4gPiA+ID4gPiA+ID4gKyAgICAvKiBJU08vSUVDIDIzMDA4LTIsIElUVS1UIFJlYy4gSC4y
+NjU6IEdlbmVyYWwgc2xpY2Ugc2VnbWVudCBoZWFkZXIgKi8KPiA+ID4gPiA+ID4gPiA+ID4gKyAg
+ICBzdHJ1Y3QgdjRsMl9oZXZjX2RwYl9lbnRyeSBkcGJbVjRMMl9IRVZDX0RQQl9FTlRSSUVTX05V
+TV9NQVhdOwo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fdTggICAgbnVtX2FjdGl2ZV9kcGJfZW50
+cmllczsKPiA+ID4gPiA+ID4gPiA+ID4gKyAgICBfX3U4ICAgIHJlZl9pZHhfbDBbVjRMMl9IRVZD
+X0RQQl9FTlRSSUVTX05VTV9NQVhdOwo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fdTggICAgcmVm
+X2lkeF9sMVtWNEwyX0hFVkNfRFBCX0VOVFJJRVNfTlVNX01BWF07Cj4gPiA+ID4gPiA+ID4gPiA+
+ICsKPiA+ID4gPiA+ID4gPiA+ID4gKyAgICBfX3U4ICAgIG51bV9ycHNfcG9jX3N0X2N1cnJfYmVm
+b3JlOwo+ID4gPiA+ID4gPiA+ID4gPiArICAgIF9fdTggICAgbnVtX3Jwc19wb2Nfc3RfY3Vycl9h
+ZnRlcjsKPiA+ID4gPiA+ID4gPiA+ID4gKyAgICBfX3U4ICAgIG51bV9ycHNfcG9jX2x0X2N1cnI7
+Cj4gPiA+ID4gPiA+ID4gPiA+ICsKPiA+ID4gPiA+ID4gPiA+ID4gKyAgICAvKiBJU08vSUVDIDIz
+MDA4LTIsIElUVS1UIFJlYy4gSC4yNjU6IFdlaWdodGVkIHByZWRpY3Rpb24gcGFyYW1ldGVyICov
+Cj4gPiA+ID4gPiA+ID4gPiA+ICsgICAgc3RydWN0IHY0bDJfaGV2Y19wcmVkX3dlaWdodF90YWJs
+ZSBwcmVkX3dlaWdodF90YWJsZTsKPiA+ID4gPiA+ID4gPiA+ID4gK307Cj4gPiA+ID4gPiA+ID4g
+PiA+ICsKPiA+ID4gPiA+ID4gPiA+ID4gI2VuZGlmCj4gPiA+ID4gPiAtLSAKPiA+ID4gPiA+IFBh
+dWwgS29jaWFsa293c2tpLCBCb290bGluIChmb3JtZXJseSBGcmVlIEVsZWN0cm9ucykKPiA+ID4g
+PiA+IEVtYmVkZGVkIExpbnV4IGFuZCBrZXJuZWwgZW5naW5lZXJpbmcKPiA+ID4gPiA+IGh0dHBz
+Oi8vYm9vdGxpbi5jb20KPiA+ID4gPiA+IAo+ID4gPiAtLSAKPiA+ID4gUGF1bCBLb2NpYWxrb3dz
+a2ksIEJvb3RsaW4gKGZvcm1lcmx5IEZyZWUgRWxlY3Ryb25zKQo+ID4gPiBFbWJlZGRlZCBMaW51
+eCBhbmQga2VybmVsIGVuZ2luZWVyaW5nCj4gPiA+IGh0dHBzOi8vYm9vdGxpbi5jb20KPiA+ID4g
+Ci0tIApQYXVsIEtvY2lhbGtvd3NraSwgQm9vdGxpbgpFbWJlZGRlZCBMaW51eCBhbmQga2VybmVs
+IGVuZ2luZWVyaW5nCmh0dHBzOi8vYm9vdGxpbi5jb20KCgpfX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdAps
+aW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVh
+ZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
