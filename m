@@ -2,70 +2,86 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 22EF3C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 10:16:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D6076C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 10:17:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E215D218A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 10:16:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A64B0218AD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 10:17:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YnA2bVF/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E215D218A2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oKzfh+8R"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A64B0218AD
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=X+EmB3Gcsk1SyiOq3wVeGU8Bu+I7Y9L61bHGlP3GCtk=; b=YnA2bVF/VyFMCD
-	4UZ/pFo/812JW0sLPHZtjLx9iLXS5M2nASe6eNPWHe/FoO9a0VySWW/7yaaJ3viVhsW6eokpSpLYk
-	tVz+KwkPUZIxyv0wxSq2Be6PTsGVmrZhqiyzeWSmHJYicWUw/BbllErOaG6dAywRS5b9n02HDxAvA
-	+sM5EcUGktx1rZCkZBWHFu41G4xq85TievofQtJnVnF/Sr982ZwFnZXZUaZYecKZ/5OwWW4BSiwxV
-	Sm5VL0HlulZkdFPMkkbNtKulx2LtKcvUXEN1Y+RNXnIU+TAjV0DhpUwhnN99NuC4OTX1JdJr530MY
-	zYL7xdCCDWgedZesIUYg==;
+	List-Owner; bh=MeQ883hRFyZl5stIOzSvJMQZ0iA5PwqVi6I0KzdDOrQ=; b=oKzfh+8R2VP0kD
+	Dfai/lm1TMRLKZ26gJXu76X2abPWb7+3RnHo5HZZZxVsqLCY5tXdE83zcqCMPz8xqn4mWPxbX4BZ0
+	juftFecLb/ofow3BdhqQjo7Q8hHahJTQh+WevLHTanSZJ+kobWgMAnWPTcD2IaPUI0D+I98GsqRc4
+	WD8kput/iJMRprO8hG2QUGCZv5lpXXt9PMLVmSDHOa+bsD8VyBaD3r2ID/PErwZtr8eiDKjPcLVtE
+	L+nqAVVV+T6a5uLDOBihLZG74E2dMBBtV49HCURB7ytWQfg13kWqS3/WGXDz4ibJMcXQDqXv5v72q
+	TAm6xhPvSzYZi07kKvog==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmc44-0004Dv-Pl; Thu, 24 Jan 2019 10:16:52 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gmc4T-0004gc-NQ; Thu, 24 Jan 2019 10:17:17 +0000
+Received: from mail-ed1-f68.google.com ([209.85.208.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmc40-0004Cp-B5; Thu, 24 Jan 2019 10:16:50 +0000
-X-UUID: 31d2191c0b644733b2e4b15ccce7ca71-20190124
-X-UUID: 31d2191c0b644733b2e4b15ccce7ca71-20190124
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
- (envelope-from <shun-chih.yu@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 564504293; Thu, 24 Jan 2019 02:16:46 -0800
-Received: from MTKMBS01N1.mediatek.inc (172.21.101.68) by
- MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 24 Jan 2019 02:16:44 -0800
-Received: from mtkcas07.mediatek.inc (172.21.101.84) by
- mtkmbs01n1.mediatek.inc (172.21.101.68) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 24 Jan 2019 18:16:36 +0800
-Received: from [172.21.77.33] (172.21.77.33) by mtkcas07.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Thu, 24 Jan 2019 18:16:36 +0800
-Message-ID: <1548324996.26017.2.camel@mtkswgap22>
-Subject: Re: [PATCH v5] add support for Mediatek Command-Queue DMA
- controller on MT6765 SoC
-From: Shun-Chih.Yu <shun-chih.yu@mediatek.com>
-To: Sean Wang <sean.wang@kernel.org>
-Date: Thu, 24 Jan 2019 18:16:36 +0800
-In-Reply-To: <CAGp9LzqMbYOXCEmHOEcCboQLfpXwxH7zcJ3snj4a8NBLiHhQdg@mail.gmail.com>
-References: <1548314060-4833-1-git-send-email-shun-chih.yu@mediatek.com>
- <CAGp9LzqMbYOXCEmHOEcCboQLfpXwxH7zcJ3snj4a8NBLiHhQdg@mail.gmail.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gmc4O-0004fD-3E
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 10:17:15 +0000
+Received: by mail-ed1-f68.google.com with SMTP id y56so4092544edd.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 24 Jan 2019 02:17:11 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=QrS7sDgTK/p6WIKMEMFfTtaoUcPIzsYu3/wEQPiXjgs=;
+ b=BmgoNuULOtcjatU+Z4lOKvchp4zmK1qGvPPzUmDQ+XrE1u906WUUEODHPTU46/Pgic
+ a8WbnCW7dPLEvrTK2OwJpgeDLa8TH6Nb4BYfAFKaIJnWmXGMs/shUKnDNVKgPKEYO8e7
+ SfcczdsASRa9MOkOfCMv/Oo11Bjjdld8nu4kedzQWV1v0QoRap3aXwEjRUCVG801l9ch
+ hXUPAjAG6+HJuVigQYCD6MU/z2zQMD5zccj1lH61AjbOeDWY4FFWvm0EqI/lN34WnIf9
+ HcJwK3r2wCAgsuThtFBki48Ka3ggHkIBfBc0DN/PJJ/ItdTIzhJdknowz5PMQvfl6vP9
+ 1LNQ==
+X-Gm-Message-State: AJcUukclmhvtkKhrtpuaqAtz/GsDA/RUomNoSXy5W+Jl9hFLto9kmw1+
+ lzsaqsOMgGl+iIF/N2XJA1/YdhL6xm8=
+X-Google-Smtp-Source: ALg8bN5lcAtHw4bBTjVUYErsOeS4Ler8Y+w/2lV9LpDZnYQaypOa+Dl1UNIQTpksABb/ZVe+4GBiZA==
+X-Received: by 2002:a50:a826:: with SMTP id j35mr6231617edc.230.1548325029640; 
+ Thu, 24 Jan 2019 02:17:09 -0800 (PST)
+Received: from mail-wr1-f41.google.com (mail-wr1-f41.google.com.
+ [209.85.221.41])
+ by smtp.gmail.com with ESMTPSA id p16-v6sm5977117eju.73.2019.01.24.02.17.08
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 24 Jan 2019 02:17:09 -0800 (PST)
+Received: by mail-wr1-f41.google.com with SMTP id z5so5787309wrt.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 24 Jan 2019 02:17:08 -0800 (PST)
+X-Received: by 2002:adf:a1d2:: with SMTP id v18mr6254579wrv.87.1548325028586; 
+ Thu, 24 Jan 2019 02:17:08 -0800 (PST)
 MIME-Version: 1.0
-X-MTK: N
+References: <20181130075849.16941-1-wens@csie.org>
+ <20181130075849.16941-5-wens@csie.org>
+ <CAMty3ZB6p8Uv7abMC8jDHHYwdAeuBen2GPjOhN=wEL7+=DDt3g@mail.gmail.com>
+In-Reply-To: <CAMty3ZB6p8Uv7abMC8jDHHYwdAeuBen2GPjOhN=wEL7+=DDt3g@mail.gmail.com>
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Thu, 24 Jan 2019 18:16:55 +0800
+X-Gmail-Original-Message-ID: <CAGb2v67nAGC0xwgtq+_mYv_ZRmhBQsPdLbbJ6thfKDNY456sYg@mail.gmail.com>
+Message-ID: <CAGb2v67nAGC0xwgtq+_mYv_ZRmhBQsPdLbbJ6thfKDNY456sYg@mail.gmail.com>
+Subject: Re: [PATCH 4/6] ARM: dts: sunxi: h3-h5: Add pinmux setting for CSI
+ MCLK on PE1
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_021648_382978_44B4C1EE 
-X-CRM114-Status: GOOD (  19.63  )
+X-CRM114-CacheID: sfid-20190124_021712_176151_AAF7B8E6 
+X-CRM114-Status: GOOD (  17.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,97 +93,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Sean Wang <sean.wang@mediatek.com>,
- linux-kernel@vger.kernel.org, srv_wsdupstream@mediatek.com,
- Matthias Brugger <matthias.bgg@gmail.com>, Vinod Koul <vkoul@kernel.org>,
- Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
- dmaengine@vger.kernel.org, Dan Williams <dan.j.williams@intel.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ linux-kernel <linux-kernel@vger.kernel.org>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Jagan Teki <jagan@amarulasolutions.com>,
+ Yong Deng <yong.deng@magewell.com>, Mauro Carvalho Chehab <mchehab@kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ linux-media <linux-media@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Sean,
+On Mon, Dec 3, 2018 at 5:46 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+>
+> On Fri, Nov 30, 2018 at 1:28 PM Chen-Yu Tsai <wens@csie.org> wrote:
+> >
+> > Some camera modules have the SoC feeding a master clock to the sensor
+> > instead of having a standalone crystal. This clock signal is generated
+> > from the clock control unit and output from the CSI MCLK function of
+> > pin PE1.
+> >
+> > Add a pinmux setting for it for camera sensors to reference.
+> >
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > ---
+>
+> On Fri, Nov 30, 2018 at 1:29 PM Chen-Yu Tsai <wens@csie.org> wrote:
+> >
+> > The CSI controller found on the H3 (and H5) is a reduced version of the
+> > one found on the A31. It only has 1 channel, instead of 4 channels for
+> > time-multiplexed BT.656. Since the H3 is a reduced version, it cannot
+> > "fallback" to a compatible that implements more features than it
+> > supports.
+> >
+> > Drop the A31 fallback compatible.
+> >
+> > Fixes: f89120b6f554 ("ARM: dts: sun8i: Add the H3/H5 CSI controller")
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > ---
+>
+> Reviewed-by: Jagan Teki <jagan@amarulasolutions.com>
 
-I would send a patch based on v5.0-rc1 for the changes, thanks for your
-kind reminder.
+Not merging this one, as there are no boards in tree that directly use this.
 
-thanks,
-Shun-Chih
-
-On Thu, 2019-01-24 at 01:35 -0800, Sean Wang wrote:
-> Hi Shun-Chih,
-> 
-> the driver seems already be applied since v5.0-rc1
-> 
-> I suggest these improvements you made in the recent version can be
-> split into several patches and then be applied on the top of the base
-> driver.
-> 
-> On Wed, Jan 23, 2019 at 11:15 PM <shun-chih.yu@mediatek.com> wrote:
-> >
-> > This patchset introduces support for MediaTek Command-Queue DMA controller.
-> >
-> > MediaTek Command-Queue DMA controller (CQDMA) on MT6765 SoC is dedicated to memory-to-memory transfer through queue-based descriptor management.
-> >
-> > There are only 3 physical channels inside CQDMA, while the driver is extended to support 32 virtual channels for multiple dma users to issue dma requests onto the CQDMA simultaneously.
-> >
-> > dmatest result:
-> > dmatest: dma0chan0-copy2: summary 5000 tests, 0 failures 3500 iops 28037 KB/s (0)
-> > dmatest: dma0chan0-copy4: summary 5000 tests, 0 failures 3494 iops 27612 KB/s (0)
-> > dmatest: dma0chan0-copy1: summary 5000 tests, 0 failures 3491 iops 27749 KB/s (0)
-> > dmatest: dma0chan0-copy7: summary 5000 tests, 0 failures 3673 iops 29092 KB/s (0)
-> > dmatest: dma0chan0-copy6: summary 5000 tests, 0 failures 3763 iops 30237 KB/s (0)
-> > dmatest: dma0chan0-copy0: summary 5000 tests, 0 failures 3730 iops 30131 KB/s (0)
-> > dmatest: dma0chan0-copy3: summary 5000 tests, 0 failures 3717 iops 29569 KB/s (0)
-> > dmatest: dma0chan0-copy5: summary 5000 tests, 0 failures 3699 iops 29302 KB/s (0)
-> >
-> > Changes since v4:
-> > - remove redundant queue structure in mtk_cqdma_pchan
-> > - remove redundant completion management
-> > - fix wrong residue assignment in mtk_cqdma_tx_status
-> > - fix typos
-> >
-> > Changes since v3:
-> > - simplify the ISR and management on descriptors by removing tasklet and ASYNC_TX_ENABLE_CHANNEL_SWITCH
-> > - remove useless field in mtk_cqdma_vdesc structure
-> > - change dev_info to dev_dbg
-> > - fix typos
-> >
-> > Changes since v2:
-> > - fix build warning for kernel with DMA address in 32-bit
-> >
-> > Changes since v1:
-> > - remove unused macros, typos
-> > - leverage ASYNC_TX_ENABLE_CHANNEL_SWITCH to maintain DMA descriptor list
-> >
-> > Shun-Chih Yu (2):
-> >   dt-bindings: dmaengine: Add MediaTek Command-Queue DMA controller
-> >     bindings
-> >   dmaengine: mediatek: Add MediaTek Command-Queue DMA controller for
-> >     MT6765 SoC
-> >
-> >  .../devicetree/bindings/dma/mtk-cqdma.txt          |   31 +
-> >  drivers/dma/mediatek/Kconfig                       |   12 +
-> >  drivers/dma/mediatek/Makefile                      |    1 +
-> >  drivers/dma/mediatek/mtk-cqdma.c                   |  748 ++++++++++++++++++++
-> >  4 files changed, 792 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/dma/mtk-cqdma.txt
-> >  create mode 100644 drivers/dma/mediatek/mtk-cqdma.c
-> >
-> >
-> > _______________________________________________
-> > Linux-mediatek mailing list
-> > Linux-mediatek@lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-mediatek
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
-
-
+ChenYu
 
 _______________________________________________
 linux-arm-kernel mailing list
