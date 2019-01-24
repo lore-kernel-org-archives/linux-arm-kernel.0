@@ -2,100 +2,137 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 844C6C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 06:58:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 92AABC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 07:01:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4F8F52184C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 06:58:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5EDBF2184C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 07:01:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rtq8y5Nm";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="HO3TH/bc";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="O9z6VRYk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F8F52184C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WYbcMqxD";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=marvell.com header.i=@marvell.com header.b="u9V0sZcg";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=marvell.onmicrosoft.com header.i=@marvell.onmicrosoft.com header.b="Vx6ltav5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5EDBF2184C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=marvell.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=O0+18hynRi9d+kujUCdQaaMMVMQn73q/fbbGZ4Xgh1g=; b=Rtq8y5NmbCLtok
-	FOTK/33xsxs1Qq+R3Tg07h8yXTjn4hAOv4RiXncy2ug8SUBTlsr7l4nbWu5qGrT0S0RnswesVZ+4T
-	eDE+6KTWqGnqpvrJu05IYCfwcClw1kx/pBZsJz5WSAzMKYfi2RmQoJW3zHCVB68h820lnXuAFyElW
-	wMxuRgZomnbNpLsHrN8HdXTzL2O6wdZVFmEApr4BICMCPpqKHXaNiJTI+rLjCnAFt4Y0E7hiHRskC
-	tm5h6iJ8aWdVp4/JBLsiGtGac2a+IRO3AjKDlDDT1KEjE8V2i/0C3V2OpQNgDLQsbTZyQOUodpKS9
-	8e31eklPR7Jlm0QUa51w==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:Date
+	:Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	List-Owner; bh=NAPmw0o6Ep904499RVS9w8Q6YeRMMzXRcy4cD0G/oS8=; b=WYbcMqxDQAK/Sy
+	qbpZok5DXiY/yDDbTmDQocCN6l1vO+gcwjXZHTN3+cuLbCJ6Nq0v0p75SsX8e6cvQrXiHzX0nuKd/
+	ZZNHoYIo5j7g+oDgymc/aPzfI28JydHdjqUQ9SC4mowHGSd2cuwqRgOw8UjEAm5vtMJfK9wwS9qwh
+	kfNtunYgh3LFm+HOpkgyeLaJ/z27iD9R+aTesashnFtf69vW/NzxvX2zrWl2wii2jbyrmndNJRHEy
+	2uZnDzUNd4RsJp2bhneqtfBxbssdcKe9zMDv6BTpueseYgVJ3eLL5RjzYRej0Vh9OQ2lv6aPa5q4A
+	ABoPtMLpFQL75MeXRdSw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmYxz-0004DM-Mk; Thu, 24 Jan 2019 06:58:23 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1gmZ0b-0005nY-Vn; Thu, 24 Jan 2019 07:01:05 +0000
+Received: from mx0a-0016f401.pphosted.com ([67.231.148.174]
+ helo=mx0b-0016f401.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmYxv-0004Cm-3g
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 06:58:21 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 3B7C460795; Thu, 24 Jan 2019 06:58:18 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548313098;
- bh=njDRlprMxI0qLtIk0ZEqPrhYxG6uwkZe42WtrF39QV0=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=HO3TH/bcP/JnsYvRvhbEm8/lEJ1ZqnUZXzGJGmjThIwACY6bd7eQx1z8GzYRihHgB
- LQFZywm9ZM8OPe/ZDjMyVfxDUeZnFrMv2T6patkWqESqlxQ1EeYcsdQciWQY1M9tyD
- OU7/0z7b3G4SYoJQ12ZHBb0mvXQrG0syo3uquSeM=
-Received: from mail-ed1-f43.google.com (mail-ed1-f43.google.com
- [209.85.208.43])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: vivek.gautam@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id DA8B56085C
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 24 Jan 2019 06:58:16 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548313097;
- bh=njDRlprMxI0qLtIk0ZEqPrhYxG6uwkZe42WtrF39QV0=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=O9z6VRYk9mxWxwwugE8ZwtNVR+zUJ0afRWwIRtDoyL16rsFp6leYt+YLH1FU86N+x
- kL+Ib1bv9xJflgsu39xGQMqYQXYKUZ8ouFcVaY3bKZpK4ONNkWLmezHX+TwGjJla8f
- qYpoiyH0ml6K0UR5fRappESj2/5Eb8yzNTxN/B7A=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org DA8B56085C
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=vivek.gautam@codeaurora.org
-Received: by mail-ed1-f43.google.com with SMTP id h15so3694440edb.4
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 23 Jan 2019 22:58:16 -0800 (PST)
-X-Gm-Message-State: AJcUukdX6T+aq0EWgMZrsztXav1kzO7XtqNc0olBoCYenu7ESuB4Vj9X
- okVnoD/fQDOcG6TtNiImUNog5hv2yW+EsQezs/Y=
-X-Google-Smtp-Source: ALg8bN4Rngo8jKcGaqdsIFNBJAKiARrqQ8SFIAU1vP7LvvTsNtxDoXCQvQm/uxcLce0ZqySSV3i2tN1/FjIsEv93M3w=
-X-Received: by 2002:a05:6402:3d1:: with SMTP id
- t17mr5651101edw.21.1548313095461; 
- Wed, 23 Jan 2019 22:58:15 -0800 (PST)
+ id 1gmZ0W-0005lC-AS
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 07:01:04 +0000
+Received: from pps.filterd (m0045849.ppops.net [127.0.0.1])
+ by mx0a-0016f401.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x0O6slNV027374; Wed, 23 Jan 2019 23:00:48 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=marvell.com;
+ h=from : to : cc :
+ subject : date : message-id : references : content-type :
+ content-transfer-encoding : mime-version; s=pfpt0818;
+ bh=fc9IXfGdE9sM+XtxwZapVJdQk8emv1URaobNKTvsalk=;
+ b=u9V0sZcgOT8YCSQrpiCez6aMncnU+edrc2de30ykCLtlni+9Dt0tONRapWKusn5s8/ct
+ 15xLhi9zWxQDcoGuo7RahE34zQdcK6ld3Ds8/vKSv7uhKdk5joJvaCQocFRbD7EbAACQ
+ UYJushr+Wmh+Vugkh6gD2wi/Pm9as5y5UInHRVxFed6XC/JXFaG8++knnig8+1acMefQ
+ bsqWTqcRV9nP5YCt0ARc6LnJ2XBZKhz9ufoTthdfLxs8Y7o2hKx0rvBmJSs5loLs3S6G
+ fycr47O63LfQsVavc7RwiTpg9dEtDhUU9dZ69c7P7zJ8B/AI+7E9FT3SNxDoZZO+Momx SA== 
+Received: from sc-exch02.marvell.com ([199.233.58.182])
+ by mx0a-0016f401.pphosted.com with ESMTP id 2q6w0kkb88-15
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
+ Wed, 23 Jan 2019 23:00:48 -0800
+Received: from SC-EXCH02.marvell.com (10.93.176.82) by SC-EXCH02.marvell.com
+ (10.93.176.82) with Microsoft SMTP Server (TLS) id 15.0.1367.3; Wed, 23 Jan
+ 2019 23:00:46 -0800
+Received: from NAM05-CO1-obe.outbound.protection.outlook.com (104.47.48.54) by
+ SC-EXCH02.marvell.com (10.93.176.82) with Microsoft SMTP Server
+ (TLS) id
+ 15.0.1367.3 via Frontend Transport; Wed, 23 Jan 2019 23:00:46 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=marvell.onmicrosoft.com; s=selector1-marvell-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=fc9IXfGdE9sM+XtxwZapVJdQk8emv1URaobNKTvsalk=;
+ b=Vx6ltav5ZSZpRmFDDhCGyh823EXtrif/DhcF7f6Xxw0OWATHpdPqBc9zpuFBCSLlS7RR2oXW0olON38QwFPaa9GZfxcMA90GD/YZLjhouW9EbiaJ17DatjQRyxapJCXCtmdJZlqYrqSmD5OSf+niulX4eoWO6b1KXFrXSIjctFY=
+Received: from DM6PR18MB2460.namprd18.prod.outlook.com (20.179.104.155) by
+ DM6PR18MB2537.namprd18.prod.outlook.com (20.179.105.157) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1558.16; Thu, 24 Jan 2019 07:00:42 +0000
+Received: from DM6PR18MB2460.namprd18.prod.outlook.com
+ ([fe80::bc61:3698:d8a8:f93c]) by DM6PR18MB2460.namprd18.prod.outlook.com
+ ([fe80::bc61:3698:d8a8:f93c%2]) with mapi id 15.20.1558.016; Thu, 24 Jan 2019
+ 07:00:42 +0000
+From: Shijith Thotton <sthotton@marvell.com>
+To: Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
+ <will.deacon@arm.com>
+Subject: Re: [Qestion] Softlockup when send IPI to other CPUs
+Thread-Topic: [Qestion] Softlockup when send IPI to other CPUs
+Thread-Index: AQHUsFLrrYWN2sDbSEeIkTghgif1Ug==
+Date: Thu, 24 Jan 2019 07:00:42 +0000
+Message-ID: <DM6PR18MB24607427B3B2BEAD80A75780D99A0@DM6PR18MB2460.namprd18.prod.outlook.com>
+References: <95C141B25E7AB14BA042DCCC556C0E6501620A47@dggeml529-mbx.china.huawei.com>
+ <20190119235825.GG26876@brain-police>
+ <20190121142127.GD29504@arrakis.emea.arm.com>
+ <20190122054400.GB6445@brain-police>
+ <20190123181530.GA234790@arrakis.emea.arm.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [111.93.218.67]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DM6PR18MB2537;
+ 20:j53mggkNk3vVKWLCIN0+heKAriIPd2fKN5gdLL9aTfk0sAwVSkWxtq9PLOSij2CMtxzLIAAJfzJtJIXryaYWPKC46zcpp7gIYd6Uedbz8Q+KGjwYjrWx92LoOQfD4uIpN72W+MRsSA7oQLrsOqKcNYqWo2SeiXGvDrGQRu/G5js=
+x-ms-office365-filtering-correlation-id: 195d9aa4-fa8f-4086-2638-08d681c9a80d
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605077)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:DM6PR18MB2537; 
+x-ms-traffictypediagnostic: DM6PR18MB2537:
+x-microsoft-antispam-prvs: <DM6PR18MB25370FB599466BE96CC69F34D99A0@DM6PR18MB2537.namprd18.prod.outlook.com>
+x-forefront-prvs: 0927AA37C7
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(346002)(39860400002)(136003)(396003)(376002)(366004)(189003)(199004)(305945005)(102836004)(446003)(6506007)(4326008)(53546011)(93886005)(186003)(7736002)(7696005)(26005)(99286004)(76176011)(97736004)(110136005)(54906003)(55016002)(486006)(476003)(71190400001)(3846002)(229853002)(74316002)(6116002)(6306002)(71200400001)(53936002)(25786009)(316002)(9686003)(8936002)(14454004)(256004)(14444005)(6436002)(8676002)(105586002)(81156014)(81166006)(33656002)(2906002)(966005)(78486014)(6246003)(478600001)(86362001)(66066001)(107886003)(68736007)(106356001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DM6PR18MB2537;
+ H:DM6PR18MB2460.namprd18.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: marvell.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: yX6EZNlyBevqX9BqJVd4P14IUogxtVgrvw1MRTlH3o1roxwOMkPjtfREBuOWPdpfTMKG3XfTA2w6YSSMtzyax81oN+hSe4mvKdiiwxX4PR+mZqe3a8s402FkY3sAec4jaKwnoWBV2viiDSQx0O/yozAQqLlOJB9aCtTAKPU/5XI2byGYVZjDEkeaOYyZgXpTN3njmhAsf8vI4WkhByTfMrv8eCjHfO1aj/9+PTaQ22ftNpYSlb89T5qo4t8fYmaSmEt4B7+H3mp425W6i6zCYoRbYdQAbMqTTwNL7jLiV5RDffLvMb2fSk2bCHCvIRZpKEKIX0wLfkw3nD/LktcpuCjskK7VTv2roO+BgD4O41EtVYjXS/8i2O7ToteLsIMphzCeygQIIgrQ7q2FAbAs40oqCGcvn5h9viqL3hM2vo4=
 MIME-Version: 1.0
-References: <20190121055335.15430-1-vivek.gautam@codeaurora.org>
- <CAKv+Gu8P-5hxZ8+OV_xSZteTvCLw-Sc-=KJM1i=3aWajcS9bUw@mail.gmail.com>
- <CAFp+6iEp-bzMrZz8cFUciTFKm7TwAoLdYpsSTD73kDfCRh60bA@mail.gmail.com>
- <CAKv+Gu9z_mGwdZYMKPfM_g2MZwrCF5=f4WAdn_R6wJ1A9xSZ_Q@mail.gmail.com>
- <dbba5a8a-70c0-dd01-713c-081eb412e2d7@arm.com>
- <CAKv+Gu8K5f0va9q4FYk9x1puoOTDjZ0c25qokm2izSVAwd1gmQ@mail.gmail.com>
- <964779d6-c676-3379-bf1e-cde0dd82d63d@arm.com>
- <CAKv+Gu_Oz-QEFnq9KiOBHQrC8o+0ykkEZBm0vCWfYDfFB8QTcQ@mail.gmail.com>
-In-Reply-To: <CAKv+Gu_Oz-QEFnq9KiOBHQrC8o+0ykkEZBm0vCWfYDfFB8QTcQ@mail.gmail.com>
-From: Vivek Gautam <vivek.gautam@codeaurora.org>
-Date: Thu, 24 Jan 2019 12:28:02 +0530
-X-Gmail-Original-Message-ID: <CAFp+6iESSKZsG06j9RJDn3n84zNT=b962sEyPwfyW1u5DGu-+A@mail.gmail.com>
-Message-ID: <CAFp+6iESSKZsG06j9RJDn3n84zNT=b962sEyPwfyW1u5DGu-+A@mail.gmail.com>
-Subject: Re: [PATCH 0/3] iommu/arm-smmu: Add support to use Last level cache
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+X-MS-Exchange-CrossTenant-Network-Message-Id: 195d9aa4-fa8f-4086-2638-08d681c9a80d
+X-MS-Exchange-CrossTenant-originalarrivaltime: 24 Jan 2019 07:00:42.6722 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 70e1fb47-1155-421d-87fc-2e58f638b6e0
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM6PR18MB2537
+X-OriginatorOrg: marvell.com
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-01-24_03:, , signatures=0
+X-Proofpoint-Details: rule=outbound_notspam policy=outbound score=0
+ priorityscore=1501
+ malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
+ clxscore=1011 lowpriorityscore=0 mlxscore=0 impostorscore=0
+ mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
+ scancount=1 engine=8.0.1-1810050000 definitions=main-1901240049
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_225819_242922_F3E47E1F 
-X-CRM114-Status: GOOD (  32.92  )
+X-CRM114-CacheID: sfid-20190123_230100_946453_C47BB088 
+X-CRM114-Status: GOOD (  19.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,134 +144,89 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jordan Crouse <jcrouse@codeaurora.org>, pdaly@codeaurora.org,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>, Joerg Roedel <joro@8bytes.org>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Tomasz Figa <tfiga@chromium.org>,
- "list@263.net:IOMMU DRIVERS" <iommu@lists.linux-foundation.org>,
- Robin Murphy <robin.murphy@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- pratikp@codeaurora.org
+Cc: "Wangkefeng \(Kevin\)" <wangkefeng.wang@huawei.com>,
+ Ganapatrao Kulkarni <gkulkarni@marvell.com>,
+ "anshuman.khandual@arm.com" <anshuman.khandual@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Jayachandran Chandrasekharan Nair <jnair@marvell.com>,
+ chenwandun <chenwandun@huawei.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 21, 2019 at 7:55 PM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
->
-> On Mon, 21 Jan 2019 at 14:56, Robin Murphy <robin.murphy@arm.com> wrote:
-> >
-> > On 21/01/2019 13:36, Ard Biesheuvel wrote:
-> > > On Mon, 21 Jan 2019 at 14:25, Robin Murphy <robin.murphy@arm.com> wrote:
-> > >>
-> > >> On 21/01/2019 10:50, Ard Biesheuvel wrote:
-> > >>> On Mon, 21 Jan 2019 at 11:17, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
-> > >>>>
-> > >>>> Hi,
-> > >>>>
-> > >>>>
-> > >>>> On Mon, Jan 21, 2019 at 12:56 PM Ard Biesheuvel
-> > >>>> <ard.biesheuvel@linaro.org> wrote:
-> > >>>>>
-> > >>>>> On Mon, 21 Jan 2019 at 06:54, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
-> > >>>>>>
-> > >>>>>> Qualcomm SoCs have an additional level of cache called as
-> > >>>>>> System cache, aka. Last level cache (LLC). This cache sits right
-> > >>>>>> before the DDR, and is tightly coupled with the memory controller.
-> > >>>>>> The clients using this cache request their slices from this
-> > >>>>>> system cache, make it active, and can then start using it.
-> > >>>>>> For these clients with smmu, to start using the system cache for
-> > >>>>>> buffers and, related page tables [1], memory attributes need to be
-> > >>>>>> set accordingly. This series add the required support.
-> > >>>>>>
-> > >>>>>
-> > >>>>> Does this actually improve performance on reads from a device? The
-> > >>>>> non-cache coherent DMA routines perform an unconditional D-cache
-> > >>>>> invalidate by VA to the PoC before reading from the buffers filled by
-> > >>>>> the device, and I would expect the PoC to be defined as lying beyond
-> > >>>>> the LLC to still guarantee the architected behavior.
-> > >>>>
-> > >>>> We have seen performance improvements when running Manhattan
-> > >>>> GFXBench benchmarks.
-> > >>>>
-> > >>>
-> > >>> Ah ok, that makes sense, since in that case, the data flow is mostly
-> > >>> to the device, not from the device.
-> > >>>
-> > >>>> As for the PoC, from my knowledge on sdm845 the system cache, aka
-> > >>>> Last level cache (LLC) lies beyond the point of coherency.
-> > >>>> Non-cache coherent buffers will not be cached to system cache also, and
-> > >>>> no additional software cache maintenance ops are required for system cache.
-> > >>>> Pratik can add more if I am missing something.
-> > >>>>
-> > >>>> To take care of the memory attributes from DMA APIs side, we can add a
-> > >>>> DMA_ATTR definition to take care of any dma non-coherent APIs calls.
-> > >>>>
-> > >>>
-> > >>> So does the device use the correct inner non-cacheable, outer
-> > >>> writeback cacheable attributes if the SMMU is in pass-through?
-> > >>>
-> > >>> We have been looking into another use case where the fact that the
-> > >>> SMMU overrides memory attributes is causing issues (WC mappings used
-> > >>> by the radeon and amdgpu driver). So if the SMMU would honour the
-> > >>> existing attributes, would you still need the SMMU changes?
-> > >>
-> > >> Even if we could force a stage 2 mapping with the weakest pagetable
-> > >> attributes (such that combining would work), there would still need to
-> > >> be a way to set the TCR attributes appropriately if this behaviour is
-> > >> wanted for the SMMU's own table walks as well.
-> > >>
-> > >
-> > > Isn't that just a matter of implementing support for SMMUs that lack
-> > > the 'dma-coherent' attribute?
-> >
-> > Not quite - in general they need INC-ONC attributes in case there
-> > actually is something in the architectural outer-cacheable domain.
->
-> But is it a problem to use INC-ONC attributes for the SMMU PTW on this
-> chip? AIUI, the reason for the SMMU changes is to avoid the
-> performance hit of snooping, which is more expensive than cache
-> maintenance of SMMU page tables. So are you saying the by-VA cache
-> maintenance is not relayed to this system cache, resulting in page
-> table updates to be invisible to masters using INC-ONC attributes?
+Hi Catalin,
 
-The reason for this SMMU changes is that the non-coherent devices
-can't access the inner caches at all. But they have a way to allocate
-and lookup in system cache.
+On 01/23/2019 11:45 PM, Catalin Marinas wrote:
+> On Tue, Jan 22, 2019 at 05:44:02AM +0000, Will Deacon wrote:
+>> On Mon, Jan 21, 2019 at 02:21:28PM +0000, Catalin Marinas wrote:
+>>> arm64: Do not issue IPIs for user executable ptes
+>>>
+>>> From: Catalin Marinas <catalin.marinas@arm.com>
+>>>
+>>> Commit 3b8c9f1cdfc5 ("arm64: IPI each CPU after invalidating the I-cache
+>>> for kernel mappings") was aimed at fixing the I-cache invalidation for
+>>> kernel mappings. However, it inadvertently caused all cache maintenance
+>>> for user mappings via set_pte_at() -> __sync_icache_dcache() to call
+>>> kick_all_cpus_sync().
+>>>
+>>> Fixes: 3b8c9f1cdfc5 ("arm64: IPI each CPU after invalidating the I-cache for kernel mappings")
+>>> Cc: <stable@vger.kernel.org> # 4.19.x-
+>>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+>>> ---
+>>>   arch/arm64/include/asm/cacheflush.h |    2 +-
+>>>   arch/arm64/kernel/probes/uprobes.c  |    2 +-
+>>>   arch/arm64/mm/flush.c               |   14 ++++++++++----
+>>>   3 files changed, 12 insertions(+), 6 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+>>> index 19844211a4e6..18e92d9dacd4 100644
+>>> --- a/arch/arm64/include/asm/cacheflush.h
+>>> +++ b/arch/arm64/include/asm/cacheflush.h
+>>> @@ -80,7 +80,7 @@ extern void __clean_dcache_area_poc(void *addr, size_t len);
+>>>   extern void __clean_dcache_area_pop(void *addr, size_t len);
+>>>   extern void __clean_dcache_area_pou(void *addr, size_t len);
+>>>   extern long __flush_cache_user_range(unsigned long start, unsigned long end);
+>>> -extern void sync_icache_aliases(void *kaddr, unsigned long len);
+>>> +extern void sync_icache_aliases(void *kaddr, unsigned long len, bool sync);
+>>
+>> I'd much prefer just adding something like sync_user_icache_aliases(), which
+>> would avoid the IPI, since bool arguments tend to make the callsites
+>> unreadable imo.
+> 
+> I wonder whether we need the IPI for uprobes and ptrace. I would say we
+> can avoid it for ptrace since normally the debugged thread should be
+> stopped. I think it's different for uprobes but changing the text of a
+> live thread doesn't come with many guarantees anyway. So I'm tempted to
+> simply change sync_icache_aliases() to not issue an IPI at all, in which
+> case we wouldn't even need the bool argument; it's only used for user
+> addresses. So the new diff would be (the text is the same):
+> 
+> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+> index 30695a868107..5c9073bace83 100644
+> --- a/arch/arm64/mm/flush.c
+> +++ b/arch/arm64/mm/flush.c
+> @@ -33,7 +33,11 @@ void sync_icache_aliases(void *kaddr, unsigned long len)
+>   		__clean_dcache_area_pou(kaddr, len);
+>   		__flush_icache_all();
+>   	} else {
+> -		flush_icache_range(addr, addr + len);
+> +		/*
+> +		 * Don't issue kick_all_cpus_sync() after I-cache invalidation
+> +		 * for user mappings.
+> +		 */
+> +		__flush_icache_range(addr, addr + len);
+>   	}
+>   }
 
-CPU will by default make use of system cache when the inner-cacheable
-and outer-cacheable memory attribute is set.
+We also faced similar issue with LTP test migrate_pages03 in past and this patch 
+fixes the issue.
 
-So for SMMU page tables to be visible to PTW,
--- For IO coherent clients, the CPU cache maintenance operations are not
-required for buffers marked Normal Cached to achieve a coherent view of
-memory. However, client-specific cache maintenance may still be
-required for devices
-with local caches (for example, compute DSP local L1 or L2).
--- For non-IO coherent clients, the CPU cache maintenance operations (cleans
-and/or invalidates) are required at buffer handoff points for buffers marked as
-Normal Cached in any CPU page table in order to observe the latest updates.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2019-January/623574.html
 
-
-Regards
-Vivek
-
->
-> > The
-> > case of the outer cacheablility being not that but a hint to control
-> > non-CPU traffic through some not-quite-transparent cache behind the PoC
-> > definitely stays wrapped up in qcom-specific magic ;)
-> >
->
-> I'm not surprised ...
-
-
-
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+Thanks,
+Shijith
 
 _______________________________________________
 linux-arm-kernel mailing list
