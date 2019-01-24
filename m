@@ -2,98 +2,61 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A92CEC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 13:57:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EFB22C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 14:00:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6B65321855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 13:57:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BEC7521855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 14:00:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FrUOLTDg";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Lqn+gjIn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B65321855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WYRUGE9K"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BEC7521855
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0d7WTjUeHTNb+biv2SXr3+dEm6EB6MV6jkxPprvagGo=; b=FrUOLTDgw1qwQH
-	rY22XCU9Tru8kVNEy59O1p4e4U/Au0LUmxrNz+6kvR6kY3R+d7gMeV3lw3O4VD0c4PJriNSY9oGKu
-	X+v0ZM1p8tx/6Mo6UgiHpQHH1aENiCh6d0Wqe08Uq+agk1cQDTPzrPXUE0JHl+m8p/zFRqlhdZAIr
-	T4Z2MFUsQ5isTbmoshDcfepB4vRe+9lZN5ea1Bx9V7/mykX+N5PX6qhw2fhoJVAz/pId4bfa3uk15
-	z+tazS8nvfYaqZ7bd6NUZCY1TGHV86xadN9drrYf2IXnkIUIXfVaaRiqoulszKAPA2BIbBivylZcR
-	vY8Qx1HsJat0sCIrvEYw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=MOFV1e1et1ufjijwSHC3Y68j0k1LXSQBHoWo8mGHI8M=; b=WYRUGE9KB14f+HyGQyX1mhKiw4
+	12cdBbDHWeBt8D3cT7BYQOV7WVXCyv7zOBWIvSBGSNW2ds3rLSY8Q8t6bYgbbVZon5KbxEfxgBYjJ
+	5NbxTb4VHR8gumtgGIMdsVG3mrlg3WTlyUO6I3MKDwyzOdvL7cKM10kXNXTZyf9SO0P9uGG3SM1t5
+	HLj2IaI4LncWdOC91xd4IFV909n+uO7S0Cx+IBL89BgOSs7Ys32F1AjnbgNN06YHIGhtZNIsQb2/V
+	sOLEkF2veaw8Zldi3oXABvvk62fEu0Fzuv98jeaonut2LOhnMISd9GcoRLQAUWyY1qYzVgwtUzYZK
+	X+iW7d9A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmfVS-0000xW-CO; Thu, 24 Jan 2019 13:57:22 +0000
-Received: from mail-io1-xd42.google.com ([2607:f8b0:4864:20::d42])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmfVN-0000wT-9U
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 13:57:20 +0000
-Received: by mail-io1-xd42.google.com with SMTP id x6so4762178ioa.9
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 24 Jan 2019 05:57:16 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=KqbWSaiyHO3jwEX7JNeSt49HGRO3N4zQp3FURwWaLU8=;
- b=Lqn+gjIncbO+NzbYiyb0YDloKirpxpmGe7BXLsnXWzCVc3ZzzwqqFJK51g8pB/doPq
- x3EMwUwquEo0yoPU+TF8PcW49SknCactKU4a0hXwN9IwRMUJ9jLLBTqOXiomOvQkEI+G
- ZVaA5gjqsmoi1hgbWKtGxA8F/m2H5BNVBpW4U=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=KqbWSaiyHO3jwEX7JNeSt49HGRO3N4zQp3FURwWaLU8=;
- b=nrmMDaFD+XN2IAlvCxHLCsnbnCQF4Z0D3H8U6STsOaVlyEXFASlKN7W7CWxg6nFV47
- 6QEJGRARS7V29Co/SaVKkE3ZRdsb4eFw8HxVspT1uHTPl1j94Rr771gJK9wqJhXAwBbV
- 1ukssmNipj5esna5bBjLchFg7e9w8iYkfCRs+aARBvymTHmHseqSudhyEZ7CAW58d59a
- NTnrOmn5FSo0ZXap7afwtmcleHG22feZJ6vzXq+XvmU5CtiFaBfTFWYaGXClK043SN4q
- UefP8dMlz9QNDif3oJV3TN0oSjtJfmQB92rwQjoCLJbqrHjb2Y0SnL/cfhPFfKQnf3/J
- YrwA==
-X-Gm-Message-State: AHQUAuZutXtuuE6Eb+qNlyNxxfvkZF7D4KtvOEMyVW9Gt9PNp0cTFtms
- JxfEb8QCGiFbXjZe/OJLEn9D+S6NPRKS2emjVDfEmg==
-X-Google-Smtp-Source: AHgI3IacgV/7vsn3EhiuoUEjBt39UNePxZwKGDwheNXi6tRhv9gvAmkwo555nmg2A9XnDhLRJQ/Q2s+Su3vkJIZoApc=
-X-Received: by 2002:a5e:c206:: with SMTP id v6mr4049610iop.60.1548338236024;
- Thu, 24 Jan 2019 05:57:16 -0800 (PST)
-MIME-Version: 1.0
-References: <850b6aee-0040-c333-b125-45211c18ada5@daenzer.net>
- <CAKv+Gu99zHqcQtj6TiOXAr3Qa6WWhKem+DHVA_mAQ0-Bc0Vbqw@mail.gmail.com>
- <047667fd-17be-1c37-5d2a-26768cfd6ab8@daenzer.net>
- <CAKv+Gu_VBd8agHASc5RS0eCgyXP64Lt_i4yPuBjKwGQ+5Lpd5Q@mail.gmail.com>
- <CADnq5_O1uxCrSksfF127AZTfbmdukxmqGdh2Ee0zM6CqgG_Mhg@mail.gmail.com>
- <CAKv+Gu-4uYh_HD_5Ry_L80Nf5zpRhT4oJYhhG5_8g3gSzBs2tg@mail.gmail.com>
- <20190123071521.GB20526@infradead.org>
- <CAKv+Gu8+77uZHJ6ZYjGNcKQL8C3cT5Ree+TcTVmkQXAHV-ADyg@mail.gmail.com>
- <20190123164428.GA9367@infradead.org>
- <CAKv+Gu-9vEKu8mG-o+-4M1ZcgZmTTJVfEdNS9R27AFX8P5sqyQ@mail.gmail.com>
- <20190124091316.GA22796@infradead.org>
- <bb559f74-4b1e-d5ee-74fb-b5dcd4a128cb@amd.com>
- <CAKv+Gu_3LurSN-6w1WijPfpJpc+Pgu0YTnwTfMrXMF3-AKAnJA@mail.gmail.com>
- <953e5e5f-5d47-d6df-40df-c8c94db5447f@amd.com>
- <CAKv+Gu9umPEmB+wh54NOTYcQ14oxf7rwVAXgCqo7V2A+VwkqPA@mail.gmail.com>
- <57590a48-4629-e2a1-8673-ce9eb2ec210b@amd.com>
- <CAKv+Gu_2f0FaJ+Th7H48u4GrPX=MM9xw0fFjdwhfRrr1nhgEkA@mail.gmail.com>
- <40ad3ae7-9970-0cb9-d35c-05e128f83820@amd.com>
- <CAKv+Gu_D4FC05Rz3Oxm_dTWLaGt+a3EDecbsrge1eHY7gFXEYg@mail.gmail.com>
- <CADnq5_PCCj1dgYTnJoWdFp45X8GMwdT34sMtWH7p6Ms1_SncOQ@mail.gmail.com>
-In-Reply-To: <CADnq5_PCCj1dgYTnJoWdFp45X8GMwdT34sMtWH7p6Ms1_SncOQ@mail.gmail.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Thu, 24 Jan 2019 14:57:03 +0100
-Message-ID: <CAKv+Gu9Ch_+2wUirmPb1-dXGzWbF2XoH-b6DrtkBNEXpx5obPA@mail.gmail.com>
-Subject: Re: [RFC PATCH] drm: disable WC optimization for cache coherent
- devices on non-x86
-To: Alex Deucher <alexdeucher@gmail.com>
+	id 1gmfYg-0002o9-AF; Thu, 24 Jan 2019 14:00:42 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmfYd-0002nE-AT
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 14:00:40 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C91AF1596;
+ Thu, 24 Jan 2019 06:00:38 -0800 (PST)
+Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 3AC2A3F5C1;
+ Thu, 24 Jan 2019 06:00:38 -0800 (PST)
+From: Christoffer Dall <christoffer.dall@arm.com>
+To: kvmarm@lists.cs.columbia.edu,
+	linux-arm-kernel@lists.infradead.org
+Subject: [PATCH 01/14] arm/arm64: KVM: Introduce kvm_call_hyp_ret()
+Date: Thu, 24 Jan 2019 15:00:19 +0100
+Message-Id: <20190124140032.8588-2-christoffer.dall@arm.com>
+X-Mailer: git-send-email 2.18.0
+In-Reply-To: <20190124140032.8588-1-christoffer.dall@arm.com>
+References: <20190124140032.8588-1-christoffer.dall@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_055718_806790_31E2B57F 
-X-CRM114-Status: GOOD (  28.08  )
+X-CRM114-CacheID: sfid-20190124_060039_368369_0B50BD2F 
+X-CRM114-Status: GOOD (  12.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,110 +68,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
- Michael Ellerman <mpe@ellerman.id.au>,
- =?UTF-8?Q?Michel_D=C3=A4nzer?= <michel@daenzer.net>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- amd-gfx list <amd-gfx@lists.freedesktop.org>,
- Christoph Hellwig <hch@infradead.org>, David Airlie <airlied@linux.ie>, "Huang,
- Ray" <Ray.Huang@amd.com>, dri-devel <dri-devel@lists.freedesktop.org>, "Zhang,
- Jerry" <Jerry.Zhang@amd.com>, "Deucher, Alexander" <Alexander.Deucher@amd.com>,
- Sean Paul <sean@poorly.run>, "Koenig, Christian" <Christian.Koenig@amd.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>, kvm@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 24 Jan 2019 at 14:54, Alex Deucher <alexdeucher@gmail.com> wrote:
->
-> On Thu, Jan 24, 2019 at 6:45 AM Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
-> >
-> > On Thu, 24 Jan 2019 at 12:37, Koenig, Christian
-> > <Christian.Koenig@amd.com> wrote:
-> > >
-> > > Am 24.01.19 um 12:26 schrieb Ard Biesheuvel:
-> > > > On Thu, 24 Jan 2019 at 12:23, Koenig, Christian
-> > > > <Christian.Koenig@amd.com> wrote:
-> > > >> Am 24.01.19 um 10:59 schrieb Ard Biesheuvel:
-> > > >>> [SNIP]
-> > > >>> This is *exactly* my point the whole time.
-> > > >>>
-> > > >>> The current code has
-> > > >>>
-> > > >>> static inline bool drm_arch_can_wc_memory(void)
-> > > >>> {
-> > > >>> #if defined(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
-> > > >>>      return false;
-> > > >>>
-> > > >>> which means the optimization is disabled *unless the system is
-> > > >>> non-cache coherent*
-> > > >>>
-> > > >>> So if you have reports that the optimization works on some PowerPC, it
-> > > >>> must be non-cache coherent PowerPC, because that is the only place
-> > > >>> where it is enabled in the first place.
-> > > >>>
-> > > >>>> The only problematic here actually seems to be ARM, so you should
-> > > >>>> probably just add an "#ifdef .._ARM return false;".
-> > > >>>>
-> > > >>> ARM/arm64 does not have a Kconfig symbol like
-> > > >>> CONFIG_NOT_COHERENT_CACHE, so we can only disable it everywhere. If
-> > > >>> there are non-coherent ARM systems that are currently working in the
-> > > >>> same way as those non-coherent PowerPC systems, we will break them by
-> > > >>> doing this.
-> > > >> Summing the things I've read so far for ARM up I actually think it
-> > > >> depends on a runtime configuration and not on compile time one.
-> > > >>
-> > > >> So the whole idea of providing the device to the drm_*_can_wc_memory()
-> > > >> function isn't so far fetched.
-> > > >>
-> > > > Thank you.
-> > > >
-> > > >> But for now I do prefer working and slightly slower system over broken
-> > > >> one, so I think we should just disable this on ARM for now.
-> > > >>
-> > > > Again, this is not about non-cache coherent being slower without the
-> > > > optimization, it is about non-cache coherent likely not working *at
-> > > > all* unless the optimization is enabled.
-> > >
-> > > As Michel tried to explain this CAN'T happen. The optimization is a
-> > > purely optional request from userspace.
-> > >
-> >
-> > Right.
-> >
-> > So in that case, we can assume that the following test
-> >
-> > static inline bool drm_arch_can_wc_memory(void)
-> > {
-> > #if defined(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
-> >     return false;
-> >
-> > is bogus, and it was just unnecessary caution on the part of the
-> > author to disregard non-cache coherent devices.
-> > Unfortunately, those commits have no log messages whatsoever, so it is
-> > difficult to infer the intent retroactively.
-> >
-> > > > Otherwise, the driver will vmap() DMA pages with cacheable attributes,
-> > > > while the non-cache coherent device uses uncached attributes, breaking
-> > > > coherency.
-> > >
-> > > Again this is mandated by the userspace APIs anyway. E.g. we can't
-> > > vmap() pages in any other way or our userspace APIs would break.
-> > >
-> >
-> > OK,
-> >
-> > So let's just disable this for all ARM and arm64 then, given that
-> > non-cache coherent is not supported in any case
->
-> So I think we are back to this patch:
-> https://patchwork.kernel.org/patch/10739023/
->
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Apart from the fact that the issue has nothing to do with write-combining, yes.
+Until now, we haven't differentiated between HYP calls that
+have a return value and those who don't. As we're about to
+change this, introduce kvm_call_hyp_ret(), and change all
+call sites that actually make use of a return value.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+---
+ arch/arm/include/asm/kvm_host.h   | 3 +++
+ arch/arm64/include/asm/kvm_host.h | 1 +
+ arch/arm64/kvm/debug.c            | 2 +-
+ virt/kvm/arm/arm.c                | 2 +-
+ virt/kvm/arm/vgic/vgic-v3.c       | 4 ++--
+ 5 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index ca56537b61bc..023c9f2b1eea 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -214,7 +214,10 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
+ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
+ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
+ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
++
+ unsigned long kvm_call_hyp(void *hypfn, ...);
++#define kvm_call_hyp_ret(f, ...) kvm_call_hyp(f, ##__VA_ARGS__)
++
+ void force_vm_exit(const cpumask_t *mask);
+ int __kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
+ 			      struct kvm_vcpu_events *events);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 7732d0ba4e60..e54cb7c88a4e 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -371,6 +371,7 @@ void kvm_arm_resume_guest(struct kvm *kvm);
+ 
+ u64 __kvm_call_hyp(void *hypfn, ...);
+ #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
++#define kvm_call_hyp_ret(f, ...) kvm_call_hyp(f, ##__VA_ARGS__)
+ 
+ void force_vm_exit(const cpumask_t *mask);
+ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+index f39801e4136c..fd917d6d12af 100644
+--- a/arch/arm64/kvm/debug.c
++++ b/arch/arm64/kvm/debug.c
+@@ -76,7 +76,7 @@ static void restore_guest_debug_regs(struct kvm_vcpu *vcpu)
+ 
+ void kvm_arm_init_debug(void)
+ {
+-	__this_cpu_write(mdcr_el2, kvm_call_hyp(__kvm_get_mdcr_el2));
++	__this_cpu_write(mdcr_el2, kvm_call_hyp_ret(__kvm_get_mdcr_el2));
+ }
+ 
+ /**
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 9e350fd34504..4d55f98f97f7 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -765,7 +765,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			ret = kvm_vcpu_run_vhe(vcpu);
+ 			kvm_arm_vhe_guest_exit();
+ 		} else {
+-			ret = kvm_call_hyp(__kvm_vcpu_run_nvhe, vcpu);
++			ret = kvm_call_hyp_ret(__kvm_vcpu_run_nvhe, vcpu);
+ 		}
+ 
+ 		vcpu->mode = OUTSIDE_GUEST_MODE;
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 9c0dd234ebe8..67f98151c88d 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -589,7 +589,7 @@ early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
+  */
+ int vgic_v3_probe(const struct gic_kvm_info *info)
+ {
+-	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
++	u32 ich_vtr_el2 = kvm_call_hyp_ret(__vgic_v3_get_ich_vtr_el2);
+ 	int ret;
+ 
+ 	/*
+@@ -679,7 +679,7 @@ void vgic_v3_put(struct kvm_vcpu *vcpu)
+ 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+ 
+ 	if (likely(cpu_if->vgic_sre))
+-		cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
++		cpu_if->vgic_vmcr = kvm_call_hyp_ret(__vgic_v3_read_vmcr);
+ 
+ 	kvm_call_hyp(__vgic_v3_save_aprs, vcpu);
+ 
+-- 
+2.18.0
+
 
 _______________________________________________
 linux-arm-kernel mailing list
