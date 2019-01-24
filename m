@@ -2,22 +2,23 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 26B57C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 09:47:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7F625C41518
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 09:48:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA99020855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 09:47:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4C8F6218AC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 09:48:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MzxdvSZ8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ffwll.ch header.i=@ffwll.ch header.b="KyqlCxnm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA99020855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ffwll.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UdHEuXIL";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="S6uns5Nv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C8F6218AC
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,65 +26,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=v00kFMeFvdEPIFcVC8IhzZtmMAYUnPTU90cPhBfEg/A=; b=MzxdvSZ8/HHI3e
-	4xZjgxLyX0sUnfv1PPbvC5P7kg6bIQ6zkwSMpOQ0HpMqe0qkvMMR60MxVv+NNBcQb3GAO7SObxelJ
-	cWTSEQilwQE7g0NOxhBXfOK/IPD6kZ/Tdvrbn2FoCQpcWiHUkp1ZjQWGw4HyMG3YB871spopUeetE
-	noEOvvTyS02VBFVyFhzUs+4C4Ud3vH92Ma8wK31vf/dJyAObM82aVVwFORKfJbk/4VbMFM00gqS+M
-	+N7FROAOYX9TisRvo/v5b+uao6pkH2q7NkYLVmrSbCYtiYu3OiVpaw97fXfGTKhM/RzGt5JE7U91Y
-	qX7hgiz6QkjGMEPTd64Q==;
+	List-Owner; bh=NHNXCec3zJHvypz8BL8f+DA43WoW3xdAspNrbE4ZJ/A=; b=UdHEuXILKQ1JBg
+	OFt9M1ujABSfoLk+IUAR13rZHwQgvoonPWACgf1BN7Il4nrOIIjHR/fuSDeCX7UtWYpKDNjSSqIwf
+	T+PsYn5qM6zFHnYfRVXtV+E2TLSucAXljJyuThOIpigoWUcqZw4QjloJqeaHsPgnl6wp6BvSbl4cF
+	wlZ8K4UfB7TVrbHTylLSjZCxRB70cZHcptvhfb3elZTkApZv2kRHlEsa2g5JsHMZNFoGJ7mlAjfZa
+	veMSqddk8ZNHrkZRyQ4bpPREAvDCwcW+RCbg8he48TaGXyVXND6J+KlvZEeNBkM+T+RXF1ZBhsTVr
+	ytglwfiUgphqg9/kh5cQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmbbB-0006gH-Nj; Thu, 24 Jan 2019 09:47:01 +0000
-Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
+	id 1gmbcM-000710-NB; Thu, 24 Jan 2019 09:48:14 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmbb2-0006bg-Pj
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 09:46:56 +0000
-Received: by mail-ed1-x544.google.com with SMTP id g22so4036054edr.7
+ id 1gmbcJ-00070d-Sc
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 09:48:13 +0000
+Received: by mail-wm1-x343.google.com with SMTP id p6so2277576wmc.1
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 24 Jan 2019 01:46:52 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ffwll.ch; s=google;
- h=sender:date:from:to:cc:subject:message-id:references:mime-version
+ Thu, 24 Jan 2019 01:48:11 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=ME0rz5SsonrtYN9ChIhZ9ZFSOi0ay5CtbTSVpion9Q0=;
- b=KyqlCxnmv4L3viaQMANDb+fINanAb67JVx/6zt4Qktv1H4g76xD1wDkDcIofW5RdY0
- Ba5YfSlchLicDP/y6WJgm5QJjDLH9kY0+gN9dMqetri15M5Mz6nXvlg7dn8+Z4rAeMEE
- UDULxpA0wkJF0ucou5+UfEGWwXX8ogKEnlO6o=
+ bh=lmFP/pb4I5zeZfqkGNoFLNvT1VnfwQ5xiH+1Aqxo9WU=;
+ b=S6uns5NvROKjcHrjjPdRTiVOP6Jr3+gYGBi5Nj1xbr8p8a9O83CNFnyO3Y2++RfCN3
+ x77XVvgLInsrMuj0hsIhYUxIgTcwzDeZ1dlBVd89sWpLxFEteg9jr8kxmNSFvFPS7fel
+ n6Xw5jOwFpOaDD7G8BPcTIbZiWUrpVR0jKjFY=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
- :references:mime-version:content-disposition:in-reply-to:user-agent;
- bh=ME0rz5SsonrtYN9ChIhZ9ZFSOi0ay5CtbTSVpion9Q0=;
- b=njM33NCtHNcJyrMO6mAkXyR8Glt7fJEIPIwJhFZ8TohtijPY1KxurcECYdpm+/jCmR
- g8IZIHa0fAT7tKqzyb55j4ijETVRM7oMKWnEqmnXfzHyAMQaHcgX7dILIl/mj/Fs2c46
- GCit0/1KkUXC7icBN2NW3EnVbaAeZyze4NYdRTgijRotOFkafuRDP0dR+XQpbt7gEbvM
- zUuoC3G7QEukGMHGdVkY8uSBjjQKya7/WlfPFz3UAmFEHNf3chvvSaiy+QAZ+3GxXooy
- 4pdvm1bu6guhJbtZhMf9RzX8L3oS6gXfTubIcT59kJyCmJFZvOTO1+0d0PRZIlJMCetO
- sIZg==
-X-Gm-Message-State: AJcUukeHArcxq/KTTyy+RObdR9meU8bH17LBsyqVRz2sf/1o2HRv1MIH
- d/14E28b1OJo3yr3hVgS4HGRmg==
-X-Google-Smtp-Source: ALg8bN4/Jzo5nGSIJv/qkSUJLMIMSvfioivlnWljZGhkvdTBvNWgQmgFPEUTnTWmjk//fiRqWCbmJA==
-X-Received: by 2002:aa7:d88c:: with SMTP id u12mr5735270edq.237.1548323210614; 
- Thu, 24 Jan 2019 01:46:50 -0800 (PST)
-Received: from phenom.ffwll.local ([2a02:168:569e:0:3106:d637:d723:e855])
- by smtp.gmail.com with ESMTPSA id b46sm11288858edc.57.2019.01.24.01.46.48
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=lmFP/pb4I5zeZfqkGNoFLNvT1VnfwQ5xiH+1Aqxo9WU=;
+ b=g8xTF8AwVI2MKXwP2vwhemA/G8ccLquppDuoh5EDCTQ5tYYi/AI149Uv0hnfKghVc8
+ XVt+0ngw6aUcAD49TCRot+1Imb6J/cLcn9+HqV9wBH7fPvfegEABZR1MeGMcDg0+IW41
+ AUDMtSp4HjjYwfcf5jauGkKwLnnhs6elnDfM4ZQIp7B3gz/CZhYBQWZ/SS/lHaJwL/X4
+ I86YUfw6QtvDrIvkw9BPTWwEBwCxdhOcThhGuf58mPdCfdjBUBLfAyNkqfu2/tpNUr7u
+ 7Pno1ETJCQihkn9drTa3yXgIc/c1gUEiNrNcOhLnmGf+zu+vtFypYLAtmPb85INgjitX
+ j8GQ==
+X-Gm-Message-State: AJcUukcSzwjN87WWiI+Jx3REjZlqtElWkS6WxJE4bBujc0pKG3nS+auR
+ 3c6fp1bXZ5nuD/QVsRuCf/QSlQ==
+X-Google-Smtp-Source: ALg8bN7k5F3d3HmMNZ3l53xd7jox3iJWVd5MnEEHVVb13cUSe52nYcGYBIgsSkTeBh3xzvTChTVIfQ==
+X-Received: by 2002:a1c:7eca:: with SMTP id z193mr1808014wmc.5.1548323290424; 
+ Thu, 24 Jan 2019 01:48:10 -0800 (PST)
+Received: from holly.lan (cpc141214-aztw34-2-0-cust773.18-1.cable.virginm.net.
+ [86.9.19.6])
+ by smtp.gmail.com with ESMTPSA id e17sm161551887wri.36.2019.01.24.01.48.08
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 24 Jan 2019 01:46:49 -0800 (PST)
-Date: Thu, 24 Jan 2019 10:46:47 +0100
-From: Daniel Vetter <daniel@ffwll.ch>
-To: Sam Ravnborg <sam@ravnborg.org>
-Subject: Re: [PATCH] drm: Split out drm_probe_helper.h
-Message-ID: <20190124094646.GR3271@phenom.ffwll.local>
-References: <20190116181018.GA27364@ravnborg.org>
- <20190117210334.13234-1-daniel.vetter@ffwll.ch>
- <20190123170015.GA23138@ravnborg.org>
+ Thu, 24 Jan 2019 01:48:09 -0800 (PST)
+Date: Thu, 24 Jan 2019 09:48:07 +0000
+From: Daniel Thompson <daniel.thompson@linaro.org>
+To: Sumit Garg <sumit.garg@linaro.org>
+Subject: Re: [PATCH v5 2/4] tee: add supp_nowait flag in tee_context struct
+Message-ID: <20190124094807.yg5onsmbx46bi7bm@holly.lan>
+References: <1548309279-5281-1-git-send-email-sumit.garg@linaro.org>
+ <1548309279-5281-3-git-send-email-sumit.garg@linaro.org>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190123170015.GA23138@ravnborg.org>
-X-Operating-System: Linux phenom 4.19.0-1-amd64 
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <1548309279-5281-3-git-send-email-sumit.garg@linaro.org>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_014652_919628_76B0D671 
-X-CRM114-Status: GOOD (  14.72  )
+X-CRM114-CacheID: sfid-20190124_014811_959282_29C05457 
+X-CRM114-Status: GOOD (  23.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,60 +95,116 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Neil Armstrong <narmstrong@baylibre.com>,
- Daniel Vetter <daniel.vetter@ffwll.ch>, Liviu Dudau <liviu.dudau@arm.com>,
- DRI Development <dri-devel@lists.freedesktop.org>,
- virtualization@lists.linux-foundation.org,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Benjamin Gaignard <benjamin.gaignard@linaro.org>,
- Daniel Vetter <daniel.vetter@intel.com>,
- linux-stm32@st-md-mailman.stormreply.com, linux-samsung-soc@vger.kernel.org,
- Oleksandr Andrushchenko <oleksandr_andrushchenko@epam.com>,
- amd-gfx@lists.freedesktop.org, linux-rockchip@lists.infradead.org,
- nouveau@lists.freedesktop.org, CK Hu <ck.hu@mediatek.com>,
- spice-devel@lists.freedesktop.org, Jani Nikula <jani.nikula@intel.com>,
- linux-arm-msm@vger.kernel.org, intel-gfx@lists.freedesktop.org,
- etnaviv@lists.freedesktop.org, Jani Nikula <jani.nikula@linux.intel.com>,
- linux-mediatek@lists.infradead.org, Rodrigo Vivi <rodrigo.vivi@intel.com>,
- linux-tegra@vger.kernel.org, linux-amlogic@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org, xen-devel@lists.xen.org,
- linux-renesas-soc@vger.kernel.org, Alex Deucher <alexander.deucher@amd.com>,
- freedreno@lists.freedesktop.org
+Cc: mark.rutland@arm.com, michal.lkml@markovi.net, herbert@gondor.apana.org.au,
+ arnd@arndb.de, ard.biesheuvel@linaro.org, gregkh@linuxfoundation.org,
+ bhsharma@redhat.com, linux-kernel@vger.kernel.org, tee-dev@lists.linaro.org,
+ yamada.masahiro@socionext.com, robh+dt@kernel.org,
+ linux-crypto@vger.kernel.org, mpm@selenic.com, jens.wiklander@linaro.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 23, 2019 at 06:00:15PM +0100, Sam Ravnborg wrote:
-> Hi Daniel.
+On Thu, Jan 24, 2019 at 11:24:37AM +0530, Sumit Garg wrote:
+> This flag indicates that requests in this context should not wait for
+> tee-supplicant daemon to be started if not present and just return
+> with an error code. It is needed for requests which should be
+> non-blocking in nature like ones arising from TEE based kernel drivers
+> or any in kernel api that uses TEE internal client interface.
 > 
-> On Thu, Jan 17, 2019 at 10:03:34PM +0100, Daniel Vetter wrote:
-> > Having the probe helper stuff (which pretty much everyone needs) in
-> > the drm_crtc_helper.h file (which atomic drivers should never need) is
-> > confusing. Split them out.
-> > 
-> > To make sure I actually achieved the goal here I went through all
-> > drivers. And indeed, all atomic drivers are now free of
-> > drm_crtc_helper.h includes.
+> Signed-off-by: Sumit Garg <sumit.garg@linaro.org>
+
+Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
+
+> ---
+>  drivers/tee/optee/supp.c | 10 +++++++++-
+>  drivers/tee/tee_core.c   | 13 +++++++++++++
+>  include/linux/tee_drv.h  |  6 ++++++
+>  3 files changed, 28 insertions(+), 1 deletion(-)
 > 
-> How are the plans to get this patchset merged?
-> There were dependencies on onging drmP.h removal in i915 IIRC?
-> I guess my "Minimize drmP.h dependencies" patch-set also have a role in this.
-
-Working on it, a pull request got lost. I originally wanted to get this
-all resolved this week, probably going to be next week now :-(
--Daniel
-
-
-> This does not hold up any work of mine, mainly wanted to make
-> sure this was not lost between all the other patches.
+> diff --git a/drivers/tee/optee/supp.c b/drivers/tee/optee/supp.c
+> index 43626e1..92f56b8 100644
+> --- a/drivers/tee/optee/supp.c
+> +++ b/drivers/tee/optee/supp.c
+> @@ -88,10 +88,18 @@ u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
+>  {
+>  	struct optee *optee = tee_get_drvdata(ctx->teedev);
+>  	struct optee_supp *supp = &optee->supp;
+> -	struct optee_supp_req *req = kzalloc(sizeof(*req), GFP_KERNEL);
+> +	struct optee_supp_req *req;
+>  	bool interruptable;
+>  	u32 ret;
+>  
+> +	/*
+> +	 * Return in case there is no supplicant available and
+> +	 * non-blocking request.
+> +	 */
+> +	if (!supp->ctx && ctx->supp_nowait)
+> +		return TEEC_ERROR_COMMUNICATION;
+> +
+> +	req = kzalloc(sizeof(*req), GFP_KERNEL);
+>  	if (!req)
+>  		return TEEC_ERROR_OUT_OF_MEMORY;
+>  
+> diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
+> index 9f4c8bc..2612dfa 100644
+> --- a/drivers/tee/tee_core.c
+> +++ b/drivers/tee/tee_core.c
+> @@ -105,6 +105,11 @@ static int tee_open(struct inode *inode, struct file *filp)
+>  	if (IS_ERR(ctx))
+>  		return PTR_ERR(ctx);
+>  
+> +	/*
+> +	 * Default user-space behaviour is to wait for tee-supplicant
+> +	 * if not present for any requests in this context.
+> +	 */
+> +	ctx->supp_nowait = false;
+>  	filp->private_data = ctx;
+>  	return 0;
+>  }
+> @@ -981,6 +986,14 @@ tee_client_open_context(struct tee_context *start,
+>  	} while (IS_ERR(ctx) && PTR_ERR(ctx) != -ENOMEM);
+>  
+>  	put_device(put_dev);
+> +	/*
+> +	 * Default behaviour for in kernel client is to not wait for
+> +	 * tee-supplicant if not present for any requests in this context.
+> +	 * Also this flag could be configured again before call to
+> +	 * tee_client_open_session() if any in kernel client requires
+> +	 * different behaviour.
+> +	 */
+> +	ctx->supp_nowait = true;
+>  	return ctx;
+>  }
+>  EXPORT_SYMBOL_GPL(tee_client_open_context);
+> diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
+> index ce957ce..56d7f1b 100644
+> --- a/include/linux/tee_drv.h
+> +++ b/include/linux/tee_drv.h
+> @@ -50,6 +50,11 @@ struct tee_shm_pool;
+>   * @releasing:  flag that indicates if context is being released right now.
+>   *		It is needed to break circular dependency on context during
+>   *              shared memory release.
+> + * @supp_nowait: flag that indicates that requests in this context should not
+> + *              wait for tee-supplicant daemon to be started if not present
+> + *              and just return with an error code. It is needed for requests
+> + *              that arises from TEE based kernel drivers that should be
+> + *              non-blocking in nature.
+>   */
+>  struct tee_context {
+>  	struct tee_device *teedev;
+> @@ -57,6 +62,7 @@ struct tee_context {
+>  	void *data;
+>  	struct kref refcount;
+>  	bool releasing;
+> +	bool supp_nowait;
+>  };
+>  
+>  struct tee_param_memref {
+> -- 
+> 2.7.4
 > 
-> 	Sam
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
 
 _______________________________________________
 linux-arm-kernel mailing list
