@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 06CA4C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 05:21:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B6E52C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 05:21:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B6D01218A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 05:21:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6E65A218A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 05:21:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qjecv540"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6D01218A3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c1qc/Isn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E65A218A2
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,39 +26,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=ythFZuiySaYZJ28sPWI48i0N8j+4LMJhalnSB5SqLZ4=; b=Qjecv540K4InnF+cafSXqcMmDp
-	otVumht/iICIYwBG+CAUurtYY9vegZj58vhAmhD+cht41X15Ip592YnP2OioBS9HBKG978Vrt2Dl3
-	9pf6EoV3cXoaoXaM1clOa7LwjGsIAJ0CqAZrNiwyUQEDlRLx6VYXJYJEhJxE1uJx3quNcucV/ttlL
-	UmCRPHn8rsE6vo3BTeMGDwRZBCCw2IxfWjHEoZ8IvdPRhNBFOWQ981ZISDB91rpDC1unrOvulpK38
-	ZDUicWE40fznNWpRNRFffyyDcYJ4NI1zXRiegYLpXauz3Ty0I7sRxU1mlIKwPwh+zURzjubbu3m2+
-	u20TE2PA==;
+	bh=WSEc1Liu7iAI76eusyw1DISD7+OF43CpWU+immUgxyQ=; b=c1qc/IsnHe4kaUeuAWyQQGUcnu
+	vILzck79X42egRFi5ZWa/CuNAtm5Nc1y/fIFhz7w4of0iGiRhT2mG5pjMKvJAmHlAc5cNAAV7IhnD
+	0UOMVNrpZ2mV2M7NN7hYcclYGlnxtINQj5YsyR/FN9vKA7o6JCEKpSDNpv85memAO6eZ34szi5b9A
+	Zd/32VLzNYOXe4ZKYi58TFJs1eJez7KkMRUEC1Ko75jJTGGD2eZ6rNokoRI6S/DjwF13ctnr18/Vz
+	y1lKZSZGdAIxD2jvjoVMbiyWPIEOpP/j+F6j6qIJ7Ts7Pe9FG07TDOeYjMg/9eB0bwvNCfKqbEfFb
+	4xTcOvow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmXSC-00035O-0j; Thu, 24 Jan 2019 05:21:28 +0000
+	id 1gmXSb-0003TY-S3; Thu, 24 Jan 2019 05:21:53 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmXRW-0002SH-CQ
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 05:20:50 +0000
+ id 1gmXRc-0002Yt-GU
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 05:20:54 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4593CA78;
- Wed, 23 Jan 2019 21:20:45 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2552AA78;
+ Wed, 23 Jan 2019 21:20:52 -0800 (PST)
 Received: from p8cg001049571a15.blr.arm.com (p8cg001049571a15.blr.arm.com
  [10.162.40.157])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 5D7F83F5C1;
- Wed, 23 Jan 2019 21:20:42 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 3D2133F5C1;
+ Wed, 23 Jan 2019 21:20:48 -0800 (PST)
 From: Anshuman Khandual <anshuman.khandual@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 3/6] arm64/mm: Make pgd_pgtable_alloc() call pte_alloc_one()
- always
-Date: Thu, 24 Jan 2019 10:50:17 +0530
-Message-Id: <1548307220-19756-4-git-send-email-anshuman.khandual@arm.com>
+Subject: [PATCH 5/6] arm64/mm: Call pgtable_page_dtor() for both PMD and PUD
+ page table pages
+Date: Thu, 24 Jan 2019 10:50:19 +0530
+Message-Id: <1548307220-19756-6-git-send-email-anshuman.khandual@arm.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1548307220-19756-1-git-send-email-anshuman.khandual@arm.com>
 References: <1548307220-19756-1-git-send-email-anshuman.khandual@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_212046_491003_82BDA453 
-X-CRM114-Status: GOOD (  13.85  )
+X-CRM114-CacheID: sfid-20190123_212052_635886_79E544A1 
+X-CRM114-Status: UNSURE (   9.95  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,49 +80,39 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-pgd_pgtable_alloc() provides page allocation function while creating all
-levels of page table (e.g PGD, PUD, CONT PMD) for various kernel mappings.
-It calls __get_free_page() and initializes page with pagetable_page_ctor().
-pte_alloc_one() already provides a standard interface for allocating a page
-table page and initializes it with pagetable_page_ctor(). This removes the
-redundancy and instead make it call pte_alloc_one() directly.
+TLB flush during PMD and PUD level page table page tear down currently does
+not call pgtable_page_dtor() like that for PTE page table pages. Now that
+all the page table pages which are allocated from the buddy allocator must
+have been initialized through pgtable_page_ctor() they must be freed back
+only after being called into pgtable_page_dtor() destructor. Else these
+pages might run into bad page state errors while getting freed into buddy
+allocator.
 
 Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
 ---
- arch/arm64/mm/mmu.c | 17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/tlb.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index b6f5aa5..2dbd723 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -372,13 +372,22 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
- 
- static phys_addr_t pgd_pgtable_alloc(void)
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index 106fdc9..de46ba0 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -62,6 +62,7 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+ 				  unsigned long addr)
  {
--	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
--	if (!ptr || !pgtable_page_ctor(virt_to_page(ptr)))
--		BUG();
-+
-+	pgtable_t ptr;
-+
-+	/*
-+	 * pgd_pgtable_alloc() is called while creating kernel mappings
-+	 * through __create_pgd_mapping() might not install it through
-+	 * swapper_pg_dir (&init_mm). Even then init_mm is passed here
-+	 * just to indicate that the allocation is kernel specific not
-+	 * for the user space page tables.
-+	 */
-+	ptr = pte_alloc_one(&init_mm);
-+	BUG_ON(!ptr);
- 
- 	/* Ensure the zeroed page is visible to the page table walker */
- 	dsb(ishst);
--	return __pa(ptr);
-+	return page_to_phys(ptr);
++	pgtable_page_dtor(virt_to_page(pmdp));
+ 	tlb_remove_table(tlb, virt_to_page(pmdp));
  }
- 
- /*
+ #endif
+@@ -70,6 +71,7 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+ static inline void __pud_free_tlb(struct mmu_gather *tlb, pud_t *pudp,
+ 				  unsigned long addr)
+ {
++	pgtable_page_dtor(virt_to_page(pudp));
+ 	tlb_remove_table(tlb, virt_to_page(pudp));
+ }
+ #endif
 -- 
 2.7.4
 
