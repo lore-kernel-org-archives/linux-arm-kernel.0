@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 49E29C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 14:01:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CF7A0C282C5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 14:01:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F35E121855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 14:01:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 89CA221855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 14:01:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZEoBIny1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F35E121855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UZN2R9xT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89CA221855
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,38 +26,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=FhfMCjjMU1ho42p8rf++EgVa3sfnv2kEVzP5Gz/R764=; b=ZEoBIny19GhZk2laa2pAOvMm0G
-	u28lQvBXrHjtTN+e+VUsGhS0CacvS2vRsSTKJAbDBeee+H7d20P/zOL8sh+9faPhUjAaJH/pWA1Sk
-	mToaNXvaZidwByvK0uQpAUrKMZkJ+DCEdWy7nVF4Mh8aLz7ivZqIyPe0+/yzwNzE1qdg8b10tS9yf
-	YyW5mCqLu2aeuArsqN81a48eZhMcXKY0q46ML0ioaV9rOMs/i335qIAIkRRPvEP4e+w0rKFQ8hKMM
-	43RGp3+Yrkd4Z+10wP8U1G7+49nuV4Ejl5idmrIjNbx1z4TdSH/i5FdWnYx7eCPShRKbQzEJXm6aH
-	nU+p3+CA==;
+	bh=hUqROWKjwciYBmVwVD9cFqwD6hXEg3s4Y224s6WK86A=; b=UZN2R9xTWzuhZMa8Sx+mxBvvr6
+	8eXcngXMTwD6K7BpNphehgU1Mu9EUod3bmd97J9BEcNDccw4CTgIMVRkK7Dy7ZG5ULzLMxAR3+8ue
+	pYLj6pIpUb3Leuyti6Y7n9Sw3NpMtGOkxylZC58MijAnO3tOERMJl4IYffR25N5uMHjg8y/S3rdsA
+	cAfqg/VOy2OAGH6m/Oc9HDjI3wa1eIbFoIPz5vlhTVyxUd//5C6PhM1Y9/cweZmnJJQ6GsvM7yOWY
+	QUmZVHEujVeRvtTLMBvnp6H7fTUI9yvhwbGjvOWgcWXppYdezvfRLEeuekrxqZUQXCxiWZdWIXjEY
+	Fubb+prQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmfZc-0003oy-8R; Thu, 24 Jan 2019 14:01:40 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gmfZq-00044z-Mi; Thu, 24 Jan 2019 14:01:54 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmfYh-0002q3-VA
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 14:00:48 +0000
+ id 1gmfYp-0002yQ-Cc
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 14:00:56 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A2FABA78;
- Thu, 24 Jan 2019 06:00:43 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 014A5A78;
+ Thu, 24 Jan 2019 06:00:51 -0800 (PST)
 Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1424E3F5C1;
- Thu, 24 Jan 2019 06:00:42 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 670BC3F5C1;
+ Thu, 24 Jan 2019 06:00:50 -0800 (PST)
 From: Christoffer Dall <christoffer.dall@arm.com>
 To: kvmarm@lists.cs.columbia.edu,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 03/14] arm64: KVM: Drop VHE-specific HYP call stub
-Date: Thu, 24 Jan 2019 15:00:21 +0100
-Message-Id: <20190124140032.8588-4-christoffer.dall@arm.com>
+Subject: [PATCH 06/14] KVM: arm/arm64: Factor out VMID into struct kvm_vmid
+Date: Thu, 24 Jan 2019 15:00:24 +0100
+Message-Id: <20190124140032.8588-7-christoffer.dall@arm.com>
 X-Mailer: git-send-email 2.18.0
 In-Reply-To: <20190124140032.8588-1-christoffer.dall@arm.com>
 References: <20190124140032.8588-1-christoffer.dall@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_060044_277505_1CB6DB32 
-X-CRM114-Status: UNSURE (   8.51  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190124_060051_808227_2CB834F0 
+X-CRM114-Status: GOOD (  30.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,62 +69,363 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>, kvm@vger.kernel.org
+Cc: Marc Zyngier <marc.zyngier@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>, kvm@vger.kernel.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+In preparation for nested virtualization where we are going to have more
+than a single VMID per VM, let's factor out the VMID data into a
+separate VMID data structure and change the VMID allocator to operate on
+this new structure instead of using a struct kvm.
 
-We now call VHE code directly, without going through any central
-dispatching function. Let's drop that code.
+This also means that udate_vttbr now becomes update_vmid, and that the
+vttbr itself is generated on the fly based on the stage 2 page table
+base address and the vmid.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+We cache the physical address of the pgd when allocating the pgd to
+avoid doing the calculation on every entry to the guest and to avoid
+calling into potentially non-hyp-mapped code from hyp/EL2.
+
+If we wanted to merge the VMID allocator with the arm64 ASID allocator
+at some point in the future, it should actually become easier to do that
+after this patch.
+
+Note that to avoid mapping the kvm_vmid_bits variable into hyp, we
+simply forego the masking of the vmid value in kvm_get_vttbr and rely on
+update_vmid to always assign a valid vmid value (within the supported
+range).
+
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp.S           |  3 ---
- arch/arm64/kvm/hyp/hyp-entry.S | 12 ------------
- 2 files changed, 15 deletions(-)
+ arch/arm/include/asm/kvm_host.h   | 13 ++++---
+ arch/arm/include/asm/kvm_mmu.h    | 11 ++++++
+ arch/arm/kvm/hyp/switch.c         |  2 +-
+ arch/arm/kvm/hyp/tlb.c            |  4 +--
+ arch/arm64/include/asm/kvm_host.h |  9 +++--
+ arch/arm64/include/asm/kvm_hyp.h  |  3 +-
+ arch/arm64/include/asm/kvm_mmu.h  | 11 ++++++
+ virt/kvm/arm/arm.c                | 57 +++++++++++--------------------
+ virt/kvm/arm/mmu.c                |  2 ++
+ 9 files changed, 63 insertions(+), 49 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 952f6cb9cf72..2845aa680841 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -40,9 +40,6 @@
-  * arch/arm64/kernel/hyp_stub.S.
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 43e343e00fb8..8073267dc4a0 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -57,10 +57,13 @@ int __attribute_const__ kvm_target_cpu(void);
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+ void kvm_reset_coprocs(struct kvm_vcpu *vcpu);
+ 
+-struct kvm_arch {
+-	/* VTTBR value associated with below pgd and vmid */
+-	u64    vttbr;
++struct kvm_vmid {
++	/* The VMID generation used for the virt. memory system */
++	u64    vmid_gen;
++	u32    vmid;
++};
+ 
++struct kvm_arch {
+ 	/* The last vcpu id that ran on each physical CPU */
+ 	int __percpu *last_vcpu_ran;
+ 
+@@ -70,11 +73,11 @@ struct kvm_arch {
+ 	 */
+ 
+ 	/* The VMID generation used for the virt. memory system */
+-	u64    vmid_gen;
+-	u32    vmid;
++	struct kvm_vmid vmid;
+ 
+ 	/* Stage-2 page table */
+ 	pgd_t *pgd;
++	phys_addr_t pgd_phys;
+ 
+ 	/* Interrupt controller */
+ 	struct vgic_dist	vgic;
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 3a875fc1b63c..fadbd9ad3a90 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -426,6 +426,17 @@ static inline bool kvm_cpu_has_cnp(void)
+ 	return false;
+ }
+ 
++static __always_inline u64 kvm_get_vttbr(struct kvm *kvm)
++{
++	struct kvm_vmid *vmid = &kvm->arch.vmid;
++	u64 vmid_field, baddr;
++	u64 cnp = kvm_cpu_has_cnp() ? VTTBR_CNP_BIT : 0;
++
++	baddr = kvm->arch.pgd_phys;
++	vmid_field = (u64)vmid->vmid << VTTBR_VMID_SHIFT;
++	return kvm_phys_to_vttbr(baddr) | vmid_field | cnp;
++}
++
+ #endif	/* !__ASSEMBLY__ */
+ 
+ #endif /* __ARM_KVM_MMU_H__ */
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index acf1c37fa49c..3b058a5d7c5f 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -77,7 +77,7 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+ static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+-	write_sysreg(kvm->arch.vttbr, VTTBR);
++	write_sysreg(kvm_get_vttbr(kvm), VTTBR);
+ 	write_sysreg(vcpu->arch.midr, VPIDR);
+ }
+ 
+diff --git a/arch/arm/kvm/hyp/tlb.c b/arch/arm/kvm/hyp/tlb.c
+index c0edd450e104..8e4afba73635 100644
+--- a/arch/arm/kvm/hyp/tlb.c
++++ b/arch/arm/kvm/hyp/tlb.c
+@@ -41,7 +41,7 @@ void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
+ 
+ 	/* Switch to requested VMID */
+ 	kvm = kern_hyp_va(kvm);
+-	write_sysreg(kvm->arch.vttbr, VTTBR);
++	write_sysreg(kvm_get_vttbr(kvm), VTTBR);
+ 	isb();
+ 
+ 	write_sysreg(0, TLBIALLIS);
+@@ -61,7 +61,7 @@ void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu)
+ 	struct kvm *kvm = kern_hyp_va(kern_hyp_va(vcpu)->kvm);
+ 
+ 	/* Switch to requested VMID */
+-	write_sysreg(kvm->arch.vttbr, VTTBR);
++	write_sysreg(kvm_get_vttbr(kvm), VTTBR);
+ 	isb();
+ 
+ 	write_sysreg(0, TLBIALL);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index f497bb31031f..444dd1cb1958 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -57,16 +57,19 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+ int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext);
+ void __extended_idmap_trampoline(phys_addr_t boot_pgd, phys_addr_t idmap_start);
+ 
+-struct kvm_arch {
++struct kvm_vmid {
+ 	/* The VMID generation used for the virt. memory system */
+ 	u64    vmid_gen;
+ 	u32    vmid;
++};
++
++struct kvm_arch {
++	struct kvm_vmid vmid;
+ 
+ 	/* stage2 entry level table */
+ 	pgd_t *pgd;
++	phys_addr_t pgd_phys;
+ 
+-	/* VTTBR value associated with above pgd and vmid */
+-	u64    vttbr;
+ 	/* VTCR_EL2 value for this VM */
+ 	u64    vtcr;
+ 
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index a80a7ef57325..4da765f2cca5 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -21,6 +21,7 @@
+ #include <linux/compiler.h>
+ #include <linux/kvm_host.h>
+ #include <asm/alternative.h>
++#include <asm/kvm_mmu.h>
+ #include <asm/sysreg.h>
+ 
+ #define __hyp_text __section(.hyp.text) notrace
+@@ -163,7 +164,7 @@ void __noreturn __hyp_do_panic(unsigned long, ...);
+ static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
+ {
+ 	write_sysreg(kvm->arch.vtcr, vtcr_el2);
+-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
++	write_sysreg(kvm_get_vttbr(kvm), vttbr_el2);
+ 
+ 	/*
+ 	 * ARM erratum 1165522 requires the actual execution of the above
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 8af4b1befa42..189d93461d33 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -596,5 +596,16 @@ static inline bool kvm_cpu_has_cnp(void)
+ 	return system_supports_cnp();
+ }
+ 
++static __always_inline u64 kvm_get_vttbr(struct kvm *kvm)
++{
++	struct kvm_vmid *vmid = &kvm->arch.vmid;
++	u64 vmid_field, baddr;
++	u64 cnp = kvm_cpu_has_cnp() ? VTTBR_CNP_BIT : 0;
++
++	baddr = kvm->arch.pgd_phys;
++	vmid_field = (u64)vmid->vmid << VTTBR_VMID_SHIFT;
++	return kvm_phys_to_vttbr(baddr) | vmid_field | cnp;
++}
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ARM64_KVM_MMU_H__ */
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 3dd240ea9e76..b77db673bb03 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -65,7 +65,6 @@ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
+ /* The VMID used in the VTTBR */
+ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+ static u32 kvm_next_vmid;
+-static unsigned int kvm_vmid_bits __read_mostly;
+ static DEFINE_SPINLOCK(kvm_vmid_lock);
+ 
+ static bool vgic_present;
+@@ -142,7 +141,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
+ 	kvm_vgic_early_init(kvm);
+ 
+ 	/* Mark the initial VMID generation invalid */
+-	kvm->arch.vmid_gen = 0;
++	kvm->arch.vmid.vmid_gen = 0;
+ 
+ 	/* The maximum number of VCPUs is limited by the host's GIC model */
+ 	kvm->arch.max_vcpus = vgic_present ?
+@@ -472,37 +471,31 @@ void force_vm_exit(const cpumask_t *mask)
+ 
+ /**
+  * need_new_vmid_gen - check that the VMID is still valid
+- * @kvm: The VM's VMID to check
++ * @vmid: The VMID to check
+  *
+  * return true if there is a new generation of VMIDs being used
+  *
+- * The hardware supports only 256 values with the value zero reserved for the
+- * host, so we check if an assigned value belongs to a previous generation,
+- * which which requires us to assign a new value. If we're the first to use a
+- * VMID for the new generation, we must flush necessary caches and TLBs on all
+- * CPUs.
++ * The hardware supports a limited set of values with the value zero reserved
++ * for the host, so we check if an assigned value belongs to a previous
++ * generation, which which requires us to assign a new value. If we're the
++ * first to use a VMID for the new generation, we must flush necessary caches
++ * and TLBs on all CPUs.
   */
- ENTRY(__kvm_call_hyp)
--alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
- 	hvc	#0
- 	ret
--alternative_else_nop_endif
--	b	__vhe_hyp_call
- ENDPROC(__kvm_call_hyp)
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 73c1b483ec39..2b1e686772bf 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -43,18 +43,6 @@
- 	ldr	lr, [sp], #16
- .endm
+-static bool need_new_vmid_gen(struct kvm *kvm)
++static bool need_new_vmid_gen(struct kvm_vmid *vmid)
+ {
+ 	u64 current_vmid_gen = atomic64_read(&kvm_vmid_gen);
+ 	smp_rmb(); /* Orders read of kvm_vmid_gen and kvm->arch.vmid */
+-	return unlikely(READ_ONCE(kvm->arch.vmid_gen) != current_vmid_gen);
++	return unlikely(READ_ONCE(vmid->vmid_gen) != current_vmid_gen);
+ }
  
--ENTRY(__vhe_hyp_call)
--	do_el2_call
--	/*
--	 * We used to rely on having an exception return to get
--	 * an implicit isb. In the E2H case, we don't have it anymore.
--	 * rather than changing all the leaf functions, just do it here
--	 * before returning to the rest of the kernel.
--	 */
--	isb
--	ret
--ENDPROC(__vhe_hyp_call)
+ /**
+- * update_vttbr - Update the VTTBR with a valid VMID before the guest runs
+- * @kvm	The guest that we are about to run
+- *
+- * Called from kvm_arch_vcpu_ioctl_run before entering the guest to ensure the
+- * VM has a valid VMID, otherwise assigns a new one and flushes corresponding
+- * caches and TLBs.
++ * update_vmid - Update the vmid with a valid VMID for the current generation
++ * @kvm: The guest that struct vmid belongs to
++ * @vmid: The stage-2 VMID information struct
+  */
+-static void update_vttbr(struct kvm *kvm)
++static void update_vmid(struct kvm_vmid *vmid)
+ {
+-	phys_addr_t pgd_phys;
+-	u64 vmid, cnp = kvm_cpu_has_cnp() ? VTTBR_CNP_BIT : 0;
 -
- el1_sync:				// Guest trapped into EL2
+-	if (!need_new_vmid_gen(kvm))
++	if (!need_new_vmid_gen(vmid))
+ 		return;
  
- 	mrs	x0, esr_el2
+ 	spin_lock(&kvm_vmid_lock);
+@@ -512,7 +505,7 @@ static void update_vttbr(struct kvm *kvm)
+ 	 * already allocated a valid vmid for this vm, then this vcpu should
+ 	 * use the same vmid.
+ 	 */
+-	if (!need_new_vmid_gen(kvm)) {
++	if (!need_new_vmid_gen(vmid)) {
+ 		spin_unlock(&kvm_vmid_lock);
+ 		return;
+ 	}
+@@ -536,18 +529,12 @@ static void update_vttbr(struct kvm *kvm)
+ 		kvm_call_hyp(__kvm_flush_vm_context);
+ 	}
+ 
+-	kvm->arch.vmid = kvm_next_vmid;
++	vmid->vmid = kvm_next_vmid;
+ 	kvm_next_vmid++;
+-	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
+-
+-	/* update vttbr to be used with the new vmid */
+-	pgd_phys = virt_to_phys(kvm->arch.pgd);
+-	BUG_ON(pgd_phys & ~kvm_vttbr_baddr_mask(kvm));
+-	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
+-	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid | cnp;
++	kvm_next_vmid &= (1 << kvm_get_vmid_bits()) - 1;
+ 
+ 	smp_wmb();
+-	WRITE_ONCE(kvm->arch.vmid_gen, atomic64_read(&kvm_vmid_gen));
++	WRITE_ONCE(vmid->vmid_gen, atomic64_read(&kvm_vmid_gen));
+ 
+ 	spin_unlock(&kvm_vmid_lock);
+ }
+@@ -690,7 +677,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		cond_resched();
+ 
+-		update_vttbr(vcpu->kvm);
++		update_vmid(&vcpu->kvm->arch.vmid);
+ 
+ 		check_vcpu_requests(vcpu);
+ 
+@@ -739,7 +726,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		smp_store_mb(vcpu->mode, IN_GUEST_MODE);
+ 
+-		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
++		if (ret <= 0 || need_new_vmid_gen(&vcpu->kvm->arch.vmid) ||
+ 		    kvm_request_pending(vcpu)) {
+ 			vcpu->mode = OUTSIDE_GUEST_MODE;
+ 			isb(); /* Ensure work in x_flush_hwstate is committed */
+@@ -1417,10 +1404,6 @@ static inline void hyp_cpu_pm_exit(void)
+ 
+ static int init_common_resources(void)
+ {
+-	/* set size of VMID supported by CPU */
+-	kvm_vmid_bits = kvm_get_vmid_bits();
+-	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
+-
+ 	kvm_set_ipa_limit();
+ 
+ 	return 0;
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index fbdf3ac2f001..bffcbc423f4c 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -921,6 +921,7 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+ 		return -ENOMEM;
+ 
+ 	kvm->arch.pgd = pgd;
++	kvm->arch.pgd_phys = virt_to_phys(pgd);
+ 	return 0;
+ }
+ 
+@@ -1008,6 +1009,7 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+ 		unmap_stage2_range(kvm, 0, kvm_phys_size(kvm));
+ 		pgd = READ_ONCE(kvm->arch.pgd);
+ 		kvm->arch.pgd = NULL;
++		kvm->arch.pgd_phys = 0;
+ 	}
+ 	spin_unlock(&kvm->mmu_lock);
+ 
 -- 
 2.18.0
 
