@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C186C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:25:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A95DFC282C7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:26:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1F685218AE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:25:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 755EF218B0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:26:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YNyPkUx6";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="ZYYqaU9X"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1F685218AE
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AlOZ/CpP";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="kH4Tt23r"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 755EF218B0
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,42 +27,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=nyP54maLFM57J15/RITbYpguTtKnKKyQgNypDThzFvQ=; b=YNyPkUx6RC9R6YpMogcwohMhVd
-	kJX3QMlCdc3bQ0P7BKSE8tSeirYGuVHiw+GiyKLlS4CKj7f9W8P/uc3qyuEl98o7LE1vZu0LYzbOz
-	AKhGfRpEgxAlTYqfEhLlZCfpEO2BFgywyN1oLcKJa5wQDf2vEA6RasjS+qOKaD0CNhuBh21iIxNKQ
-	wdXn5XjanSZe9V+FoxkjmVJUvyZylF2CoOM3p57jFKJpucl+b2Lbpoz8yxc54Rbj2csmh8edOkk5g
-	5/YRTB3sCpB0PjuxcVqy97pGOgGt5axbQU4jQKwiMFThE6cMIzeZPXz+MNtweLA4QHLG1p6d8Sa6N
-	omXYK1KA==;
+	bh=GqvjrzS2vnzmGfpOlBX3IpkXIRf/toWkxllCb3l0H2o=; b=AlOZ/CpPIq2eO67ZacWaxsRjiO
+	cRHv1loGFXIv+UMs+J6Um+tRDmodvBTMtamX5bdyc23YK5BaenwTfkyQojjVSHo91iYKbWgAtF2RQ
+	JdNnpwP2I0VVjFCbgAjMbrXu++QTQ8ArnZok4h2YZ8a70mc4oQLZCJX+cf9ek2lcUAnGVq4oh6azy
+	jajtbslEqa48MoW6bH8sB1PugKRlZvBQ/gsmkJIMDzDfHymWtLODe00J0br11EyZRQco+DriOOdcf
+	k4mw87Hl0EYQKUDYol8fAgt90fAAl6hV7JUxgfgFKO9TBCjQoQ29FBN9+nW5dxiVRT2FTVwYq3gvw
+	5XICdEyg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmgsz-0007FQ-Rf; Thu, 24 Jan 2019 15:25:45 +0000
+	id 1gmgtD-0007U9-Fs; Thu, 24 Jan 2019 15:25:59 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmgpo-0007Ii-Nu
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 15:22:43 +0000
+ id 1gmgq3-0007Ii-L4
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 15:22:53 +0000
 Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 4C75025BF0A;
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 4EB5425BF0F;
  Fri, 25 Jan 2019 02:12:45 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1548342765; bh=bsdi+ynj+kAAoK2XbcizzMweSNBssSGNNwoDUYrhwXU=;
+ t=1548342765; bh=OaIyUEhZsQRxBF1EXMbctlHHqluhDcSjbQh+ocIpD4I=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=ZYYqaU9XxgIuI7WpkkQdvWvKS3e1+H+6cLyOJKX+b2CKLy7yTX30VGO0IaPwhuVk5
- 43ddwCrYDuFxUnVjGjxklNiZOwx1mBbzHSx6hOMK3BZLozvki9pm0STvy9yXvmVje0
- z0UeFkEjgON9AtQkejxfWUvXrZhh7vd0hIBc3j1s=
+ b=kH4Tt23r//gHNdAuNchjGjldEE3uVHROd6th9ZTmXDubLdCOu8Xa4vDU3r3j8ZNmm
+ tcGnp8/ODjPzz1PlfJZScOYz7TamvjewuQOEzkSB8ZfenGun6Ji/9zmKlLO5S4RKpw
+ ndjia24LV+pGcx8pw60es8kybR4TZRUGDpQVGFBw=
 Received: by reginn.horms.nl (Postfix, from userid 7100)
- id 82163940E45; Thu, 24 Jan 2019 16:12:41 +0100 (CET)
+ id 91DE7940E6B; Thu, 24 Jan 2019 16:12:41 +0100 (CET)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 41/44] arm64: dts: renesas: r8a77990: ebisu: Fix backlight
- regulator numbering
-Date: Thu, 24 Jan 2019 16:12:35 +0100
-Message-Id: <12105cec654cf90648f65f7dc90d1be982d326eb.1548233325.git.horms+renesas@verge.net.au>
+Subject: [PATCH 42/44] arm64: dts: renesas: r8a774c0: Enable DMA for SCIF2
+Date: Thu, 24 Jan 2019 16:12:36 +0100
+Message-Id: <d9fd4e5814079ba4a2111d7d792a24bf8f747500.1548233325.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1548233325.git.horms+renesas@verge.net.au>
 References: <cover.1548233325.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_072229_610366_ED90965B 
-X-CRM114-Status: GOOD (  11.15  )
+X-CRM114-CacheID: sfid-20190124_072244_014839_0CE6A961 
+X-CRM114-Status: UNSURE (   9.76  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,45 +75,40 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Simon Horman <horms+renesas@verge.net.au>,
- Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org,
- Marek Vasut <marek.vasut+renesas@gmail.com>
+ Magnus Damm <magnus.damm@gmail.com>,
+ Geert Uytterhoeven <geert+renesas@glider.be>,
+ linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Marek Vasut <marek.vasut+renesas@gmail.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-There are two regulator1 nodes in the Ebisu DTS right now, one 3.3V for
-the eMMC and one 12V for the backlight. This causes one to be overwritten
-by the other, ultimatelly resulting in inoperable eMMC, which depends on
-the former. Fix this by renumbering the backlight regulator to regulator2.
+SCIF2 on RZ/G2E can be used with both DMAC1 and DMAC2.
 
-Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-Reported-by: Simon Horman <horms+renesas@verge.net.au>
-Fixes: 9d16c4a10e07 ("arm64: dts: renesas: r8a77990: ebisu: Add backlight")
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Fixes: 1b24f9e8ea3ff95f ("arm64: dts: renesas: r8a774c0: Add SCIF and HSCIF nodes")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/renesas/r8a774c0.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-index e0590c0af4c4..89383aa35d65 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-@@ -191,7 +191,7 @@
- 		clock-frequency = <24576000>;
- 	};
- 
--	reg_12p0v: regulator1 {
-+	reg_12p0v: regulator2 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "D12.0V";
- 		regulator-min-microvolt = <12000000>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a774c0.dtsi b/arch/arm64/boot/dts/renesas/r8a774c0.dtsi
+index 3970aafeee12..f2e390f7f1d5 100644
+--- a/arch/arm64/boot/dts/renesas/r8a774c0.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a774c0.dtsi
+@@ -941,6 +941,9 @@
+ 				 <&cpg CPG_CORE R8A774C0_CLK_S3D1C>,
+ 				 <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x13>, <&dmac1 0x12>,
++			       <&dmac2 0x13>, <&dmac2 0x12>;
++			dma-names = "tx", "rx", "tx", "rx";
+ 			power-domains = <&sysc R8A774C0_PD_ALWAYS_ON>;
+ 			resets = <&cpg 310>;
+ 			status = "disabled";
 -- 
 2.11.0
 
