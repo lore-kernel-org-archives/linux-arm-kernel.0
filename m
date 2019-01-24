@@ -2,85 +2,63 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A2C47C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 20:25:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ADF5AC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 20:48:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 53E44218B0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 20:25:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 77A7B218D3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 20:48:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="brouYnBU";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="GBVgzAGe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 53E44218B0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W9q8O6Im"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 77A7B218D3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=yj7/vriC9AdyZnezfAsdZhRHsHV0HvcsNCXNAOUPy5M=; b=brouYnBUVEkiWDI91oeWsAbnsS
-	lEYFzAmRh/r/gThPOfU5K1l/tUaj9C3s9X/5u8DnTzSDJyKRNkPo7JoSSxp2ZUa3d2n1Ai/HkARCl
-	FAfQHmeu0Vn/DpUYDeLUsUAtK6Rq664xyA5nwk8HDn755FIYOBwTxzKNmQsRLzNRj5F7wd63Xu38m
-	9l3M5QSBTLNtklE/ra6VdjDB+zt6H/KlC9Mc6BDVgbOErTiR+VurvUlCwXP7TdejI7jZe+VRNukG8
-	5fLqYiSLPAx/qrR+0WobTB6F2KRyBF67gGNgif/0IKOxN2bc30FI1N1Z+Jpf7u7ge57Qxb/t0rvk6
-	qdk0hWJA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
+	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=v2gWp1uUNxlO0odcu/oYmZgfadNg+UIL0nANr2jT39k=; b=W9q8O6ImAtpalQ
+	JChLJQzGsiIecYbxDOdH3YwGJfA1mbzyJ7KKOJjeRmH5bJrqmoQLb0rbqpCN2FvlmMd6FL1GEZ4fU
+	HLlUxslzv+gop1cm9IbIS01ildNLpxDKPdxzoD/3dOgI3rJcXVaP/9KO2BNrRzgTAnJYvQsqoZXK8
+	BCXnqRx/mk1Ydu/ToLh0HaiHRa7eCCIdpQIoUeqYe9teKnywqpdH9WPD7v7tgui2UdwjmyO7WzCnR
+	fFKIZK1YpPmkpa164f8kyqCJammUqRuVGijvTFvkF8jIuGrtavYd/ER66mFAUk/oIMEyFBnIc73im
+	1T5IpXZ86WDtpT0JkHyA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmlZ0-0007jv-0v; Thu, 24 Jan 2019 20:25:26 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
+	id 1gmlvX-0006EB-Ph; Thu, 24 Jan 2019 20:48:43 +0000
+Received: from smtp07.smtpout.orange.fr ([80.12.242.129]
+ helo=smtp.smtpout.orange.fr)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmlYF-0005rs-MX
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 20:24:46 +0000
-Received: by mail-pf1-x441.google.com with SMTP id i12so3556462pfo.7
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 24 Jan 2019 12:24:39 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=BJPwKdPemEfYMv75wEmswxneBbTlFKZrByoYlXp3bSs=;
- b=GBVgzAGeXK+Rhr1uP35wQOeRalFHWCi6YOovZ9EHhbjKLg4yxkKXqnqtApf0Y5S3H9
- b4H4CAPIayf6QvJmzrs55RsV5o8EGOhnulQipxJQbllKeAijXxj1I8a68SNWkSFK/gRT
- R8QtLPrvRqGYp6FmqxxigMenl9z2kGBksziag=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=BJPwKdPemEfYMv75wEmswxneBbTlFKZrByoYlXp3bSs=;
- b=ugXk+ZO/yHf+BNM2J4iNwDROC3ddwCVCX1BOnZeHMeNrA8y5Pgh6n96s9oRUlc1gs1
- ZShT8i22+Ap7rUpBeEE3rhJAdN8I0nZWIfskwMAebQDvX6tBl0/60JV/70PUaLKqLc1W
- +YX7yED+WubRBwVOkAN73y6poxGpJ5t863hHK8a0OBFdL9NvM0IBMgNzZUp8NZCWNKat
- lyaFyNsh0AlXua5mbn5Tep6Pa3/7fShlEIP4ZFXDO8ZVz9d+6kvlG9z7WGelvXxiWWjR
- ZBijS+GRaWroy09OjsnUs9HT9HHPMkbFHE2x+Io/QFoQ0Mb9eqAu9kXlb8IvkgL2dPXz
- BTAg==
-X-Gm-Message-State: AJcUukeNhbgYtNhpbV+UY4Jp07KPrOrhtpa67ppDXRoe984Fi83qBqJf
- tUvkzdjQOMnhX3kPDNKRu+chVw==
-X-Google-Smtp-Source: ALg8bN6A6yCdAMBKYtld1GZx43O5sg0gUviTrnslHfiYH9eOjxyBo3E/puHb2tby2efvI4cQdIGP+w==
-X-Received: by 2002:a63:6ac5:: with SMTP id f188mr7369721pgc.165.1548361478990; 
- Thu, 24 Jan 2019 12:24:38 -0800 (PST)
-Received: from localhost.localdomain ([2601:1c2:680:1319:4e72:b9ff:fe99:466a])
- by smtp.gmail.com with ESMTPSA id
- c72sm45263309pfb.107.2019.01.24.12.24.37
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Thu, 24 Jan 2019 12:24:38 -0800 (PST)
-From: John Stultz <john.stultz@linaro.org>
-To: lkml <linux-kernel@vger.kernel.org>
-Subject: [PATCH 7/8 v5] arm64: dts: hi3660: Add hisi asp dma device
-Date: Thu, 24 Jan 2019 12:24:22 -0800
-Message-Id: <1548361463-28372-8-git-send-email-john.stultz@linaro.org>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1548361463-28372-1-git-send-email-john.stultz@linaro.org>
-References: <1548361463-28372-1-git-send-email-john.stultz@linaro.org>
+ id 1gmlvT-0006Dj-0p
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 20:48:41 +0000
+Received: from belgarion ([86.206.19.74]) by mwinf5d65 with ME
+ id ULoa1z00F1btlZA03LobGZ; Thu, 24 Jan 2019 21:48:36 +0100
+X-ME-Helo: belgarion
+X-ME-Auth: amFyem1pay5yb2JlcnRAb3JhbmdlLmZy
+X-ME-Date: Thu, 24 Jan 2019 21:48:36 +0100
+X-ME-IP: 86.206.19.74
+From: Robert Jarzmik <robert.jarzmik@free.fr>
+To: Vladimir Zapolskiy <vz@mleia.com>
+Subject: Re: [PATCH] ARM: pxa: remove unused empty mach/pxa25x-udc.h file
+References: <20190124160222.13138-1-vz@mleia.com>
+X-URL: http://belgarath.falguerolles.org/
+Date: Thu, 24 Jan 2019 21:48:34 +0100
+In-Reply-To: <20190124160222.13138-1-vz@mleia.com> (Vladimir Zapolskiy's
+ message of "Thu, 24 Jan 2019 18:02:22 +0200")
+Message-ID: <87ef91wzml.fsf@belgarion.home>
+User-Agent: Gnus/5.130008 (Ma Gnus v0.8) Emacs/26 (gnu/linux)
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_122440_229785_29084097 
-X-CRM114-Status: GOOD (  14.10  )
+X-CRM114-CacheID: sfid-20190124_124839_433519_89EB4424 
+X-CRM114-Status: GOOD (  13.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,66 +70,29 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Youlin Wang <wwx575822@notesmail.huawei.com>, Ryan Grachek <ryan@edited.us>,
- Zhuangluan Su <suzhuangluan@hisilicon.com>,
- Tanglei Han <hantanglei@huawei.com>, Wei Xu <xuwei5@hisilicon.com>,
- Rob Herring <robh+dt@kernel.org>, John Stultz <john.stultz@linaro.org>,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: linux-arm-kernel@lists.infradead.org,
+ Haojian Zhuang <haojian.zhuang@gmail.com>, Daniel Mack <daniel@zonque.org>,
+ Russell King <linux@armlinux.org.uk>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Youlin Wang <wwx575822@notesmail.huawei.com>
+Vladimir Zapolskiy <vz@mleia.com> writes:
 
-Add asp-dma device to hi3660 dts
+> Commit c5418a0b98c1 ("usb: gadget: pxa25x_udc: move register definitions
+> from arch") removed inclusion of mach/pxa25x-udc.h from the PXA25x UDC
+> driver, the contents of the header file was also wiped out, however the
+> file itself hasn't been removed, now this change removes the unused empty
+> header file.
+>
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+Queued to pxa/for-next, thanks.
 
-Cc: Tanglei Han <hantanglei@huawei.com>
-Cc: Zhuangluan Su <suzhuangluan@hisilicon.com>
-Cc: Ryan Grachek <ryan@edited.us>
-Cc: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-Cc: Wei Xu <xuwei5@hisilicon.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: devicetree@vger.kernel.org
-Acked-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-Signed-off-by: Youlin Wang <wwx575822@notesmail.huawei.com>
-Signed-off-by: Tanglei Han <hantanglei@huawei.com>
-Signed-off-by: John Stultz <john.stultz@linaro.org>
----
-v2: Removed undocumented bindings
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Cheers.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 4c8d682..77a7135 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -567,6 +567,16 @@
- 			dma-type = "hi3660_dma";
- 		};
- 
-+		asp_dmac: dma-controller@e804b000 {
-+			compatible = "hisilicon,hisi-pcm-asp-dma-1.0";
-+			reg = <0x0 0xe804b000 0x0 0x1000>;
-+			#dma-cells = <1>;
-+			dma-channels = <16>;
-+			dma-requests = <32>;
-+			interrupts = <GIC_SPI 216 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "asp_dma_irq";
-+		};
-+
- 		rtc0: rtc@fff04000 {
- 			compatible = "arm,pl031", "arm,primecell";
- 			reg = <0x0 0Xfff04000 0x0 0x1000>;
 -- 
-2.7.4
-
+Robert
 
 _______________________________________________
 linux-arm-kernel mailing list
