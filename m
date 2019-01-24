@@ -2,63 +2,73 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1A629C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 17:01:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 07162C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 17:12:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DD678217D4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 17:01:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CB7F12184C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 17:12:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WnZU6fEt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DD678217D4
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nIN0dd7c";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="xX6lqGbw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB7F12184C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DU9GhWLM315hxUcaOlB/u5jJ7VkaremMMcFr3iKJpUg=; b=WnZU6fEtutxGCg
-	OLSIr3d5YkZT+eTObZEffytme+GoM9diDik+h04CCOBEXbvGC43XntLAB6z31ca0b5tpUuM2q7EKm
-	UMunqShQsZsh0C22LoaHOBG13thwwSUpoIX3WErbMz8PU1aNF+8u/IXrbpvmMFTZb7tka7OABthf6
-	DvUdxPHMcD3eVponmuSuNuy5TfnItsSeYt7i2Ug90+WefwjOFM//pd6TKJt+lZZhZW1oL0Zz+xD/w
-	08HWpe2QYXCo6GQ8CDOoLuTiQi/qIJVzHl8+Z2y6KFnN6xCQIZMZIa97wR7v4oAC3VcCDh729kTb6
-	Nw68E1Itxt15zbnZE63A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=KcrmwchcjQP2CVZOXutWmm2kw//L/vpmdGsqw68oKmw=; b=nIN0dd7cDmVqI43Ui9ZBwY/Bp
+	JyErJj6c8JWgKVDddcWD+4GQaJJsS2o0GONJM/Zhk5aXVGUvPJolCTZfY7VaThXriCuRk7/NW2kH/
+	+bzIQmIf2mzb3VafO3Sy7lrrmIhVe4pHp2b9TAcTEzv3kgB9rFp/fhkVAavvr00VgW9+3HF4t9irI
+	JISkqMsLQ6SlgWi+zUrwhAlHUFpOgLpdI/C/lfEnQpSUZfxLMlK3ZAKDQfZicJTIsRRb6FwH1GOnB
+	jfKsgP0EYZVU2EvcE9NEhUzhJ8GUl3VJDj8tob86YvlSIWc8Tx0Pphz3Dd7mOEfvH8SMP9r/pHGfV
+	Ue9aWyB4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmiNG-0003Qd-2m; Thu, 24 Jan 2019 17:01:06 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmiNB-0003Q8-Sf
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 17:01:03 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5C3621596;
- Thu, 24 Jan 2019 09:01:01 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6AE9E3F237;
- Thu, 24 Jan 2019 09:00:59 -0800 (PST)
-Date: Thu, 24 Jan 2019 17:00:56 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Baruch Siach <baruch@tkos.co.il>
-Subject: Re: [PATCH] Revert "PCI: armada8k: Add support for gpio controlled
- reset signal"
-Message-ID: <20190124170056.GE23362@e107981-ln.cambridge.arm.com>
-References: <2e0f1e9d250b6ee1b3039362affc411751a3cd4a.1547382494.git.baruch@tkos.co.il>
+	id 1gmiXv-0006XT-To; Thu, 24 Jan 2019 17:12:07 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmiXs-0006Wj-6H
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 17:12:05 +0000
+Received: from earth.universe (tmo-116-177.customers.d1-online.com
+ [80.187.116.177])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 3AD702184C;
+ Thu, 24 Jan 2019 17:12:03 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548349923;
+ bh=5P98kFxsApaMTMrQLVTD4P/w5ZamWC+rXZU8wbFbCbg=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=xX6lqGbwK1LWd8uQtipMyFEOJeigu/FgL/tLZ3r+To7i4tWDKnJESc0i7FyDBm99a
+ t/ruOe3k4BTF6SAA0Wpgj8+Qt3349fcWs0WVxVdiyvIqAbo5naF5/eBplGI/6t6Cjn
+ qNZpZfM2Sc37YiOdB07vYGioPe4c3NoxSlE8vva0=
+Received: by earth.universe (Postfix, from userid 1000)
+ id 400CA3C08DF; Thu, 24 Jan 2019 18:11:58 +0100 (CET)
+Date: Thu, 24 Jan 2019 18:11:58 +0100
+From: Sebastian Reichel <sre@kernel.org>
+To: Nicolas.Ferre@microchip.com
+Subject: Re: [PATCH 6/8] power: reset: at91-reset: add support for sam9x60 SoC
+Message-ID: <20190124171158.bi74cnxngsjcawwn@earth.universe>
+References: <cover.1547629763.git.nicolas.ferre@microchip.com>
+ <7e68a0298b8802edaead1f9c011f9c2e191ecf6a.1547629763.git.nicolas.ferre@microchip.com>
+ <20190123183443.ppxdfstmau2xtodi@earth.universe>
+ <a74956fc-6085-eec2-c1b8-ed116b2297d8@microchip.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <2e0f1e9d250b6ee1b3039362affc411751a3cd4a.1547382494.git.baruch@tkos.co.il>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+In-Reply-To: <a74956fc-6085-eec2-c1b8-ed116b2297d8@microchip.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_090101_938153_5689B486 
-X-CRM114-Status: GOOD (  17.67  )
+X-CRM114-CacheID: sfid-20190124_091204_270414_0328DA79 
+X-CRM114-Status: GOOD (  20.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,106 +80,121 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Sven Auhagen <sven.auhagen@voleatech.de>,
- Jason Cooper <jason@lakedaemon.net>, linux-pci@vger.kernel.org,
- Gregory Clement <gregory.clement@bootlin.com>,
- Russell King <linux@armlinux.org.uk>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Bjorn Helgaas <bhelgaas@google.com>, linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org, alexandre.belloni@bootlin.com,
+ linux-pm@vger.kernel.org, netdev@vger.kernel.org, linux-usb@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Ludovic.Desroches@microchip.com,
+ robh+dt@kernel.org, stern@rowland.harvard.edu, gregkh@linuxfoundation.org,
+ davem@davemloft.net, linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============8569034742079033561=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, Jan 13, 2019 at 02:28:14PM +0200, Baruch Siach wrote:
-> This reverts commit 3d71746c420c1c1c27cf5c4e48f8fa0a6cfdc185.
-> 
-> That commit breaks boot on Macchiatobin when a Mellanox NIC is in the
-> PCIe slot.
-> 
-> It turns out that full reset cycle requires first comphy serdes
-> initialization. Reset signal toggle without comphy initialization makes
-> access to PCI configuration registers stall indefinitely. U-Boot toggles
-> the Macchiatobin PCIe reset line already at boot, after initializing the
-> comphy serdes.
-> 
-> So while commit 3d71746c42 enables PCIe on platforms that U-Boot does
-> not (yet) touch the reset line (like Clearfog GT-8K), it breaks PCIe
-> (and boot) on the Macchiatobin.
-> 
-> Revert commit 3d71746c42 entirely for now to fix the Macchaitobin
-> regression. Proper PCIe reset support would require PCIe comphy setup
-> support. That must wait for another kernel release.
-> 
-> Reported-by: Sven Auhagen <sven.auhagen@voleatech.de>
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
->  drivers/pci/controller/dwc/pcie-armada8k.c | 16 ----------------
->  1 file changed, 16 deletions(-)
 
-Read:
+--===============8569034742079033561==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="3hmt5rtfj35e5bjm"
+Content-Disposition: inline
 
-https://lore.kernel.org/linux-pci/20171026223701.GA25649@bhelgaas-glaptop.roam.corp.google.com/
 
-reformat the patch, repost it and I will pick it up.
+--3hmt5rtfj35e5bjm
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Thanks,
-Lorenzo
+Hi,
 
-> diff --git a/drivers/pci/controller/dwc/pcie-armada8k.c b/drivers/pci/controller/dwc/pcie-armada8k.c
-> index b171b6bc15c8..0c389a30ef5d 100644
-> --- a/drivers/pci/controller/dwc/pcie-armada8k.c
-> +++ b/drivers/pci/controller/dwc/pcie-armada8k.c
-> @@ -22,7 +22,6 @@
->  #include <linux/resource.h>
->  #include <linux/of_pci.h>
->  #include <linux/of_irq.h>
-> -#include <linux/gpio/consumer.h>
->  
->  #include "pcie-designware.h"
->  
-> @@ -30,7 +29,6 @@ struct armada8k_pcie {
->  	struct dw_pcie *pci;
->  	struct clk *clk;
->  	struct clk *clk_reg;
-> -	struct gpio_desc *reset_gpio;
->  };
->  
->  #define PCIE_VENDOR_REGS_OFFSET		0x8000
-> @@ -139,12 +137,6 @@ static int armada8k_pcie_host_init(struct pcie_port *pp)
->  	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
->  	struct armada8k_pcie *pcie = to_armada8k_pcie(pci);
->  
-> -	if (pcie->reset_gpio) {
-> -		/* assert and then deassert the reset signal */
-> -		gpiod_set_value_cansleep(pcie->reset_gpio, 1);
-> -		msleep(100);
-> -		gpiod_set_value_cansleep(pcie->reset_gpio, 0);
-> -	}
->  	dw_pcie_setup_rc(pp);
->  	armada8k_pcie_establish_link(pcie);
->  
-> @@ -257,14 +249,6 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
->  		goto fail_clkreg;
->  	}
->  
-> -	/* Get reset gpio signal and hold asserted (logically high) */
-> -	pcie->reset_gpio = devm_gpiod_get_optional(dev, "reset",
-> -						   GPIOD_OUT_HIGH);
-> -	if (IS_ERR(pcie->reset_gpio)) {
-> -		ret = PTR_ERR(pcie->reset_gpio);
-> -		goto fail_clkreg;
-> -	}
-> -
->  	platform_set_drvdata(pdev, pcie);
->  
->  	ret = armada8k_add_pcie_port(pcie, pdev);
-> -- 
-> 2.20.1
-> 
+On Thu, Jan 24, 2019 at 10:34:50AM +0000, Nicolas.Ferre@microchip.com wrote:
+> Hi Sebastian,
+>=20
+> On 23/01/2019 at 19:34, Sebastian Reichel wrote:
+> > Hi,
+> >=20
+> > On Wed, Jan 16, 2019 at 10:57:42AM +0100, Nicolas Ferre wrote:
+> >> Add support for additional reset causes and the proper compatibility
+> >> string for sam9x60 SoC. The restart function is the same as the samx7.
+> >>
+> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> >> ---
+> >>   drivers/power/reset/at91-reset.c | 13 +++++++++++++
+> >>   1 file changed, 13 insertions(+)
+> >>
+> >> diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at=
+91-reset.c
+> >> index f44a9ffcc2ab..44ca983a49a1 100644
+> >> --- a/drivers/power/reset/at91-reset.c
+> >> +++ b/drivers/power/reset/at91-reset.c
+> >> @@ -44,6 +44,9 @@ enum reset_type {
+> >>   	RESET_TYPE_WATCHDOG	=3D 2,
+> >>   	RESET_TYPE_SOFTWARE	=3D 3,
+> >>   	RESET_TYPE_USER		=3D 4,
+> >> +	RESET_TYPE_CPU_FAIL	=3D 6,
+> >> +	RESET_TYPE_XTAL_FAIL	=3D 7,
+> >> +	RESET_TYPE_ULP2		=3D 8,
+> >=20
+> > what happened to 5? :)
+>=20
+> That a good question ;-)
+>=20
+> It's marked as "Reserved"... which opens up a whole new field of=20
+> speculation :-)
+
+Ok :)
+
+> [..]
+>=20
+> >>   	{ .compatible =3D "atmel,samx7-rstc", .data =3D samx7_restart },
+> >> +	{ .compatible =3D "microchip,sam9x60-rstc", .data =3D samx7_restart =
+},
+> >>   	{ /* sentinel */ }
+> >>   };
+> >>   MODULE_DEVICE_TABLE(of, at91_reset_of_match);
+> >=20
+> > Patch looks fine to me. But I will wait a bit with merging, so that
+> > Alexandre or Ludovic have a chance to provide feedback.
+>=20
+> What about merging this patch with the whole series through the at91=20
+> then arm-soc trees?
+
+It seems to be possible to merge this standalone, but merging
+through at91/arm-soc is also fine with me.
+
+Acked-by: Sebastian Reichel <sebastian.reichel@collabora.com>
+
+-- Sebastian
+
+--3hmt5rtfj35e5bjm
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEE72YNB0Y/i3JqeVQT2O7X88g7+poFAlxJ8d4ACgkQ2O7X88g7
++prYRw//eRpCrw2o9rSRDF1wuaqVT8k3sgEoM3G9V+hWk243agZ5b+ahgAG70hrw
+I9eV6psmHguTnxDgmCowpaKc0r+Ep/g3wOSOJCD7Qnp9dtlyVJyPPUYfaIULKasN
+MlAJp7zHydM+7o7H9hHpVDmq+X7LLX6ZXye5hbCOFjzFwfq3CAehZknRHPnOTMtZ
+Mym/E+sqKemS49cBUyGxK+WDe2zQ/ZjTldaVvJ72zzwJTCqSevPZHs687uNYa0YE
+K7fH1y3AtO6IDQC63nL/aZd2z/r00/2/7u9QdkgdAHI35+LtKfscyuUUxE64AERB
+XXAvksjAYbEsIyMcxsFSDTrGzqg6PVxSTbXgGt08vosBaOTOhSCmxbb3THvWHWmG
+uZBTHr6TSyDdti/epp0+PYocWcn5CxY2HhwqJIxFYO75o8K3jFtYefuRP8KgTccX
+uiSwxWovPWj8cs3m5o87QL1kVAtsCn+Rib5pyZf8vdbmun4B3Rb01iCS1aam03oH
+jvb0PQedQ/PpO5RsBOZtxihWeXhVjDPzTp4JAc8e8TAaeVVwCvCDQOW2Kcy2q9IU
+fjEbQE0tFSUE6JcWriI1ZEszCLOWUdbxXv/eaxMjmAwALGYHv54WJQUMo1rlMRsu
+1UMuorDWmoN6PBTMmmJR4+yWI9VSAdO8TTApCYTafu/byJh/pig=
+=OZfk
+-----END PGP SIGNATURE-----
+
+--3hmt5rtfj35e5bjm--
+
+
+--===============8569034742079033561==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============8569034742079033561==--
+
