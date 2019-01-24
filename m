@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 55C41C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:18:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 35A72C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:18:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E43AD2184C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:18:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D916F2184C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:18:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H4AOjLt1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="i8pTutJr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E43AD2184C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XXmYXtnt";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="Cy6Oglcq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D916F2184C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,41 +27,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=uG9KVcFMH5qpwnDgWrw7cxKcOqdg2ggwyKhsvZ+NlkU=; b=H4AOjLt1cB5cyjJPOwNmXVv/vX
-	K86GNS3jLCDb61GidUwefxpWyiz4KHRdMJNrSnRqTeD2hcm320mgeCjG/ec1CLK+Q8I62u117dXBH
-	1HTTFud4axku809ELK0nJBabgDCZn29HmmUOlUYMSZRP+xPXnIm2kgrdmLik+1QxvpJKpn0D7KV/V
-	Epj561q/jBuMlTCC5a9Nvsmw3VflpWh6YbthadGYnAAG7YS10KT8WaqfQthwEuSpKW7K5RJV55j6e
-	ng75SBcgYMex4NuCZM4auEm7syAqRbDU1bYovY0F2XC5uvpodfCT2Dzx5wiTsO+O866Wkp4winJZ6
-	LNHoHV4Q==;
+	bh=wxvcomVOZqmdJxkSy0wrquOiiatJDn2y0N4rCycRvDo=; b=XXmYXtntXaMtkKnRy0k9B/mXTG
+	14x2tXbntu4p6+Hv8ktzZM47HZ0OYsjq0p0EADLNx0XAOZimQaQxqsj/VIjgpFTeGLzv7s2SsMXI/
+	TcoV/ZUHCoPT8GQIXprDwaW1XJlZSRUGh5/diCbA01pcir4wABS6FVhgjp0RyEDiPtWCl98trwejs
+	YsaFl3NnNd1pZ0yl9z0YF8dfpPHvLxsRY3QB5IgZW77Lke6ibD8pNqKXLyqkflgAUiG3Qc1JF+FSA
+	6XTtCRmfS0GXCCDGHjeEJc2VQN+96Os5eDlv4KfWFiLVfV3Wd+fRxQDPAfniEUqxauu9UlbGHItJm
+	PkWJ4YiQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmgld-0006h0-0Q; Thu, 24 Jan 2019 15:18:09 +0000
+	id 1gmglt-0006zC-UU; Thu, 24 Jan 2019 15:18:25 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmgj4-0001GQ-OA
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 15:15:32 +0000
+ id 1gmgjB-0001GQ-8s
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 15:15:38 +0000
 Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 80C6C25BEEA;
+ by kirsty.vergenet.net (Postfix) with ESMTPA id AF23B25BEEE;
  Fri, 25 Jan 2019 02:12:43 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1548342763; bh=jvF0TE2dd/HGYvZjWLnKsi/ZfzWr52vYE/F6TVGeIPo=;
+ t=1548342764; bh=cdMWnTH9TSANg/vwMmHL8W3ZMOYD56AJpDA+GJ7/TAM=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=i8pTutJr5WpObnOCO90AiFIdR+09oz8LBOT317y17R3C2DOsEo80YHAWEQfcauJBn
- H19Hhy304X67FmeLk91ksXQRHzQFgDkVFY5e0e5wRp/5efjPduymHPR7gjnzB1BWPJ
- G8+gzROggDDPP4Z6G9VVwvtMafFW8HdoIWlfe8Xc=
+ b=Cy6OglcqLA1GhX19pqcCwt6NzqkJRpFfhF4U6wdGTCx5MqEQkhTuo7tyJ2KXFOQ8I
+ bAu+R7ANxa2HzimFlRykalqj0vWkqOu1307Dnmf+EqFW/1y+7/RWcfELnpxuzcAtx8
+ 2VXfgeKZbkTPLSKfUVaWgLT/Byzx5SlkMKQTAPLI=
 Received: by reginn.horms.nl (Postfix, from userid 7100)
- id B815A940AC0; Thu, 24 Jan 2019 16:12:39 +0100 (CET)
+ id E046A940BB2; Thu, 24 Jan 2019 16:12:39 +0100 (CET)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 10/44] arm64: dts: renesas: r8a774c0: Add Ethernet AVB node
-Date: Thu, 24 Jan 2019 16:12:04 +0100
-Message-Id: <2f71109eef53e3396510afb724358be91e2eb5c9.1548233325.git.horms+renesas@verge.net.au>
+Subject: [PATCH 13/44] arm64: dts: renesas: r8a774c0: Add SDHI nodes
+Date: Thu, 24 Jan 2019 16:12:07 +0100
+Message-Id: <77223211f44db5b35541f4cc1fe48cdee21a85b2.1548233325.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1548233325.git.horms+renesas@verge.net.au>
 References: <cover.1548233325.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_071531_069021_CCE06157 
-X-CRM114-Status: GOOD (  10.26  )
+X-CRM114-CacheID: sfid-20190124_071537_454286_4A6D7526 
+X-CRM114-Status: GOOD (  10.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,72 +84,62 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-This patch adds the SoC specific part of the Ethernet AVB
-device tree node.
+Add SDHI nodes to the DT of the r8a774c0 SoC.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a774c0.dtsi | 45 +++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a774c0.dtsi | 36 +++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a774c0.dtsi b/arch/arm64/boot/dts/renesas/r8a774c0.dtsi
-index f09a240acb15..ea405289bcf5 100644
+index 83db7c740481..96a71e3f9fe4 100644
 --- a/arch/arm64/boot/dts/renesas/r8a774c0.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a774c0.dtsi
-@@ -442,6 +442,51 @@
- 			dma-channels = <16>;
+@@ -603,6 +603,42 @@
+ 			status = "disabled";
  		};
  
-+		avb: ethernet@e6800000 {
-+			compatible = "renesas,etheravb-r8a774c0",
-+				     "renesas,etheravb-rcar-gen3";
-+			reg = <0 0xe6800000 0 0x800>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "ch0", "ch1", "ch2", "ch3",
-+					  "ch4", "ch5", "ch6", "ch7",
-+					  "ch8", "ch9", "ch10", "ch11",
-+					  "ch12", "ch13", "ch14", "ch15",
-+					  "ch16", "ch17", "ch18", "ch19",
-+					  "ch20", "ch21", "ch22", "ch23",
-+					  "ch24";
-+			clocks = <&cpg CPG_MOD 812>;
++		sdhi0: sd@ee100000 {
++			compatible = "renesas,sdhi-r8a774c0",
++				     "renesas,rcar-gen3-sdhi";
++			reg = <0 0xee100000 0 0x2000>;
++			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 314>;
++			max-frequency = <200000000>;
 +			power-domains = <&sysc R8A774C0_PD_ALWAYS_ON>;
-+			resets = <&cpg 812>;
-+			phy-mode = "rgmii";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++			resets = <&cpg 314>;
 +			status = "disabled";
 +		};
 +
- 		scif0: serial@e6e60000 {
- 			compatible = "renesas,scif-r8a774c0",
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
++		sdhi1: sd@ee120000 {
++			compatible = "renesas,sdhi-r8a774c0",
++				     "renesas,rcar-gen3-sdhi";
++			reg = <0 0xee120000 0 0x2000>;
++			interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 313>;
++			max-frequency = <200000000>;
++			power-domains = <&sysc R8A774C0_PD_ALWAYS_ON>;
++			resets = <&cpg 313>;
++			status = "disabled";
++		};
++
++		sdhi3: sd@ee160000 {
++			compatible = "renesas,sdhi-r8a774c0",
++				     "renesas,rcar-gen3-sdhi";
++			reg = <0 0xee160000 0 0x2000>;
++			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 311>;
++			max-frequency = <200000000>;
++			power-domains = <&sysc R8A774C0_PD_ALWAYS_ON>;
++			resets = <&cpg 311>;
++			status = "disabled";
++		};
++
+ 		gic: interrupt-controller@f1010000 {
+ 			compatible = "arm,gic-400";
+ 			#interrupt-cells = <3>;
 -- 
 2.11.0
 
