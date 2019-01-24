@@ -4,81 +4,61 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 84DF7C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:16:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 49FBBC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:18:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4409021872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:16:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1A89521872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:18:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Af2iZ432";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="Ygoi/SBT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4409021872
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q5Nna+Vf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1A89521872
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=nxR3f7Q7dBYapJfniZJfQPUQplbG/h88smj0e0IL0qs=; b=Af2iZ4329Xh1BF
-	vWaqcS2sxbWRyR9trCAmvOteM2s0CamZfqBxgsNq2hnyQaD7vy9wiDYPoE3VxYv/gS5pXatmmZeNm
-	kGlApwH9ki3h7r/Wl/Uq1u0A0YsC6VSr6dFWhQsmltTKU1pmq8TAY5YFv4uUC600LS7CZensEuYjt
-	0XA00IgXvITk45sSQ8+YQMQkzoDM+jwuiJWwS3zQKpKiNThsCECQ5jrp8KQ/q33xucDVI1jTw9CwV
-	0cw0ZqpU0J1/kCOy/AEAPguZ2sKYRj7TUcWC0nR7bsElge38w9vxNI7ZgCOtBti5EhC3pvTQLrFgS
-	ZnM09CmXuobOAT+n8TKA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=zy+/ZIfNS/65Iw9CJTf27OWPq1vPzzcaEDjDWqHrRhs=; b=q5Nna+VfV+foEOsENFhzMXtfC
+	F2mb77s6B3STZUyQ2NlpZ2sFyPJ8Gac80UQaDciNXk7zHsEhTWJc9GBPdNY+cIOjIiDvwjhyODZJW
+	AMwXsxnfxSCmzvMBOs3lmoFUWg9m9v4lsxLbv4+Jtf9lEbzUTuXYGe5LtPSIKDUG5WID2rLiThq1s
+	26Z58n12tsmqd0NUTRGomJddeP5uV7njcNq7vDxHaEH9HklUGjoLfscJ28bFQiz5eRlT2fGIumAGN
+	FGhnedR8AVHGnUBtQLI2hWwNgr2WglLq/HVvugcQRkfvl3RFLLZJDXq6GtiJlSmBxjxwjPvt4lPLT
+	LpGIzfPCw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmczb-0004BY-6y; Thu, 24 Jan 2019 11:16:19 +0000
-Received: from hqemgate16.nvidia.com ([216.228.121.65])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmczX-0004BC-W1
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 11:16:17 +0000
-Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c499e5b0000>; Thu, 24 Jan 2019 03:15:39 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate102.nvidia.com (PGP Universal service);
- Thu, 24 Jan 2019 03:16:15 -0800
-X-PGP-Universal: processed;
- by hqpgpgate102.nvidia.com on Thu, 24 Jan 2019 03:16:15 -0800
-Received: from [10.21.132.148] (172.20.13.39) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 24 Jan
- 2019 11:16:14 +0000
-Subject: Re: [PATCH 3/6] arm64: dts: tegra210: fix timer node
-To: Joseph Lo <josephl@nvidia.com>, Thierry Reding <thierry.reding@gmail.com>
-References: <20190107032810.13522-1-josephl@nvidia.com>
- <20190107032810.13522-4-josephl@nvidia.com>
-From: Jon Hunter <jonathanh@nvidia.com>
-Message-ID: <867b5168-e3cb-6423-b3d2-c075d1701c88@nvidia.com>
-Date: Thu, 24 Jan 2019 11:16:12 +0000
+	id 1gmd25-0004YE-TL; Thu, 24 Jan 2019 11:18:53 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmd21-0004Wt-GO
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 11:18:51 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2C56F1596;
+ Thu, 24 Jan 2019 03:18:46 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5CFE63F237;
+ Thu, 24 Jan 2019 03:18:44 -0800 (PST)
+Subject: Re: [PATCH] arm64: dts: hikey: Revert "Enable HS200 mode on eMMC"
+To: John Stultz <john.stultz@linaro.org>, lkml <linux-kernel@vger.kernel.org>
+References: <1548273966-5889-1-git-send-email-john.stultz@linaro.org>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <107a6e2e-ddd8-cbc1-5680-1b5899665327@arm.com>
+Date: Thu, 24 Jan 2019 11:18:42 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20190107032810.13522-4-josephl@nvidia.com>
-X-Originating-IP: [172.20.13.39]
-X-ClientProxiedBy: HQMAIL107.nvidia.com (172.20.187.13) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1548328540; bh=wukT3fhtTy6AxJ1st3q4P4uDJj4L5i4e8TiPulGOpKU=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=Ygoi/SBTgrGXtzLeHJxC9BCg1szcy9VnhdctXAj12VBAb+zZ9tX5EOtzEHivRkgLa
- 2IpxO5Kta8XnQz9kFvcJNbZ00+IVU2CCiSAntywlj4OlVV49QBlRhjDlj3dhD+idr0
- /3iA6GOY5m02AwEqOyrKcVSNEfe8LEHqP+nDOQ4Cy0NddqEnz0AQsEeny2QSlrHpAc
- Vf8nyLHkxtX6kkfnW7jyl+H22QZ1OSdHPYCc1qKBVE0NtE2DWGz19kKbfq3f8+7csl
- wkKhuqnHGN67vcY7fYoZCtw3OOSamYrV3lBN8v8y2eoeCZG+iv6fvMloyWnMEV0UYw
- rVrzPaj7/6s9A==
+In-Reply-To: <1548273966-5889-1-git-send-email-john.stultz@linaro.org>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_031616_042588_8718427B 
-X-CRM114-Status: GOOD (  13.72  )
+X-CRM114-CacheID: sfid-20190124_031849_545953_E0B0783F 
+X-CRM114-Status: GOOD (  19.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,62 +70,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Ryan Grachek <ryan@edited.us>, Alistair Strachan <astrachan@google.com>,
+ Wei Xu <xuwei5@hisilicon.com>, Rob Herring <robh+dt@kernel.org>,
+ "stable #4 . 17+" <stable@vger.kernel.org>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi John,
 
-On 07/01/2019 03:28, Joseph Lo wrote:
-> Fix timer node to make it work with Tegra210 timer driver. And backward
-> compatible with the Tegra watchdog driver.
+On 23/01/2019 20:06, John Stultz wrote:
+> From: Alistair Strachan <astrachan@google.com>
 > 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> This reverts commit abd7d0972a192ee653efc7b151a6af69db58f2bb. This
+> change was already partially reverted by John Stultz in commit
+> 9c6d26df1fae ("arm64: dts: hikey: Fix eMMC corruption regression").
+> 
+> This change appears to cause controller resets and block read failures
+> which prevents successful booting on some hikey boards.
+
+FWIW, you might want to have a play with the pinctrl settings - I've 
+seen various flakiness with HS200 eMMCs on Rockchip boards which could 
+be solved by bumping up the drive strength.
+
+Robin.
+
+> Cc: Ryan Grachek <ryan@edited.us>
+> Cc: Wei Xu <xuwei5@hisilicon.com>
+> Cc: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: linux-arm-kernel@lists.infradead.org
+> Cc: devicetree@vger.kernel.org
+> Cc: stable <stable@vger.kernel.org> #4.17+
+> Signed-off-by: Alistair Strachan <astrachan@google.com>
+> Signed-off-by: John Stultz <john.stultz@linaro.org>
 > ---
->  arch/arm64/boot/dts/nvidia/tegra210.dtsi | 12 +++++-------
->  1 file changed, 5 insertions(+), 7 deletions(-)
+>   arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 1 -
+>   1 file changed, 1 deletion(-)
 > 
-> diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-> index b5858b5ea052..143bd103c923 100644
-> --- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-> +++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-> @@ -384,14 +384,12 @@
->  	};
->  
->  	timer@60005000 {
-> -		compatible = "nvidia,tegra210-timer", "nvidia,tegra20-timer";
-> +		compatible = "nvidia,tegra210-timer", "nvidia,tegra30-timer";
->  		reg = <0x0 0x60005000 0x0 0x400>;
-> -		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>;
->  		clocks = <&tegra_car TEGRA210_CLK_TIMER>;
->  		clock-names = "timer";
->  	};
-
-Hmmm ... I can't say I understand this. So now the timer devices are
-compatible with two different drivers?
-
-Begs the question why did we not just extend the existing tegra20-timer
-rather than adding a new one?
-
-Also you did not explain why we make them compatible with the watchdog
-driver? We have other watchdogs timer and so why do we need to make them
-compatible?
-
-Cheers
-Jon
-
--- 
-nvpublic
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> index 6102350..7092460 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> @@ -300,7 +300,6 @@
+>   
+>   		dwmmc_0: dwmmc0@f723d000 {
+>   			cap-mmc-highspeed;
+> -			mmc-hs200-1_8v;
+>   			non-removable;
+>   			bus-width = <0x8>;
+>   			vmmc-supply = <&ldo19>;
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
