@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DC642C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 14:02:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 455F5C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 14:02:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A1F2E21855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 14:02:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1174821855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 14:02:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gHSsv0cy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A1F2E21855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EyvwfgDp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1174821855
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,38 +26,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=uDisa9MxBKX1pSnOUjinhZw+Qcgz1kLwX2XOJWahFTA=; b=gHSsv0cyoCFWrnsWSLOlM49J5J
-	Ro7USreJYnWERgQRhyGRojlxsxLJ050EnrWeh6ocwGAimABwGIhm1chnTqm95Z8pWDhjT5pksfAvK
-	QIzTncTe/iPjt+WecLVv0budgM/QvikHsJEU+dd5wLugIgw4sV9X+HOFf6agPV/ngddUfcz7YEjdg
-	OKHq38wIvnTKIK10UaRjyeeEz+gtuduC8tCsv+hQS6XtiGfEjiOYFGKPvhfaoafadfdFfC/d/hfXE
-	H7FnyyHFY9DLqZ/uxpq57AG8QaM+BxMWJsrIGvuityj1zWR/gjRjA0UpqzUjhr2U3+uIfEOHHoTdt
-	laJHhqCQ==;
+	bh=bDMZpz/5GxgGRVfghU2SHJWlX0KKAepLEuov8bGUSVE=; b=EyvwfgDpTEYCJ/GGj+FBxNNbEJ
+	dK8NBqGkM1De4NkDHOgczrO+WsBrjWgS00hSnfUQQtCy7udblKbbUrrkasw5eIwieCo/kioqoRtdo
+	qCdUlVB5CmqLxVQMNXnAcXfjgQMWd0nX/BPjvCq1SMDZr0ajG2306qu5GPj8QtsyYFjQ5hj3nz/K1
+	2fbLtJDs3/731F+H692vQ+ldTXvdfu/lM/eLiRpDi77AOglrZltLgwJRK1ODJJA3DKQxFVHPcP+Rr
+	LDkYn7VsJIxi3PyjrRqOLfpkc5wVokFmBPSxBYu9wKwfRZ9PXLmJbewx6zZCqZtmoYHOa5rjChljD
+	/nXTE/0g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmfaa-0004S6-1W; Thu, 24 Jan 2019 14:02:40 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gmfal-0004eb-K6; Thu, 24 Jan 2019 14:02:51 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmfYr-000325-PR
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 14:00:58 +0000
+ id 1gmfYq-0002zZ-58
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 14:00:59 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 530581596;
- Thu, 24 Jan 2019 06:00:53 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7AF611650;
+ Thu, 24 Jan 2019 06:00:48 -0800 (PST)
 Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E15B73F5C1;
- Thu, 24 Jan 2019 06:00:52 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E0C8C3F5C1;
+ Thu, 24 Jan 2019 06:00:47 -0800 (PST)
 From: Christoffer Dall <christoffer.dall@arm.com>
 To: kvmarm@lists.cs.columbia.edu,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 07/14] KVM: arm/arm64: Simplify bg_timer programming
-Date: Thu, 24 Jan 2019 15:00:25 +0100
-Message-Id: <20190124140032.8588-8-christoffer.dall@arm.com>
+Subject: [PATCH 05/14] arm/arm64: KVM: Statically configure the host's view of
+ MPIDR
+Date: Thu, 24 Jan 2019 15:00:23 +0100
+Message-Id: <20190124140032.8588-6-christoffer.dall@arm.com>
 X-Mailer: git-send-email 2.18.0
 In-Reply-To: <20190124140032.8588-1-christoffer.dall@arm.com>
 References: <20190124140032.8588-1-christoffer.dall@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_060054_236140_7C076EB6 
-X-CRM114-Status: GOOD (  15.89  )
+X-CRM114-CacheID: sfid-20190124_060052_788871_A456DD8B 
+X-CRM114-Status: GOOD (  14.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,152 +69,124 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>, kvm@vger.kernel.org
+Cc: Marc Zyngier <marc.zyngier@arm.com>, kvm@vger.kernel.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Instead of calling into kvm_timer_[un]schedule from the main kvm
-blocking path, test if the VCPU is on the wait queue from the load/put
-path and perform the background timer setup/cancel in this path.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-This has the distinct advantage that we no longer race between load/put
-and schedule/unschedule and programming and canceling of the bg_timer
-always happens when the timer state is not loaded.
+We currently eagerly save/restore MPIDR. It turns out to be
+slightly pointless:
+- On the host, this value is known as soon as we're scheduled on a
+  physical CPU
+- In the guest, this value cannot change, as it is set by KVM
+  (and this is a read-only register)
 
-Note that we must now remove the checks in kvm_timer_blocking that do
-not schedule a background timer if one of the timers can fire, because
-we no longer have a guarantee that kvm_vcpu_check_block() will be called
-before kvm_timer_blocking.
+The result of the above is that we can perfectly avoid the eager
+saving of MPIDR_EL1, and only keep the restore. We just have
+to setup the host contexts appropriately at boot time.
 
-Reported-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
- include/kvm/arm_arch_timer.h |  3 ---
- virt/kvm/arm/arch_timer.c    | 35 ++++++++++++++---------------------
- virt/kvm/arm/arm.c           |  2 --
- 3 files changed, 14 insertions(+), 26 deletions(-)
+ arch/arm/include/asm/kvm_host.h   | 8 ++++++++
+ arch/arm/kvm/hyp/cp15-sr.c        | 1 -
+ arch/arm64/include/asm/kvm_host.h | 8 ++++++++
+ arch/arm64/kvm/hyp/sysreg-sr.c    | 1 -
+ virt/kvm/arm/arm.c                | 1 +
+ 5 files changed, 17 insertions(+), 2 deletions(-)
 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 33771352dcd6..d6e6a45d1d24 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -76,9 +76,6 @@ int kvm_arm_timer_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 4b6193f2f0f6..43e343e00fb8 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -26,6 +26,7 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmio.h>
+ #include <asm/fpstate.h>
++#include <asm/smp_plat.h>
+ #include <kvm/arm_arch_timer.h>
  
- bool kvm_timer_is_pending(struct kvm_vcpu *vcpu);
+ #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+@@ -147,6 +148,13 @@ struct kvm_cpu_context {
  
--void kvm_timer_schedule(struct kvm_vcpu *vcpu);
--void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
--
- u64 kvm_phys_timer_read(void);
+ typedef struct kvm_cpu_context kvm_cpu_context_t;
  
- void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index b07ac4614e1c..4986028d9829 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -349,22 +349,12 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
-  * thread is removed from its waitqueue and made runnable when there's a timer
-  * interrupt to handle.
-  */
--void kvm_timer_schedule(struct kvm_vcpu *vcpu)
-+static void kvm_timer_blocking(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
- 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
- 
--	vtimer_save_state(vcpu);
--
--	/*
--	 * No need to schedule a background timer if any guest timer has
--	 * already expired, because kvm_vcpu_block will return before putting
--	 * the thread to sleep.
--	 */
--	if (kvm_timer_should_fire(vtimer) || kvm_timer_should_fire(ptimer))
--		return;
--
- 	/*
- 	 * If both timers are not capable of raising interrupts (disabled or
- 	 * masked), then there's no more work for us to do.
-@@ -373,12 +363,19 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
- 		return;
- 
- 	/*
--	 * The guest timers have not yet expired, schedule a background timer.
-+	 * At least one guest time will expire. Schedule a background timer.
- 	 * Set the earliest expiration time among the guest timers.
- 	 */
- 	soft_timer_start(&timer->bg_timer, kvm_timer_earliest_exp(vcpu));
- }
- 
-+static void kvm_timer_unblocking(struct kvm_vcpu *vcpu)
++static inline void kvm_init_host_cpu_context(kvm_cpu_context_t *cpu_ctxt,
++					     int cpu)
 +{
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+
-+	soft_timer_cancel(&timer->bg_timer);
++	/* The host's MPIDR is immutable, so let's set it up at boot time */
++	cpu_ctxt->cp15[c0_MPIDR] = cpu_logical_map(cpu);
 +}
 +
- static void vtimer_restore_state(struct kvm_vcpu *vcpu)
+ struct kvm_vcpu_arch {
+ 	struct kvm_cpu_context ctxt;
+ 
+diff --git a/arch/arm/kvm/hyp/cp15-sr.c b/arch/arm/kvm/hyp/cp15-sr.c
+index c4782812714c..8bf895ec6e04 100644
+--- a/arch/arm/kvm/hyp/cp15-sr.c
++++ b/arch/arm/kvm/hyp/cp15-sr.c
+@@ -27,7 +27,6 @@ static u64 *cp15_64(struct kvm_cpu_context *ctxt, int idx)
+ 
+ void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
  {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-@@ -401,15 +398,6 @@ static void vtimer_restore_state(struct kvm_vcpu *vcpu)
- 	local_irq_restore(flags);
- }
+-	ctxt->cp15[c0_MPIDR]		= read_sysreg(VMPIDR);
+ 	ctxt->cp15[c0_CSSELR]		= read_sysreg(CSSELR);
+ 	ctxt->cp15[c1_SCTLR]		= read_sysreg(SCTLR);
+ 	ctxt->cp15[c1_CPACR]		= read_sysreg(CPACR);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 8b7702bdb219..f497bb31031f 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -30,6 +30,7 @@
+ #include <asm/kvm.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmio.h>
++#include <asm/smp_plat.h>
+ #include <asm/thread_info.h>
  
--void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
--{
--	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
--
--	vtimer_restore_state(vcpu);
--
--	soft_timer_cancel(&timer->bg_timer);
--}
--
- static void set_cntvoff(u64 cntvoff)
+ #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+@@ -418,6 +419,13 @@ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+ 
+ DECLARE_PER_CPU(kvm_cpu_context_t, kvm_host_cpu_state);
+ 
++static inline void kvm_init_host_cpu_context(kvm_cpu_context_t *cpu_ctxt,
++					     int cpu)
++{
++	/* The host's MPIDR is immutable, so let's set it up at boot time */
++	cpu_ctxt->sys_regs[MPIDR_EL1] = cpu_logical_map(cpu);
++}
++
+ void __kvm_enable_ssbs(void);
+ 
+ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index 68d6f7c3b237..2498f86defcb 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -52,7 +52,6 @@ static void __hyp_text __sysreg_save_user_state(struct kvm_cpu_context *ctxt)
+ 
+ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
  {
- 	u32 low = lower_32_bits(cntvoff);
-@@ -485,6 +473,8 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
- 	/* Set the background timer for the physical timer emulation. */
- 	phys_timer_emulate(vcpu);
- 
-+	kvm_timer_unblocking(vcpu);
-+
- 	/* If the timer fired while we weren't running, inject it now */
- 	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
- 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
-@@ -527,6 +517,9 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
- 	 */
- 	soft_timer_cancel(&timer->phys_timer);
- 
-+	if (swait_active(kvm_arch_vcpu_wq(vcpu)))
-+		kvm_timer_blocking(vcpu);
-+
- 	/*
- 	 * The kernel may decide to run userspace after calling vcpu_put, so
- 	 * we reset cntvoff to 0 to ensure a consistent read between user
+-	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
+ 	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
+ 	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg_el1(sctlr);
+ 	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
 diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index b77db673bb03..9fbdb9e1c51f 100644
+index 4d55f98f97f7..3dd240ea9e76 100644
 --- a/virt/kvm/arm/arm.c
 +++ b/virt/kvm/arm/arm.c
-@@ -335,13 +335,11 @@ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
+@@ -1561,6 +1561,7 @@ static int init_hyp_mode(void)
+ 		kvm_cpu_context_t *cpu_ctxt;
  
- void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
- {
--	kvm_timer_schedule(vcpu);
- 	kvm_vgic_v4_enable_doorbell(vcpu);
- }
+ 		cpu_ctxt = per_cpu_ptr(&kvm_host_cpu_state, cpu);
++		kvm_init_host_cpu_context(cpu_ctxt, cpu);
+ 		err = create_hyp_mappings(cpu_ctxt, cpu_ctxt + 1, PAGE_HYP);
  
- void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu)
- {
--	kvm_timer_unschedule(vcpu);
- 	kvm_vgic_v4_disable_doorbell(vcpu);
- }
- 
+ 		if (err) {
 -- 
 2.18.0
 
