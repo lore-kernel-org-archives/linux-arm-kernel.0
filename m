@@ -2,81 +2,128 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6E5CDC282C5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:28:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CF030C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:37:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3A43020854
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:28:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 98266217D4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:37:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qsUdtVIY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ULcNqx3/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3A43020854
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p722Sd5R";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amdcloud.onmicrosoft.com header.i=@amdcloud.onmicrosoft.com header.b="i5Br2AVX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 98266217D4
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amd.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qg2yb7iHFzTpHskIsI/aovl+H1Ova/vKfRDV9bmhWDI=; b=qsUdtVIYHKIKlr
-	eqdmzeWVihf9/1UEV7xWKbwImTV3pbFlN0eGsdHmeAmF0fMv1S/eQ2c81FqD6/PJgr0RUkkzovbGP
-	/RK747uUgbMAMziYwz5RhgAtu47eUpFF5Db3kTn9Ur/XwvnI21NOUAPyqdNM109DsDdEEGlzPud9L
-	KBp5rL97bPdcHRpejYlKEACi8V2noQ57NQsvdaW8xqcDPciPuh09oWgpJuIu+jE2tXKTm686i+JYc
-	i2xOCGFyu6pvzfswcbIlqSgPP5DgYaAd7GUzghM5BYvxOPoHnjKORVqfgLVmT8Eeh1i6cQHVbVLle
-	JrmHyMSp5IAZtDjdkXhw==;
+	List-Owner; bh=3I9wN0l5pmcQqgYsNEj7czLN71qWvxbl8TwfPRwcMfc=; b=p722Sd5Rvs5/8t
+	rFOLCTr2zn61gYB0f2hMwkYYiN43tVtZ+mW+GZ4VgCfwGfMCv1Injl6MTWeQldiHUalSxrhmGIcNC
+	W8O5ghX99sGv/o8Wb08Kt3qNpJDuUGW2WZ7xIV91hjEeYV+cZYd4vWG0iHbUeXmnyIluTuGoJZUx1
+	cHiQs7ZMOdynctYHkP2XN9USUiuwU9MUyviPGQKNSblHSOB1QxBlGluonXvQ3UYKIJEqDr0dvORQl
+	QWH6RmwCvqNYpzDVnX3Ib1jZcO18A2bfbNgCrOw/yrRvqPMg14Y15/Syzy0FWCy7SusQbAnIIa+to
+	5zzR1KbW1xCmrlSKTkfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmdBi-0002Fq-L6; Thu, 24 Jan 2019 11:28:50 +0000
-Received: from mail-ua1-x944.google.com ([2607:f8b0:4864:20::944])
+	id 1gmdKI-0005Bk-7r; Thu, 24 Jan 2019 11:37:42 +0000
+Received: from mail-bl2nam02on0620.outbound.protection.outlook.com
+ ([2a01:111:f400:fe46::620]
+ helo=NAM02-BL2-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmdBe-0002FT-Ot
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 11:28:48 +0000
-Received: by mail-ua1-x944.google.com with SMTP id d21so1846351uap.9
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 24 Jan 2019 03:28:46 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=6TtzdD/cba6sa/DrDzOU/l6zlkRVDT6fBw8RnvsQq3s=;
- b=ULcNqx3/mSpX5maCGz+/K5jI9k2Qj6DXOgdgsx/EVpksvsg7lIyz4wv3fRFo2270xd
- cFHpOcketX44O2SdfZWKoViwaHt+g4m8GTRmD4b6TqgVRX2UJz3aNtfK/eSNxCkL4GDT
- WCE/SwpcYAMeU54TM4Cx8W2xalOKiH97v2zgQ=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=6TtzdD/cba6sa/DrDzOU/l6zlkRVDT6fBw8RnvsQq3s=;
- b=sIPWG97Rj2okY3XreHVi319ThBpKfugiCT2cYf7wJf//ZteETd6gCjvlo7iOqdBmbK
- Oo4wFnkW31GbFxyS6A5xolVuSDYBR28TRM2pdH6ySwhlf7yCr9wZyfrW7hUgJv4OhWcQ
- ZqttT4ahGC0I3rtfrhVkACn2D3R6VuHDH7yhxyYh7C0rdyy6QgjlTdV+jP/ZVxnJhIDQ
- T3ygos3WEkGo3TVIFDb4WRCzc/LVHpmNM807xX1PTipVygM7wJXSH86yOxpbXDwtpBEH
- MrjuP8UK4sP+gi/kcBI801kdGjPYOvaCX4vnzSE5zY0GQfc6clmIowtaQHBXSaa0Z/ve
- zhmQ==
-X-Gm-Message-State: AJcUukeMMJA3eOtR3BJtajbHAxMEro2QCVURLfwktmwwjKuFaWI3tw6b
- irBQKwNWBAJqbEaf12K9TiBCoFPQa+KKAgozzkGg3w==
-X-Google-Smtp-Source: ALg8bN6iS46jnJBIMo8Xyi2MquUv8kAIqGURM0TPbaskQKGy7sLxOz+4QnTtRT/57dqWEHVZ3EJOwGK4XbDdcUCmW4U=
-X-Received: by 2002:ab0:21c6:: with SMTP id u6mr2525197uan.97.1548329325479;
- Thu, 24 Jan 2019 03:28:45 -0800 (PST)
+ id 1gmdKE-0005B1-GE
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 11:37:40 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amdcloud.onmicrosoft.com; s=selector1-amd-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=aWo/JpDfLERoTEvy07CLEshKybOBtvoS1BSz04ddzDI=;
+ b=i5Br2AVXNfQ1tQ7Yjg/IxJnQ0N/4n1DsKN+0+F7TBHwQGaQ1yQvixw0hqlYffUJPS5fe+NbHTdOrZEqhx+y+IntR0AYgAvOXkmdy2MjOer5gVB1ruoyxGbmdyo4vHGuK4hvyzokwO+wqqH6USXqyWIoB1kJ/EYvd0H+ggY8SwOo=
+Received: from DM5PR12MB1546.namprd12.prod.outlook.com (10.172.36.23) by
+ DM5PR12MB1226.namprd12.prod.outlook.com (10.168.237.17) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1558.18; Thu, 24 Jan 2019 11:37:33 +0000
+Received: from DM5PR12MB1546.namprd12.prod.outlook.com
+ ([fe80::35a3:c1b4:5ad0:ec6e]) by DM5PR12MB1546.namprd12.prod.outlook.com
+ ([fe80::35a3:c1b4:5ad0:ec6e%10]) with mapi id 15.20.1558.016; Thu, 24 Jan
+ 2019 11:37:33 +0000
+From: "Koenig, Christian" <Christian.Koenig@amd.com>
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Subject: Re: [RFC PATCH] drm: disable WC optimization for cache coherent
+ devices on non-x86
+Thread-Topic: [RFC PATCH] drm: disable WC optimization for cache coherent
+ devices on non-x86
+Thread-Index: AQHUsXD3UXk0MPD/dUyEFCISRS4xuqW50zEAgAAHO4CAAActAIAABFSAgAACPQCAAAIPAIAAF8kAgAABIQCAAAF0AIAABGAAgAABGQCAAAFFAIAAChyAgADjSQCAAM5NgIAAAvSAgACp8ICAAB+TAIAAf28AgAACVwCAARHuAIAAA2gAgAAA64CAAASOgIAAA/WAgAAXlACAAAC8AIAAAx8A
+Date: Thu, 24 Jan 2019 11:37:32 +0000
+Message-ID: <40ad3ae7-9970-0cb9-d35c-05e128f83820@amd.com>
+References: <850b6aee-0040-c333-b125-45211c18ada5@daenzer.net>
+ <CAKv+Gu99zHqcQtj6TiOXAr3Qa6WWhKem+DHVA_mAQ0-Bc0Vbqw@mail.gmail.com>
+ <047667fd-17be-1c37-5d2a-26768cfd6ab8@daenzer.net>
+ <CAKv+Gu_VBd8agHASc5RS0eCgyXP64Lt_i4yPuBjKwGQ+5Lpd5Q@mail.gmail.com>
+ <CADnq5_O1uxCrSksfF127AZTfbmdukxmqGdh2Ee0zM6CqgG_Mhg@mail.gmail.com>
+ <CAKv+Gu-4uYh_HD_5Ry_L80Nf5zpRhT4oJYhhG5_8g3gSzBs2tg@mail.gmail.com>
+ <20190123071521.GB20526@infradead.org>
+ <CAKv+Gu8+77uZHJ6ZYjGNcKQL8C3cT5Ree+TcTVmkQXAHV-ADyg@mail.gmail.com>
+ <20190123164428.GA9367@infradead.org>
+ <CAKv+Gu-9vEKu8mG-o+-4M1ZcgZmTTJVfEdNS9R27AFX8P5sqyQ@mail.gmail.com>
+ <20190124091316.GA22796@infradead.org>
+ <bb559f74-4b1e-d5ee-74fb-b5dcd4a128cb@amd.com>
+ <CAKv+Gu_3LurSN-6w1WijPfpJpc+Pgu0YTnwTfMrXMF3-AKAnJA@mail.gmail.com>
+ <953e5e5f-5d47-d6df-40df-c8c94db5447f@amd.com>
+ <CAKv+Gu9umPEmB+wh54NOTYcQ14oxf7rwVAXgCqo7V2A+VwkqPA@mail.gmail.com>
+ <57590a48-4629-e2a1-8673-ce9eb2ec210b@amd.com>
+ <CAKv+Gu_2f0FaJ+Th7H48u4GrPX=MM9xw0fFjdwhfRrr1nhgEkA@mail.gmail.com>
+In-Reply-To: <CAKv+Gu_2f0FaJ+Th7H48u4GrPX=MM9xw0fFjdwhfRrr1nhgEkA@mail.gmail.com>
+Accept-Language: de-DE, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+user-agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+x-originating-ip: [2a02:908:1252:fb60:be8a:bd56:1f94:86e7]
+x-clientproxiedby: AM6PR0102CA0024.eurprd01.prod.exchangelabs.com
+ (2603:10a6:209:14::37) To DM5PR12MB1546.namprd12.prod.outlook.com
+ (2603:10b6:4:8::23)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Christian.Koenig@amd.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DM5PR12MB1226;
+ 20:f+wIn9Ei8lOGm1Oxo4Pa3vI7YEwb6qg85ndIICENvENW3JTmutyN/HjH7fblm53jT4riFL+5EQJw+v6KAlmDBz9u88Pm6Hiw/I3LJQTP+tMvbXp4dS6a5oGQFxevIrs16AHzP4ssaRb1TTkCb6VyiyXzfKTFW204v8L8xjI4vYdhQ+gWPNnbMTu8BVq58wUER07O03wOU56UyvKllh9xJ7NQmd46G+yXc1HDLqLHaVde0SMxrLsa7GDBsshEDCto
+x-ms-office365-filtering-correlation-id: 29a80888-f77e-4623-55a2-08d681f0544b
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DM5PR12MB1226; 
+x-ms-traffictypediagnostic: DM5PR12MB1226:
+x-microsoft-antispam-prvs: <DM5PR12MB12262CAD31D6E92555997D67839A0@DM5PR12MB1226.namprd12.prod.outlook.com>
+x-forefront-prvs: 0927AA37C7
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(136003)(366004)(39860400002)(346002)(376002)(189003)(199004)(6116002)(93886005)(76176011)(71200400001)(52116002)(65956001)(46003)(65806001)(71190400001)(6916009)(476003)(58126008)(316002)(2616005)(65826007)(386003)(6506007)(186003)(102836004)(54906003)(446003)(11346002)(97736004)(14454004)(68736007)(105586002)(7416002)(106356001)(486006)(31686004)(99286004)(81166006)(25786009)(6436002)(86362001)(81156014)(8676002)(229853002)(6246003)(6486002)(72206003)(64126003)(2906002)(31696002)(14444005)(256004)(8936002)(478600001)(53936002)(7736002)(305945005)(4326008)(39060400002)(36756003)(6512007);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DM5PR12MB1226;
+ H:DM5PR12MB1546.namprd12.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: amd.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 3K5FuE9rdkB/GQIImsDNnVQpMZNb0Kjm/dwcfzEol0BeHrq8yU5sM5p0E4YS9vAlQ1O1ed1XUXk+uYu0Voambh3NnR9Tmf1bUBZ2h0xheb9NUPthfJuOMMeG08iMvx3XA+htWCeszRQjFVdHId2sydfCrICLktL1FvBWAMpNLH86dmCRV0ukp+W4MU7TgNTARQ4+Hfy6Ul0rUh+wgZHgtGQbw1nD/LoqonrluEvF9amFgfUHmH0OBZUdG/lfMufBu/uZovVZT+KNCtEriwo8cr2m1QZQNpAOgRpTK8e70G+bAc45qe58X+Mx1tX7AHDA6mwfsGlQEkJM/qHWwKuHfheT1avo1dFx8sVdAzlHXs3/8vT1pieEByD82ug9PhudwMkbWH0kjxsdKablP/KcX7OXj0v5IheI8xzgJYkeDM4=
+Content-ID: <59400AED9633BA419EDBE63373A4A150@namprd12.prod.outlook.com>
 MIME-Version: 1.0
-References: <1548309279-5281-1-git-send-email-sumit.garg@linaro.org>
- <1548309279-5281-4-git-send-email-sumit.garg@linaro.org>
- <20190124101509.yrhyaj4xh32bn6pu@holly.lan>
-In-Reply-To: <20190124101509.yrhyaj4xh32bn6pu@holly.lan>
-From: Sumit Garg <sumit.garg@linaro.org>
-Date: Thu, 24 Jan 2019 16:58:33 +0530
-Message-ID: <CAFA6WYNTo+fQ0zcgP3SuBXeFmzMY3AiHXsbMtHWE+rNoYQPUgg@mail.gmail.com>
-Subject: Re: [PATCH v5 3/4] tee: optee: add TEE bus device enumeration support
-To: Daniel Thompson <daniel.thompson@linaro.org>
+X-OriginatorOrg: amd.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 29a80888-f77e-4623-55a2-08d681f0544b
+X-MS-Exchange-CrossTenant-originalarrivaltime: 24 Jan 2019 11:37:28.7058 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3dd8961f-e488-4e60-8e11-a82d994e183d
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM5PR12MB1226
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_032846_841850_FD0D2438 
-X-CRM114-Status: GOOD (  26.46  )
+X-CRM114-CacheID: sfid-20190124_033738_549004_52D92490 
+X-CRM114-Status: GOOD (  18.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,274 +135,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, michal.lkml@markovi.net,
- Herbert Xu <herbert@gondor.apana.org.au>, Arnd Bergmann <arnd@arndb.de>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Bhupesh Sharma <bhsharma@redhat.com>,
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
+ Michael Ellerman <mpe@ellerman.id.au>,
+ =?utf-8?B?TWljaGVsIETDpG56ZXI=?= <michel@daenzer.net>,
+ Will Deacon <will.deacon@arm.com>,
  Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- tee-dev@lists.linaro.org, yamada.masahiro@socionext.com,
- Rob Herring <robh+dt@kernel.org>,
- "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
- <linux-crypto@vger.kernel.org>, mpm@selenic.com,
- Jens Wiklander <jens.wiklander@linaro.org>,
+ amd-gfx list <amd-gfx@lists.freedesktop.org>, "Zhang,
+ Jerry" <Jerry.Zhang@amd.com>, Christoph Hellwig <hch@infradead.org>,
+ David Airlie <airlied@linux.ie>, "Huang, Ray" <Ray.Huang@amd.com>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Alex Deucher <alexdeucher@gmail.com>, "Deucher,
+ Alexander" <Alexander.Deucher@amd.com>, Sean Paul <sean@poorly.run>,
  linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 24 Jan 2019 at 15:45, Daniel Thompson
-<daniel.thompson@linaro.org> wrote:
+Am 24.01.19 um 12:26 schrieb Ard Biesheuvel:
+> On Thu, 24 Jan 2019 at 12:23, Koenig, Christian
+> <Christian.Koenig@amd.com> wrote:
+>> Am 24.01.19 um 10:59 schrieb Ard Biesheuvel:
+>>> [SNIP]
+>>> This is *exactly* my point the whole time.
+>>>
+>>> The current code has
+>>>
+>>> static inline bool drm_arch_can_wc_memory(void)
+>>> {
+>>> #if defined(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
+>>>      return false;
+>>>
+>>> which means the optimization is disabled *unless the system is
+>>> non-cache coherent*
+>>>
+>>> So if you have reports that the optimization works on some PowerPC, it
+>>> must be non-cache coherent PowerPC, because that is the only place
+>>> where it is enabled in the first place.
+>>>
+>>>> The only problematic here actually seems to be ARM, so you should
+>>>> probably just add an "#ifdef .._ARM return false;".
+>>>>
+>>> ARM/arm64 does not have a Kconfig symbol like
+>>> CONFIG_NOT_COHERENT_CACHE, so we can only disable it everywhere. If
+>>> there are non-coherent ARM systems that are currently working in the
+>>> same way as those non-coherent PowerPC systems, we will break them by
+>>> doing this.
+>> Summing the things I've read so far for ARM up I actually think it
+>> depends on a runtime configuration and not on compile time one.
+>>
+>> So the whole idea of providing the device to the drm_*_can_wc_memory()
+>> function isn't so far fetched.
+>>
+> Thank you.
 >
-> On Thu, Jan 24, 2019 at 11:24:38AM +0530, Sumit Garg wrote:
-> > OP-TEE provides a pseudo TA to enumerate TAs which can act as devices/
-> > services for TEE bus. So implement device enumeration using invoke
-> > function: PTA_CMD_GET_DEVICES provided by pseudo TA to fetch array of
-> > device UUIDs. Also register these enumerated devices with TEE bus as
-> > "optee-clntX" device.
-> >
-> > Signed-off-by: Sumit Garg <sumit.garg@linaro.org>
-> > ---
-> >  drivers/tee/optee/Makefile        |   1 +
-> >  drivers/tee/optee/core.c          |   4 +
-> >  drivers/tee/optee/device.c        | 153 ++++++++++++++++++++++++++++++++++++++
-> >  drivers/tee/optee/optee_private.h |   3 +
-> >  4 files changed, 161 insertions(+)
-> >  create mode 100644 drivers/tee/optee/device.c
-> >
-> > diff --git a/drivers/tee/optee/Makefile b/drivers/tee/optee/Makefile
-> > index 48d262a..56263ae 100644
-> > --- a/drivers/tee/optee/Makefile
-> > +++ b/drivers/tee/optee/Makefile
-> > @@ -5,3 +5,4 @@ optee-objs += call.o
-> >  optee-objs += rpc.o
-> >  optee-objs += supp.o
-> >  optee-objs += shm_pool.o
-> > +optee-objs += device.o
-> > diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-> > index e5efce3..ac59c77 100644
-> > --- a/drivers/tee/optee/core.c
-> > +++ b/drivers/tee/optee/core.c
-> > @@ -634,6 +634,10 @@ static struct optee *optee_probe(struct device_node *np)
-> >       if (optee->sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
-> >               pr_info("dynamic shared memory is enabled\n");
-> >
-> > +     rc = optee_enumerate_devices();
-> > +     if (rc)
-> > +             goto err;
-> > +
-> >       pr_info("initialized driver\n");
-> >       return optee;
-> >  err:
-> > diff --git a/drivers/tee/optee/device.c b/drivers/tee/optee/device.c
-> > new file mode 100644
-> > index 0000000..987e552
-> > --- /dev/null
-> > +++ b/drivers/tee/optee/device.c
-> > @@ -0,0 +1,153 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * Copyright (C) 2019 Linaro Ltd.
-> > + */
-> > +
->
-> Does there need to be a pr_fmt() here (to make the pr_*() messages from
-> this file match those from the optee/core.c):
-> #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
->
+>> But for now I do prefer working and slightly slower system over broken
+>> one, so I think we should just disable this on ARM for now.
+>>
+> Again, this is not about non-cache coherent being slower without the
+> optimization, it is about non-cache coherent likely not working *at
+> all* unless the optimization is enabled.
 
-I think for consistency with optee/core.c file prints, will add this here.
+As Michel tried to explain this CAN'T happen. The optimization is a 
+purely optional request from userspace.
 
-> Alternatively you could get the probe function to pass the optee device
-> and use dev_*()...
->
-> TBH this is pretty severe nitpicking so feel free to add my reviewed
-> by the next time this patch comes around:
->
+> Otherwise, the driver will vmap() DMA pages with cacheable attributes,
+> while the non-cache coherent device uses uncached attributes, breaking
+> coherency.
 
-No worries :).
+Again this is mandated by the userspace APIs anyway. E.g. we can't 
+vmap() pages in any other way or our userspace APIs would break.
 
--Sumit
-
-> Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
->
->
-> Daniel.
->
-> > +#include <linux/kernel.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/tee_drv.h>
-> > +#include <linux/uuid.h>
-> > +#include "optee_private.h"
-> > +
-> > +/*
-> > + * Get device UUIDs
-> > + *
-> > + * [out]     memref[0]        Array of device UUIDs
-> > + *
-> > + * Return codes:
-> > + * TEE_SUCCESS - Invoke command success
-> > + * TEE_ERROR_BAD_PARAMETERS - Incorrect input param
-> > + * TEE_ERROR_SHORT_BUFFER - Output buffer size less than required
-> > + */
-> > +#define PTA_CMD_GET_DEVICES          0x0
-> > +
-> > +static int optee_ctx_match(struct tee_ioctl_version_data *ver, const void *data)
-> > +{
-> > +     if (ver->impl_id == TEE_IMPL_ID_OPTEE)
-> > +             return 1;
-> > +     else
-> > +             return 0;
-> > +}
-> > +
-> > +static int get_devices(struct tee_context *ctx, u32 session,
-> > +                    struct tee_shm *device_shm, u32 *shm_size)
-> > +{
-> > +     u32 ret = 0;
-> > +     struct tee_ioctl_invoke_arg inv_arg = {0};
-> > +     struct tee_param param[4] = {0};
-> > +
-> > +     /* Invoke PTA_CMD_GET_DEVICES function */
-> > +     inv_arg.func = PTA_CMD_GET_DEVICES;
-> > +     inv_arg.session = session;
-> > +     inv_arg.num_params = 4;
-> > +
-> > +     /* Fill invoke cmd params */
-> > +     param[0].attr = TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT;
-> > +     param[0].u.memref.shm = device_shm;
-> > +     param[0].u.memref.size = *shm_size;
-> > +     param[0].u.memref.shm_offs = 0;
-> > +
-> > +     ret = tee_client_invoke_func(ctx, &inv_arg, param);
-> > +     if ((ret < 0) || ((inv_arg.ret != TEEC_SUCCESS) &&
-> > +                       (inv_arg.ret != TEEC_ERROR_SHORT_BUFFER))) {
-> > +             pr_err("PTA_CMD_GET_DEVICES invoke function err: %x\n",
-> > +                    inv_arg.ret);
-> > +             return -EINVAL;
-> > +     }
-> > +
-> > +     *shm_size = param[0].u.memref.size;
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static int optee_register_device(const uuid_t *device_uuid, u32 device_id)
-> > +{
-> > +     struct tee_client_device *optee_device = NULL;
-> > +     int rc;
-> > +
-> > +     optee_device = kzalloc(sizeof(*optee_device), GFP_KERNEL);
-> > +     if (!optee_device)
-> > +             return -ENOMEM;
-> > +
-> > +     optee_device->dev.bus = &tee_bus_type;
-> > +     dev_set_name(&optee_device->dev, "optee-clnt%u", device_id);
-> > +     uuid_copy(&optee_device->id.uuid, device_uuid);
-> > +
-> > +     rc = device_register(&optee_device->dev);
-> > +     if (rc) {
-> > +             pr_err("device registration failed, err: %d\n", rc);
-> > +             kfree(optee_device);
-> > +     }
-> > +
-> > +     return rc;
-> > +}
-> > +
-> > +int optee_enumerate_devices(void)
-> > +{
-> > +     const uuid_t pta_uuid =
-> > +             UUID_INIT(0x7011a688, 0xddde, 0x4053,
-> > +                       0xa5, 0xa9, 0x7b, 0x3c, 0x4d, 0xdf, 0x13, 0xb8);
-> > +     struct tee_ioctl_open_session_arg sess_arg = {0};
-> > +     struct tee_shm *device_shm = NULL;
-> > +     const uuid_t *device_uuid = NULL;
-> > +     struct tee_context *ctx = NULL;
-> > +     u32 shm_size = 0, idx, num_devices = 0;
-> > +     int rc;
-> > +
-> > +     /* Open context with OP-TEE driver */
-> > +     ctx = tee_client_open_context(NULL, optee_ctx_match, NULL, NULL);
-> > +     if (IS_ERR(ctx))
-> > +             return -ENODEV;
-> > +
-> > +     /* Open session with device enumeration pseudo TA */
-> > +     memcpy(sess_arg.uuid, pta_uuid.b, TEE_IOCTL_UUID_LEN);
-> > +     sess_arg.clnt_login = TEE_IOCTL_LOGIN_PUBLIC;
-> > +     sess_arg.num_params = 0;
-> > +
-> > +     rc = tee_client_open_session(ctx, &sess_arg, NULL);
-> > +     if ((rc < 0) || (sess_arg.ret != TEEC_SUCCESS)) {
-> > +             /* Device enumeration pseudo TA not found */
-> > +             rc = 0;
-> > +             goto out_ctx;
-> > +     }
-> > +
-> > +     rc = get_devices(ctx, sess_arg.session, NULL, &shm_size);
-> > +     if (rc < 0)
-> > +             goto out_sess;
-> > +
-> > +     device_shm = tee_shm_alloc(ctx, shm_size,
-> > +                                TEE_SHM_MAPPED | TEE_SHM_DMA_BUF);
-> > +     if (IS_ERR(device_shm)) {
-> > +             pr_err("tee_shm_alloc failed\n");
-> > +             rc = PTR_ERR(device_shm);
-> > +             goto out_sess;
-> > +     }
-> > +
-> > +     rc = get_devices(ctx, sess_arg.session, device_shm, &shm_size);
-> > +     if (rc < 0)
-> > +             goto out_shm;
-> > +
-> > +     device_uuid = tee_shm_get_va(device_shm, 0);
-> > +     if (IS_ERR(device_uuid)) {
-> > +             pr_err("tee_shm_get_va failed\n");
-> > +             rc = PTR_ERR(device_uuid);
-> > +             goto out_shm;
-> > +     }
-> > +
-> > +     num_devices = shm_size / sizeof(uuid_t);
-> > +
-> > +     for (idx = 0; idx < num_devices; idx++) {
-> > +             rc = optee_register_device(&device_uuid[idx], idx);
-> > +             if (rc)
-> > +                     goto out_shm;
-> > +     }
-> > +
-> > +out_shm:
-> > +     tee_shm_free(device_shm);
-> > +out_sess:
-> > +     tee_client_close_session(ctx, sess_arg.session);
-> > +out_ctx:
-> > +     tee_client_close_context(ctx);
-> > +
-> > +     return rc;
-> > +}
-> > diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
-> > index 35e7938..a5e84af 100644
-> > --- a/drivers/tee/optee/optee_private.h
-> > +++ b/drivers/tee/optee/optee_private.h
-> > @@ -28,6 +28,7 @@
-> >  #define TEEC_ERROR_BAD_PARAMETERS    0xFFFF0006
-> >  #define TEEC_ERROR_COMMUNICATION     0xFFFF000E
-> >  #define TEEC_ERROR_OUT_OF_MEMORY     0xFFFF000C
-> > +#define TEEC_ERROR_SHORT_BUFFER              0xFFFF0010
-> >
-> >  #define TEEC_ORIGIN_COMMS            0x00000002
-> >
-> > @@ -181,6 +182,8 @@ void optee_free_pages_list(void *array, size_t num_entries);
-> >  void optee_fill_pages_list(u64 *dst, struct page **pages, int num_pages,
-> >                          size_t page_offset);
-> >
-> > +int optee_enumerate_devices(void);
-> > +
-> >  /*
-> >   * Small helpers
-> >   */
-> > --
-> > 2.7.4
-> >
-
+Regards,
+Christian.
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
