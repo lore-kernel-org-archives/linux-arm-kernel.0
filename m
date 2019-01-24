@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B2E40C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 16:34:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ADBDFC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 16:35:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7040B218CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 16:34:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7BA1E2184C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 16:35:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BRDQwSEo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7040B218CD
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ULtMhUPN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7BA1E2184C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KsMaGk5JadMJ544b42+L5LIuU0WchXx9ffOe3dUH9cw=; b=BRDQwSEoeLjWay
-	M7BUKyEJBL+lGElOBgvL7J8EsJOV1jw3AwsQu5ZpW3QREjOY2Qjw2mXmzaN9xi1VORngpMRzNMs9F
-	o8fbbK5pnt1vkh6bHB2MbEhqAvh6RJNBZYu8AVRwpzjZxGbpp7So2V1eiTnAenFfjYUHbz7waY9OP
-	sw9DrrkcBRK/z/ih6tTK2dDYeQ7HmdJBn58OqYSDnyTXTm0gawIoIjM9tMXSgvBjNNeEBXaUhezkC
-	NNDq87v2XjZqN17d0BfTObXilUZP70wwGkWnWa9g0CCFLD/mn7Tex5ygxtvmtq24pkm/Lj7hyhqLJ
-	FS/ATPEQAPZcJoxdqqZQ==;
+	List-Owner; bh=SZd9pKEqVq4eFbFSvX93VvKErmVV9SCLQItMFuozK1U=; b=ULtMhUPN9fD8BU
+	tIByMh63Fsn58FjYRaJRMB82YbJDE24fi3vPjQcAv8cLCmlgX6TmSLwbPS47DgDMOZOjUuTaNJMjT
+	YOLBS/US/nAS3HUmBAjM0uu7KPoWv76G13mE7EUsHJqoHqNLmFpwEKHIn1Eo4qgrdRrsKiGpKNW4a
+	l3WckQNHIyhCOr0J7g+bjop0sE04Ozzix1WaOI8T0amg/SHCZOWwQWNZaqKv2k9vaNzyt441WY3/M
+	9MvOiis7RYftFECrGwDAzVTH6qtBWUkLY7B3OypftvbyOY8h8n+FyK/NLpJfYk4i/l+Ms70eCkFs1
+	/bS/rqszB96zHriCCwAA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmhx7-0006fR-4K; Thu, 24 Jan 2019 16:34:05 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gmhxx-0007B5-61; Thu, 24 Jan 2019 16:34:57 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmhwX-0006Af-HX
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 16:33:31 +0000
+ id 1gmhwa-0006Cg-1W
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 16:33:33 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5234BA78;
- Thu, 24 Jan 2019 08:33:29 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C3820A78;
+ Thu, 24 Jan 2019 08:33:31 -0800 (PST)
 Received: from eglon.cambridge.arm.com (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id CC5EB3F237;
- Thu, 24 Jan 2019 08:33:27 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 499BF3F237;
+ Thu, 24 Jan 2019 08:33:30 -0800 (PST)
 From: James Morse <james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v2 3/4] arm64: hyp-stub: Forbid kprobing of the hyp-stub
-Date: Thu, 24 Jan 2019 16:32:56 +0000
-Message-Id: <20190124163257.233929-4-james.morse@arm.com>
+Subject: [PATCH v2 4/4] arm64: hibernate: Clean the __hyp_text to PoC after
+ resume
+Date: Thu, 24 Jan 2019 16:32:57 +0000
+Message-Id: <20190124163257.233929-5-james.morse@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190124163257.233929-1-james.morse@arm.com>
 References: <20190124163257.233929-1-james.morse@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_083329_730630_B1A76E09 
-X-CRM114-Status: GOOD (  14.07  )
+X-CRM114-CacheID: sfid-20190124_083332_261533_171FF69F 
+X-CRM114-Status: GOOD (  12.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,44 +77,40 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The hyp-stub is loaded by the kernel's early startup code at EL2
-during boot, before KVM takes ownership later. The hyp-stub's
-text is part of the regular kernel text, meaning it can be kprobed.
+During resume hibernate restores all physical memory. Any memory
+that is accessed with the MMU disabled needs to be cleaned to the
+PoC.
 
-A breakpoint in the hyp-stub causes the CPU to spin in el2_sync_invalid.
+KVMs __hyp_text was previously ommitted as it runs with the MMU
+enabled, but now that the hyp-stub is located in this section,
+we must clean __hyp_text too.
 
-Add it to the __hyp_text.
+This ensures secondary CPUs that come online after hibernate
+has finished resuming, and load KVM via the freshly written
+hyp-stub see the correct instructions.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 Cc: stable@vger.kernel.org
 ---
+ arch/arm64/kernel/hibernate.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-This has been a problem since kprobes was merged, it should
-probably have been covered in 888b3c8720e0.
-
-I'm not sure __hyp_text is the right place. Its not idmaped,
-and as it contains a set of vectors, adding it to the host/hyp
-idmap sections could grow them beyond a page... but it does
-run with the MMU off, so does need to be cleaned to PoC when
-anything wacky, like hibernate happens. With this patch,
-hibernate should clean the __hyp_text to PoC too.
----
- arch/arm64/kernel/hyp-stub.S | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index e1261fbaa374..17f325ba831e 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -28,6 +28,8 @@
- #include <asm/virt.h>
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index 29cdc99688f3..9859e1178e6b 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -299,8 +299,10 @@ int swsusp_arch_suspend(void)
+ 		dcache_clean_range(__idmap_text_start, __idmap_text_end);
  
- 	.text
-+	.pushsection	.hyp.text, "ax"
-+
- 	.align 11
+ 		/* Clean kvm setup code to PoC? */
+-		if (el2_reset_needed())
++		if (el2_reset_needed()) {
+ 			dcache_clean_range(__hyp_idmap_text_start, __hyp_idmap_text_end);
++			dcache_clean_range(__hyp_text_start, __hyp_text_end);
++		}
  
- ENTRY(__hyp_stub_vectors)
+ 		/* make the crash dump kernel image protected again */
+ 		crash_post_resume();
 -- 
 2.20.1
 
