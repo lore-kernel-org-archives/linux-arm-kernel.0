@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4A9DAC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:17:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A73DC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:17:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0C4C62184C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:17:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 271F12184C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:17:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o8zpOESo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="NEjsnYt1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C4C62184C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cynn2q5M";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="Z3/7pelu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 271F12184C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,42 +27,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=AtGnOHkG3OsXIOoXkt43p2uKjP+nDMLls17hu4QqlL8=; b=o8zpOESomPe4ul+ykUgU3UzX/H
-	zp+ckMrqlNC2fyl8dmkq4YN+XCHfPk8YndGwYjEuxZUNt5Az7ws7jewbM10cric0D+69GgLH47a6o
-	UySw8HSbmvM3/hNLz1EORQhuAbboNy08MlqgpAxTs+bVAdSqa0ysxc3h6lFJKOnHoxbB9ZjuIqORt
-	BsjjieA1qARkdFAQBT/COaZjQPh1McDX/pXdMy8YYwv9LQz97LsRowU7jjn0EvNtF18E2istDjeFV
-	ZBMfrkiT43GrGi9WtIlTTzN7XOrpAU5pEHOIjvt3mlfmEDxa2DBng6ccvioctQ7PG6O2vLoelyfkf
-	7B9vgw6Q==;
+	bh=ixZt6z5lSSYdfQWRg28eCTb9XIs6J2zkxamXU2p6z1Q=; b=cynn2q5MnYrbUST4/YgsNoy7GI
+	Pgh9K/HaX1VzB4l2D0E3VK77AL83oPy65gIAFqMPrRCfIWOZFcAzw8A0x+nLAJYTvIe+IojWt4h0J
+	wByZEkCfpJ5ZB6fVjhbtA4vUH2wgreB5v2MP5ccSPA5dn6SJM2zJI0TiiHu6mIr1okwMB+nvI+ZNK
+	OiujXyrq0NLTls5vyK7kudhcI55naXK7TCZWjkjyc7vQ9wUu9jgAt/znftHS7JbeF4wVKhRvL7PlG
+	4vXl/9Emn1TyXfQhMr8CotnDQfbcs5TLuaGC+Rx664xQOfX/TsZfKZxLEca4fxXu6SY0i7rB9IkEV
+	r7iJTClg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmgkV-0005ih-7D; Thu, 24 Jan 2019 15:16:59 +0000
+	id 1gmgky-00063o-1T; Thu, 24 Jan 2019 15:17:28 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmgj9-0001GQ-Do
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 15:15:36 +0000
+ id 1gmghd-0001GQ-PT
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 15:14:06 +0000
 Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 9A40525BEEC;
- Fri, 25 Jan 2019 02:12:43 +1100 (AEDT)
+ by kirsty.vergenet.net (Postfix) with ESMTPA id EF77B25BEE2;
+ Fri, 25 Jan 2019 02:12:41 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1548342763; bh=V8NkbyeT0VINMjZWa9e+5++LTyHXyDPcFomF9awOFis=;
+ t=1548342762; bh=QqWUDK4oeAo2epajtIwvPxmqchqxjRbT8iSjTed0qes=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=NEjsnYt1tiYJ7hZ5l6isddmHR44oEXZ4w39i6bKZp5Qzzq8loFY25nUJ2l67HUxGV
- V/p3MdAGkachGmggKEsGR5dBU86jvy45vMPYJ2qs6vdsJ7/LjB9XwBim7bN9UaSmkO
- Q4o2bZ8/SXJ7H+xrpFXXx70LGtmYCPOmIbNPru+c=
+ b=Z3/7pelu1JfPNKSCKNm5cMYPlwKIEY6LKW0eCJRGLwuPmkSdCjzBqSufGC/aWtnk4
+ Hp91ANmuQEsifbG7g0f/uGMfl4I//xMa8g2fyJAjwnMEnDdEt25eG17exjX2J+jVWR
+ 5OY0uduHEORQUH6g0ne/sSXyaF61dbrutmxc3oF0=
 Received: by reginn.horms.nl (Postfix, from userid 7100)
- id D37F0940B7D; Thu, 24 Jan 2019 16:12:39 +0100 (CET)
+ id 764C8940903; Thu, 24 Jan 2019 16:12:39 +0100 (CET)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 12/44] arm64: dts: renesas: r8a774c0: Add secondary CA53 CPU
- core
-Date: Thu, 24 Jan 2019 16:12:06 +0100
-Message-Id: <9b55a05ebfbe41bfb4c2aa98a81a46f2031e599f.1548233325.git.horms+renesas@verge.net.au>
+Subject: [PATCH 05/44] arm64: dts: renesas: r8a774c0: Add SYS-DMAC controller
+ nodes
+Date: Thu, 24 Jan 2019 16:11:59 +0100
+Message-Id: <e2088cf8e6d5c5bf0b822b07fa9778d41894dee2.1548233325.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1548233325.git.horms+renesas@verge.net.au>
 References: <cover.1548233325.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_071535_610953_EBA072C6 
-X-CRM114-Status: GOOD (  11.86  )
+X-CRM114-CacheID: sfid-20190124_071402_140403_DC689300 
+X-CRM114-Status: UNSURE (   9.73  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,81 +86,128 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Add a device node for the second Cortex-A53 CPU core on the Renesas
-RZ/G2E (a.k.a r8a774c0) SoC, and adjust the interrupt delivery masks
-for the ARM Generic Interrupt Controller and Architectured Timer.
+Add sys-dmac[012] device nodes for the RZ/G2E SoC (a.k.a. r8a774c0).
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a774c0.dtsi | 25 +++++++++++++++++--------
- 1 file changed, 17 insertions(+), 8 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a774c0.dtsi | 102 ++++++++++++++++++++++++++++++
+ 1 file changed, 102 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a774c0.dtsi b/arch/arm64/boot/dts/renesas/r8a774c0.dtsi
-index a51b6d37f0cb..83db7c740481 100644
+index f425d0b3a31b..7b3d247ca004 100644
 --- a/arch/arm64/boot/dts/renesas/r8a774c0.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a774c0.dtsi
-@@ -48,7 +48,6 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		/* 1 core only at this point */
- 		a53_0: cpu@0 {
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0>;
-@@ -58,6 +57,15 @@
- 			enable-method = "psci";
+@@ -126,6 +126,108 @@
+ 			#power-domain-cells = <1>;
  		};
  
-+		a53_1: cpu@1 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <1>;
-+			device_type = "cpu";
-+			power-domains = <&sysc R8A774C0_PD_CA53_CPU1>;
-+			next-level-cache = <&L2_CA53>;
-+			enable-method = "psci";
++		dmac0: dma-controller@e6700000 {
++			compatible = "renesas,dmac-r8a774c0",
++				     "renesas,rcar-dmac";
++			reg = <0 0xe6700000 0 0x10000>;
++			interrupts = <GIC_SPI 199 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 201 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 202 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 203 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 210 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 211 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 212 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 213 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 214 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 215 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					"ch0", "ch1", "ch2", "ch3",
++					"ch4", "ch5", "ch6", "ch7",
++					"ch8", "ch9", "ch10", "ch11",
++					"ch12", "ch13", "ch14", "ch15";
++			clocks = <&cpg CPG_MOD 219>;
++			clock-names = "fck";
++			power-domains = <&sysc R8A774C0_PD_ALWAYS_ON>;
++			resets = <&cpg 219>;
++			#dma-cells = <1>;
++			dma-channels = <16>;
 +		};
 +
- 		L2_CA53: cache-controller-0 {
- 			compatible = "cache";
- 			power-domains = <&sysc R8A774C0_PD_CA53_SCU>;
-@@ -82,8 +90,9 @@
- 
- 	pmu_a53 {
- 		compatible = "arm,cortex-a53-pmu";
--		interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
--		interrupt-affinity = <&a53_0>;
-+		interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
-+				      <&gic GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&a53_0>, <&a53_1>;
- 	};
- 
- 	psci {
-@@ -604,7 +613,7 @@
- 			      <0x0 0xf1040000 0 0x20000>,
- 			      <0x0 0xf1060000 0 0x20000>;
- 			interrupts = <GIC_PPI 9
--					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
-+					(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
- 			clocks = <&cpg CPG_MOD 408>;
- 			clock-names = "clk";
- 			power-domains = <&sysc R8A774C0_PD_ALWAYS_ON>;
-@@ -619,10 +628,10 @@
- 
- 	timer {
- 		compatible = "arm,armv8-timer";
--		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
--				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
--				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
--				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- 
- 	/* External USB clocks - can be overridden by the board */
++		dmac1: dma-controller@e7300000 {
++			compatible = "renesas,dmac-r8a774c0",
++				     "renesas,rcar-dmac";
++			reg = <0 0xe7300000 0 0x10000>;
++			interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 216 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 219 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 308 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 309 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 313 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 314 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 315 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 316 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 317 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 318 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 319 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					"ch0", "ch1", "ch2", "ch3",
++					"ch4", "ch5", "ch6", "ch7",
++					"ch8", "ch9", "ch10", "ch11",
++					"ch12", "ch13", "ch14", "ch15";
++			clocks = <&cpg CPG_MOD 218>;
++			clock-names = "fck";
++			power-domains = <&sysc R8A774C0_PD_ALWAYS_ON>;
++			resets = <&cpg 218>;
++			#dma-cells = <1>;
++			dma-channels = <16>;
++		};
++
++		dmac2: dma-controller@e7310000 {
++			compatible = "renesas,dmac-r8a774c0",
++				     "renesas,rcar-dmac";
++			reg = <0 0xe7310000 0 0x10000>;
++			interrupts = <GIC_SPI 416 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 417 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 418 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 419 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 420 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 421 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 422 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 423 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 424 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 425 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 426 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 427 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 428 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 429 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 430 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 431 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 397 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					"ch0", "ch1", "ch2", "ch3",
++					"ch4", "ch5", "ch6", "ch7",
++					"ch8", "ch9", "ch10", "ch11",
++					"ch12", "ch13", "ch14", "ch15";
++			clocks = <&cpg CPG_MOD 217>;
++			clock-names = "fck";
++			power-domains = <&sysc R8A774C0_PD_ALWAYS_ON>;
++			resets = <&cpg 217>;
++			#dma-cells = <1>;
++			dma-channels = <16>;
++		};
++
+ 		scif2: serial@e6e88000 {
+ 			compatible = "renesas,scif-r8a774c0",
+ 				     "renesas,rcar-gen3-scif", "renesas,scif";
 -- 
 2.11.0
 
