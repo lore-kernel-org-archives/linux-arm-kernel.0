@@ -2,59 +2,63 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1BA74C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 16:40:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4CF96C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 16:41:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E06812184C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 16:40:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 150F82184C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 16:41:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PpXVqWmc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E06812184C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hSJGHPUx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 150F82184C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=glider.be
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=g0ZJ73M/9u211jlLjTKlcC2kv/zwnrdYTT8XTjNl+9E=; b=PpX
-	VqWmcIm56nYOSU6tm0nsQrssjc70GpaiMmZb7adxMzHdhwag3fhgK8GnwUgK38wefVhsVCZosyYya
-	2/ukXAfIos5I4BiAhSQpHKE9VjXgdK4IiTdoreSvE9tiDNjHwbTCX1l+4GpszsGCInOvbr05QsQoG
-	nfTyvlfueg3TDmgYREt4C6yI7o+x4fdZb8LYN1rnjozcEW151ZiVzqhZErrGG7dp0THVaPUm7bzIC
-	in4hRZcK3ZIlsTseXufvX8bOPGAc7bcD3IDxwK+2YmKf8JxvtwMqgpzxipan0Q0lGqzKGdPgVEWvu
-	f60Nrbe2UR3hzqUTgNy4GK1u+kE4D0Q==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=l8JuPcKTha+p03v1DKqMu+OGZE5FkYOVmbjPTrjDuqg=; b=hSJGHPUxHS8GzpbgRGh7CR8ybN
+	lp5vnSij+kRIss48EmdnXYN+SaF9+Ycrv968aNtqP8Uzu1uZqHZxvkS5FyxyS+D4kYjx/tA7t7CY5
+	ythD5cL8i0IzK01w1ZNOTis/yweP6LewYepdq5P2A4/5bu8vj7XfL7p8qBdQpjTRNSLjYZCoodG2T
+	jBu98nR6KrwejyABEeptNlKkQZfflZBxJFRKBmWugRh/knwuvegGp+84VMl9ICX+fZlYZlDDIF0DP
+	4wpW5mNlPhHJGxvuBu2DUUMQrMjZQJVAw7xA4X3sDttI7qWog0/2IFqJc/4SZ8du1egVGEG1/lGLi
+	IyhzMhEw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmi3f-0002oN-EV; Thu, 24 Jan 2019 16:40:51 +0000
+	id 1gmi45-00039d-Ly; Thu, 24 Jan 2019 16:41:17 +0000
 Received: from albert.telenet-ops.be ([2a02:1800:110:4::f00:1a])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmi3R-0002d7-E4
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 16:40:39 +0000
+ id 1gmi3R-0002d8-GA
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 16:40:40 +0000
 Received: from ramsan ([84.194.111.163]) by albert.telenet-ops.be with bizsmtp
- id UGgU1z0013XaVaC06GgUhy; Thu, 24 Jan 2019 17:40:29 +0100
+ id UGgU1z0023XaVaC06GgUhz; Thu, 24 Jan 2019 17:40:29 +0100
 Received: from rox.of.borg ([192.168.97.57]) by ramsan with esmtp (Exim 4.90_1)
  (envelope-from <geert@linux-m68k.org>)
- id 1gmi3H-0008GN-Te; Thu, 24 Jan 2019 17:40:27 +0100
+ id 1gmi3H-0008GO-Tv; Thu, 24 Jan 2019 17:40:27 +0100
 Received: from geert by rox.of.borg with local (Exim 4.90_1)
  (envelope-from <geert@linux-m68k.org>)
- id 1gmi3H-0002Z1-RW; Thu, 24 Jan 2019 17:40:27 +0100
+ id 1gmi3H-0002Z3-So; Thu, 24 Jan 2019 17:40:27 +0100
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 To: Simon Horman <horms@verge.net.au>,
 	Magnus Damm <magnus.damm@gmail.com>
-Subject: [PATCH 0/2] ARM: defconfig: Enable support for RZ/A2
-Date: Thu, 24 Jan 2019 17:40:20 +0100
-Message-Id: <20190124164022.9810-1-geert+renesas@glider.be>
+Subject: [PATCH 1/2] ARM: shmobile: defconfig: Enable support for RZ/A2
+Date: Thu, 24 Jan 2019 17:40:21 +0100
+Message-Id: <20190124164022.9810-2-geert+renesas@glider.be>
 X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20190124164022.9810-1-geert+renesas@glider.be>
+References: <20190124164022.9810-1-geert+renesas@glider.be>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_084037_651149_A26FA0EB 
-X-CRM114-Status: UNSURE (   9.10  )
+X-CRM114-CacheID: sfid-20190124_084037_910210_4EDC40D3 
+X-CRM114-Status: UNSURE (   9.74  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -76,35 +80,37 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-	Hi Simon, Magnus,
+Enable support for the RZ/A2 SoC, including pin control, now the DTS for
+the Renesas RZ/A2M evaluation board is included.
 
-This patch series enables support for the RZ/A2 SoC in the Renesas and
-ARM V7 multiplatform defconfigs, now the DTS for the Renesas RZ/A2M
-evaluation board is included.
-
-Thanks!
-
-Geert Uytterhoeven (2):
-  ARM: shmobile: defconfig: Enable support for RZ/A2
-  ARM: multi_v7_defconfig: Enable support for RZ/A2
-
- arch/arm/configs/multi_v7_defconfig | 2 ++
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
  arch/arm/configs/shmobile_defconfig | 2 ++
- 2 files changed, 4 insertions(+)
+ 1 file changed, 2 insertions(+)
 
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 14e9255e48c3184e..9b0efac101abc992 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -86,6 +86,7 @@ CONFIG_SPI_RSPI=y
+ CONFIG_SPI_SH_MSIOF=y
+ CONFIG_SPI_SH_HSPI=y
+ CONFIG_PINCTRL_RZA1=y
++CONFIG_PINCTRL_RZA2=y
+ CONFIG_GPIO_EM=y
+ CONFIG_GPIO_RCAR=y
+ CONFIG_GPIO_PCF857X=y
+@@ -172,6 +173,7 @@ CONFIG_STAGING_BOARD=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_ARCH_EMEV2=y
+ CONFIG_ARCH_R7S72100=y
++CONFIG_ARCH_R7S9210=y
+ CONFIG_ARCH_R8A73A4=y
+ CONFIG_ARCH_R8A7740=y
+ CONFIG_ARCH_R8A7743=y
 -- 
 2.17.1
 
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
 
 _______________________________________________
 linux-arm-kernel mailing list
