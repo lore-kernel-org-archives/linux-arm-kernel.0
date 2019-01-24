@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3289DC282C5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 19:59:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2BB5EC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 20:00:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F3DB4218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 19:59:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E8D48218D2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 20:00:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TNoacwJ9";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="C2Q0VDKt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F3DB4218D3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="US2L0IH3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="ebTKTuOV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E8D48218D2
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cHSwFqe2Fv1J08DKJGkelsHuHblRi4fIBjSaUOUEKoU=; b=TNoacwJ9VjC6By
-	UcqY4bTZTX8SSH81nxgykcp9LUsVjiVwHW9lHJ8H8xyktzZCLZMx0LIT8IAWHuhWxjxphhOuMSL4W
-	snEnaczlL3CXONcwrkx7/grh4L5euj9bgdgtY74z3Azkp8pGROUFDUXfMyavs2ylj0FmAGBA3XXi5
-	n1v57ps/jJM2dKqcwOHOpShIypex0EKw4MHy3Am8QgKwxfWHj2KKKDBgKa4kUMmX2+bNlRh9NRfgV
-	lF7sTbER8Z8AfxGVQIW2tpL9ymjEyxmyKFRt56y0hhPYGNvYgmr8+TbOsL5rl69iyJbOAQliuCE3K
-	dPcHTb8i8/vcO8L0Fsrg==;
+	List-Owner; bh=hGoVabADvpyV7vFnv/z5UZvGjBX68+L3OhNzVFxxDLI=; b=US2L0IH39WmQui
+	PGMOdOwRGEWS4JI6+MOiWwpWULa6yMc1xfwKYKRm1a+J/xiz9z3T8/zeawUASACxvaqH3YvQ5xiIw
+	FHs1Kl0h6VZ9I6M1tf3fMaLZFHBaAyg4Qh1pohFmWFxr4nRPY6trRNdqsDH6v1gezPmt1gLwlwm40
+	PxyyMzHD1MbGRJNV2JdUiowm2Cr09TENWQ7gCp3zg+Xqw+p3FduEzcmcEbISA0QQIHPa2zffDDj9m
+	m53aCKMiFEchw+eytqNDP6zV9VzXeNLwX4X8P0Pv5oyQchIn7WqAk76G5r704UEdSTRUsTQ/X07X5
+	7UgsAzrY+y4tvtp2tN3g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmlAF-0007UC-UU; Thu, 24 Jan 2019 19:59:51 +0000
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
+	id 1gmlAX-0007zY-EO; Thu, 24 Jan 2019 20:00:09 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gml9s-00076D-Kp
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 19:59:33 +0000
-Received: by mail-pf1-x442.google.com with SMTP id r136so3534191pfc.6
+ id 1gml9y-0007DT-KT
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 19:59:36 +0000
+Received: by mail-pl1-x642.google.com with SMTP id z23so3391584plo.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 24 Jan 2019 11:59:28 -0800 (PST)
+ Thu, 24 Jan 2019 11:59:34 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=5Ak/RzbTyrrXIVZkdGtey2LIaf9k4mP2yZqsX+ON3ZQ=;
- b=C2Q0VDKtacLIgo4Mjh++5QTJFI5flCR8BhPzFH1OJGMSW92ZiSnDvX6ObOTGi3Vh+5
- 7GdaDav2EZc4+yTV3gCBsh3xebpBRzpcSM0E8wH+xdfQ8F/juUgrG29Ve/3dL2UTWiXv
- bammi2n2cGE1VQH6vo0jsMBdrZlBe0lWufylk=
+ bh=a8vOl3skF2N3dkaRRYLofdwZfQDV/6WD5CsnhZdLWdk=;
+ b=ebTKTuOVkL11ASo0UBwv/Mx+SzrHJ5oxFw3eMUKqwdsqzM4HdFzzv/TA4aIK7Y3Ftw
+ TcXzrmY5ETcR8XSeYVhErcnmF+JPo+UL0E/derqnYwa+gopPyOAQPmygRzw2jvMdg71o
+ V12iSQzJ2QeiT7Lxi5VBYJwZbP/np+wp/leXo=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=5Ak/RzbTyrrXIVZkdGtey2LIaf9k4mP2yZqsX+ON3ZQ=;
- b=B6y6JplbxgCn+dx3OqlIeanz3jjQKCmW5n9R6D4R4hgMLHYKW7IFNrGRU6EgTbtnjo
- MXA9J2RFeacs8vgmajAT2NNlfF8GEcQ80nOPEMD3dij3d/wHj37IXqfSU7AAgXZjJ4GY
- Qhf8F/YYwVDOJmv9DBuCTeP4tZLUFp8cg4tUmFd4TVLTZdO4DnkZmV1aVBPpjJtcKVMz
- l1Fu59a01pCLcyZ54i4iAIF0aQ/z0QCK3n1XIMyKlhxkUZ+o24L8oKLNrkIUcwLk33IP
- xrQGZpEJskIL/kdAGgL2KX7Ata9eMazSlsjXzSR7AzCvEB5s+U6fteV9fhLf9bsnpbUT
- s+Lg==
-X-Gm-Message-State: AJcUukdttgIosrcS4XEutOweWXkhEoUzkvcAkCfw0vx2Ow80/Zy8ZRLW
- x/GDTGkimbmTnN48Bsf/a9HwcgOYEYI=
-X-Google-Smtp-Source: ALg8bN70Hto641qCAhjyPHIEGxG0+WOYHri2dEXZu/4KY0n5xb4Bmf7S/rYMO8nj1Duk/+WXrZQc4w==
-X-Received: by 2002:a63:1d1d:: with SMTP id d29mr7244592pgd.49.1548359967683; 
- Thu, 24 Jan 2019 11:59:27 -0800 (PST)
+ bh=a8vOl3skF2N3dkaRRYLofdwZfQDV/6WD5CsnhZdLWdk=;
+ b=KVsl/HCrrGkpWRPYsoGZ4sm9F+2P/EoS6DUV5IbMkmA16k9mKNeChF23mMRETIkkga
+ ATmUk6jU+RIaBvd0fbZZU4AuepDyvA3gW1QGUEaimKNyeQlrc2CnS5uwAUqLRzFtDMI6
+ Ao1wH2i8ms3N6GG4eNcHKzyfMx8PsJlYPTG3W9P2KslWmg/Q52mlZ4lvsrgXPCjiW5VX
+ Wu0bV9Z6c0Qd4JeDh6lIbmz7AOwUcg50lIbjeU3+vzBwkiir4lXl1oWmN5tz5FX0eyQL
+ ocDPfvXnM4bjRUcGPfvSHj2SvLDAQKW3xk1OIPXy42PuCcy3zfAt+78ODheKtdDt4iP4
+ T0xw==
+X-Gm-Message-State: AJcUukdYNQBDz8/DNgvTHMC/71oeN9YDO0GkW2Yoo3nWPGQKrY+pkWO6
+ fa59wBUoMp7bX1+wJx3kl9LnmQ==
+X-Google-Smtp-Source: ALg8bN600OaZSBVU1MphHnvnL6Q/ASOz8fdtUlZH15Pf1qk+U2hWLSI1BdNwhM2H3XNJJT28S7ntjA==
+X-Received: by 2002:a17:902:848d:: with SMTP id
+ c13mr7959131plo.257.1548359973705; 
+ Thu, 24 Jan 2019 11:59:33 -0800 (PST)
 Received: from localhost.localdomain ([115.97.179.75])
- by smtp.gmail.com with ESMTPSA id x11sm61637003pfe.72.2019.01.24.11.59.22
+ by smtp.gmail.com with ESMTPSA id x11sm61637003pfe.72.2019.01.24.11.59.27
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 24 Jan 2019 11:59:27 -0800 (PST)
+ Thu, 24 Jan 2019 11:59:33 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
  Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>,
  Michael Turquette <mturquette@baylibre.com>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH v6 02/22] drm/sun4i: sun6i_mipi_dsi: Support instruction loop
- selection
-Date: Fri, 25 Jan 2019 01:28:40 +0530
-Message-Id: <20190124195900.22620-3-jagan@amarulasolutions.com>
+Subject: [PATCH v6 03/22] drm/sun4i: sun6i_mipi_dsi: Setup burst mode timings
+Date: Fri, 25 Jan 2019 01:28:41 +0530
+Message-Id: <20190124195900.22620-4-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 In-Reply-To: <20190124195900.22620-1-jagan@amarulasolutions.com>
 References: <20190124195900.22620-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_115929_515127_699932CF 
-X-CRM114-Status: GOOD (  11.47  )
+X-CRM114-CacheID: sfid-20190124_115934_707222_5D07A857 
+X-CRM114-Status: GOOD (  14.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,35 +108,52 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Instruction loop selection would require before writing
-loop number registers, so enable idle, LP11 bits on
-loop selection register.
+Burst mode display timings are different from conventional
+video mode, for burst mode most of the timings hsa, hbp, hfp,
+vblk are 0 and hblk is computed as (mode->hdisplay * Bpp)
 
-Reference code available in BSP (from linux-sunxi/
+This patch add burst mode timings and directly goto alloc buffer.
+
+Reference code taken from BSP (from linux-sunxi/
 drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
 
-(dsi_dev[sel]->dsi_inst_loop_sel.dwval = 2<<(4*DSI_INST_ID_LP11) |
-	3<<(4*DSI_INST_ID_DLY);
+dsi_hsa  = 0;
+dsi_hbp  = 0;
+dsi_hact = x*dsi_pixel_bits[format]/8;
+dsi_hblk = dsi_hact;
+dsi_hfp  = 0;
+dsi_vblk = 0;
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index a5fcee750bee..813d5523f1c7 100644
+index 813d5523f1c7..0f02bcc997a5 100644
 --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -403,6 +403,9 @@ static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
- {
- 	u16 delay = sun6i_dsi_setup_inst_delay(dsi, mode);
+@@ -477,6 +477,12 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
  
-+	regmap_write(dsi->regs, SUN6I_DSI_INST_LOOP_SEL_REG,
-+		     DSI_INST_ID_HSC  << (4 * DSI_INST_ID_LP11) |
-+		     DSI_INST_ID_HSD  << (4 * DSI_INST_ID_DLY));
- 	regmap_write(dsi->regs, SUN6I_DSI_INST_LOOP_NUM_REG(0),
- 		     SUN6I_DSI_INST_LOOP_NUM_N0(50 - 1) |
- 		     SUN6I_DSI_INST_LOOP_NUM_N1(delay));
+ 	/* Do all timing calculations up front to allocate buffer space */
+ 
++	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) {
++		hbp = hfp = hsa = vblk = 0;
++		hblk = (mode->hdisplay * Bpp);
++		goto alloc_buf;
++	}
++
+ 	/*
+ 	 * A sync period is composed of a blanking packet (4 bytes +
+ 	 * payload + 2 bytes) and a sync event packet (4 bytes). Its
+@@ -515,6 +521,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+ 	 */
+ 	vblk = 0;
+ 
++alloc_buf:
+ 	/* How many bytes do we need to send all payloads? */
+ 	bytes = max_t(size_t, max(max(hfp, hblk), max(hsa, hbp)), vblk);
+ 	buffer = kmalloc(bytes, GFP_KERNEL);
 -- 
 2.18.0.321.gffc6fa0e3
 
