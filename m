@@ -2,106 +2,80 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A631FC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 20:23:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C8E9C282C5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 20:24:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 74EA0217D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 20:23:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CF949218B0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 20:24:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZGJ1Qhr+";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="oxSMfGsS";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="XX85W9JM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 74EA0217D7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a+o6lHfq";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="bgKLtKIu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF949218B0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=TWe7p3O8nBjWTUbsHu8TlfOZ5UMmxjIkvhi+6DeSikI=; b=ZGJ1Qhr+QK0Eak
-	uZjisgdE1PMK7E/iQO4kuRi3WrbIzZxG4dNzv6o56oxUbxf5z4/jkHTQPkyw0qTlyibAWhjOpfp6A
-	wsESUBHzeeiZNopSFYlHulyfg9PYjl4mjWQN3/e7+I6k9/n5g/Y4K1WVSxf6qnomuAqi0InVKIdV5
-	1hsMh//A7NdHSX3nPL4NRjejxt4x5G3hDwVr3pBDXf5ooZsG6D1AVWxEcEh3HW0uJDO0P6kHkNLrb
-	PNo+NAyR/eF5jgZ0MtGKRdtWLKsvQfoBcO9HqU+BdCmAT2WR2MmjhohYYdE8/jC8TwD4Kfg9ZJIuD
-	Y5j7jDqV1Tjb6QQovS9w==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=gAHTkx+HofidQ2GErXjKh9Hds3INw/YakaZpVUChmiI=; b=a+o
+	6lHfqHm6fFog0EIeNg2McZW6+ZmzuTvniLGz6fsSSMYzOrkECnNQ/pNDbLOKRIeEQabEFU9lieiRU
+	DHW01skEPz3QMrd4tq7ILjMLx5ZPHh21c66BbcxAF+ViBP9uwnHTF7kEz9iuWII8vT+c13stnlbFx
+	lmjzEi+kbcboL8qif1x6n8HvP7YMXF2/BjRcV3ab94HqRfcbVezKntV7r7aOP8Du1C3q3szuX+1EA
+	JeL4vpWhqo3kJkJNDP/7Oef4zNvgUUv2ygx1jd89UNQIp5uAlrv1Zins2oyMhXuOhNBnI+dqJorXp
+	8hJ/kJZQKBSc0KdjjKEghoNbtefiyKA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmlWV-0005dx-6N; Thu, 24 Jan 2019 20:22:51 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gmlY8-0005ji-8q; Thu, 24 Jan 2019 20:24:32 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmlPl-0001KH-Pc
- for linux-arm-kernel@bombadil.infradead.org; Thu, 24 Jan 2019 20:15:53 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=gRegVC+JR56IFWmVyKDLRuzzRXdOa660M3yO267QTPA=; b=oxSMfGsSe679z2JuKZQWiYg4IZ
- yqcgc3XFXBmyVmatEl5flZWCCFTiXmnONNwznLGxmGYgENDZsevGyW2ncPQUvvdkvz+2EiftYq11y
- g35qGWU+H4Rs0b/JGQ+Mh/vHM7l1eWOHdD2501VcOzlEc0ADusoHJ5/8OpVD2R5ovWckpWmJj6vZK
- ldoXSjPgDwMZtIKTYpQOTT6mzZEpPatgxNOvD+msfUkZ6xYswtPn4EpkfI+k6pNU12lLwOURjNuMC
- WndZ+DKSdPFZYGa5HesrmMK813uVdlC1wNr/cDAQpXSmq3afq7w78r6hnoNFkqYmqvc/9qXY2I+9w
- mF2LEoWA==;
-Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmlAm-0001ug-Ho
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 20:00:26 +0000
-Received: by mail-pl1-x643.google.com with SMTP id u18so3380420plq.7
+ id 1gmlY4-0005jM-Mi
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 20:24:30 +0000
+Received: by mail-pf1-x441.google.com with SMTP id q1so3559992pfi.5
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 24 Jan 2019 12:00:24 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=gRegVC+JR56IFWmVyKDLRuzzRXdOa660M3yO267QTPA=;
- b=XX85W9JM3QzoUOQIUKI7V8K9T+EZDaVppVDplpV+yN1RPAMtaDZrW/AyjORDOjI8R2
- oeVCvGNdLCTdca/8je/awH7tFatX6ja4JUCYXSCk0A7RlqPgtsbBRY2O68UN/0AVVcNl
- boDqEEXIrUS6d884VQIkLDAhxC0fi+LAMUjMo=
+ Thu, 24 Jan 2019 12:24:28 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=bp8b67pG2vTJ7yWzC/S5wh8lIvcx0mZj/HjgKpZRDlc=;
+ b=bgKLtKIufJMwtHBgfGMqC+7n6MJbRWrqDhVyWcgTLdVlF3WxSryGjvn4NFTKtMxnul
+ eISMksc55KItcYirUqh9zmt3q1zdsoWrjRSJI3d9JPvgTHVMFxU4jAslj5SOImQOq8UY
+ RMT8wZeWsgM2jT9P/HZ3zwnrHEu9QZq8RLAOg=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=gRegVC+JR56IFWmVyKDLRuzzRXdOa660M3yO267QTPA=;
- b=qteP3f9FKKS4H7pTELVhw5yu/pOAISfvRymiCdwjCCRAHG/9afz7z5/kW1F2UaQNo4
- MHFYdYwlaUAhbxMFG6+PQPVmQARsd9UMqRtLAr1DDtOhL8jlivhD1rhyxGHFLnYrUQ7L
- gSZyrrlW9g+uvNHolAKYUk2yd6STNquynq8swHOtsH1WZAPZjJrtjCNTSZ0ki4JXzd9X
- EW0B/kJ8EUIAbt1AKATTUc1uri9rRCiuvA7nAy5aZap98JN5aUgPkUl0qkWvZtktwFfD
- Sg6RCaXPZIvAQ8M19C/JpyEwqw3rS87ssVeBitZz1/GfVjmNgKZJH19GDMD5dVi4BV0l
- vPSw==
-X-Gm-Message-State: AJcUukfslvHzBWY62Pi7F9+S4Sy3mf+mlixiCFTyG8NXJNTkfQYO0yAK
- kYFpDCUfIN6Y5JkjZunnndzi8A==
-X-Google-Smtp-Source: ALg8bN7GxiLQI9M5eT3P6PNQeyDSKSr75K/UljM/ECi4BQLWX9qt+fR+VTx5SODUcxnpR82iuSKXHg==
-X-Received: by 2002:a17:902:584:: with SMTP id f4mr8117719plf.28.1548360022788; 
- Thu, 24 Jan 2019 12:00:22 -0800 (PST)
-Received: from localhost.localdomain ([115.97.179.75])
- by smtp.gmail.com with ESMTPSA id x11sm61637003pfe.72.2019.01.24.12.00.17
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 24 Jan 2019 12:00:22 -0800 (PST)
-From: Jagan Teki <jagan@amarulasolutions.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
- Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>,
- Michael Turquette <mturquette@baylibre.com>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH v6 12/22] dt-bindings: sun6i-dsi: Add VCC-DSI supply property
-Date: Fri, 25 Jan 2019 01:28:50 +0530
-Message-Id: <20190124195900.22620-13-jagan@amarulasolutions.com>
-X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
-In-Reply-To: <20190124195900.22620-1-jagan@amarulasolutions.com>
-References: <20190124195900.22620-1-jagan@amarulasolutions.com>
-MIME-Version: 1.0
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=bp8b67pG2vTJ7yWzC/S5wh8lIvcx0mZj/HjgKpZRDlc=;
+ b=JOYLiunbLsuokQqj0UXHPpvScjR6eGCdatV5yr/0QKfvP0xs9gqUGZHQOc0aHEQ3S/
+ u7AOj3HJLTCll1vUcmH6KtA/8yk7cGeK0m5Xet6dJfO5oYr9MQj6Uz+WrGzVpMtXEUxl
+ yoLhFSyTAzZLD6ATcK0FT0Ih5iXJ6u6NRREtwqgvh86SYwTZfEveDf8n5Xc+S/kWjm/Q
+ jHupeHbDU9HW/3lu5IstIxxDawhbho/F4zQ3Flf+qmt8xc6BQ35Sc9G9IP3VDK51v20Z
+ bEg2pWYXonGjhecDYieBVnxCvoLqMKvbUDzb4Q9sWiI8zEPB2O2aF0Z1kBWPmsbHhVEc
+ pSOw==
+X-Gm-Message-State: AJcUukeCNCJhdWVFBzE5thgDlFd32f5T2h5aAH+CNxm7f1BSdwDxudo7
+ u7b6DRf6Xd39RdAYEI25Rw/rCSHYLEwbCg==
+X-Google-Smtp-Source: ALg8bN4dXRv1fmtfHH9kDqCWAAdrhTfrb2iLdGric4sRzwtXAUuaN++SnL9PbVNOik8ST2bSLXtLug==
+X-Received: by 2002:a63:c848:: with SMTP id l8mr7214918pgi.78.1548361467519;
+ Thu, 24 Jan 2019 12:24:27 -0800 (PST)
+Received: from localhost.localdomain ([2601:1c2:680:1319:4e72:b9ff:fe99:466a])
+ by smtp.gmail.com with ESMTPSA id
+ c72sm45263309pfb.107.2019.01.24.12.24.26
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Thu, 24 Jan 2019 12:24:26 -0800 (PST)
+From: John Stultz <john.stultz@linaro.org>
+To: lkml <linux-kernel@vger.kernel.org>
+Subject: [PATCH 0/8 v5] k3dma patches to add support for hi3660/HiKey960
+Date: Thu, 24 Jan 2019 12:24:15 -0800
+Message-Id: <1548361463-28372-1-git-send-email-john.stultz@linaro.org>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_200024_736199_12ECBFBE 
-X-CRM114-Status: GOOD (  14.34  )
+X-CRM114-CacheID: sfid-20190124_122428_745700_E8C1D41B 
+X-CRM114-Status: GOOD (  12.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -113,46 +87,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, linux-sunxi@googlegroups.com,
- Jagan Teki <jagan@amarulasolutions.com>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-clk@vger.kernel.org,
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Guodong Xu <guodong.xu@linaro.org>, Ryan Grachek <ryan@edited.us>,
+ Zhuangluan Su <suzhuangluan@hisilicon.com>,
+ Tanglei Han <hantanglei@huawei.com>, Wei Xu <xuwei5@hisilicon.com>,
+ Vinod Koul <vkoul@kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ John Stultz <john.stultz@linaro.org>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ dmaengine@vger.kernel.org, Dan Williams <dan.j.williams@intel.com>,
  linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Most of the Allwinner MIPI DSI controllers are supply with
-VCC-DSI pin. which need to supply for some of the boards to
-trigger the power.
+This patch series is based on recent work by Tanglei Han, and
+adds support for hi3660 SoCs as found on the HiKey960 board,
+along with a few patches I've been carrying.
 
-So, document the supply property so-that the required board
-can eable it via device tree.
+thanks
+-john
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 3 +++
- 1 file changed, 3 insertions(+)
+New in v5:
+* Minor typo fixes, minor rework to use BIT() macros 
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-index 6a6cf5de08b0..69e233e8fad1 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-@@ -27,6 +27,9 @@ Required properties:
-     first port should be the input endpoint, usually coming from the
-     associated TCON.
- 
-+Optional properties:
-+  - vcc-dsi-supply: the VCC-DSI power supply of the DSI encoder
-+
- Any MIPI-DSI device attached to this should be described according to
- the bindings defined in ../mipi-dsi-bus.txt
- 
+Cc: Tanglei Han <hantanglei@huawei.com>
+Cc: Zhuangluan Su <suzhuangluan@hisilicon.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Vinod Koul <vkoul@kernel.org>
+Cc: Wei Xu <xuwei5@hisilicon.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Guodong Xu <guodong.xu@linaro.org>
+Cc: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+Cc: Ryan Grachek <ryan@edited.us>
+CC: devicetree@vger.kernel.org
+Cc: dmaengine@vger.kernel.org
+Cc: linux-arm-kernel@lists.infradead.org
+
+John Stultz (3):
+  Documentation: bindings: dma: Add binding for dma-channel-mask
+  arm64: dts: hi3660: Add dma to uart nodes
+  arm64: dts: hi3660: Fixup unofficial dma-min-chan to dma-channel-mask
+
+Li Yu (2):
+  dma: k3dma: Delete axi_config
+  dma: k3dma: Add support for dma-channel-mask
+
+Youlin Wang (3):
+  Documentation: bindings: k3dma: Extend the k3dma driver binding to
+    support hisi-asp
+  dma: k3dma: Upgrade k3dma driver to support hisi_asp_dma hardware
+  arm64: dts: hi3660: Add hisi asp dma device
+
+ Documentation/devicetree/bindings/dma/dma.txt   |  4 ++
+ Documentation/devicetree/bindings/dma/k3dma.txt |  4 +-
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi       | 20 +++++++-
+ drivers/dma/k3dma.c                             | 61 +++++++++++++++++++++----
+ 4 files changed, 78 insertions(+), 11 deletions(-)
+
 -- 
-2.18.0.321.gffc6fa0e3
+2.7.4
 
 
 _______________________________________________
