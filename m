@@ -2,121 +2,87 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B2D6C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 10:35:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B0DAEC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 10:35:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5A37A21872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 10:35:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7F11821872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 10:35:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LNGTjWLv";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="BFHkNe/j"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A37A21872
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eSqpCmmw";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Tq9ww657"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7F11821872
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pPg4JPyQloeEVVHQaf6nwqQJ9UToqTRdk8VCGSpTci0=; b=LNGTjWLv5Yrtdd
-	BNqcYnq5aQ8mfDQ35OtQN6jTbG8Qz6jbQ4S1E+pe8TzPwacfL/tKuCNI9yBV88vZtUP0vh8+OShCN
-	klAN1oQXL2RM+mJNG8BGdpzWrsIGGotuC6H1HnSFuNKgidjIfqAPMxW+niV5aUKvbl0QRTkR9fCZV
-	zg82BQWzUpquZh1wE+0NEwePgxDb5uol8oUrue/ON6vIKHYXuXS7BL7pFwGD9R0JvR0RFfsy5EU2g
-	19X3A5NLu9zPQDs3X0TGT+r2zzyoAXLKDvoFv+089X0cXDlpXYDELwrCQgCDprmKtUtam2fJ5GSDJ
-	X0UDsQcj1epg/PJmaDAw==;
+	List-Owner; bh=qf68rPfHDDa1MbkFncQmCnKUC0IxT7SMn6Bt604suwc=; b=eSqpCmmwinKGUm
+	G9qN1iLSBvSM7SDFdMzWOjMjvD7UmF8HOjbmG8s9yfMb5pgQ6qygcy1/sJaqUghZklJqYpAmwF46Z
+	NbFUV87PnW7Jrk4fUFCUXNKZ7Oc67SIQ1uzTmM27SAw6muthkM7Xpec/qzyhn9Q30nrN7kq6ScwRa
+	wQQZcIOFiw+E5NaPY4hY37uI4dR/aeI9rilCp3Ic7G86kwabF5HBCN/bDGWw9fn3B1v5qlWunIy1D
+	5R7g+keEuE+Q+kKczcCtb9r31VZlyNuLZhmwi76U8ecVahyuaUVImp5V7YtuqdMtnc+Nlu5m/PPjN
+	6RSDtsTNtx0GG1Ewjxnw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmcLe-0004d3-EJ; Thu, 24 Jan 2019 10:35:02 +0000
-Received: from esa1.microchip.iphmx.com ([68.232.147.91])
+	id 1gmcMD-0006Dx-C3; Thu, 24 Jan 2019 10:35:37 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmcLZ-0004bv-GG
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 10:35:00 +0000
-X-IronPort-AV: E=Sophos;i="5.56,515,1539673200"; d="scan'208";a="26827529"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa1.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 24 Jan 2019 03:34:53 -0700
-Received: from NAM02-CY1-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.105) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Thu, 24 Jan 2019 03:34:53 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=f30V+qbfBuV88b2q2Qp9GmqMjvJnFu56HwNB0lPWQ5E=;
- b=BFHkNe/jF2GY46Xw3Wur2+Uu/2fisIRdOAajC0nL5g+u6+IddjGemaKh79GULoo7IvxLxcbNtg/gSEJJjwBi5VeWP+hjSGrlomlybZKQT0UBFyb4X19OG6jLmY+vy+32n8FkV/68ZEBa4ySIzCP82hbou7JwPOXNdV/MshNkxPk=
-Received: from MWHPR11MB1662.namprd11.prod.outlook.com (10.172.55.15) by
- MWHPR11MB2013.namprd11.prod.outlook.com (10.169.234.23) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1558.16; Thu, 24 Jan 2019 10:34:50 +0000
-Received: from MWHPR11MB1662.namprd11.prod.outlook.com
- ([fe80::890b:3c0f:a8f4:5de5]) by MWHPR11MB1662.namprd11.prod.outlook.com
- ([fe80::890b:3c0f:a8f4:5de5%7]) with mapi id 15.20.1537.031; Thu, 24 Jan 2019
- 10:34:50 +0000
-From: <Nicolas.Ferre@microchip.com>
-To: <sre@kernel.org>
-Subject: Re: [PATCH 6/8] power: reset: at91-reset: add support for sam9x60 SoC
-Thread-Topic: [PATCH 6/8] power: reset: at91-reset: add support for sam9x60 SoC
-Thread-Index: AQHUs8tdXETHJiEk9kOBJGz8hjKFtqW+OTyA
-Date: Thu, 24 Jan 2019 10:34:50 +0000
-Message-ID: <a74956fc-6085-eec2-c1b8-ed116b2297d8@microchip.com>
-References: <cover.1547629763.git.nicolas.ferre@microchip.com>
- <7e68a0298b8802edaead1f9c011f9c2e191ecf6a.1547629763.git.nicolas.ferre@microchip.com>
- <20190123183443.ppxdfstmau2xtodi@earth.universe>
-In-Reply-To: <20190123183443.ppxdfstmau2xtodi@earth.universe>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: CWLP123CA0056.GBRP123.PROD.OUTLOOK.COM
- (2603:10a6:401:59::20) To MWHPR11MB1662.namprd11.prod.outlook.com
- (2603:10b6:301:e::15)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Nicolas.Ferre@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [195.6.168.232]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; MWHPR11MB2013;
- 6:3c/iXhypUXK75R2d4DM04cHaLT4NDEFY7tfgUOczIeO8cKyXIymlC4axLSDeqr+r1SKFNYox8wXing7/yGSgjxHfwBtkGV2JAXK1C2RzMau4IqPhVBeVaWaTurEa6794e37QGr31YuNJzO90h2G4FG0/pGHMxquCcTfADXbAPQTV6xKvQ8tqTRi17UOtJSuhlgZsOjn/7f95r3pRDYocttq/bDkZm7yg3N4k/UKc/fChiWXfhWGuVDFO4HuzEYd1KiVCJ9D21JGDr4LMMtvRiTIsl24mOtSQrlIO2PAcWkorys2yrtMvB/pTAzJ/O1K+4/zk8srG8O/DcoVdahrbxU/4koVkd0rSPUk3eD5ubCarvvQeuGGIDcRtMrTW2lOpwIgtAdiN2p8GWH9p227ojuumfFVEW8LO0WCkOwkroSxcdT7JLa45YszDn+ekVsdEOCnVSMzkbMEoIeTW6yO6LA==;
- 5:7dexNYkWGlcBw/w2R+w7VmHePZUZdq4lAeSI1dq9fD58H7P8ZU9LA0QUAqx5IDHOI83VqiCNHTse1cPNuGUO7FojoJP0MaqjtwCIvOylTc95cxrSsJjYEBvvE+Z8JKQ3bPAeqlgEf7L03z/GrufK9VAlUzDAY3N5CVPwGo+BXTujy2spvosaP4R293BKgkqD+KWjAaIl4LEH1nNG9lIHwQ==;
- 7:C8YhkDRaDYK5eqAISAjo8WsS5RdBDlKnMVEKjJzNTWLtdiXY+txC+PQQwCeCebEwoe/9lD96bd8fc8RrnbzwMmvL4YBdjgYwwIwxJ8PSs/nAA78ynrZVle0uz0HiJ12Vs3QRQcAfYToAnA5DmwHEVw==
-x-ms-office365-filtering-correlation-id: 3c7628c7-6b10-47b8-0c3d-08d681e79195
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
- SRVR:MWHPR11MB2013; 
-x-ms-traffictypediagnostic: MWHPR11MB2013:
-x-microsoft-antispam-prvs: <MWHPR11MB20131F4126E532E286AB6196E09A0@MWHPR11MB2013.namprd11.prod.outlook.com>
-x-forefront-prvs: 0927AA37C7
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(376002)(346002)(136003)(366004)(396003)(39860400002)(189003)(199004)(52116002)(97736004)(106356001)(486006)(7736002)(31696002)(76176011)(105586002)(31686004)(86362001)(446003)(72206003)(68736007)(305945005)(6512007)(8676002)(14454004)(81156014)(53936002)(186003)(26005)(66066001)(478600001)(102836004)(36756003)(53546011)(81166006)(71190400001)(316002)(6116002)(2906002)(7416002)(71200400001)(8936002)(386003)(6246003)(25786009)(6436002)(6486002)(229853002)(99286004)(6916009)(11346002)(476003)(6506007)(2616005)(54906003)(3846002)(256004)(4326008);
- DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB2013;
- H:MWHPR11MB1662.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: ZVBOIF6faSWg6RX88/Sv4MbVhy81dorWf9LToTBjOf5nY6nVKgPLiOxfL9z/xttYYDxtATcQWkGvxbydGOD2QHgAJsYkozcomeDHVyAHV6KoJGhmUi1DcArcC9bEEWfpi2JUYP2zq9gKgzUfPQxqAMvZ0qDaJ7kM88up2fpmlIeYr83M18gnxy6ujoLh3QVYIFXkv2TehOor05e97xndgEK+fj1brNJFONua8Tz9dQVhV6b+C3tU90Hj4pSgmZo5MZjQGrHnIKlARIjJluhr/yXJJ9LPS7yaO52IoT3TrRe/92BsnMEp2O0DgyewcpSoYqsG37AVmlfaz2AjnKOU07Zvkv6hJhs6RvK79q12HaVFZ13vRM72SFYVKwiBXBKtsrXit2daBGPm2trI+OTUZgDs7Zg5jS3tEDtiU7ZESmg=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <642BCDF518A7F14D94401399BB09A101@namprd11.prod.outlook.com>
+ id 1gmcM9-0006Cu-QW
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 10:35:35 +0000
+Received: by mail-it1-x141.google.com with SMTP id a6so3653121itl.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 24 Jan 2019 02:35:33 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=DxbJL4ZzcPGmo3x32HRFW7MZrbBGNIu7eISt3vQRymM=;
+ b=Tq9ww657YOwU12AEbCe37UjZ4NLzUL24vEbQxQrQ6o++y+pyJvRiFIUUYDsdrUB6fp
+ /4wt8YoVZ+GcxepKy/eOukDXHRve4ys1xTW+8Es8wSLuXpgCDQLiP3n87Qe49GhK2Nhn
+ 4IU7VIMUpQC5gbf6Ww1QJG97CNsU1ZumhGAsk=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=DxbJL4ZzcPGmo3x32HRFW7MZrbBGNIu7eISt3vQRymM=;
+ b=d4e5NrP4EQxJdz5nK0LNdKh36C1HynpZC24OYpaAHTAoZuNbN8Z02IhvpPDI2FE4f5
+ zszvOksPMqJkGO3kFlfdXOcxmhdMPPmcaIB3IEBaVSNFFtjJ6czxuvaoSvQv4hPYYgym
+ VxWaPtvDhq1iPZf8etfUU54lN9j9IpQbJOtT0G9hTTo8ZECFjhcTjRbSUM3LeI9yuVca
+ RdS7K/AKIzz6r+81QRp7LJ0Te0TxxaakNk+SZD59poywvwrl8MFt4YN2vmmpGOYoYjVh
+ TjOSwGUUti32MXypnxjVkRPSNqt0nUB4QyVT0wAVOCRCy7HRrVNqZMN6gKFtcS8hXNA+
+ fVNw==
+X-Gm-Message-State: AJcUukdvBVH3gx1AFvmM+OFUFCVVIiVf5seW6jjJ++hoQ7G3jvBhN5MM
+ wkEJ+h8S4GWi/sVJ0uGR5ZWE
+X-Google-Smtp-Source: ALg8bN4OtsPTuqWnMQqX6ejMX/LeJMhDLMZBstV0CXMlDbTm/au6/Yh7KxfKb8oUh8HtDx4S+X/n5w==
+X-Received: by 2002:a24:55d4:: with SMTP id e203mr1008435itb.36.1548326132324; 
+ Thu, 24 Jan 2019 02:35:32 -0800 (PST)
+Received: from Mani-XPS-13-9360 ([2405:204:73c6:b855:b411:39cd:c90d:867f])
+ by smtp.gmail.com with ESMTPSA id y8sm10626613ita.5.2019.01.24.02.35.26
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 24 Jan 2019 02:35:31 -0800 (PST)
+Date: Thu, 24 Jan 2019 16:05:23 +0530
+From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+To: John Stultz <john.stultz@linaro.org>
+Subject: Re: [PATCH][RESEND] arm64: dts: hikey: Add DMA entries for Bluetooth
+ UART
+Message-ID: <20190124103523.GA20854@Mani-XPS-13-9360>
+References: <1548275437-6022-1-git-send-email-john.stultz@linaro.org>
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 3c7628c7-6b10-47b8-0c3d-08d681e79195
-X-MS-Exchange-CrossTenant-originalarrivaltime: 24 Jan 2019 10:34:46.8682 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB2013
-X-OriginatorOrg: microchip.com
+Content-Disposition: inline
+In-Reply-To: <1548275437-6022-1-git-send-email-john.stultz@linaro.org>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_023457_704821_320D74DC 
-X-CRM114-Status: GOOD (  15.78  )
+X-CRM114-CacheID: sfid-20190124_023534_119966_306D81E9 
+X-CRM114-Status: GOOD (  16.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -128,66 +94,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, alexandre.belloni@bootlin.com,
- linux-pm@vger.kernel.org, netdev@vger.kernel.org, linux-usb@vger.kernel.org,
- linux-kernel@vger.kernel.org, Ludovic.Desroches@microchip.com,
- robh+dt@kernel.org, stern@rowland.harvard.edu, gregkh@linuxfoundation.org,
- davem@davemloft.net, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Ryan Grachek <ryan@edited.us>, lkml <linux-kernel@vger.kernel.org>,
+ Wei Xu <xuwei5@hisilicon.com>, Rob Herring <robh+dt@kernel.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Sebastian,
-
-On 23/01/2019 at 19:34, Sebastian Reichel wrote:
-> Hi,
+On Wed, Jan 23, 2019 at 12:30:37PM -0800, John Stultz wrote:
+> Add dma0 references for bluetooth uart to enable dma
+> for bt transfers.
 > 
-> On Wed, Jan 16, 2019 at 10:57:42AM +0100, Nicolas Ferre wrote:
->> Add support for additional reset causes and the proper compatibility
->> string for sam9x60 SoC. The restart function is the same as the samx7.
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
->> ---
->>   drivers/power/reset/at91-reset.c | 13 +++++++++++++
->>   1 file changed, 13 insertions(+)
->>
->> diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
->> index f44a9ffcc2ab..44ca983a49a1 100644
->> --- a/drivers/power/reset/at91-reset.c
->> +++ b/drivers/power/reset/at91-reset.c
->> @@ -44,6 +44,9 @@ enum reset_type {
->>   	RESET_TYPE_WATCHDOG	= 2,
->>   	RESET_TYPE_SOFTWARE	= 3,
->>   	RESET_TYPE_USER		= 4,
->> +	RESET_TYPE_CPU_FAIL	= 6,
->> +	RESET_TYPE_XTAL_FAIL	= 7,
->> +	RESET_TYPE_ULP2		= 8,
+> Cc: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> Cc: Ryan Grachek <ryan@edited.us>
+> Cc: Wei Xu <xuwei5@hisilicon.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: linux-arm-kernel@lists.infradead.org
+> Cc: devicetree@vger.kernel.org
+> Signed-off-by: John Stultz <john.stultz@linaro.org>
+
+Acked-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+
+Thanks,
+Mani
+
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> what happened to 5? :)
-
-That a good question ;-)
-
-It's marked as "Reserved"... which opens up a whole new field of 
-speculation :-)
-
-[..]
-
->>   	{ .compatible = "atmel,samx7-rstc", .data = samx7_restart },
->> +	{ .compatible = "microchip,sam9x60-rstc", .data = samx7_restart },
->>   	{ /* sentinel */ }
->>   };
->>   MODULE_DEVICE_TABLE(of, at91_reset_of_match);
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index aec9e37..fa15a08 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -319,6 +319,8 @@
+>  			clock-names = "uartclk", "apb_pclk";
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&uart1_pmx_func &uart1_cfg_func1 &uart1_cfg_func2>;
+> +			dmas = <&dma0 8 &dma0 9>;
+> +			dma-names = "rx", "tx";
+>  			status = "disabled";
+>  		};
+>  
+> -- 
+> 2.7.4
 > 
-> Patch looks fine to me. But I will wait a bit with merging, so that
-> Alexandre or Ludovic have a chance to provide feedback.
-
-What about merging this patch with the whole series through the at91 
-then arm-soc trees?
-
-Best regards,
--- 
-Nicolas Ferre
 
 _______________________________________________
 linux-arm-kernel mailing list
