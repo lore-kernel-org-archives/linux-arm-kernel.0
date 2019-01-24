@@ -2,22 +2,23 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B5792C282C5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:45:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CDC19C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:46:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 84F87218AD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:45:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9A9E121872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:46:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qFvzyVHD";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="VNVplABe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84F87218AD
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iy4bgbhY";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="a1LfWsPL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9A9E121872
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,73 +26,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gj9YaWgW9dUGo+6OS/Q9+p7HGgYeNSS/+DRFD9/BhMk=; b=qFvzyVHDL1pMkT
-	0H9JAbgICx1izWC+DB2Ch1broUgnQrva+CMdPatVk+QegQwqKzBzLjWPTT6XsVtDDBshbGZ7gfgl8
-	UYa+PmF+zBF51m+mtgL1k4xAGPPyFO4s/zqxvTceWK6Gi5U/HwqdB3K5uaqU6zC/Wt9QHrUSELloD
-	3SZQ+Q6LJJVBBPos5xwDlQx0DHfUB44wkegSL0gbhg1AFURTUjWHjQVOTQcp/oa0ProdcMcjIeTkM
-	kC8OdIqhUYAENhMI+y8MyJi62czhSl1VLEXLIDkVIN8vGjlhcsLpcW0GQfqHlSyujV5GeNowLsZjw
-	rxrjhgM5uygWVV5SdZlA==;
+	List-Owner; bh=krzH7e0ny3IDNUz9Qcnekn+GSUm3+DrRIZDDH2iW138=; b=iy4bgbhYiZ82Px
+	o6ec1P2iwTrGAzHdszpiRgBdCEImorfcxCINkT/26/Ik072+Zkp060n4nlBfzOrsd5lDK2oACk4Fm
+	GND16F9I8A32CQyNB49KNh+48RoROiLGN3t6Cfzc+KH+vb5HO9KRYy4eZ1X8mPm2PlYQ970dvcXnp
+	xofkM3KBCwrFCEXEXBNUr2R1I90Rc4DA8KeHJnKBIAUQwLcuUeNyx5ID61oj5MUBFXb9qy8BSs/QD
+	52cWHkjdR8C35KYQJxyixsA/84GFhhwdXS4L/C+cS8RN7q+mxcpnNWhccSzz3rXtEFx+L7EQcI12B
+	jYElQJ92BSxX3cNr1MIA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmdS2-0008H5-Ho; Thu, 24 Jan 2019 11:45:42 +0000
-Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
+	id 1gmdT0-000076-Bj; Thu, 24 Jan 2019 11:46:42 +0000
+Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmdRy-0008Gg-A6
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 11:45:39 +0000
-Received: by mail-it1-x144.google.com with SMTP id h193so3926452ita.5
+ id 1gmdSx-00006j-Df
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 11:46:40 +0000
+Received: by mail-oi1-x242.google.com with SMTP id c206so4608468oib.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 24 Jan 2019 03:45:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ Thu, 24 Jan 2019 03:46:39 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=RiJfJVQn9ipocanilHbvN+pBTvJFO8m0bUxVSuu/m2c=;
- b=VNVplABefsVH3G65rFsCVd95d3nFQzasRDyGQyOcfzKBnZo59YcwuB0nFeJN4/RTp7
- UkJWxDvaDAMRmwh9TC6wvi1CBLDV+Lni+upFBmMKwDku8vea3GAYMf+mx5pRTFolpr95
- FCQCXOVWlxVPhuCjV81tMk+AE6bEldE03mXzg=
+ :cc; bh=HCLaqfqxnIx3CTAyuVAUeiFx47dXR5GwtO3X8bsylQo=;
+ b=a1LfWsPLyJA3ERMeCOPhOSbjIFoMeurGet446KKOhDlw4hpOuVXSyDIFLKOYlyR5qn
+ YN1BPRhTX2yZl3vpAq2JV4kvbwJrZhOk0sOZNQWBi7fneJfs2AqvFVyWM/R4lH/JzC8V
+ TEcgBjaxQnv88NTWgHtZ0QwOlkMO8pmXXFkMTSmzc2UvPgdHTZ5rAhl0OrbbujHIaG+/
+ LR+6Z6pmUZw82avpQimSnc8wHY/G8Yt3VlGEMf/dQhLphy27mPS1MHDmOv3Mc8wZd6Yg
+ bWxEHmOVUeHfa+kuLaBnu4p9fNuqOwlaAnL/88ka9h5sZOT5ddXWAxY3nbpoLVXqZXC7
+ GFmQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=RiJfJVQn9ipocanilHbvN+pBTvJFO8m0bUxVSuu/m2c=;
- b=GbLHGF0akkrst5B6MTZhWNll1rxJ3XGH6dWClo/MiV9jm0Zwax36K8A8n1c4eq/3BM
- 41wo7Ng5g11OFvj6ZxG7dIKLmdeEvWYtGmp64W6Fl4gFoCOzUD7LSCUb/fUOm1SG8RLL
- 1nVNt+pe256T1b8zLOQ6SLHwG8sAdccygHcZ+XmWgLCz8cP3wELAotjwugDwMKdlVoyL
- /u59DDUV8UZ+BBPyf2Xt58Uq1JFU1Qi4573OiuZ1xJt3V8C2SDIez4K6LKmZn4ORK45M
- gfLvc2S/FzPVCThmx3Mpf5jAfT/O7mHnqg37zvPe8IU/D6+VRbgkW1w5MLB2FYI08LDY
- t99Q==
-X-Gm-Message-State: AJcUukc4kgK7IXC0qCtpdw+mE98MPPxSgIvRv2Hh9CThSHZhrL1As95P
- fi/OvgLyxC+SmONvrRIsJ6tNP5TxZyZTKdVl34COGw==
-X-Google-Smtp-Source: ALg8bN7RJk9pFgoljMBv8BpeMril0v9qmuiLoksGmfhoHFtngyp2v2obV+aAdZ5LxBqgjK7TZs9ERIbZWeKHu3cmNOk=
-X-Received: by 2002:a24:edc4:: with SMTP id r187mr1302451ith.158.1548330337048; 
- Thu, 24 Jan 2019 03:45:37 -0800 (PST)
+ bh=HCLaqfqxnIx3CTAyuVAUeiFx47dXR5GwtO3X8bsylQo=;
+ b=MLoLoCkacvNrBX896VChjrzbrABTAKZl1yIFqBXc5yV1gGleXaEe0DkhZ46xrVGENO
+ 6X+jF5WNgPOx9UJDqf3YaD8RUqPijhJuV6WeIVz0dwFH9t0sk5c2BTJollwlAegpg0NN
+ KDOxnGCBGPlUyEXsyROj3zmBx++kkV27RJyA3IVwqIG/aY39CWsvry4LVdTbdSlgowqz
+ XYYDv/Ce0r02B9DUyyyoKbc/KzCBVtmhsecTfNVK7kKkkXPlPd5KyTFYj2KYOjUGsYPo
+ NyogMGrxItfS71vVIPelAut9bbMp3CGEg9pGFsB9q7Xvq0c9LPGA1pBvMOG3GMyO5g/x
+ 6QHA==
+X-Gm-Message-State: AJcUuke3xpJWt+eQmaNnZMGd1m/W/iTC0M307Vsz2xgcSeILfB4J4o34
+ 4B0GOGFvtBR2W20Qb5RbDCSg01+1tQJGtHL16gc=
+X-Google-Smtp-Source: AHgI3Ib7ncBFVqodang+8JXtzpYyhabPDb8yUpYDev1bqJrUGdfanm4ROu3NC/lFLRcmBnqXNSl4GUqBY8apsStaOZ0=
+X-Received: by 2002:a05:6808:296:: with SMTP id
+ z22mr933649oic.67.1548330398157; 
+ Thu, 24 Jan 2019 03:46:38 -0800 (PST)
 MIME-Version: 1.0
-References: <850b6aee-0040-c333-b125-45211c18ada5@daenzer.net>
- <CAKv+Gu99zHqcQtj6TiOXAr3Qa6WWhKem+DHVA_mAQ0-Bc0Vbqw@mail.gmail.com>
- <047667fd-17be-1c37-5d2a-26768cfd6ab8@daenzer.net>
- <CAKv+Gu_VBd8agHASc5RS0eCgyXP64Lt_i4yPuBjKwGQ+5Lpd5Q@mail.gmail.com>
- <CADnq5_O1uxCrSksfF127AZTfbmdukxmqGdh2Ee0zM6CqgG_Mhg@mail.gmail.com>
- <CAKv+Gu-4uYh_HD_5Ry_L80Nf5zpRhT4oJYhhG5_8g3gSzBs2tg@mail.gmail.com>
- <20190123071521.GB20526@infradead.org>
- <CAKv+Gu8+77uZHJ6ZYjGNcKQL8C3cT5Ree+TcTVmkQXAHV-ADyg@mail.gmail.com>
- <20190123164428.GA9367@infradead.org>
- <CAKv+Gu-9vEKu8mG-o+-4M1ZcgZmTTJVfEdNS9R27AFX8P5sqyQ@mail.gmail.com>
- <20190124091316.GA22796@infradead.org>
- <bb559f74-4b1e-d5ee-74fb-b5dcd4a128cb@amd.com>
- <CAKv+Gu_3LurSN-6w1WijPfpJpc+Pgu0YTnwTfMrXMF3-AKAnJA@mail.gmail.com>
- <953e5e5f-5d47-d6df-40df-c8c94db5447f@amd.com>
- <CAKv+Gu9umPEmB+wh54NOTYcQ14oxf7rwVAXgCqo7V2A+VwkqPA@mail.gmail.com>
- <57590a48-4629-e2a1-8673-ce9eb2ec210b@amd.com>
- <CAKv+Gu_2f0FaJ+Th7H48u4GrPX=MM9xw0fFjdwhfRrr1nhgEkA@mail.gmail.com>
- <40ad3ae7-9970-0cb9-d35c-05e128f83820@amd.com>
-In-Reply-To: <40ad3ae7-9970-0cb9-d35c-05e128f83820@amd.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Thu, 24 Jan 2019 12:45:25 +0100
-Message-ID: <CAKv+Gu_D4FC05Rz3Oxm_dTWLaGt+a3EDecbsrge1eHY7gFXEYg@mail.gmail.com>
-Subject: Re: [RFC PATCH] drm: disable WC optimization for cache coherent
- devices on non-x86
-To: "Koenig, Christian" <Christian.Koenig@amd.com>
+References: <20180912152702.14640-1-l.stach@pengutronix.de>
+ <20180926023937.GD22238@dragon>
+In-Reply-To: <20180926023937.GD22238@dragon>
+From: Fabio Estevam <festevam@gmail.com>
+Date: Thu, 24 Jan 2019 09:46:35 -0200
+Message-ID: <CAOMZO5CeOxzyEG0tTKHfrNjY8WRKs=s5nBvxqZuFuJjR62eXOA@mail.gmail.com>
+Subject: Re: [PATCH] soc: imx: gpc: set DMA mask for PD platform devices
+To: Shawn Guo <shawnguo@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_034538_349137_75C6286F 
-X-CRM114-Status: GOOD (  22.90  )
+X-CRM114-CacheID: sfid-20190124_034639_481151_BF20B16D 
+X-CRM114-Status: GOOD (  14.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,100 +91,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
- Michael Ellerman <mpe@ellerman.id.au>,
- =?UTF-8?Q?Michel_D=C3=A4nzer?= <michel@daenzer.net>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- amd-gfx list <amd-gfx@lists.freedesktop.org>, "Zhang,
- Jerry" <Jerry.Zhang@amd.com>, Christoph Hellwig <hch@infradead.org>,
- David Airlie <airlied@linux.ie>, "Huang, Ray" <Ray.Huang@amd.com>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Alex Deucher <alexdeucher@gmail.com>, "Deucher,
- Alexander" <Alexander.Deucher@amd.com>, Sean Paul <sean@poorly.run>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: patchwork-lst@pengutronix.de, NXP Linux Team <linux-imx@nxp.com>,
+ Sascha Hauer <kernel@pengutronix.de>, Fabio Estevam <fabio.estevam@nxp.com>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>, Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 24 Jan 2019 at 12:37, Koenig, Christian
-<Christian.Koenig@amd.com> wrote:
+Hi Shawn,
+
+On Tue, Sep 25, 2018 at 11:41 PM Shawn Guo <shawnguo@kernel.org> wrote:
 >
-> Am 24.01.19 um 12:26 schrieb Ard Biesheuvel:
-> > On Thu, 24 Jan 2019 at 12:23, Koenig, Christian
-> > <Christian.Koenig@amd.com> wrote:
-> >> Am 24.01.19 um 10:59 schrieb Ard Biesheuvel:
-> >>> [SNIP]
-> >>> This is *exactly* my point the whole time.
-> >>>
-> >>> The current code has
-> >>>
-> >>> static inline bool drm_arch_can_wc_memory(void)
-> >>> {
-> >>> #if defined(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
-> >>>      return false;
-> >>>
-> >>> which means the optimization is disabled *unless the system is
-> >>> non-cache coherent*
-> >>>
-> >>> So if you have reports that the optimization works on some PowerPC, it
-> >>> must be non-cache coherent PowerPC, because that is the only place
-> >>> where it is enabled in the first place.
-> >>>
-> >>>> The only problematic here actually seems to be ARM, so you should
-> >>>> probably just add an "#ifdef .._ARM return false;".
-> >>>>
-> >>> ARM/arm64 does not have a Kconfig symbol like
-> >>> CONFIG_NOT_COHERENT_CACHE, so we can only disable it everywhere. If
-> >>> there are non-coherent ARM systems that are currently working in the
-> >>> same way as those non-coherent PowerPC systems, we will break them by
-> >>> doing this.
-> >> Summing the things I've read so far for ARM up I actually think it
-> >> depends on a runtime configuration and not on compile time one.
-> >>
-> >> So the whole idea of providing the device to the drm_*_can_wc_memory()
-> >> function isn't so far fetched.
-> >>
-> > Thank you.
+> On Wed, Sep 12, 2018 at 05:27:02PM +0200, Lucas Stach wrote:
+> > The PD platform devices aren't DMA capable (as is correctly reflected
+> > in with a zero mask coherent_dma_mask). As they have a of_node attached
+> > they will go through of_dma_configure, which will warn if it finds an
+> > uninitialized DMA mask. Let the driver core know that this isn't a
+> > missing configuration, but a non DMA capable device by pointing the
+> > dma_mask to the coherent_dma_mask.
 > >
-> >> But for now I do prefer working and slightly slower system over broken
-> >> one, so I think we should just disable this on ARM for now.
-> >>
-> > Again, this is not about non-cache coherent being slower without the
-> > optimization, it is about non-cache coherent likely not working *at
-> > all* unless the optimization is enabled.
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> > Since the warning that is triggered with the incomplete configuration
+> > has been introduced in the v4.19 cycle, it would nice to get this in
+> > as a fix.
 >
-> As Michel tried to explain this CAN'T happen. The optimization is a
-> purely optional request from userspace.
->
+> Applied as a fix, thanks.
 
-Right.
-
-So in that case, we can assume that the following test
-
-static inline bool drm_arch_can_wc_memory(void)
-{
-#if defined(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
-    return false;
-
-is bogus, and it was just unnecessary caution on the part of the
-author to disregard non-cache coherent devices.
-Unfortunately, those commits have no log messages whatsoever, so it is
-difficult to infer the intent retroactively.
-
-> > Otherwise, the driver will vmap() DMA pages with cacheable attributes,
-> > while the non-cache coherent device uses uncached attributes, breaking
-> > coherency.
->
-> Again this is mandated by the userspace APIs anyway. E.g. we can't
-> vmap() pages in any other way or our userspace APIs would break.
->
-
-OK,
-
-So let's just disable this for all ARM and arm64 then, given that
-non-cache coherent is not supported in any case
+Did you forget to push this change? I still don't see it applied.
 
 _______________________________________________
 linux-arm-kernel mailing list
