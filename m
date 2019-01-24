@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4130AC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:22:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2B381C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:23:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 085E82184C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:22:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F37F8218AE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 15:23:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rTsd4m9m";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="c8tyMx/x"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 085E82184C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iFcQ51vx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="YWsvXIcg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F37F8218AE
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,43 +27,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=PDnylWrT5Ejkb9lbxt50BcPFpX7Pq0tAAqqjxR1gyLs=; b=rTsd4m9mcsE+LgT2YsX1Uwucza
-	2j06kRR6JlqnWOmrTBmvqepUBAfI4kxiqOh43sTMzeVM/18tVhuRgG00VZcbkmGyXwIgRMFEIj6wu
-	bBRYMTL5pN1zTEG84A0y/yas2y5pQ7ipiK5E0omJOqsyBqVlAwKStgnXfSJFucCHzpEvv89rFb3qy
-	UKPOEP2nMdrAEdVxDgjdA0cj2o4lpD95e4lHrTLYvgIE0HBQc8qtwrI4WC2bdjP548EttNWbYOrVt
-	eCmv6SOMKK4U07io2sJ1rdLKPSpwtv3dPLSXkHOSUrId8Er1Y1N0rWfPw/aLUGVCToSeDE23VwSXD
-	5zGYh+1w==;
+	bh=C/JxUqm9m35Q40zZdZv78+LgvgPLL3VetkNW06nR+cI=; b=iFcQ51vx7hw23KgRbxDrBoQJDj
+	cJzXRupgX+0ZOaqCgYOshcHzAjg2XD9RhPyjGmHsftZ5ZGz3GGeF2g9Zimvl7RRtSKtnl2pDr7Scg
+	cdcbwir53yNwgYmDALpf4QgnCZRTL5/fMhEN/normXIcPPSCoTlsKYtS98ST16uc6UM+H4K/3N0/T
+	jaoxdQW0f+sLeaK9M4KN0d/RA+J212sLvm8fqEFraYaVV7CxjLjRpCWODfzxmDMUFD0KmXx+JF92H
+	dcZkgBeW9uwVs6JxrEeuhBaGgSkbSQEBe72I7vHD2IulBbnCwtUbQ1xG6t+IH2+AIW0RcNMfOhBVg
+	xAMkFQKw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmgpW-0003Pz-Vb; Thu, 24 Jan 2019 15:22:10 +0000
+	id 1gmgqi-0003tu-Ow; Thu, 24 Jan 2019 15:23:24 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmgmA-0007Ii-AW
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 15:19:32 +0000
+ id 1gmgoc-0007Ii-RW
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 15:21:50 +0000
 Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id BB13025BF04;
- Fri, 25 Jan 2019 02:12:44 +1100 (AEDT)
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 410FF25BF08;
+ Fri, 25 Jan 2019 02:12:45 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1548342765; bh=GXWlKxJfS6NEXBhINDZjuoJcIlfeoeIvwc7afD25Xm4=;
+ t=1548342765; bh=solIyGLyFPknOe7kTOoC+Fgc2mjmWGxEw4OnuZarm8o=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=c8tyMx/xjrYA9PuDZMzO2EbP08jvxLoIQg+Htflcq/7ZQRALQYwPdCwLHtvFcF2rC
- CDCtxmaAWaeddNonCjpHMIFGrYOPgtZ9SAULFC5tAyWNZ6s12EhnZqkJqhYCYgYzNY
- gw+A9PEUfhzlHK5QCmDpdxhG9DZasLBpwZlE+KXk=
+ b=YWsvXIcgsngEoWC5Xn6ZnZ4vY4EMqezkUx3l87SiDfEW3p6CqZD5ZYFURcr/NQyTE
+ +DYMU5VKnFJFo0qZFZ/Di+PiMKrsQiqCcoHUrrqty0PYdkil+J2EzNEbH1qzH+h753
+ osjygeAxmXAU3SHz5S9RxGFGTcfDugUxPLntTRBY=
 Received: by reginn.horms.nl (Postfix, from userid 7100)
- id 56B16940E28; Thu, 24 Jan 2019 16:12:41 +0100 (CET)
+ id 72F44940CBE; Thu, 24 Jan 2019 16:12:40 +0100 (CET)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 38/44] arm64: dts: renesas: r8a7796: remove BUSIF0 settings
- from rcar_sound, ssi
-Date: Thu, 24 Jan 2019 16:12:32 +0100
-Message-Id: <10bd03fa896ee5e25fa3548a3d1112b9beb76943.1548233325.git.horms+renesas@verge.net.au>
+Subject: [PATCH 22/44] arm64: dts: renesas: r8a774c0: Add USB2.0 phy and host
+ device nodes
+Date: Thu, 24 Jan 2019 16:12:16 +0100
+Message-Id: <89893580cf561fd67a3f70ee812e02eac9966096.1548233325.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1548233325.git.horms+renesas@verge.net.au>
 References: <cover.1548233325.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_071842_986238_7FD01E0D 
-X-CRM114-Status: UNSURE (   8.84  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190124_072116_041395_3C4B3238 
+X-CRM114-Status: GOOD (  10.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,9 +74,8 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Simon Horman <horms+renesas@verge.net.au>,
- Magnus Damm <magnus.damm@gmail.com>,
- Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>,
+Cc: Fabrizio Castro <fabrizio.castro@bp.renesas.com>,
+ Simon Horman <horms+renesas@verge.net.au>, Magnus Damm <magnus.damm@gmail.com>,
  linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -85,100 +83,66 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Before, BUSIF which is needed for DMA transfer was automatically handled
-via SSI, but it cared BUSIF0 only.
-Now, rsnd driver can handle BUSIF0-7 (= for Gen3) BUSIF0-3 (= for Gen2)
-via SSIU, and it is keeping compatibility.
-Thus, BUSIF0 settings via SSI had been kept to avoid git merge timing
-issue / git bisect issue, but it is no longer needed.
-This patch removes it.
+Add USB2.0 phy and host (EHCI/OHCI) device tree nodes to the RZ/G2E
+SoC dtsi.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 40 ++++++++++++++++----------------
- 1 file changed, 20 insertions(+), 20 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a774c0.dtsi | 37 +++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index afedbf5728ec..3a9f8c7081ca 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -2110,53 +2110,53 @@
- 			rcar_sound,ssi {
- 				ssi0: ssi-0 {
- 					interrupts = <GIC_SPI 370 IRQ_TYPE_LEVEL_HIGH>;
--					dmas = <&audma0 0x01>, <&audma1 0x02>, <&audma0 0x15>, <&audma1 0x16>;
--					dma-names = "rx", "tx", "rxu", "txu";
-+					dmas = <&audma0 0x01>, <&audma1 0x02>;
-+					dma-names = "rx", "tx";
- 				};
- 				ssi1: ssi-1 {
- 					interrupts = <GIC_SPI 371 IRQ_TYPE_LEVEL_HIGH>;
--					dmas = <&audma0 0x03>, <&audma1 0x04>, <&audma0 0x49>, <&audma1 0x4a>;
--					dma-names = "rx", "tx", "rxu", "txu";
-+					dmas = <&audma0 0x03>, <&audma1 0x04>;
-+					dma-names = "rx", "tx";
- 				};
- 				ssi2: ssi-2 {
- 					interrupts = <GIC_SPI 372 IRQ_TYPE_LEVEL_HIGH>;
--					dmas = <&audma0 0x05>, <&audma1 0x06>, <&audma0 0x63>, <&audma1 0x64>;
--					dma-names = "rx", "tx", "rxu", "txu";
-+					dmas = <&audma0 0x05>, <&audma1 0x06>;
-+					dma-names = "rx", "tx";
- 				};
- 				ssi3: ssi-3 {
- 					interrupts = <GIC_SPI 373 IRQ_TYPE_LEVEL_HIGH>;
--					dmas = <&audma0 0x07>, <&audma1 0x08>, <&audma0 0x6f>, <&audma1 0x70>;
--					dma-names = "rx", "tx", "rxu", "txu";
-+					dmas = <&audma0 0x07>, <&audma1 0x08>;
-+					dma-names = "rx", "tx";
- 				};
- 				ssi4: ssi-4 {
- 					interrupts = <GIC_SPI 374 IRQ_TYPE_LEVEL_HIGH>;
--					dmas = <&audma0 0x09>, <&audma1 0x0a>, <&audma0 0x71>, <&audma1 0x72>;
--					dma-names = "rx", "tx", "rxu", "txu";
-+					dmas = <&audma0 0x09>, <&audma1 0x0a>;
-+					dma-names = "rx", "tx";
- 				};
- 				ssi5: ssi-5 {
- 					interrupts = <GIC_SPI 375 IRQ_TYPE_LEVEL_HIGH>;
--					dmas = <&audma0 0x0b>, <&audma1 0x0c>, <&audma0 0x73>, <&audma1 0x74>;
--					dma-names = "rx", "tx", "rxu", "txu";
-+					dmas = <&audma0 0x0b>, <&audma1 0x0c>;
-+					dma-names = "rx", "tx";
- 				};
- 				ssi6: ssi-6 {
- 					interrupts = <GIC_SPI 376 IRQ_TYPE_LEVEL_HIGH>;
--					dmas = <&audma0 0x0d>, <&audma1 0x0e>, <&audma0 0x75>, <&audma1 0x76>;
--					dma-names = "rx", "tx", "rxu", "txu";
-+					dmas = <&audma0 0x0d>, <&audma1 0x0e>;
-+					dma-names = "rx", "tx";
- 				};
- 				ssi7: ssi-7 {
- 					interrupts = <GIC_SPI 377 IRQ_TYPE_LEVEL_HIGH>;
--					dmas = <&audma0 0x0f>, <&audma1 0x10>, <&audma0 0x79>, <&audma1 0x7a>;
--					dma-names = "rx", "tx", "rxu", "txu";
-+					dmas = <&audma0 0x0f>, <&audma1 0x10>;
-+					dma-names = "rx", "tx";
- 				};
- 				ssi8: ssi-8 {
- 					interrupts = <GIC_SPI 378 IRQ_TYPE_LEVEL_HIGH>;
--					dmas = <&audma0 0x11>, <&audma1 0x12>, <&audma0 0x7b>, <&audma1 0x7c>;
--					dma-names = "rx", "tx", "rxu", "txu";
-+					dmas = <&audma0 0x11>, <&audma1 0x12>;
-+					dma-names = "rx", "tx";
- 				};
- 				ssi9: ssi-9 {
- 					interrupts = <GIC_SPI 379 IRQ_TYPE_LEVEL_HIGH>;
--					dmas = <&audma0 0x13>, <&audma1 0x14>, <&audma0 0x7d>, <&audma1 0x7e>;
--					dma-names = "rx", "tx", "rxu", "txu";
-+					dmas = <&audma0 0x13>, <&audma1 0x14>;
-+					dma-names = "rx", "tx";
- 				};
- 			};
+diff --git a/arch/arm64/boot/dts/renesas/r8a774c0.dtsi b/arch/arm64/boot/dts/renesas/r8a774c0.dtsi
+index f3c4910e6585..0ab3aa66354c 100644
+--- a/arch/arm64/boot/dts/renesas/r8a774c0.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a774c0.dtsi
+@@ -1228,6 +1228,43 @@
+ 			dma-channels = <16>;
+ 		};
  
++		ohci0: usb@ee080000 {
++			compatible = "generic-ohci";
++			reg = <0 0xee080000 0 0x100>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>, <&cpg CPG_MOD 704>;
++			phys = <&usb2_phy0>;
++			phy-names = "usb";
++			power-domains = <&sysc R8A774C0_PD_ALWAYS_ON>;
++			resets = <&cpg 703>, <&cpg 704>;
++			status = "disabled";
++		};
++
++		ehci0: usb@ee080100 {
++			compatible = "generic-ehci";
++			reg = <0 0xee080100 0 0x100>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>, <&cpg CPG_MOD 704>;
++			phys = <&usb2_phy0>;
++			phy-names = "usb";
++			companion = <&ohci0>;
++			power-domains = <&sysc R8A774C0_PD_ALWAYS_ON>;
++			resets = <&cpg 703>, <&cpg 704>;
++			status = "disabled";
++		};
++
++		usb2_phy0: usb-phy@ee080200 {
++			compatible = "renesas,usb2-phy-r8a774c0",
++				     "renesas,rcar-gen3-usb2-phy";
++			reg = <0 0xee080200 0 0x700>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>, <&cpg CPG_MOD 704>;
++			power-domains = <&sysc R8A774C0_PD_ALWAYS_ON>;
++			resets = <&cpg 703>, <&cpg 704>;
++			#phy-cells = <0>;
++			status = "disabled";
++		};
++
+ 		sdhi0: sd@ee100000 {
+ 			compatible = "renesas,sdhi-r8a774c0",
+ 				     "renesas,rcar-gen3-sdhi";
 -- 
 2.11.0
 
