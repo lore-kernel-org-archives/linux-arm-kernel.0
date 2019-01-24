@@ -2,149 +2,92 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 30D02C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 18:41:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BD6ECC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 18:53:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F319F218B0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 18:41:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8D0E7218A6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 18:53:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RUAnLjZI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="jqDVZlSI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F319F218B0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IIoo6ByU";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=broadcom.com header.i=@broadcom.com header.b="Dq6Jhcuc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D0E7218A6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=broadcom.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IFnZXvcxSeby6XQlT7LqefY53C4wyzHHkNTo/VwxJa8=; b=RUAnLjZI7i/PGe
-	R5U4op0mZQ09mQZD6VVdytlk74Xq2M6wInsY1gME0hapFRiXhqRGbz7eSH3t5OZtcFekVCoQLC/EA
-	Gq4IIZDo69+0iVhokFW04YlOQHnHQCexJ/FdQ9Fl/hp1/Q1Try397VgesQWfcG0Hkpxy55WVIPqEN
-	yuOOiVfTDRPbWwhlEiV1G4PoYJoT/AFH+QVohBzUv6MWUcEt81fzfUzuLPw15MVwcRnFmJlhRUpz8
-	YRcuGcmvt2GH4hNtCj/tIWe1xohn2bmbh4axyYmZXarC224xRPdxnLH+pBSM331CRiTyXF5eeSoJl
-	hyehrrHiatVaRUg2zrnA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=+pvgn1eZs4/HrDiKMNbgN8VyZhwnj0vlscz0P1VlwzE=; b=IIoo6ByUk0psHeIGj8lrKOJ7t
+	TACWvan7S868ZMxGgZHRnrgvoNHzOhO4Hl43hoOrYlVkV78ngwq5e3+o09VD4BICrX36u0K04SSX0
+	O6L2F1Wqv0RZlUybml+pduFQkN2Hb48aHQQFXirPV97CQESlGS/wHjM18Ku5647fY1uix676+v+S/
+	dw0/tLJ7cq2jIIo3nb8JyA2TBwvm6W0tLvTJiAM0/zOf0ut4OEYgIY8bFlOXt7oDWfyZbp2SmPzVf
+	vp+mx43jrIQqsVzQ5vppdGDP9TByYMP1ssa6T5rwTOpbZecJcPyoFdPTv4vyqwdml7b/7Fc8WQ86z
+	2fjGADThQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmjwL-00087y-SY; Thu, 24 Jan 2019 18:41:25 +0000
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
+	id 1gmk7x-00032C-SS; Thu, 24 Jan 2019 18:53:25 +0000
+Received: from mail-yw1-xc44.google.com ([2607:f8b0:4864:20::c44])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmjwH-000879-C1
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 18:41:23 +0000
-Received: by mail-pg1-x541.google.com with SMTP id m1so3028581pgq.8
+ id 1gmk7t-00031Z-Oc
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 18:53:23 +0000
+Received: by mail-yw1-xc44.google.com with SMTP id i73so2859705ywg.3
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 24 Jan 2019 10:41:20 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=MZ2SMnPNiVkprr4xAxZE2TpGtOSyvixz34SCUEQ+hzo=;
- b=jqDVZlSI/qCPvyuMGA2oZtSh+D/mOtu++Jd2jiipIJuNtGU/c4irv57DdFbBC9UEyh
- H9oFQFOi+sDLe+q38IqwyaiXYKMtCktmTTrzg35050r+FEIdcVP023nK/RieifgN9bn8
- QEaOxR4pnoZ+qlPrAjuCj5CYYhpHGdFT4QYplfqDszg4xlu2lJw/q1ADQBKsAMhjIU8A
- 4GPxqn8j0WN5/IeHUoWGGN5j+LDZdc2khP+4IjuTReXp35yEj0S1/pweyqEXM1TD/E7c
- rK6RYN5AJAsmGvryjkqagm30Aq6naOUfeofSP5nLmyEqdmeJBFylbHafSxxBGlukJoNf
- uhrg==
+ Thu, 24 Jan 2019 10:53:21 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=broadcom.com; s=google;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-transfer-encoding:content-language;
+ bh=QLX/QOlTZWw+tAjbeYdhZ1fbepA115XW5TiGiA4xmLk=;
+ b=Dq6JhcucpvslU26/DgU8IrHLcL5OW6lM5Qact4C3MklLOPQCJ8JDGfJ3MjaszwAowi
+ Qi7qU86ZReDZb5ddWwoAz+QEnNNCvh+JGxAjhD1QFHxrI5Ft3p/ql3ujbI4YZ1FwlIz+
+ drLN3zuh/zcyc1g5o5KzIO6VQ9Hm1Xo0+ohCc=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=MZ2SMnPNiVkprr4xAxZE2TpGtOSyvixz34SCUEQ+hzo=;
- b=aO+6OfbS/qPPg+jfcm6V9nuCQt+5MAdlgYW3io3U7LhfvhYb1+RbGM8qT6Cip5GaOh
- wm8c3IqseRgrm5kCvHcZCjGlWfgxJBXvXtJdh51ynewOWR8a9B68B7InRR/7/F3tKTgH
- xWK2G4r9S35fUzFBf+e7yPU7bw4/01xTbyazNs7KnpQerMZwKWSm5igS5smclulSrE0I
- ozW9i7gqi3dd2kVsWNsFxMYitbdPI2JSA31pLFqpcnNPjs8SuU3R86LXsA58/D+9kcpd
- DF5SLV5rcijzZSa68nCJ4gQ9w84MF0rtcIhQF+K1kVB9mLWvXgs58hB3i/6PsvbfD2SS
- 5P5Q==
-X-Gm-Message-State: AJcUukf5i61KseN9iczkcm0sjM328o2PmQMBtY1X6DEiBc+mCuOnvfaI
- yJMP65Y2fRzfh33IZbox+mIQs19l
-X-Google-Smtp-Source: ALg8bN4JTB9+2Cpgc1rmld/ExR2TnvjJ3IruNW8YOxc6+IkOTMBHIfsIop3ek+CP1fsfjhfyI9UEOw==
-X-Received: by 2002:a63:a16:: with SMTP id 22mr6972802pgk.318.1548355279538;
- Thu, 24 Jan 2019 10:41:19 -0800 (PST)
-Received: from [10.67.49.9] ([192.19.223.250])
- by smtp.googlemail.com with ESMTPSA id b9sm26907533pfi.118.2019.01.24.10.41.17
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-transfer-encoding
+ :content-language;
+ bh=QLX/QOlTZWw+tAjbeYdhZ1fbepA115XW5TiGiA4xmLk=;
+ b=VW5zNUdAFY/1hqJVQvCp0A2SZ4F3+nn6DTveQY7vVy34s9E/69Y0/pdvJ+9HA9oS3o
+ gS4EwqsasPbjMDSGT2qn4dFpjS+uAxeYAziMi+TTXSCHLLQhqEy2oKr7WaXRey5u3eSj
+ HCFfGNdRESn6SCfiNIUT/jeDalESXX/lwYCFFSFpbnoF68uDn2bOoumObepdHLLP5P6d
+ PNZWdh663xdW+kpCuRm3GHiU21M1t7nE2sQkUAREqgPXY7+O2RRk80i4CzZUqodgd15M
+ FBjjJeBQISTKGUogNBzGFONMXphEbVvfcdsBG22kUt4URNQgdVgGpb+q/b7h7eTikQtc
+ eCxA==
+X-Gm-Message-State: AJcUukeZy1TRfzlbOvYBmiirYRSQRWg7E13wO4F2UO6ba/7hkQohDRUl
+ W2g3lbn0CfsWKOpUaD7R3FK/NENaGmGIvK5MH39LvoBmqlriFHkuknHLzLaIheyPOqjA/T2QF2n
+ 145OrkLVX0sxa2XamnVKcV1Uc6nRL6XVgSJAu7ibk18vtedaYvJZEPFpdqQeEYbgY6Kt2c3mc24
+ Do01ofN0+MXdec7DflIekaGw==
+X-Google-Smtp-Source: ALg8bN6q+CR6Vk03gZAPXk5rLYW55vjDQWgY12zyiMsgkmQI4hdpu/dAu0FJa7pll3bnhemMYwOyGA==
+X-Received: by 2002:a81:8d44:: with SMTP id w4mr7798014ywj.121.1548355999404; 
+ Thu, 24 Jan 2019 10:53:19 -0800 (PST)
+Received: from [10.136.13.65] ([192.19.228.250])
+ by smtp.gmail.com with ESMTPSA id b144sm16274777ywa.33.2019.01.24.10.53.16
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 24 Jan 2019 10:41:18 -0800 (PST)
-Subject: Re: linux-next: arm multi_v7_defconfig build failure next-20190124
-To: Naresh Kamboju <naresh.kamboju@linaro.org>,
- Linux-Next Mailing List <linux-next@vger.kernel.org>,
- linux-arm-kernel@lists.infradead.org
-References: <CA+G9fYv0m79UC+Pq9Cq_5vGcos8A87oPYA7Ph7LUyZrfEkLXQA@mail.gmail.com>
-From: Florian Fainelli <f.fainelli@gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=f.fainelli@gmail.com; prefer-encrypt=mutual; keydata=
- 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
- M5kY0ACeNhCZJvZ5g4C2Lc9fcTHu8jxmEkI=
-Message-ID: <84da29c7-a51b-4844-2963-f155dad28eee@gmail.com>
-Date: Thu, 24 Jan 2019 10:41:10 -0800
+ Thu, 24 Jan 2019 10:53:18 -0800 (PST)
+Subject: Re: [PATCH V2] soc: bcm: Make PM driver default for BCM2835
+To: Eric Anholt <eric@anholt.net>, Stefan Wahren <stefan.wahren@i2se.com>,
+ Florian Fainelli <f.fainelli@gmail.com>, Ray Jui <rjui@broadcom.com>,
+ Scott Branden <sbranden@broadcom.com>
+References: <1548353060-4900-1-git-send-email-stefan.wahren@i2se.com>
+ <87imydvs55.fsf@anholt.net>
+From: Scott Branden <scott.branden@broadcom.com>
+Message-ID: <fc40f7a3-8c28-f6fe-c9c0-0af0b55a9ffe@broadcom.com>
+Date: Thu, 24 Jan 2019 10:53:13 -0800
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <CA+G9fYv0m79UC+Pq9Cq_5vGcos8A87oPYA7Ph7LUyZrfEkLXQA@mail.gmail.com>
+In-Reply-To: <87imydvs55.fsf@anholt.net>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_104121_439889_7C9AE105 
-X-CRM114-Status: GOOD (  11.05  )
+X-CRM114-CacheID: sfid-20190124_105321_803284_BC82CD40 
+X-CRM114-Status: GOOD (  13.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -156,35 +99,27 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stephen Rothwell <sfr@canb.auug.org.au>, computersforpeace@gmail.com,
- gregory.0xf0@gmail.com, p.zabel@pengutronix.de
-Content-Type: text/plain; charset="us-ascii"
+Cc: Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, bcm-kernel-feedback-list@broadcom.com,
+ linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/24/19 8:57 AM, Naresh Kamboju wrote:
-> linux-next 20190122,  20190123 and 20190124 build arm
-> multi_v7_defconfig failed like this:
-> drivers/reset/reset-brcmstb.o: In function `brcmstb_reset_probe':
-> reset-brcmstb.c:(.text+0x110): undefined reference to `__aeabi_uldivmod'
-> reset-brcmstb.c:(.text+0x160): undefined reference to `__aeabi_uldivmod'
-> 
-> Full test log,
-> https://ci.linaro.org/view/lkft/job/openembedded-lkft-linux-next/DISTRO=lkft,MACHINE=am57xx-evm,label=docker-lkft/448/console
 
-Should be fixed tonight, since Philipp applied a revised version:
-
-https://lore.kernel.org/patchwork/patch/1035070/
-
-> 
-> Best regards
-> Naresh Kamboju
-> 
-
-
--- 
-Florian
+On 2019-01-24 10:15 a.m., Eric Anholt wrote:
+> Stefan Wahren <stefan.wahren@i2se.com> writes:
+>
+>> Since commit 52a4adbaebcc ("ARM: bcm283x: Switch V3D over to using the
+>> PM driver instead of firmware.") VC4 on BCM2835 requires the power driver.
+>>
+>> Otherwise the driver won't probe and HDMI output stays black:
+>> vc4_v3d 20c00000.v3d: ignoring dependency for device, assuming no driver
+>>
+>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Reviewed-by: Eric Anholt <eric@anholt.net>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 
 _______________________________________________
 linux-arm-kernel mailing list
