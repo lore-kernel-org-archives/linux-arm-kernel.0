@@ -2,63 +2,84 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 49FBBC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:18:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E304EC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:19:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1A89521872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:18:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 91D6F21872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 11:19:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q5Nna+Vf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1A89521872
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P7ktNFzJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 91D6F21872
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=zy+/ZIfNS/65Iw9CJTf27OWPq1vPzzcaEDjDWqHrRhs=; b=q5Nna+VfV+foEOsENFhzMXtfC
-	F2mb77s6B3STZUyQ2NlpZ2sFyPJ8Gac80UQaDciNXk7zHsEhTWJc9GBPdNY+cIOjIiDvwjhyODZJW
-	AMwXsxnfxSCmzvMBOs3lmoFUWg9m9v4lsxLbv4+Jtf9lEbzUTuXYGe5LtPSIKDUG5WID2rLiThq1s
-	26Z58n12tsmqd0NUTRGomJddeP5uV7njcNq7vDxHaEH9HklUGjoLfscJ28bFQiz5eRlT2fGIumAGN
-	FGhnedR8AVHGnUBtQLI2hWwNgr2WglLq/HVvugcQRkfvl3RFLLZJDXq6GtiJlSmBxjxwjPvt4lPLT
-	LpGIzfPCw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=tHPi69meHhcEqXpOoe91jfQ2zu8SOvYCJbbKYqyDvc4=; b=P7ktNFzJs8dkLE
+	Jy97wVLXe95tyEQhd+dxAO/XLuidSDnn2cmhDb6yU4aE2U5kn9gDfMznRZ0DmnWR5xVEe3bYgfpJ1
+	+8zJNOiK2y3a3Zgbm/Cf48blGnZQ3HqFKBi4QnzHSQZLJsjRzJgsnPiSkMOd1iE3pEHQBp3x6iozn
+	Ef7bJ6y5Hyi+bq8TX7xI/Y/IFQIxT4NTK+h5mTJL2pXbpDXxAwNi3eLBqO2ZKrPio63r70jX5rKoc
+	Xr9c9nCobRxFB/7HmzfDiaZhiEblfOflDZYm5smpd+peyLC+2Av8jLMZKrIYq0aJCsFJAyeVtm/aP
+	1C378ogXo0zQfHGWClRA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmd25-0004YE-TL; Thu, 24 Jan 2019 11:18:53 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmd21-0004Wt-GO
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 11:18:51 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2C56F1596;
- Thu, 24 Jan 2019 03:18:46 -0800 (PST)
-Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5CFE63F237;
- Thu, 24 Jan 2019 03:18:44 -0800 (PST)
-Subject: Re: [PATCH] arm64: dts: hikey: Revert "Enable HS200 mode on eMMC"
-To: John Stultz <john.stultz@linaro.org>, lkml <linux-kernel@vger.kernel.org>
-References: <1548273966-5889-1-git-send-email-john.stultz@linaro.org>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <107a6e2e-ddd8-cbc1-5680-1b5899665327@arm.com>
-Date: Thu, 24 Jan 2019 11:18:42 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gmd2e-0004pX-MH; Thu, 24 Jan 2019 11:19:28 +0000
+Received: from mail-ed1-f46.google.com ([209.85.208.46])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmd2a-0004p9-P5
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 11:19:26 +0000
+Received: by mail-ed1-f46.google.com with SMTP id f9so4245463eds.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 24 Jan 2019 03:19:24 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=0NqzwY66JqyLd2Ihiqe2zw22z9qsYJW34hQJda4K5CU=;
+ b=UqDVP0BYLB3pm92mvSfVtw56TeRNMXeJLObQyloldMecunShdctst9uwUfkDHiJQhx
+ nwIO7KuepiYyZ8s1d+kghDwW4v82FijlZ6IrUpj9n8btUV8WpFqE1QEmTY3gvHCzHjtm
+ /qW+kSlGww5twbXZwLnZP3GsrjtDOFv9u8jfwt991CFctDz6f6QAPMhwS9NsR9V8yMcs
+ 8+uuTT+JRT1xQv/7AHnoLhZ29XNVrniZbJNyc+ZhFCOxGa52Sv7ttaxNfc96BSBeV49J
+ Mfw3XTNz29ynCqDopOdFTdNzwZyAOEwKDZcK5LyNjq3shlnw0du+eP50Oxkle8KN6BG6
+ CFIA==
+X-Gm-Message-State: AJcUukeVqsaIhKVt2vEczNWoV/7lkGZFHWw6Q+FuP3ZVkD546k705v5N
+ eHzILvSv/OqnllYSGFqkpEQHmdZj57w=
+X-Google-Smtp-Source: ALg8bN4tpg27SvA8Sno6dAB3P3LPYf1aA655+k5JfhJVpcqa2qkkuaUSIG++A1xY/mDPnlZloPHbYg==
+X-Received: by 2002:a17:906:4e82:: with SMTP id
+ v2-v6mr5562560eju.149.1548328762697; 
+ Thu, 24 Jan 2019 03:19:22 -0800 (PST)
+Received: from mail-wm1-f41.google.com (mail-wm1-f41.google.com.
+ [209.85.128.41])
+ by smtp.gmail.com with ESMTPSA id n11sm10858233edn.14.2019.01.24.03.19.21
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 24 Jan 2019 03:19:21 -0800 (PST)
+Received: by mail-wm1-f41.google.com with SMTP id d15so2694893wmb.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 24 Jan 2019 03:19:21 -0800 (PST)
+X-Received: by 2002:a1c:c008:: with SMTP id q8mr2012314wmf.99.1548328761436;
+ Thu, 24 Jan 2019 03:19:21 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <1548273966-5889-1-git-send-email-john.stultz@linaro.org>
-Content-Language: en-GB
+References: <09bd31e2-afb7-98ae-9c77-96380ec18de0@suse.de>
+In-Reply-To: <09bd31e2-afb7-98ae-9c77-96380ec18de0@suse.de>
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Thu, 24 Jan 2019 19:19:08 +0800
+X-Gmail-Original-Message-ID: <CAGb2v67wu9AoMnhMw-kJ4bREpfNZPKc9zSXAWpNwFhG-FmiPmQ@mail.gmail.com>
+Message-ID: <CAGb2v67wu9AoMnhMw-kJ4bREpfNZPKc9zSXAWpNwFhG-FmiPmQ@mail.gmail.com>
+Subject: Re: [5.0-rc3] arm64: sun50i: h6: Pine H64 uart2 vs. emac
+To: =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_031849_545953_E0B0783F 
-X-CRM114-Status: GOOD (  19.36  )
+X-CRM114-CacheID: sfid-20190124_031924_809908_7D9DCA09 
+X-CRM114-Status: GOOD (  16.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,64 +91,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Ryan Grachek <ryan@edited.us>, Alistair Strachan <astrachan@google.com>,
- Wei Xu <xuwei5@hisilicon.com>, Rob Herring <robh+dt@kernel.org>,
- "stable #4 . 17+" <stable@vger.kernel.org>,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi John,
-
-On 23/01/2019 20:06, John Stultz wrote:
-> From: Alistair Strachan <astrachan@google.com>
-> 
-> This reverts commit abd7d0972a192ee653efc7b151a6af69db58f2bb. This
-> change was already partially reverted by John Stultz in commit
-> 9c6d26df1fae ("arm64: dts: hikey: Fix eMMC corruption regression").
-> 
-> This change appears to cause controller resets and block read failures
-> which prevents successful booting on some hikey boards.
-
-FWIW, you might want to have a play with the pinctrl settings - I've 
-seen various flakiness with HS200 eMMCs on Rockchip boards which could 
-be solved by bumping up the drive strength.
-
-Robin.
-
-> Cc: Ryan Grachek <ryan@edited.us>
-> Cc: Wei Xu <xuwei5@hisilicon.com>
-> Cc: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-arm-kernel@lists.infradead.org
-> Cc: devicetree@vger.kernel.org
-> Cc: stable <stable@vger.kernel.org> #4.17+
-> Signed-off-by: Alistair Strachan <astrachan@google.com>
-> Signed-off-by: John Stultz <john.stultz@linaro.org>
-> ---
->   arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 1 -
->   1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> index 6102350..7092460 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> @@ -300,7 +300,6 @@
->   
->   		dwmmc_0: dwmmc0@f723d000 {
->   			cap-mmc-highspeed;
-> -			mmc-hs200-1_8v;
->   			non-removable;
->   			bus-width = <0x8>;
->   			vmmc-supply = <&ldo19>;
-> 
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gV2VkLCBKYW4gMjMsIDIwMTkgYXQgNzoxNiBQTSBBbmRyZWFzIEbDpHJiZXIgPGFmYWVyYmVy
+QHN1c2UuZGU+IHdyb3RlOgo+Cj4gSGkgZ3V5cywKPgo+IEluIDUuMCB0aGUgUGluZSBINjQncyBF
+dGhlcm5ldCBoYXMgYmVjb21lIHVzYWJsZSAodGhhbmtzIGZvciB5b3VyIHdvcmspLgo+Cj4gSSdt
+IG5vdyB0cnlpbmcgdG8gdXNlIHRoZSBQaS0yIFVBUlQgcGlucyAoc3VwcG9zZWRseSBQRDE5L1BE
+MjAgVUFSVDIpOwo+IGhvd2V2ZXIgdGhlIEg2IC5kdHNpIHJlc2VydmVzIHRob3NlIHBpbnMgaW4g
+ZXh0X3JnbWlpX3BpbnMsIGNhdXNpbmcgYW4KPiBlcnJvci4gSWYgSSBvdmVyd3JpdGUgaXRzIHBp
+bnMgcHJvcGVydHkgKHdoaWNoIGlzIGEgbGl0dGxlIGN1bWJlcnNvbWUsCj4gYW55IGNoYW5jZSB3
+ZSBjYW4gc3BsaXQgdGhlbSBvZmYgaW50byBhIHNlcGFyYXRlIG5vZGU/KSBFdGhlcm5ldCBpcyBu
+bwo+IGxvbmdlciB3b3JraW5nLiBJJ20gZ3Vlc3NpbmcgdGhhdCdzIHJlbGF0ZWQgdG8gTURJTy9Q
+SFksIGFzIHRoZQo+IGludGVyZmFjZSBkb2VzIHNob3cgdXAsIGp1c3QgZG9lc24ndCBnZXQgdGhl
+IGxpbmsgdXAuCgpDb3JyZWN0LCB0aGUgcGlucyBoYXBwZW4gdG8gYmUgdGhlIE1ESU8gZGF0YSBh
+bmQgY2xvY2sgcGlucy4KCj4gSXMgaXQgbm90IHBvc3NpYmxlIHRvIHVzZSBFdGhlcm5ldCBhbmQg
+R1BJTyBoZWFkZXIgYXQgdGhlIHNhbWUgdGltZSwKPiB1bmxpa2UgdGhlIG9yaWdpbmFsIFBpbmU2
+NCssIG9yIGFtIEkgbWlzc2luZyBzb21lIHJlcXVpcmVkIERUIGNoYW5nZT8KCkxvb2tzIGxpa2Ug
+aXQgd29uJ3QgYmUgcG9zc2libGUuIEkgc3VnZ2VzdCB1c2luZyBVQVJUMyBpbnN0ZWFkLCB3aGlj
+aAphcmUgcGlucyBQRDIzL1BEMjQsIGFuZCBjb3JyZXNwb25kIHRvIHBpbnMgMzcvMzggb24gdGhl
+IEdQSU8gaGVhZGVyLgoKQ2hlbll1Cgo+IFRoYW5rcywKPiBBbmRyZWFzCj4KPgo+ICAgICAgICAg
+ZnJhZ21lbnRAMCB7Cj4gICAgICAgICAgICAgICAgIHJlZyA9IDwwPjsKPgo+ICAgICAgICAgICAg
+ICAgICB0YXJnZXQgPSA8JnBpbz47Cj4KPiAgICAgICAgICAgICAgICAgX19vdmVybGF5X18gewo+
+ICAgICAgICAgICAgICAgICAgICAgICAgIHVhcnQyX3BpbnM6IHVhcnQyLXBpbnMgewo+ICAgICAg
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgcGlucyA9ICJQRDE5IiwgIlBEMjAiOwo+ICAgICAg
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgZnVuY3Rpb24gPSAidWFydDIiOwo+ICAgICAgICAg
+ICAgICAgICAgICAgICAgIH07Cj4gICAgICAgICAgICAgICAgIH07Cj4gICAgICAgICB9Owo+Cj4g
+ICAgICAgICBmcmFnbWVudEAxIHsKPiAgICAgICAgICAgICAgICAgcmVnID0gPDE+Owo+Cj4gICAg
+ICAgICAgICAgICAgIHRhcmdldCA9IDwmZXh0X3JnbWlpX3BpbnM+Owo+Cj4gICAgICAgICAgICAg
+ICAgIF9fb3ZlcmxheV9fIHsKPiAgICAgICAgICAgICAgICAgICAgICAgICBwaW5zID0gIlBEMCIs
+ICJQRDEiLCAiUEQyIiwgIlBEMyIsICJQRDQiLAo+ICAgICAgICAgICAgICAgICAgICAgICAgICAg
+ICAgICAiUEQ1IiwgIlBENyIsICJQRDgiLCAiUEQ5IiwgIlBEMTAiLAo+ICAgICAgICAgICAgICAg
+ICAgICAgICAgICAgICAgICAiUEQxMSIsICJQRDEyIiwgIlBEMTMiLyosICJQRDE5IiwgIlBEMjAi
+Ki87Cj4gICAgICAgICAgICAgICAgIH07Cj4gICAgICAgICB9Owo+Cj4gICAgICAgICBmcmFnbWVu
+dEAyIHsKPiAgICAgICAgICAgICAgICAgcmVnID0gPDI+Owo+Cj4gICAgICAgICAgICAgICAgIHRh
+cmdldCA9IDwmdWFydDI+Owo+Cj4gICAgICAgICAgICAgICAgIF9fb3ZlcmxheV9fIHsKPiAgICAg
+ICAgICAgICAgICAgICAgICAgICBzdGF0dXMgPSAib2theSI7Cj4gICAgICAgICAgICAgICAgICAg
+ICAgICAgcGluY3RybC1uYW1lcyA9ICJkZWZhdWx0IjsKPiAgICAgICAgICAgICAgICAgICAgICAg
+ICBwaW5jdHJsLTAgPSA8JnVhcnQyX3BpbnM+Owo+ICAgICAgICAgICAgICAgICB9Owo+ICAgICAg
+ICAgfTsKPgo+Cj4gLS0KPiBTVVNFIExpbnV4IEdtYkgsIE1heGZlbGRzdHIuIDUsIDkwNDA5IE7D
+vHJuYmVyZywgR2VybWFueQo+IEdGOiBGZWxpeCBJbWVuZMO2cmZmZXIsIEphbmUgU21pdGhhcmQs
+IEdyYWhhbSBOb3J0b24KPiBIUkIgMjEyODQgKEFHIE7DvHJuYmVyZykKCl9fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGlu
+ZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMu
+aW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
