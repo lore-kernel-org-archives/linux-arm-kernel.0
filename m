@@ -2,62 +2,82 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 55FA8C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 13:10:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E31AC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 13:11:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1D6DF218AD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 13:10:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6D52421855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 13:11:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y4Wtk/c0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D6DF218AD
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nqCwae/P";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="VrW4JPf/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D52421855
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=l2nVvZ3OkrDdVxX1/HJ5wxKbnZfdtRbYK5OAxiJuVMg=; b=Y4Wtk/c0VOnNTz
-	VtSkuWcB7t8oGVyh3xlbwedOP4bSjMXZlynhJDT3RF17IEMcO+oIPot2U/+1KdmHCyRu2rRdBx+Lt
-	0/IFdP0sd+AZgbXuMQ3lzHOTO3k0NTC40O9YbOTdjyt9Zr2GBnNBicvNLexugScHRvComixRfFPkZ
-	tJUgeQYJy+QMfndFAcFsnnnyq3Oc9+Nkj40XG4KJpAqgXFw613TcoexYdjk5ZHp4vI/YLStBx0hwW
-	i2ye5UE8ojlrWCU+35GKdiyQ6acbpFJKuobaov/Lt1QA4XVVxd0odrksVrScSUvgj19p+6g8uotc3
-	UGWLY2rn0KETQLvXUZKA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=GXS+/wKbWCdTo9zfJkOUeYLceSoZSzkj7CP5lF8Qbcg=; b=nqC
+	wae/P+aV4Mj37ZZ7Z9gaFSfva0uB/u3xhNHQthnFF7VAoT8h4p0JdG0BTy66HKfplAZlV4VEyAvfR
+	JMtX0UrcL7oyDgi4VI4b0rf1GPt/+xnQZiJ+5mJmqyCdsHDvCTCJX5yg98lo2q3TcNqER8XmdKu0e
+	TPe7YWoLzyJxMvNgQTgPfFIuzQYZ0xnvDEEMp83iERf+EP6OB7yqwznxYVFn/lMBg8PqCosWjlfZm
+	oLfaSUe5pufXfnlTsGVM2sB8Eo3oPZdl0mw2skjicYiXB6aCA1xzIP2R/PKFMfLWN/qdupBDEyhw1
+	Z6/Kho8niobb9Xyr/U8ibGCNfxeEXmg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmemI-0000fu-Ei; Thu, 24 Jan 2019 13:10:42 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmemD-0000fV-Su
- for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 13:10:39 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 2B14D209B6; Thu, 24 Jan 2019 14:10:35 +0100 (CET)
-Received: from aptenodytes (aaubervilliers-681-1-87-206.w90-88.abo.wanadoo.fr
- [90.88.29.206])
- by mail.bootlin.com (Postfix) with ESMTPSA id AB8DC20654;
- Thu, 24 Jan 2019 14:10:24 +0100 (CET)
-Message-ID: <4f25de5bbcb7bf196fe4925f54e3335b50670bd2.camel@bootlin.com>
-Subject: Re: [PATCH v2 2/2] media: cedrus: Add HEVC/H.265 decoding support
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>
-Date: Thu, 24 Jan 2019 14:10:25 +0100
-In-Reply-To: <20181127082119.xdemdwgclai7kj3r@flea>
-References: <20181123130209.11696-1-paul.kocialkowski@bootlin.com>
- <20181123130209.11696-3-paul.kocialkowski@bootlin.com>
- <20181127082119.xdemdwgclai7kj3r@flea>
-Organization: Bootlin
-User-Agent: Evolution 3.30.4 
-Mime-Version: 1.0
+	id 1gmenR-00010G-OZ; Thu, 24 Jan 2019 13:11:53 +0000
+Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmenO-0000yN-Ve
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 13:11:52 +0000
+Received: by mail-lj1-x243.google.com with SMTP id u89-v6so5207964lje.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 24 Jan 2019 05:11:45 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=M5kM16zyd/EiORNWuO/i8/IoR4fv7qnZKxV0scf9zO0=;
+ b=VrW4JPf/trBoEUxZFLak6MnFQ8yOzjvXFGiMb9sx4ubbFBi75cuglw5eeLfxqPelMv
+ YDQn+65yjQci49S3NHEXhk0euqnRBJOmnh4MkX8rwNcftqwRL6HMR8JioMqEn77rhbdB
+ Usa/rr9JJXzLGo+AIYKstriVHWDkesqk60pIM=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=M5kM16zyd/EiORNWuO/i8/IoR4fv7qnZKxV0scf9zO0=;
+ b=HzGUBmg4nQBkd9U6XKAvM7GwGIVADG+b/KT2J5Vj/cw0/5dms1vvJk1Xwk1Wt5xsIq
+ tEtXALfCmfT9m33MOVcOPI8/7x/ayYZ9osCvu3BzwetqIKf9Q0HafJcoD0es9pR4cELp
+ xx08VR1Q9nLZKQJjyqOTmr1iZ0v4u07Iualhy4D0v8A5XPfAUa0PolzEa5VtcTEd0oai
+ xQoOb06Rag6+bR/UKkln4GKXKcS3eIn644r3kJ71FKQCf8dNRJrS4ap89MQORTudWASj
+ ZmKhnYlRDMGpqhhB4wcokIPeTbpzU2SVFtxF4Z5PQQyH5ldNzKyi7dEY/9Qv1tLsGMQn
+ Sacw==
+X-Gm-Message-State: AJcUukcT9/p6lPbrs49OWRq8DGcNrsr5Xy68T9nn9dsCMcnxiH0O8U3g
+ 73UGbb+qHegXnHJXHZS2JNa5Jw==
+X-Google-Smtp-Source: ALg8bN6/8ayVgXcnEBPQ8Fuz4g3lfP7Kq2EuzDauja88HlWUbwnFuy8qiW726xfHyP5pgA9VqBr7Gg==
+X-Received: by 2002:a2e:a0d5:: with SMTP id
+ f21-v6mr5576293ljm.98.1548335503991; 
+ Thu, 24 Jan 2019 05:11:43 -0800 (PST)
+Received: from localhost ([195.238.92.223])
+ by smtp.gmail.com with ESMTPSA id 18-v6sm982144ljg.83.2019.01.24.05.11.42
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 24 Jan 2019 05:11:42 -0800 (PST)
+From: Igor Opaniuk <igor.opaniuk@linaro.org>
+To: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ tee-dev@lists.linaro.org
+Subject: [PATCH 1/1] tee: add cancellation support to client interface
+Date: Thu, 24 Jan 2019 15:11:41 +0200
+Message-Id: <1548335501-7868-1-git-send-email-igor.opaniuk@linaro.org>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_051038_223967_6B318815 
-X-CRM114-Status: GOOD (  22.27  )
+X-CRM114-CacheID: sfid-20190124_051151_028388_A2D937BA 
+X-CRM114-Status: GOOD (  11.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,156 +89,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devel@driverdev.osuosl.org, Alexandre Courbot <acourbot@chromium.org>,
- Randy Li <ayaka@soulik.info>, linux-kernel@vger.kernel.org,
- Tomasz Figa <tfiga@chromium.org>, Hans Verkuil <hverkuil@xs4all.nl>,
- linux-sunxi@googlegroups.com, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- Ezequiel Garcia <ezequiel@collabora.com>, linux-arm-kernel@lists.infradead.org,
- linux-media@vger.kernel.org
+Cc: sumit.garg@linaro.org, prime.zeng@hisilicon.com, jens.wiklander@linaro.org,
+ jerome.forissier@linaro.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+Add support of cancellation request to the TEE kernel internal
+client interface. Can be used by software TPM drivers, that leverage
+TEE under the hood (for instance in TPM2.0 mobile profile), for requesting
+cancellation of time-consuming operations (RSA key-pair generation etc.).
 
-On Tue, 2018-11-27 at 09:21 +0100, Maxime Ripard wrote:
-> Hi!
-> 
-> On Fri, Nov 23, 2018 at 02:02:09PM +0100, Paul Kocialkowski wrote:
-> > This introduces support for HEVC/H.265 to the Cedrus VPU driver, with
-> > both uni-directional and bi-directional prediction modes supported.
-> > 
-> > Field-coded (interlaced) pictures, custom quantization matrices and
-> > 10-bit output are not supported at this point.
-> > 
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> 
-> Output from checkpatch:
-> total: 0 errors, 68 warnings, 14 checks, 999 lines checked
+Signed-off-by: Igor Opaniuk <igor.opaniuk@linaro.org>
+---
+ drivers/tee/tee_core.c  | 12 ++++++++++++
+ include/linux/tee_drv.h | 14 ++++++++++++++
+ 2 files changed, 26 insertions(+)
 
-Looks like many of the "line over 80 chars" are due to macros. I don't
-think it would be a good idea to break them down or to change the
-macros names since they are directly inherited from the bitstream
-elements.
-
-What do you think?
-
-> > +/*
-> > + * Note: Neighbor info buffer size is apparently doubled for H6, which may be
-> > + * related to 10 bit H265 support.
-> > + */
-> > +#define CEDRUS_H265_NEIGHBOR_INFO_BUF_SIZE	(397 * SZ_1K)
-> > +#define CEDRUS_H265_ENTRY_POINTS_BUF_SIZE	(4 * SZ_1K)
-> > +#define CEDRUS_H265_MV_COL_BUF_UNIT_CTB_SIZE	160
-> 
-> Having some information on where this is coming from would be useful.
-
-Yes, definitely.
-
-> > +static void cedrus_h265_sram_write_data(struct cedrus_dev *dev, u32 *data,
-> 
-> Since the data pointer is pretty much an opaque structure, you should
-> have a void pointer here, that would avoid the type casting you're
-> doing when calling that function.
-
-Sure, that would make more sense.
-
-[...]
-
-> > +	/* Output frame. */
-> > +
-> > +	output_pic_list_index = V4L2_HEVC_DPB_ENTRIES_NUM_MAX;
-> > +	pic_order_cnt[0] = pic_order_cnt[1] = slice_params->slice_pic_order_cnt;
-> > +	mv_col_buf_addr[0] = cedrus_h265_frame_info_mv_col_buf_addr(ctx,
-> > +		run->dst->vb2_buf.index, 0) - PHYS_OFFSET;
-> > +	mv_col_buf_addr[1] = cedrus_h265_frame_info_mv_col_buf_addr(ctx,
-> > +		run->dst->vb2_buf.index, 1) - PHYS_OFFSET;
-> > +	dst_luma_addr = cedrus_dst_buf_addr(ctx, run->dst->vb2_buf.index, 0) -
-> > +			PHYS_OFFSET;
-> > +	dst_chroma_addr = cedrus_dst_buf_addr(ctx, run->dst->vb2_buf.index, 1) -
-> > +			PHYS_OFFSET;
-> > +
-> > +	cedrus_h265_frame_info_write_single(dev, output_pic_list_index,
-> > +					    slice_params->pic_struct != 0,
-> > +					    pic_order_cnt, mv_col_buf_addr,
-> > +					    dst_luma_addr, dst_chroma_addr);
-> 
-> You can only pass the run and slice_params pointers to that function.
-
-The point is to make it independent from the context, so that the same
-function can be called with either the slice_params or the dpb info.
-I don't think making two variants or even two wrappers would bring any
-significant benefit.
-
-> > +
-> > +	cedrus_write(dev, VE_DEC_H265_OUTPUT_FRAME_IDX, output_pic_list_index);
-> > +
-> > +	/* Reference picture list 0 (for P/B frames). */
-> > +	if (slice_params->slice_type != V4L2_HEVC_SLICE_TYPE_I) {
-> > +		cedrus_h265_ref_pic_list_write(dev, slice_params->ref_idx_l0,
-> > +			slice_params->num_ref_idx_l0_active_minus1 + 1,
-> > +			slice_params->dpb, slice_params->num_active_dpb_entries,
-> > +			VE_DEC_H265_SRAM_OFFSET_REF_PIC_LIST0);
-> > +
-> 
-> slice_params is enough.
-
-The rationale is similar to the one above: being able to use the same
-helper with either L0 or L1, which implies passing the relevant
-elements directly.
-
-> > +		if (pps->weighted_pred_flag || pps->weighted_bipred_flag)
-> > +			cedrus_h265_pred_weight_write(dev,
-> > +				pred_weight_table->delta_luma_weight_l0,
-> > +				pred_weight_table->luma_offset_l0,
-> > +				pred_weight_table->delta_chroma_weight_l0,
-> > +				pred_weight_table->chroma_offset_l0,
-> > +				slice_params->num_ref_idx_l0_active_minus1 + 1,
-> > +				VE_DEC_H265_SRAM_OFFSET_PRED_WEIGHT_LUMA_L0,
-> > +				VE_DEC_H265_SRAM_OFFSET_PRED_WEIGHT_CHROMA_L0);
-> 
-> Ditto, that function should only take the pred_weight_table and
-> slice_params pointers
-
-And same rational as well.
-
-> > +	}
-> > +
-> > +	/* Reference picture list 1 (for B frames). */
-> > +	if (slice_params->slice_type == V4L2_HEVC_SLICE_TYPE_B) {
-> > +		cedrus_h265_ref_pic_list_write(dev, slice_params->ref_idx_l1,
-> > +			slice_params->num_ref_idx_l1_active_minus1 + 1,
-> > +			slice_params->dpb,
-> > +			slice_params->num_active_dpb_entries,
-> > +			VE_DEC_H265_SRAM_OFFSET_REF_PIC_LIST1);
-> > +
-> > +		if (pps->weighted_bipred_flag)
-> > +			cedrus_h265_pred_weight_write(dev,
-> > +				pred_weight_table->delta_luma_weight_l1,
-> > +				pred_weight_table->luma_offset_l1,
-> > +				pred_weight_table->delta_chroma_weight_l1,
-> > +				pred_weight_table->chroma_offset_l1,
-> > +				slice_params->num_ref_idx_l1_active_minus1 + 1,
-> > +				VE_DEC_H265_SRAM_OFFSET_PRED_WEIGHT_LUMA_L1,
-> > +				VE_DEC_H265_SRAM_OFFSET_PRED_WEIGHT_CHROMA_L1);
-> > +	}
-> 
-> Ditto
-> 
-> Looks good otherwise, thanks!
-
-Thanks for the review!
-
-Cheers,
-
-Paul
-
+diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
+index 7b2bb4c..aba71a8 100644
+--- a/drivers/tee/tee_core.c
++++ b/drivers/tee/tee_core.c
+@@ -1027,6 +1027,18 @@ int tee_client_invoke_func(struct tee_context *ctx,
+ }
+ EXPORT_SYMBOL_GPL(tee_client_invoke_func);
+ 
++int tee_client_cancel_req(struct tee_context *ctx,
++			  u32 cancel_id,
++			  u32 session)
++{
++
++	if (!ctx->teedev->desc->ops->cancel_req)
++		return -EINVAL;
++	return ctx->teedev->desc->ops->cancel_req(ctx, cancel_id,
++						  session);
++}
++EXPORT_SYMBOL_GPL(tee_client_cancel_req);
++
+ static int __init tee_init(void)
+ {
+ 	int rc;
+diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
+index 6cfe058..62a0b56 100644
+--- a/include/linux/tee_drv.h
++++ b/include/linux/tee_drv.h
+@@ -526,6 +526,20 @@ int tee_client_invoke_func(struct tee_context *ctx,
+ 			   struct tee_ioctl_invoke_arg *arg,
+ 			   struct tee_param *param);
+ 
++/**
++ * tee_client_cancel_req() - Request cancellation of the previous open-session
++ * or invoke-command operations in a Trusted Application
++ * @ctx:       TEE Context
++ * @arg:       Unique cancel request id
++ * @param:     Session id
++ *
++ * Returns < 0 on error else see @arg->ret for result.
++ */
++int tee_client_cancel_req(struct tee_context *ctx,
++			  u32 cancel_id,
++			  u32 session);
++
++
+ static inline bool tee_param_is_memref(struct tee_param *param)
+ {
+ 	switch (param->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
 -- 
-Paul Kocialkowski, Bootlin
-Embedded Linux and kernel engineering
-https://bootlin.com
+2.7.4
 
 
 _______________________________________________
