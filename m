@@ -2,62 +2,64 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-6.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 833C3C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 15:53:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EAF7CC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 15:56:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 503AA218B0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 15:53:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C1135218CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 15:56:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OTCRZagd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 503AA218B0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ox08fBEq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C1135218CD
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=p1WFbAU+zW4dC3SERDgCMxTxJxb4BGg3YckdwSvpR+Y=; b=OTCRZagdR3TIuGJYw8DWkreXS
-	LawFh7Wv/LG/ZBP5UcnjZIW1Vx2OgmSGn2UJ2Yhyo7EqtmmKKUrU0JsgqQn+U9s0zfQOhOVKIlr0d
-	GBQgq2J2UQnw9dxJAo0AhLkjcSYweVOvwmPZo3Lm3B364YL5r4UNsttUkOA/lwZ9wHx4YMVtxWvMZ
-	EVBfWf90YUgAxAeToVfPx+2UgZDbAKV4u2U3r0vajcPmrOTDZ13EsEYev/8XmkYkv/GyiD9Sye1qw
-	Gp7o38hCspWgTs4zwn0yn0eDNJKHBpSNJdrXu3So4ShUWRa5TUbJosmDsBZT63x97dEf4JJurnNvP
-	PrlpnIX6Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=M6ZH2Gu284CV5hoWv+X1DjRSNh/NTA51DdIVdeodn/4=; b=ox08fBEqDqkxDU
+	PcQ0Zdeokw2vBepInPTqESzwLGrBaonzLiJ8nx27mzH3N6DFjIReRzDflU579M1iwv8kmnYkYHvxr
+	ubMSwR8THHbu1ew8z5vgh5EQD8N7uLOPxK3fGkLn7vQ2cMx3Qe1ekkfRRuEeD4AN47OlLTKPKZY74
+	aOm1WyGG9vQnmX+ve5p9jrm5/1I5Pb6xZnesWvKWgygQkVN0XW91FHeQv9fmTaeM05O0VgjHvJQnE
+	TFgYA/0rco6RGCki+IUNYpPV3Rmbb0xIz85L7v7qSyFyrmhZpDCY2rme4RpwhumXZhtVbWQgg3SB5
+	e0kEnPgBYTks287w6jfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn3mt-0005VN-Ft; Fri, 25 Jan 2019 15:52:59 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
+	id 1gn3pl-0007Wy-5V; Fri, 25 Jan 2019 15:55:57 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn3mo-0005So-AY
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 15:52:56 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id E7F69207B6; Fri, 25 Jan 2019 16:52:52 +0100 (CET)
-Received: from localhost (aaubervilliers-681-1-87-206.w90-88.abo.wanadoo.fr
- [90.88.29.206])
- by mail.bootlin.com (Postfix) with ESMTPSA id BB08E207AD;
- Fri, 25 Jan 2019 16:52:52 +0100 (CET)
-Date: Fri, 25 Jan 2019 16:52:53 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Jagan Teki <jagan@amarulasolutions.com>
-Subject: Re: [PATCH v6 15/22] dt-bindings: sun6i-dsi: Add A64 DPHY compatible
- (w/ A31 fallback)
-Message-ID: <20190125155253.v33vk3rfpdgv6537@flea>
-References: <20190124195900.22620-1-jagan@amarulasolutions.com>
- <20190124195900.22620-16-jagan@amarulasolutions.com>
+ id 1gn3ph-0007WM-Dw
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 15:55:54 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C2BC2A78;
+ Fri, 25 Jan 2019 07:55:52 -0800 (PST)
+Received: from arrakis.emea.arm.com (arrakis.cambridge.arm.com [10.1.196.113])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 5A0403F5AF; Fri, 25 Jan 2019 07:55:46 -0800 (PST)
+Date: Fri, 25 Jan 2019 15:55:43 +0000
+From: Catalin Marinas <catalin.marinas@arm.com>
+To: Arnd Bergmann <arnd@arndb.de>
+Subject: Re: [PATCH v2 29/29] y2038: add 64-bit time_t syscalls to all 32-bit
+ architectures
+Message-ID: <20190125155542.GI25901@arrakis.emea.arm.com>
+References: <20190118161835.2259170-1-arnd@arndb.de>
+ <20190118161835.2259170-30-arnd@arndb.de>
 MIME-Version: 1.0
-In-Reply-To: <20190124195900.22620-16-jagan@amarulasolutions.com>
-User-Agent: NeoMutt/20180716
+Content-Disposition: inline
+In-Reply-To: <20190118161835.2259170-30-arnd@arndb.de>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_075254_520839_7AA378A7 
-X-CRM114-Status: GOOD (  14.80  )
+X-CRM114-CacheID: sfid-20190125_075553_474101_F9A99D68 
+X-CRM114-Status: GOOD (  15.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,86 +71,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- David Airlie <airlied@linux.ie>, Michael Turquette <mturquette@baylibre.com>,
- linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Daniel Vetter <daniel@ffwll.ch>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============1291214536780631565=="
+Cc: dalias@libc.org, linux-ia64@vger.kernel.org, linux-sh@vger.kernel.org,
+ benh@kernel.crashing.org, heiko.carstens@de.ibm.com,
+ linux-mips@vger.kernel.org, jcmvbkbc@gmail.com, netdev@vger.kernel.org,
+ deepa.kernel@gmail.com, hpa@zytor.com, sparclinux@vger.kernel.org,
+ linux-arch@vger.kernel.org, linux-s390@vger.kernel.org, y2038@lists.linaro.org,
+ mpe@ellerman.id.au, deller@gmx.de, x86@kernel.org, linux@armlinux.org.uk,
+ mingo@redhat.com, geert@linux-m68k.org, firoz.khan@linaro.org,
+ mattst88@gmail.com, fenghua.yu@intel.com, will.deacon@arm.com,
+ linux-fsdevel@vger.kernel.org, linux-m68k@lists.linux-m68k.org,
+ luto@kernel.org, tglx@linutronix.de, linux-arm-kernel@lists.infradead.org,
+ monstr@monstr.eu, tony.luck@intel.com, linux-parisc@vger.kernel.org,
+ linux-api@vger.kernel.org, linux-kernel@vger.kernel.org, paul.burton@mips.com,
+ ebiederm@xmission.com, linux-alpha@vger.kernel.org, schwidefsky@de.ibm.com,
+ akpm@linux-foundation.org, linuxppc-dev@lists.ozlabs.org, davem@davemloft.net
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Fri, Jan 18, 2019 at 05:18:35PM +0100, Arnd Bergmann wrote:
+> This adds 21 new system calls on each ABI that has 32-bit time_t
+> today. All of these have the exact same semantics as their existing
+> counterparts, and the new ones all have macro names that end in 'time64'
+> for clarification.
+> 
+> This gets us to the point of being able to safely use a C library
+> that has 64-bit time_t in user space. There are still a couple of
+> loose ends to tie up in various areas of the code, but this is the
+> big one, and should be entirely uncontroversial at this point.
+> 
+> In particular, there are four system calls (getitimer, setitimer,
+> waitid, and getrusage) that don't have a 64-bit counterpart yet,
+> but these can all be safely implemented in the C library by wrapping
+> around the existing system calls because the 32-bit time_t they
+> pass only counts elapsed time, not time since the epoch. They
+> will be dealt with later.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
---===============1291214536780631565==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="ykfgu7c2rq7ykthf"
-Content-Disposition: inline
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-
---ykfgu7c2rq7ykthf
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Fri, Jan 25, 2019 at 01:28:53AM +0530, Jagan Teki wrote:
-> The MIPI DSI PHY controller on Allwinner A64 is similar
-> on the one on A31.
->=20
-> Add A64 compatible and append A31 compatible as fallback.
->=20
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> ---
->  Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 1 +
->  1 file changed, 1 insertion(+)
->=20
-> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.tx=
-t b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-> index dbda2e567760..9c553637c72b 100644
-> --- a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-> +++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-> @@ -40,6 +40,7 @@ D-PHY
->  Required properties:
->    - compatible: value must be one of:
->      * allwinner,sun6i-a31-mipi-dphy
-> +    * "allwinner,sun50i-a64-mipi-dphy", "allwinner,sun6i-a31-mipi-dphy"
-
-Same remark than patch 14
-
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---ykfgu7c2rq7ykthf
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXEsw1QAKCRDj7w1vZxhR
-xTi8AQDz3tkCaFBlGhOZG03SKppIfmHwuOSJbl3fNs5PW6BAKwEAuk0HYmnWsXo8
-fkTCcHkKV1uTbLP+Woq7p1BlVjuvMg4=
-=DoXw
------END PGP SIGNATURE-----
-
---ykfgu7c2rq7ykthf--
-
-
---===============1291214536780631565==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+(as long as compat follows the arm32 syscall numbers)
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============1291214536780631565==--
-
