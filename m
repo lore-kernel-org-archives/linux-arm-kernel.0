@@ -5,20 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C299FC282C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:23:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 044BAC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:24:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 88E782184B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:23:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C5CA52184B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:24:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UbbhfPoN";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="TpRDTPim"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88E782184B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QmtXM8rq";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="V3UvVsmo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C5CA52184B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,65 +26,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6aBpEtnGbUf4vyJvFzCLHnoyFJW9KAJuxITmgD/CBZI=; b=UbbhfPoNYYOT9z
-	3Je4kpb3lbdUkTghc/g+DBmEXUDMzrzOFe1MKDkbE0OKMCgv1KLDb6Lp0n0zSLyLV0hZkA+VjA+H3
-	pPIwssJLmIA9A7uoYhdXjC53foCs9Uj3Pm0wexJ2w0ze/rS9Ndb9sR7uV/ORRfb5KSRYY94yaGM+z
-	6w1Y8Xji+xfBz6uEJ6DqcSg4uJ66nZmJ3+0wpUPeonGsm/S11C1L13WR3m8LP/xP0sAMqzMFhLU0G
-	NKscb66h3vKsP4Gys5IXA6CXHzYmw87bOoUG3Yl6rlXDpA3qXmZbrhtIUY28pktzNRiI2zD7+oelI
-	RxgDqFGZ/nFydW/A/DgQ==;
+	List-Owner; bh=4RTOOf3dwsvmoVbsY9ND4PgRF5LRtJfnu9frZETRZ3Q=; b=QmtXM8rqpER5Yi
+	cPln8l2BElzbdCT6doyzpWRgW8hYyHOs5Y6pRTpPrIkH+bS4/Ccnn07PMKfyTExjqrVYuyO3Dazfv
+	TDZOohKFr958bLRZsWQOritFnUkOkKsNxLqn/eFyELN07SlQKhBlU4Ti8FQtSuUWp150+F5lA+BiA
+	ZNmu4t/96iN+Pc2NApJBxI/ccsMy8oDsiWH6N4G6171E+KBbXQn3bANehIGrXDzR+lREpNzSkvPIT
+	Iff0B72KcDflmtiajD8mRzlcKob3pO0k/ysmIDmaPMRzZLvtrsHrg393cCf5U2fMbhsKevR6lzQVH
+	dXC9mDktoEG7gkdM75ew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmyeA-0005O1-C9; Fri, 25 Jan 2019 10:23:38 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gmyeR-0005dz-DO; Fri, 25 Jan 2019 10:23:55 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmydZ-0004tK-PV
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 10:23:04 +0000
-Received: by mail-wr1-x441.google.com with SMTP id t27so9673906wra.6
+ id 1gmydd-0004vL-EM
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 10:23:10 +0000
+Received: by mail-wr1-x444.google.com with SMTP id t6so9633566wrr.12
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 25 Jan 2019 02:23:01 -0800 (PST)
+ Fri, 25 Jan 2019 02:23:04 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=XVw4yJ3DeRUUhOCTYlQV70I31SQK+1qVA1VsbWC0olQ=;
- b=TpRDTPimDSAOlU1vu9YH/SZh8OLKNaCHJtqoYS3/ElOmNPrI9RjdxVbYPUqvnua/VP
- +ZO31KNz6uh6EyAONiJS7UZtCy3/c1bhB1nWf4qS5VfMUPqqvw3vl6at63duttor+haz
- bTV3tlKZzP5MLsSSvayntAdWAl6jgpjUkxfM5oETQFSy68JxmLTCjnpAMs97KSBBjfAh
- t5qBdYRDXZSfXxcyoStWt8CdBFZSBjMx4p7aJD9u09FnRIdKBmjY2snBz4LGXddPAle6
- uEQNqqVGJe7cKpXLlolcGoMC6tOoJantH8Xd4RKVsWSNElHyw7mgPp1AWo6cfRYpTHjj
- gR/g==
+ bh=9ESKf+NTV2tZwpCvoTuHSzsM0y5nQHTu9YPl83xksac=;
+ b=V3UvVsmo8od8cG4m1268uDUygbmaCtDPDKMrcj0vwSVmrc/ka4AGEAxbFklAKcwFe5
+ 3XEO2wa9ti+8IsxURyGuAedjw6SI4kTtuzW+JG9I6VfH99M5DmTcmV9gFF7TWjMJWz4k
+ bcqLNPblJ4aKPvgV1wwD+7Awmd00+oAzk1vXYuJLrbeUPWaP9UGVd5EfRmvcaS485sHI
+ LUAce+5efV3tDuwYalyrHhwbllLc8T+RC2yGkxjjMEUkVrsIswmJK0cWFTiPve1YsSep
+ NaRxTA20SSwMc5cecQQFU+Uj7FpwydwCxOSDPWHrmq+PrFT9lyz/4gsQvpob3qYltmYM
+ jTow==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=XVw4yJ3DeRUUhOCTYlQV70I31SQK+1qVA1VsbWC0olQ=;
- b=Bndpn9pt7KjOQf789HB0pr0+rtrNqBIK5EzOUJ0bLxzWHLXeYaDInfbzjbx4PRVOKn
- /Y+lpc7edVH7omk2mZIU9BzdZyy/22aO5sOJ+nTxBYvfuzUFDO81KAi0h9pir9WVJG1M
- f3oNE58aUec+1JR/gASFXW+mHMLiXINYHj5/v5wQmIhC4W+xbcbKawjXQ9k58SaasLvh
- 0lS9LWaUfhyThNiiF65JW3ET+YSetBYpc0NNLEKNBQCSbdYlJOyeh2mBzo6wTdCMcrtR
- uCfb1vWt+86CpUMizTbDkaFnP1KtIGijEw4Z7O8HtZ6BQleZLg03R/wrSoiYTMMhP493
- xo+Q==
-X-Gm-Message-State: AJcUukeZdN1AHN8KIxSTQVp38uQYmYVfjGS6/xNYWczxseIDcrJZbXQ8
- kKFATfCFOHRF0Mh9qd7vUzI=
-X-Google-Smtp-Source: ALg8bN70uKcw/sNISUpWdFwUt/+bkwUw3kz+gUnkpm1pCBV2cqEA+QWVm09TtwzXuI8geLIO1VPF6Q==
-X-Received: by 2002:a5d:6487:: with SMTP id r7mr11183650wru.263.1548411779937; 
- Fri, 25 Jan 2019 02:22:59 -0800 (PST)
+ bh=9ESKf+NTV2tZwpCvoTuHSzsM0y5nQHTu9YPl83xksac=;
+ b=VSv0AQfm9BFNjKO5IGWSvSLt9zM/MQokeJMQ7OAE+xMywZcx0MITgNrMR0Id/oZmpd
+ zCfDiQWLWKcB9IQ+hHslwthxC3INuwRMn27XjTPxUlRYMm2pplzxW1SH9UfxDKPAsdke
+ 4TwPAWrdPddMLKXwVFeJHntYvL33DhM7ZyLk45KRcQhz9YCWkZO0XGe7OTAap/HCWY1o
+ NJx8+Yzfv9V63tqNYbT0Yid3arEAW1CUlDZ6HXo/p6L5Kabrp+hYkoKsPOCSLWGQ88IF
+ 0OAd+3JyRTkV3SD3AjwE+IglqtIEgNnT3c/X3OjQBkbuwp3t/mEAHPvWY+40YFo+IBWF
+ 2a+Q==
+X-Gm-Message-State: AJcUuke/2qlfMWrYpb8w9mz6kdyfA7p7Uw7zmURCP4zkQA5woCicp9qe
+ BXwg1LFqzluHIInBFcr6Zc0=
+X-Google-Smtp-Source: ALg8bN7icbo0zobuv2S7bV/Ku+UarJhxk54I+l3dtnhLiT5rblymee+1D7c9HiktRk/ZNNS2H3uK+g==
+X-Received: by 2002:adf:8b4d:: with SMTP id v13mr10438970wra.282.1548411783250; 
+ Fri, 25 Jan 2019 02:23:03 -0800 (PST)
 Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
- by smtp.gmail.com with ESMTPSA id v12sm130936929wmd.27.2019.01.25.02.22.59
+ by smtp.gmail.com with ESMTPSA id 200sm65839601wmw.31.2019.01.25.02.23.02
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 25 Jan 2019 02:22:59 -0800 (PST)
+ Fri, 25 Jan 2019 02:23:02 -0800 (PST)
 From: Thierry Reding <thierry.reding@gmail.com>
 To: Thierry Reding <thierry.reding@gmail.com>
-Subject: [PATCH 3/7] soc/tegra: pmc: Make tegra_powergate_is_powered() a local
- function
-Date: Fri, 25 Jan 2019 11:22:51 +0100
-Message-Id: <20190125102255.6862-3-thierry.reding@gmail.com>
+Subject: [PATCH 5/7] soc/tegra: pmc: Make alignment consistent
+Date: Fri, 25 Jan 2019 11:22:53 +0100
+Message-Id: <20190125102255.6862-5-thierry.reding@gmail.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190125102255.6862-1-thierry.reding@gmail.com>
 References: <20190125102255.6862-1-thierry.reding@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_022301_837703_A4A6BE45 
-X-CRM114-Status: GOOD (  10.83  )
+X-CRM114-CacheID: sfid-20190125_022306_029731_65DE4727 
+X-CRM114-Status: GOOD (  14.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,55 +103,117 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Jon Hunter <jonathanh@nvidia.com>
+From: Thierry Reding <treding@nvidia.com>
 
-Now there are no more external users of tegra_powergate_is_powered(),
-make this a local function.
+Some recently added code used weird alignment and indentation. Fix these
+occurrences to make them consistent with the rest of the code.
 
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- drivers/soc/tegra/pmc.c | 2 +-
- include/soc/tegra/pmc.h | 6 ------
- 2 files changed, 1 insertion(+), 7 deletions(-)
+ drivers/soc/tegra/pmc.c | 29 ++++++++++++++++++-----------
+ 1 file changed, 18 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-index 550653302ff2..fa0e1ac6d501 100644
+index 32dd619c098e..2a2e6aaae97e 100644
 --- a/drivers/soc/tegra/pmc.c
 +++ b/drivers/soc/tegra/pmc.c
-@@ -637,7 +637,7 @@ EXPORT_SYMBOL(tegra_powergate_power_off);
-  * tegra_powergate_is_powered() - check if partition is powered
-  * @id: partition ID
-  */
--int tegra_powergate_is_powered(unsigned int id)
-+static int tegra_powergate_is_powered(unsigned int id)
+@@ -1502,8 +1502,8 @@ static int tegra_io_pad_pinctrl_get_groups_count(struct pinctrl_dev *pctl_dev)
+ 	return pmc->soc->num_io_pads;
+ }
+ 
+-static const char *tegra_io_pad_pinctrl_get_group_name(
+-		struct pinctrl_dev *pctl, unsigned int group)
++static const char *tegra_io_pad_pinctrl_get_group_name(struct pinctrl_dev *pctl,
++						       unsigned int group)
  {
- 	if (!tegra_powergate_is_valid(id))
+ 	struct tegra_pmc *pmc = pinctrl_dev_get_drvdata(pctl);
+ 
+@@ -1519,6 +1519,7 @@ static int tegra_io_pad_pinctrl_get_group_pins(struct pinctrl_dev *pctl_dev,
+ 
+ 	*pins = &pmc->soc->io_pads[group].id;
+ 	*num_pins = 1;
++
+ 	return 0;
+ }
+ 
+@@ -1548,14 +1549,18 @@ static int tegra_io_pad_pinconf_get(struct pinctrl_dev *pctl_dev,
+ 		ret = tegra_io_pad_get_voltage(pmc, pad->id);
+ 		if (ret < 0)
+ 			return ret;
++
+ 		arg = ret;
+ 		break;
++
+ 	case PIN_CONFIG_LOW_POWER_MODE:
+ 		ret = tegra_io_pad_is_powered(pmc, pad->id);
+ 		if (ret < 0)
+ 			return ret;
++
+ 		arg = !ret;
+ 		break;
++
+ 	default:
  		return -EINVAL;
-diff --git a/include/soc/tegra/pmc.h b/include/soc/tegra/pmc.h
-index a9db1b501de1..b32ee5d82dd4 100644
---- a/include/soc/tegra/pmc.h
-+++ b/include/soc/tegra/pmc.h
-@@ -161,7 +161,6 @@ enum tegra_io_pad {
- #define TEGRA_IO_RAIL_LVDS	TEGRA_IO_PAD_LVDS
+ 	}
+@@ -1622,7 +1627,7 @@ static struct pinctrl_desc tegra_pmc_pctl_desc = {
  
- #ifdef CONFIG_SOC_TEGRA_PMC
--int tegra_powergate_is_powered(unsigned int id);
- int tegra_powergate_power_on(unsigned int id);
- int tegra_powergate_power_off(unsigned int id);
- int tegra_powergate_remove_clamping(unsigned int id);
-@@ -182,11 +181,6 @@ void tegra_pmc_set_suspend_mode(enum tegra_suspend_mode mode);
- void tegra_pmc_enter_suspend_mode(enum tegra_suspend_mode mode);
- 
- #else
--static inline int tegra_powergate_is_powered(unsigned int id)
--{
--	return -ENOSYS;
--}
--
- static inline int tegra_powergate_power_on(unsigned int id)
+ static int tegra_pmc_pinctrl_init(struct tegra_pmc *pmc)
  {
- 	return -ENOSYS;
+-	int err = 0;
++	int err;
+ 
+ 	if (!pmc->soc->num_pin_descs)
+ 		return 0;
+@@ -1635,14 +1640,16 @@ static int tegra_pmc_pinctrl_init(struct tegra_pmc *pmc)
+ 					      pmc);
+ 	if (IS_ERR(pmc->pctl_dev)) {
+ 		err = PTR_ERR(pmc->pctl_dev);
+-		dev_err(pmc->dev, "unable to register pinctrl, %d\n", err);
++		dev_err(pmc->dev, "failed to register pin controller: %d\n",
++			err);
++		return err;
+ 	}
+ 
+-	return err;
++	return 0;
+ }
+ 
+ static ssize_t reset_reason_show(struct device *dev,
+-			struct device_attribute *attr, char *buf)
++				 struct device_attribute *attr, char *buf)
+ {
+ 	u32 value, rst_src;
+ 
+@@ -1656,7 +1663,7 @@ static ssize_t reset_reason_show(struct device *dev,
+ static DEVICE_ATTR_RO(reset_reason);
+ 
+ static ssize_t reset_level_show(struct device *dev,
+-			struct device_attribute *attr, char *buf)
++				struct device_attribute *attr, char *buf)
+ {
+ 	u32 value, rst_lvl;
+ 
+@@ -1678,16 +1685,16 @@ static void tegra_pmc_reset_sysfs_init(struct tegra_pmc *pmc)
+ 		err = device_create_file(dev, &dev_attr_reset_reason);
+ 		if (err < 0)
+ 			dev_warn(dev,
+-				"failed to create attr \"reset_reason\": %d\n",
+-				err);
++				 "failed to create attr \"reset_reason\": %d\n",
++				 err);
+ 	}
+ 
+ 	if (pmc->soc->reset_levels) {
+ 		err = device_create_file(dev, &dev_attr_reset_level);
+ 		if (err < 0)
+ 			dev_warn(dev,
+-				"failed to create attr \"reset_level\": %d\n",
+-				err);
++				 "failed to create attr \"reset_level\": %d\n",
++				 err);
+ 	}
+ }
+ 
 -- 
 2.19.1
 
