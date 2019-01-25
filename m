@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 33388C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:08:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C52C8C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:08:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA74F218B0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:08:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9797F218B0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:08:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N6t5FnqQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA74F218B0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="avhy2wjg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9797F218B0
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,38 +26,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=JYpwgkQ7OAZTo9RJpnZlJzu+xVxDA4I/SUoId1PmpGY=; b=N6t5FnqQ9RdKU67WoyKO0L+fwC
-	mM8CV6vyyqjf1Avf/rfAzWCTKvopfisPryyn+WbuN4DDiY7YFs8izc9aE00FkbFQWo/76OA3ebDxq
-	2gVRpKQpJe5XSHAo0ewbM9FyqyEVQ5lC38eTabbFJ0zp/0ibt4EF9fra1Q28banQ1ukoP1h2IhnVY
-	b2VEdG4hx8HBxxUywpjLe+GrwGY7rbdqyxAKh0o+82hlzphTkxLMJrn9xzjvdart1rxpjj74oLyTi
-	2hVMOuboZnW7WSKIlCHZk2JM+BePmdNPaybwEPK0xDV0AhG+AgZf0aOTclkvKXd260xvTTQytKo7B
-	AfvObnsA==;
+	bh=UPAfNCx6g4B1rDA7Zn8qRLeWd6VOAVlz12HxsqzV1g0=; b=avhy2wjg2AoHlnzsi6fJMfT2ep
+	fF+ATv/pm+3/ABPPjc0x+upZ5B6WI2GQh1oTPTHCwZgnwCXvvV04INsJeHPXjAugQBPZgjzMyCU3J
+	YhHvNBxlrCeDhwFAR/ifPi/1fHRxLRUtjnTm9uHBL6isJg0mmqFfe7VOY6rrpEqF+dQhIycF8Tgp1
+	4P+/RcePUAfS/Ri3q2yNggHOcg1MsjlE2hXO7xOy3akvYdnFYgZ4+NKUTphvVsnAy6ytP01Db6/5Y
+	Zqg/r+2g4tw0gRH7cEF1ZLoVZ1HoO1D8EYVo9ykVpOKXXO3+nUBaLJCf6ATXbpL9Ozh2ph7IlcbPB
+	wXoLMkug==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn5tl-000654-0L; Fri, 25 Jan 2019 18:08:13 +0000
+	id 1gn5u1-0006Od-Pu; Fri, 25 Jan 2019 18:08:30 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn5sy-0005K1-Lq
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 18:07:27 +0000
+ id 1gn5sz-0005LD-W3
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 18:07:30 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 67BA1165C;
- Fri, 25 Jan 2019 10:07:24 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A2148EBD;
+ Fri, 25 Jan 2019 10:07:25 -0800 (PST)
 Received: from beelzebub.austin.arm.com (beelzebub.austin.arm.com
  [10.118.12.119])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id AA23F3F5AF;
- Fri, 25 Jan 2019 10:07:23 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id E90B33F5AF;
+ Fri, 25 Jan 2019 10:07:24 -0800 (PST)
 From: Jeremy Linton <jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v4 03/12] arm64: Remove the ability to build a kernel without
- ssbd
-Date: Fri, 25 Jan 2019 12:07:02 -0600
-Message-Id: <20190125180711.1970973-4-jeremy.linton@arm.com>
+Subject: [PATCH v4 04/12] arm64: remove the ability to build a kernel without
+ hardened branch predictors
+Date: Fri, 25 Jan 2019 12:07:03 -0600
+Message-Id: <20190125180711.1970973-5-jeremy.linton@arm.com>
 X-Mailer: git-send-email 2.17.2
 In-Reply-To: <20190125180711.1970973-1-jeremy.linton@arm.com>
 References: <20190125180711.1970973-1-jeremy.linton@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_100724_726820_11586E34 
-X-CRM114-Status: GOOD (  15.25  )
+X-CRM114-CacheID: sfid-20190125_100726_334580_E078A0DE 
+X-CRM114-Status: GOOD (  15.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,9 +82,10 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 Buried behind EXPERT is the ability to build a kernel without
-SSBD, this needlessly clutters up the code as well as creates
-the opportunity for bugs. It also removes the kernel's ability
-to determine if the machine its running on is vulnerable.
+hardened branch predictors, this needlessly clutters up the
+code as well as creates the opportunity for bugs. It also
+removes the kernel's ability to determine if the machine its
+running on is vulnerable.
 
 Since its also possible to disable it at boot time, lets remove
 the config option.
@@ -93,250 +94,228 @@ Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 Cc: Christoffer Dall <christoffer.dall@arm.com>
 Cc: kvmarm@lists.cs.columbia.edu
 ---
- arch/arm64/Kconfig                  | 9 ---------
- arch/arm64/include/asm/cpufeature.h | 8 --------
- arch/arm64/include/asm/kvm_mmu.h    | 7 -------
- arch/arm64/kernel/Makefile          | 3 +--
- arch/arm64/kernel/cpu_errata.c      | 4 ----
- arch/arm64/kernel/cpufeature.c      | 4 ----
- arch/arm64/kernel/entry.S           | 2 --
- arch/arm64/kvm/hyp/hyp-entry.S      | 2 --
- arch/arm64/kvm/hyp/switch.c         | 4 ----
- 9 files changed, 1 insertion(+), 42 deletions(-)
+ arch/arm64/Kconfig               | 17 -----------------
+ arch/arm64/include/asm/kvm_mmu.h | 12 ------------
+ arch/arm64/include/asm/mmu.h     | 12 ------------
+ arch/arm64/kernel/cpu_errata.c   | 19 -------------------
+ arch/arm64/kernel/entry.S        |  2 --
+ arch/arm64/kvm/Kconfig           |  3 ---
+ arch/arm64/kvm/hyp/hyp-entry.S   |  2 --
+ 7 files changed, 67 deletions(-)
 
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a4168d366127..0baa632bf0a8 100644
+index 0baa632bf0a8..6b4c6d3fdf4d 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -1038,15 +1038,6 @@ config HARDEN_EL2_VECTORS
+@@ -1005,23 +1005,6 @@ config UNMAP_KERNEL_AT_EL0
  
  	  If unsure, say Y.
  
--config ARM64_SSBD
--	bool "Speculative Store Bypass Disable" if EXPERT
+-config HARDEN_BRANCH_PREDICTOR
+-	bool "Harden the branch predictor against aliasing attacks" if EXPERT
 -	default y
 -	help
--	  This enables mitigation of the bypassing of previous stores
--	  by speculative loads.
+-	  Speculation attacks against some high-performance processors rely on
+-	  being able to manipulate the branch predictor for a victim context by
+-	  executing aliasing branches in the attacker context.  Such attacks
+-	  can be partially mitigated against by clearing internal branch
+-	  predictor state and limiting the prediction logic in some situations.
+-
+-	  This config option will take CPU-specific actions to harden the
+-	  branch predictor against aliasing attacks and may rely on specific
+-	  instruction sequences or control bits being set by the system
+-	  firmware.
 -
 -	  If unsure, say Y.
 -
- config RODATA_FULL_DEFAULT_ENABLED
- 	bool "Apply r/o permissions of VM areas also to their linear aliases"
+ config HARDEN_EL2_VECTORS
+ 	bool "Harden EL2 vector mapping against system register leak" if EXPERT
  	default y
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index dfcfba725d72..bbed2067a1a4 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -620,19 +620,11 @@ static inline bool system_supports_generic_auth(void)
- 
- static inline int arm64_get_ssbd_state(void)
- {
--#ifdef CONFIG_ARM64_SSBD
- 	extern int ssbd_state;
- 	return ssbd_state;
--#else
--	return ARM64_SSBD_UNKNOWN;
--#endif
- }
- 
--#ifdef CONFIG_ARM64_SSBD
- void arm64_set_ssbd_mitigation(bool state);
--#else
--static inline void arm64_set_ssbd_mitigation(bool state) {}
--#endif
- 
- extern int do_emulate_mrs(struct pt_regs *regs, u32 sys_reg, u32 rt);
- 
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 8af4b1befa42..a5c152d79820 100644
+index a5c152d79820..9dd680194db9 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -541,7 +541,6 @@ static inline int kvm_map_vectors(void)
+@@ -444,7 +444,6 @@ static inline int kvm_read_guest_lock(struct kvm *kvm,
+ 	return ret;
  }
- #endif
  
--#ifdef CONFIG_ARM64_SSBD
- DECLARE_PER_CPU_READ_MOSTLY(u64, arm64_ssbd_callback_required);
+-#ifdef CONFIG_KVM_INDIRECT_VECTORS
+ /*
+  * EL2 vectors can be mapped and rerouted in a number of ways,
+  * depending on the kernel configuration and CPU present:
+@@ -529,17 +528,6 @@ static inline int kvm_map_vectors(void)
  
- static inline int hyp_map_aux_data(void)
-@@ -558,12 +557,6 @@ static inline int hyp_map_aux_data(void)
- 	}
  	return 0;
  }
 -#else
--static inline int hyp_map_aux_data(void)
+-static inline void *kvm_get_hyp_vector(void)
+-{
+-	return kern_hyp_va(kvm_ksym_ref(__kvm_hyp_vector));
+-}
+-
+-static inline int kvm_map_vectors(void)
 -{
 -	return 0;
 -}
 -#endif
  
- #define kvm_phys_to_vttbr(addr)		phys_to_ttbr(addr)
+ DECLARE_PER_CPU_READ_MOSTLY(u64, arm64_ssbd_callback_required);
  
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index cd434d0719c1..306336a2fa34 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -19,7 +19,7 @@ obj-y			:= debug-monitors.o entry.o irq.o fpsimd.o		\
- 			   return_address.o cpuinfo.o cpu_errata.o		\
- 			   cpufeature.o alternative.o cacheinfo.o		\
- 			   smp.o smp_spin_table.o topology.o smccc-call.o	\
--			   syscall.o
-+			   syscall.o ssbd.o
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 3e8063f4f9d3..20fdf71f96c3 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -95,13 +95,9 @@ struct bp_hardening_data {
+ 	bp_hardening_cb_t	fn;
+ };
  
- extra-$(CONFIG_EFI)			:= efi-entry.o
+-#if (defined(CONFIG_HARDEN_BRANCH_PREDICTOR) ||	\
+-     defined(CONFIG_HARDEN_EL2_VECTORS))
+ extern char __bp_harden_hyp_vecs_start[], __bp_harden_hyp_vecs_end[];
+ extern atomic_t arm64_el2_vector_last_slot;
+-#endif  /* CONFIG_HARDEN_BRANCH_PREDICTOR || CONFIG_HARDEN_EL2_VECTORS */
  
-@@ -57,7 +57,6 @@ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
- obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
- obj-$(CONFIG_CRASH_CORE)		+= crash_core.o
- obj-$(CONFIG_ARM_SDE_INTERFACE)		+= sdei.o
--obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
- obj-$(CONFIG_ARM64_PTR_AUTH)		+= pointer_auth.o
+-#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+ DECLARE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
  
- obj-y					+= vdso/ probes/
+ static inline struct bp_hardening_data *arm64_get_bp_hardening_data(void)
+@@ -120,14 +116,6 @@ static inline void arm64_apply_bp_hardening(void)
+ 	if (d->fn)
+ 		d->fn();
+ }
+-#else
+-static inline struct bp_hardening_data *arm64_get_bp_hardening_data(void)
+-{
+-	return NULL;
+-}
+-
+-static inline void arm64_apply_bp_hardening(void)	{ }
+-#endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+ 
+ extern void paging_init(void);
+ extern void bootmem_init(void);
 diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 9a7b5fca51a0..934d50788ca3 100644
+index 934d50788ca3..de09a3537cd4 100644
 --- a/arch/arm64/kernel/cpu_errata.c
 +++ b/arch/arm64/kernel/cpu_errata.c
-@@ -281,7 +281,6 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
- }
- #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+@@ -109,13 +109,11 @@ cpu_enable_trap_ctr_access(const struct arm64_cpu_capabilities *__unused)
  
--#ifdef CONFIG_ARM64_SSBD
+ atomic_t arm64_el2_vector_last_slot = ATOMIC_INIT(-1);
+ 
+-#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+ #include <asm/mmu_context.h>
+ #include <asm/cacheflush.h>
+ 
+ DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+ 
+-#ifdef CONFIG_KVM_INDIRECT_VECTORS
+ extern char __smccc_workaround_1_smc_start[];
+ extern char __smccc_workaround_1_smc_end[];
+ 
+@@ -165,17 +163,6 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+ 	__this_cpu_write(bp_hardening_data.fn, fn);
+ 	raw_spin_unlock(&bp_lock);
+ }
+-#else
+-#define __smccc_workaround_1_smc_start		NULL
+-#define __smccc_workaround_1_smc_end		NULL
+-
+-static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+-				      const char *hyp_vecs_start,
+-				      const char *hyp_vecs_end)
+-{
+-	__this_cpu_write(bp_hardening_data.fn, fn);
+-}
+-#endif	/* CONFIG_KVM_INDIRECT_VECTORS */
+ 
+ static void  install_bp_hardening_cb(const struct arm64_cpu_capabilities *entry,
+ 				     bp_hardening_cb_t fn,
+@@ -279,7 +266,6 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
+ 
+ 	return;
+ }
+-#endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
+ 
  DEFINE_PER_CPU_READ_MOSTLY(u64, arm64_ssbd_callback_required);
  
- int ssbd_state __read_mostly = ARM64_SSBD_KERNEL;
-@@ -473,7 +472,6 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
+@@ -516,7 +502,6 @@ cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused)
+ 	.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,			\
+ 	CAP_MIDR_RANGE_LIST(midr_list)
  
- 	return required;
- }
--#endif	/* CONFIG_ARM64_SSBD */
+-#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
  
- static void __maybe_unused
- cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused)
-@@ -726,14 +724,12 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		ERRATA_MIDR_RANGE_LIST(arm64_harden_el2_vectors),
+ /*
+  * List of CPUs where we need to issue a psci call to
+@@ -535,8 +520,6 @@ static const struct midr_range arm64_bp_harden_smccc_cpus[] = {
+ 	{},
+ };
+ 
+-#endif
+-
+ #ifdef CONFIG_HARDEN_EL2_VECTORS
+ 
+ static const struct midr_range arm64_harden_el2_vectors[] = {
+@@ -710,13 +693,11 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A73),
  	},
  #endif
--#ifdef CONFIG_ARM64_SSBD
+-#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
  	{
- 		.desc = "Speculative Store Bypass Disable",
- 		.capability = ARM64_SSBD,
- 		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
- 		.matches = has_ssbd_mitigation,
+ 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
+ 		.cpu_enable = enable_smccc_arch_workaround_1,
+ 		ERRATA_MIDR_RANGE_LIST(arm64_bp_harden_smccc_cpus),
  	},
 -#endif
- #ifdef CONFIG_ARM64_ERRATUM_1188873
+ #ifdef CONFIG_HARDEN_EL2_VECTORS
  	{
- 		/* Cortex-A76 r0p0 to r2p0 */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index f6d84e2c92fe..d1a7fd7972f9 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1131,7 +1131,6 @@ static void cpu_has_fwb(const struct arm64_cpu_capabilities *__unused)
- 	WARN_ON(val & (7 << 27 | 7 << 21));
- }
- 
--#ifdef CONFIG_ARM64_SSBD
- static int ssbs_emulation_handler(struct pt_regs *regs, u32 instr)
- {
- 	if (user_mode(regs))
-@@ -1171,7 +1170,6 @@ static void cpu_enable_ssbs(const struct arm64_cpu_capabilities *__unused)
- 		arm64_set_ssbd_mitigation(true);
- 	}
- }
--#endif /* CONFIG_ARM64_SSBD */
- 
- #ifdef CONFIG_ARM64_PAN
- static void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused)
-@@ -1400,7 +1398,6 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.field_pos = ID_AA64ISAR0_CRC32_SHIFT,
- 		.min_field_value = 1,
- 	},
--#ifdef CONFIG_ARM64_SSBD
- 	{
- 		.desc = "Speculative Store Bypassing Safe (SSBS)",
- 		.capability = ARM64_SSBS,
-@@ -1412,7 +1409,6 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.min_field_value = ID_AA64PFR1_SSBS_PSTATE_ONLY,
- 		.cpu_enable = cpu_enable_ssbs,
- 	},
--#endif
- #ifdef CONFIG_ARM64_CNP
- 	{
- 		.desc = "Common not Private translations",
+ 		.desc = "EL2 vector hardening",
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 0ec0c46b2c0c..bee54b7d17b9 100644
+index bee54b7d17b9..3f0eaaf704c8 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -137,7 +137,6 @@ alternative_else_nop_endif
- 	// This macro corrupts x0-x3. It is the caller's duty
- 	// to save/restore them if required.
- 	.macro	apply_ssbd, state, tmp1, tmp2
--#ifdef CONFIG_ARM64_SSBD
- alternative_cb	arm64_enable_wa2_handling
- 	b	.L__asm_ssbd_skip\@
- alternative_cb_end
-@@ -151,7 +150,6 @@ alternative_cb	arm64_update_smccc_conduit
- 	nop					// Patched to SMC/HVC #0
- alternative_cb_end
- .L__asm_ssbd_skip\@:
--#endif
- 	.endm
+@@ -842,11 +842,9 @@ el0_irq_naked:
+ #endif
  
- 	.macro	kernel_entry, el, regsize = 64
+ 	ct_user_exit
+-#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+ 	tbz	x22, #55, 1f
+ 	bl	do_el0_irq_bp_hardening
+ 1:
+-#endif
+ 	irq_handler
+ 
+ #ifdef CONFIG_TRACE_IRQFLAGS
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index a3f85624313e..402bcfb85f25 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -58,9 +58,6 @@ config KVM_ARM_PMU
+ 	  Adds support for a virtual Performance Monitoring Unit (PMU) in
+ 	  virtual machines.
+ 
+-config KVM_INDIRECT_VECTORS
+-       def_bool KVM && (HARDEN_BRANCH_PREDICTOR || HARDEN_EL2_VECTORS)
+-
+ source "drivers/vhost/Kconfig"
+ 
+ endif # VIRTUALIZATION
 diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 73c1b483ec39..53c9344968d4 100644
+index 53c9344968d4..e02ddf40f113 100644
 --- a/arch/arm64/kvm/hyp/hyp-entry.S
 +++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -114,7 +114,6 @@ el1_hvc_guest:
- 			  ARM_SMCCC_ARCH_WORKAROUND_2)
- 	cbnz	w1, el1_trap
+@@ -272,7 +272,6 @@ ENTRY(__kvm_hyp_vector)
+ 	valid_vect	el1_error		// Error 32-bit EL1
+ ENDPROC(__kvm_hyp_vector)
  
--#ifdef CONFIG_ARM64_SSBD
- alternative_cb	arm64_enable_wa2_handling
- 	b	wa2_end
- alternative_cb_end
-@@ -141,7 +140,6 @@ alternative_cb_end
- wa2_end:
- 	mov	x2, xzr
- 	mov	x1, xzr
+-#ifdef CONFIG_KVM_INDIRECT_VECTORS
+ .macro hyp_ventry
+ 	.align 7
+ 1:	.rept 27
+@@ -331,4 +330,3 @@ ENTRY(__smccc_workaround_1_smc_start)
+ 	ldp	x0, x1, [sp, #(8 * 2)]
+ 	add	sp, sp, #(8 * 4)
+ ENTRY(__smccc_workaround_1_smc_end)
 -#endif
- 
- wa_epilogue:
- 	mov	x0, xzr
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index b0b1478094b4..9ce43ae6fc13 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -436,7 +436,6 @@ static inline bool __hyp_text __needs_ssbd_off(struct kvm_vcpu *vcpu)
- 
- static void __hyp_text __set_guest_arch_workaround_state(struct kvm_vcpu *vcpu)
- {
--#ifdef CONFIG_ARM64_SSBD
- 	/*
- 	 * The host runs with the workaround always present. If the
- 	 * guest wants it disabled, so be it...
-@@ -444,19 +443,16 @@ static void __hyp_text __set_guest_arch_workaround_state(struct kvm_vcpu *vcpu)
- 	if (__needs_ssbd_off(vcpu) &&
- 	    __hyp_this_cpu_read(arm64_ssbd_callback_required))
- 		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2, 0, NULL);
--#endif
- }
- 
- static void __hyp_text __set_host_arch_workaround_state(struct kvm_vcpu *vcpu)
- {
--#ifdef CONFIG_ARM64_SSBD
- 	/*
- 	 * If the guest has disabled the workaround, bring it back on.
- 	 */
- 	if (__needs_ssbd_off(vcpu) &&
- 	    __hyp_this_cpu_read(arm64_ssbd_callback_required))
- 		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2, 1, NULL);
--#endif
- }
- 
- /* Switch to the guest for VHE systems running in EL2 */
 -- 
 2.17.2
 
