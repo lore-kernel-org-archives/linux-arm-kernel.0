@@ -2,70 +2,107 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 39AB9C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 07:29:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 43DFBC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 07:40:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 04D24218D0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 07:29:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0A454218D0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 07:40:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PoJYsxHV";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="RsDBUUhn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 04D24218D0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eYdJelv3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=Synaptics.onmicrosoft.com header.i=@Synaptics.onmicrosoft.com header.b="n78qvGGL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0A454218D0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=synaptics.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FgxiHNnZTLpyp5So0lH064K40DoI1IJgMNFxChf78dg=; b=PoJYsxHVBz8U3r
-	HkrYL81obmxJP/9NyoIPWC1p3Hfa6p8NMfRrjwrRqqSgLgXwuV+3/WFzKFiLHF+oB9YdyuUaySjgK
-	UIlW63YO+Bf3hOFb6//NeMjogLuT8BKwF+G2Fsa7Dn/qK4dNQs4ZlcSUC9jNDxfXKTGd+nrx3erO/
-	R4YUf1/7H67fK1G2CuSqN4O/AAj81IqcnVF/OzgOSlUg+cu+Q/sbiT1ELr013cwVyxu0vdBEI4UyS
-	yda1qx50ps5wLFxckQ1dx1Qfi7ZpRn8YsZkJqAEZoTKCWKCC2gsZIjUqwTfev8oNoqRk2Vh2jnW4W
-	ABiYXTWaGv1GjumPBWew==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:Message-ID:Date
+	:Subject:To:From:Reply-To:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=E8NknnlLCOvlpK8PQszo91VVpniOebTOq2xuM1vjA5E=; b=eYdJelv3QWKdMi
+	XUpooCI4QzkiKXvjYDNnALN1+dFNSrB7OkCWyZrmhIyUrW6JpS6RrvczZNjhO1Z4Q9+f3y8cyHJ2X
+	XFp9EDEDOOQrYB39pOkyg3KC9w/VnSxDlh+vk5lAAYvPtbRi9QfEl4PA5sZ74E/ab50REWLJvacZF
+	y7ByFvm0D45Qekj7r7J4GEVc96UcA6cIqVcN0XQqRwiLX4H8MFbF8V9SnntkfM8FJmMk+hcCvOf10
+	igas4r9W6atHWnDArocdWVkC0yq57sp+IJWzDdS5duxClUSLdMYVptni1oc6h1C3Gfqhgr7XrRvBu
+	VqeqJ8hV6ubxs0Jl3lUQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmvw2-0006Fp-28; Fri, 25 Jan 2019 07:29:54 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gmw6Q-00027s-Dw; Fri, 25 Jan 2019 07:40:38 +0000
+Received: from mail-eopbgr720089.outbound.protection.outlook.com
+ ([40.107.72.89] helo=NAM05-CO1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmvvz-0006FE-2u
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 07:29:52 +0000
-Received: from sol.localdomain (c-107-3-167-184.hsd1.ca.comcast.net
- [107.3.167.184])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 96FED218D0;
- Fri, 25 Jan 2019 07:29:50 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548401390;
- bh=C7+wb730/3XKsMNiRj9KszZnH7HKQyvxkscH9k5PF+k=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=RsDBUUhnJ1b9eureZO4p/KZwfT4PCVsmXtWLyL20lTDVheo++157kBm5idNtG+oqt
- tjG+qqiCJFGI8WVNNzyLy0+qLi/dQ57QvRWHqoDa2dsP5J06ULyZg7tfCpbQFfDvd0
- GU/DyMwJeFX4+uAzNAhLmZi2vio+n6+sieF16iIc=
-Date: Thu, 24 Jan 2019 23:29:49 -0800
-From: Eric Biggers <ebiggers@kernel.org>
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Subject: Re: [PATCH 2/2] crypto: arm64/crct10dif - revert to C code for short
- inputs
-Message-ID: <20190125072948.GC700@sol.localdomain>
-References: <20190124182712.7142-1-ard.biesheuvel@linaro.org>
- <20190124182712.7142-3-ard.biesheuvel@linaro.org>
+ id 1gmw6N-00027P-Kh; Fri, 25 Jan 2019 07:40:37 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=Synaptics.onmicrosoft.com; s=selector1-synaptics-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=ZK4fBTFSIMw6I8Ka1Z2zTKEC1C8kcDFKFZd6k3RITMg=;
+ b=n78qvGGL6SBcx67UW62KyG9ldTdFg4cC7C6UfKiGFcHRlIHU0wl8KmyCnvO1S4b5v5pFc6vdjMQqJHOMahv/cSLS3/zAw7il4Kqf+rPaQeR6saXCiYDZ9CwRjl7DFz3tjFIw4LynRa0RiDPoWQEvhp0ULLOXkgnEKAgc/4+yUmI=
+Received: from SN6PR03MB4398.namprd03.prod.outlook.com (20.177.255.219) by
+ SN6PR03MB3503.namprd03.prod.outlook.com (52.135.79.32) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1558.16; Fri, 25 Jan 2019 07:40:32 +0000
+Received: from SN6PR03MB4398.namprd03.prod.outlook.com
+ ([fe80::59c4:7034:c325:36f]) by SN6PR03MB4398.namprd03.prod.outlook.com
+ ([fe80::59c4:7034:c325:36f%2]) with mapi id 15.20.1558.021; Fri, 25 Jan 2019
+ 07:40:32 +0000
+From: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+To: Boris Brezillon <bbrezillon@kernel.org>
+Subject: [PATCH] i3c: fix missing detach if failed to retrieve i3c dev
+Thread-Topic: [PATCH] i3c: fix missing detach if failed to retrieve i3c dev
+Thread-Index: AQHUtIFA6VlT+4CX00GLhIOQTsp/gQ==
+Date: Fri, 25 Jan 2019 07:40:32 +0000
+Message-ID: <20190125153420.0533d156@xhacker.debian>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [199.33.119.15]
+x-clientproxiedby: TY2PR01CA0050.jpnprd01.prod.outlook.com
+ (2603:1096:404:10a::14) To SN6PR03MB4398.namprd03.prod.outlook.com
+ (2603:10b6:805:fd::27)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Jisheng.Zhang@synaptics.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; SN6PR03MB3503;
+ 6:tEXvl7wQxAEhWUYlFoTUXRTnMDfPjustfN8m7A7FKr1CHoSFJlpBgP1cmYfVfWV+aloT2+B7aVF+xvnrgfLufThqfL/W1/IHtCzUhNUePKZRj3IC2I453qULJsH0+EkuF84dLFYR3x9+nOyYmRX2/4jhJimNMk2es8a0pY28ut1mJo11d9zlJvvxlSTG09ihwyR5LnO3RtHwZH+err4/IprOB5bG4V2DaKPoO02wiBx1SwbOaQEsMKPhu02TaxEofeI1VkPkfKGqyGh6fY3f/2k79sReygNJFfcN+kn3Kwh8ll1EftYRVqMpSiwQvc5FtmKJF9nKwgHmMDoRgWu+m6arGf7Qrkw0kwd5fD3Qv8k2Ydj8f4Diony24HNTMLn63C0dor19AkqZbIzkab8KY4d185E01LPWoLHbVr1qjhnPH7NkVEMPO3QlZ9jFeOQXtGupK6BZ93pqd0uFaas9+g==;
+ 5:avtHNqSHmZYpnPA7zfsOKI/NBj/6iUWGEVzK8mzy1cOqso2VaE4HMrOfQRFZ+Kwt58SFrIplATaaxkQXcSFYQ7+WQ59syqNEKbqgSLb+wA/JlbyiogJGXuXKVPgxHPeJVCGuVQr9pm/hxFygs+l/ViBd3+DYx4QNfjCv0UvLwW5uMH5j4cnR6BwOnu3uLQzjN4iFuE56qMQxsryYTSpAAw==;
+ 7:GEE72wAk0lP/T8thRgEdWeJxu+JEAmbnBy5UtRvgBm2DqZdrhif5G7Q+qLQZrOAsmB513GKPVuSabT0T8xuQQrzyMM1imgBsuJeCQD8rdHyvrns6mjtFjoBKWrjkko0weriweG4Y/1zt16hKMHzC1A==
+x-ms-office365-filtering-correlation-id: d7ebe86a-1922-4e21-c944-08d6829862a1
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:SN6PR03MB3503; 
+x-ms-traffictypediagnostic: SN6PR03MB3503:
+x-microsoft-antispam-prvs: <SN6PR03MB3503C30113AB4D14DB89C907ED9B0@SN6PR03MB3503.namprd03.prod.outlook.com>
+x-forefront-prvs: 0928072091
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(396003)(136003)(39860400002)(376002)(346002)(189003)(199004)(486006)(3846002)(6116002)(476003)(53936002)(68736007)(7736002)(305945005)(25786009)(50226002)(105586002)(8936002)(4326008)(81166006)(8676002)(66066001)(81156014)(86362001)(6916009)(106356001)(6436002)(6486002)(97736004)(72206003)(99286004)(14454004)(386003)(6506007)(2906002)(9686003)(6512007)(4744005)(186003)(316002)(102836004)(26005)(54906003)(1076003)(256004)(14444005)(71190400001)(71200400001)(52116002)(478600001)(33896004)(42413003)(39210200001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:SN6PR03MB3503;
+ H:SN6PR03MB4398.namprd03.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:0; 
+received-spf: None (protection.outlook.com: synaptics.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: YKB4J5r6KxxAVsb6VsAA4a64m6JgJwsTKU4m1Oes5sOGcbBBoMb9udzk98Ro/IJlLvMobquRVvmIfsL27lmGjC6scK4y/d2ryfATNpvZxKmdUphmuTavCuBBrXuyHVfTZCUeTDlEZ6uPak6TcveaaVillO6Hrv9mdKfHVdvFde/cdF2JofgQkZD0rNBFelEhp3srVgU8cYvrzfXF4JeoQNP0OTkiTKeoyy5vFZDvopXuZxA5g1LkLDCjHVIyt8F6vwMS6dD6smHhXSBLbLECVtojxYVGx0bvhRNpO386n3HQGvM9hnAcqxST5vTI6T9R7dz2GpVYf7pUZ9p3GGngs5KFS+l02PZ1wcB+xyqMOCmdWxTSA33+hRPFQUbIAfCbs21QuPLyefnD7QD0CWwGkkVWPXRu5QrvPOnFfiv6ayc=
+Content-ID: <6910436CE5444249A38A01E2D35CC120@namprd03.prod.outlook.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190124182712.7142-3-ard.biesheuvel@linaro.org>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+X-OriginatorOrg: synaptics.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: d7ebe86a-1922-4e21-c944-08d6829862a1
+X-MS-Exchange-CrossTenant-originalarrivaltime: 25 Jan 2019 07:40:30.7454 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 335d1fbc-2124-4173-9863-17e7051a2a0e
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: SN6PR03MB3503
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_232951_141649_81D90B2C 
-X-CRM114-Status: GOOD (  21.85  )
+X-CRM114-CacheID: sfid-20190124_234035_677596_73286EDD 
+X-CRM114-Status: GOOD (  10.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,85 +114,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-crypto@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- herbert@gondor.apana.org.au
+Cc: "linux-i3c@lists.infradead.org" <linux-i3c@lists.infradead.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 24, 2019 at 07:27:12PM +0100, Ard Biesheuvel wrote:
-> The SIMD routine ported from x86 used to have a special code path
-> for inputs < 16 bytes, which got lost somewhere along the way.
-> Instead, the current glue code aligns the input pointer to permit
-> the NEON routine to use special versions of the vld1 instructions
-> that assume 16 byte alignment, but this could result in inputs of
-> less than 16 bytes to be passed in. 
+If we failed to retrieve the i3c dev, we should detach the i3c dev
+I.E i3c_master_detach_i3c_dev().
 
-This description doesn't quite match the patch since the arm64 version of the
-assembly doesn't use any alignment specifiers.  I take it that actually means
-the alignment in the glue code wasn't necessary in the first place?
+Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+---
+ drivers/i3c/master.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> This not only fails the new
-> extended tests that Eric has implemented, it also results in the
-> code reading before the input pointer, which could potentially
-> result in crashes when dealing with less than 16 bytes of input
-> at the start of a page which is preceded by an unmapped page.
-> 
-> So update the glue code to only invoke the NEON routine if the
-> input is more than 16 bytes.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+diff --git a/drivers/i3c/master.c b/drivers/i3c/master.c
+index c39f89d2deba..2dc628d4f1ae 100644
+--- a/drivers/i3c/master.c
++++ b/drivers/i3c/master.c
+@@ -1828,7 +1828,7 @@ int i3c_master_add_i3c_dev_locked(struct i3c_master_controller *master,
+ 
+ 	ret = i3c_master_retrieve_dev_info(newdev);
+ 	if (ret)
+-		goto err_free_dev;
++		goto err_detach_dev;
+ 
+ 	olddev = i3c_master_search_i3c_dev_duplicate(newdev);
+ 	if (olddev) {
+-- 
+2.20.1
 
-Can you add:
-
-Fixes: 6ef5737f3931 ("crypto: arm64/crct10dif - port x86 SSE implementation to arm64")
-Cc: stable@vger.kernel.org
-
-> ---
->  arch/arm64/crypto/crct10dif-ce-glue.c | 25 +++++---------------
->  1 file changed, 6 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm64/crypto/crct10dif-ce-glue.c b/arch/arm64/crypto/crct10dif-ce-glue.c
-> index b461d62023f2..567c24f3d224 100644
-> --- a/arch/arm64/crypto/crct10dif-ce-glue.c
-> +++ b/arch/arm64/crypto/crct10dif-ce-glue.c
-> @@ -39,26 +39,13 @@ static int crct10dif_update(struct shash_desc *desc, const u8 *data,
->  			    unsigned int length)
->  {
->  	u16 *crc = shash_desc_ctx(desc);
-> -	unsigned int l;
->  
-> -	if (unlikely((u64)data % CRC_T10DIF_PMULL_CHUNK_SIZE)) {
-> -		l = min_t(u32, length, CRC_T10DIF_PMULL_CHUNK_SIZE -
-> -			  ((u64)data % CRC_T10DIF_PMULL_CHUNK_SIZE));
-> -
-> -		*crc = crc_t10dif_generic(*crc, data, l);
-> -
-> -		length -= l;
-> -		data += l;
-> -	}
-> -
-> -	if (length > 0) {
-> -		if (may_use_simd()) {
-> -			kernel_neon_begin();
-> -			*crc = crc_t10dif_pmull(*crc, data, length);
-> -			kernel_neon_end();
-> -		} else {
-> -			*crc = crc_t10dif_generic(*crc, data, length);
-> -		}
-> +	if (length >= CRC_T10DIF_PMULL_CHUNK_SIZE && may_use_simd()) {
-> +		kernel_neon_begin();
-> +		*crc = crc_t10dif_pmull(*crc, data, length);
-> +		kernel_neon_end();
-> +	} else {
-> +		*crc = crc_t10dif_generic(*crc, data, length);
->  	}
->  
->  	return 0;
-> -- 
-> 2.17.1
-> 
 
 _______________________________________________
 linux-arm-kernel mailing list
