@@ -2,57 +2,83 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B898BC282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 14:53:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E15C8C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 15:06:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 865E2218CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 14:53:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AF58E218A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 15:06:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hqDYDd/K"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 865E2218CD
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=protonic.nl
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nhWOl3W6";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dVylY3MG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF58E218A2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lf/+y44LFceGz1v4LuJrsw2q6hRCm6WRbbfIgi/H/rI=; b=hqDYDd/KsmRacr
-	O1J5zkCL2/DO1xKeGcTvTI6B48UdPvoEbeo5gz9GFFvgK1n0X15WqwU4l6Jai9JpgMfsXOKhI20Pt
-	hSpUzwxWefOi7HmmlV32vkB4STrqxK47KruDaCuRBz65uhaIMZmlEdTWgLvlcMf2VxPrzLgEh6XaI
-	i71cXXgn3ZrUbsD6AWw7ye3Q7JgTeY+sZm+TIWEN5s/1xk9ChItbgO4TU/iR35T/lQX/VSYMExJiY
-	0tF96oZAMlRdOL6YfzXJy8V7euKcxZlAYY8EBPA3NJLx+nfR0KKNcQ/R4zkLSAcp1QFaw93aLl1d6
-	wmYbnWYg9J+U/Z2wshsw==;
+	List-Owner; bh=7LJFkPFRGBJMcOq41b7OEVv+dr+XtL3uq/JTG/e11L4=; b=nhWOl3W6JhocIS
+	wbY4LBaE3p9GT6rWDE3WYCd7jvutbJnPGi2YB6WT7BQrqPEmi3oNOfawmQvtGYmYz+RanyG6c5TNi
+	Jc/HboxOMAJxFPxbamSFCH/KH83538mMEQuH/J/00Xs3Y6eRYRzx+jwLAlB0rf6dxoPnlZH7ErbQ2
+	1SU1geEsUp2IMJQd3HnLoG2c8wWb3a8jprD/rZWjJdAPEMXomMCsqH65Cb+gBbtPBfauhdA+asUoq
+	hKjF0LbglWJfSGTYDJVggMqxgoG54g3C5B+R2BLLdBCN9ncEu0VrStRwa4Z0Jp5VFIzEMGJKmxJlp
+	vG6/LhNsIhd8K1DOhoUQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn2qo-00074u-6X; Fri, 25 Jan 2019 14:52:58 +0000
-Received: from protonic.xs4all.nl ([83.163.252.89] helo=protonic.nl)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn2qj-00074S-UC
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 14:52:55 +0000
-Received: from erd987 (unknown [192.168.2.69])
- by sparta (Postfix) with ESMTP id EA1F844A004C;
- Fri, 25 Jan 2019 15:54:01 +0100 (CET)
-Date: Fri, 25 Jan 2019 15:52:48 +0100
-From: Robin van der Gracht <robin@protonic.nl>
-To: Martin Kepplinger <martink@posteo.de>
-Subject: Re: [PATCH] mmc: mxs-mmc: Introduce regulator support
-Message-ID: <20190125155248.23937600@erd987>
-In-Reply-To: <20190125113449.10128-1-martink@posteo.de>
-References: <20190125113449.10128-1-martink@posteo.de>
-Organization: Protonic Holland
-X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+	id 1gn34H-0003Kc-12; Fri, 25 Jan 2019 15:06:53 +0000
+Received: from mail-vk1-xa44.google.com ([2607:f8b0:4864:20::a44])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gn343-0003Jq-DW; Fri, 25 Jan 2019 15:06:40 +0000
+Received: by mail-vk1-xa44.google.com with SMTP id w72so2189747vkd.5;
+ Fri, 25 Jan 2019 07:06:38 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=2tuwG0ftAhvsmIdX92d0e/Lmg6rffrspm0jvnvVUl2s=;
+ b=dVylY3MGyGM7FnJ2iL26hB7mzL8KzLS5iqz4PdygfGmGDv5GmK7YXLN5xKdciXt5Rp
+ CHd2VjSvCL6j9a/3kY93rSVQNVOupqdAElZdGrhsJ+9+I0SXDA5Saijq59ixp0q0Ce7F
+ jKErQPON1E5F28LZH7gWrXVXB4u5nOJhe6Dwook5YePcWZxZ0VqTMIVZZDwiTGYvk6QU
+ eSA/Mp+pb++LzW4BSWWNG3xcNdMzzwCYWMFFY5ZQp6pUc8byTWQsdYx2V9F+Bf1wEQDo
+ vknSJ3ukKoNS5ud7TFYVIa4owDdSBGPCTgw/UJ9/9UAQ9yr9HeqT6pAToagWcvCSZlOJ
+ T7Hg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=2tuwG0ftAhvsmIdX92d0e/Lmg6rffrspm0jvnvVUl2s=;
+ b=LaKxXmjZsRCk0vkXnd3nKIfcrZwlP1xrfb/ul45AalObQRvo9mo6aL2RHCU/bb7+Yg
+ qeobHX3IQ+Nezf2tlzd51hT11Nk31wXFRNMK4ane5CPRKnYSN1rk1uWyM+5dN8nI0lcz
+ N/IKNphs/EsHaJr+rC+atC4i2x5ejlsbC10N3UXr4TVRsdfcbXlVcVT2O3GgqxBDEIwg
+ 3G5EOm4mhS3a4/xCfW19IHXVBTakHtl7iKPQN4nczoRXubtgtR/9dWjRwMpHLHQ3aLXI
+ WFg2rN0FGxr9K88ew1nyp+tBeaSsBf87/cBdoNqSGGy//txst5MvvSYjsnM/Jvl4yrRz
+ lyUQ==
+X-Gm-Message-State: AJcUukc0zQsd0Z+EsG5bTxHdggdauZ6/bOA/Ji/3D1GQwts+ikfxsD7/
+ R5aAhbMPgspiRo+p11kQjn8gUTo9U5fJReXnAEk=
+X-Google-Smtp-Source: ALg8bN4sX9Tzc32rkLIDSwECpOZhwMSyIALQo8FVD52KnDlJZmcALk9/ODEfv6yjhogrbFpLc60DHjL6aXuYC19VAAo=
+X-Received: by 2002:a1f:d02:: with SMTP id 2mr4375381vkn.23.1548428797068;
+ Fri, 25 Jan 2019 07:06:37 -0800 (PST)
 MIME-Version: 1.0
+References: <20190124165831.16427-1-daniel.vetter@ffwll.ch>
+ <20190124165831.16427-27-daniel.vetter@ffwll.ch>
+In-Reply-To: <20190124165831.16427-27-daniel.vetter@ffwll.ch>
+From: Emil Velikov <emil.l.velikov@gmail.com>
+Date: Fri, 25 Jan 2019 15:02:46 +0000
+Message-ID: <CACvgo52YJ0kSBVJryELvZn70--4rbPr7R=TJdRgbVr1fEVr2yw@mail.gmail.com>
+Subject: Re: [Intel-gfx] [PATCH 26/26] drm/<drivers>: Don't set
+ FBINFO_(FLAG_)DEFAULT
+To: Daniel Vetter <daniel.vetter@ffwll.ch>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_065254_132841_C231787C 
-X-CRM114-Status: GOOD (  21.06  )
+X-CRM114-CacheID: sfid-20190125_070639_478372_3B4D4AE9 
+X-CRM114-Status: UNSURE (   7.11  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,121 +90,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: ulf.hansson@linaro.org, s.hauer@pengutronix.de,
- Martin Kepplinger <martin.kepplinger@ginzinger.com>, linux-mmc@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-imx@nxp.com, shawnguo@kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: "moderated list:ARM/S5P EXYNOS AR..." <linux-samsung-soc@vger.kernel.org>,
+ =?UTF-8?Q?Heiko_St=C3=BCbner?= <heiko@sntech.de>,
+ Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+ ML nouveau <nouveau@lists.freedesktop.org>,
+ Intel Graphics Development <intel-gfx@lists.freedesktop.org>,
+ Seung-Woo Kim <sw0312.kim@samsung.com>, Sandy Huang <hjc@rock-chips.com>,
+ Krzysztof Kozlowski <krzk@kernel.org>, Jonathan Hunter <jonathanh@nvidia.com>,
+ Inki Dae <inki.dae@samsung.com>,
+ linux-rockchip <linux-rockchip@lists.infradead.org>,
+ Kyungmin Park <kyungmin.park@samsung.com>, Kukjin Kim <kgene@kernel.org>,
+ DRI Development <dri-devel@lists.freedesktop.org>,
+ Alexander Kapshuk <alexander.kapshuk@gmail.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-tegra@vger.kernel.org,
+ Daniel Vetter <daniel.vetter@intel.com>, Ben Skeggs <bskeggs@redhat.com>,
+ LAKML <linux-arm-kernel@lists.infradead.org>,
+ Joonyoung Shim <jy0922.shim@samsung.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Martin,
+On Thu, 24 Jan 2019 at 17:00, Daniel Vetter <daniel.vetter@ffwll.ch> wrote:
+>
+> It's 0.
+>
+I'd add a bit more information here. Feel free to reuse as much/little
+of the following:
 
-On Fri, 25 Jan 2019 12:34:49 +0100
-Martin Kepplinger <martink@posteo.de> wrote:
-
-> From: Martin Kepplinger <martin.kepplinger@ginzinger.com>
-> 
-> This adds support for explicitly switching the mmc's power on and off.
-> 
-> Signed-off-by: Martin Kepplinger <martin.kepplinger@ginzinger.com>
-> ---
-> 
-> This is not my patch. It's taken from https://patchwork.kernel.org/patch/4365751/
-> rebased and minimally changed; but we use this.
-> 
-> Are there any objections to this?
-> 
-> Robin, can I still add your Signed-off-by to this? Also, should I set you
-> as the author?
-
-It's old, but thanks for keeping me in the loop :)
-
-> 
-> thanks,
-> 
->                                 martin
-> 
->  drivers/mmc/host/mxs-mmc.c | 31 +++++++++++++++++++++++--------
->  1 file changed, 23 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> index add1e70195ea..e3c19fabb723 100644
-> --- a/drivers/mmc/host/mxs-mmc.c
-> +++ b/drivers/mmc/host/mxs-mmc.c
-> @@ -517,6 +517,26 @@ static void mxs_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->  	else
->  		host->bus_width = 0;
->  
-> +	if (ios->power_mode != host->power_mode) {
-> +		switch (ios->power_mode) {
-> +		case MMC_POWER_OFF:
-> +			if ((host->vmmc) && regulator_disable(host->vmmc)) {
-> +				dev_err(mmc_dev(host->mmc),
-> +					"Failed to disable vmmc regulator\n");
-> +			}
-> +			break;
-> +		case MMC_POWER_UP:
-> +			if ((host->vmmc) && regulator_enable(host->vmmc)) {
-> +				dev_err(mmc_dev(host->mmc),
-> +					"Failed to enable vmmc regulator\n");
-> +			}
-> +			break;
-> +		default:
-> +			break;
-> +		}
-> +		host->power_mode = ios->power_mode;
-> +	}
-> +
-
-A single check in the root contitional for the availability of vmmc
-should suffice, so:
-
-if (host->vmmc && ios->power_mode != host->power_mode) {
-	...
-	case MMC_POWER_XX:
-		if (regulator_xx(host->vmmc))
-			dev_err;
-	...
+Both macros evaluate to 0. At the same time flag is already set to
+zero since the struct is kzalloc'd in framebuffer_alloc().
+As called by drm_fb_helper_alloc_fbi() in the DRM drivers.
 
 
->  	if (ios->clock)
->  		mxs_ssp_set_clk_rate(&host->ssp, ios->clock);
->  }
-> @@ -613,16 +633,11 @@ static int mxs_mmc_probe(struct platform_device *pdev)
->  
->  	host->mmc = mmc;
->  	host->sdio_irq_en = 0;
-> +	host->power_mode = MMC_POWER_OFF;
-
-My patch added 'power_mode' and 'vmmc' to the drivers private struct
-(which are missing in this email?)
-
->  
->  	reg_vmmc = devm_regulator_get(&pdev->dev, "vmmc");
-> -	if (!IS_ERR(reg_vmmc)) {
-> -		ret = regulator_enable(reg_vmmc);
-> -		if (ret) {
-> -			dev_err(&pdev->dev,
-> -				"Failed to enable vmmc regulator: %d\n", ret);
-> -			goto out_mmc_free;
-> -		}
-> -	}
-> +	if (!IS_ERR(reg_vmmc))
-> +		host->vmmc = reg_vmmc;
-
-what about mmc_regulator_get_supply(mmc)?
-
-If we use that the vmmc will be made available under mmv->supply->vmmc
-if probe was successfull instead of storing it in the drivers private
-struct.
-
->  
->  	ssp->clk = devm_clk_get(&pdev->dev, NULL);
->  	if (IS_ERR(ssp->clk)) {
-
-Robin van der Gracht
+-Emil
 
 _______________________________________________
 linux-arm-kernel mailing list
