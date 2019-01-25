@@ -2,62 +2,66 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BD190C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:05:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4FD98C282C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:09:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8B521218A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:05:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1F512218B0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:09:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aOf/p+lZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8B521218A2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ubPqSCXs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1F512218B0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cUgMKY2d5FGmvLBgxuWZdPGDzKIzw42ZPy2IyKLdBRU=; b=aOf/p+lZTv+M7H
-	VkG61y3uaZlmu501XlUBq2R0VhVyUJ1w8XZ/3cECLoNEfUw6fQVu+BD6shIBpjvzLdfLuB4RbqBfh
-	WGw9pVh19qbKc7ca2oUHYIlfAUsK9RUK08AnlKuXFCpCafcSZMG2i0lWsdtqck05bVb0NziMIu7mO
-	hquq4Tv2wIh/rfmlD5hZ6DemCEsWsafwxazRFA2EnGmUTfRQy9vzOQY3fBU6tCTwcnL6mjMDVhmfr
-	6muVhJvHz+xcFidhw1id9ho8NM7u0LPTiS2Awq/ZRSdzMYKw5IUX5kwkvwvqfMf3AcegOB3ues268
-	LLMK8yYb2aDK8lOW7aZw==;
+	List-Owner; bh=rrvxQUAeNERY/knjXm7sue/FB+iGSP6vsAFBzvhymVE=; b=ubPqSCXsnk+DLn
+	DBSgFBPkwQv/aVXUrWjstfYlWWxADT9V0WR30gguQUmQK02yYH7i51li8oyc1rSE81nueSNM/JNa3
+	cio0fD3tSGeezetRF6oRl0QH61giuycPNqa/Dpg1G3lUT25EYm6fSKJxHZYctRklBB2udHWm5TUhX
+	lTtaiHnDOvZ6SM3yA73DTKZznXvYXgIAT+909eM7ZDC/VMw9K4U5w81xjUu/Z7iIVPoVjxJYZNjIC
+	A+50Gxz0JJxZz46/+cexAM22VMsSjrWKmYjsa/VYBOxBTMcDYQZFJl60SU3RTFPA1g0xTX+B3pFjv
+	DWnOl2REgRky8x3Ycq/A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmyMh-0006As-RN; Fri, 25 Jan 2019 10:05:35 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
+	id 1gmyQN-0006hT-Pe; Fri, 25 Jan 2019 10:09:23 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmyMe-0006A9-92
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 10:05:33 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 9753120798; Fri, 25 Jan 2019 11:05:30 +0100 (CET)
-Received: from xps13 (aaubervilliers-681-1-87-206.w90-88.abo.wanadoo.fr
- [90.88.29.206])
- by mail.bootlin.com (Postfix) with ESMTPSA id 315D6206A6;
- Fri, 25 Jan 2019 11:05:30 +0100 (CET)
-Date: Fri, 25 Jan 2019 11:05:30 +0100
-From: Miquel Raynal <miquel.raynal@bootlin.com>
-To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Subject: Re: [PATCH v3 00/15] Bring suspend to RAM support to PCIe Aardvark
- driver
-Message-ID: <20190125110530.0ff11a54@xps13>
-In-Reply-To: <20190123170509.GB1157@e107981-ln.cambridge.arm.com>
-References: <20190108162441.5278-1-miquel.raynal@bootlin.com>
- <20190123170509.GB1157@e107981-ln.cambridge.arm.com>
-Organization: Bootlin
-X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
-MIME-Version: 1.0
+ id 1gmyQK-0006h5-EP
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 10:09:22 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D849EEBD;
+ Fri, 25 Jan 2019 02:09:17 -0800 (PST)
+Received: from big-swifty.misterjones.org (big-swifty.copenhagen.arm.com
+ [10.32.148.139])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BA30F3F589;
+ Fri, 25 Jan 2019 02:09:12 -0800 (PST)
+Date: Fri, 25 Jan 2019 10:09:05 +0000
+Message-ID: <86ef9182wu.wl-marc.zyngier@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: James Morse <james.morse@arm.com>
+Subject: Re: [PATCH 06/14] KVM: arm/arm64: Factor out VMID into struct kvm_vmid
+In-Reply-To: <9ec36462-5a93-8246-85d3-a3c528959341@arm.com>
+References: <20190124140032.8588-1-christoffer.dall@arm.com>
+ <20190124140032.8588-7-christoffer.dall@arm.com>
+ <9ec36462-5a93-8246-85d3-a3c528959341@arm.com>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_020532_456536_C353A0D3 
-X-CRM114-Status: GOOD (  20.40  )
+X-CRM114-CacheID: sfid-20190125_020920_502554_9D048F17 
+X-CRM114-Status: GOOD (  33.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,59 +73,132 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
- Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
- Antoine Tenart <antoine.tenart@bootlin.com>, linux-pci@vger.kernel.org,
- Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>, Rob Herring <robh+dt@kernel.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Bjorn Helgaas <bhelgaas@google.com>, linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: kvm@vger.kernel.org, Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgTG9yZW56bywKCkxvcmVuem8gUGllcmFsaXNpIDxsb3JlbnpvLnBpZXJhbGlzaUBhcm0uY29t
-PiB3cm90ZSBvbiBXZWQsIDIzIEphbiAyMDE5CjE3OjA1OjA5ICswMDAwOgoKPiBPbiBUdWUsIEph
-biAwOCwgMjAxOSBhdCAwNToyNDoyNVBNICswMTAwLCBNaXF1ZWwgUmF5bmFsIHdyb3RlOgo+ID4g
-SGVsbG8sCj4gPiAKPiA+IEFzIHBhcnQgb2YgYW4gZWZmb3J0IHRvIGJyaW5nIHN1c3BlbmQgdG8g
-UkFNIHN1cHBvcnQgdG8gQXJtYWRhIDM3MDAKPiA+IFNvQ3MgKG1haW4gdGFyZ2V0OiBFU1BSRVNT
-T2JpbiksIHRoaXMgc2VyaWVzIGhhbmRsZXMgdGhlIHdvcmsgYXJvdW5kCj4gPiB0aGUgUENJZSBJ
-UC4KPiA+IAo+ID4gRmlyc3QsIG1vcmUgY29uZmlndXJhdGlvbiBpcyBkb25lIGluIHRoZSAnc2V0
-dXAnIGhlbHBlciBhcyBpbnNwaXJlZAo+ID4gZnJvbSB0aGUgVS1Cb290IGRyaXZlci4gVGhpcyBp
-cyBuZWVkZWQgdG8gZW50aXJlbHkgaW5pdGlhbGl6ZSB0aGUgSVAKPiA+IGR1cmluZyBmdXR1cmUg
-cmVzdW1lIG9wZXJhdGlvbiAocGF0Y2ggMSkuCj4gPiAKPiA+IFRoZW4sIHJlc2V0IEdQSU8sIFBI
-WSBhbmQgY2xvY2sgc3VwcG9ydCBhcmUgaW50cm9kdWNlZCAocGF0Y2ggMi00KS4gQXMKPiA+IGN1
-cnJlbnQgZGV2aWNlIHRyZWVzIGRvIG5vdCBwcm92aWRlIHRoZSBjb3JyZXNwb25kaW5nIHByb3Bl
-cnRpZXMsIG5vdAo+ID4gZmluZGluZyBvbmUgb2YgdGhlc2UgcHJvcGVydGllcyBpcyBub3QgYW4g
-ZXJyb3IgYW5kIGp1c3QgcHJvZHVjZXMgYQo+ID4gd2FybmluZy4gSG93ZXZlciwgaWYgdGhlIHBy
-b3BlcnR5IGlzIHByZXNlbnQsIGFuIGVycm9yIGR1cmluZyBQSFkKPiA+IGluaXRpYWxpemF0aW9u
-IHdpbGwgZmFpbCB0aGUgcHJvYmUgb2YgdGhlIGRyaXZlci4KPiA+IAo+ID4gTm90ZTogVG8gYmUg
-c3VyZSB0aGUgY2xvY2sgd2lsbCBiZSByZXN1bWVkIGJlZm9yZSB0aGlzIGRyaXZlciwgYSBmaXJz
-dAo+ID4gc2VyaWVzIGFkZGluZyBsaW5rcyBiZXR3ZWVuIGNsb2NrcyBhbmQgY29uc3VtZXJzIGhh
-cyBiZWVuIHN1Ym1pdHRlZCwKPiA+IHNlZSBbMV0uIEFueXdheSwgaGF2aW5nIHRoZSBjbG9jayBz
-ZXJpZXMgYXBwbGllZCBmaXJzdCBpcyBub3QgbmVlZGVkLiAgCj4gCj4gSSBkbyBub3QgdW5kZXJz
-dGFuZCB3aGF0IHRoaXMgbWVhbnMsIGluIHBhcnRpY3VsYXIgaW4gcmVsYXRpb24KPiB0byB0aGUg
-YmxvY2tpbmcgY2xvY2sgY2FsbHMgaW4gdGhlIHN1c3BlbmQvcmVzdW1lIE5PSVJRIGhvb2tzLgoK
-SSBhbSBub3Qgc3VyZSB0byB1bmRlcnN0YW5kIHlvdXIgcXVlc3Rpb24uCgpBcyB0aGVyZSBhcmUg
-bXVsdGlwbGUgcG9pbnRzIGluIHRoaXMgc2VudGVuY2UgSSB3aWxsIGRldGFpbCBlYWNoIG9mCnRo
-ZW0gc28gcGxlYXNlIGNvbW1lbnQgb24gdGhlIG9uZSB3aGljaCBpcyBib3RoZXJpbmcgeW91Ogoq
-IEkgYW0gd29ya2luZyBpbiBwYXJhbGxlbCBvbiBhIHNlcmllcyBhZGRpbmcgZGV2aWNlIGxpbmtz
-IHRvIHRoZSBjbG9jawogIGZyYW1ld29yay4gVGhpcyB3YXkgd2hlbiBhIGRyaXZlciBjb25zdW1l
-cyBhIGNsb2NrLCB0aGUgY2xvY2sKICBwcm92aWRlciBkcml2ZXIgd2lsbCBiZSByZXN1bWVkIGZp
-cnN0LgoqIElmIHRoZSBjbG9jayBzZXJpZXMgSSBhbSB0YWxraW5nIGFib3V0IGlzIGFwcGxpZWQg
-YWZ0ZXIgdGhpcyBvbmUsCiAgdGhlcmUgaXMgbm8gYnVpbGQgaXNzdWUuIE9mIGNvdXJzZSBzdXNw
-ZW5kaW5nIHRoZSBwbGF0Zm9ybSBtYXkKICBub3Qgd29yayBidXQgdGhpcyBpcyBhIG5ldyBmZWF0
-dXJlIHNvIG5vdGhpbmcgd2lsbCBiZSBicm9rZW4uCiogRGV2aWNlIGxpbmtzIGRvIG5vdCBlbmZv
-cmNlIGFueSBwcmlvcml0eSBpZiB0aGUgc3VzcGVuZC9yZXN1bWUgcGhhc2UKICBiZXR3ZWVuIHR3
-byBkcml2ZXJzIGlzIG5vdCB0aGUgc2FtZS4gVGhlIFBDSWUgZHJpdmVyIHN1c3BlbmRzIGluIHRo
-ZQogIE5PSVJRIHBoYXNlLiBJZiB3ZSB3YW50IHRoZSBjbG9jayBkcml2ZXIgdG8gc3VzcGVuZCAq
-YWZ0ZXIqIFBDSWUsIGl0cwogIHN1c3BlbmQvcmVzdW1lIGNhbGxiYWNrcyBtdXN0IGJlIHByb21v
-dGVkIHRvIHRoZSBOT0lSUSBwaGFzZSBhcyB3ZWxsCiAgKGFuZCB0aGlzIGlzIHBhcnQgb2YgYW5v
-dGhlciBzZXJpZXMpLiBBcyBvZiB0b2RheSB0aGVyZSBpcwogIG5vIGFsdGVybmF0aXZlLgoKClRo
-YW5rcywKTWlxdcOobAoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0
-cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGlu
-Zm8vbGludXgtYXJtLWtlcm5lbAo=
+Hi James,
+
+Thanks for looking into this.
+
+On Thu, 24 Jan 2019 19:01:57 +0000,
+James Morse <james.morse@arm.com> wrote:
+> 
+> Hi guys,
+> 
+> (CC: +Suzuki)
+> 
+> On 24/01/2019 14:00, Christoffer Dall wrote:
+> > In preparation for nested virtualization where we are going to have more
+> > than a single VMID per VM, let's factor out the VMID data into a
+> > separate VMID data structure and change the VMID allocator to operate on
+> > this new structure instead of using a struct kvm.
+> > 
+> > This also means that udate_vttbr now becomes update_vmid, and that the
+> > vttbr itself is generated on the fly based on the stage 2 page table
+> > base address and the vmid.
+> > 
+> > We cache the physical address of the pgd when allocating the pgd to
+> > avoid doing the calculation on every entry to the guest and to avoid
+> > calling into potentially non-hyp-mapped code from hyp/EL2.
+> > 
+> > If we wanted to merge the VMID allocator with the arm64 ASID allocator
+> > at some point in the future, it should actually become easier to do that
+> > after this patch.
+> 
+> > Note that to avoid mapping the kvm_vmid_bits variable into hyp, we
+> > simply forego the masking of the vmid value in kvm_get_vttbr and rely on
+> > update_vmid to always assign a valid vmid value (within the supported
+> > range).
+> 
+> 
+> > diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> > index 8af4b1befa42..189d93461d33 100644
+> > --- a/arch/arm64/include/asm/kvm_mmu.h
+> > +++ b/arch/arm64/include/asm/kvm_mmu.h
+> > @@ -596,5 +596,16 @@ static inline bool kvm_cpu_has_cnp(void)
+> >  	return system_supports_cnp();
+> >  }
+> >  
+> > +static __always_inline u64 kvm_get_vttbr(struct kvm *kvm)
+> > +{
+> > +	struct kvm_vmid *vmid = &kvm->arch.vmid;
+> > +	u64 vmid_field, baddr;
+> > +	u64 cnp = kvm_cpu_has_cnp() ? VTTBR_CNP_BIT : 0;
+> > +
+> > +	baddr = kvm->arch.pgd_phys;
+> > +	vmid_field = (u64)vmid->vmid << VTTBR_VMID_SHIFT;
+> > +	return kvm_phys_to_vttbr(baddr) | vmid_field | cnp;
+> > +}
+> 
+> (32bits version is the same ... but I guess there is nowhere to put it!)
+
+Yes, that's the usual conundrum.
+
+> 
+> 
+> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> > index 3dd240ea9e76..b77db673bb03 100644
+> > --- a/virt/kvm/arm/arm.c
+> > +++ b/virt/kvm/arm/arm.c
+> > @@ -536,18 +529,12 @@ static void update_vttbr(struct kvm *kvm)
+> >  		kvm_call_hyp(__kvm_flush_vm_context);
+> >  	}
+> >  
+> > -	kvm->arch.vmid = kvm_next_vmid;
+> > +	vmid->vmid = kvm_next_vmid;
+> >  	kvm_next_vmid++;
+> > -	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
+> > -
+> > -	/* update vttbr to be used with the new vmid */
+> > -	pgd_phys = virt_to_phys(kvm->arch.pgd);
+> 
+> > -	BUG_ON(pgd_phys & ~kvm_vttbr_baddr_mask(kvm));
+> 
+> Where did this go? (escaped during a turbulent rebase?)
+> 
+> This removes the only caller of kvm_vttbr_baddr_mask()... It looks
+> like this is a safety check that the stage2-pgd is correctly aligned
+> when the IPA size, and thus size of the top level entry can by set
+> by user-space.
+> 
+> ... or is it unnecessary if alloc_pages_exact() can only return naturally
+> aligned groups of pages? (which I haven't checked)
+
+The rational is indeed that alloc_pages_exact allocates a power of 2
+number of pages, and then frees the unrequested tail pages. This means
+that we're always correctly aligned.
+
+> Keeping it sounds like a good thing to have in case we accidentally merge
+> stage2/host-stage1 pgd's somewhere down the line.
+
+This seems hard to achieve for this very reason, as level-0
+concatenation gets in the way of unifying the two allocators.
+
+> (Suzuki suggested it would make more sense in kvm_alloc_stage2_pgd(), where we
+> could fail vm creation, instead of BUG()ing).
+> 
+> (this was added by e55cac5bf2a9c ("kvm: arm/arm64: Prepare for VM specific
+> stage2 translations"), the bulk of the logic is in 595583306434c ("kvm: arm64:
+> Dynamic configuration of VTTBR mask"))
+
+We could bring it back if people have a strong feeling about this, but
+certainly not as a BUG_ON(). Failing it in gracefully in
+kvm_alloc_stage2_pgd seems a more palatable solution, but I can't
+convince myself that we need it.
+
+Thanks,
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
