@@ -4,82 +4,80 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 166F8C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:53:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8050FC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:54:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DA427218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:53:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 50CF520881
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:54:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tT737Sst";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="I8XHN5yf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA427218A6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="InCu+2YO";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="wIInP2ld"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 50CF520881
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2nOw8NeX86U73fCzYORAUu0VFOgY82qT5323UpRkuJk=; b=tT737SsttcKPeq
-	jA+2j2v+0EF/vemikJro2rVjo+5d2AZ2LK3Z+7UiUKLqFovzANBAmKxc9J+j+OiFAR2wNGxt0Rfax
-	fxWtvoho8UcVv90+UxB6ZZAz1CChhzeIG0kC6Y3+Wnxh1dOBORaMnszQ9Byy/eywBURoLnBLCX2Eh
-	gsx5WNqhAhYFkd6L/B8UP/ZbIaVX690PiA9orm6nrC7V6nZdfJoHj9CexKOuzxwqGsNekpNcLqgGc
-	g7L5Xo6D/jgtC0llx5CfO0mWzQejvyYo4cJcBRjN7e0fVcNTu59FC615VrD6Qa/tIQJq8FCIarLhh
-	WEVTy/Ze0WFOD+l0rxSQ==;
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=iVmInWUM9/PXeBb0qdzVLDpysnrJWWq40L8+fNN9FHI=; b=InCu+2YOoywFWM
+	CHS4ZxeiAwyqDGIPewJyshTIackW+FWA9GgdEzBuD5WY+3N9TVPYyK42Nse8AtPrK//4PH/th4M2V
+	Db4CVzFpmQ2fwqiII12nCddej2BaiXkWwJhkIXzcJkLXwq1NyxP11Rc4SVl8eLpYr0qSDXg+9n+jn
+	pWkYoQkrCwrnLo/KBstHRuDuz9Qw8aplDUrji5ZbrbW6/j2Qy50zMr62dXVRpNcwklOKAb9sIPeWx
+	IFfciShxUiGd5z8a+lBGImxOh4JtJJNHfwng7l50XtMCcnhq36Zu7Tovqs/RYK6SJiuDyP86+7ovu
+	jK/eMnpQL0SM8mpIJ0MA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmz7H-0004U9-Pp; Fri, 25 Jan 2019 10:53:43 +0000
-Received: from hqemgate14.nvidia.com ([216.228.121.143])
+	id 1gmz8F-0004q3-1e; Fri, 25 Jan 2019 10:54:43 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmz7E-0004TM-4w
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 10:53:41 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c4aeab20000>; Fri, 25 Jan 2019 02:53:39 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Fri, 25 Jan 2019 02:53:39 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Fri, 25 Jan 2019 02:53:39 -0800
-Received: from [10.21.132.148] (172.20.13.39) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 25 Jan
- 2019 10:53:37 +0000
-Subject: Re: [PATCH 2/7] soc/tegra: pmc: Add missing kerneldoc
-To: Thierry Reding <thierry.reding@gmail.com>
-References: <20190125102255.6862-1-thierry.reding@gmail.com>
- <20190125102255.6862-2-thierry.reding@gmail.com>
-From: Jon Hunter <jonathanh@nvidia.com>
-Message-ID: <e6c3fbbb-123c-0797-d486-6f9962dea84a@nvidia.com>
-Date: Fri, 25 Jan 2019 10:53:35 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <20190125102255.6862-2-thierry.reding@gmail.com>
-X-Originating-IP: [172.20.13.39]
-X-ClientProxiedBy: HQMAIL107.nvidia.com (172.20.187.13) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1548413619; bh=9lxRN5tljFfcnUuGqs+/AcFNUdisABtVSZPbh7Vms+I=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=I8XHN5yfmgmOfrnQXhr4/UWLkVggINjSwca+1DZjvfRYp7MRsjonuE9nqiMtzJf2K
- rnNxKrGf5GFPdkjOYALjU8+MtgqKbLbFt/24kLw1Fi8ZUF9TpM/Z+OyrE8rUEPdxeV
- jxzsZQya/avoeqp1YyaN7YkMmnGgLLjNNbkwNtT91PjKxdDVnZXSUNPg8B+3/AG7d7
- ThCDOBgfaA547v9S0WKmmkUOz0emZEWEH2WmiGBM6jsDfXfl9PYDmn/FH4cQ7a2iN/
- MkwwumI1ICaLT8e5rX9aS8n4QDcdavWmCy+YC7lLOHLeqDpJ7ODnbM6Loekb0EiNHF
- cO8CZeDkR70Yw==
+ id 1gmz8D-0004pk-Gv
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 25 Jan 2019 10:54:41 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:Mime-Version:
+ Content-Type:References:In-Reply-To:Date:Cc:To:From:Subject:Message-ID:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=OANXAbr+jPlAa6OwHHjhCaU/TYdPMvO5xNrvxkSoFBE=; b=wIInP2ldb2Sr63qdFxAJfLvoPp
+ 9FuzUY4v1Bu5VZ1UWfNophHlmftNOx5UftsTRP9iIgyMxLIURLKEd/lHxrUjYXp84HfElHjPLSuVm
+ cMK9c0iEnV3OeL+3+cStoFf48TANiDNYiK8Xk1KSE0J2ZiYzKRV54nelRPEvffTmwB8ywECZYl9sj
+ h+MhOz8lUyRh1WiMr/OFC+ATR+O6lCNXqxufmh1GZr0kwq7pEg8XlIt1ro5gaY4haqWQhiI8QIvrm
+ Kp7+fH1o0B5HbgvPNGF6SwSG96TMpUcuYVkA0x0xT9t8D6mPTj/uFa9b0ffDpnMbmaapgRKtqoGlp
+ OHYmKHZQ==;
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmz8A-00044T-Qk
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 10:54:39 +0000
+Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <l.stach@pengutronix.de>)
+ id 1gmz88-0003cp-Dj; Fri, 25 Jan 2019 11:54:36 +0100
+Message-ID: <1548413675.28802.45.camel@pengutronix.de>
+Subject: Re: [PATCH 4/4] irq: imx: irqsteer: add multi output interrupts
+ support
+From: Lucas Stach <l.stach@pengutronix.de>
+To: Aisheng Dong <aisheng.dong@nxp.com>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Date: Fri, 25 Jan 2019 11:54:35 +0100
+In-Reply-To: <1547797668-30342-5-git-send-email-aisheng.dong@nxp.com>
+References: <1547797668-30342-1-git-send-email-aisheng.dong@nxp.com>
+ <1547797668-30342-5-git-send-email-aisheng.dong@nxp.com>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
+X-SA-Exim-Mail-From: l.stach@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_025340_206817_8B3D5D69 
-X-CRM114-Status: GOOD (  14.81  )
+X-CRM114-CacheID: sfid-20190125_055439_011492_364528E4 
+X-CRM114-Status: GOOD (  20.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,59 +89,74 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Stephen Warren <swarren@nvidia.com>,
- linux-arm-kernel@lists.infradead.org, Joseph Lo <josephl@nvidia.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>, "tglx@linutronix.de" <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-On 25/01/2019 10:22, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> Some of the fields in struct tegra_pmc had not been documented when they
-> were added. Add the missing kerneldoc.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
->  drivers/soc/tegra/pmc.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-> index cd865be3b195..550653302ff2 100644
-> --- a/drivers/soc/tegra/pmc.c
-> +++ b/drivers/soc/tegra/pmc.c
-> @@ -273,6 +273,9 @@ static const char * const tegra30_reset_sources[] = {
->   * struct tegra_pmc - NVIDIA Tegra PMC
->   * @dev: pointer to PMC device structure
->   * @base: pointer to I/O remapped register region
-> + * @wake: pointer to I/O remapped region for WAKE registers
-> + * @aotag: pointer to I/O remapped region for AOTAG registers
-> + * @scratch: pointer to I/O remapped region for scratch registers
->   * @clk: pointer to pclk clock
->   * @soc: pointer to SoC data structure
->   * @debugfs: pointer to debugfs entry
-> @@ -291,6 +294,9 @@ static const char * const tegra30_reset_sources[] = {
->   * @lp0_vec_size: size of the LP0 warm boot code
->   * @powergates_available: Bitmap of available power gates
->   * @powergates_lock: mutex for power gate register access
-> + * @pctl_dev: pin controller exposed by the PMC
-> + * @domain: IRQ domain provided by the PMC
-> + * @irq: chip implementation for the IRQ domain
->   */
->  struct tegra_pmc {
->  	struct device *dev;
-> 
-
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-
-Cheers
-Jon
--- 
-nvpublic
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+QW0gRnJlaXRhZywgZGVuIDE4LjAxLjIwMTksIDA3OjUzICswMDAwIHNjaHJpZWIgQWlzaGVuZyBE
+b25nOgo+IE9uZSBpcnFzdGVlciBjaGFubmVsIGNhbiBzdXBwb3J0IHVwIHRvIDggb3V0cHV0IGlu
+dGVycnVwdHMuCj4gCj4gPiBDYzogTWFyYyBaeW5naWVyIDxtYXJjLnp5bmdpZXJAYXJtLmNvbT4K
+PiA+IENjOiBMdWNhcyBTdGFjaCA8bC5zdGFjaEBwZW5ndXRyb25peC5kZT4KPiA+IENjOiBTaGF3
+biBHdW8gPHNoYXduZ3VvQGtlcm5lbC5vcmc+Cj4gPiBTaWduZWQtb2ZmLWJ5OiBEb25nIEFpc2hl
+bmcgPGFpc2hlbmcuZG9uZ0BueHAuY29tPgo+IC0tLQo+IMKgZHJpdmVycy9pcnFjaGlwL2lycS1p
+bXgtaXJxc3RlZXIuYyB8IDM5ICsrKysrKysrKysrKysrKysrKysrKysrKysrKy0tLS0tLS0tLS0t
+Cj4gwqAxIGZpbGUgY2hhbmdlZCwgMjggaW5zZXJ0aW9ucygrKSwgMTEgZGVsZXRpb25zKC0pCj4g
+Cj4gZGlmZiAtLWdpdCBhL2RyaXZlcnMvaXJxY2hpcC9pcnEtaW14LWlycXN0ZWVyLmMgYi9kcml2
+ZXJzL2lycWNoaXAvaXJxLWlteC1pcnFzdGVlci5jCj4gaW5kZXggMWJlYmYwYS4uNTQ4MDJmYSAx
+MDA2NDQKPiAtLS0gYS9kcml2ZXJzL2lycWNoaXAvaXJxLWlteC1pcnFzdGVlci5jCj4gKysrIGIv
+ZHJpdmVycy9pcnFjaGlwL2lycS1pbXgtaXJxc3RlZXIuYwo+IEBAIC0xMCw2ICsxMCw3IEBACj4g
+wqAjaW5jbHVkZSA8bGludXgvaXJxY2hpcC9jaGFpbmVkX2lycS5oPgo+IMKgI2luY2x1ZGUgPGxp
+bnV4L2lycWRvbWFpbi5oPgo+IMKgI2luY2x1ZGUgPGxpbnV4L2tlcm5lbC5oPgo+ICsjaW5jbHVk
+ZSA8bGludXgvb2ZfaXJxLmg+Cj4gwqAjaW5jbHVkZSA8bGludXgvb2ZfcGxhdGZvcm0uaD4KPiDC
+oCNpbmNsdWRlIDxsaW51eC9zcGlubG9jay5oPgo+IMKgCj4gQEAgLTIxLDEwICsyMiwxMyBAQAo+
+ID4gwqAjZGVmaW5lIENIQU5fTUlOVERJUyh0KQkJKENUUkxfU1RSSURFX09GRih0LCAzKSArIDB4
+NCkKPiA+IMKgI2RlZmluZSBDSEFOX01BU1RSU1RBVCh0KQkoQ1RSTF9TVFJJREVfT0ZGKHQsIDMp
+ICsgMHg4KQo+IMKgCj4gPiArI2RlZmluZSBDSEFOX01BWF9PVVRQVVRfSU5UCTB4OAo+ICsKPiDC
+oHN0cnVjdCBpcnFzdGVlcl9kYXRhIHsKPiA+ID4gwqAJdm9pZCBfX2lvbWVtCQkqcmVnczsKPiA+
+ID4gwqAJc3RydWN0IGNsawkJKmlwZ19jbGs7Cj4gPiA+IC0JaW50CQkJaXJxOwo+ID4gPiArCWlu
+dAkJCWlycVtDSEFOX01BWF9PVVRQVVRfSU5UXTsKPiA+ID4gKwlpbnQJCQlpcnFfY291bnQ7Cj4g
+PiA+IMKgCXJhd19zcGlubG9ja190CQlsb2NrOwo+ID4gPiDCoAlpbnQJCQlyZWdfbnVtOwo+ID4g
+PiDCoAlpbnQJCQljaGFubmVsOwo+IEBAIC0xMTcsNyArMTIxLDcgQEAgc3RhdGljIGludCBpbXhf
+aXJxc3RlZXJfcHJvYmUoc3RydWN0IHBsYXRmb3JtX2RldmljZSAqcGRldikKPiA+IMKgCXN0cnVj
+dCBkZXZpY2Vfbm9kZSAqbnAgPSBwZGV2LT5kZXYub2Zfbm9kZTsKPiA+IMKgCXN0cnVjdCBpcnFz
+dGVlcl9kYXRhICpkYXRhOwo+ID4gwqAJc3RydWN0IHJlc291cmNlICpyZXM7Cj4gPiAtCWludCBy
+ZXQ7Cj4gPiArCWludCBpLCByZXQ7Cj4gwqAKPiA+IMKgCWRhdGEgPSBkZXZtX2t6YWxsb2MoJnBk
+ZXYtPmRldiwgc2l6ZW9mKCpkYXRhKSwgR0ZQX0tFUk5FTCk7Cj4gPiDCoAlpZiAoIWRhdGEpCj4g
+QEAgLTEzMCwxMiArMTM0LDYgQEAgc3RhdGljIGludCBpbXhfaXJxc3RlZXJfcHJvYmUoc3RydWN0
+IHBsYXRmb3JtX2RldmljZSAqcGRldikKPiA+IMKgCQlyZXR1cm4gUFRSX0VSUihkYXRhLT5yZWdz
+KTsKPiA+IMKgCX0KPiDCoAo+ID4gLQlkYXRhLT5pcnEgPSBwbGF0Zm9ybV9nZXRfaXJxKHBkZXYs
+IDApOwo+ID4gLQlpZiAoZGF0YS0+aXJxIDw9IDApIHsKPiA+IC0JCWRldl9lcnIoJnBkZXYtPmRl
+diwgImZhaWxlZCB0byBnZXQgaXJxXG4iKTsKPiA+IC0JCXJldHVybiAtRU5PREVWOwo+ID4gLQl9
+Cj4gLQo+ID4gwqAJZGF0YS0+aXBnX2NsayA9IGRldm1fY2xrX2dldCgmcGRldi0+ZGV2LCAiaXBn
+Iik7Cj4gPiDCoAlpZiAoSVNfRVJSKGRhdGEtPmlwZ19jbGspKSB7Cj4gPiDCoAkJcmV0ID0gUFRS
+X0VSUihkYXRhLT5pcGdfY2xrKTsKPiBAQCAtMTc3LDggKzE3NSwyMyBAQCBzdGF0aWMgaW50IGlt
+eF9pcnFzdGVlcl9wcm9iZShzdHJ1Y3QgcGxhdGZvcm1fZGV2aWNlICpwZGV2KQo+ID4gwqAJCXJl
+dHVybiAtRU5PTUVNOwo+ID4gwqAJfQo+IMKgCj4gPiAtCWlycV9zZXRfY2hhaW5lZF9oYW5kbGVy
+X2FuZF9kYXRhKGRhdGEtPmlycSwgaW14X2lycXN0ZWVyX2lycV9oYW5kbGVyLAo+ID4gLQkJCQkJ
+wqBkYXRhKTsKPiArCWRhdGEtPmlycV9jb3VudCA9IG9mX2lycV9jb3VudChucCk7CgpXZSBub3Jt
+YWxseSBkb24ndCB2YWxpZGF0ZSBzdHVmZiB0aGF0IGNvbWVzIGZyb20gdGhlIERULCBidXQgSSBn
+dWVzcyBpdAptaWdodCBiZSBoZWxwZnVsIHRvIHZhbGlkYXRlIHRoYXQgdGhlIG51bWJlciBvZiBv
+dXRwdXQgaXJxcyBzcGVjaWZpZWQKbWF0Y2hlcyB3aGF0IHRoZSBudW1iZXIgb2YgaW5wdXQgaXJx
+cywgaS5lLiB0aGVyZSBpcyBvbmUgb3V0cHV0IGlycXMKc3BlY2lmaWVkIGZvciBlYWNoIGdyb3Vw
+IG9mIDY0IGlucHV0cy4KCj4gKwlpZiAoIWRhdGEtPmlycV9jb3VudCB8fCBkYXRhLT5pcnFfY291
+bnQgPiBDSEFOX01BWF9PVVRQVVRfSU5UKSB7Cj4gPiArCQljbGtfZGlzYWJsZV91bnByZXBhcmUo
+ZGF0YS0+aXBnX2Nsayk7Cj4gPiArCQlyZXR1cm4gLUVJTlZBTDsKPiA+ICsJfQo+ICsKPiA+ICsJ
+Zm9yIChpID0gMDsgaSA8IGRhdGEtPmlycV9jb3VudDsgaSsrKSB7Cj4gPiArCQlkYXRhLT5pcnFb
+aV0gPSBpcnFfb2ZfcGFyc2VfYW5kX21hcChucCwgaSk7Cj4gPiArCQlpZiAoIWRhdGEtPmlycVtp
+XSkgewo+ID4gKwkJCWNsa19kaXNhYmxlX3VucHJlcGFyZShkYXRhLT5pcGdfY2xrKTsKPiA+ICsJ
+CQlyZXR1cm4gLUVJTlZBTDsKPiA+ICsJCX0KPiArCj4gPiArCQlpcnFfc2V0X2NoYWluZWRfaGFu
+ZGxlcl9hbmRfZGF0YShkYXRhLT5pcnFbaV0sCj4gPiArCQkJCQkJwqBpbXhfaXJxc3RlZXJfaXJx
+X2hhbmRsZXIsCj4gKwkJCQkJCcKgZGF0YSk7CgpXZSByZWFsbHkgd2FudCBzb21lIGRhdGEgYWJv
+dXQgdGhlIG91dHB1dCBpcnEgYmVpbmcgcGFzc2VkIGhlcmUsIHNvIHdlCmNhbiBjdXQgZG93biB0
+aGUgbnVtYmVyIG9mIHJlZ2lzdGVyIHJlYWRzIGluIHRoZSBpcnEgaGFuZGxlciB0byB0aGUKbWF4
+aW11bSBvZiAyIHN0YXR1cyByZWdpc3RlcnMgcGVyIGdyb3VwLgoKUmVnYXJkcywKTHVjYXMKCl9f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1r
+ZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpo
+dHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJu
+ZWwK
