@@ -7,50 +7,48 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DB85AC282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 16:20:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0EA61C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 16:20:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A7F662133D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 16:20:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C93D12133D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 16:20:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TtIdSBY8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A7F662133D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FW6s7rVD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C93D12133D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uA5O6XLizKkd8V9bTWkuwgC+GAldoRbp3XaMbObtWxE=; b=TtIdSBY8CrFhZN
-	a/RcJFcBu0JMmimj03u2+ixiVmwHvQYAzvRAWG5GZXh7CmwKMLVm2KAdry5k6HMxnqIux0TzF41ve
-	bE4wXPyuQHyaMytwoNPBIHbDhMcBAALDGvp9zAKn1xWu3UhpalGze8WTyNs6D4oUgDcYVbLvpgXqj
-	TEeg09ijWVCvTh3L5rDt2WlRouvEddxBJiGtErCzOicSJ5/OVlsYyvmj+jD+Iz8JfGls1DOtTna/J
-	UlLgDsoMsNl72yiVzrECRgkBx5o1RzPS7S3Zv7MsdteX8rKiht9g7I6QFFIsJkurWjBmpuTZTUlZZ
-	fgylqAC4kSK0EBj4RxzQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=6ywgYXbe8TUGUY9XqIIT6S1zFZ0eD7SFCwbalmVlw9A=; b=FW6s7rVDjCn0WE
+	JlLTFosYQp7wB8cd/pD31sFeoZyl7MJIDxGZYOSFA5DiAejAaWFtIFWtYHvEc+14PscBQ6RNkPaRi
+	Yk8iVShqp3XBCzAUzYytJ/TBDY5sUPGCzR31Iz/rTSU73AKj8++ERhvFAGvgIxEI1JQOTpStZyWGW
+	Oc3DgW0NgCzVmpoQe7FWE3qQVIZekggvbq3ngQrQlKuvkJdBrS7BknZ9YH9tpaYFdJ9uwtinQXvOC
+	8/ry+GInEEr9xhOL4gZuL0Vac3iwYf/01g0GoZ0tlt25KwUgMeyngZmMRVNbjgFBT6s5/bBE3IXuM
+	bAClULfuXo/ozcIht+lw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn4Di-0000dP-ME; Fri, 25 Jan 2019 16:20:42 +0000
+	id 1gn4Dx-0000qI-1n; Fri, 25 Jan 2019 16:20:57 +0000
 Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn4Df-0000cn-Fu
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 16:20:40 +0000
+ id 1gn4Df-0000co-SF
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 16:20:41 +0000
 Received: from dude02.hi.pengutronix.de ([2001:67c:670:100:1d::28]
  helo=dude02.pengutronix.de.)
  by metis.ext.pengutronix.de with esmtp (Exim 4.89)
  (envelope-from <l.stach@pengutronix.de>)
- id 1gn4Db-0004TU-Eq; Fri, 25 Jan 2019 17:20:35 +0100
+ id 1gn4Db-0004TU-Co; Fri, 25 Jan 2019 17:20:35 +0100
 From: Lucas Stach <l.stach@pengutronix.de>
 To: Shawn Guo <shawnguo@kernel.org>
-Subject: [PATCH v2 2/2] arm64: imx8mq: select GPCv2 irqchip driver
-Date: Fri, 25 Jan 2019 17:20:34 +0100
-Message-Id: <20190125162034.12984-2-l.stach@pengutronix.de>
+Subject: [PATCH v2 1/2] arm64: dts: imx8mq: properly describe IRQ hierarchy
+Date: Fri, 25 Jan 2019 17:20:33 +0100
+Message-Id: <20190125162034.12984-1-l.stach@pengutronix.de>
 X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190125162034.12984-1-l.stach@pengutronix.de>
-References: <20190125162034.12984-1-l.stach@pengutronix.de>
 MIME-Version: 1.0
 X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::28
 X-SA-Exim-Mail-From: l.stach@pengutronix.de
@@ -58,9 +56,8 @@ X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
  SAEximRunCond expanded to false
 X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_082039_687423_4942A6FA 
-X-CRM114-Status: UNSURE (   9.67  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190125_082040_063267_24A0F0DC 
+X-CRM114-Status: GOOD (  10.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,26 +78,38 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The system is unable to boot without this driver being present,
-as most of the peripherals are connected to this IRQ controller.
+The GPCv2 sits between most of the peripherals and the GIC and
+functions as a wakeup controller for the CPU cores.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/freescale/imx8mq.dtsi | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 251ecf34cb02..f4e45c52aea4 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -146,6 +146,7 @@ config ARCH_MXC
- 	bool "ARMv8 based NXP i.MX SoC family"
- 	select ARM64_ERRATUM_843419
- 	select ARM64_ERRATUM_845719
-+	select IMX_GPCV2
- 	help
- 	  This enables support for the ARMv8 based SoCs in the
- 	  NXP i.MX family.
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+index 5bd1f106ed84..af2584d51fa2 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
++++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+@@ -11,8 +11,7 @@
+ #include "imx8mq-pinfunc.h"
+ 
+ / {
+-	/* This should really be the GPC, but we need a driver for this first */
+-	interrupt-parent = <&gic>;
++	interrupt-parent = <&gpc>;
+ 
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+@@ -257,6 +256,9 @@
+ 			gpc: gpc@303a0000 {
+ 				compatible = "fsl,imx8mq-gpc";
+ 				reg = <0x303a0000 0x10000>;
++				interrupt-parent = <&gic>;
++				interrupt-controller;
++				#interrupt-cells = <3>;
+ 
+ 				pgc {
+ 					#address-cells = <1>;
 -- 
 2.20.1
 
