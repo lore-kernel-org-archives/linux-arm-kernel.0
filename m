@@ -2,69 +2,65 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 25FDCC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 15:56:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AB3A6C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 15:57:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E1E86218B0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 15:56:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 734CD218D0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 15:57:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cR/MEAbt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1E86218B0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j8t7+j4d"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 734CD218D0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=8R3dRYfdttoOTI1UB68V1uArOjDdzl4pN/rG2DSEuIE=; b=cR/MEAbtWfI4w/MHLMEa7JMDt
-	kdWPDuXEGoSfRYvBDi/TMsDAixebLoiQSS3O1KmxnYekt09B+7qyWMOIG2/wSeJOIrlkdqXyg5V+s
-	fz8CnGMTCzX/fJ97fuwv1Vu+dqZMawEs7ZElTcwRUhlaV4JKqC3PY8LJAg8qn+gECc6efbu4yrsRe
-	DkMH9T5+mBkHBVPwsDDqP3US9BsxjS7uqEDy8DWSyJhKCuLls6EWJ5oqpL/+UCnBbxvp3o3A2+c4a
-	6CtTe5Z4jKIQNnLZfEekduRUR3PVHn+JoimM+Hrh+woUGpbsiJb3ZEzQrZquLo6a1xb8PDOO6q9+T
-	lOwWNvq9g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=5R8tYB9hN3Wlphhxr6+5ZtFM7jH6PJJiKksyincf6ss=; b=j8t7+j4dY07V4W
+	G2M62KKKZtj5S7h7Ipc5zy0L9HcqAuJVMU7kIqGUQ1oofTv2H5a7eU+QQ9TnJnp+rTPZGmgR5tH5g
+	2mfDqtybPniuUPOtyf5PbMlhDp12cBa+iE42MUWa50C9zq0RWdE4NsAC6nBgruZanY/zEHyJuyKGS
+	w8j5lc6h74qyJfKvOBf3XGM4fcnTkviGys8yQssENiD1TQPFGuasBLRKpax1bI19NiG0cr/AJALnp
+	DZsue3vMkPsgNXX3mo36/+krj2sYpDgLIQQbVm/is5/sD3VbxFJZvU93zRxT412kiL2wF4vNWm6xD
+	ardG7h90z/xGJjHH1K6A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn3qa-0007xR-Sc; Fri, 25 Jan 2019 15:56:48 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn3qX-0007x5-VH
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 15:56:47 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BDD77A78;
- Fri, 25 Jan 2019 07:56:45 -0800 (PST)
-Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 813253F5AF;
- Fri, 25 Jan 2019 07:56:43 -0800 (PST)
-Subject: Re: [PATCH RFC 1/1] arm64: Use PSCI calls for CPU stop when hotplug
- is supported
-To: Pramod Kumar <pramod.kumar@broadcom.com>
-References: <1547790380-6276-1-git-send-email-pramod.kumar@broadcom.com>
- <20190118113242.GA8928@e107155-lin>
- <CAJ+tv6+6yqT1xkmkY3x6SNQ83K+J6zqKZr7PV5A_ffvyEzceqg@mail.gmail.com>
- <CAJ+tv6KqynSf5t_VwLqpdM4BF+wLWcJ0wPTD4nWqL4ej1Yih4g@mail.gmail.com>
- <20190123164801.GA55887@lakrids.cambridge.arm.com>
- <f1851a76-8078-b8e7-6a54-b038b47f9214@broadcom.com>
- <20190123173343.GC55887@lakrids.cambridge.arm.com>
- <CAJ+tv6+Mm8Rmsx8cfOuDT4+CVWVd4gKLzUnTs_EMxKYax+NScw@mail.gmail.com>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <28d43f76-12ac-662b-31ad-942c9d7e81ea@arm.com>
-Date: Fri, 25 Jan 2019 15:56:42 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <CAJ+tv6+Mm8Rmsx8cfOuDT4+CVWVd4gKLzUnTs_EMxKYax+NScw@mail.gmail.com>
-Content-Language: en-GB
+	id 1gn3r2-0008Eq-Kv; Fri, 25 Jan 2019 15:57:16 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gn3qy-0008ER-KL
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 15:57:14 +0000
+Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <l.stach@pengutronix.de>)
+ id 1gn3qv-0001w3-QD; Fri, 25 Jan 2019 16:57:09 +0100
+Message-ID: <1548431829.28802.50.camel@pengutronix.de>
+Subject: Re: [PATCH] arm64: Kconfig.platforms: fix warning unmet direct
+ dependencies
+From: Lucas Stach <l.stach@pengutronix.de>
+To: Catalin Marinas <catalin.marinas@arm.com>, Anders Roxell
+ <anders.roxell@linaro.org>
+Date: Fri, 25 Jan 2019 16:57:09 +0100
+In-Reply-To: <20190125143215.GE25901@arrakis.emea.arm.com>
+References: <20190115191839.13823-1-anders.roxell@linaro.org>
+ <20190125143215.GE25901@arrakis.emea.arm.com>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
+X-SA-Exim-Mail-From: l.stach@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_075646_014018_8A40C4CE 
-X-CRM114-Status: GOOD (  27.99  )
+X-CRM114-CacheID: sfid-20190125_075712_817960_AA19F8F1 
+X-CRM114-Status: GOOD (  19.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,117 +72,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Scott Branden <scott.branden@broadcom.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Suzuki K Poulose <Suzuki.Poulose@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org,
- BCM Kernel Feedback <bcm-kernel-feedback-list@broadcom.com>,
- Sudeep Holla <sudeep.holla@arm.com>, Dave Martin <dave.martin@arm.com>,
- linux-arm-kernel@lists.infradead.org, Steve Capper <steve.capper@arm.com>
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 25/01/2019 07:03, Pramod Kumar wrote:
-> On Wed, Jan 23, 2019 at 11:03 PM Mark Rutland <mark.rutland@arm.com> wrote:
->>
->> On Wed, Jan 23, 2019 at 09:05:26AM -0800, Scott Branden wrote:
->>> Hi Mark,
->>>
->>> Hopefully I can shed some light on the use case inline.
->>>
->>> On 2019-01-23 8:48 a.m., Mark Rutland wrote:
->>>> On Mon, Jan 21, 2019 at 11:30:02AM +0530, Pramod Kumar wrote:
->>>>> On Mon, Jan 21, 2019 at 11:28 AM Pramod Kumar <pramod.kumar@broadcom.com>
->>>>> wrote:
->>>>>
->>>>>       Need comes from a specific use case where one Accelerator card(SoC) is
->>>>>       plugged in a sever over a PCIe interface.  This Card gets supply from a
->>>>>       battery, which could provide very less power for a very small time, in case
->>>>>       of any power loss. Once Card switches to battery, this has to reduce its
->>>>>       power consumption to its lowest point and back-up the DDR contents asap
->>>>>       before battery gets fully drained off.
->>>> In this example is Linux running on the server, or on the accelerator?
->>> Accelerator
->>>>
->>>> What precisely are you trying to back up from DDR, and why?
->>> Data in DDR is being written to disk at this time (disk is connected to
->>> accelerator)
->>>>
->>>> What is responsible for backing up that contents?
->>>
->>> A low power M-class processor and DMA engine which continues necessary
->>> operations to transfer DDR memory to disk.
->>>
->>> The high power processors on the accelerator running linux needed to be
->>> halted ASAP on this power loss event and M0 take over. Graceful shutdown of
->>> linux and other peripherals is unnecessary (and we don't have the power
->>> necessary to do so).
->>
->> If graceful shutdown of Linux is not required (and is in fact
->> undesireable), why is Linux involved at all in this shutdown process?
->>
->> For example, why is this not a secure interrupt taken to EL3, which can
->> (gracefully) shut down the CPUs regardless?
->>
-> 
-> This is an GPIO interrupt. This can not be marked secure as for that
-> we need to mark whole GPIO controller as secure which is not possible
-> as GPIO controller is meant for non-secure world having more than 100
-> lines connected.
-> 
-> I agree we have work around where we invoke handler in Linux and
-> switch to ATF via SMC and from ATF we need bring all secondary CPU to
-> ATF via sending SGI and and then respective core flushes the L1/L2 and
-> bring himself out of coherency domain and cluster and MCU shutdowns
-> the CPU subsystem gracefully. This could work for our requirement.
-> Need to check ATF support for that.
-
-Right, SMCCC has whole spaces for SoC-specific and platform-specific 
-service calls. If your system has a need to power off as fast as 
-possible under system-specific constraints, it seems much more sensible 
-to immediately tell the firmware "power off as fast as possible under 
-the system-specific constraints that you have full knowledge of, 
-please", rather than trying to coax the generic kernel_halt() (or 
-whatever) infrastructure to sort-of-do-what-you-want.
-
-> But What about generic system? This patch address the generic
-> multi-master system's requirement. Consider system where shutting down
-> the linux does not mean shutting down the complete system. Lets take
-> an example of smartnic case Where NIC master and CPUs access cachable
-> DDR. In smarnic its quite common to bring CPUs on demand means when
-> needed via MCU help.
-> Now in full-fledged system. if CPU subsystem is shutdown via poweroff
-> command which does not bring secondary CPUs out of coherency domain,
-> it will bring the complete system unstable when NIC master tries to
-> access DDR and snoop is send to CPUs as well which is not available.
-> Fabric/System hangs...
-
-Not sure that's really relevant here... If platform firmware is able to 
-power things off in a way that breaks the platform, surely that's 
-entirely the firmware's own fault.
-
-> I feel While shutting down the CPUs subsystem or powering off, All
-> secondary CPUs must be shutdown properly by bring-out of coherency
-> domain to remain rest of subsystem usable. I agree that introducing
-> PSCI call introduce delay for shutdown/reboot case but stability
-> matter than little delay.
-
-Again, if you don't trust the firmware to implement SYSTEM_OFF 
-appropriately for the platform, can you really assume its CPU_OFF 
-implementation is safe either?
-
-People already complain today about how long CPU bringup takes on 
-certain systems. Extending their reboot cycle by a similar degree for 
-reasons that are entirely irrelevant to those systems is hardly going to 
-make those users any happier.
-
-Robin.
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+QW0gRnJlaXRhZywgZGVuIDI1LjAxLjIwMTksIDE0OjMyICswMDAwIHNjaHJpZWIgQ2F0YWxpbiBN
+YXJpbmFzOgo+IE9uIFR1ZSwgSmFuIDE1LCAyMDE5IGF0IDA4OjE4OjM5UE0gKzAxMDAsIEFuZGVy
+cyBSb3hlbGwgd3JvdGU6Cj4gPiBXaGVuIEFSQ0hfTVhDIGdldCBlbmFibGVkLCBBUk02NF9FUlJB
+VFVNXzg0NTcxOSB3aWxsIGJlIHNlbGVjdGVkIGFuZAo+ID4gdGhpcyB3YXJuaW5nIHdpbGwgaGFw
+cGVuIHdoZW4gQ09NUEFUIGlzbid0IHNldC4KPiA+IAo+ID4gV0FSTklORzogdW5tZXQgZGlyZWN0
+IGRlcGVuZGVuY2llcyBkZXRlY3RlZCBmb3IgQVJNNjRfRVJSQVRVTV84NDU3MTkKPiA+IMKgIERl
+cGVuZHMgb24gW25dOiBDT01QQVQgWz1uXQo+ID4gwqAgU2VsZWN0ZWQgYnkgW3ldOgo+ID4gwqAg
+LSBBUkNIX01YQyBbPXldCj4gPiAKPiA+IFJld29yayB0byBhZGQgJ2lmIENPTVBBVCcgYmVmb3Jl
+IEFSTTY0X0VSUkFUVU1fODQ1NzE5IGdldHMgc2VsZWN0ZWQsCj4gPiBzaW5jZSBBUk02NF9FUlJB
+VFVNXzg0NTcxOSBkZXBlbmRzIG9uIENPTVBBVC4KPiA+IAo+ID4gPiA+IFNpZ25lZC1vZmYtYnk6
+IEFuZGVycyBSb3hlbGwgPGFuZGVycy5yb3hlbGxAbGluYXJvLm9yZz4KPiA+IC0tLQo+ID4gwqBh
+cmNoL2FybTY0L0tjb25maWcucGxhdGZvcm1zIHwgMiArLQo+ID4gwqAxIGZpbGUgY2hhbmdlZCwg
+MSBpbnNlcnRpb24oKyksIDEgZGVsZXRpb24oLSkKPiA+IAo+ID4gZGlmZiAtLWdpdCBhL2FyY2gv
+YXJtNjQvS2NvbmZpZy5wbGF0Zm9ybXMgYi9hcmNoL2FybTY0L0tjb25maWcucGxhdGZvcm1zCj4g
+PiBpbmRleCAyNTFlY2YzNGNiMDIuLmQ0ZmFjYTc3NWQ5YyAxMDA2NDQKPiA+IC0tLSBhL2FyY2gv
+YXJtNjQvS2NvbmZpZy5wbGF0Zm9ybXMKPiA+ICsrKyBiL2FyY2gvYXJtNjQvS2NvbmZpZy5wbGF0
+Zm9ybXMKPiA+IEBAIC0xNDUsNyArMTQ1LDcgQEAgY29uZmlnIEFSQ0hfTVZFQlUKPiA+IMKgY29u
+ZmlnIEFSQ0hfTVhDCj4gPiA+ID4gwqAJYm9vbCAiQVJNdjggYmFzZWQgTlhQIGkuTVggU29DIGZh
+bWlseSIKPiA+ID4gPiDCoAlzZWxlY3QgQVJNNjRfRVJSQVRVTV84NDM0MTkKPiA+ID4gPiAtCXNl
+bGVjdCBBUk02NF9FUlJBVFVNXzg0NTcxOQo+ID4gPiA+ICsJc2VsZWN0IEFSTTY0X0VSUkFUVU1f
+ODQ1NzE5IGlmIENPTVBBVAo+ID4gPiA+IMKgCWhlbHAKPiA+ID4gPiDCoAnCoMKgVGhpcyBlbmFi
+bGVzIHN1cHBvcnQgZm9yIHRoZSBBUk12OCBiYXNlZCBTb0NzIGluIHRoZQo+ID4gwqAJwqDCoE5Y
+UCBpLk1YIGZhbWlseS4KPiAKPiBBY3R1YWxseSwgZG8gd2UgbmVlZCB0byBzZWxlY3QgdGhlIGVy
+cmF0YSB3b3JrYXJvdW5kcyBleHBsaWNpdGx5PyBUaGF0Cj4gc2VlbXMgdG8gYmUgdGhlIG9ubHkg
+Y2FzZSB3aGVyZSB3ZSBkbyBpdCAoY29tbWl0IDkzMDUwN2MxODMwNCwgImFybTY0Ogo+IGFkZCBi
+YXNpYyBLY29uZmlnIHN5bWJvbHMgZm9yIGkuTVg4IikuIFRoZXkgYXJlIGRlZmF1bHQgeSwgc28g
+d2UKPiBzaG91bGRuJ3QgbmVlZCB0byBmb3JjZSB0aGVtIG9uLgoKVGhpcyBpcyBiYXNlZCBvbiBw
+YXN0IGV4cGVyaWVuY2UuIFdlJ3ZlIGhhZCBhIGxvdCBvZiBjYXNlcyB3ZXJlIHBlb3BsZQpkaWQg
+bm90IGVuYWJsZSB0aGUgbmVjZXNzYXJ5IENQVSBlcnJhdGEgd29ya2Fyb3VuZCwgd2hpY2ggdGhl
+biB1c3VhbGx5CmxlYWQgdG8gdmVyeSBoYXJkIHRvIGRlYnVnIHN5c3RlbSBmYWlsdXJlcy4gSXQg
+aXMgb24gb3VyIGxpc3Qgb2YgdGhpbmdzCnRvIGxvb2sgb3V0IGZvciBub3csIGJ1dCBJIHdvdWxk
+IGZlZWwgbXVjaCBiZXR0ZXIgaWYgdGhlcmUgaXMganVzdCBubwpjaGFuY2UgZm9yIGEgdXNlciB0
+byBtaXNjb25maWd1cmUgdGhlIGtlcm5lbCBpbiB0aGlzIHdheS4KClJlZ2FyZHMsCkx1Y2FzCgpf
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0t
+a2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcK
+aHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2Vy
+bmVsCg==
