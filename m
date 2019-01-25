@@ -7,72 +7,63 @@ X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4CCB8C282C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:01:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 39411C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:03:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1BC0E218D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:01:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 07DCF218A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:03:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TZt2eEDg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1BC0E218D9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=gondor.apana.org.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F0nB4/Fm";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="cPb5oB4M"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 07DCF218A2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Cc:Content-ID:Content-Description:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=X9kN8tysqlhwSsz5KwyinrRYsAUWPOkflO2+GYsOQ88=; b=TZt2eEDg3wB+XI
-	ajiSwUb8sDtXzpgOV8U9wSFtI4Rq+ckF/4GFqN5VM7Hp3YxV9W8pGQCxnZSlAcZmSf2G+4DerY2em
-	ygR69F9+3z2KZl+dqUAZXfJZzwXZq5Ic1qYzgobGEqrEVg9eR4Ld6wwXsAFpXJeLpDoDTGcaiCb8Y
-	O30puQhCi7mlIN9YowH30LKzeXLVZW8f16gwQAffB34CM7GidruAQ66y1USD4Eg49Qtmpzqje/and
-	8xnoaVZ85k8nCDox9pyx5x+SCn0YSh4dEg1x7qjmdL5q/et+pZKnkjqYWmTNHoRkBVLoa3xLv5an7
-	UgjE7wLwDsFqHIpfeEqw==;
+	List-Owner; bh=JMvMmnHqk8pqoaJYyWCzycBxxaUVzArbVuajUe1u+uE=; b=F0nB4/FmBqG179
+	HOTpxkRpKfzTIqShq7Bffn4Lato5nuxXGLRx1j3EoGOYVuFwXRTMJa6SlSyJ5k/ZOBdvBrbHVPjN4
+	IJIE1Msvjfpuy6s0oXshC7xiZz/5AY+GooPY+HdJhxfenq8aXdVBK1tENleBvr6jKFlbYZLVj5PwL
+	c4g29UxqwJ8iUHx9T/FSijKzkbC/X5KOpI2aawYK+p9lLnPEDxONaaqTzZigVlbR5hkmHsrYzwn9z
+	ys4wzDceS0PPfzGZUEptR4iiPVu2jMB0jIGm8D6hsMJtMAHZhz3hO0i3V6HBb+7i8hG0ge5PEzJPd
+	xbSpdLXajwOJ9G+aDtVw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmyIH-0003ov-5k; Fri, 25 Jan 2019 10:01:01 +0000
-Received: from orcrist.hmeau.com ([104.223.48.154] helo=deadmen.hmeau.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmyI8-0003o5-TN
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 10:00:59 +0000
-Received: from gondobar.mordor.me.apana.org.au ([192.168.128.4] helo=gondobar)
- by deadmen.hmeau.com with esmtps (Exim 4.89 #2 (Debian))
- id 1gmyHi-0004lp-GK; Fri, 25 Jan 2019 18:00:26 +0800
-Received: from herbert by gondobar with local (Exim 4.89)
- (envelope-from <herbert@gondor.apana.org.au>)
- id 1gmyHR-0007Vp-TN; Fri, 25 Jan 2019 18:00:09 +0800
-Date: Fri, 25 Jan 2019 18:00:09 +0800
-From: Herbert Xu <herbert@gondor.apana.org.au>
-To: David Howells <dhowells@redhat.com>,
- Tudor Ambarus <tudor-dan.ambarus@nxp.com>,
- "David S. Miller" <davem@davemloft.net>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- Alexandre Torgue <alexandre.torgue@st.com>,
- Horia =?utf-8?Q?Geant=C4=83?= <horia.geanta@nxp.com>,
- Aymen Sghaier <aymen.sghaier@nxp.com>,
- Tom Lendacky <thomas.lendacky@amd.com>, Gary Hook <gary.hook@amd.com>,
- Giovanni Cabiddu <giovanni.cabiddu@intel.com>,
- linux-crypto@vger.kernel.org, linux-kernel@vger.kernel.org,
- keyrings@vger.kernel.org, linux-stm32@st-md-mailman.stormreply.com,
- linux-arm-kernel@lists.infradead.org, qat-linux@intel.com
-Subject: Re: [RFC PATCH v2] akcipher: Introduce verify_rsa/verify for public
- key algorithms
-Message-ID: <20190125100009.i2ggpc7k7qvzayvj@gondor.apana.org.au>
-References: <20190116164703.9267-1-vt@altlinux.org>
- <24887.1547658740@warthog.procyon.org.uk>
- <20190116182719.j6ii6nmn4ciiurqr@altlinux.org>
- <20190118204100.6o3ovctanb62nvd2@altlinux.org>
+	id 1gmyKt-0004QM-KG; Fri, 25 Jan 2019 10:03:43 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmyKk-0004Pu-Rm
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 10:03:40 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id B356425BE52;
+ Fri, 25 Jan 2019 21:03:30 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1548410611; bh=lnvJGWz38jIg4upa0glnv4+Pgqon1ApASKT2L3fOX9M=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=cPb5oB4M0y486Gz/RGfJwmwrFyGnmlhOud3vvP03Da/dOcBI8/bM5hE3byQK0md4/
+ T7NPQ+ZhK7NPoHhnVIzWo/0dztw/ZYAy4vyhBnLQtVAnsnkJhD1rJrieNlxByvO6Xr
+ /D7eIHZInxYqSPvgHqMpm2rpJ6pYzFHXLm3/8tcQ=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id EF48D94048D; Fri, 25 Jan 2019 11:03:28 +0100 (CET)
+Date: Fri, 25 Jan 2019 11:03:28 +0100
+From: Simon Horman <horms@verge.net.au>
+To: Geert Uytterhoeven <geert+renesas@glider.be>
+Subject: Re: [PATCH 0/2] ARM: defconfig: Enable support for RZ/A2
+Message-ID: <20190125100328.tupij36uclthrlgb@verge.net.au>
+References: <20190124164022.9810-1-geert+renesas@glider.be>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190118204100.6o3ovctanb62nvd2@altlinux.org>
+In-Reply-To: <20190124164022.9810-1-geert+renesas@glider.be>
+Organisation: Horms Solutions BV
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_020053_273825_F224A212 
-X-CRM114-Status: UNSURE (   9.35  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190125_020335_549854_C9D67860 
+X-CRM114-Status: GOOD (  10.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,36 +75,22 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: Arnd Bergmann <arnd@arndb.de>, Magnus Damm <magnus.damm@gmail.com>,
+ linux-renesas-soc@vger.kernel.org, Chris Brandt <chris.brandt@renesas.com>,
+ Olof Johansson <olof@lixom.net>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 18, 2019 at 11:41:00PM +0300, Vitaly Chikunov wrote:
->
-> a) RSA verify works differently (is it just disguised encrypt),
-> b) We have separate wrapper module for it (pkcs1pad). Thus:
+On Thu, Jan 24, 2019 at 05:40:20PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> Old API can not be removed. In other words, we can not replace
-> .verify_rsa with .verify in these drivers or PKCS1 will not work.
-> 
-> We can replace .verify_rsa with .verify in pkcs1pad, but there is no
-> need for that if we stay with two API calls, which we can't avoid.
+> This patch series enables support for the RZ/A2 SoC in the Renesas and
+> ARM V7 multiplatform defconfigs, now the DTS for the Renesas RZ/A2M
+> evaluation board is included.
 
-I think having two API calls during a transition period is fine.
-But it must not be the long-term outcome.
-
-In order to keep existing drivers working, I think we should make
-the API wrap the legacy verify_rsa and implement verify directly
-on top of it.  IOW the driver remains unchanged for now but the
-crypto API code should provide a verify API that is implemented
-on top of the driver's verify_rsa call.
-
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Thanks, applied for v5.1.
 
 _______________________________________________
 linux-arm-kernel mailing list
