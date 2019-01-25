@@ -2,73 +2,169 @@ Return-Path: <SRS0=pdKw=QA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.0 required=3.0 tests=BAD_ENC_HEADER,
+	DATE_IN_FUTURE_24_48,DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,UPPERCASE_50_75,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 08547C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 07:15:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8DF42C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 07:46:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C976121872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 07:15:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5AC52218A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 24 Jan 2019 07:46:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q9/E3z27"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C976121872
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RhX39Q3S";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="c/lhSyNY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5AC52218A3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Message-ID:Date:Subject:To:From:Reply-To:Cc:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=csWjQJGeA5NxN9wJWY/+qhGTfRi9HzANs+p9QqV/sSE=; b=q9/E3z27KLiAly
-	lUnEaR4ETnkyv02nDiSe1MqxfsGDkM0ObWor+ZyRuDlzFpy1Y51ZC2e1Wvg0h2r+EnHsbcSnLIA5n
-	JYiT2End84n0MTAi7KkVMLdYL2Vqv0mgXSsonbxpFQYcR2oHv8fVoq0K/8LzHVhTVNnZjziFhIvJD
-	ugZWEkYRILVhIgRP48pUoTq3LXGYxa92TFgg+Ksz/5DbXwIiR/ApHaMCmMhI3ra0g5TcFufW7HVw4
-	VHcL4uqNfcXOXzAPor8+HgM+XpKd0TgOF9Oawgz5xwGAF64vKdVEQZu3aMpEaadD1WsDUAIJ2w9k6
-	okHMMMpSyNd0PybM7C9Q==;
+	List-Owner; bh=CwF2xlZInpgeh9QDVqvme+zy7M/+wrW+MX8lsvP+UaE=; b=RhX39Q3Sfm6wFh
+	i4yav8vv/DgwWAxHF0+eqSjquGGEGF2WeWC36orsnUrQSFbsIQLIjRFCDKf/8Ou6Lv8Nffa1fAzRC
+	fnLJs8dS4ysLw6iGCa/2o0PgsG+pR5sd3JT8rn4eAKyZ7vTVlBTLPAxNiNZGsGzbYbEhKz/ni0uKt
+	uJVpPNLXB2Fu/KWx+0QwZ90gHwG6+3ZHLtCu29JETfMSJgwmHhvsLbrHZKrjLeDH1AN4yKmnFJDqM
+	UgxqoInOg8Vt+T301Ot0r4LZIPhrsq0898++Y/A0iOKZxs3fzWBeENj1BVvUZvfsbkQ8Vec/Z1+rv
+	Hi0RubBn8k65FR8lRcEA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmZEv-0002tu-2H; Thu, 24 Jan 2019 07:15:53 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gmZie-0005Rd-Uq; Thu, 24 Jan 2019 07:46:36 +0000
+Received: from mail-eopbgr740041.outbound.protection.outlook.com
+ ([40.107.74.41] helo=NAM01-BN3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmZEG-0001xj-7F; Thu, 24 Jan 2019 07:15:28 +0000
-X-UUID: dbf5aef5ec1b48f6b65ede8a074e9bc6-20190123
-X-UUID: dbf5aef5ec1b48f6b65ede8a074e9bc6-20190123
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
- (envelope-from <shun-chih.yu@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 657680955; Wed, 23 Jan 2019 23:15:03 -0800
-Received: from MTKMBS01N2.mediatek.inc (172.21.101.79) by
- MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 23 Jan 2019 23:15:02 -0800
-Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
- mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 24 Jan 2019 15:14:59 +0800
-Received: from mtkswgap22.mediatek.inc (172.21.77.33) by MTKCAS06.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
- Frontend Transport; Thu, 24 Jan 2019 15:14:59 +0800
-From: <shun-chih.yu@mediatek.com>
-To: Sean Wang <sean.wang@mediatek.com>, Vinod Koul <vkoul@kernel.org>, "Rob
- Herring" <robh+dt@kernel.org>, Matthias Brugger <matthias.bgg@gmail.com>,
- "Dan Williams" <dan.j.williams@intel.com>
-Subject: [PATCH v5 2/2] dmaengine: mediatek: Add MediaTek Command-Queue DMA
- controller for MT6765 SoC
-Date: Thu, 24 Jan 2019 15:14:20 +0800
-Message-ID: <1548314060-4833-3-git-send-email-shun-chih.yu@mediatek.com>
-X-Mailer: git-send-email 1.7.9.5
-In-Reply-To: <1548314060-4833-1-git-send-email-shun-chih.yu@mediatek.com>
-References: <1548314060-4833-1-git-send-email-shun-chih.yu@mediatek.com>
+ id 1gmZib-0005Qv-O8
+ for linux-arm-kernel@lists.infradead.org; Thu, 24 Jan 2019 07:46:35 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=mA7EtohcjS7J/1m9sGn0SDAUUF6GPWZSWqZg1nCod58=;
+ b=c/lhSyNYT/DaqoBdEMbPutmMAinpnF/egqsVl58TfHdhHPYzYLAa79elRdd6I8zdosZYGMJW9CAfK2ZVYDNMRuuNRBiLm+VLq0afUwyKPbZdnv89x8Tg62e6N0G20lmHTvBpLf6KlUZsQ4DHcS+/Q4IBd+R/glLCgwJrTGjpUTk=
+Received: from BN6PR02CA0047.namprd02.prod.outlook.com (2603:10b6:404:5f::33)
+ by DM6PR02MB4458.namprd02.prod.outlook.com (2603:10b6:5:29::27) with
+ Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1558.17; Thu, 24 Jan
+ 2019 07:46:31 +0000
+Received: from CY1NAM02FT017.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e45::205) by BN6PR02CA0047.outlook.office365.com
+ (2603:10b6:404:5f::33) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1558.17 via Frontend
+ Transport; Thu, 24 Jan 2019 07:46:31 +0000
+Authentication-Results: spf=pass (sender IP is 149.199.60.83)
+ smtp.mailfrom=xilinx.com; gmail.com; dkim=none (message not signed)
+ header.d=none;gmail.com; dmarc=bestguesspass action=none
+ header.from=xilinx.com;
+Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
+ 149.199.60.83 as permitted sender) receiver=protection.outlook.com;
+ client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
+Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
+ CY1NAM02FT017.mail.protection.outlook.com (10.152.75.181) with Microsoft SMTP
+ Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1558.11
+ via Frontend Transport; Thu, 24 Jan 2019 07:46:28 +0000
+Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
+ by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
+ (envelope-from <nava.manne@xilinx.com>)
+ id 1gmZiV-0005YK-EI; Wed, 23 Jan 2019 23:46:27 -0800
+Received: from [127.0.0.1] (helo=localhost)
+ by xsj-pvapsmtp01 with smtp (Exim 4.63)
+ (envelope-from <nava.manne@xilinx.com>)
+ id 1gmZiQ-00071u-A2; Wed, 23 Jan 2019 23:46:22 -0800
+Received: from xsj-pvapsmtp01 (mailman.xilinx.com [149.199.38.66])
+ by xsj-smtp-dlp1.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x0O7kCCa028329; 
+ Wed, 23 Jan 2019 23:46:12 -0800
+Received: from [172.23.37.118] (helo=xhdnavam40.xilinx.com)
+ by xsj-pvapsmtp01 with esmtp (Exim 4.63)
+ (envelope-from <nava.manne@xilinx.com>)
+ id 1gmZiF-0006yr-La; Wed, 23 Jan 2019 23:46:12 -0800
+From: Nava kishore Manne <nava.manne@xilinx.com>
+To: <p.zabel@pengutronix.de>, <robh+dt@kernel.org>, <mark.rutland@arm.com>,
+ <michal.simek@xilinx.com>, <rajanv@xilinx.com>, <jollys@xilinx.com>,
+ <nava.manne@xilinx.com>, <devicetree@vger.kernel.org>,
+ <linux-arm-kernel@lists.infradead.org>, <linux-kernel@vger.kernel.org>,
+ <chinnikishore369@gmail.com>
+Subject: [PATCH v3 1/3] firmware: xilinx: Add reset API's
+Date: Fri, 25 Jan 2019 13:16:52 +0530
+Message-ID: <20190125074654.10950-2-nava.manne@xilinx.com>
+X-Mailer: git-send-email 2.18.0
+In-Reply-To: <20190125074654.10950-1-nava.manne@xilinx.com>
+References: <20190125074654.10950-1-nava.manne@xilinx.com>
+X-RCIS-Action: ALLOW
+X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
+X-TM-AS-User-Approved-Sender: Yes;Yes
+X-EOPAttributedMessage: 0
+X-MS-Office365-Filtering-HT: Tenant
+X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
+ SFV:NSPM;
+ SFS:(10009020)(376002)(136003)(346002)(39860400002)(396003)(2980300002)(199004)(189003)(63266004)(26005)(77096007)(48376002)(186003)(14444005)(76176011)(36756003)(305945005)(47776003)(2906002)(478600001)(50466002)(81156014)(81166006)(106002)(356004)(8676002)(6666004)(51416003)(8936002)(50226002)(7696005)(39060400002)(36386004)(426003)(336012)(316002)(16586007)(476003)(2616005)(486006)(126002)(9786002)(2201001)(110136005)(446003)(106466001)(11346002)(1076003)(921003)(107986001)(1121003)(2101003)(83996005);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DM6PR02MB4458; H:xsj-pvapsmtpgw01; FPR:;
+ SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; A:1; MX:1; 
+X-Microsoft-Exchange-Diagnostics: 1; CY1NAM02FT017;
+ 1:nZgPU597VkHgZY8C2Ap2TIBT1KALh+1kP71p+hlkZxHuPJ0/oWDIee5aeL1ImcWtE3ZlnA89f3Rw3vCEQl/tRLQPbWUUy8U8bC3CbbBePHUyDjfyH0EpHSNQKkhR3BZpzbG6eOoLyPj0clHAISOKV8WQXGYG6tcyAwx309+FGSc=
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: E65FCE50B027A977F052CDE5CF44AC4EAFC0E9B603A5D1B19E4829F5611CAA842000:8
-X-MTK: N
+X-MS-PublicTrafficType: Email
+X-MS-Office365-Filtering-Correlation-Id: f093da17-0fe7-4d5b-0d3a-08d681d00e06
+X-Microsoft-Antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4608076)(4709027)(2017052603328)(7153060);
+ SRVR:DM6PR02MB4458; 
+X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB4458;
+ 3:6NceGFMg/KahIc6267Zgop4WUvT1z9/X9JDiZ42vGZGQL0gze482LJOZ1fXpPibZ7ow6ayAnc20OmOKnaI36DWbXyknDYxQFKNruZx6ja/aJcQnVqmX711/yBNtBFBwjscQIOI8gB9I14J1XpRB+lYP8TY+V9Xz+/pGDuS6G5JmNTF789+LJAFmiuQ4H9T7UKdLHn9W/cr6aHIsYajT9d6tnyQ6GuG04f+NMgBIAK2k8UPjz56+OsUDUPTL+Al6VLs2iEIbDDDPeTm4dM0WP8WX3AUs+e2syyth+I8O6b2I+l0IGxiwDafBSDk6LcU6rumqszzizeasgIt3Rti7W/oN02N8k8kpedCIwS42yyKQz37ssNw79wNuGapsJfT/6;
+ 25:a/Qm+YWzVyaeDQ4cjJoU7XiK2iegC+nVMw90tSzYyKmwyCgrhG1W7Z7p66rYDTEod5V8RuxJJnsyzcGp3i2E4Rtzamdbm4VL9oW93aUBE4c0Su4ejDEsNKC5f+DjaWyR5kQjMK0PqdV640Emiq9Bts3Pmy16bfDyC35XGXAz9H1VpKdhn4RfD9V0b+JUK30mgxT4jW5zwms5Z6bgdk1zReUc2wmgtMju6mu+ZezagW/xi78OS4K4og1qiCzSW6mbB705Z6RO8u0VcrKi0XcFNOlIIqfOu8Cz0jHTFQHBNbfc4nNz+PXyo6HOUpPs/ifkPXM/Dv0mMdl4ZVJB2IfsvQ==
+X-MS-TrafficTypeDiagnostic: DM6PR02MB4458:
+X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB4458;
+ 31:52KAhn+8DOo8B/ddIL5nPy2f+12dVhobKudtC4cZYHlOaDK2l9PzopXoDezWb8RC1dPlLp0Mwj3VDIg92BMuUh4mAJxhfSClPJIYuFKrhbmfG0j4Ht0QjoTj0HeVlcjB6UcMl8CNkuAcdaDLJ3kgfqdExQYwwD4j2Q9nYX5e4LN9CwQgSej691vIJZ4bVw8AihNiTXSwtDfiiiVx7N0yamDO5nIkCLKKneAvJ/t1TFE=;
+ 20:406I52nrFzZVbUDL/PQ5yH6g5J3zkGjiRM/zbTp+/9zjcExSrkvIy15TRVjQtldXh9c7548YzybnkU+4zfpchRoWJN0ic6Gr9vYE6Fb53dSm+BX8TtvTsSOXjOqqMWYriL7d5DaUyYxdi7YNZh8tC5cv9bmBgEuBqgK6IZYMb/iCNJMaxhBXKWIdk22j9KfTPpXfJ/zOeWd2VvdzD+0iov0+BUCodu06tSHS0amDJf0ujW7WhC2i+27eorZQlwJH2BIMu9z66U6qei2i/jWkPDvI+GURd8P1ccA7F9RKwVDc2CfMKTXRLDG2cFKjfLHMYq1iLF0X7cf5rEsj87QbdZ3owxCJ19awyOLV706sD/YAG+u+BYnAxO4dvjnj8jDoHpY3Svf10tlCDwC4pCFhXKyYQLzQWqoP5vErBjjeZTLI6XGM2Gnp9p4gJ7oS7fXsvg3XxqPatRS5tRvtfjoAmWroiIX2Ib30xt02b/yIv5WyEPqHQZ3HEPQUflmtw4z2
+X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
+X-Microsoft-Antispam-PRVS: <DM6PR02MB4458FA4E565085E4F97FBAE4C29A0@DM6PR02MB4458.namprd02.prod.outlook.com>
+X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB4458;
+ 4:af9HSEl6E7sdDwHHS4QYAJbq7DH3Sbqx54LNJ5941e9dg1Pz+wM4GDh5tcYXnL+AoNmp00lsPh8aUAzFbtj216a7iv/PkQflsf/OHT2GO3Kv5n1QBMR8TUXn2xYny7RWvuG+nvmwQB3/397hIGkGUmtAxToT2zLR19wvBG7vQVqSvd2Ds8je7s0xqSPI41JXppMbcCOnH+QWNKXljooStQqF1G8LGvpQxX/FmF8fWqlI/qUHGNUsfaLBANGt5VUy8z+3LjWD1ACiksk/bHTB52T1DeZgLQXOkELfM01Us0rFQKJ3DuJClGftaCor59QG
+X-Forefront-PRVS: 0927AA37C7
+X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; DM6PR02MB4458;
+ 23:CLhQLNhe1xevD4QcUlLjbQXS5GMxVj1bjMX4B7rAy?=
+ =?us-ascii?Q?0/10jdwNWv/t43oHXXo3GtD6FQWW+k4HqNiBZd4K/KGiuN+BOaKihE23qg9v?=
+ =?us-ascii?Q?+jcicud3+7bovV0/8c0tkD1E+XeDZFygIBa6fNqLcHNiVBhMFbpENXWg/8Fr?=
+ =?us-ascii?Q?ZCe/yv1feDoCtbbqPVwiFvoR2c34hl8rGr2bfO0vaNnTamqTkgB9DsDR0z8E?=
+ =?us-ascii?Q?4L/8wlg5ujUFXqGDNNw0GDoq5ir+krnep/YUOqArpAPhuPjN+JEzl6qroTn9?=
+ =?us-ascii?Q?SGuHwasN+dr7V49xnAg6qXCTFlrx9/G1NZGAmVvlFDTPbndRIhmesSTNSmqM?=
+ =?us-ascii?Q?MBJ2w/9Gwme3cLcebtphFfWuncRhGVoN+4y+Zzqb+Yz0isrEXY1YoJPJJ1EE?=
+ =?us-ascii?Q?ghY4q+AOuesgJK2igpal8L+MVIl1ULW55S+qsxWSPD2S5k0tdCRyAkPjCHOG?=
+ =?us-ascii?Q?pDVbXKBXA2TZgWQHM1fRgunjxSxwu5jdqibZORG/0BWZAIVfPRKqkIj5T1rU?=
+ =?us-ascii?Q?SAyjkE/B0bw2O+PtaBkPKlPQ8GaHZuiFPxr765ZPc2GZRnE1ClU8rroXlYvf?=
+ =?us-ascii?Q?w0pSnZWg3zebtssSpSdwIdd7LhLYVFw6wgLyyyIiz89MYa/QGIHDsApIV75y?=
+ =?us-ascii?Q?6M7/Da+qj37yaiQCvgLd4Tym+452KLDmeisYWu5sxd/Nwu2stvo3iRjaRrGB?=
+ =?us-ascii?Q?Dza/rjSssYkYxYZSCf/1LqThsDwG5CMXf4bQ7hIgt/hGlKQcKdGElgVv3Ses?=
+ =?us-ascii?Q?bkcIsB/UubTyjyehPYRJHwN+3pJ1/K5qyS3ROC0n9aWjJDxfsWP86v/rqwWw?=
+ =?us-ascii?Q?Vpjy/yQyEmq/2KCv016IGMOxUX46T3pk+G3KQ4lYAdLPqH6u/KBjpMDaxzNR?=
+ =?us-ascii?Q?yz7MRpYMyM+GVWg5fwm5UbdXENPcyoT2+gFOvvekBAyFenZF1fK02Fk5S0Iv?=
+ =?us-ascii?Q?CdP/8iO4Kq4aLkBixTVXfl8O2I/BtTomKLtl6vtvo2fOd+x2LG2k6ulpxzut?=
+ =?us-ascii?Q?QDMFVTP9dRSn4AyzijmQBRccpPmwofm8K1NMfLPT5NNQm9V8PzFA6vn2TUug?=
+ =?us-ascii?Q?I0lkJPGRNdh0WsWY1LYn6fyCaHIChJkXFmaPkiaK0Q81WF4dwDYS+slXy+wK?=
+ =?us-ascii?Q?v4RWWFuD8MOUO+c8Ag5HGKmfCOnT9hvfRSikXFlXuRs6btan4pqxg=3D=3D?=
+X-MS-Exchange-SenderADCheck: 1
+X-Microsoft-Antispam-Message-Info: jmjq+zX4QZq5i6jOXPmVvjgg/nQbMe/VmbH7HJ/Vkt4B9N1ZaoUFNkl2pFB2UCOGj5or1ni+l4kEAeaCOwq9eBBvwT+Y3VaLYt9ms28vDL4x1P5DFYVsDE94pNEhCKNM59GHFMX40fP56gqCUCrkwZord9BWzq+k/wc4hHmMXdjHYFsDZ/d6PQDKjIninx0ZCHF9ZzQAKRIV9u6WYxiO7yLpetgV5p8jVmndzLNwMg7DA5n5kPsv6nyeppEOBhdRWhU185NXBFSmGH7PVYAgwTy3sfbVdhfs+P7R4HE18LoayDeZf8bnLu80RumgPvFMJMC4yaPO9Rd8bDStwHomJTG1eDoHgirfna1FJJasT2wrjQlEAkHqazQMtBoy8qNoYiKFLJ720jGdpd6zS36ZrEmFpfNQ688jUOuP0oXZyGY=
+X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB4458;
+ 6:fPmrrE3bQUslDhXMt0Wjs1e+YQ0Q4RKQhwFeU7jx29gYny+xev6YDUjslyknfWccu3jY+rEmDB/iKIJPIE/mXRSB5bmWxJrcYN31SBfsMr16iKstHTNMNTaF+tnhKxVPavUcY4PgB3aGpZ91GxwrihfypRMUNNniKqdAOK1I41vyPpBEMceuEAg1P23TU/7oQtTTfBS9ifBDWRNc4b2kaVNsWsumJsLnQxX64GkBzs3/98YY9mVwWrmltLcDPgQEaHAFU7u1ny2g5PzkpK0E5yZxoSv6QLPFK+jwadhqynZaXHLn/GLho+AFdXfhjkmQT+18MKnZrqRsA37H43TsNek8tr2K1ULm5Rf0RbRIANVqgKVcX9zETXWLT/rAZuRGfjuqslntCB6lBUuMRKjpK9uPgpL+YdHe2ByNEqQs1Fe/7Ymu3lbYKXcQSNrDJc0vZFUgBobJhI4Xf17zcX8XMA==;
+ 5:RVR6cc/o3ZSHtebyctGn/YwZYFn9cemOaGyWIvrU3A01tZyP/wbMdrEL9VsXvCmT+NB4I3Q664M71JXrDH4VfG3+/XGLmM2bczQuBUicOyDseN9EhadMV9sSAwG8Gr/F8S5G6oPsgCfo1qhhYdbMmcm/ipGrc2TxOW3OSiQRnX71jFLa7AqutYtrDSXpzhfSiwY+YAW0adGH8Z3hd6kNWg==;
+ 7:t88Bs7Y/y35Sc6TzyWt6hNRs2gZHfo2u4hvPy7SpihYKEblpAvkWKrNFvtC++5dFiGwJqqi2eP322586T5+dn4pFj99DMXeGt7qjn2eEah7LV2SWMcQGhYNBlj4Fukp/1awSEVLMr3zMxR5pxqUzUQ==
+SpamDiagnosticOutput: 1:99
+SpamDiagnosticMetadata: NSPM
+X-OriginatorOrg: xilinx.com
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 24 Jan 2019 07:46:28.1555 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: f093da17-0fe7-4d5b-0d3a-08d681d00e06
+X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
+ Helo=[xsj-pvapsmtpgw01]
+X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM6PR02MB4458
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190123_231512_689882_0E0D2B8A 
-X-CRM114-Status: GOOD (  21.38  )
+X-CRM114-CacheID: sfid-20190123_234633_855720_1DE733B4 
+X-CRM114-Status: UNSURE (   9.90  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,815 +176,257 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- srv_wsdupstream@mediatek.com, linux-mediatek@lists.infradead.org,
- Shun-Chih Yu <shun-chih.yu@mediatek.com>, dmaengine@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Shun-Chih Yu <shun-chih.yu@mediatek.com>
+This Patch Adds reset API's to support release, assert
+and status functionalities by using firmware interface.
 
-MediaTek Command-Queue DMA controller (CQDMA) on MT6765 SoC is dedicated
-to memory-to-memory transfer through queue based descriptor management.
-
-There are only 3 physical channels inside CQDMA, while the driver is
-extended to support 32 virtual channels for multiple dma users to issue
-dma requests onto the CQDMA simultaneously.
-
-Signed-off-by: Shun-Chih Yu <shun-chih.yu@mediatek.com>
+Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
 ---
- drivers/dma/mediatek/Kconfig     |   12 +
- drivers/dma/mediatek/Makefile    |    1 +
- drivers/dma/mediatek/mtk-cqdma.c |  748 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 761 insertions(+)
- create mode 100644 drivers/dma/mediatek/mtk-cqdma.c
+Changes for v3:
+		-Modified the reset start and end macro
+		 values as suggested by Vesa.
 
-diff --git a/drivers/dma/mediatek/Kconfig b/drivers/dma/mediatek/Kconfig
-index 27bac0b..4a1582d 100644
---- a/drivers/dma/mediatek/Kconfig
-+++ b/drivers/dma/mediatek/Kconfig
-@@ -11,3 +11,15 @@ config MTK_HSDMA
- 	  This controller provides the channels which is dedicated to
- 	  memory-to-memory transfer to offload from CPU through ring-
- 	  based descriptor management.
-+
-+config MTK_CQDMA
-+	tristate "MediaTek Command-Queue DMA controller support"
-+	depends on ARCH_MEDIATEK || COMPILE_TEST
-+	select DMA_ENGINE
-+	select DMA_VIRTUAL_CHANNELS
-+	help
-+	  Enable support for Command-Queue DMA controller on MediaTek
-+	  SoCs.
-+
-+	  This controller provides the channels which is dedicated to
-+	  memory-to-memory transfer to offload from CPU.
-diff --git a/drivers/dma/mediatek/Makefile b/drivers/dma/mediatek/Makefile
-index 6e778f8..41bb381 100644
---- a/drivers/dma/mediatek/Makefile
-+++ b/drivers/dma/mediatek/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_MTK_HSDMA) += mtk-hsdma.o
-+obj-$(CONFIG_MTK_CQDMA) += mtk-cqdma.o
-diff --git a/drivers/dma/mediatek/mtk-cqdma.c b/drivers/dma/mediatek/mtk-cqdma.c
-new file mode 100644
-index 0000000..0009260
---- /dev/null
-+++ b/drivers/dma/mediatek/mtk-cqdma.c
-@@ -0,0 +1,748 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018-2019 MediaTek Inc.
-+
-+/*
-+ * Driver for MediaTek Command-Queue DMA Controller
+Changes for v2:
+		-None.
+
+Changes for v1:
+		-None.
+
+Changes for RFC-V3:
+		-None.
+
+Changes for RFC-V2:
+		-New patch.
+
+ drivers/firmware/xilinx/zynqmp.c     |  40 ++++++++
+ include/linux/firmware/xlnx-zynqmp.h | 136 +++++++++++++++++++++++++++
+ 2 files changed, 176 insertions(+)
+
+diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
+index 9a1c72a9280f..70b50377ae5f 100644
+--- a/drivers/firmware/xilinx/zynqmp.c
++++ b/drivers/firmware/xilinx/zynqmp.c
+@@ -469,6 +469,44 @@ static int zynqmp_pm_ioctl(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2,
+ 				   arg1, arg2, out);
+ }
+ 
++/**
++ * zynqmp_pm_reset_assert - Request setting of reset (1 - assert, 0 - release)
++ * @reset:		Reset to be configured
++ * @assert_flag:	Flag stating should reset be asserted (1) or
++ *			released (0)
 + *
-+ * Author: Shun-Chih Yu <shun-chih.yu@mediatek.com>
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_reset_assert(const enum zynqmp_pm_reset reset,
++				  const enum zynqmp_pm_reset_action assert_flag)
++{
++	return zynqmp_pm_invoke_fn(PM_RESET_ASSERT, reset, assert_flag,
++				   0, 0, NULL);
++}
++
++/**
++ * zynqmp_pm_reset_get_status - Get status of the reset
++ * @reset:      Reset whose status should be returned
++ * @status:     Returned status
 + *
++ * Return: Returns status, either success or error+reason
 + */
-+
-+#include <linux/bitops.h>
-+#include <linux/clk.h>
-+#include <linux/dmaengine.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/err.h>
-+#include <linux/iopoll.h>
-+#include <linux/interrupt.h>
-+#include <linux/list.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_dma.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/preempt.h>
-+#include <linux/refcount.h>
-+#include <linux/slab.h>
-+
-+#include "../virt-dma.h"
-+
-+#define MTK_CQDMA_USEC_POLL		10
-+#define MTK_CQDMA_TIMEOUT_POLL		1000
-+#define MTK_CQDMA_DMA_BUSWIDTHS		BIT(DMA_SLAVE_BUSWIDTH_4_BYTES)
-+#define MTK_CQDMA_ALIGN_SIZE		1
-+
-+/* The default number of virtual channel */
-+#define MTK_CQDMA_NR_VCHANS		32
-+
-+/* The default number of physical channel */
-+#define MTK_CQDMA_NR_PCHANS		3
-+
-+/* Registers for underlying dma manipulation */
-+#define MTK_CQDMA_INT_FLAG		0x0
-+#define MTK_CQDMA_INT_EN		0x4
-+#define MTK_CQDMA_EN			0x8
-+#define MTK_CQDMA_RESET			0xc
-+#define MTK_CQDMA_FLUSH			0x14
-+#define MTK_CQDMA_SRC			0x1c
-+#define MTK_CQDMA_DST			0x20
-+#define MTK_CQDMA_LEN1			0x24
-+#define MTK_CQDMA_SRC2			0x60
-+#define MTK_CQDMA_DST2			0x64
-+
-+/* Registers setting */
-+#define MTK_CQDMA_EN_BIT		BIT(0)
-+#define MTK_CQDMA_INT_FLAG_BIT		BIT(0)
-+#define MTK_CQDMA_INT_EN_BIT		BIT(0)
-+#define MTK_CQDMA_FLUSH_BIT		BIT(0)
-+
-+#define MTK_CQDMA_WARM_RST_BIT		BIT(0)
-+#define MTK_CQDMA_HARD_RST_BIT		BIT(1)
-+
-+#define MTK_CQDMA_MAX_LEN		GENMASK(27, 0)
-+#define MTK_CQDMA_ADDR_LIMIT		GENMASK(31, 0)
-+#define MTK_CQDMA_ADDR2_SHFIT		(32)
-+
-+/**
-+ * struct mtk_cqdma_vdesc - The struct holding info describing virtual
-+ *                         descriptor (CVD)
-+ * @vd:                    An instance for struct virt_dma_desc
-+ * @len:                   The total data size device wants to move
-+ * @dest:                  The destination address device wants to move to
-+ * @src:                   The source address device wants to move from
-+ * @ch:                    The pointer to the corresponding dma channel
-+ */
-+struct mtk_cqdma_vdesc {
-+	struct virt_dma_desc vd;
-+	size_t len;
-+	dma_addr_t dest;
-+	dma_addr_t src;
-+	struct dma_chan *ch;
-+};
-+
-+/**
-+ * struct mtk_cqdma_pchan - The struct holding info describing physical
-+ *                         channel (PC)
-+ * @active_vdesc:          Pointer to the CVD which is under hardware processing
-+ * @base:                  The mapped register I/O base of this PC
-+ * @irq:                   The IRQ that this PC are using
-+ * @refcnt:                Track how many VCs are using this PC
-+ * @lock:                  Lock protect agaisting multiple VCs access PC
-+ */
-+struct mtk_cqdma_pchan {
-+	struct mtk_cqdma_vdesc *active_vdesc;
-+	void __iomem *base;
-+	u32 irq;
-+	refcount_t refcnt;
-+	spinlock_t lock;
-+};
-+
-+/**
-+ * struct mtk_cqdma_vchan - The struct holding info describing virtual
-+ *                         channel (VC)
-+ * @vc:                    An instance for struct virt_dma_chan
-+ * @pc:                    The pointer to the underlying PC
-+ */
-+struct mtk_cqdma_vchan {
-+	struct virt_dma_chan vc;
-+	struct mtk_cqdma_pchan *pc;
-+};
-+
-+/**
-+ * struct mtk_cqdma_device - The struct holding info describing CQDMA
-+ *                          device
-+ * @ddev:                   An instance for struct dma_device
-+ * @clk:                    The clock that device internal is using
-+ * @dma_requests:           The number of VCs the device supports to
-+ * @dma_channels:           The number of PCs the device supports to
-+ * @vc:                     The pointer to all available VCs
-+ * @pc:                     The pointer to all the underlying PCs
-+ */
-+struct mtk_cqdma_device {
-+	struct dma_device ddev;
-+	struct clk *clk;
-+
-+	u32 dma_requests;
-+	u32 dma_channels;
-+	struct mtk_cqdma_vchan *vc;
-+	struct mtk_cqdma_pchan **pc;
-+};
-+
-+static struct mtk_cqdma_device *to_cqdma_dev(struct dma_chan *chan)
++static int zynqmp_pm_reset_get_status(const enum zynqmp_pm_reset reset,
++				      u32 *status)
 +{
-+	return container_of(chan->device, struct mtk_cqdma_device, ddev);
-+}
++	u32 ret_payload[PAYLOAD_ARG_CNT];
++	int ret;
 +
-+static struct mtk_cqdma_vchan *to_cqdma_vchan(struct dma_chan *chan)
-+{
-+	return container_of(chan, struct mtk_cqdma_vchan, vc.chan);
-+}
++	if (!status)
++		return -EINVAL;
 +
-+static struct mtk_cqdma_vdesc *to_cqdma_vdesc(struct virt_dma_desc *vd)
-+{
-+	return container_of(vd, struct mtk_cqdma_vdesc, vd);
-+}
-+
-+static struct device *cqdma2dev(struct mtk_cqdma_device *cqdma)
-+{
-+	return cqdma->ddev.dev;
-+}
-+
-+static u32 mtk_dma_read(struct mtk_cqdma_pchan *pc, u32 reg)
-+{
-+	return readl_relaxed(pc->base + reg);
-+}
-+
-+static void mtk_dma_write(struct mtk_cqdma_pchan *pc, u32 reg, u32 val)
-+{
-+	writel_relaxed(val, pc->base + reg);
-+}
-+
-+static void mtk_dma_rmw(struct mtk_cqdma_pchan *pc, u32 reg,
-+			u32 mask, u32 set)
-+{
-+	u32 val;
-+
-+	val = mtk_dma_read(pc, reg);
-+	val &= ~mask;
-+	val |= set;
-+	mtk_dma_write(pc, reg, val);
-+}
-+
-+static void mtk_dma_set(struct mtk_cqdma_pchan *pc, u32 reg, u32 val)
-+{
-+	mtk_dma_rmw(pc, reg, 0, val);
-+}
-+
-+static void mtk_dma_clr(struct mtk_cqdma_pchan *pc, u32 reg, u32 val)
-+{
-+	mtk_dma_rmw(pc, reg, val, 0);
-+}
-+
-+static void mtk_cqdma_vdesc_free(struct virt_dma_desc *vd)
-+{
-+	kfree(to_cqdma_vdesc(vd));
-+}
-+
-+static int mtk_cqdma_poll_engine_done(struct mtk_cqdma_pchan *pc)
-+{
-+	u32 status = 0;
-+
-+	if (!in_task())
-+		return readl_poll_timeout(pc->base + MTK_CQDMA_EN,
-+					  status,
-+					  !(status & MTK_CQDMA_EN_BIT),
-+					  MTK_CQDMA_USEC_POLL,
-+					  MTK_CQDMA_TIMEOUT_POLL);
-+	else
-+		return readl_poll_timeout_atomic(pc->base + MTK_CQDMA_EN,
-+						 status,
-+						 !(status & MTK_CQDMA_EN_BIT),
-+						 MTK_CQDMA_USEC_POLL,
-+						 MTK_CQDMA_TIMEOUT_POLL);
-+}
-+
-+static int mtk_cqdma_hard_reset(struct mtk_cqdma_pchan *pc)
-+{
-+	mtk_dma_set(pc, MTK_CQDMA_RESET, MTK_CQDMA_HARD_RST_BIT);
-+	mtk_dma_clr(pc, MTK_CQDMA_RESET, MTK_CQDMA_HARD_RST_BIT);
-+
-+	return mtk_cqdma_poll_engine_done(pc);
-+}
-+
-+static void mtk_cqdma_start(struct mtk_cqdma_pchan *pc,
-+			    struct mtk_cqdma_vdesc *cvd)
-+{
-+	/* warm reset the dma engine for the new transaction */
-+	mtk_dma_set(pc, MTK_CQDMA_RESET, MTK_CQDMA_WARM_RST_BIT);
-+	if (mtk_cqdma_poll_engine_done(pc) < 0)
-+		dev_err(cqdma2dev(to_cqdma_dev(cvd->ch)),
-+			"cqdma warm reset timeout\n");
-+
-+	/* setup the source */
-+	mtk_dma_set(pc, MTK_CQDMA_SRC, cvd->src & MTK_CQDMA_ADDR_LIMIT);
-+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-+	mtk_dma_set(pc, MTK_CQDMA_SRC2, cvd->src >> MTK_CQDMA_ADDR2_SHFIT);
-+#else
-+	mtk_dma_set(pc, MTK_CQDMA_SRC2, 0);
-+#endif
-+
-+	/* setup the destination */
-+	mtk_dma_set(pc, MTK_CQDMA_DST, cvd->dest & MTK_CQDMA_ADDR_LIMIT);
-+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-+	mtk_dma_set(pc, MTK_CQDMA_DST2, cvd->dest >> MTK_CQDMA_ADDR2_SHFIT);
-+#else
-+	mtk_dma_set(pc, MTK_CQDMA_DST2, 0);
-+#endif
-+
-+	/* setup the length */
-+	mtk_dma_set(pc, MTK_CQDMA_LEN1, (cvd->len < MTK_CQDMA_MAX_LEN) ?
-+		    cvd->len : MTK_CQDMA_MAX_LEN);
-+
-+	/* start dma engine */
-+	mtk_dma_set(pc, MTK_CQDMA_EN, MTK_CQDMA_EN_BIT);
-+}
-+
-+static void mtk_cqdma_issue_vchan_pending(struct mtk_cqdma_vchan *cvc)
-+{
-+	struct virt_dma_desc *vd;
-+	struct mtk_cqdma_pchan *pc = cvc->pc;
-+
-+	lockdep_assert_held(&cvc->vc.lock);
-+	lockdep_assert_held(&pc->lock);
-+
-+	vd = vchan_next_desc(&cvc->vc);
-+
-+	if (vd && !pc->active_vdesc) {
-+		pc->active_vdesc = to_cqdma_vdesc(vd);
-+		mtk_cqdma_start(pc, pc->active_vdesc);
-+	}
-+}
-+
-+/*
-+ * return true if this VC is active,
-+ * meaning that there are VDs under processing by the PC
-+ */
-+static bool mtk_cqdma_is_vchan_active(struct mtk_cqdma_vchan *cvc)
-+{
-+	return (!cvc->pc->active_vdesc) ? false :
-+	       (cvc == to_cqdma_vchan(cvc->pc->active_vdesc->ch));
-+}
-+
-+static void mtk_cqdma_complete_vdesc(struct mtk_cqdma_pchan *pc)
-+{
-+	struct mtk_cqdma_vchan *cvc;
-+	struct mtk_cqdma_vdesc *cvd;
-+	struct virt_dma_desc *vd;
-+	size_t tlen;
-+
-+	cvd = pc->active_vdesc;
-+	cvc = to_cqdma_vchan(cvd->ch);
-+
-+	tlen = (cvd->len < MTK_CQDMA_MAX_LEN) ? cvd->len : MTK_CQDMA_MAX_LEN;
-+	cvd->len -= tlen;
-+	cvd->src += tlen;
-+	cvd->dest += tlen;
-+
-+	spin_lock(&cvc->vc.lock);
-+
-+	/* check whether the VD completed */
-+	if (!cvd->len) {
-+		/* delete VD from desc_issued */
-+		list_del(&cvd->vd.node);
-+
-+		/* add the VD into list desc_completed */
-+		vchan_cookie_complete(&cvd->vd);
-+
-+		/* get the next active VD */
-+		vd = vchan_next_desc(&cvc->vc);
-+		pc->active_vdesc = (!vd) ? NULL : to_cqdma_vdesc(vd);
-+	}
-+
-+	/* start the next transaction */
-+	if (pc->active_vdesc)
-+		mtk_cqdma_start(pc, pc->active_vdesc);
-+
-+	spin_unlock(&cvc->vc.lock);
-+}
-+
-+static irqreturn_t mtk_cqdma_irq(int irq, void *devid)
-+{
-+	struct mtk_cqdma_device *cqdma = devid;
-+	irqreturn_t ret = IRQ_NONE;
-+	u32 i;
-+
-+	/* clear interrupt flags for each PC */
-+	for (i = 0; i < cqdma->dma_channels; ++i) {
-+		spin_lock(&cqdma->pc[i]->lock);
-+		if (mtk_dma_read(cqdma->pc[i],
-+				 MTK_CQDMA_INT_FLAG) & MTK_CQDMA_INT_FLAG_BIT) {
-+			/* clear interrupt */
-+			mtk_dma_clr(cqdma->pc[i], MTK_CQDMA_INT_FLAG,
-+				    MTK_CQDMA_INT_FLAG_BIT);
-+
-+			mtk_cqdma_complete_vdesc(cqdma->pc[i]);
-+
-+			ret = IRQ_HANDLED;
-+		}
-+		spin_unlock(&cqdma->pc[i]->lock);
-+	}
++	ret = zynqmp_pm_invoke_fn(PM_RESET_GET_STATUS, reset, 0,
++				  0, 0, ret_payload);
++	*status = ret_payload[1];
 +
 +	return ret;
 +}
 +
-+static enum dma_status mtk_cqdma_tx_status(struct dma_chan *c,
-+					   dma_cookie_t cookie,
-+					   struct dma_tx_state *txstate)
-+{
-+	return dma_cookie_status(c, cookie, txstate);
-+}
-+
-+static void mtk_cqdma_issue_pending(struct dma_chan *c)
-+{
-+	struct mtk_cqdma_vchan *cvc = to_cqdma_vchan(c);
-+	unsigned long pc_flags;
-+	unsigned long vc_flags;
-+
-+	/* acquire PC's lock before VC's lock for lock dependency in ISR */
-+	spin_lock_irqsave(&cvc->pc->lock, pc_flags);
-+	spin_lock_irqsave(&cvc->vc.lock, vc_flags);
-+
-+	if (vchan_issue_pending(&cvc->vc))
-+		mtk_cqdma_issue_vchan_pending(cvc);
-+
-+	spin_unlock_irqrestore(&cvc->vc.lock, vc_flags);
-+	spin_unlock_irqrestore(&cvc->pc->lock, pc_flags);
-+}
-+
-+static struct dma_async_tx_descriptor *
-+mtk_cqdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest,
-+			  dma_addr_t src, size_t len, unsigned long flags)
-+{
-+	struct mtk_cqdma_vdesc *cvd;
-+
-+	cvd = kzalloc(sizeof(*cvd), GFP_NOWAIT);
-+	if (!cvd)
-+		return NULL;
-+
-+	/* setup dma channel */
-+	cvd->ch = c;
-+
-+	/* setup sourece, destination, and length */
-+	cvd->len = len;
-+	cvd->src = src;
-+	cvd->dest = dest;
-+
-+	return vchan_tx_prep(to_virt_chan(c), &cvd->vd, flags);
-+}
-+
-+static int mtk_cqdma_terminate_all(struct dma_chan *c)
-+{
-+	struct mtk_cqdma_vchan *cvc = to_cqdma_vchan(c);
-+	struct virt_dma_chan *vc = to_virt_chan(c);
-+	unsigned long pc_flags;
-+	unsigned long vc_flags;
-+	LIST_HEAD(head);
-+
-+	do {
-+		/* acquire PC's lock first due to lock dependency in dma ISR */
-+		spin_lock_irqsave(&cvc->pc->lock, pc_flags);
-+		spin_lock_irqsave(&cvc->vc.lock, vc_flags);
-+
-+		/* wait for the VC to be inactive  */
-+		if (mtk_cqdma_is_vchan_active(cvc)) {
-+			spin_unlock_irqrestore(&cvc->vc.lock, vc_flags);
-+			spin_unlock_irqrestore(&cvc->pc->lock, pc_flags);
-+			continue;
-+		}
-+
-+		/* get VDs from lists */
-+		vchan_get_all_descriptors(vc, &head);
-+
-+		/* free all the VDs */
-+		vchan_dma_desc_free_list(vc, &head);
-+
-+		spin_unlock_irqrestore(&cvc->vc.lock, vc_flags);
-+		spin_unlock_irqrestore(&cvc->pc->lock, pc_flags);
-+
-+		break;
-+	} while (1);
-+
-+	vchan_synchronize(&cvc->vc);
-+
-+	return 0;
-+}
-+
-+static int mtk_cqdma_alloc_chan_resources(struct dma_chan *c)
-+{
-+	struct mtk_cqdma_device *cqdma = to_cqdma_dev(c);
-+	struct mtk_cqdma_vchan *vc = to_cqdma_vchan(c);
-+	struct mtk_cqdma_pchan *pc = NULL;
-+	u32 i, min_refcnt = U32_MAX, refcnt;
-+	unsigned long flags;
-+
-+	/* allocate PC with the minimum refcount */
-+	for (i = 0; i < cqdma->dma_channels; ++i) {
-+		refcnt = refcount_read(&cqdma->pc[i]->refcnt);
-+		if (refcnt < min_refcnt) {
-+			pc = cqdma->pc[i];
-+			min_refcnt = refcnt;
-+		}
-+	}
-+
-+	if (!pc)
-+		return -ENOSPC;
-+
-+	spin_lock_irqsave(&pc->lock, flags);
-+
-+	if (!refcount_read(&pc->refcnt)) {
-+		/* allocate PC when the refcount is zero */
-+		mtk_cqdma_hard_reset(pc);
-+
-+		/* enable interrupt for this PC */
-+		mtk_dma_set(pc, MTK_CQDMA_INT_EN, MTK_CQDMA_INT_EN_BIT);
-+
-+		/*
-+		 * refcount_inc would complain increment on 0; use-after-free.
-+		 * Thus, we need to explicitly set it as 1 initially.
-+		 */
-+		refcount_set(&pc->refcnt, 1);
-+	} else {
-+		refcount_inc(&pc->refcnt);
-+	}
-+
-+	spin_unlock_irqrestore(&pc->lock, flags);
-+
-+	vc->pc = pc;
-+
-+	return 0;
-+}
-+
-+static void mtk_cqdma_free_chan_resources(struct dma_chan *c)
-+{
-+	struct mtk_cqdma_vchan *cvc = to_cqdma_vchan(c);
-+	unsigned long flags;
-+
-+	/* free all descriptors in all lists on the VC */
-+	mtk_cqdma_terminate_all(c);
-+
-+	spin_lock_irqsave(&cvc->pc->lock, flags);
-+
-+	/* PC is not freed until there is no VC mapped to it */
-+	if (refcount_dec_and_test(&cvc->pc->refcnt)) {
-+		/* start the flush operation and stop the engine */
-+		mtk_dma_set(cvc->pc, MTK_CQDMA_FLUSH, MTK_CQDMA_FLUSH_BIT);
-+
-+		/* wait for the completion of flush operation */
-+		if (mtk_cqdma_poll_engine_done(cvc->pc) < 0)
-+			dev_err(cqdma2dev(to_cqdma_dev(c)),
-+				"cqdma flush timeout\n");
-+
-+		/* clear the flush bit and interrupt flag */
-+		mtk_dma_clr(cvc->pc, MTK_CQDMA_FLUSH, MTK_CQDMA_FLUSH_BIT);
-+		mtk_dma_clr(cvc->pc, MTK_CQDMA_INT_FLAG,
-+			    MTK_CQDMA_INT_FLAG_BIT);
-+
-+		/* disable interrupt for this PC */
-+		mtk_dma_clr(cvc->pc, MTK_CQDMA_INT_EN, MTK_CQDMA_INT_EN_BIT);
-+	}
-+
-+	spin_unlock_irqrestore(&cvc->pc->lock, flags);
-+}
-+
-+static int mtk_cqdma_hw_init(struct mtk_cqdma_device *cqdma)
-+{
-+	unsigned long flags;
-+	int err;
-+	u32 i;
-+
-+	pm_runtime_enable(cqdma2dev(cqdma));
-+	pm_runtime_get_sync(cqdma2dev(cqdma));
-+
-+	err = clk_prepare_enable(cqdma->clk);
-+
-+	if (err) {
-+		pm_runtime_put_sync(cqdma2dev(cqdma));
-+		pm_runtime_disable(cqdma2dev(cqdma));
-+		return err;
-+	}
-+
-+	/* reset all PCs */
-+	for (i = 0; i < cqdma->dma_channels; ++i) {
-+		spin_lock_irqsave(&cqdma->pc[i]->lock, flags);
-+		if (mtk_cqdma_hard_reset(cqdma->pc[i]) < 0) {
-+			dev_err(cqdma2dev(cqdma), "cqdma hard reset timeout\n");
-+			spin_unlock_irqrestore(&cqdma->pc[i]->lock, flags);
-+
-+			clk_disable_unprepare(cqdma->clk);
-+			pm_runtime_put_sync(cqdma2dev(cqdma));
-+			pm_runtime_disable(cqdma2dev(cqdma));
-+			return -EINVAL;
-+		}
-+		spin_unlock_irqrestore(&cqdma->pc[i]->lock, flags);
-+	}
-+
-+	return 0;
-+}
-+
-+static void mtk_cqdma_hw_deinit(struct mtk_cqdma_device *cqdma)
-+{
-+	unsigned long flags;
-+	u32 i;
-+
-+	/* reset all PCs */
-+	for (i = 0; i < cqdma->dma_channels; ++i) {
-+		spin_lock_irqsave(&cqdma->pc[i]->lock, flags);
-+		if (mtk_cqdma_hard_reset(cqdma->pc[i]) < 0)
-+			dev_err(cqdma2dev(cqdma), "cqdma hard reset timeout\n");
-+		spin_unlock_irqrestore(&cqdma->pc[i]->lock, flags);
-+	}
-+
-+	clk_disable_unprepare(cqdma->clk);
-+
-+	pm_runtime_put_sync(cqdma2dev(cqdma));
-+	pm_runtime_disable(cqdma2dev(cqdma));
-+}
-+
-+static const struct of_device_id mtk_cqdma_match[] = {
-+	{ .compatible = "mediatek,mt6765-cqdma" },
-+	{ /* sentinel */ }
+ static const struct zynqmp_eemi_ops eemi_ops = {
+ 	.get_api_version = zynqmp_pm_get_api_version,
+ 	.query_data = zynqmp_pm_query_data,
+@@ -482,6 +520,8 @@ static const struct zynqmp_eemi_ops eemi_ops = {
+ 	.clock_setparent = zynqmp_pm_clock_setparent,
+ 	.clock_getparent = zynqmp_pm_clock_getparent,
+ 	.ioctl = zynqmp_pm_ioctl,
++	.reset_assert = zynqmp_pm_reset_assert,
++	.reset_get_status = zynqmp_pm_reset_get_status,
+ };
+ 
+ /**
+diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
+index 3c3c28eff56a..07c587a0b06e 100644
+--- a/include/linux/firmware/xlnx-zynqmp.h
++++ b/include/linux/firmware/xlnx-zynqmp.h
+@@ -34,6 +34,8 @@
+ 
+ enum pm_api_id {
+ 	PM_GET_API_VERSION = 1,
++	PM_RESET_ASSERT = 17,
++	PM_RESET_GET_STATUS,
+ 	PM_IOCTL = 34,
+ 	PM_QUERY_DATA,
+ 	PM_CLOCK_ENABLE,
+@@ -75,6 +77,137 @@ enum pm_query_id {
+ 	PM_QID_CLOCK_GET_NUM_CLOCKS = 12,
+ };
+ 
++enum zynqmp_pm_reset_action {
++	PM_RESET_ACTION_RELEASE,
++	PM_RESET_ACTION_ASSERT,
++	PM_RESET_ACTION_PULSE,
 +};
-+MODULE_DEVICE_TABLE(of, mtk_cqdma_match);
 +
-+static int mtk_cqdma_probe(struct platform_device *pdev)
-+{
-+	struct mtk_cqdma_device *cqdma;
-+	struct mtk_cqdma_vchan *vc;
-+	struct dma_device *dd;
-+	struct resource *res;
-+	int err;
-+	u32 i;
-+
-+	cqdma = devm_kzalloc(&pdev->dev, sizeof(*cqdma), GFP_KERNEL);
-+	if (!cqdma)
-+		return -ENOMEM;
-+
-+	dd = &cqdma->ddev;
-+
-+	cqdma->clk = devm_clk_get(&pdev->dev, "cqdma");
-+	if (IS_ERR(cqdma->clk)) {
-+		dev_err(&pdev->dev, "No clock for %s\n",
-+			dev_name(&pdev->dev));
-+		return PTR_ERR(cqdma->clk);
-+	}
-+
-+	dma_cap_set(DMA_MEMCPY, dd->cap_mask);
-+
-+	dd->copy_align = MTK_CQDMA_ALIGN_SIZE;
-+	dd->device_alloc_chan_resources = mtk_cqdma_alloc_chan_resources;
-+	dd->device_free_chan_resources = mtk_cqdma_free_chan_resources;
-+	dd->device_tx_status = mtk_cqdma_tx_status;
-+	dd->device_issue_pending = mtk_cqdma_issue_pending;
-+	dd->device_prep_dma_memcpy = mtk_cqdma_prep_dma_memcpy;
-+	dd->device_terminate_all = mtk_cqdma_terminate_all;
-+	dd->src_addr_widths = MTK_CQDMA_DMA_BUSWIDTHS;
-+	dd->dst_addr_widths = MTK_CQDMA_DMA_BUSWIDTHS;
-+	dd->directions = BIT(DMA_MEM_TO_MEM);
-+	dd->residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
-+	dd->dev = &pdev->dev;
-+	INIT_LIST_HEAD(&dd->channels);
-+
-+	if (pdev->dev.of_node && of_property_read_u32(pdev->dev.of_node,
-+						      "dma-requests",
-+						      &cqdma->dma_requests)) {
-+		dev_dbg(&pdev->dev,
-+			"Using %u as missing dma-requests property\n",
-+			MTK_CQDMA_NR_VCHANS);
-+
-+		cqdma->dma_requests = MTK_CQDMA_NR_VCHANS;
-+	}
-+
-+	if (pdev->dev.of_node && of_property_read_u32(pdev->dev.of_node,
-+						      "dma-channels",
-+						      &cqdma->dma_channels)) {
-+		dev_dbg(&pdev->dev,
-+			"Using %u as missing dma-channels property\n",
-+			MTK_CQDMA_NR_PCHANS);
-+
-+		cqdma->dma_channels = MTK_CQDMA_NR_PCHANS;
-+	}
-+
-+	cqdma->pc = devm_kcalloc(&pdev->dev, cqdma->dma_channels,
-+				 sizeof(*cqdma->pc), GFP_KERNEL);
-+	if (!cqdma->pc)
-+		return -ENOMEM;
-+
-+	/* initialization for PCs */
-+	for (i = 0; i < cqdma->dma_channels; ++i) {
-+		cqdma->pc[i] = devm_kcalloc(&pdev->dev, 1,
-+					    sizeof(**cqdma->pc), GFP_KERNEL);
-+		if (!cqdma->pc[i])
-+			return -ENOMEM;
-+
-+		cqdma->pc[i]->active_vdesc = NULL;
-+		spin_lock_init(&cqdma->pc[i]->lock);
-+		refcount_set(&cqdma->pc[i]->refcnt, 0);
-+
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
-+		if (!res) {
-+			dev_err(&pdev->dev, "No mem resource for %s\n",
-+				dev_name(&pdev->dev));
-+			return -EINVAL;
-+		}
-+
-+		cqdma->pc[i]->base = devm_ioremap_resource(&pdev->dev, res);
-+		if (IS_ERR(cqdma->pc[i]->base))
-+			return PTR_ERR(cqdma->pc[i]->base);
-+
-+		/* allocate IRQ resource */
-+		res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
-+		if (!res) {
-+			dev_err(&pdev->dev, "No irq resource for %s\n",
-+				dev_name(&pdev->dev));
-+			return -EINVAL;
-+		}
-+		cqdma->pc[i]->irq = res->start;
-+
-+		err = devm_request_irq(&pdev->dev, cqdma->pc[i]->irq,
-+				       mtk_cqdma_irq, 0, dev_name(&pdev->dev),
-+				       cqdma);
-+		if (err) {
-+			dev_err(&pdev->dev,
-+				"request_irq failed with err %d\n", err);
-+			return -EINVAL;
-+		}
-+	}
-+
-+	/* allocate resource for VCs */
-+	cqdma->vc = devm_kcalloc(&pdev->dev, cqdma->dma_requests,
-+				 sizeof(*cqdma->vc), GFP_KERNEL);
-+	if (!cqdma->vc)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < cqdma->dma_requests; i++) {
-+		vc = &cqdma->vc[i];
-+		vc->vc.desc_free = mtk_cqdma_vdesc_free;
-+		vchan_init(&vc->vc, dd);
-+	}
-+
-+	err = dma_async_device_register(dd);
-+	if (err)
-+		return err;
-+
-+	err = of_dma_controller_register(pdev->dev.of_node,
-+					 of_dma_xlate_by_chan_id, cqdma);
-+	if (err) {
-+		dev_err(&pdev->dev,
-+			"MediaTek CQDMA OF registration failed %d\n", err);
-+		goto err_unregister;
-+	}
-+
-+	err = mtk_cqdma_hw_init(cqdma);
-+	if (err) {
-+		dev_err(&pdev->dev,
-+			"MediaTek CQDMA HW initialization failed %d\n", err);
-+		goto err_unregister;
-+	}
-+
-+	platform_set_drvdata(pdev, cqdma);
-+
-+	dev_dbg(&pdev->dev, "MediaTek CQDMA driver registered\n");
-+
-+	return 0;
-+
-+err_unregister:
-+	dma_async_device_unregister(dd);
-+
-+	return err;
-+}
-+
-+static int mtk_cqdma_remove(struct platform_device *pdev)
-+{
-+	struct mtk_cqdma_device *cqdma = platform_get_drvdata(pdev);
-+	struct mtk_cqdma_vchan *vc;
-+	unsigned long flags;
-+	int i;
-+
-+	/* kill VC task */
-+	for (i = 0; i < cqdma->dma_requests; i++) {
-+		vc = &cqdma->vc[i];
-+
-+		list_del(&vc->vc.chan.device_node);
-+		tasklet_kill(&vc->vc.task);
-+	}
-+
-+	/* disable interrupt */
-+	for (i = 0; i < cqdma->dma_channels; i++) {
-+		spin_lock_irqsave(&cqdma->pc[i]->lock, flags);
-+		mtk_dma_clr(cqdma->pc[i], MTK_CQDMA_INT_EN,
-+			    MTK_CQDMA_INT_EN_BIT);
-+		spin_unlock_irqrestore(&cqdma->pc[i]->lock, flags);
-+
-+		/* Waits for any pending IRQ handlers to complete */
-+		synchronize_irq(cqdma->pc[i]->irq);
-+	}
-+
-+	/* disable hardware */
-+	mtk_cqdma_hw_deinit(cqdma);
-+
-+	dma_async_device_unregister(&cqdma->ddev);
-+	of_dma_controller_free(pdev->dev.of_node);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver mtk_cqdma_driver = {
-+	.probe = mtk_cqdma_probe,
-+	.remove = mtk_cqdma_remove,
-+	.driver = {
-+		.name           = KBUILD_MODNAME,
-+		.of_match_table = mtk_cqdma_match,
-+	},
++enum zynqmp_pm_reset {
++	ZYNQMP_PM_RESET_START = 1000,
++	ZYNQMP_PM_RESET_PCIE_CFG = ZYNQMP_PM_RESET_START,
++	ZYNQMP_PM_RESET_PCIE_BRIDGE,
++	ZYNQMP_PM_RESET_PCIE_CTRL,
++	ZYNQMP_PM_RESET_DP,
++	ZYNQMP_PM_RESET_SWDT_CRF,
++	ZYNQMP_PM_RESET_AFI_FM5,
++	ZYNQMP_PM_RESET_AFI_FM4,
++	ZYNQMP_PM_RESET_AFI_FM3,
++	ZYNQMP_PM_RESET_AFI_FM2,
++	ZYNQMP_PM_RESET_AFI_FM1,
++	ZYNQMP_PM_RESET_AFI_FM0,
++	ZYNQMP_PM_RESET_GDMA,
++	ZYNQMP_PM_RESET_GPU_PP1,
++	ZYNQMP_PM_RESET_GPU_PP0,
++	ZYNQMP_PM_RESET_GPU,
++	ZYNQMP_PM_RESET_GT,
++	ZYNQMP_PM_RESET_SATA,
++	ZYNQMP_PM_RESET_ACPU3_PWRON,
++	ZYNQMP_PM_RESET_ACPU2_PWRON,
++	ZYNQMP_PM_RESET_ACPU1_PWRON,
++	ZYNQMP_PM_RESET_ACPU0_PWRON,
++	ZYNQMP_PM_RESET_APU_L2,
++	ZYNQMP_PM_RESET_ACPU3,
++	ZYNQMP_PM_RESET_ACPU2,
++	ZYNQMP_PM_RESET_ACPU1,
++	ZYNQMP_PM_RESET_ACPU0,
++	ZYNQMP_PM_RESET_DDR,
++	ZYNQMP_PM_RESET_APM_FPD,
++	ZYNQMP_PM_RESET_SOFT,
++	ZYNQMP_PM_RESET_GEM0,
++	ZYNQMP_PM_RESET_GEM1,
++	ZYNQMP_PM_RESET_GEM2,
++	ZYNQMP_PM_RESET_GEM3,
++	ZYNQMP_PM_RESET_QSPI,
++	ZYNQMP_PM_RESET_UART0,
++	ZYNQMP_PM_RESET_UART1,
++	ZYNQMP_PM_RESET_SPI0,
++	ZYNQMP_PM_RESET_SPI1,
++	ZYNQMP_PM_RESET_SDIO0,
++	ZYNQMP_PM_RESET_SDIO1,
++	ZYNQMP_PM_RESET_CAN0,
++	ZYNQMP_PM_RESET_CAN1,
++	ZYNQMP_PM_RESET_I2C0,
++	ZYNQMP_PM_RESET_I2C1,
++	ZYNQMP_PM_RESET_TTC0,
++	ZYNQMP_PM_RESET_TTC1,
++	ZYNQMP_PM_RESET_TTC2,
++	ZYNQMP_PM_RESET_TTC3,
++	ZYNQMP_PM_RESET_SWDT_CRL,
++	ZYNQMP_PM_RESET_NAND,
++	ZYNQMP_PM_RESET_ADMA,
++	ZYNQMP_PM_RESET_GPIO,
++	ZYNQMP_PM_RESET_IOU_CC,
++	ZYNQMP_PM_RESET_TIMESTAMP,
++	ZYNQMP_PM_RESET_RPU_R50,
++	ZYNQMP_PM_RESET_RPU_R51,
++	ZYNQMP_PM_RESET_RPU_AMBA,
++	ZYNQMP_PM_RESET_OCM,
++	ZYNQMP_PM_RESET_RPU_PGE,
++	ZYNQMP_PM_RESET_USB0_CORERESET,
++	ZYNQMP_PM_RESET_USB1_CORERESET,
++	ZYNQMP_PM_RESET_USB0_HIBERRESET,
++	ZYNQMP_PM_RESET_USB1_HIBERRESET,
++	ZYNQMP_PM_RESET_USB0_APB,
++	ZYNQMP_PM_RESET_USB1_APB,
++	ZYNQMP_PM_RESET_IPI,
++	ZYNQMP_PM_RESET_APM_LPD,
++	ZYNQMP_PM_RESET_RTC,
++	ZYNQMP_PM_RESET_SYSMON,
++	ZYNQMP_PM_RESET_AFI_FM6,
++	ZYNQMP_PM_RESET_LPD_SWDT,
++	ZYNQMP_PM_RESET_FPD,
++	ZYNQMP_PM_RESET_RPU_DBG1,
++	ZYNQMP_PM_RESET_RPU_DBG0,
++	ZYNQMP_PM_RESET_DBG_LPD,
++	ZYNQMP_PM_RESET_DBG_FPD,
++	ZYNQMP_PM_RESET_APLL,
++	ZYNQMP_PM_RESET_DPLL,
++	ZYNQMP_PM_RESET_VPLL,
++	ZYNQMP_PM_RESET_IOPLL,
++	ZYNQMP_PM_RESET_RPLL,
++	ZYNQMP_PM_RESET_GPO3_PL_0,
++	ZYNQMP_PM_RESET_GPO3_PL_1,
++	ZYNQMP_PM_RESET_GPO3_PL_2,
++	ZYNQMP_PM_RESET_GPO3_PL_3,
++	ZYNQMP_PM_RESET_GPO3_PL_4,
++	ZYNQMP_PM_RESET_GPO3_PL_5,
++	ZYNQMP_PM_RESET_GPO3_PL_6,
++	ZYNQMP_PM_RESET_GPO3_PL_7,
++	ZYNQMP_PM_RESET_GPO3_PL_8,
++	ZYNQMP_PM_RESET_GPO3_PL_9,
++	ZYNQMP_PM_RESET_GPO3_PL_10,
++	ZYNQMP_PM_RESET_GPO3_PL_11,
++	ZYNQMP_PM_RESET_GPO3_PL_12,
++	ZYNQMP_PM_RESET_GPO3_PL_13,
++	ZYNQMP_PM_RESET_GPO3_PL_14,
++	ZYNQMP_PM_RESET_GPO3_PL_15,
++	ZYNQMP_PM_RESET_GPO3_PL_16,
++	ZYNQMP_PM_RESET_GPO3_PL_17,
++	ZYNQMP_PM_RESET_GPO3_PL_18,
++	ZYNQMP_PM_RESET_GPO3_PL_19,
++	ZYNQMP_PM_RESET_GPO3_PL_20,
++	ZYNQMP_PM_RESET_GPO3_PL_21,
++	ZYNQMP_PM_RESET_GPO3_PL_22,
++	ZYNQMP_PM_RESET_GPO3_PL_23,
++	ZYNQMP_PM_RESET_GPO3_PL_24,
++	ZYNQMP_PM_RESET_GPO3_PL_25,
++	ZYNQMP_PM_RESET_GPO3_PL_26,
++	ZYNQMP_PM_RESET_GPO3_PL_27,
++	ZYNQMP_PM_RESET_GPO3_PL_28,
++	ZYNQMP_PM_RESET_GPO3_PL_29,
++	ZYNQMP_PM_RESET_GPO3_PL_30,
++	ZYNQMP_PM_RESET_GPO3_PL_31,
++	ZYNQMP_PM_RESET_RPU_LS,
++	ZYNQMP_PM_RESET_PS_ONLY,
++	ZYNQMP_PM_RESET_PL,
++	ZYNQMP_PM_RESET_PS_PL0,
++	ZYNQMP_PM_RESET_PS_PL1,
++	ZYNQMP_PM_RESET_PS_PL2,
++	ZYNQMP_PM_RESET_PS_PL3,
++	ZYNQMP_PM_RESET_END = ZYNQMP_PM_RESET_PS_PL3
 +};
-+module_platform_driver(mtk_cqdma_driver);
 +
-+MODULE_DESCRIPTION("MediaTek CQDMA Controller Driver");
-+MODULE_AUTHOR("Shun-Chih Yu <shun-chih.yu@mediatek.com>");
-+MODULE_LICENSE("GPL v2");
+ /**
+  * struct zynqmp_pm_query_data - PM query data
+  * @qid:	query ID
+@@ -102,6 +235,9 @@ struct zynqmp_eemi_ops {
+ 	int (*clock_setparent)(u32 clock_id, u32 parent_id);
+ 	int (*clock_getparent)(u32 clock_id, u32 *parent_id);
+ 	int (*ioctl)(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2, u32 *out);
++	int (*reset_assert)(const enum zynqmp_pm_reset reset,
++			    const enum zynqmp_pm_reset_action assert_flag);
++	int (*reset_get_status)(const enum zynqmp_pm_reset reset, u32 *status);
+ };
+ 
+ #if IS_REACHABLE(CONFIG_ARCH_ZYNQMP)
 -- 
-1.7.9.5
+2.18.0
 
 
 _______________________________________________
