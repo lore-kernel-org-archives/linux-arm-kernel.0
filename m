@@ -2,81 +2,67 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 767E8C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 17:23:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2357EC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 17:39:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2F4A7218D0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 17:23:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D79DD218A6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 17:39:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="maIpvFVg";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="WWzK5ySp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F4A7218D0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tNrIRWgv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D79DD218A6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vTV9rKqkU9ojzqxWK9wbqg7OUcsuJd1gOtrNbjomlB4=; b=maIpvFVgLUMP/Y
-	iFigEmTdDcOpwUYrfbOAQJ6tUv8I2Q7nTNBYdwIYMAzCHE1HRQgeTNNRx28Y64FnTXMyku2PAn2dY
-	XVcPwWhUeT7T2ezsw0P+OyeMlAnQ4OijHcnHiYF3x2i12L6T/gWd/dFi5rkhS9S0Ktss5lrIxu820
-	W7u7TpXIBhAT8Q5lDdQ5aynrwRnzZ02tMtDsR1ahOcQlKnDTFSZOn1wQFigD0tsJOazLVb0u0Bg54
-	5vRPKR4ajIwjic8wf5NsLNyLFwNFWfvnjtsMvlTUd+wAM7tKNCuVC8DgF8sBC+AfuwTfoSPefAhsG
-	+jgitTOuFauRCi8nWoBw==;
+	List-Owner; bh=rL7pnRTzXV3QgCj3vhuW2vRmaxB0PscWrBBDAp03O1A=; b=tNrIRWgvA4dLm6
+	UCK3xY9Nrju9kyYY3inOQNr+aoPAxTNvcpjwZ9BrYw6YdfKc1gfbeE+jNL5lKo9TaqMtFyK2oYuC8
+	0Lnm1FG6hO85fX7+WZ9GMk5g7fL4lshT5a7gdD7mU9tD/SzQHKmF7f7GnsblCCvG8N3Orkxu7Phvd
+	kAWZpTlpuct13QF9HI1evhC0k+07BOhw3Cl99FZ3eqHCS6KGJM6DXuT2SU5X+9sUuuY5LUxgTASzu
+	5ZZOpm8GsDt4KjuoXe7p/X5KmCe4lvjYG1r8pRPmBEQ6JIEMWcbNp9KyOlKPclsIdhBdnN6PSeLMV
+	pSs19kOaVC9TtS6DHD7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn5Cp-000851-9s; Fri, 25 Jan 2019 17:23:51 +0000
-Received: from mail-wm1-x32b.google.com ([2a00:1450:4864:20::32b])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn5Cl-00084Y-VL
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 17:23:49 +0000
-Received: by mail-wm1-x32b.google.com with SMTP id a62so7523784wmh.4
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 25 Jan 2019 09:23:46 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=dCxzJV/7/vhu6LFecxpy/4ttxgmBiWtOwJ3/U1G05ok=;
- b=WWzK5ySpsWIKJadTFttaTp24ZXjapUxz1BP56tKo1gM7DP7KB1zRK2FvTbL+CEVzZT
- gHObqgUkVHYl5qciGJYEaoqw4DayFx0EdHT7c4dIfxzUI1i62QAF8hHDZeFn7PbUlJSM
- HXceloy6gXpmzxhZ1zG8us/kGXUcW/w+c6fuY=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=dCxzJV/7/vhu6LFecxpy/4ttxgmBiWtOwJ3/U1G05ok=;
- b=lPmCwY68TtpdGtgTC5+uRcSt7YNaFcD3knkkZRPm5/TxAUhbZuIOIfZ6UniZTX5N+A
- H41WrqVyjZQhGt6hejMeggqmQWKscGPpcfMfBxyFzJJ0KkSNyMEW2M/tQiAtko+Ph/8O
- hISrm2jVhJZouiYaCRHbncRGepJoL37jf3RA+W8vnYRRuRbLWyuPtWiqvGAH7vT6l7TF
- rgdOy3yA5EN1Ysw+BqCrsZvo57drfXLsmz6APeqdEOb8YDhZwswT28LPcJFE4JIC/mQa
- VnV2yf+DB9fCyAUF/xa0Ejb7NtzQFG3U5fCUiH+2Or6AruYmkB3ROXxhKFKOK/baWJtC
- Cvag==
-X-Gm-Message-State: AJcUukcmeLz+r3TXg/SGB9qlrrFyTQvi9a0GvUPAZJpUFAd3zY9FA5Qs
- 4tEe37iIbB3fVZS9yjXytxg9kvtAAMpuF+goPoLDRgUCYL/3Xw==
-X-Google-Smtp-Source: ALg8bN5VtfbB6x7F7grXrDN9qJsftykyxjzgRU7O4ADw4sR6henxY12Ueka6kGUm7521TUhQYOUU2rZB/5XmAw+1vqc=
-X-Received: by 2002:a1c:4683:: with SMTP id t125mr8021717wma.9.1548437025186; 
- Fri, 25 Jan 2019 09:23:45 -0800 (PST)
+	id 1gn5RT-0000jc-La; Fri, 25 Jan 2019 17:38:59 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gn5RQ-0000ix-3E
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 17:38:57 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4252DEBD;
+ Fri, 25 Jan 2019 09:38:55 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 3D8B93F5AF;
+ Fri, 25 Jan 2019 09:38:52 -0800 (PST)
+Date: Fri, 25 Jan 2019 17:38:42 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Miquel Raynal <miquel.raynal@bootlin.com>
+Subject: Re: [PATCH v3 00/15] Bring suspend to RAM support to PCIe Aardvark
+ driver
+Message-ID: <20190125173834.GA24052@e107981-ln.cambridge.arm.com>
+References: <20190108162441.5278-1-miquel.raynal@bootlin.com>
+ <20190123170509.GB1157@e107981-ln.cambridge.arm.com>
+ <20190125110530.0ff11a54@xps13>
+ <20190125124011.GA16389@e107981-ln.cambridge.arm.com>
+ <20190125135757.6518191e@xps13>
 MIME-Version: 1.0
-References: <CALAqxLX0P6P4xnv=HgQsP-Cv4dkGJhkkMRn7jy-sbzZKUa1z4w@mail.gmail.com>
- <CAKv+Gu_OrO1Spx949j9LOUONJZvsnr_XsNxE1QkERTcFxdG0bA@mail.gmail.com>
- <86o9868j68.wl-marc.zyngier@arm.com>
-In-Reply-To: <86o9868j68.wl-marc.zyngier@arm.com>
-From: John Stultz <john.stultz@linaro.org>
-Date: Fri, 25 Jan 2019 09:23:32 -0800
-Message-ID: <CALAqxLV5SsFuW+ZSwi6R3YBg5jYWLUeh=NFcc-SxQYQoJX4wyg@mail.gmail.com>
-Subject: Re: BUG: sleeping function called from invalid context at
- kernel/locking/mutex.c:908
-To: Marc Zyngier <marc.zyngier@arm.com>
+Content-Disposition: inline
+In-Reply-To: <20190125135757.6518191e@xps13>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_092348_013826_18183637 
-X-CRM114-Status: GOOD (  14.63  )
+X-CRM114-CacheID: sfid-20190125_093856_153957_51BDBD4F 
+X-CRM114-Status: GOOD (  34.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,64 +74,112 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "Suzuki K. Poulose" <Suzuki.Poulose@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, Will Deacon <Will.Deacon@arm.com>,
- Valentin Schneider <Valentin.Schneider@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
+ Antoine Tenart <antoine.tenart@bootlin.com>, linux-pci@vger.kernel.org,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>, Rob Herring <robh+dt@kernel.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Bjorn Helgaas <bhelgaas@google.com>, linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 24, 2019 at 2:05 AM Marc Zyngier <marc.zyngier@arm.com> wrote:
->
-> On Thu, 24 Jan 2019 08:10:53 +0000,
-> Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+On Fri, Jan 25, 2019 at 01:57:57PM +0100, Miquel Raynal wrote:
+> Hi Lorenzo,
+> 
+> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote on Fri, 25 Jan 2019
+> 12:40:11 +0000:
+> 
+> > On Fri, Jan 25, 2019 at 11:05:30AM +0100, Miquel Raynal wrote:
+> > > Hi Lorenzo,
+> > > 
+> > > Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote on Wed, 23 Jan 2019
+> > > 17:05:09 +0000:
+> > >   
+> > > > On Tue, Jan 08, 2019 at 05:24:25PM +0100, Miquel Raynal wrote:  
+> > > > > Hello,
+> > > > > 
+> > > > > As part of an effort to bring suspend to RAM support to Armada 3700
+> > > > > SoCs (main target: ESPRESSObin), this series handles the work around
+> > > > > the PCIe IP.
+> > > > > 
+> > > > > First, more configuration is done in the 'setup' helper as inspired
+> > > > > from the U-Boot driver. This is needed to entirely initialize the IP
+> > > > > during future resume operation (patch 1).
+> > > > > 
+> > > > > Then, reset GPIO, PHY and clock support are introduced (patch 2-4). As
+> > > > > current device trees do not provide the corresponding properties, not
+> > > > > finding one of these properties is not an error and just produces a
+> > > > > warning. However, if the property is present, an error during PHY
+> > > > > initialization will fail the probe of the driver.
+> > > > > 
+> > > > > Note: To be sure the clock will be resumed before this driver, a first
+> > > > > series adding links between clocks and consumers has been submitted,
+> > > > > see [1]. Anyway, having the clock series applied first is not needed.    
+> > > > 
+> > > > I do not understand what this means, in particular in relation
+> > > > to the blocking clock calls in the suspend/resume NOIRQ hooks.  
+> > > 
+> > > I am not sure to understand your question.
+> > > 
+> > > As there are multiple points in this sentence I will detail each of
+> > > them so please comment on the one which is bothering you:
+> > > * I am working in parallel on a series adding device links to the clock
+> > >   framework. This way when a driver consumes a clock, the clock
+> > >   provider driver will be resumed first.
+> > > * If the clock series I am talking about is applied after this one,
+> > >   there is no build issue. Of course suspending the platform may
+> > >   not work but this is a new feature so nothing will be broken.  
+> > 
+> > Suspend to RAM will be broken if the clock is suspended and no
+> > notification will happen in the NOIRQ phase, it is a new-broken-feature.
 > >
-> > On Thu, 24 Jan 2019 at 06:36, John Stultz <john.stultz@linaro.org> wrote:
-> > >
-> > > Trying to boot hikey960 with v5.0-rc3 (and Valentin's 2 recent lockdep
-> > > fixes), with lock debugging enabled, I'm seeing the BUG below.
-> > >
-> > > Wanted to see if anyone else had seen this or had ideas at what was going on.
-> > >
-> > > thanks
-> > > -john
-> > >
-> > > [    0.183376] Detected VIPT I-cache on CPU4
-> > > [    0.183388] CPU features: SANITY CHECK: Unexpected variation in
-> > > SYS_ID_AA64MMFR0_EL1. Boot CPU: 0x00000000001122, CPU4:
-> > > 0x00000000101122
-> > > [    0.183399] CPU features: Unsupported CPU feature variation detected.
-> >
-> > This means that some CPUs support 16k pages and some don't. This is
-> > hardly relevant if you are running with 4k pages, but as Suzuki
-> > pointed out (IIRC), it could be relevant for KVM, since you cannot
-> > migrate a VM using 16k pages from one CPU to the other.
->
-> I think we now have some code to present sanitised ID registers to the
-> guest. It won't prevent it from running though. I contend that life is
-> too short for caring about these systems.
->
-> >
-> > Suzuki, has there been any progress since this last came up?
-> >
-> > The output below is from a separate issue, where it seems that we are
-> > enabling a static key from atomic context, which apparently isn't
-> > supported.
-> >
-> > Marc might know more about this.
->
-> I thought that what Valentin's fix was addressing. Or was I mistaken?
+> > 
+> > > * Device links do not enforce any priority if the suspend/resume phase
+> > >   between two drivers is not the same. The PCIe driver suspends in the
+> > >   NOIRQ phase. If we want the clock driver to suspend *after* PCIe, its
+> > >   suspend/resume callbacks must be promoted to the NOIRQ phase as well
+> > >   (and this is part of another series). As of today there is
+> > >   no alternative.  
+> > 
+> > I will merge this series when it works, I have no evidence that it does
+> > given what you are writing above, if the series you mention are
+> > *necessary* for suspend-to-RAM to work they ought to be merged first.
+> 
+> I am working actively to bring A3700 SoC suspend to RAM support almost
+> from scratch. 
+> 
+> As of today I have contributed 65 patches spread in 8 series for the
+> PHY, clk, PCIe, SATA, USB, pinctrl and net subsystems. Some of them
+> have been merged, but the vast majority has not, yet.
+> 
+> I mentioned this run-time dependency because it exists for people who
+> would like to test just the PCIe IP. But S2RAM on A3700 will be a
+> new-broken-feature until all patches are merged. While there is
+> still one missing, the feature is broken. If everybody waits for
+> the other patches to be merged first, it is gonna be a long process :)
+> 
+> However, if you want to wait for the clock core series to be applied
+> first I respect this choice and I will update you when it will be the
+> case.
 
-This is something additional. I've already added Valentin's patches,
-which  addresses the separate:
-  WARNING: CPU: 4 PID: 0 at kernel/cpu.c:316 lockdep_assert_cpus_held+0x3c/0x48
-splat.
+I do not want to merge new code with known issues, it makes no sense.
 
-thanks
--john
+There are other drivers with a similar problem in the mainline, we
+ought to fix those but certainly adding more won't help in that respect.
+
+There is nothing I am saying here that goes against your work, I just
+want to have working code in the mainlike kernel, we will merge this
+series when it is ready, thanks for bearing with me.
+
+Feel free to ping me/rebase/repost when dependencies are sorted.
+
+Thanks,
+Lorenzo
 
 _______________________________________________
 linux-arm-kernel mailing list
