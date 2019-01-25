@@ -2,74 +2,88 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D0664C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 13:08:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F25FEC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 13:46:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 99AE7218DE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 13:08:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B5604218D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 13:46:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p1irBTtN";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="k8/6/kQq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 99AE7218DE
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cYmmTdtI";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="XdVEgXVe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B5604218D9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mRO6fIXdNMbTsIMmwZTMddMcyrFNJX6bjXrGvQxF9P0=; b=p1irBTtNCN1sVb
-	TtnOTuRLbDuf9i4ynYDRNHIUsbqCNDiIMGAT9JIvCF5lMBKHE/Ch7NJyEYZp4phjEO8Pib4GNyC0U
-	jEBFZC9qb6cE+qCon+19biI2tcNLIfoaY4cxFPrd07/jO/4+jvRdSrnw6/42F8TCuu/Yfh/OM1Zdp
-	f3pQdMjPWGSdgz2XzPjj7KvniLk2AU42tH/3KcTs2QplTYwTP7kHX5uN2gz5cIoDBES5oB8XyP+sD
-	lIGbC4jv7n7jQBd5S5R3vplmiznxART4Z64CQXxiPKoCMwnJp2ro4qe3S4uxVYDQCU78PjpWfa+9Q
-	h3DdKp1hmM3GBfcG229g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=FXoS3pjTDlghkIbevxO8ELpOGHfvq0xihgvTzAWM4gk=; b=cYmmTdtIggkDbLhDcxrmm7Qkv
+	1XYQFjOPLQLcY9CYyZd9Ex6bpU8UIb4dsDbcR4WJJKsKvUzvy6AxeZ7+46eFONUi8reLa2xBw6bvw
+	t4zkw4Mebk+L2qE9hiy5domCUSYnyKkEvCQvenCl+Z+jBoxnopopxhw9X1xk8mfZDjtTIGXckckN4
+	GS/0OiA1KYYCYJLuTQoLxJhrbkRFlb957i++gvYJdFgrkQYwiUPHSI/xjHhxpJzjaG/Y70MsDx/9i
+	g+I/vnfq6NnvGHrR9WBmnewR6IUg9yxt4nG4HQVZZUerV0in00NfoOPHIJ2mcVsT+WZ+1YXL2VJQf
+	W/r6QUNhw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn1Dq-0003Wo-Nc; Fri, 25 Jan 2019 13:08:38 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+	id 1gn1oP-0000Rw-IX; Fri, 25 Jan 2019 13:46:25 +0000
+Received: from mail-wm1-x335.google.com ([2a00:1450:4864:20::335])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn1Dn-00030T-CL
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 13:08:37 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=3l9KA5WA47X3fuBSEU6EOmrGqfvF82jiXonXzym/elk=; b=k8/6/kQqbWxwHV0+gTzd5zLgg
- xQ+O/kY/yw/T/SD4qfcieWsxwb+5mKcpIh/cRlMkjo+bnWhfMalqrCZf6qTib1P/LzgipAc3zl1Bm
- M8Sqo8hVqizJEKWaTCa6/ujRJoM4m8b9MIHp8KDy0HG/Fno8gzMqgacm5aPff+PpzqOU4=;
-Received: from e5254000004ec.dyn.armlinux.org.uk
- ([2001:4d48:ad52:3201:5054:ff:fe00:4ec]:50938 helo=shell.armlinux.org.uk)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gn1BV-00026v-Qn; Fri, 25 Jan 2019 13:06:13 +0000
-Received: from linux by shell.armlinux.org.uk with local (Exim 4.89)
- (envelope-from <linux@shell.armlinux.org.uk>)
- id 1gn1BV-0001hZ-4O; Fri, 25 Jan 2019 13:06:13 +0000
-Date: Fri, 25 Jan 2019 13:06:13 +0000
-From: Russell King - ARM Linux admin <linux@armlinux.org.uk>
-To: Carlo Caione <ccaione@baylibre.com>
-Subject: Re: [PATCH 0/3] at803x: Add quirk to disable SmartEEE
-Message-ID: <20190125130612.npknjuzjmny4yohg@e5254000004ec.dyn.armlinux.org.uk>
-References: <20190125125513.23656-1-ccaione@baylibre.com>
+ id 1gn1oL-0000RY-To
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 13:46:24 +0000
+Received: by mail-wm1-x335.google.com with SMTP id m1so6837334wml.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 25 Jan 2019 05:46:21 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=OXhukp/dyN3JCCSOA+snc8wagVwhPEcgOEWTq5bZfp0=;
+ b=XdVEgXVeuGYMbbOrXTawZgTlDYtkvt38l1/PBe99pfzyZMps1Pyt/Ayfbfv0gMJI4g
+ P1FPEY3MQTjFTis8mUdvG0gpubd86XSWnHdpQvgbvG0YMY6UDZ0UK1WzQHC/5kVpdir8
+ IzW2YqKLC1eP9ZYdJnvBT3f8VNcc42aPiMQ+CiBHh3OuG/INEHpzc1uOfJbiO6aUN83s
+ eUeXNVMgQxVagD4PAXZ+9S3zuLCgcl7UUIKhUZEN2MHES4OzkC6k1qVnhJLMifX7Upuj
+ 9bKLahezRlkh1xAYUOPmule220DZXXFgxdSN+vGlNQCHFiFleAB9ugpqn80Rbu8v8dmM
+ 5bvQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=OXhukp/dyN3JCCSOA+snc8wagVwhPEcgOEWTq5bZfp0=;
+ b=V1OwSqYdLscJ0i2TD/LCmCxU0bpslRZgDoonzeGZRgbiVakJvhZMPeiATh6QsYxTuf
+ CV5i9Rc7dCK6Ipae79mZlEDErxrbkhIw2bft0bqZSSEi62Kndw5rSWAl7eKQFnMHUyux
+ H16RxsxmkJQ44sVcmwvbPXCxZhqnS9Gt97z2obn11Nhp/YyWCsDs6s2XZr0yCQ9V/YPH
+ gVq/q/23Afl88su+s0W2DXtjzvH5Wp5UoBPB47kgvlOl+ig+JSrUN7jeUJJGQ6Y1wxbO
+ tqNf75btEfuqPzK4xcD4I49hJ3au2UJZn+P2Htr0cDYpoNb/JzTW3V0f3Nq4g8FWM8Jz
+ 2rtw==
+X-Gm-Message-State: AJcUukcvCD0VMjK6KiuOVKNKKjFmsUrldcCVJUuiWFAyM8kb+uvZTXaK
+ 8Ube57Dyfwjw6sDkiHfZgr4=
+X-Google-Smtp-Source: ALg8bN4aecN+6d16UnWgpvMK65aR4VITS735HO4JAlfG2l7lrUhvFV+KLtFaEVDNItA22L89abx8FA==
+X-Received: by 2002:a1c:c008:: with SMTP id q8mr6329746wmf.99.1548423980004;
+ Fri, 25 Jan 2019 05:46:20 -0800 (PST)
+Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
+ by smtp.gmail.com with ESMTPSA id 67sm164193447wra.37.2019.01.25.05.46.18
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 25 Jan 2019 05:46:19 -0800 (PST)
+Date: Fri, 25 Jan 2019 14:46:17 +0100
+From: Thierry Reding <thierry.reding@gmail.com>
+To: Joseph Lo <josephl@nvidia.com>
+Subject: Re: [PATCH V4 00/20] Tegra210 DFLL support
+Message-ID: <20190125134617.GE22565@ulmo>
+References: <20190104030702.8684-1-josephl@nvidia.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190125125513.23656-1-ccaione@baylibre.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
+In-Reply-To: <20190104030702.8684-1-josephl@nvidia.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_050835_568864_EC6CBE47 
-X-CRM114-Status: GOOD (  14.05  )
+X-CRM114-CacheID: sfid-20190125_054621_982813_8514FC67 
+X-CRM114-Status: GOOD (  24.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,60 +95,153 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, andrew@lunn.ch, f.fainelli@gmail.com,
- devicetree@vger.kernel.org, s.hauer@pengutronix.de, abailon@baylibre.com,
- robh+dt@kernel.org, linux-imx@nxp.com, kernel@pengutronix.de,
- fabio.estevam@nxp.com, shawnguo@kernel.org, aisheng.dong@nxp.com,
- linux-arm-kernel@lists.infradead.org, hkallweit1@gmail.com
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-tegra@vger.kernel.org, Peter De Schrijver <pdeschrijver@nvidia.com>,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Jonathan Hunter <jonathanh@nvidia.com>
+Content-Type: multipart/mixed; boundary="===============2998387882393220254=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 25, 2019 at 12:55:10PM +0000, Carlo Caione wrote:
-> SmartEEE, compatible with IEEE802.3az standard, is designed to include
-> legacy MAC without EEE capability into the power saving system. SmartEEE 
-> is enabled by default configuration on AR8031 after power-on or hardware 
-> reset.
-> 
-> Unfortunately this is proved causing issues for certain hw 
-> configurations.  We add a quirk to optionally disable SmartEEE.
 
-It may be a good idea to detail what "certain hw configurations" are
-and/or what the "issues" are, so it's easier to find this if/when
-others encounter the same issue.
+--===============2998387882393220254==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="KlAEzMkarCnErv5Q"
+Content-Disposition: inline
 
-> 
-> PATCH 3/3 depends on https://patchwork.kernel.org/patch/10781297/
-> 
-> 
-> Carlo Caione (3):
->   net: phy: at803x: Introduce quirk to disable SmartEEE
->   dt-bindings: net: at803x: Document at803x,smarteee-disabled property
->   arm64: dts: imx8mq-evk: Disable SmartEEE
-> 
->  .../devicetree/bindings/net/at803x.txt        | 18 +++++++++++++++
->  arch/arm64/boot/dts/freescale/imx8mq-evk.dts  |  1 +
->  drivers/net/phy/at803x.c                      | 22 +++++++++++++++++++
->  3 files changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/at803x.txt
-> 
-> -- 
-> 2.19.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
 
--- 
-RMK's Patch system: https://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+--KlAEzMkarCnErv5Q
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Fri, Jan 04, 2019 at 11:06:42AM +0800, Joseph Lo wrote:
+> This series introduces support for the DFLL as a CPU clock source
+> on Tegra210. As Jetson TX1 uses a PWM controlled regulator IC which
+> is driven directly by the DFLLs PWM output, we also introduce support
+> for PWM regulators next to I2C controlled regulators. The DFLL output
+> frequency is directly controlled by the regulator voltage. The registers
+> for controlling the PWM are part of the DFLL IP block, so there's no
+> separate linux regulator object involved because the regulator IC only
+> supplies the rail powering the CPUs. It doesn't have any other controls.
+>=20
+> The patch 1~4 are the patches of DT bindings update for DFLL clock and
+> Tegra124 cpufreq, which add PWM and Tegra210 support for DFLL clock and
+> remove deprecate properties for Tegra124 cpufreq bindings.
+>=20
+> The patch 5~10 are the patches for DFLL clock driver update for PWM-mode
+> DFLL support.
+>=20
+> The patch 11~13 are the Tegra124 cpufreq driver update to make it
+> work with Tegra210.
+>=20
+> The patch 14~19 are the devicetree files update for Tegra210 SoC and
+> platforms. Two platforms are updated here for different DFLL mode usage.
+> The Tegra210-p2371-2180 (a.k.a. Jetson Tx1) uses DFLL-PWM and the
+> Tegra210-smaug (a.k.a. Pixel C) uses DFLL-I2C. So two different modes
+> are verified with this series.
+>=20
+> The patch 20 is the patch for enabling the CPU regulator for Smaug
+> board.
+>=20
+> * Update in V4:
+>  - s/nvidia,pwm-period/nvidia,pwm-period-nanoseconds/ in patch 1 for
+>  DFLL DT bindings update.
+>  - remove parenthesis in Kconfig of DFLL driver
+>  - add more ack and RB tags
+>=20
+> * Update in V3:
+>  - Squash patch 9 in previous series into patch 7 (ref. [0])
+>  - minor fixes in patch 6 for geting alignment data
+>  - more variable type fixes in patch 7
+>  - fix the error handling in patch 8
+>  - collect more ack tags
+>=20
+> * Update in V2:
+>  - Add two patches that suggested from comments in V1. See patch 9 and
+>  14.
+>  - Update DT binding for DFLL-PWM mode in patch 1.
+>  - Update the code for how to get regulator data from DT or regulator
+>  API in patch 6.
+>  - Update to use lut_uv table for LUT lookup in patch 7. That makes the
+>  generic lut table to work with both I2C and PWM mode.
+>  - not allow Tegra124 cpufreq driver to be built as a module and remove
+>  the removal function in patch 12.
+>=20
+> [0]: http://patchwork.ozlabs.org/project/linux-tegra/list/?series=3D81595
+>=20
+> Joseph Lo (17):
+>   dt-bindings: clock: tegra124-dfll: add Tegra210 support
+>   dt-bindings: cpufreq: tegra124: remove vdd-cpu-supply from required
+>     properties
+>   dt-bindings: cpufreq: tegra124: remove cpu_lp clock from required
+>     properties
+>   clk: tegra: dfll: CVB calculation alignment with the regulator
+>   clk: tegra: dfll: support PWM regulator control
+>   clk: tegra: dfll: round down voltages based on alignment
+>   clk: tegra: dfll: add CVB tables for Tegra210
+>   cpufreq: tegra124: do not handle the CPU rail
+>   cpufreq: tegra124: extend to support Tegra210
+>   cpufreq: dt-platdev: add Tegra210 to blacklist
+>   arm64: dts: tegra210: add DFLL clock
+>   arm64: dts: tegra210: add CPU clocks
+>   arm64: dts: tegra210-p2597: add pinmux for PWM-based DFLL support
+>   arm64: dts: tegra210-p2371-2180: enable DFLL clock
+>   arm64: dts: tegra210-smaug: add CPU power rail regulator
+>   arm64: dts: tegra210-smaug: enable DFLL clock
+>   arm64: defconfig: Enable MAX8973 regulator
+>=20
+> Peter De Schrijver (3):
+>   dt-bindings: clock: tegra124-dfll: Update DFLL binding for PWM
+>     regulator
+>   clk: tegra: dfll: registration for multiple SoCs
+>   clk: tegra: dfll: build clk-dfll.c for Tegra124 and Tegra210
+
+Joseph,
+
+can you detail the dependencies between the various patches. From a
+brief look the CPU frequency driver changes are completely separate
+bits and it should be possible to apply them to the cpufreq tree.
+
+The clock changes also seem independent of the rest.
+
+Are there any dependencies at all that we need to be mindful about?
+Or can individual maintainers just pick up the subseries directly?
+
+Thierry
+
+--KlAEzMkarCnErv5Q
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlxLEyYACgkQ3SOs138+
+s6HBIg/8DTm4DsCp+vntQYd8NXlB0cqjVentmwKMUHCGFHaUW8FllyOSZdtaoV9E
+hxpAjUv5J28PRGGuUbL31eeXfvdyhTDh2+bkH7ND7IV43sLnGM5LPwTHZks+Sp8p
+5mh/OjNDFZ2FOykcILtKJJiEHU6Fi9pDrw4xIMU3juZJgP1+csDoQm6Ae9Fy4Yb4
+2fDwZ6QtSadf1ddvvdXcBcNpIdnTD2tfSFLg8m7yiDsAY3oc9g4NH+3Jbp0SsRjo
+MBIGLNijy+hcgJL2gjmIMFubVGfT5CkJocs63bUv/dGjM9mbpBt28tCQhoRq/C6d
+YPzF2Awz7FgJdw83ifumuPusTaXRF5z/p8FJKitDqUpxvZ049l8z9U3SMsptoHq3
+4HF0F59EPEqX3GNUZZGke4I9Dmtc4mZOL8rSIJd2QGFVaTaPBS/Bgz4wQQ9vsDEB
+AlvwbIK66oiklX6JjM3DtgVsZRLLEClQAImkI9RjXG/bS9RtJWP8Ywl4thrbYPbq
+JQ9e3pe/KsGf0fsXCFxAeQ7cmBO2ktHn957iebw/pcF9KaJ3QFsEAEful6yLN8Om
+TImsJKOyFPVtG0bNKwVuOCazIRN0KQem8RGbS5qB70kWfwsB2rb/gb4BTEi+VHsK
+oAlS34t1G/mprmR0cXYH2iLuF63//M8yNwygQYXlUGXGqcmLFsY=
+=6hYF
+-----END PGP SIGNATURE-----
+
+--KlAEzMkarCnErv5Q--
+
+
+--===============2998387882393220254==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============2998387882393220254==--
+
