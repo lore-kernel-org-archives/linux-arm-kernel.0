@@ -2,62 +2,137 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 98C02C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 09:48:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4FDEAC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 09:57:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6A1422082E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 09:48:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1F686218A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 09:57:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RBS+MV3Q"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A1422082E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QHsMG+/j";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=marvell.com header.i=@marvell.com header.b="ijbJ8nx4";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=marvell.onmicrosoft.com header.i=@marvell.onmicrosoft.com header.b="NTkoQe9H"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1F686218A2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=marvell.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=L09P9Gu7LHsS1Kh+grpmLDuOuSnTX2nk1xp2eMxuWwg=; b=RBS+MV3QGkOk1i5fN8dlELnWJr
-	IvmLv99xzkkK/DYHEVn4qyjwgT73l4fRmwDS+s2/KffI1s8VWeceNaxt6FsSYByR1eLRMKXPZKRDe
-	EosVdFcpdBQOPALFbdDHqOR+svNyOvTsP62u07HSxTWmNpX+BzO4g3BoBuSoLBdFv6k3f789XwFR/
-	TcjrePuf4EOgWxMG2m36OIoq5dPLbCcEJ3/fNtn5h8rn3NjugTRZqe0VJOPjzZzI5FvGVswHhpvyW
-	FCHaxFCZ7qBny6MUZ7Y4TKB/M9EehO/YplMNmdAFgvzRmEg3JUJy6vqL3laShNLEyBB8VlQ1dH7wN
-	l2zcCJYg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:Date
+	:Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	List-Owner; bh=S24gZc4d94Jr0J62YCdK1g34Z0QaJno/ndO/4DWrs2Q=; b=QHsMG+/jEd0j6K
+	TQnmPlDXlQiiJ2VTltrwEW3RCIYE9cduBZ67/gSufTgTwHwaB278GnoesvGsZLZdVPIRps2QgD1uk
+	TAX4JqMTW/1QPNSeG2Riko+oBoMidAiNnY08LA5yecf2ElbbTMLm1SE+rWMrTrqqxrbErbHRx3V2t
+	6dSmJljUlMOz1F7omFZ4YGB1aYhqMQgtADbvlPprtVl+VPca2kEmvqECcLl0UEqntds/wKn7C9ctU
+	fXdK6c3RfiF3Bt0KnmYDsfVoGZLN8BLOpyvBlHEQJYhqFXE/NHVxtBTMLn/YDrS/WLKfuXOnqwFkn
+	zujeWJv7WfW29E2WO4Hw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmy6B-0004gg-3Q; Fri, 25 Jan 2019 09:48:31 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmy4u-0003II-44
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 09:47:19 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 42BB9EBD;
- Fri, 25 Jan 2019 01:47:10 -0800 (PST)
-Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A85353F589;
- Fri, 25 Jan 2019 01:47:09 -0800 (PST)
-From: Christoffer Dall <christoffer.dall@arm.com>
-To: kvmarm@lists.cs.columbia.edu,
-	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 4/5] KVM: arm/arm64: Implement PSCI ON_PENDING when turning on
- VCPUs
-Date: Fri, 25 Jan 2019 10:46:55 +0100
-Message-Id: <20190125094656.5026-5-christoffer.dall@arm.com>
-X-Mailer: git-send-email 2.18.0
-In-Reply-To: <20190125094656.5026-1-christoffer.dall@arm.com>
-References: <20190125094656.5026-1-christoffer.dall@arm.com>
+	id 1gmyEl-0001Pc-1Q; Fri, 25 Jan 2019 09:57:23 +0000
+Received: from mx0a-0016f401.pphosted.com ([67.231.148.174]
+ helo=mx0b-0016f401.pphosted.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmyEf-0001PF-Qj
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 09:57:20 +0000
+Received: from pps.filterd (m0045849.ppops.net [127.0.0.1])
+ by mx0a-0016f401.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x0P9tTv5008135; Fri, 25 Jan 2019 01:57:05 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=marvell.com;
+ h=from : to : cc :
+ subject : date : message-id : references : content-type :
+ content-transfer-encoding : mime-version; s=pfpt0818;
+ bh=EQnQqwY/tm8bc71raR2DrJ1FKi0tEnl9+qqUKaWURSw=;
+ b=ijbJ8nx4Qb5S76xjc4f0cxcT+SfQ6VAB1u+5N4UapwQsofjUaa6vavFgFTg3nDOfnX66
+ GLpX8bTfA6shJUjwcCt/6eYdmr9NLPn91LszeGJ26R9PrTQsYHWMAAy8TVGYrvaiF6rb
+ sTEvVUCBulTWsighzziNbKz4eCCyHa3nepKvnIA7ybB5Nu56itCjgiw9IPtlQauicurH
+ l5Q0DW2vIsYAc3gq5nBnOjBY0s2evIWmYGbApzfo1U7hXcD05Rki6eIQPaRH/d4RZF/y
+ X1BbRhsKKBvcv1+tVotjylDrkHIbGYvtfQI5/gwLACgqeyJ9/xC4kW9Quv5wfF6LnZmK iw== 
+Received: from sc-exch02.marvell.com ([199.233.58.182])
+ by mx0a-0016f401.pphosted.com with ESMTP id 2q7q0kjyk8-1
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
+ Fri, 25 Jan 2019 01:57:05 -0800
+Received: from SC-EXCH02.marvell.com (10.93.176.82) by SC-EXCH02.marvell.com
+ (10.93.176.82) with Microsoft SMTP Server (TLS) id 15.0.1367.3; Fri, 25 Jan
+ 2019 01:57:04 -0800
+Received: from NAM04-SN1-obe.outbound.protection.outlook.com (104.47.44.58) by
+ SC-EXCH02.marvell.com (10.93.176.82) with Microsoft SMTP Server
+ (TLS) id
+ 15.0.1367.3 via Frontend Transport; Fri, 25 Jan 2019 01:57:04 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=marvell.onmicrosoft.com; s=selector1-marvell-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=EQnQqwY/tm8bc71raR2DrJ1FKi0tEnl9+qqUKaWURSw=;
+ b=NTkoQe9HmlBh2zxZuCY9MvWT7YPF1mCoaqo9K1QmfS0eHtuy4lojSlgelViTP5KJaOSHyAfQAIQmkduo2J9Azc6ohWHy3sU5y2uk5YRW+pJ64orItscDVlh6W022FysH8INCQhepgP4rhSM2Ci26OL0N7zZ7odbxvyZcWixU4MY=
+Received: from DM6PR18MB2460.namprd18.prod.outlook.com (20.179.104.155) by
+ DM6PR18MB2763.namprd18.prod.outlook.com (20.179.49.144) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1537.28; Fri, 25 Jan 2019 09:57:02 +0000
+Received: from DM6PR18MB2460.namprd18.prod.outlook.com
+ ([fe80::bc61:3698:d8a8:f93c]) by DM6PR18MB2460.namprd18.prod.outlook.com
+ ([fe80::bc61:3698:d8a8:f93c%2]) with mapi id 15.20.1558.016; Fri, 25 Jan 2019
+ 09:57:02 +0000
+From: Shijith Thotton <sthotton@marvell.com>
+To: Catalin Marinas <catalin.marinas@arm.com>
+Subject: Re: [Qestion] Softlockup when send IPI to other CPUs
+Thread-Topic: [Qestion] Softlockup when send IPI to other CPUs
+Thread-Index: AQHUsFLrrYWN2sDbSEeIkTghgif1Ug==
+Date: Fri, 25 Jan 2019 09:57:02 +0000
+Message-ID: <DM6PR18MB246092A6734074485E33B8BDD99B0@DM6PR18MB2460.namprd18.prod.outlook.com>
+References: <95C141B25E7AB14BA042DCCC556C0E6501620A47@dggeml529-mbx.china.huawei.com>
+ <20190119235825.GG26876@brain-police>
+ <20190121142127.GD29504@arrakis.emea.arm.com>
+ <20190122054400.GB6445@brain-police>
+ <20190123181530.GA234790@arrakis.emea.arm.com>
+ <DM6PR18MB24607427B3B2BEAD80A75780D99A0@DM6PR18MB2460.namprd18.prod.outlook.com>
+ <20190124163743.GK253679@arrakis.emea.arm.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [111.93.218.67]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DM6PR18MB2763;
+ 20:rm92w7eWfDKzl/uwcR4WZyxu+OyC0FzWAWNxN2Ku99MG3TZygzQT5iTRtnCWx5sYweHl0+qkaVo2b2If40yz/n8m+NZKruzewkLPs+4ErG6VvE4wo+dHsTznc0H56sCm3Qyf/GxW1a3LOH0rGPWPd8HIyM9/lP2eP3hF2vcA8do=
+x-ms-office365-filtering-correlation-id: 31ffa278-ebee-4e27-ec9e-08d682ab74a6
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:DM6PR18MB2763; 
+x-ms-traffictypediagnostic: DM6PR18MB2763:
+x-microsoft-antispam-prvs: <DM6PR18MB2763791EFC12B61359CDAD03D99B0@DM6PR18MB2763.namprd18.prod.outlook.com>
+x-forefront-prvs: 0928072091
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(376002)(396003)(136003)(346002)(39860400002)(189003)(199004)(93886005)(102836004)(26005)(229853002)(14454004)(7736002)(305945005)(71190400001)(316002)(54906003)(6506007)(53546011)(71200400001)(7696005)(6436002)(76176011)(476003)(446003)(478600001)(4326008)(6116002)(186003)(68736007)(25786009)(106356001)(105586002)(97736004)(3846002)(486006)(66066001)(966005)(8936002)(8676002)(53936002)(81156014)(81166006)(9686003)(6306002)(6916009)(99286004)(107886003)(74316002)(2906002)(6246003)(256004)(78486014)(33656002)(86362001)(55016002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DM6PR18MB2763;
+ H:DM6PR18MB2460.namprd18.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: marvell.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: EoDQtdT58KuQXJPzCeSHteCUSaS/RieML2JXob4IhTlXq1FYURTbMp1xloqQgKntZWz3sMu6pZu56ks3NFrezw08Ps/qKOFL65FiRW95OaYYA8LW2RUe5OShPvYLTdTiPzUC54NY36HuoWrbnv8SqTjDDx/o31r/slqqlXUAriX+zrfRdRvIdbC45AW3NJhpZ80KOLljyte+mVnipxPUckqCT3TzNsToizmcDgeuO491RyLBMiIdt5bOCC3QU7cAPlptMhcydwm8l1EzvdKTzoqm+2IU6m9ZERnzV8GCsTXkZP8TRu1TqLqcs5nu6pDOnSrDvzZN4HfyhlprpvI/GV4/R2TeGmjV5JVKwiobRVUIKX7uENKphn6ZCrejgAKCQPliSXdA4iK0dou5DR6Gf117InxAtBws9viOTp0sB6c=
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 31ffa278-ebee-4e27-ec9e-08d682ab74a6
+X-MS-Exchange-CrossTenant-originalarrivaltime: 25 Jan 2019 09:57:02.7150 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 70e1fb47-1155-421d-87fc-2e58f638b6e0
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM6PR18MB2763
+X-OriginatorOrg: marvell.com
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-01-25_06:, , signatures=0
+X-Proofpoint-Details: rule=outbound_notspam policy=outbound score=0
+ priorityscore=1501
+ malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
+ clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
+ mlxlogscore=647 adultscore=0 classifier=spam adjust=0 reason=mlx
+ scancount=1 engine=8.0.1-1810050000 definitions=main-1901250083
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_014712_620477_B11E4BF6 
-X-CRM114-Status: GOOD (  17.32  )
+X-CRM114-CacheID: sfid-20190125_015718_448935_440D45FF 
+X-CRM114-Status: GOOD (  11.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,220 +144,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Christoffer Dall <christoffer.dall@arm.com>, kvm@vger.kernel.org
-MIME-Version: 1.0
+Cc: "Wangkefeng \(Kevin\)" <wangkefeng.wang@huawei.com>,
+ Ganapatrao Kulkarni <gkulkarni@marvell.com>,
+ "anshuman.khandual@arm.com" <anshuman.khandual@arm.com>,
+ Will Deacon <will.deacon@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Jayachandran Chandrasekharan Nair <jnair@marvell.com>,
+ chenwandun <chenwandun@huawei.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-We are currently not implementing the PSCI spec completely, as we do not
-take handle the situation where two VCPUs are attempting to turn on a
-third VCPU at the same time.  The PSCI implementation should make sure
-that only one requesting VCPU wins the race and that the other receives
-PSCI_RET_ON_PENDING.
+On 01/24/2019 10:07 PM, Catalin Marinas wrote:
+> Hi  Shijith,
+> 
+> On Thu, Jan 24, 2019 at 07:00:42AM +0000, Shijith Thotton wrote:
+>> On 01/23/2019 11:45 PM, Catalin Marinas wrote:
+>>> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+>>> index 30695a868107..5c9073bace83 100644
+>>> --- a/arch/arm64/mm/flush.c
+>>> +++ b/arch/arm64/mm/flush.c
+>>> @@ -33,7 +33,11 @@ void sync_icache_aliases(void *kaddr, unsigned long len)
+>>>    		__clean_dcache_area_pou(kaddr, len);
+>>>    		__flush_icache_all();
+>>>    	} else {
+>>> -		flush_icache_range(addr, addr + len);
+>>> +		/*
+>>> +		 * Don't issue kick_all_cpus_sync() after I-cache invalidation
+>>> +		 * for user mappings.
+>>> +		 */
+>>> +		__flush_icache_range(addr, addr + len);
+>>>    	}
+>>>    }
+>>
+>> We also faced similar issue with LTP test migrate_pages03 in past and this patch
+>> fixes the issue.
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2019-January/623574.html
+> 
+> Thanks for confirming. I presume I can add your tested-by.
+> 
 
-Implement this by changing the VCPU power state to a tristate enum and
-ensure only a single VCPU can turn on another VCPU at a given time using
-a cmpxchg operation.
+Sure.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_host.h   | 10 ++++++++--
- arch/arm64/include/asm/kvm_host.h | 10 ++++++++--
- virt/kvm/arm/arm.c                | 24 +++++++++++++++---------
- virt/kvm/arm/psci.c               | 21 ++++++++++++++-------
- 4 files changed, 45 insertions(+), 20 deletions(-)
+Tested-by: Shijith Thotton <sthotton@marvell.com>
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index b1cfae222441..4dc47fea1ac8 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -157,6 +157,12 @@ struct vcpu_reset_state {
- 	bool		reset;
- };
- 
-+enum vcpu_power_state {
-+	KVM_ARM_VCPU_OFF,
-+	KVM_ARM_VCPU_ON_PENDING,
-+	KVM_ARM_VCPU_ON,
-+};
-+
- struct kvm_vcpu_arch {
- 	struct kvm_cpu_context ctxt;
- 
-@@ -184,8 +190,8 @@ struct kvm_vcpu_arch {
- 	 * here.
- 	 */
- 
--	/* vcpu power-off state */
--	bool power_off;
-+	/* vcpu power state */
-+	enum vcpu_power_state power_state;
- 
- 	 /* Don't run the guest (internal implementation need) */
- 	bool pause;
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index d43b13421987..0647a409657b 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -218,6 +218,12 @@ struct vcpu_reset_state {
- 	bool		reset;
- };
- 
-+enum vcpu_power_state {
-+	KVM_ARM_VCPU_OFF,
-+	KVM_ARM_VCPU_ON_PENDING,
-+	KVM_ARM_VCPU_ON,
-+};
-+
- struct kvm_vcpu_arch {
- 	struct kvm_cpu_context ctxt;
- 
-@@ -285,8 +291,8 @@ struct kvm_vcpu_arch {
- 		u32	mdscr_el1;
- 	} guest_debug_preserved;
- 
--	/* vcpu power-off state */
--	bool power_off;
-+	/* vcpu power state */
-+	enum vcpu_power_state power_state;
- 
- 	/* Don't run the guest (internal implementation need) */
- 	bool pause;
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 785076176814..1e3195155860 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -411,7 +411,7 @@ static void vcpu_power_off(struct kvm_vcpu *vcpu)
- int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
- 				    struct kvm_mp_state *mp_state)
- {
--	if (vcpu->arch.power_off)
-+	if (vcpu->arch.power_state != KVM_ARM_VCPU_ON)
- 		mp_state->mp_state = KVM_MP_STATE_STOPPED;
- 	else
- 		mp_state->mp_state = KVM_MP_STATE_RUNNABLE;
-@@ -426,7 +426,7 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
- 
- 	switch (mp_state->mp_state) {
- 	case KVM_MP_STATE_RUNNABLE:
--		vcpu->arch.power_off = false;
-+		vcpu->arch.power_state = KVM_ARM_VCPU_ON;
- 		break;
- 	case KVM_MP_STATE_STOPPED:
- 		vcpu_power_off(vcpu);
-@@ -448,8 +448,9 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
- int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
- {
- 	bool irq_lines = *vcpu_hcr(v) & (HCR_VI | HCR_VF);
--	return ((irq_lines || kvm_vgic_vcpu_pending_irq(v))
--		&& !v->arch.power_off && !v->arch.pause);
-+	return (irq_lines || kvm_vgic_vcpu_pending_irq(v)) &&
-+		v->arch.power_state == KVM_ARM_VCPU_ON &&
-+		!v->arch.pause;
- }
- 
- bool kvm_arch_vcpu_in_kernel(struct kvm_vcpu *vcpu)
-@@ -614,14 +615,19 @@ void kvm_arm_resume_guest(struct kvm *kvm)
- 	}
- }
- 
-+static bool vcpu_sleeping(struct kvm_vcpu *vcpu)
-+{
-+	return vcpu->arch.power_state != KVM_ARM_VCPU_ON ||
-+		vcpu->arch.pause;
-+}
-+
- static void vcpu_req_sleep(struct kvm_vcpu *vcpu)
- {
- 	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
- 
--	swait_event_interruptible_exclusive(*wq, ((!vcpu->arch.power_off) &&
--				       (!vcpu->arch.pause)));
-+	swait_event_interruptible_exclusive(*wq, !vcpu_sleeping(vcpu));
- 
--	if (vcpu->arch.power_off || vcpu->arch.pause) {
-+	if (vcpu_sleeping(vcpu)) {
- 		/* Awaken to handle a signal, request we sleep again later. */
- 		kvm_make_request(KVM_REQ_SLEEP, vcpu);
- 	}
-@@ -646,7 +652,7 @@ static void check_vcpu_requests(struct kvm_vcpu *vcpu)
- 			vcpu_req_sleep(vcpu);
- 
- 		if (kvm_check_request(KVM_REQ_VCPU_OFF, vcpu)) {
--			vcpu->arch.power_off = true;
-+			vcpu->arch.power_state = KVM_ARM_VCPU_OFF;
- 			vcpu_req_sleep(vcpu);
- 		}
- 
-@@ -1016,7 +1022,7 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
- 	if (test_bit(KVM_ARM_VCPU_POWER_OFF, vcpu->arch.features))
- 		vcpu_power_off(vcpu);
- 	else
--		vcpu->arch.power_off = false;
-+		vcpu->arch.power_state = KVM_ARM_VCPU_ON;
- 
- 	return 0;
- }
-diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
-index 20255319e193..5c2d9eeb810c 100644
---- a/virt/kvm/arm/psci.c
-+++ b/virt/kvm/arm/psci.c
-@@ -106,6 +106,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- 	struct kvm *kvm = source_vcpu->kvm;
- 	struct kvm_vcpu *vcpu = NULL;
- 	unsigned long cpu_id;
-+	enum vcpu_power_state old_power_state;
- 
- 	cpu_id = smccc_get_arg1(source_vcpu) & MPIDR_HWID_BITMASK;
- 	if (vcpu_mode_is_32bit(source_vcpu))
-@@ -119,12 +120,18 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- 	 */
- 	if (!vcpu)
- 		return PSCI_RET_INVALID_PARAMS;
--	if (!vcpu->arch.power_off) {
--		if (kvm_psci_version(source_vcpu, kvm) != KVM_ARM_PSCI_0_1)
--			return PSCI_RET_ALREADY_ON;
--		else
-+	old_power_state = cmpxchg(&vcpu->arch.power_state,
-+				  KVM_ARM_VCPU_OFF,
-+				  KVM_ARM_VCPU_ON_PENDING);
-+
-+	if (old_power_state != KVM_ARM_VCPU_OFF &&
-+	    kvm_psci_version(source_vcpu, kvm) == KVM_ARM_PSCI_0_1)
- 			return PSCI_RET_INVALID_PARAMS;
--	}
-+
-+	if (old_power_state == KVM_ARM_VCPU_ON_PENDING)
-+			return PSCI_RET_ON_PENDING;
-+	else if (old_power_state == KVM_ARM_VCPU_ON)
-+			return PSCI_RET_ALREADY_ON;
- 
- 	reset_state = &vcpu->arch.reset_state;
- 
-@@ -148,7 +155,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
- 	 */
- 	smp_wmb();
- 
--	vcpu->arch.power_off = false;
-+	vcpu->arch.power_state = KVM_ARM_VCPU_ON;
- 	kvm_vcpu_wake_up(vcpu);
- 
- 	return PSCI_RET_SUCCESS;
-@@ -183,7 +190,7 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
- 		mpidr = kvm_vcpu_get_mpidr_aff(tmp);
- 		if ((mpidr & target_affinity_mask) == target_affinity) {
- 			matching_cpus++;
--			if (!tmp->arch.power_off)
-+			if (tmp->arch.power_state == KVM_ARM_VCPU_ON)
- 				return PSCI_0_2_AFFINITY_LEVEL_ON;
- 		}
- 	}
--- 
-2.18.0
-
+Shijith
 
 _______________________________________________
 linux-arm-kernel mailing list
