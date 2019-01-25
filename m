@@ -2,96 +2,62 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DAD78C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:16:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A98F7C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:23:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 97C2E218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:16:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A530218A6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:23:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qmfR+P1w";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="IKSJuxU4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 97C2E218A6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K0PINcxt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A530218A6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=e9BhN6sgAMOL1fKEGMzUNKcIEyT3XJnQX/Wz5zP99bw=; b=qmfR+P1wquO6wO
-	dFLjG5REWHYtAvkbt1QEh/YOelGvk6nHVbPYKCoGQLJ49DascwNoLrMW9O/tVllsuTLX3tZGlXy+p
-	k8urBgojMNY8OYW3YcRPuBa1M5iRvopyP0ExzQ4QNsDfqe5uJkRnK0QpOI+YPv8QwyXKxg0tPIt8V
-	2sEMgizs3WcgBeBBxkcRNI88uICcokRFiDbhxhXKvt0vZg/6aoN2lvqJEelt+5oTvjgI5mYgdi8oD
-	vQT2bFta3qt6YAxd474A20BDmMOW7EZz4kVJSYdRrVF7FKpiTp59f/W/mW2d0AWxKZTanz2QqxN7v
-	fXOhA4tvaZzWSwcvyIlw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=hwWF5AQ6nunVD1+k3o/MtAWu5QG7fUHzqhoHWRUxGac=; b=K0PINcxtWdLu5tHLHK7hi7jxba
+	9sYPodS9F+Y+rFU+8L51T7j6vo7Fn3ya5R+8GZR/6Pli3YVxofXljYAbqzUFsL2jrksRZOXNp7Blc
+	LNoSCab4eFfAAHVBBXTs+gmOmW6LjetfgIUp0M/AL+rGvOlHu6VOsw+372MYUC3olEcDeOZUryuOp
+	btQbeoO0iJqkTYIlxyWSYSVxzUYXa1dDGAMoe6BGWiWjkFfcv95vDPRRWv5PxCsg8PphLrtJCteWQ
+	NVlQOspDd6e+iPpv+67g2aZPQxUnV9u0Qsw4A3C126WVlfdjFAg1TVsdGoLBhJkyHUjBNOn84bJ3V
+	9Zzgfabw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn61I-0003rn-Ee; Fri, 25 Jan 2019 18:16:00 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn61E-0003r5-TW
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 18:15:58 +0000
-Received: by mail-wr1-x443.google.com with SMTP id v13so11281272wrw.5
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 25 Jan 2019 10:15:56 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=kOpQQPF+GTC1JNEf2ih6Ffc+WAOYfMu6X3eN5bqi0Cc=;
- b=IKSJuxU4yX4Lt6i5fEp7iyE2hXmrzLijUHKJ6+so09W2M6ilW4H4S5cMEEZx0d5iUU
- iSqOmmyjmmcBENUwS2iwABDhZkgyYfm/++FNO/WB9tnRpys0cKVbssBoQMSbMm770lq7
- Rq8YkL1D7zlKdedEJujpZ7x9bkHgIURfJubpZDE045sYUL7CoGJgtbhIjcyHvd9YvD3t
- 1cuAlmEcPnnww2WL8vYM//4MBJw0+JyX8TaTHHk4ZlPOI6XqqNQYVEDSGHTrVaYPpcu3
- kdt4D2Zi6fkDtF7aEGGvK4x/3E7gURd6SYG1PBVadJBmoYCFbABUmgLKn9EISa6BV4mc
- yMFA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=kOpQQPF+GTC1JNEf2ih6Ffc+WAOYfMu6X3eN5bqi0Cc=;
- b=CRRL24rRTnFPwqzLP2WuxMluMvNbUMShTRxLRz3xqKYj0UmCoO+ccGwiieFZDeHoQt
- xO3XihgbR9lwWIIp0KdOOdUgtw88EwdkCxLKQIeWDfe5D7tHPFepays0/zbi6RCsr6S/
- 8Zn9Wa54JYWlrBkvprRUBf3yuq7D5Ft4mlmRvbO3Eeo1oNyfvvBZu/G3jGK1JF9VfdpA
- eTmJCw7M54lVFOmdEjPKW6U35uGuwWVXcaeu/QIrrAgwlGDOSTbI3RJ2ctLxQG4hy1AO
- hWu9e1IHENE6ceFTsURNp8OgWe9PWYxmW71VGHTDg99UP4LEOyATA0hAnvp25almqhJ1
- 15vw==
-X-Gm-Message-State: AJcUukc2Mthd5uliwZC6r/eQWNe+5xLsy/AegMR1MiQm8Fwgw7HFEmeN
- ubv94zMFqcrcAXCd9zuICf97jsn2
-X-Google-Smtp-Source: ALg8bN6sa0TN30A7zO1ZfyOoXGnrjNLL5qdt6b4LtEBHOXjHUy4DyJ9VZrx09DTqgw5/NQgjKST9OA==
-X-Received: by 2002:adf:ea11:: with SMTP id q17mr12051201wrm.328.1548440154765; 
- Fri, 25 Jan 2019 10:15:54 -0800 (PST)
-Received: from ?IPv6:2003:ea:8bf1:e200:fc07:c732:1a36:65ad?
- (p200300EA8BF1E200FC07C7321A3665AD.dip0.t-ipconnect.de.
- [2003:ea:8bf1:e200:fc07:c732:1a36:65ad])
- by smtp.googlemail.com with ESMTPSA id
- v12sm132476499wmd.27.2019.01.25.10.15.53
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 25 Jan 2019 10:15:54 -0800 (PST)
-Subject: Re: [PATCH 0/3] at803x: Add quirk to disable SmartEEE
-To: Russell King - ARM Linux admin <linux@armlinux.org.uk>,
- Carlo Caione <ccaione@baylibre.com>
-References: <20190125125513.23656-1-ccaione@baylibre.com>
- <20190125130612.npknjuzjmny4yohg@e5254000004ec.dyn.armlinux.org.uk>
-From: Heiner Kallweit <hkallweit1@gmail.com>
-Message-ID: <7d43e158-bfbe-4b30-4298-426ea9f71bb3@gmail.com>
-Date: Fri, 25 Jan 2019 19:15:47 +0100
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <20190125130612.npknjuzjmny4yohg@e5254000004ec.dyn.armlinux.org.uk>
-Content-Language: en-US
+	id 1gn684-0006K0-9d; Fri, 25 Jan 2019 18:23:00 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gn5t1-0005MJ-9G
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 18:07:33 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BE48A1596;
+ Fri, 25 Jan 2019 10:07:26 -0800 (PST)
+Received: from beelzebub.austin.arm.com (beelzebub.austin.arm.com
+ [10.118.12.119])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 22ED23F5AF;
+ Fri, 25 Jan 2019 10:07:26 -0800 (PST)
+From: Jeremy Linton <jeremy.linton@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH v4 05/12] arm64: remove the ability to build a kernel without
+ kpti
+Date: Fri, 25 Jan 2019 12:07:04 -0600
+Message-Id: <20190125180711.1970973-6-jeremy.linton@arm.com>
+X-Mailer: git-send-email 2.17.2
+In-Reply-To: <20190125180711.1970973-1-jeremy.linton@arm.com>
+References: <20190125180711.1970973-1-jeremy.linton@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_101556_956182_1304A41D 
-X-CRM114-Status: GOOD (  16.16  )
+X-CRM114-CacheID: sfid-20190125_100727_989960_AB5FA91E 
+X-CRM114-Status: GOOD (  20.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,60 +69,373 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, andrew@lunn.ch, f.fainelli@gmail.com,
- devicetree@vger.kernel.org, s.hauer@pengutronix.de, robh+dt@kernel.org,
- linux-imx@nxp.com, kernel@pengutronix.de, fabio.estevam@nxp.com,
- shawnguo@kernel.org, aisheng.dong@nxp.com,
- linux-arm-kernel@lists.infradead.org, abailon@baylibre.com
+Cc: stefan.wahren@i2se.com, mlangsdo@redhat.com, suzuki.poulose@arm.com,
+ marc.zyngier@arm.com, catalin.marinas@arm.com, julien.thierry@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ Jeremy Linton <jeremy.linton@arm.com>, steven.price@arm.com, ykaukab@suse.de,
+ dave.martin@arm.com, shankerd@codeaurora.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 25.01.2019 14:06, Russell King - ARM Linux admin wrote:
-> On Fri, Jan 25, 2019 at 12:55:10PM +0000, Carlo Caione wrote:
->> SmartEEE, compatible with IEEE802.3az standard, is designed to include
->> legacy MAC without EEE capability into the power saving system. SmartEEE 
->> is enabled by default configuration on AR8031 after power-on or hardware 
->> reset.
->>
->> Unfortunately this is proved causing issues for certain hw 
->> configurations.  We add a quirk to optionally disable SmartEEE.
-> 
-> It may be a good idea to detail what "certain hw configurations" are
-> and/or what the "issues" are, so it's easier to find this if/when
-> others encounter the same issue.
-> 
-Question would also be whether the issue with SmartEEE occurs also
-if EEE isn't advertized and therefore not active.
-Then we could use the existing DT properties to flag broken EEE
-modes, see of_set_phy_eee_broken().
+Buried behind EXPERT is the ability to build a kernel without
+hardened branch predictors, this needlessly clutters up the
+code as well as creates the opportunity for bugs. It also
+removes the kernel's ability to determine if the machine its
+running on is vulnerable.
 
->>
->> PATCH 3/3 depends on https://patchwork.kernel.org/patch/10781297/
->>
->>
->> Carlo Caione (3):
->>   net: phy: at803x: Introduce quirk to disable SmartEEE
->>   dt-bindings: net: at803x: Document at803x,smarteee-disabled property
->>   arm64: dts: imx8mq-evk: Disable SmartEEE
->>
->>  .../devicetree/bindings/net/at803x.txt        | 18 +++++++++++++++
->>  arch/arm64/boot/dts/freescale/imx8mq-evk.dts  |  1 +
->>  drivers/net/phy/at803x.c                      | 22 +++++++++++++++++++
->>  3 files changed, 41 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/net/at803x.txt
->>
->> -- 
->> 2.19.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel@lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
+Since its also possible to disable it at boot time, lets remove
+the config option.
+
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm64/Kconfig              | 12 ------------
+ arch/arm64/include/asm/fixmap.h |  2 --
+ arch/arm64/include/asm/mmu.h    |  7 +------
+ arch/arm64/include/asm/sdei.h   |  2 +-
+ arch/arm64/kernel/asm-offsets.c |  2 --
+ arch/arm64/kernel/cpufeature.c  |  4 ----
+ arch/arm64/kernel/entry.S       | 11 +----------
+ arch/arm64/kernel/sdei.c        |  2 --
+ arch/arm64/kernel/vmlinux.lds.S |  8 --------
+ arch/arm64/mm/context.c         |  6 ------
+ arch/arm64/mm/mmu.c             |  2 --
+ arch/arm64/mm/proc.S            |  2 --
+ 12 files changed, 3 insertions(+), 57 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 6b4c6d3fdf4d..09a85410d814 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -993,18 +993,6 @@ config FORCE_MAX_ZONEORDER
+ 	  However for 4K, we choose a higher default value, 11 as opposed to 10, giving us
+ 	  4M allocations matching the default size used by generic code.
+ 
+-config UNMAP_KERNEL_AT_EL0
+-	bool "Unmap kernel when running in userspace (aka \"KAISER\")" if EXPERT
+-	default y
+-	help
+-	  Speculation attacks against some high-performance processors can
+-	  be used to bypass MMU permission checks and leak kernel data to
+-	  userspace. This can be defended against by unmapping the kernel
+-	  when running in userspace, mapping it back in on exception entry
+-	  via a trampoline page in the vector table.
+-
+-	  If unsure, say Y.
+-
+ config HARDEN_EL2_VECTORS
+ 	bool "Harden EL2 vector mapping against system register leak" if EXPERT
+ 	default y
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index ec1e6d6fa14c..62371f07d4ce 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -58,11 +58,9 @@ enum fixed_addresses {
+ 	FIX_APEI_GHES_NMI,
+ #endif /* CONFIG_ACPI_APEI_GHES */
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ 	FIX_ENTRY_TRAMP_DATA,
+ 	FIX_ENTRY_TRAMP_TEXT,
+ #define TRAMP_VALIAS		(__fix_to_virt(FIX_ENTRY_TRAMP_TEXT))
+-#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 	__end_of_permanent_fixed_addresses,
+ 
+ 	/*
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 20fdf71f96c3..9d689661471c 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -42,18 +42,13 @@ typedef struct {
+ 
+ static inline bool arm64_kernel_unmapped_at_el0(void)
+ {
+-	return IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0) &&
+-	       cpus_have_const_cap(ARM64_UNMAP_KERNEL_AT_EL0);
++	return cpus_have_const_cap(ARM64_UNMAP_KERNEL_AT_EL0);
+ }
+ 
+ static inline bool arm64_kernel_use_ng_mappings(void)
+ {
+ 	bool tx1_bug;
+ 
+-	/* What's a kpti? Use global mappings if we don't know. */
+-	if (!IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0))
+-		return false;
+-
+ 	/*
+ 	 * Note: this function is called before the CPU capabilities have
+ 	 * been configured, so our early mappings will be global. If we
+diff --git a/arch/arm64/include/asm/sdei.h b/arch/arm64/include/asm/sdei.h
+index ffe47d766c25..82c3e9b6a4b0 100644
+--- a/arch/arm64/include/asm/sdei.h
++++ b/arch/arm64/include/asm/sdei.h
+@@ -23,7 +23,7 @@ extern unsigned long sdei_exit_mode;
+ asmlinkage void __sdei_asm_handler(unsigned long event_num, unsigned long arg,
+ 				   unsigned long pc, unsigned long pstate);
+ 
+-/* and its CONFIG_UNMAP_KERNEL_AT_EL0 trampoline */
++/* and its unmap kernel at el0 trampoline */
+ asmlinkage void __sdei_asm_entry_trampoline(unsigned long event_num,
+ 						   unsigned long arg,
+ 						   unsigned long pc,
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 65b8afc84466..6a6f83de91b8 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -165,9 +165,7 @@ int main(void)
+   DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
+   DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
+   BLANK();
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+   DEFINE(TRAMP_VALIAS,		TRAMP_VALIAS);
+-#endif
+ #ifdef CONFIG_ARM_SDE_INTERFACE
+   DEFINE(SDEI_EVENT_INTREGS,	offsetof(struct sdei_registered_event, interrupted_regs));
+   DEFINE(SDEI_EVENT_PRIORITY,	offsetof(struct sdei_registered_event, priority));
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index d1a7fd7972f9..a9e18b9cdc1e 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -944,7 +944,6 @@ has_useable_cnp(const struct arm64_cpu_capabilities *entry, int scope)
+ 	return has_cpuid_feature(entry, scope);
+ }
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
+ 
+ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+@@ -1035,7 +1034,6 @@ static int __init parse_kpti(char *str)
+ 	return 0;
+ }
+ early_param("kpti", parse_kpti);
+-#endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 
+ #ifdef CONFIG_ARM64_HW_AFDBM
+ static inline void __cpu_enable_hw_dbm(void)
+@@ -1284,7 +1282,6 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.field_pos = ID_AA64PFR0_EL0_SHIFT,
+ 		.min_field_value = ID_AA64PFR0_EL0_32BIT_64BIT,
+ 	},
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ 	{
+ 		.desc = "Kernel page table isolation (KPTI)",
+ 		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
+@@ -1300,7 +1297,6 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.matches = unmap_kernel_at_el0,
+ 		.cpu_enable = kpti_install_ng_mappings,
+ 	},
+-#endif
+ 	{
+ 		/* FP/SIMD is not implemented */
+ 		.capability = ARM64_HAS_NO_FPSIMD,
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 3f0eaaf704c8..1d8efc144b04 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -70,7 +70,6 @@
+ 
+ 	.macro kernel_ventry, el, label, regsize = 64
+ 	.align 7
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ alternative_if ARM64_UNMAP_KERNEL_AT_EL0
+ 	.if	\el == 0
+ 	.if	\regsize == 64
+@@ -81,7 +80,6 @@ alternative_if ARM64_UNMAP_KERNEL_AT_EL0
+ 	.endif
+ 	.endif
+ alternative_else_nop_endif
+-#endif
+ 
+ 	sub	sp, sp, #S_FRAME_SIZE
+ #ifdef CONFIG_VMAP_STACK
+@@ -345,7 +343,6 @@ alternative_else_nop_endif
+ 
+ 	.if	\el == 0
+ alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ 	bne	4f
+ 	msr	far_el1, x30
+ 	tramp_alias	x30, tramp_exit_native
+@@ -353,7 +350,7 @@ alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
+ 4:
+ 	tramp_alias	x30, tramp_exit_compat
+ 	br	x30
+-#endif
++
+ 	.else
+ 	eret
+ 	.endif
+@@ -913,7 +910,6 @@ ENDPROC(el0_svc)
+ 
+ 	.popsection				// .entry.text
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ /*
+  * Exception vectors trampoline.
+  */
+@@ -1023,7 +1019,6 @@ __entry_tramp_data_start:
+ 	.quad	vectors
+ 	.popsection				// .rodata
+ #endif /* CONFIG_RANDOMIZE_BASE */
+-#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 
+ /*
+  * Register switch for AArch64. The callee-saved registers need to be saved
+@@ -1086,7 +1081,6 @@ NOKPROBE(ret_from_fork)
+ 	b	.
+ .endm
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ /*
+  * The regular SDEI entry point may have been unmapped along with the rest of
+  * the kernel. This trampoline restores the kernel mapping to make the x1 memory
+@@ -1146,7 +1140,6 @@ __sdei_asm_trampoline_next_handler:
+ 	.quad	__sdei_asm_handler
+ .popsection		// .rodata
+ #endif /* CONFIG_RANDOMIZE_BASE */
+-#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 
+ /*
+  * Software Delegated Exception entry point.
+@@ -1240,10 +1233,8 @@ alternative_if_not ARM64_UNMAP_KERNEL_AT_EL0
+ 	sdei_handler_exit exit_mode=x2
+ alternative_else_nop_endif
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ 	tramp_alias	dst=x5, sym=__sdei_asm_exit_trampoline
+ 	br	x5
+-#endif
+ ENDPROC(__sdei_asm_handler)
+ NOKPROBE(__sdei_asm_handler)
+ #endif /* CONFIG_ARM_SDE_INTERFACE */
+diff --git a/arch/arm64/kernel/sdei.c b/arch/arm64/kernel/sdei.c
+index 5ba4465e44f0..a0dbdb962019 100644
+--- a/arch/arm64/kernel/sdei.c
++++ b/arch/arm64/kernel/sdei.c
+@@ -157,7 +157,6 @@ unsigned long sdei_arch_get_entry_point(int conduit)
+ 
+ 	sdei_exit_mode = (conduit == CONDUIT_HVC) ? SDEI_EXIT_HVC : SDEI_EXIT_SMC;
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ 	if (arm64_kernel_unmapped_at_el0()) {
+ 		unsigned long offset;
+ 
+@@ -165,7 +164,6 @@ unsigned long sdei_arch_get_entry_point(int conduit)
+ 			 (unsigned long)__entry_tramp_text_start;
+ 		return TRAMP_VALIAS + offset;
+ 	} else
+-#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 		return (unsigned long)__sdei_asm_handler;
+ 
+ }
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 7fa008374907..a4dbee11bcb5 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -57,16 +57,12 @@ jiffies = jiffies_64;
+ #define HIBERNATE_TEXT
+ #endif
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ #define TRAMP_TEXT					\
+ 	. = ALIGN(PAGE_SIZE);				\
+ 	__entry_tramp_text_start = .;			\
+ 	*(.entry.tramp.text)				\
+ 	. = ALIGN(PAGE_SIZE);				\
+ 	__entry_tramp_text_end = .;
+-#else
+-#define TRAMP_TEXT
+-#endif
+ 
+ /*
+  * The size of the PE/COFF section that covers the kernel image, which
+@@ -143,10 +139,8 @@ SECTIONS
+ 	idmap_pg_dir = .;
+ 	. += IDMAP_DIR_SIZE;
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ 	tramp_pg_dir = .;
+ 	. += PAGE_SIZE;
+-#endif
+ 
+ #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+ 	reserved_ttbr0 = .;
+@@ -257,10 +251,8 @@ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
+ ASSERT(__hibernate_exit_text_end - (__hibernate_exit_text_start & ~(SZ_4K - 1))
+ 	<= SZ_4K, "Hibernate exit text too big or misaligned")
+ #endif
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ ASSERT((__entry_tramp_text_end - __entry_tramp_text_start) == PAGE_SIZE,
+ 	"Entry trampoline text too big")
+-#endif
+ /*
+  * If padding is applied before .head.text, virt<->phys conversions will fail.
+  */
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index 1f0ea2facf24..e99f3e645e06 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -40,15 +40,9 @@ static cpumask_t tlb_flush_pending;
+ #define ASID_MASK		(~GENMASK(asid_bits - 1, 0))
+ #define ASID_FIRST_VERSION	(1UL << asid_bits)
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ #define NUM_USER_ASIDS		(ASID_FIRST_VERSION >> 1)
+ #define asid2idx(asid)		(((asid) & ~ASID_MASK) >> 1)
+ #define idx2asid(idx)		(((idx) << 1) & ~ASID_MASK)
+-#else
+-#define NUM_USER_ASIDS		(ASID_FIRST_VERSION)
+-#define asid2idx(asid)		((asid) & ~ASID_MASK)
+-#define idx2asid(idx)		asid2idx(idx)
+-#endif
+ 
+ /* Get the ASIDBits supported by the current CPU */
+ static u32 get_cpu_asid_bits(void)
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index b6f5aa52ac67..97252baf4700 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -570,7 +570,6 @@ static int __init parse_rodata(char *arg)
+ }
+ early_param("rodata", parse_rodata);
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ static int __init map_entry_trampoline(void)
+ {
+ 	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
+@@ -597,7 +596,6 @@ static int __init map_entry_trampoline(void)
+ 	return 0;
+ }
+ core_initcall(map_entry_trampoline);
+-#endif
+ 
+ /*
+  * Create fine-grained mappings for the kernel.
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 73886a5f1f30..e9ca5cbb93bc 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -217,7 +217,6 @@ ENTRY(idmap_cpu_replace_ttbr1)
+ ENDPROC(idmap_cpu_replace_ttbr1)
+ 	.popsection
+ 
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ 	.pushsection ".idmap.text", "awx"
+ 
+ 	.macro	__idmap_kpti_get_pgtable_ent, type
+@@ -406,7 +405,6 @@ __idmap_kpti_secondary:
+ 	.unreq	pte
+ ENDPROC(idmap_kpti_install_ng_mappings)
+ 	.popsection
+-#endif
+ 
+ /*
+  *	__cpu_setup
+-- 
+2.17.2
 
 
 _______________________________________________
