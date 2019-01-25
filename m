@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D022C41518
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:53:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 166F8C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:53:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E3201218DE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:53:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DA427218A6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:53:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lFZ2suQE";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="avuv6uQH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E3201218DE
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tT737Sst";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="I8XHN5yf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA427218A6
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,59 +26,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4ZuM0FOtV3paxaQRTRuGd4cMa9j/SiC/geLGtKfYpoE=; b=lFZ2suQEq094TL
-	0Iknnn7LxC7eW5nXbArAY6jZ3oKqPbidyGTWnskn9xqG3ykkXCNz/ZU+9RV43/Cv5R1Kvh82cRwwZ
-	/rTx3o51VJcRZRyuRGePH0m0bMqqH9RFp30ChyhOfnKGtdUN/+HY9a98HsuG2e5SExBinZmYcc0lx
-	FEswkf2kisJ5oyCzkYPxgs6VPKYD6I3n9PW7GLKkkEs8heBWnY/1ODxSR4XdLEUXGjccSFYjbhrmC
-	NBX2CTr14kMKgH6kTuu6XMm1UEbyZy3QrlaWGu9B8FHZS7A/Bz36znZd9OcAMYQ79JI9C/kuzT0+G
-	WTzo12tCL3q4ievsspFQ==;
+	List-Owner; bh=2nOw8NeX86U73fCzYORAUu0VFOgY82qT5323UpRkuJk=; b=tT737SsttcKPeq
+	jA+2j2v+0EF/vemikJro2rVjo+5d2AZ2LK3Z+7UiUKLqFovzANBAmKxc9J+j+OiFAR2wNGxt0Rfax
+	fxWtvoho8UcVv90+UxB6ZZAz1CChhzeIG0kC6Y3+Wnxh1dOBORaMnszQ9Byy/eywBURoLnBLCX2Eh
+	gsx5WNqhAhYFkd6L/B8UP/ZbIaVX690PiA9orm6nrC7V6nZdfJoHj9CexKOuzxwqGsNekpNcLqgGc
+	g7L5Xo6D/jgtC0llx5CfO0mWzQejvyYo4cJcBRjN7e0fVcNTu59FC615VrD6Qa/tIQJq8FCIarLhh
+	WEVTy/Ze0WFOD+l0rxSQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmz6s-0004CX-Oy; Fri, 25 Jan 2019 10:53:18 +0000
+	id 1gmz7H-0004U9-Pp; Fri, 25 Jan 2019 10:53:43 +0000
 Received: from hqemgate14.nvidia.com ([216.228.121.143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmz6q-0004Bq-3y
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 10:53:17 +0000
+ id 1gmz7E-0004TM-4w
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 10:53:41 +0000
 Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
  hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c4aea990000>; Fri, 25 Jan 2019 02:53:13 -0800
+ id <B5c4aeab20000>; Fri, 25 Jan 2019 02:53:39 -0800
 Received: from hqmail.nvidia.com ([172.20.161.6])
  by hqpgpgate101.nvidia.com (PGP Universal service);
- Fri, 25 Jan 2019 02:53:13 -0800
+ Fri, 25 Jan 2019 02:53:39 -0800
 X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Fri, 25 Jan 2019 02:53:13 -0800
+ by hqpgpgate101.nvidia.com on Fri, 25 Jan 2019 02:53:39 -0800
 Received: from [10.21.132.148] (172.20.13.39) by HQMAIL101.nvidia.com
  (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 25 Jan
- 2019 10:53:12 +0000
-Subject: Re: [PATCH 1/7] soc/tegra: pmc: Sort includes alphabetically
+ 2019 10:53:37 +0000
+Subject: Re: [PATCH 2/7] soc/tegra: pmc: Add missing kerneldoc
 To: Thierry Reding <thierry.reding@gmail.com>
 References: <20190125102255.6862-1-thierry.reding@gmail.com>
+ <20190125102255.6862-2-thierry.reding@gmail.com>
 From: Jon Hunter <jonathanh@nvidia.com>
-Message-ID: <7a5419b1-3729-8778-17d6-5d2e23467387@nvidia.com>
-Date: Fri, 25 Jan 2019 10:53:10 +0000
+Message-ID: <e6c3fbbb-123c-0797-d486-6f9962dea84a@nvidia.com>
+Date: Fri, 25 Jan 2019 10:53:35 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20190125102255.6862-1-thierry.reding@gmail.com>
+In-Reply-To: <20190125102255.6862-2-thierry.reding@gmail.com>
 X-Originating-IP: [172.20.13.39]
 X-ClientProxiedBy: HQMAIL107.nvidia.com (172.20.187.13) To
  HQMAIL101.nvidia.com (172.20.187.10)
 Content-Language: en-US
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1548413593; bh=xSAVBASzXCEEHJwsAvAls+79K9S1aAdV+xLcFmMAzUM=;
+ t=1548413619; bh=9lxRN5tljFfcnUuGqs+/AcFNUdisABtVSZPbh7Vms+I=;
  h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
  User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
  X-ClientProxiedBy:Content-Type:Content-Language:
  Content-Transfer-Encoding;
- b=avuv6uQHRSQZewR/Zk6uai9//+wkc48Yv3kcQN7aD82IkV3SGcyOrKHIEocj6lvkZ
- VXV6ASq8nQJCmV81e5WW9AH5CuYGFwbO3KU5jaoWwEMkIFRecXB9aRZdzpSEutka+7
- TtXjSPgnYv6AhMBEJfaosjqPPD3g78RgVMF/GNlFX44QXYNAM0/Yv47wdUxk8zEGWX
- aWt+PnoabVJRsMillJIxzmjIOlzKxCS8PjT3a6LUIsO8j7WBwhwul/wA94vtp2VH0k
- vzCbh4jO1z5zPsJtgd7aag69jWxaAHaqa4Vwa66MHmHU0VfsF1d5+f3vJiZcpaJ74H
- qggrWdTAJrq+w==
+ b=I8XHN5yfmgmOfrnQXhr4/UWLkVggINjSwca+1DZjvfRYp7MRsjonuE9nqiMtzJf2K
+ rnNxKrGf5GFPdkjOYALjU8+MtgqKbLbFt/24kLw1Fi8ZUF9TpM/Z+OyrE8rUEPdxeV
+ jxzsZQya/avoeqp1YyaN7YkMmnGgLLjNNbkwNtT91PjKxdDVnZXSUNPg8B+3/AG7d7
+ ThCDOBgfaA547v9S0WKmmkUOz0emZEWEH2WmiGBM6jsDfXfl9PYDmn/FH4cQ7a2iN/
+ MkwwumI1ICaLT8e5rX9aS8n4QDcdavWmCy+YC7lLOHLeqDpJ7ODnbM6Loekb0EiNHF
+ cO8CZeDkR70Yw==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_025316_169619_6E46E7E4 
-X-CRM114-Status: GOOD (  12.05  )
+X-CRM114-CacheID: sfid-20190125_025340_206817_8B3D5D69 
+X-CRM114-Status: GOOD (  14.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,48 +102,38 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 On 25/01/2019 10:22, Thierry Reding wrote:
 > From: Thierry Reding <treding@nvidia.com>
 > 
-> This will make it easier to insert new includes in the right place in
-> subsequent patches.
+> Some of the fields in struct tegra_pmc had not been documented when they
+> were added. Add the missing kerneldoc.
 > 
 > Signed-off-by: Thierry Reding <treding@nvidia.com>
 > ---
->  drivers/soc/tegra/pmc.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
+>  drivers/soc/tegra/pmc.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
 > diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-> index 7ea3280279ff..cd865be3b195 100644
+> index cd865be3b195..550653302ff2 100644
 > --- a/drivers/soc/tegra/pmc.c
 > +++ b/drivers/soc/tegra/pmc.c
-> @@ -20,7 +20,6 @@
->  
->  #define pr_fmt(fmt) "tegra-pmc: " fmt
->  
-> -#include <linux/kernel.h>
->  #include <linux/clk.h>
->  #include <linux/clk/tegra.h>
->  #include <linux/debugfs.h>
-> @@ -30,16 +29,17 @@
->  #include <linux/init.h>
->  #include <linux/io.h>
->  #include <linux/iopoll.h>
-> -#include <linux/irq.h>
->  #include <linux/irqdomain.h>
-> -#include <linux/of.h>
-> +#include <linux/irq.h>
-> +#include <linux/kernel.h>
->  #include <linux/of_address.h>
->  #include <linux/of_clk.h>
-> +#include <linux/of.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
-> -#include <linux/pinctrl/pinctrl.h>
-> -#include <linux/pinctrl/pinconf.h>
->  #include <linux/pinctrl/pinconf-generic.h>
-> +#include <linux/pinctrl/pinconf.h>
-> +#include <linux/pinctrl/pinctrl.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm_domain.h>
->  #include <linux/reboot.h>
+> @@ -273,6 +273,9 @@ static const char * const tegra30_reset_sources[] = {
+>   * struct tegra_pmc - NVIDIA Tegra PMC
+>   * @dev: pointer to PMC device structure
+>   * @base: pointer to I/O remapped register region
+> + * @wake: pointer to I/O remapped region for WAKE registers
+> + * @aotag: pointer to I/O remapped region for AOTAG registers
+> + * @scratch: pointer to I/O remapped region for scratch registers
+>   * @clk: pointer to pclk clock
+>   * @soc: pointer to SoC data structure
+>   * @debugfs: pointer to debugfs entry
+> @@ -291,6 +294,9 @@ static const char * const tegra30_reset_sources[] = {
+>   * @lp0_vec_size: size of the LP0 warm boot code
+>   * @powergates_available: Bitmap of available power gates
+>   * @powergates_lock: mutex for power gate register access
+> + * @pctl_dev: pin controller exposed by the PMC
+> + * @domain: IRQ domain provided by the PMC
+> + * @irq: chip implementation for the IRQ domain
+>   */
+>  struct tegra_pmc {
+>  	struct device *dev;
 > 
 
 Acked-by: Jon Hunter <jonathanh@nvidia.com>
