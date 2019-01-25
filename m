@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B7561C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:26:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 94A10C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:26:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8627E218D2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:26:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 633582085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:26:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EJVkslv7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8627E218D2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K3yHsNqy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 633582085A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5sZr6o0TAL6iI0K9BTBmuBpsBu+NNyh6ebKhaF/pcMI=; b=EJVkslv70u76ZK
-	OO/8txacmL9lzcEMgkyd6ZAe1YxuOPNus0lI+JvaUVV0+JKPqYepN9mR9F6vnqjAgwcif7b/0xmAB
-	qnguunEZ9eGJWfRoFOapb636TFzw3VuMpcdrG4MIFGKCXJ0zNYg7xb0rUgqbjQETX6BhhGCX60Itp
-	jxT58c0XIjutL75B8vmWbbMDCsyTMu/yTPwpIj1p47vXbnQBizbTyrLzF/6yczhGi/fNLpM234der
-	0FtpJfx+Trygx75kuz7oCJZ4FJDSgHlflEdU7ga7nvigrBQ3NORRBbseRIF3RKr1GAXL8ygJQKyAR
-	jBW4StsdZg+IPJYZ2l4Q==;
+	List-Owner; bh=LUKGc+9BdTtqOzwkUok8hLBqQ2f+y9dFaU+1ymdOUSE=; b=K3yHsNqy+o5WZy
+	T+WkFtuLrjEwMpktvCWox5jPDgPyQuKz42h2tmtFeGapV7F6R/874vS1vZGBd3hL48DEBMiJKmRzf
+	YMds4Mz54qJboXuJP2hAtocO6xZ5/sZCFe9TnBoClhcL5j25BemppDaTOK5DlucIU6CD0tiDUH0JY
+	PGJy1KlJFvbhE+G4wvbuohsmwjklHfYCP3lI9D7k3m3GiOxadBG0rJRZ5RlRDQgcp06+DeR6NujDz
+	gkvgl0B1jMZPh6gPu1/I/36WUWJjYnftLp9ox3+SO+tygl6dfOo+KCam1lPJscWm0RU5dUlTvIQxE
+	qoVN16GNDXBqVuuBgLJg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gms8W-0001aq-Fe; Fri, 25 Jan 2019 03:26:32 +0000
+	id 1gms8r-0001qZ-GW; Fri, 25 Jan 2019 03:26:53 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gms5U-0006gp-MG
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 03:23:29 +0000
+ id 1gms5U-0006gM-Ab
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 03:23:30 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 5D8C05FDC1; Fri, 25 Jan 2019 11:23:15 +0800 (CST)
+ id 55CEA5FDD0; Fri, 25 Jan 2019 11:23:15 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Michael Turquette <mturquette@baylibre.com>,
  Stephen Boyd <sboyd@kernel.org>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>, David Airlie <airlied@linux.ie>,
  Daniel Vetter <daniel@ffwll.ch>
-Subject: [PATCH 07/11] ARM: dts: sun8i-a23-a33: Move NAND controller device
- node to sort by address
-Date: Fri, 25 Jan 2019 11:23:10 +0800
-Message-Id: <20190125032314.20915-8-wens@csie.org>
+Subject: [PATCH 06/11] drm/sun4i: Add support for A23 display pipeline
+Date: Fri, 25 Jan 2019 11:23:09 +0800
+Message-Id: <20190125032314.20915-7-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190125032314.20915-1-wens@csie.org>
 References: <20190125032314.20915-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_192325_642540_E706EEE1 
-X-CRM114-Status: GOOD (  12.39  )
+X-CRM114-CacheID: sfid-20190124_192325_404216_6D470BBB 
+X-CRM114-Status: GOOD (  13.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,63 +75,103 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The NAND controller device node was inserted into the wrong position,
-probably due to a rebase or merge, as the file's structure does not
-provide enough context for git to accurately match the previous device
-node block.
+The A23's display pipeline is similar to the A33. Differences include:
 
-Fixes: d7b843df13ea ("ARM: dts: sun8i: add NAND controller node for A23/A33")
+  - Display backend supports larger layers, 8192x8192 instead of 2048x2048
+
+  - TCON has DMA input
+
+  - There is no SAT module packed in the display backend
+
+Add support for the display pipeline and its components.
+
+As the MIPI DSI output device is not officially documented, and there
+are no A23 reference devices to test it, it is not covered by this
+patch.
+
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 28 +++++++++++++---------------
- 1 file changed, 13 insertions(+), 15 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_backend.c  | 4 ++++
+ drivers/gpu/drm/sun4i/sun4i_drv.c      | 2 ++
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 4 ++++
+ drivers/gpu/drm/sun4i/sun4i_tcon.c     | 1 +
+ drivers/gpu/drm/sun4i/sun6i_drc.c      | 1 +
+ 5 files changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index a9c123de5d2c..97ec8b8cec09 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -155,6 +155,19 @@
- 			#dma-cells = <1>;
- 		};
- 
-+		nfc: nand@1c03000 {
-+			compatible = "allwinner,sun4i-a10-nand";
-+			reg = <0x01c03000 0x1000>;
-+			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_NAND>, <&ccu CLK_NAND>;
-+			clock-names = "ahb", "mod";
-+			resets = <&ccu RST_BUS_NAND>;
-+			reset-names = "ahb";
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		mmc0: mmc@1c0f000 {
- 			compatible = "allwinner,sun7i-a20-mmc";
- 			reg = <0x01c0f000 0x1000>;
-@@ -214,21 +227,6 @@
- 			#size-cells = <0>;
- 		};
- 
--		nfc: nand@1c03000 {
--			compatible = "allwinner,sun4i-a10-nand";
--			reg = <0x01c03000 0x1000>;
--			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&ccu CLK_BUS_NAND>, <&ccu CLK_NAND>;
--			clock-names = "ahb", "mod";
--			resets = <&ccu RST_BUS_NAND>;
--			reset-names = "ahb";
--			pinctrl-names = "default";
--			pinctrl-0 = <&nand_pins &nand_pins_cs0 &nand_pins_rb0>;
--			status = "disabled";
--			#address-cells = <1>;
--			#size-cells = <0>;
--		};
--
- 		usb_otg: usb@1c19000 {
- 			/* compatible gets set in SoC specific dtsi file */
- 			reg = <0x01c19000 0x0400>;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 85e64d02fb5f..2ada915a877e 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -1012,6 +1012,10 @@ static const struct of_device_id sun4i_backend_of_table[] = {
+ 		.compatible = "allwinner,sun7i-a20-display-backend",
+ 		.data = &sun7i_backend_quirks,
+ 	},
++	{
++		.compatible = "allwinner,sun8i-a23-display-backend",
++		.data = &sun8i_a33_backend_quirks,
++	},
+ 	{
+ 		.compatible = "allwinner,sun8i-a33-display-backend",
+ 		.data = &sun8i_a33_backend_quirks,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 93da837194cf..477957a865fb 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -165,6 +165,7 @@ static bool sun4i_drv_node_is_frontend(struct device_node *node)
+ 		of_device_is_compatible(node, "allwinner,sun5i-a13-display-frontend") ||
+ 		of_device_is_compatible(node, "allwinner,sun6i-a31-display-frontend") ||
+ 		of_device_is_compatible(node, "allwinner,sun7i-a20-display-frontend") ||
++		of_device_is_compatible(node, "allwinner,sun8i-a23-display-frontend") ||
+ 		of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend") ||
+ 		of_device_is_compatible(node, "allwinner,sun9i-a80-display-frontend");
+ }
+@@ -404,6 +405,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-display-engine" },
+ 	{ .compatible = "allwinner,sun6i-a31s-display-engine" },
+ 	{ .compatible = "allwinner,sun7i-a20-display-engine" },
++	{ .compatible = "allwinner,sun8i-a23-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-a33-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-h3-display-engine" },
+diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+index e8239d4d4dd5..346c8071bd38 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+@@ -719,6 +719,10 @@ const struct of_device_id sun4i_frontend_of_table[] = {
+ 		.compatible = "allwinner,sun7i-a20-display-frontend",
+ 		.data = &sun4i_a10_frontend
+ 	},
++	{
++		.compatible = "allwinner,sun8i-a23-display-frontend",
++		.data = &sun8i_a33_frontend
++	},
+ 	{
+ 		.compatible = "allwinner,sun8i-a33-display-frontend",
+ 		.data = &sun8i_a33_frontend
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 0420f5c978b9..565955a46b0b 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -1494,6 +1494,7 @@ const struct of_device_id sun4i_tcon_of_table[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-tcon", .data = &sun6i_a31_quirks },
+ 	{ .compatible = "allwinner,sun6i-a31s-tcon", .data = &sun6i_a31s_quirks },
+ 	{ .compatible = "allwinner,sun7i-a20-tcon", .data = &sun7i_a20_quirks },
++	{ .compatible = "allwinner,sun8i-a23-tcon", .data = &sun8i_a33_quirks },
+ 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
+ 	{ .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data = &sun8i_a83t_lcd_quirks },
+ 	{ .compatible = "allwinner,sun8i-a83t-tcon-tv", .data = &sun8i_a83t_tv_quirks },
+diff --git a/drivers/gpu/drm/sun4i/sun6i_drc.c b/drivers/gpu/drm/sun4i/sun6i_drc.c
+index 88eb268fdf73..442094a4af7a 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_drc.c
++++ b/drivers/gpu/drm/sun4i/sun6i_drc.c
+@@ -101,6 +101,7 @@ static int sun6i_drc_remove(struct platform_device *pdev)
+ static const struct of_device_id sun6i_drc_of_table[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-drc" },
+ 	{ .compatible = "allwinner,sun6i-a31s-drc" },
++	{ .compatible = "allwinner,sun8i-a23-drc" },
+ 	{ .compatible = "allwinner,sun8i-a33-drc" },
+ 	{ .compatible = "allwinner,sun9i-a80-drc" },
+ 	{ }
 -- 
 2.20.1
 
