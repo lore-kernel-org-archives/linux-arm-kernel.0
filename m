@@ -2,55 +2,69 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C58ABC282C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 16:52:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5DD0BC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 16:52:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8D2A121904
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 16:52:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2A165218CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 16:52:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E2kHvfyp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D2A121904
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TP0QIUG/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2A165218CD
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=4JESN3AJMXWPhmbn0bBqnEgQVxDVoY1dZU9C68H7tkc=; b=E2kHvfypS3j6YY
-	BCJkR3IcfK5Q/DNUmvSNWwzA7V7fwOtDrjSRARtLSOFpl1K4XBstMn0QtDkTGb+IMXy5o1CCF6o7e
-	E6l74aChVRG15b67OrxSGh1Ml+2HG1rzvgi/BmtS1zakE5Q8lUBBqoTIx2ZzgBysS1zyqlXrbUnxE
-	ggumJEjrp8Gx2E4oJGWgqBs9FocUIC5+L4aLymNNKnG3h1gztm7FsXJFBA0dUrqxajxDz4kaVuLA9
-	n9qQveVwvQKpgc0lz62+AaGd/jrDMYke4XOjvUPaioFS5U/0wRV411IIx+MfFuIqGstuI6QsrVgNU
-	3eyGIzU42CZGBe7WmppA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=sjRMdDsbx7IpfHonw4uzZIH0zirWC0oQJPh8+cZPAt0=; b=TP0QIUG/wRzayy
+	kAb0oKoRDw2Ge82oTTiejcKxS402NtX9LME+qQXUka2uNzGdP7zM0vm0Nh8hj6TjDLlrkFndS8Ipl
+	jq6gfuB8K7XLcUuWDeHLxF3opjwamPcbtr2IN99LvwyFJME7k/N11XuF6Vxix99DFHjDr9p7aIJ6E
+	0G0g2fXFZmT378SS+/J4KOsRjy54Rd5Iu9XMPhBCPX4bj9QPApKvznJ1efHjAnpiPpSXRweL4oXT+
+	OouePKIEqBqDo9tzEtBSZdXHs6Rzk69cfi7OK7MeYX0UTp7jsnsirfDicuv5bUoQGRutGCBRSAahQ
+	gSzM/R1AumeU4zajJCJw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn4i2-00040k-Bu; Fri, 25 Jan 2019 16:52:02 +0000
-Received: from muru.com ([72.249.23.125])
+	id 1gn4iM-0004H8-38; Fri, 25 Jan 2019 16:52:22 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn4hz-000403-Ay
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 16:52:00 +0000
-Received: from hillo.muru.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTP id AD990806C;
- Fri, 25 Jan 2019 16:52:04 +0000 (UTC)
-From: Tony Lindgren <tony@atomide.com>
-To: arm@kernel.org
-Subject: [GIT PULL] dts fixes for omaps for v5.0-rc cycle
-Date: Fri, 25 Jan 2019 08:51:49 -0800
-Message-Id: <pull-1548435073-725543@atomide.com>
-X-Mailer: git-send-email 2.20.1
+ id 1gn4iI-0004ED-5p
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 16:52:20 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2249FA78;
+ Fri, 25 Jan 2019 08:52:14 -0800 (PST)
+Received: from e107155-lin (e107155-lin.cambridge.arm.com [10.1.196.42])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B741D3F5AF;
+ Fri, 25 Jan 2019 08:52:11 -0800 (PST)
+Date: Fri, 25 Jan 2019 16:52:04 +0000
+From: Sudeep Holla <sudeep.holla@arm.com>
+To: Pramod Kumar <pramod.kumar@broadcom.com>
+Subject: Re: [PATCH RFC 1/1] arm64: Use PSCI calls for CPU stop when hotplug
+ is supported
+Message-ID: <20190125165204.GA20168@e107155-lin>
+References: <1547790380-6276-1-git-send-email-pramod.kumar@broadcom.com>
+ <20190118113242.GA8928@e107155-lin>
+ <CAJ+tv6+6yqT1xkmkY3x6SNQ83K+J6zqKZr7PV5A_ffvyEzceqg@mail.gmail.com>
+ <CAJ+tv6KqynSf5t_VwLqpdM4BF+wLWcJ0wPTD4nWqL4ej1Yih4g@mail.gmail.com>
+ <20190123164801.GA55887@lakrids.cambridge.arm.com>
+ <f1851a76-8078-b8e7-6a54-b038b47f9214@broadcom.com>
+ <20190123173343.GC55887@lakrids.cambridge.arm.com>
+ <CAJ+tv6+Mm8Rmsx8cfOuDT4+CVWVd4gKLzUnTs_EMxKYax+NScw@mail.gmail.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CAJ+tv6+Mm8Rmsx8cfOuDT4+CVWVd4gKLzUnTs_EMxKYax+NScw@mail.gmail.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_085159_417937_0C950E52 
-X-CRM114-Status: GOOD (  10.68  )
+X-CRM114-CacheID: sfid-20190125_085218_270956_E640E120 
+X-CRM114-Status: GOOD (  22.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -62,69 +76,89 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Tony Lindgren <tony@atomide.com>, linux-omap@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Suzuki K Poulose <Suzuki.Poulose@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Scott Branden <scott.branden@broadcom.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org,
+ BCM Kernel Feedback <bcm-kernel-feedback-list@broadcom.com>,
+ Sudeep Holla <sudeep.holla@arm.com>, Dave Martin <dave.martin@arm.com>,
+ linux-arm-kernel@lists.infradead.org, Steve Capper <steve.capper@arm.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+On Fri, Jan 25, 2019 at 12:33:56PM +0530, Pramod Kumar wrote:
 
-The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
+[...]
 
-  Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
+>
+> This is an GPIO interrupt. This can not be marked secure as for that
+> we need to mark whole GPIO controller as secure which is not possible
+> as GPIO controller is meant for non-secure world having more than 100
+> lines connected.
+>
+> I agree we have work around where we invoke handler in Linux and
+> switch to ATF via SMC and from ATF we need bring all secondary CPU to
+> ATF via sending SGI and and then respective core flushes the L1/L2 and
+> bring himself out of coherency domain and cluster and MCU shutdowns
+> the CPU subsystem gracefully. This could work for our requirement.
+> Need to check ATF support for that.
+>
 
-are available in the Git repository at:
+Yes platform specific requirement and platform specific solution,
+happy ending :).
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v5.0/fixes-rc3
+> But What about generic system? This patch address the generic
+> multi-master system's requirement.
 
-for you to fetch changes up to 063c20e12f8bbbc10cabc2413606b140085beb62:
+Why do we need to address this in generic system ? And what exactly
+is this multi-master system's requirement ? Linux runs on one or more
+masters and will own it completely. Shutdown must involve everything
+it owns if it needs to be graceful.
 
-  ARM: dts: am335x-shc.dts: fix wrong cd pin level (2019-01-23 16:14:33 -0800)
+> Consider system where shutting down the linux does not mean shutting
+> down the complete system.
 
-----------------------------------------------------------------
-Device tree fixes for omaps for v5.0-rc cycle
+Why is that the case ? Is it forceful shutdown ? Does Linux just own
+CPUs and don't care about other blocks in the system ? Irrespective
+of what it owns, system shutdown will take care.
 
-This series of dts fixes for omap devices fixes several device specific
-regressions:
+> Lets take an example of smartnic case Where NIC master and CPUs access
+> cachable DDR. In smarnic its quite common to bring CPUs on demand means
+> when needed via MCU help.
 
-- The onenand timings for n950/n9 have been wrong for a while since
-  we moved to dts based timings
+Yes you are talking about CPU hotplug or system here ? The above
+indicates, it's just CPU hotplug and a solution already exists for that.
 
-- A typo for the cpcap pmic is now producing erors during boot as the
-  level should be 0 for unconfigurable triggering instead of 1
+> Now in full-fledged system. if CPU subsystem is shutdown via poweroff
+> command which does not bring secondary CPUs out of coherency domain,
+> it will bring the complete system unstable when NIC master tries to
+> access DDR and snoop is send to CPUs as well which is not available.
+> Fabric/System hangs...
+>
 
-- Changes for ti-sysc for omap5 left uart3 with debug flags that should
-  not be set
+That's because your custom solution just sends ipi to stop CPUs. If you
+shutdown the system, all the required information is save to non-volatile
+memory and system is powered off gracefully.
 
-- Fix a new dtc warning started showing up for omap3-gta04 grap_port
+> I feel While shutting down the CPUs subsystem or powering off, All
+> secondary CPUs must be shutdown properly by bring-out of coherency
+> domain to remain rest of subsystem usable. I agree that introducing
+> PSCI call introduce delay for shutdown/reboot case but stability
+> matter than little delay.
 
-- With the generic MMC card detection code we need to fix the gpio
-  in dts for n900 and am335x-shc
+IPI_STOP is not designed to do a graceful shutdown of CPU subsystem.
+Use CPU hotplug. You are trying to make you custom requirement a generic
+one. We have CPU hotplug framework to do what you want, you just have to
+use it. Infact you are doing almost the same with you patch, I don't see
+any point as why CPU hotplug can't be used.
 
-----------------------------------------------------------------
-Aaro Koskinen (1):
-      ARM: OMAP: dts: N950/N9: fix onenand timings
-
-Arthur Demchenkov (1):
-      ARM: dts: n900: fix mmc1 card detect gpio polarity
-
-Heiko Schocher (1):
-      ARM: dts: am335x-shc.dts: fix wrong cd pin level
-
-Tony Lindgren (3):
-      ARM: dts: omap4-droid4: Fix typo in cpcap IRQ flags
-      ARM: dts: Remove unnecessary idle flags for omap5 uart3
-      ARM: dts: omap3-gta04: Fix graph_port warning
-
- arch/arm/boot/dts/am335x-shc.dts               |  2 +-
- arch/arm/boot/dts/motorola-cpcap-mapphone.dtsi |  2 +-
- arch/arm/boot/dts/omap3-gta04.dtsi             |  4 ---
- arch/arm/boot/dts/omap3-n900.dts               |  2 +-
- arch/arm/boot/dts/omap3-n950-n9.dtsi           | 42 +++++++++++++++++---------
- arch/arm/boot/dts/omap5-l4.dtsi                |  2 --
- 6 files changed, 31 insertions(+), 23 deletions(-)
+--
+Regards,
+Sudeep
 
 _______________________________________________
 linux-arm-kernel mailing list
