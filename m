@@ -6,77 +6,106 @@ X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B81FC282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 07:49:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BB56FC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 07:51:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2C2C5218DE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 07:49:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 88D82217D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 07:51:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GJFM0yod";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="LUY3hEdb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2C2C5218DE
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i1WqqWxy";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="XVECqFOU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88D82217D7
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xyhPAIiiZC8qKDLexozIhRyM4B8Rd2edMcHswy4fX9U=; b=GJFM0yodLs4kZ8
-	/KJqTKsT8Nqd6ttjsR/RxS/LUNW5BzK5ID1g76BJ5PrmpJxnZ3rZsShIe8wvhHwyeNDlYkUTtTwu3
-	QdGeinMcyztPM/MseFG6vfI4cXxCf1BebzLIpjuOlu8LHYEY99FIt566Z3fyRnW/41/bJo3ls2mdh
-	TaLdyVmlwm3zxrOnmDxdj4mjKsJ53IBZnF6w2s0dOHQ+XXhtq4jC8Tir1/rVJil04hYi9wbjgTQNe
-	Dmh0znA3iOs19nbHGJRTSb70IUiJ57TZiBFfn84WnhJ0Zm34oaEjn/S802hQJqYm/1NblEZgu4J5/
-	+EHjeNYP2kEQUH/p0z5g==;
+	List-Owner; bh=bP5wOX8p495UFnWyLy6Z0IGVjgJAAErvDqFeui1yc9s=; b=i1WqqWxys5DfuL
+	VbQbzEmeWrsUYg0YUNzc1gzxuQPBkdJ/83wer1n2h7KXN8aTS/LijXEua0HSYE3rTof/hHYpumL58
+	ueY8xqljliYKfYzTYL+5MWKgj6vnvcf0FaNQMtvTXJ+FSf/m9I7zImfHtIpIV385BdgM8EgwjoC+0
+	t5x8YQFMZG5tudVqePe+6E9ZjX0Ib8Lyvj+AeF1yq/t9a4Kur0pFEHBVEqAOVkA9ITMkGhVCi4y6f
+	yIOQi8Ug9PzLprFxwu9azZ1Fy03QoL+7SX9YJJMWrt/Acg0yRjicBq5fOzwx7fqcjb4puei+jNh4A
+	MKH98HwhfT5dA2BsdZbA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmwFM-0004UT-Uf; Fri, 25 Jan 2019 07:49:52 +0000
-Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
+	id 1gmwH0-0006C7-Eq; Fri, 25 Jan 2019 07:51:34 +0000
+Received: from mail-eopbgr30059.outbound.protection.outlook.com ([40.107.3.59]
+ helo=EUR03-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmwFJ-0004U7-Nz
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 07:49:51 +0000
-Received: by mail-it1-x144.google.com with SMTP id a6so8459945itl.4
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 24 Jan 2019 23:49:48 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=/pADXBfQMBB0ZhOXN56Df7WzUKfxqN8DN7uguFJDGBI=;
- b=LUY3hEdbRMUIs72HUlLQ4Z45esUjzJ7KuDxlRqy1cGqcci5WEcLlr4pGxl7HXTV6oN
- PHJRzu/8bpkfjD1laSn4x6AHJXjXq9P5/N0XZYeJZx+Cp042TlBVns3e0wpvecWqz+2W
- rpkd5JjTLB8BAzpNvFFtgcWcXolFDHwjFOsig=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=/pADXBfQMBB0ZhOXN56Df7WzUKfxqN8DN7uguFJDGBI=;
- b=WFywL5VUA3TKFKQBqTW+bnfljTVOV0okZFsLuk16163C71rhYDU1GPvUUWals5kkiq
- DPNQni4+5ukLAaBFHrGNz+EMM7IUVjjl0hZsvS5OxAPsDZbCw8nKF8mcZwTC0sGcblJu
- z2DJviZgX1z1LWDVBdgOcxL29PyrSvfzpLUrTLB61wIQxqsmkKGAT4kQXdsAv3rtji1H
- 72xOicZAbhdbcSVdeRxR7DWQF55k1IhUxuViVn3Vs++vAeSM0PxFqhj78q3LlclTDx7c
- D+ZTUUmUdfhZHXcO/jglmgXIQ03fExJY6VthLOEHlrOZ/cNEn+NmCw8ZglzQmzmX6cV0
- /TEQ==
-X-Gm-Message-State: AJcUukeL8zlo3hGvqfcMLe42JuQDdMZdUA+00V5UZfT+Q2fpt4XwSCT0
- pe1p57JvHAd+tcQtvqVU8GoKaovr8PMUroJ0tqTUOw==
-X-Google-Smtp-Source: ALg8bN4dFevJSD2Sh54TewH77Sv/BehSnrO6i++8XF/4am8+FiTXqOneIsnFhuW3fZmPA5wKBpClJXk6aPJbxu2UkZE=
-X-Received: by 2002:a24:edc4:: with SMTP id r187mr3875676ith.158.1548402587357; 
- Thu, 24 Jan 2019 23:49:47 -0800 (PST)
+ id 1gmwGv-0006BG-Ou
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 07:51:31 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=8wUGkLvQF0cnkmBYg2JGT+JABvtZ2h9/CUkQXQu43Pw=;
+ b=XVECqFOU8T/oxqF005sB+D7GKaZbM90/hjwGcQA2nd4ZHk+iVafCHi68eA6UeSUxeaa3BlyOeghOowCXDuRZ4R77CN9ODWcRWzH/JdcmlYlgQCy/ZL/l4T2nhrkc4PfTN5n0ndugAzsnnX1VrBEzHPMY90YF9d4QETujUFr2FBI=
+Received: from VI1PR04MB4431.eurprd04.prod.outlook.com (20.177.55.159) by
+ VI1PR04MB4336.eurprd04.prod.outlook.com (52.134.122.158) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1537.29; Fri, 25 Jan 2019 07:51:25 +0000
+Received: from VI1PR04MB4431.eurprd04.prod.outlook.com
+ ([fe80::558f:3cb4:9a6a:8f84]) by VI1PR04MB4431.eurprd04.prod.outlook.com
+ ([fe80::558f:3cb4:9a6a:8f84%4]) with mapi id 15.20.1558.021; Fri, 25 Jan 2019
+ 07:51:25 +0000
+From: Peng Ma <peng.ma@nxp.com>
+To: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>, "axboe@kernel.dk"
+ <axboe@kernel.dk>
+Subject: RE: [v4] dt-bindings: ahci-fsl-qoriq: add lx2160a chip name to the
+ list
+Thread-Topic: [v4] dt-bindings: ahci-fsl-qoriq: add lx2160a chip name to the
+ list
+Thread-Index: AQHUtF9efFS7Qrpb80CTNCtsf0630qW/myqAgAAAzMA=
+Date: Fri, 25 Jan 2019 07:51:25 +0000
+Message-ID: <VI1PR04MB443120B2EDFF71E7F6BB1969ED9B0@VI1PR04MB4431.eurprd04.prod.outlook.com>
+References: <20190125033221.30333-1-peng.ma@nxp.com>
+ <20190125033221.30333-2-peng.ma@nxp.com>
+ <7c0ed8e1-7d41-8594-fd9d-9e220cbb2ab1@cogentembedded.com>
+In-Reply-To: <7c0ed8e1-7d41-8594-fd9d-9e220cbb2ab1@cogentembedded.com>
+Accept-Language: zh-CN, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=peng.ma@nxp.com; 
+x-originating-ip: [119.31.174.73]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR04MB4336;
+ 6:mCNYjiQoKGdHu3DQglESCNpa/ZGSkKuaGHR1dm+GV2uOM59Yb3PrmvdOkpe+ydHeYfd4oG3YRkIPt+dnP/LkMsYeseK73ivuiP2xQhKSKfwKTPHJvJwH5FSlDsm0a7wGNYLFUZz1pIVksb78FOHUToEAYVHheQsT/S6WYD2kk1NKze4QbLIDxpzSgWXgY72TxsGBtnwY+LBFJdlcjpceq6I/RbYiAh4cW3zChPzlCkQZXNr4zH54Vogrw8ut8M+K4AYOdNSEE5CcKwkocE59CJIQk+0xdv8LGsYEey33tepbzwyG2mtXBhTV1juHEL+DHWZNxg+G6fij28TPAl0rnPn9eJhSJantPYZAd3+9LYzlPePVytbk1EdnjvTNAqOFcVF+bg3k3v8fMoBLGbhbiVYK0VfUUOOwrO4AxVZRizpGVvKyF2a31qEAADcQWRC9azK90Gxh7T9+DPVlG4klag==;
+ 5:eBX+UQu4RDPRmyh8O+ZsfW8qsATKbN/BTwRb+CKHP3PFX4dVBocoOgUiTi93w1rvCf9sHJcE+bmtwm9/mE7hWdXpTlyLaMgRHq59HDQGcgf0o/sj6QLkXN/wxgIu3E/7Sowyk6O++Gj0jYusyQBd8kM0PAcv484mwKUzdqx1EHyjMvpjGOrGSkFaE5/dt6YRqlFYBNvycURZgWnd5FCmPg==;
+ 7:4vbNi11yiKJnCWpwLpgz2lZL3te5/oDni2SbAURqothx39vo8tFX5a92ON/ueHdQCAOd9smVo/blHS62wUpXTCy0CKoamwvcBRW7NC32MsbO+Tg5IUMuw7Zod2X/42FLvQJZUvqaGcxUTFA6uzXR9g==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 660bfebb-734b-4838-4046-08d68299e839
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB4336; 
+x-ms-traffictypediagnostic: VI1PR04MB4336:
+x-microsoft-antispam-prvs: <VI1PR04MB433665DF3731AB03401DDE45ED9B0@VI1PR04MB4336.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0928072091
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(39860400002)(366004)(346002)(376002)(136003)(13464003)(189003)(199004)(44832011)(55016002)(256004)(81156014)(81166006)(8936002)(6116002)(3846002)(99286004)(7736002)(6436002)(8676002)(66066001)(2201001)(2501003)(86362001)(305945005)(53936002)(106356001)(102836004)(11346002)(97736004)(486006)(26005)(9686003)(71190400001)(54906003)(7696005)(2906002)(316002)(478600001)(76176011)(229853002)(71200400001)(110136005)(74316002)(105586002)(68736007)(6506007)(14454004)(25786009)(33656002)(446003)(4326008)(186003)(6246003)(476003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4336;
+ H:VI1PR04MB4431.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: rcqlbfTsd417duwEtjJe0Z9fo6NxJ3XLiHG21OJ8bAVufEieUONiUnIxwuW0qUhnH/MHLUAvUWicdgNup0i6eNRSiEdFSVew9J1FF7YWPcWNfZq07ar8qBAJiecKJCF4He67ytOFJ0Rxb4mYwSw+g3tiDNeuZdq4ppAB1FJ1yKx2ReCg5ApneZlGlAz6kZBGFI7XX1qV+ACTKPaqwr5PA46HKcxV0peZ7CqFP9i+oFokXb9b81qup8cSoR08GJ8x9U+SEP9FNYiAWlsckJZ5NsZqxHNYMd9K4Uu5gvoJHjD694/ld+8+nx0OfVLrUx6iv5M6+6ziBqMf8zBrBdxpPlOQKsW3BWOhyJOgkbEoMoimBAF5NWFyseGon2PZVCaKVLaMRITDScqjJbg84lntP+V1//2PnLpjym+19+cljBA=
 MIME-Version: 1.0
-References: <20190124182712.7142-1-ard.biesheuvel@linaro.org>
- <20190124182712.7142-3-ard.biesheuvel@linaro.org>
- <20190125072948.GC700@sol.localdomain>
-In-Reply-To: <20190125072948.GC700@sol.localdomain>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Fri, 25 Jan 2019 08:49:36 +0100
-Message-ID: <CAKv+Gu_=NOiATKH1LgWYggBsfAUBU3DkDyFPv8NG=DgtA+sQyQ@mail.gmail.com>
-Subject: Re: [PATCH 2/2] crypto: arm64/crct10dif - revert to C code for short
- inputs
-To: Eric Biggers <ebiggers@kernel.org>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 660bfebb-734b-4838-4046-08d68299e839
+X-MS-Exchange-CrossTenant-originalarrivaltime: 25 Jan 2019 07:51:25.6239 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4336
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_234949_792720_33794E77 
-X-CRM114-Status: GOOD (  23.97  )
+X-CRM114-CacheID: sfid-20190124_235129_811028_278754C3 
+X-CRM114-Status: GOOD (  13.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,97 +117,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
- <linux-crypto@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Herbert Xu <herbert@gondor.apana.org.au>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Andy Tang <andy.tang@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Leo Li <leoyang.li@nxp.com>,
+ "linux-ide@vger.kernel.org" <linux-ide@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 25 Jan 2019 at 08:29, Eric Biggers <ebiggers@kernel.org> wrote:
->
-> On Thu, Jan 24, 2019 at 07:27:12PM +0100, Ard Biesheuvel wrote:
-> > The SIMD routine ported from x86 used to have a special code path
-> > for inputs < 16 bytes, which got lost somewhere along the way.
-> > Instead, the current glue code aligns the input pointer to permit
-> > the NEON routine to use special versions of the vld1 instructions
-> > that assume 16 byte alignment, but this could result in inputs of
-> > less than 16 bytes to be passed in.
->
-> This description doesn't quite match the patch since the arm64 version of the
-> assembly doesn't use any alignment specifiers.  I take it that actually means
-> the alignment in the glue code wasn't necessary in the first place?
->
-
-Not for correctness, but it could affect performance.
-
-> > This not only fails the new
-> > extended tests that Eric has implemented, it also results in the
-> > code reading before the input pointer, which could potentially
-> > result in crashes when dealing with less than 16 bytes of input
-> > at the start of a page which is preceded by an unmapped page.
-> >
-> > So update the glue code to only invoke the NEON routine if the
-> > input is more than 16 bytes.
-> >
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> Can you add:
->
-> Fixes: 6ef5737f3931 ("crypto: arm64/crct10dif - port x86 SSE implementation to arm64")
-> Cc: stable@vger.kernel.org
->
-
-Will do
-
-> > ---
-> >  arch/arm64/crypto/crct10dif-ce-glue.c | 25 +++++---------------
-> >  1 file changed, 6 insertions(+), 19 deletions(-)
-> >
-> > diff --git a/arch/arm64/crypto/crct10dif-ce-glue.c b/arch/arm64/crypto/crct10dif-ce-glue.c
-> > index b461d62023f2..567c24f3d224 100644
-> > --- a/arch/arm64/crypto/crct10dif-ce-glue.c
-> > +++ b/arch/arm64/crypto/crct10dif-ce-glue.c
-> > @@ -39,26 +39,13 @@ static int crct10dif_update(struct shash_desc *desc, const u8 *data,
-> >                           unsigned int length)
-> >  {
-> >       u16 *crc = shash_desc_ctx(desc);
-> > -     unsigned int l;
-> >
-> > -     if (unlikely((u64)data % CRC_T10DIF_PMULL_CHUNK_SIZE)) {
-> > -             l = min_t(u32, length, CRC_T10DIF_PMULL_CHUNK_SIZE -
-> > -                       ((u64)data % CRC_T10DIF_PMULL_CHUNK_SIZE));
-> > -
-> > -             *crc = crc_t10dif_generic(*crc, data, l);
-> > -
-> > -             length -= l;
-> > -             data += l;
-> > -     }
-> > -
-> > -     if (length > 0) {
-> > -             if (may_use_simd()) {
-> > -                     kernel_neon_begin();
-> > -                     *crc = crc_t10dif_pmull(*crc, data, length);
-> > -                     kernel_neon_end();
-> > -             } else {
-> > -                     *crc = crc_t10dif_generic(*crc, data, length);
-> > -             }
-> > +     if (length >= CRC_T10DIF_PMULL_CHUNK_SIZE && may_use_simd()) {
-> > +             kernel_neon_begin();
-> > +             *crc = crc_t10dif_pmull(*crc, data, length);
-> > +             kernel_neon_end();
-> > +     } else {
-> > +             *crc = crc_t10dif_generic(*crc, data, length);
-> >       }
-> >
-> >       return 0;
-> > --
-> > 2.17.1
-> >
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+DQoNCj4tLS0tLU9yaWdpbmFsIE1lc3NhZ2UtLS0tLQ0KPkZyb206IFNlcmdlaSBTaHR5bHlvdiA8
+c2VyZ2VpLnNodHlseW92QGNvZ2VudGVtYmVkZGVkLmNvbT4NCj5TZW50OiAyMDE55bm0MeaciDI1
+5pelIDE1OjQ2DQo+VG86IFBlbmcgTWEgPHBlbmcubWFAbnhwLmNvbT47IHNoYXduZ3VvQGtlcm5l
+bC5vcmc7IGF4Ym9lQGtlcm5lbC5kaw0KPkNjOiByb2JoK2R0QGtlcm5lbC5vcmc7IG1hcmsucnV0
+bGFuZEBhcm0uY29tOyBMZW8gTGkNCj48bGVveWFuZy5saUBueHAuY29tPjsgbGludXgtaWRlQHZn
+ZXIua2VybmVsLm9yZzsgZGV2aWNldHJlZUB2Z2VyLmtlcm5lbC5vcmc7DQo+bGludXgta2VybmVs
+QHZnZXIua2VybmVsLm9yZzsgbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnOyBB
+bmR5IFRhbmcNCj48YW5keS50YW5nQG54cC5jb20+DQo+U3ViamVjdDogUmU6IFt2NF0gZHQtYmlu
+ZGluZ3M6IGFoY2ktZnNsLXFvcmlxOiBhZGQgbHgyMTYwYSBjaGlwIG5hbWUgdG8gdGhlIGxpc3QN
+Cj4NCj5IZWxsbyENCj4NCj5PbiAyNS4wMS4yMDE5IDY6MzIsIFBlbmcgTWEgd3JvdGU6DQo+DQo+
+PiBBZGQgbHh4MjE2MGEgY29tcGF0aWJsZSB0byBiaW5kaW5ncyBkb2N1bWVudGF0aW9uLg0KPg0K
+PiAgICBseDIxNjBhPw0KPg0KW1BlbmcgTWFdIA0KWWVzLCBpdCBpcyBzaG91bGQgYmUgbHgyMTYw
+YSwgdGhhbmtzIHZlcnkgbXVjaC4NCkkgd2lsbCBjaGFuZ2UgaXQgYXMgc29vbiBhcyBwb3NzaWJs
+ZS4NCkJlc3QgUmVnYXJkcywNClBlbmcNCj4+IFNpZ25lZC1vZmYtYnk6IFBlbmcgTWEgPHBlbmcu
+bWFAbnhwLmNvbT4NCj4+IC0tLQ0KPj4gY2hhbmdlZCBmb3IgVjQ6DQo+PiAJLSBhZGQgbHgyMTYw
+YSBjb21wYXRpYmxlIHRvIGJpbmRpbmdzIGRvYw0KPj4NCj4+ICAgLi4uL2RldmljZXRyZWUvYmlu
+ZGluZ3MvYXRhL2FoY2ktZnNsLXFvcmlxLnR4dCAgICAgfCAgICAyICstDQo+PiAgIDEgZmlsZXMg
+Y2hhbmdlZCwgMSBpbnNlcnRpb25zKCspLCAxIGRlbGV0aW9ucygtKQ0KPj4NCj4+IGRpZmYgLS1n
+aXQgYS9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvYXRhL2FoY2ktZnNsLXFvcmlx
+LnR4dA0KPmIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL2F0YS9haGNpLWZzbC1x
+b3JpcS50eHQNCj4+IGluZGV4IDdjM2NhMGUuLjllY2MwMTkgMTAwNjQ0DQo+PiAtLS0gYS9Eb2N1
+bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvYXRhL2FoY2ktZnNsLXFvcmlxLnR4dA0KPj4g
+KysrIGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL2F0YS9haGNpLWZzbC1xb3Jp
+cS50eHQNCj4+IEBAIC0zLDcgKzMsNyBAQCBCaW5kaW5nIGZvciBGcmVlc2NhbGUgUW9ySVEgQUhD
+SSBTQVRBIENvbnRyb2xsZXINCj4+ICAgUmVxdWlyZWQgcHJvcGVydGllczoNCj4+ICAgICAtIHJl
+ZzogUGh5c2ljYWwgYmFzZSBhZGRyZXNzIGFuZCBzaXplIG9mIHRoZSBjb250cm9sbGVyJ3MgcmVn
+aXN0ZXIgYXJlYS4NCj4+ICAgICAtIGNvbXBhdGlibGU6IENvbXBhdGliaWxpdHkgc3RyaW5nLiBN
+dXN0IGJlICdmc2wsPGNoaXA+LWFoY2knLCB3aGVyZQ0KPj4gLSAgICBjaGlwIGNvdWxkIGJlIGxz
+MTAyMWEsIGxzMTA0M2EsIGxzMTA0NmEsIGxzMTA4OGEsIGxzMjA4MGEgZXRjLg0KPj4gKyAgICBj
+aGlwIGNvdWxkIGJlIGxzMTAyMWEsIGxzMTA0M2EsIGxzMTA0NmEsIGxzMTA4OGEsIGxzMjA4MGEs
+IGx4MjE2MGEsIGV0Yy4NCj4+ICAgICAtIGNsb2NrczogSW5wdXQgY2xvY2sgc3BlY2lmaWVyLiBS
+ZWZlciB0byBjb21tb24gY2xvY2sgYmluZGluZ3MuDQo+PiAgICAgLSBpbnRlcnJ1cHRzOiBJbnRl
+cnJ1cHQgc3BlY2lmaWVyLiBSZWZlciB0byBpbnRlcnJ1cHQgYmluZGluZy4NCj4+DQo+DQo+TUJS
+LCBTZXJnZWkNCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+CmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5m
+cmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xp
+bnV4LWFybS1rZXJuZWwK
