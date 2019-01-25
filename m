@@ -4,71 +4,84 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 79627C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:53:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DED17C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:57:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 487C221855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:53:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ADA2621872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:57:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uD5JJdle"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 487C221855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sxfFGREh";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="J73g2hmV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADA2621872
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Pr2jDIkOY8wPz7inTtjtRBtoBy2dFej1k/aGhmq2ESA=; b=uD5JJdleMc8Rd9
-	IifItn/m7xhJBMUJhxxj/BkT2X2eLk/o0E5YXBOQ7o/elAo6II+baB76TmVfgzU24Dj5+CeS/fO4l
-	8pSxmN12By/3yIkf0rv1dQqtE7a89FxGgiTmq5uzvBIBibkQeUtdC9F9eYBLGbF4yuC4hu6mTEPIS
-	uRYGAtqialUmtJjdd+YxQrkl1u161rkvlNKuEZBnjMS1O5VV/OcSUdW2ZIh7ifozgm/c/OG+MrAs8
-	d4reSJqvZ1y91g3K5o24IOf2OiNglIY6QqcJCYWlAP+3qjv+Cw7F7lIIwAU+kDq6Enpsv0QDM2eSg
-	6nyyh084TXXYc8z3x6MQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=RHKiTbST8I6BmhOKbRo1SiL7Nlnj6skLSJ9Kl0B8KqQ=; b=sxfFGREhA3rEIWZyyZOOquTHW
+	n8RDlYpdq+UXjBs519ATlhONqnPa/6jtlNf9dKwahnVUOChY8+fBMcA+8nApxa5oxKiwcsj0BN57u
+	54AnzxHS1qu/1eIyPcl7YbsUKA8ntYlGrdXaaNl/7Yai8KsOjFDBjN1MXtENNOKBdvRncoP9Dp5yF
+	ds2EcXc+HtJl2aGQrHuTOP7xIOpZtSHJoNq2qT/GW9q1iMkA5WxTjdRc63Mcsg6KTRzvMdIh7ISS5
+	r8XDHhYAkXiVar7kUWwKRUQthcLHh05GhkCo8vWL8r7qzV+Kgp2R7rVwd3sjGfJm+RD1uwRntZPrV
+	yJY4TNYZA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmsY6-0003KK-3P; Fri, 25 Jan 2019 03:52:58 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gmsbz-000578-1X; Fri, 25 Jan 2019 03:56:59 +0000
+Received: from hqemgate14.nvidia.com ([216.228.121.143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmsXy-0003D2-EN; Fri, 25 Jan 2019 03:52:55 +0000
-X-UUID: 4a8e8d74693e4c51b9283f05f9ee38eb-20190124
-X-UUID: 4a8e8d74693e4c51b9283f05f9ee38eb-20190124
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
- (envelope-from <ryder.lee@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 17482150; Thu, 24 Jan 2019 19:52:47 -0800
-Received: from MTKMBS31N2.mediatek.inc (172.27.4.87) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 24 Jan 2019 19:52:46 -0800
-Received: from mtkcas07.mediatek.inc (172.21.101.84) by
- MTKMBS31N2.mediatek.inc (172.27.4.87) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 25 Jan 2019 11:52:43 +0800
-Received: from [172.21.77.33] (172.21.77.33) by mtkcas07.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 25 Jan 2019 11:52:43 +0800
-Message-ID: <1548388363.29237.17.camel@mtkswgap22>
-Subject: Re: [PATCH v1 1/5] pwm: mediatek: add a property "mediatek,num-pwms"
-From: Ryder Lee <ryder.lee@mediatek.com>
-To: Uwe =?ISO-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>,
- "John Crispin" <john@phrozen.org>
-Date: Fri, 25 Jan 2019 11:52:43 +0800
-In-Reply-To: <20190121084948.frpcgg6wkdjxkl7k@pengutronix.de>
-References: <de316385a84e079d3b23891e61c959094b9fa7e5.1547781007.git.ryder.lee@mediatek.com>
- <c007d399-af86-98d3-94f9-b9762efdc219@gmail.com>
- <1547866487.14213.10.camel@mtkswgap22>
- <20190121084948.frpcgg6wkdjxkl7k@pengutronix.de>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gmsbv-00056k-SC
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 03:56:57 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c4a89070005>; Thu, 24 Jan 2019 19:56:55 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Thu, 24 Jan 2019 19:56:55 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Thu, 24 Jan 2019 19:56:55 -0800
+Received: from [10.19.108.132] (10.124.1.5) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 25 Jan
+ 2019 03:56:54 +0000
+Subject: Re: [PATCH 3/6] arm64: dts: tegra210: fix timer node
+To: Jon Hunter <jonathanh@nvidia.com>, Thierry Reding
+ <thierry.reding@gmail.com>
+References: <20190107032810.13522-1-josephl@nvidia.com>
+ <20190107032810.13522-4-josephl@nvidia.com>
+ <867b5168-e3cb-6423-b3d2-c075d1701c88@nvidia.com>
+From: Joseph Lo <josephl@nvidia.com>
+Message-ID: <60b7e6b5-225b-b873-3aea-f81a2a658c9c@nvidia.com>
+Date: Fri, 25 Jan 2019 11:56:52 +0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-MTK: N
+In-Reply-To: <867b5168-e3cb-6423-b3d2-c075d1701c88@nvidia.com>
+X-Originating-IP: [10.124.1.5]
+X-ClientProxiedBy: HQMAIL108.nvidia.com (172.18.146.13) To
+ HQMAIL101.nvidia.com (172.20.187.10)
+Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1548388615; bh=u6xEaqIllTWZWwzmeuJG2pP0vnj6HylcW3Y1zSDRztM=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=J73g2hmVIkH4LIbpggnta3lK3WVfDIdhUMrndUBe7bsjvuPajMqbuQF/DFgYScVjn
+ 0meWTmOgo8WLBrjwuYNtto2tygnab1BLXGbxaR8B2rupBbiQHGFuHVN3e5CzKMAi21
+ ZjgxTYQER6y/OX0hIP1Aj3fMbLPYkYxAEVihzSjEFSTYayiLo5hYfdV0HHECiA+kzA
+ d8Xh0Hzzk7XtsDjW88vFh7S9y/EaKnYnxAogJ3lmAZ6B35uHrb6Ln0ccFg4aqlNR3D
+ B3MvZqe+iMrL8QMmVS0JQHE+hB8zuts8sTmLALSJ92PayjjSt6qowLDRI4hxOahdzc
+ Cv1SYSaFzGz6A==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_195250_841710_807BA881 
-X-CRM114-Status: GOOD (  28.23  )
+X-CRM114-CacheID: sfid-20190124_195655_923551_0BA48F3D 
+X-CRM114-Status: GOOD (  20.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,95 +93,92 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-pwm@vger.kernel.org" <linux-pwm@vger.kernel.org>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Sean Wang <sean.wang@kernel.org>,
- Weijie Gao =?UTF-8?Q?=28=E9=AB=98=E6=83=9F=E6=9D=B0=29?=
- <Weijie.Gao@mediatek.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, Thierry
- Reding <thierry.reding@gmail.com>,
- "linux-mediatek@lists.infradead.org" <linux-mediatek@lists.infradead.org>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-K0pvaG4KCkhJIEpvaG4sCgpPbiBNb24sIDIwMTktMDEtMjEgYXQgMTY6NDkgKzA4MDAsIFV3ZSBL
-bGVpbmUtS8O2bmlnIHdyb3RlOgo+IE9uIFNhdCwgSmFuIDE5LCAyMDE5IGF0IDEwOjU0OjQ3QU0g
-KzA4MDAsIFJ5ZGVyIExlZSB3cm90ZToKPiA+IE9uIEZyaSwgMjAxOS0wMS0xOCBhdCAwOTo0MyAr
-MDEwMCwgTWF0dGhpYXMgQnJ1Z2dlciB3cm90ZToKPiA+ID4KPiA+ID4gT24gMTgvMDEvMjAxOSAw
-NDoyNCwgUnlkZXIgTGVlIHdyb3RlOgo+ID4gPiA+IFRoaXMgYWRkcyBhIHByb3BlcnR5ICJtZWRp
-YXRlayxudW0tcHdtcyIgdG8gYXZvaWQgaGF2aW5nIGFuIGVuZGxlc3MKPiA+ID4gPiBsaXN0IG9m
-IGNvbXBhdGlibGVzIHdpdGggbm8gZGlmZmVyZW5jZXMgZm9yIHRoZSBzYW1lIGRyaXZlci4KPiA+
-ID4gPgo+ID4gPiA+IFRodXMsIHRoZSBkcml2ZXIgc2hvdWxkIGhhdmUgYmFja3dhcmRzIGNvbXBh
-dGliaWxpdHkgdG8gb2xkZXIgRFRzLgo+ID4gPiA+Cj4gPiA+ID4gU2lnbmVkLW9mZi1ieTogUnlk
-ZXIgTGVlIDxyeWRlci5sZWVAbWVkaWF0ZWsuY29tPgo+ID4gPiA+IC0tLQo+ID4gPiA+IENoYW5n
-ZXMgc2luY2UgdjE6IGFkZCBzb21lIGNoZWNrcyBmb3IgYmFja3dhcmRzIGNvbXBhdGliaWxpdHku
-Cj4gPiA+ID4gLS0tCj4gPiA+ID4gIGRyaXZlcnMvcHdtL3B3bS1tZWRpYXRlay5jIHwgMjcgKysr
-KysrKysrKysrKysrKysrLS0tLS0tLS0tCj4gPiA+ID4gIDEgZmlsZSBjaGFuZ2VkLCAxOCBpbnNl
-cnRpb25zKCspLCA5IGRlbGV0aW9ucygtKQo+ID4gPiA+Cj4gPiA+ID4gZGlmZiAtLWdpdCBhL2Ry
-aXZlcnMvcHdtL3B3bS1tZWRpYXRlay5jIGIvZHJpdmVycy9wd20vcHdtLW1lZGlhdGVrLmMKPiA+
-ID4gPiBpbmRleCBlYjY2NzRjLi44MWI3ZTVlIDEwMDY0NAo+ID4gPiA+IC0tLSBhL2RyaXZlcnMv
-cHdtL3B3bS1tZWRpYXRlay5jCj4gPiA+ID4gKysrIGIvZHJpdmVycy9wd20vcHdtLW1lZGlhdGVr
-LmMKPiA+ID4gPiBAQCAtNTUsNyArNTUsNyBAQCBlbnVtIHsKPiA+ID4gPiAgfTsKPiA+ID4gPgo+
-ID4gPiA+ICBzdHJ1Y3QgbXRrX3B3bV9wbGF0Zm9ybV9kYXRhIHsKPiA+ID4gPiAtIHVuc2lnbmVk
-IGludCBudW1fcHdtczsKPiA+ID4gPiArIHVuc2lnbmVkIGludCBudW1fcHdtczsgIC8qIGl0IHNo
-b3VsZCBub3QgYmUgdXNlZCBpbiB0aGUgZnV0dXJlIFNvQ3MgKi8KPiA+ID4gPiAgIGJvb2wgcHdt
-NDVfZml4dXA7Cj4gPiA+ID4gICBib29sIGhhc19jbGtzOwo+ID4gPiA+ICB9Owo+ID4gPiA+IEBA
-IC0yMjYsMjcgKzIyNiwzNiBAQCBzdGF0aWMgdm9pZCBtdGtfcHdtX2Rpc2FibGUoc3RydWN0IHB3
-bV9jaGlwICpjaGlwLCBzdHJ1Y3QgcHdtX2RldmljZSAqcHdtKQo+ID4gPiA+Cj4gPiA+ID4gIHN0
-YXRpYyBpbnQgbXRrX3B3bV9wcm9iZShzdHJ1Y3QgcGxhdGZvcm1fZGV2aWNlICpwZGV2KQo+ID4g
-PiA+ICB7Cj4gPiA+ID4gLSBjb25zdCBzdHJ1Y3QgbXRrX3B3bV9wbGF0Zm9ybV9kYXRhICpkYXRh
-Owo+ID4gPiA+ICsgc3RydWN0IGRldmljZV9ub2RlICpucCA9IHBkZXYtPmRldi5vZl9ub2RlOwo+
-ID4gPiA+ICAgc3RydWN0IG10a19wd21fY2hpcCAqcGM7Cj4gPiA+ID4gICBzdHJ1Y3QgcmVzb3Vy
-Y2UgKnJlczsKPiA+ID4gPiAtIHVuc2lnbmVkIGludCBpOwo+ID4gPiA+ICsgdW5zaWduZWQgaW50
-IGksIG51bV9wd21zOwo+ID4gPiA+ICAgaW50IHJldDsKPiA+ID4gPgo+ID4gPiA+ICAgcGMgPSBk
-ZXZtX2t6YWxsb2MoJnBkZXYtPmRldiwgc2l6ZW9mKCpwYyksIEdGUF9LRVJORUwpOwo+ID4gPiA+
-ICAgaWYgKCFwYykKPiA+ID4gPiAgICAgICAgICAgcmV0dXJuIC1FTk9NRU07Cj4gPiA+ID4KPiA+
-ID4gPiAtIGRhdGEgPSBvZl9kZXZpY2VfZ2V0X21hdGNoX2RhdGEoJnBkZXYtPmRldik7Cj4gPiA+
-ID4gLSBpZiAoZGF0YSA9PSBOVUxMKQo+ID4gPiA+IC0gICAgICAgICByZXR1cm4gLUVJTlZBTDsK
-PiA+ID4gPiAtIHBjLT5zb2MgPSBkYXRhOwo+ID4gPiA+ICsgcGMtPnNvYyA9IG9mX2RldmljZV9n
-ZXRfbWF0Y2hfZGF0YSgmcGRldi0+ZGV2KTsKPiA+ID4gPgo+ID4gPiA+ICAgcmVzID0gcGxhdGZv
-cm1fZ2V0X3Jlc291cmNlKHBkZXYsIElPUkVTT1VSQ0VfTUVNLCAwKTsKPiA+ID4gPiAgIHBjLT5y
-ZWdzID0gZGV2bV9pb3JlbWFwX3Jlc291cmNlKCZwZGV2LT5kZXYsIHJlcyk7Cj4gPiA+ID4gICBp
-ZiAoSVNfRVJSKHBjLT5yZWdzKSkKPiA+ID4gPiAgICAgICAgICAgcmV0dXJuIFBUUl9FUlIocGMt
-PnJlZ3MpOwo+ID4gPiA+Cj4gPiA+ID4gLSBmb3IgKGkgPSAwOyBpIDwgZGF0YS0+bnVtX3B3bXMg
-KyAyICYmIHBjLT5zb2MtPmhhc19jbGtzOyBpKyspIHsKPiA+ID4gPiArIC8qIENoZWNrIGlmIHdl
-IGhhdmUgc2V0ICdudW0tcHdtcycgaW4gRFRzLiAqLwo+ID4gPiA+ICsgcmV0ID0gb2ZfcHJvcGVy
-dHlfcmVhZF91MzIobnAsICJtZWRpYXRlayxudW0tcHdtcyIsICZudW1fcHdtcyk7Cj4gPiA+ID4g
-KyBpZiAocmV0IDwgMCkgewo+ID4gPiA+ICsgICAgICAgICAvKiBJZiBubywgZmFsbGJhY2sgdG8g
-dXNlIFNvQyBkYXRhIGZvciBiYWNrd2FyZHMgY29tcGF0aWJpbGl0eS4gKi8KPiA+ID4gPiArICAg
-ICAgICAgaWYgKHBjLT5zb2MtPm51bV9wd21zKSB7Cj4gPiA+ID4gKyAgICAgICAgICAgICAgICAg
-bnVtX3B3bXMgPSBwYy0+c29jLT5udW1fcHdtczsKPiA+ID4KPiA+ID4gTWF5YmUgdGhhdCdzIGJp
-a2Ugc2hlZGRpbmcsIGJ1dCBJIHRoaW5rIGl0IHdvdWxkIGJlIGJldHRlciB0byBjYXJ2ZSBvdXQg
-dGhlCj4gPiA+IG51bV9wd21zIGZyb20gdGhlIG10a19wd21fcGxhdGZvcm1fZGF0YSBhbmQgY2hl
-Y2sgYWdhaW5zdCB0aGUgY29tcGF0aWJsZSBoZXJlLgo+ID4KPiA+IEknbSBub3Qgc3VyZSBob3cg
-dG8gcHJvcGVybHkgY3VydmUgaXQgb3V0PyBJIHRoaW5rIHdlIHN0aWxsIG5lZWQgdGhpcwo+ID4g
-dmFyaWFibGUgdG8gc2F2ZSB0aGUgc3BlY2lmaWMgdmFsdWUgZm9yIHNvbWUgbGVnYWN5IFNvQ3Mg
-KHdpdGggb2xkZXIKPiA+IERUcykuCj4gCj4gSSBndWVzcyBoZSBtZWFucyAgc29tZXRoaW5nIGxp
-a2U6Cj4gCj4gICAgICAgICBpZiAoaXNfY29tcGF0aWJsZV90b192YXJpYW50X0EoZGV2KSkKPiAg
-ICAgICAgICAgICAgICAgbnVtX3B3bXMgPSAxMjsKPiAgICAgICAgIGVsc2UgaWYgKGlzX2NvbXBh
-dGlibGVfdG9fdmFyaWFudF9CKGRldikpCj4gICAgICAgICAgICAgICAgIG51bV9wd21zID0gMjsK
-PiAKPiAuIEluIG15IGV5ZXMgdGhlIGJpa2Ugc2hlZCBzaG91bGQgYmUgbGlnaHQgcmVkIGFuZCBJ
-IHByZWZlciB0byBjb2xsZWN0Cj4gdGhlIGZhbGxiYWNrIG51bV9wd21zIGluIHRoZSBjb21wYXRp
-YmxlX2RhdGEgYXMgaXMgdG8ga2VlcCB0aGUgY29kZQo+IHNpbXBsZXIuIE1heWJlIHJlbmFtZSB0
-aGUgbWVtYmVyIGZyb20gbnVtX3B3bXMgdG8gZmFsbGJhY2tfbnVtX3B3bXMgdG8KPiBtYWtlIGl0
-IG1vcmUgb2J2aW91cyB0aGF0IGl0IGRvZXNuJ3QgcmVwcmVzZW50IHRoZSBhY3R1YWxseSB1c2Vk
-IHZhbHVlLgo+IAo+ID4gPiBXaXRoIGEgZXhwcmVzc2l2ZSBjb21tZW50IGl0IHdpbGwgaGVscCBv
-dGhlciBkcml2ZXIgZGV2ZWxvcGVycyB0byBub3Qgc3RhcnQKPiA+ID4gYWRkaW5nIG51bV9wd21z
-IGluIHRoZSBwbGF0Zm9ybSBkYXRhIGluIHRoZWlyIGZpcnN0IGF0dGVtcHQuCj4gPgo+ID4gRGVm
-aW5pdGVseS4KPiAKPiBNeSBzdWdnZXN0aW9uIHdhcyB0byBhZGQgYSBkZXZfd2Fybiwgd2hpY2gg
-SU1ITyBpcyBzdGlsbCBiZXR0ZXIgdGhhbiBhCj4gY29tbWVudC4KPiAKPiBCZXN0IHJlZ2FyZHMK
-PiBVd2UKPiAKClVucmVsYXRlZCB0byB0aGlzIHBhdGNoOiBJJ20gcmVhZHkgdG8gc2VuZCB2MiB0
-byBhbGxvY2F0ZSB0aGUgY2xrcyBhcnJheQpkeW5hbWljYWxseSwgYnV0IEkgZ3Vlc3MgTVQ3NjI4
-IGNvdWxkbid0IHdvcmsgaW4gb3JpZ2luYWwgY29kZS4KCgpJbiBtdGtfcHdtX2NvbmZpZygpOgoK
-ICAgICAgICBjbGsgPSBwYy0+Y2xrc1tNVEtfQ0xLX1BXTTEgKyBwd20tPmh3cHdtXTsgCiAgICAg
-ICAgLi4uLgogICAgICAgIHJlc29sdXRpb24gPSAodTY0KU5TRUNfUEVSX1NFQyAqIDEwMDA7CiAg
-ICAgICAgZG9fZGl2KHJlc29sdXRpb24sIGNsa19nZXRfcmF0ZShjbGspKTsKICAgICAgICAuLi4u
-CgpJIHRoaW5rIGNsayBzaG91bGQgYmUgTlVMTCBhbmQgcmVzb2x1dGlvbiBpcyBhbHdheXMgMCBo
-ZXJlLiAKCgpSeWRlcgoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlz
-dHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3Rp
-bmZvL2xpbnV4LWFybS1rZXJuZWwK
+On 1/24/19 7:16 PM, Jon Hunter wrote:
+> 
+> On 07/01/2019 03:28, Joseph Lo wrote:
+>> Fix timer node to make it work with Tegra210 timer driver. And backward
+>> compatible with the Tegra watchdog driver.
+>>
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> ---
+>>   arch/arm64/boot/dts/nvidia/tegra210.dtsi | 12 +++++-------
+>>   1 file changed, 5 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+>> index b5858b5ea052..143bd103c923 100644
+>> --- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+>> +++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+>> @@ -384,14 +384,12 @@
+>>   	};
+>>   
+>>   	timer@60005000 {
+>> -		compatible = "nvidia,tegra210-timer", "nvidia,tegra20-timer";
+>> +		compatible = "nvidia,tegra210-timer", "nvidia,tegra30-timer";
+>>   		reg = <0x0 0x60005000 0x0 0x400>;
+>> -		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
+>> -			     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
+>> -			     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
+>> -			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
+>> -			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+>> -			     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
+>> +		interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>,
+>> +			     <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>,
+>> +			     <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>,
+>> +			     <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>;
+>>   		clocks = <&tegra_car TEGRA210_CLK_TIMER>;
+>>   		clock-names = "timer";
+>>   	};
+> 
+> Hmmm ... I can't say I understand this. So now the timer devices are
+> compatible with two different drivers?
+
+The tegra210-timer is for clock event device and the tegra30-timer is 
+for watchdog timer, that is the usage for Tegra platform before 
+Tegra210. But... (see below)
+
+> 
+> Begs the question why did we not just extend the existing tegra20-timer
+> rather than adding a new one?
+
+The tegra20-timer was designed for very early stage that the arm-twd 
+driver not ready yet. So it was the clock event device and sched timer 
+for tegra20/30 at that stage. And I believe this driver was replaced and 
+deprecated by arm-twd and armv7 timer for tegra20/30/114/124. So 
+basically, I think we can remove this driver now.
+
+So back to the question above, as we see the similar timer node binding 
+in tegra20/30/114/124/132 dts file. It actually didn't use tegra20 timer 
+driver at all but instead of arm-twd and armv7 timer. The binding only 
+makes it work with the tegra-wdt driver, which is the compatible string 
+of "nvidia,tegra30-timer". Maybe we should fix them all together.
+
+> 
+> Also you did not explain why we make them compatible with the watchdog
+> driver? We have other watchdogs timer and so why do we need to make them
+> compatible?
+> 
+
+The detail explanation is above. In here, I just follow the legacy 
+binding convention that we used in other tegra dts files. This binding 
+makes it work with TMR5, which is the watchdog timer that we used to use 
+for Tegra.
+
+If we don't prefer this way, I can remove that for now. And we need to 
+find a different way to merge watchdog timer driver and timer driver 
+into one driver.
+
+Let me know which one is acceptable for now.
+
+Thanks,
+Joseph
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
