@@ -7,80 +7,60 @@ X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D6100C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 04:21:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C748C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 05:00:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A871C218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 04:21:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 30C1F218D2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 05:00:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FGzvPEdL";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="h4k/TjIM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A871C218A6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nFf4zFnp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 30C1F218D2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=dW2Mn2QmJH0pPPXhx+bE9nD0bc1qxvCnWmHenxAENHg=; b=FGzvPEdLIdTytF8/eLFGBFzTK
-	bszBiQ+zfLej5TULh70nMDt9y+LuCYdpwWIQxrpzU6NHv566hniD7y/tsDtYawmoJs6Z2aDd7cxBk
-	Bb7e2BTy4Q77WyKYIeQfFei7+jH2LT5gYYgRN+AftY0AqIvlf5Hq5FNq6Q4hjCpz+TMYGkf24o6/j
-	LwGVPpHgiCSu3PF2nC5RJVsS9lfY/GTqy5mZVhJlkUHHWGfAg4rLSvjj9YqNf/M9QHU/+jfL83NHF
-	chcqBOt1N7Gal5ALTc1xqQYmEMktDCRYa0u0OPP3DLgX9j8eHAUmYiTcQb4coloR1FqTpdAbeujlO
-	8BXeNKHBA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=+M7lAO25jdJWHrT3ZLfzMPoydQAFrWyI8gNv2pYM/Ag=; b=nFf4zFnpCPkgs5
+	0X0j99BN66xi+TXlbz+VYj60oLEhhhHGzfKgQtf0ydJuKOocfZyWUp/eB7gNk/M3DpOPNHLQ6WzKP
+	TnToY3hj3aslG2eeA0GVMy6i320xb2w26sbe9lkmPUoOXJW7ot+k6OH18XzOWnxzjfzV/VDY8+3RJ
+	CoZEo1JsuT31Mzwow7mZ3qMdsbx4OdIZcloPN5H5oGEUCn8/lBMEqvYuijHMf4WBOEbrbqtXpqkEU
+	6wHJWvAnW6CMcA3K+BhRuDRAyWUvNCUPezWqnMJa2XtaEN4gJsrdC6rLcfblO4mU2kL2tQKtlAFE7
+	g8JwWkfIdAiJ7zihCUnA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmszs-0005zf-En; Fri, 25 Jan 2019 04:21:40 +0000
-Received: from hqemgate15.nvidia.com ([216.228.121.64])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmszZ-0005si-IZ
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 04:21:25 +0000
-Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c4a8ea70002>; Thu, 24 Jan 2019 20:20:55 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate102.nvidia.com (PGP Universal service);
- Thu, 24 Jan 2019 20:21:20 -0800
-X-PGP-Universal: processed;
- by hqpgpgate102.nvidia.com on Thu, 24 Jan 2019 20:21:20 -0800
-Received: from [10.19.108.132] (172.20.13.39) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 25 Jan
- 2019 04:21:19 +0000
-Subject: Re: [PATCH] soc/tegra: fuse: fix typo in tegra210_init_speedo_data
-To: Thierry Reding <thierry.reding@gmail.com>, Jonathan Hunter
- <jonathanh@nvidia.com>
-References: <20190104071646.15828-1-josephl@nvidia.com>
- <20190104071646.15828-3-josephl@nvidia.com>
-From: Joseph Lo <josephl@nvidia.com>
-Message-ID: <2a20640b-5df7-c9e1-9e8d-66e33e79ab83@nvidia.com>
-Date: Fri, 25 Jan 2019 12:21:17 +0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gmtas-0007q8-TC; Fri, 25 Jan 2019 04:59:54 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmtaq-0007pP-Hf
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 04:59:53 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C6ED915AB;
+ Thu, 24 Jan 2019 20:59:47 -0800 (PST)
+Received: from [10.163.1.93] (unknown [10.163.1.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 2FDAC3F589;
+ Thu, 24 Jan 2019 20:59:44 -0800 (PST)
+Subject: Re: [PATCH 2/6] arm64/mm: Ensure PGD kmem cache object is actually
+ allocated
+To: Catalin Marinas <catalin.marinas@arm.com>
+References: <1548307220-19756-1-git-send-email-anshuman.khandual@arm.com>
+ <1548307220-19756-3-git-send-email-anshuman.khandual@arm.com>
+ <20190124151655.GH253679@arrakis.emea.arm.com>
+From: Anshuman Khandual <anshuman.khandual@arm.com>
+Message-ID: <30550513-697f-1fd1-70c9-03d376368a67@arm.com>
+Date: Fri, 25 Jan 2019 10:29:47 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
 MIME-Version: 1.0
-In-Reply-To: <20190104071646.15828-3-josephl@nvidia.com>
-X-Originating-IP: [172.20.13.39]
-X-ClientProxiedBy: HQMAIL106.nvidia.com (172.18.146.12) To
- HQMAIL101.nvidia.com (172.20.187.10)
+In-Reply-To: <20190124151655.GH253679@arrakis.emea.arm.com>
 Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1548390055; bh=wio4l1/6WvEpOjUwV9nUYpkmrUecf9gtyYO1MXrKXO0=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=h4k/TjIMPD3zAIWcsOg1y1pOOjLj0sQp2ZFXgDPlPvZlnCTM8UircoSobWg8lYkwe
- qQHgn5dSMdO15i5C++dbSDkP7C23t5PXiC6OGWxDhDPvRuRe1VzeauEXjcTPfCFvXb
- Otghov1vNPy1T/0w86emnigwWQcLoRJnDxgcG/LzycLER9vS6Y3cguXpDdPC5VwScx
- AS9pf8+bNC18woFAFHA8nZXQjiJT0hCoVG1s/lIEe8/3fEgPAeXvUWiR2COGcE9Jmw
- 7tV/27LxyhMXK2l6LLFsyCPTuGT1Km8HkZ5tV2p9hFqEd7S3YfiMK1Ynl4bvByNJSS
- YOikG4iUi3H7Q==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_202122_198963_3ADD0E7D 
-X-CRM114-Status: GOOD (  12.43  )
+X-CRM114-CacheID: sfid-20190124_205952_595322_ECDAC0BF 
+X-CRM114-Status: GOOD (  14.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,43 +72,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Mark Zhang <markz@nvidia.com>,
+Cc: mark.rutland@arm.com, suzuki.poulose@arm.com, marc.zyngier@arm.com,
+ Steve.Capper@arm.com, will.deacon@arm.com, james.morse@arm.com,
  linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Jon,
 
-Could you help me to review this patch?
 
-Thanks,
-Joseph
+On 01/24/2019 08:46 PM, Catalin Marinas wrote:
+> On Thu, Jan 24, 2019 at 10:50:16AM +0530, Anshuman Khandual wrote:
+>> 'pgd_cache' is created for allocating non PAGE_SIZE based PGD pointers. In
+>> such cases ensure that the kmem cache object is allocated before proceeding
+>> further with boot.
+>>
+>> Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
+>> ---
+>>  arch/arm64/mm/pgd.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
+>> index 289f911..8cb4e39 100644
+>> --- a/arch/arm64/mm/pgd.c
+>> +++ b/arch/arm64/mm/pgd.c
+>> @@ -62,4 +62,5 @@ void __init pgd_cache_init(void)
+>>  	 */
+>>  	pgd_cache = kmem_cache_create("pgd_cache", PGD_SIZE, PGD_SIZE,
+>>  				      SLAB_PANIC, NULL);
+>> +	BUG_ON(!pgd_cache);
+> 
+> Isn't SLAB_PANIC sufficient here?
 
-On 1/4/19 3:16 PM, Joseph Lo wrote:
-> Fix typo when reading SoC speedo value from fuse SoC speedo register.
-> 
-> Reported-by: Mark Zhang <markz@nvidia.com>
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
->   drivers/soc/tegra/fuse/speedo-tegra210.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/soc/tegra/fuse/speedo-tegra210.c b/drivers/soc/tegra/fuse/speedo-tegra210.c
-> index 5373f4c16b54..8ed35d9851f8 100644
-> --- a/drivers/soc/tegra/fuse/speedo-tegra210.c
-> +++ b/drivers/soc/tegra/fuse/speedo-tegra210.c
-> @@ -131,7 +131,7 @@ void __init tegra210_init_speedo_data(struct tegra_sku_info *sku_info)
->   
->   	soc_speedo[0] = tegra_fuse_read_early(FUSE_SOC_SPEEDO_0);
->   	soc_speedo[1] = tegra_fuse_read_early(FUSE_SOC_SPEEDO_1);
-> -	soc_speedo[2] = tegra_fuse_read_early(FUSE_CPU_SPEEDO_2);
-> +	soc_speedo[2] = tegra_fuse_read_early(FUSE_SOC_SPEEDO_2);
->   
->   	cpu_iddq = tegra_fuse_read_early(FUSE_CPU_IDDQ) * 4;
->   	soc_iddq = tegra_fuse_read_early(FUSE_SOC_IDDQ) * 4;
-> 
+It should be sufficient as it calls panic(). Please drop this patch from consideration.
 
 _______________________________________________
 linux-arm-kernel mailing list
