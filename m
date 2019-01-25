@@ -2,88 +2,81 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-15.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 321B9C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 17:15:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 767E8C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 17:23:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EECD320811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 17:15:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2F4A7218D0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 17:23:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F2i5Sc+x";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=sartura-hr.20150623.gappssmtp.com header.i=@sartura-hr.20150623.gappssmtp.com header.b="Z09ok8WN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EECD320811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sartura.hr
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="maIpvFVg";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="WWzK5ySp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F4A7218D0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=M3ogjepGaBZYfjdkRKDzXN5TgntnlPxdibKmXUZMorY=; b=F2i5Sc+xw1kbED
-	NSdIlFlm0L6uSyq1zdB/wAJX8zVzVgp87MzM0I3tXwiJTpxV2T9YECWqPn+Sge+LssMM1MA93XHOt
-	c6Xb0f01UcDiA5F/q2BPIPxGNXA7LFCpjyZblPFS2eK0gOw4g3a43+zAvqmqx7DHXr7BjsCjCay2o
-	HNREtXIAJCX5ifFJxfTPW4XPlF69iNArzEi2GnmyyEpSdrXSIGuP0LnfvLAASStlAQnCxVzBXSej1
-	2fOP0t16969dnrN7/IKtD9HGwJLo8wBKGv4p3gej2RDwp1liyn/apfnbqXqpae2Zid4zWsYGV1ewB
-	2m0RRam28wWvCtnC9H7A==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=vTV9rKqkU9ojzqxWK9wbqg7OUcsuJd1gOtrNbjomlB4=; b=maIpvFVgLUMP/Y
+	iFigEmTdDcOpwUYrfbOAQJ6tUv8I2Q7nTNBYdwIYMAzCHE1HRQgeTNNRx28Y64FnTXMyku2PAn2dY
+	XVcPwWhUeT7T2ezsw0P+OyeMlAnQ4OijHcnHiYF3x2i12L6T/gWd/dFi5rkhS9S0Ktss5lrIxu820
+	W7u7TpXIBhAT8Q5lDdQ5aynrwRnzZ02tMtDsR1ahOcQlKnDTFSZOn1wQFigD0tsJOazLVb0u0Bg54
+	5vRPKR4ajIwjic8wf5NsLNyLFwNFWfvnjtsMvlTUd+wAM7tKNCuVC8DgF8sBC+AfuwTfoSPefAhsG
+	+jgitTOuFauRCi8nWoBw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn54f-0006QG-Na; Fri, 25 Jan 2019 17:15:25 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gn5Cp-000851-9s; Fri, 25 Jan 2019 17:23:51 +0000
+Received: from mail-wm1-x32b.google.com ([2a00:1450:4864:20::32b])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn54b-0006Pp-PO
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 17:15:23 +0000
-Received: by mail-wm1-x344.google.com with SMTP id g67so7333959wmd.2
+ id 1gn5Cl-00084Y-VL
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 17:23:49 +0000
+Received: by mail-wm1-x32b.google.com with SMTP id a62so7523784wmh.4
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 25 Jan 2019 09:15:20 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=sartura-hr.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=+e9pluMdE1ABNbBgyJ0RNl4dBO2t8PcsYv8wVKZxmko=;
- b=Z09ok8WNKMOBjCHaM5T9BOMMt4X2v9GnvQkZhI4Toh4blBUhjDis6evPyJ1886LXK0
- IRfygpZawChu+VvbxXfSYeelmaW+zCidap3k46QCf2sXn5qkgcE/lJ0Eb10gMM4rYGKO
- 1lk0rk9g0BqF3hGc9B+S4ddflrC2SmMvzo9ffALGU2l2CwUyYkQkrEs7JLM1zFOnVF2k
- 3m135Q8l8JhKiS60VQbwtQcwiUyDJOCE/tGWVitc1JyoPhBX55QNp7vqWgdpJfGD7Zik
- GY94a1N9/5ggTRvN4FL/HpAd3XvRSEnrcvzlujQmOjsKs7mOt8lA2MziEiu5GGBi6NAb
- k44g==
+ Fri, 25 Jan 2019 09:23:46 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=dCxzJV/7/vhu6LFecxpy/4ttxgmBiWtOwJ3/U1G05ok=;
+ b=WWzK5ySpsWIKJadTFttaTp24ZXjapUxz1BP56tKo1gM7DP7KB1zRK2FvTbL+CEVzZT
+ gHObqgUkVHYl5qciGJYEaoqw4DayFx0EdHT7c4dIfxzUI1i62QAF8hHDZeFn7PbUlJSM
+ HXceloy6gXpmzxhZ1zG8us/kGXUcW/w+c6fuY=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=+e9pluMdE1ABNbBgyJ0RNl4dBO2t8PcsYv8wVKZxmko=;
- b=eWihqAAUTwvvpAEGTH3z0qQ6Jzek0bBH2IlsFJbfwQtAy4UfdQdICdjhyK8M8/rW16
- zX+U7o3N4f2MDUI4VnzrzJ7D1yucUgqm7iSSrVKDPd7RomStdK721YsOtxuAKpykMRuf
- gG/oYjrH4DIj5B9QKZM+JYskEvcNDBPBKlSv0+9ZcfMAJEGbJQMgWYsUx5EAA8J6FIah
- PNafyC2hE8u4KdCDpWNyDbtLqcsP49cNRyf70JV6oOOokmoEWuCtQaG/i2SN1DHRh6/M
- ebxNORDIhbBbVFbGZSonN4jj61UT3uDG2IOq+O7/YKZWQL7VkfYg7DWz78CwiiEUJWj9
- 0h0w==
-X-Gm-Message-State: AJcUukc5CpYaEEb5xq0q60JcJZBtqvI6IZpc6ZftSE1ZOuqud3Unm+kA
- fzWUg5JDirUhyZNO9UU5vRt+
-X-Google-Smtp-Source: ALg8bN5pIU1zwDwxZKcd172/d9Sq77cQUDZGuJcnsQcu1XSkBRpRUbOJy3PuZqgfg/XOkFK7nQxAPg==
-X-Received: by 2002:a1c:c58d:: with SMTP id v135mr7881595wmf.88.1548436519443; 
- Fri, 25 Jan 2019 09:15:19 -0800 (PST)
-Received: from b50.local (cpe-94-253-225-226.st.cable.xnet.hr.
- [94.253.225.226])
- by smtp.gmail.com with ESMTPSA id y14sm7738603wro.92.2019.01.25.09.15.17
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 25 Jan 2019 09:15:18 -0800 (PST)
-From: Vladimir Vid <vladimir.vid@sartura.hr>
-To: devicetree@vger.kernel.org
-Subject: [PATCH v6] arm64: dts: marvell: Add device tree for uDPU board
-Date: Fri, 25 Jan 2019 18:17:08 +0100
-Message-Id: <20190125171707.27742-1-vladimir.vid@sartura.hr>
-X-Mailer: git-send-email 2.19.0
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=dCxzJV/7/vhu6LFecxpy/4ttxgmBiWtOwJ3/U1G05ok=;
+ b=lPmCwY68TtpdGtgTC5+uRcSt7YNaFcD3knkkZRPm5/TxAUhbZuIOIfZ6UniZTX5N+A
+ H41WrqVyjZQhGt6hejMeggqmQWKscGPpcfMfBxyFzJJ0KkSNyMEW2M/tQiAtko+Ph/8O
+ hISrm2jVhJZouiYaCRHbncRGepJoL37jf3RA+W8vnYRRuRbLWyuPtWiqvGAH7vT6l7TF
+ rgdOy3yA5EN1Ysw+BqCrsZvo57drfXLsmz6APeqdEOb8YDhZwswT28LPcJFE4JIC/mQa
+ VnV2yf+DB9fCyAUF/xa0Ejb7NtzQFG3U5fCUiH+2Or6AruYmkB3ROXxhKFKOK/baWJtC
+ Cvag==
+X-Gm-Message-State: AJcUukcmeLz+r3TXg/SGB9qlrrFyTQvi9a0GvUPAZJpUFAd3zY9FA5Qs
+ 4tEe37iIbB3fVZS9yjXytxg9kvtAAMpuF+goPoLDRgUCYL/3Xw==
+X-Google-Smtp-Source: ALg8bN5VtfbB6x7F7grXrDN9qJsftykyxjzgRU7O4ADw4sR6henxY12Ueka6kGUm7521TUhQYOUU2rZB/5XmAw+1vqc=
+X-Received: by 2002:a1c:4683:: with SMTP id t125mr8021717wma.9.1548437025186; 
+ Fri, 25 Jan 2019 09:23:45 -0800 (PST)
 MIME-Version: 1.0
+References: <CALAqxLX0P6P4xnv=HgQsP-Cv4dkGJhkkMRn7jy-sbzZKUa1z4w@mail.gmail.com>
+ <CAKv+Gu_OrO1Spx949j9LOUONJZvsnr_XsNxE1QkERTcFxdG0bA@mail.gmail.com>
+ <86o9868j68.wl-marc.zyngier@arm.com>
+In-Reply-To: <86o9868j68.wl-marc.zyngier@arm.com>
+From: John Stultz <john.stultz@linaro.org>
+Date: Fri, 25 Jan 2019 09:23:32 -0800
+Message-ID: <CALAqxLV5SsFuW+ZSwi6R3YBg5jYWLUeh=NFcc-SxQYQoJX4wyg@mail.gmail.com>
+Subject: Re: BUG: sleeping function called from invalid context at
+ kernel/locking/mutex.c:908
+To: Marc Zyngier <marc.zyngier@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_091521_876951_AC9F87F6 
-X-CRM114-Status: GOOD (  15.93  )
+X-CRM114-CacheID: sfid-20190125_092348_013826_18183637 
+X-CRM114-Status: GOOD (  14.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,254 +88,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Luis Torres <luis.torres@methode.com>,
- Jason Cooper <jason@lakedaemon.net>, Paul Arola <paul.arola@telus.com>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Vladimir Vid <vladimir.vid@sartura.hr>,
- Scott Roberts <scott.roberts@telus.com>, Luka Perkov <luka.perkov@sartura.hr>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: "Suzuki K. Poulose" <Suzuki.Poulose@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, Will Deacon <Will.Deacon@arm.com>,
+ Valentin Schneider <Valentin.Schneider@arm.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This adds initial support for micro-DPU (uDPU) board which is based on
-Armada-3720 SoC.  micro-DPU is the single-port FTTdp distribution point
-unit made by Methode Electronics which offers complete modularity with
-replaceable SFP modules both for uplink and downlink (G.hn over
-twisted-pair, G.hn over coax, 1G and 2.5G Ethernet over Cat-5e cable).
+On Thu, Jan 24, 2019 at 2:05 AM Marc Zyngier <marc.zyngier@arm.com> wrote:
+>
+> On Thu, 24 Jan 2019 08:10:53 +0000,
+> Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >
+> > On Thu, 24 Jan 2019 at 06:36, John Stultz <john.stultz@linaro.org> wrote:
+> > >
+> > > Trying to boot hikey960 with v5.0-rc3 (and Valentin's 2 recent lockdep
+> > > fixes), with lock debugging enabled, I'm seeing the BUG below.
+> > >
+> > > Wanted to see if anyone else had seen this or had ideas at what was going on.
+> > >
+> > > thanks
+> > > -john
+> > >
+> > > [    0.183376] Detected VIPT I-cache on CPU4
+> > > [    0.183388] CPU features: SANITY CHECK: Unexpected variation in
+> > > SYS_ID_AA64MMFR0_EL1. Boot CPU: 0x00000000001122, CPU4:
+> > > 0x00000000101122
+> > > [    0.183399] CPU features: Unsupported CPU feature variation detected.
+> >
+> > This means that some CPUs support 16k pages and some don't. This is
+> > hardly relevant if you are running with 4k pages, but as Suzuki
+> > pointed out (IIRC), it could be relevant for KVM, since you cannot
+> > migrate a VM using 16k pages from one CPU to the other.
+>
+> I think we now have some code to present sanitised ID registers to the
+> guest. It won't prevent it from running though. I contend that life is
+> too short for caring about these systems.
+>
+> >
+> > Suzuki, has there been any progress since this last came up?
+> >
+> > The output below is from a separate issue, where it seems that we are
+> > enabling a static key from atomic context, which apparently isn't
+> > supported.
+> >
+> > Marc might know more about this.
+>
+> I thought that what Valentin's fix was addressing. Or was I mistaken?
 
-On-board features:
-- 512 MiB DDR3
-- 2 x 2.5G SFP via HSGMII SERDES interface to the A3720 SoC
-- USB 2.0 Type-C connector
-- 4GB eMMC
-- ETSI TS 101548 reverse powering via twisted pair (RJ45) or coax (F Type)
+This is something additional. I've already added Valentin's patches,
+which  addresses the separate:
+  WARNING: CPU: 4 PID: 0 at kernel/cpu.c:316 lockdep_assert_cpus_held+0x3c/0x48
+splat.
 
-Cc: Luka Perkov <luka.perkov@sartura.hr>
-Cc: Luis Torres <luis.torres@methode.com>
-Cc: Scott Roberts <scott.roberts@telus.com>
-Cc: Paul Arola <paul.arola@telus.com>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Gregory Clement <gregory.clement@bootlin.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: linux-arm-kernel@lists.infradead.org
-Signed-off-by: Vladimir Vid <vladimir.vid@sartura.hr>
----
-
-v6 changes:
-- updated LED labels per naming convention (Documentation/leds/leds-class.txt)
-
----
- MAINTAINERS                                   |   5 +
- arch/arm64/boot/dts/marvell/Makefile          |   1 +
- .../boot/dts/marvell/armada-3720-uDPU.dts     | 164 ++++++++++++++++++
- 3 files changed, 170 insertions(+)
- create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 51029a425dbe..21174a13049b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -9851,6 +9851,11 @@ F:	drivers/media/platform/meson/ao-cec.c
- F:	Documentation/devicetree/bindings/media/meson-ao-cec.txt
- T:	git git://linuxtv.org/media_tree.git
- 
-+METHODE UDPU SUPPORT
-+M:	Vladimir Vid <vladimir.vid@sartura.hr>
-+S:	Maintained
-+F:	arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
-+
- MICROBLAZE ARCHITECTURE
- M:	Michal Simek <monstr@monstr.eu>
- W:	http://www.monstr.eu/fdt/
-diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
-index 2eff1f927471..caed4334f27d 100644
---- a/arch/arm64/boot/dts/marvell/Makefile
-+++ b/arch/arm64/boot/dts/marvell/Makefile
-@@ -2,6 +2,7 @@
- # Mvebu SoC Family
- dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-espressobin.dtb
-+dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-uDPU.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-clearfog-gt-8k.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db.dtb
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts b/arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
-new file mode 100644
-index 000000000000..2441481643a4
---- /dev/null
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
-@@ -0,0 +1,164 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Device tree for the uDPU board.
-+ * Based on Marvell Armada 3720 development board (DB-88F3720-DDR3)
-+ * Copyright (C) 2016 Marvell
-+ * Copyright (C) 2019 Methode Electronics
-+ * Copyright (C) 2019 Telus
-+ *
-+ * Vladimir Vid <vladimir.vid@sartura.hr>
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include "armada-372x.dtsi"
-+
-+/ {
-+	model = "Methode uDPU Board";
-+	compatible = "methode,udpu", "marvell,armada3720";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory@0 {
-+		device_type = "memory";
-+		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
-+	};
-+
-+	leds {
-+		pinctrl-names = "default";
-+		compatible = "gpio-leds";
-+
-+		power1 {
-+			label = "udpu:green:power";
-+			gpios = <&gpionb 11 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		power2 {
-+			label = "udpu:red:power";
-+			gpios = <&gpionb 12 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		network1 {
-+			label = "udpu:green:network";
-+			gpios = <&gpionb 13 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		network2 {
-+			label = "udpu:red:network";
-+			gpios = <&gpionb 14 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		alarm1 {
-+			label = "udpu:green:alarm";
-+			gpios = <&gpionb 15 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		alarm2 {
-+			label = "udpu:red:alarm";
-+			gpios = <&gpionb 16 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	sfp_eth0: sfp-eth0 {
-+		compatible = "sff,sfp";
-+		i2c-bus = <&i2c0>;
-+		los-gpio = <&gpiosb 2 GPIO_ACTIVE_HIGH>;
-+		mod-def0-gpio = <&gpiosb 3 GPIO_ACTIVE_LOW>;
-+		tx-disable-gpio = <&gpiosb 4 GPIO_ACTIVE_HIGH>;
-+		tx-fault-gpio = <&gpiosb 5 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	sfp_eth1: sfp-eth1 {
-+		compatible = "sff,sfp";
-+		i2c-bus = <&i2c1>;
-+		los-gpio = <&gpiosb 7 GPIO_ACTIVE_HIGH>;
-+		mod-def0-gpio = <&gpiosb 8 GPIO_ACTIVE_LOW>;
-+		tx-disable-gpio = <&gpiosb 9 GPIO_ACTIVE_HIGH>;
-+		tx-fault-gpio = <&gpiosb 10 GPIO_ACTIVE_HIGH>;
-+	};
-+};
-+
-+&sdhci0 {
-+	status = "okay";
-+	bus-width = <8>;
-+	mmc-ddr-1_8v;
-+	mmc-hs400-1_8v;
-+	marvell,pad-type = "fixed-1-8v";
-+	non-removable;
-+	no-sd;
-+	no-sdio;
-+};
-+
-+&spi0 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi_quad_pins>;
-+
-+	m25p80@0 {
-+		compatible = "jedec,spi-nor";
-+		reg = <0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <54000000>;
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			/* only bootloader is located on the SPI */
-+			partition@0 {
-+				label = "uboot";
-+				reg = <0 0x400000>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins>;
-+
-+	lm75@48 {
-+		status = "okay";
-+		compatible = "lm75";
-+		reg = <0x48>;
-+	};
-+
-+	lm75@49 {
-+		status = "okay";
-+		compatible = "lm75";
-+		reg = <0x49>;
-+	};
-+};
-+
-+&eth0 {
-+	phy-mode = "sgmii";
-+	status = "okay";
-+	managed = "in-band-status";
-+	sfp = <&sfp_eth0>;
-+};
-+
-+&eth1 {
-+	phy-mode = "sgmii";
-+	status = "okay";
-+	managed = "in-band-status";
-+	sfp = <&sfp_eth1>;
-+};
-+
-+&usb3 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
--- 
-2.19.0
-
+thanks
+-john
 
 _______________________________________________
 linux-arm-kernel mailing list
