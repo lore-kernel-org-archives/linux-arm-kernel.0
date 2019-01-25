@@ -2,65 +2,60 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B7D12C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 09:42:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D6E39C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 09:44:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7AC6B2184B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 09:42:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9E8902082E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 09:44:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SeRFedM3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7AC6B2184B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RFrVLoLN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E8902082E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AsWvO2FRI0hM1KsrzPxPGwEkbs6cy1Luvrqe1ZrNxAM=; b=SeRFedM37/wgy0
-	hSG7kLxpu3OtDNY+JwdQva6GhBpGTVGXxwFHrVFcMZgpzRhhZJduXS7yACZ5GCc2nR8XMfriVQhLZ
-	ajnhwrTr8aLFVW9ABBaTgvuV/4KCntCkzAnHMtO/nqUGAJRQ9tdRPI2OoLEvL2RaYYnvDOrxri18F
-	LgIqv03sqHAISTdYNOBn+7m8EdnydIIJxebfpRLVZ2uRLQwbzq7A64995nX4kyeg5WzEq+g1US9RN
-	5uWYZonqI+vZJxrX0D4cBc0cKx5nR785w8n5amfdd7DI5xugouFXID+1cbF1qmpDSkS8iR8lr3KSP
-	+xtcPsvdVJNqQNBHMklw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=6jD2JyzPx5608fgb64Zo/6oo1PVzIHgZk+Dl10/pBQs=; b=RFrVLoLNv1EM/iONaasnzAdr0
+	ciujrbqI4+DSgqXfxe9Q38yMKfKpCSPPtO3jW41uGOeOrlpLpGdIpONN7Dc1RH19RsBE+zKNY+8vp
+	IM57VorIgqe1dCXMH1Qz4KDy25uZDyCpgF+aK0yQVaDkcKapvIROiQtZotPjKMub2o/8lpFrWyZuo
+	Kc1t66nm/o04NGBFB0+/MwNfyyzpPrwurpjaqVW4IV7/TBxVDO4a12eCPU/QM1iUQcc36zzqx7f41
+	H+Pm+OtIkK7Cbt/jrmZAWN5RHuriGtx6K/XSO2Pe+WuGIR7AmCzemBMDwQLMhWYJ5itnVvDNu6Hqb
+	IsV3nu9TQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmy0l-0007Jf-EF; Fri, 25 Jan 2019 09:42:55 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmy0h-0007J9-V0
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 09:42:53 +0000
-Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
- by metis.ext.pengutronix.de with esmtp (Exim 4.89)
- (envelope-from <l.stach@pengutronix.de>)
- id 1gmy0c-0002bH-MG; Fri, 25 Jan 2019 10:42:46 +0100
-Message-ID: <1548409366.28802.39.camel@pengutronix.de>
-Subject: Re: [PATCH v4 1/5] dmaengine: imx-sdma: add clock ratio 1:1 check
-From: Lucas Stach <l.stach@pengutronix.de>
-To: "Angus Ainslie (Purism)" <angus@akkea.ca>
-Date: Fri, 25 Jan 2019 10:42:46 +0100
-In-Reply-To: <20190125025528.15645-2-angus@akkea.ca>
-References: <20190120023150.17138-1-angus@akkea.ca>
- <20190125025528.15645-1-angus@akkea.ca>
- <20190125025528.15645-2-angus@akkea.ca>
-X-Mailer: Evolution 3.22.6-1+deb9u1 
-Mime-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
-X-SA-Exim-Mail-From: l.stach@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+	id 1gmy2I-0007oI-3A; Fri, 25 Jan 2019 09:44:30 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmy2D-0007na-Ll
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 09:44:28 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id B31D3209B6; Fri, 25 Jan 2019 10:44:21 +0100 (CET)
+Received: from localhost (aaubervilliers-681-1-87-206.w90-88.abo.wanadoo.fr
+ [90.88.29.206])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 80A4420798;
+ Fri, 25 Jan 2019 10:44:21 +0100 (CET)
+Date: Fri, 25 Jan 2019 10:44:22 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Chen-Yu Tsai <wens@csie.org>
+Subject: Re: [PATCH 00/11] ARM: sun8i: a23: Enable display pipeline
+Message-ID: <20190125094422.cpisr63pk7af3nnq@flea>
+References: <20190125032314.20915-1-wens@csie.org>
+MIME-Version: 1.0
+In-Reply-To: <20190125032314.20915-1-wens@csie.org>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_014252_173650_FCAF533D 
-X-CRM114-Status: GOOD (  16.94  )
+X-CRM114-CacheID: sfid-20190125_014425_843154_B21F4EAB 
+X-CRM114-Status: GOOD (  20.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,68 +67,109 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Daniel Baluta <daniel.baluta@gmail.com>, linux-kernel@vger.kernel.org,
- dmaengine@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
- NXP Linux Team <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>, angus.ainslie@puri.sm,
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Stephen Boyd <sboyd@kernel.org>, Michael Turquette <mturquette@baylibre.com>,
+ linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
+ David Airlie <airlied@linux.ie>, Rob Herring <robh+dt@kernel.org>,
+ Daniel Vetter <daniel@ffwll.ch>, linux-clk@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: multipart/mixed; boundary="===============2769953538079505665=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-QW0gRG9ubmVyc3RhZywgZGVuIDI0LjAxLjIwMTksIDE5OjU1IC0wNzAwIHNjaHJpZWIgQW5ndXMg
-QWluc2xpZSAoUHVyaXNtKToKPiBPbiBpLm14OCBtc2NhbGUgQjAgY2hpcCwgQUhCL1NETUEgY2xv
-Y2sgcmF0aW8gMjoxIGNhbid0IGJlIHN1cHBvcnR0ZWQsCj4gc2luY2UgU0RNQSBjbG9jayByYXRp
-byBoYXMgdG8gYmUgaW5jcmVhc2VkIHRvIDI1ME1oeiwgQUhCIGNhbid0IHJlYWNoCj4gdG8gNTAw
-TWh6LCBzbyB1c2UgMToxIGluc3RlYWQuCj4gCj4gPiBCYXNlZCBvbiBOWFAgY29tbWl0IE1MSy0x
-Njg0MS0xIGJ5IFJvYmluIEdvbmcgPHlpYmluLmdvbmdAbnhwLmNvbT4KPiAKPiA+IFNpZ25lZC1v
-ZmYtYnk6IEFuZ3VzIEFpbnNsaWUgKFB1cmlzbSkgPGFuZ3VzQGFra2VhLmNhPgo+IC0tLQo+IMKg
-ZHJpdmVycy9kbWEvaW14LXNkbWEuYyB8IDIxICsrKysrKysrKysrKysrKysrLS0tLQo+IMKgMSBm
-aWxlIGNoYW5nZWQsIDE3IGluc2VydGlvbnMoKyksIDQgZGVsZXRpb25zKC0pCj4gCj4gZGlmZiAt
-LWdpdCBhL2RyaXZlcnMvZG1hL2lteC1zZG1hLmMgYi9kcml2ZXJzL2RtYS9pbXgtc2RtYS5jCj4g
-aW5kZXggMGIzYTY3ZmY4ZTgyLi41ZTVlZjBiNWE5NzMgMTAwNjQ0Cj4gLS0tIGEvZHJpdmVycy9k
-bWEvaW14LXNkbWEuYwo+ICsrKyBiL2RyaXZlcnMvZG1hL2lteC1zZG1hLmMKPiBAQCAtNDQwLDYg
-KzQ0MCw4IEBAIHN0cnVjdCBzZG1hX2VuZ2luZSB7Cj4gPiA+IMKgCXVuc2lnbmVkIGludAkJCWly
-cTsKPiA+ID4gwqAJZG1hX2FkZHJfdAkJCWJkMF9waHlzOwo+ID4gPiDCoAlzdHJ1Y3Qgc2RtYV9i
-dWZmZXJfZGVzY3JpcHRvcgkqYmQwOwo+ID4gKwkvKiBjbG9jayByYXRpbyBmb3IgQUhCOlNETUEg
-Y29yZS4gMToxIGlzIDEsIDI6MSBpcyAwKi8KPiA+ID4gKwlib29sCQkJCWNsa19yYXRpbzsKPiDC
-oH07Cj4gwqAKPiDCoHN0YXRpYyBpbnQgc2RtYV9jb25maWdfd3JpdGUoc3RydWN0IGRtYV9jaGFu
-ICpjaGFuLAo+IEBAIC02NjIsOCArNjY0LDE0IEBAIHN0YXRpYyBpbnQgc2RtYV9ydW5fY2hhbm5l
-bDAoc3RydWN0IHNkbWFfZW5naW5lICpzZG1hKQo+ID4gwqAJCWRldl9lcnIoc2RtYS0+ZGV2LCAi
-VGltZW91dCB3YWl0aW5nIGZvciBDSDAgcmVhZHlcbiIpOwo+IMKgCj4gPiDCoAkvKiBTZXQgYml0
-cyBvZiBDT05GSUcgcmVnaXN0ZXIgd2l0aCBkeW5hbWljIGNvbnRleHQgc3dpdGNoaW5nICovCj4g
-PiAtCWlmIChyZWFkbChzZG1hLT5yZWdzICsgU0RNQV9IX0NPTkZJRykgPT0gMCkKPiA+IC0JCXdy
-aXRlbF9yZWxheGVkKFNETUFfSF9DT05GSUdfQ1NNLCBzZG1hLT5yZWdzICsgU0RNQV9IX0NPTkZJ
-Ryk7Cj4gKwlpZiAoKHJlYWRsKHNkbWEtPnJlZ3MgKyBTRE1BX0hfQ09ORklHKSAmIH5TRE1BX0hf
-Q09ORklHX0FDUikgPT0gMCkgewoKVGhlIGludGVudGlvbiBvZiB0aGlzIGNvZGUgd2FzIHByb2Jh
-Ymx5IHRvIHNldCB0aGUgQ1NNIGJpdCBpZiB0aGV5CndlcmVuJ3Qgc2V0IGJlZm9yZSwgc28gbWFz
-a2luZyBvdXQgaW5kaXZpZHVhbCBiaXRzIGZyb20gdGhlIHJlZ2lzdGVyCmFuZCByaXNraW5nIHRv
-IHNraXAgdGhpcyB3aGVuIG9uZSBvZiB0aGUgb3RoZXIgYml0cyB3YXMgc2V0IGRvZXNuJ3QKc2Vl
-bSByaWdodC4KCkkgZ3Vlc3MgdGhlIHdob2xlIGJsb2NrIGNhbiBiZSBzaW1wbGlmaWVkIHRvOgoK
-cmVnID0gcmVhZGwoc2RtYS0+cmVncyArIFNETUFfSF9DT05GSUcpOwppZiAoKHJlZyAmIFNETUFf
-SF9DT05GSUdfQ1NNKSAhPSBTRE1BX0hfQ09ORklHX0NTTSkKCXJlZyB8PSBTRE1BX0hfQ09ORklH
-X0NTTTsKd3JpdGVsX3JlbGF4ZWQocmVnLCBzZG1hLT5yZWdzICsgU0RNQV9IX0NPTkZJRyk7CgpS
-ZWdhcmRzLApMdWNhcwoKPiArCQlyZWcgPSBTRE1BX0hfQ09ORklHX0NTTTsKPiArCj4gPiArCQlp
-ZiAoc2RtYS0+Y2xrX3JhdGlvKQo+ID4gKwkJCXJlZyB8PSBTRE1BX0hfQ09ORklHX0FDUjsKPiAr
-Cj4gPiArCQl3cml0ZWxfcmVsYXhlZChyZWcsIHNkbWEtPnJlZ3MgKyBTRE1BX0hfQ09ORklHKTsK
-PiA+ICsJfQo+IMKgCj4gPiDCoAlyZXR1cm4gcmV0Owo+IMKgfQo+IEBAIC0xODQwLDYgKzE4NDgs
-OSBAQCBzdGF0aWMgaW50IHNkbWFfaW5pdChzdHJ1Y3Qgc2RtYV9lbmdpbmUgKnNkbWEpCj4gPiDC
-oAlpZiAocmV0KQo+ID4gwqAJCWdvdG8gZGlzYWJsZV9jbGtfaXBnOwo+IMKgCj4gPiArCWlmIChj
-bGtfZ2V0X3JhdGUoc2RtYS0+Y2xrX2FoYikgPT0gY2xrX2dldF9yYXRlKHNkbWEtPmNsa19pcGcp
-KQo+ID4gKwkJc2RtYS0+Y2xrX3JhdGlvID0gMTsKPiArCj4gPiDCoAkvKiBCZSBzdXJlIFNETUEg
-aGFzIG5vdCBzdGFydGVkIHlldCAqLwo+ID4gwqAJd3JpdGVsX3JlbGF4ZWQoMCwgc2RtYS0+cmVn
-cyArIFNETUFfSF9DMFBUUik7Cj4gwqAKPiBAQCAtMTg4MCw4ICsxODkxLDEwIEBAIHN0YXRpYyBp
-bnQgc2RtYV9pbml0KHN0cnVjdCBzZG1hX2VuZ2luZSAqc2RtYSkKPiA+IMKgCXdyaXRlbF9yZWxh
-eGVkKDB4NDA1MCwgc2RtYS0+cmVncyArIFNETUFfQ0hOMEFERFIpOwo+IMKgCj4gPiDCoAkvKiBT
-ZXQgYml0cyBvZiBDT05GSUcgcmVnaXN0ZXIgYnV0IHdpdGggc3RhdGljIGNvbnRleHQgc3dpdGNo
-aW5nICovCj4gPiAtCS8qIEZJWE1FOiBDaGVjayB3aGV0aGVyIHRvIHNldCBBQ1IgYml0IGRlcGVu
-ZGluZyBvbiBjbG9jayByYXRpb3MgKi8KPiA+IC0Jd3JpdGVsX3JlbGF4ZWQoMCwgc2RtYS0+cmVn
-cyArIFNETUFfSF9DT05GSUcpOwo+ID4gKwlpZiAoc2RtYS0+Y2xrX3JhdGlvKQo+ID4gKwkJd3Jp
-dGVsX3JlbGF4ZWQoU0RNQV9IX0NPTkZJR19BQ1IsIHNkbWEtPnJlZ3MgKyBTRE1BX0hfQ09ORklH
-KTsKPiA+ICsJZWxzZQo+ID4gKwkJd3JpdGVsX3JlbGF4ZWQoMCwgc2RtYS0+cmVncyArIFNETUFf
-SF9DT05GSUcpOwo+IMKgCj4gPiDCoAl3cml0ZWxfcmVsYXhlZChjY2JfcGh5cywgc2RtYS0+cmVn
-cyArIFNETUFfSF9DMFBUUik7Cj4gwqAKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1r
-ZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWls
-bWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+
+--===============2769953538079505665==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="rscg5zrsk3zckgor"
+Content-Disposition: inline
+
+
+--rscg5zrsk3zckgor
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Fri, Jan 25, 2019 at 11:23:03AM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
+>=20
+> This series enables the display pipeline on the Allwinner A23 SoC.
+> A few fixes are included for corner cases when the frontend isn't
+> enabled.
+>=20
+> The A23 display pipeline is very much the same as the A33, except
+> that the A23 does not have the SAT IP block embedded within the
+> display backend.
+>=20
+> MIPI DSI is not covered as I do not have a device that uses it.
+>=20
+> Patch 1 fixes the pll-mipi clock on the A23.
+>=20
+> Patch 2 adds compatible strings for the various hardware blocks
+> of the A23 display pipeline.
+>=20
+> Patch 3 through 5 fix some issues in our DRM plane support, namely
+> declaring support for formats when we shouldn't.
+>=20
+> Patch 6 adds support for the A23 display pipeline to the driver.
+>=20
+> Patch 7 is a small cleanup before moving the display pipeline device
+> nodes.
+>=20
+> Patch 8 moves the display nodes from the A33-specific dtsi file to
+> the A23-A33 shared dtsi file. Note that the MIPI DSI device nodes are
+> not moved.
+>=20
+> Patch 9 adds compatible strings to the display nodes in the A23-specific
+> dtsi file.
+>=20
+> Patch 10 enables the display pipeline for the shared A23/A33 Q8 tablet
+> dtsi file. The compatible string should be filled in by the tablet dts
+> files.
+>=20
+> Patch 11 fills in the compatible string for the standard A23 Q8 tablet.
+> Note the compatible string is not for the specific model used in the
+> tablet, as it varies between production runs. Rather it is just one that
+> works.
+>=20
+> Please have a look. Patch 3 might be worth applying as a fix, but might
+> not be worth the trouble. It could just as easily be applied for -next
+> and then backported.
+>=20
+> Also, the fixes tags are no longer line wrapped, unlike patches I've
+> sent in the past.
+
+Applied all, thanks!
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--rscg5zrsk3zckgor
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXEradQAKCRDj7w1vZxhR
+xU1iAP4gdJXMRt2zbfjcLw4OB2DzAijDTr0FQfYjolcT9AHgHgD+I0KOJCZ9tJAM
+iiCJXi+JYKLhP+SyLjnL4p20FOAw+ww=
+=+w+u
+-----END PGP SIGNATURE-----
+
+--rscg5zrsk3zckgor--
+
+
+--===============2769953538079505665==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============2769953538079505665==--
+
