@@ -3,72 +3,74 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 057D5C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:48:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D598C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:52:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CB2A921855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:48:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D1B0B218CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:52:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TpZsLk3/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB2A921855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HwObnEd3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="gb1CXkOy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D1B0B218CD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=y4vADlM+PEHWbunpQf9KEgcmszdqQi0NyZXRqBzclfw=; b=TpZsLk3/j5/cVn
-	lQSS3ikm5xo8iepxVfQSohx40liu2e2zBmOnRaVcWD58HFhYeclKVv7aTn+kZu0q6Lkm5MaXvRW2a
-	F77TJwchcv9PkQmtzdBbov7cMidwgoiC7hYLpTJXeImi4XKXLufbCqav7sAW4DJLjYGAu8v0iVTID
-	PWb14JuKEh+9nDG5rGObfX9rcLuWF65yYA+3mbSmR6pmunynwXXQ5sClRIY+V+LVgDvlFbYAO51hk
-	1S1Ty74IPHMH24+xm5VLcWlsf6K5QoOw4b5/UUNxEY4Q2rCWDtitI1e7OUp3nth1WmwUlfV9XpJlT
-	N/MTEwSqV2k3bOu51GZQ==;
+	List-Owner; bh=22eAqn/GlwpTNtsTlYA2E1pElaEtQmeD8xYLGvCQMh8=; b=HwObnEd33/X1SY
+	9Dg+gpyWTGT0S/6Byml32AGjJyOVOEi93CxPjUUqulo4VRgioBrpohXOpPXreQw4kNhmE5YV4pBEW
+	ztVfh94b+HIJEjco657uqAdXev1wjNzmxbxpGJ3wJcq4dWTqdQvHBhufuX7JVo4SjoQdK6cgr9aLI
+	6jJtIj+XVmayqZZEfKBMZeEKIQj5eYb/yuUqYUsTooQzQ7kMICt4CpWJJSY5dJiVATsTaefk57JZ+
+	NDhhRRP3Sr+xsvlc5iCUQC6qFcHBk2Mpf7FlpmXzHhiFFjGMeXvrz3OGmBiwnJCUXoObOO1Kmni8Z
+	ZDf1QvBmrstyCntgrIPw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmsU7-0001S4-Mm; Fri, 25 Jan 2019 03:48:51 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gmsXm-000330-P7; Fri, 25 Jan 2019 03:52:38 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmsU4-0001Ra-DD; Fri, 25 Jan 2019 03:48:50 +0000
-X-UUID: e70389fcf37f4110b6302cc55657fb0c-20190124
-X-UUID: e70389fcf37f4110b6302cc55657fb0c-20190124
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
- (envelope-from <ryder.lee@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1325140564; Thu, 24 Jan 2019 19:48:40 -0800
-Received: from MTKMBS31DR.mediatek.inc (172.27.6.102) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 24 Jan 2019 19:48:39 -0800
-Received: from mtkcas07.mediatek.inc (172.21.101.84) by
- MTKMBS31DR.mediatek.inc (172.27.6.102) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 25 Jan 2019 11:48:35 +0800
-Received: from [172.21.77.33] (172.21.77.33) by mtkcas07.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 25 Jan 2019 11:48:36 +0800
-Message-ID: <1548388116.29237.15.camel@mtkswgap22>
-Subject: Re: [PATCH v1 1/5] pwm: mediatek: add a property "mediatek,num-pwms"
-From: Ryder Lee <ryder.lee@mediatek.com>
-To: Uwe =?ISO-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>,
- "John Crispin" <blogic@openwrt.org>
-Date: Fri, 25 Jan 2019 11:48:36 +0800
-In-Reply-To: <20190121084948.frpcgg6wkdjxkl7k@pengutronix.de>
-References: <de316385a84e079d3b23891e61c959094b9fa7e5.1547781007.git.ryder.lee@mediatek.com>
- <c007d399-af86-98d3-94f9-b9762efdc219@gmail.com>
- <1547866487.14213.10.camel@mtkswgap22>
- <20190121084948.frpcgg6wkdjxkl7k@pengutronix.de>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gmsXj-00032X-IW; Fri, 25 Jan 2019 03:52:37 +0000
+Received: from mail-wr1-f45.google.com (mail-wr1-f45.google.com
+ [209.85.221.45])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 96306218E2;
+ Fri, 25 Jan 2019 03:52:34 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548388354;
+ bh=QjJfJAWb0FZ5pqq41y0/x0xjclMd9L8cJJNHUvy33U4=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=gb1CXkOycEV5lU97KyTzF1Fn8MVf0CwXq/0vWC5zlyx97oMpW9OCads+gBzFqCQs5
+ P5mu0iMPQv94pABP91vGkYLQQniMqqkY2I7NY7IWx8h7XTH6R94yMK9E9xRGwO6vS5
+ EhXJ0i9glgU7mKDCDYD+yVnMQa4jVZ4xXT6epW8s=
+Received: by mail-wr1-f45.google.com with SMTP id t6so8728772wrr.12;
+ Thu, 24 Jan 2019 19:52:34 -0800 (PST)
+X-Gm-Message-State: AJcUukcCrBynha9bb1juxa7QMSACWpO+PaAdv0oFLtbUZZdYFD5WWxCd
+ Lw7nl+Z/Xf4PkS4CAT2cfJl0pt6QX57sRqSbQME=
+X-Google-Smtp-Source: ALg8bN5yvgt59covVG6lIFn3cW7Zt6kKnn0KEC8w6n6KayED8ss+qwnOw9vxugt3wTC3U75xUMkQtbxwtm+rsoQbPpk=
+X-Received: by 2002:a5d:4e82:: with SMTP id e2mr9370428wru.291.1548388353048; 
+ Thu, 24 Jan 2019 19:52:33 -0800 (PST)
 MIME-Version: 1.0
-X-MTK: N
+References: <1548326680-16454-1-git-send-email-shun-chih.yu@mediatek.com>
+ <1548326680-16454-2-git-send-email-shun-chih.yu@mediatek.com>
+In-Reply-To: <1548326680-16454-2-git-send-email-shun-chih.yu@mediatek.com>
+From: Sean Wang <sean.wang@kernel.org>
+Date: Thu, 24 Jan 2019 19:52:21 -0800
+X-Gmail-Original-Message-ID: <CAGp9LzofToojhoXL9DpbrF-GKcxnGX7VBKrTq27SF8uGYnQOMg@mail.gmail.com>
+Message-ID: <CAGp9LzofToojhoXL9DpbrF-GKcxnGX7VBKrTq27SF8uGYnQOMg@mail.gmail.com>
+Subject: Re: [PATCH 1/2] dt-bindings: dmaengine: Add MediaTek Command-Queue
+ DMA controller bindings
+To: shun-chih.yu@mediatek.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_194848_449754_912FC74E 
-X-CRM114-Status: GOOD (  28.43  )
+X-CRM114-CacheID: sfid-20190124_195235_649074_CF7AC8C5 
+X-CRM114-Status: GOOD (  18.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,94 +82,84 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-pwm@vger.kernel.org" <linux-pwm@vger.kernel.org>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Sean Wang <sean.wang@kernel.org>,
- Weijie Gao =?UTF-8?Q?=28=E9=AB=98=E6=83=9F=E6=9D=B0=29?=
- <Weijie.Gao@mediatek.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>, Thierry
- Reding <thierry.reding@gmail.com>,
- "linux-mediatek@lists.infradead.org" <linux-mediatek@lists.infradead.org>,
+Cc: devicetree@vger.kernel.org, Sean Wang <sean.wang@mediatek.com>,
+ linux-kernel@vger.kernel.org, srv_wsdupstream@mediatek.com,
+ dmaengine@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
  Matthias Brugger <matthias.bgg@gmail.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+ Dan Williams <dan.j.williams@intel.com>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-K0pvaG4KCkhJIEpvaG4sCgpPbiBNb24sIDIwMTktMDEtMjEgYXQgMTY6NDkgKzA4MDAsIFV3ZSBL
-bGVpbmUtS8O2bmlnIHdyb3RlOgo+IE9uIFNhdCwgSmFuIDE5LCAyMDE5IGF0IDEwOjU0OjQ3QU0g
-KzA4MDAsIFJ5ZGVyIExlZSB3cm90ZToKPiA+IE9uIEZyaSwgMjAxOS0wMS0xOCBhdCAwOTo0MyAr
-MDEwMCwgTWF0dGhpYXMgQnJ1Z2dlciB3cm90ZToKPiA+ID4KPiA+ID4gT24gMTgvMDEvMjAxOSAw
-NDoyNCwgUnlkZXIgTGVlIHdyb3RlOgo+ID4gPiA+IFRoaXMgYWRkcyBhIHByb3BlcnR5ICJtZWRp
-YXRlayxudW0tcHdtcyIgdG8gYXZvaWQgaGF2aW5nIGFuIGVuZGxlc3MKPiA+ID4gPiBsaXN0IG9m
-IGNvbXBhdGlibGVzIHdpdGggbm8gZGlmZmVyZW5jZXMgZm9yIHRoZSBzYW1lIGRyaXZlci4KPiA+
-ID4gPgo+ID4gPiA+IFRodXMsIHRoZSBkcml2ZXIgc2hvdWxkIGhhdmUgYmFja3dhcmRzIGNvbXBh
-dGliaWxpdHkgdG8gb2xkZXIgRFRzLgo+ID4gPiA+Cj4gPiA+ID4gU2lnbmVkLW9mZi1ieTogUnlk
-ZXIgTGVlIDxyeWRlci5sZWVAbWVkaWF0ZWsuY29tPgo+ID4gPiA+IC0tLQo+ID4gPiA+IENoYW5n
-ZXMgc2luY2UgdjE6IGFkZCBzb21lIGNoZWNrcyBmb3IgYmFja3dhcmRzIGNvbXBhdGliaWxpdHku
-Cj4gPiA+ID4gLS0tCj4gPiA+ID4gIGRyaXZlcnMvcHdtL3B3bS1tZWRpYXRlay5jIHwgMjcgKysr
-KysrKysrKysrKysrKysrLS0tLS0tLS0tCj4gPiA+ID4gIDEgZmlsZSBjaGFuZ2VkLCAxOCBpbnNl
-cnRpb25zKCspLCA5IGRlbGV0aW9ucygtKQo+ID4gPiA+Cj4gPiA+ID4gZGlmZiAtLWdpdCBhL2Ry
-aXZlcnMvcHdtL3B3bS1tZWRpYXRlay5jIGIvZHJpdmVycy9wd20vcHdtLW1lZGlhdGVrLmMKPiA+
-ID4gPiBpbmRleCBlYjY2NzRjLi44MWI3ZTVlIDEwMDY0NAo+ID4gPiA+IC0tLSBhL2RyaXZlcnMv
-cHdtL3B3bS1tZWRpYXRlay5jCj4gPiA+ID4gKysrIGIvZHJpdmVycy9wd20vcHdtLW1lZGlhdGVr
-LmMKPiA+ID4gPiBAQCAtNTUsNyArNTUsNyBAQCBlbnVtIHsKPiA+ID4gPiAgfTsKPiA+ID4gPgo+
-ID4gPiA+ICBzdHJ1Y3QgbXRrX3B3bV9wbGF0Zm9ybV9kYXRhIHsKPiA+ID4gPiAtIHVuc2lnbmVk
-IGludCBudW1fcHdtczsKPiA+ID4gPiArIHVuc2lnbmVkIGludCBudW1fcHdtczsgIC8qIGl0IHNo
-b3VsZCBub3QgYmUgdXNlZCBpbiB0aGUgZnV0dXJlIFNvQ3MgKi8KPiA+ID4gPiAgIGJvb2wgcHdt
-NDVfZml4dXA7Cj4gPiA+ID4gICBib29sIGhhc19jbGtzOwo+ID4gPiA+ICB9Owo+ID4gPiA+IEBA
-IC0yMjYsMjcgKzIyNiwzNiBAQCBzdGF0aWMgdm9pZCBtdGtfcHdtX2Rpc2FibGUoc3RydWN0IHB3
-bV9jaGlwICpjaGlwLCBzdHJ1Y3QgcHdtX2RldmljZSAqcHdtKQo+ID4gPiA+Cj4gPiA+ID4gIHN0
-YXRpYyBpbnQgbXRrX3B3bV9wcm9iZShzdHJ1Y3QgcGxhdGZvcm1fZGV2aWNlICpwZGV2KQo+ID4g
-PiA+ICB7Cj4gPiA+ID4gLSBjb25zdCBzdHJ1Y3QgbXRrX3B3bV9wbGF0Zm9ybV9kYXRhICpkYXRh
-Owo+ID4gPiA+ICsgc3RydWN0IGRldmljZV9ub2RlICpucCA9IHBkZXYtPmRldi5vZl9ub2RlOwo+
-ID4gPiA+ICAgc3RydWN0IG10a19wd21fY2hpcCAqcGM7Cj4gPiA+ID4gICBzdHJ1Y3QgcmVzb3Vy
-Y2UgKnJlczsKPiA+ID4gPiAtIHVuc2lnbmVkIGludCBpOwo+ID4gPiA+ICsgdW5zaWduZWQgaW50
-IGksIG51bV9wd21zOwo+ID4gPiA+ICAgaW50IHJldDsKPiA+ID4gPgo+ID4gPiA+ICAgcGMgPSBk
-ZXZtX2t6YWxsb2MoJnBkZXYtPmRldiwgc2l6ZW9mKCpwYyksIEdGUF9LRVJORUwpOwo+ID4gPiA+
-ICAgaWYgKCFwYykKPiA+ID4gPiAgICAgICAgICAgcmV0dXJuIC1FTk9NRU07Cj4gPiA+ID4KPiA+
-ID4gPiAtIGRhdGEgPSBvZl9kZXZpY2VfZ2V0X21hdGNoX2RhdGEoJnBkZXYtPmRldik7Cj4gPiA+
-ID4gLSBpZiAoZGF0YSA9PSBOVUxMKQo+ID4gPiA+IC0gICAgICAgICByZXR1cm4gLUVJTlZBTDsK
-PiA+ID4gPiAtIHBjLT5zb2MgPSBkYXRhOwo+ID4gPiA+ICsgcGMtPnNvYyA9IG9mX2RldmljZV9n
-ZXRfbWF0Y2hfZGF0YSgmcGRldi0+ZGV2KTsKPiA+ID4gPgo+ID4gPiA+ICAgcmVzID0gcGxhdGZv
-cm1fZ2V0X3Jlc291cmNlKHBkZXYsIElPUkVTT1VSQ0VfTUVNLCAwKTsKPiA+ID4gPiAgIHBjLT5y
-ZWdzID0gZGV2bV9pb3JlbWFwX3Jlc291cmNlKCZwZGV2LT5kZXYsIHJlcyk7Cj4gPiA+ID4gICBp
-ZiAoSVNfRVJSKHBjLT5yZWdzKSkKPiA+ID4gPiAgICAgICAgICAgcmV0dXJuIFBUUl9FUlIocGMt
-PnJlZ3MpOwo+ID4gPiA+Cj4gPiA+ID4gLSBmb3IgKGkgPSAwOyBpIDwgZGF0YS0+bnVtX3B3bXMg
-KyAyICYmIHBjLT5zb2MtPmhhc19jbGtzOyBpKyspIHsKPiA+ID4gPiArIC8qIENoZWNrIGlmIHdl
-IGhhdmUgc2V0ICdudW0tcHdtcycgaW4gRFRzLiAqLwo+ID4gPiA+ICsgcmV0ID0gb2ZfcHJvcGVy
-dHlfcmVhZF91MzIobnAsICJtZWRpYXRlayxudW0tcHdtcyIsICZudW1fcHdtcyk7Cj4gPiA+ID4g
-KyBpZiAocmV0IDwgMCkgewo+ID4gPiA+ICsgICAgICAgICAvKiBJZiBubywgZmFsbGJhY2sgdG8g
-dXNlIFNvQyBkYXRhIGZvciBiYWNrd2FyZHMgY29tcGF0aWJpbGl0eS4gKi8KPiA+ID4gPiArICAg
-ICAgICAgaWYgKHBjLT5zb2MtPm51bV9wd21zKSB7Cj4gPiA+ID4gKyAgICAgICAgICAgICAgICAg
-bnVtX3B3bXMgPSBwYy0+c29jLT5udW1fcHdtczsKPiA+ID4KPiA+ID4gTWF5YmUgdGhhdCdzIGJp
-a2Ugc2hlZGRpbmcsIGJ1dCBJIHRoaW5rIGl0IHdvdWxkIGJlIGJldHRlciB0byBjYXJ2ZSBvdXQg
-dGhlCj4gPiA+IG51bV9wd21zIGZyb20gdGhlIG10a19wd21fcGxhdGZvcm1fZGF0YSBhbmQgY2hl
-Y2sgYWdhaW5zdCB0aGUgY29tcGF0aWJsZSBoZXJlLgo+ID4KPiA+IEknbSBub3Qgc3VyZSBob3cg
-dG8gcHJvcGVybHkgY3VydmUgaXQgb3V0PyBJIHRoaW5rIHdlIHN0aWxsIG5lZWQgdGhpcwo+ID4g
-dmFyaWFibGUgdG8gc2F2ZSB0aGUgc3BlY2lmaWMgdmFsdWUgZm9yIHNvbWUgbGVnYWN5IFNvQ3Mg
-KHdpdGggb2xkZXIKPiA+IERUcykuCj4gCj4gSSBndWVzcyBoZSBtZWFucyAgc29tZXRoaW5nIGxp
-a2U6Cj4gCj4gICAgICAgICBpZiAoaXNfY29tcGF0aWJsZV90b192YXJpYW50X0EoZGV2KSkKPiAg
-ICAgICAgICAgICAgICAgbnVtX3B3bXMgPSAxMjsKPiAgICAgICAgIGVsc2UgaWYgKGlzX2NvbXBh
-dGlibGVfdG9fdmFyaWFudF9CKGRldikpCj4gICAgICAgICAgICAgICAgIG51bV9wd21zID0gMjsK
-PiAKPiAuIEluIG15IGV5ZXMgdGhlIGJpa2Ugc2hlZCBzaG91bGQgYmUgbGlnaHQgcmVkIGFuZCBJ
-IHByZWZlciB0byBjb2xsZWN0Cj4gdGhlIGZhbGxiYWNrIG51bV9wd21zIGluIHRoZSBjb21wYXRp
-YmxlX2RhdGEgYXMgaXMgdG8ga2VlcCB0aGUgY29kZQo+IHNpbXBsZXIuIE1heWJlIHJlbmFtZSB0
-aGUgbWVtYmVyIGZyb20gbnVtX3B3bXMgdG8gZmFsbGJhY2tfbnVtX3B3bXMgdG8KPiBtYWtlIGl0
-IG1vcmUgb2J2aW91cyB0aGF0IGl0IGRvZXNuJ3QgcmVwcmVzZW50IHRoZSBhY3R1YWxseSB1c2Vk
-IHZhbHVlLgo+IAo+ID4gPiBXaXRoIGEgZXhwcmVzc2l2ZSBjb21tZW50IGl0IHdpbGwgaGVscCBv
-dGhlciBkcml2ZXIgZGV2ZWxvcGVycyB0byBub3Qgc3RhcnQKPiA+ID4gYWRkaW5nIG51bV9wd21z
-IGluIHRoZSBwbGF0Zm9ybSBkYXRhIGluIHRoZWlyIGZpcnN0IGF0dGVtcHQuCj4gPgo+ID4gRGVm
-aW5pdGVseS4KPiAKPiBNeSBzdWdnZXN0aW9uIHdhcyB0byBhZGQgYSBkZXZfd2Fybiwgd2hpY2gg
-SU1ITyBpcyBzdGlsbCBiZXR0ZXIgdGhhbiBhCj4gY29tbWVudC4KPiAKPiBCZXN0IHJlZ2FyZHMK
-PiBVd2UKPiAKClVucmVsYXRlZCB0byB0aGlzIHBhdGNoOiBJJ20gcmVhZHkgdG8gc2VuZCB2MiB0
-byBhbGxvY2F0ZSB0aGUgY2xrcyBhcnJheQpkeW5hbWljYWxseSwgYnV0IEkgZ3Vlc3MgTVQ3NjI4
-IGNvdWxkbid0IHdvcmsgaW4gb3JpZ2luYWwgY29kZS4KCgpJbiBtdGtfcHdtX2NvbmZpZygpOgoK
-CWNsayA9IHBjLT5jbGtzW01US19DTEtfUFdNMSArIHB3bS0+aHdwd21dOyAKCS4uLi4KCXJlc29s
-dXRpb24gPSAodTY0KU5TRUNfUEVSX1NFQyAqIDEwMDA7Cglkb19kaXYocmVzb2x1dGlvbiwgY2xr
-X2dldF9yYXRlKGNsaykpOwoJLi4uLgoKSSB0aGluayBjbGsgc2hvdWxkIGJlIE5VTEwgYW5kIHJl
-c29sdXRpb24gaXMgYWx3YXlzIDAgaGVyZS4gCgoKUnlkZXIKCgpfX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlz
-dApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJh
-ZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+You dropped the version tag that doesn't reflect that is a newer one
+and that would be easily ignored by other people
+
+On Thu, Jan 24, 2019 at 2:46 AM <shun-chih.yu@mediatek.com> wrote:
+>
+> From: Shun-Chih Yu <shun-chih.yu@mediatek.com>
+>
+> Document the devicetree bindings for MediaTek Command-Queue DMA controller
+> which could be found on MT6765 SoC or other similar Mediatek SoCs.
+>
+> Signed-off-by: Shun-Chih Yu <shun-chih.yu@mediatek.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+
+otherwise, Acked-by: Sean Wang <sean.wang@kernel.org>
+
+> ---
+>  .../devicetree/bindings/dma/mtk-cqdma.txt          |   31 ++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/mtk-cqdma.txt
+>
+> diff --git a/Documentation/devicetree/bindings/dma/mtk-cqdma.txt b/Documentation/devicetree/bindings/dma/mtk-cqdma.txt
+> new file mode 100644
+> index 0000000..fb12927
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/mtk-cqdma.txt
+> @@ -0,0 +1,31 @@
+> +MediaTek Command-Queue DMA Controller
+> +==================================
+> +
+> +Required properties:
+> +
+> +- compatible:  Must be "mediatek,mt6765-cqdma" for MT6765.
+> +- reg:         Should contain the base address and length for each channel.
+> +- interrupts:  Should contain references to the interrupts for each channel.
+> +- clocks:      Should be the clock specifiers corresponding to the entry in
+> +               clock-names property.
+> +- clock-names: Should contain "cqdma" entries.
+> +- dma-channels: The number of DMA channels supported by the controller.
+> +- dma-requests: The number of DMA request supported by the controller.
+> +- #dma-cells:  The length of the DMA specifier, must be <1>. This one cell
+> +               in dmas property of a client device represents the channel
+> +               number.
+> +Example:
+> +
+> +        cqdma: dma-controller@10212000 {
+> +               compatible = "mediatek,mt6765-cqdma";
+> +               reg = <0 0x10212000 0 0x1000>;
+> +               interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>,
+> +                       <GIC_SPI 114 IRQ_TYPE_LEVEL_LOW>;
+> +               clocks = <&infracfg CLK_IFR_CQ_DMA>;
+> +               clock-names = "cqdma";
+> +               dma-channels = <2>;
+> +               dma-requests = <32>;
+> +               #dma-cells = <1>;
+> +       };
+> +
+> +DMA clients must use the format described in dma/dma.txt file.
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
