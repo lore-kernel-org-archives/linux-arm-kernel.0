@@ -2,86 +2,87 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 94DCDC282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 06:25:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C4ACC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 06:51:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 621E12133D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 06:25:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D327218D0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 06:51:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LvXY3d8x";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="YupNbHs7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 621E12133D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h71It76Y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D327218D0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jp.fujitsu.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0X6KryklzYh02J02RgqVpaDSQ4W+DYXl4gVvo3FZfV8=; b=LvXY3d8xsHzsGr
-	ZSZB98ZW/5pFL6H14Nj1QDYYLxM1WkimhPTqGjR+xyecXYVBWgxr6pLcflNyXpQ8MaQaqMFdLXpsT
-	TKd2pldfNm1YZfKPOgKz4Q603FXtnIUj9rJLPSVZ931zr9iH7fjCFhCkfy1CFr1sr26EBjpcNoHNr
-	S4LLU5nFEoBpSQUyklejZqn1Lzh2F5E4xTYhjORbf41BP2r7IWm3THc0GmCpQ5CG4hLmK7YN195FN
-	Ki3t3DfK4nE5LTmot3wesh5K74Sje8p1PlD+6rtAFzfwHkeUCy06UCCwVQ+nYm4GAfWHbPidVgScA
-	J2ShoKFtm8BfTT6N2yvw==;
+	List-Owner; bh=lM5vW0znka9VdxF4+8EXusCmjeI5KbfxcXRcCMbsdoA=; b=h71It76YZWqUAS
+	eqhT5UtFw2Lq/ksCYs/yn9VINwlxyGWMffZeuxgo+EaMz2YFyiSk2M7xvrNS8JnNueUyotMUOWRS/
+	x4EWd4RVCdUMERyNdWszFuNR5kOMeereIAnTC/huY/QZLm4LlVYUz+ntfF1oWTMAvNjCKDnmlO0bG
+	QmtimedW6co/sPc47pDJ4DizKcKYd2umENZGhseNFOVtqvXnKQ9PGYSq9nF4TWNXWU9RtXv730KUA
+	L91Z5RTkbCkPLeeaVr+d7kl9Tpxd3z3xbCSjVlHW3w7S2kkKfk/12d54r3HJ+LNwSq76piTHB7bxS
+	VgR/F5ft9POciIZWT1BQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmuvY-0000mZ-M9; Fri, 25 Jan 2019 06:25:20 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gmvKo-0000Vn-9z; Fri, 25 Jan 2019 06:51:26 +0000
+Received: from mgwkm02.jp.fujitsu.com ([202.219.69.169])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmuvV-0000lz-I0
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 06:25:18 +0000
-Received: by mail-lf1-x142.google.com with SMTP id n18so6119350lfh.6
+ id 1gmvKk-0000UX-Oo
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 06:51:24 +0000
+Received: from kw-mxauth.gw.nic.fujitsu.com (unknown [192.168.231.132]) by
+ mgwkm02.jp.fujitsu.com with smtp
+ id 6e5d_80ce_a4577ed7_c7dc_422e_a722_dcd292b193ef;
+ Fri, 25 Jan 2019 15:51:11 +0900
+Received: from g01jpfmpwkw03.exch.g01.fujitsu.local
+ (g01jpfmpwkw03.exch.g01.fujitsu.local [10.0.193.57])
+ by kw-mxauth.gw.nic.fujitsu.com (Postfix) with ESMTP id 5CBD1AC00B9
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 24 Jan 2019 22:25:16 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=aWkGNsj9H+PPXdmDM8jphreLemaKpKVhG6fjRtFnO8Q=;
- b=YupNbHs7iQOuXsIbeTOXEVnZWfkYovxF20NQ9awvZDPy3o8iS3gw202JHD+bqIdggi
- UC14YfN4ZrjI7wuEC4DsSOrSczpv/7Y3Wf4HmgUgvtwNLvJKceDaTs8OI5dH73FH9cQD
- LY6TE4NtmLMKmcOTYdiuV4C8EDCAetO1QZCN9xqdK/xdCRgoQ6YoFfk4NseNKYsX3tLi
- Qc0/b7DsS7n+1jljKTJNoyZYK+mwbbZMW5CEsPWDVwNh7AN1d5Ycmr9yKEvU94TgPNyk
- JdQSXkO376pFgoEgPwv5M9iT0TLyDJytBSp3tnVR7+XNKX8CyRS3SRRnWZJuLkvJ1pKJ
- fUgw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=aWkGNsj9H+PPXdmDM8jphreLemaKpKVhG6fjRtFnO8Q=;
- b=CRsp56QOkbYb8YkfZEl+cKRxoEUygFDDdP5/W1OzeW+ZkqRgI2p+ZH+Ww3dxvbJ1Un
- UuJUHWO78dO6dqaK8S8k5rmuTmGusSVoTZc5UlnZQEBd7ncHQ01Fp3wl8G7SZ0ZA/xrc
- ciRDM032CeXiUJGxNqkd45bYv8MfsEHbKniS9tL1H8sl1L3QZDF26AbH2oReekDbSQlt
- bJ/BGelhjgmiXvjOfeNHNuhSMdfDJUsw+UL5X0B+XJZlGNCxLFAnTIsCTd2NTqdaGFkj
- EhUAZ1w7OlXA7o7oFz41rH1aYzq7jW7w31xL4Qnyim8M0cwo+Ozwuq11dggMmoact2rT
- CNaA==
-X-Gm-Message-State: AJcUukeil4TblC9rGWF+u83ADwWUi1IpKKZgn9Hz7u+D0VJHlXUo+5Mm
- EGf68TWackcnuzoBLzlJptDqgAk3Tl9/YiEX3Po=
-X-Google-Smtp-Source: ALg8bN4TGwzzV9+rDqN6jqokcuS2worneigqBlgltDsQYW2kgwnVOXojAkAzi6U2DdppgszxXxvosU25VS4BiX6F4FQ=
-X-Received: by 2002:a19:7dc2:: with SMTP id y185mr7847121lfc.27.1548397514916; 
- Thu, 24 Jan 2019 22:25:14 -0800 (PST)
+ Fri, 25 Jan 2019 15:51:11 +0900 (JST)
+Received: from G01JPEXCHKW14.g01.fujitsu.local
+ (G01JPEXCHKW14.g01.fujitsu.local [10.0.194.53])
+ by g01jpfmpwkw03.exch.g01.fujitsu.local (Postfix) with ESMTP id D60AEBD6795;
+ Fri, 25 Jan 2019 15:51:09 +0900 (JST)
+Received: from G01JPEXMBKW03.g01.fujitsu.local ([10.0.194.67]) by
+ g01jpexchkw14 ([10.0.194.53]) with mapi id 14.03.0415.000; Fri, 25 Jan 2019
+ 15:51:09 +0900
+From: "Zhang, Lei" <zhang.lei@jp.fujitsu.com>
+To: "Zhang, Lei" <zhang.lei@jp.fujitsu.com>, 'Mark Rutland'
+ <mark.rutland@arm.com>, "'james.morse@arm.com'" <james.morse@arm.com>
+Subject: RE: [PATCH] arm64 memory accesses may cause undefined fault on
+ Fujitsu-A64FX
+Thread-Topic: [PATCH] arm64 memory accesses may cause undefined fault on
+ Fujitsu-A64FX
+Thread-Index: AdSvK6W0/Nm6810RQFa/OOuw1JbhXP//gw+A//n57fCADGG/gP/+BGiA//lIR1A=
+Date: Fri, 25 Jan 2019 06:51:08 +0000
+Message-ID: <8898674D84E3B24BA3A2D289B872026A6A2A6045@G01JPEXMBKW03>
+References: <8898674D84E3B24BA3A2D289B872026A6A29FA8F@G01JPEXMBKW03>
+ <20190118141758.GC12256@lakrids.cambridge.arm.com>
+ <8898674D84E3B24BA3A2D289B872026A6A2A2F44@G01JPEXMBKW03>
+ <20190122152339.GD52887@lakrids.cambridge.arm.com>
+ <8898674D84E3B24BA3A2D289B872026A6A2A3BED@G01JPEXMBKW03>
+In-Reply-To: <8898674D84E3B24BA3A2D289B872026A6A2A3BED@G01JPEXMBKW03>
+Accept-Language: ja-JP, en-US
+Content-Language: ja-JP
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-securitypolicycheck: OK by SHieldMailChecker v2.2.3
+x-shieldmailcheckerpolicyversion: FJ-ISEC-20140219
+x-originating-ip: [10.18.70.198]
 MIME-Version: 1.0
-References: <20190111150834.GA2744@jordon-HP-15-Notebook-PC>
-In-Reply-To: <20190111150834.GA2744@jordon-HP-15-Notebook-PC>
-From: Souptick Joarder <jrdr.linux@gmail.com>
-Date: Fri, 25 Jan 2019 11:55:03 +0530
-Message-ID: <CAFqt6zYLDrC7CtLawWUAQPyB_M+5H8BikDR6LOm+v0qaq1GvZw@mail.gmail.com>
-Subject: Re: [PATCH 3/9] drivers/firewire/core-iso.c: Convert to use
- vm_insert_range_buggy
-To: Andrew Morton <akpm@linux-foundation.org>,
- Matthew Wilcox <willy@infradead.org>, 
- Michal Hocko <mhocko@suse.com>, stefanr@s5r6.in-berlin.de, 
- Russell King - ARM Linux <linux@armlinux.org.uk>, robin.murphy@arm.com
+X-SecurityPolicyCheck-GC: OK by FENCE-Mail
+X-TM-AS-MML: disable
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_222517_602234_ABEF5437 
-X-CRM114-Status: GOOD (  17.67  )
+X-CRM114-CacheID: sfid-20190124_225123_054891_0C0E4FC1 
+X-CRM114-Status: UNSURE (   6.26  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,61 +94,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linux-MM <linux-mm@kvack.org>, linux1394-devel@lists.sourceforge.net,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: "'catalin.marinas@arm.com'" <catalin.marinas@arm.com>,
+ "'will.deacon@arm.com'" <will.deacon@arm.com>,
+ "'linux-kernel@vger.kernel.org'" <linux-kernel@vger.kernel.org>,
+ "'linux-arm-kernel@lists.infradead.org'"
+ <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="iso-2022-jp"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 11, 2019 at 8:34 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
->
-> Convert to use vm_insert_range_buggy to map range of kernel memory
-> to user vma.
->
-> This driver has ignored vm_pgoff and mapped the entire pages. We
-> could later "fix" these drivers to behave according to the normal
-> vm_pgoff offsetting simply by removing the _buggy suffix on the
-> function name and if that causes regressions, it gives us an easy
-> way to revert.
->
-> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+Hi, Mark, James
 
-Any comment on this patch ?
+> -----Original Message-----
+> From: linux-arm-kernel
+> [mailto:linux-arm-kernel-bounces@lists.infradead.org] On Behalf Of
+> Zhang, Lei
+> Sent: Wednesday, January 23, 2019 9:51 PM
+> To: 'Mark Rutland'; 'james.morse@arm.com'
+> Cc: 'catalin.marinas@arm.com'; 'will.deacon@arm.com';
+> 'linux-kernel@vger.kernel.org';
+> 'linux-arm-kernel@lists.infradead.org'; Zhang, Lei/張 雷
+> Subject: RE: [PATCH] arm64 memory accesses may cause undefined fault on
+> Fujitsu-A64FX
+> 
+> At first thanks for your comments.
+> I thinks James's comments is quite similar with above comment.
+> I am reviewing this point now.
+> I will respond to your questions after I check this.
+As your comments, this patch cannot avoid this problem
+completely. So I will post a new patch to resolve this 
+problem in different way.
 
-> ---
->  drivers/firewire/core-iso.c | 15 ++-------------
->  1 file changed, 2 insertions(+), 13 deletions(-)
->
-> diff --git a/drivers/firewire/core-iso.c b/drivers/firewire/core-iso.c
-> index 35e784c..99a6582 100644
-> --- a/drivers/firewire/core-iso.c
-> +++ b/drivers/firewire/core-iso.c
-> @@ -107,19 +107,8 @@ int fw_iso_buffer_init(struct fw_iso_buffer *buffer, struct fw_card *card,
->  int fw_iso_buffer_map_vma(struct fw_iso_buffer *buffer,
->                           struct vm_area_struct *vma)
->  {
-> -       unsigned long uaddr;
-> -       int i, err;
-> -
-> -       uaddr = vma->vm_start;
-> -       for (i = 0; i < buffer->page_count; i++) {
-> -               err = vm_insert_page(vma, uaddr, buffer->pages[i]);
-> -               if (err)
-> -                       return err;
-> -
-> -               uaddr += PAGE_SIZE;
-> -       }
-> -
-> -       return 0;
-> +       return vm_insert_range_buggy(vma, buffer->pages,
-> +                                       buffer->page_count);
->  }
->
->  void fw_iso_buffer_destroy(struct fw_iso_buffer *buffer,
-> --
-> 1.9.1
->
+Lei Zhang
+zhang.lei@jp.fujitsu.com
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
