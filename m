@@ -2,66 +2,69 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2EAF8C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:43:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B5ABCC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:43:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F3219218A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:43:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7B0BC218A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:43:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s4k+vAWb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F3219218A2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LBR2frFz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7B0BC218A2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ravnborg.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=/TQo1YaL4xjyLN7HGoKM6h7PmllfC52TO0c5O4q/m84=; b=s4k+vAWbdNITuvVJcy0orCFdX
-	6gZu0JG2h2PIeMIAwhC7aYbaYn/M6lI6Rc71rUMaIKa2EXBxiPg3UW4kJUKFt4J08A781PcXncY+S
-	N4Md6DNdeH0rv7y3b+ySnQTQQBTy44AW7hDT/nwWdN9QO1O64wKJ+kVxNbU6h0OJoGN8gZvrNn3jw
-	5qV8eUk1n9n10uwN5Y8EVO39fMgvpS0Hm1HmimVtJeDLTuST6HvmzH4owH4j/KI6jgL8VbWME5gAz
-	Lb6tjJMQa2YCG+j+Ds6PVxK+WyFnSrajOFdJg44lPSQzSyItfwNeC5c0sGRktbFL3EpOSuyaSEZ0u
-	kiD1clWyw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=sDOY41Ud1A12SShXG2XZHr9/cKqYwmpf3Ylty9k2tRI=; b=LBR2frFztkDprf
+	ar/laZuiuV3dK3ANsukIurd01/zgHzIphNpEjP+MT5pkwMJw04x30kRH5zBXhpxHpRxYpxF3y/S7N
+	X05ALCyVIwgvtha3KFCC/GQrt6dTV3jM/5X1eFVdLh0bNmMyj4H1txDAqbhyzW2v04zMdQOcO5WnT
+	tNNC1BaQxCUsWGu7CyM1czfXL5VvAVvClk8xiF8JtM4U7jff4HiSNUbsxxN4OfDMKRVlBK348tGoZ
+	H/rL7/HTCX6TQf/qs+CbToH9q9rrKcA2VNYqVvnd6n5eULSKMsfurqgK3ddCYOrA2WcxDjXD3EP5d
+	FY8XY8IWgI2EXZrMTwBw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmyxZ-00008X-1u; Fri, 25 Jan 2019 10:43:41 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmywP-0007zR-6V
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 10:43:11 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 80CEBEBD;
- Fri, 25 Jan 2019 02:42:28 -0800 (PST)
-Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 692A83F5AF;
- Fri, 25 Jan 2019 02:42:26 -0800 (PST)
-Subject: Re: [RESEND PATCH v3 1/2] drivers: amba: Updates to component
- identification for driver matching.
-To: mike.leach@linaro.org, saiprakash.ranjan@codeaurora.org
-References: <20181218215944.2444-1-mike.leach@linaro.org>
- <20181218215944.2444-2-mike.leach@linaro.org>
- <353c8f4b-f48f-863c-7149-342b764a02c0@codeaurora.org>
- <CAJ9a7Vh6McpjtyRuBDPSYMWec0TuWkXeOLBOpKvv8tWUU0sV2A@mail.gmail.com>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <f4d78f6f-1b85-22ca-bfa6-abaf0d67a898@arm.com>
-Date: Fri, 25 Jan 2019 10:42:23 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gmyxm-0000PH-Jj; Fri, 25 Jan 2019 10:43:54 +0000
+Received: from asavdk3.altibox.net ([109.247.116.14])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gmywd-0006Mx-F8; Fri, 25 Jan 2019 10:43:15 +0000
+Received: from ravnborg.org (unknown [158.248.194.18])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by asavdk3.altibox.net (Postfix) with ESMTPS id A78E720057;
+ Fri, 25 Jan 2019 11:40:33 +0100 (CET)
+Date: Fri, 25 Jan 2019 11:40:32 +0100
+From: Sam Ravnborg <sam@ravnborg.org>
+To: Daniel Vetter <daniel.vetter@ffwll.ch>
+Subject: Re: [PATCH 01/26] drm/irq: Don't check for DRIVER_HAVE_IRQ in
+ drm_irq_(un)install
+Message-ID: <20190125104032.GA27214@ravnborg.org>
+References: <20190124165831.16427-1-daniel.vetter@ffwll.ch>
+ <20190124165831.16427-2-daniel.vetter@ffwll.ch>
 MIME-Version: 1.0
-In-Reply-To: <CAJ9a7Vh6McpjtyRuBDPSYMWec0TuWkXeOLBOpKvv8tWUU0sV2A@mail.gmail.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20190124165831.16427-2-daniel.vetter@ffwll.ch>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+X-CMAE-Score: 0
+X-CMAE-Analysis: v=2.3 cv=dqr19Wo4 c=1 sm=1 tr=0
+ a=UWs3HLbX/2nnQ3s7vZ42gw==:117 a=UWs3HLbX/2nnQ3s7vZ42gw==:17
+ a=kj9zAlcOel0A:10 a=QyXUC8HyAAAA:8 a=JfrnYn6hAAAA:8 a=e5mUnYsNAAAA:8
+ a=VwQbUJbxAAAA:8 a=Z4Rwk6OoAAAA:8 a=7gkXJVJtAAAA:8 a=-wFMkYpdgSpu5CXY80EA:9
+ a=CjuIK1q_8ugA:10 a=1CNFftbPRP8L7MoqJWF3:22 a=Vxmtnl_E_bksehYqCbjh:22
+ a=AjGcO6oz07-iQ99wixmX:22 a=HkZW87K1Qel5hWWM3VKY:22
+ a=E9Po1WZjFZOl8hwRPBS3:22
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_024229_863503_20F6CEE5 
-X-CRM114-Status: GOOD (  21.27  )
+X-CRM114-CacheID: sfid-20190125_024244_653687_D4089F59 
+X-CRM114-Status: GOOD (  10.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,91 +76,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: rnayak@codeaurora.org, mathieu.poirier@linaro.org,
- coresight@lists.linaro.org, linux@armlinux.org.uk,
- linux-kernel@vger.kernel.org, sibis@codeaurora.org,
- vivek.gautam@codeaurora.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-arm-msm@vger.kernel.org,
+ Intel Graphics Development <intel-gfx@lists.freedesktop.org>,
+ amd-gfx@lists.freedesktop.org, virtualization@lists.linux-foundation.org,
+ linux-renesas-soc@vger.kernel.org,
+ DRI Development <dri-devel@lists.freedesktop.org>,
+ spice-devel@lists.freedesktop.org, Daniel Vetter <daniel.vetter@intel.com>,
+ linux-amlogic@lists.infradead.org, freedreno@lists.freedesktop.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Mike,
+Hi Daniel.
 
-On 25/01/2019 10:37, Mike Leach wrote:
-> Hello Sai
-> On Fri, 25 Jan 2019 at 07:20, Sai Prakash Ranjan
-> <saiprakash.ranjan@codeaurora.org> wrote:
->>
->> Hi Mike,
->>
->> Thanks for the patch.
->>
->> BTW somehow I can't find the latest series in my inbox, so commenting
->> on this here.
->>
->> Mathieu pointed me to this patch series.This solves CPU debug module
->> sharing same PID as ETM on MSM8996. I will be posting patch for CPU
->> debug UCI table soon.
->>
->> But please find my one comment inline.
->>
->> On 12/19/2018 3:29 AM, Mike Leach wrote:
->>> The CoreSight specification (ARM IHI 0029E), updates the ID register
->>> requirements for components on an AMBA bus, to cover both traditional
->>> ARM Primecell type devices, and newer CoreSight and other components.
->>>
->>> The Peripheral ID (PID) / Component ID (CID) pair is extended in certain
->>> cases to uniquely identify components. CoreSight components related to
->>> a single function can share Peripheral ID values, and must be further
->>> identified using a Unique Component Identifier (UCI). e.g. the ETM, CTI,
->>> PMU and Debug hardware of the A35 all share the same PID.
->>>
->>
->> [..]
->>
->>> +static const struct amba_id *
->>> +amba_lookup(const struct amba_id *table, struct amba_device *dev)
->>> +{
->>>        while (table->mask) {
->>> -             ret = (dev->periphid & table->mask) == table->id;
->>> -             if (ret)
->>> -                     break;
->>> +             if (((dev->periphid & table->mask) == table->id) &&
->>> +                     ((dev->cid != CORESIGHT_CID) ||
->>> +                      (amba_cs_uci_id_match(table, dev))))
->>
->> Shouldn't the check be (dev->cid == CORESIGHT_CID) ?
->> Without this STM fails to probe on both SDM845 and MSM8996.
->>
-> I believe the test is correct
+On Thu, Jan 24, 2019 at 05:58:06PM +0100, Daniel Vetter wrote:
+> If a non-legacy driver calls these it's valid to assume there is
+> interrupt support. The flag is really only needed for legacy drivers.
 > 
-> To expand the logic here:
+> Also remove all the flag usage from non-legacy drivers.
 > 
-> if  (dev->periphid & table->mask) == table->id) {
->        //** match on peripheral ID at this point
->       if (CID != CORESIGHT_ID)
->                 return table; //** not coresight - match on peripheral ID only
->       //** or
->       if (amba_cs_uci_id_match() )
->                  return table;  //** is coresight - match on UCI if
-> available - otherwise peripheral ID only;
-> 
-> However - looking at the coresight STM driver - this is using the
-> private .data field in the amba_id for a name - which I had not
-> spotted before.
+> Signed-off-by: Daniel Vetter <daniel.vetter@intel.com>
+> Cc: linux-arm-kernel@lists.infradead.org
+> Cc: intel-gfx@lists.freedesktop.org
+> Cc: linux-amlogic@lists.infradead.org
+> Cc: linux-arm-msm@vger.kernel.org
+> Cc: freedreno@lists.freedesktop.org
+> Cc: virtualization@lists.linux-foundation.org
+> Cc: spice-devel@lists.freedesktop.org
+> Cc: amd-gfx@lists.freedesktop.org
+> Cc: linux-renesas-soc@vger.kernel.org
 
-Good point. We also use this field for Coresight SOC-600 ETR for
-advertising the caps not detected from hardware.
+The actual code changes looks good.
+But if this is the right thing to do I cannot tell.
 
-> I will have to revisit this patchset to fix either the amba id struct
-> or the method for getting the uci data into the amba_id.data which
-> allows for multiple uses.
-
-Thanks Mike !
-
-Cheers
-Suzuki
+On this (limited) basis I provide an:
+Reviewed-by: Sam Ravnborg <sam@ravnborg.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
