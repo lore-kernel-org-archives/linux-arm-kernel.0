@@ -2,22 +2,23 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A9E39C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 12:33:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 92661C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 12:39:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7AFAB218DE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 12:33:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5D264218DE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 12:39:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GEyZaKgj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7AFAB218DE
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hIGEthHe";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="RtpG1b1V"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D264218DE
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,41 +26,149 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lellgZ7Y2cnCqwN1ccd3BikxH3AGAjULbAmKnf0p/6A=; b=GEyZaKgjJtkJQf
-	CFKrDn6l3j6Yzz+bzqN8qvpA31V8M1Z4c9zfyP5HAkOVcHhfwHcro25qZWavCIPbiBt3mlISwDpqE
-	KGIDYIxyeakmbEG1CncBh+qPdoCDJMMkJBSJnGb/e+Z+KsT+yCK0BAPo05zsf/mPJcMndTLYPkcwM
-	3Eh3DBcsM3kt2+etynktXMiOfTminkBYma2oJts4TKq6LyMI2jXvarfiyoQk70HMFSZgBIolvUfCF
-	GnAkB5aHp2pNtm1Sx7TcrN4wsi3qee8RqNRxGg/sNCBRD+0Pe1LYF2SixiurO6nOiHcr7bYh6h0Xj
-	FJ8L6WzcR+5SHoJSzvHQ==;
+	List-Owner; bh=1QX8wseAn5i+Nf+EEdrH4+pvLQkXuu3lRwAklG8f4Gs=; b=hIGEthHelsLS/q
+	GJBkopCyxOrIeshZNdG8DF7M2KSZMiZvH/8Fqzx2u2lnYrJ4m0v1W8Qcx3bEM+JpojPee9XTbJJeh
+	68vwQYqEDsYmBXVmXFXaCIQPTVYn3dCrC+Ueh1Uww9ran/crzoO0cQDvtjefJQiDLhMRs0lL0yxpm
+	BqabDisPHjzbYqBppBobfAfj9Rj6mFf1zM/9C/OSGc9xbvLUbdPu6SQWdreGNwgPecB+F1WB0OtBw
+	kFzaWc4fgJLEvLRFteozdj14gPigQ+3+A4ef3ZRiKv3/5sH77xseXzvzGI7k+CY/H/weTN1XCK5rH
+	nsXUTHWn4AOJMM756K6Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn0fz-0003NS-79; Fri, 25 Jan 2019 12:33:39 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn0fu-0003Mu-B8
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 12:33:36 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D992FA78;
- Fri, 25 Jan 2019 04:33:33 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9881E3F589;
- Fri, 25 Jan 2019 04:33:32 -0800 (PST)
-Subject: Re: [PATCH 10/14] KVM: arm/arm64: consolidate arch timer trap handlers
-To: Christoffer Dall <christoffer.dall@arm.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
-References: <20190124140032.8588-1-christoffer.dall@arm.com>
- <20190124140032.8588-11-christoffer.dall@arm.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <d9e59695-bc87-e2b5-f0d0-7bc172d2d83c@arm.com>
-Date: Fri, 25 Jan 2019 12:33:30 +0000
+	id 1gn0lO-0006k1-MK; Fri, 25 Jan 2019 12:39:14 +0000
+Received: from mail-eopbgr790078.outbound.protection.outlook.com
+ ([40.107.79.78] helo=NAM03-CO1-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gn0lB-0006aM-WC
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 12:39:03 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=dWWZ2Z0do7Upi4OG89U/jIdnIjn6hehZPDOULUURuGQ=;
+ b=RtpG1b1VxrYjuQPzFgobmHOhDFn1oF3mQs551daxbckCn996aUux7CmyizKJtrfGRz5qf+xJvMMAlziKyFpXRh6P+EBEZaUp0ZlyCBKG5iundYa8s3c/mVCVEwlP/R5B5hhaArzWB8xJ/IQhZYhzASR0muRNdaSYk+fD/ve/ixQ=
+Received: from BYAPR02CA0009.namprd02.prod.outlook.com (2603:10b6:a02:ee::22)
+ by BYAPR02MB4326.namprd02.prod.outlook.com (2603:10b6:a03:56::27)
+ with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1537.31; Fri, 25 Jan
+ 2019 12:38:56 +0000
+Received: from SN1NAM02FT057.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e44::205) by BYAPR02CA0009.outlook.office365.com
+ (2603:10b6:a02:ee::22) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1558.16 via Frontend
+ Transport; Fri, 25 Jan 2019 12:38:56 +0000
+Authentication-Results: spf=pass (sender IP is 149.199.60.100)
+ smtp.mailfrom=xilinx.com; web.de; dkim=none (message not signed)
+ header.d=none; web.de; dmarc=bestguesspass action=none header.from=xilinx.com; 
+Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
+ 149.199.60.100 as permitted sender) receiver=protection.outlook.com;
+ client-ip=149.199.60.100; helo=xsj-pvapsmtpgw02;
+Received: from xsj-pvapsmtpgw02 (149.199.60.100) by
+ SN1NAM02FT057.mail.protection.outlook.com (10.152.73.105) with Microsoft SMTP
+ Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1558.11
+ via Frontend Transport; Fri, 25 Jan 2019 12:38:54 +0000
+Received: from unknown-38-66.xilinx.com ([149.199.38.66]:42881
+ helo=xsj-pvapsmtp01) by xsj-pvapsmtpgw02 with esmtp (Exim 4.63)
+ (envelope-from <michal.simek@xilinx.com>)
+ id 1gn0l3-0005Dy-OL; Fri, 25 Jan 2019 04:38:53 -0800
+Received: from [127.0.0.1] (helo=localhost)
+ by xsj-pvapsmtp01 with smtp (Exim 4.63)
+ (envelope-from <michal.simek@xilinx.com>)
+ id 1gn0ky-000432-KQ; Fri, 25 Jan 2019 04:38:48 -0800
+Received: from xsj-pvapsmtp01 (xsj-smtp.xilinx.com [149.199.38.66])
+ by xsj-smtp-dlp1.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x0PCcbHm019896; 
+ Fri, 25 Jan 2019 04:38:38 -0800
+Received: from [172.30.17.111] by xsj-pvapsmtp01 with esmtp (Exim 4.63)
+ (envelope-from <michals@xilinx.com>)
+ id 1gn0kn-00041p-HW; Fri, 25 Jan 2019 04:38:37 -0800
+Subject: Re: [PATCH v2] arm64: dts: zcu100-revC: Give wifi some time after
+ power-on
+To: Jan Kiszka <jan.kiszka@web.de>, Linux Kernel Mailing List
+ <linux-kernel@vger.kernel.org>, linux-arm-kernel
+ <linux-arm-kernel@lists.infradead.org>, Wei Xu <xuwei5@hisilicon.com>
+References: <efc793c8-da17-e267-851e-f08f097843ee@web.de>
+From: Michal Simek <michal.simek@xilinx.com>
+Message-ID: <bf8ed343-d9af-c7d3-0836-6dda2b3e8243@xilinx.com>
+Date: Fri, 25 Jan 2019 13:38:34 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <20190124140032.8588-11-christoffer.dall@arm.com>
+In-Reply-To: <efc793c8-da17-e267-851e-f08f097843ee@web.de>
 Content-Language: en-US
+X-RCIS-Action: ALLOW
+X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
+X-TM-AS-User-Approved-Sender: Yes;Yes
+X-EOPAttributedMessage: 0
+X-MS-Office365-Filtering-HT: Tenant
+X-Forefront-Antispam-Report: CIP:149.199.60.100; IPV:NLI; CTRY:US; EFV:NLI;
+ SFV:NSPM;
+ SFS:(10009020)(346002)(136003)(376002)(39860400002)(396003)(2980300002)(189003)(199004)(54534003)(8936002)(77096007)(186003)(31696002)(26005)(336012)(305945005)(9786002)(4326008)(36386004)(446003)(426003)(47776003)(2486003)(23676004)(106002)(65956001)(50466002)(2906002)(65806001)(110136005)(316002)(65826007)(58126008)(54906003)(230700001)(7416002)(6666004)(356004)(36756003)(126002)(6246003)(107886003)(11346002)(44832011)(106466001)(76176011)(8676002)(81166006)(81156014)(486006)(63266004)(2616005)(31686004)(476003)(229853002)(478600001)(64126003)(107986001)(5001870100001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BYAPR02MB4326; H:xsj-pvapsmtpgw02; FPR:;
+ SPF:Pass; LANG:en; PTR:xapps1.xilinx.com,unknown-60-100.xilinx.com; MX:1; A:1;
+X-Microsoft-Exchange-Diagnostics: 1; SN1NAM02FT057;
+ 1:SZMmH2eqIq5csuiMZNNv3i+JX7sIAbxPqLZ2RS8NGnLVYcvufLAP4FPTheKlDT201sSkPEZege/PEnLpVkDFyNp3prcz5YWPOUyra3FtTUz61UjrQLzgRzQc+TEwJTivY55R292kJuiaKQY5A0KvWg==
+X-MS-PublicTrafficType: Email
+X-MS-Office365-Filtering-Correlation-Id: bdabf3de-1752-4067-8087-08d682c2122b
+X-Microsoft-Antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4608076)(4709027)(2017052603328)(7153060);
+ SRVR:BYAPR02MB4326; 
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
+ 3:5uNJ0KYUKn72osJydvi+4CVMuxyEVG2xWYpXVNv5ay5axTStuudbsnUAWyd1q/4wDOfY2ZnJtuh7t8EeZpVeofFtpAl50eIzKcT1A8hk90BmPzKXa8wbybHYR1qdvrpc2SvpLvO7N/RoS0UCxJRoXek7KXIVJ2UOG+ujCmGoUinSCvvIi3nkLU6sS/jyD3XNUkQAgNhI3duevsdf8tqiZl5avGUApMDUA5zt2LLrRUcDKKzY00ZAeVFSzXMlLaSWntqPvp+8AXM31yhEKTsy2iljLex8vK3xc5W1X4CKcQjoMSgUpRJbFHo5mDrGFa5/W1LOWz0E83gIqeO+ZczuuB6gbz1QZEZ97X2vDTFTByWaUX76YT+NqFNO3DTW+jtp;
+ 25:awe3PMVAKpK5wER7rQe2uZ0U3gbNaAW/zsiP4umFEEjKcDBlERpZ0sj3+uB/hNaP15Ja7i1puGT1L1WdGLVLSWu2JOAILVi3Y0RQRRUJDiGoP2CxVIKct6VsNJ0ornUHEU6Oxx077b24kZOzyszAXA1SQEVC5QO4Fx6gP5Zsy9Va9SBXL/naJi6YOmcvSghpaZkPnc7Zpe771JquDlVo9rbzUsjIy87qx7jfmcBxNKL0GfNHri8VCWZFjr48enk+NmW/cKt/rfe77A77tSBrpDJuZIPwADkCHy5oVfWNrIsHMEkddKqIcwJWzjr2HLruRbfW0nhqfsqT4XXQnczG4Q==
+X-MS-TrafficTypeDiagnostic: BYAPR02MB4326:
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
+ 31:us+eu2ULmRC5+hY6O8XS8IOwLO5D1UYZNQDjDt+MRee+2NFSzEZb7zUPPGfm/Y6EzX/iSBH2vIUVlzkazubLCXOR3FQogYB7UhMhjegxOIAN67THTR8ceLQ91P2qM9tqt8f32O/NhCeX3B3vR43oQltm6F19f3DdhCzLXgMJnj8kAi8hnHAtnvOiTjLn4J+pO9PfdksP1NkQVxk4VeQJ08HmoxQt26YcV9NGBgM7t6o=;
+ 20:HbFKLkaTo9+ayT3XOKYsxxHp2tRm6qSl6Aj9e8c8es+luv7i0t/p86niOlqYDLd8waH1rH/Nu2KbIcMUpp/O5lqF4noIuKhhodQ+uHqmUsiJvfudSLvVyk7wAA/SgHX1DrYKOv+XreXPo3uEUbfALEjGkKF0f4ay03HRVM2d8gG8M0l4XGc6hY7psqSg3m6wbGdkDEtTht6r7lzIp3VzAXDOSyySUTu8f3XLZg5aT0Kh30Vblk7Dyp6srJGu+PaA5Uc2BTlfzjIC2M2AotrvF4RdV6Qg9qW/4K6hI4GQl7VcYg3i4DlEW4agWF+tE+QxwCNdAR9gjpOWqKK2gf/A5Z91X1xFxpavztGKsk1KNgpFBl6tJBqVDKeZe8JttKSfcEbUNCmCgvzJ2vlNIfgZ/V72xqf9GBnteru1Y+uwOoHptSjXpbzCeneIdOS1iDhcBOkk3sHYVFfDr0bvEyEsEIURNHgvzNISTXQNhAEw65fpeI8JbDCCR2eZZb6PtK68
+X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
+X-Microsoft-Antispam-PRVS: <BYAPR02MB43267F03BAA208C46A17A122C69B0@BYAPR02MB4326.namprd02.prod.outlook.com>
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
+ 4:/73Vgtu2vY8F+mamz1iYhnykZjqh8pxaQOJaIEkiBB1VC9KeiYKq1ukj/84jM/XzaAr3SUELc/yr0sZUbF97e955upeciKid1coQF7SQjN/kXKMbzcPCoosogwPVubDDXxGb8+KjiTT0eBGqUf37c/JJTMWRqRi5HckyADgnprWsQkmjff9BPh2y13RO/6ZddP+T9kcKvlNjztchFAd+THmeKSL3/pqxf8MrwYcFbaHF8ecJ8oyKis0b8KLExc53gUZonqf+YHHHmfGkoidKxg9S5dftEJL45PTtBMx09lVC9PwPn8mVGaBbIkhZnvZl
+X-Forefront-PRVS: 0928072091
+X-Microsoft-Exchange-Diagnostics: =?utf-8?B?MTtCWUFQUjAyTUI0MzI2OzIzOitVY0xmOHd5L3FwaGZxU0ZnaWpWZnZkQWJI?=
+ =?utf-8?B?RjFXTmMxUTZGSU1RZVNxa0djQ0NCV3pmb253aTRibW9jOFNsQVJESWtIbWtk?=
+ =?utf-8?B?VVcwNmxoUGNFQkQwU3R1Sml3REZUUXVtVVBneVFTZXdOcmhzVlR0MzRQWEFr?=
+ =?utf-8?B?NzgwOTJwMnRta0l6Q0UxNGM2cC9CZkZpcWtvaVhLTktBSnpaYjZqcFVoOVph?=
+ =?utf-8?B?YUxOcWZxT29OQWlWbzJMak5Oc0hRdDVPRE9nQ0NBbXZXNTFQaVgwazVsd3M2?=
+ =?utf-8?B?VzZkVlhyUFlUTkFTcy91YlZYYVVCVWRWcDl1am1xZjZpVUxvU09zQmIra3di?=
+ =?utf-8?B?QlAvVVFtc1FEVVRwWDl2Q2NTSk5BcktCaGZwTjY3ekg3bHE1OGd4ZzRWR0ZQ?=
+ =?utf-8?B?WWRnRkZ3MFBFNmVwc0RGYmhQVTdJdE5UZjdFWWNSWlEwU1JrRnlzZXNNZU40?=
+ =?utf-8?B?RjdWUzR1RGZ5dkZtdHFjT3pORlFyb3NwekQvaFlrZEtSZGlHOEVMbUlTVGxF?=
+ =?utf-8?B?clRDRjcvWkNwNlNOQkFUT1ZUbVZmTjJVd0VVUkloZXcyU2pNWC83RERFQnVH?=
+ =?utf-8?B?ZkdOdE1ZWXZtNFh6bTN0QW9rdjg4Q2gwRVpTWVZOVmRLM254U1RSVE4xNnZm?=
+ =?utf-8?B?SkJoSThtVGNJaDBaQzZqQTZkSVZOcFpKRFUvTVlMRXBHNmNxSHVjM0pKNHhJ?=
+ =?utf-8?B?NWNIYjVxMW1DTXlqQzhHakE2dGpuQ1RvaUNQQU1BYlYzTXFKbUE5RnVTSjF5?=
+ =?utf-8?B?MzRHRnFaQlplazRTVmdqa1kvVWM4S1BPOVE1V3hwMTBZYUhlYUk2TGNXQ3E2?=
+ =?utf-8?B?Q2hpM3FyYmw3OTNxdkttdGtLbnVvMTkxb2swVTZ0RENxbHFUV1EzVDhjR1Vk?=
+ =?utf-8?B?enZTbmMrZFdmYkFZcUFQdjEzd2V1dVFiTkNheEhFOGMzb1BoZTBQZlNuQTc5?=
+ =?utf-8?B?RlNEaW1FQTBzOHgzdHJFa2FuSWk4dkpJUFJnNWs4QW5NUXhxZmdtUS9YaWFl?=
+ =?utf-8?B?Z08vZFFoSHhieUN6ZjRQSlh0MG5zQkZ0RnlRbWF5WHVOQ0gvQnYxUlBsZVZ5?=
+ =?utf-8?B?dUpvcVI2dTFkWGtlWWZpWm40U056cnNHVXRCTTJzckZSeTk0TnlGRjBicWRx?=
+ =?utf-8?B?K3YvU0dOTkhzcWVRTTBIanluU0tXQlZRbVBGZjhESzdJdlJVSnZCMk5LYzBX?=
+ =?utf-8?B?YUNES1Z3L2RvMm9FbmdDQ1d5aUlnM0R4bVRhaEEwcEFlY3JHSkFRcnkza3k2?=
+ =?utf-8?B?MEd3Tnk0QkFSZnlmTDU2N2RqNDJTWlIzYVhhNVF2ZDd1T0NJMk83WnAzMXJB?=
+ =?utf-8?B?MGZNMUVJVkE0a2FJRlF3V1QrRmFzRVFSSkhYTlNzVldxNVp4M3hsWmZQZ3g4?=
+ =?utf-8?B?Y0FXTlFIek8zQm50aGlWdUppNTcrakNBSWN2UWFsQVlNWTZ4YTJCUUFBS0RJ?=
+ =?utf-8?B?Y05mbks5YW95TzNtWnA3ZnU3SVc5Nkp0Z1BYM0djdUVLNE5VS081RHBuNmlZ?=
+ =?utf-8?B?TDFoYjNKaE5WTHdmaGdHblpTRXp4Q05ScXFHOHRqMDZ5SnBhbFFsTHE1STE1?=
+ =?utf-8?B?REVrdjFDOE9uSDRHM0E0QUVjdFY5amJlSUVqVTlvdWpXbDlnbk1OTDZ0MlJN?=
+ =?utf-8?B?Y1VQT3pnQ1VPOXZ5aEpJK083RU1pdnlBcWl3ZXR0Sm9pT2orQ3JacHAyb0hi?=
+ =?utf-8?B?c3ZtSWFSK3pGYzEyVUN3dEtma0J1dzdKZ1RCYXZibGRYMFQvNGhSTTRLc0lO?=
+ =?utf-8?Q?NNdaDEEXTshJVd6Jnq2riZ02YD//AT+cWIOWk=3D?=
+X-MS-Exchange-SenderADCheck: 1
+X-Microsoft-Antispam-Message-Info: M7Rql3j4peueuEId2UaH7f8Xh+qwHyQMbyLzm0WAt560opVzJ8VRq4DA0NRiLqFJtAuFHNvST2l9kLBsrlbyg8tCrCaGC0IsB1vl1oxGDQBTBaL6yWncv8RMB+rscfcnhhX9K+oEfQL+KEg2tMQHPLGqPRkYC1i96/FnRm9EM8EfQNND1F03kgvIfohgZvOXf3rLNBcQ6rNSZQqZ6VrhsBjQKfJoIbY7iKPELmn6T5lKZ4kyGaoNQiaee0rRXCWJulPAE9YYb7gZTVftV6HW5FkWrVrc5P1GECPlLPPwQFGglRCV394RYZTZEWnROh/qyCkZ0VfrXOtj0nJfYE+px+Z3BRGUDdkciE24fKf5WERDCAnxP06ATzWdiu4AwgOvBVOCY5qPOzsr9Cdbb2N/8Bh9WbTw8tj09Il9Z6oju6s=
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4326;
+ 6:XOmL1MQSNfo0uMAEF9jeiAQVVQ/9u1WT05CVZjdcBJ8+x09m9XOz8vokmsfZ8N3VYdaC5dFsqmh2pOnBhc6c4iTSoKUgQn9QTFd9Y06C3lX5zea0Z94zNR0tx8kLLX0nu6uLONSiiHUzgqUSWCFUZnifBZrpSRUVP49ROePFiuJclTJEdGdvHROvN/2jWyQ/ZIfcECbFM1VsFmUr9T9+BcPz0/EUQp5lxjU3qFcHgS0VVP6qVoRBkF4Owtu7OoxqCiN1HTsxIMYnzCqvFiY4WeKQuRPp10MBPoG9kCQVLYeYBp37yGyY17xpMcAzI6pAa6iOmb6bewDxbJCQgJ1DT1RZGJhwOXI4P3xdiill5+l2VVEoxbUdnhwJyFA8YFIEkYwuaXbEoU13kcsNvEJYjU6vTgBa7P3+U3D4UY9z7O+v5bmFfJPhSnF5iVMqCEeVA+oVkvRhmBAkI/3RBQgsyg==;
+ 5:cPNvmYnw+OJRCisAGZZZXVLwP+eb4fPjC2X8oWCNCDqXsIodEhpog7aOJvfpZJt5MOB4LcgMCkwjBBJbQ99hv+onk7SFP829hCwQzAznZOH9DvKPdjCFOi7SKd/RnNBuwTjwqzl5WGkDaAz79ccD7RVNASQrccW3QO5RjqB7E+/tjwE8b/zGRJfROdfFyuy6uSMnJBQtqoT68cvLwAsSNQ==;
+ 7:VCAP7pqr0yPGa/nMrV4ONHcESKsgEAApX6wLRm0Jk3Rpw+dwTH82hTRZST9QjozgTwv3sAIb347boAXrOaeh3K04HrPqURYo/ouOBCl1/uSyjuPIbq/Rvh8w90CfVoBm6AYyAPvGTReLfiwmw9pWwg==
+X-OriginatorOrg: xilinx.com
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 25 Jan 2019 12:38:54.4923 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: bdabf3de-1752-4067-8087-08d682c2122b
+X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.100];
+ Helo=[xsj-pvapsmtpgw02]
+X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BYAPR02MB4326
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_043334_725837_C803D6D8 
-X-CRM114-Status: GOOD (  24.08  )
+X-CRM114-CacheID: sfid-20190125_043902_083175_E8572C61 
+X-CRM114-Status: GOOD (  18.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,417 +180,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>,
- Andre Przywara <andre.przywara@arm.com>, kvm@vger.kernel.org
+Cc: Ulf Hansson <ulf.hansson@linaro.org>, Ryan Grachek <ryan@edited.us>,
+ Tony Lindgren <tony@atomide.com>, linux-wireless@vger.kernel.org,
+ Michal Simek <michal.simek@xilinx.com>, "Reizer, Eyal" <eyalr@ti.com>,
+ John Stultz <john.stultz@linaro.org>,
+ Valentin Schneider <valentin.schneider@arm.com>,
+ Kalle Valo <kvalo@codeaurora.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
-
-I'm wondering, could this patch be split in two? One for the
-introduction of kvm_arm_timer_read_sysreg() +
-kvm_arm_timer_write_sysreg() and the other for merging the handlers into
-a single function?
-
-
-
-On 24/01/2019 14:00, Christoffer Dall wrote:
-> From: Andre Przywara <andre.przywara@arm.com>
+On 24. 01. 19 9:28, Jan Kiszka wrote:
+> From: Jan Kiszka <jan.kiszka@siemens.com>
 > 
-> At the moment we have separate system register emulation handlers for
-> each timer register. Actually they are quite similar, and we rely on
-> kvm_arm_timer_[gs]et_reg() for the actual emulation anyways, so let's
-> just merge all of those handlers into one function, which just marshalls
-> the arguments and then hands off to a set of common accessors.
-> This makes extending the emulation to include EL2 timers much easier.
+> Somewhere along recent changes to power control of the wl1831, power-on
+> became very unreliable on the Ultra96, failing like this:
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> [Fixed 32-bit VM breakage and reduced to reworking existing code]
-> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-> [Fixed 32bit host, general cleanup]
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> wl1271_sdio: probe of mmc2:0001:1 failed with error -16
+> wl1271_sdio: probe of mmc2:0001:2 failed with error -16
+> 
+> After playing with some dt parameters and comparing to other users of
+> this chip, it turned out we need some power-on delay to make things
+> stable again. In contrast to those other users which define 200 ms,
+> Ultra96 is already happy with 10 ms.
+> 
+> Fixes: 5869ba0653b9 ("arm64: zynqmp: Add support for Xilinx zcu100-revC")
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 > ---
->  arch/arm/kvm/coproc.c           |  23 +++---
->  arch/arm64/include/asm/sysreg.h |   4 +
->  arch/arm64/kvm/sys_regs.c       |  80 +++++++++++---------
->  include/kvm/arm_arch_timer.h    |  23 ++++++
->  virt/kvm/arm/arch_timer.c       | 129 +++++++++++++++++++++++++++-----
->  5 files changed, 196 insertions(+), 63 deletions(-)
 > 
-> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> index 222c1635bc7a..51863364f8d1 100644
-> --- a/arch/arm/kvm/coproc.c
-> +++ b/arch/arm/kvm/coproc.c
-> @@ -293,15 +293,16 @@ static bool access_cntp_tval(struct kvm_vcpu *vcpu,
->  			     const struct coproc_params *p,
->  			     const struct coproc_reg *r)
->  {
-> -	u64 now = kvm_phys_timer_read();
-> -	u64 val;
-> +	u32 val;
->  
->  	if (p->is_write) {
->  		val = *vcpu_reg(vcpu, p->Rt1);
-> -		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL, val + now);
-> +		kvm_arm_timer_write_sysreg(vcpu,
-> +					   TIMER_PTIMER, TIMER_REG_TVAL, val);
->  	} else {
-> -		val = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
-> -		*vcpu_reg(vcpu, p->Rt1) = val - now;
-> +		val = kvm_arm_timer_read_sysreg(vcpu,
-> +						TIMER_PTIMER, TIMER_REG_TVAL);
-> +		*vcpu_reg(vcpu, p->Rt1) = val;
->  	}
->  
->  	return true;
-> @@ -315,9 +316,11 @@ static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
->  
->  	if (p->is_write) {
->  		val = *vcpu_reg(vcpu, p->Rt1);
-> -		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CTL, val);
-> +		kvm_arm_timer_write_sysreg(vcpu,
-> +					   TIMER_PTIMER, TIMER_REG_CTL, val);
->  	} else {
-> -		val = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CTL);
-> +		val = kvm_arm_timer_read_sysreg(vcpu,
-> +						TIMER_PTIMER, TIMER_REG_CTL);
->  		*vcpu_reg(vcpu, p->Rt1) = val;
->  	}
->  
-> @@ -333,9 +336,11 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
->  	if (p->is_write) {
->  		val = (u64)*vcpu_reg(vcpu, p->Rt2) << 32;
->  		val |= *vcpu_reg(vcpu, p->Rt1);
-> -		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL, val);
-> +		kvm_arm_timer_write_sysreg(vcpu,
-> +					   TIMER_PTIMER, TIMER_REG_CVAL, val);
->  	} else {
-> -		val = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
-> +		val = kvm_arm_timer_read_sysreg(vcpu,
-> +						TIMER_PTIMER, TIMER_REG_CVAL);
->  		*vcpu_reg(vcpu, p->Rt1) = val;
->  		*vcpu_reg(vcpu, p->Rt2) = val >> 32;
->  	}
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 3e5650903d6d..6482e8bcf1b8 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -392,6 +392,10 @@
->  #define SYS_CNTP_CTL_EL0		sys_reg(3, 3, 14, 2, 1)
->  #define SYS_CNTP_CVAL_EL0		sys_reg(3, 3, 14, 2, 2)
->  
-> +#define SYS_AARCH32_CNTP_TVAL		sys_reg(0, 0, 14, 2, 0)
-> +#define SYS_AARCH32_CNTP_CTL		sys_reg(0, 0, 14, 2, 1)
-> +#define SYS_AARCH32_CNTP_CVAL		sys_reg(0, 2, 0, 14, 0)
-> +
->  #define __PMEV_op2(n)			((n) & 0x7)
->  #define __CNTR_CRm(n)			(0x8 | (((n) >> 3) & 0x3))
->  #define SYS_PMEVCNTRn_EL0(n)		sys_reg(3, 3, 14, __CNTR_CRm(n), __PMEV_op2(n))
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 1a5bea4285e4..65ea63366c67 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -990,44 +990,51 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
->  	{ SYS_DESC(SYS_PMEVTYPERn_EL0(n)),					\
->  	  access_pmu_evtyper, reset_unknown, (PMEVTYPER0_EL0 + n), }
->  
-> -static bool access_cntp_tval(struct kvm_vcpu *vcpu,
-> -		struct sys_reg_params *p,
-> -		const struct sys_reg_desc *r)
-> +static bool access_arch_timer(struct kvm_vcpu *vcpu,
-> +			      struct sys_reg_params *p,
-> +			      const struct sys_reg_desc *r)
->  {
-> -	u64 now = kvm_phys_timer_read();
-> -	u64 cval;
-> +	enum kvm_arch_timers tmr;
-> +	enum kvm_arch_timer_regs treg;
-> +	u64 reg = reg_to_encoding(r);
->  
-> -	if (p->is_write) {
-> -		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL,
-> -				      p->regval + now);
-> -	} else {
-> -		cval = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
-> -		p->regval = cval - now;
-> +	switch (reg) {
-> +	case SYS_CNTP_TVAL_EL0:
-> +	case SYS_CNTP_CTL_EL0:
-> +	case SYS_CNTP_CVAL_EL0:
-> +	case SYS_AARCH32_CNTP_TVAL:
-> +	case SYS_AARCH32_CNTP_CTL:
-> +	case SYS_AARCH32_CNTP_CVAL:
-> +		tmr = TIMER_PTIMER;
-> +		break;
-> +	default:
-> +		BUG();
->  	}
->  
-> -	return true;
-> -}
-> +	switch (reg) {
-
-I find having two consecutive switch on the same element a bit weird
-(and takes a lot of space).
-
-Either I'd merge the two since the valid cases are the same, or I'd put
-them in separate function "reg_get_timer(reg)",
-"reg_get_timer_reg(reg)". (Can probably fit those in
-include/kvm/arm_arch_timer.h)
-
-> +	case SYS_CNTP_CVAL_EL0:
-> +	case SYS_AARCH32_CNTP_CVAL:
-> +		treg = TIMER_REG_CVAL;
-> +		break;
->  
-> -static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
-> -		struct sys_reg_params *p,
-> -		const struct sys_reg_desc *r)
-> -{
-> -	if (p->is_write)
-> -		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CTL, p->regval);
-> -	else
-> -		p->regval = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CTL);
-> +	case SYS_CNTP_TVAL_EL0:
-> +	case SYS_AARCH32_CNTP_TVAL:
-> +		treg = TIMER_REG_TVAL;
-> +		break;
->  
-> -	return true;
-> -}
-> +	case SYS_CNTP_CTL_EL0:
-> +	case SYS_AARCH32_CNTP_CTL:
-> +		treg = TIMER_REG_CTL;
-> +		break;
-> +
-> +	default:
-> +		BUG();
-> +	}
->  
-> -static bool access_cntp_cval(struct kvm_vcpu *vcpu,
-> -		struct sys_reg_params *p,
-> -		const struct sys_reg_desc *r)
-> -{
->  	if (p->is_write)
-> -		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL, p->regval);
-> +		kvm_arm_timer_write_sysreg(vcpu, tmr, treg, p->regval);
->  	else
-> -		p->regval = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
-> +		p->regval = kvm_arm_timer_read_sysreg(vcpu, tmr, treg);
->  
->  	return true;
->  }
-> @@ -1392,9 +1399,9 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	{ SYS_DESC(SYS_TPIDR_EL0), NULL, reset_unknown, TPIDR_EL0 },
->  	{ SYS_DESC(SYS_TPIDRRO_EL0), NULL, reset_unknown, TPIDRRO_EL0 },
->  
-> -	{ SYS_DESC(SYS_CNTP_TVAL_EL0), access_cntp_tval },
-> -	{ SYS_DESC(SYS_CNTP_CTL_EL0), access_cntp_ctl },
-> -	{ SYS_DESC(SYS_CNTP_CVAL_EL0), access_cntp_cval },
-> +	{ SYS_DESC(SYS_CNTP_TVAL_EL0), access_arch_timer },
-> +	{ SYS_DESC(SYS_CNTP_CTL_EL0), access_arch_timer },
-> +	{ SYS_DESC(SYS_CNTP_CVAL_EL0), access_arch_timer },
->  
->  	/* PMEVCNTRn_EL0 */
->  	PMU_PMEVCNTR_EL0(0),
-> @@ -1715,10 +1722,9 @@ static const struct sys_reg_desc cp15_regs[] = {
->  
->  	{ Op1( 0), CRn(13), CRm( 0), Op2( 1), access_vm_reg, NULL, c13_CID },
->  
-> -	/* CNTP_TVAL */
-> -	{ Op1( 0), CRn(14), CRm( 2), Op2( 0), access_cntp_tval },
-> -	/* CNTP_CTL */
-> -	{ Op1( 0), CRn(14), CRm( 2), Op2( 1), access_cntp_ctl },
-> +	/* Arch Tmers */
-> +	{ SYS_DESC(SYS_AARCH32_CNTP_TVAL), access_arch_timer },
-> +	{ SYS_DESC(SYS_AARCH32_CNTP_CTL), access_arch_timer },
->  
->  	/* PMEVCNTRn */
->  	PMU_PMEVCNTR(0),
-> @@ -1795,7 +1801,7 @@ static const struct sys_reg_desc cp15_64_regs[] = {
->  	{ Op1( 1), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR1 },
->  	{ Op1( 1), CRn( 0), CRm(12), Op2( 0), access_gic_sgi }, /* ICC_ASGI1R */
->  	{ Op1( 2), CRn( 0), CRm(12), Op2( 0), access_gic_sgi }, /* ICC_SGI0R */
-> -	{ Op1( 2), CRn( 0), CRm(14), Op2( 0), access_cntp_cval },
-> +	{ SYS_DESC(SYS_AARCH32_CNTP_CVAL),    access_arch_timer },
+> Changes in v2:
+>  - fix changelog
+> 
+>  arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+> index 13a0a028df98..e5699d0d91e4 100644
+> --- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+> @@ -101,6 +101,7 @@
+>  	sdio_pwrseq: sdio-pwrseq {
+>  		compatible = "mmc-pwrseq-simple";
+>  		reset-gpios = <&gpio 7 GPIO_ACTIVE_LOW>; /* WIFI_EN */
+> +		post-power-on-delay-ms = <10>;
+>  	};
 >  };
->  
->  /* Target specific emulation tables */
-> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-> index d6e6a45d1d24..d26b7fde9935 100644
-> --- a/include/kvm/arm_arch_timer.h
-> +++ b/include/kvm/arm_arch_timer.h
-> @@ -22,6 +22,19 @@
->  #include <linux/clocksource.h>
->  #include <linux/hrtimer.h>
->  
-> +enum kvm_arch_timers {
-> +	TIMER_PTIMER,
-> +	TIMER_VTIMER,
-> +	NR_KVM_TIMERS
-> +};
-> +
-> +enum kvm_arch_timer_regs {
-> +	TIMER_REG_CNT,
-> +	TIMER_REG_CVAL,
-> +	TIMER_REG_TVAL,
-> +	TIMER_REG_CTL,
-> +};
-> +
->  struct arch_timer_context {
->  	/* Registers: control register, timer value */
->  	u32				cnt_ctl;
-> @@ -87,5 +100,15 @@ bool kvm_arch_timer_get_input_level(int vintid);
->  
->  #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
->  #define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
-> +#define vcpu_get_timer(v,t)					\
-> +	(t == TIMER_VTIMER ? vcpu_vtimer(v) : vcpu_ptimer(v))
-> +
-> +u64 kvm_arm_timer_read_sysreg(struct kvm_vcpu *vcpu,
-> +			      enum kvm_arch_timers tmr,
-> +			      enum kvm_arch_timer_regs treg);
-> +void kvm_arm_timer_write_sysreg(struct kvm_vcpu *vcpu,
-> +				enum kvm_arch_timers tmr,
-> +				enum kvm_arch_timer_regs treg,
-> +				u64 val);
 > 
->  #endif
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 4986028d9829..9502bb91776b 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -25,6 +25,7 @@
->  
->  #include <clocksource/arm_arch_timer.h>
->  #include <asm/arch_timer.h>
-> +#include <asm/kvm_emulate.h>
->  #include <asm/kvm_hyp.h>
->  
->  #include <kvm/arm_vgic.h>
-> @@ -52,6 +53,13 @@ static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx);
->  static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
->  				 struct arch_timer_context *timer_ctx);
->  static bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx);
-> +static void kvm_arm_timer_write(struct kvm_vcpu *vcpu,
-> +				struct arch_timer_context *timer,
-> +				enum kvm_arch_timer_regs treg,
-> +				u64 val);
-> +static u64 kvm_arm_timer_read(struct kvm_vcpu *vcpu,
-> +			      struct arch_timer_context *timer,
-> +			      enum kvm_arch_timer_regs treg);
->  
->  u64 kvm_phys_timer_read(void)
->  {
-> @@ -628,24 +636,25 @@ static void kvm_timer_init_interrupt(void *info)
->  
->  int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
->  {
-> -	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-> -	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-> -
->  	switch (regid) {
->  	case KVM_REG_ARM_TIMER_CTL:
-> -		vtimer->cnt_ctl = value & ~ARCH_TIMER_CTRL_IT_STAT;
-> +		kvm_arm_timer_write(vcpu,
-> +				    vcpu_vtimer(vcpu), TIMER_REG_CTL, value);
->  		break;
->  	case KVM_REG_ARM_TIMER_CNT:
->  		update_vtimer_cntvoff(vcpu, kvm_phys_timer_read() - value);
->  		break;
->  	case KVM_REG_ARM_TIMER_CVAL:
-> -		vtimer->cnt_cval = value;
-> +		kvm_arm_timer_write(vcpu,
-> +				    vcpu_vtimer(vcpu), TIMER_REG_CVAL, value);
->  		break;
->  	case KVM_REG_ARM_PTIMER_CTL:
-> -		ptimer->cnt_ctl = value & ~ARCH_TIMER_CTRL_IT_STAT;
-> +		kvm_arm_timer_write(vcpu,
-> +				    vcpu_ptimer(vcpu), TIMER_REG_CTL, value);
->  		break;
->  	case KVM_REG_ARM_PTIMER_CVAL:
-> -		ptimer->cnt_cval = value;
-> +		kvm_arm_timer_write(vcpu,
-> +				    vcpu_ptimer(vcpu), TIMER_REG_CVAL, value);
->  		break;
->  
->  	default:
-> @@ -672,26 +681,112 @@ static u64 read_timer_ctl(struct arch_timer_context *timer)
->  
->  u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
->  {
-> -	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-> -	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-> -
->  	switch (regid) {
->  	case KVM_REG_ARM_TIMER_CTL:
-> -		return read_timer_ctl(vtimer);
-> +		return kvm_arm_timer_read(vcpu,
-> +					  vcpu_vtimer(vcpu), TIMER_REG_CTL);
->  	case KVM_REG_ARM_TIMER_CNT:
-> -		return kvm_phys_timer_read() - vtimer->cntvoff;
-> +		return kvm_arm_timer_read(vcpu,
-> +					  vcpu_vtimer(vcpu), TIMER_REG_CNT);
->  	case KVM_REG_ARM_TIMER_CVAL:
-> -		return vtimer->cnt_cval;
-> +		return kvm_arm_timer_read(vcpu,
-> +					  vcpu_vtimer(vcpu), TIMER_REG_CVAL);
->  	case KVM_REG_ARM_PTIMER_CTL:
-> -		return read_timer_ctl(ptimer);
-> -	case KVM_REG_ARM_PTIMER_CVAL:
-> -		return ptimer->cnt_cval;
-> +		return kvm_arm_timer_read(vcpu,
-> +					  vcpu_ptimer(vcpu), TIMER_REG_CTL);
->  	case KVM_REG_ARM_PTIMER_CNT:
-> -		return kvm_phys_timer_read();
-> +		return kvm_arm_timer_read(vcpu,
-> +					  vcpu_vtimer(vcpu), TIMER_REG_CNT);
-> +	case KVM_REG_ARM_PTIMER_CVAL:
-> +		return kvm_arm_timer_read(vcpu,
-> +					  vcpu_ptimer(vcpu), TIMER_REG_CVAL);
->  	}
->  	return (u64)-1;
->  }
->  
-> +static u64 kvm_arm_timer_read(struct kvm_vcpu *vcpu,
-> +			      struct arch_timer_context *timer,
-> +			      enum kvm_arch_timer_regs treg)
-> +{
-> +	u64 val;
-> +
-> +	switch (treg) {
-> +	case TIMER_REG_TVAL:
-> +		val = kvm_phys_timer_read() - timer->cntvoff - timer->cnt_cval;
-> +		break;
-> +
-> +	case TIMER_REG_CTL:
-> +		val = read_timer_ctl(timer);
-> +		break;
-> +
-> +	case TIMER_REG_CVAL:
-> +		val = timer->cnt_cval;
-> +		break;
-> +
-> +	case TIMER_REG_CNT:
-> +		val = kvm_phys_timer_read() - timer->cntvoff;
+> --
+> 2.16.4
+> 
 
-Unless you really don't want people to read this register, you might
-want to add a "break;" here :) .
+Applied.
 
-> +
-> +	default:
-> +		BUG();
-> +	}
-> +
-> +	return val;
-> +}
-
-Cheers,
-
--- 
-Julien Thierry
+Thanks,
+Michal
 
 _______________________________________________
 linux-arm-kernel mailing list
