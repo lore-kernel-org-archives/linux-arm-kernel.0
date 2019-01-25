@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D7C91C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:25:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 98269C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:26:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A1B132085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:25:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6B8562085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:26:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c46YLbzB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A1B132085A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lkn7LfRc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B8562085A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YuB7o1pH61LyPDydpFYH7yGRV5uYrhtPx7rZ1yoxWhw=; b=c46YLbzBWKO8o7
-	iEOTHqNOivGng0MZb8vQhFT1omeFSVjbADYZMvuRhfgjqS3fXPhaIGFznlGWQ+/gAgPRv5lf3weIv
-	4Cw5NhaWWT+iaunhWNrKduuaYWC0X53cuTxHXuF7XgiVkCfMTMRF+hvHYHlkkkKy3aBsLBr3akosm
-	JTe7OCYsxybxeKVJiWR19usLXd463nuKhM+Q5AbBqCxwmlQKJ7ZN7yd7WZo4a3lDgb/1hBkD+ifxb
-	iWG7wzk7jZvZVwBSVad5ormkeAlBK3kx+uRLD/GP1ZRqZYtMPvlP+MHw0iRrZVMwL7uqWvR2fLvzO
-	qFmc5x2Vhi7CLY+Yvvzw==;
+	List-Owner; bh=2N75gyGUZ0BTh1xp3H6z/7jCBDBvxtZ695ZzzSQCr8Q=; b=lkn7LfRc8HSxQy
+	9px5gbR5PMuUHJTzMzItFSoPTlBX2Fc0cBzLuvFJ/biZ66n8+KP83FpqiIEVI4yEVNOn+fYtZYOdc
+	pnKMb1K0PvnAKo0+j27w1gZK8c0NRGxPMppeJ3ngBSaoHpJTqdsAT7F/EdbptSd/n1EVmllkbDDc5
+	DAkxRsNheSEz1z/cO0W+MDtyf/ghgnk97Bf+I3fG9p47c+T1eLSs3SIMPzJRj6XRTup6zoNT0LDd+
+	XlEzXSh0DFthdTOFyNKrP1oFuWu7PYHjIMa3nUvwiNpfBsRdM8jTLYBKaA7tlsTfZhsgyFm7t/xfc
+	J+pOmoYx5wjkGKmXHRwQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gms7k-00015j-2Q; Fri, 25 Jan 2019 03:25:44 +0000
+	id 1gms8A-0001Lp-Qn; Fri, 25 Jan 2019 03:26:10 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gms5U-0006gq-Nn
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 03:23:30 +0000
+ id 1gms5T-0006fo-RB
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 03:23:28 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 66C325FE11; Fri, 25 Jan 2019 11:23:15 +0800 (CST)
+ id 45EEB5FDBD; Fri, 25 Jan 2019 11:23:15 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Michael Turquette <mturquette@baylibre.com>,
  Stephen Boyd <sboyd@kernel.org>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>, David Airlie <airlied@linux.ie>,
  Daniel Vetter <daniel@ffwll.ch>
-Subject: [PATCH 08/11] ARM: dts: sun8i-a33: Move display pipeline nodes to
- a23/a33 common dtsi
-Date: Fri, 25 Jan 2019 11:23:11 +0800
-Message-Id: <20190125032314.20915-9-wens@csie.org>
+Subject: [PATCH 05/11] drm/sun4i: layer: support just backend formats when
+ frontend is unavailable
+Date: Fri, 25 Jan 2019 11:23:08 +0800
+Message-Id: <20190125032314.20915-6-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190125032314.20915-1-wens@csie.org>
 References: <20190125032314.20915-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_192325_651367_A7A11731 
-X-CRM114-Status: GOOD (  15.60  )
+X-CRM114-CacheID: sfid-20190124_192324_753314_386134F4 
+X-CRM114-Status: GOOD (  14.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,438 +76,95 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The display pipeline has the same structure, resources and connections
-on both the A23 and A33. The differences include:
+In some cases, such as running a new kernel with an old device tree that
+has the frontend disabled, the backend's matching frontend might be
+unavailable.
 
-  - compatible strings
-  - extra clock, reset control, and IO region for SAT in the backend
-    only found on the A33
-  - missing ch1 clock for the TCON
+When this happens, the layers should only declare support for formats
+that the backend support. This partially reverts commit 1c29d263f624
+("drm/sun4i: Rename sun4i_backend_layer_formats to sun4i_layer_formats")
+by bringing back sun4i_backend_layer_formats, and passing it to
+drm_universal_plane_init, while also dropping the modifiers list,
+in the event no frontend is available.
 
-However, while the A23 has the TCON ch1 clock defined in the CCU, and
-the channel 1 registers are available, it does not have any means to
-use channel 1 due to a lack of downstream encoders, and the enable bit
-for channel 1 is hard-wired to 0 (off).
-
-As the MIPI DSI output device is not officially documented, and there
-are no A23 reference devices to test it, it is not covered by this
-patch.
-
+Fixes: b636d3f97d04 ("drm/sun4i: frontend: Add support for the BGRX8888 input format")
+Fixes: 9afe52d54bb0 ("drm/sun4i: frontend: Add support for semi-planar YUV input formats")
+Fixes: 8c8152bf4db6 ("drm/sun4i: frontend: Add support for planar YUV input formats")
+Fixes: b2ddf277ab5e ("drm/sun4i: layer: Add tiled modifier support and helper")
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 147 ++++++++++++++++++++
- arch/arm/boot/dts/sun8i-a33.dtsi     | 194 ++++++---------------------
- 2 files changed, 185 insertions(+), 156 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_layer.c | 34 ++++++++++++++++++++++++++---
+ 1 file changed, 31 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 97ec8b8cec09..43fe215e83ea 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -68,6 +68,12 @@
- 		};
- 	};
- 
-+	de: display-engine {
-+		/* compatible gets set in SoC specific dtsi file */
-+		allwinner,pipelines = <&fe0>;
-+		status = "disabled";
-+	};
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 95d4aaa51a5c..a514fe88d441 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -117,6 +117,11 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
+ static bool sun4i_layer_format_mod_supported(struct drm_plane *plane,
+ 					     uint32_t format, uint64_t modifier)
+ {
++	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
 +
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-@@ -168,6 +174,42 @@
- 			#size-cells = <0>;
- 		};
- 
-+		tcon0: lcd-controller@1c0c000 {
-+			/* compatible gets set in SoC specific dtsi file */
-+			reg = <0x01c0c000 0x1000>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_LCD>,
-+				 <&ccu CLK_LCD_CH0>;
-+			clock-names = "ahb",
-+				      "tcon-ch0";
-+			clock-output-names = "tcon-pixel-clock";
-+			resets = <&ccu RST_BUS_LCD>;
-+			reset-names = "lcd";
-+			status = "disabled";
++	if (IS_ERR_OR_NULL(layer->backend->frontend))
++		sun4i_backend_format_is_supported(format, modifier);
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon0_in: port@0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					tcon0_in_drc0: endpoint@0 {
-+						reg = <0>;
-+						remote-endpoint = <&drc0_out_tcon0>;
-+					};
-+				};
-+
-+				tcon0_out: port@1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
- 		mmc0: mmc@1c0f000 {
- 			compatible = "allwinner,sun7i-a20-mmc";
- 			reg = <0x01c0f000 0x1000>;
-@@ -570,6 +612,111 @@
- 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 		};
- 
-+		fe0: display-frontend@1e00000 {
-+			/* compatible gets set in SoC specific dtsi file */
-+			reg = <0x01e00000 0x20000>;
-+			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_DE_FE>, <&ccu CLK_DE_FE>,
-+				 <&ccu CLK_DRAM_DE_FE>;
-+			clock-names = "ahb", "mod",
-+				      "ram";
-+			resets = <&ccu RST_BUS_DE_FE>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				fe0_out: port@1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					fe0_out_be0: endpoint@0 {
-+						reg = <0>;
-+						remote-endpoint = <&be0_in_fe0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		be0: display-backend@1e60000 {
-+			/* compatible gets set in SoC specific dtsi file */
-+			reg = <0x01e60000 0x10000>;
-+			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_DE_BE>, <&ccu CLK_DE_BE>,
-+				 <&ccu CLK_DRAM_DE_BE>;
-+			clock-names = "ahb", "mod",
-+				      "ram";
-+			resets = <&ccu RST_BUS_DE_BE>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				be0_in: port@0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					be0_in_fe0: endpoint@0 {
-+						reg = <0>;
-+						remote-endpoint = <&fe0_out_be0>;
-+					};
-+				};
-+
-+				be0_out: port@1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					be0_out_drc0: endpoint@0 {
-+						reg = <0>;
-+						remote-endpoint = <&drc0_in_be0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		drc0: drc@1e70000 {
-+			/* compatible gets set in SoC specific dtsi file */
-+			reg = <0x01e70000 0x10000>;
-+			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_DRC>, <&ccu CLK_DRC>,
-+				 <&ccu CLK_DRAM_DRC>;
-+			clock-names = "ahb", "mod", "ram";
-+			resets = <&ccu RST_BUS_DRC>;
-+
-+			assigned-clocks = <&ccu CLK_DRC>;
-+			assigned-clock-rates = <300000000>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				drc0_in: port@0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					drc0_in_be0: endpoint@0 {
-+						reg = <0>;
-+						remote-endpoint = <&be0_out_drc0>;
-+					};
-+				};
-+
-+				drc0_out: port@1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					drc0_out_tcon0: endpoint@0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_in_drc0>;
-+					};
-+				};
-+			};
-+		};
-+
- 		rtc: rtc@1f00000 {
- 			compatible = "allwinner,sun8i-a23-rtc";
- 			reg = <0x01f00000 0x400>;
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 626152c30f50..1111a6498102 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -159,12 +159,6 @@
- 		};
- 	};
- 
--	de: display-engine {
--		compatible = "allwinner,sun8i-a33-display-engine";
--		allwinner,pipelines = <&fe0>;
--		status = "disabled";
--	};
--
- 	iio-hwmon {
- 		compatible = "iio-hwmon";
- 		io-channels = <&ths>;
-@@ -209,47 +203,6 @@
- 	};
- 
- 	soc {
--		tcon0: lcd-controller@1c0c000 {
--			compatible = "allwinner,sun8i-a33-tcon";
--			reg = <0x01c0c000 0x1000>;
--			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&ccu CLK_BUS_LCD>,
--				 <&ccu CLK_LCD_CH0>;
--			clock-names = "ahb",
--				      "tcon-ch0";
--			clock-output-names = "tcon-pixel-clock";
--			resets = <&ccu RST_BUS_LCD>;
--			reset-names = "lcd";
--			status = "disabled";
--
--			ports {
--				#address-cells = <1>;
--				#size-cells = <0>;
--
--				tcon0_in: port@0 {
--					#address-cells = <1>;
--					#size-cells = <0>;
--					reg = <0>;
--
--					tcon0_in_drc0: endpoint@0 {
--						reg = <0>;
--						remote-endpoint = <&drc0_out_tcon0>;
--					};
--				};
--
--				tcon0_out: port@1 {
--					#address-cells = <1>;
--					#size-cells = <0>;
--					reg = <1>;
--
--					tcon0_out_dsi: endpoint@1 {
--						reg = <1>;
--						remote-endpoint = <&dsi_in_tcon0>;
--					};
--				};
--			};
--		};
--
- 		video-codec@1c0e000 {
- 			compatible = "allwinner,sun8i-a33-video-engine";
- 			reg = <0x01c0e000 0x1000>;
-@@ -339,115 +292,6 @@
- 			status = "disabled";
- 			#phy-cells = <0>;
- 		};
--
--		fe0: display-frontend@1e00000 {
--			compatible = "allwinner,sun8i-a33-display-frontend";
--			reg = <0x01e00000 0x20000>;
--			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&ccu CLK_BUS_DE_FE>, <&ccu CLK_DE_FE>,
--				 <&ccu CLK_DRAM_DE_FE>;
--			clock-names = "ahb", "mod",
--				      "ram";
--			resets = <&ccu RST_BUS_DE_FE>;
--
--			ports {
--				#address-cells = <1>;
--				#size-cells = <0>;
--
--				fe0_out: port@1 {
--					#address-cells = <1>;
--					#size-cells = <0>;
--					reg = <1>;
--
--					fe0_out_be0: endpoint@0 {
--						reg = <0>;
--						remote-endpoint = <&be0_in_fe0>;
--					};
--				};
--			};
--		};
--
--		be0: display-backend@1e60000 {
--			compatible = "allwinner,sun8i-a33-display-backend";
--			reg = <0x01e60000 0x10000>, <0x01e80000 0x1000>;
--			reg-names = "be", "sat";
--			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&ccu CLK_BUS_DE_BE>, <&ccu CLK_DE_BE>,
--				 <&ccu CLK_DRAM_DE_BE>, <&ccu CLK_BUS_SAT>;
--			clock-names = "ahb", "mod",
--				      "ram", "sat";
--			resets = <&ccu RST_BUS_DE_BE>, <&ccu RST_BUS_SAT>;
--			reset-names = "be", "sat";
--			assigned-clocks = <&ccu CLK_DE_BE>;
--			assigned-clock-rates = <300000000>;
--
--			ports {
--				#address-cells = <1>;
--				#size-cells = <0>;
--
--				be0_in: port@0 {
--					#address-cells = <1>;
--					#size-cells = <0>;
--					reg = <0>;
--
--					be0_in_fe0: endpoint@0 {
--						reg = <0>;
--						remote-endpoint = <&fe0_out_be0>;
--					};
--				};
--
--				be0_out: port@1 {
--					#address-cells = <1>;
--					#size-cells = <0>;
--					reg = <1>;
--
--					be0_out_drc0: endpoint@0 {
--						reg = <0>;
--						remote-endpoint = <&drc0_in_be0>;
--					};
--				};
--			};
--		};
--
--		drc0: drc@1e70000 {
--			compatible = "allwinner,sun8i-a33-drc";
--			reg = <0x01e70000 0x10000>;
--			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&ccu CLK_BUS_DRC>, <&ccu CLK_DRC>,
--				 <&ccu CLK_DRAM_DRC>;
--			clock-names = "ahb", "mod", "ram";
--			resets = <&ccu RST_BUS_DRC>;
--
--			assigned-clocks = <&ccu CLK_DRC>;
--			assigned-clock-rates = <300000000>;
--
--			ports {
--				#address-cells = <1>;
--				#size-cells = <0>;
--
--				drc0_in: port@0 {
--					#address-cells = <1>;
--					#size-cells = <0>;
--					reg = <0>;
--
--					drc0_in_be0: endpoint@0 {
--						reg = <0>;
--						remote-endpoint = <&be0_out_drc0>;
--					};
--				};
--
--				drc0_out: port@1 {
--					#address-cells = <1>;
--					#size-cells = <0>;
--					reg = <1>;
--
--					drc0_out_tcon0: endpoint@0 {
--						reg = <0>;
--						remote-endpoint = <&tcon0_in_drc0>;
--					};
--				};
--			};
--		};
- 	};
- 
- 	thermal-zones {
-@@ -524,10 +368,37 @@
- 	};
+ 	return sun4i_backend_format_is_supported(format, modifier) ||
+ 	       sun4i_frontend_format_is_supported(format, modifier);
+ }
+@@ -165,6 +170,21 @@ static const uint32_t sun4i_layer_formats[] = {
+ 	DRM_FORMAT_YVYU,
  };
  
-+&be0 {
-+	compatible = "allwinner,sun8i-a33-display-backend";
-+	/* A33 has an extra "SAT" module packed inside the display backend */
-+	reg = <0x01e60000 0x10000>, <0x01e80000 0x1000>;
-+	reg-names = "be", "sat";
-+	clocks = <&ccu CLK_BUS_DE_BE>, <&ccu CLK_DE_BE>,
-+		 <&ccu CLK_DRAM_DE_BE>, <&ccu CLK_BUS_SAT>;
-+	clock-names = "ahb", "mod",
-+		      "ram", "sat";
-+	resets = <&ccu RST_BUS_DE_BE>, <&ccu RST_BUS_SAT>;
-+	reset-names = "be", "sat";
-+	assigned-clocks = <&ccu CLK_DE_BE>;
-+	assigned-clock-rates = <300000000>;
++static const uint32_t sun4i_backend_layer_formats[] = {
++	DRM_FORMAT_ARGB8888,
++	DRM_FORMAT_ARGB4444,
++	DRM_FORMAT_ARGB1555,
++	DRM_FORMAT_RGBA5551,
++	DRM_FORMAT_RGBA4444,
++	DRM_FORMAT_RGB888,
++	DRM_FORMAT_RGB565,
++	DRM_FORMAT_UYVY,
++	DRM_FORMAT_VYUY,
++	DRM_FORMAT_XRGB8888,
++	DRM_FORMAT_YUYV,
++	DRM_FORMAT_YVYU,
 +};
 +
- &ccu {
- 	compatible = "allwinner,sun8i-a33-ccu";
- };
+ static const uint64_t sun4i_layer_modifiers[] = {
+ 	DRM_FORMAT_MOD_LINEAR,
+ 	DRM_FORMAT_MOD_ALLWINNER_TILED,
+@@ -175,6 +195,9 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 						struct sun4i_backend *backend,
+ 						enum drm_plane_type type)
+ {
++	const uint64_t *modifiers = sun4i_layer_modifiers;
++	const uint32_t *formats = sun4i_layer_formats;
++	unsigned int formats_len = ARRAY_SIZE(sun4i_layer_formats);
+ 	struct sun4i_layer *layer;
+ 	int ret;
  
-+&de {
-+	compatible = "allwinner,sun8i-a33-display-engine";
-+};
-+
-+&drc0 {
-+	compatible = "allwinner,sun8i-a33-drc";
-+};
-+
-+&fe0 {
-+	compatible = "allwinner,sun8i-a33-display-frontend";
-+};
-+
- &mali {
- 	operating-points-v2 = <&mali_opp_table>;
- };
-@@ -544,6 +415,17 @@
+@@ -184,12 +207,17 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
  
- };
+ 	layer->backend = backend;
  
-+&tcon0 {
-+	compatible = "allwinner,sun8i-a33-tcon";
-+};
++	if (IS_ERR_OR_NULL(backend->frontend)) {
++		formats = sun4i_backend_layer_formats;
++		formats_len = ARRAY_SIZE(sun4i_backend_layer_formats);
++		modifiers = NULL;
++	}
 +
-+&tcon0_out {
-+	tcon0_out_dsi: endpoint@1 {
-+		reg = <1>;
-+		remote-endpoint = <&dsi_in_tcon0>;
-+	};
-+};
-+
- &usb_otg {
- 	compatible = "allwinner,sun8i-a33-musb";
- };
+ 	/* possible crtcs are set later */
+ 	ret = drm_universal_plane_init(drm, &layer->plane, 0,
+ 				       &sun4i_backend_layer_funcs,
+-				       sun4i_layer_formats,
+-				       ARRAY_SIZE(sun4i_layer_formats),
+-				       sun4i_layer_modifiers, type, NULL);
++				       formats, formats_len,
++				       modifiers, type, NULL);
+ 	if (ret) {
+ 		dev_err(drm->dev, "Couldn't initialize layer\n");
+ 		return ERR_PTR(ret);
 -- 
 2.20.1
 
