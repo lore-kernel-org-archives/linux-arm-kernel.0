@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6BB92C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:27:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3D91FC282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:27:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3DE082085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:27:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0F0CF2085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:27:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M/f6HNdq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3DE082085A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PJ3zIZee"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0F0CF2085A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=m+AWqxMf/EKlxmjErM0/Yo3JX2uXDmc9TILoeq1Fyzw=; b=M/f6HNdqfrEDRp
-	QuG8cJMAL/fu1lHfkRfM13wYd2qqlvaqE04MEBhkJMxip8T3+bT225Lv0JBzAf9JbwKLqw2UcCp1s
-	3ijtNbUJ9+wZDwwy79YKJ16th6MPDv6ZKVrSUcCY0eDCY+j319zFK47e/4hQ+te01JHsihUt3HjG1
-	TYuDYnrl+BCt3808+RZE0MsuJ2Z/UEnChj3PWpLjb+0HY8tbS6PGUfiE0C3B6wBiYHZeCJI20Pm/m
-	j7ED7+qh6FCLR712aAo11ilRASTIZ7MiQbXjVl1+ufGmMn/VkJ2g/seW6qm9i49xQH3t4VjjFvrah
-	fkIm6yNRdkXYsI+NFeVA==;
+	List-Owner; bh=wGb8dUTDxbuko766u2HrScxKI5aT+R0uHKsBU9M2NHI=; b=PJ3zIZeeIi9+Q3
+	wCaNyqr97rd+YtX5fyrXedliYcEV+o4RWvx614RjvSK0cipG5NGHx46ZawvYhF9SzX5LRWnEmlH5n
+	SrcPWkkgQGsp3t3jZDWekd5OVhF6MID3xQf5rL6gIxy9os2OG+l2/8FM1I9tkfZEec0B9MVAIL47l
+	eCq2I749oXVZPk0VW9O0uNKksxhx59bYIQaAkkvTenTmwjeWjozB3VHCxiE79h0mri+2Te4q3fOOZ
+	CaYnKgIxo5Wkjx53WNyEAkfY8o5yJqgfrFkq53qp8RMpzRJJLUFh6rSFHfb6ajG8TasklhyZuuVcR
+	aVwpddAiD0kx1ORBCyFg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gms9A-00026n-M9; Fri, 25 Jan 2019 03:27:12 +0000
+	id 1gms9V-0002N9-9g; Fri, 25 Jan 2019 03:27:33 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gms5W-0006iy-Cn
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 03:23:32 +0000
+ id 1gms5W-0006iw-7l
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 03:23:31 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 72B6F5FE33; Fri, 25 Jan 2019 11:23:15 +0800 (CST)
+ id 6C7B25FDD9; Fri, 25 Jan 2019 11:23:15 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Michael Turquette <mturquette@baylibre.com>,
  Stephen Boyd <sboyd@kernel.org>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>, David Airlie <airlied@linux.ie>,
  Daniel Vetter <daniel@ffwll.ch>
-Subject: [PATCH 10/11] ARM: dts: sun8i-q8-common: Enable display pipeline with
- RGB LCD panel
-Date: Fri, 25 Jan 2019 11:23:13 +0800
-Message-Id: <20190125032314.20915-11-wens@csie.org>
+Subject: [PATCH 09/11] ARM: dts: sun8i-a23: Add compatible strings to display
+ pipeline device nodes
+Date: Fri, 25 Jan 2019 11:23:12 +0800
+Message-Id: <20190125032314.20915-10-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190125032314.20915-1-wens@csie.org>
 References: <20190125032314.20915-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_192327_118137_E9030215 
-X-CRM114-Status: GOOD (  13.11  )
+X-CRM114-CacheID: sfid-20190124_192326_782465_972F851E 
+X-CRM114-Status: GOOD (  12.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,82 +76,64 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Q8 design for A23/A33 tablets have an 18-bit RGB LCD panel connected
-to the LCD interface on the SoC, the DC1SW output on the PMIC providing
-power for the LCD, and PH7 toggling the reset pin for the panel.
+Now that the compatible strings for the display pipeline on the A23 have
+been added to the bindings, add the corresponding compatibles to the
+device nodes already in the A23/A33 shared dtsi.
 
-This patch adds a device node for the panel, describing the above, and
-enables the display pipeline.
+While the A23 has the TCON ch1 clock defined in the CCU, and the channel
+1 registers are available, it does not have any means to use channel 1
+due to a lack of downstream encoders, and the enable bit for channel 1 is
+hard-wired to 0 (off). Hence the ch1 clock is left out.
 
-The actual model or compatible string for the panel should be added in
-the tablet device tree file.
+As the MIPI DSI output device is not officially documented, and there
+are no reference devices to test it, it is not covered by this patch.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-q8-common.dtsi | 37 ++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ arch/arm/boot/dts/sun8i-a23.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index 719ad769b837..53104f4ccacc 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-@@ -49,6 +49,26 @@
- 		ethernet0 = &sdio_wifi;
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+index d00055e9eef5..a5e884a8b2ae 100644
+--- a/arch/arm/boot/dts/sun8i-a23.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -62,10 +62,26 @@
  	};
+ };
  
-+	panel: panel {
-+		/* Tablet dts should provide panel compatible */
-+		backlight = <&backlight>;
-+		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
-+		power-supply = <&reg_dc1sw>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++&be0 {
++	compatible = "allwinner,sun8i-a23-display-backend";
++};
 +
-+		port@0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			panel_input: endpoint@0 {
-+				reg = <0>;
-+				remote-endpoint = <&tcon0_out_lcd>;
-+			};
-+		};
-+	};
-+
- 	wifi_pwrseq: wifi_pwrseq {
- 		compatible = "mmc-pwrseq-simple";
- 		/*
-@@ -64,6 +84,10 @@
- 	};
+ &ccu {
+ 	compatible = "allwinner,sun8i-a23-ccu";
  };
  
 +&de {
-+	status = "okay";
++	compatible = "allwinner,sun8i-a23-display-engine";
 +};
 +
- &ehci0 {
- 	status  = "okay";
- };
-@@ -90,6 +114,19 @@
- 	};
++&drc0 {
++	compatible = "allwinner,sun8i-a23-drc";
++};
++
++&fe0 {
++	compatible = "allwinner,sun8i-a23-display-frontend";
++};
++
+ &pio {
+ 	compatible = "allwinner,sun8i-a23-pinctrl";
+ 	interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
+@@ -73,6 +89,10 @@
+ 		     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
  };
  
 +&tcon0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_rgb666_pins>;
-+	status = "okay";
++	compatible = "allwinner,sun8i-a23-tcon";
 +};
 +
-+&tcon0_out {
-+	tcon0_out_lcd: endpoint@0 {
-+		reg = <0>;
-+		remote-endpoint = <&panel_input>;
-+	};
-+};
-+
- &usbphy {
- 	usb1_vbus-supply = <&reg_dldo1>;
+ &usb_otg {
+ 	compatible = "allwinner,sun6i-a31-musb";
  };
 -- 
 2.20.1
