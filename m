@@ -2,68 +2,59 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4647CC282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:06:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D253C282C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:07:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 14BDE218B0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:06:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 63F25218D0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:07:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OZ3mGRKm";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lunn.ch header.i=@lunn.ch header.b="iPeFP3G6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 14BDE218B0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lunn.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JA0OWmVw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 63F25218D0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kf2qNBk7Xobo/5hlnzN4QD7Kg00L1bh03Z3s9LYZpBc=; b=OZ3mGRKmRAdtEy
-	i+r8QWJtwqRX4XKU2DXYaGfT47iEO643VTC73HcgpwV/9tmu9ylbaAUjas6jMnF9yh59cM4LYwhQV
-	2l7wfCSZ7ZjqmBqjT69RMtnNBsz79dMOeCiVhLnv8ylUhTE7qaQa6dJ5O/p6Kvlfb3hm0iZgWJd0K
-	vtDKb2V5ObG7ZPYKl1RjJnVNfNy6Uu5rQoGrt0KpxBEEA6GOHgbTgg/sjzsMS6gTEWpYEuB+nQIFB
-	yJVyLyenEX5An34PKvIJdaga8pjQ/7HETCqIXUFfVhFUI2L5wcP+xNd+ox8V4iRUikFK+eb3/ZU/L
-	EaWMG9J31mcNJ1X6bI5g==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=fmePYvoAU+UYyRysgAFxQ3nD58NN62ol8y1DFGGf3fE=; b=JA0
+	OWmVwLQtyaD+Lp1SddnrrdMhRyfjqnaQOqzTKq4VakvrSQixt6Wz/hpQP55M2Nkv6d965MOf8iLWd
+	QcW7LWRSM/eXr0lJ/Lkimzt2Tt+Ah+0bu8wc5lZdOHLIOlE1pL7RdKtr9ORuUY8YKFtx8mHPMSeAD
+	2SLQOQsyf9cD/Y0X7tsav88scP9C46e3ZZccdk92GIQQsb1TIF8g6YN/tEuShqnnXBTkZZhQS+MB1
+	OXmqUW+s/bmpGttHUGQBefatINHAfwIc+1UbsGQ5akqsj461Dq5ifHw85zVp8JqU7QRCqlF6ulKH5
+	yAxufDg+3b/Sng5m96uxZ69dYjvQKrg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn5rv-00052c-Hx; Fri, 25 Jan 2019 18:06:19 +0000
-Received: from vps0.lunn.ch ([185.16.172.187])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn5rr-00052A-U7
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 18:06:17 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=lunn.ch;
- s=20171124; h=In-Reply-To:Content-Type:MIME-Version:References:Message-ID:
- Subject:Cc:To:From:Date:Sender:Reply-To:Content-Transfer-Encoding:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:List-Subscribe:
- List-Post:List-Owner:List-Archive;
- bh=n46IukVJ69fo7pjc4+MGmLxT8EA6jo8+s3B+Lj2LzKc=; b=iPeFP3G6491/K5fpmSUZq1UjVW
- ztph4F2tNhMYNvromOsinm/dlBcY3RB3cexLAM2wqWHChrXWnAibv6qYf9n/y+0hlGAoLgxxwXREK
- gbA7tRMSHEIufQY+5eMKD/a8niOShrPWI0rlYm/Dcft+eMqjzZHI9QBJCuko5BEuDPDI=;
-Received: from andrew by vps0.lunn.ch with local (Exim 4.89)
- (envelope-from <andrew@lunn.ch>)
- id 1gn5rc-00069G-NO; Fri, 25 Jan 2019 19:06:00 +0100
-Date: Fri, 25 Jan 2019 19:06:00 +0100
-From: Andrew Lunn <andrew@lunn.ch>
-To: Vladimir Vid <vladimir.vid@sartura.hr>
-Subject: Re: [PATCH v6] arm64: dts: marvell: Add device tree for uDPU board
-Message-ID: <20190125180600.GE22211@lunn.ch>
-References: <20190125171707.27742-1-vladimir.vid@sartura.hr>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190125171707.27742-1-vladimir.vid@sartura.hr>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+	id 1gn5sz-0005KX-9j; Fri, 25 Jan 2019 18:07:25 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gn5sw-0005JE-F4
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 18:07:23 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 440F8EBD;
+ Fri, 25 Jan 2019 10:07:20 -0800 (PST)
+Received: from beelzebub.austin.arm.com (beelzebub.austin.arm.com
+ [10.118.12.119])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 9ADDA3F5AF;
+ Fri, 25 Jan 2019 10:07:19 -0800 (PST)
+From: Jeremy Linton <jeremy.linton@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH v4 00/12] arm64: add system vulnerability sysfs entries
+Date: Fri, 25 Jan 2019 12:06:59 -0600
+Message-Id: <20190125180711.1970973-1-jeremy.linton@arm.com>
+X-Mailer: git-send-email 2.17.2
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_100616_123316_31486005 
-X-CRM114-Status: GOOD (  10.12  )
+X-CRM114-CacheID: sfid-20190125_100722_517100_3301301D 
+X-CRM114-Status: UNSURE (   9.42  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,45 +66,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Luis Torres <luis.torres@methode.com>,
- Jason Cooper <jason@lakedaemon.net>, Paul Arola <paul.arola@telus.com>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Scott Roberts <scott.roberts@telus.com>, Luka Perkov <luka.perkov@sartura.hr>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: stefan.wahren@i2se.com, mlangsdo@redhat.com, suzuki.poulose@arm.com,
+ marc.zyngier@arm.com, catalin.marinas@arm.com, julien.thierry@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ Jeremy Linton <jeremy.linton@arm.com>, steven.price@arm.com, ykaukab@suse.de,
+ dave.martin@arm.com, shankerd@codeaurora.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 25, 2019 at 06:17:08PM +0100, Vladimir Vid wrote:
-> This adds initial support for micro-DPU (uDPU) board which is based on
-> Armada-3720 SoC.  micro-DPU is the single-port FTTdp distribution point
-> unit made by Methode Electronics which offers complete modularity with
-> replaceable SFP modules both for uplink and downlink (G.hn over
-> twisted-pair, G.hn over coax, 1G and 2.5G Ethernet over Cat-5e cable).
-> 
-> On-board features:
-> - 512 MiB DDR3
-> - 2 x 2.5G SFP via HSGMII SERDES interface to the A3720 SoC
-> - USB 2.0 Type-C connector
-> - 4GB eMMC
-> - ETSI TS 101548 reverse powering via twisted pair (RJ45) or coax (F Type)
-> 
-> Cc: Luka Perkov <luka.perkov@sartura.hr>
-> Cc: Luis Torres <luis.torres@methode.com>
-> Cc: Scott Roberts <scott.roberts@telus.com>
-> Cc: Paul Arola <paul.arola@telus.com>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Gregory Clement <gregory.clement@bootlin.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: linux-arm-kernel@lists.infradead.org
-> Signed-off-by: Vladimir Vid <vladimir.vid@sartura.hr>
+Arm64 machines should be displaying a human readable
+vulnerability status to speculative execution attacks in
+/sys/devices/system/cpu/vulnerabilities 
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+This series enables that behavior by providing the expected
+functions. Those functions expose the cpu errata and feature
+states, as well as whether firmware is responding appropriately
+to display the overall machine status. This means that in a
+heterogeneous machine we will only claim the machine is mitigated
+or safe if we are confident all booted cores are safe or
+mitigated.
 
-    Andrew
+v3->v4:
+	Drop the patch which selectivly exports sysfs entries
+	Remove the CONFIG_EXPERT hidden options which allowed
+	       the kernel to be built without the vulnerability
+	       detection code.
+	Pick Marc Z's patches which invert the white/black
+	       lists for spectrev2 and clean up the firmware
+	       detection logic.
+	Document the existing kpti controls
+	Add a nospectre_v2 option to boot time disable the
+	     mitigation
+
+v2->v3:
+	Remove "Unknown" states, replace with further blacklists
+	       and default vulnerable/not affected states.
+	Add the ability for an arch port to selectively export
+	       sysfs vulnerabilities.
+
+v1->v2:
+	Add "Unknown" state to ABI/testing docs.
+	Minor tweaks.
+
+Jeremy Linton (8):
+  Documentation: Document arm64 kpti control
+  arm64: Provide a command line to disable spectre_v2 mitigation
+  arm64: Remove the ability to build a kernel without ssbd
+  arm64: remove the ability to build a kernel without hardened branch
+    predictors
+  arm64: remove the ability to build a kernel without kpti
+  arm64: add sysfs vulnerability show for meltdown
+  arm64: add sysfs vulnerability show for spectre v2
+  arm64: add sysfs vulnerability show for speculative store bypass
+
+Marc Zyngier (2):
+  arm64: Advertise mitigation of Spectre-v2, or lack thereof
+  arm64: Use firmware to detect CPUs that are not affected by Spectre-v2
+
+Mian Yousaf Kaukab (2):
+  arm64: add sysfs vulnerability show for spectre v1
+  arm64: enable generic CPU vulnerabilites support
+
+ .../admin-guide/kernel-parameters.txt         |  14 +-
+ arch/arm64/Kconfig                            |  39 +--
+ arch/arm64/include/asm/cpufeature.h           |   8 -
+ arch/arm64/include/asm/fixmap.h               |   2 -
+ arch/arm64/include/asm/kvm_mmu.h              |  19 --
+ arch/arm64/include/asm/mmu.h                  |  19 +-
+ arch/arm64/include/asm/sdei.h                 |   2 +-
+ arch/arm64/kernel/Makefile                    |   3 +-
+ arch/arm64/kernel/asm-offsets.c               |   2 -
+ arch/arm64/kernel/cpu_errata.c                | 242 ++++++++++++------
+ arch/arm64/kernel/cpufeature.c                |  41 ++-
+ arch/arm64/kernel/entry.S                     |  15 +-
+ arch/arm64/kernel/sdei.c                      |   2 -
+ arch/arm64/kernel/vmlinux.lds.S               |   8 -
+ arch/arm64/kvm/Kconfig                        |   3 -
+ arch/arm64/kvm/hyp/hyp-entry.S                |   4 -
+ arch/arm64/kvm/hyp/switch.c                   |   4 -
+ arch/arm64/mm/context.c                       |   6 -
+ arch/arm64/mm/mmu.c                           |   2 -
+ arch/arm64/mm/proc.S                          |   2 -
+ 20 files changed, 207 insertions(+), 230 deletions(-)
+
+-- 
+2.17.2
+
 
 _______________________________________________
 linux-arm-kernel mailing list
