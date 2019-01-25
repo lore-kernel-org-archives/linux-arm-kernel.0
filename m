@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 98269C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:26:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B7561C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:26:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6B8562085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:26:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8627E218D2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:26:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lkn7LfRc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B8562085A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EJVkslv7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8627E218D2
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2N75gyGUZ0BTh1xp3H6z/7jCBDBvxtZ695ZzzSQCr8Q=; b=lkn7LfRc8HSxQy
-	9px5gbR5PMuUHJTzMzItFSoPTlBX2Fc0cBzLuvFJ/biZ66n8+KP83FpqiIEVI4yEVNOn+fYtZYOdc
-	pnKMb1K0PvnAKo0+j27w1gZK8c0NRGxPMppeJ3ngBSaoHpJTqdsAT7F/EdbptSd/n1EVmllkbDDc5
-	DAkxRsNheSEz1z/cO0W+MDtyf/ghgnk97Bf+I3fG9p47c+T1eLSs3SIMPzJRj6XRTup6zoNT0LDd+
-	XlEzXSh0DFthdTOFyNKrP1oFuWu7PYHjIMa3nUvwiNpfBsRdM8jTLYBKaA7tlsTfZhsgyFm7t/xfc
-	J+pOmoYx5wjkGKmXHRwQ==;
+	List-Owner; bh=5sZr6o0TAL6iI0K9BTBmuBpsBu+NNyh6ebKhaF/pcMI=; b=EJVkslv70u76ZK
+	OO/8txacmL9lzcEMgkyd6ZAe1YxuOPNus0lI+JvaUVV0+JKPqYepN9mR9F6vnqjAgwcif7b/0xmAB
+	qnguunEZ9eGJWfRoFOapb636TFzw3VuMpcdrG4MIFGKCXJ0zNYg7xb0rUgqbjQETX6BhhGCX60Itp
+	jxT58c0XIjutL75B8vmWbbMDCsyTMu/yTPwpIj1p47vXbnQBizbTyrLzF/6yczhGi/fNLpM234der
+	0FtpJfx+Trygx75kuz7oCJZ4FJDSgHlflEdU7ga7nvigrBQ3NORRBbseRIF3RKr1GAXL8ygJQKyAR
+	jBW4StsdZg+IPJYZ2l4Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gms8A-0001Lp-Qn; Fri, 25 Jan 2019 03:26:10 +0000
+	id 1gms8W-0001aq-Fe; Fri, 25 Jan 2019 03:26:32 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gms5T-0006fo-RB
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 03:23:28 +0000
+ id 1gms5U-0006gp-MG
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 03:23:29 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 45EEB5FDBD; Fri, 25 Jan 2019 11:23:15 +0800 (CST)
+ id 5D8C05FDC1; Fri, 25 Jan 2019 11:23:15 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Michael Turquette <mturquette@baylibre.com>,
  Stephen Boyd <sboyd@kernel.org>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>, David Airlie <airlied@linux.ie>,
  Daniel Vetter <daniel@ffwll.ch>
-Subject: [PATCH 05/11] drm/sun4i: layer: support just backend formats when
- frontend is unavailable
-Date: Fri, 25 Jan 2019 11:23:08 +0800
-Message-Id: <20190125032314.20915-6-wens@csie.org>
+Subject: [PATCH 07/11] ARM: dts: sun8i-a23-a33: Move NAND controller device
+ node to sort by address
+Date: Fri, 25 Jan 2019 11:23:10 +0800
+Message-Id: <20190125032314.20915-8-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190125032314.20915-1-wens@csie.org>
 References: <20190125032314.20915-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_192324_753314_386134F4 
-X-CRM114-Status: GOOD (  14.44  )
+X-CRM114-CacheID: sfid-20190124_192325_642540_E706EEE1 
+X-CRM114-Status: GOOD (  12.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,95 +76,63 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-In some cases, such as running a new kernel with an old device tree that
-has the frontend disabled, the backend's matching frontend might be
-unavailable.
+The NAND controller device node was inserted into the wrong position,
+probably due to a rebase or merge, as the file's structure does not
+provide enough context for git to accurately match the previous device
+node block.
 
-When this happens, the layers should only declare support for formats
-that the backend support. This partially reverts commit 1c29d263f624
-("drm/sun4i: Rename sun4i_backend_layer_formats to sun4i_layer_formats")
-by bringing back sun4i_backend_layer_formats, and passing it to
-drm_universal_plane_init, while also dropping the modifiers list,
-in the event no frontend is available.
-
-Fixes: b636d3f97d04 ("drm/sun4i: frontend: Add support for the BGRX8888 input format")
-Fixes: 9afe52d54bb0 ("drm/sun4i: frontend: Add support for semi-planar YUV input formats")
-Fixes: 8c8152bf4db6 ("drm/sun4i: frontend: Add support for planar YUV input formats")
-Fixes: b2ddf277ab5e ("drm/sun4i: layer: Add tiled modifier support and helper")
+Fixes: d7b843df13ea ("ARM: dts: sun8i: add NAND controller node for A23/A33")
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_layer.c | 34 ++++++++++++++++++++++++++---
- 1 file changed, 31 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 28 +++++++++++++---------------
+ 1 file changed, 13 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 95d4aaa51a5c..a514fe88d441 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -117,6 +117,11 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
- static bool sun4i_layer_format_mod_supported(struct drm_plane *plane,
- 					     uint32_t format, uint64_t modifier)
- {
-+	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
-+
-+	if (IS_ERR_OR_NULL(layer->backend->frontend))
-+		sun4i_backend_format_is_supported(format, modifier);
-+
- 	return sun4i_backend_format_is_supported(format, modifier) ||
- 	       sun4i_frontend_format_is_supported(format, modifier);
- }
-@@ -165,6 +170,21 @@ static const uint32_t sun4i_layer_formats[] = {
- 	DRM_FORMAT_YVYU,
- };
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index a9c123de5d2c..97ec8b8cec09 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -155,6 +155,19 @@
+ 			#dma-cells = <1>;
+ 		};
  
-+static const uint32_t sun4i_backend_layer_formats[] = {
-+	DRM_FORMAT_ARGB8888,
-+	DRM_FORMAT_ARGB4444,
-+	DRM_FORMAT_ARGB1555,
-+	DRM_FORMAT_RGBA5551,
-+	DRM_FORMAT_RGBA4444,
-+	DRM_FORMAT_RGB888,
-+	DRM_FORMAT_RGB565,
-+	DRM_FORMAT_UYVY,
-+	DRM_FORMAT_VYUY,
-+	DRM_FORMAT_XRGB8888,
-+	DRM_FORMAT_YUYV,
-+	DRM_FORMAT_YVYU,
-+};
++		nfc: nand@1c03000 {
++			compatible = "allwinner,sun4i-a10-nand";
++			reg = <0x01c03000 0x1000>;
++			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_NAND>, <&ccu CLK_NAND>;
++			clock-names = "ahb", "mod";
++			resets = <&ccu RST_BUS_NAND>;
++			reset-names = "ahb";
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
 +
- static const uint64_t sun4i_layer_modifiers[] = {
- 	DRM_FORMAT_MOD_LINEAR,
- 	DRM_FORMAT_MOD_ALLWINNER_TILED,
-@@ -175,6 +195,9 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
- 						struct sun4i_backend *backend,
- 						enum drm_plane_type type)
- {
-+	const uint64_t *modifiers = sun4i_layer_modifiers;
-+	const uint32_t *formats = sun4i_layer_formats;
-+	unsigned int formats_len = ARRAY_SIZE(sun4i_layer_formats);
- 	struct sun4i_layer *layer;
- 	int ret;
+ 		mmc0: mmc@1c0f000 {
+ 			compatible = "allwinner,sun7i-a20-mmc";
+ 			reg = <0x01c0f000 0x1000>;
+@@ -214,21 +227,6 @@
+ 			#size-cells = <0>;
+ 		};
  
-@@ -184,12 +207,17 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
- 
- 	layer->backend = backend;
- 
-+	if (IS_ERR_OR_NULL(backend->frontend)) {
-+		formats = sun4i_backend_layer_formats;
-+		formats_len = ARRAY_SIZE(sun4i_backend_layer_formats);
-+		modifiers = NULL;
-+	}
-+
- 	/* possible crtcs are set later */
- 	ret = drm_universal_plane_init(drm, &layer->plane, 0,
- 				       &sun4i_backend_layer_funcs,
--				       sun4i_layer_formats,
--				       ARRAY_SIZE(sun4i_layer_formats),
--				       sun4i_layer_modifiers, type, NULL);
-+				       formats, formats_len,
-+				       modifiers, type, NULL);
- 	if (ret) {
- 		dev_err(drm->dev, "Couldn't initialize layer\n");
- 		return ERR_PTR(ret);
+-		nfc: nand@1c03000 {
+-			compatible = "allwinner,sun4i-a10-nand";
+-			reg = <0x01c03000 0x1000>;
+-			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&ccu CLK_BUS_NAND>, <&ccu CLK_NAND>;
+-			clock-names = "ahb", "mod";
+-			resets = <&ccu RST_BUS_NAND>;
+-			reset-names = "ahb";
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&nand_pins &nand_pins_cs0 &nand_pins_rb0>;
+-			status = "disabled";
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-		};
+-
+ 		usb_otg: usb@1c19000 {
+ 			/* compatible gets set in SoC specific dtsi file */
+ 			reg = <0x01c19000 0x0400>;
 -- 
 2.20.1
 
