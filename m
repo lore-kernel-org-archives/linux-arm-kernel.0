@@ -2,66 +2,62 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4FD98C282C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:09:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BB147C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:10:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1F512218B0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:09:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 89F56218B0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 10:10:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ubPqSCXs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1F512218B0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gdD3qwXB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89F56218B0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rrvxQUAeNERY/knjXm7sue/FB+iGSP6vsAFBzvhymVE=; b=ubPqSCXsnk+DLn
-	DBSgFBPkwQv/aVXUrWjstfYlWWxADT9V0WR30gguQUmQK02yYH7i51li8oyc1rSE81nueSNM/JNa3
-	cio0fD3tSGeezetRF6oRl0QH61giuycPNqa/Dpg1G3lUT25EYm6fSKJxHZYctRklBB2udHWm5TUhX
-	lTtaiHnDOvZ6SM3yA73DTKZznXvYXgIAT+909eM7ZDC/VMw9K4U5w81xjUu/Z7iIVPoVjxJYZNjIC
-	A+50Gxz0JJxZz46/+cexAM22VMsSjrWKmYjsa/VYBOxBTMcDYQZFJl60SU3RTFPA1g0xTX+B3pFjv
-	DWnOl2REgRky8x3Ycq/A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=lrTqJkr72uZbt0AheZdmhXfUwdTXkfu05GxIf26nsAI=; b=gdD3qwXB7xARkmm4uJ+wpiosE
+	GbP1JJS2R4uP5kwxqV3rg11+qPSNBe8DbUhLWrRpYIbDwwfZpUxWLcuzdxaR0WxiM+XVfiKUw+VkN
+	n/36zqVQcn5yMYBnNgkPNlAo1ngRhAu1DWCpeHh5MO2aI4HuLAZnCSXzUSkA7a6HgiENmAoiE3ick
+	lAQP/TkjAdmNbUvHNp0AcJp5Cpe9SENrtFT6CzGXPa5pwd3HOL8hAh4LXFBPWCrkluFnOfWMboTsR
+	LEEkPX0NYTSv+xQpjf7Zcht7efc90xJtpAo/2cquxWx5hex3S7x7FNMH6tVeb2S29un40sy1wWLzz
+	ZM4cX/6kg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmyQN-0006hT-Pe; Fri, 25 Jan 2019 10:09:23 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gmyR6-0007UH-K9; Fri, 25 Jan 2019 10:10:08 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmyQK-0006h5-EP
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 10:09:22 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D849EEBD;
- Fri, 25 Jan 2019 02:09:17 -0800 (PST)
-Received: from big-swifty.misterjones.org (big-swifty.copenhagen.arm.com
- [10.32.148.139])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BA30F3F589;
- Fri, 25 Jan 2019 02:09:12 -0800 (PST)
-Date: Fri, 25 Jan 2019 10:09:05 +0000
-Message-ID: <86ef9182wu.wl-marc.zyngier@arm.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH 06/14] KVM: arm/arm64: Factor out VMID into struct kvm_vmid
-In-Reply-To: <9ec36462-5a93-8246-85d3-a3c528959341@arm.com>
-References: <20190124140032.8588-1-christoffer.dall@arm.com>
- <20190124140032.8588-7-christoffer.dall@arm.com>
- <9ec36462-5a93-8246-85d3-a3c528959341@arm.com>
-User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
- FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
- (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
-Organization: ARM Ltd
-MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
+ id 1gmyR1-000710-IZ
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 10:10:05 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id D4F8A20798; Fri, 25 Jan 2019 11:10:01 +0100 (CET)
+Received: from localhost (aaubervilliers-681-1-87-206.w90-88.abo.wanadoo.fr
+ [90.88.29.206])
+ by mail.bootlin.com (Postfix) with ESMTPSA id A49B9206A6;
+ Fri, 25 Jan 2019 11:10:01 +0100 (CET)
+Date: Fri, 25 Jan 2019 11:10:02 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Subject: Re: [PATCH v2 2/2] media: cedrus: Add HEVC/H.265 decoding support
+Message-ID: <20190125101002.z5ftls5xo7izygvy@flea>
+References: <20181123130209.11696-1-paul.kocialkowski@bootlin.com>
+ <20181123130209.11696-3-paul.kocialkowski@bootlin.com>
+ <20181127082119.xdemdwgclai7kj3r@flea>
+ <4f25de5bbcb7bf196fe4925f54e3335b50670bd2.camel@bootlin.com>
+MIME-Version: 1.0
+In-Reply-To: <4f25de5bbcb7bf196fe4925f54e3335b50670bd2.camel@bootlin.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_020920_502554_9D048F17 
-X-CRM114-Status: GOOD (  33.71  )
+X-CRM114-CacheID: sfid-20190125_021003_975138_A3EE2D1B 
+X-CRM114-Status: GOOD (  22.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,132 +69,143 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvm@vger.kernel.org, Suzuki K Poulose <suzuki.poulose@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devel@driverdev.osuosl.org, Alexandre Courbot <acourbot@chromium.org>,
+ Randy Li <ayaka@soulik.info>, linux-kernel@vger.kernel.org,
+ Tomasz Figa <tfiga@chromium.org>, Hans Verkuil <hverkuil@xs4all.nl>,
+ linux-sunxi@googlegroups.com, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ Ezequiel Garcia <ezequiel@collabora.com>, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
+Content-Type: multipart/mixed; boundary="===============7383120295340314457=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi James,
 
-Thanks for looking into this.
+--===============7383120295340314457==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="z6zsvccsx3aejq2d"
+Content-Disposition: inline
 
-On Thu, 24 Jan 2019 19:01:57 +0000,
-James Morse <james.morse@arm.com> wrote:
-> 
-> Hi guys,
-> 
-> (CC: +Suzuki)
-> 
-> On 24/01/2019 14:00, Christoffer Dall wrote:
-> > In preparation for nested virtualization where we are going to have more
-> > than a single VMID per VM, let's factor out the VMID data into a
-> > separate VMID data structure and change the VMID allocator to operate on
-> > this new structure instead of using a struct kvm.
-> > 
-> > This also means that udate_vttbr now becomes update_vmid, and that the
-> > vttbr itself is generated on the fly based on the stage 2 page table
-> > base address and the vmid.
-> > 
-> > We cache the physical address of the pgd when allocating the pgd to
-> > avoid doing the calculation on every entry to the guest and to avoid
-> > calling into potentially non-hyp-mapped code from hyp/EL2.
-> > 
-> > If we wanted to merge the VMID allocator with the arm64 ASID allocator
-> > at some point in the future, it should actually become easier to do that
-> > after this patch.
-> 
-> > Note that to avoid mapping the kvm_vmid_bits variable into hyp, we
-> > simply forego the masking of the vmid value in kvm_get_vttbr and rely on
-> > update_vmid to always assign a valid vmid value (within the supported
-> > range).
-> 
-> 
-> > diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> > index 8af4b1befa42..189d93461d33 100644
-> > --- a/arch/arm64/include/asm/kvm_mmu.h
-> > +++ b/arch/arm64/include/asm/kvm_mmu.h
-> > @@ -596,5 +596,16 @@ static inline bool kvm_cpu_has_cnp(void)
-> >  	return system_supports_cnp();
-> >  }
-> >  
-> > +static __always_inline u64 kvm_get_vttbr(struct kvm *kvm)
-> > +{
-> > +	struct kvm_vmid *vmid = &kvm->arch.vmid;
-> > +	u64 vmid_field, baddr;
-> > +	u64 cnp = kvm_cpu_has_cnp() ? VTTBR_CNP_BIT : 0;
-> > +
-> > +	baddr = kvm->arch.pgd_phys;
-> > +	vmid_field = (u64)vmid->vmid << VTTBR_VMID_SHIFT;
-> > +	return kvm_phys_to_vttbr(baddr) | vmid_field | cnp;
-> > +}
-> 
-> (32bits version is the same ... but I guess there is nowhere to put it!)
 
-Yes, that's the usual conundrum.
+--z6zsvccsx3aejq2d
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-> 
-> 
-> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > index 3dd240ea9e76..b77db673bb03 100644
-> > --- a/virt/kvm/arm/arm.c
-> > +++ b/virt/kvm/arm/arm.c
-> > @@ -536,18 +529,12 @@ static void update_vttbr(struct kvm *kvm)
-> >  		kvm_call_hyp(__kvm_flush_vm_context);
-> >  	}
-> >  
-> > -	kvm->arch.vmid = kvm_next_vmid;
-> > +	vmid->vmid = kvm_next_vmid;
-> >  	kvm_next_vmid++;
-> > -	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
-> > -
-> > -	/* update vttbr to be used with the new vmid */
-> > -	pgd_phys = virt_to_phys(kvm->arch.pgd);
-> 
-> > -	BUG_ON(pgd_phys & ~kvm_vttbr_baddr_mask(kvm));
-> 
-> Where did this go? (escaped during a turbulent rebase?)
-> 
-> This removes the only caller of kvm_vttbr_baddr_mask()... It looks
-> like this is a safety check that the stage2-pgd is correctly aligned
-> when the IPA size, and thus size of the top level entry can by set
-> by user-space.
-> 
-> ... or is it unnecessary if alloc_pages_exact() can only return naturally
-> aligned groups of pages? (which I haven't checked)
+Hi,
 
-The rational is indeed that alloc_pages_exact allocates a power of 2
-number of pages, and then frees the unrequested tail pages. This means
-that we're always correctly aligned.
+On Thu, Jan 24, 2019 at 02:10:25PM +0100, Paul Kocialkowski wrote:
+> On Tue, 2018-11-27 at 09:21 +0100, Maxime Ripard wrote:
+> > Hi!
+> >=20
+> > On Fri, Nov 23, 2018 at 02:02:09PM +0100, Paul Kocialkowski wrote:
+> > > This introduces support for HEVC/H.265 to the Cedrus VPU driver, with
+> > > both uni-directional and bi-directional prediction modes supported.
+> > >=20
+> > > Field-coded (interlaced) pictures, custom quantization matrices and
+> > > 10-bit output are not supported at this point.
+> > >=20
+> > > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> >=20
+> > Output from checkpatch:
+> > total: 0 errors, 68 warnings, 14 checks, 999 lines checked
+>=20
+> Looks like many of the "line over 80 chars" are due to macros. I don't
+> think it would be a good idea to break them down or to change the
+> macros names since they are directly inherited from the bitstream
+> elements.
+>=20
+> What do you think?
 
-> Keeping it sounds like a good thing to have in case we accidentally merge
-> stage2/host-stage1 pgd's somewhere down the line.
+Yeah, the 80-chars limit can be ignored. But there's more warnings and
+checks that should be addressed.
 
-This seems hard to achieve for this very reason, as level-0
-concatenation gets in the way of unifying the two allocators.
+> > > +	/* Output frame. */
+> > > +
+> > > +	output_pic_list_index =3D V4L2_HEVC_DPB_ENTRIES_NUM_MAX;
+> > > +	pic_order_cnt[0] =3D pic_order_cnt[1] =3D slice_params->slice_pic_o=
+rder_cnt;
+> > > +	mv_col_buf_addr[0] =3D cedrus_h265_frame_info_mv_col_buf_addr(ctx,
+> > > +		run->dst->vb2_buf.index, 0) - PHYS_OFFSET;
+> > > +	mv_col_buf_addr[1] =3D cedrus_h265_frame_info_mv_col_buf_addr(ctx,
+> > > +		run->dst->vb2_buf.index, 1) - PHYS_OFFSET;
+> > > +	dst_luma_addr =3D cedrus_dst_buf_addr(ctx, run->dst->vb2_buf.index,=
+ 0) -
+> > > +			PHYS_OFFSET;
+> > > +	dst_chroma_addr =3D cedrus_dst_buf_addr(ctx, run->dst->vb2_buf.inde=
+x, 1) -
+> > > +			PHYS_OFFSET;
+> > > +
+> > > +	cedrus_h265_frame_info_write_single(dev, output_pic_list_index,
+> > > +					    slice_params->pic_struct !=3D 0,
+> > > +					    pic_order_cnt, mv_col_buf_addr,
+> > > +					    dst_luma_addr, dst_chroma_addr);
+> >=20
+> > You can only pass the run and slice_params pointers to that function.
+>=20
+> The point is to make it independent from the context, so that the same
+> function can be called with either the slice_params or the dpb info.
+> I don't think making two variants or even two wrappers would bring any
+> significant benefit.
 
-> (Suzuki suggested it would make more sense in kvm_alloc_stage2_pgd(), where we
-> could fail vm creation, instead of BUG()ing).
-> 
-> (this was added by e55cac5bf2a9c ("kvm: arm/arm64: Prepare for VM specific
-> stage2 translations"), the bulk of the logic is in 595583306434c ("kvm: arm64:
-> Dynamic configuration of VTTBR mask"))
+Then you can still pass directly the vb2 buffer pointer, that would
+remove the mv_col_buf_addr, dst_luma_addr and dst_chroma_addr. The
+idea here is that the less arguments you have in your function, the
+easier it is to understand.
 
-We could bring it back if people have a strong feeling about this, but
-certainly not as a BUG_ON(). Failing it in gracefully in
-kvm_alloc_stage2_pgd seems a more palatable solution, but I can't
-convince myself that we need it.
+> > > +
+> > > +	cedrus_write(dev, VE_DEC_H265_OUTPUT_FRAME_IDX, output_pic_list_ind=
+ex);
+> > > +
+> > > +	/* Reference picture list 0 (for P/B frames). */
+> > > +	if (slice_params->slice_type !=3D V4L2_HEVC_SLICE_TYPE_I) {
+> > > +		cedrus_h265_ref_pic_list_write(dev, slice_params->ref_idx_l0,
+> > > +			slice_params->num_ref_idx_l0_active_minus1 + 1,
+> > > +			slice_params->dpb, slice_params->num_active_dpb_entries,
+> > > +			VE_DEC_H265_SRAM_OFFSET_REF_PIC_LIST0);
+> > > +
+> >=20
+> > slice_params is enough.
+>=20
+> The rationale is similar to the one above: being able to use the same
+> helper with either L0 or L1, which implies passing the relevant
+> elements directly.
 
-Thanks,
+The DPB and num_active_dpb_entries will not change from one run to the
+other though. And having intermediate functions if that allows to be
+clearer is fine as well.
 
-	M.
+Maxime
 
--- 
-Jazz is not dead, it just smell funny.
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--z6zsvccsx3aejq2d
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXErgegAKCRDj7w1vZxhR
+xRsaAQC2ViWDkwRbE+VzfnvT6IM2IOggLnD2AO3axObHgVowZwEAsoum8jkX4cu3
+0xmBF8qYXaO9qf+KUl0tIhsEPcj2dQA=
+=H23o
+-----END PGP SIGNATURE-----
+
+--z6zsvccsx3aejq2d--
+
+
+--===============7383120295340314457==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============7383120295340314457==--
+
