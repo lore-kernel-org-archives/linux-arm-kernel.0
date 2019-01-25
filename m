@@ -2,67 +2,88 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-15.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F3BBAC282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 16:54:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 321B9C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 17:15:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B01A8218CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 16:54:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EECD320811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 17:15:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SyEy19Pb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B01A8218CD
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ravnborg.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F2i5Sc+x";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=sartura-hr.20150623.gappssmtp.com header.i=@sartura-hr.20150623.gappssmtp.com header.b="Z09ok8WN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EECD320811
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sartura.hr
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YZcWBeHgmKFAj1Ws8rAysr8WICkX7m++uGYcpkTHcdI=; b=SyEy19PbapyRy2
-	U4FnfHpnkqJadMsCpce2T4OF5pb7RLWcd/xH7mFFzohqleVUKvAO96kaaUMKETdUzi1s54l0LeGm2
-	E8tOV4YLVp72xT30OgQqUMb9n6JVsCt8SIGKLyB8f1AWAxnJcPEzFUBa8g8/jfPQb9z0ph8Ycfgpm
-	ACGRwxPSlV+eKUp7CKUIFUBG19H6/TSSghPxC22ghhsTppIcmmh8Txaex+x1crggkSW4Buf11sD2W
-	ang8wN9OpHITzbjp2Mg/lTAYCI9VGgyGc2xPJ7f+ObMclR2yngIFLuBi4A4L980XgFi1wAU30Wwwv
-	ZfE1JjA8U9gQqUI7+E4A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=M3ogjepGaBZYfjdkRKDzXN5TgntnlPxdibKmXUZMorY=; b=F2i5Sc+xw1kbED
+	NSdIlFlm0L6uSyq1zdB/wAJX8zVzVgp87MzM0I3tXwiJTpxV2T9YECWqPn+Sge+LssMM1MA93XHOt
+	c6Xb0f01UcDiA5F/q2BPIPxGNXA7LFCpjyZblPFS2eK0gOw4g3a43+zAvqmqx7DHXr7BjsCjCay2o
+	HNREtXIAJCX5ifFJxfTPW4XPlF69iNArzEi2GnmyyEpSdrXSIGuP0LnfvLAASStlAQnCxVzBXSej1
+	2fOP0t16969dnrN7/IKtD9HGwJLo8wBKGv4p3gej2RDwp1liyn/apfnbqXqpae2Zid4zWsYGV1ewB
+	2m0RRam28wWvCtnC9H7A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn4k0-0004Yk-Tu; Fri, 25 Jan 2019 16:54:04 +0000
-Received: from asavdk3.altibox.net ([109.247.116.14])
+	id 1gn54f-0006QG-Na; Fri, 25 Jan 2019 17:15:25 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn4jw-0004YP-LH
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 16:54:03 +0000
-Received: from ravnborg.org (unknown [158.248.194.18])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by asavdk3.altibox.net (Postfix) with ESMTPS id 1431A20050;
- Fri, 25 Jan 2019 17:53:56 +0100 (CET)
-Date: Fri, 25 Jan 2019 17:53:55 +0100
-From: Sam Ravnborg <sam@ravnborg.org>
-To: Guido =?iso-8859-1?Q?G=FCnther?= <agx@sigxcpu.org>
-Subject: Re: [PATCH 2/2] phy: Add driver for mixel dphy
-Message-ID: <20190125165355.GA3522@ravnborg.org>
-References: <cover.1548410989.git.agx@sigxcpu.org>
- <bbefc77a437bd21bfe1c27b15f65b57e7714b18a.1548410989.git.agx@sigxcpu.org>
+ id 1gn54b-0006Pp-PO
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 17:15:23 +0000
+Received: by mail-wm1-x344.google.com with SMTP id g67so7333959wmd.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 25 Jan 2019 09:15:20 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=sartura-hr.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=+e9pluMdE1ABNbBgyJ0RNl4dBO2t8PcsYv8wVKZxmko=;
+ b=Z09ok8WNKMOBjCHaM5T9BOMMt4X2v9GnvQkZhI4Toh4blBUhjDis6evPyJ1886LXK0
+ IRfygpZawChu+VvbxXfSYeelmaW+zCidap3k46QCf2sXn5qkgcE/lJ0Eb10gMM4rYGKO
+ 1lk0rk9g0BqF3hGc9B+S4ddflrC2SmMvzo9ffALGU2l2CwUyYkQkrEs7JLM1zFOnVF2k
+ 3m135Q8l8JhKiS60VQbwtQcwiUyDJOCE/tGWVitc1JyoPhBX55QNp7vqWgdpJfGD7Zik
+ GY94a1N9/5ggTRvN4FL/HpAd3XvRSEnrcvzlujQmOjsKs7mOt8lA2MziEiu5GGBi6NAb
+ k44g==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=+e9pluMdE1ABNbBgyJ0RNl4dBO2t8PcsYv8wVKZxmko=;
+ b=eWihqAAUTwvvpAEGTH3z0qQ6Jzek0bBH2IlsFJbfwQtAy4UfdQdICdjhyK8M8/rW16
+ zX+U7o3N4f2MDUI4VnzrzJ7D1yucUgqm7iSSrVKDPd7RomStdK721YsOtxuAKpykMRuf
+ gG/oYjrH4DIj5B9QKZM+JYskEvcNDBPBKlSv0+9ZcfMAJEGbJQMgWYsUx5EAA8J6FIah
+ PNafyC2hE8u4KdCDpWNyDbtLqcsP49cNRyf70JV6oOOokmoEWuCtQaG/i2SN1DHRh6/M
+ ebxNORDIhbBbVFbGZSonN4jj61UT3uDG2IOq+O7/YKZWQL7VkfYg7DWz78CwiiEUJWj9
+ 0h0w==
+X-Gm-Message-State: AJcUukc5CpYaEEb5xq0q60JcJZBtqvI6IZpc6ZftSE1ZOuqud3Unm+kA
+ fzWUg5JDirUhyZNO9UU5vRt+
+X-Google-Smtp-Source: ALg8bN5pIU1zwDwxZKcd172/d9Sq77cQUDZGuJcnsQcu1XSkBRpRUbOJy3PuZqgfg/XOkFK7nQxAPg==
+X-Received: by 2002:a1c:c58d:: with SMTP id v135mr7881595wmf.88.1548436519443; 
+ Fri, 25 Jan 2019 09:15:19 -0800 (PST)
+Received: from b50.local (cpe-94-253-225-226.st.cable.xnet.hr.
+ [94.253.225.226])
+ by smtp.gmail.com with ESMTPSA id y14sm7738603wro.92.2019.01.25.09.15.17
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 25 Jan 2019 09:15:18 -0800 (PST)
+From: Vladimir Vid <vladimir.vid@sartura.hr>
+To: devicetree@vger.kernel.org
+Subject: [PATCH v6] arm64: dts: marvell: Add device tree for uDPU board
+Date: Fri, 25 Jan 2019 18:17:08 +0100
+Message-Id: <20190125171707.27742-1-vladimir.vid@sartura.hr>
+X-Mailer: git-send-email 2.19.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <bbefc77a437bd21bfe1c27b15f65b57e7714b18a.1548410989.git.agx@sigxcpu.org>
-User-Agent: Mutt/1.5.21 (2010-09-15)
-X-CMAE-Score: 0
-X-CMAE-Analysis: v=2.3 cv=dqr19Wo4 c=1 sm=1 tr=0
- a=UWs3HLbX/2nnQ3s7vZ42gw==:117 a=UWs3HLbX/2nnQ3s7vZ42gw==:17
- a=8nJEP1OIZ-IA:10 a=ze386MxoAAAA:8 a=e5mUnYsNAAAA:8
- a=wTxEHkJ9yh_FIgG7YY4A:9 a=wPNLvfGTeEIA:10 a=iBZjaW-pnkserzjvUTHh:22
- a=Vxmtnl_E_bksehYqCbjh:22
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_085401_057026_A0915539 
-X-CRM114-Status: GOOD (  36.34  )
+X-CRM114-CacheID: sfid-20190125_091521_876951_AC9F87F6 
+X-CRM114-Status: GOOD (  15.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,420 +95,254 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
- Robert Chiras <robert.chiras@nxp.com>, linux-arm-kernel@lists.infradead.org,
- dri-devel@lists.freedesktop.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Andrew Lunn <andrew@lunn.ch>, Luis Torres <luis.torres@methode.com>,
+ Jason Cooper <jason@lakedaemon.net>, Paul Arola <paul.arola@telus.com>,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ Vladimir Vid <vladimir.vid@sartura.hr>,
+ Scott Roberts <scott.roberts@telus.com>, Luka Perkov <luka.perkov@sartura.hr>,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Guido.
+This adds initial support for micro-DPU (uDPU) board which is based on
+Armada-3720 SoC.  micro-DPU is the single-port FTTdp distribution point
+unit made by Methode Electronics which offers complete modularity with
+replaceable SFP modules both for uplink and downlink (G.hn over
+twisted-pair, G.hn over coax, 1G and 2.5G Ethernet over Cat-5e cable).
 
-Patch looks good but a few comments below.
+On-board features:
+- 512 MiB DDR3
+- 2 x 2.5G SFP via HSGMII SERDES interface to the A3720 SoC
+- USB 2.0 Type-C connector
+- 4GB eMMC
+- ETSI TS 101548 reverse powering via twisted pair (RJ45) or coax (F Type)
 
-	Sam
+Cc: Luka Perkov <luka.perkov@sartura.hr>
+Cc: Luis Torres <luis.torres@methode.com>
+Cc: Scott Roberts <scott.roberts@telus.com>
+Cc: Paul Arola <paul.arola@telus.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Gregory Clement <gregory.clement@bootlin.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: linux-arm-kernel@lists.infradead.org
+Signed-off-by: Vladimir Vid <vladimir.vid@sartura.hr>
+---
 
-On Fri, Jan 25, 2019 at 11:14:46AM +0100, Guido G=FCnther wrote:
-> This adds support for the Mixel DPHY as found on i.MX8 CPUs but since
-> this is an IP core it will likely be found on others in the future. So
-> instead of adding this to the nwl host driver make it a generic PHY
-> driver.
-> =
+v6 changes:
+- updated LED labels per naming convention (Documentation/leds/leds-class.txt)
 
-> The driver supports the i.MX8MQ. Support for i.MX8QM and i.MX8QXP can be
-> added once the necessary system controller bits are in via
-> mixel_dpy_ops.
-> =
+---
+ MAINTAINERS                                   |   5 +
+ arch/arm64/boot/dts/marvell/Makefile          |   1 +
+ .../boot/dts/marvell/armada-3720-uDPU.dts     | 164 ++++++++++++++++++
+ 3 files changed, 170 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
 
-> Signed-off-by: Guido G=FCnther <agx@sigxcpu.org>
-> ---
->  drivers/phy/Kconfig               |   7 +
->  drivers/phy/Makefile              |   1 +
->  drivers/phy/phy-mixel-mipi-dphy.c | 449 ++++++++++++++++++++++++++++++
->  3 files changed, 457 insertions(+)
->  create mode 100644 drivers/phy/phy-mixel-mipi-dphy.c
-> =
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 51029a425dbe..21174a13049b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9851,6 +9851,11 @@ F:	drivers/media/platform/meson/ao-cec.c
+ F:	Documentation/devicetree/bindings/media/meson-ao-cec.txt
+ T:	git git://linuxtv.org/media_tree.git
+ 
++METHODE UDPU SUPPORT
++M:	Vladimir Vid <vladimir.vid@sartura.hr>
++S:	Maintained
++F:	arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
++
+ MICROBLAZE ARCHITECTURE
+ M:	Michal Simek <monstr@monstr.eu>
+ W:	http://www.monstr.eu/fdt/
+diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
+index 2eff1f927471..caed4334f27d 100644
+--- a/arch/arm64/boot/dts/marvell/Makefile
++++ b/arch/arm64/boot/dts/marvell/Makefile
+@@ -2,6 +2,7 @@
+ # Mvebu SoC Family
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-espressobin.dtb
++dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-uDPU.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-clearfog-gt-8k.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db.dtb
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts b/arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
+new file mode 100644
+index 000000000000..2441481643a4
+--- /dev/null
++++ b/arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
+@@ -0,0 +1,164 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Device tree for the uDPU board.
++ * Based on Marvell Armada 3720 development board (DB-88F3720-DDR3)
++ * Copyright (C) 2016 Marvell
++ * Copyright (C) 2019 Methode Electronics
++ * Copyright (C) 2019 Telus
++ *
++ * Vladimir Vid <vladimir.vid@sartura.hr>
++ */
++
++/dts-v1/;
++
++#include <dt-bindings/gpio/gpio.h>
++#include "armada-372x.dtsi"
++
++/ {
++	model = "Methode uDPU Board";
++	compatible = "methode,udpu", "marvell,armada3720";
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory@0 {
++		device_type = "memory";
++		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
++	};
++
++	leds {
++		pinctrl-names = "default";
++		compatible = "gpio-leds";
++
++		power1 {
++			label = "udpu:green:power";
++			gpios = <&gpionb 11 GPIO_ACTIVE_LOW>;
++		};
++
++		power2 {
++			label = "udpu:red:power";
++			gpios = <&gpionb 12 GPIO_ACTIVE_LOW>;
++		};
++
++		network1 {
++			label = "udpu:green:network";
++			gpios = <&gpionb 13 GPIO_ACTIVE_LOW>;
++		};
++
++		network2 {
++			label = "udpu:red:network";
++			gpios = <&gpionb 14 GPIO_ACTIVE_LOW>;
++		};
++
++		alarm1 {
++			label = "udpu:green:alarm";
++			gpios = <&gpionb 15 GPIO_ACTIVE_LOW>;
++		};
++
++		alarm2 {
++			label = "udpu:red:alarm";
++			gpios = <&gpionb 16 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	sfp_eth0: sfp-eth0 {
++		compatible = "sff,sfp";
++		i2c-bus = <&i2c0>;
++		los-gpio = <&gpiosb 2 GPIO_ACTIVE_HIGH>;
++		mod-def0-gpio = <&gpiosb 3 GPIO_ACTIVE_LOW>;
++		tx-disable-gpio = <&gpiosb 4 GPIO_ACTIVE_HIGH>;
++		tx-fault-gpio = <&gpiosb 5 GPIO_ACTIVE_HIGH>;
++	};
++
++	sfp_eth1: sfp-eth1 {
++		compatible = "sff,sfp";
++		i2c-bus = <&i2c1>;
++		los-gpio = <&gpiosb 7 GPIO_ACTIVE_HIGH>;
++		mod-def0-gpio = <&gpiosb 8 GPIO_ACTIVE_LOW>;
++		tx-disable-gpio = <&gpiosb 9 GPIO_ACTIVE_HIGH>;
++		tx-fault-gpio = <&gpiosb 10 GPIO_ACTIVE_HIGH>;
++	};
++};
++
++&sdhci0 {
++	status = "okay";
++	bus-width = <8>;
++	mmc-ddr-1_8v;
++	mmc-hs400-1_8v;
++	marvell,pad-type = "fixed-1-8v";
++	non-removable;
++	no-sd;
++	no-sdio;
++};
++
++&spi0 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi_quad_pins>;
++
++	m25p80@0 {
++		compatible = "jedec,spi-nor";
++		reg = <0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		spi-max-frequency = <54000000>;
++
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			/* only bootloader is located on the SPI */
++			partition@0 {
++				label = "uboot";
++				reg = <0 0x400000>;
++			};
++		};
++	};
++};
++
++&i2c0 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
++};
++
++&i2c1 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins>;
++
++	lm75@48 {
++		status = "okay";
++		compatible = "lm75";
++		reg = <0x48>;
++	};
++
++	lm75@49 {
++		status = "okay";
++		compatible = "lm75";
++		reg = <0x49>;
++	};
++};
++
++&eth0 {
++	phy-mode = "sgmii";
++	status = "okay";
++	managed = "in-band-status";
++	sfp = <&sfp_eth0>;
++};
++
++&eth1 {
++	phy-mode = "sgmii";
++	status = "okay";
++	managed = "in-band-status";
++	sfp = <&sfp_eth1>;
++};
++
++&usb3 {
++	status = "okay";
++};
++
++&uart0 {
++	status = "okay";
++};
+-- 
+2.19.0
 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 250abe290ca1..9195b5876bcc 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -48,6 +48,13 @@ config PHY_XGENE
->  	help
->  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
->  =
-
-> +config PHY_MIXEL_MIPI_DPHY
-> +	bool
-> +	depends on OF
-> +	select GENERIC_PHY
-> +	select GENERIC_PHY_MIPI_DPHY
-> +	default ARCH_MXC && ARM64
-
-Is it correct that driver is mandatory if ARCH_MXC is y?
-There is no prompt to allow the user to select it.
-Or in other words - will all i.MX8 user need it?
-
-> +
->  source "drivers/phy/allwinner/Kconfig"
->  source "drivers/phy/amlogic/Kconfig"
->  source "drivers/phy/broadcom/Kconfig"
-> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> index 0d9fddc498a6..264f570b67bf 100644
-> --- a/drivers/phy/Makefile
-> +++ b/drivers/phy/Makefile
-> @@ -15,6 +15,7 @@ obj-$(CONFIG_ARCH_MEDIATEK)		+=3D mediatek/
->  obj-$(CONFIG_ARCH_RENESAS)		+=3D renesas/
->  obj-$(CONFIG_ARCH_ROCKCHIP)		+=3D rockchip/
->  obj-$(CONFIG_ARCH_TEGRA)		+=3D tegra/
-> +obj-$(CONFIG_PHY_MIXEL_MIPI_DPHY)	+=3D phy-mixel-mipi-dphy.o
->  obj-y					+=3D broadcom/	\
->  					   cadence/	\
->  					   freescale/	\
-> diff --git a/drivers/phy/phy-mixel-mipi-dphy.c b/drivers/phy/phy-mixel-mi=
-pi-dphy.c
-> new file mode 100644
-> index 000000000000..8a43dab79cee
-> --- /dev/null
-> +++ b/drivers/phy/phy-mixel-mipi-dphy.c
-
-There is already a PHY named phy-fsl-imx8mq-usb, located in the
-freescale subdirectory.
-Why locate another imx8 PHY in the top level directory with
-another naming convention?
-
-> @@ -0,0 +1,449 @@
-> +/*
-> + * Copyright 2017 NXP
-> + * Copyright 2019 Purism SPC
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-> + */
-SPDX-License-Identifier goes in at first line with //.
-It is documented somewhere.
-Also, did you double check that GPL 2.0 is correct?
-
-> +
-> +/* #define DEBUG 1 */
-There is no reference to DEBUG in this file - delete?
-
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/phy/phy.h>
-> +#include <linux/platform_device.h>
-> +
-> +/* DPHY registers */
-> +#define DPHY_PD_DPHY			0x00
-> +#define DPHY_M_PRG_HS_PREPARE		0x04
-> +#define DPHY_MC_PRG_HS_PREPARE		0x08
-> +#define DPHY_M_PRG_HS_ZERO		0x0c
-> +#define DPHY_MC_PRG_HS_ZERO		0x10
-> +#define DPHY_M_PRG_HS_TRAIL		0x14
-> +#define DPHY_MC_PRG_HS_TRAIL		0x18
-> +#define DPHY_PD_PLL			0x1c
-> +#define DPHY_TST			0x20
-> +#define DPHY_CN				0x24
-> +#define DPHY_CM				0x28
-> +#define DPHY_CO				0x2c
-> +#define DPHY_LOCK			0x30
-> +#define DPHY_LOCK_BYP			0x34
-> +#define DPHY_TX_RCAL			0x38
-> +#define DPHY_AUTO_PD_EN			0x3c
-> +#define DPHY_RXLPRP			0x40
-> +#define DPHY_RXCDRP			0x44
-> +
-> +#define MBPS(x) ((x) * 1000000)
-> +
-> +#define DATA_RATE_MAX_SPEED MBPS(1500)
-> +#define DATA_RATE_MIN_SPEED MBPS(80)
-> +
-> +#define CN_BUF	0xcb7a89c0
-> +#define CO_BUF	0x63
-> +#define CM(x)	(				\
-> +		((x) <  32)?0xe0|((x)-16) :	\
-> +		((x) <  64)?0xc0|((x)-32) :	\
-> +		((x) < 128)?0x80|((x)-64) :	\
-> +		((x) - 128))
-> +#define CN(x)	(((x) =3D=3D 1)?0x1f : (((CN_BUF)>>((x)-1))&0x1f))
-> +#define CO(x)	((CO_BUF)>>(8-(x))&0x3)
-> +
-> +/* PHY power on is LOW_ENABLE */
-> +#define PWR_ON	0
-> +#define PWR_OFF	1
-> +
-> +struct mixel_dphy_cfg {
-> +	u32 cm;
-> +	u32 cn;
-> +	u32 co;
-> +	unsigned long hs_clk_rate;
-> +	u8 mc_prg_hs_prepare;
-> +	u8 m_prg_hs_prepare;
-> +	u8 mc_prg_hs_zero;
-> +	u8 m_prg_hs_zero;
-> +	u8 mc_prg_hs_trail;
-> +	u8 m_prg_hs_trail;
-> +};
-
-For the naive reader it would be helpful to spell out the names in a commen=
-t.
-As I assume the names comes from the data sheet the short names are OK - but
-let others know the purpose.
-
-> +
-> +struct mixel_dphy_priv;
-> +struct mixel_dphy_ops {
-> +	int (*probe)(struct mixel_dphy_priv *priv);
-> +	int (*power_on)(struct phy *phy);
-> +	int (*power_off)(struct phy *phy);
-> +};
-Consider same argument for all three ops, less suprises.
-But then probe() is called before we have a phy, so this may be
-the best option.
-> +
-> +struct mixel_dphy_priv {
-> +	struct mixel_dphy_cfg cfg;
-> +	void __iomem *regs;
-> +	struct clk *phy_ref_clk;
-> +	struct mutex lock;
-> +	const struct mixel_dphy_ops *ops;
-> +};
-Document what the lock protects, or find a better name for the lock to docu=
-ment it
-
-> +
-> +/* Find a ratio close to the desired one using continued fraction
-> +   approximation ending either at exact match or maximum allowed
-> +   nominator, denominator. */
-
-Use kernel style comments
-/*
- * Bla bla
- * more bla
- */
-
-> +static void get_best_ratio(unsigned long *pnum, unsigned long *pdenom, u=
-nsigned max_n, unsigned max_d)
-Wrap line to stay below 80 chars.
-Use checkpatch to help you sport things like this.
-
-> +{
-> +	unsigned long a =3D *pnum;
-> +	unsigned long b =3D *pdenom;
-> +	unsigned long c;
-> +	unsigned n[] =3D {0, 1};
-> +	unsigned d[] =3D {1, 0};
-> +	unsigned whole;
-> +	unsigned i =3D 1;
-> +	while (b) {
-Add empty line after last local variable.
-
-> +		i ^=3D 1;
-> +		whole =3D a / b;
-> +		n[i] +=3D (n[i ^ 1] * whole);
-> +		d[i] +=3D (d[i ^ 1] * whole);
-> +		if ((n[i] > max_n) || (d[i] > max_d)) {
-> +			i ^=3D 1;
-> +			break;
-> +		}
-> +		c =3D a - (b * whole);
-> +		a =3D b;
-> +		b =3D c;
-> +	}
-> +	*pnum =3D n[i];
-> +	*pdenom =3D d[i];
-> +}
-> +
-> +static int mixel_dphy_config_from_opts(struct phy *phy,
-> +	       struct phy_configure_opts_mipi_dphy *dphy_opts,
-> +	       struct mixel_dphy_cfg *cfg)
-> +{
-Align extra paratmers below the first parameter using tabs and add necessary
-spaces.
-
-> +	struct mixel_dphy_priv *priv =3D dev_get_drvdata(phy->dev.parent);
-> +	unsigned long ref_clk =3D clk_get_rate(priv->phy_ref_clk);
-> +	int i;
-> +	unsigned long numerator, denominator, frequency;
-> +	unsigned step;
-> +
-> +static int mixel_dphy_ref_power_on(struct phy *phy)
-> +{
-> +	struct mixel_dphy_priv *priv =3D phy_get_drvdata(phy);
-> +	u32 lock, timeout;
-> +	int ret =3D 0;
-> +
-> +	mutex_lock(&priv->lock);
-> +	clk_prepare_enable(priv->phy_ref_clk);
-> +
-> +	phy_write(phy, PWR_ON, DPHY_PD_DPHY);
-> +	phy_write(phy, PWR_ON, DPHY_PD_PLL);
-> +
-> +	timeout =3D 100;
-> +	while (!(lock =3D phy_read(phy, DPHY_LOCK))) {
-> +		udelay(10);
-> +		if (--timeout =3D=3D 0) {
-> +			dev_err(&phy->dev, "Could not get DPHY lock!\n");
-> +			mutex_unlock(&priv->lock);
-> +			return -EINVAL;
-> +		}
-USe goto to have a single exit path where you do mutex_unlock()
-
-> +	}
-> +	mutex_unlock(&priv->lock);
-> +
-> +	return ret;
-> +}
-> +
-> +
-> +	mutex_lock(&priv->lock);
-> +
-> +	phy_write(phy, 0x00, DPHY_LOCK_BYP);
-> +	phy_write(phy, 0x01, DPHY_TX_RCAL);
-> +	phy_write(phy, 0x00, DPHY_AUTO_PD_EN);
-> +	phy_write(phy, 0x01, DPHY_RXLPRP);
-> +	phy_write(phy, 0x01, DPHY_RXCDRP);
-> +	phy_write(phy, 0x25, DPHY_TST);
-> +
-> +	mixel_phy_set_hs_timings(phy);
-> +	ret =3D mixel_dphy_set_pll_params(phy);
-> +	if (ret < 0) {
-> +		mutex_unlock(&priv->lock);
-> +		return ret;
-> +	}
-USe goto to have a single exit path where you do mutex_unlock()
-> +
-> +	mutex_unlock(&priv->lock);
-> +
-> +	return 0;
-> +}
-> +
-> +
-> +/*
-> + * This is the reference implementation of DPHY hooks. Specific integrat=
-ion of
-> + * this IP may have to re-implement some of them depending on how they d=
-ecided
-> + * to wire things in the SoC.
-> + */
-> +static const struct mixel_dphy_ops mixel_dphy_ref_ops =3D {
-> +	.power_on =3D mixel_dphy_ref_power_on,
-> +	.power_off =3D mixel_dphy_ref_power_off,
-> +};
-> +
-> +static const struct phy_ops mixel_dphy_ops =3D {
-> +	.power_on =3D mixel_dphy_power_on,
-> +	.power_off =3D mixel_dphy_power_off,
-> +	.configure =3D mixel_dphy_configure,
-> +	.validate =3D mixel_dphy_validate,
-> +	.owner =3D THIS_MODULE,
-> +};
-This is confusing.
-We have struct mixel_dphy_ops =3D> mixel_dphy_ref_ops
-And then struct phy_ops =3D> mixel_dphy_ops
-
-So reading this there are to uses of mixel_dphy_ops,
-one is a struct, and another is an instance of another type.
-Try to find a niming scheme that is less confusing.
-
-
-> +
-> +static const struct of_device_id mixel_dphy_of_match[] =3D {
-> +	{ .compatible =3D "mixel,imx8mq-mipi-dphy", .data =3D &mixel_dphy_ref_o=
-ps },
-> +	{ /* sentinel */ },
-> +};
-Multi-line to keep line shorter?
-
-> +MODULE_DEVICE_TABLE(of, mixel_dphy_of_match);
-> +
-> +static int mixel_dphy_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev =3D &pdev->dev;
-> +	struct device_node *np =3D dev->of_node;
-> +	struct phy_provider *phy_provider;
-> +	struct mixel_dphy_priv *priv;
-> +	struct resource *res;
-> +	struct phy *phy;
-> +	int ret;
-> +
-> +	if (!np)
-> +		return -ENODEV;
-> +
-> +	priv =3D devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	priv->ops =3D of_device_get_match_data(&pdev->dev);
-> +	if (!priv->ops)
-> +		return -EINVAL;
-> +
-> +	res =3D platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res)
-> +		return -ENODEV;
-> +
-> +	priv->regs =3D devm_ioremap(dev, res->start, SZ_256);
-> +	if (IS_ERR(priv->regs))
-> +		return PTR_ERR(priv->regs);
-> +
-> +	priv->phy_ref_clk =3D devm_clk_get(&pdev->dev, "phy_ref");
-> +	if (IS_ERR(priv->phy_ref_clk)) {
-> +		dev_err(dev, "No phy_ref clock found");
-> +		return PTR_ERR(priv->phy_ref_clk);
-> +	}
-> +	dev_dbg(dev, "phy_ref clock rate: %lu", clk_get_rate(priv->phy_ref_clk)=
-);
-> +
-> +	mutex_init(&priv->lock);
-> +	dev_set_drvdata(dev, priv);
-> +
-> +	if (priv->ops->probe) {
-> +		ret =3D priv->ops->probe(priv);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	phy =3D devm_phy_create(dev, np, &mixel_dphy_ops);
-> +	if (IS_ERR(phy)) {
-> +		dev_err(dev, "Failed to create phy %ld\n", PTR_ERR(phy));
-> +		return PTR_ERR(phy);
-> +	}
-> +	phy_set_drvdata(phy, priv);
-> +
-> +	phy_provider =3D devm_of_phy_provider_register(dev, of_phy_simple_xlate=
-);
-> +
-> +	return PTR_ERR_OR_ZERO(phy_provider);
-> +}
-> +
-> +static struct platform_driver mixel_dphy_driver =3D {
-> +	.probe	=3D mixel_dphy_probe,
-> +	.driver =3D {
-> +		.name =3D "mixel-mipi-dphy",
-> +		.of_match_table	=3D mixel_dphy_of_match,
-> +	}
-> +};
-> +module_platform_driver(mixel_dphy_driver);
-> +
-> +MODULE_AUTHOR("NXP Semiconductor");
-> +MODULE_DESCRIPTION("Mixel MIPI-DSI PHY driver");
-> +MODULE_LICENSE("GPL v2");
-> -- =
-
-> 2.20.1
-> =
-
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel@lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 _______________________________________________
 linux-arm-kernel mailing list
