@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 94A10C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:26:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6BB92C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:27:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 633582085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:26:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3DE082085A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:27:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K3yHsNqy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 633582085A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M/f6HNdq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3DE082085A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LUKGc+9BdTtqOzwkUok8hLBqQ2f+y9dFaU+1ymdOUSE=; b=K3yHsNqy+o5WZy
-	T+WkFtuLrjEwMpktvCWox5jPDgPyQuKz42h2tmtFeGapV7F6R/874vS1vZGBd3hL48DEBMiJKmRzf
-	YMds4Mz54qJboXuJP2hAtocO6xZ5/sZCFe9TnBoClhcL5j25BemppDaTOK5DlucIU6CD0tiDUH0JY
-	PGJy1KlJFvbhE+G4wvbuohsmwjklHfYCP3lI9D7k3m3GiOxadBG0rJRZ5RlRDQgcp06+DeR6NujDz
-	gkvgl0B1jMZPh6gPu1/I/36WUWJjYnftLp9ox3+SO+tygl6dfOo+KCam1lPJscWm0RU5dUlTvIQxE
-	qoVN16GNDXBqVuuBgLJg==;
+	List-Owner; bh=m+AWqxMf/EKlxmjErM0/Yo3JX2uXDmc9TILoeq1Fyzw=; b=M/f6HNdqfrEDRp
+	QuG8cJMAL/fu1lHfkRfM13wYd2qqlvaqE04MEBhkJMxip8T3+bT225Lv0JBzAf9JbwKLqw2UcCp1s
+	3ijtNbUJ9+wZDwwy79YKJ16th6MPDv6ZKVrSUcCY0eDCY+j319zFK47e/4hQ+te01JHsihUt3HjG1
+	TYuDYnrl+BCt3808+RZE0MsuJ2Z/UEnChj3PWpLjb+0HY8tbS6PGUfiE0C3B6wBiYHZeCJI20Pm/m
+	j7ED7+qh6FCLR712aAo11ilRASTIZ7MiQbXjVl1+ufGmMn/VkJ2g/seW6qm9i49xQH3t4VjjFvrah
+	fkIm6yNRdkXYsI+NFeVA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gms8r-0001qZ-GW; Fri, 25 Jan 2019 03:26:53 +0000
+	id 1gms9A-00026n-M9; Fri, 25 Jan 2019 03:27:12 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gms5U-0006gM-Ab
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 03:23:30 +0000
+ id 1gms5W-0006iy-Cn
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 03:23:32 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 55CEA5FDD0; Fri, 25 Jan 2019 11:23:15 +0800 (CST)
+ id 72B6F5FE33; Fri, 25 Jan 2019 11:23:15 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Michael Turquette <mturquette@baylibre.com>,
  Stephen Boyd <sboyd@kernel.org>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>, David Airlie <airlied@linux.ie>,
  Daniel Vetter <daniel@ffwll.ch>
-Subject: [PATCH 06/11] drm/sun4i: Add support for A23 display pipeline
-Date: Fri, 25 Jan 2019 11:23:09 +0800
-Message-Id: <20190125032314.20915-7-wens@csie.org>
+Subject: [PATCH 10/11] ARM: dts: sun8i-q8-common: Enable display pipeline with
+ RGB LCD panel
+Date: Fri, 25 Jan 2019 11:23:13 +0800
+Message-Id: <20190125032314.20915-11-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190125032314.20915-1-wens@csie.org>
 References: <20190125032314.20915-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_192325_404216_6D470BBB 
-X-CRM114-Status: GOOD (  13.80  )
+X-CRM114-CacheID: sfid-20190124_192327_118137_E9030215 
+X-CRM114-Status: GOOD (  13.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,103 +76,83 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The A23's display pipeline is similar to the A33. Differences include:
+The Q8 design for A23/A33 tablets have an 18-bit RGB LCD panel connected
+to the LCD interface on the SoC, the DC1SW output on the PMIC providing
+power for the LCD, and PH7 toggling the reset pin for the panel.
 
-  - Display backend supports larger layers, 8192x8192 instead of 2048x2048
+This patch adds a device node for the panel, describing the above, and
+enables the display pipeline.
 
-  - TCON has DMA input
-
-  - There is no SAT module packed in the display backend
-
-Add support for the display pipeline and its components.
-
-As the MIPI DSI output device is not officially documented, and there
-are no A23 reference devices to test it, it is not covered by this
-patch.
+The actual model or compatible string for the panel should be added in
+the tablet device tree file.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c  | 4 ++++
- drivers/gpu/drm/sun4i/sun4i_drv.c      | 2 ++
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 4 ++++
- drivers/gpu/drm/sun4i/sun4i_tcon.c     | 1 +
- drivers/gpu/drm/sun4i/sun6i_drc.c      | 1 +
- 5 files changed, 12 insertions(+)
+ arch/arm/boot/dts/sun8i-q8-common.dtsi | 37 ++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 85e64d02fb5f..2ada915a877e 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -1012,6 +1012,10 @@ static const struct of_device_id sun4i_backend_of_table[] = {
- 		.compatible = "allwinner,sun7i-a20-display-backend",
- 		.data = &sun7i_backend_quirks,
- 	},
-+	{
-+		.compatible = "allwinner,sun8i-a23-display-backend",
-+		.data = &sun8i_a33_backend_quirks,
-+	},
- 	{
- 		.compatible = "allwinner,sun8i-a33-display-backend",
- 		.data = &sun8i_a33_backend_quirks,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 93da837194cf..477957a865fb 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -165,6 +165,7 @@ static bool sun4i_drv_node_is_frontend(struct device_node *node)
- 		of_device_is_compatible(node, "allwinner,sun5i-a13-display-frontend") ||
- 		of_device_is_compatible(node, "allwinner,sun6i-a31-display-frontend") ||
- 		of_device_is_compatible(node, "allwinner,sun7i-a20-display-frontend") ||
-+		of_device_is_compatible(node, "allwinner,sun8i-a23-display-frontend") ||
- 		of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend") ||
- 		of_device_is_compatible(node, "allwinner,sun9i-a80-display-frontend");
- }
-@@ -404,6 +405,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
- 	{ .compatible = "allwinner,sun6i-a31-display-engine" },
- 	{ .compatible = "allwinner,sun6i-a31s-display-engine" },
- 	{ .compatible = "allwinner,sun7i-a20-display-engine" },
-+	{ .compatible = "allwinner,sun8i-a23-display-engine" },
- 	{ .compatible = "allwinner,sun8i-a33-display-engine" },
- 	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
- 	{ .compatible = "allwinner,sun8i-h3-display-engine" },
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index e8239d4d4dd5..346c8071bd38 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -719,6 +719,10 @@ const struct of_device_id sun4i_frontend_of_table[] = {
- 		.compatible = "allwinner,sun7i-a20-display-frontend",
- 		.data = &sun4i_a10_frontend
- 	},
-+	{
-+		.compatible = "allwinner,sun8i-a23-display-frontend",
-+		.data = &sun8i_a33_frontend
-+	},
- 	{
- 		.compatible = "allwinner,sun8i-a33-display-frontend",
- 		.data = &sun8i_a33_frontend
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 0420f5c978b9..565955a46b0b 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -1494,6 +1494,7 @@ const struct of_device_id sun4i_tcon_of_table[] = {
- 	{ .compatible = "allwinner,sun6i-a31-tcon", .data = &sun6i_a31_quirks },
- 	{ .compatible = "allwinner,sun6i-a31s-tcon", .data = &sun6i_a31s_quirks },
- 	{ .compatible = "allwinner,sun7i-a20-tcon", .data = &sun7i_a20_quirks },
-+	{ .compatible = "allwinner,sun8i-a23-tcon", .data = &sun8i_a33_quirks },
- 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
- 	{ .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data = &sun8i_a83t_lcd_quirks },
- 	{ .compatible = "allwinner,sun8i-a83t-tcon-tv", .data = &sun8i_a83t_tv_quirks },
-diff --git a/drivers/gpu/drm/sun4i/sun6i_drc.c b/drivers/gpu/drm/sun4i/sun6i_drc.c
-index 88eb268fdf73..442094a4af7a 100644
---- a/drivers/gpu/drm/sun4i/sun6i_drc.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_drc.c
-@@ -101,6 +101,7 @@ static int sun6i_drc_remove(struct platform_device *pdev)
- static const struct of_device_id sun6i_drc_of_table[] = {
- 	{ .compatible = "allwinner,sun6i-a31-drc" },
- 	{ .compatible = "allwinner,sun6i-a31s-drc" },
-+	{ .compatible = "allwinner,sun8i-a23-drc" },
- 	{ .compatible = "allwinner,sun8i-a33-drc" },
- 	{ .compatible = "allwinner,sun9i-a80-drc" },
- 	{ }
+diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+index 719ad769b837..53104f4ccacc 100644
+--- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
++++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+@@ -49,6 +49,26 @@
+ 		ethernet0 = &sdio_wifi;
+ 	};
+ 
++	panel: panel {
++		/* Tablet dts should provide panel compatible */
++		backlight = <&backlight>;
++		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
++		power-supply = <&reg_dc1sw>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port@0 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			panel_input: endpoint@0 {
++				reg = <0>;
++				remote-endpoint = <&tcon0_out_lcd>;
++			};
++		};
++	};
++
+ 	wifi_pwrseq: wifi_pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		/*
+@@ -64,6 +84,10 @@
+ 	};
+ };
+ 
++&de {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	status  = "okay";
+ };
+@@ -90,6 +114,19 @@
+ 	};
+ };
+ 
++&tcon0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd_rgb666_pins>;
++	status = "okay";
++};
++
++&tcon0_out {
++	tcon0_out_lcd: endpoint@0 {
++		reg = <0>;
++		remote-endpoint = <&panel_input>;
++	};
++};
++
+ &usbphy {
+ 	usb1_vbus-supply = <&reg_dldo1>;
+ };
 -- 
 2.20.1
 
