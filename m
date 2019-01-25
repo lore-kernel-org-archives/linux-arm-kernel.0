@@ -2,62 +2,64 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A98F7C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:23:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 69D0BC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:32:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7A530218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:23:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3BE9F2087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 18:32:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K0PINcxt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A530218A6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PvEqNBV/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3BE9F2087E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=hwWF5AQ6nunVD1+k3o/MtAWu5QG7fUHzqhoHWRUxGac=; b=K0PINcxtWdLu5tHLHK7hi7jxba
-	9sYPodS9F+Y+rFU+8L51T7j6vo7Fn3ya5R+8GZR/6Pli3YVxofXljYAbqzUFsL2jrksRZOXNp7Blc
-	LNoSCab4eFfAAHVBBXTs+gmOmW6LjetfgIUp0M/AL+rGvOlHu6VOsw+372MYUC3olEcDeOZUryuOp
-	btQbeoO0iJqkTYIlxyWSYSVxzUYXa1dDGAMoe6BGWiWjkFfcv95vDPRRWv5PxCsg8PphLrtJCteWQ
-	NVlQOspDd6e+iPpv+67g2aZPQxUnV9u0Qsw4A3C126WVlfdjFAg1TVsdGoLBhJkyHUjBNOn84bJ3V
-	9Zzgfabw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=32Nl528N/gBoQ9Bva9wmWXcGJY/3sc4lEPOCbNt1CPQ=; b=PvEqNBV/lMQgJk7cKTKEPgu6f
+	Y2i3T5xb6nZRxHzHVhl4+6eUiH6Y9ifvB51s4BFZVY1vBVJsp0q4GRlxjsAZYBkoiKCUd9o3B2FFm
+	C637mJ7VU7i6iw6BDjZZF2mJLyy+2sNhd2NyAyIs7ssJ5iPXJO6wYVc1d2jlUFm7qTGoZCP3eU/Vk
+	+U2O37kBku/RQ39JW5YXGIHOy5E1hWynXV8wWyO7yxvkGXzkhPYmnIN0eOpNpMefEznHUmEcRTrSg
+	S74KmpqujaSd6mKFdamT3Uf9Lytl8MmBii4GJrgPEhyJ6Ap+sdU0CR/Og7jJL4veqew+UfbqEKaDW
+	0eyOA+f+A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gn684-0006K0-9d; Fri, 25 Jan 2019 18:23:00 +0000
+	id 1gn6Hc-0001Cj-RS; Fri, 25 Jan 2019 18:32:52 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gn5t1-0005MJ-9G
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 18:07:33 +0000
+ id 1gn6HZ-0001CH-5y
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 18:32:50 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BE48A1596;
- Fri, 25 Jan 2019 10:07:26 -0800 (PST)
-Received: from beelzebub.austin.arm.com (beelzebub.austin.arm.com
- [10.118.12.119])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 22ED23F5AF;
- Fri, 25 Jan 2019 10:07:26 -0800 (PST)
-From: Jeremy Linton <jeremy.linton@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v4 05/12] arm64: remove the ability to build a kernel without
- kpti
-Date: Fri, 25 Jan 2019 12:07:04 -0600
-Message-Id: <20190125180711.1970973-6-jeremy.linton@arm.com>
-X-Mailer: git-send-email 2.17.2
-In-Reply-To: <20190125180711.1970973-1-jeremy.linton@arm.com>
-References: <20190125180711.1970973-1-jeremy.linton@arm.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 755CFEBD;
+ Fri, 25 Jan 2019 10:32:48 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 179B83F5C1;
+ Fri, 25 Jan 2019 10:32:45 -0800 (PST)
+Subject: Re: [PATCH v5 4/4] perf/smmuv3_pmu: Enable HiSilicon Erratum
+ 162001800 quirk
+To: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>,
+ lorenzo.pieralisi@arm.com
+References: <20181130154751.28580-1-shameerali.kolothum.thodi@huawei.com>
+ <20181130154751.28580-5-shameerali.kolothum.thodi@huawei.com>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <bfb957ad-ab5d-1848-7aec-a486476f8be6@arm.com>
+Date: Fri, 25 Jan 2019 18:32:40 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
+MIME-Version: 1.0
+In-Reply-To: <20181130154751.28580-5-shameerali.kolothum.thodi@huawei.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_100727_989960_AB5FA91E 
-X-CRM114-Status: GOOD (  20.44  )
+X-CRM114-CacheID: sfid-20190125_103249_240811_1832D3D5 
+X-CRM114-Status: GOOD (  32.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,374 +71,207 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: stefan.wahren@i2se.com, mlangsdo@redhat.com, suzuki.poulose@arm.com,
- marc.zyngier@arm.com, catalin.marinas@arm.com, julien.thierry@arm.com,
- will.deacon@arm.com, linux-kernel@vger.kernel.org,
- Jeremy Linton <jeremy.linton@arm.com>, steven.price@arm.com, ykaukab@suse.de,
- dave.martin@arm.com, shankerd@codeaurora.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
+Cc: mark.rutland@arm.com, vkilari@codeaurora.org, neil.m.leeder@gmail.com,
+ jean-philippe.brucker@arm.com, pabba@codeaurora.org, john.garry@huawei.com,
+ will.deacon@arm.com, rruigrok@codeaurora.org, linuxarm@huawei.com,
+ linux-kernel@vger.kernel.org, linux-acpi@vger.kernel.org, guohanjun@huawei.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Buried behind EXPERT is the ability to build a kernel without
-hardened branch predictors, this needlessly clutters up the
-code as well as creates the opportunity for bugs. It also
-removes the kernel's ability to determine if the machine its
-running on is vulnerable.
+On 30/11/2018 15:47, Shameer Kolothum wrote:
+> HiSilicon erratum 162001800 describes the limitation of
+> SMMUv3 PMCG implementation on HiSilicon Hip08 platforms.
+> 
+> On these platforms, the PMCG event counter registers
+> (SMMU_PMCG_EVCNTRn) are read only and as a result it
+> is not possible to set the initial counter period value
+> on event monitor start.
+> 
+> To work around this, the current value of the counter
+> is read and used for delta calculations. OEM information
+> from ACPI header is used to identify the affected hardware
+> platforms.
+> 
+> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+> ---
+>   drivers/acpi/arm64/iort.c     | 30 +++++++++++++++++++++++++++---
+>   drivers/perf/arm_smmuv3_pmu.c | 35 +++++++++++++++++++++++++++++------
+>   include/linux/acpi_iort.h     |  3 +++
+>   3 files changed, 59 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 2da08e1..d174379 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -1364,6 +1364,22 @@ static void __init arm_smmu_v3_pmcg_init_resources(struct resource *res,
+>   				       ACPI_EDGE_SENSITIVE, &res[2]);
+>   }
+>   
+> +static struct acpi_platform_list pmcg_evcntr_rdonly_list[] __initdata = {
+> +	/* HiSilicon Erratum 162001800 */
+> +	{"HISI  ", "HIP08   ", 0, ACPI_SIG_IORT, greater_than_or_equal},
+> +	{ }
+> +};
+> +
+> +static int __init arm_smmu_v3_pmcg_add_platdata(struct platform_device *pdev)
+> +{
+> +	u32 options = 0;
+> +
+> +	if (acpi_match_platform_list(pmcg_evcntr_rdonly_list) >= 0)
+> +		options |= IORT_PMCG_EVCNTR_RDONLY;
 
-Since its also possible to disable it at boot time, lets remove
-the config option.
+Hmm, do we want IORT code to have to understand a (potential) whole load 
+of PMCG-specific quirks directly, or do we really only need to pass some 
+unambiguous identifier for the PMCG implementation, and let the driver 
+handle the details in private - much like the SMMU model field, only 
+without an external spec to constrain us :)
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- arch/arm64/Kconfig              | 12 ------------
- arch/arm64/include/asm/fixmap.h |  2 --
- arch/arm64/include/asm/mmu.h    |  7 +------
- arch/arm64/include/asm/sdei.h   |  2 +-
- arch/arm64/kernel/asm-offsets.c |  2 --
- arch/arm64/kernel/cpufeature.c  |  4 ----
- arch/arm64/kernel/entry.S       | 11 +----------
- arch/arm64/kernel/sdei.c        |  2 --
- arch/arm64/kernel/vmlinux.lds.S |  8 --------
- arch/arm64/mm/context.c         |  6 ------
- arch/arm64/mm/mmu.c             |  2 --
- arch/arm64/mm/proc.S            |  2 --
- 12 files changed, 3 insertions(+), 57 deletions(-)
+If we ever want to have named imp-def events, we'd need to do something 
+like that anyway, so perhaps we might be better off taking that approach 
+to begin with (and if so, I'd be inclined to push the basic platdata 
+initialisation for "generic PMCG" into patch #1).
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6b4c6d3fdf4d..09a85410d814 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -993,18 +993,6 @@ config FORCE_MAX_ZONEORDER
- 	  However for 4K, we choose a higher default value, 11 as opposed to 10, giving us
- 	  4M allocations matching the default size used by generic code.
- 
--config UNMAP_KERNEL_AT_EL0
--	bool "Unmap kernel when running in userspace (aka \"KAISER\")" if EXPERT
--	default y
--	help
--	  Speculation attacks against some high-performance processors can
--	  be used to bypass MMU permission checks and leak kernel data to
--	  userspace. This can be defended against by unmapping the kernel
--	  when running in userspace, mapping it back in on exception entry
--	  via a trampoline page in the vector table.
--
--	  If unsure, say Y.
--
- config HARDEN_EL2_VECTORS
- 	bool "Harden EL2 vector mapping against system register leak" if EXPERT
- 	default y
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index ec1e6d6fa14c..62371f07d4ce 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -58,11 +58,9 @@ enum fixed_addresses {
- 	FIX_APEI_GHES_NMI,
- #endif /* CONFIG_ACPI_APEI_GHES */
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- 	FIX_ENTRY_TRAMP_DATA,
- 	FIX_ENTRY_TRAMP_TEXT,
- #define TRAMP_VALIAS		(__fix_to_virt(FIX_ENTRY_TRAMP_TEXT))
--#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 	__end_of_permanent_fixed_addresses,
- 
- 	/*
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 20fdf71f96c3..9d689661471c 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -42,18 +42,13 @@ typedef struct {
- 
- static inline bool arm64_kernel_unmapped_at_el0(void)
- {
--	return IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0) &&
--	       cpus_have_const_cap(ARM64_UNMAP_KERNEL_AT_EL0);
-+	return cpus_have_const_cap(ARM64_UNMAP_KERNEL_AT_EL0);
- }
- 
- static inline bool arm64_kernel_use_ng_mappings(void)
- {
- 	bool tx1_bug;
- 
--	/* What's a kpti? Use global mappings if we don't know. */
--	if (!IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0))
--		return false;
--
- 	/*
- 	 * Note: this function is called before the CPU capabilities have
- 	 * been configured, so our early mappings will be global. If we
-diff --git a/arch/arm64/include/asm/sdei.h b/arch/arm64/include/asm/sdei.h
-index ffe47d766c25..82c3e9b6a4b0 100644
---- a/arch/arm64/include/asm/sdei.h
-+++ b/arch/arm64/include/asm/sdei.h
-@@ -23,7 +23,7 @@ extern unsigned long sdei_exit_mode;
- asmlinkage void __sdei_asm_handler(unsigned long event_num, unsigned long arg,
- 				   unsigned long pc, unsigned long pstate);
- 
--/* and its CONFIG_UNMAP_KERNEL_AT_EL0 trampoline */
-+/* and its unmap kernel at el0 trampoline */
- asmlinkage void __sdei_asm_entry_trampoline(unsigned long event_num,
- 						   unsigned long arg,
- 						   unsigned long pc,
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 65b8afc84466..6a6f83de91b8 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -165,9 +165,7 @@ int main(void)
-   DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
-   DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
-   BLANK();
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-   DEFINE(TRAMP_VALIAS,		TRAMP_VALIAS);
--#endif
- #ifdef CONFIG_ARM_SDE_INTERFACE
-   DEFINE(SDEI_EVENT_INTREGS,	offsetof(struct sdei_registered_event, interrupted_regs));
-   DEFINE(SDEI_EVENT_PRIORITY,	offsetof(struct sdei_registered_event, priority));
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index d1a7fd7972f9..a9e18b9cdc1e 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -944,7 +944,6 @@ has_useable_cnp(const struct arm64_cpu_capabilities *entry, int scope)
- 	return has_cpuid_feature(entry, scope);
- }
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
- 
- static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
-@@ -1035,7 +1034,6 @@ static int __init parse_kpti(char *str)
- 	return 0;
- }
- early_param("kpti", parse_kpti);
--#endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 
- #ifdef CONFIG_ARM64_HW_AFDBM
- static inline void __cpu_enable_hw_dbm(void)
-@@ -1284,7 +1282,6 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.field_pos = ID_AA64PFR0_EL0_SHIFT,
- 		.min_field_value = ID_AA64PFR0_EL0_32BIT_64BIT,
- 	},
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- 	{
- 		.desc = "Kernel page table isolation (KPTI)",
- 		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
-@@ -1300,7 +1297,6 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.matches = unmap_kernel_at_el0,
- 		.cpu_enable = kpti_install_ng_mappings,
- 	},
--#endif
- 	{
- 		/* FP/SIMD is not implemented */
- 		.capability = ARM64_HAS_NO_FPSIMD,
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 3f0eaaf704c8..1d8efc144b04 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -70,7 +70,6 @@
- 
- 	.macro kernel_ventry, el, label, regsize = 64
- 	.align 7
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- alternative_if ARM64_UNMAP_KERNEL_AT_EL0
- 	.if	\el == 0
- 	.if	\regsize == 64
-@@ -81,7 +80,6 @@ alternative_if ARM64_UNMAP_KERNEL_AT_EL0
- 	.endif
- 	.endif
- alternative_else_nop_endif
--#endif
- 
- 	sub	sp, sp, #S_FRAME_SIZE
- #ifdef CONFIG_VMAP_STACK
-@@ -345,7 +343,6 @@ alternative_else_nop_endif
- 
- 	.if	\el == 0
- alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- 	bne	4f
- 	msr	far_el1, x30
- 	tramp_alias	x30, tramp_exit_native
-@@ -353,7 +350,7 @@ alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
- 4:
- 	tramp_alias	x30, tramp_exit_compat
- 	br	x30
--#endif
-+
- 	.else
- 	eret
- 	.endif
-@@ -913,7 +910,6 @@ ENDPROC(el0_svc)
- 
- 	.popsection				// .entry.text
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- /*
-  * Exception vectors trampoline.
-  */
-@@ -1023,7 +1019,6 @@ __entry_tramp_data_start:
- 	.quad	vectors
- 	.popsection				// .rodata
- #endif /* CONFIG_RANDOMIZE_BASE */
--#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 
- /*
-  * Register switch for AArch64. The callee-saved registers need to be saved
-@@ -1086,7 +1081,6 @@ NOKPROBE(ret_from_fork)
- 	b	.
- .endm
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- /*
-  * The regular SDEI entry point may have been unmapped along with the rest of
-  * the kernel. This trampoline restores the kernel mapping to make the x1 memory
-@@ -1146,7 +1140,6 @@ __sdei_asm_trampoline_next_handler:
- 	.quad	__sdei_asm_handler
- .popsection		// .rodata
- #endif /* CONFIG_RANDOMIZE_BASE */
--#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 
- /*
-  * Software Delegated Exception entry point.
-@@ -1240,10 +1233,8 @@ alternative_if_not ARM64_UNMAP_KERNEL_AT_EL0
- 	sdei_handler_exit exit_mode=x2
- alternative_else_nop_endif
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- 	tramp_alias	dst=x5, sym=__sdei_asm_exit_trampoline
- 	br	x5
--#endif
- ENDPROC(__sdei_asm_handler)
- NOKPROBE(__sdei_asm_handler)
- #endif /* CONFIG_ARM_SDE_INTERFACE */
-diff --git a/arch/arm64/kernel/sdei.c b/arch/arm64/kernel/sdei.c
-index 5ba4465e44f0..a0dbdb962019 100644
---- a/arch/arm64/kernel/sdei.c
-+++ b/arch/arm64/kernel/sdei.c
-@@ -157,7 +157,6 @@ unsigned long sdei_arch_get_entry_point(int conduit)
- 
- 	sdei_exit_mode = (conduit == CONDUIT_HVC) ? SDEI_EXIT_HVC : SDEI_EXIT_SMC;
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- 	if (arm64_kernel_unmapped_at_el0()) {
- 		unsigned long offset;
- 
-@@ -165,7 +164,6 @@ unsigned long sdei_arch_get_entry_point(int conduit)
- 			 (unsigned long)__entry_tramp_text_start;
- 		return TRAMP_VALIAS + offset;
- 	} else
--#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 		return (unsigned long)__sdei_asm_handler;
- 
- }
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 7fa008374907..a4dbee11bcb5 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -57,16 +57,12 @@ jiffies = jiffies_64;
- #define HIBERNATE_TEXT
- #endif
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- #define TRAMP_TEXT					\
- 	. = ALIGN(PAGE_SIZE);				\
- 	__entry_tramp_text_start = .;			\
- 	*(.entry.tramp.text)				\
- 	. = ALIGN(PAGE_SIZE);				\
- 	__entry_tramp_text_end = .;
--#else
--#define TRAMP_TEXT
--#endif
- 
- /*
-  * The size of the PE/COFF section that covers the kernel image, which
-@@ -143,10 +139,8 @@ SECTIONS
- 	idmap_pg_dir = .;
- 	. += IDMAP_DIR_SIZE;
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- 	tramp_pg_dir = .;
- 	. += PAGE_SIZE;
--#endif
- 
- #ifdef CONFIG_ARM64_SW_TTBR0_PAN
- 	reserved_ttbr0 = .;
-@@ -257,10 +251,8 @@ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
- ASSERT(__hibernate_exit_text_end - (__hibernate_exit_text_start & ~(SZ_4K - 1))
- 	<= SZ_4K, "Hibernate exit text too big or misaligned")
- #endif
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- ASSERT((__entry_tramp_text_end - __entry_tramp_text_start) == PAGE_SIZE,
- 	"Entry trampoline text too big")
--#endif
- /*
-  * If padding is applied before .head.text, virt<->phys conversions will fail.
-  */
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index 1f0ea2facf24..e99f3e645e06 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -40,15 +40,9 @@ static cpumask_t tlb_flush_pending;
- #define ASID_MASK		(~GENMASK(asid_bits - 1, 0))
- #define ASID_FIRST_VERSION	(1UL << asid_bits)
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- #define NUM_USER_ASIDS		(ASID_FIRST_VERSION >> 1)
- #define asid2idx(asid)		(((asid) & ~ASID_MASK) >> 1)
- #define idx2asid(idx)		(((idx) << 1) & ~ASID_MASK)
--#else
--#define NUM_USER_ASIDS		(ASID_FIRST_VERSION)
--#define asid2idx(asid)		((asid) & ~ASID_MASK)
--#define idx2asid(idx)		asid2idx(idx)
--#endif
- 
- /* Get the ASIDBits supported by the current CPU */
- static u32 get_cpu_asid_bits(void)
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index b6f5aa52ac67..97252baf4700 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -570,7 +570,6 @@ static int __init parse_rodata(char *arg)
- }
- early_param("rodata", parse_rodata);
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- static int __init map_entry_trampoline(void)
- {
- 	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
-@@ -597,7 +596,6 @@ static int __init map_entry_trampoline(void)
- 	return 0;
- }
- core_initcall(map_entry_trampoline);
--#endif
- 
- /*
-  * Create fine-grained mappings for the kernel.
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 73886a5f1f30..e9ca5cbb93bc 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -217,7 +217,6 @@ ENTRY(idmap_cpu_replace_ttbr1)
- ENDPROC(idmap_cpu_replace_ttbr1)
- 	.popsection
- 
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- 	.pushsection ".idmap.text", "awx"
- 
- 	.macro	__idmap_kpti_get_pgtable_ent, type
-@@ -406,7 +405,6 @@ __idmap_kpti_secondary:
- 	.unreq	pte
- ENDPROC(idmap_kpti_install_ng_mappings)
- 	.popsection
--#endif
- 
- /*
-  *	__cpu_setup
--- 
-2.17.2
+> +
+> +	return platform_device_add_data(pdev, &options, sizeof(options));
+> +}
+> +
+>   struct iort_dev_config {
+>   	const char *name;
+>   	int (*dev_init)(struct acpi_iort_node *node);
+> @@ -1374,6 +1390,7 @@ struct iort_dev_config {
+>   				     struct acpi_iort_node *node);
+>   	void (*dev_set_proximity)(struct device *dev,
+>   				    struct acpi_iort_node *node);
+> +	int (*dev_add_platdata)(struct platform_device *pdev);
+>   };
+>   
+>   static const struct iort_dev_config iort_arm_smmu_v3_cfg __initconst = {
+> @@ -1395,6 +1412,7 @@ static const struct iort_dev_config iort_arm_smmu_v3_pmcg_cfg __initconst = {
+>   	.name = "arm-smmu-v3-pmu",
+>   	.dev_count_resources = arm_smmu_v3_pmcg_count_resources,
+>   	.dev_init_resources = arm_smmu_v3_pmcg_init_resources,
+> +	.dev_add_platdata	= arm_smmu_v3_pmcg_add_platdata,
+>   };
+>   
+>   static __init const struct iort_dev_config *iort_get_dev_cfg(
+> @@ -1455,10 +1473,16 @@ static int __init iort_add_platform_device(struct acpi_iort_node *node,
+>   		goto dev_put;
+>   
+>   	/*
+> -	 * Add a copy of IORT node pointer to platform_data to
+> -	 * be used to retrieve IORT data information.
+> +	 * Platform devices based on PMCG nodes uses platform_data to
+> +	 * pass quirk flags to the driver. For others, add a copy of
+> +	 * IORT node pointer to platform_data to be used to retrieve
+> +	 * IORT data information.
+>   	 */
+> -	ret = platform_device_add_data(pdev, &node, sizeof(node));
+> +	if (ops->dev_add_platdata)
+> +		ret = ops->dev_add_platdata(pdev);
+> +	else
+> +		ret = platform_device_add_data(pdev, &node, sizeof(node));
+> +
+>   	if (ret)
+>   		goto dev_put;
+>   
+> diff --git a/drivers/perf/arm_smmuv3_pmu.c b/drivers/perf/arm_smmuv3_pmu.c
+> index 71d10a0..02107a1 100644
+> --- a/drivers/perf/arm_smmuv3_pmu.c
+> +++ b/drivers/perf/arm_smmuv3_pmu.c
+> @@ -35,6 +35,7 @@
+>    */
+>   
+>   #include <linux/acpi.h>
+> +#include <linux/acpi_iort.h>
+>   #include <linux/bitfield.h>
+>   #include <linux/bitops.h>
+>   #include <linux/cpuhotplug.h>
+> @@ -111,6 +112,7 @@ struct smmu_pmu {
+>   	struct device *dev;
+>   	void __iomem *reg_base;
+>   	void __iomem *reloc_base;
+> +	u32 options;
+>   	u64 counter_present_mask;
+>   	u64 counter_mask;
+>   };
+> @@ -224,12 +226,25 @@ static void smmu_pmu_set_period(struct smmu_pmu *smmu_pmu,
+>   	u32 idx = hwc->idx;
+>   	u64 new;
+>   
+> -	/*
+> -	 * We limit the max period to half the max counter value of the counter
+> -	 * size, so that even in the case of extreme interrupt latency the
+> -	 * counter will (hopefully) not wrap past its initial value.
+> -	 */
+> -	new = smmu_pmu->counter_mask >> 1;
+> +	if (smmu_pmu->options & IORT_PMCG_EVCNTR_RDONLY) {
+> +		/*
+> +		 * On platforms that require this quirk, if the counter starts
+> +		 * at < half_counter value and wraps, the current logic of
+> +		 * handling the overflow may not work. It is expected that,
+> +		 * those platforms will have full 64 counter bits implemented
+> +		 * so that such a possibility is remote(eg: HiSilicon HIP08).
+> +		 */
+> +		new = smmu_pmu_counter_get_value(smmu_pmu, idx);
+> +	} else {
+> +		/*
+> +		 * We limit the max period to half the max counter value
+> +		 * of the counter size, so that even in the case of extreme
+> +		 * interrupt latency the counter will (hopefully) not wrap
+> +		 * past its initial value.
+> +		 */
+> +		new = smmu_pmu->counter_mask >> 1;
+> +		smmu_pmu_counter_set_value(smmu_pmu, idx, new);
+> +	}
+>   
+>   	local64_set(&hwc->prev_count, new);
+>   	smmu_pmu_counter_set_value(smmu_pmu, idx, new);
 
+Either we've just done this already, or it's not going to have any 
+effect anyway, so it can definitely go.
+
+Robin.
+
+> @@ -670,6 +685,12 @@ static void smmu_pmu_reset(struct smmu_pmu *smmu_pmu)
+>   		       smmu_pmu->reloc_base + SMMU_PMCG_OVSCLR0);
+>   }
+>   
+> +static void smmu_pmu_get_acpi_options(struct smmu_pmu *smmu_pmu)
+> +{
+> +	smmu_pmu->options = *(u32 *)dev_get_platdata(smmu_pmu->dev);
+> +	dev_notice(smmu_pmu->dev, "option mask 0x%x\n", smmu_pmu->options);
+> +}
+> +
+>   static int smmu_pmu_probe(struct platform_device *pdev)
+>   {
+>   	struct smmu_pmu *smmu_pmu;
+> @@ -749,6 +770,8 @@ static int smmu_pmu_probe(struct platform_device *pdev)
+>   		return -EINVAL;
+>   	}
+>   
+> +	smmu_pmu_get_acpi_options(smmu_pmu);
+> +
+>   	/* Pick one CPU to be the preferred one to use */
+>   	smmu_pmu->on_cpu = get_cpu();
+>   	WARN_ON(irq_set_affinity(smmu_pmu->irq, cpumask_of(smmu_pmu->on_cpu)));
+> diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
+> index 38cd77b..4a7ae69 100644
+> --- a/include/linux/acpi_iort.h
+> +++ b/include/linux/acpi_iort.h
+> @@ -26,6 +26,9 @@
+>   #define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
+>   #define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
+>   
+> +/* PMCG node option or quirk flags */
+> +#define IORT_PMCG_EVCNTR_RDONLY		(1 << 0)
+> +
+>   int iort_register_domain_token(int trans_id, phys_addr_t base,
+>   			       struct fwnode_handle *fw_node);
+>   void iort_deregister_domain_token(int trans_id);
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
