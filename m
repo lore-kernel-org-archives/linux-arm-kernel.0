@@ -4,59 +4,62 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 44450C282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:27:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B5394C282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:38:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1621D2085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:27:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 858BA218A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 03:38:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jIbfIPDZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1621D2085A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n7tjikH4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 858BA218A2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qSADlG+rXQz13JFddqEpRK/ew5Gmh0cC+o94e/x2PuY=; b=jIbfIPDZKzj6g5
-	vU4KzrBKQmWF/OkoZRuKmduwPs68smTuv2tYL9UhTKO/Ql6cIEZmSTC3INx60Jz4pbCyAyAFIwrLU
-	YG8E6ofPaIf/sRZAmhNQ7S48NszsLhw4R+FRmqO8jkbcdsZQ2NW7A/zknxDYUHnUXh+rnZ/cG3znP
-	5jFxTQjJ9OO1VomzL9enFzbzF+TA8RuX/1qkAfQ4UtJ3fqkXJFBVJjKmyb7FtodtH/rekK4d/1RnG
-	WeNgNjbtGJgn0950DTbHOa7blU9DM9/eoB5rv6HJmB1+PDga8z4NApw07rc1N7cfdPf6jYOm76mAs
-	6xTqUzlRCG8HrEmYwQ4Q==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=zGI2G17en/b9M06GsIe/U7M6liR8b4de0qGRcps9cls=; b=n7t
+	jikH4pAFMDBgaxhpEC5tafvpM92iVv1rr6FKBugQnNf3eyAb2ScWYsS8RkyfXePiBjc6T5xnh4n3j
+	FQG6RqQnmKlgOteyKpNfgZbEJUK32rwKG2R11AsH1ZGIzw6+GI/gT+ECG7n3cIOnax6dx2Kszx/vo
+	zwlYhfaxgJeFL2GHH/V7HBkcKwc7dLzTs7PEFtbOlgT3lQN2o5mFEb8uT3SMgGgYxlOqjgT61lJvC
+	x4vS+mvUod7ZRlOCRn+/DMS5J4RcXmDaBKApI1vytKs2DgZPh53m0afJrAjahNFaavWtT3aZ31pkw
+	dUCnHryqIPuOclZMC1iAFFrCwE++LhA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gms9m-0002c3-FQ; Fri, 25 Jan 2019 03:27:50 +0000
-Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
+	id 1gmsJu-00061n-6i; Fri, 25 Jan 2019 03:38:18 +0000
+Received: from inva020.nxp.com ([92.121.34.13])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gms5X-0006l7-W7
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 03:23:33 +0000
-Received: by wens.csie.org (Postfix, from userid 1000)
- id 789D65FE3D; Fri, 25 Jan 2019 11:23:15 +0800 (CST)
-From: Chen-Yu Tsai <wens@csie.org>
-To: Maxime Ripard <maxime.ripard@bootlin.com>,
- Michael Turquette <mturquette@baylibre.com>,
- Stephen Boyd <sboyd@kernel.org>, Rob Herring <robh+dt@kernel.org>,
- Mark Rutland <mark.rutland@arm.com>, David Airlie <airlied@linux.ie>,
- Daniel Vetter <daniel@ffwll.ch>
-Subject: [PATCH 11/11] ARM: dts: sun8i-a23-q8: Set compatible string for LCD
- panel
-Date: Fri, 25 Jan 2019 11:23:14 +0800
-Message-Id: <20190125032314.20915-12-wens@csie.org>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190125032314.20915-1-wens@csie.org>
-References: <20190125032314.20915-1-wens@csie.org>
-MIME-Version: 1.0
+ id 1gmsJd-0005oi-CJ
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 03:38:03 +0000
+Received: from inva020.nxp.com (localhost [127.0.0.1])
+ by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id F0E0D1A011E;
+ Fri, 25 Jan 2019 04:37:56 +0100 (CET)
+Received: from invc005.ap-rdc01.nxp.com (invc005.ap-rdc01.nxp.com
+ [165.114.16.14])
+ by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id D5B431A008B;
+ Fri, 25 Jan 2019 04:37:51 +0100 (CET)
+Received: from titan.ap.freescale.net (TITAN.ap.freescale.net [10.192.208.233])
+ by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id 5B209402D8;
+ Fri, 25 Jan 2019 11:37:45 +0800 (SGT)
+From: Peng Ma <peng.ma@nxp.com>
+To: shawnguo@kernel.org,
+	axboe@kernel.dk
+Subject: [v4] arm64: dts: lx2160a: add sata node support
+Date: Fri, 25 Jan 2019 11:32:20 +0800
+Message-Id: <20190125033221.30333-1-peng.ma@nxp.com>
+X-Mailer: git-send-email 2.14.1
+X-Virus-Scanned: ClamAV using ClamSMTP
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190124_192328_802847_ABCE5338 
-X-CRM114-Status: GOOD (  10.01  )
+X-CRM114-CacheID: sfid-20190124_193801_852893_83BCA6BF 
+X-CRM114-Status: UNSURE (   8.64  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,42 +71,140 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, Chen-Yu Tsai <wens@csie.org>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, andy.tang@nxp.com,
+ Peng Ma <peng.ma@nxp.com>, linux-kernel@vger.kernel.org, leoyang.li@nxp.com,
+ linux-ide@vger.kernel.org, robh+dt@kernel.org,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Q8 tablets follow the A23/A33 tablet reference design, and normally
-use a "generic" 800x480 LCD panel. The actual panel may vary between
-production runs, and there are no visible markings denoting its model.
-This patch uses a panel that has the same dimensions and timings that
-are close to what was provided in the vendor fex files.
+Add SATA device nodes for fsl-lx2160a and enable support
+for QDS and RDB boards.
 
-Since there are also A33 Q8 tablets with 1024x600 panels, this patch
-only sets the compatible string for A23 Q8 tablets.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Peng Ma <peng.ma@nxp.com>
 ---
- arch/arm/boot/dts/sun8i-a23-q8-tablet.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+changed for V4:
+	- no change
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts b/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
-index b6958e8f2f01..d4dab7c28398 100644
---- a/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
-+++ b/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
-@@ -61,3 +61,7 @@
- 		"Headset Mic", "HBIAS";
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts |   16 +++++++
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |   16 +++++++
+ arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi    |   44 +++++++++++++++++++++
+ 3 files changed, 76 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+index 99a22ab..1a5acf6 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+@@ -95,6 +95,22 @@
+ 	};
+ };
+ 
++&sata0 {
++	status = "okay";
++};
++
++&sata1 {
++	status = "okay";
++};
++
++&sata2 {
++	status = "okay";
++};
++
++&sata3 {
++	status = "okay";
++};
++
+ &uart0 {
  	status = "okay";
  };
-+
-+&panel {
-+	compatible = "bananapi,s070wv20-ct16", "simple-panel";
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+index 6481e5f..5b6799e 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+@@ -102,6 +102,22 @@
+ 	};
+ };
+ 
++&sata0 {
++	status = "okay";
 +};
++
++&sata1 {
++	status = "okay";
++};
++
++&sata2 {
++	status = "okay";
++};
++
++&sata3 {
++	status = "okay";
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+index a79f5c1..592034b 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+@@ -671,6 +671,50 @@
+ 			status = "disabled";
+ 		};
+ 
++		sata0: sata@3200000 {
++			compatible = "fsl,lx2160a-ahci";
++			reg = <0x0 0x3200000 0x0 0x10000>,
++			      <0x7 0x100520 0x0 0x4>;
++			reg-names = "ahci", "sata-ecc";
++			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 3>;
++			dma-coherent;
++			status = "disabled";
++		};
++
++		sata1: sata@3210000 {
++			compatible = "fsl,lx2160a-ahci";
++			reg = <0x0 0x3210000 0x0 0x10000>,
++			      <0x7 0x100520 0x0 0x4>;
++			reg-names = "ahci", "sata-ecc";
++			interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 3>;
++			dma-coherent;
++			status = "disabled";
++		};
++
++		sata2: sata@3220000 {
++			compatible = "fsl,lx2160a-ahci";
++			reg = <0x0 0x3220000 0x0 0x10000>,
++			      <0x7 0x100520 0x0 0x4>;
++			reg-names = "ahci", "sata-ecc";
++			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 3>;
++			dma-coherent;
++			status = "disabled";
++		};
++
++		sata3: sata@3230000 {
++			compatible = "fsl,lx2160a-ahci";
++			reg = <0x0 0x3230000 0x0 0x10000>,
++			      <0x7 0x100520 0x0 0x4>;
++			reg-names = "ahci", "sata-ecc";
++			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clockgen 4 3>;
++			dma-coherent;
++			status = "disabled";
++		};
++
+ 		smmu: iommu@5000000 {
+ 			compatible = "arm,mmu-500";
+ 			reg = <0 0x5000000 0 0x800000>;
 -- 
-2.20.1
+1.7.1
 
 
 _______________________________________________
