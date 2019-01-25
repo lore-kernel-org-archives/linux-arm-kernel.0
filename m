@@ -2,66 +2,80 @@ Return-Path: <SRS0=vAN3=QB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A4AF2C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 09:35:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 089ADC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 09:36:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7600921855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 09:35:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CC9FC21855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 25 Jan 2019 09:36:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AhMuU6lC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7600921855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="csK/sjPk";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="B2MKYAdG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC9FC21855
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=c+dCzdHVo5wtRuvrpQh7jyuGzE396gSPoRrgaZN7fhI=; b=AhMuU6lCtNMDL0
-	H2dxXsBrM4rv63fLPmoqlrhNm3b35CUcs7DLCe9YOg2CdWbe1YYvMBDrkmmU4gMgp41dwYNOwliez
-	0XfWqrHhCdnWEgm8gs6sSeUBbcMrLjJvRONcD4EZ/ow44QotGb7WAvBVK7zgdbA77cF0GvxzeNHq2
-	jpbPMFcdxkDM2+aaXMb8PMTB6eLsJGGz+aRk6PUxMZxMwVyhyrFgvwMUJFr2khHpmASfJaJAT/GB9
-	zxS2pOwlvKxHWx6pdwcP/oxZbfV61NwLP9mnxUuz514QvDqGL8xVrhHn2HCihSgOuXkIc3Si1N3Jk
-	6yFXlUl/KRCAxyTZxvVw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=2NuXxMof8L3086s+onpGQpnYEh1FKyXdpvwH4nE9FdU=; b=csK
+	/sjPkd3rIrjEQgg2HwIMtVtNF3yZkjTCHWxiRm0vKFG6CJIEQ0uxVmS6SWuFTh1kTL+3rytvlh/Ki
+	lxM+wp4ENXlQepKVp4Q8zkm7JuNJS0Q2k404t7hEMyncg8TV+4R6Qa//BZM2DzmQ6cDHwGQd7vEtl
+	V/LNznxQBMRtavRmf+KbJG+tvq/WEOp14EHt7D1oIqnT2QNhgyLbgg0lKgoFHZJezLIw3OO93KRFw
+	uqg/YDihOdnGvCp5oazyLjYxcaUAf2t19y90ByOP6dyvvNk1GLn5TDEmUabbWwhBdvMQN8hbpO8mj
+	/8pM2V4MjEovObf1O3ICvOUZCMoaXsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gmxtk-0003c2-5b; Fri, 25 Jan 2019 09:35:40 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gmxug-0003tJ-6a; Fri, 25 Jan 2019 09:36:38 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gmxtg-0003bb-It
- for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 09:35:38 +0000
-Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
- by metis.ext.pengutronix.de with esmtp (Exim 4.89)
- (envelope-from <l.stach@pengutronix.de>)
- id 1gmxta-0001gw-Ol; Fri, 25 Jan 2019 10:35:30 +0100
-Message-ID: <1548408930.28802.34.camel@pengutronix.de>
-Subject: Re: [PATCH v4 2/5] dmaengine: imx-sdma: add imx8mq sdma compatible
- parts
-From: Lucas Stach <l.stach@pengutronix.de>
-To: "Angus Ainslie (Purism)" <angus@akkea.ca>
-Date: Fri, 25 Jan 2019 10:35:30 +0100
-In-Reply-To: <20190125025528.15645-3-angus@akkea.ca>
-References: <20190120023150.17138-1-angus@akkea.ca>
- <20190125025528.15645-1-angus@akkea.ca>
- <20190125025528.15645-3-angus@akkea.ca>
-X-Mailer: Evolution 3.22.6-1+deb9u1 
-Mime-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
-X-SA-Exim-Mail-From: l.stach@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+ id 1gmxud-0003sY-GO
+ for linux-arm-kernel@lists.infradead.org; Fri, 25 Jan 2019 09:36:36 +0000
+Received: by mail-wr1-x444.google.com with SMTP id l9so9474398wrt.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 25 Jan 2019 01:36:35 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=K82b4u0JeOxmjCgmJBy7RDWk5mZMmmjLdOOMm2/dRP8=;
+ b=B2MKYAdGHJazbaVbP1PZkrkDcNSrjKTR9v9WP3oBqkyUr6SUSazVYMaosXXVikDsfR
+ t4YjVHBbU8r5IYt/yd5oHVJCQgGr8sVR+m96D0lZEtfaExFlXcYaLhgFXYhbI3hckG4b
+ Ee5yhVanr/Oj1fQZj1n9da4GuFiwD1cNSY7Ro=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=K82b4u0JeOxmjCgmJBy7RDWk5mZMmmjLdOOMm2/dRP8=;
+ b=K6wud4B0AEnncnsPiw1TTcc0Wxsh6Kc4dPyCv8Klkur75UiGf+d0vAl/nDPaLEPsIU
+ lXe39Lb89mcgNbWSQ0Bxoh74VJiCwiqJFRFxJdyQti7WJ8SjSW25c1Y/anWDSt4OM2He
+ gVzuAL3hmyjDch30zPjkJKoj7OOjf+7i5fBOqxsao2cSPU07oIAqGddunIlHnrVQF6H6
+ Q9VpcHfmAJSXmYarPCaQY5IG1scgN31v2HpCMTP5iZ0SnlB9M1xXSVQam1xVZsOM2edt
+ JjNmjbbRCcxyJqXvmbxVhoSI1jgTtfd5nqVc0aT0oAVU6n+g6sNFaFQUZM+QPN9CpKYa
+ bPow==
+X-Gm-Message-State: AJcUukcTrvOVzCu6gs5jddB0s2bbs8WUpUWAKsohoIye5pYYM9dwOSKF
+ INxqfFKdoyyw+Kt5C4VizZYoEA==
+X-Google-Smtp-Source: ALg8bN4eEFs0NiKZlfzz0vEKISQvY8Vmh6IoOT7PLzLliyKHbVNwE+FHVkOmm7pHuMj626GWI2sl/Q==
+X-Received: by 2002:adf:dbcb:: with SMTP id e11mr11066521wrj.58.1548408993535; 
+ Fri, 25 Jan 2019 01:36:33 -0800 (PST)
+Received: from dogfood.home ([2a01:cb1d:112:6f00:bcd4:806e:230a:673e])
+ by smtp.gmail.com with ESMTPSA id w80sm92323955wme.38.2019.01.25.01.36.32
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 25 Jan 2019 01:36:32 -0800 (PST)
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+To: linux-crypto@vger.kernel.org
+Subject: [PATCH 0/2] crypto: arm64 - expose PMULL variants as separate algos
+Date: Fri, 25 Jan 2019 10:36:25 +0100
+Message-Id: <20190125093627.14288-1-ard.biesheuvel@linaro.org>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_013536_776450_F22FE1D6 
-X-CRM114-Status: GOOD (  14.03  )
+X-CRM114-CacheID: sfid-20190125_013635_548218_52B85D2F 
+X-CRM114-Status: UNSURE (   7.94  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,47 +87,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Daniel Baluta <daniel.baluta@gmail.com>, linux-kernel@vger.kernel.org,
- dmaengine@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
- NXP Linux Team <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>, angus.ainslie@puri.sm,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: ebiggers@kernel.org, herbert@gondor.apana.org.au,
+ linux-arm-kernel@lists.infradead.org,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-QW0gRG9ubmVyc3RhZywgZGVuIDI0LjAxLjIwMTksIDE5OjU1IC0wNzAwIHNjaHJpZWIgQW5ndXMg
-QWluc2xpZSAoUHVyaXNtKToKPiBUaGlzIGlzIGlkZW50aWNhbCB0byB0aGUgaW14N2QgZGF0YSBz
-dHJ1Y3R1cmVzIGJ1dCB3ZSBuZWVkIHRvCj4gYmUgYWJsZSB0byBkaWZmZXJlbnRpYXRlIHRoYXQg
-dGhlIGlteDhtcSBoYXMgMiBzZG1hIGNvbnRyb2xsZXJzLgoKTm8sIHdlIGRvbid0LCBzZWUgY29t
-bWVudCBvbiBwYXRjaCA0LzUuIFRoaXMgY2FuIHJldXNlIHRoZSBpbXg3ZCBkYXRhLgoKUmVnYXJk
-cywKTHVjYXMKCj4gU2lnbmVkLW9mZi1ieTogQW5ndXMgQWluc2xpZSAoUHVyaXNtKSA8YW5ndXNA
-YWtrZWEuY2E+Cj4gLS0tCj4gwqBkcml2ZXJzL2RtYS9pbXgtc2RtYS5jIHwgMTAgKysrKysrKysr
-Kwo+IMKgMSBmaWxlIGNoYW5nZWQsIDEwIGluc2VydGlvbnMoKykKPiAKPiBkaWZmIC0tZ2l0IGEv
-ZHJpdmVycy9kbWEvaW14LXNkbWEuYyBiL2RyaXZlcnMvZG1hL2lteC1zZG1hLmMKPiBpbmRleCA1
-ZTVlZjBiNWE5NzMuLmVjNmZiNDhmMzg3YSAxMDA2NDQKPiAtLS0gYS9kcml2ZXJzL2RtYS9pbXgt
-c2RtYS5jCj4gKysrIGIvZHJpdmVycy9kbWEvaW14LXNkbWEuYwo+IEBAIC01NTYsNiArNTU2LDEy
-IEBAIHN0YXRpYyBzdHJ1Y3Qgc2RtYV9kcml2ZXJfZGF0YSBzZG1hX2lteDdkID0gewo+ID4gwqAJ
-LnNjcmlwdF9hZGRycyA9ICZzZG1hX3NjcmlwdF9pbXg3ZCwKPiDCoH07Cj4gwqAKPiArc3RhdGlj
-IHN0cnVjdCBzZG1hX2RyaXZlcl9kYXRhIHNkbWFfaW14OG1xID0gewo+ID4gKwkuY2huZW5ibDAg
-PSBTRE1BX0NITkVOQkwwX0lNWDM1LAo+ID4gKwkubnVtX2V2ZW50cyA9IDQ4LAo+ID4gKwkuc2Ny
-aXB0X2FkZHJzID0gJnNkbWFfc2NyaXB0X2lteDdkLAo+ICt9Owo+ICsKPiDCoHN0YXRpYyBjb25z
-dCBzdHJ1Y3QgcGxhdGZvcm1fZGV2aWNlX2lkIHNkbWFfZGV2dHlwZXNbXSA9IHsKPiA+IMKgCXsK
-PiA+IMKgCQkubmFtZSA9ICJpbXgyNS1zZG1hIiwKPiBAQCAtNTc4LDYgKzU4NCw5IEBAIHN0YXRp
-YyBjb25zdCBzdHJ1Y3QgcGxhdGZvcm1fZGV2aWNlX2lkIHNkbWFfZGV2dHlwZXNbXSA9IHsKPiA+
-IMKgCX0sIHsKPiA+IMKgCQkubmFtZSA9ICJpbXg3ZC1zZG1hIiwKPiA+IMKgCQkuZHJpdmVyX2Rh
-dGEgPSAodW5zaWduZWQgbG9uZykmc2RtYV9pbXg3ZCwKPiA+ICsJfSwgewo+ID4gKwkJLm5hbWUg
-PSAiaW14OG1xLXNkbWEiLAo+ID4gKwkJLmRyaXZlcl9kYXRhID0gKHVuc2lnbmVkIGxvbmcpJnNk
-bWFfaW14OG1xLAo+ID4gwqAJfSwgewo+ID4gwqAJCS8qIHNlbnRpbmVsICovCj4gPiDCoAl9Cj4g
-QEAgLTU5Miw2ICs2MDEsNyBAQCBzdGF0aWMgY29uc3Qgc3RydWN0IG9mX2RldmljZV9pZCBzZG1h
-X2R0X2lkc1tdID0gewo+ID4gwqAJeyAuY29tcGF0aWJsZSA9ICJmc2wsaW14MzEtc2RtYSIsIC5k
-YXRhID0gJnNkbWFfaW14MzEsIH0sCj4gPiDCoAl7IC5jb21wYXRpYmxlID0gImZzbCxpbXgyNS1z
-ZG1hIiwgLmRhdGEgPSAmc2RtYV9pbXgyNSwgfSwKPiA+IMKgCXsgLmNvbXBhdGlibGUgPSAiZnNs
-LGlteDdkLXNkbWEiLCAuZGF0YSA9ICZzZG1hX2lteDdkLCB9LAo+ID4gKwl7IC5jb21wYXRpYmxl
-ID0gImZzbCxpbXg4bXEtc2RtYSIsIC5kYXRhID0gJnNkbWFfaW14OG1xLCB9LAo+ID4gwqAJeyAv
-KiBzZW50aW5lbCAqLyB9Cj4gwqB9Owo+IMKgTU9EVUxFX0RFVklDRV9UQUJMRShvZiwgc2RtYV9k
-dF9pZHMpOwoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18K
-bGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZy
-YWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGlu
-dXgtYXJtLWtlcm5lbAo=
+Both the GHASH and the CRC-T10DIF SIMD routines are based on 64-bit
+polynomial multiplication, but fall back to the slower 8-bit polynomial
+instructions if the optional 64-bit PMULL instruction is not implemented.
+
+This means we can only ever test one of the two on a single system,
+which is unfortunate. So instead, register both versions on hardware
+that supports them, and let the crypto API decide which is the preferred
+one based on priorities. That way, both will be tested, but only the
+fastest available one will be used.
+
+Ard Biesheuvel (2):
+  crypto: arm64/crct10dif - register PMULL variants as separate algos
+  crypto: arm64/ghash - register PMULL variants as separate algos
+
+ arch/arm64/crypto/crct10dif-ce-glue.c |  54 +++++++--
+ arch/arm64/crypto/ghash-ce-glue.c     | 118 +++++++++++++++-----
+ 2 files changed, 132 insertions(+), 40 deletions(-)
+
+-- 
+2.17.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
