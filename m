@@ -2,67 +2,91 @@ Return-Path: <SRS0=wPy5=QC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 40BCEC282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 15:42:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6EFECC282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 16:32:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 09E7021903
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 15:42:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3CFDC218B0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 16:32:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SPJG5qdZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 09E7021903
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ravnborg.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TBI/Yta4";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=norrbonn-se.20150623.gappssmtp.com header.i=@norrbonn-se.20150623.gappssmtp.com header.b="1Dw3YGg8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3CFDC218B0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=norrbonn.se
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qCREWHCr3nkp11BWAuRlYIWqJ2QMsSGASBJ9esHnVPE=; b=SPJG5qdZr2q0Si
-	pamd0DXES5hJN9MC1zgIJHi5EdiAIBSowWPebI8KOXR6YRUQCCuvMLqrV0NHr9jSroU7u+WQnvrRj
-	jj4zC7ViFUA9LiSKUAt+Axa2pfJSchr6oyvv8E7DT2CVF/9K6OllltERzGterST2mtSCDMKc6lmZD
-	5Yy79fNcd3AYL3L65t/KMMC9gc3S1KQF5aJ2Qc1ft2e4lVJBXpboq9ZEcVjUo3GX6UwZ5ERjKsdRH
-	rUgK1T4yztkRDbdCcktacSjdKXl4e99CGotM8pzCR6zySgSrqYJ4ZR371PS6m6IbsX2SYSxOc00ST
-	E0SlEPFVtA2AdcSBTC+g==;
+	List-Owner; bh=hoxLb1vzzZGh58tcjf9vVuOU160ttt8gX53iR9g1fL0=; b=TBI/Yta4nBnnLJ
+	4dNk4GIV6kZebOozz0y+wJlaTCLbQMjMpDiE7Duj54go48Dqh2CSfjlTYtCV5LopioYkTAxj/4sRX
+	EAwE0sH9usq40Yj5vQxtSnVhJFgNCNjH0LzsF6OnXVkSZ4aT3rHBSu09m36UVyELMwYVwS4Im7gOU
+	DLvhmG6AGc1iL5gfhVEXgCLM/DYuloj4R9ua1HPk84rBRBTkAYfphNWSwKQVIlJkrUBP6QKbuJ2hs
+	gsYeaSAcLkQjDQGEvPbh/Np5HVG6NsCFLJFJ5kA/B6LCwYdBr5xSBpfwaZoVWINz+azLjtaIV8hIy
+	HlQuRIPUsIn/sb2+e/CQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gnQ5q-0001fW-U1; Sat, 26 Jan 2019 15:42:02 +0000
-Received: from asavdk3.altibox.net ([109.247.116.14])
+	id 1gnQsk-0000IU-BZ; Sat, 26 Jan 2019 16:32:34 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gnQ5l-0000Jm-JE
- for linux-arm-kernel@lists.infradead.org; Sat, 26 Jan 2019 15:42:00 +0000
-Received: from ravnborg.org (unknown [158.248.194.18])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by asavdk3.altibox.net (Postfix) with ESMTPS id 2AD1C20025;
- Sat, 26 Jan 2019 16:39:47 +0100 (CET)
-Date: Sat, 26 Jan 2019 16:39:46 +0100
-From: Sam Ravnborg <sam@ravnborg.org>
-To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: Re: [PATCH 4/4] drm/panel: Add Rondo RB070D30 panel
-Message-ID: <20190126153946.GB17756@ravnborg.org>
-References: <cover.f7a136448029ab87c498d68164670712639748e7.1548236066.git-series.maxime.ripard@bootlin.com>
- <15b81a58eddd5d3fbfa418293cf1c817ef46423a.1548236066.git-series.maxime.ripard@bootlin.com>
+ id 1gnQsg-0000Hh-3f
+ for linux-arm-kernel@lists.infradead.org; Sat, 26 Jan 2019 16:32:31 +0000
+Received: by mail-lf1-x143.google.com with SMTP id n18so9018369lfh.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 26 Jan 2019 08:32:28 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=norrbonn-se.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=H4asA/HrfRTCLZ9s+7ODb9ujqrC02barVnHHP3w4OeE=;
+ b=1Dw3YGg8xJI9+QrCu/LPqQ7Tr/GpytlL6Sj9JOqPWV3qR7JsVOZvTwcLkBmBXK2uSZ
+ TFcurMiTzkCaWD95yVxh4ISXWz4SAVqgOKY1IaZeYUf/9QFNcV5k7bFGLvIHyADk5vWy
+ +YN52P1zK5m6I6mEfnSzjP8VWEep9DACZXPu6VHTUPEnrcK28uoeDKgzsfU/E8PH800R
+ HaXLsnx/buy6A5AdzNPoivt2pFHTu4B9tUtKGGpSKXpY9ygCjl8VdKWo/P9tOtBlfeyL
+ shX85Yq4wrOuH5UporbikUTEjIY4YqXfIDN1Ar/apyBE8ldFeEmDCvW4015QH3UkobIS
+ lhhQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=H4asA/HrfRTCLZ9s+7ODb9ujqrC02barVnHHP3w4OeE=;
+ b=DSwwm5jHn4m25HDaAF2kkP1m1e78FU/9bo1x1MAFq5XbLlu8bLyMG3bvi0Dl1cB7dy
+ GBpOaA7QlGw1vvaCziMmpmbPdot54RT+wsx4bnVVJQUn+7jkgdZQ17owgrXxbx/gZ42U
+ NYkysyyUfQZ+deY8KAwKm07zZIZ8X3bUMNl481Vl1uA1ufsOw1InV5O5FhdDwvsuk3xr
+ k7QIHFs3b5Cf5RpuJMH8OVTa2JPc8nzNotf7r0qzTiNL7vcoBFcrG4y97zyPbkfQlqSn
+ 9Gdd7HqH7FYhi1BZVlrF/aAs7PoACaxOXA0Hs21Ey8+01XinvNmlnsrxm9Kxp0222Oa/
+ yQcA==
+X-Gm-Message-State: AJcUukfT2E0vTsTDGEJIdN6+xwsOnKvVksvuEwB/h9GggkjhhdBpoS9I
+ 01pAzEoQ63y4Ddw3ujSc0AsqBg==
+X-Google-Smtp-Source: ALg8bN7ixO5jynANWXsRXQCc6pion+WBh06LKAJNIlpvS/JPjjM6Ib4nje2yFpEoX9h2Cy6IwOzaeA==
+X-Received: by 2002:a19:c4cc:: with SMTP id
+ u195mr12471052lff.141.1548520346833; 
+ Sat, 26 Jan 2019 08:32:26 -0800 (PST)
+Received: from mimer.lan (h-29-16.A159.priv.bahnhof.se. [79.136.29.16])
+ by smtp.gmail.com with ESMTPSA id e94sm2170532lfi.23.2019.01.26.08.32.25
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Sat, 26 Jan 2019 08:32:26 -0800 (PST)
+From: Jonas Bonn <jonas@norrbonn.se>
+To: linux-kernel@vger.kernel.org,
+	linux-spi@vger.kernel.org
+Subject: [PATCH v3 2/2] spi-atmel: support inter-word delay
+Date: Sat, 26 Jan 2019 17:32:20 +0100
+Message-Id: <20190126163220.26421-3-jonas@norrbonn.se>
+X-Mailer: git-send-email 2.19.1
+In-Reply-To: <20190126163220.26421-1-jonas@norrbonn.se>
+References: <20190126163220.26421-1-jonas@norrbonn.se>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <15b81a58eddd5d3fbfa418293cf1c817ef46423a.1548236066.git-series.maxime.ripard@bootlin.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
-X-CMAE-Score: 0
-X-CMAE-Analysis: v=2.3 cv=dqr19Wo4 c=1 sm=1 tr=0
- a=UWs3HLbX/2nnQ3s7vZ42gw==:117 a=UWs3HLbX/2nnQ3s7vZ42gw==:17
- a=kj9zAlcOel0A:10 a=skhwakB6AAAA:8 a=P-IC7800AAAA:8 a=e5mUnYsNAAAA:8
- a=miUDieqKsZ6B3VLQ9JQA:9 a=CjuIK1q_8ugA:10 a=ygsXHyuYt4xGk45z1DgA:22
- a=d3PnA9EDa4IxuAV0gXij:22 a=Vxmtnl_E_bksehYqCbjh:22
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190126_074157_995479_78D7C513 
-X-CRM114-Status: GOOD (  30.71  )
+X-CRM114-CacheID: sfid-20190126_083230_153526_ED62B877 
+X-CRM114-Status: GOOD (  13.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,347 +98,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Konstantin Sudakov <k.sudakov@integrasources.com>, bbrezillon@kernel.org,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- dri-devel@lists.freedesktop.org,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Chen-Yu Tsai <wens@csie.org>, Sean Paul <seanpaul@chromium.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Jagan Teki <jagan@openedev.com>, linux-arm-kernel@lists.infradead.org
+Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ Jonas Bonn <jonas@norrbonn.se>,
+ Ludovic Desroches <ludovic.desroches@microchip.com>,
+ Mark Brown <broonie@kernel.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Maxime / Konstantin.
+If the SPI slave requires an inter-word delay, configure the DLYBCT
+register accordingly.
 
-Nice welstructured and small driver.
-Please see a few comments below
+Tested on a SAMA5D2 board (derived from SAMA5D2-Xplained reference
+board).
 
-Some of the comments in the following apply to a lot of
-the existing panel drivers as well.
-But lets see if we can get new drivers to be even better.
+Signed-off-by: Jonas Bonn <jonas@norrbonn.se>
+CC: Nicolas Ferre <nicolas.ferre@microchip.com>
+CC: Mark Brown <broonie@kernel.org>
+CC: Alexandre Belloni <alexandre.belloni@bootlin.com>
+CC: Ludovic Desroches <ludovic.desroches@microchip.com>
+CC: linux-spi@vger.kernel.org
+CC: linux-arm-kernel@lists.infradead.org
+---
+ drivers/spi/spi-atmel.c | 18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
 
-	Sam 
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 74fddcd3282b..24445bfbd74e 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -1209,13 +1209,21 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 		csr |= SPI_BIT(CSAAT);
+ 
+ 	/* DLYBS is mostly irrelevant since we manage chipselect using GPIOs.
+-	 *
+-	 * DLYBCT would add delays between words, slowing down transfers.
+-	 * It could potentially be useful to cope with DMA bottlenecks, but
+-	 * in those cases it's probably best to just use a lower bitrate.
+ 	 */
+ 	csr |= SPI_BF(DLYBS, 0);
+-	csr |= SPI_BF(DLYBCT, 0);
++
++	/* DLYBCT adds delays between words.  This is useful for slow devices
++	 * that need a bit of time to setup the next transfer.
++	 */
++	if (spi->word_delay) {
++		csr |= SPI_BF(DLYBCT,
++			clamp_t(u8,
++				(as->spi_clk/1000000*spi->word_delay)>>5,
++				1, 255));
++	} else {
++		csr |= SPI_BF(DLYBCT, 0);
++	}
++
+ 
+ 	/* chipselect must have been muxed as GPIO (e.g. in board setup) */
+ 	npcs_pin = (unsigned long)spi->controller_data;
+-- 
+2.19.1
 
-On Wed, Jan 23, 2019 at 04:54:24PM +0100, Maxime Ripard wrote:
-> From: Konstantin Sudakov <k.sudakov@integrasources.com>
-> 
-> The Rondo RB070D30 panel is a MIPI-DSI panel based on a Fitipower EK79007
-> controller and a 1024x600 panel.
-> 
-> Signed-off-by: Konstantin Sudakov <k.sudakov@integrasources.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  drivers/gpu/drm/panel/Kconfig                |   9 +-
->  drivers/gpu/drm/panel/Makefile               |   1 +-
->  drivers/gpu/drm/panel/panel-rondo-rb070d30.c | 258 ++++++++++++++++++++-
->  3 files changed, 268 insertions(+)
->  create mode 100644 drivers/gpu/drm/panel/panel-rondo-rb070d30.c
-> 
-> diff --git a/drivers/gpu/drm/panel/panel-rondo-rb070d30.c b/drivers/gpu/drm/panel/panel-rondo-rb070d30.c
-> new file mode 100644
-> index 000000000000..4f8e63f367b1
-> --- /dev/null
-> +++ b/drivers/gpu/drm/panel/panel-rondo-rb070d30.c
-> @@ -0,0 +1,258 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Copyright (C) 2018, Bridge Systems BV
-> + * Copyright (C) 2018, Bootlin
-> + * Copyright (C) 2017, Free Electrons
-> + *
-> + * This file based on panel-ilitek-ili9881c.c
-> + */
-> +
-> +#include <linux/backlight.h>
-> +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/errno.h>
-> +#include <linux/fb.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +
-> +#include <linux/gpio/consumer.h>
-> +#include <linux/regulator/consumer.h>
-> +
-> +#include <drm/drm_mipi_dsi.h>
-> +#include <drm/drmP.h>
-> +#include <drm/drm_panel.h>
-Please do not use drmP.h in new drivers. We are trying to get rid of it.
-
-> +
-> +#include <video/mipi_display.h>
-> +#include <video/of_display_timing.h>
-> +#include <video/videomode.h>
-> +
-> +struct rb070d30_panel {
-> +	struct drm_panel panel;
-> +	struct mipi_dsi_device *dsi;
-> +	struct backlight_device *backlight;
-> +	struct regulator *supply;
-> +
-> +	struct {
-> +		struct gpio_desc *power;
-> +		struct gpio_desc *reset;
-> +		struct gpio_desc *updn;
-> +		struct gpio_desc *shlr;
-> +	} gpios;
-> +};
-> +
-> +static inline struct rb070d30_panel *panel_to_rb070d30_panel(struct drm_panel *panel)
-> +{
-> +	return container_of(panel, struct rb070d30_panel, panel);
-> +}
-> +
-> +static int rb070d30_panel_prepare(struct drm_panel *panel)
-> +{
-> +	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
-> +	int ret;
-> +
-> +	ret = regulator_enable(ctx->supply);
-> +	if (ret < 0) {
-> +		dev_err(&ctx->dsi->dev, "Failed to enable supply: %d\n", ret);
-Use DRM_DEV_ERROR(...) to have consistent error message for the drm drivers.
-This is general for the whole file.
-
-> +		return ret;
-> +	}
-> +
-> +	/* Reset */
-> +	msleep(20);
-> +	gpiod_set_value(ctx->gpios.power, 1);
-> +	msleep(20);
-> +	gpiod_set_value(ctx->gpios.reset, 1);
-> +	msleep(20);
-> +	return 0;
-> +}
-To verify the above pointer to a datasheet would be nice.
-
-
-> +
-> +static int rb070d30_panel_unprepare(struct drm_panel *panel)
-> +{
-> +	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
-> +
-> +	gpiod_set_value(ctx->gpios.power, 0);
-> +	gpiod_set_value(ctx->gpios.reset, 0);
-> +	regulator_disable(ctx->supply);
-> +
-> +	return 0;
-> +}
-There is sometimes timing constrains after deassert reset..
-The order is not strictly reverse of prepare - is that on purpose?
-
-
-> +
-> +static int rb070d30_panel_enable(struct drm_panel *panel)
-> +{
-> +	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
-> +	int ret;
-> +
-> +	ret = mipi_dsi_dcs_exit_sleep_mode(ctx->dsi);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = backlight_enable(ctx->backlight);
-> +	if (ret)
-> +		goto out;
-> +
-> +	return 0;
-> +
-> +out:
-> +	mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
-> +	return ret;
-> +}
-> +
-> +static int rb070d30_panel_disable(struct drm_panel *panel)
-> +{
-> +	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
-> +
-> +	backlight_disable(ctx->backlight);
-> +	return mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
-> +}
-> +
-> +/* Default timings */
-> +static const struct drm_display_mode default_mode = {
-> +	.clock		= 51206,
-> +	.hdisplay	= 1024,
-> +	.hsync_start	= 1024 + 160,
-> +	.hsync_end	= 1024 + 160 + 80,
-> +	.htotal		= 1024 + 160 + 80 + 80,
-> +	.vdisplay	= 600,
-> +	.vsync_start	= 600 + 12,
-> +	.vsync_end	= 600 + 12 + 10,
-> +	.vtotal		= 600 + 12 + 10 + 13,
-> +	.vrefresh	= 60,
-> +};
-height and width missing here. Seems better to add them here than hiding in code below.
-Is it on purpose that no flags are specified?
-
-> +
-> +static int rb070d30_panel_get_modes(struct drm_panel *panel)
-> +{
-> +	struct drm_connector *connector = panel->connector;
-> +	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
-> +	struct drm_display_mode *mode;
-> +	static const u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
-> +
-> +	mode = drm_mode_duplicate(panel->drm, &default_mode);
-> +	if (!mode) {
-> +		dev_err(&ctx->dsi->dev, "failed to add mode %ux%ux@%u\n",
-> +			default_mode.hdisplay, default_mode.vdisplay,
-> +			default_mode.vrefresh);
-Use"
-		DRM_DEV_ERROR(&ctx->dsi->dev,
-			      "failed to add mode" DRM_MODE_FMT,
-			      DRM_MODE_ARG(mode));
-> +		return -EINVAL;
-> +	}
-> +
-> +	drm_mode_set_name(mode);
-> +
-> +	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
-> +	drm_mode_probed_add(connector, mode);
-> +
-> +	panel->connector->display_info.bpc = 8;
-> +	panel->connector->display_info.width_mm = 154;
-> +	panel->connector->display_info.height_mm = 85;
-See comment on height above.
-Same goes for bpc
-
-> +	drm_display_info_set_bus_formats(&connector->display_info,
-> +					 &bus_format, 1);
-> +
-> +	return 1;
-> +}
-> +
-> +static const struct drm_panel_funcs rb070d30_panel_funcs = {
-> +	.get_modes	= rb070d30_panel_get_modes,
-> +	.prepare	= rb070d30_panel_prepare,
-> +	.enable		= rb070d30_panel_enable,
-> +	.disable	= rb070d30_panel_disable,
-> +	.unprepare	= rb070d30_panel_unprepare,
-> +};
-> +
-> +static int rb070d30_panel_dsi_probe(struct mipi_dsi_device *dsi)
-> +{
-> +	struct device_node *np;
-> +	struct rb070d30_panel *ctx;
-> +	int ret;
-> +
-> +	ctx = devm_kzalloc(&dsi->dev, sizeof(*ctx), GFP_KERNEL);
-> +	if (!ctx)
-> +		return -ENOMEM;
-> +
-> +	ctx->supply = devm_regulator_get(&dsi->dev, "vcc-lcd");
-> +	if (IS_ERR(ctx->supply))
-> +		return PTR_ERR(ctx->supply);
-> +
-> +	mipi_dsi_set_drvdata(dsi, ctx);
-> +	ctx->dsi = dsi;
-> +
-> +	drm_panel_init(&ctx->panel);
-> +	ctx->panel.dev = &dsi->dev;
-> +	ctx->panel.funcs = &rb070d30_panel_funcs;
-> +
-> +	ctx->gpios.reset = devm_gpiod_get(&dsi->dev, "reset", GPIOD_OUT_LOW);
-> +	if (IS_ERR(ctx->gpios.reset)) {
-> +		dev_err(&dsi->dev, "Couldn't get our reset GPIO\n");
-> +		return PTR_ERR(ctx->gpios.reset);
-> +	}
-> +
-> +	ctx->gpios.power = devm_gpiod_get(&dsi->dev, "power", GPIOD_OUT_LOW);
-> +	if (IS_ERR(ctx->gpios.power)) {
-> +		dev_err(&dsi->dev, "Couldn't get our power GPIO\n");
-> +		return PTR_ERR(ctx->gpios.power);
-> +	}
-> +
-> +	ctx->gpios.updn = devm_gpiod_get(&dsi->dev, "updn", GPIOD_OUT_LOW);
-> +	if (IS_ERR(ctx->gpios.updn)) {
-> +		dev_err(&dsi->dev, "Couldn't get our updn GPIO\n");
-> +		return PTR_ERR(ctx->gpios.updn);
-> +	}
-This gpio is never used, it is only read from DT
-
-
-> +
-> +	ctx->gpios.shlr = devm_gpiod_get(&dsi->dev, "shlr", GPIOD_OUT_LOW);
-> +	if (IS_ERR(ctx->gpios.shlr)) {
-> +		dev_err(&dsi->dev, "Couldn't get our shlr GPIO\n");
-> +		return PTR_ERR(ctx->gpios.shlr);
-> +	}
-This gpio is never used, it is only read from DT
-
-> +
-> +	np = of_parse_phandle(dsi->dev.of_node, "backlight", 0);
-> +	if (np) {
-> +		ctx->backlight = of_find_backlight_by_node(np);
-> +		of_node_put(np);
-> +
-> +		if (!ctx->backlight)
-> +			return -EPROBE_DEFER;
-> +	}
-Use devm_of_find_backlight()
-
-> +
-> +	ret = drm_panel_add(&ctx->panel);
-> +	if (ret < 0)
-> +		goto free_backlight;
-> +
-> +	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST | MIPI_DSI_MODE_LPM;
-> +	dsi->format = MIPI_DSI_FMT_RGB888;
-> +	dsi->lanes = 4;
-> +
-> +	return mipi_dsi_attach(dsi);
-> +
-> +free_backlight:
-> +	backlight_put(ctx->backlight);
-If devm_of_find_backlight() is used this can go.
-
-> +	return ret;
-> +}
-> +
-> +static int rb070d30_panel_dsi_remove(struct mipi_dsi_device *dsi)
-> +{
-> +	struct rb070d30_panel *ctx = mipi_dsi_get_drvdata(dsi);
-> +
-> +	mipi_dsi_detach(dsi);
-> +	drm_panel_remove(&ctx->panel);
-> +	backlight_put(ctx->backlight);
-If devm_of_find_backlight() is used this can go.
-
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id rb070d30_panel_of_match[] = {
-> +	{ .compatible = "rondo,rb070d30" },
-> +	{ /* sentinel */ },
-> +};
-> +MODULE_DEVICE_TABLE(of, rb070d30_panel_of_match);
-> +
-> +static struct mipi_dsi_driver rb070d30_panel_driver = {
-> +	.probe = rb070d30_panel_dsi_probe,
-> +	.remove = rb070d30_panel_dsi_remove,
-> +	.driver = {
-> +		.name = "panel-rondo-rb070d30",
-> +		.of_match_table	= rb070d30_panel_of_match,
-> +	},
-> +};
-> +module_mipi_dsi_driver(rb070d30_panel_driver);
-> +
-> +MODULE_AUTHOR("Boris Brezillon <boris.brezillon@bootlin.com>");
-> +MODULE_AUTHOR("Konstantin Sudakov <k.sudakov@integrasources.com>");
-> +MODULE_DESCRIPTION("Rondo RB070D30 Panel Driver");
-> +MODULE_LICENSE("GPL");
-> -- 
-> git-series 0.9.1
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel@lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 _______________________________________________
 linux-arm-kernel mailing list
