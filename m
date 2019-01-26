@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6D29FC282C3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 04:11:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 98466C282C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 04:12:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3E0E1218CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 04:11:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5CBB6218A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 04:12:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UGbiTp/d";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="MoNvlOcO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3E0E1218CD
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HEDl1fc1";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="R18l4W5O"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5CBB6218A2
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,61 +27,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=uLZzjY/YnKVzX67Vw7CAK+Zcjg3qpPtV/fX8nDiMW8g=; b=UGbiTp/d7tZTcjJ4BPopJoBlkH
-	G2FwhBuSetElSK0TN/X/QQvsVi10KSMo/yN4tJUJncTvzrLMuezLih+g6xN/dLJOy6RZ7k1ii3n9c
-	p/g0h9sINkEcGyq9sPEbLlffKactAcnz69D6DrJYvTq2uLu2vs1OIzYdd92ZzrywSsmIh+ftqBUER
-	2mUTTtPAr0zwMJBiKGjppTo0lfg4L8uckEJyqFi0y6D0z+Sd+w8/ImorpIuaApXNboMEooQq5mo42
-	jrCQfU6CxinyaCEZwwpFK9iOCXkh5SMZ+/i9OTwySS/u/3YUmNyRgR+xTsEK8VWlHQ4Tfk9+ysMJO
-	zGBXdAUA==;
+	bh=yAkArzw5mBeeIIr1MKiQEd9WLRbqVOfpY2Sf/iLNAL4=; b=HEDl1fc1Ri6CxFGYMHV787TfXP
+	0LPqpn3tpKJ19VpcH8z1C1DyBaUVOOn7+osCIuD+AiDUf1zoprnmtUp/6IcLbM9jaYKijg1/hdKRy
+	TWJVrUVI5NYPeEuxkh88sJ5R/0qCRJKDz8pVw2ekeQRfnJqFR/5vUblJxhYORG9/XG7gZpRKY5HHe
+	C0qoOkFqknzPK03Emliwg4i71TLCGX8HDxm/2YWhd7viaZtt5yHP7isWryBIAFyZKH74ct3ZMRSgS
+	W5tugHpxiDvvU5SOGZdEMLm3PuT0t1XNenNGyU10mLyca13/ZFMgClKhNzotBCv0ujA0Kt7XlyLt+
+	lc4JDhPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gnFJj-0003Zn-KJ; Sat, 26 Jan 2019 04:11:39 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1gnFK7-0003tx-Fx; Sat, 26 Jan 2019 04:12:03 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gnFJK-0003Ab-2l
- for linux-arm-kernel@lists.infradead.org; Sat, 26 Jan 2019 04:11:16 +0000
-Received: by mail-pg1-x543.google.com with SMTP id z11so5025770pgu.0
+ id 1gnFJX-0003No-Cl
+ for linux-arm-kernel@lists.infradead.org; Sat, 26 Jan 2019 04:11:36 +0000
+Received: by mail-pg1-x544.google.com with SMTP id n2so5018321pgm.3
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 25 Jan 2019 20:11:12 -0800 (PST)
+ Fri, 25 Jan 2019 20:11:25 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=DnQG/HiE2U5xeSz8P1vTnKFViPBKRO7Pu6aoK2typAc=;
- b=MoNvlOcOqo37jI4uIVlvzASCJfgdx8CplJe84HYoIlxS0UuX8yPlRNFinxPV9+hYsS
- NcDdOyyEKURW0i8Afk1f3eAzwDmpOaGIk3hhNuwjRk3nXko4lgsL1xHwQ4a0TRj7KI9+
- xXnsP8BQOMbF3r1DJonTn/EeZizlFbRyKyDGo=
+ bh=/Dlsm30B9KuTOu0GLcpGbceT3Bf9eF5q8ffkTHhPK10=;
+ b=R18l4W5OI7MT0OK4nLJAsmi8khYt/36YKWTv5ckk2NTnitUlKl72fIqBCfmvsQN3as
+ qBR872ibrOcIUJkPaiTAlt4BjlDOY+cc0IPemlJn5jr5bNKFoFI2i3DEvowPRV6Qsw34
+ e8SNnZ7+l3wPAp8E9Q3H1rDVkLzcNZCCB7cSo=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=DnQG/HiE2U5xeSz8P1vTnKFViPBKRO7Pu6aoK2typAc=;
- b=rKD8H6UlehuYkIPmZhZ13KLumcVY5I3FoGSClUDD/SiaPKcNZz+P2e0g8IibgTyiB4
- UuPQJ/xskvLj0dxoCcZmYxrFtq/oL1U8EplpIERboUoFOWh+/Tb396w9kxiADmevRhVW
- YanbsLGvnvxZrDvkkbORLg5d9+9oqmoqrCMKAM8LbGyrsSuOAHSrqe2f1cMcp0zkoNPn
- dERFMdBx5cUAKdlBJJ5zddobWU5dSx+iI1PFMHmTcLARei2ygIpmDdYPwgp2fDgTFqh7
- wyPHUGStYbazb60l6exJze96n39DwbG5Z5V2mHDVpiiPTCG9+tZV9K3D7d/L16inBLff
- HzSA==
-X-Gm-Message-State: AJcUukfjzCCsZk1x+YAl1OqUZfEuIikFdXzjZzXl31FS8uL8jevePdpS
- XRKKoWgWGId19OImMyUGVntb
-X-Google-Smtp-Source: ALg8bN7cbS+ALU+Gv9LnR4FVM55phzdF9O4D9GZv3oDx/IB1WSCNYO2C0fFU2rWSMVD38hRG2pbQug==
-X-Received: by 2002:a63:4c4e:: with SMTP id m14mr12549096pgl.173.1548475872284; 
- Fri, 25 Jan 2019 20:11:12 -0800 (PST)
+ bh=/Dlsm30B9KuTOu0GLcpGbceT3Bf9eF5q8ffkTHhPK10=;
+ b=L8HI6fft2a4n0Ibsp8RnZAMnJaRZFXamtXuV1UeGAdUCQ1l9b/1elg1UvYB/p91xOz
+ I/POsdt3iTGXAXcxrHP+URYUShlBvS0law1fr613rct9SxQnQJBPdxDb2PDmeWAdBLhQ
+ xvmt5yZVgeA/danAJk1fQWXDrdTzp444uRjA+TT4Nch88CHwkq7D71+yI1Le9M8p99Pg
+ 3f1EzteUtvkNKt776vekr1tCPwFxxsExniafMObrD1A/mflMlWxUh4JohsnciicXyui2
+ NVKqjuVZiOPEI8ezxWfOmVHMWhsiSQH/J5Ap+p22dgayR2XXTnP7Nf8iUwYw2imAk2xO
+ WTEw==
+X-Gm-Message-State: AJcUukd9hqDKdt3AppyV86UnuyHdXnBJgFE8jvYwj+e7gKFK7rD7+Q2Y
+ qkRPH2tWzzvVrQ+tb2jhGQHr
+X-Google-Smtp-Source: ALg8bN4JSzb6u5ERSDZfaPGotK5jNqyeieNtXwX7Y4wLRt4M8ZupFvHXqLZoqM/vdUeYYooFMWBe0w==
+X-Received: by 2002:a63:4b60:: with SMTP id k32mr12318387pgl.186.1548475885231; 
+ Fri, 25 Jan 2019 20:11:25 -0800 (PST)
 Received: from localhost.localdomain ([2409:4072:905:e69d:b1bd:9891:c622:302d])
- by smtp.gmail.com with ESMTPSA id h129sm75099676pfb.110.2019.01.25.20.11.06
+ by smtp.gmail.com with ESMTPSA id h129sm75099676pfb.110.2019.01.25.20.11.19
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 25 Jan 2019 20:11:11 -0800 (PST)
+ Fri, 25 Jan 2019 20:11:24 -0800 (PST)
 From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 To: robh+dt@kernel.org,
 	arnd@arndb.de,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 2/5] arm64: Add ARCH_BITMAIN platform
-Date: Sat, 26 Jan 2019 09:40:38 +0530
-Message-Id: <20190126041041.13173-3-manivannan.sadhasivam@linaro.org>
+Subject: [PATCH 4/5] arm64: dts: bitmain: Add Sophon Egde board support
+Date: Sat, 26 Jan 2019 09:40:40 +0530
+Message-Id: <20190126041041.13173-5-manivannan.sadhasivam@linaro.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190126041041.13173-1-manivannan.sadhasivam@linaro.org>
 References: <20190126041041.13173-1-manivannan.sadhasivam@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190125_201114_386762_3C074AFE 
-X-CRM114-Status: GOOD (  10.49  )
+X-CRM114-CacheID: sfid-20190125_201127_793116_44EFC9A4 
+X-CRM114-Status: GOOD (  13.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,29 +103,87 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add ARCH_BITMAIN for supporting Bitmain SoC platforms.
+Add devicetree support for Sophon Edge board from Bitmain based on
+BM1880 SoC. This board is one of the 96Boards Consumer and AI platform.
+More information about this board can be found in 96Boards product page:
+
+https://www.96boards.org/documentation/consumer/sophon-edge/
+
+Only UART peripheral support is enabled for now.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm64/Kconfig.platforms | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/boot/dts/bitmain/Makefile          |  3 ++
+ .../boot/dts/bitmain/bm1880-sophon-edge.dts   | 50 +++++++++++++++++++
+ 2 files changed, 53 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/bitmain/Makefile
+ create mode 100644 arch/arm64/boot/dts/bitmain/bm1880-sophon-edge.dts
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 251ecf34cb02..6bb7db9126f7 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -52,6 +52,11 @@ config ARCH_BERLIN
- 	help
- 	  This enables support for Marvell Berlin SoC Family
- 
-+config ARCH_BITMAIN
-+	bool "Bitmain SoC Platforms"
-+	help
-+	  This enables support for the Bitmain SoC Family.
+diff --git a/arch/arm64/boot/dts/bitmain/Makefile b/arch/arm64/boot/dts/bitmain/Makefile
+new file mode 100644
+index 000000000000..be90a6071be0
+--- /dev/null
++++ b/arch/arm64/boot/dts/bitmain/Makefile
+@@ -0,0 +1,3 @@
++# SPDX-License-Identifier: GPL-2.0+
 +
- config ARCH_BRCMSTB
- 	bool "Broadcom Set-Top-Box SoCs"
- 	select BRCMSTB_L2_IRQ
++dtb-$(CONFIG_ARCH_BITMAIN) += bm1880-sophon-edge.dtb
+diff --git a/arch/arm64/boot/dts/bitmain/bm1880-sophon-edge.dts b/arch/arm64/boot/dts/bitmain/bm1880-sophon-edge.dts
+new file mode 100644
+index 000000000000..6a3255597138
+--- /dev/null
++++ b/arch/arm64/boot/dts/bitmain/bm1880-sophon-edge.dts
+@@ -0,0 +1,50 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (c) 2019 Linaro Ltd.
++ * Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
++ */
++
++/dts-v1/;
++
++#include "bm1880.dtsi"
++
++/ {
++	compatible = "bitmain,sophon-edge", "bitmain,bm1880";
++	model = "Sophon Edge";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart2;
++		serial2 = &uart1;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory@0 {
++		device_type = "memory";
++		reg = <0x1 0x00000000 0x0 0x40000000>; // 1GB
++	};
++
++	uart_clk: uart-clk {
++		compatible = "fixed-clock";
++		clock-frequency = <500000000>;
++		#clock-cells = <0>;
++	};
++};
++
++&uart0 {
++	status = "okay";
++	clocks = <&uart_clk>;
++};
++
++&uart1 {
++	status = "okay";
++	clocks = <&uart_clk>;
++};
++
++&uart2 {
++	status = "okay";
++	clocks = <&uart_clk>;
++};
 -- 
 2.17.1
 
