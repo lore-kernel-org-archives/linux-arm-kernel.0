@@ -2,56 +2,57 @@ Return-Path: <SRS0=wPy5=QC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2BD49C282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 19:49:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 37F7DC282C7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 21:00:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E94182085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 19:49:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E95F921903
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 21:00:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ia8K0Yv9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E94182085A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ispras.ru
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pTIqDes8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E95F921903
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pwsan.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=W7MBwIYxhK4nRBPJ1fTVBunLFzInQfz1MEYsgKXFKME=; b=ia8
-	K0Yv9SODCAF84f+KPZ90b5PFEsGFcwYEg7Me5d6tly7xbrqpuGx+vRXLKlCgrbEX5AIiB0oCSW8OT
-	YCb2b5N4ZyJ6e/goiY1Z5qgSspj7j0C8rB+gPqeaA9HFkoz6ukDnSWzwdyN0KH2RvLgEs78AIBSDQ
-	O9TwXzZRAwoCHPwaHxEHJX/6kkYpS3LFP+E4tcnd9b3x6kNjEyZaWxmJyG89Uk4QfWvVxAIWFy0oM
-	1XtY6IJLYkepMr+zgyM8J49YfSXCeQUbf6crbLG5nnU9Wu8UNuadpoTEwwiZFErgUo7Vis5APTDtE
-	JwAKvc6fjNtpDcXiw6fhWWe30XNiE3g==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:
+	In-Reply-To:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=DUswrVAy3LZnPBiSth2njMHWD1K+vDJjXeAl5Yq1awE=; b=pTIqDes8YIkkVm
+	vsxI9oRCQm3sJYKXeLjNRB/AlJ+If4ydtZ7SNaqSpupa6XllNUrHKgQ0gbtGocuaUDVZ7gbMoymt3
+	A9l1sInOEJV2zbMS8X1qibyEfA9lH37DGrvwwu4cDPUiU4xyiZwL/EiTciOIK1LNCOdGkhyQCquY+
+	zFuqGuqcPwBbQr50sPzL/4J5cgtI1Skn06SN5GS0+oayxCHg7GSS/q3wF/eWCrtvU1qH5YQq6ygB+
+	cR+LqNOPevs6Dq12yyfy+D9TYSG2fl2UHN3awi53Sh2aTKnhf6xBHbh2cTbiQYuqlV47ye1fVyyNq
+	5sdOEgSGP3S4rRimooZA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gnTxG-000325-A2; Sat, 26 Jan 2019 19:49:26 +0000
-Received: from mail.ispras.ru ([83.149.199.45])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gnTx9-00031j-Px
- for linux-arm-kernel@lists.infradead.org; Sat, 26 Jan 2019 19:49:22 +0000
-Received: from localhost.localdomain (109-252-62-199.nat.spd-mgts.ru
- [109.252.62.199])
- by mail.ispras.ru (Postfix) with ESMTPSA id 50449540082;
- Sat, 26 Jan 2019 22:49:12 +0300 (MSK)
-From: Alexey Khoroshilov <khoroshilov@ispras.ru>
-To: David Wu <david.wu@rock-chips.com>
-Subject: [PATCH] net: stmmac: dwmac-rk: fix error handling in rk_gmac_powerup()
-Date: Sat, 26 Jan 2019 22:48:57 +0300
-Message-Id: <1548532137-15618-1-git-send-email-khoroshilov@ispras.ru>
-X-Mailer: git-send-email 2.7.4
+	id 1gnV3l-0000AG-B6; Sat, 26 Jan 2019 21:00:13 +0000
+Received: from utopia.booyaka.com ([74.50.51.50])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gnV3f-0007SV-SU
+ for linux-arm-kernel@lists.infradead.org; Sat, 26 Jan 2019 21:00:10 +0000
+Received: (qmail 21064 invoked by uid 1019); 26 Jan 2019 21:00:03 -0000
+Received: from localhost (sendmail-bs@127.0.0.1)
+ by localhost with SMTP; 26 Jan 2019 21:00:03 -0000
+Date: Sat, 26 Jan 2019 21:00:03 +0000 (UTC)
+From: Paul Walmsley <paul@pwsan.com>
+To: Tony Lindgren <tony@atomide.com>
+Subject: Re: [PATCH v2] ARM: avoid Cortex-A9 livelock on tight dmb loops
+In-Reply-To: <20190125232020.GX5720@atomide.com>
+Message-ID: <alpine.DEB.2.21.999.1901262053130.20293@utopia.booyaka.com>
+References: <E1gn8dp-0004Ai-AW@rmk-PC.armlinux.org.uk>
+ <20190125232020.GX5720@atomide.com>
+User-Agent: Alpine 2.21.999 (DEB 260 2018-02-26)
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190126_114920_075606_235908B8 
-X-CRM114-Status: UNSURE (   8.19  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190126_130008_016495_F8D17C60 
+X-CRM114-Status: GOOD (  16.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -63,45 +64,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: ldv-project@linuxtesting.org, netdev@vger.kernel.org,
- linux-kernel@vger.kernel.org, Jose Abreu <joabreu@synopsys.com>,
- Alexey Khoroshilov <khoroshilov@ispras.ru>,
- Giuseppe Cavallaro <peppe.cavallaro@st.com>,
- "David S. Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Rajendra Nayak <rnayak@codeaurora.org>,
+ Russell King <rmk+kernel@armlinux.org.uk>, linux-omap@vger.kernel.org,
+ Will Deacon <will.deacon@arm.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-If phy_power_on() fails in rk_gmac_powerup(), clocks are left enabled.
+On Fri, 25 Jan 2019, Tony Lindgren wrote:
 
-Found by Linux Driver Verification project (linuxtesting.org).
+> * Russell King <rmk+kernel@armlinux.org.uk> [190125 21:04]:
+> > Executing loops such as:
+> > 
+> > 	while (1)
+> > 		cpu_relax();
+> > 
+> > with interrupts disabled results in a livelock of the entire system,
+> > as other CPUs are prevented making progress.  This is most noticable
+> > as a failure of crashdump kexec, which stops just after issuing:
+> > 
+> > 	Loading crashdump kernel...
+> > 
+> > to the system console.  A workaround for this is to use 10 nops in
+> > cpu_relax().
+> > 
+> > We also use wfe() in while (1) loops to avoid burning cycles in a
+> > tight loop, giving the CPU a hint that we're not doing anything
+> > useful.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > ---
+> > It's been a while since this was posted, Will's suggestion was to use
+> > 10 nops in cpu_relax() last time around.  I still prefer wfe() in
+> > these infinite-not-doing-anything-ever loops.
+> 
+> Works for me:
+> 
+> Tested-by: Tony Lindgren <tony@atomide.com>
 
-Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
----
- drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+There was some concern in the past that WFE, like WFI, might cause the 
+core to assert an external signal that might cause the SoC integration to 
+place the core into a low-power mode from which it might not be able to 
+wake up.  This could happen on OMAP, for example, with WFI.
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-index 7b923362ee55..3b174eae77c1 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-@@ -1342,8 +1342,10 @@ static int rk_gmac_powerup(struct rk_priv_data *bsp_priv)
- 	}
- 
- 	ret = phy_power_on(bsp_priv, true);
--	if (ret)
-+	if (ret) {
-+		gmac_clk_enable(bsp_priv, false);
- 		return ret;
-+	}
- 
- 	pm_runtime_enable(dev);
- 	pm_runtime_get_sync(dev);
--- 
-2.7.4
+I don't recall the outcome of those discussions.  Was a conclusion ever 
+reached?
 
+
+- Paul
 
 _______________________________________________
 linux-arm-kernel mailing list
