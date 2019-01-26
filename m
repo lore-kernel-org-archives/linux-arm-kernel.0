@@ -2,71 +2,83 @@ Return-Path: <SRS0=wPy5=QC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 820D4C282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 16:49:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 77055C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 16:50:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4BC61214D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 16:49:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 43C28218A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 16:50:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S0MSHQIq";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="eaqcRrV1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4BC61214D8
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TBmdAcEh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="fIUPB6JF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43C28218A2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:
-	Subject:To:From:Date:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HdPCwLZuTSeDNndDbG1M5sds6FqQ1mHyuAwIWjutPo8=; b=S0MSHQIqp2tL9I
-	A7k2uo0OOkKtE7qnym64gzUz4GvsGW0PyVuJleFgUL26qFWgMz6UCRmOyavMSh5loqTD4Qnm14qNT
-	dHz4OFoRa8RYYYBE+Ba/c9Kuja97opuUW0jTHp7CKmh+oXKt5vr12uUpfs8ZuNqlr4VAOIzV8Lyd6
-	UZW/eveI2cvDpXvmV2EZEOZ1X+r2ZqNuFWvpGbRQHblfZfdP+zHLkCSUfimmYU+8O/Zf5xer+QDO1
-	nr/JGQ5wpSjfavd+ciPt8QMVHzXIMQSfzAjS1o9b1kGi96HA12PK7xhTuljAUcnM7hpKt53MZh9rG
-	eLUtmXUw6AhQ8TIY8ZLA==;
+	List-Owner; bh=rQwSewm5xp6B7H3h25lfYHwWgb5VJRj9xek7V27AND8=; b=TBmdAcEh/hxxLk
+	13R/PDM8GtYiyUCA8cIkeLnyklrKbyJ6TvAuaEvOMir8ccg5gFrxlPbkqVv8WFekivzdUumg1hC00
+	iGkyaH1IpjZnActEd8u1LYob1GQSDKzplDLNkbzh4Vi2pdkx2CWhkueX/mQ4ALJfkBFjWDLvcgmgB
+	w0A5LvS0xJdMYl43i4DH8UTU2Cu9DWwC8T3obgmbw/iGHENYlMKU/vcLGvZdz0P/UEbjF/scFXLxA
+	JFwG9VQqhxoiUuiXzCNSMJPDoDmD6tq7OkMXDPKqtqThXhYkZmSryxhhxIlkvyXQbKNt4DaykVaiJ
+	ReEwhbADLh4fPz0I3T/w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gnR8P-0005Rm-OS; Sat, 26 Jan 2019 16:48:45 +0000
-Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
+	id 1gnR9a-0005jP-T3; Sat, 26 Jan 2019 16:49:58 +0000
+Received: from mail-io1-xd44.google.com ([2607:f8b0:4864:20::d44])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gnR8K-0005GE-JW
- for linux-arm-kernel@lists.infradead.org; Sat, 26 Jan 2019 16:48:43 +0000
-Received: from webmail.kmu-office.ch (unknown [IPv6:2a02:418:6a02::a3])
- by mail.kmu-office.ch (Postfix) with ESMTPSA id 5C3ED5C00D5;
- Sat, 26 Jan 2019 17:48:33 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
- t=1548521313;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:content-transfer-encoding:
- in-reply-to:in-reply-to:references:references;
- bh=zmrneEBPESZO4rZ5YaNDNI0pxmdcbOzgYqXq0Y2bbBQ=;
- b=eaqcRrV1MQrUTIEgZuuch0+kNMaNqiI4CuhxKMKO3iMcoleILAHFNsxr6aIOqFz4xogg6u
- 6eByMgx1djO69qnxID8p8zgVQiWGOdGQEYJ8aaflfOcrJ5/iqyd6XlUOnEnw+O4IDqZ/bm
- gqZzaUfWYW6MHs2pQBZOtfPmSglyr00=
+ id 1gnR9X-0005j4-4n
+ for linux-arm-kernel@lists.infradead.org; Sat, 26 Jan 2019 16:49:56 +0000
+Received: by mail-io1-xd44.google.com with SMTP id m19so10187235ioh.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 26 Jan 2019 08:49:54 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=8LT0f8WyOGXh8kglWV2U+nQROiqObE8VsJv8feION5o=;
+ b=fIUPB6JFH7bvSi1b5iErS833UUXUoUZpVT3v0tOx4Tx9F4fiCQaNmmumctOE05WPqz
+ AtAYPBO9Lpo6O9ACr+iGyWqG0C2OLJSIo6yZCJGsmzszM/evejn/F3u1Xhekpqn6aFxC
+ EyNfsAVEl9lXNDY+xdR44B+6aJn+Osg6sAJeg=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=8LT0f8WyOGXh8kglWV2U+nQROiqObE8VsJv8feION5o=;
+ b=P/lmAZ8za1mnxo2EJZjRJvcengeNTpJBuR5A5x8bCtAQLsUodbemPYNyXiihmsg8Ga
+ lQlWaM4m45TTDNUxxseRK2Xze9BUU/hkiQf3n9yHkoVbDanfmAyqLR88Tl6LRmQRTHuJ
+ 6uHtgbcb1cTPFiWrdc6QRGwCjcS3HW31zislOBFyoa7rOCqNEh1pPFam9fX9Kd65eMkS
+ RiN4AnV5s+9uflugVdiWGrhpeSYWCD1S+/H+ZLVXPygtORXHli0/lrJlIIvXXbyTdoSx
+ lSCLxV/BuD004TCKCVMAtCI2h+stOql8YPLg4bDAuay04Vpb4kqvSJQliGALreA4A2zz
+ De8A==
+X-Gm-Message-State: AHQUAubcrlLnMjeYK8y4w0L4Zm0FsX9nErNyPa1aLmgGjo9nNplz9iqc
+ +MUPytkCdHPUk2EEl5/4Mlu7FuTaJHfBd7WdBKX+XQ==
+X-Google-Smtp-Source: AHgI3IYCelimT7B/5ZAUUzelo17/9p0K535rk8Xkx7XLeh0W3bG4ttDSk9uBEikPaxmY7mlsVN1MJzhlyk4N+h3mvOE=
+X-Received: by 2002:a5e:c206:: with SMTP id v6mr4832541iop.60.1548521394030;
+ Sat, 26 Jan 2019 08:49:54 -0800 (PST)
 MIME-Version: 1.0
-Date: Sat, 26 Jan 2019 17:48:33 +0100
-From: Stefan Agner <stefan@agner.ch>
-To: Nathan Chancellor <natechancellor@gmail.com>
-Subject: Re: [PATCH RESEND] ARM: Ensure that NEON code always compiles with
- Clang
-In-Reply-To: <20190126040111.9013-1-natechancellor@gmail.com>
-References: <20181215212304.19390-1-natechancellor@gmail.com>
- <20190126040111.9013-1-natechancellor@gmail.com>
-Message-ID: <20e649cde3fadfa63d7ae9fefbda4915@agner.ch>
-X-Sender: stefan@agner.ch
-User-Agent: Roundcube Webmail/1.3.7
+References: <20190126102207.29488-1-ard.biesheuvel@linaro.org>
+ <496259a6-f277-77b3-e5d2-7d45b4f515c7@gmx.de>
+ <CAKv+Gu9Cz5AW6o_FWxaGOeWsTN_AveiuNQkMhiDT5U-mZ1r91g@mail.gmail.com>
+ <47E85138-58E2-434B-8D78-525DF5A2E7E0@suse.de>
+ <9f44bf5c-49ce-48ef-7857-74ce9fd87f17@gmx.de>
+ <CAKv+Gu-0r=8uxtKM4WzumVYnNQj6AbUhrx_ct_MOqnymgeRwAg@mail.gmail.com>
+In-Reply-To: <CAKv+Gu-0r=8uxtKM4WzumVYnNQj6AbUhrx_ct_MOqnymgeRwAg@mail.gmail.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Sat, 26 Jan 2019 17:49:42 +0100
+Message-ID: <CAKv+Gu-vmXiz4NF8ecNR_nb2r6_pikaspBjMuDesxaSNvofQ-w@mail.gmail.com>
+Subject: Re: [PATCH] efi: arm/arm64: allow SetVirtualAddressMap() to be omitted
+To: Heinrich Schuchardt <xypron.glpk@gmx.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190126_084841_093627_DA219C9C 
-X-CRM114-Status: GOOD (  28.25  )
+X-CRM114-CacheID: sfid-20190126_084955_185586_3C025FCC 
+X-CRM114-Status: GOOD (  25.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,162 +90,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, Tri Vo <trong@android.com>,
- Jonathan Corbet <corbet@lwn.net>, linux-doc@vger.kernel.org,
- Nick Desaulniers <ndesaulniers@google.com>, linux-kernel@vger.kernel.org,
- Russell King <linux@armlinux.org.uk>, Nicolas Pitre <nico@linaro.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, linux-efi <linux-efi@vger.kernel.org>,
+ Will Deacon <will.deacon@arm.com>, Alexander Graf <agraf@suse.de>,
+ Leif Lindholm <leif.lindholm@linaro.org>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>,
+ James Morse <james.morse@arm.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 26.01.2019 05:01, Nathan Chancellor wrote:
-> While building arm32 allyesconfig, I ran into the following errors:
-> 
->   arch/arm/lib/xor-neon.c:17:2: error: You should compile this file with
->   '-mfloat-abi=softfp -mfpu=neon'
-> 
->   In file included from lib/raid6/neon1.c:27:
->   /home/nathan/cbl/prebuilt/lib/clang/8.0.0/include/arm_neon.h:28:2:
->   error: "NEON support not enabled"
-> 
-> Building V=1 showed NEON_FLAGS getting passed along to Clang but
-> __ARM_NEON__ was not getting defined. Ultimately, it boils down to Clang
-> only defining __ARM_NEON__ when targeting armv7, rather than armv6k,
-> which is the '-march' value for allyesconfig.
-> 
->>From lib/Basic/Targets/ARM.cpp in the Clang source:
-> 
->   // This only gets set when Neon instructions are actually available, unlike
->   // the VFP define, hence the soft float and arch check. This is subtly
->   // different from gcc, we follow the intent which was that it should be set
->   // when Neon instructions are actually available.
->   if ((FPU & NeonFPU) && !SoftFloat && ArchVersion >= 7) {
->     Builder.defineMacro("__ARM_NEON", "1");
->     Builder.defineMacro("__ARM_NEON__");
->     // current AArch32 NEON implementations do not support double-precision
->     // floating-point even when it is present in VFP.
->     Builder.defineMacro("__ARM_NEON_FP",
->                         "0x" + Twine::utohexstr(HW_FP & ~HW_FP_DP));
->   }
-> 
-> Ard Biesheuvel recommended explicitly adding '-march=armv7-a' at the
-> beginning of the NEON_FLAGS definitions so that __ARM_NEON__ always gets
-> definined by Clang. This doesn't functionally change anything because
-> that code will only run where NEON is supported, which is implicitly
-> armv7.
-> 
-> Link: https://github.com/ClangBuiltLinux/linux/issues/287
-> Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
-> ---
-> 
-> Resending with Nicolas's ack and Nick's review, to give others a chance
-> to pitch in with review/testing before submitting it to the patch
-> system (specifically Stefan, sorry I should have included you in the
-> previous posting).
+On Sat, 26 Jan 2019 at 16:03, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+> On Sat, 26 Jan 2019 at 15:33, Heinrich Schuchardt <xypron.glpk@gmx.de> wrote:
+> >
+> > On 1/26/19 1:34 PM, Alexander Graf wrote:
+> > >
+> > >
+> > >> Am 26.01.2019 um 13:28 schrieb Ard Biesheuvel <ard.biesheuvel@linaro.org>:
+> > >>
+> > >>> On Sat, 26 Jan 2019 at 13:27, Heinrich Schuchardt <xypron.glpk@gmx.de> wrote:
+> > >>>
+> > >>>> On 1/26/19 11:22 AM, Ard Biesheuvel wrote:
+> > >>>> The UEFI spec revision 2.7 errata A section 8.4 has the following to
+> > >>>> say about the virtual memory runtime services:
+> > >>>>
+> > >>>>  "This section contains function definitions for the virtual memory
+> > >>>>  support that may be optionally used by an operating system at runtime.
+> > >>>>  If an operating system chooses to make EFI runtime service calls in a
+> > >>>>  virtual addressing mode instead of the flat physical mode, then the
+> > >>>>  operating system must use the services in this section to switch the
+> > >>>>  EFI runtime services from flat physical addressing to virtual
+> > >>>>  addressing."
+> > >>>>
+> > >>>> So it is pretty clear that calling SetVirtualAddressMap() is entirely
+> > >>>> optional, and so there is no point in doing so unless it achieves
+> > >>>> anything useful for us.
+> > >>>>
+> > >>>> This is not the case for 64-bit ARM. The native mapping used by the OS
+> > >>>> is arbitrarily converted into another permutation of userland addresses
+> > >>>> (i.e., bits [63:48] cleared), and the runtime code could easily deal
+> > >>>> with the original layout in exactly the same way as it deals with the
+> > >>>> converted layout. However, due to constraints related to page size
+> > >>>> differences if the OS is not running with 4k pages, and related to
+> > >>>> systems that may expose the individual sections of PE/COFF runtime
+> > >>>> modules as different memory regions, creating the virtual layout is a
+> > >>>> bit fiddly, and requires us to sort the memory map and reason about
+> > >>>> adjacent regions with identical memory types etc etc.
+> > >>>>
+> > >>>> So the obvious fix is to stop calling SetVirtualAddressMap() altogether
+> > >>>> on arm64 systems. However, to avoid surprises, which are notoriously
+> > >>>> hard to diagnose when it comes to OS<->firmware interactions, let's
+> > >>>> start by making it an opt-out feature, and implement support for the
+> > >>>> 'efi=novamap' kernel command line parameter on ARM and arm64 systems.
+> > >>>>
+> > >>>> (Note that 32-bit ARM generally does require SetVirtualAddressMap() to be
+> > >>>> used, given that the physical memory map and the kernel virtual address
+> > >>>> map are not guaranteed to be non-overlapping like on arm64. However,
+> > >>>> having support for efi=novamap,noruntime on 32-bit ARM, combined with
+> > >>>> the recently proposed support for earlycon=efi, is likely to be useful
+> > >>>> to diagnose boot issues on such systems if they have no accessible serial
+> > >>>> port)
+> > >>>>
+> > >>>
+> > >>> NAK
+> > >>>
+> > >>
+> > >> Excuse me?
+> > >>
+> > >>> This patch breaks EFI booting with any known U-Boot release.
+> > >>>
+> > >>
+> > >> It does if you pass 'efi=novmap'. Otherwise, it works fine.
+> >
+> > It think it would be helpful to add this information to the commit message.
+> >
+>
+> Did you read the commit message?
+>
+> > If it is strictly opt-in, I have no concern.
+> >
+>
+> Thanks.
 
-No worries.
+Below is the boot log of a EDK2 based SynQuacer UEFI/ACPI machine
+running with this change enabled. The dump of the memory map has been
+modified to show the virtual address between ()
 
-Looks good to me.
-
-Reviewed-by: Stefan Agner <stefan@agner.ch>
-
---
-Stefan
-
-> 
-> With this patch and:
-> * A tip of tree LLVM build (I used apt.llvm.org)
-> * Clang GCOV support:
-> https://lore.kernel.org/lkml/20190122233749.42220-1-trong@android.com/
-> * Two minor hacks for unrelated issues that are still being worked through:
->   *
-> https://raw.githubusercontent.com/nathanchance/patches/c313b2fa0efb/linux/build-hax/0003-DO-NOT-UPSTREAM-ARM-Don-t-select-HAVE_FUNCTION_TRACE.patch
-> (see https://github.com/ClangBuiltLinux/linux/issues/35)
->   *
-> https://gist.githubusercontent.com/nathanchance/b2f5a4015abade1a41e78d5fc3235c5b/raw/744321882ab05511331f26896bad7c9f0056a6a5/gistfile1.txt
-> (see https://github.com/ClangBuiltLinux/linux/issues/325)
-> 
-> I can build and link a little endian allyesconfig ARM kernel. This
-> patch alone works with GCC 8.2.0 and binutils 2.31.1.
-> 
->  Documentation/arm/kernel_mode_neon.txt | 4 ++--
->  arch/arm/lib/Makefile                  | 2 +-
->  arch/arm/lib/xor-neon.c                | 2 +-
->  lib/raid6/Makefile                     | 2 +-
->  4 files changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/Documentation/arm/kernel_mode_neon.txt
-> b/Documentation/arm/kernel_mode_neon.txt
-> index 525452726d31..b9e060c5b61e 100644
-> --- a/Documentation/arm/kernel_mode_neon.txt
-> +++ b/Documentation/arm/kernel_mode_neon.txt
-> @@ -6,7 +6,7 @@ TL;DR summary
->  * Use only NEON instructions, or VFP instructions that don't rely on support
->    code
->  * Isolate your NEON code in a separate compilation unit, and compile it with
-> -  '-mfpu=neon -mfloat-abi=softfp'
-> +  '-march=armv7-a -mfpu=neon -mfloat-abi=softfp'
->  * Put kernel_neon_begin() and kernel_neon_end() calls around the
-> calls into your
->    NEON code
->  * Don't sleep in your NEON code, and be aware that it will be executed with
-> @@ -87,7 +87,7 @@ instructions appearing in unexpected places if no
-> special care is taken.
->  Therefore, the recommended and only supported way of using NEON/VFP in the
->  kernel is by adhering to the following rules:
->  * isolate the NEON code in a separate compilation unit and compile it with
-> -  '-mfpu=neon -mfloat-abi=softfp';
-> +  '-march=armv7-a -mfpu=neon -mfloat-abi=softfp';
->  * issue the calls to kernel_neon_begin(), kernel_neon_end() as well
-> as the calls
->    into the unit containing the NEON code from a compilation unit which is *not*
->    built with the GCC flag '-mfpu=neon' set.
-> diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-> index ad25fd1872c7..0bff0176db2c 100644
-> --- a/arch/arm/lib/Makefile
-> +++ b/arch/arm/lib/Makefile
-> @@ -39,7 +39,7 @@ $(obj)/csumpartialcopy.o:	$(obj)/csumpartialcopygeneric.S
->  $(obj)/csumpartialcopyuser.o:	$(obj)/csumpartialcopygeneric.S
->  
->  ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
-> -  NEON_FLAGS			:= -mfloat-abi=softfp -mfpu=neon
-> +  NEON_FLAGS			:= -march=armv7-a -mfloat-abi=softfp -mfpu=neon
->    CFLAGS_xor-neon.o		+= $(NEON_FLAGS)
->    obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
->  endif
-> diff --git a/arch/arm/lib/xor-neon.c b/arch/arm/lib/xor-neon.c
-> index 2c40aeab3eaa..c691b901092f 100644
-> --- a/arch/arm/lib/xor-neon.c
-> +++ b/arch/arm/lib/xor-neon.c
-> @@ -14,7 +14,7 @@
->  MODULE_LICENSE("GPL");
->  
->  #ifndef __ARM_NEON__
-> -#error You should compile this file with '-mfloat-abi=softfp -mfpu=neon'
-> +#error You should compile this file with '-march=armv7-a
-> -mfloat-abi=softfp -mfpu=neon'
->  #endif
->  
->  /*
-> diff --git a/lib/raid6/Makefile b/lib/raid6/Makefile
-> index 4e90d443d1b0..e723eacf7868 100644
-> --- a/lib/raid6/Makefile
-> +++ b/lib/raid6/Makefile
-> @@ -39,7 +39,7 @@ endif
->  ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
->  NEON_FLAGS := -ffreestanding
->  ifeq ($(ARCH),arm)
-> -NEON_FLAGS += -mfloat-abi=softfp -mfpu=neon
-> +NEON_FLAGS += -march=armv7-a -mfloat-abi=softfp -mfpu=neon
->  endif
->  CFLAGS_recov_neon_inner.o += $(NEON_FLAGS)
->  ifeq ($(ARCH),arm64)
+https://storage.kernelci.org/ardb/for-kernelci/v5.0-rc2-3-g4f78f37fc6eb/arm64/defconfig/lab-mhart/boot-synquacer-acpi.html
 
 _______________________________________________
 linux-arm-kernel mailing list
