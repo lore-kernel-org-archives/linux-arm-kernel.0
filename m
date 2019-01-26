@@ -2,56 +2,68 @@ Return-Path: <SRS0=wPy5=QC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EDB28C282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 10:38:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6322BC282C7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 10:41:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B5070218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 10:38:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 33F58218A6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 10:41:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tEcnTDq1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B5070218A6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V3XlBOkU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 33F58218A6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OwKfVRiV7/5bcLmOiG0+DxJxf+UA6jYNys+yoH3ToF4=; b=tEcnTDq1JSbfXF
-	9ITCRxt+UcldjKfCoDzdogKcm8sXY4414AM76enih19N/5SvbWTsb5S+wdsqNfwNGQ+ndQCitqHyM
-	wETMErD/aBxwlP65nkW0sJennKsV1XVYhYhs7GxAjxYaGwLEI36KKi1tdKU2SLohNpVwfy+tsfF0E
-	brU62g9nnsYrUaW4nvMb9kooGADkBU6i46FSXQdocP2EmObwr9QxPBj+BSrec60OmvBeOz5aJ1bp+
-	x1hYwiEQklymNOqqmSTHPUThNv+0KSDKfMQd5fbb2A9NnK7/vSeNfitFjhKGGjHJOB2dS91ttYxzT
-	+qqu4YxEOD8WfACQ82ng==;
+	List-Owner; bh=ZoOCTVzW9c2p5L9x3VoHXOHOxb1YUKu2muB3DIWjijQ=; b=V3XlBOkUzyNa05
+	vKa1CZ09RvbFpzFrqDx22xbxRx5EQntZLIPYz7wfpmOyQpW08ZS6NSg1BclyKHTji+sS9Oj4Fgi+/
+	PY0KX57+7eKgBX0bGjtTF9wXUx5YQHd9FKl0XB+hJHxipU9bfv6sIwfPi9mOPI+3hvydDSVx5vaHX
+	EpYtPyg+W9McjMAI0uIhLcxc6eChIXrFiCwEiS2cdK/rSfrjS9g01aCZy+vuLcoqOVTBIDjl/pnNI
+	K+a9xaJ5quyCfMqMfzFIpgMT3BiRuKiC2H5krdsXsPNV7s09g17AmRRZQ23mTf8Q/yj+W16Y+Ky5m
+	Lz/kPI3QipFVarGm2DQA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gnLMC-00006g-Hm; Sat, 26 Jan 2019 10:38:36 +0000
-Received: from bhuna.collabora.co.uk ([46.235.227.227])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gnLLW-0007vk-LK; Sat, 26 Jan 2019 10:37:57 +0000
-Received: from [127.0.0.1] (localhost [127.0.0.1])
- (Authenticated sender: eballetbo) with ESMTPSA id 7969827958F
-From: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-To: devicetree@vger.kernel.org
-Subject: [PATCH 3/3] arm64: dts: rockchip: fix rk3399-sapphire-excavator
- graph_port warning
-Date: Sat, 26 Jan 2019 11:37:30 +0100
-Message-Id: <20190126103730.3883-3-enric.balletbo@collabora.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190126103730.3883-1-enric.balletbo@collabora.com>
-References: <20190126103730.3883-1-enric.balletbo@collabora.com>
-MIME-Version: 1.0
+	id 1gnLPC-0001oE-Qx; Sat, 26 Jan 2019 10:41:42 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gnLP9-0001nX-9G
+ for linux-arm-kernel@lists.infradead.org; Sat, 26 Jan 2019 10:41:40 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C7E06EBD;
+ Sat, 26 Jan 2019 02:41:36 -0800 (PST)
+Received: from big-swifty.misterjones.org (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id AA0E33F5C1;
+ Sat, 26 Jan 2019 02:41:33 -0800 (PST)
+Date: Sat, 26 Jan 2019 10:41:30 +0000
+Message-ID: <86d0oj8zvp.wl-marc.zyngier@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: "liwei (GF)" <liwei391@huawei.com>
+Subject: Re: [PATCH v9 22/26] irqchip/gic-v3: Allow interrupts to be set as
+ pseudo-NMI
+In-Reply-To: <8c0efe3f-1fc7-cbc7-0086-bd9c379cf0fc@huawei.com>
+References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
+ <1548084825-8803-23-git-send-email-julien.thierry@arm.com>
+ <8c0efe3f-1fc7-cbc7-0086-bd9c379cf0fc@huawei.com>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190126_023754_832610_A3C9EB4F 
-X-CRM114-Status: GOOD (  11.52  )
+X-CRM114-CacheID: sfid-20190126_024139_337615_C558995A 
+X-CRM114-Status: GOOD (  26.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -63,48 +75,160 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Matthias Brugger <mbrugger@suse.com>,
- Heiko Stuebner <heiko@sntech.de>, Shawn Lin <shawn.lin@rock-chips.com>,
- linux-kernel@vger.kernel.org, Vicente Bergas <vicencb@gmail.com>,
- Douglas Anderson <dianders@chromium.org>, linux-rockchip@lists.infradead.org,
- Rob Herring <robh+dt@kernel.org>,
- Klaus Goger <klaus.goger@theobroma-systems.com>, kernel@collabora.com,
- linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
+ Jason Cooper <jason@lakedaemon.net>, Julien Thierry <julien.thierry@arm.com>,
+ catalin.marinas@arm.com, will.deacon@arm.com, christoffer.dall@arm.com,
+ linux-kernel@vger.kernel.org, james.morse@arm.com, joel@joelfernandes.org,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Ports are described by child 'port' nodes contained in the device node.
-'ports' is optional and is used to group all 'port' nodes which is not
-the case here.
+On Sat, 26 Jan 2019 10:19:52 +0000,
+"liwei (GF)" <liwei391@huawei.com> wrote:
+> 
+> 
+> 
+> On 2019/1/21 23:33, Julien Thierry wrote:
+> > Implement NMI callbacks for GICv3 irqchip. Install NMI safe handlers
+> > when setting up interrupt line as NMI.
+> > 
+> > Only SPIs and PPIs are allowed to be set up as NMI.
+> > 
+> > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  drivers/irqchip/irq-gic-v3.c | 84 ++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 84 insertions(+)
+> > 
+> > diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> > index 4df1e94..447d8ab 100644
+> > --- a/drivers/irqchip/irq-gic-v3.c
+> > +++ b/drivers/irqchip/irq-gic-v3.c
+> (snip)
+> >  
+> > +static int gic_irq_nmi_setup(struct irq_data *d)
+> > +{
+> > +	struct irq_desc *desc = irq_to_desc(d->irq);
+> > +
+> > +	if (!gic_supports_nmi())
+> > +		return -EINVAL;
+> > +
+> > +	if (gic_peek_irq(d, GICD_ISENABLER)) {
+> > +		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	/*
+> > +	 * A secondary irq_chip should be in charge of LPI request,
+> > +	 * it should not be possible to get there
+> > +	 */
+> > +	if (WARN_ON(gic_irq(d) >= 8192))
+> > +		return -EINVAL;
+> > +
+> > +	/* desc lock should already be held */
+> > +	if (gic_irq(d) < 32) {
+> > +		/* Setting up PPI as NMI, only switch handler for first NMI */
+> > +		if (!refcount_inc_not_zero(&ppi_nmi_refs[gic_irq(d) - 16])) {
+> > +			refcount_set(&ppi_nmi_refs[gic_irq(d) - 16], 1);
+> > +			desc->handle_irq = handle_percpu_devid_fasteoi_nmi;
+> > +		}
+> > +	} else {
+> > +		desc->handle_irq = handle_fasteoi_nmi;
+> > +	}
+> > +
+> > +	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), GICD_INT_NMI_PRI);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void gic_irq_nmi_teardown(struct irq_data *d)
+> > +{
+> > +	struct irq_desc *desc = irq_to_desc(d->irq);
+> > +
+> > +	if (WARN_ON(!gic_supports_nmi()))
+> > +		return;
+> > +
+> > +	if (gic_peek_irq(d, GICD_ISENABLER)) {
+> > +		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
+> > +		return;
+> > +	}
+> > +
+> > +	/*
+> > +	 * A secondary irq_chip should be in charge of LPI request,
+> > +	 * it should not be possible to get there
+> > +	 */
+> > +	if (WARN_ON(gic_irq(d) >= 8192))
+> > +		return;
+> > +
+> > +	/* desc lock should already be held */
+> > +	if (gic_irq(d) < 32) {
+> > +		/* Tearing down NMI, only switch handler for last NMI */
+> > +		if (refcount_dec_and_test(&ppi_nmi_refs[gic_irq(d) - 16]))
+> > +			desc->handle_irq = handle_percpu_devid_irq;
+> > +	} else {
+> > +		desc->handle_irq = handle_fasteoi_irq;
+> > +	}
+> > +
+> > +	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), GICD_INT_DEF_PRI);
+> > +}
+> > +
+> 
+> Hello Julien,
+> I am afraid the setting of priority is not correct here. If the irq
+> is in redistributor(gic_irq(d) < 32), we should set the priority on
+> each cpu, while we just set the priority on the current cpu here.
 
-This patch fixes the following warning:
+I think it really boils down to what semantic we want to present to
+the drivers. Given that all operations on PPIs are per-CPU
+(enable/disable), I do not see why the NMI setting should be any
+different.
 
-arch/arm64/boot/dts/rockchip/rk3399-sapphire-excavator.dts:94.9-98.5: Warning (graph_port): /edp-panel/ports: graph port node name should be 'port'
+I'm certainly not keen on having diverging semantics here.
 
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
+> static inline void __iomem *gic_dist_base(struct irq_data *d)
+> {
+> 	if (gic_irq_in_rdist(d))	/* SGI+PPI -> SGI_base for this CPU */
+> 		return gic_data_rdist_sgi_base();
+> 
+> 	if (d->hwirq <= 1023)		/* SPI -> dist_base */
+> 		return gic_data.dist_base;
+> 
+> 	return NULL;
+> }
+> 
+> I tried to add a smp_call_function here, but the kernel reported a warning as we have disabled irq
+> when calling raw_spin_lock_irqsave in request_nmi or ready_percpu_nmi.
+> [    2.137262] Call trace:
+> [    2.137265]  smp_call_function_many+0xf8/0x3a0
+> [    2.137267]  smp_call_function+0x40/0x58
+> [    2.137271]  gic_irq_nmi_setup+0xe8/0x118
+> [    2.137275]  ready_percpu_nmi+0x6c/0xf0
+> [    2.137279]  armpmu_request_irq+0x228/0x250
+> [    2.137281]  arm_pmu_acpi_init+0x150/0x2f0
+> [    2.137284]  do_one_initcall+0x54/0x218
+> [    2.137289]  kernel_init_freeable+0x230/0x354
+> [    2.137293]  kernel_init+0x18/0x118
+> [    2.137295]  ret_from_fork+0x10/0x18
+> 
+> I am exploring a better way to solve this issue.
 
- arch/arm64/boot/dts/rockchip/rk3399-sapphire-excavator.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The real question is "why should you care?". As far as the system is
+concerned, a PPI only makes sense on a single CPU. So a single PPI on
+two CPUs represent to different interrupts. Yes, they have the same
+interrupt number, but they really are two independent interrupt lines.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-sapphire-excavator.dts b/arch/arm64/boot/dts/rockchip/rk3399-sapphire-excavator.dts
-index 0b8f1edbd746..b48a63c3efc3 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-sapphire-excavator.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-sapphire-excavator.dts
-@@ -91,7 +91,7 @@
- 		pinctrl-0 = <&lcd_panel_reset>;
- 		power-supply = <&vcc3v3_s0>;
- 
--		ports {
-+		port {
- 			panel_in_edp: endpoint {
- 				remote-endpoint = <&edp_out_panel>;
- 			};
+What issue do you see with this?
+
+Thanks,
+
+	M.
+
 -- 
-2.20.1
-
+Jazz is not dead, it just smell funny.
 
 _______________________________________________
 linux-arm-kernel mailing list
