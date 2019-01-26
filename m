@@ -4,66 +4,70 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6322BC282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 10:41:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2CDCCC282C7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 11:14:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 33F58218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 10:41:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EF6E9218A6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 11:14:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V3XlBOkU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 33F58218A6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XsmBd8s+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF6E9218A6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=katsuster.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZoOCTVzW9c2p5L9x3VoHXOHOxb1YUKu2muB3DIWjijQ=; b=V3XlBOkUzyNa05
-	vKa1CZ09RvbFpzFrqDx22xbxRx5EQntZLIPYz7wfpmOyQpW08ZS6NSg1BclyKHTji+sS9Oj4Fgi+/
-	PY0KX57+7eKgBX0bGjtTF9wXUx5YQHd9FKl0XB+hJHxipU9bfv6sIwfPi9mOPI+3hvydDSVx5vaHX
-	EpYtPyg+W9McjMAI0uIhLcxc6eChIXrFiCwEiS2cdK/rSfrjS9g01aCZy+vuLcoqOVTBIDjl/pnNI
-	K+a9xaJ5quyCfMqMfzFIpgMT3BiRuKiC2H5krdsXsPNV7s09g17AmRRZQ23mTf8Q/yj+W16Y+Ky5m
-	Lz/kPI3QipFVarGm2DQA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=9oYDwqqqnbyXvvINcvlIfl3vv10jcCnOTzEEXi0egbw=; b=XsmBd8s+dsHNk5mD8gl+yh0UA
+	EtQPpiRXSziaTKd8P8VEMvA0yq03PuHKsaxu8htNv/oDgVL/3rM8ftnHZ01BtEZy5LSWHrChtv361
+	27X18/5OYDXhF7RgszaZ4r5RwxaTB7xzaQVxr/zh+FIlXnOfcj5AByFXczOE13qdcuOuu6LimU2Aj
+	Uh1QjaPjeY0m6aU4Xn1s/3jUZ0MmziXQhfobwtnlmyTXcgshJElWt5gIEOGsmKqOLw9crqglZPXKP
+	xU9rFETEJiSvFPbl8ZKfNJnES5rkrcbhJdTTEZrZTnKBbH0nj+WLsKYxE5jd+NjxWiAFZHVh1VEhC
+	idgsFQNIQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gnLPC-0001oE-Qx; Sat, 26 Jan 2019 10:41:42 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gnLP9-0001nX-9G
- for linux-arm-kernel@lists.infradead.org; Sat, 26 Jan 2019 10:41:40 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C7E06EBD;
- Sat, 26 Jan 2019 02:41:36 -0800 (PST)
-Received: from big-swifty.misterjones.org (usa-sjc-mx-foss1.foss.arm.com
- [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id AA0E33F5C1;
- Sat, 26 Jan 2019 02:41:33 -0800 (PST)
-Date: Sat, 26 Jan 2019 10:41:30 +0000
-Message-ID: <86d0oj8zvp.wl-marc.zyngier@arm.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: "liwei (GF)" <liwei391@huawei.com>
-Subject: Re: [PATCH v9 22/26] irqchip/gic-v3: Allow interrupts to be set as
- pseudo-NMI
-In-Reply-To: <8c0efe3f-1fc7-cbc7-0086-bd9c379cf0fc@huawei.com>
-References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
- <1548084825-8803-23-git-send-email-julien.thierry@arm.com>
- <8c0efe3f-1fc7-cbc7-0086-bd9c379cf0fc@huawei.com>
-User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
- FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
- (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
-Organization: ARM Ltd
-MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
+	id 1gnLuW-0005ZS-H9; Sat, 26 Jan 2019 11:14:04 +0000
+Received: from www1102.sakura.ne.jp ([219.94.129.142])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gnLuT-0005YW-Cb
+ for linux-arm-kernel@lists.infradead.org; Sat, 26 Jan 2019 11:14:03 +0000
+Received: from fsav302.sakura.ne.jp (fsav302.sakura.ne.jp [153.120.85.133])
+ by www1102.sakura.ne.jp (8.15.2/8.15.2) with ESMTP id x0QBDmWc001322;
+ Sat, 26 Jan 2019 20:13:48 +0900 (JST)
+ (envelope-from katsuhiro@katsuster.net)
+Received: from www1102.sakura.ne.jp (219.94.129.142)
+ by fsav302.sakura.ne.jp (F-Secure/fsigk_smtp/530/fsav302.sakura.ne.jp);
+ Sat, 26 Jan 2019 20:13:48 +0900 (JST)
+X-Virus-Status: clean(F-Secure/fsigk_smtp/530/fsav302.sakura.ne.jp)
+Received: from [192.168.1.2] (119.104.232.153.ap.dti.ne.jp [153.232.104.119])
+ (authenticated bits=0)
+ by www1102.sakura.ne.jp (8.15.2/8.15.2) with ESMTPSA id x0QBDmgY001317
+ (version=TLSv1.2 cipher=AES256-SHA bits=256 verify=NO);
+ Sat, 26 Jan 2019 20:13:48 +0900 (JST)
+ (envelope-from katsuhiro@katsuster.net)
+Subject: Re: [PATCH] clk: fractional-divider: check parent rate only for
+ general approximation
+To: Michael Turquette <mturquette@baylibre.com>,
+ Stephen Boyd <sboyd@kernel.org>, linux-clk@vger.kernel.org
+References: <20190107132124.27788-1-katsuhiro@katsuster.net>
+From: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+Message-ID: <063dea80-a13e-3af2-1008-1c0c2bbe2706@katsuster.net>
+Date: Sat, 26 Jan 2019 20:13:48 +0900
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
+MIME-Version: 1.0
+In-Reply-To: <20190107132124.27788-1-katsuhiro@katsuster.net>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190126_024139_337615_C558995A 
-X-CRM114-Status: GOOD (  26.10  )
+X-CRM114-CacheID: sfid-20190126_031401_656860_C5085892 
+X-CRM114-Status: GOOD (  14.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,160 +79,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
- Jason Cooper <jason@lakedaemon.net>, Julien Thierry <julien.thierry@arm.com>,
- catalin.marinas@arm.com, will.deacon@arm.com, christoffer.dall@arm.com,
- linux-kernel@vger.kernel.org, james.morse@arm.com, joel@joelfernandes.org,
- Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, 26 Jan 2019 10:19:52 +0000,
-"liwei (GF)" <liwei391@huawei.com> wrote:
-> 
-> 
-> 
-> On 2019/1/21 23:33, Julien Thierry wrote:
-> > Implement NMI callbacks for GICv3 irqchip. Install NMI safe handlers
-> > when setting up interrupt line as NMI.
-> > 
-> > Only SPIs and PPIs are allowed to be set up as NMI.
-> > 
-> > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Jason Cooper <jason@lakedaemon.net>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  drivers/irqchip/irq-gic-v3.c | 84 ++++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 84 insertions(+)
-> > 
-> > diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> > index 4df1e94..447d8ab 100644
-> > --- a/drivers/irqchip/irq-gic-v3.c
-> > +++ b/drivers/irqchip/irq-gic-v3.c
-> (snip)
-> >  
-> > +static int gic_irq_nmi_setup(struct irq_data *d)
-> > +{
-> > +	struct irq_desc *desc = irq_to_desc(d->irq);
-> > +
-> > +	if (!gic_supports_nmi())
-> > +		return -EINVAL;
-> > +
-> > +	if (gic_peek_irq(d, GICD_ISENABLER)) {
-> > +		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	/*
-> > +	 * A secondary irq_chip should be in charge of LPI request,
-> > +	 * it should not be possible to get there
-> > +	 */
-> > +	if (WARN_ON(gic_irq(d) >= 8192))
-> > +		return -EINVAL;
-> > +
-> > +	/* desc lock should already be held */
-> > +	if (gic_irq(d) < 32) {
-> > +		/* Setting up PPI as NMI, only switch handler for first NMI */
-> > +		if (!refcount_inc_not_zero(&ppi_nmi_refs[gic_irq(d) - 16])) {
-> > +			refcount_set(&ppi_nmi_refs[gic_irq(d) - 16], 1);
-> > +			desc->handle_irq = handle_percpu_devid_fasteoi_nmi;
-> > +		}
-> > +	} else {
-> > +		desc->handle_irq = handle_fasteoi_nmi;
-> > +	}
-> > +
-> > +	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), GICD_INT_NMI_PRI);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static void gic_irq_nmi_teardown(struct irq_data *d)
-> > +{
-> > +	struct irq_desc *desc = irq_to_desc(d->irq);
-> > +
-> > +	if (WARN_ON(!gic_supports_nmi()))
-> > +		return;
-> > +
-> > +	if (gic_peek_irq(d, GICD_ISENABLER)) {
-> > +		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
-> > +		return;
-> > +	}
-> > +
-> > +	/*
-> > +	 * A secondary irq_chip should be in charge of LPI request,
-> > +	 * it should not be possible to get there
-> > +	 */
-> > +	if (WARN_ON(gic_irq(d) >= 8192))
-> > +		return;
-> > +
-> > +	/* desc lock should already be held */
-> > +	if (gic_irq(d) < 32) {
-> > +		/* Tearing down NMI, only switch handler for last NMI */
-> > +		if (refcount_dec_and_test(&ppi_nmi_refs[gic_irq(d) - 16]))
-> > +			desc->handle_irq = handle_percpu_devid_irq;
-> > +	} else {
-> > +		desc->handle_irq = handle_fasteoi_irq;
-> > +	}
-> > +
-> > +	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), GICD_INT_DEF_PRI);
-> > +}
-> > +
-> 
-> Hello Julien,
-> I am afraid the setting of priority is not correct here. If the irq
-> is in redistributor(gic_irq(d) < 32), we should set the priority on
-> each cpu, while we just set the priority on the current cpu here.
+Ping...
 
-I think it really boils down to what semantic we want to present to
-the drivers. Given that all operations on PPIs are per-CPU
-(enable/disable), I do not see why the NMI setting should be any
-different.
-
-I'm certainly not keen on having diverging semantics here.
-
-> static inline void __iomem *gic_dist_base(struct irq_data *d)
-> {
-> 	if (gic_irq_in_rdist(d))	/* SGI+PPI -> SGI_base for this CPU */
-> 		return gic_data_rdist_sgi_base();
+On 2019/01/07 22:21, Katsuhiro Suzuki wrote:
+> Custom approximation of fractional-divider may not need parent clock
+> rate checking. For example Rockchip SoCs work fine using grand parent
+> clock rate evne if target rate is greater than parent.
 > 
-> 	if (d->hwirq <= 1023)		/* SPI -> dist_base */
-> 		return gic_data.dist_base;
+> This patch removes parent clock rate check from custom approximation.
 > 
-> 	return NULL;
-> }
+> Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+> ---
+>   drivers/clk/clk-fractional-divider.c | 10 +++++++---
+>   1 file changed, 7 insertions(+), 3 deletions(-)
 > 
-> I tried to add a smp_call_function here, but the kernel reported a warning as we have disabled irq
-> when calling raw_spin_lock_irqsave in request_nmi or ready_percpu_nmi.
-> [    2.137262] Call trace:
-> [    2.137265]  smp_call_function_many+0xf8/0x3a0
-> [    2.137267]  smp_call_function+0x40/0x58
-> [    2.137271]  gic_irq_nmi_setup+0xe8/0x118
-> [    2.137275]  ready_percpu_nmi+0x6c/0xf0
-> [    2.137279]  armpmu_request_irq+0x228/0x250
-> [    2.137281]  arm_pmu_acpi_init+0x150/0x2f0
-> [    2.137284]  do_one_initcall+0x54/0x218
-> [    2.137289]  kernel_init_freeable+0x230/0x354
-> [    2.137293]  kernel_init+0x18/0x118
-> [    2.137295]  ret_from_fork+0x10/0x18
+> diff --git a/drivers/clk/clk-fractional-divider.c b/drivers/clk/clk-fractional-divider.c
+> index 545dceec0bbf..b0fc5509e0ff 100644
+> --- a/drivers/clk/clk-fractional-divider.c
+> +++ b/drivers/clk/clk-fractional-divider.c
+> @@ -79,13 +79,17 @@ static long clk_fd_round_rate(struct clk_hw *hw, unsigned long rate,
+>   	unsigned long m, n;
+>   	u64 ret;
+>   
+> -	if (!rate || rate >= *parent_rate)
+> +	if (!rate)
+>   		return *parent_rate;
+>   
+> -	if (fd->approximation)
+> +	if (fd->approximation) {
+>   		fd->approximation(hw, rate, parent_rate, &m, &n);
+> -	else
+> +	} else {
+> +		if (rate >= *parent_rate)
+> +			return *parent_rate;
+> +
+>   		clk_fd_general_approximation(hw, rate, parent_rate, &m, &n);
+> +	}
+>   
+>   	ret = (u64)*parent_rate * m;
+>   	do_div(ret, n);
 > 
-> I am exploring a better way to solve this issue.
 
-The real question is "why should you care?". As far as the system is
-concerned, a PPI only makes sense on a single CPU. So a single PPI on
-two CPUs represent to different interrupts. Yes, they have the same
-interrupt number, but they really are two independent interrupt lines.
-
-What issue do you see with this?
-
-Thanks,
-
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
 
 _______________________________________________
 linux-arm-kernel mailing list
