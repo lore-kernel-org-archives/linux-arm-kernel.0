@@ -2,114 +2,71 @@ Return-Path: <SRS0=wPy5=QC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3BEBAC282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 17:16:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 00AACC282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 18:41:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0E7B42184C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 17:16:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CAB172184B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 26 Jan 2019 18:41:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PFQVPzJn";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=openedev.com header.i=@openedev.com header.b="N55NHHGE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0E7B42184C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=openedev.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JlJIgYZV";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kemnade.info header.i=@kemnade.info header.b="gztZkI2M"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CAB172184B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kemnade.info
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	MIME-Version:References:In-Reply-To:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=xtdBKGRWUUBfVDgFTHLfZ5ycBBjsLfPuYpcSuR2PCJg=; b=PFQVPzJne4wjILjykPena5Jbw
-	BScaaAOel1evlAWlIgfgDLMKdZO2W+Dxki5Amn88tp0YvuECuu8hJQy0i+kq8Ir8OYOf6uPH7+tKs
-	rY72yLiiBsqgsEL9jsqd5KLKjzHb2voG3MFueYbrWZwiOAe4k2kHcA/pEkOOEjeQ1hwAlSeDdUtr8
-	DUYS6y0ecOlybJAwJYC9LzKHPtQng0t2pjGJJQMa5nVB5nq5OYX3cpGLsfx2NbpbzJuhybCk3hPiM
-	LjnGeh9EjMqAlkpO9Mzlt3Lij11ft0j4WpyOOgzphDzQ+Ff6onHT2nls57o+xxt+TWTTVIyKPwD7r
-	kQZXHgnzw==;
+	 bh=FBJdY+zAJuOT49v0l9d0bJZTUa3QT5YsLqTqmHO8V9M=; b=JlJIgYZVfWHfr56qQOn/PBrqE
+	xNum4VH0STCs06cgA+YME5t6HL69OaaXb2tnVq6WO8OYvEP9Z81ClWwH/VhlHA+vpo6C7R05J22no
+	n5OSQpxtwcDiH3/Awc5WyCVGxQxL2LPtTe8SWFIU5taRpADkNTNOPZ3CEVpeO4/EizouRcmUsX+1p
+	38O9mH4Jf8Z3Dwoxu7H/BQj0GSn+aZRUY7WiZkSLkj+HII0NOa8/MQswFWMYhRxoG/IYB3fy8jiTy
+	q5ynpLP0zk5XCsR/Ip0BSX4VAXcW/4s0DXYH9e652One71aJV+KTO37FaK5vqytWK8Df7Ply9kzV6
+	QH/bPdTSA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gnRZD-0007FK-4V; Sat, 26 Jan 2019 17:16:27 +0000
-Received: from se14t.web-hosting.com ([162.255.118.155])
+	id 1gnSt4-0007W0-MA; Sat, 26 Jan 2019 18:41:02 +0000
+Received: from mail.andi.de1.cc ([2a01:238:43f3:0:615b:ee97:1f81:cbf2]
+ helo=h2641619.stratoserver.net)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gnRZ9-0007Eh-N0
- for linux-arm-kernel@lists.infradead.org; Sat, 26 Jan 2019 17:16:25 +0000
-Received: from [68.65.123.203] (helo=server153.web-hosting.com)
- by se14.registrar-servers.com with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.89)
- (envelope-from <jagan@openedev.com>)
- id 1gnQW8-0002w8-Kf; Sat, 26 Jan 2019 08:09:16 -0800
+ id 1gnSt0-0007VX-In
+ for linux-arm-kernel@lists.infradead.org; Sat, 26 Jan 2019 18:41:00 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=openedev.com; s=default; h=Content-Transfer-Encoding:Content-Type:
- In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=eerXW8deLRFNJ082VjgdoXPR1hogTB4K5IRcED5Ob3Q=; b=N55NHHGErksks3wkgIKLSVpTMV
- AyPOu3jAy4oEqzGeV0wB4quAc5qG9HzFd5bpWk499eoLSv7RCagZ9ldqTXQqWIMJ4heu/5V7J0/+/
- /COiDLD2blMLPcGULqDX+6qbJlgD5mn5V4X8j5MHEP/pJjnwLaSLuV2jlCs+0QldbKB8t84u8HXOa
- PyVcztswWSc1ZboBU+eHC2prPtoy859LyK+d3+BpQwnNnbYWt2kBFcbspX/TDtH6jAjzPOOIcbXqI
- 6gGn8IsSmnToFlgwolHOa3Va/ZTkuWeOOasYYs8+RYu3NgCwlig/wM8mkg3j3zobOVCzG7vU9n6LZ
- qM0hHLKQ==;
-Received: from [115.97.179.75] (port=51782 helo=[192.168.0.10])
- by server153.web-hosting.com with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.91)
- (envelope-from <jagan@openedev.com>)
- id 1gnQW2-002TlN-Vi; Sat, 26 Jan 2019 11:09:07 -0500
-Subject: Re: [linux-sunxi] Re: [PATCH v6 14/22] dt-bindings: sun6i-dsi: Add
- A64 DSI compatible (w/ A31 fallback)
-To: maxime.ripard@bootlin.com, Jagan Teki <jagan@amarulasolutions.com>
-References: <20190124195900.22620-1-jagan@amarulasolutions.com>
- <20190124195900.22620-15-jagan@amarulasolutions.com>
- <20190125155236.agxwkxvyefmrbvym@flea>
-From: Jagan Teki <jagan@openedev.com>
-Message-ID: <bed39fd2-1f4f-4c6b-afc6-da127326775c@openedev.com>
-Date: Sat, 26 Jan 2019 21:39:00 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ d=kemnade.info; s=20180802; h=Content-Type:MIME-Version:References:
+ In-Reply-To:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=Mp65YKRqiZLYb7rn16aDP6BkwG4Y9/EmU7kqVpFnUr0=; b=gztZkI2MK7n/IT7Ut/yGA0FG0
+ jw3ql+cGgjZUcE+QLDrDD0mG5EPy57JzFcsQ9wBlAzaOZJZ7t7M0PmoFBAKeXZ828vp0ERH7QGa3F
+ E68l3nCkqtZsdrP2OiNTo7LH7hplZyl+H87EL+6o/yq1jzbX+gg0RdpLp7Ksrya+y3MpY=;
+Received: from p5dc58b75.dip0.t-ipconnect.de ([93.197.139.117] helo=aktux)
+ by h2641619.stratoserver.net with esmtpsa
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <andreas@kemnade.info>)
+ id 1gnSsq-00005z-D6; Sat, 26 Jan 2019 19:40:48 +0100
+Date: Sat, 26 Jan 2019 19:40:44 +0100
+From: Andreas Kemnade <andreas@kemnade.info>
+To: Tony Lindgren <tony@atomide.com>
+Subject: Re: [PATCH 1/3] clocksource: timer-ti-dm: Fix pwm dmtimer usage of
+ fck reparenting
+Message-ID: <20190126194044.2fad4427@aktux>
+In-Reply-To: <20190122175717.13428-2-tony@atomide.com>
+References: <20190122175717.13428-1-tony@atomide.com>
+ <20190122175717.13428-2-tony@atomide.com>
+X-Mailer: Claws Mail 3.14.1 (GTK+ 2.24.31; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-In-Reply-To: <20190125155236.agxwkxvyefmrbvym@flea>
-Content-Language: en-US
-X-OutGoing-Spam-Status: No, score=-1.0
-X-Originating-IP: 68.65.123.203
-X-SpamExperts-Domain: nctest.net
-X-SpamExperts-Username: whmcalls3
-Authentication-Results: registrar-servers.com;
- auth=pass (login) smtp.auth=whmcalls3@nctest.net
-X-SpamExperts-Outgoing-Class: ham
-X-SpamExperts-Outgoing-Evidence: Combined (0.06)
-X-Recommended-Action: accept
-X-Filter-ID: EX5BVjFpneJeBchSMxfU5p3su2DtuSZ1p0nI9y4N8fZ602E9L7XzfQH6nu9C/Fh9KJzpNe6xgvOx
- q3u0UDjvO0Ma0zdKrj2HeYAO9pcN4rBgaa/6KAnDjbDW9Kfk8S67g3pl1PjvMwh7dhUCqsSW27/t
- rDpkMvqAKkcaWePFrnWbCOEGmYDYXX5N55z9d8KgsbramU7NHkOygsZkJKqgTbdp4t6W3IMAO2SH
- 1E8zaxox8L7GcfNO+2MU0i0gmK7/z4AuKVkkaYzGFQ2Ibzaym5b2BO/9WjebTieNrwxflLMZXQ36
- dEAVm3i4vm5cXrAOZG9Sp2J20AHLJSx77kQkVnnVSft1LT6y1e0U9STPKa/GQdeBNIkLb6r47afa
- w/CH6KBkbKsuM8AASIR5FkcIFuzQu5IqYl3M6BKhcK235VfjkgLL7IxFttHKDG1B2EwbdbpdlBjV
- CLeXVxe8pBwJ2z2ZxJi1Q8sHZ7bnbbjx8d44Mc2SXSmbnCWBzdnGy8uFWJJSMDV+rzwLvyOpGnZR
- EskE8uGttwnPZM1P+VPKwUVnVpSuzRRB0yO0FgxZ5NStM50u1cVPItYg5ol3QOm7L4Sid3vYU1bR
- 705IPIadxBD/3mgYy2wgK4dNReNhf3bmnjFv2zPPUxDS+mKKTObFcFx0QrY5Wr4Tr9eOpg5s32g8
- 9AFms9wgEy0AcHbma/+26M+pbz8SjqkO4ZmYmgW7lHTFgIfDMShmlQFqCr5hA8wXS7Jg7MEKutMz
- dp+wUO6KCTr6J/h3GgxZZjPp6umVzGyBOCDwRLhgcnpcOwrGK2ayxQgNyqqf/IN48z1lpo6ODRmi
- SLYXQoEVxAAhr5KC2z00v+4P+5at/HsH1isNq8k+VTLs7+3/QriFdXoSiJZ/kuI+OJDNovVqKLll
- g3MLAhJh4EBfV0EQXhOSRzoZcOef8MeTUF+3u4q6NzJgW1ruJDheH5hLAJSBqnHN5aPUgBtRC2aF
- hr6pfb8wbPuJxsjlgTl6fJxyntEfhZCKje4ZXau28ZLUwqHGS5T/H0nFZKe5av/CxXIXJIBC+ema
- c+G2uJyh1FYJh7VnqItchrC72OUMeHyTpNN0eXybX/w7/4VO4PqH7tRQbUwn/Z22G56P9zwlrdZi
- NQj4PT1Zbis+EXUG7TNSxNow7/t2xrEP1ATsqGMGrkOirMZUMXyr+Ba9g0MOnCndEeVcIKB2jIn4
- vrRYEXTMu1QMr3TBnoscZ8OYieT8qf6TsMCg/vmaSHUKgyH3fip4DAxWRW/wxLWB7HrZLYgDmgz6
- KUwxi29Bp9FIkeIiDP/ECUoOSkeHK8v64f+QgoKau2bG0Hp+HzAjsWCLuhF1p5ywGhk+JygEFSG7
- X+t1TW39Ja77LGPpOwA1DvwEC4Lrfaqa2sMQ8hhbKGrji4Pk/Gyrw43N0WGaeDB4FfZzPE/Pcs/5
- uRYMV187qlt4wO85XNTxg1DyrHa1ZbTcx8N0iCdZNCLd191YqcjWBA4Ws7Ey1JEqCGHE58V2XN6q
- AseowdwxD2E3+DaJDvXMbLOjVpPm3YT8Yh1GaqvcHCQ0IJV0lzcUVPfZKuExL7hrJSk60SF3F6RY
- OYr2
-X-Report-Abuse-To: spam@se16.registrar-servers.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190126_091623_753604_2AA46220 
-X-CRM114-Status: GOOD (  16.35  )
+X-CRM114-CacheID: sfid-20190126_104058_916848_E2BBDC26 
+X-CRM114-Status: GOOD (  11.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,56 +78,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- David Airlie <airlied@linux.ie>, Michael Turquette <mturquette@baylibre.com>,
- linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Daniel Vetter <daniel@ffwll.ch>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: Ladislav Michl <ladis@linux-mips.org>, "H
+ . Nikolaus Schaller" <hns@goldelico.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
+ Sebastian Reichel <sre@kernel.org>, Tero Kristo <t-kristo@ti.com>,
+ Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Andy Shevchenko <andy.shevchenko@gmail.com>,
+ Thierry Reding <thierry.reding@gmail.com>, Pavel Machek <pavel@ucw.cz>,
+ Keerthy <j-keerthy@ti.com>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-omap@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============2678235839763053915=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 25/01/19 9:22 PM, Maxime Ripard wrote:
-> On Fri, Jan 25, 2019 at 01:28:52AM +0530, Jagan Teki wrote:
->> The MIPI DSI controller in Allwinner A64 is similar to A33.
->>
->> But unlike A33, A64 doesn't have DSI_SCLK gating which eventually
->> set the mod clock rate for the controller.
->>
->> So, use the DSI_DPHY gating for the similar purpose of mod clock
->> so-that the controller can operate properly.
->>
->> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->> Reviewed-by: Rob Herring <robh@kernel.org>
->> ---
->>   Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
->> index 69e233e8fad1..dbda2e567760 100644
->> --- a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
->> +++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
->> @@ -12,6 +12,7 @@ The DSI Encoder generates the DSI signal from the TCON's.
->>   Required properties:
->>     - compatible: value must be one of:
->>       * allwinner,sun6i-a31-mipi-dsi
->> +    * "allwinner,sun50i-a64-mipi-dsi", "allwinner,sun6i-a31-mipi-dsi"
-> 
-> The other line doesn't have quotes, we should be consistent
+--===============2678235839763053915==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+ boundary="Sig_/5AbSC/DfyOdNO2cukCydAeE"; protocol="application/pgp-signature"
 
-You mean to say, remove quotes like this
+--Sig_/5AbSC/DfyOdNO2cukCydAeE
+Content-Type: text/plain; charset=US-ASCII
+Content-Transfer-Encoding: quoted-printable
+
+On Tue, 22 Jan 2019 09:57:15 -0800
+Tony Lindgren <tony@atomide.com> wrote:
+
+> Commit 84badc5ec5fc ("ARM: dts: omap4: Move l4 child devices to probe
+> them with ti-sysc") moved some omap4 timers to probe with ti-sysc
+> interconnect target module. Turns out this broke pwm-omap-dmtimer
+> where we now try to reparent the clock to itself with the following:
+>=20
+> omap_dm_timer_of_set_source: failed to set parent
+>=20
+> With ti-sysc, we can now configure the clock sources in the dts
+> with assigned-clocks and assigned-clock-parents. So we should be able
+> to remove omap_dm_timer_of_set_source with clean-up patches later on.
+> But for now, let's just fix it first by checking if parent and fck
+> are the same and bail out of so.
+>=20
+together with 2/3 it fixes things on pyra
+
+Tested-By: Andreas Kemnade <andreas@kemnade.info>
+
+--Sig_/5AbSC/DfyOdNO2cukCydAeE
+Content-Type: application/pgp-signature
+Content-Description: OpenPGP digital signature
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCAAdFiEE7sDbhY5mwNpwYgrAfb1qx03ikyQFAlxMqawACgkQfb1qx03i
+kyT5yw//ZSntlnj30pDgOix+cgXsXwIjRu8Q4saMMzN18kLHRZv5bdjACIFRbGdl
+H8i4SvDjILrspfjRpH8e4TJcVqETdO3WO9SiulldBnU0nOYFcMBEPlqVKh2KZnwV
+GCJkHntwIwb+1HvoqYnteeBRQNhozFC+oDFv2XT/kAtCImgyc9LqUdw4fBKK9Smv
++8AS83jBLcOix2okDitGoZ/R2bz+Z9G1XwbrH2/3ovh5APa4taHkrGnhqtnX/npW
+C4FlrOCJhOCpRk7JCY/gxdWBXUFhEHPUBIgV4UaS1A12nQXQnpUzKpFFJcBx1CFI
+zSmE/ph7sutbg5rM8jGwy6PYeEBBwp0G+WkG6zKoyr2nVQQ0CpjsXW8wak8f7QZ7
+lqEe0iEfEkBdN0BMy+gNXbJhKf53b2WrTeKx2c8N4UWj/n16ETMNB24pZEJyC6z1
+eHp60FABXxSluyBTAGdNBgM9rqVQTQRWG/Pelgi2i0yovnFWhrKZJLcung+GuFUR
+YCqAbDtKtRHd+Nt8bKdc6VbsUVNhZArFm3op8uszQsAG43XYDjsCT+Yf3ikjL0Wo
+dDf4txq4V19WC4Kutvk23M65SbeWlVK5H5fx1NhIsnO2owZsJ+R+slLeZQ4/qiS5
+vIkmaDch2gZXtA41bVpEl2bV8xOPkGbwvUlA02iRY93bYtnTKZU=
+=YJJJ
+-----END PGP SIGNATURE-----
+
+--Sig_/5AbSC/DfyOdNO2cukCydAeE--
 
 
-allwinner,sun50i-a64-mipi-dsi, allwinner,sun6i-a31-mipi-dsi
-
-This make confusion with comma with allwinner vs next compatible string 
-isn't it? (In fact I did follow the similar like TCON in sun4i-drm.txt)
+--===============2678235839763053915==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============2678235839763053915==--
+
