@@ -2,84 +2,81 @@ Return-Path: <SRS0=mu0f=QD=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C6911C282C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 08:29:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E0E5AC282C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 08:55:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 93D42214C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 08:29:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AEDDE20989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 08:55:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mElXApVa";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Z6pC8HdZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 93D42214C6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dFr4Rf+p";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="j4Bmxi9u"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AEDDE20989
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=PChs9u0uz3MVlu2lnOlf288B5T1aIGBRsY6nWpSwCFA=; b=mElXApVabDaCMh
-	SKzLL1TYEtcFht19t9ZnnDIMs/tRKy+Zg3st+moKA2Q3E0+ndUPWMz8MXwPVIhp7LepyvXp4L24Kb
-	jM6SdgU5D6UJeP1cOwufGtBqwW/iOeBvp2aPc52wblZUJ+/OHEIN3/WboFRcoj/9VySBaYZq49hH+
-	yD1Q/sWxXg0TAQevEXtIq/6KcI75CvsCkIAxDNnEEUCXEY6osANmnHS/ylK3MFGd1G8LTPlBxLug3
-	3jLH2cmA5SFNlAxrOIWmjJL0+lrltGcwq5V/YL98I5pXD1uo0fCDQogtycINQ0mZuRqdWajL/9UFs
-	wHic0Kp4Q49jn0GH5t5w==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=mi7QHAX8i0pEO9htTkHTr1c8VoAnT5bNwrU9fCbVheE=; b=dFr4Rf+phbXRoF
+	W5LtdGBo6rmktlQ9tRWzG27W/2w9A465UYlMvDqiNY+MWa8Y0WPh90ojAkmtjdJnlVRAO2mxngW8p
+	u3Ckrk3JlhOsRssoVveg30WK19YM9e1h3e0rwd/tGzlR/SHQTh1xPUXiDOFrcBiM/8ePkse6lkqS4
+	XEYIlrZ02pQJJcFt93KdbOTh+pRi+bFWeS8Li0TO6S4Dc50FsXAmzF1RHhBqVi2U2GDqBll9S/gRb
+	WoXM7FE8ACGHcSJFATWkv7ZqPaEFarQNyHPjAMq9tqDP8sc/DE5Yhd4u+xqkiGApeiQrSbulreZmg
+	JiK9+TdCyllnJEmbDr4w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gnfp8-0001AL-Tw; Sun, 27 Jan 2019 08:29:50 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gngDj-0002MY-23; Sun, 27 Jan 2019 08:55:15 +0000
+Received: from mail-io1-xd2c.google.com ([2607:f8b0:4864:20::d2c])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gnfp6-00019w-C4
- for linux-arm-kernel@lists.infradead.org; Sun, 27 Jan 2019 08:29:50 +0000
-Received: by mail-wr1-x443.google.com with SMTP id 96so14581765wrb.2
+ id 1gngDe-0001uL-Bc
+ for linux-arm-kernel@lists.infradead.org; Sun, 27 Jan 2019 08:55:12 +0000
+Received: by mail-io1-xd2c.google.com with SMTP id k7so11034154iob.6
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 27 Jan 2019 00:29:47 -0800 (PST)
+ Sun, 27 Jan 2019 00:55:07 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=Pcz3APvMfrAaCnd4rFCsM9XQr9R81TbDRa9rzor92zE=;
- b=Z6pC8HdZqyTNII1AxdK5JVy4mxJEMJAaVCRMYfmPnfFyKmCW9VksTk6xtanGgEWsnm
- /2D7ijl5KBeSqcOxtd1FVtdfMRAgePMB/7VV2Eh/CHwHUWpAV9KITfXn3XJzJx+1+5dv
- XVMOR2iPKxyoPDlsZtFehKhBNVxubKTp0oaZQ=
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=DdMckKEcWICyP6+dmYxRWpMFp9C9/P0ba38gUhiNXhU=;
+ b=j4Bmxi9uLxmCIli5O0OOmHvmGf3hqwcnaI+kc1v+eVLUEXjOKr/mu5DoCVhS5HY6UH
+ h0FiZUXm0Ki0cPR/+M3dXVEXSA9ac6qfSmfpR375Pv1X7AlwiXcxVJCozXhSKer7Q8SH
+ rWdafWUXfzyEZbMwiz+HfygT9ZjwiQML72AyA=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=Pcz3APvMfrAaCnd4rFCsM9XQr9R81TbDRa9rzor92zE=;
- b=swnXhHJck0w9foYnzhbuJB0p6+MrxUsQKqniEDkKQjVCReosw3SXJyY7YJ94q5yuZE
- SvVBCKz4GMkZiuAUeRqTJv/1A6C73qnTar+DSnuUvEXJjS+8AYnih9cPoCJAl8ajQFIq
- zITpf9VBoTvjbZ4X4UpZUyJup2m6m0T2AjikwpKqIXz3pQtb9l2jqe65/f61AGwKTg1J
- Apx2Mk2Ix5Y0GEZbMfTglygs8Dkd/wI3EeFwoEJ70Uo1oatwjiciXzeTQwfKj3zn0W/w
- JJoEWcM1ASzGaKMearzPEyKhOaUqDiAZDIYGLf/lN5XTNhCJ8V26+qADgppQ0caJTeUP
- jE5w==
-X-Gm-Message-State: AJcUukfGDrd6jkIdR8MosTNheVcjqYzx9oOy/KgrtkUhybq246M4zsWk
- 4kC90U5HEmYTFL8ZKZ+WFq6v7i/+bbsRDA==
-X-Google-Smtp-Source: ALg8bN7myPNpp+4hoakbGcUIL9vlMcOq4GjW80QNsFkwQYMG8fQf408388vXsjYN5zVCyToGNApLzw==
-X-Received: by 2002:adf:b102:: with SMTP id l2mr16906631wra.296.1548577786162; 
- Sun, 27 Jan 2019 00:29:46 -0800 (PST)
-Received: from sudo.home ([2a01:cb1d:112:6f00:887d:32e9:9391:d3bf])
- by smtp.gmail.com with ESMTPSA id s66sm59019402wmf.34.2019.01.27.00.29.44
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sun, 27 Jan 2019 00:29:45 -0800 (PST)
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH] arm64: kaslr: ensure randomized quantities are clean also
- when kaslr is off
-Date: Sun, 27 Jan 2019 09:29:42 +0100
-Message-Id: <20190127082942.21998-1-ard.biesheuvel@linaro.org>
-X-Mailer: git-send-email 2.20.1
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=DdMckKEcWICyP6+dmYxRWpMFp9C9/P0ba38gUhiNXhU=;
+ b=foS+cRYfC4h7CCgyuGFAQp+zRDNm0gRNHqidKlyZRAjL7Kw5estaqqWrW7/vYBOVWg
+ vF+o/W6fy/AWAqtA8+SIC+uON8Xh+oUEo+81YbVDhaTFPGrO6uWUD34Hzawf2ZUSKEJG
+ xnzVisEXrDI9UTrvoBK2uNHSb3lm6MdZZdC2Hhl+0xaRu3/s5BmRR/jMt70pOfeWXFjB
+ +YdNoDzp6FXKI3qunPO+glmc0oNp/a7iO+DC/86e/1YY+oV0y6TW7yIg4AKv93pb5CId
+ GokkMkFv3aCJiDw67ic6rRMZkvSgfvFLANCa44es7MJCzx8REIxzuTwPG8rpRpJtTLoO
+ cmGQ==
+X-Gm-Message-State: AHQUAuaOhNJOP1BEFg4SB+vZOnM9pNDisbifWps2N7+WSsMkY0ySfK8m
+ 1M+sgnfPMuJKrQR+ApdmCmgfvJlgwi+jQm64EZnqrw==
+X-Google-Smtp-Source: ALg8bN4kxXlUhNNkKDKt/5NXGmkTCrvnZn0Vdfyt1NCEroJXhSgBiFvyFFc4nkvAHM6QuOv8B7yJAQtVRC55dOZ+Qf0=
+X-Received: by 2002:a5d:8410:: with SMTP id i16mr10317879ion.173.1548579306987; 
+ Sun, 27 Jan 2019 00:55:06 -0800 (PST)
 MIME-Version: 1.0
+References: <20190126210530.GB709@sol.localdomain>
+In-Reply-To: <20190126210530.GB709@sol.localdomain>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Sun, 27 Jan 2019 09:54:54 +0100
+Message-ID: <CAKv+Gu-RKu9jt+2FnV2529zqyLGR8RSu8r4B8eOs-7Om-pL0aQ@mail.gmail.com>
+Subject: Re: [Bug] Rockchip crypto driver sometimes produces wrong ciphertext
+To: Eric Biggers <ebiggers@kernel.org>, 
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Arnd Bergmann <arnd@arndb.de>, Olof Johansson <olof@lixom.net>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190127_002948_420242_BCEB92FC 
-X-CRM114-Status: GOOD (  11.65  )
+X-CRM114-CacheID: sfid-20190127_005510_395732_B9D5A735 
+X-CRM114-Status: GOOD (  12.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,52 +88,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: catalin.marinas@arm.com, will.deacon@arm.com, stable@vger.kernel.org,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: linux-rockchip@lists.infradead.org, Zain Wang <wzz@rock-chips.com>,
+ Heiko Stuebner <heiko@sntech.de>,
+ "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
+ <linux-crypto@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Commit 1598ecda7b23 ("arm64: kaslr: ensure randomized quantities are
-clean to the PoC") added cache maintenance to ensure that global
-variables set by the kaslr init routine are not wiped clean due to
-cache invalidation occurring during the second round of page table
-creation.
+(add LAKML and arm-soc maintainers)
 
-However, if kaslr_early_init() exits early with no randomization
-being applied (either due to the lack of a seed, or because the user
-has disabled kaslr explicitly), no cache maintenance is performed,
-leading to the same issue we attempted to fix earlier, as far as the
-module_alloc_base variable is concerned.
-
-Note that module_alloc_base cannot be initialized statically, because
-that would cause it to be subject to a R_AARCH64_RELATIVE relocation,
-causing it to be overwritten by the second round of KASLR relocation
-processing.
-
-Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
-Cc: <stable@vger.kernel.org> # v4.6+
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/kaslr.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
-index ba6b41790fcd..b09b6f75f759 100644
---- a/arch/arm64/kernel/kaslr.c
-+++ b/arch/arm64/kernel/kaslr.c
-@@ -88,6 +88,7 @@ u64 __init kaslr_early_init(u64 dt_phys)
- 	 * we end up running with module randomization disabled.
- 	 */
- 	module_alloc_base = (u64)_etext - MODULES_VSIZE;
-+	__flush_dcache_area(&module_alloc_base, sizeof(module_alloc_base));
- 
- 	/*
- 	 * Try to map the FDT early. If this fails, we simply bail,
--- 
-2.20.1
-
+On Sat, 26 Jan 2019 at 22:05, Eric Biggers <ebiggers@kernel.org> wrote:
+>
+> Hello,
+>
+> I don't know whether anyone is actually maintaining the Rockchip crypto driver
+> in drivers/crypto/rockchip/, but it's failing the improved crypto tests
+> that I currently have out for review: https://patchwork.kernel.org/cover/10778089/
+>
+> See the boot logs for RK3288 from the KernelCI job here:
+>
+> https://storage.kernelci.org/ardb/for-kernelci/v5.0-rc1-86-geaffe22db9d1/arm/multi_v7_defconfig/lab-collabora/boot-rk3288-rock2-square.txt
+> https://storage.kernelci.org/ardb/for-kernelci/v5.0-rc1-86-geaffe22db9d1/arm/multi_v7_defconfig/lab-collabora/boot-rk3288-veyron-jaq.txt
+>
+> alg: skcipher: ecb-aes-rk encryption test failed (wrong result) on test vector 0, cfg=\"random: use_digest src_divs=[15.64%@+3258, 84.36%@+4059] dst_divs=[69.11%@+1796, 8.49%@+4027, 6.34%@+1, 16.6%@+4058] iv_offset=21\"
+> alg: skcipher: cbc-aes-rk encryption test failed (wrong result) on test vector 0, cfg=\"random: may_sleep use_digest src_divs=[100.0%@alignmask+3993] dst_divs=[65.31%@alignmask+1435, 34.69%@+14]\"
+> alg: skcipher: ecb-des-rk encryption test failed (wrong result) on test vector 0, cfg=\"random: may_sleep use_final src_divs=[<flush> 66.52%@+11, 33.48%@+1519] dst_divs=[58.82%@+1, 19.43%@+4082, 21.75%@+8]\"
+> alg: skcipher: cbc-des-rk encryption test failed (wrong result) on test vector 0, cfg=\"random: may_sleep use_finup src_divs=[100.0%@+3980] dst_divs=[60.4%@+3763, 23.9%@+4011, 16.87%@+4046]\"
+> alg: skcipher: ecb-des3-ede-rk encryption test failed (wrong result) on test vector 0, cfg=\"random: may_sleep use_digest src_divs=[100.0%@+4] dst_divs=[47.25%@+19, 14.83%@+22, 37.92%@+31]\"
+> alg: skcipher: cbc-des3-ede-rk encryption test failed (wrong result) on test vector 0, cfg=\"two even aligned splits\"
+>
+> In other words: the ecb-aes-rk, cbc-aes-rk, ecb-des-rk, cbc-des-rk,
+> ecb-des3-ede-rk, and cbc-des3-ede-rk algorithms are failing because they produce
+> the wrong ciphertext on some scatterlist layouts.
+>
+> You can reproduce by pulling from
+> https://git.kernel.org/pub/scm/linux/kernel/git/ebiggers/linux.git
+> branch "testmgr-improvements", unsetting CONFIG_CRYPTO_MANAGER_DISABLE_TESTS,
+> setting CONFIG_CRYPTO_MANAGER_EXTRA_TESTS=y, rebooting and checking dmesg.
+>
+> Note that I don't have this hardware myself, so if it turns out that no one is
+> interested in fixing this anytime soon I'll instead have to propose disabling
+> these algorithms until they can be fixed.
+>
+> Thanks,
+>
+> - Eric
 
 _______________________________________________
 linux-arm-kernel mailing list
