@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8032EC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 14:48:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7C133C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 14:49:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 51C572147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 14:48:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4C0722147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 14:49:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H8l/ELX3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 51C572147A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mqyCqwet"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C0722147A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,33 +25,34 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZlfNdZaegAHadPoOp25uGyyinZ4C4FEwRY4PZmlPeNs=; b=H8l/ELX36Ze6bA
-	hqmoan9UInZ8b14wYDjoftDHiwS8vHNIbjIr5S3FbDwXe4jG12maBcaudmXQQJwp9dXeFe1eL6hYa
-	6b2ZUfuEGkA4XaiEqjPREj+IrBvxnzgfrPd831w239EJEn+8tqX9wAMLsNPsSs4NI3y03vEHoWkVr
-	330csJYlBPQctRGe2hLMRCbQ4KB1a53eVmemXvccInh3IJQQopo8uO9caZFeg5cTLt/nI9Obfo8do
-	lkgjiOvcCK5yVeyPAZseEmGnV0WcI0WQbuf2kvMnHGv0/wkE2nNi2RFGw5DtBAOlkHKW4Xwqsh32e
-	Kxlae8N7v0ARsm9lTf+A==;
+	List-Owner; bh=1JFAgNDTJnjEzH9CvqF44dc/NTJhz3gXAdJOBr+/l9Q=; b=mqyCqwetUg+dmr
+	kHzNErOxRCkXD3Pn0oGTzfmkBgpykYJjAEeDrVTwiDnkBhys6yzdUlSOi8tHuMddbfKP1DR/OS56L
+	vLEZegtzsqAzjdViDzr5eSBeZmB2bDt7YohB6i2TotoidXm4A1GipEtqFKPT4RBeTBe+EYDzfxCNP
+	/gHrGqvFolSR7zzTXNSDmlxU9SJAzKuWcCkT6X6oQkI2FJSnMx1Myzp9zFdrjY0cU8inDLCzQUin/
+	AzVnbgADexhf5UEF1TAT7YzRoidjjZygHNWqVdq6aopNC+SZmByQa+VwIZ/NOUIJUCaDUXfq+SULD
+	JAnI1OiHmwx3erd4ZZdw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gnljs-0000Ol-DI; Sun, 27 Jan 2019 14:48:48 +0000
+	id 1gnlk1-0000Z5-Jp; Sun, 27 Jan 2019 14:48:57 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gnljn-0000MX-Jt
+ id 1gnljn-0000MW-Iu
  for linux-arm-kernel@lists.infradead.org; Sun, 27 Jan 2019 14:48:45 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 789EE5FD54; Sun, 27 Jan 2019 22:48:39 +0800 (CST)
+ id 614F45F9F2; Sun, 27 Jan 2019 22:48:39 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH 4/5] ARM: dts: sun5i: q8-tablet: Add LCD Panel power supply
-Date: Sun, 27 Jan 2019 22:48:37 +0800
-Message-Id: <20190127144838.3578-5-wens@csie.org>
+Subject: [PATCH 1/5] ARM: dts: sun5i: Add backlight GPIO for reference design
+ tablet
+Date: Sun, 27 Jan 2019 22:48:34 +0800
+Message-Id: <20190127144838.3578-2-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190127144838.3578-1-wens@csie.org>
 References: <20190127144838.3578-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190127_064843_779868_8CD32454 
-X-CRM114-Status: GOOD (  10.79  )
+X-CRM114-CacheID: sfid-20190127_064843_751527_CEF21603 
+X-CRM114-Status: GOOD (  11.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,31 +71,27 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The A13 Q8 tablet, following the A13 reference tablet design, has the
-system's fixed 3.3V rail feed the VCC supply of the LCD panel.
-Additional voltage rails used by the panel are generated using a
-regulator fed from the unregulated IPSOUT output of the PMIC. The latter
-is unrepresentable in the device tree. Both are controlled with MOSFETs
-by the enable GPIO added in the previous patch. The actual enable or
-reset pin for the panel is tied directly to LCD-VCC after the MOSFET.
+Now that we support the GPIOs on the AXP209, we can control the LCD
+backlight with them.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun5i-a13-q8-tablet.dts | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts b/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
-index ead159f89e74..c77c0758145a 100644
---- a/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
-@@ -50,6 +50,7 @@
+diff --git a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+index 6202aabedbfe..5b1f0e198eb6 100644
+--- a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
++++ b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+@@ -54,7 +54,7 @@
+ 		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
+ 		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
+ 		default-brightness-level = <8>;
+-		/* TODO: backlight uses axp gpio1 as enable pin */
++		enable-gpios = <&axp_gpio 1 GPIO_ACTIVE_HIGH>; /* AXP GPIO1 */
+ 	};
  
- 	panel: panel {
- 		compatible = "urt,umsh-8596md-t", "simple-panel";
-+		power-supply = <&reg_vcc3v3>;
- 		enable-gpios = <&axp_gpio 0 GPIO_ACTIVE_HIGH>; /* AXP GPIO0 */
- 		backlight = <&backlight>;
- 		#address-cells = <1>;
+ 	chosen {
 -- 
 2.20.1
 
