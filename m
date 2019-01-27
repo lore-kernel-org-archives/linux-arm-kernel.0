@@ -2,23 +2,22 @@ Return-Path: <SRS0=mu0f=QD=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E363BC282C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 10:38:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 894A6C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 12:27:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 98E59217D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 10:38:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 58CE221473
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 12:27:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Bmz4I+YQ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="bG7fmttc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 98E59217D7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Riu8qGHd";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="MPy5WjsJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 58CE221473
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,69 +25,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VhuKdWHwjFdzUE9PXLS7q8KiIhmjWA0KWHgiCU9rgZ8=; b=Bmz4I+YQAhjccx
-	w95wUdLpTTLx7oEOKggmqa/Ok+qWcU12Zg/vepY1fUV/fo1FXi2mrpVk5LlFdwVzmx+/ANTSfoO7z
-	FWM5WVd810ju7Z+3RU2aCnXVRNyIPLh0akJwCONAVsNqWJy6FXa20hUV/+7o7Rx1yBZVtJVWhd/Vj
-	ujpZ1pwdrfDoGNm87rwE0Yz0f36Gbw4qXIR7SLM62hr4q4EBzguLo5f6/UfFC7YIXYeuwCAHtknzu
-	5ZtmZBglQMRqi+0bMkOGkD1PuoSJQLrYWu0diuizPC9Z9g8wsWdpL/Biop2PFtsnb3ZXTGGQTo0Do
-	wGi7852xJ/yq9WamibJw==;
+	List-Owner; bh=XV5udglCeZgLgq1Uil0llzSqMeiVdL8UpDXHsUMCMCs=; b=Riu8qGHdmJqoOn
+	7sqB5jPMgIoEVnmolidtYeVfczFwokvHf+gdc9onNObuY4O6TecVjzGPaKp6c/kSWP+RV0D1NQbSA
+	6hMvHW+nYKPXacBt2juhVTf5pPEjWHAwsEUO+/Urq4lLjxqmBpgZuOBtNvZdAoFbz5e0s5+GKAz7d
+	pRKiAdiTdLaj1n+/BN2Rt9RO6tKl/SSDznoMSntGmRTiqEF+tTY8dmKxiL/AyvwaWDt4JqyDsiKDU
+	aspCrZo9EYYQVVnQMUgtUbxr9hu1AI28Y/R/KEiJ0hkjtLeBtMfejhMe6IkBp4TFImpcc+4g4o0N9
+	0XUNuLJxtcG3p/XoBhSg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gnhpu-0007Kb-8V; Sun, 27 Jan 2019 10:38:46 +0000
-Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
+	id 1gnjWX-000853-IY; Sun, 27 Jan 2019 12:26:53 +0000
+Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gnhpr-0007KH-Pb
- for linux-arm-kernel@lists.infradead.org; Sun, 27 Jan 2019 10:38:45 +0000
-Received: by mail-it1-x143.google.com with SMTP id p197so15569202itp.0
+ id 1gnjWS-00084j-PL
+ for linux-arm-kernel@lists.infradead.org; Sun, 27 Jan 2019 12:26:51 +0000
+Received: by mail-ot1-x341.google.com with SMTP id 81so12456854otj.2
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 27 Jan 2019 02:38:41 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ Sun, 27 Jan 2019 04:26:46 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=ybBP+IUw0wA6yvj6uUeWUOT7wvGHqpFpF4qMfyRcWAM=;
- b=bG7fmttcrAu/Ib97423dO1HX/u6b6j2OiH72pNWCm9YsSPr+CkbvNLaO0+qS0NdiWH
- HfFdW3rJnBrpDG6II8cyG/0GS8Ugk4WYPOgCdZX6GVfQsIaK/vivWBNslH+jaiEhnQR6
- f7sE60jq+WEeDxqydzM+HAOVSFy3XOfkadkxnLT5t+U5xQQz43RFKYjx0h6mGN9394Lu
- bzPX2EKfQZ7tL05oRBJtYqNT+q1e21AmnGOLw5bUoACAmhXAeUD2xFtroammMMN710vz
- fBy+yeKZ1COMftUdn7E0nj1C9LY5Z+8pwth2zEnl0RmbyQlSuadtA4eTnyLHX3itaBQk
- Tt7A==
+ :cc:content-transfer-encoding;
+ bh=FV09SYoL0F04ZmSUaNF5xOhlXlJTckZ/GU1hR92+CcY=;
+ b=MPy5WjsJlaQiwcMncMwsJ5UFS7ZMJeBLA+3P1DRfqyigMRlDTk9SBD7VBGVJuoeFx9
+ JCDjwxEkl5hg24uZmIH4BB2qy0LWpSXcPwgO1ZQ8qBkEIy3V+wkESXqmHnh1evX1Lw96
+ BUjoydtFnWg2EtZvKpWaPO/1jv2AIrB/z9h2HN+BDIM5ZjbT67YMGjmsHQRGP7umF/dK
+ 1ZT8KiRNiqIefnlL7tGjWSMzaqzHmh08TGsBHiKFL5NKHiO+FOnTnDMH/MF/0HdcXH+s
+ SEvVk1gPv/TITcF+7a/0CQU62H/tvSLC8WW5IRwvxMWmigl2eMja+bwDHo5MCFnH4bHA
+ 7MJQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=ybBP+IUw0wA6yvj6uUeWUOT7wvGHqpFpF4qMfyRcWAM=;
- b=Q7dZLuzM82+Ca+enkGv9WqviAAQZ/Enk1uAUC07wKEXOXngBk18yWobTXZGUnjISFD
- BUQIuKuoVv4a05lRPmIEIDyjGyAw+RDk1poNg3sSKYIjJVrGniY5+JF+CdkbL5FkAqbf
- 59wCOsoPZv4LWa/leIycYZFQy73tmtf9NSU2NYoZz5Or1WhmZiLr5Q9rBNSRsiVYengM
- 5GRNDyYT9NlSK6bS1C1BOOIVjoWyILQUqPKb0OVghy58xYWzK18XIUxZCrFcAUfe2klN
- MUiGSy4IFLpbJYPD8r2wILYj59n0GL9hatK7tEl7zyjlBQyHGGnKsGMDPy2MWjXKZcNk
- mhzA==
-X-Gm-Message-State: AJcUukcOrkumNPkAtEROdMKnnW7BOPtFA5qVx93f3NGPI/wIrSbm61O/
- 2JVYUzsg10OJ2srNS3Ol1+TukrqGXWwJdK/56hCiSqA7
-X-Google-Smtp-Source: ALg8bN6auXmMl/eBky+INoX6daFtX2dvE4FectWVTRTKUn3QD9JPQcoJApENBpBky3q1IeDwMvvAWPCFL9rx9wfzzjc=
-X-Received: by 2002:a24:80d2:: with SMTP id g201mr8084982itd.63.1548585520921; 
- Sun, 27 Jan 2019 02:38:40 -0800 (PST)
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=FV09SYoL0F04ZmSUaNF5xOhlXlJTckZ/GU1hR92+CcY=;
+ b=uaLjTdFyne3Drw3f4lN9K9cNp6hhrm9Rpkb6jygJsotrJBx/8Fe+h5BovoGTCi62Xs
+ fYDMhKtyKzyxRdS2iSWp4nsd5dFNvylMOChOcQUjTsFVSukgfqJYwnSjwSylxCcJ4MuC
+ SDKhU/FSuAdctFHutyM6CqlDP/aK4xQQo9OfYEwFBwK3aQ1kybeSetNgfRdLaI6LoBVa
+ Keh1JqJvesQqH4ZfDwlOxFo+2I6IALfxfEDeRZK1p7dUJ40KJE9e1FL0ymOBPRAEtfGB
+ /+hONHetGmbJwbWFeUIjHUPYxmMm/8n+JvCRVK89Bnpz2vSFpmYO9tsbeeyvXX9gBqUS
+ KPPA==
+X-Gm-Message-State: AJcUukd49MPxGJEbFjJdATIV8BHhtcUNPDLncZ10HGJ6VRsLIG9I9eog
+ tok394ATFOA7bwL9rXsIwuedUX7DbIUFPX60TMcJmw==
+X-Google-Smtp-Source: ALg8bN4HwA9drGKobG9D/YBH0b7fqsVPIKzg6dyz6wZHcrg8C9kuTgwJ6Z+iOW8kvKSOrp+9PSPce9tS3QjA86cCAhA=
+X-Received: by 2002:a9d:70d5:: with SMTP id w21mr9862260otj.301.1548592006116; 
+ Sun, 27 Jan 2019 04:26:46 -0800 (PST)
 MIME-Version: 1.0
-References: <1547797668-30342-1-git-send-email-aisheng.dong@nxp.com>
- <1547797668-30342-5-git-send-email-aisheng.dong@nxp.com>
- <1547801609.2626.5.camel@pengutronix.de>
- <AM0PR04MB42111D634F28492434AA9309809C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <1547806960.2626.9.camel@pengutronix.de>
- <AM0PR04MB42111FE266342A2C2EAECC3580980@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <1548154758.2465.20.camel@pengutronix.de>
- <AM0PR04MB4211B9003857795EBC79541480980@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <1548161549.2465.24.camel@pengutronix.de>
- <AM0PR04MB42114F3D625CC48343EA427080980@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <1548412956.28802.41.camel@pengutronix.de>
-In-Reply-To: <1548412956.28802.41.camel@pengutronix.de>
-From: Dong Aisheng <dongas86@gmail.com>
-Date: Sun, 27 Jan 2019 18:38:29 +0800
-Message-ID: <CAA+hA=TmBBTaNtmWFEX62LViwPKsBTvv-jWcwU7a7K7yh=JhYQ@mail.gmail.com>
-Subject: Re: [PATCH 4/4] irq: imx: irqsteer: add multi output interrupts
- support
-To: Lucas Stach <l.stach@pengutronix.de>
+References: <20190108091539.16674-1-brgl@bgdev.pl>
+ <8c190cf3-b4f3-90d0-07ce-4bb7927160df@ti.com>
+ <20190122122228.GA2736@kroah.com>
+In-Reply-To: <20190122122228.GA2736@kroah.com>
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Date: Sun, 27 Jan 2019 13:26:35 +0100
+Message-ID: <CAMpxmJW+ODrqCTSaQMOgRG2d3Qy2SipzYQU3JRPbJE_Wn85H0w@mail.gmail.com>
+Subject: Re: [RESEND PATCH 00/12] eeprom: at24: remove platform_data
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190127_023843_857717_2B2D934B 
-X-CRM114-Status: GOOD (  13.90  )
+X-CRM114-CacheID: sfid-20190127_042648_892029_DAFEE8DD 
+X-CRM114-Status: GOOD (  14.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,67 +92,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Marc Zyngier <marc.zyngier@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- "tglx@linutronix.de" <tglx@linutronix.de>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Arnd Bergmann <arnd@arndb.de>, Kevin Hilman <khilman@kernel.org>,
+ Bartosz Golaszewski <brgl@bgdev.pl>, Sekhar Nori <nsekhar@ti.com>,
+ LKML <linux-kernel@vger.kernel.org>, linux-i2c <linux-i2c@vger.kernel.org>,
+ arm-soc <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Lucas,
-
-[...]
-
-> > > The fsl,irq-groups property is exactly your NINT32 parameter above. I just
-> > > wrongly assumed that it's always in multiples of 64, as that's what the
-> > > i.MX8MQ DCSS irqsteer module looks like. We should fix this and be done with
-> > > it.
-> > >
-> >
-> > No, not exactly the same thing. Using group will confuse people that the group is 32.
-> > However, internally Group is fixed 64 interrupts although it may not use all the
-> > 64 interrupts. E.g. 32 interrupts.
-> > See CHn_MINTDIS register which is also defined fixed to 64.
-> >
-> > The two HW parameter for integration is already very clear. We should use interrupts
-> > Number for the channel. Not group.
->
-> Okay, I see that the name irq-groups is confusing for you. But then I
-> find the -per-chan naming confusing.
->
-> So given that we seem to agree to split each channel into it's own DT
-> node, there is no need to name the property "something-per-chan", as
-> it's implied by the split DT nodes that all properties in one node are
-> referencing a channel.
->
-
-Double checked with IP module owner by looking into the RTL code,
-writes to CHANnCTL registers have no effect.
-This register is reserved and the doc will be updated.
-Verified on both MX8QXP and MX8MQ.
-
-All channels are isolated and have independent programming model.
-So it will be okay to define them separately in device tree.
-
-> May I suggest to name the property "fsl,num-irqs"?
-
-Sounds good to me.
-
-Regards
-Dong Aisheng
-
->
-> Regards,
-> Lucas
->
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+d3QuLCAyMiBzdHkgMjAxOSBvIDEzOjIyIEdyZWcgS3JvYWgtSGFydG1hbgo8Z3JlZ2toQGxpbnV4
+Zm91bmRhdGlvbi5vcmc+IG5hcGlzYcWCKGEpOgo+Cj4gT24gVGh1LCBKYW4gMTAsIDIwMTkgYXQg
+MDc6NDM6NDdQTSArMDUzMCwgU2VraGFyIE5vcmkgd3JvdGU6Cj4gPiBIaSBCYXJ0b3N6LAo+ID4K
+PiA+IE9uIDA4LzAxLzE5IDI6NDUgUE0sIEJhcnRvc3ogR29sYXN6ZXdza2kgd3JvdGU6Cj4gPiA+
+IEZyb206IEJhcnRvc3ogR29sYXN6ZXdza2kgPGJnb2xhc3pld3NraUBiYXlsaWJyZS5jb20+Cj4g
+PiA+Cj4gPiA+IEhpIFNla2hhciwKPiA+ID4KPiA+ID4gbm93IHRoYXQgYWxsIGRlcGVuZGVuY2ll
+cyBhcmUgaW4gYW5kIHY1LjAtcmMxIGlzIHRhZ2dlZCwgcGxlYXNlIGNvbnNpZGVyCj4gPiA+IHBp
+Y2tpbmcgdXAgdGhlIHNlY29uZCBiYXRjaCBvZiBkYXZpbmNpLXNwZWNpZmljIGNoYW5nZXMgaW50
+byB5b3VyIHRyZWUuCj4gPiA+IE9uY2UgdGhhdCdzIGRvbmUsIHBsZWFzZSBwcm92aWRlIG1lIHdp
+dGggYW4gaW1tdXRhYmxlIGJyYW5jaCBmb3IgbWUgdG8KPiA+ID4gYXBwbHkgdGhlIGxhc3QgcGF0
+Y2ggdG8gbXkgYXQyNCB0cmVlLgo+ID4KPiA+IFlvdSBjYW4gdXNlIGJyYW5jaCB2NS4xL2VlcHJv
+bS1mb3ItYmFydG9zeiBpbiBteSB0cmVlIGZvciB0aGlzIChjb21taXQKPiA+IGU0MzA2ODVmNDk2
+OSkuCj4gPgo+ID4gPgo+ID4gPiBUaGlzIGlzIHRoZSBzZWNvbmQgcGFydCBvZiB0aGUgZWZmb3J0
+IHRvIG1vZGVybml6ZSB0aGUgYXQyNCBkcml2ZXIgYW5kCj4gPiA+IHJlbW92ZSB0aGUgbGVnYWN5
+IHBsYXRmb3JtIGRhdGEgc3RydWN0dXJlIGluIGZhdm9yIG9mIGRldmljZSBwcm9wZXJ0aWVzLgo+
+ID4gPiBJdCByZXF1aXJlZCBnZXR0aW5nIHJpZCBvZiB0aGUgYXQyNCBzZXR1cCBjYWxsYmFjayBp
+biBmYXZvciBvZiBudm1lbQo+ID4gPiBsb29rdXBzLgo+ID4gPgo+ID4gPiBSZS10ZXN0ZWQgd2l0
+aCBkYTg1MC1ldm0gYW5kIGRtMzY1LWV2bS4KPiA+Cj4gPiBBcHBsaWVkIHBhdGNoZXMgMS0xMSBm
+b3IgdjUuMQo+Cj4gRmVlbCBmcmVlIHRvIHRha2UgcGF0Y2ggMTIgYXMgd2VsbCA6KQoKSGkgR3Jl
+ZywKCkkgdG9vayBvdmVyIHRoZSBhdDI0IGRyaXZlciBmcm9tIFdvbGZyYW0gU2FuZy4gSSBjb2xs
+ZWN0IHBhdGNoZXMgZm9yCml0IGluIG15IGJyYW5jaCBhbmQgdGhlbiBzZW5kIHB1bGwtcmVxdWVz
+dHMgdG8gV29sZnJhbSBkaXJlY3RseS4gSSd2ZQphcHBsaWVkIHRoaXMgcGF0Y2ggdG8gbXkgYnJh
+bmNoIGluIGNhc2UgdGhlcmUncyBzb21lIG1vcmUgZGV2ZWxvcG1lbnQKZm9yIGF0MjQgaW4gdGhp
+cyBjeWNsZS4gU2VraGFyIHByb3ZpZGVkIG1lIHdpdGggYW4gaW1tdXRhYmxlIGJyYW5jaAp3aXRo
+IHRoZSBhcmNoIGNvbW1pdHMgSSBtZXJnZWQgaW4uCgpCZXN0IHJlZ2FyZHMsCkJhcnRvc3ogR29s
+YXN6ZXdza2kKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+CmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5m
+cmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xp
+bnV4LWFybS1rZXJuZWwK
