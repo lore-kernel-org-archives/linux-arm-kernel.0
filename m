@@ -2,22 +2,23 @@ Return-Path: <SRS0=mu0f=QD=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 894A6C282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 12:27:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 242D8C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 14:03:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 58CE221473
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 12:27:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DF06A21736
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 27 Jan 2019 14:03:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Riu8qGHd";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="MPy5WjsJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 58CE221473
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J6T4nQ2q";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="G4QW6D+u"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF06A21736
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,62 +26,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XV5udglCeZgLgq1Uil0llzSqMeiVdL8UpDXHsUMCMCs=; b=Riu8qGHdmJqoOn
-	7sqB5jPMgIoEVnmolidtYeVfczFwokvHf+gdc9onNObuY4O6TecVjzGPaKp6c/kSWP+RV0D1NQbSA
-	6hMvHW+nYKPXacBt2juhVTf5pPEjWHAwsEUO+/Urq4lLjxqmBpgZuOBtNvZdAoFbz5e0s5+GKAz7d
-	pRKiAdiTdLaj1n+/BN2Rt9RO6tKl/SSDznoMSntGmRTiqEF+tTY8dmKxiL/AyvwaWDt4JqyDsiKDU
-	aspCrZo9EYYQVVnQMUgtUbxr9hu1AI28Y/R/KEiJ0hkjtLeBtMfejhMe6IkBp4TFImpcc+4g4o0N9
-	0XUNuLJxtcG3p/XoBhSg==;
+	List-Owner; bh=+gOU6EA+LNqkNYToQjveaIH255j8Hr8aheMW5J/clIY=; b=J6T4nQ2qq46ALw
+	JNzE+zcsGgIAZI9MZgfHa/7w8/xkgmkb7N+78Ca+QmRNKrR/+O4Gq+GPSdfpBDqPld5LsMBqt4aoD
+	0K/8vpILanuGo57iVgyliIxbPHnvMMmuZRwXBWClO6a1KSRTa6JnIR3QWYokgTqxkNV76KbdKkLlv
+	XjCW8Yy044gR4sKxp5D54VT/NRvDtm36hCYEQvCQstn6oSib/AzMcyQPqTWABrWweMtLf4nB13QjT
+	BofyvVDwacpGYEHSPQ+Ygt+LGSxK77FvOpEOOa+jvl5tHNzDc27Kte1BCF7rqZbkLPuWm5bumh8od
+	l/cAaM5XDXKo5rtLz68Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gnjWX-000853-IY; Sun, 27 Jan 2019 12:26:53 +0000
-Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
+	id 1gnl1n-00037R-3q; Sun, 27 Jan 2019 14:03:15 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gnjWS-00084j-PL
- for linux-arm-kernel@lists.infradead.org; Sun, 27 Jan 2019 12:26:51 +0000
-Received: by mail-ot1-x341.google.com with SMTP id 81so12456854otj.2
+ id 1gnl1i-00036U-Il
+ for linux-arm-kernel@lists.infradead.org; Sun, 27 Jan 2019 14:03:12 +0000
+Received: by mail-it1-x141.google.com with SMTP id i145so16982091ita.4
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 27 Jan 2019 04:26:46 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ Sun, 27 Jan 2019 06:03:09 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=FV09SYoL0F04ZmSUaNF5xOhlXlJTckZ/GU1hR92+CcY=;
- b=MPy5WjsJlaQiwcMncMwsJ5UFS7ZMJeBLA+3P1DRfqyigMRlDTk9SBD7VBGVJuoeFx9
- JCDjwxEkl5hg24uZmIH4BB2qy0LWpSXcPwgO1ZQ8qBkEIy3V+wkESXqmHnh1evX1Lw96
- BUjoydtFnWg2EtZvKpWaPO/1jv2AIrB/z9h2HN+BDIM5ZjbT67YMGjmsHQRGP7umF/dK
- 1ZT8KiRNiqIefnlL7tGjWSMzaqzHmh08TGsBHiKFL5NKHiO+FOnTnDMH/MF/0HdcXH+s
- SEvVk1gPv/TITcF+7a/0CQU62H/tvSLC8WW5IRwvxMWmigl2eMja+bwDHo5MCFnH4bHA
- 7MJQ==
+ :cc; bh=DvjaMtoCZExGiMT2FyI4koJ0UPtbXCHbovdkZaR21eY=;
+ b=G4QW6D+uRzus557flxpuGp2rsJyR6ogM1bdSJq1LRTH1dcdrcrHX42d7KgcqiUtQVT
+ flmZoW4bGOBvQDmfvS+B/Z19MYnP0RC1e8Ss2YxeHG8ZUpVjdcC8PJ8pw1yy3QR2hCb3
+ ernizcjiehGIVShXhf7ySJu4E8YJTTRDP7LI4rurlBnBFIZSvigb6w2tflUcPIeUMpSs
+ JHaZ2xDX0dvsAqAFWNU39Am4iK4/0hsq8NEnqIoE6TmluLZzzMXuw61YyZ8pVjNawrrD
+ fgD7YMDK2OEQULYQzzl+cfD9AzTgWzVb/H3OOZFFbJ0pk86PzmqeuR6w0T9/FdBi+uWe
+ trsQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=FV09SYoL0F04ZmSUaNF5xOhlXlJTckZ/GU1hR92+CcY=;
- b=uaLjTdFyne3Drw3f4lN9K9cNp6hhrm9Rpkb6jygJsotrJBx/8Fe+h5BovoGTCi62Xs
- fYDMhKtyKzyxRdS2iSWp4nsd5dFNvylMOChOcQUjTsFVSukgfqJYwnSjwSylxCcJ4MuC
- SDKhU/FSuAdctFHutyM6CqlDP/aK4xQQo9OfYEwFBwK3aQ1kybeSetNgfRdLaI6LoBVa
- Keh1JqJvesQqH4ZfDwlOxFo+2I6IALfxfEDeRZK1p7dUJ40KJE9e1FL0ymOBPRAEtfGB
- /+hONHetGmbJwbWFeUIjHUPYxmMm/8n+JvCRVK89Bnpz2vSFpmYO9tsbeeyvXX9gBqUS
- KPPA==
-X-Gm-Message-State: AJcUukd49MPxGJEbFjJdATIV8BHhtcUNPDLncZ10HGJ6VRsLIG9I9eog
- tok394ATFOA7bwL9rXsIwuedUX7DbIUFPX60TMcJmw==
-X-Google-Smtp-Source: ALg8bN4HwA9drGKobG9D/YBH0b7fqsVPIKzg6dyz6wZHcrg8C9kuTgwJ6Z+iOW8kvKSOrp+9PSPce9tS3QjA86cCAhA=
-X-Received: by 2002:a9d:70d5:: with SMTP id w21mr9862260otj.301.1548592006116; 
- Sun, 27 Jan 2019 04:26:46 -0800 (PST)
+ :message-id:subject:to:cc;
+ bh=DvjaMtoCZExGiMT2FyI4koJ0UPtbXCHbovdkZaR21eY=;
+ b=XAuZiJQL3YEPtGP4N4t4FYCWBrbnOFE98C1EdK259zURwFcdyHF/Qs+XrafpUL2p07
+ 8Psax7j4uIcxOcqsUO5peV0SrJS2WwS73E5gRZInH1SbPAXCb1JSHsxbCWhg8m6rM0rp
+ 3PeUmYjvQSSqMUDo+WVvzuW1VCHm1WjpjXSWanOPDtIICKYziRfvFBnI8PrDw8eGq0+9
+ B8C3JLuCk8xH3UfkyaZ/fdnm9tA8rHerqvD6chbGTGqxq3MbJyKFLyMI5hRQiUfxHLC8
+ CqGvIHcIsZ2kdBIbhNcA1ZZl0BVLUNnCA7vOSZ4KkbCvZfX8atDdHg/68W6c/bO1rOzV
+ vysQ==
+X-Gm-Message-State: AJcUukcDjaWRFF9Z+zET62rGL150QQWFJ8Hp9AmOhhdd/mkxdZ25pCRv
+ zLGlE3GGk3NIRVSye67hGli1m9ThfBnSZylU5QosMI5w
+X-Google-Smtp-Source: ALg8bN5iCtsmN/4SlgXENnzc/k2k8wl3zCFITXp1H4qgjh9zJXXUEOpa8+LMxDlBJqko4opDB85ofIFsGfHRrdEBOR4=
+X-Received: by 2002:a24:65c8:: with SMTP id u191mr8511124itb.7.1548597788745; 
+ Sun, 27 Jan 2019 06:03:08 -0800 (PST)
 MIME-Version: 1.0
-References: <20190108091539.16674-1-brgl@bgdev.pl>
- <8c190cf3-b4f3-90d0-07ce-4bb7927160df@ti.com>
- <20190122122228.GA2736@kroah.com>
-In-Reply-To: <20190122122228.GA2736@kroah.com>
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Date: Sun, 27 Jan 2019 13:26:35 +0100
-Message-ID: <CAMpxmJW+ODrqCTSaQMOgRG2d3Qy2SipzYQU3JRPbJE_Wn85H0w@mail.gmail.com>
-Subject: Re: [RESEND PATCH 00/12] eeprom: at24: remove platform_data
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+References: <1547797668-30342-1-git-send-email-aisheng.dong@nxp.com>
+ <1547797668-30342-5-git-send-email-aisheng.dong@nxp.com>
+ <1548413675.28802.45.camel@pengutronix.de>
+In-Reply-To: <1548413675.28802.45.camel@pengutronix.de>
+From: Dong Aisheng <dongas86@gmail.com>
+Date: Sun, 27 Jan 2019 22:02:57 +0800
+Message-ID: <CAA+hA=SSP8eF6hikBgBqAxv29W4J2+szyvsLS2MXSMvxRv9wDw@mail.gmail.com>
+Subject: Re: [PATCH 4/4] irq: imx: irqsteer: add multi output interrupts
+ support
+To: Lucas Stach <l.stach@pengutronix.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190127_042648_892029_DAFEE8DD 
-X-CRM114-Status: GOOD (  14.86  )
+X-CRM114-CacheID: sfid-20190127_060310_674880_FA192080 
+X-CRM114-Status: GOOD (  20.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,41 +92,131 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, Kevin Hilman <khilman@kernel.org>,
- Bartosz Golaszewski <brgl@bgdev.pl>, Sekhar Nori <nsekhar@ti.com>,
- LKML <linux-kernel@vger.kernel.org>, linux-i2c <linux-i2c@vger.kernel.org>,
- arm-soc <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Aisheng Dong <aisheng.dong@nxp.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "tglx@linutronix.de" <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-d3QuLCAyMiBzdHkgMjAxOSBvIDEzOjIyIEdyZWcgS3JvYWgtSGFydG1hbgo8Z3JlZ2toQGxpbnV4
-Zm91bmRhdGlvbi5vcmc+IG5hcGlzYcWCKGEpOgo+Cj4gT24gVGh1LCBKYW4gMTAsIDIwMTkgYXQg
-MDc6NDM6NDdQTSArMDUzMCwgU2VraGFyIE5vcmkgd3JvdGU6Cj4gPiBIaSBCYXJ0b3N6LAo+ID4K
-PiA+IE9uIDA4LzAxLzE5IDI6NDUgUE0sIEJhcnRvc3ogR29sYXN6ZXdza2kgd3JvdGU6Cj4gPiA+
-IEZyb206IEJhcnRvc3ogR29sYXN6ZXdza2kgPGJnb2xhc3pld3NraUBiYXlsaWJyZS5jb20+Cj4g
-PiA+Cj4gPiA+IEhpIFNla2hhciwKPiA+ID4KPiA+ID4gbm93IHRoYXQgYWxsIGRlcGVuZGVuY2ll
-cyBhcmUgaW4gYW5kIHY1LjAtcmMxIGlzIHRhZ2dlZCwgcGxlYXNlIGNvbnNpZGVyCj4gPiA+IHBp
-Y2tpbmcgdXAgdGhlIHNlY29uZCBiYXRjaCBvZiBkYXZpbmNpLXNwZWNpZmljIGNoYW5nZXMgaW50
-byB5b3VyIHRyZWUuCj4gPiA+IE9uY2UgdGhhdCdzIGRvbmUsIHBsZWFzZSBwcm92aWRlIG1lIHdp
-dGggYW4gaW1tdXRhYmxlIGJyYW5jaCBmb3IgbWUgdG8KPiA+ID4gYXBwbHkgdGhlIGxhc3QgcGF0
-Y2ggdG8gbXkgYXQyNCB0cmVlLgo+ID4KPiA+IFlvdSBjYW4gdXNlIGJyYW5jaCB2NS4xL2VlcHJv
-bS1mb3ItYmFydG9zeiBpbiBteSB0cmVlIGZvciB0aGlzIChjb21taXQKPiA+IGU0MzA2ODVmNDk2
-OSkuCj4gPgo+ID4gPgo+ID4gPiBUaGlzIGlzIHRoZSBzZWNvbmQgcGFydCBvZiB0aGUgZWZmb3J0
-IHRvIG1vZGVybml6ZSB0aGUgYXQyNCBkcml2ZXIgYW5kCj4gPiA+IHJlbW92ZSB0aGUgbGVnYWN5
-IHBsYXRmb3JtIGRhdGEgc3RydWN0dXJlIGluIGZhdm9yIG9mIGRldmljZSBwcm9wZXJ0aWVzLgo+
-ID4gPiBJdCByZXF1aXJlZCBnZXR0aW5nIHJpZCBvZiB0aGUgYXQyNCBzZXR1cCBjYWxsYmFjayBp
-biBmYXZvciBvZiBudm1lbQo+ID4gPiBsb29rdXBzLgo+ID4gPgo+ID4gPiBSZS10ZXN0ZWQgd2l0
-aCBkYTg1MC1ldm0gYW5kIGRtMzY1LWV2bS4KPiA+Cj4gPiBBcHBsaWVkIHBhdGNoZXMgMS0xMSBm
-b3IgdjUuMQo+Cj4gRmVlbCBmcmVlIHRvIHRha2UgcGF0Y2ggMTIgYXMgd2VsbCA6KQoKSGkgR3Jl
-ZywKCkkgdG9vayBvdmVyIHRoZSBhdDI0IGRyaXZlciBmcm9tIFdvbGZyYW0gU2FuZy4gSSBjb2xs
-ZWN0IHBhdGNoZXMgZm9yCml0IGluIG15IGJyYW5jaCBhbmQgdGhlbiBzZW5kIHB1bGwtcmVxdWVz
-dHMgdG8gV29sZnJhbSBkaXJlY3RseS4gSSd2ZQphcHBsaWVkIHRoaXMgcGF0Y2ggdG8gbXkgYnJh
-bmNoIGluIGNhc2UgdGhlcmUncyBzb21lIG1vcmUgZGV2ZWxvcG1lbnQKZm9yIGF0MjQgaW4gdGhp
-cyBjeWNsZS4gU2VraGFyIHByb3ZpZGVkIG1lIHdpdGggYW4gaW1tdXRhYmxlIGJyYW5jaAp3aXRo
-IHRoZSBhcmNoIGNvbW1pdHMgSSBtZXJnZWQgaW4uCgpCZXN0IHJlZ2FyZHMsCkJhcnRvc3ogR29s
-YXN6ZXdza2kKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-CmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5m
-cmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xp
-bnV4LWFybS1rZXJuZWwK
+On Fri, Jan 25, 2019 at 6:55 PM Lucas Stach <l.stach@pengutronix.de> wrote:
+>
+> Am Freitag, den 18.01.2019, 07:53 +0000 schrieb Aisheng Dong:
+> > One irqsteer channel can support up to 8 output interrupts.
+> >
+> > > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > > Cc: Lucas Stach <l.stach@pengutronix.de>
+> > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> >  drivers/irqchip/irq-imx-irqsteer.c | 39 +++++++++++++++++++++++++++-----------
+> >  1 file changed, 28 insertions(+), 11 deletions(-)
+> >
+> > diff --git a/drivers/irqchip/irq-imx-irqsteer.c b/drivers/irqchip/irq-imx-irqsteer.c
+> > index 1bebf0a..54802fa 100644
+> > --- a/drivers/irqchip/irq-imx-irqsteer.c
+> > +++ b/drivers/irqchip/irq-imx-irqsteer.c
+> > @@ -10,6 +10,7 @@
+> >  #include <linux/irqchip/chained_irq.h>
+> >  #include <linux/irqdomain.h>
+> >  #include <linux/kernel.h>
+> > +#include <linux/of_irq.h>
+> >  #include <linux/of_platform.h>
+> >  #include <linux/spinlock.h>
+> >
+> > @@ -21,10 +22,13 @@
+> > >  #define CHAN_MINTDIS(t)            (CTRL_STRIDE_OFF(t, 3) + 0x4)
+> > >  #define CHAN_MASTRSTAT(t)  (CTRL_STRIDE_OFF(t, 3) + 0x8)
+> >
+> > > +#define CHAN_MAX_OUTPUT_INT        0x8
+> > +
+> >  struct irqsteer_data {
+> > > >   void __iomem            *regs;
+> > > >   struct clk              *ipg_clk;
+> > > > - int                     irq;
+> > > > + int                     irq[CHAN_MAX_OUTPUT_INT];
+> > > > + int                     irq_count;
+> > > >   raw_spinlock_t          lock;
+> > > >   int                     reg_num;
+> > > >   int                     channel;
+> > @@ -117,7 +121,7 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
+> > >     struct device_node *np = pdev->dev.of_node;
+> > >     struct irqsteer_data *data;
+> > >     struct resource *res;
+> > > -   int ret;
+> > > +   int i, ret;
+> >
+> > >     data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> > >     if (!data)
+> > @@ -130,12 +134,6 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
+> > >             return PTR_ERR(data->regs);
+> > >     }
+> >
+> > > -   data->irq = platform_get_irq(pdev, 0);
+> > > -   if (data->irq <= 0) {
+> > > -           dev_err(&pdev->dev, "failed to get irq\n");
+> > > -           return -ENODEV;
+> > > -   }
+> > -
+> > >     data->ipg_clk = devm_clk_get(&pdev->dev, "ipg");
+> > >     if (IS_ERR(data->ipg_clk)) {
+> > >             ret = PTR_ERR(data->ipg_clk);
+> > @@ -177,8 +175,23 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
+> > >             return -ENOMEM;
+> > >     }
+> >
+> > > -   irq_set_chained_handler_and_data(data->irq, imx_irqsteer_irq_handler,
+> > > -                                    data);
+> > +     data->irq_count = of_irq_count(np);
+>
+> We normally don't validate stuff that comes from the DT, but I guess it
+> might be helpful to validate that the number of output irqs specified
+> matches what the number of input irqs, i.e. there is one output irqs
+> specified for each group of 64 inputs.
+>
+
+Sound like a good idea.
+I think we can calculate the irq_count from irqs number instead of of_irq_count.
+Then the following irq_of_parse_and_map() will validate them automatically.
+
+However, i think we'd better to keep the irq_count range check as well.
+
+> > +     if (!data->irq_count || data->irq_count > CHAN_MAX_OUTPUT_INT) {
+> > > +           clk_disable_unprepare(data->ipg_clk);
+> > > +           return -EINVAL;
+> > > +   }
+> > +
+> > > +   for (i = 0; i < data->irq_count; i++) {
+> > > +           data->irq[i] = irq_of_parse_and_map(np, i);
+> > > +           if (!data->irq[i]) {
+> > > +                   clk_disable_unprepare(data->ipg_clk);
+> > > +                   return -EINVAL;
+> > > +           }
+> > +
+> > > +           irq_set_chained_handler_and_data(data->irq[i],
+> > > +                                            imx_irqsteer_irq_handler,
+> > +                                              data);
+>
+> We really want some data about the output irq being passed here, so we
+> can cut down the number of register reads in the irq handler to the
+> maximum of 2 status registers per group.
+>
+
+Will implement it and resend.
+
+Regards
+Dong Aisheng
+
+> Regards,
+> Lucas
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
