@@ -2,59 +2,62 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DCE88C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 14:53:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 696B6C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 14:53:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ACDB820844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 14:53:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2F48C2084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 14:53:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KJNwiimP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ACDB820844
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MSE1YYL/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F48C2084A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=sS3FykqgPhA+1E2KkMoJ32IPK7ZDa/GAol7XGlU/EdA=; b=KJNwiimPdMyYO7
-	7Y/mY9jINW5n2Fm1upvzRGgu9K2HsJzg6hDKHBzaJCBR3GQHs5nTt6CeU9KRx7onNxrn70b+87q0/
-	7qQ1H7U0A34rwxsumHBsnJk5cW/eX3InWnM7fkUDGrorxw7zRlOMzzmsnxCqrstN9zUcDTD+HC6iy
-	Ys548uvQ/cUL73Lwc42iTCeur/yVGEgyR7War3qoLf+VAu7xptUgNaz/KjIMkppry+DRGkpMxBXZn
-	F/6OsFpCiKHkZg8yktxK74CmDTLy4/wXWlQcRZ/V/yfHtG8waNN5FJUbwo/Xd0EnGEazz8AZiYfkz
-	YOQm9JaAkrjTGict2XdA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ARDpiOlnn+o65EfBHe8h1uFqesAsiCbSu34fX8BxQ9M=; b=MSE1YYL/tZFceT
+	nxGpIa1mCmkatJdpKmEBtfwvastmahFhUcgn3DJD7UTIjO7u7kyMdk7hnD7WIG9E5ZTZx4B2U+rpg
+	NdkD226wH/v6AK1FLPR+A4TycfrNvsVuVK2gDaRRKNswev2IALVW4m+1Q06XJwghYysLfhhKcMsWH
+	wGH2RRSlEb9g6qrH1wUCpXA8CEtF80uE5TCSnxZrjpmXmsK1EsXPF3e+0HHRqx9vo5zjp2OESM3PO
+	TxE0dm9MyAheR3GwiHyKuHMsu3nsqZjsmw1AShoXt1+EXb6k/PVZ5ylF/ZKayGvepGKu6xnz/HuTV
+	o3UuY5LwuuZ0t4Lf7s/w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go8I5-0002o6-Bj; Mon, 28 Jan 2019 14:53:37 +0000
+	id 1go8II-0002wQ-S2; Mon, 28 Jan 2019 14:53:50 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go8HA-00023K-9t
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 14:52:44 +0000
+ id 1go8HC-00024c-Nz
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 14:52:45 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 005A02078C; Mon, 28 Jan 2019 15:52:36 +0100 (CET)
+ id 63C5A209BF; Mon, 28 Jan 2019 15:52:39 +0100 (CET)
 Received: from localhost (aaubervilliers-681-1-87-206.w90-88.abo.wanadoo.fr
  [90.88.29.206])
- by mail.bootlin.com (Postfix) with ESMTPSA id C562020714;
- Mon, 28 Jan 2019 15:52:36 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id 353DC20714;
+ Mon, 28 Jan 2019 15:52:39 +0100 (CET)
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Hans Verkuil <hans.verkuil@cisco.com>,
  Sakari Ailus <sakari.ailus@linux.intel.com>,
  Mauro Carvalho Chehab <mchehab@kernel.org>
-Subject: [PATCH v2 0/5] media: Allwinner A10 CSI support
-Date: Mon, 28 Jan 2019 15:52:31 +0100
-Message-Id: <cover.ba7411f0c7155d0292b38d3dec698e26b5cc813b.1548687041.git-series.maxime.ripard@bootlin.com>
+Subject: [PATCH v2 5/5] DO NOT MERGE: ARM: dts: bananapi: Add Camera support
+Date: Mon, 28 Jan 2019 15:52:36 +0100
+Message-Id: <b1279df2faefbb50120270417c3f5d66bb52df18.1548687041.git-series.maxime.ripard@bootlin.com>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <cover.ba7411f0c7155d0292b38d3dec698e26b5cc813b.1548687041.git-series.maxime.ripard@bootlin.com>
+References: <cover.ba7411f0c7155d0292b38d3dec698e26b5cc813b.1548687041.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_065240_835227_BDC4F872 
-X-CRM114-Status: GOOD (  16.20  )
+X-CRM114-CacheID: sfid-20190128_065243_102447_C0E35641 
+X-CRM114-Status: GOOD (  11.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,193 +82,144 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts | 94 +++++++++++++++++++++++++-
+ 1 file changed, 94 insertions(+)
 
-Here is a series introducing the support for the A10 (and SoCs of the same
-generation) CMOS Sensor Interface (called CSI, not to be confused with
-MIPI-CSI, which isn't support by that IP).
-
-That interface is pretty straightforward, but the driver has a few issues
-that I wanted to bring up:
-
-  * The only board I've been testing this with has an ov5640 sensor
-    attached, which doesn't work with the upstream driver. Copying the
-    Allwinner init sequence works though, and this is how it has been
-    tested. Testing with a second sensor would allow to see if it's an
-    issue on the CSI side or the sensor side.
-  * We don't have support for the ISP at the moment, but this can be added
-    eventually.
-
-Here is the v4l2-compliance output (commit f61132e81d79 of v4l-utils)
-v4l2-compliance SHA: not available, 32 bits
-
-Compliance test for device /dev/video1:
-
-Driver Info:
-	Driver name      : sun4i_csi
-	Card type        : sun4i-csi
-	Bus info         : platform:1c09000.csi
-	Driver version   : 5.0.0
-	Capabilities     : 0x84201000
-		Video Capture Multiplanar
-		Streaming
-		Extended Pix Format
-		Device Capabilities
-	Device Caps      : 0x04201000
-		Video Capture Multiplanar
-		Streaming
-		Extended Pix Format
-Media Driver Info:
-	Driver name      : sun4i-csi
-	Model            : Allwinner Video Capture Device
-	Serial           :
-	Bus info         :
-	Media version    : 5.0.0
-	Hardware revision: 0x00000000 (0)
-	Driver version   : 5.0.0
-Interface Info:
-	ID               : 0x03000007
-	Type             : V4L Video
-Entity Info:
-	ID               : 0x00000005 (5)
-	Name             : sun4i_csi
-	Function         : V4L2 I/O
-	Pad 0x01000006   : 0: Sink, Must Connect
-	  Link 0x02000009: from remote pad 0x1000002 of entity 'ov5640 1-0021': Data, Enabled, Immutable
-
-Required ioctls:
-	test MC information (see 'Media Driver Info' above): OK
-	test VIDIOC_QUERYCAP: OK
-
-Allow for multiple opens:
-	test second /dev/video1 open: OK
-	test VIDIOC_QUERYCAP: OK
-	test VIDIOC_G/S_PRIORITY: OK
-	test for unlimited opens: OK
-
-Debug ioctls:
-	test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
-	test VIDIOC_LOG_STATUS: OK (Not Supported)
-
-Input ioctls:
-	test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
-	test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-	test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
-	test VIDIOC_ENUMAUDIO: OK (Not Supported)
-	test VIDIOC_G/S/ENUMINPUT: OK
-	test VIDIOC_G/S_AUDIO: OK (Not Supported)
-	Inputs: 1 Audio Inputs: 0 Tuners: 0
-
-Output ioctls:
-	test VIDIOC_G/S_MODULATOR: OK (Not Supported)
-	test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-	test VIDIOC_ENUMAUDOUT: OK (Not Supported)
-	test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
-	test VIDIOC_G/S_AUDOUT: OK (Not Supported)
-	Outputs: 0 Audio Outputs: 0 Modulators: 0
-
-Input/Output configuration ioctls:
-	test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
-	test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
-	test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
-	test VIDIOC_G/S_EDID: OK (Not Supported)
-
-Control ioctls (Input 0):
-	test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
-	test VIDIOC_QUERYCTRL: OK (Not Supported)
-	test VIDIOC_G/S_CTRL: OK (Not Supported)
-	test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
-	test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
-	test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
-	Standard Controls: 0 Private Controls: 0
-
-Format ioctls (Input 0):
-	test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
-	test VIDIOC_G/S_PARM: OK (Not Supported)
-	test VIDIOC_G_FBUF: OK (Not Supported)
-	test VIDIOC_G_FMT: OK
-	test VIDIOC_TRY_FMT: OK
-	test VIDIOC_S_FMT: OK
-	test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
-	test Cropping: OK (Not Supported)
-	test Composing: OK (Not Supported)
-	test Scaling: OK
-
-Codec ioctls (Input 0):
-	test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
-	test VIDIOC_G_ENC_INDEX: OK (Not Supported)
-	test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
-
-Buffer ioctls (Input 0):
-	test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
-	test VIDIOC_EXPBUF: OK
-
-Test input 0:
-
-Streaming ioctls:
-	test read/write: OK (Not Supported)
-	test blocking wait: OK
-	test MMAP: OK
-	test USERPTR: OK (Not Supported)
-	test DMABUF: OK (Not Supported)
-
-Stream using all formats:
-	test MMAP for Format YM12, Frame Size 2x2:
-		Stride 2, Field None: OK
-	test MMAP for Format YM12, Frame Size 2x2:
-		Stride 2, Field None: OK
-	test MMAP for Format YM12, Frame Size 640x480:
-		Stride 640, Field None: OK
-Total: 52, Succeeded: 52, Failed: 0, Warnings: 0
-
-Let me know what you think,
-Maxime
-
-Changes from v1:
-  - Make sure it's compliant with a much newer v4l2-compliance
-  - Conversion of the DT bindings to a JSON schema
-  - Drop the vendor properties and use a separate compatible instead
-  - Fix an issue on the last frame where we would not have any buffer
-    queued and would report an error by using a scratch buffer
-  - Fix the warnings reported by v4l2-compliance
-  - Rebase on top of 5.0-rc1
-  - Added a MAINTAINERS entry
-  - Switched to strscpy
-  - Fixed SPDX header
-
-Maxime Ripard (5):
-  dt-bindings: media: Add Allwinner A10 CSI binding
-  media: sunxi: Refactor the Makefile and Kconfig
-  media: sunxi: Add A10 CSI driver
-  ARM: dts: sun7i: Add CSI0 controller
-  DO NOT MERGE: ARM: dts: bananapi: Add Camera support
-
- Documentation/devicetree/bindings/media/allwinner,sun4i-a10-csi.yaml |  73 ++++++++++++-
- MAINTAINERS                                                          |   8 +-
- arch/arm/boot/dts/sun7i-a20-bananapi.dts                             |  94 ++++++++++++++++-
- arch/arm/boot/dts/sun7i-a20.dtsi                                     |  11 ++-
- drivers/media/platform/Kconfig                                       |   2 +-
- drivers/media/platform/Makefile                                      |   2 +-
- drivers/media/platform/sunxi/Kconfig                                 |   2 +-
- drivers/media/platform/sunxi/Makefile                                |   2 +-
- drivers/media/platform/sunxi/sun4i-csi/Kconfig                       |  12 ++-
- drivers/media/platform/sunxi/sun4i-csi/Makefile                      |   5 +-
- drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.c                   | 261 +++++++++++++++++++++++++++++++++++++++++++-
- drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.h                   | 142 ++++++++++++++++++++++++-
- drivers/media/platform/sunxi/sun4i-csi/sun4i_dma.c                   | 435 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- drivers/media/platform/sunxi/sun4i-csi/sun4i_v4l2.c                  | 305 ++++++++++++++++++++++++++++++++++++++++++++++++++-
- 14 files changed, 1352 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/media/allwinner,sun4i-a10-csi.yaml
- create mode 100644 drivers/media/platform/sunxi/Kconfig
- create mode 100644 drivers/media/platform/sunxi/Makefile
- create mode 100644 drivers/media/platform/sunxi/sun4i-csi/Kconfig
- create mode 100644 drivers/media/platform/sunxi/sun4i-csi/Makefile
- create mode 100644 drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.c
- create mode 100644 drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.h
- create mode 100644 drivers/media/platform/sunxi/sun4i-csi/sun4i_dma.c
- create mode 100644 drivers/media/platform/sunxi/sun4i-csi/sun4i_v4l2.c
-
-base-commit: 372df08972ca8fb397f82fdc63d9669281c50aee
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+index 556b1b591c5d..f5fee1f95900 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+@@ -54,6 +54,9 @@
+ 	compatible = "lemaker,bananapi", "allwinner,sun7i-a20";
+ 
+ 	aliases {
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
++		i2c2 = &i2c2;
+ 		serial0 = &uart0;
+ 		serial1 = &uart3;
+ 		serial2 = &uart7;
+@@ -63,6 +66,41 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	reg_cam: cam {
++		compatible = "regulator-fixed";
++		regulator-name = "cam";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		vin-supply = <&reg_vcc5v0>;
++		gpio = <&pio 7 16 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-always-on;
++	};
++
++        reg_cam_avdd: cam-avdd {
++                compatible = "regulator-fixed";
++                regulator-name = "cam500b-avdd";
++                regulator-min-microvolt = <2800000>;
++                regulator-max-microvolt = <2800000>;
++                vin-supply = <&reg_cam>;
++        };
++
++        reg_cam_dovdd: cam-dovdd {
++                compatible = "regulator-fixed";
++                regulator-name = "cam500b-dovdd";
++                regulator-min-microvolt = <1800000>;
++                regulator-max-microvolt = <1800000>;
++                vin-supply = <&reg_cam>;
++        };
++
++        reg_cam_dvdd: cam-dvdd {
++                compatible = "regulator-fixed";
++                regulator-name = "cam500b-dvdd";
++                regulator-min-microvolt = <1500000>;
++                regulator-max-microvolt = <1500000>;
++                vin-supply = <&reg_cam>;
++        };
++
+ 	hdmi-connector {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
+@@ -116,6 +154,26 @@
+ 		>;
+ };
+ 
++&csi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&csi0_pins_a>;
++	status = "okay";
++
++	port {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		csi_from_ov5640: endpoint {
++                        remote-endpoint = <&ov5640_to_csi>;
++                        bus-width = <8>;
++                        hsync-active = <1>; /* Active high */
++                        vsync-active = <0>; /* Active low */
++                        data-active = <1>;  /* Active high */
++                        pclk-sample = <1>;  /* Rising */
++                };
++	};
++};
++
+ &de {
+ 	status = "okay";
+ };
+@@ -161,6 +219,36 @@
+ 	};
+ };
+ 
++&i2c1 {
++	status = "okay";
++
++	camera: camera@21 {
++		compatible = "ovti,ov5640";
++		reg = <0x21>;
++                clocks = <&ccu CLK_CSI0>;
++                clock-names = "xclk";
++		assigned-clocks = <&ccu CLK_CSI0>;
++		assigned-clock-rates = <24000000>;
++
++                reset-gpios = <&pio 7 14 GPIO_ACTIVE_LOW>;
++                powerdown-gpios = <&pio 7 19 GPIO_ACTIVE_HIGH>;
++                AVDD-supply = <&reg_cam_avdd>;
++                DOVDD-supply = <&reg_cam_dovdd>;
++                DVDD-supply = <&reg_cam_dvdd>;
++
++                port {
++                        ov5640_to_csi: endpoint {
++                                remote-endpoint = <&csi_from_ov5640>;
++                                bus-width = <8>;
++                                hsync-active = <1>; /* Active high */
++                                vsync-active = <0>; /* Active low */
++                                data-active = <1>;  /* Active high */
++                                pclk-sample = <1>;  /* Rising */
++                        };
++                };
++	};
++};
++
+ &i2c2 {
+ 	status = "okay";
+ };
+@@ -242,6 +330,12 @@
+ 		"IO-6", "IO-3", "IO-2", "IO-0", "", "", "", "",
+ 		"", "", "", "", "", "", "", "";
+ 
++	csi0_pins_a: csi_pins_a@0 {
++		pins = "PE0", "PE1", "PE2", "PE3", "PE4", "PE5",
++		       "PE6", "PE7", "PE8", "PE9", "PE10", "PE11";
++		function = "csi0";
++	};
++
+ 	usb0_id_detect_pin: usb0-id-detect-pin {
+ 		pins = "PH4";
+ 		function = "gpio_in";
 -- 
 git-series 0.9.1
 
