@@ -2,65 +2,61 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A85AAC282CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:00:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1E4E5C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:02:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 745672171F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:00:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DEBCC2171F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:02:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jNWSpug1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 745672171F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XxHcpWNT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DEBCC2171F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=twVockdr32IC1gjmgZT0h+Jm+03skMoNn1uNCGdF+RA=; b=jNWSpug1+tXgF/
-	yn9MLn04mgL3ypjVN8hEFsU6f5nuMkhLJBRldc78gU7QQ5+n7zFLyn97OBq8sCqHXnWwOjLX6ZuUq
-	yenVOoYDNdEeUUkuP50lcb2lVppv2Dhi7lvaaA7r3F4c0SzlbTO4GEQAXUXcWRtmzwoIyAx+UBv/b
-	wIAfV6fUHnmxMjEl6ROfi8sR6sxQA7f2MxwHf6f7pT+1meM7peSiXe3DPPqhUYnu+VhAYYHzgtbI4
-	rXuIjIMQQdUw4/Fic19FGf5hEmRYm83WRV6auAJMnRug2hFoBcEsJLCbzRquy4z0rBUEsUfX9Z7Yx
-	Pwjx3spubKZCwhlncH2Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=96PrAUc3DCSw9ZlgNYRCGfonTXwbxw49nX/yiLN9OR4=; b=XxHcpWNTELA/r7b1I91xZBAKa
+	x5K3AXPvUXAEhfX5K0KrDPGJoEhpyTpElyOewGjxQPPhdGyd/k/e5aRxI2avKhSeQ3KJ/3u0KsUJw
+	tzjhcp9W6HtSAzHo6XnfD2KF8IPQnSmHSsVigc+TiLbOaAVLcFt1BUyQJ/hZ6eQqseCrDnV3xuHIC
+	ZilgMH+p6LZS/4vTFtjQiuS9TsuYg36A6fePWfFLh2rUj3IpvgI1mRqqzDO6tr27yVciKcDWNXGEz
+	dqHRi9w4tOVatwrsmLMc0eIbd9wrYZ4Ze75zNHZtDy8a+DqUfLwWw+dusyW27vAS7HlmOXB7k2btP
+	QLCReMDjQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go4es-0003md-CP; Mon, 28 Jan 2019 11:00:54 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1go4gM-00043p-MX; Mon, 28 Jan 2019 11:02:26 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go4em-0003m0-Sf
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 11:00:52 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 14E7FEBD;
- Mon, 28 Jan 2019 03:00:48 -0800 (PST)
-Received: from big-swifty.misterjones.org (big-swifty.cambridge.arm.com
- [10.1.39.122])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 2900C3F589;
- Mon, 28 Jan 2019 03:00:44 -0800 (PST)
-Date: Mon, 28 Jan 2019 11:00:45 +0000
-Message-ID: <865zu9vyg2.wl-marc.zyngier@arm.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v9 14/26] arm64: alternative: Allow alternative status
- checking per cpufeature
-In-Reply-To: <1548084825-8803-15-git-send-email-julien.thierry@arm.com>
-References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
- <1548084825-8803-15-git-send-email-julien.thierry@arm.com>
-User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
- FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
- (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
-Organization: ARM Ltd
-MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
+ id 1go4gI-00043L-T5
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 11:02:24 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id DB27C209A7; Mon, 28 Jan 2019 12:02:20 +0100 (CET)
+Received: from localhost (aaubervilliers-681-1-87-206.w90-88.abo.wanadoo.fr
+ [90.88.29.206])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 9FDF220714;
+ Mon, 28 Jan 2019 12:02:10 +0100 (CET)
+Date: Mon, 28 Jan 2019 12:02:11 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Jagan Teki <jagan@amarulasolutions.com>
+Subject: Re: [PATCH v8 2/5] media: sun6i: Add A64 CSI block support
+Message-ID: <20190128110211.fmbnudcfrw2rnqya@flea>
+References: <20190128085847.7217-1-jagan@amarulasolutions.com>
+ <20190128085847.7217-3-jagan@amarulasolutions.com>
+MIME-Version: 1.0
+In-Reply-To: <20190128085847.7217-3-jagan@amarulasolutions.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_030048_929027_AA33EE6C 
-X-CRM114-Status: GOOD (  11.53  )
+X-CRM114-CacheID: sfid-20190128_030223_083340_82DD6B0C 
+X-CRM114-Status: GOOD (  11.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,42 +68,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
- Suzuki K Poulose <suzuki.poulose@arm.com>, catalin.marinas@arm.com,
- will.deacon@arm.com, linux-kernel@vger.kernel.org,
- Christoffer Dall <Christoffer.Dall@arm.com>, james.morse@arm.com,
- joel@joelfernandes.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Michael Trimarchi <michael@amarulasolutions.com>, linux-sunxi@googlegroups.com,
+ linux-kernel@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Yong Deng <yong.deng@magewell.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>, linux-amarula@amarulasolutions.com,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Content-Type: multipart/mixed; boundary="===============7466309364158089795=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 21 Jan 2019 15:33:33 +0000,
-Julien Thierry <julien.thierry@arm.com> wrote:
-> 
-> In preparation for the application of alternatives at different points
-> during the boot process, provide the possibility to check whether
-> alternatives for a feature of interest was already applied instead of
-> having a global boolean for all alternatives.
-> 
-> Make VHE enablement code check for the VHE feature instead of considering
-> all alternatives.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-> Cc: Christoffer Dall <Christoffer.Dall@arm.com>
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+--===============7466309364158089795==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="6okpvrlphzl3mugw"
+Content-Disposition: inline
 
-	M.
 
--- 
-Jazz is not dead, it just smell funny.
+--6okpvrlphzl3mugw
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Mon, Jan 28, 2019 at 02:28:44PM +0530, Jagan Teki wrote:
+> CSI block in Allwinner A64 has similar features as like in H3,
+> but the default CSI_SCLK rate cannot work properly to drive the
+> connected sensor interface.
+>=20
+> The tested mod cock rate is 300 MHz and BSP vfe media driver is also
+> using the same rate. Unfortunately there is no valid information about
+> clock rate in manual or any other sources except the BSP driver. so more
+> faith on BSP code, because same has tested in mainline.
+>=20
+> So, add support for A64 CSI block by setting updated mod clock rate.
+>=20
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--6okpvrlphzl3mugw
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXE7hMwAKCRDj7w1vZxhR
+xUDUAQC8hj7QHPP/IFtTJaDkazmu6MXL/AJadiU0/vZ0ovo+EAD+ORm8Mrwb5wwY
+IzkWk1Mjzvs6xuUjXHBKCUXENlDxGgs=
+=IZEo
+-----END PGP SIGNATURE-----
+
+--6okpvrlphzl3mugw--
+
+
+--===============7466309364158089795==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============7466309364158089795==--
+
