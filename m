@@ -2,94 +2,126 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DEB9DC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 19:18:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E8CD0C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 19:22:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AE44A20881
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 19:18:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AA8BF2148E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 19:22:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aOXrN3FC";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="OgfZYls1";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="GVSd0MNd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE44A20881
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m2yRIcj1";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="khHDF6ww"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AA8BF2148E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=partner.samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=8HaVGixLoNo2BiuVkmp0Tui1TsW96W45A9Fs7PG+jtk=; b=aOXrN3FCd5yeY8YqsJBFTC7hj
-	Vv/fryUs80IhElc1N5wCU7ugWTKDt7f+cCVfWIogqogi31iRNYHYWunp3S8q2ZbPRpR2Qt6uQMzOL
-	qPb9FQyNHjjjIBhU+7k/cuyxy6URYG8797fIB7IDpcFPtO35Y5l5kXGAMjJLnkulW5W1HWhNwy+jY
-	PwoJvUZkCammwsCPKKTfwKNbJG1Y+5WuZrfxhzqgduecsrG/B0uPSC8sq+MdqA9aQNwVLhKWcIeyJ
-	zKTi8rhGqk2LDtUPbw0coGfZXkQ2bdt6XAYzAwugAbR73tq12I2nEbzoBr7kKiSY3jEOo6Bobnwqr
-	OA5yQITbA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=qVXmCqm2rqZ7xKU7ywPRPWBofy+rIhUz2U0KsfO50hk=; b=m2yRIcj1Av//VE0zNC40mlZT8H
+	enkCGW5TMv6sAWrL2AyBI3z1QLcNSzcIN4PPcnTqTLLwQPE8NcSA7g0+QC0qq2cZQHb+sg/lDiVN8
+	+WfWPgLMnmTKsYpFZ1lAE/FUgKjiXz/j2SCLBX9Gt3EWsdQ752dMTxucPJHWJK02/KxrstcfGk0SE
+	50N5VlY1p5+NrHUDxwD6FNCEMZ1nbmzXGHiVidy59BhiCW8haAapwG4SXaoAxMEEjPmZXKFp9FcKw
+	whbzU8TJIFU/fDQEHl/jA9WBAEfnUMYpzIkfcbunVpCtfRBfV3UGFGexKzqlUlsOMF6gQXhEjlItS
+	COkHJqZQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goCQB-0002HU-Bf; Mon, 28 Jan 2019 19:18:15 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1goCTs-0004M2-6r; Mon, 28 Jan 2019 19:22:04 +0000
+Received: from mailout2.w1.samsung.com ([210.118.77.12])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goCQ2-0002Fu-JP
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 19:18:13 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 93D0E617DA; Mon, 28 Jan 2019 19:18:04 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548703085;
- bh=Kg7vvUwTktzmDpIqYZapRFXAV1l3wJ0DM/dbZeWt7EA=;
- h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=OgfZYls1pxplh+vVeXc1cFV3rXmE9d0Y38Bki/yeZXaR4dbpWJMCopYyssatYtBxg
- ckf2do08M3Uojc3Yh4hrcobIepg8UImveSSR5hPW1jwNQJbYiBaNPp5NiGYH2RQe01
- GCji1h9N4ezpO7cWYVZz25u3cGoBcIgkfm5BAWs8=
-Received: from [192.168.43.47] (unknown [27.59.122.35])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: saiprakash.ranjan@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 20FE76182C;
- Mon, 28 Jan 2019 19:17:53 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548703083;
- bh=Kg7vvUwTktzmDpIqYZapRFXAV1l3wJ0DM/dbZeWt7EA=;
- h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=GVSd0MNdP9hQcuV5UN1znOxxTpsAo4+Ck5QXvYYAyrlcO+y5vkYvw4Tbh//pqj9nX
- X0L8eH+OmjdTLiMaxFGQ/1xQSrsc9DhlZEMJzZ5IzyQSTUmQjrEO3eiVZ1TJGUqJhX
- k8IG//pcUCvR46wr2mQJjyqEnObe9eIBLtJ0YGqY=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 20FE76182C
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
- smtp.mailfrom=saiprakash.ranjan@codeaurora.org
-Subject: Re: [PATCHv4 1/4] arm64: dts: qcom: sdm845: Add Coresight support
-To: Mathieu Poirier <mathieu.poirier@linaro.org>
-References: <cover.1548133311.git.saiprakash.ranjan@codeaurora.org>
- <ad16cfb9b6f5efb85149458d5f5a1abf43fa027c.1548133311.git.saiprakash.ranjan@codeaurora.org>
- <1bd39862-0725-70ce-6535-fdb59569f683@arm.com>
- <75ed74af-6946-b86d-092e-42dc16e55308@codeaurora.org>
- <91a90daa-9e14-2d2e-e633-2ddfdc0955bf@arm.com>
- <3906faf1-abbd-9c28-ad55-ed3800f06352@codeaurora.org>
- <c03b63bf-aca8-ea46-70ad-ee4558f0319e@arm.com>
- <5b54c6e0-7d22-ecee-486f-31333f49f84a@codeaurora.org>
- <18b70426-60fe-4871-6388-6e09fd5feb37@arm.com>
- <de6e021a-4f9a-8e2e-dff0-1e7c61ad8b2b@codeaurora.org>
- <CANLsYkxkTTfTMNNZZ1tmS=cjakcfveMDrW6wxXPXie8M9_VDOg@mail.gmail.com>
-From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-Message-ID: <eec64938-ef6a-a3d5-d93f-7a63df8b132f@codeaurora.org>
-Date: Tue, 29 Jan 2019 00:47:50 +0530
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <CANLsYkxkTTfTMNNZZ1tmS=cjakcfveMDrW6wxXPXie8M9_VDOg@mail.gmail.com>
-Content-Language: en-US
+ id 1goCTm-0004Jd-Gh
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 19:22:00 +0000
+Received: from eucas1p1.samsung.com (unknown [182.198.249.206])
+ by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
+ 20190128192153euoutp02dc5f6b0707705a72bccc0851c4238f5b~_GXVCWye62449024490euoutp02o
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 28 Jan 2019 19:21:53 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
+ 20190128192153euoutp02dc5f6b0707705a72bccc0851c4238f5b~_GXVCWye62449024490euoutp02o
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1548703313;
+ bh=/B+NB4uqgeDOd3dvQHPUDWOagHz1W+WijPmr921u0mY=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=khHDF6ww7EQVfIWsolhxXdTZz6SvamIoD3rQu2f0eOJWEN2+UQejphBTl5yEQnoy+
+ 1gfKUTc5aGN96bx+CKFowqLseHzi0yeK/UYxrrp1oFO3hix3dTPIoDPtP2+sGG4bVu
+ W58S00wx+uwdkp/bn+R54bcjOV6yzqoKJI9Wbt/Y=
+Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
+ eucas1p2.samsung.com (KnoxPortal) with ESMTP id
+ 20190128192152eucas1p236338a6b2a20a183eaa83c4dff30f510~_GXUgMX-G3066330663eucas1p2n;
+ Mon, 28 Jan 2019 19:21:52 +0000 (GMT)
+Received: from eucas1p2.samsung.com ( [182.198.249.207]) by
+ eusmges2new.samsung.com (EUCPMTA) with SMTP id 6A.C5.04294.0565F4C5; Mon, 28
+ Jan 2019 19:21:52 +0000 (GMT)
+Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTPA id
+ 20190128192151eucas1p1d5ad3a851ffc8b56a7a62febdb6d5677~_GXTlDcx00390603906eucas1p1F;
+ Mon, 28 Jan 2019 19:21:51 +0000 (GMT)
+Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
+ eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
+ 20190128192151eusmtrp1541b7d32d5d3239894d2a6661f5b3f80~_GXTWRIdy2976329763eusmtrp1L;
+ Mon, 28 Jan 2019 19:21:51 +0000 (GMT)
+X-AuditID: cbfec7f4-84fff700000010c6-98-5c4f56501487
+Received: from eusmtip1.samsung.com ( [203.254.199.221]) by
+ eusmgms2.samsung.com (EUCPMTA) with SMTP id A9.2F.04128.F465F4C5; Mon, 28
+ Jan 2019 19:21:51 +0000 (GMT)
+Received: from AMDC3778.DIGITAL.local (unknown [106.120.51.20]) by
+ eusmtip1.samsung.com (KnoxPortal) with ESMTPA id
+ 20190128192150eusmtip16ab53501587aff53b3ece06932ac5468~_GXSwLihc0143401434eusmtip1J;
+ Mon, 28 Jan 2019 19:21:50 +0000 (GMT)
+From: Lukasz Luba <l.luba@partner.samsung.com>
+To: devicetree@vger.kernel.org
+Subject: [PATCH 2/8] clk: samsung: add new clocks for DMC for Exynos5422 SoC
+Date: Mon, 28 Jan 2019 20:21:33 +0100
+Message-Id: <1548703299-15806-3-git-send-email-l.luba@partner.samsung.com>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1548703299-15806-1-git-send-email-l.luba@partner.samsung.com>
+X-Brightmail-Tracker: H4sIAAAAAAAAA0VSfSyUcRzvd8/LPeTs1zF+caNuM2o6etl6tpS0yvWGra2abquLZ1gc7kHI
+ 1mkrL7skb0mGlkVXC8ekI9YhO+Zt3oUprYwkczRLynlO/ff5fr6fl+9++1GYsIhwoMIUMYxS
+ IQ8Xk5Z47fuV7j0BF/xlnup7DnRVfgVBDxm/EnRxSxdB35+axeju7ko+PaoS0dqpQYJeUE8Q
+ dJ+ukKTzuxt5dG/7CfpDcjlJN39LIei1wSr8qLV0fvgOX6rVpJHS6tJb0nffG3jSjBoNkC5q
+ nQLIQEuvYCY8LI5Rehy5ahm6OP6EiOrxiO8fMxAq8NstHVhQCB5AyfWjZDqwpISwHKAHQ1Xm
+ wQhQ//y0eVgE6PPtZ9imxdCaiZuwEJYB1NjD/nPUrxrXRRRFQgmq00SbNLbQCY0sjW8EYbAJ
+ Q02PszbMNvAs6p+b5Zv0OHRBxtxwEy2Ap1GvthLnuta9XWkbvRbwDOrIKAGmHAQ1fJTT0Gg+
+ 6DiaXnxFcNgGzbTV8DksQh3ZanMQizpTNSSHk1CKoc6sOYSa23oJ0w0Y3IUqdB4c7YMmqpaA
+ iUbQGg3PbTPR2DrMqn2IcbQApd4Vcmo3VKPu4XHYDpW9zDOHS1HBi0d87nWKAMpsWSEzgXPB
+ /7ISADTAnollI0IYdp+CuSFh5RFsrCJEEhQZoQXrv6Zjrc1YB3Sr1/QAUkBsJfAk/WVCQh7H
+ JkToAaIwsa0gd8hPJhQEyxMSGWXkFWVsOMPqgSOFi+0FN7dMXhbCEHkMc51hohjl5pZHWTio
+ QDWymmsobl82QC9r90mf+B8j6Z0gR4Qf9hzwzePpty4M/AlU7fhJJSXCc/h+7/MgrV5UInlz
+ cuytInt7wcHOT0GlM9RFl9HWdt3oR7vCXzJrOqb41HPiWHRTM+kWzCtSO35xZ0LVT5fto/yo
+ 7FnXwbGdzq/lSX3sJVdv31Z/Mc6GyvfuxpSs/C/vveZQMQMAAA==
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFmpgkeLIzCtJLcpLzFFi42I5/e/4XV3/MP8Yg0sHJC02zljPanH9y3NW
+ i/lHzrFa9D9+zWxx/vwGdotbDTIWmx5fY7X42HOP1eLyrjlsFjPO72OyuHjK1eJ24wo2i8Nv
+ 2lkt/l3byOLA5/H+Riu7x6ZVnWwem5fUexx8t4fJo2/LKkaPz5vkAtii9GyK8ktLUhUy8otL
+ bJWiDS2M9AwtLfSMTCz1DI3NY62MTJX07WxSUnMyy1KL9O0S9DI+313IWnBBv+LKnZOsDYx/
+ NboYOTkkBEwkTh6dwNLFyMUhJLCUUeLOvxnsEAkxiUn7tkPZwhJ/rnWxgdhCAp8YJf7sU+pi
+ 5OBgE9CT2LGqECQsIiAncfPrXTaQOcwCp5kldj34wwKSEBbwkbjy9jU7SD2LgKrEl6k5IGFe
+ AS+Ji5s2sECMB+o918kMYnMKeEuc7lvACLHKS2L65BcsExj5FjAyrGIUSS0tzk3PLTbSK07M
+ LS7NS9dLzs/dxAgM/W3Hfm7Zwdj1LvgQowAHoxIPrwGbf4wQa2JZcWXuIUYJDmYlEd6p1/1i
+ hHhTEiurUovy44tKc1KLDzGaAt00kVlKNDkfGJd5JfGGpobmFpaG5sbmxmYWSuK85w0qo4QE
+ 0hNLUrNTUwtSi2D6mDg4pRoYxb7Y3wzXqHlw6IBJG09g0+FTly+LyL91Zb/wgc3sZMCO7vPl
+ NgHG12dbr/z//3bytJ+pU5b/dnlQ+P2x0dO/D9aIqKhnXFvrLfbdN0cgQf+OW/Sy7sDUVR48
+ f1z4r4ttTDnu1v4hUadzlYla7exz6ctWfNmwM/Z7X5cjh5Mq04ssucUCGWnLlViKMxINtZiL
+ ihMBQLV8/ZMCAAA=
+X-CMS-MailID: 20190128192151eucas1p1d5ad3a851ffc8b56a7a62febdb6d5677
+X-Msg-Generator: CA
+X-RootMTR: 20190128192151eucas1p1d5ad3a851ffc8b56a7a62febdb6d5677
+X-EPHeader: CA
+CMS-TYPE: 201P
+X-CMS-RootMailID: 20190128192151eucas1p1d5ad3a851ffc8b56a7a62febdb6d5677
+References: <1548703299-15806-1-git-send-email-l.luba@partner.samsung.com>
+ <CGME20190128192151eucas1p1d5ad3a851ffc8b56a7a62febdb6d5677@eucas1p1.samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_111806_757833_1EA7E1F3 
-X-CRM114-Status: GOOD (  13.90  )
+X-CRM114-CacheID: sfid-20190128_112158_724787_B5478737 
+X-CRM114-Status: GOOD (  14.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,52 +133,155 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Rajendra Nayak <rnayak@codeaurora.org>,
- Suzuki K Poulose <suzuki.poulose@arm.com>,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- John Horley <John.Horley@arm.com>, Doug Anderson <dianders@chromium.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- David Brown <david.brown@linaro.org>, Rob Herring <robh+dt@kernel.org>,
- Sibi Sankar <sibis@codeaurora.org>, Vivek Gautam <vivek.gautam@codeaurora.org>,
- Leo Yan <leo.yan@linaro.org>, Andy Gross <andy.gross@linaro.org>,
- Stephen Boyd <sboyd@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: linux-samsung-soc@vger.kernel.org, b.zolnierkie@samsung.com,
+ Stephen Boyd <sboyd@kernel.org>, Michael Turquette <mturquette@baylibre.com>,
+ linux-kernel@vger.kernel.org, krzk@kernel.org,
+ Lukasz Luba <l.luba@partner.samsung.com>, Chanwoo Choi <cw00.choi@samsung.com>,
+ myungjoo.ham@samsung.com, Kukjin Kim <kgene@kernel.org>,
+ Sylwester Nawrocki <s.nawrocki@samsung.com>, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/28/2019 10:45 PM, Mathieu Poirier wrote:
+This patch provides support for clocks needed for Dynamic Memory Controller
+in Exynos5422 SoC. It adds CDREX base register addresses, new DIV, MUX and
+GATE entries.
 
->> For SDM845(A75 based):
->>
->> *0xB_B8_03* does indicate that the JEP106 identification
->> code is 0x3B and continuation code is 0x4 which is of ARM and not
->> QCOM(JEP106 ID is 0x70) which is expected.
->>
->> And the other values of PIDR0[0:7] and PIDR1[3:0] are *Implementation
->> defined part numbers* and can be different from ARM A75/A55.
->>
->> I think this clears up case for SDM845.
->>
->> As for MSM8996, it is not based on any ARM derivative and hence the
->> JEP106 ID is of QCOM(0x70) from the value of pid = *0xF_02_11*
->> based on PIDR1[7:4] and PIDR2[2:0]. This clears this as well.
->>
->> Please correct me if I am wrong and also let me know if I can
->> continue with PID addition to table.
-> 
-> Please proceed.
-> 
+CC: Sylwester Nawrocki <s.nawrocki@samsung.com>
+CC: Chanwoo Choi <cw00.choi@samsung.com>
+CC: Michael Turquette <mturquette@baylibre.com>
+CC: Stephen Boyd <sboyd@kernel.org>
+CC: Kukjin Kim <kgene@kernel.org>
+CC: Krzysztof Kozlowski <krzk@kernel.org>
+CC: linux-samsung-soc@vger.kernel.org
+CC: linux-clk@vger.kernel.org
+CC: linux-arm-kernel@lists.infradead.org
+CC: linux-kernel@vger.kernel.org
+Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+---
+ drivers/clk/samsung/clk-exynos5420.c | 48 +++++++++++++++++++++++++++++++++---
+ 1 file changed, 44 insertions(+), 4 deletions(-)
 
-Thanks Mathieu, posted the next version now.
-
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 34cce3c..3e87421 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -132,6 +132,8 @@
+ #define BPLL_LOCK		0x20010
+ #define BPLL_CON0		0x20110
+ #define SRC_CDREX		0x20200
++#define GATE_BUS_CDREX0		0x20700
++#define GATE_BUS_CDREX1		0x20704
+ #define DIV_CDREX0		0x20500
+ #define DIV_CDREX1		0x20504
+ #define KPLL_LOCK		0x28000
+@@ -248,6 +250,8 @@ static const unsigned long exynos5x_clk_regs[] __initconst = {
+ 	DIV_CDREX1,
+ 	SRC_KFC,
+ 	DIV_KFC0,
++	GATE_BUS_CDREX0,
++	GATE_BUS_CDREX1,
+ };
+ 
+ static const unsigned long exynos5800_clk_regs[] __initconst = {
+@@ -425,6 +429,10 @@ PNAME(mout_group13_5800_p)	= { "dout_osc_div", "mout_sw_aclkfl1_550_cam" };
+ PNAME(mout_group14_5800_p)	= { "dout_aclk550_cam", "dout_sclk_sw" };
+ PNAME(mout_group15_5800_p)	= { "dout_osc_div", "mout_sw_aclk550_cam" };
+ PNAME(mout_group16_5800_p)	= { "dout_osc_div", "mout_mau_epll_clk" };
++PNAME(mout_mx_mspll_ccore_phy_p) = { "sclk_bpll", "mout_dpll_ctrl",
++					"mout_mpll_ctrl", "ff_dout_spll2",
++					"mout_sclk_spll"};
++
+ 
+ /* fixed rate clocks generated outside the soc */
+ static struct samsung_fixed_rate_clock
+@@ -450,7 +458,7 @@ static const struct samsung_fixed_factor_clock
+ static const struct samsung_fixed_factor_clock
+ 		exynos5800_fixed_factor_clks[] __initconst = {
+ 	FFACTOR(0, "ff_dout_epll2", "mout_sclk_epll", 1, 2, 0),
+-	FFACTOR(0, "ff_dout_spll2", "mout_sclk_spll", 1, 2, 0),
++	FFACTOR(CLK_FF_DOUT_SPLL2, "ff_dout_spll2", "mout_sclk_spll", 1, 2, 0),
+ };
+ 
+ static const struct samsung_mux_clock exynos5800_mux_clks[] __initconst = {
+@@ -472,11 +480,14 @@ static const struct samsung_mux_clock exynos5800_mux_clks[] __initconst = {
+ 	MUX(0, "mout_aclk300_disp1", mout_group5_5800_p, SRC_TOP2, 24, 2),
+ 	MUX(0, "mout_aclk300_gscl", mout_group5_5800_p, SRC_TOP2, 28, 2),
+ 
++	MUX(CLK_MOUT_MX_MSPLL_CCORE_PHY, "mout_mx_mspll_ccore_phy",
++		mout_mx_mspll_ccore_phy_p, SRC_TOP7, 0, 3),
++
+ 	MUX(CLK_MOUT_MX_MSPLL_CCORE, "mout_mx_mspll_ccore",
+-			mout_mx_mspll_ccore_p, SRC_TOP7, 16, 2),
++			mout_mx_mspll_ccore_p, SRC_TOP7, 16, 3),
+ 	MUX_F(CLK_MOUT_MAU_EPLL, "mout_mau_epll_clk", mout_mau_epll_clk_5800_p,
+ 			SRC_TOP7, 20, 2, CLK_SET_RATE_PARENT, 0),
+-	MUX(0, "sclk_bpll", mout_bpll_p, SRC_TOP7, 24, 1),
++	MUX(CLK_SCLK_BPLL, "sclk_bpll", mout_bpll_p, SRC_TOP7, 24, 1),
+ 	MUX(0, "mout_epll2", mout_epll2_5800_p, SRC_TOP7, 28, 1),
+ 
+ 	MUX(0, "mout_aclk550_cam", mout_group3_5800_p, SRC_TOP8, 16, 3),
+@@ -648,7 +659,7 @@ static const struct samsung_mux_clock exynos5x_mux_clks[] __initconst = {
+ 
+ 	MUX(0, "mout_sclk_mpll", mout_mpll_p, SRC_TOP6, 0, 1),
+ 	MUX(CLK_MOUT_VPLL, "mout_sclk_vpll", mout_vpll_p, SRC_TOP6, 4, 1),
+-	MUX(0, "mout_sclk_spll", mout_spll_p, SRC_TOP6, 8, 1),
++	MUX(CLK_MOUT_SCLK_SPLL, "mout_sclk_spll", mout_spll_p, SRC_TOP6, 8, 1),
+ 	MUX(0, "mout_sclk_ipll", mout_ipll_p, SRC_TOP6, 12, 1),
+ 	MUX(0, "mout_sclk_rpll", mout_rpll_p, SRC_TOP6, 16, 1),
+ 	MUX_F(CLK_MOUT_EPLL, "mout_sclk_epll", mout_epll_p, SRC_TOP6, 20, 1,
+@@ -814,9 +825,13 @@ static const struct samsung_div_clock exynos5x_div_clks[] __initconst = {
+ 			DIV_CDREX0, 16, 3),
+ 	DIV(CLK_DOUT_CCLK_DREX0, "dout_cclk_drex0", "dout_clk2x_phy0",
+ 			DIV_CDREX0, 8, 3),
++	DIV(0, "dout_cclk_drex1", "dout_clk2x_phy0", DIV_CDREX0, 8, 3),
+ 	DIV(CLK_DOUT_CLK2X_PHY0, "dout_clk2x_phy0", "dout_sclk_cdrex",
+ 			DIV_CDREX0, 3, 5),
+ 
++	DIV(0, "dout_pclk_drex0", "dout_cclk_drex0", DIV_CDREX0, 28, 3),
++	DIV(0, "dout_pclk_drex1", "dout_cclk_drex1", DIV_CDREX0, 28, 3),
++
+ 	DIV(CLK_DOUT_PCLK_CORE_MEM, "dout_pclk_core_mem", "mout_mclk_cdrex",
+ 			DIV_CDREX1, 8, 3),
+ 
+@@ -1170,6 +1185,31 @@ static const struct samsung_gate_clock exynos5x_gate_clks[] __initconst = {
+ 			GATE_TOP_SCLK_ISP, 12, CLK_SET_RATE_PARENT, 0),
+ 
+ 	GATE(CLK_G3D, "g3d", "mout_user_aclk_g3d", GATE_IP_G3D, 9, 0, 0),
++
++	GATE(CLK_CLKM_PHY0, "clkm_phy0", "dout_sclk_cdrex",
++			GATE_BUS_CDREX0, 0, 0, 0),
++	GATE(CLK_CLKM_PHY1, "clkm_phy1", "dout_sclk_cdrex",
++			GATE_BUS_CDREX0, 1, 0, 0),
++	GATE(0, "mx_mspll_ccore_phy", "mout_mx_mspll_ccore_phy",
++			SRC_MASK_TOP7, 0, CLK_IGNORE_UNUSED, 0),
++
++	GATE(CLK_ACLK_PPMU_DREX0_0, "aclk_ppmu_drex0_0", "dout_aclk_cdrex1",
++			GATE_BUS_CDREX1, 15, CLK_IGNORE_UNUSED, 0),
++	GATE(CLK_ACLK_PPMU_DREX0_1, "aclk_ppmu_drex0_1", "dout_aclk_cdrex1",
++			GATE_BUS_CDREX1, 14, CLK_IGNORE_UNUSED, 0),
++	GATE(CLK_ACLK_PPMU_DREX1_0, "aclk_ppmu_drex1_0", "dout_aclk_cdrex1",
++			GATE_BUS_CDREX1, 13, CLK_IGNORE_UNUSED, 0),
++	GATE(CLK_ACLK_PPMU_DREX1_1, "aclk_ppmu_drex1_1", "dout_aclk_cdrex1",
++			GATE_BUS_CDREX1, 12, CLK_IGNORE_UNUSED, 0),
++
++	GATE(CLK_PCLK_PPMU_DREX0_0, "pclk_ppmu_drex0_0", "dout_pclk_cdrex",
++			GATE_BUS_CDREX1, 29, CLK_IGNORE_UNUSED, 0),
++	GATE(CLK_PCLK_PPMU_DREX0_1, "pclk_ppmu_drex0_1", "dout_pclk_cdrex",
++			GATE_BUS_CDREX1, 28, CLK_IGNORE_UNUSED, 0),
++	GATE(CLK_PCLK_PPMU_DREX1_0, "pclk_ppmu_drex1_0", "dout_pclk_cdrex",
++			GATE_BUS_CDREX1, 27, CLK_IGNORE_UNUSED, 0),
++	GATE(CLK_PCLK_PPMU_DREX1_1, "pclk_ppmu_drex1_1", "dout_pclk_cdrex",
++			GATE_BUS_CDREX1, 26, CLK_IGNORE_UNUSED, 0),
+ };
+ 
+ static const struct samsung_div_clock exynos5x_disp_div_clks[] __initconst = {
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
