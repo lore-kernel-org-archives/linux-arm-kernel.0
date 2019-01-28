@@ -2,68 +2,65 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D10FC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 08:58:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 48028C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 08:58:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D7B4E2148E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 08:58:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0C531207E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 08:58:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rRIOLSDL";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="jYGpnB3R"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D7B4E2148E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RlSvkCU2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C531207E0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XSPgUtRn+ZJapEL5kd7tDGTm2npoey74weWSsRffOIw=; b=rRIOLSDLZSFMHH
-	4InbfFM6lQKan7dfmIp7azpymPlzdsTfy3lwrMzAyQ3D/nvbNTLyMuqoO3FTO2Wx/DTY8rtfZhCXo
-	mI72CVICK//3HGEEWAXJi4vGAdDCpjr81r89DHmVAbVJg5mDShLGYdQgwyGeww/fxTmLBGwMa0E48
-	MAFGuv+X9D0wvmgimoeHy2t3LzNyIAxN+lTKiyu6+dw7l2nNryQUa9Y3/sI3YRr6rUCGKD4i7AnCZ
-	o5a2/Otuy/LaF4Gf/ACBQpVSeIzzTAtiop+CW6A30HyOL3xsdBA9bddRa15kfVan9X/APQbAOH7wE
-	POlSZUdJ3TD62a+nH2Og==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=aCpeGE5sBhG0gxmhoknsdguc/BXQOvQ8x5jH0ldN+2s=; b=RlSvkCU2RDJxJb
+	VKiLiH9fkHwcZgPdk6M+XsK9lvbgMLHL5DRTdhFYrCNXX2NTiXxAh0XVkHe9viqRAp8KiLuV9wZpB
+	K5GZS/NjVF4FUNrQj7TcE4Wb+4yr/l0DCz/i8niOtwYQMUn6ml9xOLNyBdw1inIPgqLy98RO66p/v
+	D4JsobCc7PnbrtSJmp7ora1XeGY+vkyaROSc93hxE2vqWBSPvjnkNHVCqccEw10WzSDTvCMlGWx2Z
+	ka7Igz3fR5UR8EBijyBrVD4fva8F3GuZl58/NJoRmu4XsHH7B25zevjR5Lfn4xqj7vzuG2K7EzXZD
+	86J+13YQjiKCtznNhBCw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go2kE-0003jj-JM; Mon, 28 Jan 2019 08:58:18 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go2jE-0002vF-1a
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 08:57:20 +0000
-Received: from sol.localdomain (c-107-3-167-184.hsd1.ca.comcast.net
- [107.3.167.184])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 7669E21736;
- Mon, 28 Jan 2019 08:57:14 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548665834;
- bh=eSzGFyxP4Jw0vacBVRI1etSyokvwt2fSr1FGiMs4pyc=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=jYGpnB3RXjCK4WENLwo/jCQoviTaJ4yOqI68+HPyUBbtd0pmR7TmO+UWi0YfTgkqE
- CywNFkDBiT+Na3V+4nH0SFLV5jSSW7N5tvfsAENvyMXS3iVoEAe2uvO13oF4fy8qFl
- wGT5AqQxerTJiaUwkZsJ3uMr2KVrBrYmo/R2nxCA=
-From: Eric Biggers <ebiggers@kernel.org>
-To: linux-crypto@vger.kernel.org,
-	Herbert Xu <herbert@gondor.apana.org.au>
-Subject: [PATCH 1/3] crypto: x86/crct10dif-pcl - cleanup and optimizations
-Date: Mon, 28 Jan 2019 00:50:43 -0800
-Message-Id: <20190128085045.6504-2-ebiggers@kernel.org>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190128085045.6504-1-ebiggers@kernel.org>
-References: <20190128085045.6504-1-ebiggers@kernel.org>
+	id 1go2ko-0004Bp-P6; Mon, 28 Jan 2019 08:58:54 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1go2jn-0003Rm-3h
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 08:58:08 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id F08BDEBD;
+ Mon, 28 Jan 2019 00:57:47 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B75413F589;
+ Mon, 28 Jan 2019 00:57:45 -0800 (PST)
+Subject: Re: [PATCH v9 22/26] irqchip/gic-v3: Allow interrupts to be set as
+ pseudo-NMI
+To: "liwei (GF)" <liwei391@huawei.com>, linux-arm-kernel@lists.infradead.org
+References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
+ <1548084825-8803-23-git-send-email-julien.thierry@arm.com>
+ <8c0efe3f-1fc7-cbc7-0086-bd9c379cf0fc@huawei.com>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <315b0845-441d-4e02-d0a8-03769b63caee@arm.com>
+Date: Mon, 28 Jan 2019 08:57:43 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <8c0efe3f-1fc7-cbc7-0086-bd9c379cf0fc@huawei.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_005716_133610_422ADC99 
-X-CRM114-Status: GOOD (  21.43  )
+X-CRM114-CacheID: sfid-20190128_005751_669317_E60D87D8 
+X-CRM114-Status: GOOD (  23.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,974 +72,159 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Tim Chen <tim.c.chen@linux.intel.com>, linux-arm-kernel@lists.infradead.org,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
+ Jason Cooper <jason@lakedaemon.net>, marc.zyngier@arm.com,
+ catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ christoffer.dall@arm.com, james.morse@arm.com, joel@joelfernandes.org,
+ Thomas Gleixner <tglx@linutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Eric Biggers <ebiggers@google.com>
+Hi,
 
-The x86, arm, and arm64 asm implementations of crct10dif are very
-difficult to understand partly because many of the comments, labels, and
-macros are named incorrectly: the lengths mentioned are usually off by a
-factor of two from the actual code.  Many other things are unnecessarily
-convoluted as well, e.g. there are many more fold constants than
-actually needed and some aren't fully reduced.
+On 26/01/2019 10:19, liwei (GF) wrote:
+> 
+> 
+> On 2019/1/21 23:33, Julien Thierry wrote:
+>> Implement NMI callbacks for GICv3 irqchip. Install NMI safe handlers
+>> when setting up interrupt line as NMI.
+>>
+>> Only SPIs and PPIs are allowed to be set up as NMI.
+>>
+>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3.c | 84 ++++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 84 insertions(+)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index 4df1e94..447d8ab 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+> (snip)
+>>  
+>> +static int gic_irq_nmi_setup(struct irq_data *d)
+>> +{
+>> +	struct irq_desc *desc = irq_to_desc(d->irq);
+>> +
+>> +	if (!gic_supports_nmi())
+>> +		return -EINVAL;
+>> +
+>> +	if (gic_peek_irq(d, GICD_ISENABLER)) {
+>> +		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	/*
+>> +	 * A secondary irq_chip should be in charge of LPI request,
+>> +	 * it should not be possible to get there
+>> +	 */
+>> +	if (WARN_ON(gic_irq(d) >= 8192))
+>> +		return -EINVAL;
+>> +
+>> +	/* desc lock should already be held */
+>> +	if (gic_irq(d) < 32) {
+>> +		/* Setting up PPI as NMI, only switch handler for first NMI */
+>> +		if (!refcount_inc_not_zero(&ppi_nmi_refs[gic_irq(d) - 16])) {
+>> +			refcount_set(&ppi_nmi_refs[gic_irq(d) - 16], 1);
+>> +			desc->handle_irq = handle_percpu_devid_fasteoi_nmi;
+>> +		}
+>> +	} else {
+>> +		desc->handle_irq = handle_fasteoi_nmi;
+>> +	}
+>> +
+>> +	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), GICD_INT_NMI_PRI);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static void gic_irq_nmi_teardown(struct irq_data *d)
+>> +{
+>> +	struct irq_desc *desc = irq_to_desc(d->irq);
+>> +
+>> +	if (WARN_ON(!gic_supports_nmi()))
+>> +		return;
+>> +
+>> +	if (gic_peek_irq(d, GICD_ISENABLER)) {
+>> +		pr_err("Cannot set NMI property of enabled IRQ %u\n", d->irq);
+>> +		return;
+>> +	}
+>> +
+>> +	/*
+>> +	 * A secondary irq_chip should be in charge of LPI request,
+>> +	 * it should not be possible to get there
+>> +	 */
+>> +	if (WARN_ON(gic_irq(d) >= 8192))
+>> +		return;
+>> +
+>> +	/* desc lock should already be held */
+>> +	if (gic_irq(d) < 32) {
+>> +		/* Tearing down NMI, only switch handler for last NMI */
+>> +		if (refcount_dec_and_test(&ppi_nmi_refs[gic_irq(d) - 16]))
+>> +			desc->handle_irq = handle_percpu_devid_irq;
+>> +	} else {
+>> +		desc->handle_irq = handle_fasteoi_irq;
+>> +	}
+>> +
+>> +	gic_set_irq_prio(gic_irq(d), gic_dist_base(d), GICD_INT_DEF_PRI);
+>> +}
+>> +
+> 
+> Hello Julien,
+> I am afraid the setting of priority is not correct here. If the irq is in redistributor(gic_irq(d) < 32),
+> we should set the priority on each cpu, while we just set the priority on the current cpu here.
 
-This series therefore cleans up all these implementations to be much
-more maintainable.  I also made some small optimizations where I saw
-opportunities, resulting in slightly better performance.
+As Marc stated, to work with PPIs, the core IRQ API provides a set of
+*_percpu_irq functions (request, enable, disable...).
 
-This patch cleans up the x86 version.  Note that I opted to retain the
-support for buffers < 16 bytes, but I simplified it to be much shorter
-and have fewer different cases.  Performance on 2 and 3-byte inputs
-dropped slightly but the rest are actually faster now.
+The current idea is that the driver is in charge of calling
+ready_percpu_nmi() before enabling on the correct CPU, in a similar
+manner that the driver is in charge of calling enable_percpu_irq() and
+disable_percpu_irq() on the correct CPU.
 
-Signed-off-by: Eric Biggers <ebiggers@google.com>
----
- arch/x86/crypto/crct10dif-pcl-asm_64.S  | 848 +++++++++---------------
- arch/x86/crypto/crct10dif-pclmul_glue.c |   3 +-
- 2 files changed, 307 insertions(+), 544 deletions(-)
 
-diff --git a/arch/x86/crypto/crct10dif-pcl-asm_64.S b/arch/x86/crypto/crct10dif-pcl-asm_64.S
-index de04d3e98d8d3..e53d7137d9dea 100644
---- a/arch/x86/crypto/crct10dif-pcl-asm_64.S
-+++ b/arch/x86/crypto/crct10dif-pcl-asm_64.S
-@@ -43,609 +43,373 @@
- # LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
--########################################################################
--#       Function API:
--#       UINT16 crc_t10dif_pcl(
--#               UINT16 init_crc, //initial CRC value, 16 bits
--#               const unsigned char *buf, //buffer pointer to calculate CRC on
--#               UINT64 len //buffer length in bytes (64-bit data)
--#       );
- #
- #       Reference paper titled "Fast CRC Computation for Generic
- #	Polynomials Using PCLMULQDQ Instruction"
- #       URL: http://www.intel.com/content/dam/www/public/us/en/documents
- #  /white-papers/fast-crc-computation-generic-polynomials-pclmulqdq-paper.pdf
- #
--#
- 
- #include <linux/linkage.h>
- 
- .text
- 
--#define        arg1 %rdi
--#define        arg2 %rsi
--#define        arg3 %rdx
--
--#define        arg1_low32 %edi
-+#define		init_crc	%edi
-+#define		buf		%rsi
-+#define		len		%rdx
-+
-+#define		FOLD_CONSTS	%xmm10
-+#define		BSWAP_MASK	%xmm11
-+
-+# Fold reg1, reg2 into the next 32 data bytes, storing the result back into
-+# reg1, reg2.
-+.macro	fold_32_bytes	offset, reg1, reg2
-+	movdqu	\offset(buf), %xmm9
-+	movdqu	\offset+16(buf), %xmm12
-+	pshufb	BSWAP_MASK, %xmm9
-+	pshufb	BSWAP_MASK, %xmm12
-+	movdqa	\reg1, %xmm8
-+	movdqa	\reg2, %xmm13
-+	pclmulqdq	$0x00, FOLD_CONSTS, \reg1
-+	pclmulqdq	$0x11, FOLD_CONSTS, %xmm8
-+	pclmulqdq	$0x00, FOLD_CONSTS, \reg2
-+	pclmulqdq	$0x11, FOLD_CONSTS, %xmm13
-+	pxor	%xmm9 , \reg1
-+	xorps	%xmm8 , \reg1
-+	pxor	%xmm12, \reg2
-+	xorps	%xmm13, \reg2
-+.endm
-+
-+# Fold src_reg into dst_reg.
-+.macro	fold_16_bytes	src_reg, dst_reg
-+	movdqa	\src_reg, %xmm8
-+	pclmulqdq	$0x11, FOLD_CONSTS, \src_reg
-+	pclmulqdq	$0x00, FOLD_CONSTS, %xmm8
-+	pxor	%xmm8, \dst_reg
-+	xorps	\src_reg, \dst_reg
-+.endm
- 
--ENTRY(crc_t10dif_pcl)
-+#
-+# u16 crc_t10dif_pcl(u16 init_crc, const *u8 buf, size_t len);
-+#
- .align 16
--
--	# adjust the 16-bit initial_crc value, scale it to 32 bits
--	shl	$16, arg1_low32
--
--	# Allocate Stack Space
--	mov     %rsp, %rcx
--	sub	$16*2, %rsp
--	# align stack to 16 byte boundary
--	and     $~(0x10 - 1), %rsp
--
--	# check if smaller than 256
--	cmp	$256, arg3
--
--	# for sizes less than 128, we can't fold 64B at a time...
--	jl	_less_than_128
--
--
--	# load the initial crc value
--	movd	arg1_low32, %xmm10	# initial crc
--
--	# crc value does not need to be byte-reflected, but it needs
--	# to be moved to the high part of the register.
--	# because data will be byte-reflected and will align with
--	# initial crc at correct place.
--	pslldq	$12, %xmm10
--
--	movdqa  SHUF_MASK(%rip), %xmm11
--	# receive the initial 64B data, xor the initial crc value
--	movdqu	16*0(arg2), %xmm0
--	movdqu	16*1(arg2), %xmm1
--	movdqu	16*2(arg2), %xmm2
--	movdqu	16*3(arg2), %xmm3
--	movdqu	16*4(arg2), %xmm4
--	movdqu	16*5(arg2), %xmm5
--	movdqu	16*6(arg2), %xmm6
--	movdqu	16*7(arg2), %xmm7
--
--	pshufb	%xmm11, %xmm0
--	# XOR the initial_crc value
--	pxor	%xmm10, %xmm0
--	pshufb	%xmm11, %xmm1
--	pshufb	%xmm11, %xmm2
--	pshufb	%xmm11, %xmm3
--	pshufb	%xmm11, %xmm4
--	pshufb	%xmm11, %xmm5
--	pshufb	%xmm11, %xmm6
--	pshufb	%xmm11, %xmm7
--
--	movdqa	rk3(%rip), %xmm10	#xmm10 has rk3 and rk4
--					#imm value of pclmulqdq instruction
--					#will determine which constant to use
--
--	#################################################################
--	# we subtract 256 instead of 128 to save one instruction from the loop
--	sub	$256, arg3
--
--	# at this section of the code, there is 64*x+y (0<=y<64) bytes of
--	# buffer. The _fold_64_B_loop will fold 64B at a time
--	# until we have 64+y Bytes of buffer
--
--
--	# fold 64B at a time. This section of the code folds 4 xmm
--	# registers in parallel
--_fold_64_B_loop:
--
--	# update the buffer pointer
--	add	$128, arg2		#    buf += 64#
--
--	movdqu	16*0(arg2), %xmm9
--	movdqu	16*1(arg2), %xmm12
--	pshufb	%xmm11, %xmm9
--	pshufb	%xmm11, %xmm12
--	movdqa	%xmm0, %xmm8
--	movdqa	%xmm1, %xmm13
--	pclmulqdq	$0x0 , %xmm10, %xmm0
--	pclmulqdq	$0x11, %xmm10, %xmm8
--	pclmulqdq	$0x0 , %xmm10, %xmm1
--	pclmulqdq	$0x11, %xmm10, %xmm13
--	pxor	%xmm9 , %xmm0
--	xorps	%xmm8 , %xmm0
--	pxor	%xmm12, %xmm1
--	xorps	%xmm13, %xmm1
--
--	movdqu	16*2(arg2), %xmm9
--	movdqu	16*3(arg2), %xmm12
--	pshufb	%xmm11, %xmm9
--	pshufb	%xmm11, %xmm12
--	movdqa	%xmm2, %xmm8
--	movdqa	%xmm3, %xmm13
--	pclmulqdq	$0x0, %xmm10, %xmm2
--	pclmulqdq	$0x11, %xmm10, %xmm8
--	pclmulqdq	$0x0, %xmm10, %xmm3
--	pclmulqdq	$0x11, %xmm10, %xmm13
--	pxor	%xmm9 , %xmm2
--	xorps	%xmm8 , %xmm2
--	pxor	%xmm12, %xmm3
--	xorps	%xmm13, %xmm3
--
--	movdqu	16*4(arg2), %xmm9
--	movdqu	16*5(arg2), %xmm12
--	pshufb	%xmm11, %xmm9
--	pshufb	%xmm11, %xmm12
--	movdqa	%xmm4, %xmm8
--	movdqa	%xmm5, %xmm13
--	pclmulqdq	$0x0,  %xmm10, %xmm4
--	pclmulqdq	$0x11, %xmm10, %xmm8
--	pclmulqdq	$0x0,  %xmm10, %xmm5
--	pclmulqdq	$0x11, %xmm10, %xmm13
--	pxor	%xmm9 ,  %xmm4
--	xorps	%xmm8 ,  %xmm4
--	pxor	%xmm12,  %xmm5
--	xorps	%xmm13,  %xmm5
--
--	movdqu	16*6(arg2), %xmm9
--	movdqu	16*7(arg2), %xmm12
--	pshufb	%xmm11, %xmm9
--	pshufb	%xmm11, %xmm12
--	movdqa	%xmm6 , %xmm8
--	movdqa	%xmm7 , %xmm13
--	pclmulqdq	$0x0 , %xmm10, %xmm6
--	pclmulqdq	$0x11, %xmm10, %xmm8
--	pclmulqdq	$0x0 , %xmm10, %xmm7
--	pclmulqdq	$0x11, %xmm10, %xmm13
--	pxor	%xmm9 , %xmm6
--	xorps	%xmm8 , %xmm6
--	pxor	%xmm12, %xmm7
--	xorps	%xmm13, %xmm7
--
--	sub	$128, arg3
--
--	# check if there is another 64B in the buffer to be able to fold
--	jge	_fold_64_B_loop
--	##################################################################
--
--
--	add	$128, arg2
--	# at this point, the buffer pointer is pointing at the last y Bytes
--	# of the buffer the 64B of folded data is in 4 of the xmm
--	# registers: xmm0, xmm1, xmm2, xmm3
--
--
--	# fold the 8 xmm registers to 1 xmm register with different constants
--
--	movdqa	rk9(%rip), %xmm10
--	movdqa	%xmm0, %xmm8
--	pclmulqdq	$0x11, %xmm10, %xmm0
--	pclmulqdq	$0x0 , %xmm10, %xmm8
--	pxor	%xmm8, %xmm7
--	xorps	%xmm0, %xmm7
--
--	movdqa	rk11(%rip), %xmm10
--	movdqa	%xmm1, %xmm8
--	pclmulqdq	 $0x11, %xmm10, %xmm1
--	pclmulqdq	 $0x0 , %xmm10, %xmm8
--	pxor	%xmm8, %xmm7
--	xorps	%xmm1, %xmm7
--
--	movdqa	rk13(%rip), %xmm10
--	movdqa	%xmm2, %xmm8
--	pclmulqdq	 $0x11, %xmm10, %xmm2
--	pclmulqdq	 $0x0 , %xmm10, %xmm8
--	pxor	%xmm8, %xmm7
--	pxor	%xmm2, %xmm7
--
--	movdqa	rk15(%rip), %xmm10
--	movdqa	%xmm3, %xmm8
--	pclmulqdq	$0x11, %xmm10, %xmm3
--	pclmulqdq	$0x0 , %xmm10, %xmm8
--	pxor	%xmm8, %xmm7
--	xorps	%xmm3, %xmm7
--
--	movdqa	rk17(%rip), %xmm10
--	movdqa	%xmm4, %xmm8
--	pclmulqdq	$0x11, %xmm10, %xmm4
--	pclmulqdq	$0x0 , %xmm10, %xmm8
--	pxor	%xmm8, %xmm7
--	pxor	%xmm4, %xmm7
--
--	movdqa	rk19(%rip), %xmm10
--	movdqa	%xmm5, %xmm8
--	pclmulqdq	$0x11, %xmm10, %xmm5
--	pclmulqdq	$0x0 , %xmm10, %xmm8
--	pxor	%xmm8, %xmm7
--	xorps	%xmm5, %xmm7
--
--	movdqa	rk1(%rip), %xmm10	#xmm10 has rk1 and rk2
--					#imm value of pclmulqdq instruction
--					#will determine which constant to use
--	movdqa	%xmm6, %xmm8
--	pclmulqdq	$0x11, %xmm10, %xmm6
--	pclmulqdq	$0x0 , %xmm10, %xmm8
--	pxor	%xmm8, %xmm7
--	pxor	%xmm6, %xmm7
--
--
--	# instead of 64, we add 48 to the loop counter to save 1 instruction
--	# from the loop instead of a cmp instruction, we use the negative
--	# flag with the jl instruction
--	add	$128-16, arg3
--	jl	_final_reduction_for_128
--
--	# now we have 16+y bytes left to reduce. 16 Bytes is in register xmm7
--	# and the rest is in memory. We can fold 16 bytes at a time if y>=16
--	# continue folding 16B at a time
--
--_16B_reduction_loop:
-+ENTRY(crc_t10dif_pcl)
-+	# Allocate a 16-byte aligned 16-byte stack buffer.
-+	mov	%rsp, %rcx
-+	sub	$16, %rsp
-+	and	$~15, %rsp
-+
-+	movdqa	.Lbswap_mask(%rip), BSWAP_MASK
-+
-+	# For sizes less than 256 bytes, we can't fold 128 bytes at a time.
-+	cmp	$256, len
-+	jl	.Lless_than_256_bytes
-+
-+	# Load the first 128 data bytes.  Byte swapping is necessary to make the
-+	# bit order match the polynomial coefficient order.
-+	movdqu	16*0(buf), %xmm0
-+	movdqu	16*1(buf), %xmm1
-+	movdqu	16*2(buf), %xmm2
-+	movdqu	16*3(buf), %xmm3
-+	movdqu	16*4(buf), %xmm4
-+	movdqu	16*5(buf), %xmm5
-+	movdqu	16*6(buf), %xmm6
-+	movdqu	16*7(buf), %xmm7
-+	add	$128, buf
-+	pshufb	BSWAP_MASK, %xmm0
-+	pshufb	BSWAP_MASK, %xmm1
-+	pshufb	BSWAP_MASK, %xmm2
-+	pshufb	BSWAP_MASK, %xmm3
-+	pshufb	BSWAP_MASK, %xmm4
-+	pshufb	BSWAP_MASK, %xmm5
-+	pshufb	BSWAP_MASK, %xmm6
-+	pshufb	BSWAP_MASK, %xmm7
-+
-+	# XOR the first 16 data *bits* with the initial CRC value.
-+	pxor	%xmm8, %xmm8
-+	pinsrw	$7, init_crc, %xmm8
-+	pxor	%xmm8, %xmm0
-+
-+	movdqa	.Lfold_across_128_bytes_consts(%rip), FOLD_CONSTS
-+
-+	# Subtract 128 for the 128 data bytes just consumed.  Subtract another
-+	# 128 to simplify the termination condition of the following loop.
-+	sub	$256, len
-+
-+	# While >= 128 data bytes remain (not counting xmm0-7), fold the 128
-+	# bytes xmm0-7 into them, storing the result back into xmm0-7.
-+.Lfold_128_bytes_loop:
-+	fold_32_bytes	0, %xmm0, %xmm1
-+	fold_32_bytes	32, %xmm2, %xmm3
-+	fold_32_bytes	64, %xmm4, %xmm5
-+	fold_32_bytes	96, %xmm6, %xmm7
-+	add	$128, buf
-+	sub	$128, len
-+	jge	.Lfold_128_bytes_loop
-+
-+	# Now fold the 112 bytes in xmm0-xmm6 into the 16 bytes in xmm7.
-+
-+	# Fold across 64 bytes.
-+	movdqa	.Lfold_across_64_bytes_consts(%rip), FOLD_CONSTS
-+	fold_16_bytes	%xmm0, %xmm4
-+	fold_16_bytes	%xmm1, %xmm5
-+	fold_16_bytes	%xmm2, %xmm6
-+	fold_16_bytes	%xmm3, %xmm7
-+	# Fold across 32 bytes.
-+	movdqa	.Lfold_across_32_bytes_consts(%rip), FOLD_CONSTS
-+	fold_16_bytes	%xmm4, %xmm6
-+	fold_16_bytes	%xmm5, %xmm7
-+	# Fold across 16 bytes.
-+	movdqa	.Lfold_across_16_bytes_consts(%rip), FOLD_CONSTS
-+	fold_16_bytes	%xmm6, %xmm7
-+
-+	# Add 128 to get the correct number of data bytes remaining in 0...127
-+	# (not counting xmm7), following the previous extra subtraction by 128.
-+	# Then subtract 16 to simplify the termination condition of the
-+	# following loop.
-+	add	$128-16, len
-+
-+	# While >= 16 data bytes remain (not counting xmm7), fold the 16 bytes
-+	# xmm7 into them, storing the result back into xmm7.
-+	jl	.Lfold_16_bytes_loop_done
-+.Lfold_16_bytes_loop:
- 	movdqa	%xmm7, %xmm8
--	pclmulqdq	$0x11, %xmm10, %xmm7
--	pclmulqdq	$0x0 , %xmm10, %xmm8
-+	pclmulqdq	$0x11, FOLD_CONSTS, %xmm7
-+	pclmulqdq	$0x00, FOLD_CONSTS, %xmm8
- 	pxor	%xmm8, %xmm7
--	movdqu	(arg2), %xmm0
--	pshufb	%xmm11, %xmm0
-+	movdqu	(buf), %xmm0
-+	pshufb	BSWAP_MASK, %xmm0
- 	pxor	%xmm0 , %xmm7
--	add	$16, arg2
--	sub	$16, arg3
--	# instead of a cmp instruction, we utilize the flags with the
--	# jge instruction equivalent of: cmp arg3, 16-16
--	# check if there is any more 16B in the buffer to be able to fold
--	jge	_16B_reduction_loop
--
--	#now we have 16+z bytes left to reduce, where 0<= z < 16.
--	#first, we reduce the data in the xmm7 register
--
--
--_final_reduction_for_128:
--	# check if any more data to fold. If not, compute the CRC of
--	# the final 128 bits
--	add	$16, arg3
--	je	_128_done
--
--	# here we are getting data that is less than 16 bytes.
--	# since we know that there was data before the pointer, we can
--	# offset the input pointer before the actual point, to receive
--	# exactly 16 bytes. after that the registers need to be adjusted.
--_get_last_two_xmms:
-+	add	$16, buf
-+	sub	$16, len
-+	jge	.Lfold_16_bytes_loop
-+
-+.Lfold_16_bytes_loop_done:
-+	# Add 16 to get the correct number of data bytes remaining in 0...15
-+	# (not counting xmm7), following the previous extra subtraction by 16.
-+	add	$16, len
-+	je	.Lreduce_final_16_bytes
-+
-+.Lhandle_partial_segment:
-+	# Reduce the last '16 + len' bytes where 1 <= len <= 15 and the first 16
-+	# bytes are in xmm7 and the rest are the remaining data in 'buf'.  To do
-+	# this without needing a fold constant for each possible 'len', redivide
-+	# the bytes into a first chunk of 'len' bytes and a second chunk of 16
-+	# bytes, then fold the first chunk into the second.
-+
- 	movdqa	%xmm7, %xmm2
- 
--	movdqu	-16(arg2, arg3), %xmm1
--	pshufb	%xmm11, %xmm1
-+	# xmm1 = last 16 original data bytes
-+	movdqu	-16(buf, len), %xmm1
-+	pshufb	BSWAP_MASK, %xmm1
- 
--	# get rid of the extra data that was loaded before
--	# load the shift constant
--	lea	pshufb_shf_table+16(%rip), %rax
--	sub	arg3, %rax
-+	# xmm2 = high order part of second chunk: xmm7 left-shifted by 'len' bytes.
-+	lea	.Lbyteshift_table+16(%rip), %rax
-+	sub	len, %rax
- 	movdqu	(%rax), %xmm0
--
--	# shift xmm2 to the left by arg3 bytes
- 	pshufb	%xmm0, %xmm2
- 
--	# shift xmm7 to the right by 16-arg3 bytes
--	pxor	mask1(%rip), %xmm0
-+	# xmm7 = first chunk: xmm7 right-shifted by '16-len' bytes.
-+	pxor	.Lmask1(%rip), %xmm0
- 	pshufb	%xmm0, %xmm7
-+
-+	# xmm1 = second chunk: 'len' bytes from xmm1 (low-order bytes),
-+	# then '16-len' bytes from xmm2 (high-order bytes).
- 	pblendvb	%xmm2, %xmm1	#xmm0 is implicit
- 
--	# fold 16 Bytes
-+	# Fold the first chunk into the second chunk, storing the result in xmm7.
- 	movdqa	%xmm1, %xmm2
- 	movdqa	%xmm7, %xmm8
--	pclmulqdq	$0x11, %xmm10, %xmm7
--	pclmulqdq	$0x0 , %xmm10, %xmm8
-+	pclmulqdq	$0x11, FOLD_CONSTS, %xmm7
-+	pclmulqdq	$0x00, FOLD_CONSTS, %xmm8
- 	pxor	%xmm8, %xmm7
- 	pxor	%xmm2, %xmm7
- 
--_128_done:
--	# compute crc of a 128-bit value
--	movdqa	rk5(%rip), %xmm10	# rk5 and rk6 in xmm10
--	movdqa	%xmm7, %xmm0
--
--	#64b fold
--	pclmulqdq	$0x1, %xmm10, %xmm7
--	pslldq	$8   ,  %xmm0
--	pxor	%xmm0,  %xmm7
-+.Lreduce_final_16_bytes:
-+	# Reduce the 128-bit value M(x), stored in xmm7, to the final 16-bit CRC
- 
--	#32b fold
-+	# Load 'x^48 * (x^48 mod G(x))' and 'x^48 * (x^80 mod G(x))'.
-+	movdqa	.Lfinal_fold_consts(%rip), FOLD_CONSTS
- 	movdqa	%xmm7, %xmm0
- 
--	pand	mask2(%rip), %xmm0
-+	# Fold the high 64 bits into the low 64 bits, while also multiplying by
-+	# x^64.  This produces a 128-bit value congruent to x^64 * M(x) and
-+	# whose low 48 bits are 0.
-+	pclmulqdq	$0x11, FOLD_CONSTS, %xmm7 # high bits * x^48 * (x^80 mod G(x))
-+	pslldq	$8, %xmm0
-+	pxor	%xmm0, %xmm7			  # + low bits * x^64
- 
--	psrldq	$12, %xmm7
--	pclmulqdq	$0x10, %xmm10, %xmm7
--	pxor	%xmm0, %xmm7
--
--	#barrett reduction
--_barrett:
--	movdqa	rk7(%rip), %xmm10	# rk7 and rk8 in xmm10
-+	# Fold the high 32 bits into the low 96 bits.  This produces a 96-bit
-+	# value congruent to x^64 * M(x) and whose low 48 bits are 0.
- 	movdqa	%xmm7, %xmm0
--	pclmulqdq	$0x01, %xmm10, %xmm7
--	pslldq	$4, %xmm7
--	pclmulqdq	$0x11, %xmm10, %xmm7
-+	pand	.Lmask2(%rip), %xmm0		  # zero high 32 bits
-+	psrldq	$12, %xmm7			  # extract high 32 bits
-+	pclmulqdq	$0x00, FOLD_CONSTS, %xmm7 # high 32 bits * x^48 * (x^48 mod G(x))
-+	pxor	%xmm0, %xmm7			  # + low bits
- 
--	pslldq	$4, %xmm7
--	pxor	%xmm0, %xmm7
--	pextrd	$1, %xmm7, %eax
-+.Lbarrett_reduction:
-+	# Load G(x) and floor(x^48 / G(x)).
-+	movdqa	.Lbarrett_reduction_consts(%rip), FOLD_CONSTS
- 
--_cleanup:
--	# scale the result back to 16 bits
--	shr	$16, %eax
--	mov     %rcx, %rsp
-+	# Use Barrett reduction to compute the final CRC value.
-+	movdqa	%xmm7, %xmm0
-+	pclmulqdq	$0x11, FOLD_CONSTS, %xmm7 # high 32 bits * floor(x^48 / G(x))
-+	psrlq	$32, %xmm7			  # /= x^32
-+	pclmulqdq	$0x00, FOLD_CONSTS, %xmm7 # *= G(x)
-+	psrlq	$48, %xmm0
-+	pxor	%xmm7, %xmm0		     # + low 16 nonzero bits
-+	# Final CRC value (x^16 * M(x)) mod G(x) is in low 16 bits of xmm0.
-+
-+	pextrw	$0, %xmm0, %eax
-+.Ldone:
-+	mov	%rcx, %rsp
- 	ret
- 
--########################################################################
--
- .align 16
--_less_than_128:
-+.Lless_than_256_bytes:
-+	cmp	$16, len
-+	jl	.Lless_than_16_bytes
- 
--	# check if there is enough buffer to be able to fold 16B at a time
--	cmp	$32, arg3
--	jl	_less_than_32
--	movdqa  SHUF_MASK(%rip), %xmm11
-+	# Checksumming a buffer of length 16...255 bytes
- 
--	# now if there is, load the constants
--	movdqa	rk1(%rip), %xmm10	# rk1 and rk2 in xmm10
-+	# Load the first 16 data bytes.
-+	movdqu	(buf), %xmm7
-+	pshufb	BSWAP_MASK, %xmm7
-+	add	$16, buf
- 
--	movd	arg1_low32, %xmm0	# get the initial crc value
--	pslldq	$12, %xmm0	# align it to its correct place
--	movdqu	(arg2), %xmm7	# load the plaintext
--	pshufb	%xmm11, %xmm7	# byte-reflect the plaintext
-+	# XOR the first 16 data *bits* with the initial CRC value.
-+	pxor	%xmm0, %xmm0
-+	pinsrw	$7, init_crc, %xmm0
- 	pxor	%xmm0, %xmm7
- 
--
--	# update the buffer pointer
--	add	$16, arg2
--
--	# update the counter. subtract 32 instead of 16 to save one
--	# instruction from the loop
--	sub	$32, arg3
--
--	jmp	_16B_reduction_loop
--
--
--.align 16
--_less_than_32:
--	# mov initial crc to the return value. this is necessary for
--	# zero-length buffers.
--	mov	arg1_low32, %eax
--	test	arg3, arg3
--	je	_cleanup
--
--	movdqa  SHUF_MASK(%rip), %xmm11
--
--	movd	arg1_low32, %xmm0	# get the initial crc value
--	pslldq	$12, %xmm0	# align it to its correct place
--
--	cmp	$16, arg3
--	je	_exact_16_left
--	jl	_less_than_16_left
--
--	movdqu	(arg2), %xmm7	# load the plaintext
--	pshufb	%xmm11, %xmm7	# byte-reflect the plaintext
--	pxor	%xmm0 , %xmm7	# xor the initial crc value
--	add	$16, arg2
--	sub	$16, arg3
--	movdqa	rk1(%rip), %xmm10	# rk1 and rk2 in xmm10
--	jmp	_get_last_two_xmms
--
-+	movdqa	.Lfold_across_16_bytes_consts(%rip), FOLD_CONSTS
-+	cmp	$16, len
-+	je	.Lreduce_final_16_bytes		# len == 16
-+	sub	$32, len
-+	jge	.Lfold_16_bytes_loop		# 32 <= len <= 255
-+	add	$16, len
-+	jmp	.Lhandle_partial_segment	# 17 <= len <= 31
- 
- .align 16
--_less_than_16_left:
--	# use stack space to load data less than 16 bytes, zero-out
--	# the 16B in memory first.
--
--	pxor	%xmm1, %xmm1
--	mov	%rsp, %r11
--	movdqa	%xmm1, (%r11)
--
--	cmp	$4, arg3
--	jl	_only_less_than_4
--
--	# backup the counter value
--	mov	arg3, %r9
--	cmp	$8, arg3
--	jl	_less_than_8_left
--
--	# load 8 Bytes
--	mov	(arg2), %rax
--	mov	%rax, (%r11)
--	add	$8, %r11
--	sub	$8, arg3
--	add	$8, arg2
--_less_than_8_left:
--
--	cmp	$4, arg3
--	jl	_less_than_4_left
--
--	# load 4 Bytes
--	mov	(arg2), %eax
--	mov	%eax, (%r11)
--	add	$4, %r11
--	sub	$4, arg3
--	add	$4, arg2
--_less_than_4_left:
--
--	cmp	$2, arg3
--	jl	_less_than_2_left
--
--	# load 2 Bytes
--	mov	(arg2), %ax
--	mov	%ax, (%r11)
--	add	$2, %r11
--	sub	$2, arg3
--	add	$2, arg2
--_less_than_2_left:
--	cmp     $1, arg3
--        jl      _zero_left
--
--	# load 1 Byte
--	mov	(arg2), %al
--	mov	%al, (%r11)
--_zero_left:
-+.Lless_than_16_bytes:
-+	mov	init_crc, %eax
-+	pxor	%xmm0, %xmm0
-+
-+	cmp	$2, len
-+	jl	.Lless_than_2_bytes
-+
-+	# Checksumming a buffer of length 2...15 bytes.  Copy the data into a
-+	# 16-byte stack buffer, left-padding with zeroes.  Then reduce the
-+	# resulting 16-byte value.
-+
-+	movdqa	%xmm0, (%rsp)
-+	lea	16(%rsp), %r8
-+	sub	len, %r8
-+	mov	%r8, %r10
-+
-+	test	$8, len
-+	jz	1f
-+	movq	(buf), %r9
-+	movq	%r9, (%r8)
-+	add	$8, buf
-+	add	$8, %r8
-+1:
-+	test	$4, len
-+	jz	1f
-+	movl	(buf), %r9d
-+	movl	%r9d, (%r8)
-+	add	$4, buf
-+	add	$4, %r8
-+1:
-+	test	$2, len
-+	jz	1f
-+	movw	(buf), %r9w
-+	movw	%r9w, (%r8)
-+	add	$2, buf
-+	add	$2, %r8
-+1:
-+	test	$1, len
-+	jz	1f
-+	movb	(buf), %r9b
-+	movb	%r9b, (%r8)
-+1:
-+	# XOR the first 16 data *bits* with the initial CRC value.
-+	rol	$0x8, %ax
-+	xor	%ax, (%r10)
-+
-+	# Load the data and reduce it.
- 	movdqa	(%rsp), %xmm7
--	pshufb	%xmm11, %xmm7
--	pxor	%xmm0 , %xmm7	# xor the initial crc value
--
--	# shl r9, 4
--	lea	pshufb_shf_table+16(%rip), %rax
--	sub	%r9, %rax
--	movdqu	(%rax), %xmm0
--	pxor	mask1(%rip), %xmm0
--
--	pshufb	%xmm0, %xmm7
--	jmp	_128_done
-+	pshufb	BSWAP_MASK, %xmm7
-+	jmp	.Lreduce_final_16_bytes
- 
- .align 16
--_exact_16_left:
--	movdqu	(arg2), %xmm7
--	pshufb	%xmm11, %xmm7
--	pxor	%xmm0 , %xmm7   # xor the initial crc value
--
--	jmp	_128_done
--
--_only_less_than_4:
--	cmp	$3, arg3
--	jl	_only_less_than_3
--
--	# load 3 Bytes
--	mov	(arg2), %al
--	mov	%al, (%r11)
--
--	mov	1(arg2), %al
--	mov	%al, 1(%r11)
--
--	mov	2(arg2), %al
--	mov	%al, 2(%r11)
--
--	movdqa	 (%rsp), %xmm7
--	pshufb	 %xmm11, %xmm7
--	pxor	 %xmm0 , %xmm7  # xor the initial crc value
--
--	psrldq	$5, %xmm7
--
--	jmp	_barrett
--_only_less_than_3:
--	cmp	$2, arg3
--	jl	_only_less_than_2
--
--	# load 2 Bytes
--	mov	(arg2), %al
--	mov	%al, (%r11)
--
--	mov	1(arg2), %al
--	mov	%al, 1(%r11)
--
--	movdqa	(%rsp), %xmm7
--	pshufb	%xmm11, %xmm7
--	pxor	%xmm0 , %xmm7   # xor the initial crc value
--
--	psrldq	$6, %xmm7
--
--	jmp	_barrett
--_only_less_than_2:
--
--	# load 1 Byte
--	mov	(arg2), %al
--	mov	%al, (%r11)
--
--	movdqa	(%rsp), %xmm7
--	pshufb	%xmm11, %xmm7
--	pxor	%xmm0 , %xmm7   # xor the initial crc value
--
--	psrldq	$7, %xmm7
--
--	jmp	_barrett
-+.Lless_than_2_bytes:
-+	test	len, len
-+	je	.Ldone	# len = 0.  Nothing to do, just return init_crc.
-+
-+	# len = 1.  This is a special case because with only 1 data byte the
-+	# 16-bit initial CRC value can't just be XOR'ed with the first 16 data
-+	# bits as usual.  Instead, directly build the scaled value 'x^64 * M(x)'
-+	# and skip to the Barrett reduction step.
-+
-+	movzbl	(buf), %eax
-+	movd	%eax, %xmm7
-+	pslldq	$8, %xmm7
-+
-+	pxor	%xmm0, %xmm0
-+	movd	init_crc, %xmm0
-+	pslldq  $7, %xmm0
-+	pxor	%xmm0, %xmm7
-+	jmp	.Lbarrett_reduction
- 
- ENDPROC(crc_t10dif_pcl)
- 
- .section	.rodata, "a", @progbits
- .align 16
--# precomputed constants
--# these constants are precomputed from the poly:
--# 0x8bb70000 (0x8bb7 scaled to 32 bits)
--# Q = 0x18BB70000
--# rk1 = 2^(32*3) mod Q << 32
--# rk2 = 2^(32*5) mod Q << 32
--# rk3 = 2^(32*15) mod Q << 32
--# rk4 = 2^(32*17) mod Q << 32
--# rk5 = 2^(32*3) mod Q << 32
--# rk6 = 2^(32*2) mod Q << 32
--# rk7 = floor(2^64/Q)
--# rk8 = Q
--rk1:
--.quad 0x2d56000000000000
--rk2:
--.quad 0x06df000000000000
--rk3:
--.quad 0x9d9d000000000000
--rk4:
--.quad 0x7cf5000000000000
--rk5:
--.quad 0x2d56000000000000
--rk6:
--.quad 0x1368000000000000
--rk7:
--.quad 0x00000001f65a57f8
--rk8:
--.quad 0x000000018bb70000
--
--rk9:
--.quad 0xceae000000000000
--rk10:
--.quad 0xbfd6000000000000
--rk11:
--.quad 0x1e16000000000000
--rk12:
--.quad 0x713c000000000000
--rk13:
--.quad 0xf7f9000000000000
--rk14:
--.quad 0x80a6000000000000
--rk15:
--.quad 0x044c000000000000
--rk16:
--.quad 0xe658000000000000
--rk17:
--.quad 0xad18000000000000
--rk18:
--.quad 0xa497000000000000
--rk19:
--.quad 0x6ee3000000000000
--rk20:
--.quad 0xe7b5000000000000
--
- 
-+# Fold constants precomputed from the polynomial 0x18bb7
-+# G(x) = x^16 + x^15 + x^11 + x^9 + x^8 + x^7 + x^5 + x^4 + x^2 + x^1 + x^0
-+.Lfold_across_128_bytes_consts:
-+	.quad		0x0000000000006123	# x^(8*128)	mod G(x)
-+	.quad		0x0000000000002295	# x^(8*128+64)	mod G(x)
-+.Lfold_across_64_bytes_consts:
-+	.quad		0x0000000000001069	# x^(4*128)	mod G(x)
-+	.quad		0x000000000000dd31	# x^(4*128+64)	mod G(x)
-+.Lfold_across_32_bytes_consts:
-+	.quad		0x000000000000857d	# x^(2*128)	mod G(x)
-+	.quad		0x0000000000007acc	# x^(2*128+64)	mod G(x)
-+.Lfold_across_16_bytes_consts:
-+	.quad		0x000000000000a010	# x^(1*128)	mod G(x)
-+	.quad		0x0000000000001faa	# x^(1*128+64)	mod G(x)
-+.Lfinal_fold_consts:
-+	.quad		0x1368000000000000	# x^48 * (x^48 mod G(x))
-+	.quad		0x2d56000000000000	# x^48 * (x^80 mod G(x))
-+.Lbarrett_reduction_consts:
-+	.quad		0x0000000000018bb7	# G(x)
-+	.quad		0x00000001f65a57f8	# floor(x^48 / G(x))
- 
- .section	.rodata.cst16.mask1, "aM", @progbits, 16
- .align 16
--mask1:
--.octa 0x80808080808080808080808080808080
-+.Lmask1:
-+	.octa	0x80808080808080808080808080808080
- 
- .section	.rodata.cst16.mask2, "aM", @progbits, 16
- .align 16
--mask2:
--.octa 0x00000000FFFFFFFFFFFFFFFFFFFFFFFF
-+.Lmask2:
-+	.octa	0x00000000FFFFFFFFFFFFFFFFFFFFFFFF
-+
-+.section	.rodata.cst16.bswap_mask, "aM", @progbits, 16
-+.align 16
-+.Lbswap_mask:
-+	.octa	0x000102030405060708090A0B0C0D0E0F
- 
--.section	.rodata.cst16.SHUF_MASK, "aM", @progbits, 16
-+.section	.rodata.cst32.byteshift_table, "aM", @progbits, 32
- .align 16
--SHUF_MASK:
--.octa 0x000102030405060708090A0B0C0D0E0F
--
--.section	.rodata.cst32.pshufb_shf_table, "aM", @progbits, 32
--.align 32
--pshufb_shf_table:
--# use these values for shift constants for the pshufb instruction
--# different alignments result in values as shown:
--#	DDQ 0x008f8e8d8c8b8a898887868584838281 # shl 15 (16-1) / shr1
--#	DDQ 0x01008f8e8d8c8b8a8988878685848382 # shl 14 (16-3) / shr2
--#	DDQ 0x0201008f8e8d8c8b8a89888786858483 # shl 13 (16-4) / shr3
--#	DDQ 0x030201008f8e8d8c8b8a898887868584 # shl 12 (16-4) / shr4
--#	DDQ 0x04030201008f8e8d8c8b8a8988878685 # shl 11 (16-5) / shr5
--#	DDQ 0x0504030201008f8e8d8c8b8a89888786 # shl 10 (16-6) / shr6
--#	DDQ 0x060504030201008f8e8d8c8b8a898887 # shl 9  (16-7) / shr7
--#	DDQ 0x07060504030201008f8e8d8c8b8a8988 # shl 8  (16-8) / shr8
--#	DDQ 0x0807060504030201008f8e8d8c8b8a89 # shl 7  (16-9) / shr9
--#	DDQ 0x090807060504030201008f8e8d8c8b8a # shl 6  (16-10) / shr10
--#	DDQ 0x0a090807060504030201008f8e8d8c8b # shl 5  (16-11) / shr11
--#	DDQ 0x0b0a090807060504030201008f8e8d8c # shl 4  (16-12) / shr12
--#	DDQ 0x0c0b0a090807060504030201008f8e8d # shl 3  (16-13) / shr13
--#	DDQ 0x0d0c0b0a090807060504030201008f8e # shl 2  (16-14) / shr14
--#	DDQ 0x0e0d0c0b0a090807060504030201008f # shl 1  (16-15) / shr15
--.octa 0x8f8e8d8c8b8a89888786858483828100
--.octa 0x000e0d0c0b0a09080706050403020100
-+# The 16-byte vector beginning at &byteshift_table[16 - len] is the index vector
-+# to shift left by 'len' bytes, and is also {0x80, ..., 0x80} XOR the index
-+# vector to shift right by '16 - len' bytes.
-+.Lbyteshift_table:
-+	.byte		 0x0, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87
-+	.byte		0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f
-+	.byte		 0x0,  0x1,  0x2,  0x3,  0x4,  0x5,  0x6,  0x7
-+	.byte		 0x8,  0x9,  0xa,  0xb,  0xc,  0xd,  0xe , 0x0
-diff --git a/arch/x86/crypto/crct10dif-pclmul_glue.c b/arch/x86/crypto/crct10dif-pclmul_glue.c
-index cd4df93225014..80cea60e9c6d6 100644
---- a/arch/x86/crypto/crct10dif-pclmul_glue.c
-+++ b/arch/x86/crypto/crct10dif-pclmul_glue.c
-@@ -33,8 +33,7 @@
- #include <asm/cpufeatures.h>
- #include <asm/cpu_device_id.h>
- 
--asmlinkage __u16 crc_t10dif_pcl(__u16 crc, const unsigned char *buf,
--				size_t len);
-+asmlinkage u16 crc_t10dif_pcl(u16 init_crc, const u8 *buf, size_t len);
- 
- struct chksum_desc_ctx {
- 	__u16 crc;
+> static inline void __iomem *gic_dist_base(struct irq_data *d)
+> {
+> 	if (gic_irq_in_rdist(d))	/* SGI+PPI -> SGI_base for this CPU */
+> 		return gic_data_rdist_sgi_base();
+> 
+> 	if (d->hwirq <= 1023)		/* SPI -> dist_base */
+> 		return gic_data.dist_base;
+> 
+> 	return NULL;
+> }
+> 
+> I tried to add a smp_call_function here, but the kernel reported a warning as we have disabled irq
+> when calling raw_spin_lock_irqsave in request_nmi or ready_percpu_nmi.
+> [    2.137262] Call trace:
+> [    2.137265]  smp_call_function_many+0xf8/0x3a0
+> [    2.137267]  smp_call_function+0x40/0x58
+> [    2.137271]  gic_irq_nmi_setup+0xe8/0x118
+> [    2.137275]  ready_percpu_nmi+0x6c/0xf0> [    2.137279]  armpmu_request_irq+0x228/0x250
+
+Your issue lies here, if your PMU IRQ is a PPI, you shouldn't be calling
+ready_percpu_nmi() at the time you request but probably somewhere like
+arm_perf_starting_cpu().
+
+And you wouldn't need the smp_call to set the priority.
+
+Hope this helps.
+
+> [    2.137281]  arm_pmu_acpi_init+0x150/0x2f0
+> [    2.137284]  do_one_initcall+0x54/0x218
+> [    2.137289]  kernel_init_freeable+0x230/0x354
+> [    2.137293]  kernel_init+0x18/0x118
+> [    2.137295]  ret_from_fork+0x10/0x18
+> 
+
+Thanks,
+
 -- 
-2.20.1
-
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
