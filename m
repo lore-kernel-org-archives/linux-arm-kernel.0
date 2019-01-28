@@ -2,46 +2,47 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 72986C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 20:00:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1B4FBC282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 20:01:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 47B862147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 20:00:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DFF292177E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 20:01:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HSYr+WDj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 47B862147A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LN0nS5NI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DFF292177E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=triplefau.lt
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=47Jb7ie36PX5MRE3T+YXbwmaEvBYsoo4F/uo1eZPZUc=; b=HSYr+WDju1VRTs
-	zr3uTTyDrmaKbuNB+ywXhud0+vy41YAPi6+Caf8GagNmbGARyD3HhWA+1J9Bx5f+9zCyVOdST+lhT
-	aFdoopyX3atkRofYCLn5At8JsNBQnPLgikRgJKhFvC0xi7WRPjagLJxelsfojzwuB8wT4annLLhOs
-	QdA3yKhFmSpSW6vWOzHuCej8jvZ+lJWkTBUB+mr5jPt0ZX3TIFqVa5vgtV4+qNqvJwY0355FOmouG
-	fNKUgHJg7WZnLbbvvNMUaFXJq9XOxPsK3s6HPbkW29gPr/hEhihHFV4PXM31D33/kyMw+sQZvK4f7
-	sVcLwBiRYWgYqS0mVsBQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Ln6Slf+L+S+st390AM6ZFvXDxe/QEU9ugwX1u/Lx49o=; b=LN0nS5NIV+pKVR
+	I2EbhYbtEvvat7m9miEmoBpi6yMGJKBj97MWrgUHufvXPeINOuTShE+yUXC1yB6DSiZTLmHDSG9xu
+	dKkCeOwQ9cut2zsGHLSW7wEgCxrxfz9MMVp0UJYcEdajdbQKb87I4ky1eQdLtd19GfKpiIJKEtKqU
+	qpoturPi4FmNnTIxw8StkfCCma0DLagQ92XQ+i6/yzcms16GJDN/AyVd+1J5fzeErYHSWMKCL427n
+	T8UqaIbYNI6ZtNJ7tlMHus60U7SQTL1xl5RnNrYECXyA6D4ew773tfWfDPk8ZbK8SDOSrp1GwpmKF
+	rOWK1dnBVcFoMHiWzhiw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goD5S-0003qm-9I; Mon, 28 Jan 2019 20:00:54 +0000
-Received: from relay7-d.mail.gandi.net ([217.70.183.200])
+	id 1goD5k-00047E-0Q; Mon, 28 Jan 2019 20:01:12 +0000
+Received: from relay8-d.mail.gandi.net ([217.70.183.201])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goD5N-0003pq-Tz
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 20:00:51 +0000
+ id 1goD5U-0003rf-Vm
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 20:00:59 +0000
 X-Originating-IP: 88.190.179.123
 Received: from localhost (unknown [88.190.179.123])
  (Authenticated sender: repk@triplefau.lt)
- by relay7-d.mail.gandi.net (Postfix) with ESMTPSA id B777120010;
- Mon, 28 Jan 2019 20:00:34 +0000 (UTC)
+ by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id 906891BF206;
+ Mon, 28 Jan 2019 20:00:48 +0000 (UTC)
 From: Remi Pommarel <repk@triplefau.lt>
 To: Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
  Gregory Clement <gregory.clement@bootlin.com>,
@@ -49,15 +50,17 @@ To: Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Catalin Marinas <catalin.marinas@arm.com>,
  Will Deacon <will.deacon@arm.com>
-Subject: [PATCH 0/2] Fix espressobin ethernet support on mainline u-boot
-Date: Mon, 28 Jan 2019 21:07:26 +0100
-Message-Id: <20190128200728.17747-1-repk@triplefau.lt>
+Subject: [PATCH 1/2] arm64: dts: armada-3720-espressobin: Configure RGMII and
+ SMI pins
+Date: Mon, 28 Jan 2019 21:07:27 +0100
+Message-Id: <20190128200728.17747-2-repk@triplefau.lt>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190128200728.17747-1-repk@triplefau.lt>
+References: <20190128200728.17747-1-repk@triplefau.lt>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_120050_119319_56F17F94 
-X-CRM114-Status: UNSURE (   7.03  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190128_120057_776242_BFB7B305 
+X-CRM114-Status: GOOD (  10.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,23 +79,48 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patchset fixes ethernet and mv88e6341 switch support on espressobin
-board when bootloader does not initialize needed registers.
+In order to be able to communicate with the 88e6341 switch some pins
+have to be repurposed as RGMII and SMI pins.
 
-This patchset should be applied along with pinctrl fixes from [1] which
-have been merged in next branch of linux-pinctrl tree.
+This fixes ethernet support on system booted via a bootloader that
+has not already configured those pins (e.g. mainline u-boot, or vendor
+u-boot compiled without ethernet support).
 
-[1] https://lkml.org/lkml/2018/12/21/507
-
-Remi Pommarel (2):
-  arm64: dts: armada-3720-espressobin: Configure RGMII and SMI pins
-  arm64: dts: armada-3720-espressobin: Set mv88e6341 cpu port as
-    RGMII-ID
-
- arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 7 +++++++
+Signed-off-by: Remi Pommarel <repk@triplefau.lt>
+---
+ arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 2 ++
  arch/arm64/boot/dts/marvell/armada-37xx.dtsi            | 5 +++++
- 2 files changed, 12 insertions(+)
+ 2 files changed, 7 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+index 846003bb480c..b60897edc885 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+@@ -196,6 +196,8 @@
+ };
+ 
+ &eth0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&rgmii_pins>, <&smi_pins>;
+ 	phy-mode = "rgmii-id";
+ 	status = "okay";
+ 
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index e05594ea15fb..f61538910901 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -271,6 +271,11 @@
+ 					function = "mii";
+ 				};
+ 
++				smi_pins: smi-pins {
++					groups = "smi";
++					function = "smi";
++				};
++
+ 				sdio_pins: sdio-pins {
+ 					groups = "sdio_sb";
+ 					function = "sdio";
 -- 
 2.20.1
 
