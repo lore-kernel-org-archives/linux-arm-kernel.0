@@ -2,21 +2,20 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A9A6C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:59:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5F488C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 10:01:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2A2FB2087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:59:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2D5242087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 10:01:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KMsIetSt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2A2FB2087F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JnCccLJS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D5242087F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,43 +24,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kNYyROB+GQ89FAwoXhBVVJK8w2B9YsrbM9/gpKld+UI=; b=KMsIetSt4ka8K7
-	MjEOUsnJosJGyxEDOYHgmx/9ucGzQ8lJodTGXyC7VLYe0twZhM45ZTYFNlHYNd4Xbw0TfWDqp0ZNI
-	pk6GetFDt1ukXA0zfNG2ksTZzKdq5cxF552arSfjNx5gd3RfEXzDfPMXvDf+pFesT9gi2QZOGUMhD
-	SCMneADr+aNmlXsWbF77vZrsvUhelvWsv7SFQN8LhHxCNaDtodNKYuaInbrx07+vw3IjcdWOzzV9t
-	89M/X35BhtrlSO8xYlYIT9jSDc0mteON+CqQGFKAbnG3ZILv7J2tfc0NfIt2kHfmU5LKf6wMnYn0C
-	CcSm/qgGXaWxK7ai7FBA==;
+	List-Owner; bh=PMH5H4Bjj99QyzL5J3YUBTFOI68qSXz0VZutR4DTLpo=; b=JnCccLJSs+f4pP
+	yTI1mBrxTqko6gy6cjZZMXmht5L5CJ6cy1pUMG78CD/Chr7nK2BLUVQIsfCqHlsyTQ5tL8y+Wtcsi
+	RZjvLoPzVHThsxRiqXVkTibDDQZxmASNqjSJtW3b6akbGyl5lbSqa7DlNtvywBhVj0e3TFG8Sc1lz
+	xQAeQcRKlkQJhb+YV4DA3iVGmgGTzoZgcEl/JzRL3ohfclG8u2mf0xycl4si4pOeOY4JNtGws22KY
+	KruEu1FS6SJmeBXdxqmiWy62y9oSWJ+8OTGykyR6UHHjGlh41ASdp3mJk4zHSvtaHfnsgyRCJeNeJ
+	x9unaMw8z3gQRJ4lDCDw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go3h5-0003y5-Sq; Mon, 28 Jan 2019 09:59:07 +0000
+	id 1go3ix-0005Vj-6m; Mon, 28 Jan 2019 10:01:03 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go3h2-0003xN-6R
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 09:59:05 +0000
+ id 1go3it-0005VC-U8
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 10:01:01 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4CF59EBD;
- Mon, 28 Jan 2019 01:59:03 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E241BEBD;
+ Mon, 28 Jan 2019 02:00:58 -0800 (PST)
 Received: from big-swifty.misterjones.org (big-swifty.cambridge.arm.com
  [10.1.39.122])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7B0103F589;
- Mon, 28 Jan 2019 01:59:00 -0800 (PST)
-Date: Mon, 28 Jan 2019 09:58:59 +0000
-Message-ID: <86a7jlw1b0.wl-marc.zyngier@arm.com>
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 02F883F589;
+ Mon, 28 Jan 2019 02:00:55 -0800 (PST)
+Date: Mon, 28 Jan 2019 10:00:54 +0000
+Message-ID: <868sz5w17t.wl-marc.zyngier@arm.com>
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v9 10/26] arm64: kvm: Unmask PMR before entering guest
-In-Reply-To: <1548084825-8803-11-git-send-email-julien.thierry@arm.com>
+Subject: Re: [PATCH v9 11/26] efi: Let architectures decide the flags that
+ should be saved/restored
+In-Reply-To: <1548084825-8803-12-git-send-email-julien.thierry@arm.com>
 References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
- <1548084825-8803-11-git-send-email-julien.thierry@arm.com>
+ <1548084825-8803-12-git-send-email-julien.thierry@arm.com>
 User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
  FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
  (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
 Organization: ARM Ltd
 MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_015904_246899_0396147A 
-X-CRM114-Status: GOOD (  21.67  )
+X-CRM114-CacheID: sfid-20190128_020059_983647_163D7B6E 
+X-CRM114-Status: GOOD (  13.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,113 +73,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org, catalin.marinas@arm.com,
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org, linux-efi@vger.kernel.org,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, catalin.marinas@arm.com,
  will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
- james.morse@arm.com, joel@joelfernandes.org, kvmarm@lists.cs.columbia.edu,
+ james.morse@arm.com, joel@joelfernandes.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 21 Jan 2019 15:33:29 +0000,
+On Mon, 21 Jan 2019 15:33:30 +0000,
 Julien Thierry <julien.thierry@arm.com> wrote:
 > 
-> Interrupts masked by ICC_PMR_EL1 will not be signaled to the CPU. This
-> means that hypervisor will not receive masked interrupts while running a
-> guest.
+> Currently, irqflags are saved before calling runtime services and
+> checked for mismatch on return.
 > 
-> Avoid this by making sure ICC_PMR_EL1 is unmasked when we enter a guest.
+> Provide a pair of overridable macros to save and restore (if needed) the
+> state that need to be preserved on return from a runtime service.
+> This allows to check for flags that are not necesarly related to
+> irqflags.
 > 
 > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: kvmarm@lists.cs.columbia.edu
-> ---
->  arch/arm64/include/asm/kvm_host.h | 12 ++++++++++++
->  arch/arm64/kvm/hyp/switch.c       | 16 ++++++++++++++++
->  2 files changed, 28 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 7732d0b..a1f9f55 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -24,6 +24,7 @@
->  
->  #include <linux/types.h>
->  #include <linux/kvm_types.h>
-> +#include <asm/arch_gicv3.h>
->  #include <asm/cpufeature.h>
->  #include <asm/daifflags.h>
->  #include <asm/fpsimd.h>
-> @@ -474,6 +475,17 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
->  static inline void kvm_arm_vhe_guest_enter(void)
->  {
->  	local_daif_mask();
-> +
-> +	/*
-> +	 * Having IRQs masked via PMR when entering the guest means the GIC
-> +	 * will not signal the CPU of interrupts of lower priority, and the
-> +	 * only way to get out will be via guest exceptions.
-> +	 * Naturally, we want to avoid this.
-> +	 */
-> +	if (system_uses_irq_prio_masking()) {
-> +		gic_write_pmr(GIC_PRIO_IRQON);
-> +		dsb(sy);
-> +	}
->  }
->  
->  static inline void kvm_arm_vhe_guest_exit(void)
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index b0b1478..6a4c2d6 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -22,6 +22,7 @@
->  
->  #include <kvm/arm_psci.h>
->  
-> +#include <asm/arch_gicv3.h>
->  #include <asm/cpufeature.h>
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_emulate.h>
-> @@ -521,6 +522,17 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
->  	struct kvm_cpu_context *guest_ctxt;
->  	u64 exit_code;
->  
-> +	/*
-> +	 * Having IRQs masked via PMR when entering the guest means the GIC
-> +	 * will not signal the CPU of interrupts of lower priority, and the
-> +	 * only way to get out will be via guest exceptions.
-> +	 * Naturally, we want to avoid this.
-> +	 */
-> +	if (system_uses_irq_prio_masking()) {
-> +		gic_write_pmr(GIC_PRIO_IRQON);
-> +		dsb(sy);
-> +	}
-> +
->  	vcpu = kern_hyp_va(vcpu);
->  
->  	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-> @@ -573,6 +585,10 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
->  	 */
->  	__debug_switch_to_host(vcpu);
->  
-> +	/* Returning to host will clear PSR.I, remask PMR if needed */
-> +	if (system_uses_irq_prio_masking())
-> +		gic_write_pmr(GIC_PRIO_IRQOFF);
-> +
->  	return exit_code;
->  }
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: linux-efi@vger.kernel.org
 
-It'd be good to have helpers for these PMR manipulations, which I
-suspect you could use in other parts of the code such as patch #9.
+With the changes requested by Ard,
 
-The logic itself seems good to me, so irrespective of the above:
-
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 	M.
 
