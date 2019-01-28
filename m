@@ -2,119 +2,95 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 764E7C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 08:20:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 28533C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 08:29:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 45A5A2148E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 08:20:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EC5BC20881
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 08:29:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XZdCpKTN";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="AHsjvRs1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 45A5A2148E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LkHA3Myd";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="BxYrYAks"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EC5BC20881
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=K9GN9yzd9OXcwiPMgyGn0ZKD7FsxvouJE6jOO7malCc=; b=XZdCpKTNC+VTwt
-	QKxnTDpbLTnf5Eg5uUQmCbHiSTTQQkm1wUt0HARXjaipPJ1h4FCL3UmwUhkZLF7YSeSMrIu/Ws/2q
-	15cQf3ZHcwSu8VVxeZytA1vG6iKK+QEVC5VSD6CbLuKCQUY0c130vsJlv+XMJTVRgcWDhhp2eEpzM
-	+p+4GtFq9msrqG3dWtCfkppQ1h80QoQe0VoOzFwPdUZKQCpucqLpijwTowJ8AwYcj30/vIgT1PhHs
-	qWikhTa6XsxRjiVfhDk5+ix2M3FWZtUFKk9ch8XOza29ndyB2fVArDpvwcWg5dupFuOBdhDCj9Ia7
-	nBqGKNMoqFX8iq1dsTlQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=CjVZPyUggnr6Lp3MlvuOqQWNKS5AHth9KgNgoX26960=; b=LkHA3MydiQjj7ZdHVkWdDsNgK
+	dDRK0K+dRFKBwye5G2uj2sN0DT4Dr09U5AL8JKjPdL5nRD8OfFRnMIzHq90DA578PVNO4UvRfdIUF
+	KxZmHxWRoE5zWd+A+1JBndIT4h8SEcghN0uijtvUvUW89nqZ47vcvwBuo6j0Szhip5gvM+hJs6g2Q
+	fgLLQONmwawNyJzYJMIcInP5eu6vLeEAcJ7x+QbzodL+1p23dpe5a33YN2R+NzPppo2XpaX7rw+6f
+	4IHuD+OfxjIhcuF69J2nj+9qCdJXQ1s1WAvtPS5neLpMFQGDpJyPYcOz516IpafOYVBZtpHzB6gv6
+	Bl0IdwISw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go29O-0008Gp-N5; Mon, 28 Jan 2019 08:20:14 +0000
-Received: from esa3.microchip.iphmx.com ([68.232.153.233])
+	id 1go2I0-0001Yn-V1; Mon, 28 Jan 2019 08:29:08 +0000
+Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go29L-0008GT-BM
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 08:20:12 +0000
-X-IronPort-AV: E=Sophos;i="5.56,533,1539673200"; d="scan'208";a="25998333"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa3.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 28 Jan 2019 01:20:09 -0700
-Received: from NAM04-SN1-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.108) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Mon, 28 Jan 2019 01:20:08 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=9nVOhVEs4ieN4bvpPHj6Uf4ijItakZ3Mrep4D+QbLHU=;
- b=AHsjvRs1mdDMxtERg+SytUPAStXj7+To/sdTDSsJb8+2dyNoLxpyqGfxt8Tu6DE7OCmjKe9xthC3d8F6H2L9YvKjq7GOB331V4gG7ZYxP0VZ09rHSId3BY47Wgdgbe0xzQbKUibqTKal9fKjKONzRv/rNiFDbiGCv0ranvT1xBY=
-Received: from MWHPR11MB1662.namprd11.prod.outlook.com (10.172.55.15) by
- MWHPR11MB1280.namprd11.prod.outlook.com (10.169.237.135) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1558.16; Mon, 28 Jan 2019 08:20:07 +0000
-Received: from MWHPR11MB1662.namprd11.prod.outlook.com
- ([fe80::b92e:f982:af32:2887]) by MWHPR11MB1662.namprd11.prod.outlook.com
- ([fe80::b92e:f982:af32:2887%5]) with mapi id 15.20.1558.023; Mon, 28 Jan 2019
- 08:20:07 +0000
-From: <Nicolas.Ferre@microchip.com>
-To: <axel.lin@ingics.com>, <broonie@kernel.org>
-Subject: Re: [PATCH] regulator: mcp16502: Include linux/gpio/consumer.h to fix
- build error
-Thread-Topic: [PATCH] regulator: mcp16502: Include linux/gpio/consumer.h to
- fix build error
-Thread-Index: AQHUth2FzkcnWQZHS0SpOd1qVqXvFaXEWEuA
-Date: Mon, 28 Jan 2019 08:20:06 +0000
-Message-ID: <7f96f237-ed95-7d6f-f269-5466fa144d5b@microchip.com>
-References: <20190127085122.11821-1-axel.lin@ingics.com>
-In-Reply-To: <20190127085122.11821-1-axel.lin@ingics.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: CWLP265CA0222.GBRP265.PROD.OUTLOOK.COM
- (2603:10a6:401:4f::18) To MWHPR11MB1662.namprd11.prod.outlook.com
- (2603:10b6:301:e::15)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Nicolas.Ferre@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [195.6.168.232]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; MWHPR11MB1280;
- 6:jCE8HUBRS2ggBPdhi462ayki/AvrJBn2T/gKoPMCz8Z/xPNJ5KzQaFmh0nwkRsG+mImIt50bgsLtd6X8myLw+YmZJEDEjSaOZ/H9bfXZZwqsqf1fbrmuQ+CfYAGOw02rVfjaTmOrpyDCz0y46KmEFL+aPx1ebwEZu1ZCcTiTj+OyVuU8jO0yhCDUJbzlLUxHAbTIFPzBz+tdn2mr8+pFC6kLTxPqbWcVJ1OzalY4K/XR78gWScIhtcgvRELeFf1uUbNvjtAWPKFHa1YrhkRIc100S9NuaaYvsxbdeju784qZSCTHe0eaKwORyjqq8/Mac2XMz9uS0w5KyYOJuZXf7IekvSFxi5vy5IJR+REbwJeh7P6txshSrOSBtkUlnuhiCT5sj10vPKxt2g1dgDqX1SmIySzQqMf9nUUuB0JG6MwnMMPrvN6/dyxJ8ETJFpM0dPbDY5pAOaL3WaRD8AQOIA==;
- 5:qDNTsm1EwJ1CQktKuQvoLyT+I1z/IA5TujoqyO5n0O2FGC/T378P40+lofkd7FFRNVX5dzkN2uljAs97I6sIy+3jJecDFCkT1Xu40yzcxjnkibS8y66ViuMhtqYCIBxi2tZWUe7lg0Xw3EyP0OJMi2Z4UBTSR0Esmnqw6dEf3iJUaOBrWn2yIkqRHpcr39AeobV2wXzCGSR5U/OeAixgTQ==;
- 7:qKwE7q4X5ksVj7gdlEwXERcWj6JQw2l+6xvU/jazPMsmGlScONYxqvOSeS9kUSLGmUi8E58XiAvweqvRD2VCLX6Bw1afjKZ9MT75X/bjamJYBh2f8m0bRN/gthfGvGgQcYwg1DlPZ629mOXDp7wJhA==
-x-ms-office365-filtering-correlation-id: 9e9e8d33-1d04-4cce-0374-08d684f96948
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
- SRVR:MWHPR11MB1280; 
-x-ms-traffictypediagnostic: MWHPR11MB1280:
-x-microsoft-antispam-prvs: <MWHPR11MB1280244E7FE4612308BE6061E0960@MWHPR11MB1280.namprd11.prod.outlook.com>
-x-forefront-prvs: 0931CB1479
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(376002)(346002)(136003)(396003)(39860400002)(366004)(199004)(189003)(26005)(71190400001)(71200400001)(478600001)(446003)(72206003)(6506007)(36756003)(186003)(99286004)(386003)(229853002)(256004)(6436002)(53546011)(76176011)(52116002)(305945005)(6486002)(14454004)(102836004)(110136005)(31696002)(316002)(107886003)(8676002)(81156014)(81166006)(11346002)(2616005)(53936002)(7736002)(66066001)(25786009)(31686004)(68736007)(106356001)(39060400002)(97736004)(8936002)(486006)(54906003)(6116002)(3846002)(6512007)(105586002)(2906002)(6246003)(86362001)(476003)(4326008);
- DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1280;
- H:MWHPR11MB1662.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: vjIf3rFVQzErfYjwf4KHBY5hdAo5LX0GDZ8Zp8Z3UdZDqb3WXmIl3L8wp4NvGPAjX2KfuTew6SuHzuIptXuAW7RLZP59s6UwKmm8eGDcEp9l9BaIwLmuPIMEMkPMvCv4qIL5rgvrbFd+utIJEw2+2/JDG8g1Wh+o7Y4zPPAiJuJFsV01jyuD5P4anWNehM+Xo3hmBw1C1mKVMQgX6xqrnTF5Q+uQ+6yXsMeAolK/hwCuEsuKkKpNGRTTT4YaOAUbRm2/uE9Gw+cisU+prnhcKFvCOdm12w4Ne+QO6uUneb8BABQZDvpk/o73fLY9T6sOPbR/5HCJwrD4zdShE+rU79w44vEtuYx3szONc/sdOJqfQA5h+OITWPGBq1FnA+XGGugtlXDOb59Kv6GaZgj86dqd+Gmt8F+hyPk3OM01GEg=
-Content-ID: <56A46BED8861F54E9DB0C0CB62988F65@namprd11.prod.outlook.com>
+ id 1go2Hw-0001YN-T2
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 08:29:06 +0000
+Received: by mail-lj1-x243.google.com with SMTP id c19-v6so13420479lja.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 28 Jan 2019 00:29:04 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-transfer-encoding:content-language;
+ bh=Cr0Xvw30nlRoRenB6A+Xtlvq8eKjofNGXUNco6MaAUQ=;
+ b=BxYrYAksWrbzcMFPdGNfy68pu99ouzCMCV0mjEgC5c4C03ALt3H8/Ose+ibTbxdY+s
+ nMA2UkQKk3EAsPLj7Ir7IhC8stI0TZEiWD2GQ/AmX2H7qmmMf7ZQeAEfGyCKVQup5lSy
+ hR+2Mt/JepEs7isaGqI9rQiyquG11lfhdgSGcrPgMyUxQ7Zs0frSVCJtDZZdVOeZPzS2
+ 3CGCnW+n2AJQv5tKXYsSmbpvSYSQa+BOGN2jcur9r/m3LbEhWTUbTNf37zzaLjyOFW6E
+ 2OAGr+v02zDznpt1OinBcEiIwlDA1ZR3GvLpxiTHqPGfj5V/Rp6UgyONXo9dFRqFwkhV
+ qw1g==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-transfer-encoding
+ :content-language;
+ bh=Cr0Xvw30nlRoRenB6A+Xtlvq8eKjofNGXUNco6MaAUQ=;
+ b=BKnDgkS8YAve4nCJpFY1YVaKJPi/j6mEMDHt5LYPFDjGyIGFJgj7S4xllxL/54axH4
+ sqtP+3iMBBuRpYIgf+NAgMUwYY2DYdYkPGVogDral+uGhbuyCZLD/drao+Q1h874Nvd8
+ kt6nMsKpbNQJGz1tl6pPEoNtidsUyedH0fgvcG99N+Hixs+2jlxKv2EyIc2Bd7cddWoh
+ qBTfJ2xgbWaMcv196D4AldiJjpTuJG0SoDPq/qd49LZaPqhS/PcXzBf9Xrp7khnQtiOm
+ oCaD+Diabuzm7SbLl0SImvCaqmLFso5idlVBlxrg5hXzxEXdhE7d61CM1FWKoJHuZx+/
+ LLAg==
+X-Gm-Message-State: AJcUukf4aj3oAoioRenLg332a2J75/VimMwWTLLApsiJu4tE5bv93dKX
+ 6VBXGv1DZTpPNi4tzP/zSF4=
+X-Google-Smtp-Source: ALg8bN5LLVZWXUpWBs8gJJvQE2wwTSFPDzPRuPjWs3XoZ0dqt1PTVV+EZAXWx23OwmybcJvxoa8Xsg==
+X-Received: by 2002:a2e:9d17:: with SMTP id
+ t23-v6mr8987847lji.57.1548664142550; 
+ Mon, 28 Jan 2019 00:29:02 -0800 (PST)
+Received: from [10.17.182.20] (ll-22.209.223.85.sovam.net.ua. [85.223.209.22])
+ by smtp.gmail.com with ESMTPSA id
+ m1sm2788894lfb.56.2019.01.28.00.29.01
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 28 Jan 2019 00:29:01 -0800 (PST)
+Subject: Re: [Xen-devel] [PATCH] arch/arm/xen: Remove duplicate header
+To: Souptick Joarder <jrdr.linux@gmail.com>
+References: <20190107173719.GA30197@jordon-HP-15-Notebook-PC>
+ <eab5c59d-cfb4-bd2a-de07-7db827830472@gmail.com>
+ <CAFqt6zb0cU3TjAs0LO-DL3Ut98-7=b7cP9+hZ+bUxDLD2EN2vA@mail.gmail.com>
+From: Oleksandr Andrushchenko <andr2000@gmail.com>
+Message-ID: <cd855c41-dca0-14dc-6703-886feccd34ea@gmail.com>
+Date: Mon, 28 Jan 2019 10:29:00 +0200
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 9e9e8d33-1d04-4cce-0374-08d684f96948
-X-MS-Exchange-CrossTenant-originalarrivaltime: 28 Jan 2019 08:20:05.3302 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1280
-X-OriginatorOrg: microchip.com
+In-Reply-To: <CAFqt6zb0cU3TjAs0LO-DL3Ut98-7=b7cP9+hZ+bUxDLD2EN2vA@mail.gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_002011_552115_3833D287 
-X-CRM114-Status: GOOD (  12.56  )
+X-CRM114-CacheID: sfid-20190128_002904_938005_3423BCEB 
+X-CRM114-Status: GOOD (  13.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -126,44 +102,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Claudiu.Beznea@microchip.com, lgirdwood@gmail.com,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Juergen Gross <jgross@suse.com>, sstabellini@kernel.org,
+ Sabyasachi Gupta <sabyasachi.linux@gmail.com>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>, linux-kernel@vger.kernel.org,
+ Brajeswar Ghosh <brajeswar.linux@gmail.com>, xen-devel@lists.xenproject.org,
+ Boris Ostrovsky <boris.ostrovsky@oracle.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMjcvMDEvMjAxOSBhdCAwOTo1MSwgQXhlbCBMaW4gd3JvdGU6DQo+IEZpeCBiZWxvdyBidWls
-ZCBlcnJvcjoNCj4gZHJpdmVycy9yZWd1bGF0b3IvbWNwMTY1MDIuYzogSW4gZnVuY3Rpb24g4oCY
-bWNwMTY1MDJfZ3Bpb19zZXRfbW9kZeKAmToNCj4gZHJpdmVycy9yZWd1bGF0b3IvbWNwMTY1MDIu
-YzoxMzU6MzogZXJyb3I6IGltcGxpY2l0IGRlY2xhcmF0aW9uIG9mIGZ1bmN0aW9uIOKAmGdwaW9k
-X3NldF92YWx1ZeKAmTsgZGlkIHlvdSBtZWFuIOKAmGdwaW9fc2V0X3ZhbHVl4oCZPyBbLVdlcnJv
-cj1pbXBsaWNpdC1mdW5jdGlvbi1kZWNsYXJhdGlvbl0NCj4gICAgIGdwaW9kX3NldF92YWx1ZSht
-Y3AtPmxwbSwgMCk7DQo+ICAgICBefn5+fn5+fn5+fn5+fn4NCj4gICAgIGdwaW9fc2V0X3ZhbHVl
-DQo+IGRyaXZlcnMvcmVndWxhdG9yL21jcDE2NTAyLmM6IEluIGZ1bmN0aW9uIOKAmG1jcDE2NTAy
-X3Byb2Jl4oCZOg0KPiBkcml2ZXJzL3JlZ3VsYXRvci9tY3AxNjUwMi5jOjQ4NjoxMzogZXJyb3I6
-IGltcGxpY2l0IGRlY2xhcmF0aW9uIG9mIGZ1bmN0aW9uIOKAmGRldm1fZ3Bpb2RfZ2V04oCZOyBk
-aWQgeW91IG1lYW4g4oCYZGV2bV9ncGlvX2ZyZWXigJk/IFstV2Vycm9yPWltcGxpY2l0LWZ1bmN0
-aW9uLWRlY2xhcmF0aW9uXQ0KPiAgICBtY3AtPmxwbSA9IGRldm1fZ3Bpb2RfZ2V0KGRldiwgImxw
-bSIsIEdQSU9EX09VVF9MT1cpOw0KPiAgICAgICAgICAgICAgIF5+fn5+fn5+fn5+fn5+DQo+ICAg
-ICAgICAgICAgICAgZGV2bV9ncGlvX2ZyZWUNCj4gZHJpdmVycy9yZWd1bGF0b3IvbWNwMTY1MDIu
-Yzo0ODY6NDA6IGVycm9yOiDigJhHUElPRF9PVVRfTE9X4oCZIHVuZGVjbGFyZWQgKGZpcnN0IHVz
-ZSBpbiB0aGlzIGZ1bmN0aW9uKTsgZGlkIHlvdSBtZWFuIOKAmEdQSU9GX0lOSVRfTE9X4oCZPw0K
-PiAgICBtY3AtPmxwbSA9IGRldm1fZ3Bpb2RfZ2V0KGRldiwgImxwbSIsIEdQSU9EX09VVF9MT1cp
-Ow0KPiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIF5+fn5+fn5+fn5+
-fn4NCj4gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBHUElPRl9JTklU
-X0xPVw0KPiANCj4gU2lnbmVkLW9mZi1ieTogQXhlbCBMaW4gPGF4ZWwubGluQGluZ2ljcy5jb20+
-DQoNCkFja2VkLWJ5OiBOaWNvbGFzIEZlcnJlIDxuaWNvbGFzLmZlcnJlQG1pY3JvY2hpcC5jb20+
-DQoNClRoYW5rcyBBbGV4IQ0KDQo+IC0tLQ0KPiAgIGRyaXZlcnMvcmVndWxhdG9yL21jcDE2NTAy
-LmMgfCAxICsNCj4gICAxIGZpbGUgY2hhbmdlZCwgMSBpbnNlcnRpb24oKykNCj4gDQo+IGRpZmYg
-LS1naXQgYS9kcml2ZXJzL3JlZ3VsYXRvci9tY3AxNjUwMi5jIGIvZHJpdmVycy9yZWd1bGF0b3Iv
-bWNwMTY1MDIuYw0KPiBpbmRleCAzNDc5YWUwMDliMGIuLjBmYzQ5NjNiZDViMCAxMDA2NDQNCj4g
-LS0tIGEvZHJpdmVycy9yZWd1bGF0b3IvbWNwMTY1MDIuYw0KPiArKysgYi9kcml2ZXJzL3JlZ3Vs
-YXRvci9tY3AxNjUwMi5jDQo+IEBAIC0xNyw2ICsxNyw3IEBADQo+ICAgI2luY2x1ZGUgPGxpbnV4
-L3JlZ21hcC5oPg0KPiAgICNpbmNsdWRlIDxsaW51eC9yZWd1bGF0b3IvZHJpdmVyLmg+DQo+ICAg
-I2luY2x1ZGUgPGxpbnV4L3N1c3BlbmQuaD4NCj4gKyNpbmNsdWRlIDxsaW51eC9ncGlvL2NvbnN1
-bWVyLmg+DQo+ICAgDQo+ICAgI2RlZmluZSBWRERfTE9XX1NFTCAweDBEDQo+ICAgI2RlZmluZSBW
-RERfSElHSF9TRUwgMHgzRg0KPiANCg0KDQotLSANCk5pY29sYXMgRmVycmUNCl9fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFp
-bGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlz
-dHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
++Boris and Juergen who can also help getting it in
+
+On 1/28/19 8:34 AM, Souptick Joarder wrote:
+> On Mon, Jan 14, 2019 at 4:08 PM Oleksandr Andrushchenko
+> <andr2000@gmail.com> wrote:
+>> On 1/7/19 7:37 PM, Souptick Joarder wrote:
+>>> Remove duplicate header which is included twice.
+>>>
+>>> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+>> Reviewed-by: Oleksandr Andrushchenko <oleksandr_andrushchenko@epam.com>
+> Can we get this patch in queue for 5.1 ?
+>>> ---
+>>>    arch/arm/xen/mm.c | 1 -
+>>>    1 file changed, 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+>>> index cb44aa2..e1d44b9 100644
+>>> --- a/arch/arm/xen/mm.c
+>>> +++ b/arch/arm/xen/mm.c
+>>> @@ -7,7 +7,6 @@
+>>>    #include <linux/of_address.h>
+>>>    #include <linux/slab.h>
+>>>    #include <linux/types.h>
+>>> -#include <linux/dma-mapping.h>
+>>>    #include <linux/vmalloc.h>
+>>>    #include <linux/swiotlb.h>
+>>>
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
