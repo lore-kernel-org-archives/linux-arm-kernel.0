@@ -2,82 +2,93 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3ADC5C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 05:02:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 68983C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 05:54:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0B75C20870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 05:02:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3BA21217D6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 05:54:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rTb7op01";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="S8BhtOZu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B75C20870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h34fP4t7";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Uyoff7v8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3BA21217D6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/HjT81RAcn2XVS8rlSLmA3yr4NPtcXhU/G9zZSVm+lU=; b=rTb7op015ltYZV
-	YzLtRfG0y/DyvxRYSntKTHlhGZe5txM9ek6x/cY1Uu5xR5fIQx7gMOV5oJrl6bSHFxYBVYip5dOiS
-	suQC/Al33xTOCg/cZkOcJv0CWlGPPbl61rKwwjeTOp/085EuWHdzv2znNatILDmned3yHDQAfxG1c
-	M+HR1NVHaKcKzDCcw7Vqfjwafbj48r9XkFKQ0MVer21b2y+8TE2RQI71a49VgPOvlBpsixyEyQHu1
-	qzQ8oW5lkWtIcm6+JLbokVHLxmj7qYPMzzZs59kSVRvPAjLsCPtgOfBb7fFzN99OBaBRHLUN/4k7Q
-	NyMRaxxpx9I/7PcpolqQ==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=nzI5n5sgcX77WlkAyCfikWyDFoshbQCgnguz2qvKRAc=; b=h34fP4t70qMZna
+	00r44hDLKtvnULtk8Z8s3lGR62imm/glyLGunHZpEhvgAgTZlT1nptWxp56yNGp5Q2G/nX2o373X3
+	4+uq+XMionvr/ncL6rgxsrwmVCO7PVz0A3aEuxJWrk8ME/zCWI/RIncbqKGFCxtejeopIgNkQUJfA
+	ji0L/X2FbI4BJ/cpbgMJ7JLdiV20mTpyQnnJAWybvS036h+eFslGJhCeEwR7PSA3Qrq2iPA4GmSao
+	yhosPHYYr9etBgNvDnhUYMI/2ZdmB21iEn9PBUCrwbiY/p4/BLyA5CxezsFfIiJ8DWI/ahqHg5DyD
+	TnTYfhpeG0YjcOUyN0jg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gnz3Z-0006sa-0J; Mon, 28 Jan 2019 05:02:01 +0000
-Received: from lelv0142.ext.ti.com ([198.47.23.249])
+	id 1gnzsd-0005h6-Tp; Mon, 28 Jan 2019 05:54:47 +0000
+Received: from mail-oi1-x244.google.com ([2607:f8b0:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gnz3T-0006rr-LA; Mon, 28 Jan 2019 05:01:57 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0S51dxx030139;
- Sun, 27 Jan 2019 23:01:39 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1548651699;
- bh=XPjDlXvG3F0BiZ3mpuQAQvzcxWbKcbzD2ZGGw5Vhk/4=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=S8BhtOZux8OFN8h0SoN5YzzMoHxGuu7hNDUeJN4DxrB8IOHR2sKc5yFL5F51Yt+AF
- WGOdEPoyJaOJf8cUMEQmCI6y30tnhV4fPgrqcih/Zgng/DtvdD6H2ZyDBT5MlKwNEb
- fiCjsuT5KMNYK/Kp5gyyOrdI6Ucb35Ko8Ih/5yck=
-Received: from DLEE114.ent.ti.com (dlee114.ent.ti.com [157.170.170.25])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0S51db7103823
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Sun, 27 Jan 2019 23:01:39 -0600
-Received: from DLEE110.ent.ti.com (157.170.170.21) by DLEE114.ent.ti.com
- (157.170.170.25) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Sun, 27
- Jan 2019 23:01:39 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE110.ent.ti.com
- (157.170.170.21) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Sun, 27 Jan 2019 23:01:38 -0600
-Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0S51YDd013948;
- Sun, 27 Jan 2019 23:01:35 -0600
-Subject: Re: [PATCH 00/15] PCI: endpoint: Cleanup EPC features
-To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-References: <20190107064148.10152-1-kishon@ti.com>
- <20190124145219.GD23362@e107981-ln.cambridge.arm.com>
-From: Kishon Vijay Abraham I <kishon@ti.com>
-Message-ID: <ae09e4e2-3015-f4c9-4b3c-093f30e9b508@ti.com>
-Date: Mon, 28 Jan 2019 10:31:03 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gnzsZ-0005gm-G7
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 05:54:45 +0000
+Received: by mail-oi1-x244.google.com with SMTP id v6so12110038oif.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 27 Jan 2019 21:54:42 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=vFcdm97ZQVqY+sV8pPGkw6BS+L2oAzaBBnHbL8dP6qY=;
+ b=Uyoff7v8XzH8f5DxoBbglk0HZJLuF+9E8p7lxgKwVrvu5ZYWUGmCiADjNdzSzDki9M
+ dn31m0DG6cwz/d8+NwWxZI5CL2SMMzbEKpvOXMMgXKMY14+ciHrdd9LNFavU5QXk+l0Q
+ eMU36ihXXuctBaDC0u8ivl7W6QrPxSq8SdAYw=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=vFcdm97ZQVqY+sV8pPGkw6BS+L2oAzaBBnHbL8dP6qY=;
+ b=XkoTgfRHI+Um2sOc4E+GY9hEfdv8rE9XkbLL5eURe4L2atfcOxWj3C+cvoHOHrSzfP
+ auWb6RPhbhCm/ZQUPw308r1e6zampUKbNI+O7YsbP4hGk6W1RFSyBz1bxA74nxzumANj
+ OLGe3OVV9eTxMk27lRTYdzPJ6DQNuKs6ipUYcPRxM4JmvhTotVXe+LAsKk4nBTR4h4XC
+ mvaApZMXII2speShbksvcSKzQUfLQiJeZSLJtI3XoVdoLkyNGTz7vzA3cwMD2MerVDIv
+ R2BSsjz/9PaQU5cuOtpZIlGowbB1c9WaMG1WsQvA99aTykSaffayymVuMlc8R0E4YkCx
+ tSGg==
+X-Gm-Message-State: AJcUukdNaDvvjJJ4Qa8S96/+EjPB3LmKXWCgYIIckjClvo6FOMXPVscA
+ KM3kD+rFKZQditNkXhkKIjgN5WQ6PYc=
+X-Google-Smtp-Source: ALg8bN6yLPkVKEhEn8D3VdTeQW73Q1ofCoU7YG33FGe16mF/hy2WVu6kd5tuKYzYq9d85nrOnm27HQ==
+X-Received: by 2002:aca:cc0d:: with SMTP id c13mr5065150oig.150.1548654881556; 
+ Sun, 27 Jan 2019 21:54:41 -0800 (PST)
+Received: from mail-oi1-f178.google.com (mail-oi1-f178.google.com.
+ [209.85.167.178])
+ by smtp.gmail.com with ESMTPSA id h2sm3983892oti.76.2019.01.27.21.54.39
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Sun, 27 Jan 2019 21:54:40 -0800 (PST)
+Received: by mail-oi1-f178.google.com with SMTP id i6so12081329oia.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 27 Jan 2019 21:54:39 -0800 (PST)
+X-Received: by 2002:a54:4486:: with SMTP id v6mr5215060oiv.233.1548654879619; 
+ Sun, 27 Jan 2019 21:54:39 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190124145219.GD23362@e107981-ln.cambridge.arm.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+References: <20181115145650.9827-1-maxime.ripard@bootlin.com>
+ <20181115145650.9827-2-maxime.ripard@bootlin.com>
+In-Reply-To: <20181115145650.9827-2-maxime.ripard@bootlin.com>
+From: Alexandre Courbot <acourbot@chromium.org>
+Date: Mon, 28 Jan 2019 14:54:27 +0900
+X-Gmail-Original-Message-ID: <CAPBb6MX9=+k=5M-w7SyCUAKUceAXN7UG_6==tFx4RhR13Etdwg@mail.gmail.com>
+Message-ID: <CAPBb6MX9=+k=5M-w7SyCUAKUceAXN7UG_6==tFx4RhR13Etdwg@mail.gmail.com>
+Subject: Re: [PATCH v2 1/2] media: uapi: Add H264 low-level decoder API
+ compound controls.
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190127_210155_819009_48E6D2B9 
-X-CRM114-Status: GOOD (  22.11  )
+X-CRM114-CacheID: sfid-20190127_215443_562953_241FE2E7 
+X-CRM114-Status: GOOD (  17.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,107 +100,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Heiko Stuebner <heiko@sntech.de>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
- Shawn Lin <shawn.lin@rock-chips.com>, linux-pci@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-rockchip@lists.infradead.org,
- Alan Douglas <adouglas@cadence.com>, Jia-Ju Bai <baijiaju1990@gmail.com>,
- Cyrille Pitchen <cyrille.pitchen@free-electrons.com>,
- Jingoo Han <jingoohan1@gmail.com>, Bjorn Helgaas <bhelgaas@google.com>,
- linux-omap@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-arm-kernel@lists.infradead.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>, jenskuske@gmail.com,
+ linux-sunxi@googlegroups.com, LKML <linux-kernel@vger.kernel.org>,
+ Tomasz Figa <tfiga@chromium.org>,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Chen-Yu Tsai <wens@csie.org>, Hans Verkuil <hans.verkuil@cisco.com>,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ Sakari Ailus <sakari.ailus@linux.intel.com>,
+ Guenter Roeck <groeck@chromium.org>,
+ Nicolas Dufresne <nicolas.dufresne@collabora.com>,
+ Pawel Osciak <posciak@chromium.org>,
+ Linux Media Mailing List <linux-media@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Thu, Nov 15, 2018 at 11:56 PM Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+>
+> From: Pawel Osciak <posciak@chromium.org>
+>
+> Stateless video codecs will require both the H264 metadata and slices in
+> order to be able to decode frames.
+>
+> This introduces the definitions for a new pixel format for H264 slices that
+> have been parsed, as well as the structures used to pass the metadata from
+> the userspace to the kernel.
+>
+> Co-Developed-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> Signed-off-by: Pawel Osciak <posciak@chromium.org>
+> Signed-off-by: Guenter Roeck <groeck@chromium.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-On 24/01/19 8:22 PM, Lorenzo Pieralisi wrote:
-> On Mon, Jan 07, 2019 at 12:11:33PM +0530, Kishon Vijay Abraham I wrote:
->> Hi Lorenzo,
->>
->> The Endpoint controller driver uses features member in 'struct pci_epc'
->> to advertise the list of supported features to the endpoint function
->> driver.
->>
->> There are a few shortcomings with this approach.
->>   *) Certain endpoint controllers support fixed size BAR (e.g. TI's
->>      AM654 uses Designware configuration with fixed size BAR). The
->>      size of each BARs cannot be passed to the endpoint function
->>      driver.
->>   *) Too many macros for handling EPC features.
->>      (EPC_FEATURE_NO_LINKUP_NOTIFIER, EPC_FEATURE_BAR_MASK,
->>       EPC_FEATURE_MSIX_AVAILABLE, EPC_FEATURE_SET_BAR,
->>       EPC_FEATURE_GET_BAR)
->>   *) Endpoint controllers are directly modifying struct pci_epc
->>      members. (I have plans to move struct pci_epc to
->>      drivers/pci/endpoint so that pci_epc members are referenced
->>      only by endpoint core).
->>
->> To overcome the above shortcomings, introduced pci_epc_get_features()
->> API, pci_epc_features structure and a ->get_features() callback.
->>
->> Also added a patch to set BAR flags in pci_epf_alloc_space and
->> remove it from pci-epf-test function driver.
->>
->> Tested on TI's DRA7xx platform.
-> 
-> Hi Kishon,
-> 
-> I have no major objections to this series but I would like to see some
-> testing done in EP mode (on test platforms other than DRA7XX) to make
-> sure it does not break anything.
-> 
-> Please do help Kishon get some testing done.
+<snip>
 
-Please test v2 of this series please [1]
+> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+> index b854cceb19dc..e96c453208e8 100644
+> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
+> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+> @@ -825,6 +825,11 @@ const char *v4l2_ctrl_get_name(u32 id)
+>         case V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER:return "H264 Number of HC Layers";
+>         case V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER_QP:
+>                                                                 return "H264 Set QP Value for HC Layers";
+> +       case V4L2_CID_MPEG_VIDEO_H264_SPS:                      return "H264 SPS";
+> +       case V4L2_CID_MPEG_VIDEO_H264_PPS:                      return "H264 PPS";
+> +       case V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX:           return "H264 Scaling Matrix";
+> +       case V4L2_CID_MPEG_VIDEO_H264_SLICE_PARAMS:             return "H264 Slice Parameters";
+> +       case V4L2_CID_MPEG_VIDEO_H264_DECODE_PARAMS:            return "H264 Decode Parameters";
+>         case V4L2_CID_MPEG_VIDEO_MPEG4_I_FRAME_QP:              return "MPEG4 I-Frame QP Value";
+>         case V4L2_CID_MPEG_VIDEO_MPEG4_P_FRAME_QP:              return "MPEG4 P-Frame QP Value";
+>         case V4L2_CID_MPEG_VIDEO_MPEG4_B_FRAME_QP:              return "MPEG4 B-Frame QP Value";
 
-[1] -> https://www.spinics.net/lists/arm-kernel/msg699787.html
+To make things future-proof I think it may be good to add a control
+specifying the granularity of data sent with each request (see
+https://lkml.org/lkml/2019/1/24/147).
 
-Thanks
-Kishon
+Right now we have a consensus that to make things simple, we request
+one frame of encoded data per request. But this will probably be
+relaxed in the future, since allowing to process things at lower
+granularity may improve latency. Moreover the granularity accepted by
+the encoder is hardware/firmware dependent, so it is probably a good
+idea to expose this from the beginning.
 
-> 
-> Thanks,
-> Lorenzo
-> 
->> Thanks
->> Kishon
->>
->> Kishon Vijay Abraham I (15):
->>   PCI: endpoint: Add new pci_epc_ops to get EPC features
->>   PCI: dwc: Add ->get_features() callback function in dw_pcie_ep_ops
->>   PCI: designware-plat: Populate ->get_features() dw_pcie_ep_ops
->>   PCI: pci-dra7xx: Populate ->get_features() dw_pcie_ep_ops
->>   PCI: rockchip: Populate ->get_features() dw_pcie_ep_ops
->>   PCI: cadence: Populate ->get_features() cdns_pcie_epc_ops
->>   PCI: endpoint: Add helper to get first unreserved BAR
->>   PCI: endpoint: Fix pci_epf_alloc_space to set correct MEM TYPE flags
->>   PCI: pci-epf-test: Remove setting epf_bar flags in function driver
->>   PCI: pci-epf-test: Do not allocate next BARs memory if current BAR is
->>     64Bit
->>   PCI: pci-epf-test: Use pci_epc_get_features to get EPC features
->>   PCI: cadence: Remove pci_epf_linkup from Cadence EP driver
->>   PCI: rockchip: Remove pci_epf_linkup from Rockchip EP driver
->>   PCI: designware-plat: Remove setting epc->features in Designware plat
->>     EP driver
->>   PCI: endpoint: Remove features member in struct pci_epc
->>
->>  drivers/pci/controller/dwc/pci-dra7xx.c       | 13 +++
->>  .../pci/controller/dwc/pcie-designware-ep.c   | 12 +++
->>  .../pci/controller/dwc/pcie-designware-plat.c | 17 +++-
->>  drivers/pci/controller/dwc/pcie-designware.h  |  1 +
->>  drivers/pci/controller/pcie-cadence-ep.c      | 25 +++---
->>  drivers/pci/controller/pcie-rockchip-ep.c     | 16 +++-
->>  drivers/pci/endpoint/functions/pci-epf-test.c | 80 ++++++++++---------
->>  drivers/pci/endpoint/pci-epc-core.c           | 52 ++++++++++++
->>  drivers/pci/endpoint/pci-epf-core.c           |  3 +
->>  include/linux/pci-epc.h                       | 30 +++++--
->>  10 files changed, 185 insertions(+), 64 deletions(-)
->>
->> -- 
->> 2.17.1
->>
+How about a new V4L2_CID_MPEG_VIDEO_H264_GRANULARITY control with only
+one value at the moment, namely
+V4L2_MPEG_VIDEO_H264_GRANULARITY_FRAME? We could extend this in the
+future, and that way user-space will have no excuse for not checking
+that the codec supports the input granularity it will send.
+
+I'm wondering whether this could be made codec-independent, but I'm
+afraid this would add confusion.
 
 _______________________________________________
 linux-arm-kernel mailing list
