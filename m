@@ -2,86 +2,65 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CD500C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:46:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 42BB4C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:47:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 95E042086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:46:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1304D21738
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:47:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="spNuIiCw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="QFAkdXtW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 95E042086C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K3EUGLAB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1304D21738
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=kxPSr+RwIpz5djIvlEWPQ9XFAcQsIOWcG4zqau/Ba5w=; b=spNuIiCw4I5hgFBZxr7GVkYzyc
-	XMM3Gwt9GzqpmmyzlM4+RusR2qeUZQuqLY+N3VdvAePgN1XNMx4gly6fa5VA5UaATSl+wYGbCcaol
-	GfvQu68ayMVA21L4BrQgq8lzvrC3vRoG2DBmi+EV0KTET6wr5zrMhTkNB/Zbw9fvGA3KTgbhzBB/L
-	RqnNAIAi8/mgBuxCb9HkurzKL0+WeC7tUoZT/JZ/e8Cj7aVE8vv49caPutvTYPggq6hIEQc+dg0/X
-	SNfc6FICnLSQIseVMe4mw/8Um4lTYL071oT1Dcy6BujQluIbexu4ysP0vlsgAZtY893q9sMuq9FG1
-	rqzKGzAw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=2ar69T+vUwejr94zeg6ids5VlFKBPf4ER0bL6RonLrg=; b=K3EUGLABBoVzij
+	iRR6n9EYEBrDzD2UkD22iQKRfPPXI92zOdWhHFiP4TjlDVH5xGqHu4lQRjvkvTZnp2szdo+M6Bnr1
+	/lGnePhZH9Y7UJCBDbdwbgZ4vV9lrUsR5aRVSzdXWy7n0X0W7kEKtzPfOYodx1bVsFQ7Qm4qBdSgP
+	W/GHO8vTdEOEjWxJxzmchGaY4aNG7XSpINIZ9th08QzfzC8z8qO3taUZ0PfetmdSuo/jwOOMtBbrC
+	SpvHHsnXPONq067+zRE/j3QE27O8/+C7yz/6GlRTuZzN91hypkOeLdvJ2mCnbeYN1OQof3HqjQHGD
+	IwTJ04DlvEPX5kOz+U9g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go5Mb-0004pA-QF; Mon, 28 Jan 2019 11:46:05 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go5Lr-00048J-Bs
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 11:45:22 +0000
-Received: by mail-wr1-x442.google.com with SMTP id q18so17659275wrx.9
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 03:45:18 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=2gNvmDs3vCdOhRLOPNjOrr4p1fKxmGZTEdGsMe8hCo4=;
- b=QFAkdXtWd050TwoTegdEMbPl5/cb7Ej2bG9FxckLttf25SeT1yiZiIAAqPSeadyF/c
- 8crg1BiOvFHr0tHdZ6fq1EPi8wIGAL536DP2a05uUx0Kj8WWbuFqYbmZwpdwr4gU6G3k
- cYu9/da5qQov7rxgj9S8OF6En08rYNaOkO064=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=2gNvmDs3vCdOhRLOPNjOrr4p1fKxmGZTEdGsMe8hCo4=;
- b=WkkKegKOPsBh99iW/sc9Gt4Lu8FkwDMNwaE7ginXByXhRst3wPmaYctOErGW3DTgOE
- gE7HeOcEyoq8xQ/JvSuNOVAkBb8Z8HyD0AzzCWXz7/uuA+YAXZ5+SIws4TUW3IllGD2q
- uB+u0lfzyd6zICWgCDOvawfilrhyByLN56xll0lipuzK/juDiU6FFpjEvSLjrDCzvXLJ
- 4Oum83dc3P080+XlEEwwRvqLLZnNyUklfCKYXwWr/EOInsmE2uauONnPYa789LwwdgVp
- s0DvxDsCPhJf48Sez4GCRmlYhJFoJXFOPBX9U9sFb2n4iCfcxelv+uP+6/FhjaL6SB0/
- ECCg==
-X-Gm-Message-State: AJcUukfN7Zi+253m0YPWMo+btQoQnuriGDvPzv+ZaEVbM1YZNCZMdDQp
- vYa2OElCdBuZBQ4qFG5zt6sQMg==
-X-Google-Smtp-Source: ALg8bN6BGZsCuwASfqXlpxEOCs2Vy2ZlU2twy93qHgQNQJQAkcnMzXRuKazQyjafvS1+QJ4qCNEWzQ==
-X-Received: by 2002:adf:fdc2:: with SMTP id i2mr22181171wrs.117.1548675917529; 
- Mon, 28 Jan 2019 03:45:17 -0800 (PST)
-Received: from localhost.localdomain (233.red-81-47-145.staticip.rima-tde.net.
- [81.47.145.233])
- by smtp.gmail.com with ESMTPSA id z9sm122968775wrs.63.2019.01.28.03.45.16
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 28 Jan 2019 03:45:17 -0800 (PST)
-From: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
-To: jorge.ramirez-ortiz@linaro.org, lgirdwood@gmail.com, broonie@kernel.org,
- robh+dt@kernel.org, mark.rutland@arm.com
-Subject: [PATCH 3/3] arm64: dts: qcom: pms405: add spmi regulators
-Date: Mon, 28 Jan 2019 12:45:04 +0100
-Message-Id: <1548675904-18324-4-git-send-email-jorge.ramirez-ortiz@linaro.org>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1548675904-18324-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
-References: <1548675904-18324-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+	id 1go5Ns-0005Rh-Ub; Mon, 28 Jan 2019 11:47:24 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1go5No-0005RO-DS
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 11:47:22 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B3420EBD;
+ Mon, 28 Jan 2019 03:47:17 -0800 (PST)
+Received: from localhost (unknown [10.37.6.11])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1E7153F59C;
+ Mon, 28 Jan 2019 03:47:16 -0800 (PST)
+Date: Mon, 28 Jan 2019 11:47:15 +0000
+From: Andrew Murray <andrew.murray@arm.com>
+To: Suzuki K Poulose <suzuki.poulose@arm.com>
+Subject: Re: [PATCH 2/4] KVM: arm/arm64: re-create event when setting counter
+ value
+Message-ID: <20190128114714.GA16627@e119886-lin.cambridge.arm.com>
+References: <1548154197-5470-1-git-send-email-andrew.murray@arm.com>
+ <1548154197-5470-3-git-send-email-andrew.murray@arm.com>
+ <46fc9476-cff2-fd93-f5bb-237e26a2adc6@arm.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <46fc9476-cff2-fd93-f5bb-237e26a2adc6@arm.com>
+User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_034519_569123_644927CC 
-X-CRM114-Status: GOOD (  10.50  )
+X-CRM114-CacheID: sfid-20190128_034720_465558_530D28C9 
+X-CRM114-Status: GOOD (  29.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,55 +72,152 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, vinod.koul@linaro.org,
- linux-arm-msm@vger.kernel.org, khasim.mohammed@linaro.org,
- linux-kernel@vger.kernel.org, bjorn.andersson@linaro.org,
- niklas.cassel@linaro.org, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: marc.zyngier@arm.com, christoffer.dall@arm.com,
+ linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The PMS405 sports 5 SMPS and 13 LDO regulators.
+On Tue, Jan 22, 2019 at 02:18:17PM +0000, Suzuki K Poulose wrote:
+> Hi Andrew
+> 
+> On 01/22/2019 10:49 AM, Andrew Murray wrote:
+> > The perf event sample_period is currently set based upon the current
+> > counter value, when PMXEVTYPER is written to and the perf event is created.
+> > However the user may choose to write the type before the counter value in
+> > which case sample_period will be set incorrectly. Let's instead decouple
+> > event creation from PMXEVTYPER and (re)create the event in either
+> > suitation.
+> > 
+> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> 
+> The approach looks fine to me. However this patch seems to introduce a
+> memory leak, see below, which you may be addressing in a later patch in the
+> series. But this will affect bisecting issues.
 
-Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
----
- arch/arm64/boot/dts/qcom/pms405.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+See below, I don't think this is true.
 
-diff --git a/arch/arm64/boot/dts/qcom/pms405.dtsi b/arch/arm64/boot/dts/qcom/pms405.dtsi
-index ad2b62d..6fbdb1e 100644
---- a/arch/arm64/boot/dts/qcom/pms405.dtsi
-+++ b/arch/arm64/boot/dts/qcom/pms405.dtsi
-@@ -52,4 +52,24 @@
- 			interrupts = <0x0 0x61 0x1 IRQ_TYPE_NONE>;
- 		};
- 	};
-+
-+	pms405_1: pms405@1 {
-+		compatible = "qcom,spmi-pmic";
-+		reg = <0x1 SPMI_USID>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		regulators {
-+			compatible = "qcom,pms405-regulators";
-+			vdd_s3-supply = <&pms405_s3>;
-+
-+			pms405_s3: s3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vdd_cpu";
-+				regulator-min-microvolt = <1048000>;
-+				regulator-max-microvolt = <1352000>;
-+			};
-+		};
-+	};
- };
--- 
-2.7.4
+> 
+> > ---
+> >   virt/kvm/arm/pmu.c | 39 ++++++++++++++++++++++++++++++---------
+> >   1 file changed, 30 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> > index 531d27f..4464899 100644
+> > --- a/virt/kvm/arm/pmu.c
+> > +++ b/virt/kvm/arm/pmu.c
+> > @@ -24,6 +24,8 @@
+> >   #include <kvm/arm_pmu.h>
+> >   #include <kvm/arm_vgic.h>
+> > +static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 data,
+> > +				      u64 select_idx);
+> 
+> Could we just pass the counter index (i.e, select_idx) after updating
+> the event_type/counter value in the respective functions.
 
+Unless I misunderstand we need the value of 'data' as it is used to
+populate the function local perf_event_attr structure.
+
+However it is possible to instead read 'data' from __vcpu_sys_reg in
+kvm_pmu_create_perf_event instead of the call site. However
+kvm_pmu_set_counter_event_type would have to set the value of
+__vcpu_sys_reg from its data argument (as __vcpu_sys_reg normally gets
+set after kvm_pmu_set_counter_event_type returns). This is OK as we
+do this in the next patch in this series anyway - so perhaps I can
+bring that forward to this patch?
+
+> 
+> nit: If we decide not to do that, please rename "data" to something more
+> obvious, event_type.
+> 
+> >   /**
+> >    * kvm_pmu_get_counter_value - get PMU counter value
+> >    * @vcpu: The vcpu pointer
+> > @@ -57,11 +59,18 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
+> >    */
+> >   void kvm_pmu_set_counter_value(struct kvm_vcpu *vcpu, u64 select_idx, u64 val)
+> >   {
+> > -	u64 reg;
+> > +	u64 reg, data;
+> 
+> nit: Same here, data is too generic.
+> 
+> >   	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
+> >   	      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx;
+> >   	__vcpu_sys_reg(vcpu, reg) += (s64)val - kvm_pmu_get_counter_value(vcpu, select_idx);
+> > +
+> > +	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
+> > +	      ? PMCCFILTR_EL0 : PMEVTYPER0_EL0 + select_idx;
+> > +	data = __vcpu_sys_reg(vcpu, reg + select_idx);
+> > +
+> > +	/* Recreate the perf event to reflect the updated sample_period */
+> > +	kvm_pmu_create_perf_event(vcpu, data, select_idx);
+> >   }
+> >   /**
+> > @@ -380,17 +389,13 @@ static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
+> >   }
+> >   /**
+> > - * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
+> > + * kvm_pmu_create_perf_event - create a perf event for a counter
+> >    * @vcpu: The vcpu pointer
+> > - * @data: The data guest writes to PMXEVTYPER_EL0
+> > + * @data: Type of event as per PMXEVTYPER_EL0 format
+> >    * @select_idx: The number of selected counter
+> > - *
+> > - * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
+> > - * event with given hardware event number. Here we call perf_event API to
+> > - * emulate this action and create a kernel perf event for it.
+> >    */
+> > -void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+> > -				    u64 select_idx)
+> > +static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 data,
+> > +				      u64 select_idx)
+> >   {
+> >   	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> >   	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+> > @@ -433,6 +438,22 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+> >   	pmc->perf_event = event;
+> 
+> We should release the existing perf_event to prevent a memory leak and
+> also a corruption in the data via the overflow handler for the existing
+> event. Am I missing something here ?
+
+In kvm_pmu_create_perf_event (formally kvm_pmu_set_counter_event_type) we call
+kvm_pmu_stop_counter - this releases the event.
+
+So there is no memory leak here.
+
+Thanks,
+
+Andrew Murray
+
+> 
+> >   }
+> > +/**
+> > + * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
+> > + * @vcpu: The vcpu pointer
+> > + * @data: The data guest writes to PMXEVTYPER_EL0
+> > + * @select_idx: The number of selected counter
+> > + *
+> > + * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
+> > + * event with given hardware event number. Here we call perf_event API to
+> > + * emulate this action and create a kernel perf event for it.
+> > + */
+> > +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+> > +				    u64 select_idx)
+> > +{
+> > +	kvm_pmu_create_perf_event(vcpu, data, select_idx);
+> > +}
+> > +
+> >   bool kvm_arm_support_pmu_v3(void)
+> >   {
+> >   	/*
+> > 
+> 
+> 
+> Cheers
+> Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
