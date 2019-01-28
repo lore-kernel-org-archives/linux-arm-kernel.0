@@ -2,90 +2,84 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2808BC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 15:09:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5E7E8C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 15:11:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ECA162087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 15:09:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2BAF720880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 15:11:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qdpOW8/b";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="g6H2XO3a"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ECA162087F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ib/qllMO";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="J2hTWdyK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2BAF720880
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=5sOosMCLpDC3qDpHzTaXtM84Yxy7JUaog5fNFvG99Y4=; b=qdpOW8/b9Qzvt51Cn/FsrnDit
-	6HOftlr8E/cGTqU2g8xHogrCOukN5gHPC1KKfxzU5O1Umu8M3xIuzzAggjPA0VoKmCWKfaZ6SIT3C
-	NmiNnmmPLA2t+ieTHGa4ZtEVXyGm5CYhm76C5QggC8MsDhzE0mQTNsZYG+33kGNhO+u5WgRc39WW6
-	nIB4oOEY/fKETjqSQV13TW2a+mrDpakChtVI0FfgS1yPfmjCE42/uUz0dkBO2yhoq4P+46DZFbk2v
-	yGweuDOB+5xTsUVyQEWGGYZiSQShDhhsvksZSVj4J3kAEJL4Jiz5M65kGD5vARJLVhMP1HITK4Jb7
-	595gphoMQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=KW7Tam/Ng6V/PVp1trSpuqzhWl9zIUEIH9eWP1AnSYI=; b=Ib/qllMO791LH7
+	Kc9l1mqFajHW2MWpa6FyBd9DDVqFTN7RY2TFwVa+uKpiakP4clBrRoMx/2Hpiz4Xtijf3yGyyfedD
+	CBv/4nTAky/xx6TnEB5hyx57RRzm/VtTOKIHr1WX3VpOS9xHxqZkxgNdhQEr+QUTjV69QFG84Cchm
+	WyVMPrfqlNMtXFDKpgB0gs2VCWOqpubFWD9hylQY+iXeuQfEVhpLMnw5EXwfoWa5eLT9LxXY9IJMC
+	0K9bYM60axqp0Ox9wlbRmZhIm7HbUCky6gCYufQkWuDNKCIN/a1nOSqGV3JifdkDWVxmN49gDffvh
+	C6+naoeXsS7i1Moje1aA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go8XE-00027z-AX; Mon, 28 Jan 2019 15:09:16 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1go8Ys-0003tF-12; Mon, 28 Jan 2019 15:10:58 +0000
+Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go8XA-00027c-Tp
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 15:09:14 +0000
-Received: by mail-wr1-x443.google.com with SMTP id v13so18411955wrw.5
+ id 1go8Yo-0003sn-24
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 15:10:55 +0000
+Received: by mail-ot1-x342.google.com with SMTP id k98so14895410otk.3
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 07:09:12 -0800 (PST)
+ Mon, 28 Jan 2019 07:10:53 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=jLRLeJJ4vXgRYRkUNOKN95IL2dl3P67YmfBbj4Dgqi0=;
- b=g6H2XO3ay5npAXtszIVyDrbEzXJvLcxNvM/nNT7uko/Uu3ekJr56zehiwhL6dgah94
- CFyaxMbkzIhnf6SeZlF8/GbNdo0DRVAYNBFp89/xzTtB1iBor81DMBgyJn6I721AY6Kl
- 2o5Afov430OIP6HhbUiFDz3IOyEDnYPkRQ85caV2E+nXx6jG0/4KX/RtT+0KY6Ev85AS
- Q+fvSQ2gW5hJ6ckWuLbGh32YKgT75v4EWb4SZ6C5iEnDIP9/Qg16TCD/CZ9ajb9pTicI
- O9Hj1DKkyr/fqK959Q9arR1wcLaNjCRxkQCoVcCsrQLQiNNruWwRp1Aql6E5eYiaabmT
- 7ciw==
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=7T3ZqOnenrx6jIqRYDxP3muUucth1NdLVu8FY6ADprw=;
+ b=J2hTWdyK9gfwWBRM/Yh25hwCvLv2fjhjltx01GtX9FdOyxGiPf71k+9FH281DDTT/y
+ CSPbX8wUndnQmcpPMu6+hxKnv6daXVYPBlOZo5hCgMWTJLkZAF0NYsBgKu54M7t3ClBU
+ wCO5JF3+4Q7ITz5u/ibcOvodjNOL6WGt9gQiVkQHDGIxCp/ZUESyrpY0bUbSkorCm2QV
+ WHLaigopf9yXAP2145ef0sD95/nw9a1vZQX4C0Gi2ROtUDZj4gWf1KqBStOy8z7S05Rh
+ Vlz6dkGpFliT+nF3Q9CKY4imWp3O3oyKnS5gen02wVs9H2RXBk/1qKYAHzEkI5ruhjrF
+ +Kpg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=jLRLeJJ4vXgRYRkUNOKN95IL2dl3P67YmfBbj4Dgqi0=;
- b=mgUtWn5zoLvBMHRrgN4+0jrGSLC50FLpL8tj6xihczAPeOKPVIcXrXtsxtD0vvGK9/
- XAejldrMwNcBCmQqmtM3RRathCzgNMugu7tZq2oBBfL+lN9djITP3/rAQcZstdShYA9f
- f+AAzPNUjuC3qwz0+QGPS0FwYGggIvAozQSaG7czVA84fdYeJGpy/wTYkhwSZ3Bhed/4
- 3O7hl8a4NeQR8ZViYiW6lbfdxpEaNp4MlmIi2T1yriLN12jWXQvHZguFZqhskcmNNAzk
- 4KJcPR78npVemmqh7yAIs0LoAhbO90dD4n5++z7tHTekZ2GBI9kqulaWVN9atAjkal6k
- bS9A==
-X-Gm-Message-State: AJcUukeIdFEPpCweRscRZxet8eHm4tv6jNtD/JPu/9GjwU/uxvX7xshq
- 9Ni55rsZL98ig8TduNs0UdY=
-X-Google-Smtp-Source: ALg8bN5EvbpcKs5FyQwh+cGZrxdR3rDt9NdbsYU1dxIpgBf7jqAayLIDea4IoyeIZfwCxyQ9ABu6kw==
-X-Received: by 2002:adf:fc09:: with SMTP id i9mr21306085wrr.299.1548688151119; 
- Mon, 28 Jan 2019 07:09:11 -0800 (PST)
-Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
- by smtp.gmail.com with ESMTPSA id f3sm8023821wmd.22.2019.01.28.07.09.09
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 28 Jan 2019 07:09:10 -0800 (PST)
-Date: Mon, 28 Jan 2019 16:09:08 +0100
-From: Thierry Reding <thierry.reding@gmail.com>
-To: Joseph Lo <josephl@nvidia.com>
-Subject: Re: [PATCH V2 2/6] clocksource: tegra: add Tegra210 timer driver
-Message-ID: <20190128150908.GB31317@ulmo>
-References: <20190128091815.7040-1-josephl@nvidia.com>
- <20190128091815.7040-3-josephl@nvidia.com>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=7T3ZqOnenrx6jIqRYDxP3muUucth1NdLVu8FY6ADprw=;
+ b=b2u4uollHz6l8LNtLCyW5TEWKp/cSWZki1Ylt8s6lCtGa1HTddIdMrx0EtLn+rni+X
+ cklXqFTizMMyAJMsrvMFmnRKbwRSoHMpHF5b5Wpv0110/U8+rr1HQVy3nIdt4s/LsGUi
+ X3A5f0/fZ1DLmqXgv4OFiNQtq3sVQ4a8y8Cq6bdJyVvMRvjw3+TFRZ6DGMsm/SofxDib
+ 2yETpXM9dN/bMp+IM/oXKeieh7VHuA8XtZwApZMWPOATAjaJzoEPPyJoGRjhAv7WxQeX
+ f1XmBBVVDXLbyQ2yxwbjuNZpwbyTN63311+fYLCH6kscxYwitJQnaK2DCDOJk00nAdnB
+ /Ulg==
+X-Gm-Message-State: AJcUuker97XN6tpoMzVkS+2K5vuW/rjjP1dxGZO9TJ6TQZ15QZdLggt7
+ epy1I7lSrJyUOrwkDxw5+bedIvH+i3ArFaYSuIXWqFJb
+X-Google-Smtp-Source: ALg8bN4yAAkbPoYsAuvjajtTu8XmnlnaJiAk/+Q2n6AavcMqHupRvMjIu9tJZ/ZnnnHDtGncH0Gu3dpri0prAMXJdSg=
+X-Received: by 2002:a9d:7e87:: with SMTP id m7mr17857487otp.225.1548688252892; 
+ Mon, 28 Jan 2019 07:10:52 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190128091815.7040-3-josephl@nvidia.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <cover.1548410989.git.agx@sigxcpu.org>
+ <bbefc77a437bd21bfe1c27b15f65b57e7714b18a.1548410989.git.agx@sigxcpu.org>
+In-Reply-To: <bbefc77a437bd21bfe1c27b15f65b57e7714b18a.1548410989.git.agx@sigxcpu.org>
+From: Fabio Estevam <festevam@gmail.com>
+Date: Mon, 28 Jan 2019 13:10:45 -0200
+Message-ID: <CAOMZO5B9uMZuZX_QkGzMiLC=hKzsuEyD_3DXxakEATO1rNK_Cw@mail.gmail.com>
+Subject: Re: [PATCH 2/2] phy: Add driver for mixel dphy
+To: =?UTF-8?Q?Guido_G=C3=BCnther?= <agx@sigxcpu.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_070912_986730_E5B8763D 
-X-CRM114-Status: GOOD (  23.55  )
+X-CRM114-CacheID: sfid-20190128_071054_123845_0CD769AE 
+X-CRM114-Status: GOOD (  18.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,222 +91,110 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
- Jonathan Hunter <jonathanh@nvidia.com>, linux-tegra@vger.kernel.org,
- Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============2936377187937137185=="
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
+ Robert Chiras <robert.chiras@nxp.com>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>,
+ DRI mailing list <dri-devel@lists.freedesktop.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
---===============2936377187937137185==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="MfFXiAuoTsnnDAfZ"
-Content-Disposition: inline
-
-
---MfFXiAuoTsnnDAfZ
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Mon, Jan 28, 2019 at 05:18:11PM +0800, Joseph Lo wrote:
-> Add support for the Tegra210 timer that runs at oscillator clock
-> (TMR10-TMR13). We need these timers to work as clock event device and to
-> replace the ARMv8 architected timer due to it can't survive across the
-> power cycle of the CPU core or CPUPORESET signal. So it can't be a wake-up
-> source when CPU suspends in power down state.
->=20
-> Based on the work of Antti P Miettinen <amiettinen@nvidia.com>
->=20
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: linux-kernel@vger.kernel.org
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
-> v2:
->  * add error clean-up code
-> ---
->  drivers/clocksource/Kconfig          |   3 +
->  drivers/clocksource/Makefile         |   1 +
->  drivers/clocksource/timer-tegra210.c | 268 +++++++++++++++++++++++++++
->  include/linux/cpuhotplug.h           |   1 +
->  4 files changed, 273 insertions(+)
->  create mode 100644 drivers/clocksource/timer-tegra210.c
->=20
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index a9e26f6a81a1..e6e3e64b6320 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -135,6 +135,9 @@ config TEGRA_TIMER
->  	help
->  	  Enables support for the Tegra driver.
-> =20
-> +config TEGRA210_TIMER
-> +	def_bool ARCH_TEGRA_210_SOC
-> +
->  config VT8500_TIMER
->  	bool "VT8500 timer driver" if COMPILE_TEST
->  	depends on HAS_IOMEM
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index cdd210ff89ea..95de59c8a47b 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -36,6 +36,7 @@ obj-$(CONFIG_SUN4I_TIMER)	+=3D timer-sun4i.o
->  obj-$(CONFIG_SUN5I_HSTIMER)	+=3D timer-sun5i.o
->  obj-$(CONFIG_MESON6_TIMER)	+=3D timer-meson6.o
->  obj-$(CONFIG_TEGRA_TIMER)	+=3D timer-tegra20.o
-> +obj-$(CONFIG_TEGRA210_TIMER)	+=3D timer-tegra210.o
->  obj-$(CONFIG_VT8500_TIMER)	+=3D timer-vt8500.o
->  obj-$(CONFIG_NSPIRE_TIMER)	+=3D timer-zevio.o
->  obj-$(CONFIG_BCM_KONA_TIMER)	+=3D bcm_kona_timer.o
-> diff --git a/drivers/clocksource/timer-tegra210.c b/drivers/clocksource/t=
-imer-tegra210.c
-> new file mode 100644
-> index 000000000000..477b164e540b
-> --- /dev/null
-> +++ b/drivers/clocksource/timer-tegra210.c
-> @@ -0,0 +1,268 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (c) 2014-2019, NVIDIA CORPORATION.  All rights reserved.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/cpu.h>
-> +#include <linux/cpumask.h>
-> +#include <linux/err.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/percpu.h>
-> +#include <linux/syscore_ops.h>
-> +
-> +static u32 tegra210_timer_freq;
-> +static void __iomem *tegra210_timer_reg_base;
-> +static u32 usec_config;
-> +
-> +#define TIMER_PTV		0x0
-> +#define TIMER_PTV_EN		BIT(31)
-> +#define TIMER_PTV_PER		BIT(30)
-> +#define TIMER_PCR		0x4
-> +#define TIMER_PCR_INTR_CLR	BIT(30)
-> +#define TIMERUS_CNTR_1US	0x10
-> +#define TIMERUS_USEC_CFG	0x14
-> +
-> +#define TIMER10_OFFSET		0x90
-> +#define TIMER10_IRQ_IDX		10
-> +
-> +#define TIMER_FOR_CPU(cpu) (TIMER10_OFFSET + (cpu) * 8)
-> +#define IRQ_IDX_FOR_CPU(cpu)	(TIMER10_IRQ_IDX + cpu)
-> +
-> +struct tegra210_clockevent {
-> +	struct clock_event_device evt;
-> +	char name[20];
-> +	void __iomem *reg_base;
-> +};
-> +#define to_tegra_cevt(p) (container_of(p, struct tegra210_clockevent, ev=
-t))
-> +
-> +static struct tegra210_clockevent __percpu *tegra210_evt;
-> +
-> +static int tegra210_timer_set_next_event(unsigned long cycles,
-> +					 struct clock_event_device *evt)
-> +{
-> +	struct tegra210_clockevent *tevt;
-> +
-> +	tevt =3D to_tegra_cevt(evt);
-> +	writel(TIMER_PTV_EN |
-> +	       ((cycles > 1) ? (cycles - 1) : 0), /* n+1 scheme */
-> +	       tevt->reg_base + TIMER_PTV);
-> +
-> +	return 0;
-> +}
-> +
-> +static inline void timer_shutdown(struct tegra210_clockevent *tevt)
-> +{
-> +	writel(0, tevt->reg_base + TIMER_PTV);
-> +}
-> +
-> +static int tegra210_timer_shutdown(struct clock_event_device *evt)
-> +{
-> +	struct tegra210_clockevent *tevt;
-> +
-> +	tevt =3D to_tegra_cevt(evt);
-> +	timer_shutdown(tevt);
-> +
-> +	return 0;
-> +}
-> +
-> +static int tegra210_timer_set_periodic(struct clock_event_device *evt)
-> +{
-> +	struct tegra210_clockevent *tevt;
-> +
-> +	tevt =3D to_tegra_cevt(evt);
-> +	writel(TIMER_PTV_EN | TIMER_PTV_PER | ((tegra210_timer_freq / HZ) - 1),
-> +	       tevt->reg_base + TIMER_PTV);
-> +
-> +	return 0;
-> +}
-> +
-> +static irqreturn_t tegra210_timer_isr(int irq, void *dev_id)
-> +{
-> +	struct tegra210_clockevent *tevt;
-> +
-> +	tevt =3D dev_id;
-> +	writel(TIMER_PCR_INTR_CLR, tevt->reg_base + TIMER_PCR);
-> +	tevt->evt.event_handler(&tevt->evt);
-> +
-> +	return IRQ_HANDLED;
-> +}
-
-Up to here this is a duplicate of timer-tegra20.c. And a lot of
-tegra210_timer_init() is the same as tegra20_timer_init() as well. Can't
-we unify the two drivers instead?
-
-The power cycle restrictions of the architected timer, do they not apply
-to chips earlier than Tegra210 either? So don't we need all of these
-additional features on the timer-tegra20.c driver as well? If so that
-would increase the code duplication even more. I think we should avoid
-that, unless there are any strong arguments that would justify it.
-
-Thierry
-
---MfFXiAuoTsnnDAfZ
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlxPGxIACgkQ3SOs138+
-s6GwFg/8DJCWHrWuFSOY6LIcYSKi2FK7juvR23Bw/fRwCJg+CWYhGmBi6+ib3sll
-xgWA6cvQ6OOv5/fXXswPNKSDXWFPlGS7ujVz24EYqzup6bh832as/XcjXkXfPgsN
-pVlhq6CImaxlLEIZscP7N/8FBboIrr6pgXtvw+WjRk+Q5IQ/8IVbFmGtDn6UnA+h
-F1CxEA9XbFkpY+UAWlKW0vwi9l5wjAoAuzSfYBBDTGhbYIjj7z9Yza/1hOy2f7eO
-2kR35GJDzBGPA13G/aQWqoO8xzF/qv6CZryQT3GJXaTCetGgbPGpEY5IvGDA68fZ
-4wvOxOgYAjyrBi4eU43Vq6142hxL2+VQltYpKmwo6VO5FTZoaBT1sLJVlgkglU58
-a5nX9JfzI7//oT8xXGYfJYv7ox6MnLIh89y578sEb5zvuhkby+3O0qDR6XiklzRI
-asTENLzfgJIbKwalzAAqWpgGvU515uLnbbZ2UbCBBZNlGMDxtFDwuH1u+5IRzkkF
-NaY7s8edXJ269UPYiEESP/3cBzhz3zFNJAkK9Por9t4LHceE7C2hnxLaaatdbsUx
-wvpH8rbNDjhmv9tL0yyr1U47cadBpjGMF3jBC1/S8NB7p8F5KI+kzz0uNZzeN7r9
-HZ7oOEDPQIy8as1LsFFDUZnBuXuN20OkJ71gry/gpkYCr8Nq8u4=
-=CZGE
------END PGP SIGNATURE-----
-
---MfFXiAuoTsnnDAfZ--
-
-
---===============2936377187937137185==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============2936377187937137185==--
-
+SGkgR3VpZG8sCgpPbiBGcmksIEphbiAyNSwgMjAxOSBhdCA4OjE1IEFNIEd1aWRvIEfDvG50aGVy
+IDxhZ3hAc2lneGNwdS5vcmc+IHdyb3RlOgoKPiArY29uZmlnIFBIWV9NSVhFTF9NSVBJX0RQSFkK
+PiArICAgICAgIGJvb2wKPiArICAgICAgIGRlcGVuZHMgb24gT0YKPiArICAgICAgIHNlbGVjdCBH
+RU5FUklDX1BIWQo+ICsgICAgICAgc2VsZWN0IEdFTkVSSUNfUEhZX01JUElfRFBIWQo+ICsgICAg
+ICAgZGVmYXVsdCBBUkNIX01YQyAmJiBBUk02NAoKTm8gbmVlZCB0byBmb3JjZSB0aGlzIHNlbGVj
+dGlvbiBmb3IgYWxsIGkuTVg4TSBib2FyZHMsIGFzIG5vdCBldmVyeW9uZQppcyBpbnRlcmVzdGVk
+IGluIHVzaW5nIE1peGVsIERTSS4KCj4gLS0tIC9kZXYvbnVsbAo+ICsrKyBiL2RyaXZlcnMvcGh5
+L3BoeS1taXhlbC1taXBpLWRwaHkuYwo+IEBAIC0wLDAgKzEsNDQ5IEBACj4gKy8qCj4gKyAqIENv
+cHlyaWdodCAyMDE3IE5YUAo+ICsgKiBDb3B5cmlnaHQgMjAxOSBQdXJpc20gU1BDCj4gKyAqCj4g
+KyAqIFNQRFgtTGljZW5zZS1JZGVudGlmaWVyOiBHUEwtMi4wCgpTUERYIGxpbmUgc2hvdWxkIGJl
+IGluIHRoZSBmaXJzdCBsaW5lIGFuZCBzdGFydCB3aXRoIC8vCgo+ICsgKi8KPiArCj4gKy8qICNk
+ZWZpbmUgREVCVUcgMSAqLwoKUGxlYXNlIHJlbW92ZSBpdC4KCj4gKy8qIERQSFkgcmVnaXN0ZXJz
+ICovCj4gKyNkZWZpbmUgRFBIWV9QRF9EUEhZICAgICAgICAgICAgICAgICAgIDB4MDAKPiArI2Rl
+ZmluZSBEUEhZX01fUFJHX0hTX1BSRVBBUkUgICAgICAgICAgMHgwNAo+ICsjZGVmaW5lIERQSFlf
+TUNfUFJHX0hTX1BSRVBBUkUgICAgICAgICAweDA4Cj4gKyNkZWZpbmUgRFBIWV9NX1BSR19IU19a
+RVJPICAgICAgICAgICAgIDB4MGMKPiArI2RlZmluZSBEUEhZX01DX1BSR19IU19aRVJPICAgICAg
+ICAgICAgMHgxMAo+ICsjZGVmaW5lIERQSFlfTV9QUkdfSFNfVFJBSUwgICAgICAgICAgICAweDE0
+Cj4gKyNkZWZpbmUgRFBIWV9NQ19QUkdfSFNfVFJBSUwgICAgICAgICAgIDB4MTgKPiArI2RlZmlu
+ZSBEUEhZX1BEX1BMTCAgICAgICAgICAgICAgICAgICAgMHgxYwo+ICsjZGVmaW5lIERQSFlfVFNU
+ICAgICAgICAgICAgICAgICAgICAgICAweDIwCj4gKyNkZWZpbmUgRFBIWV9DTiAgICAgICAgICAg
+ICAgICAgICAgICAgICAgICAgICAgMHgyNAo+ICsjZGVmaW5lIERQSFlfQ00gICAgICAgICAgICAg
+ICAgICAgICAgICAgICAgICAgIDB4MjgKPiArI2RlZmluZSBEUEhZX0NPICAgICAgICAgICAgICAg
+ICAgICAgICAgICAgICAgICAweDJjCj4gKyNkZWZpbmUgRFBIWV9MT0NLICAgICAgICAgICAgICAg
+ICAgICAgIDB4MzAKPiArI2RlZmluZSBEUEhZX0xPQ0tfQllQICAgICAgICAgICAgICAgICAgMHgz
+NAo+ICsjZGVmaW5lIERQSFlfVFhfUkNBTCAgICAgICAgICAgICAgICAgICAweDM4Cj4gKyNkZWZp
+bmUgRFBIWV9BVVRPX1BEX0VOICAgICAgICAgICAgICAgICAgICAgICAgMHgzYwo+ICsjZGVmaW5l
+IERQSFlfUlhMUFJQICAgICAgICAgICAgICAgICAgICAweDQwCj4gKyNkZWZpbmUgRFBIWV9SWENE
+UlAgICAgICAgICAgICAgICAgICAgIDB4NDQKCkluIHRoZSBOWFAgdmVuZG9yIHRyZWUgd2UgaGF2
+ZSB0aGVzZSBhZGRpdGlvbmFsIG9mZnNldHMgZm9yIGlteDhtIHRoYXQKYXJlIG1pc3NpbmcgaGVy
+ZToKCi5yZWdfcnhoc19zZXR0bGUgPSAweDQ4LAoucmVnX2J5cGFzc19wbGwgPSAweDRjLAoKPiAr
+I2RlZmluZSBNQlBTKHgpICgoeCkgKiAxMDAwMDAwKQo+ICsKPiArI2RlZmluZSBEQVRBX1JBVEVf
+TUFYX1NQRUVEIE1CUFMoMTUwMCkKPiArI2RlZmluZSBEQVRBX1JBVEVfTUlOX1NQRUVEIE1CUFMo
+ODApCj4gKwo+ICsjZGVmaW5lIENOX0JVRiAweGNiN2E4OWMwCj4gKyNkZWZpbmUgQ09fQlVGIDB4
+NjMKPiArI2RlZmluZSBDTSh4KSAgKCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBcCj4g
+KyAgICAgICAgICAgICAgICgoeCkgPCAgMzIpPzB4ZTB8KCh4KS0xNikgOiAgICAgXAo+ICsgICAg
+ICAgICAgICAgICAoKHgpIDwgIDY0KT8weGMwfCgoeCktMzIpIDogICAgIFwKPiArICAgICAgICAg
+ICAgICAgKCh4KSA8IDEyOCk/MHg4MHwoKHgpLTY0KSA6ICAgICBcCj4gKyAgICAgICAgICAgICAg
+ICgoeCkgLSAxMjgpKQo+ICsjZGVmaW5lIENOKHgpICAoKCh4KSA9PSAxKT8weDFmIDogKCgoQ05f
+QlVGKT4+KCh4KS0xKSkmMHgxZikpCj4gKyNkZWZpbmUgQ08oeCkgICgoQ09fQlVGKT4+KDgtKHgp
+KSYweDMpCj4gKwo+ICtzdGF0aWMgaW5saW5lIHUzMiBwaHlfcmVhZChzdHJ1Y3QgcGh5ICpwaHks
+IHVuc2lnbmVkIGludCByZWcpCj4gK3sKPiArICAgICAgIHN0cnVjdCBtaXhlbF9kcGh5X3ByaXYg
+KnByaXYgPSBwaHlfZ2V0X2RydmRhdGEocGh5KTsKPiArCj4gKyAgICAgICByZXR1cm4gcmVhZGwo
+cHJpdi0+cmVncyArIHJlZyk7CgpNYXliZSBpdCdzIHdvcnRoIHVzaW5nIHJlZ21hcCBoZXJlLiBJ
+dCBtYWtlcyBpdCB2ZXJ5IGVhc3kgdG8gZHVtcCBhbGwKdGhlIE1JWEVMIHJlZ2lzdGVycyBhdCBv
+bmNlLgoKPiArc3RhdGljIGludCBtaXhlbF9kcGh5X2NvbmZpZ19mcm9tX29wdHMoc3RydWN0IHBo
+eSAqcGh5LAo+ICsgICAgICAgICAgICAgIHN0cnVjdCBwaHlfY29uZmlndXJlX29wdHNfbWlwaV9k
+cGh5ICpkcGh5X29wdHMsCj4gKyAgICAgICAgICAgICAgc3RydWN0IG1peGVsX2RwaHlfY2ZnICpj
+ZmcpCj4gK3sKPiArICAgICAgIHN0cnVjdCBtaXhlbF9kcGh5X3ByaXYgKnByaXYgPSBkZXZfZ2V0
+X2RydmRhdGEocGh5LT5kZXYucGFyZW50KTsKPiArICAgICAgIHVuc2lnbmVkIGxvbmcgcmVmX2Ns
+ayA9IGNsa19nZXRfcmF0ZShwcml2LT5waHlfcmVmX2Nsayk7Cj4gKyAgICAgICBpbnQgaTsKPiAr
+ICAgICAgIHVuc2lnbmVkIGxvbmcgbnVtZXJhdG9yLCBkZW5vbWluYXRvciwgZnJlcXVlbmN5Owo+
+ICsgICAgICAgdW5zaWduZWQgc3RlcDsKPiArCj4gKyAgICAgICBpZiAoZHBoeV9vcHRzLT5oc19j
+bGtfcmF0ZSA+IERBVEFfUkFURV9NQVhfU1BFRUQgfHwKPiArICAgICAgICAgICBkcGh5X29wdHMt
+PmhzX2Nsa19yYXRlIDwgREFUQV9SQVRFX01JTl9TUEVFRCkKPiArICAgICAgICAgICAgICAgcmV0
+dXJuIC1FSU5WQUw7Cj4gKyAgICAgICBjZmctPmhzX2Nsa19yYXRlID0gZHBoeV9vcHRzLT5oc19j
+bGtfcmF0ZTsKPiArCj4gKyAgICAgICBudW1lcmF0b3IgPSBkcGh5X29wdHMtPmhzX2Nsa19yYXRl
+Owo+ICsgICAgICAgZGVub21pbmF0b3IgPSByZWZfY2xrOwo+ICsgICAgICAgZ2V0X2Jlc3RfcmF0
+aW8oJm51bWVyYXRvciwgJmRlbm9taW5hdG9yLCAyNTUsIDI1Nik7Cj4gKyAgICAgICBpZiAoIW51
+bWVyYXRvciB8fCAhZGVub21pbmF0b3IpIHsKPiArICAgICAgICAgICAgICAgZGV2X2RiZygmcGh5
+LT5kZXYsICJJbnZhbGlkICVsZC8lbGQgZm9yICVsZC8lbGRcbiIsCgpkZXZfZXJyIHNob3VsZCBi
+ZSBtb3JlIGFwcHJvcHJpYXRlIGhlcmUuCgo+ICtzdGF0aWMgaW50IG1peGVsX2RwaHlfcmVmX3Bv
+d2VyX29uKHN0cnVjdCBwaHkgKnBoeSkKPiArewo+ICsgICAgICAgc3RydWN0IG1peGVsX2RwaHlf
+cHJpdiAqcHJpdiA9IHBoeV9nZXRfZHJ2ZGF0YShwaHkpOwo+ICsgICAgICAgdTMyIGxvY2ssIHRp
+bWVvdXQ7Cj4gKyAgICAgICBpbnQgcmV0ID0gMDsKPiArCj4gKyAgICAgICBtdXRleF9sb2NrKCZw
+cml2LT5sb2NrKTsKPiArICAgICAgIGNsa19wcmVwYXJlX2VuYWJsZShwcml2LT5waHlfcmVmX2Ns
+ayk7Cj4gKwo+ICsgICAgICAgcGh5X3dyaXRlKHBoeSwgUFdSX09OLCBEUEhZX1BEX0RQSFkpOwo+
+ICsgICAgICAgcGh5X3dyaXRlKHBoeSwgUFdSX09OLCBEUEhZX1BEX1BMTCk7Cj4gKwo+ICsgICAg
+ICAgdGltZW91dCA9IDEwMDsKPiArICAgICAgIHdoaWxlICghKGxvY2sgPSBwaHlfcmVhZChwaHks
+IERQSFlfTE9DSykpKSB7Cj4gKyAgICAgICAgICAgICAgIHVkZWxheSgxMCk7Cj4gKyAgICAgICAg
+ICAgICAgIGlmICgtLXRpbWVvdXQgPT0gMCkgewo+ICsgICAgICAgICAgICAgICAgICAgICAgIGRl
+dl9lcnIoJnBoeS0+ZGV2LCAiQ291bGQgbm90IGdldCBEUEhZIGxvY2shXG4iKTsKPiArICAgICAg
+ICAgICAgICAgICAgICAgICBtdXRleF91bmxvY2soJnByaXYtPmxvY2spOwo+ICsgICAgICAgICAg
+ICAgICAgICAgICAgIHJldHVybiAtRUlOVkFMOwoKQ291bGQgeW91IHVzZSByZWFkbF9wb2xsX3Rp
+bWVvdXQoKSBpbnN0ZWFkPwoKPiArc3RhdGljIGludCBtaXhlbF9kcGh5X3JlZl9wb3dlcl9vZmYo
+c3RydWN0IHBoeSAqcGh5KQo+ICt7Cj4gKyAgICAgICBzdHJ1Y3QgbWl4ZWxfZHBoeV9wcml2ICpw
+cml2ID0gcGh5X2dldF9kcnZkYXRhKHBoeSk7Cj4gKyAgICAgICBpbnQgcmV0ID0gMDsKClRoaXMg
+dmFyaWFibGUgaXMgbm90IG5lZWRlZC4KCj4gKwo+ICsgICAgICAgbXV0ZXhfbG9jaygmcHJpdi0+
+bG9jayk7Cj4gKwo+ICsgICAgICAgcGh5X3dyaXRlKHBoeSwgUFdSX09GRiwgRFBIWV9QRF9QTEwp
+Owo+ICsgICAgICAgcGh5X3dyaXRlKHBoeSwgUFdSX09GRiwgRFBIWV9QRF9EUEhZKTsKPiArCj4g
+KyAgICAgICBjbGtfZGlzYWJsZV91bnByZXBhcmUocHJpdi0+cGh5X3JlZl9jbGspOwo+ICsgICAg
+ICAgbXV0ZXhfdW5sb2NrKCZwcml2LT5sb2NrKTsKPiArCj4gKyAgICAgICByZXR1cm4gcmV0OwoK
+YW5kIHlvdSBjb3VsZCBzaW1wbHkgZG8gYSAncmV0dXJuIDAnIGluc3RlYWQuCgo+ICsgICAgICAg
+cGh5X3dyaXRlKHBoeSwgMHgwMCwgRFBIWV9MT0NLX0JZUCk7Cj4gKyAgICAgICBwaHlfd3JpdGUo
+cGh5LCAweDAxLCBEUEhZX1RYX1JDQUwpOwo+ICsgICAgICAgcGh5X3dyaXRlKHBoeSwgMHgwMCwg
+RFBIWV9BVVRPX1BEX0VOKTsKPiArICAgICAgIHBoeV93cml0ZShwaHksIDB4MDEsIERQSFlfUlhM
+UFJQKTsKPiArICAgICAgIHBoeV93cml0ZShwaHksIDB4MDEsIERQSFlfUlhDRFJQKTsKCkluIHRo
+ZSBOWFAgdmVuZG9yIGNvZGUgdGhlIHZhbHVlIDIgaXMgd3JpdHRlbiB0byB0aGlzIHJlZ2lzdGVy
+OgoKcGh5X3dyaXRlKHBoeSwgMHgwMiwgcHJpdi0+cGxhdF9kYXRhLT5yZWdfcnhjZHJwKTsKCkl0
+IHdvdWxkIGJlIGdvb2QgdG8gZHVtcCBhbGwgTWl4ZWwgRFNJIFBIWSByZWdpc3RlcnMgaW4gdGhl
+IE5YUCB2ZW5kb3IKYW5kIGluIG1haW5saW5lIGFuZCBtYWtlIHN1cmUgdGhleSBtYXRjaC4KCj4g
+KyAgICAgICBwcml2LT5yZWdzID0gZGV2bV9pb3JlbWFwKGRldiwgcmVzLT5zdGFydCwgU1pfMjU2
+KTsKCk5vIG5lZWQgdG8gaGFyZGNvZGUgU1pfMjU2IGhlcmUgYW5kIHRoZSBzaXplIHNob3VsZCBj
+b21lIGZyb20gdGhlIGRldmljZSB0cmVlLgoKWW91IGNvdWxkIGFsc28gdXNlIGRldm1faW9yZW1h
+cF9yZXNvdXJjZSgpIGluc3RlYWQuCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2Vy
+bmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1h
+bi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
