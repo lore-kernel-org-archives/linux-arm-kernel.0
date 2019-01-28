@@ -2,78 +2,77 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F200BC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 15:35:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 72D93C282CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 15:36:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C3F4F2148E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 15:35:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 436A62148E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 15:36:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MMR3MTWE";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="LhayHQp6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C3F4F2148E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="L3fRiPo6";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="qKOZ06eS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 436A62148E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QX3TE34Qkx0F0Z2w+/BlMuZj7kjeIDxSMmvAnVGfo9g=; b=MMR3MTWEFVMVJx
-	3ZUxR8r5vUpa0qEXoiDXIO1z/vS8WqhvKrHr5n2UybLb/ukeuykjg1oix4S3yKDcURw3pTfGT3LzN
-	3wApiKQi2cinVxFZ0lGAkJzaiGSZyQ5A3LIYtqmJ/5RtTyPu0jg5LXHvezHKwvdOI0l/Le56uIAEm
-	WvHfkyv8DkGoCEfxqhVfkROAlTIB3ZDDAPLcwjZCass0gaDFavYPtAD2HGD63U9hJBGsHHrOBcymz
-	qn11qOMWONi+5+bBC+zY60PW3PDqWIIQBJDmZzd6Kor2fUzVdyMEVP4X9lm7ylfWeax9jXMDwtaco
-	mAv7FqKOvnJVvcoMD2lg==;
+	List-Owner; bh=Rd4vPXm81kmfbHq6a1XR+Mki/qqYwDFoK2611Gc/TWk=; b=L3fRiPo6AU7o5F
+	O3zU+TKW9kDYhri4cssSQwjzSshpvmJKf5S+EvNrJ5HdOj9Aefx+rt+q1m2Og10lm6LTfs+09U+ZP
+	TjQ9+uUCzuan6Xc5qshvobuIoG0JEkJEeixlJoyvyFeLgr4H3iZtL8SiRjTbL+mUJxouETjD1K2KW
+	33AL/W+icOfNqqDVTJNr84DE/BIFPlIKlj5ocdjh7K4Ui5MhqzgemdSM3mkFIa/6AZkWkk3Ypm6DP
+	6Dfad34PjzSVcLKI0yUWQH/oYgAf5hL+ovmfjALK/ayUWL+02jsvxWrM1WZbuHYAWguw4bFJowm+S
+	EdFqPW75iK2VmXg05yQg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go8wH-00030S-PI; Mon, 28 Jan 2019 15:35:09 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1go8xu-0004R6-0q; Mon, 28 Jan 2019 15:36:50 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go8w9-0002qW-4r
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 15:35:03 +0000
-Received: from mail-qk1-f180.google.com (mail-qk1-f180.google.com
- [209.85.222.180])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id D4AF12177B
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 15:34:59 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548689700;
- bh=NZmE/2MZuC2Pg/w/22LZvSE7CCI06iRQKfA1qY1cgu0=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=LhayHQp6GYG7uw8Zd5CbicwmBepg9ykEKPLIvCHzl7aD2Qj4WGmPGOukJ1DVG0HRD
- YRb1vyEQz8kVB7eoTVMxP2Rhn4w5kOwkH9g/a6YNTMp0jiygRcaRbVDJCIBMUYxcJ9
- PcJW4pHFFont0kUcymbL9rK4B55h8nKSOKHGpRO4=
-Received: by mail-qk1-f180.google.com with SMTP id c21so9592428qkl.6
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 07:34:59 -0800 (PST)
-X-Gm-Message-State: AJcUukegPUvTvWk8WfCNFbd1WCFf4pcDQAhayzt8Lca7p4OTfR27aI2M
- BMYOakeD9IZgvaxgalXj3c8nDgjtOMewCplWxg==
-X-Google-Smtp-Source: ALg8bN7/6xUWddlpOWTZGyOMvMZN+9ik8FtdIbA1p+CzxDg9H/QULhFgM1PqM4cJaz5SKqu8x4tT/ivAdUkyr38+528=
-X-Received: by 2002:a37:a483:: with SMTP id
- n125mr19292602qke.184.1548689698974; 
- Mon, 28 Jan 2019 07:34:58 -0800 (PST)
+ id 1go8xs-0004Qw-0m
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 28 Jan 2019 15:36:48 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:Content-Type:
+ MIME-Version:References:In-Reply-To:Message-ID:Subject:Cc:To:From:Date:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=HBvmq3pGprB2BkAH3raH5U3m1TJVl9+kHg9F6PXiw/8=; b=qKOZ06eS6f/Vu55OH6NDODkiTj
+ cbbdcj+ok+vcyEZ2h1IAecFuWwN9dtVg1A9/MkTYGecnufDj/t7oZN+JbRKhpwDRFWjDC88cHO6p4
+ EOH6iys0Gaj0kWXZjHg4M+1HFjZ/YX6vse6n3fvc2awkmOhQFmGD08iZzgodOmauZYAgU/SJ/DMTb
+ bTwZIXnesCU2mhpzDlR3KkUJaNwbOpaxiCchaXUnYX8WVmDJFYIUM/OzK1URLyxUH2ScmN13BHCQC
+ /czruLc7E/N6EXn1zWrskwSynNJjDK6i6FlRZD72aRiy3AicHQZoWhlATcPlPrbTol/yuf5kiVQ3Y
+ w8Ulihcg==;
+Received: from relay12.mail.gandi.net ([217.70.178.232])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1go8xo-00082g-Fl
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 15:36:45 +0000
+Received: from xps13 (aaubervilliers-681-1-87-206.w90-88.abo.wanadoo.fr
+ [90.88.29.206]) (Authenticated sender: miquel.raynal@bootlin.com)
+ by relay12.mail.gandi.net (Postfix) with ESMTPSA id B6F2620000C;
+ Mon, 28 Jan 2019 15:36:05 +0000 (UTC)
+Date: Mon, 28 Jan 2019 16:36:04 +0100
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: Alan Stern <stern@rowland.harvard.edu>
+Subject: Re: [PATCH v4 04/10] usb: ehci-orion: add S2RAM support
+Message-ID: <20190128163604.6c34bdb7@xps13>
+In-Reply-To: <Pine.LNX.4.44L0.1901281025190.1450-100000@iolanthe.rowland.org>
+References: <20190128113350.603b2be3@xps13>
+ <Pine.LNX.4.44L0.1901281025190.1450-100000@iolanthe.rowland.org>
+Organization: Bootlin
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-References: <20181211202406.27721-1-robh@kernel.org>
- <CAMuHMdUdGvBUX7EsOrwJM4_LzR_Pe2exJ1Pfo48Vt5_scrdy0w@mail.gmail.com>
-In-Reply-To: <CAMuHMdUdGvBUX7EsOrwJM4_LzR_Pe2exJ1Pfo48Vt5_scrdy0w@mail.gmail.com>
-From: Rob Herring <robh@kernel.org>
-Date: Mon, 28 Jan 2019 09:34:47 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqKG8d+yONY2ikeiCaORYBfWhLe_rAsir11R8zRAD84MmA@mail.gmail.com>
-Message-ID: <CAL_JsqKG8d+yONY2ikeiCaORYBfWhLe_rAsir11R8zRAD84MmA@mail.gmail.com>
-Subject: Re: [PATCH v4] kbuild: Add support for DT binding schema checks
-To: Geert Uytterhoeven <geert@linux-m68k.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_073501_577843_95648969 
-X-CRM114-Status: GOOD (  18.19  )
+X-CRM114-CacheID: sfid-20190128_103644_632641_943CD6A4 
+X-CRM114-Status: GOOD (  22.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,67 +84,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Kumar Gala <kumar.gala@linaro.org>,
- arm-soc <arm@kernel.org>, Sean Hudson <darknighte@darknighte.com>,
- Jonathan Corbet <corbet@lwn.net>, linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
- "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- linux-kbuild <linux-kbuild@vger.kernel.org>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- Grant Likely <grant.likely@arm.com>, Michal Marek <michal.lkml@markovi.net>,
- Frank Rowand <frowand.list@gmail.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Jason Cooper <jason@lakedaemon.net>, Mathias Nyman <mathias.nyman@intel.com>,
+ devicetree@vger.kernel.org, Antoine Tenart <antoine.tenart@bootlin.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-usb@vger.kernel.org,
+ Kishon Vijay Abraham I <kishon@ti.com>, Nadav Haklai <nadavh@marvell.com>,
+ Rob Herring <robh+dt@kernel.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 28, 2019 at 3:43 AM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->
-> Hi Rob,
->
-> On Tue, Dec 11, 2018 at 9:24 PM Rob Herring <robh@kernel.org> wrote:
-> > This adds the build infrastructure for checking DT binding schema
-> > documents and validating dts files using the binding schema.
-> >
-> > Check DT binding schema documents:
-> > make dt_binding_check
-> >
-> > Build dts files and check using DT binding schema:
-> > make dtbs_check
-> >
-> > Optionally, DT_SCHEMA_FILES can be passed in with a schema file(s) to
-> > use for validation. This makes it easier to find and fix errors
-> > generated by a specific schema.
-> >
-> > Currently, the validation targets are separate from a normal build to
-> > avoid a hard dependency on the external DT schema project and because
-> > there are lots of warnings generated.
-> >
-> > Cc: Jonathan Corbet <corbet@lwn.net>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > Cc: Michal Marek <michal.lkml@markovi.net>
-> > Cc: linux-doc@vger.kernel.org
-> > Cc: devicetree@vger.kernel.org
-> > Cc: linux-kbuild@vger.kernel.org
-> > Signed-off-by: Rob Herring <robh@kernel.org>
->
-> BTW, what are the CONFIG dependencies for this to work?
-> E.g. defconfig on x86_64 fails, even after enabling CONFIG_OF:
-
-I generally use allmodconfig which enables building all DTs.
-
-Yes, there's a dependency on CONFIG_DTC which isn't always enabled
-with CONFIG_OF. Maybe it should be. The only other solutions I've
-thought of are either always build dtc or make the targets conditional
-on CONFIG_DTC. The latter would only change the error message.
-
-Rob
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgQWxhbiwKCkFsYW4gU3Rlcm4gPHN0ZXJuQHJvd2xhbmQuaGFydmFyZC5lZHU+IHdyb3RlIG9u
+IE1vbiwgMjggSmFuIDIwMTkKMTA6Mjc6NTMgLTA1MDAgKEVTVCk6Cgo+IE9uIE1vbiwgMjggSmFu
+IDIwMTksIE1pcXVlbCBSYXluYWwgd3JvdGU6Cj4gCj4gPiBIaSBBbGFuLAo+ID4gCj4gPiBBbGFu
+IFN0ZXJuIDxzdGVybkByb3dsYW5kLmhhcnZhcmQuZWR1PiB3cm90ZSBvbiBGcmksIDI1IEphbiAy
+MDE5Cj4gPiAyMTo1NjoyNyAtMDUwMCAoRVNUKToKPiA+ICAgCj4gPiA+IE9uIEZyaSwgMjUgSmFu
+IDIwMTksIE1pcXVlbCBSYXluYWwgd3JvdGU6Cj4gPiA+ICAgCj4gPiA+ID4gQWRkIHN1c3BlbmQv
+cmVzdW1lIGNhbGxiYWNrcyB0byByZXNldCB0aGUgaG9zdCBjb250cm9sbGVyIHByb3Blcmx5Cj4g
+PiA+ID4gZHVyaW5nIFMyUkFNIG9wZXJhdGlvbi4KPiA+ID4gPiAKPiA+ID4gPiBTaWduZWQtb2Zm
+LWJ5OiBNaXF1ZWwgUmF5bmFsIDxtaXF1ZWwucmF5bmFsQGJvb3RsaW4uY29tPgo+ID4gPiA+IC0t
+LQo+ID4gPiA+ICBkcml2ZXJzL3VzYi9ob3N0L2VoY2ktb3Jpb24uYyB8IDE4ICsrKysrKysrKysr
+KysrKysrKwo+ID4gPiA+ICAxIGZpbGUgY2hhbmdlZCwgMTggaW5zZXJ0aW9ucygrKQo+ID4gPiA+
+IAo+ID4gPiA+IGRpZmYgLS1naXQgYS9kcml2ZXJzL3VzYi9ob3N0L2VoY2ktb3Jpb24uYyBiL2Ry
+aXZlcnMvdXNiL2hvc3QvZWhjaS1vcmlvbi5jCj4gPiA+ID4gaW5kZXggMzEwOWYwODI5NDllLi4w
+ZGFiMDk5YjVkMTUgMTAwNjQ0Cj4gPiA+ID4gLS0tIGEvZHJpdmVycy91c2IvaG9zdC9laGNpLW9y
+aW9uLmMKPiA+ID4gPiArKysgYi9kcml2ZXJzL3VzYi9ob3N0L2VoY2ktb3Jpb24uYwo+ID4gPiA+
+IEBAIC0xODIsNiArMTgyLDIzIEBAIHN0YXRpYyBpbnQgZWhjaV9vcmlvbl9kcnZfcmVzZXQoc3Ry
+dWN0IHVzYl9oY2QgKmhjZCkKPiA+ID4gPiAgCXJldHVybiByZXQ7Cj4gPiA+ID4gIH0KPiA+ID4g
+PiAgCj4gPiA+ID4gK3N0YXRpYyBpbnQgX19tYXliZV91bnVzZWQgZWhjaV9vcmlvbl9kcnZfc3Vz
+cGVuZChzdHJ1Y3QgZGV2aWNlICpkZXYpCj4gPiA+ID4gK3sKPiA+ID4gPiArCXN0cnVjdCB1c2Jf
+aGNkICpoY2QgPSBkZXZfZ2V0X2RydmRhdGEoZGV2KTsKPiA+ID4gPiArCj4gPiA+ID4gKwlyZXR1
+cm4gZWhjaV9zdXNwZW5kKGhjZCwgZGV2aWNlX21heV93YWtldXAoZGV2KSk7ICAgIAo+ID4gPiAK
+PiA+ID4gT2theSwgZ29vZC4KPiA+ID4gICAKPiA+ID4gPiArfQo+ID4gPiA+ICsKPiA+ID4gPiAr
+c3RhdGljIGludCBfX21heWJlX3VudXNlZCBlaGNpX29yaW9uX2Rydl9yZXN1bWUoc3RydWN0IGRl
+dmljZSAqZGV2KQo+ID4gPiA+ICt7Cj4gPiA+ID4gKwlzdHJ1Y3QgdXNiX2hjZCAqaGNkID0gZGV2
+X2dldF9kcnZkYXRhKGRldik7Cj4gPiA+ID4gKwo+ID4gPiA+ICsJcmV0dXJuIGVoY2lfcmVzdW1l
+KGhjZCwgZGV2aWNlX21heV93YWtldXAoZGV2KSk7ICAgIAo+ID4gPiAKPiA+ID4gTm90IHNvIGdv
+b2QuICBUaGUgc2Vjb25kIGFyZ3VtZW50IGhlcmUgaXMgZm9yY2VfcmVzZXQ7IHByZXN1bWFibHkg
+eW91IAo+ID4gPiB3YW50IGl0IGFsd2F5cyB0byBiZSBmYWxzZS4gIChOb3RlIHRoYXQgdGhlIHYz
+IHZlcnNpb24gb2YgdGhpcyBwYXRjaCAKPiA+ID4gZGlkIG5vdCBjYWxsIGRldmljZV9tYXlfd2Fr
+ZXVwKCkgaW4gZWhjaV9vcmlvbl9kcnZfcmVzdW1lLikKPiA+ID4gCj4gPiA+IFllcywgdGhlIEFQ
+SSBpcyBub3Qgc3ltbWV0cmljYWwuICBTbyBzdWUgbWUuLi4gIAo+ID4gCj4gPiBPaCByaWdodCwg
+SSBjb21wbGV0ZWx5IG92ZXJsb29rZWQgdGhhdCBvbmUuIEluZGVlZCB0aGUgc2Vjb25kIHBhcmFt
+ZXRlcgo+ID4gc2hvdWxkIGJlICJmYWxzZSIsIGFzIGluIHRoZSB2My4gRG8geW91IG1pbmQgaWYg
+SSBzZW5kIGEgdjUgb25seSBmb3IKPiA+IHRoaXMgcGF0Y2g/IElmIHRoZSByZXN0IGxvb2tzIGdv
+b2QgdG8geW91IG9mIGNvdXJzZS4gIAo+IAo+IFRvIGF2b2lkIGNvbmZ1c2luZyBHcmVnLCBpdCB3
+b3VsZCBiZSBiZXN0IHRvIHNlbmQgdjUgb2YgYWxsIHRoZSBwYXRjaGVzCj4gdGhhdCBoZSBzaG91
+bGQgYXBwbHkuICBUaGUgcmVzdCBvZiB0aGUgRUhDSSBjaGFuZ2VzIGxvb2sgb2theSwgYW5kIHdo
+ZW4KPiB5b3UgZml4IHRoaXMgeW91IGNhbiBhZGQ6Cj4gCj4gQWNrZWQtYnk6IEFsYW4gU3Rlcm4g
+PHN0ZXJuQHJvd2xhbmQuaGFydmFyZC5lZHU+CgpTdXJlIQoKClRoYW5rcywKTWlxdcOobAoKX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtl
+cm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0
+dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5l
+bAo=
