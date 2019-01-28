@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 600EAC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:34:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C037C282CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:34:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1607420989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:34:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D1F3320881
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:34:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bDybBxsd";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="b6Ldp0I3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1607420989
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tgMFiJfj";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="kI8S6Adu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D1F3320881
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,49 +27,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=QhQ+IZHJN3IJ6oeG5uF9ZWfdC+tV6/RljOAJwVlmq88=; b=bDybBxsduth7puaIwJ6KlRABra
-	+EBv+rjOPE/pcSKmnU+UFluV/IFa3ZNbiAhB5iC5/JW4/0cQfkVtGQ3IoZMVXN9VlSjmf6hLf5u4x
-	YlIixgshlPbYExvPtF4ZOfazLiqKA1B1ZIaFOrDmtMz80/XCWSK4kfZvQT43uBCE4ItrL15JL3fx1
-	Pli5E1iIkIt1PJm9nfdhH0bDN+9HebEwyNu2GRZTWhmqfsWC1Z8HdFvKnneuvX5GsFnroV57HZE7w
-	E3pLt5e8WnpaxKCSfX6ce9qmddcVh/0MLexCq68sPSY/D7ZA4qj5OxkveiVXJoNmEjJttotAPVTh5
-	d4lHRbvA==;
+	bh=H7TmfEj2P7Qhpi6rdvygn3/+NyKeQIEUqsEi30A9MsY=; b=tgMFiJfjPtLV5RmtFvfiCTzlQ1
+	kYd1wR2Qd4uuOZinSzCNU44WE3cnWlrc5kAP/juMmUAEBlESZldca+nKsG4y2ffX8EoTbPGEEysyW
+	9VCUX4US2wb6MMUQkCoCEmvbyDZML59tAG+FjcDFKpBvGYKm/Cdoct0WLTB53/2Gug9znj5L2A1Zd
+	GZcziIM/bSgFmoh0lA5WIlK/ur5kVB1LWtN36JNA2GqUULgiNDlFcmDv6XA3iCKIvsret5/6NsoNc
+	h4RqKRnieP1v2GZ/7olFWPFJd9t3mtOdwOyXnbtI2teW1bDfcOJY7L+AjCJraFz81is4cBv33kSjL
+	QkPDeEmA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goBjr-0006WX-2G; Mon, 28 Jan 2019 18:34:31 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1goBk6-0006lr-KG; Mon, 28 Jan 2019 18:34:46 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goBim-0005bk-MP
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 18:33:30 +0000
-Received: by mail-wm1-x342.google.com with SMTP id y139so14984511wmc.5
+ id 1goBio-0005dh-EX
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 18:33:33 +0000
+Received: by mail-wm1-x344.google.com with SMTP id y139so14984623wmc.5
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 10:33:24 -0800 (PST)
+ Mon, 28 Jan 2019 10:33:26 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=FIFLlUi8drrhCNTy3FqCtrXujaAw4Y9ofI00ORq7Auk=;
- b=b6Ldp0I3RPws0bLT95JFNpvw76wG74hw+6/PgQ+T41Qa8oNK+XLjTZ6buT5NPiYHUc
- q+U9eKO10Tvrzvpnw1hkX/EmEPRxnsv2+mVnwmqqTVBDCq2oqX9OxC0nAv9ML7iAZ2i5
- tomOdp46RvvGVncKz7AEC+UnNyUd3lAnxhgPE=
+ bh=0hHd3izZjkE/zbr93sjgSJI16UQMbc5YRiXdFWOT/jk=;
+ b=kI8S6AduKzz9wxl/MDzKM3malF+7UGzYK1zbeBoG8GSNdFgohonCQflEcSHdoTPASw
+ lzFxi7YYPRdbm7u9A4i4mwfq7Z9NQoDBZcCOmUfxZcA5EEpZPKd7qZL7D3Y4XG/dCscu
+ it9CLMygETIGCMm0PJbLFRg787N1t84tffxIs=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=FIFLlUi8drrhCNTy3FqCtrXujaAw4Y9ofI00ORq7Auk=;
- b=Ic7yTA3fWk9x9CKdG/XxJGNvKPPrvruGxcsqqgCVrsYynTrPt6vCKPZjtNKXqS8kW+
- 12D6poUsdgSBrZ9JDM9OYrHl+uEpru/hiOYNH7F0prRFTU8qkdB4nRQeIBlmzHYFRLnT
- KszMLogi6gXNllK95ReeTfaKW61vwW1U0k0d2OpcgIQ35TSQ/kWhjSLYu/D0CjGHtEGa
- LZIaIfbSo2t0qC1KTPCrai0DitD4bBEW7q0lmcdL3dZ/daGz3wtL5agZJNkVSyrcnWIg
- 0LPUfH6+hTJ+EjijQKHJRd8J+9FUvuWENSreLm7h1E8SjfS43Svljz0w8qRe7D8yZHJ1
- utJw==
-X-Gm-Message-State: AJcUukeyLqv+LdyLx2SJTMNyY2foEKnfbmbbkuRrJ63zRlIgZE9sZ4V8
- TSOJiphOvITHzBQ74rRVQOEPmQ==
-X-Google-Smtp-Source: ALg8bN79ttzTGTtXdASSq0kwSmgMOpjbXbSGhLwpIeLye7gxlRPIWKGEFgVIcaGSokTzE2quyKJaiQ==
-X-Received: by 2002:a1c:ad45:: with SMTP id w66mr17892760wme.60.1548700403197; 
- Mon, 28 Jan 2019 10:33:23 -0800 (PST)
+ bh=0hHd3izZjkE/zbr93sjgSJI16UQMbc5YRiXdFWOT/jk=;
+ b=FmC0CWUa/NIGTjZs/EdKr8ew207uMnn5kPX99Sbl2h2T9HhXJ9R/+43iLF2zdBV+ud
+ ZzaW0i/HdZGP5+jyqF7vANvXiMrekaNmo/t5tLVNoMug6LMbmNx2wbVsXkvAG7JS9N2H
+ G6ZTSqtleQeHIUziAkmfR/QGkpLRfBRehA5aAGSqGOKNFu3DnS+aAZDqXNYcEmBStyAK
+ UdVgllLkTYN23f713gV+ezWlFRyOB+06bREIZmGC+4Sd+dcJztvnwoteckvPl88FAQ1U
+ t2OPGwhQCVEObRBINzRBHa6SC8E5vTsfkKxMual/igEI25KSUFe2Y4Fo0xB/2SmiSAbb
+ GhAg==
+X-Gm-Message-State: AJcUukcqRsKEu8e3cJM/5vmMc887lfj2XT11V/KPxKnawqOE1Murq3yK
+ 1lGK7HCLe/8aA1M3H6MdAxWtaA==
+X-Google-Smtp-Source: ALg8bN6t+0vjlFUpTvlcpNaeEM5rLYmpagl1jx/x0bgSvlVKSQhUx/xwm1tGzvEU9vC4IEKq6yUb/g==
+X-Received: by 2002:a1c:968a:: with SMTP id
+ y132mr17912179wmd.107.1548700405028; 
+ Mon, 28 Jan 2019 10:33:25 -0800 (PST)
 Received: from localhost.localdomain (233.red-81-47-145.staticip.rima-tde.net.
  [81.47.145.233])
- by smtp.gmail.com with ESMTPSA id l19sm270082wme.21.2019.01.28.10.33.21
+ by smtp.gmail.com with ESMTPSA id l19sm270082wme.21.2019.01.28.10.33.23
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 28 Jan 2019 10:33:22 -0800 (PST)
+ Mon, 28 Jan 2019 10:33:24 -0800 (PST)
 From: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
 To: jorge.ramirez-ortiz@linaro.org, sboyd@kernel.org,
  bjorn.andersson@linaro.org, andy.gross@linaro.org, david.brown@linaro.org,
@@ -77,16 +78,16 @@ To: jorge.ramirez-ortiz@linaro.org, sboyd@kernel.org,
  robh+dt@kernel.org, will.deacon@arm.com, arnd@arndb.de,
  horms+renesas@verge.net.au, heiko@sntech.de, sibis@codeaurora.org,
  enric.balletbo@collabora.com, jagan@amarulasolutions.com, olof@lixom.net
-Subject: [PATCH v2 04/14] dt-bindings: mailbox: qcom: Add clock-name optional
- property
-Date: Mon, 28 Jan 2019 19:32:51 +0100
-Message-Id: <1548700381-22376-5-git-send-email-jorge.ramirez-ortiz@linaro.org>
+Subject: [PATCH v2 05/14] clk: qcom: apcs-msm8916: get parent clock names from
+ DT
+Date: Mon, 28 Jan 2019 19:32:52 +0100
+Message-Id: <1548700381-22376-6-git-send-email-jorge.ramirez-ortiz@linaro.org>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1548700381-22376-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
 References: <1548700381-22376-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_103325_198493_13862CF1 
-X-CRM114-Status: GOOD (  13.80  )
+X-CRM114-CacheID: sfid-20190128_103326_979555_1F588F9A 
+X-CRM114-Status: GOOD (  16.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,67 +110,85 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-When the APCS clock is registered (platform dependent), it retrieves
-its parent names from hardcoded values in the driver.
+Allow accessing the parent clock names required for the driver
+operation by using the device tree node.
 
-The following commit allows the DT node to provide such clock names to
-the platform data based clock driver therefore avoiding having to
-explicitly embed those names in the clock driver source code.
+This permits extending the driver to other platforms without having to
+modify its source code.
+
+For backwards compatibility leave previous values as default.
 
 Co-developed-by: Niklas Cassel <niklas.cassel@linaro.org>
 Signed-off-by: Niklas Cassel <niklas.cassel@linaro.org>
 Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
 ---
- .../bindings/mailbox/qcom,apcs-kpss-global.txt     | 24 +++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
+ drivers/clk/qcom/apcs-msm8916.c | 32 ++++++++++++++++++++++++--------
+ 1 file changed, 24 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mailbox/qcom,apcs-kpss-global.txt b/Documentation/devicetree/bindings/mailbox/qcom,apcs-kpss-global.txt
-index 1232fc9..b693103 100644
---- a/Documentation/devicetree/bindings/mailbox/qcom,apcs-kpss-global.txt
-+++ b/Documentation/devicetree/bindings/mailbox/qcom,apcs-kpss-global.txt
-@@ -18,10 +18,11 @@ platforms.
- 	Usage: required
- 	Value type: <prop-encoded-array>
- 	Definition: must specify the base address and size of the global block
-+
- - clocks:
--	Usage: required if #clocks-cells property is present
--	Value type: <phandle>
--	Definition: phandle to the input PLL, which feeds the APCS mux/divider
-+	Usage: required if #clock-names property is present
-+	Value type: <phandle array>
-+	Definition: phandles to the two parent clocks of the clock driver.
+diff --git a/drivers/clk/qcom/apcs-msm8916.c b/drivers/clk/qcom/apcs-msm8916.c
+index a6c89a3..987ee00 100644
+--- a/drivers/clk/qcom/apcs-msm8916.c
++++ b/drivers/clk/qcom/apcs-msm8916.c
+@@ -19,7 +19,7 @@
  
- - #mbox-cells:
- 	Usage: required
-@@ -33,6 +34,12 @@ platforms.
- 	Value type: <u32>
- 	Definition: as described in clock.txt, must be 0
+ static const u32 gpll0_a53cc_map[] = { 4, 5 };
  
-+- clock-names:
-+	Usage: required if the platform data based clock driver needs to
-+	retrieve the parent clock names from device tree.
-+	This will requires two mandatory clocks to be defined.
-+	Value type: <string-array>
-+	Definition: must be "aux" and "pll"
- 
- = EXAMPLE
- The following example describes the APCS HMSS found in MSM8996 and part of the
-@@ -65,3 +72,14 @@ Below is another example of the APCS binding on MSM8916 platforms:
- 		clocks = <&a53pll>;
- 		#clock-cells = <0>;
- 	};
-+
-+Below is another example of the APCS binding on QCS404 platforms:
-+
-+	apcs_glb: mailbox@b011000 {
-+		compatible = "qcom,qcs404-apcs-apps-global", "syscon";
-+		reg = <0x0b011000 0x1000>;
-+		#mbox-cells = <1>;
-+		clocks = <&gcc GCC_GPLL0_AO_OUT_MAIN>, <&apcs_hfpll>;
-+		clock-names = "aux", "pll";
-+		#clock-cells = <0>;
+-static const char * const gpll0_a53cc[] = {
++static const char *gpll0_a53cc[] = {
+ 	"gpll0_vote",
+ 	"a53pll",
+ };
+@@ -50,6 +50,10 @@ static int qcom_apcs_msm8916_clk_probe(struct platform_device *pdev)
+ 	struct regmap *regmap;
+ 	struct clk_init_data init = { };
+ 	int ret = -ENODEV;
++	struct clk_bulk_data pclks[] = {
++		[0] = { .id = "aux", .clk = NULL },
++		[1] = { .id = "pll", .clk = NULL },
 +	};
+ 
+ 	regmap = dev_get_regmap(parent, NULL);
+ 	if (!regmap) {
+@@ -61,6 +65,25 @@ static int qcom_apcs_msm8916_clk_probe(struct platform_device *pdev)
+ 	if (!a53cc)
+ 		return -ENOMEM;
+ 
++	/* check if the parent names are present in the device tree */
++	ret = devm_clk_bulk_get(parent, ARRAY_SIZE(pclks), pclks);
++	if (ret == -EPROBE_DEFER)
++		return ret;
++
++	if (!ret) {
++		gpll0_a53cc[0] = __clk_get_name(pclks[0].clk);
++		gpll0_a53cc[1] = __clk_get_name(pclks[1].clk);
++		a53cc->pclk = pclks[1].clk;
++	} else {
++		/* support old binding where only pll was explicitily defined */
++		a53cc->pclk = devm_clk_get(parent, NULL);
++		if (IS_ERR(a53cc->pclk)) {
++			ret = PTR_ERR(a53cc->pclk);
++			dev_err(dev, "failed to get clk: %d\n", ret);
++			return ret;
++		}
++	}
++
+ 	init.name = "a53mux";
+ 	init.parent_names = gpll0_a53cc;
+ 	init.num_parents = ARRAY_SIZE(gpll0_a53cc);
+@@ -76,13 +99,6 @@ static int qcom_apcs_msm8916_clk_probe(struct platform_device *pdev)
+ 	a53cc->src_shift = 8;
+ 	a53cc->parent_map = gpll0_a53cc_map;
+ 
+-	a53cc->pclk = devm_clk_get(parent, NULL);
+-	if (IS_ERR(a53cc->pclk)) {
+-		ret = PTR_ERR(a53cc->pclk);
+-		dev_err(dev, "failed to get clk: %d\n", ret);
+-		return ret;
+-	}
+-
+ 	a53cc->clk_nb.notifier_call = a53cc_notifier_cb;
+ 	ret = clk_notifier_register(a53cc->pclk, &a53cc->clk_nb);
+ 	if (ret) {
 -- 
 2.7.4
 
