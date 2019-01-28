@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5DDF6C282CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:21:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 86834C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:23:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2622F214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:21:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 56226214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:23:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fcuRlBff"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2622F214DA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XmuTCXzz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 56226214DA
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,42 +24,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8rE9DIeqNSjkrp0tMrd8wq+NPJo3fyslsJOOhrnC8C8=; b=fcuRlBfffZlP94
-	IvwuFUshYJsfVRVF2TqPPQZ6l4vK5F11rj0xA2W4I53AqXhvd+tRXtHOvj8HEakuC8LT9mHDDD84S
-	PK7wH/43tj+bj6p2a8y92/AFXLI/SD1pL6Ts6uJbB+KgsLYoftjOjzT417G4lAlissGT8ASx0ikKO
-	4Bhl0+4ESrYqbcbVnWC81JtuZBoWSmQGlFtkpuazeUAY/GB7Os5WHhe2IYM9xNSEaHhB3tkV+D9Fs
-	fQLKU+l+z9DN/bbJ6Jw5n5DKtrzSdA76trEQlZN/cmwIusE3sqdVFBatuMKRYZPF70877TBLFLvf1
-	UbflmsuzBn/ApOHS2OMg==;
+	List-Owner; bh=ST75souWa6JOwEsZ4th04k4OEm35vth9SAB6mBdnGFg=; b=XmuTCXzzI/qmbY
+	OEXNIjYuhyyQ3k8vLcvlZQGo8UGou6Htrw+J4fCF5RJS9vfySC1D2N7XhPV3FxdGIFVevaJ5juWIM
+	CSXgJ/qps8aBxtyZSI/Mf4rWlN1hb+RAAEo7IpHabo4Iei9AFTQ3klOeLeWwCjGETxSZA30NsRchc
+	JzFpj0uPdkvMmfZPkxfKQg/hdFkrOVCGmRgnoaH6odQNcVgxZDiFHcsWLmZRuEBC9esCGKtTxBP5a
+	0a/0FAFPGqs1lwlJUTD7f385ThxLjOVhsK2YlaAUJ71ZVWM1eqeLtnEZTIxp8IuLtoWFgplQhJY5C
+	Mjhp7ld3xJW5jUogN4Vw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go4yl-0003FU-V9; Mon, 28 Jan 2019 11:21:27 +0000
+	id 1go50Q-0003Vj-6l; Mon, 28 Jan 2019 11:23:10 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go4yi-0003FB-Lk
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 11:21:26 +0000
+ id 1go50M-0003VP-T9
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 11:23:08 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0B4D7EBD;
- Mon, 28 Jan 2019 03:21:23 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 417AEEBD;
+ Mon, 28 Jan 2019 03:23:06 -0800 (PST)
 Received: from big-swifty.misterjones.org (big-swifty.cambridge.arm.com
  [10.1.39.122])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 823573F59C;
- Mon, 28 Jan 2019 03:21:20 -0800 (PST)
-Date: Mon, 28 Jan 2019 11:21:21 +0000
-Message-ID: <861s4xvxhq.wl-marc.zyngier@arm.com>
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5429F3F59C;
+ Mon, 28 Jan 2019 03:23:03 -0800 (PST)
+Date: Mon, 28 Jan 2019 11:23:04 +0000
+Message-ID: <86zhrluiuf.wl-marc.zyngier@arm.com>
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v9 17/26] arm64: Switch to PMR masking when starting CPUs
-In-Reply-To: <1548084825-8803-18-git-send-email-julien.thierry@arm.com>
+Subject: Re: [PATCH v9 18/26] arm64: gic-v3: Implement arch support for
+ priority masking
+In-Reply-To: <1548084825-8803-19-git-send-email-julien.thierry@arm.com>
 References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
- <1548084825-8803-18-git-send-email-julien.thierry@arm.com>
+ <1548084825-8803-19-git-send-email-julien.thierry@arm.com>
 User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
  FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
  (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
 Organization: ARM Ltd
 MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_032124_717640_CAD12DCF 
-X-CRM114-Status: GOOD (  10.35  )
+X-CRM114-CacheID: sfid-20190128_032306_943461_93B6EF4E 
+X-CRM114-Status: UNSURE (   9.67  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,22 +82,17 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 21 Jan 2019 15:33:36 +0000,
+On Mon, 21 Jan 2019 15:33:37 +0000,
 Julien Thierry <julien.thierry@arm.com> wrote:
 > 
-> Once the boot CPU has been prepared or a new secondary CPU has been
-> brought up, use ICC_PMR_EL1 to mask interrupts on that CPU and clear
-> PSR.I bit.
-> 
-> Since ICC_PMR_EL1 is initialized at CPU bringup, avoid overwriting
-> it in the GICv3 driver.
+> Implement architecture specific primitive allowing the GICv3 driver to
+> use priorities to mask interrupts.
 > 
 > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 > Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
 
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
