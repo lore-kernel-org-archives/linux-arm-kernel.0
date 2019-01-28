@@ -2,92 +2,71 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 37C8CC282CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 15:47:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4FDCDC282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 15:48:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 09D3520880
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 15:47:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1EF662085B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 15:48:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Irg8W92K";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="xemMwMlw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 09D3520880
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bCS1gfp2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="UGohGytj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1EF662085B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:In-reply-to:Subject:To:
-	From:References:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=o78s087yLCoR0/Stx5f0pKo2VcVyP4fwOLFqtYjCvmI=; b=Irg8W92KX36xxd7xhTKHIEWUS
-	+t0anwF/PLD3sILeg4+Y9A3nWK3XDK74pVreTN5Tl1PX5h2Xa8/pHxbO7ct4mkcjPG1YV2qbpZZh0
-	8L6uzYlMSWzsJkwoE1JrvTwVolH85fMKi1RlkuSDqN/f4Hc6U+FsH+G8vHFB/AWbt8Dt3kXus/YwI
-	4FXkHS/vc3lwLO/Y1M3+A+qIaN5xlUtYCEh44UCPK0eBwRwd/TVhNc7HDkKHPvxnLtbmBkToNk95B
-	xQJHpU0Bal+CrSrfyisrNdfoC6YB06xl24XZXTMoZwjCUeMz6DZfIU8gHwA/HQ91Cxh/CP1leK8Hv
-	U8brs1GkQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=cWyD9D8kAmJ/NSOm+ITdmgdOf+acIwu21N1BzUc8MaE=; b=bCS1gfp2q4uqDc
+	uRLLw4L5g9bZEQ8bSeJR1Wkv7L0VZMP4YlaacOrGTsTXpSw+5hnbvusWD/GoPhhBqYRvgkDObyhdM
+	D9NZaqIshULR7IOtl5oKSHzIcDmrcQLcFeWANGtZxiUO0E/PQ9TVQpPQXnCkM7fTpiBuY+d4ZauZg
+	HiZrnXdnM7+ctVcU8yKFJfk0WOJgaYsUefkllQV/2O+0GXtNMpYjSGbaqJ4N3oJTCbZ02OSGk90I4
+	LyB8iy9VTzZcjBbO4NoZzbIMYnXQQ3PAYJxK+/6u+Gg5u61WX4klGzr33NjhHlRhQAM71pXOufreZ
+	gdM07ZJRmr7X5jwb840A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go97w-0000bQ-Ut; Mon, 28 Jan 2019 15:47:12 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
+	id 1go99S-00013Q-6N; Mon, 28 Jan 2019 15:48:46 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go97k-0000Qb-Gc
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 15:47:05 +0000
-Received: by mail-wm1-x343.google.com with SMTP id p6so14405644wmc.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 07:46:56 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=references:user-agent:from:to:cc:subject:in-reply-to:date
- :message-id:mime-version;
- bh=24NjDh3BgzGxjDtL0C3I6Y10gxo/KZPwGxzMjFIVtMI=;
- b=xemMwMlwXf0BKqEfwRqgiOIMoMN8z7uXTejRabvpUg1OmgIO5e4E+nkKCTNHXOiRTi
- BV1XTNcTMnQhJm5Mb6QRGqoKSOvOIMpUa15/eYbBsL3FcM77mV6Kqi4bcpzjLO6Ucf4f
- mTiRQC+gtANadgMmekUTIWJV4CW4y5XZ/gWY/Dawp7l+CXRVUm7tjmD0lTd9FnddIVO9
- njCh1/gsIXcsyorEu28o/maE6XBko7M7h0/vgD9CynxuJ5kX7Xh4/NiGzfBM22D1L6TW
- 6bXRkf73eQYrfhu0snVhyTTjOKvlsSeNkZGTNpPRhjw8eyShoaukER1fNagUMfl4p4Gj
- wrRA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:references:user-agent:from:to:cc:subject
- :in-reply-to:date:message-id:mime-version;
- bh=24NjDh3BgzGxjDtL0C3I6Y10gxo/KZPwGxzMjFIVtMI=;
- b=YU0z9HHxTSIxMIoqnn3sxZXv8ancJtYFTE59R5qLyuu7zs/n6uxp/s8BGfWG3ftHIb
- ekrHvjRZa3SbfGiPMa01sOcr6n0ieAq4dX4aw95RkPX9OktjGqkEX3SriA/2vZqG7pWj
- BsvCOknIapzlp4QpMpzmhhgd3isBq6Xov5xmTx0x71Qcxuo8rHP/qusGktz1UFF2pOR2
- zMGMcV7DrKbf03Qi8k4kvsDni9DeAb501lxhTzqW7mf0gWedtrLJoe3pAL/i30T2CYqg
- EBkP1v5SF8ZprIFBgtU9vZtI4qxtmwIUNOWQvXW9NbTmpgYPJv5Gtwnp+2KJJliRkKXr
- oUeQ==
-X-Gm-Message-State: AJcUukdMyHtzHTeFUOlWge4ZEbyrQ+a/R81KHnl575lbcRvjP++YNIZa
- uwhJi17JOXSStUR9S9MVuquWgET1SJQ2jHec
-X-Google-Smtp-Source: ALg8bN6vhE491KDsiIHapLz+m/0OKAtWRRjjytp9mM2ieqMYH7gW7G2QPAcsU1sb6TwEVWuZnYRmUQ==
-X-Received: by 2002:a1c:5fd7:: with SMTP id
- t206mr18536987wmb.145.1548690415418; 
- Mon, 28 Jan 2019 07:46:55 -0800 (PST)
-Received: from localhost ([2620:10d:c092:180::1:d40b])
- by smtp.gmail.com with ESMTPSA id r22sm23802wmh.2.2019.01.28.07.46.54
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 28 Jan 2019 07:46:54 -0800 (PST)
-References: <1547744074-28308-1-git-send-email-lollivier@baylibre.com>
- <1547744074-28308-3-git-send-email-lollivier@baylibre.com>
- <20190125090755.GB3691@localhost>
-User-agent: mu4e 1.0; emacs 25.3.2
-From: Loys Ollivier <lollivier@baylibre.com>
-To: Johan Hovold <johan@kernel.org>
-Subject: Re: [PATCH v2 2/4] dt-bindings: gnss: add mediatek binding
-In-reply-to: <20190125090755.GB3691@localhost>
-Date: Mon, 28 Jan 2019 16:46:53 +0100
-Message-ID: <867eeo7pjm.fsf@baylibre.com>
+ id 1go99O-00012z-Kb
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 15:48:44 +0000
+Received: from sasha-vm.mshome.net (c-73-47-72-35.hsd1.nh.comcast.net
+ [73.47.72.35])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id EC4D920880;
+ Mon, 28 Jan 2019 15:48:39 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548690522;
+ bh=148sDG9duXACtyjsI7o/I4sR9rvIi2U0xb0huy7DZns=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=UGohGytjQOOGq7c5BrEhv0al1tDpMzs5dzyU7rENWEKwd1jfRPtmQj0YmVuSnsJWI
+ WcMlOImoDEQcJeeVmaRkn9XSKsZByD4A3DnuCZHsHgCYhnwFmJNidGJKSHJgYN91xm
+ +DwIN5HO6+kl1sV5G+C0Z0D/6L5a+RORdtiexVR0=
+From: Sasha Levin <sashal@kernel.org>
+To: linux-kernel@vger.kernel.org,
+	stable@vger.kernel.org
+Subject: [PATCH AUTOSEL 4.20 111/304] ARM: dts: aspeed: add missing memory
+ unit-address
+Date: Mon, 28 Jan 2019 10:40:28 -0500
+Message-Id: <20190128154341.47195-111-sashal@kernel.org>
+X-Mailer: git-send-email 2.19.1
+In-Reply-To: <20190128154341.47195-1-sashal@kernel.org>
+References: <20190128154341.47195-1-sashal@kernel.org>
 MIME-Version: 1.0
+X-Patchwork-Hint: Ignore
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_074700_602415_7DE2E1C1 
-X-CRM114-Status: GOOD (  22.25  )
+X-CRM114-CacheID: sfid-20190128_074842_708765_E05BC856 
+X-CRM114-Status: GOOD (  12.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,128 +78,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Kevin Hilman <khilman@baylibre.com>, Loys Ollivier <lollivier@baylibre.com>,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-mediatek@lists.infradead.org, linux-amlogic@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Sasha Levin <sashal@kernel.org>, Rob Herring <robh@kernel.org>,
+ linux-aspeed@lists.ozlabs.org, devicetree@vger.kernel.org,
+ Andrew Jeffery <andrew@aj.id.au>, Joel Stanley <joel@jms.id.au>,
+ Olof Johansson <olof@lixom.net>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+From: Rob Herring <robh@kernel.org>
 
-On Fri 25 Jan 2019 at 09:07, Johan Hovold wrote:
+[ Upstream commit 8ef86955fe59f7912a40d57ae4c6d511f0187b4d ]
 
-> On Thu, Jan 17, 2019 at 05:54:32PM +0100, Loys Ollivier wrote:
->> Add binding for Mediatek-based GNSS receivers.
->> 
->> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
->> ---
->> 
->> v2:
->> Renamed bindings from Globaltop/gtop to Mediatek/mtk.
->> Moved current-speed as an optional propertie.
->> Removed the status line in the example.
->> Added "mediatek,mt3339" compatible.
->> 
->>  .../devicetree/bindings/gnss/mediatek.txt          | 39 
->>  ++++++++++++++++++++++
->>  1 file changed, 39 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/gnss/mediatek.txt
->> 
->> diff --git a/Documentation/devicetree/bindings/gnss/mediatek.txt 
->> b/Documentation/devicetree/bindings/gnss/mediatek.txt
->> new file mode 100644
->> index 000000000000..fd984b4a9a6d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/gnss/mediatek.txt
->> @@ -0,0 +1,39 @@
->> +Mediatek-based GNSS Receiver DT binding
->> +
->> +Mediatek chipsets are used in GNSS-receiver modules produced by several
->> +vendors and can use UART, SPI or I2C interfaces.
->> +
->> +Please see Documentation/devicetree/bindings/gnss/gnss.txt for generic
->> +properties.
->> +
->> +Required properties:
->> +
->> +- compatible	: Must be one of
->> +
->> +			"globaltop,pa6h"
->> +			"mediatek,mt3339"
->
-> I'm not sure it makes sense to add the GPS chip itself as it cannot be
-> used stand-alone AFAIU, and either not way would require a lot more
-> resources to be defined than what you add to this binding.
->
+The base aspeed-g5.dtsi already defines a '/memory@80000000' node, so
+'/memory' in the board files create a duplicate node. We're probably
+getting lucky that the bootloader fixes up the memory node that the
+kernel ends up using. Add the unit-address so it's merged with the base
+node.
 
-OK, I find it a bit confusing to have Mediatek bindings but no
-compatible Mediatek SoCs.
-But it is true that it can't be used stand-alone. I will remove this
-reference and also remove it from the mtk.c driver code from this patch
-serie.
+Found with DT json-schema checks.
 
->> +
->> +- vcc-supply	: Main voltage regulator (pin name: 3V3_IN, VCC, VDD)
->
-> The pin names in parenthesis were copied from the sirf-star binding and
-> were used to capture the various names given to this supply by different
-> vendors. Please drop as it doesn't apply here.
->
->> +
->> +Required properties (I2C):
->> +- reg		: I2C slave address
->> +
->> +Required properties (SPI):
->> +- reg		: SPI chip select address
->
-> While the mt3339 appears to support these interfaces, the globaltop one
-> does not.
->
-> Have you looked around for a small sample of mt3339-based receivers, to
-> see whether anyone actually provides these?
->
+Cc: Joel Stanley <joel@jms.id.au>
+Cc: Andrew Jeffery <andrew@aj.id.au>
+Cc: devicetree@vger.kernel.org
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: linux-aspeed@lists.ozlabs.org
+Signed-off-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Sasha Levin <sashal@kernel.org>
+---
+ arch/arm/boot/dts/aspeed-bmc-arm-centriq2400-rep.dts | 2 +-
+ arch/arm/boot/dts/aspeed-bmc-intel-s2600wf.dts       | 2 +-
+ arch/arm/boot/dts/aspeed-bmc-opp-lanyang.dts         | 3 +--
+ arch/arm/boot/dts/aspeed-bmc-portwell-neptune.dts    | 2 +-
+ 4 files changed, 4 insertions(+), 5 deletions(-)
 
-Again I'm confused by the fact that it is the Mediatek bindings.
-Hence why I have added it and why it was not present in the v1 that was
-only for Globaltop.
-I find it odd mentionning the chipset but not all its interfaces.
-I will remove these sections and only list supported interfaces (i.e.
-UART). Other interfaces can be added afterward if one finds a board that
-provides them.
-
->> +Optional properties:
->> +
->> +- timepulse-gpios	: Time pulse GPIO
->> +- v-bckp-supply		: Backup voltage regulator
->> +- current-speed		: Default UART baud rate
->
-> Looks like you forgot the optional NRESET input and 3D-FIX output (even
-> if the latter might be of limited use).
->
-
-Thanks I will clean this section.
-
->> +
->> +Example:
->> +
->> +serial@1234 {
->> +	compatible = "ns16550a";
->> +
->> +	gnss {
->> +		compatible = "globaltop,pa6h";
->> +		vcc-supply = <&vcc_3v3>;
->> +	};
->> +};
->
-> Johan
-
-
+diff --git a/arch/arm/boot/dts/aspeed-bmc-arm-centriq2400-rep.dts b/arch/arm/boot/dts/aspeed-bmc-arm-centriq2400-rep.dts
+index df1227613d48..c2ece0b91885 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-arm-centriq2400-rep.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-arm-centriq2400-rep.dts
+@@ -13,7 +13,7 @@
+ 		bootargs = "console=ttyS4,115200 earlyprintk";
+ 	};
+ 
+-	memory {
++	memory@80000000 {
+ 		reg = <0x80000000 0x40000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/aspeed-bmc-intel-s2600wf.dts b/arch/arm/boot/dts/aspeed-bmc-intel-s2600wf.dts
+index 7a291de02543..22dade6393d0 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-intel-s2600wf.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-intel-s2600wf.dts
+@@ -13,7 +13,7 @@
+ 		bootargs = "earlyprintk";
+ 	};
+ 
+-	memory {
++	memory@80000000 {
+ 		reg = <0x80000000 0x20000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-lanyang.dts b/arch/arm/boot/dts/aspeed-bmc-opp-lanyang.dts
+index d598b6391362..024e52a6cd0f 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-opp-lanyang.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-opp-lanyang.dts
+@@ -14,7 +14,7 @@
+ 		bootargs = "console=ttyS4,115200 earlyprintk";
+ 	};
+ 
+-	memory {
++	memory@80000000 {
+ 		reg = <0x80000000 0x40000000>;
+ 	};
+ 
+@@ -322,4 +322,3 @@
+ &adc {
+ 	status = "okay";
+ };
+-
+diff --git a/arch/arm/boot/dts/aspeed-bmc-portwell-neptune.dts b/arch/arm/boot/dts/aspeed-bmc-portwell-neptune.dts
+index 43ed13963d35..33d704541de6 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-portwell-neptune.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-portwell-neptune.dts
+@@ -17,7 +17,7 @@
+ 		bootargs = "console=ttyS4,115200 earlyprintk";
+ 	};
+ 
+-	memory {
++	memory@80000000 {
+ 		reg = <0x80000000 0x20000000>;
+ 	};
+ 
 -- 
--L
+2.19.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
