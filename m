@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DE64EC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 14:52:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BE512C282CF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 14:52:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AF1D120844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 14:52:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8D8E32171F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 14:52:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QYA2cAZL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF1D120844
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WtjB6W4Q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D8E32171F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RuJy6HBPSV8UrijQBsFO0u1+il8oL+u7qihqU5dbiQ4=; b=QYA2cAZL1/dTOa
-	ODnvzlBDEIUtrtCLWJWhOP9GMlZKkEvzqy2ghAoTJJzu7bMISGiMoIB4aCzgWdDQFk/DSkehMCKqQ
-	5vo/jbjt4RGkAmTC1Q4Mpx+6NlYfnXpbxdxcgD6zsN3PeobsqKv/2qSQhLNjmeca3ZoA2MmSeTyUl
-	75nXqhZY9M3honBHRoBfj8i5Zz5HHxys+hEfR2VH4CEJ4TCMpBSXuwN3P/D5wBu8yN8/tCW8C7i0z
-	2l7Y0rBULuQ+KZ4l3CrN0nusyvp96DJ0uQ6M4TB/XFCOx2/F56HmjaaNGNl0oWwSLZEF6a0jt4Rwy
-	AqLbG2NiEuwqVl0aNxbA==;
+	List-Owner; bh=tu8ADU4E3qfJkpGwm7Lc2GRu53DJCX6bcFozB0Tmvoc=; b=WtjB6W4Qvc2sRJ
+	X1Lun08ZHluzJbDXNhKxEtAZmKQDGmomjh+j2wH/+V5IvMbHX2Ov17Dfwvs/X1pdsbSfl36HGitPI
+	J9962u9MQKwOjbF7c82zn6vy68OlOBnAZndGazPPT0N9Spd0Ajv4qdfwHMhmNwpIRQKkBdf05jNJ4
+	T6wFafLpg1mc8ck/Wc9TUlIBHhjiJOiiX2J9dTb+qKrgXCN1BvaK2S1VcF3zCtsqYx6Adc+2n9XJi
+	6LkNisDbLp21KFgmzkrUmqnskNnnbILcxHg3KHxOqJGKjgiUypj3yDeO1KWBeSAupD38akasWQvJy
+	tPcoPok1wapWqdZVfTGg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go8HD-00024j-Eg; Mon, 28 Jan 2019 14:52:43 +0000
+	id 1go8HO-0002Fe-GZ; Mon, 28 Jan 2019 14:52:54 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go8HA-00023M-9u
+ id 1go8HA-00023L-9r
  for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 14:52:42 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 5332E209A7; Mon, 28 Jan 2019 15:52:38 +0100 (CET)
+ id 083CE2078F; Mon, 28 Jan 2019 15:52:38 +0100 (CET)
 Received: from localhost (aaubervilliers-681-1-87-206.w90-88.abo.wanadoo.fr
  [90.88.29.206])
- by mail.bootlin.com (Postfix) with ESMTPSA id 28C8820714;
- Mon, 28 Jan 2019 15:52:38 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id CB52E20714;
+ Mon, 28 Jan 2019 15:52:37 +0100 (CET)
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Hans Verkuil <hans.verkuil@cisco.com>,
  Sakari Ailus <sakari.ailus@linux.intel.com>,
  Mauro Carvalho Chehab <mchehab@kernel.org>
-Subject: [PATCH v2 2/5] media: sunxi: Refactor the Makefile and Kconfig
-Date: Mon, 28 Jan 2019 15:52:33 +0100
-Message-Id: <fd6a255cb67e9df588cbeed954abe7442066f59c.1548687041.git-series.maxime.ripard@bootlin.com>
+Subject: [PATCH v2 1/5] dt-bindings: media: Add Allwinner A10 CSI binding
+Date: Mon, 28 Jan 2019 15:52:32 +0100
+Message-Id: <f6b6adf84c58e0de605d0a23dd559fee011f380c.1548687041.git-series.maxime.ripard@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <cover.ba7411f0c7155d0292b38d3dec698e26b5cc813b.1548687041.git-series.maxime.ripard@bootlin.com>
 References: <cover.ba7411f0c7155d0292b38d3dec698e26b5cc813b.1548687041.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_065240_487379_068A6D0C 
-X-CRM114-Status: GOOD (  14.24  )
+X-CRM114-CacheID: sfid-20190128_065240_622272_E939FC5A 
+X-CRM114-Status: GOOD (  10.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,58 +82,97 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Makefile and Kconfig for the sun6i CSI driver are included in the main
-Makefile / KConfig file. Since we're going to add a new CSI driver for an
-older chip, and the Cedrus driver eventually, it makes more sense to put
-those in our directory.
+The Allwinner A10 CMOS Sensor Interface is a camera capture interface also
+used in later (A10s, A13, A20, R8 and GR8) SoCs.
+
+On some SoCs, like the A10, there's multiple instances of that controller,
+with one instance supporting more channels and having an ISP.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/media/platform/Kconfig        | 2 +-
- drivers/media/platform/Makefile       | 2 +-
- drivers/media/platform/sunxi/Kconfig  | 1 +
- drivers/media/platform/sunxi/Makefile | 1 +
- 4 files changed, 4 insertions(+), 2 deletions(-)
- create mode 100644 drivers/media/platform/sunxi/Kconfig
- create mode 100644 drivers/media/platform/sunxi/Makefile
+ Documentation/devicetree/bindings/media/allwinner,sun4i-a10-csi.yaml | 73 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 73 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/allwinner,sun4i-a10-csi.yaml
 
-diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-index a505e9f5a1e2..70d5a9ba2863 100644
---- a/drivers/media/platform/Kconfig
-+++ b/drivers/media/platform/Kconfig
-@@ -147,7 +147,7 @@ source "drivers/media/platform/am437x/Kconfig"
- source "drivers/media/platform/xilinx/Kconfig"
- source "drivers/media/platform/rcar-vin/Kconfig"
- source "drivers/media/platform/atmel/Kconfig"
--source "drivers/media/platform/sunxi/sun6i-csi/Kconfig"
-+source "drivers/media/platform/sunxi/Kconfig"
- 
- config VIDEO_TI_CAL
- 	tristate "TI CAL (Camera Adaptation Layer) driver"
-diff --git a/drivers/media/platform/Makefile b/drivers/media/platform/Makefile
-index e6deb2597738..43841df5c57d 100644
---- a/drivers/media/platform/Makefile
-+++ b/drivers/media/platform/Makefile
-@@ -102,4 +102,4 @@ obj-y					+= meson/
- 
- obj-y					+= cros-ec-cec/
- 
--obj-$(CONFIG_VIDEO_SUN6I_CSI)		+= sunxi/sun6i-csi/
-+obj-y					+= sunxi/
-diff --git a/drivers/media/platform/sunxi/Kconfig b/drivers/media/platform/sunxi/Kconfig
+diff --git a/Documentation/devicetree/bindings/media/allwinner,sun4i-a10-csi.yaml b/Documentation/devicetree/bindings/media/allwinner,sun4i-a10-csi.yaml
 new file mode 100644
-index 000000000000..1b6e89cb78b2
+index 000000000000..f550fefa074f
 --- /dev/null
-+++ b/drivers/media/platform/sunxi/Kconfig
-@@ -0,0 +1 @@
-+source "drivers/media/platform/sunxi/sun6i-csi/Kconfig"
-diff --git a/drivers/media/platform/sunxi/Makefile b/drivers/media/platform/sunxi/Makefile
-new file mode 100644
-index 000000000000..8d06f98500ee
---- /dev/null
-+++ b/drivers/media/platform/sunxi/Makefile
-@@ -0,0 +1 @@
-+obj-y		+= sun6i-csi/
++++ b/Documentation/devicetree/bindings/media/allwinner,sun4i-a10-csi.yaml
+@@ -0,0 +1,73 @@
++# SPDX-License-Identifier: (GPL-2.0+ OR X11)
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/arm/allwinner,sun4i-a10-csi.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: Allwinner A10 CMOS Sensor Interface (CSI) Device Tree Bindings
++
++maintainers:
++  - Chen-Yu Tsai <wens@csie.org>
++  - Maxime Ripard <maxime.ripard@bootlin.com>
++
++properties:
++  compatible:
++    oneOf:
++      - description: Allwinner A10 CSI0 Controller
++        items:
++        - const: allwinner,sun4i-a10-csi0
++
++      - description: Allwinner A20 CSI0 Controller
++        items:
++        - const: allwinner,sun7i-a20-csi0
++        - const: allwinner,sun4i-a10-csi0
++
++  reg:
++    description: The base address and size of the memory-mapped region
++    maxItems: 1
++
++  interrupts:
++    description: The interrupt associated to this IP
++    maxItems: 1
++
++  clocks:
++    minItems: 4
++    maxItems: 4
++    items:
++      - description: The CSI interface clock
++      - description: The CSI module clock
++      - description: The CSI ISP clock
++      - description: The CSI DRAM clock
++
++  clock-names:
++    minItems: 4
++    maxItems: 4
++    items:
++      - const: bus
++      - const: mod
++      - const: isp
++      - const: ram
++
++  resets:
++    description: The reset line driver this IP
++    maxItems: 1
++
++  pinctrl-0: true
++
++  pinctrl-names:
++    description:
++      When present, must have one state named "default" that sets up
++      pins for ordinary operations.
++    minItems: 1
++    maxItems: 1
++    items:
++      - const: default
++
++required:
++  - compatible
++  - reg
++  - interrupts
++  - clocks
++
++# The media OF-graph binding hasn't been described yet
++# additionalProperties: false
 -- 
 git-series 0.9.1
 
