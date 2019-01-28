@@ -2,68 +2,65 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2087FC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 10:55:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A85AAC282CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:00:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E35D62148E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 10:55:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 745672171F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:00:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hoaGi86j"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E35D62148E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jNWSpug1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 745672171F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=83axh8q9wlHCGD9f4PfxeqQh4hWn04ClUeVG95ga5hk=; b=hoaGi86jn+KOFb
-	kfyCabzfQ1O0sBEJ2ZSno9t+8RwWga9EXEw/xv2r4JwKNMP+VYZba5qMoO1Ne9WlnD3cmYZumqPkt
-	WNUIOyZ1VH1uPWsqjXy3FZvF+9D/AOfzxovQg/xQw3pc+YhmjcubOWTaVmHXuegcB0jriNbLG3GJx
-	/q+p5yPEzYr721PI04AG8YRDRy6A64ln5e2gY/bnp1QxGzCVKDcPy5vHxbx8Hk8As0o3ul+53CLbe
-	PqciTfVyv6tIXGtsMsb7YOSBxEvsZWsuUs+Vp1tHvdC5W4jMoDXs6sKC9ogMrF4J4ybCdhSkDq44A
-	Va/Ukjc26N/A1Q26PJNA==;
+	List-Owner; bh=twVockdr32IC1gjmgZT0h+Jm+03skMoNn1uNCGdF+RA=; b=jNWSpug1+tXgF/
+	yn9MLn04mgL3ypjVN8hEFsU6f5nuMkhLJBRldc78gU7QQ5+n7zFLyn97OBq8sCqHXnWwOjLX6ZuUq
+	yenVOoYDNdEeUUkuP50lcb2lVppv2Dhi7lvaaA7r3F4c0SzlbTO4GEQAXUXcWRtmzwoIyAx+UBv/b
+	wIAfV6fUHnmxMjEl6ROfi8sR6sxQA7f2MxwHf6f7pT+1meM7peSiXe3DPPqhUYnu+VhAYYHzgtbI4
+	rXuIjIMQQdUw4/Fic19FGf5hEmRYm83WRV6auAJMnRug2hFoBcEsJLCbzRquy4z0rBUEsUfX9Z7Yx
+	Pwjx3spubKZCwhlncH2Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go4ZV-0001lP-Ef; Mon, 28 Jan 2019 10:55:21 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go4ZR-0001km-M4
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 10:55:19 +0000
-Received: from lupine.hi.pengutronix.de
- ([2001:67c:670:100:3ad5:47ff:feaf:1a17] helo=lupine)
- by metis.ext.pengutronix.de with esmtp (Exim 4.89)
- (envelope-from <p.zabel@pengutronix.de>)
- id 1go4ZJ-0000YF-N7; Mon, 28 Jan 2019 11:55:09 +0100
-Message-ID: <1548672908.6421.1.camel@pengutronix.de>
-Subject: Re: [PATCH v5 3/3] reset: imx7: Add support for i.MX8MQ IP block
- variant
-From: Philipp Zabel <p.zabel@pengutronix.de>
-To: Andrey Smirnov <andrew.smirnov@gmail.com>
-Date: Mon, 28 Jan 2019 11:55:08 +0100
-In-Reply-To: <CAHQ1cqFx3b2fTy8YbpwC0fGJYpO4BLO4FW9q-Z2Np1tVktrKpg@mail.gmail.com>
-References: <20190122021043.25449-1-andrew.smirnov@gmail.com>
- <20190122021043.25449-4-andrew.smirnov@gmail.com>
- <1548240560.3904.6.camel@pengutronix.de>
- <CAHQ1cqFx3b2fTy8YbpwC0fGJYpO4BLO4FW9q-Z2Np1tVktrKpg@mail.gmail.com>
-X-Mailer: Evolution 3.22.6-1+deb9u1 
-Mime-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:3ad5:47ff:feaf:1a17
-X-SA-Exim-Mail-From: p.zabel@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+	id 1go4es-0003md-CP; Mon, 28 Jan 2019 11:00:54 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1go4em-0003m0-Sf
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 11:00:52 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 14E7FEBD;
+ Mon, 28 Jan 2019 03:00:48 -0800 (PST)
+Received: from big-swifty.misterjones.org (big-swifty.cambridge.arm.com
+ [10.1.39.122])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 2900C3F589;
+ Mon, 28 Jan 2019 03:00:44 -0800 (PST)
+Date: Mon, 28 Jan 2019 11:00:45 +0000
+Message-ID: <865zu9vyg2.wl-marc.zyngier@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH v9 14/26] arm64: alternative: Allow alternative status
+ checking per cpufeature
+In-Reply-To: <1548084825-8803-15-git-send-email-julien.thierry@arm.com>
+References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
+ <1548084825-8803-15-git-send-email-julien.thierry@arm.com>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_025517_878938_4F50FE3B 
-X-CRM114-Status: GOOD (  10.04  )
+X-CRM114-CacheID: sfid-20190128_030048_929027_AA33EE6C 
+X-CRM114-Status: GOOD (  11.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,37 +72,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Rob Herring <robh@kernel.org>,
- Richard Zhu <hongxing.zhu@nxp.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>, "open list:OPEN
- FIRMWARE AND FLATTENED DEVICE TREE BINDINGS" <devicetree@vger.kernel.org>,
- linux-kernel <linux-kernel@vger.kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- Leonard Crestez <leonard.crestez@nxp.com>, Chris Healy <cphealy@gmail.com>,
- Lucas Stach <l.stach@pengutronix.de>
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
+ Suzuki K Poulose <suzuki.poulose@arm.com>, catalin.marinas@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ Christoffer Dall <Christoffer.Dall@arm.com>, james.morse@arm.com,
+ joel@joelfernandes.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Andrey,
-
-On Thu, 2019-01-24 at 16:21 -0800, Andrey Smirnov wrote:
-> > Thank you, applied all three to reset/next with a small whitespace
-> > alignment fix.
-> > 
+On Mon, 21 Jan 2019 15:33:33 +0000,
+Julien Thierry <julien.thierry@arm.com> wrote:
 > 
-> Thanks again for applying this stuff. If that's not too much to ask,
-> would you mind creating an immutable branch, so I could start sending
-> patches that depend on "dt-bindings/reset/imx8mq-reset.h" to i.MX tree
-> without waiting for it to trickle down? If not, no worries, I'll wait.
+> In preparation for the application of alternatives at different points
+> during the boot process, provide the possibility to check whether
+> alternatives for a feature of interest was already applied instead of
+> having a global boolean for all alternatives.
+> 
+> Make VHE enablement code check for the VHE feature instead of considering
+> all alternatives.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+> Cc: Christoffer Dall <Christoffer.Dall@arm.com>
 
-Here is an immutable branch containing just the header/dt-binding patch:
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-  git://git.pengutronix.de/pza/linux reset/imx8mq
+	M.
 
-regards
-Philipp
+-- 
+Jazz is not dead, it just smell funny.
 
 _______________________________________________
 linux-arm-kernel mailing list
