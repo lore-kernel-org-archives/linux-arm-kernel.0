@@ -3,73 +3,65 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 60FB0C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 07:03:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C0826C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 07:04:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2F2ED20881
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 07:03:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7AC8B21736
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 07:04:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HZowACr0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F2ED20881
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D5WKBdQE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7AC8B21736
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	From:Subject:To:Message-Id:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tpHUdx1xhEM3jVVjx9HDOoqfO6Pa/PGp/VwiZo3sfjU=; b=HZowACr0T5EXU1
-	fDTjySVgRdgiSZqcQ3u/oM49RRNNMhkkXPP4IxNILcWtskiRPYju/6ifdUd0TB0zPopG96bSb2YoA
-	nhqAI8Sl9ppe300loyG2x2StNZiQatyXG5txrUUcc7+hBtQQHMmYICDujwF0qawpiStDKk4jZeXTE
-	xe+pYXLLqojaCKirmUXp7uRWbNufX7+n1amAeuHFP4YvvvnRR0bGGk81lNjXVnYLgUzhYjDKr++0Z
-	bWS9D+zSwHkzHInPt0nuxN5Pq0wpWytql0tHhCvVuGK8J03fUCY8PDztCyjlK8wmcQ5c/+Gi+iSFh
-	AEgDvsZV0Y57MRLDGpuw==;
+	List-Owner; bh=kiLdrNVdibyZIjQd2oUsuFZ6RHnXpHciiwLFsRjL0/E=; b=D5WKBdQELtb3Oh
+	CsIVflCQvQuq/Ch4gTArh0cN6DlDOE8jrOM3kw5JLb9aYO//9clkxTlsS1BjGrA0sMpqBO9dt7mRJ
+	dwksv+WncS1AXe2+f878m1Vn2KQ7eTxMaV8Vq/v+otR4tnwr3i3nI8E0f1U4vZe2+x1ZuE9LG9t96
+	z05bBxmgVHFNd4nYzhYHsJEeDQr2P/rCkUCWk6Dbz1FNAcYIgI2eA6k8sa+5KsUqk31Jsgr7b+Lgc
+	gwgoDRfgUGkDkr7u4HeOwylXxoyuuIZ+uwsNqf9Ri1pW4855muLqMHyS62GgxxGjHm93zYH8Nh7II
+	zWCu0MQwaH+Jx9Eq66/A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go0wn-0006GX-4Z; Mon, 28 Jan 2019 07:03:09 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go0wj-0006GD-Bu
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 07:03:06 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CB9BD15AD
- for <linux-arm-kernel@lists.infradead.org>;
- Sun, 27 Jan 2019 23:03:04 -0800 (PST)
-Received: from mail-it1-f179.google.com (usa-sjc-mx-foss1.foss.arm.com
- [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A987D3F906
- for <linux-arm-kernel@lists.infradead.org>;
- Sun, 27 Jan 2019 23:03:04 -0800 (PST)
-Received: by mail-it1-f179.google.com with SMTP id z20so17856647itc.3
- for <linux-arm-kernel@lists.infradead.org>;
- Sun, 27 Jan 2019 23:03:04 -0800 (PST)
-X-Gm-Message-State: AJcUukc+SLpfW7PFs1BE+ecG7/mT1P8U1BWOoy2yHmaGX99d1zulkd89
- y3qwAflD3E2s1z4n9sGE0zKNwjMSjX5FTTyXt2Q=
-X-Google-Smtp-Source: ALg8bN664xwq7reDknsxdCeBBZ8+zo98DEtoj4rF+RVtlyPWTYKQ61nL7fdEC6zgdhIHg6nqVSBJQRmi2PnVERQg/7g=
-X-Received: by 2002:a24:7c58:: with SMTP id a85mr9778119itd.9.1548658983837;
- Sun, 27 Jan 2019 23:03:03 -0800 (PST)
-MIME-Version: 1.0
-References: <1545119810-12182-1-git-send-email-amit.kachhap@arm.com>
- <1545119810-12182-5-git-send-email-amit.kachhap@arm.com>
- <33542a00-23f4-b159-91f5-f05d3afa5b9f@arm.com>
-In-Reply-To: <33542a00-23f4-b159-91f5-f05d3afa5b9f@arm.com>
-From: Amit Daniel Kachhap <amit.kachhap@arm.com>
-Date: Mon, 28 Jan 2019 12:32:52 +0530
-X-Gmail-Original-Message-ID: <CADGdYn7kcBXO3YbB+QEfS-Aw4O-G-ssQaapRoXCoG6gD08JjAw@mail.gmail.com>
-Message-ID: <CADGdYn7kcBXO3YbB+QEfS-Aw4O-G-ssQaapRoXCoG6gD08JjAw@mail.gmail.com>
-Subject: Re: [PATCH v4 4/6] arm64/kvm: enable pointer authentication
- cpufeature conditionally
-To: James Morse <james.morse@arm.com>
+	id 1go0xn-0006Wk-I5; Mon, 28 Jan 2019 07:04:11 +0000
+Received: from mx1.redhat.com ([209.132.183.28])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1go0xl-0006WQ-0s
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 07:04:10 +0000
+Received: from smtp.corp.redhat.com (int-mx03.intmail.prod.int.phx2.redhat.com
+ [10.5.11.13])
+ (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
+ (No client certificate requested)
+ by mx1.redhat.com (Postfix) with ESMTPS id 316A6C049DC1;
+ Mon, 28 Jan 2019 07:04:07 +0000 (UTC)
+Received: from localhost (ovpn-112-14.rdu2.redhat.com [10.10.112.14])
+ by smtp.corp.redhat.com (Postfix) with ESMTP id 8829C83BEF;
+ Mon, 28 Jan 2019 07:04:04 +0000 (UTC)
+Date: Sun, 27 Jan 2019 23:04:03 -0800 (PST)
+Message-Id: <20190127.230403.636736583040998189.davem@redhat.com>
+To: khoroshilov@ispras.ru
+Subject: Re: [PATCH] net: stmmac: dwmac-rk: fix error handling in
+ rk_gmac_powerup()
+From: David Miller <davem@redhat.com>
+In-Reply-To: <1548532137-15618-1-git-send-email-khoroshilov@ispras.ru>
+References: <1548532137-15618-1-git-send-email-khoroshilov@ispras.ru>
+Mime-Version: 1.0
+X-Scanned-By: MIMEDefang 2.79 on 10.5.11.13
+X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
+ (mx1.redhat.com [10.5.110.31]); Mon, 28 Jan 2019 07:04:08 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190127_230305_407016_B4ECC821 
-X-CRM114-Status: GOOD (  20.17  )
+X-CRM114-CacheID: sfid-20190127_230409_082060_42AAED9D 
+X-CRM114-Status: UNSURE (   9.13  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,66 +73,24 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Kristina Martsenko <kristina.martsenko@arm.com>,
- Dave Martin <Dave.Martin@arm.com>,
- Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
- kvmarm@lists.cs.columbia.edu, LAK <linux-arm-kernel@lists.infradead.org>
+Cc: ldv-project@linuxtesting.org, netdev@vger.kernel.org,
+ linux-kernel@vger.kernel.org, joabreu@synopsys.com, david.wu@rock-chips.com,
+ peppe.cavallaro@st.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi James,
-On Fri, Jan 4, 2019 at 11:32 PM James Morse <james.morse@arm.com> wrote:
->
-> Hi Amit,
->
-> On 18/12/2018 07:56, Amit Daniel Kachhap wrote:
-> > According to userspace settings, pointer authentication cpufeature
-> > is enabled/disabled from guests.
->
-> This reads like the guest is changing something in the host. Isn't this hiding
-> the id-register values from the guest?
-I dropped this patch altogether in V5 series and now only key
-registers are masked
-if userspace disables it.
+From: Alexey Khoroshilov <khoroshilov@ispras.ru>
+Date: Sat, 26 Jan 2019 22:48:57 +0300
 
-Thanks,
-Amit Daniel
->
->
-> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> > index 6af6c7d..ce6144a 100644
-> > --- a/arch/arm64/kvm/sys_regs.c
-> > +++ b/arch/arm64/kvm/sys_regs.c
-> > @@ -1066,6 +1066,15 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
-> >                       kvm_debug("SVE unsupported for guests, suppressing\n");
-> >
-> >               val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
-> > +     } else if (id == SYS_ID_AA64ISAR1_EL1) {
-> > +             const u64 ptrauth_mask = (0xfUL << ID_AA64ISAR1_APA_SHIFT) |
-> > +                                      (0xfUL << ID_AA64ISAR1_API_SHIFT) |
-> > +                                      (0xfUL << ID_AA64ISAR1_GPA_SHIFT) |
-> > +                                      (0xfUL << ID_AA64ISAR1_GPI_SHIFT);
-> > +             if (!kvm_arm_vcpu_ptrauth_allowed(vcpu)) {
-> > +                     kvm_debug("ptrauth unsupported for guests, suppressing\n");
-> > +                     val &= ~ptrauth_mask;
-> > +             }
->
-> I think this hunk should have been in the previous patch as otherwise its a
-> bisection oddity.
->
-> Could you merge this hunk with the previous patch, and move the mechanical bits
-> that pass vcpu around to a prior preparatory patch.
->
-> (I'm still unsure if we need to hide this as a user-controlled policy)
->
->
-> Thanks,
->
-> James
+> If phy_power_on() fails in rk_gmac_powerup(), clocks are left enabled.
+> 
+> Found by Linux Driver Verification project (linuxtesting.org).
+> 
+> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+
+Applied, thank you.
 
 _______________________________________________
 linux-arm-kernel mailing list
