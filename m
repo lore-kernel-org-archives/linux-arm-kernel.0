@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 23886C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 14:25:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D8DCAC282CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 14:25:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B640A2171F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 14:25:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AA6352171F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 14:25:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oBuN/ziD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B640A2171F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bNDNT95+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AA6352171F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,44 +25,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LbVuhyKV4xyhQZDHe8VH6TymDartBqZb7i3VTV/TBQU=; b=oBuN/ziDNyrHSt
-	Zx/LQdEnFrLl9ioHmp7OsXJ435kNB4/lGsNylDHg4ISyciTMn0I+MjZm+tc5doZlxbFAPPLz3i8FB
-	W7O6nbmQ4LPH37jV2qAOsyjw4skjG9bbB0v6dklUi87OGioNXArNgwuj3Aum0kPgI3rR6fZiVVtPI
-	uLp3bLE7hiWsFhIqvcMjfgTwV9COgIwxxOR3tKAitDgC3c1qX7m18TRitbhlC7DOcfjBI+WqzzC09
-	X0+tAt2sRnzfp79dwziEvtQ8g/zDQzaFSMjTXdb+kayFHawLrd5I1CPAMqi7OwIVJhk0LU8RNT5te
-	L/E+ejGmXwqTAbOuj26g==;
+	List-Owner; bh=yP8ejk0pl8eBd20uEaVrCBQyV5De+OI1I8yaQG+3pm0=; b=bNDNT95+bJh9xI
+	ds7bRhYimD6/YbcPk1N6bJTvF1aOxQsyGSXiTovDP5ZbevSL0IqUsmJfukeHkYuxrbuyewswCHnss
+	NO5VFE3KcPctttVrpiEQ7y2xpNdTSveFnaa2m9saGwoegPT8YfiAjcwl3OAiBbC6zxmF6LR7fYSWL
+	FjPDS7ICWxepCvwvg35M0f3ZM017cBCMAYCHx1DoZQLrF3Uw8awfNaBvHPtbhvdh8udmngXJulAB1
+	q0RT/uqAw5fSDoqoglbwa3gEJdyqJFV+b2A/6xqRiDe5v5fB4B0O1hyTYEGXuhcbyKIjNhYI+UEC6
+	49E6MoNBsIHQ/TEAgyeA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go7qL-0005yn-Q4; Mon, 28 Jan 2019 14:24:57 +0000
+	id 1go7qf-0006s1-J5; Mon, 28 Jan 2019 14:25:17 +0000
 Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go7p4-0004tv-Gf
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 14:23:42 +0000
+ id 1go7p6-0004ug-5z
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 14:23:43 +0000
 Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
  by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x0SEL2Nj020045; Mon, 28 Jan 2019 15:23:32 +0100
+ x0SEL2Nk020045; Mon, 28 Jan 2019 15:23:36 +0100
 Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2q8e71vveh-1
+ by mx07-00178001.pphosted.com with ESMTP id 2q8e71vvew-1
  (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Mon, 28 Jan 2019 15:23:32 +0100
+ Mon, 28 Jan 2019 15:23:36 +0100
 Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 5CA8831;
- Mon, 28 Jan 2019 14:23:31 +0000 (GMT)
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 94DBB34;
+ Mon, 28 Jan 2019 14:23:34 +0000 (GMT)
 Received: from Webmail-eu.st.com (Safex1hubcas21.st.com [10.75.90.44])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 36DFD2D38;
- Mon, 28 Jan 2019 14:23:31 +0000 (GMT)
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 715BA2D38;
+ Mon, 28 Jan 2019 14:23:34 +0000 (GMT)
 Received: from SAFEX1HUBCAS24.st.com (10.75.90.95) by SAFEX1HUBCAS21.st.com
  (10.75.90.44) with Microsoft SMTP Server (TLS) id 14.3.361.1; Mon, 28 Jan
- 2019 15:23:30 +0100
+ 2019 15:23:33 +0100
 Received: from localhost (10.201.20.122) by webmail-ga.st.com (10.75.90.48)
- with Microsoft SMTP Server (TLS) id 14.3.361.1; Mon, 28 Jan 2019 15:23:30
+ with Microsoft SMTP Server (TLS) id 14.3.361.1; Mon, 28 Jan 2019 15:23:33
  +0100
 From: Benjamin Gaignard <benjamin.gaignard@st.com>
 To: <broonie@kernel.org>, <robh@kernel.org>, <arnd@arndb.de>,
  <shawnguo@kernel.org>, <s.hauer@pengutronix.de>, <fabio.estevam@nxp.com>
-Subject: [RFC v2 2/7] domainsctrl: Introduce domains controller framework
-Date: Mon, 28 Jan 2019 15:23:08 +0100
-Message-ID: <20190128142313.17036-3-benjamin.gaignard@st.com>
+Subject: [RFC v2 5/7] bus: domainsctrl: Add driver for STM32 ETZPC controller
+Date: Mon, 28 Jan 2019 15:23:11 +0100
+Message-ID: <20190128142313.17036-6-benjamin.gaignard@st.com>
 X-Mailer: git-send-email 2.15.0
 In-Reply-To: <20190128142313.17036-1-benjamin.gaignard@st.com>
 References: <20190128142313.17036-1-benjamin.gaignard@st.com>
@@ -71,8 +71,8 @@ X-Originating-IP: [10.201.20.122]
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-01-28_08:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_062338_845159_16764BD8 
-X-CRM114-Status: GOOD (  23.32  )
+X-CRM114-CacheID: sfid-20190128_062340_692629_E9877A07 
+X-CRM114-Status: GOOD (  18.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,112 +93,56 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The goal of this framework is to offer an interface for the
-hardware blocks controlling bus accesses rights.
+STM32 Extended TrustZone Protection Controller (ETZPC) got 3 domains:
+- secure: hardware blocks are only accessible by software running on trust
+  zone.
+- non-secure: hardware blocks are accessible by non-secure software (i.e.
+    linux kernel).
+- coprocessor: hardware blocks are only accessible by the corpocessor.
 
-Bus domains controllers are typically used to control if a
-hardware block can perform read or write operations on bus.
-
-Smarter domains controllers could be able to define accesses
-rights per hardware blocks to control where they can read
-or write.
-
-Domains controller configurations are provided in device node,
-parsed by the framework and send to the driver to apply them.
-Each controller may need different number and type of inputs
-to configure a domain so device-tree properties size have to
-be define by using "#domainctrl-cells".
-Domains configurations properties have to be named "domainsctrl-X"
-on device node.
-"domainsctrl-names" keyword can also be used to give a name to
-a specific configuration.
-
-Example of device-tree:
-ctrl0: domainsctrl@0 {
-	#domainctrl-cells = <2>;
-      };
-
-foo: foo@0 {
-	domainsctrl-names = "default", "setting1";
-	domainsctrl-0 = <&ctrl0 1 2>;
-	domainsctrl-1 = <&ctrl0 3 4>;
-};
-
-Configurations could be applied with functions like
-domainsctrl_set_config_by_index() or domainsctrl_set_config_by_name().
-
-domainsctrl_set_default_config() function will apply the
-configuration named "default" (if existing) or the configuration
-with index 0 (i.e. domainsctrl-0).
-
-Drivers could register/unregister themselves be calling
-domainsctrl_register/domainsctrl_unregister functions.
-
-When a configuration has to be applied the driver callback,
-provided in the ops at registration time, set_config is called
-by the framework.
+Each hardware block status is defined by a 2 bits field and all of
+them are packed into 32 bits registers. ETZPC can manage up to 94
+hardware blocks.
 
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- drivers/bus/Kconfig               |   2 +
- drivers/bus/Makefile              |   2 +
- drivers/bus/domains/Kconfig       |   7 ++
- drivers/bus/domains/Makefile      |   1 +
- drivers/bus/domains/domainsctrl.c | 234 ++++++++++++++++++++++++++++++++++++++
- include/linux/domainsctrl.h       |  70 ++++++++++++
- 6 files changed, 316 insertions(+)
- create mode 100644 drivers/bus/domains/Kconfig
- create mode 100644 drivers/bus/domains/Makefile
- create mode 100644 drivers/bus/domains/domainsctrl.c
- create mode 100644 include/linux/domainsctrl.h
+ drivers/bus/domains/Kconfig                   |   7 ++
+ drivers/bus/domains/Makefile                  |   1 +
+ drivers/bus/domains/stm32-etzpc.c             | 140 ++++++++++++++++++++++++++
+ include/dt-bindings/bus/domains/stm32-etzpc.h |  25 +++++
+ 4 files changed, 173 insertions(+)
+ create mode 100644 drivers/bus/domains/stm32-etzpc.c
+ create mode 100644 include/dt-bindings/bus/domains/stm32-etzpc.h
 
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 1851112ccc29..a0f7a67c1296 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -183,4 +183,6 @@ config DA8XX_MSTPRI
+diff --git a/drivers/bus/domains/Kconfig b/drivers/bus/domains/Kconfig
+index 5ba15f750bee..7afd209e8c4f 100644
+--- a/drivers/bus/domains/Kconfig
++++ b/drivers/bus/domains/Kconfig
+@@ -4,4 +4,11 @@ config DOMAINS_CONTROLLERS
+ 	bool "Support of bus domains controllers"
+ 	depends on OF
  
- source "drivers/bus/fsl-mc/Kconfig"
- 
-+source "drivers/bus/domains/Kconfig"
++config STM32_ETZPC
++	bool "STM32 ETZPC Domain Controller"
++	depends on DOMAINS_CONTROLLERS && MACH_STM32MP157
++	help
++	  Select y to enable STM32 Extended TrustZone Protection
++	  Controller (ETZPC)
 +
  endmenu
-diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-index ca300b1914ce..d7e95edba33d 100644
---- a/drivers/bus/Makefile
-+++ b/drivers/bus/Makefile
-@@ -32,3 +32,5 @@ obj-$(CONFIG_UNIPHIER_SYSTEM_BUS)	+= uniphier-system-bus.o
- obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
- 
- obj-$(CONFIG_DA8XX_MSTPRI)	+= da8xx-mstpri.o
-+
-+obj-$(CONFIG_DOMAINS_CONTROLLERS) 	+= domains/
-diff --git a/drivers/bus/domains/Kconfig b/drivers/bus/domains/Kconfig
-new file mode 100644
-index 000000000000..5ba15f750bee
---- /dev/null
-+++ b/drivers/bus/domains/Kconfig
-@@ -0,0 +1,7 @@
-+menu "Bus Domains Controllers"
-+
-+config DOMAINS_CONTROLLERS
-+	bool "Support of bus domains controllers"
-+	depends on OF
-+
-+endmenu
 diff --git a/drivers/bus/domains/Makefile b/drivers/bus/domains/Makefile
-new file mode 100644
-index 000000000000..262338b7cad5
---- /dev/null
+index 262338b7cad5..8000de6023a5 100644
+--- a/drivers/bus/domains/Makefile
 +++ b/drivers/bus/domains/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_DOMAINS_CONTROLLERS) += domainsctrl.o
-diff --git a/drivers/bus/domains/domainsctrl.c b/drivers/bus/domains/domainsctrl.c
+@@ -1 +1,2 @@
+ obj-$(CONFIG_DOMAINS_CONTROLLERS) += domainsctrl.o
++obj-$(CONFIG_STM32_ETZPC) += stm32-etzpc.o
+diff --git a/drivers/bus/domains/stm32-etzpc.c b/drivers/bus/domains/stm32-etzpc.c
 new file mode 100644
-index 000000000000..bbadf8165bc8
+index 000000000000..8a03128a8715
 --- /dev/null
-+++ b/drivers/bus/domains/domainsctrl.c
-@@ -0,0 +1,234 @@
++++ b/drivers/bus/domains/stm32-etzpc.c
+@@ -0,0 +1,140 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright (C) STMicroelectronics 2018 - All Rights Reserved
@@ -210,305 +154,166 @@ index 000000000000..bbadf8165bc8
 +#include <linux/err.h>
 +#include <linux/init.h>
 +#include <linux/kernel.h>
-+#include <linux/list.h>
++#include <linux/module.h>
 +#include <linux/of.h>
-+#include <linux/slab.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
 +
-+/* Mutex taken to protect domainctrl_list */
-+static DEFINE_MUTEX(domainctrl_list_mutex);
++#include <dt-bindings/bus/domains/stm32-etzpc.h>
 +
-+/* Global list of domain control devices (struct domains_ctrl) */
-+static LIST_HEAD(domainctrl_list);
++#define ETZPC_DECPROT	0x010
++#define ETZPC_NUM_LOCKS	94
 +
-+struct domains_ctrl {
-+	struct list_head node;
-+	struct device *dev;
-+	struct domains_ctrl_ops *ops;
++struct stm32_etzpc {
++	struct regmap_field *fields[ETZPC_NUM_LOCKS];
 +};
 +
-+static struct domains_ctrl *get_domainctrl_from_node(struct device_node *np)
++static int stm32_etzpc_set_config(struct device *dev,
++				  struct of_phandle_args *out_args)
 +{
-+	struct domains_ctrl *ctrl;
++	struct stm32_etzpc *etzpc = dev_get_drvdata(dev);
++	int index = out_args->args[0];
++	unsigned int value = out_args->args[1];
++	u32 status;
 +
-+	mutex_lock(&domainctrl_list_mutex);
-+
-+	list_for_each_entry(ctrl, &domainctrl_list, node) {
-+		if (ctrl->dev->of_node == np) {
-+			mutex_unlock(&domainctrl_list_mutex);
-+			return ctrl;
-+		}
-+	}
-+
-+	mutex_unlock(&domainctrl_list_mutex);
-+
-+	return NULL;
-+}
-+
-+/**
-+ * domainsctrl_set_config_by_index
-+ *
-+ * Set a domains controller configuration based on given index.
-+ *
-+ * @dev: device with domain configuration to apply.
-+ * @index: the index of the configuration in device node.
-+ *
-+ * Returns 0 if OK, -EPROBE_DEFER if waiting for domains controller to be
-+ * registered or negative value on other errors.
-+ */
-+int domainsctrl_set_config_by_index(struct device *dev, int index)
-+{
-+	struct device_node *np = dev->of_node;
-+	char *propname;
-+	int configs, i, err = 0;
-+
-+	if (!np)
-+		return 0;
-+
-+	propname = kasprintf(GFP_KERNEL, "domainctrl-%d", index);
-+	configs = of_count_phandle_with_args(np, propname, "#domainctrl-cells");
-+	if (configs < 0) {
-+		err = -EINVAL;
-+		goto error;
-+	}
-+
-+	for (i = 0; i < configs; i++) {
-+		struct domains_ctrl *ctrl;
-+		struct of_phandle_args args;
-+
-+		err = of_parse_phandle_with_args(np, propname,
-+						 "#domainctrl-cells",
-+						 i, &args);
-+		if (err)
-+			goto error;
-+
-+		/* Test if the controller is (or will be) available */
-+		if (!of_device_is_available(args.np)) {
-+			of_node_put(args.np);
-+			continue;
-+		}
-+
-+		ctrl = get_domainctrl_from_node(args.np);
-+		of_node_put(args.np);
-+
-+		/* Controller is not yet registered */
-+		if (!ctrl) {
-+			err = -EPROBE_DEFER;
-+			goto error;
-+		}
-+
-+		err = ctrl->ops->set_config(ctrl->dev, &args);
-+		if (err)
-+			goto error;
-+	}
-+
-+error:
-+	kfree(propname);
-+	return err;
-+}
-+EXPORT_SYMBOL_GPL(domainsctrl_set_config_by_index);
-+
-+/**
-+ * domainsctrl_set_config_by_name
-+ *
-+ * Set a domains controller configuration based on given name.
-+ *
-+ * @dev: device with domain configuration to apply.
-+ * @name: the name of the configuration in device node.
-+ *
-+ * Returns 0 if OK, -EPROBE_DEFER if waiting for domains controller to be
-+ * registered or negative value on other errors.
-+ */
-+int domainsctrl_set_config_by_name(struct device *dev, char *name)
-+{
-+	const char *configname;
-+	int count, i;
-+
-+	count = of_property_count_strings(dev->of_node, "domainctrl-names");
-+	for (i = 0; i < count; i++) {
-+		int err;
-+
-+		err = of_property_read_string_index(dev->of_node,
-+						    "domainctrl-names",
-+						    i, &configname);
-+		if (err)
-+			return err;
-+
-+		if (strcmp(name, configname))
-+			continue;
-+
-+		return domainsctrl_set_config_by_index(dev, i);
-+	}
-+
-+	return -EINVAL;
-+}
-+EXPORT_SYMBOL_GPL(domainsctrl_set_config_by_name);
-+
-+/**
-+ * domainsctrl_set_default_config
-+ *
-+ * Set the default configuration for device.
-+ * First try to apply configuration named "default", if it fails
-+ * or doesn't exist, try to apply domainsctrl-0 configuration.
-+ *
-+ * @dev: device with domain configuration to apply.
-+ *
-+ * Returns 0 if OK, -EPROBE_DEFER if waiting for domains controller to be
-+ * registered or negative value on other errors.
-+ */
-+int domainsctrl_set_default_config(struct device *dev)
-+{
-+	int ret;
-+
-+	ret = domainsctrl_set_config_by_name(dev, "default");
-+	if (!ret || (ret == -EPROBE_DEFER))
-+		return ret;
-+
-+	return domainsctrl_set_config_by_index(dev, 0);
-+}
-+EXPORT_SYMBOL_GPL(domainsctrl_set_default_config);
-+
-+/**
-+ * domainsctrl_register
-+ *
-+ * Register a domains controller device.
-+ *
-+ * @dev: device implementing domains controller.
-+ * @ops: domains controller operations.
-+ *
-+ * Returns 0 if OK or negative value on error.
-+ */
-+int domainsctrl_register(struct device *dev,
-+			 struct domains_ctrl_ops *ops)
-+{
-+	struct domains_ctrl *ctrl;
-+
-+	if (!dev || !ops || !ops->set_config)
++	if (out_args->args_count != 2)
 +		return -EINVAL;
 +
-+	ctrl = kzalloc(sizeof(*ctrl), GFP_KERNEL);
-+	if (!ctrl)
++	if (index >= ETZPC_NUM_LOCKS)
++		return -EINVAL;
++
++	if (value > STM32_ETZPC_NON_SECURE)
++		return -EINVAL;
++
++	regmap_field_force_write(etzpc->fields[index], value);
++
++	/* Hardware could denied the new value, read it back to check it */
++	regmap_field_read(etzpc->fields[index], &status);
++
++	if (value != status) {
++		dev_info(dev, "failed to set configuration: index %d, value %d\n",
++			 index, value);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static struct domains_ctrl_ops stm32_etzpc_ops = {
++	.set_config = stm32_etzpc_set_config,
++};
++
++static const struct regmap_config stm32_etzpc_regmap_cfg = {
++	.reg_bits = 32,
++	.val_bits = 32,
++	.reg_stride = sizeof(u32),
++	.max_register = 0x3FF,
++	.fast_io = true,
++};
++
++static int stm32_etzpc_probe(struct platform_device *pdev)
++{
++	struct stm32_etzpc *etzpc;
++	struct resource *res;
++	void __iomem *mmio;
++	struct regmap *regmap;
++	int i;
++
++	etzpc = devm_kzalloc(&pdev->dev, sizeof(*etzpc), GFP_KERNEL);
++	if (!etzpc)
 +		return -ENOMEM;
 +
-+	INIT_LIST_HEAD(&ctrl->node);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	mmio = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(mmio))
++		return PTR_ERR(mmio);
 +
-+	ctrl->dev = dev;
-+	ctrl->ops = ops;
++	regmap = devm_regmap_init_mmio(&pdev->dev, mmio,
++				       &stm32_etzpc_regmap_cfg);
 +
-+	mutex_lock(&domainctrl_list_mutex);
-+	list_add_tail(&ctrl->node, &domainctrl_list);
-+	mutex_unlock(&domainctrl_list_mutex);
++	for (i = 0; i < ETZPC_NUM_LOCKS; i++) {
++		struct reg_field field;
++
++		/*
++		 * Each hardware block status is defined by
++		 * a 2 bits field and all of them are packed into
++		 * 32 bits registers. Do some computation to get
++		 * register offset and the shift.
++		 */
++		field.reg = ETZPC_DECPROT + (i >> 4) * sizeof(u32);
++		field.lsb = (i % 0x10) << 1;
++		field.msb = field.lsb + 1;
++
++		etzpc->fields[i] = devm_regmap_field_alloc(&pdev->dev,
++							   regmap, field);
++	}
++
++	platform_set_drvdata(pdev, etzpc);
++
++	return domainsctrl_register(&pdev->dev, &stm32_etzpc_ops);
++}
++
++static int stm32_etzpc_remove(struct platform_device *pdev)
++{
++	domainsctrl_unregister(&pdev->dev);
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL_GPL(domainsctrl_register);
 +
-+/**
-+ * domainsctrl_unregister
-+ *
-+ * Unregister a domains controller device.
-+ *
-+ * @dev: device implementing domains controller.
-+ */
-+void domainsctrl_unregister(struct device *dev)
++static const struct of_device_id stm32_etzpc_of_match[] = {
++	{ .compatible = "st,stm32-etzpc" },
++	{ /* end node */ }
++};
++MODULE_DEVICE_TABLE(of, stm32_etzpc_of_match);
++
++static struct platform_driver stm32_etzpc_driver = {
++	.probe  = stm32_etzpc_probe,
++	.remove = stm32_etzpc_remove,
++	.driver = {
++		.name = "stm32-etzpc",
++		.of_match_table = stm32_etzpc_of_match,
++	},
++};
++
++static int __init stm32_etzpc_init(void)
 +{
-+	struct domains_ctrl *ctrl;
-+
-+	ctrl = get_domainctrl_from_node(dev->of_node);
-+	if (!ctrl)
-+		return;
-+
-+	mutex_lock(&domainctrl_list_mutex);
-+	list_del(&ctrl->node);
-+	mutex_unlock(&domainctrl_list_mutex);
-+
-+	kfree(ctrl);
++	return platform_driver_register(&stm32_etzpc_driver);
 +}
-+EXPORT_SYMBOL_GPL(domainsctrl_unregister);
++arch_initcall(stm32_etzpc_init);
 +
-+static int __init domainsctrl_init(void)
-+{
-+	pr_info("initialized bus domain controller subsystem\n");
-+	return 0;
-+}
-+
-+/* Init early since drivers really need to configure domains early */
-+core_initcall(domainsctrl_init);
-diff --git a/include/linux/domainsctrl.h b/include/linux/domainsctrl.h
++MODULE_AUTHOR("Benjamin Gaignard <benjamin.gaignard@st.com>");
++MODULE_DESCRIPTION("STMicroelectronics STM32 Bus Dommains Controller");
+diff --git a/include/dt-bindings/bus/domains/stm32-etzpc.h b/include/dt-bindings/bus/domains/stm32-etzpc.h
 new file mode 100644
-index 000000000000..1d1960175342
+index 000000000000..93190fa29a9c
 --- /dev/null
-+++ b/include/linux/domainsctrl.h
-@@ -0,0 +1,70 @@
++++ b/include/dt-bindings/bus/domains/stm32-etzpc.h
+@@ -0,0 +1,25 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +/*
 + * Copyright (C) STMicroelectronics 2018 - All Rights Reserved
 + * Author: Benjamin Gaignard <benjamin.gaignard@st.com> for STMicroelectronics.
 + */
 +
-+#ifndef _DOMAINSCTRL_H_
-+#define _DOMAINSCTRL_H_
++#ifndef _STM32_ETZPC_H_
++#define _STM32_ETZPC_H_
 +
-+#include <linux/device.h>
-+#include <linux/of.h>
++/* ETZPC domains: secure, non-secure or coprocessor*/
++#define STM32_ETZPC_SECURE	1
++#define STM32_ETPCZ_COPRO	2
++#define STM32_ETZPC_NON_SECURE	3
 +
-+/**
-+ * struct domains_ctrl_ops
-+ *
-+ * Domains controller operations structure to be filled by drivers.
-+ */
-+struct domains_ctrl_ops {
-+	/**
-+	 * @set_config:
-+	 *
-+	 * Driver callback to set a domain configuration on a domain controller.
-+	 * Configuration arguments are provided in out_args parameter.
-+	 *
-+	 * Returns 0 on success, a negative error code on failure.
-+	 */
-+	int (*set_config)(struct device *dev, struct of_phandle_args *out_args);
-+};
++/* ETZPC hard blaokcs index */
++#define STM32_ETZPC_USART1	3
++#define STM32_ETZPC_SPI6	4
++#define STM32_ETZPC_I2C4	5
++#define STM32_ETZPC_RNG1	7
++#define STM32_ETZPC_HASH1	8
++#define STM32_ETZPC_CRYP1	9
++#define STM32_ETZPC_I2C6	12
++#define STM32_ETZPC_CEC		38
 +
-+#ifdef CONFIG_DOMAINS_CONTROLLERS
-+
-+int domainsctrl_set_config_by_index(struct device *dev, int index);
-+int domainsctrl_set_config_by_name(struct device *dev, char *name);
-+int domainsctrl_set_default_config(struct device *dev);
-+
-+int domainsctrl_register(struct device *dev, struct domains_ctrl_ops *ops);
-+
-+void domainsctrl_unregister(struct device *dev);
-+
-+#else
-+
-+static inline int domainsctrl_set_config_by_index(struct device *dev, int index)
-+{
-+	return 0;
-+}
-+
-+static inline int domainsctrl_set_config_by_name(struct device *dev, char *name)
-+{
-+	return 0;
-+}
-+
-+static inline int domainsctrl_set_default_config(struct device *dev)
-+{
-+	return 0;
-+}
-+
-+static inline int domainsctrl_register(struct device *dev,
-+				       struct domains_ctrl_ops *ops)
-+{
-+	return 0;
-+}
-+
-+static inline void domainsctrl_unregister(struct device *dev)
-+{
-+	/* Empty */
-+}
-+
-+#endif
-+
-+#endif /* _DOMAINSCTRL_H_ */
++#endif /* _STM32_ETZPC_H_ */
 -- 
 2.15.0
 
