@@ -2,79 +2,72 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8DA44C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:26:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EF5A4C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:26:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5D3392147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:26:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BED112147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:26:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OznGgeDc";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="cEV79igJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D3392147A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F1PhjM4J";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="V9iGdGm8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BED112147A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
+	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aXgZv+4cAlWV2siCIB2Cv5i86I3OOt961VVHb0zOWTc=; b=OznGgeDcJOBbVt
-	YalwT5mhJ/XjyhmJS4Qn7QFrekJ/AxPm00lJOgIk/CCTWE6k2xIvJCcig1RGYGI3EB7WRxAKuoXzZ
-	ZzLhIv3QLbTuI5mO75u/1SzOcS+hiwZXUO0Urr/f9QqZEyqYXYNXWAws6U7QNP/yFmAAfkV1ic9Ia
-	EX4vr3X6fq/nRm4cHjk58QVxPUI96G5TFQJTl5JTUycL7xVU0oizgfDdzUMbPswx1PI6FOPFiCpw/
-	rn6tEV9DjjJDyDZiP1VRJMDkORBEvj1g8Syo+a6uc2Vg/bVNZJD4phD+IaBdWPUBKtM88WNX8WWif
-	g7+1wAOnxgdjCbvaHjFQ==;
+	References:List-Owner; bh=JCB0AXLDlAYhm5au6uYHSPQkU7Zsiq9W/7mrrJ79eIk=; b=F1P
+	hjM4JrrUB7svPNl65uWWykUIiXShv2vMeTHMmlQ/p0hi8JKJtaDO+3fKyDuNXlgj+wqaiMeuZZxcT
+	nCZ6AeyJBG254g3nB2nQ+0GjhLlBNuWUv75Ey1dcDbU1pIPjaypLgppVd8j0mVUROxZgxjmPK8+5Y
+	qQPy+XeatX9vb3njkEZAV28iU6MGg20O/XyngfwtDExasRECFtWiWmM0nFWzvKO16ptKRnN5Y9j07
+	k+pxHMBukygtoidrr4cDaSqs9oo43lxEsRyZwxkc+MA3Vpp9Nlh8JO3FndoXbeqk/zuG/Y9/kNoNR
+	g2NI+WsuOtUXycpDksn72tpI2ULSCbQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goBbf-0003F0-RF; Mon, 28 Jan 2019 18:26:03 +0000
-Received: from mail-io1-xd42.google.com ([2607:f8b0:4864:20::d42])
+	id 1goBcD-0003Vo-Na; Mon, 28 Jan 2019 18:26:37 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goBao-0001dw-GN
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 18:25:41 +0000
-Received: by mail-io1-xd42.google.com with SMTP id g8so14330951iok.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 10:25:09 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=cDXtTN7co9CVtOC4cJfSnE27asvgyKK/qJgeyPXeZAs=;
- b=cEV79igJIJ/AgX0bSi5cvEuMpPoAyzNAUBd8KrCy3kjv7j96iUj4DQ+F+4A5I9GX6S
- xoOR8ajugZ736ypsGyiTLWh5Qj6xS/HkrLpkYOqHNyLqd1TS58ASZyoUiygSWCVUgX5y
- UQenzBRf8RBmPjgIBuHAfDzAypZAwocieyl6Y=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=cDXtTN7co9CVtOC4cJfSnE27asvgyKK/qJgeyPXeZAs=;
- b=Y9mG3xuWRHFyPBaoqXwc4jw3K0N/eGuybay8MJux0X6QmQMLYd7Tn34xD9QkBmLR8e
- kNY5aHDmLnpKb7Rl7DDq3D1IQC8Fk/aGyp/IwNjQmlKm5T91OXm24UeEbxH82t8RFdms
- 6o11q1VHa6ty49VqWHpfXMK+QDao3YRD8aQjhh+do2oLakVlDyiqju05eDhHNfck7B/J
- FgcV4c1fODyWARlRoV17m+sqhOjYskEZmll3GUB0rlBE2e2baZWw5T/289Bodbe3B3AW
- +JXowI05SIAU66aAgaNnnMYqCMQn3Qh/nv9FlE1IrrAN9NEF7SE3C9dmhnkvgriaviKL
- KO9Q==
-X-Gm-Message-State: AHQUAua874ky2m/ywJgiwB8vloht1j5/hIu6Sy+Vx8xvm4Of2s48M3uP
- B9s5h4jeIBuyBaXbbDUuKGhra8AvSffzleB+hCOg4A==
-X-Google-Smtp-Source: AHgI3IYNAN8znIkU5pTPx3TMjg5EEFC9sWWQuHu3CQ7X2FVa9k4OJNdtN5k6rbcJ5+uwOzaIdZB0fid4TeMMaES6AR4=
-X-Received: by 2002:a6b:5d01:: with SMTP id r1mr12824727iob.170.1548699908936; 
- Mon, 28 Jan 2019 10:25:08 -0800 (PST)
-MIME-Version: 1.0
-References: <20190126102207.29488-1-ard.biesheuvel@linaro.org>
- <abc36cf9-4fa1-da12-bb94-34d850ae34ec@codeaurora.org>
-In-Reply-To: <abc36cf9-4fa1-da12-bb94-34d850ae34ec@codeaurora.org>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Mon, 28 Jan 2019 19:24:56 +0100
-Message-ID: <CAKv+Gu-2SwfeZ26zGK_z+VUpAKgtusHn9oKKz396n8M2NDZ04A@mail.gmail.com>
-Subject: Re: [PATCH] efi: arm/arm64: allow SetVirtualAddressMap() to be omitted
-To: Jeffrey Hugo <jhugo@codeaurora.org>
+ id 1goBbf-0003En-ID
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 18:26:28 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
+ List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
+ List-Archive; bh=mfhnHH0x2E654fntPsAGavlrFArTu2BdabxZHTu/TvM=; b=V9iGdGm8ucFw
+ FOntlS62UojUqPgesp06L5J9u4hMR4wJ5bHfYxghwAFrIPpCMlzqP4KgQSIpdq3xX/fDZWGxU+IEL
+ KHslhE+BrHczLbb0XWn1dKzhkIEbQZozBgeUVjOw2deEuFU9VGdhlV/VJTAJSadriA2WnIalo645+
+ 7OH60=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=debutante.sirena.org.uk)
+ by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1goBba-0003Cf-1l; Mon, 28 Jan 2019 18:25:58 +0000
+Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
+ id A0AAA1127D29; Mon, 28 Jan 2019 18:25:57 +0000 (GMT)
+From: Mark Brown <broonie@kernel.org>
+To: Jiwei Sun <jiwei.sun@windriver.com>
+Subject: Applied "spi: pl022: add a message state STATE_TIMEOUT for timeout
+ transfer" to the spi tree
+In-Reply-To: <20190118033229.22553-1-jiwei.sun@windriver.com>
+X-Patchwork-Hint: ignore
+Message-Id: <20190128182557.A0AAA1127D29@debutante.sirena.org.uk>
+Date: Mon, 28 Jan 2019 18:25:57 +0000 (GMT)
+X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_102510_697644_351842E6 
-X-CRM114-Status: GOOD (  23.96  )
+X-CRM114-CacheID: sfid-20190128_102604_019074_D361BABA 
+X-CRM114-Status: GOOD (  13.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,78 +79,123 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, linux-efi <linux-efi@vger.kernel.org>,
- Heinrich Schuchardt <xypron.glpk@gmx.de>, Will Deacon <will.deacon@arm.com>,
- Alexander Graf <agraf@suse.de>, Leif Lindholm <leif.lindholm@linaro.org>,
- AKASHI Takahiro <takahiro.akashi@linaro.org>,
- James Morse <james.morse@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: linus.walleij@linaro.org, broonie@kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-spi@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 28 Jan 2019 at 19:04, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
->
-> On 1/26/2019 3:22 AM, Ard Biesheuvel wrote:
-> > The UEFI spec revision 2.7 errata A section 8.4 has the following to
-> > say about the virtual memory runtime services:
-> >
-> >    "This section contains function definitions for the virtual memory
-> >    support that may be optionally used by an operating system at runtime.
-> >    If an operating system chooses to make EFI runtime service calls in a
-> >    virtual addressing mode instead of the flat physical mode, then the
-> >    operating system must use the services in this section to switch the
-> >    EFI runtime services from flat physical addressing to virtual
-> >    addressing."
-> >
-> > So it is pretty clear that calling SetVirtualAddressMap() is entirely
-> > optional, and so there is no point in doing so unless it achieves
-> > anything useful for us.
-> >
-> > This is not the case for 64-bit ARM. The native mapping used by the OS
-> > is arbitrarily converted into another permutation of userland addresses
-> > (i.e., bits [63:48] cleared), and the runtime code could easily deal
-> > with the original layout in exactly the same way as it deals with the
-> > converted layout. However, due to constraints related to page size
-> > differences if the OS is not running with 4k pages, and related to
-> > systems that may expose the individual sections of PE/COFF runtime
-> > modules as different memory regions, creating the virtual layout is a
-> > bit fiddly, and requires us to sort the memory map and reason about
-> > adjacent regions with identical memory types etc etc.
-> >
-> > So the obvious fix is to stop calling SetVirtualAddressMap() altogether
-> > on arm64 systems. However, to avoid surprises, which are notoriously
-> > hard to diagnose when it comes to OS<->firmware interactions, let's
-> > start by making it an opt-out feature, and implement support for the
-> > 'efi=novamap' kernel command line parameter on ARM and arm64 systems.
-> >
-> > (Note that 32-bit ARM generally does require SetVirtualAddressMap() to be
-> > used, given that the physical memory map and the kernel virtual address
-> > map are not guaranteed to be non-overlapping like on arm64. However,
-> > having support for efi=novamap,noruntime on 32-bit ARM, combined with
-> > the recently proposed support for earlycon=efi, is likely to be useful
-> > to diagnose boot issues on such systems if they have no accessible serial
-> > port)
-> >
-> > Cc: Alexander Graf <agraf@suse.de>
-> > Cc: Heinrich Schuchardt <xypron.glpk@gmx.de>
-> > Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > Cc: Leif Lindholm <leif.lindholm@linaro.org>
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
->
-> I threw this at msm8998 (arm64), and it seem to work fine as far as I
-> can tell.
->
-> For what it's worth:
-> Tested-by: Jeffrey Hugo <jhugo@codeaurora.org>
->
+The patch
 
-Thanks a lot.
+   spi: pl022: add a message state STATE_TIMEOUT for timeout transfer
 
-Unless anyone has any objections, I'll get this queued up for v5.1 by
-the end of the week.
+has been applied to the spi tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+From 7aef2b646b24247d880a353e09d4e10614a61cd6 Mon Sep 17 00:00:00 2001
+From: Jiwei Sun <jiwei.sun@windriver.com>
+Date: Fri, 18 Jan 2019 11:32:29 +0800
+Subject: [PATCH] spi: pl022: add a message state STATE_TIMEOUT for timeout
+ transfer
+
+When transfer timeout, give -EAGAIN to the message's status, and it can
+make the spi device driver choose repeated transimation or not. And if
+transfer timeout, output some useful information for tracing the issue.
+
+Signed-off-by: Jiwei Sun <jiwei.sun@windriver.com>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-pl022.c | 30 +++++++++++++++++++++++++++++-
+ 1 file changed, 29 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index 0c793e31d60f..26684178786f 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -253,6 +253,7 @@
+ #define STATE_RUNNING			((void *) 1)
+ #define STATE_DONE			((void *) 2)
+ #define STATE_ERROR			((void *) -1)
++#define STATE_TIMEOUT			((void *) -2)
+ 
+ /*
+  * SSP State - Whether Enabled or Disabled
+@@ -1484,6 +1485,30 @@ static void do_interrupt_dma_transfer(struct pl022 *pl022)
+ 	writew(irqflags, SSP_IMSC(pl022->virtbase));
+ }
+ 
++static void print_current_status(struct pl022 *pl022)
++{
++	u32 read_cr0;
++	u16 read_cr1, read_dmacr, read_sr;
++
++	if (pl022->vendor->extended_cr)
++		read_cr0 = readl(SSP_CR0(pl022->virtbase));
++	else
++		read_cr0 = readw(SSP_CR0(pl022->virtbase));
++	read_cr1 = readw(SSP_CR1(pl022->virtbase));
++	read_dmacr = readw(SSP_DMACR(pl022->virtbase));
++	read_sr = readw(SSP_SR(pl022->virtbase));
++
++	dev_warn(&pl022->adev->dev, "spi-pl022 CR0: %x\n", read_cr0);
++	dev_warn(&pl022->adev->dev, "spi-pl022 CR1: %x\n", read_cr1);
++	dev_warn(&pl022->adev->dev, "spi-pl022 DMACR: %x\n", read_dmacr);
++	dev_warn(&pl022->adev->dev, "spi-pl022 SR: %x\n", read_sr);
++	dev_warn(&pl022->adev->dev,
++			"spi-pl022 exp_fifo_level/fifodepth: %u/%d\n",
++			pl022->exp_fifo_level,
++			pl022->vendor->fifodepth);
++
++}
++
+ static void do_polling_transfer(struct pl022 *pl022)
+ {
+ 	struct spi_message *message = NULL;
+@@ -1535,7 +1560,8 @@ static void do_polling_transfer(struct pl022 *pl022)
+ 			if (time_after(time, timeout)) {
+ 				dev_warn(&pl022->adev->dev,
+ 				"%s: timeout!\n", __func__);
+-				message->state = STATE_ERROR;
++				message->state = STATE_TIMEOUT;
++				print_current_status(pl022);
+ 				goto out;
+ 			}
+ 			cpu_relax();
+@@ -1553,6 +1579,8 @@ static void do_polling_transfer(struct pl022 *pl022)
+ 	/* Handle end of message */
+ 	if (message->state == STATE_DONE)
+ 		message->status = 0;
++	else if (message->state == STATE_TIMEOUT)
++		message->status = -EAGAIN;
+ 	else
+ 		message->status = -EIO;
+ 
+-- 
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
