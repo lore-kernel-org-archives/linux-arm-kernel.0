@@ -2,69 +2,69 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 92843C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 16:27:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 932B3C282CF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 16:35:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5EEFC20879
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 16:27:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 66C4020844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 16:35:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dxL99Thm";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="doMtwnE/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5EEFC20879
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ob3L1YIR";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="i/+IfggS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 66C4020844
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lxgC+EyvFxGUuHi9GM8Hh/FF8FU4Nx9uSRjKJc1oPF4=; b=dxL99ThmIkpSGv
-	U0lDxalciXa4OiiypaAMBos2kcAxupxgIdhBXPRLtLMtqh9P5mH3a7MUYAhqDpeLpBvzgAFXECYpe
-	7y+i9mFba5OYMyPMUBbZhRkLuCyDolikFbpJptjacXSKxZRAj7wl8kFKGrIE+yj4twvUx8kQZZ/4B
-	4y1xP6Z9GdGiYrzD2adxZj23mYPMYoMbkxsloLXRI2UfQv9q5LSPqowzTyAkP0xF4iBOhoTtQ/yKS
-	KWDU/vcQIaJ++2LDS6w2lJhT3mOWVXkUCjvj656/yDLpzvDYRrF+ZpTnLxZLWQGBzgQIqHQaNvZxE
-	rzsPxHgsKnJO4S73X4Ng==;
+	List-Owner; bh=2POzdEzSEEv41ASPrsv7mLek2uMkTuuNHQCytZGYP10=; b=ob3L1YIRZZbzLa
+	Lil2tVi6ew7ZApuk1GwNYrB9tLLj3PHq+f18PYgdI6fox15gHpFuaL42LrEKRywkiapctbrTsel5j
+	L+Tr4y4qtHh+mbtHwlgiVb89suDTsKcjOEsgN4tU/Mrb0QBW/lIaQGqzcea1T0YQp89dCaNFgJN1n
+	ckA+yVRG1qOCMk0uclQx+wa58Eo094L3KoxZW9/iapFG5SQhl1DGkcdlleBpmOfDBRJp97iobv0KD
+	zwDUouHU5Dyc1Wixmrjq3W4M2KOMZL46vNPfEgiIag+37ObRPKoHqo1Kx5bsr6bYiAMWWzmQuH7GK
+	Gbo3ivsBWf+FLtKSKGCQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go9kf-0000dg-5c; Mon, 28 Jan 2019 16:27:13 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go9kb-0000cn-Ml
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 16:27:11 +0000
-Received: from sasha-vm.mshome.net (c-73-47-72-35.hsd1.nh.comcast.net
- [73.47.72.35])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 976132171F;
- Mon, 28 Jan 2019 16:27:08 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548692829;
- bh=7vmwSnSkoSBlPJpO4xiuEwisQFItDkXoMXOIAveCiZQ=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=doMtwnE/L/E7BhYPadr66rdGa/L2ACXFA0D57pnc2G1581zcfl2AS/ZUfHTlU7Jao
- zhfFZIsPBQX+loUnw/QVHWiQpZ0Bw0SRW8lfY09P+xXxiyJ57lvDSQj692UVs5SGSw
- 46RKcQTkT3jUBho0G78BZxRt9YS0/JgKeLuwJ62g=
-From: Sasha Levin <sashal@kernel.org>
-To: linux-kernel@vger.kernel.org,
-	stable@vger.kernel.org
-Subject: [PATCH AUTOSEL 3.18 28/61] cpuidle: big.LITTLE: fix refcount leak
-Date: Mon, 28 Jan 2019 11:25:50 -0500
-Message-Id: <20190128162623.59854-28-sashal@kernel.org>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20190128162623.59854-1-sashal@kernel.org>
-References: <20190128162623.59854-1-sashal@kernel.org>
+	id 1go9sy-0005c9-Vu; Mon, 28 Jan 2019 16:35:48 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1go9sv-0005ax-Ot
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 16:35:47 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id D012425B7BA;
+ Tue, 29 Jan 2019 03:35:42 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1548693343; bh=2sXz8tKmkSGOFC/Aprio4ztb8ZCYofPqo8MAVncgY4U=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=i/+IfggSB0Vuvxtj4SWL/YkTKkN015Ola1ieSyd2sbaPgbM3xCbuj38UVA+b2OIxL
+ ChVCFiTaPUF16KhUYoF6KjL+C+0wKG1MkScxVzNZPQJFIIvj6rQUMoXEMPRBA6sVHE
+ 5khMlj99WuMOxxmC9qRy1VYlQ9MXQDEXXDajkOws=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id 49EC29403E0; Mon, 28 Jan 2019 17:35:40 +0100 (CET)
+Date: Mon, 28 Jan 2019 17:35:40 +0100
+From: Simon Horman <horms@verge.net.au>
+To: Geert Uytterhoeven <geert@linux-m68k.org>
+Subject: Re: [PATCH] clk: renesas: r8a77990: Add Z2 clock
+Message-ID: <20190128163337.t2ditrru474ybdob@verge.net.au>
+References: <20190128140127.17540-1-horms+renesas@verge.net.au>
+ <CAMuHMdUw6WjkykiCwK6_SYt+ktF-DkU+jczuoLuRh0-fKpVNwA@mail.gmail.com>
 MIME-Version: 1.0
-X-Patchwork-Hint: Ignore
+Content-Disposition: inline
+In-Reply-To: <CAMuHMdUw6WjkykiCwK6_SYt+ktF-DkU+jczuoLuRh0-fKpVNwA@mail.gmail.com>
+Organisation: Horms Solutions BV
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_082709_765324_8792214B 
-X-CRM114-Status: GOOD (  10.92  )
+X-CRM114-CacheID: sfid-20190128_083545_999245_0622228E 
+X-CRM114-Status: GOOD (  11.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,58 +76,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Yangtao Li <tiny.windzz@gmail.com>, Sasha Levin <sashal@kernel.org>,
- "Rafael J . Wysocki" <rafael.j.wysocki@intel.com>,
- linux-arm-kernel@lists.infradead.org, linux-pm@vger.kernel.org
+Cc: Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ Magnus Damm <magnus.damm@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Yangtao Li <tiny.windzz@gmail.com>
+On Mon, Jan 28, 2019 at 04:12:03PM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Mon, Jan 28, 2019 at 3:01 PM Simon Horman <horms+renesas@verge.net.au> wrote:
+> > Adds Z2 clock to CPG driver for the R-Car E3 (r8a77990) SoC.
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Thanks for your patch!
+> 
+> > --- a/drivers/clk/renesas/r8a77990-cpg-mssr.c
+> > +++ b/drivers/clk/renesas/r8a77990-cpg-mssr.c
+> > @@ -79,6 +79,7 @@ static const struct cpg_core_clk r8a77990_core_clks[] __initconst = {
+> >         DEF_RATE(".oco",       CLK_OCO,            8 * 1000 * 1000),
+> >
+> >         /* Core Clock Outputs */
+> > +       DEF_FIXED("z2",        R8A77990_CLK_Z2,    CLK_PLL0D4,     1, 1),
+> 
+> According to R-Car Gen3 Hardware User's Manual rev. 1.50, the SYS-CPU
+> Divider 2 is controlled through the Z2FC bit field in the Frequency
+> Control Register C. So it is not a fixed clock, unlike on R-Car D3.
 
-[ Upstream commit 9456823c842f346c74265fcd98d008d87a7eb6f5 ]
-
-of_find_node_by_path() acquires a reference to the node
-returned by it and that reference needs to be dropped by its caller.
-bl_idle_init() doesn't do that, so fix it.
-
-Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Signed-off-by: Sasha Levin <sashal@kernel.org>
----
- drivers/cpuidle/cpuidle-big_little.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
-index fbc00a1d3c48..355dc3d9cb35 100644
---- a/drivers/cpuidle/cpuidle-big_little.c
-+++ b/drivers/cpuidle/cpuidle-big_little.c
-@@ -175,6 +175,7 @@ static int __init bl_idle_init(void)
- {
- 	int ret;
- 	struct device_node *root = of_find_node_by_path("/");
-+	const struct of_device_id *match_id;
- 
- 	if (!root)
- 		return -ENODEV;
-@@ -182,7 +183,11 @@ static int __init bl_idle_init(void)
- 	/*
- 	 * Initialize the driver just for a compliant set of machines
- 	 */
--	if (!of_match_node(compatible_machine_match, root))
-+	match_id = of_match_node(compatible_machine_match, root);
-+
-+	of_node_put(root);
-+
-+	if (!match_id)
- 		return -ENODEV;
- 	/*
- 	 * For now the differentiation between little and big cores
--- 
-2.19.1
-
+Thanks, I will look into that.
 
 _______________________________________________
 linux-arm-kernel mailing list
