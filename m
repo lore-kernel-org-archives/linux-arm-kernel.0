@@ -2,81 +2,88 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9159BC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 06:42:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 39871C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 06:45:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 60CD920989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 06:42:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0B1AD21736
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 06:45:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IaOJ7oGy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="gjN/9A4y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 60CD920989
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Hpurtge5";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="W4RfYAIz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B1AD21736
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=oMi/II/9MrNBWyIZWaDP+EOXKhAy+5sDO/9tfqwT4Dg=; b=IaO
-	J7oGyYJZzh+KGvS8X/soMo+LeeZxTKTgYP0PCzzF4vBCUQSjXzHEmdPP4DoP+I/KBvomx+Y3g3Uvh
-	MQGXTUgPluxqDPYR56qM1PqGeQp/5A3jjM2gFU265Ysvc/0I2vNENULI2ZjBeI/g/tekwSsk3aWqv
-	F8kNPhzRwRZRkFXu3o5SHb+q8Jv5+oQBdvbPFmCcKRTnYJHEazmq0nKvpZ1cLM3gvIUObgSR4jZp8
-	1ToUIMZ0xiITiq+87PtlFjig7CL9cRQrMJ7nabemz6N3WcSnQKWK4eTu3Vi4Ea45DKkskeoNhppVt
-	SOVo1zyjSIbzXAzmQrt6uWEbUkTEj1Q==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=Yhx6Ry4LKReMxVAcDiOUkbPdfSiEwXCOP46x3YvFAlM=; b=Hpurtge5RHroQtqyEVPCVlLzb7
+	OgjnswOzVevP26z7f1qIncGNeBYbBdFJbd1yPumU66/BsReCDN3xjtrBsoXYb4HjLEUl//bYRz8pn
+	eA2yGXHLtm6a23WHuXyUCwicYPDwirSjXKnCuSkocfozFxKcULFSqbTGfxCjeoVWIDznAUoK86i6M
+	bX+UfPao87Wgcqraub5+p0tGWMaqgqvW6ASsrwoHYHaXUVAGfbZ155tLxTvnjR9hAAHspscGwD3uo
+	cRjWMz6+tN/bna3TSc9gf8P6XEPR8X1stDaZvUs5CEXEoKt083nQwjzf5BmNz3Jsg0M3ht72mYnz7
+	WIzUCMdg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go0cY-0005aH-H2; Mon, 28 Jan 2019 06:42:14 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1go0fu-0007CT-1N; Mon, 28 Jan 2019 06:45:42 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go0cS-0005ZB-RB
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 06:42:11 +0000
-Received: by mail-wm1-x344.google.com with SMTP id y8so12526257wmi.4
+ id 1go0fr-0007Bn-9i
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 06:45:40 +0000
+Received: by mail-wr1-x441.google.com with SMTP id z5so16657938wrt.11
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 27 Jan 2019 22:42:07 -0800 (PST)
+ Sun, 27 Jan 2019 22:45:38 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=s7lgGPNmk6yzNikPOAgazA8H44bs/2pQ5Wgm9TQ1twA=;
- b=gjN/9A4yevg58U7HPgUuet0K8raeSd4xai9sQWAx/DEtA2Vhcd4oB46FvobTC4vGve
- Jy7ZeUMxIZBlx30jMeRbySIQ6KYpmVZgph6e9Ps0skU2XViWZw26AJhOBjZl1H73EpdT
- cKCo4VY9DOlrx+stQcL3r0c4ae0zEkgnrxWMc=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :in-reply-to:references;
+ bh=QV55M5UT9ckgy/+9mgu7lB9S5ppe7rLYbFWvyS23/Cg=;
+ b=W4RfYAIzJgkQJh5MIR4Gnjr5DkFNFNW1Bt6NGGz/WvBZMMfK0AudwJi6FlerejmBKc
+ J9fVVMr3cbR7h6Iko7GMxSgIEJaah943A3l9Qy1SyFuzWRCiTSHf2Gz43+BRUokIyw/m
+ S8THImJ1AIjte0KIUe9HHfxEvOnWpacdFWgYw=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=s7lgGPNmk6yzNikPOAgazA8H44bs/2pQ5Wgm9TQ1twA=;
- b=gu/ISNDg3pVa0jS7Yz8lV/mMOM39iopk/E0Gql6AgSBUsKHKwlnvxnkpHShG7XMC/C
- mA7e6UK9pUtrqwxzNSGsE/dhXzVsz+D03GE5oBhkBv7iwmIbzk9n+OZ1dld9Ht+k9CsL
- YHJMn1ZNnhX/V8rcdnUq8n3e7vgHNf2bRWYV5USVN7PMYnz1NqnME6bmDumcj83lLtPA
- 9cK8cNOtAtvC7uUslET9aWRJtELrBIOhU6Vn+lqKDO2zRXmFC7pQe7pJWApNbT4mtlH5
- mxF17/vvVfCR4Vl0AJhYc+1TIaDIYPJb71gqKnh3e5E0Q3RnhpOipy81DMO7lBqNQHb9
- WeUA==
-X-Gm-Message-State: AJcUukdPd4CE8+VSqWQrmM3wOHg/97ylqfUP2If6APm1YMnQi2a000rK
- l9dX0hVRVZDSIgjPegpMsm74Zw==
-X-Google-Smtp-Source: ALg8bN56Oc0AMEP5gfBhIDmLIXlCubXW6Y/E9vYy7dSKP63aUa7PLIv1ymDctNxYrxzeHNRuw/P5uA==
-X-Received: by 2002:a1c:9ed7:: with SMTP id h206mr14803086wme.28.1548657726247; 
- Sun, 27 Jan 2019 22:42:06 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:in-reply-to:references;
+ bh=QV55M5UT9ckgy/+9mgu7lB9S5ppe7rLYbFWvyS23/Cg=;
+ b=Dh1ed8ZET+PIWEqoWq8nYjS4P83x+Q8wM2Sn45Chdmd1mS0laTssDnJf85xmEQMqll
+ Nui1t2tLiR9egzRB5dktqIFrPNywq9QdeY7b7ZtSw18FBTgrp7xdvNiALBqG03rMBYsb
+ XGXUkMYKamN3CQkr6V+GkxoE5JPvSNf6b8T56BOPZmDBQLbnW/UHDN+pR1d5Ck1VPzPj
+ Ullt5ubMKf6Yp5nH6I6eouaXp8v/FcqF5S/xo9v4sChdPgNw6XSz9yRl2PUfVxb3o+3o
+ hSUaTMztDy25DAxjOzEDnpp5XpZghywvMCLdGmOGL0vuzzj0WO1MEnLAEDCjh4rr6nnK
+ dUUQ==
+X-Gm-Message-State: AJcUukc2BhF31LL0DVZq3VKJzX1ey6O/JG2UfMI8iRKVAv74NHSL7TRV
+ fU8c4uJ2CD6VNII6XrcoA9DpwA==
+X-Google-Smtp-Source: ALg8bN4fEZbMsW2aJV3GIEKXlU9FXLXqqPljV9IgOZozj99LxxfrGRSNvbGzEEu/lZMvxeyJzJ3boQ==
+X-Received: by 2002:adf:f691:: with SMTP id v17mr19591125wrp.114.1548657937143; 
+ Sun, 27 Jan 2019 22:45:37 -0800 (PST)
 Received: from localhost ([49.248.191.44])
- by smtp.gmail.com with ESMTPSA id t4sm86845856wrb.64.2019.01.27.22.42.04
+ by smtp.gmail.com with ESMTPSA id c10sm47955333wrr.69.2019.01.27.22.45.35
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Sun, 27 Jan 2019 22:42:05 -0800 (PST)
+ Sun, 27 Jan 2019 22:45:36 -0800 (PST)
 From: Amit Kucheria <amit.kucheria@linaro.org>
 To: linux-kernel@vger.kernel.org
-Subject: [PATCH v4 0/9] cpufreq: Add flag to auto-register as cooling device
-Date: Mon, 28 Jan 2019 12:11:25 +0530
-Message-Id: <cover.1548654899.git.amit.kucheria@linaro.org>
+Subject: [PATCH v4 6/9] cpufreq: mediatek: Use auto-registration of thermal
+ cooling device
+Date: Mon, 28 Jan 2019 12:11:31 +0530
+Message-Id: <f4d658bcbc428f6fb9bd70bcd9c7a0b00a20cd08.1548654899.git.amit.kucheria@linaro.org>
 X-Mailer: git-send-email 2.17.1
+In-Reply-To: <cover.1548654899.git.amit.kucheria@linaro.org>
+References: <cover.1548654899.git.amit.kucheria@linaro.org>
+In-Reply-To: <cover.1548654899.git.amit.kucheria@linaro.org>
+References: <cover.1548654899.git.amit.kucheria@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190127_224208_896851_A46CB6CB 
-X-CRM114-Status: UNSURE (   9.99  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190127_224539_336118_C4FD4FB7 
+X-CRM114-Status: GOOD (  13.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,72 +95,86 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sudeep Holla <sudeep.holla@arm.com>,
- "open list:CPU FREQUENCY SCALING FRAMEWORK" <linux-pm@vger.kernel.org>,
- linux-arm-msm@vger.kernel.org, Daniel Lezcano <daniel.lezcano@linaro.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>, dianders@chromium.org,
- swboyd@chromium.org, edubezval@gmail.com, mka@chromium.org,
- "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
- viresh.kumar@linaro.org, Matthias Brugger <matthias.bgg@gmail.com>,
- Zhang Rui <rui.zhang@intel.com>, "moderated list:ARM/Mediatek SoC support"
- <linux-arm-kernel@lists.infradead.org>
+Cc: linux-pm@vger.kernel.org, linux-arm-msm@vger.kernel.org,
+ Sean Wang <sean.wang@mediatek.com>, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ dianders@chromium.org, swboyd@chromium.org, edubezval@gmail.com,
+ mka@chromium.org, linux-mediatek@lists.infradead.org, viresh.kumar@linaro.org,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add a flag for cpufreq drivers to tell cpufreq core to auto-register
-themselves as a thermal cooling device.
+Use the CPUFREQ_AUTO_REGISTER_COOLING_DEV flag to allow cpufreq core to
+automatically register as a thermal cooling device.
 
-There series converts over all the drivers except arm_big_little.c.
-Tested on SDM845 with the qcom-cpufreq-hw driver. Only compile-tested the
-others.
+This allows removal of boiler plate code from the driver.
 
-Things needing fixing (but not a blocker for the series):
- - Look at how to detect that we're not in IKS mode in arm_big_little's
-   .ready callback.
-
-Chnages since v3:
- - Got rid of wrapper function to register/unregister cooling devices.
-   Directly call the function in cpufreq.c
-
-Changes since v2:
- - Get rid of #ifdef'ery and let the pointer exist in all cases
- - Get rid of (!CPU_THERMAL || THERMAL) dependency in all cpufreq drivers'
-   Kconfig
-
-Changes since v1:
-- Fix compilation failures with allmodconfig
-- Get rid of #ifdef in cpufreq.c
-- Removed miscellaneous patches and sent them separately
-- Merged patches 1 and 2 from v1
-
-Amit Kucheria (9):
-  thermal: cpu_cooling: Require thermal core to be compiled in
-  cpufreq: Auto-register the driver as a thermal cooling device if asked
-  cpufreq: qcom-hw: Register as a cpufreq cooling device
-  cpufreq: imx6q: Use auto-registration of thermal cooling device
-  cpufreq: cpufreq-dt: Use auto-registration of thermal cooling device
-  cpufreq: mediatek: Use auto-registration of thermal cooling device
-  cpufreq: qoriq: Use auto-registration of thermal cooling device
-  cpufreq: scmi: Use auto-registration of thermal cooling device
-  cpufreq: scpi: Use auto-registration of thermal cooling device
-
- drivers/cpufreq/Kconfig            |  3 ---
- drivers/cpufreq/Kconfig.arm        |  5 -----
- drivers/cpufreq/cpufreq-dt.c       | 14 ++------------
- drivers/cpufreq/cpufreq.c          |  9 +++++++++
- drivers/cpufreq/imx6q-cpufreq.c    | 24 ++----------------------
+Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+---
  drivers/cpufreq/mediatek-cpufreq.c | 14 ++------------
- drivers/cpufreq/qcom-cpufreq-hw.c  |  3 ++-
- drivers/cpufreq/qoriq-cpufreq.c    | 15 ++-------------
- drivers/cpufreq/scmi-cpufreq.c     | 14 ++------------
- drivers/cpufreq/scpi-cpufreq.c     | 14 ++------------
- drivers/thermal/Kconfig            |  1 +
- include/linux/cpufreq.h            |  9 +++++++++
- 12 files changed, 33 insertions(+), 92 deletions(-)
+ 1 file changed, 2 insertions(+), 12 deletions(-)
 
+diff --git a/drivers/cpufreq/mediatek-cpufreq.c b/drivers/cpufreq/mediatek-cpufreq.c
+index eb8920d39818..9a937f4c63e7 100644
+--- a/drivers/cpufreq/mediatek-cpufreq.c
++++ b/drivers/cpufreq/mediatek-cpufreq.c
+@@ -14,7 +14,6 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/cpu.h>
+-#include <linux/cpu_cooling.h>
+ #include <linux/cpufreq.h>
+ #include <linux/cpumask.h>
+ #include <linux/module.h>
+@@ -48,7 +47,6 @@ struct mtk_cpu_dvfs_info {
+ 	struct regulator *sram_reg;
+ 	struct clk *cpu_clk;
+ 	struct clk *inter_clk;
+-	struct thermal_cooling_device *cdev;
+ 	struct list_head list_head;
+ 	int intermediate_voltage;
+ 	bool need_voltage_tracking;
+@@ -307,13 +305,6 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
+ 
+ #define DYNAMIC_POWER "dynamic-power-coefficient"
+ 
+-static void mtk_cpufreq_ready(struct cpufreq_policy *policy)
+-{
+-	struct mtk_cpu_dvfs_info *info = policy->driver_data;
+-
+-	info->cdev = of_cpufreq_cooling_register(policy);
+-}
+-
+ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
+ {
+ 	struct device *cpu_dev;
+@@ -472,7 +463,6 @@ static int mtk_cpufreq_exit(struct cpufreq_policy *policy)
+ {
+ 	struct mtk_cpu_dvfs_info *info = policy->driver_data;
+ 
+-	cpufreq_cooling_unregister(info->cdev);
+ 	dev_pm_opp_free_cpufreq_table(info->cpu_dev, &policy->freq_table);
+ 
+ 	return 0;
+@@ -480,13 +470,13 @@ static int mtk_cpufreq_exit(struct cpufreq_policy *policy)
+ 
+ static struct cpufreq_driver mtk_cpufreq_driver = {
+ 	.flags = CPUFREQ_STICKY | CPUFREQ_NEED_INITIAL_FREQ_CHECK |
+-		 CPUFREQ_HAVE_GOVERNOR_PER_POLICY,
++		 CPUFREQ_HAVE_GOVERNOR_PER_POLICY |
++		 CPUFREQ_AUTO_REGISTER_COOLING_DEV,
+ 	.verify = cpufreq_generic_frequency_table_verify,
+ 	.target_index = mtk_cpufreq_set_target,
+ 	.get = cpufreq_generic_get,
+ 	.init = mtk_cpufreq_init,
+ 	.exit = mtk_cpufreq_exit,
+-	.ready = mtk_cpufreq_ready,
+ 	.name = "mtk-cpufreq",
+ 	.attr = cpufreq_generic_attr,
+ };
 -- 
 2.17.1
 
