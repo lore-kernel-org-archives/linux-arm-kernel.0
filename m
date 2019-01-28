@@ -2,66 +2,75 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E151FC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:23:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 07149C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:24:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B3CE02087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:23:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C91B02087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:24:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dAogT2t6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B3CE02087F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d/5ffhg9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C91B02087F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MneHndovnm0+I8W/fyfyb+WXbtpmEGb9mXV131hhfRE=; b=dAogT2t6LF7OEt
-	FI7aF9LqxmU7dGfpIFAz7i2vrqDL6w3Otealsc8Ur6A1XnjSAkBtmofyn1OMogYPYmQBuuCWdBHsV
-	JqhfUbxHOZF4ru29pyTnyd9OwnRTT91qomc8zCibhYWiRZGdLoaYbiGGnsgLcWH2qzTCGwendFlKD
-	yPZ/AEpgfwB8W204r4BLoVaaiYP6iZtTiqwbXquClLLsfLK+pyCkRLxZFBjsllxKG++WaQC+lzOPE
-	+poywJHbUMZUHXPt4Id6qPtqRd+Lv+Vn3KI4uMcM47EhZigcJBojGnGcN/n/d5uaU37MZARg6SgA3
-	BucliQDsEIjNUMafLUQA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Q7lgYt3hBwfnyskH8v6og6SJ84BAHndEB9WAiO0YIEU=; b=d/5ffhg9/tFfUr
+	THC/X4guCEMlSePXyxvXPqhCjyh4/QBZwtcl2V2Nzy1Q1OjYp13Davgj5yaSy2t+uSEKmLOu0QrB6
+	G+5ofpnGQ9GEnx5ZilrV2xSM+3NnbH3Jq7E8GgOdkUtfL5bEEuthHJfLZWjsxqAAwqBilfIFcUKqN
+	C1wbqB1zzB1mN1nWYSNXpKFsWWYTKb8N7ptCVkeBeJllYiZdn/WXxAvcNe6kvdQN/Mx+tnU6ZokiS
+	eEy2y9lUGe6siOmCxT+B8udRWE54g2Et5JNMjJO76szqUN8yV8yBxL3n6kapJDGRhoZHTI+GdAWJI
+	36U5dIpoIPPMLjlvHl+A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go38A-0000bo-NJ; Mon, 28 Jan 2019 09:23:02 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go387-0000bR-Cx
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 09:23:00 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D32E7EBD;
- Mon, 28 Jan 2019 01:22:58 -0800 (PST)
-Received: from big-swifty.misterjones.org (big-swifty.cambridge.arm.com
- [10.1.39.122])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 25DD83F589;
- Mon, 28 Jan 2019 01:22:55 -0800 (PST)
-Date: Mon, 28 Jan 2019 09:22:53 +0000
-Message-ID: <86k1ipw2z6.wl-marc.zyngier@arm.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v9 03/26] arm64: cpufeature: Set SYSREG_GIC_CPUIF as a
- boot system feature
-In-Reply-To: <1548084825-8803-4-git-send-email-julien.thierry@arm.com>
-References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
- <1548084825-8803-4-git-send-email-julien.thierry@arm.com>
-User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
- FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
- (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
-Organization: ARM Ltd
-MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
+	id 1go38v-0000t6-P4; Mon, 28 Jan 2019 09:23:49 +0000
+Received: from mout.kundenserver.de ([212.227.126.131])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1go38s-0000sY-6F
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 09:23:48 +0000
+Received: from [192.168.178.52] ([109.104.36.222]) by mrelayeu.kundenserver.de
+ (mreue009 [212.227.15.167]) with ESMTPSA (Nemesis) id
+ 1MbRXd-1hLB692OLZ-00bsqU; Mon, 28 Jan 2019 10:23:36 +0100
+Subject: Re: [PATCH RFC V2 0/4] pinctrl: bcm2835: improve libgpiod output
+To: Linus Walleij <linus.walleij@linaro.org>
+References: <1548054685-3781-1-git-send-email-stefan.wahren@i2se.com>
+ <CACRpkdb1fUYz+a9QrO_jEcKgMNJO3ApZAVDR0gqz_Hd=WVQ35g@mail.gmail.com>
+From: Stefan Wahren <stefan.wahren@i2se.com>
+Message-ID: <1363edbf-51cf-54d4-e2a2-79ee4c3e501b@i2se.com>
+Date: Mon, 28 Jan 2019 10:23:35 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+MIME-Version: 1.0
+In-Reply-To: <CACRpkdb1fUYz+a9QrO_jEcKgMNJO3ApZAVDR0gqz_Hd=WVQ35g@mail.gmail.com>
+Content-Language: en-US
+X-Provags-ID: V03:K1:/Lkkf5kp/q9cqTfMGlAyiRmn87X8Dwp35wY6ITTbUEUABMFGSS9
+ lyr1O/5EU1+JvrJ+QoJHv82U1l+vsZWfgr+EE2Wk69WH8imKVdwgY+hHm2ndGfaHGc87gAs
+ U7tZuaEtFq+jRiMaEydb34OD6slruCVz/f/iot+YXdGPQrjZ/ixGdTb7KsFew6URbXJY8R7
+ yAtcnkCBkw/YFNM2BmJZQ==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:++5xxMD4tmM=:aGwH8oUiAzrQ9hBQQT8TO1
+ LIfbAavW7/aVTZghDUzylMEfn229GMU+r9nZesRAkU/1HNS+euL9WpCfemAM3If4kEEO9jTQH
+ /oRNcEBtwHTSt2sc4bKBMzqQiTLKWsxPvLEkYkhW3AnuaKmdmAWQO5Ow0Zv9DMhDeL7ctJSo3
+ ffKTt4Jx8TMaVrPChYmrzBMwhARPz7yrQaKMirvrKV7PuQcYQUx8e8As76dF1DHX72Fvw+qss
+ cL0Od5N6GiQ9btoZwZW8p3CCmoX9RTHirswUX5qNXf24CUOw0bkKgNM14ipperxGHR51tGqGV
+ WaHRiKIlUf0gH5LRr1y1FSa91Ri+DGWrKvwo9e5cxqDiKmPmrA7m68NAB7yR5J/LDKSIIXdO5
+ jtRfBc2bMfKBSAvliTVyHaM7ykKVqgoDZx5fxuydfQH8vg8+TDDsPo1UnXp7y8baOKrNtN+U2
+ LjODNHO5QsbhoUL6tu2upfGQ7o+EZQZSB9cIz1Ws/zKRSieAnfODEz0669m/KF6mIhgcyjJWh
+ cwDh2s3BCTyaeTK20puH+y4bNtuQUnNbgUYhtGkkEWRVJhJZ8irGvxGj2IbrcS9IipiykfbFQ
+ r11ND1Zrpv91Y1BRnaMEDtlDikfJIFkySuq5MoDE51BLQWGyfexZXqtdi2tSJMwymm60W0qEL
+ ob1WYM5EUsPvcDPHk5qJbZntNhxZ82XZ9toamOKZgByvTDebhRS0603hi8RB4QIvxGhwFnGPL
+ QNlrdBAyI3iPnID6b5VdW6fFOCG4KG55FtqPBBRP3BpYEfNI8bRJdWUuajk=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_012259_438966_3687728E 
-X-CRM114-Status: GOOD (  14.42  )
+X-CRM114-CacheID: sfid-20190128_012346_523261_9E43BD1C 
+X-CRM114-Status: GOOD (  11.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,45 +82,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
- Suzuki K Poulose <suzuki.poulose@arm.com>, catalin.marinas@arm.com,
- will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
- james.morse@arm.com, joel@joelfernandes.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Eric Anholt <eric@anholt.net>,
+ "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
+ Lukas Wunner <lukas@wunner.de>, Peter Robinson <pbrobinson@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 21 Jan 2019 15:33:22 +0000,
-Julien Thierry <julien.thierry@arm.com> wrote:
-> 
-> It is not supported to have some CPUs using GICv3 sysreg CPU interface
-> while some others do not.
-> 
-> Once ICC_SRE_EL1.SRE is set on a CPU, the bit cannot be cleared. Since
-> matching this feature require setting ICC_SRE_EL1.SRE, it cannot be
-> turned off if found on a CPU.
-> 
-> Set the feature as STRICT_BOOT, if boot CPU has it, all other CPUs are
-> required to have it.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+Hi Linus,
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Am 28.01.19 um 09:06 schrieb Linus Walleij:
+> On Mon, Jan 21, 2019 at 8:11 AM Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>
+>> Based on a recent discussion [1],[2] about the unexpected output of gpioinfo
+>> this patch series tries to improve the situation. Patches 1-3 are specific
+>> changes for bcm2835 while the last one is the intended improvement for gpiolib.
+>>
+>> Changes in V2:
+>> - take strict mode into account as suggested by Linus
+>> - add bcm2835 specific changes
+> Ooops started to apply this but now I noticed it's in RFC state so I
+> backed them out and wait for a non-RFC version first.
 
-	M.
+i will split this series and resend the non-controversial part (Patch 1+2).
 
--- 
-Jazz is not dead, it just smell funny.
+Stefan
+
+>
+> Yours,
+> Linus Walleij
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 _______________________________________________
 linux-arm-kernel mailing list
