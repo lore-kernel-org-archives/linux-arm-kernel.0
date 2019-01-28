@@ -2,80 +2,83 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 408DFC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 13:44:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0A958C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 13:50:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 12BF12171F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 13:44:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CDB162087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 13:50:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oR+Q+Ix8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="XWWjD84E"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 12BF12171F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uo9COPN8";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="GOzFILp/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CDB162087F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oaG6PorcOiVJ88oMyIiCLrqskJ87KFKz82nMxhPba00=; b=oR+Q+Ix8wL/zRD
-	cPVT+WVjZvG1tfoNwIU2H5Atmx87zdf+K0eD39pvIXu72v7coTQNMS24bUxoOTPIzc55WoZTbmI1d
-	ByzNJbYwgx8gpZF6qycQPu5FrQoxWC4A6lw586twz95jxaKoaW6kLEPVIanpCPTM2ZBkfM1zTjvfd
-	5QgJ2IBhBf4zWjQODPY9tU7EykVdeXxBRBgNRIghomF66GBcadZ7l02OFJAc58zu9s9BJX1MHIaWI
-	5v1sy8pW1Fyx0KpygVLN6imWxEEU7dQ1ggl7pSsiN/orWqZxgS9B8VSX6ZaP+/gUEVfqoAV0P+14A
-	D3cYw2/bHcO4VOBizobw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=k5tK0CrSw4ML27MtoKkzOiGP2yreP5v5+tVSdatgkEM=; b=uo9COPN8VmH53R
+	rh4xL22r4s6ncCQtTdKhKeP5Y2XRX1yIciJeoNr98SIYjc4bZo1e4Mi6gdgrXGnsK3sR6Eikg8fVW
+	rhcysnC0ut+QYFd4P8hFz8ZQhwaay3mvxL3/EFST04tkVhC67eCkHTVfCxsvf2ie+Gsm9zdq/LXk8
+	rQmZSeCmYbkgZy8zDChYQbx79l8AtuULiynIjYXT6fjquzil9XLPjuiguf0E3bnSSmXnTVBhNSyTu
+	M72n5YtxmgOF6xT9XX4Y8lELx0UwPrX9MSDk7vduV4xAUOH8lEKrfwidxj118TuJmPN5+dXb58JXl
+	ZbxR+w+LpOpMnhuzXlag==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go7Ch-0004BB-J1; Mon, 28 Jan 2019 13:43:59 +0000
+	id 1go7Id-0006Dv-6N; Mon, 28 Jan 2019 13:50:07 +0000
 Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go7Ce-0004Ak-7t
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 13:43:57 +0000
-Received: by mail-lf1-x143.google.com with SMTP id v5so11856679lfe.7
+ id 1go7IW-0005oR-Ux
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 13:50:02 +0000
+Received: by mail-lf1-x143.google.com with SMTP id p6so11927776lfc.1
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 05:43:54 -0800 (PST)
+ Mon, 28 Jan 2019 05:50:00 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=KSSQy5S6QE7RDBm3NS+S4YIXbwfX8BbfMaGVRtuBv0E=;
- b=XWWjD84Epz7vnqMkXSHZVCUq/sjp/B6pTtUdidS/5oy24oLuLFTUDYjFSyvcpccNQN
- R78w2Y2yixr2F2QRXssOo3isRniZswRW+G9MMRg1sTXKA/QQE/5/71Gd45Tts1CFhrfL
- uE2JGRMhls3fGI5CfFoaym4r9Pz1j8EwJ5Id8=
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=AiZvB0E5Pl9On7hsxkTERflPl7J4LOC/VIOv/AccAOU=;
+ b=GOzFILp/TcukYNWnxug3YtbVbMeoHEA4o94AGiIp8xZDxjWa46bsJAc6QQZRRm6SdN
+ NL5Z7APBIaLOTNqsyMHM9Zgh8uEmbpvZ+PdsAVCxorZe02cPx2YVjRG/WMsYuF8s7idV
+ 385mHQiFILLq2Hil6lUCtBAch8aIIxXJMznrQ=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=KSSQy5S6QE7RDBm3NS+S4YIXbwfX8BbfMaGVRtuBv0E=;
- b=ALkncIZvN8REC/L7CvpLPbCjAECvA+GRRBnz2Kdt5jSF8Vg4MQX6PZbI6prR2qda24
- mncXKT5I3KUqSTXKyenNPdMnqzcce6nqsgM2Z67bdjSAgAlZOrzoHQloB7jr78BHI1ou
- 6b95LdWvUS1qwZETc+B6eeBBP4THssxsgiw/RZg9wzI5VHJUhIgtI/p+nUoDRGI4oSo1
- VgE2HmPi0ML/vcthrqpST5T3qNQezHNzeTCgEBXReBf4xGpuGbX4ShQ/T/zOTMAzWyXT
- HxaVrOtzwg2qtynNREHPjX6izA+wiewlwDoXuPOqdbSbxUuJffGCaj/7Uo3ti3Yn04yC
- i0Pg==
-X-Gm-Message-State: AJcUukcjOwr7iVWRA4toMmP2qHWQ46tn1Vd8OtUSf2rPWAsYKJUAXBuo
- py5AfP1nyZA7S3Nsiuk1bZ6b2UdAlF0uSmgb+TnmDw==
-X-Google-Smtp-Source: ALg8bN6jhe7J5o0PZRdUP/xOMN6ZHj21qHLi7KUc3yGZo1mvObn/9lPcX5QETWqo41Lqs46p28KfdyrleyM0jtlA0fg=
-X-Received: by 2002:a19:db82:: with SMTP id t2mr16334927lfi.130.1548683032916; 
- Mon, 28 Jan 2019 05:43:52 -0800 (PST)
-MIME-Version: 1.0
-References: <20190123084140.16524-1-yuehaibing@huawei.com>
-In-Reply-To: <20190123084140.16524-1-yuehaibing@huawei.com>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=AiZvB0E5Pl9On7hsxkTERflPl7J4LOC/VIOv/AccAOU=;
+ b=heQanrK6xECaX0tCYaUhytB1fGEUHCBbdh4szYhKHIh4tDFi+ftt3/OF8lUC/RBRZN
+ Q4nqq+FvRTyRPmlJtci5uYH6FAL5Rodl/Yf6kLY9V+XgNQpfN4Z6sY3JYm5CB9S44piT
+ mxnUsUAifAlNiwPHHGXjfCoDOIFVP5rJn6lRbdFB84lJDf9idmwhMSKOK6u2D3kIgUkt
+ lX5O5QYnlmOgNNLH1HT7ToubPFoOYkPLpDQABf1S3ekJc4czhMwtvnG77+AKwGASComI
+ acbc1sJGKefOM2aYxJtHmY3VxvM4od0gX6HMKL0n2A063T847ZSC1cHvlNnzKVTUGZlc
+ SQzA==
+X-Gm-Message-State: AJcUukcr5HG/tuDfvVz4Ye2Xf5WTMcDh0NJZkTvR/WeMwszDzaXpygEh
+ bEyGH13j4FBjbSgRQb9amGH6Xw==
+X-Google-Smtp-Source: ALg8bN58YKRAWL5Mr8WmnsKPqGDHrcxa2SBEiQauVaGMHP0SOiGKVNuwmoJnhsLzGY3m4XHhe745wg==
+X-Received: by 2002:a19:8096:: with SMTP id b144mr16116460lfd.8.1548683396777; 
+ Mon, 28 Jan 2019 05:49:56 -0800 (PST)
+Received: from genomnajs.ideon.se ([85.235.10.227])
+ by smtp.gmail.com with ESMTPSA id q8-v6sm2961499lji.69.2019.01.28.05.49.55
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 28 Jan 2019 05:49:55 -0800 (PST)
 From: Linus Walleij <linus.walleij@linaro.org>
-Date: Mon, 28 Jan 2019 14:43:41 +0100
-Message-ID: <CACRpkdb0V5e5=OgaFe=jPubEV-JaDNpEGNjE24SjZAAuEtMweQ@mail.gmail.com>
-Subject: Re: [PATCH -next] pinctrl: sirf: drop pointless static qualifier in
- sirfsoc_gpio_probe
-To: YueHaibing <yuehaibing@huawei.com>
+To: arm@kernel.org
+Subject: [PATCH v2] ARM: defconfig: axm55xx: Drop PL11x graphics driver
+Date: Mon, 28 Jan 2019 14:49:53 +0100
+Message-Id: <20190128134953.14726-1-linus.walleij@linaro.org>
+X-Mailer: git-send-email 2.20.1
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_054356_280356_27CFA534 
-X-CRM114-Status: UNSURE (   8.11  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190128_055000_997541_FABAFA17 
+X-CRM114-Status: GOOD (  10.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,29 +90,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
- Barry Song <baohua@kernel.org>, Kees Cook <keescook@chromium.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+Cc: Krzysztof Adamski <krzysztof.adamski@nokia.com>,
+ Linus Walleij <linus.walleij@linaro.org>,
+ Anders Roxell <anders.roxell@linaro.org>, linux-arm-kernel@lists.infradead.org,
+ John Logan <john.logan@intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 23, 2019 at 9:42 AM YueHaibing <yuehaibing@huawei.com> wrote:
+The defconfig for the AXM55xx includes the ARM CLCD
+(PL11x) PrimeCell framebuffer driver, but the device tree
+for this platform does not include this hardware, nor do I
+find it likely that this chip has graphics.
 
-> There is no need to have the 'sgpio' variable static since new
-> value always be assigned before use it.
->
-> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+Drop these config items.
 
-Patch applied.
+Cc: John Logan <john.logan@intel.com>
+Cc: Anders Roxell <anders.roxell@linaro.org>
+Acked-by: Krzysztof Adamski <krzysztof.adamski@nokia.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Collected Krzysztof's ACK.
 
-I haven't heard from the SirfSoC people in some time, I wonder
-if they still actively maintain this file?
+ARM SoC folks: please apply this directly for defconfigs
+for v5.1.
+---
+ arch/arm/configs/axm55xx_defconfig | 4 ----
+ 1 file changed, 4 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/configs/axm55xx_defconfig b/arch/arm/configs/axm55xx_defconfig
+index 8e17e7ed1f02..53864316bee1 100644
+--- a/arch/arm/configs/axm55xx_defconfig
++++ b/arch/arm/configs/axm55xx_defconfig
+@@ -155,10 +155,6 @@ CONFIG_PMBUS=y
+ CONFIG_SENSORS_LTC2978=y
+ CONFIG_WATCHDOG=y
+ CONFIG_ARM_SP805_WATCHDOG=y
+-CONFIG_FB=y
+-CONFIG_FB_ARMCLCD=y
+-CONFIG_FRAMEBUFFER_CONSOLE=y
+-CONFIG_LOGO=y
+ # CONFIG_LOGO_LINUX_MONO is not set
+ # CONFIG_LOGO_LINUX_VGA16 is not set
+ CONFIG_HID_A4TECH=y
+-- 
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
