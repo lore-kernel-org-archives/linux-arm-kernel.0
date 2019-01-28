@@ -2,101 +2,79 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C10E2C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:24:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9777FC282CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:25:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7C9DE2147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:24:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5D8C121783
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:25:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZcNVp+2v";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="DyRBPFna"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7C9DE2147A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="regVEG/r";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="PmeU1g9+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D8C121783
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=hadess.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uqj3i0GcBrBvmzY/xUmcBCZswL4+e0kw1BI1+/bCXMQ=; b=ZcNVp+2vREPksX
-	3YeBB5VK+X+KZpWGbFmLjX5Ot1YWbvcU0l6ra7CtOwoFtxls4LmvA14PDNxIn2kMmIyGhIzofNyl1
-	eKjmYUnZtg92i4/p/tua7ZYy/1bP0Tf/L7hpimD81G2DsG/AVdl/FggsONCn10ZK1BKR6Qv5JJXRM
-	JpocgUejX0jGCySNI6BOM27siXvkbSGKbFEs+LNnXmEdXYPZ0AcPQy3WPTNNUHhhiGIwcA5+xSkpX
-	z5VO+no8cB2yJi2HseQvGhdJr9b6nbIjHkhi5qAXMWG9kWw5fJlHfTtgWN4M7b7g6g9NnGtQCkAtg
-	Q9Hb53j5pfToOlIL+oQg==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Cc:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=sbzX7MZi6y+KEWSeCQ9WBUaIv4EshF/F1rDkZqStkk4=; b=regVEG/rjkWYpr
+	brpUqoAVQfcbY5v2vRJtbdgG8Eqh56ezy/fCoNngDqS9qVWvwyv1MUshcocJhx1oMWyDMLybS8Wfl
+	ujUsfxuYMQ++nnz/VardBqpJrrprS3FyqMb9h9qiSzwk3v09fQZHg6yClSEM9xrPeyjPir/VlHAYJ
+	y0kg8jdGcy5sSOHWyyjLjmReDQbXi+Sd5pMFABfehUd7CuHJgu1qjisGO0EDWSwpXZD88y7akfaEc
+	9GsitLm5zlQaHyxTVf2D7s9qHNK3VmbJh0xSaOcqU3MyTioHQBRhHAFQrDJd6uq/gifDiMJSQ6WlG
+	w82T2qghY9Dr1vIR4aTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goBaI-00013F-TT; Mon, 28 Jan 2019 18:24:38 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1goBb1-0002RL-1m; Mon, 28 Jan 2019 18:25:23 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goBZf-0000NV-Nz
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 18:24:10 +0000
-Received: by mail-wm1-x342.google.com with SMTP id d15so15082250wmb.3
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 10:23:59 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=Xj0d7I32fuOoqVi/A/OMH6CHS57j+7/CkGP/z0TtpYo=;
- b=DyRBPFnaOtHAe58P28Ksxfr8kQ9iztZPGwdqJND42tFnfs0mkVaU0Ni1na9iebvPr0
- riU2eO7DtqEg0bJhRiOaygMeNgKSMW7+Gkur8bqM/zfqSd9DE1GZHW4UxiKkcj2/cLJD
- 1yABo0h5Tl8dsod21VE1Ss/4YGlX0gmcig0uxJ3GZ66a0IDRke6egMG/Abx4heXCa4Ow
- 9VXnG2H9lFjNz/f/0GU2XAxT+iMTzktW68Ygd9sFRsRvWw/iLq431D2xJj9E0NhtWoV6
- t13dPcDXcLs2abwAwQsaZivo7nN7C57Sk8exyYm8EHuVGcjho/nso0n0rd+2MUFirGqs
- KFMw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=Xj0d7I32fuOoqVi/A/OMH6CHS57j+7/CkGP/z0TtpYo=;
- b=L62wI+pfLa0YnTopwESk4XCz/diBDbXV3lTzjkH5qyojzwiu1bgc6Rg3HHpnnfrb1M
- 2GvWO37gwilVjcAakCB3eGmIuKwFLftBZCKhowJBmAVyUMtA9Cz+7LMTTB9gAfGAzC1K
- +zwM1Nd0lPcGqD38C/GL0qzUMLpnSw/5z6qT3j9vdXkB9TDXAQRF0lI6Rph9bs8DbdA5
- lKV2IUu3By90Yl5WqcTWhlImjC4Ih7kIY5MvPZfKUi+9LinsTy67J5QC6iXgYDyiTrzI
- aDv4wAaH5oZfNeQr2KeGwLDYckm0x1npAl4vL0WK5/RtbuKtrje8q3yFM+8JSAttDf0O
- inng==
-X-Gm-Message-State: AJcUukd6e57NA4VayO2tzp7wer+Q0WZEpFagD9WKP/ysZSQxvTdu51+D
- VzNi4ozUDz86r2TON2QL1/I=
-X-Google-Smtp-Source: ALg8bN5yTpyDsiVwfOmewXm63lxTer9dRcYX5iq2Nh5OnyJ2MskdmF1E3Sbs+oLlBOelH08kGROn5Q==
-X-Received: by 2002:a1c:9a4c:: with SMTP id c73mr18785268wme.35.1548699837472; 
- Mon, 28 Jan 2019 10:23:57 -0800 (PST)
-Received: from ?IPv6:2003:ea:8bf1:e200:2c9c:e1a3:b321:9449?
- (p200300EA8BF1E2002C9CE1A3B3219449.dip0.t-ipconnect.de.
- [2003:ea:8bf1:e200:2c9c:e1a3:b321:9449])
- by smtp.googlemail.com with ESMTPSA id m4sm213090wml.2.2019.01.28.10.23.56
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 28 Jan 2019 10:23:56 -0800 (PST)
-Subject: Re: [PATCH 0/3] at803x: Add quirk to disable SmartEEE
-To: Russell King - ARM Linux admin <linux@armlinux.org.uk>,
- Carlo Caione <ccaione@baylibre.com>
-References: <20190125125513.23656-1-ccaione@baylibre.com>
- <20190125130612.npknjuzjmny4yohg@e5254000004ec.dyn.armlinux.org.uk>
- <20190125184330.dm3kaoewvbwddacy@xps>
- <a8b8e82f-2b68-ed9d-6106-0542dddc1181@gmail.com>
- <20190125191947.um4w4e5jpsv2kcxc@e5254000004ec.dyn.armlinux.org.uk>
- <3e09ef54-f817-2659-4e9e-74a88a80cbcc@gmail.com>
- <20190128104620.3e724lfm5xv5il4x@xps>
- <20190128155739.yyftnu7a5hz6if7d@e5254000004ec.dyn.armlinux.org.uk>
-From: Heiner Kallweit <hkallweit1@gmail.com>
-Message-ID: <9118a1cc-7ad7-cdfc-4925-d609efbc8265@gmail.com>
-Date: Mon, 28 Jan 2019 19:23:49 +0100
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <20190128155739.yyftnu7a5hz6if7d@e5254000004ec.dyn.armlinux.org.uk>
-Content-Language: en-US
+ id 1goBaq-0001gK-CL; Mon, 28 Jan 2019 18:25:12 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:Mime-Version:
+ Content-Type:References:In-Reply-To:Date:To:From:Subject:Message-ID:Sender:
+ Reply-To:Cc:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=r1XU3ocFpnsznbPSbxFceyXNXEb17hRGRbRwITPYzYs=; b=PmeU1g9+y5uZlXlwXJR0tsuwhw
+ aEfIPG289zqprOda6fivLJKJZyAy8sxikQ8CBAxy2Y/53/kBJQCahQWk9jEdo4uisAlp53Latd4a+
+ CijskxpbAzkQMeanUUhl/s4b3sudOJdsjDjWFXoFPD0HxprzOKhbrHwUDh9lENLgvhjyq3gfgVNdX
+ kBGnNX+l6mXLM4rVDr5oW3HoxPopq9dEKb/8Q2JDy7m8qndKtoKPWNbockkH/gxdMyPgypEn4sCcC
+ iR185wgFyEDBD45hD0A0yhm8JZs/vcBY94cQhwxZ9lxt9+q3DBotrZPJXtzCFgOp1XuniIlXiXZYU
+ nMqtuLiw==;
+Received: from relay6-d.mail.gandi.net ([217.70.183.198])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goBam-0003AE-Le; Mon, 28 Jan 2019 18:25:10 +0000
+X-Originating-IP: 83.155.44.161
+Received: from classic (mon69-7-83-155-44-161.fbx.proxad.net [83.155.44.161])
+ (Authenticated sender: hadess@hadess.net)
+ by relay6-d.mail.gandi.net (Postfix) with ESMTPSA id 886FDC0003;
+ Mon, 28 Jan 2019 18:24:33 +0000 (UTC)
+Message-ID: <7e289e6b3410a3fdea99d7d6becfe5180a69f0c5.camel@hadess.net>
+Subject: Re: [PATCH] input: goodix - support Goodix gt5688
+From: Bastien Nocera <hadess@hadess.net>
+To: Guido =?ISO-8859-1?Q?G=FCnther?= <agx@sigxcpu.org>, Dmitry Torokhov
+ <dmitry.torokhov@gmail.com>, Rob Herring <robh+dt@kernel.org>, Mark Rutland
+ <mark.rutland@arm.com>, Matthias Brugger <matthias.bgg@gmail.com>, 
+ linux-input@vger.kernel.org, devicetree@vger.kernel.org, 
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org, 
+ linux-mediatek@lists.infradead.org
+Date: Mon, 28 Jan 2019 19:24:33 +0100
+In-Reply-To: <20190128170310.GA305@bogon.m.sigxcpu.org>
+References: <20190128170310.GA305@bogon.m.sigxcpu.org>
+User-Agent: Evolution 3.30.4 (3.30.4-1.fc29) 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_102400_779416_C4B9853F 
-X-CRM114-Status: GOOD (  28.66  )
+X-CRM114-CacheID: sfid-20190128_132508_821673_AF0CDDBB 
+X-CRM114-Status: GOOD (  15.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,80 +86,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, andrew@lunn.ch, f.fainelli@gmail.com,
- devicetree@vger.kernel.org, s.hauer@pengutronix.de, robh+dt@kernel.org,
- abailon@baylibre.com, kernel@pengutronix.de, fabio.estevam@nxp.com,
- shawnguo@kernel.org, aisheng.dong@nxp.com,
- linux-arm-kernel@lists.infradead.org, linux-imx@nxp.com
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 28.01.2019 16:57, Russell King - ARM Linux admin wrote:
-> On Mon, Jan 28, 2019 at 10:46:20AM +0000, Carlo Caione wrote:
->> On 25/01/19 20:27, Heiner Kallweit wrote:
->>> OK, then the description of the referenced patch isn't fully correct
->>> and SmartEEE and EEE are partially compatible, and the problem is
->>> just that we don't know exactly to which extent.
->>
->> Reading from the datasheet at [0] it seems that SmartEEE is compatible with
->> EEE but it's something different.
-> 
-> As I understand it, SmartEEE is just like normal EEE as far as the link
-> partner is concerned.  The difference is between the PHY and MAC.  What
-> follows is a simplified understanding of the differences.
-> 
-> In conventional EEE, the MAC takes part in EEE - the local MAC requests
-> that its attached PHY enters LPI mode, which signals to the link partner
-> PHY that the data stream on the link is going to pause.  When the local
-> MAC wants to transmit, it first has to signal to the attached PHY that
-> the link should be woken up, and the MAC has to wait for the link to
-> exit LPI before transmitting.
-> 
-> With SmartEEE, the decision to enter LPI mode is taken not by the local
-> MAC but by the PHY instead, since SmartEEE is designed to produce power
-> savings for MACs that do not support LPI.  Of course, they won't achieve
-> the same power saving as real EEE, but they do help to reduce the power
-> dissipation in the PHY.
-> 
-> PHYs that support this buffer some data from the MAC, and that buffering
-> has to be sufficient for the delay in the link coming out of LPI mode
-> without losing data.
-> 
-> As far as the link partner is concerned, EEE and SmartEEE appear the
-> same.
-> 
->> With SmartEEE the PHY can actually enter LPI state even if this is not
->> supported by the link partner since the LPI pattern is generated inside the
->> PHY itself, so auto-implementing a sort of EEE.
-> 
-> It sounds to me like you have this the wrong way round.  SmartEEE isn't
-> about the link partner not supporting LPI, it's about the local MAC not
-> supporting EEE, but still getting some power savings.
-> 
-> EEE (of either kind) can only be entered on the link when both the
-> local PHY and remote PHY indicate support for EEE, and have negotiated
-> that they support EEE.
-> 
-> Most of the power dissipation is from driving the signals into the
-> network cable (which is a lossy environment) to ensure that the far
-> end has sufficient signal to keep the link established.  SmartEEE is
-> about giving a way to enter 802.3az EEE mode on the _cable_ with a
-> MAC that does not support EEE.
-> 
-> I've monitored the signals on a link with an Atheros AR8035 with
-> SmartEEE mode enabled, and a Marvell 88e1514 PHY in a Marvell switch
-> on the other end, and seen the signals on the cable quiesce as a
-> result of SmartEEE, but only when _both_ partners are set to allow
-> EEE in the negotiated link mode.
-> 
-
-If SmartEEE is compatible with EEE on a PHY level, then I'd expect that
-advertisement of SmartEEE at different speeds can be controlled via the
-standard EEE MMD regs. Is this the case?
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gTW9uLCAyMDE5LTAxLTI4IGF0IDE4OjAzICswMTAwLCBHdWlkbyBHw7xudGhlciB3cm90ZToK
+PiBGcm9tIHdoYXQgSSd2ZSBzZWVuIGluIHZlbmRvciB0cmVlcyBpdCdzIGZpbmUgdG8gdHJlYXQg
+dGhpcyBhcyBndDF4wrkuCj4gCj4gWzFdOiBodHRwczovL2dpdGh1Yi5jb20vVGFkaVQ3L2FuZHJv
+aWRfa2VybmVsX210ay00LjQvdHJlZS9tYXN0ZXIvZHJpdmVycy9pbnB1dC90b3VjaHNjcmVlbi9t
+ZWRpYXRlay9HVDU2ODgKCkNhbiB5b3UgcGxlYXNlIHBvaW50IHRvIHRoZSBleGFjdCBsaW5lIG9m
+IGNvZGUgdGhhdCBtYWtlcyB5b3Ugc2F5IHRoYXQ/CkknbSBub3Qgc2F5aW5nIGl0J3Mgbm90IGNv
+bXBhdGlibGUsIGJ1dCBpdCdzIG5vdCB0aGUgc2FtZSBkcml2ZXIgdGhhdAp0aGUgY3VycmVudCBn
+b29kaXguYyB3YXMgYmFzZWQgb24sIG9yIGV2ZW4gZ29vZGl4LmMuCgpDYW4geW91IHBsZWFzZSBl
+bGFib3JhdGU/CgpGaW5kaW5nIHRoYXQgZGF0YSBpbiB0aGUgc3BlY3Mgd291bGQgYWxzbyBiZSBm
+aW5lOgpodHRwczovL2dpdGh1Yi5jb20vaGFkZXNzL2d0OXh4L3RyZWUvbWFzdGVyL3NwZWNpZmlj
+YXRpb25zCgpDaGVlcnMKClsxXTogb3JpZ2luYWwgZHJpdmVyOgpodHRwczovL2dpdGh1Yi5jb20v
+aGFkZXNzL2d0OXh4L2NvbW1pdC84MmIxNDEyMjBlOGJjZTAwMDYwZTBkZTY5NzczNWQwYTcwYWYy
+Njc4Cgo+IFNpZ25lZC1vZmYtYnk6IEd1aWRvIEfDvG50aGVyIDxhZ3hAc2lneGNwdS5vcmc+Cj4g
+LS0tCj4gIERvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9pbnB1dC90b3VjaHNjcmVl
+bi9nb29kaXgudHh0IHwgMSArCj4gIGRyaXZlcnMvaW5wdXQvdG91Y2hzY3JlZW4vZ29vZGl4LmMg
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgIHwgMgo+ICsrCj4gIDIgZmlsZXMgY2hhbmdlZCwg
+MyBpbnNlcnRpb25zKCspCj4gCj4gZGlmZiAtLWdpdAo+IGEvRG9jdW1lbnRhdGlvbi9kZXZpY2V0
+cmVlL2JpbmRpbmdzL2lucHV0L3RvdWNoc2NyZWVuL2dvb2RpeC50eHQKPiBiL0RvY3VtZW50YXRp
+b24vZGV2aWNldHJlZS9iaW5kaW5ncy9pbnB1dC90b3VjaHNjcmVlbi9nb29kaXgudHh0Cj4gaW5k
+ZXggZjdlOTVjNTJmM2M3Li41N2QzZDg4NzBhMDkgMTAwNjQ0Cj4gLS0tIGEvRG9jdW1lbnRhdGlv
+bi9kZXZpY2V0cmVlL2JpbmRpbmdzL2lucHV0L3RvdWNoc2NyZWVuL2dvb2RpeC50eHQKPiArKysg
+Yi9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvaW5wdXQvdG91Y2hzY3JlZW4vZ29v
+ZGl4LnR4dAo+IEBAIC0zLDYgKzMsNyBAQCBEZXZpY2UgdHJlZSBiaW5kaW5ncyBmb3IgR29vZGl4
+IEdUOXh4IHNlcmllcwo+IHRvdWNoc2NyZWVuIGNvbnRyb2xsZXIKPiAgUmVxdWlyZWQgcHJvcGVy
+dGllczoKPiAgCj4gICAtIGNvbXBhdGlibGUJCTogU2hvdWxkIGJlICJnb29kaXgsZ3QxMTUxIgo+
+ICsJCQkJIG9yICJnb29kaXgsZ3Q1Njg4Igo+ICAJCQkJIG9yICJnb29kaXgsZ3Q5MTEiCj4gIAkJ
+CQkgb3IgImdvb2RpeCxndDkxMTAiCj4gIAkJCQkgb3IgImdvb2RpeCxndDkxMiIKPiBkaWZmIC0t
+Z2l0IGEvZHJpdmVycy9pbnB1dC90b3VjaHNjcmVlbi9nb29kaXguYwo+IGIvZHJpdmVycy9pbnB1
+dC90b3VjaHNjcmVlbi9nb29kaXguYwo+IGluZGV4IGYyZDljMmM0MTg4NS4uNDdiMWNlZDQxNTc2
+IDEwMDY0NAo+IC0tLSBhL2RyaXZlcnMvaW5wdXQvdG91Y2hzY3JlZW4vZ29vZGl4LmMKPiArKysg
+Yi9kcml2ZXJzL2lucHV0L3RvdWNoc2NyZWVuL2dvb2RpeC5jCj4gQEAgLTIxNiw2ICsyMTYsNyBA
+QCBzdGF0aWMgY29uc3Qgc3RydWN0IGdvb2RpeF9jaGlwX2RhdGEKPiAqZ29vZGl4X2dldF9jaGlw
+X2RhdGEodTE2IGlkKQo+ICB7Cj4gIAlzd2l0Y2ggKGlkKSB7Cj4gIAljYXNlIDExNTE6Cj4gKwlj
+YXNlIDU2ODg6Cj4gIAkJcmV0dXJuICZndDF4X2NoaXBfZGF0YTsKPiAgCj4gIAljYXNlIDkxMToK
+PiBAQCAtOTQyLDYgKzk0Myw3IEBAIE1PRFVMRV9ERVZJQ0VfVEFCTEUoYWNwaSwgZ29vZGl4X2Fj
+cGlfbWF0Y2gpOwo+ICAjaWZkZWYgQ09ORklHX09GCj4gIHN0YXRpYyBjb25zdCBzdHJ1Y3Qgb2Zf
+ZGV2aWNlX2lkIGdvb2RpeF9vZl9tYXRjaFtdID0gewo+ICAJeyAuY29tcGF0aWJsZSA9ICJnb29k
+aXgsZ3QxMTUxIiB9LAo+ICsJeyAuY29tcGF0aWJsZSA9ICJnb29kaXgsZ3Q1Njg4IiB9LAo+ICAJ
+eyAuY29tcGF0aWJsZSA9ICJnb29kaXgsZ3Q5MTEiIH0sCj4gIAl7IC5jb21wYXRpYmxlID0gImdv
+b2RpeCxndDkxMTAiIH0sCj4gIAl7IC5jb21wYXRpYmxlID0gImdvb2RpeCxndDkxMiIgfSwKCgpf
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0t
+a2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcK
+aHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2Vy
+bmVsCg==
