@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8925BC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:08:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8268EC282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:08:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 57FC92148E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:08:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 459D52148E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:08:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y7qQZH9W";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="s9fk6aav"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57FC92148E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kZT5JrRk";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="bLJpQmG4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 459D52148E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iNjkv63J8w1e/BSi9OxaSDndMPtsT1LYX2b9QiJ/MOQ=; b=Y7qQZH9WHtpp0y
-	n/2XCgbm2BZOY71LOxu/MrvdXAkTPvBfmbFSqmRbj1DfNwJKf6tnI1shj4iMJ3l5Ana7oWUwDGF6+
-	ecoquhDCHDGietepnlaXBwHotrJIIO9DisyPjz9ra+nMcy77O9KEhZvTfBl+Vc0WX5NQRN2mpZPNe
-	GLUrqsCJWhbq8UmCUvypNXdwzC6U6sJSJWs/vBAvkmKeFm+NZNoS/RaK+zWw2tbxDWSTJ+mM+EyYf
-	N6PhyitDgwibDem3DVdyyYvIuXXIxC79QCUmUWVoEc9wM18JNwOqEf9E3AOLUHl0p7wCy04n5/TIN
-	BCzIx9f4hJkyCLOqAEMQ==;
+	List-Owner; bh=ojb3ROVTNpP2fzpAvgpU0EiQgdluMiUU2zc1zolB7os=; b=kZT5JrRkxM05j3
+	HHm1lwP7y1UcaNDwhlLGFmd6PGWrVcwlKrrv957TUjUXDGhJ3ZH9Bdps7U+EMi/dRf4HpHjklSEWh
+	UvUFmqVdH4BzcUCf7iZAEdxy2tnXBWZZOz6kXDarc/GFMDMRGvNdI5Txc7jdAV3CPsDk5h91HYVRb
+	TArzzJdT//XK2om+MxgpoEr7+4cu5Hoi9pXxd6M2AVMqet+uVSA2vmx2XiTklfGalSAV0GbWRQHi5
+	MZ/lK1WW5TwRNvXAu/lh8RlVAbjs+7g1ntyblpdCsi6qWa6ZWYc9036qgj4REBdFM3HhXqDh+76Qa
+	f5UBs8ee50VuU5cMOZAw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goBKE-0007OK-VI; Mon, 28 Jan 2019 18:08:02 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1goBKR-0007YX-9i; Mon, 28 Jan 2019 18:08:15 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goBH9-0003j9-9T
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 18:05:07 +0000
-Received: by mail-wr1-x441.google.com with SMTP id z5so19097802wrt.11
+ id 1goBHC-0003mb-MC
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 18:05:12 +0000
+Received: by mail-wr1-x443.google.com with SMTP id f7so19209471wrp.1
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 10:04:51 -0800 (PST)
+ Mon, 28 Jan 2019 10:04:54 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=tFsiSEWNipF5j/nl4GiByTeXt6gTIo/QNa1h8WqspDA=;
- b=s9fk6aav/smNqwREMwe6B+H4p5UdpW7nkEjbAL+Fcun3b3/M+kxgDzUZDHB3ffeOrx
- SFY8xMWPuBg5lUGBFx2dw3beHsXwoLCQiEGgHMFCiTluBkwSDbD9qn0oSb4B05vWuvXH
- jerhvW/yMoT7ft++LPY2mGXSfES2aqAYXgxqD7zoZK3P+/ChKfDFXwdm1uEG/dE9Trgp
- 3nclpK6SIjyYBqOCwJNiRPtPrbaVe1lnGN9a5YZHm9kxBkGKa0zZTUpPBCrdGTsbMxx0
- xW7MlWlrFCM7kRZxRiwfvRWNiznZSEGDAjU7hWP52YunjJPKBx3kDY51aXIjP4JGKkt9
- eAmA==
+ bh=nbXfyjfqzqGpHsSm+wGVBTSI4vzKOQ2CLwSheFxJ0pY=;
+ b=bLJpQmG4xEa3nqZqf2uYPgGgvShCScNAnZJS/q4tIDJxY5DwMpFJZ6mdtcbmCk/HP1
+ 3O/hdz5zfiulKkSzwA5TFEOFbS7E+gG4O4V0aVFaxQg/TUWTmnOlX+Gk8CHQN4dvuaRr
+ SUbrk8P8HqMB2t2froBrbHPnoLt1VOso5vywumJuWHFv5OSv6pGEekrC2TMP0zm1O6P/
+ WPJTLq4oZmGIVhUNkKJt7UpP3pANfvFrUzdYdUc9qMG+gqsEvzdeQmmyqzLIZbgtkihu
+ 4OZ7gqRALpFPdLOzxOIDtLt0efq3sYAqMUIjBg0lMHrIzz0iuXII0gHXWKJU+YuGPbBS
+ 7jmw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=tFsiSEWNipF5j/nl4GiByTeXt6gTIo/QNa1h8WqspDA=;
- b=LIG3MtgdqWH+NXDcwKT46NNzLjjBV/dHkJOEcSZwc/sYbWg2NKOHw35xkAOgsPlcLp
- r67BndYauuMEiWWwHOmax9+jmm+21+zOjMcPd/tv1f+UpPOo79veu0sw8Po9kBMMLqEn
- QTGGvuZ8hS0Vey3brNABGhOs3GTQECUKSVHpbd+aryp5GzxzriHlWPjfCgf086/lrOAd
- frPy4qObLpvsrVHQU5OOwOjnFLi8lm1WcX/FTyKcINLQ2aZwkLWFsZKLu960j7Sx9Uen
- xmdJbqfy8Nrd9b0qVzOLCLsTfsDfVX2mahJbOtm2ueAFefc7+oXbI7GWsxiQvPfxt8US
- AZPw==
-X-Gm-Message-State: AJcUukdr3yKolYL32v/7Dn7H6drq7+RPXSHZrtMtpNt+kKsEjedJVGGK
- 0384AfUjuN8cvVcNK98Y8mtbfQ==
-X-Google-Smtp-Source: ALg8bN43+P7d4wrn97gV8O0Ak5AVOuyFY/9fHPH1klbLsHnSlllH1qCMuc1gy1HgllQVPkmK6SXfUA==
-X-Received: by 2002:a5d:6647:: with SMTP id f7mr22600942wrw.225.1548698689917; 
- Mon, 28 Jan 2019 10:04:49 -0800 (PST)
+ bh=nbXfyjfqzqGpHsSm+wGVBTSI4vzKOQ2CLwSheFxJ0pY=;
+ b=kK3ZGhCigFPQUTpVDR5jOttniKxg3v7jUWKQ9RLbROfABZNgXylHOFo7bxJ6ekGkKG
+ yYzSf98w+gevMtBlEtEAsN8s0Zpc/GeXzgQAUHfB4TqXRy6+mD7zWTj01ycpGKBMzLkS
+ KyOsDexgIj42N0U9vD4NikQpdT9Qjdw2rF90WuFIWzVYp+RMxBq+FlBgxp87HrK92BX2
+ y5ATsKLnZrh0zhvlwOMrMnSxDItqqj2VFX6+k34GGB/sbYy4op2uj8+0db/3tt5OTOep
+ OQxkMpRaV2qcDD+Lw5uuRnRWrZqY9r9qwLrcicJqWT2zA78MkOEgUXyK8ClG1KWSLAkC
+ aS8w==
+X-Gm-Message-State: AHQUAuZ++nEZ7jfWrtqrEZd4WwwK0Mi65QEvxnVU8ayW9cSzv4kNS6qm
+ 3Z9EFOtVbd+2lflswa71J1nhyq4GJmk=
+X-Google-Smtp-Source: AHgI3Ibf86P6JrR4OEXFj0tAJZiXCpcxEJRKZPGFbtTm60QemWO8lWx4yqtwQENi/Hxu6K3Voru+hg==
+X-Received: by 2002:adf:fd81:: with SMTP id d1mr15171607wrr.105.1548698693294; 
+ Mon, 28 Jan 2019 10:04:53 -0800 (PST)
 Received: from boomer.local ([2a01:e34:eeb6:4690:106b:bae3:31ed:7561])
- by smtp.googlemail.com with ESMTPSA id p6sm145548193wrx.50.2019.01.28.10.04.48
+ by smtp.googlemail.com with ESMTPSA id p6sm145548193wrx.50.2019.01.28.10.04.51
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 28 Jan 2019 10:04:49 -0800 (PST)
+ Mon, 28 Jan 2019 10:04:52 -0800 (PST)
 From: Jerome Brunet <jbrunet@baylibre.com>
 To: Neil Armstrong <narmstrong@baylibre.com>, Stephen Boyd <sboyd@kernel.org>,
  Michael Turquette <mturquette@baylibre.com>
-Subject: [PATCH 05/14] clk: meson: move parm out of clkc
-Date: Mon, 28 Jan 2019 19:04:21 +0100
-Message-Id: <20190128180430.28689-6-jbrunet@baylibre.com>
+Subject: [PATCH 07/14] clk: meson: take the mpll driver out of clkc
+Date: Mon, 28 Jan 2019 19:04:23 +0100
+Message-Id: <20190128180430.28689-8-jbrunet@baylibre.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190128180430.28689-1-jbrunet@baylibre.com>
 References: <20190128180430.28689-1-jbrunet@baylibre.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_100451_715434_BFD12D84 
-X-CRM114-Status: GOOD (  13.01  )
+X-CRM114-CacheID: sfid-20190128_100455_252789_280F095F 
+X-CRM114-Status: GOOD (  16.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,108 +107,152 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/clk/meson/clkc.h | 34 +----------------------------
- drivers/clk/meson/parm.h | 46 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+), 33 deletions(-)
- create mode 100644 drivers/clk/meson/parm.h
+ drivers/clk/meson/axg.c      |  1 +
+ drivers/clk/meson/clk-mpll.c | 12 +++++++++++-
+ drivers/clk/meson/clk-mpll.h | 30 ++++++++++++++++++++++++++++++
+ drivers/clk/meson/clkc.h     | 14 --------------
+ drivers/clk/meson/gxbb.c     |  1 +
+ drivers/clk/meson/meson8b.c  |  1 +
+ 6 files changed, 44 insertions(+), 15 deletions(-)
+ create mode 100644 drivers/clk/meson/clk-mpll.h
 
-diff --git a/drivers/clk/meson/clkc.h b/drivers/clk/meson/clkc.h
-index 35768c2327ba..58a343fa94e6 100644
---- a/drivers/clk/meson/clkc.h
-+++ b/drivers/clk/meson/clkc.h
-@@ -9,39 +9,7 @@
+diff --git a/drivers/clk/meson/axg.c b/drivers/clk/meson/axg.c
+index 8a3896fa343f..dc973b4324f3 100644
+--- a/drivers/clk/meson/axg.c
++++ b/drivers/clk/meson/axg.c
+@@ -20,6 +20,7 @@
+ #include "clkc.h"
+ #include "clk-regmap.h"
+ #include "clk-pll.h"
++#include "clk-mpll.h"
+ #include "axg.h"
+ 
+ #define IN_PREFIX "ee-in-"
+diff --git a/drivers/clk/meson/clk-mpll.c b/drivers/clk/meson/clk-mpll.c
+index 650f75cc15a9..f76850d99e59 100644
+--- a/drivers/clk/meson/clk-mpll.c
++++ b/drivers/clk/meson/clk-mpll.c
+@@ -12,7 +12,11 @@
+  */
  
  #include <linux/clk-provider.h>
- #include "clk-regmap.h"
--
--#define PMASK(width)			GENMASK(width - 1, 0)
--#define SETPMASK(width, shift)		GENMASK(shift + width - 1, shift)
--#define CLRPMASK(width, shift)		(~SETPMASK(width, shift))
--
--#define PARM_GET(width, shift, reg)					\
--	(((reg) & SETPMASK(width, shift)) >> (shift))
--#define PARM_SET(width, shift, reg, val)				\
--	(((reg) & CLRPMASK(width, shift)) | ((val) << (shift)))
--
--#define MESON_PARM_APPLICABLE(p)		(!!((p)->width))
--
--struct parm {
--	u16	reg_off;
--	u8	shift;
--	u8	width;
--};
--
--static inline unsigned int meson_parm_read(struct regmap *map, struct parm *p)
--{
--	unsigned int val;
--
--	regmap_read(map, p->reg_off, &val);
--	return PARM_GET(p->width, p->shift, val);
--}
--
--static inline void meson_parm_write(struct regmap *map, struct parm *p,
--				    unsigned int val)
--{
--	regmap_update_bits(map, p->reg_off, SETPMASK(p->width, p->shift),
--			   val << p->shift);
--}
--
-+#include "parm.h"
+-#include "clkc.h"
++#include <linux/module.h>
++#include <linux/spinlock.h>
++
++#include "clk-regmap.h"
++#include "clk-mpll.h"
  
- struct pll_params_table {
- 	u16		m;
-diff --git a/drivers/clk/meson/parm.h b/drivers/clk/meson/parm.h
+ #define SDM_DEN 16384
+ #define N2_MIN	4
+@@ -138,9 +142,15 @@ const struct clk_ops meson_clk_mpll_ro_ops = {
+ 	.recalc_rate	= mpll_recalc_rate,
+ 	.round_rate	= mpll_round_rate,
+ };
++EXPORT_SYMBOL_GPL(meson_clk_mpll_ro_ops);
+ 
+ const struct clk_ops meson_clk_mpll_ops = {
+ 	.recalc_rate	= mpll_recalc_rate,
+ 	.round_rate	= mpll_round_rate,
+ 	.set_rate	= mpll_set_rate,
+ };
++EXPORT_SYMBOL_GPL(meson_clk_mpll_ops);
++
++MODULE_DESCRIPTION("Amlogic MPLL driver");
++MODULE_AUTHOR("Michael Turquette <mturquette@baylibre.com>");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/clk/meson/clk-mpll.h b/drivers/clk/meson/clk-mpll.h
 new file mode 100644
-index 000000000000..3c9ef1b505ce
+index 000000000000..cf79340006dd
 --- /dev/null
-+++ b/drivers/clk/meson/parm.h
-@@ -0,0 +1,46 @@
++++ b/drivers/clk/meson/clk-mpll.h
+@@ -0,0 +1,30 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +/*
-+ * Copyright (c) 2015 Endless Mobile, Inc.
-+ * Author: Carlo Caione <carlo@endlessm.com>
++ * Copyright (c) 2019 BayLibre, SAS.
++ * Author: Jerome Brunet <jbrunet@baylibre.com>
 + */
 +
-+#ifndef __MESON_PARM_H
-+#define __MESON_PARM_H
++#ifndef __MESON_CLK_MPLL_H
++#define __MESON_CLK_MPLL_H
 +
-+#include <linux/bits.h>
-+#include <linux/regmap.h>
++#include <linux/clk-provider.h>
++#include <linux/spinlock.h>
 +
-+#define PMASK(width)			GENMASK(width - 1, 0)
-+#define SETPMASK(width, shift)		GENMASK(shift + width - 1, shift)
-+#define CLRPMASK(width, shift)		(~SETPMASK(width, shift))
++#include "parm.h"
 +
-+#define PARM_GET(width, shift, reg)					\
-+	(((reg) & SETPMASK(width, shift)) >> (shift))
-+#define PARM_SET(width, shift, reg, val)				\
-+	(((reg) & CLRPMASK(width, shift)) | ((val) << (shift)))
-+
-+#define MESON_PARM_APPLICABLE(p)		(!!((p)->width))
-+
-+struct parm {
-+	u16	reg_off;
-+	u8	shift;
-+	u8	width;
++struct meson_clk_mpll_data {
++	struct parm sdm;
++	struct parm sdm_en;
++	struct parm n2;
++	struct parm ssen;
++	struct parm misc;
++	spinlock_t *lock;
++	u8 flags;
 +};
 +
-+static inline unsigned int meson_parm_read(struct regmap *map, struct parm *p)
-+{
-+	unsigned int val;
++#define CLK_MESON_MPLL_ROUND_CLOSEST	BIT(0)
 +
-+	regmap_read(map, p->reg_off, &val);
-+	return PARM_GET(p->width, p->shift, val);
-+}
++extern const struct clk_ops meson_clk_mpll_ro_ops;
++extern const struct clk_ops meson_clk_mpll_ops;
 +
-+static inline void meson_parm_write(struct regmap *map, struct parm *p,
-+				    unsigned int val)
-+{
-+	regmap_update_bits(map, p->reg_off, SETPMASK(p->width, p->shift),
-+			   val << p->shift);
-+}
-+
-+#endif /* __MESON_PARM_H */
-+
++#endif /* __MESON_CLK_MPLL_H */
+diff --git a/drivers/clk/meson/clkc.h b/drivers/clk/meson/clkc.h
+index 4857c8fa1ac4..32947bd76bab 100644
+--- a/drivers/clk/meson/clkc.h
++++ b/drivers/clk/meson/clkc.h
+@@ -11,18 +11,6 @@
+ #include "clk-regmap.h"
+ #include "parm.h"
+ 
+-struct meson_clk_mpll_data {
+-	struct parm sdm;
+-	struct parm sdm_en;
+-	struct parm n2;
+-	struct parm ssen;
+-	struct parm misc;
+-	spinlock_t *lock;
+-	u8 flags;
+-};
+-
+-#define CLK_MESON_MPLL_ROUND_CLOSEST	BIT(0)
+-
+ struct meson_clk_phase_data {
+ 	struct parm ph;
+ };
+@@ -54,8 +42,6 @@ struct meson_clk_dualdiv_data {
+ 
+ /* clk_ops */
+ extern const struct clk_ops meson_clk_cpu_ops;
+-extern const struct clk_ops meson_clk_mpll_ro_ops;
+-extern const struct clk_ops meson_clk_mpll_ops;
+ extern const struct clk_ops meson_clk_phase_ops;
+ extern const struct clk_ops meson_vid_pll_div_ro_ops;
+ extern const struct clk_ops meson_clk_dualdiv_ops;
+diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+index 813822ec5f57..6a8358f3e0ef 100644
+--- a/drivers/clk/meson/gxbb.c
++++ b/drivers/clk/meson/gxbb.c
+@@ -16,6 +16,7 @@
+ #include "gxbb.h"
+ #include "clk-regmap.h"
+ #include "clk-pll.h"
++#include "clk-mpll.h"
+ 
+ #define IN_PREFIX "ee-in-"
+ 
+diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
+index 9b35d5e08378..91a5306b13f6 100644
+--- a/drivers/clk/meson/meson8b.c
++++ b/drivers/clk/meson/meson8b.c
+@@ -20,6 +20,7 @@
+ #include "meson8b.h"
+ #include "clk-regmap.h"
+ #include "clk-pll.h"
++#include "clk-mpll.h"
+ 
+ static DEFINE_SPINLOCK(meson_clk_lock);
+ 
 -- 
 2.20.1
 
