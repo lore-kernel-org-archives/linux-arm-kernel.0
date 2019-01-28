@@ -4,61 +4,65 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 187CDC282CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 10:37:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BDB94C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 10:37:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DADA5214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 10:37:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8F036214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 10:37:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QaOTB0kV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DADA5214DA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kTxGeBLA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F036214DA
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6QqRQIe6m4R0NXnkDFpyx+6pYYTP2HYK1l8b3beBIRE=; b=QaOTB0kVJW0+ap
-	vcmeYHq3/44iRM1kEKSvm8Bx5OLUr4a9ZX5QzllWOHnYVOh0AaEZrWAHlg+F219VabuYwX46HufIl
-	/MO9u5aUNxhUXybUYTXto6c4kX00cMsXJ6mB3tDrmKdnusjHyeXxg9SxQTTOpk4P7CnK38oaRcNoO
-	HQ8daHXKWPI6h8SMJ864eeBxdygaaiSYtrw26mwmIZwrq2XXNIedlUwhiO6DvUFkLyjELZ2i0Qal2
-	TAKOY9hFVxRSbfbCgP9PyNTEcjSj/f9yefcisrdo2E0ipHpPTF6P568XWCbEah0fLzt/+hpXpVItS
-	aPzhqIA4O2HLbhvgiLzw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=PDTrANp3B1dAcLOVNY1xSp3Ei9+dDb9TDcRgU48ZRwo=; b=kTxGeBLAHYpyB+
+	ZkwBUcS9rINbw/N+tx3BGjKHS8v2VReayXMWL5DOJSxr0dOgI4ZJyIBWYgnJgcmpY3pWls7i5Pt26
+	eh74gU9YtlJ70uwA0wR9RvH25IJ4UbNE4HTwWJoQ+q1JJw/mwzZJOr8oI6EoNHroys36ku6x/+BQc
+	B5/0M3Hji2drypRImzXHhVUfs2C79/FxkO3G3t6egc8QEIPc+kuolkOXMpLoYpZtblINk3/ZrV3L4
+	NbHiCR5SF8V8J+Yn6oEoeeySz82XhdS0jxyX/a2pRD3YAEMicqVig4gevuqBLYTe8ziflna4DQzEt
+	MuuLZ/z+rbfpbtPDpgOg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go4I0-0001co-0e; Mon, 28 Jan 2019 10:37:16 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1go4IN-0001uD-1x; Mon, 28 Jan 2019 10:37:39 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go4Hs-0001VA-Ae
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 10:37:12 +0000
+ id 1go4I5-0001iO-O0
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 10:37:28 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 80E69EBD;
- Mon, 28 Jan 2019 02:37:06 -0800 (PST)
-Received: from [10.1.32.197] (e121487-lin.cambridge.arm.com [10.1.32.197])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6DA9F3F589;
- Mon, 28 Jan 2019 02:37:05 -0800 (PST)
-Subject: Re: [PATCH 2/4] arm64: dts: models: use list instead of tuple for
- mmci interrupts
-To: Sudeep Holla <sudeep.holla@arm.com>, linux-arm-kernel@lists.infradead.org
-References: <20190125175606.6607-1-sudeep.holla@arm.com>
- <20190125175606.6607-2-sudeep.holla@arm.com>
-From: Vladimir Murzin <vladimir.murzin@arm.com>
-Message-ID: <246b5569-efac-b229-2949-c6916b852c63@arm.com>
-Date: Mon, 28 Jan 2019 10:37:03 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <20190125175606.6607-2-sudeep.holla@arm.com>
-Content-Language: en-US
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id F1C2AEBD;
+ Mon, 28 Jan 2019 02:37:20 -0800 (PST)
+Received: from big-swifty.misterjones.org (big-swifty.cambridge.arm.com
+ [10.1.39.122])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7654E3F589;
+ Mon, 28 Jan 2019 02:37:18 -0800 (PST)
+Date: Mon, 28 Jan 2019 10:37:18 +0000
+Message-ID: <867eepvzj5.wl-marc.zyngier@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH v9 13/26] arm64: daifflags: Include PMR in daifflags
+ restore operations
+In-Reply-To: <1548084825-8803-14-git-send-email-julien.thierry@arm.com>
+References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
+ <1548084825-8803-14-git-send-email-julien.thierry@arm.com>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_023708_895483_866EA0EE 
-X-CRM114-Status: GOOD (  15.82  )
+X-CRM114-CacheID: sfid-20190128_023722_025496_E53FBA6D 
+X-CRM114-Status: GOOD (  23.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,42 +74,113 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Liviu Dudau <liviu.dudau@arm.com>
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org, catalin.marinas@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
+ james.morse@arm.com, joel@joelfernandes.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/25/19 5:56 PM, Sudeep Holla wrote:
-> RTSM/FVP vexpress motherboard model MMCI requires dedicated interrupts
-> for CMD and PIO, which obviously should be expressed as a list. Current
-> form uses tuple and it works fine since interrupt-cells equal to 1.
+On Mon, 21 Jan 2019 15:33:32 +0000,
+Julien Thierry <julien.thierry@arm.com> wrote:
 > 
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Reported-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> The addition of PMR should not bypass the semantics of daifflags.
+> 
+> When DA_F are set, I bit is also set as no interrupts (even of higher
+> priority) is allowed.
+> 
+> When DA_F are cleared, I bit is cleared and interrupt enabling/disabling
+> goes through ICC_PMR_EL1.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: James Morse <james.morse@arm.com>
 > ---
->  arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm64/include/asm/daifflags.h | 31 +++++++++++++++++++++++++++----
+>  1 file changed, 27 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi b/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
-> index b25f3cbd3da8..102e93744edc 100644
-> --- a/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
-> +++ b/arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
-> @@ -86,7 +86,7 @@
->  				mmci@50000 {
->  					compatible = "arm,pl180", "arm,primecell";
->  					reg = <0x050000 0x1000>;
-> -					interrupts = <9 10>;
-> +					interrupts = <9>, <10>;
->  					cd-gpios = <&v2m_sysreg 0 0>;
->  					wp-gpios = <&v2m_sysreg 1 0>;
->  					max-frequency = <12000000>;
+> diff --git a/arch/arm64/include/asm/daifflags.h b/arch/arm64/include/asm/daifflags.h
+> index 546bc39..1fd390e 100644
+> --- a/arch/arm64/include/asm/daifflags.h
+> +++ b/arch/arm64/include/asm/daifflags.h
+> @@ -18,6 +18,8 @@
+>  
+>  #include <linux/irqflags.h>
+>  
+> +#include <asm/cpufeature.h>
+> +
+>  #define DAIF_PROCCTX		0
+>  #define DAIF_PROCCTX_NOIRQ	PSR_I_BIT
+>  
+> @@ -36,7 +38,13 @@ static inline unsigned long local_daif_save(void)
+>  {
+>  	unsigned long flags;
+>  
+> -	flags = arch_local_save_flags();
+> +	flags = read_sysreg(daif);
+> +
+> +	if (system_uses_irq_prio_masking()) {
+> +		/* If IRQs are masked with PMR, reflect it in the flags */
+> +		if (read_sysreg_s(SYS_ICC_PMR_EL1) <= GIC_PRIO_IRQOFF)
+> +			flags |= PSR_I_BIT;
+> +	}
+>  
+>  	local_daif_mask();
+>  
+> @@ -45,12 +53,27 @@ static inline unsigned long local_daif_save(void)
+>  
+>  static inline void local_daif_restore(unsigned long flags)
+>  {
+> -	if (!arch_irqs_disabled_flags(flags))
+> +	bool irq_disabled = flags & PSR_I_BIT;
+> +
+> +	if (!irq_disabled) {
+>  		trace_hardirqs_on();
+>  
+> -	arch_local_irq_restore(flags);
+> +		if (system_uses_irq_prio_masking())
+> +			arch_local_irq_enable();
+> +	} else if (!(flags & PSR_A_BIT)) {
+> +		/*
+> +		 * If interrupts are disabled but we can take
+> +		 * asynchronous errors, we can take NMIs
+> +		 */
+> +		if (system_uses_irq_prio_masking()) {
+> +			flags &= ~PSR_I_BIT;
+> +			arch_local_irq_disable();
+> +		}
+> +	}
+> +
+> +	write_sysreg(flags, daif);
+
+After much head scratching, I finally came to the conclusion that the
+above is safe, as a write to PSTATE is guaranteed not to be visible to
+instructions before it in program order (and the write to PMR is
+itself self-synchronising). I guess that a reference to the ARM ARM is
+in order here (no pun intended...).
+
+>  
+> -	if (arch_irqs_disabled_flags(flags))
+> +	if (irq_disabled)
+>  		trace_hardirqs_off();
+>  }
+>  
+> -- 
+> 1.9.1
 > 
 
-FWIW
+With the above,
 
-Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
 
 _______________________________________________
 linux-arm-kernel mailing list
