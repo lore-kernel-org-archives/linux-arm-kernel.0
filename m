@@ -2,22 +2,23 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 014DAC282CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 16:17:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8F302C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 16:18:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C6C1A2148E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 16:17:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5FC6221917
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 16:18:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hCvkfN16";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="TA4S29oo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C6C1A2148E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kggvRp1r";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="aSUMi63y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5FC6221917
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +27,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
 	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=KJ3V9YPwY0RvdEElATe/yqcRoEAiJHoPfU8zTCjo+xg=; b=hCvkfN16rUmQj4bFPMwR2PBKk
-	L/Dx/rx9ju5xBEk8tgZzi4iu36kkwtqJoDyGLz71UnBnu3uga/356knBSx1CMfbWcBnAL8L4jGGza
-	DKef9Ca07js/w7kf/nWYQQMF+zKmLycDMzF2gvNcVyJNq4elhZBK/5+YHR7XUCXSZ+4ajTmTtF6VK
-	4v69lvPdJX3xIeWiLvcHSKhguKOnEqnUgYOrfMb7uiZYopdwRJXhuxwnT0wznlcbGNAJykx3N6Q5Y
-	++z23Rh5tYhMS92WTq+Gm33GaTgtnU+XhXKxTZNVV4PcpKxWvDu7ac+0txAsJW1kHiNZtfTKgHuBg
-	2tgB7Xzvg==;
+	 bh=rNBel5JO5vi3DzTIvG8RQU8PJ69DDepAVtcbXsfgpV0=; b=kggvRp1rNAgnCySzqye5zPqSN
+	M4LhTAjPuafxIH4erWM6/IyWBYTFOo7x5WFXV3TNt62WkN97XnI/4BGsIgLFtR318DGOtzDWVwtfw
+	hAvyAxczT8+M0BBA9H5UeFGiD3xhAxk1oljhkUbCoj/Yg9iCyDOiNv7U6v4dQkEOxI6vKtPIqrfLL
+	QSxD+ier71FQmjZQMpprt00Pd7gwxUbnZiohUUPBYQ6fX5xU60rQQUpLk96TrMXo6vk/ehEpN/Zhq
+	i8RvciX+n6077HFPkj9NuYtk6X+FfwNJV9zEotaBktwY9h5zsonO+pGa7ZUPWegRT5KXjfFjHc+A2
+	LPY+BOzjg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go9bR-0002x3-Qx; Mon, 28 Jan 2019 16:17:41 +0000
-Received: from mail-wm1-x32c.google.com ([2a00:1450:4864:20::32c])
+	id 1go9c5-0003X9-DM; Mon, 28 Jan 2019 16:18:21 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go9bA-0002iL-Fy
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 16:17:26 +0000
-Received: by mail-wm1-x32c.google.com with SMTP id g67so14527021wmd.2
+ id 1go9bZ-00034m-VD
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 16:18:04 +0000
+Received: by mail-wm1-x344.google.com with SMTP id f188so14482040wmf.5
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 08:17:24 -0800 (PST)
+ Mon, 28 Jan 2019 08:17:49 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=VwVsEA2njTY9kmtgz8zYxOdAC1khnlriZ3fSWEOj6Pg=;
- b=TA4S29oowlIuR/wSOjVAJWHABKVmbfGKaJHNGPpARmmLW1HpV79Cd38WlzYikFerQM
- gBGg3ah88sJEs43r4Fr5y8/HOH9b1gjNjP4SRnFFZToHUpM/OTfDVE6K8rz7ZGuMEAeN
- Tn6P2p0BmTVbEtZOeoTctsboBTHxSV//1ifbVzqyyGOOx6Q8dFa1N45VEarWt+idixu0
- bWc+n8LK+SyHjjoE7zedtsqgbHqT+kY5jRUZNTb2P2+FLjflcCMnreLSRQDEDUkAR8K/
- WOoW69hCYH3lENT7MyWXQSgUWCcElxlDxRL3fB9AJ+XlGlpj9rodqhnX0/Jf+oCpFTop
- SZXA==
+ bh=m1WiVpso5x1xBVUxmLjH0VSxUW1HDcRaj1rhGSoI6JY=;
+ b=aSUMi63yh2pX/jfsvS5/wXeZHl7Na+5pmQbmspgJ+TIEbezZpMNsJxQQboUuW7WQNe
+ Itn1FjvVqV+u0Bn8YS6Ss/c42qsM75BoXHsg4+4eFGBhhjbKfQQcaz5FVMK+NVNRR9rd
+ dVgOvrzgdKh/1AQutAS2/bqXVq/GmuDA4/F/VuCf2ZTIofzAmlGru2SqOHGlJbMT4e6l
+ JNUHiB6SOhRB94vaHakDRMAHxZ1yBFPh1RmRw71h1vZvB5nbhtTeRXiGroxUEYo/jM2f
+ if4eqMxyKiOJiuDM8nH3hgcviMuk1FLRsaTEbTBqN0E/iJYki6Y3qHYiMjQ+llOwLZOy
+ sdGA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=VwVsEA2njTY9kmtgz8zYxOdAC1khnlriZ3fSWEOj6Pg=;
- b=fNM2iibpa3U1h3EckeueH/w1KsD5QnHDSNrEvwT2cHQcfbXqjsMLbUBE5bnaI39jUd
- MYOBcqR9/IRcwzz22fRoVDy9j/Is8yfRFc0VRj3yPlI0Ct6tguDCMRpdzQcLKHOaJJ4O
- vbCQHEWK2x5kIazxt3NVdlYY1NK7ICwzR0f5EzK3M3t6UZLnWa2kChnr9IPM8F2OQnpU
- GO/IcWlDG2qqWrfg6LVa1xvrTZ6TYzxDitT3QF3YxzEQUfF7sZkXD8Kqf0U18ulEjDgT
- sq2DevUQwpwa/VLnV6908hZkUjRMIJTaPy9ZFnvwnoYzBkrjF2ExXy2nQcf3NjKjbNU+
- TtXw==
-X-Gm-Message-State: AJcUukcMrmaakc21MgBC3Xw+X7fF2P140HqTfKXqE/wIztquttDQ5SpH
- wnxbtFhOBiD0RG3tOiGoUVA=
-X-Google-Smtp-Source: ALg8bN7BdFLsNlp1vWslEpMOoUN7x9MyLbXxytcmeKWEDcfRrsi4TerWrgUtvSOQqwVQpTEXmbjcVQ==
-X-Received: by 2002:a1c:c543:: with SMTP id v64mr16903037wmf.123.1548692242563; 
- Mon, 28 Jan 2019 08:17:22 -0800 (PST)
+ bh=m1WiVpso5x1xBVUxmLjH0VSxUW1HDcRaj1rhGSoI6JY=;
+ b=kpj128LfiYWG8S6WbqLp/olZCYF/A7lBjXYE1UGQb+Xj8v3iR82yWCltiJSQpe6XaG
+ 3F7hOJD3HMnusSk6cJ9qrtgIgut7PyBTToTbbYx2tCpkGC2GluA3hb5AlDpoob20xHJP
+ ufsNofU3IUb41TvRQvJI0I9A8TyRdP03INtUbVi0Ppe1hr8lprEWGXo3ZlHtOkJT7Tw2
+ +JIomZUAfRt4get9cyoIVGuFSWr56+NblK79WoNFBQhPjsc3O/6Ggdfxu+n5qE2fOZ4l
+ WE/iJ3jVVJetA5z7hVX1l8SbVT8THocBGHFsBLWCCDI2J8GTIVaE2ZujDKZbZTui5/x+
+ qJxg==
+X-Gm-Message-State: AJcUukfdrFZVhIPFsqfvbcYsmrJiA/IcRTj4UCBPBaEwFIdJ8HEOuKVu
+ ocoGcTqsK0tpCEEA4XAn5MBfLho66/Q=
+X-Google-Smtp-Source: ALg8bN4YOa0O7+ofIYVAMBz9v9LgWOVDM0yeL63AOhY/p6P8aMrjTRUdnCzoXoMUej1McfL+1LTyJg==
+X-Received: by 2002:a1c:4c10:: with SMTP id z16mr18443201wmf.117.1548692268276; 
+ Mon, 28 Jan 2019 08:17:48 -0800 (PST)
 Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
- by smtp.gmail.com with ESMTPSA id f14sm96752343wrv.56.2019.01.28.08.17.21
+ by smtp.gmail.com with ESMTPSA id w18sm113601795wru.54.2019.01.28.08.17.47
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 28 Jan 2019 08:17:21 -0800 (PST)
-Date: Mon, 28 Jan 2019 17:17:20 +0100
+ Mon, 28 Jan 2019 08:17:47 -0800 (PST)
+Date: Mon, 28 Jan 2019 17:17:45 +0100
 From: Thierry Reding <thierry.reding@gmail.com>
 To: Eugen.Hristev@microchip.com
-Subject: Re: [PATCH v2 1/3] dt-bindings: add vendor prefix for PDA Precision
- Design Associates, Inc.
-Message-ID: <20190128161720.GG26200@ulmo>
+Subject: Re: [PATCH v2 2/3] dt-bindings: drm/panel: simple: add support for
+ PDA 91-00156-A0
+Message-ID: <20190128161745.GH26200@ulmo>
 References: <1547458584-29548-1-git-send-email-eugen.hristev@microchip.com>
- <1547458584-29548-2-git-send-email-eugen.hristev@microchip.com>
+ <1547458584-29548-3-git-send-email-eugen.hristev@microchip.com>
 MIME-Version: 1.0
-In-Reply-To: <1547458584-29548-2-git-send-email-eugen.hristev@microchip.com>
+In-Reply-To: <1547458584-29548-3-git-send-email-eugen.hristev@microchip.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_081724_550521_75BC76BE 
-X-CRM114-Status: GOOD (  11.61  )
+X-CRM114-CacheID: sfid-20190128_081750_425426_B0060A52 
+X-CRM114-Status: GOOD (  12.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,64 +102,72 @@ Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, airlied@linux.ie,
  linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
  robh+dt@kernel.org, Cristian.Birsan@microchip.com,
  linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============3498653039445537759=="
+Content-Type: multipart/mixed; boundary="===============7991791300593195151=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 
---===============3498653039445537759==
+--===============7991791300593195151==
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="j2AXaZ4YhVcLc+PQ"
+	protocol="application/pgp-signature"; boundary="FUaywKC54iCcLzqT"
 Content-Disposition: inline
 
 
---j2AXaZ4YhVcLc+PQ
+--FUaywKC54iCcLzqT
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Mon, Jan 14, 2019 at 09:43:26AM +0000, Eugen.Hristev@microchip.com wrote:
-> From: Eugen Hristev <eugen.hristev@microchip.com>
+On Mon, Jan 14, 2019 at 09:43:28AM +0000, Eugen.Hristev@microchip.com wrote:
+> From: Cristian Birsan <cristian.birsan@microchip.com>
 >=20
-> Precision Design Associates, Inc. (PDA) manufactures standard and custom
-> capacitive touch screens, LCD's embedded controllers and custom embedded
-> software. They specialize in industrial, rugged and outdoor applications.
-> Website: http://www.pdaatl.com/
+> PDA 91-00156-A0 5.0 is a 5.0" WVGA TFT LCD panel.
+> This panel with backlight is found in PDA 5" LCD screen (TM5000 series or
+> AC320005-5).
+> Adding Device Tree bindings for this panel.
 >=20
+> Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+> [eugen.hristev@microchip.com]: specified backlight and supply bindings
 > Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
 > ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+> Changes in v2:
+> - added binding explanations for required properties from simple-panel:
+> backlight and power supply which are mandatory
+>=20
+>  .../devicetree/bindings/display/panel/pda,91-00156-a0.txt  | 14 ++++++++=
+++++++
+>  1 file changed, 14 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/pda,9=
+1-00156-a0.txt
 
 Applied to drm-misc-next, thanks.
 
 Thierry
 
---j2AXaZ4YhVcLc+PQ
+--FUaywKC54iCcLzqT
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlxPKw0ACgkQ3SOs138+
-s6FjaQ/8Dz8ooo1Sw+gdDzpk+oaeVdeilOjCttAtRJpGhZkCnA12MCjqsVPrpn3M
-kjEAYf+3mz4cK3Dbe1A4Cvjuog8kKvbpnVePdxky/A/QtIO6rsMlwvo9gX5kZJ54
-IbmmYWO2szqXYa25QjqUCpUtRa7sdZQ/sOaaLHh60orWq7e5zavuuxUQNHr2+UGT
-Mp5erO+18P1SdRyAKrf80Fzq4CYTbtLyvDt0hZiHoddC8fYy17L8i8a0VmdRMIcI
-NXEwC7XA0XlRJsiqYXJZqizxKALkFfqzkHbFK22rdyLlb6bKkC/hHwTVk4Pua6BC
-P0RYSH7ZHd3oyHJco8pTIvwWrHRwCgHjvzo1Bgun1uJZpFuIGRcUhWxVlyUG95i9
-NuWJxkEXQA7mjXNmJOyvPB9CTGlXPF+UQ9WJ5/dTqHuZdIhYWGrtoCHlqlscuWws
-Ewmjd1axA53lQQoL/WDJxNWIU8p8s7XIZqgGHv1WFDZwJCioKTlEcUPfnq2MixPR
-QAo6WjFy1LGOlpZJW5ixf3OiftbD9Dup8S4/ZryDnC2mSB3AtzXZ/XuPo+MSrqhs
-UuNSFSTo5NYB0TmaE3oq+d8ZnshuwH2qN3RZSNCgzELkiEmHdrFza2+nhIX3eLNP
-v0lkzln3ZyN31aXoDmOK02tx/bl6YCVQBoNU+zWkuIdwEF8DOk8=
-=/+Y0
+iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlxPKykACgkQ3SOs138+
+s6HlEQ//fZonuiZIonlMiwGhVPmzmd+XQNGGtRXIuqmjSUUoK++wYhFu8Ys0R/1+
+eT0l6pdVmETBUIp+XIWWWhUqSUqBrG+DLQhDFtCxEFDWkV+qodcE0C4Ms+lz9GVf
+RVE0v1efNCZXEsS5/YqoxTse91FXlm71MIpzmRf+NTh6zeSCM2hR0fdrRfLMvmCS
+GiJn0MFqbvMPuZvG2sClOrAt7vrkoLsyAAY4DrYHvHksqPCQGnwizyeTo8flFOla
+alT9hnrRbplwmIQ5yTFDhSQZQ1rsBlyuLVHwOOHabLCiwJYs/XoyVsAwEQ4617DP
+W/mmHL6fTLkqWU8EcJ2mZVRPG10fqHkc//iKez6lta/uPy0ckKNEarS5x7Jd9SzC
+UTLAGdBI4CMXQ1sfRY2CTj5IFZe+MiZ5ay66/jXbMob/fuloYBmDFtwECkKQZwzx
+NG9iJo8plIISX2r+pKfLPAKGPKlIlzDUNFd9mZJNG+CnzMhwxudYJ9M2s4T+AZWu
+7J80Xcka48F07VCiBHNfnRG/r8Z9r6zDpKVAPAcJMwo2Qi26nLaU35UTCosSLVrY
+WYtS8YoEsnc7nMrJm6stpwEahNAE5vsXKeeMU22ziGkpRpgpnRA0049yhmU8V1jj
+qItsaF2QrihE63oDhuJnOD+16Zje9ALV6ecum07EI8N0CPJ4YQM=
+=rNwQ
 -----END PGP SIGNATURE-----
 
---j2AXaZ4YhVcLc+PQ--
+--FUaywKC54iCcLzqT--
 
 
---===============3498653039445537759==
+--===============7991791300593195151==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -169,5 +178,5 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---===============3498653039445537759==--
+--===============7991791300593195151==--
 
