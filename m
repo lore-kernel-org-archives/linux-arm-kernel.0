@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D03CC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:22:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E151FC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:23:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 13FBC21736
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:22:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B3CE02087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:23:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RWX6d2po"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 13FBC21736
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dAogT2t6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B3CE02087F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,43 +24,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ynDURdSHLFlq0pGs67YJ4VmJonpQlta6kO7NVkDJ8Ao=; b=RWX6d2popK7HHh
-	9rxFOsCPrFIVLAm4HMOc9AsWY8Wj4LNhF4oerkvLQhXdIg2BKEeIcSLS7jngr81JBnw1Z1iXCmzAh
-	KQYNvZCoHOxcydBPsaP+rLiaw+IGL66glVqnR6daypVhdprVC5PDONxHZmGgmdvGOzhyJFsd0cCwS
-	3bzJpNJaElgaCsY2fuprquFydEsC7eMJ4/NjPLNvkDA8yUW2IrmFWlFeeBxz9O6wpX9W5e8WX9AOi
-	vyjHubDpiGb2RJKwrGb80mwjHAteRbRgJf0XFplk8ZBVPpopaezzTKvam9HKQv8Kfu4/s7sBtNz2U
-	frp2Q0wO3Y2omfLoB0vA==;
+	List-Owner; bh=MneHndovnm0+I8W/fyfyb+WXbtpmEGb9mXV131hhfRE=; b=dAogT2t6LF7OEt
+	FI7aF9LqxmU7dGfpIFAz7i2vrqDL6w3Otealsc8Ur6A1XnjSAkBtmofyn1OMogYPYmQBuuCWdBHsV
+	JqhfUbxHOZF4ru29pyTnyd9OwnRTT91qomc8zCibhYWiRZGdLoaYbiGGnsgLcWH2qzTCGwendFlKD
+	yPZ/AEpgfwB8W204r4BLoVaaiYP6iZtTiqwbXquClLLsfLK+pyCkRLxZFBjsllxKG++WaQC+lzOPE
+	+poywJHbUMZUHXPt4Id6qPtqRd+Lv+Vn3KI4uMcM47EhZigcJBojGnGcN/n/d5uaU37MZARg6SgA3
+	BucliQDsEIjNUMafLUQA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go37E-0000Hz-1T; Mon, 28 Jan 2019 09:22:04 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1go38A-0000bo-NJ; Mon, 28 Jan 2019 09:23:02 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go37B-0000HU-AZ
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 09:22:02 +0000
+ id 1go387-0000bR-Cx
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 09:23:00 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id ABE9DEBD;
- Mon, 28 Jan 2019 01:22:00 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D32E7EBD;
+ Mon, 28 Jan 2019 01:22:58 -0800 (PST)
 Received: from big-swifty.misterjones.org (big-swifty.cambridge.arm.com
  [10.1.39.122])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 16E413F589;
- Mon, 28 Jan 2019 01:21:57 -0800 (PST)
-Date: Mon, 28 Jan 2019 09:21:56 +0000
-Message-ID: <86lg35w30r.wl-marc.zyngier@arm.com>
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 25DD83F589;
+ Mon, 28 Jan 2019 01:22:55 -0800 (PST)
+Date: Mon, 28 Jan 2019 09:22:53 +0000
+Message-ID: <86k1ipw2z6.wl-marc.zyngier@arm.com>
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v9 02/26] arm64: Remove unused daif related
- functions/macros
-In-Reply-To: <1548084825-8803-3-git-send-email-julien.thierry@arm.com>
+Subject: Re: [PATCH v9 03/26] arm64: cpufeature: Set SYSREG_GIC_CPUIF as a
+ boot system feature
+In-Reply-To: <1548084825-8803-4-git-send-email-julien.thierry@arm.com>
 References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
- <1548084825-8803-3-git-send-email-julien.thierry@arm.com>
+ <1548084825-8803-4-git-send-email-julien.thierry@arm.com>
 User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
  FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
  (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
 Organization: ARM Ltd
 MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_012201_368889_10017B1E 
-X-CRM114-Status: GOOD (  11.52  )
+X-CRM114-CacheID: sfid-20190128_012259_438966_3687728E 
+X-CRM114-Status: GOOD (  14.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,7 +73,8 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org, catalin.marinas@arm.com,
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
+ Suzuki K Poulose <suzuki.poulose@arm.com>, catalin.marinas@arm.com,
  will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
  james.morse@arm.com, joel@joelfernandes.org,
  linux-arm-kernel@lists.infradead.org
@@ -81,21 +83,28 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 21 Jan 2019 15:33:21 +0000,
+On Mon, 21 Jan 2019 15:33:22 +0000,
 Julien Thierry <julien.thierry@arm.com> wrote:
 > 
-> There are some helpers to modify PSR.[DAIF] bits that are not referenced
-> anywhere. The less these bits are available outside of local_irq_*
-> functions the better.
+> It is not supported to have some CPUs using GICv3 sysreg CPU interface
+> while some others do not.
 > 
-> Get rid of those unused helpers.
+> Once ICC_SRE_EL1.SRE is set on a CPU, the bit cannot be cleared. Since
+> matching this feature require setting ICC_SRE_EL1.SRE, it cannot be
+> turned off if found on a CPU.
+> 
+> Set the feature as STRICT_BOOT, if boot CPU has it, all other CPUs are
+> required to have it.
 > 
 > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
-> Cc: James Morse <james.morse@arm.com>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
