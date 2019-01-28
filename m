@@ -2,81 +2,83 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E0D8BC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:36:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3DE43C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:38:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AFFC4217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:36:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0CA0B20880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:38:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q+Y9pYHZ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="AY7yun73"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AFFC4217F9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dFCLRNiI";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="jPJI6Svw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CA0B20880
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AIaA07LhZ18Bx0G3ve++qms6B4oK7KmnC6jjfTIO3ns=; b=Q+Y9pYHZ5iGYwn
-	Ryc9wEi6cUoSYHIaJ81L5CGiImo3AyoUSYrQ3qJp13WbqlqcZftNwZuQYBkucD01y6GyVEVsf+c1a
-	Dgdp1hBXrNKhhpVKQzYBeKqzuIyXh4N4IRaAnNhZB0b+VvQPbvQDLDtvaqWe64tZzXQIMAOJ4t8s0
-	Yv5kuO4Tsp34YYb4HcRsNXEOR8Fw7fXJGsWVvSWLGKqOCLQ/chz4SJ65V7QZvx+MBy0ZN34viGWLT
-	6al+a2OtEzYCZ9FrP2Iu0e9QRJBhF2g1ObJ9F+KmPDWXKUnhZ7rDPGQ51pWMJJpXchuX11PEc97J2
-	+Ucp6BM1IXvQeOdj5+dQ==;
+	List-Owner; bh=6t/clKQYqIAcotv3yHZ2gvgEsVwMMHCv+bSGTYj5VpM=; b=dFCLRNiIjsfyiy
+	l68zIydMRB/SH4njRAxAJjoIQbfuOSi65//BMt5wqbwbkQxGnOCrbfDlx+LpuljpMndAdV0+2rBY2
+	6o+Bzpw1NXpNqj8i3SU94wL8ygEmpghNoENBfFdcib0IbBP8JlmHMvqAWHM2sZIXf4rZiY3mUmORo
+	lr1IiF36oKcjhTRFthCZ4AA4MzrXJKjSweq/nSlTNFZevxqFjoIZeqz1nhTwSfff0G6BfhwqX/aMS
+	uMtv//cgQhvJy74Ws3sU2l93rvh53yUH8l/LGF+R/+D/UFbsiHMXL0qOfy7HhZVghuKV5spY8SKJi
+	hlAP8s8sA5nHjDzxwlvg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go3L8-0008GY-J7; Mon, 28 Jan 2019 09:36:26 +0000
-Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
+	id 1go3Mj-0001di-Ac; Mon, 28 Jan 2019 09:38:05 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go3L4-0008Bj-Qm
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 09:36:24 +0000
-Received: by mail-it1-x142.google.com with SMTP id i145so19578951ita.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 01:36:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=Ozesp4rWwiinrHtP2lbjF0VXem3poIT2No6pvmp0vP4=;
- b=AY7yun73QD+EMNMwN0Y9/iGld70czBDXBhZwOgwRagFJXGF4+NVDKL7UmP/oFwxqMa
- bx3rn5BaL6yp5Cf4amrzXIkfjukg6OKP6aXwgTM0QqGO5rzZ41224LwdVvL3SHWhpBL2
- aR2HTIR8GnB108wOYdYBcqWMpVgeDWctVrae4=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=Ozesp4rWwiinrHtP2lbjF0VXem3poIT2No6pvmp0vP4=;
- b=bdcB+fyzyiBkJhPsord2yqNJgXRLl4kuNSTaohepptB/YGrCn77aVzttFzMPT+Kpim
- qzbCczWQVdcbc6OvT3BIEY741AFZCwfh7Qnp9j6du2SEYgEFwBK1B6BnmUlyY342oHpe
- Ksl++bMnS9G2bSa1SF7zvNTslz86DRLwWknbWr9A4QABaiv+2UxZwYdwPR80uBWY0bvY
- jK3TxYgf08bXOADJVD3qER1H1og+EFf1XJ4x3ZL66xEbYKHLp8vMGzVbFDia461L0Tdu
- yMqjcSHa3z63EZ6qsY7Mx10hpWDtHArPSgrSfABsv+8aZRblkxDTgC+bLKaXDzNxW6Tp
- Xgvw==
-X-Gm-Message-State: AJcUukeP8LRBiTtcOgidfCQMf1akgr/qd+NoVBlUfsllbVyT2hDhN/Ol
- iPKRQXiRWYxN5cVO3CY2MJ+oJ9WTXTL85UK8vV2BKw==
-X-Google-Smtp-Source: ALg8bN6pbH8aim/d9XQIpdNF6Ci4nzcWf2S1jjcKEHd6gLiFxhxCMBZ3bZKyOFJKx+7PoFzRn8eTtVwDlkiO4D5JUu4=
-X-Received: by 2002:a02:781e:: with SMTP id p30mr13465792jac.85.1548668181627; 
- Mon, 28 Jan 2019 01:36:21 -0800 (PST)
-MIME-Version: 1.0
-References: <20190124195900.22620-1-jagan@amarulasolutions.com>
- <20190124195900.22620-12-jagan@amarulasolutions.com>
- <20190125212433.ni2jg3wvpyjazlxf@flea>
-In-Reply-To: <20190125212433.ni2jg3wvpyjazlxf@flea>
-From: Jagan Teki <jagan@amarulasolutions.com>
-Date: Mon, 28 Jan 2019 15:06:10 +0530
-Message-ID: <CAMty3ZAsH2iZ+JEqTE3D58aXfGuhMSg9YoO56ZhhOeE4c4yQHQ@mail.gmail.com>
-Subject: Re: [PATCH v6 11/22] clk: sunxi-ng: a64: Add minimum rate for PLL_MIPI
-To: Maxime Ripard <maxime.ripard@bootlin.com>
+ id 1go3MS-0001OW-AA
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 28 Jan 2019 09:37:48 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Content-Type:MIME-Version:References:
+ In-Reply-To:Subject:Cc:To:From:Message-ID:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=mzYV5QxvuEjZhjPQAOjtdlHikFRLjLqvXFf5+p/MYk8=; b=jPJI6Svwq2ozGfR+aJC9K5QlA
+ 4tHScTUoXw09/rqM/owwQFCN1Fe+XQhhZmt04cDCPSicCvqe4Km3a1myXJyqDOyV87oIpGr4KjAnq
+ nTwkKM2d2j+MJKQfrxGkqO8KpFJ1SA2wkVsC2CcEU0yxLSQUzDV6b2FUCGsfNRLV2TS60HfefUYXx
+ CIPPzTG9ob/QeptvSNaxkrYwUYg0Tz1Nm9DRZUJl67oUqNsrmszRIn9JzPaNZrvpTXAbKdSqeByWp
+ 2oRKtBgQwas7Bhw+N/hF/RDgajF25/h0dcTWUaYoxzrzCeYOLHPSewMXZazsweL7U3afKXjWoOhgJ
+ eEeceLpZg==;
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1go3MP-00065Q-63
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 09:37:46 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5DA41EBD;
+ Mon, 28 Jan 2019 01:37:42 -0800 (PST)
+Received: from big-swifty.misterjones.org (big-swifty.cambridge.arm.com
+ [10.1.39.122])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A42043F589;
+ Mon, 28 Jan 2019 01:37:39 -0800 (PST)
+Date: Mon, 28 Jan 2019 09:37:37 +0000
+Message-ID: <86ef8xw2am.wl-marc.zyngier@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH v9 07/26] arm64: ptrace: Provide definitions for PMR values
+In-Reply-To: <1548084825-8803-8-git-send-email-julien.thierry@arm.com>
+References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
+ <1548084825-8803-8-git-send-email-julien.thierry@arm.com>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_013623_025623_BBAB941F 
-X-CRM114-Status: GOOD (  16.09  )
+X-CRM114-CacheID: sfid-20190128_043745_313792_2FFE538E 
+X-CRM114-Status: GOOD (  22.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,83 +90,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>, David Airlie <airlied@linux.ie>,
- Michael Turquette <mturquette@baylibre.com>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Daniel Vetter <daniel@ffwll.ch>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org, catalin.marinas@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
+ james.morse@arm.com, Oleg Nesterov <oleg@redhat.com>, joel@joelfernandes.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Jan 26, 2019 at 2:54 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Fri, Jan 25, 2019 at 01:28:49AM +0530, Jagan Teki wrote:
-> > Minimum PLL used for MIPI is 500MHz, as per manual, but
-> > lowering the min rate by 300MHz can result proper working
-> > nkms divider with the help of desired dclock rate from
-> > panel driver.
-> >
-> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > Acked-by: Stephen Boyd <sboyd@kernel.org>
->
-> Going 200MHz below the minimum doesn't seem really reasonable. What
-> is the issue that you are trying to fix here?
->
-> It looks like it's picking bad dividers, but if that's the case, this
-> isn't the proper fix.
+On Mon, 21 Jan 2019 15:33:26 +0000,
+Julien Thierry <julien.thierry@arm.com> wrote:
+> 
+> Introduce fixed values for PMR that are going to be used to mask and
+> unmask interrupts by priority.
+> 
+> The current priority given to GIC interrupts is 0xa0, so clearing PMR's
+> most significant bit is enough to mask interrupts.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Oleg Nesterov <oleg@redhat.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/ptrace.h | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+> index fce22c4..05cf913 100644
+> --- a/arch/arm64/include/asm/ptrace.h
+> +++ b/arch/arm64/include/asm/ptrace.h
+> @@ -25,6 +25,18 @@
+>  #define CurrentEL_EL1		(1 << 2)
+>  #define CurrentEL_EL2		(2 << 2)
+>  
+> +/*
+> + * PMR values used to mask/unmask interrupts.
+> + *
+> + * GIC priority masking works as follows: if an IRQ's priority is a higher value
+> + * than the value held in PMR, that interrupt is masked. A lower value of PMR
+> + * means more IRQ priorities are masked.
 
-As I stated in earlier patches, the whole idea is pick the desired
-dclk divider based dclk rate. So the dotclock, sun4i_dclk_round_rate
-is unable to get the proper dclk divider at the end, so it eventually
-picking up wrong divider value and fired vblank timeout.
+Nit: It is not the priorities that are masked, but interrupts that
+have a priority higher than that of PMR.
 
-So, we come-up with optimal and working min_rate 300MHz in pll-mipi to
-get the desired clock something like below.
-[    2.415773] [drm] No driver support for vblank timestamp query.
-[    2.424116] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
-[    2.424172] ideal = 220000000, rounded = 0
-[    2.424176] ideal = 275000000, rounded = 0
-[    2.424194] ccu_nkm_round_rate: rate = 330000000
-[    2.424197] ideal = 330000000, rounded = 330000000
-[    2.424201] sun4i_dclk_round_rate: div = 6 rate = 55000000
-[    2.424205] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
-[    2.424209] ideal = 220000000, rounded = 0
-[    2.424213] ideal = 275000000, rounded = 0
-[    2.424230] ccu_nkm_round_rate: rate = 330000000
-[    2.424233] ideal = 330000000, rounded = 330000000
-[    2.424236] sun4i_dclk_round_rate: div = 6 rate = 55000000
-[    2.424253] ccu_nkm_round_rate: rate = 330000000
-[    2.424270] ccu_nkm_round_rate: rate = 330000000
-[    2.424278] sun4i_dclk_recalc_rate: val = 1, rate = 330000000
-[    2.424281] sun4i_dclk_recalc_rate: val = 1, rate = 330000000
-[    2.424306] ccu_nkm_set_rate: rate = 330000000, parent_rate = 297000000
-[    2.424309] ccu_nkm_set_rate: _nkm.n = 5
-[    2.424311] ccu_nkm_set_rate: _nkm.k = 2
-[    2.424313] ccu_nkm_set_rate: _nkm.m = 9
-[    2.424661] sun4i_dclk_set_rate div 6
-[    2.424668] sun4i_dclk_recalc_rate: val = 6, rate = 55000000
+> + *
+> + * To mask priorities, we clear the most significant bit of PMR.
+> + */
+> +#define GIC_PRIO_IRQON		0xf0
+> +#define GIC_PRIO_IRQOFF		(GIC_PRIO_IRQON & ~0x80)
+> +
+>  /* Additional SPSR bits not exposed in the UABI */
+>  #define PSR_IL_BIT		(1 << 20)
+>  
+> -- 
+> 1.9.1
+> 
 
-But look like this wouldn't valid for all other dclock rates, say BPI
-panel has 30MHz clock that would failed with this logic.
+Otherwise:
 
-On the other side Allwinner BSP calculating dclk divider based on the
-SoC's. for A33 [1] it is fixed dclk divider of 4 and for A64 is is
-calculated based on the bpp/lanes.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Since the above min_rate is not desired for possible panels clock, I
-think we can rely on BSP to make a move here. I'm planning to do these
-changes in next version.
+	M.
 
-Let me know if you have any comments here?
-
-[1] https://patchwork.kernel.org/patch/10777519/
+-- 
+Jazz is not dead, it just smell funny.
 
 _______________________________________________
 linux-arm-kernel mailing list
