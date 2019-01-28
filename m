@@ -2,20 +2,21 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0A8B8C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 12:40:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AB014C282CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 12:47:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D092121738
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 12:40:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 79CBE214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 12:47:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SowvdFai"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D092121738
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="roTf1Ljj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 79CBE214DA
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,44 +25,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lMmfv4ILrSCJ+dk+bbzag7WUyGMM1WTjAvr+f6CtN/M=; b=SowvdFaiJVSLDB
-	pA/G1I/MM0kJ0scIPlmPBRq7lKl8/t49QV6509mAJgL5/rz5KIkC1A+GQt4CxAxKyVyFRQP9hWi6W
-	5kj1W30oRgN07YSWwVk8leUeNSjfwF/Nal8PIu+UbFE7g4gTThfE1E/kLSMju78uxmSKY3oRtWkhG
-	H9U/lhHr9/RJTgnOMZBdWFC6+r9HHLrOwCpAZ9t7tJiwsiNUSePOP80kwSSNXKh36wJbx+uLap9WA
-	Oges2/jg7li9cuu/VpdpbIPZF3gwm6Uw7JlP4JFKPnphfBMIBXOr8xvjB+8XSi1/5Y5i//rHBAxWA
-	OjtBxq+6rN3ecdBnCnuQ==;
+	List-Owner; bh=qw0PoXJ08X2RpgTyE/j6S9Gp0IuxVsoutjW8sQZVNZE=; b=roTf1Ljj0xR9K6
+	urU50Fp4wGpzAzUxEtnt4X1qSkdK90DOdpyLZrqCdhOeXY+8qo9ZlWo/h5FHyOygc5Ac/VVdD9Mia
+	nSHVEn0Vm9x3YU78hRQkcMy/HixG/qkFB1/eh2wFeThHk66WIVW3Ax/U4OR75n7aGgh2+JYrhcy2x
+	9z1qTuALg2reyZit/S8CmS7niZmAU5iRrf5NiXzHMobOGGYicwIRh5QoSgF3VRU3CVLOatx+G4QSV
+	6d17jWvVF4qeoxE5o4kKK+hRStJ7m37+vvAxs3MVYzCx5cdE7MIfNFx31Sr3z7JOxIfUGtwf/UV8I
+	40VwUaOofs51Dv9VbImw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go6DJ-00020m-EG; Mon, 28 Jan 2019 12:40:33 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1go6Jb-0003q1-Ne; Mon, 28 Jan 2019 12:47:03 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go6DG-00020R-JK
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 12:40:31 +0000
+ id 1go6JY-0003pi-IH
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 12:47:01 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E59B580D;
- Mon, 28 Jan 2019 04:40:29 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8EAB980D;
+ Mon, 28 Jan 2019 04:46:59 -0800 (PST)
 Received: from big-swifty.misterjones.org (big-swifty.cambridge.arm.com
  [10.1.39.122])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6A9C53F59C;
- Mon, 28 Jan 2019 04:40:27 -0800 (PST)
-Date: Mon, 28 Jan 2019 12:40:30 +0000
-Message-ID: <86pnshuf9d.wl-marc.zyngier@arm.com>
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 11BC13F59C;
+ Mon, 28 Jan 2019 04:46:56 -0800 (PST)
+Date: Mon, 28 Jan 2019 12:47:00 +0000
+Message-ID: <86o981ueyj.wl-marc.zyngier@arm.com>
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v9 25/26] arm64: Skip irqflags tracing for NMI in IRQs
- disabled context
-In-Reply-To: <1548084825-8803-26-git-send-email-julien.thierry@arm.com>
+Subject: Re: [PATCH v9 26/26] arm64: Enable the support of pseudo-NMIs
+In-Reply-To: <1548084825-8803-27-git-send-email-julien.thierry@arm.com>
 References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
- <1548084825-8803-26-git-send-email-julien.thierry@arm.com>
+ <1548084825-8803-27-git-send-email-julien.thierry@arm.com>
 User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
  FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
  (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
 Organization: ARM Ltd
 MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_044030_641426_9A2764ED 
-X-CRM114-Status: GOOD (  12.16  )
+X-CRM114-CacheID: sfid-20190128_044700_614161_1636B147 
+X-CRM114-Status: GOOD (  25.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,22 +81,110 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 21 Jan 2019 15:33:44 +0000,
+On Mon, 21 Jan 2019 15:33:45 +0000,
 Julien Thierry <julien.thierry@arm.com> wrote:
 > 
-> When an NMI is raised while interrupts where disabled, the IRQ tracing
-> already is in the correct state (i.e. hardirqs_off) and should be left
-> as such when returning to the interrupted context.
-> 
-> Check whether PMR was masking interrupts when the NMI was raised and
-> skip IRQ tracing if necessary.
+> Add a build option and a command line parameter to build and enable the
+> support of pseudo-NMIs.
 > 
 > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  Documentation/admin-guide/kernel-parameters.txt |  6 ++++++
+>  arch/arm64/Kconfig                              | 14 ++++++++++++++
+>  arch/arm64/kernel/cpufeature.c                  | 11 ++++++++++-
+>  3 files changed, 30 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+> index b799bcf..173e2cc 100644
+> --- a/Documentation/admin-guide/kernel-parameters.txt
+> +++ b/Documentation/admin-guide/kernel-parameters.txt
+> @@ -1197,6 +1197,12 @@
+>  			to discrete, to make X server driver able to add WB
+>  			entry later. This parameter enables that.
+>  
+> +	enable_pseudo_nmi [ARM64]
+> +			Enables support for pseudo-NMIs in the kernel. This
+> +			requires both the kernel to be built with
+> +			CONFIG_ARM64_PSEUDO_NMI and to be running on a
+> +			platform with GICv3.
+> +
+>  	enable_timer_pin_1 [X86]
+>  			Enable PIN 1 of APIC timer
+>  			Can be useful to work around chipset bugs
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index a4168d3..8d84bfd 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -1328,6 +1328,20 @@ config ARM64_MODULE_PLTS
+>  	bool
+>  	select HAVE_MOD_ARCH_SPECIFIC
+>  
+> +config ARM64_PSEUDO_NMI
+> +	bool "Support for NMI-like interrupts"
+> +	select CONFIG_ARM_GIC_V3
+> +	help
+> +	  Adds support for mimicking Non-Maskable Interrupts through the use of
+> +	  GIC interrupt priority. This support requires version 3 or later of
+> +	  Arm GIC.
+> +
+> +	  This high priority configuration for interrupts need to be
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+s/need/needs/
+
+> +	  explicitly enabled through the new kernel parameter
+
+It won't be new forever... ;-)
+
+> +	  "enable_pseudo_nmi".
+
+I'm not overly keen on this name. We already have "irqchip.gicv3_nolpi",
+so why not adopt something similar. "irqchip.gicv3_pseudo_nmi", taking a
+boolean value?
+
+> +
+> +	  If unsure, say N
+> +
+>  config RELOCATABLE
+>  	bool
+>  	help
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index b530fb24..e66d778 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1207,10 +1207,19 @@ static void cpu_enable_address_auth(struct arm64_cpu_capabilities const *cap)
+>  #endif /* CONFIG_ARM64_PTR_AUTH */
+>  
+>  #ifdef CONFIG_ARM64_PSEUDO_NMI
+> +static bool enable_pseudo_nmi;
+> +
+> +static int __init early_enable_pseudo_nmi(char *p)
+> +{
+> +	enable_pseudo_nmi = true;
+
+And if you're happy with the above, this becomes:
+
+	return strtobool(p, &enable_pseudo_nmi);
+
+> +	return 0;
+> +}
+> +early_param("enable_pseudo_nmi", early_enable_pseudo_nmi);
+> +
+>  static bool can_use_gic_priorities(const struct arm64_cpu_capabilities *entry,
+>  				   int scope)
+>  {
+> -	return false;
+> +	return enable_pseudo_nmi && has_useable_gicv3_cpuif(entry, scope);
+>  }
+>  #endif
+>  
+> -- 
+> 1.9.1
+> 
+
+Thanks,
 
 	M.
 
