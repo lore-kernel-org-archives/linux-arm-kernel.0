@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3E433C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:18:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 75DD6C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:19:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0F9AF214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:18:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4635D214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:19:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CDINk57U"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0F9AF214DA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T+xs2b5g"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4635D214DA
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,44 +24,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+B9XNz4dTea1dvLj0hVPrKsK4Bx2Inxezwl2tAdH4ZE=; b=CDINk57UFWNazz
-	Hy5isHa7HtZ/XFxfTYWSFim3jIys+sHpWS3RQhKSOIPOLJ4a/UhfnfW7jdjDd+0adDUCOg2tVvFER
-	buZ3lPbSIER0KtgPhnSkzHLZWpki56+r2HSzRJgfe4kY67KsVSqFGbjiweP+T3lbWwmK+q0nwdqjL
-	aRlqt3rECEfNEYVXvPqvO7kRtGaK6wNmUATtiS3TnOkm7UvSqvSY78hbjxdRT6NwIHTxDFejo6sBP
-	9Qnxq6pXZPXRrSBtVO7c+LTqEcefaVXRiXCgTJLBDj3LI4VAhKz9/wz6moT9d/aeB5aaE5peMgiwv
-	t2UJyXrtjk2UCcaZ9qAw==;
+	List-Owner; bh=4hNJnaXsRV+NPDoPRNmUA1gTvnDogRwDqQOoxyKENGk=; b=T+xs2b5g/OdTJH
+	T2DD2M/cHfN4xrfqs6eMni4EYJ71h/mX0l0PFNB0LYIbNZzuBNx6r90UbEwhMGcrHppBcV6gBvB6w
+	qVguD2U5BIAAosPGJfbsYZSa43M0CEPeDvyGGBvnm6baVukfItwJfQR12RrD5a8wwJ5ScNxjCyA5X
+	EZLmaLM9kNyk3QRWvvsEefaGTEzjP1y76WjNi2/cZN6KcZw6OWW035F5HwE9N1iTRnu67Aiq18sEv
+	r4W+hm+2tD7/WpGl5yt1D7PgxJxK85hgpNGVRcEJhPmq+YryEOVgIgjLhArCXkkDh6AasusHtEwab
+	X3hFC+vj1c6HasNLoACA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go4vc-0001Rb-DZ; Mon, 28 Jan 2019 11:18:12 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1go4x3-0001km-AF; Mon, 28 Jan 2019 11:19:41 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go4v9-0001N3-Bi
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 11:18:10 +0000
+ id 1go4wz-0001kT-AU
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 11:19:39 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8CD77EBD;
- Mon, 28 Jan 2019 03:17:42 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E7CAEEBD;
+ Mon, 28 Jan 2019 03:19:36 -0800 (PST)
 Received: from big-swifty.misterjones.org (big-swifty.cambridge.arm.com
  [10.1.39.122])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D1E693F59C;
- Mon, 28 Jan 2019 03:17:39 -0800 (PST)
-Date: Mon, 28 Jan 2019 11:17:40 +0000
-Message-ID: <864l9tvxnv.wl-marc.zyngier@arm.com>
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 08E4F3F59C;
+ Mon, 28 Jan 2019 03:19:33 -0800 (PST)
+Date: Mon, 28 Jan 2019 11:19:34 +0000
+Message-ID: <8636pdvxkp.wl-marc.zyngier@arm.com>
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v9 15/26] arm64: alternative: Apply alternatives early in
- boot process
-In-Reply-To: <1548084825-8803-16-git-send-email-julien.thierry@arm.com>
+Subject: Re: [PATCH v9 16/26] irqchip/gic-v3: Factor group0 detection into
+ functions
+In-Reply-To: <1548084825-8803-17-git-send-email-julien.thierry@arm.com>
 References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
- <1548084825-8803-16-git-send-email-julien.thierry@arm.com>
+ <1548084825-8803-17-git-send-email-julien.thierry@arm.com>
 User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
  FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
  (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
 Organization: ARM Ltd
 MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_031743_728574_84EE06AC 
-X-CRM114-Status: GOOD (  12.96  )
+X-CRM114-CacheID: sfid-20190128_031937_364401_A0D1727E 
+X-CRM114-Status: GOOD (  10.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,39 +73,29 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
- Suzuki K Poulose <suzuki.poulose@arm.com>, catalin.marinas@arm.com,
+ Jason Cooper <jason@lakedaemon.net>, catalin.marinas@arm.com,
  will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
  james.morse@arm.com, joel@joelfernandes.org,
- linux-arm-kernel@lists.infradead.org
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 21 Jan 2019 15:33:34 +0000,
+On Mon, 21 Jan 2019 15:33:35 +0000,
 Julien Thierry <julien.thierry@arm.com> wrote:
 > 
-> From: Daniel Thompson <daniel.thompson@linaro.org>
+> The code to detect whether Linux has access to group0 interrupts can
+> prove useful in other parts of the driver.
 > 
-> Currently alternatives are applied very late in the boot process (and
-> a long time after we enable scheduling). Some alternative sequences,
-> such as those that alter the way CPU context is stored, must be applied
-> much earlier in the boot sequence.
+> Provide a separate function to do this.
 > 
-> Introduce apply_boot_alternatives() to allow some alternatives to be
-> applied immediately after we detect the CPU features of the boot CPU.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> [julien.thierry@arm.com: rename to fit new cpufeature framework better,
-> 			 apply BOOT_SCOPE feature early in boot]
 > Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 	M.
 
