@@ -2,90 +2,88 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D21E9C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 19:31:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1CF80C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 19:37:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A41E421741
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 19:31:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DD68B2171F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 19:37:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iEp+8fT/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=broadcom.com header.i=@broadcom.com header.b="dXfTwVc9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A41E421741
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=broadcom.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TAFMpx/Y";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="VQgargok"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DD68B2171F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Quk/UdM5V1sYb3g++qbvQcF/wm2NxwalTooRHrk+ECs=; b=iEp+8fT/FFvqwb
-	XURhZOcVzOovm7IJ4wOi8uGfpnziycbCCNu+T0hjW0/GhBiuTmIFbPQJk63OloDicEosAFaxjX7Lk
-	IL69JGY8fWTkAsadC1ZeqwSb+VAw67zQT0KuwtHlrznQdYszPDlGZ1I18w0eSxC0Nipy5LbnxDGFj
-	gTg5TqDdoAMSBGFaFIQ6UXYWjGVPftOzDtJgis/aFqLMF+RPm41P8mk0+yrIZG4V8owD/zBIQmGyh
-	EaSmGalNL5wDE3TKvBfz5BzUsoiPYhq9BTYbfprZJm8ZJMa39RaSsA5ME5BnNcN6rorvupUnT1yKl
-	irVz4/DfPV3gSAY+LnEQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=M253I91P20X4fEt/Bcpjhj1W3Jspg0z1Szazt4vrOV4=; b=TAFMpx/YlDc+vz
+	ghGn60KWHUw0pKYCtRjwweRnFH1O3o06a1beGWclp+8oVC/3Cdzu5d9Eg+uvuRdWd9dRZvzUqH9PM
+	4AwgN1T7Ts9FRzyqyCZXK4nC1F0uyCaEo7IDSB7M0FCGmqKrq0i+IT9eBhNXc8hh97Iu8Suh6aarY
+	Ow7G3paKmITN8kUMt0MHsvQtJDy0WuMfP1HYYkBjj1o/I7UqOF0M3OaYgEGjScgqkYcFQ9NR5jCCO
+	u6LS/ClhZg+lEn9r8rlmQQbVVQ7ZSCBahzsxjVMvrv+SmqagSR588w5z17bWcRHz0cRaET7fD1z8O
+	xu4eswJ3atc5j0j3oQFQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goCdG-0001cD-3u; Mon, 28 Jan 2019 19:31:46 +0000
-Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
+	id 1goCiM-0003Or-Q9; Mon, 28 Jan 2019 19:37:02 +0000
+Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goCdC-0001bo-NA
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 19:31:44 +0000
-Received: by mail-pl1-x642.google.com with SMTP id 101so8188096pld.6
+ id 1goCiI-0003OQ-RR
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 19:37:00 +0000
+Received: by mail-pl1-x641.google.com with SMTP id w4so8215632plz.1
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 11:31:42 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=broadcom.com; s=google;
- h=subject:from:to:cc:references:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=c4sq5QNCH6X83p5VVC8SEGlVPFetVhIWyH3awcb2tbQ=;
- b=dXfTwVc9OO27KTyVD87Z0yZ8nPCi+y0EhnKNbgAmbZT5yaO3dUhVCeQ/gycZ+ana8b
- plprhaeMM+mNP0KLhzYSf3c4IPJ3JfW9BHnMhyFq2ZTfUwYEFmcr9cIa3OIQ7HqgEIkA
- uAzQNyPLRojgVDSlipRp3Jztskt084fO2+Rvk=
+ Mon, 28 Jan 2019 11:36:58 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=fNUJ09BCIZ3YVWy/Ji5fieGPR7dMwabmPYhcIO/fyFg=;
+ b=VQgargokXjtIdGA1PK+y73iiIC+deS807thO0SWlB8K2cezAE6Xo+lsNWbu84PfpW8
+ zcN9EFl4XsaY3Zr/Tn3+DvFvYg5rN6UeRJ1yJp75VJPYVfFcu9ncX91x+TyxSD1mSRWM
+ lFKgi6UF84qekMTQrbaBWf9/kLNdg1IuS9/z4=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:from:to:cc:references:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=c4sq5QNCH6X83p5VVC8SEGlVPFetVhIWyH3awcb2tbQ=;
- b=Mfnb2Utzm5N8mf7lorG8pLHQRRs+agFysrXsWWdmdoVYwlsj/mKptUQGsA2PXXaMhM
- 2yfZJk9V0p17hz87wYsNy9iar25np6Z6k9i59MGTGTBN77jbYADDf9squDb4l68i8fwa
- PM8pmfKFjAaUxm1EK9RCcxkAq9xkbmB8IbwaQ/VsdILZfG0KkLO0yH9Jv5+RLdEL6Hxh
- ycHmzjGuJH8UdAag1jAi05iyKDH1hnXZk9r2xBGPaCzm7D2g1SpQdqMW+xwyyqSPUf8o
- UlYqKBDR+ax9AxNE87LriLUFuegyBEZUSxq/2tfZ4jfMvB21XHf+OtnKqekCG4BhhNys
- CmjQ==
-X-Gm-Message-State: AJcUukcRddEFcGc3i7qLXt2uc9ybTiVkiMF+IJEBXsYJoNAZLE4PkEIi
- dbBzy8vBGE8AR06MJ3JWySR8sg==
-X-Google-Smtp-Source: ALg8bN60vUlnR5KheML4KFtRDNESKi8Gq3t8C3ZZui5R3UiAQb8S4CNvAh3NFU2deIKAIL6FiLz6bg==
-X-Received: by 2002:a17:902:bc81:: with SMTP id
- bb1mr22538826plb.223.1548703901410; 
- Mon, 28 Jan 2019 11:31:41 -0800 (PST)
-Received: from [10.136.8.252] ([192.19.228.250])
- by smtp.gmail.com with ESMTPSA id c4sm67597103pfm.151.2019.01.28.11.31.33
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 28 Jan 2019 11:31:40 -0800 (PST)
-Subject: Re: [PATCH v3 0/8] Add IPROC I2C slave mode and NIC I2C support
-From: Ray Jui <ray.jui@broadcom.com>
-To: Rayagonda Kokatanur <rayagonda.kokatanur@broadcom.com>,
- rjui@broadcom.com, Wolfram Sang <wsa@the-dreams.de>
-References: <1547791464-3540-1-git-send-email-rayagonda.kokatanur@broadcom.com>
- <e658ce66-98e3-3ca6-5786-56bfea6d176e@broadcom.com>
-Message-ID: <746cf074-69e0-7bd1-034e-c8d3156b5506@broadcom.com>
-Date: Mon, 28 Jan 2019 11:31:31 -0800
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=fNUJ09BCIZ3YVWy/Ji5fieGPR7dMwabmPYhcIO/fyFg=;
+ b=pBiVszUGDvh6OfU4HjwZS02EfEBfbuDlIi0+qkTgteIHa9Jr9tkZjt//uaPKFXzvWs
+ SBUVbPhuIQI4rQTnecND/4nMB/rzc+n3iYIkNGkL62Yrp7JfjGdVi5EZgRGu/aGhITiZ
+ Hul7Rjvj5GU9x95qKUOGXzBpdoDdhmFdjme+aj1gG3fZ7yCjmmpxkpHE3F/FTjfI1YXe
+ QxCKSAWFdCmU/At/iepmy/i1lyRdHu0p5uBEW0PIUjK9pNyT675IlL6JI46Xy3JKRite
+ 3aJS4rII9Ezd+sYph6k6UbmbYb6vH5OXMrzENyOXKO3+gcI6o15HApu1t7v6kIgHa2lb
+ s3Gg==
+X-Gm-Message-State: AJcUukfyfdPURpFIW5Jh2zR82VZJx60au9zot0C5dVHpmv9jxte9kpCz
+ aTzfgO7grQZqiB2JEhTmnIA7oA==
+X-Google-Smtp-Source: ALg8bN6N18gNvICoXmmf/LmIw4oTBamfgrQCK9BROI5ovoz2+Uisd8OY1O/8j5x/CleV8Ye1HArcJA==
+X-Received: by 2002:a17:902:7296:: with SMTP id
+ d22mr23520246pll.265.1548704217884; 
+ Mon, 28 Jan 2019 11:36:57 -0800 (PST)
+Received: from localhost ([2620:15c:202:1:75a:3f6e:21d:9374])
+ by smtp.gmail.com with ESMTPSA id t13sm39064565pgr.42.2019.01.28.11.36.57
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 28 Jan 2019 11:36:57 -0800 (PST)
+Date: Mon, 28 Jan 2019 11:36:56 -0800
+From: Matthias Kaehlcke <mka@chromium.org>
+To: Quentin Perret <quentin.perret@arm.com>
+Subject: Re: [PATCH 2/7] cpufreq: dt: Register an Energy Model
+Message-ID: <20190128193656.GI81583@google.com>
+References: <20190128165522.31749-1-quentin.perret@arm.com>
+ <20190128165522.31749-3-quentin.perret@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <e658ce66-98e3-3ca6-5786-56bfea6d176e@broadcom.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20190128165522.31749-3-quentin.perret@arm.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_113142_755499_416FEDE8 
-X-CRM114-Status: GOOD (  15.94  )
+X-CRM114-CacheID: sfid-20190128_113658_912989_F123C3CE 
+X-CRM114-Status: GOOD (  19.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,84 +95,91 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, heikki.krogerus@linux.intel.com, vigneshr@ti.com,
- ajayg@nvidia.com, wsa@the-dreams.de, rayagonoda.kokatanur@braodcom.com,
- aaron.wu@analog.com, pierre-yves.mordret@st.com, kramasub@codeaurora.org,
- linux-i2c@vger.kernel.org, manivannan.sadhasivam@linaro.org, jdelvare@suse.de,
- f.fainelli@gmail.com, eajames@linux.vnet.ibm.com,
- shreesha.rajashekar@broadcom.com, bcm-kernel-feedback-list@broadcom.com,
- geert@linux-m68k.org, devicetree@vger.kernel.org, arnd@arndb.de,
- robh+dt@kernel.org, ccheng@broadcom.com, andriy.shevchenko@linux.intel.com,
- mika.westerberg@linux.intel.com, linux-arm-kernel@lists.infradead.org,
- sbranden@broadcom.com, ard.biesheuvel@linaro.org, linux-kernel@vger.kernel.org,
- jarkko.nikula@linux.intel.com
+Cc: mark.rutland@arm.com, rjw@rjwysocki.net, nm@ti.com,
+ lorenzo.pieralisi@arm.com, devicetree@vger.kernel.org, sboyd@kernel.org,
+ viresh.kumar@linaro.org, linux-pm@vger.kernel.org, liviu.dudau@arm.com,
+ linux-kernel@vger.kernel.org, robh+dt@kernel.org, sudeep.holla@arm.com,
+ dietmar.eggemann@arm.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Wolfram,
-
-Just want to check if you had a chance to review the following patch series?
-
-Thanks,
-
-Ray
-
-On 1/20/2019 1:49 PM, Ray Jui wrote:
-> Hi Rayagonda/Wolfram,
+On Mon, Jan 28, 2019 at 04:55:17PM +0000, Quentin Perret wrote:
+> Now that PM_OPP provides a helper function to estimate the power
+> consumed by CPUs, make sure to try and register an Energy Model (EM)
+> from cpufreq-dt, hence ensuring interested subsystems (the task
+> scheduler, for example) can make use of that information when available.
 > 
-> I reviewed the entire patch series and added my Reviewed-by tag on 1/8
-> and 2/8. The rest of the patches in this series already had my
-> Signed-off-by tag.
+> Signed-off-by: Quentin Perret <quentin.perret@arm.com>
+> ---
+>  drivers/cpufreq/cpufreq-dt.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 > 
-> Thanks,
-> 
-> Ray
-> 
-> On 1/17/2019 10:04 PM, Rayagonda Kokatanur wrote:
->> Hi,
->> This patchset contains support for IPROC I2C slave and NIC I2C support.
->> Following are the brief changes done inorder to support both IPROC I2C
->> slave mode and NIC I2C,
->>
->> a. Add support to allow I2C rx transfer upto 255 bytes
->> b. Add polling mode support to the iProc I2C driver. Polling mode is used
->>    in certain SoCs where interrupt is not connected from the I2C block.
->> c. Add warpper read/write access for register to support indirect register
->>    access. This is required in certain SoCs with this iProc I2C
->>    block registered.
->> d. Remove the set RESET bit to LOW right after setting it to HIGH so that
->>    wait duration can be met.
->>
->> This patch series is based on kernel v5.0.0-rc2.
->>
->> Changes from v2:
->>  - Address Ray's review comments.
->>
->> Changes from v1:
->>  - Rebased to Linux v5.0.0-rc2
->>
->> Ray Jui (1):
->>   dt-bindings: i2c: iproc: make 'interrupts' optional
->>
->> Rayagonda Kokatanur (5):
->>   i2c: iproc: add polling support
->>   i2c: iproc: use wrapper for read/write access
->>   dt-bindings: i2c: iproc: add "brcm,iproc-nic-i2c" compatible string
->>   i2c: iproc: add NIC I2C support
->>   arm64: dts: Stingray: Add NIC i2c device node
->>
->> Shreesha Rajashekar (2):
->>   i2c: iproc: I2C read up to 255 bytes support
->>   i2c: iproc: Add Slave mode support
->>
->>  .../devicetree/bindings/i2c/brcm,iproc-i2c.txt     |  14 +-
->>  .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |  18 +
->>  drivers/i2c/busses/Kconfig                         |   1 +
->>  drivers/i2c/busses/i2c-bcm-iproc.c                 | 757 +++++++++++++++++----
->>  4 files changed, 659 insertions(+), 131 deletions(-)
->>
+> diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+> index e58bfcb1169e..7556e07e7a9f 100644
+> --- a/drivers/cpufreq/cpufreq-dt.c
+> +++ b/drivers/cpufreq/cpufreq-dt.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/cpu_cooling.h>
+>  #include <linux/cpufreq.h>
+>  #include <linux/cpumask.h>
+> +#include <linux/energy_model.h>
+>  #include <linux/err.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> @@ -152,6 +153,7 @@ static int resources_available(void)
+>  
+>  static int cpufreq_init(struct cpufreq_policy *policy)
+>  {
+> +	struct em_data_callback em_cb = EM_DATA_CB(of_dev_pm_opp_get_cpu_power);
+>  	struct cpufreq_frequency_table *freq_table;
+>  	struct opp_table *opp_table = NULL;
+>  	struct private_data *priv;
+> @@ -160,7 +162,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>  	unsigned int transition_latency;
+>  	bool fallback = false;
+>  	const char *name;
+> -	int ret;
+> +	int ret, nr_opp;
+>  
+>  	cpu_dev = get_cpu_device(policy->cpu);
+>  	if (!cpu_dev) {
+> @@ -237,6 +239,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>  		ret = -EPROBE_DEFER;
+>  		goto out_free_opp;
+>  	}
+> +	nr_opp = ret;
+>  
+>  	if (fallback) {
+>  		cpumask_setall(policy->cpus);
+> @@ -280,6 +283,8 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+>  	policy->cpuinfo.transition_latency = transition_latency;
+>  	policy->dvfs_possible_from_any_cpu = true;
+>  
+> +	em_register_perf_domain(policy->cpus, nr_opp, &em_cb);
+
+The perf domain is registered here but not unregistered in exit()
+(there is currently no API do do this). When init() is called for the
+second (or third, ...) time em_register_perf_domain() is called again,
+though it skips the registration. To make things more explicit and not
+rely on internal behavior of em_register_perf_domain() you could place
+the registration inside an 'if (!em_cpu_get(cpu))' branch.
+
+You should probably check the return value of em_register_perf_domain()
+and at least print a warning in case of failure. This would require to
+call em_register_perf_domain() only when CONFIG_ENERGY_MODEL=y (the
+function returns -EINVAL otherwise).
+
+I think this patch will result in error messages at registration on
+platforms that use the cpufreq-dt driver and don't specify
+'dynamic-power-coefficient' for the CPUs in the DT. Not sure if that's
+a problem as long as the cpufreq initialization succeeds regardless,
+it could be seen as a not-so-gentle nudge to add the values.
+
+Cheers
+
+Matthias
 
 _______________________________________________
 linux-arm-kernel mailing list
