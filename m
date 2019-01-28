@@ -2,86 +2,65 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 75AA1C282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:20:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D03CC282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:22:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3E524217D6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:20:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 13FBC21736
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:22:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rev+5M93";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="nlYbsMwU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3E524217D6
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RWX6d2po"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 13FBC21736
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=N3K73KcgJXS3ESRnSbKSvYNhs3My9x9pWQH6Jt/kFmI=; b=Rev+5M93cr2/u4
-	70ZRsjVFsK3/VQe0K8rll5jDp27l3O4TyrgJhtNpTW1YgW73yRSuGn6VaXsU4B/xgpu/707yPJy9+
-	pCL95VHQNfD8JOQnjtr7AiOH5H76ClI/0qVnhd1BzoeUHI69F08rYeoELgfWsfpI1rHSGD3R3z67o
-	MtKgtrIkFQG2OEFPgGwcznPqyFh+3ZisnL+YaoUVlsPYbgiZIATwgJnfx89oVyyYhw6ijUEx+LtPd
-	549rNqO9Lleg9YhdsobSMO8cHQCWKSDYtxr2dIfIzmsymhwFevltqYn1i4BVnhcipgpIQPNNfo0X4
-	lQJx76pUsKan2pDoDvVQ==;
+	List-Owner; bh=ynDURdSHLFlq0pGs67YJ4VmJonpQlta6kO7NVkDJ8Ao=; b=RWX6d2popK7HHh
+	9rxFOsCPrFIVLAm4HMOc9AsWY8Wj4LNhF4oerkvLQhXdIg2BKEeIcSLS7jngr81JBnw1Z1iXCmzAh
+	KQYNvZCoHOxcydBPsaP+rLiaw+IGL66glVqnR6daypVhdprVC5PDONxHZmGgmdvGOzhyJFsd0cCwS
+	3bzJpNJaElgaCsY2fuprquFydEsC7eMJ4/NjPLNvkDA8yUW2IrmFWlFeeBxz9O6wpX9W5e8WX9AOi
+	vyjHubDpiGb2RJKwrGb80mwjHAteRbRgJf0XFplk8ZBVPpopaezzTKvam9HKQv8Kfu4/s7sBtNz2U
+	frp2Q0wO3Y2omfLoB0vA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go35a-00085U-Si; Mon, 28 Jan 2019 09:20:22 +0000
-Received: from hqemgate16.nvidia.com ([216.228.121.65])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go33u-0005gK-3S
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 09:18:42 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c4ec8c60000>; Mon, 28 Jan 2019 01:17:58 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Mon, 28 Jan 2019 01:18:36 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Mon, 28 Jan 2019 01:18:36 -0800
-Received: from HQMAIL107.nvidia.com (172.20.187.13) by HQMAIL108.nvidia.com
- (172.18.146.13) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Mon, 28 Jan
- 2019 09:18:36 +0000
-Received: from hqnvemgw01.nvidia.com (172.20.150.20) by HQMAIL107.nvidia.com
- (172.20.187.13) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via Frontend
- Transport; Mon, 28 Jan 2019 09:18:36 +0000
-Received: from josephl-linux.nvidia.com (Not Verified[10.19.108.132]) by
- hqnvemgw01.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
- id <B5c4ec8eb0006>; Mon, 28 Jan 2019 01:18:36 -0800
-From: Joseph Lo <josephl@nvidia.com>
-To: Thierry Reding <thierry.reding@gmail.com>, Jonathan Hunter
- <jonathanh@nvidia.com>
-Subject: [PATCH V2 6/6] arm64: dts: tegra210-smaug: Enable CPU idle support
-Date: Mon, 28 Jan 2019 17:18:15 +0800
-Message-ID: <20190128091815.7040-7-josephl@nvidia.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190128091815.7040-1-josephl@nvidia.com>
-References: <20190128091815.7040-1-josephl@nvidia.com>
-MIME-Version: 1.0
-X-NVConfidentiality: public
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1548667078; bh=xd0ZR8dQ36qKQbYv+HOK581GWhTND0rl8DAClF2pDF4=;
- h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
- In-Reply-To:References:MIME-Version:X-NVConfidentiality:
- Content-Transfer-Encoding:Content-Type;
- b=nlYbsMwU6gKi3tZqmhGL1r6W3+/lYrBytASPD2QDkSz3ei95EihoEu7GTBUeVJrO2
- qaJ/AN4yBRowKlNncE0MSNC9X5LeIjGhCoqlvfeDXOHlP0F29rtolfCmfIff8zVweG
- wplfCVAhp6+o6/f5RGIEDiY09LznsE68bBq8cV1JmZSAG8jOY8kDOtwCgT8fDhU99c
- TA/wCrt5QDqUKyJOhso0Ssfv+nyYhvFE1Rgdjscp2+jQlvUOaLyUMG35Gx9dMZsk+V
- p3KIdaPts8idPrj0CH/pQX11IcdJzs3nP9UP6m/Bxw4XkM+YLPmPKnX9otnzY1JGp2
- pUIV/M8/v78iw==
+	id 1go37E-0000Hz-1T; Mon, 28 Jan 2019 09:22:04 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1go37B-0000HU-AZ
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 09:22:02 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id ABE9DEBD;
+ Mon, 28 Jan 2019 01:22:00 -0800 (PST)
+Received: from big-swifty.misterjones.org (big-swifty.cambridge.arm.com
+ [10.1.39.122])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 16E413F589;
+ Mon, 28 Jan 2019 01:21:57 -0800 (PST)
+Date: Mon, 28 Jan 2019 09:21:56 +0000
+Message-ID: <86lg35w30r.wl-marc.zyngier@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH v9 02/26] arm64: Remove unused daif related
+ functions/macros
+In-Reply-To: <1548084825-8803-3-git-send-email-julien.thierry@arm.com>
+References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
+ <1548084825-8803-3-git-send-email-julien.thierry@arm.com>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_011838_458388_BD01E592 
-X-CRM114-Status: UNSURE (   6.76  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190128_012201_368889_10017B1E 
+X-CRM114-Status: GOOD (  11.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,44 +72,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Joseph Lo <josephl@nvidia.com>
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org, catalin.marinas@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
+ james.morse@arm.com, joel@joelfernandes.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Enable CPU idle support for Smaug platform.
+On Mon, 21 Jan 2019 15:33:21 +0000,
+Julien Thierry <julien.thierry@arm.com> wrote:
+> 
+> There are some helpers to modify PSR.[DAIF] bits that are not referenced
+> anywhere. The less these bits are available outside of local_irq_*
+> functions the better.
+> 
+> Get rid of those unused helpers.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: James Morse <james.morse@arm.com>
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
-v2:
- * no change
----
- arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-index 5a67890cfb7a..da0eb4530acf 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-+++ b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-@@ -1751,6 +1751,13 @@
- 		cpu@3 {
- 			enable-method = "psci";
- 		};
-+
-+		idle-states {
-+			c7 {
-+				arm,psci-suspend-param = <0x00010007>;
-+				status = "okay";
-+			};
-+		};
- 	};
- 
- 	gpio-keys {
+	M.
+
 -- 
-2.20.1
-
+Jazz is not dead, it just smell funny.
 
 _______________________________________________
 linux-arm-kernel mailing list
