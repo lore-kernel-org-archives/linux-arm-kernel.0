@@ -7,17 +7,18 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8268EC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:08:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C528CC282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:08:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 459D52148E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:08:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8F9572148E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:08:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kZT5JrRk";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="bLJpQmG4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 459D52148E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HcnlywXC";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="cdRV1j2D";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="ETuq24SZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F9572148E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +27,82 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ojb3ROVTNpP2fzpAvgpU0EiQgdluMiUU2zc1zolB7os=; b=kZT5JrRkxM05j3
-	HHm1lwP7y1UcaNDwhlLGFmd6PGWrVcwlKrrv957TUjUXDGhJ3ZH9Bdps7U+EMi/dRf4HpHjklSEWh
-	UvUFmqVdH4BzcUCf7iZAEdxy2tnXBWZZOz6kXDarc/GFMDMRGvNdI5Txc7jdAV3CPsDk5h91HYVRb
-	TArzzJdT//XK2om+MxgpoEr7+4cu5Hoi9pXxd6M2AVMqet+uVSA2vmx2XiTklfGalSAV0GbWRQHi5
-	MZ/lK1WW5TwRNvXAu/lh8RlVAbjs+7g1ntyblpdCsi6qWa6ZWYc9036qgj4REBdFM3HhXqDh+76Qa
-	f5UBs8ee50VuU5cMOZAw==;
+	List-Owner; bh=jCHrMZR0Cd/ZuHtN2rMIvsqCmxSPoCGhou7UI7Z7W38=; b=HcnlywXCLwg8mK
+	IujWEXrAF6iDFKMswK4RGZETCR/N7Nu0Iu+G/ilarkc0A/M1ypgcnGhXDPyTw/8gBCMcfFaDboxjb
+	QbXQsQ6GunQ8vTKXTuZpuJGJTCbXfPEGDjLqSPF9S8/het7Vpv/gjPcb6FM9TGovlX5M8eGADAbX+
+	UuP9F9DrOrtPrG0jVi5HCR+tBvNtvuR3Hwhsdujfw/uQv6tVDyEMrIm9ZFge79IEcqhbamoW2o9ks
+	ghtOw3J5ohwNjX3coqFgpcDDx/US7TOnW0oelpIjtyTRmHWB2rlBhvwU4/GaYdqKYX7WYkzX17c/Y
+	gXnzI0m5iME4GTfpX39Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goBKR-0007YX-9i; Mon, 28 Jan 2019 18:08:15 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1goBKg-0007p6-LT; Mon, 28 Jan 2019 18:08:30 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goBHC-0003mb-MC
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 18:05:12 +0000
-Received: by mail-wr1-x443.google.com with SMTP id f7so19209471wrp.1
+ id 1goBHV-0004PV-Nn
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 28 Jan 2019 18:05:13 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=+5f9A0owJWTYd+3JvitHCSPw9imXDTHvj+3LfT3bYOk=; b=cdRV1j2D0B7bp9DtUPxJk17Qbp
+ teNQtHRn4WrRS7mCjDQNJKyrkBhH/t6jU3hqWLl3NQHOnrfF2RFhUOZ3V9MS/7qZFq17Wxik5NRZJ
+ RTzemQca5b2L/apSs60I2+bvE+huTiFwkEH37A9WHBmaMxNFQTf3kOlz0wBV/ieNyhhFoGdodktZO
+ 9EpN3sFk2PdE8WziWrazr77c/0tbcQGiXgyUDtLZlx+ozrqmDMuuovb3Gsuc5hjqR2Jp0mTmgiSC4
+ 2HPkmY0GfyIXRsERyOu+YWP6usmcWUNgPe/idIcAfwDvyfgwR+AaTqeNtV5k0e6jJpXCW6b0+WmeH
+ OaX4VKxg==;
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goBHR-0002uh-Bt
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 18:05:11 +0000
+Received: by mail-wm1-x341.google.com with SMTP id f188so14883483wmf.5
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 10:04:54 -0800 (PST)
+ Mon, 28 Jan 2019 10:05:07 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=nbXfyjfqzqGpHsSm+wGVBTSI4vzKOQ2CLwSheFxJ0pY=;
- b=bLJpQmG4xEa3nqZqf2uYPgGgvShCScNAnZJS/q4tIDJxY5DwMpFJZ6mdtcbmCk/HP1
- 3O/hdz5zfiulKkSzwA5TFEOFbS7E+gG4O4V0aVFaxQg/TUWTmnOlX+Gk8CHQN4dvuaRr
- SUbrk8P8HqMB2t2froBrbHPnoLt1VOso5vywumJuWHFv5OSv6pGEekrC2TMP0zm1O6P/
- WPJTLq4oZmGIVhUNkKJt7UpP3pANfvFrUzdYdUc9qMG+gqsEvzdeQmmyqzLIZbgtkihu
- 4OZ7gqRALpFPdLOzxOIDtLt0efq3sYAqMUIjBg0lMHrIzz0iuXII0gHXWKJU+YuGPbBS
- 7jmw==
+ bh=+5f9A0owJWTYd+3JvitHCSPw9imXDTHvj+3LfT3bYOk=;
+ b=ETuq24SZivIvXbXZQMQiQzMYvQn/sT+AacURDekfgymKKkFu8yGWenSI4vUAtGbe+u
+ cBjG+KHy7HrDl2qhC9Bsp/0ZINUCoJ3x7GP5EXS71l14/pgaX2lwZUun9mSTyw/koB9o
+ sx8UxbLWuREoOXv/Srv6L1/kVio1yCy2+K/CXDy8r0NsgE5YA+V7l9qoR9Tz0ZjZUCz5
+ fE0/yN+RssTvAWizB5QRodcm5YL5lY5o2c0bwtF6XYJNO32LlVHz6WJmbQvqf/deB2Zp
+ SpM6VxA8f9bIGFqneKoiba5GPTreRJP+NisVYvFF7V1LUOzVuMdc13tEpKP1WnyfWGIP
+ a4kQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=nbXfyjfqzqGpHsSm+wGVBTSI4vzKOQ2CLwSheFxJ0pY=;
- b=kK3ZGhCigFPQUTpVDR5jOttniKxg3v7jUWKQ9RLbROfABZNgXylHOFo7bxJ6ekGkKG
- yYzSf98w+gevMtBlEtEAsN8s0Zpc/GeXzgQAUHfB4TqXRy6+mD7zWTj01ycpGKBMzLkS
- KyOsDexgIj42N0U9vD4NikQpdT9Qjdw2rF90WuFIWzVYp+RMxBq+FlBgxp87HrK92BX2
- y5ATsKLnZrh0zhvlwOMrMnSxDItqqj2VFX6+k34GGB/sbYy4op2uj8+0db/3tt5OTOep
- OQxkMpRaV2qcDD+Lw5uuRnRWrZqY9r9qwLrcicJqWT2zA78MkOEgUXyK8ClG1KWSLAkC
- aS8w==
-X-Gm-Message-State: AHQUAuZ++nEZ7jfWrtqrEZd4WwwK0Mi65QEvxnVU8ayW9cSzv4kNS6qm
- 3Z9EFOtVbd+2lflswa71J1nhyq4GJmk=
-X-Google-Smtp-Source: AHgI3Ibf86P6JrR4OEXFj0tAJZiXCpcxEJRKZPGFbtTm60QemWO8lWx4yqtwQENi/Hxu6K3Voru+hg==
-X-Received: by 2002:adf:fd81:: with SMTP id d1mr15171607wrr.105.1548698693294; 
- Mon, 28 Jan 2019 10:04:53 -0800 (PST)
+ bh=+5f9A0owJWTYd+3JvitHCSPw9imXDTHvj+3LfT3bYOk=;
+ b=NrgmG/2mS+zFzz85dpijbFScqssjd39GYzdZ2WQ5nNHhmqOYIgk4DaPn359kG8TVHE
+ LnyYaD7GfCtkqIxnyshpDk6CVNo11C72ac1G5jHBLcpwNAV/0FaGlbpXIq1PWVH6PYaB
+ oExvbsf/4xTF1ErXnlRzd67PdtcarsVNDufH29D6IG4BQoc7mHxBsN9qNzXdmFAQiTZy
+ KYGQqNv517cOK2BiGVKXeBGVRypDDSyhB5vlLHjwfKiFoI01+14pr4NkXppeVu9VhmSv
+ dQfuAfr11jbsxGQGQL3TghECs/AJyDUG7myg51a409B934ICRkIrTLXQB1FUVUphGtfJ
+ SFIQ==
+X-Gm-Message-State: AJcUukdHahIXtswwLIeVc2jeuSU+Ep++5JpU8yamfYIgpZvyd/yxW/Ot
+ 6k+NFC2Z14ERWkXjvdQT7ROxcw==
+X-Google-Smtp-Source: ALg8bN6k298/NJi0b7cLi+OrdmFywtfHwPwOaIFMaHfwxuqMYGiXLkd08l3a+VUxPu7kE3ta1cihPg==
+X-Received: by 2002:a1c:4346:: with SMTP id q67mr18947083wma.114.1548698705527; 
+ Mon, 28 Jan 2019 10:05:05 -0800 (PST)
 Received: from boomer.local ([2a01:e34:eeb6:4690:106b:bae3:31ed:7561])
- by smtp.googlemail.com with ESMTPSA id p6sm145548193wrx.50.2019.01.28.10.04.51
+ by smtp.googlemail.com with ESMTPSA id p6sm145548193wrx.50.2019.01.28.10.05.03
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 28 Jan 2019 10:04:52 -0800 (PST)
+ Mon, 28 Jan 2019 10:05:04 -0800 (PST)
 From: Jerome Brunet <jbrunet@baylibre.com>
 To: Neil Armstrong <narmstrong@baylibre.com>, Stephen Boyd <sboyd@kernel.org>,
  Michael Turquette <mturquette@baylibre.com>
-Subject: [PATCH 07/14] clk: meson: take the mpll driver out of clkc
-Date: Mon, 28 Jan 2019 19:04:23 +0100
-Message-Id: <20190128180430.28689-8-jbrunet@baylibre.com>
+Subject: [PATCH 14/14] clk: meson: rework and clean drivers dependencies
+Date: Mon, 28 Jan 2019 19:04:30 +0100
+Message-Id: <20190128180430.28689-15-jbrunet@baylibre.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190128180430.28689-1-jbrunet@baylibre.com>
 References: <20190128180430.28689-1-jbrunet@baylibre.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_100455_252789_280F095F 
-X-CRM114-Status: GOOD (  16.02  )
+X-CRM114-CacheID: sfid-20190128_130509_427166_2EB17D17 
+X-CRM114-Status: GOOD (  15.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,154 +122,176 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Initially, the meson clock directory only hosted 2 controllers drivers,
+for meson8 and gxbb. At the time, both used the same set of clock drivers
+so managing the dependencies was not a big concern.
+
+Since this ancient time, entropy did its job, controllers with different
+requirement and specific clock drivers have been added. Unfortunately, we
+did not do a great job at managing the dependencies between the
+controllers and the different clock drivers. Some drivers, such as
+clk-phase or vid-pll-div, are compiled even if they are useless on the
+target (meson8). As we are adding new controllers, we need to be able to
+pick a driver w/o pulling the whole thing.
+
+The patch aims to clean things up by:
+* providing a dedicated CONFIG_ for each clock drivers
+* allowing clock drivers to be compiled as a modules, if possible
+* stating explicitly which drivers are required by each controller.
+
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/clk/meson/axg.c      |  1 +
- drivers/clk/meson/clk-mpll.c | 12 +++++++++++-
- drivers/clk/meson/clk-mpll.h | 30 ++++++++++++++++++++++++++++++
- drivers/clk/meson/clkc.h     | 14 --------------
- drivers/clk/meson/gxbb.c     |  1 +
- drivers/clk/meson/meson8b.c  |  1 +
- 6 files changed, 44 insertions(+), 15 deletions(-)
- create mode 100644 drivers/clk/meson/clk-mpll.h
+ drivers/clk/meson/Kconfig  | 82 +++++++++++++++++++++++++++-----------
+ drivers/clk/meson/Makefile | 21 ++++++----
+ 2 files changed, 71 insertions(+), 32 deletions(-)
 
-diff --git a/drivers/clk/meson/axg.c b/drivers/clk/meson/axg.c
-index 8a3896fa343f..dc973b4324f3 100644
---- a/drivers/clk/meson/axg.c
-+++ b/drivers/clk/meson/axg.c
-@@ -20,6 +20,7 @@
- #include "clkc.h"
- #include "clk-regmap.h"
- #include "clk-pll.h"
-+#include "clk-mpll.h"
- #include "axg.h"
+diff --git a/drivers/clk/meson/Kconfig b/drivers/clk/meson/Kconfig
+index 2479dab09d70..f2e757aea4f1 100644
+--- a/drivers/clk/meson/Kconfig
++++ b/drivers/clk/meson/Kconfig
+@@ -1,27 +1,47 @@
+-config COMMON_CLK_AMLOGIC
+-	bool
+-	depends on ARCH_MESON || COMPILE_TEST
+-	select COMMON_CLK_REGMAP_MESON
++config COMMON_CLK_MESON_INPUT
++	tristate
  
- #define IN_PREFIX "ee-in-"
-diff --git a/drivers/clk/meson/clk-mpll.c b/drivers/clk/meson/clk-mpll.c
-index 650f75cc15a9..f76850d99e59 100644
---- a/drivers/clk/meson/clk-mpll.c
-+++ b/drivers/clk/meson/clk-mpll.c
-@@ -12,7 +12,11 @@
-  */
+-config COMMON_CLK_AMLOGIC_AUDIO
+-	bool
+-	depends on ARCH_MESON || COMPILE_TEST
+-	select COMMON_CLK_AMLOGIC
++config COMMON_CLK_MESON_REGMAP
++	tristate
++	select REGMAP
  
- #include <linux/clk-provider.h>
--#include "clkc.h"
-+#include <linux/module.h>
-+#include <linux/spinlock.h>
+-config COMMON_CLK_MESON_AO
+-	bool
+-	depends on OF
+-	depends on ARCH_MESON || COMPILE_TEST
+-	select COMMON_CLK_REGMAP_MESON
+-	select RESET_CONTROLLER
++config COMMON_CLK_MESON_DUALDIV
++	tristate
++	select COMMON_CLK_MESON_REGMAP
+ 
+-config COMMON_CLK_REGMAP_MESON
+-	bool
+-	select REGMAP
++config COMMON_CLK_MESON_MPLL
++	tristate
++	select COMMON_CLK_MESON_REGMAP
 +
-+#include "clk-regmap.h"
-+#include "clk-mpll.h"
- 
- #define SDM_DEN 16384
- #define N2_MIN	4
-@@ -138,9 +142,15 @@ const struct clk_ops meson_clk_mpll_ro_ops = {
- 	.recalc_rate	= mpll_recalc_rate,
- 	.round_rate	= mpll_round_rate,
- };
-+EXPORT_SYMBOL_GPL(meson_clk_mpll_ro_ops);
- 
- const struct clk_ops meson_clk_mpll_ops = {
- 	.recalc_rate	= mpll_recalc_rate,
- 	.round_rate	= mpll_round_rate,
- 	.set_rate	= mpll_set_rate,
- };
-+EXPORT_SYMBOL_GPL(meson_clk_mpll_ops);
++config COMMON_CLK_MESON_PHASE
++	tristate
++	select COMMON_CLK_MESON_REGMAP
 +
-+MODULE_DESCRIPTION("Amlogic MPLL driver");
-+MODULE_AUTHOR("Michael Turquette <mturquette@baylibre.com>");
-+MODULE_LICENSE("GPL v2");
-diff --git a/drivers/clk/meson/clk-mpll.h b/drivers/clk/meson/clk-mpll.h
-new file mode 100644
-index 000000000000..cf79340006dd
---- /dev/null
-+++ b/drivers/clk/meson/clk-mpll.h
-@@ -0,0 +1,30 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright (c) 2019 BayLibre, SAS.
-+ * Author: Jerome Brunet <jbrunet@baylibre.com>
-+ */
++config COMMON_CLK_MESON_PLL
++	tristate
++	select COMMON_CLK_MESON_REGMAP
 +
-+#ifndef __MESON_CLK_MPLL_H
-+#define __MESON_CLK_MPLL_H
++config COMMON_CLK_MESON_SCLK_DIV
++	tristate
++	select COMMON_CLK_MESON_REGMAP
 +
-+#include <linux/clk-provider.h>
-+#include <linux/spinlock.h>
++config COMMON_CLK_MESON_VID_PLL_DIV
++	tristate
++	select COMMON_CLK_MESON_REGMAP
 +
-+#include "parm.h"
-+
-+struct meson_clk_mpll_data {
-+	struct parm sdm;
-+	struct parm sdm_en;
-+	struct parm n2;
-+	struct parm ssen;
-+	struct parm misc;
-+	spinlock_t *lock;
-+	u8 flags;
-+};
-+
-+#define CLK_MESON_MPLL_ROUND_CLOSEST	BIT(0)
-+
-+extern const struct clk_ops meson_clk_mpll_ro_ops;
-+extern const struct clk_ops meson_clk_mpll_ops;
-+
-+#endif /* __MESON_CLK_MPLL_H */
-diff --git a/drivers/clk/meson/clkc.h b/drivers/clk/meson/clkc.h
-index 4857c8fa1ac4..32947bd76bab 100644
---- a/drivers/clk/meson/clkc.h
-+++ b/drivers/clk/meson/clkc.h
-@@ -11,18 +11,6 @@
- #include "clk-regmap.h"
- #include "parm.h"
++config COMMON_CLK_MESON_AO_CLKC
++	tristate
++	select COMMON_CLK_MESON_REGMAP
++	select COMMON_CLK_MESON_INPUT
++	select RESET_CONTROLLER
  
--struct meson_clk_mpll_data {
--	struct parm sdm;
--	struct parm sdm_en;
--	struct parm n2;
--	struct parm ssen;
--	struct parm misc;
--	spinlock_t *lock;
--	u8 flags;
--};
--
--#define CLK_MESON_MPLL_ROUND_CLOSEST	BIT(0)
--
- struct meson_clk_phase_data {
- 	struct parm ph;
- };
-@@ -54,8 +42,6 @@ struct meson_clk_dualdiv_data {
+ config COMMON_CLK_MESON8B
+ 	bool
+-	select COMMON_CLK_AMLOGIC
++	depends on ARCH_MESON
++	select COMMON_CLK_MESON_REGMAP
++	select COMMON_CLK_MESON_MPLL
++	select COMMON_CLK_MESON_PLL
++	select MFD_SYSCON
+ 	select RESET_CONTROLLER
+ 	help
+ 	  Support for the clock controller on AmLogic S802 (Meson8),
+@@ -30,8 +50,14 @@ config COMMON_CLK_MESON8B
  
- /* clk_ops */
- extern const struct clk_ops meson_clk_cpu_ops;
--extern const struct clk_ops meson_clk_mpll_ro_ops;
--extern const struct clk_ops meson_clk_mpll_ops;
- extern const struct clk_ops meson_clk_phase_ops;
- extern const struct clk_ops meson_vid_pll_div_ro_ops;
- extern const struct clk_ops meson_clk_dualdiv_ops;
-diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-index 813822ec5f57..6a8358f3e0ef 100644
---- a/drivers/clk/meson/gxbb.c
-+++ b/drivers/clk/meson/gxbb.c
-@@ -16,6 +16,7 @@
- #include "gxbb.h"
- #include "clk-regmap.h"
- #include "clk-pll.h"
-+#include "clk-mpll.h"
+ config COMMON_CLK_GXBB
+ 	bool
+-	select COMMON_CLK_AMLOGIC
+-	select COMMON_CLK_MESON_AO
++	depends on ARCH_MESON
++	select COMMON_CLK_MESON_INPUT
++	select COMMON_CLK_MESON_REGMAP
++	select COMMON_CLK_MESON_DUALDIV
++	select COMMON_CLK_MESON_VID_PLL_DIV
++	select COMMON_CLK_MESON_MPLL
++	select COMMON_CLK_MESON_PLL
++	select COMMON_CLK_MESON_AO_CLKC
+ 	select MFD_SYSCON
+ 	help
+ 	  Support for the clock controller on AmLogic S905 devices, aka gxbb.
+@@ -39,8 +65,13 @@ config COMMON_CLK_GXBB
  
- #define IN_PREFIX "ee-in-"
+ config COMMON_CLK_AXG
+ 	bool
+-	select COMMON_CLK_AMLOGIC
+-	select COMMON_CLK_MESON_AO
++	depends on ARCH_MESON
++	select COMMON_CLK_MESON_INPUT
++	select COMMON_CLK_MESON_REGMAP
++	select COMMON_CLK_MESON_DUALDIV
++	select COMMON_CLK_MESON_MPLL
++	select COMMON_CLK_MESON_PLL
++	select COMMON_CLK_MESON_AO_CLKC
+ 	select MFD_SYSCON
+ 	help
+ 	  Support for the clock controller on AmLogic A113D devices, aka axg.
+@@ -48,8 +79,11 @@ config COMMON_CLK_AXG
  
-diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
-index 9b35d5e08378..91a5306b13f6 100644
---- a/drivers/clk/meson/meson8b.c
-+++ b/drivers/clk/meson/meson8b.c
-@@ -20,6 +20,7 @@
- #include "meson8b.h"
- #include "clk-regmap.h"
- #include "clk-pll.h"
-+#include "clk-mpll.h"
+ config COMMON_CLK_AXG_AUDIO
+ 	tristate "Meson AXG Audio Clock Controller Driver"
+-	depends on COMMON_CLK_AXG
+-	select COMMON_CLK_AMLOGIC_AUDIO
++	depends on ARCH_MESON
++	select COMMON_CLK_MESON_INPUT
++	select COMMON_CLK_MESON_REGMAP
++	select COMMON_CLK_MESON_PHASE
++	select COMMON_CLK_MESON_SCLK_DIV
+ 	select REGMAP_MMIO
+ 	help
+ 	  Support for the audio clock controller on AmLogic A113D devices,
+diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
+index 2b9490dd9878..8baec10a49a1 100644
+--- a/drivers/clk/meson/Makefile
++++ b/drivers/clk/meson/Makefile
+@@ -2,12 +2,17 @@
+ # Makefile for Meson specific clk
+ #
  
- static DEFINE_SPINLOCK(meson_clk_lock);
- 
+-obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-pll.o clk-mpll.o clk-phase.o vid-pll-div.o
+-obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-input.o clk-dualdiv.o
+-obj-$(CONFIG_COMMON_CLK_AMLOGIC_AUDIO)	+= sclk-div.o
+-obj-$(CONFIG_COMMON_CLK_MESON_AO) += meson-aoclk.o
++obj-$(CONFIG_COMMON_CLK_MESON_INPUT) += clk-input.o
++obj-$(CONFIG_COMMON_CLK_MESON_REGMAP) += clk-regmap.o
++obj-$(CONFIG_COMMON_CLK_MESON_DUALDIV) += clk-dualdiv.o
++obj-$(CONFIG_COMMON_CLK_MESON_MPLL) += clk-mpll.o
++obj-$(CONFIG_COMMON_CLK_MESON_PHASE) += clk-phase.o
++obj-$(CONFIG_COMMON_CLK_MESON_PLL) += clk-pll.o
++obj-$(CONFIG_COMMON_CLK_MESON_SCLK_DIV) += sclk-div.o
++obj-$(CONFIG_COMMON_CLK_MESON_VID_PLL_DIV) += vid-pll-div.o
++obj-$(CONFIG_COMMON_CLK_MESON_AO_CLKC) += meson-aoclk.o
++
+ obj-$(CONFIG_COMMON_CLK_MESON8B) += meson8b.o
+-obj-$(CONFIG_COMMON_CLK_GXBB)	 += gxbb.o gxbb-aoclk.o
+-obj-$(CONFIG_COMMON_CLK_AXG)	 += axg.o axg-aoclk.o
+-obj-$(CONFIG_COMMON_CLK_AXG_AUDIO)	+= axg-audio.o
+-obj-$(CONFIG_COMMON_CLK_REGMAP_MESON)	+= clk-regmap.o
++obj-$(CONFIG_COMMON_CLK_GXBB) += gxbb.o gxbb-aoclk.o
++obj-$(CONFIG_COMMON_CLK_AXG) += axg.o axg-aoclk.o
++obj-$(CONFIG_COMMON_CLK_AXG_AUDIO) += axg-audio.o
 -- 
 2.20.1
 
