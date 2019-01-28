@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
 	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7522DC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 16:06:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BA26C282CF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 16:15:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3341C2171F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 16:06:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5CED02184D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 16:15:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="emPerAoI";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="J+JRIOs3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3341C2171F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YGFYApsg";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="lbDi7a36"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5CED02184D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Q+ozM5boZ0Lx7rA0yFHv2UEJl2Xvbe+Bv8cGBPARaj8=; b=emPerAoIGPCqPr
-	vEnruff1jdYk2SXVuz4vKG5zD+0OC4wZ8uG83QVIfo9wyaM3Jj/0duruMuOvfGqAbkPHsh5FIpxas
-	ZhKz3Sr7emCPJZ4h5Czw+CjZHzAzvSJQ1pZeZUpxotBdWI5I6EQUig1LyRjggMl8c4SIN2RIBqnPY
-	6vIJhgcfaY8F6E3qQrT84m96yZIwrBuSOKKZDUPiIpkTj5m3zuglGPNcsLy/Os0c31qApUESYklXf
-	N5JXoxBYHloX+HLbmSkYqA/GLv/PUkId+0tubspv714dcbqpaEe2njpVmHN9yI5Uwnl0NuJXlFbms
-	q3nBP74lZqxKMESntuKQ==;
+	List-Owner; bh=Q+ozM5boZ0Lx7rA0yFHv2UEJl2Xvbe+Bv8cGBPARaj8=; b=YGFYApsgtW4duM
+	dp3jB9cgCHnSukk6J0jdwbE8+COlDPsmlBi8yVsE3sFnEsXpBxpZtkM4VEivpZPrzmYsi+qnTqn6L
+	zWQ6RQSoXhzVVwtSgB39rZSUrBRWPJLLFtEFowNc0BldfJpujhDW1mHyUFyjdph59R4VvXPIxuH3T
+	+YVLZO2jIxa23Ih/F1ajhcaDaFrg/oBcaQoNuExlbr91s/nQNzs7sXRDDWrw6fEicw6yv8pTJtfsZ
+	FYxnANVe5k9KniQsMY3GmhIa+i2K4iA4zl513Nakxoyj6JTlUwBaYnZsPVIOcqVRXBqms29/B89I2
+	ovMSclVcsvu5hMuNK+NA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go9QS-00066n-U5; Mon, 28 Jan 2019 16:06:20 +0000
+	id 1go9Zd-0002JD-Br; Mon, 28 Jan 2019 16:15:49 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go9Pl-0005Zm-Su
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 16:05:48 +0000
+ id 1go9Za-0002Ib-LL
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 16:15:47 +0000
 Received: from sasha-vm.mshome.net (c-73-47-72-35.hsd1.nh.comcast.net
  [73.47.72.35])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 330392147A;
- Mon, 28 Jan 2019 16:05:35 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 842BF2184D;
+ Mon, 28 Jan 2019 16:15:44 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548691537;
+ s=default; t=1548692146;
  bh=DFqmGOJ3LBP+z8Wjz8u/2EGfM5QptJOFDIpszZXQ/0A=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=J+JRIOs3kvEnPnTgMkBSK2Eg/9Nziz41j9rwlWxjHfP2Vahvw10zQJ7OiYXCzxoTs
- p5xBAYHAiExbQatAD7Wu/fLWgvgLe8JEYIP12DJreHP8i5cdD6blkTnLMsSpVNAvg6
- WKyZ1DTbJrp+wtvQKWHP5+d//hzQThtFImHR4kFQ=
+ b=lbDi7a362Dn56RM7bJUiBLCwQaMa9jl+D9jxqFgLfL9L52Zlgq7M5uMR1T0JdKXWA
+ mEyxSZ3X8OCPfyCldjRW41/Ctlw52SrFNAgUJMva8CU+S1Lxy9BoDnh0n8R73hZPNt
+ u5tSd6iHqJ/tsgZokLIfnZZCFy400sgxefNDIHW0=
 From: Sasha Levin <sashal@kernel.org>
 To: linux-kernel@vger.kernel.org,
 	stable@vger.kernel.org
-Subject: [PATCH AUTOSEL 4.19 134/258] cpuidle: big.LITTLE: fix refcount leak
-Date: Mon, 28 Jan 2019 10:57:20 -0500
-Message-Id: <20190128155924.51521-134-sashal@kernel.org>
+Subject: [PATCH AUTOSEL 4.14 088/170] cpuidle: big.LITTLE: fix refcount leak
+Date: Mon, 28 Jan 2019 11:10:38 -0500
+Message-Id: <20190128161200.55107-88-sashal@kernel.org>
 X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20190128155924.51521-1-sashal@kernel.org>
-References: <20190128155924.51521-1-sashal@kernel.org>
+In-Reply-To: <20190128161200.55107-1-sashal@kernel.org>
+References: <20190128161200.55107-1-sashal@kernel.org>
 MIME-Version: 1.0
 X-Patchwork-Hint: Ignore
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_080538_826481_24235F9D 
+X-CRM114-CacheID: sfid-20190128_081546_713396_8D24AA46 
 X-CRM114-Status: GOOD (  10.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
