@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F21CC282CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:23:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6D903C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:23:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B6EEC2147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:23:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3D7452147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 18:23:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UzntINdH";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="M7+NLFO/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6EEC2147A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I9dIzmhz";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="zjHDbhlk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3D7452147A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,65 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZGC0/HLVYNQYJQyHPbZzFsw99vuDCKpE4xERaEp2z2Y=; b=UzntINdHId6iWH
-	kC7Re7fDPg/pgokxwim3UtGPvkjX/Rvd+HcRNSb+q3eFARTwgJdFO92OCdZQdwa/0UDHLby7iXzdB
-	uZglxI10dxuQUvTBw6KTxkJ/nYVE5s0BvUJnBV5wDTuoL5/Z+USdr0L6eNdnHL6XyOZLIwVuTmz5J
-	F77Q0TR3G17W1LyNoORyls9TwFtNRz1E8ni426cpLUqC2V6Cch0iSLSDdk0JhFgHp2pDBdrjyll/B
-	J+7NbSfzojxmnakBo8Fxea+H7el/MtisSbCd72xBcMs40F6+M49rOFR+LXy1ICmUvcMFSJA2tbjkD
-	HzhRyCF+UvDjGg585jgg==;
+	List-Owner; bh=KncuINe7A+TCkLeWjOfpWBQqWDqE9Iy98Pgp6oq36NE=; b=I9dIzmhzwOgce+
+	qPvBBzPYKgGkRdCqeSbd7QnVQ1pbVkn40j4fRZpQ8agbF8IML6GvoFxM5buSfjAcPvn3Ixj33SyS9
+	LQoLqAqXWaAi0Lcvs43VlFlkm55gcMVKLN7oun4GHBwrAdIE7gwHsGDm9t5NrjDf04KRdAIDgVMcq
+	53NWkDMgwu6L7szwyVPUe39ubtIqGwOUOWwzyzqpkUJb57ojoSLjchQzxAI+ViFCNOxB7iowcWxla
+	cqJcLl8ksR3qyp9B7dNHC3FeKjt7wgBANDC9JorNU/DQcU91H/vucbHOpYx9Lg9byJt8Qeibxp76T
+	uR9/Z43i5eVfs2WpqsaQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goBYz-0008Fi-Er; Mon, 28 Jan 2019 18:23:17 +0000
+	id 1goBZX-0000HE-QT; Mon, 28 Jan 2019 18:23:51 +0000
 Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goBYj-0007xz-GH
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 18:23:03 +0000
-Received: by mail-wm1-x341.google.com with SMTP id n190so15099361wmd.0
+ id 1goBYk-0007yF-GM
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 18:23:04 +0000
+Received: by mail-wm1-x341.google.com with SMTP id m1so15081976wml.2
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 28 Jan 2019 10:23:01 -0800 (PST)
+ Mon, 28 Jan 2019 10:23:02 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=dSImbPlNDIywIdqcZTWb3Qn/6DZr3el7F0sh0GH4dss=;
- b=M7+NLFO/nlmBfyC59hkNptd7DHeK7vI5LyDgPf12El+xVGcTqxP9I/08aBi5m7B7a1
- kJ72Sc8hlsn3emC4zcH0K3UOx7ZYWG87qE5y1aFCO/rodTlY7gUQ8nPYDGfQiv1SDfjy
- sAa5gIjAQC49nJXDozRMozzVuaXXfPXjBjl3qo1FECRBT+Gyg2UlhzPQ4zaPfc+5aMCk
- poDogurE31LdjdeY+I46MmzQCuB29KKOfaPvYkb7i67r2KDHT789qQ1dDVHwqJynBm8T
- x7PI0LF+qtuMHZ8oKhRko0S98gPzuM2f0kZI50OHuEaO/OVgcht6QT4aKYGRFo/gi+XU
- JoIg==
+ bh=KF36F6q9GQzGHJ20m9zEs0OSKLwz9Wn20oRSDsKSvn8=;
+ b=zjHDbhlkRCr07+TN1SMYNQ5eDsCYWPn44MbDZJoK3N4hCs0Ou/GHl8txK4GZCV/UeU
+ ONr2lwM40JdODhiJzwQquNRpyDcZ72xiI83sDVIZXMR6wOMuZMn/ikiUdeRN+eVg+kzZ
+ qaXTyLwoqZIPX5ubXieyc5QpU9CptnqN2y3RjedjkRTKD1HmroGseXq4y8G9b73VU2zF
+ +WVpb2uUJCKXn0PnQFetdRhLWU2NXrJOzcem/6s5KRrHsvzd4nEA7QADgS6rHGeb4y6S
+ 6fQ7QVrnGa/TaKJmzFmdD60blf26Zwo4TlMZfHGquaTLstW96ReTPiHzAOnf7ewAYxVh
+ x8ww==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=dSImbPlNDIywIdqcZTWb3Qn/6DZr3el7F0sh0GH4dss=;
- b=G3Tnz3xrH8WJd9Q0mey2Wv2KpY7KGqqpiGFk/68GgLpA1nNU8F159B+CCEgi3V1NBF
- FZALCgPffrMhdCApwtyJXVUnFRcAYlmhSaG566B1F02iQp/8Bv311liJanC1hriT+9OV
- 9Z0hwgzswZUlQ3l7m+PK99wo4bfd8XPQ/nGRD1dRFkuW7Nw0EMd803K0XYDbWtx7+Lwl
- 9zE4DmDrfVMaWSIcczyhkvCilVEKlj02+8c8l54oFoVjnlw+zsG4T+j3v8/IC5ZFh+52
- rd86c+4n5wwYZnJMDZlJiuYerSobPCbgZRynce+gCY+sJG9u9AD47y4wc7YmYkvxuP/H
- 9rjg==
-X-Gm-Message-State: AJcUukfN3Uj3luOkhIyLOLg791R4JVShDf7a07AxON3VyyxfF8RviFyq
- 4M5VF/RtkfGqirCGXygeGzzDOA==
-X-Google-Smtp-Source: ALg8bN4AEdWhwQn2iOThFA+3Lvqrn6rmwSBfNsb+pcUvuauS0gfrltNNs5Cj5CwUzlA/pgz+Ws4zhw==
-X-Received: by 2002:a1c:6489:: with SMTP id y131mr17963873wmb.34.1548699779850; 
- Mon, 28 Jan 2019 10:22:59 -0800 (PST)
+ bh=KF36F6q9GQzGHJ20m9zEs0OSKLwz9Wn20oRSDsKSvn8=;
+ b=UcFeuMvr3xikn4cFvLlCsFWUW6FTo22/FO3C0ozukg+2fqyXOP4PBpFAD5cAjVVQgO
+ r+scY72/yxCaP4ULjORoOzNVoYJRXNuUL0/lyH6pPiRDRsrNbv94Pqn/IREzFEz1IIoP
+ UFG/PHeBVSpBMe7WBajTgbXKgQb5RDr+dFfEhwshfk4Z2AJnvjJW9SaTDLm+kx3Y+BgS
+ dKyfWuTQV+Us70DFK0NxQkRpojEqyGYGexBjJRSeFXGS7uJFjz3wtLupLAQwBKXkASXc
+ XXXmPhPEdycVybXNeDOsekLLb/23YEaz4l4ZQCNiuUlEWh3cL2Q2KgoOBQM8UlofodBa
+ 54YA==
+X-Gm-Message-State: AJcUukeb3XHgkeXqpfw5w/Zx4DdYFXW+x6x5+tz9+PeJ85f499Kr5Myw
+ Oa26LiKftncav8VCUybz+TiMJg==
+X-Google-Smtp-Source: ALg8bN49XeLSs+dhj5l9IQ/0Ag8h3yAaNs1LWB9trd1NPYyBk8ti9OKURggjsFGXYvd6jAbnXkQOhA==
+X-Received: by 2002:a1c:d00d:: with SMTP id h13mr17657339wmg.13.1548699781116; 
+ Mon, 28 Jan 2019 10:23:01 -0800 (PST)
 Received: from boomer.local ([2a01:e34:eeb6:4690:106b:bae3:31ed:7561])
- by smtp.googlemail.com with ESMTPSA id s1sm169223758wro.9.2019.01.28.10.22.58
+ by smtp.googlemail.com with ESMTPSA id s1sm169223758wro.9.2019.01.28.10.22.59
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 28 Jan 2019 10:22:59 -0800 (PST)
+ Mon, 28 Jan 2019 10:23:00 -0800 (PST)
 From: Jerome Brunet <jbrunet@baylibre.com>
 To: Kevin Hilman <khilman@baylibre.com>
-Subject: [PATCH 1/2] arm64: meson: remove COMMON_CLK_AMLOGIC selection
-Date: Mon, 28 Jan 2019 19:22:51 +0100
-Message-Id: <20190128182252.32589-2-jbrunet@baylibre.com>
+Subject: [PATCH 2/2] ARM: meson: remove COMMON_CLK_AMLOGIC selection
+Date: Mon, 28 Jan 2019 19:22:52 +0100
+Message-Id: <20190128182252.32589-3-jbrunet@baylibre.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190128182252.32589-1-jbrunet@baylibre.com>
 References: <20190128182252.32589-1-jbrunet@baylibre.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_102301_537239_F7CB65CE 
-X-CRM114-Status: GOOD (  10.73  )
+X-CRM114-CacheID: sfid-20190128_102302_536816_18669BA5 
+X-CRM114-Status: GOOD (  10.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,21 +108,21 @@ by the SoC clock controller driver
 
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- arch/arm64/Kconfig.platforms | 1 -
+ arch/arm/mach-meson/Kconfig | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 251ecf34cb02..819e74ae9224 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -112,7 +112,6 @@ config ARCH_MESON
- 	bool "Amlogic Platforms"
+diff --git a/arch/arm/mach-meson/Kconfig b/arch/arm/mach-meson/Kconfig
+index b16831697183..15e9cb75738e 100644
+--- a/arch/arm/mach-meson/Kconfig
++++ b/arch/arm/mach-meson/Kconfig
+@@ -9,7 +9,6 @@ menuconfig ARCH_MESON
  	select PINCTRL
  	select PINCTRL_MESON
+ 	select COMMON_CLK
 -	select COMMON_CLK_AMLOGIC
- 	select COMMON_CLK_GXBB
- 	select COMMON_CLK_AXG
- 	select MESON_IRQ_GPIO
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+ 
 -- 
 2.20.1
 
