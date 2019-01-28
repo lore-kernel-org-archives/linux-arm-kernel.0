@@ -4,18 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 05C01C282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:32:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D8A8C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:33:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C6D87217D6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:32:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5029C20880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 09:33:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MKiblm0q"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C6D87217D6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V3NQzw/j"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5029C20880
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,35 +25,35 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
 	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9t9R/4sKK99G4VrvuuMOYxMGoaVkByNYAbWgWeXcsfc=; b=MKiblm0qp58V0t
-	wdmK5qrAczyEw6k4BjXNhTB46iWdub6kiNxnCP3uWwDuRMP/NISbxeMcg5+IFwC1cKjmHScCXmLIu
-	ISeQowDcbc4c2D0ACw87SNbGAukRvemBO+G6YwL6v2JoPUxKWL4AYXK4hI7O+vcg7G2FNRU77VQvf
-	LEkFAsfmwRcsyQiLjdBxbOJj0OikghbI8arMmlPYKo+ZYvHWSHBVZjd3nSxDIHGUqJCbpZ381IwfY
-	18abzMFCT1Cn07P44kmvBcxEFJbWAhK26YUEJdoiVOUhf9Cpz1Xs7fYopgUl6WCDO3fd4VNd3bikC
-	qSoPqMdhJHeSDnpHRLUg==;
+	List-Owner; bh=jygBk0yoAyN84me38/+gaJxegd5EndOlJ00xBbz9wk0=; b=V3NQzw/jGBAt5j
+	V3hsxXLVHCdf2JLYSlZQaE+5IEST4lyH6ooK+JiLnuk5Js/1T21omMCvyl4q+qqRkMBqeRjjxp9va
+	qVraYQ+yHQZRqUzH/9yr23OLERFWsAem/fg5IlEBmEqOphZNfH632C2mQ4++ZnM3tUus92Hvp+oOk
+	CBnR5r3Ty4HbdrKDabphPc8s/afO5qrD+F9IQwL6IVDeST70okwNOIZyk7oiDWNk3aolL+cYtzEKt
+	vs6j4Xr5wHatAM391P5HczgAiAZhaoY7780dPOn31w28ErMx+1MNUdMHGRM6FAJRd/aRtAVaE6jhQ
+	ZC+T0/eLUMlkc0wYIDAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go3H4-0005fn-6b; Mon, 28 Jan 2019 09:32:14 +0000
+	id 1go3IS-00066Y-2T; Mon, 28 Jan 2019 09:33:40 +0000
 Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go3H1-0005fT-57
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 09:32:12 +0000
+ id 1go3IP-00065i-Au
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 09:33:38 +0000
 Received: from gallifrey.ext.pengutronix.de
  ([2001:67c:670:201:5054:ff:fe8d:eefb] helo=localhost)
  by metis.ext.pengutronix.de with esmtps
  (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
  (envelope-from <l.stach@pengutronix.de>)
- id 1go3Gw-0007wX-09; Mon, 28 Jan 2019 10:32:06 +0100
-Message-ID: <85151aee51eca63d4a664b38837930c53cf8e7c1.camel@pengutronix.de>
-Subject: Re: [PATCH v5 2/5] dmaengine: imx-sdma: add imx8mq sdma compatible
- parts
+ id 1go3IK-00083N-2i; Mon, 28 Jan 2019 10:33:32 +0100
+Message-ID: <7a3c2f812b7529e23a0007c70949a02e86a4f4f2.camel@pengutronix.de>
+Subject: Re: [PATCH v5 4/5] dmaengine: imx-sdma: add a test for imx8mq multi
+ sdma devices
 From: Lucas Stach <l.stach@pengutronix.de>
 To: "Angus Ainslie (Purism)" <angus@akkea.ca>
-Date: Mon, 28 Jan 2019 10:32:04 +0100
-In-Reply-To: <20190128060840.31695-3-angus@akkea.ca>
+Date: Mon, 28 Jan 2019 10:33:31 +0100
+In-Reply-To: <20190128060840.31695-5-angus@akkea.ca>
 References: <20190120023150.17138-1-angus@akkea.ca>
  <20190128060840.31695-1-angus@akkea.ca>
- <20190128060840.31695-3-angus@akkea.ca>
+ <20190128060840.31695-5-angus@akkea.ca>
 User-Agent: Evolution 3.30.4 (3.30.4-1.fc29) 
 Mime-Version: 1.0
 X-SA-Exim-Connect-IP: 2001:67c:670:201:5054:ff:fe8d:eefb
@@ -61,8 +62,8 @@ X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
  SAEximRunCond expanded to false
 X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_013211_354140_D3C22764 
-X-CRM114-Status: GOOD (  13.77  )
+X-CRM114-CacheID: sfid-20190128_013337_527444_37FAA6B9 
+X-CRM114-Status: GOOD (  17.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,47 +86,62 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 Am Sonntag, den 27.01.2019, 23:08 -0700 schrieb Angus Ainslie (Purism):
-> This is identical to the imx7d.
-
-So it can be dropped and the i.MX8M DT should just specify the
-"fsl,imx7d-sdma" as a fallback compatible for the SDMA codes.
-
-If both the imx8m and imx7d compatible are present in the DT, we can
-introduce a more specific matchic when we actually need it. No need to
-pollute the code with this from the start.
-
-Regards,
-Lucas
-
+> On i.mx8mq, there are two sdma instances, and the common dma framework
+> will get a channel dynamically from any available sdma instance whether
+> it's the first sdma device or the second sdma device. Some IPs like
+> SAI only work with sdma2 not sdma1. To make sure the sdma channel is from
+> the correct sdma device, use the node pointer to match.
+> 
 > Signed-off-by: Angus Ainslie (Purism) <angus@akkea.ca>
+
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+
 > ---
->  drivers/dma/imx-sdma.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>  drivers/dma/imx-sdma.c                | 6 ++++++
+>  include/linux/platform_data/dma-imx.h | 1 +
+>  2 files changed, 7 insertions(+)
 > 
 > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index 757fad2fbfae..c4db4fe6bcc9 100644
+> index c4db4fe6bcc9..d5f86becf59e 100644
 > --- a/drivers/dma/imx-sdma.c
 > +++ b/drivers/dma/imx-sdma.c
-> @@ -578,6 +578,9 @@ static const struct platform_device_id
-> sdma_devtypes[] = {
->  	}, {
->  		.name = "imx7d-sdma",
->  		.driver_data = (unsigned long)&sdma_imx7d,
-> +	}, {
-> +		.name = "imx8mq-sdma",
-> +		.driver_data = (unsigned long)&sdma_imx7d,
->  	}, {
->  		/* sentinel */
->  	}
-> @@ -592,6 +595,7 @@ static const struct of_device_id sdma_dt_ids[] =
-> {
->  	{ .compatible = "fsl,imx31-sdma", .data = &sdma_imx31, },
->  	{ .compatible = "fsl,imx25-sdma", .data = &sdma_imx25, },
->  	{ .compatible = "fsl,imx7d-sdma", .data = &sdma_imx7d, },
-> +	{ .compatible = "fsl,imx8mq-sdma", .data = &sdma_imx7d, },
->  	{ /* sentinel */ }
+> @@ -1918,11 +1918,16 @@ static int sdma_init(struct sdma_engine *sdma)
+>  static bool sdma_filter_fn(struct dma_chan *chan, void *fn_param)
+>  {
+>  	struct sdma_channel *sdmac = to_sdma_chan(chan);
+> +	struct sdma_engine *sdma = sdmac->sdma;
+>  	struct imx_dma_data *data = fn_param;
+>  
+>  	if (!imx_dma_is_general_purpose(chan))
+>  		return false;
+>  
+> +	/* return false if it's not the right device */
+> +	if (sdma->dev->of_node != data->of_node)
+> +		return false;
+> +
+>  	sdmac->data = *data;
+>  	chan->private = &sdmac->data;
+>  
+> @@ -1950,6 +1955,7 @@ static struct dma_chan *sdma_xlate(struct of_phandle_args *dma_spec,
+>  	 * be set to sdmac->event_id1.
+>  	 */
+>  	data.dma_request2 = 0;
+> +	data.of_node = ofdma->of_node;
+>  
+>  	return dma_request_channel(mask, sdma_filter_fn, &data);
+>  }
+> diff --git a/include/linux/platform_data/dma-imx.h b/include/linux/platform_data/dma-imx.h
+> index 7d964e787299..9daea8d42a10 100644
+> --- a/include/linux/platform_data/dma-imx.h
+> +++ b/include/linux/platform_data/dma-imx.h
+> @@ -55,6 +55,7 @@ struct imx_dma_data {
+>  	int dma_request2; /* secondary DMA request line */
+>  	enum sdma_peripheral_type peripheral_type;
+>  	int priority;
+> +	struct device_node *of_node;
 >  };
->  MODULE_DEVICE_TABLE(of, sdma_dt_ids);
+>  
+>  static inline int imx_dma_is_ipu(struct dma_chan *chan)
 
 
 _______________________________________________
