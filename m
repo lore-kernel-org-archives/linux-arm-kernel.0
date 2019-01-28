@@ -2,66 +2,82 @@ Return-Path: <SRS0=FIMe=QE=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D557CC282C8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:39:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EF8E7C282C8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:45:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 873A32148E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:39:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C14DB21741
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 28 Jan 2019 11:45:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FvLQnV6q"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 873A32148E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gNONXqlk";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="QST1QHTo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C14DB21741
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iIELZ/D5HIkLmR8/71PgS4y9hEpb9uFfYESQm1AhtQY=; b=FvLQnV6qpNrj34
-	jQvY52A4d6x3sKw7L3WBNfcAQYLcorRrW2qa6h7647VDFYcx3u3KKZXlkYxxfhsVxAJwyeO/quMyR
-	3P9hON6tKe8tnG2RT/2BynupBObnSldLMm6LK8QVGzi21WaY2yLIRCjW9C1oM/HGu8MKp5/LLsiCA
-	2Qlj/iAzsUu9IjEZt4l00oW1ROoQjy48gCuOFbvRoJ6kPMk/nqx1CIwe11FoJFaH5BB5tGGE0Fm3u
-	o01qx4nyJ1iHs4dggENIzoy94KrwxKYUtV7GFCisyd5OkMyuItAIcmgRBoLnkrBHoiOr92WTKzLyP
-	Zs6Bn/zCN/FRY0gUbscA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=kvN+yGSBN/cIIrd3Ft80vn4JW5ILonQd2YzYMZnMAvQ=; b=gNO
+	NXqlkz98gChi/1dc2KmPce1pS6Dn59oFqbTAsvMxsm4RNdcyHzf3Cpf/cyN6POamM50bw3nrtuNp9
+	c/411ha2iHrm1xIfGUKIR3SaF28di0P45rjWv5p7J3fTic/VAEJh1O1seLC86zQ0OyZLOf3pmNZLZ
+	0Ct0nDqZmCsGyVlBq5mu++zLWjitouYoYsgBvMa8P/tdTkSQMCpTPlIFGM5YYSZHoH97mtGwfP+Tz
+	JM+R1IzUGYhEA4l82hgWpLeqQoWrC0Q0jHdpw0FjlOJp+R9gdQSTYzV31kI3KP27Mayfq39J44o16
+	qSVaZVGCO+p/YM8qOKLe/x0ObLXq9sg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1go5G6-0001CS-9l; Mon, 28 Jan 2019 11:39:22 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1go5G2-0001C9-N4
- for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 11:39:20 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 24AE0EBD;
- Mon, 28 Jan 2019 03:39:18 -0800 (PST)
-Received: from big-swifty.misterjones.org (big-swifty.cambridge.arm.com
- [10.1.39.122])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 06CCC3F59C;
- Mon, 28 Jan 2019 03:39:14 -0800 (PST)
-Date: Mon, 28 Jan 2019 11:39:16 +0000
-Message-ID: <86y375ui3f.wl-marc.zyngier@arm.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v9 19/26] irqchip/gic-v3: Detect if GIC can support
- pseudo-NMIs
-In-Reply-To: <1548084825-8803-20-git-send-email-julien.thierry@arm.com>
-References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
- <1548084825-8803-20-git-send-email-julien.thierry@arm.com>
-User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
- FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
- (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
-Organization: ARM Ltd
-MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
+	id 1go5Lq-00048Q-Tg; Mon, 28 Jan 2019 11:45:18 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1go5Ln-00047i-Si
+ for linux-arm-kernel@lists.infradead.org; Mon, 28 Jan 2019 11:45:17 +0000
+Received: by mail-wr1-x443.google.com with SMTP id u4so17685499wrp.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 28 Jan 2019 03:45:14 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=XXP3hIFo09qbYxDEZ84UjroMfNXRwbZdmDEOnudwpmA=;
+ b=QST1QHTo+SnjfGWbtje9MmvxvXe4/o/N50DokM5mJxKpXFb63tUU1x/mmlOjswaquL
+ x/B9ltLTidkjQvB8ltU33qlfqwIxGvVVLsfIHFn55bKZF287AeDlb6uuaC5f7M+g6XBd
+ 0wU+H6OCt7OAaazBWp9kitFWKCJEp6s4QFmzA=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=XXP3hIFo09qbYxDEZ84UjroMfNXRwbZdmDEOnudwpmA=;
+ b=ZCSoXZeeUziJ084u426700tk5eQbRWD74BtdDM4/IhvMk7go0Vccl6mukFgQvNaoIW
+ XwH89bCVqirt8FDeo49SW+02BGhvDstu+K+t6y6eNMBj4UlxkjOCjKO/es8XF4ozisOQ
+ Ez9KH/qcVhYqHAlFxk5b0Eel2s1/UhGbmVBuWzcIVx1cI5RtL00gMepKjPivMdUEHf+j
+ 0BOTm8Y52gB4ASsx+3l4TQp/l5/9uh0oIJJ1GrDAoKwGQ9uS43CyI4HAlVWAjZDjELI0
+ vDS/f3moYbTQvmveaxwgwcFf0G+2Q1rex5gOHLRsbVRuViL/RTCD7XmDXiD9VYjL3jXN
+ Ielg==
+X-Gm-Message-State: AJcUukfmWTS5Ie9HYN1XMk1VUzScwBZQwPfT46gqbcsKlTv45z5rPLSt
+ 2rYbcuMjaEsgo01CqGHiEXwGBA==
+X-Google-Smtp-Source: ALg8bN4EHw6SpI3q7wRaHuK0UXmG8c7NqpCc59mw5ZFdAx5u6QilmJUB2vTbnMbhKqBMYELKaKRDdA==
+X-Received: by 2002:a5d:6b09:: with SMTP id v9mr22526419wrw.304.1548675913628; 
+ Mon, 28 Jan 2019 03:45:13 -0800 (PST)
+Received: from localhost.localdomain (233.red-81-47-145.staticip.rima-tde.net.
+ [81.47.145.233])
+ by smtp.gmail.com with ESMTPSA id z9sm122968775wrs.63.2019.01.28.03.45.12
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Mon, 28 Jan 2019 03:45:13 -0800 (PST)
+From: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+To: jorge.ramirez-ortiz@linaro.org, lgirdwood@gmail.com, broonie@kernel.org,
+ robh+dt@kernel.org, mark.rutland@arm.com
+Subject: [PATCH 0/3] qcom: add PMS405 SPMI regulator
+Date: Mon, 28 Jan 2019 12:45:01 +0100
+Message-Id: <1548675904-18324-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_033918_765307_B75BD0DE 
-X-CRM114-Status: GOOD (  29.03  )
+X-CRM114-CacheID: sfid-20190128_034515_940569_16697E56 
+X-CRM114-Status: UNSURE (   8.83  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,191 +89,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
- Jason Cooper <jason@lakedaemon.net>, Jonathan Corbet <corbet@lwn.net>,
- catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- christoffer.dall@arm.com, james.morse@arm.com, joel@joelfernandes.org,
- Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, vinod.koul@linaro.org,
+ linux-arm-msm@vger.kernel.org, khasim.mohammed@linaro.org,
+ linux-kernel@vger.kernel.org, bjorn.andersson@linaro.org,
+ niklas.cassel@linaro.org, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 21 Jan 2019 15:33:38 +0000,
-Julien Thierry <julien.thierry@arm.com> wrote:
-> 
-> The values non secure EL1 needs to use for PMR and RPR registers depends on
-> the value of SCR_EL3.FIQ.
-> 
-> The values non secure EL1 sees from the distributor and redistributor
-> depend on whether security is enabled for the GIC or not.
-> 
-> To avoid having to deal with two sets of values for PMR
-> masking/unmasking, only enable pseudo-NMIs when GIC has non-secure view
-> of priorities.
-> 
-> Also, add firmware requirements related to SCR_EL3.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Jonathan Corbet <corbet@lwn.net>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  Documentation/arm64/booting.txt |  5 ++++
->  drivers/irqchip/irq-gic-v3.c    | 58 ++++++++++++++++++++++++++++++++++++-----
->  2 files changed, 57 insertions(+), 6 deletions(-)
-> 
-> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> index 8df9f46..fbab7e2 100644
-> --- a/Documentation/arm64/booting.txt
-> +++ b/Documentation/arm64/booting.txt
-> @@ -188,6 +188,11 @@ Before jumping into the kernel, the following conditions must be met:
->    the kernel image will be entered must be initialised by software at a
->    higher exception level to prevent execution in an UNKNOWN state.
->  
-> +  - SCR_EL3.FIQ must have the same value across all CPUs the kernel is
-> +    executing on.
-> +  - The value of SCR_EL3.FIQ must be the same as the one present at boot
-> +    time whenever the kernel is executing.
-> +
->    For systems with a GICv3 interrupt controller to be used in v3 mode:
->    - If EL3 is present:
->      ICC_SRE_EL3.Enable (bit 3) must be initialiased to 0b1.
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index 5a703ae..5374b43 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -66,6 +66,31 @@ struct gic_chip_data {
->  static struct gic_chip_data gic_data __read_mostly;
->  static DEFINE_STATIC_KEY_TRUE(supports_deactivate_key);
->  
-> +/*
-> + * The behaviours of RPR and PMR registers differ depending on the value of
-> + * SCR_EL3.FIQ, and the behaviour of non-secure priority registers of the
-> + * distributor and redistributors depends on whether security is enabled in the
-> + * GIC.
-> + *
-> + * When security is enabled, non-secure priority values from the (re)distributor
-> + * are presented to the GIC CPUIF as follow:
-> + *     (GIC_(R)DIST_PRI[irq] >> 1) | 0x80;
-> + *
-> + * If SCR_EL3.FIQ == 1, the values writen to/read from PMR and RPR at non-secure
-> + * EL1 are subject to a similar operation thus matching the priorities presented
-> + * from the (re)distributor when security is enabled.
-> + *
-> + * see GICv3/GICv4 Architecture Specification (IHI0069D):
-> + * - section 4.8.1 Non-secure accesses to register fields for Secure interrupt
-> + *   priorities.
-> + * - Figure 4-7 Secure read of the priority field for a Non-secure Group 1
-> + *   interrupt.
-> + *
-> + * For now, we only support pseudo-NMIs if we have non-secure view of
-> + * priorities.
-> + */
-> +static DEFINE_STATIC_KEY_FALSE(supports_pseudo_nmis);
-> +
->  static struct gic_kvm_info gic_v3_kvm_info;
->  static DEFINE_PER_CPU(bool, has_rss);
->  
-> @@ -232,6 +257,12 @@ static void gic_unmask_irq(struct irq_data *d)
->  	gic_poke_irq(d, GICD_ISENABLER);
->  }
->  
-> +static inline bool gic_supports_nmi(void)
-> +{
-> +	return IS_ENABLED(CONFIG_ARM64_PSEUDO_NMI) &&
-> +	       static_branch_likely(&supports_pseudo_nmis);
-> +}
-> +
->  static int gic_irq_set_irqchip_state(struct irq_data *d,
->  				     enum irqchip_irq_state which, bool val)
->  {
-> @@ -573,6 +604,12 @@ static void gic_update_vlpi_properties(void)
->  		!gic_data.rdists.has_direct_lpi ? "no " : "");
->  }
->  
-> +/* Check whether it's single security state view */
-> +static inline bool gic_dist_security_disabled(void)
-> +{
-> +	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
-> +}
-> +
->  static void gic_cpu_sys_reg_init(void)
->  {
->  	int i, cpu = smp_processor_id();
-> @@ -598,6 +635,9 @@ static void gic_cpu_sys_reg_init(void)
->  	/* Set priority mask register */
->  	if (!gic_prio_masking_enabled())
->  		write_gicreg(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
-> +	else if (gic_supports_nmi() && group0)
-> +		/* Mismatch configuration with boot CPU */
-> +		WARN_ON(!gic_dist_security_disabled());
+The following patchset applies cleanly on linux 5.0-rc2.
 
-You can probably write this as a single line:
+It adds support for the pms405 spmi regulators and configures s3 as a
+supply.
 
-	WARN_ON(gic_supports_nmi() && group0 && !gic_dist_security_disabled());
+The dts modifications required to enable voltage scaling will be
+posted after the currently pending cpufreq patches are merged.
 
-Maybe even add a comment saying that in this case, the system is
-likely to be dead, as the masking of interrupt will not work
-correctly.
+Jorge Ramirez-Ortiz (3):
+  dt-bindings: qcom_spmi: Document pms405 support
+  drivers: regulator: qcom: add PMS405 SPMI regulator
+  arm64: dts: qcom: pms405: add spmi regulators
 
->  
->  	/*
->  	 * Some firmwares hand over to the kernel with the BPR changed from
-> @@ -852,12 +892,6 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->  #endif
->  
->  #ifdef CONFIG_CPU_PM
-> -/* Check whether it's single security state view */
-> -static bool gic_dist_security_disabled(void)
-> -{
-> -	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
-> -}
-> -
->  static int gic_cpu_pm_notifier(struct notifier_block *self,
->  			       unsigned long cmd, void *v)
->  {
-> @@ -1110,6 +1144,11 @@ static bool gic_enable_quirk_msm8996(void *data)
->  	return true;
->  }
->  
-> +static void gic_enable_nmi_support(void)
-> +{
-> +	static_branch_enable(&supports_pseudo_nmis);
-> +}
-> +
->  static int __init gic_init_bases(void __iomem *dist_base,
->  				 struct redist_region *rdist_regs,
->  				 u32 nr_redist_regions,
-> @@ -1179,6 +1218,13 @@ static int __init gic_init_bases(void __iomem *dist_base,
->  		its_cpu_init();
->  	}
->  
-> +	if (gic_prio_masking_enabled()) {
-> +		if (!gic_has_group0() || gic_dist_security_disabled())
-> +			gic_enable_nmi_support();
-> +		else
-> +			pr_warn("SCR_EL3.FIQ is cleared, cannot enable use of pseudo-NMIs\n");
-> +	}
-> +
->  	return 0;
->  
->  out_free:
-> -- 
-> 1.9.1
-> 
-
-Otherwise:
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
+ .../bindings/regulator/qcom,spmi-regulator.txt     |  24 +++
+ arch/arm64/boot/dts/qcom/pms405.dtsi               |  20 +++
+ drivers/regulator/qcom_spmi-regulator.c            | 197 +++++++++++++++++++--
+ 3 files changed, 224 insertions(+), 17 deletions(-)
 
 -- 
-Jazz is not dead, it just smell funny.
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
