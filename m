@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A3152C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:55:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 130A7C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:55:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 712612084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:55:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D85212084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:55:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Coys78s+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 712612084C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="izPqOM1i"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D85212084C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ossystems.com.br
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,57 +25,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wKq1wM9zyrO6+bpYQMvTVpY0KJkMBiOpIcapOa/AL2k=; b=Coys78s+RxI+nb
-	E6dagiDOAY3CpCpfCa3c2AJTZvfiNNYVClV3+yCIK0mB7YBDcnFmkGu+KTbkFYLhV4Vsz18kCLcgl
-	t9b7AaWDmsk5KN0rsAnXVgqmDRR4j2lnqUAgPZZ6nEYuSvj7Eb9QGTPBgAjDe6NT/PzFKSGvXqFOj
-	rmwxeocta16e4f5C/Rlt1BQjsQtfUIgmJS2+X04wBFHFuZNbDsnUrImmPbKEnCNJ+nEJe1eocmgo6
-	yVZRfQlJOAUQvsjtnkmOXI8E6lgxAK9kvc6AolkipQb9rxKcMGOwAw0kXOj/SnqsmmuAiCz/VJ10Z
-	qQ9S+YrXVjJ3D50Ff+Yw==;
+	List-Owner; bh=LCxZz6RAhUbBYOvVAos+tBqSjJk+kziLsngkSAN85gQ=; b=izPqOM1iCiEzzQ
+	zENley5vKDh+9x/FKpsBI6lRbE/kAqis+5tF5Ijigo4VDKYVIMMy8/X6moWDTD47t5nZEUJd69gRB
+	r4cA70KIUwu28WTkJkGnUg5N3ptDwRg0fT4JdzBeiFA2uYbzgSvPbDTpMhmdi+Qrsc8p4E3aofKiX
+	AcloNzlBJo6bigyUqZMwuAmpnBcrkfaJoMO/F0HlqQTuQSRvG8WaqX+OyWPqPnt0iyP9M0PSw3Frm
+	G6QSoy7WDPjSa4uOAMUIlvhvgIJUVmTfOKPZobkf2eP9kcu3YCFGnFjJ3TMG5NwyYR5TMPKHJdwRb
+	V9pBU3dsrDSe9STiGv9Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goZTi-0001MK-5Y; Tue, 29 Jan 2019 19:55:26 +0000
-Received: from mail-qk1-f195.google.com ([209.85.222.195])
+	id 1goZU6-0001uH-2x; Tue, 29 Jan 2019 19:55:50 +0000
+Received: from mail-qk1-f196.google.com ([209.85.222.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goZT9-0008IZ-AQ; Tue, 29 Jan 2019 19:54:54 +0000
-Received: by mail-qk1-f195.google.com with SMTP id c21so12292463qkl.6;
- Tue, 29 Jan 2019 11:54:51 -0800 (PST)
+ id 1goZTG-0008Nk-L6; Tue, 29 Jan 2019 19:55:01 +0000
+Received: by mail-qk1-f196.google.com with SMTP id o8so12267754qkk.11;
+ Tue, 29 Jan 2019 11:54:58 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:organization:content-transfer-encoding;
- bh=YfdZ0pFeestCCoBpwNdQi//11yLabafdERytJZT1uSY=;
- b=BxLDnklRMV1z8jh0d9atoR36wKiHVkFzI8WrLNZ7Qp3rG8FysXWiBGQ7/5BHQsVF8/
- qP6xwAuilNTqtU2I8taoECd34uwd0BJ3mam7jQPS9JJzp1KW0Gyff71JVuIABfnPVvBd
- CnPDtVBbpWnhENwLx1OM3q0cL4kZglpv4TCVRIlkSIoi2i6LL1q1TkXNAg4ox209qb0Y
- ZW9fomlhQC/p/YGZUkJBSx1TBBRloKdJyo9Q8H04LOUlHgu07525qTKEJcMtBANqecZm
- Bt4aadAwVUgIWTQewC+SyxHPlMKsJ7r0jFhc4MpjTFzxeTqhCH8xMndplEOjbKtCe9mq
- JnCA==
-X-Gm-Message-State: AJcUukddERJ7F0X6cSdHIzMCp2mwtMqLCdTpS9ZL6Sc+0EnQwYrzpr9W
- MRqLh+j+aaIO2LEqwcVbgWbX8SzT
-X-Google-Smtp-Source: ALg8bN7W/xAFZJ0vpoB16xhxXNxjK6+BHsDBb+n1vGdAHPIJKPO3auQjxqlbLKm7nEIw0l6bXKxNkA==
-X-Received: by 2002:a37:72c3:: with SMTP id
- n186mr24139391qkc.340.1548791689695; 
- Tue, 29 Jan 2019 11:54:49 -0800 (PST)
+ bh=H2zEvdVTOJICHXPBMAI1W22X3IkRf9LxQWOWo6ZMP3Q=;
+ b=QSNkHyVDJ2RK8u1LE43+V3fTCqarYPrlKSxEWYj5X37O6UIqELVaXRk3ZnCRzEwJEy
+ AymtnkUaHEHh/IRAzb91petla27fnvLXxpaXY7Y0PWOdkJfz3jFNWdvQST06u3YhFDXg
+ s75596xE/iJ3M8Oq4Nj4QRoxHVgCP70ME8J84Zc7wTXHP5fU36NPdbRA9nM0cTEB3fLV
+ GTRKLzJtd1Pz1PQSNcgb12/bLZKOo77oMLLjz+PXbrcqYwWf5UkedDFJyOdjlOGTuGVp
+ WFg4Xj7sL5f3+jG5bk+/XbznmTxv3lQ9h5306E8hRH0RRJcj8V7KDNBHIqlmgQb84yli
+ Y2BQ==
+X-Gm-Message-State: AJcUukf5h0pGO9gqQUfTd3H7bCM5S7nuurYDCZHu/uudiYdaBYYhyc0A
+ JBDiVfWr4XoPv7swOelU9q/LkNSR
+X-Google-Smtp-Source: ALg8bN5c/9oPbcZ7NQS6kBvonzoKu1QLMDpvt5AACYpcDDUgg8r3PXrLzJZtDfH4sDyAFWAxF80gaA==
+X-Received: by 2002:a37:7003:: with SMTP id l3mr25512071qkc.80.1548791697221; 
+ Tue, 29 Jan 2019 11:54:57 -0800 (PST)
 Received: from localhost.localdomain ([181.220.86.121])
- by smtp.gmail.com with ESMTPSA id s9sm105268727qta.35.2019.01.29.11.54.44
+ by smtp.gmail.com with ESMTPSA id y12sm104050456qta.13.2019.01.29.11.54.52
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 29 Jan 2019 11:54:49 -0800 (PST)
+ Tue, 29 Jan 2019 11:54:56 -0800 (PST)
 Received: by localhost.localdomain (sSMTP sendmail emulation);
- Tue, 29 Jan 2019 17:54:42 -0200
+ Tue, 29 Jan 2019 17:54:50 -0200
 From: Otavio Salvador <otavio@ossystems.com.br>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 3/4] ARM: dts: rockchip: rv1108-elgin: Use the correct
- regulator properties
-Date: Tue, 29 Jan 2019 17:54:23 -0200
-Message-Id: <20190129195424.10161-3-otavio@ossystems.com.br>
+Subject: [PATCH 4/4] ARM: dts: rockchip: rv1108-evb: Use the correct regulator
+ properties
+Date: Tue, 29 Jan 2019 17:54:24 -0200
+Message-Id: <20190129195424.10161-4-otavio@ossystems.com.br>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190129195424.10161-1-otavio@ossystems.com.br>
 References: <20190129195424.10161-1-otavio@ossystems.com.br>
 MIME-Version: 1.0
 Organization: O.S. Systems Software LTDA.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_115452_188992_71772D0B 
-X-CRM114-Status: GOOD (  12.63  )
+X-CRM114-CacheID: sfid-20190129_115459_147309_2FA59C9E 
+X-CRM114-Status: GOOD (  12.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -113,14 +112,14 @@ Fix it by using the correct properties as per the dt bindings.
 Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
 ---
 
- arch/arm/boot/dts/rv1108-elgin-r1.dts | 20 ++++++++++----------
+ arch/arm/boot/dts/rv1108-evb.dts | 20 ++++++++++----------
  1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rv1108-elgin-r1.dts b/arch/arm/boot/dts/rv1108-elgin-r1.dts
-index dc2ae1731ae2..ef31fee8acec 100644
---- a/arch/arm/boot/dts/rv1108-elgin-r1.dts
-+++ b/arch/arm/boot/dts/rv1108-elgin-r1.dts
-@@ -85,8 +85,8 @@
+diff --git a/arch/arm/boot/dts/rv1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
+index 203d83e3bbf5..30f3d0470ad9 100644
+--- a/arch/arm/boot/dts/rv1108-evb.dts
++++ b/arch/arm/boot/dts/rv1108-evb.dts
+@@ -97,8 +97,8 @@
  				regulator-always-on;
  				regulator-boot-on;
  				regulator-state-mem {
@@ -131,16 +130,16 @@ index dc2ae1731ae2..ef31fee8acec 100644
  				};
  			};
  
-@@ -97,7 +97,7 @@
- 				regulator-always-on;
- 				regulator-boot-on;
+@@ -107,7 +107,7 @@
+ 				regulator-min-microvolt = <700000>;
+ 				regulator-max-microvolt = <2000000>;
  				regulator-state-mem {
 -					regulator-state-disabled;
 +					regulator-off-in-suspend;
  				};
  			};
  
-@@ -106,7 +106,7 @@
+@@ -116,7 +116,7 @@
  				regulator-always-on;
  				regulator-boot-on;
  				regulator-state-mem {
@@ -149,7 +148,7 @@ index dc2ae1731ae2..ef31fee8acec 100644
  				};
  			};
  
-@@ -117,8 +117,8 @@
+@@ -127,8 +127,8 @@
  				regulator-always-on;
  				regulator-boot-on;
  				regulator-state-mem {
@@ -160,7 +159,7 @@ index dc2ae1731ae2..ef31fee8acec 100644
  				};
  			};
  
-@@ -129,7 +129,7 @@
+@@ -139,7 +139,7 @@
  				regulator-always-on;
  				regulator-boot-on;
  				regulator-state-mem {
@@ -169,7 +168,7 @@ index dc2ae1731ae2..ef31fee8acec 100644
  				};
  			};
  
-@@ -140,7 +140,7 @@
+@@ -150,7 +150,7 @@
  				regulator-always-on;
  				regulator-boot-on;
  				regulator-state-mem {
@@ -178,7 +177,7 @@ index dc2ae1731ae2..ef31fee8acec 100644
  				};
  			};
  
-@@ -151,8 +151,8 @@
+@@ -161,8 +161,8 @@
  				regulator-always-on;
  				regulator-boot-on;
  				regulator-state-mem {
