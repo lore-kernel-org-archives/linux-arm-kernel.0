@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B499AC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:52:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BFF7DC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:52:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 76D1320844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:52:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 744C320844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:52:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uBsA6ikV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 76D1320844
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iZCBBW7i"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 744C320844
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=WnzzIh2knJC8f3i4w+BDufJqPw41eEDMlLt/qILxmTM=; b=uBsA6ikVGLBD4d
-	NkMMCEvc2RUfIcc0RgEMy0T9j8UXdHu5PPanudbRpo/48Q82CfAgOhr8NYsiSEF89UAO4hGSP0McN
-	ElsXYnmi1sxckVBXojva/yL9d4pOR7vSrOrsEgbckFboOyW0xPpVv/SemBrkYnhSLZctxLvmXmTa5
-	SyiM99KyIsARY6bR9RhfiB7Cc+Xu2dVb8vn200pOdN+Gfdggltt10vSZpcS76nnXUf01SH1uzopQ4
-	N2pJIPAu1GVsKTM5Ylu6Op0Ba/OURJZbmB4nNv6MwY8EwGyj14v69R/5k+TgBbMhFXXnEQMOq36ld
-	cBasdfTOIharqkqq6f6A==;
+	List-Owner; bh=2/FpSWZXuTu9OOhVc2SmRgAmcsXK16ed+6ziVLnAxyQ=; b=iZCBBW7i9pl41v
+	yprJ8SfA5+t9c2np5OPwCr44KSiLzjzH4Uwx+DhPwwPWXSWUvnwXhyVxcRwnpQFYRyvsiwQiRash1
+	X7LHZPOhw3e0fg3l2CV8SgVm5sVXp72PSdjCCxMbQzjEvlEWnOPIedQ9siILl+M7c9VyVBRfmFc/n
+	5/USIVoGEGgpWpRbAKsfP/NW+/sFwxzfmfC52FiqXNCQN4amvOlgwK1Srp4VYVv/s/GLKv8Eplttp
+	PlJZMh+O/knH7+RPh2gpaeNFYBiFKrosQgOf5mPjQo3pz/Bghve6bKKbOW8N6ob52ltKvcP6M/QWB
+	bOJM+KlZ1ykjh6axpFDA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goYUm-0000Za-OG; Tue, 29 Jan 2019 18:52:28 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1goYV1-0000mz-GD; Tue, 29 Jan 2019 18:52:43 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goYSN-0005ig-CX
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 18:50:00 +0000
+ id 1goYSc-0006Hp-Gg
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 18:50:27 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1E30E1596;
- Tue, 29 Jan 2019 10:49:59 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id ADFF21596;
+ Tue, 29 Jan 2019 10:50:13 -0800 (PST)
 Received: from eglon.cambridge.arm.com (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 711903F557;
- Tue, 29 Jan 2019 10:49:56 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 0D7D83F557;
+ Tue, 29 Jan 2019 10:50:10 -0800 (PST)
 From: James Morse <james.morse@arm.com>
 To: linux-acpi@vger.kernel.org
-Subject: [PATCH v8 07/26] ACPI / APEI: Remove spurious GHES_TO_CLEAR check
-Date: Tue, 29 Jan 2019 18:48:43 +0000
-Message-Id: <20190129184902.102850-8-james.morse@arm.com>
+Subject: [PATCH v8 12/26] ACPI / APEI: Switch NOTIFY_SEA to use the estatus
+ queue
+Date: Tue, 29 Jan 2019 18:48:48 +0000
+Message-Id: <20190129184902.102850-13-james.morse@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190129184902.102850-1-james.morse@arm.com>
 References: <20190129184902.102850-1-james.morse@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_104959_426266_5F460A2B 
-X-CRM114-Status: UNSURE (   9.18  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190129_105015_068775_187CE9D9 
+X-CRM114-Status: GOOD (  18.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,31 +82,114 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-ghes_notify_nmi() checks ghes->flags for GHES_TO_CLEAR before going
-on to __process_error(). This is pointless as ghes_read_estatus()
-will always set this flag if it returns success, which was checked
-earlier in the loop. Remove it.
+Now that the estatus queue can be used by more than one notification
+method, we can move notifications that have NMI-like behaviour over.
+
+Switch NOTIFY_SEA over to use the estatus queue. This makes it behave
+in the same way as x86's NOTIFY_NMI.
+
+Remove Kconfig's ability to turn ACPI_APEI_SEA off if ACPI_APEI_GHES
+is selected. This roughly matches the x86 NOTIFY_NMI behaviour, and means
+each architecture has at least one user of the estatus-queue, meaning it
+doesn't need guarding with ifdef.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Borislav Petkov <bp@suse.de>
 ---
- drivers/acpi/apei/ghes.c | 3 ---
- 1 file changed, 3 deletions(-)
+Changes since v6:
+ * Lost all the pool grow/shrink stuff,
+ * Changed Kconfig so this can't be turned off to avoid kconfig complexity:
+ * Dropped Tyler's tested-by.
+ * For now we need #ifdef around the SEA code as the arch code assumes its there.
+ * Removed Punit's reviewed-by due to the swirling #ifdeffery
+---
+ drivers/acpi/apei/Kconfig | 12 +-----------
+ drivers/acpi/apei/ghes.c  | 22 +++++-----------------
+ 2 files changed, 6 insertions(+), 28 deletions(-)
 
+diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+index 52ae5438edeb..6b18f8bc7be3 100644
+--- a/drivers/acpi/apei/Kconfig
++++ b/drivers/acpi/apei/Kconfig
+@@ -41,19 +41,9 @@ config ACPI_APEI_PCIEAER
+ 	  Turn on this option to enable the corresponding support.
+ 
+ config ACPI_APEI_SEA
+-	bool "APEI Synchronous External Abort logging/recovering support"
++	bool
+ 	depends on ARM64 && ACPI_APEI_GHES
+ 	default y
+-	help
+-	  This option should be enabled if the system supports
+-	  firmware first handling of SEA (Synchronous External Abort).
+-	  SEA happens with certain faults of data abort or instruction
+-	  abort synchronous exceptions on ARMv8 systems. If a system
+-	  supports firmware first handling of SEA, the platform analyzes
+-	  and handles hardware error notifications from SEA, and it may then
+-	  form a HW error record for the OS to parse and handle. This
+-	  option allows the OS to look for such hardware error record, and
+-	  take appropriate action.
+ 
+ config ACPI_APEI_MEMORY_FAILURE
+ 	bool "APEI memory error recovering support"
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index a34f79153b1a..c20e1d0947b1 100644
+index 576dce29159d..ab794ab29554 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -940,9 +940,6 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
- 			__ghes_panic(ghes, buf_paddr);
- 		}
+@@ -767,7 +767,6 @@ static struct notifier_block ghes_notifier_hed = {
+ 	.notifier_call = ghes_notify_hed,
+ };
  
--		if (!(ghes->flags & GHES_TO_CLEAR))
--			continue;
+-#ifdef CONFIG_HAVE_ACPI_APEI_NMI
+ /*
+  * Handlers for CPER records may not be NMI safe. For example,
+  * memory_failure_queue() takes spinlocks and calls schedule_work_on().
+@@ -904,7 +903,6 @@ static int ghes_in_nmi_spool_from_list(struct list_head *rcu_list)
+ 
+ 	return ret;
+ }
+-#endif /* CONFIG_HAVE_ACPI_APEI_NMI */
+ 
+ #ifdef CONFIG_ACPI_APEI_SEA
+ static LIST_HEAD(ghes_sea);
+@@ -915,16 +913,7 @@ static LIST_HEAD(ghes_sea);
+  */
+ int ghes_notify_sea(void)
+ {
+-	struct ghes *ghes;
+-	int ret = -ENOENT;
 -
- 		__process_error(ghes);
- 		ghes_clear_estatus(ghes, buf_paddr);
- 	}
+-	rcu_read_lock();
+-	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
+-		if (!ghes_proc(ghes))
+-			ret = 0;
+-	}
+-	rcu_read_unlock();
+-	return ret;
++	return ghes_in_nmi_spool_from_list(&ghes_sea);
+ }
+ 
+ static void ghes_sea_add(struct ghes *ghes)
+@@ -992,16 +981,15 @@ static void ghes_nmi_remove(struct ghes *ghes)
+ 	 */
+ 	synchronize_rcu();
+ }
++#else /* CONFIG_HAVE_ACPI_APEI_NMI */
++static inline void ghes_nmi_add(struct ghes *ghes) { }
++static inline void ghes_nmi_remove(struct ghes *ghes) { }
++#endif /* CONFIG_HAVE_ACPI_APEI_NMI */
+ 
+ static void ghes_nmi_init_cxt(void)
+ {
+ 	init_irq_work(&ghes_proc_irq_work, ghes_proc_in_irq);
+ }
+-#else /* CONFIG_HAVE_ACPI_APEI_NMI */
+-static inline void ghes_nmi_add(struct ghes *ghes) { }
+-static inline void ghes_nmi_remove(struct ghes *ghes) { }
+-static inline void ghes_nmi_init_cxt(void) { }
+-#endif /* CONFIG_HAVE_ACPI_APEI_NMI */
+ 
+ static int ghes_probe(struct platform_device *ghes_dev)
+ {
 -- 
 2.20.1
 
