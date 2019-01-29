@@ -2,63 +2,57 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1EC31C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 13:42:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 112B0C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 13:47:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D485820989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 13:42:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D1FD120989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 13:47:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LCbdxzSu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D485820989
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cRk22VYI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D1FD120989
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=solinno.co.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RVJrVYwZT4j9ctjwl3cqOT/GmfBtYs7PLHH6pfNhzPM=; b=LCbdxzSupw6UfQ
-	RT054Yckizjk1UZk2CxACTK1p8X3k9LPB3pq4Yi/FA8aKBnoWnkcwiotjxMOLGkfWXfD0MX4GbejT
-	6GlL1pzZmAXuh+sN15T3djZkbP11HLjsSHxPyu88P0Cz5FgxqCp+g6FXivkhbGTLLRHNO7RMtd06z
-	R0M3kraDT+MAoqQVySAt28vdMrlHo/8LddiVsmDEBjJLC37PaO8HKXT/lPiLP78drSL0kQbOHiHH4
-	MLWTiRpFkBExXMQhxkEv4uoNSkAsuoAJIaZRPnFB5d4vOYroTt97CvLWXno7ksNU1ooRRV8cf1BQ0
-	z6dt7Qe1620s6DejuhHg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:Message-ID:Subject:To:From:Date:MIME-Version:
+	Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender
+	:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Owner;
+	bh=aN0o9Psprhuqt15fkISrXFI7EjTgbvyCOCzViqSYGAk=; b=cRk22VYIM980XrlQgRhaCaJw7o
+	kCM4sbP5iPXRqCpls2VlAcM1tYGiFfZxk+FXmlP0A82MlRWNVO/yIqH1SCX9fgJ4EM85dDhDyoAtK
+	C4mdHQipkKn7eOkICewQ7+hLB/2nozQsEGxZgkHQFCqRDnJ2w8yaMaW/7+8tAf0WEzA69FBaWfeob
+	G+vY0xiN04y7In5+Pm8Ehz+sNxlxoBBqBp1oLUcQB8i/LK5vyE3puiLdgHLcoU4WN1+5sBvmqe7Ie
+	NIHyTZsQs1niEX6YDSgCtPg16q/rYOs9FDEEZgaaMct5NOzJvjgerL90HNF6TniH/C5W5H8CQO8vm
+	3YlaE/eg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goTem-00042Q-UW; Tue, 29 Jan 2019 13:42:28 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goTeg-00040N-SC
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 13:42:27 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C5BF1EBD;
- Tue, 29 Jan 2019 05:42:21 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 38D253F59C;
- Tue, 29 Jan 2019 05:42:19 -0800 (PST)
-Subject: Re: [PATCH] arm64: fix potential deadlock in
- arm64-provide-pseudo-NMI-with-GICv3
-To: Wei Li <liwei391@huawei.com>, linux-arm-kernel@lists.infradead.org
-References: <20190129131223.32505-1-liwei391@huawei.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <37962c23-75a9-a0a1-7810-3abfb702be72@arm.com>
-Date: Tue, 29 Jan 2019 13:42:16 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1goTjx-0005mP-J7; Tue, 29 Jan 2019 13:47:49 +0000
+Received: from doppler.thel33t.co.uk ([185.153.207.61])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goTjs-0005lk-7k
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 13:47:46 +0000
+Received: from doppler.thel33t.co.uk (localhost [127.0.0.1])
+ by doppler.thel33t.co.uk (Postfix) with ESMTP id C24F12099F;
+ Tue, 29 Jan 2019 13:47:38 +0000 (GMT)
 MIME-Version: 1.0
-In-Reply-To: <20190129131223.32505-1-liwei391@huawei.com>
-Content-Language: en-US
+Date: Tue, 29 Jan 2019 13:47:38 +0000
+From: Leigh Brown <leigh@solinno.co.uk>
+To: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Subject: Out-of-tree mwlwifi driver crashes
+Message-ID: <01e409217be1c1cb08ac3bab072fccd3@solinno.co.uk>
+X-Sender: leigh@solinno.co.uk
+User-Agent: Roundcube Webmail/1.3.8
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_054223_044265_AE6FAE8C 
-X-CRM114-Status: GOOD (  22.17  )
+X-CRM114-CacheID: sfid-20190129_054744_556929_14B85099 
+X-CRM114-Status: UNSURE (   8.74  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,128 +64,188 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org, jason@lakedaemon.net,
- marc.zyngier@arm.com, catalin.marinas@arm.com, thunder.leizhen@huawei.com,
- will.deacon@arm.com, linux-kernel@vger.kernel.org, huawei.libin@huawei.com,
- guohanjun@huawei.com, dave.martin@arm.com
-Content-Type: text/plain; charset="us-ascii"
+Cc: Leigh Brown <leigh@solinno.co.uk>, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Wei,
+Hi Thomas,
 
-Thanks testing the series.
+The following commit causes the out-of-tree mwlwifi driver [1] to crash, 
+which
+I have found with git bisect.
 
-On 29/01/2019 13:12, Wei Li wrote:
-> In some exception handlers, the interrupt is not reenabled by daifclr at first.
-> The later process may call local_irq_enable() to enable the interrupt, like
-> gic_handle_irq(). As we known, function local_irq_enable() just change the pmr now.
+commit 1f08673eef1236f7d02d93fcf596bb8531ef0d12
+Author: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Date:   Thu Oct 18 17:37:18 2018 +0200
 
-This is not yet in, so it might be useful to point to the series that
-adds this:
-https://lkml.org/lkml/2019/1/21/1060
+     PCI: mvebu: Convert to PCI emulated bridge config space
 
-> The following codes what i found may cause a deadlock or some issues else:
-> 
-> do_sp_pc_abort			<- el0_sp_pc
-> do_el0_ia_bp_hardening	<- el0_ia
-> kgdb_roundup_cpus		<- el1_dbg
-> 
-> Signed-off-by: Wei Li <liwei391@huawei.com>
-> ---
->  arch/arm64/kernel/kgdb.c | 4 ++++
->  arch/arm64/mm/fault.c    | 6 ++++++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-> index a20de58061a8..119fbf2c0788 100644
-> --- a/arch/arm64/kernel/kgdb.c
-> +++ b/arch/arm64/kernel/kgdb.c
-> @@ -25,6 +25,7 @@
->  #include <linux/kgdb.h>
->  #include <linux/kprobes.h>
->  #include <linux/sched/task_stack.h>
-> +#include <linux/irqchip/arm-gic-v3.h>
->  
->  #include <asm/debug-monitors.h>
->  #include <asm/insn.h>
-> @@ -291,6 +292,9 @@ static void kgdb_call_nmi_hook(void *ignored)
->  
->  void kgdb_roundup_cpus(unsigned long flags)
+     Convert the pci-mvebu driver to use the pci-bridge-emul logic, that
+     helps emulating a root port PCI bridge configuration space.
 
-Hmm, I don't see this function defined in arch/arm64/kernel/kgdb.c in
-v5.0-rc*. Was it removed? or is that something in your local tree.
+     Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+     [lorenzo.pieralisi@arm.com: updated commit log]
+     Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
->  {
-> +	if (gic_prio_masking_enabled())
-> +		gic_arch_enable_irqs();
-> +
->  	local_irq_enable();
+I have raised the issue with the driver maintainers but they responded 
+that
+this is a kernel regression [2].
 
-Seeing we introduce the daifflags functions, with the relation described
-at the top of arch/arm64/include/asm/daifflags.h. I think just calling
-local_irq_enable() might not comply with this, as PSR.I would be clear
-while PSR.D is set.
+Do you think this is a driver issue or a regression? I am happy to test 
+proposed
+fixes but I don't understand enough about the driver or PCI to 
+investigate.
 
-Maybe it should be using:
+If I revert that single commit, the issue goes away.
 
-	local_daif_restore(DAIF_PROCCTX);
+Any help would be gratefully received.
 
->  	smp_call_function(kgdb_call_nmi_hook, NULL, 0);
->  	local_irq_disable();
+The crash dump is as follows:
 
-and here
-	local_daif_mask();
+pgd = f47c1616
+[d1480c14] *pgd=16096811, *pte=e0100243, *ppte=e0100013
+Internal error: : 1008 [#1] SMP THUMB2
+Modules linked in: sg(+) mwlwifi(+)
+CPU: 1 PID: 426 Comm: systemd-udevd Not tainted 4.20.3+ #11
+Hardware name: Marvell Armada 380/385 (Device Tree)
+PC is at pcie_reset+0xb/0x40 [mwlwifi]
+LR is at pcie_download_firmware+0x18/0x2fc [mwlwifi]
+pc : [<af80ac2c>]    lr : [<af80ac79>]    psr: 60070133
+sp : ce3a9c58  ip : c9318180  fp : b0847eec
+r10: b0804c08  r9 : c9318140  r8 : 000029a4
+r7 : 00000000  r6 : ce380440  r5 : ce380de0  r4 : ce3857a0
+r3 : ce380de0  r2 : d1480000  r1 : ce380de0  r0 : ce380440
+Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA Thumb  Segment none
+Control: 50c5387d  Table: 1e3ac04a  DAC: 00000051
+Process systemd-udevd (pid: 426, stack limit = 0x1e0d6d10)
+Stack: (0xce3a9c58 to 0xce3aa000)
+9c40:                                                       ce3857a0 
+af80ac79
+9c60: cf443870 000029a4 000029a8 b0804c08 00000000 ce380de0 af81336a 
+00000000
+9c80: 00000000 000029a4 000029a8 b0804c08 b0847eec af803875 1e3fc000 
+c60c6040
+9ca0: ce380440 b0804c08 cf443870 5e4e1a10 00100000 cf443800 ce3857a0 
+ce380440
+9cc0: ce380de0 cf443800 af812290 cf443870 b0847eec af80a52f 00019100 
+af815104
+9ce0: af815104 cf443870 cf443800 00000000 af8150b4 af81507c 00000013 
+b02629cf
+9d00: b0262963 cf443870 00000000 00000000 b0847ee0 00000000 af8150b4 
+b028e12f
+9d20: 00000000 cf443870 af8150b4 af8150b4 b028e429 00000000 00000024 
+00000028
+9d40: c93186e4 b028e40b af8150b4 cf443870 00000000 cf443870 cf4438a4 
+af8150b4
+9d60: b028e429 00000000 00000024 b028e473 cf443870 b0804c08 af8150b4 
+b028d1c9
+9d80: ce3a9da8 cf414c58 ce9a1db4 5e4e1a10 00000000 af8150b4 c60c6e00 
+00000000
+9da0: b08173fc b028d6a3 af8130db af8130dc 0000006d af8150b4 b0804c08 
+af833001
+9dc0: ffffe000 b028e8fd af8150fc b0831300 b0804c08 b0102601 00000001 
+006000c0
+9de0: ce29e000 ce93a240 cf4e9b40 cf501400 ce29e000 00003bdd 8040003f 
+ce29e000
+9e00: 80000000 5e4e1a10 ce37bf80 cffc0f60 00000001 00000001 cffc0f60 
+00000001
+9e20: 00000001 5e4e1a10 af815640 af815640 c9318b80 c93186c0 00000001 
+b016020d
+9e40: af815640 b072f5fc ce3a9f40 af815640 00000001 b015f877 af81564c 
+00007fff
+9e60: af815640 b015dc91 ce248488 af815688 b015dbd1 b080f790 b0502ac8 
+d128a440
+9e80: a6f1bbb8 000001f8 ce3a8000 af000000 00000000 b0804c08 ce3a9ec0 
+b01a133f
+9ea0: 00000000 00000000 00000000 00000000 00000000 00000000 6e72656b 
+00006c65
+9ec0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 
+00000000
+9ee0: 00000000 00000000 00000000 00000000 00000000 5e4e1a10 7fffffff 
+00000000
+9f00: b0804c08 a6f1bbb8 00000006 b0101224 ce3a8000 0000017b 02147238 
+b015fd1b
+9f20: 7fffffff 00000000 00000003 00000000 0001b4b8 d126f000 0001b4b8 
+00000000
+9f40: d127f730 d127ff00 d126f000 0001b4b8 d1289ea0 d1289d14 d1283d38 
+00013000
+9f60: 00014f90 00000000 00000000 00000000 000061e4 00000024 00000025 
+0000001b
+9f80: 00000000 00000013 00000000 5e4e1a10 00000006 02147238 0213c3c8 
+f739ef00
+9fa0: 0000017b b0101001 02147238 0213c3c8 00000006 a6f1bbb8 00000000 
+a6f1c398
+9fc0: 02147238 0213c3c8 f739ef00 0000017b 00020000 004ef6c4 00000000 
+02147238
+9fe0: ae813948 ae813938 a6f15aeb a6e25fc2 600f0030 00000006 00000000 
+00000000
+[<af80ac2c>] (pcie_reset [mwlwifi]) from [<af80ac79>] 
+(pcie_download_firmware+0x18/0x2fc [mwlwifi])
+[<af80ac79>] (pcie_download_firmware [mwlwifi]) from [<af803875>] 
+(mwl_init_hw+0xf8/0x8b0 [mwlwifi])
+[<af803875>] (mwl_init_hw [mwlwifi]) from [<af80a52f>] 
+(pcie_probe+0x18e/0x1e8 [mwlwifi])
+[<af80a52f>] (pcie_probe [mwlwifi]) from [<b02629cf>] 
+(pci_device_probe+0x6d/0xb6)
+[<b02629cf>] (pci_device_probe) from [<b028e12f>] 
+(really_probe+0x137/0x1c4)
+[<b028e12f>] (really_probe) from [<b028e40b>] 
+(driver_probe_device+0xef/0x10c)
+[<b028e40b>] (driver_probe_device) from [<b028e473>] 
+(__driver_attach+0x4b/0x6e)
+[<b028e473>] (__driver_attach) from [<b028d1c9>] 
+(bus_for_each_dev+0x31/0x5c)
+[<b028d1c9>] (bus_for_each_dev) from [<b028d6a3>] 
+(bus_add_driver+0xd7/0x130)
+[<b028d6a3>] (bus_add_driver) from [<b028e8fd>] 
+(driver_register+0x5b/0x8a)
+[<b028e8fd>] (driver_register) from [<b0102601>] 
+(do_one_initcall+0x45/0xfc)
+[<b0102601>] (do_one_initcall) from [<b016020d>] 
+(do_init_module+0x39/0x134)
+[<b016020d>] (do_init_module) from [<b015f877>] 
+(load_module+0x1141/0x1492)
+[<b015f877>] (load_module) from [<b015fd1b>] 
+(sys_finit_module+0x53/0x6c)
+[<b015fd1b>] (sys_finit_module) from [<b0101001>] 
+(ret_fast_syscall+0x1/0x62)
+Exception stack(0xce3a9fa8 to 0xce3a9ff0)
+9fa0:                   02147238 0213c3c8 00000006 a6f1bbb8 00000000 
+a6f1c398
+9fc0: 02147238 0213c3c8 f739ef00 0000017b 00020000 004ef6c4 00000000 
+02147238
+9fe0: ae813948 ae813938 a6f15aeb a6e25fc2
+Code: 727c 6b43 589c 68e2 (f8d2) 2c14
+---[ end trace 57b500d8bc2ce2a5 ]---
+Kernel panic - not syncing: Fatal exception
+CPU0: stopping
+CPU: 0 PID: 0 Comm: swapper/0 Tainted: G      D           4.20.3+ #11
+Hardware name: Marvell Armada 380/385 (Device Tree)
+[<b010a691>] (unwind_backtrace) from [<b0108017>] (show_stack+0xb/0xc)
+[<b0108017>] (show_stack) from [<b043c073>] (dump_stack+0x5b/0x70)
+[<b043c073>] (dump_stack) from [<b0109ba5>] (handle_IPI+0x95/0x118)
+[<b0109ba5>] (handle_IPI) from [<b0250a85>] (gic_handle_irq+0x59/0x68)
+[<b0250a85>] (gic_handle_irq) from [<b0101a65>] (__irq_svc+0x65/0x94)
+Exception stack(0xb0801f20 to 0xb0801f68)
+1f20: 00000000 00042a24 cfbd42a0 b010e121 00000000 b0800000 b0804c08 
+00000000
+1f40: 00000001 b0801f78 b0804c68 00000000 00000008 b0801f70 b010636f 
+b0106366
+1f60: 40010033 ffffffff
+[<b0101a65>] (__irq_svc) from [<b0106366>] (arch_cpu_idle+0xc/0x1e)
+[<b0106366>] (arch_cpu_idle) from [<b0132d9b>] (do_idle+0xd7/0x17c)
+[<b0132d9b>] (do_idle) from [<b0132fab>] (cpu_startup_entry+0x13/0x14)
+[<b0132fab>] (cpu_startup_entry) from [<b0700937>] 
+(start_kernel+0x25f/0x2dc)
 
-Although I'd like to understand what you are applying the pseudo-NMI
-series on first.
+[1]: https://github.com/kaloz/mwlwifi/
+[2]: https://github.com/kaloz/mwlwifi/issues/345
 
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 97ba2ba78aee..f7c39a0b28bc 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -32,6 +32,7 @@
->  #include <linux/perf_event.h>
->  #include <linux/preempt.h>
->  #include <linux/hugetlb.h>
-> +#include <linux/irqchip/arm-gic-v3.h>
->  
->  #include <asm/bug.h>
->  #include <asm/cmpxchg.h>
-> @@ -780,6 +781,8 @@ asmlinkage void __exception do_el0_ia_bp_hardening(unsigned long addr,
->  	if (addr > TASK_SIZE)
->  		arm64_apply_bp_hardening();
->  
-> +	if (gic_prio_masking_enabled())
-> +		gic_arch_enable_irqs();
->  	local_irq_enable();
+Regards,
 
-This is not in mainline, in v5.0-rc1 there is:
-
-	local_daif_restore(DAIF_PROCCTX);
-
-Which my series updates to modify both DAIF and PMR if needed.
-
-So you wouldn't need to have the gic_arch_enable_irqs().
-
->  	do_mem_abort(addr, esr, regs);
->  }
-> @@ -794,6 +797,9 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
->  	if (user_mode(regs)) {
->  		if (instruction_pointer(regs) > TASK_SIZE)
->  			arm64_apply_bp_hardening();
-> +
-> +		if (gic_prio_masking_enabled())
-> +			gic_arch_enable_irqs();
->  		local_irq_enable();
-
-Same here.
-
-Thanks,
-
--- 
-Julien Thierry
+Leigh.
 
 _______________________________________________
 linux-arm-kernel mailing list
