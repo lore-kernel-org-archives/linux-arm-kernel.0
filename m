@@ -4,130 +4,84 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D5EB2C282CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 00:55:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3AF16C282CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 03:08:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A1F6420870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 00:55:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 07D352175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 03:08:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vu+n1yD8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="Q1DMDQkq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A1F6420870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KE30hZGi";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="J9Jm7dYJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 07D352175B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=F4JVBl2PK68tBawXR2GPPrmz6pG4L7l5lKt3ketMUrw=; b=Vu+n1yD80kmBLL
-	3MhCWkN+cDENqJ9vqdTC+qB6N9PsqmWm9WErw4UNtaTISRXOtblFL/V2DBRhDSuZTy4T1X4HLiyjB
-	KY9cdgP/HgLUpr13pM2DhVdWLRxhDMJ+UI6LgqsOX2h7Cen2siBy3psuLqdE1hHYK0tbyEO+HM18/
-	ZKlmuTELRrZbf5JgHfGCrc+z8KDyPvdS7u0llKzudQI57xow3/CqFSz2PdbC6c92haIYTQ+wlpX4U
-	ckC4ApgyLx0XB79Vn0poC90ssOa8A15d29IIfrCFgR49IFDTOOEnV+wAv6VdH2xxKrIUQxXob9sRr
-	LseUIls9HzSTvkLPmvaw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=r7j/axICMkVyyzdh9FBXeWxDYnY/PbZIIxYojS0KYiQ=; b=KE30hZGikguj9i7XUf99cL1Tc
+	wSz9peVRSqfKDlHirG9k9+F5uzB6gDwr/LvfKlNsL8+BGLpvMrgnYJ6reRIkv4P/rw1SEU/jCE7GE
+	EGraK59OUiecxrMwBwaETxFwn9mJUjGlvod1nkgIXJQ49JU5EeT0OJ5cUyIBFSJ92a0ARkY083nsL
+	697lI+vGj++lyivo6PKPTQ6/4cENc0RMOdvejcMdGuQMLojS/WMygYSIsV6Z1EBma9dpCM6plOL3N
+	LCCtBuQTVEaeHoinUSJnDvbmDu5QlmuKjC+WgxOba9ZWmGR7oyH9xyUQIiW63peSLPP3X1iXAVUVz
+	j5TNOQFuw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goHgE-00089k-2a; Tue, 29 Jan 2019 00:55:10 +0000
-Received: from mailout3.samsung.com ([203.254.224.33])
+	id 1goJkw-0006r9-Sb; Tue, 29 Jan 2019 03:08:10 +0000
+Received: from hqemgate14.nvidia.com ([216.228.121.143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goHg9-00079J-E8
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 00:55:08 +0000
-Received: from epcas1p1.samsung.com (unknown [182.195.41.45])
- by mailout3.samsung.com (KnoxPortal) with ESMTP id
- 20190129005457epoutp03462b1db3efafea9dd1289786ddcf64ca~_K6JCQ73f1233712337epoutp03i
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 00:54:57 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout3.samsung.com
- 20190129005457epoutp03462b1db3efafea9dd1289786ddcf64ca~_K6JCQ73f1233712337epoutp03i
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1548723297;
- bh=zLAibsdoFvMmWEbacdodHxeeG2Y32JVatu5Ty0jm96E=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=Q1DMDQkqnLsbQXzLxVcBPVAMlpDoEx6/2XCDVpRvaynye8xF63Iv/sgUlRmq4v4OF
- P5ZvVvvI5Wo+tNoq6gAPT1AbAY/yTfJ/9RrQBb0QLDe/F+5DqZhKjKraWi5Q/e+ZRQ
- Cl+DswuXDKnQDjBD88llaG+2AaizZUgQupvtAA68=
-Received: from epsmges1p5.samsung.com (unknown [182.195.40.157]) by
- epcas1p3.samsung.com (KnoxPortal) with ESMTP id
- 20190129005450epcas1p32077770357f698a7c0b6ba2aade77fe5~_K6CEphDz0449004490epcas1p3v;
- Tue, 29 Jan 2019 00:54:50 +0000 (GMT)
-Received: from epcas1p4.samsung.com ( [182.195.41.48]) by
- epsmges1p5.samsung.com (Symantec Messaging Gateway) with SMTP id
- 53.A0.04206.A54AF4C5; Tue, 29 Jan 2019 09:54:50 +0900 (KST)
-Received: from epsmtrp2.samsung.com (unknown [182.195.40.14]) by
- epcas1p2.samsung.com (KnoxPortal) with ESMTPA id
- 20190129005449epcas1p25ed3cb1e476f164d6720f9c34aa49b7a~_K6BizHHD0902409024epcas1p2f;
- Tue, 29 Jan 2019 00:54:49 +0000 (GMT)
-Received: from epsmgms1p2new.samsung.com (unknown [182.195.42.42]) by
- epsmtrp2.samsung.com (KnoxPortal) with ESMTP id
- 20190129005449epsmtrp23b61f0098ebecda13b6c4a6fc447d60a~_K6Bem85x1829418294epsmtrp2r;
- Tue, 29 Jan 2019 00:54:49 +0000 (GMT)
-X-AuditID: b6c32a39-d7dff7000000106e-52-5c4fa45a8549
-Received: from epsmtip1.samsung.com ( [182.195.34.30]) by
- epsmgms1p2new.samsung.com (Symantec Messaging Gateway) with SMTP id
- AA.A4.03601.954AF4C5; Tue, 29 Jan 2019 09:54:49 +0900 (KST)
-Received: from [10.113.221.102] (unknown [10.113.221.102]) by
- epsmtip1.samsung.com (KnoxPortal) with ESMTPA id
- 20190129005449epsmtip19de1b48c94645808bbbef57bd8b95e46~_K6BQ6K2b1774017740epsmtip1w;
- Tue, 29 Jan 2019 00:54:49 +0000 (GMT)
-Subject: Re: [PATCH 1/8] clk: samsung: add needed IDs for DMC clocks in
- Exynos5420
-To: Lukasz Luba <l.luba@partner.samsung.com>, devicetree@vger.kernel.org
-From: Chanwoo Choi <cw00.choi@samsung.com>
-Organization: Samsung Electronics
-Message-ID: <d6cbbeac-c15f-91b8-caf3-b22b8715665a@samsung.com>
-Date: Tue, 29 Jan 2019 09:54:49 +0900
+ id 1goJkt-0006qB-7O
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 03:08:09 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c4fc38f0000>; Mon, 28 Jan 2019 19:07:59 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Mon, 28 Jan 2019 19:07:59 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Mon, 28 Jan 2019 19:07:59 -0800
+Received: from [10.19.108.132] (10.124.1.5) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 29 Jan
+ 2019 03:07:57 +0000
+Subject: Re: [PATCH V2 2/6] clocksource: tegra: add Tegra210 timer driver
+To: Daniel Lezcano <daniel.lezcano@linaro.org>, Thierry Reding
+ <thierry.reding@gmail.com>, Jonathan Hunter <jonathanh@nvidia.com>
+References: <20190128091815.7040-1-josephl@nvidia.com>
+ <20190128091815.7040-3-josephl@nvidia.com>
+ <fa03140e-4f7f-ac9a-bb54-26b1efe2dc3d@linaro.org>
+From: Joseph Lo <josephl@nvidia.com>
+Message-ID: <4828640a-adc5-3b23-104b-33af1afe77b4@nvidia.com>
+Date: Tue, 29 Jan 2019 11:07:55 +0800
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <1548703299-15806-2-git-send-email-l.luba@partner.samsung.com>
+In-Reply-To: <fa03140e-4f7f-ac9a-bb54-26b1efe2dc3d@linaro.org>
+X-Originating-IP: [10.124.1.5]
+X-ClientProxiedBy: HQMAIL105.nvidia.com (172.20.187.12) To
+ HQMAIL101.nvidia.com (172.20.187.10)
 Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFjrIJsWRmVeSWpSXmKPExsWy7bCmgW7UEv8Yg67zPBYbZ6xntZh/5Byr
- Rf/j18wW589vYLe41SBjsenxNVaLy7vmsFnMOL+PyWLp9YtMFrcbV7BZtO49wm5x+E07qwOP
- x5p5axg9Nq3qZPPYvKTe4+C7PUwefVtWMXp83iQXwBaVbZORmpiSWqSQmpecn5KZl26r5B0c
- 7xxvamZgqGtoaWGupJCXmJtqq+TiE6DrlpkDdKKSQlliTilQKCCxuFhJ386mKL+0JFUhI7+4
- xFYptSAlp8CyQK84Mbe4NC9dLzk/18rQwMDIFKgwITtjy9fLLAV3xCr+Nz5kbmB8INTFyMkh
- IWAiMeX3P6YuRi4OIYEdjBJ7Lt2Ccj4xSpyc3c4G4XxjlLizdCkLTMvZ1xNZIRJ7GSVe/r3P
- BpIQEnjPKPFrqg2ILSwQIrF9xR52EFtEwEPi9ecprCA2s8BJJommySYgNpuAlsT+FzfAevkF
- FCWu/njMCGLzCthJnPu+ixnEZhFQlbg2dy8TiC0qECFxuPcdVI2gxMmZT8AO4hTwllj0bx8T
- xHxxiVtP5kPZ8hLNW2czgxwqITCPXeLf24VMEB+4SPzf854dwhaWeHV8C5QtJfH53V42CLta
- YuXJI2wQzR2MElv2X2CFSBhL7F86GWgQB9AGTYn1u/QhlvFJvPvawwoSlhDglehog4avssTl
- B3eh1kpKLG7vhBrvIbFiUjPLBEbFWUjemYXkhVlIXpiFsGwBI8sqRrHUguLc9NRiwwJT5Nje
- xAhOvlqWOxiPnfM5xCjAwajEw2vA5h8jxJpYVlyZe4hRgoNZSYR36nW/GCHelMTKqtSi/Pii
- 0pzU4kOMpsDQnsgsJZqcD8wMeSXxhqZGxsbGFiaGZqaGhkrivOsdnGOEBNITS1KzU1MLUotg
- +pg4OKUaGI9vlfDrOsR9vOJUtP+sV2kXqlj22E4yt2s6p/9Qtu6ixanQ4z6Sxm9kbKLufcr5
- 9+1NxY1fa65mbf384BpD1p/dzidtvE3ECoW9lE7ovylK2Pqb83ap6+Ir9y60FtvXWR5ydhC+
- v8i7OCWoxWiTh0o9R/BnkdZCB77TVa8iJMMKGRTsb5dvV2Ipzkg01GIuKk4EAOS/RZLUAwAA
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFlrDIsWRmVeSWpSXmKPExsWy7bCSnG7kEv8Yg6kblC02zljPajH/yDlW
- i/7Hr5ktzp/fwG5xq0HGYtPja6wWl3fNYbOYcX4fk8XS6xeZLG43rmCzaN17hN3i8Jt2Vgce
- jzXz1jB6bFrVyeaxeUm9x8F3e5g8+rasYvT4vEkugC2KyyYlNSezLLVI3y6BK2PL18ssBXfE
- Kv43PmRuYHwg1MXIySEhYCJx9vVE1i5GLg4hgd2MEo9nvWOHSEhKTLt4lLmLkQPIFpY4fLgY
- ouYto8SPv3vAaoQFQiS2r4CwRQQ8JF5/ngI2iFngJJNE87tJjCAJIYH7jBI7PimA2GwCWhL7
- X9xgA7H5BRQlrv54DFbDK2Ance77LmYQm0VAVeLa3L1MILaoQITEx6f7mCBqBCVOznzCAmJz
- CnhLLPoHEWcWUJf4M+8SM4QtLnHryXyouLxE89bZzBMYhWchaZ+FpGUWkpZZSFoWMLKsYpRM
- LSjOTc8tNiwwykst1ytOzC0uzUvXS87P3cQIjkMtrR2MJ07EH2IU4GBU4uE1YPOPEWJNLCuu
- zD3EKMHBrCTCO/W6X4wQb0piZVVqUX58UWlOavEhRmkOFiVxXvn8Y5FCAumJJanZqakFqUUw
- WSYOTqkGRuFsl23xv2Ln7uUIVNjNHDKX19YwYc/cj3ur455/rXm7q09pS+v23+2fr1g5C4Wf
- Z3ddaf3n2vWp6nduHA3LlRfQ0S682jbh1a8duXMZ60L/TT739NnaysaW6/1PIhpXGs9997Ke
- ze3u3oTIT4ceB65Ljtpca9Y399rhX4kXmaSWx9qwPd319LQSS3FGoqEWc1FxIgCpKem1vwIA
- AA==
-X-CMS-MailID: 20190129005449epcas1p25ed3cb1e476f164d6720f9c34aa49b7a
-X-Msg-Generator: CA
-CMS-TYPE: 101P
-DLP-Filter: Pass
-X-CFilter-Loop: Reflected
-X-CMS-RootMailID: 20190128192151eucas1p1754d1286ff0f46e8e98796d7583d8e96
-References: <1548703299-15806-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20190128192151eucas1p1754d1286ff0f46e8e98796d7583d8e96@eucas1p1.samsung.com>
- <1548703299-15806-2-git-send-email-l.luba@partner.samsung.com>
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1548731279; bh=XyJzwWJE+6DhItDvhg/MZwWvRpb228cUbcLYMgCklis=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=J9Jm7dYJT7a5TXlN1rnxUWoxpugS78s6CKrZSYisVNRV011eZwpIkbtmtU4GsFVLY
+ fmB6kalbmsGRlisiJxhK79Qgp7/AXt70UII+VuqKj5vgOMq4QDCm635W8fqlYBVpKA
+ l0ugELnr/ch6BrGnbMBK5D+EONErVslkisexUwIVctXg9unOpyJ+BEiKn0S+crILzl
+ VS9CVN1RPm9OgpWoNoPvPcbdG3OQdUYaJ5Suk/OgzDHD7v4jG/MuE+OAQVQruXnlbY
+ KknTH+IkeaGJOuyw5N+7YFxnARn3QjMrByyAQ1Ld6DdUjTHJq5g5VAvcvEhYoMelZM
+ 5qDiHlemMJ02w==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_165505_648684_FB69A390 
-X-CRM114-Status: GOOD (  18.61  )
+X-CRM114-CacheID: sfid-20190128_190807_296158_7CAF1C9E 
+X-CRM114-Status: GOOD (  24.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -139,67 +93,403 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, linux-samsung-soc@vger.kernel.org,
- Kukjin Kim <kgene@kernel.org>, b.zolnierkie@samsung.com,
- linux-kernel@vger.kernel.org, krzk@kernel.org,
- Rob Herring <robh+dt@kernel.org>, myungjoo.ham@samsung.com,
- Sylwester Nawrocki <s.nawrocki@samsung.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-tegra@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgTHVrYXN6LAoKVGhpcyBwYXRjaHNldCBkb24ndCBjb250YWluIHRoZSBjb3Zlci1sZXR0ZXIu
-IFBsZWFzZSBzZW5kIHRoZQpjb3Zlci1sZXR0ZXIgd2hpY2ggZXhwbGFpbnMgd2hhdCB0byBkbyBv
-biB0aGlzIHBhdGNoc2V0LgoKQW5kIGlzIGl0IHN1cHBvcnRpbmcgYWxsIEV4eW5vczUgZm9yIGJv
-dGggMzJiaXQoNTQyMCw1NDIyKQphbmQgNjRiaXQoNTQzMykgb3Igb25seSBFeHlub3M1NDJ4KDMy
-Yml0KT8gSWYgaXQgb25seSBzdXBwb3J0CnRoZSBFeHlub3MgNTQyeCBzZXJpZXMsIHlvdSBoYXZl
-IHRvIGNoYW5nZSB0aGUgZHJpdmVyIG5hbWUKZnJvbSAnZXh5bm9zNS1kbWMuYycgdG8gJ2V4eW5v
-czU0MjAtZG1jLmMnIG9yICdleHlub3M1NDIyLWRtYy5jJwppbiBvcmRlciB0byBwcmV2ZW50IHRo
-ZSBjb25mdXNpb24gYWNjb3JkaW5nIHRvIHRoZSBkcml2ZXIgbmFtZS4KCgpPbiAxOS4gMS4gMjku
-IOyYpOyghCA0OjIxLCBMdWthc3ogTHViYSB3cm90ZToKPiBEZWZpbmUgbmV3IElEcyBmb3IgY2xv
-Y2tzIHVzZWQgYnkgRHluYW1pYyBNZW1vcnkgQ29udHJvbGxlciBpbgo+IEV4eW5vczU0MjIgU29D
-Lgo+IAo+IENDOiBTeWx3ZXN0ZXIgTmF3cm9ja2kgPHMubmF3cm9ja2lAc2Ftc3VuZy5jb20+Cj4g
-Q0M6IENoYW53b28gQ2hvaSA8Y3cwMC5jaG9pQHNhbXN1bmcuY29tPgo+IENDOiBSb2IgSGVycmlu
-ZyA8cm9iaCtkdEBrZXJuZWwub3JnPgo+IENDOiBNYXJrIFJ1dGxhbmQgPG1hcmsucnV0bGFuZEBh
-cm0uY29tPgo+IENDOiBLdWtqaW4gS2ltIDxrZ2VuZUBrZXJuZWwub3JnPgo+IENDOiBLcnp5c3p0
-b2YgS296bG93c2tpIDxrcnprQGtlcm5lbC5vcmc+Cj4gQ0M6IGxpbnV4LXNhbXN1bmctc29jQHZn
-ZXIua2VybmVsLm9yZwo+IENDOiBkZXZpY2V0cmVlQHZnZXIua2VybmVsLm9yZwo+IENDOiBsaW51
-eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKPiBDQzogbGludXgta2VybmVsQHZnZXIu
-a2VybmVsLm9yZwo+IFNpZ25lZC1vZmYtYnk6IEx1a2FzeiBMdWJhIDxsLmx1YmFAcGFydG5lci5z
-YW1zdW5nLmNvbT4KPiAtLS0KPiAgaW5jbHVkZS9kdC1iaW5kaW5ncy9jbG9jay9leHlub3M1NDIw
-LmggfCAxOCArKysrKysrKysrKysrKysrKy0KPiAgMSBmaWxlIGNoYW5nZWQsIDE3IGluc2VydGlv
-bnMoKyksIDEgZGVsZXRpb24oLSkKPiAKPiBkaWZmIC0tZ2l0IGEvaW5jbHVkZS9kdC1iaW5kaW5n
-cy9jbG9jay9leHlub3M1NDIwLmggYi9pbmNsdWRlL2R0LWJpbmRpbmdzL2Nsb2NrL2V4eW5vczU0
-MjAuaAo+IGluZGV4IDM1NWY0NjkuLjE4MjdhNjQgMTAwNjQ0Cj4gLS0tIGEvaW5jbHVkZS9kdC1i
-aW5kaW5ncy9jbG9jay9leHlub3M1NDIwLmgKPiArKysgYi9pbmNsdWRlL2R0LWJpbmRpbmdzL2Ns
-b2NrL2V4eW5vczU0MjAuaAo+IEBAIC02MCw2ICs2MCw3IEBACj4gICNkZWZpbmUgQ0xLX01BVV9F
-UExMCQkxNTkKPiAgI2RlZmluZSBDTEtfU0NMS19IU0lDXzEyTQkxNjAKPiAgI2RlZmluZSBDTEtf
-U0NMS19NUEhZX0lYVEFMMjQJMTYxCj4gKyNkZWZpbmUgQ0xLX1NDTEtfQlBMTAkJMTYyCj4gIAo+
-ICAvKiBnYXRlIGNsb2NrcyAqLwo+ICAjZGVmaW5lIENMS19VQVJUMAkJMjU3Cj4gQEAgLTE5NSw2
-ICsxOTYsMTYgQEAKPiAgI2RlZmluZSBDTEtfQUNMSzQzMl9DQU0JCTUxOAo+ICAjZGVmaW5lIENM
-S19BQ0xLX0ZMMTU1MF9DQU0JNTE5Cj4gICNkZWZpbmUgQ0xLX0FDTEs1NTBfQ0FNCQk1MjAKPiAr
-I2RlZmluZSBDTEtfQ0xLTV9QSFkwCQk1MjEKPiArI2RlZmluZSBDTEtfQ0xLTV9QSFkxCQk1MjIK
-PiArI2RlZmluZSBDTEtfQUNMS19QUE1VX0RSRVgwXzAJNTIzCj4gKyNkZWZpbmUgQ0xLX0FDTEtf
-UFBNVV9EUkVYMF8xCTUyNAo+ICsjZGVmaW5lIENMS19BQ0xLX1BQTVVfRFJFWDFfMAk1MjUKPiAr
-I2RlZmluZSBDTEtfQUNMS19QUE1VX0RSRVgxXzEJNTI2Cj4gKyNkZWZpbmUgQ0xLX1BDTEtfUFBN
-VV9EUkVYMF8wCTUyNwo+ICsjZGVmaW5lIENMS19QQ0xLX1BQTVVfRFJFWDBfMQk1MjgKPiArI2Rl
-ZmluZSBDTEtfUENMS19QUE1VX0RSRVgxXzAJNTI5Cj4gKyNkZWZpbmUgQ0xLX1BDTEtfUFBNVV9E
-UkVYMV8xCTUzMAo+ICAKPiAgLyogbXV4IGNsb2NrcyAqLwo+ICAjZGVmaW5lIENMS19NT1VUX0hE
-TUkJCTY0MAo+IEBAIC0yMTcsNiArMjI4LDEwIEBACj4gICNkZWZpbmUgQ0xLX01PVVRfRVBMTAkJ
-NjU3Cj4gICNkZWZpbmUgQ0xLX01PVVRfTUFVX0VQTEwJNjU4Cj4gICNkZWZpbmUgQ0xLX01PVVRf
-VVNFUl9NQVVfRVBMTAk2NTkKPiArI2RlZmluZSBDTEtfTU9VVF9EUExMCQk2NjAKPiArI2RlZmlu
-ZSBDTEtfTU9VVF9BQ0xLX0czRAk2NjEKPiArI2RlZmluZSBDTEtfTU9VVF9TQ0xLX1NQTEwJNjYy
-Cj4gKyNkZWZpbmUgQ0xLX01PVVRfTVhfTVNQTExfQ0NPUkVfUEhZCTY2Mwo+ICAKPiAgLyogZGl2
-aWRlciBjbG9ja3MgKi8KPiAgI2RlZmluZSBDTEtfRE9VVF9QSVhFTAkJNzY4Cj4gQEAgLTI0OCw4
-ICsyNjMsOSBAQAo+ICAjZGVmaW5lIENMS19ET1VUX0NDTEtfRFJFWDAJNzk0Cj4gICNkZWZpbmUg
-Q0xLX0RPVVRfQ0xLMlhfUEhZMAk3OTUKPiAgI2RlZmluZSBDTEtfRE9VVF9QQ0xLX0NPUkVfTUVN
-CTc5Ngo+ICsjZGVmaW5lIENMS19GRl9ET1VUX1NQTEwyCTc5Nwo+ICAKPiAgLyogbXVzdCBiZSBn
-cmVhdGVyIHRoYW4gbWF4aW1hbCBjbG9jayBpZCAqLwo+IC0jZGVmaW5lIENMS19OUl9DTEtTCQk3
-OTcKPiArI2RlZmluZSBDTEtfTlJfQ0xLUwkJNzk4Cj4gIAo+ICAjZW5kaWYgLyogX0RUX0JJTkRJ
-TkdTX0NMT0NLX0VYWU5PU181NDIwX0ggKi8KPiAKCgotLSAKQmVzdCBSZWdhcmRzLApDaGFud29v
-IENob2kKU2Ftc3VuZyBFbGVjdHJvbmljcwoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJt
-LWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21h
-aWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+Hi Daniel,
+
+Thanks for your review.
+
+On 1/28/19 9:00 PM, Daniel Lezcano wrote:
+> On 28/01/2019 10:18, Joseph Lo wrote:
+>> Add support for the Tegra210 timer that runs at oscillator clock
+>> (TMR10-TMR13). We need these timers to work as clock event device and to
+>> replace the ARMv8 architected timer due to it can't survive across the
+>> power cycle of the CPU core or CPUPORESET signal. So it can't be a wake-up
+>> source when CPU suspends in power down state.
+>>
+>> Based on the work of Antti P Miettinen <amiettinen@nvidia.com>
+>>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: linux-kernel@vger.kernel.org
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> ---
+>> v2:
+>>   * add error clean-up code
+>> ---
+>>   drivers/clocksource/Kconfig          |   3 +
+>>   drivers/clocksource/Makefile         |   1 +
+>>   drivers/clocksource/timer-tegra210.c | 268 +++++++++++++++++++++++++++
+>>   include/linux/cpuhotplug.h           |   1 +
+>>   4 files changed, 273 insertions(+)
+>>   create mode 100644 drivers/clocksource/timer-tegra210.c
+>>
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index a9e26f6a81a1..e6e3e64b6320 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -135,6 +135,9 @@ config TEGRA_TIMER
+>>   	help
+>>   	  Enables support for the Tegra driver.
+>>   
+>> +config TEGRA210_TIMER
+>> +	def_bool ARCH_TEGRA_210_SOC
+>> +
+> 
+> Please make the option consistent with the option below (VT8500_TIMER or
+> similar).
+
+Okay, will check.
+
+> 
+>>   config VT8500_TIMER
+>>   	bool "VT8500 timer driver" if COMPILE_TEST
+>>   	depends on HAS_IOMEM
+>> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+>> index cdd210ff89ea..95de59c8a47b 100644
+>> --- a/drivers/clocksource/Makefile
+>> +++ b/drivers/clocksource/Makefile
+>> @@ -36,6 +36,7 @@ obj-$(CONFIG_SUN4I_TIMER)	+= timer-sun4i.o
+>>   obj-$(CONFIG_SUN5I_HSTIMER)	+= timer-sun5i.o
+>>   obj-$(CONFIG_MESON6_TIMER)	+= timer-meson6.o
+>>   obj-$(CONFIG_TEGRA_TIMER)	+= timer-tegra20.o
+>> +obj-$(CONFIG_TEGRA210_TIMER)	+= timer-tegra210.o
+>>   obj-$(CONFIG_VT8500_TIMER)	+= timer-vt8500.o
+>>   obj-$(CONFIG_NSPIRE_TIMER)	+= timer-zevio.o
+>>   obj-$(CONFIG_BCM_KONA_TIMER)	+= bcm_kona_timer.o
+>> diff --git a/drivers/clocksource/timer-tegra210.c b/drivers/clocksource/timer-tegra210.c
+>> new file mode 100644
+>> index 000000000000..477b164e540b
+>> --- /dev/null
+>> +++ b/drivers/clocksource/timer-tegra210.c
+>> @@ -0,0 +1,268 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +/*
+>> + * Copyright (c) 2014-2019, NVIDIA CORPORATION.  All rights reserved.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/clockchips.h>
+>> +#include <linux/cpu.h>
+>> +#include <linux/cpumask.h>
+>> +#include <linux/err.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/io.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/percpu.h>
+>> +#include <linux/syscore_ops.h>
+>> +
+>> +static u32 tegra210_timer_freq;
+>> +static void __iomem *tegra210_timer_reg_base;
+>> +static u32 usec_config;
+>> +
+>> +#define TIMER_PTV		0x0
+>> +#define TIMER_PTV_EN		BIT(31)
+>> +#define TIMER_PTV_PER		BIT(30)
+>> +#define TIMER_PCR		0x4
+>> +#define TIMER_PCR_INTR_CLR	BIT(30)
+>> +#define TIMERUS_CNTR_1US	0x10
+>> +#define TIMERUS_USEC_CFG	0x14
+>> +
+>> +#define TIMER10_OFFSET		0x90
+>> +#define TIMER10_IRQ_IDX		10
+>> +
+>> +#define TIMER_FOR_CPU(cpu) (TIMER10_OFFSET + (cpu) * 8)
+>> +#define IRQ_IDX_FOR_CPU(cpu)	(TIMER10_IRQ_IDX + cpu)
+>> +
+>> +struct tegra210_clockevent {
+>> +	struct clock_event_device evt;
+>> +	char name[20];
+>> +	void __iomem *reg_base;
+>> +};
+>> +#define to_tegra_cevt(p) (container_of(p, struct tegra210_clockevent, evt))
+>> +
+>> +static struct tegra210_clockevent __percpu *tegra210_evt;
+>> +
+>> +static int tegra210_timer_set_next_event(unsigned long cycles,
+>> +					 struct clock_event_device *evt)
+>> +{
+>> +	struct tegra210_clockevent *tevt;
+>> +
+>> +	tevt = to_tegra_cevt(evt);
+>> +	writel(TIMER_PTV_EN |
+>> +	       ((cycles > 1) ? (cycles - 1) : 0), /* n+1 scheme */
+>> +	       tevt->reg_base + TIMER_PTV);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static inline void timer_shutdown(struct tegra210_clockevent *tevt)
+>> +{
+>> +	writel(0, tevt->reg_base + TIMER_PTV);
+>> +}
+>> +
+>> +static int tegra210_timer_shutdown(struct clock_event_device *evt)
+>> +{
+>> +	struct tegra210_clockevent *tevt;
+>> +
+>> +	tevt = to_tegra_cevt(evt);
+>> +	timer_shutdown(tevt);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int tegra210_timer_set_periodic(struct clock_event_device *evt)
+>> +{
+>> +	struct tegra210_clockevent *tevt;
+>> +
+>> +	tevt = to_tegra_cevt(evt);
+>> +	writel(TIMER_PTV_EN | TIMER_PTV_PER | ((tegra210_timer_freq / HZ) - 1),
+>> +	       tevt->reg_base + TIMER_PTV);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static irqreturn_t tegra210_timer_isr(int irq, void *dev_id)
+>> +{
+>> +	struct tegra210_clockevent *tevt;
+>> +
+>> +	tevt = dev_id;
+>> +	writel(TIMER_PCR_INTR_CLR, tevt->reg_base + TIMER_PCR);
+>> +	tevt->evt.event_handler(&tevt->evt);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>> +static int tegra210_timer_setup(unsigned int cpu)
+>> +{
+>> +	struct tegra210_clockevent *tevt = per_cpu_ptr(tegra210_evt, cpu);
+>> +
+>> +	irq_force_affinity(tevt->evt.irq, cpumask_of(cpu));
+>> +	enable_irq(tevt->evt.irq);
+>> +
+>> +	clockevents_config_and_register(&tevt->evt, tegra210_timer_freq,
+>> +					1, /* min */
+>> +					0x1fffffff); /* 29 bits */
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int tegra210_timer_stop(unsigned int cpu)
+>> +{
+>> +	struct tegra210_clockevent *tevt = per_cpu_ptr(tegra210_evt, cpu);
+>> +
+>> +	tevt->evt.set_state_shutdown(&tevt->evt);
+>> +	disable_irq_nosync(tevt->evt.irq);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int tegra_timer_suspend(void)
+>> +{
+>> +	int cpu;
+>> +
+>> +	for_each_possible_cpu(cpu) {
+>> +		void __iomem *reg_base = tegra210_timer_reg_base +
+>> +					 TIMER_FOR_CPU(cpu);
+>> +		writel(TIMER_PCR_INTR_CLR, reg_base + TIMER_PCR);
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static void tegra_timer_resume(void)
+>> +{
+>> +	writel(usec_config, tegra210_timer_reg_base + TIMERUS_USEC_CFG);
+>> +}
+>> +
+>> +static struct syscore_ops tegra_timer_syscore_ops = {
+>> +	.suspend = tegra_timer_suspend,
+>> +	.resume = tegra_timer_resume,
+>> +};
+>> +
+>> +static int __init tegra210_timer_init(struct device_node *np)
+>> +{
+>> +	int cpu, ret = 0;
+>> +	struct tegra210_clockevent *tevt;
+>> +	struct clk *clk;
+>> +
+>> +	tegra210_evt = alloc_percpu(struct tegra210_clockevent);
+>> +	if (!tegra210_evt) {
+>> +		ret = -ENOMEM;
+>> +		goto out;
+>> +	}
+>> +
+>> +	tegra210_timer_reg_base = of_iomap(np, 0);
+>> +	if (!tegra210_timer_reg_base) {
+>> +		ret = -ENXIO;
+>> +		goto out_free_mem;
+>> +	}
+>> +
+>> +	clk = of_clk_get(np, 0);
+>> +	if (IS_ERR(clk)) {
+>> +		ret = -EINVAL;
+>> +		goto out_iounmap;
+>> +	}
+>> +
+>> +	clk_prepare_enable(clk);
+>> +	tegra210_timer_freq = clk_get_rate(clk);
+> 
+> 
+> Use the timer-of API for each CPU.
+
+Okay, I'll try to apply that for TIMER_OF_BASE and TIMER_OF_CLOCK. But 
+the TIMER_OF_IRQ, as you see below, it didn't have the ability to handle 
+the case that multiple CPUs with different timer IRQ lines. Which means 
+it's not PPI.
+
+> 
+>> +	for_each_possible_cpu(cpu) {
+> 
+> 
+> No cpu loop for the initialization, use the tegra210_timer_setup for
+> this (cf. armada 370 timer).
+
+As mentioned above, I may still need this for IRQs initialization for 
+each CPU cores. Something like the IRQ init code in "exnos_mct.c".
+
+> 
+>> +		tevt = per_cpu_ptr(tegra210_evt, cpu);
+>> +		tevt->reg_base = tegra210_timer_reg_base + TIMER_FOR_CPU(cpu);
+>> +		tevt->evt.irq = irq_of_parse_and_map(np, IRQ_IDX_FOR_CPU(cpu));
+>> +		if (!tevt->evt.irq) {
+>> +			pr_err("%s: can't map IRQ for CPU%d\n",
+>> +			       __func__, cpu);
+>> +			ret = -EINVAL;
+>> +			goto out_clk;
+>> +		}
+>> +
+>> +		snprintf(tevt->name, ARRAY_SIZE(tevt->name),
+>> +			 "tegra210_timer%d", cpu);
+>> +		tevt->evt.name = tevt->name;
+>> +		tevt->evt.cpumask = cpumask_of(cpu);
+>> +		tevt->evt.set_next_event = tegra210_timer_set_next_event;
+>> +		tevt->evt.set_state_shutdown = tegra210_timer_shutdown;
+>> +		tevt->evt.set_state_periodic = tegra210_timer_set_periodic;
+>> +		tevt->evt.set_state_oneshot = tegra210_timer_shutdown;
+>> +		tevt->evt.tick_resume = tegra210_timer_shutdown;
+>> +		tevt->evt.features = CLOCK_EVT_FEAT_PERIODIC |
+>> +			CLOCK_EVT_FEAT_ONESHOT;
+>> +		tevt->evt.rating = 460;
+>> +		irq_set_status_flags(tevt->evt.irq, IRQ_NOAUTOEN);
+> 
+> Why do you need to prevent the interrupt to be enabled ? If the timer is
+> stopped and cleared, no spurious interrupt will occur no ?
+
+This is to prevent the IRQ will been enabled twice in the timer_setup 
+API with CPU hotplug event triggered. So we only enable the IRQ once the 
+CPU is online.
+
+> 
+>> +		ret = request_irq(tevt->evt.irq, tegra210_timer_isr,
+>> +				  IRQF_TIMER | IRQF_NOBALANCING,
+>> +				  tevt->name, tevt);
+>> +		if (ret) {
+>> +			pr_err("%s: cannot setup irq %d for CPU%d\n",
+>> +				__func__, tevt->evt.irq, cpu);
+>> +			ret = -EINVAL;
+>> +			goto out_irq;
+>> +		}
+>> +	}
+>> +
+>> +	/*
+>> +	 * Configure microsecond timers to have 1MHz clock
+>> +	 * Config register is 0xqqww, where qq is "dividend", ww is "divisor"
+> 
+> Did you mean 0xwwqq ?
+
+Ah, because it's microsecond timer, that means the fraction of 1 
+microsecond each clk represents. For ex, if the clk is running at 12MHz, 
+then each clk represents 1/12 of a microsecond.
+
+Thanks,
+Joseph
+
+> 
+>> +	 * Uses n+1 scheme
+>> +	 */
+>> +	switch (tegra210_timer_freq) {
+>> +	case 12000000:
+>> +		usec_config = 0x000b; /* (11+1)/(0+1) */
+>> +		break;
+>> +	case 12800000:
+>> +		usec_config = 0x043f; /* (63+1)/(4+1) */
+>> +		break;
+>> +	case 13000000:
+>> +		usec_config = 0x000c; /* (12+1)/(0+1) */
+>> +		break;
+>> +	case 16800000:
+>> +		usec_config = 0x0453; /* (83+1)/(4+1) */
+>> +		break;
+>> +	case 19200000:
+>> +		usec_config = 0x045f; /* (95+1)/(4+1) */
+>> +		break;
+>> +	case 26000000:
+>> +		usec_config = 0x0019; /* (25+1)/(0+1) */
+>> +		break;
+>> +	case 38400000:
+>> +		usec_config = 0x04bf; /* (191+1)/(4+1) */
+>> +		break;
+>> +	case 48000000:
+>> +		usec_config = 0x002f; /* (47+1)/(0+1) */
+>> +		break;
+>> +	default:
+>> +		ret = -EINVAL;
+>> +		goto out_irq;
+>> +	}
+>> +
+>> +	writel(usec_config, tegra210_timer_reg_base + TIMERUS_USEC_CFG);
+>> +
+>> +	cpuhp_setup_state(CPUHP_AP_TEGRA_TIMER_STARTING,
+>> +			  "AP_TEGRA_TIMER_STARTING", tegra210_timer_setup,
+>> +			  tegra210_timer_stop);
+>> +
+>> +	register_syscore_ops(&tegra_timer_syscore_ops);
+>> +
+>> +	return ret;
+>> +
+>> +out_irq:
+>> +	for_each_possible_cpu(cpu) {
+>> +		tevt = per_cpu_ptr(tegra210_evt, cpu);
+>> +		if (tevt->evt.irq) {
+>> +			free_irq(tevt->evt.irq, tevt);
+>> +			irq_dispose_mapping(tevt->evt.irq);
+>> +		}
+>> +	}
+>> +out_clk:
+>> +	clk_put(clk);
+>> +out_iounmap:
+>> +	iounmap(tegra210_timer_reg_base);
+>> +out_free_mem:
+>> +	free_percpu(tegra210_evt);
+>> +out:
+>> +	return ret;
+>> +}
+>> +
+>> +TIMER_OF_DECLARE(tegra210_timer, "nvidia,tegra210-timer", tegra210_timer_init);
+>> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+>> index fd586d0301e7..e78281d07b70 100644
+>> --- a/include/linux/cpuhotplug.h
+>> +++ b/include/linux/cpuhotplug.h
+>> @@ -121,6 +121,7 @@ enum cpuhp_state {
+>>   	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
+>>   	CPUHP_AP_ARM_TWD_STARTING,
+>>   	CPUHP_AP_QCOM_TIMER_STARTING,
+>> +	CPUHP_AP_TEGRA_TIMER_STARTING,
+>>   	CPUHP_AP_ARMADA_TIMER_STARTING,
+>>   	CPUHP_AP_MARCO_TIMER_STARTING,
+>>   	CPUHP_AP_MIPS_GIC_TIMER_STARTING,
+>>
+> 
+> 
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
