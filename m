@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2BE6FC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:22:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 369FDC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:23:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EFE1820989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:22:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E8A8120882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:23:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rnnHR6Cq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EFE1820989
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="suwBw1EN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E8A8120882
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mleia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,42 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BFyBl6GcFuGeFjsgScgU0UrDU/lzecVyFi8SOnsr9o4=; b=rnnHR6CqkmKVSz
-	w6Kj/IFeduIoMXytZUhY9VyeWa+5QX0bLTyuHPLg7IUvMJWmTC9AMfkI42faNl0bWEarIfUyewXKr
-	Ks+c78phyxPIUgUOoPLS7AV8tU0DyJ6+HagK303l79ah+eR2Of10UJN4lRCzeXpMqiiRY9ohps/nL
-	5NolQNJYpvkuWFLuQzakixICuK2dtXMYWddaurmT5XzIdfmSiRXImbUwIVcFFmTafkx83XaQoZ6V7
-	i6SBGvUQl3goDq8DcfYDdBuAljN5bu+UmdwWaz9dsAdLcxVgHAyKbTbC836Gpk7ZEaWjwQd1QWbcM
-	pIHEDug47IS2Vpo+cBpA==;
+	List-Owner; bh=2KoEL+XZ+6T9DSi0RvoRGKQqA1LE1q7SrHeMuyoO0wo=; b=suwBw1ENiFn1at
+	807RDtTota1eTIpbYf2Lj0DmMF0BRh7M36yDIGvDsWTeNDSicuYreM0fFT1/M6rMMEfYB8Jy7KZj+
+	7xwhjBRkYyJaYTha2HB8wDkQsA4btDiLElwFZ80/I2aCrkYIjbrLEDqGSesLikrdBoPLPzMfFLtAl
+	gnjozYziWhim16xY4xkJADisjfUSZeYERVaxuG+wOF2of/7wHkpv6S50IKW2It0dl92FdScQINq+P
+	U5y/Jh3pgFsflu8/aS09CeMVe1YEnC7pxqX215tujY9elUc1d5YRbNt160BCvywok2dRudH6FTgfe
+	6VnSSg7n+61IoO/WI+QQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goYy5-0003K3-Fv; Tue, 29 Jan 2019 19:22:45 +0000
+	id 1goYyK-0003Ya-C5; Tue, 29 Jan 2019 19:23:00 +0000
 Received: from mleia.com ([178.79.152.223] helo=mail.mleia.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goYwU-0001p6-3c
+ id 1goYwU-0001p8-9q
  for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 19:21:08 +0000
 Received: from mail.mleia.com (localhost [127.0.0.1])
- by mail.mleia.com (Postfix) with ESMTP id 8F61A43EF21;
- Tue, 29 Jan 2019 19:20:59 +0000 (GMT)
+ by mail.mleia.com (Postfix) with ESMTP id B23B643EF29;
+ Tue, 29 Jan 2019 19:21:00 +0000 (GMT)
 From: Vladimir Zapolskiy <vz@mleia.com>
 To: Sylvain Lemieux <slemieux.tyco@gmail.com>,
  Russell King <linux@armlinux.org.uk>
-Subject: [PATCH 06/13] ARM: dts: lpc32xx: remove inclusion of deprecated
- skeleton.dtsi
-Date: Tue, 29 Jan 2019 21:20:42 +0200
-Message-Id: <20190129192049.11223-7-vz@mleia.com>
+Subject: [PATCH 08/13] ARM: dts: lpc32xx: phy3250: setup LCD controller to
+ panel interface
+Date: Tue, 29 Jan 2019 21:20:44 +0200
+Message-Id: <20190129192049.11223-9-vz@mleia.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190129192049.11223-1-vz@mleia.com>
 References: <20190129192049.11223-1-vz@mleia.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-49551924 
-X-CRM114-CacheID: sfid-20190129_192059_611136_5B485D6E 
-X-CRM114-Status: GOOD (  11.03  )
-/bin/ln: failed to access
- 'reaver_cache/texts/20190129_192059_611136_5B485D6E': No such file or
- directory
+X-CRM114-CacheID: sfid-20190129_192100_754916_3EA3C038 
+X-CRM114-Status: GOOD (  11.11  )
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_192059_611136_5B485D6E 
-X-CRM114-Status: GOOD (  10.02  )
+X-CRM114-CacheID: sfid-20190129_192100_754916_3EA3C038 
+X-CRM114-Status: UNSURE (   8.77  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,43 +77,54 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Inclusion of skeleton.dtsi into DTS files is deprecated since
-commit 9c0da3cc61f1233c ("ARM: dts: explicitly mark skeleton.dtsi
-as deprecated").
+The change adds description of Sharp LQ035Q7DB03 3.5" 320x240 TFT panel,
+which is connected to Phytec phyCORE-LPC3250 board, ARM PrimeCell PL111
+LCD controller on NXP LPC3250 SoC gets its configuration appropriately
+to support graphics output to the panel.
 
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- arch/arm/boot/dts/lpc32xx.dtsi | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/lpc3250-phy3250.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-index 9ad3df11db0d..d27a0a722ad5 100644
---- a/arch/arm/boot/dts/lpc32xx.dtsi
-+++ b/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -1,6 +1,7 @@
- /*
-  * NXP LPC32xx SoC
-  *
-+ * Copyright (C) 2015-2019 Vladimir Zapolskiy <vz@mleia.com>
-  * Copyright 2012 Roland Stigge <stigge@antcom.de>
-  *
-  * The code contained herein is licensed under the GNU General Public
-@@ -11,12 +12,13 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
+diff --git a/arch/arm/boot/dts/lpc3250-phy3250.dts b/arch/arm/boot/dts/lpc3250-phy3250.dts
+index d2dad2b541ff..aff72f14ad83 100644
+--- a/arch/arm/boot/dts/lpc3250-phy3250.dts
++++ b/arch/arm/boot/dts/lpc3250-phy3250.dts
+@@ -39,6 +39,17 @@
+ 		};
+ 	};
  
--#include "skeleton.dtsi"
--
- #include <dt-bindings/clock/lpc32xx-clock.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
++	panel: panel {
++		compatible = "sharp,lq035q7db03";
++		power-supply = <&reg_lcd>;
 +
- 	compatible = "nxp,lpc3220";
- 	interrupt-parent = <&mic>;
++		port {
++			panel_input: endpoint {
++				remote-endpoint = <&cldc_output>;
++			};
++		};
++	};
++
+ 	reg_backlight: regulator-backlight {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "backlight";
+@@ -71,7 +82,15 @@
+ };
  
+ &clcd {
++	max-memory-bandwidth = <18710000>;
+ 	status = "okay";
++
++	port {
++		cldc_output: endpoint {
++			remote-endpoint = <&panel_input>;
++			arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
++		};
++	};
+ };
+ 
+ &i2c1 {
 -- 
 2.20.1
 
