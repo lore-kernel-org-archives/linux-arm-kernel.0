@@ -2,107 +2,66 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 245E9C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 21:19:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 24C8EC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 21:32:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E1D932082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 21:19:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DE04E2087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 21:32:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q/kXRszR";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="nY/Cb6da"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1D932082F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cV06GyEg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DE04E2087E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4sMRCZ8Y5pJCcHQCmjm2efLxF+3R9WPBWePSIqFUhDs=; b=Q/kXRszRGTfO6L
-	KLHY0CKQiclPMIXuM4WhcyrJw37aVdmu8OYwjbOQmImCc67tcA7lDA1mIkYBtkPyUy3tlIvtIjvwk
-	vymCFpO4P9dCXwS81O24jW9UJzlbzBInKPPMeefadl/6+tJxCzPgHdN50RU+QRk3DO/bB2vk9MuGv
-	f2HhTVcD67AheZ021YMLJ6Zf2Dr57XyFs7oUwDPnxeHYBhToFq8lmpGqIilTXrqtl2rBG9o8VmYcv
-	06nytMEtJya08EyrekRa0GrZV+WY5Wjq+jcBdz01nb5q8S6C2PE1vDs27Fx500DVFvTW3y73pA3ju
-	scnEe0jCHYvrQZ5tG/bg==;
+	List-Owner; bh=JJhzRP0MHphX4nLPVFE2nErWET4CRDLTloK+Xv/DVh0=; b=cV06GyEgorWP1a
+	wV1Ig4/waGgFP9HQOQQB6QkJ5IuE7yFaeYARbg73QY0O5Q32OC/TjEG4cA0Gfive+27/Gqp9KuWHv
+	S9Is2A/E8khcKD3EUMx794aRXqoUFYDP18BxltYwFv9polhjmjUEJ9NcE6TuBw1gWqcVcArnFRqpH
+	wunSh+m4yV5/GHsjhtVL6IvJPh8BkQc31d4jdaTcI+ZV8D5gWu5h89ZYz96kITueNPruk8pBBmygd
+	lmbNtN3SYFg2vJcq6Mqb/kLZUvAeUnMpvbR5cexOOKIytRxCBErSL4V9ssL+2E2hcMw6JTm2n2LMU
+	GG+vv256z/NRfImYwdAQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goan0-0007XV-Mg; Tue, 29 Jan 2019 21:19:26 +0000
-Received: from mail-eopbgr80058.outbound.protection.outlook.com ([40.107.8.58]
- helo=EUR04-VI1-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goamw-0007X8-Hu
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 21:19:25 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=9pQBatef1UDVF2uUH19ESPKG26AR9lj7Z2VU3nHKQ4M=;
- b=nY/Cb6da7v7Y100H+3aRIoIzHf1Y3NW9pvZE5x5bR36Y0skcwMqDgPnr/XB3FYMCTfPZ66nfmeZV+11xvq+AwFJZSlDmtYJDUqkp8jt7USNWbbN4iRqNJUN/xQOYL/9XIY6T3HgyWphBsWHbahoTdOfJzmCcVKaoE7YEuajCves=
-Received: from VI1PR04MB5008.eurprd04.prod.outlook.com (20.177.49.225) by
- VI1PR04MB4895.eurprd04.prod.outlook.com (20.177.49.156) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1558.21; Tue, 29 Jan 2019 21:19:19 +0000
-Received: from VI1PR04MB5008.eurprd04.prod.outlook.com
- ([fe80::2d2c:455a:16e9:cd4f]) by VI1PR04MB5008.eurprd04.prod.outlook.com
- ([fe80::2d2c:455a:16e9:cd4f%2]) with mapi id 15.20.1558.023; Tue, 29 Jan 2019
- 21:19:18 +0000
-From: Abel Vesa <abel.vesa@nxp.com>
-To: Lucas Stach <l.stach@pengutronix.de>
-Subject: Re: [PATCH] soc: imx: Add psci gpc support for i.MX8MQ
-Thread-Topic: [PATCH] soc: imx: Add psci gpc support for i.MX8MQ
-Thread-Index: AQHUt9bU+/jArCh7A0qIut8V+yy3WaXGanOAgABWdIA=
-Date: Tue, 29 Jan 2019 21:19:18 +0000
-Message-ID: <20190129211917.imy3amuguh4dqmb4@fsr-ub1664-175>
-References: <1548768630-2416-1-git-send-email-abel.vesa@nxp.com>
- <1548778191.6869.7.camel@pengutronix.de>
-In-Reply-To: <1548778191.6869.7.camel@pengutronix.de>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=abel.vesa@nxp.com; 
-x-originating-ip: [95.76.156.53]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR04MB4895;
- 6:j7o0G5g5m4nxITEcP2bWfDde9ldq02nwSOL1ZBSdtgk8X6aUoOPgwUt+7G3j5jx3ftK5a2bUsOrHIHXrzju0ePTgfKQW0hO30s4MXdSnZhd3sZsOHE8AHESOBLQtv+Z4qdrMj1wPHVDlgbb74QJePf0rerri9N7oRpF2DXtq2sjzVcdnH8qXl/yG5MBGbdL3K6RhwzCYQxK8bSoFVl2cI26xiVnutkZd9ut/aIfE/BIFzWS8TXB208XnZSN4QvORLrWNhCOMsXTqNgIDEWYd+CIT9zMxh6ANMqIkUg9ch2NuSjs9ZNZdPoWud4LIvQBsTJ6IbRGoZM3h6dKRXnqu0JW0lJ4DaFjTooVRu536e16B5o+6FjbuH+aO0eY9Usvb+lqzyIQbsdSqkP54S3/5ZCVZR69RJ8JD3hITt8E2kMHIDKCNMIAPgHSdo14BmlasKTXjAllWyRZ4CAfqDcjOrw==;
- 5:tKUr4S0R55VrEwUvQABDRXfrw7taZCSHW9jhBJ+wLaYU1fIL5nYaIsbXAgP6tSLAS6EjY0OV9zYvWpO+7NyEnEO4XMa8kRN0qHYaQbbwnY2+hTNFP6ppanPJgI4EHXmy+HyEwEIY53Jl5+0A2UE2jFUOSUfEVRzmJQFvaudzyZNLw5rf6j9LMY7cn4vLA2DT7NEyc8pHlTxEi83Q2qTjDw==;
- 7:WLE8JB+i4qKCU69wBbqcyA5nJ1UbGchuzanRSM6Dr7qlQtroiSiTPEFaHzSyC2NCjJodIUl+PwvxKIY6SBzTcmjqXmOzeBukpncA44yperMH2nQS/b7/2CEoBRLusYd3mnfkB356JiqOQStyFtZlDA==
-x-ms-exchange-antispam-srfa-diagnostics: SOS;
-x-ms-office365-filtering-correlation-id: 08ff229d-a91e-4b4f-ded2-08d6862f6e33
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB4895; 
-x-ms-traffictypediagnostic: VI1PR04MB4895:
-x-microsoft-antispam-prvs: <VI1PR04MB48955CB9F455E14789674590F6970@VI1PR04MB4895.eurprd04.prod.outlook.com>
-x-forefront-prvs: 093290AD39
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(7916004)(39860400002)(136003)(396003)(376002)(346002)(366004)(199004)(189003)(26005)(8676002)(14454004)(6916009)(476003)(9686003)(8936002)(33716001)(33896004)(6486002)(81156014)(7736002)(71200400001)(6512007)(81166006)(14444005)(2906002)(6436002)(71190400001)(106356001)(25786009)(30864003)(53936002)(6506007)(68736007)(478600001)(105586002)(486006)(44832011)(4326008)(53546011)(102836004)(86362001)(39060400002)(54906003)(6116002)(97736004)(446003)(256004)(1076003)(53946003)(6246003)(316002)(11346002)(305945005)(99286004)(66066001)(229853002)(3846002)(186003)(76176011)(2004002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4895;
- H:VI1PR04MB5008.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: i5tyerXg+t2BKUbWxIoSXtUytBkn/vmSEE9aHsyKBCYq6GJuGiba5jmwpjv9yPjtxNDcJPMmL2PBoZSiyvVR1/pQW+wK5v9Qz9wg61oUN+c6sD5NocwQFo/icvEWFWY8pqCXPQ459FYvfj7Q1lKimuABZ7Qw2gc7IGwXXCQbC98RfSYJPP+G9MJZGWRvynjjoYMS7pHbT+sY2+23FzEMynjAzJ23kLBRBPgJ+lPRb72Up6+rVmIwsoTytKTKFaJFOLfyBL+GH9oM1pzIpbn9u9knuGyGypUC9RDw36oStSF0uLhP/4I70Qm9GWqtTwiDRYipBk2sCu8UwZMZw5si+G0jw08K7hh3onM2DrNZ2XrjmP4Pd6M5F0V5jlGek1ZfkSzKVJZjSeURzPc11EWEHej6hTzFLY8JuPfW4JD0kTk=
-Content-ID: <CC5B1D3FD5495C4BAC9A4F5181B808BB@eurprd04.prod.outlook.com>
+	id 1goazf-0003eY-Ma; Tue, 29 Jan 2019 21:32:31 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goazb-0003ds-Pn
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 21:32:29 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E0C87EBD;
+ Tue, 29 Jan 2019 13:32:26 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D03643F59C;
+ Tue, 29 Jan 2019 13:32:25 -0800 (PST)
+Date: Tue, 29 Jan 2019 21:32:23 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Andre Przywara <andre.przywara@arm.com>
+Subject: Re: [PATCH 1/2] KVM: arm/arm64: Add save/restore support for
+ firmware workaround state
+Message-ID: <20190129213223.GB3567@e103592.cambridge.arm.com>
+References: <20190107120537.184252-1-andre.przywara@arm.com>
+ <20190107120537.184252-2-andre.przywara@arm.com>
+ <20190122151714.GG3578@e103592.cambridge.arm.com>
+ <20190125144657.3db91c91@donnerap.cambridge.arm.com>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 08ff229d-a91e-4b4f-ded2-08d6862f6e33
-X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 21:19:18.8575 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4895
+Content-Disposition: inline
+In-Reply-To: <20190125144657.3db91c91@donnerap.cambridge.arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_131922_855852_0DD3CC46 
-X-CRM114-Status: GOOD (  25.70  )
+X-CRM114-CacheID: sfid-20190129_133227_853857_B57E3893 
+X-CRM114-Status: GOOD (  42.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -114,562 +73,225 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Jacky Bai <ping.bai@nxp.com>,
- Anson Huang <anson.huang@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Abel Vesa <abelvesa@linux.com>, dl-linux-imx <linux-imx@nxp.com>,
- Sascha Hauer <kernel@pengutronix.de>, Fabio Estevam <fabio.estevam@nxp.com>,
- Fabio Estevam <festevam@gmail.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Marc Zyngier <marc.zyngier@arm.com>, linux-arm-kernel@lists.infradead.org,
+ kvm@vger.kernel.org, kvmarm@lists.cs.columbia.edu
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 19-01-29 17:09:51, Lucas Stach wrote:
-> Am Dienstag, den 29.01.2019, 13:30 +0000 schrieb Abel Vesa:
-> > From: Anson Huang <Anson.Huang@nxp.com>
-> > =
+On Fri, Jan 25, 2019 at 02:46:57PM +0000, Andre Przywara wrote:
+> On Tue, 22 Jan 2019 15:17:14 +0000
+> Dave Martin <Dave.Martin@arm.com> wrote:
+> 
+> Hi Dave,
+> 
+> thanks for having a look!
+> 
+> > On Mon, Jan 07, 2019 at 12:05:36PM +0000, Andre Przywara wrote:
+> > > KVM implements the firmware interface for mitigating cache
+> > > speculation vulnerabilities. Guests may use this interface to
+> > > ensure mitigation is active.
+> > > If we want to migrate such a guest to a host with a different
+> > > support level for those workarounds, migration might need to fail,
+> > > to ensure that critical guests don't loose their protection.
+> > > 
+> > > Introduce a way for userland to save and restore the workarounds
+> > > state. On restoring we do checks that make sure we don't downgrade
+> > > our mitigation level.
+> > > 
+> > > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> > > ---
+> > >  arch/arm/include/asm/kvm_emulate.h   |  10 ++
+> > >  arch/arm/include/uapi/asm/kvm.h      |   9 ++
+> > >  arch/arm64/include/asm/kvm_emulate.h |  14 +++
+> > >  arch/arm64/include/uapi/asm/kvm.h    |   9 ++
+> > >  virt/kvm/arm/psci.c                  | 138
+> > > ++++++++++++++++++++++++++- 5 files changed, 178 insertions(+), 2
+> > > deletions(-)
+> > > 
+> > > diff --git a/arch/arm/include/asm/kvm_emulate.h
+> > > b/arch/arm/include/asm/kvm_emulate.h index
+> > > 77121b713bef..2255c50debab 100644 ---
+> > > a/arch/arm/include/asm/kvm_emulate.h +++
+> > > b/arch/arm/include/asm/kvm_emulate.h @@ -275,6 +275,16 @@ static
+> > > inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
+> > > return vcpu_cp15(vcpu, c0_MPIDR) & MPIDR_HWID_BITMASK; }
+> > >  
+> > > +static inline bool kvm_arm_get_vcpu_workaround_2_flag(struct
+> > > kvm_vcpu *vcpu) +{
+> > > +	return false;
+> > > +}
+> > > +
+> > > +static inline void kvm_arm_set_vcpu_workaround_2_flag(struct
+> > > kvm_vcpu *vcpu,
+> > > +						      bool flag)
+> > > +{
+> > > +}
+> > > +
+> > >  static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
+> > >  {
+> > >  	*vcpu_cpsr(vcpu) |= PSR_E_BIT;
+> > > diff --git a/arch/arm/include/uapi/asm/kvm.h
+> > > b/arch/arm/include/uapi/asm/kvm.h index 4602464ebdfb..02c93b1d8f6d
+> > > 100644 --- a/arch/arm/include/uapi/asm/kvm.h
+> > > +++ b/arch/arm/include/uapi/asm/kvm.h
+> > > @@ -214,6 +214,15 @@ struct kvm_vcpu_events {
+> > >  #define KVM_REG_ARM_FW_REG(r)		(KVM_REG_ARM |
+> > > KVM_REG_SIZE_U64 | \ KVM_REG_ARM_FW | ((r) & 0xffff))
+> > >  #define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
+> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1
+> > > KVM_REG_ARM_FW_REG(1) +#define
+> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_NOT_AVAIL	0 +#define
+> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_AVAIL	1 +#define
+> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2	KVM_REG_ARM_FW_REG(2)
+> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_MASK	0x3
+> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL	0
+> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_AVAIL	1
+> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNAFFECTED	2
+> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_ENABLED	4 
+> > >  /* Device Control API: ARM VGIC */
+> > >  #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
+> > > diff --git a/arch/arm64/include/asm/kvm_emulate.h
+> > > b/arch/arm64/include/asm/kvm_emulate.h index
+> > > 506386a3edde..a44f07f68da4 100644 ---
+> > > a/arch/arm64/include/asm/kvm_emulate.h +++
+> > > b/arch/arm64/include/asm/kvm_emulate.h @@ -336,6 +336,20 @@ static
+> > > inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
+> > > return vcpu_read_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK; }
+> > >  
+> > > +static inline bool kvm_arm_get_vcpu_workaround_2_flag(struct
+> > > kvm_vcpu *vcpu) +{
+> > > +	return vcpu->arch.workaround_flags &
+> > > VCPU_WORKAROUND_2_FLAG; +}
+> > > +
+> > > +static inline void kvm_arm_set_vcpu_workaround_2_flag(struct
+> > > kvm_vcpu *vcpu,
+> > > +						      bool flag)
+> > > +{
+> > > +	if (flag)
+> > > +		vcpu->arch.workaround_flags |=
+> > > VCPU_WORKAROUND_2_FLAG;
+> > > +	else
+> > > +		vcpu->arch.workaround_flags &=
+> > > ~VCPU_WORKAROUND_2_FLAG; +}
+> > > +
+> > >  static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
+> > >  {
+> > >  	if (vcpu_mode_is_32bit(vcpu)) {
+> > > diff --git a/arch/arm64/include/uapi/asm/kvm.h
+> > > b/arch/arm64/include/uapi/asm/kvm.h index
+> > > 97c3478ee6e7..4a19ef199a99 100644 ---
+> > > a/arch/arm64/include/uapi/asm/kvm.h +++
+> > > b/arch/arm64/include/uapi/asm/kvm.h @@ -225,6 +225,15 @@ struct
+> > > kvm_vcpu_events { #define KVM_REG_ARM_FW_REG(r)
+> > > (KVM_REG_ARM64 | KVM_REG_SIZE_U64 | \ KVM_REG_ARM_FW | ((r) &
+> > > 0xffff)) #define KVM_REG_ARM_PSCI_VERSION
+> > > KVM_REG_ARM_FW_REG(0) +#define
+> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1	KVM_REG_ARM_FW_REG(1)
+> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_NOT_AVAIL	0
+> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_AVAIL	1
+> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2
+> > > KVM_REG_ARM_FW_REG(2) +#define
+> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_MASK	0x3 +#define
+> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL	0 +#define
+> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_AVAIL	1 +#define
+> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNAFFECTED	2 +#define
+> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_ENABLED	4  
+> > 
+> > If this is the first exposure of this information to userspace, I
+> > wonder if we can come up with some common semantics that avoid having
+> > to add new ad-hoc code (and bugs) every time a new
+> > vulnerability/workaround is defined.
+> > 
+> > We seem to have at least the two following independent properties
+> > for a vulnerability, with the listed values for each:
+> > 
+> >  * vulnerability (Vulnerable, Unknown, Not Vulnerable)
+> > 
+> >  * mitigation support (Not Requestable, Requestable)
+> > 
+> > Migrations must not move to the left in _either_ list for any
+> > vulnerability.
+> > 
+> > If we want to hedge out bets we could follow the style of the ID
+> > registers and allocate to each theoretical vulnerability a pair of
+> > signed 2- or (for more expansion room if we think we might need it)
+> > 4-bit fields.
+> > 
+> > We could perhaps allocate as follows:
+> > 
+> >  * -1=Vulnerable, 0=Unknown, 1=Not Vulnerable
+> >  *  0=Mitigation not requestable, 1=Mitigation requestable
+> 
+> So as discussed in person, that sounds quite neat. I implemented
+> that, but the sign extension and masking to n bits is not very pretty
+> and limits readability.
+> However the property of having a kind of "vulnerability scale", where a
+> simple comparison would determine compatibility, is a good thing to
+> have and drastically simplifies the checking code.
+> 
+> > Checking code wouldn't need to know which fields describe mitigation
+> > mechanisms and which describe vulnerabilities: we'd just do a strict
+> > >= comparison on each.
+> > 
+> > Further, if a register is never written before the vcpu is first run,
+> > we should imply a write of 0 to it as part of KVM_RUN (so that if the
+> > destination node has a negative value anywhere, KVM_RUN barfs cleanly.
+> 
+> What I like about the signedness is this "0 means unknown", which is
+> magically forwards compatible. However I am not sure we can transfer
+> this semantic into every upcoming register that pops up in the future.
 
-> > Add i.MX8MQ PSCI GPC virtual driver support.
-> > =
+I appreciate the concern, but can you give an example of how it might
+break?
 
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> > Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
-> =
+My idea is that you can check for compatibility by comparing fields
+without any need to know what they mean, but we wouldn't pre-assign
+meanings for the values of unallocated fields, just create a precedent
+that future fields can follow (where it works).
 
-> NACK, we already have a working driver for the power domains on
-> i.MX8MQ, reusing the existing GPCv2 driver. This has been done in
-> coordination with Anson Huang. There is no need to involve PSCI in any
-> of this.
-> =
+This is much like the CPU ID features scheme itself.  A "0" might
+mean that something is absent, but there's no way (or need) to know
+what.
 
+> Actually we might not need this:
+> My understanding of how QEMU handles this in migration is that it reads
+> the f/w reg on the originating host A and writes this into the target
+> host B, without itself interpreting this in any way. It's up to the
+> target kernel (basically this code here) to check compatibility. So I am
+> not sure we actually need a stable scheme. If host A doesn't know about
 
-Hmmm, didn't see that until now. You're right, no point in adding this then.
-So I guess the upcomming drivers will have to switch from this old one to t=
-he
-one already existing when upstreaming.
+Nothing stops userspace from interpreting the data, so there's a risk
+people may grow to rely on it even if we don't want them to.
 
-I'll drop this then. =
+So we should try to have something that's forward-compatible if at all
+possible...
 
-Thanks.
+> a certain register, it won't appear in the result of the
+> KVM_GET_REG_LIST ioctl, so it won't be transferred to host B at all. In
+> the opposite case the receiving host would reject an unknown register,
+> which I believe is safer, although I see that it leaves the "unknown"
+> case on the table.
+> 
+> It would be good to have some opinion of how forward looking we want to
+> (and can) be here.
+> 
+> Meanwhile I am sending a v2 which implements the linear scale idea,
+> without using signed values, as this indeed simplifies the code.
+> I have the signed version still in a branch here, let me know if you
+> want to have a look.
 
-> Regards,
-> Lucas
-> =
+Happy to take a look at it.
 
-> > ---
-> > =A0drivers/soc/imx/Makefile=A0=A0=A0|=A0=A0=A01 +
-> > =A0drivers/soc/imx/gpc-psci.c | 423
-> > +++++++++++++++++++++++++++++++++++++++++++++
-> > =A0include/soc/imx/fsl_sip.h=A0=A0|=A0=A031 ++++
-> > =A03 files changed, 455 insertions(+)
-> > =A0create mode 100644 drivers/soc/imx/gpc-psci.c
-> > =A0create mode 100644 include/soc/imx/fsl_sip.h
-> > =
+I was hoping that cpufeatures already had a helper for extracting a
+signed field, but I didn't go looking for it...
 
-> > diff --git a/drivers/soc/imx/Makefile b/drivers/soc/imx/Makefile
-> > index 506a6f3..83a38ac 100644
-> > --- a/drivers/soc/imx/Makefile
-> > +++ b/drivers/soc/imx/Makefile
-> > @@ -1,2 +1,3 @@
-> > =A0obj-$(CONFIG_HAVE_IMX_GPC) +=3D gpc.o
-> > =A0obj-$(CONFIG_IMX_GPCV2_PM_DOMAINS) +=3D gpcv2.o
-> > +obj-$(CONFIG_ARCH_MXC) +=3D gpc-psci.o
-> > diff --git a/drivers/soc/imx/gpc-psci.c b/drivers/soc/imx/gpc-psci.c
-> > new file mode 100644
-> > index 0000000..4f8fee9
-> > --- /dev/null
-> > +++ b/drivers/soc/imx/gpc-psci.c
-> > @@ -0,0 +1,423 @@
-> > +// SPDX-License-Identifier: GPL-2.0+
-> > +/*
-> > + * Copyright 2019 NXP.
-> > + *
-> > + */
-> > +
-> > +#include <linux/arm-smccc.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/cpumask.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/io.h>
-> > +#include <linux/irq.h>
-> > +#include <linux/irqchip.h>
-> > +#include <linux/irqchip/arm-gic.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/of_irq.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/regulator/consumer.h>
-> > +#include <linux/pm_domain.h>
-> > +#include <soc/imx/fsl_sip.h>
-> > +
-> > +#define GPC_MAX_IRQS		(4 * 32)
-> > +
-> > +struct imx_gpc_pm_domain {
-> > +	const char name[30];
-> > +	struct device *dev;
-> > +	struct generic_pm_domain pd;
-> > +	u32 gpc_domain_id;
-> > +	struct clk **clks;
-> > +	unsigned int num_clks;
-> > +	struct regulator *reg;
-> > +};
-> > +
-> > +enum imx_gpc_pm_domain_state {
-> > +	GPC_PD_STATE_OFF,
-> > +	GPC_PD_STATE_ON,
-> > +};
-> > +
-> > +#define to_imx_gpc_pm_domain(_genpd) \
-> > +	container_of(_genpd, struct imx_gpc_pm_domain, pd)
-> > +
-> > +static DEFINE_SPINLOCK(gpc_psci_lock);
-> > +static DEFINE_MUTEX(gpc_pd_mutex);
-> > +
-> > +static void imx_gpc_psci_irq_unmask(struct irq_data *d)
-> > +{
-> > +	struct arm_smccc_res res;
-> > +
-> > +	spin_lock(&gpc_psci_lock);
-> > +	arm_smccc_smc(FSL_SIP_GPC, FSL_SIP_CONFIG_GPC_UNMASK, d-
-> > >hwirq,
-> > +		=A0=A0=A0=A0=A0=A00, 0, 0, 0, 0, &res);
-> > +	spin_unlock(&gpc_psci_lock);
-> > +
-> > +	irq_chip_unmask_parent(d);
-> > +}
-> > +
-> > +static void imx_gpc_psci_irq_mask(struct irq_data *d)
-> > +{
-> > +	struct arm_smccc_res res;
-> > +
-> > +	spin_lock(&gpc_psci_lock);
-> > +	arm_smccc_smc(FSL_SIP_GPC, FSL_SIP_CONFIG_GPC_MASK, d-
-> > >hwirq,
-> > +		=A0=A0=A0=A0=A0=A00, 0, 0, 0, 0, &res);
-> > +	spin_unlock(&gpc_psci_lock);
-> > +
-> > +	irq_chip_mask_parent(d);
-> > +}
-> > +static int imx_gpc_psci_irq_set_wake(struct irq_data *d, unsigned
-> > int on)
-> > +{
-> > +	struct arm_smccc_res res;
-> > +
-> > +	spin_lock(&gpc_psci_lock);
-> > +	arm_smccc_smc(FSL_SIP_GPC, FSL_SIP_CONFIG_GPC_SET_WAKE, d-
-> > >hwirq,
-> > +			on, 0, 0, 0, 0, &res);
-> > +	spin_unlock(&gpc_psci_lock);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int imx_gpc_psci_irq_set_affinity(struct irq_data *d,
-> > +					=A0const struct cpumask *dest,
-> > +					=A0bool force)
-> > +{
-> > +	/* parse the cpu of irq affinity */
-> > +	struct arm_smccc_res res;
-> > +	int cpu =3D cpumask_any_and(dest, cpu_online_mask);
-> > +
-> > +	irq_chip_set_affinity_parent(d, dest, force);
-> > +
-> > +	spin_lock(&gpc_psci_lock);
-> > +	arm_smccc_smc(FSL_SIP_GPC, 0x4, d->hwirq,
-> > +		=A0=A0=A0=A0=A0=A0cpu, 0, 0, 0, 0, &res);
-> > +	spin_unlock(&gpc_psci_lock);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static struct irq_chip imx_gpc_psci_chip =3D {
-> > +	.name			=3D "GPC-PSCI",
-> > +	.irq_eoi		=3D irq_chip_eoi_parent,
-> > +	.irq_mask		=3D imx_gpc_psci_irq_mask,
-> > +	.irq_unmask		=3D imx_gpc_psci_irq_unmask,
-> > +	.irq_retrigger		=3D
-> > irq_chip_retrigger_hierarchy,
-> > +	.irq_set_wake		=3D imx_gpc_psci_irq_set_wake,
-> > +	.irq_set_affinity	=3D imx_gpc_psci_irq_set_affinity,
-> > +};
-> > +
-> > +static int imx_gpc_psci_domain_translate(struct irq_domain *d,
-> > +				=A0=A0=A0=A0struct irq_fwspec *fwspec,
-> > +				=A0=A0=A0=A0unsigned long *hwirq,
-> > +				=A0=A0=A0=A0unsigned int *type)
-> > +{
-> > +	if (is_of_node(fwspec->fwnode)) {
-> > +		if (fwspec->param_count !=3D 3)
-> > +			return -EINVAL;
-> > +
-> > +		/* No PPI should point to this domain */
-> > +		if (fwspec->param[0] !=3D 0)
-> > +			return -EINVAL;
-> > +
-> > +		*hwirq =3D fwspec->param[1];
-> > +		*type =3D fwspec->param[2];
-> > +		return 0;
-> > +	}
-> > +
-> > +	return -EINVAL;
-> > +}
-> > +
-> > +static int imx_gpc_psci_domain_alloc(struct irq_domain *domain,
-> > +				=A0=A0unsigned int irq,
-> > +				=A0=A0unsigned int nr_irqs, void *data)
-> > +{
-> > +	struct irq_fwspec *fwspec =3D data;
-> > +	struct irq_fwspec parent_fwspec;
-> > +	irq_hw_number_t hwirq;
-> > +	int i;
-> > +
-> > +	if (fwspec->param_count !=3D 3)
-> > +		return -EINVAL;	/* Not GIC compliant */
-> > +	if (fwspec->param[0] !=3D 0)
-> > +		return -EINVAL;	/* No PPI should point to
-> > this domain */
-> > +
-> > +	hwirq =3D fwspec->param[1];
-> > +	if (hwirq >=3D GPC_MAX_IRQS)
-> > +		return -EINVAL;	/* Can't deal with this */
-> > +
-> > +	for (i =3D 0; i < nr_irqs; i++)
-> > +		irq_domain_set_hwirq_and_chip(domain, irq + i, hwirq
-> > + i,
-> > +					=A0=A0=A0=A0=A0=A0&imx_gpc_psci_chip,
-> > NULL);
-> > +
-> > +	parent_fwspec =3D *fwspec;
-> > +	parent_fwspec.fwnode =3D domain->parent->fwnode;
-> > +
-> > +	return irq_domain_alloc_irqs_parent(domain, irq, nr_irqs,
-> > +					=A0=A0=A0=A0&parent_fwspec);
-> > +}
-> > +
-> > +static const struct irq_domain_ops imx_gpc_psci_domain_ops =3D {
-> > +	.translate =3D imx_gpc_psci_domain_translate,
-> > +	.alloc	=3D imx_gpc_psci_domain_alloc,
-> > +	.free	=3D irq_domain_free_irqs_common,
-> > +};
-> > +
-> > +static int __init imx_gpc_psci_init(struct device_node *node,
-> > +			=A0=A0=A0=A0=A0=A0=A0struct device_node *parent)
-> > +{
-> > +	struct irq_domain *parent_domain, *domain;
-> > +
-> > +	if (!parent) {
-> > +		pr_err("%s: no parent, giving up\n", node-
-> > >full_name);
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	parent_domain =3D irq_find_host(parent);
-> > +	if (!parent_domain) {
-> > +		pr_err("%s: unable to obtain parent domain\n",
-> > +			node->full_name);
-> > +		return -ENXIO;
-> > +	}
-> > +
-> > +	domain =3D irq_domain_add_hierarchy(parent_domain, 0,
-> > GPC_MAX_IRQS,
-> > +					=A0=A0node,
-> > &imx_gpc_psci_domain_ops,
-> > +					=A0=A0NULL);
-> > +	if (!domain)
-> > +		return -ENOMEM;
-> > +
-> > +	return 0;
-> > +}
-> > +IRQCHIP_DECLARE(imx_gpc_psci, "fsl,imx8mq-gpc", imx_gpc_psci_init);
-> > +
-> > +static int imx_gpc_pd_power_on(struct generic_pm_domain *domain)
-> > +{
-> > +	struct imx_gpc_pm_domain *pd =3D to_imx_gpc_pm_domain(domain);
-> > +	struct arm_smccc_res res;
-> > +	int index, ret =3D 0;
-> > +
-> > +	/* power on the external supply */
-> > +	if (pd->reg) {
-> > +		ret =3D regulator_enable(pd->reg);
-> > +		if (ret) {
-> > +			dev_warn(pd->dev, "failed to power up the
-> > reg%d\n", ret);
-> > +			return ret;
-> > +		}
-> > +	}
-> > +
-> > +	/* enable the necessary clks needed by the power domain */
-> > +	if (pd->num_clks) {
-> > +		for (index =3D 0; index < pd->num_clks; index++)
-> > +			clk_prepare_enable(pd->clks[index]);
-> > +	}
-> > +
-> > +	mutex_lock(&gpc_pd_mutex);
-> > +	arm_smccc_smc(FSL_SIP_GPC, FSL_SIP_CONFIG_GPC_PM_DOMAIN,
-> > +			pd->gpc_domain_id,
-> > +			GPC_PD_STATE_ON, 0, 0, 0, 0, &res);
-> > +	mutex_unlock(&gpc_pd_mutex);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int imx_gpc_pd_power_off(struct generic_pm_domain *domain)
-> > +{
-> > +	struct imx_gpc_pm_domain *pd =3D to_imx_gpc_pm_domain(domain);
-> > +	struct arm_smccc_res res;
-> > +	int index, ret =3D 0;
-> > +
-> > +	mutex_lock(&gpc_pd_mutex);
-> > +	arm_smccc_smc(FSL_SIP_GPC, FSL_SIP_CONFIG_GPC_PM_DOMAIN,
-> > +			pd->gpc_domain_id, GPC_PD_STATE_OFF,
-> > +			0, 0, 0, 0, &res);
-> > +	mutex_unlock(&gpc_pd_mutex);
-> > +
-> > +	/* power off the external supply */
-> > +	if (pd->reg) {
-> > +		ret =3D regulator_disable(pd->reg);
-> > +		if (ret) {
-> > +			dev_warn(pd->dev, "failed to power off the
-> > reg%d\n", ret);
-> > +			return ret;
-> > +		}
-> > +	}
-> > +
-> > +	/* disable the necessary clks when power domain on finished
-> > */
-> > +	if (pd->num_clks) {
-> > +		for (index =3D 0; index < pd->num_clks; index++)
-> > +			clk_disable_unprepare(pd->clks[index]);
-> > +	}
-> > +
-> > +	return ret;
-> > +};
-> > +
-> > +static int imx8m_pd_clk_init(struct device_node *np,
-> > +			=A0=A0=A0=A0=A0struct imx_gpc_pm_domain *domain)
-> > +{
-> > +	struct property *pp;
-> > +	struct clk **clks;
-> > +	int index;
-> > +
-> > +	pp =3D of_find_property(np, "clocks", NULL);
-> > +	if (pp)
-> > +		domain->num_clks =3D pp->length / 8;
-> > +	else
-> > +		domain->num_clks =3D 0;
-> > +
-> > +	if (domain->num_clks) {
-> > +		clks =3D kcalloc(domain->num_clks, sizeof(*clks),
-> > GFP_KERNEL);
-> > +		if (!clks) {
-> > +			domain->num_clks =3D 0;
-> > +			domain->clks =3D NULL;
-> > +			return -ENOMEM;
-> > +		}
-> > +
-> > +		domain->clks =3D clks;
-> > +	}
-> > +
-> > +	for (index =3D 0; index < domain->num_clks; index++) {
-> > +		clks[index] =3D of_clk_get(np, index);
-> > +		if (IS_ERR(clks[index])) {
-> > +			for (index =3D 0; index < domain->num_clks;
-> > index++) {
-> > +				if (!IS_ERR(clks[index]))
-> > +					clk_put(clks[index]);
-> > +			}
-> > +
-> > +			domain->num_clks =3D 0;
-> > +			domain->clks =3D NULL;
-> > +			kfree(clks);
-> > +			pr_warn("imx8m domain clock init failed\n");
-> > +			return -ENODEV;
-> > +		}
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int imx8m_add_subdomain(struct device_node *parent,
-> > +			=A0=A0=A0=A0=A0=A0=A0struct generic_pm_domain *parent_pd)
-> > +{
-> > +	struct device_node *child_node;
-> > +	struct imx_gpc_pm_domain *child_domain;
-> > +	int ret =3D 0;
-> > +
-> > +	/* add each of the child domain of parent */
-> > +	for_each_child_of_node(parent, child_node) {
-> > +		if (!of_device_is_available(child_node))
-> > +			continue;
-> > +
-> > +		child_domain =3D kzalloc(sizeof(*child_domain),
-> > GFP_KERNEL);
-> > +		if (!child_domain)
-> > +			return -ENOMEM;
-> > +
-> > +		ret =3D of_property_read_string(child_node, "domain-
-> > name",
-> > +					=A0=A0=A0=A0=A0=A0&child_domain-
-> > >pd.name);
-> > +		if (ret)
-> > +			goto exit;
-> > +
-> > +		ret =3D of_property_read_u32(child_node, "domain-id",
-> > +					=A0=A0=A0&child_domain-
-> > >gpc_domain_id);
-> > +		if (ret)
-> > +			goto exit;
-> > +
-> > +		child_domain->pd.power_off =3D imx_gpc_pd_power_off;
-> > +		child_domain->pd.power_on =3D imx_gpc_pd_power_on;
-> > +		/* no reg for subdomains */
-> > +		child_domain->reg =3D NULL;
-> > +
-> > +		imx8m_pd_clk_init(child_node, child_domain);
-> > +
-> > +		/* power domains as off at boot */
-> > +		pm_genpd_init(&child_domain->pd, NULL, true);
-> > +
-> > +		/* add subdomain of parent power domain */
-> > +		pm_genpd_add_subdomain(parent_pd, &child_domain-
-> > >pd);
-> > +
-> > +		ret =3D of_genpd_add_provider_simple(child_node,
-> > +						=A0&child_domain->pd);
-> > +		if (ret)
-> > +			pr_err("failed to add subdomain\n");
-> > +	}
-> > +
-> > +	return 0;
-> > +exit:
-> > +	kfree(child_domain);
-> > +	return ret;
-> > +};
-> > +
-> > +static int imx_gpc_pm_domain_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev =3D &pdev->dev;
-> > +	struct device_node *np =3D dev->of_node;
-> > +	struct imx_gpc_pm_domain *imx_pm_domain;
-> > +	int ret =3D 0;
-> > +
-> > +	if (!np) {
-> > +		dev_err(dev, "power domain device tree node not
-> > found\n");
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	imx_pm_domain =3D devm_kzalloc(dev, sizeof(*imx_pm_domain),
-> > GFP_KERNEL);
-> > +	if (!imx_pm_domain)
-> > +		return -ENOMEM;
-> > +	imx_pm_domain->dev =3D dev;
-> > +
-> > +	ret =3D of_property_read_string(np, "domain-name",
-> > +					&imx_pm_domain->pd.name);
-> > +	if (ret) {
-> > +		dev_err(dev, "get domain name failed\n");
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	ret =3D of_property_read_u32(np, "domain-id",
-> > +					&imx_pm_domain-
-> > >gpc_domain_id);
-> > +	if (ret) {
-> > +		dev_err(dev, "get domain id failed\n");
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	imx_pm_domain->reg =3D devm_regulator_get_optional(dev,
-> > "power");
-> > +	if (IS_ERR(imx_pm_domain->reg)) {
-> > +		if (PTR_ERR(imx_pm_domain->reg) =3D=3D -EPROBE_DEFER)
-> > +			return -EPROBE_DEFER;
-> > +
-> > +		imx_pm_domain->reg =3D NULL;
-> > +	}
-> > +
-> > +	imx8m_pd_clk_init(np, imx_pm_domain);
-> > +
-> > +	imx_pm_domain->pd.power_off =3D imx_gpc_pd_power_off;
-> > +	imx_pm_domain->pd.power_on =3D imx_gpc_pd_power_on;
-> > +	/* all power domains as off at boot */
-> > +	pm_genpd_init(&imx_pm_domain->pd, NULL, true);
-> > +
-> > +	ret =3D of_genpd_add_provider_simple(np,
-> > +				=A0&imx_pm_domain->pd);
-> > +
-> > +	/* add subdomain */
-> > +	ret =3D imx8m_add_subdomain(np, &imx_pm_domain->pd);
-> > +	if (ret)
-> > +		dev_warn(dev, "please check the child power domain
-> > init\n");
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id imx_gpc_pm_domain_ids[] =3D {
-> > +	{.compatible =3D "fsl,imx8mq-pm-domain"},
-> > +	{.compatible =3D "fsl,imx8mm-pm-domain"},
-> > +	{},
-> > +};
-> > +
-> > +static struct platform_driver imx_gpc_pm_domain_driver =3D {
-> > +	.driver =3D {
-> > +		.name	=3D "imx8m_gpc_pm_domain",
-> > +		.owner	=3D THIS_MODULE,
-> > +		.of_match_table =3D imx_gpc_pm_domain_ids,
-> > +	},
-> > +	.probe =3D imx_gpc_pm_domain_probe,
-> > +};
-> > +
-> > +module_platform_driver(imx_gpc_pm_domain_driver);
-> > +
-> > +MODULE_AUTHOR("NXP");
-> > +MODULE_DESCRIPTION("NXP i.MX8M GPC power domain driver");
-> > +MODULE_LICENSE("GPL v2");
-> > diff --git a/include/soc/imx/fsl_sip.h b/include/soc/imx/fsl_sip.h
-> > new file mode 100644
-> > index 0000000..c3867a2
-> > --- /dev/null
-> > +++ b/include/soc/imx/fsl_sip.h
-> > @@ -0,0 +1,31 @@
-> > +/*
-> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> > + * Copyright 2017 NXP
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#ifndef __SOC_FSL_SIP_H
-> > +#define __SOC_FSL_SIP_H
-> > +
-> > +#define FSL_SIP_GPC			0xC2000000
-> > +#define FSL_SIP_CONFIG_GPC_MASK		0x00
-> > +#define FSL_SIP_CONFIG_GPC_UNMASK	0x01
-> > +#define FSL_SIP_CONFIG_GPC_SET_WAKE	0x02
-> > +#define FSL_SIP_CONFIG_GPC_PM_DOMAIN	0x03
-> > +
-> > +#define IMX8MQ_PD_MIPI		0
-> > +#define IMX8MQ_PD_PCIE1		1
-> > +#define IMX8MQ_PD_OTG1		2
-> > +#define IMX8MQ_PD_OTG2		3
-> > +#define IMX8MQ_PD_GPU		4
-> > +#define IMX8MQ_PD_VPU		5
-> > +#define IMX8MQ_PD_HDMI		6
-> > +#define IMX8MQ_PD_DISP		7
-> > +#define IMX8MQ_PD_MIPI_CSI1	8
-> > +#define IMX8MQ_PD_MIPI_CSI2	9
-> > +#define IMX8MQ_PD_PCIE2		10
-> > +
-> > +#endif
+At the asm level this is just a sbfx, so it's hardly expensive.
+
+Cheers
+---Dave
+
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
