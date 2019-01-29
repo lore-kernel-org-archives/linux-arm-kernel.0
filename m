@@ -2,88 +2,167 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 62FD8C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 20:27:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4CA06C282D0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 20:39:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2F76D21473
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 20:27:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1899C2087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 20:39:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Cs48fZgP";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="kReRXwnN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F76D21473
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W8rKT2MB";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="tqu5iUkL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1899C2087E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=r2yCtW4rp43l92KqVO99xBnYgA+USAKPn9avYvxBNFY=; b=Cs48fZgP0CrGHL
-	zvJ6Me8ADwB8YvaW+RqrJCwD8DlN6k70jTH9iuJuSznBXK1BB8DKnho5S1BpAfC3dRXjKFFB8dUqE
-	JYdmjGyKK5oQJDu6m0Pge8IbGsFl4W5MC8/Dalp9Op6YKpfckaPaVO+fap5jQ2bZIGhdQEyHIRiZe
-	jeKDbCdrltTEZKopBNlLyU+L+L7fRZY7A1NvWRpu9U6VCL7/nu3I0M/XCL2Qhtukka3OfqjnBsLLS
-	K6B6AlpPp1yxHfWcVrZYgR7oVSo0QCmJP8RBxeF/fIYNnE4zWE4xyeUlJvwEg6nLIfb/YbAv0hluK
-	dLuj4zW+3+mLOiUj7ZDQ==;
+	List-Owner; bh=4TJxR8jHl8rMrleAuduGYKIzpe77wNDe3r6f22T7baU=; b=W8rKT2MB+K5Mzj
+	bmr/RL/IpWpvv3l55p3JZnBjEJ+s0+FY8ykhVzNwzg/BcqkxCG+lCqzsB/pYN3KT+XPLrS1uuNFbY
+	C/7h9zUz3o6I186q8AuV/Un1vRRNn8imjbjLBnI/FEwHE/c3E1WxQG2DyYpYBb8KMIpjbGHaxSXbd
+	X1SLyBTPeUkndn2U/4GCSictRu6WY8lwcwiNlUShmEKc3NAl4d5nigFJyhQKpvBWTnxF2O88NHcEf
+	Td1cQ2NPTd231hgoaTd8Vbgy/kS2ElSNYIpbeFnBltz4vwCbQD+avldK9o8vM/PtmBhmWnJ2ORIxh
+	0IOCDxuWbnku2bjetBnQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goZz3-0004tY-2O; Tue, 29 Jan 2019 20:27:49 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1goa9v-0008Hh-5p; Tue, 29 Jan 2019 20:39:03 +0000
+Received: from mail-eopbgr780071.outbound.protection.outlook.com
+ ([40.107.78.71] helo=NAM03-BY2-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goZyz-0004t5-Ff
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 20:27:47 +0000
-Received: by mail-pg1-x543.google.com with SMTP id j10so9259194pga.1
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 12:27:45 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=FcXX162GqhxYJvEtt0yO0BCjii24nkrvGMIFzvdDOIU=;
- b=kReRXwnNv9LdWNm9YCPt8kgqNiKnumGOhE3nk1ifJaU9YFoUPYUThUHCc/uGenOrZl
- Rsz6/DEbTIehqY2NJhGdHpyyE5h9HpTxUkyWD1iy3qfqym14NuD4JDGjYig5ONXLqcmK
- J20e2P7g+fAqwaeGD1nWEgpEdV2KNPls1dYg4=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=FcXX162GqhxYJvEtt0yO0BCjii24nkrvGMIFzvdDOIU=;
- b=SEftBmsbz4sXTjOVQtcy3/yIPJv/LKEYVf+94es4NbJW5XkO6vBnBVOcIcdL+PZlcV
- EpxuM+eBcGlF/2/iRUPtxbN+gUPG7e/FcJ+G2mRCs+gazfj2aV5Z69X2GrUFns/a4OBt
- usfGvlpyJBsBTobmAKLuDlTWfJiuVy9Z6itDK0T/aRTxjmO6s0jZaWa/DGLvP8ePmzM9
- Ho8qY3mQpeogfIflhYZJwUIEu2dgcgKLjp8ZPzgaWn10dD9QwOOOcw2/iEm3+mh/ZQdK
- gtEGg9rzhR24ZAYrkZqXqcQPkQTLs58TnqNaoze/0hJRQln+BHkFCUDyAc2meDhxNzd3
- 9MCg==
-X-Gm-Message-State: AJcUukfdLU+fDmrZtkNe1KVtXIMGPiTvjMOCQ9vP0INkJa7QYS3esJRu
- kNwbbg/lSUwB3qPVJlKhXFZl1g==
-X-Google-Smtp-Source: ALg8bN4ZtZ2R5A1iBrYut3stE1Zu34zmPfEZwJwEBlHcx8zHXSHsl0XDs2uQHOyK2tofLtOYQ0O0+A==
-X-Received: by 2002:a62:4181:: with SMTP id g1mr27587030pfd.45.1548793664269; 
- Tue, 29 Jan 2019 12:27:44 -0800 (PST)
-Received: from builder (104-188-17-28.lightspeed.sndgca.sbcglobal.net.
- [104.188.17.28])
- by smtp.gmail.com with ESMTPSA id 6sm78912651pfv.30.2019.01.29.12.27.42
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 29 Jan 2019 12:27:43 -0800 (PST)
-Date: Tue, 29 Jan 2019 12:27:26 -0800
-From: Bjorn Andersson <bjorn.andersson@linaro.org>
-To: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
-Subject: Re: [PATCH v2 2/2] phy: qualcomm: usb: Add Super-Speed PHY driver
-Message-ID: <20190129202726.GA3036@builder>
-References: <1548761715-4004-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <1548761715-4004-3-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ id 1goa9r-0008GR-BT
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 20:39:00 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=qOprgopWaThs2RZVQAxl3VL9bMTAW5QLsOWAa5YF6qc=;
+ b=tqu5iUkLXYAI1IcAE2J6FUsgP/dXaTlWxWCFrVTX6uql3wRfu3MUsoldD+Vf5OrCmCJCIby8lEMNf0foxhW+X1lC+YUi7b80tQuwgheEfX3Y9jU0/MntE2jpJ417Qf2Ai6N695hT7/g071OsL3O9ZxSQf7Q8m8Q9Dkps7hhQA0Q=
+Received: from MWHPR0201CA0036.namprd02.prod.outlook.com
+ (2603:10b6:301:74::49) by BYAPR02MB5015.namprd02.prod.outlook.com
+ (2603:10b6:a03:71::20) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1558.21; Tue, 29 Jan
+ 2019 20:38:54 +0000
+Received: from BL2NAM02FT053.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e46::207) by MWHPR0201CA0036.outlook.office365.com
+ (2603:10b6:301:74::49) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1558.18 via Frontend
+ Transport; Tue, 29 Jan 2019 20:38:54 +0000
+Authentication-Results: spf=pass (sender IP is 149.199.60.83)
+ smtp.mailfrom=xilinx.com; vger.kernel.org; dkim=none (message not signed)
+ header.d=none;vger.kernel.org; dmarc=bestguesspass action=none
+ header.from=xilinx.com;
+Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
+ 149.199.60.83 as permitted sender) receiver=protection.outlook.com;
+ client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
+Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
+ BL2NAM02FT053.mail.protection.outlook.com (10.152.76.225) with Microsoft SMTP
+ Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1580.10
+ via Frontend Transport; Tue, 29 Jan 2019 20:38:53 +0000
+Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
+ by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
+ (envelope-from <jolly.shah@xilinx.com>)
+ id 1goa9l-0007ir-5w; Tue, 29 Jan 2019 12:38:53 -0800
+Received: from [127.0.0.1] (helo=localhost)
+ by xsj-pvapsmtp01 with smtp (Exim 4.63)
+ (envelope-from <jolly.shah@xilinx.com>)
+ id 1goa9g-0007aV-24; Tue, 29 Jan 2019 12:38:48 -0800
+Received: from xsj-pvapsmtp01 (xsj-pvapsmtp01.xilinx.com [149.199.38.66])
+ by xsj-smtp-dlp1.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x0TKcaDj023880; 
+ Tue, 29 Jan 2019 12:38:36 -0800
+Received: from [172.19.2.91] (helo=xsjjollys50.xilinx.com)
+ by xsj-pvapsmtp01 with esmtp (Exim 4.63)
+ (envelope-from <jollys@xilinx.com>)
+ id 1goa9U-0007YY-G6; Tue, 29 Jan 2019 12:38:36 -0800
+From: Jolly Shah <jolly.shah@xilinx.com>
+To: <matthias.bgg@gmail.com>, <andy.gross@linaro.org>, <shawnguo@kernel.org>, 
+ <geert+renesas@glider.be>, <bjorn.andersson@linaro.org>,
+ <sean.wang@mediatek.com>, <m.szyprowski@samsung.com>,
+ <michal.simek@xilinx.com>, <robh+dt@kernel.org>, <mark.rutland@arm.com>
+Subject: [PATCH v6 1/3] dt-bindings: soc: Add ZynqMP PM bindings
+Date: Tue, 29 Jan 2019 12:38:19 -0800
+Message-ID: <1548794301-30483-2-git-send-email-jollys@xilinx.com>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1548794301-30483-1-git-send-email-jollys@xilinx.com>
+References: <1548794301-30483-1-git-send-email-jollys@xilinx.com>
+X-RCIS-Action: ALLOW
+X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
+X-TM-AS-User-Approved-Sender: Yes;Yes
+X-EOPAttributedMessage: 0
+X-MS-Office365-Filtering-HT: Tenant
+X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
+ SFV:NSPM;
+ SFS:(10009020)(136003)(39860400002)(376002)(396003)(346002)(2980300002)(199004)(189003)(110136005)(54906003)(50466002)(9786002)(14444005)(356004)(6666004)(36386004)(26005)(336012)(77096007)(186003)(51416003)(47776003)(48376002)(76176011)(7696005)(2201001)(426003)(106002)(72206003)(2906002)(81166006)(81156014)(39060400002)(8936002)(4326008)(478600001)(63266004)(36756003)(126002)(486006)(50226002)(16586007)(11346002)(476003)(305945005)(7416002)(44832011)(446003)(8676002)(106466001)(316002)(2616005)(107886003)(921003)(107986001)(83996005)(2101003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BYAPR02MB5015; H:xsj-pvapsmtpgw01; FPR:;
+ SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; A:1; MX:1; 
+X-Microsoft-Exchange-Diagnostics: 1; BL2NAM02FT053;
+ 1:POCAFKSG6rtF1FWIp+NTOASiJja8UpN4s9wSs+Sy7D0ApXaweFHQYd59oAXk0Rk8P2U1W4Hl7iWYbE5hVcpfE9g2rlKJM1Gdob9B2zTVylS9NGlBG1VVqZ24aootFmC4a/R8RMLMAfnJjykwdgCvLfws76AKPNYfE6Di1Oq5nOI=
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1548761715-4004-3-git-send-email-jorge.ramirez-ortiz@linaro.org>
-User-Agent: Mutt/1.10.0 (2018-05-17)
+X-MS-PublicTrafficType: Email
+X-MS-Office365-Filtering-Correlation-Id: 2f1bb559-a50a-495c-43e1-08d68629c8bf
+X-Microsoft-Antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4608076)(4709027)(2017052603328)(7153060);
+ SRVR:BYAPR02MB5015; 
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB5015;
+ 3:xqulMMTqnNMFMki4o5EtrJPUX9ljzrrxX6eqzXMdjP23rDFlOkTFv9S4yicSImkS+LVr11CoOYSh4npNSydvOMH8c58Idnbw9oeguBQKorFWK1FROhKKHekI1fFnP0m77ngEPOV4QgmwCx24MCeaXtIeTEcsAosoUxxiftcwfJez0jCH4c16g09Qwb3wpR2TL/6ggGoBnGr08DuT88vpQ4Hoo7U8JXfZuC7s1jL+xWGPONP4I6dExRi7c5A+Cv3O37kpK6hTpFQ3m7AId2sKytisNY2zbktJ10XXCxJZH7DVDsWknrp2RFMRD1UcwnDxSqhxu0JOWAIoGYK69bnPt1cHmXi1pyHmUqO4kmlz5hPMedn7cgUMe5trfeCJbSRq;
+ 25:UWclD4c8eFVGiZWTTo78n+dcrNGbJkBXX0Q4syJL3KMI+j4DvUXeTSNfGr16XdeIQ2WfjWHjE721pcsUvslZ/WT9bt+d85PFFjGVPmyZpwtFqAu2eADPXxPVSY64LTc9FafI9S8dJwxYKtN8xJXjC4NmqGSvMQVTIrTs3Jy+yoICxiG+oWMdTze9TCS7ju7KZYWTf7rqP0/Uyt9GNsapcd4yrVG6Oaa5Xnz4/+LB+MQgVZ/IO3wZ3Nkp0sikYUt8hwiAyvoPOAtjolEzDRL7KjOMTvQJ6+SkwcEYpHw7EkJqkc/r47Dj1QSCTfF/px9RGb/qucpH1ruzsaONyBh2OQ==
+X-MS-TrafficTypeDiagnostic: BYAPR02MB5015:
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB5015;
+ 31:FIyUNL5eHqKqjLDVaavhk/QWxbCs8pvVhFv/Z0lhDimwOO406ra6FyVo4WdFxVY1760+ym0tMEsWk2bulKYDlpg/JNulK+LOWSP9zVSRil1Ax+7loThT2+Dhd1LbahgydIjBOW5Le+CFKk5aEA3HUvM7OAg94PZGvjQKfEIVJ+T78+uKeovCVDD0IFuFnoEv+SVLNoabPP6fKMtj0AabOA1R8RpMCv2aX24vTXRzEsM=;
+ 20:2rbvtEwNXvU3U+auaTm/a1RaMS73Vn4Nim8NayGrbiW8iXzqlpGxz51VCWBc96BMV/TRbGUv68tMAs/NKokO5hLityZvg3PjlGVqaEmywE7OXjVfbnrrB3Ls+lQkSeWTHgAuqOTTCjBFaVbEumz9gtZnY+cqtjp9Wrq6rO69iLbLLgNtL7WLQKe/whjGMyNXpmuGtoNsHVvXlF5vd66XR5LwZ1eWezMJ+O3dZCWiTqxGYuErNRbjBnz4KYqVKqK9gKEyP//0L1RptF9QHlykfnSjE8RUn3T+p9UjdU6nfUPtNGmr4xujZ+cvcM9FPQNFzOjXKnSyXPKSz1XrqefL5aYTSaYbcidYATXFEtEG2aGBIbIK4JFctW66KaRieGAgXuul/clrhb9tKTHSysGpLoT+BCj62jJ2QhJt0umh+BXJ8JnQ1CIKn89KsIszK1ISJa1Q2Hop2QeJHTAir6DOfOIApNNlix+qhBjGgEDGt7MmhBi2x93H4uPoXgG5c7u+
+X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
+X-Microsoft-Antispam-PRVS: <BYAPR02MB5015A4896B4789ADDC52B629B8970@BYAPR02MB5015.namprd02.prod.outlook.com>
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB5015;
+ 4:71QEsivvk1w11vxpk2XKeQBl0xh0MXWHnh5FBP4mmt/+VFENH1ZDe4YqbEngOPrlYZrpybq+I6bKsXANWwdXJAaFTpDY+9Oh+D4WNQOS97Iu5C7Qbi0udaZnecKMLAUwdbEC1msy3oxJeA6pQ/iqvH5NmT5M5vxRTDL+S5a3yJv0lLGX5Yg4qDi4rv9yQDFk5I3SatJkhxBat72kFjVhNhJmU/zWk/0eWiPCglj65b2OAY9YlqGaswKWNf5/0D3JvcHQpnhZHD3FMIWtmMqdyUXoek/Ro+ChFqmQrXzm9EZf3ytlJdC58zzgTPah7AJr
+X-Forefront-PRVS: 093290AD39
+X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; BYAPR02MB5015;
+ 23:sCjkHXAjrszm/JgxEAfSFNGaUKQbz1sDG0vaTp9p5?=
+ =?us-ascii?Q?TL+JGV48KZI0dMQv8e+j9c7LS2g2oGFEh4gqKbnmzBu+zJpuK5yzkUXReT5v?=
+ =?us-ascii?Q?QtNqtmKYbQbVPA7Jy5VxOVY/Q75mEKk0jxyRQFvVpQ/0BnRyyT8Qi8ygrzBC?=
+ =?us-ascii?Q?2GcYryrPZaRHcm8DoQ1/MlBkDjrltJBaBLR2ri8c0t78MtQrMfZDTG6V9XWG?=
+ =?us-ascii?Q?LWkJdEi5qorPZ5Uonteb+kiMwNW3GzdG4Zj3/km6xC9ZA++V986UnSzduN91?=
+ =?us-ascii?Q?Pt176qGQ8N7AYJvB8qAogo5/BhPKY71OV2COvPo0yA0XJtFoc5puOHHNBAs4?=
+ =?us-ascii?Q?/3qnljDhsVOyKtxbLUMcydfolHvs4/vNaWkvb8PApdHcBg1Mh85FeWFty5es?=
+ =?us-ascii?Q?jOnKWc0v4fSyo+31gnC1iLG8mU7ePNaHwWeLwCdPDvpSb8PIUuCqsq9xJShR?=
+ =?us-ascii?Q?qkoXLUoN8p0BzWWtUtEVBxxXGLhSfcDTnxH05TV2q9nwHtfj9CQStujVSmGZ?=
+ =?us-ascii?Q?AJ4wtQ+Y7X7nriJlhhd/nErDX2G5WxgwpZUzDs+GdhTgo++vDEIBuhzLlUif?=
+ =?us-ascii?Q?RKN11J10eb+/FKydiwrGsvOQv/GCmQwlTsyFZwuZGxsrTGzcW9lvHMd5H3El?=
+ =?us-ascii?Q?9/aDaQSxZ2zX3zBd/ADIY36ITdaxyYIeXYrPvGGUKkRY+4028mlnwgUncb7M?=
+ =?us-ascii?Q?xhP2gMA2zxKBI+Nzp859nO7An/Hv5tqpXqEDGbvE+kxIuIIIJy+mMCVPAIz+?=
+ =?us-ascii?Q?eA8lkwVgBHh206NRDIUi9JmyXdh3QfDNB3amMGXLoVxYbUbhMXofUtibqJZV?=
+ =?us-ascii?Q?E9qelfpR4y1b42jRDOV0pnYpJnLchfI+wOKXYZWbYDoe1RgYBmMo1vnxVyih?=
+ =?us-ascii?Q?hDo3bXpVgZqJoH7utmCbyr7tZlcQH+pjm9Rr8mMr0JBqFnJD1ws8j9J/3EtV?=
+ =?us-ascii?Q?hGbPsB7FVhJelWRXhXBteZauxxxeHZ3/cyB40eK3pfwH9DhbEz8uF01DmRmT?=
+ =?us-ascii?Q?//YBPtFl2gfXPS9u1zVuXM8+zZ5N+ZQBhTktQNAqrVy5m7YVbKUr2HK86kUo?=
+ =?us-ascii?Q?DgD5oLohigeeCVGLxCR8lPdUbn9ZZiaF6W91z1BQcq+NdJg7htVULZQjGGF5?=
+ =?us-ascii?Q?vstJvvq5lKdt9y9U2yRIvZSDe7P6fCRzjNhPxWOqkxv8ekWVP0wLOxIghKzu?=
+ =?us-ascii?Q?0uiY2dkCVua1gVN43vcsXVEinC27Q4VDt8DaXsAQqlo/h5NY8Xd+BIRNgDcS?=
+ =?us-ascii?Q?KubUoVFHnxDBFElD0ScRwQOU87WjR/Ruivy8Sqp?=
+X-MS-Exchange-SenderADCheck: 1
+X-Microsoft-Antispam-Message-Info: Lz9uBC17GnLo2+WJIwuyBSpCbFN+776JYKzos1ZZA//vAWnv+OvJalq+sAUb0VGBYLsTk36V9VffRdpBlzpc+zVY5B5ZiEsscyBqWMIsJh5yMDwaVApRzxJHyip1wr7roylBOQcizisqXzey1vAf6YbD9j4CSMnGH7ygZYLBJtkgX0oQs7YkzwRfRjSCDlY+NI5yxp+blNmJBJjf40IpD/69PWkLrGGAmPaJBOP2h6KUSKoHAUkiT8XdPq37bPrc5sXbpKMGfHIjQNjNgwL4k44sI2ov1bJ9ZBu5+P4MT+vfVpjJRSuJCHK4QlkhCR6Ils2P3IdzRWW3GiVYpO0l624CgwjMV8/yzeFlBsDiNAVrN0yY18aheqAivjAmuidbOXI334kEFhBmuv5jQdSqi9pkRgGoddzrPF2xqdWBGn0=
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB5015;
+ 6:rgMjsvJB6osaP2MhHiLCGLrBtWl5m7oK7KPbDW+Q701/L/EJpMTr96TdKjmpaQLFPjhpjlFOP95Ya5duSX69to3iHJ+fH3Yj6y9fZ56UgV+axinof0jsTlqJC37iz+4ec2IoezZQrg5WEprdCVjfk9BCOGZntCP5HBhArq+RbCv7PfzikteaVxHNaEtFO2PzwalBkQkNuiDs5NxO23WMR+qAg21fknV24VPwjzmwUJ1msaMVAWxfqaPJcoAdoUPOfb294toIDYVOhcfLpoBjm0puAP6shJowAXXCu3knKLtdb6GDQCRJCarfTThALFmcbQQuWBjDPTgNqMt88NeMLU0VEhdo5PogdaE9Siefa+f4qz+emMMpMZ1eClDk6rA7PLD26Wu4mNFJWgSuvV+dSuAaQYMyx1HVfrz6Uemy7hNFwlUt6NgWVWQfVGZ2Wlq0eNrMTb+siNrun+j6BKrThw==;
+ 5:bLLx/goqcrM4QW7bM971L0psO2vgFGRlE24Cc5DufbuxTUdxeQzgyRRSEzuXtNEsuiZMvKRMPHTW2GDaXYR2crh+7zxTrvh+P0C75lnAik3iG6WXrAFs5XbeZgN8VKhKNPrWH2D1HTHZyc1b98c/Qtx8sI1RZnbKY5CaLANyP1EfOp4JMLAWdH0BrFg5GOm3Fz+uzz9rUIGbifCs1381sQ==;
+ 7:H0vZEW1aX/AQZTZR5r7ao02SlVEIoHVKL0S22FFHN00FyTWT4CGTS8WIMTX0oeyz1sWzvS9uDohomXImU683ga63MrfknVKNIB9JtzadDo04gLrVR/XcpBgkyYAGQbQwpNQkaPoQZgs+kMvWwBhrfg==
+X-OriginatorOrg: xilinx.com
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 29 Jan 2019 20:38:53.7511 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 2f1bb559-a50a-495c-43e1-08d68629c8bf
+X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
+ Helo=[xsj-pvapsmtpgw01]
+X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BYAPR02MB5015
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_122745_536167_54F73EA4 
-X-CRM114-Status: GOOD (  22.43  )
+X-CRM114-CacheID: sfid-20190129_123859_400249_1164E483 
+X-CRM114-Status: UNSURE (   9.98  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,287 +174,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, jackp@codeaurora.org,
- shawn.guo@linaro.org, gregkh@linuxfoundation.org, linux-usb@vger.kernel.org,
- khasim.mohammed@linaro.org, linux-kernel@vger.kernel.org, swboyd@chromium.org,
- vkoul@kernel.org, linux-arm-msm@vger.kernel.org, andy.gross@linaro.org,
- kishon@ti.com, linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, Rajan Vaja <rajan.vaja@xilinx.com>,
+ linux-kernel@vger.kernel.org, Jolly Shah <jollys@xilinx.com>,
+ rajanv@xilinx.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue 29 Jan 03:35 PST 2019, Jorge Ramirez-Ortiz wrote:
-> diff --git a/drivers/phy/qualcomm/phy-qcom-usb-ss.c b/drivers/phy/qualcomm/phy-qcom-usb-ss.c
-> new file mode 100644
-> index 0000000..e6ae96e
-> --- /dev/null
-> +++ b/drivers/phy/qualcomm/phy-qcom-usb-ss.c
-> @@ -0,0 +1,347 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (c) 2012-2014,2017 The Linux Foundation. All rights reserved.
-> + * Copyright (c) 2018, Linaro Limited
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/phy/phy.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <linux/reset.h>
-> +#include <linux/slab.h>
-> +
-> +#define PHY_CTRL0			0x6C
-> +#define PHY_CTRL1			0x70
-> +#define PHY_CTRL2			0x74
-> +#define PHY_CTRL4			0x7C
-> +
-> +/* PHY_CTRL bits */
-> +#define REF_PHY_EN			BIT(0)
-> +#define LANE0_PWR_ON			BIT(2)
-> +#define SWI_PCS_CLK_SEL			BIT(4)
-> +#define TST_PWR_DOWN			BIT(4)
-> +#define PHY_RESET			BIT(7)
-> +
-> +enum phy_vdd_ctrl { ENABLE, DISABLE, };
+From: Rajan Vaja <rajan.vaja@xilinx.com>
 
-Use bool to describe boolean values.
+Add documentation to describe Xilinx ZynqMP power management
+bindings.
 
-> +enum phy_regulator { VDD, VDDA1P8, };
+Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
+Signed-off-by: Jolly Shah <jollys@xilinx.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ .../bindings/power/reset/xlnx,zynqmp-power.txt     | 25 ++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt
 
-It doesn't look like you need either of these if you remove the
-set_voltage calls.
+diff --git a/Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt b/Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt
+new file mode 100644
+index 0000000..d366f1e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt
+@@ -0,0 +1,25 @@
++--------------------------------------------------------------------
++Device Tree Bindings for the Xilinx Zynq MPSoC Power Management
++--------------------------------------------------------------------
++The zynqmp-power node describes the power management configurations.
++It will control remote suspend/shutdown interfaces.
++
++Required properties:
++ - compatible:		Must contain:	"xlnx,zynqmp-power"
++ - interrupts:		Interrupt specifier
++
++-------
++Example
++-------
++
++firmware {
++	zynqmp_firmware: zynqmp-firmware {
++		compatible = "xlnx,zynqmp-firmware";
++		method = "smc";
++
++		zynqmp_power: zynqmp-power {
++			compatible = "xlnx,zynqmp-power";
++			interrupts = <0 35 4>;
++		};
++	};
++};
+-- 
+2.7.4
 
-> +
-> +struct ssphy_priv {
-> +	void __iomem *base;
-> +	struct device *dev;
-> +	struct reset_control *reset_com;
-> +	struct reset_control *reset_phy;
-> +	struct regulator *vbus;
-> +	struct regulator_bulk_data *regs;
-> +	int num_regs;
-> +	struct clk_bulk_data *clks;
-> +	int num_clks;
-> +	enum phy_mode mode;
-> +};
-> +
-> +static inline void qcom_ssphy_updatel(void __iomem *addr, u32 mask, u32 val)
-> +{
-> +	writel((readl(addr) & ~mask) | val, addr);
-> +}
-> +
-> +static inline int qcom_ssphy_vbus_enable(struct regulator *vbus)
-> +{
-> +	return !regulator_is_enabled(vbus) ? regulator_enable(vbus) : 0;
-
-regulator_is_enabled() will check if the actual regulator is on, not if
-you already voted for it.
-
-So if something else is enabling the vbus regulator you will skip your
-enable and be in the mercy of them not releasing it. Presumably there's
-only one consumer of this particular regulator, but it's a bad habit.
-
-Please keep track of this drivers requested state in this driver, if
-qcom_ssphy_vbus_ctrl() is called not only for the state changes.
-
-> +}
-> +
-> +static inline int qcom_ssphy_vbus_disable(struct regulator *vbus)
-> +{
-> +	return regulator_is_enabled(vbus) ? regulator_disable(vbus) : 0;
-> +}
-> +
-> +static int qcom_ssphy_vdd_ctrl(struct ssphy_priv *priv, enum phy_vdd_ctrl ctrl)
-
-As discussed on IRC, I think you should just leave the voltage
-constraints to DeviceTree.
-
-> +{
-> +	const int vdd_min = ctrl == ENABLE ? 1050000 : 0;
-> +	const int vdd_max = 1050000;
-> +	int ret;
-> +
-> +	ret = regulator_set_voltage(priv->regs[VDD].consumer, vdd_min, vdd_max);
-> +	if (ret)
-> +		dev_err(priv->dev, "Failed to set regulator vdd to %d\n",
-> +			vdd_min);
-> +
-> +	return ret;
-> +}
-[..]
-> +static int qcom_ssphy_power_on(struct phy *phy)
-> +{
-> +	struct ssphy_priv *priv = phy_get_drvdata(phy);
-> +	int ret;
-> +
-> +	ret = qcom_ssphy_vdd_ctrl(priv, ENABLE);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = regulator_bulk_enable(priv->num_regs, priv->regs);
-> +	if (ret)
-> +		goto err1;
-> +
-> +	ret = clk_bulk_prepare_enable(priv->num_clks, priv->clks);
-> +	if (ret)
-> +		goto err2;
-> +
-> +	ret = qcom_ssphy_vbus_ctrl(priv->vbus, priv->mode);
-> +	if (ret)
-> +		goto err3;
-> +
-> +	ret = qcom_ssphy_do_reset(priv);
-> +	if (ret)
-> +		goto err4;
-> +
-> +	writeb(SWI_PCS_CLK_SEL, priv->base + PHY_CTRL0);
-> +	qcom_ssphy_updatel(priv->base + PHY_CTRL4, LANE0_PWR_ON, LANE0_PWR_ON);
-> +	qcom_ssphy_updatel(priv->base + PHY_CTRL2, REF_PHY_EN, REF_PHY_EN);
-> +	qcom_ssphy_updatel(priv->base + PHY_CTRL4, TST_PWR_DOWN, 0);
-> +
-> +	return 0;
-> +err4:
-
-Name your labels based on what they do, e.g. err_disable_vbus.
-
-> +	if (priv->vbus && priv->mode != PHY_MODE_INVALID)
-> +		qcom_ssphy_vbus_disable(priv->vbus);
-
-qcom_ssphy_vbus_ctrl() above was either enabling or disabling vbus, but
-here you're directly calling disable to unroll that. It think the result
-is correct (in host this reverts to disabled and in gadget it's a
-no-op), but I'm not sure I like the design of sometimes calling straight
-to the vbus enable/disable and sometimes to the wrapper function.
-
-> +err3:
-
-err_clk_disable
-
-> +	clk_bulk_disable_unprepare(priv->num_clks, priv->clks);
-> +err2:
-> +	regulator_bulk_disable(priv->num_regs, priv->regs);
-> +err1:
-> +	qcom_ssphy_vdd_ctrl(priv, DISABLE);
-> +
-> +	return ret;
-> +}
-> +
-> +static int qcom_ssphy_power_off(struct phy *phy)
-> +{
-> +	struct ssphy_priv *priv = phy_get_drvdata(phy);
-> +
-> +	qcom_ssphy_updatel(priv->base + PHY_CTRL4, LANE0_PWR_ON, 0);
-> +	qcom_ssphy_updatel(priv->base + PHY_CTRL2, REF_PHY_EN, 0);
-> +	qcom_ssphy_updatel(priv->base + PHY_CTRL4, TST_PWR_DOWN, TST_PWR_DOWN);
-> +
-> +	clk_bulk_disable_unprepare(priv->num_clks, priv->clks);
-> +	regulator_bulk_disable(priv->num_regs, priv->regs);
-> +
-> +	if (priv->vbus && priv->mode != PHY_MODE_INVALID)
-> +		qcom_ssphy_vbus_disable(priv->vbus);
-> +
-> +	qcom_ssphy_vdd_ctrl(priv, DISABLE);
-> +
-> +	return 0;
-> +}
-> +
-> +static int qcom_ssphy_init_clock(struct ssphy_priv *priv)
-> +{
-> +	const char * const clk_id[] = { "ref", "phy", "pipe", };
-> +	int i;
-> +
-> +	priv->num_clks = ARRAY_SIZE(clk_id);
-> +	priv->clks = devm_kcalloc(priv->dev, priv->num_clks,
-> +				  sizeof(*priv->clks), GFP_KERNEL);
-
-You know num_clks is 3, so I would suggest that you just change the
-sshphy_priv to clks[3] and skip the dynamic allocation.
-
-
-Also, as num_clks always is ARRAY_SIZE(priv->clks) I would suggest using
-the latter, to make that clear throughout the driver.
-
-> +	if (!priv->clks)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < priv->num_clks; i++)
-> +		priv->clks[i].id = clk_id[i];
-
-There's no harm in just writing this on three lines:
-
-	priv->clks[0].id = "ref";
-	priv->clks[1].id = "phy";
-	priv->clks[2].id = "pipe";
-
-> +
-> +	return devm_clk_bulk_get(priv->dev, priv->num_clks, priv->clks);
-> +}
-> +
-> +static int qcom_ssphy_init_regulator(struct ssphy_priv *priv)
-> +{
-> +	const char * const reg_supplies[] = {
-> +		[VDD] = "vdd",
-> +		[VDDA1P8] = "vdda1p8",
-> +	};
-> +	int ret, i;
-> +
-> +	priv->num_regs = ARRAY_SIZE(reg_supplies);
-> +	priv->regs = devm_kcalloc(priv->dev, priv->num_regs,
-> +				  sizeof(*priv->regs), GFP_KERNEL);
-
-As with clocks, you know there will only be 2 of these, make it fixed
-size in ssphy_priv.
-
-And as with clocks, I would suggest using ARRAY_SIZE(priv->regs)
-throughout the driver to make it obvious that's it's a static number. 
-
-> +	if (!priv->regs)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < priv->num_regs; i++)
-> +		priv->regs[i].supply = reg_supplies[i];
-
-As with clocks, just unroll this and fill in the 2 supplies directly.
-
-> +
-> +	ret = devm_regulator_bulk_get(priv->dev, priv->num_regs, priv->regs);
-> +	if (ret)
-> +		return ret;
-> +
-> +	priv->vbus = devm_regulator_get_optional(priv->dev, "vbus");
-
-get_optional means that if vbus-supply is not found, rather than
-returning a dummy regulator object this will fail with -ENODEV.
-
-Given the rest of the logic related to vbus you should set vbus to NULL
-if the returned PTR_ERR(value) is -ENODEV, and fail for other errors.
-
-
-Or just drop the _optional, and let your vbus controls operate on the
-dummy regulator you get back.
-
-(Right now vbus can't be NULL, so these checks are not very useful)
-
-> +	if (IS_ERR(priv->vbus))
-> +		return PTR_ERR(priv->vbus);
-> +
-> +	return 0;
-
-return PTR_ERR_OR_ZERO(priv->vbus)
-
-(Although that might change based on above comment)
-
-> +}
-
-Regards,
-Bjorn
 
 _______________________________________________
 linux-arm-kernel mailing list
