@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BFF7DC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:52:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AD1D9C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:53:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 744C320844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:52:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7F8F020844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:53:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iZCBBW7i"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 744C320844
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CVJIkGpK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7F8F020844
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2/FpSWZXuTu9OOhVc2SmRgAmcsXK16ed+6ziVLnAxyQ=; b=iZCBBW7i9pl41v
-	yprJ8SfA5+t9c2np5OPwCr44KSiLzjzH4Uwx+DhPwwPWXSWUvnwXhyVxcRwnpQFYRyvsiwQiRash1
-	X7LHZPOhw3e0fg3l2CV8SgVm5sVXp72PSdjCCxMbQzjEvlEWnOPIedQ9siILl+M7c9VyVBRfmFc/n
-	5/USIVoGEGgpWpRbAKsfP/NW+/sFwxzfmfC52FiqXNCQN4amvOlgwK1Srp4VYVv/s/GLKv8Eplttp
-	PlJZMh+O/knH7+RPh2gpaeNFYBiFKrosQgOf5mPjQo3pz/Bghve6bKKbOW8N6ob52ltKvcP6M/QWB
-	bOJM+KlZ1ykjh6axpFDA==;
+	List-Owner; bh=ctJZeN3GZY96m/bq5nhkRJtYwoexveOk4fDFkvqszvw=; b=CVJIkGpK+Bz/CH
+	RZQaANVS7qD5i0z7CGBke4wTWKQ9t7DbGmm+ltFERxxlP92VRxHTs+Rq4mHRMlXMVJ2itDa1vp1qk
+	zjIyfh/gyprPI5zZ8UvRdENhr4x3UGH5vzRXIUzRn1wRA1exUqxTNlpeXPU+g3mlcyjYJbWdhDwl+
+	JaRbaZ9LB9mgOwN5JTN0WddHZvOGSW26WL+cG5hgMq2wRXJ5SyFG578kRDi8pbgt8G+lMCfv999WB
+	0BeykQIC6GAVA75kLx/12sHy39TCYzmPsvdR46uHT9q/4CA9HmNc8PHjXleSnh+WHlWVRjwPRHoKr
+	vsj771btCqDFBnHoZqgw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goYV1-0000mz-GD; Tue, 29 Jan 2019 18:52:43 +0000
+	id 1goYVO-0001C2-O4; Tue, 29 Jan 2019 18:53:06 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goYSc-0006Hp-Gg
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 18:50:27 +0000
+ id 1goYST-0005qk-Iq
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 18:50:12 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id ADFF21596;
- Tue, 29 Jan 2019 10:50:13 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EA8C41596;
+ Tue, 29 Jan 2019 10:50:04 -0800 (PST)
 Received: from eglon.cambridge.arm.com (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 0D7D83F557;
- Tue, 29 Jan 2019 10:50:10 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 48CA03F557;
+ Tue, 29 Jan 2019 10:50:02 -0800 (PST)
 From: James Morse <james.morse@arm.com>
 To: linux-acpi@vger.kernel.org
-Subject: [PATCH v8 12/26] ACPI / APEI: Switch NOTIFY_SEA to use the estatus
- queue
-Date: Tue, 29 Jan 2019 18:48:48 +0000
-Message-Id: <20190129184902.102850-13-james.morse@arm.com>
+Subject: [PATCH v8 09/26] ACPI / APEI: Generalise the estatus queue's notify
+ code
+Date: Tue, 29 Jan 2019 18:48:45 +0000
+Message-Id: <20190129184902.102850-10-james.morse@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190129184902.102850-1-james.morse@arm.com>
 References: <20190129184902.102850-1-james.morse@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_105015_068775_187CE9D9 
-X-CRM114-Status: GOOD (  18.49  )
+X-CRM114-CacheID: sfid-20190129_105005_999833_88FD9BA5 
+X-CRM114-Status: GOOD (  14.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,114 +82,125 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Now that the estatus queue can be used by more than one notification
-method, we can move notifications that have NMI-like behaviour over.
+Refactor the estatus queue's pool notification routine from
+NOTIFY_NMI's handlers. This will allow another notification
+method to use the estatus queue without duplicating this code.
 
-Switch NOTIFY_SEA over to use the estatus queue. This makes it behave
-in the same way as x86's NOTIFY_NMI.
+Add rcu_read_lock()/rcu_read_unlock() around the list
+list_for_each_entry_rcu() walker. These aren't strictly necessary as
+the whole nmi_enter/nmi_exit() window is a spooky RCU read-side
+critical section.
 
-Remove Kconfig's ability to turn ACPI_APEI_SEA off if ACPI_APEI_GHES
-is selected. This roughly matches the x86 NOTIFY_NMI behaviour, and means
-each architecture has at least one user of the estatus-queue, meaning it
-doesn't need guarding with ifdef.
+in_nmi_queue_one_entry() is separate from the rcu-list walker for a
+later caller that doesn't need to walk a list.
 
 Signed-off-by: James Morse <james.morse@arm.com>
----
-Changes since v6:
- * Lost all the pool grow/shrink stuff,
- * Changed Kconfig so this can't be turned off to avoid kconfig complexity:
- * Dropped Tyler's tested-by.
- * For now we need #ifdef around the SEA code as the arch code assumes its there.
- * Removed Punit's reviewed-by due to the swirling #ifdeffery
----
- drivers/acpi/apei/Kconfig | 12 +-----------
- drivers/acpi/apei/ghes.c  | 22 +++++-----------------
- 2 files changed, 6 insertions(+), 28 deletions(-)
+Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
+Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
 
-diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-index 52ae5438edeb..6b18f8bc7be3 100644
---- a/drivers/acpi/apei/Kconfig
-+++ b/drivers/acpi/apei/Kconfig
-@@ -41,19 +41,9 @@ config ACPI_APEI_PCIEAER
- 	  Turn on this option to enable the corresponding support.
- 
- config ACPI_APEI_SEA
--	bool "APEI Synchronous External Abort logging/recovering support"
-+	bool
- 	depends on ARM64 && ACPI_APEI_GHES
- 	default y
--	help
--	  This option should be enabled if the system supports
--	  firmware first handling of SEA (Synchronous External Abort).
--	  SEA happens with certain faults of data abort or instruction
--	  abort synchronous exceptions on ARMv8 systems. If a system
--	  supports firmware first handling of SEA, the platform analyzes
--	  and handles hardware error notifications from SEA, and it may then
--	  form a HW error record for the OS to parse and handle. This
--	  option allows the OS to look for such hardware error record, and
--	  take appropriate action.
- 
- config ACPI_APEI_MEMORY_FAILURE
- 	bool "APEI memory error recovering support"
+---
+Changes since v7:
+ * Moved err= onto a separate line to make this more readable
+ * Dropped ghes_ prefix on new static functions
+ * Renamed stuff, 'notify' has an overloaded meaning,
+
+Changes since v6:
+ * Removed pool grow/remove code as this is no longer necessary.
+
+Changes since v3:
+ * Removed duplicate or redundant paragraphs in commit message.
+ * Fixed the style of a zero check.
+Changes since v1:
+   * Tidied up _in_nmi_notify_one().
+---
+ drivers/acpi/apei/ghes.c | 65 ++++++++++++++++++++++++++--------------
+ 1 file changed, 43 insertions(+), 22 deletions(-)
+
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 576dce29159d..ab794ab29554 100644
+index af3c10f47f20..cb3d88de711f 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -767,7 +767,6 @@ static struct notifier_block ghes_notifier_hed = {
- 	.notifier_call = ghes_notify_hed,
- };
+@@ -912,37 +912,58 @@ static void __process_error(struct ghes *ghes)
+ #endif
+ }
  
--#ifdef CONFIG_HAVE_ACPI_APEI_NMI
- /*
-  * Handlers for CPER records may not be NMI safe. For example,
-  * memory_failure_queue() takes spinlocks and calls schedule_work_on().
-@@ -904,7 +903,6 @@ static int ghes_in_nmi_spool_from_list(struct list_head *rcu_list)
+-static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
++static int ghes_in_nmi_queue_one_entry(struct ghes *ghes)
+ {
+ 	u64 buf_paddr;
+-	struct ghes *ghes;
+-	int sev, ret = NMI_DONE;
++	int sev;
  
+-	if (!atomic_add_unless(&ghes_in_nmi, 1, 1))
+-		return ret;
++	if (ghes_read_estatus(ghes, &buf_paddr)) {
++		ghes_clear_estatus(ghes, buf_paddr);
++		return -ENOENT;
++	}
+ 
+-	list_for_each_entry_rcu(ghes, &ghes_nmi, list) {
+-		if (ghes_read_estatus(ghes, &buf_paddr)) {
+-			ghes_clear_estatus(ghes, buf_paddr);
+-			continue;
+-		} else {
+-			ret = NMI_HANDLED;
+-		}
++	sev = ghes_severity(ghes->estatus->error_severity);
++	if (sev >= GHES_SEV_PANIC) {
++		ghes_print_queued_estatus();
++		__ghes_panic(ghes, buf_paddr);
++	}
+ 
+-		sev = ghes_severity(ghes->estatus->error_severity);
+-		if (sev >= GHES_SEV_PANIC) {
+-			ghes_print_queued_estatus();
+-			__ghes_panic(ghes, buf_paddr);
+-		}
++	__process_error(ghes);
++	ghes_clear_estatus(ghes, buf_paddr);
+ 
+-		__process_error(ghes);
+-		ghes_clear_estatus(ghes, buf_paddr);
++	return 0;
++}
++
++static int ghes_in_nmi_spool_from_list(struct list_head *rcu_list)
++{
++	int err, ret = -ENOENT;
++	struct ghes *ghes;
++
++	rcu_read_lock();
++	list_for_each_entry_rcu(ghes, rcu_list, list) {
++		err = ghes_in_nmi_queue_one_entry(ghes);
++		if (!err)
++			ret = 0;
+ 	}
++	rcu_read_unlock();
+ 
+-#ifdef CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG
+-	if (ret == NMI_HANDLED)
++	if (IS_ENABLED(CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG) && !ret)
+ 		irq_work_queue(&ghes_proc_irq_work);
+-#endif
++
++	return ret;
++}
++
++static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
++{
++	int err, ret = NMI_DONE;
++
++	if (!atomic_add_unless(&ghes_in_nmi, 1, 1))
++		return ret;
++
++	err = ghes_in_nmi_spool_from_list(&ghes_nmi);
++	if (!err)
++		ret = NMI_HANDLED;
++
+ 	atomic_dec(&ghes_in_nmi);
  	return ret;
  }
--#endif /* CONFIG_HAVE_ACPI_APEI_NMI */
- 
- #ifdef CONFIG_ACPI_APEI_SEA
- static LIST_HEAD(ghes_sea);
-@@ -915,16 +913,7 @@ static LIST_HEAD(ghes_sea);
-  */
- int ghes_notify_sea(void)
- {
--	struct ghes *ghes;
--	int ret = -ENOENT;
--
--	rcu_read_lock();
--	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
--		if (!ghes_proc(ghes))
--			ret = 0;
--	}
--	rcu_read_unlock();
--	return ret;
-+	return ghes_in_nmi_spool_from_list(&ghes_sea);
- }
- 
- static void ghes_sea_add(struct ghes *ghes)
-@@ -992,16 +981,15 @@ static void ghes_nmi_remove(struct ghes *ghes)
- 	 */
- 	synchronize_rcu();
- }
-+#else /* CONFIG_HAVE_ACPI_APEI_NMI */
-+static inline void ghes_nmi_add(struct ghes *ghes) { }
-+static inline void ghes_nmi_remove(struct ghes *ghes) { }
-+#endif /* CONFIG_HAVE_ACPI_APEI_NMI */
- 
- static void ghes_nmi_init_cxt(void)
- {
- 	init_irq_work(&ghes_proc_irq_work, ghes_proc_in_irq);
- }
--#else /* CONFIG_HAVE_ACPI_APEI_NMI */
--static inline void ghes_nmi_add(struct ghes *ghes) { }
--static inline void ghes_nmi_remove(struct ghes *ghes) { }
--static inline void ghes_nmi_init_cxt(void) { }
--#endif /* CONFIG_HAVE_ACPI_APEI_NMI */
- 
- static int ghes_probe(struct platform_device *ghes_dev)
- {
 -- 
 2.20.1
 
