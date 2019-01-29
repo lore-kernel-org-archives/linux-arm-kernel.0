@@ -3,61 +3,62 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,USER_AGENT_NEOMUTT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6FBBDC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:09:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9870AC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:10:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 35E352084A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:09:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 631022084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:10:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qdhhK+CH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35E352084A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pO15D1/R"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 631022084A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=TrY6UHIIqQNjF4a9hLdvZKixgGrC/3bw0AW31yGVIW4=; b=qdhhK+CHeftXu/sE9cgGKN+UO
-	1pSw9SWeXo+aC0YqjvaE1j3XrT07aqFdsgz8XOtDbwfAnnoEBV1evwIpoGZuQGbyQNUyRUb0FKGEk
-	rC5Kcey4uQrXEFm4rgPpM6Or9baN7xcSz0HMamqr0hzqGarCBOph4cAx1uq31rRaVwMBA0hV3oqkM
-	XhpEK80ztMup4CQQOA0aFepM8iIXFPkE8eH8KW0A7Sn6+8mkAjHeuKkyzumyLx8qMEyTByxQDOIdv
-	3rN2TIFUr+1y3ytSqQgQ1SNtYCpNSIZmKY/1OmoJ9mfm3fzHtMNfXFKhlGlq0eTrAvcuz2BHhUXcZ
-	qz4Z/W+Mg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Guc26NtW9Knthv1rCukCW+bm2BUO+ImuCOfptnYS/Kk=; b=pO15D1/Rf6Auio
+	+WAwuzpvDzsjZrAuPE09nkj7xgbu4k/grV699oeT2AAWsT0sJCG8ZMn67uDTaINj/5WdAPVm9Cbof
+	kc+D7OWamuzm9OKNfVyBHiXhqqyMQrMweai/nSXzMYxonW5I1y8DMu6jIovh6IfmMgaW5Vj5m/t4h
+	DFzx45gSGYQZXz2IPYPjxhyVQqMxjLy4vtQ7k/t4xr+bGIOhi4kkESyy/ftcQ51yy+hHxcvXpeQQ5
+	3xnfGKB1A9FNv1xUl+8UygqMcjS6iNutlVvozrIQUUdxA+nNkotXHiGcyNA1nJtYKbZ71/NYwG2JQ
+	yQLCJp91Zpz1QhctF71g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goPOh-0004JZ-9t; Tue, 29 Jan 2019 09:09:35 +0000
-Received: from relay6-d.mail.gandi.net ([217.70.183.198])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goPNq-0003e3-1f
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 09:08:57 +0000
-X-Originating-IP: 90.88.29.206
-Received: from localhost (aaubervilliers-681-1-87-206.w90-88.abo.wanadoo.fr
- [90.88.29.206]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay6-d.mail.gandi.net (Postfix) with ESMTPSA id 2D557C0006;
- Tue, 29 Jan 2019 09:08:30 +0000 (UTC)
-Date: Tue, 29 Jan 2019 10:08:29 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Jernej Skrabec <jernej.skrabec@siol.net>
-Subject: Re: [PATCH 5/6] arm64: dts: allwinner: h6: Add support for the SRAM
- C1 section
-Message-ID: <20190129090829.k7omjzplkjiwvboq@flea>
-References: <20190128205504.11225-1-jernej.skrabec@siol.net>
- <20190128205504.11225-6-jernej.skrabec@siol.net>
+	id 1goPPQ-00061Z-7k; Tue, 29 Jan 2019 09:10:20 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goPP1-0004eb-1G
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 09:10:11 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3DE2280D;
+ Tue, 29 Jan 2019 01:09:54 -0800 (PST)
+Received: from queper01-lin (queper01-lin.cambridge.arm.com [10.1.195.48])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B2A6B3F7A6;
+ Tue, 29 Jan 2019 01:09:51 -0800 (PST)
+Date: Tue, 29 Jan 2019 09:09:50 +0000
+From: Quentin Perret <quentin.perret@arm.com>
+To: Viresh Kumar <viresh.kumar@linaro.org>
+Subject: Re: [PATCH 1/7] PM / OPP: Introduce a power estimation helper
+Message-ID: <20190129090948.3yomjtpbdsar576w@queper01-lin>
+References: <20190128165522.31749-1-quentin.perret@arm.com>
+ <20190128165522.31749-2-quentin.perret@arm.com>
+ <20190129051030.gu5nhr6vmcd35bzk@vireshk-i7>
 MIME-Version: 1.0
-In-Reply-To: <20190128205504.11225-6-jernej.skrabec@siol.net>
-User-Agent: NeoMutt/20180716
+Content-Disposition: inline
+In-Reply-To: <20190129051030.gu5nhr6vmcd35bzk@vireshk-i7>
+User-Agent: NeoMutt/20171215
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_010842_641943_EA256BA8 
-X-CRM114-Status: UNSURE (   9.98  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190129_010955_361016_5D35B8C2 
+X-CRM114-Status: GOOD (  20.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,66 +70,128 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org, wens@csie.org,
- robh+dt@kernel.org, mchehab@kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-media@vger.kernel.org
-Content-Type: multipart/mixed; boundary="===============1404316023099842879=="
+Cc: mark.rutland@arm.com, nm@ti.com, lorenzo.pieralisi@arm.com,
+ devicetree@vger.kernel.org, sboyd@kernel.org, rjw@rjwysocki.net,
+ mka@chromium.org, linux-pm@vger.kernel.org, liviu.dudau@arm.com,
+ linux-kernel@vger.kernel.org, robh+dt@kernel.org, sudeep.holla@arm.com,
+ dietmar.eggemann@arm.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Viresh,
 
---===============1404316023099842879==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="2tlylttralbldoot"
-Content-Disposition: inline
+On Tuesday 29 Jan 2019 at 10:40:30 (+0530), Viresh Kumar wrote:
+> > +int of_dev_pm_opp_get_cpu_power(unsigned long *mW, unsigned long *KHz, int cpu)
+> 
+> I would suggest to change the return type to unsigned long and return 0 for
+> errors and positive values for mW.
 
+Well, I can't really do that -- this must match the API of PM_EM:
 
---2tlylttralbldoot
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+https://elixir.bootlin.com/linux/v5.0-rc4/source/include/linux/energy_model.h#L62
 
-On Mon, Jan 28, 2019 at 09:55:03PM +0100, Jernej Skrabec wrote:
-> Add a node for H6 SRAM C1 section.
->=20
-> Manual calls it VE SRAM, but for consistency with older SoCs, SRAM C1
-> name is used.
->=20
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+I'll make sure to make that explicit in the commit message for v2.
 
-Applied, thanks!
-Maxime
+> 
+> > +{
+> > +	unsigned long mV, Hz, MHz;
+> 
+> MHz is used only once, I think you can get rid of it just open code the division
+> by 1000000. Maybe remove Hz as well and directly use kHz.
 
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+I would expect/hope the compiler will optimize things like that for me
+but yes, I can try to reduce a bit the temp variables if you prefer.
 
---2tlylttralbldoot
-Content-Type: application/pgp-signature; name="signature.asc"
+> 
+> > +	struct device *cpu_dev;
+> > +	struct dev_pm_opp *opp;
+> > +	struct device_node *np;
+> > +	u32 cap;
+> > +	u64 tmp;
+> 
+> Name this mW with the above changes.
 
------BEGIN PGP SIGNATURE-----
+So that doesn't really work given what I mentioned above.
 
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXFAYDQAKCRDj7w1vZxhR
-xe1vAP91XGwjUCzq4Xg2ocqx14PZOtQumiewdjEwbaURwrZFEAD9FbGBtYoHh40e
-IB+CrsbKA2JpX1fQxvRHNt6uQsNmFww=
-=uqSI
------END PGP SIGNATURE-----
+> > +	int ret;
+> > +
+> > +	cpu_dev = get_cpu_device(cpu);
+> > +	if (!cpu_dev)
+> > +		return -ENODEV;
+> > +
+> > +	np = of_node_get(cpu_dev->of_node);
+> > +	if (!np)
+> > +		return -EINVAL;
+> > +
+> > +	ret = of_property_read_u32(np, "dynamic-power-coefficient", &cap);
+> > +	of_node_put(np);
+> > +	if (ret)
+> > +		return -EINVAL;
+> > +
+> > +	Hz = *KHz * 1000;
+> > +	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &Hz);
+> > +	if (IS_ERR(opp))
+> > +		return -EINVAL;
+> > +
+> > +	mV = dev_pm_opp_get_voltage(opp) / 1000;
+> > +	dev_pm_opp_put(opp);
+> > +	if (!mV)
+> > +		return -EINVAL;
+> > +
+> > +	MHz = Hz / 1000000;
+> > +	tmp = (u64)cap * mV * mV * MHz;
+> > +	do_div(tmp, 1000000000);
+> > +
+> > +	*mW = (unsigned long)tmp;
+> > +	*KHz = Hz / 1000;
+> > +
+> > +	return 0;
+> > +}
+> > +EXPORT_SYMBOL_GPL(of_dev_pm_opp_get_cpu_power);
+> > diff --git a/include/linux/pm_opp.h b/include/linux/pm_opp.h
+> > index 0a2a88e5a383..fedde14f5187 100644
+> > --- a/include/linux/pm_opp.h
+> > +++ b/include/linux/pm_opp.h
+> > @@ -322,6 +322,7 @@ int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpuma
+> >  struct device_node *dev_pm_opp_of_get_opp_desc_node(struct device *dev);
+> >  struct device_node *dev_pm_opp_get_of_node(struct dev_pm_opp *opp);
+> >  int of_get_required_opp_performance_state(struct device_node *np, int index);
+> > +int of_dev_pm_opp_get_cpu_power(unsigned long *mW, unsigned long *KHz, int cpu);
+> >  #else
+> >  static inline int dev_pm_opp_of_add_table(struct device *dev)
+> >  {
+> > @@ -364,6 +365,10 @@ static inline int of_get_required_opp_performance_state(struct device_node *np,
+> >  {
+> >  	return -ENOTSUPP;
+> >  }
+> 
+> Add a blank line here. We missed adding the same before
+> of_get_required_opp_performance_state() earlier, maybe add the new routine
+> before of_get_required_opp_performance_state() and add blank line before and
+> after it :)
 
---2tlylttralbldoot--
+Sounds good !
 
+> 
+> > +static inline int of_dev_pm_opp_get_cpu_power(unsigned long *mW, unsigned long *KHz, int cpu)
+> > +{
+> > +	return -ENOTSUPP;
+> > +}
+> >  #endif
+> >  
+> >  #endif		/* __LINUX_OPP_H__ */
+> > -- 
+> > 2.20.1
+> 
+> -- 
+> viresh
 
---===============1404316023099842879==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Thanks,
+Quentin
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============1404316023099842879==--
-
