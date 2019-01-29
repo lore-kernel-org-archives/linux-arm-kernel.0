@@ -2,65 +2,94 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F00CFC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:43:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A976BC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:43:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BE3172175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:43:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 78978214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:43:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XkE7wr4T"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BE3172175B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OFZ/4ikn";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="kIt8rzHs";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="bMROu3pG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 78978214DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Cc:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Cc:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/wP6woXz+D++1ejJFAI9Udc7r/CwdryhkSmALM8rvNE=; b=XkE7wr4T1gkZ55
-	zlUiicttWdP87K94GqazrTIevvA434sfzAFyRCD0nqMxwwXZ6+Fvk9IGt0Yfkrd1fxR8Ul7m8CGBj
-	yzMLA3wYFydDwcX3xCiUDZIM15VRv9ZlouS77Nf1+sO2R4l34oxXd1Lk0H0h/DT0Pm6GvT3Rx+HaB
-	f3LfVCXFvSJi80WFdmsdCzUuKifwj/Lkdxv/cBSdO0DhvfIKv9Li9WUpod7U1OmO31nCGFqvARMUu
-	Y8/5HQ0rwpA2J5Zrv0tvlc4I2xAvEds0+Cq3zkpTvjtJZ9bDVSI5nHNKIbcLCyb7Uf18NA7UJPexn
-	9RSJxQC+Oh8Z9072OZVA==;
+	List-Owner; bh=KTKDXsgXLL1B2J2z4ieWYMEz96y89UhrkRqS9Kqh0Zk=; b=OFZ/4ikntodKzn
+	5WvZ5WX772WOM5FeVMG1T+CHK7PV9+fT0eG1iGu9IKd6PkUnGaNDHJdiyJ9RDsABopO9Z++K2jOkl
+	dn2/TAl+pNTaLeF8lZEuqCGhBe17kbiHJbR3poHRjky+xnpocP+h22i4SuDIu9TFx55qkLevp5rCU
+	kOGDeF0QFu0ZXs6rKlj5GGRyiOjyBGWm3aqiXWgBQLq+8MawhUcjslD6qQhel0NGjz1LEFqrzF40i
+	sVzGNI+6bCxx6ot1UoNjY0CIgVu6RiB0t4Xr6YPVCpTnlX3IsV++AdnDSlLSvmFEJFne/wMw2ZCmF
+	cGaHghUw1uf7G7kX6l/Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goWTh-0007uQ-NR; Tue, 29 Jan 2019 16:43:13 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1goWU9-0008C9-HK; Tue, 29 Jan 2019 16:43:41 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goWTd-0007tU-85
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 16:43:10 +0000
-Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
- by metis.ext.pengutronix.de with esmtp (Exim 4.89)
- (envelope-from <l.stach@pengutronix.de>)
- id 1goWTV-0002t7-Tq; Tue, 29 Jan 2019 17:43:01 +0100
-Message-ID: <1548780179.6869.9.camel@pengutronix.de>
-Subject: Re: [PATCH] arm64: dts: imx8mq: Add QuadSPI controller
-From: Lucas Stach <l.stach@pengutronix.de>
-To: Carlo Caione <ccaione@baylibre.com>, robh+dt@kernel.org, 
- mark.rutland@arm.com, shawnguo@kernel.org, s.hauer@pengutronix.de, 
- kernel@pengutronix.de, festevam@gmail.com, linux-imx@nxp.com, 
- devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Date: Tue, 29 Jan 2019 17:42:59 +0100
-In-Reply-To: <20190129163457.7107-1-ccaione@baylibre.com>
-References: <20190129163457.7107-1-ccaione@baylibre.com>
-X-Mailer: Evolution 3.22.6-1+deb9u1 
-Mime-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
-X-SA-Exim-Mail-From: l.stach@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+ id 1goWU5-0008BG-2F
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 16:43:38 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id 9A48960881; Tue, 29 Jan 2019 16:43:36 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1548780216;
+ bh=JfTrcetsbIer2xED0sD2i7Mz01/A5DfN8tSHkm0L1/o=;
+ h=Date:From:To:Subject:References:In-Reply-To:From;
+ b=kIt8rzHsEL6QFMpIsCz93vpqYp4jGRPOplr0WHmOTYX2k7+kHYPnANlKUdjahkwIp
+ U6YVBzqMvvovNEiuA1Fw15VevNKpMtcphbOjlNluUuMZBeFin57uhaOQU3UbXYeddU
+ L9sIq1sb6COmwCGYiZtf3pCD6apuza5azaIzXYiQ=
+Received: from jcrouse1-lnx.qualcomm.com (i-global254.qualcomm.com
+ [199.106.103.254])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ (Authenticated sender: jcrouse@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id A8E75601CF;
+ Tue, 29 Jan 2019 16:43:34 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1548780215;
+ bh=JfTrcetsbIer2xED0sD2i7Mz01/A5DfN8tSHkm0L1/o=;
+ h=Date:From:To:Subject:References:In-Reply-To:From;
+ b=bMROu3pGcvlDg5M5AK/lkq99zRox9csQN5evQ16vBttp94OwPUmDOzeREknDGC8j6
+ 1KLy/SP/K4uo7gUDiqlz6VeAd9pjnYYxdtM833rIFUgGjq5uCek1X5DXORoBAlu1nM
+ OlAgikCboDXVxDZIHTBtqeOqLfIpIrWgajMIS24U=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org A8E75601CF
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=jcrouse@codeaurora.org
+Date: Tue, 29 Jan 2019 09:43:32 -0700
+From: Jordan Crouse <jcrouse@codeaurora.org>
+To: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>,
+ andy.gross@linaro.org, linux-arm-msm@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
+ Vivek Gautam <vivek.gautam@codeaurora.org>
+Subject: Re: [PATCH 4/6] arm64: dts: Add Adreno GPU and GPU smmu definitions
+Message-ID: <20190129164332.GB18874@jcrouse1-lnx.qualcomm.com>
+Mail-Followup-To: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>,
+ andy.gross@linaro.org, linux-arm-msm@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
+ Vivek Gautam <vivek.gautam@codeaurora.org>
+References: <20190129132335.30695-1-srinivas.kandagatla@linaro.org>
+ <20190129132335.30695-5-srinivas.kandagatla@linaro.org>
+ <20190129160426.GA18874@jcrouse1-lnx.qualcomm.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190129160426.GA18874@jcrouse1-lnx.qualcomm.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_084309_443022_18749A4D 
-X-CRM114-Status: GOOD (  15.12  )
+X-CRM114-CacheID: sfid-20190129_084337_142467_DF0935B2 
+X-CRM114-Status: GOOD (  24.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,62 +101,137 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgQ2FybG8sCgpBbSBEaWVuc3RhZywgZGVuIDI5LjAxLjIwMTksIDE2OjM0ICswMDAwIHNjaHJp
-ZWIgQ2FybG8gQ2Fpb25lOgo+IEFkZCBhIG5vZGUgZm9yIHRoZSBGcmVlc2NhbGUvTlhQIFF1YWRT
-UEkgY29udHJvbGxlciB3aXRoIGEgcHJvcGVyCj4gcGluY3RybCBzZXQgYW5kIGVuYWJsZSBpdCBm
-b3IgdGhlIGkuTVg4TVEgRVZLIGJvYXJkLgo+IAo+ID4gU2lnbmVkLW9mZi1ieTogQ2FybG8gQ2Fp
-b25lIDxjY2Fpb25lQGJheWxpYnJlLmNvbT4KPiAtLS0KPiDCoGFyY2gvYXJtNjQvYm9vdC9kdHMv
-ZnJlZXNjYWxlL2lteDhtcS1ldmsuZHRzIHwgMjcgKysrKysrKysrKysrKysrKysrKysKPiDCoGFy
-Y2gvYXJtNjQvYm9vdC9kdHMvZnJlZXNjYWxlL2lteDhtcS5kdHNpwqDCoMKgwqB8IDEzICsrKysr
-KysrKysKPiDCoDIgZmlsZXMgY2hhbmdlZCwgNDAgaW5zZXJ0aW9ucygrKQo+IAo+IGRpZmYgLS1n
-aXQgYS9hcmNoL2FybTY0L2Jvb3QvZHRzL2ZyZWVzY2FsZS9pbXg4bXEtZXZrLmR0cyBiL2FyY2gv
-YXJtNjQvYm9vdC9kdHMvZnJlZXNjYWxlL2lteDhtcS1ldmsuZHRzCj4gaW5kZXggZjc0YjEzYWE1
-YWE1Li5hZTE4MWMyYTUwMDMgMTAwNjQ0Cj4gLS0tIGEvYXJjaC9hcm02NC9ib290L2R0cy9mcmVl
-c2NhbGUvaW14OG1xLWV2ay5kdHMKPiArKysgYi9hcmNoL2FybTY0L2Jvb3QvZHRzL2ZyZWVzY2Fs
-ZS9pbXg4bXEtZXZrLmR0cwo+IEBAIC0xMzcsNiArMTM3LDIxIEBACj4gPiDCoAlzdGF0dXMgPSAi
-b2theSI7Cj4gwqB9Owo+IMKgCj4gKyZzcGkwIHsKPiA+ICsJcGluY3RybC1uYW1lcyA9ICJkZWZh
-dWx0IjsKPiA+ICsJcGluY3RybC0wID0gPCZwaW5jdHJsX3FzcGk+Owo+ID4gKwlzdGF0dXMgPSAi
-b2theSI7Cj4gKwo+ID4gPiArCWZsYXNoMDogbjI1cTI1NmFAMCB7Cj4gPiArCQlyZWcgPSA8MD47
-Cj4gPiArCQkjYWRkcmVzcy1jZWxscyA9IDwxPjsKPiA+ICsJCSNzaXplLWNlbGxzID0gPDE+Owo+
-ID4gKwkJY29tcGF0aWJsZSA9ICJtaWNyb24sbjI1cTI1NmEiLCAiamVkZWMsc3BpLW5vciI7Cj4g
-PiArCQlzcGktbWF4LWZyZXF1ZW5jeSA9IDwyOTAwMDAwMD47Cj4gPiArCQlzcGktbm9yLGRkci1x
-dWFkLXJlYWQtZHVtbXkgPSA8Nj47Cj4gPiArCX07Cj4gK307Cj4gKwo+IMKgJnVzZGhjMSB7Cj4g
-PiDCoAlwaW5jdHJsLW5hbWVzID0gImRlZmF1bHQiLCAic3RhdGVfMTAwbWh6IiwgInN0YXRlXzIw
-MG1oeiI7Cj4gPiDCoAlwaW5jdHJsLTAgPSA8JnBpbmN0cmxfdXNkaGMxPjsKPiBAQCAtMTk1LDYg
-KzIxMCwxOCBAQAo+ID4gwqAJCT47Cj4gPiDCoAl9Owo+IMKgCj4gPiArCXBpbmN0cmxfcXNwaTog
-cXNwaWdycCB7Cj4gPiArCQlmc2wscGlucyA9IDwKPiA+ID4gKwkJCU1YOE1RX0lPTVVYQ19OQU5E
-X0FMRV9RU1BJX0FfU0NMSwkweDgyCj4gPiA+ICsJCQlNWDhNUV9JT01VWENfTkFORF9DRTBfQl9R
-U1BJX0FfU1MwX0IJMHg4Mgo+ID4gPiArCQkJTVg4TVFfSU9NVVhDX05BTkRfREFUQTAwX1FTUElf
-QV9EQVRBMAkweDgyCj4gPiA+ICsJCQlNWDhNUV9JT01VWENfTkFORF9EQVRBMDFfUVNQSV9BX0RB
-VEExCTB4ODIKPiA+ID4gKwkJCU1YOE1RX0lPTVVYQ19OQU5EX0RBVEEwMl9RU1BJX0FfREFUQTIJ
-MHg4Mgo+ID4gPiArCQkJTVg4TVFfSU9NVVhDX05BTkRfREFUQTAzX1FTUElfQV9EQVRBMwkweDgy
-Cj4gKwo+ID4gKwkJPjsKPiA+ICsJfTsKPiArCj4gPiDCoAlwaW5jdHJsX3JlZ191c2RoYzI6IHJl
-Z3VzZGhjMmdycGdwaW8gewo+ID4gwqAJCWZzbCxwaW5zID0gPAo+ID4gPiDCoAkJCU1YOE1RX0lP
-TVVYQ19TRDJfUkVTRVRfQl9HUElPMl9JTzE5CQkweDQxCj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJt
-NjQvYm9vdC9kdHMvZnJlZXNjYWxlL2lteDhtcS5kdHNpIGIvYXJjaC9hcm02NC9ib290L2R0cy9m
-cmVlc2NhbGUvaW14OG1xLmR0c2kKPiBpbmRleCBkYmVkYzRhNWU3ZmIuLmUwMDU5ZjQ1MTU5MSAx
-MDA2NDQKPiAtLS0gYS9hcmNoL2FybTY0L2Jvb3QvZHRzL2ZyZWVzY2FsZS9pbXg4bXEuZHRzaQo+
-ICsrKyBiL2FyY2gvYXJtNjQvYm9vdC9kdHMvZnJlZXNjYWxlL2lteDhtcS5kdHNpCj4gQEAgLTUx
-Niw2ICs1MTYsMTkgQEAKPiA+IMKgCQkJfTsKPiA+IMKgCQl9Owo+IMKgCj4gKwkJc3BpMDogc3Bp
-QDMwYmIwMDAwIHsKCjMwYmIwMDAwIGlzIHBhcnQgb2YgdGhlIEFJUFMzIGJ1cyBhZGRyZXNzIHNw
-YWNlLCBzbyBwbGVhc2UgbW92ZSB0aGlzIHRvCnRoZSBjb3JyZWN0IGxvY2F0aW9uIHdpdGhpbiB0
-aGlzIGJ1cyBub2RlLgoKPiArCQkJI2FkZHJlc3MtY2VsbHMgPSA8MT47Cj4gPiArCQkJI3NpemUt
-Y2VsbHMgPSA8MD47Cj4gKwkJCWNvbXBhdGlibGUgPSAiZnNsLGlteDdkLXFzcGkiOwoKUGxlYXNl
-IGFkZCBhICJmc2wsaW14OG1xLXFzcGkiIGNvbXBhdGlibGUgaGVyZSwgYXMgd2FzIGRvbmUgd2l0
-aCBhbGwKdGhlIG90aGVyIG5vZGVzIGluIHRoaXMgZmlsZSwgc28gd2UgY2FuIG1hdGNoIHRoaXMg
-aW4gdGhlIGRyaXZlciBzaG91bGQKdGhlIG5lZWQgYXJpc2UuCgo+ICsJCQlyZWcgPSA8MHgzMGJi
-MDAwMCAweDEwMDAwPiwgPDB4MDgwMDAwMDAgMHgxMDAwMDAwMD47Cj4gPiArCQkJcmVnLW5hbWVz
-ID0gIlF1YWRTUEkiLCAiUXVhZFNQSS1tZW1vcnkiOwo+ID4gKwkJCWludGVycnVwdHMgPSA8R0lD
-X1NQSSAxMDcgSVJRX1RZUEVfTEVWRUxfSElHSD47Cj4gPiArCQkJY2xvY2tzID0gPCZjbGsgSU1Y
-OE1RX0NMS19RU1BJX1JPT1Q+LAo+ICsJCQk8JmNsayBJTVg4TVFfQ0xLX1FTUElfUk9PVD47CgpQ
-bGVhc2UgYWxpZ24gdGhlIHNlY29uZCBjbG9jayByZWZlcmVuY2UsIGFzIGlzIGRvbmUgZm9yIGFs
-bCBvdGhlcgpwZXJpcGhlcmFsIG5vZGVzIGluIHRoaXMgZmlsZS4KClJlZ2FyZHMsCkx1Y2FzCgpf
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0t
-a2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcK
-aHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2Vy
-bmVsCg==
+On Tue, Jan 29, 2019 at 09:04:26AM -0700, Jordan Crouse wrote:
+> On Tue, Jan 29, 2019 at 01:23:33PM +0000, Srinivas Kandagatla wrote:
+> > From: Jordan Crouse <jcrouse@codeaurora.org>
+> > 
+> > Add an initial node for the Adreno GPU and it's companion
+> > SMMU. The GPU node is mostly complete except for a bare
+> > bones power table that will be filled out more completely
+> > later.
+> > 
+> > Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+> > [Remove mmagic clocks from GPU/smmu nodes]
+> > Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> > Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> 
+> Thanks for sending this.
+> 
+> > ---
+> >  arch/arm64/boot/dts/qcom/msm8996.dtsi | 52 +++++++++++++++++++++++++++
+> >  1 file changed, 52 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> > index 0d0b9482aa4d..b5f23594905c 100644
+> > --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> > +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+> > @@ -84,6 +84,12 @@
+> >  			qcom,client-id = <1>;
+> >  			qcom,vmid = <15>;
+> >  		};
+> > +
+> > +		zap_shader_region: gpu@8f200000 {
+> > +			compatible = "shared-dma-pool";
+> > +			reg = <0x0 0x90b00000 0x0 0xa00000>;
+> > +			no-map;
+> > +		};
+> >  	};
+> >  
+> >  	cpus {
+> > @@ -1338,6 +1344,52 @@
+> >  			};
+> >  		};
+> >  
+> > +		gpu@b00000 {
+> > +			compatible = "qcom,adreno-530.2", "qcom,adreno";
+> > +			#stream-id-cells = <16>;
+> > +
+> > +			reg = <0xb00000 0x3f000>;
+> > +			reg-names = "kgsl_3d0_reg_memory";
+> > +
+> > +			interrupts = <0 300 IRQ_TYPE_LEVEL_HIGH>;
+> > +			interrupt-names = "kgsl_3d0_irq";
+> 
+> We dropped the interrupt name as of:
+> 
+> https://cgit.freedesktop.org/~robclark/linux/commit/?h=msm-next&id=2255f244f92e651dbd410f92d2968c6dae4ead8e
+> 
+> You should be able to safely omit it.
+> 
+> > +
+> > +			clocks = <&mmcc GPU_GX_GFX3D_CLK>,
+> > +				<&mmcc GPU_AHB_CLK>,
+> > +				<&mmcc GPU_GX_RBBMTIMER_CLK>,
+> > +				<&gcc GCC_BIMC_GFX_CLK>,
+> > +				<&gcc GCC_MMSS_BIMC_GFX_CLK>;
+> > +
+> > +			clock-names = "core",
+> > +				"iface",
+> > +				"rbbmtimer",
+> > +				"mem",
+> > +				"mem_iface";
+> > +
+> > +			power-domains = <&mmcc GPU_GDSC>;
+> > +			iommus = <&adreno_smmu 0>;
+> > +
+> > +			qcom,gpu-quirk-two-pass-use-wfi;
+> > +			qcom,gpu-quirk-fault-detect-mask;
+> 
+> This was downstream silliness - neither of these "flags" made it upstream
+> (thankfully).
+> 
+> > +
+> > +			/* This is a safe speed for bring up in all bin levels.
+> > +			 * This isn't the fastest the chip can go, but we can
+> > +			 * get there eventually */
+> > +			qcom,gpu-pwrlevels {
+> > +				compatible = "qcom,gpu-pwrlevels";
+> > +				qcom,gpu-pwrlevel@0 {
+> > +					qcom,gpu-freq = <510000000>;
+> > +				};
+> > +				qcom,gpu-pwrlevel@1 {
+> > +					qcom,gpu-freq = <27000000>;
+> > +				};
+> 
+> Hmm - I haven't looked at the integration branch in a while but I'm positive
+> that we had opp tables at some point because the driver supports
+> opp-supported-hw. I hope I didn't just leave that sitting on my hard drive
+> somewhere. I'll check and let you know.
+
+Ugh, I just found them sitting unsent in a dusty git branch. I can either send
+them as incremental patches on top of yours to be squashed later or I can
+refactor this patch and send it out again, whatever is easiest for you.
+
+Jordan
+
+> > +			};
+> > +
+> > +			zap-shader {
+> > +				memory-region = <&zap_shader_region>;
+> > +			};
+> > +		};
+> > +
+> >  		mdss: mdss@900000 {
+> >  			compatible = "qcom,mdss";
+> >  
+> > -- 
+> > 2.20.1
+> > 
+> 
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
