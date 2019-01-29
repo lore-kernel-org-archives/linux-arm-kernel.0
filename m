@@ -2,84 +2,68 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B1EFC282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 03:35:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B1783C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 04:29:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 366D7214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 03:35:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6A1192175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 04:29:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dawyy6xh";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="paAXyu1N"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 366D7214DA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ud2GNmf+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A1192175B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=QDbTXHYDtPvvpI6pZIyfdXtu2gwCTa4E7jGJx6bF5eQ=; b=Dawyy6xhEt6vb6lBOB450p7vW
-	DShL3PqxBhuQICjoFz9E65tPTpUDYaNAexeczhI/DNU5lQ696OygRYhH8WC8oCNRdisbDBr9l/ztQ
-	4t+p++4I9N+elLdL1pCTV9qnonX6CgHbQ7mOJJHSiezjsyjrRDsqY5MhhpYUdBE6SxNN1wy3MQ8e5
-	OYM6f9+8gD9UUpqrN/g2L2jp5STtNy8mzXeAlnanG6pI5lPWuBf2L1glSj8EpkuDhkkixw+fLvxTF
-	QM68or0z9IPQnO+4SUupRuiB/BF2FoLVg3Yw37pPIoTkhJDzKuCI653yKMa2SyZwF7kZ9rRGUrRgF
-	iYY9J9XCw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=+RzoI62wtugOzN36NxbZNKtSy42QFSKe3kNYNDy2Y3Q=; b=Ud2GNmf+RTHY+Q
+	8EaRt6r/probpP3q3N5spJ8HYxGYtouxTvhUpOg/SPXgkHcf8PiUAA+ujoGUNX9H8ngPrmaOZVmxr
+	h6F6OSDtltQKhVnpHwR95J2Ia7YsKQPpYcVDSuYkuhhwCfa4GFOuknD/aX9gy6b0QKrb4nOKXU4Mz
+	U27kI7EA5g7re8rGxVNR8jATN4mP0ifQiLuEIq0X/lSDfiIpmzvi8wlxfI+R9tehqAFPpiRQkLdNI
+	wX2dFiWG4qioMtA9ZFymZRNcWs90eMBeYhQq9/X3zODUqS/TwzxGywCxuBmI2iKQ8yzhnu5udToYC
+	OlpD+oz4+pSlLDlMe7oA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goKBF-00013V-IE; Tue, 29 Jan 2019 03:35:21 +0000
-Received: from hqemgate16.nvidia.com ([216.228.121.65])
+	id 1goL1I-0008Jq-Cw; Tue, 29 Jan 2019 04:29:08 +0000
+Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goKBC-000136-Ni
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 03:35:20 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c4fc9ce0001>; Mon, 28 Jan 2019 19:34:38 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Mon, 28 Jan 2019 19:35:17 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Mon, 28 Jan 2019 19:35:17 -0800
-Received: from [10.19.108.132] (172.20.13.39) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 29 Jan
- 2019 03:35:15 +0000
-Subject: Re: [PATCH V2 2/6] clocksource: tegra: add Tegra210 timer driver
-To: Thierry Reding <thierry.reding@gmail.com>
-References: <20190128091815.7040-1-josephl@nvidia.com>
- <20190128091815.7040-3-josephl@nvidia.com> <20190128150908.GB31317@ulmo>
-From: Joseph Lo <josephl@nvidia.com>
-Message-ID: <3607f32b-c20a-e00f-3dc1-630169342392@nvidia.com>
-Date: Tue, 29 Jan 2019 11:35:13 +0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1goL1E-0008Iq-Td; Tue, 29 Jan 2019 04:29:06 +0000
+X-UUID: a478b59e2a1d4caa838fc9528ec493ce-20190128
+X-UUID: a478b59e2a1d4caa838fc9528ec493ce-20190128
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
+ (envelope-from <ryder.lee@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 411352679; Mon, 28 Jan 2019 20:28:59 -0800
+Received: from mtkmbs08n1.mediatek.inc (172.21.101.55) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 28 Jan 2019 20:28:57 -0800
+Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
+ mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 29 Jan 2019 12:28:55 +0800
+Received: from mtkslt306.mediatek.inc (10.21.14.136) by MTKCAS06.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
+ Frontend Transport; Tue, 29 Jan 2019 12:28:55 +0800
+From: Ryder Lee <ryder.lee@mediatek.com>
+To: Matthias Brugger <matthias.bgg@gmail.com>
+Subject: [PATCH 1/7] Revert "ARM: mediatek: add MT7623a smp bringup code"
+Date: Tue, 29 Jan 2019 12:28:48 +0800
+Message-ID: <d1ab6c89b115ad0582815816490fa0c13ea83178.1548735271.git.ryder.lee@mediatek.com>
+X-Mailer: git-send-email 1.9.1
 MIME-Version: 1.0
-In-Reply-To: <20190128150908.GB31317@ulmo>
-X-Originating-IP: [172.20.13.39]
-X-ClientProxiedBy: HQMAIL103.nvidia.com (172.20.187.11) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1548732878; bh=I7OcIB1j+RQ7EY2WdpzztGJzqgX53Vd7FmQwH7hnMd4=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=paAXyu1NVx/ym2MErMl9QAepuPu/nb3ZPpq4ZddrKbcbfpUsrJTXDAoxUrzmhLouZ
- yEv00EezZ8+mH5rkfR7y+uoAE0fItB0JsctUzYHmXFhtX3hmpu6+kPfkt6KkQhEYVZ
- iE3DI1eDPfCRN0v4Oqe46JD/LpNcGJoO9SlLM18x7EGn5Yzz4QPsVsoxX2ugED4yTU
- 1ianG6GP2Ebg+4CoCbqrh/6coPq1EIA35uM4DcX8xTQpSOTH3DMIxr8rw10epGQBB0
- 9NVPVnJhYELzayq5Fxg/7qidEJQRZXVs0Wpgm4N1dDrzQnP5baIwZifDHwGSQhlYcS
- 1j0aiOGqTuToQ==
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_193518_783222_B6FA836C 
-X-CRM114-Status: GOOD (  23.18  )
+X-CRM114-CacheID: sfid-20190128_202904_959729_DEC065B3 
+X-CRM114-Status: UNSURE (   8.88  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,204 +75,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
- Jonathan Hunter <jonathanh@nvidia.com>, linux-tegra@vger.kernel.org,
- Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, Ryder Lee <ryder.lee@mediatek.com>,
+ Sean Wang <sean.wang@kernel.org>, Weijie Gao <weijie.gao@mediatek.com>,
+ Roy Luo <roychl666@gmail.com>, linux-kernel@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/28/19 11:09 PM, Thierry Reding wrote:
-> On Mon, Jan 28, 2019 at 05:18:11PM +0800, Joseph Lo wrote:
->> Add support for the Tegra210 timer that runs at oscillator clock
->> (TMR10-TMR13). We need these timers to work as clock event device and to
->> replace the ARMv8 architected timer due to it can't survive across the
->> power cycle of the CPU core or CPUPORESET signal. So it can't be a wake-up
->> source when CPU suspends in power down state.
->>
->> Based on the work of Antti P Miettinen <amiettinen@nvidia.com>
->>
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: linux-kernel@vger.kernel.org
->> Signed-off-by: Joseph Lo <josephl@nvidia.com>
->> ---
->> v2:
->>   * add error clean-up code
->> ---
->>   drivers/clocksource/Kconfig          |   3 +
->>   drivers/clocksource/Makefile         |   1 +
->>   drivers/clocksource/timer-tegra210.c | 268 +++++++++++++++++++++++++++
->>   include/linux/cpuhotplug.h           |   1 +
->>   4 files changed, 273 insertions(+)
->>   create mode 100644 drivers/clocksource/timer-tegra210.c
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index a9e26f6a81a1..e6e3e64b6320 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -135,6 +135,9 @@ config TEGRA_TIMER
->>   	help
->>   	  Enables support for the Tegra driver.
->>   
->> +config TEGRA210_TIMER
->> +	def_bool ARCH_TEGRA_210_SOC
->> +
->>   config VT8500_TIMER
->>   	bool "VT8500 timer driver" if COMPILE_TEST
->>   	depends on HAS_IOMEM
->> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
->> index cdd210ff89ea..95de59c8a47b 100644
->> --- a/drivers/clocksource/Makefile
->> +++ b/drivers/clocksource/Makefile
->> @@ -36,6 +36,7 @@ obj-$(CONFIG_SUN4I_TIMER)	+= timer-sun4i.o
->>   obj-$(CONFIG_SUN5I_HSTIMER)	+= timer-sun5i.o
->>   obj-$(CONFIG_MESON6_TIMER)	+= timer-meson6.o
->>   obj-$(CONFIG_TEGRA_TIMER)	+= timer-tegra20.o
->> +obj-$(CONFIG_TEGRA210_TIMER)	+= timer-tegra210.o
->>   obj-$(CONFIG_VT8500_TIMER)	+= timer-vt8500.o
->>   obj-$(CONFIG_NSPIRE_TIMER)	+= timer-zevio.o
->>   obj-$(CONFIG_BCM_KONA_TIMER)	+= bcm_kona_timer.o
->> diff --git a/drivers/clocksource/timer-tegra210.c b/drivers/clocksource/timer-tegra210.c
->> new file mode 100644
->> index 000000000000..477b164e540b
->> --- /dev/null
->> +++ b/drivers/clocksource/timer-tegra210.c
->> @@ -0,0 +1,268 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * Copyright (c) 2014-2019, NVIDIA CORPORATION.  All rights reserved.
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/clockchips.h>
->> +#include <linux/cpu.h>
->> +#include <linux/cpumask.h>
->> +#include <linux/err.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/io.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/percpu.h>
->> +#include <linux/syscore_ops.h>
->> +
->> +static u32 tegra210_timer_freq;
->> +static void __iomem *tegra210_timer_reg_base;
->> +static u32 usec_config;
->> +
->> +#define TIMER_PTV		0x0
->> +#define TIMER_PTV_EN		BIT(31)
->> +#define TIMER_PTV_PER		BIT(30)
->> +#define TIMER_PCR		0x4
->> +#define TIMER_PCR_INTR_CLR	BIT(30)
->> +#define TIMERUS_CNTR_1US	0x10
->> +#define TIMERUS_USEC_CFG	0x14
->> +
->> +#define TIMER10_OFFSET		0x90
->> +#define TIMER10_IRQ_IDX		10
->> +
->> +#define TIMER_FOR_CPU(cpu) (TIMER10_OFFSET + (cpu) * 8)
->> +#define IRQ_IDX_FOR_CPU(cpu)	(TIMER10_IRQ_IDX + cpu)
->> +
->> +struct tegra210_clockevent {
->> +	struct clock_event_device evt;
->> +	char name[20];
->> +	void __iomem *reg_base;
->> +};
->> +#define to_tegra_cevt(p) (container_of(p, struct tegra210_clockevent, evt))
->> +
->> +static struct tegra210_clockevent __percpu *tegra210_evt;
->> +
->> +static int tegra210_timer_set_next_event(unsigned long cycles,
->> +					 struct clock_event_device *evt)
->> +{
->> +	struct tegra210_clockevent *tevt;
->> +
->> +	tevt = to_tegra_cevt(evt);
->> +	writel(TIMER_PTV_EN |
->> +	       ((cycles > 1) ? (cycles - 1) : 0), /* n+1 scheme */
->> +	       tevt->reg_base + TIMER_PTV);
->> +
->> +	return 0;
->> +}
->> +
->> +static inline void timer_shutdown(struct tegra210_clockevent *tevt)
->> +{
->> +	writel(0, tevt->reg_base + TIMER_PTV);
->> +}
->> +
->> +static int tegra210_timer_shutdown(struct clock_event_device *evt)
->> +{
->> +	struct tegra210_clockevent *tevt;
->> +
->> +	tevt = to_tegra_cevt(evt);
->> +	timer_shutdown(tevt);
->> +
->> +	return 0;
->> +}
->> +
->> +static int tegra210_timer_set_periodic(struct clock_event_device *evt)
->> +{
->> +	struct tegra210_clockevent *tevt;
->> +
->> +	tevt = to_tegra_cevt(evt);
->> +	writel(TIMER_PTV_EN | TIMER_PTV_PER | ((tegra210_timer_freq / HZ) - 1),
->> +	       tevt->reg_base + TIMER_PTV);
->> +
->> +	return 0;
->> +}
->> +
->> +static irqreturn_t tegra210_timer_isr(int irq, void *dev_id)
->> +{
->> +	struct tegra210_clockevent *tevt;
->> +
->> +	tevt = dev_id;
->> +	writel(TIMER_PCR_INTR_CLR, tevt->reg_base + TIMER_PCR);
->> +	tevt->evt.event_handler(&tevt->evt);
->> +
->> +	return IRQ_HANDLED;
->> +}
-> 
-> Up to here this is a duplicate of timer-tegra20.c. And a lot of
-> tegra210_timer_init() is the same as tegra20_timer_init() as well. Can't
-> we unify the two drivers instead?
+This reverts commit 3b99ab7deca1e5f4229b4bdecd005d71e22cfc60.
 
-I still prefer to remove the timer-tegra20 driver, because it didn't 
-been used for Tegra 32 bit chips for quite a long time. So currently it 
-just compiles OK, I also doubt the functionality still can achieve the 
-same what I want to do for Tegra210.
+The compatible "mediatek,mt7623a" is useless, so remove it.
 
-My personal opinion is to remove the old and unused driver and enhance 
-the new one.
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ arch/arm/mach-mediatek/mediatek.c | 2 --
+ arch/arm/mach-mediatek/platsmp.c  | 1 -
+ 2 files changed, 3 deletions(-)
 
-> 
-> The power cycle restrictions of the architected timer, do they not apply
-> to chips earlier than Tegra210 either? So don't we need all of these
-> additional features on the timer-tegra20.c driver as well? If so that
-> would increase the code duplication even more. I think we should avoid
-> that, unless there are any strong arguments that would justify it.
-> 
+diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+index 6910b4e..c3cf215 100644
+--- a/arch/arm/mach-mediatek/mediatek.c
++++ b/arch/arm/mach-mediatek/mediatek.c
+@@ -30,7 +30,6 @@ static void __init mediatek_timer_init(void)
+ 
+ 	if (of_machine_is_compatible("mediatek,mt6589") ||
+ 	    of_machine_is_compatible("mediatek,mt7623") ||
+-	    of_machine_is_compatible("mediatek,mt7623a") ||
+ 	    of_machine_is_compatible("mediatek,mt8135") ||
+ 	    of_machine_is_compatible("mediatek,mt8127")) {
+ 		/* turn on GPT6 which ungates arch timer clocks */
+@@ -50,7 +49,6 @@ static void __init mediatek_timer_init(void)
+ 	"mediatek,mt6589",
+ 	"mediatek,mt6592",
+ 	"mediatek,mt7623",
+-	"mediatek,mt7623a",
+ 	"mediatek,mt8127",
+ 	"mediatek,mt8135",
+ 	NULL,
+diff --git a/arch/arm/mach-mediatek/platsmp.c b/arch/arm/mach-mediatek/platsmp.c
+index 6882ff0..51e8556 100644
+--- a/arch/arm/mach-mediatek/platsmp.c
++++ b/arch/arm/mach-mediatek/platsmp.c
+@@ -60,7 +60,6 @@ struct mtk_smp_boot_info {
+ static const struct of_device_id mtk_smp_boot_infos[] __initconst = {
+ 	{ .compatible   = "mediatek,mt6589", .data = &mtk_mt6589_boot },
+ 	{ .compatible   = "mediatek,mt7623", .data = &mtk_mt7623_boot },
+-	{ .compatible   = "mediatek,mt7623a", .data = &mtk_mt7623_boot },
+ 	{},
+ };
+ 
+-- 
+1.9.1
 
-As far as I know, this was a issue on some specific version of Cortex-a57.
-For timer-tegra20, which was designed for the very early stage that TWD 
-driver was not ready yet for Tegra 32 bit chips (Tegra20/30). Currently, 
-it has been replaced by ARM TWD and V7 timer driver. It didn't been used 
-and maintained for quite a long time.
-
-BTW, we had very similar issue with idle power-down state with Tegra 
-32bit chips. But it's related to GIC not timer. See below two changes 
-for reference.
-
-For Tegra20,
-d4b92fb2535a ARM: tegra: add pending SGI checking API
-
-For Tegra114/124,
-7e8b15dbc392 ARM: tegra114: Reprogram GIC CPU interface to bypass IRQ on 
-CPU PM entry
-
-Thanks,
-Joseph
 
 _______________________________________________
 linux-arm-kernel mailing list
