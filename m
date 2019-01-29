@@ -7,18 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E6E87C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:14:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3EC71C282C7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:14:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B02CD2175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:14:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0EB2B2175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:14:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aitplfSK";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="rQptscbi";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="lgsh2r26"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B02CD2175B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ygxu/BAh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="sgEjzDtJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0EB2B2175B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,49 +26,32 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=x03uug/ihOOyOitquiKgIe5tLeKpkjI2wiEO8Ykpnok=; b=aitplfSKSDd5me
-	5UUE3I4B1e9wo3KL5lCJ9yQjf9Q9q7W0Sl21Pp++u8or/iwHirNROnxm8hM/do9KO+s55ytlr2QcP
-	F06Bo6IkK70MvXiXdl9Hz1bQc+eILYE24mcKu2FX3LoioRYXjK7Oy3gUqM1doI5GD9/PKXHBpPMJd
-	4lRicXzE4+b450dq2/nY31quf9pvPP0q5m5ynsEQXBfGj9qsWGIoNb8ShTVaSYzQXsvDUrg7BDkRB
-	wa2U7Vb+cZDVVWiyzd/AE5fSxlfvw9v4+n0rD+VhZf+c1paauA1j35u0/DAMjI8EDHh1ywC1cY2GZ
-	pyVMmuuv+J/ZSaMEU1CA==;
+	List-Owner; bh=fjXFleSsAdB8hkFnO+d5TscPpRtGSOxmFNJQHokvEVk=; b=Ygxu/BAhPLaouW
+	FudoxuRLC3Qk4JkdyLuDc0JAtMFrKoPkGbSBgOUw7Y3zjUE51IZ7Z0TU1amzvuTz3KjrIR9ee33uq
+	/APNmicbdL8v9pRq2rKY6B2kFsBHe5Dwk9ngA0ZiCelJIEi+YCFn2Jpbj9XY6MZgQiKZTEcypUjuT
+	F8DUfbk5ooM5jHJtedvCsaeo2G1XQlR32QLmBQ7rV7qfzW3JMP1+rDVRyqrcCC/7CydoknjE9MUJ3
+	h6RO5rkDrv9W2sP7C20lOMU766EIVnJub1enNCXZn0IkK9vszTeXNu4yA9Gd+0nsh2jGGXYAScqrd
+	mhVAr1jnKzNAlsgMpx/A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goOX2-0001Gt-Pz; Tue, 29 Jan 2019 08:14:08 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1goOXJ-0001YH-W4; Tue, 29 Jan 2019 08:14:26 +0000
+Received: from mail-eopbgr20055.outbound.protection.outlook.com ([40.107.2.55]
+ helo=EUR02-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goOTq-0006fa-71
- for linux-arm-kernel@bombadil.infradead.org; Tue, 29 Jan 2019 08:10:50 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=MIME-Version:Content-Transfer-Encoding:
- Content-Type:In-Reply-To:References:Message-ID:Date:Subject:CC:To:From:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=yswwHhxY3CmA5odLLO+DpwEYMpJo6mlvclSAye3x2g0=; b=rQptscbitGMi8ZWFShXl3MtOFU
- PCodm7EyneufgkivItEkj+AeCMpRnyWnsQ3Nauv84eVQAGq/rfomt7zF4MipfxM/ugxgmU0NhgO0W
- z5irZ3MqUahzZ9Hu/THzWVMWKef/T6a8u17oN8a1vZSwoq1RhoHdN5KezdD/075GVItD02YzuLFyi
- SAEfPE/HevWlTIV8LXanpZAPXvGbcCMchn5LdH1jbYuGAjCNUi6NerZI7UPWhMKzC8wkI/ohsog2X
- zHpJJjiwcjw+gX/0Lw1hsU/JfHXNtpLEWX8bP4l9bUPNLqc3j5UmhFN1ahzNGNZWV0yX28h4J+tbE
- rH8obxQw==;
-Received: from mail-he1eur04on0625.outbound.protection.outlook.com
- ([2a01:111:f400:fe0d::625]
- helo=EUR04-HE1-obe.outbound.protection.outlook.com)
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goOTn-0007Xj-5P
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:10:48 +0000
+ id 1goOTu-0006h6-Ua
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:11:38 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=yswwHhxY3CmA5odLLO+DpwEYMpJo6mlvclSAye3x2g0=;
- b=lgsh2r26WnDzk8ABe+1mSf4TyQkJSoWSkquWsZjDfQUuonvdfw9JCaEilo2m9afdPf8MXISsRHTyy9rwZ41kWITBVtk6SKh6dPyD5qx3ZzPkNwZrYvHhAnj+Jql+ypLMJ9hEaPxmwEr2oDLaO57lZoJImheXsYfIPx5MocCSkoo=
+ bh=i57eLhu1gSG894+3Og8uPuG1ib/zZBt1UPBxJiNBkKY=;
+ b=sgEjzDtJXKKLNh57jAy+8Z2CmoA+mwU6qWA8uk/sFAgvnz+nlbnptZN4bMAZk1XxG0jH+uNntjtEZIEXRGFm2DAtOqzIwk+6yy6neRSDEGhtsiQAFJ5AP/VZSc+tZqWSka6ghK5LfdvBm0m/FxfybZ8GmNc1d9/orPus3B6O6MA=
 Received: from AM6PR04MB5781.eurprd04.prod.outlook.com (20.179.3.19) by
- AM6PR04MB4728.eurprd04.prod.outlook.com (20.177.32.205) with Microsoft SMTP
+ AM6PR04MB6117.eurprd04.prod.outlook.com (20.179.7.206) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1558.21; Tue, 29 Jan 2019 08:10:43 +0000
+ 15.20.1580.16; Tue, 29 Jan 2019 08:10:49 +0000
 Received: from AM6PR04MB5781.eurprd04.prod.outlook.com
  ([fe80::9c0:e3aa:b41f:9504]) by AM6PR04MB5781.eurprd04.prod.outlook.com
  ([fe80::9c0:e3aa:b41f:9504%3]) with mapi id 15.20.1558.023; Tue, 29 Jan 2019
- 08:10:43 +0000
+ 08:10:49 +0000
 From: "Z.q. Hou" <zhiqiang.hou@nxp.com>
 To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
  "linux-arm-kernel@lists.infradead.org"
@@ -82,13 +64,13 @@ To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
  Leo Li <leoyang.li@nxp.com>, "lorenzo.pieralisi@arm.com"
  <lorenzo.pieralisi@arm.com>, "catalin.marinas@arm.com"
  <catalin.marinas@arm.com>, "will.deacon@arm.com" <will.deacon@arm.com>
-Subject: [PATCHv3 21/27] PCI: mobiveil: make mobiveil_host_init can be used to
- re-init host
-Thread-Topic: [PATCHv3 21/27] PCI: mobiveil: make mobiveil_host_init can be
- used to re-init host
-Thread-Index: AQHUt6ohojgx1Yze4UypyOz4JWt69w==
-Date: Tue, 29 Jan 2019 08:10:42 +0000
-Message-ID: <20190129080926.36773-22-Zhiqiang.Hou@nxp.com>
+Subject: [PATCHv3 22/27] dt-bindings: pci: Add NXP Layerscape SoCs PCIe Gen4
+ controller
+Thread-Topic: [PATCHv3 22/27] dt-bindings: pci: Add NXP Layerscape SoCs PCIe
+ Gen4 controller
+Thread-Index: AQHUt6okOxbMujwBKEGpZZeZBxLQnQ==
+Date: Tue, 29 Jan 2019 08:10:49 +0000
+Message-ID: <20190129080926.36773-23-Zhiqiang.Hou@nxp.com>
 References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
 In-Reply-To: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
 Accept-Language: zh-CN, en-US
@@ -104,37 +86,38 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-mailer: git-send-email 2.17.1
 x-originating-ip: [119.31.174.73]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM6PR04MB4728;
- 6:ahBt7z8yvQIj0BxqwfhxnLeFSB2yf7md9Ra/0F0hNCkvxXyEklm6i4zZ9/FXm6XCBd+u9HiJw3LbUn5wUlZ0074nPP99MRPFW3gESkq5DOJaxvVhVXQT5fjLdI+2/JdLIImtf+dJlrzsycIDDo2vU02dT1wGWfEZjrgAancgmrYNZpJ0nHXj/cQYOAUUs4XYexFonKsoq55vlBi9ORW+9dMMgUvpVJE4MtRF2ZJe6y6eTCCPOn9q8dAcpRMEmgEpMtOmHPCZ0dLFbdH874XsDskdokk4m7jrU6lvBif2OhqNDBpLKx4S+M7NwuvAAGLBn3dYeunOpAApAKgfCYPPFfG6H5nZfEodVHxrNDtNOXKw9eMUbQFOzFDNOaM9IqKbkb8BPdtzcK4upevhRxs1KVcq5jpkhvY4AgEAovL0l97HSxvVXVOggWwfnASYPHth3Zc1sgh9DJrjPSjFNBTmag==;
- 5:nH57VSL0RO7qwMnelXiVMhT6ClqjdqfNW8bRT6v0N6bSHjpQ52YSrBtjhnDNLKBMDnbrLsrXfhkf2UdNEA5r0Zb60pkt5nWUVIzXw9ANmdFL6Ed54Ayj/v3YB6UfK0mxo6Zno79O6LkuSZTsnYs2bXQQNOzMf8XzCh2UyKu4Wx3pzS8XumYCMqBXZvH6x4+s1xMTAUpVd2Z/Eb0Pfkm4Lg==;
- 7:JaX0rahzDq5b3NaUdlvxfXLIscpI0FSUT4yibCQy4XQvGVyj5/nT/6afCW+ZRFxCnEOp6oSi4cIZbfHT+Ca+aDOI9W+hLJHQohELRV21uFdNEwJX1RuJsHSlxfe2Q3CYnuZCUwUC/BS7lu6Byo+Aog==
-x-ms-office365-filtering-correlation-id: 270c9557-7076-4b62-343f-08d685c14359
+x-microsoft-exchange-diagnostics: 1; AM6PR04MB6117;
+ 6:BCKZPIT6SPvbzFrl8W8R9nqi1fNMQYQ02i71xF/obdC+h0gHRW8u9VG+FSL7lJINml4qkt6PLaJ/6N03Fs2PVcBOw2zhiCU/PE1f/6Era2FVncncDCKp9ZDLyQM8viBStJmAhvv1FVzdu7gK+sPNGIhjULIs3ZQ4MG0jMgjAwhQHfDX9ihRDflmi8KvZPf38dDUOjG5f12Y59rYZYGG+7J68ZrWyxmkauBUvdeCT4dBYGFomdUqAgYkgeIOrgvBmh7sweEgAXY2EjNd1ZRW5lTCqKRjk/coQ87T67Xy5Et+MA9Iu47VZJCyqYwOg1DqIt9YUANXbg3CG6rEoQiAQt/47u6VPhtsrUI5Bn0IrFtoUNsH+UEGe7vk7SYyMPaWUwh61H6bFyu4ctjjPIA3gN58LoFdheveEBMQ6f78SD9GW4s5pVJ0adATehelUG0In7U7qGJxQxl80J3+CgvoAMA==;
+ 5:DGJxnOsnLGWbOhVioQBN1ZrusmAgl0dRfaYQHAy9xVR7Zp8yeLRFyLTU24sI5LsyQcLyv5U2CtB1HaHUyfqoZt8ciDmE7LkJ0BEjp/H4721LmfmhM/Qr/bpWlIz9eyGySwimnAluUpIVeNiUTYH2VC1YtHO32bY4JukVL6LInOPWWo9hK6vY/lWF4YSD+pJEpmgkWNqp3j11z8zgNTuIxg==;
+ 7:/aNN86MPXyBeaM20/ZRocpzt4ZHldTsGazr9ltUYTPp/dB3bxhpFIqAtaMd5L9gNbrFEexXw3ZC/rxcOnEXORTtF5Jsh1Qm6ZhuQe0BMgFzPqRei+KjTne4owA32KZksFEaGzBETMsZw1xO0H4xnSQ==
+x-ms-office365-filtering-correlation-id: 51979c69-a84e-47bd-e487-08d685c14712
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM6PR04MB4728; 
-x-ms-traffictypediagnostic: AM6PR04MB4728:
-x-microsoft-antispam-prvs: <AM6PR04MB47286772F45E7052F831F67B84970@AM6PR04MB4728.eurprd04.prod.outlook.com>
+ SRVR:AM6PR04MB6117; 
+x-ms-traffictypediagnostic: AM6PR04MB6117:
+x-microsoft-antispam-prvs: <AM6PR04MB6117A1B0A14B3FF9952BFFCC84970@AM6PR04MB6117.eurprd04.prod.outlook.com>
 x-forefront-prvs: 093290AD39
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(366004)(396003)(39860400002)(346002)(376002)(189003)(199004)(3846002)(7416002)(71190400001)(71200400001)(2201001)(36756003)(4326008)(316002)(6512007)(105586002)(53936002)(6116002)(6436002)(106356001)(6486002)(86362001)(1076003)(97736004)(81166006)(81156014)(476003)(2616005)(486006)(256004)(52116002)(446003)(68736007)(50226002)(478600001)(2501003)(14444005)(8936002)(8676002)(66066001)(6506007)(386003)(2906002)(11346002)(102836004)(110136005)(26005)(54906003)(76176011)(305945005)(186003)(7736002)(99286004)(25786009)(14454004)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB4728;
+ SFS:(10009020)(6029001)(396003)(366004)(346002)(376002)(39860400002)(136003)(199004)(189003)(3846002)(6116002)(486006)(81166006)(81156014)(8676002)(7416002)(106356001)(14454004)(478600001)(386003)(446003)(11346002)(186003)(102836004)(476003)(6506007)(8936002)(50226002)(105586002)(68736007)(71190400001)(2906002)(2616005)(71200400001)(36756003)(2501003)(66066001)(97736004)(26005)(4326008)(25786009)(6436002)(6486002)(53936002)(6512007)(256004)(54906003)(7736002)(14444005)(99286004)(305945005)(76176011)(2201001)(110136005)(1076003)(316002)(86362001)(52116002)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB6117;
  H:AM6PR04MB5781.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
+ PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: HzNbQtwRanj6ULymwgzmb9sxenkKldORt08448TJ0GmAnYzo6oqK+KGrWwSnXoscKjgG0td/maxPLJQiZV39P1Dxx7dJXqIvZXFfEgkW6PKdaBU3d9J6OPMubsu2RLZINPz7hFPZY/gVl8hhK3DfWx7D3/+a6xGChQ3CKAPMUt9yElCS4jtARdKoZ9lV0TRBHmIajhXcGWMh8d28m/KELu/CcrjTmDdmupxtNfD7eqmqGyEW/Nti+NdGXQpnqk2ZgogT4JQhCIcuYSr4mAXvl31QkD7JVg+CycsySmR84b/Y48ywSfUXIFLdQdjRrfLcnLk3gocMnfcnv9nMSqXg6nwcqPZiiKV6YTFLzTjXUqu+5BxoNjJcdjvVJ0kqKyAarbvdKFeu+7wpa97f1LrYK0vxpBEBnKoNTiTKMjvMHoU=
+x-microsoft-antispam-message-info: J19CwNJ3Kl4A+ahzVZTzvy1DIx6/v9ie/5LG2IRmruf3KBPe2I8W3+trscToRlGJn8B3Xs5u6SpOjf++36eDULbeZL+fbpEZdtWxEpMsc4q4DJ8FyhYmXk/Gy6XxIvmiY2mD4wPWxKWQA88Az6o+d79JJZHhdZj1WvjXQBmVma3mfdU/lH0n4xM6/X8aZlvbMd4wnlffGbW9PRGyP773ttl1L4+XsSsLeKveygaywy4+Z1XvikD8VKi5u/m8ejZWh9rG43qjVMXfFeTc2tRZNs1iS9kwFkBgj9Dh8W8A2TkKuDdYX5gRk9pn6Vsedz1g9yjTL6yEWeV8tKIjjPbruW39qLMf8ntpCvXXAOJRHKSzP2UcmClKc+m4ylRTl0tFQmzAKpNP5jze85/EWphpKvGB88DYdYKqfy7a5NdZV/k=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 270c9557-7076-4b62-343f-08d685c14359
-X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 08:10:36.8511 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 51979c69-a84e-47bd-e487-08d685c14712
+X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 08:10:43.1012 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB4728
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB6117
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_031047_236463_E660AD73 
-X-CRM114-Status: GOOD (  17.93  )
+X-CRM114-CacheID: sfid-20190129_001055_302238_B03D775F 
+X-CRM114-Status: GOOD (  14.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -155,154 +138,96 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-Make the mobiveil_host_init function can be used to re-init
-host controller's PAB and GPEX CSR register block, as NXP
-integrated Mobiveil IP has to reset and then re-init the PAB
-and GPEX CSR registers upon Hot-reset.
+Add PCIe Gen4 controller DT bindings of NXP Layerscape SoCs.
 
 Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 ---
 V3:
- - Removed the duplicated free opteration of pcie->resources.
+ - Change back to use an new doc for Layerscape PCIe Gen4 DT bindings.
+ - Switch the order of "csr_axi_slave" and "config_axi_slave".
 
- .../controller/mobiveil/pcie-mobiveil-host.c  | 41 ++++++++++---------
- .../pci/controller/mobiveil/pcie-mobiveil.h   |  3 +-
- 2 files changed, 23 insertions(+), 21 deletions(-)
+ .../bindings/pci/layerscape-pci-gen4.txt      | 52 +++++++++++++++++++
+ MAINTAINERS                                   |  8 +++
+ 2 files changed, 60 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/layerscape-pci-gen4.txt
 
-diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-index d028cdf31d0e..e8d0c4989013 100644
---- a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-+++ b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-@@ -217,7 +217,7 @@ static void mobiveil_pcie_enable_msi(struct mobiveil_pcie *pcie)
- 	writel_relaxed(1, pcie->apb_csr_base + MSI_ENABLE_OFFSET);
- }
- 
--static int mobiveil_host_init(struct mobiveil_pcie *pcie)
-+int mobiveil_host_init(struct mobiveil_pcie *pcie, bool reinit)
- {
- 	u32 value, pab_ctrl, type;
- 	struct resource_entry *win;
-@@ -229,11 +229,16 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- 	for (i = 0; i < pcie->ppio_wins; i++)
- 		mobiveil_pcie_disable_ib_win(pcie, i);
- 
--	/* setup bus numbers */
--	value = csr_readl(pcie, PCI_PRIMARY_BUS);
--	value &= 0xff000000;
--	value |= 0x00ff0100;
--	csr_writel(pcie, value, PCI_PRIMARY_BUS);
-+	pcie->ib_wins_configured = 0;
-+	pcie->ob_wins_configured = 0;
+diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci-gen4.txt b/Documentation/devicetree/bindings/pci/layerscape-pci-gen4.txt
+new file mode 100644
+index 000000000000..b40fb5d15d3d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/layerscape-pci-gen4.txt
+@@ -0,0 +1,52 @@
++NXP Layerscape PCIe Gen4 controller
 +
-+	if (!reinit) {
-+		/* setup bus numbers */
-+		value = csr_readl(pcie, PCI_PRIMARY_BUS);
-+		value &= 0xff000000;
-+		value |= 0x00ff0100;
-+		csr_writel(pcie, value, PCI_PRIMARY_BUS);
-+	}
- 
- 	/*
- 	 * program Bus Master Enable Bit in Command Register in PAB Config
-@@ -279,7 +284,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- 	program_ib_windows(pcie, WIN_NUM_0, 0, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
- 
- 	/* Get the I/O and memory ranges from DT */
--	resource_list_for_each_entry(win, &pcie->resources) {
-+	resource_list_for_each_entry(win, pcie->resources) {
- 		if (resource_type(win->res) == IORESOURCE_MEM) {
- 			type = MEM_WINDOW_TYPE;
- 		} else if (resource_type(win->res) == IORESOURCE_IO) {
-@@ -550,8 +555,6 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
- 	resource_size_t iobase;
- 	int ret;
- 
--	INIT_LIST_HEAD(&pcie->resources);
--
- 	ret = mobiveil_pcie_parse_dt(pcie);
- 	if (ret) {
- 		dev_err(dev, "Parsing DT failed, ret: %x\n", ret);
-@@ -565,34 +568,35 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
- 
- 	/* parse the host bridge base addresses from the device tree file */
- 	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
--						    &pcie->resources, &iobase);
-+						    &bridge->windows, &iobase);
- 	if (ret) {
- 		dev_err(dev, "Getting bridge resources failed\n");
- 		return ret;
- 	}
- 
-+	pcie->resources = &bridge->windows;
++This PCIe controller is based on the Mobiveil PCIe IP and thus inherits all
++the common properties defined in mobiveil-pcie.txt.
 +
- 	/*
- 	 * configure all inbound and outbound windows and prepare the RC for
- 	 * config access
- 	 */
--	ret = mobiveil_host_init(pcie);
-+	ret = mobiveil_host_init(pcie, false);
- 	if (ret) {
- 		dev_err(dev, "Failed to initialize host\n");
--		goto error;
-+		return ret;
- 	}
++Required properties:
++- compatible: should contain the platform identifier such as:
++  "fsl,lx2160a-pcie"
++- reg: base addresses and lengths of the PCIe controller register blocks.
++  "csr_axi_slave": Bridge config registers
++  "config_axi_slave": PCIe controller registers
++- interrupts: A list of interrupt outputs of the controller. Must contain an
++  entry for each entry in the interrupt-names property.
++- interrupt-names: It could include the following entries:
++  "intr": The interrupt that is asserted for controller interrupts
++  "aer": Asserted for aer interrupt when chip support the aer interrupt with
++	 none MSI/MSI-X/INTx mode,but there is interrupt line for aer.
++  "pme": Asserted for pme interrupt when chip support the pme interrupt with
++	 none MSI/MSI-X/INTx mode,but there is interrupt line for pme.
++- dma-coherent: Indicates that the hardware IP block can ensure the coherency
++  of the data transferred from/to the IP block. This can avoid the software
++  cache flush/invalid actions, and improve the performance significantly.
++- msi-parent : See the generic MSI binding described in
++  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
++
++Example:
++
++	pcie@3400000 {
++		compatible = "fsl,lx2160a-pcie";
++		reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
++		       0x80 0x00000000 0x0 0x00001000>; /* configuration space */
++		reg-names = "csr_axi_slave", "config_axi_slave";
++		interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /* AER interrupt */
++			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /* PME interrupt */
++			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
++		interrupt-names = "aer", "pme", "intr";
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		apio-wins = <8>;
++		ppio-wins = <8>;
++		dma-coherent;
++		bus-range = <0x0 0xff>;
++		msi-parent = <&its>;
++		ranges = <0x82000000 0x0 0x40000000 0x80 0x40000000 0x0 0x40000000>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 0 7>;
++		interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
++				<0000 0 0 2 &gic 0 0 GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
++				<0000 0 0 3 &gic 0 0 GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>,
++				<0000 0 0 4 &gic 0 0 GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
++	};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 3bca9642b08b..16b9f56fadba 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -11667,6 +11667,14 @@ L:	linux-arm-kernel@lists.infradead.org
+ S:	Maintained
+ F:	drivers/pci/controller/dwc/*layerscape*
  
- 	ret = mobiveil_pcie_interrupt_init(pcie);
- 	if (ret) {
- 		dev_err(dev, "Interrupt init failed\n");
--		goto error;
-+		return ret;
- 	}
- 
--	ret = devm_request_pci_bus_resources(dev, &pcie->resources);
-+	ret = devm_request_pci_bus_resources(dev, pcie->resources);
- 	if (ret)
--		goto error;
-+		return ret;
- 
- 	/* Initialize bridge */
--	list_splice_init(&pcie->resources, &bridge->windows);
- 	bridge->dev.parent = dev;
- 	bridge->sysdata = pcie;
- 	bridge->busnr = pcie->rp.root_bus_nr;
-@@ -608,7 +612,7 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
- 	/* setup the kernel resources for the newly added PCIe root bus */
- 	ret = pci_scan_root_bus_bridge(bridge);
- 	if (ret)
--		goto error;
-+		return ret;
- 
- 	bus = bridge->bus;
- 
-@@ -618,7 +622,4 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
- 	pci_bus_add_devices(bus);
- 
- 	return 0;
--error:
--	pci_free_resource_list(&pcie->resources);
--	return ret;
- }
-diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil.h b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-index 933c2f34bc52..0f5303962e88 100644
---- a/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-+++ b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-@@ -152,7 +152,7 @@ struct mobiveil_pab_ops {
- 
- struct mobiveil_pcie {
- 	struct platform_device *pdev;
--	struct list_head resources;
-+	struct list_head *resources;
- 	void __iomem *csr_axi_slave_base;	/* PAB registers base */
- 	phys_addr_t pcie_reg_base;	/* Physical PCIe Controller Base */
- 	void __iomem *apb_csr_base;	/* MSI register base */
-@@ -165,6 +165,7 @@ struct mobiveil_pcie {
- };
- 
- int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie);
-+int mobiveil_host_init(struct mobiveil_pcie *pcie, bool reinit);
- bool mobiveil_pcie_link_up(struct mobiveil_pcie *pcie);
- int mobiveil_bringup_link(struct mobiveil_pcie *pcie);
- void program_ob_windows(struct mobiveil_pcie *pcie, int win_num, u64 cpu_addr,
++PCI DRIVER FOR NXP LAYERSCAPE GEN4 CONTROLLER
++M:	Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
++L:	linux-pci@vger.kernel.org
++L:	linux-arm-kernel@lists.infradead.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/pci/layerscape-pci-gen4.txt
++F:	drivers/pci/controller/mobibeil/pci-layerscape-gen4.c
++
+ PCI DRIVER FOR GENERIC OF HOSTS
+ M:	Will Deacon <will.deacon@arm.com>
+ L:	linux-pci@vger.kernel.org
 -- 
 2.17.1
 
