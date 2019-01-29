@@ -2,64 +2,71 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 27805C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:44:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5EFDEC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:48:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E9FD321848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:44:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 323C92087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:48:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KoIRcSgn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E9FD321848
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ReFMaOWT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 323C92087F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KA5IwSMCAp8YAe9CvASH7uJ3YBRNuneGy+Hp38S/JNs=; b=KoIRcSgn8Ks+Pr
-	bxGdikBSJZnQJSywZYmA4AqY61COW1xGKNFEiZa3bgqhKNVCzsj7Jq4SgE4CcQxzvluo7PNvXpUzs
-	X4AdTSW9TPljy37AsHC5Zm8HEKu+FV/6WZUF7GEBD3aF75wenz02t8EQalrIKpr6gEUWbwvNQYC5u
-	lIRc+h8RkGP7bnpDIfSVsqSXkJail4hO9QW99u1WZRjb2jKCAWIJCMl006T0yKK52BrFr6xex+YBv
-	19LTB0oNIiLgg4FiQ2Iu90jd3CvTzbr7dbM8nqVEnz12iIIUa7gnkaY5gOPRcoEw5tH+792nkWIcr
-	XgR9eP0Jj3vSOUvAjD2A==;
+	List-Owner; bh=XJh/axGwl0KvSOwWHogGxSlLwV4ig+6Gn31b2JBH7Tc=; b=ReFMaOWTpJF5rU
+	RLV47JeyCbnmYbZO50V2QitvEVHhv79ugjuZh+1Ct9cNqjCn8hfUpy0E68PRiSQwoF45Io1eD9Aqj
+	6Le0J8qRwsMap8PMa6Mr2zZn6PNs3baeZC1TdFgjEX7r0JlWJS7aoAy5FqT3jqfjvG8CDgSKVbGZf
+	oiF5j+cUc5/Akr55xexqNp7JoW1Iw59dWBxpBSMt5RsuqgtOuk7HIqEBDiWS9lX1JfAAVYoDhi0lY
+	nGB5zX6ki2k5m9sPkTs6MURUUzl3fqltDx5VJvg6kICzQAl/ZHj/iumXJS4T4b8hosjl08npLsV9M
+	yRygUl7wPuorBODmv1Vw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goYNM-0003X1-PJ; Tue, 29 Jan 2019 18:44:48 +0000
+	id 1goYRO-00058Q-Bo; Tue, 29 Jan 2019 18:48:58 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goYNI-0003Wb-9e
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 18:44:46 +0000
+ id 1goYRK-00057i-Py
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 18:48:56 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4A9F5A78;
- Tue, 29 Jan 2019 10:44:41 -0800 (PST)
-Received: from [10.1.197.21] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 397313F557; Tue, 29 Jan 2019 10:44:40 -0800 (PST)
-From: Kristina Martsenko <kristina.martsenko@arm.com>
-Subject: Re: [PATCH v3] arm64: add ptrace regsets for ptrauth key management
-To: Dave Martin <Dave.Martin@arm.com>
-References: <20190123153519.7874-1-kristina.martsenko@arm.com>
- <20190123173750.GM3578@e103592.cambridge.arm.com>
-Message-ID: <02c2e38e-2e04-9867-6f7d-cf79e4f49c12@arm.com>
-Date: Tue, 29 Jan 2019 18:44:38 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C97D9A78;
+ Tue, 29 Jan 2019 10:48:52 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 120C33F557;
+ Tue, 29 Jan 2019 10:48:49 -0800 (PST)
+Subject: Re: [PATCH v7 10/25] ACPI / APEI: Tell firmware the estatus queue
+ consumed the records
+To: Tyler Baicar <baicar.tyler@gmail.com>
+References: <20181203180613.228133-1-james.morse@arm.com>
+ <20181203180613.228133-11-james.morse@arm.com>
+ <20181211183634.GO27375@zn.tnic>
+ <56cfa16b-ece4-76e0-3799-58201f8a4ff1@arm.com>
+ <CABo9ajArdbYMOBGPRa185yo9MnKRb0pgS-pHqUNdNS9m+kKO-Q@mail.gmail.com>
+ <20190111120322.GD4729@zn.tnic>
+ <CABo9ajAk5XNBmNHRRfUb-dQzW7-UOs5826jPkrVz-8zrtMUYkg@mail.gmail.com>
+ <0939c14d-de58-f21d-57a6-89bdce3bcb44@arm.com>
+ <CABo9ajB9TAkycLbe++yyDibXx33MntNV_Hy27JSXCVsvP6rf7g@mail.gmail.com>
+From: James Morse <james.morse@arm.com>
+Message-ID: <1530de77-3f9d-f214-216e-42eec7d757b7@arm.com>
+Date: Tue, 29 Jan 2019 18:48:40 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <20190123173750.GM3578@e103592.cambridge.arm.com>
-Content-Language: en-US
+In-Reply-To: <CABo9ajB9TAkycLbe++yyDibXx33MntNV_Hy27JSXCVsvP6rf7g@mail.gmail.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_104444_354182_745FFA3E 
-X-CRM114-Status: GOOD (  40.15  )
+X-CRM114-CacheID: sfid-20190129_104854_867118_A47DA37C 
+X-CRM114-Status: GOOD (  12.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,327 +78,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Amit Kachhap <amit.kachhap@arm.com>,
- Will Deacon <will.deacon@arm.com>, linux-arm-kernel@lists.infradead.org
+Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
+ Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Dongjiu Geng <gengdongjiu@huawei.com>, Linux ACPI <linux-acpi@vger.kernel.org>,
+ Borislav Petkov <bp@alien8.de>, Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>,
+ kvmarm@lists.cs.columbia.edu,
+ arm-mail-list <linux-arm-kernel@lists.infradead.org>,
+ Len Brown <lenb@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 23/01/2019 17:37, Dave Martin wrote:
-> On Wed, Jan 23, 2019 at 03:35:19PM +0000, Kristina Martsenko wrote:
->> Add two new ptrace regsets, which can be used to request and change the
->> pointer authentication keys of a thread. NT_ARM_PACA_KEYS gives access
->> to the instruction/data address keys, and NT_ARM_PACG_KEYS to the
->> generic authentication key. The keys are also part of the core dump file
->> of the process.
-> 
-> Is there a use case for including these in the coredump?  Perhaps it
-> would make sense to suppress them.  If the core code doesn't make that
-> easy it may not be worth it though.
+Hi Tyler,
 
-From what I can see there is no proper way to exclude the keys from the
-core dump. There is an ->active() callback on struct user_regset, which
-could be implemented to always return 0, which would exclude the keys
-from the core dump. But while the callback seems to currently only be
-used for the core dump, its purpose seems to be more general, so I don't
-think it would be right to have it always return 0.
-
-> Including the keys in a coredump doesn't feel like a security risk,
-> unless the checkpoint restore folks have a way of resurrecting dead
-> processes from coredumps.  Otherwise, (statistically) no new process
-> will have the same keys anyway.
-> 
->> The regsets are only exposed if the kernel is compiled with
->> CONFIG_CHECKPOINT_RESTORE=y, as the only intended use case is
->> checkpointing and restoring processes that are using pointer
->> authentication. (This can be changed later if there are other use
->> cases.)
+On 11/01/2019 20:53, Tyler Baicar wrote:
+> On Fri, Jan 11, 2019 at 1:09 PM James Morse <james.morse@arm.com> wrote:
+>> We can return on ENOENT out earlier, as nothing needs doing in that case. Its
+>> what the GHES_TO_CLEAR spaghetti is for, we can probably move the ack thing into
+>> ghes_clear_estatus(), that way that thing means 'I'm done with this memory'.
 >>
->> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+>> Something like:
+>> -------------------------
+>> rc = ghes_read_estatus();
+>> if (rc == -ENOENT)
+>>         return 0;
 > 
-> I think this looks nicer overall.
-> 
-> A few comments, which are all nits except for the questions about the
-> memset() calls.
-> 
->> ---
->>
->> Changes in v3:
->>  - 128-bit keys in uapi struct, conversions to/from ptrauth_keys fields
->>  - Commit message tweaks
->>
->>  Documentation/arm64/pointer-authentication.txt |   5 +
->>  arch/arm64/include/uapi/asm/ptrace.h           |  13 +++
->>  arch/arm64/kernel/ptrace.c                     | 139 +++++++++++++++++++++++++
->>  include/uapi/linux/elf.h                       |   2 +
->>  4 files changed, 159 insertions(+)
->>
->> diff --git a/Documentation/arm64/pointer-authentication.txt b/Documentation/arm64/pointer-authentication.txt
->> index a25cd21290e9..5baca42ba146 100644
->> --- a/Documentation/arm64/pointer-authentication.txt
->> +++ b/Documentation/arm64/pointer-authentication.txt
->> @@ -78,6 +78,11 @@ bits can vary between the two. Note that the masks apply to TTBR0
->>  addresses, and are not valid to apply to TTBR1 addresses (e.g. kernel
->>  pointers).
->>  
->> +Additionally, when CONFIG_CHECKPOINT_RESTORE is also set, the kernel
->> +will expose the NT_ARM_PACA_KEYS and NT_ARM_PACG_KEYS regsets (struct
->> +user_pac_address_keys and struct user_pac_generic_keys). These can be
->> +used to get and set the keys for a thread.
->> +
->>  
->>  Virtualization
->>  --------------
->> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
->> index 28d77c9ed531..d78623acb649 100644
->> --- a/arch/arm64/include/uapi/asm/ptrace.h
->> +++ b/arch/arm64/include/uapi/asm/ptrace.h
->> @@ -233,6 +233,19 @@ struct user_pac_mask {
->>  	__u64		insn_mask;
->>  };
->>  
->> +/* pointer authentication keys (NT_ARM_PACA_KEYS, NT_ARM_PACG_KEYS) */
->> +
->> +struct user_pac_address_keys {
->> +	__uint128_t	apiakey;
->> +	__uint128_t	apibkey;
->> +	__uint128_t	apdakey;
->> +	__uint128_t	apdbkey;
->> +};
->> +
->> +struct user_pac_generic_keys {
->> +	__uint128_t	apgakey;
->> +};
->> +
->>  #endif /* __ASSEMBLY__ */
->>  
->>  #endif /* _UAPI__ASM_PTRACE_H */
->> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->> index 9dce33b0e260..102f71fe0288 100644
->> --- a/arch/arm64/kernel/ptrace.c
->> +++ b/arch/arm64/kernel/ptrace.c
->> @@ -979,6 +979,123 @@ static int pac_mask_get(struct task_struct *target,
->>  
->>  	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, &uregs, 0, -1);
->>  }
->> +
->> +#ifdef CONFIG_CHECKPOINT_RESTORE
->> +static void pac_address_keys_to_user(struct user_pac_address_keys *ukeys,
->> +				     struct ptrauth_keys *keys)
-> 
-> const?
+> We still should be returning at least the -ENOENT from ghes_read_estatus().
+> That is being used by the SEA handling to determine if an SEA was properly
+> reported/handled by the host kernel in the KVM SEA case.
 
-Done.
+Sorry, my terrible example code. You'll be glad to know I would have caught this
+when testing it!
 
->> +{
->> +	ukeys->apiakey = ((__uint128_t)keys->apia.hi << 64) | keys->apia.lo;
-> 
-> We could have a helper
-> 
-> static __uint128_t key_to_user(struct ptrauth_key const *key)
-> {
-> 	return (__uint128_t)key->hi << 64 | key->lo;
-> }
-> 
-> and then do
-> 
-> 	ukeys->apiakey = key_to_user(&keys->apia);
-> 	ukeys->apibkey = key_to_user(&keys->apib);
 
-Done.
+Thanks,
 
->> +	ukeys->apibkey = ((__uint128_t)keys->apib.hi << 64) | keys->apib.lo;
->> +	ukeys->apdakey = ((__uint128_t)keys->apda.hi << 64) | keys->apda.lo;
->> +	ukeys->apdbkey = ((__uint128_t)keys->apdb.hi << 64) | keys->apdb.lo;
->> +}
->> +
->> +static void pac_address_keys_from_user(struct user_pac_address_keys *ukeys,
-> 
-> const?
-
-Done.
-
->> +				       struct ptrauth_keys *keys)
-> 
-> Is the argument order for this function intentional?
-> 
-> It means that for pac_address_keys_to_user() the destination argument is
-> on the left, but in pac_address_keys_from_user() the destination
-> argument is on the right.
-> 
-> This is mildly confusing, but because the arguments are of different
-> types the compiler should catch mistakes (especially if the const is
-> added appropriately.)
-> 
-> If this is following a pattern already set elsewhere, then fair enough.
-
-I think the order is accidental here. I'll move the destination argument
-to the left.
-
->> +{
->> +	keys->apia.lo = (unsigned long)ukeys->apiakey;
->> +	keys->apia.hi = (unsigned long)(ukeys->apiakey >> 64);
-> 
-> Similarly, we could have 
-> 
-> static struct ptrauth_key key_from_user(__uint128_t ukey)
-> {
-> 	struct ptrauth_key key = {
-> 		.lo = (unsigned long)ukey;
-> 		.hi = (unsigned long)(ukey >> 64);
-> 	};
-> 
-> 	return key;
-> }
-> 
-> 	keys->apia = key_from_user(ukeys->apiakey);
-> 	keys->apib = key_from_user(ukeys->apibkey);
-> 
-> These factorings may be overkill though.
-
-Done.
-
->> +	keys->apib.lo = (unsigned long)ukeys->apibkey;
->> +	keys->apib.hi = (unsigned long)(ukeys->apibkey >> 64);
->> +	keys->apda.lo = (unsigned long)ukeys->apdakey;
->> +	keys->apda.hi = (unsigned long)(ukeys->apdakey >> 64);
->> +	keys->apdb.lo = (unsigned long)ukeys->apdbkey;
->> +	keys->apdb.hi = (unsigned long)(ukeys->apdbkey >> 64);
->> +}
->> +
->> +static int pac_address_keys_get(struct task_struct *target,
->> +				const struct user_regset *regset,
->> +				unsigned int pos, unsigned int count,
->> +				void *kbuf, void __user *ubuf)
->> +{
->> +	struct ptrauth_keys *keys = &target->thread.keys_user;
->> +	struct user_pac_address_keys user_keys;
->> +
->> +	if (!system_supports_address_auth())
->> +		return -EINVAL;
->> +
->> +	memset(&user_keys, 0, sizeof(user_keys));
-> 
-> Why this memset?
-
-From your previous email [1], I understood that you wanted the user
-struct zeroed to avoid leaking kernel stack to userspace through padding
-bits, even if the keys are 128-bit (or 64-bit) and there shouldn't be
-any padding bits anyway. I don't personally think that the struct needs
-to be zeroed (since there shouldn't be any padding), so if it's alright
-with you I'll remove the memset.
-
-[1] https://lore.kernel.org/lkml/20181212152347.GY3505@e103592.cambridge.arm.com/
-
-> (In particular, we have no similar memset in pac_address_keys_get().
-
-I guess you mean pac_address_keys_set. We only copy the fields into the
-kernel struct there, not the padding, so this issue doesn't apply.
-
-> Maybe it's needed for some reason I've missed, but I don't see it.)
-> 
->> +	pac_address_keys_to_user(&user_keys, keys);
->> +
->> +	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
->> +				   &user_keys, 0, -1);
->> +}
->> +
->> +static int pac_address_keys_set(struct task_struct *target,
->> +				const struct user_regset *regset,
->> +				unsigned int pos, unsigned int count,
->> +				const void *kbuf, const void __user *ubuf)
->> +{
->> +	struct ptrauth_keys *keys = &target->thread.keys_user;
->> +	struct user_pac_address_keys user_keys;
->> +	int ret;
->> +
->> +	if (!system_supports_address_auth())
->> +		return -EINVAL;
->> +
->> +	pac_address_keys_to_user(&user_keys, keys);
->> +	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
->> +				 &user_keys, 0, -1);
->> +	if (ret)
->> +		return ret;
->> +	pac_address_keys_from_user(&user_keys, keys);
->> +
->> +	return 0;
->> +}
->> +
->> +static void pac_generic_keys_to_user(struct user_pac_generic_keys *ukeys,
->> +				     struct ptrauth_keys *keys)
-> 
-> const?
-
-Done.
-
->> +{
->> +	ukeys->apgakey = ((__uint128_t)keys->apga.hi << 64) | keys->apga.lo;
->> +}
->> +
->> +static void pac_generic_keys_from_user(struct user_pac_generic_keys *ukeys,
-> 
-> const?
-
-Done.
-
->> +				       struct ptrauth_keys *keys)
->> +{
->> +	keys->apga.lo = (unsigned long)ukeys->apgakey;
->> +	keys->apga.hi = (unsigned long)(ukeys->apgakey >> 64);
-> 
-> (The above helpers could be used here too.)
-> 
->> +}
->> +
->> +static int pac_generic_keys_get(struct task_struct *target,
->> +				const struct user_regset *regset,
->> +				unsigned int pos, unsigned int count,
->> +				void *kbuf, void __user *ubuf)
->> +{
->> +	struct ptrauth_keys *keys = &target->thread.keys_user;
->> +	struct user_pac_generic_keys user_keys;
->> +
->> +	if (!system_supports_generic_auth())
->> +		return -EINVAL;
->> +
->> +	memset(&user_keys, 0, sizeof(user_keys));
-> 
-> Similarly to above, is this needed?
-
-Same reason as above; I'll remove it.
-
-Kristina
-
->> +	pac_generic_keys_to_user(&user_keys, keys);
->> +
->> +	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
->> +				   &user_keys, 0, -1);
->> +}
->> +
->> +static int pac_generic_keys_set(struct task_struct *target,
->> +				const struct user_regset *regset,
->> +				unsigned int pos, unsigned int count,
->> +				const void *kbuf, const void __user *ubuf)
->> +{
->> +	struct ptrauth_keys *keys = &target->thread.keys_user;
->> +	struct user_pac_generic_keys user_keys;
->> +	int ret;
->> +
->> +	if (!system_supports_generic_auth())
->> +		return -EINVAL;
->> +
->> +	pac_generic_keys_to_user(&user_keys, keys);
->> +	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
->> +				 &user_keys, 0, -1);
->> +	if (ret)
->> +		return ret;
->> +	pac_generic_keys_from_user(&user_keys, keys);
->> +
->> +	return 0;
->> +}
+James
 
 _______________________________________________
 linux-arm-kernel mailing list
