@@ -7,62 +7,65 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B1783C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 04:29:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 74AD7C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 04:31:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6A1192175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 04:29:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3FED02175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 04:31:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ud2GNmf+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A1192175B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eNY/YroS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3FED02175B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=+RzoI62wtugOzN36NxbZNKtSy42QFSKe3kNYNDy2Y3Q=; b=Ud2GNmf+RTHY+Q
-	8EaRt6r/probpP3q3N5spJ8HYxGYtouxTvhUpOg/SPXgkHcf8PiUAA+ujoGUNX9H8ngPrmaOZVmxr
-	h6F6OSDtltQKhVnpHwR95J2Ia7YsKQPpYcVDSuYkuhhwCfa4GFOuknD/aX9gy6b0QKrb4nOKXU4Mz
-	U27kI7EA5g7re8rGxVNR8jATN4mP0ifQiLuEIq0X/lSDfiIpmzvi8wlxfI+R9tehqAFPpiRQkLdNI
-	wX2dFiWG4qioMtA9ZFymZRNcWs90eMBeYhQq9/X3zODUqS/TwzxGywCxuBmI2iKQ8yzhnu5udToYC
-	OlpD+oz4+pSlLDlMe7oA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=NknBkl/3dlLpOzRtrjVuKPnCx7Fwy5vJz7GbbvdbRn8=; b=eNY/YroSdflXd4
+	rEMRuLlozxgNwAzfKGhLsfcFWtOYxM8/IR261e3CqV47QVOXVU4CJOUJ7VqJUv4odKbXI2BZkxsRU
+	xTxTxBXdxqTdoeZn7Ai86mt7GRtQU1R8aeLgv9/k8ykr/2LqgGcxK/wA+d3GcN85dR0KTNfwgHBO8
+	wjppal5n2cp9QL9/siUISY9H5DiKswJKLLNlM6cGW3d+2V+qn+Q523Cdz3TZ80RcQ2QWdBd27jUMG
+	2cs1Z9n4HlMdJd8/aUEBZY0/YrP2wcAGZy2CryvxikXXW2YN2nRO/3NkJhp5DqcjwXll9od+xGjNz
+	JV+bKS+80nAN8Ld2oh1A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goL1I-0008Jq-Cw; Tue, 29 Jan 2019 04:29:08 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1goL3m-0001hn-Um; Tue, 29 Jan 2019 04:31:42 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goL1E-0008Iq-Td; Tue, 29 Jan 2019 04:29:06 +0000
-X-UUID: a478b59e2a1d4caa838fc9528ec493ce-20190128
-X-UUID: a478b59e2a1d4caa838fc9528ec493ce-20190128
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
+ id 1goL3g-0001f0-7r; Tue, 29 Jan 2019 04:31:37 +0000
+X-UUID: fb6e1585c381416a9ca50c14a41f5284-20190128
+X-UUID: fb6e1585c381416a9ca50c14a41f5284-20190128
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
  (envelope-from <ryder.lee@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 411352679; Mon, 28 Jan 2019 20:28:59 -0800
+ with ESMTP id 705133501; Mon, 28 Jan 2019 20:31:33 -0800
 Received: from mtkmbs08n1.mediatek.inc (172.21.101.55) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 28 Jan 2019 20:28:57 -0800
+ MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 28 Jan 2019 20:31:31 -0800
 Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
  mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 29 Jan 2019 12:28:55 +0800
+ 15.0.1395.4; Tue, 29 Jan 2019 12:31:23 +0800
 Received: from mtkslt306.mediatek.inc (10.21.14.136) by MTKCAS06.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
- Frontend Transport; Tue, 29 Jan 2019 12:28:55 +0800
+ Frontend Transport; Tue, 29 Jan 2019 12:31:23 +0800
 From: Ryder Lee <ryder.lee@mediatek.com>
 To: Matthias Brugger <matthias.bgg@gmail.com>
-Subject: [PATCH 1/7] Revert "ARM: mediatek: add MT7623a smp bringup code"
-Date: Tue, 29 Jan 2019 12:28:48 +0800
-Message-ID: <d1ab6c89b115ad0582815816490fa0c13ea83178.1548735271.git.ryder.lee@mediatek.com>
+Subject: [PATCH 3/7] dt-bindings: arm: mediatek: add support for MT7622
+ BPI-R64 and MT7629 RFB
+Date: Tue, 29 Jan 2019 12:31:15 +0800
+Message-ID: <1421bc57f9f4d5f3e087a1fd38c5fa9ef087dd1b.1548735271.git.ryder.lee@mediatek.com>
 X-Mailer: git-send-email 1.9.1
+In-Reply-To: <d1ab6c89b115ad0582815816490fa0c13ea83178.1548735271.git.ryder.lee@mediatek.com>
+References: <d1ab6c89b115ad0582815816490fa0c13ea83178.1548735271.git.ryder.lee@mediatek.com>
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_202904_959729_DEC065B3 
-X-CRM114-Status: UNSURE (   8.88  )
+X-CRM114-CacheID: sfid-20190128_203136_291571_136A2DC8 
+X-CRM114-Status: UNSURE (   7.76  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -85,48 +88,45 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This reverts commit 3b99ab7deca1e5f4229b4bdecd005d71e22cfc60.
-
-The compatible "mediatek,mt7623a" is useless, so remove it.
+Update binding document for MT7622 BPI-R64 and MT7629 reference board.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- arch/arm/mach-mediatek/mediatek.c | 2 --
- arch/arm/mach-mediatek/platsmp.c  | 1 -
- 2 files changed, 3 deletions(-)
+ Documentation/devicetree/bindings/arm/mediatek.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
-index 6910b4e..c3cf215 100644
---- a/arch/arm/mach-mediatek/mediatek.c
-+++ b/arch/arm/mach-mediatek/mediatek.c
-@@ -30,7 +30,6 @@ static void __init mediatek_timer_init(void)
- 
- 	if (of_machine_is_compatible("mediatek,mt6589") ||
- 	    of_machine_is_compatible("mediatek,mt7623") ||
--	    of_machine_is_compatible("mediatek,mt7623a") ||
- 	    of_machine_is_compatible("mediatek,mt8135") ||
- 	    of_machine_is_compatible("mediatek,mt8127")) {
- 		/* turn on GPT6 which ungates arch timer clocks */
-@@ -50,7 +49,6 @@ static void __init mediatek_timer_init(void)
- 	"mediatek,mt6589",
- 	"mediatek,mt6592",
- 	"mediatek,mt7623",
--	"mediatek,mt7623a",
- 	"mediatek,mt8127",
- 	"mediatek,mt8135",
- 	NULL,
-diff --git a/arch/arm/mach-mediatek/platsmp.c b/arch/arm/mach-mediatek/platsmp.c
-index 6882ff0..51e8556 100644
---- a/arch/arm/mach-mediatek/platsmp.c
-+++ b/arch/arm/mach-mediatek/platsmp.c
-@@ -60,7 +60,6 @@ struct mtk_smp_boot_info {
- static const struct of_device_id mtk_smp_boot_infos[] __initconst = {
- 	{ .compatible   = "mediatek,mt6589", .data = &mtk_mt6589_boot },
- 	{ .compatible   = "mediatek,mt7623", .data = &mtk_mt7623_boot },
--	{ .compatible   = "mediatek,mt7623a", .data = &mtk_mt7623_boot },
- 	{},
- };
- 
+diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+index a3d1b4f..3ebcc9e 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek.txt
+@@ -16,6 +16,7 @@ compatible: Must contain one of
+    "mediatek,mt6797"
+    "mediatek,mt7622"
+    "mediatek,mt7623"
++   "mediatek,mt7629"
+    "mediatek,mt8127"
+    "mediatek,mt8135"
+    "mediatek,mt8173"
+@@ -56,6 +57,9 @@ Supported boards:
+ - Reference board variant 1 for MT7622:
+     Required root node properties:
+       - compatible = "mediatek,mt7622-rfb1", "mediatek,mt7622";
++- Bananapi BPI-R64 for MT7622:
++    Required root node properties:
++      - compatible = "bananapi,bpi-r64", "mediatek,mt7622";
+ - Reference board for MT7623a with eMMC:
+     Required root node properties:
+       - compatible = "mediatek,mt7623a-rfb-emmc", "mediatek,mt7623";
+@@ -67,6 +71,9 @@ Supported boards:
+       - compatible = "mediatek,mt7623n-rfb-emmc", "mediatek,mt7623";
+ - Bananapi BPI-R2 board:
+       - compatible = "bananapi,bpi-r2", "mediatek,mt7623";
++- Reference board for MT7629:
++    Required root node properties:
++      - compatible = "mediatek,mt7629-rfb", "mediatek,mt7629";
+ - MTK mt8127 tablet moose EVB:
+     Required root node properties:
+       - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
 -- 
 1.9.1
 
