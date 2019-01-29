@@ -7,16 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54D32C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:55:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8E3C8C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:56:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1DA8E20844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:55:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6439420844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:56:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FU0PIPqp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1DA8E20844
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="klglN5/L";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="ICyWDv/R"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6439420844
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +26,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ejTmrm+hWeqgHH8wZA3Yg1QH5I9tdPn7czixnoYQK/k=; b=FU0PIPqpEE6lYK
-	qfTafndAKFKHC0+wtAY3EMujuaeP/03S38+zg5VtJmmTBuL/FOaCvEE3ejdZyzSexY76XTxE2/d72
-	kzC7fO5UzIGMVQbfkkKBAL/LH2MFRvRocbCd4PXRCSpg6xdiRcit/AwuRr1U4YpFkpEHMuewa3kWB
-	WLdoHWQ7DICnp2+64P6Q/tSNTv9qtc0KYyPvuXK80Lf+BM4gqwa8EXYdfDGG4ghie2unry3maoSND
-	BbIew2tWWn5WHMfq6Sar8hhOlG+69EBGgtugLH/pGTlprjuzCdxy7xxtB6Ux8LpJFbE2Aas+3m/oV
-	qcDNAduMh8268/AX8gWQ==;
+	List-Owner; bh=nmD8VPjId7asqUHwMD+uGcW6pxIrspsgIJpok/B/t+o=; b=klglN5/LYtWFJ4
+	sR1NMbiYJvC2IYLCtDB85if2apjS4ZL/cBanjQqywXmIT2gKo/ZW0y5bJdYPUD4WnK4T7Z6LYQyGW
+	JVFM21TlozDBjEzUoZp9FbQ1e80uAntT0q4sISk/5AnKIToYrkETjxpdwEeHQRon9rF1VG0IMlUPE
+	yQ4yawTkg7C1xxfmDOAikloZwyWQfRaz2sVT2r1MUIghRKUFwz+5X6P2ti4Gp+eIT3IElOU5gKV25
+	2FfI3Bx+eH4+T6uoEwNejeTVm7olg4vFVpfXDr9N6lrBT/n6bYXHIsOXbVA81gCyjUbrkZ/1Kq0Yy
+	EmbBLBA61K/kgGQNQBQw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goYXx-0004kQ-Gq; Tue, 29 Jan 2019 18:55:45 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goYSQ-0005kG-Lt
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 18:50:06 +0000
+	id 1goYY7-0004tI-TR; Tue, 29 Jan 2019 18:55:55 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goYSu-0007QQ-Rg
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 29 Jan 2019 18:50:33 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=+/VkkUETllQIA07Icbpa2r7ErALoSIv6fRodU1kN9Fs=; b=ICyWDv/RTGOz1IjE7UfeW72fCn
+ 97zHdCP6uzC7yCXPi/ui+1WJF5hwauHI4FUo8R8B3m6VSTBH69qI5pzxl/J0Xrv8i6fLmL+lhRzy8
+ 8K8yr9CjDQfBGOsPGNbaxzf3wxIYABKKNEFkpBYExWjUKYM1ppGXJzougqr841djZLmva1fRn3dfh
+ YdHPt59TJre6w8vOvWk3v0tb/Qom4xPaiLZvQfEV+RV2PH299iaprKsSxN0QWrW76aE1ZVepwGJV1
+ qzSvv2blver8rbBkpS7AzOmhMIFNuaPXsYnW89sdc1lB8+xJYMHm2ws1yq0h1BLBZ3u8FDWsfJdc+
+ wtr8zB+g==;
+Received: from foss.arm.com ([217.140.101.70])
+ by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goYSr-0005YO-Cm
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 18:50:30 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0A08DA78;
- Tue, 29 Jan 2019 10:50:02 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 815EB15AB;
+ Tue, 29 Jan 2019 10:50:25 -0800 (PST)
 Received: from eglon.cambridge.arm.com (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5CF633F557;
- Tue, 29 Jan 2019 10:49:59 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B11E93F557;
+ Tue, 29 Jan 2019 10:50:22 -0800 (PST)
 From: James Morse <james.morse@arm.com>
 To: linux-acpi@vger.kernel.org
-Subject: [PATCH v8 08/26] ACPI / APEI: Don't update struct ghes' flags in
- read/clear estatus
-Date: Tue, 29 Jan 2019 18:48:44 +0000
-Message-Id: <20190129184902.102850-9-james.morse@arm.com>
+Subject: [PATCH v8 16/26] ACPI / APEI: Let the notification helper specify the
+ fixmap slot
+Date: Tue, 29 Jan 2019 18:48:52 +0000
+Message-Id: <20190129184902.102850-17-james.morse@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190129184902.102850-1-james.morse@arm.com>
 References: <20190129184902.102850-1-james.morse@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_105003_210077_48737E61 
-X-CRM114-Status: GOOD (  13.55  )
+X-CRM114-CacheID: sfid-20190129_135029_582887_A8237AF9 
+X-CRM114-Status: GOOD (  20.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,78 +98,277 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-ghes_read_estatus() sets a flag in struct ghes if the buffer of
-CPER records needs to be cleared once the records have been
-processed. This flag value is a problem if a struct ghes can be
-processed concurrently, as happens at probe time if an NMI arrives
-for the same error source. The NMI clears the flag, meaning the
-interrupted handler may never do the ghes_estatus_clear() work.
+ghes_copy_tofrom_phys() uses a different fixmap slot depending on in_nmi().
+This doesn't work when there are multiple NMI-like notifications, that
+could interrupt each other.
 
-The GHES_TO_CLEAR flags is only set at the same time as
-buffer_paddr, which is now owned by the caller and passed to
-ghes_clear_estatus(). Use this value as the flag.
+As with the locking, move the chosen fixmap_idx to the notification helper.
+This only matters for NMI-like notifications, anything calling
+ghes_proc() can use the IRQ fixmap slot as its already holding an irqsave
+spinlock.
 
-A non-zero buf_paddr returned by ghes_read_estatus() means
-ghes_clear_estatus() should clear this address. ghes_read_estatus()
-already checks for a read of error_status_address being zero,
-so CPER records cannot be written here.
+This lets us collapse the ghes_ioremap_pfn_*() helpers.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 Reviewed-by: Borislav Petkov <bp@suse.de>
-
---
-Changes since v6:
- * Added Boris' RB, then:
- * Moved earlier in the series,
- * Tinkered with the commit message,
- * Always cleared buf_paddr on errors in the previous patch, which was
-   previously in here.
 ---
- drivers/acpi/apei/ghes.c | 5 -----
- include/acpi/ghes.h      | 1 -
- 2 files changed, 6 deletions(-)
+
+The fixmap-idx and vaddr are passed back to ghes_unmap()
+to allow ioremap() to be used in process context in the
+future. This will let us send tlbi-ipi for notifications
+that don't mask irqs.
+
+Changes since v7:
+ * Wwitched unmap arg order for concistency, p/v addr is always first
+ * use the enum name for the fixmap_idx, in the hope the compiler validates it.
+---
+ drivers/acpi/apei/ghes.c | 92 +++++++++++++++++-----------------------
+ 1 file changed, 39 insertions(+), 53 deletions(-)
 
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index c20e1d0947b1..af3c10f47f20 100644
+index c6bc73281d6a..ccad57468ab7 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -329,8 +329,6 @@ static int ghes_read_estatus(struct ghes *ghes, u64 *buf_paddr)
- 		return -ENOENT;
- 	}
+@@ -41,6 +41,7 @@
+ #include <linux/llist.h>
+ #include <linux/genalloc.h>
+ #include <linux/pci.h>
++#include <linux/pfn.h>
+ #include <linux/aer.h>
+ #include <linux/nmi.h>
+ #include <linux/sched/clock.h>
+@@ -127,38 +128,24 @@ static atomic_t ghes_estatus_cache_alloced;
  
--	ghes->flags |= GHES_TO_CLEAR;
+ static int ghes_panic_timeout __read_mostly = 30;
+ 
+-static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
++static void __iomem *ghes_map(u64 pfn, enum fixed_addresses fixmap_idx)
+ {
+ 	phys_addr_t paddr;
+ 	pgprot_t prot;
+ 
+-	paddr = pfn << PAGE_SHIFT;
++	paddr = PFN_PHYS(pfn);
+ 	prot = arch_apei_get_mem_attribute(paddr);
+-	__set_fixmap(FIX_APEI_GHES_NMI, paddr, prot);
++	__set_fixmap(fixmap_idx, paddr, prot);
+ 
+-	return (void __iomem *) fix_to_virt(FIX_APEI_GHES_NMI);
++	return (void __iomem *) __fix_to_virt(fixmap_idx);
+ }
+ 
+-static void __iomem *ghes_ioremap_pfn_irq(u64 pfn)
++static void ghes_unmap(void __iomem *vaddr, enum fixed_addresses fixmap_idx)
+ {
+-	phys_addr_t paddr;
+-	pgprot_t prot;
 -
- 	rc = -EIO;
- 	len = cper_estatus_len(ghes->estatus);
- 	if (len < sizeof(*ghes->estatus))
-@@ -357,15 +355,12 @@ static int ghes_read_estatus(struct ghes *ghes, u64 *buf_paddr)
- static void ghes_clear_estatus(struct ghes *ghes, u64 buf_paddr)
+-	paddr = pfn << PAGE_SHIFT;
+-	prot = arch_apei_get_mem_attribute(paddr);
+-	__set_fixmap(FIX_APEI_GHES_IRQ, paddr, prot);
++	int _idx = virt_to_fix((unsigned long)vaddr);
+ 
+-	return (void __iomem *) fix_to_virt(FIX_APEI_GHES_IRQ);
+-}
+-
+-static void ghes_iounmap_nmi(void)
+-{
+-	clear_fixmap(FIX_APEI_GHES_NMI);
+-}
+-
+-static void ghes_iounmap_irq(void)
+-{
+-	clear_fixmap(FIX_APEI_GHES_IRQ);
++	WARN_ON_ONCE(fixmap_idx != _idx);
++	clear_fixmap(fixmap_idx);
+ }
+ 
+ int ghes_estatus_pool_init(int num_ghes)
+@@ -283,20 +270,16 @@ static inline int ghes_severity(int severity)
+ }
+ 
+ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+-				  int from_phys)
++				  int from_phys,
++				  enum fixed_addresses fixmap_idx)
+ {
+ 	void __iomem *vaddr;
+-	int in_nmi = in_nmi();
+ 	u64 offset;
+ 	u32 trunk;
+ 
+ 	while (len > 0) {
+ 		offset = paddr - (paddr & PAGE_MASK);
+-		if (in_nmi) {
+-			vaddr = ghes_ioremap_pfn_nmi(paddr >> PAGE_SHIFT);
+-		} else {
+-			vaddr = ghes_ioremap_pfn_irq(paddr >> PAGE_SHIFT);
+-		}
++		vaddr = ghes_map(PHYS_PFN(paddr), fixmap_idx);
+ 		trunk = PAGE_SIZE - offset;
+ 		trunk = min(trunk, len);
+ 		if (from_phys)
+@@ -306,15 +289,13 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+ 		len -= trunk;
+ 		paddr += trunk;
+ 		buffer += trunk;
+-		if (in_nmi) {
+-			ghes_iounmap_nmi();
+-		} else {
+-			ghes_iounmap_irq();
+-		}
++		ghes_unmap(vaddr, fixmap_idx);
+ 	}
+ }
+ 
+-static int ghes_read_estatus(struct ghes *ghes, u64 *buf_paddr)
++static int ghes_read_estatus(struct ghes *ghes, u64 *buf_paddr,
++			     enum fixed_addresses fixmap_idx)
++
+ {
+ 	struct acpi_hest_generic *g = ghes->generic;
+ 	u32 len;
+@@ -332,7 +313,7 @@ static int ghes_read_estatus(struct ghes *ghes, u64 *buf_paddr)
+ 		return -ENOENT;
+ 
+ 	ghes_copy_tofrom_phys(ghes->estatus, *buf_paddr,
+-			      sizeof(*ghes->estatus), 1);
++			      sizeof(*ghes->estatus), 1, fixmap_idx);
+ 	if (!ghes->estatus->block_status) {
+ 		*buf_paddr = 0;
+ 		return -ENOENT;
+@@ -348,7 +329,7 @@ static int ghes_read_estatus(struct ghes *ghes, u64 *buf_paddr)
+ 		goto err_read_block;
+ 	ghes_copy_tofrom_phys(ghes->estatus + 1,
+ 			      *buf_paddr + sizeof(*ghes->estatus),
+-			      len - sizeof(*ghes->estatus), 1);
++			      len - sizeof(*ghes->estatus), 1, fixmap_idx);
+ 	if (cper_estatus_check(ghes->estatus))
+ 		goto err_read_block;
+ 	rc = 0;
+@@ -361,7 +342,8 @@ static int ghes_read_estatus(struct ghes *ghes, u64 *buf_paddr)
+ 	return rc;
+ }
+ 
+-static void ghes_clear_estatus(struct ghes *ghes, u64 buf_paddr)
++static void ghes_clear_estatus(struct ghes *ghes, u64 buf_paddr,
++			       enum fixed_addresses fixmap_idx)
  {
  	ghes->estatus->block_status = 0;
--	if (!(ghes->flags & GHES_TO_CLEAR))
--		return;
  
- 	if (!buf_paddr)
+@@ -369,7 +351,8 @@ static void ghes_clear_estatus(struct ghes *ghes, u64 buf_paddr)
  		return;
  
  	ghes_copy_tofrom_phys(ghes->estatus, buf_paddr,
- 			      sizeof(ghes->estatus->block_status), 0);
--	ghes->flags &= ~GHES_TO_CLEAR;
+-			      sizeof(ghes->estatus->block_status), 0);
++			      sizeof(ghes->estatus->block_status), 0,
++			      fixmap_idx);
+ 
+ 	/*
+ 	 * GHESv2 type HEST entries introduce support for error acknowledgment,
+@@ -668,11 +651,12 @@ static void ghes_estatus_cache_add(
+ 	rcu_read_unlock();
  }
  
- static void ghes_handle_memory_failure(struct acpi_hest_generic_data *gdata, int sev)
-diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index f82f4a7ddd90..e3f1cddb4ac8 100644
---- a/include/acpi/ghes.h
-+++ b/include/acpi/ghes.h
-@@ -13,7 +13,6 @@
-  * estatus: memory buffer for error status block, allocated during
-  * HEST parsing.
-  */
--#define GHES_TO_CLEAR		0x0001
- #define GHES_EXITING		0x0002
+-static void __ghes_panic(struct ghes *ghes, u64 buf_paddr)
++static void __ghes_panic(struct ghes *ghes, u64 buf_paddr,
++			 enum fixed_addresses fixmap_idx)
+ {
+ 	__ghes_print_estatus(KERN_EMERG, ghes->generic, ghes->estatus);
  
- struct ghes {
+-	ghes_clear_estatus(ghes, buf_paddr);
++	ghes_clear_estatus(ghes, buf_paddr, fixmap_idx);
+ 
+ 	/* reboot to log the error! */
+ 	if (!panic_timeout)
+@@ -685,12 +669,12 @@ static int ghes_proc(struct ghes *ghes)
+ 	u64 buf_paddr;
+ 	int rc;
+ 
+-	rc = ghes_read_estatus(ghes, &buf_paddr);
++	rc = ghes_read_estatus(ghes, &buf_paddr, FIX_APEI_GHES_IRQ);
+ 	if (rc)
+ 		goto out;
+ 
+ 	if (ghes_severity(ghes->estatus->error_severity) >= GHES_SEV_PANIC) {
+-		__ghes_panic(ghes, buf_paddr);
++		__ghes_panic(ghes, buf_paddr, FIX_APEI_GHES_IRQ);
+ 	}
+ 
+ 	if (!ghes_estatus_cached(ghes->estatus)) {
+@@ -700,7 +684,7 @@ static int ghes_proc(struct ghes *ghes)
+ 	ghes_do_proc(ghes, ghes->estatus);
+ 
+ out:
+-	ghes_clear_estatus(ghes, buf_paddr);
++	ghes_clear_estatus(ghes, buf_paddr, FIX_APEI_GHES_IRQ);
+ 
+ 	return rc;
+ }
+@@ -866,36 +850,38 @@ static void __process_error(struct ghes *ghes)
+ #endif
+ }
+ 
+-static int ghes_in_nmi_queue_one_entry(struct ghes *ghes)
++static int ghes_in_nmi_queue_one_entry(struct ghes *ghes,
++				       enum fixed_addresses fixmap_idx)
+ {
+ 	u64 buf_paddr;
+ 	int sev;
+ 
+-	if (ghes_read_estatus(ghes, &buf_paddr)) {
+-		ghes_clear_estatus(ghes, buf_paddr);
++	if (ghes_read_estatus(ghes, &buf_paddr, fixmap_idx)) {
++		ghes_clear_estatus(ghes, buf_paddr, fixmap_idx);
+ 		return -ENOENT;
+ 	}
+ 
+ 	sev = ghes_severity(ghes->estatus->error_severity);
+ 	if (sev >= GHES_SEV_PANIC) {
+ 		ghes_print_queued_estatus();
+-		__ghes_panic(ghes, buf_paddr);
++		__ghes_panic(ghes, buf_paddr, fixmap_idx);
+ 	}
+ 
+ 	__process_error(ghes);
+-	ghes_clear_estatus(ghes, buf_paddr);
++	ghes_clear_estatus(ghes, buf_paddr, fixmap_idx);
+ 
+ 	return 0;
+ }
+ 
+-static int ghes_in_nmi_spool_from_list(struct list_head *rcu_list)
++static int ghes_in_nmi_spool_from_list(struct list_head *rcu_list,
++				       enum fixed_addresses fixmap_idx)
+ {
+ 	int err, ret = -ENOENT;
+ 	struct ghes *ghes;
+ 
+ 	rcu_read_lock();
+ 	list_for_each_entry_rcu(ghes, rcu_list, list) {
+-		err = ghes_in_nmi_queue_one_entry(ghes);
++		err = ghes_in_nmi_queue_one_entry(ghes, fixmap_idx);
+ 		if (!err)
+ 			ret = 0;
+ 	}
+@@ -920,7 +906,7 @@ int ghes_notify_sea(void)
+ 	int rv;
+ 
+ 	raw_spin_lock(&ghes_notify_lock_sea);
+-	rv = ghes_in_nmi_spool_from_list(&ghes_sea);
++	rv = ghes_in_nmi_spool_from_list(&ghes_sea, FIX_APEI_GHES_NMI);
+ 	raw_spin_unlock(&ghes_notify_lock_sea);
+ 
+ 	return rv;
+@@ -963,7 +949,7 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
+ 		return ret;
+ 
+ 	raw_spin_lock(&ghes_notify_lock_nmi);
+-	err = ghes_in_nmi_spool_from_list(&ghes_nmi);
++	err = ghes_in_nmi_spool_from_list(&ghes_nmi, FIX_APEI_GHES_NMI);
+ 	if (!err)
+ 		ret = NMI_HANDLED;
+ 	raw_spin_unlock(&ghes_notify_lock_nmi);
 -- 
 2.20.1
 
