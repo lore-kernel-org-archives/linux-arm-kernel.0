@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0620CC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 13:24:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CDF89C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 13:25:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C059E2147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 13:24:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 985A52147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 13:25:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hUB7fzcb";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="itYg1ZnB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C059E2147A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g53uCnak";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="imGOnd4x"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 985A52147A
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,62 +26,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GeKPJlTuP0qysOJdYckX5RTkQ/DDUZB4jTiHbztt10w=; b=hUB7fzcb2GiIfi
-	0uSnSgMW8p/6tX6mWuvzGMNitQBcHM0xLeqc5WUc6gUlrpPcNApeh5EJUunuC2v4skLmsiYn9H5Lu
-	sDXckx1bqBJNt/Vl5omiEFadtncJ47hLEQtj0eLvPb+BgkDMZINYVH39KEq71DY/Ta8WIFcT9S2B4
-	Jy5dD8e2ydVRqSu9LzlFBNq6wXDR2uoAD6YBpllEWhFZk91aGUMpSbQoDDSnsKcgPQQIpSCcIs7Dy
-	PtPjF3Qma2JnnuKB//GyxaK33ucBf3U7LBlfCUW2/Jxmuc+sp6OH1zcJE1IscSBWYOs05VRdOuDwN
-	DD2Ad/flNsWBYectXg8Q==;
+	List-Owner; bh=OV1h0SLcoUaiht52EcXdxCBtz+PyRXxy8kgL8gOy4rs=; b=g53uCnakdPHXKc
+	He9SM4aQA5U6k57B4IpL54JRl75CniJSJJUcluvwllMHu849nLBpw3BgWH5mCw7afeF4/Pp8QfUU8
+	+V5avQ2mcdrzGHVwEP2FfqvTQv6u7DS/HQN/PuUzpX6xnHuRQt1v0PO/1CWZES42J5pU3lIpXimOX
+	1RF1LhKKhMJkzcADtDL1kMcvYUc8e9kkde3YBIpFyIPp9Py6Ut75T0xZj6IUW1EugqO2YKoxpCFAB
+	yVo0mPMf1KxLO4xGp4idGdWEup1hcM9hfzYrCPn/T/gXCzWhY4gNA6fBhI2lQjjtLLLP+uZHCauzp
+	rspGwpagT4AngrdV2zCw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goTNf-0003kL-Rr; Tue, 29 Jan 2019 13:24:47 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1goTO6-0004Yz-KL; Tue, 29 Jan 2019 13:25:14 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goTMp-00036F-6h
+ id 1goTMq-00036M-9S
  for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 13:23:59 +0000
-Received: by mail-wr1-x443.google.com with SMTP id t6so22001904wrr.12
+Received: by mail-wr1-x442.google.com with SMTP id t6so22001990wrr.12
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 05:23:54 -0800 (PST)
+ Tue, 29 Jan 2019 05:23:55 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=+iUaGMGKWn9N83ma0ITcBvsEGTsrPVKtGMn9CVZ2yxg=;
- b=itYg1ZnBFqTT8OEIbW6NsGc8XTFUE4zxH8Me1Q2KohBZ8RHYlDfZ9JpxIZFXPaSoqb
- LRYSqugdWDsFlrCHrmkNbvl5M9NXShdm9KIgoh+IMFROAIYDv9Tq5sB1oL02vqZhg0GG
- ur8+Q2MxvdTVP858MqQqCNZ5x9yJCKMIyvLm8=
+ bh=cJVPwkmiIQelbKGNm2p5QIWk1VCEgPV2Jz4v/peH4c0=;
+ b=imGOnd4xYHw7xLkRLPA4lgqDpncHIIKu2AQdnXEMbU+4x0h7mJSwF/pVxC6qUeVyRt
+ Bgy58LZ6QBcY1j8frbUMg1SuLU+Xx/TPLgxXHO1XF+6+FihDAhqI4V/+SwKAO7uOO0i9
+ +V96ptKufbrdpE7IEgDGw3QN9V7tktrNCCEFE=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=+iUaGMGKWn9N83ma0ITcBvsEGTsrPVKtGMn9CVZ2yxg=;
- b=cb57Jda2dXPxxswGBN8ah69wgmiqCzeDD6HBfGrWbbJEK3fn2MvOKpHPuQ+9BBEeO+
- zQYXpd29eKQ8dkPUOxaShNeSP3hanrVblxz0peLd3rmjmNLWAgshZuhJnrHoF2V/1hfE
- O3MBPLzuEWK6Sd5QM67EeOF6zDb+z3dZktFhrnQO1h6zey0BgsdT1/Js3elFdStg+uKy
- Dje5Ej2ZvVrLt6HWcOnGXi+f89RX3T1F0Sf/vCwOtK6sShbqSNcuPxGokpnxnHIiMlJp
- DV/Yz9ok4EHZ1NcMNDmyUzyU+wvFPTeL84ZSVMTOi9od7vlqST3Fiiks0Ry57FmVR+R+
- pkWA==
-X-Gm-Message-State: AJcUukfms5aW4zHl1ue1tHaFUXwUE4pWLOwrCSwkrxlVxUgchR3R/DVs
- 8eQxQr3xBgU3pWSniBmwI7KKHbP2srM=
-X-Google-Smtp-Source: ALg8bN4R2UjjjzQwle8+n4l73Ie84+eu9E/FU0tDbIKDEd/JPn4L5EI3x0aGvigsF9jTh1TjrQkI4Q==
-X-Received: by 2002:adf:fe11:: with SMTP id n17mr25308535wrr.329.1548768232946; 
- Tue, 29 Jan 2019 05:23:52 -0800 (PST)
+ bh=cJVPwkmiIQelbKGNm2p5QIWk1VCEgPV2Jz4v/peH4c0=;
+ b=NT6Eac8E9lm9pK8WS63C1ZFW4hrAe+YrdihPEDIEeDHNZNX40HKQYWIKsXxjxFUn9x
+ hp95An5ZeF9/fAUCdNMzc4l4pPoOJe0lAafNAjKhdpLW1wYADIq4CPo9es98oNwYWVEd
+ uW5tkBnt8ECrUUk8Sa4x4DdJCh7ZiOrRKNG7+KVhmjClpWraF6V12dTqAxTByFULnVTT
+ Zd6E134mZUHXYUX73a6nOWtHv6yhU1PPKEQthuNs1KZRCxqA9Dsfs5JMPjA6P//MQ+DD
+ G6QVXdTBhLyXJtDBca4wqmCt4sCqrx1k7aLeQyQGYyugt3BkQ73Yye0u1taOEYe+fnC+
+ mH2A==
+X-Gm-Message-State: AJcUukegNxJLHt4Y7LntEaaZCPG4+xvC+1FZs+aYnGg3TrIm/scZmTaH
+ Bdo9gwmF3Y0+iL8jOdGiOP2/oQ==
+X-Google-Smtp-Source: ALg8bN6H2O6S+DgjvlJxLwdrvmqRTs6WaXE7z/QfJnss67fMh6N1TAkxmZ/M2jFSW2kHnrI222Ah2g==
+X-Received: by 2002:adf:d243:: with SMTP id o3mr26911673wri.66.1548768234046; 
+ Tue, 29 Jan 2019 05:23:54 -0800 (PST)
 Received: from srini-hackbox.lan
  (cpc89974-aztw32-2-0-cust43.18-1.cable.virginm.net. [86.30.250.44])
- by smtp.gmail.com with ESMTPSA id w80sm3739628wme.38.2019.01.29.05.23.51
+ by smtp.gmail.com with ESMTPSA id w80sm3739628wme.38.2019.01.29.05.23.52
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Tue, 29 Jan 2019 05:23:52 -0800 (PST)
+ Tue, 29 Jan 2019 05:23:53 -0800 (PST)
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 To: andy.gross@linaro.org
-Subject: [PATCH 2/6] arm64: dts: msm8996: Add display smmu node
-Date: Tue, 29 Jan 2019 13:23:31 +0000
-Message-Id: <20190129132335.30695-3-srinivas.kandagatla@linaro.org>
+Subject: [PATCH 3/6] arm64: qcom: msm8996.dtsi: Add Display nodes
+Date: Tue, 29 Jan 2019 13:23:32 +0000
+Message-Id: <20190129132335.30695-4-srinivas.kandagatla@linaro.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190129132335.30695-1-srinivas.kandagatla@linaro.org>
 References: <20190129132335.30695-1-srinivas.kandagatla@linaro.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_052356_789742_AAB9D0ED 
-X-CRM114-Status: GOOD (  10.24  )
+X-CRM114-CacheID: sfid-20190129_052356_777538_B3AC679B 
+X-CRM114-Status: UNSURE (   9.71  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,43 +106,146 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Archit Taneja <architt@codeaurora.org>
 
-Add device node for display smmu, aka. mdp_smmu.
-
 Signed-off-by: Archit Taneja <architt@codeaurora.org>
+[Removed instances of mmagic clocks;
+Use qcom,msm8996-smmu-v2 bindings]
 Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8996.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 120 ++++++++++++++++++++++++++
+ 1 file changed, 120 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index c9b80d175fd4..96adda520bd5 100644
+index 96adda520bd5..0d0b9482aa4d 100644
 --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
 +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -1155,6 +1155,23 @@
- 			power-domains = <&mmcc GPU_GDSC>;
+@@ -1337,6 +1337,126 @@
+ 						"bus_slave";
+ 			};
  		};
- 
-+		mdp_smmu: arm,smmu@d00000 {
-+			compatible = "qcom,msm8996-smmu-v2", "qcom,smmu-v2";
-+			reg = <0xd00000 0x10000>;
 +
-+			#global-interrupts = <1>;
-+			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH>;
-+			#iommu-cells = <1>;
++		mdss: mdss@900000 {
++			compatible = "qcom,mdss";
 +
-+			clocks = <&mmcc SMMU_MDP_AHB_CLK>,
-+				 <&mmcc SMMU_MDP_AXI_CLK>;
-+			clock-names = "iface", "bus";
++			reg = <0x900000 0x1000>,
++			      <0x9b0000 0x1040>,
++			      <0x9b8000 0x1040>;
++			reg-names = "mdss_phys",
++				    "vbif_phys",
++				    "vbif_nrt_phys";
 +
 +			power-domains = <&mmcc MDSS_GDSC>;
-+		};
++			interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
 +
- 		agnoc@0 {
- 			power-domains = <&gcc AGGRE0_NOC_GDSC>;
- 			compatible = "simple-pm-bus";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++
++			clocks = <&mmcc MDSS_AHB_CLK>;
++			clock-names = "iface_clk";
++
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			mdp: mdp@901000 {
++				compatible = "qcom,mdp5";
++				reg = <0x901000 0x90000>;
++				reg-names = "mdp_phys";
++
++				interrupt-parent = <&mdss>;
++				interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
++
++				clocks = <&mmcc MDSS_AHB_CLK>,
++					 <&mmcc MDSS_AXI_CLK>,
++					 <&mmcc MDSS_MDP_CLK>,
++					 <&mmcc SMMU_MDP_AXI_CLK>,
++					 <&mmcc MDSS_VSYNC_CLK>;
++				clock-names = "iface_clk",
++					      "bus_clk",
++					      "core_clk",
++					      "iommu_clk",
++					      "vsync_clk";
++
++				iommus = <&mdp_smmu 0>;
++
++				ports {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					port@0 {
++						reg = <0>;
++						mdp5_intf3_out: endpoint {
++							remote-endpoint = <&hdmi_in>;
++						};
++					};
++				};
++			};
++
++			hdmi: hdmi-tx@9a0000 {
++				compatible = "qcom,hdmi-tx-8996";
++				reg =	<0x009a0000 0x50c>,
++					<0x00070000 0x6158>,
++					<0x009e0000 0xfff>;
++				reg-names = "core_physical",
++					    "qfprom_physical",
++					    "hdcp_physical";
++
++				interrupt-parent = <&mdss>;
++				interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
++
++				clocks = <&mmcc MDSS_MDP_CLK>,
++					 <&mmcc MDSS_AHB_CLK>,
++					 <&mmcc MDSS_HDMI_CLK>,
++					 <&mmcc MDSS_HDMI_AHB_CLK>,
++					 <&mmcc MDSS_EXTPCLK_CLK>;
++				clock-names =
++					"mdp_core_clk",
++					"iface_clk",
++					"core_clk",
++					"alt_iface_clk",
++					"extp_clk";
++
++				phys = <&hdmi_phy>;
++				phy-names = "hdmi_phy";
++
++				ports {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					port@0 {
++						reg = <0>;
++						hdmi_in: endpoint {
++							remote-endpoint = <&mdp5_intf3_out>;
++						};
++					};
++				};
++			};
++
++			hdmi_phy: hdmi-phy@9a0600 {
++				#phy-cells = <0>;
++				compatible = "qcom,hdmi-phy-8996";
++				reg = <0x9a0600 0x1c4>,
++				      <0x9a0a00 0x124>,
++				      <0x9a0c00 0x124>,
++				      <0x9a0e00 0x124>,
++				      <0x9a1000 0x124>,
++				      <0x9a1200 0x0c8>;
++				reg-names = "hdmi_pll",
++					    "hdmi_tx_l0",
++					    "hdmi_tx_l1",
++					    "hdmi_tx_l2",
++					    "hdmi_tx_l3",
++					    "hdmi_phy";
++
++				clocks = <&mmcc MDSS_AHB_CLK>,
++					 <&gcc GCC_HDMI_CLKREF_CLK>;
++				clock-names = "iface_clk",
++					      "ref_clk";
++			};
++		};
+ 	};
+ 
+ 	adsp-pil {
 -- 
 2.20.1
 
