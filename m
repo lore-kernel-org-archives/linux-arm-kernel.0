@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 49E81C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:23:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EE928C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:23:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 07D1720882
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:23:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B39812086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:23:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lV4KZzSC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 07D1720882
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hj+KjI+D"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B39812086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mleia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,42 +25,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vjZC1U7/sBJv8kXH7E/H8t0uoS7u7rVc58K6EIZVWZ4=; b=lV4KZzSCl0e7ma
-	3r5r6dQyNGzvSoRjkPs/HHt/qysuHibU7lf29ns1VHJaz62QcZKKGbGiAclmveQ8Vr8y4hBLMCqMN
-	kjjAKR0F9erOAdXoqE2N/+BLf/wh7Jq554jp/ewYV1WfdZ5LuOZYbl5XG1o79NneUYl0GSJamD4JS
-	6lOBCQA/AFf9Wsw9tSKZ4nqmdNMPk9/Wp0/veWceaoxzuEmPCmSR9HTkkjkb9opAHaVNrnrbENl2w
-	6r+fAf6d1KEQawK6yZTUOnjmMmDbaKrGfYnJ9QevtDb/efcYA5lZgh5tiCMEItI5pRqX3wRikpgAy
-	JzagqdT0t9EbQV1o+XkA==;
+	List-Owner; bh=1kM2mLTQ+eGQHY/vTyxP8VtGDcRUMnRJ6fuL8JX1Ygg=; b=hj+KjI+DLWdOQx
+	7gwjwIvaeLGeq2BAoGxklUZS5FJO4k9KwBhmYzV9cl1nhPSAe48fwh58SqucuCrJ1oYb+Z9axNtJP
+	ZH4mgjyX72YSHYqRe4118/MD0La/kROREBQ0bTbhRpQYwf2cBhE105TN4MWX5UBv0p5skvtcVwtFx
+	NDn2lzidIPkhhUUmkYgADh/8MfuvGHsRY7fOABkuiagAzDQilrh4M5PauSn0WBz1j7SIOEBFD6vYA
+	Ox5noOHWgP40ESmWh6wPDd2+UrB20cw4o/M+p4QSXFQkcVzsXyNiVdYsVRbDFrfyRdT8CiL+mxtiI
+	AFfbJUuwDovGv5MWhb8A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goYyz-0004H3-Jh; Tue, 29 Jan 2019 19:23:41 +0000
+	id 1goYzD-0004V4-DO; Tue, 29 Jan 2019 19:23:55 +0000
 Received: from mleia.com ([178.79.152.223] helo=mail.mleia.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goYwP-0001o6-14
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 19:21:06 +0000
+ id 1goYwV-0001pd-D5
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 19:21:09 +0000
 Received: from mail.mleia.com (localhost [127.0.0.1])
- by mail.mleia.com (Postfix) with ESMTP id DB09843EF1D;
- Tue, 29 Jan 2019 19:20:57 +0000 (GMT)
+ by mail.mleia.com (Postfix) with ESMTP id 4892143EF2B;
+ Tue, 29 Jan 2019 19:21:01 +0000 (GMT)
 From: Vladimir Zapolskiy <vz@mleia.com>
 To: Sylvain Lemieux <slemieux.tyco@gmail.com>,
  Russell King <linux@armlinux.org.uk>
-Subject: [PATCH 03/13] ARM: dts: lpc32xx: fix ARM PrimeCell LCD controller
- variant
-Date: Tue, 29 Jan 2019 21:20:39 +0200
-Message-Id: <20190129192049.11223-4-vz@mleia.com>
+Subject: [PATCH 09/13] ARM: dts: lpc32xx: phy3250: add unit address to memory
+ device node
+Date: Tue, 29 Jan 2019 21:20:45 +0200
+Message-Id: <20190129192049.11223-10-vz@mleia.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190129192049.11223-1-vz@mleia.com>
 References: <20190129192049.11223-1-vz@mleia.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-49551924 
-X-CRM114-CacheID: sfid-20190129_192057_918393_AAD9197A 
-X-CRM114-Status: GOOD (  11.71  )
+X-CRM114-CacheID: sfid-20190129_192101_322342_2B8BF001 
+X-CRM114-Status: GOOD (  12.18  )
 /bin/ln: failed to access
- 'reaver_cache/texts/20190129_192057_918393_AAD9197A': No such file or
+ 'reaver_cache/texts/20190129_192101_322342_2B8BF001': No such file or
  directory
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_192057_918393_AAD9197A 
-X-CRM114-Status: GOOD (  11.46  )
+X-CRM114-CacheID: sfid-20190129_192101_322342_2B8BF001 
+X-CRM114-Status: GOOD (  10.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,29 +79,41 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-ARM PrimeCell PL111 LCD controller is found on On NXP LPC3230
-and LPC3250 SoCs variants, the original reference in compatible
-property to an older one ARM PrimeCell PL110 is invalid.
+The change adds a unit address to memory device node, the issue was
+reported as a unit_address_vs_reg warning by dtc.
 
-Fixes: e04920d9efcb3 ("ARM: LPC32xx: DTS files for device tree conversion")
+Root device node properties #address-cells and #size-cells were
+removed as inherited from lpc32xx.dtsi.
+
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- arch/arm/boot/dts/lpc32xx.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/lpc3250-phy3250.dts | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-index 4f8f671c3343..cfd422e7f774 100644
---- a/arch/arm/boot/dts/lpc32xx.dtsi
-+++ b/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -139,7 +139,7 @@
- 		};
+diff --git a/arch/arm/boot/dts/lpc3250-phy3250.dts b/arch/arm/boot/dts/lpc3250-phy3250.dts
+index aff72f14ad83..ebd19258e22b 100644
+--- a/arch/arm/boot/dts/lpc3250-phy3250.dts
++++ b/arch/arm/boot/dts/lpc3250-phy3250.dts
+@@ -1,6 +1,7 @@
+ /*
+  * PHYTEC phyCORE-LPC3250 board
+  *
++ * Copyright (C) 2015-2019 Vladimir Zapolskiy <vz@mleia.com>
+  * Copyright 2012 Roland Stigge <stigge@antcom.de>
+  *
+  * The code contained herein is licensed under the GNU General Public
+@@ -17,10 +18,8 @@
+ / {
+ 	model = "PHYTEC phyCORE-LPC3250 board based on NXP LPC3250";
+ 	compatible = "phytec,phy3250", "nxp,lpc3250";
+-	#address-cells = <1>;
+-	#size-cells = <1>;
  
- 		clcd: clcd@31040000 {
--			compatible = "arm,pl110", "arm,primecell";
-+			compatible = "arm,pl111", "arm,primecell";
- 			reg = <0x31040000 0x1000>;
- 			interrupts = <14 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&clk LPC32XX_CLK_LCD>;
+-	memory {
++	memory@80000000 {
+ 		device_type = "memory";
+ 		reg = <0x80000000 0x4000000>;
+ 	};
 -- 
 2.20.1
 
