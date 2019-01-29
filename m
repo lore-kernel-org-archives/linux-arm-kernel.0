@@ -2,56 +2,60 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A6266C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:48:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B1E2C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:50:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 772CC2083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:48:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4BA5320881
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:50:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e+3xl4kb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 772CC2083B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LhZswZjA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4BA5320881
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
-	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=eplgJ3VBZ1//L2VXDld8zWedZRXjCN7mtE0LJtrPNxk=; b=e+3xl4kbG/kAfY
-	k5i6q1ccYE2JpppaVCor6rqNB3S91/LGqYQvSqVp6XodyzLFpYHi6TW4fFdOYFgTZuHGS12zZVfrn
-	5mHEUAd9LvRSdTN0l8JjQbSTT9CHSCx6arZpUUV2u7sMWK4PVfsmg7dg8Fhz1zjS1NxPW2QDEx7vQ
-	ADeubX9QDWJyoDdhCvpC6LWkuJQ0hTU/tqZaedEANlIaJSgQiRpVGYjdtk2jOxUhU9HrDUYQLCtff
-	ljAJKdoSejP+HwcSApLXJhBxAEQYvykVLYAMEL3eIta+5K03KFFhjz6JksfxySAXjAp4FW5t0WyUy
-	cO32qq2Wm84b4bDMqOvg==;
+	List-Owner; bh=yTEgU3w1vdlaqIcjunnGaXMxfky0pywlJ0Q3oFch8dc=; b=LhZswZjAWWiClJ
+	BuYx5rubBShMGasG6InsM6SKiYOZxRm9xnydACR4IEp4abbJarkur8utflPnkvq7ma2JgfdYG+n7l
+	YYBXqUVUh7HkRCIcDSmDHwXED3gNafs7CEPgrO+Qr9qrn4x88pRZMzK5zPf11PW3Z/maCThoLewxN
+	kuhF8a2PF4ekerv+4IjTfsuPXwU+65jWjdWescbOC9DOZ9ljg4z51ypjaVTAGFCqcxQoSjS/acHcH
+	VvptI4NfpKCFsqyrqethY8ut/B0Nz+u0nIL/eOY2JxRO2d8VG1EzLXZV9oo8yep7WscMxHEvU13oP
+	6pm7WiQ86/uJRAzo1dYA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goWYh-0003n6-0G; Tue, 29 Jan 2019 16:48:23 +0000
-Received: from muru.com ([72.249.23.125])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goWYd-0003mP-ME
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 16:48:21 +0000
-Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id ECC05804F;
- Tue, 29 Jan 2019 16:48:24 +0000 (UTC)
-Date: Tue, 29 Jan 2019 08:48:13 -0800
-From: Tony Lindgren <tony@atomide.com>
-To: Douglas Anderson <dianders@chromium.org>, Mark Brown <broonie@kernel.org>
-Subject: New underflow of regulator enable count warnings in v5.0-rc1
-Message-ID: <20190129164813.GA5720@atomide.com>
+	id 1goWaX-0005LC-9I; Tue, 29 Jan 2019 16:50:17 +0000
+Received: from esa1.microchip.iphmx.com ([68.232.147.91])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goWaR-0005AT-TF
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 16:50:15 +0000
+X-IronPort-AV: E=Sophos;i="5.56,537,1539673200"; d="scan'208";a="27013017"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa1.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 29 Jan 2019 09:50:09 -0700
+Received: from tenerife.corp.atmel.com (10.10.76.4) by
+ chn-sv-exch05.mchp-main.com (10.10.76.106) with Microsoft SMTP Server id
+ 14.3.352.0; Tue, 29 Jan 2019 09:50:08 -0700
+From: Nicolas Ferre <nicolas.ferre@microchip.com>
+To: Ludovic Desroches <ludovic.desroches@microchip.com>
+Subject: [PATCH] mmc: atmel-mci: enable 8 bits buswidth support
+Date: Tue, 29 Jan 2019 17:49:12 +0100
+Message-ID: <20190129164950.31052-1-nicolas.ferre@microchip.com>
+X-Mailer: git-send-email 2.17.1
 MIME-Version: 1.0
-Content-Disposition: inline
-User-Agent: Mutt/1.11.2 (2019-01-07)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_084819_769078_67A10353 
-X-CRM114-Status: UNSURE (   4.50  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190129_085012_080752_99EB3917 
+X-CRM114-Status: GOOD (  10.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -63,35 +67,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-omap@vger.kernel.org, Sebastian Reichel <sre@kernel.org>,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Cc: Ulf Hansson <ulf.hansson@linaro.org>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>, linux-mmc@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+This patch adds support for 8-bit buswidth.
+Relevant SDCR value modified.
 
-Looks like commit 5451781dadf8 ("regulator: core: Only count load for
-enabled consumers") started showing new warnings with v5.0-rc cycle:
+Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+---
+ drivers/mmc/host/atmel-mci.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-regulator-dummy: Underflow of regulator enable count
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index 47189f9ed4e2..735aa5871358 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -1410,6 +1410,9 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	case MMC_BUS_WIDTH_4:
+ 		slot->sdc_reg |= ATMCI_SDCBUS_4BIT;
+ 		break;
++	case MMC_BUS_WIDTH_8:
++		slot->sdc_reg |= ATMCI_SDCBUS_8BIT;
++		break;
+ 	}
+ 
+ 	if (ios->clock) {
+@@ -2275,8 +2278,11 @@ static int atmci_init_slot(struct atmel_mci *host,
+ 	 * use only one bit for data to prevent fifo underruns and overruns
+ 	 * which will corrupt data.
+ 	 */
+-	if ((slot_data->bus_width >= 4) && host->caps.has_rwproof)
++	if ((slot_data->bus_width >= 4) && host->caps.has_rwproof) {
+ 		mmc->caps |= MMC_CAP_4_BIT_DATA;
++		if (slot_data->bus_width >= 8)
++			mmc->caps |= MMC_CAP_8_BIT_DATA;
++	}
+ 
+ 	if (atmci_get_version(host) < 0x200) {
+ 		mmc->max_segs = 256;
+-- 
+2.17.1
 
-I'm seeing this at least with my pwm-vibra test case:
-
-# rumble-test /dev/input/by-path/platform-vibrator-event 0xffff
-pwm-vibrator vibrator: vibrator supply vcc not found, using dummy regulator
-input: pwm-vibrator as /devices/platform/vibrator/input/input4
-regulator-dummy: Underflow of regulator enable count
-Upload rumble effect... id=0
-regulator-dummy: Underflow of regulator enable count
-
-Are these bogus warnings for dummy regulator or do we have
-real unpaired regulator calls or somewhere?
-
-Regards,
-
-Tony
 
 _______________________________________________
 linux-arm-kernel mailing list
