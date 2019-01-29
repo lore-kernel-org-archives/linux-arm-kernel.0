@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB93CC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:09:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EBF14C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:09:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8A1EF20881
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:09:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BC944214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:09:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qw33xk5a";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="IDTQdAoi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8A1EF20881
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pHqzMX/1";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="P3wD+tMF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC944214DA
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,32 +26,32 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1h8U6BVnnF7JX4QzHww6PLQOIs90mt7J5VhnXosm05E=; b=Qw33xk5aqsuh+R
-	nETSef9SfzkR9DNe3ZHWr3R9STyHhIipaeXMex2al3CX7XUmPp1O+ZvcV563uvXFcbxWajKIzgxMB
-	5JaeZtZyzK1QON3Aa5MyVzVFiX3thfmqNxzxVBIe3fueU8Bj3tq5s/qPCmas5c0mFnrnO3n4soAto
-	n39gA4QN3LP1rnhUhVWuZlVwM91c2CelsKUUrM3T5hTVQWGiuahX72gLedbGelAMWHpFiYNapFF92
-	JNS9oJfGZtXjMInhDjjvi5gTNR+F5KY368aP9RBmwXJM/euKm2M8MGrOXpKY8J3TqU2QKaxm1+Tge
-	NGz/rKX530hohVh9HYcw==;
+	List-Owner; bh=IdaA7/4zmYFlLMeMfYoAKN3tj3O2W1L3MNxyZJT7igA=; b=pHqzMX/11PL3oL
+	N6ySrMXKxHMAQUvQoJ6GluH/OVI8un48w79wYJc5HNMZHOozpzymYzhqMWejn5Zr9pHL9xMGf3+Iv
+	Id4atj2L1sAkZZoapb8POUz5AbIjIKCNdv5vwiPewHqECLgfaEcVh9n/PyjNXAnX7VHQVhcBSDkuH
+	cUx4Sd7shu+EcNFG0heWmF+0lIug7734YXTjR1+JLN9tzkZ/y2mNGOZyXjQJHm44E2S1yfI1Afpcg
+	lLYd+cLGTVCc5QpO9UHCX6fORgro2OHN60L/BecCdHD/UOlSlONv8wdX/HklYmeTgiT+R02TdAPRc
+	YOcgXqU3HLcV/Au+9yRQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goOSL-0004CV-LB; Tue, 29 Jan 2019 08:09:17 +0000
+	id 1goOSh-0004Uf-4Y; Tue, 29 Jan 2019 08:09:39 +0000
 Received: from mail-eopbgr30081.outbound.protection.outlook.com ([40.107.3.81]
  helo=EUR03-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goORr-0003cw-Cn
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:08:53 +0000
+ id 1goORx-0003cw-Nl
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:08:55 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=xS1hS5AfHsshWc5VdjkZkvv/SrMyo6wmrTvVdcy4VkM=;
- b=IDTQdAoiwcSR0ixvsmUdjJJ4yh8RGadRcNU5vOyLw7APUgYPLXsPQ8EQGN4GJlrv1gGDZMSsi4alBSnD6Yg0FbrsRR+ECNBRr+4K0laZxF+7cR6bzsg5S8m1HJ1Tk4wESLSer5rx6W7gx8+tbkzDOCoe+i5uo7Gq/cOrP6naIOs=
+ bh=LaEntDyw6qLx6mvy22xU073gwAKY3mmxOe0XBwod+gQ=;
+ b=P3wD+tMFJ6dj7tE4ZDNzUxTsNeC5HYvkbkJKlFb5vVN+9Wr//aSyQwNnYAcbdgA/xCvqvffG4xdZPg5LddPPGwvnsGBXLR8eci1vfeuEAMNYnnlK2d/7fe3KDoH43LTNhL1rtOIoEsibMb+Izmdgcls+P77wUdeGg/SnCn2njzM=
 Received: from AM6PR04MB5781.eurprd04.prod.outlook.com (20.179.3.19) by
  AM6PR04MB5847.eurprd04.prod.outlook.com (20.179.3.27) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1558.17; Tue, 29 Jan 2019 08:08:41 +0000
+ 15.20.1558.17; Tue, 29 Jan 2019 08:08:47 +0000
 Received: from AM6PR04MB5781.eurprd04.prod.outlook.com
  ([fe80::9c0:e3aa:b41f:9504]) by AM6PR04MB5781.eurprd04.prod.outlook.com
  ([fe80::9c0:e3aa:b41f:9504%3]) with mapi id 15.20.1558.023; Tue, 29 Jan 2019
- 08:08:41 +0000
+ 08:08:47 +0000
 From: "Z.q. Hou" <zhiqiang.hou@nxp.com>
 To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
  "linux-arm-kernel@lists.infradead.org"
@@ -64,12 +64,11 @@ To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
  Leo Li <leoyang.li@nxp.com>, "lorenzo.pieralisi@arm.com"
  <lorenzo.pieralisi@arm.com>, "catalin.marinas@arm.com"
  <catalin.marinas@arm.com>, "will.deacon@arm.com" <will.deacon@arm.com>
-Subject: [PATCHv3 02/27] PCI: mobiveil: format the code without function change
-Thread-Topic: [PATCHv3 02/27] PCI: mobiveil: format the code without function
- change
-Thread-Index: AQHUt6nYizUVXjYBBUqYadNYiw9xeA==
-Date: Tue, 29 Jan 2019 08:08:40 +0000
-Message-ID: <20190129080926.36773-3-Zhiqiang.Hou@nxp.com>
+Subject: [PATCHv3 03/27] PCI: mobiveil: correct the returned error number
+Thread-Topic: [PATCHv3 03/27] PCI: mobiveil: correct the returned error number
+Thread-Index: AQHUt6ncjsMFdns5G0+hpkPdSUjWog==
+Date: Tue, 29 Jan 2019 08:08:47 +0000
+Message-ID: <20190129080926.36773-4-Zhiqiang.Hou@nxp.com>
 References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
 In-Reply-To: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
 Accept-Language: zh-CN, en-US
@@ -86,36 +85,36 @@ x-mailer: git-send-email 2.17.1
 x-originating-ip: [119.31.174.73]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; AM6PR04MB5847;
- 6:+FHJL5c/KCKX0E+tXABbpyadrmsZBf+TLIHUl4Vi0WRTpu/U0Uq4J/kJfLbNjNtveHP+aJIFuv2X42nFX4kSEAkYmMtqecDyE+C++3BL6YStHei3LU8M0UYiZu5rTRhKSzr+HPauYSrHXczoyL3ukdeN3/lWg75rKnksiyL5gAITaSstunrW4Esi7rxQ2iy7fgq+P6yJNkR+wxlqwIsrvCXPy/b4eK4K3I2qj9r7ZBQ/hTVOx8t1oOWj0r3NGNX0AjeoP3DGQHqIXT52tL3F8fhAT8kSQbyZ6M7aNVD85vkQzP0FFFRFfwXRxiiUOQS8T8Sw6lv1rbaNlcdc35XRmQ8BNhk+9iySeypo+WNk9AQ6t6V9VfBtDTINXITecj8k3uls4gUoJL1kbNdDRhDN9PoaAwxPXowyM0vBmhsTjbS8VcvfiLigM5S4+/ZfXSJK8M3/s/LkO250jtbPK7Jymg==;
- 5:BK7Er5sazpJEqjJL3xZHv6NwA73SH+DKFBtHv1VX9YnKZyiP58tj05JFQMvopoYB04LlH/NUTPel2VrMGe2huuJMlqHhdiIiWqMZxUJ95ixPuoBQL7SqLg8CjJykKS1COa+NQPlIVHI4KVhcqVA2/Mna67VLzICgJryKIGD37J1U8hKRIRl8QQ+OhdkrDpNey+VfDBWJnaL00yRp1lB3nw==;
- 7:dsDGVdTMZ34kQrFq/HlcZSweoTX+M8fhYontBX4Tb04dJrtQya65NlWXgEtmEaSNVenMX+dNbTctAQuNdfPiTXe/UPvr8GGfnt+40MU2KIK65D2d9wrtof6xCd6tyhPxnRIX2XMqSlblM+34khjuyw==
-x-ms-office365-filtering-correlation-id: ab080bc6-d07f-4188-23cf-08d685c0faad
+ 6:lg+RLQN4pERq6haAXAbj3/lGFyYAFdVUFixry0imbZpg97O3MUP/G1AV7gVwq3Sh8cNJ9EHo9aw9vLFT3bEMIoWSIz1D2hWpbXF2hKjiocEAqvH3rl83+kQlyqv9N2GU4nhEdpn9h5s6oyPKUcmz3abIWnabelPgNFpNCRg1D8GhgjddOt+y/U0mXsGRUCO+m3sJFKE8tUd3+Pa1nWvR0j2BMf5b2CPMKFjQ1C67g9L/FiZCMKAgtoS6gjKKsmWVVOQ3QYPNjSHBQ9Oxd9Bw7xRVUN0KIASMobTM+3dFEdS7FRixLKLC+bSzn2l01kiBGJuGBBT8hTzqY2CqbTz/Zbn2Dsm5lWuTqS+V4aBLTnQgvZYUxHEeQuz1eU9snpd5uGaB+4Xgacz8wMrdRul+uZyYLDuq88MpENP2TBxoOF6NUy3rKAdeMISv9BWsOSM+NFy5D2HoGBhZPmcflqLooA==;
+ 5:iaE1oyO2Dis18G9Y7JqCygaIO0GTrjBpBDuJGkyCilQwkpkesd9X9UeUmpz/T/Cs9QJLhSa2tt6pqR0CFm5HMB9N55QXzBSmjlnmB34LCbcSx8UkltHL7KyJLYLIhOiD/hCOZFsPpQORUmFSfWSmy3mx9RVAyUBxZQHSDe78zQz3bZ305U8KSjJsiSu14TerI5+Od1fMTHmkRlC7HgC0Ew==;
+ 7:j16y6KOkV6lGh0oi6spCG2Ef0C/D/qu+qCyubcqGcv/psdhpYNJW+mB3Z/qFto8oG/x2GMNB/tcOdI372ukUf+C5GsXinKaj7tIeLAFsWv/ZS5nLFWrZO0f6zjR6blndrbyOrzMyZ2EiEqRTB2hw0w==
+x-ms-office365-filtering-correlation-id: 063fc20a-3f06-4a2c-fb28-08d685c0fe6d
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:AM6PR04MB5847; 
 x-ms-traffictypediagnostic: AM6PR04MB5847:
-x-microsoft-antispam-prvs: <AM6PR04MB58472BE8B2B615B2B3970EDE84970@AM6PR04MB5847.eurprd04.prod.outlook.com>
+x-microsoft-antispam-prvs: <AM6PR04MB58479E75382AB38E7BD00B2484970@AM6PR04MB5847.eurprd04.prod.outlook.com>
 x-forefront-prvs: 093290AD39
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(396003)(346002)(366004)(376002)(136003)(199004)(189003)(14444005)(14454004)(66066001)(478600001)(2616005)(6436002)(71200400001)(446003)(486006)(54906003)(11346002)(476003)(99286004)(110136005)(52116002)(30864003)(256004)(6486002)(36756003)(6506007)(386003)(316002)(97736004)(26005)(102836004)(71190400001)(186003)(76176011)(81156014)(81166006)(7736002)(8676002)(3846002)(50226002)(305945005)(53946003)(4326008)(7416002)(25786009)(1076003)(2906002)(53936002)(6116002)(86362001)(2201001)(105586002)(106356001)(8936002)(2501003)(68736007)(6512007)(921003)(1121003);
+ SFS:(10009020)(39860400002)(396003)(346002)(366004)(376002)(136003)(199004)(189003)(14444005)(14454004)(66066001)(478600001)(2616005)(6436002)(71200400001)(446003)(486006)(54906003)(11346002)(476003)(99286004)(110136005)(52116002)(256004)(6486002)(36756003)(6506007)(386003)(316002)(97736004)(26005)(102836004)(71190400001)(186003)(76176011)(81156014)(81166006)(7736002)(8676002)(3846002)(50226002)(305945005)(4326008)(7416002)(25786009)(1076003)(2906002)(53936002)(6116002)(86362001)(2201001)(105586002)(106356001)(8936002)(2501003)(68736007)(6512007)(921003)(1121003);
  DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB5847;
  H:AM6PR04MB5781.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: Il93OfK7M8kexScWSym+HtQGepS8ddad7RLqCnTce7ZXkwrn7ILsxBROM7ezgXv/Kf91qUAhV9zlskEPzpc280QbJxoHeMXs8JyKfifDEijlnEMIIA/VFe3GDQnSkgaYBdQ2fC3iwLcjjYDuMcLGo5cg995OB8wh8yfu98LKSs9tufMyhZ5mn6BaNnevn8YcQtgO2LKvA/Z9KTVnmjUYCUG1mBwRfW6x58D75oltoAT4NiXXFR+JYc2G9gyCEz7W4GG4+5+aXsykVXJn3YbLMLlajBIgqZ8reELwfgVm76h3hwB6ians7Im79uCt/vTRtFBQ0NYSjS9XvD4r3LASCu6EKoAlFvCJ5RHAZSPyglAW54vr7HS+3tXoHdp66VXiS6JRMajOQHGDDjD2yl9PdQt9XW3yS4ryv62A+BEFCgQ=
+x-microsoft-antispam-message-info: kqlYz9/vZQAilr+kTioiVklEfa3hrLAUi9zoD9mVE4wgAPO+/aJI/79pH8y9s4ynvz4EmNXngjuMRMnx7dmrbaeANeEMOzv9rNyNy+UtCGI9bZ5FPeKNLOwKyDEHSWIJQy37xYG4bG05zDGN1DQtJ1Nmgmb8itdJvOAnL1wzLcopM72+/wtynEHS1UqjeQejdjWj8jhsqrS0nNvNsw3qfHCxMhP02utmXZtHBoj+TchVeP/2ed8tnLMYMGM48KlQlEs2tFCZ7Z0j1dEm11h19ZiyybP1FCAfnc/ELui2lucPdHQmPi7R0nPeoV2ij36mul2rTzTp6pP0Q8QBFTQRHz6vrA+Zxx36cY3rbhmN8+nA05uhJHRGFce74BmeBf86wEQNb1i1IQ3+TvAp4wFglQ+HyBNWMMVTMCKOHo5tRuM=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: ab080bc6-d07f-4188-23cf-08d685c0faad
-X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 08:08:34.9119 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 063fc20a-3f06-4a2c-fb28-08d685c0fe6d
+X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 08:08:41.2401 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB5847
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_000847_749803_0133D162 
-X-CRM114-Status: GOOD (  14.33  )
+X-CRM114-CacheID: sfid-20190129_000853_970343_1E7CF35C 
+X-CRM114-Status: GOOD (  12.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -136,7 +135,8 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-Just format the code without functionality change.
+This patch corrected the returned error number by convention,
+and removed a unnecessary error check.
 
 Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 Reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
@@ -144,587 +144,44 @@ Reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 V3:
  - No change
 
- drivers/pci/controller/pcie-mobiveil.c | 261 +++++++++++++------------
- 1 file changed, 137 insertions(+), 124 deletions(-)
+ drivers/pci/controller/pcie-mobiveil.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-index d55c7e780c6e..b87471f08a40 100644
+index b87471f08a40..563210e731d3 100644
 --- a/drivers/pci/controller/pcie-mobiveil.c
 +++ b/drivers/pci/controller/pcie-mobiveil.c
-@@ -31,38 +31,40 @@
-  * translation tables are grouped into windows, each window registers are
-  * grouped into blocks of 4 or 16 registers each
-  */
--#define PAB_REG_BLOCK_SIZE	16
--#define PAB_EXT_REG_BLOCK_SIZE	4
-+#define PAB_REG_BLOCK_SIZE		16
-+#define PAB_EXT_REG_BLOCK_SIZE		4
- 
--#define PAB_REG_ADDR(offset, win) (offset + (win * PAB_REG_BLOCK_SIZE))
--#define PAB_EXT_REG_ADDR(offset, win) (offset + (win * PAB_EXT_REG_BLOCK_SIZE))
-+#define PAB_REG_ADDR(offset, win)	\
-+	(offset + (win * PAB_REG_BLOCK_SIZE))
-+#define PAB_EXT_REG_ADDR(offset, win)	\
-+	(offset + (win * PAB_EXT_REG_BLOCK_SIZE))
- 
--#define LTSSM_STATUS		0x0404
--#define  LTSSM_STATUS_L0_MASK	0x3f
--#define  LTSSM_STATUS_L0	0x2d
-+#define LTSSM_STATUS			0x0404
-+#define  LTSSM_STATUS_L0_MASK		0x3f
-+#define  LTSSM_STATUS_L0		0x2d
- 
--#define PAB_CTRL		0x0808
--#define  AMBA_PIO_ENABLE_SHIFT	0
--#define  PEX_PIO_ENABLE_SHIFT	1
--#define  PAGE_SEL_SHIFT	13
--#define  PAGE_SEL_MASK		0x3f
--#define  PAGE_LO_MASK		0x3ff
--#define  PAGE_SEL_OFFSET_SHIFT	10
-+#define PAB_CTRL			0x0808
-+#define  AMBA_PIO_ENABLE_SHIFT		0
-+#define  PEX_PIO_ENABLE_SHIFT		1
-+#define  PAGE_SEL_SHIFT			13
-+#define  PAGE_SEL_MASK			0x3f
-+#define  PAGE_LO_MASK			0x3ff
-+#define  PAGE_SEL_OFFSET_SHIFT		10
- 
--#define PAB_AXI_PIO_CTRL	0x0840
--#define  APIO_EN_MASK		0xf
-+#define PAB_AXI_PIO_CTRL		0x0840
-+#define  APIO_EN_MASK			0xf
- 
--#define PAB_PEX_PIO_CTRL	0x08c0
--#define  PIO_ENABLE_SHIFT	0
-+#define PAB_PEX_PIO_CTRL		0x08c0
-+#define  PIO_ENABLE_SHIFT		0
- 
- #define PAB_INTP_AMBA_MISC_ENB		0x0b0c
--#define PAB_INTP_AMBA_MISC_STAT	0x0b1c
-+#define PAB_INTP_AMBA_MISC_STAT		0x0b1c
- #define  PAB_INTP_INTX_MASK		0x01e0
- #define  PAB_INTP_MSI_MASK		0x8
- 
--#define PAB_AXI_AMAP_CTRL(win)	PAB_REG_ADDR(0x0ba0, win)
--#define  WIN_ENABLE_SHIFT	0
--#define  WIN_TYPE_SHIFT	1
-+#define PAB_AXI_AMAP_CTRL(win)		PAB_REG_ADDR(0x0ba0, win)
-+#define  WIN_ENABLE_SHIFT		0
-+#define  WIN_TYPE_SHIFT			1
- 
- #define PAB_EXT_AXI_AMAP_SIZE(win)	PAB_EXT_REG_ADDR(0xbaf0, win)
- 
-@@ -70,16 +72,16 @@
- #define  AXI_WINDOW_ALIGN_MASK		3
- 
- #define PAB_AXI_AMAP_PEX_WIN_L(win)	PAB_REG_ADDR(0x0ba8, win)
--#define  PAB_BUS_SHIFT		24
--#define  PAB_DEVICE_SHIFT	19
--#define  PAB_FUNCTION_SHIFT	16
-+#define  PAB_BUS_SHIFT			24
-+#define  PAB_DEVICE_SHIFT		19
-+#define  PAB_FUNCTION_SHIFT		16
- 
- #define PAB_AXI_AMAP_PEX_WIN_H(win)	PAB_REG_ADDR(0x0bac, win)
- #define PAB_INTP_AXI_PIO_CLASS		0x474
- 
--#define PAB_PEX_AMAP_CTRL(win)	PAB_REG_ADDR(0x4ba0, win)
--#define  AMAP_CTRL_EN_SHIFT	0
--#define  AMAP_CTRL_TYPE_SHIFT	1
-+#define PAB_PEX_AMAP_CTRL(win)		PAB_REG_ADDR(0x4ba0, win)
-+#define  AMAP_CTRL_EN_SHIFT		0
-+#define  AMAP_CTRL_TYPE_SHIFT		1
- 
- #define PAB_EXT_PEX_AMAP_SIZEN(win)	PAB_EXT_REG_ADDR(0xbef0, win)
- #define PAB_PEX_AMAP_AXI_WIN(win)	PAB_REG_ADDR(0x4ba4, win)
-@@ -87,39 +89,39 @@
- #define PAB_PEX_AMAP_PEX_WIN_H(win)	PAB_REG_ADDR(0x4bac, win)
- 
- /* starting offset of INTX bits in status register */
--#define PAB_INTX_START	5
-+#define PAB_INTX_START			5
- 
- /* supported number of MSI interrupts */
--#define PCI_NUM_MSI	16
-+#define PCI_NUM_MSI			16
- 
- /* MSI registers */
--#define MSI_BASE_LO_OFFSET	0x04
--#define MSI_BASE_HI_OFFSET	0x08
--#define MSI_SIZE_OFFSET	0x0c
--#define MSI_ENABLE_OFFSET	0x14
--#define MSI_STATUS_OFFSET	0x18
--#define MSI_DATA_OFFSET	0x20
--#define MSI_ADDR_L_OFFSET	0x24
--#define MSI_ADDR_H_OFFSET	0x28
-+#define MSI_BASE_LO_OFFSET		0x04
-+#define MSI_BASE_HI_OFFSET		0x08
-+#define MSI_SIZE_OFFSET			0x0c
-+#define MSI_ENABLE_OFFSET		0x14
-+#define MSI_STATUS_OFFSET		0x18
-+#define MSI_DATA_OFFSET			0x20
-+#define MSI_ADDR_L_OFFSET		0x24
-+#define MSI_ADDR_H_OFFSET		0x28
- 
- /* outbound and inbound window definitions */
--#define WIN_NUM_0		0
--#define WIN_NUM_1		1
--#define CFG_WINDOW_TYPE	0
--#define IO_WINDOW_TYPE		1
--#define MEM_WINDOW_TYPE	2
--#define IB_WIN_SIZE		((u64)256 * 1024 * 1024 * 1024)
--#define MAX_PIO_WINDOWS	8
-+#define WIN_NUM_0			0
-+#define WIN_NUM_1			1
-+#define CFG_WINDOW_TYPE			0
-+#define IO_WINDOW_TYPE			1
-+#define MEM_WINDOW_TYPE			2
-+#define IB_WIN_SIZE			((u64)256 * 1024 * 1024 * 1024)
-+#define MAX_PIO_WINDOWS			8
- 
- /* Parameters for the waiting for link up routine */
--#define LINK_WAIT_MAX_RETRIES	10
--#define LINK_WAIT_MIN	90000
--#define LINK_WAIT_MAX	100000
-+#define LINK_WAIT_MAX_RETRIES		10
-+#define LINK_WAIT_MIN			90000
-+#define LINK_WAIT_MAX			100000
- 
--#define PAGED_ADDR_BNDRY			0xc00
--#define OFFSET_TO_PAGE_ADDR(off)		\
-+#define PAGED_ADDR_BNDRY		0xc00
-+#define OFFSET_TO_PAGE_ADDR(off)	\
- 	((off & PAGE_LO_MASK) | PAGED_ADDR_BNDRY)
--#define OFFSET_TO_PAGE_IDX(off)			\
-+#define OFFSET_TO_PAGE_IDX(off)		\
- 	((off >> PAGE_SEL_OFFSET_SHIFT) & PAGE_SEL_MASK)
- 
- struct mobiveil_msi {			/* MSI information */
-@@ -297,14 +299,14 @@ static void __iomem *mobiveil_pcie_map_bus(struct pci_bus *bus,
- 					unsigned int devfn, int where)
- {
- 	struct mobiveil_pcie *pcie = bus->sysdata;
-+	u32 value;
- 
- 	if (!mobiveil_pcie_valid_device(bus, devfn))
- 		return NULL;
- 
--	if (bus->number == pcie->root_bus_nr) {
--		/* RC config access */
-+	/* RC config access */
-+	if (bus->number == pcie->root_bus_nr)
- 		return pcie->csr_axi_slave_base + where;
--	}
- 
- 	/*
- 	 * EP config access (in Config/APIO space)
-@@ -312,10 +314,12 @@ static void __iomem *mobiveil_pcie_map_bus(struct pci_bus *bus,
- 	 * (BDF) in PAB_AXI_AMAP_PEX_WIN_L0 Register.
- 	 * Relies on pci_lock serialization
- 	 */
--	csr_writel(pcie, bus->number << PAB_BUS_SHIFT |
--			PCI_SLOT(devfn) << PAB_DEVICE_SHIFT |
--			PCI_FUNC(devfn) << PAB_FUNCTION_SHIFT,
--			PAB_AXI_AMAP_PEX_WIN_L(WIN_NUM_0));
-+	value = bus->number << PAB_BUS_SHIFT |
-+		PCI_SLOT(devfn) << PAB_DEVICE_SHIFT |
-+		PCI_FUNC(devfn) << PAB_FUNCTION_SHIFT;
-+
-+	csr_writel(pcie, value, PAB_AXI_AMAP_PEX_WIN_L(WIN_NUM_0));
-+
- 	return pcie->config_axi_slave_base + where;
- }
- 
-@@ -350,22 +354,22 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
- 
- 	/* Handle INTx */
- 	if (intr_status & PAB_INTP_INTX_MASK) {
--		shifted_status = csr_readl(pcie, PAB_INTP_AMBA_MISC_STAT) >>
--			PAB_INTX_START;
-+		shifted_status = csr_readl(pcie, PAB_INTP_AMBA_MISC_STAT);
-+		shifted_status >>= PAB_INTX_START;
- 		do {
- 			for_each_set_bit(bit, &shifted_status, PCI_NUM_INTX) {
- 				virq = irq_find_mapping(pcie->intx_domain,
--						bit + 1);
-+							bit + 1);
- 				if (virq)
- 					generic_handle_irq(virq);
- 				else
--					dev_err_ratelimited(dev,
--						"unexpected IRQ, INT%d\n", bit);
-+					dev_err_ratelimited(dev, "unexpected IRQ, INT%d\n",
-+							    bit);
- 
- 				/* clear interrupt */
- 				csr_writel(pcie,
--					shifted_status << PAB_INTX_START,
--					PAB_INTP_AMBA_MISC_STAT);
-+					   shifted_status << PAB_INTX_START,
-+					   PAB_INTP_AMBA_MISC_STAT);
- 			}
- 		} while ((shifted_status >> PAB_INTX_START) != 0);
- 	}
-@@ -375,8 +379,7 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
- 
- 	/* handle MSI interrupts */
- 	while (msi_status & 1) {
--		msi_data = readl_relaxed(pcie->apb_csr_base
--				+ MSI_DATA_OFFSET);
-+		msi_data = readl_relaxed(pcie->apb_csr_base + MSI_DATA_OFFSET);
- 
- 		/*
- 		 * MSI_STATUS_OFFSET register gets updated to zero
-@@ -385,18 +388,18 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
- 		 * two dummy reads.
- 		 */
- 		msi_addr_lo = readl_relaxed(pcie->apb_csr_base +
--				MSI_ADDR_L_OFFSET);
-+					    MSI_ADDR_L_OFFSET);
- 		msi_addr_hi = readl_relaxed(pcie->apb_csr_base +
--				MSI_ADDR_H_OFFSET);
-+					    MSI_ADDR_H_OFFSET);
- 		dev_dbg(dev, "MSI registers, data: %08x, addr: %08x:%08x\n",
--				msi_data, msi_addr_hi, msi_addr_lo);
-+			msi_data, msi_addr_hi, msi_addr_lo);
- 
- 		virq = irq_find_mapping(msi->dev_domain, msi_data);
- 		if (virq)
- 			generic_handle_irq(virq);
- 
- 		msi_status = readl_relaxed(pcie->apb_csr_base +
--				MSI_STATUS_OFFSET);
-+					   MSI_STATUS_OFFSET);
- 	}
- 
- 	/* Clear the interrupt status */
-@@ -413,7 +416,7 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
- 
- 	/* map config resource */
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
--			"config_axi_slave");
-+					   "config_axi_slave");
- 	pcie->config_axi_slave_base = devm_pci_remap_cfg_resource(dev, res);
- 	if (IS_ERR(pcie->config_axi_slave_base))
- 		return PTR_ERR(pcie->config_axi_slave_base);
-@@ -421,7 +424,7 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
- 
- 	/* map csr resource */
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
--			"csr_axi_slave");
-+					   "csr_axi_slave");
- 	pcie->csr_axi_slave_base = devm_pci_remap_cfg_resource(dev, res);
- 	if (IS_ERR(pcie->csr_axi_slave_base))
- 		return PTR_ERR(pcie->csr_axi_slave_base);
-@@ -452,7 +455,7 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
- }
- 
- static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
--		int pci_addr, u32 type, u64 size)
-+			       int pci_addr, u32 type, u64 size)
- {
- 	int pio_ctrl_val;
- 	int amap_ctrl_dw;
-@@ -465,19 +468,20 @@ static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
- 	}
- 
- 	pio_ctrl_val = csr_readl(pcie, PAB_PEX_PIO_CTRL);
--	csr_writel(pcie,
--		pio_ctrl_val | (1 << PIO_ENABLE_SHIFT), PAB_PEX_PIO_CTRL);
--	amap_ctrl_dw = csr_readl(pcie, PAB_PEX_AMAP_CTRL(win_num));
--	amap_ctrl_dw = (amap_ctrl_dw | (type << AMAP_CTRL_TYPE_SHIFT));
--	amap_ctrl_dw = (amap_ctrl_dw | (1 << AMAP_CTRL_EN_SHIFT));
-+	pio_ctrl_val |= 1 << PIO_ENABLE_SHIFT;
-+	csr_writel(pcie, pio_ctrl_val, PAB_PEX_PIO_CTRL);
- 
--	csr_writel(pcie, amap_ctrl_dw | lower_32_bits(size64),
--		   PAB_PEX_AMAP_CTRL(win_num));
-+	amap_ctrl_dw = csr_readl(pcie, PAB_PEX_AMAP_CTRL(win_num));
-+	amap_ctrl_dw |= (type << AMAP_CTRL_TYPE_SHIFT) |
-+			(1 << AMAP_CTRL_EN_SHIFT) |
-+			lower_32_bits(size64);
-+	csr_writel(pcie, amap_ctrl_dw, PAB_PEX_AMAP_CTRL(win_num));
- 
- 	csr_writel(pcie, upper_32_bits(size64),
- 		   PAB_EXT_PEX_AMAP_SIZEN(win_num));
- 
- 	csr_writel(pcie, pci_addr, PAB_PEX_AMAP_AXI_WIN(win_num));
-+
- 	csr_writel(pcie, pci_addr, PAB_PEX_AMAP_PEX_WIN_L(win_num));
- 	csr_writel(pcie, 0, PAB_PEX_AMAP_PEX_WIN_H(win_num));
- }
-@@ -486,7 +490,8 @@ static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
-  * routine to program the outbound windows
-  */
- static void program_ob_windows(struct mobiveil_pcie *pcie, int win_num,
--		u64 cpu_addr, u64 pci_addr, u32 config_io_bit, u64 size)
-+			       u64 cpu_addr, u64 pci_addr,
-+			       u32 config_io_bit, u64 size)
- {
- 
- 	u32 value, type;
-@@ -505,7 +510,7 @@ static void program_ob_windows(struct mobiveil_pcie *pcie, int win_num,
- 	type = config_io_bit;
- 	value = csr_readl(pcie, PAB_AXI_AMAP_CTRL(win_num));
- 	csr_writel(pcie, 1 << WIN_ENABLE_SHIFT | type << WIN_TYPE_SHIFT |
--			lower_32_bits(size64), PAB_AXI_AMAP_CTRL(win_num));
-+		   lower_32_bits(size64), PAB_AXI_AMAP_CTRL(win_num));
- 
- 	csr_writel(pcie, upper_32_bits(size64), PAB_EXT_AXI_AMAP_SIZE(win_num));
- 
-@@ -515,14 +520,14 @@ static void program_ob_windows(struct mobiveil_pcie *pcie, int win_num,
- 	 */
- 	value = csr_readl(pcie, PAB_AXI_AMAP_AXI_WIN(win_num));
- 	csr_writel(pcie, cpu_addr & (~AXI_WINDOW_ALIGN_MASK),
--			PAB_AXI_AMAP_AXI_WIN(win_num));
-+		   PAB_AXI_AMAP_AXI_WIN(win_num));
- 
- 	value = csr_readl(pcie, PAB_AXI_AMAP_PEX_WIN_H(win_num));
- 
- 	csr_writel(pcie, lower_32_bits(pci_addr),
--			PAB_AXI_AMAP_PEX_WIN_L(win_num));
-+		   PAB_AXI_AMAP_PEX_WIN_L(win_num));
- 	csr_writel(pcie, upper_32_bits(pci_addr),
--			PAB_AXI_AMAP_PEX_WIN_H(win_num));
-+		   PAB_AXI_AMAP_PEX_WIN_H(win_num));
- 
- 	pcie->ob_wins_configured++;
- }
-@@ -538,7 +543,9 @@ static int mobiveil_bringup_link(struct mobiveil_pcie *pcie)
- 
- 		usleep_range(LINK_WAIT_MIN, LINK_WAIT_MAX);
- 	}
-+
- 	dev_err(&pcie->pdev->dev, "link never came up\n");
-+
- 	return -ETIMEDOUT;
- }
- 
-@@ -551,16 +558,16 @@ static void mobiveil_pcie_enable_msi(struct mobiveil_pcie *pcie)
- 	msi->msi_pages_phys = (phys_addr_t)msg_addr;
- 
- 	writel_relaxed(lower_32_bits(msg_addr),
--		pcie->apb_csr_base + MSI_BASE_LO_OFFSET);
-+		       pcie->apb_csr_base + MSI_BASE_LO_OFFSET);
- 	writel_relaxed(upper_32_bits(msg_addr),
--		pcie->apb_csr_base + MSI_BASE_HI_OFFSET);
-+		       pcie->apb_csr_base + MSI_BASE_HI_OFFSET);
- 	writel_relaxed(4096, pcie->apb_csr_base + MSI_SIZE_OFFSET);
- 	writel_relaxed(1, pcie->apb_csr_base + MSI_ENABLE_OFFSET);
- }
- 
- static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- {
--	u32 value, pab_ctrl, type = 0;
-+	u32 value, pab_ctrl, type;
- 	int err;
- 	struct resource_entry *win, *tmp;
- 
-@@ -575,26 +582,27 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- 	 * Space
- 	 */
- 	value = csr_readl(pcie, PCI_COMMAND);
--	csr_writel(pcie, value | PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
--		PCI_COMMAND_MASTER, PCI_COMMAND);
-+	value |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER;
-+	csr_writel(pcie, value, PCI_COMMAND);
- 
- 	/*
- 	 * program PIO Enable Bit to 1 (and PEX PIO Enable to 1) in PAB_CTRL
- 	 * register
- 	 */
- 	pab_ctrl = csr_readl(pcie, PAB_CTRL);
--	csr_writel(pcie, pab_ctrl | (1 << AMBA_PIO_ENABLE_SHIFT) |
--		(1 << PEX_PIO_ENABLE_SHIFT), PAB_CTRL);
-+	pab_ctrl |= (1 << AMBA_PIO_ENABLE_SHIFT) | (1 << PEX_PIO_ENABLE_SHIFT);
-+	csr_writel(pcie, pab_ctrl, PAB_CTRL);
- 
- 	csr_writel(pcie, (PAB_INTP_INTX_MASK | PAB_INTP_MSI_MASK),
--		PAB_INTP_AMBA_MISC_ENB);
-+		   PAB_INTP_AMBA_MISC_ENB);
- 
- 	/*
- 	 * program PIO Enable Bit to 1 and Config Window Enable Bit to 1 in
- 	 * PAB_AXI_PIO_CTRL Register
- 	 */
- 	value = csr_readl(pcie, PAB_AXI_PIO_CTRL);
--	csr_writel(pcie, value | APIO_EN_MASK, PAB_AXI_PIO_CTRL);
-+	value |= APIO_EN_MASK;
-+	csr_writel(pcie, value, PAB_AXI_PIO_CTRL);
- 
- 	/*
- 	 * we'll program one outbound window for config reads and
-@@ -605,25 +613,25 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- 
- 	/* config outbound translation window */
- 	program_ob_windows(pcie, pcie->ob_wins_configured,
--			pcie->ob_io_res->start, 0, CFG_WINDOW_TYPE,
--			resource_size(pcie->ob_io_res));
-+			   pcie->ob_io_res->start, 0, CFG_WINDOW_TYPE,
-+			   resource_size(pcie->ob_io_res));
- 
- 	/* memory inbound translation window */
- 	program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
- 
- 	/* Get the I/O and memory ranges from DT */
- 	resource_list_for_each_entry_safe(win, tmp, &pcie->resources) {
--		type = 0;
- 		if (resource_type(win->res) == IORESOURCE_MEM)
- 			type = MEM_WINDOW_TYPE;
--		if (resource_type(win->res) == IORESOURCE_IO)
-+		else if (resource_type(win->res) == IORESOURCE_IO)
- 			type = IO_WINDOW_TYPE;
--		if (type) {
--			/* configure outbound translation window */
--			program_ob_windows(pcie, pcie->ob_wins_configured,
--				win->res->start, 0, type,
--				resource_size(win->res));
--		}
-+		else
-+			continue;
-+
-+		/* configure outbound translation window */
-+		program_ob_windows(pcie, pcie->ob_wins_configured,
-+				   win->res->start, 0, type,
-+				   resource_size(win->res));
- 	}
- 
- 	/* setup MSI hardware registers */
-@@ -643,7 +651,8 @@ static void mobiveil_mask_intx_irq(struct irq_data *data)
- 	mask = 1 << ((data->hwirq + PAB_INTX_START) - 1);
- 	raw_spin_lock_irqsave(&pcie->intx_mask_lock, flags);
- 	shifted_val = csr_readl(pcie, PAB_INTP_AMBA_MISC_ENB);
--	csr_writel(pcie, (shifted_val & (~mask)), PAB_INTP_AMBA_MISC_ENB);
-+	shifted_val &= ~mask;
-+	csr_writel(pcie, shifted_val, PAB_INTP_AMBA_MISC_ENB);
- 	raw_spin_unlock_irqrestore(&pcie->intx_mask_lock, flags);
- }
- 
-@@ -658,7 +667,8 @@ static void mobiveil_unmask_intx_irq(struct irq_data *data)
- 	mask = 1 << ((data->hwirq + PAB_INTX_START) - 1);
- 	raw_spin_lock_irqsave(&pcie->intx_mask_lock, flags);
- 	shifted_val = csr_readl(pcie, PAB_INTP_AMBA_MISC_ENB);
--	csr_writel(pcie, (shifted_val | mask), PAB_INTP_AMBA_MISC_ENB);
-+	shifted_val |= mask;
-+	csr_writel(pcie, shifted_val, PAB_INTP_AMBA_MISC_ENB);
- 	raw_spin_unlock_irqrestore(&pcie->intx_mask_lock, flags);
- }
- 
-@@ -672,10 +682,11 @@ static struct irq_chip intx_irq_chip = {
- 
- /* routine to setup the INTx related data */
- static int mobiveil_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
--		irq_hw_number_t hwirq)
-+				  irq_hw_number_t hwirq)
- {
- 	irq_set_chip_and_handler(irq, &intx_irq_chip, handle_level_irq);
- 	irq_set_chip_data(irq, domain->host_data);
-+
- 	return 0;
- }
- 
-@@ -692,7 +703,7 @@ static struct irq_chip mobiveil_msi_irq_chip = {
- 
- static struct msi_domain_info mobiveil_msi_domain_info = {
- 	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
--		MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
-+		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
- 	.chip	= &mobiveil_msi_irq_chip,
- };
- 
-@@ -710,7 +721,7 @@ static void mobiveil_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
- }
- 
- static int mobiveil_msi_set_affinity(struct irq_data *irq_data,
--		const struct cpumask *mask, bool force)
-+				     const struct cpumask *mask, bool force)
- {
- 	return -EINVAL;
- }
-@@ -722,7 +733,8 @@ static struct irq_chip mobiveil_msi_bottom_irq_chip = {
- };
- 
- static int mobiveil_irq_msi_domain_alloc(struct irq_domain *domain,
--		unsigned int virq, unsigned int nr_irqs, void *args)
-+					 unsigned int virq,
-+					 unsigned int nr_irqs, void *args)
- {
- 	struct mobiveil_pcie *pcie = domain->host_data;
- 	struct mobiveil_msi *msi = &pcie->msi;
-@@ -742,13 +754,13 @@ static int mobiveil_irq_msi_domain_alloc(struct irq_domain *domain,
- 	mutex_unlock(&msi->lock);
- 
- 	irq_domain_set_info(domain, virq, bit, &mobiveil_msi_bottom_irq_chip,
--				domain->host_data, handle_level_irq,
--				NULL, NULL);
-+			    domain->host_data, handle_level_irq, NULL, NULL);
- 	return 0;
- }
- 
- static void mobiveil_irq_msi_domain_free(struct irq_domain *domain,
--		unsigned int virq, unsigned int nr_irqs)
-+					 unsigned int virq,
-+					 unsigned int nr_irqs)
- {
- 	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
- 	struct mobiveil_pcie *pcie = irq_data_get_irq_chip_data(d);
-@@ -756,12 +768,11 @@ static void mobiveil_irq_msi_domain_free(struct irq_domain *domain,
- 
- 	mutex_lock(&msi->lock);
- 
--	if (!test_bit(d->hwirq, msi->msi_irq_in_use)) {
-+	if (!test_bit(d->hwirq, msi->msi_irq_in_use))
- 		dev_err(&pcie->pdev->dev, "trying to free unused MSI#%lu\n",
- 			d->hwirq);
--	} else {
-+	else
- 		__clear_bit(d->hwirq, msi->msi_irq_in_use);
--	}
- 
- 	mutex_unlock(&msi->lock);
- }
-@@ -785,12 +796,14 @@ static int mobiveil_allocate_msi_domains(struct mobiveil_pcie *pcie)
- 	}
- 
- 	msi->msi_domain = pci_msi_create_irq_domain(fwnode,
--				&mobiveil_msi_domain_info, msi->dev_domain);
-+						    &mobiveil_msi_domain_info,
-+						    msi->dev_domain);
- 	if (!msi->msi_domain) {
- 		dev_err(dev, "failed to create MSI domain\n");
- 		irq_domain_remove(msi->dev_domain);
- 		return -ENOMEM;
- 	}
-+
- 	return 0;
- }
- 
-@@ -801,8 +814,8 @@ static int mobiveil_pcie_init_irq_domain(struct mobiveil_pcie *pcie)
- 	int ret;
- 
- 	/* setup INTx */
--	pcie->intx_domain = irq_domain_add_linear(node,
--				PCI_NUM_INTX, &intx_domain_ops, pcie);
-+	pcie->intx_domain = irq_domain_add_linear(node, PCI_NUM_INTX,
-+						  &intx_domain_ops, pcie);
+@@ -819,7 +819,7 @@ static int mobiveil_pcie_init_irq_domain(struct mobiveil_pcie *pcie)
  
  	if (!pcie->intx_domain) {
  		dev_err(dev, "Failed to get a INTx IRQ domain\n");
-@@ -917,10 +930,10 @@ MODULE_DEVICE_TABLE(of, mobiveil_pcie_of_match);
- static struct platform_driver mobiveil_pcie_driver = {
- 	.probe = mobiveil_pcie_probe,
- 	.driver = {
--			.name = "mobiveil-pcie",
--			.of_match_table = mobiveil_pcie_of_match,
--			.suppress_bind_attrs = true,
--		},
-+		.name = "mobiveil-pcie",
-+		.of_match_table = mobiveil_pcie_of_match,
-+		.suppress_bind_attrs = true,
-+	},
- };
+-		return -ENODEV;
++		return -ENOMEM;
+ 	}
  
- builtin_platform_driver(mobiveil_pcie_driver);
+ 	raw_spin_lock_init(&pcie->intx_mask_lock);
+@@ -845,11 +845,9 @@ static int mobiveil_pcie_probe(struct platform_device *pdev)
+ 	/* allocate the PCIe port */
+ 	bridge = devm_pci_alloc_host_bridge(dev, sizeof(*pcie));
+ 	if (!bridge)
+-		return -ENODEV;
++		return -ENOMEM;
+ 
+ 	pcie = pci_host_bridge_priv(bridge);
+-	if (!pcie)
+-		return -ENOMEM;
+ 
+ 	pcie->pdev = pdev;
+ 
+@@ -866,7 +864,7 @@ static int mobiveil_pcie_probe(struct platform_device *pdev)
+ 						    &pcie->resources, &iobase);
+ 	if (ret) {
+ 		dev_err(dev, "Getting bridge resources failed\n");
+-		return -ENOMEM;
++		return ret;
+ 	}
+ 
+ 	/*
 -- 
 2.17.1
 
