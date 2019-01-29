@@ -2,73 +2,89 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C0B79C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 15:09:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4EE63C282D0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 15:12:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8F6F22175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 15:09:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 153BE214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 15:12:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ndhY4NKx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F6F22175B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QDjxDt1n";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="ganX7ifr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 153BE214DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oilvjhQFbS5uBCUI0hOWV+zszqu6tsIq0qrRlSqjTh4=; b=ndhY4NKxXrPhyT
-	I00/GpB44K/0PvUURd6sNn9k2/Vx10dgwa/AXd9dT8VxB/PHXuHRNWuSIN6sbZLpc5cfnka1Izhr/
-	jKL7t2NmT50UCVWRWPIAtf3LgQEeSzv8y5q/T8Jw4Q5Geh6S+eEPdVItgLETPNAaVQ02vZNTDMo7m
-	26atepbq5x2leaO4nFz9s0ezeqIihb3nAMJEuWRZn2k6cf+VVd8diVEQWyhBfDj4hFDs7Y0r6gaEq
-	x7lM9PHMwHSiXw3K7ELOExeKHZYn93FM1SwIhYgfG6cLiLqywPo+x5hVZX2Ypu2MNzGpnoQDXOpBL
-	BbGu3wQ9gXhTvXabI62Q==;
+	List-Owner; bh=Kk48x5kn7QyxA4nQK9+sXh0K5NHIre99Dond0qSscQ4=; b=QDjxDt1n++7AnI
+	2NlU7eNCmrn4JNkFFcAA5p/W2PSxB1V215lI5RCVzCnky6Y+MwlsqXoYspV2O3CCdRdx8dfjAgz1L
+	jlVSPTfLnXzuJiJIBdae9lbk1MziQjJ9aGy/RsApfRB6lgs5XBjl8IuvUXKFHtnAqc3YGOc8nWzIH
+	v5yF9MSJlFsZhAoDLOciadLlzKvm9Jf7svL3VRvjbBK9k2HrUURMTLxXypgENVvI7T3s/gZM/qcZi
+	I6ZkfUM5RdbTZdY4pSR/yotDFWGOVVvATLH5Ls6eNPm2//oPvPdGj7QjwD4z2lldiwzLsEGwQKT6U
+	hmCUmBQTsaPtovI5mZAw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goV12-0006xx-4Q; Tue, 29 Jan 2019 15:09:32 +0000
-Received: from mail-oi1-f195.google.com ([209.85.167.195])
+	id 1goV3j-0000H0-DY; Tue, 29 Jan 2019 15:12:19 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goV0t-0006xY-IJ
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 15:09:29 +0000
-Received: by mail-oi1-f195.google.com with SMTP id y1so16339934oie.12
+ id 1goV3e-0000FW-3R
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 15:12:15 +0000
+Received: by mail-wm1-x341.google.com with SMTP id f188so18116256wmf.5
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 07:09:23 -0800 (PST)
+ Tue, 29 Jan 2019 07:12:13 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:in-reply-to:references:date:message-id
+ :mime-version; bh=vNZ5FJ7cxIMAaxbhIhbHCzmHy341mREO1gfpm3+S9gI=;
+ b=ganX7ifrtp5tHj6ni1+LPVWP1E17F8xIGdm7jPsOh7pTgepdccnF2KaBhkLZk0bsEO
+ KWM3WIriSYx6AbD3+3QDu0fInI0fAARwj/YG67JXNKsQXT1YU4ea1IWUmKu8f1J2Xb60
+ j1vkl34Cro1sm5lCT0LI+i0bbX1fSSeaCyH1Txm6kO12fRVWpId6CtUjApyFniqSdR1T
+ I6qO9V48oBkyREa+ezNnhmMABmZUFQdAWNxy09MsCn95ndTOubJbsGD3PdTVsFIjMqJI
+ z2QAfgWwQW40O2SFwHt9WMHiHdSMZ31fRoftP6LpgX/BUYRShxF895WPuBArRCheanKS
+ OLaw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=dBWLcVk2FKdoriSA6cBuTTloAIyPoayaHnUIXHy+MVU=;
- b=WNhi812UPSBTdvaDWcLE0QkRCEOQKDvsxvyi9Lq66vWh8OS29OiUe0/UqLJ6I8I/Rs
- IWr/xUmwV3LoYVxbswaFfWiOMS5e94xqAxh+/NK3zY/ZGEPczcHJnP+cclX9fAUBqFV3
- gGng5frkmai+V6jVIcE6ap5ZGsCvOCBAIgjnX56k95r1MldplDNPh9EOUq1G0jMSwpbd
- FvbTLVpiPa4Dj0/duf16L9LzYUDEuL1/K8VDSLf82ArMsF0ttzHshPTvzVzU9T30xEJU
- QynGOyy2IiiOAc2Irx5oF2GA42LViOH7K4h/f4fgpyHOnuByOnHn+LFCMpR9VOL1cnIW
- ElIw==
-X-Gm-Message-State: AJcUukcuDnax8XhXCvQhwt4Ru3hZ0O6klBSRkrzPbua3OLvoP7WSHyUZ
- KmEx0CcKwYJ1WkFAv7NR60X6kjw8E+PBOemaf2I=
-X-Google-Smtp-Source: ALg8bN41nyw/11NQDZx4GhvEABa4wfji3OY5KJXkzMkall32qSsQClytAxXFCK557gZVAF6zdgTgvV3cvDk7z+X/4MY=
-X-Received: by 2002:aca:e715:: with SMTP id e21mr9747980oih.76.1548774562350; 
- Tue, 29 Jan 2019 07:09:22 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
+ :message-id:mime-version;
+ bh=vNZ5FJ7cxIMAaxbhIhbHCzmHy341mREO1gfpm3+S9gI=;
+ b=qgI1jSZWf/trhWOS56HeNi3vhyuSHRic0X1YnOuDCI3Y4t06keZH5+aLTQn5oGFdaw
+ PhBcZQAo1p7aHFQ5xUwwhWNW5u59bF0SMFgrvcdOZDGYX/yDCHO1BqO8p37SvfQft34+
+ Kehj0Qy6elFAsRs6xl/h7pMCgojiDjIOuZPEcUdo7HVw4JQPkXCAkDn2BnSoElr7lA53
+ cn6my8jvHX7KyEqotV5WehhZSVb96FHwIxEotyDOEdGAHgpxpMWLccfWcOSVM+kXZ17L
+ DhLpgJUmyVudhRni393cR1BQei7wy5oX4V1AZnwki7BESUFOA8w7g+8i4Cil48DjLoeA
+ jGiQ==
+X-Gm-Message-State: AJcUukfL/6f6Fd1fpDSceR//w8Go9ua/mjQetgHb/Pz1BZD/7fmS88sR
+ Qq+F6ZxjFfSuZC2OING9Pcb8Eg==
+X-Google-Smtp-Source: ALg8bN6L5HiBonH/xydVY8vwKwxq8H7DS1iyrX1T/hefVcJGQR+A0hsHu4l/9SSJFXhLQwTERu+uTw==
+X-Received: by 2002:a1c:2944:: with SMTP id p65mr21261486wmp.20.1548774731567; 
+ Tue, 29 Jan 2019 07:12:11 -0800 (PST)
+Received: from localhost (aputeaux-684-1-12-29.w90-86.abo.wanadoo.fr.
+ [90.86.215.29])
+ by smtp.googlemail.com with ESMTPSA id x81sm3069370wmg.17.2019.01.29.07.12.10
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 29 Jan 2019 07:12:10 -0800 (PST)
+From: Kevin Hilman <khilman@baylibre.com>
+To: Jerome Brunet <jbrunet@baylibre.com>,
+ Philipp Zabel <p.zabel@pengutronix.de>
+Subject: Re: [PATCH v2 2/2] reset: meson: add g12a compatible string
+In-Reply-To: <20190128181316.30814-3-jbrunet@baylibre.com>
+References: <20190128181316.30814-1-jbrunet@baylibre.com>
+ <20190128181316.30814-3-jbrunet@baylibre.com>
+Date: Tue, 29 Jan 2019 16:12:10 +0100
+Message-ID: <7hwomno5v9.fsf@baylibre.com>
 MIME-Version: 1.0
-References: <20190122150616.850-1-ard.biesheuvel@linaro.org>
- <CAKv+Gu9Ya45KONSiTh1Nj=WEoiwJqqfhOJf6-PxhyHtOoBeiKw@mail.gmail.com>
-In-Reply-To: <CAKv+Gu9Ya45KONSiTh1Nj=WEoiwJqqfhOJf6-PxhyHtOoBeiKw@mail.gmail.com>
-From: "Rafael J. Wysocki" <rafael@kernel.org>
-Date: Tue, 29 Jan 2019 16:09:11 +0100
-Message-ID: <CAJZ5v0jcrP1KnKO3cNfz07UmMtita0xFzS67=_v9BVhJZiBP0A@mail.gmail.com>
-Subject: Re: [PATCH] acpi: bgrt: parse BGRT to obtain BMP address before it
- gets clobbered
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_070923_600088_2B82F12A 
-X-CRM114-Status: GOOD (  17.77  )
+X-CRM114-CacheID: sfid-20190129_071214_154903_3E0F30B1 
+X-CRM114-Status: GOOD (  14.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,67 +96,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Graeme Gregory <graeme.gregory@linaro.org>, Peter Jones <pjones@redhat.com>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- Leif Lindholm <leif.lindholm@linaro.org>, Al Stone <astone@redhat.com>,
- ACPI Devel Maling List <linux-acpi@vger.kernel.org>,
- linux-efi <linux-efi@vger.kernel.org>, "Hsiung,
- Harry L" <harry.l.hsiung@intel.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Len Brown <lenb@kernel.org>
+Cc: devicetree@vger.kernel.org, Neil Armstrong <narmstrong@baylibre.com>,
+ linux-kernel@vger.kernel.org, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org, Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 29, 2019 at 3:36 PM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
->
-> On Tue, 22 Jan 2019 at 16:06, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> >
-> > The bitmap left in the framebuffer by the firmware is described by an
-> > ACPI table called "BGRT", which describes the size, pixel format and
-> > the address of a BMP image in memory. While the BGRT ACPI table is
-> > guaranteed to reside in a "ACPI reclaim" memory region, which is
-> > never touched by Linux. The BMP image, however, typically resides
-> > in EFI Boot Services Memory, which may have been overwritten by the
-> > time the BGRT discovery routine runs.
-> >
-> > So instead, drop the handling from the ACPI init code, and call the
-> > BGRT parsing code immediately after going over the EFI configuration
-> > table array, at which time no memory has been touched yet except for
-> > the .data/.bss regions covered by the static kernel image.
-> >
-> > Unfortunately, this involves a non-trivial amount of ACPI entry
-> > point and root table parsing, but we cannot rely on the normal
-> > ACPI infrastructure yet this early in the boot.
-> >
-> > Also note that we cannot take the 'acpi_disabled' global variable
-> > into account, since it may not have assumed the correct value yet
-> > (on arm64, the default value is '1' which is overridden to '0' if
-> > no DT description has been made available by the firmware)
-> >
-> > Cc: Peter Jones <pjones@redhat.com>
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  arch/arm64/kernel/acpi.c        |  2 -
-> >  arch/x86/kernel/acpi/boot.c     |  2 -
-> >  drivers/acpi/bgrt.c             |  6 --
-> >  drivers/firmware/efi/efi-bgrt.c | 80 ++++++++++++++++++--
-> >  drivers/firmware/efi/efi.c      | 13 ++++
-> >  include/linux/efi-bgrt.h        |  4 +-
-> >  6 files changed, 89 insertions(+), 18 deletions(-)
-> >
->
-> Rafael, Len,
->
-> Do you mind if i take this via the EFI tree (after addressing
-> Lorenzo's comments)
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-Not at all, please take it.
+> Add a compatible for the new g12a SoC family.
+>
+> Tested-by: Neil Armstrong <narmstrong@baylibre.com>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>  drivers/reset/reset-meson.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/reset/reset-meson.c b/drivers/reset/reset-meson.c
+> index 5242e0679df7..a8f6549b3af4 100644
+> --- a/drivers/reset/reset-meson.c
+> +++ b/drivers/reset/reset-meson.c
+> @@ -134,6 +134,7 @@ static const struct of_device_id meson_reset_dt_ids[] = {
+>  	 { .compatible = "amlogic,meson8b-reset" },
+>  	 { .compatible = "amlogic,meson-gxbb-reset" },
+>  	 { .compatible = "amlogic,meson-axg-reset" },
+> +	 { .compatible = "amlogic,meson-g12a-reset" },
+>  	 { /* sentinel */ },
 
-Thanks!
+Looks like this new compatiable isn't used for anything new in the
+driver.  Let's not add a new compatible unless it's needed fo rnew
+behavior.
+
+Kevin
 
 _______________________________________________
 linux-arm-kernel mailing list
