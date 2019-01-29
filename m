@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CE93FC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:16:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4DFD1C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:16:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9CDA42175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:16:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 138622175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:16:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HqXSQB93";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="eWzXcfzt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9CDA42175B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RzGMLtif";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="a8xwvwjn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 138622175B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,33 +26,32 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NOuFKvLH+ebD5l/2xHyW2pDLfrQyrn5m+Hm1JP6nzgo=; b=HqXSQB93kGnEe3
-	zfhCvZKKr9RGRF+BEI4nW1+5Qt4Dhe9899HL86o80md5TGRqOE/c5xm5F4iwDZMHM9zBwkHbbqfYt
-	qo2TuWu24xuJb10N8BtqiPYsvw047PyoQdkoASuyUgKVfoAqDVI+lZHDju2+s0nXzdNOw4PseyEow
-	bfkECaqtTNRuphx33DL5/cLmuYJTcPJcPtt3ELhjBPyPOFBCbYJ/vZlumQBa3Q1iJuslj+rh2KIbd
-	+l2gGBFQMRtadOQOsr2X2M2xbmmQMVhykvfvz46QHKJUxXPze9lMeKbfijnZSB89BpxAxGGA/Hea6
-	sml4GpkCX/pO+dBBGWkg==;
+	List-Owner; bh=TPXstOQVp2FQbqBghCB2R8DHNyQk+2PLiqVTlZ/uNP4=; b=RzGMLtifOE8whx
+	YUferJDdNx2TOVG0OZY6xsNemXsyKh/rkSNHt7pLvnsYEk3nVRetHhwW58L9AwGX22g+3JVdPnJat
+	/OoPt+HzwyEPxg2T7zU8Lgvbl0L2pgsMfi8QLymiUvY4Oq+0y4kwUaM1g5HafV1HUCF3FrKON0Ovl
+	L6jQ1dNYnh68PuaJJ8+9wfU1qTvgoscnk+mLg+NhDQrZ5VXbPLB2SlZuzHwcs1PL4ImvTWOvJOMuM
+	VYVKnBmmCwOG3IuccV0XJ1xstJ1aQRLI01c+CS7gdZPWOuY3eR1yXATV7s5dKV+DIsNT8Gp7mrRvI
+	PaPqeLw2OBcXFc3lsP4w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goOZ8-0004EX-EM; Tue, 29 Jan 2019 08:16:18 +0000
-Received: from mail-he1eur01on0628.outbound.protection.outlook.com
- ([2a01:111:f400:fe1e::628]
- helo=EUR01-HE1-obe.outbound.protection.outlook.com)
+	id 1goOZQ-0004Rb-Ho; Tue, 29 Jan 2019 08:16:36 +0000
+Received: from mail-eopbgr20055.outbound.protection.outlook.com ([40.107.2.55]
+ helo=EUR02-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goOUt-0005RP-Is
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:12:28 +0000
+ id 1goOV9-0006h6-85
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:12:44 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=wa6VnPE/whJ973L4lALZYSCLltLY6qSv8g2wTEOGLlU=;
- b=eWzXcfztSOu+OsrdkSHkQ8PicKjfSPiO0dw+cu5eJ325rrAxT0p73mza6IfTrnp6AgbYG8/Eo+RXFd4n7hF/pAb13ERUSNRWacoaattqvM4Mj88134XNd1o/pd3sw5zfSn+MM6jbbV+3iAQ3mA6QFQiCN9Ayjgxc69W/yjfLT8s=
+ bh=gQ7im4d+0qk6TsKBdAeOVYMW8Zt3WiFbFs1MQpvMyTk=;
+ b=a8xwvwjni80idqos/Ty/QgAs5kFyLuo4PQoo0NwBxMVi7S3DGGPk+XfWpW94eP/NgMEq68HxCz0L3/YBwYBwlp6aZh+OMOHOW4pyd7j8hOQdoAg7D+Qt3cTjAG3soxbrz4exKw0E/1bSwrLwfTJ/dWSaN9cUlsXwUtlMq5KL/EA=
 Received: from AM6PR04MB5781.eurprd04.prod.outlook.com (20.179.3.19) by
- AM6PR04MB5127.eurprd04.prod.outlook.com (20.177.34.155) with Microsoft SMTP
+ AM6PR04MB6117.eurprd04.prod.outlook.com (20.179.7.206) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1558.23; Tue, 29 Jan 2019 08:10:36 +0000
+ 15.20.1580.16; Tue, 29 Jan 2019 08:11:14 +0000
 Received: from AM6PR04MB5781.eurprd04.prod.outlook.com
  ([fe80::9c0:e3aa:b41f:9504]) by AM6PR04MB5781.eurprd04.prod.outlook.com
  ([fe80::9c0:e3aa:b41f:9504%3]) with mapi id 15.20.1558.023; Tue, 29 Jan 2019
- 08:10:36 +0000
+ 08:11:14 +0000
 From: "Z.q. Hou" <zhiqiang.hou@nxp.com>
 To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
  "linux-arm-kernel@lists.infradead.org"
@@ -65,13 +64,11 @@ To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
  Leo Li <leoyang.li@nxp.com>, "lorenzo.pieralisi@arm.com"
  <lorenzo.pieralisi@arm.com>, "catalin.marinas@arm.com"
  <catalin.marinas@arm.com>, "will.deacon@arm.com" <will.deacon@arm.com>
-Subject: [PATCHv3 20/27] PCI: mobiveil: add Byte and Half-Word width register
- accessors
-Thread-Topic: [PATCHv3 20/27] PCI: mobiveil: add Byte and Half-Word width
- register accessors
-Thread-Index: AQHUt6odOw0MOSvMekmxd5JY38DqwA==
-Date: Tue, 29 Jan 2019 08:10:36 +0000
-Message-ID: <20190129080926.36773-21-Zhiqiang.Hou@nxp.com>
+Subject: [PATCHv3 26/27] arm64: dts: freescale: lx2160a: add pcie DT nodes
+Thread-Topic: [PATCHv3 26/27] arm64: dts: freescale: lx2160a: add pcie DT nodes
+Thread-Index: AQHUt6oznfGVo6R9S0KQcgPiexQzJg==
+Date: Tue, 29 Jan 2019 08:11:13 +0000
+Message-ID: <20190129080926.36773-27-Zhiqiang.Hou@nxp.com>
 References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
 In-Reply-To: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
 Accept-Language: zh-CN, en-US
@@ -87,37 +84,38 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-mailer: git-send-email 2.17.1
 x-originating-ip: [119.31.174.73]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM6PR04MB5127;
- 6:qCgmmuvegDsaMvmrWZIMZv+9U/NeksgpzzqxPAthPgQILqpntiC164CKtjajZdv14vymZdf0WW2FIPL07E0zDJY7V/IEIylj8B2C52Mn/LL7AbYMTA5oJHLwT+/ZtvLXD2Nkw5z4tDfGUTkC+SV/nbDeWrBuri6DZ2j1aMfDEt5tgJJTq7uxfkvMSm+/ArA1jle1cKMNd2kRZiINk7OsXyDGAIB4//+NJpUbQceWbWV53/4vemmwKJe18Ef1EAPHSX8mCf7ZvCGWYX86kmelgHmEDK7I1yOig765QYCjgSSTZIvZNml+iljV+nxrdUKOiJdEZaBbxJdP6/y5QxRClBqERFJwMTV01pBdF3KL5y4o0OQ0xJYAimLxG7oGG7LjjLel7etlF2AmtnvSTA4ubY+o+4cQfsgFMOfHS5NgrYLEVFRklrZDfhKkrKIY1RjRqVKR149GWB2buES3BcPB1A==;
- 5:e3QVhYwlYXZUwoDJXCHx9SAswxZk7DC9eVgWjXJhROf8MR3WQTRi1h6t1aEi+yKl+Y8GRtxxV2muBWkKTJuA2BU3TObRAqe+2Urj7qp0sgsDOk2iWyTrnEDh9wwsE+KurzFNCVqWD/jY95Ei44LUejk3cgqovCnni1j2EIvFUQIxwx880WstDUJF3uS0EUi8w+lAO2TEB84mOlCNzVP75g==;
- 7:ELn1J61eLECVBPOGHITQCYByYLCXS9h5xnlptKxPTBzHaDvE86pche4TkA0d4kDyZhrQnn9eeFjBsZWdYCNMFTM5z9YdG7bvbD5zVAn7m+cbfaF7+e2+Yz5F8qssZWhtbzqQmL2XLYZRoXHYVBhhIg==
-x-ms-office365-filtering-correlation-id: dbba98e5-8396-455d-e69c-08d685c13fa1
+x-microsoft-exchange-diagnostics: 1; AM6PR04MB6117;
+ 6:ukzFZvVvvbGLef9zi1UPu1dffQnOprZCpUhXdxnlDyw+CNTMNk9bDXDrwe4flhV8FUZCD91hzYvET8m3zwn7suPWMVDj0ArqgA00cJ2noJyxpAUJCgoj/ChLl647gWc/JXv4lQrGX41/9wylnn3BrZXT7OLawhCFO3PW4KkpUWvU0ROQprJc9ZL2UTiOxpsssoDYm97I7U62gQ7rBub1rJX0EV9OvHf1uRFqq7t13wE9Xe2lr+zH7PtflRwkUIxh9HpEVdk80XS9EA/R2EaUUlJqhQI9kecTK/BrdNv4cVy0HgJqJ5gvhD6ZiQjfVrdIt/o3/PP0rKQDSv72Ksz3YofVnyA4JqwmzzcdC7Ay9rpGylMXt3Z8Jt6IczuIAvS2JkwBTnkiPHAkHc6h/fWIue1msI3Ir2xWgE8vshoPHPr8EgZ0WuvPcHarlMenOUJI3ILi+mTdjNL90eIbMSOnZA==;
+ 5:Gc2Uy7KTmpC7ftIJpyf5QSN3nZoZqs6FIVghcQmS9HUPnbU84qLtWRrUbYsIBpLlhDEZ3xX3l9ytgcpwzKKv6QfJne0vOFsz2ekiCvqv3kUejPmICCj6xqvxi0Gk+IzhjgcK5s4VK0O8jFp1cw+S65FbJRnBzcjRek/P95Nyv12Y5Gv49mqWuGMGRLum+RAndL0bvAF/3wPk0a2jpt0/eg==;
+ 7:7J9FRqEv/hR6sQBnmAJLfOyiWh0DY+KNu1AzfStfPI5fb8Euail+dKkaGAEBJN4ndapXsjdvXVLHSDyqrVGYvStgRClrilGaRJDyAIko+Be7s4Po+p+HNiiyNvRjWQB4by9LisDPgDuWVVfgo62BCw==
+x-ms-office365-filtering-correlation-id: 87e19e5d-5088-4421-cbd9-08d685c15600
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM6PR04MB5127; 
-x-ms-traffictypediagnostic: AM6PR04MB5127:
-x-microsoft-antispam-prvs: <AM6PR04MB5127B15FD987D47262DFA91A84970@AM6PR04MB5127.eurprd04.prod.outlook.com>
+ SRVR:AM6PR04MB6117; 
+x-ms-traffictypediagnostic: AM6PR04MB6117:
+x-microsoft-antispam-prvs: <AM6PR04MB611707D293445BD0D0D8EF5E84970@AM6PR04MB6117.eurprd04.prod.outlook.com>
 x-forefront-prvs: 093290AD39
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(396003)(376002)(346002)(366004)(39860400002)(189003)(199004)(6512007)(8936002)(26005)(81166006)(99286004)(4326008)(486006)(52116002)(2501003)(186003)(97736004)(76176011)(105586002)(14454004)(478600001)(106356001)(6486002)(305945005)(54906003)(53936002)(50226002)(81156014)(6436002)(110136005)(8676002)(68736007)(476003)(71190400001)(36756003)(71200400001)(316002)(7416002)(256004)(386003)(2906002)(6506007)(446003)(11346002)(102836004)(66066001)(86362001)(1076003)(25786009)(7736002)(6116002)(3846002)(2201001)(2616005)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB5127;
+ SFS:(10009020)(396003)(366004)(346002)(376002)(39860400002)(136003)(199004)(189003)(3846002)(6116002)(486006)(81166006)(81156014)(8676002)(7416002)(106356001)(14454004)(478600001)(386003)(446003)(11346002)(186003)(102836004)(476003)(6506007)(8936002)(50226002)(105586002)(68736007)(71190400001)(2906002)(2616005)(71200400001)(36756003)(2501003)(66066001)(97736004)(26005)(4326008)(25786009)(6436002)(6486002)(53936002)(6512007)(256004)(54906003)(7736002)(14444005)(99286004)(305945005)(76176011)(2201001)(110136005)(1076003)(316002)(86362001)(52116002)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB6117;
  H:AM6PR04MB5781.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
+ PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: pzlG77XcQb/IT+LvjX9SmWnvXkaTOFrmsbVPlZhDQis6PQdIVNonZ5hEnooMKZYiM+vWMRIyPplEcqCuL8P9oZZxrsyAL1T0kZxW4DPJdzK6vu8NQFdhKP6Xz8zrm9HB2H7uNbvEMcdgaE5FhZi8J35n+p9liF93CKTEww1PVquxwYOo8adTik5CG8z+NVg5ZJfrOlRGrFSNfuJgGJx/iIf6hxIaXjnGMspBbEdUfNle4Jbq1zjKY3A4JKLArIUEc1Rj25riU0XA7r2fvOWoSnJmK5/Ug4cLfTWMzZOoF4Yzn76MBKdMa99H/VOB+IQbI+pRTmycvaoWJhBoNnKaz6G2sjiFoAWFs9XOxTXUj62I07jYpBMXZ4zim84HUc3gEFEuDZLJgAXwYD+kkMLE9mErQ2VmAtct9bBitUO4pNg=
+x-microsoft-antispam-message-info: slQnXzdSwmTUQU13aN45isFiReZVV3xEIzL0vXAhgT96Ds/i9v5qN5CibTTjhSM5GCZgNnrP35q9X1iBfW40oZ4faPKCJfHOoDJdS5v7ChTJoHBheU/Kkq0BZxx7dKcYMhulozJlDw0BNXfXf20+AQ0HIg2r3SvUTuzCS8HOkrBAwa/8NoRjMExvmRQNwHzP+P/9vJlz6GplVsuVFdMumMMsWg8o5avV+TPYX2drSZ7t1+clJoiwsS+KI5z2XwP+meTa5zVV9efab5l71qepkTGDGlnC1OTrNQpZxTqTD3vHTkazHFwaEwqmNXFN/Fjz/sQPKHn3WecigYHwTtzFlRGHkeihD05hTrmW9nRwEC5WMDzDlbjNBw9DggwxjyBuKYytN+c9EymnzZD0bCzwBu2ZsLSrvBjUyCdGPxCar3c=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: dbba98e5-8396-455d-e69c-08d685c13fa1
-X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 08:10:30.6010 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 87e19e5d-5088-4421-cbd9-08d685c15600
+X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 08:11:08.1328 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB5127
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB6117
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_001155_840928_C36A3AD9 
-X-CRM114-Status: UNSURE (   8.07  )
+X-CRM114-CacheID: sfid-20190129_001211_982961_57B37540 
+X-CRM114-Status: UNSURE (   8.69  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -139,9 +137,7 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-As there are some Byte and Half-Work width registers in PCIe
-configuration space, add Byte and Half-Word width register
-accessors.
+The LX2160A integrated 6 PCIe Gen4 controllers.
 
 Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 Reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
@@ -149,43 +145,182 @@ Reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 V3:
  - No change
 
- .../pci/controller/mobiveil/pcie-mobiveil.h   | 20 +++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ .../arm64/boot/dts/freescale/fsl-lx2160a.dtsi | 163 ++++++++++++++++++
+ 1 file changed, 163 insertions(+)
 
-diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil.h b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-index 81685840b378..933c2f34bc52 100644
---- a/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-+++ b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-@@ -181,9 +181,29 @@ static inline u32 csr_readl(struct mobiveil_pcie *pcie, u32 off)
- 	return csr_read(pcie, off, 0x4);
- }
- 
-+static inline u32 csr_readw(struct mobiveil_pcie *pcie, u32 off)
-+{
-+	return csr_read(pcie, off, 0x2);
-+}
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+index 3f6521c47f51..8f687a3ef185 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+@@ -882,5 +882,168 @@
+ 				};
+ 			};
+ 		};
 +
-+static inline u32 csr_readb(struct mobiveil_pcie *pcie, u32 off)
-+{
-+	return csr_read(pcie, off, 0x1);
-+}
++		pcie@3400000 {
++			compatible = "fsl,lx2160a-pcie";
++			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
++			       0x80 0x00000000 0x0 0x00001000>; /* configuration space */
++			reg-names = "csr_axi_slave", "config_axi_slave";
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /* AER interrupt */
++				     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /* PME interrupt */
++				     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
++			interrupt-names = "aer", "pme", "intr";
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			dma-coherent;
++			apio-wins = <8>;
++			ppio-wins = <8>;
++			bus-range = <0x0 0xff>;
++			ranges = <0x82000000 0x0 0x40000000 0x80 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++			msi-parent = <&its>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 7>;
++			interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 2 &gic 0 0 GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 3 &gic 0 0 GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 4 &gic 0 0 GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
 +
- static inline void csr_writel(struct mobiveil_pcie *pcie, u32 val, u32 off)
- {
- 	csr_write(pcie, val, off, 0x4);
- }
- 
-+static inline void csr_writew(struct mobiveil_pcie *pcie, u32 val, u32 off)
-+{
-+	csr_write(pcie, val, off, 0x2);
-+}
++		pcie@3500000 {
++			compatible = "fsl,lx2160a-pcie";
++			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
++			       0x88 0x00000000 0x0 0x00001000>; /* configuration space */
++			reg-names = "csr_axi_slave", "config_axi_slave";
++			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>, /* AER interrupt */
++				     <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>, /* PME interrupt */
++				     <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
++			interrupt-names = "aer", "pme", "intr";
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			dma-coherent;
++			apio-wins = <8>;
++			ppio-wins = <8>;
++			bus-range = <0x0 0xff>;
++			ranges = <0x82000000 0x0 0x40000000 0x88 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++			msi-parent = <&its>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 7>;
++			interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 2 &gic 0 0 GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 3 &gic 0 0 GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 4 &gic 0 0 GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
 +
-+static inline void csr_writeb(struct mobiveil_pcie *pcie, u32 val, u32 off)
-+{
-+	csr_write(pcie, val, off, 0x1);
-+}
++		pcie@3600000 {
++			compatible = "fsl,lx2160a-pcie";
++			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
++			       0x90 0x00000000 0x0 0x00001000>; /* configuration space */
++			reg-names = "csr_axi_slave", "config_axi_slave";
++			interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>, /* AER interrupt */
++				     <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>, /* PME interrupt */
++				     <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
++			interrupt-names = "aer", "pme", "intr";
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			dma-coherent;
++			apio-wins = <256>;
++			ppio-wins = <24>;
++			bus-range = <0x0 0xff>;
++			ranges = <0x82000000 0x0 0x40000000 0x90 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++			msi-parent = <&its>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 7>;
++			interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 2 &gic 0 0 GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 3 &gic 0 0 GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 4 &gic 0 0 GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
 +
- #endif /* _PCIE_MOBIVEIL_H */
++		pcie@3700000 {
++			compatible = "fsl,lx2160a-pcie";
++			reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
++			       0x98 0x00000000 0x0 0x00001000>; /* configuration space */
++			reg-names = "csr_axi_slave", "config_axi_slave";
++			interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>, /* AER interrupt */
++				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>, /* PME interrupt */
++				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
++			interrupt-names = "aer", "pme", "intr";
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			dma-coherent;
++			apio-wins = <8>;
++			ppio-wins = <8>;
++			bus-range = <0x0 0xff>;
++			ranges = <0x82000000 0x0 0x40000000 0x98 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++			msi-parent = <&its>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 7>;
++			interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 2 &gic 0 0 GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 3 &gic 0 0 GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 4 &gic 0 0 GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		pcie@3800000 {
++			compatible = "fsl,lx2160a-pcie";
++			reg = <0x00 0x03800000 0x0 0x00100000   /* controller registers */
++			       0xa0 0x00000000 0x0 0x00001000>; /* configuration space */
++			reg-names = "csr_axi_slave", "config_axi_slave";
++			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>, /* AER interrupt */
++				     <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>, /* PME interrupt */
++				     <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
++			interrupt-names = "aer", "pme", "intr";
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			dma-coherent;
++			apio-wins = <256>;
++			ppio-wins = <24>;
++			bus-range = <0x0 0xff>;
++			ranges = <0x82000000 0x0 0x40000000 0xa0 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++			msi-parent = <&its>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 7>;
++			interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 2 &gic 0 0 GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 3 &gic 0 0 GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 4 &gic 0 0 GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		pcie@3900000 {
++			compatible = "fsl,lx2160a-pcie";
++			reg = <0x00 0x03900000 0x0 0x00100000   /* controller registers */
++			       0xa8 0x00000000 0x0 0x00001000>; /* configuration space */
++			reg-names = "csr_axi_slave", "config_axi_slave";
++			interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>, /* AER interrupt */
++				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>, /* PME interrupt */
++				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
++			interrupt-names = "aer", "pme", "intr";
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			dma-coherent;
++			apio-wins = <8>;
++			ppio-wins = <8>;
++			bus-range = <0x0 0xff>;
++			ranges = <0x82000000 0x0 0x40000000 0xa8 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++			msi-parent = <&its>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 7>;
++			interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 2 &gic 0 0 GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 3 &gic 0 0 GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 4 &gic 0 0 GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
+ 	};
+ };
 -- 
 2.17.1
 
