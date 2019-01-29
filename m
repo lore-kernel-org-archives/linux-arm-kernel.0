@@ -2,61 +2,66 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 62167C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:01:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 230D0C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:02:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2FC74214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:01:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E5032214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:02:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ALapR6KN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2FC74214DA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TUlD7Q8A";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="tNpjBlaa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E5032214DA
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=9bLQ79lYaD+7g13G/XYWT2X/zLFTd/lbCc5FRMWk9ao=; b=ALapR6KNvzdRDG
-	rle+JTW4hAiKLP7fDIm8Cq0GyTSWXfoTINrDLHwJ8JBpp/kXcuNHGZoCDzW/t/Z5p6zZ4aPJXiMaS
-	jogd7Zfkww2xFQaMZVffgSTCVAU2eJ8lOU5SodPv/8sNDWgKLz+gTd1APZadsrJFj5mMZ0WaQbJjH
-	ag1Gy7qFzo4YPKEIdGRnUSQZRviN2FSW20NkSEO9Wlyp1+RUWSNrlaT5J7Gh/WLsOtKNACmY8p2Kf
-	yJFo9OuXBueC2xlxGxiYzEndUL60ccvUq98cR7ZGEAFc1oratBGOvlHLhuD+1hoedBP5uSpqJuQFT
-	zZ4P3NrIxaPJj5KOLtMQ==;
+	List-Owner; bh=x4jM7M3Lod93uFlpMhkkNuu78o7s/IcHTtHV4F4cp+I=; b=TUlD7Q8AaqQJTK
+	wIb4QDGkTQQmOCCSi2eeCmcg10MQb+jhsoncAyv510ZvA5ahcZMrCHT5wUGODBd/sTNGCDpJ3Nx43
+	G4W2NScTdxt8jGQL6y9hDQmKgvwcN272AiaGEumMzAxg1DBaI4jcVdPGwinQbNaUsV+M6DkcBOQdd
+	i5VdlOQyqxQFylA2UeM5uVisopru+YxP13PN+uCg1zIic3DRjppRpPLL0tpJh2Lly3Fkki3iTSHUM
+	wTDZmDgVqJTs5HoQZMImTgCdjN3WacyeUoyPSHLCs+zfvjrMazwFXLOsJeseQp1Ev/zUI7/8kBwgA
+	adX/7Wg8SuumOaMvw54Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goOKx-0000GP-Ku; Tue, 29 Jan 2019 08:01:39 +0000
-Received: from szxga04-in.huawei.com ([45.249.212.190] helo=huawei.com)
+	id 1goOLF-0000Y4-65; Tue, 29 Jan 2019 08:01:57 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goOKt-0000Ff-SC
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:01:37 +0000
-Received: from DGGEMS404-HUB.china.huawei.com (unknown [172.30.72.60])
- by Forcepoint Email with ESMTP id C0F605A20DFE18E7A8A7;
- Tue, 29 Jan 2019 16:01:31 +0800 (CST)
-Received: from localhost (10.177.31.96) by DGGEMS404-HUB.china.huawei.com
- (10.3.19.204) with Microsoft SMTP Server id 14.3.408.0; Tue, 29 Jan 2019
- 16:01:25 +0800
-From: YueHaibing <yuehaibing@huawei.com>
-To: <tglx@linutronix.de>, <jason@lakedaemon.net>, <marc.zyngier@arm.com>,
- <marc.w.gonzalez@free.fr>, <mans@mansr.com>
-Subject: [PATCH -next] irqchip/tango: Fix potential NULL pointer dereference
-Date: Tue, 29 Jan 2019 16:01:22 +0800
-Message-ID: <20190129080122.20392-1-yuehaibing@huawei.com>
-X-Mailer: git-send-email 2.10.2.windows.1
+ id 1goOL6-0000Q7-R2
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:01:51 +0000
+Received: from sol.localdomain (c-107-3-167-184.hsd1.ca.comcast.net
+ [107.3.167.184])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id B6568214DA;
+ Tue, 29 Jan 2019 08:01:47 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548748907;
+ bh=g+W7VC6SNl0/DAvQhhsBlOJex6ABF8fMixCYerChMUc=;
+ h=From:To:Cc:Subject:Date:From;
+ b=tNpjBlaaGV7UnB+T3jUMTkf3JiWd5ULm2gnMZfGHdZm7bpFXB09Lnll349FPVjHet
+ 77r5gZ/xGwV45cFElIRXosCesjXuLhSuZpNuH6NcpoSf2wXM/qpCTwV65f9REeT5vH
+ 42VKlxqdDwno63zKt7BnhP+y4YzV18qcpt4vOKUs=
+From: Eric Biggers <ebiggers@kernel.org>
+To: linux-crypto@vger.kernel.org,
+	Herbert Xu <herbert@gondor.apana.org.au>
+Subject: [PATCH v2 0/3] crypto: crct10dif assembly cleanup and optimizations
+Date: Tue, 29 Jan 2019 00:00:26 -0800
+Message-Id: <20190129080029.22261-1-ebiggers@kernel.org>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-X-Originating-IP: [10.177.31.96]
-X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_000136_082231_39504092 
-X-CRM114-Status: UNSURE (   7.94  )
+X-CRM114-CacheID: sfid-20190129_000149_179489_2F1FE8BF 
+X-CRM114-Status: UNSURE (   7.87  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -69,38 +74,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: YueHaibing <yuehaibing@huawei.com>, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Tim Chen <tim.c.chen@linux.intel.com>, linux-arm-kernel@lists.infradead.org,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-There is a potential NULL pointer dereference in case kzalloc()
-fails and returns NULL.
+The x86, arm, and arm64 asm implementations of crct10dif are very
+difficult to understand partly because many of the comments, labels, and
+macros are named incorrectly: the lengths mentioned are usually off by a
+factor of two from the actual code.  Many other things are unnecessarily
+convoluted as well, e.g. there are many more fold constants than
+actually needed and some aren't fully reduced.
 
-Fixes: 4bba66899ac6 ("irqchip/tango: Add support for Sigma Designs SMP86xx/SMP87xx interrupt controller")
-Signed-off-by: YueHaibing <yuehaibing@huawei.com>
----
- drivers/irqchip/irq-tango.c | 2 ++
- 1 file changed, 2 insertions(+)
+This series therefore cleans up all these implementations to be much
+more maintainable.  I also made some small optimizations where I saw
+opportunities, resulting in slightly better performance.
 
-diff --git a/drivers/irqchip/irq-tango.c b/drivers/irqchip/irq-tango.c
-index ae28d86..a63b828 100644
---- a/drivers/irqchip/irq-tango.c
-+++ b/drivers/irqchip/irq-tango.c
-@@ -191,6 +191,8 @@ static int __init tangox_irq_init(void __iomem *base, struct resource *baseres,
- 		panic("%pOFn: failed to get address", node);
- 
- 	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
-+	if (!chip)
-+		return -ENOMEM;
- 	chip->ctl = res.start - baseres->start;
- 	chip->base = base;
- 
+This is based on top of the pending patches from Ard Biesheuvel.
+
+These all pass the new extra self-tests.
+
+Changed since v1:
+- Moved constants in arm implementation to .rodata.
+- Eliminated a few instructions from the x86 implementation.
+- Tweaked a few comments.
+
+Eric Biggers (3):
+  crypto: x86/crct10dif-pcl - cleanup and optimizations
+  crypto: arm/crct10dif-ce - cleanup and optimizations
+  crypto: arm64/crct10dif-ce - cleanup and optimizations
+
+ arch/arm/crypto/crct10dif-ce-core.S     | 554 ++++++++--------
+ arch/arm/crypto/crct10dif-ce-glue.c     |   2 +-
+ arch/arm64/crypto/crct10dif-ce-core.S   | 496 +++++++-------
+ arch/arm64/crypto/crct10dif-ce-glue.c   |   4 +-
+ arch/x86/crypto/crct10dif-pcl-asm_64.S  | 844 +++++++++---------------
+ arch/x86/crypto/crct10dif-pclmul_glue.c |   3 +-
+ 6 files changed, 797 insertions(+), 1106 deletions(-)
+
 -- 
-2.7.0
-
+2.20.1
 
 
 _______________________________________________
