@@ -4,70 +4,63 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DB80BC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:13:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 66D9FC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:33:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ACC062087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:13:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 387C820844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:33:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GQaUaFqx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ACC062087E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l6kal2ii"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 387C820844
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=WmmzW2er6MbFRYsoq80S/VxKGC7wD69geq0+22JuvGw=; b=GQaUaFqxkR+EWN
-	dQILJ57AYqqp25ATQIgGCJHGRtoLDkmG5MPiWiZRSasnnnAhNtRMBLWkZ0HxabPvOpdsl7H22SQ1f
-	j65gqh+76ggaHgJCpJ0ekHHaxlzBl1ONrSylACC4j8hoX5QCzpFZBwSEBxq4LM0gXZiTxqAvOHxc4
-	Eiil7k9Pjl4d6OrqeKObTwz2U8mQxOLpLIvn+qN4mtbMDsSgbaJAsqrxHbEbG5wSfdNN0Puy6uI1m
-	BNLxU3Tg6CqX+ZmE9qKL5vIGR/YVVa53FWvhpLrYuEFmLdBjuRwUcAv5NkNlEDACS7mbII7JjCVc3
-	xDAiCx0ZSerzs/XIuDjA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=r+Zuhv4DGGSMXriXVVhQHCA4/+BrVxmgQ1GLJiHJp1Y=; b=l6kal2iiHSesA/
+	PG5HImb9k5/M0YPGBO0JRW9WE42iZ0HsBgJYuTxczmKdT9ls/lyXgzDh2pzH9V1dSaDRlkJzaX2K2
+	nPzTqhlM5NZjEYhT0MtLxpP+3a6WN+NFEr49Op9Erju3wYNaibffRaMgOubXhizaqEI/zWSg5szwO
+	llY5Wv61MahSNBEuGj9NPt59focIgJ0V0IjetMwmpkYlfewPLSqTqVVoZD6hdD/mbEjHEH97pNogZ
+	e5XOZZT/jHtCLTXsBJkB056X/Gh5Gyl6i8UCsVWSKWIQxVoTW7Am+SGgpmewIeWHoVPi7ye31Ynpi
+	nXrU7Yc1lnrTbYlAPA7w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goRKj-0007hb-2M; Tue, 29 Jan 2019 11:13:37 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goRKf-0007h1-Uu; Tue, 29 Jan 2019 11:13:35 +0000
-X-UUID: 72837e692ceb4d0d94bbce0365a643f1-20190129
-X-UUID: 72837e692ceb4d0d94bbce0365a643f1-20190129
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
- (envelope-from <ck.hu@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1602501201; Tue, 29 Jan 2019 03:13:31 -0800
-Received: from mtkmbs08n2.mediatek.inc (172.21.101.56) by
- MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 29 Jan 2019 03:13:29 -0800
-Received: from mtkcas07.mediatek.inc (172.21.101.84) by
- mtkmbs08n2.mediatek.inc (172.21.101.56) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 29 Jan 2019 19:13:21 +0800
-Received: from [172.21.77.4] (172.21.77.4) by mtkcas07.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 29 Jan 2019 19:13:21 +0800
-Message-ID: <1548760401.11055.14.camel@mtksdaap41>
-Subject: Re: [PATCH 09/10] soc: mediatek: change the argument of write and
- write_mask API
-From: CK Hu <ck.hu@mediatek.com>
-To: Bibby Hsieh <bibby.hsieh@mediatek.com>
-Date: Tue, 29 Jan 2019 19:13:21 +0800
-In-Reply-To: <1548747128-60136-10-git-send-email-bibby.hsieh@mediatek.com>
-References: <1548747128-60136-1-git-send-email-bibby.hsieh@mediatek.com>
- <1548747128-60136-10-git-send-email-bibby.hsieh@mediatek.com>
-X-Mailer: Evolution 3.10.4-0ubuntu2 
+	id 1goReB-0005qn-Q5; Tue, 29 Jan 2019 11:33:43 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goRe7-0005q2-PJ
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 11:33:41 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 017D1EBD;
+ Tue, 29 Jan 2019 03:33:39 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 0AC8C3F589;
+ Tue, 29 Jan 2019 03:33:36 -0800 (PST)
+Subject: Re: [PATCH v9 20/26] irqchip/gic-v3: Handle pseudo-NMIs
+To: Marc Zyngier <marc.zyngier@arm.com>
+References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
+ <1548084825-8803-21-git-send-email-julien.thierry@arm.com>
+ <86wompuh5j.wl-marc.zyngier@arm.com>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <c332af8d-4529-dbb0-f760-0c2518823053@arm.com>
+Date: Tue, 29 Jan 2019 11:33:35 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 433790CE84CD2A062C8E9A921330B0CEFFF4AA745752DFB3361EC0CCBE68712F2000:8
-X-MTK: N
+In-Reply-To: <86wompuh5j.wl-marc.zyngier@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_031333_999446_25C31654 
-X-CRM114-Status: GOOD (  16.73  )
+X-CRM114-CacheID: sfid-20190129_033339_831383_5F3C9F2F 
+X-CRM114-Status: GOOD (  16.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,138 +72,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Nicolas Boichat <drinkcat@chromium.org>,
- Philipp Zabel <p.zabel@pengutronix.de>, srv_heupstream@mediatek.com,
- kendrick.hsu@mediatek.com, Daoyuan Huang <daoyuan.huang@mediatek.com>,
- Sascha Hauer <s.hauer@pengutronix.de>, Jassi Brar <jassisinghbrar@gmail.com>,
- linux-kernel@vger.kernel.org, Daniel Kurtz <djkurtz@chromium.org>,
- Dennis-YC Hsieh <dennis-yc.hsieh@mediatek.com>, YT
- Shen <yt.shen@mediatek.com>, Rob Herring <robh+dt@kernel.org>,
- linux-mediatek@lists.infradead.org, Houlong Wei <houlong.wei@mediatek.com>,
- Sascha Hauer <kernel@pengutronix.de>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Jiaguang Zhang <jiaguang.zhang@mediatek.com>,
- Frederic Chen <Frederic.Chen@mediatek.com>,
- linux-arm-kernel@lists.infradead.org, ginny.chen@mediatek.com
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
+ Jason Cooper <jason@lakedaemon.net>, catalin.marinas@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
+ james.morse@arm.com, joel@joelfernandes.org,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi, Bibby:
 
-On Tue, 2019-01-29 at 15:32 +0800, Bibby Hsieh wrote:
-> In order to enhance the convienience of client usage,
-> we change the input argument from subsys and offset to
-> struct cmdq_base and dma_addr_t.
+
+On 28/01/2019 11:59, Marc Zyngier wrote:
+> On Mon, 21 Jan 2019 15:33:39 +0000,
+> Julien Thierry <julien.thierry@arm.com> wrote:
+>>
+>> Provide a higher priority to be used for pseudo-NMIs. When such an
+>> interrupt is received, keep interrupts fully disabled at CPU level to
+>> prevent receiving other pseudo-NMIs while handling the current one.
+>>
+>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/irqchip/irq-gic-v3.c | 42 ++++++++++++++++++++++++++++++++++++------
+>>  1 file changed, 36 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index 5374b43..4df1e94 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -41,6 +41,8 @@
+>>  
+>>  #include "irq-gic-common.h"
+>>  
+>> +#define GICD_INT_NMI_PRI	(GICD_INT_DEF_PRI & ~0x80)
+>> +
+>>  #define FLAGS_WORKAROUND_GICR_WAKER_MSM8996	(1ULL << 0)
+>>  
+>>  struct redist_region {
+>> @@ -381,12 +383,45 @@ static u64 gic_mpidr_to_affinity(unsigned long mpidr)
+>>  	return aff;
+>>  }
+>>  
+>> +static inline void gic_deactivate_unexpected_irq(u32 irqnr)
 > 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> ---
->  drivers/soc/mediatek/mtk-cmdq-helper.c | 24 +++++++++++++++++-------
->  include/linux/soc/mediatek/mtk-cmdq.h  | 16 ++++++++--------
->  2 files changed, 25 insertions(+), 15 deletions(-)
+> Same remark as on some other patches: you should be able to drop the
+> inline attribute without any ill effect. I'd also like this to be
+> renamed "gic_deactivate_spurious", or something similar.
 > 
-> diff --git a/drivers/soc/mediatek/mtk-cmdq-helper.c b/drivers/soc/mediatek/mtk-cmdq-helper.c
-> index 923a815..34ae712 100644
-> --- a/drivers/soc/mediatek/mtk-cmdq-helper.c
-> +++ b/drivers/soc/mediatek/mtk-cmdq-helper.c
-> @@ -238,8 +238,13 @@ static int cmdq_pkt_append_command(struct cmdq_pkt *pkt, s16 arg_c, s16 arg_b,
->  	return 0;
->  }
->  
-> -int cmdq_pkt_write(struct cmdq_pkt *pkt, u8 subsys, u16 offset, u32 value)
-> +int cmdq_pkt_write(struct cmdq_pkt *pkt, struct cmdq_base *clt_base,
-> +		   dma_addr_t addr, u32 value)
->  {
-> +	const u32 base = (addr >> 32) ? 0 : addr & 0xFFFF0000;
-> +	u8 subsys = cmdq_subsys_base_to_id(clt_base, base);
 
-I don't understand why this would let client more convenient?  Every
-time client call cmdq_pkt_write(), cmdq_subsys_base_to_id() would search
-again. Why do we need such frequently search?
+I'm a bit concern about using spurious since it is not related to
+GICC_INT_SPURIOUS, we actually read a valid IRQ number, we just don't
+know how we should handle it.
 
-Regards,
-CK
+Would "gic_deactivate_unhandled" work? Or "gic_deactivate_bad"?
 
-> +	s16 offset = addr & 0x0000FFFF;
-> +
->  	return cmdq_pkt_append_command(pkt, CMDQ_GET_ARG_C(value),
->  				       CMDQ_GET_ARG_B(value), offset, subsys,
->  				       CMDQ_IMMEDIATE_VALUE,
-> @@ -248,21 +253,26 @@ int cmdq_pkt_write(struct cmdq_pkt *pkt, u8 subsys, u16 offset, u32 value)
->  }
->  EXPORT_SYMBOL(cmdq_pkt_write);
->  
-> -int cmdq_pkt_write_mask(struct cmdq_pkt *pkt, u8 subsys, u16 offset,
-> -			u32 value, u32 mask)
-> +int cmdq_pkt_write_mask(struct cmdq_pkt *pkt, struct cmdq_base *clt_base,
-> +			dma_addr_t addr, u32 value, u32 mask)
->  {
-> -	u32 offset_mask = offset;
-> +	const u32 base = (addr >> 32) ? 0 : addr & 0xFFFF0000;
-> +	u8 subsys = cmdq_subsys_base_to_id(clt_base, base);
-> +	s16 offset = addr & 0x0000FFFF;
->  	int err = 0;
->  
->  	if (mask != 0xffffffff) {
->  		err = cmdq_pkt_append_command(pkt, CMDQ_GET_ARG_C(~mask),
->  					      CMDQ_GET_ARG_B(~mask), 0, 0, 0, 0,
->  					      0, CMDQ_CODE_MASK);
-> -		offset_mask |= CMDQ_WRITE_ENABLE_MASK;
-> +		offset |= CMDQ_WRITE_ENABLE_MASK;
->  	}
-> -	err |= cmdq_pkt_write(pkt, subsys, offset_mask, value);
->  
-> -	return err;
-> +	return cmdq_pkt_append_command(pkt, CMDQ_GET_ARG_C(value),
-> +				       CMDQ_GET_ARG_B(value), offset, subsys,
-> +				       CMDQ_IMMEDIATE_VALUE,
-> +				       CMDQ_IMMEDIATE_VALUE,
-> +				       CMDQ_IMMEDIATE_VALUE, CMDQ_CODE_WRITE);
->  }
->  EXPORT_SYMBOL(cmdq_pkt_write_mask);
->  
-> diff --git a/include/linux/soc/mediatek/mtk-cmdq.h b/include/linux/soc/mediatek/mtk-cmdq.h
-> index e4d1876..230bc2b 100644
-> --- a/include/linux/soc/mediatek/mtk-cmdq.h
-> +++ b/include/linux/soc/mediatek/mtk-cmdq.h
-> @@ -70,26 +70,26 @@ struct cmdq_client *cmdq_mbox_create(struct device *dev, int index,
->  /**
->   * cmdq_pkt_write() - append write command to the CMDQ packet
->   * @pkt:	the CMDQ packet
-> - * @subsys:	the CMDQ sub system code
-> - * @offset:	register offset from CMDQ sub system
-> + * @cmdq_base:	the CMDQ sub system code and base address
-> + * @addr:	register address
->   * @value:	the specified target register value
->   *
->   * Return: 0 for success; else the error code is returned
->   */
-> -int cmdq_pkt_write(struct cmdq_pkt *pkt, u8 subsys, u16 offset, u32 value);
-> -
-> +int cmdq_pkt_write(struct cmdq_pkt *pkt, struct cmdq_base *clt_base,
-> +		   dma_addr_t addr, u32 value);
->  /**
->   * cmdq_pkt_write_mask() - append write command with mask to the CMDQ packet
->   * @pkt:	the CMDQ packet
-> - * @subsys:	the CMDQ sub system code
-> - * @offset:	register offset from CMDQ sub system
-> + * @cmdq_base:	the CMDQ sub system code and base address
-> + * @addr:	register address
->   * @value:	the specified target register value
->   * @mask:	the specified target register mask
->   *
->   * Return: 0 for success; else the error code is returned
->   */
-> -int cmdq_pkt_write_mask(struct cmdq_pkt *pkt, u8 subsys, u16 offset,
-> -			u32 value, u32 mask);
-> +int cmdq_pkt_write_mask(struct cmdq_pkt *pkt, struct cmdq_base *clt_base,
-> +			dma_addr_t addr, u32 value, u32 mask);
->  
->  /**
->   * cmdq_pkt_wfe() - append wait for event command to the CMDQ packet
+Thanks,
 
-
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
