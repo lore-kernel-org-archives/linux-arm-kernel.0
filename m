@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3AF16C282CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 03:08:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B1EFC282C7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 03:35:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 07D352175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 03:08:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 366D7214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 03:35:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KE30hZGi";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="J9Jm7dYJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 07D352175B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dawyy6xh";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="paAXyu1N"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 366D7214DA
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,62 +26,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=r7j/axICMkVyyzdh9FBXeWxDYnY/PbZIIxYojS0KYiQ=; b=KE30hZGikguj9i7XUf99cL1Tc
-	wSz9peVRSqfKDlHirG9k9+F5uzB6gDwr/LvfKlNsL8+BGLpvMrgnYJ6reRIkv4P/rw1SEU/jCE7GE
-	EGraK59OUiecxrMwBwaETxFwn9mJUjGlvod1nkgIXJQ49JU5EeT0OJ5cUyIBFSJ92a0ARkY083nsL
-	697lI+vGj++lyivo6PKPTQ6/4cENc0RMOdvejcMdGuQMLojS/WMygYSIsV6Z1EBma9dpCM6plOL3N
-	LCCtBuQTVEaeHoinUSJnDvbmDu5QlmuKjC+WgxOba9ZWmGR7oyH9xyUQIiW63peSLPP3X1iXAVUVz
-	j5TNOQFuw==;
+	 bh=QDbTXHYDtPvvpI6pZIyfdXtu2gwCTa4E7jGJx6bF5eQ=; b=Dawyy6xhEt6vb6lBOB450p7vW
+	DShL3PqxBhuQICjoFz9E65tPTpUDYaNAexeczhI/DNU5lQ696OygRYhH8WC8oCNRdisbDBr9l/ztQ
+	4t+p++4I9N+elLdL1pCTV9qnonX6CgHbQ7mOJJHSiezjsyjrRDsqY5MhhpYUdBE6SxNN1wy3MQ8e5
+	OYM6f9+8gD9UUpqrN/g2L2jp5STtNy8mzXeAlnanG6pI5lPWuBf2L1glSj8EpkuDhkkixw+fLvxTF
+	QM68or0z9IPQnO+4SUupRuiB/BF2FoLVg3Yw37pPIoTkhJDzKuCI653yKMa2SyZwF7kZ9rRGUrRgF
+	iYY9J9XCw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goJkw-0006r9-Sb; Tue, 29 Jan 2019 03:08:10 +0000
-Received: from hqemgate14.nvidia.com ([216.228.121.143])
+	id 1goKBF-00013V-IE; Tue, 29 Jan 2019 03:35:21 +0000
+Received: from hqemgate16.nvidia.com ([216.228.121.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goJkt-0006qB-7O
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 03:08:09 +0000
+ id 1goKBC-000136-Ni
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 03:35:20 +0000
 Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c4fc38f0000>; Mon, 28 Jan 2019 19:07:59 -0800
+ hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c4fc9ce0001>; Mon, 28 Jan 2019 19:34:38 -0800
 Received: from hqmail.nvidia.com ([172.20.161.6])
  by hqpgpgate101.nvidia.com (PGP Universal service);
- Mon, 28 Jan 2019 19:07:59 -0800
+ Mon, 28 Jan 2019 19:35:17 -0800
 X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Mon, 28 Jan 2019 19:07:59 -0800
-Received: from [10.19.108.132] (10.124.1.5) by HQMAIL101.nvidia.com
+ by hqpgpgate101.nvidia.com on Mon, 28 Jan 2019 19:35:17 -0800
+Received: from [10.19.108.132] (172.20.13.39) by HQMAIL101.nvidia.com
  (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 29 Jan
- 2019 03:07:57 +0000
+ 2019 03:35:15 +0000
 Subject: Re: [PATCH V2 2/6] clocksource: tegra: add Tegra210 timer driver
-To: Daniel Lezcano <daniel.lezcano@linaro.org>, Thierry Reding
- <thierry.reding@gmail.com>, Jonathan Hunter <jonathanh@nvidia.com>
+To: Thierry Reding <thierry.reding@gmail.com>
 References: <20190128091815.7040-1-josephl@nvidia.com>
- <20190128091815.7040-3-josephl@nvidia.com>
- <fa03140e-4f7f-ac9a-bb54-26b1efe2dc3d@linaro.org>
+ <20190128091815.7040-3-josephl@nvidia.com> <20190128150908.GB31317@ulmo>
 From: Joseph Lo <josephl@nvidia.com>
-Message-ID: <4828640a-adc5-3b23-104b-33af1afe77b4@nvidia.com>
-Date: Tue, 29 Jan 2019 11:07:55 +0800
+Message-ID: <3607f32b-c20a-e00f-3dc1-630169342392@nvidia.com>
+Date: Tue, 29 Jan 2019 11:35:13 +0800
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <fa03140e-4f7f-ac9a-bb54-26b1efe2dc3d@linaro.org>
-X-Originating-IP: [10.124.1.5]
-X-ClientProxiedBy: HQMAIL105.nvidia.com (172.20.187.12) To
+In-Reply-To: <20190128150908.GB31317@ulmo>
+X-Originating-IP: [172.20.13.39]
+X-ClientProxiedBy: HQMAIL103.nvidia.com (172.20.187.11) To
  HQMAIL101.nvidia.com (172.20.187.10)
 Content-Language: en-US
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1548731279; bh=XyJzwWJE+6DhItDvhg/MZwWvRpb228cUbcLYMgCklis=;
+ t=1548732878; bh=I7OcIB1j+RQ7EY2WdpzztGJzqgX53Vd7FmQwH7hnMd4=;
  h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
  User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
  X-ClientProxiedBy:Content-Type:Content-Language:
  Content-Transfer-Encoding;
- b=J9Jm7dYJT7a5TXlN1rnxUWoxpugS78s6CKrZSYisVNRV011eZwpIkbtmtU4GsFVLY
- fmB6kalbmsGRlisiJxhK79Qgp7/AXt70UII+VuqKj5vgOMq4QDCm635W8fqlYBVpKA
- l0ugELnr/ch6BrGnbMBK5D+EONErVslkisexUwIVctXg9unOpyJ+BEiKn0S+crILzl
- VS9CVN1RPm9OgpWoNoPvPcbdG3OQdUYaJ5Suk/OgzDHD7v4jG/MuE+OAQVQruXnlbY
- KknTH+IkeaGJOuyw5N+7YFxnARn3QjMrByyAQ1Ld6DdUjTHJq5g5VAvcvEhYoMelZM
- 5qDiHlemMJ02w==
+ b=paAXyu1NVx/ym2MErMl9QAepuPu/nb3ZPpq4ZddrKbcbfpUsrJTXDAoxUrzmhLouZ
+ yEv00EezZ8+mH5rkfR7y+uoAE0fItB0JsctUzYHmXFhtX3hmpu6+kPfkt6KkQhEYVZ
+ iE3DI1eDPfCRN0v4Oqe46JD/LpNcGJoO9SlLM18x7EGn5Yzz4QPsVsoxX2ugED4yTU
+ 1ianG6GP2Ebg+4CoCbqrh/6coPq1EIA35uM4DcX8xTQpSOTH3DMIxr8rw10epGQBB0
+ 9NVPVnJhYELzayq5Fxg/7qidEJQRZXVs0Wpgm4N1dDrzQnP5baIwZifDHwGSQhlYcS
+ 1j0aiOGqTuToQ==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190128_190807_296158_7CAF1C9E 
-X-CRM114-Status: GOOD (  24.22  )
+X-CRM114-CacheID: sfid-20190128_193518_783222_B6FA836C 
+X-CRM114-Status: GOOD (  23.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,19 +91,16 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
+ Jonathan Hunter <jonathanh@nvidia.com>, linux-tegra@vger.kernel.org,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
 Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Daniel,
-
-Thanks for your review.
-
-On 1/28/19 9:00 PM, Daniel Lezcano wrote:
-> On 28/01/2019 10:18, Joseph Lo wrote:
+On 1/28/19 11:09 PM, Thierry Reding wrote:
+> On Mon, Jan 28, 2019 at 05:18:11PM +0800, Joseph Lo wrote:
 >> Add support for the Tegra210 timer that runs at oscillator clock
 >> (TMR10-TMR13). We need these timers to work as clock event device and to
 >> replace the ARMv8 architected timer due to it can't survive across the
@@ -140,13 +135,6 @@ On 1/28/19 9:00 PM, Daniel Lezcano wrote:
 >> +config TEGRA210_TIMER
 >> +	def_bool ARCH_TEGRA_210_SOC
 >> +
-> 
-> Please make the option consistent with the option below (VT8500_TIMER or
-> similar).
-
-Okay, will check.
-
-> 
 >>   config VT8500_TIMER
 >>   	bool "VT8500 timer driver" if COMPILE_TEST
 >>   	depends on HAS_IOMEM
@@ -261,233 +249,46 @@ Okay, will check.
 >> +
 >> +	return IRQ_HANDLED;
 >> +}
->> +
->> +static int tegra210_timer_setup(unsigned int cpu)
->> +{
->> +	struct tegra210_clockevent *tevt = per_cpu_ptr(tegra210_evt, cpu);
->> +
->> +	irq_force_affinity(tevt->evt.irq, cpumask_of(cpu));
->> +	enable_irq(tevt->evt.irq);
->> +
->> +	clockevents_config_and_register(&tevt->evt, tegra210_timer_freq,
->> +					1, /* min */
->> +					0x1fffffff); /* 29 bits */
->> +
->> +	return 0;
->> +}
->> +
->> +static int tegra210_timer_stop(unsigned int cpu)
->> +{
->> +	struct tegra210_clockevent *tevt = per_cpu_ptr(tegra210_evt, cpu);
->> +
->> +	tevt->evt.set_state_shutdown(&tevt->evt);
->> +	disable_irq_nosync(tevt->evt.irq);
->> +
->> +	return 0;
->> +}
->> +
->> +static int tegra_timer_suspend(void)
->> +{
->> +	int cpu;
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		void __iomem *reg_base = tegra210_timer_reg_base +
->> +					 TIMER_FOR_CPU(cpu);
->> +		writel(TIMER_PCR_INTR_CLR, reg_base + TIMER_PCR);
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static void tegra_timer_resume(void)
->> +{
->> +	writel(usec_config, tegra210_timer_reg_base + TIMERUS_USEC_CFG);
->> +}
->> +
->> +static struct syscore_ops tegra_timer_syscore_ops = {
->> +	.suspend = tegra_timer_suspend,
->> +	.resume = tegra_timer_resume,
->> +};
->> +
->> +static int __init tegra210_timer_init(struct device_node *np)
->> +{
->> +	int cpu, ret = 0;
->> +	struct tegra210_clockevent *tevt;
->> +	struct clk *clk;
->> +
->> +	tegra210_evt = alloc_percpu(struct tegra210_clockevent);
->> +	if (!tegra210_evt) {
->> +		ret = -ENOMEM;
->> +		goto out;
->> +	}
->> +
->> +	tegra210_timer_reg_base = of_iomap(np, 0);
->> +	if (!tegra210_timer_reg_base) {
->> +		ret = -ENXIO;
->> +		goto out_free_mem;
->> +	}
->> +
->> +	clk = of_clk_get(np, 0);
->> +	if (IS_ERR(clk)) {
->> +		ret = -EINVAL;
->> +		goto out_iounmap;
->> +	}
->> +
->> +	clk_prepare_enable(clk);
->> +	tegra210_timer_freq = clk_get_rate(clk);
 > 
-> 
-> Use the timer-of API for each CPU.
+> Up to here this is a duplicate of timer-tegra20.c. And a lot of
+> tegra210_timer_init() is the same as tegra20_timer_init() as well. Can't
+> we unify the two drivers instead?
 
-Okay, I'll try to apply that for TIMER_OF_BASE and TIMER_OF_CLOCK. But 
-the TIMER_OF_IRQ, as you see below, it didn't have the ability to handle 
-the case that multiple CPUs with different timer IRQ lines. Which means 
-it's not PPI.
+I still prefer to remove the timer-tegra20 driver, because it didn't 
+been used for Tegra 32 bit chips for quite a long time. So currently it 
+just compiles OK, I also doubt the functionality still can achieve the 
+same what I want to do for Tegra210.
+
+My personal opinion is to remove the old and unused driver and enhance 
+the new one.
 
 > 
->> +	for_each_possible_cpu(cpu) {
+> The power cycle restrictions of the architected timer, do they not apply
+> to chips earlier than Tegra210 either? So don't we need all of these
+> additional features on the timer-tegra20.c driver as well? If so that
+> would increase the code duplication even more. I think we should avoid
+> that, unless there are any strong arguments that would justify it.
 > 
-> 
-> No cpu loop for the initialization, use the tegra210_timer_setup for
-> this (cf. armada 370 timer).
 
-As mentioned above, I may still need this for IRQs initialization for 
-each CPU cores. Something like the IRQ init code in "exnos_mct.c".
+As far as I know, this was a issue on some specific version of Cortex-a57.
+For timer-tegra20, which was designed for the very early stage that TWD 
+driver was not ready yet for Tegra 32 bit chips (Tegra20/30). Currently, 
+it has been replaced by ARM TWD and V7 timer driver. It didn't been used 
+and maintained for quite a long time.
 
-> 
->> +		tevt = per_cpu_ptr(tegra210_evt, cpu);
->> +		tevt->reg_base = tegra210_timer_reg_base + TIMER_FOR_CPU(cpu);
->> +		tevt->evt.irq = irq_of_parse_and_map(np, IRQ_IDX_FOR_CPU(cpu));
->> +		if (!tevt->evt.irq) {
->> +			pr_err("%s: can't map IRQ for CPU%d\n",
->> +			       __func__, cpu);
->> +			ret = -EINVAL;
->> +			goto out_clk;
->> +		}
->> +
->> +		snprintf(tevt->name, ARRAY_SIZE(tevt->name),
->> +			 "tegra210_timer%d", cpu);
->> +		tevt->evt.name = tevt->name;
->> +		tevt->evt.cpumask = cpumask_of(cpu);
->> +		tevt->evt.set_next_event = tegra210_timer_set_next_event;
->> +		tevt->evt.set_state_shutdown = tegra210_timer_shutdown;
->> +		tevt->evt.set_state_periodic = tegra210_timer_set_periodic;
->> +		tevt->evt.set_state_oneshot = tegra210_timer_shutdown;
->> +		tevt->evt.tick_resume = tegra210_timer_shutdown;
->> +		tevt->evt.features = CLOCK_EVT_FEAT_PERIODIC |
->> +			CLOCK_EVT_FEAT_ONESHOT;
->> +		tevt->evt.rating = 460;
->> +		irq_set_status_flags(tevt->evt.irq, IRQ_NOAUTOEN);
-> 
-> Why do you need to prevent the interrupt to be enabled ? If the timer is
-> stopped and cleared, no spurious interrupt will occur no ?
+BTW, we had very similar issue with idle power-down state with Tegra 
+32bit chips. But it's related to GIC not timer. See below two changes 
+for reference.
 
-This is to prevent the IRQ will been enabled twice in the timer_setup 
-API with CPU hotplug event triggered. So we only enable the IRQ once the 
-CPU is online.
+For Tegra20,
+d4b92fb2535a ARM: tegra: add pending SGI checking API
 
-> 
->> +		ret = request_irq(tevt->evt.irq, tegra210_timer_isr,
->> +				  IRQF_TIMER | IRQF_NOBALANCING,
->> +				  tevt->name, tevt);
->> +		if (ret) {
->> +			pr_err("%s: cannot setup irq %d for CPU%d\n",
->> +				__func__, tevt->evt.irq, cpu);
->> +			ret = -EINVAL;
->> +			goto out_irq;
->> +		}
->> +	}
->> +
->> +	/*
->> +	 * Configure microsecond timers to have 1MHz clock
->> +	 * Config register is 0xqqww, where qq is "dividend", ww is "divisor"
-> 
-> Did you mean 0xwwqq ?
-
-Ah, because it's microsecond timer, that means the fraction of 1 
-microsecond each clk represents. For ex, if the clk is running at 12MHz, 
-then each clk represents 1/12 of a microsecond.
+For Tegra114/124,
+7e8b15dbc392 ARM: tegra114: Reprogram GIC CPU interface to bypass IRQ on 
+CPU PM entry
 
 Thanks,
 Joseph
-
-> 
->> +	 * Uses n+1 scheme
->> +	 */
->> +	switch (tegra210_timer_freq) {
->> +	case 12000000:
->> +		usec_config = 0x000b; /* (11+1)/(0+1) */
->> +		break;
->> +	case 12800000:
->> +		usec_config = 0x043f; /* (63+1)/(4+1) */
->> +		break;
->> +	case 13000000:
->> +		usec_config = 0x000c; /* (12+1)/(0+1) */
->> +		break;
->> +	case 16800000:
->> +		usec_config = 0x0453; /* (83+1)/(4+1) */
->> +		break;
->> +	case 19200000:
->> +		usec_config = 0x045f; /* (95+1)/(4+1) */
->> +		break;
->> +	case 26000000:
->> +		usec_config = 0x0019; /* (25+1)/(0+1) */
->> +		break;
->> +	case 38400000:
->> +		usec_config = 0x04bf; /* (191+1)/(4+1) */
->> +		break;
->> +	case 48000000:
->> +		usec_config = 0x002f; /* (47+1)/(0+1) */
->> +		break;
->> +	default:
->> +		ret = -EINVAL;
->> +		goto out_irq;
->> +	}
->> +
->> +	writel(usec_config, tegra210_timer_reg_base + TIMERUS_USEC_CFG);
->> +
->> +	cpuhp_setup_state(CPUHP_AP_TEGRA_TIMER_STARTING,
->> +			  "AP_TEGRA_TIMER_STARTING", tegra210_timer_setup,
->> +			  tegra210_timer_stop);
->> +
->> +	register_syscore_ops(&tegra_timer_syscore_ops);
->> +
->> +	return ret;
->> +
->> +out_irq:
->> +	for_each_possible_cpu(cpu) {
->> +		tevt = per_cpu_ptr(tegra210_evt, cpu);
->> +		if (tevt->evt.irq) {
->> +			free_irq(tevt->evt.irq, tevt);
->> +			irq_dispose_mapping(tevt->evt.irq);
->> +		}
->> +	}
->> +out_clk:
->> +	clk_put(clk);
->> +out_iounmap:
->> +	iounmap(tegra210_timer_reg_base);
->> +out_free_mem:
->> +	free_percpu(tegra210_evt);
->> +out:
->> +	return ret;
->> +}
->> +
->> +TIMER_OF_DECLARE(tegra210_timer, "nvidia,tegra210-timer", tegra210_timer_init);
->> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
->> index fd586d0301e7..e78281d07b70 100644
->> --- a/include/linux/cpuhotplug.h
->> +++ b/include/linux/cpuhotplug.h
->> @@ -121,6 +121,7 @@ enum cpuhp_state {
->>   	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
->>   	CPUHP_AP_ARM_TWD_STARTING,
->>   	CPUHP_AP_QCOM_TIMER_STARTING,
->> +	CPUHP_AP_TEGRA_TIMER_STARTING,
->>   	CPUHP_AP_ARMADA_TIMER_STARTING,
->>   	CPUHP_AP_MARCO_TIMER_STARTING,
->>   	CPUHP_AP_MIPS_GIC_TIMER_STARTING,
->>
-> 
-> 
 
 _______________________________________________
 linux-arm-kernel mailing list
