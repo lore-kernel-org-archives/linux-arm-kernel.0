@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 01E7EC282D0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:57:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 09FAEC282C7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:58:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C669D20869
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:57:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CC98720870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:58:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GkhnGbMk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C669D20869
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c0oHleVN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC98720870
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ellerman.id.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,37 +24,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
 	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=c4xwNPaEDPY6WC/IoZ15BULBfQUB8dF32KC4LxleeD8=; b=GkhnGbMkNxIfOn
-	1o94Ab+YbCpKbrfBsC0M8L2lX+/PF6XByWUFskPQ/KFUH0u2q6pD5ubBkAqst3mQDQpBITyLk5fyt
-	hMeWDFGDrWnDuvzej5wSO5TblMHvsbivRiRy3YZJWtPZvLiFJud1ZZUbtdenTzNPzqZPVfno5RN1j
-	ODd4vIp5N/I9fjHqgY889iPQw7kG6m/ibZqP7U/F+QfRk9dqDUNyKPjyrpF8tafXpGZIZs7DfpKQm
-	+PPWhL7A3OdIZVPT/pX4ObbpiMQ4Ab7WjKKwLe0xLPL3rgBUu28geyX1AvdPjrA5cRnY0aLOzKOD5
-	gy86TwG/z9b22A0tf3Iw==;
+	List-Owner; bh=2eS6bHvRpcgWJDiHCRhR8mpHA3yKg3U5anF9RVg9bDI=; b=c0oHleVN/zME05
+	HK+emZXheEh7dpwLVB5YvVDnqq75mZSOVjCj4gVNxZZFSqaclghoAjF9L+CIyqmpRde5l7Mw2Q1JP
+	iEVTMhBYIurGaOoB5p4XjeS62lVOP2SL8NcqtlO339ZSpvoQkxu9eEOCwLxqV0pZaqmRWfYtEvwL4
+	ElnOm9y04A12+A2OXiBfMptcMrPZkF8SdTA0JnUrgdvxuNXdhOH+qcH9uwU95CdlqxHhMXbmVBs1X
+	/I9P3zPvpJ71z0QP2Ldd67D9CqaebtpUgIDCdMmKzr3AcA/axHEbNt352gcWgMdkb5Bo+vIxho5PY
+	yYJiWEnQAPZshMdDfgCg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goQ8b-0005re-MH; Tue, 29 Jan 2019 09:57:01 +0000
-Received: from ozlabs.org ([203.11.71.1])
+	id 1goQ9s-0006Jg-RU; Tue, 29 Jan 2019 09:58:20 +0000
+Received: from ozlabs.org ([2401:3900:2:1::2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goQ8X-0005qy-RN; Tue, 29 Jan 2019 09:56:59 +0000
+ id 1goQ9q-0006J7-0L; Tue, 29 Jan 2019 09:58:19 +0000
 Received: from authenticated.ozlabs.org (localhost [127.0.0.1])
  (using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits)
  key-exchange ECDHE (P-256) server-signature RSA-PSS (2048 bits) server-digest
  SHA256) (No client certificate requested)
- by ozlabs.org (Postfix) with ESMTPSA id 43phjg3h9Pz9sDr;
- Tue, 29 Jan 2019 20:56:55 +1100 (AEDT)
+ by ozlabs.org (Postfix) with ESMTPSA id 43phlB1Pcgz9sMM;
+ Tue, 29 Jan 2019 20:58:14 +1100 (AEDT)
 From: Michael Ellerman <mpe@ellerman.id.au>
 To: Mike Rapoport <rppt@linux.ibm.com>, linux-mm@kvack.org
 Subject: Re: [PATCH v2 06/21] memblock: memblock_phys_alloc_try_nid(): don't
  panic
-In-Reply-To: <1548057848-15136-7-git-send-email-rppt@linux.ibm.com>
+In-Reply-To: <87y373rdll.fsf@concordia.ellerman.id.au>
 References: <1548057848-15136-1-git-send-email-rppt@linux.ibm.com>
  <1548057848-15136-7-git-send-email-rppt@linux.ibm.com>
-Date: Tue, 29 Jan 2019 20:56:54 +1100
-Message-ID: <87y373rdll.fsf@concordia.ellerman.id.au>
+ <87y373rdll.fsf@concordia.ellerman.id.au>
+Date: Tue, 29 Jan 2019 20:58:13 +1100
+Message-ID: <87va27rdje.fsf@concordia.ellerman.id.au>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_015658_065142_5E70ECF5 
-X-CRM114-Status: UNSURE (   8.29  )
+X-CRM114-CacheID: sfid-20190129_015818_279761_3752F759 
+X-CRM114-Status: UNSURE (   6.90  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -96,23 +97,29 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Mike Rapoport <rppt@linux.ibm.com> writes:
+Michael Ellerman <mpe@ellerman.id.au> writes:
 
-> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-> index ae34e3a..2c61ea4 100644
-> --- a/arch/arm64/mm/numa.c
-> +++ b/arch/arm64/mm/numa.c
-> @@ -237,6 +237,10 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
->  		pr_info("Initmem setup node %d [<memory-less node>]\n", nid);
->  
->  	nd_pa = memblock_phys_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
-> +	if (!nd_pa)
-> +		panic("Cannot allocate %zu bytes for node %d data\n",
-> +		      nd_size, nid);
-> +
->  	nd = __va(nd_pa);
+> Mike Rapoport <rppt@linux.ibm.com> writes:
+>
+>> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+>> index ae34e3a..2c61ea4 100644
+>> --- a/arch/arm64/mm/numa.c
+>> +++ b/arch/arm64/mm/numa.c
+>> @@ -237,6 +237,10 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
+>>  		pr_info("Initmem setup node %d [<memory-less node>]\n", nid);
+>>  
+>>  	nd_pa = memblock_phys_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
+>> +	if (!nd_pa)
+>> +		panic("Cannot allocate %zu bytes for node %d data\n",
+>> +		      nd_size, nid);
+>> +
+>>  	nd = __va(nd_pa);
 
-Acked-by: Michael Ellerman <mpe@ellerman.id.au> (powerpc)
+Wrong hunk, O_o
+
+> Acked-by: Michael Ellerman <mpe@ellerman.id.au> (powerpc)
+
+You know what I mean though :)
 
 cheers
 
