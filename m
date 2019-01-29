@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ED753C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:30:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DE47AC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:30:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AE3DF214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:30:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ADDAE214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:30:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g4DV2VFB";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="oRxaqqQR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE3DF214DA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fV7Fdy87";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="eD+JYgVS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADDAE214DA
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,61 +26,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=c1rBf3V5Wkj90QA6EJTNd06EFQSD57cufja865iBZSE=; b=g4DV2VFBLx2K2f
-	QFfjzj9NgWAV34UbivGUsFn8ka4ZHJ5Q77a9HHKVkJzHnLzlDV2UTajAZgktseCIxDqeCO+kJdDB1
-	JU4ZPzrqGAO3Wodyl3uuAZC7n+F6qiRMkmQHOwyQCq0IIp2IAwbZc93MqGdqDwF8eZA1lInJq16Sf
-	LTKKayNE4OER66o5dzbLhd6uI7oLT4jq81tH9L6RnWccarDCjq2wpHq66mHn7HRTDfUbmXIh+lkwo
-	ksQ3Q2V0sb5jtcdGLPW82uyL77f8RMCnhfKGmYdMc3J+1jRP5qzwXLb7axk5XfHwnxip6KRDVA2XT
-	PQNv1U20eDsiYl1Welkg==;
+	List-Owner; bh=teB1LehyO+6c4ABwzEruiXJ8fbi/4auTUMyr4Yy+o30=; b=fV7Fdy87Fw/PnH
+	L253DPY9lTuO3bTs88roySsxckPfPO/0/mhF2JJ7y9NTGwq7/C2N5E6f7wi8IZVDoaQDs6odqgVDB
+	eqfmkyZT357FetGNN5mmRLFwnA+2JlZYoDPrGLX7mCKmFTJHJ4Lri92ZzIOB5jymeVTPoZl4SmoLR
+	CHm9uHKj3HCD8mXhTcIFcOYJ1buiNl12XeBYre2xJRgfZf25sff4V3IuCyOrAAMmN74x11AdTrRKm
+	jbnomKtHvR6hMu5KMqu1XfDmTj9TpqXWmdsiWv5Lku2Mnv0QedqDFvPUp2fqZSeUOQJ5iUvc6hpqR
+	oZ6SFdioy4ELkoojOsRA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goPiN-00078L-Fp; Tue, 29 Jan 2019 09:29:55 +0000
-Received: from hqemgate14.nvidia.com ([216.228.121.143])
+	id 1goPih-0007th-Sn; Tue, 29 Jan 2019 09:30:15 +0000
+Received: from hqemgate15.nvidia.com ([216.228.121.64])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goPh6-00068X-Gf
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 09:28:41 +0000
-Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c501cc50000>; Tue, 29 Jan 2019 01:28:37 -0800
+ id 1goPh9-0006Bg-6T
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 09:28:42 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c501cab0000>; Tue, 29 Jan 2019 01:28:11 -0800
 Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate102.nvidia.com (PGP Universal service);
- Tue, 29 Jan 2019 01:28:36 -0800
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Tue, 29 Jan 2019 01:28:38 -0800
 X-PGP-Universal: processed;
- by hqpgpgate102.nvidia.com on Tue, 29 Jan 2019 01:28:36 -0800
-Received: from HQMAIL101.nvidia.com (172.20.187.10) by HQMAIL104.nvidia.com
- (172.18.146.11) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 29 Jan
- 2019 09:28:35 +0000
-Received: from hqnvemgw01.nvidia.com (172.20.150.20) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via Frontend
- Transport; Tue, 29 Jan 2019 09:28:35 +0000
+ by hqpgpgate101.nvidia.com on Tue, 29 Jan 2019 01:28:38 -0800
+Received: from HQMAIL110.nvidia.com (172.18.146.15) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 29 Jan
+ 2019 09:28:38 +0000
+Received: from HQMAIL104.nvidia.com (172.18.146.11) by hqmail110.nvidia.com
+ (172.18.146.15) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 29 Jan
+ 2019 09:28:37 +0000
+Received: from hqnvemgw01.nvidia.com (172.20.150.20) by HQMAIL104.nvidia.com
+ (172.18.146.11) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via Frontend
+ Transport; Tue, 29 Jan 2019 09:28:37 +0000
 Received: from josephl-linux.nvidia.com (Not Verified[10.19.108.132]) by
  hqnvemgw01.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
- id <B5c501cc20003>; Tue, 29 Jan 2019 01:28:35 -0800
+ id <B5c501cc40001>; Tue, 29 Jan 2019 01:28:37 -0800
 From: Joseph Lo <josephl@nvidia.com>
 To: Thierry Reding <thierry.reding@gmail.com>, Jonathan Hunter
  <jonathanh@nvidia.com>
-Subject: [PATCH V3 4/6] arm64: dts: tegra210: add CPU idle states properties
-Date: Tue, 29 Jan 2019 17:28:21 +0800
-Message-ID: <20190129092823.24983-5-josephl@nvidia.com>
+Subject: [PATCH V3 5/6] arm64: dts: tegra210-p2180: Enable CPU idle support
+Date: Tue, 29 Jan 2019 17:28:22 +0800
+Message-ID: <20190129092823.24983-6-josephl@nvidia.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190129092823.24983-1-josephl@nvidia.com>
 References: <20190129092823.24983-1-josephl@nvidia.com>
 MIME-Version: 1.0
 X-NVConfidentiality: public
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1548754117; bh=2bAE2TFa23HscVFAfxOhYaDup4svaBcvFeGwLO9+yjc=;
+ t=1548754091; bh=ohcHPu43YSqkJDsZ15hzw5CwbI9S1iwLmxddh97DsgE=;
  h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
  In-Reply-To:References:MIME-Version:X-NVConfidentiality:
  Content-Transfer-Encoding:Content-Type;
- b=oRxaqqQRA7Cf0JSraeNsor+Sb4miQ9DmsWqa4HWnAz+eRlB4fQf9WINUQ5nhrVonB
- gYKkd1918xn39sN8vDDi1pb1sykKrxPCJwqZ5GuYcxGYMmZOF2ahH3hUyLeOdKrH7r
- 575dCVTmJfRCEP4Zbj+5aBZ+PmoGFQinYwcuufsfM6QFNJ+IUD7QF64kQ6H5lkRC5x
- tY1qVwJwes/xTIjwQfWodT4TGlWu1a0vBEDldW2wwM1f4K+IbBnPWjaWMted0bSjEM
- h7uk6Yl3ElDV9O3C7y00tH9dEvAcm4gwrucOJXFiFZk3Hd0yISdEpL5LY6oMyMOEUW
- vJ2po/uHzf3cQ==
+ b=eD+JYgVSrVBjuHLNFbqxZ8522CCg/uEk5jc8L+SHpZAKHQGX7+MEhBdnh8Ui4sZxo
+ 7cxhJbGE7oUGdbohFDkuTL+pRrSfJ6o1hw6mEyaB7LkbNoOORLvp/FXZTD4QyYJQsP
+ n2/+teLxaSh/SG54SrIQp7uGKsdU1EF2Fb+Ajj9BmWq1K6u+o6gSvcVkfTOegu5ZTO
+ sVviTTcWcBnEZ0vvFN6NytRY2Emt7lA2CyotJpOBwp8zBneIiiHxfpa9osF2VQ6huM
+ 5HdJ3Yd4jgysPsI2FsRUT36joSUCwCfAtR32kHipGGBe8LiamiedxXCfImM38/4seN
+ YO1y2B04/+tsA==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_012837_053653_0D047E81 
-X-CRM114-Status: UNSURE (   7.93  )
+X-CRM114-CacheID: sfid-20190129_012840_136448_2EF6F242 
+X-CRM114-Status: UNSURE (   7.49  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -100,71 +103,35 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add idle states properties for generic ARM CPU idle driver. This
-includes a C7 state which is the power down state of CPU cores.
+Enable CPU idle support for Jetson TX1 platform.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 v3:
  * no change
 v2:
- * add entry-latency-us and exit-latency-us properties
-
-Note:
-This dt patch depends on the DT changes in below series.
-http://patchwork.ozlabs.org/project/linux-tegra/list/?series=84380
+ * no change
 ---
- arch/arm64/boot/dts/nvidia/tegra210.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-index 2b387364afc3..75534692604c 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-@@ -1318,24 +1318,43 @@
- 				 <&dfll>;
- 			clock-names = "cpu_g", "pll_x", "pll_p", "dfll";
- 			clock-latency = <300000>;
-+			cpu-idle-states = <&C7>;
- 		};
- 
- 		cpu@1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a57";
- 			reg = <1>;
-+			cpu-idle-states = <&C7>;
- 		};
- 
- 		cpu@2 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a57";
- 			reg = <2>;
-+			cpu-idle-states = <&C7>;
- 		};
- 
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
+index 053458a5db55..d1a492c63e96 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
+@@ -305,6 +305,12 @@
  		cpu@3 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a57";
- 			reg = <3>;
-+			cpu-idle-states = <&C7>;
-+		};
+ 			enable-method = "psci";
+ 		};
 +
 +		idle-states {
-+			entry-method = "psci";
-+
-+			C7: c7 {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x40000007>;
-+				entry-latency-us = <250>;
-+				exit-latency-us = <100>;
-+				min-residency-us = <1000>;
-+				wakeup-latency-us = <130>;
-+				idle-state-name = "c7-cpu-powergated";
-+				status = "disabled";
++			c7 {
++				status = "okay";
 +			};
- 		};
++		};
  	};
  
+ 	psci {
 -- 
 2.20.1
 
