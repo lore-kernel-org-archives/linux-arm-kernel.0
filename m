@@ -2,94 +2,76 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0BE28C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 14:56:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E474AC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 14:59:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D2BF62184D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 14:56:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A91792175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 14:59:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qux1PNdJ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=norrbonn-se.20150623.gappssmtp.com header.i=@norrbonn-se.20150623.gappssmtp.com header.b="N2QHYwHj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D2BF62184D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=norrbonn.se
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d200mO8N";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="e4JQw+Gb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A91792175B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=+426An30aLPz8LfQ7syIEChJWwvcWpMKjk/Ixz62j9k=; b=qux1PNdJ9sBSGTNCOQ/xNN1ev
-	Iewysm3BGXiIpezP184IeQZluhSlmVOQMQrZZEQcs2xD/SVIbPHa3s8pstntEv1zyYQBljJPleyly
-	XdIYC8mxHCEwroNhnfORhG/cTfLSxgst3lv1jHdyVuoFHsih0TCcWyCMjgvwFRsGv5jm8ILuODZZv
-	OokH5H54oh/tnvlv0+rlwsaePMKaJb+RoVfgo8pUN79xOtSqtKpPVu8ut+zXMt7nwqFn25YO3zqah
-	XrOEt++KMRPowiUSVnR6U0cE5DwBOxH/r8Sx/OXZ7cIkghEWA49xxnBJqaenh2c9r4ywsN0Ars+xu
-	TMEGyYffw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=N+obfuWYcgh67mu+lvZjQbqdg+jLTqG2kbuJ6bcixfU=; b=d200mO8N0Qn0aD
+	yx8sNpjec9uD2qrW2761foV1jTjhCdU9q1CmrnMvlP+XwgQveatR59vAeRIWBS8JI0AtceLu7wUPG
+	+MEDXnPZgUxJ5lxAbucJyo/YyVUx0HtWxJs0sx2chwY6aHB/0CZJlbotE/yR08Me+cqH90pCQSQU1
+	NNQ17afz0h9/faWNhvP1+nYPlhAnEfKCfvtSMBjpmMAHnI69GL7IeqUdos0pu0hTe064sEz9gC1l0
+	TwXHzdyXvezgUxHF5zHBkSvlZ2oQZtYLjsZFccmvm2mSOi4hggW2MXIQE6HhSZHdWmZBIFFbmsfcs
+	Zn/9Yxypmvy5RpQHmTxQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goUoZ-0000rO-OX; Tue, 29 Jan 2019 14:56:39 +0000
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+	id 1goUrj-0001Oe-E0; Tue, 29 Jan 2019 14:59:55 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goUoV-0000qz-Md
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 14:56:37 +0000
-Received: by mail-lf1-x144.google.com with SMTP id u18so14816459lff.10
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 06:56:35 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=norrbonn-se.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=YtmDmx4hF7yUv9PZ4nol91PQCpWWisMGSSBsX/os2+8=;
- b=N2QHYwHjj9U1Wh04zqHIe3EW9H8HfQwmSullR+DHw7bbzKnhuK2K+0s8dzkEOUd2ma
- S7eFATRyL7g3Yau1HPrm11eF3rdnEITmYq+4Qa0ke9ygGpMF/eR2jXA4ERwHZ70DCCFv
- VWyECTjPnXoUzXELtmpE283atZP0yEG19z2tZ4kmCFs0/gzw1dCzehHi0MWd+QbGjvvV
- dgcmyHJLCntRGKyuEinerpyR9nYswRt3H9YBg/M1eEWCHJUiLc1fwISZmI3RCMGkVAaF
- tC+VOLwPtjNuEdUrdQsQxpC+keYzY/3fXRMg1SNucde/MIk6vy/CARgRBD9xSgNmWNHQ
- JDEA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=YtmDmx4hF7yUv9PZ4nol91PQCpWWisMGSSBsX/os2+8=;
- b=riuwCwz5SY76SnVm6pFynXQU+v8U+JFJtAhGt+QnG2up583GF/0NN4w/09iWVwk/k5
- 1E42lyLi8z/FrTDOb31Rb/SW0l9ZOc/glL2FO6S8i3ZZbnPvyO75dB0sOGCwG7DPPq1G
- R37fpCs++uXvoPiLiQ3nbKe3aESfAzFyuQnXa+TRLonvqI6evU5YK7/+5XyhKbURLawR
- dSebnHhCuGMsJD8dfPsk0F2hU7uUpUtrfJ3Qw5wvdVfZ0HBZk2NHA2O2qzWhRMx+9OKk
- Vy4xVJQdaoXoF1EEk4mcuN9rFv2azmoiuYTqhrASXh1XnxH6naav8PvG+A9iOd5oL/G0
- INiw==
-X-Gm-Message-State: AJcUukeW4uwVgoSZhZlUroISCKJWabhX/iG1MLaZDJDORByWIIf4dHXi
- TwKSMRiOcyd2EBe4Z0IP8afQ5Q==
-X-Google-Smtp-Source: ALg8bN6oDCwGX67Kvm6xb9k3EUdbs+5+I74YZEN+oGHSzrNQIKdeJUC6TUDTR2Yyz+H5jaob8t5DqQ==
-X-Received: by 2002:a19:41c4:: with SMTP id o187mr20236759lfa.32.1548773793484; 
- Tue, 29 Jan 2019 06:56:33 -0800 (PST)
-Received: from [192.168.1.169] (h-29-16.A159.priv.bahnhof.se. [79.136.29.16])
- by smtp.gmail.com with ESMTPSA id
- m10-v6sm3553378ljj.34.2019.01.29.06.56.31
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 29 Jan 2019 06:56:32 -0800 (PST)
-Subject: Re: [PATCH v4 2/2] spi-atmel: support inter-word delay
-To: Nicolas.Ferre@microchip.com, linux-kernel@vger.kernel.org
-References: <20190129083844.20572-1-jonas@norrbonn.se>
- <20190129083844.20572-3-jonas@norrbonn.se>
- <995b3885-254b-7932-8d05-77271a2c070d@microchip.com>
-From: Jonas Bonn <jonas@norrbonn.se>
-Message-ID: <7a6efd1a-5920-60e5-bc68-dfbe6866e522@norrbonn.se>
-Date: Tue, 29 Jan 2019 15:56:31 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1goUri-0001OW-Fn
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 29 Jan 2019 14:59:54 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:Content-Type:
+ MIME-Version:References:In-Reply-To:Message-ID:Subject:Cc:To:From:Date:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=Bpok+/RycEtZupHiAdTqfud8JgaqhJf69hEkrbMlRms=; b=e4JQw+GbCSlD+OgDgNNR+6IlHV
+ WTKKm+ogRcuwEjBGh+Q4Zjf2k09rbWJz9M7wUHl/NjLYSe+HJrzVxnm4PAF8LfA9rfl7ajUYbFJf2
+ URQd0DI/pXIHi3ASPwZ7UFCYImHLFnws1wHB8CO0ZeDAw3eoqiXwy8esD/7GwWgEXkEeqyUcrLZEi
+ l+CLwnJ3t46qa7bv0m0DQiVmn8//mun8Rml4cvIa3WtNDOnnEEX72/26m0b/UzAotEMObsmXDsC+L
+ 4USWC4jlL/QgoKWW5qBW7Siitp6DU+7jFeJacmIkPg+Kups6BIAXGWrETG4oDEmDHjfjav9rew2za
+ IN50slNw==;
+Received: from relay8-d.mail.gandi.net ([217.70.183.201])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goUre-0002Jf-LO
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 14:59:52 +0000
+X-Originating-IP: 90.88.147.226
+Received: from windsurf (aaubervilliers-681-1-27-226.w90-88.abo.wanadoo.fr
+ [90.88.147.226]) (Authenticated sender: thomas.petazzoni@bootlin.com)
+ by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id C84841BF20D;
+ Tue, 29 Jan 2019 14:59:14 +0000 (UTC)
+Date: Tue, 29 Jan 2019 15:59:13 +0100
+From: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+To: Leigh Brown <leigh@solinno.co.uk>
+Subject: Re: Out-of-tree mwlwifi driver crashes
+Message-ID: <20190129155913.163f1e98@windsurf>
+In-Reply-To: <01e409217be1c1cb08ac3bab072fccd3@solinno.co.uk>
+References: <01e409217be1c1cb08ac3bab072fccd3@solinno.co.uk>
+Organization: Bootlin
+X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
 MIME-Version: 1.0
-In-Reply-To: <995b3885-254b-7932-8d05-77271a2c070d@microchip.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_065635_882662_3471E0D5 
-X-CRM114-Status: GOOD (  15.06  )
+X-CRM114-CacheID: sfid-20190129_095950_806228_0AF975D2 
+X-CRM114-Status: GOOD (  19.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,43 +83,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: alexandre.belloni@bootlin.com, Tudor.Ambarus@microchip.com,
- linux-spi@vger.kernel.org, Ludovic.Desroches@microchip.com, broonie@kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+Hello Leigh,
 
-On 29/01/2019 15:27, Nicolas.Ferre@microchip.com wrote:
-> On 29/01/2019 at 09:38, Jonas Bonn wrote:
->> 
->> +	/* DLYBCT adds delays between words.  This is useful for slow devices
->> +	 * that need a bit of time to setup the next transfer.
->> +	 */
->> +	if (spi->word_delay_us) {
-> 
-> Well...
-> 
->> +		csr |= SPI_BF(DLYBCT,
->> +			clamp_t(u8,
->> +				(as->spi_clk/1000000*spi->word_delay_us)>>5,
->> +				1, 255));
-> 
-> ... why not simplifying to:
-> +				0, 255));
-> and remove the test altogether, after all?
+On Tue, 29 Jan 2019 13:47:38 +0000
+Leigh Brown <leigh@solinno.co.uk> wrote:
 
-Hmm... that seemed too easy!  This started out as something else and 
-looking at it now I think even the clamp_t() is unnecessary.  The value 
-is already 0-255 and the way SPI_BF works any overflow is already 
-truncated...  I'll rework this and resubmit once I get some feedback on 
-the word_delay_us bits.
+> The following commit causes the out-of-tree mwlwifi driver [1] to crash, 
+> which
+> I have found with git bisect.
+> 
+> commit 1f08673eef1236f7d02d93fcf596bb8531ef0d12
+> Author: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+> Date:   Thu Oct 18 17:37:18 2018 +0200
+> 
+>      PCI: mvebu: Convert to PCI emulated bridge config space
+> 
+>      Convert the pci-mvebu driver to use the pci-bridge-emul logic, that
+>      helps emulating a root port PCI bridge configuration space.
+> 
+>      Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+>      [lorenzo.pieralisi@arm.com: updated commit log]
+>      Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> 
+> I have raised the issue with the driver maintainers but they responded 
+> that
+> this is a kernel regression [2].
+> 
+> Do you think this is a driver issue or a regression? I am happy to test 
+> proposed
+> fixes but I don't understand enough about the driver or PCI to 
+> investigate.
+> 
+> If I revert that single commit, the issue goes away.
 
-Thanks,
-/Jonas
+Thanks a lot for this report. This is the second report related to this
+commit. I already started investigating, but didn't dedicate enough
+time to find a proper fix yet.
+
+Could you share the output of "lspci -vvv -xxx" with the commit applied
+and reverted ?
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
