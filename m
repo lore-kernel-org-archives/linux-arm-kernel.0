@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 69D80C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:53:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C27DEC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:54:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2EC0E20844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:53:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 913F020989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 18:54:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i8V/3YDw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2EC0E20844
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jd6e0Rpr";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="R8aNpKUK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 913F020989
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +26,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hA5osYv/FzAoXwocwTsVtiF7muOq10auGr4edthK3iw=; b=i8V/3YDwOp9xxS
-	+m2TYZMCWpIV/PWjo91hObZBKTfKltFHM0IEo+Xt/ZgPPpLiRjQ24eoMfa1bEHnPYamKUF6TR4D03
-	wDeBSFxgII+WKIEIWQTmCBVNAHsKJ87/umDG7elJ5JXhrBIS6HKNgGBHe4uZuVV3GtAnyObaYToU4
-	hYfaHWVIfgfjAeBzaDlaIm4mp84qxiTzNT4Knm8aTwQ8A9pSblMXHpp8PoAgFzfuxilIxyz4q19sB
-	nwQVMe3yM/caTZpa0vl22AoMjZfkCLVn0iFNXjRp0DFFZRe1rCd8Ls8ckLfeZNJeEBKMyX2kIMUj5
-	4YH2odc57U7CM2hAPw/g==;
+	List-Owner; bh=YsUo666lhKgGlcFSxeZEkdcUlD5j6i0qqptU4ufOgbk=; b=jd6e0Rpr5k1DgR
+	iccQoHQIkKn1xicV8qU9Exk0LuT0q3AHBmN8Xk9PnSr39bLrDWvxQGS+azQWLAmE8fgRuBTixu1CS
+	0nWgaqjda+HNpqnAqlkANGGnEl+yGkb584e4YLWZbnxVpi4bw8TRXc84am8optf+DqjHo7Cpk4Q1W
+	9AcuBEaLsEOFLBey2aeg2Dx4UBKj8XHNvncg3Mk79ULBRxNdj7G2//jgC4XlTujhvdwXkPzGP051P
+	SFckDUZVDxOPNhsOYiTrdE1LQ5TGXtiNFuQlUx7oQ/hvMON/sk8nUA8wI6iUZ6+kr1Z5MZIcBwmOt
+	P9GcTStvDgEd0ylTDRIw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goYVw-0001fh-Fg; Tue, 29 Jan 2019 18:53:40 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goYSZ-00066F-66
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 18:50:19 +0000
+	id 1goYWN-00024Y-Cj; Tue, 29 Jan 2019 18:54:07 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goYSw-0007Su-Ur
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 29 Jan 2019 18:50:34 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=81UVWBzuiiLWxlt5Zhyss5LIIbWmTL+dhjejw8e0YyU=; b=R8aNpKUKf7uabCENUkY0mmT9BX
+ x3zmIMk3PWczgPg+6R0HmEEYRgvpPrfJiZVa7QLoom/I6aoQDO8GoM1iBTCIZxMKar2Wtv9NLG17T
+ ec/li5mhxHqYUzjj2rCVoCrmGyym+3ziFTziZqz9n2n54xBLgQmlRNIauggg/OI36jUfx65YD8baI
+ x76e+cdNx1DV0bpML6v2jERzjNZsX1S+525jawYRoUIdy4etjPAgdyn9kY8A1QzWzE247w2aUpQoJ
+ yYciOP+OQQtuNYp2EmKwS0GRu9gEvGYF/+ZpMRWPIex5d5ooZ5vNvHX3AKuPCr8jk+7bzTNj078L9
+ 37o9PcHg==;
+Received: from foss.arm.com ([217.140.101.70])
+ by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goYSt-0005YO-G4
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 18:50:33 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C2C4715AB;
- Tue, 29 Jan 2019 10:50:10 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5894715AB;
+ Tue, 29 Jan 2019 10:50:31 -0800 (PST)
 Received: from eglon.cambridge.arm.com (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 210DF3F557;
- Tue, 29 Jan 2019 10:50:07 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id AB9013F557;
+ Tue, 29 Jan 2019 10:50:28 -0800 (PST)
 From: James Morse <james.morse@arm.com>
 To: linux-acpi@vger.kernel.org
-Subject: [PATCH v8 11/26] ACPI / APEI: Move NOTIFY_SEA between the
- estatus-queue and NOTIFY_NMI
-Date: Tue, 29 Jan 2019 18:48:47 +0000
-Message-Id: <20190129184902.102850-12-james.morse@arm.com>
+Subject: [PATCH v8 18/26] ACPI / APEI: Make GHES estatus header validation
+ more user friendly
+Date: Tue, 29 Jan 2019 18:48:54 +0000
+Message-Id: <20190129184902.102850-19-james.morse@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190129184902.102850-1-james.morse@arm.com>
 References: <20190129184902.102850-1-james.morse@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_105011_766934_971BDCD1 
-X-CRM114-Status: GOOD (  19.32  )
+X-CRM114-CacheID: sfid-20190129_135032_037389_AAADA372 
+X-CRM114-Status: GOOD (  14.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,159 +98,89 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The estatus-queue code is currently hidden by the NOTIFY_NMI #ifdefs.
-Once NOTIFY_SEA starts using the estatus-queue we can stop hiding
-it as each architecture has a user that can't be turned off.
+ghes_read_estatus() checks various lengths in the top-level header to
+ensure the CPER records to be read aren't obviously corrupt.
 
-Split the existing CONFIG_HAVE_ACPI_APEI_NMI block in two, and move
-the SEA code into the gap.
+Take the opportunity to make this more user-friendly, printing a
+(ratelimited) message about the nature of the header format error.
 
-Move the code around ... and changes the stale comment describing
-why the status queue is necessary: printk() is no longer the issue,
-its the helpers like memory_failure_queue() that aren't nmi safe.
-
+Suggested-by: Borislav Petkov <bp@alien8.de>
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- drivers/acpi/apei/ghes.c | 113 ++++++++++++++++++++-------------------
- 1 file changed, 59 insertions(+), 54 deletions(-)
+ drivers/acpi/apei/ghes.c | 46 ++++++++++++++++++++++++++++------------
+ 1 file changed, 32 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index bd58749d31bb..576dce29159d 100644
+index f95db2398dd5..9391fff71344 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -767,66 +767,21 @@ static struct notifier_block ghes_notifier_hed = {
- 	.notifier_call = ghes_notify_hed,
- };
- 
--#ifdef CONFIG_ACPI_APEI_SEA
--static LIST_HEAD(ghes_sea);
--
--/*
-- * Return 0 only if one of the SEA error sources successfully reported an error
-- * record sent from the firmware.
-- */
--int ghes_notify_sea(void)
--{
--	struct ghes *ghes;
--	int ret = -ENOENT;
--
--	rcu_read_lock();
--	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
--		if (!ghes_proc(ghes))
--			ret = 0;
--	}
--	rcu_read_unlock();
--	return ret;
--}
--
--static void ghes_sea_add(struct ghes *ghes)
--{
--	mutex_lock(&ghes_list_mutex);
--	list_add_rcu(&ghes->list, &ghes_sea);
--	mutex_unlock(&ghes_list_mutex);
--}
--
--static void ghes_sea_remove(struct ghes *ghes)
--{
--	mutex_lock(&ghes_list_mutex);
--	list_del_rcu(&ghes->list);
--	mutex_unlock(&ghes_list_mutex);
--	synchronize_rcu();
--}
--#else /* CONFIG_ACPI_APEI_SEA */
--static inline void ghes_sea_add(struct ghes *ghes) { }
--static inline void ghes_sea_remove(struct ghes *ghes) { }
--#endif /* CONFIG_ACPI_APEI_SEA */
--
- #ifdef CONFIG_HAVE_ACPI_APEI_NMI
- /*
-- * printk is not safe in NMI context.  So in NMI handler, we allocate
-- * required memory from lock-less memory allocator
-- * (ghes_estatus_pool), save estatus into it, put them into lock-less
-- * list (ghes_estatus_llist), then delay printk into IRQ context via
-- * irq_work (ghes_proc_irq_work).  ghes_estatus_size_request record
-- * required pool size by all NMI error source.
-+ * Handlers for CPER records may not be NMI safe. For example,
-+ * memory_failure_queue() takes spinlocks and calls schedule_work_on().
-+ * In any NMI-like handler, memory from ghes_estatus_pool is used to save
-+ * estatus, and added to the ghes_estatus_llist. irq_work_queue() causes
-+ * ghes_proc_in_irq() to run in IRQ context where each estatus in
-+ * ghes_estatus_llist is processed.
-+ *
-+ * Memory from the ghes_estatus_pool is also used with the ghes_estatus_cache
-+ * to suppress frequent messages.
-  */
- static struct llist_head ghes_estatus_llist;
- static struct irq_work ghes_proc_irq_work;
- 
--/*
-- * NMI may be triggered on any CPU, so ghes_in_nmi is used for
-- * having only one concurrent reader.
-- */
--static atomic_t ghes_in_nmi = ATOMIC_INIT(0);
--
--static LIST_HEAD(ghes_nmi);
--
- static void ghes_proc_in_irq(struct irq_work *irq_work)
- {
- 	struct llist_node *llnode, *next;
-@@ -949,6 +904,56 @@ static int ghes_in_nmi_spool_from_list(struct list_head *rcu_list)
- 
- 	return ret;
+@@ -293,6 +293,30 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
+ 	}
  }
-+#endif /* CONFIG_HAVE_ACPI_APEI_NMI */
-+
-+#ifdef CONFIG_ACPI_APEI_SEA
-+static LIST_HEAD(ghes_sea);
-+
-+/*
-+ * Return 0 only if one of the SEA error sources successfully reported an error
-+ * record sent from the firmware.
-+ */
-+int ghes_notify_sea(void)
-+{
-+	struct ghes *ghes;
-+	int ret = -ENOENT;
-+
-+	rcu_read_lock();
-+	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
-+		if (!ghes_proc(ghes))
-+			ret = 0;
-+	}
-+	rcu_read_unlock();
-+	return ret;
-+}
-+
-+static void ghes_sea_add(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_add_rcu(&ghes->list, &ghes_sea);
-+	mutex_unlock(&ghes_list_mutex);
-+}
-+
-+static void ghes_sea_remove(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_del_rcu(&ghes->list);
-+	mutex_unlock(&ghes_list_mutex);
-+	synchronize_rcu();
-+}
-+#else /* CONFIG_ACPI_APEI_SEA */
-+static inline void ghes_sea_add(struct ghes *ghes) { }
-+static inline void ghes_sea_remove(struct ghes *ghes) { }
-+#endif /* CONFIG_ACPI_APEI_SEA */
-+
-+#ifdef CONFIG_HAVE_ACPI_APEI_NMI
-+/*
-+ * NMI may be triggered on any CPU, so ghes_in_nmi is used for
-+ * having only one concurrent reader.
-+ */
-+static atomic_t ghes_in_nmi = ATOMIC_INIT(0);
-+
-+static LIST_HEAD(ghes_nmi);
  
- static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
- {
++/* Check the top-level record header has an appropriate size. */
++int __ghes_check_estatus(struct ghes *ghes,
++			 struct acpi_hest_generic_status *estatus)
++{
++	u32 len = cper_estatus_len(estatus);
++
++	if (len < sizeof(*estatus)) {
++		pr_warn_ratelimited(FW_WARN GHES_PFX "Truncated error status block!\n");
++		return -EIO;
++	}
++
++	if (len > ghes->generic->error_block_length) {
++		pr_warn_ratelimited(FW_WARN GHES_PFX "Invalid error status block length!\n");
++		return -EIO;
++	}
++
++	if (cper_estatus_check_header(estatus)) {
++		pr_warn_ratelimited(FW_WARN GHES_PFX "Invalid CPER header!\n");
++		return -EIO;
++	}
++
++	return 0;
++}
++
+ static int ghes_read_estatus(struct ghes *ghes,
+ 			     struct acpi_hest_generic_status *estatus,
+ 			     u64 *buf_paddr, enum fixed_addresses fixmap_idx)
+@@ -319,27 +343,21 @@ static int ghes_read_estatus(struct ghes *ghes,
+ 		return -ENOENT;
+ 	}
+ 
+-	rc = -EIO;
++	rc = __ghes_check_estatus(ghes, estatus);
++	if (rc)
++		return rc;
++
+ 	len = cper_estatus_len(estatus);
+-	if (len < sizeof(*estatus))
+-		goto err_read_block;
+-	if (len > ghes->generic->error_block_length)
+-		goto err_read_block;
+-	if (cper_estatus_check_header(estatus))
+-		goto err_read_block;
+ 	ghes_copy_tofrom_phys(estatus + 1,
+ 			      *buf_paddr + sizeof(*estatus),
+ 			      len - sizeof(*estatus), 1, fixmap_idx);
+-	if (cper_estatus_check(estatus))
+-		goto err_read_block;
+-	rc = 0;
+-
+-err_read_block:
+-	if (rc)
++	if (cper_estatus_check(estatus)) {
+ 		pr_warn_ratelimited(FW_WARN GHES_PFX
+ 				    "Failed to read error status block!\n");
++		return -EIO;
++	}
+ 
+-	return rc;
++	return 0;
+ }
+ 
+ static void ghes_clear_estatus(struct ghes *ghes,
 -- 
 2.20.1
 
