@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ABFCDC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:10:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 90525C282C7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:11:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 73A48214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:10:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4DB6B214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:11:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UuTKZrNC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="djPYXVoI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 73A48214DA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CCozedws";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="kWo7mVpG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4DB6B214DA
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,33 +26,32 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jIzXDXv7+nL9Lt1cPN8/zupp4B4lPqalmfLkiNnP3a4=; b=UuTKZrNCFjztiK
-	2cV3zJd+cif9NrLRUwd8AjeueTBWI/bt6ln3zqvTGClOmhoUztGytgLYY5xzaEz7KT7hD7Pic7hDk
-	rMFs0wMAw2Pv0O/WNfazGQXdYOscdy82GZF7KKT3kSa324VD7WfyxxnghoEPOR1eMRE5RfMhAJQvq
-	CBJPSYnhtePcxHLSLR/zc8CDqiKQgbhj/Lxd6nBLdPTt/edVqmbA0YLYr4Rp+P2sChngC8NNqLApy
-	my4RAZXpBoOhH5GNJalJR6UMh+0y/UOZQ76C8iEfuMJ8BZWsSlcxKzcV8MMDW3c4nblgDd6oK5FBn
-	b3O5pDrxCAaei2iLq7Ug==;
+	List-Owner; bh=dGZke9agrIIVSBnPEEXu0DMbHOR8ocH2tSNsVH9Bf88=; b=CCozedwsoDgPbf
+	QpUfZcr0Duos6OofvVdEPuT1+YSbdmN4X7Z1NDsreFjoKt/f2OMxOlH/mxZxHmqcpbCAxT2hQ/653
+	pkfZgBXDjMx1LagWg/Gk0YDiBvHPk9vaCADtkEFAeZJtxEFSETIsT1B3wyRKifnarW/qyRwGK1xj7
+	Q5oAuxo9NmWyEkO/1BjfdFrZ8QElb8utPj0/ZBJkya3RQQeMsXpPM/Lpzf8jc05e1Muy3HRMN39xw
+	yBxekwGu84gsMR/8uI+9ij1OA32g5nYokHQtDwWoasOlOLcTpvaf99/N+HkfJfRNG+sclx2Yc1zcb
+	Nzn3xNee2xZ7LqPQ5cdA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goOTq-0006gB-Mj; Tue, 29 Jan 2019 08:10:50 +0000
-Received: from mail-db3eur04on0625.outbound.protection.outlook.com
- ([2a01:111:f400:fe0c::625]
- helo=EUR04-DB3-obe.outbound.protection.outlook.com)
+	id 1goOU4-0006tG-4h; Tue, 29 Jan 2019 08:11:04 +0000
+Received: from mail-eopbgr50072.outbound.protection.outlook.com ([40.107.5.72]
+ helo=EUR03-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goOS1-0003tc-Al
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:09:00 +0000
+ id 1goOSL-0004BI-OE
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:09:27 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=PHqR/FXj0HKqNCbtsS5N9hT6szJRQA3lf7JEfN9PluA=;
- b=djPYXVoInQRQ9MesSmaDDYrUTurjG30gI4lZ/Xrr1IK7fDrb5e86E9AL+e5gGqAkpqVnwSbsccIjtg4nx1Uyh70ZiRd3iWml18+NI4FXlWO1rld3YIM2gZkmZZs7nqERJ+nvY3mayerQCansZ3yF02AYkGVrIwKQ+ycHxMxSk80=
+ bh=P5BAdkEhrJMH8+dv8iY2cFT6nVwZnqdMYoU4MGgc9QE=;
+ b=kWo7mVpGgjIcKatGv3ulejT2Lggxwno45mPbksRXnJsqVLrnwrRXJgnPl7Gsh/DKXHho9p4Fuhpws85fyUoP1AbQ/M9VoXL/QA9Zhrs4GK+bSwGqCF7cRg9PcRpBbl5Ss3B70cFAMrmfWBWQHj6lHmxw9Alo+k6E6s9Ub0UozrY=
 Received: from AM6PR04MB5781.eurprd04.prod.outlook.com (20.179.3.19) by
  AM6PR04MB5784.eurprd04.prod.outlook.com (20.179.2.83) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1558.17; Tue, 29 Jan 2019 08:08:53 +0000
+ 15.20.1558.17; Tue, 29 Jan 2019 08:09:13 +0000
 Received: from AM6PR04MB5781.eurprd04.prod.outlook.com
  ([fe80::9c0:e3aa:b41f:9504]) by AM6PR04MB5781.eurprd04.prod.outlook.com
  ([fe80::9c0:e3aa:b41f:9504%3]) with mapi id 15.20.1558.023; Tue, 29 Jan 2019
- 08:08:53 +0000
+ 08:09:13 +0000
 From: "Z.q. Hou" <zhiqiang.hou@nxp.com>
 To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
  "linux-arm-kernel@lists.infradead.org"
@@ -65,11 +64,13 @@ To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
  Leo Li <leoyang.li@nxp.com>, "lorenzo.pieralisi@arm.com"
  <lorenzo.pieralisi@arm.com>, "catalin.marinas@arm.com"
  <catalin.marinas@arm.com>, "will.deacon@arm.com" <will.deacon@arm.com>
-Subject: [PATCHv3 04/27] PCI: mobiveil: remove flag MSI_FLAG_MULTI_PCI_MSI
-Thread-Topic: [PATCHv3 04/27] PCI: mobiveil: remove flag MSI_FLAG_MULTI_PCI_MSI
-Thread-Index: AQHUt6nfsD9iNbAFAUaq30Vq7P8rlA==
-Date: Tue, 29 Jan 2019 08:08:53 +0000
-Message-ID: <20190129080926.36773-5-Zhiqiang.Hou@nxp.com>
+Subject: [PATCHv3 07/27] PCI: mobiveil: use WIN_NUM_0 explicitly for CFG
+ outbound window
+Thread-Topic: [PATCHv3 07/27] PCI: mobiveil: use WIN_NUM_0 explicitly for CFG
+ outbound window
+Thread-Index: AQHUt6nrKxupMxkXJUiatcGFBiTdig==
+Date: Tue, 29 Jan 2019 08:09:12 +0000
+Message-ID: <20190129080926.36773-8-Zhiqiang.Hou@nxp.com>
 References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
 In-Reply-To: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
 Accept-Language: zh-CN, en-US
@@ -86,36 +87,37 @@ x-mailer: git-send-email 2.17.1
 x-originating-ip: [119.31.174.73]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; AM6PR04MB5784;
- 6:3TYroxuSysEb7S9mvRge5Q1tJdiEqxXQYbNKgS/tt+4YZgc4cjGCtMo6sc09T50G6dGpXGhHe+WGs/FHGD/tiZtKRwtyZc9RcHuu9Bo1OLbunSxWfMFucom2TBt8Xe9N1RIYhrF2Efnbr7grcChFmI25toq3R3BHT9yJ5CZ7n4vN3XgPWjbbaGrLPMVYI5VRg0qi5fSNsIF47+7abUPoAxa6yTQeu4mFKfm6IRkn3+Zs/4+xEINMwonnBbAJC6qnlpMRJAMXxWDyMBjg/Bz3i+ud1nM95fgd9nWZyrEAWnVYxnb+mam/rEqSEGCMVatLmYDuktwsEpIRNsAEKCtD4ipRqv8CE4i6CX7YZUM1Nf4vZzEciJErna7IW+JSkAZDbdmVyLwFFF1MAoag2ty881I6foZO+8X0f6LQD+9ztdH4ToNLwLQgzMJhBQD8rsSlKKWFTnDPlEg3/jlnpbEdYQ==;
- 5:Y5+1rHSk7sZ/5DfI4NzrtbNceeAoxlr4CQpmgvCGpjpGBA4H3jR/6DbZdD+5ckXlUcvvLZbEDZ6PBbiewcMxcldOSK3atRTL15NCJyY+RoFRiAJvr9E6fCvUxumzH8g1M1GHnZ+eFd0N3WbBa68CFH8RZR8QIZ5z2HosOMCLzJGbVO9u55zGXAPhDrsQYUn7LtEaUVvR1H45EykvmxOrEw==;
- 7:be0x2ghZsxb6RLd6gTTMZtz/odIZ3ucQlwtfwkF2E/Z5aRG3HzAebnqIxsqkW7jzv00sAkKPSk6LUFPowUyHSStUs5I/Rvd2pmn6InsNOsDivKlHBFgnqAOGriVcoo9/2LOKPakSprOH8zPtVSodSg==
-x-ms-office365-filtering-correlation-id: 4c207ecc-d8a1-41cc-ab29-08d685c10227
+ 6:euk6gOArvVPiaE9GrBUqKpEsw2E85739cEmV23jNgrmKRJ8DErI5dpNF6SQ9HnueTWGUoCthbJPu1c9Y/q7BZ3nn8QFHgOSLLsMm6D54cLq0eWLdIVYdzq7gvqsFefpRdN0Xa9Q0dDuDatlTGbLesOvAIu9FYD7O2aaSguHreNVO/FS6liNP2rluEYOraShT+IuC//TsVFaKR8UyfwtwcperGHAHsFQmDlvhU+uaAtafdwC8DvbOCFfYRSfsgemB0cC5//RPf0EUW4wKnxPiiJX+Kgq6xTeg3/y3c2ZUG+YzIOZIPvCc9bP4ScUubNOQzK/41WMxvnO61L57/y7+AZAMv3eF+G60SKCMxALAtICPF2jJoG3cn38WT16qCSfyYYGDa8U4CXA5PZTSabTxZMx9o5uyJRcOX+OzF1vxXZMbg7ckLeDKpUQ+peUXsiZu4FcV5/q3WaLrilPgBF2xdw==;
+ 5:zl0WcdeZ6BmyBsXCBCw2MiZuY/2o/gJFpDDhCp6YBD21fznFTW5JTGuAPc54bs9CPD6TbyHyDGXaShPyBDlaan6Z8H5yLrlVqdb4B9NmTOJKhqtdwRTzl7XvNf6LNYq+0Tbemt3wkaeM1Y939tJ8wuvQgMpSsYtLMX/X34EnQF2NXrg7e716khndisDltDUncAcMy1bzAN5D1Ev/DS9KjA==;
+ 7:x8WSSiA+Y7irQUXxE+mO3BeU7sAglk30o8Q16buhQnM/yz5z35hVK4AdTyU25ODax9wC0S7ZQDTYJRaAOiev8Pr4MPsfaIZ3/XLSoFihYDibM/nlQZy9XIWFSx0f/g2OKdCNLTQlzg6ep9AdzUFkqw==
+x-ms-office365-filtering-correlation-id: 3bedcdf9-7bee-491f-a347-08d685c10dbd
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:AM6PR04MB5784; 
 x-ms-traffictypediagnostic: AM6PR04MB5784:
-x-microsoft-antispam-prvs: <AM6PR04MB5784E026954BFFE86135C62184970@AM6PR04MB5784.eurprd04.prod.outlook.com>
+x-microsoft-antispam-prvs: <AM6PR04MB5784466B51C2C246BC5B546984970@AM6PR04MB5784.eurprd04.prod.outlook.com>
 x-forefront-prvs: 093290AD39
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(346002)(376002)(366004)(396003)(39860400002)(189003)(199004)(3846002)(105586002)(6506007)(386003)(71200400001)(71190400001)(26005)(305945005)(66066001)(7736002)(106356001)(4326008)(102836004)(4744005)(68736007)(6116002)(2501003)(25786009)(8936002)(8676002)(81166006)(81156014)(50226002)(97736004)(486006)(14444005)(256004)(476003)(99286004)(6436002)(186003)(6486002)(7416002)(2906002)(14454004)(110136005)(1076003)(2201001)(316002)(478600001)(86362001)(53936002)(446003)(36756003)(6512007)(54906003)(76176011)(2616005)(11346002)(52116002)(921003)(1121003);
+ SFS:(10009020)(136003)(346002)(376002)(366004)(396003)(39860400002)(189003)(199004)(3846002)(105586002)(6506007)(386003)(71200400001)(71190400001)(26005)(305945005)(66066001)(7736002)(106356001)(4326008)(102836004)(68736007)(6116002)(2501003)(25786009)(8936002)(8676002)(81166006)(81156014)(50226002)(97736004)(486006)(256004)(476003)(99286004)(6436002)(186003)(6486002)(7416002)(2906002)(14454004)(110136005)(1076003)(2201001)(316002)(478600001)(86362001)(53936002)(446003)(36756003)(6512007)(54906003)(76176011)(2616005)(11346002)(52116002)(921003)(1121003);
  DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB5784;
  H:AM6PR04MB5781.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: 5AdkIXrqf8/MTRRCWs53CB8RF8Z7O+esyu4rtnSFRFQnbonH29oQXcF2AE4RD4wyUvmSDznsyaQ1tkWa+YL2OYddd0UGBitpy0Ap/0CN9CHBkGjUks3OoJRMpvB0k5YQHDW+KigLc9+nYQVIp6/41ZmBKxVHD1fevSYVFZiH4FitA09kmrZqJ8ZLARSxSdJ1xcr8M8dTRLaPPAt5A2WyghIW3IX5Gbr8x8rW//C1/siAXW3xtkJAaqNtkzFhpSDXwWvaO1DRvZKljkMVJW9Pp76gwe4pnwVCShLh4oY/4Ahl8FfnbqXjTrI+A0vhKBJTEnnVwr/JQkV5v9IJueFUsAPgMbkScQOxKuCeKk9dLQqTiVGcd95wvoCesLqjHekoAV0slb7C9+mw3FjO0CBIgRCYOFEFiRXr7VVLLvxAX8Q=
+x-microsoft-antispam-message-info: TudSq1fPlSYq7EKL3IZLoSulGtzf60RtfHdVypPb02ZLW3QFYe5Q4iHcZWBcXkJbCr8kwTnHfA1onT5HLz62ZJUCyFZkihBUS6RLhZrgqwdwxr0w/S1w8XqcXe+C6W54cACS0ZmlKG+1t7eT4WPXwc75l3xEj7b+M3hOVUoKXR5JHw6xg1UeJrtNjC1Civwjm9pEwrcXxSk/gLNRlAwYORXmVIoS7qOg8vOK1i2t+uz8SFsMl7mcQiU57+/DfH5BPYxfv7bej7GJ9RuMK5GY3FQJZwuEeaXUhY5w+k7keV5PAPZU22qO2BWsnFYb2mophGJ8dRuysnd1xb+Hy6v70kzcLWDvYd5nwDc95WhyvLQL5GKIC+ptTZ/txxIxoB/Wr33uIYCPhhdy84CPIBJ82wdcuD0Nt+vYkfw1gY2pYcY=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 4c207ecc-d8a1-41cc-ab29-08d685c10227
-X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 08:08:47.4277 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 3bedcdf9-7bee-491f-a347-08d685c10dbd
+X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 08:09:06.9123 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB5784
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_000857_590419_50294E83 
-X-CRM114-Status: GOOD (  11.50  )
+X-CRM114-CacheID: sfid-20190129_000918_185918_04075DAB 
+X-CRM114-Status: UNSURE (   9.47  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -136,32 +138,35 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-The current code does not support multiple MSIs, so remove
-the corresponding flag from the msi_domain_info structure.
+As the .map_bus() use the WIN_NUM_0 for CFG transactions,
+it's better passing WIN_NUM_0 explicitly when initialize
+the CFG outbound window.
 
-Fixes: 1e913e58335f ("PCI: mobiveil: Add MSI support")
 Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 Reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 ---
 V3:
  - No change
 
- drivers/pci/controller/pcie-mobiveil.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/controller/pcie-mobiveil.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-index 563210e731d3..a0dd337c6214 100644
+index b2cc9c097fc9..df71c11b4810 100644
 --- a/drivers/pci/controller/pcie-mobiveil.c
 +++ b/drivers/pci/controller/pcie-mobiveil.c
-@@ -703,7 +703,7 @@ static struct irq_chip mobiveil_msi_irq_chip = {
+@@ -612,9 +612,8 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+ 	 */
  
- static struct msi_domain_info mobiveil_msi_domain_info = {
- 	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
--		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
-+		   MSI_FLAG_PCI_MSIX),
- 	.chip	= &mobiveil_msi_irq_chip,
- };
+ 	/* config outbound translation window */
+-	program_ob_windows(pcie, pcie->ob_wins_configured,
+-			   pcie->ob_io_res->start, 0, CFG_WINDOW_TYPE,
+-			   resource_size(pcie->ob_io_res));
++	program_ob_windows(pcie, WIN_NUM_0, pcie->ob_io_res->start, 0,
++			   CFG_WINDOW_TYPE, resource_size(pcie->ob_io_res));
  
+ 	/* memory inbound translation window */
+ 	program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
 -- 
 2.17.1
 
