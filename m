@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F00B1C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:10:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ABFCDC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:10:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BC027214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:10:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 73A48214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:10:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kKRr3JHz";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="If737FFE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC027214DA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UuTKZrNC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="djPYXVoI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 73A48214DA
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,32 +26,33 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CThrYSKR2BDhFYqJOFOTKpLDFc//HiNZ3OqmaPlMsGU=; b=kKRr3JHzpr3HB/
-	Un5cvhI84SHeIjP1cIxp2LQ4DBwAKNCuFBfu6Uf6vIIBNKnWI5yKPkfUR5tWs9XuuvHZoqb/Bg8mZ
-	xrIhj0c+WeMn5bXvwzYgln/Tkam2nQst+Izv1Vcq/rE2dS+4/dkVuR80RrUpZ4vBmINz40qxCCNlr
-	cCkEu9m+Ny4XUTTV8YIsW2VFU0sEX5XOVjrWxsnxxR1ssmRO4EWR/6aHOtYeCELlY+Jz3Rh8J7tnH
-	uC/tPTgdsSdg2a+SsVC3WgF764B8GG98lLvbsEq3+XTMxsrf8LU4+MlOYRCAhVjAU9UDhPL4vXsZo
-	rHHJ6G6ZogUshKvBxrZw==;
+	List-Owner; bh=jIzXDXv7+nL9Lt1cPN8/zupp4B4lPqalmfLkiNnP3a4=; b=UuTKZrNCFjztiK
+	2cV3zJd+cif9NrLRUwd8AjeueTBWI/bt6ln3zqvTGClOmhoUztGytgLYY5xzaEz7KT7hD7Pic7hDk
+	rMFs0wMAw2Pv0O/WNfazGQXdYOscdy82GZF7KKT3kSa324VD7WfyxxnghoEPOR1eMRE5RfMhAJQvq
+	CBJPSYnhtePcxHLSLR/zc8CDqiKQgbhj/Lxd6nBLdPTt/edVqmbA0YLYr4Rp+P2sChngC8NNqLApy
+	my4RAZXpBoOhH5GNJalJR6UMh+0y/UOZQ76C8iEfuMJ8BZWsSlcxKzcV8MMDW3c4nblgDd6oK5FBn
+	b3O5pDrxCAaei2iLq7Ug==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goOTa-0006QU-GI; Tue, 29 Jan 2019 08:10:34 +0000
-Received: from mail-eopbgr30081.outbound.protection.outlook.com ([40.107.3.81]
- helo=EUR03-AM5-obe.outbound.protection.outlook.com)
+	id 1goOTq-0006gB-Mj; Tue, 29 Jan 2019 08:10:50 +0000
+Received: from mail-db3eur04on0625.outbound.protection.outlook.com
+ ([2a01:111:f400:fe0c::625]
+ helo=EUR04-DB3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goOSC-00043y-UY
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:09:15 +0000
+ id 1goOS1-0003tc-Al
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:09:00 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=zWRF3y+yIg0qh/YwJ94M3l2NqInYWwQg2bIkHthvH8s=;
- b=If737FFEWxwSRImCF78MBJUGLAzXFXolse9cJThSQLmhg9xrSUc6UmGEAGDNOSwF5Nwh5xw1BvQ8J5WXM/oOZUQD4dwIcunzDVpn7TTZYyzjIEQLSv9YuECida4Eq9w+YpBG47XVwIt8CNQsz2/jRmXyEEARFvTipPL7IZTPTkI=
+ bh=PHqR/FXj0HKqNCbtsS5N9hT6szJRQA3lf7JEfN9PluA=;
+ b=djPYXVoInQRQ9MesSmaDDYrUTurjG30gI4lZ/Xrr1IK7fDrb5e86E9AL+e5gGqAkpqVnwSbsccIjtg4nx1Uyh70ZiRd3iWml18+NI4FXlWO1rld3YIM2gZkmZZs7nqERJ+nvY3mayerQCansZ3yF02AYkGVrIwKQ+ycHxMxSk80=
 Received: from AM6PR04MB5781.eurprd04.prod.outlook.com (20.179.3.19) by
- AM6PR04MB4774.eurprd04.prod.outlook.com (20.177.32.215) with Microsoft SMTP
+ AM6PR04MB5784.eurprd04.prod.outlook.com (20.179.2.83) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1558.21; Tue, 29 Jan 2019 08:09:06 +0000
+ 15.20.1558.17; Tue, 29 Jan 2019 08:08:53 +0000
 Received: from AM6PR04MB5781.eurprd04.prod.outlook.com
  ([fe80::9c0:e3aa:b41f:9504]) by AM6PR04MB5781.eurprd04.prod.outlook.com
  ([fe80::9c0:e3aa:b41f:9504%3]) with mapi id 15.20.1558.023; Tue, 29 Jan 2019
- 08:09:06 +0000
+ 08:08:53 +0000
 From: "Z.q. Hou" <zhiqiang.hou@nxp.com>
 To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
  "linux-arm-kernel@lists.infradead.org"
@@ -64,13 +65,11 @@ To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
  Leo Li <leoyang.li@nxp.com>, "lorenzo.pieralisi@arm.com"
  <lorenzo.pieralisi@arm.com>, "catalin.marinas@arm.com"
  <catalin.marinas@arm.com>, "will.deacon@arm.com" <will.deacon@arm.com>
-Subject: [PATCHv3 06/27] PCI: mobiveil: replace the resource list iteration
- function
-Thread-Topic: [PATCHv3 06/27] PCI: mobiveil: replace the resource list
- iteration function
-Thread-Index: AQHUt6nndQPORYGGqUOoSJ3IZh1Uiw==
-Date: Tue, 29 Jan 2019 08:09:06 +0000
-Message-ID: <20190129080926.36773-7-Zhiqiang.Hou@nxp.com>
+Subject: [PATCHv3 04/27] PCI: mobiveil: remove flag MSI_FLAG_MULTI_PCI_MSI
+Thread-Topic: [PATCHv3 04/27] PCI: mobiveil: remove flag MSI_FLAG_MULTI_PCI_MSI
+Thread-Index: AQHUt6nfsD9iNbAFAUaq30Vq7P8rlA==
+Date: Tue, 29 Jan 2019 08:08:53 +0000
+Message-ID: <20190129080926.36773-5-Zhiqiang.Hou@nxp.com>
 References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
 In-Reply-To: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
 Accept-Language: zh-CN, en-US
@@ -86,37 +85,37 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-mailer: git-send-email 2.17.1
 x-originating-ip: [119.31.174.73]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM6PR04MB4774;
- 6:wptA+bDFKAyyXgd3diLKvznTn3lDwqQP4MD2cVegccD05lDD9v58VU668LzybWdBjQTSHGORtMKgwPnIXpXKyat9WU+6bwyJAqu56cSLrmLRo2QtWqPj/RvZgTyBkvQ/NqWV2SLq9QjLDGnUr2iAx7wtvZ/6xeecgYWEBi5UH/OnNa+fJUxuwvQ/f+TV+ldAshMDAhxxjSUJsKxoECWWz5MpNQn3GeLI/uanpL05yj9UvA+BJTofyLGffMjVEiLGdEm9RbYOavCG0bqIWbm2cURJHUhWMsNlSa2/16xykZstGJYqZRrKv3sKCAOPYNC6rxXniryuWOAdhCJGMWgkDBjFay/QVveZkzor+NwPwDxz9/DdlTZKD/gFypPfI4n852uFRKvlEa7ICDKNE11qlvZFPC0vXuY/RAve2t5n7AVx2shI7M4U6UG/XfvwY6zCoh7SA4jZn6YcOiYBNAahVw==;
- 5:vzvrK2zrftHv3uKk4j2pTu9OOlOrBc/MGNITRCNRBzR9KYCF9Ygfzn6bE6CLhLo5hLce8BTCpiRdl1GWfNLl7esp2I64hKfsiJxg3zRxYdIr0hmp9+ENFJmNucYwbpU6UCFaFuX7pl3LeBz1J+UCA9VzuG5/Ywg/1mVpDDeg86l+X1UgesPJ5gct+apn1L2NfLSCYlxga51dtmStOFSHvg==;
- 7:2BXEJu7fwDYNLRLrRFbkanzbEEMSl6X0e9nNmIU+6VvEZarZp9mkLwpK+vE1+LhS1rFlxbx8LBluc8+ytwBr59Z/zHfRmVHoP1+EIiJ9JuaZPEGPJ6xZMWMd2TWFtv8gOrX/q2BOpvMKnn2/O7mVzQ==
-x-ms-office365-filtering-correlation-id: 1c16e84e-76bb-495f-f456-08d685c109e4
+x-microsoft-exchange-diagnostics: 1; AM6PR04MB5784;
+ 6:3TYroxuSysEb7S9mvRge5Q1tJdiEqxXQYbNKgS/tt+4YZgc4cjGCtMo6sc09T50G6dGpXGhHe+WGs/FHGD/tiZtKRwtyZc9RcHuu9Bo1OLbunSxWfMFucom2TBt8Xe9N1RIYhrF2Efnbr7grcChFmI25toq3R3BHT9yJ5CZ7n4vN3XgPWjbbaGrLPMVYI5VRg0qi5fSNsIF47+7abUPoAxa6yTQeu4mFKfm6IRkn3+Zs/4+xEINMwonnBbAJC6qnlpMRJAMXxWDyMBjg/Bz3i+ud1nM95fgd9nWZyrEAWnVYxnb+mam/rEqSEGCMVatLmYDuktwsEpIRNsAEKCtD4ipRqv8CE4i6CX7YZUM1Nf4vZzEciJErna7IW+JSkAZDbdmVyLwFFF1MAoag2ty881I6foZO+8X0f6LQD+9ztdH4ToNLwLQgzMJhBQD8rsSlKKWFTnDPlEg3/jlnpbEdYQ==;
+ 5:Y5+1rHSk7sZ/5DfI4NzrtbNceeAoxlr4CQpmgvCGpjpGBA4H3jR/6DbZdD+5ckXlUcvvLZbEDZ6PBbiewcMxcldOSK3atRTL15NCJyY+RoFRiAJvr9E6fCvUxumzH8g1M1GHnZ+eFd0N3WbBa68CFH8RZR8QIZ5z2HosOMCLzJGbVO9u55zGXAPhDrsQYUn7LtEaUVvR1H45EykvmxOrEw==;
+ 7:be0x2ghZsxb6RLd6gTTMZtz/odIZ3ucQlwtfwkF2E/Z5aRG3HzAebnqIxsqkW7jzv00sAkKPSk6LUFPowUyHSStUs5I/Rvd2pmn6InsNOsDivKlHBFgnqAOGriVcoo9/2LOKPakSprOH8zPtVSodSg==
+x-ms-office365-filtering-correlation-id: 4c207ecc-d8a1-41cc-ab29-08d685c10227
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM6PR04MB4774; 
-x-ms-traffictypediagnostic: AM6PR04MB4774:
-x-microsoft-antispam-prvs: <AM6PR04MB47748CA9B04E3CB55E7C4EEA84970@AM6PR04MB4774.eurprd04.prod.outlook.com>
+ SRVR:AM6PR04MB5784; 
+x-ms-traffictypediagnostic: AM6PR04MB5784:
+x-microsoft-antispam-prvs: <AM6PR04MB5784E026954BFFE86135C62184970@AM6PR04MB5784.eurprd04.prod.outlook.com>
 x-forefront-prvs: 093290AD39
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(366004)(376002)(396003)(136003)(39860400002)(189003)(199004)(86362001)(2201001)(102836004)(4326008)(305945005)(186003)(478600001)(26005)(7736002)(386003)(14444005)(76176011)(71200400001)(14454004)(25786009)(6506007)(446003)(53936002)(71190400001)(52116002)(1076003)(256004)(11346002)(7416002)(68736007)(81166006)(81156014)(8936002)(316002)(486006)(6436002)(2616005)(8676002)(110136005)(54906003)(3846002)(2501003)(6116002)(99286004)(2906002)(476003)(105586002)(97736004)(36756003)(50226002)(66066001)(6512007)(106356001)(6486002)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB4774;
+ SFS:(10009020)(136003)(346002)(376002)(366004)(396003)(39860400002)(189003)(199004)(3846002)(105586002)(6506007)(386003)(71200400001)(71190400001)(26005)(305945005)(66066001)(7736002)(106356001)(4326008)(102836004)(4744005)(68736007)(6116002)(2501003)(25786009)(8936002)(8676002)(81166006)(81156014)(50226002)(97736004)(486006)(14444005)(256004)(476003)(99286004)(6436002)(186003)(6486002)(7416002)(2906002)(14454004)(110136005)(1076003)(2201001)(316002)(478600001)(86362001)(53936002)(446003)(36756003)(6512007)(54906003)(76176011)(2616005)(11346002)(52116002)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB5784;
  H:AM6PR04MB5781.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: jJT7kXXkQJy10OmSkkGd+ZNb/Ih53KDn1/HuXwKdScwGZKiNtxrrwackMfeCdbCNmzrkRmMmozhtiHFN+wXJtfboJkvh47SZYCTUCydPziZnpLuz5lcW1vYkDn/nyWYXBx0Yrcp3e/09b+TY66wdDH2eO3eRHSoYogQ6h5dPs7kfcMHmBLCs6Bs82o7oR5ZFTFOaaTu1dPwHoObSyaqZSiTewUH0KK090fe7OCaRdEr+w32JIuGJ1wyHaH7vKsI9csL+2J4XB0ggwWagTIZa1WFR198au6bRrTZcOgfWCMLoPcOmm1TamYO6FqXMEXkDTWhY81W6hrR/2chUJ8RIv3e5a5zWCx2Hv/m+60jGofj19QtO9rikfsuiv8+eqx2JYQSPCU+gJaZIlnQZ409vk8XgXmAagn50SbGN8kvt4E8=
+x-microsoft-antispam-message-info: 5AdkIXrqf8/MTRRCWs53CB8RF8Z7O+esyu4rtnSFRFQnbonH29oQXcF2AE4RD4wyUvmSDznsyaQ1tkWa+YL2OYddd0UGBitpy0Ap/0CN9CHBkGjUks3OoJRMpvB0k5YQHDW+KigLc9+nYQVIp6/41ZmBKxVHD1fevSYVFZiH4FitA09kmrZqJ8ZLARSxSdJ1xcr8M8dTRLaPPAt5A2WyghIW3IX5Gbr8x8rW//C1/siAXW3xtkJAaqNtkzFhpSDXwWvaO1DRvZKljkMVJW9Pp76gwe4pnwVCShLh4oY/4Ahl8FfnbqXjTrI+A0vhKBJTEnnVwr/JQkV5v9IJueFUsAPgMbkScQOxKuCeKk9dLQqTiVGcd95wvoCesLqjHekoAV0slb7C9+mw3FjO0CBIgRCYOFEFiRXr7VVLLvxAX8Q=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 1c16e84e-76bb-495f-f456-08d685c109e4
-X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 08:09:00.4747 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 4c207ecc-d8a1-41cc-ab29-08d685c10227
+X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 08:08:47.4277 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB4774
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB5784
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_000909_768509_8CEDACAC 
-X-CRM114-Status: GOOD (  10.11  )
+X-CRM114-CacheID: sfid-20190129_000857_590419_50294E83 
+X-CRM114-Status: GOOD (  11.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -137,41 +136,32 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-As it won't delete any node in this iteration, replaced
-the function resource_list_for_each_entry_safe() with
-the resource_list_for_each_entry().
+The current code does not support multiple MSIs, so remove
+the corresponding flag from the msi_domain_info structure.
 
+Fixes: 1e913e58335f ("PCI: mobiveil: Add MSI support")
 Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 Reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 ---
 V3:
  - No change
 
- drivers/pci/controller/pcie-mobiveil.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/pci/controller/pcie-mobiveil.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-index 8ff873023b5f..b2cc9c097fc9 100644
+index 563210e731d3..a0dd337c6214 100644
 --- a/drivers/pci/controller/pcie-mobiveil.c
 +++ b/drivers/pci/controller/pcie-mobiveil.c
-@@ -569,7 +569,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- {
- 	u32 value, pab_ctrl, type;
- 	int err;
--	struct resource_entry *win, *tmp;
-+	struct resource_entry *win;
+@@ -703,7 +703,7 @@ static struct irq_chip mobiveil_msi_irq_chip = {
  
- 	err = mobiveil_bringup_link(pcie);
- 	if (err) {
-@@ -620,7 +620,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- 	program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
+ static struct msi_domain_info mobiveil_msi_domain_info = {
+ 	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+-		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
++		   MSI_FLAG_PCI_MSIX),
+ 	.chip	= &mobiveil_msi_irq_chip,
+ };
  
- 	/* Get the I/O and memory ranges from DT */
--	resource_list_for_each_entry_safe(win, tmp, &pcie->resources) {
-+	resource_list_for_each_entry(win, &pcie->resources) {
- 		if (resource_type(win->res) == IORESOURCE_MEM)
- 			type = MEM_WINDOW_TYPE;
- 		else if (resource_type(win->res) == IORESOURCE_IO)
 -- 
 2.17.1
 
