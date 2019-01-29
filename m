@@ -3,97 +3,83 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A22E4C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 10:43:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5F493C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 10:55:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 726E02148E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 10:43:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2BEEE20844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 10:55:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bXX8e8Dd";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="C+nCPt/l";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="KXjhPqYb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 726E02148E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WeB84Tyc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2BEEE20844
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jp.fujitsu.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kqKUKxDTSPv3mYuFmk+6jNzjU6Tkn5QI/otVFIZ20YQ=; b=bXX8e8DdYP2KVj
-	gUvd7vICDp5P6qJgmJGKntixNEWgi9YO7s0Xldg4FZx/NNocPiShkiqTzmX8QQ6kXWtS1v0xPbLWU
-	+njfFY+u2B59lvD3Cc1FEojDfIFONMDftOCSc/VdS823u4eOQ0gt3V6NCfrVAbUxHHjAXX389qcfs
-	BzfTSVqTSyfJOGsbLel4G/JU+pEWYmKawyQ79XmEvzewi1y9uoVHj++lh6SMxRimzAlHF0ObYLtGH
-	YsXjauBaaFOS/kgXGts8svvpg5oYcCiCD6H0D2yZKC1aeo3kMQ+5x8NxVZkKreWaDyzv+Vm0k7TVI
-	qw8RG/BjcgyFRHTbfA+A==;
+	List-Owner; bh=RpqSpn5bBENVEim+UXxqTUFe0Pvo4bpySjdDjasz4rc=; b=WeB84TyckRdiYh
+	mh4El1rpyrd6prSkssuZZTzazI+0WNvtnQ2lzcs/Z0QRqtG/kA7cxJCfWASi6U20n2LFxWpDlrtsJ
+	Vm7cA8ez4SsDgkhrl7iP/8SP7d6a818GSgOa7LZpLbsI6J00S+cnTShhxke68MOFOZbmA8vW1hXK6
+	K5q7qginZBgnYMZFLGMeLA4QHpQtkLe3MmhKqeARo5s24jwZyaMHaU4wJvKbDaK55u1D7p64lhhHI
+	oYJOh+rRjAvaXhUl3Qj+fp2hwe0BqjHDSXD3B9jO4zo+pfORtLOx3+Wa3/XTvGRadqyrM4HjMljEi
+	XUurZ829vybYCJpik72w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goQrb-0001Kg-Qb; Tue, 29 Jan 2019 10:43:31 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1goR2m-0005Uw-Tx; Tue, 29 Jan 2019 10:55:04 +0000
+Received: from mgwym04.jp.fujitsu.com ([211.128.242.43])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goQrX-0001K0-41
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 10:43:29 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 7D53B60850; Tue, 29 Jan 2019 10:43:26 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548758606;
- bh=b8SkCNRhjNOfUi0XfdquRN5VpBwkG9P4jLXAjsvZQdQ=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=C+nCPt/lF+oxnenPcKCFA5OZAp4MhujiewCbiXiq45IAmoveM+T2Qfj6DJXywNIyc
- ks6DYG4wSrgRiADLjRbIZRElnLeN5jXRlSLLzjvYsnG4GLazNPRCvegzzSWx7tJA5c
- KlJXxU4lDUJuKl2WUyaxGsr+Mc0Z4H5JUyfUIv7E=
-Received: from mail-ed1-f51.google.com (mail-ed1-f51.google.com
- [209.85.208.51])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: vivek.gautam@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 6D1FA609D1
+ id 1goR2h-0005OD-O0
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 10:55:01 +0000
+Received: from yt-mxoi1.gw.nic.fujitsu.com (unknown [192.168.229.67]) by
+ mgwym04.jp.fujitsu.com with smtp
+ id 72fe_4f90_13cc3859_cf4e_497e_ab0a_2334c95ef8e2;
+ Tue, 29 Jan 2019 19:54:54 +0900
+Received: from g01jpfmpwkw02.exch.g01.fujitsu.local
+ (g01jpfmpwkw02.exch.g01.fujitsu.local [10.0.193.56])
+ by yt-mxoi1.gw.nic.fujitsu.com (Postfix) with ESMTP id 02832AC0124
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 10:43:25 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548758605;
- bh=b8SkCNRhjNOfUi0XfdquRN5VpBwkG9P4jLXAjsvZQdQ=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=KXjhPqYbcmmPih5E5qJpApgRkwMj/jHrkpaTUTqTgQsXD8mMWLDAMeZ5Li1WWXG2V
- NFebdVUSMVeSKcQglGyAOYpR3gkOI46YRGJHfGTP8KKjuxi9CVeeno15UA1SexdY98
- g6lkef0tX/E/IkoSxbNvuHg94hKSPziV/QKzE4hQ=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 6D1FA609D1
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=vivek.gautam@codeaurora.org
-Received: by mail-ed1-f51.google.com with SMTP id d39so15538324edb.12
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 02:43:25 -0800 (PST)
-X-Gm-Message-State: AJcUukekyAeKmWD/6yggtv9XI1bbM6rKgEKZDVIX5IF4XMwGlw5Xjn7a
- +aYvmrORZq3FPAcprhau/0jt/HgXZb8c+8aA5F8=
-X-Google-Smtp-Source: ALg8bN4wRRQQdDYNNzhSv9KBKIAwkqmbUvcI5Sz6uW5VBaUr5b2J+z2xBius0AjqsCH1Rj0DiXBmii/VvjNGJg/6EoM=
-X-Received: by 2002:a17:906:452:: with SMTP id
- e18mr11493850eja.142.1548758604052; 
- Tue, 29 Jan 2019 02:43:24 -0800 (PST)
+ Tue, 29 Jan 2019 19:54:54 +0900 (JST)
+Received: from G01JPEXCHKW14.g01.fujitsu.local
+ (G01JPEXCHKW14.g01.fujitsu.local [10.0.194.53])
+ by g01jpfmpwkw02.exch.g01.fujitsu.local (Postfix) with ESMTP id CDA043286EE;
+ Tue, 29 Jan 2019 19:54:52 +0900 (JST)
+Received: from G01JPEXMBKW03.g01.fujitsu.local ([10.0.194.67]) by
+ g01jpexchkw14 ([10.0.194.53]) with mapi id 14.03.0415.000; Tue, 29 Jan 2019
+ 19:54:52 +0900
+From: "Zhang, Lei" <zhang.lei@jp.fujitsu.com>
+To: 'Catalin Marinas' <catalin.marinas@arm.com>
+Subject: RE: [PATCH v2 1/1] arm64: Add workaround for Fujitsu A64FX erratum
+ 010001
+Thread-Topic: [PATCH v2 1/1] arm64: Add workaround for Fujitsu A64FX erratum
+ 010001
+Thread-Index: AdSyLRrS1IDcSdJoRF6WCq7/B3VdwACYGWwAAMw1BtA=
+Date: Tue, 29 Jan 2019 10:54:51 +0000
+Message-ID: <8898674D84E3B24BA3A2D289B872026A6A2C03E0@G01JPEXMBKW03>
+References: <8898674D84E3B24BA3A2D289B872026A6A2A32D6@G01JPEXMBKW03>
+ <8898674D84E3B24BA3A2D289B872026A6A2A32EB@G01JPEXMBKW03>
+ <20190125180813.GM25901@arrakis.emea.arm.com>
+In-Reply-To: <20190125180813.GM25901@arrakis.emea.arm.com>
+Accept-Language: ja-JP, en-US
+Content-Language: ja-JP
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-securitypolicycheck: OK by SHieldMailChecker v2.2.3
+x-shieldmailcheckerpolicyversion: FJ-ISEC-20140219
+x-originating-ip: [10.18.70.198]
 MIME-Version: 1.0
-References: <20190117092718.1396-1-vivek.gautam@codeaurora.org>
- <20190117092718.1396-3-vivek.gautam@codeaurora.org>
- <20190120000117.GH26876@brain-police>
- <CAFp+6iFh26JgBUx1jkm4EHNY1vs93Uz2qngxP27D0f7dcpX2GQ@mail.gmail.com>
- <20190122054326.GA6445@brain-police>
-In-Reply-To: <20190122054326.GA6445@brain-police>
-From: Vivek Gautam <vivek.gautam@codeaurora.org>
-Date: Tue, 29 Jan 2019 16:13:12 +0530
-X-Gmail-Original-Message-ID: <CAFp+6iHJ_Ctjh8-y8p4KWGrCVHE+1uv3KX2-rfKkt1uqb0YqHA@mail.gmail.com>
-Message-ID: <CAFp+6iHJ_Ctjh8-y8p4KWGrCVHE+1uv3KX2-rfKkt1uqb0YqHA@mail.gmail.com>
-Subject: Re: [PATCH 2/2] iommu/arm-smmu: Add support for non-coherent page
- table mappings
-To: Will Deacon <will.deacon@arm.com>
+X-SecurityPolicyCheck-GC: OK by FENCE-Mail
+X-TM-AS-MML: disable
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_024327_220335_78694B09 
-X-CRM114-Status: GOOD (  24.06  )
+X-CRM114-CacheID: sfid-20190129_025500_030820_0EC91162 
+X-CRM114-Status: UNSURE (   8.65  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,77 +91,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,
- Joerg Roedel <joro@8bytes.org>, " <iommu@lists.linux-foundation.org>,
- Robin Murphy <robin.murphy@arm.com>, open list <linux-kernel@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: 'Mark Rutland' <mark.rutland@arm.com>,
+ "'will.deacon@arm.com'" <will.deacon@arm.com>,
+ "'linux-kernel@vger.kernel.org'" <linux-kernel@vger.kernel.org>,
+ "'linux-arm-kernel@lists.infradead.org'"
+ <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="iso-2022-jp"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Will,
-
-On Tue, Jan 22, 2019 at 11:14 AM Will Deacon <will.deacon@arm.com> wrote:
->
-> On Mon, Jan 21, 2019 at 11:35:30AM +0530, Vivek Gautam wrote:
-> > On Sun, Jan 20, 2019 at 5:31 AM Will Deacon <will.deacon@arm.com> wrote:
-> > > On Thu, Jan 17, 2019 at 02:57:18PM +0530, Vivek Gautam wrote:
-> > > > Adding a device tree option for arm smmu to enable non-cacheable
-> > > > memory for page tables.
-> > > > We already enable a smmu feature for coherent walk based on
-> > > > whether the smmu device is dma-coherent or not. Have an option
-> > > > to enable non-cacheable page table memory to force set it for
-> > > > particular smmu devices.
-> > >
-> > > Hmm, I must be missing something here. What is the difference between this
-> > > new property, and simply omitting dma-coherent on the SMMU?
-> >
-> > So, this is what I understood from the email thread for Last level
-> > cache support -
-> > Robin pointed to the fact that we may need to add support for setting
-> > non-cacheable
-> > mappings in the TCR.
-> > Currently, we don't do that for SMMUs that omit dma-coherent.
-> > We rely on the interconnect to handle the configuration set in TCR,
-> > and let interconnect
-> > ignore the cacheability if it can't support.
->
-> I think that's a bug. With that fixed, can you get what you want by omitting
-> "dma-coherent"?
-
-Based on the discussion on the first patch in this series [1], I can
-update the series.
-First thing can be -
-if QUIRK_NO_DMA is set (i.e. the IOMMU _is_ coherent) then we use a
-cacheable TCR;
-So, we may need an additional check for this when setting the TCR.
-
-For the second case -
-IOMMUs that are *not* coherent, i.e ones that are omitting
-'dma-coherent' property,
-anyways have to access the page table directly from memory. We take
-care of the CPU
-side of this by allocating non-coherent memory, and making sure that we sync the
-PTEs from map call.
-Shouldn't we mark TCR for these IOMMUs as non-cacheable for inner and outer
-cacheability attribute?
+Hi Catalin,
+> -----Original Message-----
+> From: linux-arm-kernel
+> [mailto:linux-arm-kernel-bounces@lists.infradead.org] On Behalf Of
+> Catalin Marinas
+> Sent: Saturday, January 26, 2019 3:08 AM
+> To: Zhang, Lei/張 雷
+> Cc: 'Mark Rutland'; 'will.deacon@arm.com';
+> 'linux-kernel@vger.kernel.org';
+> 'linux-arm-kernel@lists.infradead.org'
+> Subject: Re: [PATCH v2 1/1] arm64: Add workaround for Fujitsu A64FX
+> erratum 010001
+> 
+> IIUC, this can happen very early when the errata framework isn't yet
+> ready. Given that this is not on a fast path (you already took a fault),
+> I don't think it's worth optimising for cpus_have_cap() (and
+> ARM64_WORKAROUND_FUJITSU_A64FX_0100001). I've seen Mark's comments on
+> why checking MIDR in a preemptible context is not a good idea but I
+> suspect your platform is homogeneous (i.e. not big.LITTLE).
+Thanks for comment.
+I will post a new patch to resolve fast path problem in today.
+By the way our platform is homogeneous.
 
 
-[1] https://lore.kernel.org/patchwork/patch/1032939/
+Best Regards,
+Lei Zhang
+zhang.lei@jp.fujitsu.com
 
-Regards
-Vivek
+ 
 
->
-> Will
-
-
-
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
 
 _______________________________________________
 linux-arm-kernel mailing list
