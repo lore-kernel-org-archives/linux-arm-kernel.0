@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7E0ACC282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:23:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 49E81C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:23:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4EFC620882
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:23:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 07D1720882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:23:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p8PsSqxb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4EFC620882
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lV4KZzSC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 07D1720882
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mleia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cfpWRYXf3EpeidgjWOaxShlep22a86nTIntkHpGu6iA=; b=p8PsSqxbD4BFx6
-	4QpC3234HnwZwfLEejk1jcGfoqnJYql4onA6TqnMSHeGSbDSa2G/+1lLheTEwTPsh76qfh8gvQFhF
-	+Z3yDM9WLwHpy4k5Q0FTYo6fL0a0wC/f+3Op/jy6yNarqJRmqW038Z02tUt9clchJAk+SgAmfWQ6V
-	E0HOix4k1QeWvbyxV/yS/C4DVw+4Dwu3odhvoy9LK7+jydivewZTz+LMyXWN4OR6E+GsnOkhom3pV
-	h28laa/iCasmVobQ/GfIUJdNh8nasTRG69YLotFWydQw0GllUqcQ19+OKecRMZdIF7M4BlXk2npYz
-	2Ckgy7EoZUcM9yFIxoQA==;
+	List-Owner; bh=vjZC1U7/sBJv8kXH7E/H8t0uoS7u7rVc58K6EIZVWZ4=; b=lV4KZzSCl0e7ma
+	3r5r6dQyNGzvSoRjkPs/HHt/qysuHibU7lf29ns1VHJaz62QcZKKGbGiAclmveQ8Vr8y4hBLMCqMN
+	kjjAKR0F9erOAdXoqE2N/+BLf/wh7Jq554jp/ewYV1WfdZ5LuOZYbl5XG1o79NneUYl0GSJamD4JS
+	6lOBCQA/AFf9Wsw9tSKZ4nqmdNMPk9/Wp0/veWceaoxzuEmPCmSR9HTkkjkb9opAHaVNrnrbENl2w
+	6r+fAf6d1KEQawK6yZTUOnjmMmDbaKrGfYnJ9QevtDb/efcYA5lZgh5tiCMEItI5pRqX3wRikpgAy
+	JzagqdT0t9EbQV1o+XkA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goYyl-00042I-H8; Tue, 29 Jan 2019 19:23:27 +0000
+	id 1goYyz-0004H3-Jh; Tue, 29 Jan 2019 19:23:41 +0000
 Received: from mleia.com ([178.79.152.223] helo=mail.mleia.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goYwV-0001pq-Ip
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 19:21:10 +0000
+ id 1goYwP-0001o6-14
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 19:21:06 +0000
 Received: from mail.mleia.com (localhost [127.0.0.1])
- by mail.mleia.com (Postfix) with ESMTP id 6858043EF2F;
- Tue, 29 Jan 2019 19:21:02 +0000 (GMT)
+ by mail.mleia.com (Postfix) with ESMTP id DB09843EF1D;
+ Tue, 29 Jan 2019 19:20:57 +0000 (GMT)
 From: Vladimir Zapolskiy <vz@mleia.com>
 To: Sylvain Lemieux <slemieux.tyco@gmail.com>,
  Russell King <linux@armlinux.org.uk>
-Subject: [PATCH 11/13] ARM: dts: lpc32xx: ea3250: beautify gpio keys children
- nodes
-Date: Tue, 29 Jan 2019 21:20:47 +0200
-Message-Id: <20190129192049.11223-12-vz@mleia.com>
+Subject: [PATCH 03/13] ARM: dts: lpc32xx: fix ARM PrimeCell LCD controller
+ variant
+Date: Tue, 29 Jan 2019 21:20:39 +0200
+Message-Id: <20190129192049.11223-4-vz@mleia.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190129192049.11223-1-vz@mleia.com>
 References: <20190129192049.11223-1-vz@mleia.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-49551924 
-X-CRM114-CacheID: sfid-20190129_192102_449457_09F698E6 
-X-CRM114-Status: GOOD (  10.95  )
+X-CRM114-CacheID: sfid-20190129_192057_918393_AAD9197A 
+X-CRM114-Status: GOOD (  11.71  )
+/bin/ln: failed to access
+ 'reaver_cache/texts/20190129_192057_918393_AAD9197A': No such file or
+ directory
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_192102_449457_09F698E6 
-X-CRM114-Status: UNSURE (   9.69  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190129_192057_918393_AAD9197A 
+X-CRM114-Status: GOOD (  11.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,98 +79,29 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Regarding the 'gpio_keys' device node a dtc reports a couple of
-warnings:
+ARM PrimeCell PL111 LCD controller is found on On NXP LPC3230
+and LPC3250 SoCs variants, the original reference in compatible
+property to an older one ARM PrimeCell PL110 is invalid.
 
-  Warning (avoid_unnecessary_addr_size): /gpio_keys: unnecessary
-  #address-cells/#size-cells without "ranges" or child "reg" property
-
-  Warning (unit_address_vs_reg): /gpio_keys/button@21: node has
-  a unit name, but no reg property
-
-The change fixes these issues and adds empty lines between adjacent
-children device nodes. The device node itself is renamed by substituting
-an underscore by hyphen to follow the standard naming convention
-of device tree nodes.
-
+Fixes: e04920d9efcb3 ("ARM: LPC32xx: DTS files for device tree conversion")
 Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- arch/arm/boot/dts/lpc3250-ea3250.dts | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/lpc32xx.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/lpc3250-ea3250.dts b/arch/arm/boot/dts/lpc3250-ea3250.dts
-index ef6b3e74cd9f..f46a11827ef6 100644
---- a/arch/arm/boot/dts/lpc3250-ea3250.dts
-+++ b/arch/arm/boot/dts/lpc3250-ea3250.dts
-@@ -23,56 +23,64 @@
- 		reg = <0x80000000 0x4000000>;
- 	};
+diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
+index 4f8f671c3343..cfd422e7f774 100644
+--- a/arch/arm/boot/dts/lpc32xx.dtsi
++++ b/arch/arm/boot/dts/lpc32xx.dtsi
+@@ -139,7 +139,7 @@
+ 		};
  
--	gpio_keys {
-+	gpio-keys {
- 		compatible = "gpio-keys";
--		#address-cells = <1>;
--		#size-cells = <0>;
- 		autorepeat;
--		button@21 {
-+
-+		button {
- 			label = "Interrupt Key";
- 			linux,code = <103>;
- 			gpios = <&gpio 4 1 0>; /* GPI_P3 1 */
- 		};
-+
- 		key1 {
- 			label = "KEY1";
- 			linux,code = <1>;
- 			gpios = <&pca9532 0 0>;
- 		};
-+
- 		key2 {
- 			label = "KEY2";
- 			linux,code = <2>;
- 			gpios = <&pca9532 1 0>;
- 		};
-+
- 		key3 {
- 			label = "KEY3";
- 			linux,code = <3>;
- 			gpios = <&pca9532 2 0>;
- 		};
-+
- 		key4 {
- 			label = "KEY4";
- 			linux,code = <4>;
- 			gpios = <&pca9532 3 0>;
- 		};
-+
- 		joy0 {
- 			label = "Joystick Key 0";
- 			linux,code = <10>;
- 			gpios = <&gpio 2 0 0>; /* P2.0 */
- 		};
-+
- 		joy1 {
- 			label = "Joystick Key 1";
- 			linux,code = <11>;
- 			gpios = <&gpio 2 1 0>; /* P2.1 */
- 		};
-+
- 		joy2 {
- 			label = "Joystick Key 2";
- 			linux,code = <12>;
- 			gpios = <&gpio 2 2 0>; /* P2.2 */
- 		};
-+
- 		joy3 {
- 			label = "Joystick Key 3";
- 			linux,code = <13>;
- 			gpios = <&gpio 2 3 0>; /* P2.3 */
- 		};
-+
- 		joy4 {
- 			label = "Joystick Key 4";
- 			linux,code = <14>;
+ 		clcd: clcd@31040000 {
+-			compatible = "arm,pl110", "arm,primecell";
++			compatible = "arm,pl111", "arm,primecell";
+ 			reg = <0x31040000 0x1000>;
+ 			interrupts = <14 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&clk LPC32XX_CLK_LCD>;
 -- 
 2.20.1
 
