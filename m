@@ -2,66 +2,104 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 24C8EC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 21:32:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 963C3C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 21:41:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DE04E2087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 21:32:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 626B020882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 21:41:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cV06GyEg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DE04E2087E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y0vrpJvO";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=ndufresne-ca.20150623.gappssmtp.com header.i=@ndufresne-ca.20150623.gappssmtp.com header.b="vfYGx4D6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 626B020882
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ndufresne.ca
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=JJhzRP0MHphX4nLPVFE2nErWET4CRDLTloK+Xv/DVh0=; b=cV06GyEgorWP1a
-	wV1Ig4/waGgFP9HQOQQB6QkJ5IuE7yFaeYARbg73QY0O5Q32OC/TjEG4cA0Gfive+27/Gqp9KuWHv
-	S9Is2A/E8khcKD3EUMx794aRXqoUFYDP18BxltYwFv9polhjmjUEJ9NcE6TuBw1gWqcVcArnFRqpH
-	wunSh+m4yV5/GHsjhtVL6IvJPh8BkQc31d4jdaTcI+ZV8D5gWu5h89ZYz96kITueNPruk8pBBmygd
-	lmbNtN3SYFg2vJcq6Mqb/kLZUvAeUnMpvbR5cexOOKIytRxCBErSL4V9ssL+2E2hcMw6JTm2n2LMU
-	GG+vv256z/NRfImYwdAQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	Mime-Version:References:In-Reply-To:Date:To:From:Subject:Message-ID:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=ZBZdCOPQf4av3/TaMlMv5ueYmGNxPh+rj2IyKF0WzsI=; b=Y0vrpJvOWZM1nHmOLFsjewEOD
+	T4wjbRxx51cSXeBSd35+7v+JzGHIfneuhKUlPLIZBDslk17jBQ58u0rrS+tHSW5QDfl/5f7WieLNj
+	76P1VhdZ83Yc4DYFher8hH5pTZMGinx5j15uwQfMMz2W2Gx/3oYjbYbKTlBW5vHImggbFT2bEQREh
+	8aE/q8aH3hyOvUqV75ZyeurPKSLygyUtj7z8BC0xBCyoAkMFjb8CJCFchQvpKf932VudIQHJ6shnw
+	PM3IWxnV+t5fNrNC61BBNTlIE4kutSwZVcRVIs6VdurzwLzSWpN47N4WjY5ZJnrA1YjrhzYhU0t7L
+	FafrlY1Ew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goazf-0003eY-Ma; Tue, 29 Jan 2019 21:32:31 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goazb-0003ds-Pn
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 21:32:29 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E0C87EBD;
- Tue, 29 Jan 2019 13:32:26 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D03643F59C;
- Tue, 29 Jan 2019 13:32:25 -0800 (PST)
-Date: Tue, 29 Jan 2019 21:32:23 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Andre Przywara <andre.przywara@arm.com>
-Subject: Re: [PATCH 1/2] KVM: arm/arm64: Add save/restore support for
- firmware workaround state
-Message-ID: <20190129213223.GB3567@e103592.cambridge.arm.com>
-References: <20190107120537.184252-1-andre.przywara@arm.com>
- <20190107120537.184252-2-andre.przywara@arm.com>
- <20190122151714.GG3578@e103592.cambridge.arm.com>
- <20190125144657.3db91c91@donnerap.cambridge.arm.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190125144657.3db91c91@donnerap.cambridge.arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+	id 1gob8d-0006ij-7S; Tue, 29 Jan 2019 21:41:47 +0000
+Received: from mail-qt1-x843.google.com ([2607:f8b0:4864:20::843])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gob8Y-0006hC-Om
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 21:41:44 +0000
+Received: by mail-qt1-x843.google.com with SMTP id i7so24011848qtj.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 29 Jan 2019 13:41:39 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=ndufresne-ca.20150623.gappssmtp.com; s=20150623;
+ h=message-id:subject:from:to:cc:date:in-reply-to:references
+ :user-agent:mime-version;
+ bh=p8xnOvZSHMvDSgZGAc1wzQUwKncdi8WTrdqxIvluZ0o=;
+ b=vfYGx4D6OZSneIa7NZOJF9VhGjHOCtSSkHQyiAvEeG4tFMUixTqqEVi5FzWSUxFiFp
+ rg0/BVEs/WVS/SPPolQsI/UwEMXfc/FVCxrXW9W0SgM2jluoSUHazATW5bGRAvkRGMOp
+ vM6vXENljThoz2uzjjCqj4puk3H9QKpEx22Z4lzi5tzczZC0NO5Hasbm00Ar5T74iZjr
+ BW3BKxE0V85uSntDWII+gx1LClNcqmW4/0QLFE9bfIoRrQ/Ty2jynf47P/KwJ741iVCN
+ 7Oaf3VpNFfZ5DhGiVwj74XN9XBNi7co9RzeOwVtSZGNM+0weTI6+kDfe4yw8msHu4dzN
+ bIIQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:message-id:subject:from:to:cc:date:in-reply-to
+ :references:user-agent:mime-version;
+ bh=p8xnOvZSHMvDSgZGAc1wzQUwKncdi8WTrdqxIvluZ0o=;
+ b=RcuB8bd2h170YkM27rgfSzTVjrM4lyyQrWOqMwDMuvJacQ558HIEaUatSTcvFykV1c
+ ypdvb5dDKoGozDoxhgARp1lftWntguUSxcO6dgZUUg2Ka5KUy/uBbpFbrmDDeraxfzGu
+ AKbPcmayTyTJVdLeO97nqn0/YKOMY2rDLt2kxaklFFhs08jt0owWUeY+d9Xdr89625vi
+ M/gT+J+DmLMl5ufpvydLf0EpDkIdStPOgDjSOURX2kXzaJECKmPjmDRoqUKkrOcqB0Ro
+ Mo435g7PM9sEH3NE4prPsnMGAo5qkQ+Qcz4r5RF3yx5624BfwNIxc4Wm2tlBp+wXWSjK
+ h9jQ==
+X-Gm-Message-State: AJcUukdP7lCKwoctnOHFhXBiU1sNHxXaG2VmZeuNJ+wLhbrP5hzejQD2
+ 0v/RcGgrj8w+0fiebrbSEFsP7A==
+X-Google-Smtp-Source: ALg8bN60yPISFL3544dT/MqkG6QDr9VICZrPdWezny+OX7W1Ga8ij8CSzpschO4sUxnVEu3jJff5pw==
+X-Received: by 2002:a0c:d792:: with SMTP id z18mr26408815qvi.183.1548798098924; 
+ Tue, 29 Jan 2019 13:41:38 -0800 (PST)
+Received: from tpx230-nicolas.collaboramtl
+ (modemcable154.55-37-24.static.videotron.ca. [24.37.55.154])
+ by smtp.gmail.com with ESMTPSA id r47sm84192955qtc.77.2019.01.29.13.41.36
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 29 Jan 2019 13:41:38 -0800 (PST)
+Message-ID: <2442b23d3b0a00c1bd441298a712888e016acf92.camel@ndufresne.ca>
+Subject: Re: [linux-sunxi] [PATCH v2 1/2] media: v4l: Add definitions for
+ the HEVC slice format and controls
+From: Nicolas Dufresne <nicolas@ndufresne.ca>
+To: Alexandre Courbot <acourbot@chromium.org>, Paul Kocialkowski
+ <paul.kocialkowski@bootlin.com>
+Date: Tue, 29 Jan 2019 16:41:35 -0500
+In-Reply-To: <CAPBb6MUJu3cX9A-E32bSSjxc1cvGP83ayzZzUxa5_QMf6niK4g@mail.gmail.com>
+References: <20181123130209.11696-1-paul.kocialkowski@bootlin.com>
+ <20181123130209.11696-2-paul.kocialkowski@bootlin.com>
+ <5515174.7lFZcYkk85@jernej-laptop>
+ <ffe9c81db34b599f675ca5bbf02de360bf0a1608.camel@bootlin.com>
+ <776e63c9-d4a5-342a-e0f7-200ef144ffc4@rock-chips.com>
+ <64c793e08d61181b78125b3956ec38623fa5d261.camel@bootlin.com>
+ <D8005130-F7FD-4CBD-8396-1BB08BB08E81@soulik.info>
+ <f982ef378a8ade075bc7077b93640e20ecebf9f4.camel@bootlin.com>
+ <82FA0C3F-BC54-4D89-AECB-90D81B89B1CE@soulik.info>
+ <c3619a00-17e7-fb92-a427-a7478b96f356@soulik.info>
+ <bdf14f97e98f2fd06307545ab9038ac3c2086ae7.camel@bootlin.com>
+ <42520087-4EAE-4F7F-BCA0-42E422170E91@soulik.info>
+ <ab8ca098ad60f209fe97f79bb93b2d1e898da524.camel@bootlin.com>
+ <CAPBb6MUJu3cX9A-E32bSSjxc1cvGP83ayzZzUxa5_QMf6niK4g@mail.gmail.com>
+User-Agent: Evolution 3.30.3 (3.30.3-1.fc29) 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_133227_853857_B57E3893 
-X-CRM114-Status: GOOD (  42.24  )
+X-CRM114-CacheID: sfid-20190129_134142_953474_E85400D0 
+X-CRM114-Status: GOOD (  30.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,226 +111,152 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>, linux-arm-kernel@lists.infradead.org,
- kvm@vger.kernel.org, kvmarm@lists.cs.columbia.edu
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devel@driverdev.osuosl.org, Maxime Ripard <maxime.ripard@bootlin.com>,
+ Ayaka <ayaka@soulik.info>, Randy Li <randy.li@rock-chips.com>,
+ LKML <linux-kernel@vger.kernel.org>,
+ Jernej =?UTF-8?Q?=C5=A0krabec?= <jernej.skrabec@gmail.com>,
+ Tomasz Figa <tfiga@chromium.org>, Hans Verkuil <hverkuil@xs4all.nl>,
+ linux-rockchip@lists.infradead.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ Ezequiel Garcia <ezequiel@collabora.com>, linux-arm-kernel@lists.infradead.org,
+ Linux Media Mailing List <linux-media@vger.kernel.org>
+Content-Type: multipart/mixed; boundary="===============9003124925935533088=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 25, 2019 at 02:46:57PM +0000, Andre Przywara wrote:
-> On Tue, 22 Jan 2019 15:17:14 +0000
-> Dave Martin <Dave.Martin@arm.com> wrote:
-> 
-> Hi Dave,
-> 
-> thanks for having a look!
-> 
-> > On Mon, Jan 07, 2019 at 12:05:36PM +0000, Andre Przywara wrote:
-> > > KVM implements the firmware interface for mitigating cache
-> > > speculation vulnerabilities. Guests may use this interface to
-> > > ensure mitigation is active.
-> > > If we want to migrate such a guest to a host with a different
-> > > support level for those workarounds, migration might need to fail,
-> > > to ensure that critical guests don't loose their protection.
-> > > 
-> > > Introduce a way for userland to save and restore the workarounds
-> > > state. On restoring we do checks that make sure we don't downgrade
-> > > our mitigation level.
-> > > 
-> > > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> > > ---
-> > >  arch/arm/include/asm/kvm_emulate.h   |  10 ++
-> > >  arch/arm/include/uapi/asm/kvm.h      |   9 ++
-> > >  arch/arm64/include/asm/kvm_emulate.h |  14 +++
-> > >  arch/arm64/include/uapi/asm/kvm.h    |   9 ++
-> > >  virt/kvm/arm/psci.c                  | 138
-> > > ++++++++++++++++++++++++++- 5 files changed, 178 insertions(+), 2
-> > > deletions(-)
-> > > 
-> > > diff --git a/arch/arm/include/asm/kvm_emulate.h
-> > > b/arch/arm/include/asm/kvm_emulate.h index
-> > > 77121b713bef..2255c50debab 100644 ---
-> > > a/arch/arm/include/asm/kvm_emulate.h +++
-> > > b/arch/arm/include/asm/kvm_emulate.h @@ -275,6 +275,16 @@ static
-> > > inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
-> > > return vcpu_cp15(vcpu, c0_MPIDR) & MPIDR_HWID_BITMASK; }
-> > >  
-> > > +static inline bool kvm_arm_get_vcpu_workaround_2_flag(struct
-> > > kvm_vcpu *vcpu) +{
-> > > +	return false;
-> > > +}
-> > > +
-> > > +static inline void kvm_arm_set_vcpu_workaround_2_flag(struct
-> > > kvm_vcpu *vcpu,
-> > > +						      bool flag)
-> > > +{
-> > > +}
-> > > +
-> > >  static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-> > >  {
-> > >  	*vcpu_cpsr(vcpu) |= PSR_E_BIT;
-> > > diff --git a/arch/arm/include/uapi/asm/kvm.h
-> > > b/arch/arm/include/uapi/asm/kvm.h index 4602464ebdfb..02c93b1d8f6d
-> > > 100644 --- a/arch/arm/include/uapi/asm/kvm.h
-> > > +++ b/arch/arm/include/uapi/asm/kvm.h
-> > > @@ -214,6 +214,15 @@ struct kvm_vcpu_events {
-> > >  #define KVM_REG_ARM_FW_REG(r)		(KVM_REG_ARM |
-> > > KVM_REG_SIZE_U64 | \ KVM_REG_ARM_FW | ((r) & 0xffff))
-> > >  #define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
-> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1
-> > > KVM_REG_ARM_FW_REG(1) +#define
-> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_NOT_AVAIL	0 +#define
-> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_AVAIL	1 +#define
-> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2	KVM_REG_ARM_FW_REG(2)
-> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_MASK	0x3
-> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL	0
-> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_AVAIL	1
-> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNAFFECTED	2
-> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_ENABLED	4 
-> > >  /* Device Control API: ARM VGIC */
-> > >  #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
-> > > diff --git a/arch/arm64/include/asm/kvm_emulate.h
-> > > b/arch/arm64/include/asm/kvm_emulate.h index
-> > > 506386a3edde..a44f07f68da4 100644 ---
-> > > a/arch/arm64/include/asm/kvm_emulate.h +++
-> > > b/arch/arm64/include/asm/kvm_emulate.h @@ -336,6 +336,20 @@ static
-> > > inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
-> > > return vcpu_read_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK; }
-> > >  
-> > > +static inline bool kvm_arm_get_vcpu_workaround_2_flag(struct
-> > > kvm_vcpu *vcpu) +{
-> > > +	return vcpu->arch.workaround_flags &
-> > > VCPU_WORKAROUND_2_FLAG; +}
-> > > +
-> > > +static inline void kvm_arm_set_vcpu_workaround_2_flag(struct
-> > > kvm_vcpu *vcpu,
-> > > +						      bool flag)
-> > > +{
-> > > +	if (flag)
-> > > +		vcpu->arch.workaround_flags |=
-> > > VCPU_WORKAROUND_2_FLAG;
-> > > +	else
-> > > +		vcpu->arch.workaround_flags &=
-> > > ~VCPU_WORKAROUND_2_FLAG; +}
-> > > +
-> > >  static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-> > >  {
-> > >  	if (vcpu_mode_is_32bit(vcpu)) {
-> > > diff --git a/arch/arm64/include/uapi/asm/kvm.h
-> > > b/arch/arm64/include/uapi/asm/kvm.h index
-> > > 97c3478ee6e7..4a19ef199a99 100644 ---
-> > > a/arch/arm64/include/uapi/asm/kvm.h +++
-> > > b/arch/arm64/include/uapi/asm/kvm.h @@ -225,6 +225,15 @@ struct
-> > > kvm_vcpu_events { #define KVM_REG_ARM_FW_REG(r)
-> > > (KVM_REG_ARM64 | KVM_REG_SIZE_U64 | \ KVM_REG_ARM_FW | ((r) &
-> > > 0xffff)) #define KVM_REG_ARM_PSCI_VERSION
-> > > KVM_REG_ARM_FW_REG(0) +#define
-> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1	KVM_REG_ARM_FW_REG(1)
-> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_NOT_AVAIL	0
-> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_AVAIL	1
-> > > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2
-> > > KVM_REG_ARM_FW_REG(2) +#define
-> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_MASK	0x3 +#define
-> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL	0 +#define
-> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_AVAIL	1 +#define
-> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNAFFECTED	2 +#define
-> > > KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_ENABLED	4  
-> > 
-> > If this is the first exposure of this information to userspace, I
-> > wonder if we can come up with some common semantics that avoid having
-> > to add new ad-hoc code (and bugs) every time a new
-> > vulnerability/workaround is defined.
-> > 
-> > We seem to have at least the two following independent properties
-> > for a vulnerability, with the listed values for each:
-> > 
-> >  * vulnerability (Vulnerable, Unknown, Not Vulnerable)
-> > 
-> >  * mitigation support (Not Requestable, Requestable)
-> > 
-> > Migrations must not move to the left in _either_ list for any
-> > vulnerability.
-> > 
-> > If we want to hedge out bets we could follow the style of the ID
-> > registers and allocate to each theoretical vulnerability a pair of
-> > signed 2- or (for more expansion room if we think we might need it)
-> > 4-bit fields.
-> > 
-> > We could perhaps allocate as follows:
-> > 
-> >  * -1=Vulnerable, 0=Unknown, 1=Not Vulnerable
-> >  *  0=Mitigation not requestable, 1=Mitigation requestable
-> 
-> So as discussed in person, that sounds quite neat. I implemented
-> that, but the sign extension and masking to n bits is not very pretty
-> and limits readability.
-> However the property of having a kind of "vulnerability scale", where a
-> simple comparison would determine compatibility, is a good thing to
-> have and drastically simplifies the checking code.
-> 
-> > Checking code wouldn't need to know which fields describe mitigation
-> > mechanisms and which describe vulnerabilities: we'd just do a strict
-> > >= comparison on each.
-> > 
-> > Further, if a register is never written before the vcpu is first run,
-> > we should imply a write of 0 to it as part of KVM_RUN (so that if the
-> > destination node has a negative value anywhere, KVM_RUN barfs cleanly.
-> 
-> What I like about the signedness is this "0 means unknown", which is
-> magically forwards compatible. However I am not sure we can transfer
-> this semantic into every upcoming register that pops up in the future.
 
-I appreciate the concern, but can you give an example of how it might
-break?
+--===============9003124925935533088==
+Content-Type: multipart/signed; micalg="pgp-sha1"; protocol="application/pgp-signature";
+	boundary="=-2kunDr+ALQ68ZYgOww0f"
 
-My idea is that you can check for compatibility by comparing fields
-without any need to know what they mean, but we wouldn't pre-assign
-meanings for the values of unallocated fields, just create a precedent
-that future fields can follow (where it works).
 
-This is much like the CPU ID features scheme itself.  A "0" might
-mean that something is absent, but there's no way (or need) to know
-what.
+--=-2kunDr+ALQ68ZYgOww0f
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-> Actually we might not need this:
-> My understanding of how QEMU handles this in migration is that it reads
-> the f/w reg on the originating host A and writes this into the target
-> host B, without itself interpreting this in any way. It's up to the
-> target kernel (basically this code here) to check compatibility. So I am
-> not sure we actually need a stable scheme. If host A doesn't know about
+Le mardi 29 janvier 2019 =C3=A0 16:44 +0900, Alexandre Courbot a =C3=A9crit=
+ :
+> On Fri, Jan 25, 2019 at 10:04 PM Paul Kocialkowski
+> <paul.kocialkowski@bootlin.com> wrote:
+> > Hi,
+> >=20
+> > On Thu, 2019-01-24 at 20:23 +0800, Ayaka wrote:
+> > > Sent from my iPad
+> > >=20
+> > > > On Jan 24, 2019, at 6:27 PM, Paul Kocialkowski <paul.kocialkowski@b=
+ootlin.com> wrote:
+> > > >=20
+> > > > Hi,
+> > > >=20
+> > > > > On Thu, 2019-01-10 at 21:32 +0800, ayaka wrote:
+> > > > > I forget a important thing, for the rkvdec and rk hevc decoder, i=
+t would
+> > > > > requests cabac table, scaling list, picture parameter set and ref=
+erence
+> > > > > picture storing in one or various of DMA buffers. I am not talkin=
+g about
+> > > > > the data been parsed, the decoder would requests a raw data.
+> > > > >=20
+> > > > > For the pps and rps, it is possible to reuse the slice header, ju=
+st let
+> > > > > the decoder know the offset from the bitstream bufer, I would sug=
+gest to
+> > > > > add three properties(with sps) for them. But I think we need a me=
+thod to
+> > > > > mark a OUTPUT side buffer for those aux data.
+> > > >=20
+> > > > I'm quite confused about the hardware implementation then. From wha=
+t
+> > > > you're saying, it seems that it takes the raw bitstream elements ra=
+ther
+> > > > than parsed elements. Is it really a stateless implementation?
+> > > >=20
+> > > > The stateless implementation was designed with the idea that only t=
+he
+> > > > raw slice data should be passed in bitstream form to the decoder. F=
+or
+> > > > H.264, it seems that some decoders also need the slice header in ra=
+w
+> > > > bitstream form (because they take the full slice NAL unit), see the
+> > > > discussions in this thread:
+> > > > media: docs-rst: Document m2m stateless video decoder interface
+> > >=20
+> > > Stateless just mean it won=E2=80=99t track the previous result, but I=
+ don=E2=80=99t
+> > > think you can define what a date the hardware would need. Even you
+> > > just build a dpb for the decoder, it is still stateless, but parsing
+> > > less or more data from the bitstream doesn=E2=80=99t stop a decoder b=
+ecome a
+> > > stateless decoder.
+> >=20
+> > Yes fair enough, the format in which the hardware decoder takes the
+> > bitstream parameters does not make it stateless or stateful per-se.
+> > It's just that stateless decoders should have no particular reason for
+> > parsing the bitstream on their own since the hardware can be designed
+> > with registers for each relevant bitstream element to configure the
+> > decoding pipeline. That's how GPU-based decoder implementations are
+> > implemented (VAAPI/VDPAU/NVDEC, etc).
+> >=20
+> > So the format we have agreed on so far for the stateless interface is
+> > to pass parsed elements via v4l2 control structures.
+> >=20
+> > If the hardware can only work by parsing the bitstream itself, I'm not
+> > sure what the best solution would be. Reconstructing the bitstream in
+> > the kernel is a pretty bad option, but so is parsing in the kernel or
+> > having the data both in parsed and raw forms. Do you see another
+> > possibility?
+>=20
+> Is reconstructing the bitstream so bad? The v4l2 controls provide a
+> generic interface to an encoded format which the driver needs to
+> convert into a sequence that the hardware can understand. Typically
+> this is done by populating hardware-specific structures. Can't we
+> consider that in this specific instance, the hardware-specific
+> structure just happens to be identical to the original bitstream
+> format?
 
-Nothing stops userspace from interpreting the data, so there's a risk
-people may grow to rely on it even if we don't want them to.
+At maximum allowed bitrate for let's say HEVC (940MB/s iirc), yes, it
+would be really really bad. In GStreamer project we have discussed for
+a while (but have never done anything about) adding the ability through
+a bitmask to select which part of the stream need to be parsed, as
+parsing itself was causing some overhead. Maybe similar thing applies,
+though as per our new design, it's the fourcc that dictate the driver
+behaviour, we'd need yet another fourcc for drivers that wants the full
+bitstream (which seems odd if you have already parsed everything, I
+think this need some clarification).
 
-So we should try to have something that's forward-compatible if at all
-possible...
+>=20
+> I agree that this is not strictly optimal for that particular
+> hardware, but such is the cost of abstractions, and in this specific
+> case I don't believe the cost would be particularly high?
 
-> a certain register, it won't appear in the result of the
-> KVM_GET_REG_LIST ioctl, so it won't be transferred to host B at all. In
-> the opposite case the receiving host would reject an unknown register,
-> which I believe is safer, although I see that it leaves the "unknown"
-> case on the table.
-> 
-> It would be good to have some opinion of how forward looking we want to
-> (and can) be here.
-> 
-> Meanwhile I am sending a v2 which implements the linear scale idea,
-> without using signed values, as this indeed simplifies the code.
-> I have the signed version still in a branch here, let me know if you
-> want to have a look.
+--=-2kunDr+ALQ68ZYgOww0f
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: This is a digitally signed message part
+Content-Transfer-Encoding: 7bit
 
-Happy to take a look at it.
+-----BEGIN PGP SIGNATURE-----
 
-I was hoping that cpufeatures already had a helper for extracting a
-signed field, but I didn't go looking for it...
+iF0EABECAB0WIQSScpfJiL+hb5vvd45xUwItrAaoHAUCXFDIjwAKCRBxUwItrAao
+HMH7AJ9In4tsGt+ueK2AiiooucvNAJ+86QCdFysjbjVAgW9gD81I6i2cYXI9afk=
+=CPiw
+-----END PGP SIGNATURE-----
 
-At the asm level this is just a sbfx, so it's hardly expensive.
+--=-2kunDr+ALQ68ZYgOww0f--
 
-Cheers
----Dave
+
+
+--===============9003124925935533088==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============9003124925935533088==--
+
+
