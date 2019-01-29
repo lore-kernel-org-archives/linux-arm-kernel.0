@@ -2,130 +2,68 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 37A90C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:03:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0527DC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:04:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F1C362087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:03:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B30E22087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:03:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sET4a38P";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="GjiOcNXu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F1C362087E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=partner.samsung.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LJDFy4tU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B30E22087F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YepnPZXlr6Wvzvldj5okfo0/oiTXXpYrhUt4CivFQqw=; b=sET4a38P5cyWPe
-	YLzU+VzG/H0ry0290EJYo4UggplcoYZSh00JfLAFYhewv45Ngq5aSMnGTA4qYumql5PF9K5rJuBl0
-	2t5AHqiyBIQ67EB8LkmFLl9CJ1r1J4+wRc/XEnNUf42HtUKp/7Bdjr3KRBVeUmCPGRLrKdwjw0v1Q
-	TtSZ7w3CcYY+VWJAxrvGOclbg2jD/bjXCdAl9sspOzGY+wBu3eR6u8WD+Q6cpHxo3I/SWVCNZKWuv
-	1wAu3xmWa53pQixZMFVGaNKRur7nxJdHf7ph/CkHvmDIEzDmtdhSoSC3i3FLnsId641L4+10LaN0q
-	YbAgZBdnLxa0Ulmc1dvw==;
+	List-Owner; bh=Pt0RV8Y6+qlNvmAsCTz/7HzkRWdKk76Nq42XgwFKLUQ=; b=LJDFy4tURFVnGk
+	5TOvjHX+UQgJTvsgqBRq+w0mZcD19LBVMa/sMky0rH/o3s7aH4Y1hcT3Ca9PTS+J6LQSaA55Pa+xB
+	O6KqT3PXz4KpkfK+rNnJLhx1KEQ76QOrPm88gM1ea/QkFeFz3CnWgpwXKsnrtUIQJE57BnO8B53ez
+	rbSS7bxcuUtqiDAdW15+ETX5kxzrjs4g4972jq+PxDjdKPIZYjwD/6DIioakX1Zhd59l3+C1o5+PV
+	6e+N9ArYohV08oj76k3GFBOO+EHunnaiMS/UCVaDXHhCk+kGfLyv38PeFRPk6ngxYHlb859gQ4/2k
+	Wu5dwEy/NAWGwh5K63kg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goVqk-0007MF-7e; Tue, 29 Jan 2019 16:02:58 +0000
-Received: from mailout1.w1.samsung.com ([210.118.77.11])
+	id 1goVrg-0007kq-4n; Tue, 29 Jan 2019 16:03:56 +0000
+Received: from mx1.redhat.com ([209.132.183.28])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goVqg-0007LU-02
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 16:02:56 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
- by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190129160252euoutp0176889cc9e1d7a7c3ff11b8ba5a27a95b~_XS2L0fRW1958519585euoutp01H
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 16:02:52 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
- 20190129160252euoutp0176889cc9e1d7a7c3ff11b8ba5a27a95b~_XS2L0fRW1958519585euoutp01H
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1548777772;
- bh=DRjEHJKFWYoavZVVURNhjQgbrY289jL767C8PXItlo8=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=GjiOcNXuZjkgNdjkAIDVRVv5hd939Hh66xgwwq2tMgrexVQz1cjtu6+vqHAIYwKuO
- 57LQgqV7DxagVT5l8cIbHJ3zdw6fYwUKR7BzgwM4eX0OODEv4XkA+MqKowUveV/QSt
- f5s8j60JjyV1Og0kD9X9CicolpqqGnY3GW227Wp8=
-Received: from eusmges3new.samsung.com (unknown [203.254.199.245]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20190129160251eucas1p11b2a576b3e50f36ad7fd8611cbd1e055~_XS1wlKdu2002920029eucas1p1h;
- Tue, 29 Jan 2019 16:02:51 +0000 (GMT)
-Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
- eusmges3new.samsung.com (EUCPMTA) with SMTP id DD.6B.04806.B29705C5; Tue, 29
- Jan 2019 16:02:51 +0000 (GMT)
-Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
- 20190129160250eucas1p2eb448275d6c25f1d2a72f68d06f3763a~_XS0_SCkg1287912879eucas1p2X;
- Tue, 29 Jan 2019 16:02:50 +0000 (GMT)
-Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
- eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
- 20190129160250eusmtrp10ebb3444ee7272afa1d53764f8dc1545~_XS0vgENY3028630286eusmtrp1Q;
- Tue, 29 Jan 2019 16:02:50 +0000 (GMT)
-X-AuditID: cbfec7f5-34dff700000012c6-67-5c50792bce98
-Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id 7C.76.04128.A29705C5; Tue, 29
- Jan 2019 16:02:50 +0000 (GMT)
-Received: from [106.120.51.20] (unknown [106.120.51.20]) by
- eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20190129160249eusmtip22cb274509439e1e990976d16ef1c7476~_XS0NM2QX1687116871eusmtip2U;
- Tue, 29 Jan 2019 16:02:49 +0000 (GMT)
-Subject: Re: [PATCH 4/8] dt-bindings: devfreq: add DMC device description
-To: Krzysztof Kozlowski <krzk@kernel.org>
-From: Lukasz Luba <l.luba@partner.samsung.com>
-Message-ID: <79cd56c4-2415-7db1-be6f-73c03c0902bc@partner.samsung.com>
-Date: Tue, 29 Jan 2019 17:02:49 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1goVrc-0007kM-LQ
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 16:03:54 +0000
+Received: from smtp.corp.redhat.com (int-mx06.intmail.prod.int.phx2.redhat.com
+ [10.5.11.16])
+ (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
+ (No client certificate requested)
+ by mx1.redhat.com (Postfix) with ESMTPS id 09AD8A909;
+ Tue, 29 Jan 2019 16:03:52 +0000 (UTC)
+Received: from kamzik.brq.redhat.com (unknown [10.43.2.160])
+ by smtp.corp.redhat.com (Postfix) with ESMTPS id 7090845F01;
+ Tue, 29 Jan 2019 16:03:50 +0000 (UTC)
+Date: Tue, 29 Jan 2019 17:03:47 +0100
+From: Andrew Jones <drjones@redhat.com>
+To: Christoffer Dall <christoffer.dall@arm.com>
+Subject: Re: [PATCH 2/5] arm/arm64: KVM: Allow a VCPU to fully reset itself
+Message-ID: <20190129160347.fcbry76igwyatqzx@kamzik.brq.redhat.com>
+References: <20190125094656.5026-1-christoffer.dall@arm.com>
+ <20190125094656.5026-3-christoffer.dall@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <CAJKOXPd2g6rtZpK20emJ0tqHhq0D01=BWbU_9MP30313XHvPHg@mail.gmail.com>
-Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA01Sa0hTYRj229k5Ow4nx6Pli0nBSOhC3io6dEMhYkGgFVKpUDMPU3RqO96W
- UpaWdy0NL1OaPwxtidPlDVErLw0RZ1K4yh+KGpaXStTMUsvtTPLf8z2X730feEmM7sXdyMiY
- eFYVI4+WEmJhy5tV06GD6sBQ768VNNNYpscZ89I0zmh7TThTODmLMUNDDSJm8N6ciDFMjuDM
- u/ZKglnM70VM2VCXgHlqHhYwo3drCeZ+Z6/ITyKre1KHZAZdNiF7UX1HVtCkQ7JFw+5APFh8
- MpyNjkxkVV6nr4sj+r6sE3HDx5PX6uuJNNThkYPsSaCOQHa+nshBYpKmahEUdfzA+McSgvTC
- 9zZlEcG4vlC4FTFmrOK8UINgbjrT5ppHUDKjFVlcztQ56BkxWRMu1H4wr69YExi1jEHu64ZN
- gSQJyhPadDctHgl1FmbTN3ALLaQ8oKY1ykLvoK5AT/43xFucoL98ypq0py7AYrmLhcYoV/g0
- pRXweA+0zldaGwA1IYK1338Rv/QZMH03C3jsDDPGJhGP3WGgOM9WjIPBLB3B41TI7G+zeU5A
- j3HYuhq2WUXf7mWBQPlDV7GYh47wYd6J38ARilpKMZ6WQNYDmv9jHzTlvbXN3wk1dSWih0iq
- 2VZLs62LZlsXzf+xVUioQ65sAqdUsNzhGDbJk5MruYQYheeNWKUBbd7WwIZxuQ11rYV1I4pE
- UgeJ3aXAUBqXJ3JqZTcCEpO6SHz+BITSknC5+harir2mSohmuW60ixRKXSUpduMhNKWQx7NR
- LBvHqrZUAWnvlobUSv8FUbUh4ZmRzhUzCw0Fj4Oe45iWzhhVXDRmf6xyuLpi7lBXD6cwBXM/
- F9pUIY+83Ztzj45lJgd5BE9Hho96+zWXJrYHffY9FrA3NXNmTFHRWO+XPPIrDPo6826vOGnd
- SgN9g8eTZi7XTch8XDSvmiZr0s+H5o69PFWi7W+WCrkIuc8BTMXJ/wHE8bBHVwMAAA==
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFrrJIsWRmVeSWpSXmKPExsVy+t/xe7palQExBnsnyFpsnLGe1eL6l+es
- FvOPnGO16H/8mtni/PkN7BZnm96wW2x6fI3V4vKuOWwWn3uPMFrMOL+PyWLp9YtMFrcbV7BZ
- tO49wu7A67Fm3hpGj02rOtk8Ni+p9+jbsorR4/MmuQDWKD2bovzSklSFjPziElulaEMLIz1D
- Sws9IxNLPUNj81grI1MlfTublNSczLLUIn27BL2Moy/+shVctKr4s24dWwPjHtUuRk4OCQET
- ieMtP1m7GLk4hASWMkrM7bnFDpEQk5i0bzuULSzx51oXG0TRa0aJ6xOPgCWEBTwlDl87xwJi
- iwhoSlz/+x1sErPAd2aJhTfnsEN0LGOSmPJmO3MXIwcHm4CexI5VhSANvAJuEq+b/7GChFkE
- VCWWb88GCYsKREh8fLqPCaJEUOLkzCcsICWcAoESn2eKgISZBcwk5m1+yAxhi0vcejKfCcKW
- l9j+dg7zBEahWUi6ZyFpmYWkZRaSlgWMLKsYRVJLi3PTc4uN9IoTc4tL89L1kvNzNzECo3Xb
- sZ9bdjB2vQs+xCjAwajEw8sQHBAjxJpYVlyZe4hRgoNZSYTX8Ld/jBBvSmJlVWpRfnxRaU5q
- 8SFGU6DXJjJLiSbnAxNJXkm8oamhuYWlobmxubGZhZI473mDyighgfTEktTs1NSC1CKYPiYO
- TqkGxp13+N9en2Ixc9WRNK7X237XqM5oKWd1X7SYIXLFO5WJn3nm/O0ufbV9+Y+/gj1Lvps/
- LexbPOuBuex9xpfPn1XefFEmeVNCxVUgz+yjgk7lSSNXDWGFObu+LT8372u51WmdI/KXXVQP
- fXuy23nr827JTRZH7Po/ckX6FZ47yPazPWhv1upbGluUWIozEg21mIuKEwE/2ycw7AIAAA==
-X-CMS-MailID: 20190129160250eucas1p2eb448275d6c25f1d2a72f68d06f3763a
-X-Msg-Generator: CA
-X-RootMTR: 20190128192153eucas1p2d7a796cb89e68c1789069562e91296be
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20190128192153eucas1p2d7a796cb89e68c1789069562e91296be
-References: <CGME20190128192153eucas1p2d7a796cb89e68c1789069562e91296be@eucas1p2.samsung.com>
- <1548703299-15806-1-git-send-email-l.luba@partner.samsung.com>
- <1548703299-15806-5-git-send-email-l.luba@partner.samsung.com>
- <CAJKOXPd2g6rtZpK20emJ0tqHhq0D01=BWbU_9MP30313XHvPHg@mail.gmail.com>
+Content-Disposition: inline
+In-Reply-To: <20190125094656.5026-3-christoffer.dall@arm.com>
+User-Agent: NeoMutt/20180716
+X-Scanned-By: MIMEDefang 2.79 on 10.5.11.16
+X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
+ (mx1.redhat.com [10.5.110.29]); Tue, 29 Jan 2019 16:03:52 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_080254_293000_134BD7D4 
-X-CRM114-Status: GOOD (  23.38  )
+X-CRM114-CacheID: sfid-20190129_080352_744526_C47F3752 
+X-CRM114-Status: GOOD (  32.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -137,196 +75,310 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
- =?UTF-8?Q?Bart=c5=82omiej_=c5=bbo=c5=82nierkiewicz?=
- <b.zolnierkie@samsung.com>, linux-pm@vger.kernel.org,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- Chanwoo Choi <cw00.choi@samsung.com>,
- Kyungmin Park <kyungmin.park@samsung.com>, myungjoo.ham@samsung.com,
- Kukjin Kim <kgene@kernel.org>, linux-arm-kernel@lists.infradead.org
+Cc: Marc Zyngier <marc.zyngier@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org, kvm@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Krzysztof,
+On Fri, Jan 25, 2019 at 10:46:53AM +0100, Christoffer Dall wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> The current kvm_psci_vcpu_on implementation will directly try to
+> manipulate the state of the VCPU to reset it.  However, since this is
+> not done on the thread that runs the VCPU, we can end up in a strangely
+> corrupted state when the source and target VCPUs are running at the same
+> time.
+> 
+> Fix this by factoring out all reset logic from the PSCI implementation
+> and forwarding the required information along with a request to the
+> target VCPU.
 
-On 1/29/19 3:47 PM, Krzysztof Kozlowski wrote:
-> On Mon, 28 Jan 2019 at 20:21, Lukasz Luba <l.luba@partner.samsung.com> wrote:
->>
->> The patch adds description for DT binding for a new Exynos5 Dynamic Memory
->> Controller device.
->> It also contains needed MAINTAINERS file updates.
->>
->> CC: MyungJoo Ham <myungjoo.ham@samsung.com>
->> CC: Kyungmin Park <kyungmin.park@samsung.com>
->> CC: Chanwoo Choi <cw00.choi@samsung.com>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: Mark Rutland <mark.rutland@arm.com>
->> CC: Kukjin Kim <kgene@kernel.org>
->> CC: Krzysztof Kozlowski <krzk@kernel.org>
->> CC: linux-pm@vger.kernel.org
->> CC: linux-samsung-soc@vger.kernel.org
->> CC: devicetree@vger.kernel.org
->> CC: linux-arm-kernel@lists.infradead.org
->> CC: linux-kernel@vger.kernel.org
->> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
->> ---
->>   .../devicetree/bindings/devfreq/exynos5-dmc.txt    | 108 +++++++++++++++++++++
->>   MAINTAINERS                                        |   7 ++
->>   2 files changed, 115 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt b/Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt
->> new file mode 100644
->> index 0000000..914bd85
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt
->> @@ -0,0 +1,108 @@
->> +* Exynos5 frequency and voltage scaling for Dynamic Memory Controller device
->> +
->> +The Samsung Exynos5 SoC has DMC (Dynamic Memory Controller) to which the DRAM
->> +memory chips are connected. The driver is to monitor the controller in runtime
->> +and switch frequency and voltage. To monitor the usage of the controller in
->> +runtime, the driver uses the PPMU (Platform Performance Monitoring Unit), which
->> +is able to measure the current load of the memory.
->> +When 'userspace' governor is used for the driver, an application is able to
->> +switch the DMC frequency.
->> +
->> +Required properties for DMC device for Exynos5422:
->> +- compatible: Should be "samsung,exynos5422-bus".
->> +- clock-names : the name of clock used by the bus, "bus".
->> +- clocks : phandles for clock specified in "clock-names" property.
->> +- devfreq-events : phandles for PPMU devices connected to this DMC.
->> +
->> +The example definition of a DMC and PPMU devices declared in DT is shown below:
->> +
->> +       ppmu_dmc0_0: ppmu_dmc0_0@10d00000 {
->> +               compatible = "samsung,exynos-ppmu";
->> +               reg = <0x10d00000 0x2000>;
->> +               clocks = <&clock CLK_PCLK_PPMU_DREX0_0>;
->> +               clock-names = "ppmu";
->> +               status = "okay";
->> +               events {
->> +                       ppmu_event_dmc0_0: ppmu-event3-dmc0_0 {
->> +                               event-name = "ppmu-event3-dmc0_0";
->> +                       };
->> +               };
->> +       };
->> +
->> +
->> +       ppmu_dmc0_1: ppmu_dmc0_1@10d10000 {
->> +               compatible = "samsung,exynos-ppmu";
->> +               reg = <0x10d10000 0x2000>;
->> +               clocks = <&clock CLK_PCLK_PPMU_DREX0_1>;
->> +               clock-names = "ppmu";
->> +               status = "okay";
->> +               events {
->> +                       ppmu_event_dmc0_1: ppmu-event3-dmc0_1 {
->> +                               event-name = "ppmu-event3-dmc0_1";
->> +                       };
->> +               };
->> +       };
->> +
->> +       ppmu_dmc1_0: ppmu_dmc1_0@10d10000 {
->> +               compatible = "samsung,exynos-ppmu";
->> +               reg = <0x10d60000 0x2000>;
->> +               clocks = <&clock CLK_PCLK_PPMU_DREX1_0>;
->> +               clock-names = "ppmu";
->> +               status = "okay";
->> +               events {
->> +                       ppmu_event_dmc1_0: ppmu-event3-dmc1_0 {
->> +                               event-name = "ppmu-event3-dmc1_0";
->> +                       };
->> +               };
->> +       };
->> +
->> +       ppmu_dmc1_1: ppmu_dmc1_1@10d70000 {
->> +               compatible = "samsung,exynos-ppmu";
->> +               reg = <0x10d70000 0x2000>;
->> +               clocks = <&clock CLK_PCLK_PPMU_DREX1_1>;
->> +               clock-names = "ppmu";
->> +               status = "okay";
->> +               events {
->> +                       ppmu_event_dmc1_1: ppmu-event3-dmc1_1 {
->> +                               event-name = "ppmu-event3-dmc1_1";
->> +                       };
->> +               };
->> +       };
->> +
->> +       dmc: dmc@10c20000 {
->> +               compatible = "samsung,exynos5422-dmc";
->> +               reg = <0x10c20000 0x10000>, <0x10c30000 0x10000>,
->> +                       <0x10030000 0x1000>, <0x10000000 0x1000>;
->> +               clocks =        <&clock CLK_FOUT_SPLL>,
->> +                               <&clock CLK_MOUT_SCLK_SPLL>,
->> +                               <&clock CLK_FF_DOUT_SPLL2>,
->> +                               <&clock CLK_FOUT_BPLL>,
->> +                               <&clock CLK_MOUT_BPLL>,
->> +                               <&clock CLK_SCLK_BPLL>,
->> +                               <&clock CLK_MOUT_MX_MSPLL_CCORE>,
->> +                               <&clock CLK_MOUT_MX_MSPLL_CCORE_PHY>,
->> +                               <&clock CLK_MOUT_MCLK_CDREX>,
->> +                               <&clock CLK_DOUT_CLK2X_PHY0>,
->> +                               <&clock CLK_CLKM_PHY0>,
->> +                               <&clock CLK_CLKM_PHY1>
->> +                       ;
-> 
-> Join with previous line.
-> 
->> +               clock-names =   "fout_spll",
->> +                               "mout_sclk_spll",
->> +                               "ff_dout_spll2",
->> +                               "fout_bpll",
->> +                               "mout_bpll",
->> +                               "sclk_bpll",
->> +                               "mout_mx_mspll_ccore",
->> +                               "mout_mx_mspll_ccore_phy",
->> +                               "mout_mclk_cdrex",
->> +                               "dout_clk2x_phy0",
->> +                               "clkm_phy0",
->> +                               "clkm_phy1"
->> +                               ;
-> 
-> Ditto.
-OK, I will fix it.
-> 
->> +
->> +               status = "okay";
->> +               devfreq-events = <&ppmu_dmc0_0>, <&ppmu_dmc0_1>,
->> +                               <&ppmu_dmc1_0>, <&ppmu_dmc1_1>;
->> +       };
->> +
->> +
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 9f64f8d..3581807 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -3310,6 +3310,13 @@ S:       Maintained
->>   F:     drivers/devfreq/exynos-bus.c
->>   F:     Documentation/devicetree/bindings/devfreq/exynos-bus.txt
->>
->> +DMC FREQUENCY DRIVER FOR SAMSUNG EXYNOS5
->> +M:     Lukasz Luba <l.luba@partner.samsung.com>
->> +L:     linux-pm@vger.kernel.org
->> +L:     linux-samsung-soc@vger.kernel.org
->> +S:     Maintained
->> +F:     Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt
-> 
-> Maintainers change should go with the next change, I think. It looks
-> unusual to add an entry for driver... without the driver.
-Thank you for the review. I will move the dt-bindings in the patch set
-after the dmc driver file. Then the MAINTAINERS file will be updated
-only by one entry.
+The last patch makes more sense, now that I see this one. I guess their
+order should be swapped.
 
-Regards,
-Lukasz
 > 
-> Best regards,
-> Krzysztof
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_host.h   | 10 +++++++++
+>  arch/arm/kvm/reset.c              | 24 +++++++++++++++++++++
+>  arch/arm64/include/asm/kvm_host.h | 11 ++++++++++
+>  arch/arm64/kvm/reset.c            | 24 +++++++++++++++++++++
+>  virt/kvm/arm/arm.c                | 10 +++++++++
+>  virt/kvm/arm/psci.c               | 36 ++++++++++++++-----------------
+>  6 files changed, 95 insertions(+), 20 deletions(-)
 > 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index ca56537b61bc..50e89869178a 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -48,6 +48,7 @@
+>  #define KVM_REQ_SLEEP \
+>  	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
+>  #define KVM_REQ_IRQ_PENDING	KVM_ARCH_REQ(1)
+> +#define KVM_REQ_VCPU_RESET	KVM_ARCH_REQ(2)
+>  
+>  DECLARE_STATIC_KEY_FALSE(userspace_irqchip_in_use);
+>  
+> @@ -147,6 +148,13 @@ struct kvm_cpu_context {
+>  
+>  typedef struct kvm_cpu_context kvm_cpu_context_t;
+>  
+> +struct vcpu_reset_state {
+> +	unsigned long	pc;
+> +	unsigned long	r0;
+> +	bool		be;
+> +	bool		reset;
+> +};
+> +
+>  struct kvm_vcpu_arch {
+>  	struct kvm_cpu_context ctxt;
+>  
+> @@ -186,6 +194,8 @@ struct kvm_vcpu_arch {
+>  	/* Cache some mmu pages needed inside spinlock regions */
+>  	struct kvm_mmu_memory_cache mmu_page_cache;
+>  
+> +	struct vcpu_reset_state reset_state;
+> +
+>  	/* Detect first run of a vcpu */
+>  	bool has_run_once;
+>  };
+> diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+> index 5ed0c3ee33d6..de41255eebcd 100644
+> --- a/arch/arm/kvm/reset.c
+> +++ b/arch/arm/kvm/reset.c
+> @@ -26,6 +26,7 @@
+>  #include <asm/cputype.h>
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_coproc.h>
+> +#include <asm/kvm_emulate.h>
+>  
+>  #include <kvm/arm_arch_timer.h>
+>  
+> @@ -69,6 +70,29 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+>  	/* Reset CP15 registers */
+>  	kvm_reset_coprocs(vcpu);
+>  
+> +	/*
+> +	 * Additional reset state handling that PSCI may have imposed on us.
+> +	 * Must be done after all the sys_reg reset.
+> +	 */
+> +	if (vcpu->arch.reset_state.reset) {
+> +		unsigned long target_pc = vcpu->arch.reset_state.pc;
+> +
+> +		/* Gracefully handle Thumb2 entry point */
+> +		if (target_pc & 1) {
+> +			target_pc &= ~1UL;
+> +			vcpu_set_thumb(vcpu);
+> +		}
+> +
+> +		/* Propagate caller endianness */
+> +		if (vcpu->arch.reset_state.be)
+> +			kvm_vcpu_set_be(vcpu);
+> +
+> +		*vcpu_pc(vcpu) = target_pc;
+> +		vcpu_set_reg(vcpu, 0, vcpu->arch.reset_state.r0);
+> +
+> +		vcpu->arch.reset_state.reset = false;
+> +	}
+> +
+>  	/* Reset arch_timer context */
+>  	return kvm_timer_vcpu_reset(vcpu);
+>  }
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 7732d0ba4e60..da3fc7324d68 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -48,6 +48,7 @@
+>  #define KVM_REQ_SLEEP \
+>  	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
+>  #define KVM_REQ_IRQ_PENDING	KVM_ARCH_REQ(1)
+> +#define KVM_REQ_VCPU_RESET	KVM_ARCH_REQ(2)
+>  
+>  DECLARE_STATIC_KEY_FALSE(userspace_irqchip_in_use);
+>  
+> @@ -208,6 +209,13 @@ struct kvm_cpu_context {
+>  
+>  typedef struct kvm_cpu_context kvm_cpu_context_t;
+>  
+> +struct vcpu_reset_state {
+> +	unsigned long	pc;
+> +	unsigned long	r0;
+> +	bool		be;
+> +	bool		reset;
+> +};
+> +
+>  struct kvm_vcpu_arch {
+>  	struct kvm_cpu_context ctxt;
+>  
+> @@ -297,6 +305,9 @@ struct kvm_vcpu_arch {
+>  	/* Virtual SError ESR to restore when HCR_EL2.VSE is set */
+>  	u64 vsesr_el2;
+>  
+> +	/* Additional reset state */
+> +	struct vcpu_reset_state	reset_state;
+> +
+>  	/* True when deferrable sysregs are loaded on the physical CPU,
+>  	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
+>  	bool sysregs_loaded_on_cpu;
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index f21a2a575939..f16a5f8ff2b4 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -32,6 +32,7 @@
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_coproc.h>
+> +#include <asm/kvm_emulate.h>
+>  #include <asm/kvm_mmu.h>
+>  
+>  /* Maximum phys_shift supported for any VM on this host */
+> @@ -146,6 +147,29 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+>  	/* Reset system registers */
+>  	kvm_reset_sys_regs(vcpu);
+>  
+> +	/*
+> +	 * Additional reset state handling that PSCI may have imposed on us.
+> +	 * Must be done after all the sys_reg reset.
+> +	 */
+> +	if (vcpu->arch.reset_state.reset) {
+> +		unsigned long target_pc = vcpu->arch.reset_state.pc;
+> +
+> +		/* Gracefully handle Thumb2 entry point */
+> +		if (vcpu_mode_is_32bit(vcpu) && (target_pc & 1)) {
+> +			target_pc &= ~1UL;
+> +			vcpu_set_thumb(vcpu);
+> +		}
+> +
+> +		/* Propagate caller endianness */
+> +		if (vcpu->arch.reset_state.be)
+> +			kvm_vcpu_set_be(vcpu);
+> +
+> +		*vcpu_pc(vcpu) = target_pc;
+> +		vcpu_set_reg(vcpu, 0, vcpu->arch.reset_state.r0);
+> +
+> +		vcpu->arch.reset_state.reset = false;
+> +	}
+> +
+>  	/* Reset PMU */
+>  	kvm_pmu_vcpu_reset(vcpu);
+>  
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index 9e350fd34504..9c486fad3f9f 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -626,6 +626,13 @@ static void vcpu_req_sleep(struct kvm_vcpu *vcpu)
+>  		/* Awaken to handle a signal, request we sleep again later. */
+>  		kvm_make_request(KVM_REQ_SLEEP, vcpu);
+>  	}
+> +
+> +	/*
+> +	 * Make sure we will observe a potential reset request if we've
+> +	 * observed a change to the power state. Pairs with the smp_wmb() in
+> +	 * kvm_psci_vcpu_on().
+> +	 */
+> +	smp_rmb();
+
+I don't believe this should be necessary, because...
+
+>  }
+>  
+>  static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
+> @@ -639,6 +646,9 @@ static void check_vcpu_requests(struct kvm_vcpu *vcpu)
+>  		if (kvm_check_request(KVM_REQ_SLEEP, vcpu))
+>  			vcpu_req_sleep(vcpu);
+>  
+> +		if (kvm_check_request(KVM_REQ_VCPU_RESET, vcpu))
+> +			kvm_reset_vcpu(vcpu);
+
+... we do kvm_check_request here before using the reset data, and we do...
+
+> +
+>  		/*
+>  		 * Clear IRQ_PENDING requests that were made to guarantee
+>  		 * that a VCPU sees new virtual interrupts.
+> diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
+> index 9b73d3ad918a..b9cff1d4b06d 100644
+> --- a/virt/kvm/arm/psci.c
+> +++ b/virt/kvm/arm/psci.c
+> @@ -104,12 +104,10 @@ static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
+>  
+>  static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>  {
+> +	struct vcpu_reset_state *reset_state;
+>  	struct kvm *kvm = source_vcpu->kvm;
+>  	struct kvm_vcpu *vcpu = NULL;
+> -	struct swait_queue_head *wq;
+>  	unsigned long cpu_id;
+> -	unsigned long context_id;
+> -	phys_addr_t target_pc;
+>  
+>  	cpu_id = smccc_get_arg1(source_vcpu) & MPIDR_HWID_BITMASK;
+>  	if (vcpu_mode_is_32bit(source_vcpu))
+> @@ -130,32 +128,30 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>  			return PSCI_RET_INVALID_PARAMS;
+>  	}
+>  
+> -	target_pc = smccc_get_arg2(source_vcpu);
+> -	context_id = smccc_get_arg3(source_vcpu);
+> +	reset_state = &vcpu->arch.reset_state;
+>  
+> -	kvm_reset_vcpu(vcpu);
+> -
+> -	/* Gracefully handle Thumb2 entry point */
+> -	if (vcpu_mode_is_32bit(vcpu) && (target_pc & 1)) {
+> -		target_pc &= ~((phys_addr_t) 1);
+> -		vcpu_set_thumb(vcpu);
+> -	}
+> +	reset_state->pc = smccc_get_arg2(source_vcpu);
+>  
+>  	/* Propagate caller endianness */
+> -	if (kvm_vcpu_is_be(source_vcpu))
+> -		kvm_vcpu_set_be(vcpu);
+> +	reset_state->be = kvm_vcpu_is_be(source_vcpu);
+>  
+> -	*vcpu_pc(vcpu) = target_pc;
+>  	/*
+>  	 * NOTE: We always update r0 (or x0) because for PSCI v0.1
+>  	 * the general puspose registers are undefined upon CPU_ON.
+>  	 */
+> -	smccc_set_retval(vcpu, context_id, 0, 0, 0);
+> -	vcpu->arch.power_off = false;
+> -	smp_mb();		/* Make sure the above is visible */
+> +	reset_state->r0 = smccc_get_arg3(source_vcpu);
+> +
+> +	reset_state->reset = true;
+> +	kvm_make_request(KVM_REQ_VCPU_RESET, vcpu);
+
+... this kvm_make_request() after writing the reset data. The
+kvm_make_request/kvm_check_request embeds the necessary barriers.
+
+>  
+> -	wq = kvm_arch_vcpu_wq(vcpu);
+> -	swake_up_one(wq);
+> +	/*
+> +	 * Make sure the reset request is observed if the change to
+> +	 * power_state is observed.
+> +	 */
+> +	smp_wmb();
+> +
+> +	vcpu->arch.power_off = false;
+
+Or you want to tie the reset data to the observability of the power_off
+state? Why not just tie it to the KVM_REQ_VCPU_RESET request?
+
+> +	kvm_vcpu_wake_up(vcpu);
+>  
+>  	return PSCI_RET_SUCCESS;
+>  }
+> -- 
+> 2.18.0
 > 
+
+Thanks,
+drew
 
 _______________________________________________
 linux-arm-kernel mailing list
