@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 338D7C282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:38:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 225B8C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:39:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0476520821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:38:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D918F2082E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 09:39:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Orh52S1o"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0476520821
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SoR/OuxH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D918F2082E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,42 +25,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KqVtlsg8Euh1wjBVAB5JxWvt5d/VshAaDP8Dz7mc8ig=; b=Orh52S1oKV1sP0
-	ZFJ+Viu5U627G0ZgZdJyvhZy2L29SOLThCsZg1buct3PfS+nY8taE93zN5F6hBfj2y+Z5NiytYkUq
-	+i/F/VmB1p2xHvhVlHpjKegUURe+f4gkH9NsJWamAGHWACfU/RpBkILq8xdSPxKhty+DlsvKLJq3n
-	Fb4F4f7o4ZjXO6O+IzTfVu16r7l4gpIuMCKo2Cfda/8LFqX3I3xiu8m6bCfGbHHeE+IZjTeskthHg
-	Uc7AXShVN9Y+24jXtuQl8CI64GrI0oy8NZcFZb+yCG+DQGepD9B9Ro3/U6M2PqaBuy+utU0aqiafQ
-	TpwHsjvc+JiAN7so+oJg==;
+	List-Owner; bh=2/zY4OdASZxj5ez8a3jIDPYtlTLpXCf6rPQXPLkW934=; b=SoR/OuxHOsWixF
+	eLKUwXHhNyBH0fLxPKuEILAqYzZK4Ut2fQ7EuAYQ3WANJ8XswqtWvX0VnHaSWeww/NhgVwCiTNm7U
+	CY5vjPT1QOGfZXx79ADPM/FsnbsWErL/fkhIA+F/4INupGHWwdnmRP4BPqMfcTwR9Us/4YwTNzJaP
+	fR4rIQw7lJ2PKjxc51xwALay+yPTsPPEIwdw6q7Z+cCbo7mXtyn3v8iBIQW+1WtRcY0e7sER3NTQR
+	F01YOxJp9IrJmFYBFTtI9YAfpaNhZ0xR+dnyma94pC7STL/FlE8nBYjAlAqPpZlGypRi6zP9NVeYi
+	v5OXW870LOFRhHphfgRA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goPqz-00055J-OS; Tue, 29 Jan 2019 09:38:49 +0000
+	id 1goPrA-0005Ei-3F; Tue, 29 Jan 2019 09:39:00 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goPpC-0003hU-UZ
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 09:37:02 +0000
+ id 1goPpC-0003hS-Tp
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 09:37:04 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 713E720654; Tue, 29 Jan 2019 10:36:57 +0100 (CET)
+ id 6F6DD207A3; Tue, 29 Jan 2019 10:36:57 +0100 (CET)
 Received: from localhost.localdomain
  (aaubervilliers-681-1-87-206.w90-88.abo.wanadoo.fr [90.88.29.206])
- by mail.bootlin.com (Postfix) with ESMTPSA id 2925A209EF;
- Tue, 29 Jan 2019 10:36:39 +0100 (CET)
+ by mail.bootlin.com (Postfix) with ESMTPSA id CE6A2209BF;
+ Tue, 29 Jan 2019 10:36:38 +0100 (CET)
 From: Miquel Raynal <miquel.raynal@bootlin.com>
 To: Kishon Vijay Abraham I <kishon@ti.com>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>,
  Gregory Clement <gregory.clement@bootlin.com>,
  Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
  Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Subject: [PATCH v5 6/6] ARM64: dts: marvell: armada-37xx: link USB hosts with
- their PHYs
-Date: Tue, 29 Jan 2019 10:36:35 +0100
-Message-Id: <20190129093635.4321-7-miquel.raynal@bootlin.com>
+Subject: [PATCH v5 5/6] ARM64: dts: marvell: armada-37xx: declare USB2 UTMI
+ PHYs
+Date: Tue, 29 Jan 2019 10:36:34 +0100
+Message-Id: <20190129093635.4321-6-miquel.raynal@bootlin.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190129093635.4321-1-miquel.raynal@bootlin.com>
 References: <20190129093635.4321-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_013659_775871_45BC9AE8 
-X-CRM114-Status: GOOD (  11.49  )
+X-CRM114-CacheID: sfid-20190129_013659_770001_A5BBF3E8 
+X-CRM114-Status: GOOD (  12.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,42 +83,69 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Reference the PHY nodes from the USB controller nodes.
+On Marvell Armada 3700 SoCs there are two USB2 UTMI PHYs. They are
+both very similar but only one has OTG/charging capabilities.
 
-The USB3 host controller is wired to:
-  * the first PHY of the COMPHY IP
-  * the OTG-capable UTMI PHY
-
-The USB2 host controller is wired to:
-  * the host-only UTMI PHY
+Because there are USB host registers and PHY registers mixed in a
+single area, a system controller is also created and referenced from
+both the USB host node and the PHY node.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 28 ++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index d2d8ef00c592..c0b1c9146525 100644
+index 5cfd1b920f31..d2d8ef00c592 100644
 --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
 +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -347,6 +347,8 @@
- 				marvell,usb-misc-reg = <&usb32_syscon>;
+@@ -344,18 +344,46 @@
+ 				compatible = "marvell,armada3700-xhci",
+ 				"generic-xhci";
+ 				reg = <0x58000 0x4000>;
++				marvell,usb-misc-reg = <&usb32_syscon>;
  				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
  				clocks = <&sb_periph_clk 12>;
-+				phys = <&comphy0 0>, <&usb2_utmi_otg_phy>;
-+				phy-names = "usb3-phy", "usb2-utmi-otg-phy";
  				status = "disabled";
  			};
  
-@@ -368,6 +370,8 @@
++			usb2_utmi_otg_phy: phy@5d000 {
++				compatible = "marvell,a3700-utmi-otg-phy";
++				reg = <0x5d000 0x800>;
++				marvell,usb-misc-reg = <&usb32_syscon>;
++				#phy-cells = <0>;
++			};
++
++			usb32_syscon: system-controller@5d800 {
++				compatible = "marvell,armada-3700-usb2-host-device-misc",
++				"syscon";
++				reg = <0x5d800 0x800>;
++			};
++
+ 			usb2: usb@5e000 {
+ 				compatible = "marvell,armada-3700-ehci";
  				reg = <0x5e000 0x1000>;
- 				marvell,usb-misc-reg = <&usb2_syscon>;
++				marvell,usb-misc-reg = <&usb2_syscon>;
  				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+				phys = <&usb2_utmi_host_phy>;
-+				phy-names = "usb2-utmi-host-phy";
  				status = "disabled";
  			};
  
++			usb2_utmi_host_phy: phy@5f000 {
++				compatible = "marvell,a3700-utmi-host-phy";
++				reg = <0x5f000 0x800>;
++				marvell,usb-misc-reg = <&usb2_syscon>;
++				#phy-cells = <0>;
++			};
++
++			usb2_syscon: system-controller@5f800 {
++				compatible = "marvell,armada-3700-usb2-host-misc",
++				"syscon";
++				reg = <0x5f800 0x800>;
++			};
++
+ 			xor@60900 {
+ 				compatible = "marvell,armada-3700-xor";
+ 				reg = <0x60900 0x100>,
 -- 
 2.19.1
 
