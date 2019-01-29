@@ -2,87 +2,68 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E389DC282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 12:33:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C537CC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 12:33:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B43422083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 12:33:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 734A32083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 12:33:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ijcWLVd5";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="LZZN6Wad"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B43422083B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MIi6kBkE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 734A32083B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=s1GmjEOXBi3adt884iXRS86H1UswXk76YA8jfxbx1cs=; b=ijcWLVd5o7MTAQ
-	4padAPCNFcFz/cxJRVnmu4/zq90GKJWcaZSyJCo5P5dqFHk6xgIRPQUO2jkMuzYo44V2ztEzxvTqI
-	CBMfXc40QlZ6DOr3TeakhccaWlDL4rSzDJgJMxpPBR9X35vS+qQUc7aJVts/2aigp8dqQwmNeTIqv
-	euRMHg3yQW70/7ytdK/NDIpgwgLr1Vgd75vOWFM8PJYzUOrR9p4YtT7HLbzJc2/AJNpXEWP9EXnP5
-	IX0nnTcRaucm9sCr0zjk6a9uunWOWcsjfX05BZpGWqPjpc0doH9VsLcF+WaJFf3Jjg/DFLhsW4Hs8
-	09FEZfRblnZLnAtkJSpA==;
+	List-Owner; bh=Uxo2/htqDe62omWVQ41C4U63hYsTzbNSy5xS9d5YLv8=; b=MIi6kBkEmlnBvg
+	AGZexdDItS1fTjzCiQtclXXXUn+iLh8rScGC9GZqrND+4RNREbyfZ6i7a8QByLKDRLm6fmKN+nSDi
+	I6eB9htt8FbHZKQZ5nXujs2wX2Bxwmn4FvtrEc4uJLJZJrnWhs0vJbcYmOLO3nQ49S+ss8PaC1ymB
+	lRMA+OtrPp1RmygL4xt2BnZpX+TQbS+KGDDob3z5zxDJuCiDVirf/zo9f+rB1cQ8E4XxdBtRZVhep
+	uyaYd9IWTiLJjSVc551GWNST92Xbmgs2nH7P+2cFDqgPwFaW1eWE2mB5/xkxFzraBO4qISnHdQws8
+	DXbS8/bsbIpj1b4+DnpQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goSa5-0001C2-Nv; Tue, 29 Jan 2019 12:33:33 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goSWr-000687-39
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 12:30:25 +0000
-Received: by mail-wm1-x342.google.com with SMTP id f188so17503761wmf.5
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 04:30:12 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:content-transfer-encoding:in-reply-to
- :user-agent; bh=oE8Qm9PdZluCUZkLGWY+ZFIppoNu/D2qntGj/3XiAXQ=;
- b=LZZN6Wadr4cjXRY+8dG1EeZk5m/TdVcTfpOsZ5V3GC5hu0tCP6jbbMPBh03ne5P1zy
- ghlKYErOvpXI91DIeGX1ODR8VvIyaDe5KPQSfDOG6AzBpYuhi+79EKFNQFSSbLM68h6D
- 95Z/d7mkgz/UENS2zkiIHBphbNV6BRLo8vu6U=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:content-transfer-encoding
- :in-reply-to:user-agent;
- bh=oE8Qm9PdZluCUZkLGWY+ZFIppoNu/D2qntGj/3XiAXQ=;
- b=bX7PuTJ0MqUA+uhVdlnLbYNBF3xdJsacltuWM8iojuB1Znax2Qv4/LCDLxfaaXXXKW
- Nz8Zpw1i4e6+VtXnxZP4m9zF8Rayz5WKq5EmWB5zIXT7P2DIvdZ0to1URxEoiTaBf/Dj
- M4JM/8KtF44axcM2SBMug8jiotAiVWk2t6SxfHfkuzh6i83vw0yweG7lqz2XzhGBdI1n
- ElGrCf7mlYwe2qX2xdOXh8JtCm/JsS74+PzG7s4jTyIhrWDxslIYhtA50v+b6Pm+sady
- Kfr9FaCtiQqMna/B41HEtdzTw+moz9rqwiW8saIsb45aA0QJfMIyQM1uwa2qCP704cCg
- bxTQ==
-X-Gm-Message-State: AJcUukfyV7dqRLh6778Q+A5c+ANNJYYNp7DDYK3M1lWRh1Izrtqq8XX9
- KLNWhXtspt/Kx23YkU8ns87y8w==
-X-Google-Smtp-Source: ALg8bN6Dv5bto48uf2VZhK8Y3t2maUaWJp3mSF942fyW3hxN7qnMGNqU1ppDG+NKI3dclarAXzygsA==
-X-Received: by 2002:a1c:a755:: with SMTP id q82mr21799557wme.6.1548765010759; 
- Tue, 29 Jan 2019 04:30:10 -0800 (PST)
-Received: from dell ([2.27.35.198])
- by smtp.gmail.com with ESMTPSA id l19sm2852142wme.21.2019.01.29.04.30.09
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 29 Jan 2019 04:30:09 -0800 (PST)
-Date: Tue, 29 Jan 2019 12:30:08 +0000
-From: Lee Jones <lee.jones@linaro.org>
-To: Vijay Khemka <vijaykhemka@fb.com>
-Subject: Re: [PATCH v2] dt-bindings: aspeed-lpc: Make parameter optional
-Message-ID: <20190129123008.GC24070@dell>
-References: <20190118201547.640173-1-vijaykhemka@fb.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190118201547.640173-1-vijaykhemka@fb.com>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+	id 1goSaM-0001QP-3i; Tue, 29 Jan 2019 12:33:50 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goSXg-0007jb-IO
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 12:31:38 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E6B41EBD;
+ Tue, 29 Jan 2019 04:31:01 -0800 (PST)
+Received: from big-swifty.misterjones.org (big-swifty.cambridge.arm.com
+ [10.1.37.186])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 173A93F59C;
+ Tue, 29 Jan 2019 04:30:58 -0800 (PST)
+Date: Tue, 29 Jan 2019 12:31:00 +0000
+Message-ID: <868sz3ve63.wl-marc.zyngier@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH v9 20/26] irqchip/gic-v3: Handle pseudo-NMIs
+In-Reply-To: <c332af8d-4529-dbb0-f760-0c2518823053@arm.com>
+References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
+ <1548084825-8803-21-git-send-email-julien.thierry@arm.com>
+ <86wompuh5j.wl-marc.zyngier@arm.com>
+ <c332af8d-4529-dbb0-f760-0c2518823053@arm.com>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_043013_252934_F8A4DCE3 
-X-CRM114-Status: GOOD (  16.63  )
+X-CRM114-CacheID: sfid-20190129_043105_577266_C701C720 
+X-CRM114-Status: GOOD (  20.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,37 +75,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- linux-aspeed@lists.ozlabs.org, Andrew Jeffery <andrew@aj.id.au>,
- "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- Joel Stanley <joel@jms.id.au>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
+ Jason Cooper <jason@lakedaemon.net>, catalin.marinas@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
+ james.morse@arm.com, joel@joelfernandes.org,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gRnJpLCAxOCBKYW4gMjAxOSwgVmlqYXkgS2hlbWthIHdyb3RlOgoKPiBNZW1vcnktcmVnaW9u
-IGFuZCBmbGFzaCBwaGFuZGxlIGlzIG5vdCBhIHJlcXVpcmVkIHBhcmFtZXRlciwgaXQgaXMKPiBv
-cHRpb25hbCB0byBkZXNjcmliZSBpbiBkZXZpY2UgdHJlZSBhbmQgbmVlZGVkIG9ubHkgdXNlIGJh
-c2lzLgo+IAo+IFNpZ25lZC1vZmYtYnk6IFZpamF5IEtoZW1rYSA8dmlqYXlraGVta2FAZmIuY29t
-Pgo+IC0tLQo+ICBEb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvbWZkL2FzcGVlZC1s
-cGMudHh0IHwgMyArKysKPiAgMSBmaWxlIGNoYW5nZWQsIDMgaW5zZXJ0aW9ucygrKQo+IAo+IGRp
-ZmYgLS1naXQgYS9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvbWZkL2FzcGVlZC1s
-cGMudHh0IGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL21mZC9hc3BlZWQtbHBj
-LnR4dAo+IGluZGV4IDM0ZGQ4OTA4N2NmZi4uZDI4YzRlMTE3NjExIDEwMDY0NAo+IC0tLSBhL0Rv
-Y3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9tZmQvYXNwZWVkLWxwYy50eHQKPiArKysg
-Yi9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvbWZkL2FzcGVlZC1scGMudHh0Cj4g
-QEAgLTEzNSw2ICsxMzUsOSBAQCBSZXF1aXJlZCBwcm9wZXJ0aWVzOgo+ICAtIGNsb2NrczoJY29u
-dGFpbnMgYSBwaGFuZGxlIHRvIHRoZSBzeXNjb24gbm9kZSBkZXNjcmliaW5nIHRoZSBjbG9ja3Mu
-Cj4gIAkJVGhlcmUgc2hvdWxkIHRoZW4gYmUgb25lIGNlbGwgcmVwcmVzZW50aW5nIHRoZSBjbG9j
-ayB0byB1c2UKPiAgCj4gK09wdGlvbmFsIHByb3BlcnRpZXM6Cj4gK1RoZXNlIGJlbG93IHByb3Bl
-cnRpZXMgYXJlIG9wdGlvbmFsIHRvIGRlZmluZS4KClRoaXMgbGluZSBpcyBzdXBlcmZsdW91cy4g
-IFBsZWFzZSByZW1vdmUgaXQuCgo+ICsKPiAgLSBtZW1vcnktcmVnaW9uOiBBIHBoYW5kbGUgdG8g
-YSByZXNlcnZlZF9tZW1vcnkgcmVnaW9uIHRvIGJlIHVzZWQgZm9yIHRoZSBMUEMKPiAgCQl0byBB
-SEIgbWFwcGluZwo+ICAKCi0tIApMZWUgSm9uZXMgW+adjueQvOaWr10KTGluYXJvIFNlcnZpY2Vz
-IFRlY2huaWNhbCBMZWFkCkxpbmFyby5vcmcg4pSCIE9wZW4gc291cmNlIHNvZnR3YXJlIGZvciBB
-Uk0gU29DcwpGb2xsb3cgTGluYXJvOiBGYWNlYm9vayB8IFR3aXR0ZXIgfCBCbG9nCgpfX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVs
-IG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDov
-L2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On Tue, 29 Jan 2019 11:33:35 +0000,
+Julien Thierry <julien.thierry@arm.com> wrote:
+> 
+> 
+> 
+> On 28/01/2019 11:59, Marc Zyngier wrote:
+> > On Mon, 21 Jan 2019 15:33:39 +0000,
+> > Julien Thierry <julien.thierry@arm.com> wrote:
+> >>
+> >> Provide a higher priority to be used for pseudo-NMIs. When such an
+> >> interrupt is received, keep interrupts fully disabled at CPU level to
+> >> prevent receiving other pseudo-NMIs while handling the current one.
+> >>
+> >> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> >> Cc: Thomas Gleixner <tglx@linutronix.de>
+> >> Cc: Jason Cooper <jason@lakedaemon.net>
+> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  drivers/irqchip/irq-gic-v3.c | 42 ++++++++++++++++++++++++++++++++++++------
+> >>  1 file changed, 36 insertions(+), 6 deletions(-)
+> >>
+> >> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> >> index 5374b43..4df1e94 100644
+> >> --- a/drivers/irqchip/irq-gic-v3.c
+> >> +++ b/drivers/irqchip/irq-gic-v3.c
+> >> @@ -41,6 +41,8 @@
+> >>  
+> >>  #include "irq-gic-common.h"
+> >>  
+> >> +#define GICD_INT_NMI_PRI	(GICD_INT_DEF_PRI & ~0x80)
+> >> +
+> >>  #define FLAGS_WORKAROUND_GICR_WAKER_MSM8996	(1ULL << 0)
+> >>  
+> >>  struct redist_region {
+> >> @@ -381,12 +383,45 @@ static u64 gic_mpidr_to_affinity(unsigned long mpidr)
+> >>  	return aff;
+> >>  }
+> >>  
+> >> +static inline void gic_deactivate_unexpected_irq(u32 irqnr)
+> > 
+> > Same remark as on some other patches: you should be able to drop the
+> > inline attribute without any ill effect. I'd also like this to be
+> > renamed "gic_deactivate_spurious", or something similar.
+> > 
+> 
+> I'm a bit concern about using spurious since it is not related to
+> GICC_INT_SPURIOUS, we actually read a valid IRQ number, we just don't
+> know how we should handle it.
+
+Well, I'd say that in the case of GICC_INT_SPURIOUS, there is nothing
+to deactivate, but hey... ;-)
+
+> Would "gic_deactivate_unhandled" work? Or "gic_deactivate_bad"?
+
+Sure, any will do.
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
