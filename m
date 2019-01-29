@@ -7,54 +7,58 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C05DBC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:13:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AF3EFC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:21:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 872E920880
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:13:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7EC2520882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 19:21:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="plaSXoza"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 872E920880
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VnL+KKkV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7EC2520882
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mleia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=zZoFIZwLyN7uY56Y7sUkbArpyOWKr51SEFLe9RneOzM=; b=pla
-	SXozaVL2fQy/gQe9rcZcrDHZ97fdUEgcMDUys1PGtfncmsC7HtQ7+uU1TUhStWtJrX6eppbVQasXO
-	rWjsqzSH/o8wEAoaRoD8wtn8QH8SfWuutrvBTPiaGUzMhbEQWxvIGan9/V1iPI9Ft4qJdh3I7xHWq
-	NbuZmptrwH6Qhhk75uDkluZh6Ly+HHAYW5Sk9DCEzZS1PgfmNwU4EEcQp3jbTG1ta0Yl9E6b5PskD
-	VBldolEUAi/+xXjvuAL4YVfbfVd4CGUou9xJGbBLIJ1fBYYRMZS1RB8is4ShroetYJO1dm3LFh9w9
-	oJZid6nBisp9ssClTrRxuAZbors77sw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=3kIAyUybCFfvOgsLdDJ5vfKxcJWCa+m355kRDzP8W4M=; b=VnL+KKkV8vif/t
+	cNuMMxtg5/qzatfSL6OnxHaskmtpkvf2LP7SzA4tseesImvdBqnveBN8dZN5fYz+OWy5qaenkLbuk
+	D6xdnQDolLFz+q7wINgDuoGgrM6mspxcgFXJSyPcQNfkJgJ46l6TkPow20zjK0k/QxwhXOqv/YYtK
+	sgFqLHrxEkL2qFaTAAjlYWTxaOAQnNIDuZud46wU8EblYL2x7HrpDNlE0nQR9vnvoJgLA+2d8mkjb
+	5xNgom3+TbbDgHn1uVCw1sLcKQY4lZRzmcyMfawA7r27BDk12Uw+vjV7fjTEFB+llLQe1pn/W+9Nk
+	PCidHfxTVysHH+O+VsAQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goYop-0006ai-6Z; Tue, 29 Jan 2019 19:13:11 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goYoO-0006Do-2P
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 19:12:54 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A3BF4A78;
- Tue, 29 Jan 2019 11:12:42 -0800 (PST)
-Received: from en101.cambridge.arm.com (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id
- 2A67C3F557; Tue, 29 Jan 2019 11:12:41 -0800 (PST)
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH] kvm: arm64: Relax the restriction on using stage2 PUD huge
- mapping
-Date: Tue, 29 Jan 2019 19:12:17 +0000
-Message-Id: <1548789137-4446-1-git-send-email-suzuki.poulose@arm.com>
-X-Mailer: git-send-email 2.7.4
+	id 1goYwW-0001ps-8g; Tue, 29 Jan 2019 19:21:08 +0000
+Received: from mleia.com ([178.79.152.223] helo=mail.mleia.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goYwP-0001o4-0s
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 19:21:04 +0000
+Received: from mail.mleia.com (localhost [127.0.0.1])
+ by mail.mleia.com (Postfix) with ESMTP id 53F2443EF1B;
+ Tue, 29 Jan 2019 19:20:57 +0000 (GMT)
+From: Vladimir Zapolskiy <vz@mleia.com>
+To: Sylvain Lemieux <slemieux.tyco@gmail.com>,
+ Russell King <linux@armlinux.org.uk>
+Subject: [PATCH 02/13] ARM: defconfig: lpc32xx: enable DRM simple panel driver
+Date: Tue, 29 Jan 2019 21:20:38 +0200
+Message-Id: <20190129192049.11223-3-vz@mleia.com>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190129192049.11223-1-vz@mleia.com>
+References: <20190129192049.11223-1-vz@mleia.com>
+MIME-Version: 1.0
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-49551924 
+X-CRM114-CacheID: sfid-20190129_192057_363354_5750D86E 
+X-CRM114-Status: UNSURE (   9.60  )
+X-CRM114-Notice: Please train this message. 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_111244_661612_D7DEF117 
-X-CRM114-Status: GOOD (  13.08  )
+X-CRM114-CacheID: sfid-20190129_192057_363354_5750D86E 
+X-CRM114-Status: UNSURE (   9.21  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,54 +70,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: cdall@kernel.org, kvm@vger.kernel.org,
- Suzuki K Poulose <suzuki.poulose@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>, linux-kernel@vger.kernel.org,
- kvmarm@lists.cs.columbia.edu
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-We restrict mapping the PUD huge pages in stage2 to only when the
-stage2 has 4 level page table, leaving the feature unused with
-the default IPA size. But we could use it even with a 3
-level page table, i.e, when the PUD level is folded into PGD,
-just like the stage1. Relax the condition to allow using the
-PUD huge page mappings at stage2 when it is possible.
+Phytec phyCORE-LPC3250 board is equipped with a Sharp LQ035Q7DB03
+3.5" QVGA TFT panel, enable simple panel device driver to get it
+supported in the kernel image by default.
 
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 ---
- virt/kvm/arm/mmu.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/configs/lpc32xx_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index fbdf3ac..30251e2 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1695,11 +1695,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 
- 	vma_pagesize = vma_kernel_pagesize(vma);
- 	/*
--	 * PUD level may not exist for a VM but PMD is guaranteed to
--	 * exist.
-+	 * The stage2 has a minimum of 2 level table (For arm64 see
-+	 * kvm_arm_setup_stage2()). Hence, we are guaranteed that we can
-+	 * use PMD_SIZE huge mappings (even when the PMD is folded into PGD).
-+	 * As for PUD huge maps, we must make sure that we have at least
-+	 * 3 levels, i.e, PMD is not folded.
- 	 */
- 	if ((vma_pagesize == PMD_SIZE ||
--	     (vma_pagesize == PUD_SIZE && kvm_stage2_has_pud(kvm))) &&
-+	     (vma_pagesize == PUD_SIZE && kvm_stage2_has_pmd(kvm))) &&
- 	    !force_pte) {
- 		gfn = (fault_ipa & huge_page_mask(hstate_vma(vma))) >> PAGE_SHIFT;
- 	}
+diff --git a/arch/arm/configs/lpc32xx_defconfig b/arch/arm/configs/lpc32xx_defconfig
+index 23b4d5348e39..e752fb704df0 100644
+--- a/arch/arm/configs/lpc32xx_defconfig
++++ b/arch/arm/configs/lpc32xx_defconfig
+@@ -107,6 +107,7 @@ CONFIG_PNX4008_WATCHDOG=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_DRM=y
++CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_DRM_PL111=y
+ CONFIG_FB_MODE_HELPERS=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
 -- 
-2.7.4
+2.20.1
 
 
 _______________________________________________
