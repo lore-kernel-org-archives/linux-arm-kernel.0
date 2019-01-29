@@ -2,76 +2,89 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E474AC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 14:59:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F1725C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 15:03:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A91792175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 14:59:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C1CFA2175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 15:03:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d200mO8N";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="e4JQw+Gb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A91792175B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hT3T6vpC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="L/EYODH/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C1CFA2175B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=N+obfuWYcgh67mu+lvZjQbqdg+jLTqG2kbuJ6bcixfU=; b=d200mO8N0Qn0aD
-	yx8sNpjec9uD2qrW2761foV1jTjhCdU9q1CmrnMvlP+XwgQveatR59vAeRIWBS8JI0AtceLu7wUPG
-	+MEDXnPZgUxJ5lxAbucJyo/YyVUx0HtWxJs0sx2chwY6aHB/0CZJlbotE/yR08Me+cqH90pCQSQU1
-	NNQ17afz0h9/faWNhvP1+nYPlhAnEfKCfvtSMBjpmMAHnI69GL7IeqUdos0pu0hTe064sEz9gC1l0
-	TwXHzdyXvezgUxHF5zHBkSvlZ2oQZtYLjsZFccmvm2mSOi4hggW2MXIQE6HhSZHdWmZBIFFbmsfcs
-	Zn/9Yxypmvy5RpQHmTxQ==;
+	List-Owner; bh=AGgu4HQtwr55JIAqBjuFvPhevXab4VNIsUVOPTz85CA=; b=hT3T6vpClsgTkr
+	aDwNwOJ4DoVnzhCagCA765OcJromslCDFCgSGzRdP6eFWagWZfwyDR/lvUq+SVk0jTh+e7BOdMJFF
+	mFzPpu/JMfLI3Jjr2331pwZMc9C8n+BwZWw+SPTvTbBZAXqrwJOWIA6l+uKnBwGlrnJPB+fJ0uyi6
+	P7CDwSBT//1DLW/UkvrkK5DkOM/Rna4aN7j2u98Ji7LYhjmREw4LGtPppmyoGWphOV3K9mSrOFjoZ
+	dODGpaNDovFWLu1vJztI6dAQfqwOQ1w7v0K4VbFeKZXaFdnwBNpyRZ5Y+O7ltVymiQfPPs7dfRxLE
+	RmCOLKkckc8m7uC5hUpw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goUrj-0001Oe-E0; Tue, 29 Jan 2019 14:59:55 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1goUui-0003m8-Gm; Tue, 29 Jan 2019 15:03:00 +0000
+Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goUri-0001OW-Fn
- for linux-arm-kernel@bombadil.infradead.org; Tue, 29 Jan 2019 14:59:54 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:Content-Type:
- MIME-Version:References:In-Reply-To:Message-ID:Subject:Cc:To:From:Date:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=Bpok+/RycEtZupHiAdTqfud8JgaqhJf69hEkrbMlRms=; b=e4JQw+GbCSlD+OgDgNNR+6IlHV
- WTKKm+ogRcuwEjBGh+Q4Zjf2k09rbWJz9M7wUHl/NjLYSe+HJrzVxnm4PAF8LfA9rfl7ajUYbFJf2
- URQd0DI/pXIHi3ASPwZ7UFCYImHLFnws1wHB8CO0ZeDAw3eoqiXwy8esD/7GwWgEXkEeqyUcrLZEi
- l+CLwnJ3t46qa7bv0m0DQiVmn8//mun8Rml4cvIa3WtNDOnnEEX72/26m0b/UzAotEMObsmXDsC+L
- 4USWC4jlL/QgoKWW5qBW7Siitp6DU+7jFeJacmIkPg+Kups6BIAXGWrETG4oDEmDHjfjav9rew2za
- IN50slNw==;
-Received: from relay8-d.mail.gandi.net ([217.70.183.201])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goUre-0002Jf-LO
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 14:59:52 +0000
-X-Originating-IP: 90.88.147.226
-Received: from windsurf (aaubervilliers-681-1-27-226.w90-88.abo.wanadoo.fr
- [90.88.147.226]) (Authenticated sender: thomas.petazzoni@bootlin.com)
- by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id C84841BF20D;
- Tue, 29 Jan 2019 14:59:14 +0000 (UTC)
-Date: Tue, 29 Jan 2019 15:59:13 +0100
-From: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-To: Leigh Brown <leigh@solinno.co.uk>
-Subject: Re: Out-of-tree mwlwifi driver crashes
-Message-ID: <20190129155913.163f1e98@windsurf>
-In-Reply-To: <01e409217be1c1cb08ac3bab072fccd3@solinno.co.uk>
-References: <01e409217be1c1cb08ac3bab072fccd3@solinno.co.uk>
-Organization: Bootlin
-X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
+ id 1goUud-0003lK-3m
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 15:02:58 +0000
+Received: by mail-it1-x144.google.com with SMTP id g85so4914727ita.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 29 Jan 2019 07:02:54 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=tcGl2vWERSNLlX1x8MuJ4PVihGXS6s5oBYyDN8j2C+4=;
+ b=L/EYODH/BFh8kjNGedPQPzgYsWDsS/GAzL2nDVkbX2c6vJYVWFyZhjzw42Iw+ZfLtd
+ J9HJQpiVKRb7IuQBXeAx81kurTvlCp2DNAc3LJY7ewn7wAxfD5aXHg3NfqyBGfy0VLvE
+ d8MYkIH4NsQW53RhLy2RQZO1QwQ1OrqLEy4V0=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=tcGl2vWERSNLlX1x8MuJ4PVihGXS6s5oBYyDN8j2C+4=;
+ b=VQDl+C0w0xrNI0S6al3ipuyIrYFzjF3cUYVxksh0UuerXOWEN7EUnvaiWXjYbvTNC+
+ uBfq+kg3WKuJ2Ahpi76HCKXHfnq6rVNToVCkZ8ZurPld7/XIWvSzSxMC+zhNISvY1ndT
+ ij74rUyCClsLhgCB66Oe7HneJSJDBeeRT/B4kszY0nUhOrXYLi5snTsUUC3btln9h/qN
+ TN8P3ae37sIhvecU4XkFGFdq+68+JSd65lbiOid2d7zw95+j170cJ/foU+jC5B4iMOnp
+ LMVJZgPWSenQk8J729qXWsCztgSqUL3DqzYNsN9F/0tUxjyMlGk42OjczCGKNq/bg2Sl
+ ZqFw==
+X-Gm-Message-State: AJcUukd1VG6eMHGStTjfMzGpb0e4JVSyxr16y8xOBvfZ7MEMEROBNkVE
+ CA9FdNvwcq0tVvCy+xNM4EomvBRYsBE8v5DunzrvnQ==
+X-Google-Smtp-Source: ALg8bN7ZsCbM/WBP2/WHL1rhL8TyzZra1quuvz0nSUIsnxTTR50HbjGIsaRMZRL0Ji/IG3VQVqPH3mFrkjcBUj7+Wpk=
+X-Received: by 2002:a02:734b:: with SMTP id a11mr14929593jae.62.1548774173968; 
+ Tue, 29 Jan 2019 07:02:53 -0800 (PST)
 MIME-Version: 1.0
+References: <20190121055335.15430-1-vivek.gautam@codeaurora.org>
+ <CAKv+Gu8P-5hxZ8+OV_xSZteTvCLw-Sc-=KJM1i=3aWajcS9bUw@mail.gmail.com>
+ <CAFp+6iEp-bzMrZz8cFUciTFKm7TwAoLdYpsSTD73kDfCRh60bA@mail.gmail.com>
+ <CAKv+Gu9z_mGwdZYMKPfM_g2MZwrCF5=f4WAdn_R6wJ1A9xSZ_Q@mail.gmail.com>
+ <dbba5a8a-70c0-dd01-713c-081eb412e2d7@arm.com>
+ <CAKv+Gu8K5f0va9q4FYk9x1puoOTDjZ0c25qokm2izSVAwd1gmQ@mail.gmail.com>
+ <964779d6-c676-3379-bf1e-cde0dd82d63d@arm.com>
+ <CAKv+Gu_Oz-QEFnq9KiOBHQrC8o+0ykkEZBm0vCWfYDfFB8QTcQ@mail.gmail.com>
+ <CAFp+6iESSKZsG06j9RJDn3n84zNT=b962sEyPwfyW1u5DGu-+A@mail.gmail.com>
+ <CAKv+Gu964=UOPcxh1ZZ4HEvJonrQ_d21t=GbVV9XwV3o91c6ng@mail.gmail.com>
+ <CAFp+6iGJLNA-sgr+rCZsf20h8Ha0aVh4zKcxYQ_nYjP9CemVpw@mail.gmail.com>
+In-Reply-To: <CAFp+6iGJLNA-sgr+rCZsf20h8Ha0aVh4zKcxYQ_nYjP9CemVpw@mail.gmail.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Tue, 29 Jan 2019 16:02:41 +0100
+Message-ID: <CAKv+Gu9c2YYQdDNV_9Lgs3nb8MFXNvLj8GdeOfEnHvPAw6qAfg@mail.gmail.com>
+Subject: Re: [PATCH 0/3] iommu/arm-smmu: Add support to use Last level cache
+To: Vivek Gautam <vivek.gautam@codeaurora.org>, 
+ Bjorn Andersson <bjorn.andersson@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_095950_806228_0AF975D2 
-X-CRM114-Status: GOOD (  19.52  )
+X-CRM114-CacheID: sfid-20190129_070255_154036_32ED7CBC 
+X-CRM114-Status: GOOD (  43.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,59 +96,193 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org
+Cc: pdaly@codeaurora.org, linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ "list@263.net:IOMMU DRIVERS" <iommu@lists.linux-foundation.org>,
+ Robin Murphy <robin.murphy@arm.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ pratikp@codeaurora.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello Leigh,
+(+ Bjorn)
 
-On Tue, 29 Jan 2019 13:47:38 +0000
-Leigh Brown <leigh@solinno.co.uk> wrote:
+On Mon, 28 Jan 2019 at 12:27, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
+>
+> Hi Ard,
+>
+> On Thu, Jan 24, 2019 at 1:25 PM Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+> >
+> > On Thu, 24 Jan 2019 at 07:58, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
+> > >
+> > > On Mon, Jan 21, 2019 at 7:55 PM Ard Biesheuvel
+> > > <ard.biesheuvel@linaro.org> wrote:
+> > > >
+> > > > On Mon, 21 Jan 2019 at 14:56, Robin Murphy <robin.murphy@arm.com> wrote:
+> > > > >
+> > > > > On 21/01/2019 13:36, Ard Biesheuvel wrote:
+> > > > > > On Mon, 21 Jan 2019 at 14:25, Robin Murphy <robin.murphy@arm.com> wrote:
+> > > > > >>
+> > > > > >> On 21/01/2019 10:50, Ard Biesheuvel wrote:
+> > > > > >>> On Mon, 21 Jan 2019 at 11:17, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
+> > > > > >>>>
+> > > > > >>>> Hi,
+> > > > > >>>>
+> > > > > >>>>
+> > > > > >>>> On Mon, Jan 21, 2019 at 12:56 PM Ard Biesheuvel
+> > > > > >>>> <ard.biesheuvel@linaro.org> wrote:
+> > > > > >>>>>
+> > > > > >>>>> On Mon, 21 Jan 2019 at 06:54, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
+> > > > > >>>>>>
+> > > > > >>>>>> Qualcomm SoCs have an additional level of cache called as
+> > > > > >>>>>> System cache, aka. Last level cache (LLC). This cache sits right
+> > > > > >>>>>> before the DDR, and is tightly coupled with the memory controller.
+> > > > > >>>>>> The clients using this cache request their slices from this
+> > > > > >>>>>> system cache, make it active, and can then start using it.
+> > > > > >>>>>> For these clients with smmu, to start using the system cache for
+> > > > > >>>>>> buffers and, related page tables [1], memory attributes need to be
+> > > > > >>>>>> set accordingly. This series add the required support.
+> > > > > >>>>>>
+> > > > > >>>>>
+> > > > > >>>>> Does this actually improve performance on reads from a device? The
+> > > > > >>>>> non-cache coherent DMA routines perform an unconditional D-cache
+> > > > > >>>>> invalidate by VA to the PoC before reading from the buffers filled by
+> > > > > >>>>> the device, and I would expect the PoC to be defined as lying beyond
+> > > > > >>>>> the LLC to still guarantee the architected behavior.
+> > > > > >>>>
+> > > > > >>>> We have seen performance improvements when running Manhattan
+> > > > > >>>> GFXBench benchmarks.
+> > > > > >>>>
+> > > > > >>>
+> > > > > >>> Ah ok, that makes sense, since in that case, the data flow is mostly
+> > > > > >>> to the device, not from the device.
+> > > > > >>>
+> > > > > >>>> As for the PoC, from my knowledge on sdm845 the system cache, aka
+> > > > > >>>> Last level cache (LLC) lies beyond the point of coherency.
+> > > > > >>>> Non-cache coherent buffers will not be cached to system cache also, and
+> > > > > >>>> no additional software cache maintenance ops are required for system cache.
+> > > > > >>>> Pratik can add more if I am missing something.
+> > > > > >>>>
+> > > > > >>>> To take care of the memory attributes from DMA APIs side, we can add a
+> > > > > >>>> DMA_ATTR definition to take care of any dma non-coherent APIs calls.
+> > > > > >>>>
+> > > > > >>>
+> > > > > >>> So does the device use the correct inner non-cacheable, outer
+> > > > > >>> writeback cacheable attributes if the SMMU is in pass-through?
+> > > > > >>>
+> > > > > >>> We have been looking into another use case where the fact that the
+> > > > > >>> SMMU overrides memory attributes is causing issues (WC mappings used
+> > > > > >>> by the radeon and amdgpu driver). So if the SMMU would honour the
+> > > > > >>> existing attributes, would you still need the SMMU changes?
+> > > > > >>
+> > > > > >> Even if we could force a stage 2 mapping with the weakest pagetable
+> > > > > >> attributes (such that combining would work), there would still need to
+> > > > > >> be a way to set the TCR attributes appropriately if this behaviour is
+> > > > > >> wanted for the SMMU's own table walks as well.
+> > > > > >>
+> > > > > >
+> > > > > > Isn't that just a matter of implementing support for SMMUs that lack
+> > > > > > the 'dma-coherent' attribute?
+> > > > >
+> > > > > Not quite - in general they need INC-ONC attributes in case there
+> > > > > actually is something in the architectural outer-cacheable domain.
+> > > >
+> > > > But is it a problem to use INC-ONC attributes for the SMMU PTW on this
+> > > > chip? AIUI, the reason for the SMMU changes is to avoid the
+> > > > performance hit of snooping, which is more expensive than cache
+> > > > maintenance of SMMU page tables. So are you saying the by-VA cache
+> > > > maintenance is not relayed to this system cache, resulting in page
+> > > > table updates to be invisible to masters using INC-ONC attributes?
+> > >
+> > > The reason for this SMMU changes is that the non-coherent devices
+> > > can't access the inner caches at all. But they have a way to allocate
+> > > and lookup in system cache.
+> > >
+> > > CPU will by default make use of system cache when the inner-cacheable
+> > > and outer-cacheable memory attribute is set.
+> > >
+> > > So for SMMU page tables to be visible to PTW,
+> > > -- For IO coherent clients, the CPU cache maintenance operations are not
+> > > required for buffers marked Normal Cached to achieve a coherent view of
+> > > memory. However, client-specific cache maintenance may still be
+> > > required for devices
+> > > with local caches (for example, compute DSP local L1 or L2).
+> >
+> > Why would devices need to access the SMMU page tables?
+>
+> No, the devices don't need to access the page tables, rather the PTW does.
+> Sorry for mixing it up.
+>
+> >
+> > > -- For non-IO coherent clients, the CPU cache maintenance operations (cleans
+> > > and/or invalidates) are required at buffer handoff points for buffers marked as
+> > > Normal Cached in any CPU page table in order to observe the latest updates.
+> > >
+> >
+> > Indeed, and this is what your non-coherent SMMU PTW requires, and what
+> > you /should/ get when you omit the 'dma-coherent' property from its DT
+> > node (and if you don't, it is a bug in the SMMU driver that should get
+> > fixed)
+> >
+> > The question is whether using inner-non-cached/outer-cacheable
+> > attributes for the PTW is required for correctness, or whether it is
+> > merely an optimization (since the point of this exercise was to avoid
+> > snoop latency from the SMMU PTW). If it is an optimization, I would
+> > like to understand whether the performance delta between SMMU page
+> > tables in DRAM vs SMMU page tables in the LLC justifies these
+> > intrusive changes to the SMMU driver.
+>
+> IIUC, SMMU uses the TCR configurations to decide how PTW should access
+> the memory. TCR doesn't direct CPU whether to use cacheable or non -cacheable
+> memory to allocate page tables. Is that right?
 
-> The following commit causes the out-of-tree mwlwifi driver [1] to crash, 
-> which
-> I have found with git bisect.
-> 
-> commit 1f08673eef1236f7d02d93fcf596bb8531ef0d12
-> Author: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-> Date:   Thu Oct 18 17:37:18 2018 +0200
-> 
->      PCI: mvebu: Convert to PCI emulated bridge config space
-> 
->      Convert the pci-mvebu driver to use the pci-bridge-emul logic, that
->      helps emulating a root port PCI bridge configuration space.
-> 
->      Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
->      [lorenzo.pieralisi@arm.com: updated commit log]
->      Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
-> I have raised the issue with the driver maintainers but they responded 
-> that
-> this is a kernel regression [2].
-> 
-> Do you think this is a driver issue or a regression? I am happy to test 
-> proposed
-> fixes but I don't understand enough about the driver or PCI to 
-> investigate.
-> 
-> If I revert that single commit, the issue goes away.
+Correct
 
-Thanks a lot for this report. This is the second report related to this
-commit. I already started investigating, but didn't dedicate enough
-time to find a proper fix yet.
+> Currently, these TCR configurations are set for inner-cacheable, and
+> outer-cacheable.
+> With this, is it assumed that PTW would snoop into the CPU caches for
+> any updates
+> of the page tables?
+>
+`
+Yes, and if I understand the issue correctly, this snooping is costly,
+which is why you want to avoid it, right?
 
-Could you share the output of "lspci -vvv -xxx" with the commit applied
-and reverted ?
+> When we omit 'dma-coherent', CPU will allocate non-coherent memory
+> for these page tables, and software has to explicitly flush CPU caches to
+> make the changes visible to SMMU.
 
-Thanks!
+Indeed. But I would expect the TCR configuration to reflect this as
+well, and that doesn't appear the case.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+> The CPU will still mark this memory as Normal Cached, i.e. inner cached,
+> outer cached, and the non-IO coherent SMMU PTW won't be able to snoop into
+> CPU caches. Does the following code in io-pgtable-arm.c ensures that SMMU
+> sees the latest page tables?
+>
+>    } else if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA) &&
+>                     !(pte & ARM_LPAE_PTE_SW_SYNC)) {
+>                  __arm_lpae_sync_pte(ptep, cfg);
+>    }
+>
+
+I don't know the history of why NO_DMA is implemented as a quirk (and
+why it is called like that in the first place).
+But it indeed appears that this is where the cache maintenance occurs
+for non-coherent PTWs.
+
+> This change is mostly to get optimized PTW. As seen in the patch [1] for GPU,
+> there's a separate slice for page tables - "gpuhtw_llc_slice".
+> Let me try to get the numbers for this optimization.
+>
+
+Yes, please. We'd need to compare page tables in the LLC with page
+tables in system RAM, and for completeness, it would be nice to
+include the cache-coherent configuration as well.
 
 _______________________________________________
 linux-arm-kernel mailing list
