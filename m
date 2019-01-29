@@ -2,65 +2,65 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 102A0C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:36:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 891DCC282C7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:39:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D3FE520844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:36:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4EE1320989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:39:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FyLOYCo3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D3FE520844
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iKe5ysbK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4EE1320989
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lGS+35Qu8vmp4EBXf291HH6/EceF1Nso4lqgwAlxYXw=; b=FyLOYCo3tQbUuA
-	d+vBfkyH9ZmgqeWj/q7PhuLWxsn4dr0phMR68XqwL0E8UBQytU0VKT8y4/T4qzo4xkW83mtnT6zuT
-	QXT9gV3mciDYjfqH7euo8f9EH9F5fgVLq+57ZMrWOihz0JQSiU36+0VPXXsqMzFRJOGrboqh8L96d
-	p3947VRNl1FgOrTE10z9Xl27IbHOhpA/xIj0V24i5uliKmoTVLctBDPznWWpYaI+GHRampAaqOnzZ
-	c49HRzIOylahsnHpot8Dr1BU6AQTs2inpptEZwFpwb6UftRzkSZfhFeNNqKrgLI2HZY1YvMXKVKqv
-	9kD+VT+NwybeS7B7pBPA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=LzSNrkf4PKJgPzqqmEYcJt9IOtaOR7qjmocPc1boFdM=; b=iKe5ysbKFg2s8g
+	InzCs5T5dBrtTve2U6PfDL//KDdeQFQ/hQMWJMuJlaWqalRGWWVL8IEwPNqxI2Pzjm1prP/TYOx2J
+	lMuThbKbL83fbiMd/v3eQ/9nxYf6DhGcTO3fbxTp8yDPPThzNeGGgCevdzOV7InuTE9ylu7OQKb62
+	aEYgcKYD9dxLx0aR5O7mqE9mBGen6h61iP60A6fxpZm9MXB1p6xJJpVUCACHxxQMNmEGE3uWjF8v+
+	M7I+CaKNJXobPp8HdFFsDtsbo6CB5cYROzcOf+UGCHcQc8jVgX0e/qDbz0aX2c/Fd/ijwJ7vXxUds
+	kKWJWW5kRfuuXNKNDMDA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goRhA-0000V8-JS; Tue, 29 Jan 2019 11:36:48 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1goRjg-0000xE-Js; Tue, 29 Jan 2019 11:39:24 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goRgS-0008OC-Lx
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 11:36:27 +0000
+ id 1goRjc-0000wn-C0
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 11:39:21 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 193ADEBD;
- Tue, 29 Jan 2019 03:36:04 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D15093F589;
- Tue, 29 Jan 2019 03:36:01 -0800 (PST)
-Subject: Re: [PATCH v9 21/26] irqchip/gic: Add functions to access irq
- priorities
-To: Marc Zyngier <marc.zyngier@arm.com>
-References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
- <1548084825-8803-22-git-send-email-julien.thierry@arm.com>
- <86va29ugy0.wl-marc.zyngier@arm.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <a47b09ff-7d68-8ed9-785e-8334319aef37@arm.com>
-Date: Tue, 29 Jan 2019 11:36:00 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DA353EBD;
+ Tue, 29 Jan 2019 03:39:17 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 37ABF3F589;
+ Tue, 29 Jan 2019 03:39:15 -0800 (PST)
+Date: Tue, 29 Jan 2019 11:39:10 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: "Z.q. Hou" <zhiqiang.hou@nxp.com>,
+ "l.subrahmanya@mobiveil.co.in" <l.subrahmanya@mobiveil.co.in>
+Subject: Re: [PATCHv3 00/27] PCI: refactor Mobiveil driver and add PCIe Gen4
+ driver for NXP Layerscape SoCs
+Message-ID: <20190129113910.GA7467@e107981-ln.cambridge.arm.com>
+References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
 MIME-Version: 1.0
-In-Reply-To: <86va29ugy0.wl-marc.zyngier@arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_033606_245143_4979B315 
-X-CRM114-Status: GOOD (  17.32  )
+X-CRM114-CacheID: sfid-20190129_033920_422475_9422A912 
+X-CRM114-Status: GOOD (  17.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,67 +72,97 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
- Jason Cooper <jason@lakedaemon.net>, catalin.marinas@arm.com,
- will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
- james.morse@arm.com, joel@joelfernandes.org,
- Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Xiaowei Bao <xiaowei.bao@nxp.com>,
+ "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
+ "will.deacon@arm.com" <will.deacon@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Leo Li <leoyang.li@nxp.com>, "M.h. Lian" <minghuan.lian@nxp.com>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, Mingkai Hu <mingkai.hu@nxp.com>,
+ "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
+ "bhelgaas@google.com" <bhelgaas@google.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 28/01/2019 12:04, Marc Zyngier wrote:
-> On Mon, 21 Jan 2019 15:33:40 +0000,
-> Julien Thierry <julien.thierry@arm.com> wrote:
->>
->> Add accessors to the GIC distributor/redistributors priority registers.
->>
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  drivers/irqchip/irq-gic-common.c | 10 ++++++++++
->>  drivers/irqchip/irq-gic-common.h |  2 ++
->>  2 files changed, 12 insertions(+)
->>
->> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
->> index 3c93c6f..04eadbc 100644
->> --- a/drivers/irqchip/irq-gic-common.c
->> +++ b/drivers/irqchip/irq-gic-common.c
->> @@ -110,6 +110,16 @@ int gic_configure_irq(unsigned int irq, unsigned int type,
->>  	return ret;
->>  }
->>  
->> +void gic_set_irq_prio(unsigned int irq, void __iomem *base, u8 prio)
->> +{
->> +	writeb_relaxed(prio, base + GIC_DIST_PRI + irq);
->> +}
->> +
->> +u8 gic_get_irq_prio(unsigned int irq, void __iomem *base)
->> +{
->> +	return readb_relaxed(base + GIC_DIST_PRI + irq);
->> +}
->> +
+On Tue, Jan 29, 2019 at 08:08:28AM +0000, Z.q. Hou wrote:
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > 
-> Is there a reason why this is in irq-gic-common.c? If we can avoid it,
-> I'd rather this is made private to GICv3, as I do not intend to
-> support this for earlier revisions on the architecture.
+> This patch set is aim to refactor the Mobiveil driver and add
+> PCIe support for NXP Layerscape series SoCs integrated Mobiveil's
+> PCIe Gen4 controller.
 > 
+> Hou Zhiqiang (27):
+>   PCI: mobiveil: uniform the register accessors
+>   PCI: mobiveil: format the code without function change
+>   PCI: mobiveil: correct the returned error number
+>   PCI: mobiveil: remove flag MSI_FLAG_MULTI_PCI_MSI
+>   PCI: mobiveil: correct PCI base address in MEM/IO outbound windows
+>   PCI: mobiveil: replace the resource list iteration function
+>   PCI: mobiveil: use WIN_NUM_0 explicitly for CFG outbound window
+>   PCI: mobiveil: use the 1st inbound window for MEM inbound transactions
+>   PCI: mobiveil: correct inbound/outbound window setup routines
+>   PCI: mobiveil: fix the INTx process error
+>   PCI: mobiveil: only fix up the Class Code field
+>   PCI: mobiveil: move out the link up waiting from mobiveil_host_init
+>   PCI: mobiveil: move irq chained handler setup out of DT parse
+>   PCI: mobiveil: initialize Primary/Secondary/Subordinate bus number
+>   dt-bindings: pci: mobiveil: change gpio_slave and apb_csr to optional
+>   PCI: mobiveil: refactor Mobiveil PCIe Host Bridge IP driver
+>   PCI: mobiveil: fix the checking of valid device
+>   PCI: mobiveil: continue to initialize the host upon no PCIe link
+>   PCI: mobiveil: disabled IB and OB windows set by bootloader
+>   PCI: mobiveil: add Byte and Half-Word width register accessors
+>   PCI: mobiveil: make mobiveil_host_init can be used to re-init host
+>   dt-bindings: pci: Add NXP Layerscape SoCs PCIe Gen4 controller
+>   PCI: mobiveil: add PCIe Gen4 RC driver for NXP Layerscape SoCs
+>   PCI: mobiveil: ls_pcie_g4: add Workaround for A-011577
+>   PCI: mobiveil: ls_pcie_g4: add Workaround for A-011451
+>   arm64: dts: freescale: lx2160a: add pcie DT nodes
+>   arm64: defconfig: Enable CONFIG_PCI_LAYERSCAPE_GEN4
 
-The only reason I put it in common is that the same code works both for
-gicv3 and gic drivers.
+Subrahmanya,
 
-But if you prefer the gic driver not to see it I'll move it to the gicv3
-driver.
+Either you review this series or I will have to drop you from
+the MAINTAINERS list for this driver, I am sorry but I asked you
+before to no avail.
 
 Thanks,
+Lorenzo
 
--- 
-Julien Thierry
+>  .../bindings/pci/layerscape-pci-gen4.txt      |  52 ++
+>  .../devicetree/bindings/pci/mobiveil-pcie.txt |   2 +
+>  MAINTAINERS                                   |  10 +-
+>  .../arm64/boot/dts/freescale/fsl-lx2160a.dtsi | 163 ++++
+>  arch/arm64/configs/defconfig                  |   1 +
+>  drivers/pci/controller/Kconfig                |  11 +-
+>  drivers/pci/controller/Makefile               |   2 +-
+>  drivers/pci/controller/mobiveil/Kconfig       |  34 +
+>  drivers/pci/controller/mobiveil/Makefile      |   5 +
+>  .../controller/mobiveil/pci-layerscape-gen4.c | 306 +++++++
+>  .../controller/mobiveil/pcie-mobiveil-host.c  | 640 +++++++++++++
+>  .../controller/mobiveil/pcie-mobiveil-plat.c  |  54 ++
+>  .../pci/controller/mobiveil/pcie-mobiveil.c   | 246 +++++
+>  .../pci/controller/mobiveil/pcie-mobiveil.h   | 229 +++++
+>  drivers/pci/controller/pcie-mobiveil.c        | 861 ------------------
+>  15 files changed, 1743 insertions(+), 873 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pci/layerscape-pci-gen4.txt
+>  create mode 100644 drivers/pci/controller/mobiveil/Kconfig
+>  create mode 100644 drivers/pci/controller/mobiveil/Makefile
+>  create mode 100644 drivers/pci/controller/mobiveil/pci-layerscape-gen4.c
+>  create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+>  create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil-plat.c
+>  create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil.c
+>  create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil.h
+>  delete mode 100644 drivers/pci/controller/pcie-mobiveil.c
+> 
+> -- 
+> 2.17.1
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
