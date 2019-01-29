@@ -2,165 +2,120 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5BDFBC282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 20:40:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 30C7EC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 20:41:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2296D2087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 20:40:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F26122087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 20:41:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P3FAlawa";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="1Si2548G"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2296D2087E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ifKIkfnX";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="l4MbR00t"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F26122087E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=mDDhnn8VSRi5hh0kyFjfW7W3dGvwCASSp/X+/uvXUYU=; b=P3FAlawaoShSvM
-	WgPjB/Py5CDrLNpE4gMzRyJ+mmQ444qKxEeGZenrJZYF822A5Cu5D6DPKno/knEFI0v9dWBl5HUh9
-	UAJ6nMhVwOscCbsFMq8TF5hTBaQVhh7fARqh8CqSldRmWuCidxtOTTZbvpjUNQL2bVzTSTny4WA+w
-	MWZeEJkycac9gQHI+Sxo5LkDpq0HUh6/YZNLLUvfXCZ+JtmeACXKIi/CpPMT6MFUkxHKDjJKq/1ig
-	sQYYJhPmJG+Cnv/e3qRBoBv57v3Sxscc3OXrK/ovC2cxx6glcK883pHHQ+F6e2ZeBqBv7xIUjPvm7
-	m2ZOWWCcfgEMaTq425kw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=FoP1L+NhmzEMX0UjbiY7hpJnBIwSuHxb9Xrgka7KhMs=; b=ifKIkfnXlvio5K
+	DiN96eAm6joR7efFIsouei8ZqTEqqdpQ949wif/1qd/3WaVwTdp2LWzplyYGJgXmyobdrq5MLaGzp
+	7Pr5U2VIHm55wo+8reKXkt16/a/xr6MIF6gBS3yvT328aIUwv9Rnp1XkUgwBsi9HrV5xw8BKE370I
+	YzxSBZ7z3GIRXk4bZFF4R1d4RekwheyZtaQHaz9vTIjxuuzQpwZtcD2IGBV94Dbkm9satWEGnwO9U
+	Ul6Fw9ng3pwytEB9sFI34RZB+StChMCovfNa/NIQdMIvdQYSEoEpUUmYF6/qPr8nRtjt44k/D+reX
+	qjX0G3EISqiapUXWZ9sQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goaB3-0001Bk-P6; Tue, 29 Jan 2019 20:40:13 +0000
-Received: from mail-dm3nam05on0622.outbound.protection.outlook.com
- ([2a01:111:f400:fe51::622]
- helo=NAM05-DM3-obe.outbound.protection.outlook.com)
+	id 1goaBv-0002SI-BY; Tue, 29 Jan 2019 20:41:07 +0000
+Received: from mail-dm3nam03on0616.outbound.protection.outlook.com
+ ([2a01:111:f400:fe49::616]
+ helo=NAM03-DM3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goa9s-0008GS-O3
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 20:39:02 +0000
+ id 1goaAy-0000xp-Se
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 20:40:46 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=m9KFacYqF/RLSQR3qJdWsI+iWk7MojEvOgSu+jBLp/g=;
- b=1Si2548GlERwZojB94Fb03s38wkhs4MVUNg48U8n6NwwwMY082ON2iLEkLhmRB9WOTz1pI8M/VVQ7MBckBlvcm0Uicw4bTuquJ76sACoVA43qRR3Y0vuQjz0GzPHnwAgISIEoKgNlW8o/CbiGan1KQWCPaLqWij7ztCMaaw2xfM=
-Received: from BN7PR02CA0027.namprd02.prod.outlook.com (2603:10b6:408:20::40)
- by DM6PR02MB5018.namprd02.prod.outlook.com (2603:10b6:5:52::19) with
- Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1558.21; Tue, 29 Jan
- 2019 20:38:55 +0000
-Received: from CY1NAM02FT024.eop-nam02.prod.protection.outlook.com
- (2a01:111:f400:7e45::205) by BN7PR02CA0027.outlook.office365.com
- (2603:10b6:408:20::40) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1558.17 via Frontend
- Transport; Tue, 29 Jan 2019 20:38:54 +0000
-Authentication-Results: spf=pass (sender IP is 149.199.60.83)
- smtp.mailfrom=xilinx.com; vger.kernel.org; dkim=none (message not signed)
- header.d=none;vger.kernel.org; dmarc=bestguesspass action=none
- header.from=xilinx.com;
-Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
- 149.199.60.83 as permitted sender) receiver=protection.outlook.com;
- client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
-Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
- CY1NAM02FT024.mail.protection.outlook.com (10.152.74.210) with Microsoft SMTP
- Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1580.10
- via Frontend Transport; Tue, 29 Jan 2019 20:38:53 +0000
-Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
- by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
- (envelope-from <jolly.shah@xilinx.com>)
- id 1goa9k-0007ip-Vp; Tue, 29 Jan 2019 12:38:52 -0800
-Received: from [127.0.0.1] (helo=localhost)
- by xsj-pvapsmtp01 with smtp (Exim 4.63)
- (envelope-from <jolly.shah@xilinx.com>)
- id 1goa9f-0007aV-S5; Tue, 29 Jan 2019 12:38:47 -0800
-Received: from xsj-pvapsmtp01 (maildrop.xilinx.com [149.199.38.66])
- by xsj-smtp-dlp1.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x0TKca9I023878; 
- Tue, 29 Jan 2019 12:38:36 -0800
-Received: from [172.19.2.91] (helo=xsjjollys50.xilinx.com)
- by xsj-pvapsmtp01 with esmtp (Exim 4.63)
- (envelope-from <jollys@xilinx.com>)
- id 1goa9U-0007YY-F9; Tue, 29 Jan 2019 12:38:36 -0800
-From: Jolly Shah <jolly.shah@xilinx.com>
-To: <matthias.bgg@gmail.com>, <andy.gross@linaro.org>, <shawnguo@kernel.org>, 
- <geert+renesas@glider.be>, <bjorn.andersson@linaro.org>,
- <sean.wang@mediatek.com>, <m.szyprowski@samsung.com>,
- <michal.simek@xilinx.com>, <robh+dt@kernel.org>, <mark.rutland@arm.com>
-Subject: [PATCH v6 0/3] drivers: soc: xilinx: Add support for ZynqMP PM driver
-Date: Tue, 29 Jan 2019 12:38:18 -0800
-Message-ID: <1548794301-30483-1-git-send-email-jollys@xilinx.com>
-X-Mailer: git-send-email 2.7.4
-X-RCIS-Action: ALLOW
-X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
-X-TM-AS-User-Approved-Sender: Yes;Yes
-X-EOPAttributedMessage: 0
-X-MS-Office365-Filtering-HT: Tenant
-X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
- SFV:NSPM;
- SFS:(10009020)(396003)(136003)(39860400002)(346002)(376002)(2980300002)(189003)(199004)(478600001)(72206003)(966005)(81156014)(48376002)(4326008)(81166006)(2906002)(39060400002)(106466001)(2201001)(6666004)(356004)(305945005)(36756003)(44832011)(6306002)(8676002)(107886003)(50466002)(426003)(2616005)(126002)(476003)(486006)(7696005)(7416002)(26005)(77096007)(186003)(106002)(36386004)(336012)(51416003)(9786002)(47776003)(50226002)(316002)(8936002)(63266004)(54906003)(16586007)(110136005)(921003)(107986001)(1121003)(2101003)(83996005);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DM6PR02MB5018; H:xsj-pvapsmtpgw01; FPR:;
- SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; MX:1; A:1; 
-X-Microsoft-Exchange-Diagnostics: 1; CY1NAM02FT024;
- 1:YvFunax9TqgkbaOb3hBQ89xtx4oK9if0H+P75Ue0jOqcYZIXleXt0BKmk4YMlpT4u6ks8wrRox00a7AwM4xnXC711REPUF2+fhdoZ6BHM55NsCNBaPOaLC49OkEDX05aR7d2tp9FVO79stc/5GKHE4GVDRgeAf1jepJOiyPfA70=
-MIME-Version: 1.0
-X-MS-PublicTrafficType: Email
-X-MS-Office365-Filtering-Correlation-Id: a1b6cfc8-50d8-4b32-94fd-08d68629c8df
-X-Microsoft-Antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4608076)(4709027)(2017052603328)(7153060);
- SRVR:DM6PR02MB5018; 
-X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB5018;
- 3:vwdAWYc1GIdO0VEiz0hEcQ0uH/2e8377ik4J3mOZFlmJFs3+cFQERav0vODwT7Z95ejCAHtNjBbK79yUPFu+lRXj2JVirGLuMBUID6ponH6/uVf7YdBhFnxkpxwM0tDIBx0oedPhxQxvWakQD6g/fa7kfI76Hpv126Ql6cFseanHU3TLuMv4IQFNvhXr1r2YqLUhPIannsU3sfxykMCLUheR7TyuG3Q72Za13oETfO5wAzZgYeYqI6Ky2LIBE4tC8loopCD4VOe/KEHmzJ2BNwVE3Q9VCzObQQ05cR6fKJs3lgdGtBnMP/veBABTHL67ROTgV0dkmDKrkFSKc8k1PyCfF4Iyd/Wex5JJAarE3VSSpzln/TmvCC3YnMbJqmES;
- 25:o998MgZvNpBIMIAL+XfLCj5lI49y63bz2HVjjy0O1A/A7bLqvUl7NKxbPf1Be3lfvZqnYQWRRo4QWUBywnLaJfK2IEYLVAYNPnza+ssLtUdi5eb9llNVRfAtbwp09bXiz5odXliVK1EPZ0SC0DKiqQz8yfsc72AOfeNr/oON0hyoMZZeAYutploZBrlQnhN5Xy5iQVRemjG7MhvTIKhg/K3pzbK4NagKpbUuBC+u4LEHpeKtjHVmnRrojEEsLhhaT9WdgsXz2wJ7uBbHWB55/+xygwBQNGfjW6OTqgw7R69+JLs9Ibzp+NPyFH/76rHE7EEvuRuPjAiozQCBppQJuQ==
-X-MS-TrafficTypeDiagnostic: DM6PR02MB5018:
-X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB5018;
- 31:9/0kQuorZ86WmsdRAoAsuj7i+qKYfMs9nNji6OumWm7iU3nIdCXErC36OIw/cef2fXKbLqM4tuI2YvBVgsCtghqoEPkHnrzRPxoEvhrAmbgKCyf5Vj/H+RjcvxyzZFNGgxRYmO+hVqkGlzOSmVEBgsqts6+MReutzTvcTCU5abBErMcG7xDGcn7d+LaG4WEzqJfYNPH2jmuQK8KEeAQOsi+/x30Zk0zrvp6+SPY8qr0=;
- 20:S3hT2fCQbH/Y6zQAaLZbxJ3i852qs6VjZez/iJ4IsGuRhdqfJHDCbIorwwSq9TEOG1PGS3ElVgqPogEW298X+/BQ0TCPZOYNQGXKc9a1T/i2j/bI4BcplUgitGPtS8gUbVAQ5ntGaSwb5MSMCJya6QQNZrIdT+ndN2XdSYyFrtUtwPfg4wA0cJELhxyqenDGOlVzzCJoiYwqRoXnclt9NUOnxdT3SlVVbgTKWPy7ouWYrPd8ebHJSZMlsX8gM2qs8QsR6Zv1RZE1J/qj1qkt9sPml2ZANIv1w5nifXjejM/9v0j33obWTiB7eSiF3gqfPl+1s1ZzCe3Va7TyEvpWhTWCevMluOJ0Grx+65qc+7lp/Yg2BynwCXC47Q+cOlxeXK902AeTjZmTl96JuD+RyFhIDem4TmVFs4LLxPiy5zDN8eoynfd8fhWuoDbo5EZefhRHo4Ab8cyrC8PXMRQxYsLYP/Esy73DzgjhCPsY/9UqchAD/XKWuiK/Ikd66zNs
+ bh=ysLSnnGPWm8C3buRpsePcHQIvj4dmhJCFcXGoKTJrJE=;
+ b=l4MbR00tOR1mx+SbTn4ECuaEXsPabzRKVGRuyIpyfpxojOeV6GDuS6+3hOZgJXACi3husqyVXd9RSf2nGnMvxz0k7JdWOc3PoNORg2RJ1scLTmW1m5JAW3+RyDFWgY5i+dBdZz8puZ/MFHJBsJhX7/Kb/6c2nXm276y+Yups9oU=
+Received: from BYAPR02MB5992.namprd02.prod.outlook.com (20.179.89.80) by
+ BYAPR02MB3959.namprd02.prod.outlook.com (20.176.248.27) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1580.16; Tue, 29 Jan 2019 20:40:04 +0000
+Received: from BYAPR02MB5992.namprd02.prod.outlook.com
+ ([fe80::44e4:ab90:ef4d:25e1]) by BYAPR02MB5992.namprd02.prod.outlook.com
+ ([fe80::44e4:ab90:ef4d:25e1%2]) with mapi id 15.20.1558.023; Tue, 29 Jan 2019
+ 20:40:04 +0000
+From: Jolly Shah <JOLLYS@xilinx.com>
+To: Michal Simek <michals@xilinx.com>, "matthias.bgg@gmail.com"
+ <matthias.bgg@gmail.com>, "andy.gross@linaro.org" <andy.gross@linaro.org>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>, "geert+renesas@glider.be"
+ <geert+renesas@glider.be>, "bjorn.andersson@linaro.org"
+ <bjorn.andersson@linaro.org>, "sean.wang@mediatek.com"
+ <sean.wang@mediatek.com>, "m.szyprowski@samsung.com"
+ <m.szyprowski@samsung.com>, Michal Simek <michals@xilinx.com>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
+ <mark.rutland@arm.com>
+Subject: RE: [PATCH v5 2/3] firmware: xilinx: Implement ZynqMP power
+ management APIs
+Thread-Topic: [PATCH v5 2/3] firmware: xilinx: Implement ZynqMP power
+ management APIs
+Thread-Index: AQHUrD6mdAof5ly9qEGscyOgLDHLxqXGT7WAgAB9SRA=
+Date: Tue, 29 Jan 2019 20:40:04 +0000
+Message-ID: <BYAPR02MB59921AA0C4ADDC078FA28BE3B8970@BYAPR02MB5992.namprd02.prod.outlook.com>
+References: <1547493778-22720-1-git-send-email-jollys@xilinx.com>
+ <1547493778-22720-3-git-send-email-jollys@xilinx.com>
+ <e4b34ee3-49ba-8b6e-76ad-69bf078a8256@xilinx.com>
+In-Reply-To: <e4b34ee3-49ba-8b6e-76ad-69bf078a8256@xilinx.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
 X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
-X-Microsoft-Antispam-PRVS: <DM6PR02MB50180AA7616508488263C0A6B8970@DM6PR02MB5018.namprd02.prod.outlook.com>
-X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB5018;
- 4:yvIQ1JdyAqqplN8d81PiNU4YjvFbpNHzoHkc6Kj0mZnI9jwD47KQyLF/+RkCu+X74de9QZp35kOwqzbUUjBJvrsNVQTeyFP+wXM3nbv4jrif2rIF9+Dqr6PD/O0vP4BotD+VZDUJflPc9JSLRGkDfoCyogX/O5bSVG0Qcj2iLyi4oku4zxTPIC8xgzg9JeW3UCySRrIRZtBIUqBg4xz2Wjtp5GZFsrtkr34KicP/whqDJygw8gmvcmgFFrNUo5o4fTNY1pLixcMB5CTVJI55togIZJqPkp9h+kdz6tMr+R6VYsZyRzea75BzPej54a0d
-X-Forefront-PRVS: 093290AD39
-X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; DM6PR02MB5018;
- 23:Dq7eo5ftgI2CN8ZlTk+xNrRPJvGHWWJi4jtChkIbo?=
- =?us-ascii?Q?Nfc7fvkpw2WEbj6ardjvspHhj+e7SmXsixv87hb8h+KN4Si/mKBg9uND/5kW?=
- =?us-ascii?Q?GNzXBl6GJgXsFvZFf0iDfXT16tKX34LlulZXQb0S6Kp+0uJ95Ke4/aIH41p6?=
- =?us-ascii?Q?zGJDTI66tqo18JCTS1/UmsLBfivH8g8W76JdYD73ccAhltcyIdcWGhTTGO0Y?=
- =?us-ascii?Q?TguvCjOXeX3FuI4ny1QNCz0QPQHl3QN+YtgRv25Y41jGtMrIJE3fhp8ORMTG?=
- =?us-ascii?Q?ellt5MZRE7YlFZQe6jrIoGYV2bCT+lgxV+COUTXUclsxxLJm+uAWXvL0uhKw?=
- =?us-ascii?Q?oEGs93eHJKNlYBYbu/JN08EbsRrA6+qV+nzhAEjh6yk66fr+D9tKaGG/yVyv?=
- =?us-ascii?Q?2YLmenLLVGI1Q4ywCn4EqEc5H7sDqrRyE3kSeeCO7RT+LXKO208p9rTNl516?=
- =?us-ascii?Q?aqi6SqCy79yK3GclYmsEb/rqD0JRZJ213Rpyq9Y2ezJ91XKikLAJZKnqbqFt?=
- =?us-ascii?Q?/rS8p3Puk0Ao0DOVfcOuucsVa6Jc7LyeUIPS/H/wnbFSqXZEKtpbHmcTVJPN?=
- =?us-ascii?Q?XIieZotibR6GP4Ovdyf/9ZsJg/GGF1YN6Kwtl4DPslV+arSBFgmrkGcgaKvD?=
- =?us-ascii?Q?UB9At/fN4ha+Q9bRcrg4dkE7lwSBnFiadH3u9C1/lyzxO1bDp9A3VqBnon9u?=
- =?us-ascii?Q?02zU4Iq9scQ/IbVJMysAUrwiPnfh+LRoO0Hw10sHWFeqQCm7Fg0fPaAk0H1H?=
- =?us-ascii?Q?Zr6ZDdwUu7sKNGfn9Hwr6w+71iLyqySTHGOTouXkFrZ4J7jlpzDFKfyoIzWs?=
- =?us-ascii?Q?Tpd5ujUoRX1P+AWrjT/LoVTfdui3xA4av4nLI+406b2OEkceRb149LBKRfqp?=
- =?us-ascii?Q?yyGWp8y/gTUA5NSsp6DFgH1ZoEW1JQs/nhL6txVTDXPzxbDbeBsdJ3NQ4AVa?=
- =?us-ascii?Q?bKfaEUfC0qCTIPz4f8lJWVJWWH5PUrGXCgFFac5H3CTjxZyE9KdmvyIBBOuY?=
- =?us-ascii?Q?/Jt4c+1GH4x/EqNDZB1t1WQUGGcaxclPNt30AO/pn+6cyrHToxsYtCv0bYss?=
- =?us-ascii?Q?A9iKtn1SQbNJork8Z4B5EGe7KlOv+Ps4bMfNcgPSudDAVRlvoXyveQFhh4yE?=
- =?us-ascii?Q?5f5H0P1vienTzFIvAtAnIomaD95Qr4RJ/O1PJTcvktEnvy/MbwGGlFTjDCX8?=
- =?us-ascii?Q?ozWOEVx6uLyujHmzA5TpZBnv5JpjyqpoXmSefaLqQMZuUZ0jrPlTXIETw=3D?=
- =?us-ascii?Q?=3D?=
-X-MS-Exchange-SenderADCheck: 1
-X-Microsoft-Antispam-Message-Info: UYCVcaIUXtk5O3cUqMSSflvqA/FcS1cdkT/cOirFKctTcCzKxq4sgiFrXwDXSNNa9iyZCmODfrY25p/INrbqO4QaadobOJfSUUeZOUntTLRSoRedks9vXp4CiSNvIBriZIAF5bB6VR3DDjOgO2lAJyoEkpsI//NUte069+Ny1awJGrb/uaKajEuN7FzmZniCzHjOgE8PnJiGnDypydOJZoT8INIhW2GffDB2qtTl+WCtat+4M0V9yC+qociYb7nTu6ejM5E2QiO6nvNqNRNWJeVy+xt3Y+h1NGCjU1UfasfS0YAE00cqqDK8+n6KuP3eYKunTR7ICYEeu5tCcmk1aIlX2LnG2Yv7An2ky2CTzu3ZUbnJ1kK7ArkRF5pbj1LMgEtXAu7fwXlJNtKFPfl/4rr3otPNSfwBZICZb5oJO3E=
-X-Microsoft-Exchange-Diagnostics: 1; DM6PR02MB5018;
- 6:AdtKY0m5pa8rSNV284hh0vs1AhIWQabFzqgEHEaf1PT75+x4PPDDEMoHNUUbEMTqZoEZkNrOtYQygv1zJSgWHPddF6E2FBW6A4Ed8dPyK1aNcrWI7Cp347DeQnhEarDlAUtW0E54urDAEVN0D+ZgN+UQWAmJRnaiN02Fn1JmU10kL6UFwjaaKG+pHOIh1Mw1euy5x0/6t22DDZpqoaaEyg9d2kJ+t6osm5wYAMBmjljcJVl5FpImk5EUbhN/X5cvunAJxtMJp5FAWfHUkUNua+U1v5D/3ImrfT933zL0msSQ2ljKKTIT62zhfGY8qWpJjpHyX4I/+YHRhl9rdT0EnytjD+1Jfm0KGwCkZ/RZOCD70LyS4+rTaZTvIMV0iePWNdk1JSmGO01zlWjq1d/AliV+4y0eKHCwuJYSY2OsL9g8NkZZN7k/70lVQlrZNB5AndkSFqu83vMdIzZnaB07qA==;
- 5:DsibzuESZnTseWPEmefSrD7fCUINrzTSG65pqmJvj21l2TC5CJxeVDz5PBibWFqbuuTYXNqHbrLhtPL+2BX9bq662mI30NIpFQf/AZC3Ae+8OMtI3Od+umfF2Oi41sNCSH0Nqs2Mb4dUkb7FfStkX40REAfcP5ZOxF1uofkrgzksBRfHQRrqpYBVNoi8IcTA1psZOk6EAfGZEtD2raeEWg==;
- 7:w//7kv80k7ByuBwaRCo4eY15OwZEBj6n8U8daPVTrSqSx+mLnobZiQsA4UjsIaFH+QZxNiJVyF3b5T6g33Mqt1tb/SYRR48D+aj9g54dtPt0l7x5lII4I+EyznOCMfWAlffKCNgturuF/891mrLYPQ==
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=JOLLYS@xilinx.com; 
+x-originating-ip: [149.199.62.133]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BYAPR02MB3959;
+ 6:T/IRzfAGX8CIEmuzTLA1WYb7ak08sc3eJrj8UXkph84vAzdXkVFnkOpIRkQjyj7QRNN5wWoINs4P4L6r5jBnKwsg/+ihq8xUU/OGOYbkkoBz3ZD7yLHYIOfXnVPhMwsj8+OwDtiU8Fc4M2yZuupXSXlGJ4dvlQpS5e9MxeqMVrhouY/y/DDKbY2jh1lYV9rdyqSjSeqK92qQGfW/yr2zMZmN7VKejb6G/BRQlVzIMzl5gUPSH/+r6qxoL9pllmBS1VzhmZkSEyPU2qItULARJUAJSTZW2lAUBX2MA6kOiSyqc66IJdQkoX699AiuSPwxb3t+WCggdMTBgC9nY/WaKvrGcmvVIRCEoTU35SmpCCN3ORYQHC1O5seVH4EA2GBXpl9rUmREDdF8tQ92ZBpxQhq8HiA/0DcWIZp5ak+ekwJn3x9MRgkdqZXqsYJ6snFk7iKIB87pRPDtW9S4221eng==;
+ 5:iZaUaK+H00uvdgcrIn0iDS1S8TFm9ylIrnF6yHRFDyNQ1n4Ul9eHvVevpnlv6W4e2Ka6v1IJwhWys8dY/QeWWnc/vY6VEw1J75HIxt94b2gwbUQtcCO+z1sLfRVJDRyEglZ2SpS6AFZFs3+GuHI1Axa0s2mWORO1Vl7iLWepU8vm/aq1eezuuNR2//m0D0lSJqG23zl+p++NrZ2tPjAT/w==;
+ 7:59C4gCShb/kGfX7GMJg1ZV/DaELjOdPYnRZP8A76I3JcYtjWXdDWYOhsFgsO1L28H+D42gzxiB4FzR3MT5lAuxfo4kLTakNgRDLAorUB0Ljp6hxr2I6CIZNezJlJoBvx0JhdjJ0iMZVRVGjih12Byw==
+x-ms-office365-filtering-correlation-id: 6a0568aa-4d20-4e38-668f-08d68629f2a9
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:BYAPR02MB3959; 
+x-ms-traffictypediagnostic: BYAPR02MB3959:
+x-microsoft-antispam-prvs: <BYAPR02MB39595747A033AD5DD8AFD8EAB8970@BYAPR02MB3959.namprd02.prod.outlook.com>
+x-forefront-prvs: 093290AD39
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39860400002)(136003)(396003)(346002)(366004)(376002)(199004)(13464003)(189003)(8676002)(66066001)(486006)(2501003)(6436002)(86362001)(74316002)(99286004)(256004)(229853002)(14444005)(102836004)(76176011)(53546011)(71200400001)(8936002)(26005)(7696005)(71190400001)(6506007)(2201001)(186003)(476003)(446003)(14454004)(11346002)(39060400002)(478600001)(6116002)(305945005)(107886003)(54906003)(7736002)(25786009)(3846002)(68736007)(4326008)(106356001)(55016002)(53936002)(7416002)(72206003)(33656002)(966005)(316002)(110136005)(2906002)(9686003)(6306002)(105586002)(81166006)(6246003)(81156014)(97736004)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BYAPR02MB3959;
+ H:BYAPR02MB5992.namprd02.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: xilinx.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: QjuQjpJX7NEiqVqS123WolFqQBzY94E4IGwLc0MdwzPgUMf+45qIu1dhDPsS13TOE5SaQP60/b6Uv0e15dazVckXsA3YlYYKg9GWTZFTvJ6Q/VDgdOCHctEGJdfn/7e2VpnnrhPKt+UH7QyKT8K4zJg1RR7xGJ1HdqtO7clXZV31NVdGlhp8qeEwyh3dl9ofwGvMbJhKfIpKh8IgSV8OcSSceqvO6NV+BY+vt/FgDxzuuC7q5BVwy2GWkUixqh1P+/+Lgiujqumk20XE1b9VJG+1he1A2z//L9v7/YvWZDsa5cGmoyAwndNFneBIOX/KAJ4DGgLr/JWK8VvzUGV+mJCGYDg41RdKuyuX70rFM5AbRINMVf+EU7YitHBXeQfuaFptjvLWHGdZ7h7wKQOclcOidDlt+jLUXxbKrrRTRNE=
+MIME-Version: 1.0
 X-OriginatorOrg: xilinx.com
-X-MS-Exchange-CrossTenant-OriginalArrivalTime: 29 Jan 2019 20:38:53.4295 (UTC)
-X-MS-Exchange-CrossTenant-Network-Message-Id: a1b6cfc8-50d8-4b32-94fd-08d68629c8df
-X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
-X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
- Helo=[xsj-pvapsmtpgw01]
-X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM6PR02MB5018
+X-MS-Exchange-CrossTenant-Network-Message-Id: 6a0568aa-4d20-4e38-668f-08d68629f2a9
+X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 20:40:04.1172 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BYAPR02MB3959
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_123900_781391_7F48301F 
-X-CRM114-Status: GOOD (  11.13  )
+X-CRM114-CacheID: sfid-20190129_124009_890849_C5510E79 
+X-CRM114-Status: GOOD (  18.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -172,53 +127,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, rajanv@xilinx.com, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, Jolly Shah <jollys@xilinx.com>
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Rajan Vaja <RAJANV@xilinx.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add ZynqMP PM driver. PM driver provides power management
-support for ZynqMP.
+Hi Michal,
 
-v6:
- - Rebased on top of 
-	https://github.com/Xilinx/linux-xlnx/commits/zynqmp/soc
-v5:
- - Added Reviewed tag for dt bindings
+> -----Original Message-----
+> From: Michal Simek [mailto:michal.simek@xilinx.com]
+> Sent: Tuesday, January 29, 2019 5:11 AM
+> To: Jolly Shah <JOLLYS@xilinx.com>; matthias.bgg@gmail.com;
+> andy.gross@linaro.org; shawnguo@kernel.org; geert+renesas@glider.be;
+> bjorn.andersson@linaro.org; sean.wang@mediatek.com;
+> m.szyprowski@samsung.com; Michal Simek <michals@xilinx.com>;
+> robh+dt@kernel.org; mark.rutland@arm.com
+> Cc: Rajan Vaja <RAJANV@xilinx.com>; devicetree@vger.kernel.org; linux-arm-
+> kernel@lists.infradead.org; linux-kernel@vger.kernel.org; Rajan Vaja
+> <RAJANV@xilinx.com>; Jolly Shah <JOLLYS@xilinx.com>
+> Subject: Re: [PATCH v5 2/3] firmware: xilinx: Implement ZynqMP power
+> management APIs
+> 
+> On 14. 01. 19 20:22, Jolly Shah wrote:
+> > From: Rajan Vaja <rajan.vaja@xilinx.com>
+> >
+> > Add Xilinx ZynqMP firmware APIs to set suspend mode
+> > and inform firmware that master has initialized its
+> > own power management.
+> >
+> > Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
+> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> > ---
+> >  drivers/firmware/xilinx/zynqmp.c     | 29 +++++++++++++++++++++++++++++
+> >  include/linux/firmware/xlnx-zynqmp.h | 20 ++++++++++++++++++++
+> >  2 files changed, 49 insertions(+)
+> >
+> > diff --git a/drivers/firmware/xilinx/zynqmp.c
+> b/drivers/firmware/xilinx/zynqmp.c
+> > index 84b3fd2..c7a3b6c 100644
+> > --- a/drivers/firmware/xilinx/zynqmp.c
+> > +++ b/drivers/firmware/xilinx/zynqmp.c
+> > @@ -428,6 +428,33 @@ static int zynqmp_pm_clock_getparent(u32 clock_id,
+> u32 *parent_id)
+> >  	return ret;
+> >  }
+> >
+> > +/**
+> > + * zynqmp_pm_init_finalize() - PM call to inform firmware that the caller
+> > + *			       master has initialized its own power management
+> > + *
+> > + * This API function is to be used for notify the power management controller
+> > + * about the completed power management initialization.
+> > + *
+> > + * Return: Returns status, either success or error+reason
+> > + */
+> > +static int zynqmp_pm_init_finalize(void)
+> > +{
+> > +	return zynqmp_pm_invoke_fn(PM_PM_INIT_FINALIZE, 0, 0, 0, 0, NULL);
+> > +}
+> > +
+> > +/**
+> > + * zynqmp_pm_set_suspend_mode()	- Set system suspend mode
+> > + * @mode:	Mode to set for system suspend
+> > + *
+> > + * This API function is used to set mode of system suspend.
+> > + *
+> > + * Return: Returns status, either success or error+reason
+> > + */
+> > +static int zynqmp_pm_set_suspend_mode(u32 mode)
+> > +{
+> > +	return zynqmp_pm_invoke_fn(PM_SET_SUSPEND_MODE, mode, 0, 0, 0,
+> NULL);
+> > +}
+> > +
+> >  static const struct zynqmp_eemi_ops eemi_ops = {
+> >  	.get_api_version = zynqmp_pm_get_api_version,
+> >  	.query_data = zynqmp_pm_query_data,
+> > @@ -440,6 +467,8 @@ static const struct zynqmp_eemi_ops eemi_ops = {
+> >  	.clock_getrate = zynqmp_pm_clock_getrate,
+> >  	.clock_setparent = zynqmp_pm_clock_setparent,
+> >  	.clock_getparent = zynqmp_pm_clock_getparent,
+> > +	.init_finalize = zynqmp_pm_init_finalize,
+> > +	.set_suspend_mode = zynqmp_pm_set_suspend_mode,
+> 
+> This has been created long time ago and there was one more patch in the
+> middle of this.
+> I have applied reset driver just now which didn't have any issue that's
+> why please rebase your patches on the top of this branch
+> https://github.com/Xilinx/linux-xlnx/commits/zynqmp/soc and resend.
+> 
 
-v4:
- - Minor fixes to address v3 review comments
- 
-v3:
- - Updated DT bindings as per v2 review comments
- 
-v2:
- - Rebased on top of latest firmware driver patch series
- - Updated driver to use shared interrupt instead of mailbox
+Rebased and sent v6.
 
-Jolly Shah (1):
-  firmware: xilinx: Implement ZynqMP power management APIs
+Thanks,
+Jolly Shah
 
-Rajan Vaja (2):
-  dt-bindings: soc: Add ZynqMP PM bindings
-  drivers: soc: xilinx: Add ZynqMP PM driver
-
- .../bindings/power/reset/xlnx,zynqmp-power.txt     |  25 +++
- drivers/firmware/xilinx/zynqmp.c                   |  29 ++++
- drivers/soc/xilinx/Kconfig                         |  11 ++
- drivers/soc/xilinx/Makefile                        |   1 +
- drivers/soc/xilinx/zynqmp_power.c                  | 178 +++++++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h               |  20 +++
- 6 files changed, 264 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt
- create mode 100644 drivers/soc/xilinx/zynqmp_power.c
-
--- 
-2.7.4
-
-
+> Thanks,
+> Michal
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
