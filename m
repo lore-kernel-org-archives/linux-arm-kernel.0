@@ -2,93 +2,87 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A943EC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 12:33:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E389DC282C7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 12:33:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3C5722083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 12:33:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B43422083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 12:33:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SZ4gwG1B";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="TE6BoR6h"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C5722083B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ijcWLVd5";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="LZZN6Wad"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B43422083B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=bV06jNn5KhDr3Bmi0h7oiL5UUar1AQrlwfLsEUOjDhw=; b=SZ4gwG1BF/xX93MzNIAQ9z6Vfq
-	gKBPZu2mjROfALjoG4B1e5k4yqnWtZjmU6hhrR3hGxaRBVjZHDn5oZi4sOKOTqyDwDAc6AaWp4vbb
-	X9F4YYWGbMc/VP65W/1vOiCexkqIY/q7D40tfQrp4xmhlgElveWmXuFuGo4E7uDiyaE6F5550UuPf
-	73FhRBFxi00XL3vksZL3ugMTR4qqr+AXZDc9Z/M54AByQttBUP9lcNrrFLdcOI03dL2Y+13IpRZMZ
-	JMaE+EhqWH6spwnvfywP8gXlsHMPYH/BQU80d3FtPSMj77lRoSYR1uBMXaQjhvL+WO9+D9pJvM609
-	EzNTVH3A==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=s1GmjEOXBi3adt884iXRS86H1UswXk76YA8jfxbx1cs=; b=ijcWLVd5o7MTAQ
+	4padAPCNFcFz/cxJRVnmu4/zq90GKJWcaZSyJCo5P5dqFHk6xgIRPQUO2jkMuzYo44V2ztEzxvTqI
+	CBMfXc40QlZ6DOr3TeakhccaWlDL4rSzDJgJMxpPBR9X35vS+qQUc7aJVts/2aigp8dqQwmNeTIqv
+	euRMHg3yQW70/7ytdK/NDIpgwgLr1Vgd75vOWFM8PJYzUOrR9p4YtT7HLbzJc2/AJNpXEWP9EXnP5
+	IX0nnTcRaucm9sCr0zjk6a9uunWOWcsjfX05BZpGWqPjpc0doH9VsLcF+WaJFf3Jjg/DFLhsW4Hs8
+	09FEZfRblnZLnAtkJSpA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goSZp-0000wb-5f; Tue, 29 Jan 2019 12:33:17 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1goSa5-0001C2-Nv; Tue, 29 Jan 2019 12:33:33 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goSWp-00067b-Ix
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 12:30:24 +0000
-Received: by mail-pg1-x543.google.com with SMTP id g189so8682002pgc.5
+ id 1goSWr-000687-39
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 12:30:25 +0000
+Received: by mail-wm1-x342.google.com with SMTP id f188so17503761wmf.5
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 04:30:11 -0800 (PST)
+ Tue, 29 Jan 2019 04:30:12 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=NI1nWA7/IJcIbEMIXPw1bIIK+zBG3TZvrY5SOoR7CDk=;
- b=TE6BoR6hFdggH7YHDuwb8cRe27bwwsk/5RaPSpXmwz5OOYgzUHVwRalJl8jXhuvg/3
- xLmJkGYEt1U+O8yQLxsAqMwgpxiUF1qxIFZzJhsydGI1/dK7SKd8g00ouzDuos8B0SDi
- uJF7+GRYQAreRW5KAcwoNSp50isZMNnmBkrVs=
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:content-transfer-encoding:in-reply-to
+ :user-agent; bh=oE8Qm9PdZluCUZkLGWY+ZFIppoNu/D2qntGj/3XiAXQ=;
+ b=LZZN6Wadr4cjXRY+8dG1EeZk5m/TdVcTfpOsZ5V3GC5hu0tCP6jbbMPBh03ne5P1zy
+ ghlKYErOvpXI91DIeGX1ODR8VvIyaDe5KPQSfDOG6AzBpYuhi+79EKFNQFSSbLM68h6D
+ 95Z/d7mkgz/UENS2zkiIHBphbNV6BRLo8vu6U=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=NI1nWA7/IJcIbEMIXPw1bIIK+zBG3TZvrY5SOoR7CDk=;
- b=g0uKh20T8Ex+1n2sW8aO+8ZJGRfSkWFVbNfhpo/eea9emrcv7O4gp3Ai3lUEdu9CB5
- 0tcvhDtRLt2VqH0/aplbxdoBbdyCQTxHcXcuAuUOSIrvqhPR2LiymOeZSNFGJsLjeNcB
- jqyvrICZ6bHxfYz0X4V1F1Aek2adUpA0n/tQHUnEy381WIAiOwyTFAl+WhbHAjyiaJbY
- NbiKkgJz8TutVg9wH5CBMTTav/pUMlkByUo8DM6zRM6VM+7Bi72fsgQoVhRqqLtECSci
- 3a76EzrA2TcVFMrEDi+UfNNWsvfKdkIRa3KWyXhNSumqLxtCilbdRzsJTyK7wO49sBQi
- faYA==
-X-Gm-Message-State: AJcUukedfi1ZNz+oqcWbLzGGLprsj92dOzb7ZDBtOwJnJDfSea7VN0YM
- yGplnLRmxgmID6ZPuU7D8CM0Kw==
-X-Google-Smtp-Source: ALg8bN4T43leE616wX+Qude3sup4NoaS7teWsvdlG5skVd2EHDhdVrvfwLDPwS3meApCd2IDYzwrEw==
-X-Received: by 2002:a62:5c41:: with SMTP id q62mr26456042pfb.171.1548765010935; 
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:content-transfer-encoding
+ :in-reply-to:user-agent;
+ bh=oE8Qm9PdZluCUZkLGWY+ZFIppoNu/D2qntGj/3XiAXQ=;
+ b=bX7PuTJ0MqUA+uhVdlnLbYNBF3xdJsacltuWM8iojuB1Znax2Qv4/LCDLxfaaXXXKW
+ Nz8Zpw1i4e6+VtXnxZP4m9zF8Rayz5WKq5EmWB5zIXT7P2DIvdZ0to1URxEoiTaBf/Dj
+ M4JM/8KtF44axcM2SBMug8jiotAiVWk2t6SxfHfkuzh6i83vw0yweG7lqz2XzhGBdI1n
+ ElGrCf7mlYwe2qX2xdOXh8JtCm/JsS74+PzG7s4jTyIhrWDxslIYhtA50v+b6Pm+sady
+ Kfr9FaCtiQqMna/B41HEtdzTw+moz9rqwiW8saIsb45aA0QJfMIyQM1uwa2qCP704cCg
+ bxTQ==
+X-Gm-Message-State: AJcUukfyV7dqRLh6778Q+A5c+ANNJYYNp7DDYK3M1lWRh1Izrtqq8XX9
+ KLNWhXtspt/Kx23YkU8ns87y8w==
+X-Google-Smtp-Source: ALg8bN6Dv5bto48uf2VZhK8Y3t2maUaWJp3mSF942fyW3hxN7qnMGNqU1ppDG+NKI3dclarAXzygsA==
+X-Received: by 2002:a1c:a755:: with SMTP id q82mr21799557wme.6.1548765010759; 
  Tue, 29 Jan 2019 04:30:10 -0800 (PST)
-Received: from localhost.localdomain (li569-141.members.linode.com.
- [192.155.82.141])
- by smtp.gmail.com with ESMTPSA id h64sm59552502pfc.142.2019.01.29.04.30.05
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 29 Jan 2019 04:30:10 -0800 (PST)
-From: Leo Yan <leo.yan@linaro.org>
-To: Arnaldo Carvalho de Melo <acme@kernel.org>,
- Mathieu Poirier <mathieu.poirier@linaro.org>,
- Suzuki K Poulose <suzuki.poulose@arm.com>,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Jiri Olsa <jolsa@redhat.com>, Namhyung Kim <namhyung@kernel.org>,
- Mike Leach <mike.leach@linaro.org>, Robert Walker <robert.walker@arm.com>,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- Coresight ML <coresight@lists.linaro.org>
-Subject: [PATCH v7 5/8] perf cs-etm: Change tuple from traceID-CPU# to
- traceID-metadata
-Date: Tue, 29 Jan 2019 20:28:39 +0800
-Message-Id: <20190129122842.32041-6-leo.yan@linaro.org>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190129122842.32041-1-leo.yan@linaro.org>
-References: <20190129122842.32041-1-leo.yan@linaro.org>
+Received: from dell ([2.27.35.198])
+ by smtp.gmail.com with ESMTPSA id l19sm2852142wme.21.2019.01.29.04.30.09
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 29 Jan 2019 04:30:09 -0800 (PST)
+Date: Tue, 29 Jan 2019 12:30:08 +0000
+From: Lee Jones <lee.jones@linaro.org>
+To: Vijay Khemka <vijaykhemka@fb.com>
+Subject: Re: [PATCH v2] dt-bindings: aspeed-lpc: Make parameter optional
+Message-ID: <20190129123008.GC24070@dell>
+References: <20190118201547.640173-1-vijaykhemka@fb.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190118201547.640173-1-vijaykhemka@fb.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_043012_019074_66CF9E78 
-X-CRM114-Status: GOOD (  19.32  )
+X-CRM114-CacheID: sfid-20190129_043013_252934_F8A4DCE3 
+X-CRM114-Status: GOOD (  16.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,164 +94,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Leo Yan <leo.yan@linaro.org>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ linux-aspeed@lists.ozlabs.org, Andrew Jeffery <andrew@aj.id.au>,
+ "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>,
+ linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ Joel Stanley <joel@jms.id.au>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-If packet processing wants to know the packet is bound with which ETM
-version, it needs to access metadata to decide that based on metadata
-magic number; but we cannot simply to use CPU logic ID number as index
-to access metadata sequential array, especially when system have
-hotplugged off CPUs, the metadata array are only allocated for online
-CPUs but not offline CPUs, so the CPU logic number doesn't match with
-its index in the array.
-
-This patch is to change tuple from traceID-CPU# to traceID-metadata,
-thus it can use the tuple to retrieve metadata pointer according to
-traceID.
-
-For safe accessing metadata fields, this patch provides helper function
-cs_etm__get_cpu() which is used to return CPU number according to
-traceID; cs_etm_decoder__buffer_packet() is the first consumer for this
-helper function.
-
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- .../perf/util/cs-etm-decoder/cs-etm-decoder.c |  8 +++---
- tools/perf/util/cs-etm.c                      | 26 ++++++++++++++-----
- tools/perf/util/cs-etm.h                      |  9 ++++++-
- 3 files changed, 31 insertions(+), 12 deletions(-)
-
-diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-index 294efa76c9e3..cdd38ffd10d2 100644
---- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-+++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-@@ -305,14 +305,12 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
- 			      enum cs_etm_sample_type sample_type)
- {
- 	u32 et = 0;
--	struct int_node *inode = NULL;
-+	int cpu;
- 
- 	if (decoder->packet_count >= MAX_BUFFER - 1)
- 		return OCSD_RESP_FATAL_SYS_ERR;
- 
--	/* Search the RB tree for the cpu associated with this traceID */
--	inode = intlist__find(traceid_list, trace_chan_id);
--	if (!inode)
-+	if (cs_etm__get_cpu(trace_chan_id, &cpu) < 0)
- 		return OCSD_RESP_FATAL_SYS_ERR;
- 
- 	et = decoder->tail;
-@@ -322,7 +320,7 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
- 
- 	decoder->packet_buffer[et].sample_type = sample_type;
- 	decoder->packet_buffer[et].isa = CS_ETM_ISA_UNKNOWN;
--	decoder->packet_buffer[et].cpu = *((int *)inode->priv);
-+	decoder->packet_buffer[et].cpu = cpu;
- 	decoder->packet_buffer[et].start_addr = CS_ETM_INVAL_ADDR;
- 	decoder->packet_buffer[et].end_addr = CS_ETM_INVAL_ADDR;
- 	decoder->packet_buffer[et].instr_count = 0;
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 1aa29633ce77..a5497a761db7 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -97,6 +97,20 @@ static u32 cs_etm__get_v7_protocol_version(u32 etmidr)
- 	return CS_ETM_PROTO_ETMV3;
- }
- 
-+int cs_etm__get_cpu(u8 trace_chan_id, int *cpu)
-+{
-+	struct int_node *inode;
-+	u64 *metadata;
-+
-+	inode = intlist__find(traceid_list, trace_chan_id);
-+	if (!inode)
-+		return -EINVAL;
-+
-+	metadata = inode->priv;
-+	*cpu = (int)metadata[CS_ETM_CPU];
-+	return 0;
-+}
-+
- static void cs_etm__packet_dump(const char *pkt_string)
- {
- 	const char *color = PERF_COLOR_BLUE;
-@@ -252,7 +266,7 @@ static void cs_etm__free(struct perf_session *session)
- 	cs_etm__free_events(session);
- 	session->auxtrace = NULL;
- 
--	/* First remove all traceID/CPU# nodes for the RB tree */
-+	/* First remove all traceID/metadata nodes for the RB tree */
- 	intlist__for_each_entry_safe(inode, tmp, traceid_list)
- 		intlist__remove(traceid_list, inode);
- 	/* Then the RB tree itself */
-@@ -1519,9 +1533,9 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
- 				    0xffffffff);
- 
- 	/*
--	 * Create an RB tree for traceID-CPU# tuple. Since the conversion has
--	 * to be made for each packet that gets decoded, optimizing access in
--	 * anything other than a sequential array is worth doing.
-+	 * Create an RB tree for traceID-metadata tuple.  Since the conversion
-+	 * has to be made for each packet that gets decoded, optimizing access
-+	 * in anything other than a sequential array is worth doing.
- 	 */
- 	traceid_list = intlist__new(NULL);
- 	if (!traceid_list) {
-@@ -1587,8 +1601,8 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
- 			err = -EINVAL;
- 			goto err_free_metadata;
- 		}
--		/* All good, associate the traceID with the CPU# */
--		inode->priv = &metadata[j][CS_ETM_CPU];
-+		/* All good, associate the traceID with the metadata pointer */
-+		inode->priv = metadata[j];
- 	}
- 
- 	/*
-diff --git a/tools/perf/util/cs-etm.h b/tools/perf/util/cs-etm.h
-index 37f8d48179ca..fb5fc6538b7f 100644
---- a/tools/perf/util/cs-etm.h
-+++ b/tools/perf/util/cs-etm.h
-@@ -53,7 +53,7 @@ enum {
- 	CS_ETMV4_PRIV_MAX,
- };
- 
--/* RB tree for quick conversion between traceID and CPUs */
-+/* RB tree for quick conversion between traceID and metadata pointers */
- struct intlist *traceid_list;
- 
- #define KiB(x) ((x) * 1024)
-@@ -69,6 +69,7 @@ static const u64 __perf_cs_etmv4_magic   = 0x4040404040404040ULL;
- #ifdef HAVE_CSTRACE_SUPPORT
- int cs_etm__process_auxtrace_info(union perf_event *event,
- 				  struct perf_session *session);
-+int cs_etm__get_cpu(u8 trace_chan_id, int *cpu);
- #else
- static inline int
- cs_etm__process_auxtrace_info(union perf_event *event __maybe_unused,
-@@ -76,6 +77,12 @@ cs_etm__process_auxtrace_info(union perf_event *event __maybe_unused,
- {
- 	return -1;
- }
-+
-+static inline int cs_etm__get_cpu(u8 trace_chan_id __maybe_unused,
-+				  int *cpu __maybe_unused)
-+{
-+	return -1;
-+}
- #endif
- 
- #endif
--- 
-2.17.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gRnJpLCAxOCBKYW4gMjAxOSwgVmlqYXkgS2hlbWthIHdyb3RlOgoKPiBNZW1vcnktcmVnaW9u
+IGFuZCBmbGFzaCBwaGFuZGxlIGlzIG5vdCBhIHJlcXVpcmVkIHBhcmFtZXRlciwgaXQgaXMKPiBv
+cHRpb25hbCB0byBkZXNjcmliZSBpbiBkZXZpY2UgdHJlZSBhbmQgbmVlZGVkIG9ubHkgdXNlIGJh
+c2lzLgo+IAo+IFNpZ25lZC1vZmYtYnk6IFZpamF5IEtoZW1rYSA8dmlqYXlraGVta2FAZmIuY29t
+Pgo+IC0tLQo+ICBEb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvbWZkL2FzcGVlZC1s
+cGMudHh0IHwgMyArKysKPiAgMSBmaWxlIGNoYW5nZWQsIDMgaW5zZXJ0aW9ucygrKQo+IAo+IGRp
+ZmYgLS1naXQgYS9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvbWZkL2FzcGVlZC1s
+cGMudHh0IGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL21mZC9hc3BlZWQtbHBj
+LnR4dAo+IGluZGV4IDM0ZGQ4OTA4N2NmZi4uZDI4YzRlMTE3NjExIDEwMDY0NAo+IC0tLSBhL0Rv
+Y3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9tZmQvYXNwZWVkLWxwYy50eHQKPiArKysg
+Yi9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvbWZkL2FzcGVlZC1scGMudHh0Cj4g
+QEAgLTEzNSw2ICsxMzUsOSBAQCBSZXF1aXJlZCBwcm9wZXJ0aWVzOgo+ICAtIGNsb2NrczoJY29u
+dGFpbnMgYSBwaGFuZGxlIHRvIHRoZSBzeXNjb24gbm9kZSBkZXNjcmliaW5nIHRoZSBjbG9ja3Mu
+Cj4gIAkJVGhlcmUgc2hvdWxkIHRoZW4gYmUgb25lIGNlbGwgcmVwcmVzZW50aW5nIHRoZSBjbG9j
+ayB0byB1c2UKPiAgCj4gK09wdGlvbmFsIHByb3BlcnRpZXM6Cj4gK1RoZXNlIGJlbG93IHByb3Bl
+cnRpZXMgYXJlIG9wdGlvbmFsIHRvIGRlZmluZS4KClRoaXMgbGluZSBpcyBzdXBlcmZsdW91cy4g
+IFBsZWFzZSByZW1vdmUgaXQuCgo+ICsKPiAgLSBtZW1vcnktcmVnaW9uOiBBIHBoYW5kbGUgdG8g
+YSByZXNlcnZlZF9tZW1vcnkgcmVnaW9uIHRvIGJlIHVzZWQgZm9yIHRoZSBMUEMKPiAgCQl0byBB
+SEIgbWFwcGluZwo+ICAKCi0tIApMZWUgSm9uZXMgW+adjueQvOaWr10KTGluYXJvIFNlcnZpY2Vz
+IFRlY2huaWNhbCBMZWFkCkxpbmFyby5vcmcg4pSCIE9wZW4gc291cmNlIHNvZnR3YXJlIGZvciBB
+Uk0gU29DcwpGb2xsb3cgTGluYXJvOiBGYWNlYm9vayB8IFR3aXR0ZXIgfCBCbG9nCgpfX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVs
+IG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDov
+L2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
