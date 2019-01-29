@@ -2,87 +2,89 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F283FC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 10:20:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D45B5C4151A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 10:24:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BB1E021841
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 10:20:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A3C192148E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 10:24:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rmbW8TSi";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="tb6+AX1B"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB1E021841
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="L0o9n1rY";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="NMSowhbE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A3C192148E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QUGySLnViQJ3tkRkksXk1wKW8khbkwc0A8gpvsWp4uc=; b=rmbW8TSiXoYu0h
-	F7UsnLz7VcgQdHzZDle2yqGiTsiseZjaFv2r5vq7E/7srxvKOTpbhJN+/kgkjl6VLBlzMG4Kc2mRo
-	s+CUl77mDnXhptktLsxpFhdfPdC+Z9Bp9inYYPfTgE8KwyURZKn5Kw8E6CVw5sugtfOPKGb+axjGI
-	qW1pu8jYKLvoZuOcDO6FNxbC3FhV3fsCocSS1mlIksQtNqEZZcF5qtC2HQquxeNb9+tQoUWsrL30S
-	ummFkpmbhhFjUdcBgggdhvJzADvxoBm1wc5iSQxQ0bhNfsoL3fu515W9g8yoU7TiIRydIIqW4MPHQ
-	3eDpVsH4Hoee7P7WLMHA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=10g1G5hJzJeLJ853IzANGhATHYIP9UbjCGwnPVP1eQ0=; b=L0o9n1rYKYgJTF
+	BD6/P3zLSJarlYwAkyOmEllCNqSOJmAFB9+oLj53fOrwKK9xWzjuGySflafdxK9pXgGydCVmE6fTH
+	8S1vd3YtGrEsYxGrFlHSOfFv0IgE8V8jEpkXgjVqJnFiIUgJ6LFHRM8oNozevoVSCQ0ntn5GxIbd4
+	R8pi5Fgmig6+CWCo0LmhRs4wKR1zqB/M3CT71mLe9GEbmIWn2rMB0fvOYYf4RbVxtFoKnPwfNMRLH
+	W+RMZwW+1+J7ff0FjQnVzSAwN8pKD8b35dz3uEGxNhzGlxKyAa8qs5wCues9Fzf1pLx0tFEdMRr0b
+	wq+p+grQNtPJhw0nByVw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goQVf-0007X5-NK; Tue, 29 Jan 2019 10:20:51 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+	id 1goQZ7-0000NM-Mg; Tue, 29 Jan 2019 10:24:25 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goQVc-0007Wa-1D
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 10:20:49 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0TAKUWE058370;
- Tue, 29 Jan 2019 04:20:30 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1548757230;
- bh=Ws8cfEW/GdK3qAnIerup80pZ7QCUAQ/ikhsMVH1JYMg=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=tb6+AX1BmbjyH91s/hiKSJdzczG6BvCc1pWzl0eWbuYfAWdBAEQE8RZhUS5gVotO0
- aQbNfeOQrAHwfWdK12biUy6+fdpOWpwi3LBE6clpDMm5eM/pn/NrBAoYgSWbCq7Ffu
- h0mIWNNzMF0VsH4bIpNEfXbuzPRZDhtQCXDx0CLc=
-Received: from DLEE114.ent.ti.com (dlee114.ent.ti.com [157.170.170.25])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0TAKTto091224
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 29 Jan 2019 04:20:29 -0600
-Received: from DLEE103.ent.ti.com (157.170.170.33) by DLEE114.ent.ti.com
- (157.170.170.25) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 29
- Jan 2019 04:20:29 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE103.ent.ti.com
- (157.170.170.33) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 29 Jan 2019 04:20:29 -0600
-Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0TAKNdi014159;
- Tue, 29 Jan 2019 04:20:24 -0600
-Subject: Re: [PATCH 18/24] PCI: dwc: Fix dw_pcie_ep_find_capability to return
- correct capability offset
-To: Gustavo Pimentel <gustavo.pimentel@synopsys.com>, Rob Herring
- <robh+dt@kernel.org>, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-References: <20190114132424.6445-1-kishon@ti.com>
- <20190114132424.6445-19-kishon@ti.com>
- <13501c15-8f3d-604b-c4fc-bde3fb208745@synopsys.com>
-From: Kishon Vijay Abraham I <kishon@ti.com>
-Message-ID: <a3c7458b-f8e8-1f02-116b-3e9f4fbf00f3@ti.com>
-Date: Tue, 29 Jan 2019 15:49:51 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1goQZ3-0000MH-N0
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 10:24:23 +0000
+Received: by mail-wr1-x443.google.com with SMTP id q18so21375366wrx.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 29 Jan 2019 02:24:21 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:in-reply-to:references:date:message-id
+ :mime-version; bh=XIWwWKt6+oCOO6cq2DZHb0F9eETVOES12psz3Sr+1T8=;
+ b=NMSowhbEAadq0sol8vCSD6RPOw6gzLfVzMboboIzUBYoBTZEkL0uv73xb2H7pHY+9i
+ FmXZ9lTnYyTw4DNIdyJ0TRNqGTVteuB2uxG++EfKMEPhTHJZnkUpkVDa7xUOV8KURJ3s
+ Y+Kzp9mRZHkB+C3hXPhpWCPjXGQlAr/nta2QcIT5gCb7CAE7xOHmsJsKDTH+j4ZzX4ep
+ //p1w8nerEUkGGfkni2Cqz/AZgac+EKRulTvQih8iL2LrR7qX3Ul4cuTOAqsU99JPrHy
+ g8okrIHedoFg8w4ztgiVVWOps9Qa4XiJgTYKbY8Hk+GLTk220ADZDKoV8pRLmncyQbwR
+ 9Tuw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
+ :message-id:mime-version;
+ bh=XIWwWKt6+oCOO6cq2DZHb0F9eETVOES12psz3Sr+1T8=;
+ b=QklR+69xlpI825h4YQG0H63d5+l1/aGG0agtObH/aR1KPXkudz/n1eEIA2emeZPfWA
+ /FOHuBli2tg+gk6ReQWZIuOjBk/c37s+4nM0Ou1Y3IDBMym9dhV3+UOtFEO6dSD+Awez
+ sl6qAiDImZzZz8MetceFur4plEP5sTzvGAYSo5Iz6ydRPcWFv6V9dgXsezmSRCppGDpo
+ Yyxko+sIIdd2ywTM0MRhndsalVLKkSJ1pHu5rbhHiLfEN9or4WGC00AHFWp9ypoGZWGu
+ i2Ur0+9n56+oM6mwPDeLh20T+tG3Nh+AojhuyVHJlIFkN6L7l0RUziYIIhWm4N1Nb4lY
+ IaJA==
+X-Gm-Message-State: AJcUukejywac5l8EKkmNZqAE6t7+I5pkoUcbVhgbemh+CeFX0Obyvd//
+ xNDMmdm6CKNBPKLslGbyovGfOg==
+X-Google-Smtp-Source: ALg8bN6YajtzxgYWfRDSV2s0O4N8XF9CMQ3zgRKk1+I8NpKTZ+iAvmK5GNgDrfA9guKccz3fDOGXfg==
+X-Received: by 2002:adf:dfd1:: with SMTP id q17mr26692099wrn.27.1548757459920; 
+ Tue, 29 Jan 2019 02:24:19 -0800 (PST)
+Received: from localhost (aputeaux-684-1-12-29.w90-86.abo.wanadoo.fr.
+ [90.86.215.29])
+ by smtp.googlemail.com with ESMTPSA id 129sm3442270wmd.18.2019.01.29.02.24.18
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 29 Jan 2019 02:24:19 -0800 (PST)
+From: Kevin Hilman <khilman@baylibre.com>
+To: Anand Moon <linux.amoon@gmail.com>
+Subject: Re: [GIT PULL] Amlogic fixes for v5.0-rc, round 2
+In-Reply-To: <CANAwSgQzXg0MW4bH=NpbxmZ6a0bf7rr0F4_gP+bDUMurJsA9bQ@mail.gmail.com>
+References: <7hh8dsqyv8.fsf@baylibre.com>
+ <CANAwSgQzXg0MW4bH=NpbxmZ6a0bf7rr0F4_gP+bDUMurJsA9bQ@mail.gmail.com>
+Date: Tue, 29 Jan 2019 11:24:18 +0100
+Message-ID: <7hk1inpxrh.fsf@baylibre.com>
 MIME-Version: 1.0
-In-Reply-To: <13501c15-8f3d-604b-c4fc-bde3fb208745@synopsys.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_022048_218379_A7D75C93 
-X-CRM114-Status: GOOD (  25.82  )
+X-CRM114-CacheID: sfid-20190129_022421_751019_56B8A298 
+X-CRM114-Status: GOOD (  12.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,101 +96,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Jesper Nilsson <jesper.nilsson@axis.com>, Arnd Bergmann <arnd@arndb.de>,
- Jingoo Han <jingoohan1@gmail.com>,
- "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-arm-kernel@axis.com" <linux-arm-kernel@axis.com>,
- Murali Karicheri <m-karicheri2@ti.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Bjorn Helgaas <bhelgaas@google.com>,
- "linux-omap@vger.kernel.org" <linux-omap@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: linux-amlogic@lists.infradead.org, arm@kernel.org,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Gustavo,
+Anand Moon <linux.amoon@gmail.com> writes:
 
-On 29/01/19 2:55 PM, Gustavo Pimentel wrote:
-> Hi Kishon,
-> 
-> On 14/01/2019 13:24, Kishon Vijay Abraham I wrote:
->> commit beb4641a787df79a ("PCI: dwc: Add MSI-X callbacks handler") while
->> adding MSI-X callback handler, introduced dw_pcie_ep_find_capability and
->> __dw_pcie_ep_find_next_cap for finding the MSI and MSIX capability.
+> Hi Kevin,
+>
+> On Tue, 29 Jan 2019 at 02:33, Kevin Hilman <khilman@baylibre.com> wrote:
 >>
->> However if MSI or MSIX capability is the last capability (i.e there are
->> no additional items in the capabilities list and the Next Capability
->> Pointer is set to '0'), __dw_pcie_ep_find_next_cap will return '0'
->> even though MSI or MSIX capability may be present. This is because of
->> incorrect ordering of "next_cap_ptr" check. Fix it here.
+>> Olof, Arnd,
 >>
->> Fixes: beb4641a787df79a142 ("PCI: dwc: Add MSI-X callbacks handler")
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  drivers/pci/controller/dwc/pcie-designware-ep.c | 10 +++++-----
->>  1 file changed, 5 insertions(+), 5 deletions(-)
+>> Below is round 2 of Amlogic fixes for v5.0-rc, based on top of the first
+>> round.
 >>
->> diff --git a/drivers/pci/controller/dwc/pcie-designware-ep.c b/drivers/pci/controller/dwc/pcie-designware-ep.c
->> index d5144781005b..cd51b008858c 100644
->> --- a/drivers/pci/controller/dwc/pcie-designware-ep.c
->> +++ b/drivers/pci/controller/dwc/pcie-designware-ep.c
->> @@ -46,16 +46,19 @@ static u8 __dw_pcie_ep_find_next_cap(struct dw_pcie *pci, u8 cap_ptr,
->>  	u8 cap_id, next_cap_ptr;
->>  	u16 reg;
->>  
->> +	if (!cap_ptr)
->> +		return 0;
->> +
-> 
-> Supposedly this was already verified by the function that calls this one.
+>> Kevin
+>>
+>>
+>> The following changes since commit 19a220dd1e8a1b1d8e5e2f8f4a25313c4b02d527:
+>>
+>>   arm64: defconfig: enable modules for amlogic s400 sound card (2019-01-08 15:27:50 -0800)
+>>
+>> are available in the Git repository at:
+>>
+>>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-fixes-2
+>>
+>> for you to fetch changes up to c90c44d8aaf5895320da1621b0a502ed5528e437:
+>>
+>>   ARM64: dts: meson-gxbb-odroidc2: Fix usb phy reset warning (2019-01-17 14:40:45 -0800)
+>>
+>> ----------------------------------------------------------------
+>> Amlogic fixes for v5.0-rc, round 2
+>> - several fixups for the GPIO cd-inverted change
+>> - IRQ trigger fixes for MAC IRQ
+>> - USB PHY reset/power fixes
+>>
+>> ----------------------------------------------------------------
+>> Anand Moon (2):
+>>       ARM64: dts: meson-gxbb-odroidc2: Fix usb phy regulator power failed warning
+>>       ARM64: dts: meson-gxbb-odroidc2: Fix usb phy reset warning
+>>
+>
+> Sorry I would like to resend my patch again, just waiting for feedback
+> on below patch.
+>
+> [0] https://www.spinics.net/lists/arm-kernel/msg701859.html
+>
+> I will resend send these patches.,
+> so please drop above patches for now.
+> Sorry for the trouble.
 
-Right, with with this fix cap_ptr is checked only once. This being a recursive
-function, it makes sense to have the check only here instead of once in the
-calling function and once here.
-> 
->>  	reg = dw_pcie_readw_dbi(pci, cap_ptr);
->> -	next_cap_ptr = (reg & 0xff00) >> 8;
->>  	cap_id = (reg & 0x00ff);
->>  
->> -	if (!next_cap_ptr || cap_id > PCI_CAP_ID_MAX)
->> +	if (cap_id > PCI_CAP_ID_MAX)
->>  		return 0;
->>  
->>  	if (cap_id == cap)
->>  		return cap_ptr;
->>  
->> +	next_cap_ptr = (reg & 0xff00) >> 8;
-> 
-> This fix seems to be a bit overdone, especially when you only need to swap the
-> if blocks order to achieve the desired goal.
+I already dropped your odroid-c1 (32-bit) patches as you requested, but
+these are for odroid-c2 (64-bit). You want me to drop those also?
 
-No, cap_id > PCI_CAP_ID_MAX is a base error case and it should checked before
-returning the offset IMO.
-> 
->>  	return __dw_pcie_ep_find_next_cap(pci, next_cap_ptr, cap);
->>  }
->>  
->> @@ -67,9 +70,6 @@ static u8 dw_pcie_ep_find_capability(struct dw_pcie *pci, u8 cap)
->>  	reg = dw_pcie_readw_dbi(pci, PCI_CAPABILITY_LIST);
->>  	next_cap_ptr = (reg & 0x00ff);
->>  
->> -	if (!next_cap_ptr)
->> -		return 0;
->> -
-> 
-> Why remove it?
-> If pointer is null, why to jump to another function to check is the the same
-> pointer is null?
-
-so that we check cap_ptr only once.
-
-Thanks
-Kishon
+Kevin
 
 _______________________________________________
 linux-arm-kernel mailing list
