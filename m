@@ -2,63 +2,66 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5021FC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:11:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 23777C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:11:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 21B8B20856
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:11:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E90D920856
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:11:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NlidEMQT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 21B8B20856
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sigxcpu.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GBdrXh93"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E90D920856
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Message-ID:
-	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
-	List-Owner; bh=SrBqvevnKXQqotg4mP5RrT9pUEg4C0GB4LQPu5eh4VI=; b=NlidEMQTCDxKyA
-	mBrQlm+lfoLBLVwx841bGxJbE4ML3Rn4oPY50Da91S6pAsjELmz4ZerR3EQpEBaJdfEcpe9audWzB
-	xBq5hXBNLciubO76Km3rPb07oG7saDzeWja1tA6gh6q8YfDGaIczAXoN0ZE5q4ZeYjarnOgstIBBZ
-	bs5lnhJNp1LbOrC1FACR3oZHUN9VkczTuSQlT8zsscx/TL3Wu6lGtk/y1HJJO6CMUopJryObAOajH
-	Dd8li24i0nUl/t5Tm2Oyupv3NMx7x548lXmmtApRUHItSq7LOhCDm072MtG3A6mKYddsgYXZJGIvL
-	GaUP+8exmNOZ5kXvxXKw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=5/N8aaRClBuKyO3lE3NU8hPfIDf/yA+2jZYRt+xAGFM=; b=GBdrXh93KBvkOBAQP0xRoPNFt
+	piyK85PVMGmnQ/3zOsMzYrQ8HGMn39FPVnYxrkn8dpkk+fK2UMCjErjRTV52s90ihAivuu1xRUspF
+	c71u4qAtM5gFHa5wF4ps0FO9UVD8dzaAzxhLVrFP3I9x1vVQWCPTXqxB8hEReOD/VBC/I5SOXyFVe
+	sBvM68YYhHjzO96Re9bXvDRL5gpeGjBkFiHc5tb4uYXftim84VCZ6lnWZ4LFni8TXD20kl2AF+SzK
+	HPrppFrR5sdBZsKx81x9PpeaORp5sBQwtiX9RkRwFRg45dLy4DZHe25cmE9fmiig2Q6CrSdqzeoy9
+	DEpKl1OIA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goRIY-0006pj-Ta; Tue, 29 Jan 2019 11:11:22 +0000
-Received: from honk.sigxcpu.org ([24.134.29.49])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goRIT-0006kv-EU; Tue, 29 Jan 2019 11:11:20 +0000
-Received: from localhost (localhost [127.0.0.1])
- by honk.sigxcpu.org (Postfix) with ESMTP id 4137FFB03;
- Tue, 29 Jan 2019 12:11:15 +0100 (CET)
-X-Virus-Scanned: Debian amavisd-new at honk.sigxcpu.org
-Received: from honk.sigxcpu.org ([127.0.0.1])
- by localhost (honk.sigxcpu.org [127.0.0.1]) (amavisd-new, port 10024)
- with ESMTP id R77ELBdo6Z_L; Tue, 29 Jan 2019 12:11:14 +0100 (CET)
-Received: by bogon.sigxcpu.org (Postfix, from userid 1000)
- id 9BEA6435AD; Tue, 29 Jan 2019 12:11:13 +0100 (CET)
-Date: Tue, 29 Jan 2019 12:11:13 +0100
-From: Guido =?iso-8859-1?Q?G=FCnther?= <agx@sigxcpu.org>
-To: Bastien Nocera <hadess@hadess.net>
-Subject: [PATCH v2] input: goodix - support Goodix gt5688
-Message-ID: <20190129111113.GA32222@bogon.m.sigxcpu.org>
+	id 1goRJ5-0007GQ-C6; Tue, 29 Jan 2019 11:11:55 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goRIk-00072a-Hx
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 11:11:47 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BB3D3A78;
+ Tue, 29 Jan 2019 03:11:32 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A7AD23F7B4;
+ Tue, 29 Jan 2019 03:11:31 -0800 (PST)
+Subject: Re: [PATCH 3/4] KVM: arm/arm64: lazily create perf events on enable
+To: andrew.murray@arm.com
+References: <1548154197-5470-1-git-send-email-andrew.murray@arm.com>
+ <1548154197-5470-4-git-send-email-andrew.murray@arm.com>
+ <82bb5635-0bca-8326-03e1-084792dd939d@arm.com>
+ <20190128142838.GB16627@e119886-lin.cambridge.arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <51e6a06a-f6f0-866b-4eca-183e2f42cad8@arm.com>
+Date: Tue, 29 Jan 2019 11:11:29 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <12e21befacf68861ddf34020838ff7a6e6e078ad.camel@hadess.net>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20190128142838.GB16627@e119886-lin.cambridge.arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_031117_859235_EC86D5DB 
-X-CRM114-Status: UNSURE (   9.19  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190129_031136_222588_2BA049A2 
+X-CRM114-Status: GOOD (  26.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,73 +73,122 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Guido =?iso-8859-1?Q?G=FCnther?= <agx@sigxcpu.org>,
- Dmitry Torokhov <dmitry.torokhov@gmail.com>, linux-kernel@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
- linux-input@vger.kernel.org, Matthias Brugger <matthias.bgg@gmail.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: marc.zyngier@arm.com, christoffer.dall@arm.com,
+ linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From what I've seen in vendor trees it's fine to treat this as gt1x=B9.
-Tested on the Purism Librem 5 Devkit (Rocktech JH057N00900 panel).
+On 28/01/2019 14:28, Andrew Murray wrote:
+> On Tue, Jan 22, 2019 at 10:12:22PM +0000, Suzuki K Poulose wrote:
+>> Hi Andrew,
+>>
+>> On 01/22/2019 10:49 AM, Andrew Murray wrote:
+>>> To prevent re-creating perf events everytime the counter registers
+>>> are changed, let's instead lazily create the event when the event
+>>> is first enabled and destroy it when it changes.
+>>>
+>>> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+>>
+>>
+>>> ---
+>>>    virt/kvm/arm/pmu.c | 114 ++++++++++++++++++++++++++++++++++++-----------------
+>>>    1 file changed, 78 insertions(+), 36 deletions(-)
+>>>
+>>> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+>>> index 4464899..1921ca9 100644
+>>> --- a/virt/kvm/arm/pmu.c
+>>> +++ b/virt/kvm/arm/pmu.c
+>>> @@ -24,8 +24,11 @@
+>>>    #include <kvm/arm_pmu.h>
+>>>    #include <kvm/arm_vgic.h>
+>>> -static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 data,
+>>> -				      u64 select_idx);
+>>> +static void kvm_pmu_reenable_enabled_single(struct kvm_vcpu *vcpu, u64 pair);
+>>
+>> I find the approach good. However the function names are a bit odd and
+>> it makes the code read a bit difficult.
+> 
+> Thanks - the odd naming probably came about as I started with a patch that
+> added chained PMU support and worked backward to split it into smaller patches
+> that each made individual sense. The _single suffix was the counterpart of
+> _pair.
+> 
+>>
+>> I think we could :
+>>
+>> 1) Rename the existing
+>>   kvm_pmu_{enable/disable}_counter => kvm_pmu_{enable/disable}_[mask or
+>> counters ]
+>> as they operate on a set of counters (as a mask) instead of a single
+>> counter.
+>> And then you may be able to drop "_single" from
+>> kvm_pmu_{enable/disable}_counter"_single() functions below, which makes
+>> better sense for what they do.
+> 
+> Thanks for this suggestion. I like this.
+> 
+>>
+>>> +static void kvm_pmu_counter_create_enabled_perf_event(struct kvm_vcpu *vcpu,
+>>> +						      u64 select_idx);
+>>
+>> Could we simply keep kvm_pmu_counter_create_event() and add a comment above
+>> the function explaining that the events are enabled as they are
+>> created lazily ?
+> 
+> OK.
+> 
 
-[1]: https://github.com/TadiT7/android_kernel_mtk-4.4/tree/master/drivers/i=
-nput/touchscreen/mediatek/GT5688
 
-Signed-off-by: Guido G=FCnther <agx@sigxcpu.org>
----
-Changes from v1:
-* Add tested board to commit message
 
- Documentation/devicetree/bindings/input/touchscreen/goodix.txt | 1 +
- drivers/input/touchscreen/goodix.c                             | 2 ++
- 2 files changed, 3 insertions(+)
+>>> + * kvm_pmu_reenable_enabled_single - reenable a counter if it should be enabled
+>>> + * @vcpu: The vcpu pointer
+>>> + * @select_idx: The counter index
+>>> + */
+>>> +static void kvm_pmu_reenable_enabled_single(struct kvm_vcpu *vcpu,
+>>> +					    u64 select_idx)
+>>> +{
+>>> +	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
+>>> +	u64 set = __vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & mask;
+>>> +
+>>> +	if (!(__vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E))
+>>> +		return;
+>>> +
+>>> +	if (set & BIT(select_idx))
+>>> +		kvm_pmu_enable_counter_single(vcpu, select_idx);
+>>
+>> Could we not reuse kvm_pmu_enable_counter() here :
+>> 	i.e,
+>> static inline void kvm_pmu_reenable_counter(struct kvm_vcpu *vcpu, u64
+>> 						select_idx)
+>> {
+>> 	kvm_pmu_enable_counter(vcpu, BIT(select_idx));
+>> }
+>>
+> 
+> Not quite - when we call kvm_pmu_reenable_enabled_single the individual
+> counter may or may not be enabled. We only want to recreate the perf event
+> if it was previously enabled.
+> 
+> But we can do better, e.g.
+> 
+> static void kvm_pmu_reenable_enabled_single(struct kvm_vcpu *vcpu,
+>                                              u64 select_idx)
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/goodix.txt=
- b/Documentation/devicetree/bindings/input/touchscreen/goodix.txt
-index f7e95c52f3c7..57d3d8870a09 100644
---- a/Documentation/devicetree/bindings/input/touchscreen/goodix.txt
-+++ b/Documentation/devicetree/bindings/input/touchscreen/goodix.txt
-@@ -3,6 +3,7 @@ Device tree bindings for Goodix GT9xx series touchscreen co=
-ntroller
- Required properties:
- =
+nit: could we use the name kvm_pmu_reenable_counter() ?
 
-  - compatible		: Should be "goodix,gt1151"
-+				 or "goodix,gt5688"
- 				 or "goodix,gt911"
- 				 or "goodix,gt9110"
- 				 or "goodix,gt912"
-diff --git a/drivers/input/touchscreen/goodix.c b/drivers/input/touchscreen=
-/goodix.c
-index f2d9c2c41885..47b1ced41576 100644
---- a/drivers/input/touchscreen/goodix.c
-+++ b/drivers/input/touchscreen/goodix.c
-@@ -216,6 +216,7 @@ static const struct goodix_chip_data *goodix_get_chip_d=
-ata(u16 id)
- {
- 	switch (id) {
- 	case 1151:
-+	case 5688:
- 		return &gt1x_chip_data;
- =
+> {
+>          u64 set = __vcpu_sys_reg(vcpu, PMCNTENSET_EL0);
+> 
+>          if (set & BIT(select_idx))
+>                  kvm_pmu_enable_counter_mask(vcpu, BIT(select_idx));
+> }
 
- 	case 911:
-@@ -942,6 +943,7 @@ MODULE_DEVICE_TABLE(acpi, goodix_acpi_match);
- #ifdef CONFIG_OF
- static const struct of_device_id goodix_of_match[] =3D {
- 	{ .compatible =3D "goodix,gt1151" },
-+	{ .compatible =3D "goodix,gt5688" },
- 	{ .compatible =3D "goodix,gt911" },
- 	{ .compatible =3D "goodix,gt9110" },
- 	{ .compatible =3D "goodix,gt912" },
--- =
+Yep, thats correct. Alternatively, you could move the CNTENSET check
+into the kvm_pmu_enable_counter_mask().
 
-2.20.1
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
