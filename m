@@ -2,76 +2,134 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6913BC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 22:31:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1476AC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 23:00:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 327842147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 22:31:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CC7192175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 23:00:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Re514mcu";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="eEa7536u"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 327842147A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mh64SxZk";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="HAnohHg0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.onmicrosoft.com header.i=@fb.onmicrosoft.com header.b="Vn8ktr1k"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC7192175B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=fb.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lPgKWBiGEhOdHsiU+oTOEDp6y1fBYOWseLfC+/glKX0=; b=Re514mcurGBFb7
-	QMXCMJiDgKoVgTQd354YtvONPNgzFV1QbpPZih3PQqsULeVEpWWA7hJsvfhUNkKpq+FEEjfWs/2RB
-	cwkDhINhN4krYEMru4gOcuxX9KMXLB+5CmLZQE6cvn7HHLSiOc7scUUmFRaFLnHDRiZidVml3VImx
-	S1PqtRYiNa+TaXqN1A437fc3P6G7kyafi/8cDKWney/vd5veRj2y18FT1RviyY6TRFDiq0yWLd6b+
-	9n3IqSJPU76+OWRc6Li15ddNiVNhmZtqzxgIvKZ0ITJ3QMiCY8Hf+OcWzCoUuPACL0H7fHuVWsrLy
-	MfHljn6ZC4PG1LmOKWsw==;
+	List-Owner; bh=sCTPVQdNnmLuXUBv7JG3fxfyxm6l/XUFha7RB9xF0PM=; b=mh64SxZk+LhTcq
+	ycoHYXAsiHGhewJqF6B+XZgDZmXPBMN5xIh1hHKK4KYgdCkUhj5Gb9/e+5dQqJjNUInUm3BDy5hGl
+	o2z6/D8wQX6yyYliFG+ctooqEFd14u3iX9Ll+k13rT2Xba5G3zChAfzvrF/YFTirVduZlJInfueNj
+	YWeE8+ffo5fCgboTEpO7Ewq1+CLV5yKwkNP3Chd1nd6Tkwi1qwuDwYev8o7LtKfR+3EiR2jyIIPHQ
+	EaVdEhq4Hk4K0SlL+NR3oLvAvRI4/i1PghGGx3CR6tc8/IahYQfU4HuJwJCIC41YCrt472Vc/rXXz
+	dlwzKDObgG55k+yWaO3g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gobuM-0007hU-TO; Tue, 29 Jan 2019 22:31:06 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gocMq-0000D4-Rf; Tue, 29 Jan 2019 23:00:32 +0000
+Received: from mx0a-00082601.pphosted.com ([67.231.145.42])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gobuJ-0007gk-1w
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 22:31:04 +0000
-Received: from mail-yw1-f48.google.com (mail-yw1-f48.google.com
- [209.85.161.48])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 1F37D214D8
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 22:31:02 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548801062;
- bh=8mchtL/kda+QX5rreOUh8RrpnFpvoBbcXfLnACnhg74=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=eEa7536ucEFh2k5Ul7LJ0hYHP6HXe8zryDPiyEvKTt3Zc6NSK69j+CM/EDjgHRGKL
- wBzBh72QsQ4krwy6gq9miA7v0WREbn6759yL1EQfi5YdpZgc9fTiraJg4u+BmgXbmM
- KEELf6bYMjkawB1SY17aJ/hQmYVx+kCmByef6tTE=
-Received: by mail-yw1-f48.google.com with SMTP id h193so8868805ywc.4
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 14:31:02 -0800 (PST)
-X-Gm-Message-State: AJcUukfRiy9r+Jkuq9X/6KI12ajsgBCYNb4h6Vk13K53M2fl6Sv6RUYZ
- tFznMyUl+zlnv2FX7L0KGLsM+pqe+bhbsErRCgE=
-X-Google-Smtp-Source: ALg8bN6GhWFWtesdzm070o/hq2HKx2K6aegmLp5gXPZTHtol0adO1wDQtAS/UqGFgIeAwte4G+Sm2flA7dn1oEJbG48=
-X-Received: by 2002:a81:8c1:: with SMTP id 184mr27309701ywi.392.1548801061366; 
- Tue, 29 Jan 2019 14:31:01 -0800 (PST)
+ id 1gocMm-0000CR-Rw
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 23:00:30 +0000
+Received: from pps.filterd (m0044012.ppops.net [127.0.0.1])
+ by mx0a-00082601.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x0TMt2KC022721; Tue, 29 Jan 2019 15:00:16 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.com;
+ h=from : to : cc : subject
+ : date : message-id : references : in-reply-to : content-type : content-id
+ : content-transfer-encoding : mime-version; s=facebook;
+ bh=uooQxjN8/atJFc3aEL4pzYDP4FYhwQDkL5vYSrH8vWo=;
+ b=HAnohHg0los1/bAm26UHmuH0vd8NOZ/wPgSD2p+zLm5/jVllFgRf75Y/lD4I/ccP3fWn
+ 9LKrAf1gXDz/iDW2bG5SOkkK7QKhD7ampXjbuYL8ukaDk3cu0mjaK4vhdegZ0qBIyb9U
+ Z0BiBuW1aGFFVpQMWeV40AQXW1+4f/i1sfg= 
+Received: from maileast.thefacebook.com ([199.201.65.23])
+ by mx0a-00082601.pphosted.com with ESMTP id 2qavr8gpxa-2
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
+ Tue, 29 Jan 2019 15:00:16 -0800
+Received: from frc-mbx02.TheFacebook.com (2620:10d:c0a1:f82::26) by
+ frc-hub05.TheFacebook.com (2620:10d:c021:18::175) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
+ 15.1.1531.3; Tue, 29 Jan 2019 15:00:14 -0800
+Received: from frc-hub03.TheFacebook.com (2620:10d:c021:18::173) by
+ frc-mbx02.TheFacebook.com (2620:10d:c0a1:f82::26) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
+ 15.1.1531.3; Tue, 29 Jan 2019 15:00:13 -0800
+Received: from NAM04-CO1-obe.outbound.protection.outlook.com (192.168.183.28)
+ by o365-in.thefacebook.com (192.168.177.73) with Microsoft SMTP
+ Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.1.1531.3
+ via Frontend Transport; Tue, 29 Jan 2019 15:00:13 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.onmicrosoft.com;
+ s=selector1-fb-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=uooQxjN8/atJFc3aEL4pzYDP4FYhwQDkL5vYSrH8vWo=;
+ b=Vn8ktr1kv21St+3SlkD9Czljgt4ofnUiO1cVcN+VprZM+ePpUzJVlH39b9RqveFMc9dWqLaBp/0eVMxYexsaHiFMPDdu35EZnK7MVQrUEOlicuhWuIk5XhGVIW33n+SJIUdKtl+gziYHBal49SyOW31tro6nJDZC6E4tKjk47ic=
+Received: from CY4PR15MB1269.namprd15.prod.outlook.com (10.172.180.139) by
+ CY4PR15MB1351.namprd15.prod.outlook.com (10.172.158.151) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1537.29; Tue, 29 Jan 2019 23:00:12 +0000
+Received: from CY4PR15MB1269.namprd15.prod.outlook.com
+ ([fe80::b4e4:1e1f:8c5d:9a8c]) by CY4PR15MB1269.namprd15.prod.outlook.com
+ ([fe80::b4e4:1e1f:8c5d:9a8c%4]) with mapi id 15.20.1537.031; Tue, 29 Jan 2019
+ 23:00:12 +0000
+From: Vijay Khemka <vijaykhemka@fb.com>
+To: Lee Jones <lee.jones@linaro.org>
+Subject: Re: [PATCH v2] dt-bindings: aspeed-lpc: Make parameter optional
+Thread-Topic: [PATCH v2] dt-bindings: aspeed-lpc: Make parameter optional
+Thread-Index: AQHUr2qjb3N/GePovUiM68RLzMkX8aXGPegAgAAp7IA=
+Date: Tue, 29 Jan 2019 23:00:11 +0000
+Message-ID: <A29B3BAA-8FA1-4FED-AB8D-C6DA2C2F785C@fb.com>
+References: <20190118201547.640173-1-vijaykhemka@fb.com>
+ <20190129123008.GC24070@dell>
+In-Reply-To: <20190129123008.GC24070@dell>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [2620:10d:c090:200::6:afcf]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; CY4PR15MB1351;
+ 20:gptrMWokAR4nhPvs4znoMSAEgN+UskRMpFeoQsCzZWXwXG0orG9olEmYzYio6XsRFLCRu2C+e68Ir4jSzXSIGLtrKyLI/2n40D2kYKjJMSl5c3tQquOeG79EexcHgjTMkdbnjGC7RtClSBehXDPoapPOxrKUfiquIH3k2fw2yhs=
+x-ms-office365-filtering-correlation-id: a4eb8c19-0937-43de-1ec6-08d6863d8616
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:CY4PR15MB1351; 
+x-ms-traffictypediagnostic: CY4PR15MB1351:
+x-microsoft-antispam-prvs: <CY4PR15MB13515765546795B8B07B91EDDD970@CY4PR15MB1351.namprd15.prod.outlook.com>
+x-forefront-prvs: 093290AD39
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(39860400002)(136003)(376002)(396003)(346002)(366004)(199004)(189003)(76176011)(46003)(7416002)(86362001)(486006)(476003)(186003)(446003)(11346002)(305945005)(102836004)(2616005)(6116002)(6506007)(99286004)(256004)(53936002)(6512007)(2906002)(83716004)(7736002)(6916009)(6246003)(71190400001)(71200400001)(316002)(478600001)(105586002)(33656002)(14454004)(97736004)(54906003)(6436002)(8676002)(229853002)(106356001)(81166006)(82746002)(81156014)(68736007)(8936002)(25786009)(36756003)(6486002)(4326008);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:CY4PR15MB1351;
+ H:CY4PR15MB1269.namprd15.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: fb.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: l67BybvluVM/hlgx1XVb7kzAPKJfDb+xsmKwGtL+n01/qqJsYwTtWIliETk7M8o03GfgwfM46265IS2d96CfsLK67HhnaMWE7rFp2MIy/xHMblOaaLtn6UrQPz0/bWXSM+ihFDTQblo6wbB7C4DXK72tidUFZiRdqTz4KOrhxGAx1WPxUkMJYFNffdwbLIu2K7ZFNAG1UA82XftDqzV/Y6zcVGFURYTmFHTjsi+mOAiiZqoBt1o4YTBsOJ9XYH6V19jUP0WrVK0PVpu3huaKXRB0KDcHJcZptCClunieHNRuDC9WgyOEHvhrzPJyWBS0gOny9nDvE19637lobvuB79Mz3ud0ok2gGnQT/5HgBoxGaCO/ZnSb4gNpxtFSEQDvcnuUS+yuquRqD/DiJU+JFMDFWkdpMD3oc/gM+b6QJnQ=
+Content-ID: <AF1F6947D459C44888696407724BBA09@namprd15.prod.outlook.com>
 MIME-Version: 1.0
-References: <20190129200858.19773-1-goldsimon@gmx.de>
-In-Reply-To: <20190129200858.19773-1-goldsimon@gmx.de>
-From: Alan Tull <atull@kernel.org>
-Date: Tue, 29 Jan 2019 16:30:25 -0600
-X-Gmail-Original-Message-ID: <CANk1AXTcbqgoCYkTY-ssMvpAbdoncrkOxyRfu-piLE2tQ15a2g@mail.gmail.com>
-Message-ID: <CANk1AXTcbqgoCYkTY-ssMvpAbdoncrkOxyRfu-piLE2tQ15a2g@mail.gmail.com>
-Subject: Re: [PATCH] ARM: socfpga: fix base address of SDR controller
-To: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
+X-MS-Exchange-CrossTenant-Network-Message-Id: a4eb8c19-0937-43de-1ec6-08d6863d8616
+X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 23:00:11.9290 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 8ae927fe-1255-47a7-a2af-5f3a069daaa2
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR15MB1351
+X-OriginatorOrg: fb.com
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-01-29_18:, , signatures=0
+X-Proofpoint-Spam-Reason: safe
+X-FB-Internal: Safe
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_143103_138956_65A4B8F7 
-X-CRM114-Status: GOOD (  13.97  )
+X-CRM114-CacheID: sfid-20190129_150029_074772_9BC0216B 
+X-CRM114-Status: GOOD (  19.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,79 +142,45 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, linux-fpga@vger.kernel.org,
- linux-kernel <linux-kernel@vger.kernel.org>,
- Russell King <linux@armlinux.org.uk>, Dinh Nguyen <dinguyen@kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Moritz Fischer <mdf@kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-aspeed@lists.ozlabs.org" <linux-aspeed@lists.ozlabs.org>,
+ Andrew Jeffery <andrew@aj.id.au>,
+ "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, Joel Stanley <joel@jms.id.au>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 29, 2019 at 2:09 PM Simon Goldschmidt
-<simon.k.r.goldschmidt@gmail.com> wrote:
-
-Hi Simon,
-
-Thanks for submitting.   A couple of things...
-
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index f365003f0..8f6c1a5d6 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -788,9 +788,9 @@
->                         reg = <0xfffec000 0x100>;
->                 };
->
-> -               sdr: sdr@ffc25000 {
-> +               sdr: sdr@ffc20000 {
->                         compatible = "altr,sdr-ctl", "syscon";
-> -                       reg = <0xffc25000 0x1000>;
-> +                       reg = <0xffc20000 0x6000>;
-
-The binding doc will also need this change (in a separate patch)
-Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
-
-> diff --git a/arch/arm/mach-socfpga/self-refresh.S b/arch/arm/mach-socfpga/self-refresh.S
-> index f2d7f883e..bd7759357 100644
-> --- a/arch/arm/mach-socfpga/self-refresh.S
-> +++ b/arch/arm/mach-socfpga/self-refresh.S
-> @@ -19,8 +19,8 @@
->  #define MAX_LOOP_COUNT         1000
->
->  /* Register offset */
-> -#define SDR_CTRLGRP_LOWPWREQ_ADDR       0x54
-> -#define SDR_CTRLGRP_LOWPWRACK_ADDR      0x58
-> +#define SDR_CTRLGRP_LOWPWREQ_ADDR       0x5054
-> +#define SDR_CTRLGRP_LOWPWRACK_ADDR      0x5058
-
-These offsets are used for ldr/sdr and are limited to 12 bits.  This
-won't build if CONFIG_SOCFPGA_SUSPEND is enabled.
-
-/home/atull/repos/linux-socfpga/arch/arm/mach-socfpga/self-refresh.S:
-Assembler messages:
-/home/atull/repos/linux-socfpga/arch/arm/mach-socfpga/self-refresh.S:65:
-Error: bad immediate value for offset (20564)
-/home/atull/repos/linux-socfpga/arch/arm/mach-socfpga/self-refresh.S:67:
-Error: bad immediate value for offset (20564)
-/home/atull/repos/linux-socfpga/arch/arm/mach-socfpga/self-refresh.S:72:
-Error: bad immediate value for offset (20568)
-/home/atull/repos/linux-socfpga/arch/arm/mach-socfpga/self-refresh.S:101:
-Error: bad immediate value for offset (20564)
-/home/atull/repos/linux-socfpga/arch/arm/mach-socfpga/self-refresh.S:103:
-Error: bad immediate value for offset (20564)
-/home/atull/repos/linux-socfpga/arch/arm/mach-socfpga/self-refresh.S:108:
-Error: bad immediate value for offset (20568)
-/home/atull/repos/linux-socfpga/scripts/Makefile.build:367: recipe for
-target 'arch/arm/mach-socfpga/self-refresh.o' failed
-
-Thanks,
-Alan
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+VGhhbmtzIExlZSwNCg0K77u/T24gMS8yOS8xOSwgNDozMCBBTSwgIkxlZSBKb25lcyIgPGxlZS5q
+b25lc0BsaW5hcm8ub3JnPiB3cm90ZToNCg0KICAgIE9uIEZyaSwgMTggSmFuIDIwMTksIFZpamF5
+IEtoZW1rYSB3cm90ZToNCiAgICANCiAgICA+IE1lbW9yeS1yZWdpb24gYW5kIGZsYXNoIHBoYW5k
+bGUgaXMgbm90IGEgcmVxdWlyZWQgcGFyYW1ldGVyLCBpdCBpcw0KICAgID4gb3B0aW9uYWwgdG8g
+ZGVzY3JpYmUgaW4gZGV2aWNlIHRyZWUgYW5kIG5lZWRlZCBvbmx5IHVzZSBiYXNpcy4NCiAgICA+
+IA0KICAgID4gU2lnbmVkLW9mZi1ieTogVmlqYXkgS2hlbWthIDx2aWpheWtoZW1rYUBmYi5jb20+
+DQogICAgPiAtLS0NCiAgICA+ICBEb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvbWZk
+L2FzcGVlZC1scGMudHh0IHwgMyArKysNCiAgICA+ICAxIGZpbGUgY2hhbmdlZCwgMyBpbnNlcnRp
+b25zKCspDQogICAgPiANCiAgICA+IGRpZmYgLS1naXQgYS9Eb2N1bWVudGF0aW9uL2RldmljZXRy
+ZWUvYmluZGluZ3MvbWZkL2FzcGVlZC1scGMudHh0IGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVl
+L2JpbmRpbmdzL21mZC9hc3BlZWQtbHBjLnR4dA0KICAgID4gaW5kZXggMzRkZDg5MDg3Y2ZmLi5k
+MjhjNGUxMTc2MTEgMTAwNjQ0DQogICAgPiAtLS0gYS9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUv
+YmluZGluZ3MvbWZkL2FzcGVlZC1scGMudHh0DQogICAgPiArKysgYi9Eb2N1bWVudGF0aW9uL2Rl
+dmljZXRyZWUvYmluZGluZ3MvbWZkL2FzcGVlZC1scGMudHh0DQogICAgPiBAQCAtMTM1LDYgKzEz
+NSw5IEBAIFJlcXVpcmVkIHByb3BlcnRpZXM6DQogICAgPiAgLSBjbG9ja3M6CWNvbnRhaW5zIGEg
+cGhhbmRsZSB0byB0aGUgc3lzY29uIG5vZGUgZGVzY3JpYmluZyB0aGUgY2xvY2tzLg0KICAgID4g
+IAkJVGhlcmUgc2hvdWxkIHRoZW4gYmUgb25lIGNlbGwgcmVwcmVzZW50aW5nIHRoZSBjbG9jayB0
+byB1c2UNCiAgICA+ICANCiAgICA+ICtPcHRpb25hbCBwcm9wZXJ0aWVzOg0KICAgID4gK1RoZXNl
+IGJlbG93IHByb3BlcnRpZXMgYXJlIG9wdGlvbmFsIHRvIGRlZmluZS4NCiAgICANCiAgICBUaGlz
+IGxpbmUgaXMgc3VwZXJmbHVvdXMuICBQbGVhc2UgcmVtb3ZlIGl0Lg0KSSB3aWxsIHJlbW92ZSBp
+dC4gSSBhbSBhc3N1bWluZyBvbmx5IDEgbGluZSB0byByZW1vdmUuDQogICAgDQogICAgPiArDQog
+ICAgPiAgLSBtZW1vcnktcmVnaW9uOiBBIHBoYW5kbGUgdG8gYSByZXNlcnZlZF9tZW1vcnkgcmVn
+aW9uIHRvIGJlIHVzZWQgZm9yIHRoZSBMUEMNCiAgICA+ICAJCXRvIEFIQiBtYXBwaW5nDQogICAg
+PiAgDQogICAgDQogICAgLS0gDQogICAgTGVlIEpvbmVzIFvmnY7nkLzmlq9dDQogICAgTGluYXJv
+IFNlcnZpY2VzIFRlY2huaWNhbCBMZWFkDQogICAgTGluYXJvLm9yZyDilIIgT3BlbiBzb3VyY2Ug
+c29mdHdhcmUgZm9yIEFSTSBTb0NzDQogICAgRm9sbG93IExpbmFybzogRmFjZWJvb2sgfCBUd2l0
+dGVyIHwgQmxvZw0KICAgIA0KDQpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVs
+QGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9s
+aXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
