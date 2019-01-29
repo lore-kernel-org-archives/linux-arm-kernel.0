@@ -2,55 +2,56 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 29753C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:08:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A5F5EC282D0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:09:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ECF1C2183F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:08:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6DABD2177E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 08:09:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uCS3KzXb";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="eM2adenx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ECF1C2183F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cEufHWiY";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="RQ6YSHhE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6DABD2177E
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:Message-ID:Date
-	:Subject:To:From:Reply-To:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=TRmlqADrjReAS4QV6q2hc9jNgf1mf3NbvYeYc+nZ1ao=; b=uCS3KzXbh29/IV
-	PuAURy9P+8HANB14krydA7+CggAh+CqvPLW3eyEEyV7Pn6K2zn7BixMpi3wXfCja7C8XTDMYdCNjx
-	SvP3PMde/j3HPAKiNZ/UJArUCFueXgH2nsLE1oMkf/3GxomPX8lYuHjUsGHguP1jK2DAH0yGh1aEv
-	mReLOECXc3KAtysllsv3xYYbk09lyRkLqChTZFSxR3RjWTaGkU9W5l356GCfrdW5zh66HrY5SSSGd
-	sV4V44+QLnDpgLIBVNGeG90fo5dXMD/bCceDnV7LzjW2zVzs+ihrSPnea1+vNshXgceM1ZtPSlsku
-	6I7lyKw+W5fc4OK4Z81g==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=/nbRsG7Y5du8VqbU46LHMa7pz4WFC7XKuVkyPRFn0ws=; b=cEufHWiYot+Zj0
+	X4CvcpuFlGESTXK9EtMrlldEhST0Uzn1e7UBSeFQGAMtwC61jtRi4TlEH1iE+wWyigohPbiYj/dI6
+	2hCBX7tnGm4a3ucsAryRc6R8t9pNmzEuWZDKYFaE28HMJ7opq8eFjpIon+vrII2G48ejNsQc0CgaN
+	iE0SxxsG9UD7031UtpVTw/inNdvE35BoBaa6387pLR4P0ZbBjw1ySqlCeaFQLWDmmWv/yaurmT5IJ
+	zl9ZSS3VCACdAhXbK/GLQJsZV6iZxjQxD0Nwl15hVigi3GYVgTnUMDrO2phk6W19wRy5FNWEAzGTY
+	txLICC80S+XZnzfNlH2Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goORh-0003ci-4Z; Tue, 29 Jan 2019 08:08:37 +0000
-Received: from mail-eopbgr30089.outbound.protection.outlook.com ([40.107.3.89]
+	id 1goOS1-0003ua-Ky; Tue, 29 Jan 2019 08:08:57 +0000
+Received: from mail-eopbgr30081.outbound.protection.outlook.com ([40.107.3.81]
  helo=EUR03-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goORc-0003cD-VB
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:08:35 +0000
+ id 1goORi-0003cw-Id
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 08:08:45 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=nPPBhB/PEqxZaqY5vkmcIdTM6symstCZ4vRv7rDGd6o=;
- b=eM2adenxW36oQKGozF8V4JJFYAuBQeZ+TrKFFNNYI5fWRckyGPBbW4/QSwchugexsBO6tvxh7OYXzuu0djpt0UUdu2jWu0Y+wu7lyP4rQTLB2ofSaKuztWkFQEvEqvkw9kYWUWjp2wvKCHfBIvdCt+RYZTUK40nMmKZz4O0xTV4=
+ bh=YURbUw422ScAlv4SQ6d02/Q+xYwCuKhy824O9vETnG8=;
+ b=RQ6YSHhEOgw5omCrqo4blcZ0spsUEWM40Rr+yWOI2r5vQpRTiKvDTCVacMPZ7DZQaKUYVZmqzS8IvstN/PwyzKfkUULq1Cxvj3Kzp0Loij77jI9HMlYJjAo59UbVPI1gxKfEzsdVk1LOhnmfJFTVW2bI8lL8nlvZzd5uCwCPODI=
 Received: from AM6PR04MB5781.eurprd04.prod.outlook.com (20.179.3.19) by
  AM6PR04MB5847.eurprd04.prod.outlook.com (20.179.3.27) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1558.17; Tue, 29 Jan 2019 08:08:28 +0000
+ 15.20.1558.17; Tue, 29 Jan 2019 08:08:34 +0000
 Received: from AM6PR04MB5781.eurprd04.prod.outlook.com
  ([fe80::9c0:e3aa:b41f:9504]) by AM6PR04MB5781.eurprd04.prod.outlook.com
  ([fe80::9c0:e3aa:b41f:9504%3]) with mapi id 15.20.1558.023; Tue, 29 Jan 2019
- 08:08:28 +0000
+ 08:08:34 +0000
 From: "Z.q. Hou" <zhiqiang.hou@nxp.com>
 To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
  "linux-arm-kernel@lists.infradead.org"
@@ -63,13 +64,13 @@ To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
  Leo Li <leoyang.li@nxp.com>, "lorenzo.pieralisi@arm.com"
  <lorenzo.pieralisi@arm.com>, "catalin.marinas@arm.com"
  <catalin.marinas@arm.com>, "will.deacon@arm.com" <will.deacon@arm.com>
-Subject: [PATCHv3 00/27] PCI: refactor Mobiveil driver and add PCIe Gen4
- driver for NXP Layerscape SoCs
-Thread-Topic: [PATCHv3 00/27] PCI: refactor Mobiveil driver and add PCIe Gen4
- driver for NXP Layerscape SoCs
-Thread-Index: AQHUt6nQIKafKgn6QEuhQ0P6HOWTOw==
-Date: Tue, 29 Jan 2019 08:08:28 +0000
-Message-ID: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
+Subject: [PATCHv3 01/27] PCI: mobiveil: uniform the register accessors
+Thread-Topic: [PATCHv3 01/27] PCI: mobiveil: uniform the register accessors
+Thread-Index: AQHUt6nUdk4grkaopECRyHHb4VOFRQ==
+Date: Tue, 29 Jan 2019 08:08:34 +0000
+Message-ID: <20190129080926.36773-2-Zhiqiang.Hou@nxp.com>
+References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
+In-Reply-To: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
 Accept-Language: zh-CN, en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -84,37 +85,36 @@ x-mailer: git-send-email 2.17.1
 x-originating-ip: [119.31.174.73]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; AM6PR04MB5847;
- 6:U/uzNn17v3Ts8Nw2LkXlfq9FZAZECR/W4g0O3BPebRNYZpr/Ey7dDGSBTYRxJqxrmeINh1wQxNCcn81eF4tAEB/Cj62PLprzKBhTYOrTPuYUKA2tcMvU+bIouIw8O/q2awQDWAoXjo9XvV1xZZ0Q6u1OtEazZGHn9lD39y32hETZOSZN9x6bWATmK+lcDA7ajC2RpKqjsocdEsg9ZETRP0bQrTm4WMJ2WeeXKa+XQYf/C2rWb1VBLsTEEaj/tF2w0gXm09t7d3ZeTxMvfcMalUE8qOj2joAbrD7Vw/r8BQ6yt5CMGfHhhSE233N8kteGuAR2zQAeqbFkls9UDevkadOTDSNYsSJk+g6Ir+4mQCFu4lf2FD74i4e5FFRVdp4WX9m0N6OiUDH0Q4NgUEbQLbGIX75DLecX34QppBZBPpoRYp9Z32BCvu8cwDJzyN09pitqh+T6QTqWmN0u88WfQw==;
- 5:zkX9dJysNEVq2isolr6NbT6XNlqCNPPgoD+9qrA3kczSxs6owSVzjPZl40BWL3t2RTIRzHWYS1SzDNZsh5HiFw11NjVwuMI6PwgZ4fdsy4JunNMamt6gXcDp4evgmVLOeLaVx5AjqxdSTIob35gGlYEmJhSqrmYfOEQ3VoxrPcsCXnhu99cZ/hIJA9YI6QytMDxVHjS9/L9Ee7zIcc2/rg==;
- 7:tXAIJaYpcQw2flBfczYrZOW/9OOKbZQVJ5pWsF8OC6i9ittpsjzOfCiPQCKkd66Oeu/jrM/b/JB+4DYl1qztjAiP/mNLEsW9+Uu1W+kZVGod1/v7PuGInA3n+1JVBcx8BryhFbcrakAge33pL6IZyw==
-x-ms-office365-filtering-correlation-id: 68ff47de-c64d-4b64-8885-08d685c0f33e
+ 6:pApE1Q8ldQUS8VpZ+P0lijVLKH4dwwg29XdlLDg5fZpufZJfjMFx8g3ecsTf9CwDcQ4547efq3Ufe0LM4Ul5li9h14V3rmJkK4g9eS18cvLfY2j01e5Wbu9W0laVkcCBwzgeQJ4KVYnRyqxce2lx/l1BUc4TMkLxAO5JFwjHid/3JQDh/tk8+DxSFknQuedj3LPVIiI0fsbQnKPi5oeuZDnT88aKTuDoD9/7zjCbWwdc3s+MFsAQI8vmLg8FwvXUU4BGW2tRJvaWhkjRafx884wAsi1PLNoLc+SFpMeVMyInMFzZtalyj6CQHzMP/gzjXd9pG4It0COk9HSz3rL9eixWfqOG/eFg6May1jX3Ir1u17/WAWuP8PFGF0FkMTmDxclxeOC4ViSInvw2kbR/ADqE8MRytUlxpKmZ+mGSROzWb3QwT8a9iPFhu5WtVPkS/UBU4kbQE6UjmA9vLyEWVg==;
+ 5:HJ/H5nxrNSccIQHaPFyb/NjMV73E0WJyK9Zmmc03lTNqhHkCaizVkoXlcCyGE1Nx/Hgb4mDHNmXmgQBhU17JE9YZZSA2d8wsNQWC4SCOgxBppK70TNz9M7uWfA4lhxcVKPc/82XPFFIHxHtvW+8Wy4FUD/wyKvOc759DhRZSRAnKJVUoJm2LQY0JT2J7DWImSwlZ/8gjt8JT6a6NuuzYhQ==;
+ 7:xgnVKJphIHgG8cBiRuvb4RkcOgXtdJLzrfuF89KPkGCwEZrN5aAxVOqvRSkFUFXrOJfTp3DU/eUMBFxREaCiA8SsPI4BRpWh3qNUvu+VdKWjx0Wp7p7Lj4Zs5Zu8mayEe5hHrfSkZgYEcWXlCd0pOw==
+x-ms-office365-filtering-correlation-id: bd76ab15-84ee-4fb9-73cf-08d685c0f6f3
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:AM6PR04MB5847; 
 x-ms-traffictypediagnostic: AM6PR04MB5847:
-x-microsoft-antispam-prvs: <AM6PR04MB5847A224B25D0D01E8F539E484970@AM6PR04MB5847.eurprd04.prod.outlook.com>
+x-microsoft-antispam-prvs: <AM6PR04MB5847B70925D763A14DC467C884970@AM6PR04MB5847.eurprd04.prod.outlook.com>
 x-forefront-prvs: 093290AD39
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(6029001)(39860400002)(396003)(346002)(366004)(376002)(136003)(199004)(189003)(14444005)(14454004)(66066001)(478600001)(2616005)(6436002)(71200400001)(486006)(54906003)(476003)(99286004)(110136005)(52116002)(256004)(6486002)(36756003)(6506007)(386003)(316002)(97736004)(26005)(102836004)(71190400001)(186003)(81156014)(81166006)(7736002)(8676002)(3846002)(50226002)(305945005)(4326008)(7416002)(25786009)(1076003)(2906002)(53936002)(6116002)(86362001)(2201001)(105586002)(106356001)(8936002)(2501003)(68736007)(6512007)(921003)(1121003);
+ SFS:(10009020)(39860400002)(396003)(346002)(366004)(376002)(136003)(199004)(189003)(14444005)(14454004)(66066001)(478600001)(2616005)(6436002)(71200400001)(446003)(486006)(54906003)(11346002)(476003)(99286004)(110136005)(52116002)(256004)(6486002)(36756003)(6506007)(386003)(316002)(97736004)(26005)(102836004)(71190400001)(186003)(76176011)(81156014)(81166006)(7736002)(8676002)(3846002)(50226002)(305945005)(4326008)(7416002)(25786009)(1076003)(2906002)(53936002)(6116002)(86362001)(2201001)(105586002)(106356001)(8936002)(2501003)(68736007)(6512007)(921003)(1121003);
  DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB5847;
  H:AM6PR04MB5781.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: /FCZdVJJqKkPid9cVjqd/kAhBvfkELSaDBWv8t60wmv3IoNxSsbbAlsmK0J02LJr+ljVojt0s+BAwDGumDpKm1z0wErVJ7eJOzPkszgV2asfm8chi1JwkN3dPr0yLrBwbWBLlHr1Nu60a8e8Pl2RoZ7B4zA+xCSUcNODdMzsBBSECg9WAnWfU9LjbIZfGfvlRE/Dbhw8JjxOQHxW6zDn8JT8D5Vnr4/E+XE877tBEFvrTckKs21Saui9zp46VYa9L2X+6yHLYwOtmSocXLilKDHZdBPyPor0hqHQvRb6dEMMt/XkkAHx1xotPrhUsSxDTQteNHXx7MLuTx9bhYvuxcyPgup3STlsmWubwyrIzHDHSs+EgsCe0tWEO2RruuPq3+pgHFVSwqJOaDRb5lGICqPm4dVC8UVW9zS7UsG2jbg=
-Content-ID: <5EB28B97FCD6E348AA7971A9D134AA44@eurprd04.prod.outlook.com>
+x-microsoft-antispam-message-info: BlFymusaf79FmIAal+Vahf+ivz6tle722klMCWp7Tym8Gfi43vfctg41eOY4m2YVPrNjHVpqafy0IoRgSEoHs3wblL5Tm1OK7qfRnlr4S4guN+dd5iXh3gVpT12HEYKQHfhQ4KCD2dEUdJCPIpfdV2MaTYrhsG5yw2EbnXn3TX9TJ8VhhArPsTPVcLbt11Mk9WjMJOFy3ZAkFM9xc4GCY/eMy1QKsCqkEUPFc626ZAWTL1U67EYHAOj96SG0fFiDnJwgcK5fXohoKjk2a1G6pKImbFmfCUvGENBOnOsMZCyN4gzf3RWFPinQ5kUMUDdLJNQwCecnrON+RYAWkv9Laze5ezC46XSJVH2owdjlrUVoSmMQIumK5LnHCL4omSOWowXEzSSmcKR8GqTC+zBZVTGS53r2tWabJk5n1dPH+Kg=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 68ff47de-c64d-4b64-8885-08d685c0f33e
-X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 08:08:22.4742 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: bd76ab15-84ee-4fb9-73cf-08d685c0f6f3
+X-MS-Exchange-CrossTenant-originalarrivaltime: 29 Jan 2019 08:08:28.6930 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB5847
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_000833_104387_87B7287F 
-X-CRM114-Status: GOOD (  13.82  )
+X-CRM114-CacheID: sfid-20190129_000839_042600_440A372F 
+X-CRM114-Status: GOOD (  14.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -135,67 +135,260 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-This patch set is aim to refactor the Mobiveil driver and add
-PCIe support for NXP Layerscape series SoCs integrated Mobiveil's
-PCIe Gen4 controller.
+It's confused that R/W some registers by csr_readl()/csr_writel(),
+while others by read_paged_register()/write_paged_register().
+Actually the low 3KB of 4KB PCIe configure space can be accessed
+directly and high 1KB is paging area. So this patch uniformed the
+register accessors to csr_readl() and csr_writel() by comparing
+the register offset with page access boundary 3KB in the accessor
+internal.
 
-Hou Zhiqiang (27):
-  PCI: mobiveil: uniform the register accessors
-  PCI: mobiveil: format the code without function change
-  PCI: mobiveil: correct the returned error number
-  PCI: mobiveil: remove flag MSI_FLAG_MULTI_PCI_MSI
-  PCI: mobiveil: correct PCI base address in MEM/IO outbound windows
-  PCI: mobiveil: replace the resource list iteration function
-  PCI: mobiveil: use WIN_NUM_0 explicitly for CFG outbound window
-  PCI: mobiveil: use the 1st inbound window for MEM inbound transactions
-  PCI: mobiveil: correct inbound/outbound window setup routines
-  PCI: mobiveil: fix the INTx process error
-  PCI: mobiveil: only fix up the Class Code field
-  PCI: mobiveil: move out the link up waiting from mobiveil_host_init
-  PCI: mobiveil: move irq chained handler setup out of DT parse
-  PCI: mobiveil: initialize Primary/Secondary/Subordinate bus number
-  dt-bindings: pci: mobiveil: change gpio_slave and apb_csr to optional
-  PCI: mobiveil: refactor Mobiveil PCIe Host Bridge IP driver
-  PCI: mobiveil: fix the checking of valid device
-  PCI: mobiveil: continue to initialize the host upon no PCIe link
-  PCI: mobiveil: disabled IB and OB windows set by bootloader
-  PCI: mobiveil: add Byte and Half-Word width register accessors
-  PCI: mobiveil: make mobiveil_host_init can be used to re-init host
-  dt-bindings: pci: Add NXP Layerscape SoCs PCIe Gen4 controller
-  PCI: mobiveil: add PCIe Gen4 RC driver for NXP Layerscape SoCs
-  PCI: mobiveil: ls_pcie_g4: add Workaround for A-011577
-  PCI: mobiveil: ls_pcie_g4: add Workaround for A-011451
-  arm64: dts: freescale: lx2160a: add pcie DT nodes
-  arm64: defconfig: Enable CONFIG_PCI_LAYERSCAPE_GEN4
+Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+Reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+---
+V3:
+ - No change
 
- .../bindings/pci/layerscape-pci-gen4.txt      |  52 ++
- .../devicetree/bindings/pci/mobiveil-pcie.txt |   2 +
- MAINTAINERS                                   |  10 +-
- .../arm64/boot/dts/freescale/fsl-lx2160a.dtsi | 163 ++++
- arch/arm64/configs/defconfig                  |   1 +
- drivers/pci/controller/Kconfig                |  11 +-
- drivers/pci/controller/Makefile               |   2 +-
- drivers/pci/controller/mobiveil/Kconfig       |  34 +
- drivers/pci/controller/mobiveil/Makefile      |   5 +
- .../controller/mobiveil/pci-layerscape-gen4.c | 306 +++++++
- .../controller/mobiveil/pcie-mobiveil-host.c  | 640 +++++++++++++
- .../controller/mobiveil/pcie-mobiveil-plat.c  |  54 ++
- .../pci/controller/mobiveil/pcie-mobiveil.c   | 246 +++++
- .../pci/controller/mobiveil/pcie-mobiveil.h   | 229 +++++
- drivers/pci/controller/pcie-mobiveil.c        | 861 ------------------
- 15 files changed, 1743 insertions(+), 873 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/layerscape-pci-gen4.txt
- create mode 100644 drivers/pci/controller/mobiveil/Kconfig
- create mode 100644 drivers/pci/controller/mobiveil/Makefile
- create mode 100644 drivers/pci/controller/mobiveil/pci-layerscape-gen4.c
- create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
- create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil-plat.c
- create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil.c
- create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil.h
- delete mode 100644 drivers/pci/controller/pcie-mobiveil.c
+ drivers/pci/controller/pcie-mobiveil.c | 179 +++++++++++++++++--------
+ 1 file changed, 124 insertions(+), 55 deletions(-)
 
+diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
+index 77052a0712d0..d55c7e780c6e 100644
+--- a/drivers/pci/controller/pcie-mobiveil.c
++++ b/drivers/pci/controller/pcie-mobiveil.c
+@@ -47,7 +47,6 @@
+ #define  PAGE_SEL_SHIFT	13
+ #define  PAGE_SEL_MASK		0x3f
+ #define  PAGE_LO_MASK		0x3ff
+-#define  PAGE_SEL_EN		0xc00
+ #define  PAGE_SEL_OFFSET_SHIFT	10
+ 
+ #define PAB_AXI_PIO_CTRL	0x0840
+@@ -117,6 +116,12 @@
+ #define LINK_WAIT_MIN	90000
+ #define LINK_WAIT_MAX	100000
+ 
++#define PAGED_ADDR_BNDRY			0xc00
++#define OFFSET_TO_PAGE_ADDR(off)		\
++	((off & PAGE_LO_MASK) | PAGED_ADDR_BNDRY)
++#define OFFSET_TO_PAGE_IDX(off)			\
++	((off >> PAGE_SEL_OFFSET_SHIFT) & PAGE_SEL_MASK)
++
+ struct mobiveil_msi {			/* MSI information */
+ 	struct mutex lock;		/* protect bitmap variable */
+ 	struct irq_domain *msi_domain;
+@@ -145,15 +150,119 @@ struct mobiveil_pcie {
+ 	struct mobiveil_msi msi;
+ };
+ 
+-static inline void csr_writel(struct mobiveil_pcie *pcie, const u32 value,
+-		const u32 reg)
++/*
++ * mobiveil_pcie_sel_page - routine to access paged register
++ *
++ * Registers whose address greater than PAGED_ADDR_BNDRY (0xc00) are paged,
++ * for this scheme to work extracted higher 6 bits of the offset will be
++ * written to pg_sel field of PAB_CTRL register and rest of the lower 10
++ * bits enabled with PAGED_ADDR_BNDRY are used as offset of the register.
++ */
++static void mobiveil_pcie_sel_page(struct mobiveil_pcie *pcie, u8 pg_idx)
+ {
+-	writel_relaxed(value, pcie->csr_axi_slave_base + reg);
++	u32 val;
++
++	val = readl(pcie->csr_axi_slave_base + PAB_CTRL);
++	val &= ~(PAGE_SEL_MASK << PAGE_SEL_SHIFT);
++	val |= (pg_idx & PAGE_SEL_MASK) << PAGE_SEL_SHIFT;
++
++	writel(val, pcie->csr_axi_slave_base + PAB_CTRL);
+ }
+ 
+-static inline u32 csr_readl(struct mobiveil_pcie *pcie, const u32 reg)
++static void *mobiveil_pcie_comp_addr(struct mobiveil_pcie *pcie, u32 off)
+ {
+-	return readl_relaxed(pcie->csr_axi_slave_base + reg);
++	if (off < PAGED_ADDR_BNDRY) {
++		/* For directly accessed registers, clear the pg_sel field */
++		mobiveil_pcie_sel_page(pcie, 0);
++		return pcie->csr_axi_slave_base + off;
++	}
++
++	mobiveil_pcie_sel_page(pcie, OFFSET_TO_PAGE_IDX(off));
++	return pcie->csr_axi_slave_base + OFFSET_TO_PAGE_ADDR(off);
++}
++
++static int mobiveil_pcie_read(void __iomem *addr, int size, u32 *val)
++{
++	if ((uintptr_t)addr & (size - 1)) {
++		*val = 0;
++		return PCIBIOS_BAD_REGISTER_NUMBER;
++	}
++
++	switch (size) {
++	case 4:
++		*val = readl(addr);
++		break;
++	case 2:
++		*val = readw(addr);
++		break;
++	case 1:
++		*val = readb(addr);
++		break;
++	default:
++		*val = 0;
++		return PCIBIOS_BAD_REGISTER_NUMBER;
++	}
++
++	return PCIBIOS_SUCCESSFUL;
++}
++
++static int mobiveil_pcie_write(void __iomem *addr, int size, u32 val)
++{
++	if ((uintptr_t)addr & (size - 1))
++		return PCIBIOS_BAD_REGISTER_NUMBER;
++
++	switch (size) {
++	case 4:
++		writel(val, addr);
++		break;
++	case 2:
++		writew(val, addr);
++		break;
++	case 1:
++		writeb(val, addr);
++		break;
++	default:
++		return PCIBIOS_BAD_REGISTER_NUMBER;
++	}
++
++	return PCIBIOS_SUCCESSFUL;
++}
++
++static u32 csr_read(struct mobiveil_pcie *pcie, u32 off, size_t size)
++{
++	void *addr;
++	u32 val;
++	int ret;
++
++	addr = mobiveil_pcie_comp_addr(pcie, off);
++
++	ret = mobiveil_pcie_read(addr, size, &val);
++	if (ret)
++		dev_err(&pcie->pdev->dev, "read CSR address failed\n");
++
++	return val;
++}
++
++static void csr_write(struct mobiveil_pcie *pcie, u32 val, u32 off, size_t size)
++{
++	void *addr;
++	int ret;
++
++	addr = mobiveil_pcie_comp_addr(pcie, off);
++
++	ret = mobiveil_pcie_write(addr, size, val);
++	if (ret)
++		dev_err(&pcie->pdev->dev, "write CSR address failed\n");
++}
++
++static u32 csr_readl(struct mobiveil_pcie *pcie, u32 off)
++{
++	return csr_read(pcie, off, 0x4);
++}
++
++static void csr_writel(struct mobiveil_pcie *pcie, u32 val, u32 off)
++{
++	csr_write(pcie, val, off, 0x4);
+ }
+ 
+ static bool mobiveil_pcie_link_up(struct mobiveil_pcie *pcie)
+@@ -342,45 +451,6 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
+ 	return 0;
+ }
+ 
+-/*
+- * select_paged_register - routine to access paged register of root complex
+- *
+- * registers of RC are paged, for this scheme to work
+- * extracted higher 6 bits of the offset will be written to pg_sel
+- * field of PAB_CTRL register and rest of the lower 10 bits enabled with
+- * PAGE_SEL_EN are used as offset of the register.
+- */
+-static void select_paged_register(struct mobiveil_pcie *pcie, u32 offset)
+-{
+-	int pab_ctrl_dw, pg_sel;
+-
+-	/* clear pg_sel field */
+-	pab_ctrl_dw = csr_readl(pcie, PAB_CTRL);
+-	pab_ctrl_dw = (pab_ctrl_dw & ~(PAGE_SEL_MASK << PAGE_SEL_SHIFT));
+-
+-	/* set pg_sel field */
+-	pg_sel = (offset >> PAGE_SEL_OFFSET_SHIFT) & PAGE_SEL_MASK;
+-	pab_ctrl_dw |= ((pg_sel << PAGE_SEL_SHIFT));
+-	csr_writel(pcie, pab_ctrl_dw, PAB_CTRL);
+-}
+-
+-static void write_paged_register(struct mobiveil_pcie *pcie,
+-		u32 val, u32 offset)
+-{
+-	u32 off = (offset & PAGE_LO_MASK) | PAGE_SEL_EN;
+-
+-	select_paged_register(pcie, offset);
+-	csr_writel(pcie, val, off);
+-}
+-
+-static u32 read_paged_register(struct mobiveil_pcie *pcie, u32 offset)
+-{
+-	u32 off = (offset & PAGE_LO_MASK) | PAGE_SEL_EN;
+-
+-	select_paged_register(pcie, offset);
+-	return csr_readl(pcie, off);
+-}
+-
+ static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
+ 		int pci_addr, u32 type, u64 size)
+ {
+@@ -397,19 +467,19 @@ static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
+ 	pio_ctrl_val = csr_readl(pcie, PAB_PEX_PIO_CTRL);
+ 	csr_writel(pcie,
+ 		pio_ctrl_val | (1 << PIO_ENABLE_SHIFT), PAB_PEX_PIO_CTRL);
+-	amap_ctrl_dw = read_paged_register(pcie, PAB_PEX_AMAP_CTRL(win_num));
++	amap_ctrl_dw = csr_readl(pcie, PAB_PEX_AMAP_CTRL(win_num));
+ 	amap_ctrl_dw = (amap_ctrl_dw | (type << AMAP_CTRL_TYPE_SHIFT));
+ 	amap_ctrl_dw = (amap_ctrl_dw | (1 << AMAP_CTRL_EN_SHIFT));
+ 
+-	write_paged_register(pcie, amap_ctrl_dw | lower_32_bits(size64),
+-				PAB_PEX_AMAP_CTRL(win_num));
++	csr_writel(pcie, amap_ctrl_dw | lower_32_bits(size64),
++		   PAB_PEX_AMAP_CTRL(win_num));
+ 
+-	write_paged_register(pcie, upper_32_bits(size64),
+-				PAB_EXT_PEX_AMAP_SIZEN(win_num));
++	csr_writel(pcie, upper_32_bits(size64),
++		   PAB_EXT_PEX_AMAP_SIZEN(win_num));
+ 
+-	write_paged_register(pcie, pci_addr, PAB_PEX_AMAP_AXI_WIN(win_num));
+-	write_paged_register(pcie, pci_addr, PAB_PEX_AMAP_PEX_WIN_L(win_num));
+-	write_paged_register(pcie, 0, PAB_PEX_AMAP_PEX_WIN_H(win_num));
++	csr_writel(pcie, pci_addr, PAB_PEX_AMAP_AXI_WIN(win_num));
++	csr_writel(pcie, pci_addr, PAB_PEX_AMAP_PEX_WIN_L(win_num));
++	csr_writel(pcie, 0, PAB_PEX_AMAP_PEX_WIN_H(win_num));
+ }
+ 
+ /*
+@@ -437,8 +507,7 @@ static void program_ob_windows(struct mobiveil_pcie *pcie, int win_num,
+ 	csr_writel(pcie, 1 << WIN_ENABLE_SHIFT | type << WIN_TYPE_SHIFT |
+ 			lower_32_bits(size64), PAB_AXI_AMAP_CTRL(win_num));
+ 
+-	write_paged_register(pcie, upper_32_bits(size64),
+-				PAB_EXT_AXI_AMAP_SIZE(win_num));
++	csr_writel(pcie, upper_32_bits(size64), PAB_EXT_AXI_AMAP_SIZE(win_num));
+ 
+ 	/*
+ 	 * program AXI window base with appropriate value in
 -- 
 2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
