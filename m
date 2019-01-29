@@ -2,82 +2,63 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E71E0C282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:54:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E67BC282C7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 12:06:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B7C9B2083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 11:54:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5BD9B20881
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 12:06:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AVAZwYn/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="gCO16ajq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B7C9B2083B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kZrUP7fF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5BD9B20881
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kLsrT3BsIbF+kYvcuSMA2sGok9TAuZJz75CLEHov85A=; b=AVAZwYn/9GTjk1
-	2SZUqh5i20irVDYAJ1b8Qymd10qedGvblpNZvQv7KzvS+/UCX9Bq3NjK9A7KXboWt1Dijyn3a1sjV
-	qNNPFvdVyWig0C5JN2x8vTi8/Rn+0hf2igzO0kcqKaVqRFQWAt5G8sTmD4yn6CyHhaAoH+jTCW+SA
-	MNonkvzedzFAQfcW9uzosQHmI3oPQihO95Tk1mAuSX6ktjLaFu4LaNqYnl1eKcchQ5cG4MiYUyQ3u
-	X6u1t5DnlHC/vYOUOovfyejXHj1sKCMITPO0swMkMKt+GXkN/iDL6zOt1wF3d3/hXszUCXwUQnMN5
-	uyU9aD/j2Bf4nROJVjUA==;
+	List-Owner; bh=N0/1mQqEd/vUfcR1QZiZ5wfFi4yPHuScKvAm2wUYLP4=; b=kZrUP7fFWXcRfT
+	9DLtDIAmjVfS6gIRTykPiBxrvYAX16NuZlJL/h2SNzrfPVHy/1nDNnDB2yiio0KGcqoez5+B1gMUu
+	1FKhsX88mRbg8dHqdTAuytRqKIBqKDesxnCTjzsjSlJMCRfICh30NmSMa7UUXNb1+Yd3dFH6RWKeo
+	R2GeCmiO4nCFHwTQCcO86VLqKrzZmMoQhZ+U6BEFo46LaZ13xQihEZwVut38MrwnFqcuIktwUSi3U
+	PcwqfQrDhpFZLe71paGBxwPaaIKC7/VcPZhokZXql99AZz5aGjIsfZdjQ5S6A5B7PkYgzIlyy4jci
+	azsumk4yL4XmAS4mkisQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goRyG-0008HX-Fb; Tue, 29 Jan 2019 11:54:28 +0000
-Received: from mail-ot1-x32e.google.com ([2607:f8b0:4864:20::32e])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goRyD-0008HE-8g
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 11:54:26 +0000
-Received: by mail-ot1-x32e.google.com with SMTP id k98so17620924otk.3
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 03:54:24 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=eUDJPzJmUcC5k5nPZ7aRNKhFFZ0kgXfliFV7Lb7YUBs=;
- b=gCO16ajqe+1st5N1lmDBzQDm1vKfBFO8fsS+Qlg4UqXMQRvgKtWU1USK+/PYGo5a11
- eCmwJYvxLZf9dikZksJGn4SiP4MwKyw9AP981WVI3Dtq1lMSP5h2N84nL7yEY9rkegcM
- V8m3442MmFGc8nV+6K0NC8cLrFFEaIQbDoXlE=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=eUDJPzJmUcC5k5nPZ7aRNKhFFZ0kgXfliFV7Lb7YUBs=;
- b=d6ZoY/ldENhkMloHepvWJm7j9t39CyZKJB9ZUmnUj0AhFFDVIukSM1R5OYjjw42Vw7
- AtJRqGrIlbIJ2XbvyiSn2siuvdhCKRzBxc+PfeDBjEDY08S1pD6o8NHr//RMCjOtFtJP
- /ZhGkdj5P8gvoJSQGYCQSi3Mprv8iaJEV06X5hv/yu+JzGQM57gWYyOOApizTAmwxANW
- 0WYpBPCyACXw5OVbrWzLRS5F2N+tunrZlortgQD1mqXQ2fFYiy04Zh0bIU50zRhXhpH1
- Jt4uWq66V46p5tU0hToGhoZSdiAozKQ7mhkhn3EIafNoMr1kni1uCG/rt6OU78RiQjCy
- b/WQ==
-X-Gm-Message-State: AJcUukfbL+1LOm1hKEvtrONKmq2MhrPB72p47Aqp4XydNmKjA9P+VCnN
- 2FqCKJ9oKJ0nNWhe8a+t9BJmLukYb5g70SF8g92Q1Q==
-X-Google-Smtp-Source: ALg8bN780PtRjwCdzaurxtpBZc/QsC9o/lLyTNd3gzyE36H9FpYJ5lanyiEammZGVO/daahjzcdCeenJclaSBDX8u80=
-X-Received: by 2002:a9d:5a81:: with SMTP id w1mr20197697oth.317.1548762863953; 
- Tue, 29 Jan 2019 03:54:23 -0800 (PST)
+	id 1goS9w-0005CR-4V; Tue, 29 Jan 2019 12:06:32 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goS9s-0005C0-Nk
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 12:06:30 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 899B6EBD;
+ Tue, 29 Jan 2019 04:06:27 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 077333F589;
+ Tue, 29 Jan 2019 04:06:23 -0800 (PST)
+Date: Tue, 29 Jan 2019 12:06:21 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Xiaowei Bao <xiaowei.bao@nxp.com>, robh+dt@kernel.org
+Subject: Re: [PATCHv5 1/4] dt-bindings: add DT binding for the layerscape
+ PCIe controller with EP mode
+Message-ID: <20190129120621.GB7467@e107981-ln.cambridge.arm.com>
+References: <20190121094500.10657-1-xiaowei.bao@nxp.com>
 MIME-Version: 1.0
-References: <87va27n2l8.fsf@linaro.org>
- <20190129114609.GA25983@lakrids.cambridge.arm.com>
-In-Reply-To: <20190129114609.GA25983@lakrids.cambridge.arm.com>
-From: Peter Maydell <peter.maydell@linaro.org>
-Date: Tue, 29 Jan 2019 11:54:13 +0000
-Message-ID: <CAFEAcA-_ShbUthqPSPgEPmV0EeRUO85n=sC-+76gRAH830co_g@mail.gmail.com>
-Subject: Re: Kernel boot regression with PAuth and aarch64-softmmu -cpu max
- and el2 enabled
-To: Mark Rutland <mark.rutland@arm.com>
+Content-Disposition: inline
+In-Reply-To: <20190121094500.10657-1-xiaowei.bao@nxp.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_035425_310869_4ED5F52B 
-X-CRM114-Status: UNSURE (   9.83  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190129_040628_774431_52EBE151 
+X-CRM114-Status: GOOD (  14.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,32 +70,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>,
- Richard Henderson <richard.henderson@linaro.org>,
- qemu-devel <qemu-devel@nongnu.org>,
- Kristina Martsenko <kristina.martsenko@arm.com>,
- "open list:ARM" <qemu-arm@nongnu.org>,
- =?UTF-8?B?QWxleCBCZW5uw6ll?= <alex.bennee@linaro.org>,
- "kvmarm@lists.cs.columbia.edu" <kvmarm@lists.cs.columbia.edu>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: mark.rutland@arm.com, roy.zang@nxp.com, linuxppc-dev@lists.ozlabs.org,
+ arnd@arndb.de, devicetree@vger.kernel.org, gregkh@linuxfoundation.org,
+ kstewart@linuxfoundation.org, niklas.cassel@axis.com,
+ linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org, kishon@ti.com,
+ minghuan.Lian@nxp.com, cyrille.pitchen@free-electrons.com,
+ linux-arm-kernel@lists.infradead.org, pombredanne@nexb.com,
+ bhelgaas@google.com, leoyang.li@nxp.com, shawnguo@kernel.org,
+ shawn.lin@rock-chips.com, mingkai.hu@nxp.com
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gVHVlLCAyOSBKYW4gMjAxOSBhdCAxMTo0NiwgTWFyayBSdXRsYW5kIDxtYXJrLnJ1dGxhbmRA
-YXJtLmNvbT4gd3JvdGU6Cj4gT24gVHVlLCBKYW4gMjksIDIwMTkgYXQgMTE6MDg6MTlBTSArMDAw
-MCwgQWxleCBCZW5uw6llIHdyb3RlOgo+ID4gVGhlIC1jcHUgbWF4IGVuYWJsZWQgYSBjb3J0ZXgt
-YTU3ICsgd2hhdGV2ZXIgZXh0cmEgZmVhdHVyZXMgd2UndmUKPiA+IGVuYWJsZWQgaW4gUUVNVSBz
-byBmYXIuIEl0IHdvbid0IG1hdGNoIGFueSAicmVhbCIgQ1BVIGJ1dCBpdCBzaG91bGQgYmUKPiA+
-IGFyY2hpdGVjdHVyYWxseSBjb3JyZWN0IGluIHNvIGZhciB3ZSBpbXBsZW1lbnQgcHJlcmVxdWlz
-aXRlIGZlYXR1cmVzIGZvcgo+ID4gYW55IGdpdmVuIGZlYXR1cmUuIFRoZSBjcHVpZCBmZWF0dXJl
-IGJpdHMgc2hvdWxkIGFsc28gYmUgY29ycmVjdCBhcyB3ZQo+ID4gdGVzdCB0aGVtIGludGVybmFs
-bHkgaW4gUUVNVSB0byBlbmFibGUgZmVhdHVyZXMuCj4KPiBKdXN0IHRvIGNoZWNrLCBkb2VzIHRo
-aXMgZW5hYmxlIFZIRT8KCkl0IGRvZXMgbm90LiAoV2UgaGF2ZSBubyBpbXBsZW1lbnRhdGlvbiBv
-ZiBWSEUgeWV0IC0tIGFzIGFuZCB3aGVuCndlIGRvIGltcGxlbWVudCB0aGF0ICItY3B1IG1heCIg
-d2lsbCB0dXJuIGl0IG9uLCBidXQgdG9kYXkgaXQgZG9lc24ndC4pCgp0aGFua3MKLS0gUE1NCgpf
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0t
-a2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcK
-aHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2Vy
-bmVsCg==
+Rob,
+
+Is it OK for you if I pull this series into the pci tree ?
+
+Please let me know, thanks.
+
+Lorenzo
+
+On Mon, Jan 21, 2019 at 05:44:57PM +0800, Xiaowei Bao wrote:
+> Add the documentation for the Device Tree binding for the layerscape PCIe
+> controller with EP mode.
+> 
+> Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
+> Reviewed-by: Minghuan Lian <minghuan.lian@nxp.com>
+> Reviewed-by: Zhiqiang Hou <zhiqiang.hou@nxp.com>
+> ---
+> v2:
+>  - Add the SoC specific compatibles.
+> v3:
+>  - modify the commit message.
+> v4:
+>  - no change.
+> v5:
+>  - no change.
+> 
+>  .../devicetree/bindings/pci/layerscape-pci.txt     |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> index 9b2b8d6..e20ceaa 100644
+> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> @@ -13,6 +13,7 @@ information.
+>  
+>  Required properties:
+>  - compatible: should contain the platform identifier such as:
+> +  RC mode:
+>          "fsl,ls1021a-pcie"
+>          "fsl,ls2080a-pcie", "fsl,ls2085a-pcie"
+>          "fsl,ls2088a-pcie"
+> @@ -20,6 +21,8 @@ Required properties:
+>          "fsl,ls1046a-pcie"
+>          "fsl,ls1043a-pcie"
+>          "fsl,ls1012a-pcie"
+> +  EP mode:
+> +	"fsl,ls1046a-pcie-ep", "fsl,ls-pcie-ep"
+>  - reg: base addresses and lengths of the PCIe controller register blocks.
+>  - interrupts: A list of interrupt outputs of the controller. Must contain an
+>    entry for each entry in the interrupt-names property.
+> -- 
+> 1.7.1
+> 
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
