@@ -2,85 +2,130 @@ Return-Path: <SRS0=P47x=QF=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DE375C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:02:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 37A90C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:03:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AFEF42087E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:02:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F1C362087E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 29 Jan 2019 16:03:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u2zCEnYq";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="FTuPjW5S"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AFEF42087E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sET4a38P";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="GjiOcNXu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F1C362087E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=partner.samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=Cgeu9IDZ5eDA80H7DnQCsbeZUw75+p0nAaIxkwYppP8=; b=u2zCEnYqh6ZIs8
-	6hpR3EGiJCGqxMBAwklrqj63MxhKo7ywSN8g9JIysqeWwU849XETRiJgXCoqDr4zFQPEkMqj+s/HG
-	ul2KzGmp5qouBl8tcQVTa8eJGQuFxxtJ4l67lzwrFFp9VaZffEt2JP787rSu9ztIUdPr9rsGBw3Oo
-	3tA61Kl6VHcRuYn5cL1e+VymeIdMxXUCpYSLXsb9lCtIP7QqXIvbt0BFB4/2NZtkE2PLFGSGvKHdP
-	rOzJh43oRxEcOWKjw4//PYoJ23czXYoZc3Ots1nGgC2L4v6Tpp/guBMmchXUc1HYdX3HcKQuW+Jcm
-	WIKQVarr/R3M8GqV7Bfg==;
+	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
+	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=YepnPZXlr6Wvzvldj5okfo0/oiTXXpYrhUt4CivFQqw=; b=sET4a38P5cyWPe
+	YLzU+VzG/H0ry0290EJYo4UggplcoYZSh00JfLAFYhewv45Ngq5aSMnGTA4qYumql5PF9K5rJuBl0
+	2t5AHqiyBIQ67EB8LkmFLl9CJ1r1J4+wRc/XEnNUf42HtUKp/7Bdjr3KRBVeUmCPGRLrKdwjw0v1Q
+	TtSZ7w3CcYY+VWJAxrvGOclbg2jD/bjXCdAl9sspOzGY+wBu3eR6u8WD+Q6cpHxo3I/SWVCNZKWuv
+	1wAu3xmWa53pQixZMFVGaNKRur7nxJdHf7ph/CkHvmDIEzDmtdhSoSC3i3FLnsId641L4+10LaN0q
+	YbAgZBdnLxa0Ulmc1dvw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goVqD-0006uG-Rc; Tue, 29 Jan 2019 16:02:25 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
+	id 1goVqk-0007MF-7e; Tue, 29 Jan 2019 16:02:58 +0000
+Received: from mailout1.w1.samsung.com ([210.118.77.11])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goVq7-0006tV-EK
- for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 16:02:23 +0000
-Received: by mail-wm1-x343.google.com with SMTP id p6so18350080wmc.1
+ id 1goVqg-0007LU-02
+ for linux-arm-kernel@lists.infradead.org; Tue, 29 Jan 2019 16:02:56 +0000
+Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
+ by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
+ 20190129160252euoutp0176889cc9e1d7a7c3ff11b8ba5a27a95b~_XS2L0fRW1958519585euoutp01H
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 08:02:18 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=hZo5cnYA2LMW+KRzEkpP91TinvaP53HQziJxPDha+Yg=;
- b=FTuPjW5S+W4lBBxUleRC84wtvKriSmpU3r1RMBCIL2y3+dQUzFeX0WGLeZLzdix7E/
- 10RnCKJ+Lqu7OFHT7QXCUGuK4dNZ3m2X4EUmCLIIy0NhXomz2CfnI/TpsI9TVBLf7Kn1
- MrsP6QedgCiQwR7EXpZpradZviAVNQMPzQjRg=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=hZo5cnYA2LMW+KRzEkpP91TinvaP53HQziJxPDha+Yg=;
- b=NpYcI10LNIPxJmvKZ/Vq19VUqBLJ7N8BRoCdiSz6y/aQ9evypdKrho/a2hmvHcohll
- a9o1IrdI/7w0JHzml9bzc8mPCYCOiESN8/wI1SNjDiRbklKtlzM2qXqDGVbk9jN26pyt
- tbTuy+N25xy/9haEHz7YQH0exLjdnugEXSeXHBTg/zN9XpnpJ4wfXd14vLqheAQrxSDx
- huL2dE8I6vmyTQp+KGKKpoDgg6PPG+cB++YGfqO8k3105jebi5vl+Uj9krOO9pzdpUQR
- Mp8YdOO45CzAfHuxmhjAkqotLCgwN9PuHARIivMmoWEM7eACx5MOwH7J0QbSJbDfu6Pv
- UXvQ==
-X-Gm-Message-State: AJcUukds9rBYjHPvrNzkYD+83boW629josM2yECuKMPHRX9OKN3v/2Mz
- K8M+UAxLFSYE4F81YB/fQz0qqg==
-X-Google-Smtp-Source: ALg8bN74v3bMU7iJ0oBMayl0+9a4FaXjkySGa7cK425JYWtEfSCMMbPX25Bu2cgYbhkOse/PmuBVuQ==
-X-Received: by 2002:a1c:cec1:: with SMTP id e184mr22509434wmg.75.1548777737370; 
- Tue, 29 Jan 2019 08:02:17 -0800 (PST)
-Received: from localhost.localdomain
- (aputeaux-684-1-39-7.w90-86.abo.wanadoo.fr. [90.86.94.7])
- by smtp.gmail.com with ESMTPSA id 127sm5347414wmm.45.2019.01.29.08.02.15
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 29 Jan 2019 08:02:15 -0800 (PST)
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-To: linux-acpi@vger.kernel.org
-Subject: [PATCH v2] acpi: bgrt: parse BGRT to obtain BMP address before it
- gets clobbered
-Date: Tue, 29 Jan 2019 17:00:52 +0100
-Message-Id: <20190129160052.2058-1-ard.biesheuvel@linaro.org>
-X-Mailer: git-send-email 2.20.1
+ Tue, 29 Jan 2019 16:02:52 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
+ 20190129160252euoutp0176889cc9e1d7a7c3ff11b8ba5a27a95b~_XS2L0fRW1958519585euoutp01H
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1548777772;
+ bh=DRjEHJKFWYoavZVVURNhjQgbrY289jL767C8PXItlo8=;
+ h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
+ b=GjiOcNXuZjkgNdjkAIDVRVv5hd939Hh66xgwwq2tMgrexVQz1cjtu6+vqHAIYwKuO
+ 57LQgqV7DxagVT5l8cIbHJ3zdw6fYwUKR7BzgwM4eX0OODEv4XkA+MqKowUveV/QSt
+ f5s8j60JjyV1Og0kD9X9CicolpqqGnY3GW227Wp8=
+Received: from eusmges3new.samsung.com (unknown [203.254.199.245]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTP id
+ 20190129160251eucas1p11b2a576b3e50f36ad7fd8611cbd1e055~_XS1wlKdu2002920029eucas1p1h;
+ Tue, 29 Jan 2019 16:02:51 +0000 (GMT)
+Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
+ eusmges3new.samsung.com (EUCPMTA) with SMTP id DD.6B.04806.B29705C5; Tue, 29
+ Jan 2019 16:02:51 +0000 (GMT)
+Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
+ eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
+ 20190129160250eucas1p2eb448275d6c25f1d2a72f68d06f3763a~_XS0_SCkg1287912879eucas1p2X;
+ Tue, 29 Jan 2019 16:02:50 +0000 (GMT)
+Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
+ eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
+ 20190129160250eusmtrp10ebb3444ee7272afa1d53764f8dc1545~_XS0vgENY3028630286eusmtrp1Q;
+ Tue, 29 Jan 2019 16:02:50 +0000 (GMT)
+X-AuditID: cbfec7f5-34dff700000012c6-67-5c50792bce98
+Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
+ eusmgms2.samsung.com (EUCPMTA) with SMTP id 7C.76.04128.A29705C5; Tue, 29
+ Jan 2019 16:02:50 +0000 (GMT)
+Received: from [106.120.51.20] (unknown [106.120.51.20]) by
+ eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
+ 20190129160249eusmtip22cb274509439e1e990976d16ef1c7476~_XS0NM2QX1687116871eusmtip2U;
+ Tue, 29 Jan 2019 16:02:49 +0000 (GMT)
+Subject: Re: [PATCH 4/8] dt-bindings: devfreq: add DMC device description
+To: Krzysztof Kozlowski <krzk@kernel.org>
+From: Lukasz Luba <l.luba@partner.samsung.com>
+Message-ID: <79cd56c4-2415-7db1-be6f-73c03c0902bc@partner.samsung.com>
+Date: Tue, 29 Jan 2019 17:02:49 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
+In-Reply-To: <CAJKOXPd2g6rtZpK20emJ0tqHhq0D01=BWbU_9MP30313XHvPHg@mail.gmail.com>
+Content-Language: en-US
+X-Brightmail-Tracker: H4sIAAAAAAAAA01Sa0hTYRj229k5Ow4nx6Pli0nBSOhC3io6dEMhYkGgFVKpUDMPU3RqO96W
+ UpaWdy0NL1OaPwxtidPlDVErLw0RZ1K4yh+KGpaXStTMUsvtTPLf8z2X730feEmM7sXdyMiY
+ eFYVI4+WEmJhy5tV06GD6sBQ768VNNNYpscZ89I0zmh7TThTODmLMUNDDSJm8N6ciDFMjuDM
+ u/ZKglnM70VM2VCXgHlqHhYwo3drCeZ+Z6/ITyKre1KHZAZdNiF7UX1HVtCkQ7JFw+5APFh8
+ MpyNjkxkVV6nr4sj+r6sE3HDx5PX6uuJNNThkYPsSaCOQHa+nshBYpKmahEUdfzA+McSgvTC
+ 9zZlEcG4vlC4FTFmrOK8UINgbjrT5ppHUDKjFVlcztQ56BkxWRMu1H4wr69YExi1jEHu64ZN
+ gSQJyhPadDctHgl1FmbTN3ALLaQ8oKY1ykLvoK5AT/43xFucoL98ypq0py7AYrmLhcYoV/g0
+ pRXweA+0zldaGwA1IYK1338Rv/QZMH03C3jsDDPGJhGP3WGgOM9WjIPBLB3B41TI7G+zeU5A
+ j3HYuhq2WUXf7mWBQPlDV7GYh47wYd6J38ARilpKMZ6WQNYDmv9jHzTlvbXN3wk1dSWih0iq
+ 2VZLs62LZlsXzf+xVUioQ65sAqdUsNzhGDbJk5MruYQYheeNWKUBbd7WwIZxuQ11rYV1I4pE
+ UgeJ3aXAUBqXJ3JqZTcCEpO6SHz+BITSknC5+harir2mSohmuW60ixRKXSUpduMhNKWQx7NR
+ LBvHqrZUAWnvlobUSv8FUbUh4ZmRzhUzCw0Fj4Oe45iWzhhVXDRmf6xyuLpi7lBXD6cwBXM/
+ F9pUIY+83Ztzj45lJgd5BE9Hho96+zWXJrYHffY9FrA3NXNmTFHRWO+XPPIrDPo6826vOGnd
+ SgN9g8eTZi7XTch8XDSvmiZr0s+H5o69PFWi7W+WCrkIuc8BTMXJ/wHE8bBHVwMAAA==
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFrrJIsWRmVeSWpSXmKPExsVy+t/xe7palQExBnsnyFpsnLGe1eL6l+es
+ FvOPnGO16H/8mtni/PkN7BZnm96wW2x6fI3V4vKuOWwWn3uPMFrMOL+PyWLp9YtMFrcbV7BZ
+ tO49wu7A67Fm3hpGj02rOtk8Ni+p9+jbsorR4/MmuQDWKD2bovzSklSFjPziElulaEMLIz1D
+ Sws9IxNLPUNj81grI1MlfTublNSczLLUIn27BL2Moy/+shVctKr4s24dWwPjHtUuRk4OCQET
+ ieMtP1m7GLk4hASWMkrM7bnFDpEQk5i0bzuULSzx51oXG0TRa0aJ6xOPgCWEBTwlDl87xwJi
+ iwhoSlz/+x1sErPAd2aJhTfnsEN0LGOSmPJmO3MXIwcHm4CexI5VhSANvAJuEq+b/7GChFkE
+ VCWWb88GCYsKREh8fLqPCaJEUOLkzCcsICWcAoESn2eKgISZBcwk5m1+yAxhi0vcejKfCcKW
+ l9j+dg7zBEahWUi6ZyFpmYWkZRaSlgWMLKsYRVJLi3PTc4uN9IoTc4tL89L1kvNzNzECo3Xb
+ sZ9bdjB2vQs+xCjAwajEw8sQHBAjxJpYVlyZe4hRgoNZSYTX8Ld/jBBvSmJlVWpRfnxRaU5q
+ 8SFGU6DXJjJLiSbnAxNJXkm8oamhuYWlobmxubGZhZI473mDyighgfTEktTs1NSC1CKYPiYO
+ TqkGxp13+N9en2Ixc9WRNK7X237XqM5oKWd1X7SYIXLFO5WJn3nm/O0ufbV9+Y+/gj1Lvps/
+ LexbPOuBuex9xpfPn1XefFEmeVNCxVUgz+yjgk7lSSNXDWGFObu+LT8372u51WmdI/KXXVQP
+ fXuy23nr827JTRZH7Po/ckX6FZ47yPazPWhv1upbGluUWIozEg21mIuKEwE/2ycw7AIAAA==
+X-CMS-MailID: 20190129160250eucas1p2eb448275d6c25f1d2a72f68d06f3763a
+X-Msg-Generator: CA
+X-RootMTR: 20190128192153eucas1p2d7a796cb89e68c1789069562e91296be
+X-EPHeader: CA
+CMS-TYPE: 201P
+X-CMS-RootMailID: 20190128192153eucas1p2d7a796cb89e68c1789069562e91296be
+References: <CGME20190128192153eucas1p2d7a796cb89e68c1789069562e91296be@eucas1p2.samsung.com>
+ <1548703299-15806-1-git-send-email-l.luba@partner.samsung.com>
+ <1548703299-15806-5-git-send-email-l.luba@partner.samsung.com>
+ <CAJKOXPd2g6rtZpK20emJ0tqHhq0D01=BWbU_9MP30313XHvPHg@mail.gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_080219_492443_92E6B609 
-X-CRM114-Status: GOOD (  23.05  )
+X-CRM114-CacheID: sfid-20190129_080254_293000_134BD7D4 
+X-CRM114-Status: GOOD (  23.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,266 +137,196 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: lorenzo.pieralisi@arm.com, graeme.gregory@linaro.org,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, Peter Jones <pjones@redhat.com>,
- rjw@rjwysocki.net, leif.lindholm@linaro.org, astone@redhat.com,
- linux-efi@vger.kernel.org, michael.d.kinney@intel.com,
- harry.l.hsiung@intel.com, linux-arm-kernel@lists.infradead.org,
- lenb@kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ =?UTF-8?Q?Bart=c5=82omiej_=c5=bbo=c5=82nierkiewicz?=
+ <b.zolnierkie@samsung.com>, linux-pm@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ Chanwoo Choi <cw00.choi@samsung.com>,
+ Kyungmin Park <kyungmin.park@samsung.com>, myungjoo.ham@samsung.com,
+ Kukjin Kim <kgene@kernel.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The bitmap left in the framebuffer by the firmware is described by an
-ACPI table called "BGRT", which describes the size, pixel format and
-the address of a BMP image in memory. While the BGRT ACPI table is
-guaranteed to reside in a "ACPI reclaim" memory region, which is
-never touched by Linux. The BMP image, however, typically resides
-in EFI Boot Services Memory, which may have been overwritten by the
-time the BGRT discovery routine runs.
+Hi Krzysztof,
 
-So instead, drop the handling from the ACPI init code, and call the
-BGRT parsing code immediately after going over the EFI configuration
-table array, at which time no memory has been touched yet except for
-the .data/.bss regions covered by the static kernel image.
+On 1/29/19 3:47 PM, Krzysztof Kozlowski wrote:
+> On Mon, 28 Jan 2019 at 20:21, Lukasz Luba <l.luba@partner.samsung.com> wrote:
+>>
+>> The patch adds description for DT binding for a new Exynos5 Dynamic Memory
+>> Controller device.
+>> It also contains needed MAINTAINERS file updates.
+>>
+>> CC: MyungJoo Ham <myungjoo.ham@samsung.com>
+>> CC: Kyungmin Park <kyungmin.park@samsung.com>
+>> CC: Chanwoo Choi <cw00.choi@samsung.com>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> CC: Mark Rutland <mark.rutland@arm.com>
+>> CC: Kukjin Kim <kgene@kernel.org>
+>> CC: Krzysztof Kozlowski <krzk@kernel.org>
+>> CC: linux-pm@vger.kernel.org
+>> CC: linux-samsung-soc@vger.kernel.org
+>> CC: devicetree@vger.kernel.org
+>> CC: linux-arm-kernel@lists.infradead.org
+>> CC: linux-kernel@vger.kernel.org
+>> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+>> ---
+>>   .../devicetree/bindings/devfreq/exynos5-dmc.txt    | 108 +++++++++++++++++++++
+>>   MAINTAINERS                                        |   7 ++
+>>   2 files changed, 115 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt b/Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt
+>> new file mode 100644
+>> index 0000000..914bd85
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt
+>> @@ -0,0 +1,108 @@
+>> +* Exynos5 frequency and voltage scaling for Dynamic Memory Controller device
+>> +
+>> +The Samsung Exynos5 SoC has DMC (Dynamic Memory Controller) to which the DRAM
+>> +memory chips are connected. The driver is to monitor the controller in runtime
+>> +and switch frequency and voltage. To monitor the usage of the controller in
+>> +runtime, the driver uses the PPMU (Platform Performance Monitoring Unit), which
+>> +is able to measure the current load of the memory.
+>> +When 'userspace' governor is used for the driver, an application is able to
+>> +switch the DMC frequency.
+>> +
+>> +Required properties for DMC device for Exynos5422:
+>> +- compatible: Should be "samsung,exynos5422-bus".
+>> +- clock-names : the name of clock used by the bus, "bus".
+>> +- clocks : phandles for clock specified in "clock-names" property.
+>> +- devfreq-events : phandles for PPMU devices connected to this DMC.
+>> +
+>> +The example definition of a DMC and PPMU devices declared in DT is shown below:
+>> +
+>> +       ppmu_dmc0_0: ppmu_dmc0_0@10d00000 {
+>> +               compatible = "samsung,exynos-ppmu";
+>> +               reg = <0x10d00000 0x2000>;
+>> +               clocks = <&clock CLK_PCLK_PPMU_DREX0_0>;
+>> +               clock-names = "ppmu";
+>> +               status = "okay";
+>> +               events {
+>> +                       ppmu_event_dmc0_0: ppmu-event3-dmc0_0 {
+>> +                               event-name = "ppmu-event3-dmc0_0";
+>> +                       };
+>> +               };
+>> +       };
+>> +
+>> +
+>> +       ppmu_dmc0_1: ppmu_dmc0_1@10d10000 {
+>> +               compatible = "samsung,exynos-ppmu";
+>> +               reg = <0x10d10000 0x2000>;
+>> +               clocks = <&clock CLK_PCLK_PPMU_DREX0_1>;
+>> +               clock-names = "ppmu";
+>> +               status = "okay";
+>> +               events {
+>> +                       ppmu_event_dmc0_1: ppmu-event3-dmc0_1 {
+>> +                               event-name = "ppmu-event3-dmc0_1";
+>> +                       };
+>> +               };
+>> +       };
+>> +
+>> +       ppmu_dmc1_0: ppmu_dmc1_0@10d10000 {
+>> +               compatible = "samsung,exynos-ppmu";
+>> +               reg = <0x10d60000 0x2000>;
+>> +               clocks = <&clock CLK_PCLK_PPMU_DREX1_0>;
+>> +               clock-names = "ppmu";
+>> +               status = "okay";
+>> +               events {
+>> +                       ppmu_event_dmc1_0: ppmu-event3-dmc1_0 {
+>> +                               event-name = "ppmu-event3-dmc1_0";
+>> +                       };
+>> +               };
+>> +       };
+>> +
+>> +       ppmu_dmc1_1: ppmu_dmc1_1@10d70000 {
+>> +               compatible = "samsung,exynos-ppmu";
+>> +               reg = <0x10d70000 0x2000>;
+>> +               clocks = <&clock CLK_PCLK_PPMU_DREX1_1>;
+>> +               clock-names = "ppmu";
+>> +               status = "okay";
+>> +               events {
+>> +                       ppmu_event_dmc1_1: ppmu-event3-dmc1_1 {
+>> +                               event-name = "ppmu-event3-dmc1_1";
+>> +                       };
+>> +               };
+>> +       };
+>> +
+>> +       dmc: dmc@10c20000 {
+>> +               compatible = "samsung,exynos5422-dmc";
+>> +               reg = <0x10c20000 0x10000>, <0x10c30000 0x10000>,
+>> +                       <0x10030000 0x1000>, <0x10000000 0x1000>;
+>> +               clocks =        <&clock CLK_FOUT_SPLL>,
+>> +                               <&clock CLK_MOUT_SCLK_SPLL>,
+>> +                               <&clock CLK_FF_DOUT_SPLL2>,
+>> +                               <&clock CLK_FOUT_BPLL>,
+>> +                               <&clock CLK_MOUT_BPLL>,
+>> +                               <&clock CLK_SCLK_BPLL>,
+>> +                               <&clock CLK_MOUT_MX_MSPLL_CCORE>,
+>> +                               <&clock CLK_MOUT_MX_MSPLL_CCORE_PHY>,
+>> +                               <&clock CLK_MOUT_MCLK_CDREX>,
+>> +                               <&clock CLK_DOUT_CLK2X_PHY0>,
+>> +                               <&clock CLK_CLKM_PHY0>,
+>> +                               <&clock CLK_CLKM_PHY1>
+>> +                       ;
+> 
+> Join with previous line.
+> 
+>> +               clock-names =   "fout_spll",
+>> +                               "mout_sclk_spll",
+>> +                               "ff_dout_spll2",
+>> +                               "fout_bpll",
+>> +                               "mout_bpll",
+>> +                               "sclk_bpll",
+>> +                               "mout_mx_mspll_ccore",
+>> +                               "mout_mx_mspll_ccore_phy",
+>> +                               "mout_mclk_cdrex",
+>> +                               "dout_clk2x_phy0",
+>> +                               "clkm_phy0",
+>> +                               "clkm_phy1"
+>> +                               ;
+> 
+> Ditto.
+OK, I will fix it.
+> 
+>> +
+>> +               status = "okay";
+>> +               devfreq-events = <&ppmu_dmc0_0>, <&ppmu_dmc0_1>,
+>> +                               <&ppmu_dmc1_0>, <&ppmu_dmc1_1>;
+>> +       };
+>> +
+>> +
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 9f64f8d..3581807 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -3310,6 +3310,13 @@ S:       Maintained
+>>   F:     drivers/devfreq/exynos-bus.c
+>>   F:     Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+>>
+>> +DMC FREQUENCY DRIVER FOR SAMSUNG EXYNOS5
+>> +M:     Lukasz Luba <l.luba@partner.samsung.com>
+>> +L:     linux-pm@vger.kernel.org
+>> +L:     linux-samsung-soc@vger.kernel.org
+>> +S:     Maintained
+>> +F:     Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt
+> 
+> Maintainers change should go with the next change, I think. It looks
+> unusual to add an entry for driver... without the driver.
+Thank you for the review. I will move the dt-bindings in the patch set
+after the dmc driver file. Then the MAINTAINERS file will be updated
+only by one entry.
 
-Unfortunately, this involves a non-trivial amount of ACPI entry
-point and root table parsing, but we cannot rely on the normal
-ACPI infrastructure yet this early in the boot.
-
-Also note that we cannot take the 'acpi_disabled' global variable
-into account, since it may not have assumed the correct value yet
-(on arm64, the default value is '1' which is overridden to '0' if
-no DT description has been made available by the firmware)
-
-Cc: Peter Jones <pjones@redhat.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v2:
-- Reshuffle the code a bit so we never leave things mapped on an error.
-  This should fix the two issues spotted by Lorenzo.
-- use R/O mappings for all the tables
-
-There was some discussion regarding parsing the status field, but that
-is a separate change in any case, so I have ignored that for now.
-
-If there are no further concerns, I intend to get this queued for
-v5.1 by the end of the week.
-
- arch/arm64/kernel/acpi.c        |  2 -
- arch/x86/kernel/acpi/boot.c     |  2 -
- drivers/acpi/bgrt.c             |  6 --
- drivers/firmware/efi/efi-bgrt.c | 84 ++++++++++++++++++--
- drivers/firmware/efi/efi.c      | 13 +++
- include/linux/efi-bgrt.h        |  4 +-
- 6 files changed, 92 insertions(+), 19 deletions(-)
-
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 44e3c351e1ea..7429a811f76d 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -230,8 +230,6 @@ void __init acpi_boot_table_init(void)
- 			early_init_dt_scan_chosen_stdout();
- 	} else {
- 		acpi_parse_spcr(earlycon_acpi_spcr_enable, true);
--		if (IS_ENABLED(CONFIG_ACPI_BGRT))
--			acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
- 	}
- }
- 
-diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
-index 2624de16cd7a..2d3535b62752 100644
---- a/arch/x86/kernel/acpi/boot.c
-+++ b/arch/x86/kernel/acpi/boot.c
-@@ -1633,8 +1633,6 @@ int __init acpi_boot_init(void)
- 	acpi_process_madt();
- 
- 	acpi_table_parse(ACPI_SIG_HPET, acpi_parse_hpet);
--	if (IS_ENABLED(CONFIG_ACPI_BGRT))
--		acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
- 
- 	if (!acpi_noirq)
- 		x86_init.pci.init = pci_acpi_init;
-diff --git a/drivers/acpi/bgrt.c b/drivers/acpi/bgrt.c
-index 75af78361ce5..048413e06898 100644
---- a/drivers/acpi/bgrt.c
-+++ b/drivers/acpi/bgrt.c
-@@ -81,12 +81,6 @@ static const struct attribute_group bgrt_attribute_group = {
- 	.bin_attrs = bgrt_bin_attributes,
- };
- 
--int __init acpi_parse_bgrt(struct acpi_table_header *table)
--{
--	efi_bgrt_init(table);
--	return 0;
--}
--
- static int __init bgrt_init(void)
- {
- 	int ret;
-diff --git a/drivers/firmware/efi/efi-bgrt.c b/drivers/firmware/efi/efi-bgrt.c
-index b22ccfb0c991..b2d98e16c7bf 100644
---- a/drivers/firmware/efi/efi-bgrt.c
-+++ b/drivers/firmware/efi/efi-bgrt.c
-@@ -27,24 +27,94 @@ struct bmp_header {
- 	u32 size;
- } __packed;
- 
--void __init efi_bgrt_init(struct acpi_table_header *table)
-+void __init efi_bgrt_init(unsigned long rsdp_phys)
- {
- 	void *image;
- 	struct bmp_header bmp_header;
- 	struct acpi_table_bgrt *bgrt = &bgrt_tab;
-+	struct acpi_table_bgrt *table = NULL;
-+	struct acpi_table_rsdp *rsdp;
-+	struct acpi_table_header *hdr;
-+	u64 xsdt_phys = 0;
-+	u32 rsdt_phys = 0;
-+	unsigned long len;
- 
--	if (acpi_disabled)
-+	if (!efi_enabled(EFI_MEMMAP))
- 		return;
- 
--	if (!efi_enabled(EFI_MEMMAP))
-+	/* map the root pointer table to find the xsdt/rsdt values */
-+	rsdp = early_memremap_ro(rsdp_phys, sizeof(*rsdp));
-+	if (rsdp) {
-+		if (ACPI_VALIDATE_RSDP_SIG(rsdp->signature)) {
-+			xsdt_phys = rsdp->xsdt_physical_address;
-+			rsdt_phys = rsdp->rsdt_physical_address;
-+		}
-+		early_memunmap(rsdp, sizeof(*rsdp));
-+	}
-+
-+	if (WARN_ON(!xsdt_phys && !rsdt_phys))
- 		return;
- 
--	if (table->length < sizeof(bgrt_tab)) {
--		pr_notice("Ignoring BGRT: invalid length %u (expected %zu)\n",
--		       table->length, sizeof(bgrt_tab));
-+	/* obtain the length of whichever table we will be using */
-+	hdr = early_memremap_ro(xsdt_phys ?: rsdt_phys, sizeof(*hdr));
-+	if (WARN_ON(!hdr))
-+		return;
-+	len = hdr->length;
-+	early_memunmap(hdr, sizeof(*hdr));
-+
-+	/* remap with the correct length */
-+	hdr = early_memremap_ro(xsdt_phys ?: rsdt_phys, len);
-+	if (WARN_ON(!hdr))
-+		return;
-+
-+	if (xsdt_phys) {
-+		struct acpi_table_xsdt *xsdt = (void *)hdr;
-+		int i;
-+
-+		for (i = 0; i < (len - sizeof(*hdr)) / sizeof(u64); i++) {
-+			table = early_memremap_ro(xsdt->table_offset_entry[i],
-+						  sizeof(*table));
-+			if (WARN_ON(!table))
-+				break;
-+
-+			if (ACPI_COMPARE_NAME(table->header.signature,
-+					      ACPI_SIG_BGRT))
-+				break;
-+			early_memunmap(table, sizeof(*table));
-+			table = NULL;
-+		}
-+	} else if (rsdt_phys) {
-+		struct acpi_table_rsdt *rsdt = (void *)hdr;
-+		int i;
-+
-+		for (i = 0; i < (len - sizeof(*hdr)) / sizeof(u32); i++) {
-+			table = early_memremap_ro(rsdt->table_offset_entry[i],
-+						  sizeof(*table));
-+			if (WARN_ON(!table))
-+				break;
-+
-+			if (ACPI_COMPARE_NAME(table->header.signature,
-+					      ACPI_SIG_BGRT))
-+				break;
-+			early_memunmap(table, sizeof(*table));
-+			table = NULL;
-+		}
-+	}
-+	early_memunmap(hdr, len);
-+
-+	if (!table)
- 		return;
-+
-+	len = table->header.length;
-+	memcpy(bgrt, table, min(len, sizeof(bgrt_tab)));
-+	early_memunmap(table, sizeof(*table));
-+
-+	if (len < sizeof(bgrt_tab)) {
-+		pr_notice("Ignoring BGRT: invalid length %lu (expected %zu)\n",
-+		       len, sizeof(bgrt_tab));
-+		goto out;
- 	}
--	*bgrt = *(struct acpi_table_bgrt *)table;
-+
- 	if (bgrt->version != 1) {
- 		pr_notice("Ignoring BGRT: invalid version %u (expected 1)\n",
- 		       bgrt->version);
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index 4c46ff6f2242..e5ef5c0eacc1 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -20,6 +20,7 @@
- #include <linux/init.h>
- #include <linux/device.h>
- #include <linux/efi.h>
-+#include <linux/efi-bgrt.h>
- #include <linux/of.h>
- #include <linux/of_fdt.h>
- #include <linux/io.h>
-@@ -592,6 +593,18 @@ int __init efi_config_parse_tables(void *config_tables, int count, int sz,
- 
- 		early_memunmap(tbl, sizeof(*tbl));
- 	}
-+
-+	/*
-+	 * We need to parse the BGRT table (which is an ACPI table not a UEFI
-+	 * configuration table) by hand and figure out where the bitmap it
-+	 * describes lives in memory so we can reserve it early on. Otherwise,
-+	 * it may be clobbered by the time we get to it during the ordinary ACPI
-+	 * table init sequence.
-+	 */
-+	if (IS_ENABLED(CONFIG_ACPI_BGRT) &&
-+	    efi.acpi20 != EFI_INVALID_TABLE_ADDR)
-+		efi_bgrt_init(efi.acpi20);
-+
- 	return 0;
- }
- 
-diff --git a/include/linux/efi-bgrt.h b/include/linux/efi-bgrt.h
-index e6cd51005633..528ea62d99ec 100644
---- a/include/linux/efi-bgrt.h
-+++ b/include/linux/efi-bgrt.h
-@@ -6,7 +6,7 @@
- 
- #ifdef CONFIG_ACPI_BGRT
- 
--void efi_bgrt_init(struct acpi_table_header *table);
-+void efi_bgrt_init(unsigned long rsdp_phys);
- int __init acpi_parse_bgrt(struct acpi_table_header *table);
- 
- /* The BGRT data itself; only valid if bgrt_image != NULL. */
-@@ -15,7 +15,7 @@ extern struct acpi_table_bgrt bgrt_tab;
- 
- #else /* !CONFIG_ACPI_BGRT */
- 
--static inline void efi_bgrt_init(struct acpi_table_header *table) {}
-+static inline void efi_bgrt_init(unsigned long rsdp_phys) {}
- static inline int __init acpi_parse_bgrt(struct acpi_table_header *table)
- {
- 	return 0;
--- 
-2.20.1
-
+Regards,
+Lukasz
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
