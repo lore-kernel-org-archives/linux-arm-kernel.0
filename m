@@ -2,66 +2,107 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D771C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:22:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D349C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:30:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4E0FD2184D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:22:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4893D20989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:30:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ru05GZj0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E0FD2184D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jIk29Vx6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="HwwT/jZl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4893D20989
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pQxFZLxJYYv7UsVpsc6GCj1pVCYMRLazOTf2Lv9N3+g=; b=ru05GZj0+WkXY4
-	RxjLX7uCIAMTy9KOxFjYpdg0rcTPyIxJjqdAhdcUKW1dDDH+a5yQwI5xMWvt+7f9dGNcwDzKhxIaj
-	Wvl32FooPQzQpAf7jd2Gwo1vNBMdgow4bg0LEDS/lpRHUdVpwJ3jp1tqvqCMyjvRwRd4Zrw22E6R3
-	msbj+7OtUQWB+Y2gZcF7KboVWlJhEZ3hoFIQ4dYnV4IY8a87+RUMfziQ1UMuncx/yjA95aKI6tVCO
-	DZH0EDrHSJ54/AJ2CreLxn6ObVt5LPOfKUprYrw3y+IC/mWLIyzcEdwfi1Lv/iIQ+nQTrggC/1wKR
-	LfdO/JXiPjLuq5wNXqFA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=bMQm5Elk3rQ3skIxDfAjESFEnNAp7DEcryerm3J02nw=; b=jIk29Vx63qXH0o
+	ovOHpComXhqYUVHJv4nvfbRRzTLTDrlIK8XKfwHtD2V7DhWXP13P0mFigQypgZreKW25Vb6cNr1TJ
+	1KZt6m6CuNK74wY8IcQpjr/1BD27yYTYr3BhfOG5nmNHQkw5JwgfnM98KC99fGY08vI8B6chEZp+K
+	mRTThxlmdV598hxi88zVWSYl7G6xBEn9eYaPg2QBs0L7oWcvYOQ2GjpFmLS0Kf/cB8Jv0QjIaXYeP
+	jjsFTaFRHKBrYm7VHfPF+vn8rYB1om5PnHw581cqCvG/UP6pO5jv7OzP6qeY6Xsinh4ZEJYrKl3pO
+	pngRG3tUJQMtia550V3Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gopof-00061O-BS; Wed, 30 Jan 2019 13:22:09 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gopwj-0001DM-4E; Wed, 30 Jan 2019 13:30:29 +0000
+Received: from mail-eopbgr00077.outbound.protection.outlook.com ([40.107.0.77]
+ helo=EUR02-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gopob-0005qb-MH
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 13:22:07 +0000
-Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
- by metis.ext.pengutronix.de with esmtp (Exim 4.89)
- (envelope-from <l.stach@pengutronix.de>)
- id 1gopoZ-0004m3-8i; Wed, 30 Jan 2019 14:22:03 +0100
-Message-ID: <1548854523.6869.25.camel@pengutronix.de>
-Subject: Re: [PATCH V2 3/4] irq: imx-irqsteer: change to use reg_num instead
- of irq_group
-From: Lucas Stach <l.stach@pengutronix.de>
-To: Aisheng Dong <aisheng.dong@nxp.com>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>
-Date: Wed, 30 Jan 2019 14:22:03 +0100
-In-Reply-To: <1548853196-11447-4-git-send-email-aisheng.dong@nxp.com>
-References: <1548853196-11447-1-git-send-email-aisheng.dong@nxp.com>
- <1548853196-11447-4-git-send-email-aisheng.dong@nxp.com>
-X-Mailer: Evolution 3.22.6-1+deb9u1 
-Mime-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
-X-SA-Exim-Mail-From: l.stach@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+ id 1gopwf-0001Cj-JJ
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 13:30:27 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=+44zd2N88E7g372vp7/pGqImutQ9Of5DsUkkVHJSAUM=;
+ b=HwwT/jZlOPG4YQ2yizq4ICIseOWbxJG5/9dhVd3/0ZzTzsJEmRctOn/gHJQMo/xkkKMiU7u+NapemFurlxhhekDWLJWdy0ixetcNi/MPSocM942AJc/HhrmBCQz+ZZyy7UIy1ClU+/ObOlO/Yp9FJHARZlF6fjsL20kN2Zpq9LA=
+Received: from VI1PR0402MB3357.eurprd04.prod.outlook.com (52.134.1.18) by
+ VI1PR0402MB3805.eurprd04.prod.outlook.com (52.134.16.26) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1558.21; Wed, 30 Jan 2019 13:30:22 +0000
+Received: from VI1PR0402MB3357.eurprd04.prod.outlook.com
+ ([fe80::2d83:eb90:f977:f649]) by VI1PR0402MB3357.eurprd04.prod.outlook.com
+ ([fe80::2d83:eb90:f977:f649%3]) with mapi id 15.20.1580.017; Wed, 30 Jan 2019
+ 13:30:22 +0000
+From: Daniel Baluta <daniel.baluta@nxp.com>
+To: "shawnguo@kernel.org" <shawnguo@kernel.org>
+Subject: [PATCH v3] firmware: imx: Add support to start/stop a CPU
+Thread-Topic: [PATCH v3] firmware: imx: Add support to start/stop a CPU
+Thread-Index: AQHUuJ/zljwGGsgqVEqW1pCa+zHOeA==
+Date: Wed, 30 Jan 2019 13:30:22 +0000
+Message-ID: <20190130133005.5732-1-daniel.baluta@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1P190CA0003.EURP190.PROD.OUTLOOK.COM
+ (2603:10a6:802:2b::16) To VI1PR0402MB3357.eurprd04.prod.outlook.com
+ (2603:10a6:803:2::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=daniel.baluta@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 2.17.1
+x-originating-ip: [95.76.156.53]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR0402MB3805;
+ 6:hEAbz7+LBFeqVrtlmf5sapoD45lqWWgqXFdw99lQNGFLSkS5zIy4nNNdb+OejPN8V/PPpiIqe9r0Y+gZHh0QTnfDTNszztyZ2KaVlJfaR8LjUIp4SNkfHo5emJEdwanfx/ohMAjxBdGFo63ofA510phPsPNIV0ge9wO4LGDilQs0beFJPpgXu9pDs0wAMlVTEAHGRZDKwH2B6/ZfhFivezBS2sYPXnKE046vgGvDGc/XrSPxB5RL5Kb0mzpkd6yqMrswjlRqulne95cc8wQeVB35kCKlXfKbwwaxR+UCCRJjyrDKWknTnvsjdcF+twECqiiEv1daKFnuUyEhfV566OueupRyvrHgddE1EjuG0KrIB2UvrdVuAUf5s796uklinF1WAWiaFUCAQ4KWAb3MSH9fhWaJ8Nehtuj4eW/ammqvhrkX3N4+liVW71WGLUq3zwkwy3AemD61cQrAe7jXjg==;
+ 5:Y5933ZQEISt/aIxLlWE00aQruaf8natQ4QtLy28jeO95warjj6sf9ZNptR8CPC4PypnC3fyBeIb9fg6sOJvhehBvPVlepanzKyTHuDyl1aIzOgKrKtkEhnZjy3lK0sCuQ7MpWwH9Hjoqu07LV62S+/e/tFePnFJij4qFw/ZnC095aFxRTbthsXQP5HVr1hawN7qcSZ9D2glBnwutS1j9/A==;
+ 7:noBQ2hheIFc6bN7SsQiAmaMBeTJB6p+bJxhRBcshlhq4Fi4Jdv96RadPEyNcKvw3U/jPVe5gB6baogYWSQuVTO7S9hIqaGLe9M2pi/vFUy9vqRMtIpxnbeE/Y02sdApdq64foDrkooTjyvUVB9lMvQ==
+x-ms-office365-filtering-correlation-id: 154e7b1c-0d1e-499a-fbdd-08d686b71584
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR0402MB3805; 
+x-ms-traffictypediagnostic: VI1PR0402MB3805:
+x-microsoft-antispam-prvs: <VI1PR0402MB38050B7DA8F552B227EF7254F9900@VI1PR0402MB3805.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0933E9FD8D
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(376002)(39860400002)(366004)(396003)(346002)(199004)(189003)(5640700003)(97736004)(478600001)(106356001)(6116002)(3846002)(6486002)(105586002)(7736002)(25786009)(8676002)(305945005)(2906002)(66066001)(1730700003)(8936002)(81166006)(81156014)(14454004)(6436002)(6512007)(4326008)(50226002)(68736007)(2501003)(2616005)(54906003)(86362001)(186003)(39060400002)(99286004)(26005)(6506007)(52116002)(71190400001)(256004)(102836004)(476003)(36756003)(71200400001)(486006)(2351001)(1076003)(386003)(316002)(44832011)(6916009)(53936002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0402MB3805;
+ H:VI1PR0402MB3357.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: RpbCOVrMfi29AyMpN5pgt5ZHHvXYDuAfBKV2C6xG0c9Qtn1yncs/m7MGVJ+9qUpjy2lNw/zchm86M9QXagT7oFJAtHtSCJ7QIYvfZwHZyu3BmgjjI0dlsSwBTLA6C/Z7ZXyBAUCsH0+LRG/j+6zVFf02g4+jTT/2Eeek4bAqO1y3W1K3BYEeaim38nSHI6EKdqPBS7mrkvwCKk6BELetIOdELZqD4TKd4qXAGxbdCtxe8SMz7scE7YTAWqruR0mo0RseHfOfmf+pYLQidm+i/9n8pnqK6g9e/cOkCy/tlGqvtT6ECWqqUZOJ3y1UY1qDGqMKLOgCbG1pd4ozW+3V515sHKk2zA9b89FKQi0uhjOYnyT1JwQlxaxD68vox1WfN9X4h870tpyipeGj+il0IA5Qy1s7toB8egCMOv5Ly3o=
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 154e7b1c-0d1e-499a-fbdd-08d686b71584
+X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Jan 2019 13:30:21.2924 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0402MB3805
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_052205_888555_2CDC8B2A 
-X-CRM114-Status: GOOD (  19.59  )
+X-CRM114-CacheID: sfid-20190130_053025_645418_33473385 
+X-CRM114-Status: GOOD (  10.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,123 +114,104 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Marc Zyngier <marc.zyngier@arm.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>, "tglx@linutronix.de" <tglx@linutronix.de>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
+Cc: Aisheng Dong <aisheng.dong@nxp.com>,
+ "daniel.baluta@gmail.com" <daniel.baluta@gmail.com>,
+ Daniel Baluta <daniel.baluta@nxp.com>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ "festevam@gmail.com" <festevam@gmail.com>, "S.j. Wang" <shengjiu.wang@nxp.com>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-QW0gTWl0dHdvY2gsIGRlbiAzMC4wMS4yMDE5LCAxMzowNiArMDAwMCBzY2hyaWViIEFpc2hlbmcg
-RG9uZzoKPiBPbmUgZ3JvdXAgY2FuIG1hbmFnZSA2NCBpbnRlcnJ1cHRzIGJ5IHVzaW5nIHR3byBy
-ZWdpc3RlcnMgKGUuZy4gU1RBVFVTL1NFVCkuCj4gSG93ZXZlciwgdGhlIGludGVncmF0ZWQgaXJx
-c3RlZXIgbWF5IHN1cHBvcnQgb25seSAzMiBpbnRlcnJ1cHRzIHdoaWNoCj4gbmVlZHMgb25seSBv
-bmUgcmVnaXN0ZXIgaW4gYSBncm91cC4gQnV0IHRoZSBjdXJyZW50IGRyaXZlciBhc3N1bWUgdGhl
-cmUncwo+IGEgbWluaW51bSBvZiB0d28gcmVnaXN0ZXJzIGluIGEgZ3JvdXAgd2hpY2ggcmVzdWx0
-IGluIGEgd3JvbmcgcmVnaXN0ZXIgbWFwCj4gZm9yIDMyIGludGVycnVwdHMgcGVyIGNoYW5uZWwg
-aXJxc3RlZXIuIExldCdzIHVzZSB0aGUgcmVnX251bSBjYWN1bGF0ZWQgYnkKPiBpbnRlcnJ1cHRz
-IHBlciBjaGFubmVsIGluc3RlYWQgb2YgaXJxX2dyb3VwIHRvIGNvdmVyIHRoaXMgY2FzZS4KPiAK
-PiA+IENjOiBNYXJjIFp5bmdpZXIgPG1hcmMuenluZ2llckBhcm0uY29tPgo+ID4gQ2M6IFJvYiBI
-ZXJyaW5nIDxyb2JoK2R0QGtlcm5lbC5vcmc+Cj4gPiBDYzogTHVjYXMgU3RhY2ggPGwuc3RhY2hA
-cGVuZ3V0cm9uaXguZGU+Cj4gPiBDYzogU2hhd24gR3VvIDxzaGF3bmd1b0BrZXJuZWwub3JnPgo+
-IFNpZ25lZC1vZmYtYnk6IERvbmcgQWlzaGVuZyA8YWlzaGVuZy5kb25nQG54cC5jb20+CgpNaW5v
-ciBuaXQgYmVsb3csIG90aGVyd2lzZToKClJldmlld2VkLWJ5OiBMdWNhcyBTdGFjaCA8bC5zdGFj
-aEBwZW5ndXRyb25peC5kZT4KCj4gLS0tCj4gdjEtPnYyOgo+IMKgKiBUaGUgdXNpbmcgb2YgcHJv
-cGVydHkgbmFtZSB1cGRhdGVkIGFjY29yZGluZ2x5Cj4gLS0tCj4gwqBkcml2ZXJzL2lycWNoaXAv
-aXJxLWlteC1pcnFzdGVlci5jIHwgMzUgKysrKysrKysrKysrKysrKysrKy0tLS0tLS0tLS0tLS0t
-LS0KPiDCoDEgZmlsZSBjaGFuZ2VkLCAxOSBpbnNlcnRpb25zKCspLCAxNiBkZWxldGlvbnMoLSkK
-PiAKPiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9pcnFjaGlwL2lycS1pbXgtaXJxc3RlZXIuYyBiL2Ry
-aXZlcnMvaXJxY2hpcC9pcnEtaW14LWlycXN0ZWVyLmMKPiBpbmRleCA1YjNmMWQ3Li42N2VkODYy
-IDEwMDY0NAo+IC0tLSBhL2RyaXZlcnMvaXJxY2hpcC9pcnEtaW14LWlycXN0ZWVyLmMKPiArKysg
-Yi9kcml2ZXJzL2lycWNoaXAvaXJxLWlteC1pcnFzdGVlci5jCj4gQEAgLTEzLDcgKzEzLDcgQEAK
-PiDCoCNpbmNsdWRlIDxsaW51eC9vZl9wbGF0Zm9ybS5oPgo+IMKgI2luY2x1ZGUgPGxpbnV4L3Nw
-aW5sb2NrLmg+Cj4gwqAKPiA+IC0jZGVmaW5lIENUUkxfU1RSSURFX09GRihfdCwgX3IpCShfdCAq
-IDggKiBfcikKPiA+ICsjZGVmaW5lIENUUkxfU1RSSURFX09GRihfdCwgX3IpCShfdCAqIDQgKiBf
-cikKPiA+IMKgI2RlZmluZSBDSEFOQ1RSTAkJMHgwCj4gPiDCoCNkZWZpbmUgQ0hBTk1BU0sobiwg
-dCkJCShDVFJMX1NUUklERV9PRkYodCwgMCkgKyAweDQgKiAobikgKyAweDQpCj4gPiDCoCNkZWZp
-bmUgQ0hBTlNFVChuLCB0KQkJKENUUkxfU1RSSURFX09GRih0LCAxKSArIDB4NCAqIChuKSArIDB4
-NCkKPiBAQCAtMjYsNyArMjYsNyBAQCBzdHJ1Y3QgaXJxc3RlZXJfZGF0YSB7Cj4gPiA+IMKgCXN0
-cnVjdCBjbGsJCSppcGdfY2xrOwo+ID4gPiDCoAlpbnQJCQlpcnE7Cj4gPiA+IMKgCXJhd19zcGlu
-bG9ja190CQlsb2NrOwo+ID4gPiAtCWludAkJCWlycV9ncm91cHM7Cj4gPiA+ICsJaW50CQkJcmVn
-X251bTsKPiA+ID4gwqAJaW50CQkJY2hhbm5lbDsKPiA+ID4gwqAJc3RydWN0IGlycV9kb21haW4J
-KmRvbWFpbjsKPiA+ID4gwqAJdTMyCQkJKnNhdmVkX3JlZzsKPiBAQCAtMzUsNyArMzUsNyBAQCBz
-dHJ1Y3QgaXJxc3RlZXJfZGF0YSB7Cj4gwqBzdGF0aWMgaW50IGlteF9pcnFzdGVlcl9nZXRfcmVn
-X2luZGV4KHN0cnVjdCBpcnFzdGVlcl9kYXRhICpkYXRhLAo+ID4gwqAJCQkJwqDCoMKgwqDCoMKg
-dW5zaWduZWQgbG9uZyBpcnFudW0pCj4gwqB7Cj4gPiAtCXJldHVybiAoZGF0YS0+aXJxX2dyb3Vw
-cyAqIDIgLSBpcnFudW0gLyAzMiAtIDEpOwo+ID4gKwlyZXR1cm4gKGRhdGEtPnJlZ19udW0gLSBp
-cnFudW0gLyAzMiAtIDEpOwo+IMKgfQo+IMKgCj4gwqBzdGF0aWMgdm9pZCBpbXhfaXJxc3RlZXJf
-aXJxX3VubWFzayhzdHJ1Y3QgaXJxX2RhdGEgKmQpCj4gQEAgLTQ2LDkgKzQ2LDkgQEAgc3RhdGlj
-IHZvaWQgaW14X2lycXN0ZWVyX2lycV91bm1hc2soc3RydWN0IGlycV9kYXRhICpkKQo+ID4gwqAJ
-dTMyIHZhbDsKPiDCoAo+ID4gwqAJcmF3X3NwaW5fbG9ja19pcnFzYXZlKCZkYXRhLT5sb2NrLCBm
-bGFncyk7Cj4gPiAtCXZhbCA9IHJlYWRsX3JlbGF4ZWQoZGF0YS0+cmVncyArIENIQU5NQVNLKGlk
-eCwgZGF0YS0+aXJxX2dyb3VwcykpOwo+ID4gKwl2YWwgPSByZWFkbF9yZWxheGVkKGRhdGEtPnJl
-Z3MgKyBDSEFOTUFTSyhpZHgsIGRhdGEtPnJlZ19udW0pKTsKPiA+IMKgCXZhbCB8PSBCSVQoZC0+
-aHdpcnEgJSAzMik7Cj4gPiAtCXdyaXRlbF9yZWxheGVkKHZhbCwgZGF0YS0+cmVncyArIENIQU5N
-QVNLKGlkeCwgZGF0YS0+aXJxX2dyb3VwcykpOwo+ID4gKwl3cml0ZWxfcmVsYXhlZCh2YWwsIGRh
-dGEtPnJlZ3MgKyBDSEFOTUFTSyhpZHgsIGRhdGEtPnJlZ19udW0pKTsKPiA+IMKgCXJhd19zcGlu
-X3VubG9ja19pcnFyZXN0b3JlKCZkYXRhLT5sb2NrLCBmbGFncyk7Cj4gwqB9Cj4gwqAKPiBAQCAt
-NjAsOSArNjAsOSBAQCBzdGF0aWMgdm9pZCBpbXhfaXJxc3RlZXJfaXJxX21hc2soc3RydWN0IGly
-cV9kYXRhICpkKQo+ID4gwqAJdTMyIHZhbDsKPiDCoAo+ID4gwqAJcmF3X3NwaW5fbG9ja19pcnFz
-YXZlKCZkYXRhLT5sb2NrLCBmbGFncyk7Cj4gPiAtCXZhbCA9IHJlYWRsX3JlbGF4ZWQoZGF0YS0+
-cmVncyArIENIQU5NQVNLKGlkeCwgZGF0YS0+aXJxX2dyb3VwcykpOwo+ID4gKwl2YWwgPSByZWFk
-bF9yZWxheGVkKGRhdGEtPnJlZ3MgKyBDSEFOTUFTSyhpZHgsIGRhdGEtPnJlZ19udW0pKTsKPiA+
-IMKgCXZhbCAmPSB+QklUKGQtPmh3aXJxICUgMzIpOwo+ID4gLQl3cml0ZWxfcmVsYXhlZCh2YWws
-IGRhdGEtPnJlZ3MgKyBDSEFOTUFTSyhpZHgsIGRhdGEtPmlycV9ncm91cHMpKTsKPiA+ICsJd3Jp
-dGVsX3JlbGF4ZWQodmFsLCBkYXRhLT5yZWdzICsgQ0hBTk1BU0soaWR4LCBkYXRhLT5yZWdfbnVt
-KSk7Cj4gPiDCoAlyYXdfc3Bpbl91bmxvY2tfaXJxcmVzdG9yZSgmZGF0YS0+bG9jaywgZmxhZ3Mp
-Owo+IMKgfQo+IMKgCj4gQEAgLTk0LDEzICs5NCwxMyBAQCBzdGF0aWMgdm9pZCBpbXhfaXJxc3Rl
-ZXJfaXJxX2hhbmRsZXIoc3RydWN0IGlycV9kZXNjICpkZXNjKQo+IMKgCj4gPiDCoAljaGFpbmVk
-X2lycV9lbnRlcihpcnFfZGVzY19nZXRfY2hpcChkZXNjKSwgZGVzYyk7Cj4gwqAKPiA+IC0JZm9y
-IChpID0gMDsgaSA8IGRhdGEtPmlycV9ncm91cHMgKiA2NDsgaSArPSAzMikgewo+ID4gKwlmb3Ig
-KGkgPSAwOyBpIDwgZGF0YS0+cmVnX251bSAqIDMyOyBpICs9IDMyKSB7Cj4gPiDCoAkJaW50IGlk
-eCA9IGlteF9pcnFzdGVlcl9nZXRfcmVnX2luZGV4KGRhdGEsIGkpOwo+ID4gwqAJCXVuc2lnbmVk
-IGxvbmcgaXJxbWFwOwo+ID4gwqAJCWludCBwb3MsIHZpcnE7Cj4gwqAKPiA+IMKgCQlpcnFtYXAg
-PSByZWFkbF9yZWxheGVkKGRhdGEtPnJlZ3MgKwo+ID4gLQkJCQnCoMKgwqDCoMKgwqDCoENIQU5T
-VEFUVVMoaWR4LCBkYXRhLT5pcnFfZ3JvdXBzKSk7Cj4gPiArCQkJCcKgwqDCoMKgwqDCoMKgQ0hB
-TlNUQVRVUyhpZHgsIGRhdGEtPnJlZ19udW0pKTsKPiDCoAo+ID4gwqAJCWZvcl9lYWNoX3NldF9i
-aXQocG9zLCAmaXJxbWFwLCAzMikgewo+ID4gwqAJCQl2aXJxID0gaXJxX2ZpbmRfbWFwcGluZyhk
-YXRhLT5kb21haW4sIHBvcyArIGkpOwo+IEBAIC0xNDYsMTIgKzE0NiwxNSBAQCBzdGF0aWMgaW50
-IGlteF9pcnFzdGVlcl9wcm9iZShzdHJ1Y3QgcGxhdGZvcm1fZGV2aWNlICpwZGV2KQo+IMKgCj4g
-PiDCoAlyYXdfc3Bpbl9sb2NrX2luaXQoJmRhdGEtPmxvY2spOwo+IMKgCj4gPiAtCW9mX3Byb3Bl
-cnR5X3JlYWRfdTMyKG5wLCAiZnNsLGlycS1ncm91cHMiLCAmZGF0YS0+aXJxX2dyb3Vwcyk7Cj4g
-PiArCW9mX3Byb3BlcnR5X3JlYWRfdTMyKG5wLCAiZnNsLG51bS1pcnFzIiwgJmRhdGEtPnJlZ19u
-dW0pOwo+ID4gwqAJb2ZfcHJvcGVydHlfcmVhZF91MzIobnAsICJmc2wsY2hhbm5lbCIsICZkYXRh
-LT5jaGFubmVsKTsKPiDCoAo+ID4gKwkvKiBvbmUgcmVnaXN0ZXIgYml0IG1hcCByZXByZXNlbnRz
-IDMyIGlucHV0IGludGVycnVwdHMgKi8KPiA+ICsJZGF0YS0+cmVnX251bSAvPSAzMjsKPiArCj4g
-PiDCoAlpZiAoSVNfRU5BQkxFRChDT05GSUdfUE1fU0xFRVApKSB7Cj4gPiDCoAkJZGF0YS0+c2F2
-ZWRfcmVnID0gZGV2bV9remFsbG9jKCZwZGV2LT5kZXYsCj4gPiAtCQkJCQlzaXplb2YodTMyKSAq
-IGRhdGEtPmlycV9ncm91cHMgKiAyLAo+ID4gKwkJCQkJc2l6ZW9mKHUzMikgKiBkYXRhLT5yZWdf
-bnVtLAo+IMKgCQkJCQlHRlBfS0VSTkVMKTsKCkRvZXMgdGhpcyBsYXN0IHBhcmFtZXRlciBub3cg
-Zml0IG9uIHRoZSBsaW5lIGFib3ZlPwoKPiDCoAkJaWYgKCFkYXRhLT5zYXZlZF9yZWcpCj4gPiDC
-oAkJCXJldHVybiAtRU5PTUVNOwo+IEBAIC0xNjYsNyArMTY5LDcgQEAgc3RhdGljIGludCBpbXhf
-aXJxc3RlZXJfcHJvYmUoc3RydWN0IHBsYXRmb3JtX2RldmljZSAqcGRldikKPiA+IMKgCS8qIHN0
-ZWVyIGFsbCBJUlFzIGludG8gY29uZmlndXJlZCBjaGFubmVsICovCj4gPiDCoAl3cml0ZWxfcmVs
-YXhlZChCSVQoZGF0YS0+Y2hhbm5lbCksIGRhdGEtPnJlZ3MgKyBDSEFOQ1RSTCk7Cj4gwqAKPiA+
-IC0JZGF0YS0+ZG9tYWluID0gaXJxX2RvbWFpbl9hZGRfbGluZWFyKG5wLCBkYXRhLT5pcnFfZ3Jv
-dXBzICogNjQsCj4gPiArCWRhdGEtPmRvbWFpbiA9IGlycV9kb21haW5fYWRkX2xpbmVhcihucCwg
-ZGF0YS0+cmVnX251bSAqIDMyLAo+ID4gwqAJCQkJCcKgwqDCoMKgwqAmaW14X2lycXN0ZWVyX2Rv
-bWFpbl9vcHMsIGRhdGEpOwo+ID4gwqAJaWYgKCFkYXRhLT5kb21haW4pIHsKPiA+IMKgCQlkZXZf
-ZXJyKCZwZGV2LT5kZXYsICJmYWlsZWQgdG8gY3JlYXRlIElSUSBkb21haW5cbiIpOwo+IEBAIC0x
-OTksOSArMjAyLDkgQEAgc3RhdGljIHZvaWQgaW14X2lycXN0ZWVyX3NhdmVfcmVncyhzdHJ1Y3Qg
-aXJxc3RlZXJfZGF0YSAqZGF0YSkKPiDCoHsKPiA+IMKgCWludCBpOwo+IMKgCj4gPiAtCWZvciAo
-aSA9IDA7IGkgPCBkYXRhLT5pcnFfZ3JvdXBzICogMjsgaSsrKQo+ID4gKwlmb3IgKGkgPSAwOyBp
-IDwgZGF0YS0+cmVnX251bTsgaSsrKQo+ID4gwqAJCWRhdGEtPnNhdmVkX3JlZ1tpXSA9IHJlYWRs
-X3JlbGF4ZWQoZGF0YS0+cmVncyArCj4gPiAtCQkJCQkJQ0hBTk1BU0soaSwgZGF0YS0+aXJxX2dy
-b3VwcykpOwo+ID4gKwkJCQkJCUNIQU5NQVNLKGksIGRhdGEtPnJlZ19udW0pKTsKPiDCoH0KPiDC
-oAo+IMKgc3RhdGljIHZvaWQgaW14X2lycXN0ZWVyX3Jlc3RvcmVfcmVncyhzdHJ1Y3QgaXJxc3Rl
-ZXJfZGF0YSAqZGF0YSkKPiBAQCAtMjA5LDkgKzIxMiw5IEBAIHN0YXRpYyB2b2lkIGlteF9pcnFz
-dGVlcl9yZXN0b3JlX3JlZ3Moc3RydWN0IGlycXN0ZWVyX2RhdGEgKmRhdGEpCj4gPiDCoAlpbnQg
-aTsKPiDCoAo+ID4gwqAJd3JpdGVsX3JlbGF4ZWQoQklUKGRhdGEtPmNoYW5uZWwpLCBkYXRhLT5y
-ZWdzICsgQ0hBTkNUUkwpOwo+ID4gLQlmb3IgKGkgPSAwOyBpIDwgZGF0YS0+aXJxX2dyb3VwcyAq
-IDI7IGkrKykKPiA+ICsJZm9yIChpID0gMDsgaSA8IGRhdGEtPnJlZ19udW07IGkrKykKPiA+IMKg
-CQl3cml0ZWxfcmVsYXhlZChkYXRhLT5zYXZlZF9yZWdbaV0sCj4gPiAtCQkJwqDCoMKgwqDCoMKg
-wqBkYXRhLT5yZWdzICsgQ0hBTk1BU0soaSwgZGF0YS0+aXJxX2dyb3VwcykpOwo+ID4gKwkJCcKg
-wqDCoMKgwqDCoMKgZGF0YS0+cmVncyArIENIQU5NQVNLKGksIGRhdGEtPnJlZ19udW0pKTsKPiDC
-oH0KPiDCoAo+IMKgc3RhdGljIGludCBpbXhfaXJxc3RlZXJfc3VzcGVuZChzdHJ1Y3QgZGV2aWNl
-ICpkZXYpCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwps
-aW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJh
-ZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51
-eC1hcm0ta2VybmVsCg==
+This is done via RPC call to SCU.
+
+Signed-off-by: Daniel Baluta <daniel.baluta@nxp.com>
+---
+Changes since v2: (as per Aisheng's review)
+	- rename address with phys_address
+	- remove unnecessary uint8_t cast
+	- use 'true' as last parameter of imx_scu_call_rpc to actually
+	wait for a response from SCU.
+
+ drivers/firmware/imx/misc.c           | 38 +++++++++++++++++++++++++++
+ include/linux/firmware/imx/svc/misc.h |  3 +++
+ 2 files changed, 41 insertions(+)
+
+diff --git a/drivers/firmware/imx/misc.c b/drivers/firmware/imx/misc.c
+index 97f5424dbac9..4b56a587dacd 100644
+--- a/drivers/firmware/imx/misc.c
++++ b/drivers/firmware/imx/misc.c
+@@ -18,6 +18,14 @@ struct imx_sc_msg_req_misc_set_ctrl {
+ 	u16 resource;
+ } __packed;
+ 
++struct imx_sc_msg_req_cpu_start {
++	struct imx_sc_rpc_msg hdr;
++	u32 address_hi;
++	u32 address_lo;
++	u16 resource;
++	u8 enable;
++} __packed;
++
+ struct imx_sc_msg_req_misc_get_ctrl {
+ 	struct imx_sc_rpc_msg hdr;
+ 	u32 ctrl;
+@@ -97,3 +105,33 @@ int imx_sc_misc_get_control(struct imx_sc_ipc *ipc, u32 resource,
+ 	return 0;
+ }
+ EXPORT_SYMBOL(imx_sc_misc_get_control);
++
++/*
++ * This function starts/stops a CPU identified by @resource
++ *
++ * @param[in]     ipc         IPC handle
++ * @param[in]     resource    resource the control is associated with
++ * @param[in]     enable      true for start, false for stop
++ * @param[in]     phys_addr   initial instruction address to be executed
++ *
++ * @return Returns 0 for success and < 0 for errors.
++ */
++int imx_sc_pm_cpu_start(struct imx_sc_ipc *ipc, u32 resource,
++			bool enable, u64 phys_addr)
++{
++	struct imx_sc_msg_req_cpu_start msg;
++	struct imx_sc_rpc_msg *hdr = &msg.hdr;
++
++	hdr->ver = IMX_SC_RPC_VERSION;
++	hdr->svc = IMX_SC_RPC_SVC_PM;
++	hdr->func = IMX_SC_PM_FUNC_CPU_START;
++	hdr->size = 4;
++
++	msg.address_hi = phys_addr >> 32;
++	msg.address_lo = phys_addr;
++	msg.resource = resource;
++	msg.enable = enable;
++
++	return imx_scu_call_rpc(ipc, &msg, true);
++}
++EXPORT_SYMBOL(imx_sc_pm_cpu_start);
+diff --git a/include/linux/firmware/imx/svc/misc.h b/include/linux/firmware/imx/svc/misc.h
+index e21c49aba92f..031dd4d3c766 100644
+--- a/include/linux/firmware/imx/svc/misc.h
++++ b/include/linux/firmware/imx/svc/misc.h
+@@ -52,4 +52,7 @@ int imx_sc_misc_set_control(struct imx_sc_ipc *ipc, u32 resource,
+ int imx_sc_misc_get_control(struct imx_sc_ipc *ipc, u32 resource,
+ 			    u8 ctrl, u32 *val);
+ 
++int imx_sc_pm_cpu_start(struct imx_sc_ipc *ipc, u32 resource,
++			bool enable, u64 phys_addr);
++
+ #endif /* _SC_MISC_API_H */
+-- 
+2.17.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
