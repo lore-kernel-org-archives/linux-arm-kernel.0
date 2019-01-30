@@ -2,92 +2,63 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 10549C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:28:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 275C1C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:33:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D2D0720855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:28:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EF33121473
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:33:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VYiYloeF";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="bBEuGwn1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D2D0720855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H8g0OUh4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF33121473
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SVGxTLppk8pSyhDVs3AedmMGKw0c0HLhRdga0KLdqdw=; b=VYiYloeFsBqs7t
-	8BDk7bAUw9ybWEfh6LLV//2XREKC1OeboBnr65ENCqJQmuVlLpL4HkLKlyr/uJ751ct6ajID963yx
-	QrMaiNIl2A2ZVewZfnNlCzEroNszfsLGQB1CmIGr+fi+3jBooEDhTgg1EFnwZNafFVfYmiMfMMsh2
-	0V7wfMuqjS5gloeAKHXCL4wkN0QxOg+kwMSeATvv91yyka0ZhYSoipGLlv9pgsqC80k4DXGdLxUG+
-	UOoGhQcSF1oP9bRQrk3pOrsCSwT3ylMf51+mblC6fpLhP6idySqNpQ8IrP8/g9nR1eLzqWaKbd4EY
-	MgDJzmAUFn8Vkyz0On7g==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=z1Op37wBduLpCxwaPiQoCjMJXnoiYYGEf2Kd95zASQY=; b=H8g0OUh4nThVxF
+	VOCHhqw/Pj27YeVvzqKcOMKcyhCsZAByK3fI/LM44RCuK37Q3tj8gKekWeVFKh2uojnVdJ/iWqfQO
+	cYpkIEavvGDPzyNmw113+k0uabsBAa2ReUgYlr8U1XLeGee8RjEBUuseTTm5W0DuPrwkHIAB3eTFJ
+	JEh0h28sXQH2q38HZETsANqWfBUMQn19WBOf/uqR243i2r5umPcyTLtJNICwWuEs8wQ5h+jQVpLeT
+	HEXBhRsyBzGwAHWtkqYCILMe0tmS1E8sE8NZ9Nbv9UZdrBmxnN2C/Q97639R1DgIx7IGZKdAd5Hfg
+	IsuYkb6H32N477tM6cOA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gooyM-0004fL-Ui; Wed, 30 Jan 2019 12:28:06 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gooyJ-0004ej-8c
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 12:28:04 +0000
-Received: by mail-wm1-x342.google.com with SMTP id a62so21438846wmh.4
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 04:28:02 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:from:to:cc:references:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=p4U/iIJj82u26qLoq46qihY0sTUO30P5OPcQP+2hQt4=;
- b=bBEuGwn1o7o2K8JnDQ6yuznyxfZ8aIkbh6vqE/DBlyhp+6yqEURJYjfHBCAepcN1gY
- KBDN9pSi+/C2hO3RkkPQZoWYUQsT0j/QwFPQiIjWsCYGD3KcATpFnofhfVf0hukoGC5B
- WWeXgPNmRZNzXguHf4Daup0YWcGB6CqwaL3b8=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:from:to:cc:references:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=p4U/iIJj82u26qLoq46qihY0sTUO30P5OPcQP+2hQt4=;
- b=LFPw1yDjAuVNDYmc7lWyc3OM+4I1VHEbP4TVWlLgO5Yj6b/lfQ8s+zDwzeK4ZmzC/3
- u2ZZaJn3IYbec2XG+Smnr/aWTWiyxkh+YLua7z5/4wtpHS3YfmlsqxtmW6hjjQUWnbmg
- Vpl71ttEtQrqn3gzRtNt6bUxBRC3zdLFQXJdOR9N7ghxQFxwI72JMVQz0AsF3R7nzLqO
- GzRiNkFROn4Q6B3zWEEoeWkcQi5nTSET2DH3G0Cep7UC+GwM2u9jzUogpjtCLOTj2UH6
- T4rbtG88AO7uK2sSjyTH47/Aq2pTpDjgorVWfcm8/XoOBnPPOPWsJpnvFQ6Wa3y8KYlI
- dZCg==
-X-Gm-Message-State: AJcUuke0DTMCm0m7/X5dxS9btAYPqOH5ae5/U9EXsQ/Sw3pZ66e6mqDl
- xOnmI9YuS+XcwcA++tyA8GBWtg==
-X-Google-Smtp-Source: ALg8bN5HK5CtsRK25o5XOzy94A9USGHN7oWCi0//bbFt7rwvoCn57KBqYeC34t2f0+YEHFUe+uiq8Q==
-X-Received: by 2002:a1c:7f0c:: with SMTP id a12mr24272697wmd.89.1548851281230; 
- Wed, 30 Jan 2019 04:28:01 -0800 (PST)
-Received: from [192.168.1.2] (99.red-79-146-83.dynamicip.rima-tde.net.
- [79.146.83.99])
- by smtp.gmail.com with ESMTPSA id f199sm2273299wmd.25.2019.01.30.04.27.59
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 30 Jan 2019 04:28:00 -0800 (PST)
-Subject: Re: [PATCH v2 2/2] phy: qualcomm: usb: Add Super-Speed PHY driver
-From: Jorge Ramirez <jorge.ramirez-ortiz@linaro.org>
-To: Bjorn Andersson <bjorn.andersson@linaro.org>
-References: <1548761715-4004-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <1548761715-4004-3-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <20190129202726.GA3036@builder>
- <fbd70494-e2f1-ae04-8b14-2cc97cead8b9@linaro.org>
-Message-ID: <61bdca18-cef9-3f02-45ef-5df4f96b4f2b@linaro.org>
-Date: Wed, 30 Jan 2019 13:27:59 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gop41-0006zg-Sy; Wed, 30 Jan 2019 12:33:57 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gop3y-0006yT-LB; Wed, 30 Jan 2019 12:33:55 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 866ECEBD;
+ Wed, 30 Jan 2019 04:33:51 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DD1BC3F557;
+ Wed, 30 Jan 2019 04:33:49 -0800 (PST)
+Date: Wed, 30 Jan 2019 12:33:47 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: honghui.zhang@mediatek.com
+Subject: Re: [PATCH] PCI: Mediatek: Use resource_size function on resource
+ object
+Message-ID: <20190130123347.GB30991@e107981-ln.cambridge.arm.com>
+References: <1546409033-20412-1-git-send-email-honghui.zhang@mediatek.com>
 MIME-Version: 1.0
-In-Reply-To: <fbd70494-e2f1-ae04-8b14-2cc97cead8b9@linaro.org>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <1546409033-20412-1-git-send-email-honghui.zhang@mediatek.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_042803_355393_2D65C8BA 
-X-CRM114-Status: UNSURE (   9.43  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190130_043354_706002_2A8136F2 
+X-CRM114-Status: GOOD (  16.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,27 +70,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, jackp@codeaurora.org,
- shawn.guo@linaro.org, gregkh@linuxfoundation.org, linux-usb@vger.kernel.org,
- khasim.mohammed@linaro.org, linux-kernel@vger.kernel.org, swboyd@chromium.org,
- vkoul@kernel.org, linux-arm-msm@vger.kernel.org, andy.gross@linaro.org,
- kishon@ti.com, linux-arm-kernel@lists.infradead.org
+Cc: youlin.pei@mediatek.com, ryder.lee@mediatek.com, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, jianjun.wang@mediatek.com,
+ linux-mediatek@lists.infradead.org, bhelgaas@google.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/30/19 10:53, Jorge Ramirez wrote:
+On Wed, Jan 02, 2019 at 02:03:53PM +0800, honghui.zhang@mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
+> 
+> drivers/pci/pcie-mediatek.c:720:13-16: WARNING: Suspicious code. resource_size is maybe missing with mem
+> 
+> Generated by: scripts/coccinelle/api/resource_size.cocci
+> 
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> ---
+>  drivers/pci/controller/pcie-mediatek.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+> index e307166..0168376 100644
+> --- a/drivers/pci/controller/pcie-mediatek.c
+> +++ b/drivers/pci/controller/pcie-mediatek.c
+> @@ -654,7 +654,6 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+>  	struct resource *mem = &pcie->mem;
+>  	const struct mtk_pcie_soc *soc = port->pcie->soc;
+>  	u32 val;
+> -	size_t size;
+>  	int err;
+>  
+>  	/* MT7622 platforms need to enable LTSSM and ASPM from PCIe subsys */
+> @@ -706,8 +705,7 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+>  		mtk_pcie_enable_msi(port);
+>  
+>  	/* Set AHB to PCIe translation windows */
+> -	size = mem->end - mem->start;
+> -	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(size));
+> +	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(resource_size(mem)));
 
->> +	priv->vbus = devm_regulator_get_optional(priv->dev, "vbus");
-> get_optional means that if vbus-supply is not found, rather than
-> returning a dummy regulator object this will fail with -ENODEV.
+checkpatch warns on this line, please make sure patches pass it before
+posting them.
 
-on this subject, is it intentional that devm_reset_control_get_optional
-behaves differently (ie, it returns a NULL if it cant be found)
+I will fix it up myself but please pay attention next time.
 
-IMO all *_get_optional should be semantically as well as functionally
-equivalent to avoid confusions like the one I had.
+Thanks,
+Lorenzo
+
+>  	writel(val, port->base + PCIE_AHB_TRANS_BASE0_L);
+>  
+>  	val = upper_32_bits(mem->start);
+> -- 
+> 2.6.4
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
