@@ -2,66 +2,61 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BF81C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:53:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 71174C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:03:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5C4B820811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:53:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3F1F620869
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:03:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NS3kKNnQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5C4B820811
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IK+I+Yiy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F1F620869
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uRw11srDJYAbWylQ8ndisRxpVpV5fQbQabqdSNZ269U=; b=NS3kKNnQOA+aA5
-	GCqE4QrKbSaXOVYxYZYRc7jo5vg4oAMvmEjq2nAOTPwMvXDJiHaG7JdJxGhMUY+V4mh0AEc/mIPRS
-	7vNpvyezyy9lHBmAsPEVrJCWZ06aDxouvpVfieSRnhTZWmfpkrn9y2Z+dkRFkMgJug1McCOZDzxKi
-	Ja/EzfUAc89wWNFWLApf9dQq118oU+FHa7UJVeCa7uxatt6zcY3m3nQ5cFo5intK+dUF8/TDqJ5XO
-	PmtuVnHpczrT2JgOaF5tzTO8fwno8xi1Z3AlWQFp734ve0fTbyD3iaeGq5bk0RlRMbBsOtHVZBjbT
-	ICG8KPgxeOOHXd7K566g==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=msTu8IdPN32AXLyy3a2vDFhF5ROkZJzc2PMm1roDMl0=; b=IK+
+	I+Yiy2mVmT2RXvR5HRvpJ5vO2vWbcWLZafGslgJqQSi1FXZO0CQMoGXzRTcuNJelb9CStUTUCzHwv
+	mBj8JKAfs600/w8InMmnoZo4/J8IiiRtXgwF4VfZHYxA4BVgTIOaii0UYJUKbOo2u1rWK/nmjCAaX
+	NIk0pNPTM2hoTIcxUolojuBU9+35dGo2XY406AFXEjoM+mLY90E+Wr3y2uDg/ub6glzxPdahCCTHW
+	+NEXpN13Cuq3UWXd3evp4rjMXfJXEJGUcsjf4bL7OlkIyoJGGBxPlu/mr4OXLy1NVwKNYw75KT1MD
+	TfKKd5AsU0x0vkcxoqAfxXs3I7ED8uA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gooQW-0005oY-0k; Wed, 30 Jan 2019 11:53:08 +0000
+	id 1gooaj-0001h4-Gi; Wed, 30 Jan 2019 12:03:41 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gooQS-0005np-4v
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 11:53:05 +0000
+ id 1gooag-0001gN-HK
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 12:03:40 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DC9061596;
- Wed, 30 Jan 2019 03:53:01 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E99223F59C;
- Wed, 30 Jan 2019 03:52:59 -0800 (PST)
-Subject: Re: [PATCH v9 12/26] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
- masking
-From: Julien Thierry <julien.thierry@arm.com>
-To: Catalin Marinas <catalin.marinas@arm.com>
-References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
- <1548084825-8803-13-git-send-email-julien.thierry@arm.com>
- <20190122152149.GD187049@arrakis.emea.arm.com>
- <2eabb029-4efe-6829-7fb1-6174a2edb154@arm.com>
-Message-ID: <8873213c-a667-567b-9df2-de11cdd3671a@arm.com>
-Date: Wed, 30 Jan 2019 11:52:58 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <2eabb029-4efe-6829-7fb1-6174a2edb154@arm.com>
-Content-Language: en-US
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 344B0A78;
+ Wed, 30 Jan 2019 04:03:37 -0800 (PST)
+Received: from moonbear.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C6CC13F59C;
+ Wed, 30 Jan 2019 04:03:35 -0800 (PST)
+From: Kristina Martsenko <kristina.martsenko@arm.com>
+To: linux-arm-kernel@lists.infradead.org,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>
+Subject: [PATCH v4] arm64: add ptrace regsets for ptrauth key management
+Date: Wed, 30 Jan 2019 12:02:44 +0000
+Message-Id: <20190130120244.25158-1-kristina.martsenko@arm.com>
+X-Mailer: git-send-email 2.11.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_035304_198546_DB2EC579 
-X-CRM114-Status: GOOD (  23.53  )
+X-CRM114-CacheID: sfid-20190130_040338_587322_05D4A2CD 
+X-CRM114-Status: GOOD (  18.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,170 +68,269 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, marc.zyngier@arm.com,
- will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
- james.morse@arm.com, Oleg Nesterov <oleg@redhat.com>, joel@joelfernandes.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, Amit Kachhap <amit.kachhap@arm.com>,
+ Dave P Martin <dave.martin@arm.com>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Add two new ptrace regsets, which can be used to request and change the
+pointer authentication keys of a thread. NT_ARM_PACA_KEYS gives access
+to the instruction/data address keys, and NT_ARM_PACG_KEYS to the
+generic authentication key. The keys are also part of the core dump file
+of the process.
 
+The regsets are only exposed if the kernel is compiled with
+CONFIG_CHECKPOINT_RESTORE=y, as the only intended use case is
+checkpointing and restoring processes that are using pointer
+authentication. (This can be changed later if there are other use
+cases.)
 
-On 23/01/2019 10:44, Julien Thierry wrote:
-> 
-> 
-> On 22/01/2019 15:21, Catalin Marinas wrote:
->> On Mon, Jan 21, 2019 at 03:33:31PM +0000, Julien Thierry wrote:
->>> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
->>> index 24692ed..7e82a92 100644
->>> --- a/arch/arm64/include/asm/irqflags.h
->>> +++ b/arch/arm64/include/asm/irqflags.h
->>> @@ -18,7 +18,9 @@
->>>  
->>>  #ifdef __KERNEL__
->>>  
->>> +#include <asm/alternative.h>
->>>  #include <asm/ptrace.h>
->>> +#include <asm/sysreg.h>
->>>  
->>>  /*
->>>   * Aarch64 has flags for masking: Debug, Asynchronous (serror), Interrupts and
->>> @@ -36,33 +38,31 @@
->>>  /*
->>>   * CPU interrupt mask handling.
->>>   */
->>> -static inline unsigned long arch_local_irq_save(void)
->>> -{
->>> -	unsigned long flags;
->>> -	asm volatile(
->>> -		"mrs	%0, daif		// arch_local_irq_save\n"
->>> -		"msr	daifset, #2"
->>> -		: "=r" (flags)
->>> -		:
->>> -		: "memory");
->>> -	return flags;
->>> -}
->>> -
->>>  static inline void arch_local_irq_enable(void)
->>>  {
->>> -	asm volatile(
->>> -		"msr	daifclr, #2		// arch_local_irq_enable"
->>> -		:
->>> +	unsigned long unmasked = GIC_PRIO_IRQON;
->>> +
->>> +	asm volatile(ALTERNATIVE(
->>> +		"msr	daifclr, #2		// arch_local_irq_enable\n"
->>> +		"nop",
->>> +		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0\n"
->>> +		"dsb	sy",
->>> +		ARM64_HAS_IRQ_PRIO_MASKING)
->>>  		:
->>> +		: "r" (unmasked)
->>>  		: "memory");
->>>  }
->>>  
->>>  static inline void arch_local_irq_disable(void)
->>>  {
->>> -	asm volatile(
->>> -		"msr	daifset, #2		// arch_local_irq_disable"
->>> -		:
->>> +	unsigned long masked = GIC_PRIO_IRQOFF;
->>> +
->>> +	asm volatile(ALTERNATIVE(
->>> +		"msr	daifset, #2		// arch_local_irq_disable",
->>> +		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ", %0",
->>> +		ARM64_HAS_IRQ_PRIO_MASKING)
->>>  		:
->>> +		: "r" (masked)
->>>  		: "memory");
->>>  }
->>
->> Nitpicks: you could drop masked/unmasked variables here (it's up to you,
->> it wouldn't make any difference on the generated asm).
->>
-> 
-> Good point, I'll do that.
-> 
->>> @@ -71,12 +71,44 @@ static inline void arch_local_irq_disable(void)
->>>   */
->>>  static inline unsigned long arch_local_save_flags(void)
->>>  {
->>> +	unsigned long daif_bits;
->>>  	unsigned long flags;
->>> -	asm volatile(
->>> -		"mrs	%0, daif		// arch_local_save_flags"
->>> -		: "=r" (flags)
->>> -		:
->>> +
->>> +	daif_bits = read_sysreg(daif);
->>> +
->>> +	/*
->>> +	 * The asm is logically equivalent to:
->>> +	 *
->>> +	 * if (system_uses_irq_prio_masking())
->>> +	 *	flags = (daif_bits & PSR_I_BIT) ?
->>> +	 *			GIC_PRIO_IRQOFF :
->>> +	 *			read_sysreg_s(SYS_ICC_PMR_EL1);
->>> +	 * else
->>> +	 *	flags = daif_bits;
->>> +	 */
->>> +	asm volatile(ALTERNATIVE(
->>> +			"mov	%0, %1\n"
->>> +			"nop\n"
->>> +			"nop",
->>> +			"mrs_s	%0, " __stringify(SYS_ICC_PMR_EL1) "\n"
->>> +			"ands	%1, %1, " __stringify(PSR_I_BIT) "\n"
->>> +			"csel	%0, %0, %2, eq",
->>> +			ARM64_HAS_IRQ_PRIO_MASKING)
->>> +		: "=&r" (flags), "+r" (daif_bits)
->>> +		: "r" (GIC_PRIO_IRQOFF)
->>>  		: "memory");
->>> +
->>> +	return flags;
->>> +}
->>
->> BTW, how's the code generated from the C version? It will have a branch
->> but may not be too bad. Either way is fine by me.
->>
-> 
-> It's a bit hard to talk about the code generated from the C version as
-> it can lie within several layers of inline, so the instructions for that
-> section are a bit more scattered.
-> 
-> However, it seems like the compiler is more clever (maybe the asm
-> volatile prevents some optimizations regarding register allocation or
-> instruction ordering) and the C version seems to perform slightly better
-> (although it could be within the noise) despite the branch.
-> 
-> So, I'll just switch up to the C version.
-> 
+Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+---
 
-I remember a reason to stick to the asm version. There is a time
-interval between the (early) CPU feature being enabled and the (early)
-alternatives being applied.
+Changes in v4:
+ - remove unnecessary memset's
+ - add pac_key_to_user and pac_key_from_user helpers
+ - use 'const' in pac_{address,generic}_keys_{to,from}_user
+ - reverse argument order in pac_{address,generic}_keys_from_user
 
-For the early ones, interrupts remain disabled between CPU feature
-enabling and alternative application. However, if you enable lockdep, it
-will do some interrupts_disabled() checks which become
-local_irqs_disabled_flags(local_save_flags()). If one is using the
-alternative and the other the static branch, lockdep will emit a warning
-about it.
+ Documentation/arm64/pointer-authentication.txt |   5 +
+ arch/arm64/include/uapi/asm/ptrace.h           |  13 +++
+ arch/arm64/kernel/ptrace.c                     | 147 +++++++++++++++++++++++++
+ include/uapi/linux/elf.h                       |   2 +
+ 4 files changed, 167 insertions(+)
 
-So, I tried moving all irqflags functions but using the static branch
-for arch_local_irq_restore() slows things down a bit, and I'm not sure
-having arch_local_irq_save() use static branch while
-arch_local_irq_restore() uses alternative makes much sense.
-
-In the end, I'll stick to the ASM + alternative version to avoid the
-lockdep issue and have consistant manipulation of the irqflags.
-
-Thanks,
-
+diff --git a/Documentation/arm64/pointer-authentication.txt b/Documentation/arm64/pointer-authentication.txt
+index a25cd21290e9..5baca42ba146 100644
+--- a/Documentation/arm64/pointer-authentication.txt
++++ b/Documentation/arm64/pointer-authentication.txt
+@@ -78,6 +78,11 @@ bits can vary between the two. Note that the masks apply to TTBR0
+ addresses, and are not valid to apply to TTBR1 addresses (e.g. kernel
+ pointers).
+ 
++Additionally, when CONFIG_CHECKPOINT_RESTORE is also set, the kernel
++will expose the NT_ARM_PACA_KEYS and NT_ARM_PACG_KEYS regsets (struct
++user_pac_address_keys and struct user_pac_generic_keys). These can be
++used to get and set the keys for a thread.
++
+ 
+ Virtualization
+ --------------
+diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+index 28d77c9ed531..d78623acb649 100644
+--- a/arch/arm64/include/uapi/asm/ptrace.h
++++ b/arch/arm64/include/uapi/asm/ptrace.h
+@@ -233,6 +233,19 @@ struct user_pac_mask {
+ 	__u64		insn_mask;
+ };
+ 
++/* pointer authentication keys (NT_ARM_PACA_KEYS, NT_ARM_PACG_KEYS) */
++
++struct user_pac_address_keys {
++	__uint128_t	apiakey;
++	__uint128_t	apibkey;
++	__uint128_t	apdakey;
++	__uint128_t	apdbkey;
++};
++
++struct user_pac_generic_keys {
++	__uint128_t	apgakey;
++};
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif /* _UAPI__ASM_PTRACE_H */
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 9dce33b0e260..a86413be5a2d 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -979,6 +979,131 @@ static int pac_mask_get(struct task_struct *target,
+ 
+ 	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, &uregs, 0, -1);
+ }
++
++#ifdef CONFIG_CHECKPOINT_RESTORE
++static __uint128_t pac_key_to_user(const struct ptrauth_key *key)
++{
++	return (__uint128_t)key->hi << 64 | key->lo;
++}
++
++static struct ptrauth_key pac_key_from_user(__uint128_t ukey)
++{
++	struct ptrauth_key key = {
++		.lo = (unsigned long)ukey,
++		.hi = (unsigned long)(ukey >> 64),
++	};
++
++	return key;
++}
++
++static void pac_address_keys_to_user(struct user_pac_address_keys *ukeys,
++				     const struct ptrauth_keys *keys)
++{
++	ukeys->apiakey = pac_key_to_user(&keys->apia);
++	ukeys->apibkey = pac_key_to_user(&keys->apib);
++	ukeys->apdakey = pac_key_to_user(&keys->apda);
++	ukeys->apdbkey = pac_key_to_user(&keys->apdb);
++}
++
++static void pac_address_keys_from_user(struct ptrauth_keys *keys,
++				       const struct user_pac_address_keys *ukeys)
++{
++	keys->apia = pac_key_from_user(ukeys->apiakey);
++	keys->apib = pac_key_from_user(ukeys->apibkey);
++	keys->apda = pac_key_from_user(ukeys->apdakey);
++	keys->apdb = pac_key_from_user(ukeys->apdbkey);
++}
++
++static int pac_address_keys_get(struct task_struct *target,
++				const struct user_regset *regset,
++				unsigned int pos, unsigned int count,
++				void *kbuf, void __user *ubuf)
++{
++	struct ptrauth_keys *keys = &target->thread.keys_user;
++	struct user_pac_address_keys user_keys;
++
++	if (!system_supports_address_auth())
++		return -EINVAL;
++
++	pac_address_keys_to_user(&user_keys, keys);
++
++	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
++				   &user_keys, 0, -1);
++}
++
++static int pac_address_keys_set(struct task_struct *target,
++				const struct user_regset *regset,
++				unsigned int pos, unsigned int count,
++				const void *kbuf, const void __user *ubuf)
++{
++	struct ptrauth_keys *keys = &target->thread.keys_user;
++	struct user_pac_address_keys user_keys;
++	int ret;
++
++	if (!system_supports_address_auth())
++		return -EINVAL;
++
++	pac_address_keys_to_user(&user_keys, keys);
++	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
++				 &user_keys, 0, -1);
++	if (ret)
++		return ret;
++	pac_address_keys_from_user(keys, &user_keys);
++
++	return 0;
++}
++
++static void pac_generic_keys_to_user(struct user_pac_generic_keys *ukeys,
++				     const struct ptrauth_keys *keys)
++{
++	ukeys->apgakey = pac_key_to_user(&keys->apga);
++}
++
++static void pac_generic_keys_from_user(struct ptrauth_keys *keys,
++				       const struct user_pac_generic_keys *ukeys)
++{
++	keys->apga = pac_key_from_user(ukeys->apgakey);
++}
++
++static int pac_generic_keys_get(struct task_struct *target,
++				const struct user_regset *regset,
++				unsigned int pos, unsigned int count,
++				void *kbuf, void __user *ubuf)
++{
++	struct ptrauth_keys *keys = &target->thread.keys_user;
++	struct user_pac_generic_keys user_keys;
++
++	if (!system_supports_generic_auth())
++		return -EINVAL;
++
++	pac_generic_keys_to_user(&user_keys, keys);
++
++	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
++				   &user_keys, 0, -1);
++}
++
++static int pac_generic_keys_set(struct task_struct *target,
++				const struct user_regset *regset,
++				unsigned int pos, unsigned int count,
++				const void *kbuf, const void __user *ubuf)
++{
++	struct ptrauth_keys *keys = &target->thread.keys_user;
++	struct user_pac_generic_keys user_keys;
++	int ret;
++
++	if (!system_supports_generic_auth())
++		return -EINVAL;
++
++	pac_generic_keys_to_user(&user_keys, keys);
++	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
++				 &user_keys, 0, -1);
++	if (ret)
++		return ret;
++	pac_generic_keys_from_user(keys, &user_keys);
++
++	return 0;
++}
++#endif /* CONFIG_CHECKPOINT_RESTORE */
+ #endif /* CONFIG_ARM64_PTR_AUTH */
+ 
+ enum aarch64_regset {
+@@ -995,6 +1120,10 @@ enum aarch64_regset {
+ #endif
+ #ifdef CONFIG_ARM64_PTR_AUTH
+ 	REGSET_PAC_MASK,
++#ifdef CONFIG_CHECKPOINT_RESTORE
++	REGSET_PACA_KEYS,
++	REGSET_PACG_KEYS,
++#endif
+ #endif
+ };
+ 
+@@ -1074,6 +1203,24 @@ static const struct user_regset aarch64_regsets[] = {
+ 		.get = pac_mask_get,
+ 		/* this cannot be set dynamically */
+ 	},
++#ifdef CONFIG_CHECKPOINT_RESTORE
++	[REGSET_PACA_KEYS] = {
++		.core_note_type = NT_ARM_PACA_KEYS,
++		.n = sizeof(struct user_pac_address_keys) / sizeof(__uint128_t),
++		.size = sizeof(__uint128_t),
++		.align = sizeof(__uint128_t),
++		.get = pac_address_keys_get,
++		.set = pac_address_keys_set,
++	},
++	[REGSET_PACG_KEYS] = {
++		.core_note_type = NT_ARM_PACG_KEYS,
++		.n = sizeof(struct user_pac_generic_keys) / sizeof(__uint128_t),
++		.size = sizeof(__uint128_t),
++		.align = sizeof(__uint128_t),
++		.get = pac_generic_keys_get,
++		.set = pac_generic_keys_set,
++	},
++#endif
+ #endif
+ };
+ 
+diff --git a/include/uapi/linux/elf.h b/include/uapi/linux/elf.h
+index e4d6ddd93567..34c02e4290fe 100644
+--- a/include/uapi/linux/elf.h
++++ b/include/uapi/linux/elf.h
+@@ -421,6 +421,8 @@ typedef struct elf64_shdr {
+ #define NT_ARM_SYSTEM_CALL	0x404	/* ARM system call number */
+ #define NT_ARM_SVE	0x405		/* ARM Scalable Vector Extension registers */
+ #define NT_ARM_PAC_MASK		0x406	/* ARM pointer authentication code masks */
++#define NT_ARM_PACA_KEYS	0x407	/* ARM pointer authentication address keys */
++#define NT_ARM_PACG_KEYS	0x408	/* ARM pointer authentication generic key */
+ #define NT_ARC_V2	0x600		/* ARCv2 accumulator/extra registers */
+ #define NT_VMCOREDD	0x700		/* Vmcore Device Dump Note */
+ #define NT_MIPS_DSP	0x800		/* MIPS DSP ASE registers */
 -- 
-Julien Thierry
+2.11.0
+
 
 _______________________________________________
 linux-arm-kernel mailing list
