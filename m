@@ -2,71 +2,105 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 21D3EC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:07:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DD6F2C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:12:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C378121473
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:07:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B0157218A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:12:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Gtfp6gSA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C378121473
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jySIWEpK";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="ktIo+OeL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B0157218A3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KGZjngZOgXIW+LXIWe7ygBbZVZJeAkmKSYO2qXQmIZI=; b=Gtfp6gSArYu9++
-	37NhAamUgwWOSF08B82wCC39FGPyniqVwk2iX0m5/0UzXfcIu4epktGK1YjbIu8Vnf/AtTCnpoFfS
-	Jc5/EnHx+48iR1cF3cyIZCIOFhT4QQE7q/ILY4S1fjPlB2hACsGR4Lfwq4twsSC6YvRtgCYvC4sh5
-	PSgr6Y1XiJVdfQ+w7F31zluynLE8qDlQpfof8wWcNl5tJcc5qEc1qFwO27gKUsOGPzYgmJvMyYjhn
-	2i6GefhjJfa5YE0FBXjb+dFQRs37WE5sa81d7UdluMS33QSX5lNoNTDP9YeAMJI0ISCY3+6O2TAQp
-	wL27rGNujEoCHaf2GiRw==;
+	List-Owner; bh=8mpp20eT+Xca/RK/nTftH9QtvhMkwV4lkI5mA6J2/x0=; b=jySIWEpKsgvMys
+	E66SDfF4UvKbiDoICWjMLXvVg7WP5uxS/tGQK4n+4zMc3jgrDNTkmjNhYss6THhgWhsEJcfzfGfsJ
+	KjgRox9yW42Phm2L+NnY8pjvibdo3m2o2KU9xAR+QlmK9Oae2IQR/AFX7RP/H+YddCgO5lG3PVPZ3
+	lkWd3FvmewcvVW3M4RJI0RTYhYtGRvOx52MmwKq94/1iMMC8ou+wCky5W+EHUN/2nM0tV3rwv56v0
+	Ct+ETVCLccbWOqrM1hKH6tKTMcK7SgI7D3Dzssednqr9tG0INgFavpoOLlD1WrmAXnfkYMcde+v4t
+	yI7pxKv01HnY2qB5qdtw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gopai-0005cb-8E; Wed, 30 Jan 2019 13:07:44 +0000
-Received: from mail-ot1-f65.google.com ([209.85.210.65])
+	id 1gopfM-0000XL-Kd; Wed, 30 Jan 2019 13:12:32 +0000
+Received: from mail-eopbgr70072.outbound.protection.outlook.com ([40.107.7.72]
+ helo=EUR04-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gopZM-0004cm-KU
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 13:06:36 +0000
-Received: by mail-ot1-f65.google.com with SMTP id s13so21025392otq.4
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 05:06:20 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=L/xB8+fKGsHNHqt+qw739geAKACge/qKuZW9F1aYPGU=;
- b=kSPtuki95rw1gFmgUC8rHQ/wb0R2z0eapOgYKwOlWehGMEczoVIGhVhRxN6Ao619Xu
- R+10f+HfrrpX+yKWsEdysbR7K2tIGH8VwLVvshUs6iv0OvwBKgBRv2nh5nQci2KqxDCL
- FFWflRG39kCBMdnNGVbyaP2tthx2wNJfDXe0xqt0OKnUAEJZcsUG7TbgaT7SSHHrybjc
- ilBFq9mudVSMO64mIVFZlscpMAkSJL1hr9b+I9XsL5Q00kMcOpMJlgiZ1WAGFy9Rv4RA
- q8ZOqu5Qw4yaQP6kWirL85QAn5S75BoMlpDVQ7bgFzIr/jnNkkHP0J4UMwW+8L14lV6a
- oNiw==
-X-Gm-Message-State: AJcUukcYCp6vlZ/1dOai37mm6SNgR3PqKmTcryWYb7MsKzIZv38M69dG
- DpRzlbg+fsXvEd+fMuJ3BJ8qe52Fpj8HKh42J8ctedz0
-X-Google-Smtp-Source: ALg8bN6Ty+Fh1ghF2ukWnelA6x0UzMZrPDCzhSDkSe54qYG+eYjZ+xTo79yOyzGKpEBSvadJ2z5deMxrHbIxP9Bb3wQ=
-X-Received: by 2002:a9d:63c1:: with SMTP id e1mr21471175otl.119.1548853579044; 
- Wed, 30 Jan 2019 05:06:19 -0800 (PST)
+ id 1gopfJ-0000Wp-SB
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 13:12:31 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=o8BbTiEmfTjgib/yt8bvr/LhNAB7SHb796LPPgcvNzw=;
+ b=ktIo+OeLQERBFiQFrPt1XgfmJ8ikNp2wjN6rf4SBNCrdCVI65N9uTVevvVnbOlbxU/dO9W4nyU99CSthE+YORix8LroQk0Clqx48iaI/T6SSU1IVUc/OO8SH4N16h+I04Frr7T1voxKVLBHW8Sa6YSlXxv62BUHHd4hakMkxrOE=
+Received: from VI1PR0402MB3357.eurprd04.prod.outlook.com (52.134.1.18) by
+ VI1PR0402MB3325.eurprd04.prod.outlook.com (52.134.7.17) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1558.17; Wed, 30 Jan 2019 13:12:25 +0000
+Received: from VI1PR0402MB3357.eurprd04.prod.outlook.com
+ ([fe80::2d83:eb90:f977:f649]) by VI1PR0402MB3357.eurprd04.prod.outlook.com
+ ([fe80::2d83:eb90:f977:f649%3]) with mapi id 15.20.1580.017; Wed, 30 Jan 2019
+ 13:12:25 +0000
+From: Daniel Baluta <daniel.baluta@nxp.com>
+To: "dongas86@gmail.com" <dongas86@gmail.com>
+Subject: Re: [PATCH v2] firmware: imx: Add support to start/stop a CPU
+Thread-Topic: [PATCH v2] firmware: imx: Add support to start/stop a CPU
+Thread-Index: AQHUuIJIb5ERbmz8Z0ilGZjHtOs21aXHwqaAgAAHN4A=
+Date: Wed, 30 Jan 2019 13:12:25 +0000
+Message-ID: <fc0ef2f1709cb678f29cd37d618e28a7ed606791.camel@nxp.com>
+References: <20190130095749.8952-1-daniel.baluta@nxp.com>
+ <CAA+hA=Tz0p8Ea9f8wuqUZFkmuDrqMHj8_4sLvT8wi6qrTnaVKQ@mail.gmail.com>
+In-Reply-To: <CAA+hA=Tz0p8Ea9f8wuqUZFkmuDrqMHj8_4sLvT8wi6qrTnaVKQ@mail.gmail.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=daniel.baluta@nxp.com; 
+x-originating-ip: [95.76.156.53]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR0402MB3325;
+ 6:POv9+r9GP0ezFLNDHwGpagrpkaB0L7rxtDjHoxM0eGXQ6qDwioi3g69LADfLN+O0PO6bV0XZ7ZkyVxik/NcMxnDgTqML2rmlLa8CmVTVyKweA5DJMz2WmLyPw86HZ9QQ/iMVIlzKTw/exV9kLoWImRDoU2xNjAHd4cglyqF7oMaOQJXUZomW4OSQG2XHVhLj3xGKO8GQeshFQEmW8JuyykMeCfR9GhWhegqia2hZnl35pEcOy6q6DromUOO2HOyVz12pCQkhIQR5tNAgfeNLPyOVBJ+vnqn//YmCxHi2a8JIubbMoCqGjwGegGTjS9s+8ta19bfjrIX7fLQC4b6zN70nz4wmJzQH12Duq/wRL5uOe4/WOH4lyEIgaA8GkwBfM+f8NocS2q+eguwL2RiQz29dY2UZtqtt3NfQTek2DlRmAS2p50YBl3yRZOqA53iMrKLqdW8GeAjKyj2MThxVzQ==;
+ 5:n3XpJldxLDXSxGhfrHmPO71P3XwWrtEd0SuRkUywTl3nyQuj+oLEQXOkMPFn6dIX4m0CPblHSJ6+rA5qXH28x411uRNAIew9o99IYztxodpSRqaM0g/WLCn9BBTsQr5EU6y0oCA8DZQljDf5mWk2iQOtSLW1BzzrQDAxXWIpTLnNfjpREzou/s0NJMx+87Qax/TFWsFGDWY1p/CDjpszDA==;
+ 7:mrTcdnD/zSP/w/deay3Zal2IEC3K78CErWD0teqc2xzPtOjmsrrDEErHi+tQqt7ZG6ngcl+M4zvgQRbsqTWoaPvZ9vhkM1b0hQa/QByp4eJrVJVRkwcio+iIT81um2RmM/jLicV4Lz+o4ADs9rHAhw==
+x-ms-office365-filtering-correlation-id: 8d1b9f81-e9cc-411d-53f5-08d686b49447
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR0402MB3325; 
+x-ms-traffictypediagnostic: VI1PR0402MB3325:
+x-microsoft-antispam-prvs: <VI1PR0402MB332578725EC593001CD36D57F9900@VI1PR0402MB3325.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0933E9FD8D
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(346002)(376002)(39860400002)(396003)(366004)(136003)(199004)(189003)(316002)(6116002)(3846002)(66066001)(6916009)(478600001)(39060400002)(81156014)(81166006)(486006)(54906003)(446003)(11346002)(2616005)(476003)(4326008)(25786009)(44832011)(5640700003)(106356001)(99286004)(2351001)(68736007)(6506007)(105586002)(186003)(7736002)(26005)(305945005)(102836004)(6512007)(97736004)(76176011)(8676002)(71190400001)(6486002)(71200400001)(6436002)(53936002)(14454004)(118296001)(1411001)(6246003)(8936002)(2906002)(1361003)(86362001)(256004)(229853002)(36756003)(2501003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0402MB3325;
+ H:VI1PR0402MB3357.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: TOdKSgblq4bpmqRDd0CcHw7BQLC5ldDF2d2PIGAmihD6i5nJdsA8aB8gLaHHW7w8BRGFSeKksrOd3QDyo4WvIC65nMnl9f20+V4QmfTPzlRQSeH/XJsxxdaLGCfiamyW3KGB9DtZAFsItiSPgVOxeNjx6RB6536Fm8ar/L2yAScoVpnnoWoSHmG03xhHGcBd2/sSU5URDv6pC4qRA+x2rpGQOU4IAD/ct9ZSghM1mbWTCffTmCtxQOa0/7to6jD9FAr4B0BPrDFCOWLwi/Cjm+wcclUwasg6iFkUp6JxX0ZQJNhZdC92qes42/+PO4k8x4za1RtsE+nARjKaqhvupfXZqZrVJrmvPypjjldn+jUNm7mPmw7pSxM3HSE98BVOLF6MjPhBw5wvIKZm31k3wy/2ITn6e4e0uKz6fE/XwvA=
+Content-ID: <5A7123B49DE5604F812E02A28FED717D@eurprd04.prod.outlook.com>
 MIME-Version: 1.0
-References: <1548846984-2044-1-git-send-email-vincent.guittot@linaro.org>
-In-Reply-To: <1548846984-2044-1-git-send-email-vincent.guittot@linaro.org>
-From: "Rafael J. Wysocki" <rafael@kernel.org>
-Date: Wed, 30 Jan 2019 14:06:07 +0100
-Message-ID: <CAJZ5v0gunbCHp_9mDTmtwW1i-_GcXPcjTP48NdV2zv-B6UrD4g@mail.gmail.com>
-Subject: Re: [PATCH v2 ] PM-runtime: fix deadlock with ktime
-To: Vincent Guittot <vincent.guittot@linaro.org>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 8d1b9f81-e9cc-411d-53f5-08d686b49447
+X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Jan 2019 13:12:25.8320 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0402MB3325
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_050621_376692_CA8179C8 
-X-CRM114-Status: GOOD (  22.60  )
+X-CRM114-CacheID: sfid-20190130_051229_907690_828FB712 
+X-CRM114-Status: GOOD (  11.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,131 +112,74 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>, Ladislav Michl <ladis@linux-mips.org>,
- Linux PM <linux-pm@vger.kernel.org>, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Biju Das <biju.das@bp.renesas.com>,
- Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
- Geert Uytterhoeven <geert@linux-m68k.org>,
- Linux OMAP Mailing List <linux-omap@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Aisheng Dong <aisheng.dong@nxp.com>,
+ "daniel.baluta@gmail.com" <daniel.baluta@gmail.com>,
+ "festevam@gmail.com" <festevam@gmail.com>, "S.j. Wang" <shengjiu.wang@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 30, 2019 at 12:16 PM Vincent Guittot
-<vincent.guittot@linaro.org> wrote:
->
-> A deadlock has been seen when swicthing clocksources which use PM runtime.
-> The call path is:
-> change_clocksource
->     ...
->     write_seqcount_begin
->     ...
->     timekeeping_update
->         ...
->         sh_cmt_clocksource_enable
->             ...
->             rpm_resume
->                 pm_runtime_mark_last_busy
->                     ktime_get
->                         do
->                             read_seqcount_begin
->                         while read_seqcount_retry
->     ....
->     write_seqcount_end
->
-> Although we should be safe because we haven't yet changed the clocksource
-> at that time, we can't because of seqcount protection.
->
-> Use ktime_get_mono_fast_ns() instead which is lock safe for such case
->
-> With ktime_get_mono_fast_ns, the timestamp is not guaranteed to be
-> monotonic across an update and as a result can goes backward. According to
-> update_fast_timekeeper() description: "In the worst case, this can
-> result is a slightly wrong timestamp (a few nanoseconds)". For
-> PM runtime autosuspend, this means only that the suspend decision can
-> be slightly sub optimal.
->
-> Fixes: 8234f6734c5d ("PM-runtime: Switch autosuspend over to using hrtimers")
-> Reported-by: Biju Das <biju.das@bp.renesas.com>
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+Thanks Aisheng for the comments!
 
-I've queued this one up as a fix for 5.0, but unfortunately it clashes
-with the patch from Ladislav Michl at
-https://patchwork.kernel.org/patch/10755477/ which has been dropped
-now.
+<snip>
 
-Can you or Ladislav please rebase that patch on top of this one and repost?
++int imx_sc_pm_cpu_start(struct imx_sc_ipc *ipc, u32 resource,
+> > +                       bool enable, u64 address)
+> > +{
+> > +       struct imx_sc_msg_req_cpu_start msg;
+> > +       struct imx_sc_rpc_msg *hdr = &msg.hdr;
+> > +
+> > +       hdr->ver = IMX_SC_RPC_VERSION;
+> > +       hdr->svc = (uint8_t)IMX_SC_RPC_SVC_PM;
+> > +       hdr->func = (uint8_t)IMX_SC_PM_FUNC_CPU_START;
+> 
+> pls drop the unneccesary unit8_t
 
-> ---
->
-> - v2: Updated commit message to explain the impact of using
->   ktime_get_mono_fast_ns()
->
->  drivers/base/power/runtime.c | 10 +++++-----
->  include/linux/pm_runtime.h   |  2 +-
->  2 files changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-> index 457be03..708a13f 100644
-> --- a/drivers/base/power/runtime.c
-> +++ b/drivers/base/power/runtime.c
-> @@ -130,7 +130,7 @@ u64 pm_runtime_autosuspend_expiration(struct device *dev)
->  {
->         int autosuspend_delay;
->         u64 last_busy, expires = 0;
-> -       u64 now = ktime_to_ns(ktime_get());
-> +       u64 now = ktime_get_mono_fast_ns();
->
->         if (!dev->power.use_autosuspend)
->                 goto out;
-> @@ -909,7 +909,7 @@ static enum hrtimer_restart  pm_suspend_timer_fn(struct hrtimer *timer)
->          * If 'expires' is after the current time, we've been called
->          * too early.
->          */
-> -       if (expires > 0 && expires < ktime_to_ns(ktime_get())) {
-> +       if (expires > 0 && expires < ktime_get_mono_fast_ns()) {
->                 dev->power.timer_expires = 0;
->                 rpm_suspend(dev, dev->power.timer_autosuspends ?
->                     (RPM_ASYNC | RPM_AUTO) : RPM_ASYNC);
-> @@ -928,7 +928,7 @@ static enum hrtimer_restart  pm_suspend_timer_fn(struct hrtimer *timer)
->  int pm_schedule_suspend(struct device *dev, unsigned int delay)
->  {
->         unsigned long flags;
-> -       ktime_t expires;
-> +       u64 expires;
->         int retval;
->
->         spin_lock_irqsave(&dev->power.lock, flags);
-> @@ -945,8 +945,8 @@ int pm_schedule_suspend(struct device *dev, unsigned int delay)
->         /* Other scheduled or pending requests need to be canceled. */
->         pm_runtime_cancel_pending(dev);
->
-> -       expires = ktime_add(ktime_get(), ms_to_ktime(delay));
-> -       dev->power.timer_expires = ktime_to_ns(expires);
-> +       expires = ktime_get_mono_fast_ns() + (u64)delay * NSEC_PER_MSEC);
-> +       dev->power.timer_expires = expires;
->         dev->power.timer_autosuspends = 0;
->         hrtimer_start(&dev->power.suspend_timer, expires, HRTIMER_MODE_ABS);
->
-> diff --git a/include/linux/pm_runtime.h b/include/linux/pm_runtime.h
-> index 54af4ee..fed5be7 100644
-> --- a/include/linux/pm_runtime.h
-> +++ b/include/linux/pm_runtime.h
-> @@ -105,7 +105,7 @@ static inline bool pm_runtime_callbacks_present(struct device *dev)
->
->  static inline void pm_runtime_mark_last_busy(struct device *dev)
->  {
-> -       WRITE_ONCE(dev->power.last_busy, ktime_to_ns(ktime_get()));
-> +       WRITE_ONCE(dev->power.last_busy, ktime_get_mono_fast_ns());
->  }
->
->  static inline bool pm_runtime_is_irq_safe(struct device *dev)
-> --
-> 2.7.4
->
+Ok, I can do that. I had borrowed it from the already existing
+functions imx_sc_misc_get_control / imx_sc_misc_set_control
+
+> 
+> > +       hdr->size = 4;
+> > +
+> > +       msg.address_hi = address >> 32;
+> > +       msg.address_lo = address;
+> > +       msg.resource = resource;
+> > +       msg.enable = enable;
+> > +
+> > +       return imx_scu_call_rpc(ipc, &msg, false);
+> 
+> s/false/true
+
+Nice catch!
+
+Inded, the old API had a different semantic for this parameter.
+> 
+> > +}
+> > +EXPORT_SYMBOL(imx_sc_pm_cpu_start);
+> > diff --git a/include/linux/firmware/imx/svc/misc.h
+> > b/include/linux/firmware/imx/svc/misc.h
+> > index e21c49aba92f..c03bf2a23add 100644
+> > --- a/include/linux/firmware/imx/svc/misc.h
+> > +++ b/include/linux/firmware/imx/svc/misc.h
+> > @@ -52,4 +52,7 @@ int imx_sc_misc_set_control(struct imx_sc_ipc
+> > *ipc, u32 resource,
+> >  int imx_sc_misc_get_control(struct imx_sc_ipc *ipc, u32 resource,
+> >                             u8 ctrl, u32 *val);
+> > 
+> > +int imx_sc_pm_cpu_start(struct imx_sc_ipc *ipc, u32 resource,
+> > +                       bool enable, u64 address);
+> 
+> Nitpick: phy_addr
+
+Ok, will fix.
+
 
 _______________________________________________
 linux-arm-kernel mailing list
