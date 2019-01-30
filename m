@@ -2,58 +2,72 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 24F64C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 21:40:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 652E5C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 21:40:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B917320881
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 21:40:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 05080218D2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 21:40:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cz/CjvLd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B917320881
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-mips.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O0WHYdHA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 05080218D2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
-	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=Niu30Pb2Wgd/kNYwzJX2P/1iKt38Bzi8AMV8VnAH0lA=; b=cz/CjvLdMn7vsk
-	Jpt7Qp7L07ZsrQoe8deg95H5+wzXty4CpcLnvWyLqMjj/L6FR0qCFYlTqFhZ4dLiN85xwpUws1vh4
-	rKAlC3rT5b3gMBRKPV4X+/ea6n92UUrfm3ou8epVEbgNOeCdSpxntSS00w6Bju/0dR3h0MNMhFZb+
-	D3ehwLp2GSsJPfn9DS1vNhBfs2GjhheLL2QfSx9xru0MjXL8bxtGdKQig8p6mLKTk3Y7dbzhxIttC
-	Y95rpJO/aeWx0nfovbyoxFb669Lnwp/JVi0+tB0ChT5wdxS2xqW+ibmjmRkSMr+szb314M6p3KtW7
-	wHAeU7ODFH2pQ9WYXosw==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Ma1Fbxz39zSxtUQWekpC+455h5ncSEaJ2Cr3qM2upyY=; b=O0WHYdHA5PptTr
+	ypPFE9rzW01yYa28Hc7LMyJkVDjOA8ffAeeZzMYaQhJlvSDG+SYQQsZV7G0YdjMEHbhp0oZaG6w/T
+	M9qXZGH+nQKA8aw6ptreejg9MYTq8UZT2FMVXrJWAMtGlkS+YRAb/JbepczZWFbBa+Qkij7PUhAba
+	5/MTnq3X0ZoZduWsWfpDm8CKpZAIcyG5T8aiLtC/qs6sBH46ZS5fXgHxLg31gby/R1/bV7bsvUc62
+	mRI3m9gcsgw8mWYzXAqbosZCdS21VDBslVBuaYN2g9QDEaGuucjZos7uWff93lXKLhikfkx3b9pis
+	+8H78n83v9AwsS2qeRSw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goxap-0006uj-It; Wed, 30 Jan 2019 21:40:23 +0000
-Received: from eddie.linux-mips.org ([148.251.95.138] helo=cvs.linux-mips.org)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goxam-0006uL-HH
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 21:40:22 +0000
-Received: (from localhost user: 'ladis' uid#1021 fake: STDIN
- (ladis@eddie.linux-mips.org)) by eddie.linux-mips.org
- id S23992792AbfA3VkSjTYCh (ORCPT
- <rfc822;linux-arm-kernel@lists.infradead.org>);
- Wed, 30 Jan 2019 22:40:18 +0100
-Date: Wed, 30 Jan 2019 22:40:17 +0100
-From: Ladislav Michl <ladis@linux-mips.org>
-To: "Rafael J. Wysocki" <rafael@kernel.org>
-Subject: [PATCH] PM/runtime: Optimize pm_runtime_autosuspend_expiration()
-Message-ID: <20190130214017.GA5038@lenoch>
+	id 1goxbB-0007BT-2k; Wed, 30 Jan 2019 21:40:45 +0000
+Received: from mail-qk1-f196.google.com ([209.85.222.196])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goxay-00074O-V2
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 21:40:37 +0000
+Received: by mail-qk1-f196.google.com with SMTP id y78so664392qka.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 13:40:32 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=E+kd0mlNW27Q+6i/WMrQFy7qk1vD8sD4qcKqva1l2WU=;
+ b=MuqGBiksDaMjElde+3a3xCtomOEos76uodClvY6TcBkkhf3V53Qqzy8Ji/KB2zZml5
+ Qsnv0W6w/IKMihG+QU3OXeP6Db0VyRgqW4Slgm11rncBsUl4gNayVPqn38rWI5WRMBKv
+ MC/b1aYke6ZbgIksT4IEL/zLrNUILQL4yfLaUIzH/Q1Oa5wlMQhowgsEbt/BR76IrZJA
+ TXisZtuZlVrGYst1ySFT35eQ1jpaZIW9hkWO8huIszHXsbCvzOQ6p/Pew8CZ9WUZYZFy
+ VFDVNBRCg7r8lW3LOoJMCRc1RSZ2eXkh9u4e7cXtElFcrOTLpBjoccgmtiylkEqWir81
+ nT3w==
+X-Gm-Message-State: AJcUukePCK3qqpzNxUTkwreQAlz/Bd8/I9v67Sb7F1XoVdzX+svhhO+/
+ OS/ofwSAX3E/2IyziGjqka4bH8NKBRuyAVvy6ug=
+X-Google-Smtp-Source: ALg8bN4bjQ4n0pddx7uagr+Gr3zMr+BZ4esO2GaPlDueaqYTxYqNorCgZCTU4ZPfaNj4L5iCPL9i5v/iBxxvfdIXPg4=
+X-Received: by 2002:a37:ad04:: with SMTP id f4mr24428572qkm.291.1548884431426; 
+ Wed, 30 Jan 2019 13:40:31 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <20190128134953.14726-1-linus.walleij@linaro.org>
+In-Reply-To: <20190128134953.14726-1-linus.walleij@linaro.org>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 30 Jan 2019 22:40:15 +0100
+Message-ID: <CAK8P3a3r+JnyQKLnO497Au4QufBqzk1p4aRd7tX5snWn7echtw@mail.gmail.com>
+Subject: Re: [PATCH v2] ARM: defconfig: axm55xx: Drop PL11x graphics driver
+To: Linus Walleij <linus.walleij@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_134021_334091_31CFEF55 
-X-CRM114-Status: GOOD (  13.10  )
+X-CRM114-CacheID: sfid-20190130_134033_378337_B644A46F 
+X-CRM114-Status: UNSURE (   9.66  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,77 +79,33 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>,
- Vincent Guittot <vincent.guittot@linaro.org>,
- Linux PM <linux-pm@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Biju Das <biju.das@bp.renesas.com>,
- Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
- Geert Uytterhoeven <geert@linux-m68k.org>,
- Linux OMAP Mailing List <linux-omap@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Krzysztof Adamski <krzysztof.adamski@nokia.com>, arm-soc <arm@kernel.org>,
+ Anders Roxell <anders.roxell@linaro.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ John Logan <john.logan@intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-pm_runtime_autosuspend_expiration calls ktime_get_mono_fast_ns
-even when its returned value may be unused. Therefore get
-current time later and remove gotos while there.
+On Mon, Jan 28, 2019 at 2:50 PM Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+> The defconfig for the AXM55xx includes the ARM CLCD
+> (PL11x) PrimeCell framebuffer driver, but the device tree
+> for this platform does not include this hardware, nor do I
+> find it likely that this chip has graphics.
+>
+> Drop these config items.
+>
+> Cc: John Logan <john.logan@intel.com>
+> Cc: Anders Roxell <anders.roxell@linaro.org>
+> Acked-by: Krzysztof Adamski <krzysztof.adamski@nokia.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
 
-Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Acked-by: Vincent Guittot <vincent.guittot@linaro.org>
----
- This patch is based on top of bleeding-edge branch, where
- "[PATCH v2 ] PM-runtime: fix deadlock with ktime" is sitting.
- I expect v3 of that patch, which should not harm this one.
- It is meant to replace "PM/runtime: Do not needlessly call ktime_get"
- sent earlier.
+Applied to arm/defconfig, thanks
 
- drivers/base/power/runtime.c | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-index 65e2b5f48e0c..7bbe28faca8d 100644
---- a/drivers/base/power/runtime.c
-+++ b/drivers/base/power/runtime.c
-@@ -145,24 +145,21 @@ static void pm_runtime_cancel_pending(struct device *dev)
- u64 pm_runtime_autosuspend_expiration(struct device *dev)
- {
- 	int autosuspend_delay;
--	u64 last_busy, expires = 0;
--	u64 now = ktime_get_mono_fast_ns();
-+	u64 expires;
- 
- 	if (!dev->power.use_autosuspend)
--		goto out;
-+		return 0;
- 
- 	autosuspend_delay = READ_ONCE(dev->power.autosuspend_delay);
- 	if (autosuspend_delay < 0)
--		goto out;
--
--	last_busy = READ_ONCE(dev->power.last_busy);
-+		return 0;
- 
--	expires = last_busy + (u64)autosuspend_delay * NSEC_PER_MSEC;
--	if (expires <= now)
--		expires = 0;	/* Already expired. */
-+	expires  = READ_ONCE(dev->power.last_busy);
-+	expires += (u64)autosuspend_delay * NSEC_PER_MSEC;
-+	if (expires > ktime_get_mono_fast_ns())
-+		return expires;	/* Expires in the future */
- 
-- out:
--	return expires;
-+	return 0;
- }
- EXPORT_SYMBOL_GPL(pm_runtime_autosuspend_expiration);
- 
--- 
-2.20.1
-
+    Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
