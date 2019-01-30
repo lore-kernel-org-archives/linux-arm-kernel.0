@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A7D7BC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:06:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 92747C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:06:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6697920882
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:06:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6505720882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:06:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nmts/5H9";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="gn+DXnir"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6697920882
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ib4VqARh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="diXVS6PJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6505720882
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,62 +26,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NwBzMQKOuekQqhP4aX6QtKBhUGxbxiclpB7y8LWfyIQ=; b=nmts/5H9Ag8tIY
-	0vxKfNiySkJDMi+Z8gbJqvm+nWyIKQDpcIycH4DYz//z02sVCTdjLNdzhZggKDKx/87uEcHUEWhIC
-	Bv59vnxsEV2kSdG+7wr4oSQopNwtT0t0NxN79tjokVk3iWQOh9LaDs853qwLiSOcaOkqCq8+Q25+c
-	4Qc2TnjYH66CdF7/BjnTtccVnfzSz5QUUNxNtvPKYVjHbXnirjpWAePKir5nbWdtxabFKQYV+QcNv
-	tw0LeCthQLlhoOZqaoF8W72Zsk1AMJagqE1aBEmw2bZzO6UuMmrZyj2SW/e3YKYkt68KxxXk22K1J
-	ONzTAQw0B04gRCbiQhXQ==;
+	List-Owner; bh=VK8gf88K3DGYTPLHA89pgpeDdo1uGC/w5vLUayBuYPI=; b=ib4VqARhFvHp0c
+	A5mZilKd3NJzhURrKYwuXP08lT5iqaZzT430WEWxf+zCCqwtOEbEuXdUIA2hl1STvvX6XycrSZ130
+	BGtsmW8iJ1EmWAyYEiQwkUcY31z0/5dfo6mahcMyInTGJU8b8Sjuo9l1xYMSq9f2UdGgQEohdm3Wb
+	OQ/XLzF1EHZeg3OIEkBuaOVIvvxp8/KTLumMcifv+FLuxsXCOTiKel9u0TjFGrtsS/S8nKUdB0fN8
+	WXep8M+5CjdSnqcLoPApEc8CZu6aSquXPV92COZi//PJYLw2kSdtQJhyiNY1rkTioB4WqniTCbzhP
+	tGE/7+1mZ2AZMyzmamzg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gonh4-0002qJ-Ak; Wed, 30 Jan 2019 11:06:10 +0000
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
+	id 1gonhI-00035s-TP; Wed, 30 Jan 2019 11:06:24 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gonfg-0000YL-JS
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 11:04:50 +0000
-Received: by mail-wr1-x444.google.com with SMTP id s12so25535969wrt.4
+ id 1gonfl-0000Ze-WE
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 11:04:55 +0000
+Received: by mail-wr1-x441.google.com with SMTP id f7so25648060wrp.1
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 03:04:44 -0800 (PST)
+ Wed, 30 Jan 2019 03:04:47 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=C9cOt5ITDVopsgviHrr1V3PGSqn/anQnP2GxQeP5Cxg=;
- b=gn+DXnir9piDYexpCWGL7lc3abIZ/CDJAP+BGByt5jD3f5f97v9WT6TktBgljAnZsD
- Ao4rZdOXsEr2adImVGzZz43IxI++0tSWE1K6c2y/QA09wlQs8oAlJHekQ/atH8AY4tPG
- 4vFGUImC7rBGj1dnktqds8sMRKRMLArH9XFIE=
+ bh=EqtbkSQo7L/mANhknVJMLP+N/PdTpbVp8wiFd5sS1F4=;
+ b=diXVS6PJBdiMcOYaOG/ZY3fIgtF55Dr3OKVSfizpuVp2CdlATsN2/QrFRWWbwOktBB
+ wCJKa3koHcTuAcZJ/xzTco+eZzHXPuR4/yfce2YskejIieKZHsCITJezxzpTdu+uphwm
+ xZJnBB84S3ka3smS+BTvqC6yRdhucpjr+226M=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=C9cOt5ITDVopsgviHrr1V3PGSqn/anQnP2GxQeP5Cxg=;
- b=VMhPCkIvfH27OSdCthxZOoiGQ73P7GMSSh9WPobdOfbFzqFmMnByScnPkjgRZcUESY
- g2ROkhm38ICegjn85nzNZkVuvflOUV7LX81nCqQp9SONLDaHJdqH5qTUIub1u6TiVG4l
- GVb9NCgJrcTgrVNcCfAH2FMM/NrL8ViFvxIgsrqZG4OKiPAeM2DuOMvPjVJJdyesVZd7
- Wzz7g3Yb793/9D6H21EDfHPxSYMF8e6vgGqKIlJck+BjBhBuCLrfK2tfqRDAjJ4hQEKK
- cesXcYP5XttsNtNMZctQJ9jEoi34TSt7QIDWbeRkUqoheNUR5ixV2dQ82aqRHBV6x3hX
- Rtfg==
-X-Gm-Message-State: AJcUukdLHdgpwGs7x6c5sqgnkUt6OWZl/Ojh43Ju3h86+1AnBqx1GzWJ
- V3wCVwSY3Io8xFevDxSttx2jKTCkUp4=
-X-Google-Smtp-Source: ALg8bN6Oj+tXLt+D8MKeFgavoVxd9htD59ACHcR9LOoiD98cfOUNfpiUhwTgxO5pS80w48YPu0Nbzw==
-X-Received: by 2002:adf:cd0e:: with SMTP id w14mr30787619wrm.218.1548846282881; 
- Wed, 30 Jan 2019 03:04:42 -0800 (PST)
+ bh=EqtbkSQo7L/mANhknVJMLP+N/PdTpbVp8wiFd5sS1F4=;
+ b=jdG/xkDLKUmNdiDEpx0Y4BPwIZVyFotL1qLxi7tSN3oAp0liM/1zNdpKCxH07gdo88
+ eDbZCehgCVC8J6F1eAyDSyvSkNf1Ciy0W6a9TESBhsv/moItnchARS7q9RP8ippIp3ch
+ /U3mCjfVC+hIXEqq9XLrscgbjYwUu52qgEBsO1/zaucuV7B43zwBnHNga5wYSraXPJsJ
+ JQloTYuLlLyHg5hk6GssnBWuTIUr1+O9B8FYjxAcSVq3rqexpv5DbTfPZ9jNk+v6lJaq
+ aYiXB6OcqKb8GVqAOYPKvSGFYJacFnA1lOzj53bU6tt5+dMJTt0CCjT48KDyJO2HY5YQ
+ f//w==
+X-Gm-Message-State: AJcUukdIgQftKRdiXYILyZQ1/ZYuxbQSDcC09MbBDSXGr3ecGkMMxduQ
+ DK5IJJG12lUH1/v8xe2e2dyGEg==
+X-Google-Smtp-Source: ALg8bN69ecBVATvgzM0eUK+4q6/ufUQGsgWiXf3HdmFnIWINbcGdnFoTrg3MIEq2EEn48xs3pBoFwQ==
+X-Received: by 2002:adf:c108:: with SMTP id r8mr30891283wre.233.1548846286387; 
+ Wed, 30 Jan 2019 03:04:46 -0800 (PST)
 Received: from srini-hackbox.lan
  (cpc89974-aztw32-2-0-cust43.18-1.cable.virginm.net. [86.30.250.44])
- by smtp.gmail.com with ESMTPSA id w16sm1138208wrp.1.2019.01.30.03.04.41
+ by smtp.gmail.com with ESMTPSA id w16sm1138208wrp.1.2019.01.30.03.04.45
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Wed, 30 Jan 2019 03:04:41 -0800 (PST)
+ Wed, 30 Jan 2019 03:04:45 -0800 (PST)
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 To: andy.gross@linaro.org
-Subject: [PATCH v2 1/6] arm64: dts: msm8996: Add graphics smmu node
-Date: Wed, 30 Jan 2019 11:04:32 +0000
-Message-Id: <20190130110437.5424-2-srinivas.kandagatla@linaro.org>
+Subject: [PATCH v2 4/6] arm64: dts: Add Adreno GPU definitions
+Date: Wed, 30 Jan 2019 11:04:35 +0000
+Message-Id: <20190130110437.5424-5-srinivas.kandagatla@linaro.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190130110437.5424-1-srinivas.kandagatla@linaro.org>
 References: <20190130110437.5424-1-srinivas.kandagatla@linaro.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_030444_634729_E30034F1 
-X-CRM114-Status: GOOD (  10.04  )
+X-CRM114-CacheID: sfid-20190130_030450_396774_871FB221 
+X-CRM114-Status: GOOD (  12.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,43 +105,126 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Jordan Crouse <jcrouse@codeaurora.org>
 
-Add device node for graphics smmu, aka. adreno_smmu.
+Add an initial node for the Adreno GPU.
 
-Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
 Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
 ---
- arch/arm64/boot/dts/qcom/msm8996.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 86 +++++++++++++++++++++++++++
+ 1 file changed, 86 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index 6ba96916c66d..c9b80d175fd4 100644
+index 0d0b9482aa4d..095041589954 100644
 --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
 +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -1138,6 +1138,23 @@
+@@ -84,6 +84,12 @@
+ 			qcom,client-id = <1>;
+ 			qcom,vmid = <15>;
+ 		};
++
++		zap_shader_region: gpu@8f200000 {
++			compatible = "shared-dma-pool";
++			reg = <0x0 0x90b00000 0x0 0xa00000>;
++			no-map;
++		};
+ 	};
+ 
+ 	cpus {
+@@ -796,6 +802,11 @@
+ 				reg = <0x24f 0x1>;
+ 				bits = <1 4>;
+ 			};
++
++			gpu_speed_bin: gpu_speed_bin@133 {
++				reg = <0x133 0x1>;
++				bits = <5 3>;
++			};
+ 		};
+ 
+ 		phy@34000 {
+@@ -1338,6 +1349,81 @@
  			};
  		};
  
-+		adreno_smmu: arm,smmu@b40000 {
-+			compatible = "qcom,msm8996-smmu-v2", "qcom,smmu-v2";
-+			reg = <0xb40000 0x10000>;
++		gpu@b00000 {
++			compatible = "qcom,adreno-530.2", "qcom,adreno";
++			#stream-id-cells = <16>;
 +
-+			#global-interrupts = <1>;
-+			interrupts = <GIC_SPI 334 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH>;
-+			#iommu-cells = <1>;
++			reg = <0xb00000 0x3f000>;
++			reg-names = "kgsl_3d0_reg_memory";
 +
-+			clocks = <&mmcc GPU_AHB_CLK>,
-+				 <&gcc GCC_MMSS_BIMC_GFX_CLK>;
-+			clock-names = "iface", "bus";
++			interrupts = <0 300 IRQ_TYPE_LEVEL_HIGH>;
++
++			clocks = <&mmcc GPU_GX_GFX3D_CLK>,
++				<&mmcc GPU_AHB_CLK>,
++				<&mmcc GPU_GX_RBBMTIMER_CLK>,
++				<&gcc GCC_BIMC_GFX_CLK>,
++				<&gcc GCC_MMSS_BIMC_GFX_CLK>;
++
++			clock-names = "core",
++				"iface",
++				"rbbmtimer",
++				"mem",
++				"mem_iface";
 +
 +			power-domains = <&mmcc GPU_GDSC>;
++			iommus = <&adreno_smmu 0>;
++
++			nvmem-cells = <&gpu_speed_bin>;
++			nvmem-cell-names = "speed_bin";
++
++			qcom,gpu-quirk-two-pass-use-wfi;
++			qcom,gpu-quirk-fault-detect-mask;
++
++			operating-points-v2 = <&gpu_opp_table>;
++
++			gpu_opp_table: opp-table {
++				compatible  ="operating-points-v2";
++
++				/*
++				 * 624Mhz and 560Mhz are only available on speed
++				 * bin (1 << 0). All the rest are available on
++				 * all bins of the hardware
++				 */
++				opp-624000000 {
++					opp-hz = /bits/ 64 <624000000>;
++					opp-supported-hw = <0x01>;
++				};
++				opp-560000000 {
++					opp-hz = /bits/ 64 <560000000>;
++					opp-supported-hw = <0x01>;
++				};
++				opp-510000000 {
++					opp-hz = /bits/ 64 <510000000>;
++					opp-supported-hw = <0xFF>;
++				};
++				opp-401800000 {
++					opp-hz = /bits/ 64 <401800000>;
++					opp-supported-hw = <0xFF>;
++				};
++				opp-315000000 {
++					opp-hz = /bits/ 64 <315000000>;
++					opp-supported-hw = <0xFF>;
++				};
++				opp-214000000 {
++					opp-hz = /bits/ 64 <214000000>;
++					opp-supported-hw = <0xFF>;
++				};
++				opp-133000000 {
++					opp-hz = /bits/ 64 <133000000>;
++					opp-supported-hw = <0xFF>;
++				};
++			};
++
++			zap-shader {
++				memory-region = <&zap_shader_region>;
++			};
 +		};
 +
- 		agnoc@0 {
- 			power-domains = <&gcc AGGRE0_NOC_GDSC>;
- 			compatible = "simple-pm-bus";
+ 		mdss: mdss@900000 {
+ 			compatible = "qcom,mdss";
+ 
 -- 
 2.20.1
 
