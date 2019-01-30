@@ -2,64 +2,107 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C9E94C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:34:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C05B0C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:35:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9BFDF20882
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:34:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 78A5020882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:35:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gh1bJFoy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9BFDF20882
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pYwrvzkn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 78A5020882
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=canonical.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HLIjGW0csbko28UJO60WUXV4w79kkA18coFYTnfs4qg=; b=gh1bJFoyYpS7IQ
-	DcWlYjBRSk31djYrFCTpHXgfttAJF9gb1N2tfZGQvhAhQ0L1oVI7zFpv5pUosEHPMJ1T0ktZ/otHX
-	hsWaVwvO8Arr0+ooC1DeIVftTNTFXEL4gT11JYxub31rDZVmw8z7/GkopA27Qo7Urqp99y50r3ysy
-	HZ9cQ/z8GjGxtO1HGo6ie43++pD+m0st6krQJNdbwoyiM7iGCMrU2kVum7XX2s7i7j4u+4a8IN3am
-	t205bHCGn9TA/ios3o6xirflFbbQVJtfDufxFRRWESU2XmmmrmYimk3HcbPJiZSPFgzsdmLmPWFKs
-	9F55w3xMJ2GEuPcR0YVA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=O+YX2iYwUV0D3Qm/92o6L02l2aOtFSchRDBsU1Fb96U=; b=pYwrvzknWGg91i
+	GOYntPcoIRmAmNefbQppmUeOJqsy5B91ej+/qHwDCLY/FXW6e4CiBGOhtS+F/50JOkXTYgYVoIrNA
+	H1kV8CvpgJcNiQnL3rZVlQOy7YI7ooNOQd+fJtFL9hThWAC/NbSJQsyPtTGyIb8xJunr/SLn+1oGR
+	GxU69Wkpd0mAgVpnKVWZW7TdOgAG/xjJW7GIv64AGekIqOaxV5cKLDj+QiMOEGRHfpAds17L8Clsc
+	U0HXuTzSP0Ql85VnRwhyR1DCtPsiPxvSc8h2KZWDX+g62/eWIjhm1RPG3IjB2mloSmwLYmZuaYsoi
+	72gjF0W5nhoHJ2ovmcUg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gomGV-0000Xl-4q; Wed, 30 Jan 2019 09:34:39 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gomGR-0000LD-6A
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 09:34:36 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 16972A78;
- Wed, 30 Jan 2019 01:34:34 -0800 (PST)
-Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7B7273F557;
- Wed, 30 Jan 2019 01:34:33 -0800 (PST)
-Date: Wed, 30 Jan 2019 10:34:31 +0100
-From: Christoffer Dall <christoffer.dall@arm.com>
-To: Andrew Jones <drjones@redhat.com>
-Subject: Re: [PATCH 2/5] arm/arm64: KVM: Allow a VCPU to fully reset itself
-Message-ID: <20190130093431.GE13482@e113682-lin.lund.arm.com>
-References: <20190125094656.5026-1-christoffer.dall@arm.com>
- <20190125094656.5026-3-christoffer.dall@arm.com>
- <20190129160347.fcbry76igwyatqzx@kamzik.brq.redhat.com>
+	id 1gomGx-00012w-Vs; Wed, 30 Jan 2019 09:35:07 +0000
+Received: from youngberry.canonical.com ([91.189.89.112])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gomGU-0000To-NM; Wed, 30 Jan 2019 09:34:41 +0000
+Received: from cpc129250-craw9-2-0-cust139.know.cable.virginm.net
+ ([82.43.126.140] helo=[192.168.0.11])
+ by youngberry.canonical.com with esmtpsa (TLS1.0:RSA_AES_128_CBC_SHA1:16)
+ (Exim 4.76) (envelope-from <colin.king@canonical.com>)
+ id 1gomGS-0000N9-B5; Wed, 30 Jan 2019 09:34:36 +0000
+Subject: Re: [PATCH][next] mtd: rawnand: meson: fix missing assignment of ret
+ on a call to meson_chip_buffer_init
+To: Miquel Raynal <miquel.raynal@bootlin.com>,
+ Liang Yang <liang.yang@amlogic.com>
+References: <20190129105757.19138-1-colin.king@canonical.com>
+ <aeadd16e-ed46-28f2-15de-66d1d9f1ed11@amlogic.com>
+ <20190130103250.4080a3b3@xps13>
+From: Colin Ian King <colin.king@canonical.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=colin.king@canonical.com; prefer-encrypt=mutual; keydata=
+ mQINBE6TJCgBEACo6nMNvy06zNKj5tiwDsXXS+LhT+LwtEsy9EnraKYXAf2xwazcICSjX06e
+ fanlyhB0figzQO0n/tP7BcfMVNG7n1+DC71mSyRK1ZERcG1523ajvdZOxbBCTvTitYOy3bjs
+ +LXKqeVMhK3mRvdTjjmVpWnWqJ1LL+Hn12ysDVVfkbtuIm2NoaSEC8Ae8LSSyCMecd22d9Pn
+ LR4UeFgrWEkQsqROq6ZDJT9pBLGe1ZS0pVGhkRyBP9GP65oPev39SmfAx9R92SYJygCy0pPv
+ BMWKvEZS/7bpetPNx6l2xu9UvwoeEbpzUvH26PHO3DDAv0ynJugPCoxlGPVf3zcfGQxy3oty
+ dNTWkP6Wh3Q85m+AlifgKZudjZLrO6c+fAw/jFu1UMjNuyhgShtFU7NvEzL3RqzFf9O1qM2m
+ uj83IeFQ1FZ65QAiCdTa3npz1vHc7N4uEQBUxyXgXfCI+A5yDnjHwzU0Y3RYS52TA3nfa08y
+ LGPLTf5wyAREkFYou20vh5vRvPASoXx6auVf1MuxokDShVhxLpryBnlKCobs4voxN54BUO7m
+ zuERXN8kadsxGFzItAyfKYzEiJrpUB1yhm78AecDyiPlMjl99xXk0zs9lcKriaByVUv/NsyJ
+ FQj/kmdxox3XHi9K29kopFszm1tFiDwCFr/xumbZcMY17Yi2bQARAQABtCVDb2xpbiBLaW5n
+ IDxjb2xpbi5raW5nQGNhbm9uaWNhbC5jb20+iQI2BBMBCAAhBQJOkyQoAhsDBQsJCAcDBRUK
+ CQgLBRYCAwEAAh4BAheAAAoJEGjCh9/GqAImsBcP9i6C/qLewfi7iVcOwqF9avfGzOPf7CVr
+ n8CayQnlWQPchmGKk6W2qgnWI2YLIkADh53TS0VeSQ7Tetj8f1gV75eP0Sr/oT/9ovn38QZ2
+ vN8hpZp0GxOUrzkvvPjpH+zdmKSaUsHGp8idfPpZX7XeBO0yojAs669+3BrnBcU5wW45SjSV
+ nfmVj1ZZj3/yBunb+hgNH1QRcm8ZPICpjvSsGFClTdB4xu2AR28eMiL/TTg9k8Gt72mOvhf0
+ fS0/BUwcP8qp1TdgOFyiYpI8CGyzbfwwuGANPSupGaqtIRVf+/KaOdYUM3dx/wFozZb93Kws
+ gXR4z6tyvYCkEg3x0Xl9BoUUyn9Jp5e6FOph2t7TgUvv9dgQOsZ+V9jFJplMhN1HPhuSnkvP
+ 5/PrX8hNOIYuT/o1AC7K5KXQmr6hkkxasjx16PnCPLpbCF5pFwcXc907eQ4+b/42k+7E3fDA
+ Erm9blEPINtt2yG2UeqEkL+qoebjFJxY9d4r8PFbEUWMT+t3+dmhr/62NfZxrB0nTHxDVIia
+ u8xM+23iDRsymnI1w0R78yaa0Eea3+f79QsoRW27Kvu191cU7QdW1eZm05wO8QUvdFagVVdW
+ Zg2DE63Fiin1AkGpaeZG9Dw8HL3pJAJiDe0KOpuq9lndHoGHs3MSa3iyQqpQKzxM6sBXWGfk
+ EkK5Ag0ETpMkKAEQAMX6HP5zSoXRHnwPCIzwz8+inMW7mJ60GmXSNTOCVoqExkopbuUCvinN
+ 4Tg+AnhnBB3R1KTHreFGoz3rcV7fmJeut6CWnBnGBtsaW5Emmh6gZbO5SlcTpl7QDacgIUuT
+ v1pgewVHCcrKiX0zQDJkcK8FeLUcB2PXuJd6sJg39kgsPlI7R0OJCXnvT/VGnd3XPSXXoO4K
+ cr5fcjsZPxn0HdYCvooJGI/Qau+imPHCSPhnX3WY/9q5/WqlY9cQA8tUC+7mgzt2VMjFft1h
+ rp/CVybW6htm+a1d4MS4cndORsWBEetnC6HnQYwuC4bVCOEg9eXMTv88FCzOHnMbE+PxxHzW
+ 3Gzor/QYZGcis+EIiU6hNTwv4F6fFkXfW6611JwfDUQCAHoCxF3B13xr0BH5d2EcbNB6XyQb
+ IGngwDvnTyKHQv34wE+4KtKxxyPBX36Z+xOzOttmiwiFWkFp4c2tQymHAV70dsZTBB5Lq06v
+ 6nJs601Qd6InlpTc2mjd5mRZUZ48/Y7i+vyuNVDXFkwhYDXzFRotO9VJqtXv8iqMtvS4xPPo
+ 2DtJx6qOyDE7gnfmk84IbyDLzlOZ3k0p7jorXEaw0bbPN9dDpw2Sh9TJAUZVssK119DJZXv5
+ 2BSc6c+GtMqkV8nmWdakunN7Qt/JbTcKlbH3HjIyXBy8gXDaEto5ABEBAAGJAh8EGAEIAAkF
+ Ak6TJCgCGwwACgkQaMKH38aoAiZ4lg/+N2mkx5vsBmcsZVd3ys3sIsG18w6RcJZo5SGMxEBj
+ t1UgyIXWI9lzpKCKIxKx0bskmEyMy4tPEDSRfZno/T7p1mU7hsM4owi/ic0aGBKP025Iok9G
+ LKJcooP/A2c9dUV0FmygecRcbIAUaeJ27gotQkiJKbi0cl2gyTRlolKbC3R23K24LUhYfx4h
+ pWj8CHoXEJrOdHO8Y0XH7059xzv5oxnXl2SD1dqA66INnX+vpW4TD2i+eQNPgfkECzKzGj+r
+ KRfhdDZFBJj8/e131Y0t5cu+3Vok1FzBwgQqBnkA7dhBsQm3V0R8JTtMAqJGmyOcL+JCJAca
+ 3Yi81yLyhmYzcRASLvJmoPTsDp2kZOdGr05Dt8aGPRJL33Jm+igfd8EgcDYtG6+F8MCBOult
+ TTAu+QAijRPZv1KhEJXwUSke9HZvzo1tNTlY3h6plBsBufELu0mnqQvHZmfa5Ay99dF+dL1H
+ WNp62+mTeHsX6v9EACH4S+Cw9Q1qJElFEu9/1vFNBmGY2vDv14gU2xEiS2eIvKiYl/b5Y85Q
+ QLOHWV8up73KK5Qq/6bm4BqVd1rKGI9un8kezUQNGBKre2KKs6wquH8oynDP/baoYxEGMXBg
+ GF/qjOC6OY+U7kNUW3N/A7J3M2VdOTLu3hVTzJMZdlMmmsg74azvZDV75dUigqXcwjE=
+Message-ID: <25109367-14bc-90b1-f0a9-ad65aac46bf8@canonical.com>
+Date: Wed, 30 Jan 2019 09:34:35 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190129160347.fcbry76igwyatqzx@kamzik.brq.redhat.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+In-Reply-To: <20190130103250.4080a3b3@xps13>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_013435_239642_D56F5165 
-X-CRM114-Status: GOOD (  35.12  )
+X-CRM114-CacheID: sfid-20190130_013439_034457_50F547B5 
+X-CRM114-Status: GOOD (  14.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,348 +114,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, kvm@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Boris Brezillon <bbrezillon@kernel.org>,
+ Richard Weinberger <richard@nod.at>, kernel-janitors@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Marek Vasut <marek.vasut@gmail.com>,
+ linux-mtd@lists.infradead.org, Kevin Hilman <khilman@baylibre.com>,
+ linux-amlogic@lists.infradead.org, Brian Norris <computersforpeace@gmail.com>,
+ David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 29, 2019 at 05:03:47PM +0100, Andrew Jones wrote:
-> On Fri, Jan 25, 2019 at 10:46:53AM +0100, Christoffer Dall wrote:
-> > From: Marc Zyngier <marc.zyngier@arm.com>
-> > 
-> > The current kvm_psci_vcpu_on implementation will directly try to
-> > manipulate the state of the VCPU to reset it.  However, since this is
-> > not done on the thread that runs the VCPU, we can end up in a strangely
-> > corrupted state when the source and target VCPUs are running at the same
-> > time.
-> > 
-> > Fix this by factoring out all reset logic from the PSCI implementation
-> > and forwarding the required information along with a request to the
-> > target VCPU.
-> 
-> The last patch makes more sense, now that I see this one. I guess their
-> order should be swapped.
-> 
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-> > ---
-> >  arch/arm/include/asm/kvm_host.h   | 10 +++++++++
-> >  arch/arm/kvm/reset.c              | 24 +++++++++++++++++++++
-> >  arch/arm64/include/asm/kvm_host.h | 11 ++++++++++
-> >  arch/arm64/kvm/reset.c            | 24 +++++++++++++++++++++
-> >  virt/kvm/arm/arm.c                | 10 +++++++++
-> >  virt/kvm/arm/psci.c               | 36 ++++++++++++++-----------------
-> >  6 files changed, 95 insertions(+), 20 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> > index ca56537b61bc..50e89869178a 100644
-> > --- a/arch/arm/include/asm/kvm_host.h
-> > +++ b/arch/arm/include/asm/kvm_host.h
-> > @@ -48,6 +48,7 @@
-> >  #define KVM_REQ_SLEEP \
-> >  	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
-> >  #define KVM_REQ_IRQ_PENDING	KVM_ARCH_REQ(1)
-> > +#define KVM_REQ_VCPU_RESET	KVM_ARCH_REQ(2)
-> >  
-> >  DECLARE_STATIC_KEY_FALSE(userspace_irqchip_in_use);
-> >  
-> > @@ -147,6 +148,13 @@ struct kvm_cpu_context {
-> >  
-> >  typedef struct kvm_cpu_context kvm_cpu_context_t;
-> >  
-> > +struct vcpu_reset_state {
-> > +	unsigned long	pc;
-> > +	unsigned long	r0;
-> > +	bool		be;
-> > +	bool		reset;
-> > +};
-> > +
-> >  struct kvm_vcpu_arch {
-> >  	struct kvm_cpu_context ctxt;
-> >  
-> > @@ -186,6 +194,8 @@ struct kvm_vcpu_arch {
-> >  	/* Cache some mmu pages needed inside spinlock regions */
-> >  	struct kvm_mmu_memory_cache mmu_page_cache;
-> >  
-> > +	struct vcpu_reset_state reset_state;
-> > +
-> >  	/* Detect first run of a vcpu */
-> >  	bool has_run_once;
-> >  };
-> > diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
-> > index 5ed0c3ee33d6..de41255eebcd 100644
-> > --- a/arch/arm/kvm/reset.c
-> > +++ b/arch/arm/kvm/reset.c
-> > @@ -26,6 +26,7 @@
-> >  #include <asm/cputype.h>
-> >  #include <asm/kvm_arm.h>
-> >  #include <asm/kvm_coproc.h>
-> > +#include <asm/kvm_emulate.h>
-> >  
-> >  #include <kvm/arm_arch_timer.h>
-> >  
-> > @@ -69,6 +70,29 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
-> >  	/* Reset CP15 registers */
-> >  	kvm_reset_coprocs(vcpu);
-> >  
-> > +	/*
-> > +	 * Additional reset state handling that PSCI may have imposed on us.
-> > +	 * Must be done after all the sys_reg reset.
-> > +	 */
-> > +	if (vcpu->arch.reset_state.reset) {
-> > +		unsigned long target_pc = vcpu->arch.reset_state.pc;
-> > +
-> > +		/* Gracefully handle Thumb2 entry point */
-> > +		if (target_pc & 1) {
-> > +			target_pc &= ~1UL;
-> > +			vcpu_set_thumb(vcpu);
-> > +		}
-> > +
-> > +		/* Propagate caller endianness */
-> > +		if (vcpu->arch.reset_state.be)
-> > +			kvm_vcpu_set_be(vcpu);
-> > +
-> > +		*vcpu_pc(vcpu) = target_pc;
-> > +		vcpu_set_reg(vcpu, 0, vcpu->arch.reset_state.r0);
-> > +
-> > +		vcpu->arch.reset_state.reset = false;
-> > +	}
-> > +
-> >  	/* Reset arch_timer context */
-> >  	return kvm_timer_vcpu_reset(vcpu);
-> >  }
-> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > index 7732d0ba4e60..da3fc7324d68 100644
-> > --- a/arch/arm64/include/asm/kvm_host.h
-> > +++ b/arch/arm64/include/asm/kvm_host.h
-> > @@ -48,6 +48,7 @@
-> >  #define KVM_REQ_SLEEP \
-> >  	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
-> >  #define KVM_REQ_IRQ_PENDING	KVM_ARCH_REQ(1)
-> > +#define KVM_REQ_VCPU_RESET	KVM_ARCH_REQ(2)
-> >  
-> >  DECLARE_STATIC_KEY_FALSE(userspace_irqchip_in_use);
-> >  
-> > @@ -208,6 +209,13 @@ struct kvm_cpu_context {
-> >  
-> >  typedef struct kvm_cpu_context kvm_cpu_context_t;
-> >  
-> > +struct vcpu_reset_state {
-> > +	unsigned long	pc;
-> > +	unsigned long	r0;
-> > +	bool		be;
-> > +	bool		reset;
-> > +};
-> > +
-> >  struct kvm_vcpu_arch {
-> >  	struct kvm_cpu_context ctxt;
-> >  
-> > @@ -297,6 +305,9 @@ struct kvm_vcpu_arch {
-> >  	/* Virtual SError ESR to restore when HCR_EL2.VSE is set */
-> >  	u64 vsesr_el2;
-> >  
-> > +	/* Additional reset state */
-> > +	struct vcpu_reset_state	reset_state;
-> > +
-> >  	/* True when deferrable sysregs are loaded on the physical CPU,
-> >  	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
-> >  	bool sysregs_loaded_on_cpu;
-> > diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> > index f21a2a575939..f16a5f8ff2b4 100644
-> > --- a/arch/arm64/kvm/reset.c
-> > +++ b/arch/arm64/kvm/reset.c
-> > @@ -32,6 +32,7 @@
-> >  #include <asm/kvm_arm.h>
-> >  #include <asm/kvm_asm.h>
-> >  #include <asm/kvm_coproc.h>
-> > +#include <asm/kvm_emulate.h>
-> >  #include <asm/kvm_mmu.h>
-> >  
-> >  /* Maximum phys_shift supported for any VM on this host */
-> > @@ -146,6 +147,29 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
-> >  	/* Reset system registers */
-> >  	kvm_reset_sys_regs(vcpu);
-> >  
-> > +	/*
-> > +	 * Additional reset state handling that PSCI may have imposed on us.
-> > +	 * Must be done after all the sys_reg reset.
-> > +	 */
-> > +	if (vcpu->arch.reset_state.reset) {
-> > +		unsigned long target_pc = vcpu->arch.reset_state.pc;
-> > +
-> > +		/* Gracefully handle Thumb2 entry point */
-> > +		if (vcpu_mode_is_32bit(vcpu) && (target_pc & 1)) {
-> > +			target_pc &= ~1UL;
-> > +			vcpu_set_thumb(vcpu);
-> > +		}
-> > +
-> > +		/* Propagate caller endianness */
-> > +		if (vcpu->arch.reset_state.be)
-> > +			kvm_vcpu_set_be(vcpu);
-> > +
-> > +		*vcpu_pc(vcpu) = target_pc;
-> > +		vcpu_set_reg(vcpu, 0, vcpu->arch.reset_state.r0);
-> > +
-> > +		vcpu->arch.reset_state.reset = false;
-> > +	}
-> > +
-> >  	/* Reset PMU */
-> >  	kvm_pmu_vcpu_reset(vcpu);
-> >  
-> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > index 9e350fd34504..9c486fad3f9f 100644
-> > --- a/virt/kvm/arm/arm.c
-> > +++ b/virt/kvm/arm/arm.c
-> > @@ -626,6 +626,13 @@ static void vcpu_req_sleep(struct kvm_vcpu *vcpu)
-> >  		/* Awaken to handle a signal, request we sleep again later. */
-> >  		kvm_make_request(KVM_REQ_SLEEP, vcpu);
-> >  	}
-> > +
-> > +	/*
-> > +	 * Make sure we will observe a potential reset request if we've
-> > +	 * observed a change to the power state. Pairs with the smp_wmb() in
-> > +	 * kvm_psci_vcpu_on().
-> > +	 */
-> > +	smp_rmb();
-> 
-> I don't believe this should be necessary, because...
-> 
-> >  }
-> >  
-> >  static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
-> > @@ -639,6 +646,9 @@ static void check_vcpu_requests(struct kvm_vcpu *vcpu)
-> >  		if (kvm_check_request(KVM_REQ_SLEEP, vcpu))
-> >  			vcpu_req_sleep(vcpu);
-> >  
-> > +		if (kvm_check_request(KVM_REQ_VCPU_RESET, vcpu))
-> > +			kvm_reset_vcpu(vcpu);
-> 
-> ... we do kvm_check_request here before using the reset data, and we do...
-> 
-> > +
-> >  		/*
-> >  		 * Clear IRQ_PENDING requests that were made to guarantee
-> >  		 * that a VCPU sees new virtual interrupts.
-> > diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
-> > index 9b73d3ad918a..b9cff1d4b06d 100644
-> > --- a/virt/kvm/arm/psci.c
-> > +++ b/virt/kvm/arm/psci.c
-> > @@ -104,12 +104,10 @@ static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
-> >  
-> >  static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
-> >  {
-> > +	struct vcpu_reset_state *reset_state;
-> >  	struct kvm *kvm = source_vcpu->kvm;
-> >  	struct kvm_vcpu *vcpu = NULL;
-> > -	struct swait_queue_head *wq;
-> >  	unsigned long cpu_id;
-> > -	unsigned long context_id;
-> > -	phys_addr_t target_pc;
-> >  
-> >  	cpu_id = smccc_get_arg1(source_vcpu) & MPIDR_HWID_BITMASK;
-> >  	if (vcpu_mode_is_32bit(source_vcpu))
-> > @@ -130,32 +128,30 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
-> >  			return PSCI_RET_INVALID_PARAMS;
-> >  	}
-> >  
-> > -	target_pc = smccc_get_arg2(source_vcpu);
-> > -	context_id = smccc_get_arg3(source_vcpu);
-> > +	reset_state = &vcpu->arch.reset_state;
-> >  
-> > -	kvm_reset_vcpu(vcpu);
-> > -
-> > -	/* Gracefully handle Thumb2 entry point */
-> > -	if (vcpu_mode_is_32bit(vcpu) && (target_pc & 1)) {
-> > -		target_pc &= ~((phys_addr_t) 1);
-> > -		vcpu_set_thumb(vcpu);
-> > -	}
-> > +	reset_state->pc = smccc_get_arg2(source_vcpu);
-> >  
-> >  	/* Propagate caller endianness */
-> > -	if (kvm_vcpu_is_be(source_vcpu))
-> > -		kvm_vcpu_set_be(vcpu);
-> > +	reset_state->be = kvm_vcpu_is_be(source_vcpu);
-> >  
-> > -	*vcpu_pc(vcpu) = target_pc;
-> >  	/*
-> >  	 * NOTE: We always update r0 (or x0) because for PSCI v0.1
-> >  	 * the general puspose registers are undefined upon CPU_ON.
-> >  	 */
-> > -	smccc_set_retval(vcpu, context_id, 0, 0, 0);
-> > -	vcpu->arch.power_off = false;
-> > -	smp_mb();		/* Make sure the above is visible */
-> > +	reset_state->r0 = smccc_get_arg3(source_vcpu);
-> > +
-> > +	reset_state->reset = true;
-> > +	kvm_make_request(KVM_REQ_VCPU_RESET, vcpu);
-> 
-> ... this kvm_make_request() after writing the reset data. The
-> kvm_make_request/kvm_check_request embeds the necessary barriers.
-> 
-> >  
-> > -	wq = kvm_arch_vcpu_wq(vcpu);
-> > -	swake_up_one(wq);
-> > +	/*
-> > +	 * Make sure the reset request is observed if the change to
-> > +	 * power_state is observed.
-> > +	 */
-> > +	smp_wmb();
-> > +
-> > +	vcpu->arch.power_off = false;
-> 
-> Or you want to tie the reset data to the observability of the power_off
-> state? Why not just tie it to the KVM_REQ_VCPU_RESET request?
-> 
-
-The barrier in kvm_make_request is *before* the write to vcpu->requests,
-so doesn't enforce any ordering of stores occurring *after* that write.
-
-We don't want to wake up the target VCPU thread, have it observe that it
-is powered on, yet not observe the reset request (my comment above
-inversed).
-
-I wrote this Litmus test (which is probably so appalingly obvious to
-memory ordering folks that it is unnecessary) to convince myself the
-barrier is needed:
-
-----<8----
-C vcpu-reset
-
-{}
-
-P0(int *power, int *reset)
-{
-	smp_wmb(); // from kvm_make_request
-	WRITE_ONCE(*reset, 1); // kvm_psci_vcpu_on: kvm_make_request(KVM_REQ_RESET, vcpu);
-	smp_wmb();
-	WRITE_ONCE(*power, 1); // kvm_psci_vcpu_on: vcpu->arch.power_state = KVM_ARM_VCPU_ON;
-}
-
-P1(int *power, int *reset, spinlock_t *wqlock)
-{
-	int r0;
-	int r1;
-
-	spin_lock(wqlock);
-	smp_mb(); // from prepare_to_wait -> set_current_state
-	spin_unlock(wqlock);
-	r0 = READ_ONCE(*power); // vcpu_req_sleep: if (vcpu_sleeping(vcpu))
-	smp_rmb();
-	r1 = READ_ONCE(*reset); // check_vcpu_requests: if (kvm_check_request(KVM_REQ_RESET, vcpu))
-}
-
-exists (1:r0=1 /\ 1:r1=0)
-----<8----
-
-
-Hope this helps,
-
-    Christoffer
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMzAvMDEvMjAxOSAwOTozMiwgTWlxdWVsIFJheW5hbCB3cm90ZToKPiBIaSBMaWFuZywgQ29s
+aW4sCj4gCj4gTGlhbmcgWWFuZyA8bGlhbmcueWFuZ0BhbWxvZ2ljLmNvbT4gd3JvdGUgb24gV2Vk
+LCAzMCBKYW4gMjAxOSAxNzoyNjo0OQo+ICswODAwOgo+IAo+PiBIaSBDb2xpbiwKPj4KPj4gT24g
+MjAxOS8xLzI5IDE4OjU3LCBDb2xpbiBLaW5nIHdyb3RlOgo+Pj4gRnJvbTogQ29saW4gSWFuIEtp
+bmcgPGNvbGluLmtpbmdAY2Fub25pY2FsLmNvbT4KPj4+Cj4+PiBUaGUgY2FsbCB0byBtZXNvbl9j
+aGlwX2J1ZmZlcl9pbml0IGlzIG5vdCBhc3NpZ25pbmcgcmV0LCBob3dldmVyLCByZXQKPj4+IGlz
+IGJlaW5nIGNoZWNrZWQgZm9yIGZhaWx1cmUuIEZpeCB0aGlzIGJ5IGFkZGluZyBpbiB0aGUgbWlz
+c2luZyBhc3NpZ25tZW50Lgo+Pj4KPj4+IEZpeGVzOiAyZDU3MGIzNGI0MWEgKCJtdGQ6IHJhd25h
+bmQ6IG1lc29uOiBhZGQgc3VwcG9ydCBmb3IgQW1sb2dpYyBOQU5EIGZsYXNoIGNvbnRyb2xsZXIi
+KQo+Pj4gU2lnbmVkLW9mZi1ieTogQ29saW4gSWFuIEtpbmcgPGNvbGluLmtpbmdAY2Fub25pY2Fs
+LmNvbT4KPj4+IC0tLQo+Pj4gICBkcml2ZXJzL210ZC9uYW5kL3Jhdy9tZXNvbl9uYW5kLmMgfCAy
+ICstCj4+PiAgIDEgZmlsZSBjaGFuZ2VkLCAxIGluc2VydGlvbigrKSwgMSBkZWxldGlvbigtKQo+
+Pj4KPj4+IGRpZmYgLS1naXQgYS9kcml2ZXJzL210ZC9uYW5kL3Jhdy9tZXNvbl9uYW5kLmMgYi9k
+cml2ZXJzL210ZC9uYW5kL3Jhdy9tZXNvbl9uYW5kLmMKPj4+IGluZGV4IGU4NThkNThkOTdiMC4u
+YjljNTQzZDEwNTRjIDEwMDY0NAo+Pj4gLS0tIGEvZHJpdmVycy9tdGQvbmFuZC9yYXcvbWVzb25f
+bmFuZC5jCj4+PiArKysgYi9kcml2ZXJzL210ZC9uYW5kL3Jhdy9tZXNvbl9uYW5kLmMKPj4+IEBA
+IC0xMjA2LDcgKzEyMDYsNyBAQCBzdGF0aWMgaW50IG1lc29uX25hbmRfYXR0YWNoX2NoaXAoc3Ry
+dWN0IG5hbmRfY2hpcCAqbmFuZCkKPj4+ICAgCQlkZXZfZXJyKG5mYy0+ZGV2LCAiMTZiaXRzIGJ1
+cyB3aWR0aCBub3Qgc3VwcG9ydGVkIik7Cj4+PiAgIAkJcmV0dXJuIC1FSU5WQUw7Cj4+PiAgIAl9
+Cj4+PiAtCW1lc29uX2NoaXBfYnVmZmVyX2luaXQobmFuZCk7Cj4+PiArCXJldCA9IG1lc29uX2No
+aXBfYnVmZmVyX2luaXQobmFuZCk7ICAKPj4KPj4gTG9va3MgZ29vZCB0byBtZToKPj4KPj4gQWNr
+ZWQtYnk6IExpYW5nIFlhbmcgPGxpYW5nLnlhbmdAYW1sb2dpYy5jb20+Cj4gCj4gVGhpcyBpcyBu
+YW5kL25leHQgbWF0ZXJpYWwsIHNvIGlmIHlvdSBkb24ndCBtaW5kIEkgd291bGQgbGlrZSB0byBz
+cXVhc2gKPiB0aGUgdHdvIGZpeGVzIHlvdSBzZW50IGludG8gdGhlIG9yaWdpbmFsIGNvbW1pdCBp
+bnNlcnRpbmcgdGhlIGRyaXZlci4KClN1cmUsIG9rIHdpdGggbWUsIHNxdWFzaGluZyB0aGVtIG1h
+a2VzIHNlbnNlLgoKQ29saW4KPiAKPiAKPiBUaGFua3MsCj4gTWlxdcOobAo+IAoKCl9fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwg
+bWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8v
+bGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
