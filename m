@@ -7,59 +7,59 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3B6E9C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:35:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2C60C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:35:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0C09520844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:35:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7155B21852
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:35:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ePTIGbBg";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="MTWYbjJE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C09520844
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uYzyR6LA";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="jV/Y9knU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7155B21852
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lMZ9FYWpoIyOYk99/X9ZjTGRm9Jt6JPilQyyY2TNc1w=; b=ePTIGbBgUYSIMl
-	GLTeOhZY6wAIBMVHPUmQhSNYDQDb5qITgdU0DY744/Ee+6tG2i841uLTbNiFZPMp3LgPPANjPPgJF
-	tOzGY/TWnEhBY+2OQG4/hjGDISgbcFtB6phjftIJMF831qTj5/9ZZs9uNuLCQ9r6OIHbX9WUAYiAL
-	DNquIObWHWjOEqx21FhoyqdSyq0afpfqge6MfXlsUOiA9eGR/jbLwtv7z2Slr0JVb39rbYrNInOFW
-	Ot0bAjsPToD11ooU+N2+xQ2aQkAHfnb7aN/URsnSGVqeloEz/s4AN9BPP7bG2PM7958gcw6rXG/SI
-	qzlALCVynB+56ZoUAp/Q==;
+	List-Owner; bh=LQ5cJ98VwaNmDgncPDXKsO/WSybDHqeCZWjhSND5Ep4=; b=uYzyR6LAvAN9DG
+	k/heRs08IW1mWodQBL98fkttMmSGsm52zOoYGJaBKNtevTI0vKYwEtl/1GL3wihbLxboJQnNBfQZC
+	G3tz1wlAFvnLeaW+eSlHuPQlp12DemxqngDswSuKHsHnm0A9c/0dauukV+kOXsKVWHuMuP3UPYyxN
+	2cJpS2OJky00pX0F168tpYowxnpMa/zlGawzW+7dk7fr8UEWmx6vwimiAukTujkecQeFq11uA0dBh
+	xgGBozJsNBz8pUv7mvyOir4j9Ad3ulfymhTHmtXTwTH1eL8OpELUa4pDbMUrOBJEP43m+zy+6YM+N
+	OBNGBs8TGjucXJTHvXwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goo97-00070B-T2; Wed, 30 Jan 2019 11:35:09 +0000
-Received: from mail-am5eur02on060f.outbound.protection.outlook.com
- ([2a01:111:f400:fe07::60f]
- helo=EUR02-AM5-obe.outbound.protection.outlook.com)
+	id 1goo9P-00089Y-M0; Wed, 30 Jan 2019 11:35:27 +0000
+Received: from mail-db5eur01on062b.outbound.protection.outlook.com
+ ([2a01:111:f400:fe02::62b]
+ helo=EUR01-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goo8e-0006LO-2R
+ id 1goo8d-0006LW-EM
  for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 11:34:41 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=ZitJBQAwDO8twr25Y+e1tdi/8c/wJPksyOEI+RP4og0=;
- b=MTWYbjJE25cW6YyNZE9qUjFbGmCvy67JsyFkiPRoRf/9dNhQ7hZeJ4HIgk/GyAiy9RN78/TTchwsOenUZa7WVTTubtErwjrOCTEj9lsO0T+RE075UkB8Rt1r4dlO+tSJaKafzbsQ+mtrmynUHUqeGXLjtBOHTKBnNjcQybGJ8hM=
+ bh=4TL88tDdhMmXhdJnfw7o2ml8v1NJyE6HHM/Z05C8noE=;
+ b=jV/Y9knUvIV9cPR/JhgQGKcKgfkEVIv1kz8fCj3OzvtRRPRQsQi/irOkPYLtTAlNaN7BDaPOD/lDlDsTL7/ppskNmedL52ptBLC+igdvXftmi3s+FGRYTLHJmvkHkrUg1fBXPNfpQqCO7KsvFFNtddtuklVg94b55KkxGN0B1pM=
 Received: from VI1PR0401MB2496.eurprd04.prod.outlook.com (10.168.65.10) by
- VI1PR0401MB2509.eurprd04.prod.outlook.com (10.168.65.11) with Microsoft SMTP
+ VI1PR0401MB2365.eurprd04.prod.outlook.com (10.169.134.6) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1580.17; Wed, 30 Jan 2019 11:34:29 +0000
+ 15.20.1580.17; Wed, 30 Jan 2019 11:34:31 +0000
 Received: from VI1PR0401MB2496.eurprd04.prod.outlook.com
  ([fe80::208f:755e:b057:2cfe]) by VI1PR0401MB2496.eurprd04.prod.outlook.com
  ([fe80::208f:755e:b057:2cfe%8]) with mapi id 15.20.1558.023; Wed, 30 Jan 2019
- 11:34:29 +0000
+ 11:34:31 +0000
 From: Pankaj Bansal <pankaj.bansal@nxp.com>
 To: Leo Li <leoyang.li@nxp.com>
-Subject: [PATCH v2 1/2] dt-bindings: soc: fsl: Document Qixis FPGA usage
-Thread-Topic: [PATCH v2 1/2] dt-bindings: soc: fsl: Document Qixis FPGA usage
-Thread-Index: AQHUuI/CnulVew1FE06wfvNuXyQiJw==
-Date: Wed, 30 Jan 2019 11:34:28 +0000
-Message-ID: <20190130165916.8628-2-pankaj.bansal@nxp.com>
+Subject: [PATCH v2 2/2] fsl: add i2c controlled qixis driver
+Thread-Topic: [PATCH v2 2/2] fsl: add i2c controlled qixis driver
+Thread-Index: AQHUuI/ERBDW6FFeH0Gz/bX0qdGRlQ==
+Date: Wed, 30 Jan 2019 11:34:31 +0000
+Message-ID: <20190130165916.8628-3-pankaj.bansal@nxp.com>
 References: <20190130165916.8628-1-pankaj.bansal@nxp.com>
 In-Reply-To: <20190130165916.8628-1-pankaj.bansal@nxp.com>
 Accept-Language: en-US
@@ -75,39 +75,38 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-mailer: git-send-email 2.17.1
 x-originating-ip: [92.120.1.69]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR0401MB2509;
- 6:UW3PqyycvmJlWgyLEfEG7Yp2sb2ozim8pR+jArH4s7eG4u8OhxMxVVw/QS9h0Wmg8LWSwmn31QZRXvFFkAcFXUFHOVd8L2Tk3W1ZDXAd1HXKzkaLLZEBMaVV7PPmU+bpO1yBoZrRsy7AcmvrTAZzENhdWNKgXforWecBdCyVcnHqVulAe/T95pYfQRt7gvbz2+WkXFaKXPjMUrhdtLxHULoNZ+4Tcn/IJc+/cWVFEdBSBJm1Q79jsEC8K+zVLOjd/bMAKRBLNLaO+YCuNn3gPyCx8XHhV2OcpzgP4omvUkh8KNx7biyO74mpDs7IZoFCXbI9/OOa4/gFuepPfun5auVivbTCdEuKlkzexw2R6fobQ5YE5MKSc8GM6+ZoorLOnJdDuDbNnvr2y6GpTSmSUZdnXOWbIvlc69nMKBKlPgfBo657ADFXjXi0iPGV286hrbUyKg+w3gsmNgy5tpkPfA==;
- 5:ac/kuvEiWfF7NkTUOC5GTW1RY4WJ0XIrJC5nhOPisUb08gRskBA+JKmHQfBQlesVOs36RP9qO6dVBsBWy4FWQZ7qUl06JQGHgPYH9TJ5uL1+/mUrWYVmtaopzpRiERmDdI/Qmnbqr04pt97NIOGH/7n/+3/NRBJRp8SPcIXeT5M6pF+EQlL9GFc+qhdfgFxt4tlslh2UmKi3EWhAad0WHQ==;
- 7:5q98QI8YBuoFcaQnMkkb4jLstcADK6rUzbDHnpDgxZCgm+tPsbFukXN9bJi6T2Sc1nx5y3n7TwdtZH5JzUO1sM7xSPwEd7JFapsJqZRENl8Zs88YgJpnNcoWMJmAg0ZoUhSKydXbjNxcCpaNeBMdUw==
-x-ms-office365-filtering-correlation-id: 3aa793cd-d0b6-4bb4-ee5b-08d686a6e52a
+x-microsoft-exchange-diagnostics: 1; VI1PR0401MB2365;
+ 6:bIl1CdFjBAUkeKg+JJcJDK59RQsey5d5lCMlT8o4UswL8kGn1JoxtvY+WaYDava/lATSLrr/mOYtywVrgN4UXXguAx0X0mRay4LaqHSr0HmxnHbfH5RGLbYx1veWZrp7DXB05WQLVrCMmxwJdMhfmE25ciFWOMk9TGHFtjHvPcQ27KDryoFgdeLot3BqIN90iODOGxjD5eA2/wJsCKknq4VJXbEitak5/t/YRoiGjb5bOEhycpRlBi+ZByVRxrzELIYjGmNg/gHkwjD0gw31r6QCEkZR33IuVfDfW89UYHZp7skmZykgUZpidso3szbRrUyYGOHXUSLZtr4pAL4fl/qcvOa9H+M+gKMSGyy9mHAg9loX0PV4xFCCIHHWJDSmBQUttEpMUdLk5ZtbzjWlE3UDY4LrMgCTimcaN12Ued7oqx/tTM0/L07ZLN5ZxsFzrmn//oR79B81OgcrLJszbA==;
+ 5:Xo3Hu+CD268CZ6KxiLGL856euGrTgGRgv5OZmRhPanu198/oM3l/OLkTu4kJiIt8IKkY3uu10kld7i8Oc8+9VMoLP7HhzTryN5ztcmFHHqjIpEAUhj3o77fYwEvH8KSxe8BLCHIEmEoRzSmlNdvQ32JXe8C7tw3ncAKwSrZ+DGySCnH6uv6Kx5MjJa5rJeiCP13W0Y1GOLdmIMlg5yQvSg==;
+ 7:bfGesAX/UA64tfYt0vUBnDzm4/xXDqSGrjRkYcVkOrZJNspQk+/iGgNLh4vJHOzyrhuOUitoJTAjHf3JBk0y+ecgEK06XgtThG5XbG45NYG9pXo71UkyyYTV9G+Wfc1dAxVflsZo1svIGVV4LmSKDw==
+x-ms-office365-filtering-correlation-id: bc517950-722c-4b2c-a483-08d686a6e665
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR0401MB2509; 
-x-ms-traffictypediagnostic: VI1PR0401MB2509:
-x-microsoft-antispam-prvs: <VI1PR0401MB2509855A84B1481C9F7A5604F1900@VI1PR0401MB2509.eurprd04.prod.outlook.com>
+ SRVR:VI1PR0401MB2365; 
+x-ms-traffictypediagnostic: VI1PR0401MB2365:
+x-microsoft-antispam-prvs: <VI1PR0401MB2365BCCE097098602C5067AAF1900@VI1PR0401MB2365.eurprd04.prod.outlook.com>
 x-forefront-prvs: 0933E9FD8D
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(366004)(396003)(136003)(346002)(376002)(189003)(199004)(2906002)(105586002)(8676002)(478600001)(26005)(25786009)(97736004)(6636002)(54906003)(106356001)(6506007)(386003)(3846002)(316002)(102836004)(37006003)(14454004)(81166006)(81156014)(6116002)(36756003)(6486002)(6512007)(256004)(50226002)(7736002)(44832011)(1076003)(71190400001)(8936002)(68736007)(6436002)(66066001)(71200400001)(11346002)(99286004)(86362001)(4326008)(186003)(53936002)(446003)(486006)(2616005)(6862004)(52116002)(476003)(76176011)(305945005);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0401MB2509;
+ SFS:(10009020)(979002)(366004)(39860400002)(396003)(346002)(136003)(376002)(189003)(199004)(105586002)(478600001)(6862004)(2906002)(68736007)(25786009)(14454004)(86362001)(66066001)(6306002)(6436002)(6486002)(966005)(6512007)(97736004)(106356001)(4326008)(26005)(52116002)(186003)(99286004)(256004)(6506007)(386003)(54906003)(102836004)(486006)(446003)(44832011)(81156014)(7736002)(11346002)(476003)(81166006)(8676002)(2616005)(3846002)(8936002)(76176011)(37006003)(305945005)(6636002)(53936002)(50226002)(1076003)(71200400001)(71190400001)(6116002)(107886003)(36756003)(316002)(969003)(989001)(999001)(1009001)(1019001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0401MB2365;
  H:VI1PR0401MB2496.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: qCWzcqQhbmYoQkVVuxSXVrCt+kYlCSUVq2tcpGJdQ8A4VoK0Nbm2Fk0/AvJXp/Sn5vQYTYZVOFiLxZyOTekkXcBIeIg1TvxghFTF+rL2dRB1aEfTvXyWy3dtB7TYFJ3Ndtd5ew9sXNdgmyjjBR/9FKK/m1bWk//iHhoydoqWHhbJCBJkIfZt2bRqmfCUK/zgosBJudtEHWOvCnZOUZhii6k5O/7nVg7Tq4TW06g985+XMkfDWasPOcaLOZP0O6s/Avk0WCjQPcYfq0udud3iTkDLuByib8tl8XJ4QeT2iJ8B9g2mLjK6gjxspusMMdB+3DEKDVafK6gjXIwTYsPr6YLJpKmJNfaXw0/B6WmfjOygQw9Jh/aJLj0MUIwEpphWs3EALKVp8XcBo7CLIqPCNUcwt4dRwayTLG9f+FbVdO4=
-Content-ID: <F3A9734DF42D4C4996843DB557859D99@eurprd04.prod.outlook.com>
+x-microsoft-antispam-message-info: f4ZmAAZqXGbc5QfbCB4GcJeFbynwiooZRQPA0mVXzyPBokB40NfHNRXkf8/lnxaQkXfpZRqJqFaEGyBAYZorrdnPJ8d0mjKRF/qLAh+fkFanYJPLJQ13ekhutZxyKAtztkBy6C2jMwVmD/Lon8JhnKWlxqaGxfCxEFi+20DvfCJdAn795U/JP0l1sEKNPHCSOrijTO8kjoyjdkF2II6KA2I+KKbUVplX22ZS0F0VuEsvUeRHVI/t5VHOpjoZG5HkM59PwanQgsc5zJ/UjevMZssxA2XzWLebvX9mLB4n1NV/6l1H0W5FzQ/LiTRpgNvllGAnIjzmXHG3Gbw+eE5fKnTRB7wLD6804rAQ1PTthi5PVzd+5yPOS7gBmVWYfD4fGO8SgB4MQcH1+02mjEiLBXajAYNuxIwKU1mhIEOPrNM=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 3aa793cd-d0b6-4bb4-ee5b-08d686a6e52a
-X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Jan 2019 11:34:27.7774 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: bc517950-722c-4b2c-a483-08d686a6e665
+X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Jan 2019 11:34:29.1680 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0401MB2509
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0401MB2365
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_033440_110625_C7F23C4A 
-X-CRM114-Status: GOOD (  11.57  )
+X-CRM114-CacheID: sfid-20190130_033439_483097_EC7F94CA 
+X-CRM114-Status: GOOD (  16.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,46 +120,198 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Pankaj Bansal <pankaj.bansal@nxp.com>,
  "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
+ Wang Dongsheng <dongsheng.wang@freescale.com>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-YW4gRlBHQS1iYXNlZCBzeXN0ZW0gY29udHJvbGxlciwgY2FsbGVkIOKAnFFpeGlz4oCdLCB3aGlj
-aA0KbWFuYWdlcyBzZXZlcmFsIGNyaXRpY2FsIHN5c3RlbSBmZWF0dXJlcywgaW5jbHVkaW5nOg0K
-4oCiIFJlc2V0IHNlcXVlbmNpbmcNCuKAoiBQb3dlciBzdXBwbHkgY29uZmlndXJhdGlvbg0K4oCi
-IEJvYXJkIGNvbmZpZ3VyYXRpb24NCuKAoiBoYXJkd2FyZSBjb25maWd1cmF0aW9uDQoNClRoZSBx
-aXhpcyByZWdpc3RlcnMgYXJlIGFjY2Vzc2libGUgb3ZlciBvbmUgb3IgbW9yZSBzeXN0ZW0tc3Bl
-Y2lmaWMNCmludGVyZmFjZXMsIHR5cGljYWxseSBJMkMsIEpUQUcgb3IgYW4gZW1iZWRkZWQgcHJv
-Y2Vzc29yLg0KDQpTaWduZWQtb2ZmLWJ5OiBQYW5rYWogQmFuc2FsIDxwYW5rYWouYmFuc2FsQG54
-cC5jb20+DQotLS0NCg0KTm90ZXM6DQogICAgVjI6DQogICAgLSBObyBjaGFuZ2UNCg0KIC4uLi9i
-aW5kaW5ncy9zb2MvZnNsL3FpeGlzX2N0cmwudHh0ICAgICAgICAgIHwgMzMgKysrKysrKysrKysr
-KysrKysrDQogMSBmaWxlIGNoYW5nZWQsIDMzIGluc2VydGlvbnMoKykNCg0KZGlmZiAtLWdpdCBh
-L0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9zb2MvZnNsL3FpeGlzX2N0cmwudHh0
-IGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL3NvYy9mc2wvcWl4aXNfY3RybC50
-eHQNCm5ldyBmaWxlIG1vZGUgMTAwNjQ0DQppbmRleCAwMDAwMDAwMDAwMDAuLmJjMjk1MGNhYjcx
-ZA0KLS0tIC9kZXYvbnVsbA0KKysrIGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdz
-L3NvYy9mc2wvcWl4aXNfY3RybC50eHQNCkBAIC0wLDAgKzEsMzMgQEANCisqIFFJWElTIEZQR0Eg
-YmxvY2sNCisNCithbiBGUEdBLWJhc2VkIHN5c3RlbSBjb250cm9sbGVyLCBjYWxsZWQg4oCcUWl4
-aXPigJ0sIHdoaWNoDQorbWFuYWdlcyBzZXZlcmFsIGNyaXRpY2FsIHN5c3RlbSBmZWF0dXJlcywg
-aW5jbHVkaW5nOg0KK+KAoiBDb25maWd1cmF0aW9uIHN3aXRjaCBtb25pdG9yaW5nDQor4oCiIFBv
-d2VyIG9uL29mZiBzZXF1ZW5jaW5nDQor4oCiIFJlc2V0IHNlcXVlbmNpbmcNCivigKIgUG93ZXIg
-c3VwcGx5IGNvbmZpZ3VyYXRpb24NCivigKIgQm9hcmQgY29uZmlndXJhdGlvbg0KK+KAoiBoYXJk
-d2FyZSBjb25maWd1cmF0aW9uDQor4oCiIEJhY2tncm91bmQgcG93ZXIgZGF0YSBjb2xsZWN0aW9u
-IChEQ00pDQor4oCiIEZhdWx0IG1vbml0b3JpbmcNCivigKIgUkNXIGJ5cGFzcyBTUkFNIChyZXBs
-YWNlIGZsYXNoIFJDVyB3aXRoIGludGVybmFsIFJDVykgKE5PUiBvbmx5KQ0KK+KAoiBEZWRpY2F0
-ZWQgZnVuY3Rpb25hbCB2YWxpZGF0aW9uIGJsb2NrcyAoUE9TdC9JUlMsIHRyaWdnZXJlZCBldmVu
-dCwgYW5kIHNvIG9uKQ0KK+KAoiBJMkMgbWFzdGVyIGZvciByZW1vdGUgYm9hcmQgY29udHJvbCBl
-dmVuIHdpdGggbm8gRFVUIGF2YWlsYWJsZQ0KKw0KK1RoZSBxaXhpcyByZWdpc3RlcnMgYXJlIGFj
-Y2Vzc2libGUgb3ZlciBvbmUgb3IgbW9yZSBzeXN0ZW0tc3BlY2lmaWMgaW50ZXJmYWNlcywNCit0
-eXBpY2FsbHkgSTJDLCBKVEFHIG9yIGFuIGVtYmVkZGVkIHByb2Nlc3Nvci4NCisNCitSZXF1aXJl
-ZCBwcm9wZXJ0aWVzOg0KKw0KKyAtIGNvbXBhdGlibGUgOiBzdHJpbmcsIG11c3QgY29udGFpbiAi
-ZnNsLGZwZ2EtcWl4aXMtaTJjIg0KKyAtIHJlZyA6IGkyYyBhZGRyZXNzIG9mIHRoZSBxaXhpcyBk
-ZXZpY2UuDQorDQorRXhhbXBsZXM6DQorCS8qIFRoZSBGUEdBIG5vZGUgKi8NCisgICAgICAgIGZw
-Z2FANjYgew0KKwkJY29tcGF0aWJsZSA9ICJmc2wsbHgyMTYwYXFkcy1mcGdhIiwgImZzbCxmcGdh
-LXFpeGlzLWkyYyI7DQorCQlyZWcgPSA8MHg2Nj47DQorCQkjYWRkcmVzcy1jZWxscyA9IDwxPjsN
-CisJCSNzaXplLWNlbGxzID0gPDA+Ow0KKwl9DQorDQotLSANCjIuMTcuMQ0KDQpfX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1h
-aWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xp
-c3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+FPGA on LX2160AQDS/LX2160ARDB connected on I2C bus, so add qixis
+driver which is basically an i2c client driver to control FPGA.
+
+Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
+---
+
+Notes:
+    V2:
+    - Modify the driver to not create platform devices corresponding to subnodes.
+      because the subnodes are not actual devices.
+    - Use mdio_mux_regmap_init/mdio_mux_regmap_uninit
+    - Remove header file from include folder, as no qixis api is called from outside
+    - Add regmap_exit in driver's remove function
+    Dendencies:
+	- https://www.mail-archive.com/netdev@vger.kernel.org/msg281274.html
+
+ drivers/soc/fsl/Kconfig      |   8 +++
+ drivers/soc/fsl/Makefile     |   1 +
+ drivers/soc/fsl/qixis_ctrl.c | 121 +++++++++++++++++++++++++++++++++
+ 3 files changed, 130 insertions(+)
+
+diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
+index 8a0ba6da6f8a..e787d3e637a4 100644
+--- a/drivers/soc/fsl/Kconfig
++++ b/drivers/soc/fsl/Kconfig
+@@ -36,6 +36,14 @@ config FSL_SLEEP_FSM
+ 	  The FSM is used to finish clean-ups at the last stage of system entering deep
+ 	  sleep, and also wakes up system when a wake up event happens.
+ 
++config FSL_QIXIS
++	tristate "QIXIS system controller driver"
++	depends on REGMAP_I2C
++	default n
++	help
++	  Say y here to enable QIXIS system controller api. The qixis driver
++	  provides FPGA functions to control system.
++
+ if ARM || ARM64
+ source "drivers/soc/fsl/Kconfig.arm"
+ endif
+diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
+index ffdf93b34501..db7b09bfbd91 100644
+--- a/drivers/soc/fsl/Makefile
++++ b/drivers/soc/fsl/Makefile
+@@ -5,6 +5,7 @@
+ obj-$(CONFIG_FSL_DPAA)                 += qbman/
+ obj-$(CONFIG_QUICC_ENGINE)		+= qe/
+ obj-$(CONFIG_CPM)			+= qe/
++obj-$(CONFIG_FSL_QIXIS) 		+= qixis_ctrl.o
+ obj-$(CONFIG_FSL_GUTS)			+= guts.o
+ obj-$(CONFIG_FSL_MC_DPIO) 		+= dpio/
+ obj-$(CONFIG_FSL_LS2_CONSOLE)		+= ls2-console/
+diff --git a/drivers/soc/fsl/qixis_ctrl.c b/drivers/soc/fsl/qixis_ctrl.c
+new file mode 100644
+index 000000000000..336f366e228e
+--- /dev/null
++++ b/drivers/soc/fsl/qixis_ctrl.c
+@@ -0,0 +1,121 @@
++// SPDX-License-Identifier: GPL-2.0+
++
++/* Freescale QIXIS system controller driver.
++ *
++ * Copyright 2015 Freescale Semiconductor, Inc.
++ * Copyright 2018 NXP
++ */
++
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/mdio-mux.h>
++
++/* QIXIS MAP */
++struct fsl_qixis_regs {
++	u8		id;		/* Identification Registers */
++	u8		version;	/* Version Register */
++	u8		qixis_ver;	/* QIXIS Version Register */
++	u8		reserved1[0x1f];
++};
++
++struct mdio_mux_data {
++	void			*data;
++	struct list_head	link;
++};
++
++struct qixis_priv {
++	struct regmap		*regmap;
++	struct list_head	mdio_mux_list;
++};
++
++static struct regmap_config qixis_regmap_config = {
++	.reg_bits = 8,
++	.val_bits = 8,
++};
++
++static int fsl_qixis_i2c_probe(struct i2c_client *client)
++{
++	struct device_node *child;
++	struct qixis_priv *priv;
++	int ret;
++	u32 qver;
++	struct mdio_mux_data *mux_data;
++
++	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA))
++		return -EOPNOTSUPP;
++
++	priv = devm_kzalloc(&client->dev, sizeof(struct qixis_priv),
++			    GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->regmap = regmap_init_i2c(client, &qixis_regmap_config);
++	INIT_LIST_HEAD(&priv->mdio_mux_list);
++
++	regmap_read(priv->regmap, offsetof(struct fsl_qixis_regs, qixis_ver),
++		    &qver);
++	pr_info("Freescale QIXIS Version: 0x%08x\n", qver);
++
++	for_each_child_of_node(client->dev.of_node, child) {
++		if (of_node_name_prefix(child, "mdio-mux")) {
++			mux_data = devm_kzalloc(&client->dev,
++						sizeof(struct mdio_mux_data),
++						GFP_KERNEL);
++			if (!mux_data)
++				return -ENOMEM;
++			ret = mdio_mux_regmap_init(&client->dev, child,
++						   &mux_data->data);
++			if (ret)
++				return ret;
++			list_add(&mux_data->link, &priv->mdio_mux_list);
++		}
++	};
++
++	i2c_set_clientdata(client, priv);
++
++	return 0;
++}
++
++static int fsl_qixis_i2c_remove(struct i2c_client *client)
++{
++	struct qixis_priv *priv;
++	struct list_head *pos;
++	struct mdio_mux_data *mux_data;
++
++	priv = i2c_get_clientdata(client);
++	list_for_each(pos, &priv->mdio_mux_list) {
++		mux_data = list_entry(pos, struct mdio_mux_data, link);
++		mdio_mux_regmap_uninit(mux_data->data);
++	}
++	regmap_exit(priv->regmap);
++
++	return 0;
++}
++
++static const struct of_device_id fsl_qixis_of_match[] = {
++	{ .compatible = "fsl,fpga-qixis-i2c" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, fsl_qixis_of_match);
++
++static struct i2c_driver fsl_qixis_i2c_driver = {
++	.driver = {
++		.name	= "qixis_ctrl",
++		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(fsl_qixis_of_match),
++	},
++	.probe_new	= fsl_qixis_i2c_probe,
++	.remove		= fsl_qixis_i2c_remove,
++};
++module_i2c_driver(fsl_qixis_i2c_driver);
++
++MODULE_AUTHOR("Wang Dongsheng <dongsheng.wang@freescale.com>");
++MODULE_DESCRIPTION("Freescale QIXIS system controller driver");
++MODULE_LICENSE("GPL v2");
+-- 
+2.17.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
