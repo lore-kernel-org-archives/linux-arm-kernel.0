@@ -2,22 +2,22 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 12933C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:34:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 27831C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:36:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D78BD2087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:34:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EB9E02084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:36:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tcmzlnNM";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="RuqVEzSl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D78BD2087F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Hs+l42QD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EB9E02084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,45 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=z2EwEoN5+3lF+5UrOUiBuEK1PbF2uLKXX0ryjr+r5ak=; b=tcmzlnNMltgq2P
-	q0NTe1F5Mn/JgcXkAvkw+CJQKMVOFg0ovHbbrtodF4zOGv725iEb+HC6c+9TtqrPEEpqA4QDR0caJ
-	RnwB5U5I9sBWnImLh3iTfFLGSqWaOYYIwZXdlkbbki4vXY/6OpIE+QSZZK5TzemzCU6QZlJ7QPrz4
-	OgKGKfNYQdPlzop0CDzab+Iy9IKRt8b3IztyaCFx1FmTzy43ZnmxMLKRsYYoJka8FKSZpBdhwV21y
-	C/31PHwed5bx7Sl/dnSs+H8S4qxWkP62o+njJbx5fp5dUOHCL2TsS6nuXRDxjYaOnNFTyIjtxtrKP
-	PCUEMF7PViG4fxVmDpbw==;
+	List-Owner; bh=yT8dnWEJIqJDyrIiGx7hTZnDuCpQd7uHPx+HLiZ+IgA=; b=Hs+l42QDm3HBeE
+	Qc4gTBFUiCaV58HGe9jOAVvmXLvL+QskqZBmOX+/levgyS0ZKfPEbn/wP+DabVsbcg/m1ffWM59HH
+	oJD7iAHTfFOXtnYDJZMSrIegQFHX2zgcXSGgcj5KoMlBaMBhN++IojuFzUcrB29pYXhIcBQ5B6FBO
+	2YLg8pa8MUru2o7EY7SNFXtWbfkFj4KUDCbEgekw+DEFXaumw/IlPvDGAfbEKimHvBEyjo9uKjD6l
+	rY9Mra1h9bujLRNH7K1E1Tm/EWtdUBuM270+rnIcStmRe4P/rCtMbPm7PXopL1pErYJxPFJvjjGHG
+	g/RAvVkguFByQPrYefKw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gort6-0005ZA-IT; Wed, 30 Jan 2019 15:34:52 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1goruN-00077Y-RD; Wed, 30 Jan 2019 15:36:11 +0000
+Received: from mx1.redhat.com ([209.132.183.28])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gort3-0005Yq-Nb
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 15:34:51 +0000
-Received: from localhost (unknown [69.71.4.100])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ id 1goruK-00077D-K2
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 15:36:10 +0000
+Received: from smtp.corp.redhat.com (int-mx07.intmail.prod.int.phx2.redhat.com
+ [10.5.11.22])
+ (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 0E45A2084C;
- Wed, 30 Jan 2019 15:34:48 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548862489;
- bh=kE1XxCFEdT4aiygJ3Mqnrvvef9WFtqdWnimE3s8rvQs=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=RuqVEzSleYDIqdx+g7l46FZ31N/2ebfIdThZzTcUokAA3dwRqgEyKXVBFfBS2dYO7
- /G9ZHwHqHtpbN18cUqrEsiwl67HgvBZSqzaeMckIZhm9Auf+dGadt9VBT/cgzOV5Vg
- IF8oKJTeAOgOQLTm28OuHxr1QAW1hjara4pu1tzM=
-Date: Wed, 30 Jan 2019 09:34:47 -0600
-From: Bjorn Helgaas <helgaas@kernel.org>
-To: "Z.q. Hou" <zhiqiang.hou@nxp.com>
-Subject: Re: [PATCHv3 00/27] PCI: refactor Mobiveil driver and add PCIe Gen4
- driver for NXP Layerscape SoCs
-Message-ID: <20190130153447.GB229773@google.com>
-References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
+ by mx1.redhat.com (Postfix) with ESMTPS id 37F4981F13;
+ Wed, 30 Jan 2019 15:36:08 +0000 (UTC)
+Received: from kamzik.brq.redhat.com (unknown [10.43.2.160])
+ by smtp.corp.redhat.com (Postfix) with ESMTPS id CFE6D100164E;
+ Wed, 30 Jan 2019 15:36:06 +0000 (UTC)
+Date: Wed, 30 Jan 2019 16:36:04 +0100
+From: Andrew Jones <drjones@redhat.com>
+To: Marc Zyngier <marc.zyngier@arm.com>
+Subject: Re: [PATCH 5/5] arm/arm64: KVM: Don't panic on failure to properly
+ reset system registers
+Message-ID: <20190130153604.l3ro4gdfsot2glnb@kamzik.brq.redhat.com>
+References: <20190125094656.5026-1-christoffer.dall@arm.com>
+ <20190125094656.5026-6-christoffer.dall@arm.com>
+ <20190129163337.nbwivspcvlcmzrmo@kamzik.brq.redhat.com>
+ <b2c0fa37-37ad-3696-e862-5d0434496d1f@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <b2c0fa37-37ad-3696-e862-5d0434496d1f@arm.com>
+User-Agent: NeoMutt/20180716
+X-Scanned-By: MIMEDefang 2.84 on 10.5.11.22
+X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
+ (mx1.redhat.com [10.5.110.25]); Wed, 30 Jan 2019 15:36:08 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_073449_805036_FE5BC459 
-X-CRM114-Status: GOOD (  13.45  )
+X-CRM114-CacheID: sfid-20190130_073608_739558_93930705 
+X-CRM114-Status: GOOD (  23.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,66 +78,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "lorenzo.pieralisi@arm.com" <lorenzo.pieralisi@arm.com>,
- Xiaowei Bao <xiaowei.bao@nxp.com>,
- "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
- "l.subrahmanya@mobiveil.co.in" <l.subrahmanya@mobiveil.co.in>,
- "will.deacon@arm.com" <will.deacon@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Leo Li <leoyang.li@nxp.com>, "M.h. Lian" <minghuan.lian@nxp.com>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, Mingkai Hu <mingkai.hu@nxp.com>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: kvm@vger.kernel.org, Christoffer Dall <christoffer.dall@arm.com>,
+ linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 29, 2019 at 08:08:28AM +0000, Z.q. Hou wrote:
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+On Wed, Jan 30, 2019 at 10:56:19AM +0000, Marc Zyngier wrote:
+> On 29/01/2019 16:33, Andrew Jones wrote:
+> > On Fri, Jan 25, 2019 at 10:46:56AM +0100, Christoffer Dall wrote:
+> >> From: Marc Zyngier <marc.zyngier@arm.com>
+> >>
+> >> Failing to properly reset system registers is pretty bad. But not
+> >> quite as bad as bringing the whole machine down... So warn loudly,
+> >> but slightly more gracefully.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+> >> ---
+> >>  arch/arm/kvm/coproc.c     | 4 ++--
+> >>  arch/arm64/kvm/sys_regs.c | 4 ++--
+> >>  2 files changed, 4 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> >> index 222c1635bc7a..e8bd288fd5be 100644
+> >> --- a/arch/arm/kvm/coproc.c
+> >> +++ b/arch/arm/kvm/coproc.c
+> >> @@ -1450,6 +1450,6 @@ void kvm_reset_coprocs(struct kvm_vcpu *vcpu)
+> >>  	reset_coproc_regs(vcpu, table, num);
+> >>  
+> >>  	for (num = 1; num < NR_CP15_REGS; num++)
+> >> -		if (vcpu_cp15(vcpu, num) == 0x42424242)
+> >> -			panic("Didn't reset vcpu_cp15(vcpu, %zi)", num);
+> >> +		WARN(vcpu_cp15(vcpu, num) == 0x42424242,
+> >> +		     "Didn't reset vcpu_cp15(vcpu, %zi)", num);
+> >>  }
+> >> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> >> index 86096774abcd..4f067545c7d2 100644
+> >> --- a/arch/arm64/kvm/sys_regs.c
+> >> +++ b/arch/arm64/kvm/sys_regs.c
+> >> @@ -2609,6 +2609,6 @@ void kvm_reset_sys_regs(struct kvm_vcpu *vcpu)
+> >>  	reset_sys_reg_descs(vcpu, table, num);
+> >>  
+> >>  	for (num = 1; num < NR_SYS_REGS; num++)
+> >> -		if (__vcpu_sys_reg(vcpu, num) == 0x4242424242424242)
+> >> -			panic("Didn't reset __vcpu_sys_reg(%zi)", num);
+> >> +		WARN(__vcpu_sys_reg(vcpu, num) == 0x4242424242424242,
+> >> +		     "Didn't reset __vcpu_sys_reg(%zi)\n", num);
+> >>  }
+> >> -- 
+> >> 2.18.0
+> >>
+> > 
+> > If we only get halfway through resetting, then we'll get a warn splat,
+> > complete with a backtrace, for each register. Should we do something
+> > like the following instead?
+> > 
+> >   for (num = 1; num < NR_SYS_REGS; num++)
+> >      if (__vcpu_sys_reg(vcpu, num) == 0x4242424242424242)
+> >         failed++;
+> >   WARN(failed, "Didn't reset %d system registers", failed);
 > 
-> This patch set is aim to refactor the Mobiveil driver and add
-> PCIe support for NXP Layerscape series SoCs integrated Mobiveil's
-> PCIe Gen4 controller.
+> And doing so we'd loose the important bit of information, which is the
+> position in the table that doesn't get initialized.
 > 
-> Hou Zhiqiang (27):
->   PCI: mobiveil: uniform the register accessors
->   PCI: mobiveil: format the code without function change
->   PCI: mobiveil: correct the returned error number
->   PCI: mobiveil: remove flag MSI_FLAG_MULTI_PCI_MSI
->   PCI: mobiveil: correct PCI base address in MEM/IO outbound windows
->   PCI: mobiveil: replace the resource list iteration function
->   PCI: mobiveil: use WIN_NUM_0 explicitly for CFG outbound window
->   PCI: mobiveil: use the 1st inbound window for MEM inbound transactions
->   PCI: mobiveil: correct inbound/outbound window setup routines
->   PCI: mobiveil: fix the INTx process error
->   PCI: mobiveil: only fix up the Class Code field
->   PCI: mobiveil: move out the link up waiting from mobiveil_host_init
->   PCI: mobiveil: move irq chained handler setup out of DT parse
->   PCI: mobiveil: initialize Primary/Secondary/Subordinate bus number
->   dt-bindings: pci: mobiveil: change gpio_slave and apb_csr to optional
->   PCI: mobiveil: refactor Mobiveil PCIe Host Bridge IP driver
->   PCI: mobiveil: fix the checking of valid device
->   PCI: mobiveil: continue to initialize the host upon no PCIe link
->   PCI: mobiveil: disabled IB and OB windows set by bootloader
->   PCI: mobiveil: add Byte and Half-Word width register accessors
->   PCI: mobiveil: make mobiveil_host_init can be used to re-init host
->   dt-bindings: pci: Add NXP Layerscape SoCs PCIe Gen4 controller
->   PCI: mobiveil: add PCIe Gen4 RC driver for NXP Layerscape SoCs
->   PCI: mobiveil: ls_pcie_g4: add Workaround for A-011577
->   PCI: mobiveil: ls_pcie_g4: add Workaround for A-011451
->   arm64: dts: freescale: lx2160a: add pcie DT nodes
->   arm64: defconfig: Enable CONFIG_PCI_LAYERSCAPE_GEN4
+> The vcpu reset issue is rare enough that nobody noticed it yet (I only
+> reproduced it twice), and having it to scream 200 times is not really a
+> concern. What I want to catch is the case where someone has added a new
+> sysreg in the table, and has failed to provide a working init function.
 
-If/when you repost this, please pay attention to the changelog
-conventions, e.g., capitalize the first word of the sentence ("Remove
-flag ...", "Correct PCI base address ...", etc), capitalize acronyms
-like "PCI" and "IRQ", use parentheses after function names, etc.  You
-can see the conventions by running "git log --oneline
-drivers/pci/controller".
+OK, Christoffer also said that information was useful. Would any following
+registers also be useful? Or should it be something like
+
+  for (num = 1; num < NR_SYS_REGS; num++) {
+       WARN(__vcpu_sys_reg(vcpu, num) == 0x4242424242424242,
+            "Didn't reset __vcpu_sys_reg(%zi)\n", num);
+       break;
+   }
+
+to ensure the first one, the most important one, is there, and that it
+doesn't get pushed out of the buffer by hundreds of more lines?
+
+Thanks,
+drew
 
 _______________________________________________
 linux-arm-kernel mailing list
