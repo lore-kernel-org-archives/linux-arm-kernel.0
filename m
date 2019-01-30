@@ -2,62 +2,77 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CD089C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:17:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2CCBC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:17:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9E78F20989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:17:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6C50920870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:17:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ouJC3bBL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E78F20989
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JI5B0DqV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C50920870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kmlC/Jz9xHTqKFsfVi1MG6B6je4raZAHLecKXU9iEEs=; b=ouJC3bBLVwkTqx
-	XnPvIqUMZAdpYw4YrILYCWBrO9BBeNqRtyoN8zbcF/GF4qLGdWuA+FWIEVG8S2leMuX0hoO1f0Yvi
-	AjpJ47XPLPqhNwKLFWhCoPgEqlLQ/WI96X7rg8pZoaeHp04bH9SH1Ct2Y+pPzpvd+HxZYyhEUjJyB
-	ksLR64oKw8HwskNvXP17NKvQ3lzt7WjEkeMgwIaC1XeozrTaukCeY3sO2v14iCNC5AZ/Mx/lfJMnv
-	54dXo2uF/TvzLbi+lAKxSAOAjDC9qpjk+vffAk1oCJhBKmt9n+WFNbZehxlSgzPnvFM0EwARxBWgg
-	I0QFRzYjRNOPlRyOQWjA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=dMLzgO5IbRvuWQwK8U4ZFT87Iswlb6ivOTgjSm6pF94=; b=JI5B0DqVJjYWHP
+	9+PlG9Msx+YSyrS0M4cLxqZ1aHaT+0cbybJM1T1eXfEFFqK3JE9044Gt61Fnc5Vl0mUUMknphOZHb
+	tWcpb/sQgyZeROriAfOoSrvfwGmxKYZ5WIlmRdcVXmL31WV7PFoXF51PfMMJJMNB1nKrQVmMeJ50E
+	sk3PxnJIncPzhKT5RD9/yej/889QyCbQnmiLpPZFbE0tfk+AYsWtMQcic6Qg/jD6kYvA+Ol9Yf26g
+	ZWSmkAu8PXX0eb2yV22XCH5LorzYFyszAVF1fNbjNgxkviGDj2P9iFZtNfJQZgB+5Tl8fUZcIHKr4
+	vCPaCXgaxcLLnaPzzEtA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gosY0-0000Vz-IS; Wed, 30 Jan 2019 16:17:08 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gosXw-0000NX-Rv
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 16:17:06 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DBF60EBD;
- Wed, 30 Jan 2019 08:17:03 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5F2F33F589;
- Wed, 30 Jan 2019 08:17:02 -0800 (PST)
-Subject: Re: [PATCH v3 0/4] uaccess: Add unsafe accessors for arm64
-To: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- mingo@redhat.com, peterz@infradead.org, hpa@zytor.com
-References: <1547560709-56207-1-git-send-email-julien.thierry@arm.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <3bb671a6-a7df-9c96-e4d3-09167df6dab1@arm.com>
-Date: Wed, 30 Jan 2019 16:17:00 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gosYS-0000q5-9b; Wed, 30 Jan 2019 16:17:36 +0000
+Received: from mail-ot1-f68.google.com ([209.85.210.68])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gosY8-0000eJ-JP; Wed, 30 Jan 2019 16:17:19 +0000
+Received: by mail-ot1-f68.google.com with SMTP id w25so21595otm.13;
+ Wed, 30 Jan 2019 08:17:16 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=RnNH3KefH9BKp5fCeCTBb5Miw1UaixFZo+DJArm4Kjo=;
+ b=nnbb3iR9CSnkzOl3WusLZyPbjJTXAufcpmRxaLQw56MoaJZe4vLytiyhrr+SRbSGsd
+ 0qLFAfo+lTSq8gsYLkpc3977ny72X/bV6SvYvwSJfVAMGEM/Uo30kZ4AZrWGaNfFo0Qn
+ hS585LwKHXLp7OdOP/TpFemhqbF8c0rN1TkzE3xgbeizB1luQlwHObygsMBib6newxbD
+ WG5YPwB5dbzCDTcDpJcEF4ZGbICfSxboJQuqOrEaK6q7pUoKdZ1IQm14mv3kk3BmJ7hd
+ 38wC8tP/ksXY1qKHX39Ir19g/5lyRBrfpqT5ymahYDDjRBNlf/hZsXdvQ2sId6+h4NEL
+ F1pQ==
+X-Gm-Message-State: AJcUukfNq3Y13yT0M9nosesg9L0J7PUy0yXg+RC+YomIaWWbRnmdkAOX
+ PW9EgrHZ1wKXEg7zEvCW1A==
+X-Google-Smtp-Source: ALg8bN484VE6nWCwePk0+gWegZBn0TUV98A4Dyxy5m/m6I8IP9iDXIkdvt0xipxDiFfuN/wc8GP6YQ==
+X-Received: by 2002:a9d:3464:: with SMTP id v91mr24557950otb.102.1548865035425; 
+ Wed, 30 Jan 2019 08:17:15 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id u136sm804401oie.38.2019.01.30.08.17.14
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 30 Jan 2019 08:17:14 -0800 (PST)
+Date: Wed, 30 Jan 2019 10:17:14 -0600
+From: Rob Herring <robh@kernel.org>
+To: Erin Lo <erin.lo@mediatek.com>
+Subject: Re: [PATCH v6 5/6] dt-bindings: pinctrl: mt8183: add binding document
+Message-ID: <20190130161714.GA24352@bogus>
+References: <1548317240-44682-1-git-send-email-erin.lo@mediatek.com>
+ <1548317240-44682-6-git-send-email-erin.lo@mediatek.com>
 MIME-Version: 1.0
-In-Reply-To: <1547560709-56207-1-git-send-email-julien.thierry@arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <1548317240-44682-6-git-send-email-erin.lo@mediatek.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_081704_904921_6202D2FD 
-X-CRM114-Status: GOOD (  18.70  )
+X-CRM114-CacheID: sfid-20190130_081717_150300_A51826CC 
+X-CRM114-Status: GOOD (  24.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,80 +84,174 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: catalin.marinas@arm.com, will.deacon@arm.com, james.morse@arm.com,
- valentin.schneider@arm.com
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Jason Cooper <jason@lakedaemon.net>,
+ srv_heupstream <srv_heupstream@mediatek.com>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, mars.cheng@mediatek.com,
+ Stephen Boyd <sboyd@codeaurora.org>, linux-kernel@vger.kernel.org,
+ linux-mediatek@lists.infradead.org, linux-serial@vger.kernel.org,
+ Zhiyong Tao <zhiyong.tao@mediatek.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>, yingjoe.chen@mediatek.com,
+ Thomas Gleixner <tglx@linutronix.de>, eddie.huang@mediatek.com,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Thu, Jan 24, 2019 at 04:07:19PM +0800, Erin Lo wrote:
+> From: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> 
+> The commit adds mt8183 compatible node in binding document.
+> 
+> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> ---
+>  .../devicetree/bindings/pinctrl/pinctrl-mt8183.txt | 115 +++++++++++++++++++++
+>  1 file changed, 115 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
+> new file mode 100644
+> index 0000000..364e673
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
+> @@ -0,0 +1,115 @@
+> +* Mediatek MT8183 Pin Controller
+> +
+> +The Mediatek's Pin controller is used to control SoC pins.
+> +
+> +Required properties:
+> +- compatible: value should be one of the following.
+> +	"mediatek,mt8183-pinctrl", compatible with mt8183 pinctrl.
+> +- gpio-controller : Marks the device node as a gpio controller.
+> +- #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
+> +  binding is used, the amount of cells must be specified as 2. See the below
+> +  mentioned gpio binding representation for description of particular cells.
+> +- gpio-ranges : gpio valid number range.
+> +- reg: physicall address base for gpio base registers. There are nine
+> +  physicall address base in mt8183. They are 0x10005000, 0x11F20000,
 
-Gentle ping for patches 3 and 4.
+Still have a typo in 'physicall'
 
-Thanks,
+> +  0x11E80000, 0x11E70000, 0x11E90000, 0x11D30000, 0x11D20000, 0x11C50000,
+> +  0x11F30000.
 
-Julien
+You don't need to list the address values. Only how many and what each 
+one is.
 
-On 15/01/2019 13:58, Julien Thierry wrote:
-> Hi,
-> 
-> First version of this series[1] was briefly in linux-next but had to be
-> reverted due to a bug where schedule would end up being called while
-> user_access was active[2].
-> 
-> After clarifications[3], rescheduling while in a user_access region is not
-> allowed.
-> 
-> * Patches 1 and 2 implement the unsafe accessors for arm64
-> * Patches 3 and 4 clarify this restriction in the API and attempts to
->   check against violations of the restriction.
-> 
-> Changes since v2[4]:
-> - Rebase on v5.0-rc2
-> - access_ok() is now done in user_access_begin(), so rework accessors
->   so access_ok() is not called in unsafe_get/put_user()
-> - Split addition of unsafe accessors and the user_access_region check
->   into separate patches
-> - Avoid reading SCTLR_EL1 in user_access_region check
-> - Add build option for user_access_region checking
-> - Reword clarifications on unsafe accessors API
-> 
-> Changes since v1[1]:
-> - Add a way to detect code calling schedule within a user_access region
-> - Make sure put_user/get_user arguments are evaluated before disabling PAN
-> 
-> [1] https://www.spinics.net/lists/arm-kernel/msg674925.html
-> [2] https://patchwork.kernel.org/patch/10634783/
-> [3] https://lkml.org/lkml/2018/11/28/50
-> [4] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-December/617080.html
-> 
-> Cheers,
-> 
-> Julien
-> 
-> -->
-> 
-> Julien Thierry (4):
->   arm64: uaccess: Cleanup get/put_user()
->   arm64: uaccess: Implement unsafe accessors
->   uaccess: Check no rescheduling function is called in unsafe region
->   arm64: uaccess: Implement user_access_region_active
-> 
->  arch/arm64/include/asm/sysreg.h  |   2 +
->  arch/arm64/include/asm/uaccess.h | 123 ++++++++++++++++++++++++++-------------
->  include/linux/kernel.h           |  11 +++-
->  include/linux/uaccess.h          |  13 +++++
->  kernel/sched/core.c              |  22 +++++++
->  lib/Kconfig.debug                |   8 +++
->  6 files changed, 135 insertions(+), 44 deletions(-)
-> 
-> --
+> +
+> +	Eg: <&pio 6 0>
+> +	<[phandle of the gpio controller node]
+> +	[line number within the gpio controller]
+> +	[flags]>
+> +
+> +	Values for gpio specifier:
+> +	- Line number: is a value between 0 to 202.
+> +	- Flags:  bit field of flags, as defined in <dt-bindings/gpio/gpio.h>.
+> +            Only the following flags are supported:
+> +            0 - GPIO_ACTIVE_HIGH
+> +            1 - GPIO_ACTIVE_LOW
+> +
+> +Optional properties:
+> +- reg-names: gpio base register names. There are nine gpio base register
+> +  names in mt8183. They are "iocfg0", "iocfg1", "iocfg2", "iocfg3", "iocfg4",
+> +  "iocfg5", "iocfg6", "iocfg7", "iocfg8".
+
+As I said before, these names aren't useful. There's already 
+inheritently an index with 'reg'.
+
+Unless some are optional and can be sparsely populated.
+
+> +- interrupt-controller: Marks the device node as an interrupt controller
+> +- #interrupt-cells: Should be two.
+> +- interrupts : The interrupt outputs from the controller.
+> +
+> +Please refer to pinctrl-bindings.txt in this directory for details of the
+> +common pinctrl bindings used by client devices.
+> +
+> +Subnode format
+> +A pinctrl node should contain at least one subnodes representing the
+> +pinctrl groups available on the machine. Each subnode will list the
+> +pins it needs, and how they should be configured, with regard to muxer
+> +configuration, pullups, drive strength, input enable/disable and input schmitt.
+> +
+> +    node {
+> +	pinmux = <PIN_NUMBER_PINMUX>;
+> +	GENERIC_PINCONFIG;
+> +    };
+> +
+> +Required properties:
+> +- pinmux: integer array, represents gpio pin number and mux setting.
+> +    Supported pin number and mux varies for different SoCs, and are defined
+> +    as macros in boot/dts/<soc>-pinfunc.h directly.
+> +
+> +Optional properties:
+> +- GENERIC_PINCONFIG: is the generic pinconfig options to use, bias-disable,
+> +    bias-pull-down, bias-pull-up, input-enable, input-disable, output-low, output-high,
+> +    input-schmitt-enable, input-schmitt-disable and drive-strength are valid.
+> +
+> +    Some special pins have extra pull up strength, there are R0 and R1 pull-up
+> +    resistors available, but for user, it's only need to set R1R0 as 00, 01, 10 or 11.
+> +    So when config mediatek,pull-up-adv or mediatek,pull-down-adv,
+> +    it support arguments for those special pins.
+> +
+> +    When config drive-strength, it can support some arguments, such as
+> +    MTK_DRIVE_4mA, MTK_DRIVE_6mA, etc. See dt-bindings/pinctrl/mt65xx.h.
+> +
+> +Examples:
+> +
+> +#include "mt8183-pinfunc.h"
+> +
+> +...
+> +{
+> +	pio: pinctrl@10005000 {
+> +		compatible = "mediatek,mt8183-pinctrl";
+> +		reg = <0 0x10005000 0 0x1000>,
+> +		      <0 0x11F20000 0 0x1000>,
+> +		      <0 0x11E80000 0 0x1000>,
+> +		      <0 0x11E70000 0 0x1000>,
+> +		      <0 0x11E90000 0 0x1000>,
+> +		      <0 0x11D30000 0 0x1000>,
+> +		      <0 0x11D20000 0 0x1000>,
+> +		      <0 0x11C50000 0 0x1000>,
+> +		      <0 0x11F30000 0 0x1000>;
+
+Use lowercase hex.
+
+> +		reg-names = "iocfg0", "iocfg1", "iocfg2",
+> +			    "iocfg3", "iocfg4", "iocfg5",
+> +			    "iocfg6", "iocfg7", "iocfg8";
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +		gpio-ranges = <&pio 0 0 192>;
+> +		interrupt-controller;
+> +		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-parent = <&gic>;
+> +		#interrupt-cells = <2>;
+> +
+> +		i2c0_pins_a: i2c0 {
+> +			pins1 {
+> +				pinmux = <PINMUX_GPIO48__FUNC_SCL5>,
+> +					 <PINMUX_GPIO49__FUNC_SDA5>;
+> +				mediatek,pull-up-adv = <11>;
+> +			};
+> +		};
+> +
+> +		i2c1_pins_a: i2c1 {
+> +			pins {
+> +				pinmux = <PINMUX_GPIO50__FUNC_SCL3>,
+> +					 <PINMUX_GPIO51__FUNC_SDA3>;
+> +				mediatek,pull-down-adv = <10>;
+> +			};
+> +		};
+> +		...
+> +	};
+> +};
+> -- 
 > 1.9.1
 > 
-
--- 
-Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
