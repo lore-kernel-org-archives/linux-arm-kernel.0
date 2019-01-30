@@ -2,79 +2,92 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9F7F3C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:54:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D61B0C282D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:55:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 740F820989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:54:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9FF3D218A4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:55:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PGxCQmEt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 740F820989
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="au6Mw/nu";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Ps15UBi2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9FF3D218A4
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CEstoEhjSDTdWnhN9H5V7yP1msYmHjg4lvciLUfQaPk=; b=PGxCQmEtsxTtIw
-	I0w6aEv+HLh1m9TvawIGUh90PK9on3gc0KuumHtlfQEiPToiNiRriCYhrvRlEWzyVRId58Itcfm4z
-	24YHRUj2WKl+Nf7BEn0YgKIGNiY677Lvrj/xJOlec6ci3Cyx04PSYFD3GW7xAmL4VdqaXXVxyEwPs
-	SCBjP3gm9+vN+UQ/b5u67OWW13xgO5CzZcMorwpkePboati6+LlYfZPIfrrOGuM/Re+HGxiCIlurN
-	C8EHpCGomxxRquG+om245xzSoL/TAJG9dFPMl+bNL4YMKaaMC4fsUSVoqzPfaW/z1qMJOQ6dE1H7q
-	7WzbIf3EAKioQQcsEb8A==;
+	List-Owner; bh=AC767cvV0R4MnGP66IwX6QgDiHIi/kzoQstm20a3wCQ=; b=au6Mw/nua1oW6w
+	cvmX/8NuwT6XAEVhrtg2j6qLkmJU+6icWXxe3iHVxTST9u+r8HnHSeAYpM467xMJCILwWlotQzJTB
+	pK+WD5AyTAyip29ZfHvw27Rfw0PVdKxsAwVTNhRFNoQ6/nFTudKHx0oUjycYd73Xu0Sf4RmW9gZNi
+	glEh+vJGjfuer8A1L6aV2nrUl2gBjNHN46CcohuvAU/vW0YL2KURfe3gbrki5uFoyiZrLzLfPhE+g
+	iLjdTBuPQgQBo3G9TTEuPgJuVKgIM32IF3R7P0ixD5VgoBcmy+SKDuLwCTClXM0TIztVmmdPobe0g
+	t7I+usLnseFJ8IUkcONA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gov0K-00008W-KS; Wed, 30 Jan 2019 18:54:32 +0000
-Received: from mail-ot1-f66.google.com ([209.85.210.66])
+	id 1gov1f-0001md-Py; Wed, 30 Jan 2019 18:55:55 +0000
+Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gov0H-00007r-8S
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 18:54:30 +0000
-Received: by mail-ot1-f66.google.com with SMTP id v23so520040otk.9
+ id 1gov1c-0001m7-Ji
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 18:55:53 +0000
+Received: by mail-lf1-x141.google.com with SMTP id i26so477864lfc.0
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 10:54:27 -0800 (PST)
+ Wed, 30 Jan 2019 10:55:52 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=iICV6iO5GGqy/9UyvLBZFlPh+9/PoKYpYWrjSxw2AAU=;
+ b=Ps15UBi2+dGsGjwapfletBv+573yHf6DC+OJb8tE5CbQxaNE2HEFKvYtYKiZ49sauE
+ qr3hdJPCfSK5vXOAYerx0ce6yfBZhbx5ydpwO5+nMk/tvHiBkQQHcvnbd4bHPcbwL28y
+ V//kUweAepKdxRr1pyB9Zwnju1ExglqAg1+QY=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=xuKXrCgT9wbthsuvNcIkt4qy3ZCHqH/u1/9j1Q7XZ+E=;
- b=ojO1BGGkziJ6Fg5Ri5Vd5vrN3goZlqUxU6Fe+yQMZxO0dBWK1Z2kM9XSfG9B7/t+5G
- lB6sheZXR+M42YyCak3cLKfFK14ys6TIysT7zWTIs4KNuqaN7FqmZJoxIz1NpixjXKi7
- UXWVlT3AKo3PHBDBF9BV0mnX0RZiAMZcNLjf6jAcFV1PFXl9bSMyvlYApI0hO3b5PWBD
- v44F3bbqK+QmVPhsZMXqBdmIU0A8LMSaFScyXtAvBSU/UCAQTU2dvUfjemnxRo08/iFK
- GrN3MFBo6MYksOhNqcmj3fUClaubk70XSgBhJ1BPYG8/j7KkysahVMIC17my/RW5AeGm
- etaw==
-X-Gm-Message-State: AJcUukdS1kO8OTzpH3a9xbTn58sHkG6G6877w3LXyA9wicZFgRJYh0Qp
- oQA8CkXAPuJTJbr1I4ZBXw==
-X-Google-Smtp-Source: ALg8bN4Vr2khkH/aDr6Q6ngT6zRiIUhIDjX2rHxfIyavhJi0xcLz6qVG3ce0QHDnR4Hn2Cs+syjRkg==
-X-Received: by 2002:a9d:1d43:: with SMTP id m61mr24085794otm.170.1548874466394; 
- Wed, 30 Jan 2019 10:54:26 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id o128sm972900oif.14.2019.01.30.10.54.25
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 30 Jan 2019 10:54:25 -0800 (PST)
-Date: Wed, 30 Jan 2019 12:54:25 -0600
-From: Rob Herring <robh@kernel.org>
-To: Carlo Caione <ccaione@baylibre.com>
-Subject: Re: [PATCH v3 3/3] dt-bindings: spi: Document imx8mq binding
-Message-ID: <20190130185425.GA20402@bogus>
-References: <20190130120511.11555-1-ccaione@baylibre.com>
- <20190130120511.11555-4-ccaione@baylibre.com>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=iICV6iO5GGqy/9UyvLBZFlPh+9/PoKYpYWrjSxw2AAU=;
+ b=uSgKrUWwvXCJnUgj/Zex851IVerm3Wzm2qHg1fIFoauHn3D0xndRqkS79mWQgKjyxS
+ Wwpq6s1w2j/n5nVcrmLJn5UoYtdOsr0mM9XcKwXOHC12VXVO0Tj46r2q7nv+OLkefBsV
+ okwTQpxMQkZYYO6qHb4h6voVp8t8okF1NzOX0Byalu4oySStusnBfTBFcfzG2Wn+xWAi
+ wktnvveDfGeNQWEii2tolRxCgfvrkP096gUEmgkTJgHkG9BaDAZpl9z3ydfaro7CMppI
+ YivYWbolH43xT0ES0LJyuObpCpxZxrtijGW/LdcRmvqqdQ5IHk4ARFFlrAWS6erK7rbk
+ H+4Q==
+X-Gm-Message-State: AJcUukf/0eb+kx4a/LuFve5dfi2oxcDzO8/oW8M7BsTATm86cfULnwBH
+ +6egbQ9GgxXlGUKR3pkoF60JJ17c+74=
+X-Google-Smtp-Source: ALg8bN5y5RlogJtTg64s2s9gwFYcjBDsGoatRtFr1uZosaHRsNfKPmnxC47cj2K27Sm8SZ4o8NvpaQ==
+X-Received: by 2002:a19:9b50:: with SMTP id d77mr24052220lfe.137.1548874550514; 
+ Wed, 30 Jan 2019 10:55:50 -0800 (PST)
+Received: from mail-lj1-f174.google.com (mail-lj1-f174.google.com.
+ [209.85.208.174])
+ by smtp.gmail.com with ESMTPSA id 85-v6sm416198lja.16.2019.01.30.10.55.50
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 30 Jan 2019 10:55:50 -0800 (PST)
+Received: by mail-lj1-f174.google.com with SMTP id v1-v6so552765ljd.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 10:55:50 -0800 (PST)
+X-Received: by 2002:a2e:9181:: with SMTP id
+ f1-v6mr18171528ljg.64.1548873092541; 
+ Wed, 30 Jan 2019 10:31:32 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190130120511.11555-4-ccaione@baylibre.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <1546314952-15990-1-git-send-email-yong.wu@mediatek.com>
+ <1546314952-15990-13-git-send-email-yong.wu@mediatek.com>
+In-Reply-To: <1546314952-15990-13-git-send-email-yong.wu@mediatek.com>
+From: Evan Green <evgreen@chromium.org>
+Date: Wed, 30 Jan 2019 10:30:55 -0800
+X-Gmail-Original-Message-ID: <CAE=gft5BS=yDQV48V1a=n8U1YyAQuQ+vxg1bFy1HFJXmvXE_gw@mail.gmail.com>
+Message-ID: <CAE=gft5BS=yDQV48V1a=n8U1YyAQuQ+vxg1bFy1HFJXmvXE_gw@mail.gmail.com>
+Subject: Re: [PATCH v5 12/20] memory: mtk-smi: Add gals support
+To: Yong Wu <yong.wu@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_105429_299318_606414F3 
-X-CRM114-Status: GOOD (  10.36  )
+X-CRM114-CacheID: sfid-20190130_105552_647950_7FDDDE14 
+X-CRM114-Status: GOOD (  16.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,26 +99,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- Carlo Caione <ccaione@baylibre.com>, shawnguo@kernel.org,
- s.hauer@pengutronix.de, robh+dt@kernel.org, linux-imx@nxp.com,
- kernel@pengutronix.de, festevam@gmail.com,
- linux-arm-kernel@lists.infradead.org, l.stach@pengutronix.de
+Cc: youlin.pei@mediatek.com,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, Nicolas Boichat <drinkcat@chromium.org>,
+ Arnd Bergmann <arnd@arndb.de>, srv_heupstream@mediatek.com,
+ Joerg Roedel <joro@8bytes.org>, Will Deacon <will.deacon@arm.com>,
+ LKML <linux-kernel@vger.kernel.org>, Tomasz Figa <tfiga@google.com>,
+ iommu@lists.linux-foundation.org, Rob Herring <robh+dt@kernel.org>,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ yingjoe.chen@mediatek.com, Robin Murphy <robin.murphy@arm.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 30 Jan 2019 12:05:11 +0000, Carlo Caione wrote:
-> Add the "fsl,imx8mq-qspi" binding to the spi-fsl-qspi documentation.
-> 
-> Signed-off-by: Carlo Caione <ccaione@baylibre.com>
-> ---
->  Documentation/devicetree/bindings/spi/spi-fsl-qspi.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
+On Mon, Dec 31, 2018 at 7:58 PM Yong Wu <yong.wu@mediatek.com> wrote:
+>
+> In some SoCs like mt8183, SMI add GALS(Global Async Local Sync) module
+> which can help synchronize for the modules in different clock frequency.
+> It can be seen as a "asynchronous fifo". This is a example diagram:
+>
+>             M4U
+>              |
+>          ----------
+>          |        |
+>      gals0-rx   gals1-rx
+>          |        |
+>          |        |
+>      gals0-tx   gals1-tx
+>          |        |
+>         ------------
+>          SMI Common
+>         ------------
+>              |
+>   +-----+--------+-----+- ...
+>   |     |        |     |
+>   |  gals-rx  gals-rx  |
+>   |     |        |     |
+>   |     |        |     |
+>   |  gals-tx  gals-tx  |
+>   |     |        |     |
+> larb1 larb2   larb3  larb4
+>
+> GALS only help transfer the command/data while it doesn't have the
+> configuring register, thus it has the special "smi" clock and doesn't
+> have the "apb" clock. From the diagram above, we add "gals0" and
+> "gals1" clocks for smi-common and add a "gals" clock for smi-larb.
+>
+> This patch adds gals clock supporting in the SMI. Note that some larbs
+> may still don't have the "gals" clock like larb1 and larb4 above.
+>
+> This is also a preparing patch for mt8183 which has GALS.
+>
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+So really from a software perspective the gals are just a couple of
+extra clocks that need to be turned on for certain larbs. Seems fine
+to me.
+
+Reviewed-by: Evan Green <evgreen@chromium.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
