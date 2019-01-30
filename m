@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54617C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:37:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 65690C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:37:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EE5E120869
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:37:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 06D2720869
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:37:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UlgBVdq7";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="SGUZF20T"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE5E120869
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tzo3W4lF";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="mQC2KzBy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 06D2720869
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,70 +25,69 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+mp7/YtDX4IlUVJfqhkFbL2MUzXw38Tx9LiFLW5G++o=; b=UlgBVdq7LWNak9
-	ICWabUeP0/saT40uqxabrCs+Ixuk884IxLKz9cAvx1kvDyk9SKlS0StAuHm04VS9DQNe1vjyHvhpc
-	HvP8pQF2/N44Q6HBJDggOFhQjKAPHgapGR1g3dVPNWlkTVwoVQddTocPZ1k4LAjS/sqxMR97hdCmW
-	0LWB2KNgMRw882LyUuw5THir8KzN4t+ls1QjRJsF3qT5H0nk68XXnbx0EEfhw3K0wpBNoV4LTlteL
-	tQN2nHyh6VdNjyCVpEdF0WEDccYgrUt75Lxe1dUSB02D7ndCdAD6QVP0srQQeyerPvA5fXPE6mRu1
-	d7k09TgbeLzr2nJkS88Q==;
+	List-Owner; bh=36jCXRiF4EfBubBhkpjyfIYX0mLdBMt87ggmAeVcBC0=; b=tzo3W4lFpVIQV2
+	BBdOqlvgNdEvbKc4mKd3w2C+GJgroPtRVx0sxx5AxkvIxgQy0tHqi6fb4L1XK5eCH7W+GdfLWur2l
+	xINes5c+In0gxqpQpM1LOrE7CKggy3fSRStiDJVJAc6ID5toMc8XrasnT8Ky6AwzZN3Wl0Gv+Xo/P
+	RurpkzCGbV9stGsbmlCazTGHPTJ1EwhjskXwCteFUodVmm1BBuTSFQM75yTIPlaxQTFnk+5ku5oze
+	m6QnhNoUcqI5SIQ3ZssNcr1ZMmU3WppaIOh53XZmhUCy3W+ylB7th1O5IEdyZy+L0WZIoysbn6iLS
+	l7d6UHHTmk0gRYD5gsCw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goujg-0000rb-Lo; Wed, 30 Jan 2019 18:37:20 +0000
-Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+	id 1goujy-00019d-2n; Wed, 30 Jan 2019 18:37:38 +0000
+Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goujA-0000Or-L7
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 18:36:57 +0000
-Received: by mail-lf1-x143.google.com with SMTP id c16so391793lfj.8
+ id 1goujJ-0000bp-Go
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 18:37:00 +0000
+Received: by mail-lj1-x242.google.com with SMTP id u89-v6so497296lje.1
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 10:36:48 -0800 (PST)
+ Wed, 30 Jan 2019 10:36:57 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=E6oIusMF+iFLQKqeXCK/18P8bJ9F9HsbW/9Ihvp1RMY=;
- b=SGUZF20Tb1xKiJC2QZUA+j8QUBKvC5yQg65xBn31Dy2xE2in2dCL6hqUZQOxdpLG0P
- cPJ1VJxs2EIh9jacIMGYv+gI0RC+TM4jx/MqphWM0IfV/+efzWVawzweyj3ELA5XmfoK
- Bj4PR68aPpg6FEajxTcsHsq7W7OCLDRfbQOrA=
+ :cc; bh=1e0nHX9Wr1oeqbeRBnTvuV8S/9zyEhNvko7O1JoesYs=;
+ b=mQC2KzBypqrIbtKDzJzKS9MEhzEcGJxb4W/HQQYlgVp3aOAmgTL0xGekyrw+Tz3V7p
+ JrDLEBOzpnX+G8RWr8e0xlBBCPzwHg56c/wYJ5/t2JQS1JyECzyWgZ/s/HRc1XAMvgAs
+ EPahZKWuoBX3Me59vXJy6MeJnSlAuEu/IrGto=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=E6oIusMF+iFLQKqeXCK/18P8bJ9F9HsbW/9Ihvp1RMY=;
- b=Bo/DcRWM09AjAJGCGJ4dYiBY+ZbRe81X2L+k9C0b0PJOB4AuKSZlPHyi94wroN/6vk
- BDnxMM0gxDBFBIerffslaFeLYgQxhBXCDYGPWNaJiclc9wnHfTwYcBnYbayKmDvrntTd
- ND9VpB+GdzS/Q2fL4GqOiNuL7IkS0D9tuJ9GZd+HRVcJYrLwPR/RL9i/tnwau7vZXZkL
- FcqrrlhR1attGhk19dGxj0/8RPWbOskaZc0CPBXkhWuADe3ZCim6YcGU9L4sAl4750nw
- 7T/9tpj2slG/P3aIGcrKr6+sC228tFJdjt+i+WE03NiSS8GX3+SdqwNZ+tSzPqgh0Jx9
- AR8w==
-X-Gm-Message-State: AJcUukdp3j8ZBNUEKuQcTNHrvGgPteO8FzBm8ajEbmFdhow9wlNT/U63
- d8lwXPkyFyHAX/eS9Q5mU073FxIVHu0=
-X-Google-Smtp-Source: ALg8bN6ISfEf9DmwCgXTZmNdsDWsOApZRf7orkWp1HtTXR6KdfxSZfNfl4w0swMk2IYAkk7lachZWw==
-X-Received: by 2002:a19:d619:: with SMTP id n25mr22609644lfg.91.1548873406496; 
- Wed, 30 Jan 2019 10:36:46 -0800 (PST)
-Received: from mail-lj1-f172.google.com (mail-lj1-f172.google.com.
- [209.85.208.172])
- by smtp.gmail.com with ESMTPSA id o14-v6sm396384lji.70.2019.01.30.10.36.46
+ bh=1e0nHX9Wr1oeqbeRBnTvuV8S/9zyEhNvko7O1JoesYs=;
+ b=T5G1l6GQW+1wxeBC0ZTMCwhrvk6OmAb/CBxMmUTOs/MTJ/PbYcT+hTg422XVmfKZ3O
+ UksrwelAZbc/u78rzNDK8l0jx/CUpXx4T91AqKF7jMmdCWiZMoqEaYXU4lNT/aYWfkEV
+ pTsDx3FmPwTDl4mj8LJQ/eaUNcVe3LbyWtMsOYJr63BfhJZ5tW1Wj/qxtbNkbJYdTjfr
+ HDd7mDrqKEBy+QXe1iqSASU4swIDZNfGfkqxtR0EvHr2VVlDF9jVWQdx0YY/LkjjONQ9
+ IXTf2If6ScOKQReX+ECRmlA5BSD5Eh6cCMW14Tc2ZnsftFfBC1d3tGWsiqgbQl0czcYX
+ uoGg==
+X-Gm-Message-State: AHQUAuaBv/Pb2MUDW1wK2cOonqa3fGAWm64NhzPUEIz6qL6IOEAgUL4i
+ MRPbSSKp+rEJ+qCDOGZ7e7zRBZcoF0U=
+X-Google-Smtp-Source: AHgI3IayIZAyJb5DSxf0RfrTK30yylr1s4AaSwyiE95ymIlaphtBbFjA+gb2/y8Cf5clpOXFY4u+uA==
+X-Received: by 2002:a2e:2246:: with SMTP id
+ i67-v6mr20209710lji.154.1548873415775; 
+ Wed, 30 Jan 2019 10:36:55 -0800 (PST)
+Received: from mail-lf1-f49.google.com (mail-lf1-f49.google.com.
+ [209.85.167.49])
+ by smtp.gmail.com with ESMTPSA id q10-v6sm422156ljh.72.2019.01.30.10.36.55
  for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 30 Jan 2019 10:36:46 -0800 (PST)
-Received: by mail-lj1-f172.google.com with SMTP id q2-v6so425957lji.10
+ Wed, 30 Jan 2019 10:36:55 -0800 (PST)
+Received: by mail-lf1-f49.google.com with SMTP id a16so420607lfg.3
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 10:36:46 -0800 (PST)
-X-Received: by 2002:a2e:9715:: with SMTP id
- r21-v6mr25985526lji.30.1548872964434; 
- Wed, 30 Jan 2019 10:29:24 -0800 (PST)
+ Wed, 30 Jan 2019 10:36:55 -0800 (PST)
+X-Received: by 2002:a19:7352:: with SMTP id o79mr25476428lfc.104.1548873009496; 
+ Wed, 30 Jan 2019 10:30:09 -0800 (PST)
 MIME-Version: 1.0
 References: <1546314952-15990-1-git-send-email-yong.wu@mediatek.com>
- <1546314952-15990-7-git-send-email-yong.wu@mediatek.com>
-In-Reply-To: <1546314952-15990-7-git-send-email-yong.wu@mediatek.com>
+ <1546314952-15990-9-git-send-email-yong.wu@mediatek.com>
+In-Reply-To: <1546314952-15990-9-git-send-email-yong.wu@mediatek.com>
 From: Evan Green <evgreen@chromium.org>
-Date: Wed, 30 Jan 2019 10:28:47 -0800
-X-Gmail-Original-Message-ID: <CAE=gft5bga+pM_7syKMnnma78xYN0HT4LaPPEftJ9DNqFf=zWw@mail.gmail.com>
-Message-ID: <CAE=gft5bga+pM_7syKMnnma78xYN0HT4LaPPEftJ9DNqFf=zWw@mail.gmail.com>
-Subject: Re: [PATCH v6 06/20] iommu/io-pgtable-arm-v7s: Extend MediaTek 4GB
- Mode
+Date: Wed, 30 Jan 2019 10:29:33 -0800
+X-Gmail-Original-Message-ID: <CAE=gft7FOfqJir8n6wGvOcs0pdxtuvmd9jonHwD4Q_1Q8wM5oQ@mail.gmail.com>
+Message-ID: <CAE=gft7FOfqJir8n6wGvOcs0pdxtuvmd9jonHwD4Q_1Q8wM5oQ@mail.gmail.com>
+Subject: Re: [PATCH v5 08/20] iommu/mediatek: Add larb-id remapped support
 To: Yong Wu <yong.wu@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_103649_409770_A7B731AE 
-X-CRM114-Status: GOOD (  35.19  )
+X-CRM114-CacheID: sfid-20190130_103657_575628_F1B77702 
+X-CRM114-Status: GOOD (  21.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -115,178 +114,69 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 31, 2018 at 7:57 PM Yong Wu <yong.wu@mediatek.com> wrote:
+On Mon, Dec 31, 2018 at 7:58 PM Yong Wu <yong.wu@mediatek.com> wrote:
 >
-> MediaTek extend the arm v7s descriptor to support the dram over 4GB.
+> The larb-id may be remapped in the smi-common, this means the
+> larb-id reported in the mtk_iommu_isr isn't the real larb-id,
 >
-> In the mt2712 and mt8173, it's called "4GB mode", the physical address
-> is from 0x4000_0000 to 0x1_3fff_ffff, but from EMI point of view, it
-> is remapped to high address from 0x1_0000_0000 to 0x1_ffff_ffff, the
-> bit32 is always enabled. thus, in the M4U, we always enable the bit9
-> for all PTEs which means to enable bit32 of physical address.
-
-I got a little lost here. I get that you're trying to explain why you
-always used to set bit32 of the physical address. But I don't totally
-get the part about physical addresses being from 0x4000_0000 -
-0x1_3fff_ffff, but also from 0x1_0000_0000-0x1_ffff_ffff. Are you
-saying that the physical addresses from the iommu's perspective were
-always >0x1_0000_0000? But then from whose perspective is it
-0x4000_0000? ... oh, or you're saying there was some sort of remapping
-facility that moved the physical addresses around?
-
+> Take mt8183 as a example:
+>                        M4U
+>                         |
+> ---------------------------------------------
+> |               SMI common                  |
+> -0-----7-----5-----6-----1-----2------3-----4- <- Id remapped
+>  |     |     |     |     |     |      |     |
+> larb0 larb1 IPU0  IPU1 larb4 larb5  larb6  CCU
+> disp  vdec  img   cam   venc  img    cam
+> As above, larb0 connects with the id 0 in smi-common.
+>           larb1 connects with the id 7 in smi-common.
+>           ...
+> If the larb-id reported in the isr is 7, actually it's larb1(vdec).
+> In order to output the right larb-id in the isr, we add a larb-id
+> remapping relationship in this patch.
 >
-> but in mt8183, M4U support the dram from 0x4000_0000 to 0x3_ffff_ffff
-> which isn't remaped. We extend the PTEs: the bit9 represent bit32 of
-> PA and the bit4 represent bit33 of PA. Meanwhile the iova still is
-> 32bits.
+> If there is no this larb-id remapping in some SoCs, use the linear
+> mapping array instead.
 >
-> In order to unify code, in the "4GB mode", we add the bit32 for the
-> physical address manually in our driver.
->
-> Correspondingly, Adding bit32 and bit33 for the PA in the iova_to_phys
-> has to been moved into v7s.
->
-> Regarding whether the pagetable address could be over 4GB, the mt8183
-> support it while the previous mt8173 don't. thus keep it as is.
+> This also is a preparing patch for mt8183.
 >
 > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 > ---
->  drivers/iommu/io-pgtable-arm-v7s.c | 31 ++++++++++++++++++++++++-------
->  drivers/iommu/io-pgtable.h         |  7 +++----
->  drivers/iommu/mtk_iommu.c          | 14 ++++++++------
->  drivers/iommu/mtk_iommu.h          |  1 +
->  4 files changed, 36 insertions(+), 17 deletions(-)
+>  drivers/iommu/mtk_iommu.c | 4 ++++
+>  drivers/iommu/mtk_iommu.h | 2 ++
+>  2 files changed, 6 insertions(+)
 >
-> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-> index 11d8505..8803a35 100644
-> --- a/drivers/iommu/io-pgtable-arm-v7s.c
-> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
-> @@ -124,7 +124,9 @@
->  #define ARM_V7S_TEX_MASK               0x7
->  #define ARM_V7S_ATTR_TEX(val)          (((val) & ARM_V7S_TEX_MASK) << ARM_V7S_TEX_SHIFT)
->
-> -#define ARM_V7S_ATTR_MTK_4GB           BIT(9) /* MTK extend it for 4GB mode */
-> +/* MediaTek extend the two bits below for over 4GB mode */
-> +#define ARM_V7S_ATTR_MTK_PA_BIT32      BIT(9)
-> +#define ARM_V7S_ATTR_MTK_PA_BIT33      BIT(4)
-
-If other vendors start doing stuff like this we'll need a more generic
-way to handle this... but I guess until we see a pattern this is okay.
-
->
->  /* *well, except for TEX on level 2 large pages, of course :( */
->  #define ARM_V7S_CONT_PAGE_TEX_SHIFT    6
-> @@ -183,13 +185,22 @@ static dma_addr_t __arm_v7s_dma_addr(void *pages)
->  static arm_v7s_iopte paddr_to_iopte(phys_addr_t paddr, int lvl,
->                                     struct io_pgtable_cfg *cfg)
->  {
-> -       return paddr & ARM_V7S_LVL_MASK(lvl);
-> +       arm_v7s_iopte pte = paddr & ARM_V7S_LVL_MASK(lvl);
-> +
-> +       if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB) {
-> +               if (paddr & BIT_ULL(32))
-> +                       pte |= ARM_V7S_ATTR_MTK_PA_BIT32;
-> +               if (paddr & BIT_ULL(33))
-> +                       pte |= ARM_V7S_ATTR_MTK_PA_BIT33;
-> +       }
-> +       return pte;
->  }
->
->  static phys_addr_t iopte_to_paddr(arm_v7s_iopte pte, int lvl,
->                                   struct io_pgtable_cfg *cfg)
->  {
->         arm_v7s_iopte mask;
-> +       phys_addr_t paddr;
->
->         if (ARM_V7S_PTE_IS_TABLE(pte, lvl))
->                 mask = ARM_V7S_TABLE_MASK;
-> @@ -198,7 +209,14 @@ static phys_addr_t iopte_to_paddr(arm_v7s_iopte pte, int lvl,
->         else
->                 mask = ARM_V7S_LVL_MASK(lvl);
->
-> -       return pte & mask;
-> +       paddr = pte & mask;
-> +       if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB) {
-> +               if (pte & ARM_V7S_ATTR_MTK_PA_BIT32)
-> +                       paddr |= BIT_ULL(32);
-> +               if (pte & ARM_V7S_ATTR_MTK_PA_BIT33)
-> +                       paddr |= BIT_ULL(33);
-> +       }
-> +       return paddr;
->  }
->
->  static arm_v7s_iopte *iopte_deref(arm_v7s_iopte pte, int lvl,
-> @@ -315,9 +333,6 @@ static arm_v7s_iopte arm_v7s_prot_to_pte(int prot, int lvl,
->         if (lvl == 1 && (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS))
->                 pte |= ARM_V7S_ATTR_NS_SECTION;
->
-> -       if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB)
-> -               pte |= ARM_V7S_ATTR_MTK_4GB;
-> -
-
-So despite getting lost in the details, I guess the reason it's okay
-that this goes from unconditional to conditional on bit32 is that
-before, with the older chips, all physical addresses were above 4GB,
-so we'll always see PA's above 4GB?
-
->         return pte;
->  }
->
-> @@ -504,7 +519,9 @@ static int arm_v7s_map(struct io_pgtable_ops *ops, unsigned long iova,
->         if (!(prot & (IOMMU_READ | IOMMU_WRITE)))
->                 return 0;
->
-> -       if (WARN_ON(upper_32_bits(iova) || upper_32_bits(paddr)))
-> +       if (WARN_ON(upper_32_bits(iova)) ||
-> +           WARN_ON(upper_32_bits(paddr) &&
-> +                   !(iop->cfg.quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB)))
->                 return -ERANGE;
->
->         ret = __arm_v7s_map(data, iova, paddr, size, prot, 1, data->pgd);
-> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-> index 47d5ae5..69db115 100644
-> --- a/drivers/iommu/io-pgtable.h
-> +++ b/drivers/iommu/io-pgtable.h
-> @@ -62,10 +62,9 @@ struct io_pgtable_cfg {
->          *      (unmapped) entries but the hardware might do so anyway, perform
->          *      TLB maintenance when mapping as well as when unmapping.
->          *
-> -        * IO_PGTABLE_QUIRK_ARM_MTK_4GB: (ARM v7s format) Set bit 9 in all
-> -        *      PTEs, for Mediatek IOMMUs which treat it as a 33rd address bit
-> -        *      when the SoC is in "4GB mode" and they can only access the high
-> -        *      remap of DRAM (0x1_00000000 to 0x1_ffffffff).
-> +        * IO_PGTABLE_QUIRK_ARM_MTK_4GB: (ARM v7s format) MediaTek IOMMUs extend
-> +        *      to support up to 34 bits PA where the bit32 and bit33 are
-> +        *      encoded in the bit9 and bit4 of the PTE respectively.
->          *
->          * IO_PGTABLE_QUIRK_NO_DMA: Guarantees that the tables will only ever
->          *      be accessed by a fully cache-coherent IOMMU or CPU (e.g. for a
 > diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-> index 189d1b5..ae1aa5a 100644
+> index 847082c..eca1536 100644
 > --- a/drivers/iommu/mtk_iommu.c
 > +++ b/drivers/iommu/mtk_iommu.c
-> @@ -367,12 +367,16 @@ static int mtk_iommu_map(struct iommu_domain *domain, unsigned long iova,
->                          phys_addr_t paddr, size_t size, int prot)
->  {
->         struct mtk_iommu_domain *dom = to_mtk_domain(domain);
-> +       struct mtk_iommu_data *data = mtk_iommu_get_m4u_data();
->         unsigned long flags;
->         int ret;
+> @@ -220,6 +220,8 @@ static irqreturn_t mtk_iommu_isr(int irq, void *dev_id)
+>         fault_larb = F_MMU0_INT_ID_LARB_ID(regval);
+>         fault_port = F_MMU0_INT_ID_PORT_ID(regval);
 >
-> +       /* The "4GB mode" M4U physically can not use the lower remap of Dram. */
-> +       if (data->plat_data->has_4gb_mode && data->enable_4GB)
-> +               paddr |= BIT_ULL(32);
+> +       fault_larb = data->plat_data->larbid_remap[fault_larb];
 > +
+>         if (report_iommu_fault(&dom->domain, data->dev, fault_iova,
+>                                write ? IOMMU_FAULT_WRITE : IOMMU_FAULT_READ)) {
+>                 dev_err_ratelimited(
+> @@ -742,12 +744,14 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+>         .m4u_plat     = M4U_MT2712,
+>         .has_4gb_mode = true,
+>         .has_bclk     = true,
+> +       .larbid_remap = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+>  };
+>
+>  static const struct mtk_iommu_plat_data mt8173_data = {
+>         .m4u_plat     = M4U_MT8173,
+>         .has_4gb_mode = true,
+>         .has_bclk     = true,
+> +       .larbid_remap = {0, 1, 2, 3, 4, 5}, /* Linear mapping. */
 
-Ok here's where I get lost. How is this okay? Is the same physical RAM
-accessible at multiple locations in the physical address space? Won't
-this map an iova to a different pa than the one requested?
+I briefly considered bikeshedding about how to define these arrays in
+a way that might save memory for linear-map devices, but then decided
+this is fine.
 
-Also, you could have rolled the has_4gb_mode check into whether or not
-you set enable_4GB. Then you're doing the check for has_4gb_mode once,
-rather than on every map call.
--Evan
+Reviewed-by: Evan Green <evgreen@chromium.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
