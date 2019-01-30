@@ -2,91 +2,110 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9896EC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:55:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CEA32C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:56:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6684A20857
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:55:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 98F1A20857
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:56:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ejw7VNeX";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="L7UPG6PL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6684A20857
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hleBA8Jf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 98F1A20857
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=iy+L5vt9XLAaEaqIsznBMS+Z2dtYpjsBB1WXAdsnQs8=; b=ejw7VNeXBAynq++mFXkuISXSa
-	iuJZoThOyGR6Q+W0DQGp8jaQhsjaidcqQc7WLzokYDHDvBqyjBcwipdwkC02KM+sfkEq6P8GAHAej
-	ExreFi2Lagldt8PlC44v9SZp88FRyv0vsKnNwfCDtjYtIpS8Kp5F8YUNhIun7M5yDvUqvQcxSnWnj
-	qyTa+Sk7seltpCVhZq330ajGUS2aR7/CJ4SUA82YR0IwKNe9jHnD6YNSvsACUCnNOEiuI/aD1hz9H
-	+zbJQZe1Viwed3U7b3tkApQI98sfR3TqNYDSiHXnkODLDndqrRSNjCtM+y+eDTnf3FoTVNkOUvIai
-	YRVK07dTw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=hgxbHwuP1mYWpbPQbC1rmvUDnYoFXm72LyDy+vlR+bA=; b=hleBA8Jf0/AhcC
+	YwXWWDbMvWGSDobtopl683HZawhJ3FXaMSB9bBlBlLdbzqCXcRSxImUbojGDBn6cBOf1e7mq/yxqI
+	qhczItoY29boGtoyuxq0v6NHvTn14LznINxa+5iXFjrZd3ej44PDnoHecQ/yFYG6XqLm2Bdu85VTW
+	7xRZUJfR8kpUxhJzQav97hPrlq66UpXh9XvcO3RCiBJN+Fwsl2nHf4e0LRig47CHRrghDn7Mwdh1p
+	azCw7U42C2ikpZ9q6HdabRL/ssG5bRqYRxocEoC3byYWW1TKz45cO8eCzxkwpRSvQSxAr3SVUI2hm
+	GA/JXM1M7oX4gtURdT0A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gonWG-000514-JN; Wed, 30 Jan 2019 10:55:00 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gonWC-00050M-FH
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 10:54:57 +0000
-Received: by mail-wm1-x341.google.com with SMTP id m22so21207724wml.3
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 02:54:53 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=8sWiLl1F2ySwwXThQumwD88+HU+lGvuWz2LP/AEShew=;
- b=L7UPG6PLGNmPJAHCG8TvmMFub++pEovw0UcqePMWbuuIqVzS4U0S1XwgUvQYENo2VT
- sB4Nv7TnGUXIwI9e3rRKdJBAfGKDHLh+Tm8X4RESwriB0b9gyPXa1H0eHPxIpj70dniB
- X7X9UD8ax68WOZRs2zM9OBMsreXQzk8fu2Y5s=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=8sWiLl1F2ySwwXThQumwD88+HU+lGvuWz2LP/AEShew=;
- b=jrPLT3fJF+R5Qcxw2H4B2N/g9xPVsKLhDzz0MfMlQzOovNakBMlKRMmjbHs2NJXBl2
- YFvq/quwUjn9Oh48dKTcIv7VrakGmHLMzHMoyBNylIY8lGsUuG7vAhbLZSlsdPV6sR8H
- qTuRUAERIUMmX4kRShifqIma9VR8cIA6Glla+FFC6FnAp5PDVj1+1KEHoaaE1OosY04H
- g/nXGWypsxVD0YEpnGvcWR8zHR3g8Z6/8jalxBmKLKyyB88uzwDROoenuvB6jx2Fzcx6
- wzX4/xsRCLv0p4i9gUPBXV/gpeBhg66J7XHy9WL6bkV6M0MPTXTKtOHUhPJurSW3Lyfn
- 8XCQ==
-X-Gm-Message-State: AJcUuke3lX4DtvOoxvuMqzB9LJmKnYG2noEsC1w8wFGbQjV5Wf1sdlxe
- nLsTQ1EsI7aHUh8xuRXLUQgrOw==
-X-Google-Smtp-Source: ALg8bN57PYsj5cVrJh06ZJVX7ex+xJ1bM8G46LAIlpM5dDYSePEFNhRl28NavbEIPL+3yz8qq5kyJw==
-X-Received: by 2002:a1c:f909:: with SMTP id x9mr24533816wmh.108.1548845692194; 
- Wed, 30 Jan 2019 02:54:52 -0800 (PST)
-Received: from [192.168.86.34]
- (cpc89974-aztw32-2-0-cust43.18-1.cable.virginm.net. [86.30.250.44])
- by smtp.googlemail.com with ESMTPSA id 133sm4184119wme.9.2019.01.30.02.54.51
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 30 Jan 2019 02:54:51 -0800 (PST)
-Subject: Re: [PATCH] arm64: dts: Add Adreno GPU and GPU smmu definitions
-To: Vivek Gautam <vivek.gautam@codeaurora.org>,
- Jordan Crouse <jcrouse@codeaurora.org>
-References: <20190129132335.30695-5-srinivas.kandagatla@linaro.org>
- <1548806314-31788-1-git-send-email-jcrouse@codeaurora.org>
- <CAFp+6iHzpZ70_qH9wvu=H_oSxVjoPXRaJ38kR9G73TRZXb5t5g@mail.gmail.com>
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Message-ID: <e209fc92-50f5-8368-8735-70c56d72e5f1@linaro.org>
-Date: Wed, 30 Jan 2019 10:54:50 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gonXe-0006YM-GG; Wed, 30 Jan 2019 10:56:26 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gonXb-0006Y1-M0
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 10:56:25 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B983CA78;
+ Wed, 30 Jan 2019 02:56:22 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 909FC3F59C; Wed, 30 Jan 2019 02:56:21 -0800 (PST)
+Subject: Re: [PATCH 5/5] arm/arm64: KVM: Don't panic on failure to properly
+ reset system registers
+To: Andrew Jones <drjones@redhat.com>,
+ Christoffer Dall <christoffer.dall@arm.com>
+References: <20190125094656.5026-1-christoffer.dall@arm.com>
+ <20190125094656.5026-6-christoffer.dall@arm.com>
+ <20190129163337.nbwivspcvlcmzrmo@kamzik.brq.redhat.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <b2c0fa37-37ad-3696-e862-5d0434496d1f@arm.com>
+Date: Wed, 30 Jan 2019 10:56:19 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <CAFp+6iHzpZ70_qH9wvu=H_oSxVjoPXRaJ38kR9G73TRZXb5t5g@mail.gmail.com>
+In-Reply-To: <20190129163337.nbwivspcvlcmzrmo@kamzik.brq.redhat.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_025456_529715_0574883F 
-X-CRM114-Status: GOOD (  13.35  )
+X-CRM114-CacheID: sfid-20190130_025623_731124_0816E90F 
+X-CRM114-Status: GOOD (  16.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,31 +117,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andy Gross <andy.gross@linaro.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>
+Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
+ kvm@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Thanks Vivek,
-
-On 30/01/2019 05:32, Vivek Gautam wrote:
-> Hi,
+On 29/01/2019 16:33, Andrew Jones wrote:
+> On Fri, Jan 25, 2019 at 10:46:56AM +0100, Christoffer Dall wrote:
+>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> Failing to properly reset system registers is pretty bad. But not
+>> quite as bad as bringing the whole machine down... So warn loudly,
+>> but slightly more gracefully.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+>> ---
+>>  arch/arm/kvm/coproc.c     | 4 ++--
+>>  arch/arm64/kvm/sys_regs.c | 4 ++--
+>>  2 files changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+>> index 222c1635bc7a..e8bd288fd5be 100644
+>> --- a/arch/arm/kvm/coproc.c
+>> +++ b/arch/arm/kvm/coproc.c
+>> @@ -1450,6 +1450,6 @@ void kvm_reset_coprocs(struct kvm_vcpu *vcpu)
+>>  	reset_coproc_regs(vcpu, table, num);
+>>  
+>>  	for (num = 1; num < NR_CP15_REGS; num++)
+>> -		if (vcpu_cp15(vcpu, num) == 0x42424242)
+>> -			panic("Didn't reset vcpu_cp15(vcpu, %zi)", num);
+>> +		WARN(vcpu_cp15(vcpu, num) == 0x42424242,
+>> +		     "Didn't reset vcpu_cp15(vcpu, %zi)", num);
+>>  }
+>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>> index 86096774abcd..4f067545c7d2 100644
+>> --- a/arch/arm64/kvm/sys_regs.c
+>> +++ b/arch/arm64/kvm/sys_regs.c
+>> @@ -2609,6 +2609,6 @@ void kvm_reset_sys_regs(struct kvm_vcpu *vcpu)
+>>  	reset_sys_reg_descs(vcpu, table, num);
+>>  
+>>  	for (num = 1; num < NR_SYS_REGS; num++)
+>> -		if (__vcpu_sys_reg(vcpu, num) == 0x4242424242424242)
+>> -			panic("Didn't reset __vcpu_sys_reg(%zi)", num);
+>> +		WARN(__vcpu_sys_reg(vcpu, num) == 0x4242424242424242,
+>> +		     "Didn't reset __vcpu_sys_reg(%zi)\n", num);
+>>  }
+>> -- 
+>> 2.18.0
+>>
 > 
-> On Wed, Jan 30, 2019 at 5:29 AM Jordan Crouse<jcrouse@codeaurora.org>  wrote:
->> Add an initial node for the Adreno GPU and it's companion
->> SMMU.
-> The SMMU node is in another patch, so may be change the title of this
-> patch and update the commit text too?
+> If we only get halfway through resetting, then we'll get a warn splat,
+> complete with a backtrace, for each register. Should we do something
+> like the following instead?
 > 
+>   for (num = 1; num < NR_SYS_REGS; num++)
+>      if (__vcpu_sys_reg(vcpu, num) == 0x4242424242424242)
+>         failed++;
+>   WARN(failed, "Didn't reset %d system registers", failed);
 
-I will update this and send v2 of the series!
+And doing so we'd loose the important bit of information, which is the
+position in the table that doesn't get initialized.
 
---srini
+The vcpu reset issue is rare enough that nobody noticed it yet (I only
+reproduced it twice), and having it to scream 200 times is not really a
+concern. What I want to catch is the case where someone has added a new
+sysreg in the table, and has failed to provide a working init function.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
