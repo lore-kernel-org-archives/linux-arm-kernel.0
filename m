@@ -2,82 +2,72 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,
-	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 70717C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:32:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F1A9BC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:34:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3F6A72087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:32:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C25992087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:34:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MqMmntHH";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="kpw2ZIFe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F6A72087F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MQmltIhN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C25992087F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	MIME-Version:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=WodLARRkYM4Y//M9XlXszNR8QiSqpy2r2qb7kIyFlUc=; b=MqMmntHHBF0bjS
-	mn7LaLGze5EqxJ0Hmdgum4sTXDCieIpzas1/vANMzPhU5bbOzX37N1UVmyaT5GhqkSou7+fg8nL+c
-	mthZr7lCiGzVPc1mYcSUDU6dcIhJXAZ7QoZG6M82tZ2IWywO5+wCDPZfhFQWPeVW8O1punPFLIbyi
-	6pW6q5xRim0D7EvHIqVYf3KE7enOP0WOrpoGflFXYYLtdT+iL/4fJcNY/yV71T2JkbOHoWPXK18Pr
-	G150i6/EXhjGE0JcyhIjr2uE1hbO+/v1VRctiffsnLsLhFZw6BH/vIglJI6G4/hyRcQd/L6kIQSUW
-	XjzXwo2WSqy4b93fzxug==;
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=dPTJzOD1YI0J3Wb0gxqD3vkkAxrCF4p1OmYkXqdQeMg=; b=MQmltIhN5KT+gu
+	i9RBP8k+SCpIy7Nt6tP5bbBWXYSMux5R0DHFBzEk9SDZfSwlklPtYHzhhpu7F8rWASw+5xhCVjKZD
+	6GU0hSaeEVaw/AWcuMXWN1Qn5v2PaqkTgcsvi8+YxuDT7o2UY6cw2pKIyTkzFE+nwRsqb8RcrYfjB
+	nsC8ya9vN17ri5wYfuOeirI7JNvHdbGmntz9YqrmOMvkirvoeOYHwaTYrLT6mWUN6JL04phogT66s
+	0lUt5EemmgZ5AVY0bSwltqlg6xIc2Pc7YqlUcvbL2igKfmZw9WsvklInj/lTZNbwPwPonEbzvSMMW
+	k07NpV6Lk3fS/eF6ySoQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gosmw-0001XB-A8; Wed, 30 Jan 2019 16:32:34 +0000
-Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
+	id 1gosoc-0001tr-Mq; Wed, 30 Jan 2019 16:34:18 +0000
+Received: from mail-qt1-f193.google.com ([209.85.160.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gosms-0001Wa-Vl
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 16:32:32 +0000
-Received: by mail-ot1-x343.google.com with SMTP id s5so116298oth.7
+ id 1gosoZ-0001tW-JZ
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 16:34:16 +0000
+Received: by mail-qt1-f193.google.com with SMTP id e5so107443qtr.12
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 08:32:27 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
- h=mime-version:from:date:message-id:subject:to:cc;
- bh=P3LJhH6cgW4upA2EWRXXc/wXQNtn/k7S03s//A6su1g=;
- b=kpw2ZIFeUCBxsDcxNjhh3Hy585LqG168l0ocOK2C3yTm+7PjfjeB2Q9f8RSc2L3iLV
- 6I+wP22GZsEtZQ7fFBgZfot3EC5ReLs8CDvET93xlb5LMd2dc+pa5PJVr0XcnEzpYvjB
- DBsWam1wJ5r0GHiXNttNVDJaablE5HVhUuXKQn0zso8RoQtQyqhXRSobk6gkoytWgRT2
- SeUEnTahHzJjfyV3t+Mqp8DRTIFJXt8ViDm1+g/7fkTgvxK7TFeXNHgWiMXv0YDhBChC
- sqx2pq0xKl4GMeJWMiRtAw+jwf/snlqQnOlrP3wVCq4bdTSeX+dfwUNrht7x2xAyPa1q
- Og8A==
+ Wed, 30 Jan 2019 08:34:15 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:from:date:message-id:subject:to:cc;
- bh=P3LJhH6cgW4upA2EWRXXc/wXQNtn/k7S03s//A6su1g=;
- b=AMnYMQmTQ2bNuMKNSGtMusKrMv66p8OzntSTnV3tSyTdYhUE/NOF+pE7XsYR8b5rXn
- N5RSi9OuofAN2YX/EpIwSOQnMdgDQlVlhOQowg1dS9gmNX4NrMSaJRm17tPnnzCUzBAQ
- aqDYQaod5P6cRptcoRw3Y1vsqziLLe5U4nUbJF9fOO637QYAwdy67rqzIEAwzA3S0sps
- NfcZvfjfJfgBwJJX9dYbJTh/sJoHTeKR8qxM79Wf+scpBO0U5k2mMyPigPcwmGK+fP99
- +hAF5J49DQJC8x8CGzob9fFhOxsr+aS/qUUdbg8IYa8bvEI8NsQuE2pF3qDE6iwPUdvm
- GqfQ==
-X-Gm-Message-State: AJcUukdhKrS1i+sYMke8lQ0hpppPsY7TiR9ddvSoNatvEbvCVzFl3N/Y
- PcYzhRWtVRU7ICOsSjQCYxb1lV+3bLh2SUq4C9qwv5ZaQDzLnQ==
-X-Google-Smtp-Source: ALg8bN45MHCQnyC0t7Ivu27C/GsFmiyhloUnQg4Wml8VU64GpqLrhQuMqastC/b7fXBQGxkJXTqTmdlwEcVj9i9lhCs=
-X-Received: by 2002:a9d:4c01:: with SMTP id l1mr23359047otf.242.1548865946597; 
- Wed, 30 Jan 2019 08:32:26 -0800 (PST)
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=euuV6RNzmdpfE6XW8Kl8bVDvDGr6dCVxskMSvSuszAo=;
+ b=Skm17mPfGBSNxS9avKFG7fWoV7UeuMT2zuH1hj9+OULJ0KKBE4J09+UId/r4nPJtme
+ INAyZsUAWR2WMvsZNpPMPt2Ktt9t+w4zcUW1SctJrnmCwYKKqN6AraekIflkHaCFBF0X
+ rmBuPeZqlrtXsVJULS4vUE+dXcaGuL6mJBPLMExXPNQfl53gHtDcvGovoLK3dUNpzR8O
+ /L9TXKBu99eV8H1+SsbKpM3m1D2tuCtHfQzq0kxY0ls8OZyfDbIAyEbshFq2tl6PzeF7
+ NTtDZuDuO+i00ToE79R+Dvqg+482atrtMDiPcOHP5gPAqki3r2hYfOX9kkoWjgErrgIq
+ uAvQ==
+X-Gm-Message-State: AJcUukd0kjGjjDGKV+vt9yyFRq0u60t1EMrg44+lZNES9TJFpHMz9dZZ
+ BBoBdNwRIrBetfJO7UjSnljtcWKYJI6a9JCNl/0=
+X-Google-Smtp-Source: AHgI3IYQuoq+cjxzwUiUrZQHM71psYfzLKuW+YSxHM4NOpLDw9WRFnyLQ+jJUX2YZGMbOzO4P/+tcXyxnmJkAhM3BhA=
+X-Received: by 2002:ac8:1d12:: with SMTP id d18mr19213617qtl.343.1548866054768; 
+ Wed, 30 Jan 2019 08:34:14 -0800 (PST)
 MIME-Version: 1.0
-From: Jann Horn <jannh@google.com>
-Date: Wed, 30 Jan 2019 17:32:00 +0100
-Message-ID: <CAG48ez0QRmU9fGV3x7nceGqBGADNTb66MnG4PW_xu+xnGUqg=g@mail.gmail.com>
-Subject: ARM64 suggestion: reduce the compat address limit (currently
- 0x100000000)?
-To: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>
+References: <20190114174533.6134-1-robh@kernel.org>
+In-Reply-To: <20190114174533.6134-1-robh@kernel.org>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 30 Jan 2019 17:33:57 +0100
+Message-ID: <CAK8P3a28_=urR1h95GN_wvYxJSOTUr_gL-cOzk9Pt1CZFGnJCA@mail.gmail.com>
+Subject: Re: [PATCH v2] arm64: dts: Remove inconsistent use of 'arm,armv8'
+ compatible string
+To: Rob Herring <robh@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_083231_039094_EB35636C 
-X-CRM114-Status: UNSURE (   9.71  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190130_083415_692682_BCC099D3 
+X-CRM114-Status: GOOD (  10.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,102 +79,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kernel list <linux-kernel@vger.kernel.org>,
- linux-arm-kernel@lists.infradead.org,
- Kernel Hardening <kernel-hardening@lists.openwall.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, Nishanth Menon <nm@ti.com>,
+ Heiko Stuebner <heiko@sntech.de>, Maxime Ripard <maxime.ripard@bootlin.com>,
+ Liviu Dudau <liviu.dudau@arm.com>,
+ Masahiro Yamada <yamada.masahiro@socionext.com>, Wei Xu <xuwei5@hisilicon.com>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ Gregory CLEMENT <gregory.clement@bootlin.com>,
+ Michal Simek <michal.simek@xilinx.com>, Krzysztof Kozlowski <krzk@kernel.org>,
+ arm-soc <arm@kernel.org>, Thierry Reding <treding@nvidia.com>,
+ DTML <devicetree@vger.kernel.org>, Scott Branden <scott.branden@broadcom.com>,
+ Antoine Tenart <antoine.tenart@bootlin.com>, Will Deacon <will.deacon@arm.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ Simon Horman <horms+renesas@verge.net.au>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Chanho Min <chanho.min@lge.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Tero Kristo <t-kristo@ti.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi!
+On Mon, Jan 14, 2019 at 6:45 PM Rob Herring <robh@kernel.org> wrote:
+>
+> The 'arm,armv8' compatible string is only for software models. It adds
+> little value otherwise and is inconsistently used as a fallback on some
+> platforms. Remove it from those platforms.
 
-At the moment, compat tasks running on ARM64 can allocate memory up to
-0x100000000 (TASK_SIZE_32). Testing on an Android device (with an
-admittedly somewhat old kernel):
+Applied on arm/dt, thanks!
 
-===========
-$ cat mmap_filler.c
-#include <sys/mman.h>
-#include <unistd.h>
-#include <err.h>
-#include <stdlib.h>
-#include <fcntl.h>
-int main(void) {
-  unsigned long size = 1UL<<31;
-  while (size >= 0x1000UL) {
-    void *res = mmap(NULL, size, PROT_READ|PROT_WRITE,
-MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0);
-    if (res == MAP_FAILED) size >>= 1;
-  }
-  int fd = open("/proc/self/maps", O_RDONLY);
-  if (fd == -1) err(1, "open");
-  while (1) {
-    char buf[0x1000];
-    ssize_t res = read(fd, buf, sizeof(buf));
-    if (res == -1) err(1, "read");
-    if (res == 0) _exit(0);
-    ssize_t wres = write(1, buf, res);
-    if (wres != res) errx(1, "write failed");
-  }
-}
-$ arm-linux-gnueabi-gcc -static -o mmap_filler mmap_filler.c && adb
-push mmap_filler /data/local/tmp/ && adb shell
-/data/local/tmp/mmap_filler
-mmap_filler: 1 file pushed. 16.3 MB/s (587008 bytes in 0.034s)
-00008000-00010000 rw-p 00000000 00:00 0
-00010000-00089000 r-xp 00000000 103:1d 2080772
-  /data/local/tmp/mmap_filler
-00089000-00098000 rw-p 00000000 00:00 0
-00098000-0009a000 rw-p 00078000 103:1d 2080772
-  /data/local/tmp/mmap_filler
-0009a000-0009b000 rw-p 00000000 00:00 0
-0009b000-00752000 rw-p 00000000 00:00 0                                  [heap]
-00752000-00774000 rw-p 00000000 00:00 0                                  [heap]
-00774000-f081b000 rw-p 00000000 00:00 0                                  [heap]
-f081b000-f081c000 r--p 00000000 00:00 0                                  [vvar]
-f081c000-f081e000 r-xp 00000000 00:00 0                                  [vdso]
-f081e000-ff710000 rw-p 00000000 00:00 0
-ff810000-ff831000 rw-p 00000000 00:00 0                                  [stack]
-ff831000-ffff0000 rw-p 00000000 00:00 0
-ffff0000-ffff1000 r-xp 00000000 00:00 0
-  [kuserhelpers]
-ffff1000-100000000 rw-p 00000000 00:00 0
-===========
-
-This means that mmap() allocations do not adhere to section 6.5.8 of
-C99 ("If the
-expression P points to an element of an array object and the
-expression Q points to the
-last element of the same array object, the pointer expression Q+1
-compares greater than
-P.") if you treat mmap() allocations as returning an array.
-
-In practice, I've also seen code that does things like computing a
-pointer that is out of bounds by a few bytes and then comparing it
-against the end of the array; while this is UB according to C99, it
-probably makes sense to try to avoid breaking such code.
-
-X86-64's compat code uses the limit 0xFFFFe000 (IA32_PAGE_OFFSET),
-which I think makes more sense. Would it make sense to do something
-like the following (untested)?
-
-==============
-diff --git a/arch/arm64/include/asm/processor.h
-b/arch/arm64/include/asm/processor.h
-index f1a7ab18faf3..a0c7eb1358dd 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -57,7 +57,7 @@
- #define TASK_SIZE_64           (UL(1) << vabits_user)
-
- #ifdef CONFIG_COMPAT
--#define TASK_SIZE_32           UL(0x100000000)
-+#define TASK_SIZE_32           UL(0xFFFFe000)
- #define TASK_SIZE              (test_thread_flag(TIF_32BIT) ? \
-                                TASK_SIZE_32 : TASK_SIZE_64)
- #define TASK_SIZE_OF(tsk)      (test_tsk_thread_flag(tsk, TIF_32BIT) ? \
-==============
+      Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
