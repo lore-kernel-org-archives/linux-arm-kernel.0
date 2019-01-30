@@ -2,21 +2,20 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AEB7DC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:22:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ED663C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:22:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 857FC2087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:22:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C02F52087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:22:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S62J75n1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 857FC2087F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l639eZbG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C02F52087F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,44 +24,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Mzl/DWi1T3IVWxndHVq5+YxKOf8K48olfUqCYh7wvOM=; b=S62J75n1m6O1dy
-	6QCL2aptTpLfXrXtB94TKPrORBKugstB0RnzSd0jFj0M/33Og75YZKjX++gu4mM3QCHeLWo6bU61q
-	YVNGKivyBS4vFpuS+sIDHrzEyVT+6nuE9MoDJezRUBZOpuu84pxhqpnmsK19yZWnypAowPwbaaMxL
-	BwIT7jdOCKtjp2X46XZg3pEzRJIwwK0njHEMSL+rQSB6tp9G06fQ3inKin7bGb/euo0Dr0wToWBKu
-	vhqMBnGmnp1qSlaelsdA6N7RXznRALxI35/c9C4N/y9cYmrqFtMc6Rm/M9sCk2Co9z1p0X0bR7VVp
-	L5EtwB/ukSzZpkLVzn0w==;
+	List-Owner; bh=2C8p55F/m72vWltAmXFfpwJjhPxBUKj9H6B7hBXZEd4=; b=l639eZbGS8+Igt
+	VNsu6wJ1O39rPONpeHeYVkwnIOWCdurs5LoONzv3+TGRcC/oSR/7s2qjqmP6SKdtJRgts/zaEfBuJ
+	XCpqkzDJKBpwFG1NPrOznfrcVQcEx0cuThCeNEaUng2U7RdFFFScxI2HDaIDOU3MS5brzPLtNYCBC
+	09ffsiZZw1NmSL/KxXq7lZ0wzZr9UuzF1tkHc3uTqwSiYYkqrqkCy4webRnc6NQass+4F+RRTrDB1
+	8syZ7/cTkoRMDqCNdaAM3C+cUvCemECMLyRzYvbt37wavT1BSs5CA+Q/2Gr931PepC/CEjevW8ZZv
+	OwykPaqhqLrC2xkU9dfw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gouV6-0001hB-VF; Wed, 30 Jan 2019 18:22:16 +0000
+	id 1gouVH-0001qV-4x; Wed, 30 Jan 2019 18:22:27 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gouUi-0001QE-Uc
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 18:21:58 +0000
+ id 1gouUr-0001YR-Il
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 18:22:09 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 65E2B80D;
- Wed, 30 Jan 2019 10:21:52 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 29B0380D;
+ Wed, 30 Jan 2019 10:22:01 -0800 (PST)
 Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 56AA63F557;
- Wed, 30 Jan 2019 10:21:51 -0800 (PST)
-Date: Wed, 30 Jan 2019 18:21:48 +0000
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1A6743F557;
+ Wed, 30 Jan 2019 10:21:59 -0800 (PST)
+Date: Wed, 30 Jan 2019 18:21:57 +0000
 From: Will Deacon <will.deacon@arm.com>
-To: Anders Roxell <anders.roxell@linaro.org>
-Subject: Re: [PATCH] arm64: Kconfig.platforms: fix warning unmet direct
- dependencies
-Message-ID: <20190130182148.GO18558@fuggles.cambridge.arm.com>
-References: <20190115191839.13823-1-anders.roxell@linaro.org>
- <20190125143215.GE25901@arrakis.emea.arm.com>
- <1548431829.28802.50.camel@pengutronix.de>
- <20190130084321.GB3369@localhost.localdomain>
+To: Jann Horn <jannh@google.com>
+Subject: Re: ARM64 suggestion: reduce the compat address limit (currently
+ 0x100000000)?
+Message-ID: <20190130182157.GP18558@fuggles.cambridge.arm.com>
+References: <CAG48ez0QRmU9fGV3x7nceGqBGADNTb66MnG4PW_xu+xnGUqg=g@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190130084321.GB3369@localhost.localdomain>
+In-Reply-To: <CAG48ez0QRmU9fGV3x7nceGqBGADNTb66MnG4PW_xu+xnGUqg=g@mail.gmail.com>
 User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_102153_169230_135384E8 
-X-CRM114-Status: GOOD (  28.30  )
+X-CRM114-CacheID: sfid-20190130_102202_235284_1E960F3E 
+X-CRM114-Status: GOOD (  15.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,77 +70,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, Lucas Stach <l.stach@pengutronix.de>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ kernel list <linux-kernel@vger.kernel.org>,
+ linux-arm-kernel@lists.infradead.org,
+ Kernel Hardening <kernel-hardening@lists.openwall.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 30, 2019 at 09:43:21AM +0100, Anders Roxell wrote:
-> On 2019-01-25 16:57, Lucas Stach wrote:
-> > Am Freitag, den 25.01.2019, 14:32 +0000 schrieb Catalin Marinas:
-> > > On Tue, Jan 15, 2019 at 08:18:39PM +0100, Anders Roxell wrote:
-> > > > When ARCH_MXC get enabled, ARM64_ERRATUM_845719 will be selected and
-> > > > this warning will happen when COMPAT isn't set.
-> > > > =
+Hi Jann,
 
-> > > > WARNING: unmet direct dependencies detected for ARM64_ERRATUM_845719
-> > > > =A0 Depends on [n]: COMPAT [=3Dn]
-> > > > =A0 Selected by [y]:
-> > > > =A0 - ARCH_MXC [=3Dy]
-> > > > =
+On Wed, Jan 30, 2019 at 05:32:00PM +0100, Jann Horn wrote:
+> At the moment, compat tasks running on ARM64 can allocate memory up to
+> 0x100000000 (TASK_SIZE_32). Testing on an Android device (with an
+> admittedly somewhat old kernel):
 
-> > > > Rework to add 'if COMPAT' before ARM64_ERRATUM_845719 gets selected,
-> > > > since ARM64_ERRATUM_845719 depends on COMPAT.
-> > > > =
+[...]
 
-> > > > > > Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
-> > > > ---
-> > > > =A0arch/arm64/Kconfig.platforms | 2 +-
-> > > > =A01 file changed, 1 insertion(+), 1 deletion(-)
-> > > > =
+> ffff1000-100000000 rw-p 00000000 00:00 0
+> 
+> This means that mmap() allocations do not adhere to section 6.5.8 of
+> C99 ("If the
+> expression P points to an element of an array object and the
+> expression Q points to the
+> last element of the same array object, the pointer expression Q+1
+> compares greater than
+> P.") if you treat mmap() allocations as returning an array.
 
-> > > > diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.plat=
-forms
-> > > > index 251ecf34cb02..d4faca775d9c 100644
-> > > > --- a/arch/arm64/Kconfig.platforms
-> > > > +++ b/arch/arm64/Kconfig.platforms
-> > > > @@ -145,7 +145,7 @@ config ARCH_MVEBU
-> > > > =A0config ARCH_MXC
-> > > > > > =A0	bool "ARMv8 based NXP i.MX SoC family"
-> > > > > > =A0	select ARM64_ERRATUM_843419
-> > > > > > -	select ARM64_ERRATUM_845719
-> > > > > > +	select ARM64_ERRATUM_845719 if COMPAT
-> > > > > > =A0	help
-> > > > > > =A0	=A0=A0This enables support for the ARMv8 based SoCs in the
-> > > > =A0	=A0=A0NXP i.MX family.
-> > > =
+Oh, good point.
 
-> > > Actually, do we need to select the errata workarounds explicitly? That
-> > > seems to be the only case where we do it (commit 930507c18304, "arm64:
-> > > add basic Kconfig symbols for i.MX8"). They are default y, so we
-> > > shouldn't need to force them on.
-> > =
+> In practice, I've also seen code that does things like computing a
+> pointer that is out of bounds by a few bytes and then comparing it
+> against the end of the array; while this is UB according to C99, it
+> probably makes sense to try to avoid breaking such code.
 
-> > This is based on past experience. We've had a lot of cases were people
-> > did not enable the necessary CPU errata workaround, which then usually
-> > lead to very hard to debug system failures. It is on our list of things
-> > to look out for now, but I would feel much better if there is just no
-> > chance for a user to misconfigure the kernel in this way.
-> > =
+Agreed, and since the current behaviour isn't something you can portably
+rely on anyway, I think we're ok to change it.
 
-> =
+> X86-64's compat code uses the limit 0xFFFFe000 (IA32_PAGE_OFFSET),
+> which I think makes more sense. Would it make sense to do something
+> like the following (untested)?
 
-> Would a better approach be to remove the 'depends on COMPAT' in the
-> Kconfig and move it into the src files instead see below.
-
-I'd prefer to keep the dependency here, because the erratum is not
-applicable for native (64-bit) userspace.
-
-I think your original patch is fine, so:
-
-Acked-by: Will Deacon <will.deacon@arm.com>
+Can't we just go with 0x100000000 - PAGE_SIZE instead?
 
 Will
 
