@@ -3,21 +3,21 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 75465C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:39:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A59E4C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:41:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3CAD721473
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:39:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A7E820882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:41:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YO2G1Qp3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3CAD721473
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-mips.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cSsvAc5p"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A7E820882
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,39 +25,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4Roo7216OfeXASlpKj6eKCXgAakUq+xcVpwV1MMoc28=; b=YO2G1Qp3VJM6l+
-	1WGEx2uMNawrwSXtaaib7uH+aw2XTtJ3p7Cq4gv7k5XxXPIsu1Txl3bPO/biKvaBk6gT0kO5ILfyj
-	smX7zP3Xn2UCKiR97dxXIj4x/A1YWaAsGfGRcVnRnfErAvj/ipQ0KpHThCADrATWG/ni43oJm/Khb
-	uM+ZeWML4icgp5w6bCjaOaNf3RzJ+Eb6J4HoIT1WS/0SxKs+jjSU7uB+P3TF+tFZAjbl5ZbJFynoj
-	ez+dOXV08hA2o80IzQ0+Lrlk/UmZpgpElAUOI0JN5PKJkKVnM5DAVnUEnJm0X1J8/UEnEb+T544wf
-	F5QWTeDizrKIfuWHawew==;
+	List-Owner; bh=ZA+Z7NItuFzPaYw6l74P/hNfdm2Csxj5iYI3fU4BMTw=; b=cSsvAc5piiOK0r
+	v/f/R6m7+Z1W2S+2BEkelrwMFlx2jJRG5FGBLrAmTERzCVdJMDSU0FlzDTXI0v0CsB66lFGhjT2+O
+	jcLgcNH7QHCHFhmjL5oxL5qtwbUl9UZM/kOPwskrvcW+kF70/tA3JdOGnkXx2n60BDEVWS++qpMCw
+	WN5M4isCE3uGVhP4kXmw0o6XSHcOspz9+XGkn/Tk8yUwqThZK6zRsRDclGONyrogbrqet+9nygNAO
+	aOF1DLviwlpfZ4eLMew7Ckwpx9pvxNF3bUizUV9KQa2R8Uwo1rdFQsm+mqmf9QmB1eEYAVVWgDxt6
+	E99sr3dmhCOhUk3KKkVw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1govhx-0002bd-64; Wed, 30 Jan 2019 19:39:37 +0000
-Received: from eddie.linux-mips.org ([148.251.95.138] helo=cvs.linux-mips.org)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1govhs-0002ak-VF
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 19:39:35 +0000
-Received: (from localhost user: 'ladis' uid#1021 fake: STDIN
- (ladis@eddie.linux-mips.org)) by eddie.linux-mips.org
- id S23992819AbfA3Tj05RT5K (ORCPT
- <rfc822;linux-arm-kernel@lists.infradead.org>);
- Wed, 30 Jan 2019 20:39:26 +0100
-Date: Wed, 30 Jan 2019 20:39:25 +0100
-From: Ladislav Michl <ladis@linux-mips.org>
-To: Vincent Guittot <vincent.guittot@linaro.org>
-Subject: Re: [PATCH v2 ] PM-runtime: fix deadlock with ktime
-Message-ID: <20190130193925.GA11090@lenoch>
-References: <1548846984-2044-1-git-send-email-vincent.guittot@linaro.org>
- <CAJZ5v0gunbCHp_9mDTmtwW1i-_GcXPcjTP48NdV2zv-B6UrD4g@mail.gmail.com>
- <CAKfTPtAO--5rkKAwExbKoKDz9pM7MApbEqe0R9pS1-1avv2Gzw@mail.gmail.com>
+	id 1govjF-0004DJ-7C; Wed, 30 Jan 2019 19:40:57 +0000
+Received: from mail-ot1-f66.google.com ([209.85.210.66])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1govjC-0004Cz-AI
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 19:40:55 +0000
+Received: by mail-ot1-f66.google.com with SMTP id k98so693529otk.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 11:40:54 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=Pzed3W/0Z0OCxQkoAsbcMNZwHTcCFLmcZxWxeac8a/I=;
+ b=AhKgNAPdMNbpJMQaszkMT2xd5IX8umSv4hxrIWWjTnPIDFcx4DSDfPph6wbGpF+5Hr
+ 4nx9wBIvyEUfv4I/DB3ZjCY/ZvIqSLajDT6oJLon78xIsdU/zC1nYYgJJ53sMy6H7At3
+ 7iDfVmJV/BZelYP3I8sCcySFqVQAV98AKYF2dDoNDAS6Ot6rprTi2PXLTfhqYJ15p+0Y
+ ummPXZrIRwDZymqyn0ozhA5cxN6Ja8O+/WYkg3bgjfrR2Ny5qkYxGxgXIymjDI5eQGkt
+ LzYjyPr8xAZTV1DJToX9BwPdvdkuQt0dBimCkY1nAOcTGir7DYHqtXLSPPufhOzRkFDI
+ I6kQ==
+X-Gm-Message-State: AJcUukeMKzdU02ThjY9YHU0vMkmnsE4khxfsQu1F0OP2YlW+1tE1ekys
+ abOUNg2oWxn8aFivF51qmw==
+X-Google-Smtp-Source: ALg8bN6IkUHTJZug2xNP1ip8Z2xgvxBQnDeycRl0IzbdTdfJ7fpiSOukORCC1SijvRRIKCqcmma7ow==
+X-Received: by 2002:a9d:2f64:: with SMTP id h91mr23653203otb.14.1548877253388; 
+ Wed, 30 Jan 2019 11:40:53 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id m131sm1055633oia.6.2019.01.30.11.40.52
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 30 Jan 2019 11:40:52 -0800 (PST)
+Date: Wed, 30 Jan 2019 13:40:52 -0600
+From: Rob Herring <robh@kernel.org>
+To: Vishal Sagar <vishal.sagar@xilinx.com>
+Subject: Re: [PATCH v2 1/2] media: dt-bindings: media: xilinx: Add Xilinx
+ MIPI CSI-2 Rx Subsystem
+Message-ID: <20190130194052.GA9543@bogus>
+References: <1548438777-11203-1-git-send-email-vishal.sagar@xilinx.com>
+ <1548438777-11203-2-git-send-email-vishal.sagar@xilinx.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CAKfTPtAO--5rkKAwExbKoKDz9pM7MApbEqe0R9pS1-1avv2Gzw@mail.gmail.com>
+In-Reply-To: <1548438777-11203-2-git-send-email-vishal.sagar@xilinx.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_113933_008219_C274A3A1 
-X-CRM114-Status: GOOD (  26.69  )
+X-CRM114-CacheID: sfid-20190130_114054_353389_21D8E4B2 
+X-CRM114-Status: GOOD (  23.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,153 +88,165 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>, Linux PM <linux-pm@vger.kernel.org>,
- "Rafael J. Wysocki" <rafael@kernel.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Biju Das <biju.das@bp.renesas.com>,
- Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
- Geert Uytterhoeven <geert@linux-m68k.org>,
- Linux OMAP Mailing List <linux-omap@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, dineshk@xilinx.com,
+ hyun.kwon@xilinx.com, sandipk@xilinx.com, michal.simek@xilinx.com,
+ linux-kernel@vger.kernel.org, hans.verkuil@cisco.com,
+ laurent.pinchart@ideasonboard.com, sakari.ailus@linux.intel.com,
+ mchehab@kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 30, 2019 at 02:18:49PM +0100, Vincent Guittot wrote:
-> On Wed, 30 Jan 2019 at 14:06, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> >
-> > On Wed, Jan 30, 2019 at 12:16 PM Vincent Guittot
-> > <vincent.guittot@linaro.org> wrote:
-> > >
-> > > A deadlock has been seen when swicthing clocksources which use PM runtime.
-> > > The call path is:
-> > > change_clocksource
-> > >     ...
-> > >     write_seqcount_begin
-> > >     ...
-> > >     timekeeping_update
-> > >         ...
-> > >         sh_cmt_clocksource_enable
-> > >             ...
-> > >             rpm_resume
-> > >                 pm_runtime_mark_last_busy
-> > >                     ktime_get
-> > >                         do
-> > >                             read_seqcount_begin
-> > >                         while read_seqcount_retry
-> > >     ....
-> > >     write_seqcount_end
-> > >
-> > > Although we should be safe because we haven't yet changed the clocksource
-> > > at that time, we can't because of seqcount protection.
-> > >
-> > > Use ktime_get_mono_fast_ns() instead which is lock safe for such case
-> > >
-> > > With ktime_get_mono_fast_ns, the timestamp is not guaranteed to be
-> > > monotonic across an update and as a result can goes backward. According to
-> > > update_fast_timekeeper() description: "In the worst case, this can
-> > > result is a slightly wrong timestamp (a few nanoseconds)". For
-> > > PM runtime autosuspend, this means only that the suspend decision can
-> > > be slightly sub optimal.
-> > >
-> > > Fixes: 8234f6734c5d ("PM-runtime: Switch autosuspend over to using hrtimers")
-> > > Reported-by: Biju Das <biju.das@bp.renesas.com>
-> > > Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> >
-> > I've queued this one up as a fix for 5.0, but unfortunately it clashes
-> > with the patch from Ladislav Michl at
-> > https://patchwork.kernel.org/patch/10755477/ which has been dropped
-> > now.
+On Fri, Jan 25, 2019 at 11:22:56PM +0530, Vishal Sagar wrote:
+> Add bindings documentation for Xilinx MIPI CSI-2 Rx Subsystem.
 > 
-> Thanks for adding Ladislav in this thread.
-> I'm sorry I forgot to add him in the loop.
+> The Xilinx MIPI CSI-2 Rx Subsystem consists of a CSI-2 Rx controller, a
+> DPHY in Rx mode, an optional I2C controller and a Video Format Bridge.
 > 
-> >
-> > Can you or Ladislav please rebase that patch on top of this one and repost?
+> Signed-off-by: Vishal Sagar <vishal.sagar@xilinx.com>
+> ---
+> v2
+> - updated the compatible string to latest version supported
+> - removed DPHY related parameters
+> - added CSI v2.0 related property (including VCX for supporting upto 16
+>   virtual channels).
+> - modified csi-pxl-format from string to unsigned int type where the value
+>   is as per the CSI specification
+> - Defined port 0 and port 1 as sink and source ports.
+> - Removed max-lanes property as suggested by Rob and Sakari
 > 
-> Ladislav,
+>  .../bindings/media/xilinx/xlnx,csi2rxss.txt        | 105 +++++++++++++++++++++
+>  1 file changed, 105 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
 > 
-> Let me know if you prefer to rebase and repost your patch of if you
-> want me to do.
+> diff --git a/Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt b/Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
+> new file mode 100644
+> index 0000000..98781cf
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
+> @@ -0,0 +1,105 @@
+> +Xilinx MIPI CSI2 Receiver Subsystem Device Tree Bindings
+> +--------------------------------------------------------
+> +
+> +The Xilinx MIPI CSI2 Receiver Subsystem is used to capture MIPI CSI2 traffic
+> +from compliant camera sensors and send the output as AXI4 Stream video data
+> +for image processing.
+> +
+> +The subsystem consists of a MIPI DPHY in slave mode which captures the
+> +data packets. This is passed along the MIPI CSI2 Rx IP which extracts the
+> +packet data. The Video Format Bridge (VFB) converts this data to AXI4 Stream
+> +video data.
+> +
+> +For more details, please refer to PG232 Xilinx MIPI CSI-2 Receiver Subsystem.
+> +
+> +Required properties:
+> +--------------------
+> +- compatible: Must contain "xlnx,mipi-csi2-rx-subsystem-4.0".
+> +- reg: Physical base address and length of the registers set for the device.
+> +- interrupt-parent: specifies the phandle to the parent interrupt controller
 
-I'll rebase it on top of Rafael's bleeding-edge branch.
+Don't document this. It is implied.
 
-Best regards,
-	ladis
+> +- interrupts: Property with a value describing the interrupt number.
+> +- clocks: List of phandles to AXI Lite, Video and 200 MHz DPHY clocks.
+> +- clock-names: Must contain "lite_aclk", "video_aclk" and "dphy_clk_200M" in
+> +  the same order as clocks listed in clocks property.
+> +- xlnx,csi-pxl-format: This denotes the CSI Data type selected in hw design.
+> +  Packets other than this data type (except for RAW8 and User defined data
+> +  types) will be filtered out. Possible values are as below -
+> +  0x1E - YUV4228B
+> +  0x1F - YUV42210B
+> +  0x20 - RGB444
+> +  0x21 - RGB555
+> +  0x22 - RGB565
+> +  0x23 - RGB666
+> +  0x24 - RGB888
+> +  0x28 - RAW6
+> +  0x29 - RAW7
+> +  0x2A - RAW8
+> +  0x2B - RAW10
+> +  0x2C - RAW12
+> +  0x2D - RAW14
+> +  0x2E - RAW16
+> +  0x2F - RAW20
+> +- xlnx,vfb: This is present when Video Format Bridge is enabled.
 
-> Regards,
-> Vincent
+boolean?
+
+> +
+> +Optional properties:
+> +--------------------
+> +- xlnx,en-csi-v2-0: Present if CSI v2 is enabled in IP configuration.
+> +- xlnx,en-vcx: When present, there are maximum 16 virtual channels, else
+> +  only 4. This is present only if xlnx,en-csi-v2-0 is present.
+> +- xlnx,en-active-lanes: Enable Active lanes configuration in Protocol
+> +  Configuration Register.
+> +- xlnx,cfa-pattern: This goes in the sink port to indicate bayer pattern.
+> +  Valid values are "bggr", "rggb", "gbrg" and "grbg".
+
+This should go in the endpoint with the other properties. I'd also move 
+it down below 'Ports' to be clear it goes in a different node.
+
+> +
+> +Ports
+> +-----
+> +The device node shall contain two 'port' child nodes as defined in
+> +Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +
+> +The port@0 is sink port and shall connect to CSI2 source like camera.
+> +It must have the data-lanes property. It may have the xlnx,cfa-pattern
+> +property to indicate bayer pattern of source.
+> +
+> +The port@1 is source port could be connected to any video processing IP
+> +which can work with AXI4 Stream data.
+> +
+> +Both ports must have remote-endpoints.
+
+No need to state that. That's implicit for the graph to work...
+> +
+> +Example:
+> +
+> +	csiss_1: csiss@a0020000 {
+> +		compatible = "xlnx,mipi-csi2-rx-subsystem-4.0";
+> +		reg = <0x0 0xa0020000 0x0 0x10000>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 95 4>;
+> +		xlnx,csi-pxl-format = <0x2a>;
+> +		xlnx,vfb;
+> +		xlnx,en-active-lanes;
+> +		xlnx,en-csi-v2-0;
+> +		xlnx,en-vcx;
+> +		clock-names = "lite_aclk", "dphy_clk_200M", "video_aclk";
+> +		clocks = <&misc_clk_0>, <&misc_clk_1>, <&misc_clk_2>;
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port@0 {
+> +				/* Sink port */
+> +				reg = <0>;
+> +				xlnx,cfa-pattern = "bggr"
+> +				csiss_in: endpoint {
+> +					data-lanes = <1 2 3 4>;
+> +					/* MIPI CSI2 Camera handle */
+> +					remote-endpoint = <&camera_out>;
+> +				};
+> +			};
+> +			port@1 {
+> +				/* Source port */
+> +				reg = <1>;
+> +				csiss_out: endpoint {
+> +					remote-endpoint = <&vproc_in>;
+> +				};
+> +			};
+> +		};
+> +	};
+> -- 
+> 2.7.4
 > 
-> >
-> > > ---
-> > >
-> > > - v2: Updated commit message to explain the impact of using
-> > >   ktime_get_mono_fast_ns()
-> > >
-> > >  drivers/base/power/runtime.c | 10 +++++-----
-> > >  include/linux/pm_runtime.h   |  2 +-
-> > >  2 files changed, 6 insertions(+), 6 deletions(-)
-> > >
-> > > diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-> > > index 457be03..708a13f 100644
-> > > --- a/drivers/base/power/runtime.c
-> > > +++ b/drivers/base/power/runtime.c
-> > > @@ -130,7 +130,7 @@ u64 pm_runtime_autosuspend_expiration(struct device *dev)
-> > >  {
-> > >         int autosuspend_delay;
-> > >         u64 last_busy, expires = 0;
-> > > -       u64 now = ktime_to_ns(ktime_get());
-> > > +       u64 now = ktime_get_mono_fast_ns();
-> > >
-> > >         if (!dev->power.use_autosuspend)
-> > >                 goto out;
-> > > @@ -909,7 +909,7 @@ static enum hrtimer_restart  pm_suspend_timer_fn(struct hrtimer *timer)
-> > >          * If 'expires' is after the current time, we've been called
-> > >          * too early.
-> > >          */
-> > > -       if (expires > 0 && expires < ktime_to_ns(ktime_get())) {
-> > > +       if (expires > 0 && expires < ktime_get_mono_fast_ns()) {
-> > >                 dev->power.timer_expires = 0;
-> > >                 rpm_suspend(dev, dev->power.timer_autosuspends ?
-> > >                     (RPM_ASYNC | RPM_AUTO) : RPM_ASYNC);
-> > > @@ -928,7 +928,7 @@ static enum hrtimer_restart  pm_suspend_timer_fn(struct hrtimer *timer)
-> > >  int pm_schedule_suspend(struct device *dev, unsigned int delay)
-> > >  {
-> > >         unsigned long flags;
-> > > -       ktime_t expires;
-> > > +       u64 expires;
-> > >         int retval;
-> > >
-> > >         spin_lock_irqsave(&dev->power.lock, flags);
-> > > @@ -945,8 +945,8 @@ int pm_schedule_suspend(struct device *dev, unsigned int delay)
-> > >         /* Other scheduled or pending requests need to be canceled. */
-> > >         pm_runtime_cancel_pending(dev);
-> > >
-> > > -       expires = ktime_add(ktime_get(), ms_to_ktime(delay));
-> > > -       dev->power.timer_expires = ktime_to_ns(expires);
-> > > +       expires = ktime_get_mono_fast_ns() + (u64)delay * NSEC_PER_MSEC);
-> > > +       dev->power.timer_expires = expires;
-> > >         dev->power.timer_autosuspends = 0;
-> > >         hrtimer_start(&dev->power.suspend_timer, expires, HRTIMER_MODE_ABS);
-> > >
-> > > diff --git a/include/linux/pm_runtime.h b/include/linux/pm_runtime.h
-> > > index 54af4ee..fed5be7 100644
-> > > --- a/include/linux/pm_runtime.h
-> > > +++ b/include/linux/pm_runtime.h
-> > > @@ -105,7 +105,7 @@ static inline bool pm_runtime_callbacks_present(struct device *dev)
-> > >
-> > >  static inline void pm_runtime_mark_last_busy(struct device *dev)
-> > >  {
-> > > -       WRITE_ONCE(dev->power.last_busy, ktime_to_ns(ktime_get()));
-> > > +       WRITE_ONCE(dev->power.last_busy, ktime_get_mono_fast_ns());
-> > >  }
-> > >
-> > >  static inline bool pm_runtime_is_irq_safe(struct device *dev)
-> > > --
-> > > 2.7.4
-> > >
 
 _______________________________________________
 linux-arm-kernel mailing list
