@@ -2,69 +2,85 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2F362C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:10:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16306C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:14:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 071BE21473
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:10:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DA91620870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:14:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ho4cEkYv";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="kobNtMP2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 071BE21473
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k05ZDE4g";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="SsHD0Nim"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA91620870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=fb.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QsIH3kAtuM2bu4L4QlfKQRofQU8AnE0h0USExZARmyU=; b=Ho4cEkYvX6PRI7
-	HlZcqfiQE8HhjcXkEZ77TTMBIixmwhAa8vUVuqsuB5LtNULv3esCYP+SbhlJCNcD3MQMH2VlE/TnA
-	mpdC3CntIbteU/Sz44LJnmFjeGwDLlYN8sV2AR8/LsK72LhUJh/KI1516JRlHfp/EX61+UJ39TkxL
-	6lVz0TcLmzeQYcd5czCyibwjsFWzvZ/3r5ON1WzkHzpXY3JsnPB5R97CbeH9RH55RlUmQbiklt7St
-	ZnFtxRDH0oqse0UDVDVLbOYSo4Xxe/OxgbUsHe84B2XMiYk+lUBZIYDnADR2PtHzKwDzwn6Q8qIxy
-	/aJV2RaDgr2qnwiXlOPg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=4tzerz1AGeLkNyB4bppimVTBNT97d/e2OChvQizdZOE=; b=k05ZDE4gD5ArMC
+	gZ2wilqUngSqKX+plVljj6moKwPOj1+GoVEIOHVIyMDCSEA5huOIMTuguKwngxpxf8Nd3bcOAoxfS
+	zAfqy/AIymfBeixLUZaYgqGdMQU3FA6JIpE70pcFTADcLh2a2YOEPkH3ZE4jETfFPcNdX6gyn9YFh
+	+VnHTbMrxFQ0YrN+MuePOcBRYQ52tPVWn+K9pMX1BNdPOxXGhcR4dKrwgKGNgjwoZf4CuE7S/nbJT
+	saitsStpNElWlCpliXRtucv///jicEyQaVELqL3u5hpSw6+HT+5Nq55AG7ndwGmdHM8JGDA5o3wR0
+	1cnPamZYkDyo1vnC5CRQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gouJP-0004dZ-SB; Wed, 30 Jan 2019 18:10:11 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gouNy-0005ue-15; Wed, 30 Jan 2019 18:14:54 +0000
+Received: from mx0b-00082601.pphosted.com ([67.231.153.30]
+ helo=mx0a-00082601.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gouJM-00045z-Qf; Wed, 30 Jan 2019 18:10:10 +0000
-Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id BD98720869;
- Wed, 30 Jan 2019 18:10:07 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548871808;
- bh=EmZvF7H+0NygrHmdlDz0uULZfAPgJ3b1iTz8wkkFJ5o=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=kobNtMP2vKsufH+UdkMFWtKPcG4I8u8Alcsc0gT169GbufQF/UBNjxPNxV1XSrcnB
- OzfFFD9q7pwtJq7mdYPGPGBoCYII84u9A9mUF8kWSz0Ucvg9/ESjiiKL2lbMAmU+qx
- 7S+5VaLnaiPgqT9ZPBFp7Y/t1/DpkjKKm3kH6lRM=
-Date: Wed, 30 Jan 2019 19:10:05 +0100
-From: "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>
-To: Andrew Lunn <andrew@lunn.ch>
-Subject: Re: [PATCH v2] staging: mt7621-eth/ethtool.c: Correction of SPDX
- license identifier
-Message-ID: <20190130181005.GA15653@kroah.com>
-References: <SC1P15201MB2014C3E0CAB4DA9ADF330797A8900@SC1P15201MB2014.LAMP152.PROD.OUTLOOK.COM>
- <20190130163817.GF21904@lunn.ch>
+ id 1gouNu-0005tv-41
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 18:14:51 +0000
+Received: from pps.filterd (m0089730.ppops.net [127.0.0.1])
+ by m0089730.ppops.net (8.16.0.27/8.16.0.27) with SMTP id x0UICDwM031847
+ for <linux-arm-kernel@lists.infradead.org>; Wed, 30 Jan 2019 10:14:47 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.com;
+ h=from : to : cc : subject
+ : date : message-id : mime-version : content-type; s=facebook;
+ bh=kfkaMT2bBs1cq2Dp5zgD3taUBGLMPsX69j6ltSYwu/A=;
+ b=SsHD0NimPXxFI3hTxFeO3PcSoQhTNZxWzG3GjySEz8ZithSrGWRYa+buPGvB1V4Iw6+U
+ NNQjJfOEDzABkO12yn6BwKuC3NwUwkGajAOsjID3svkuWqsdeZfHNCDiRGgVZOmQdBG1
+ XGYMqjT7yzDqRi8Jp8Oekk15w+t82J09IrU= 
+Received: from mail.thefacebook.com ([199.201.64.23])
+ by m0089730.ppops.net with ESMTP id 2qbh0cg09t-7
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT)
+ for <linux-arm-kernel@lists.infradead.org>; Wed, 30 Jan 2019 10:14:47 -0800
+Received: from mx-out.facebook.com (2620:10d:c081:10::13) by
+ mail.thefacebook.com (2620:10d:c081:35::125) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA) id 15.1.1531.3;
+ Wed, 30 Jan 2019 10:14:29 -0800
+Received: by devvm4117.prn2.facebook.com (Postfix, from userid 167582)
+ id 759549182779; Wed, 30 Jan 2019 10:14:29 -0800 (PST)
+Smtp-Origin-Hostprefix: devvm
+From: Vijay Khemka <vijaykhemka@fb.com>
+Smtp-Origin-Hostname: devvm4117.prn2.facebook.com
+To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Joel Stanley <joel@jms.id.au>, Andrew Jeffery <andrew@aj.id.au>,
+ <devicetree@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>,
+ <linux-aspeed@lists.ozlabs.org>, <linux-kernel@vger.kernel.org>
+Smtp-Origin-Cluster: prn2c23
+Subject: [PATCH] ARM: dts: aspeed: tiogapass: Enable VUART
+Date: Wed, 30 Jan 2019 10:14:26 -0800
+Message-ID: <20190130181427.2469674-1-vijaykhemka@fb.com>
+X-Mailer: git-send-email 2.17.1
+X-FB-Internal: Safe
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190130163817.GF21904@lunn.ch>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-01-30_13:, , signatures=0
+X-Proofpoint-Spam-Reason: safe
+X-FB-Internal: Safe
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_101008_893309_29DCC5E0 
-X-CRM114-Status: GOOD (  17.52  )
+X-CRM114-CacheID: sfid-20190130_101450_286831_9F601F14 
+X-CRM114-Status: GOOD (  12.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,69 +92,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>,
- Carlos Henrique Lima Melara <charlesmelara@outlook.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "neil@brown.name" <neil@brown.name>,
- "linux-mediatek@lists.infradead.org" <linux-mediatek@lists.infradead.org>,
- "matthias.bgg@gmail.com" <matthias.bgg@gmail.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>,
+ vijaykhemka@fb.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 30, 2019 at 05:38:17PM +0100, Andrew Lunn wrote:
-> On Wed, Jan 30, 2019 at 02:48:27PM +0000, Carlos Henrique Lima Melara wrote:
-> > 	This patch fix the checkpatch.p1 warning:
-> > 
-> > 	WARNING: Missing or malformed SPDX-License-Identifier tag in line 1
-> > 	+/*
-> > 
-> > 	It includes the SPDX expression for GPL-2.0 and corrects the comment format to suit the kernel's coding style.
-> > 
-> > Signed-off-by: Carlos (Charles) Henrique Lima Melara <charlesmelara@outlook.com>
-> > ---
-> >  drivers/staging/mt7621-eth/ethtool.c | 22 ++++++++++++----------
-> >  1 file changed, 12 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/drivers/staging/mt7621-eth/ethtool.c b/drivers/staging/mt7621-eth/ethtool.c
-> > index 40a7d47be913..49d417de64c8 100644
-> > --- a/drivers/staging/mt7621-eth/ethtool.c
-> > +++ b/drivers/staging/mt7621-eth/ethtool.c
-> > @@ -1,15 +1,17 @@
-> > -/*   This program is free software; you can redistribute it and/or modify
-> > - *   it under the terms of the GNU General Public License as published by
-> > - *   the Free Software Foundation; version 2 of the License
-> > +// SPDX-License-Identifier: GPL-2.0
-> 
-> Hi Carlos
-> 
-> drivers/staging/mt7621-eth$ grep LICENSE *
-> gsw_mt7621.c:MODULE_LICENSE("GPL");
-> mtk_eth_soc.c:MODULE_LICENSE("GPL");
-> 
-> And include/linux/module.h 
-> says:
-> 
-> /*
->  * The following license idents are currently accepted as indicating free
->  * software modules
->  *
->  *      "GPL"                           [GNU Public License v2 or later]
->  *      "GPL v2"                        [GNU Public License v2]
-> 
-> So the SPDX string probably does not match the MODULE_LICENSE.
+Enabling vuart for Facebook tiogapass
 
-No, ignore the MODULE_LICENSE marking for this, go by what the text at
-the top of the file says. See the patch about all of this from Thomas on
-lkml yesterday for why this is the case.
+Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
+---
+ arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-So the patch is fine.  If the changelog stuff ever gets fixed...
+diff --git a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
+index 42e0d7a8e8d0..a058fb2985f7 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
+@@ -64,6 +64,11 @@
+ 	status = "okay";
+ };
+ 
++&vuart {
++	// VUART Host Console
++	status = "okay";
++};
++
+ &uart1 {
+ 	// Host Console
+ 	status = "okay";
+-- 
+2.17.1
 
-thanks,
-
-greg k-h
 
 _______________________________________________
 linux-arm-kernel mailing list
