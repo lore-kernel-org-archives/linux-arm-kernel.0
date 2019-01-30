@@ -2,21 +2,23 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2D32BC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:21:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 57D4DC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:22:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F2A0320882
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:21:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 151A420882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:22:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mt9n8olu";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="e4HY0tE+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F2A0320882
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FqQuESSL";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="mA1F8WiA";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Cc5tXPHa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 151A420882
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,58 +27,71 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PnPB9iRLgxDoidsLHPZKw/73JldLqdzJ8HamAWizlC4=; b=mt9n8olu0P6UP/
-	Nq8ZGQt4OGzicXbX3b02/eXxBJ+iuPU/96g97u2rnIhoBCdwkOFDV1kYKXTb/6S5jKVsR994CYafu
-	I8/Eo431nLEme5PSLHMTEKY9JzzQV/mRP2LfjYlBT1zH4B6WqyjhrCDIgQdCy3EYqVdbADbS8Gd06
-	x+gxvMHIXlD487QTfe0vhw2E1oQ09YqJOF0FfBbn0DomaKggHVGuYcK71UN0GNwXE8BUtG0lZiVVU
-	7oC3UQ4gv4lBXujYtgV8oOPlo8tQ2AKJTQraN3skwiJYXm48nvmfIcV+D35I9fQ4v2RE1ydGmfEiI
-	FLoU5GJbv1OU+DB/3E4Q==;
+	List-Owner; bh=z92rhVxQtrQQTAagYwSlMAvcWzGttVeZgpjPRetNTDM=; b=FqQuESSL+jnMFq
+	zZdc846J05ucF/eBX+oqgK8sgFuxUAplGmrM4Eh/iWPQRGIMtdeyhVv4ff6IXIUWOCUtzxzw2mHoz
+	BvF8xuG+gWrMmDomBLzEk4eFRxBKZp39Upv2eWScve7i++MIyaklirM9ncwd3anv/++uQo0eTMclC
+	yMZo85HKacHD2t3S9Krb++1m0g3KVgfrV0mnAUOPLzM+DqO/YwTdG7wKOA6nrFrdkqUFS2IKKNQra
+	MfOUXw4nwsNirQQyIEHtET2Pf83bk8nMo3K6DrodX0z0CrU5MmJNU0dWMRw4WifHlpFvdYFk1gRWV
+	SYDZjyfKkwmOe+o+aX1A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gom3I-0008Mh-Hi; Wed, 30 Jan 2019 09:21:00 +0000
-Received: from mail-io1-xd42.google.com ([2607:f8b0:4864:20::d42])
+	id 1gom4K-0000hP-VZ; Wed, 30 Jan 2019 09:22:04 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gom1l-0005ro-39
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 09:19:56 +0000
-Received: by mail-io1-xd42.google.com with SMTP id l14so18779497ioj.5
+ id 1gom3a-0000Dg-9G
+ for linux-arm-kernel@bombadil.infradead.org; Wed, 30 Jan 2019 09:21:18 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Content-Type:Cc:To:Subject:Message-ID:
+ Date:From:In-Reply-To:References:MIME-Version:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=5q2By4zDCEQ19WGtdM+IRxh5BPqAQYmO+RXSEca+nD0=; b=mA1F8WiAuECQF8VhQPeK0kfs+
+ 2AHgZ94GY7pJf9uGrpKoXGNfih/w670YR/FTwn4TRP1B/Lwyy4aorTM/Kq/+QeQR93fMV0iPCl1Ez
+ 7wKB2rmHP5wJjNmZcKXncUNWkt4V7N8kFwSZKGPI6nKVYblJ7K2hdO0v/CMP97TA1R8djr9zBmADY
+ 5uaa9uIMpwVmAg6tGr1WXdUbTC5KK/o+EQ+bp1V30Fuew+KCvp67urN5TY0rTP1qRf6Ggq39LLgN+
+ qKVOcZjfv6l05iPWfFAeUTUJ2VOT+pheoTioAheRf9Mp2V5Ei2TQh4CdXcRJISLvej0kIUbIxf3mb
+ vYaxK1Rlg==;
+Received: from mail-vs1-xe42.google.com ([2607:f8b0:4864:20::e42])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gom3X-0007HX-9q
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 09:21:16 +0000
+Received: by mail-vs1-xe42.google.com with SMTP id p74so13845808vsc.0
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 01:19:24 -0800 (PST)
+ Wed, 30 Jan 2019 01:21:12 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=PhvCaN4Kv7vm7G6iA7saM9KjT4UB8mVq8grjhF2dBy4=;
- b=e4HY0tE+qHmSaKLgA4INHl4e+AgXVkiwSq7KR/BFdSRXM28li1IHnkT/yaqqVEuleF
- PWzms/8pP0XziQAjvJmHFbQVuvPlCrqN7Tc43z89fLJTahu4NzLfiiiYz+boqcS8eRi5
- 1YRdv0rMxGrFvt6TLA62gKg0v+BmK8Yt9TuWk=
+ :cc; bh=5q2By4zDCEQ19WGtdM+IRxh5BPqAQYmO+RXSEca+nD0=;
+ b=Cc5tXPHaEjkJ8is4qaHQKQUIRsJLCXh7Vuzsuo17FzSAc65cHiEdJyNHFX9xlMK0y+
+ UxffHHHvcWa0H+J0Uze+vh0tUvUX5JW7uqcQnKRpR26W3z+DqpNJLBJD8pvHH7z0TTcN
+ a3CrewZcStgSUt+ra0iBH/gPjPyTMbXmMhtYU=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=PhvCaN4Kv7vm7G6iA7saM9KjT4UB8mVq8grjhF2dBy4=;
- b=qUQFRGAZ0a7FvR6juihPBxKt1Pb433bELt5rmpNKhDGfNfRBjGr7dIvBBBnK3CI2Kg
- 0Y19mZtVIfpWZA6NtzolEuqaOF7f0kokqArBBu9YNn8h9OodIiqw3UIyS/tYdSg2cTvG
- elAAfRUiyIq8ZSeZM0jvZ2hb44gV9q1qgSFtpyFVh/0SvKqpEzO/dh+E0+IEJKPZ1fk3
- fdmyvmw0KUnDkE/gHcCX5hEBp0Gq8mZbMvnVXF4sc5ojb3I4L8pvnHCdfmV6ZsGVUGbd
- zQ8qkhjrzsTJ41gE1wKOQsd569paYx7JxEAvrasA95E/O6+jshHvZOQXJX8mC6LOwS2t
- bavg==
-X-Gm-Message-State: AHQUAuY+zl2036s2UaPI0AgPamdv3tkyE4fu8usRwgEzhW8icm8b6Qh6
- 6JuUt66uSSxK2IB7The0pYqBrRgUhBr+sfnU4cDYBA==
-X-Google-Smtp-Source: AHgI3IYsJJbYy2Zb+/BCEA0T7MAjCosJLSEg4zJR49yRfHTeNdEsmgC6azsTd813JhRiW1IfihrfCFfSl60l+Fvprog=
-X-Received: by 2002:a5d:8410:: with SMTP id i16mr559462ion.173.1548839964162; 
- Wed, 30 Jan 2019 01:19:24 -0800 (PST)
+ bh=5q2By4zDCEQ19WGtdM+IRxh5BPqAQYmO+RXSEca+nD0=;
+ b=eufN8iibL/eUHI9IDwRQKmJV5jFq5vHCeNgLl39I8BtQzkilOFB/aLcAoxjmo05sPf
+ C66VXmE0pqSQlSXnp7Lo16sflRtk45lF0P7gywUtgb96Q7j5UYWKPPAxdTnG8z4ZtdHm
+ TGGGb8c0ACqbeSbQ08k7dEf4Br73brfcZWq3m9INb9bNVzyq4BZlpZhn55jJs0I0G5PX
+ 38juaaA9wLTbHl5o1nC3rPAIDwryun2igX/QFEGKtabTBqBnb8ZPDxp6JZUm8NkpFQTZ
+ Ga+my9xc3vCcA9W7+bnOUX7qzD+hOEPyFRe1QcowwBWpHx2V5b5p4Z0aQafr/WLQi04Z
+ FGIQ==
+X-Gm-Message-State: AJcUukdrl3E3HKMvTJ3Cn6LyC7WD6S0Rv4LQXNLdXz0v/2hYv0vK4EFc
+ eLRgVLETJoLxN09xYRdiJXaW7Tz0eusf/8P42VrE3w==
+X-Google-Smtp-Source: ALg8bN4J35Hii93cBd4NWmhlx9nwks5erLZ56doFhQC1g6SVvZp2XJ5FjNpR5RqJGsuQYhdlbgbr1ncfdjFMy6/2Kyo=
+X-Received: by 2002:a67:74c2:: with SMTP id p185mr8785047vsc.34.1548840070176; 
+ Wed, 30 Jan 2019 01:21:10 -0800 (PST)
 MIME-Version: 1.0
-References: <20190130031444.28935-1-ebiggers@kernel.org>
- <CAKv+Gu95j-ZJC7vbUzJKqNczht1cjgx09sBiSRcwg+qn-HtXew@mail.gmail.com>
- <20190130091332.gbcce2oyb24ienu2@gondor.apana.org.au>
-In-Reply-To: <20190130091332.gbcce2oyb24ienu2@gondor.apana.org.au>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Wed, 30 Jan 2019 10:19:10 +0100
-Message-ID: <CAKv+Gu8NL+J0NncuyKEjo-K5Z_qXwRRuGMvm1227Q6s2rTGQ3w@mail.gmail.com>
-Subject: Re: [PATCH v3 0/3] crypto: crct10dif assembly cleanup and
- optimizations
-To: Herbert Xu <herbert@gondor.apana.org.au>
+References: <20190129164950.31052-1-nicolas.ferre@microchip.com>
+In-Reply-To: <20190129164950.31052-1-nicolas.ferre@microchip.com>
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Wed, 30 Jan 2019 10:20:34 +0100
+Message-ID: <CAPDyKFrknwcbTDKQsGTSo9oZWX3B=fq39Ea=YkoFt_8LoEj5AQ@mail.gmail.com>
+Subject: Re: [PATCH] mmc: atmel-mci: enable 8 bits buswidth support
+To: Nicolas Ferre <nicolas.ferre@microchip.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_011925_744815_4FFD33C1 
-X-CRM114-Status: GOOD (  16.60  )
+X-CRM114-CacheID: sfid-20190130_042115_384118_FC4DF045 
+X-CRM114-Status: GOOD (  17.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,41 +103,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Eric Biggers <ebiggers@kernel.org>, Tim Chen <tim.c.chen@linux.intel.com>,
- "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
- <linux-crypto@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Ludovic Desroches <ludovic.desroches@microchip.com>,
+ "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 30 Jan 2019 at 10:13, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+On Tue, 29 Jan 2019 at 17:50, Nicolas Ferre <nicolas.ferre@microchip.com> wrote:
 >
-> On Wed, Jan 30, 2019 at 09:33:57AM +0100, Ard Biesheuvel wrote:
-> >
-> > So what remains is the way these implementations are encapsulated by
-> > the crct10dif() library function, which is raster nasty, making
-> > CRC-T10DIF an excellent use case to discuss whether we can make any
-> > improvements to address some of the concerns that were also raised in
-> > the zinc discussion. I threw some code together a while ago [0] (and
-> > posted it as well, IIRC). In the mean time, a 'static call'
-> > infrastructure is being proposed that could be used in a similar way
-> > to avoid function pointers. I'm also interested in hearing opinions on
-> > whether the indirect call overhead is actually significant in use
-> > cases such as this one.
+> This patch adds support for 8-bit buswidth.
+> Relevant SDCR value modified.
 >
-> I think even if the overhead wasn't significant it would still make
-> sense to make the move just for the sake of simplicity.
->
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-Agreed, we should simplify this if we can.
+Applied for next, thanks!
 
-However, my question is whether in this particular case, a simple
-indirect call via a function pointer is /so/ much worse than a direct
-call that relies on code patching techniques that are different on
-every arch (and may rely on objtool or GCC plugins) that the extra
-complexity is justified.
+Kind regards
+Uffe
+
+> ---
+>  drivers/mmc/host/atmel-mci.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 47189f9ed4e2..735aa5871358 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -1410,6 +1410,9 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>         case MMC_BUS_WIDTH_4:
+>                 slot->sdc_reg |= ATMCI_SDCBUS_4BIT;
+>                 break;
+> +       case MMC_BUS_WIDTH_8:
+> +               slot->sdc_reg |= ATMCI_SDCBUS_8BIT;
+> +               break;
+>         }
+>
+>         if (ios->clock) {
+> @@ -2275,8 +2278,11 @@ static int atmci_init_slot(struct atmel_mci *host,
+>          * use only one bit for data to prevent fifo underruns and overruns
+>          * which will corrupt data.
+>          */
+> -       if ((slot_data->bus_width >= 4) && host->caps.has_rwproof)
+> +       if ((slot_data->bus_width >= 4) && host->caps.has_rwproof) {
+>                 mmc->caps |= MMC_CAP_4_BIT_DATA;
+> +               if (slot_data->bus_width >= 8)
+> +                       mmc->caps |= MMC_CAP_8_BIT_DATA;
+> +       }
+>
+>         if (atmci_get_version(host) < 0x200) {
+>                 mmc->max_segs = 256;
+> --
+> 2.17.1
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
