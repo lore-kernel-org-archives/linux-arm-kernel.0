@@ -2,70 +2,72 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DATE_IN_PAST_12_24,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E01C9C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:43:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9C654C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:46:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B2E542087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:43:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6A83E218A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:46:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GfX4YgHT";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=163.com header.i=@163.com header.b="Wf9CoRoA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B2E542087F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=163.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oSnfOPCr";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="rZncRNhq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A83E218A3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=TvGVkAOYiyIRq27MA5fYLbo0hwyPvvorxpSORwTlMW8=; b=GfX4YgHThNgbDQ
-	4I/5yTyA4PTo+2piiOg2MV2qNQoo3SxTJb0VGmlh/Os/EfAzKEDVfIXhC4fpNUilwtXus8BrsCbrv
-	Ya4tJAv2yKUaVdlfcBwtxufER1Jece8/B8XI7faGjTrAZ2oJ1MxSlAGFduL/seY/yeoMYliz0OAOY
-	/BWDv5XrZTeQav0rHEBI4jYHw0ydePqeobFE0p4vBG1gkehpPYmECYQoY1/dJAXA7dW4nC4qXxcLZ
-	H1xnDfcpgMIlfnAA8PURGGBSv1YQOoFs/s66ZKivc7tygP0QR9QJZyR4QXg//hayhwkg711/bQ2Yd
-	rBVUEY0fD8sOP+Twi2Eg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=/3KbG88MvQmAXfTX3ZJpuW7DghXBRtEuQIIaFfkmRjs=; b=oSnfOPCrWlDCoQ
+	T+9lkYEc6WjwZtP6qKNZF+ljPlrnRSaCHskFVP5xEvoceHdali5Zm6z/YyLCw5H4i2F3K8BBUrWAm
+	Rem6mNEevyVmw4/5gZedP5/dA+dAkShb7ulDbz8AvbzIBQoYBBm7+u2k0agTYZuL69P3lDPxFuAkA
+	6CVFl48eVjzclRHKANMDCE9xmw7qb2pt91cGATP5BqcUD5dFOfZoD5BLw1zV/N5NDRhyDHFlwYeAt
+	R/G5ize6Y9sak9+GpvtHXrLrP8ajJ4ZmuR1D2bbmA0gWg//4IkepQoMiEfx/4lYpwW0l50cFRcr8K
+	AnL89BF02EaB7ek48W6w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gomOn-00076Q-Fe; Wed, 30 Jan 2019 09:43:13 +0000
-Received: from m12-11.163.com ([220.181.12.11])
+	id 1gomRr-0000d1-Ef; Wed, 30 Jan 2019 09:46:23 +0000
+Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gomOJ-0006bJ-As
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 09:42:46 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=163.com;
- s=s110527; h=From:Subject:Date:Message-Id:MIME-Version; bh=hBdMe
- YqWOgwoCMrt5lUW7Gyey2VQfeeIjvvw5BlxhRw=; b=Wf9CoRoADJFNPfxz+Gar+
- wodcD1wPp40pjrZLquHUpiBzxSE23+KeuMu5dq06AFG90KZfkZC0MiRHPyhw62SB
- FYWmh66kuDbeYdhhbUL0d0LLq6sURGQJh+Bg+ie5Toy6E9pZ5J0lGnvWiCObW94J
- t3N6jCgFfbkKNSEhfHgBxk=
-Received: from localhost.localdomain (unknown [117.36.119.152])
- by smtp7 (Coremail) with SMTP id C8CowACnVnuOcVFc23h4Dg--.63966S3;
- Wed, 30 Jan 2019 17:42:39 +0800 (CST)
-From: sxauwsk <sxauwsk@163.com>
-To: Michal Simek <michal.simek@xilinx.com>
-Subject: [PATCH] i2c: cadence: try reset when master receive error interrupts
-Date: Wed, 30 Jan 2019 03:52:14 +0800
-Message-Id: <20190129195214.30272-1-sxauwsk@163.com>
-X-Mailer: git-send-email 2.19.2
+ id 1gomRm-0000Q5-FB
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 09:46:20 +0000
+Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 201F525B74E;
+ Wed, 30 Jan 2019 20:46:14 +1100 (AEDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
+ t=1548841574; bh=7u6u7g2BAPPB6kswZKrms6yTNi9E5Mdi68hF6kB+rKY=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=rZncRNhq0D8cm0rqJGU7mpC3ZQ+vJdcDhji+FweDgo+gekbC0uRRpkG7GWg2eaei0
+ U1oIZRPUokUKsDn/RQ58jJ+z/+07VH7aqk8NnuAtuZeH1vI3Xj8kPCBoIRW/ddMb5H
+ QtKk/r8TPhDAGh0rDwvvO+FqLyjop0bSi7Be1MrE=
+Received: by reginn.horms.nl (Postfix, from userid 7100)
+ id 4FB5494043D; Wed, 30 Jan 2019 10:46:12 +0100 (CET)
+Date: Wed, 30 Jan 2019 10:46:12 +0100
+From: Simon Horman <horms@verge.net.au>
+To: Geert Uytterhoeven <geert@linux-m68k.org>
+Subject: Re: [PATCH/RFT] arm64: dts: renesas: r8a77990: Add OPPs table for
+ cpu devices
+Message-ID: <20190130094607.z7sqc2vqt4c7kzd4@verge.net.au>
+References: <1547553762-4467-1-git-send-email-ykaneko0929@gmail.com>
+ <20190128140519.wfbnpgznbkx3msft@verge.net.au>
+ <CAMuHMdW2j4e4yc2ZkeJ71uqGz7FS2Kb2141tyZp9y3zTrJ21_g@mail.gmail.com>
+ <20190128163639.kv77wczde7d7lntv@verge.net.au>
 MIME-Version: 1.0
-X-CM-TRANSID: C8CowACnVnuOcVFc23h4Dg--.63966S3
-X-Coremail-Antispam: 1Uf129KBjvJXoW7Ww1rXrW5AFy5Jr1UZryfXrb_yoW8XrWkpa
- 1UG39IkrWIqF4IvFs7Zr17ZFy5uwsYga4jkr4Fk3sruF15Crn8Ka43tF98WF4xCry5X342
- qrZ8t39rG3W2vF7anT9S1TB71UUUUUUqnTZGkaVYY2UrUUUUjbIjqfuFe4nvWSU5nxnvy2
- 9KBjDUYxBIdaVFxhVjvjDU0xZFpf9x07Uoc_hUUUUU=
-X-Originating-IP: [117.36.119.152]
-X-CM-SenderInfo: 5v0d34lvn6il2tof0z/xtbBZA9MJlQHDeqMrgAAsX
+Content-Disposition: inline
+In-Reply-To: <20190128163639.kv77wczde7d7lntv@verge.net.au>
+Organisation: Horms Solutions BV
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_014244_362853_0607BBD0 
-X-CRM114-Status: GOOD (  11.85  )
+X-CRM114-CacheID: sfid-20190130_014618_696037_5F39E0EF 
+X-CRM114-Status: GOOD (  16.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,64 +79,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: sxauwsk@163.com, linux-i2c@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Cc: Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ Magnus Damm <magnus.damm@gmail.com>, Yoshihiro Kaneko <ykaneko0929@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-When the adapter receive error interrupts, such as NACK, arbitration lost,
-cdns_i2c_master_xfer return to the caller directly instead of resuming 
-the adapter which resulted in the adapter being out of control.
+On Mon, Jan 28, 2019 at 05:36:39PM +0100, Simon Horman wrote:
+> On Mon, Jan 28, 2019 at 04:15:30PM +0100, Geert Uytterhoeven wrote:
+> > Hi Simon,
+> > 
+> > On Mon, Jan 28, 2019 at 3:05 PM Simon Horman <horms@verge.net.au> wrote:
+> > > On Tue, Jan 15, 2019 at 09:02:42PM +0900, Yoshihiro Kaneko wrote:
+> > > > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > > >
+> > > > This patch define OOP tables for all CPUs.
+> > > > This allows CPUFreq to function.
+> > > >
+> > > > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > > > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> > > > ---
+> > >
+> > > Thanks, I have tested CPUFreq with this tested that with this patch and
+> > > "[PATCH] clk: renesas: r8a77990: Add Z2 clock"
+> > > (https://patchwork.kernel.org/patch/10783723/) applied on top of
+> > > renesas-devel-20190128-v5.0-rc4.
+> > >
+> > > Geert, or others, is it expected that z2 does not scale
+> > > in this test?
+> > 
+> > Given your patch adds the Z2 clock as a fixed clock, this is expected ;-)
+> > 
+> > Note that the BSP adds this clock as a programmable clock of type
+> > CLK_TYPE_GEN3_Z2.
+> 
+> Thanks, understood.
 
-So when driver detect err_status then try to repair and fix it.
+I have now tested this patch in conjunction with
+"[PATCH v2 0/6] clk: renesas: r8a77990: Add Z2 clock" [1],
+which implements Z2 as a variable clock, and the results
+seem substantially better.
 
-Signed-off-by: sxauwsk <sxauwsk@163.com>
----
- drivers/i2c/busses/i2c-cadence.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+# cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+performance
+# cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
+800000 1000000 1200000 
+# grep . /sys/devices/system/cpu/cpu*/cpufreq/*_cur_freq /sys/kernel/debug/clk/z2/clk_rate
+/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq:1200000
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq:1200000
+/sys/devices/system/cpu/cpu1/cpufreq/cpuinfo_cur_freq:1200000
+/sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq:1200000
+/sys/kernel/debug/clk/z2/clk_rate:1200000000
 
-diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-index b13605718291..e10048d7524a 100644
---- a/drivers/i2c/busses/i2c-cadence.c
-+++ b/drivers/i2c/busses/i2c-cadence.c
-@@ -548,10 +548,6 @@ static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
- 	cdns_i2c_writereg(CDNS_I2C_IXR_ALL_INTR_MASK,
- 			  CDNS_I2C_IDR_OFFSET);
- 
--	/* If it is bus arbitration error, try again */
--	if (id->err_status & CDNS_I2C_IXR_ARB_LOST)
--		return -EAGAIN;
--
- 	return 0;
- }
- 
-@@ -617,13 +613,19 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
- 			id->bus_hold_flag = 0;
- 
- 		ret = cdns_i2c_process_msg(id, msgs, adap);
--		if (ret)
-+		if (!ret)
- 			goto out;
- 
- 		/* Report the other error interrupts to application */
- 		if (id->err_status) {
- 			cdns_i2c_master_reset(adap);
- 
-+			/* If it is bus arbitration error, try again */
-+			if (id->err_status & CDNS_I2C_IXR_ARB_LOST) {
-+				ret = -EAGAIN;
-+				goto out;
-+			}
-+
- 			if (id->err_status & CDNS_I2C_IXR_NACK) {
- 				ret = -ENXIO;
- 				goto out;
--- 
-2.19.2
+# echo 1000000 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+# grep . /sys/devices/system/cpu/cpu*/cpufreq/*_cur_freq /sys/kernel/debug/clk/z2/clk_rate
+/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq:975000
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq:1000000
+/sys/devices/system/cpu/cpu1/cpufreq/cpuinfo_cur_freq:975000
+/sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq:1000000
+/sys/kernel/debug/clk/z2/clk_rate:975000000
 
+# echo 800000 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+# grep . /sys/devices/system/cpu/cpu*/cpufreq/*_cur_freq /sys/kernel/debug/clk/z2/clk_rate
+/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq:787500
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq:800000
+/sys/devices/system/cpu/cpu1/cpufreq/cpuinfo_cur_freq:787500
+/sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq:800000
+/sys/kernel/debug/clk/z2/clk_rate:787500000
 
+# echo 1200000 > /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq grep . /sys/devices/system/cpu/cpu*/cpufreq/*_cur_freq
+# /sys/kernel/debug/clk/z2/clk_rate
+/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq:1200000
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq:1200000
+/sys/devices/system/cpu/cpu1/cpufreq/cpuinfo_cur_freq:1200000
+/sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq:1200000
+/sys/kernel/debug/clk/z2/clk_rate:1200000000
+
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
+
+[1] https://lore.kernel.org/linux-renesas-soc/20190130094029.9604-1-horms+renesas@verge.net.au/T/#mec59a349508e0be00d3a1d6ef89f838c0e193591
 
 _______________________________________________
 linux-arm-kernel mailing list
