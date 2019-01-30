@@ -2,81 +2,84 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A59E4C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:41:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D2AEFC282D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:48:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7A7E820882
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:41:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A395E2084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:48:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cSsvAc5p"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A7E820882
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U4xbtLBd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A395E2084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZA+Z7NItuFzPaYw6l74P/hNfdm2Csxj5iYI3fU4BMTw=; b=cSsvAc5piiOK0r
-	v/f/R6m7+Z1W2S+2BEkelrwMFlx2jJRG5FGBLrAmTERzCVdJMDSU0FlzDTXI0v0CsB66lFGhjT2+O
-	jcLgcNH7QHCHFhmjL5oxL5qtwbUl9UZM/kOPwskrvcW+kF70/tA3JdOGnkXx2n60BDEVWS++qpMCw
-	WN5M4isCE3uGVhP4kXmw0o6XSHcOspz9+XGkn/Tk8yUwqThZK6zRsRDclGONyrogbrqet+9nygNAO
-	aOF1DLviwlpfZ4eLMew7Ckwpx9pvxNF3bUizUV9KQa2R8Uwo1rdFQsm+mqmf9QmB1eEYAVVWgDxt6
-	E99sr3dmhCOhUk3KKkVw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=uTi8xUstqdrl7LIH/TB9ZhjNTD6qjquxHAaUcTjAvN4=; b=U4xbtLBdymPaCEnJjmhiIYPuN
+	ZTiecU3lPerLjT1zF+iVIrkmWQ1vMWGweDalsMyyz+GPZ2dAN4Svu8btFDUWMYlzjMFBWUqQH2Edr
+	HzBiYBdhcZXRwJn8yCD6zYPXycRJ1JmoQwXxx57+ya4OGMa6KxotGjR2gJBt+3yWkW4amGW0GkdYf
+	Yddy1ffMBeIonQpcU5yEWkZYSm74F2F0W4HPjPIZ26Nc2wpQzYzF+MsQrd1h5CDWVK0I0YfgsVNPY
+	RPtC+JiyuvBTWqFmSosPRDHrx9t4GbR7CkX2IIK2b0lBMx6vE52BE0y9XSacLVYvriQ4F3AnYYOb6
+	7nBqV6uFA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1govjF-0004DJ-7C; Wed, 30 Jan 2019 19:40:57 +0000
-Received: from mail-ot1-f66.google.com ([209.85.210.66])
+	id 1govqT-0006Pj-GW; Wed, 30 Jan 2019 19:48:25 +0000
+Received: from mail-pl1-f196.google.com ([209.85.214.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1govjC-0004Cz-AI
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 19:40:55 +0000
-Received: by mail-ot1-f66.google.com with SMTP id k98so693529otk.3
+ id 1govqK-0006If-Df
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 19:48:19 +0000
+Received: by mail-pl1-f196.google.com with SMTP id w4so309398plz.1
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 11:40:54 -0800 (PST)
+ Wed, 30 Jan 2019 11:48:13 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=Pzed3W/0Z0OCxQkoAsbcMNZwHTcCFLmcZxWxeac8a/I=;
- b=AhKgNAPdMNbpJMQaszkMT2xd5IX8umSv4hxrIWWjTnPIDFcx4DSDfPph6wbGpF+5Hr
- 4nx9wBIvyEUfv4I/DB3ZjCY/ZvIqSLajDT6oJLon78xIsdU/zC1nYYgJJ53sMy6H7At3
- 7iDfVmJV/BZelYP3I8sCcySFqVQAV98AKYF2dDoNDAS6Ot6rprTi2PXLTfhqYJ15p+0Y
- ummPXZrIRwDZymqyn0ozhA5cxN6Ja8O+/WYkg3bgjfrR2Ny5qkYxGxgXIymjDI5eQGkt
- LzYjyPr8xAZTV1DJToX9BwPdvdkuQt0dBimCkY1nAOcTGir7DYHqtXLSPPufhOzRkFDI
- I6kQ==
-X-Gm-Message-State: AJcUukeMKzdU02ThjY9YHU0vMkmnsE4khxfsQu1F0OP2YlW+1tE1ekys
- abOUNg2oWxn8aFivF51qmw==
-X-Google-Smtp-Source: ALg8bN6IkUHTJZug2xNP1ip8Z2xgvxBQnDeycRl0IzbdTdfJ7fpiSOukORCC1SijvRRIKCqcmma7ow==
-X-Received: by 2002:a9d:2f64:: with SMTP id h91mr23653203otb.14.1548877253388; 
- Wed, 30 Jan 2019 11:40:53 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id m131sm1055633oia.6.2019.01.30.11.40.52
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 30 Jan 2019 11:40:52 -0800 (PST)
-Date: Wed, 30 Jan 2019 13:40:52 -0600
-From: Rob Herring <robh@kernel.org>
-To: Vishal Sagar <vishal.sagar@xilinx.com>
-Subject: Re: [PATCH v2 1/2] media: dt-bindings: media: xilinx: Add Xilinx
- MIPI CSI-2 Rx Subsystem
-Message-ID: <20190130194052.GA9543@bogus>
-References: <1548438777-11203-1-git-send-email-vishal.sagar@xilinx.com>
- <1548438777-11203-2-git-send-email-vishal.sagar@xilinx.com>
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=56ipZLMX5iOYji1uYJ6/d+xPlusjd7z9mmy1xQS9O1w=;
+ b=qxhgtGxOpIeVbou3r/ePO83Y4pPhLtuRPfTYz5R2wfjfR4SmLkPFc9u0EsVM0Qj2ZE
+ N8VfFSpLgNTee/7p0+79d+nAVffQPeRSC+hTuEeRXFus+uIPDWnEr56sWicEdduh4QNB
+ nmmZj3M+cFGgvF1IqP4Bde/GlFDmC3vHA9TX1B3ESjxiDgYyQP9hc0wSHMsO08OWGYqT
+ II8Z1zNI50OXzmqefQCWpQq2iQSnVG9gfsG5CC/7tlZF2vECp1TRwVkCJk7/yC6OzSSF
+ WSPxYpUMlSDmhv3vcOrS9JASC3S1/KzemOSwLxbcr1ZDAY4UpvMYJ9i0DrVG/WC9Kg0+
+ 0htg==
+X-Gm-Message-State: AJcUukcvG7YGZZM/F57dZ3n3KmS3W8GMnfKT0xxO17Sg12iydCgg3pR8
+ M9FgKVx5mkU1zHNLFVKGaas6bA==
+X-Google-Smtp-Source: ALg8bN7viKQm3lo7xLFsiMWz/VyNF0158rSJc+FIcq1i1GCDzIOvU/N8yp9HCPpPerbcOki+bpILOg==
+X-Received: by 2002:a17:902:f082:: with SMTP id
+ go2mr31776757plb.115.1548877692142; 
+ Wed, 30 Jan 2019 11:48:12 -0800 (PST)
+Received: from localhost.localdomain ([122.177.95.151])
+ by smtp.gmail.com with ESMTPSA id t24sm3397878pfh.21.2019.01.30.11.48.07
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 30 Jan 2019 11:48:11 -0800 (PST)
+Subject: Re: [PATCH 1/2] arm64: Expose address bits (physical/virtual) via
+ cpuinfo
+To: Suzuki K Poulose <suzuki.poulose@arm.com>,
+ linux-arm-kernel@lists.infradead.org
+References: <1548709076-22317-1-git-send-email-bhsharma@redhat.com>
+ <1548709076-22317-2-git-send-email-bhsharma@redhat.com>
+ <afa2417a-10d0-21f6-007f-e8eb7055f3d7@arm.com>
+From: Bhupesh Sharma <bhsharma@redhat.com>
+Message-ID: <8659c949-a588-387b-3cb6-1dd8ea86723e@redhat.com>
+Date: Thu, 31 Jan 2019 01:18:05 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1548438777-11203-2-git-send-email-vishal.sagar@xilinx.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <afa2417a-10d0-21f6-007f-e8eb7055f3d7@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_114054_353389_21D8E4B2 
-X-CRM114-Status: GOOD (  23.77  )
+X-CRM114-CacheID: sfid-20190130_114816_822626_9757CD2C 
+X-CRM114-Status: GOOD (  24.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,165 +91,142 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, dineshk@xilinx.com,
- hyun.kwon@xilinx.com, sandipk@xilinx.com, michal.simek@xilinx.com,
- linux-kernel@vger.kernel.org, hans.verkuil@cisco.com,
- laurent.pinchart@ideasonboard.com, sakari.ailus@linux.intel.com,
- mchehab@kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-media@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: mark.rutland@arm.com, Steve.Capper@arm.com, catalin.marinas@arm.com,
+ ard.biesheuvel@linaro.org, will.deacon@arm.com, bhupesh.linux@gmail.com,
+ kexec@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 25, 2019 at 11:22:56PM +0530, Vishal Sagar wrote:
-> Add bindings documentation for Xilinx MIPI CSI-2 Rx Subsystem.
+Hi Suzuki,
+
+Thanks for your review.
+
+On 01/29/2019 03:39 PM, Suzuki K Poulose wrote:
+> Hi Bupesh
 > 
-> The Xilinx MIPI CSI-2 Rx Subsystem consists of a CSI-2 Rx controller, a
-> DPHY in Rx mode, an optional I2C controller and a Video Format Bridge.
+> On 28/01/2019 20:57, Bhupesh Sharma wrote:
+>> With ARMv8.2-LVA and LPA architecture extensions, arm64 hardware which
+>> supports these extensions can support upto 52-bit virtual and 52-bit
+>> physical addresses respectively.
+>>
+>> Since at the moment we enable the support of these extensions via CONFIG
+>> flags, e.g.
+>>   - LPA via CONFIG_ARM64_PA_BITS_52, and
+>>   - LVA via CONFIG_ARM64_FORCE_52BIT
+>>
+>> The easiest way a user can determine the physical/virtual
+>> addresses supported on the hardware, is via the '/proc/cpuinfo'
+>> interface.
 > 
-> Signed-off-by: Vishal Sagar <vishal.sagar@xilinx.com>
-> ---
-> v2
-> - updated the compatible string to latest version supported
-> - removed DPHY related parameters
-> - added CSI v2.0 related property (including VCX for supporting upto 16
->   virtual channels).
-> - modified csi-pxl-format from string to unsigned int type where the value
->   is as per the CSI specification
-> - Defined port 0 and port 1 as sink and source ports.
-> - Removed max-lanes property as suggested by Rob and Sakari
+> Why do we need this information ?
+
+Sorry for the delay in reply, but I wanted to collect as much 
+information from our test teams as possible before replying to this thread.
+
+So here is brief list of reasons, as to why we need this information in 
+user-space:
+
+1. This information is useful for a non-expert user, using Linux 
+distributions (like Fedora) on different arm64 platforms. The default 
+configuration (.config) will be the same for a distribution flavor and 
+is supposed to work fine on all underlying arm64 platforms.
+
+a). Now some of these underlying platforms may support ARMv8-8.2 
+extension while others don't.
+
+b). Users performing performance bench-marking on these platforms run 
+benchmarks with different page-sizes and address ranges.
+
+c). Right now they have no way to know, about the underlying VARange and 
+PARange values other than reading the config file and search for the flags.
+
+For e.g. lets consider the 'pg-table_tests' (See - 
+<https://github.com/sanskriti-s/pg-table_tests>), which is used to test 
+and verify 5-level page table behavior on x86_64 Linux. It requires 
+determining if 5-level page tables are fully supported, for which it 
+uses either 'Intel 'la57' cpu flag' in:
+
+$ cat /proc/cpuinfo', or
+
+$ grep CONFIG_X86_5LEVEL /boot/config-$(uname -r)
+CONFIG_X86_5LEVEL=y
+
+This test suite is easily modifiable for verifying 52-bit ARMv8.2-LVA 
+support.
+
+d). Now when running the above suite and sharing results, it might be 
+that the .config file is not available or even in the case it is 
+available the CONFIG flag settings in .config file are not intuitive to 
+a non-expert user for arm64 (the example below is of 64K page size, 
+48-bit kernel VA, 52-bit User space VA and 52-bit PA):
+
+   CONFIG_ARM64_64K_PAGES=y
+   CONFIG_ARM64_USER_VA_BITS_52=y
+   CONFIG_ARM64_VA_BITS=48
+   CONFIG_ARM64_PA_BITS_52=y
+   CONFIG_ARM64_PA_BITS=52
+
+Compare it with a single CONFIG_X86_5LEVEL=y config item for x86_64.
+
+Also the cpu flag in '/proc/cpuinfo' may not hold any descriptive value 
+for ARMv8.2 hardware.
+
+2. So, its much easier in above cases to see and quote the output of '$ 
+cat /proc/cpuinfo' instead, for example:
+
+$ cat /proc/cpuinfo
+
+<..snip..>
+processor	: 31
+<..snip..>
+CPU architecture: 8
+<..snip..>
+address sizes	: 52 bits physical, 48 bits virtual
+
+> Btw, this keeps coming up all the time and the answer to this approach is
+> always no. We cannot break the "unwritten" ABI of /proc/cpuinfo, again.
+> See :
 > 
->  .../bindings/media/xilinx/xlnx,csi2rxss.txt        | 105 +++++++++++++++++++++
->  1 file changed, 105 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt b/Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
-> new file mode 100644
-> index 0000000..98781cf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
-> @@ -0,0 +1,105 @@
-> +Xilinx MIPI CSI2 Receiver Subsystem Device Tree Bindings
-> +--------------------------------------------------------
-> +
-> +The Xilinx MIPI CSI2 Receiver Subsystem is used to capture MIPI CSI2 traffic
-> +from compliant camera sensors and send the output as AXI4 Stream video data
-> +for image processing.
-> +
-> +The subsystem consists of a MIPI DPHY in slave mode which captures the
-> +data packets. This is passed along the MIPI CSI2 Rx IP which extracts the
-> +packet data. The Video Format Bridge (VFB) converts this data to AXI4 Stream
-> +video data.
-> +
-> +For more details, please refer to PG232 Xilinx MIPI CSI-2 Receiver Subsystem.
-> +
-> +Required properties:
-> +--------------------
-> +- compatible: Must contain "xlnx,mipi-csi2-rx-subsystem-4.0".
-> +- reg: Physical base address and length of the registers set for the device.
-> +- interrupt-parent: specifies the phandle to the parent interrupt controller
+> https://patchwork.kernel.org/patch/8669301/
 
-Don't document this. It is implied.
+I understand your point, but from a user-space/command-line p-o-v we 
+would ideally want an arm64 server to support most features that are 
+already available on a x86_64 server (I guess that was the whole point 
+of the SBSA server specifications - we want all arm64 servers to look 
+and feel the same way in terms of user-experience).
 
-> +- interrupts: Property with a value describing the interrupt number.
-> +- clocks: List of phandles to AXI Lite, Video and 200 MHz DPHY clocks.
-> +- clock-names: Must contain "lite_aclk", "video_aclk" and "dphy_clk_200M" in
-> +  the same order as clocks listed in clocks property.
-> +- xlnx,csi-pxl-format: This denotes the CSI Data type selected in hw design.
-> +  Packets other than this data type (except for RAW8 and User defined data
-> +  types) will be filtered out. Possible values are as below -
-> +  0x1E - YUV4228B
-> +  0x1F - YUV42210B
-> +  0x20 - RGB444
-> +  0x21 - RGB555
-> +  0x22 - RGB565
-> +  0x23 - RGB666
-> +  0x24 - RGB888
-> +  0x28 - RAW6
-> +  0x29 - RAW7
-> +  0x2A - RAW8
-> +  0x2B - RAW10
-> +  0x2C - RAW12
-> +  0x2D - RAW14
-> +  0x2E - RAW16
-> +  0x2F - RAW20
-> +- xlnx,vfb: This is present when Video Format Bridge is enabled.
+Also right now there is an absence of a standard ABI between the 
+user-space and kernel for exporting this information to the user-space, 
+with two exceptions:
 
-boolean?
+1. For vmcoreinfo specific user-space utilities (like makedumpfile and 
+crash) I have proposed a couple of CONFIG flags to be added to the 
+vmcoreinfo, so that user-space utilities can use the same (See 
+<http://lists.infradead.org/pipermail/kexec/2019-January/022387.html> 
+for details).
 
-> +
-> +Optional properties:
-> +--------------------
-> +- xlnx,en-csi-v2-0: Present if CSI v2 is enabled in IP configuration.
-> +- xlnx,en-vcx: When present, there are maximum 16 virtual channels, else
-> +  only 4. This is present only if xlnx,en-csi-v2-0 is present.
-> +- xlnx,en-active-lanes: Enable Active lanes configuration in Protocol
-> +  Configuration Register.
-> +- xlnx,cfa-pattern: This goes in the sink port to indicate bayer pattern.
-> +  Valid values are "bggr", "rggb", "gbrg" and "grbg".
+2. For other user-space utilities (especially those which make a 'mmap' 
+call and pass an address hint to the get the kernel to provide a high 
+address), I can see only two methods to determine the underlying kernel 
+support:
 
-This should go in the endpoint with the other properties. I'd also move 
-it down below 'Ports' to be clear it goes in a different node.
+a). Read the CONFIG flags from .config (as I captured some paragraphs 
+above), or
 
-> +
-> +Ports
-> +-----
-> +The device node shall contain two 'port' child nodes as defined in
-> +Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +
-> +The port@0 is sink port and shall connect to CSI2 source like camera.
-> +It must have the data-lanes property. It may have the xlnx,cfa-pattern
-> +property to indicate bayer pattern of source.
-> +
-> +The port@1 is source port could be connected to any video processing IP
-> +which can work with AXI4 Stream data.
-> +
-> +Both ports must have remote-endpoints.
+b). In absence of .config file on the system, read the system ID 
+registers like 'ID_AA64MMFR0_EL1' and 'ID_AA64MMFR2_EL1' (which PATCH 
+2/2 of this series tries to enable from kernel side) and then make a 
+decision on whether to pass a hint to 'mmap'.
 
-No need to state that. That's implicit for the graph to work...
-> +
-> +Example:
-> +
-> +	csiss_1: csiss@a0020000 {
-> +		compatible = "xlnx,mipi-csi2-rx-subsystem-4.0";
-> +		reg = <0x0 0xa0020000 0x0 0x10000>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <0 95 4>;
-> +		xlnx,csi-pxl-format = <0x2a>;
-> +		xlnx,vfb;
-> +		xlnx,en-active-lanes;
-> +		xlnx,en-csi-v2-0;
-> +		xlnx,en-vcx;
-> +		clock-names = "lite_aclk", "dphy_clk_200M", "video_aclk";
-> +		clocks = <&misc_clk_0>, <&misc_clk_1>, <&misc_clk_2>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port@0 {
-> +				/* Sink port */
-> +				reg = <0>;
-> +				xlnx,cfa-pattern = "bggr"
-> +				csiss_in: endpoint {
-> +					data-lanes = <1 2 3 4>;
-> +					/* MIPI CSI2 Camera handle */
-> +					remote-endpoint = <&camera_out>;
-> +				};
-> +			};
-> +			port@1 {
-> +				/* Source port */
-> +				reg = <1>;
-> +				csiss_out: endpoint {
-> +					remote-endpoint = <&vproc_in>;
-> +				};
-> +			};
-> +		};
-> +	};
-> -- 
-> 2.7.4
-> 
+It might be that I am missing other standard ABI mechanisms. If so, 
+please point me to the same.
+
+Thanks,
+Bhupesh
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
