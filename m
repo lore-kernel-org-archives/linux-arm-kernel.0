@@ -2,67 +2,62 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 29AAEC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:03:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CD089C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:17:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ECD67218AE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:03:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9E78F20989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:17:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pxzRDiO3";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="a24js7aW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ECD67218AE
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ouJC3bBL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E78F20989
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kq+f3G5JVJbfKEsWza+Y6xAKoLPFfPEvXZ0PvqPvzXw=; b=pxzRDiO3wt0/mR
-	5et8mCUzpGLARK7lws1T99B6k28ujDgUtdui8e84vxm04EcJ34iltmr2303gy76LUAqcc5oqh7xEf
-	8YstOozkoeXce3XuW7FdBfRFvFrZ2Fpq9fVJQqQWIPx6m3thYL7Q5OJoRUm68xN6QjZ4Hze0MpNoQ
-	d1R2lYogWN7n5z9PmHxnM14CJIkMhhKsdFD4hWYA704IA2PyMunEl9iNRQvEhCMzH8VxsUTzH7IO3
-	FjMMd9J7Qa5CXRkIprUTT6qFtr4SP6EmmG1whcaJnBHnJgXjcoOYizl3vTO7hNQwyYcFpljaI4xeM
-	HZnpZN741vRm1GXtqlMw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=kmlC/Jz9xHTqKFsfVi1MG6B6je4raZAHLecKXU9iEEs=; b=ouJC3bBLVwkTqx
+	XnPvIqUMZAdpYw4YrILYCWBrO9BBeNqRtyoN8zbcF/GF4qLGdWuA+FWIEVG8S2leMuX0hoO1f0Yvi
+	AjpJ47XPLPqhNwKLFWhCoPgEqlLQ/WI96X7rg8pZoaeHp04bH9SH1Ct2Y+pPzpvd+HxZYyhEUjJyB
+	ksLR64oKw8HwskNvXP17NKvQ3lzt7WjEkeMgwIaC1XeozrTaukCeY3sO2v14iCNC5AZ/Mx/lfJMnv
+	54dXo2uF/TvzLbi+lAKxSAOAjDC9qpjk+vffAk1oCJhBKmt9n+WFNbZehxlSgzPnvFM0EwARxBWgg
+	I0QFRzYjRNOPlRyOQWjA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gosKt-00034d-NW; Wed, 30 Jan 2019 16:03:35 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gosKq-00033g-8v; Wed, 30 Jan 2019 16:03:33 +0000
-Received: from localhost (unknown [69.71.4.100])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 90C8E207E0;
- Wed, 30 Jan 2019 16:03:31 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548864212;
- bh=uOJy6HHER2vHS2dUZM9kzGlmh4vosXagwnDxutC4v6k=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=a24js7aW/cYCaY/Vpk8cqJlVrlqw/euqCg+kBnqwwu6C+GiJbVNu858GbKi9ZYJ3f
- S99ZKo0pYcSJ1GoDoXc9fDZSgVEYWuQF9xlPXcT6unsQBNGluA6jq1pRpLdv16esjN
- 4bXPBig8vF40CgdMnkLqWFMjzWXtZBkjgBxgTxGk=
-Date: Wed, 30 Jan 2019 10:03:29 -0600
-From: Bjorn Helgaas <helgaas@kernel.org>
-To: honghui.zhang@mediatek.com
-Subject: Re: [PATCH] PCI: Mediatek: Use resource_size function on resource
- object
-Message-ID: <20190130160329.GF229773@google.com>
-References: <1546409033-20412-1-git-send-email-honghui.zhang@mediatek.com>
+	id 1gosY0-0000Vz-IS; Wed, 30 Jan 2019 16:17:08 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gosXw-0000NX-Rv
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 16:17:06 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DBF60EBD;
+ Wed, 30 Jan 2019 08:17:03 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5F2F33F589;
+ Wed, 30 Jan 2019 08:17:02 -0800 (PST)
+Subject: Re: [PATCH v3 0/4] uaccess: Add unsafe accessors for arm64
+To: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ mingo@redhat.com, peterz@infradead.org, hpa@zytor.com
+References: <1547560709-56207-1-git-send-email-julien.thierry@arm.com>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <3bb671a6-a7df-9c96-e4d3-09167df6dab1@arm.com>
+Date: Wed, 30 Jan 2019 16:17:00 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1546409033-20412-1-git-send-email-honghui.zhang@mediatek.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <1547560709-56207-1-git-send-email-julien.thierry@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_080332_332610_035AA20B 
-X-CRM114-Status: GOOD (  14.52  )
+X-CRM114-CacheID: sfid-20190130_081704_904921_6202D2FD 
+X-CRM114-Status: GOOD (  18.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,66 +69,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, lorenzo.pieralisi@arm.com,
- linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org,
- jianjun.wang@mediatek.com, ryder.lee@mediatek.com,
- linux-mediatek@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: catalin.marinas@arm.com, will.deacon@arm.com, james.morse@arm.com,
+ valentin.schneider@arm.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 02, 2019 at 02:03:53PM +0800, honghui.zhang@mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
+Hi,
+
+Gentle ping for patches 3 and 4.
+
+Thanks,
+
+Julien
+
+On 15/01/2019 13:58, Julien Thierry wrote:
+> Hi,
 > 
-> drivers/pci/pcie-mediatek.c:720:13-16: WARNING: Suspicious code. resource_size is maybe missing with mem
+> First version of this series[1] was briefly in linux-next but had to be
+> reverted due to a bug where schedule would end up being called while
+> user_access was active[2].
 > 
-> Generated by: scripts/coccinelle/api/resource_size.cocci
+> After clarifications[3], rescheduling while in a user_access region is not
+> allowed.
 > 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> ---
->  drivers/pci/controller/pcie-mediatek.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+> * Patches 1 and 2 implement the unsafe accessors for arm64
+> * Patches 3 and 4 clarify this restriction in the API and attempts to
+>   check against violations of the restriction.
 > 
-> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> index e307166..0168376 100644
-> --- a/drivers/pci/controller/pcie-mediatek.c
-> +++ b/drivers/pci/controller/pcie-mediatek.c
-> @@ -654,7 +654,6 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
->  	struct resource *mem = &pcie->mem;
->  	const struct mtk_pcie_soc *soc = port->pcie->soc;
->  	u32 val;
-> -	size_t size;
->  	int err;
->  
->  	/* MT7622 platforms need to enable LTSSM and ASPM from PCIe subsys */
-> @@ -706,8 +705,7 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
->  		mtk_pcie_enable_msi(port);
->  
->  	/* Set AHB to PCIe translation windows */
-> -	size = mem->end - mem->start;
-> -	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(size));
-> +	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(resource_size(mem)));
->  	writel(val, port->base + PCIE_AHB_TRANS_BASE0_L);
->  
->  	val = upper_32_bits(mem->start);
+> Changes since v2[4]:
+> - Rebase on v5.0-rc2
+> - access_ok() is now done in user_access_begin(), so rework accessors
+>   so access_ok() is not called in unsafe_get/put_user()
+> - Split addition of unsafe accessors and the user_access_region check
+>   into separate patches
+> - Avoid reading SCTLR_EL1 in user_access_region check
+> - Add build option for user_access_region checking
+> - Reword clarifications on unsafe accessors API
+> 
+> Changes since v1[1]:
+> - Add a way to detect code calling schedule within a user_access region
+> - Make sure put_user/get_user arguments are evaluated before disabling PAN
+> 
+> [1] https://www.spinics.net/lists/arm-kernel/msg674925.html
+> [2] https://patchwork.kernel.org/patch/10634783/
+> [3] https://lkml.org/lkml/2018/11/28/50
+> [4] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-December/617080.html
+> 
+> Cheers,
+> 
+> Julien
+> 
+> -->
+> 
+> Julien Thierry (4):
+>   arm64: uaccess: Cleanup get/put_user()
+>   arm64: uaccess: Implement unsafe accessors
+>   uaccess: Check no rescheduling function is called in unsafe region
+>   arm64: uaccess: Implement user_access_region_active
+> 
+>  arch/arm64/include/asm/sysreg.h  |   2 +
+>  arch/arm64/include/asm/uaccess.h | 123 ++++++++++++++++++++++++++-------------
+>  include/linux/kernel.h           |  11 +++-
+>  include/linux/uaccess.h          |  13 +++++
+>  kernel/sched/core.c              |  22 +++++++
+>  lib/Kconfig.debug                |   8 +++
+>  6 files changed, 135 insertions(+), 44 deletions(-)
+> 
+> --
+> 1.9.1
+> 
 
-Unrelated to this patch, but just below this:
-
-        /* Set PCIe to AXI translation memory space.*/
-        val = fls(0xffffffff) | WIN_ENABLE;
-        writel(val, port->base + PCIE_AXI_WINDOW0);
-
-Can you double-check the use of "fls(0xffffffff)"?  That expression is
-a constant and I think evaluates to 31 (0x1f), i.e.,
-
-        val = 0x1f | WIN_ENABLE;
-
-I don't know the hardware, so this might be correct, but
-"fls(0xffffffff)" looks funny because I think it's the same as
-"fls(0x80000000)".
-
-Bjorn
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
