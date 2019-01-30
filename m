@@ -2,85 +2,62 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 16306C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:14:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DDD9CC282D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:20:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DA91620870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:14:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B3B95218AE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:20:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k05ZDE4g";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="SsHD0Nim"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA91620870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=fb.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LwhJhYj7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B3B95218AE
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=4tzerz1AGeLkNyB4bppimVTBNT97d/e2OChvQizdZOE=; b=k05ZDE4gD5ArMC
-	gZ2wilqUngSqKX+plVljj6moKwPOj1+GoVEIOHVIyMDCSEA5huOIMTuguKwngxpxf8Nd3bcOAoxfS
-	zAfqy/AIymfBeixLUZaYgqGdMQU3FA6JIpE70pcFTADcLh2a2YOEPkH3ZE4jETfFPcNdX6gyn9YFh
-	+VnHTbMrxFQ0YrN+MuePOcBRYQ52tPVWn+K9pMX1BNdPOxXGhcR4dKrwgKGNgjwoZf4CuE7S/nbJT
-	saitsStpNElWlCpliXRtucv///jicEyQaVELqL3u5hpSw6+HT+5Nq55AG7ndwGmdHM8JGDA5o3wR0
-	1cnPamZYkDyo1vnC5CRQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ODN7J5MYtxq2kJU8PJ1pptFkkgXr0p60p+mXITBoznc=; b=LwhJhYj7aHG+kA
+	h6MPJ596y4NXTSj43tatVLUpNsz0qMVm+C4GK5WAqL+iA+YfYMXvRiKTZQJffGtIq/orTjzRNVDt0
+	POtG3PJGddfFPtdUjMaTLoFs05+CxaG4Her4JHxb0NMUvNXLnjSCl7X1ioX9Fz0/ZMCkKOcJbfNhc
+	VvNGHC8ZXS/rcM/DGFgfnk/p0UGCZDh/yE/wZxBiasBfihV1u9jZC/Z7kzY6At27RBJKJfJMEQsxO
+	GR5sYY8PSsSmvLtUxQR2X4RU61bUke+aLXvJ1El7Un4IVm95SZbUcY8mfnhFNWOkYKg737/lgqTyS
+	XBFuaH8syohpSPqKz6VA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gouNy-0005ue-15; Wed, 30 Jan 2019 18:14:54 +0000
-Received: from mx0b-00082601.pphosted.com ([67.231.153.30]
- helo=mx0a-00082601.pphosted.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gouNu-0005tv-41
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 18:14:51 +0000
-Received: from pps.filterd (m0089730.ppops.net [127.0.0.1])
- by m0089730.ppops.net (8.16.0.27/8.16.0.27) with SMTP id x0UICDwM031847
- for <linux-arm-kernel@lists.infradead.org>; Wed, 30 Jan 2019 10:14:47 -0800
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.com;
- h=from : to : cc : subject
- : date : message-id : mime-version : content-type; s=facebook;
- bh=kfkaMT2bBs1cq2Dp5zgD3taUBGLMPsX69j6ltSYwu/A=;
- b=SsHD0NimPXxFI3hTxFeO3PcSoQhTNZxWzG3GjySEz8ZithSrGWRYa+buPGvB1V4Iw6+U
- NNQjJfOEDzABkO12yn6BwKuC3NwUwkGajAOsjID3svkuWqsdeZfHNCDiRGgVZOmQdBG1
- XGYMqjT7yzDqRi8Jp8Oekk15w+t82J09IrU= 
-Received: from mail.thefacebook.com ([199.201.64.23])
- by m0089730.ppops.net with ESMTP id 2qbh0cg09t-7
- (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Wed, 30 Jan 2019 10:14:47 -0800
-Received: from mx-out.facebook.com (2620:10d:c081:10::13) by
- mail.thefacebook.com (2620:10d:c081:35::125) with Microsoft SMTP Server
- (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA) id 15.1.1531.3;
- Wed, 30 Jan 2019 10:14:29 -0800
-Received: by devvm4117.prn2.facebook.com (Postfix, from userid 167582)
- id 759549182779; Wed, 30 Jan 2019 10:14:29 -0800 (PST)
-Smtp-Origin-Hostprefix: devvm
-From: Vijay Khemka <vijaykhemka@fb.com>
-Smtp-Origin-Hostname: devvm4117.prn2.facebook.com
-To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Joel Stanley <joel@jms.id.au>, Andrew Jeffery <andrew@aj.id.au>,
- <devicetree@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>,
- <linux-aspeed@lists.ozlabs.org>, <linux-kernel@vger.kernel.org>
-Smtp-Origin-Cluster: prn2c23
-Subject: [PATCH] ARM: dts: aspeed: tiogapass: Enable VUART
-Date: Wed, 30 Jan 2019 10:14:26 -0800
-Message-ID: <20190130181427.2469674-1-vijaykhemka@fb.com>
-X-Mailer: git-send-email 2.17.1
-X-FB-Internal: Safe
+	id 1gouSr-0007gn-Dj; Wed, 30 Jan 2019 18:19:57 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gouSo-0007gO-Jr
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 18:19:55 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5D37080D;
+ Wed, 30 Jan 2019 10:19:52 -0800 (PST)
+Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B43A63F557;
+ Wed, 30 Jan 2019 10:19:50 -0800 (PST)
+Date: Wed, 30 Jan 2019 18:19:48 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Subject: Re: [PATCH] efi: arm/arm64: allow SetVirtualAddressMap() to be omitted
+Message-ID: <20190130181948.GC18558@fuggles.cambridge.arm.com>
+References: <20190126102207.29488-1-ard.biesheuvel@linaro.org>
 MIME-Version: 1.0
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-01-30_13:, , signatures=0
-X-Proofpoint-Spam-Reason: safe
-X-FB-Internal: Safe
+Content-Disposition: inline
+In-Reply-To: <20190126102207.29488-1-ard.biesheuvel@linaro.org>
+User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_101450_286831_9F601F14 
-X-CRM114-Status: GOOD (  12.01  )
+X-CRM114-CacheID: sfid-20190130_101954_662922_F5B50D71 
+X-CRM114-Status: GOOD (  14.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,39 +69,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>,
- vijaykhemka@fb.com
+Cc: mark.rutland@arm.com, linux-efi@vger.kernel.org,
+ Heinrich Schuchardt <xypron.glpk@gmx.de>, Alexander Graf <agraf@suse.de>,
+ Leif Lindholm <leif.lindholm@linaro.org>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>, james.morse@arm.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Enabling vuart for Facebook tiogapass
+Hi Ard,
 
-Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
----
- arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+On Sat, Jan 26, 2019 at 11:22:07AM +0100, Ard Biesheuvel wrote:
+> The UEFI spec revision 2.7 errata A section 8.4 has the following to
+> say about the virtual memory runtime services:
+> 
+>   "This section contains function definitions for the virtual memory
+>   support that may be optionally used by an operating system at runtime.
+>   If an operating system chooses to make EFI runtime service calls in a
+>   virtual addressing mode instead of the flat physical mode, then the
+>   operating system must use the services in this section to switch the
+>   EFI runtime services from flat physical addressing to virtual
+>   addressing."
 
-diff --git a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
-index 42e0d7a8e8d0..a058fb2985f7 100644
---- a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
-+++ b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
-@@ -64,6 +64,11 @@
- 	status = "okay";
- };
- 
-+&vuart {
-+	// VUART Host Console
-+	status = "okay";
-+};
-+
- &uart1 {
- 	// Host Console
- 	status = "okay";
--- 
-2.17.1
+I should probably go RTFM, but what does UEFI say about the attributes of
+"flat physical addressing"? The wording above implies to me that it should
+act as though the stage-1 MMU is disabled because it's described as an
+alternative to virtual addressing.
 
+If we move in a direction where we avoid calling SetVirtualAddressMap() by
+default on arm64, isn't there a real threat that this firmware call will no
+longer be validated? Do we need to worry about that?
+
+Finally, Bjorn said that SDM850 is unbootable without this change. Why is
+that?
+
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
