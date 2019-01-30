@@ -2,72 +2,68 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F1A9BC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:34:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B1F00C282D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:38:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C25992087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:34:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7EF662087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:38:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MQmltIhN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C25992087F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eBZTNDY0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lunn.ch header.i=@lunn.ch header.b="oLYl71C3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7EF662087F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lunn.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dPTJzOD1YI0J3Wb0gxqD3vkkAxrCF4p1OmYkXqdQeMg=; b=MQmltIhN5KT+gu
-	i9RBP8k+SCpIy7Nt6tP5bbBWXYSMux5R0DHFBzEk9SDZfSwlklPtYHzhhpu7F8rWASw+5xhCVjKZD
-	6GU0hSaeEVaw/AWcuMXWN1Qn5v2PaqkTgcsvi8+YxuDT7o2UY6cw2pKIyTkzFE+nwRsqb8RcrYfjB
-	nsC8ya9vN17ri5wYfuOeirI7JNvHdbGmntz9YqrmOMvkirvoeOYHwaTYrLT6mWUN6JL04phogT66s
-	0lUt5EemmgZ5AVY0bSwltqlg6xIc2Pc7YqlUcvbL2igKfmZw9WsvklInj/lTZNbwPwPonEbzvSMMW
-	k07NpV6Lk3fS/eF6ySoQ==;
+	List-Owner; bh=xoKfh6bNgR9TWc+/QNj9Ij6HwujGo+1HR0QxLDdtvPY=; b=eBZTNDY04MbBF3
+	Dre/MJLg930VKNfgT+NB9kSQlCnNFnUHUe3zKr7A6y57fvi1iYweICly3sJIsKyKV/YrVHkkQ/nzS
+	WvYVl0kNqokwG2/l39je3E3rIFbJrXCCXYhEjpjfIqOLiFw7FH/7fglkGwKcyf2xcZA6wyAGEm3w1
+	0FT/0Z2jEthgzHKZPoJdQL4X5F5UdDEVy8hVXIKxHArLZAEXdkeBxuLbzBH814gwIDWg8l54FO2eX
+	uLJL7N6D8w4LtDQ10JcNmvxc7KFrOMGMTayUgf9sOKbIuULVNy0PmGBqWc6Usu7RYSnGTPWVCfDAT
+	1As27pOIgy5RwrEIdMyA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gosoc-0001tr-Mq; Wed, 30 Jan 2019 16:34:18 +0000
-Received: from mail-qt1-f193.google.com ([209.85.160.193])
+	id 1gossj-00045g-5L; Wed, 30 Jan 2019 16:38:33 +0000
+Received: from vps0.lunn.ch ([185.16.172.187])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gosoZ-0001tW-JZ
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 16:34:16 +0000
-Received: by mail-qt1-f193.google.com with SMTP id e5so107443qtr.12
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 08:34:15 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=euuV6RNzmdpfE6XW8Kl8bVDvDGr6dCVxskMSvSuszAo=;
- b=Skm17mPfGBSNxS9avKFG7fWoV7UeuMT2zuH1hj9+OULJ0KKBE4J09+UId/r4nPJtme
- INAyZsUAWR2WMvsZNpPMPt2Ktt9t+w4zcUW1SctJrnmCwYKKqN6AraekIflkHaCFBF0X
- rmBuPeZqlrtXsVJULS4vUE+dXcaGuL6mJBPLMExXPNQfl53gHtDcvGovoLK3dUNpzR8O
- /L9TXKBu99eV8H1+SsbKpM3m1D2tuCtHfQzq0kxY0ls8OZyfDbIAyEbshFq2tl6PzeF7
- NTtDZuDuO+i00ToE79R+Dvqg+482atrtMDiPcOHP5gPAqki3r2hYfOX9kkoWjgErrgIq
- uAvQ==
-X-Gm-Message-State: AJcUukd0kjGjjDGKV+vt9yyFRq0u60t1EMrg44+lZNES9TJFpHMz9dZZ
- BBoBdNwRIrBetfJO7UjSnljtcWKYJI6a9JCNl/0=
-X-Google-Smtp-Source: AHgI3IYQuoq+cjxzwUiUrZQHM71psYfzLKuW+YSxHM4NOpLDw9WRFnyLQ+jJUX2YZGMbOzO4P/+tcXyxnmJkAhM3BhA=
-X-Received: by 2002:ac8:1d12:: with SMTP id d18mr19213617qtl.343.1548866054768; 
- Wed, 30 Jan 2019 08:34:14 -0800 (PST)
+ id 1gossf-00044V-4V; Wed, 30 Jan 2019 16:38:30 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=lunn.ch;
+ s=20171124; h=In-Reply-To:Content-Type:MIME-Version:References:Message-ID:
+ Subject:Cc:To:From:Date:Sender:Reply-To:Content-Transfer-Encoding:Content-ID:
+ Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+ :Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:List-Subscribe:
+ List-Post:List-Owner:List-Archive;
+ bh=Awb+e7KyeVsQY0L1pRZuEHWubonzwcbqoNNQPfvskxY=; b=oLYl71C3EZwLUlZPRYSbe0nUXy
+ C34Ofv0t26OdOMUNAiOoACSOArAQnP3VTqsPWUj+Hi1lvSJ1ohWiYWdECwQ5t+iEbddx9xb7NMRMP
+ /AIiwYlXlJ4EN4acSu5kp24FEbCPA10gihRfnZx/9cCbrxjK/HGt7IJIrXwKLNXQI3Lw=;
+Received: from andrew by vps0.lunn.ch with local (Exim 4.89)
+ (envelope-from <andrew@lunn.ch>)
+ id 1gossT-0004w7-1U; Wed, 30 Jan 2019 17:38:17 +0100
+Date: Wed, 30 Jan 2019 17:38:17 +0100
+From: Andrew Lunn <andrew@lunn.ch>
+To: Carlos Henrique Lima Melara <charlesmelara@outlook.com>
+Subject: Re: [PATCH v2] staging: mt7621-eth/ethtool.c: Correction of SPDX
+ license identifier
+Message-ID: <20190130163817.GF21904@lunn.ch>
+References: <SC1P15201MB2014C3E0CAB4DA9ADF330797A8900@SC1P15201MB2014.LAMP152.PROD.OUTLOOK.COM>
 MIME-Version: 1.0
-References: <20190114174533.6134-1-robh@kernel.org>
-In-Reply-To: <20190114174533.6134-1-robh@kernel.org>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 30 Jan 2019 17:33:57 +0100
-Message-ID: <CAK8P3a28_=urR1h95GN_wvYxJSOTUr_gL-cOzk9Pt1CZFGnJCA@mail.gmail.com>
-Subject: Re: [PATCH v2] arm64: dts: Remove inconsistent use of 'arm,armv8'
- compatible string
-To: Rob Herring <robh@kernel.org>
+Content-Disposition: inline
+In-Reply-To: <SC1P15201MB2014C3E0CAB4DA9ADF330797A8900@SC1P15201MB2014.LAMP152.PROD.OUTLOOK.COM>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_083415_692682_BCC099D3 
-X-CRM114-Status: GOOD (  10.94  )
+X-CRM114-CacheID: sfid-20190130_083829_328042_A0D353B8 
+X-CRM114-Status: GOOD (  13.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,36 +75,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Nishanth Menon <nm@ti.com>,
- Heiko Stuebner <heiko@sntech.de>, Maxime Ripard <maxime.ripard@bootlin.com>,
- Liviu Dudau <liviu.dudau@arm.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>, Wei Xu <xuwei5@hisilicon.com>,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- Gregory CLEMENT <gregory.clement@bootlin.com>,
- Michal Simek <michal.simek@xilinx.com>, Krzysztof Kozlowski <krzk@kernel.org>,
- arm-soc <arm@kernel.org>, Thierry Reding <treding@nvidia.com>,
- DTML <devicetree@vger.kernel.org>, Scott Branden <scott.branden@broadcom.com>,
- Antoine Tenart <antoine.tenart@bootlin.com>, Will Deacon <will.deacon@arm.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Simon Horman <horms+renesas@verge.net.au>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Chanho Min <chanho.min@lge.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Tero Kristo <t-kristo@ti.com>
+Cc: "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>,
+ "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "neil@brown.name" <neil@brown.name>,
+ "linux-mediatek@lists.infradead.org" <linux-mediatek@lists.infradead.org>,
+ "matthias.bgg@gmail.com" <matthias.bgg@gmail.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 14, 2019 at 6:45 PM Rob Herring <robh@kernel.org> wrote:
->
-> The 'arm,armv8' compatible string is only for software models. It adds
-> little value otherwise and is inconsistently used as a fallback on some
-> platforms. Remove it from those platforms.
+On Wed, Jan 30, 2019 at 02:48:27PM +0000, Carlos Henrique Lima Melara wrote:
+> 	This patch fix the checkpatch.p1 warning:
+> 
+> 	WARNING: Missing or malformed SPDX-License-Identifier tag in line 1
+> 	+/*
+> 
+> 	It includes the SPDX expression for GPL-2.0 and corrects the comment format to suit the kernel's coding style.
+> 
+> Signed-off-by: Carlos (Charles) Henrique Lima Melara <charlesmelara@outlook.com>
+> ---
+>  drivers/staging/mt7621-eth/ethtool.c | 22 ++++++++++++----------
+>  1 file changed, 12 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/staging/mt7621-eth/ethtool.c b/drivers/staging/mt7621-eth/ethtool.c
+> index 40a7d47be913..49d417de64c8 100644
+> --- a/drivers/staging/mt7621-eth/ethtool.c
+> +++ b/drivers/staging/mt7621-eth/ethtool.c
+> @@ -1,15 +1,17 @@
+> -/*   This program is free software; you can redistribute it and/or modify
+> - *   it under the terms of the GNU General Public License as published by
+> - *   the Free Software Foundation; version 2 of the License
+> +// SPDX-License-Identifier: GPL-2.0
 
-Applied on arm/dt, thanks!
+Hi Carlos
 
-      Arnd
+drivers/staging/mt7621-eth$ grep LICENSE *
+gsw_mt7621.c:MODULE_LICENSE("GPL");
+mtk_eth_soc.c:MODULE_LICENSE("GPL");
+
+And include/linux/module.h 
+says:
+
+/*
+ * The following license idents are currently accepted as indicating free
+ * software modules
+ *
+ *      "GPL"                           [GNU Public License v2 or later]
+ *      "GPL v2"                        [GNU Public License v2]
+
+So the SPDX string probably does not match the MODULE_LICENSE.
+
+   Andrew
 
 _______________________________________________
 linux-arm-kernel mailing list
