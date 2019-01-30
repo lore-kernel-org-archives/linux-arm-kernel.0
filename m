@@ -2,85 +2,66 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 72FBFC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 17:22:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1CFA4C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 17:24:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 26E5020855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 17:22:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E40742082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 17:24:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jgMevU+U";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="dnMTKRLu";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="1fie8BrC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 26E5020855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bVBi4GGJ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ANd4YPqq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E40742082F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iLwbnUSzR3fcgl4V9N4a7wTiYzM9LIxqH2ftX9E7qdo=; b=jgMevU+Uh0Nvwk
-	FCke+4rwwCAEg/3g00Z3BbPUxFYuoRDN9m1P8z3fQGh5N5btIHsg/1AfpajUmvITg5k5NiypC96Fv
-	Xj3Smhkm9/+RBfu8C/n0J3lL3CjsQZyStUx9nWKiaYd4JDW9nTAJnOLyWi8iCA3DD04n/o2ZUPT7t
-	rwhPcYktq/jBR4r987QfPy0E9AHcTUNQCnGDE2CbJICtBl7od7JhfktjDVCIvMjlbVlF8F5guPLJ4
-	TmNtm+3xzggg8h9b6rSI/3LEmes7ssmzBTkv7yW9/v+K//RSJIii6xfiq1kt3bSc7jWS4gsOBu2vz
-	iTuHIf24iXS4N6qETtbw==;
+	List-Owner; bh=/B/j5ejj2LpoHxY5bta6Xt425RErygGpdoTm4aM3o0U=; b=bVBi4GGJeUoZps
+	xDMp7pMFB6CJodn74qk8Zz15/GXdwUXx6l8Zf/LouytlwzAvwf0njc/v63MaBidNpDYOVjADAHmMi
+	UVARBLGbq0SWY3JVuorrrhdBEX+exUrO4dLDctebHWj6v4c14wpsMpjdIv/qkX68xqYIwPwhHHuTp
+	AQfWe/w5nhJgmDRQfel5o+cs7lktJPgpuFHGlDFlLPFVQkHsEj5z7KJOkAyS0TsEh+gYFzkhNZWQt
+	+ZNqK86/MzIY/9GlDcPYaY0lx8QIi92xERthmItEUY41oo8ZSHs77RSWlLh9oDJuEqpqxVPV8plnK
+	hXQ5DmsZ5xYmaXOJu8sQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gotZ5-0005hQ-KY; Wed, 30 Jan 2019 17:22:19 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gotZ0-0005XJ-Ar; Wed, 30 Jan 2019 17:22:14 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=iRpEHgbAXrDBhaJig2YEqSuQEt6eXPV5nIqbQpbADcc=; b=dnMTKRLuo28TbMW8sWNgMXxBS
- Evy5J5EBkqLDwcm3YK78BPYBjrfBzdivEo4FqthFCPZ5vmd3P0KiPQns+g0afnl7Q1m+kMf0gou0g
- SuA/oh5PSgL7xzNZjk7tZQJBcNNWO3EIGboBYN4bE45YJKX4ZNniDgkFQ4lRc3/DxepGPyW7VMO9k
- qlcxTwTeLq/dSFQZ5oRY65knNXMPeF1J8pRiMMMwAIsIa2LtZ4Zj48UiiaS65jPWeZnmNGdEVYPvE
- 8vabaKnUQso+/yDiB/+XYH8maOTVAmJlj2BluiqB2jH3eAb0gt1SVOFHhrMBBpyFBPdnAgtKeZ1at
- X3xAror9g==;
+	id 1gotau-00067S-E0; Wed, 30 Jan 2019 17:24:12 +0000
 Received: from mail.kernel.org ([198.145.29.99])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gotJf-0007vs-KU; Wed, 30 Jan 2019 17:06:29 +0000
-Received: from localhost (unknown [69.71.4.100])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gotaq-000671-Up; Wed, 30 Jan 2019 17:24:10 +0000
+Received: from bbrezillon (91-160-177-164.subs.proxad.net [91.160.177.164])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 381DD20989;
- Wed, 30 Jan 2019 17:06:18 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id B92DB2082F;
+ Wed, 30 Jan 2019 17:24:04 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548867980;
- bh=iJCfhl4idjAo8RareOx2BQFx3jKZU6evYVhqWFVbUFc=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=1fie8BrC5rjM3TNwbOPhnuVOvfrum0Ulwq+aPQ8jvn9BMUjupGVgSDVd/70dbbhTx
- O8Rx/nuRvjRzaR3K2K8oDY6r0Z13Dsf/fWpvz+wVEQYvbQmW+HXezZ+2mUrRwIIdfN
- lqsgGAkfwtKsJxLjdn9finik1eRF36DLwxUWVPdI=
-Date: Wed, 30 Jan 2019 11:06:12 -0600
-From: Bjorn Helgaas <helgaas@kernel.org>
-To: honghui.zhang@mediatek.com
-Subject: Re: [PATCH v9 2/9] PCI: Using PCI configuration space header type
- instead of class type to assign resource
-Message-ID: <20190130170612.GH229773@google.com>
-References: <1539686690-24068-1-git-send-email-honghui.zhang@mediatek.com>
- <1539686690-24068-3-git-send-email-honghui.zhang@mediatek.com>
+ s=default; t=1548869048;
+ bh=+qexuxyzZUXCvUAFV0o1R9tjZx4Et7tW4L3+Zv2mgis=;
+ h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
+ b=ANd4YPqqC6IyP3tlK8Ra9P/rIpieQeuauCECrQA21M/0YqDThQKdIamrmhEzlEx97
+ vNA7FNVXfuS3Ze1hoT67VHaPhjHM8PIdNtzmhgMS/yr362T8iZoXsumOey1uFuvz9s
+ DkAf851PTC84gyG/0KsJTylhltxLgjbWd61h4RTs=
+Date: Wed, 30 Jan 2019 18:23:58 +0100
+From: Boris Brezillon <bbrezillon@kernel.org>
+To: <Tudor.Ambarus@microchip.com>
+Subject: Re: [PATCH 6/9] spi: atmel-quadspi: switch to SPDX license identifiers
+Message-ID: <20190130182344.07e1d635@bbrezillon>
+In-Reply-To: <20190130150818.24902-7-tudor.ambarus@microchip.com>
+References: <20190130150818.24902-1-tudor.ambarus@microchip.com>
+ <20190130150818.24902-7-tudor.ambarus@microchip.com>
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1539686690-24068-3-git-send-email-honghui.zhang@mediatek.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_170624_066536_9E5430B2 
-X-CRM114-Status: GOOD (  19.44  )
+X-CRM114-CacheID: sfid-20190130_092409_003614_97FF7132 
+X-CRM114-Status: GOOD (  16.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,137 +73,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, devicetree@vger.kernel.org, ulf.hansson@linaro.org,
- lorenzo.pieralisi@arm.com, marc.zyngier@arm.com, linux-pci@vger.kernel.org,
- linux-kernel@vger.kernel.org, jianjun.wang@mediatek.com,
- matthias.bgg@gmail.com, ryder.lee@mediatek.com,
- linux-mediatek@lists.infradead.org, yt.shen@mediatek.com,
- yingjoe.chen@mediatek.com, eddie.huang@mediatek.com,
+Cc: alexandre.belloni@bootlin.com, linux-kernel@vger.kernel.org,
+ Ludovic.Desroches@microchip.com, broonie@kernel.org,
+ linux-mtd@lists.infradead.org, linux-spi@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Oct 16, 2018 at 06:44:43PM +0800, honghui.zhang@mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
+On Wed, 30 Jan 2019 15:08:40 +0000
+<Tudor.Ambarus@microchip.com> wrote:
+
+> From: Tudor Ambarus <tudor.ambarus@microchip.com>
 > 
-> The PCI configuration space header type defines the layout of the rest
-> of the header (PCI r3.0 sec 6.1, PCIe r4.0 sec 7.5.1.1.9) while the
-> resource assignment is based on the configuration space layout instead
-> of its class type. Using configuration space header type instead of
-> class type for the resource assignment.
+> Adopt the SPDX license identifiers to ease license compliance
+> management.
 > 
-> Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
 
-I applied the patch below to pci/enumeration for v5.1.
+Reviewed-by: Boris Brezillon <bbrezillon@kernel.org>
 
-I dropped the hunk that removed the PCI_CLASS_BRIDGE_HOST check per
-Lorenzo's concern.  Let me know if you have any other concerns.
+> ---
+>  drivers/spi/atmel-quadspi.c | 13 +------------
+>  1 file changed, 1 insertion(+), 12 deletions(-)
+> 
+> diff --git a/drivers/spi/atmel-quadspi.c b/drivers/spi/atmel-quadspi.c
+> index e6de6e3d1345..1d21db7851e9 100644
+> --- a/drivers/spi/atmel-quadspi.c
+> +++ b/drivers/spi/atmel-quadspi.c
+> @@ -1,3 +1,4 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * Driver for Atmel QSPI Controller
+>   *
+> @@ -7,18 +8,6 @@
+>   * Author: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>   * Author: Piotr Bugalski <bugalski.piotr@gmail.com>
+>   *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful, but WITHOUT
+> - * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> - * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> - * more details.
+> - *
+> - * You should have received a copy of the GNU General Public License along with
+> - * this program.  If not, see <http://www.gnu.org/licenses/>.
+> - *
+>   * This driver is based on drivers/mtd/spi-nor/fsl-quadspi.c from Freescale.
+>   */
+>  
 
-
-commit b2fb5cc57469
-Author: Honghui Zhang <honghui.zhang@mediatek.com>
-Date:   Tue Oct 16 18:44:43 2018 +0800
-
-    PCI: Rely on config space header type, not class code
-    
-    The PCI configuration space header type tells us whether the device is a
-    bridge, a CardBus bridge, or a normal device, and defines the layout of the
-    rest of the header (PCI r3.0 sec 6.1, PCIe r4.0 sec 7.5.1.1.9).
-    
-    When we rely on the header format, e.g., when we're dealing with bridge
-    windows, we should check the header type, not the class code.  The class
-    code is loosely related to the header type, but is often incorrect and the
-    spec doesn't actually require it to be related to the header format.
-    
-    Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
-    Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-    [bhelgaas: changelog, keep the PCI_CLASS_BRIDGE_HOST check]
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index c9d8e3c837de..e9d938e14ba8 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -6000,8 +6000,7 @@ void pci_reassigndev_resource_alignment(struct pci_dev *dev)
- 	 * to enable the kernel to reassign new resource
- 	 * window later on.
- 	 */
--	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE &&
--	    (dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
-+	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE) {
- 		for (i = PCI_BRIDGE_RESOURCES; i < PCI_NUM_RESOURCES; i++) {
- 			r = &dev->resource[i];
- 			if (!(r->flags & IORESOURCE_MEM))
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 8e2e4154cdd9..128459a0ffba 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1779,9 +1779,6 @@ int pci_setup_device(struct pci_dev *dev)
- 		break;
- 
- 	case PCI_HEADER_TYPE_BRIDGE:		    /* bridge header */
--		if (class != PCI_CLASS_BRIDGE_PCI)
--			goto bad;
--
- 		/*
- 		 * The PCI-to-PCI bridge spec requires that subtractive
- 		 * decoding (i.e. transparent) bridge must have programming
-diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
-index 1941bb0a6c13..ec44a0f3a7ac 100644
---- a/drivers/pci/setup-bus.c
-+++ b/drivers/pci/setup-bus.c
-@@ -1186,12 +1186,12 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
- 		if (!b)
- 			continue;
- 
--		switch (dev->class >> 8) {
--		case PCI_CLASS_BRIDGE_CARDBUS:
-+		switch (dev->hdr_type) {
-+		case PCI_HEADER_TYPE_CARDBUS:
- 			pci_bus_size_cardbus(b, realloc_head);
- 			break;
- 
--		case PCI_CLASS_BRIDGE_PCI:
-+		case PCI_HEADER_TYPE_BRIDGE:
- 		default:
- 			__pci_bus_size_bridges(b, realloc_head);
- 			break;
-@@ -1202,12 +1202,12 @@ void __pci_bus_size_bridges(struct pci_bus *bus, struct list_head *realloc_head)
- 	if (pci_is_root_bus(bus))
- 		return;
- 
--	switch (bus->self->class >> 8) {
--	case PCI_CLASS_BRIDGE_CARDBUS:
-+	switch (bus->self->hdr_type) {
-+	case PCI_HEADER_TYPE_CARDBUS:
- 		/* don't size cardbuses yet. */
- 		break;
- 
--	case PCI_CLASS_BRIDGE_PCI:
-+	case PCI_HEADER_TYPE_BRIDGE:
- 		pci_bridge_check_ranges(bus);
- 		if (bus->self->is_hotplug_bridge) {
- 			additional_io_size  = pci_hotplug_io_size;
-@@ -1356,13 +1356,13 @@ void __pci_bus_assign_resources(const struct pci_bus *bus,
- 
- 		__pci_bus_assign_resources(b, realloc_head, fail_head);
- 
--		switch (dev->class >> 8) {
--		case PCI_CLASS_BRIDGE_PCI:
-+		switch (dev->hdr_type) {
-+		case PCI_HEADER_TYPE_BRIDGE:
- 			if (!pci_is_enabled(dev))
- 				pci_setup_bridge(b);
- 			break;
- 
--		case PCI_CLASS_BRIDGE_CARDBUS:
-+		case PCI_HEADER_TYPE_CARDBUS:
- 			pci_setup_cardbus(b);
- 			break;
- 
 
 _______________________________________________
 linux-arm-kernel mailing list
