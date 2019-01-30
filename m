@@ -2,79 +2,80 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7BDB7C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:45:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3EF8FC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:46:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 49155218AE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:45:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E2DDA2086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:46:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MAzXkQu6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 49155218AE
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oFbmUq0j";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="T23VvXbA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E2DDA2086C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=OUYdycBvLKgHGVWeTNAV5T2/nooYGiPvqWEnF2ghvvk=; b=MAzXkQu63aGxuTNktpl6OUNfq
-	V7iLhwmxStS3r0aywEHKFjeKAl3XTVQNqp82NlZaf+nyse+8jOb2WV2UoMh4ha17UE8GdXH6UbEGx
-	GqqiXvb5LaP1PyjpBlvM3RmRBBRegszHN2Y/wHus3PuCPo/SigvBlNM8sRrgi7HpGmCQl4snpJBzx
-	2kYHnXXsU39SIgLRMHkqynN7R2deoMAz+vMtZi4KVLW4/9e9/H81OyBjIIXZAcrSQ+sj0Dlu6zVeu
-	g0msx+jBfSOqDPiyWTfSItmBwQKSO+lMxZogIxkpJWAYoGmhc2zfx/yaTaVQlbXBxTqUB5p/CkmHp
-	aCXcRwDiQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=MmX3wsKQ755+g8f/uf7zN9xC9qwBALEXFdd0u9hYYNw=; b=oFbmUq0jrKre6H
+	n4bwjJB/OUnofK+mG3WQTFskIGL3cFsy82je65VS7cTY7W3d8mqM4ctJCrVGQ/jn72xGZXumka5yQ
+	IfEul3JeZNl+RS0jmLx5IsgQ4XEQmYnp95FDFvIt0Klu1XHsfAMc5RkEMLrULPkMEEX7fyhCcun2D
+	hI49ls6sZYW45wdKZtfVLt1KQYkMsFT40eTFrOwUECuXYvcijSjOL0z/asEa6ZqtWqnbthBarL1YJ
+	VsqX6CvSBOfQYN3lXCjtfoei3n2E11+MZfob6GIwB3t9Sor7l+SE+WqIq3/b59RyAp/0b3r7mdwkI
+	uHBSOgC44+lAITMJHHlw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goszr-0000xo-8g; Wed, 30 Jan 2019 16:45:55 +0000
-Received: from mx07-00178001.pphosted.com ([62.209.51.94])
+	id 1got0L-0001Fi-TE; Wed, 30 Jan 2019 16:46:25 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goszn-0000x4-FU
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 16:45:53 +0000
-Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
- by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x0UGgcZh004041; Wed, 30 Jan 2019 17:45:43 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2q8e72a84u-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Wed, 30 Jan 2019 17:45:43 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 8363931;
- Wed, 30 Jan 2019 16:45:42 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag3node2.st.com [10.75.127.8])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 5F8A1A770;
- Wed, 30 Jan 2019 16:45:42 +0000 (GMT)
-Received: from [10.201.21.58] (10.75.127.48) by SFHDAG3NODE2.st.com
- (10.75.127.8) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Wed, 30 Jan
- 2019 17:45:41 +0100
-Subject: Re: [GIT PULL] STM32 DT changes for v4.21 #1
-To: Arnd Bergmann <arnd@arndb.de>
-References: <3fb58758-a67f-3a0f-72d2-abbfd71b6ae0@st.com>
- <6a490c72-c76a-51ef-7c5d-2178d2adcc83@st.com>
- <17acd15d-6fdb-c797-c37c-37bab49ac3b6@st.com>
- <CAK8P3a2g_oMMT75SbhF1aQ0+BXr+D8WUtMthEYbmF+15WfbSqg@mail.gmail.com>
-From: Alexandre Torgue <alexandre.torgue@st.com>
-Message-ID: <8d74b1fc-2771-befc-adb1-36d344f3cf53@st.com>
-Date: Wed, 30 Jan 2019 17:45:41 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1goszv-00010Z-1q
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 16:46:02 +0000
+Received: from mail-qk1-f169.google.com (mail-qk1-f169.google.com
+ [209.85.222.169])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id F1AA721473
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 16:45:57 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548866758;
+ bh=Qhz+Cmj3XDWVYkJBbEvc6p6QJjAfUK9C+dxUODNU86A=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=T23VvXbAKybvHdF5MkEVDXLqqZ/s1s86/RB8XHMAK39bV0uJ/9ASVZyOI3cpvoaVt
+ qRtYtmLzqDn2RBYmiqmEP+8Xgs7f07NUwnhSQcsdQslGVCG4i/TcnM50AEmkaoR3kq
+ K6xr1A7HFIt3G6R0yibpSCO1ynnF4gk6L1eSm82c=
+Received: by mail-qk1-f169.google.com with SMTP id c21so114540qkl.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 08:45:57 -0800 (PST)
+X-Gm-Message-State: AJcUukejVJq8uJyqs5b2Ja9IXvpiTNWQgcS8H86m+EVgVxyhxyOoUxn7
+ NOQd5gz1w64PK20RzXtzKf21kuNTve0BVNF5HA==
+X-Google-Smtp-Source: ALg8bN5aQKy+V94ZoHB/unZJZGaCCM7zhepzAF91LXVuuxQiPNrkPzFgIKzb1OsbsqyFf/SSIQOvnL0SQ1VG4XcaTcM=
+X-Received: by 2002:a37:5686:: with SMTP id k128mr26623744qkb.29.1548866757172; 
+ Wed, 30 Jan 2019 08:45:57 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <CAK8P3a2g_oMMT75SbhF1aQ0+BXr+D8WUtMthEYbmF+15WfbSqg@mail.gmail.com>
-Content-Language: en-US
-X-Originating-IP: [10.75.127.48]
-X-ClientProxiedBy: SFHDAG5NODE2.st.com (10.75.127.14) To SFHDAG3NODE2.st.com
- (10.75.127.8)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-01-30_13:, , signatures=0
+References: <1547207400-28307-1-git-send-email-aisheng.dong@nxp.com>
+ <1547207400-28307-5-git-send-email-aisheng.dong@nxp.com>
+ <20190122001011.GA15952@bogus>
+ <AM0PR04MB4211003C959DCC89B169D39B80980@AM0PR04MB4211.eurprd04.prod.outlook.com>
+In-Reply-To: <AM0PR04MB4211003C959DCC89B169D39B80980@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: Rob Herring <robh@kernel.org>
+Date: Wed, 30 Jan 2019 10:45:46 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqKwJEJmb2iAom1nckj6-eFrpfMXoGC4id5rqWiQZZn2yw@mail.gmail.com>
+Message-ID: <CAL_JsqKwJEJmb2iAom1nckj6-eFrpfMXoGC4id5rqWiQZZn2yw@mail.gmail.com>
+Subject: Re: [PATCH RESEND v1 4/4] dt-bindings: imx8-clock: add a53 and a72
+ clock id
+To: Aisheng Dong <aisheng.dong@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_084551_813262_22FD4ED4 
-X-CRM114-Status: GOOD (  16.01  )
+X-CRM114-CacheID: sfid-20190130_084559_684784_C0B349DE 
+X-CRM114-Status: GOOD (  18.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,55 +87,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Olof Johansson <olof@lixom.net>, Kevin Hilman <khilman@baylibre.com>,
- arm-soc <arm@kernel.org>, Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "sboyd@kernel.org" <sboyd@kernel.org>,
+ "mturquette@baylibre.com" <mturquette@baylibre.com>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Tue, Jan 22, 2019 at 6:59 AM Aisheng Dong <aisheng.dong@nxp.com> wrote:
+>
+> > From: Rob Herring [mailto:robh@kernel.org]
+> > Sent: Tuesday, January 22, 2019 8:10 AM
+> >
+> > On Fri, Jan 11, 2019 at 11:56:09AM +0000, Aisheng Dong wrote:
+> > > Add a53 and a72 clock id, as there's still no users, we update
+> > > IMX_LSIO_MEM_CLK base to start from 6 to allow a53 and a72 clock id to
+> > > be continued with a35 clk.
+> > >
+> > > Cc: Stephen Boyd <sboyd@kernel.org>
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Cc: devicetree@vger.kernel.org
+> > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > > Cc: Michael Turquette <mturquette@baylibre.com>
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > > ---
+> > >  include/dt-bindings/clock/imx8-clock.h | 6 ++++--
+> > >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > >
+> > > diff --git a/include/dt-bindings/clock/imx8-clock.h
+> > > b/include/dt-bindings/clock/imx8-clock.h
+> > > index 4236818..2f1aa2f 100644
+> > > --- a/include/dt-bindings/clock/imx8-clock.h
+> > > +++ b/include/dt-bindings/clock/imx8-clock.h
+> > > @@ -13,10 +13,12 @@
+> > >
+> > >  /* CPU */
+> > >  #define IMX_A35_CLK                                        1
+> > > +#define IMX_A53_CLK                                        2
+> > > +#define IMX_A72_CLK                                        3
+> >
+> > All 3 cores in one chip? If not maybe these should be split or define them as
+> > cpu cluster x clocks.
+> >
+>
+> Not in one chip.
+> Here are common clock IDs used for both MX8QXP and MX8QM.
+> You mean change to something like below?
+>
+> #define IMX_CPU_CLUSTER_A53_CLK                 2
+> #define IMX_CPU_CLUSTER_A72_CLK                 3
 
+What happened to A35? What I'm saying is if the same clock controller
+registers are used across chips even if the cores are different, use
+the same clock ID. Ideally, clock IDs have some relationship to the
+h/w such as their control register address and offset.
 
-On 1/30/19 5:29 PM, Arnd Bergmann wrote:
-> On Tue, Jan 8, 2019 at 9:42 AM Alexandre Torgue <alexandre.torgue@st.com> wrote:
->> On 1/8/19 8:29 AM, Alexandre Torgue wrote:
->>> On 12/3/18 12:18 PM, Alexandre Torgue wrote:
->>>> Hi Arnd, Olof and Kevin,
->>>>
->>>> Please consider this first round of STM32 DT updates for v4.21.
->>>>
->>>> Thanks.
->>>> Alex
->>>>
->>>
->>> This PR has not been merged in 5.0-rc1. Is there an issue (except than
->>> v4.21 doesn't exist :)) ?
->>> If not, is it possible to get it in next 5.0 rc ?
->>>
->>
->> Sorry for the last post. I completely missed Olof answer:
->>
->> "I think you might have missed pushing the tag to the remote?
->> -Olof
->> "
->>
->> My tag is now pushed. Is there a chance to get it in next RC ?
-> 
-> I noticed this we were still missing this one, but it's clearly too
-> late now for 5.0 now, so I've pulled it into arm/dt for 5.1 now.
+To put it another way, don't create a common number space of clock IDs
+across SoCs unless they are strictly subsets and supersets of each
+other.
 
-Sure it's too late :) and no pb. I planned to resend it for 5.1 so 
-thanks to have already taken it. One question, I have a (small) PR to 
-send for 5.1 this week. what is the best for you: base it on top of 
-arm/dt ? or rebase the one for 5.0 on 5.1 and make my PR on top of it ?
-
-Regard
-Alex
-
-> 
->         Arnd
-> 
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
