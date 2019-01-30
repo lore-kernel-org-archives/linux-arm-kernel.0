@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ADF7FC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:05:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8A569C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:06:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 581CB20869
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:05:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4F9D720869
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:06:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nmwFiRzJ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="Fie6jY3e"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 581CB20869
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qol065ER";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="wRyimw4q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F9D720869
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,69 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zKNJu7FZU0PQFgjd0Jmld5BOiXczssNAwXbU43ihWz4=; b=nmwFiRzJQsRq/+
-	FGJvICxsgmOWTvAEpwwGchDt47JHxCMVTtv3AjKVwBdg1CQkFgqWc4F04VTcyeUMsXXwu7ZtSq6uy
-	ojBGXiRDtgGxw7C+WUjn2NDNaOInO/THSsSOBTOTCe5Ny9xgUh7BzCQGctGzofLKi4qYly437NHh8
-	jpxNWQA5HFR6ILt+Jl3r33hgKj2jWi0e8E1LcDOj5zFAN/ZsZUH9fT53jMPXmF3kDtoLI1OMDesrR
-	5YRIZr2rYk4p1cRiWW46GBm7QHXsyYeN+b9z/aqI/9EFnx/m0zMS8uIWS5ZwqZLNqIK/kT6ShMVSs
-	n2/2SXSLt7jaU+7TKgMw==;
+	List-Owner; bh=z/lCdad/E86GWw5o+s74+NMBholtvMyg8TMWzTFmZGI=; b=Qol065ERfIRF7E
+	9gc7shV2Oi4KPd1zJNUulfLPCqKsE6Km1YEHpFudtpla9XIx2HLsfC5HC6PnJjO/N5En8n5A7qLNS
+	VGCOBBDoBfqEEXYxV3ae/6zLs9AwB8R2ccDcx0oiNFcw5T8pnjCIEmHpAmvhMVrW+mb8vMKKk1Thh
+	kJ/hjrWWM2Iiv16dIYbbcbA4bIPIU0+YidqdE8Gzt5wcBCKTc8mPdQHHBamEUJGw5Jgiu3o4J346n
+	RhF6MXpF4Af1LOCPOgW0sqb2A4jdDNqKum/KDIRFf/leR6CGhLyrLL/oiNi/YlAtny6BtKdEqqy2d
+	/XCbBe5tRLEIYNVIaxhw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gooch-0003kI-HI; Wed, 30 Jan 2019 12:05:43 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
+	id 1gooct-0003tY-Fi; Wed, 30 Jan 2019 12:05:55 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goocN-0003Tb-LL
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 12:05:25 +0000
-Received: by mail-wm1-x343.google.com with SMTP id m1so21363803wml.2
+ id 1goocO-0003Te-0z
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 12:05:28 +0000
+Received: by mail-wr1-x443.google.com with SMTP id t6so25722117wrr.12
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 04:05:19 -0800 (PST)
+ Wed, 30 Jan 2019 04:05:21 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=wqYT4k+TQ+M+pfm87o38f7PaCTS9uBZHsXpt5KCiYd4=;
- b=Fie6jY3eWbgGocsWjh+fKz9xKmPKXiVcOt/es8g2FFJuo59MlB7k6p8tCL0KgkNitD
- ixgQQpY4Ft62I25mtytFZNcyrhKHIooBHoGAOkZ5ZJx1uPszWfdcSFCluYt2IBJcYwr2
- 6rIiiFiKXzr4Hfgu+Bqjf2sGQdHzZIezERFciPYxKNV8FqSctL/xRPtrR6l0pqB2gQkl
- HX10VxWWl652xJEJGERzaNv1R5JUIiZuU5szJOv9Nsv2Jqt2rfR20dABHkcrFhpWhRne
- hne4GbEzvDTGoTxlg8r4PwztQqBMSJh4k/7SjVXvGQJmsxUBuyXcPXEUONwsy6nuPrni
- 1pPA==
+ bh=B2BO+fwpvQNa7co+MBheCqT9EeSpoweliE1h0nvrf8E=;
+ b=wRyimw4q/CieZB39/w/yhj+9ddW4wWJIPVHSz2pzkG7HYONNvO9kG6mEWI+iUQM75u
+ 19gwknb+I/uBUwUo2C1D1nyn8TykoWa/dBDl8+Y99hWUHSrGkY8i+GmOwN9PIYxOGYIw
+ mo4fl5SZbNymgwpog8C9gTPquMZdIOQ/RyCiUeVjQI6YalOvwBrDH+w/1ENwYKglw4G4
+ cFEWgMmvIik8MeFZvJj4xZzGtAzlgnRKVeUNjoacMs1bUOReud5FOf/qT3O1CUJum2+2
+ VD5c2hVD+idwH2F1ezARhmgywKUcszcDzTgFQjuvTCUbKJvlO3OTLnY1zkyOTlLIk8Hk
+ ekZg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=wqYT4k+TQ+M+pfm87o38f7PaCTS9uBZHsXpt5KCiYd4=;
- b=GlOLw7Bj4VBTLQAlc0LAGVhr6Z0i23hxb3p19k4SZkX6DrAoF5aeimp5GF5SgMc42V
- CKZSF8UmVOpVC9sETcYXWBV7RLu3aJq60tjiFcyw3RChKaumDsyqLb2I9ITKNRdn/96X
- sa2BrvsK/DPG+aRRhFehHF2tIETF2VfvrRNcfmxISP7vdAqUx04BVXLuth2vzb7CotWn
- /NILs8m2HqxvhofsvYKlg71dOUGWyXkA0MeVzdrxT6mN8gEICvLIpReoYYFddnJVNY8E
- jMP6zwV3VXdzfgpyIZgPtORtDRP7ZSNEOkASI75P974yz3KDh823Gw0Q1rtfPvwwSjhH
- c59A==
-X-Gm-Message-State: AJcUukeIWOo9bDVzptQnhX8qbBVCoYlBTClBwPMIt3qgXsyLFr9b4g71
- eLszndWacH3a7OarfuYOLP1JMQ==
-X-Google-Smtp-Source: ALg8bN7iabYejaasVAwO2Aui7uaHUFO/u9or32gSchK5Gs2ZTvTR7ob0iYkmmLwNM/fBjzkAZMH/rQ==
-X-Received: by 2002:a1c:9dc4:: with SMTP id
- g187mr25641923wme.152.1548849918689; 
- Wed, 30 Jan 2019 04:05:18 -0800 (PST)
+ bh=B2BO+fwpvQNa7co+MBheCqT9EeSpoweliE1h0nvrf8E=;
+ b=cvkQOAdyw/Rr+2kaMzkrK821imUm7yp+wN8sesS1IvadY2ihqTZvBssZqHWgb9PEf5
+ rwFGZjI83N8XUNCoPigGFd/pBLjkrANldNFo1KUrX3t9Qne1nt5qCh2SAZFXgehZ/kpj
+ JMEEYRJnJSDPW4wdyhTgEXDqt7Il3xgBvyuQpeYhwnM9xcAPOtkqEglMk4gTKyfCP0P2
+ YnTnrgWhMUzrUQ7MB+Kge+Z4XOBQJkKidOB8oqhMlbKKGfWG0KAd+JXaSUT9VXaTkIUi
+ XB8aEfMUDlocoCYfo10kdUBGMjo4VEp0pQp6OwxRcE3McqWfM4TB2Q7AueuMWDvx8uNt
+ sSZQ==
+X-Gm-Message-State: AJcUukcRkP1IGDDZObdvb1uodKeVYLn4yU/Rg15ZRk3bo1WOEb5R0LlD
+ NeUqIwr2o0NIKVkp8ksEfHIOcg==
+X-Google-Smtp-Source: ALg8bN7nsDf+G5dOa1/Oa2WPTbn+01xvu7HqJHNgAmRduhxmqMb+n3anOXwM3TvInm31/a1A3mJbyg==
+X-Received: by 2002:a5d:60cc:: with SMTP id x12mr28816411wrt.193.1548849920399; 
+ Wed, 30 Jan 2019 04:05:20 -0800 (PST)
 Received: from localhost.localdomain ([2a00:23c4:f7a1:ce00:5105:4b7b:c922:7c6])
- by smtp.gmail.com with ESMTPSA id f15sm642954wrt.10.2019.01.30.04.05.17
+ by smtp.gmail.com with ESMTPSA id f15sm642954wrt.10.2019.01.30.04.05.18
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 30 Jan 2019 04:05:17 -0800 (PST)
+ Wed, 30 Jan 2019 04:05:19 -0800 (PST)
 From: Carlo Caione <ccaione@baylibre.com>
 To: robh+dt@kernel.org, mark.rutland@arm.com, shawnguo@kernel.org,
  s.hauer@pengutronix.de, kernel@pengutronix.de, festevam@gmail.com,
  linux-imx@nxp.com, l.stach@pengutronix.de, devicetree@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v3 1/3] arm64: dts: imx8mq: Add QuadSPI controller
-Date: Wed, 30 Jan 2019 12:05:09 +0000
-Message-Id: <20190130120511.11555-2-ccaione@baylibre.com>
+Subject: [PATCH v3 2/3] arm64: dts: imx8mq-evk: Enable the QuadSPI controller
+Date: Wed, 30 Jan 2019 12:05:10 +0000
+Message-Id: <20190130120511.11555-3-ccaione@baylibre.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190130120511.11555-1-ccaione@baylibre.com>
 References: <20190130120511.11555-1-ccaione@baylibre.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_040523_697507_62BA6405 
-X-CRM114-Status: GOOD (  12.12  )
+X-CRM114-CacheID: sfid-20190130_040524_266212_F0BBC32C 
+X-CRM114-Status: GOOD (  11.21  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,50 +105,59 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add a node for the Freescale/NXP QuadSPI controller and extend the AIPS3
-memory range to accommodate the QuadSPI-memory region.
+Enable the Freescale/NXP QuadSPI controller with a proper pinctrl set on
+the i.MX8MQ EVK board.
 
 Signed-off-by: Carlo Caione <ccaione@baylibre.com>
 Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm64/boot/dts/freescale/imx8mq.dtsi | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/freescale/imx8mq-evk.dts | 26 ++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-index dbedc4a5e7fb..2be302cb2f1f 100644
---- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-@@ -379,7 +379,8 @@
- 			compatible = "fsl,imx8mq-aips-bus", "simple-bus";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
--			ranges = <0x30800000 0x30800000 0x400000>;
-+			ranges = <0x30800000 0x30800000 0x400000>,
-+				 <0x08000000 0x08000000 0x10000000>;
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+index f74b13aa5aa5..ef452d2d8653 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+@@ -137,6 +137,20 @@
+ 	status = "okay";
+ };
  
- 			uart1: serial@30860000 {
- 				compatible = "fsl,imx8mq-uart",
-@@ -497,6 +498,20 @@
- 				status = "disabled";
- 			};
- 
-+			qspi0: spi@30bb0000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx8mq-qspi", "fsl,imx7d-qspi";
-+				reg = <0x30bb0000 0x10000>,
-+				      <0x08000000 0x10000000>;
-+				reg-names = "QuadSPI", "QuadSPI-memory";
-+				interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clk IMX8MQ_CLK_QSPI_ROOT>,
-+					 <&clk IMX8MQ_CLK_QSPI_ROOT>;
-+				clock-names = "qspi_en", "qspi";
-+				status = "disabled";
-+			};
++&qspi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_qspi>;
++	status = "okay";
 +
- 			fec1: ethernet@30be0000 {
- 				compatible = "fsl,imx8mq-fec", "fsl,imx6sx-fec";
- 				reg = <0x30be0000 0x10000>;
++	n25q256a: flash@0 {
++		reg = <0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "micron,n25q256a", "jedec,spi-nor";
++		spi-max-frequency = <29000000>;
++	};
++};
++
+ &usdhc1 {
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc1>;
+@@ -195,6 +209,18 @@
+ 		>;
+ 	};
+ 
++	pinctrl_qspi: qspigrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_NAND_ALE_QSPI_A_SCLK	0x82
++			MX8MQ_IOMUXC_NAND_CE0_B_QSPI_A_SS0_B	0x82
++			MX8MQ_IOMUXC_NAND_DATA00_QSPI_A_DATA0	0x82
++			MX8MQ_IOMUXC_NAND_DATA01_QSPI_A_DATA1	0x82
++			MX8MQ_IOMUXC_NAND_DATA02_QSPI_A_DATA2	0x82
++			MX8MQ_IOMUXC_NAND_DATA03_QSPI_A_DATA3	0x82
++
++		>;
++	};
++
+ 	pinctrl_reg_usdhc2: regusdhc2grpgpio {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_SD2_RESET_B_GPIO2_IO19		0x41
 -- 
 2.19.1
 
