@@ -2,113 +2,81 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 68EB2C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 20:01:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 148EDC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 20:02:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3041220989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 20:01:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D5DF220989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 20:02:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J4Ypza23";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=outlook.com header.i=@outlook.com header.b="i8gpv7AP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3041220989
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=outlook.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Il66eJhZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D5DF220989
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VjEKxqLCv9XZGWzwD7kb7dofbzk08JBnNUz847CwCx8=; b=J4Ypza23Ajfc/E
-	T3Cvt1W3Qg4WaX82EdtnW6hVdU2med6zZRzjlUs1sEXoXkyonI7cdaHqDhTrlHRbakVsWhlDxqINr
-	Xbje+P5GkGcrcKysSBomL+6w2aKRSOskkmBJ0rMKs3luiu7aeA+9kVh/LdXCFrfbgzR8naOzuG5El
-	KCTAsWqlze62hrCvkaqz4M4H+zC+ZmtUa9JVZyDdSl6bPtCpQ1ERnIMBWSYZP4WTVFD0loDxIJ1lX
-	XJ3gv//bYsXtx+OnN4pweC8Zg20hh2EgoyxV60VZRGahqkgxripsgbWFiH3gwBkx6OZmeSckl9hoK
-	NaLNMEIHXMuSHMluAmHA==;
+	List-Owner; bh=q2ew3E/NvB5MIWLjYJmhGuDhM79Q3Gliu9na245uJyc=; b=Il66eJhZp9p5lQ
+	YpY+WZMj0UQscM5rFjPsqnzv1L1cUk/szp04Papiccg+jAKAh4JlvH3CoV8jTawWqkg6fXmthys0s
+	uZABLYSjLAMssh8ZWKT1cWIQO6KdC8a2Fd6DYRHkkeCAmDK0lq9YtQizWZj0iQ/qYk6THRxnaKsbg
+	UFzy7P4Dfd58VUHd/rutRD5ZFMtC3aUGDNO0cE2oybf/p43vJj4ogtBt1OPKwhptEACdLBgE5jLMf
+	mo3lvOfAv9SEPE27hGzOs/nXrl4M3Y7niDqcWAvTDPbkxdy+VXN/3VE5TNp9X35EdLT5C52gaQWoe
+	LS/MlliCOnlruP00f5bw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gow2x-0003Bc-Cl; Wed, 30 Jan 2019 20:01:19 +0000
-Received: from mail-oln040092000096.outbound.protection.outlook.com
- ([40.92.0.96] helo=NAM01-BN3-obe.outbound.protection.outlook.com)
+	id 1gow41-0003g5-Oe; Wed, 30 Jan 2019 20:02:25 +0000
+Received: from mail-oi1-f193.google.com ([209.85.167.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gow2t-0003Aw-R5; Wed, 30 Jan 2019 20:01:17 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=outlook.com;
- s=selector1;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=sRVNT3BFciODuz5nWl30CBONZ7QO2Wur+Hw7Y+H3vQQ=;
- b=i8gpv7APSbQ+Ut0KeMKxQsRxhQ4pN9YzTTwxOz0aayA5kLKkw/PKfT3fdptWZS+ER7T3djSlKz7EQzvLpu2xau3qNKowa4+NKt1PcCvNlwpcfnReRgbYWOF5B5+89hr3xm136j3B+GGJYPwKCl0KcFuER/1h3yCdlQAYwJ/aR1W0PJsFjo/jlECjez6iR6UVFclSJXxU3aV8syUFWRfRF7is1cx3CPueOZ1FjjzYNV/IyvcvIJ23ilIl5LHCKaBYiotTYO5rNShfMvi+s625yS9Mk11GSN9kHyK+Nba50iluKxI80i/01MrLCaZ01rLJeWxqVK4v4Oi9tDgrVvMwkg==
-Received: from SN1NAM01FT046.eop-nam01.prod.protection.outlook.com
- (10.152.64.52) by SN1NAM01HT100.eop-nam01.prod.protection.outlook.com
- (10.152.64.196) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1580.10; Wed, 30 Jan
- 2019 20:01:13 +0000
-Received: from RO1P15201MB2012.LAMP152.PROD.OUTLOOK.COM (10.152.64.56) by
- SN1NAM01FT046.mail.protection.outlook.com (10.152.65.24) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
- 15.20.1580.10 via Frontend Transport; Wed, 30 Jan 2019 20:01:13 +0000
-Received: from RO1P15201MB2012.LAMP152.PROD.OUTLOOK.COM
- ([fe80::914e:44b0:65a2:a915]) by RO1P15201MB2012.LAMP152.PROD.OUTLOOK.COM
- ([fe80::914e:44b0:65a2:a915%7]) with mapi id 15.20.1580.017; Wed, 30 Jan 2019
- 20:01:13 +0000
-From: Carlos Henrique Lima Melara <charlesmelara@outlook.com>
-To: "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>
-Subject: Re: [PATCH v2] staging: mt7621-eth/ethtool.c: Correction of SPDX
- license identifier
-Thread-Topic: [PATCH v2] staging: mt7621-eth/ethtool.c: Correction of SPDX
- license identifier
-Thread-Index: AQHUuKrcmbJ1/Slp9Uu1hNB7UlhL06XH7/gAgABLx4A=
-Date: Wed, 30 Jan 2019 20:01:13 +0000
-Message-ID: <RO1P15201MB201234F951531D13328C4FF2A8900@RO1P15201MB2012.LAMP152.PROD.OUTLOOK.COM>
-References: <SC1P15201MB2014C3E0CAB4DA9ADF330797A8900@SC1P15201MB2014.LAMP152.PROD.OUTLOOK.COM>
- <20190130152956.GA4195@kroah.com>
-In-Reply-To: <20190130152956.GA4195@kroah.com>
-Accept-Language: pt-BR, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: CP2PR80CA0037.lamprd80.prod.outlook.com (2603:10d6:102::23)
- To RO1P15201MB2012.LAMP152.PROD.OUTLOOK.COM
- (2603:10d6:4:1d::10)
-x-incomingtopheadermarker: OriginalChecksum:575977F9B7CB98A486810912E3966728025778F9C82408C67025760731873322;
- UpperCasedChecksum:7CB8BC7C81102ADBBB0E44039B3A71EBD46C045079EFAE35375B4994EEB5436C;
- SizeAsReceived:9055; Count:64
-x-ms-exchange-messagesentrepresentingtype: 1
-x-tmn: [re8PmgQJNBUJzMRMTIB8IGAf8LxrNddyoGpASTzIe3+eS7gdFefmoBUSksw8GLDI]
-x-microsoft-original-message-id: <c9304dc1-ffe8-d49c-e994-b3998e8ebce6@outlook.com>
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; SN1NAM01HT100;
- 6:hyORNiOf2r9WO8mV+FGtAeMdcvjxllAa0K1R4sv+ilKV1fxMQrqK61YqPkaqh/G7U1t1EJQ6sbh4UMSwjB73w5QjqR+P1xLC7XE/E0bhJWPXJQ7+f6fJfGqBrL4KHTllnO0LGfPb47w+SvNr3u/K/ru3iebXBu5sfrEYPd3/kS/x1Jba/ElX9i67jb72Ev+ml9NSPohQi4u6UoFGoiIzgEI0EpAyXVIpledAPQGTPdzXzQWWE4VAzf5FzxQZL+pHP2UdY1WkkKJ0wgbjW3uQYcbmXg6I5T40dpuVa/HtkGHcQFpTo69e5ywkbpgdkPPmG/J4oIS9KnXmP0FM1WB2cZlpIIHpoTshYrnF+IABE4GGyfrDQALsFPxvRsESyNiUffj2iStzijtJfwSl0bCrd91WmcODftEAbGjcQnqAW9wnkl8t6JCkOhTQXllkmohd3mjVwNYkDfhtIHrNWauIrA==;
- 5:BpmTZfqsfHxCKnULLwcgckqD7fNfbtesfbPjMbxOkRuU8PCnX6ABYpinUwvxX3RJofB1BlXtzODEdyJ6mjtrn0Bwy2vkfrN60FS+pPic5/BeaMViy0Asi+qLYhpATvvLvVxmQkgdt+bWbLddHh1hdwK0Bg5ZQPE2bW6EPmTWtPXKeWu2VItCF2Dayq5OG4CE1f+1zRBWqWJef2XrJNgaGg==;
- 7:6WloiTEXvr6wHE3ujCFrCUg0mHFU/618mhK27pkmx14fpxgP3n+eCTi7v0t9OysrT7hzG/bduTZRx/pUzskpLJPYRgEyTMcTTQAWhlckMgzoKnKKsgyJQSRhgt+UcniTaM12fNwpbI8LohBM1gtVXQ==
-x-incomingheadercount: 64
-x-eopattributedmessage: 0
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(201702061078)(5061506573)(5061507331)(1603103135)(2017031320274)(9118020)(2017031323274)(2017031324274)(2017031322404)(1601125500)(1603101475)(1701031045);
- SRVR:SN1NAM01HT100; 
-x-ms-traffictypediagnostic: SN1NAM01HT100:
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0; RULEID:(4566010)(82015058);
- SRVR:SN1NAM01HT100; BCL:0; PCL:0; RULEID:; SRVR:SN1NAM01HT100; 
-x-microsoft-antispam-message-info: K+zuSF/SBOFEzWo+8IZdFrhKJElInAZpaR+nH3TYg+yOqOEgqDH5gSqxd1IUz/an
-Content-ID: <F15E69E1BC3E5A4888E02762FFEC36A6@LAMP152.PROD.OUTLOOK.COM>
+ id 1gow3w-0003fc-Uh
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 20:02:23 +0000
+Received: by mail-oi1-f193.google.com with SMTP id u18so689791oie.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 12:02:20 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=z7U4FwF4rwvNfXRrLtt0q+Bh7E9FjuCDZRhkCbsAnKo=;
+ b=IHRNP1UllYA9h37lpLMvB/RpZ/IK0MCeX/+y5L1WjY8GS1+JKqwryYfFtKgLqD8H7v
+ kH9SlXXUlvPn8GeHVn2rZr/sMCBr15doF7vH5yo6Jf2nJzqF36+uUATrlW4jyYrtqBi4
+ Mk119PU1GwllV/SAMs/cgaaCWvpe4D/daH5MVWnnTgY/2BH13tJFpLWBwP9pV1EUafuJ
+ V3J3nKB9f1SqacU+tsDPxsdo9kkBxAI1/lOT7xnBlsZDzT2RpeBRXpkRzWyeCCIdg+aA
+ mmQQ2n88/KuLgwsFOJLbC+qw+AHYC0/kJd6ypWJOLvOYDELkr0EEWl5Zb5zA4TH77bVl
+ OlKw==
+X-Gm-Message-State: AJcUukc1ID4F8UoWBGzKzplA8wKwSVSRpEhEmOc8SyLSP3D45zwLAMXc
+ rMnKvHH4l/yFsPxyi8jClQ==
+X-Google-Smtp-Source: ALg8bN6UVC6iZTdLJlj4jcLfLc176T8NLD5kdGdWZIYeHNOXIPBLYnhsLAJr7zyLp9iqK1O/Pr1uUw==
+X-Received: by 2002:aca:c413:: with SMTP id u19mr12736474oif.209.1548878539803; 
+ Wed, 30 Jan 2019 12:02:19 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id u109sm925002otb.8.2019.01.30.12.02.18
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 30 Jan 2019 12:02:18 -0800 (PST)
+Date: Wed, 30 Jan 2019 14:02:18 -0600
+From: Rob Herring <robh@kernel.org>
+To: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+Subject: Re: [PATCH v2 1/2] dt-bindings: Add Qualcomm USB Super-Speed PHY
+ bindings
+Message-ID: <20190130200218.GB5908@bogus>
+References: <1548761715-4004-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <1548761715-4004-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
 MIME-Version: 1.0
-X-OriginatorOrg: outlook.com
-X-MS-Exchange-CrossTenant-RMS-PersistedConsumerOrg: 24fd1209-d934-423e-a578-ee886993c07f
-X-MS-Exchange-CrossTenant-Network-Message-Id: 6bba45ac-e274-498b-0d39-08d686edaf80
-X-MS-Exchange-CrossTenant-rms-persistedconsumerorg: 24fd1209-d934-423e-a578-ee886993c07f
-X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Jan 2019 20:01:11.7019 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Internet
-X-MS-Exchange-CrossTenant-id: 84df9e7f-e9f6-40af-b435-aaaaaaaaaaaa
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: SN1NAM01HT100
+Content-Disposition: inline
+In-Reply-To: <1548761715-4004-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_120115_964538_87CCF5BB 
-X-CRM114-Status: GOOD (  17.74  )
+X-CRM114-CacheID: sfid-20190130_120222_229709_2C90637D 
+X-CRM114-Status: GOOD (  18.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -120,61 +88,127 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "neil@brown.name" <neil@brown.name>,
- "linux-mediatek@lists.infradead.org" <linux-mediatek@lists.infradead.org>,
- "matthias.bgg@gmail.com" <matthias.bgg@gmail.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, jackp@codeaurora.org,
+ shawn.guo@linaro.org, gregkh@linuxfoundation.org, linux-usb@vger.kernel.org,
+ khasim.mohammed@linaro.org, linux-kernel@vger.kernel.org, swboyd@chromium.org,
+ vkoul@kernel.org, bjorn.andersson@linaro.org, linux-arm-msm@vger.kernel.org,
+ andy.gross@linaro.org, kishon@ti.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 30/01/2019 13:29, gregkh@linuxfoundation.org wrote:
-> On Wed, Jan 30, 2019 at 02:48:27PM +0000, Carlos Henrique Lima Melara wrote:
->> 	This patch fix the checkpatch.p1 warning:
->>
->> 	WARNING: Missing or malformed SPDX-License-Identifier tag in line 1
->> 	+/*
->
-> Why did you not fix up the indentation that was already mentioned?
+On Tue, Jan 29, 2019 at 12:35:14PM +0100, Jorge Ramirez-Ortiz wrote:
+> Binding description for Qualcomm's Synopsys 1.0.0 super-speed PHY
+> controller embedded in QCS404.
+> 
+> Based on Sriharsha Allenki's <sallenki@codeaurora.org> original
+> definitions.
+> 
+> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+> ---
+>  .../devicetree/bindings/usb/qcom,usb-ssphy.txt     | 73 ++++++++++++++++++++++
+>  1 file changed, 73 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/qcom,usb-ssphy.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/qcom,usb-ssphy.txt b/Documentation/devicetree/bindings/usb/qcom,usb-ssphy.txt
+> new file mode 100644
+> index 0000000..8ef6e39
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/qcom,usb-ssphy.txt
+> @@ -0,0 +1,73 @@
+> +Qualcomm Synopsys 1.0.0 SS phy controller
+> +===========================================
+> +
+> +Synopsys 1.0.0 ss phy controller supports SS usb connectivity on Qualcomm
+> +chipsets
+> +
+> +Required properties:
+> +
+> +- compatible:
+> +    Value type: <string>
+> +    Definition: Should contain "qcom,usb-ssphy".
 
-The Warning was about the missing SPDX License Identifier, so I added the 
-identifier according to the "license-rules.rst" for C source that is:
+This is in no way specific enough.
 
->   The SPDX license identifier is added in form of a comment.  The comment
->   style depends on the file type::
->
->      C source:	// SPDX-License-Identifier: <SPDX License Expression>
->      C header:	/* SPDX-License-Identifier: <SPDX License Expression> */
->      ASM:	/* SPDX-License-Identifier: <SPDX License Expression> */
->      scripts:	# SPDX-License-Identifier: <SPDX License Expression>
->      .rst:	.. SPDX-License-Identifier: <SPDX License Expression>
->      .dts{i}:	// SPDX-License-Identifier: <SPDX License Expression>
+> +
+> +- reg:
+> +    Value type: <prop-encoded-array>
+> +    Definition: USB PHY base address and length of the register map.
+> +
+> +- #phy-cells:
+> +    Value type: <u32>
+> +    Definition: Should be 0. See phy/phy-bindings.txt for details.
+> +
+> +- clocks:
+> +    Value type: <prop-encoded-array>
+> +    Definition: See clock-bindings.txt section "consumers". List of
+> +		 three clock specifiers for reference, phy core and
+> +		 pipe clocks.
+> +
+> +- clock-names:
+> +    Value type: <string>
+> +    Definition: Names of the clocks in 1-1 correspondence with the "clocks"
+> +		 property. Must contain "ref", "phy" and "pipe".
+> +
+> +- vdd-supply:
+> +    Value type: <phandle>
+> +    Definition: phandle to the regulator VDD supply node.
+> +
+> +- vdda1p8-supply:
+> +    Value type: <phandle>
+> +    Definition: phandle to the regulator 1.8V supply node.
+> +
+> +
+> +Optional child nodes:
+> +
+> +- vbus-supply:
+> +    Value type: <phandle>
+> +    Definition: phandle to the VBUS supply node.
 
-I think that was the correction needed, right?
+Does the phy actually get supplied by Vbus? If not, then Vbus supply 
+should be defined in a USB connector node.
 
-Still have a question about the license comment in the "ethtooll.c". 
+> +
+> +- resets:
+> +    Value type: <prop-encoded-array>
+> +    Definition: See reset.txt section "consumers". PHY reset specifiers
+> +		 for phy core and COR resets.
 
-> /*   This program is free software; you can redistribute it and/or modify
->  *   it under the terms of the GNU General Public License as published by
->  *   the Free Software Foundation; version 2 of the License
->  *
->  *   This program is distributed in the hope that it will be useful,
->  *   but WITHOUT ANY WARRANTY; without even the implied warranty of
->  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->  *   GNU General Public License for more details.
->  *
->  *   Copyright (C) 2009-2016 John Crispin <blogic@openwrt.org>
->  *   Copyright (C) 2009-2016 Felix Fietkau <nbd@openwrt.org>
->  *   Copyright (C) 2013-2016 Michael Lee <igvtee@gmail.com>
->  */
+COR or COM?
 
-It puts 3 spaces between the * and the text, should it be corrected to 
-only one space?
+Looks to me the order is reversed.
 
-thanks, Carlos Melara.
+> +
+> +- reset-names:
+> +    Value type: <string>
+> +    Definition: Names of the resets in 1-1 correspondence with the "resets"
+> +		 property. Must contain "com" and "phy".
+> +
+> +Example:
+> +
+> +usb3_phy: phy@78000 {
+
+usb3-phy@...
+
+> +	compatible = "qcom,usb-ssphy";
+> +	reg = <0x78000 0x400>;
+> +	#phy-cells = <0>;
+> +	clocks = <&rpmcc RPM_SMD_LN_BB_CLK>,
+> +		 <&gcc GCC_USB_HS_PHY_CFG_AHB_CLK>,
+> +		 <&gcc GCC_USB3_PHY_PIPE_CLK>;
+> +	clock-names = "ref", "phy", "pipe";
+> +	resets = <&gcc GCC_USB3_PHY_BCR>,
+> +		 <&gcc GCC_USB3PHY_PHY_BCR>;
+> +	reset-names = "com", "phy";
+> +	vdd-supply = <&vreg_l3_1p05>;
+> +	vdda1p8-supply = <&vreg_l5_1p8>;
+> +	vbus-supply = <&usb3_vbus_reg>;
+> +};
+> -- 
+> 2.7.4
+> 
+
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
