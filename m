@@ -2,71 +2,72 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 27831C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:36:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 03AEFC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:40:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EB9E02084C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:36:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C86852084C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:40:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Hs+l42QD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EB9E02084C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rVZE2CMG";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="mxiCYy2G"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C86852084C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yT8dnWEJIqJDyrIiGx7hTZnDuCpQd7uHPx+HLiZ+IgA=; b=Hs+l42QDm3HBeE
-	Qc4gTBFUiCaV58HGe9jOAVvmXLvL+QskqZBmOX+/levgyS0ZKfPEbn/wP+DabVsbcg/m1ffWM59HH
-	oJD7iAHTfFOXtnYDJZMSrIegQFHX2zgcXSGgcj5KoMlBaMBhN++IojuFzUcrB29pYXhIcBQ5B6FBO
-	2YLg8pa8MUru2o7EY7SNFXtWbfkFj4KUDCbEgekw+DEFXaumw/IlPvDGAfbEKimHvBEyjo9uKjD6l
-	rY9Mra1h9bujLRNH7K1E1Tm/EWtdUBuM270+rnIcStmRe4P/rCtMbPm7PXopL1pErYJxPFJvjjGHG
-	g/RAvVkguFByQPrYefKw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=XI24UXgO0WgBy/MbriOVsDp/KYo9eL0YeqHqZOEVOcM=; b=rVZE2CMGblAAKLLwaVJLPhksM
+	3TjMHJGOpD9obv98fyu+JRtMB1LQqfvkoEp9souM4be2viwDPfUaBypAv80aca1C3B+noyxiNpbz1
+	oia+Jrgt26OgmU7kb7inRRFhzDHKMmEcZeWYTu7+0N9XPMN20le9TvNDjvbacNOdIiawENnteSfim
+	wXUxOnQUti2s2KOLYV87Hs6T+CEAaEAeXOGf7YfpxDqh6YcL71rpDc//pxvIWSt/a7yocXzH+uxUl
+	fqM6fuKH39HY14WkTxCkjOlWyiEyk6Ofn+LTM8Y1doFqyCeI3Rjgzbu9h9wiEuBlfiHOSp/BjSooM
+	UPmjPIvkw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goruN-00077Y-RD; Wed, 30 Jan 2019 15:36:11 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
+	id 1goryE-00085V-TS; Wed, 30 Jan 2019 15:40:10 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goruK-00077D-K2
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 15:36:10 +0000
-Received: from smtp.corp.redhat.com (int-mx07.intmail.prod.int.phx2.redhat.com
- [10.5.11.22])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
- (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 37F4981F13;
- Wed, 30 Jan 2019 15:36:08 +0000 (UTC)
-Received: from kamzik.brq.redhat.com (unknown [10.43.2.160])
- by smtp.corp.redhat.com (Postfix) with ESMTPS id CFE6D100164E;
- Wed, 30 Jan 2019 15:36:06 +0000 (UTC)
-Date: Wed, 30 Jan 2019 16:36:04 +0100
-From: Andrew Jones <drjones@redhat.com>
-To: Marc Zyngier <marc.zyngier@arm.com>
-Subject: Re: [PATCH 5/5] arm/arm64: KVM: Don't panic on failure to properly
- reset system registers
-Message-ID: <20190130153604.l3ro4gdfsot2glnb@kamzik.brq.redhat.com>
-References: <20190125094656.5026-1-christoffer.dall@arm.com>
- <20190125094656.5026-6-christoffer.dall@arm.com>
- <20190129163337.nbwivspcvlcmzrmo@kamzik.brq.redhat.com>
- <b2c0fa37-37ad-3696-e862-5d0434496d1f@arm.com>
+ id 1gory7-0007iF-3K
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 15:40:04 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=G0gJjHBKp6BFs3XfPsE/2DOPMPqljkASXnoDiOLOIXw=; b=mxiCYy2GHbDO3c3z2eGOfC6GO
+ 25eEtm9uJ2ezYxpx23QnIVhQnjJhWchkWTuDHquFqNz3NzQMPWsrrpPP0sFw6URjP/neuYqjBjjvj
+ pVZI/yKNdCcUBFUzBgaKCN6jIc+p79qeihrcOcQots96+Q1WoHP8QilMQ996rvUKiQFVI=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=debutante.sirena.org.uk)
+ by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1gory1-0006Rd-8P; Wed, 30 Jan 2019 15:39:57 +0000
+Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
+ id 99D911127D43; Wed, 30 Jan 2019 15:39:56 +0000 (GMT)
+Date: Wed, 30 Jan 2019 15:39:56 +0000
+From: Mark Brown <broonie@kernel.org>
+To: Otavio Salvador <otavio@ossystems.com.br>
+Subject: Re: [PATCH 1/4] regulator: rk808: Fix BUCK1/2 voltages on rk805
+Message-ID: <20190130153956.GB10665@sirena.org.uk>
+References: <20190129195424.10161-1-otavio@ossystems.com.br>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <b2c0fa37-37ad-3696-e862-5d0434496d1f@arm.com>
-User-Agent: NeoMutt/20180716
-X-Scanned-By: MIMEDefang 2.84 on 10.5.11.22
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.25]); Wed, 30 Jan 2019 15:36:08 +0000 (UTC)
+In-Reply-To: <20190129195424.10161-1-otavio@ossystems.com.br>
+X-Cookie: Remember the... the... uhh.....
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_073608_739558_93930705 
-X-CRM114-Status: GOOD (  23.73  )
+X-CRM114-CacheID: sfid-20190130_074003_311206_2255A558 
+X-CRM114-Status: UNSURE (   7.36  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,92 +79,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvm@vger.kernel.org, Christoffer Dall <christoffer.dall@arm.com>,
- linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Jason Zhu <jason.zhu@rock-chips.com>, Liam Girdwood <lgirdwood@gmail.com>,
+ linux-kernel@vger.kernel.org, Tony Xie <tony.xie@rock-chips.com>,
+ Vicent Chi <vicent.chi@rock-chips.com>, Andy Yan <andy.yan@rock-chips.com>,
+ Philipp Tomsic <philipp.tomsich@theobroma-systems.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============5466643181139302367=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 30, 2019 at 10:56:19AM +0000, Marc Zyngier wrote:
-> On 29/01/2019 16:33, Andrew Jones wrote:
-> > On Fri, Jan 25, 2019 at 10:46:56AM +0100, Christoffer Dall wrote:
-> >> From: Marc Zyngier <marc.zyngier@arm.com>
-> >>
-> >> Failing to properly reset system registers is pretty bad. But not
-> >> quite as bad as bringing the whole machine down... So warn loudly,
-> >> but slightly more gracefully.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
-> >> ---
-> >>  arch/arm/kvm/coproc.c     | 4 ++--
-> >>  arch/arm64/kvm/sys_regs.c | 4 ++--
-> >>  2 files changed, 4 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> >> index 222c1635bc7a..e8bd288fd5be 100644
-> >> --- a/arch/arm/kvm/coproc.c
-> >> +++ b/arch/arm/kvm/coproc.c
-> >> @@ -1450,6 +1450,6 @@ void kvm_reset_coprocs(struct kvm_vcpu *vcpu)
-> >>  	reset_coproc_regs(vcpu, table, num);
-> >>  
-> >>  	for (num = 1; num < NR_CP15_REGS; num++)
-> >> -		if (vcpu_cp15(vcpu, num) == 0x42424242)
-> >> -			panic("Didn't reset vcpu_cp15(vcpu, %zi)", num);
-> >> +		WARN(vcpu_cp15(vcpu, num) == 0x42424242,
-> >> +		     "Didn't reset vcpu_cp15(vcpu, %zi)", num);
-> >>  }
-> >> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> >> index 86096774abcd..4f067545c7d2 100644
-> >> --- a/arch/arm64/kvm/sys_regs.c
-> >> +++ b/arch/arm64/kvm/sys_regs.c
-> >> @@ -2609,6 +2609,6 @@ void kvm_reset_sys_regs(struct kvm_vcpu *vcpu)
-> >>  	reset_sys_reg_descs(vcpu, table, num);
-> >>  
-> >>  	for (num = 1; num < NR_SYS_REGS; num++)
-> >> -		if (__vcpu_sys_reg(vcpu, num) == 0x4242424242424242)
-> >> -			panic("Didn't reset __vcpu_sys_reg(%zi)", num);
-> >> +		WARN(__vcpu_sys_reg(vcpu, num) == 0x4242424242424242,
-> >> +		     "Didn't reset __vcpu_sys_reg(%zi)\n", num);
-> >>  }
-> >> -- 
-> >> 2.18.0
-> >>
-> > 
-> > If we only get halfway through resetting, then we'll get a warn splat,
-> > complete with a backtrace, for each register. Should we do something
-> > like the following instead?
-> > 
-> >   for (num = 1; num < NR_SYS_REGS; num++)
-> >      if (__vcpu_sys_reg(vcpu, num) == 0x4242424242424242)
-> >         failed++;
-> >   WARN(failed, "Didn't reset %d system registers", failed);
-> 
-> And doing so we'd loose the important bit of information, which is the
-> position in the table that doesn't get initialized.
-> 
-> The vcpu reset issue is rare enough that nobody noticed it yet (I only
-> reproduced it twice), and having it to scream 200 times is not really a
-> concern. What I want to catch is the case where someone has added a new
-> sysreg in the table, and has failed to provide a working init function.
 
-OK, Christoffer also said that information was useful. Would any following
-registers also be useful? Or should it be something like
+--===============5466643181139302367==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="lEGEL1/lMxI0MVQ2"
+Content-Disposition: inline
 
-  for (num = 1; num < NR_SYS_REGS; num++) {
-       WARN(__vcpu_sys_reg(vcpu, num) == 0x4242424242424242,
-            "Didn't reset __vcpu_sys_reg(%zi)\n", num);
-       break;
-   }
 
-to ensure the first one, the most important one, is there, and that it
-doesn't get pushed out of the buffer by hundreds of more lines?
+--lEGEL1/lMxI0MVQ2
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 
-Thanks,
-drew
+On Tue, Jan 29, 2019 at 05:54:21PM -0200, Otavio Salvador wrote:
+> RK805 has the following voltage range for the BUCK1 and BUCK2 regulators:
+
+I'm missing the other patches in this series and don't see a cover
+letter - what's the story with dependencies?
+
+--lEGEL1/lMxI0MVQ2
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlxRxUsACgkQJNaLcl1U
+h9ChBAf/XVHqjJDE4f6/KMdt3ImoJBZgtxg2TGTThPA9aBsS25nL2VI9ElBmDvVK
+Y7lSAlOe8XFpmWXidFopMQfbV/9T708b5xaRY1QWkY73bq7OszPzHqq7SPwuvn7f
+mEeDlM8xtR0dOkxR2JT/r0UT4VvjWx3eSDt2zwND1tFGeQhoQ2mec0Rk5b1DLW/c
+njN8MUAOkNVV5Z2jA0x3JiE5zeBGArt5zkfq2LN3yLE0DQ1AKAA65xUze3bN+SkG
+koHBkMNsO8jc1J3HwW6WBDqrndgowfw8UDwQ8lHBvF/3cC8tk3ks4fEHFV5jjDG8
+xEReJXlbMI0j3OyG368x3RuyeIKhww==
+=2+s5
+-----END PGP SIGNATURE-----
+
+--lEGEL1/lMxI0MVQ2--
+
+
+--===============5466643181139302367==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============5466643181139302367==--
+
