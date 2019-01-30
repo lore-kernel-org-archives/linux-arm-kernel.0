@@ -2,22 +2,21 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4BB0AC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:48:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 51413C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:49:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 212E82086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:48:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 27B772086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:49:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gdhDlqzm";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lunn.ch header.i=@lunn.ch header.b="evCD49A4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 212E82086C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lunn.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BerHytyX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 27B772086C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,46 +24,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8H6zHL8ZhxpxXeUQbO+TXM+JKkcKFeNwekjfAqocNRI=; b=gdhDlqzmgIsD3O
-	9sEocNYrrpJyY0oTscJVYH/btp6MAM7SBRSwFgQtsZYZ+DqvCoE6iUJurYH0PXLa6vtEt7L7eNAlu
-	deNRW+r3FvjEIFL1+/oYvDNJ5DbGqumdlEEsjbV5X3T5BNNaiQUjwr5CTpoLsBsQwIbG+IwnSa4kq
-	nn9JxGpMFFqtbUlFtHi591RSwginsxFiIgNHGo2jJKcc5m4xikMXbd4XK5lKt/BLduTprKv87zOwM
-	k+17xc+REeSaKSS7JzOhK9MARu9dhtsjSbI4WpVT1XbXI72cuFSd2Je7I4aNNCoEEa0fZ6WUoCb8Q
-	JLHquXde02oQfQnGnwlg==;
+	List-Owner; bh=wgDwGQQWZTFOqHuQQmpCgdBMt6Ft/Zt6AGkvoOBrNiM=; b=BerHytyXn+aND9
+	KK8Wcx4ZSjYsWC4XcGzDlO4uETrA5twunEczbsazARUgI2urL40nq4HLGMWmgME0RoP+6qP1hr6VN
+	nhMbZcyqkOIXazUCW1VY7A2uyUJr2Zg5Cx3o0wJXbmX8czyXpI9SwegFLReQphUuynzwIEg7hDpYw
+	n+QrSisUpdgKpOmcS/cqaeS+Ljlu8TF0BVoWzrfVQ0dFm0y4dVqnw5JfL9Wms/yKCpp1Gx0S5wtl0
+	7JZj3XnqoLihL/TN05oB6t0MOfDJm1xK1+wcrPNPLgL55XEtkNeNLbmM4Duil/2w1znHrX7KI6yfh
+	4NggG4qe6ZigX4lxWIDw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gouuj-0005S1-P0; Wed, 30 Jan 2019 18:48:45 +0000
-Received: from vps0.lunn.ch ([185.16.172.187])
+	id 1gouvP-0005pO-Ks; Wed, 30 Jan 2019 18:49:27 +0000
+Received: from mail-ot1-f44.google.com ([209.85.210.44])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gouuf-0005RG-KV; Wed, 30 Jan 2019 18:48:43 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=lunn.ch;
- s=20171124; h=In-Reply-To:Content-Type:MIME-Version:References:Message-ID:
- Subject:Cc:To:From:Date:Sender:Reply-To:Content-Transfer-Encoding:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:List-Subscribe:
- List-Post:List-Owner:List-Archive;
- bh=BTWJYFb9oKVLJ0z43NCOvYdM3PHYmAdNnAYATfUQ1P8=; b=evCD49A4kqizkNKx3bB0Ytlmb5
- dHatUbUgCehv447ff+86bpWicUGdybqzX+pNB6loP+QC4oi3JpyeuPvufKmxfqPiQEjhKllp+fc7b
- Hm2AIpHyaHK5Vjjl90lo9WmRwZ6V2s4kpvh3KraMEV4KKImZ3PMMC5AEq8M3+U2Xic00=;
-Received: from andrew by vps0.lunn.ch with local (Exim 4.89)
- (envelope-from <andrew@lunn.ch>)
- id 1gouuX-0006VS-3z; Wed, 30 Jan 2019 19:48:33 +0100
-Date: Wed, 30 Jan 2019 19:48:33 +0100
-From: Andrew Lunn <andrew@lunn.ch>
-To: "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>
-Subject: Re: [PATCH v2] staging: mt7621-eth/ethtool.c: Correction of SPDX
- license identifier
-Message-ID: <20190130184833.GF15050@lunn.ch>
-References: <SC1P15201MB2014C3E0CAB4DA9ADF330797A8900@SC1P15201MB2014.LAMP152.PROD.OUTLOOK.COM>
- <20190130163817.GF21904@lunn.ch> <20190130181005.GA15653@kroah.com>
+ id 1gouvM-0005oz-Eg
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 18:49:25 +0000
+Received: by mail-ot1-f44.google.com with SMTP id s13so545492otq.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 10:49:24 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=tYYlhSahpUNu07gio0txRqogQXhjXBtvhFKl/XrSWBY=;
+ b=QqgiGTBx2SznXilFA94vdMiSTBUynLS1Imz5x9daG/Yj2Rtkw6umbmyk3bl/SD2/Jf
+ 1ZhvmrkOfCWhUg9BvgF+3wt9ynF92tf1bcgJZqRn0ZuYbnuNM7Mt9pTz1UirHPpMeu75
+ FAlBQqzSC20xcnXkRcREar5jvfv3joD1g4/3elRFaH7xttn4BkGYi6Q23nGSmZnS8Abs
+ n73a3C5Lv0Fz/jt77g6dc+/duIfz/mQMTSPR4oJQRSN75SqxsnfxTcp4RNnyV4Ho6urz
+ Pg0ftf6wSs0ubalrWD8/FhQeuTcClt0KTxQ6BfNRsD+Wlb0+EHf14oGoMvhKxI24YeV+
+ QbDw==
+X-Gm-Message-State: AJcUukcJfk5fKqIIuCDOdeGWgf8UivQyL4icyk0lZZgq4k/7btv7USae
+ J+z7cKl7jHtFyANoR5/q1A==
+X-Google-Smtp-Source: ALg8bN54bW836SloDXShRDMPNqN03yId2mioatzz5oGhCooWcTX9jq6BWbBL79OHo+A7V8eZwjdtWw==
+X-Received: by 2002:a9d:177:: with SMTP id 110mr23986512otu.26.1548874163431; 
+ Wed, 30 Jan 2019 10:49:23 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id t2sm795044otl.4.2019.01.30.10.49.22
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 30 Jan 2019 10:49:22 -0800 (PST)
+Date: Wed, 30 Jan 2019 12:49:22 -0600
+From: Rob Herring <robh@kernel.org>
+To: "Z.q. Hou" <zhiqiang.hou@nxp.com>
+Subject: Re: [PATCHv3 22/27] dt-bindings: pci: Add NXP Layerscape SoCs PCIe
+ Gen4  controller
+Message-ID: <20190130184922.GA13423@bogus>
+References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
+ <20190129080926.36773-23-Zhiqiang.Hou@nxp.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190130181005.GA15653@kroah.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <20190129080926.36773-23-Zhiqiang.Hou@nxp.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_104841_826176_FD864A1C 
-X-CRM114-Status: UNSURE (   6.49  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190130_104924_488963_A0F71498 
+X-CRM114-Status: GOOD (  11.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,29 +87,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>,
- Carlos Henrique Lima Melara <charlesmelara@outlook.com>,
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "lorenzo.pieralisi@arm.com" <lorenzo.pieralisi@arm.com>,
+ Xiaowei Bao <xiaowei.bao@nxp.com>,
+ "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
+ "Z.q. Hou" <zhiqiang.hou@nxp.com>,
+ "l.subrahmanya@mobiveil.co.in" <l.subrahmanya@mobiveil.co.in>,
+ "will.deacon@arm.com" <will.deacon@arm.com>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "neil@brown.name" <neil@brown.name>,
- "linux-mediatek@lists.infradead.org" <linux-mediatek@lists.infradead.org>,
- "matthias.bgg@gmail.com" <matthias.bgg@gmail.com>,
+ Leo Li <leoyang.li@nxp.com>, "M.h. Lian" <minghuan.lian@nxp.com>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, Mingkai Hu <mingkai.hu@nxp.com>,
+ "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
+ "bhelgaas@google.com" <bhelgaas@google.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> See the patch about all of this from Thomas on lkml yesterday for
-> why this is the case.
+On Tue, 29 Jan 2019 08:10:49 +0000, "Z.q. Hou" wrote:
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> 
+> Add PCIe Gen4 controller DT bindings of NXP Layerscape SoCs.
+> 
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> ---
+> V3:
+>  - Change back to use an new doc for Layerscape PCIe Gen4 DT bindings.
+>  - Switch the order of "csr_axi_slave" and "config_axi_slave".
+> 
+>  .../bindings/pci/layerscape-pci-gen4.txt      | 52 +++++++++++++++++++
+>  MAINTAINERS                                   |  8 +++
+>  2 files changed, 60 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/layerscape-pci-gen4.txt
+> 
 
-Hi Greg
-
-Thanks for the info. I had not seen this, and i guess other have not
-as well. So here is a link to the patch.
-
-https://lkml.org/lkml/2019/1/28/1975
-
-	Andrew
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
