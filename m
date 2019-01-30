@@ -2,83 +2,84 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 972ACC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:58:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3B41AC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:04:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 67E4B20857
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:58:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0E06E218AC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:04:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hbLu6jGl";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="IMSgM/g5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 67E4B20857
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WHv57MjR";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Sdq5mXyA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0E06E218AC
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=g7dFmouO7sNqyOfSLboOAyEc1fKG0XEYqm9UR6lZc90=; b=hbLu6jGlW3K+Lc
-	SGASKxPBegbxTK6yMI0TSoyVcl+y29kkhEDPyxzPSHmSm07wt7C6R3o+xTcpc7AuVkxSTm8x7/d+q
-	7KI9NSG00inWul99Xi0sPDoCvBPC6EccK3vUh6XTSuEXcRSn/WiuauJFyko0Ozw/A8P6/3prr4EFm
-	CIIwJdShoWUkuQS22WY9TB3GbRfXutclH5DGbDv+EiZPfXbzwj0JHZ2SJe/0MpFXbmTa1jU37DwVC
-	1bRKAnMHxR4cA2K2x5m8HTn7aMRaxF1bvsiVXg5KaZqWNA0pRvrEXv5khvBBc9kgtasWsu28Ee4TZ
-	W8NZsTrt8fR/HwQumI5A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=j2N/8s+l1TncNnGBAVs3grZhWXeOqU0Mi/E1CQ4GJpc=; b=WHv57MjRK5uBRq
+	OjNTDUcEvgSkCYQVKXShTFusM46gHxD40bOgw+8EegFMI/lp3jg43HxncLxaOiVck/iqHsQdO0JS5
+	0w79AIsJ/RYQe1+ult5pDaa3QzoK+t0uEYlG2BiiuLEJLXBWi+MKlbRvS6wfMW8IanQiFZnKkwvib
+	AIwZWvrnXUfOEQMulCbM7R8qhYUuJoP71lV6VWuMM2mPRnJW//uj6/InrI/94JB+24P2FQPr6ED37
+	M4ivlRPZzPM28Vugc4DxyDG4b7RSzBwMY0V3GuTHzqO1eIBGxqJOvmVpij9LzbJTkvM4z2wi8dlAE
+	h331nMF0s/ZsK1yi6RsQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gonZq-00079f-F3; Wed, 30 Jan 2019 10:58:42 +0000
-Received: from mail-oi1-x241.google.com ([2607:f8b0:4864:20::241])
+	id 1gonfl-0000Zy-0A; Wed, 30 Jan 2019 11:04:49 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gonZn-00079H-LL
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 10:58:40 +0000
-Received: by mail-oi1-x241.google.com with SMTP id w13so18828385oiw.9
+ id 1gonff-0000YI-UX
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 11:04:46 +0000
+Received: by mail-wr1-x443.google.com with SMTP id p7so25615183wru.0
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 02:58:39 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=ZnpmrekZy8eX9iUCKudMDj9y6uslCdZc154WXffoPWs=;
- b=IMSgM/g5g8Tce1NQim8T8b509pUiiyy5MqpxfKm4NB6w2rinxrEH4573ZN3keUqggo
- lfwEtsTPTrWHip8WVDJmZL171+2DliSOLsb+V0kKquyOUV6dix5ncxJZ4GcgA4dzngsg
- 44FcSOXCCvch+0qE3plvPan2s2O2gAd9zm+cYl0Go6juQsxfFW7g3hDEkKGr1fT1H4tQ
- CzS/buN6LqzHNuVK0GLeb+t5s4gLRnZ0ZDainYc9BNMf200gKU6dDVgmoV27Oq/UabAW
- A+g9Z60vcAkakjRBWIKR9AfThySNjQi9OuvO1YrZInl7ZiJs8k9N8BwaJf+M9HCY16zt
- 4krg==
+ Wed, 30 Jan 2019 03:04:42 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=RFrJaTBtuyW9jnIf1EYpnn9srDwoF1i9vdIKVnuq03s=;
+ b=Sdq5mXyAv9UuH6g1rotGfcXo0uyGrAxKkvrLNbyjppjryW5MKaclpxfut9tfTXbPr/
+ MLBQcmp/+Fg76FsKKnVYjqOymDJmQtfO8cGFcNFxH4pa37xvhEw03V+LWxYKdluZMeEe
+ ZYy4YeA2Oi4S3g+JNmljYJPniA3PeqBkfcbDk=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=ZnpmrekZy8eX9iUCKudMDj9y6uslCdZc154WXffoPWs=;
- b=Zkqv42UUpIwCZj8PV8CWmcFpmScHtPJj4fw9d1ifnblgpsV+01MgQd0yfAfOY3bzoO
- SulDuCmdwSryHOioO1/Dk536js5ybWIrH+4GOSkxewFTai81MFkuwhTOrqM0mLdcj/FG
- s9b9me9WXr0N4r1f4lCY4ZhBKh2m/Kom4Z7qBeYRM/5cQ85qLhxbYa8G8LEIaPFzcoJ7
- 5bGOYcGUHxy5wYOJF6dZCryJ84UiO6EhEzjYL9TuSqPbbOVLk2ciDi7Rcay/AguRI/aS
- NAcIxe4uc/CI9mXdSeI/PCf5rZlWRFTS/v6J1R8yjKwyS0z+AlL3BXpUaCrhu9gFTeJv
- M51g==
-X-Gm-Message-State: AJcUukd6LzN7UDh9WrnFYJYFQ12yWCdzC0jTd/p4GTZBlrBJB7hJ60jc
- PNqT/rHvMO61n4ccnc5i2er8JHL5MRh4+ChMhbQ=
-X-Google-Smtp-Source: ALg8bN7PV9DPPR2feLbj0XwIkSKQA4GsXhAEqk4KY4i9xmPvI65hNJm3Jy2dvCj082zMvE26pIUjlZYP3GtsYBcttBA=
-X-Received: by 2002:aca:3092:: with SMTP id
- w140mr12288488oiw.237.1548845918327; 
- Wed, 30 Jan 2019 02:58:38 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=RFrJaTBtuyW9jnIf1EYpnn9srDwoF1i9vdIKVnuq03s=;
+ b=FNo4nmIh2pTlhgvJbPKuWanuS3Hbn5Fze8kJbx0xCeg9PkVKgZC2FYuGdvvBw2jDIa
+ 4ZzI46ye5mgsELd0YKDiVGph8yWVhja5KZPoWOSk/xBeko1yItDPE3DqCT8LSNKerMze
+ 0yUrbg4qSRcfW15JHWsnfOIvqf+KcnoOgie6xH7wcz6K88uCLHx5oRioKK2VTuR4i3js
+ UmyAEzkdOVpDYP8uZU0iU7l/laWU1E0nlFMcqyN2lDPHBHjCNC3uF1vM+9FlFhY73c3w
+ E8SoXSERS9Nf8o56Dlgo23fehpdJo0gKPQWQIxRzDTt8e+9EOpnNIlf4eAO8LCjQTQcN
+ TSSA==
+X-Gm-Message-State: AJcUukdSygo9nK1Gcnn2jV1GgineW6B1H1CSLLNaI1YWdyGiRAqfQCLW
+ 6dyd3g6iLCH+bQg+VTcqfzQ+Mg==
+X-Google-Smtp-Source: ALg8bN6HIbAvbAVU46otX3XeFwy2YTQzmJnvE99oJzZn5matUm1pPm2V6p3uRHe6gv9qKoRmdQhXvg==
+X-Received: by 2002:a05:6000:1c8:: with SMTP id
+ t8mr30248562wrx.146.1548846281293; 
+ Wed, 30 Jan 2019 03:04:41 -0800 (PST)
+Received: from srini-hackbox.lan
+ (cpc89974-aztw32-2-0-cust43.18-1.cable.virginm.net. [86.30.250.44])
+ by smtp.gmail.com with ESMTPSA id w16sm1138208wrp.1.2019.01.30.03.04.40
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Wed, 30 Jan 2019 03:04:40 -0800 (PST)
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+To: andy.gross@linaro.org
+Subject: [PATCH v2 0/6] arm64: dts: DB820c: Add display and audio support
+Date: Wed, 30 Jan 2019 11:04:31 +0000
+Message-Id: <20190130110437.5424-1-srinivas.kandagatla@linaro.org>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-References: <20190130091953.20131-1-ccaione@baylibre.com>
-In-Reply-To: <20190130091953.20131-1-ccaione@baylibre.com>
-From: Fabio Estevam <festevam@gmail.com>
-Date: Wed, 30 Jan 2019 08:58:32 -0200
-Message-ID: <CAOMZO5DnJxgx1k3q4BxXJWV6rD9f3KUVfrK8uJmvD90BfB2NdA@mail.gmail.com>
-Subject: Re: [PATCH v2] arm64: dts: imx8mq: Add QuadSPI controller
-To: Carlo Caione <ccaione@baylibre.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_025839_697435_928751EA 
-X-CRM114-Status: GOOD (  14.05  )
+X-CRM114-CacheID: sfid-20190130_030443_991333_95B7A58F 
+X-CRM114-Status: GOOD (  10.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,69 +91,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Sascha Hauer <s.hauer@pengutronix.de>,
- Rob Herring <robh+dt@kernel.org>, NXP Linux Team <linux-imx@nxp.com>,
- Sascha Hauer <kernel@pengutronix.de>, Shawn Guo <shawnguo@kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>, Lucas Stach <l.stach@pengutronix.de>
+Cc: linux-arm-msm@vger.kernel.org,
+ Srinivas Kandagatla <srinivas.kandagatla@linaro.org>,
+ linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Carlo,
+Hi Andy, 
 
-On Wed, Jan 30, 2019 at 7:19 AM Carlo Caione <ccaione@baylibre.com> wrote:
->
-> Add a node for the Freescale/NXP QuadSPI controller with a proper
-> pinctrl set and enable it for the i.MX8MQ EVK board.
-> Extend also the AIPS3 memory range to accommodate the QuadSPI-memory
-> region.
->
-> Signed-off-by: Carlo Caione <ccaione@baylibre.com>
-> ---
->  arch/arm64/boot/dts/freescale/imx8mq-evk.dts | 27 ++++++++++++++++++++
->  arch/arm64/boot/dts/freescale/imx8mq.dtsi    | 16 +++++++++++-
+Now that most of the bits are in mainline, its good time to add display
+and audio support to DB820c.
+These patches are being tested in integration branch from long time.
 
-Please split this in two patches: one for the imx8mq.dtsi and other
-for the board dts.
+Am resending 2 SMMU patches (https://patchwork.kernel.org/cover/10726329/)
+in this series to keep all the display and sound patches together.
 
-> +&spi0 {
+Can you pick these up for 5.1
 
-I have recently sent a patch adding eCSPI support. Please call this
-qspi0 to avoid confusion with the eCSPI name instances.
+thanks,
+srini
 
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_qspi>;
-> +       status = "okay";
-> +
-> +       flash0: n25q256a@0 {
+Changes since v1:
+- GPU node updated by Jordan.
+- deleted extra lines from sound card dt patch
 
-Node names should be generic and label names specific, so:
+Archit Taneja (3):
+  arm64: dts: msm8996: Add display smmu node
+  arm64: qcom: msm8996.dtsi: Add Display nodes
+  arm64: dts: apq8096-db820c: Add HDMI display support
 
-n25q256a: flash@0
+Jordan Crouse (2):
+  arm64: dts: msm8996: Add graphics smmu node
+  arm64: dts: Add Adreno GPU definitions
 
-> +               reg = <0>;
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               compatible = "micron,n25q256a", "jedec,spi-nor";
-> +               spi-max-frequency = <29000000>;
-> +               spi-nor,ddr-quad-read-dummy = <6>;
+Srinivas Kandagatla (1):
+  arm64: dts: db820c: Add sound card support
 
-This property does not exist in mainline.
+ .../boot/dts/qcom/apq8096-db820c-pins.dtsi    |  52 +++
+ .../dts/qcom/apq8096-db820c-pmic-pins.dtsi    |   8 +
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi  | 121 ++++++
+ arch/arm64/boot/dts/qcom/msm8996-pins.dtsi    |  43 ++
+ arch/arm64/boot/dts/qcom/msm8996.dtsi         | 380 ++++++++++++++++++
+ 5 files changed, 604 insertions(+)
 
->
-> +                       spi0: spi@30bb0000 {
+-- 
+2.20.1
 
-qspi0: spi@30bb0000 {
-
-> +                               #address-cells = <1>;
-> +                               #size-cells = <0>;
-> +                               compatible = "fsl,imx8mq-qspi", "fsl,imx7d-qspi";
-
-Please send a separate patch documenting fsl,imx8mq-qspi
 
 _______________________________________________
 linux-arm-kernel mailing list
