@@ -2,22 +2,22 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 51707C282D0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 04:42:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7A3EEC282D4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 05:18:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2046120821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 04:42:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4740F21852
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 05:18:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="enh3Naw9";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="eMGz2pDI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2046120821
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o1fW16dI";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="EK7iarqz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4740F21852
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,45 +25,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ux++6sorZfeq5RqtfkFVGnH9NXlGT5UeIMxg5E+S104=; b=enh3Naw96x5L/r
-	w/Owu/BmmJK0E/n8NXvCxP5+cBnw1eQZL4n87CBh7u3tP+tmDXoH2CX6U8kBoxKFX3auRFD+LboUd
-	Cy6TY9QLuyqZ9jH+aViTUCPxzR9UL736KaL3D3/0w/rr/kfPseIBfWuWH7kVa1bbxh2Qws8LRGF0E
-	aEEXb5scLw47zackb195NlV/XmmKdcjOlMXXgX1Wc4AbwVOYSMYMIiRUinYKDKbsl2yEUdAaMB0U2
-	5u/M8seFzF/p6CScMC3pOSisW4oEYnPPm4jP7G3ASdk1vmRUOVRmaaptuEPYxeLZZiKOWf+hYpNow
-	UN+PW06ospvUvspYEnYA==;
+	List-Owner; bh=wAcJHKp8E4RFG9zZIwbdPaaUFpTDZvjLZlTbyi4wobI=; b=o1fW16dIwD8s79
+	QdQwaKP/lssnaYM70wOfjo8712xuthvz/LT/FkoniukmdTs2yIyffa7ADjDh6muQV3P9EPK/L79P5
+	vonVUuD+L6bnMlThu2pJc8w2frEX/SWmT0s/i81gLL3F73lXus42am+gSnlFyCmVUQSwxbCvXoejI
+	ECDqPUlvD+WBp2udT/iD2m8KOqEwxFDQh0DpkqHIb1+OiW0IuNwbXZFQ6mPaTHTD5YFsUwFhFm+k5
+	MpFCJSYhkFEf7oUfkZawhFl1It0EVNG8iBQxA2gVq6tUrUIuBJx4So6GMzPXkqo7cZnVQHl30oF+P
+	nOEZ7MPacKCkdtPiD3Dg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gohi3-000351-P5; Wed, 30 Jan 2019 04:42:47 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1goiGO-0004sz-J8; Wed, 30 Jan 2019 05:18:16 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gohi0-00034W-7D
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 04:42:45 +0000
-Received: from localhost (unknown [122.178.236.205])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id F41F620821;
- Wed, 30 Jan 2019 04:42:40 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548823361;
- bh=dFKhf1Iy2qfLvkhk/VEIKzKEStqnXvTd8n6sTgNlKkU=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=eMGz2pDI3OE9eqnnJ51C2XANu2SZBY9S8JoUrJL8pVfoU7F12cBD7+aTXvE1tFqpn
- FrfF7AD4RPGID27ybimMdE3nmiD0pFWatUr27U1QacdkBBj5Fb3QUNTaVlWVbn63TO
- M5ivieCTON6TZQnpB5UxVgj8/aAJ6uqPydVPvkNU=
-Date: Wed, 30 Jan 2019 10:11:12 +0530
-From: Vinod Koul <vkoul@kernel.org>
-To: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
-Subject: Re: [PATCH v2 10/14] arm64: dts: qcom: qcs404: Add OPP table
-Message-ID: <20190130044112.GE4635@vkoul-mobl>
-References: <1548700381-22376-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <1548700381-22376-11-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ id 1goiGK-0004sS-6w
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 05:18:13 +0000
+Received: by mail-pf1-x441.google.com with SMTP id c73so10846277pfe.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 29 Jan 2019 21:18:11 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=r90Ei89M9VCYw+F9gfVdb+3hF3vLe++X0fdeOzuBcy4=;
+ b=EK7iarqz3qTWQcKrL8cW6cnL3P3Kn2/CLUpaFNpZG8LN4rD8OfUjjGlvf7+hkfNWYr
+ n1os1kh0paJ0J9fKb4JdU7FeNJVclYT55FWhCYZ9vpBT/gPzNUhApyB9q3EEPfgWt6gl
+ ZWLI4E6Y74v1SvorOd9d1E3yHsQeG+kiL4MME=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=r90Ei89M9VCYw+F9gfVdb+3hF3vLe++X0fdeOzuBcy4=;
+ b=Gb28KhYFujli6Z/LrUJ51eeX5CbMSMYUdTN/XdJHu3bI6YKwoEANFnaSWUaRkdIatn
+ LUeZeAR7PVUtisKnxrYy+QwCuoeDV/i7AN98ixY9kYO57zJBZH9p57xnkaaDSlWTblZY
+ 4LTm2ql5/R65/F3Br7XDBlLs/7FE5jse967cjNds1XnHV0EXlCnE43ErvoO0AZw3N41e
+ hCzzi15PyN0/KYhhbp3WvxyL5WSbCXvpTCSU66/TvkrrsSBzdJlT2wxCJJqpMBu0GOZi
+ FqnwvkNxxHW5yX1Zbd2Spm3fK8UtDyuW1nfIVmNMdx/mnEef7alWHs/WFfxCLkoIPmCu
+ eGAg==
+X-Gm-Message-State: AJcUukcNgEZfeV0leo3oIo2auppYy01Ap+H3EgAR94qcX6tRNJ8DUEDu
+ kmTrEcXCm2xbzgavcvcEyb5aIg==
+X-Google-Smtp-Source: ALg8bN55EWmGYlADnjBHJFR98WUCk2laXakjNm1DLjDRFm1IXKZcAT8MUJ8Qn3yehiFvVZB2gQ7+TA==
+X-Received: by 2002:a65:4683:: with SMTP id h3mr25211736pgr.225.1548825490876; 
+ Tue, 29 Jan 2019 21:18:10 -0800 (PST)
+Received: from localhost ([122.172.102.63])
+ by smtp.gmail.com with ESMTPSA id h64sm632868pfc.142.2019.01.29.21.18.08
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 29 Jan 2019 21:18:09 -0800 (PST)
+Date: Wed, 30 Jan 2019 10:48:06 +0530
+From: Viresh Kumar <viresh.kumar@linaro.org>
+To: Quentin Perret <quentin.perret@arm.com>
+Subject: Re: [PATCH 2/7] cpufreq: dt: Register an Energy Model
+Message-ID: <20190130051806.fdsos27jaekkwgbs@vireshk-i7>
+References: <20190128165522.31749-1-quentin.perret@arm.com>
+ <20190128165522.31749-3-quentin.perret@arm.com>
+ <20190128193656.GI81583@google.com>
+ <20190129052144.plicqu4vozh3l3ss@vireshk-i7>
+ <20190129091546.tfh3lo4w4sosfuba@queper01-lin>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1548700381-22376-11-git-send-email-jorge.ramirez-ortiz@linaro.org>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20190129091546.tfh3lo4w4sosfuba@queper01-lin>
+User-Agent: NeoMutt/20180323-120-3dd1ac
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_204244_282650_8A569B29 
-X-CRM114-Status: GOOD (  12.92  )
+X-CRM114-CacheID: sfid-20190129_211812_256915_CD8D4EE1 
+X-CRM114-Status: GOOD (  16.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,69 +96,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, heiko@sntech.de, mturquette@baylibre.com,
- will.deacon@arm.com, bjorn.andersson@linaro.org, david.brown@linaro.org,
- linux-clk@vger.kernel.org, jassisinghbrar@gmail.com, sibis@codeaurora.org,
- andy.gross@linaro.org, jagan@amarulasolutions.com, devicetree@vger.kernel.org,
- niklas.cassel@linaro.org, arnd@arndb.de, linux-arm-msm@vger.kernel.org,
- olof@lixom.net, robh+dt@kernel.org, horms+renesas@verge.net.au,
- linux-arm-kernel@lists.infradead.org, sboyd@kernel.org,
- linux-kernel@vger.kernel.org, amit.kucheria@linaro.org,
- khasim.mohammed@linaro.org, enric.balletbo@collabora.com,
- georgi.djakov@linaro.org
+Cc: mark.rutland@arm.com, nm@ti.com, lorenzo.pieralisi@arm.com,
+ devicetree@vger.kernel.org, sboyd@kernel.org, rjw@rjwysocki.net,
+ linux-pm@vger.kernel.org, liviu.dudau@arm.com, linux-kernel@vger.kernel.org,
+ robh+dt@kernel.org, Matthias Kaehlcke <mka@chromium.org>, sudeep.holla@arm.com,
+ dietmar.eggemann@arm.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 28-01-19, 19:32, Jorge Ramirez-Ortiz wrote:
-> Add a CPU OPP table to qcs404
+On 29-01-19, 09:15, Quentin Perret wrote:
+> On Tuesday 29 Jan 2019 at 10:51:44 (+0530), Viresh Kumar wrote:
+> > On 28-01-19, 11:36, Matthias Kaehlcke wrote:
+> > > I think this patch will result in error messages at registration on
+> > > platforms that use the cpufreq-dt driver and don't specify
+> > > 'dynamic-power-coefficient' for the CPUs in the DT. Not sure if that's
+> > > a problem as long as the cpufreq initialization succeeds regardless,
+> > > it could be seen as a not-so-gentle nudge to add the values.
+> > 
+> > That wouldn't be acceptable.
 > 
-> Co-developed-by: Niklas Cassel <niklas.cassel@linaro.org>
-> Signed-off-by: Niklas Cassel <niklas.cassel@linaro.org>
-> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
-> ---
->  arch/arm64/boot/dts/qcom/qcs404.dtsi | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/qcs404.dtsi b/arch/arm64/boot/dts/qcom/qcs404.dtsi
-> index 9b5c165..4594fea7 100644
-> --- a/arch/arm64/boot/dts/qcom/qcs404.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/qcs404.dtsi
-> @@ -62,6 +62,21 @@
->  		};
->  	};
->  
-> +	cpu_opp_table: cpu_opp_table {
+> Fair enough. What I can propose in this case is to have in PM_OPP a
+> helper called 'dev_pm_opp_of_register_em()' or something like this. This
+> function will check all prerequisites are present (we have the right
+> values in DT, and so on) and then call (or not) em_register_perf_domain().
+> Then we can make the CPUFreq drivers use that instead of calling
+> em_register_perf_domain() directly.
 
-This should be:
-        cpu_opp_table: cpu-opp-table
+That should be fine.
 
-IIRC node names are not supposed to have _ and tags not supposed to have
--, please compile with W=12 to trigger these warnings :)
+> That would also make it easy to implement Matthias' suggestion to not
+> call em_register_perf_domain() if an EM is already present.
 
-> +		compatible = "operating-points-v2";
-> +		opp-shared;
-> +
-> +		opp-1094400000 {
-> +			opp-hz = /bits/ 64 <1094400000>;
-> +		};
-> +		opp-1248000000 {
-> +			opp-hz = /bits/ 64 <1248000000>;
-> +		};
-> +		opp-1401600000 {
-> +			opp-hz = /bits/ 64 <1401600000>;
-> +		};
-> +	};
-> +
->  	firmware {
->  		scm: scm {
->  			compatible = "qcom,scm-qcs404", "qcom,scm";
-> -- 
-> 2.7.4
+So you will track registration state within the OPP core for that ?
+Sorry but that doesn't sound right. What's wrong with having an
+unregister helper in energy-model to keep proper code flow everywhere
+?
 
 -- 
-~Vinod
+viresh
 
 _______________________________________________
 linux-arm-kernel mailing list
