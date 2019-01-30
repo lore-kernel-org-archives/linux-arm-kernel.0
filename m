@@ -2,68 +2,76 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B1F00C282D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:38:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7A4E0C282D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:39:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7EF662087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:38:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4D53F21473
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:39:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eBZTNDY0";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lunn.ch header.i=@lunn.ch header.b="oLYl71C3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7EF662087F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lunn.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qp9SK/3V"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4D53F21473
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xoKfh6bNgR9TWc+/QNj9Ij6HwujGo+1HR0QxLDdtvPY=; b=eBZTNDY04MbBF3
-	Dre/MJLg930VKNfgT+NB9kSQlCnNFnUHUe3zKr7A6y57fvi1iYweICly3sJIsKyKV/YrVHkkQ/nzS
-	WvYVl0kNqokwG2/l39je3E3rIFbJrXCCXYhEjpjfIqOLiFw7FH/7fglkGwKcyf2xcZA6wyAGEm3w1
-	0FT/0Z2jEthgzHKZPoJdQL4X5F5UdDEVy8hVXIKxHArLZAEXdkeBxuLbzBH814gwIDWg8l54FO2eX
-	uLJL7N6D8w4LtDQ10JcNmvxc7KFrOMGMTayUgf9sOKbIuULVNy0PmGBqWc6Usu7RYSnGTPWVCfDAT
-	1As27pOIgy5RwrEIdMyA==;
+	List-Owner; bh=ymKhkV9YFm0yBftjLmUEzCF4pPIeFX7tOQTvb7Qbbrk=; b=qp9SK/3VqpzIP6
+	UWL8H1mUlctD1aOuTDbATe2+aWa+35HO6R7oWrFnzhvjzwtq+awOV0zoRvOUlHZacwOWzt2/3SchN
+	JUSz6tuthdjbPUxWor183+wCR0SGSLBKrp0r336NwAbjOHM5y9nCcjwntxjomBVV+n2ZazuQmr1Nw
+	ef908kBjLbuAKKaQXjFKQ0nRLD9Vp0Oc8Go5ViznkixhY/1jSdL91Q0RZsGxil1KUTl48/YfBire3
+	v4Gznv8kXZH4VNwrYxOBtqZvFWDjsjQ1GaPtBk2Y842tBio3tLGCF3MiEetl8aWgcPJhmGoirG0CV
+	SVhVbwZyD8BpgK+06BVA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gossj-00045g-5L; Wed, 30 Jan 2019 16:38:33 +0000
-Received: from vps0.lunn.ch ([185.16.172.187])
+	id 1gostO-0004Pd-EV; Wed, 30 Jan 2019 16:39:14 +0000
+Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gossf-00044V-4V; Wed, 30 Jan 2019 16:38:30 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=lunn.ch;
- s=20171124; h=In-Reply-To:Content-Type:MIME-Version:References:Message-ID:
- Subject:Cc:To:From:Date:Sender:Reply-To:Content-Transfer-Encoding:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:List-Subscribe:
- List-Post:List-Owner:List-Archive;
- bh=Awb+e7KyeVsQY0L1pRZuEHWubonzwcbqoNNQPfvskxY=; b=oLYl71C3EZwLUlZPRYSbe0nUXy
- C34Ofv0t26OdOMUNAiOoACSOArAQnP3VTqsPWUj+Hi1lvSJ1ohWiYWdECwQ5t+iEbddx9xb7NMRMP
- /AIiwYlXlJ4EN4acSu5kp24FEbCPA10gihRfnZx/9cCbrxjK/HGt7IJIrXwKLNXQI3Lw=;
-Received: from andrew by vps0.lunn.ch with local (Exim 4.89)
- (envelope-from <andrew@lunn.ch>)
- id 1gossT-0004w7-1U; Wed, 30 Jan 2019 17:38:17 +0100
-Date: Wed, 30 Jan 2019 17:38:17 +0100
-From: Andrew Lunn <andrew@lunn.ch>
-To: Carlos Henrique Lima Melara <charlesmelara@outlook.com>
-Subject: Re: [PATCH v2] staging: mt7621-eth/ethtool.c: Correction of SPDX
- license identifier
-Message-ID: <20190130163817.GF21904@lunn.ch>
-References: <SC1P15201MB2014C3E0CAB4DA9ADF330797A8900@SC1P15201MB2014.LAMP152.PROD.OUTLOOK.COM>
+ id 1gostJ-0004O0-Tf
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 16:39:11 +0000
+Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
+ by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x0UGQxRi005461; Wed, 30 Jan 2019 17:39:01 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx07-00178001.pphosted.com with ESMTP id 2q8dw3aapn-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Wed, 30 Jan 2019 17:39:01 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 2D24338;
+ Wed, 30 Jan 2019 16:39:01 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 06274A71D;
+ Wed, 30 Jan 2019 16:39:01 +0000 (GMT)
+Received: from localhost (10.75.127.45) by SFHDAG5NODE3.st.com (10.75.127.15)
+ with Microsoft SMTP Server (TLS) id 15.0.1347.2;
+ Wed, 30 Jan 2019 17:39:00 +0100
+From: Fabrice Gasnier <fabrice.gasnier@st.com>
+To: <srinivas.kandagatla@linaro.org>, <robh+dt@kernel.org>,
+ <alexandre.torgue@st.com>
+Subject: [PATCH 1/4] dt-bindings: nvmem: Add STM32 factory-programmed romem
+Date: Wed, 30 Jan 2019 17:38:53 +0100
+Message-ID: <1548866336-14765-2-git-send-email-fabrice.gasnier@st.com>
+X-Mailer: git-send-email 1.9.1
+In-Reply-To: <1548866336-14765-1-git-send-email-fabrice.gasnier@st.com>
+References: <1548866336-14765-1-git-send-email-fabrice.gasnier@st.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <SC1P15201MB2014C3E0CAB4DA9ADF330797A8900@SC1P15201MB2014.LAMP152.PROD.OUTLOOK.COM>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+X-Originating-IP: [10.75.127.45]
+X-ClientProxiedBy: SFHDAG1NODE1.st.com (10.75.127.1) To SFHDAG5NODE3.st.com
+ (10.75.127.15)
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-01-30_12:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_083829_328042_A0D353B8 
-X-CRM114-Status: GOOD (  13.60  )
+X-CRM114-CacheID: sfid-20190130_083910_245844_24E08161 
+X-CRM114-Status: GOOD (  10.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,60 +83,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devel@driverdev.osuosl.org" <devel@driverdev.osuosl.org>,
- "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "neil@brown.name" <neil@brown.name>,
- "linux-mediatek@lists.infradead.org" <linux-mediatek@lists.infradead.org>,
- "matthias.bgg@gmail.com" <matthias.bgg@gmail.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: mark.rutland@arm.com, lionel.debieve@st.com, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, mcoquelin.stm32@gmail.com,
+ fabrice.gasnier@st.com, linux-stm32@st-md-mailman.stormreply.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 30, 2019 at 02:48:27PM +0000, Carlos Henrique Lima Melara wrote:
-> 	This patch fix the checkpatch.p1 warning:
-> 
-> 	WARNING: Missing or malformed SPDX-License-Identifier tag in line 1
-> 	+/*
-> 
-> 	It includes the SPDX expression for GPL-2.0 and corrects the comment format to suit the kernel's coding style.
-> 
-> Signed-off-by: Carlos (Charles) Henrique Lima Melara <charlesmelara@outlook.com>
-> ---
->  drivers/staging/mt7621-eth/ethtool.c | 22 ++++++++++++----------
->  1 file changed, 12 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/staging/mt7621-eth/ethtool.c b/drivers/staging/mt7621-eth/ethtool.c
-> index 40a7d47be913..49d417de64c8 100644
-> --- a/drivers/staging/mt7621-eth/ethtool.c
-> +++ b/drivers/staging/mt7621-eth/ethtool.c
-> @@ -1,15 +1,17 @@
-> -/*   This program is free software; you can redistribute it and/or modify
-> - *   it under the terms of the GNU General Public License as published by
-> - *   the Free Software Foundation; version 2 of the License
-> +// SPDX-License-Identifier: GPL-2.0
+Add documentation for STMicroelectronics STM32 Factory-programmed
+read only memory area.
 
-Hi Carlos
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ .../devicetree/bindings/nvmem/st,stm32-romem.txt   | 31 ++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/st,stm32-romem.txt
 
-drivers/staging/mt7621-eth$ grep LICENSE *
-gsw_mt7621.c:MODULE_LICENSE("GPL");
-mtk_eth_soc.c:MODULE_LICENSE("GPL");
+diff --git a/Documentation/devicetree/bindings/nvmem/st,stm32-romem.txt b/Documentation/devicetree/bindings/nvmem/st,stm32-romem.txt
+new file mode 100644
+index 0000000..fbff52e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/nvmem/st,stm32-romem.txt
+@@ -0,0 +1,31 @@
++STMicroelectronics STM32 Factory-programmed data device tree bindings
++
++This represents STM32 Factory-programmed read only non-volatile area: locked
++flash, OTP, read-only HW regs... This contains various information such as:
++analog calibration data for temperature sensor (e.g. TS_CAL1, TS_CAL2),
++internal vref (VREFIN_CAL), unique device ID...
++
++Required properties:
++- compatible:		Should be one of:
++			"st,stm32-romem"
++			"st,stm32mp15-bsec"
++- reg:			Offset and length of factory-programmed area.
++- #address-cells:	Should be '<1>'.
++- #size-cells:		Should be '<1>'.
++
++Optional Data cells:
++- Must be child nodes as described in nvmem.txt.
++
++Example on stm32f4:
++	romem: nvmem@1fff7800 {
++		compatible = "st,stm32-romem";
++		reg = <0x1fff7800 0x400>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		/* Data cells: ts_cal1 at 0x1fff7a2c */
++		ts_cal1: calib@22c {
++			reg = <0x22c 0x2>;
++		};
++		...
++	};
+-- 
+1.9.1
 
-And include/linux/module.h 
-says:
-
-/*
- * The following license idents are currently accepted as indicating free
- * software modules
- *
- *      "GPL"                           [GNU Public License v2 or later]
- *      "GPL v2"                        [GNU Public License v2]
-
-So the SPDX string probably does not match the MODULE_LICENSE.
-
-   Andrew
 
 _______________________________________________
 linux-arm-kernel mailing list
