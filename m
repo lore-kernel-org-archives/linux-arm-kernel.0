@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 652E5C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 21:40:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 170B9C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 21:41:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 05080218D2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 21:40:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AB93520881
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 21:41:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O0WHYdHA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 05080218D2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gsn4UXhF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB93520881
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,49 +24,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ma1Fbxz39zSxtUQWekpC+455h5ncSEaJ2Cr3qM2upyY=; b=O0WHYdHA5PptTr
-	ypPFE9rzW01yYa28Hc7LMyJkVDjOA8ffAeeZzMYaQhJlvSDG+SYQQsZV7G0YdjMEHbhp0oZaG6w/T
-	M9qXZGH+nQKA8aw6ptreejg9MYTq8UZT2FMVXrJWAMtGlkS+YRAb/JbepczZWFbBa+Qkij7PUhAba
-	5/MTnq3X0ZoZduWsWfpDm8CKpZAIcyG5T8aiLtC/qs6sBH46ZS5fXgHxLg31gby/R1/bV7bsvUc62
-	mRI3m9gcsgw8mWYzXAqbosZCdS21VDBslVBuaYN2g9QDEaGuucjZos7uWff93lXKLhikfkx3b9pis
-	+8H78n83v9AwsS2qeRSw==;
+	List-Owner; bh=x9H4WgvmZfWVhC8bjpW+2htTE4JAWyreChXve68bbbU=; b=gsn4UXhF3GjXtB
+	YJKD47Fu1zjKTGK9gFcVdu8JO5iDFlS/2RK4HainaHAIV0oSPYzqtY3hEEPOiOPqBxnzcSjY1DGGZ
+	S26ugyoj5NhUa9+++f5mbaZmP/Mu4rFBgzc6RNCNf8afbCb3tNGZesY4vNaB8SFMdV48ITdli/Unm
+	4Q3vAWDdGrXDEXz5D1m9hpoUQJERZhFfL93qa7XcMpoApFNSR9wztOA9CPWnEO+bIfPoIIcI82HZe
+	nKvcbJ2ScbH93B5RubJ+biAo2qjp7YL3Xr7PrwnJZKg/+M73IyXTq5Yud2fxqM2I8NYny020EW3lV
+	HI/rJyw2ndoLv6uzBP/w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goxbB-0007BT-2k; Wed, 30 Jan 2019 21:40:45 +0000
-Received: from mail-qk1-f196.google.com ([209.85.222.196])
+	id 1goxbe-0007Rz-9u; Wed, 30 Jan 2019 21:41:14 +0000
+Received: from mail-qk1-f194.google.com ([209.85.222.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goxay-00074O-V2
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 21:40:37 +0000
-Received: by mail-qk1-f196.google.com with SMTP id y78so664392qka.12
+ id 1goxbb-0007Rf-1z
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 21:41:12 +0000
+Received: by mail-qk1-f194.google.com with SMTP id 189so684657qkj.8
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 13:40:32 -0800 (PST)
+ Wed, 30 Jan 2019 13:41:10 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=E+kd0mlNW27Q+6i/WMrQFy7qk1vD8sD4qcKqva1l2WU=;
- b=MuqGBiksDaMjElde+3a3xCtomOEos76uodClvY6TcBkkhf3V53Qqzy8Ji/KB2zZml5
- Qsnv0W6w/IKMihG+QU3OXeP6Db0VyRgqW4Slgm11rncBsUl4gNayVPqn38rWI5WRMBKv
- MC/b1aYke6ZbgIksT4IEL/zLrNUILQL4yfLaUIzH/Q1Oa5wlMQhowgsEbt/BR76IrZJA
- TXisZtuZlVrGYst1ySFT35eQ1jpaZIW9hkWO8huIszHXsbCvzOQ6p/Pew8CZ9WUZYZFy
- VFDVNBRCg7r8lW3LOoJMCRc1RSZ2eXkh9u4e7cXtElFcrOTLpBjoccgmtiylkEqWir81
- nT3w==
-X-Gm-Message-State: AJcUukePCK3qqpzNxUTkwreQAlz/Bd8/I9v67Sb7F1XoVdzX+svhhO+/
- OS/ofwSAX3E/2IyziGjqka4bH8NKBRuyAVvy6ug=
-X-Google-Smtp-Source: ALg8bN4bjQ4n0pddx7uagr+Gr3zMr+BZ4esO2GaPlDueaqYTxYqNorCgZCTU4ZPfaNj4L5iCPL9i5v/iBxxvfdIXPg4=
-X-Received: by 2002:a37:ad04:: with SMTP id f4mr24428572qkm.291.1548884431426; 
- Wed, 30 Jan 2019 13:40:31 -0800 (PST)
+ bh=B/rGrVIudIxeJSQrEFLi1MaiCRvo45wNGMhSgkZw/bI=;
+ b=Fg11vmUp57gUQjS7jyKpcTUYteApVjQ5VikxJCt5JGSKi1BqZSnzDC+MoosW1BaPk0
+ OO51vs+H7DaGMHljcVqhNQGPhiluSG1F6y2X0zxaO1jJQOav/kF9elG8D4N5H34y34f4
+ aCvHLdsyntwOjU3wA/QE+S7e030QWk5JpFzXUnrFNL89eW2RRc9e6VeIoiofO8BFKdIq
+ Hv+0Rw1q0qo4nJ8meBUaOZ8jLPqJS2qYNxvcNhK2pS0LK4yE7RHCaKABGvPuo655a7d/
+ vzUhTM+xnMoglY8yDFTpmJV7MarfZNQVonbUSwf8baxYa70Umx20LXVr49Tk46FVY1OD
+ lv3A==
+X-Gm-Message-State: AJcUukfZUK3FOR7zLMn77jXg8dsCnSWsiJSjhQ/iLiGMQ559IaN+/js4
+ E0UFA3l1pwDiBppcn2c3KnFynm9o1/scK9AIqt0=
+X-Google-Smtp-Source: ALg8bN4WyWr+kqCU+IFgBui+zK7KHgvlSRnJH4BswMA6/w5lKxUcMbhnbxT+sygfNASVQo0XUlbBvG1JHEV7IN/m2jo=
+X-Received: by 2002:ae9:d8c2:: with SMTP id
+ u185mr27908794qkf.107.1548884469929; 
+ Wed, 30 Jan 2019 13:41:09 -0800 (PST)
 MIME-Version: 1.0
-References: <20190128134953.14726-1-linus.walleij@linaro.org>
-In-Reply-To: <20190128134953.14726-1-linus.walleij@linaro.org>
+References: <20190123094515.15284-1-linus.walleij@linaro.org>
+In-Reply-To: <20190123094515.15284-1-linus.walleij@linaro.org>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 30 Jan 2019 22:40:15 +0100
-Message-ID: <CAK8P3a3r+JnyQKLnO497Au4QufBqzk1p4aRd7tX5snWn7echtw@mail.gmail.com>
-Subject: Re: [PATCH v2] ARM: defconfig: axm55xx: Drop PL11x graphics driver
+Date: Wed, 30 Jan 2019 22:40:53 +0100
+Message-ID: <CAK8P3a2-zx6TcJfjR35Jvic-9gmq50hAWsP51PAkrO_KTTT4gQ@mail.gmail.com>
+Subject: Re: [PATCH] ARM: defconfig: Enable PL11x DRM driver on multi_v7
 To: Linus Walleij <linus.walleij@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_134033_378337_B644A46F 
-X-CRM114-Status: UNSURE (   9.66  )
+X-CRM114-CacheID: sfid-20190130_134111_097826_7E51B743 
+X-CRM114-Status: UNSURE (   9.55  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -79,33 +80,27 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Krzysztof Adamski <krzysztof.adamski@nokia.com>, arm-soc <arm@kernel.org>,
- Anders Roxell <anders.roxell@linaro.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- John Logan <john.logan@intel.com>
+Cc: arm-soc <arm@kernel.org>, Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 28, 2019 at 2:50 PM Linus Walleij <linus.walleij@linaro.org> wrote:
+On Wed, Jan 23, 2019 at 10:45 AM Linus Walleij <linus.walleij@linaro.org> wrote:
 >
-> The defconfig for the AXM55xx includes the ARM CLCD
-> (PL11x) PrimeCell framebuffer driver, but the device tree
-> for this platform does not include this hardware, nor do I
-> find it likely that this chip has graphics.
+> This switches the ARMv7 defconfig away from the old
+> fbdev driver to the new DRM driver. All machines are
+> now supported by the new driver.
 >
-> Drop these config items.
->
-> Cc: John Logan <john.logan@intel.com>
-> Cc: Anders Roxell <anders.roxell@linaro.org>
-> Acked-by: Krzysztof Adamski <krzysztof.adamski@nokia.com>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
+> ARM SoC folks: please apply this directly where applicable
+> for v5.1 if you are fine with the change.
 
-Applied to arm/defconfig, thanks
 
-    Arnd
+Applied to arm/defconfig, thanks!
+
+       Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
