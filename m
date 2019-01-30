@@ -2,110 +2,83 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CEA32C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:56:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 972ACC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:58:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 98F1A20857
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:56:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 67E4B20857
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:58:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hleBA8Jf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 98F1A20857
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hbLu6jGl";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="IMSgM/g5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 67E4B20857
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hgxbHwuP1mYWpbPQbC1rmvUDnYoFXm72LyDy+vlR+bA=; b=hleBA8Jf0/AhcC
-	YwXWWDbMvWGSDobtopl683HZawhJ3FXaMSB9bBlBlLdbzqCXcRSxImUbojGDBn6cBOf1e7mq/yxqI
-	qhczItoY29boGtoyuxq0v6NHvTn14LznINxa+5iXFjrZd3ej44PDnoHecQ/yFYG6XqLm2Bdu85VTW
-	7xRZUJfR8kpUxhJzQav97hPrlq66UpXh9XvcO3RCiBJN+Fwsl2nHf4e0LRig47CHRrghDn7Mwdh1p
-	azCw7U42C2ikpZ9q6HdabRL/ssG5bRqYRxocEoC3byYWW1TKz45cO8eCzxkwpRSvQSxAr3SVUI2hm
-	GA/JXM1M7oX4gtURdT0A==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=g7dFmouO7sNqyOfSLboOAyEc1fKG0XEYqm9UR6lZc90=; b=hbLu6jGlW3K+Lc
+	SGASKxPBegbxTK6yMI0TSoyVcl+y29kkhEDPyxzPSHmSm07wt7C6R3o+xTcpc7AuVkxSTm8x7/d+q
+	7KI9NSG00inWul99Xi0sPDoCvBPC6EccK3vUh6XTSuEXcRSn/WiuauJFyko0Ozw/A8P6/3prr4EFm
+	CIIwJdShoWUkuQS22WY9TB3GbRfXutclH5DGbDv+EiZPfXbzwj0JHZ2SJe/0MpFXbmTa1jU37DwVC
+	1bRKAnMHxR4cA2K2x5m8HTn7aMRaxF1bvsiVXg5KaZqWNA0pRvrEXv5khvBBc9kgtasWsu28Ee4TZ
+	W8NZsTrt8fR/HwQumI5A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gonXe-0006YM-GG; Wed, 30 Jan 2019 10:56:26 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gonXb-0006Y1-M0
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 10:56:25 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B983CA78;
- Wed, 30 Jan 2019 02:56:22 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 909FC3F59C; Wed, 30 Jan 2019 02:56:21 -0800 (PST)
-Subject: Re: [PATCH 5/5] arm/arm64: KVM: Don't panic on failure to properly
- reset system registers
-To: Andrew Jones <drjones@redhat.com>,
- Christoffer Dall <christoffer.dall@arm.com>
-References: <20190125094656.5026-1-christoffer.dall@arm.com>
- <20190125094656.5026-6-christoffer.dall@arm.com>
- <20190129163337.nbwivspcvlcmzrmo@kamzik.brq.redhat.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <b2c0fa37-37ad-3696-e862-5d0434496d1f@arm.com>
-Date: Wed, 30 Jan 2019 10:56:19 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gonZq-00079f-F3; Wed, 30 Jan 2019 10:58:42 +0000
+Received: from mail-oi1-x241.google.com ([2607:f8b0:4864:20::241])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gonZn-00079H-LL
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 10:58:40 +0000
+Received: by mail-oi1-x241.google.com with SMTP id w13so18828385oiw.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 02:58:39 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=ZnpmrekZy8eX9iUCKudMDj9y6uslCdZc154WXffoPWs=;
+ b=IMSgM/g5g8Tce1NQim8T8b509pUiiyy5MqpxfKm4NB6w2rinxrEH4573ZN3keUqggo
+ lfwEtsTPTrWHip8WVDJmZL171+2DliSOLsb+V0kKquyOUV6dix5ncxJZ4GcgA4dzngsg
+ 44FcSOXCCvch+0qE3plvPan2s2O2gAd9zm+cYl0Go6juQsxfFW7g3hDEkKGr1fT1H4tQ
+ CzS/buN6LqzHNuVK0GLeb+t5s4gLRnZ0ZDainYc9BNMf200gKU6dDVgmoV27Oq/UabAW
+ A+g9Z60vcAkakjRBWIKR9AfThySNjQi9OuvO1YrZInl7ZiJs8k9N8BwaJf+M9HCY16zt
+ 4krg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=ZnpmrekZy8eX9iUCKudMDj9y6uslCdZc154WXffoPWs=;
+ b=Zkqv42UUpIwCZj8PV8CWmcFpmScHtPJj4fw9d1ifnblgpsV+01MgQd0yfAfOY3bzoO
+ SulDuCmdwSryHOioO1/Dk536js5ybWIrH+4GOSkxewFTai81MFkuwhTOrqM0mLdcj/FG
+ s9b9me9WXr0N4r1f4lCY4ZhBKh2m/Kom4Z7qBeYRM/5cQ85qLhxbYa8G8LEIaPFzcoJ7
+ 5bGOYcGUHxy5wYOJF6dZCryJ84UiO6EhEzjYL9TuSqPbbOVLk2ciDi7Rcay/AguRI/aS
+ NAcIxe4uc/CI9mXdSeI/PCf5rZlWRFTS/v6J1R8yjKwyS0z+AlL3BXpUaCrhu9gFTeJv
+ M51g==
+X-Gm-Message-State: AJcUukd6LzN7UDh9WrnFYJYFQ12yWCdzC0jTd/p4GTZBlrBJB7hJ60jc
+ PNqT/rHvMO61n4ccnc5i2er8JHL5MRh4+ChMhbQ=
+X-Google-Smtp-Source: ALg8bN7PV9DPPR2feLbj0XwIkSKQA4GsXhAEqk4KY4i9xmPvI65hNJm3Jy2dvCj082zMvE26pIUjlZYP3GtsYBcttBA=
+X-Received: by 2002:aca:3092:: with SMTP id
+ w140mr12288488oiw.237.1548845918327; 
+ Wed, 30 Jan 2019 02:58:38 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190129163337.nbwivspcvlcmzrmo@kamzik.brq.redhat.com>
-Content-Language: en-US
+References: <20190130091953.20131-1-ccaione@baylibre.com>
+In-Reply-To: <20190130091953.20131-1-ccaione@baylibre.com>
+From: Fabio Estevam <festevam@gmail.com>
+Date: Wed, 30 Jan 2019 08:58:32 -0200
+Message-ID: <CAOMZO5DnJxgx1k3q4BxXJWV6rD9f3KUVfrK8uJmvD90BfB2NdA@mail.gmail.com>
+Subject: Re: [PATCH v2] arm64: dts: imx8mq: Add QuadSPI controller
+To: Carlo Caione <ccaione@baylibre.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_025623_731124_0816E90F 
-X-CRM114-Status: GOOD (  16.63  )
+X-CRM114-CacheID: sfid-20190130_025839_697435_928751EA 
+X-CRM114-Status: GOOD (  14.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -117,80 +90,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
- kvm@vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, Sascha Hauer <s.hauer@pengutronix.de>,
+ Rob Herring <robh+dt@kernel.org>, NXP Linux Team <linux-imx@nxp.com>,
+ Sascha Hauer <kernel@pengutronix.de>, Shawn Guo <shawnguo@kernel.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>, Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 29/01/2019 16:33, Andrew Jones wrote:
-> On Fri, Jan 25, 2019 at 10:46:56AM +0100, Christoffer Dall wrote:
->> From: Marc Zyngier <marc.zyngier@arm.com>
->>
->> Failing to properly reset system registers is pretty bad. But not
->> quite as bad as bringing the whole machine down... So warn loudly,
->> but slightly more gracefully.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
->> ---
->>  arch/arm/kvm/coproc.c     | 4 ++--
->>  arch/arm64/kvm/sys_regs.c | 4 ++--
->>  2 files changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
->> index 222c1635bc7a..e8bd288fd5be 100644
->> --- a/arch/arm/kvm/coproc.c
->> +++ b/arch/arm/kvm/coproc.c
->> @@ -1450,6 +1450,6 @@ void kvm_reset_coprocs(struct kvm_vcpu *vcpu)
->>  	reset_coproc_regs(vcpu, table, num);
->>  
->>  	for (num = 1; num < NR_CP15_REGS; num++)
->> -		if (vcpu_cp15(vcpu, num) == 0x42424242)
->> -			panic("Didn't reset vcpu_cp15(vcpu, %zi)", num);
->> +		WARN(vcpu_cp15(vcpu, num) == 0x42424242,
->> +		     "Didn't reset vcpu_cp15(vcpu, %zi)", num);
->>  }
->> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> index 86096774abcd..4f067545c7d2 100644
->> --- a/arch/arm64/kvm/sys_regs.c
->> +++ b/arch/arm64/kvm/sys_regs.c
->> @@ -2609,6 +2609,6 @@ void kvm_reset_sys_regs(struct kvm_vcpu *vcpu)
->>  	reset_sys_reg_descs(vcpu, table, num);
->>  
->>  	for (num = 1; num < NR_SYS_REGS; num++)
->> -		if (__vcpu_sys_reg(vcpu, num) == 0x4242424242424242)
->> -			panic("Didn't reset __vcpu_sys_reg(%zi)", num);
->> +		WARN(__vcpu_sys_reg(vcpu, num) == 0x4242424242424242,
->> +		     "Didn't reset __vcpu_sys_reg(%zi)\n", num);
->>  }
->> -- 
->> 2.18.0
->>
-> 
-> If we only get halfway through resetting, then we'll get a warn splat,
-> complete with a backtrace, for each register. Should we do something
-> like the following instead?
-> 
->   for (num = 1; num < NR_SYS_REGS; num++)
->      if (__vcpu_sys_reg(vcpu, num) == 0x4242424242424242)
->         failed++;
->   WARN(failed, "Didn't reset %d system registers", failed);
+Hi Carlo,
 
-And doing so we'd loose the important bit of information, which is the
-position in the table that doesn't get initialized.
+On Wed, Jan 30, 2019 at 7:19 AM Carlo Caione <ccaione@baylibre.com> wrote:
+>
+> Add a node for the Freescale/NXP QuadSPI controller with a proper
+> pinctrl set and enable it for the i.MX8MQ EVK board.
+> Extend also the AIPS3 memory range to accommodate the QuadSPI-memory
+> region.
+>
+> Signed-off-by: Carlo Caione <ccaione@baylibre.com>
+> ---
+>  arch/arm64/boot/dts/freescale/imx8mq-evk.dts | 27 ++++++++++++++++++++
+>  arch/arm64/boot/dts/freescale/imx8mq.dtsi    | 16 +++++++++++-
 
-The vcpu reset issue is rare enough that nobody noticed it yet (I only
-reproduced it twice), and having it to scream 200 times is not really a
-concern. What I want to catch is the case where someone has added a new
-sysreg in the table, and has failed to provide a working init function.
+Please split this in two patches: one for the imx8mq.dtsi and other
+for the board dts.
 
-Thanks,
+> +&spi0 {
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I have recently sent a patch adding eCSPI support. Please call this
+qspi0 to avoid confusion with the eCSPI name instances.
+
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_qspi>;
+> +       status = "okay";
+> +
+> +       flash0: n25q256a@0 {
+
+Node names should be generic and label names specific, so:
+
+n25q256a: flash@0
+
+> +               reg = <0>;
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               compatible = "micron,n25q256a", "jedec,spi-nor";
+> +               spi-max-frequency = <29000000>;
+> +               spi-nor,ddr-quad-read-dummy = <6>;
+
+This property does not exist in mainline.
+
+>
+> +                       spi0: spi@30bb0000 {
+
+qspi0: spi@30bb0000 {
+
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +                               compatible = "fsl,imx8mq-qspi", "fsl,imx7d-qspi";
+
+Please send a separate patch documenting fsl,imx8mq-qspi
 
 _______________________________________________
 linux-arm-kernel mailing list
