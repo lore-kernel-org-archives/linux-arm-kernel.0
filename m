@@ -2,66 +2,62 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3FE94C282D5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 08:59:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 46EB8C282D5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:01:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0FD8F2087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 08:59:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F22DF20870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:00:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q957ZVgS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0FD8F2087F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E5EcG8fS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F22DF20870
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=taKGG1781LFkn2Uil7w81vTk/fbiT9/nBUHgv1B8jKU=; b=q957ZVgS1uPJtv
-	D5LYtHULhjli2Qzj12uYVoK6Dfok4H/7G95p8ExrmQJIKXFJg+3gpXLfvzddWbLhaFFBtSSgwO0Gc
-	nHCB0lkV3KPynMDQsQepIZDtFAcEBALC4N9tFgu6LRcwOzWAqNNX8bPz4G+cwd2ruSzNmrOXZZBw4
-	jReWL8yzqafrUoM6EoKfd7a+XrfjrbYAtPJKhOGTHD+Cc7A2Ktkzp7SiuhRwLe5dUcDb8CUFicgBp
-	63cIhBfkGP31HbB6CK4kOoOHjTNg+ArY7XYDZ3muB4WzNgrs51Aib55OzTHdO6zX5LBXgBTA3eRJw
-	3lSAZwC2cjuiVPaBav8w==;
+	List-Owner; bh=pf8Q/3/c6ljBpIEQ9WaEIzthyM8SeaBd0hv5osVqusU=; b=E5EcG8fSIUGe3s
+	d0t7GOsNy9/17LFpJAePQY+hYMlkgFCiY1ByfZAKNxi2bPRzSUQemKP0NrL+/9j1O1Xdr2vRVrMzh
+	+6mGBmWTowVJ+jz8yu7eXURz6hJ3x3w2KF2x3Ysx9PaJnOxLWT3A7MWqMFg6M+F9SAQaNMLnXUgWt
+	+w0qE2J6Y1vywJoR8QAYvdrZ3Uw4HNYSZpctr0dO1Aikk5eq6Dp1PWPISJssH0WbD3RlH8Mv9Ch1R
+	5aqTQMbgdggx+TptU5HNbiKq/qzyr/7t5Daz9xuXa8h/Hz5gpc9f5xODkXF/nS1MqfYmC8Ao6Fqll
+	WuNPJxiVLH6u+kkBz8yg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1golie-0003JS-Ub; Wed, 30 Jan 2019 08:59:40 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1goljl-00052p-C2; Wed, 30 Jan 2019 09:00:49 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goliC-0002w2-Ap
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 08:59:21 +0000
+ id 1goljh-00051j-Tx
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 09:00:47 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 041BFA78;
- Wed, 30 Jan 2019 00:59:10 -0800 (PST)
-Received: from [192.168.3.111] (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 022BB3F557;
- Wed, 30 Jan 2019 00:59:08 -0800 (PST)
-From: =?UTF-8?Q?Andr=c3=a9_Przywara?= <andre.przywara@arm.com>
-Subject: Re: [PATCH 09/14] KVM: arm64: Reuse sys_reg() macro when searching
- the trap table
-To: Christoffer Dall <christoffer.dall@arm.com>
-References: <20190124140032.8588-1-christoffer.dall@arm.com>
- <20190124140032.8588-10-christoffer.dall@arm.com>
-Organization: ARM Ltd.
-Message-ID: <2e9c6d4b-6645-e4e1-91cb-a50a26befec4@arm.com>
-Date: Wed, 30 Jan 2019 08:57:29 +0000
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 72F84A78;
+ Wed, 30 Jan 2019 01:00:45 -0800 (PST)
+Received: from [10.1.29.142] (e121487-lin.cambridge.arm.com [10.1.29.142])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C91293F557;
+ Wed, 30 Jan 2019 01:00:44 -0800 (PST)
+Subject: Re: [PATCH 2/2] serial: mps2-uart: support combined tx and rx irq
+To: linux-serial@vger.kernel.org
+References: <1548425597-38175-1-git-send-email-vladimir.murzin@arm.com>
+ <1548425597-38175-3-git-send-email-vladimir.murzin@arm.com>
+From: Vladimir Murzin <vladimir.murzin@arm.com>
+Message-ID: <db2e9569-b16a-2386-b482-d12275d06b86@arm.com>
+Date: Wed, 30 Jan 2019 09:00:43 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20190124140032.8588-10-christoffer.dall@arm.com>
-Content-Language: en-GB
+In-Reply-To: <1548425597-38175-3-git-send-email-vladimir.murzin@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_005913_007191_69CFF885 
-X-CRM114-Status: GOOD (  18.60  )
+X-CRM114-CacheID: sfid-20190130_010045_972659_D6A51001 
+X-CRM114-Status: GOOD (  10.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,97 +69,23 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, kvm@vger.kernel.org
+Cc: linux-arm-kernel@lists.infradead.org, sudeep.holla@arm.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 24 Jan 2019 15:00:27 +0100
-Christoffer Dall <christoffer.dall@arm.com> wrote:
-
-Hi,
-
-> From: Marc Zyngier <marc.zyngier@arm.com>
+On 1/25/19 2:13 PM, Vladimir Murzin wrote:
+> It turns out that some designs went for implementing only combined tx
+> and rx interrupt, which is currently not supported by the driver.
+> Support of combined irq is built on top of existent irq handlers and
+> activated by the hint form device tree.
 > 
-> Instead of having an open-coded macro, reuse the sys_reg() macro
-> that does the exact same thing.
 
-It's not the exact same thing, is it? It looks like being off by 5 bit
-to me. I think the patch is still fine, but maybe mention in the commit
-message that this difference is OK since it's only used as a key for
-comparing register indices?
+It seems that folks combine rx, tx and overrun interrupts, so I'll send v2
 
-Cheers,
-Andre.
-
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@arm.com>
-> ---
->  arch/arm64/kvm/sys_regs.c | 19 ++++++-------------
->  1 file changed, 6 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index e3e37228ae4e..1a5bea4285e4 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -965,6 +965,10 @@ static bool access_pmuserenr(struct kvm_vcpu
-> *vcpu, struct sys_reg_params *p, return true;
->  }
->  
-> +#define
-> reg_to_encoding(x)						\
-> +	sys_reg((u32)(x)->Op0,
-> (u32)(x)->Op1,				\
-> +		(u32)(x)->CRn, (u32)(x)->CRm, (u32)(x)->Op2);
-> +
->  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in
-> one go */ #define
-> DBG_BCR_BVR_WCR_WVR_EL1(n)					\
-> { SYS_DESC(SYS_DBGBVRn_EL1(n)),
-> \ @@ -1820,30 +1824,19 @@ static const struct sys_reg_desc
-> *get_target_table(unsigned target, } }
->  
-> -#define
-> reg_to_match_value(x)						\
-> -
-> ({								\
-> -		unsigned long
-> val;					\
-> -		val  = (x)->Op0 <<
-> 14;					\
-> -		val |= (x)->Op1 <<
-> 11;					\
-> -		val |= (x)->CRn <<
-> 7;					\
-> -		val |= (x)->CRm <<
-> 3;					\
-> -		val |=
-> (x)->Op2;					\
-> -
-> val;							\
-> -	 })
-> -
->  static int match_sys_reg(const void *key, const void *elt)
->  {
->  	const unsigned long pval = (unsigned long)key;
->  	const struct sys_reg_desc *r = elt;
->  
-> -	return pval - reg_to_match_value(r);
-> +	return pval - reg_to_encoding(r);
->  }
->  
->  static const struct sys_reg_desc *find_reg(const struct
-> sys_reg_params *params, const struct sys_reg_desc table[],
->  					 unsigned int num)
->  {
-> -	unsigned long pval = reg_to_match_value(params);
-> +	unsigned long pval = reg_to_encoding(params);
->  
->  	return bsearch((void *)pval, table, num, sizeof(table[0]),
-> match_sys_reg); }
-
+Cheers
+Vladimir
 
 _______________________________________________
 linux-arm-kernel mailing list
