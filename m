@@ -2,90 +2,74 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CA7E1C282D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:53:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A3C86C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:54:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9AEBD2082C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:53:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 73FAD2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:54:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MJZQzNbT";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Mt1rbyKo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9AEBD2082C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZdtcZQe0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 73FAD2087F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=soulik.info
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	List-Archive:List-Unsubscribe:List-Id:To:References:Message-Id:Date:
+	In-Reply-To:From:Subject:Mime-Version:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8hTO8Onr97quwNF3rOoENE3zhd7mfxiroLMT7Q3S0KY=; b=MJZQzNbTPPHVSI
-	T/+00BQaXiRjK3psAE40OO2w+Y99ga+ClCca2kMiXS+yOESHL9fVNNrp2decujM/AEpIEZB5VNjRD
-	J1PlRFCRTh+/Yo1Z2q+DoS6tWDZ9+NNihy3sOmZkNZm1ypNYf/WI7WyiAzcxGEgKs9eAlAR1BQE0x
-	dfrQvumasoE/Ug3Hl+P0BTbhmKPwA665R2aa4AdV+djyl0SByXp4SL7nfK2WzvSs1ScXitFw6B2XA
-	92S1vpSHcW3UCMcdWg2eZUV2c8em0vQDRm0kXNnKh9l/upAlcxKsEe4b/G3pFgRaIP9TXb4KvaY5/
-	8xsqm1bPML3itwjb5+KA==;
+	List-Owner; bh=QcC+r+jyZ2zu8w0E7AYmpI1SaIBef62WIy+6YwYuoSc=; b=ZdtcZQe0Aci7+n
+	DkH8DV6Y76+Ds9cI8HYZaUF0RVt/2Eo+LCyupRy6pvVYWjwvhoYbY6qDPzdhqzg4/E6wZzgNuOFpX
+	04+NKKL927ppH9ydotFDzxvOacvdHnx4HMDU121l0Dt5RbZYU2GvuNuAt6g2DDuH27bqns8ebobgn
+	agaN9boYqC9Qtu4z2GsK/aGZE7sUX4OzOs5ds/aemOnlKGtfViQPyElwIu3IJHcuor80w/dUk/MNS
+	Reldi0YdeC3Fc8sP0obVBgoYLW3WHrfgsMHmy1NK7ogjRw3nQpQNyfYfBmPGWztSzFo2q/tggBxXh
+	AKRWlwIpctJhW0hccP4A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gomYy-0003NK-Vj; Wed, 30 Jan 2019 09:53:45 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
+	id 1gomZt-0003fd-W4; Wed, 30 Jan 2019 09:54:42 +0000
+Received: from kozue.soulik.info ([108.61.200.231])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gomYq-0003MR-HX
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 09:53:43 +0000
-Received: by mail-wm1-x343.google.com with SMTP id n190so20945079wmd.0
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 01:53:36 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=dpepguYKa93uvnR9U774spYX7Jjb1lKwQhQj5NL8T8o=;
- b=Mt1rbyKoGoxQYnEWLFHU3eq8avrS5CPT+Ek81W4bOApyp/KHaPJuetQOhiVgwwhe9O
- cSsokr6elQvFfPTX+afMgVyp0HtyhtVVMqgEyypjAhBOxnSvPs0Xpp6+kpOSjnAv3upo
- f1k3rZdIrzUIkt4peOnsHE9aQPuj5/wgY/ITs=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=dpepguYKa93uvnR9U774spYX7Jjb1lKwQhQj5NL8T8o=;
- b=NlnPWtfo4C0R9KTK2OFkss9eGB9TRWEgBvzefuKqHsO1jYLrFXzHDDiXAvh0uwGUTc
- nXjgw7hsQiWqET52tQv/xFAYsNXlLu6F8rzhLHChn6XIpJOoxGlOHKfSrqoXEtSduRvZ
- IigFoFjvvJdGhXcVS0VyGXS2HUQN1xKgGqTHjpDbi9qI4950xDQuplSFVNWOZtj4K9Fc
- 6CJ8gkceCeCS8IEl5JYYPAeT0RPV4tvWH3vUYsi3ez1moFPMw+bDGgPCVDBVxOf4esHb
- 3k9Jbkz0jS2YgOGrw38oulS4YJm6Zi3BpsE3Mz4aUL4nccVabWij5oKT+ObYCsaB0nao
- iFqw==
-X-Gm-Message-State: AJcUukdrt/eGP+gDSfUTXwI2DDr35zi1kJL7sumPqay3O+xSqvx6d79p
- SuUR9LzMLOP2zQwMjROQPGwOHw==
-X-Google-Smtp-Source: ALg8bN68jFqOKOKYbDdVyzzHZFayG4Pd/yCnV6XLbBUaBk1F9G3f6bYb012FxUfcrUaNkvX0Vdl6pg==
-X-Received: by 2002:a1c:c60e:: with SMTP id w14mr26117385wmf.18.1548842014776; 
- Wed, 30 Jan 2019 01:53:34 -0800 (PST)
-Received: from [192.168.1.2] (99.red-79-146-83.dynamicip.rima-tde.net.
- [79.146.83.99])
- by smtp.gmail.com with ESMTPSA id x81sm1125240wmg.17.2019.01.30.01.53.33
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 30 Jan 2019 01:53:34 -0800 (PST)
-Subject: Re: [PATCH v2 2/2] phy: qualcomm: usb: Add Super-Speed PHY driver
-To: Bjorn Andersson <bjorn.andersson@linaro.org>
-References: <1548761715-4004-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <1548761715-4004-3-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <20190129202726.GA3036@builder>
-From: Jorge Ramirez <jorge.ramirez-ortiz@linaro.org>
-Message-ID: <fbd70494-e2f1-ae04-8b14-2cc97cead8b9@linaro.org>
-Date: Wed, 30 Jan 2019 10:53:32 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <20190129202726.GA3036@builder>
-Content-Language: en-US
+ id 1gomZo-0003es-7R; Wed, 30 Jan 2019 09:54:40 +0000
+Received: from [192.168.10.231] (unknown [103.29.142.67])
+ by kozue.soulik.info (Postfix) with ESMTPSA id D6EC510106E;
+ Wed, 30 Jan 2019 18:55:41 +0900 (JST)
+Mime-Version: 1.0 (1.0)
+Subject: Re: [linux-sunxi] [PATCH v2 1/2] media: v4l: Add definitions for the
+ HEVC slice format and controls
+From: Ayaka <ayaka@soulik.info>
+X-Mailer: iPad Mail (16A404)
+In-Reply-To: <CAAFQd5AKBm8WfcV29-8LFHsVNEL177JWXxAHM8SqhghzZnVn_Q@mail.gmail.com>
+Date: Wed, 30 Jan 2019 17:54:23 +0800
+Message-Id: <1079FF49-A083-47ED-81A8-83ABFDA1FFEA@soulik.info>
+References: <20181123130209.11696-1-paul.kocialkowski@bootlin.com>
+ <20181123130209.11696-2-paul.kocialkowski@bootlin.com>
+ <5515174.7lFZcYkk85@jernej-laptop>
+ <ffe9c81db34b599f675ca5bbf02de360bf0a1608.camel@bootlin.com>
+ <776e63c9-d4a5-342a-e0f7-200ef144ffc4@rock-chips.com>
+ <64c793e08d61181b78125b3956ec38623fa5d261.camel@bootlin.com>
+ <D8005130-F7FD-4CBD-8396-1BB08BB08E81@soulik.info>
+ <f982ef378a8ade075bc7077b93640e20ecebf9f4.camel@bootlin.com>
+ <82FA0C3F-BC54-4D89-AECB-90D81B89B1CE@soulik.info>
+ <c3619a00-17e7-fb92-a427-a7478b96f356@soulik.info>
+ <bdf14f97e98f2fd06307545ab9038ac3c2086ae7.camel@bootlin.com>
+ <42520087-4EAE-4F7F-BCA0-42E422170E91@soulik.info>
+ <ab8ca098ad60f209fe97f79bb93b2d1e898da524.camel@bootlin.com>
+ <CAPBb6MUJu3cX9A-E32bSSjxc1cvGP83ayzZzUxa5_QMf6niK4g@mail.gmail.com>
+ <2442b23d3b0a00c1bd441298a712888e016acf92.camel@ndufresne.ca>
+ <CAPBb6MUsbdXvkomtkiq0ygTqj58h4yqVR0PotT=ft94Ai0nbhw@mail.gmail.com>
+ <CAAFQd5BJ6_eQ2QiQLdmkkkeWEiVQ_yo86QccOn9176ZRDQxc=Q@mail.gmail.com>
+ <5F14507E -1BE2-4A74-A59C-1DB3C3E07DBA@soulik.info>
+ <CAAFQd5AKBm8WfcV29-8LFHsVNEL177JWXxAHM8SqhghzZnVn_Q@mail.gmail.com>
+To: Tomasz Figa <tfiga@chromium.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_015336_602189_07F68A0D 
-X-CRM114-Status: GOOD (  30.30  )
+X-CRM114-CacheID: sfid-20190130_015438_924158_35927559 
+X-CRM114-Status: GOOD (  32.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,346 +81,206 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, jackp@codeaurora.org,
- shawn.guo@linaro.org, gregkh@linuxfoundation.org, linux-usb@vger.kernel.org,
- khasim.mohammed@linaro.org, linux-kernel@vger.kernel.org, swboyd@chromium.org,
- vkoul@kernel.org, linux-arm-msm@vger.kernel.org, andy.gross@linaro.org,
- kishon@ti.com, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devel@driverdev.osuosl.org, Hans Verkuil <hverkuil@xs4all.nl>,
+ Alexandre Courbot <acourbot@chromium.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Randy Li <randy.li@rock-chips.com>,
+ LKML <linux-kernel@vger.kernel.org>,
+ =?utf-8?Q?Jernej_=C5=A0krabec?= <jernej.skrabec@gmail.com>,
+ Nicolas Dufresne <nicolas@ndufresne.ca>,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ "open list:ARM/Rockchip SoC..." <linux-rockchip@lists.infradead.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ Ezequiel Garcia <ezequiel@collabora.com>,
+ "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,
+ Joerg Roedel <joro@8bytes.org>, " <linux-arm-kernel@lists.infradead.org>,
+ Linux Media Mailing List <linux-media@vger.kernel.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/29/19 21:27, Bjorn Andersson wrote:
-> On Tue 29 Jan 03:35 PST 2019, Jorge Ramirez-Ortiz wrote:
->> diff --git a/drivers/phy/qualcomm/phy-qcom-usb-ss.c b/drivers/phy/qualcomm/phy-qcom-usb-ss.c
->> new file mode 100644
->> index 0000000..e6ae96e
->> --- /dev/null
->> +++ b/drivers/phy/qualcomm/phy-qcom-usb-ss.c
->> @@ -0,0 +1,347 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * Copyright (c) 2012-2014,2017 The Linux Foundation. All rights reserved.
->> + * Copyright (c) 2018, Linaro Limited
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/delay.h>
->> +#include <linux/err.h>
->> +#include <linux/io.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/phy/phy.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/regulator/consumer.h>
->> +#include <linux/reset.h>
->> +#include <linux/slab.h>
->> +
->> +#define PHY_CTRL0			0x6C
->> +#define PHY_CTRL1			0x70
->> +#define PHY_CTRL2			0x74
->> +#define PHY_CTRL4			0x7C
->> +
->> +/* PHY_CTRL bits */
->> +#define REF_PHY_EN			BIT(0)
->> +#define LANE0_PWR_ON			BIT(2)
->> +#define SWI_PCS_CLK_SEL			BIT(4)
->> +#define TST_PWR_DOWN			BIT(4)
->> +#define PHY_RESET			BIT(7)
->> +
->> +enum phy_vdd_ctrl { ENABLE, DISABLE, };
-> 
-> Use bool to describe boolean values.
-
-um, ok, but these are not booleans, they are actions (ie ctrl = action
-not true or false).
-
-anyway will change it to something else
-
-> 
->> +enum phy_regulator { VDD, VDDA1P8, };
-> 
-> It doesn't look like you need either of these if you remove the
-> set_voltage calls.
-
-we need to point to the regulator in the array so we need an index to it
-somehow.
-
-> 
->> +
->> +struct ssphy_priv {
->> +	void __iomem *base;
->> +	struct device *dev;
->> +	struct reset_control *reset_com;
->> +	struct reset_control *reset_phy;
->> +	struct regulator *vbus;
->> +	struct regulator_bulk_data *regs;
->> +	int num_regs;
->> +	struct clk_bulk_data *clks;
->> +	int num_clks;
->> +	enum phy_mode mode;
->> +};
->> +
->> +static inline void qcom_ssphy_updatel(void __iomem *addr, u32 mask, u32 val)
->> +{
->> +	writel((readl(addr) & ~mask) | val, addr);
->> +}
->> +
->> +static inline int qcom_ssphy_vbus_enable(struct regulator *vbus)
->> +{
->> +	return !regulator_is_enabled(vbus) ? regulator_enable(vbus) : 0;
-> 
-> regulator_is_enabled() will check if the actual regulator is on, not if
-> you already voted for it.
-> 
-> So if something else is enabling the vbus regulator you will skip your
-> enable and be in the mercy of them not releasing it. Presumably there's
-> only one consumer of this particular regulator, but it's a bad habit.
-
-yep
-
-> 
-> Please keep track of this drivers requested state in this driver, if
-> qcom_ssphy_vbus_ctrl() is called not only for the state changes.
-
-um, there is not such a function: the ctrl function is not for vbus but
-for vdd
-
-> 
->> +}
->> +
->> +static inline int qcom_ssphy_vbus_disable(struct regulator *vbus)
->> +{
->> +	return regulator_is_enabled(vbus) ? regulator_disable(vbus) : 0;
->> +}
->> +
->> +static int qcom_ssphy_vdd_ctrl(struct ssphy_priv *priv, enum phy_vdd_ctrl ctrl)
-> 
-> As discussed on IRC, I think you should just leave the voltage
-> constraints to DeviceTree.
-
-yes
-
-> 
->> +{
->> +	const int vdd_min = ctrl == ENABLE ? 1050000 : 0;
->> +	const int vdd_max = 1050000;
->> +	int ret;
->> +
->> +	ret = regulator_set_voltage(priv->regs[VDD].consumer, vdd_min, vdd_max);
->> +	if (ret)
->> +		dev_err(priv->dev, "Failed to set regulator vdd to %d\n",
->> +			vdd_min);
->> +
->> +	return ret;
->> +}
-> [..]
->> +static int qcom_ssphy_power_on(struct phy *phy)
->> +{
->> +	struct ssphy_priv *priv = phy_get_drvdata(phy);
->> +	int ret;
->> +
->> +	ret = qcom_ssphy_vdd_ctrl(priv, ENABLE);
->> +	if (ret)
->> +		return ret;
->> +
->> +	ret = regulator_bulk_enable(priv->num_regs, priv->regs);
->> +	if (ret)
->> +		goto err1;
->> +
->> +	ret = clk_bulk_prepare_enable(priv->num_clks, priv->clks);
->> +	if (ret)
->> +		goto err2;
->> +
->> +	ret = qcom_ssphy_vbus_ctrl(priv->vbus, priv->mode);
->> +	if (ret)
->> +		goto err3;
->> +
->> +	ret = qcom_ssphy_do_reset(priv);
->> +	if (ret)
->> +		goto err4;
->> +
->> +	writeb(SWI_PCS_CLK_SEL, priv->base + PHY_CTRL0);
->> +	qcom_ssphy_updatel(priv->base + PHY_CTRL4, LANE0_PWR_ON, LANE0_PWR_ON);
->> +	qcom_ssphy_updatel(priv->base + PHY_CTRL2, REF_PHY_EN, REF_PHY_EN);
->> +	qcom_ssphy_updatel(priv->base + PHY_CTRL4, TST_PWR_DOWN, 0);
->> +
->> +	return 0;
->> +err4:
-> 
-> Name your labels based on what they do, e.g. err_disable_vbus.
-
-ok
-
-> 
->> +	if (priv->vbus && priv->mode != PHY_MODE_INVALID)
->> +		qcom_ssphy_vbus_disable(priv->vbus);
-> 
-> qcom_ssphy_vbus_ctrl() above was either enabling or disabling vbus, but
-> here you're directly calling disable to unroll that. It think the result
-> is correct (in host this reverts to disabled and in gadget it's a
-> no-op), but I'm not sure I like the design of sometimes calling straight
-> to the vbus enable/disable and sometimes to the wrapper function.
-
-I think you misread: we have vbus enable/disable and vdd control
-(different regulators)
-
-
-I have to admit that the only reason I had separate functions for vbus
-enable/disable was cosmetic (and "if" on the control variable + another
-"if" to check that the regulator was already voted was taking me beyond
-the 80 lines character and I hate when that happens on simple
-operations). anyway will redo
-
-> 
->> +err3:
-> 
-> err_clk_disable
-> 
->> +	clk_bulk_disable_unprepare(priv->num_clks, priv->clks);
->> +err2:
->> +	regulator_bulk_disable(priv->num_regs, priv->regs);
->> +err1:
->> +	qcom_ssphy_vdd_ctrl(priv, DISABLE);
->> +
->> +	return ret;
->> +}
->> +
->> +static int qcom_ssphy_power_off(struct phy *phy)
->> +{
->> +	struct ssphy_priv *priv = phy_get_drvdata(phy);
->> +
->> +	qcom_ssphy_updatel(priv->base + PHY_CTRL4, LANE0_PWR_ON, 0);
->> +	qcom_ssphy_updatel(priv->base + PHY_CTRL2, REF_PHY_EN, 0);
->> +	qcom_ssphy_updatel(priv->base + PHY_CTRL4, TST_PWR_DOWN, TST_PWR_DOWN);
->> +
->> +	clk_bulk_disable_unprepare(priv->num_clks, priv->clks);
->> +	regulator_bulk_disable(priv->num_regs, priv->regs);
->> +
->> +	if (priv->vbus && priv->mode != PHY_MODE_INVALID)
->> +		qcom_ssphy_vbus_disable(priv->vbus);
->> +
->> +	qcom_ssphy_vdd_ctrl(priv, DISABLE);
->> +
->> +	return 0;
->> +}
->> +
->> +static int qcom_ssphy_init_clock(struct ssphy_priv *priv)
->> +{
->> +	const char * const clk_id[] = { "ref", "phy", "pipe", };
->> +	int i;
->> +
->> +	priv->num_clks = ARRAY_SIZE(clk_id);
->> +	priv->clks = devm_kcalloc(priv->dev, priv->num_clks,
->> +				  sizeof(*priv->clks), GFP_KERNEL);
-> 
-> You know num_clks is 3, so I would suggest that you just change the
-> sshphy_priv to clks[3] and skip the dynamic allocation.
-
-
-ok
-
-> 
-> 
-> Also, as num_clks always is ARRAY_SIZE(priv->clks) I would suggest using
-> the latter, to make that clear throughout the driver.
-
-maybe then just define NBR_CLKS (I find long lines a pain to read)
-
-> 
->> +	if (!priv->clks)
->> +		return -ENOMEM;
->> +
->> +	for (i = 0; i < priv->num_clks; i++)
->> +		priv->clks[i].id = clk_id[i];
-> 
-> There's no harm in just writing this on three lines:
-> 
-> 	priv->clks[0].id = "ref";
-> 	priv->clks[1].id = "phy";
-> 	priv->clks[2].id = "pipe";
-> 
->> +
->> +	return devm_clk_bulk_get(priv->dev, priv->num_clks, priv->clks);
->> +}
->> +
->> +static int qcom_ssphy_init_regulator(struct ssphy_priv *priv)
->> +{
->> +	const char * const reg_supplies[] = {
->> +		[VDD] = "vdd",
->> +		[VDDA1P8] = "vdda1p8",
->> +	};
->> +	int ret, i;
->> +
->> +	priv->num_regs = ARRAY_SIZE(reg_supplies);
->> +	priv->regs = devm_kcalloc(priv->dev, priv->num_regs,
->> +				  sizeof(*priv->regs), GFP_KERNEL);
-> 
-> As with clocks, you know there will only be 2 of these, make it fixed
-> size in ssphy_priv.
-
-well ok
-
-> 
-> And as with clocks, I would suggest using ARRAY_SIZE(priv->regs)
-> throughout the driver to make it obvious that's it's a static number. 
-> 
->> +	if (!priv->regs)
->> +		return -ENOMEM;
->> +
->> +	for (i = 0; i < priv->num_regs; i++)
->> +		priv->regs[i].supply = reg_supplies[i];
-> 
-> As with clocks, just unroll this and fill in the 2 supplies directly.
-
-um, ok, I find the above more readable but I see where you are going
-with these sort of recomendations...will just follow them
-
-> 
->> +
->> +	ret = devm_regulator_bulk_get(priv->dev, priv->num_regs, priv->regs);
->> +	if (ret)
->> +		return ret;
->> +
->> +	priv->vbus = devm_regulator_get_optional(priv->dev, "vbus");
-> 
-> get_optional means that if vbus-supply is not found, rather than
-> returning a dummy regulator object this will fail with -ENODEV.
-
-yes I messed this up.
-
-> 
-> Given the rest of the logic related to vbus you should set vbus to NULL
-> if the returned PTR_ERR(value) is -ENODEV, and fail for other errors.
-> 
-> 
-> Or just drop the _optional, and let your vbus controls operate on the
-> dummy regulator you get back.
-
-yes will do this. thanks for the suggestion and the review!
-
-> 
-> (Right now vbus can't be NULL, so these checks are not very useful)
-> 
->> +	if (IS_ERR(priv->vbus))
->> +		return PTR_ERR(priv->vbus);
->> +
->> +	return 0;
-> 
-> return PTR_ERR_OR_ZERO(priv->vbus)
-> 
-> (Although that might change based on above comment)
-> 
->> +}
-> 
-> Regards,
-> Bjorn
-> 
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+CgpTZW50IGZyb20gbXkgaVBhZAoKPiBPbiBKYW4gMzAsIDIwMTksIGF0IDM6MTcgUE0sIFRvbWFz
+eiBGaWdhIDx0ZmlnYUBjaHJvbWl1bS5vcmc+IHdyb3RlOgo+IAo+PiBPbiBXZWQsIEphbiAzMCwg
+MjAxOSBhdCAzOjI4IFBNIEF5YWthIDxheWFrYUBzb3VsaWsuaW5mbz4gd3JvdGU6Cj4+IAo+PiAK
+Pj4gCj4+IFNlbnQgZnJvbSBteSBpUGFkCj4+IAo+Pj4gT24gSmFuIDMwLCAyMDE5LCBhdCAxMToz
+NSBBTSwgVG9tYXN6IEZpZ2EgPHRmaWdhQGNocm9taXVtLm9yZz4gd3JvdGU6Cj4+PiAKPj4+IE9u
+IFdlZCwgSmFuIDMwLCAyMDE5IGF0IDExOjI5IEFNIEFsZXhhbmRyZSBDb3VyYm90Cj4+PiA8YWNv
+dXJib3RAY2hyb21pdW0ub3JnPiB3cm90ZToKPj4+PiAKPj4+Pj4+IE9uIFdlZCwgSmFuIDMwLCAy
+MDE5IGF0IDY6NDEgQU0gTmljb2xhcyBEdWZyZXNuZSA8bmljb2xhc0BuZHVmcmVzbmUuY2E+IHdy
+b3RlOgo+Pj4+Pj4gCj4+Pj4+PiBMZSBtYXJkaSAyOSBqYW52aWVyIDIwMTkgw6AgMTY6NDQgKzA5
+MDAsIEFsZXhhbmRyZSBDb3VyYm90IGEgw6ljcml0IDoKPj4+Pj4+IE9uIEZyaSwgSmFuIDI1LCAy
+MDE5IGF0IDEwOjA0IFBNIFBhdWwgS29jaWFsa293c2tpCj4+Pj4+PiA8cGF1bC5rb2NpYWxrb3dz
+a2lAYm9vdGxpbi5jb20+IHdyb3RlOgo+Pj4+Pj4+IEhpLAo+Pj4+Pj4+IAo+Pj4+Pj4+PiBPbiBU
+aHUsIDIwMTktMDEtMjQgYXQgMjA6MjMgKzA4MDAsIEF5YWthIHdyb3RlOgo+Pj4+Pj4+PiBTZW50
+IGZyb20gbXkgaVBhZAo+Pj4+Pj4+PiAKPj4+Pj4+Pj4+IE9uIEphbiAyNCwgMjAxOSwgYXQgNjoy
+NyBQTSwgUGF1bCBLb2NpYWxrb3dza2kgPHBhdWwua29jaWFsa293c2tpQGJvb3RsaW4uY29tPiB3
+cm90ZToKPj4+Pj4+Pj4+IAo+Pj4+Pj4+Pj4gSGksCj4+Pj4+Pj4+PiAKPj4+Pj4+Pj4+PiBPbiBU
+aHUsIDIwMTktMDEtMTAgYXQgMjE6MzIgKzA4MDAsIGF5YWthIHdyb3RlOgo+Pj4+Pj4+Pj4+IEkg
+Zm9yZ2V0IGEgaW1wb3J0YW50IHRoaW5nLCBmb3IgdGhlIHJrdmRlYyBhbmQgcmsgaGV2YyBkZWNv
+ZGVyLCBpdCB3b3VsZAo+Pj4+Pj4+Pj4+IHJlcXVlc3RzIGNhYmFjIHRhYmxlLCBzY2FsaW5nIGxp
+c3QsIHBpY3R1cmUgcGFyYW1ldGVyIHNldCBhbmQgcmVmZXJlbmNlCj4+Pj4+Pj4+Pj4gcGljdHVy
+ZSBzdG9yaW5nIGluIG9uZSBvciB2YXJpb3VzIG9mIERNQSBidWZmZXJzLiBJIGFtIG5vdCB0YWxr
+aW5nIGFib3V0Cj4+Pj4+Pj4+Pj4gdGhlIGRhdGEgYmVlbiBwYXJzZWQsIHRoZSBkZWNvZGVyIHdv
+dWxkIHJlcXVlc3RzIGEgcmF3IGRhdGEuCj4+Pj4+Pj4+Pj4gCj4+Pj4+Pj4+Pj4gRm9yIHRoZSBw
+cHMgYW5kIHJwcywgaXQgaXMgcG9zc2libGUgdG8gcmV1c2UgdGhlIHNsaWNlIGhlYWRlciwganVz
+dCBsZXQKPj4+Pj4+Pj4+PiB0aGUgZGVjb2RlciBrbm93IHRoZSBvZmZzZXQgZnJvbSB0aGUgYml0
+c3RyZWFtIGJ1ZmVyLCBJIHdvdWxkIHN1Z2dlc3QgdG8KPj4+Pj4+Pj4+PiBhZGQgdGhyZWUgcHJv
+cGVydGllcyh3aXRoIHNwcykgZm9yIHRoZW0uIEJ1dCBJIHRoaW5rIHdlIG5lZWQgYSBtZXRob2Qg
+dG8KPj4+Pj4+Pj4+PiBtYXJrIGEgT1VUUFVUIHNpZGUgYnVmZmVyIGZvciB0aG9zZSBhdXggZGF0
+YS4KPj4+Pj4+Pj4+IAo+Pj4+Pj4+Pj4gSSdtIHF1aXRlIGNvbmZ1c2VkIGFib3V0IHRoZSBoYXJk
+d2FyZSBpbXBsZW1lbnRhdGlvbiB0aGVuLiBGcm9tIHdoYXQKPj4+Pj4+Pj4+IHlvdSdyZSBzYXlp
+bmcsIGl0IHNlZW1zIHRoYXQgaXQgdGFrZXMgdGhlIHJhdyBiaXRzdHJlYW0gZWxlbWVudHMgcmF0
+aGVyCj4+Pj4+Pj4+PiB0aGFuIHBhcnNlZCBlbGVtZW50cy4gSXMgaXQgcmVhbGx5IGEgc3RhdGVs
+ZXNzIGltcGxlbWVudGF0aW9uPwo+Pj4+Pj4+Pj4gCj4+Pj4+Pj4+PiBUaGUgc3RhdGVsZXNzIGlt
+cGxlbWVudGF0aW9uIHdhcyBkZXNpZ25lZCB3aXRoIHRoZSBpZGVhIHRoYXQgb25seSB0aGUKPj4+
+Pj4+Pj4+IHJhdyBzbGljZSBkYXRhIHNob3VsZCBiZSBwYXNzZWQgaW4gYml0c3RyZWFtIGZvcm0g
+dG8gdGhlIGRlY29kZXIuIEZvcgo+Pj4+Pj4+Pj4gSC4yNjQsIGl0IHNlZW1zIHRoYXQgc29tZSBk
+ZWNvZGVycyBhbHNvIG5lZWQgdGhlIHNsaWNlIGhlYWRlciBpbiByYXcKPj4+Pj4+Pj4+IGJpdHN0
+cmVhbSBmb3JtIChiZWNhdXNlIHRoZXkgdGFrZSB0aGUgZnVsbCBzbGljZSBOQUwgdW5pdCksIHNl
+ZSB0aGUKPj4+Pj4+Pj4+IGRpc2N1c3Npb25zIGluIHRoaXMgdGhyZWFkOgo+Pj4+Pj4+Pj4gbWVk
+aWE6IGRvY3MtcnN0OiBEb2N1bWVudCBtMm0gc3RhdGVsZXNzIHZpZGVvIGRlY29kZXIgaW50ZXJm
+YWNlCj4+Pj4+Pj4+IAo+Pj4+Pj4+PiBTdGF0ZWxlc3MganVzdCBtZWFuIGl0IHdvbuKAmXQgdHJh
+Y2sgdGhlIHByZXZpb3VzIHJlc3VsdCwgYnV0IEkgZG9u4oCZdAo+Pj4+Pj4+PiB0aGluayB5b3Ug
+Y2FuIGRlZmluZSB3aGF0IGEgZGF0ZSB0aGUgaGFyZHdhcmUgd291bGQgbmVlZC4gRXZlbiB5b3UK
+Pj4+Pj4+Pj4ganVzdCBidWlsZCBhIGRwYiBmb3IgdGhlIGRlY29kZXIsIGl0IGlzIHN0aWxsIHN0
+YXRlbGVzcywgYnV0IHBhcnNpbmcKPj4+Pj4+Pj4gbGVzcyBvciBtb3JlIGRhdGEgZnJvbSB0aGUg
+Yml0c3RyZWFtIGRvZXNu4oCZdCBzdG9wIGEgZGVjb2RlciBiZWNvbWUgYQo+Pj4+Pj4+PiBzdGF0
+ZWxlc3MgZGVjb2Rlci4KPj4+Pj4+PiAKPj4+Pj4+PiBZZXMgZmFpciBlbm91Z2gsIHRoZSBmb3Jt
+YXQgaW4gd2hpY2ggdGhlIGhhcmR3YXJlIGRlY29kZXIgdGFrZXMgdGhlCj4+Pj4+Pj4gYml0c3Ry
+ZWFtIHBhcmFtZXRlcnMgZG9lcyBub3QgbWFrZSBpdCBzdGF0ZWxlc3Mgb3Igc3RhdGVmdWwgcGVy
+LXNlLgo+Pj4+Pj4+IEl0J3MganVzdCB0aGF0IHN0YXRlbGVzcyBkZWNvZGVycyBzaG91bGQgaGF2
+ZSBubyBwYXJ0aWN1bGFyIHJlYXNvbiBmb3IKPj4+Pj4+PiBwYXJzaW5nIHRoZSBiaXRzdHJlYW0g
+b24gdGhlaXIgb3duIHNpbmNlIHRoZSBoYXJkd2FyZSBjYW4gYmUgZGVzaWduZWQKPj4+Pj4+PiB3
+aXRoIHJlZ2lzdGVycyBmb3IgZWFjaCByZWxldmFudCBiaXRzdHJlYW0gZWxlbWVudCB0byBjb25m
+aWd1cmUgdGhlCj4+Pj4+Pj4gZGVjb2RpbmcgcGlwZWxpbmUuIFRoYXQncyBob3cgR1BVLWJhc2Vk
+IGRlY29kZXIgaW1wbGVtZW50YXRpb25zIGFyZQo+Pj4+Pj4+IGltcGxlbWVudGVkIChWQUFQSS9W
+RFBBVS9OVkRFQywgZXRjKS4KPj4+Pj4+PiAKPj4+Pj4+PiBTbyB0aGUgZm9ybWF0IHdlIGhhdmUg
+YWdyZWVkIG9uIHNvIGZhciBmb3IgdGhlIHN0YXRlbGVzcyBpbnRlcmZhY2UgaXMKPj4+Pj4+PiB0
+byBwYXNzIHBhcnNlZCBlbGVtZW50cyB2aWEgdjRsMiBjb250cm9sIHN0cnVjdHVyZXMuCj4+Pj4+
+Pj4gCj4+Pj4+Pj4gSWYgdGhlIGhhcmR3YXJlIGNhbiBvbmx5IHdvcmsgYnkgcGFyc2luZyB0aGUg
+Yml0c3RyZWFtIGl0c2VsZiwgSSdtIG5vdAo+Pj4+Pj4+IHN1cmUgd2hhdCB0aGUgYmVzdCBzb2x1
+dGlvbiB3b3VsZCBiZS4gUmVjb25zdHJ1Y3RpbmcgdGhlIGJpdHN0cmVhbSBpbgo+Pj4+Pj4+IHRo
+ZSBrZXJuZWwgaXMgYSBwcmV0dHkgYmFkIG9wdGlvbiwgYnV0IHNvIGlzIHBhcnNpbmcgaW4gdGhl
+IGtlcm5lbCBvcgo+Pj4+Pj4+IGhhdmluZyB0aGUgZGF0YSBib3RoIGluIHBhcnNlZCBhbmQgcmF3
+IGZvcm1zLiBEbyB5b3Ugc2VlIGFub3RoZXIKPj4+Pj4+PiBwb3NzaWJpbGl0eT8KPj4+Pj4+IAo+
+Pj4+Pj4gSXMgcmVjb25zdHJ1Y3RpbmcgdGhlIGJpdHN0cmVhbSBzbyBiYWQ/IFRoZSB2NGwyIGNv
+bnRyb2xzIHByb3ZpZGUgYQo+Pj4+Pj4gZ2VuZXJpYyBpbnRlcmZhY2UgdG8gYW4gZW5jb2RlZCBm
+b3JtYXQgd2hpY2ggdGhlIGRyaXZlciBuZWVkcyB0bwo+Pj4+Pj4gY29udmVydCBpbnRvIGEgc2Vx
+dWVuY2UgdGhhdCB0aGUgaGFyZHdhcmUgY2FuIHVuZGVyc3RhbmQuIFR5cGljYWxseQo+Pj4+Pj4g
+dGhpcyBpcyBkb25lIGJ5IHBvcHVsYXRpbmcgaGFyZHdhcmUtc3BlY2lmaWMgc3RydWN0dXJlcy4g
+Q2FuJ3Qgd2UKPj4+Pj4+IGNvbnNpZGVyIHRoYXQgaW4gdGhpcyBzcGVjaWZpYyBpbnN0YW5jZSwg
+dGhlIGhhcmR3YXJlLXNwZWNpZmljCj4+Pj4+PiBzdHJ1Y3R1cmUganVzdCBoYXBwZW5zIHRvIGJl
+IGlkZW50aWNhbCB0byB0aGUgb3JpZ2luYWwgYml0c3RyZWFtCj4+Pj4+PiBmb3JtYXQ/Cj4+Pj4+
+IAo+Pj4+PiBBdCBtYXhpbXVtIGFsbG93ZWQgYml0cmF0ZSBmb3IgbGV0J3Mgc2F5IEhFVkMgKDk0
+ME1CL3MgaWlyYyksIHllcywgaXQKPj4+Pj4gd291bGQgYmUgcmVhbGx5IHJlYWxseSBiYWQuIElu
+IEdTdHJlYW1lciBwcm9qZWN0IHdlIGhhdmUgZGlzY3Vzc2VkIGZvcgo+Pj4+PiBhIHdoaWxlIChi
+dXQgaGF2ZSBuZXZlciBkb25lIGFueXRoaW5nIGFib3V0KSBhZGRpbmcgdGhlIGFiaWxpdHkgdGhy
+b3VnaAo+Pj4+PiBhIGJpdG1hc2sgdG8gc2VsZWN0IHdoaWNoIHBhcnQgb2YgdGhlIHN0cmVhbSBu
+ZWVkIHRvIGJlIHBhcnNlZCwgYXMKPj4+Pj4gcGFyc2luZyBpdHNlbGYgd2FzIGNhdXNpbmcgc29t
+ZSBvdmVyaGVhZC4gTWF5YmUgc2ltaWxhciB0aGluZyBhcHBsaWVzLAo+Pj4+PiB0aG91Z2ggYXMg
+cGVyIG91ciBuZXcgZGVzaWduLCBpdCdzIHRoZSBmb3VyY2MgdGhhdCBkaWN0YXRlIHRoZSBkcml2
+ZXIKPj4+Pj4gYmVoYXZpb3VyLCB3ZSdkIG5lZWQgeWV0IGFub3RoZXIgZm91cmNjIGZvciBkcml2
+ZXJzIHRoYXQgd2FudHMgdGhlIGZ1bGwKPj4+Pj4gYml0c3RyZWFtICh3aGljaCBzZWVtcyBvZGQg
+aWYgeW91IGhhdmUgYWxyZWFkeSBwYXJzZWQgZXZlcnl0aGluZywgSQo+Pj4+PiB0aGluayB0aGlz
+IG5lZWQgc29tZSBjbGFyaWZpY2F0aW9uKS4KPj4+PiAKPj4+PiBOb3RlIHRoYXQgSSBhbSBub3Qg
+cHJvcG9zaW5nIHRvIHJlYnVpbGQgdGhlICplbnRpcmUqIGJpdHN0cmVhbQo+Pj4+IGluLWtlcm5l
+bC4gV2hhdCBJIGFtIHNheWluZyBpcyB0aGF0IGlmIHRoZSBoYXJkd2FyZSBpbnRlcnByZXRzIHNv
+bWUKPj4+PiBzdHJ1Y3R1cmVzIChsaWtlIFNQUy9QUFMpIGluIHRoZWlyIHJhdyBmb3JtYXQsIHRo
+aXMgcmF3IGZvcm1hdCBjb3VsZAo+Pj4+IGJlIHJlY29uc3RydWN0ZWQgZnJvbSB0aGUgc3RydWN0
+dXJlcyBwYXNzZWQgYnkgdXNlcnNwYWNlIGF0IG5lZ2xpZ2libGUKPj4+PiBjb3N0LiBTdWNoIG1h
+bmlwdWxhdGlvbiB3b3VsZCBvbmx5IGhhcHBlbiBvbiBhIHNtYWxsIGFtb3VudCBvZiBkYXRhLgo+
+Pj4+IAo+Pj4+IEV4cG9zaW5nIGZpbmVyLWdyYWluZWQgZHJpdmVyIHJlcXVpcmVtZW50cyB0aHJv
+dWdoIGEgYml0bWFzayBtYXkKPj4+PiBkZXNlcnZlIG1vcmUgZXhwbG9yaW5nLiBNYXliZSB3ZSBj
+b3VsZCBlbmQgd2l0aCBhIHNwZWN0cnVtIG9mCj4+Pj4gY2FwYWJpbGl0aWVzIHRoYXQgd291bGQg
+YWxsb3cgdXMgdG8gY292ZXIgdGhlIHJhbmdlIGZyb20gZnVsbHkKPj4+PiBzdGF0ZWxlc3MgdG8g
+ZnVsbHkgc3RhdGVmdWwgSVBzIG1vcmUgc21vb3RobHkuIFJpZ2h0IG5vdyB3ZSBoYXZlIHR3bwo+
+Pj4+IHNwZWNpZmljYXRpb25zIHRoYXQgb25seSBjb25zaWRlciB0aGUgZXh0cmVtZXMgb2YgdGhh
+dCByYW5nZS4KPj4+IAo+Pj4gSSBnYXZlIGl0IGEgYml0IG1vcmUgdGhvdWdodCBhbmQgaWYgd2Ug
+Y29tYmluZSB3aGF0IE5pY29sYXMgc3VnZ2VzdGVkCj4+PiBhYm91dCB0aGUgYml0bWFzayBjb250
+cm9sIHdpdGggdGhlIHVzZXJzcGFjZSBwcm92aWRpbmcgdGhlIGZ1bGwKPj4+IGJpdHN0cmVhbSBp
+biB0aGUgT1VUUFVUIGJ1ZmZlcnMsIHNwbGl0IGludG8gc29tZSBsb2dpY2FsIHVuaXRzIGFuZAo+
+Pj4gInRhZ2dlZCIgd2l0aCB0aGVpciB0eXBlIChlLmcuIFNQUywgUFBTLCBzbGljZSwgZXRjLiks
+IHdlIGNvdWxkCj4+PiBwb3RlbnRpYWxseSBnZXQgYW4gaW50ZXJmYWNlIHRoYXQgd291bGQgd29y
+ayBmb3IgYW55IGtpbmQgb2YgZGVjb2RlciBJCj4+PiBjYW4gdGhpbmsgb2YsIGFjdHVhbGx5IGVs
+aW1pbmF0aW5nIHRoZSBib3VuZGFyeSBiZXR3ZWVuIHN0YXRlZnVsIGFuZAo+Pj4gc3RhdGVsZXNz
+IGRlY29kZXJzLgo+PiBJIGFncmVlIHdpdGggdGhpcyBpZGVhLCB0aGF0IGlzIHdoYXQgSSB3YW50
+IGNhbGxpbmcgbWVtb3J5IHJlZ2lvbiBkZXNjcmlwdGlvbiB3aGlsZSBJIGFtIHN0aWxsIHN0cnVn
+Z2xpbmcgd2l0aCB1c2Vyc3BhY2UgdG8gcG9zdCBteSBkcml2ZXIgZGVtby4KPj4+IAo+Pj4gRm9y
+IGV4YW1wbGUsIGEgZnVsbHkgc3RhdGVmdWwgZGVjb2RlciB3b3VsZCBoYXZlIHRoZSBiaXRtYXNr
+IGNvbnRyb2wKPj4+IHNldCB0byAwIGFuZCBhY2NlcHQgZGF0YSBmcm9tIGFsbCB0aGUgT1VUUFVU
+IGJ1ZmZlcnMgYXMgdGhleSBjb21lLiBBCj4+PiBkZWNvZGVyIHRoYXQgZG9lc24ndCBkbyBhbnkg
+cGFyc2luZyBvbiBpdHMgb3duIHdvdWxkIGhhdmUgYWxsIHRoZQo+Pj4gdmFsaWQgYml0cyBpbiB0
+aGUgYml0bWFzayBzZXQgYW5kIGlnbm9yZSB0aGUgZGF0YSBpbiBPVVRQVVQgYnVmZmVycwo+Pj4g
+dGFnZ2VkIGFzIGFueSBraW5kIG9mIG1ldGFkYXRhLiBBbmQgdGhlbiwgd2UgY291bGQgaGF2ZSBh
+bnkgY2FzZXMgaW4KPj4+IGJldHdlZW4sIGluY2x1ZGluZyBzdGF0ZWZ1bCBkZWNvZGVycyB3aGlj
+aCBqdXN0IGNhbid0IHBhcnNlIHRoZSBzdHJlYW0KPj4+IG9uIHRoZWlyIG93biwgYnV0IHN0aWxs
+IG1hbmFnZSBhbnl0aGluZyBlbHNlIHRoZW1zZWx2ZXMsIG9yIHN0YXRlbGVzcwo+Pj4gb25lcyB3
+aGljaCBjYW4gcGFyc2UgcGFydHMgb2YgdGhlIHN0cmVhbSwgbGlrZSB0aGUgcmszMzk5IHZkZWMg
+Y2FuCj4+PiBwYXJzZSB0aGUgSC4yNjQgc2xpY2UgaGVhZGVycyBvbiBpdHMgb3duLgo+Pj4gCj4+
+IEFjdHVhbGx5IG5vdCwgdGhlIHJrdmRlYyBhbmQgcmtoZXZjIGNhbiBwYXJzZSBtb3N0IGJ1dCBu
+b3QgYWxsIHN5bnRheCBzZWN0aW9ucy4KPj4gQmVzaWRlcyB0aGUgdnA5IGRlY29kZXIgb2Ygcmt2
+ZGVjIHdvbuKAmXQgcGFyc2UgbW9zdCBvZiB0aGUgc3ludGF4Lgo+PiAKPj4gSSB0YWxrZWQgdG8g
+c29tZSByb2NrY2hpcCBzdGFmZiBhYm91dCB0aGUgcGVyZm9ybWFuY2UgcHJvYmxlbSBvZiByZWNv
+bnN0cnVjdGlvbiBiaXRzdHJlYW0gYWZ0ZXIgeWVzdGVyZGF5IGFyZ3Vpbmcgd2l0aCB0ZmlnYSBh
+dCBJUkMgeWVzdGVyZGF5LiBBbHRob3VnaCAxbXMgbG9va3Mgc21hbGwgdG8gdGhvc2UgZGVjb2Rl
+ciB3aGljaCBjYW4gZGVjb2RlIGEgcGljdHVyZSBvZiBhIFVIRCA0SyBIRVZDIHZpZGVvcyBpbiA5
+bXMsIGl0IGlzIGVub3VnaCBmb3IgNjBmcHMuIEJ1dCBob3cgYWJvdXQgYSBoaWdoZXIgZnJhbWUg
+cmF0ZSBsaWtlIDEyMGZwcyBvciAyNDBmcHMgYW5kIHdoZW4gaXQgY29tZXMgdG8gOEsgd2hpY2gg
+aXMgdXNlZCBpbiBKYXBhbiBicm9hZGNhc3QuCj4gCj4gMSBtcyBmb3IgYSA1MDAgTUh6IENQVSAo
+d2hpY2ggaXMgcXVpdGUgc2xvdyB0aGVzZSBkYXlzKSBpcyA1MDBrCj4gY3ljbGVzLiBXZSBkb24n
+dCBoYXZlIHRvIHJlY29uc3RydWN0IHRoZSB3aG9sZSBiaXRzdHJlYW0sIGp1c3QgdGhlCj4gcGFy
+c2VkIG1ldGFkYXRhIGFuZCBhbHNvIHdlIGRvbid0IGdldCBhIG5ldyBQUFMgb3IgU1BTIGV2ZXJ5
+IGZyYW1lLgo+IE5vdCBzdXJlIHdoZXJlIHlvdSBoYXZlIHRoaXMgMSBtcyBmcm9tLiBNb3N0IG9m
+IHRoZSBkaWZmZXJlbmNlIGJldHdlZW4KPiBvdXIgc3RydWN0dXJlcyBhbmQgdGhlIGJpdHN0cmVh
+bSBpcyB0aGF0IHRoZSBsYXR0ZXIgaXMgcGFja2VkIGFuZAo+IGNvdWxkIGJlIHZhcmlhYmxlIGxl
+bmd0aC4KWW91IHRvbGQgbWUgdGhhdCBudW1iZXIgeWVzdGVyZGF5Lgo+IAo+IFdlIGFjdHVhbGx5
+IGhhdmUgc29tZSBzYW1wbGUgYml0c3RyZWFtIGFzc2VtYmx5IGNvZGUgZm9yIHRoZSByb2NrY2hp
+cCBlbmNvZGVyOgo+IAo+IGh0dHBzOi8vY2hyb21pdW0uZ29vZ2xlc291cmNlLmNvbS9jaHJvbWl1
+bW9zL3RoaXJkX3BhcnR5L2xpYnY0bHBsdWdpbnMvKy81ZTYwMzQyNTgxNDZhZjZiZTk3M2ZiNmE1
+YmI2YjlkNmU3NDg5NDM3L2xpYnY0bC1yb2NrY2hpcF92Mi9saWJ2ZXB1L2gyNjRlL2gyNjRlLmMj
+MTQ4Cj4gaHR0cHM6Ly9jaHJvbWl1bS5nb29nbGVzb3VyY2UuY29tL2Nocm9taXVtb3MvdGhpcmRf
+cGFydHkvbGlidjRscGx1Z2lucy8rLzVlNjAzNDI1ODE0NmFmNmJlOTczZmI2YTViYjZiOWQ2ZTc0
+ODk0MzcvbGlidjRsLXJvY2tjaGlwX3YyL2xpYnZlcHUvc3RyZWFtcy5jIzM2Cj4gCj4gRGlzYXNz
+ZW1ibGluZyB0aGUgc3RyZWFtX3B1dF9iaXRzKCkgZ2l2ZXMgMzYgdGh1bWIyIGluc3RydWN0aW9u
+cywKPiBpbmNsdWRpbmcgMjMgZm9yIHRoZSBsb29wIGZvciBlYWNoIGJ5dGUgdGhhdCBpcyB3cml0
+dGVuLgo+IHN0cmVhbV93cml0ZV91ZSgpIGlzIGEgYml0IG1vcmUgY29tcGxpY2F0ZWQsIGJ1dCBp
+biB0aGUgd29yc3QgY2FzZSBpdAo+IGVuZHMgdXAgd2l0aCA0IGNhbGxzIHRvIHN0cmVhbV9wdXRf
+Yml0cygpLCBlYWNoIGF0IG1vc3Qgc3Bhbm5pbmcgNAo+IGJ5dGVzIGZvciBzaW1wbGljaXR5Lgo+
+IAo+IExldCdzIGNvdW50IHRoZSBvcGVyYXRpb25zIGZvciBTUFMgdGhlbjoKPiAoMSkgc3RyZWFt
+X3B1dF9iaXRzKCkgc3Bhbm5pbmcgMSBieXRlOiAzMyB0aW1lcwo+ICgyKSBzdHJlYW1fcHV0X2Jp
+dHMoKSBzcGFubmluZyB1cCB0byAzIGJ5dGVzOiA0IHRpbWVzCj4gKDMpIHN0cmVhbV93cml0ZV91
+ZSgpIHVwIHRvIDMxIGJpdHM6IDE5IHRpbWVzCj4gCj4gQWRkaW5nIGl0IHRvZ2V0aGVyOgo+ICgx
+KSAzMyAqIDM2ICsKPiAoMikgNCAqICgzNiArIDIgKiAyMykgKwo+ICgzKSAxOSAqICg0ICogKDM2
+ICsgMyAqIDIzKSkgPQo+IAo+IDExODggKyAzMjggKyA3OTgwID0gOTQ5NiB+PSAxMGsgaW5zdHJ1
+Y3Rpb25zCj4gCj4gVGhlIGNvZGUgYWJvdmUgZG9lc24ndCBzZWVtIHRvIGNvbnRhaW4gYW55IGV4
+cGVuc2l2ZSBpbnN0cnVjdGlvbnMsCj4gbGlrZSBkaXZpc2lvbiwgc28gZm9yIGEgbW9kZXJuIHBp
+cGVsaW5lZCBvdXQgb2Ygb3JkZXIgY29yZSAoZS5nLiBBNTMpLAo+IGl0IGNvdWxkIGJlIHNhZmUg
+dG8gYXNzdW1lIDEgaW5zdHJ1Y3Rpb24gcGVyIGN5Y2xlLiBBdCA1MDAgTUh6IHRoYXQKPiBnaXZl
+cyB5b3UgMjAgdXNlY3MuCj4gCj4gU1BTIGlzIHRoZSBtb3N0IGNvbXBsZXggaGVhZGVyIGFuZCBm
+b3IgSC4yNjQgd2UganVzdCBkbyBQUFMgYW5kIHNvbWUKPiBzbGljZSBoZWFkZXJzLiBMZXQncyBy
+b3VuZCBpdCB1cCBhIGJpdCBhbmQgd2UgY291bGQgaGF2ZSBhcm91bmQgMTAwCj4gdXNlY3MgZm9y
+IHRoZSBjb21wbGV0ZSBmcmFtZSBtZXRhZGF0YS4KVGhlIHNjYWxpbmcgbGlzdCAoY2FiYWMgdGFi
+bGUpIGFkZHJlc3MgIG5lZWQgdG8gZmlsbCB0aGUgcHBzIGhlYWRlciwgd2hpY2ggd291bGQgcmVx
+dWVzdCBtYXBwaW5nIGFuZCB1bm1hcHBpbmcgYSA0SyBtZW1vcnkgZWNobyBvZiB0aW1lcy4KCkFu
+ZCB5b3UgZXZlciB0aGluayBvZiBtdWx0aXBsZSBzZXNzaW9uIGF0IHRoZSBzYW1lIHRpbWUuIEJl
+c2lkZXMsIGhhdmUgeW91IHRpcmVkIHRoZSBBbmRyb2lkIENUUyB0ZXN0PyBUaGVyZSBpcyBhIHRl
+c3QgdGhhdCB3b3VsZCBkbyByZXNvbHV0aW9uIGNoYW5nZSBldmVyeSA1IGZyYW1lcyB3aGljaCB3
+b3VsZCByZXF1ZXN0IHRvIGNvbnN0cnVjdCBhIG5ldyBzcHMgYW5kIHBwcyBmb3IgSC4yNjQuIEl0
+IGlzIHRoZSBBbmRyb2lkIENUUyBtYWtlIG1lIGhhdmUgc3VjaCBvZiB0aG91Z2h0LgoKQW55d2F5
+IHRoZSBwcm9ibGVtIGhlcmUgaXMgdGhhdCB2NGwyIGRyaXZlciBuZWVkIHRvIHdhaXQgdGhlIHBy
+ZXZpb3VzIHBpY3R1cmUgaXMgZG9uZSB0byBnZW5lcmF0ZSB0aGUgcmVnaXN0ZXIgZm9yIHRoZSBu
+ZXh0IHBpY3R1cmVzLiBXaGljaCBsZWFkaW5nIG1vcmUgaWRsZSB0aW1lIG9mIHRoZSBkZXZpY2Uu
+Cj4+IAo+PiBJIHdvdWxkIGJyaW5nIG1vcmUgZGV0YWlsIGluIHRoZSBGT1NERU0gMjAxOSwgSSBt
+YXkgc3RheSBhdCBncmFwaGljcyBkZXZyb29tIGF0IFNhdHVyZGF5Lgo+Pj4gVGhhdCBjb3VsZCBw
+b3RlbnRpYWxseSBsZXQgdXMgY29tcGxldGVseSBlbGltaW5hdGUgdGhlIGRpc3RpbmN0aW9uCj4+
+PiBiZXR3ZWVuIHRoZSBzdGF0ZWZ1bCBhbmQgc3RhdGVsZXNzIGludGVyZmFjZXMgYW5kIGp1c3Qg
+aGF2ZSBvbmUgdGhhdAo+Pj4gY292ZXJzIGJvdGguCj4+PiAKPj4+IFRob3VnaHRzPwo+IAo+IEFu
+eSB0aG91Z2h0cyBvbiBteSBwcm9wb3NhbCB0byBtYWtlIHRoZSBpbnRlcmZhY2UgbW9yZSBmbGV4
+aWJsZT8gQW55Cj4gc3BlY2lmaWMgZXhhbXBsZXMgb2YgaXNzdWVzIHRoYXQgd2UgY291bGQgZW5j
+b3VudGVyIHRoYXQgd291bGQgcHJldmVudAo+IGl0IGZyb20gd29ya2luZyBlZmZpY2llbnRseSB3
+aXRoIFJvY2tjaGlwIChvciBvdGhlcikgaGFyZHdhcmU/Cj4gCj4gQmVzdCByZWdhcmRzLAo+IFRv
+bWFzegoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxp
+bnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFk
+ZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4
+LWFybS1rZXJuZWwK
