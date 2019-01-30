@@ -2,21 +2,20 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 10B86C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:21:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 08152C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:21:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DC4972087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:21:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C26FD2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:21:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pp7Tw58G"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC4972087F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lvno6WU3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C26FD2087F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,42 +24,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=O0HGfbeiSVjDiUX/jALdIHqzJ6Rn2htD9eD4iHgAjjE=; b=pp7Tw58GheUWst
-	GbgNca7FlJSyv4oTirX6BeO3bYMbPupKSqNeY6u/jAHGz9HvJC5NZMSUAbvUp3xi66C7J1/FZZAQY
-	gvK/7y0g6k7Xx1FjyEw7M2Sx3XG6EKmhv3tTQ81DXWAjXXXlPfF47R40LBvnY7MGwMgD+FJCb+bAy
-	RGGHUt2JIRVMpyrDhhm0nlutrpLuUAYVNB/hjyLSaEeCXjBNmUQCDHvc90a3TixW4WIEmKMNUaXcs
-	OTl8l54DuoCo3NKNmIRDSaRIMGgIqrR5iRx2uRJ+DGGVQeoHKwBQVFCGtyNJ7FWjQzDCezGl2OzGk
-	962o/dpjsoVa+O1rNuSQ==;
+	List-Owner; bh=LGSgkvY5QbvxrioftU5oacFcn4I1ppXm1ESQvl+Z7uA=; b=lvno6WU3SLO9V8
+	puo/vZmJL56DKO7nDvZUw6F/HYhlNsRCScrQYx0rx6WnE9peveWN4mzJKfcqcWw58SLlJgcEsDhTW
+	j64Lr94ybnXOSAA0G36JGRS3ubGEAoIOWzuEFhivIFq9lv9agUIKP9y0W1kRttYeukaiJQtspqbrg
+	+ZHjPV3pNT0Vf1Zwu42zHSS2+56D0/shouBIG+gh9+adGVDUO4uaYUHX7SRuH1xjgnIM2wHxNvQwu
+	ltznLhWLgxjlDuKB8gABayT6+gdywBr66lBi9bA2a0LpQYtMBbZRbsQw5tClPh2I2oKkkroEkV6Jt
+	bip/gVFaCbq5LhG0CXoA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gouU2-0000tM-FR; Wed, 30 Jan 2019 18:21:10 +0000
+	id 1gouUR-00019v-7y; Wed, 30 Jan 2019 18:21:35 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gouTz-0000su-3q
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 18:21:08 +0000
+ id 1gouUO-00019Z-GM
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 18:21:33 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D634580D;
- Wed, 30 Jan 2019 10:21:06 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E7A9E80D;
+ Wed, 30 Jan 2019 10:21:31 -0800 (PST)
 Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5CCF63F557;
- Wed, 30 Jan 2019 10:21:05 -0800 (PST)
-Date: Wed, 30 Jan 2019 18:21:02 +0000
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B51CE3F557;
+ Wed, 30 Jan 2019 10:21:30 -0800 (PST)
+Date: Wed, 30 Jan 2019 18:21:28 +0000
 From: Will Deacon <will.deacon@arm.com>
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: Re: [PATCH 1/4] arm64: dump: no need to check return value of
- debugfs_create functions
-Message-ID: <20190130182102.GK18558@fuggles.cambridge.arm.com>
-References: <20190122144114.9816-1-gregkh@linuxfoundation.org>
- <20190122144114.9816-2-gregkh@linuxfoundation.org>
+To: "Li, Meng" <Meng.Li@windriver.com>
+Subject: Re: Could you please help to have a look a bug trace in pmu arm-cci.c
+Message-ID: <20190130182128.GM18558@fuggles.cambridge.arm.com>
+References: <529F9A9100AE8045A7A5B5A00A39FBB862099B8E@ALA-MBD.corp.ad.wrs.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190122144114.9816-2-gregkh@linuxfoundation.org>
+In-Reply-To: <529F9A9100AE8045A7A5B5A00A39FBB862099B8E@ALA-MBD.corp.ad.wrs.com>
 User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_102107_162469_E3D611E7 
-X-CRM114-Status: GOOD (  14.06  )
+X-CRM114-CacheID: sfid-20190130_102132_544214_20D24C1B 
+X-CRM114-Status: GOOD (  11.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,36 +69,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Kevin Hilman <khilman@kernel.org>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Russell King <linux@armlinux.org.uk>, Peng Donglin <dolinux.peng@gmail.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>, robin.murphy@arm.com,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ suzuki.poulose@arm.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Greg,
+[+Suzuki and Robin]
 
-On Tue, Jan 22, 2019 at 03:41:11PM +0100, Greg Kroah-Hartman wrote:
-> When calling debugfs functions, there is no need to ever check the
-> return value.  The function can work or not, but the code logic should
-> never do something different based on this.
+On Mon, Jan 28, 2019 at 07:19:20AM +0000, Li, Meng wrote:
+> When enable kernel configure CONFIG_DEBUG_ATOMIC_SLEEP, there is below trace
+> during pmu arm cci driver probe phase.
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Peng Donglin <dolinux.peng@gmail.com>
-> Cc: <linux-arm-kernel@lists.infradead.org>
-> Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> ---
->  arch/arm64/include/asm/ptdump.h | 9 +++------
->  arch/arm64/mm/dump.c            | 4 ++--
->  arch/arm64/mm/ptdump_debugfs.c  | 7 ++-----
->  3 files changed, 7 insertions(+), 13 deletions(-)
+> [ 1.983337] BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:2004
+> [ 1.983340] in_atomic(): 1, irqs_disabled(): 0, pid: 1, name: swapper/0
+> [ 1.983342] Preemption disabled at:
+> [ 1.983353] [<ffffff80089801f4>] cci_pmu_probe+0x1dc/0x488
+> [ 1.983360] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.18.20-rt8-yocto-preempt-rt #1
+> [ 1.983362] Hardware name: ZynqMP ZCU102 Rev1.0 (DT)
+> [ 1.983364] Call trace:
+> [ 1.983369] dump_backtrace+0x0/0x158
+> [ 1.983372] show_stack+0x24/0x30
+> [ 1.983378] dump_stack+0x80/0xa4
+> [ 1.983383] ___might_sleep+0x138/0x160
+> [ 1.983386] __might_sleep+0x58/0x90
+> [ 1.983391] __rt_mutex_lock_state+0x30/0xc0
+> [ 1.983395] _mutex_lock+0x24/0x30
+> [ 1.983400] perf_pmu_register+0x2c/0x388
+> [ 1.983404] cci_pmu_probe+0x2bc/0x488
+> [ 1.983409] platform_drv_probe+0x58/0xa8
+> 
+> Because get_cpu() is invoked, preempt is disable, finally, trace occurs when
+> call might_sleep()
 
-Are you taking this via your tree, or would you like us to queue it in
-arm64?
+Hmm, the {get,put}_cpu() usage here looks very broken to me. There's the
+fact that it might sleep, but also the assignment to g_cci_pmu is done after
+we've re-enabled preemption, so there's a race with CPU hotplug there too.
+
+I don't think we can simply register the hotplug notifier before registering
+the PMU, because we can't call into perf_pmu_migrate_context() until the PMU
+has been registered. Perhaps we need to use the _cpuslocked() versions of
+the hotplug notifier registration functions.
+
+I tried looking at some other drivers, but they all look broken to me, so
+there's a good chance I'm missing something. Anybody know how this is
+supposed to work?
 
 Will
 
