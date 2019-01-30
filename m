@@ -2,103 +2,111 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 290CBC282D5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 05:39:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 503BDC282D5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 05:48:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EAEF02175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 05:39:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1271D2184D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 05:48:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lM/imDsv";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="IB+IYVm1";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="UpyEmndZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EAEF02175B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xwd5ROKS";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="xtU48DQe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1271D2184D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HJ9kL/6YvbEivBvX+hyE/VPxgL0m7N5V5BOlJiBCVNw=; b=lM/imDsvEWlzvR
-	5fq5SmeqcWxZx2Dysp3LNLaAJefDv8bw/8cHg6PyCrbqxqAUPyaXBCbadaS/6GBcn+NYWNmXafpyV
-	B6JAHnW/K0xo503qKLN9FTiMSo5Jt2vBdcs/o1fEMmfXruHSnfLAXp2yrkua3IPvUxJeT+HUozfPz
-	e1AbJGpV39o8ATssg0oq5hfyGZW0/Gc1kD11IgP3wqq8bv7XyfjPI+RUAdOye3UFbG4bbHXR6f/Um
-	5gIlzzjWCyebgRuR9ieV5HQqOJlZJr0WIHof2oddBvdW0+pCxIpz4mNV4DRHcNqwIi5J9ezyjlAFn
-	LJ+CZExmsgr0g4QoN7Zg==;
+	List-Owner; bh=nyKmvD5Avn9eiU4vCJZUt4k2YCaR2R72xixpQ3hnBxc=; b=Xwd5ROKS04P+6S
+	376H2Lf1mA41uJ5VAwLpySpD540oJpbhiA7gq1o+pVsxymQDw9Iq/l4inPUIxy5dqIa9TryGgQKsg
+	IjWEaGrltxJkQK6vgM9Y3P+bRDl2oa4vEJh1stZy8K2WSOANq3MllZcumzapP1OPr1n5vOyqEGnr/
+	hCYNLdbUK1WVT7ehxxlpXCxcYnA+K0m4Bhms6//kdo5M72rNjQ0q85hRnPLx06x8DVIqh+/X8v7pz
+	fXeVU8yLDXS15tACCGIOwe1MiU5TXt2fGo1Wmjb2Pd0FCKEPnIv6jbL1syb9v/ehoRCENjpanjgN4
+	wc4QgcbKKpXZcK+gI/+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goiax-0004Kd-Vd; Wed, 30 Jan 2019 05:39:31 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1goijn-0007Km-S7; Wed, 30 Jan 2019 05:48:39 +0000
+Received: from mail-eopbgr750045.outbound.protection.outlook.com
+ ([40.107.75.45] helo=NAM02-BL2-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goiat-0004K8-7i
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 05:39:29 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 8F62C60881; Wed, 30 Jan 2019 05:39:26 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548826766;
- bh=Q8nXOzvPrMi1PZ1bd25aoy5pCPPMVdBkwDnIdrnpnsQ=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=IB+IYVm13HFG5GUg+wZfPgtndY4E/ZJWea6p3HF4RRsBCD+c9tBvieOqGkpVqxuhj
- 5HDQvQIZixragFYGN2gqALmtYRuK8rvfzdklpsmkvQgp/3eZqwFCK2HW5d2dy9Dcqd
- O7AU3B1saWLwdiZnLwQOQ0RfTEX6qCCAcbjwcifI=
-Received: from mail-ed1-f43.google.com (mail-ed1-f43.google.com
- [209.85.208.43])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: vivek.gautam@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id BE90E607C6
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 05:39:24 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548826765;
- bh=Q8nXOzvPrMi1PZ1bd25aoy5pCPPMVdBkwDnIdrnpnsQ=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=UpyEmndZMBnTAfeB4H8dQNP5L2xCbd7L3zmOs+iza7v+xkU2KSKMHv1hIp3O3OVkQ
- ZiEsTf0vYrNIVTF8BXKtbEYC1Dp63cy5VKC/Vl8DC/G2ovk6tFyR9WvruUcTccZOjP
- cApXU6GCKX7Z2HnvCIPlhPi/0GhLiwLMZZN5t9gk=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org BE90E607C6
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=vivek.gautam@codeaurora.org
-Received: by mail-ed1-f43.google.com with SMTP id d39so17945166edb.12
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 21:39:24 -0800 (PST)
-X-Gm-Message-State: AJcUukeYxz3gxmoU3mrgL8uD6RvZCtiz8ZhgtjJYnLDUj5T7nbHvjf9Y
- /zisV5+tuchXKihZSQZ7kILz176G8fLRh1y3s+w=
-X-Google-Smtp-Source: ALg8bN7ZHGiCFOkYC1Ffh78JAeVka+h1PW4287oRadoTVpyLN6A9hr0avprPE9nrm8bgZaFrgONebnVg/gL1asc+X3w=
-X-Received: by 2002:aa7:c0d0:: with SMTP id j16mr27830398edp.173.1548826763352; 
- Tue, 29 Jan 2019 21:39:23 -0800 (PST)
+ id 1goijk-0007KB-D3
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 05:48:38 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=aUhgNHTSr0fPBcy6BGuluOx3OWf/ABzQnkEluIpOe8E=;
+ b=xtU48DQeOWut73g58vi++onrtAlZRvRkYVFLVi9D79nEmgDDQ4NWrFpmZCg4lYfEXZdJ/oc2Fb6obV6BKdF8Hlf49kcDppEF9VTORVI/LpqRqAj8U3yTTq/Enrt8I+2fiAexZLtNz5G52mFAxXUN+N8HfYpPFp85dCa0WZdcLnc=
+Received: from CY4PR02MB2709.namprd02.prod.outlook.com (10.175.59.19) by
+ CY4PR02MB2503.namprd02.prod.outlook.com (10.173.40.142) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1558.21; Wed, 30 Jan 2019 05:48:32 +0000
+Received: from CY4PR02MB2709.namprd02.prod.outlook.com
+ ([fe80::c41a:f0ef:3b4e:6903]) by CY4PR02MB2709.namprd02.prod.outlook.com
+ ([fe80::c41a:f0ef:3b4e:6903%3]) with mapi id 15.20.1558.023; Wed, 30 Jan 2019
+ 05:48:32 +0000
+From: Vishal Sagar <vsagar@xilinx.com>
+To: Sakari Ailus <sakari.ailus@linux.intel.com>
+Subject: RE: [PATCH 1/2] media: dt-bindings: media: xilinx: Add Xilinx MIPI
+ CSI-2 Rx Subsystem
+Thread-Topic: [PATCH 1/2] media: dt-bindings: media: xilinx: Add Xilinx MIPI
+ CSI-2 Rx Subsystem
+Thread-Index: AQHUp1LB9yVBRVhU3kSv/sTypyy0J6WqXxWggBpUWACAAraqkA==
+Date: Wed, 30 Jan 2019 05:48:31 +0000
+Message-ID: <CY4PR02MB270952A6BEE16CA27CE8C601A7900@CY4PR02MB2709.namprd02.prod.outlook.com>
+References: <1527620084-94864-1-git-send-email-vishal.sagar@xilinx.com>
+ <1527620084-94864-2-git-send-email-vishal.sagar@xilinx.com>
+ <20190108130457.syjuq7u7vep3km3h@paasikivi.fi.intel.com>
+ <CY4PR02MB2709C346C4BEF853C48C32DCA7800@CY4PR02MB2709.namprd02.prod.outlook.com>
+ <20190128120018.ztdxmcq4tizwwepn@paasikivi.fi.intel.com>
+In-Reply-To: <20190128120018.ztdxmcq4tizwwepn@paasikivi.fi.intel.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=vsagar@xilinx.com; 
+x-originating-ip: [149.199.50.133]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; CY4PR02MB2503;
+ 6:pBhFuKqI+WnaLLK8vIW0knP7cB53y4JOOsykhLFglFwRpJ+FMeJHH4rCYM4eSXOlOf53GKokOVKctUK67Hw8aSQHB6a2Svq6rZHFEir+E9KCChtiJfEOnv0VZSJoh2By9dk/cab0/brdS6VKxGI8xbtXSzfpd1IJ56r+Mu7G6DwPPVggAtE30PRQHsoq3sEHjOAh8W8MBAzK9Ji5hTGuX37DxaT37m9/mx45eNbDinNzMfsyoWvixrxzQJy8JHPvQo+zifwh0c4tOfu9hJuBLaXtUo3U/sEd4AJgDcqIx5cpZXaV6ANAGfPO4XnMr2RTeGscxKjix0+9+1vrU2w5ZK4vFYaqXVqxOI6daBLFt1Ikyi9db9aBjyg2WnUTCl72YzyEGXLU7X0J9WVBht9PBZU1xFqV4tZn9tT0Qwc6HxUnXiOOIwZ9Sor2fl31EsUHrEuKtorabbzRuhmYY/7tpA==;
+ 5:tlYfOgvnY1ipOrocmmQrv284MvG4gFyh9YoTs8aS/6jsEDQTMl8qUnDNkkVIHST1D1478VLdbiaIAEc8bgPlQcAWJ4AasMeJ41l0yDxL65mnrZQUwML7bciLatZteQVRkrhPWjiC5BbWx3PWAM1xHjlG7OwaRNTiDyQICkDQ8KdHcM4A9scGbAvUcRBrGk7B4zQT4othavOgKglTmcOKKg==;
+ 7:Gzp7qgxsg4q5xvKJEm37k7vAelAYPUIUuGvipPYZux7RECARQ4VFX6fFMTCXiYzd2tb3zA94ZYdW9RWoyJ/K3P6TBAu90Y9ceIGMtXuDlQyN0MI0F0AxOUzG535+HdnFu4oJXQ2+phyiD8leKR1iew==
+x-ms-office365-filtering-correlation-id: 4e76d553-4daf-4c5c-c1ae-08d68676913e
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:CY4PR02MB2503; 
+x-ms-traffictypediagnostic: CY4PR02MB2503:
+x-microsoft-antispam-prvs: <CY4PR02MB250373CD48F15BB1BDFE9198A7900@CY4PR02MB2503.namprd02.prod.outlook.com>
+x-forefront-prvs: 0933E9FD8D
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(979002)(39860400002)(396003)(136003)(346002)(366004)(376002)(13464003)(199004)(189003)(486006)(2906002)(446003)(6436002)(11346002)(6246003)(229853002)(476003)(106356001)(6306002)(478600001)(97736004)(81166006)(316002)(14454004)(99286004)(8936002)(93886005)(9686003)(66066001)(7736002)(74316002)(55016002)(105586002)(81156014)(8676002)(25786009)(76176011)(256004)(54906003)(4326008)(26005)(305945005)(53936002)(7696005)(3846002)(71190400001)(6916009)(33656002)(6506007)(53546011)(68736007)(6116002)(186003)(7416002)(14444005)(102836004)(71200400001)(86362001)(969003)(989001)(999001)(1009001)(1019001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:CY4PR02MB2503;
+ H:CY4PR02MB2709.namprd02.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: xilinx.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: qsT9nKBOVmGr2Jugkup7EWJtVLitOO95jnElVBQoNFVlvG5MsWmsYVSp8BEfFxNuumm9oouAekFaHDQ6tNhwd3iMZUZulWewN30MK7O3lJnd2FVNI8TIcGG5i6knfygYmkVwfM8Dvgym27eG6bjhRlqMFtkMcPzh+xgsOJiUhN9+TKBVa5UL2/CgKIVihSB+b0ka9RU07LyPAcS3cvicbzAvLzoUd40r1WND/3DULg+3R/6wBYAFDATPgjK/r9JJoz+mYRLdDR8MLFQMISPE8t53sTNbL9kRkQF1xa1/UY359GhL+AYTOy1F1s/+qqg/INPx0Pigo4+uW8H4lApetk1UK9WehQFLgFzWwT0kfrwgh75yMDUyeqbAb2wq4v2jTbwpUh9MOB1o7hXh7OWL26E9R2w504o4+eDUyQoWMV0=
 MIME-Version: 1.0
-References: <20190121055335.15430-1-vivek.gautam@codeaurora.org>
- <CAKv+Gu8P-5hxZ8+OV_xSZteTvCLw-Sc-=KJM1i=3aWajcS9bUw@mail.gmail.com>
- <CAFp+6iEp-bzMrZz8cFUciTFKm7TwAoLdYpsSTD73kDfCRh60bA@mail.gmail.com>
- <CAKv+Gu9z_mGwdZYMKPfM_g2MZwrCF5=f4WAdn_R6wJ1A9xSZ_Q@mail.gmail.com>
- <dbba5a8a-70c0-dd01-713c-081eb412e2d7@arm.com>
- <CAKv+Gu8K5f0va9q4FYk9x1puoOTDjZ0c25qokm2izSVAwd1gmQ@mail.gmail.com>
- <964779d6-c676-3379-bf1e-cde0dd82d63d@arm.com>
- <CAKv+Gu_Oz-QEFnq9KiOBHQrC8o+0ykkEZBm0vCWfYDfFB8QTcQ@mail.gmail.com>
- <CAFp+6iESSKZsG06j9RJDn3n84zNT=b962sEyPwfyW1u5DGu-+A@mail.gmail.com>
- <CAKv+Gu964=UOPcxh1ZZ4HEvJonrQ_d21t=GbVV9XwV3o91c6ng@mail.gmail.com>
- <CAFp+6iGJLNA-sgr+rCZsf20h8Ha0aVh4zKcxYQ_nYjP9CemVpw@mail.gmail.com>
- <CAKv+Gu9c2YYQdDNV_9Lgs3nb8MFXNvLj8GdeOfEnHvPAw6qAfg@mail.gmail.com>
-In-Reply-To: <CAKv+Gu9c2YYQdDNV_9Lgs3nb8MFXNvLj8GdeOfEnHvPAw6qAfg@mail.gmail.com>
-From: Vivek Gautam <vivek.gautam@codeaurora.org>
-Date: Wed, 30 Jan 2019 11:09:11 +0530
-X-Gmail-Original-Message-ID: <CAFp+6iHj4mD=byc3YVO++XyAOytWmj49WL-u6LfeO1RFNmv_rA@mail.gmail.com>
-Message-ID: <CAFp+6iHj4mD=byc3YVO++XyAOytWmj49WL-u6LfeO1RFNmv_rA@mail.gmail.com>
-Subject: Re: [PATCH 0/3] iommu/arm-smmu: Add support to use Last level cache
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+X-OriginatorOrg: xilinx.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 4e76d553-4daf-4c5c-c1ae-08d68676913e
+X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Jan 2019 05:48:31.9414 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR02MB2503
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_213927_319857_C405B790 
-X-CRM114-Status: GOOD (  48.19  )
+X-CRM114-CacheID: sfid-20190129_214836_524400_F9384723 
+X-CRM114-Status: GOOD (  35.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -110,213 +118,249 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: pdaly@codeaurora.org, linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- "list@263.net:IOMMU DRIVERS" <iommu@lists.linux-foundation.org>,
- Robin Murphy <robin.murphy@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- pratikp@codeaurora.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Dinesh Kumar <dineshk@xilinx.com>, Hyun Kwon <hyunk@xilinx.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, Michal Simek <michals@xilinx.com>,
+ "laurent.pinchart@ideasonboard.com" <laurent.pinchart@ideasonboard.com>,
+ Vishal Sagar <vishal.sagar@xilinx.com>,
+ "hans.verkuil@cisco.com" <hans.verkuil@cisco.com>,
+ "mchehab@kernel.org" <mchehab@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "linux-media@vger.kernel.org" <linux-media@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 29, 2019 at 8:34 PM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
->
-> (+ Bjorn)
->
-> On Mon, 28 Jan 2019 at 12:27, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
-> >
-> > Hi Ard,
-> >
-> > On Thu, Jan 24, 2019 at 1:25 PM Ard Biesheuvel
-> > <ard.biesheuvel@linaro.org> wrote:
-> > >
-> > > On Thu, 24 Jan 2019 at 07:58, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
-> > > >
-> > > > On Mon, Jan 21, 2019 at 7:55 PM Ard Biesheuvel
-> > > > <ard.biesheuvel@linaro.org> wrote:
-> > > > >
-> > > > > On Mon, 21 Jan 2019 at 14:56, Robin Murphy <robin.murphy@arm.com> wrote:
-> > > > > >
-> > > > > > On 21/01/2019 13:36, Ard Biesheuvel wrote:
-> > > > > > > On Mon, 21 Jan 2019 at 14:25, Robin Murphy <robin.murphy@arm.com> wrote:
-> > > > > > >>
-> > > > > > >> On 21/01/2019 10:50, Ard Biesheuvel wrote:
-> > > > > > >>> On Mon, 21 Jan 2019 at 11:17, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
-> > > > > > >>>>
-> > > > > > >>>> Hi,
-> > > > > > >>>>
-> > > > > > >>>>
-> > > > > > >>>> On Mon, Jan 21, 2019 at 12:56 PM Ard Biesheuvel
-> > > > > > >>>> <ard.biesheuvel@linaro.org> wrote:
-> > > > > > >>>>>
-> > > > > > >>>>> On Mon, 21 Jan 2019 at 06:54, Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
-> > > > > > >>>>>>
-> > > > > > >>>>>> Qualcomm SoCs have an additional level of cache called as
-> > > > > > >>>>>> System cache, aka. Last level cache (LLC). This cache sits right
-> > > > > > >>>>>> before the DDR, and is tightly coupled with the memory controller.
-> > > > > > >>>>>> The clients using this cache request their slices from this
-> > > > > > >>>>>> system cache, make it active, and can then start using it.
-> > > > > > >>>>>> For these clients with smmu, to start using the system cache for
-> > > > > > >>>>>> buffers and, related page tables [1], memory attributes need to be
-> > > > > > >>>>>> set accordingly. This series add the required support.
-> > > > > > >>>>>>
-> > > > > > >>>>>
-> > > > > > >>>>> Does this actually improve performance on reads from a device? The
-> > > > > > >>>>> non-cache coherent DMA routines perform an unconditional D-cache
-> > > > > > >>>>> invalidate by VA to the PoC before reading from the buffers filled by
-> > > > > > >>>>> the device, and I would expect the PoC to be defined as lying beyond
-> > > > > > >>>>> the LLC to still guarantee the architected behavior.
-> > > > > > >>>>
-> > > > > > >>>> We have seen performance improvements when running Manhattan
-> > > > > > >>>> GFXBench benchmarks.
-> > > > > > >>>>
-> > > > > > >>>
-> > > > > > >>> Ah ok, that makes sense, since in that case, the data flow is mostly
-> > > > > > >>> to the device, not from the device.
-> > > > > > >>>
-> > > > > > >>>> As for the PoC, from my knowledge on sdm845 the system cache, aka
-> > > > > > >>>> Last level cache (LLC) lies beyond the point of coherency.
-> > > > > > >>>> Non-cache coherent buffers will not be cached to system cache also, and
-> > > > > > >>>> no additional software cache maintenance ops are required for system cache.
-> > > > > > >>>> Pratik can add more if I am missing something.
-> > > > > > >>>>
-> > > > > > >>>> To take care of the memory attributes from DMA APIs side, we can add a
-> > > > > > >>>> DMA_ATTR definition to take care of any dma non-coherent APIs calls.
-> > > > > > >>>>
-> > > > > > >>>
-> > > > > > >>> So does the device use the correct inner non-cacheable, outer
-> > > > > > >>> writeback cacheable attributes if the SMMU is in pass-through?
-> > > > > > >>>
-> > > > > > >>> We have been looking into another use case where the fact that the
-> > > > > > >>> SMMU overrides memory attributes is causing issues (WC mappings used
-> > > > > > >>> by the radeon and amdgpu driver). So if the SMMU would honour the
-> > > > > > >>> existing attributes, would you still need the SMMU changes?
-> > > > > > >>
-> > > > > > >> Even if we could force a stage 2 mapping with the weakest pagetable
-> > > > > > >> attributes (such that combining would work), there would still need to
-> > > > > > >> be a way to set the TCR attributes appropriately if this behaviour is
-> > > > > > >> wanted for the SMMU's own table walks as well.
-> > > > > > >>
-> > > > > > >
-> > > > > > > Isn't that just a matter of implementing support for SMMUs that lack
-> > > > > > > the 'dma-coherent' attribute?
-> > > > > >
-> > > > > > Not quite - in general they need INC-ONC attributes in case there
-> > > > > > actually is something in the architectural outer-cacheable domain.
-> > > > >
-> > > > > But is it a problem to use INC-ONC attributes for the SMMU PTW on this
-> > > > > chip? AIUI, the reason for the SMMU changes is to avoid the
-> > > > > performance hit of snooping, which is more expensive than cache
-> > > > > maintenance of SMMU page tables. So are you saying the by-VA cache
-> > > > > maintenance is not relayed to this system cache, resulting in page
-> > > > > table updates to be invisible to masters using INC-ONC attributes?
-> > > >
-> > > > The reason for this SMMU changes is that the non-coherent devices
-> > > > can't access the inner caches at all. But they have a way to allocate
-> > > > and lookup in system cache.
-> > > >
-> > > > CPU will by default make use of system cache when the inner-cacheable
-> > > > and outer-cacheable memory attribute is set.
-> > > >
-> > > > So for SMMU page tables to be visible to PTW,
-> > > > -- For IO coherent clients, the CPU cache maintenance operations are not
-> > > > required for buffers marked Normal Cached to achieve a coherent view of
-> > > > memory. However, client-specific cache maintenance may still be
-> > > > required for devices
-> > > > with local caches (for example, compute DSP local L1 or L2).
-> > >
-> > > Why would devices need to access the SMMU page tables?
-> >
-> > No, the devices don't need to access the page tables, rather the PTW does.
-> > Sorry for mixing it up.
-> >
-> > >
-> > > > -- For non-IO coherent clients, the CPU cache maintenance operations (cleans
-> > > > and/or invalidates) are required at buffer handoff points for buffers marked as
-> > > > Normal Cached in any CPU page table in order to observe the latest updates.
-> > > >
-> > >
-> > > Indeed, and this is what your non-coherent SMMU PTW requires, and what
-> > > you /should/ get when you omit the 'dma-coherent' property from its DT
-> > > node (and if you don't, it is a bug in the SMMU driver that should get
-> > > fixed)
-> > >
-> > > The question is whether using inner-non-cached/outer-cacheable
-> > > attributes for the PTW is required for correctness, or whether it is
-> > > merely an optimization (since the point of this exercise was to avoid
-> > > snoop latency from the SMMU PTW). If it is an optimization, I would
-> > > like to understand whether the performance delta between SMMU page
-> > > tables in DRAM vs SMMU page tables in the LLC justifies these
-> > > intrusive changes to the SMMU driver.
-> >
-> > IIUC, SMMU uses the TCR configurations to decide how PTW should access
-> > the memory. TCR doesn't direct CPU whether to use cacheable or non -cacheable
-> > memory to allocate page tables. Is that right?
->
-> Correct
->
-> > Currently, these TCR configurations are set for inner-cacheable, and
-> > outer-cacheable.
-> > With this, is it assumed that PTW would snoop into the CPU caches for
-> > any updates
-> > of the page tables?
-> >
-> `
-> Yes, and if I understand the issue correctly, this snooping is costly,
-> which is why you want to avoid it, right?
->
-> > When we omit 'dma-coherent', CPU will allocate non-coherent memory
-> > for these page tables, and software has to explicitly flush CPU caches to
-> > make the changes visible to SMMU.
->
-> Indeed. But I would expect the TCR configuration to reflect this as
-> well, and that doesn't appear the case.
+Hi Sakari,
 
-Yea, we are discussing this case of TCR configurations for non-coherent memory
-in another thread [1].
-
-[1] https://lore.kernel.org/patchwork/patch/1032939/
-
->
-> > The CPU will still mark this memory as Normal Cached, i.e. inner cached,
-> > outer cached, and the non-IO coherent SMMU PTW won't be able to snoop into
-> > CPU caches. Does the following code in io-pgtable-arm.c ensures that SMMU
-> > sees the latest page tables?
+> -----Original Message-----
+> From: Sakari Ailus [mailto:sakari.ailus@linux.intel.com]
+> Sent: Monday, January 28, 2019 5:30 PM
+> To: Vishal Sagar <vsagar@xilinx.com>
+> Cc: Vishal Sagar <vishal.sagar@xilinx.com>; Hyun Kwon <hyunk@xilinx.com>;
+> laurent.pinchart@ideasonboard.com; Michal Simek <michals@xilinx.com>;
+> linux-media@vger.kernel.org; devicetree@vger.kernel.org;
+> hans.verkuil@cisco.com; mchehab@kernel.org; robh+dt@kernel.org;
+> mark.rutland@arm.com; Dinesh Kumar <dineshk@xilinx.com>; linux-arm-
+> kernel@lists.infradead.org; linux-kernel@vger.kernel.org
+> Subject: Re: [PATCH 1/2] media: dt-bindings: media: xilinx: Add Xilinx MIPI CSI-2
+> Rx Subsystem
+> 
+> Hi Vishal,
+> 
+> On Mon, Jan 14, 2019 at 09:47:41AM +0000, Vishal Sagar wrote:
+> > Hi Sakari,
 > >
-> >    } else if (!(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA) &&
-> >                     !(pte & ARM_LPAE_PTE_SW_SYNC)) {
-> >                  __arm_lpae_sync_pte(ptep, cfg);
-> >    }
+> > Thanks for reviewing this.
 > >
->
-> I don't know the history of why NO_DMA is implemented as a quirk (and
-> why it is called like that in the first place).
-> But it indeed appears that this is where the cache maintenance occurs
-> for non-coherent PTWs.
->
-> > This change is mostly to get optimized PTW. As seen in the patch [1] for GPU,
-> > there's a separate slice for page tables - "gpuhtw_llc_slice".
-> > Let me try to get the numbers for this optimization.
+> > > -----Original Message-----
+> > > From: Sakari Ailus [mailto:sakari.ailus@linux.intel.com]
+> > > Sent: Tuesday, January 08, 2019 6:35 PM
+> > > To: Vishal Sagar <vishal.sagar@xilinx.com>
+> > > Cc: Hyun Kwon <hyunk@xilinx.com>; laurent.pinchart@ideasonboard.com;
+> > > Michal Simek <michals@xilinx.com>; linux-media@vger.kernel.org;
+> > > devicetree@vger.kernel.org; hans.verkuil@cisco.com; mchehab@kernel.org;
+> > > robh+dt@kernel.org; mark.rutland@arm.com; Dinesh Kumar
+> > > <dineshk@xilinx.com>; linux-arm-kernel@lists.infradead.org; linux-
+> > > kernel@vger.kernel.org
+> > > Subject: Re: [PATCH 1/2] media: dt-bindings: media: xilinx: Add Xilinx MIPI
+> CSI-2
+> > > Rx Subsystem
+> > >
+> > > EXTERNAL EMAIL
+> > >
+> > > Hi Vishal,
+> > >
+> > > The patchset hard escaped me somehow earlier and your reply to Rob made
+> me
+> > > notice it again. Thanks. :-)
+> > >
+> > > On Wed, May 30, 2018 at 12:24:43AM +0530, Vishal Sagar wrote:
+> > > > Add bindings documentation for Xilinx MIPI CSI-2 Rx Subsystem.
+> > > >
+> > > > The Xilinx MIPI CSI-2 Rx Subsystem consists of a DPHY, CSI-2 Rx, an
+> > > > optional I2C controller and an optional Video Format Bridge (VFB). The
+> > > > active lanes can be configured at run time if enabled in the IP. The
+> > > > DPHY register interface may also be enabled.
+> > > >
+> > > > Signed-off-by: Vishal Sagar <vishal.sagar@xilinx.com>
+> > > > ---
+> > > >  .../bindings/media/xilinx/xlnx,csi2rxss.txt        | 117
+> > > +++++++++++++++++++++
+> > > >  1 file changed, 117 insertions(+)
+> > > >  create mode 100644
+> > > Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
+> > > >
+> > > > diff --git
+> a/Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
+> > > b/Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
+> > > > new file mode 100644
+> > > > index 0000000..31ed721
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/media/xilinx/xlnx,csi2rxss.txt
+> > > > @@ -0,0 +1,117 @@
+> > > > +
+> > >
+> > > Extra newline.
+> > >
 > >
->
-> Yes, please. We'd need to compare page tables in the LLC with page
-> tables in system RAM, and for completeness, it would be nice to
-> include the cache-coherent configuration as well.
+> > Will remove it in next version.
+> >
+> > > > +Xilinx MIPI CSI2 Receiver Subsystem Device Tree Bindings
+> > > > +--------------------------------------------------------
+> > > > +
+> > > > +The Xilinx MIPI CSI2 Receiver Subsystem is used to capture MIPI CSI2
+> traffic
+> > > > +from compliant camera sensors and send the output as AXI4 Stream
+> video
+> > > data
+> > > > +for image processing.
+> > > > +
+> > > > +The subsystem consists of a MIPI DPHY in slave mode which captures the
+> > > > +data packets. This is passed along the MIPI CSI2 Rx IP which extracts the
+> > > > +packet data. This data is taken in by the Video Format Bridge (VFB),
+> > > > +if selected, and converted into AXI4 Stream video data at selected
+> > > > +pixels per clock as per AXI4-Stream Video IP and System Design UG934.
+> > > > +
+> > > > +For more details, please refer to PG232 MIPI CSI-2 Receiver Subsystem.
+> > > >
+> > >
+> +https://www.xilinx.com/support/documentation/ip_documentation/mipi_csi
+> > > 2_rx_subsystem/v3_0/pg232-mipi-csi2-rx.pdf
+> > > > +
+> > > > +Required properties:
+> > > > +
+> > > > +- compatible: Must contain "xlnx,mipi-csi2-rx-subsystem-2.0" or
+> > > > +  "xlnx,mipi-csi2-rx-subsystem-3.0"
+> > > > +
+> > > > +- reg: Physical base address and length of the registers set for the device.
+> > > > +
+> > > > +- interrupt-parent: specifies the phandle to the parent interrupt
+> controller
+> > > > +
+> > > > +- interrupts: Property with a value describing the interrupt number.
+> > > > +
+> > > > +- xlnx,max-lanes: Maximum active lanes in the design.
+> > > > +
+> > > > +- xlnx,vc: Virtual Channel, specifies virtual channel number to be filtered.
+> > > > +  If this is 4 then all virtual channels are allowed.
+> > >
+> > > This seems like something a driver should configure, based on the
+> > > configuration of the connected device.
+> > >
+> >
+> > The filtering of the Virtual channels is property of the hardware IP and is fixed
+> in design.
+> > This is not software controlled.
+> 
+> So... you have different IP blocks between which (one of) the difference(s)
+> is the virtual channel?
+> 
 
-Sure, let me ping Pratik and Patrick to check if they have already have
-these numbers available, else I can check it.
+Your understanding is correct. 
+
+The Xilinx CSI2 Rx subsystem has the 3 blocks -
+1 - Xilinx CSI2 Rx controller
+2 - Xilinx DPHY in Rx mode (whose register interface may be disabled/fixed configuration to reduce logic gate count).
+3 - Xilinx I2C controller (used as CCI - camera control interface)
+
+The virtual channel filtering is a property of the CSI2 Rx controller.
+This was present in v1 as I wanted the IP configuration to be available for debug.
+This has been removed in v2 as it is not really used in the driver.
+
+> >
+> > > > +
+> > > > +- xlnx,csi-pxl-format: This denotes the CSI Data type selected in hw
+> design.
+> > > > +  Packets other than this data type (except for RAW8 and User defined
+> data
+> > > > +  types) will be filtered out. Possible values are RAW6, RAW7, RAW8,
+> RAW10,
+> > > > +  RAW12, RAW14, RGB444, RGB555, RGB565, RGB666, RGB888 and
+> > > YUV4228bit.
+> > >
+> > > This should be configured at runtime instead through V4L2 sub-device
+> > > interface; it's not a property of the hardware.
+> > >
+> >
+> > This too is a property of the hardware IP and is fixed to one data type
+> > during design to reduce gate count. So for e.g. if RGB888 is selected
+> > during design, then the hardware will only pass across RGB888 packet data
+> > to output. (RAW8 packets are also allowed to pass through for all data
+> > types selected) This is used in the driver to determine the media bus
+> > format of the connected pads.
+> 
+> If I understand this correctly, RAW8 and user defined data types will
+> always pass through, plus the other data types listed here. Is that right?
+
+Correct.
+
+> 
+> >
+> > > > +
+> > > > +- xlnx,axis-tdata-width: AXI Stream width, This denotes the AXI Stream
+> width.
+> > > > +  It depends on Data type chosen, Video Format Bridge enabled/disabled
+> and
+> > > > +  pixels per clock. If VFB is disabled then its value is either 0x20 (32 bit)
+> > > > +  or 0x40(64 bit) width.
+> > > > +
+> > > > +- xlnx,video-format, xlnx,video-width: Video format and width, as defined
+> in
+> > > > +  video.txt.
+> > >
+> > > Ditto.
+> > >
+> > Again these are fixed values and can't be changed at run time.
+> > These are used to determine the media bus format.
+> 
+> What kind of values can the xlnx,video-format property have? How about
+> xlnx.video-width? Where can video.txt be found?
+> 
+
+The video.txt is present at Documentation/devicetree/bindings/media/xilinx/video.txt
+But I have removed this from v2 as the media bus format can be derived from the CSI pixel format 
+as described above.
+
+> >
+> > > > +
+> > > > +- port: Video port, using the DT bindings defined in ../video-interfaces.txt.
+> > > > +  The CSI 2 Rx Subsystem has a two ports, one input port for connecting
+> to
+> > > > +  camera sensor and other is output port.
+> > > > +
+> > > > +- data-lanes: The number of data lanes through which CSI2 Rx Subsystem
+> is
+> > > > +  connected to the camera sensor as per video-interfaces.txt
+> > >
+> > > This is somewhat different from the documentation in video-interfaces.txt.
+> > > Could you align the two? I don't think there's a need to document standard
+> > > properties in device binding files elaborately; rather just the hardware
+> > > specific bits.
+> > >
+> >
+> > Agree. In this current IP there is no way to re-order the lanes which are set at
+> design time.
+> > So physical and logical lanes are at same index. This could only be used to
+> determine how many lanes are allowed to be programmed.
+> > For e.g. if design has set the number of lanes as 4 and xlnx,en-active-lanes is
+> present, then the number of lanes
+> > can be set from 1 to 4.
+> 
+> Ack.
+> 
+> --
+> Regards,
+> 
+> Sakari Ailus
+> sakari.ailus@linux.intel.com
 
 Regards
-Vivek
+Vishal Sagar
 
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
 
 _______________________________________________
 linux-arm-kernel mailing list
