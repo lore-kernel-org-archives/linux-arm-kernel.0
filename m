@@ -2,68 +2,79 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54FFFC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:08:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2DBE4C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:15:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2527320869
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:08:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EE8042175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:15:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Onzai0XQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2527320869
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XAHfufd5";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="UxVzKZW5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE8042175B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MwE8WcZ5WUfbvgsW/wqOJL1F11uGHMc9Kn2nR6b6DSQ=; b=Onzai0XQzMM3uu
-	N3+If7ekKNDWZqMVkJU+VdiyrPeZMnBNc+d+HPJnWyGr0wLMn1pVqJzSpxod4/QmiMTBvMMBws6i/
-	xQJ9K7FMHV0tbI3UxIcR1fgzhdhe5CPLvC/nTWnHamP3Jk1XQpb+hmDkyHK7KhrhUQJ0UdeJZR1Ye
-	MeNVosY0XZRfLApiVommgL1Yaq/Aev7vc4fpio9PWWVzocdCx/s7tXjLLqfYmsdtz6nJcxnuX2g9K
-	tH9Y+rlmO233QUImhhglf/eXwDmMd2yZQbJ74VGpwccHx5oQ10N6OtbtnGqTXEBkujaALDwQXXnOo
-	gcPGAbnz8UZbO4ZLseyA==;
+	List-Owner; bh=+lLt2AOA+pyx0llQZgoR3XYHikvXv4bJt+lZQB+rR5Y=; b=XAHfufd5Qns1hK
+	15cnUVl22jeW5lzwP/yqsMC4fsjdyIW733rYB4QLX+BeHsU7sBRWTB6qQI4XAx/tkbbzUoC4eivE4
+	MQNAsqcC3aW8n6UoH2KpMXsqfOSFkLGnpfwurTOQiW39f7Cyelj2FBpLpcCFEOCnI4k3KP7/+x+Q5
+	7XW2wPNGVaLBe8ZckC62yJcCywE1qjvjXIkCoJxmMws3Pzaedq7aob7/uUttyeKTjxxNdvuT7Abos
+	kj3ssnVObygM0qQeIcc8VeKNak581DDhsFzEcLfrHBtrTou+NBAIputyz47C2VgYebFi/NktrFqMM
+	eu4+WusJIMpF1e9aIIBw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goof2-0004s3-To; Wed, 30 Jan 2019 12:08:08 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gooep-0004lL-0M
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 12:08:00 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8F8E8A78;
- Wed, 30 Jan 2019 04:07:54 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5CB323F59C;
- Wed, 30 Jan 2019 04:07:53 -0800 (PST)
-Date: Wed, 30 Jan 2019 12:07:50 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Andre Przywara <andre.przywara@arm.com>
-Subject: Re: [PATCH 1/2] KVM: arm/arm64: Add save/restore support for
- firmware workaround state
-Message-ID: <20190130120743.GC3567@e103592.cambridge.arm.com>
-References: <20190107120537.184252-1-andre.przywara@arm.com>
- <20190107120537.184252-2-andre.przywara@arm.com>
- <20190122151714.GG3578@e103592.cambridge.arm.com>
- <20190125144657.3db91c91@donnerap.cambridge.arm.com>
- <20190129213223.GB3567@e103592.cambridge.arm.com>
- <20190130113900.10089070@donnerap.cambridge.arm.com>
+	id 1goomB-000855-Sa; Wed, 30 Jan 2019 12:15:31 +0000
+Received: from mail-vs1-xe41.google.com ([2607:f8b0:4864:20::e41])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goom7-00084W-Sj
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 12:15:29 +0000
+Received: by mail-vs1-xe41.google.com with SMTP id b74so14074923vsd.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 04:15:23 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=yhJIweRM2BZxSTmYhsNSrIUGbPfdVazOuW402hLMoKk=;
+ b=UxVzKZW5aZmGz307vl6v9NV3GscZ6l+KqNMlR4pyFyllXfciQTJVBcUk5h5bYcBl2o
+ 4FoAQcQVPzqt2J4W1rJCI7kMllk5fvaQda0yYh0dSlJaUu6dN/vHnE5/3NmmEUv4Qp+T
+ /7O9TbFkTvwQYZVSIfxeTVDLR/YIO3N9wCGss=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=yhJIweRM2BZxSTmYhsNSrIUGbPfdVazOuW402hLMoKk=;
+ b=VC524FcgvAwG13yDSUVJwfNzT3IkYT2+w/b8p5tUojw3aJlASwlevXljB8wb/fDbmn
+ 69iMjv0I8EVuWzq+Or2636iMeMSv4b9vejMMna52H+DedtUZfxAoY/Xet2VKsp3xutp9
+ p8dswHHW839H+wZcX5vTA4Ht9PAB49UKk32fDujFrr4V1VYDBzBzSQqf4UQK5gfWAUyH
+ CoFT5Y3gKm4MVXwolFdQyDkCPXCbr95HYg38dU22iiy598p4xV4DYyzrmsK1KCflHwD4
+ Cw0LfUj5ZT6UEJZO79t/A+A0gg4/in5iOtRJb4nA7AABEkGLo/k156P1nlvxJrgIj+yu
+ ccWQ==
+X-Gm-Message-State: AJcUukdOcgZGcANE1nX6SN04WjQjMd67OMXZtkva98qRVTYXjr+Brjnr
+ KvcJy1Q8EPFV+VhtU8rR/4oof/ZN1e34Blwye8PCFQ==
+X-Google-Smtp-Source: ALg8bN5QbH0Ql4qXN7O9XHvt/0NWaNloJutDmm0PPaU0Qp8kFtS2lvjorhUfQWeYhGA7xuldxvOFgabR9w6eokQLpP8=
+X-Received: by 2002:a67:b245:: with SMTP id s5mr12414544vsh.200.1548850522081; 
+ Wed, 30 Jan 2019 04:15:22 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190130113900.10089070@donnerap.cambridge.arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+References: <1548846984-2044-1-git-send-email-vincent.guittot@linaro.org>
+In-Reply-To: <1548846984-2044-1-git-send-email-vincent.guittot@linaro.org>
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Wed, 30 Jan 2019 13:14:46 +0100
+Message-ID: <CAPDyKFpyg7oGoDZA+=SG7R3yL874Geeqs5LWrsAf50csxsE05A@mail.gmail.com>
+Subject: Re: [PATCH v2 ] PM-runtime: fix deadlock with ktime
+To: Vincent Guittot <vincent.guittot@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_040755_672404_57D1C81A 
-X-CRM114-Status: GOOD (  51.55  )
+X-CRM114-CacheID: sfid-20190130_041527_946178_E789BA72 
+X-CRM114-Status: GOOD (  20.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,242 +86,141 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>,
- Peter Maydell <peter.maydell@linaro.org>, kvm@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
+Cc: Linux PM <linux-pm@vger.kernel.org>,
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Biju Das <biju.das@bp.renesas.com>,
+ Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ Geert Uytterhoeven <geert@linux-m68k.org>,
+ linux-omap <linux-omap@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 30, 2019 at 11:39:00AM +0000, Andre Przywara wrote:
-> On Tue, 29 Jan 2019 21:32:23 +0000
-> Dave Martin <Dave.Martin@arm.com> wrote:
-> 
-> Hi Dave,
-> 
-> > On Fri, Jan 25, 2019 at 02:46:57PM +0000, Andre Przywara wrote:
+On Wed, 30 Jan 2019 at 12:16, Vincent Guittot
+<vincent.guittot@linaro.org> wrote:
+>
+> A deadlock has been seen when swicthing clocksources which use PM runtime.
+> The call path is:
+> change_clocksource
+>     ...
+>     write_seqcount_begin
+>     ...
+>     timekeeping_update
+>         ...
+>         sh_cmt_clocksource_enable
+>             ...
+>             rpm_resume
 
-[...]
+Hmm, isn't this already a problem in genpd then?
 
-> > > What I like about the signedness is this "0 means unknown", which is
-> > > magically forwards compatible. However I am not sure we can transfer
-> > > this semantic into every upcoming register that pops up in the
-> > > future.  
-> > 
-> > I appreciate the concern, but can you give an example of how it might
-> > break?
-> 
-> The general problem is that we don't know how future firmware registers
-> would need to look like and whether they are actually for workarounds.
-> Take for instance KVM_REG_ARM_FW_REG(0), which holds the PSCI version.
-> So at the very least we would need to reserve a region of the 64K
-> firmware registers to use this scheme, yet don't know how many we would
-> need.
+In genpd's ->runtime_resume() callback (genpd_runtime_resume()) we
+call ktime_get() to measure the latency of running the callback.
 
-My idea was that we reserve a large block of register IDs for this
-purpose.  This means that we can say in advance what the semantics
-of these registers are going to be, and ensure plenty of expansion
-room.
+Or, perhaps irq_safe_dev_in_no_sleep_domain() returns true for the
+genpd + device in question, which means the ktime thingy is skipped.
 
-> > My idea is that you can check for compatibility by comparing fields
-> > without any need to know what they mean, but we wouldn't pre-assign
-> > meanings for the values of unallocated fields, just create a precedent
-> > that future fields can follow (where it works).
-> 
-> For clarity, what do you mean with "... you can check ...", exactly? I
-> think this "you" would be the receiving kernel, which is very strict
-> about unknown registers (-EINVAL), because we don't take any chances.
-> From what I understand how QEMU works, is that it just takes the list
-> of registers from the originating kernel and asks the receiving kernel
-> about them. It doesn't try to interpret most registers in any way.
-
-Can we solve this by pre-allocating a block of registers for future
-allocation: they all become RAZ, and writes are permitted provided that
-the value written to each field satisfies our usual comparison rule
-(every field must be written with <= 0 in this case).
-
-This is what I had in mind.
-
-> Now QEMU *could* ignore the -EINVAL return and proceed anyway, if it
-> would be very sure about the implications or the admin told it so.
-> But I believe this should be done on a per register basis, and in QEMU,
-> relying on some forward looking scheme sounds a bit fragile to me.
-> It is my understanding that QEMU does not want to gamble with migration.
-> 
-> > This is much like the CPU ID features scheme itself.  A "0" might
-> > mean that something is absent, but there's no way (or need) to know
-> > what.
-> 
-> So I think we don't disagree about that this is possible or even would
-> be nice, but it's just not how it's used today. I am not sure we want
-> to introduce something like this, given that we don't know if there will
-> be any future workaround registers at all. Sounds a bit over-engineered
-> and fragile to me.
-
-Yes, that's a concern.
-
-We could just allocate a single register with these semantics, but
-use it as a template for future expansion if it turns out that we
-need more fields.  We'll know pretty soon how fast the number of
-fields is likely to grow.
-
-> Peter, can you give your opinion about whether having some generic class
-> of firmware workaround registers which could be checked in a generic way
-> is something we want?
-> 
-> > > Actually we might not need this:
-> > > My understanding of how QEMU handles this in migration is that it
-> > > reads the f/w reg on the originating host A and writes this into
-> > > the target host B, without itself interpreting this in any way.
-> > > It's up to the target kernel (basically this code here) to check
-> > > compatibility. So I am not sure we actually need a stable scheme.
-> > > If host A doesn't know about  
-> > 
-> > Nothing stops userspace from interpreting the data, so there's a risk
-> > people may grow to rely on it even if we don't want them to.
-> 
-> Well, but userland would not interpret unknown registers, under the
-> current scheme, would it?
-> So it can surely tinker with KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1,
-> because it knows about its meaning. But I would be very careful judging
-> about anything else.
-> The moment we introduce some scheme, we would have to stick with it
-> forever. I am just not sure that's worth it. At the end of the day you
-> could always update QEMU to ignore an -EINVAL on a new firmware w/a
-> register.
-
-My point is, we are introducing a scheme whether we like it or not.
-
-Perhaps we could do this, but make it explicit that these regs hold
-KVM private metadata that userspace is not expected to interpret, say
-
-	KVM_REG_ARM_PRIVATE_1
-	KVM_REG_ARM_PRIVATE_2
-	// ...
-
-which will be listed by KVM_GET_REG_LIST, but with no #defines in the
-UAPI headers, except perhaps to identify these IDs as a class (i.e.,
-userspace can see it's in the KVM_REG_ARM_PRIVATE_ space, but it's
-told what a given ID means).
-
-Source and destination node might understand different numbers of such
-registers: we'd need a way to handle this (or at least to guarantee that
-the mismatch is detected).
+Geert?
 
 
->  
-> > So we should try to have something that's forward-compatible if at all
-> > possible...
-> > > a certain register, it won't appear in the result of the
-> > > KVM_GET_REG_LIST ioctl, so it won't be transferred to host B at
-> > > all. In the opposite case the receiving host would reject an
-> > > unknown register, which I believe is safer, although I see that it
-> > > leaves the "unknown" case on the table.
-> > > 
-> > > It would be good to have some opinion of how forward looking we
-> > > want to (and can) be here.
-> > > 
-> > > Meanwhile I am sending a v2 which implements the linear scale idea,
-> > > without using signed values, as this indeed simplifies the code.
-> > > I have the signed version still in a branch here, let me know if you
-> > > want to have a look.  
-> > 
-> > Happy to take a look at it.
-> 
-> See below.
-> 
-> > I was hoping that cpufeatures already had a helper for extracting a
-> > signed field, but I didn't go looking for it...
-> > 
-> > At the asm level this is just a sbfx, so it's hardly expensive.
-> 
-> The length of the code or the "performance" is hardly an issue (we are
-> talking about migration here, which is mostly limited by the speed of
-> the network). And yes, we have sign_extend32() and (i & 0xf) to
-> convert, it just looks a bit odd in the code and in the API
-> documentation.
-> 
-> Cheers,
-> Andre
-> 
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> index 6c6757c9571b..a7b10d835ce7 100644
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -218,10 +218,10 @@ struct kvm_vcpu_events {
->  #define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_NOT_AVAIL	0
->  #define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_AVAIL	1
->  #define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2	KVM_REG_ARM_FW_REG(2)
-> -#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL	0
-> -#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNKNOWN	1
-> -#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_AVAIL	2
-> -#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNAFFECTED	3
-> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL	(-1 & 0xf)
-> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNKNOWN	0
-> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_AVAIL	1
-> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNAFFECTED	2
->  #define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_ENABLED	(1U << 4)
->  
->  /* Device Control API: ARM VGIC */
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 367e96fe654e..7d03f8339100 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -229,10 +229,10 @@ struct kvm_vcpu_events {
->  #define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_NOT_AVAIL	0
->  #define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_AVAIL	1
->  #define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2	KVM_REG_ARM_FW_REG(2)
-> -#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL	0
-> -#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNKNOWN	1
-> -#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_AVAIL	2
-> -#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNAFFECTED	3
-> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL	(-1 & 0xf)
-> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNKNOWN	0
-> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_AVAIL	1
-> +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_UNAFFECTED	2
->  #define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_ENABLED     (1U << 4)
->  
->  /* Device Control API: ARM VGIC */
-> diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
-> index fb6af5ca259e..cfb1519b9a11 100644
-> --- a/virt/kvm/arm/psci.c
-> +++ b/virt/kvm/arm/psci.c
-> @@ -498,7 +498,8 @@ static int get_kernel_wa_level(u64 regid)
->  	case KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2:
->  		switch (fake_kvm_arm_have_ssbd()) {
->  		case KVM_SSBD_FORCE_DISABLE:
-> -			return KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL;
-> +			return sign_extend32(KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_NOT_AVAIL,
-> +					     KVM_REG_FEATURE_LEVEL_WIDTH - 1);
->  		case KVM_SSBD_KERNEL:
->  			return KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2_AVAIL;
->  		case KVM_SSBD_FORCE_ENABLE:
-> @@ -574,7 +575,7 @@ int kvm_arm_set_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  	}
->  
->  	case KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1:
-> -		wa_level = val & KVM_REG_FEATURE_LEVEL_MASK;
-> +		wa_level = sign_extend32(val, KVM_REG_FEATURE_LEVEL_WIDTH - 1);
->  
->  		if (get_kernel_wa_level(reg->id) < wa_level)
->  			return -EINVAL;
-> @@ -582,7 +583,7 @@ int kvm_arm_set_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  		return 0;
->  
->  	case KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_2:
-> -		wa_level = val & KVM_REG_FEATURE_LEVEL_MASK;
-> +		wa_level = sign_extend32(val, KVM_REG_FEATURE_LEVEL_WIDTH - 1);
+>                 pm_runtime_mark_last_busy
+>                     ktime_get
+>                         do
+>                             read_seqcount_begin
+>                         while read_seqcount_retry
+>     ....
+>     write_seqcount_end
+>
+> Although we should be safe because we haven't yet changed the clocksource
+> at that time, we can't because of seqcount protection.
+>
+> Use ktime_get_mono_fast_ns() instead which is lock safe for such case
+>
+> With ktime_get_mono_fast_ns, the timestamp is not guaranteed to be
+> monotonic across an update and as a result can goes backward. According to
+> update_fast_timekeeper() description: "In the worst case, this can
+> result is a slightly wrong timestamp (a few nanoseconds)". For
+> PM runtime autosuspend, this means only that the suspend decision can
+> be slightly sub optimal.
+>
+> Fixes: 8234f6734c5d ("PM-runtime: Switch autosuspend over to using hrtimers")
+> Reported-by: Biju Das <biju.das@bp.renesas.com>
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 
-We could have a helper to do this.  I agree it's marginally uglier than
-working with unsigned fields, we could probably use
-cpuid_feature_extract_signed_field() to achieve the same.
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-I agree that this is bikeshedding though, and it doesn't matter one way
-or the other unless there is some other compelling argument.
+Kind regards
+Uffe
 
-Cheers
----Dave
+> ---
+>
+> - v2: Updated commit message to explain the impact of using
+>   ktime_get_mono_fast_ns()
+>
+>  drivers/base/power/runtime.c | 10 +++++-----
+>  include/linux/pm_runtime.h   |  2 +-
+>  2 files changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+> index 457be03..708a13f 100644
+> --- a/drivers/base/power/runtime.c
+> +++ b/drivers/base/power/runtime.c
+> @@ -130,7 +130,7 @@ u64 pm_runtime_autosuspend_expiration(struct device *dev)
+>  {
+>         int autosuspend_delay;
+>         u64 last_busy, expires = 0;
+> -       u64 now = ktime_to_ns(ktime_get());
+> +       u64 now = ktime_get_mono_fast_ns();
+>
+>         if (!dev->power.use_autosuspend)
+>                 goto out;
+> @@ -909,7 +909,7 @@ static enum hrtimer_restart  pm_suspend_timer_fn(struct hrtimer *timer)
+>          * If 'expires' is after the current time, we've been called
+>          * too early.
+>          */
+> -       if (expires > 0 && expires < ktime_to_ns(ktime_get())) {
+> +       if (expires > 0 && expires < ktime_get_mono_fast_ns()) {
+>                 dev->power.timer_expires = 0;
+>                 rpm_suspend(dev, dev->power.timer_autosuspends ?
+>                     (RPM_ASYNC | RPM_AUTO) : RPM_ASYNC);
+> @@ -928,7 +928,7 @@ static enum hrtimer_restart  pm_suspend_timer_fn(struct hrtimer *timer)
+>  int pm_schedule_suspend(struct device *dev, unsigned int delay)
+>  {
+>         unsigned long flags;
+> -       ktime_t expires;
+> +       u64 expires;
+>         int retval;
+>
+>         spin_lock_irqsave(&dev->power.lock, flags);
+> @@ -945,8 +945,8 @@ int pm_schedule_suspend(struct device *dev, unsigned int delay)
+>         /* Other scheduled or pending requests need to be canceled. */
+>         pm_runtime_cancel_pending(dev);
+>
+> -       expires = ktime_add(ktime_get(), ms_to_ktime(delay));
+> -       dev->power.timer_expires = ktime_to_ns(expires);
+> +       expires = ktime_get_mono_fast_ns() + (u64)delay * NSEC_PER_MSEC);
+> +       dev->power.timer_expires = expires;
+>         dev->power.timer_autosuspends = 0;
+>         hrtimer_start(&dev->power.suspend_timer, expires, HRTIMER_MODE_ABS);
+>
+> diff --git a/include/linux/pm_runtime.h b/include/linux/pm_runtime.h
+> index 54af4ee..fed5be7 100644
+> --- a/include/linux/pm_runtime.h
+> +++ b/include/linux/pm_runtime.h
+> @@ -105,7 +105,7 @@ static inline bool pm_runtime_callbacks_present(struct device *dev)
+>
+>  static inline void pm_runtime_mark_last_busy(struct device *dev)
+>  {
+> -       WRITE_ONCE(dev->power.last_busy, ktime_to_ns(ktime_get()));
+> +       WRITE_ONCE(dev->power.last_busy, ktime_get_mono_fast_ns());
+>  }
+>
+>  static inline bool pm_runtime_is_irq_safe(struct device *dev)
+> --
+> 2.7.4
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
