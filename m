@@ -2,61 +2,72 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A73DC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 21:32:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 78B52C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 21:36:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B7B90218D2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 21:32:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 291D32184D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 21:36:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cvnDOrc9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B7B90218D2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-mips.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="irBXv/XJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 291D32184D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hfXeT4QGQtjmn1AvOtX09vAvQ6oQ64lLUE8f/xK7Q9w=; b=cvnDOrc9ZahiRG
-	kY1W9ON7BjVFNN5JcuxxwJ7/GRIY9VQRtOKy+6WL1Y3AXTnZ4TIKNpGSjxXcQemJ04sFGSHqJz052
-	kSuwOXVIkiJh67vjIAnXzBBTdUjPTIVG36XWqCIfl+Spy6A68CoeAOaEIz7NCA8knHg2DCMJ3REQE
-	aHUXHqbUX+4ToxAKLF2X++ojlnhtLFPxpq/cHdhNATNhrqdSQCFyp1eJdCow8HKP1u7BwOR9k9yGm
-	whETEW7EPH/L1ngB/CJ2d4R4oPLgbUl6SqVk+se2CFUK8iRU0golXI+pvZNBU9EFe+K9n/VaKk4Ci
-	+jvtMfPYrUPw+la59gRA==;
+	List-Owner; bh=m0tMLcfROEecJU5nP7gKazpGcoW+PWrY74MeoQlZvS4=; b=irBXv/XJ9wQINz
+	LXgfzurmPKDJPnq98txLzbOtDKE4gDvQCPX0NUioHeNS2HVWrFWAQ8bodJpz3YeuOcse9/M9zRpWY
+	+Z+qJxsyCWdEdnw0QzpCPaiM52y3QoFpTrfKIbiMJdhrkC/i91o8Jz409RS/272uEaRH/J7bNyE8U
+	mHX3DvXQ5lvH2GLS7c8FEP4eaW4XHbaGDu4MdWyq0CHRevbJA+EVhDV76q12CQ9DJpOLwShPNW3Fi
+	bgRUhgxt86cX3OTIHpebjlw5Z9LKPv7NHyGRbTdeEriFnoflTFDhR2zz23QAus/6d7vqbS3Gc+FWX
+	7znczgnzxClm5HTOylkQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goxTN-00036L-4s; Wed, 30 Jan 2019 21:32:41 +0000
-Received: from eddie.linux-mips.org ([148.251.95.138] helo=cvs.linux-mips.org)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goxTJ-00035w-Lg
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 21:32:39 +0000
-Received: (from localhost user: 'ladis' uid#1021 fake: STDIN
- (ladis@eddie.linux-mips.org)) by eddie.linux-mips.org
- id S23992820AbfA3VcenLVLh (ORCPT
- <rfc822;linux-arm-kernel@lists.infradead.org>);
- Wed, 30 Jan 2019 22:32:34 +0100
-Date: Wed, 30 Jan 2019 22:32:33 +0100
-From: Ladislav Michl <ladis@linux-mips.org>
-To: "Rafael J. Wysocki" <rafael@kernel.org>
-Subject: Re: [PATCH v2 ] PM-runtime: fix deadlock with ktime
-Message-ID: <20190130213233.GA20881@lenoch>
-References: <1548846984-2044-1-git-send-email-vincent.guittot@linaro.org>
- <CAJZ5v0gunbCHp_9mDTmtwW1i-_GcXPcjTP48NdV2zv-B6UrD4g@mail.gmail.com>
+	id 1goxXM-0004g5-NM; Wed, 30 Jan 2019 21:36:48 +0000
+Received: from mail-qt1-f196.google.com ([209.85.160.196])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1goxXK-0004fm-5E
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 21:36:47 +0000
+Received: by mail-qt1-f196.google.com with SMTP id t33so1295389qtt.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 13:36:44 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=WOHzBf4U53bGhuSbz/Q7E5TYtOmAFdhtzIMcmJ4Hsbc=;
+ b=OeZOya5+gacZ2pruyijrVtF/AzkH5yuuF6yfwowDxEX0tQ2DOm9MD4jsYsEgQ1n/6D
+ jCGNTSmwTFxeiMTdmqQJjroCcxPwPNul5Rad3SzzIh7TQUSxs5IN/ivdCkemUTRloukp
+ mosYH1QJT/F73QWou5G0Oe6BkS+BTmbEbxYYG73FRkw0J6pRey7bWEbLfSA45NhQZm6c
+ sZ0iWPk27+K+PhkBFQU0Yj2J7x8Rohn4MMaqDI3fupHEdcphPzTw8IOYyvf7AqYzSkQ7
+ B5jOH7USXheUQs3DSMoEsvkXcBDy0Hic9VyFdAoe3wOc2qiycJFXXX0SNMD5j1P0go4v
+ yLSw==
+X-Gm-Message-State: AJcUukfMNvD2qn9IeBuTHOsg/T72bv2X7veGutEl4O5/i9UjE/BhdRgO
+ +X4GjEdDZA/wDYnjxYX4lSEusdEHWhTLw0WP28RrJg==
+X-Google-Smtp-Source: ALg8bN7FF7MGREdoBfgiOrPgKTdV9FbK0dZfeyP+LlxGStPEriKTRlEzhjzBVtYgfqhROmnRDhSGMZopySPl/gvzk8A=
+X-Received: by 2002:aed:35c5:: with SMTP id d5mr31467515qte.212.1548884203905; 
+ Wed, 30 Jan 2019 13:36:43 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAJZ5v0gunbCHp_9mDTmtwW1i-_GcXPcjTP48NdV2zv-B6UrD4g@mail.gmail.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <20190130165449.GB19556@e107155-lin>
+In-Reply-To: <20190130165449.GB19556@e107155-lin>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 30 Jan 2019 22:36:27 +0100
+Message-ID: <CAK8P3a2JgHaLZ2kHGy0AGb2w9N6G-Y6h-ECN=ZDrKgg2Z74UDg@mail.gmail.com>
+Subject: Re: [GIT PULL] ARM: dts: vexpress: updates for v5.1
+To: Sudeep Holla <sudeep.holla@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_133237_709157_1B69A8A5 
-X-CRM114-Status: GOOD (  24.15  )
+X-CRM114-CacheID: sfid-20190130_133646_204563_3BC2BC40 
+X-CRM114-Status: UNSURE (   8.77  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,138 +79,25 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>,
- Vincent Guittot <vincent.guittot@linaro.org>,
- Linux PM <linux-pm@vger.kernel.org>, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Biju Das <biju.das@bp.renesas.com>,
- Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
- Geert Uytterhoeven <geert@linux-m68k.org>,
- Linux OMAP Mailing List <linux-omap@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Kevin Hilman <khilman@kernel.org>, Liviu Dudau <liviu.dudau@arm.com>,
+ ARM SoC Team <arm@kernel.org>, Olof Johansson <olof@lixom.net>,
+ ALKML <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 30, 2019 at 02:06:07PM +0100, Rafael J. Wysocki wrote:
-> On Wed, Jan 30, 2019 at 12:16 PM Vincent Guittot
-> <vincent.guittot@linaro.org> wrote:
-> >
-> > A deadlock has been seen when swicthing clocksources which use PM runtime.
-> > The call path is:
-> > change_clocksource
-> >     ...
-> >     write_seqcount_begin
-> >     ...
-> >     timekeeping_update
-> >         ...
-> >         sh_cmt_clocksource_enable
-> >             ...
-> >             rpm_resume
-> >                 pm_runtime_mark_last_busy
-> >                     ktime_get
-> >                         do
-> >                             read_seqcount_begin
-> >                         while read_seqcount_retry
-> >     ....
-> >     write_seqcount_end
-> >
-> > Although we should be safe because we haven't yet changed the clocksource
-> > at that time, we can't because of seqcount protection.
-> >
-> > Use ktime_get_mono_fast_ns() instead which is lock safe for such case
-> >
-> > With ktime_get_mono_fast_ns, the timestamp is not guaranteed to be
-> > monotonic across an update and as a result can goes backward. According to
-> > update_fast_timekeeper() description: "In the worst case, this can
-> > result is a slightly wrong timestamp (a few nanoseconds)". For
-> > PM runtime autosuspend, this means only that the suspend decision can
-> > be slightly sub optimal.
-> >
-> > Fixes: 8234f6734c5d ("PM-runtime: Switch autosuspend over to using hrtimers")
-> > Reported-by: Biju Das <biju.das@bp.renesas.com>
-> > Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> 
-> I've queued this one up as a fix for 5.0, but unfortunately it clashes
-> with the patch from Ladislav Michl at
-> https://patchwork.kernel.org/patch/10755477/ which has been dropped
-> now.
-> 
-> Can you or Ladislav please rebase that patch on top of this one and repost?
-> 
-> > ---
-> >
-> > - v2: Updated commit message to explain the impact of using
-> >   ktime_get_mono_fast_ns()
-> >
-> >  drivers/base/power/runtime.c | 10 +++++-----
-> >  include/linux/pm_runtime.h   |  2 +-
-> >  2 files changed, 6 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-> > index 457be03..708a13f 100644
-> > --- a/drivers/base/power/runtime.c
-> > +++ b/drivers/base/power/runtime.c
-> > @@ -130,7 +130,7 @@ u64 pm_runtime_autosuspend_expiration(struct device *dev)
-> >  {
-> >         int autosuspend_delay;
-> >         u64 last_busy, expires = 0;
-> > -       u64 now = ktime_to_ns(ktime_get());
-> > +       u64 now = ktime_get_mono_fast_ns();
-> >
-> >         if (!dev->power.use_autosuspend)
-> >                 goto out;
-> > @@ -909,7 +909,7 @@ static enum hrtimer_restart  pm_suspend_timer_fn(struct hrtimer *timer)
-> >          * If 'expires' is after the current time, we've been called
-> >          * too early.
-> >          */
-> > -       if (expires > 0 && expires < ktime_to_ns(ktime_get())) {
-> > +       if (expires > 0 && expires < ktime_get_mono_fast_ns()) {
-> >                 dev->power.timer_expires = 0;
-> >                 rpm_suspend(dev, dev->power.timer_autosuspends ?
-> >                     (RPM_ASYNC | RPM_AUTO) : RPM_ASYNC);
-> > @@ -928,7 +928,7 @@ static enum hrtimer_restart  pm_suspend_timer_fn(struct hrtimer *timer)
-> >  int pm_schedule_suspend(struct device *dev, unsigned int delay)
-> >  {
-> >         unsigned long flags;
-> > -       ktime_t expires;
-> > +       u64 expires;
-> >         int retval;
-> >
-> >         spin_lock_irqsave(&dev->power.lock, flags);
-> > @@ -945,8 +945,8 @@ int pm_schedule_suspend(struct device *dev, unsigned int delay)
-> >         /* Other scheduled or pending requests need to be canceled. */
-> >         pm_runtime_cancel_pending(dev);
-> >
-> > -       expires = ktime_add(ktime_get(), ms_to_ktime(delay));
-> > -       dev->power.timer_expires = ktime_to_ns(expires);
-> > +       expires = ktime_get_mono_fast_ns() + (u64)delay * NSEC_PER_MSEC);
+On Wed, Jan 30, 2019 at 5:54 PM Sudeep Holla <sudeep.holla@arm.com> wrote:
+> ARMv7 Vexpress updates for v5.1
+>
+> Couple of simple changes to add dynamic-power-coefficient information
+> for CPUs on TC2 and fix tuple used for uart and mmci interrupts with
+> lists.
 
-Just FYI, this one does not compile                                        ^
-I'm going to send updated optimization patch anyway as fixing this one will not
-break it :)
+Pulled into next/dt, thanks!
 
-> > +       dev->power.timer_expires = expires;
-> >         dev->power.timer_autosuspends = 0;
-> >         hrtimer_start(&dev->power.suspend_timer, expires, HRTIMER_MODE_ABS);
-> >
-> > diff --git a/include/linux/pm_runtime.h b/include/linux/pm_runtime.h
-> > index 54af4ee..fed5be7 100644
-> > --- a/include/linux/pm_runtime.h
-> > +++ b/include/linux/pm_runtime.h
-> > @@ -105,7 +105,7 @@ static inline bool pm_runtime_callbacks_present(struct device *dev)
-> >
-> >  static inline void pm_runtime_mark_last_busy(struct device *dev)
-> >  {
-> > -       WRITE_ONCE(dev->power.last_busy, ktime_to_ns(ktime_get()));
-> > +       WRITE_ONCE(dev->power.last_busy, ktime_get_mono_fast_ns());
-> >  }
-> >
-> >  static inline bool pm_runtime_is_irq_safe(struct device *dev)
-> > --
-> > 2.7.4
-> >
+     Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
