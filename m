@@ -2,78 +2,115 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C90D5C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:50:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8AE13C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:51:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 99274218A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:50:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5823D218A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:51:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fNt4yIdH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 99274218A3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DwzpVY4+";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="hidmd9jK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5823D218A3
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UXyNUDmQZ3gETUT30fF/FzIgAiqt++S3Jd+PsLxzFz8=; b=fNt4yIdHc7OCM0
-	qgAVFPlzgtV5HDa1S1v34dsm6+VC+rlcI92WyshWZnhGr1JDFVhHj3/nV7s7rZeHywvKAeC7Dn6Db
-	CNQppdnr0AcDNrLOjykzYZPMBeEW5xBRnWbzeKwkZaqRfK5tgb43hRiCK0jHllCPtP/dlBXN9P3ZX
-	qBS5SQRaqPkOVJrRchyXpRV27puddCM431bMIDoQZeKqbxdxcuhu6RvltlbHvUTXr2oWtuICkHEgM
-	ZLSsg60gt0YFvfg0dpz44DhcS36RyekeUn/plXGxBtUINOY7+B6M1483MZhWBwg6Bb+zs21ws/+i4
-	PL5KGf8wt0VEzLk0G5Gw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=SBS2stk2bnF1NpBJcLeBMgPuYsPPDWZ8Dxw14AQXhUA=; b=DwzpVY4+dVi1ri
+	+HSNv02vWvTI5wSCP+RLqHISHulrOteVOLfmlvwLluE9oLnmww07Zj2OkCvzBFnjpDvwgOVDU5/hp
+	CfvhDWl9e0cKi1zmour79VeukVbLg5i1VhTnKV2pTa9nzdNYQhINp+4lEpJfbFr/C6tUylKTZjs04
+	BrobkQNfJ5YnU1xFV0E5PJSjwgiqn8M9g6dkRqvK2xMAv7NAjDQb+vu22G80MqdVXu5nsEPYgW2eu
+	AKtxHJDvBmABRpOsi1n6uPupqdr2VFD7/ygg0hwghWwDiJAgETQR9o4F5gFiCxizi7rlhETRy0puA
+	X5D4Vfj6PYn9BnknZmtw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gos8N-0005tV-2k; Wed, 30 Jan 2019 15:50:39 +0000
-Received: from mail-oi1-f194.google.com ([209.85.167.194])
+	id 1gos8m-0006Bq-Qk; Wed, 30 Jan 2019 15:51:04 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gos83-00051N-7L; Wed, 30 Jan 2019 15:50:27 +0000
-Received: by mail-oi1-f194.google.com with SMTP id m6so19539435oig.11;
- Wed, 30 Jan 2019 07:50:18 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=P2qq8+E4g/m+cCmMeaSfpaPEUpdAovlDLmemICtL6O4=;
- b=tcM+vgLB+xuq2YHhK67h3a2mmnXHaQJ6mlJ+DKneMqRyv7CRW/ok+IDMs7yzPoqlIO
- DmTzK4+A6Vh6QMHsPxUb4dF+mTxxZsS9wS8MM4YCqZZibzFCCrgroyQh9SnuySk1Gcyk
- Py/fs5EHtq+9oyOR3FhlHxvu/wQyNnR82fw6meVXSxXZ+g9VoHAd/lkdS0MEhNRhs7y+
- AnZ8juuuoJSKexokN/F02d+xQ5HyK5uN+l1vJUwSGWSh9eHZA+4QI6gfhPU+ZDPmt+CT
- hKIDGa2zsWw5ryzI3ruPgsbFXMPWJ5gI/PmM936QZlFWg7MnrZpQI48gkrAU+dY9HPUU
- Hjew==
-X-Gm-Message-State: AJcUukdhOjm5ceQ0/VKyCN7McGk/mYcVB/3jxgo7t+jjk1QTKwAQvhuW
- pp6GsI3yQi1sBdSusIeUqA==
-X-Google-Smtp-Source: ALg8bN7YUdJsKMpCX953MaNa6vxwhOhFB2rvS6C+vX5gSNPtizkLZmOQ0v4ZTva+YKvus3IQry/J6A==
-X-Received: by 2002:aca:ba02:: with SMTP id k2mr13254932oif.177.1548863417913; 
- Wed, 30 Jan 2019 07:50:17 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id t201sm751720oie.37.2019.01.30.07.50.16
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 30 Jan 2019 07:50:17 -0800 (PST)
-Date: Wed, 30 Jan 2019 09:50:16 -0600
-From: Rob Herring <robh@kernel.org>
-To: Loys Ollivier <lollivier@baylibre.com>
-Subject: Re: [PATCH v3 2/4] dt-bindings: gnss: add mediatek binding
-Message-ID: <20190130155016.GA26536@bogus>
-References: <1548693481-1162-1-git-send-email-lollivier@baylibre.com>
- <1548693481-1162-3-git-send-email-lollivier@baylibre.com>
+ id 1gos8I-0005rb-QN
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 15:50:51 +0000
+Received: from [192.168.1.31] (cpe-70-114-128-244.austin.res.rr.com
+ [70.114.128.244])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 1C58021473;
+ Wed, 30 Jan 2019 15:50:33 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548863434;
+ bh=85JC8YFHYDqjZXa1fZ1OSykDoxtM3bWjRI1j4oyLL2s=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=hidmd9jKdW1ldcpejuGyCkp5H+YMyfkLMKtwRTsnV+pMochZzJCh16qGQqKk+oz5m
+ 01DnQ8lDNtOaYuIJ+MNPKt2SBPv9RbLu3j7dp60D/n5MrSenhk7Bemy5H+j8u+o/Hp
+ Y9s5gEeXpw4OwDfkCe5Ry3tcWkqQqttPn1GrSWNk=
+Subject: Re: [PATCH] ARM: socfpga: fix base address of SDR controller
+To: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>,
+ Marek Vasut <marex@denx.de>
+References: <20190129200858.19773-1-goldsimon@gmx.de>
+ <0711a2e0-b4fb-fa12-7c5c-0b5da73c8b02@kernel.org>
+ <CAAh8qszCQROUZVOyX9GCNF_09DebDDUWf_2cfW3M13yG1aJ_Xg@mail.gmail.com>
+From: Dinh Nguyen <dinguyen@kernel.org>
+Openpgp: preference=signencrypt
+Autocrypt: addr=dinguyen@kernel.org; prefer-encrypt=mutual; keydata=
+ mQINBFEnvWwBEAC44OQqJjuetSRuOpBMIk3HojL8dY1krl8T8GJjfgc/Gh97CfVbrqhV5yQ3
+ Sk/MW9mxO9KNvQCbZtthfn62YHmroNwipjZ6wKOMfKdtJR4+8JW/ShIJYnrMfwN8Wki6O+5a
+ yPNNCeENHleV0FLVXw3aACxOcjEzGJHYmg4UC+56rfoxPEhKF6aGBTV5aGKMtQy77ywuqt12
+ c+hlRXHODmXdIeT2V4/u/AsFNAq6UFUEvHrVj+dMIyv2VhjRvkcESIGnG12ifPdU7v/+wom/
+ smtfOAGojgTCqpwd0Ay2xFzgGnSCIFRHp0I/OJqhUcwAYEAdgHSBVwiyTQx2jP+eDu3Q0jI3
+ K/x5qrhZ7lj8MmJPJWQOSYC4fYSse2oVO+2msoMTvMi3+Jy8k+QNH8LhB6agq7wTgF2jodwO
+ yij5BRRIKttp4U62yUgfwbQtEUvatkaBQlG3qSerOzcdjSb4nhRPxasRqNbgkBfs7kqH02qU
+ LOAXJf+y9Y1o6Nk9YCqb5EprDcKCqg2c8hUya8BYqo7y+0NkBU30mpzhaJXncbCMz3CQZYgV
+ 1TR0qEzMv/QtoVuuPtWH9RCC83J5IYw1uFUG4RaoL7Z03fJhxGiXx3/r5Kr/hC9eMl2he6vH
+ 8rrEpGGDm/mwZOEoG5D758WQHLGH4dTAATg0+ZzFHWBbSnNaSQARAQABtCFEaW5oIE5ndXll
+ biA8ZGluZ3V5ZW5Aa2VybmVsLm9yZz6JAjgEEwECACIFAlbG5oQCGwMGCwkIBwMCBhUIAgkK
+ CwQWAgMBAh4BAheAAAoJEBmUBAuBoyj0fIgQAICrZ2ceRWpkZv1UPM/6hBkWwOo3YkzSQwL+
+ AH15hf9xx0D5mvzEtZ97ZoD0sAuB+aVIFwolet+nw49Q8HA3E/3j0DT7sIAqJpcPx3za+kKT
+ twuQ4NkQTTi4q5WCpA5b6e2qzIynB50b3FA6bCjJinN06PxhdOixJGv1qDDmJ01fq2lA7/PL
+ cny/1PIo6PVMWo9nf77L6iXVy8sK/d30pa1pjhMivfenIleIPYhWN1ZdRAkH39ReDxdqjQXN
+ NHanNtsnoCPFsqeCLmuUwcG+XSTo/gEM6l2sdoMF4qSkD4DdrVf5rsOyN4KJAY9Uqytn4781
+ n6l1NAQSRr0LPT5r6xdQ3YXIbwUfrBWh2nDPm0tihuHoH0CfyJMrFupSmjrKXF84F3cq0DzC
+ yasTWUKyW/YURbWeGMpQH3ioDLvBn0H3AlVoSloaRzPudQ6mP4O8mY0DZQASGf6leM82V3t0
+ Gw8MxY9tIiowY7Yl2bHqXCorPlcEYXjzBP32UOxIK7y7AQ1JQkcv6pZ0/6lX6hMshzi9Ydw0
+ m8USfFRZb48gsp039gODbSMCQ2NfxBEyUPw1O9nertCMbIO/0bHKkP9aiHwg3BPwm3YL1UvM
+ ngbze/8cyjg9pW3Eu1QAzMQHYkT1iiEjJ8fTssqDLjgJyp/I3YHYUuAf3i8SlcZTusIwSqnD
+ uQINBFEnvWwBEADZqma4LI+vMqJYe15fxnX8ANw+ZuDeYHy17VXqQ7dA7n8E827ndnoXoBKB
+ 0n7smz1C0I9StarHQPYTUciMLsaUpedEfpYgqLa7eRLFPvk/cVXxmY8Pk+aO8zHafr8yrFB1
+ cYHO3Ld8d/DvF2DuC3iqzmgXzaRQhvQZvJ513nveCa2zTPPCj5w4f/Qkq8OgCz9fOrf/CseM
+ xcP3Jssyf8qTZ4CTt1L6McRZPA/oFNTTgS/KA22PMMP9i8E6dF0Nsj0MN0R7261161PqfA9h
+ 5c+BBzKZ6IHvmfwY+Fb0AgbqegOV8H/wQYCltPJHeA5y1kc/rqplw5I5d8Q6B29p0xxXSfaP
+ UQ/qmXUkNQPNhsMnlL3wRoCol60IADiEyDJHVZRIl6U2K54LyYE1vkf14JM670FsUH608Hmk
+ 30FG8bxax9i+8Muda9ok/KR4Z/QPQukmHIN9jVP1r1C/aAEvjQ2PK9aqrlXCKKenQzZ8qbeC
+ rOTXSuJgWmWnPWzDrMxyEyy+e84bm+3/uPhZjjrNiaTzHHSRnF2ffJigu9fDKAwSof6SwbeH
+ eZcIM4a9Dy+Ue0REaAqFacktlfELeu1LVzMRvpIfPua8izTUmACTgz2kltTaeSxAXZwIziwY
+ prPU3cfnAjqxFHO2TwEpaQOMf8SH9BSAaCXArjfurOF+Pi3lKwARAQABiQIfBBgBAgAJBQJR
+ J71sAhsMAAoJEBmUBAuBoyj0MnIQAI+bcNsfTNltf5AbMJptDgzISZJrYCXuzOgv4+d1CubD
+ 83s0k6VJgsiCIEpvELQJsr58xB6l+o3yTBZRo/LViNLk0jF4CmCdXWjTyaQAIceEdlaeeTGH
+ d5GqAud9rv9q1ERHTcvmoEX6pwv3m66ANK/dHdBV97vXacl+BjQ71aRiAiAFySbJXnqj+hZQ
+ K8TCI/6TOtWJ9aicgiKpmh/sGmdeJCwZ90nxISvkxDXLEmJ1prvbGc74FGNVNTW4mmuNqj/p
+ oNr0iHan8hjPNXwoyLNCtj3I5tBmiHZcOiHDUufHDyKQcsKsKI8kqW3pJlDSACeNpKkrjrib
+ 3KLQHSEhTQCt3ZUDf5xNPnFHOnBjQuGkumlmhkgD5RVguki39AP2BQYp/mdk1NCRQxz5PR1B
+ 2w0QaTgPY24chY9PICcMw+VeEgHZJAhuARKglxiYj9szirPd2kv4CFu2w6a5HNMdVT+i5Hov
+ cJEJNezizexE0dVclt9OS2U9Xwb3VOjs1ITMEYUf8T1j83iiCCFuXqH4U3Eji0nDEiEN5Ac0
+ Jn/EGOBG2qGyKZ4uOec9j5ABF7J6hyO7H6LJaX5bLtp0Z7wUbyVaR4UIGdIOchNgNQk4stfm
+ JiyuXyoFl/1ihREfvUG/e7+VAAoOBnMjitE5/qUERDoEkkuQkMcAHyEyd+XZMyXY
+Message-ID: <961ac9bf-d111-2e42-a39b-b26c499afcc0@kernel.org>
+Date: Wed, 30 Jan 2019 09:50:31 -0600
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1548693481-1162-3-git-send-email-lollivier@baylibre.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <CAAh8qszCQROUZVOyX9GCNF_09DebDDUWf_2cfW3M13yG1aJ_Xg@mail.gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_075019_757055_FB787686 
-X-CRM114-Status: GOOD (  16.75  )
+X-CRM114-CacheID: sfid-20190130_075035_156233_17162546 
+X-CRM114-Status: GOOD (  24.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,86 +123,76 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Kevin Hilman <khilman@baylibre.com>, Johan Hovold <johan@kernel.org>,
- linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
- linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+ Alan Tull <atull@kernel.org>, linux-fpga@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Russell King <linux@armlinux.org.uk>,
+ Rob Herring <robh+dt@kernel.org>, Moritz Fischer <mdf@kernel.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 28, 2019 at 05:37:59PM +0100, Loys Ollivier wrote:
-> Add binding for Mediatek-based GNSS receivers.
-> 
-> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
-> ---
-> 
-> v3:
-> Removed the I2C and SPI interfaces references.
-> Removed the "mediatek,mt3339" compatible line.
-> Added the optional propertied (reset, fix)
-> Added the pin names for the optional properties.
-> 
-> v2:
-> Renamed bindings from Globaltop/gtop to Mediatek/mtk.
-> Moved current-speed as an optional propertie.
-> Removed the status line in the example.
-> Added "mediatek,mt3339" compatible.
-> 
->  .../devicetree/bindings/gnss/mediatek.txt          | 37 ++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gnss/mediatek.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/gnss/mediatek.txt b/Documentation/devicetree/bindings/gnss/mediatek.txt
-> new file mode 100644
-> index 000000000000..00650d81c5c8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gnss/mediatek.txt
-> @@ -0,0 +1,37 @@
-> +Mediatek-based GNSS Receiver DT binding
-> +
-> +Mediatek chipsets are used in GNSS-receiver modules produced by several
-> +vendors and can use an UART interface.
-> +
-> +Please see Documentation/devicetree/bindings/gnss/gnss.txt for generic
-> +properties.
-> +
-> +Required properties:
-> +
-> +- compatible	: Must be
-> +
-> +			"globaltop,pa6h"
-> +
-> +- vcc-supply	: Main voltage regulator (pin name: VCC)
-> +
-> +Optional properties:
-> +
-> +- gtop,reset-gpios	: GPIO used to reset the device
-> +  			  (pin name: RESET, NRESET)
 
-reset-gpios is the standard name.
 
-> +- gtop,fix-gpios	: GPIO used to determine device position fix state
-> +			  (pin name: FIX, 3D_FIX)
-> +- timepulse-gpios	: Time pulse GPIO (pin name: PPS1, 1PPS)
-> +- v-bckp-supply		: Backup voltage regulator
-> +  			  (pin name: VBAT, VBACKUP)
-> +- current-speed		: Default UART baud rate
-> +
-> +Example:
-> +
-> +serial@1234 {
-> +	compatible = "ns16550a";
-> +
-> +	gnss {
-> +		compatible = "globaltop,pa6h";
-> +		vcc-supply = <&vcc_3v3>;
-> +	};
-> +};
-> -- 
-> 2.7.4
+On 1/30/19 12:00 AM, Simon Goldschmidt wrote:
+> + Marek (as I really want to keep the dts in Linux and U-Boot in sync)
+> On Wed, Jan 30, 2019 at 1:16 AM Dinh Nguyen <dinguyen@kernel.org> wrote:
+>>
+>>
+>>
+>> On 1/29/19 2:08 PM, Simon Goldschmidt wrote:
+>>> From: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
+>>>
+>>> The documentation for socfpga gen5 says the base address of the sdram
+>>> controller is 0xffc20000, while the current devicetree says it is at
+>>> 0xffc25000.
+>>>
+>>> While this is not a problem for Linux, as it only accesses the registers
+>>> above 0xffc25000, it *is* a problem for U-Boot because the lower registers
+>>> are used during DDR calibration (up to now, the U-Boot driver does not use
+>>> the dts address, but that should change).
+>>>
+>>> To keep Linux and U-Boot devicetrees in sync, this patch changes the base
+>>> address to 0xffc20000 and adapts the 2 files where it is currently used.
+>>>
+>>> This patch changes the dts and 2 drivers with one commit to prevent
+>>> breaking the code if dts change and driver change would be split.
+>>>
+>>> Signed-off-by: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
+>>> ---
+>>>
+>>>  arch/arm/boot/dts/socfpga.dtsi       | 4 ++--
+>>>  arch/arm/mach-socfpga/self-refresh.S | 4 ++--
+>>>  drivers/fpga/altera-fpga2sdram.c     | 2 +-
+>>>  3 files changed, 5 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+>>> index f365003f0..8f6c1a5d6 100644
+>>> --- a/arch/arm/boot/dts/socfpga.dtsi
+>>> +++ b/arch/arm/boot/dts/socfpga.dtsi
+>>> @@ -788,9 +788,9 @@
+>>>                       reg = <0xfffec000 0x100>;
+>>>               };
+>>>
+>>> -             sdr: sdr@ffc25000 {
+>>> +             sdr: sdr@ffc20000 {
+>>>                       compatible = "altr,sdr-ctl", "syscon";
+>>> -                     reg = <0xffc25000 0x1000>;
+>>> +                     reg = <0xffc20000 0x6000>;
+>>
+>> I don't see the U-Boot device tree having this change. Yes, the
+>> documentation does state that the SDR address starts at 0xffc20000, but
+>> all of the pertinent registers start at 0x5000 offset. Thus, the
+>> starting address should be 0xffc25000.[1]
 > 
+> You don't see it in U-Boot as I'm working on a patch for that.
+> As I wrote in the commit message, U-Boot currently does not use the
+> devicetree for the SDR driver, but I want to convert it to do that.
+
+That's great! Can you elaborate on what is the impetus for converting
+the SDR driver to use the dts?
+
+Dinh
 
 _______________________________________________
 linux-arm-kernel mailing list
