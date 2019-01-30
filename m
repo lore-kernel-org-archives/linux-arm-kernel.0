@@ -2,132 +2,109 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B3CB6C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:53:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C5C87C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:06:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 84089218A4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:53:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 961B52084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:06:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mS0WkhVC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="sE8aSyij"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84089218A4
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=partner.samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ekkN2iXL";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="JLddZyUf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 961B52084A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DPa6Ro+POyoikv7pOQxEueV6Pl2PI7yLPd1RU+lqBO8=; b=mS0WkhVCwLm6XU
-	4UChRLptP1CQhm/z8JaXAq66nZrjasIQzBqnkgNfJkGKCpvVkDFrCRUD9hf1kjhVdUxZuFIv4fu68
-	ec7zr2oOA23g4IIAwN7awaGP1jEWmHc5TrvoWonb/nHMb2u/QRgUCZqiqdwuB6eeNnSiqzoi781tz
-	7l46+egtEolbgm7o0tR7IAqEKy9PhlgO91H9cRsrHRJkDpu9ba2b/nNOYh2kjAkXFvPdiONkhxm/6
-	bKs/2X2Q/nogwhxOnejLHzKeuOtP1zB5ZRgaZAnh4JRcdHJF20CRJUHPxTaunGcxAvgIZbkmoExRi
-	cMTD3fBdYDjsda1BommA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=9xBQET/V5vTVRZ6Si6KCnAzep91GxGCU2gZvWn4nYhg=; b=ekkN2iXLogtz3y
+	k4GthvC3oThljvkM9WFDButIc7jtoZ3uRZymJEYkdfodRItyaVEptFQNVW+xDsC7OGk4Fx8372nlG
+	3CpfAw0/tpxqDBK6BZ3HI8RW6wtbFcT7WCFkKC3qbq1AEyqBnPwBEcG+Z38ZKw0eBdrKMFHf12rrl
+	Q//UqlGTHRu6gQrks8tnNhleJa/qYN+o0ZSy0JCg3Fjk92OQKup3aOjxOWy+kuFIfI46AzMVXBRjf
+	2WUGdK6aKmfCrcWu6v/E7rRXchPAgGQd9L8+un1Dbf/1t6izo6GqzgaDJt24fUUYutgTbPt8uPLiD
+	+ntEeZU33mVNbo8nw8JQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gopMU-0006Vx-9y; Wed, 30 Jan 2019 12:53:02 +0000
-Received: from mailout2.w1.samsung.com ([210.118.77.12])
+	id 1gopZ2-0004JN-79; Wed, 30 Jan 2019 13:06:00 +0000
+Received: from mail-eopbgr20064.outbound.protection.outlook.com ([40.107.2.64]
+ helo=EUR02-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gopMP-0006Uv-Bf
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 12:52:59 +0000
-Received: from eucas1p1.samsung.com (unknown [182.198.249.206])
- by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190130125252euoutp0269037c951a792078a3713c6c0108381e~_oWPu28xr0936909369euoutp02D
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 12:52:52 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
- 20190130125252euoutp0269037c951a792078a3713c6c0108381e~_oWPu28xr0936909369euoutp02D
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1548852772;
- bh=IBPDM6AfRZ8UrMjyIhT1hwhllxDf2XHMgYs+F0ofQuE=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=sE8aSyijwmOcsW9h5Ygrgtg6lcawsviDAfAxby4JyvUZEuXrJm+Tm3IsfzstI2DaM
- 6S/iIBduHENWGKJdo7Qn9Saxb01PiDEsswdl5BLPhNKO3hVLv0iEhwP+e6/rJjYyNs
- GzncHEriLInyW3nB+WGjrISh+QBbN/ZU6ue6g3yY=
-Received: from eusmges1new.samsung.com (unknown [203.254.199.242]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20190130125251eucas1p16ac57d23f63860d2dfd744932695eed4~_oWPGx9qP1276312763eucas1p1z;
- Wed, 30 Jan 2019 12:52:51 +0000 (GMT)
-Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
- eusmges1new.samsung.com (EUCPMTA) with SMTP id 20.FE.04441.32E915C5; Wed, 30
- Jan 2019 12:52:51 +0000 (GMT)
-Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
- 20190130125250eucas1p2394b3ec6073c04ac841e85a4c9cbcc20~_oWOROfkI1276112761eucas1p23;
- Wed, 30 Jan 2019 12:52:50 +0000 (GMT)
-Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
- eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
- 20190130125250eusmtrp1feef69f34f5e9f4412d5200607805f75~_oWOCP8MB2687526875eusmtrp1F;
- Wed, 30 Jan 2019 12:52:50 +0000 (GMT)
-X-AuditID: cbfec7f2-5c9ff70000001159-8f-5c519e232f1b
-Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id F3.7E.04128.22E915C5; Wed, 30
- Jan 2019 12:52:50 +0000 (GMT)
-Received: from [106.120.51.20] (unknown [106.120.51.20]) by
- eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20190130125249eusmtip2cedfb04c24ca7a3abe86c879401bb31d~_oWNaCATz0492804928eusmtip2h;
- Wed, 30 Jan 2019 12:52:49 +0000 (GMT)
-Subject: Re: [PATCH v2 6/8] DT: arm: exynos: add DMC device for exynos5422
-To: Krzysztof Kozlowski <krzk@kernel.org>
-From: Lukasz Luba <l.luba@partner.samsung.com>
-Message-ID: <267bc3e3-efc1-c6a8-2a32-e298adb40cfe@partner.samsung.com>
-Date: Wed, 30 Jan 2019 13:52:48 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <CAJKOXPcfZsZPYStrV-QOd2YJsoaJdbtdz2RX-AJrC6A6B8vJqA@mail.gmail.com>
+ id 1gopYy-0004IC-Qw
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 13:05:58 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=2dvSOs7jc4IBx5lvl5NBWKD4tu4PC23MPZuhrIq2fcY=;
+ b=JLddZyUfnytZyO7zjH3l+wJeBGdAp4Tsa5hWyKDLxZcrGKtK1wH+mRH9vrjLVRCZudje4rfm91lTNrUJwwBYkFAeTFlWEFJWVP3rzEQ3CmwwlMS9n0r5jDpgoxt4DVQbTgFBGrAjl8Q11S6lP44jUDQL0U3u9HQSmD7yIgkdyB0=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB5057.eurprd04.prod.outlook.com (20.177.40.150) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1558.23; Wed, 30 Jan 2019 13:05:51 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::bd44:e001:ab8d:1c51]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::bd44:e001:ab8d:1c51%2]) with mapi id 15.20.1580.017; Wed, 30 Jan 2019
+ 13:05:51 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+Subject: [PATCH V2 0/4] irq: imx-irqsteer: add 32 interrupts chan and multi
+ outputs support
+Thread-Topic: [PATCH V2 0/4] irq: imx-irqsteer: add 32 interrupts chan and
+ multi outputs support
+Thread-Index: AQHUuJyGRKnSJeV/0UiLNhDEnUGqeQ==
+Date: Wed, 30 Jan 2019 13:05:51 +0000
+Message-ID: <1548853196-11447-1-git-send-email-aisheng.dong@nxp.com>
+Accept-Language: zh-CN, en-US
 Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA02Se0hTYRjG+3auDk99rsyXiopFYEEzS+hQdpOKEURKBFGDmnVSyXnZ8ZIW
- qUXqvFSolS1RE0tbmros11XQ0TLvaSmVEE3soibqxC4YOc8k//u9z/u8fM8DH0soOqglbFhE
- jKCP0IYraTn56OWvtnWrCoM06/tvrOBr8qsovsfxheKLrG0Uf9k+SPDt7dUM33p+iOHN9ncU
- 3/WkgObHs62Iz29/IeMrrX0Mf7unU8Z/SCmn+YvPrQzfOJRG7VigriisQGqzyUCrH5QmqS/V
- mpB63Lw8kDos9z8hhIfFCXqfbcfkoYbUHjrKCqcvvWxGyWgKZyA3FrAfXB2pJTOQnFXgcgT2
- C3mUNDgQDD79yEjDOIKb738ysyemu+cJaVGGICVnxHUyjOBxr4NyuhbivdBdXIecvAivgZ6p
- yRkTgYtIyEi/N/0iy9JYBRZTtNPD4T1QfP8C5ZRJvBrumPc6ZU98CBqzfyDJ4gFNN/pJJ7vh
- IKhvmSKcTGAveN9fJJN4BdQNF8yEAzzKwHCrmZBS74KW3AmZxAvhu63W1WYZNOdmkRKL0Jpu
- oiU+C2lNFpdnCzTaOmeyEdNdqp74SPJOsI/W0U4Z8HzoHfaQIsyHnEfXCUnmID1VIbm9oTar
- wxVgMZRVXGOuIKVxTjHjnDLGOWWM/98tRqQJeQmxoi5EEH0jhHiVqNWJsREhquOROjOa/mfN
- f21jFjTxJrgBYRYp3bl5BwI1CkobJyboGhCwhHIR5/tnv0bBndAmJAr6yKP62HBBbEBLWVLp
- xZ2Z9+mIAodoY4RTghAl6Ge3MtZtSTJaGb28ZsDP/YN/IZ1wsPt1TlOk7o/5maO6s2W3YXc9
- MzXJeS+92bfv29Uqy57f61I3bBdtJZZszUZr1Y7QAp9rt0bPfT0QV7JV4zmGgwxv++MDMgM+
- 2ydKo34/70ouSU/s7vLvaxiILj2cZ+IWvNpsUwWPXD+5iXsYWpmZlh8oT1IpSTFU67uW0Iva
- f/szKBpjAwAA
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFnrCIsWRmVeSWpSXmKPExsVy+t/xe7pK8wJjDO50KltsnLGe1eL6l+es
- FvOPnGO16H/8mtni/PkN7BZnm96wW2x6fI3V4vKuOWwWn3uPMFrMOL+PyWLtkbvsFkuvX2Sy
- uN24gs2ide8RdovDb9pZHfg91sxbw+ixaVUnm8fmJfUefVtWMXp83iQXwBqlZ1OUX1qSqpCR
- X1xiqxRtaGGkZ2hpoWdkYqlnaGwea2VkqqRvZ5OSmpNZllqkb5egl9HZdp2t4IhERd+x04wN
- jH8Fuhg5OSQETCRWrWxi7mLk4hASWMoo8fvEOVaIhJjEpH3b2SFsYYk/17rYIIpeM0rMPXua
- BSQhLOAlcWXBdkYQW0RAU+L63++sIEXMAvNZJKY8/c4C0bGMSeLspLVAGQ4ONgE9iR2rCkEa
- eAXcJBasawYLswioSizb5AUSFhWIkPj4dB8TRImgxMmZT8B2cQoESuw/85cZxGYWMJOYt/kh
- lC0ucevJfCYIW15i+9s5zBMYhWYhaZ+FpGUWkpZZSFoWMLKsYhRJLS3OTc8tNtIrTswtLs1L
- 10vOz93ECIzhbcd+btnB2PUu+BCjAAejEg8vQ3BAjBBrYllxZe4hRgkOZiURXsPf/jFCvCmJ
- lVWpRfnxRaU5qcWHGE2BfpvILCWanA9ML3kl8YamhuYWlobmxubGZhZK4rznDSqjhATSE0tS
- s1NTC1KLYPqYODilGhiv2D6bIb/kk1TmnpSdnRtn5b/93PTmxETnpde7FkbduS/wLqV8n2wj
- o2Lmhoc3+g/OSMrPLk2+8c/RbsWtbTtrXm4WUPPP5nXcY//QaHlAYf2M5pb7J9Ob+kRsWfKO
- rj5uOcfcqHh187uJn/S22v64crRO63ZHizbj0aKUT7tOTFi2922d0c7XSizFGYmGWsxFxYkA
- bXQC9vcCAAA=
-X-CMS-MailID: 20190130125250eucas1p2394b3ec6073c04ac841e85a4c9cbcc20
-X-Msg-Generator: CA
-X-RootMTR: 20190129175526eucas1p253dc2e8a0d64b34d95c84d585fb0fac0
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20190129175526eucas1p253dc2e8a0d64b34d95c84d585fb0fac0
-References: <CGME20190129175526eucas1p253dc2e8a0d64b34d95c84d585fb0fac0@eucas1p2.samsung.com>
- <1548784514-26649-1-git-send-email-l.luba@partner.samsung.com>
- <1548784514-26649-7-git-send-email-l.luba@partner.samsung.com>
- <CAJKOXPcfZsZPYStrV-QOd2YJsoaJdbtdz2RX-AJrC6A6B8vJqA@mail.gmail.com>
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK0PR01CA0021.apcprd01.prod.exchangelabs.com
+ (2603:1096:203:92::33) To AM0PR04MB4211.eurprd04.prod.outlook.com
+ (2603:10a6:208:66::21)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB5057;
+ 6:nGFBxvEw9rZJFsLRxv7ygmYTx3dmey2Y1QS6MzOYI9XpBtetOfNWgFGMuDf53ernCXJI5MJ8haJg/Aklk2qVy//+IrwpiFPiJTrchBViAQtPgP337OCUDygCFxSpLwYjLm1Q7HeXkz994bcdfoUh3OAXA9pUf2E7c14w25t2mPs9AOw3pSez+R8l9RSKLtPhNIefQdNMrh4OiC8UKQidk3jBOiaDuViHCFtUI3rMTVFxHZz4fE2VOUjIo8uDJ+AID8GzhKjAQUZHQnegSSDu/s8OhvElIS1x9smf0qDrH150neccyUpT7V2Omgk62QtaapGnBjsglCvk0tksNZdtH/pww16gVqRvSAKASXIuRlFHlf1fap4rGqlJaqxemj4Ww6hJnBHc2qaM5UzFtRc6fTjqr1XEwp7AsEF7R4cHYS4vz/vhZ7YaHdK8iW+57vNeNmzblEkbKMW+cEcRuQTlBQ==;
+ 5:GlAQJkkaiHrJqVsypEPYC9Uudwpiyb0i9c1v/MubsKMoHOB/Hmhu34ruuHS4KU2ECv4gEec04xLmDrT4ygDerD67qJH2DcLE2diFfz+cBUvfQFeCAXBqHCnFn54swFaPHfvsAjjEYdMGy25Hx+N3I3vHWMBbW8boq00A4kOhJNJPtr05Z6PEV4Iw+FA2e8Y2C1IRWtAmyZxtSMXTBO+F7w==;
+ 7:r7OaZCq7p+X/s5zcCHhvN+U22XFiitsAW35rlv9u2oh101akILBDJviGQTt+Q+hMdctBSJPjUncPwfiRoII43LXOdSDxehvZcG0xz7Y7xWazF/GB25RZ+bUgsB/GjQwf05KjSu6c702fEzQ4fZpy+w==
+x-ms-office365-filtering-correlation-id: 04a7d192-1399-4d95-b384-08d686b3a8b5
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB5057; 
+x-ms-traffictypediagnostic: AM0PR04MB5057:
+x-microsoft-antispam-prvs: <AM0PR04MB5057242DA59DCB0FB13D8A3080900@AM0PR04MB5057.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0933E9FD8D
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(346002)(376002)(396003)(39860400002)(366004)(136003)(199004)(189003)(5640700003)(105586002)(8676002)(8936002)(53936002)(2906002)(81156014)(81166006)(2501003)(6436002)(68736007)(256004)(50226002)(52116002)(6486002)(6512007)(6116002)(25786009)(4744005)(4326008)(3846002)(486006)(54906003)(7736002)(2616005)(476003)(478600001)(386003)(99286004)(186003)(14454004)(44832011)(6506007)(71190400001)(71200400001)(305945005)(66066001)(6916009)(86362001)(102836004)(114624004)(2351001)(316002)(36756003)(106356001)(26005)(97736004);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5057;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 1HhOJXH4iZxahfDzfTPVzs4WTEMnqBH2fR77AfFTfnkIgfq+LYVbgMN3hg5bTxqeBCAgK+eXMAyUoPed7BjflBg5jKz2JRqrge2B4jvqe8BZoKCg0jlEjqJTJ9VcOGi5/6XiFgQtXDRGgtmDmg5jGxfJXcRac7Aewj1L/1y8QkBsreirSV8BaKdC0DZXW1+jxgZsNHt2AZlHWpvtv+V4uUMZi0hhnhkBxIeh3kkbzsXmYd9QGIwaL2kB5O5wAlTSRs+s1d5VdNHKzMfLWHQ7JtEssLuol+HXTIzKqxnOLbHz399zcRDsLgqpbaa1bB/QLDGsYQ2G22ZZEDl42fiU4LD2TAE6MOK6F0cZraz0EYYZ+2E5mBVzYHVNnkyUVoH1HuJ4321xkuM2fF9w5iPYak3QZZ0dVIS7MXk12Z/k21o=
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 04a7d192-1399-4d95-b384-08d686b3a8b5
+X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Jan 2019 13:05:47.7460 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5057
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_045257_693719_8C6A6273 
-X-CRM114-Status: GOOD (  17.71  )
+X-CRM114-CacheID: sfid-20190130_050556_945559_18B274A9 
+X-CRM114-Status: UNSURE (   7.14  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -139,88 +116,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
- =?UTF-8?Q?Bart=c5=82omiej_=c5=bbo=c5=82nierkiewicz?=
- <b.zolnierkie@samsung.com>, linux-pm@vger.kernel.org,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- Chanwoo Choi <cw00.choi@samsung.com>, kyungmin.park@samsung.com,
- kgene@kernel.org, myungjoo.ham@samsung.com, s.nawrocki@samsung.com,
- linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Aisheng Dong <aisheng.dong@nxp.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "tglx@linutronix.de" <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Krzysztof,
+Not all 64 interrupts may be used in one group. e.g. most irqsteer in
+imx8qxp and imx8qm subsystems supports only 32 interrupts.
+And one irqsteer channel can support up to 8 output interrupts.
 
-On 1/30/19 10:46 AM, Krzysztof Kozlowski wrote:
-> On Tue, 29 Jan 2019 at 18:55, Lukasz Luba <l.luba@partner.samsung.com> wrote:
->>
->> Add description of Dynamic Memory Controller and PPMU counters.
->> They are used by exynos5422-dmc driver.
->>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: Mark Rutland <mark.rutland@arm.com>
->> CC: Kukjin Kim <kgene@kernel.org>
->> CC: Krzysztof Kozlowski <krzk@kernel.org>
->> CC: devicetree@vger.kernel.org
->> CC: linux-arm-kernel@lists.infradead.org
->> CC: linux-samsung-soc@vger.kernel.org
->> CC: linux-kernel@vger.kernel.org
->> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
->> ---
->>   arch/arm/boot/dts/exynos5420.dtsi             | 69 +++++++++++++++++++++++++++
->>   arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 22 +++++++++
->>   2 files changed, 91 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
->> index aaff158..4d76335 100644
->> --- a/arch/arm/boot/dts/exynos5420.dtsi
->> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->> @@ -235,6 +235,27 @@
->>                          status = "disabled";
->>                  };
->>
->> +               dmc: memory-controller@10c20000 {
->> +                       compatible = "samsung,exynos5422-dmc";
->> +                       reg = <0x10c20000 0x10000>, <0x10c30000 0x10000>,
->> +                               <0x10030000 0x1000>, <0x10000000 0x1000>;
->> +                       clocks = <&clock CLK_FOUT_SPLL>,
->> +                               <&clock CLK_MOUT_SCLK_SPLL>,
->> +                               <&clock CLK_FF_DOUT_SPLL2>,
->> +                               <&clock CLK_FOUT_BPLL>, <&clock CLK_MOUT_BPLL>,
->> +                               <&clock CLK_SCLK_BPLL>,
->> +                               <&clock CLK_MOUT_MX_MSPLL_CCORE>,
->> +                               <&clock CLK_MOUT_MX_MSPLL_CCORE_PHY>,
->> +                               <&clock CLK_MOUT_MCLK_CDREX>,
->> +                               <&clock CLK_DOUT_CLK2X_PHY0>,
->> +                               <&clock CLK_CLKM_PHY0>, <&clock CLK_CLKM_PHY1>;
->> +                       clock-names = "fout_spll", "mout_sclk_spll",
->> +                               "ff_dout_spll2", "fout_bpll", "mout_bpll",
->> +                               "sclk_bpll", "mout_mx_mspll_ccore",
->> +                               "mout_mx_mspll_ccore_phy", "mout_mclk_cdrex",
->> +                               "dout_clk2x_phy0", "clkm_phy0", "clkm_phy1";
-> 
-> We misunderstood each other. I did not ask for compaction into one
-> continued line but for proper indentation. Having one entry per one
-> line was fine because you have really a lot of entries and it was
-> making things easier to check.
-> It should look like:
-> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/exynos54xx.dtsi?h=v4.20#n78
-> 
-Yes, we misunderstood each other. I will fix it in v3.
-Thank you for having a look on it. I assume that the other issues
-have been properly addressed.
+This patch series aims to support 32 interrupts chan and multi output
+interrupts.
 
-Regards,
-Lukasz
+Tested on:
+iMX8QXP MEK with MIPI CSI capture and DC Display
+iMX8MQ EVK with MIPI DSI Display
 
-> Best regards,
-> Krzysztof
-> 
-> 
+Dong Aisheng (4):
+  dt-binding: irq: imx-irqsteer: use irq number instead of group number
+  dt-bindings: irq: imx-irqsteer: add multi output interrupts support
+  irq: imx-irqsteer: change to use reg_num instead of irq_group
+  irq: imx: irqsteer: add multi output interrupts support
+
+ .../bindings/interrupt-controller/fsl,irqsteer.txt |  11 ++-
+ drivers/irqchip/irq-imx-irqsteer.c                 | 103 +++++++++++++++------
+ 2 files changed, 80 insertions(+), 34 deletions(-)
+
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
