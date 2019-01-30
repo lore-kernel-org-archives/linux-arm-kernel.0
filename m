@@ -2,79 +2,66 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 62CB3C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:19:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D771C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:22:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2C0232184D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:19:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4E0FD2184D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 13:22:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="X2O2eaw/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="O+1VduTU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2C0232184D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ru05GZj0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E0FD2184D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FkMgezZ0MAZ7fpl8q+kXFtPoLN15erMoTyKevGkkivg=; b=X2O2eaw/hUTfVw
-	+EqoYTXX46Frn0AQAn0WcEVxc7Mp6e5n45L1UjWzmSMWy5HODz3nds+PatTCYFNFyacnKGJODL2RA
-	TYkll/sfydJULyUF0IfsTdUfXDM2O95KIi1W+xDN4iYgGGRwoDWoR0frAESPrNBi3dHWzeav3Tc9S
-	rXEx5CbXGm/gkxTjei9E/AdndH71K+KwsF71nwlQaWzVdaiGNCVKRKByxfqxRxtt7VjAJZHcdAn7z
-	LmkxWQfQ9Y3GdANmlEH23zYzYcTgaX+25KIuEkqVkxsq92e8u97W+WUiuNMF6IE1TRRWEq716ttq5
-	m/E5ogbKrUWDXovMtzZw==;
+	List-Owner; bh=pQxFZLxJYYv7UsVpsc6GCj1pVCYMRLazOTf2Lv9N3+g=; b=ru05GZj0+WkXY4
+	RxjLX7uCIAMTy9KOxFjYpdg0rcTPyIxJjqdAhdcUKW1dDDH+a5yQwI5xMWvt+7f9dGNcwDzKhxIaj
+	Wvl32FooPQzQpAf7jd2Gwo1vNBMdgow4bg0LEDS/lpRHUdVpwJ3jp1tqvqCMyjvRwRd4Zrw22E6R3
+	msbj+7OtUQWB+Y2gZcF7KboVWlJhEZ3hoFIQ4dYnV4IY8a87+RUMfziQ1UMuncx/yjA95aKI6tVCO
+	DZH0EDrHSJ54/AJ2CreLxn6ObVt5LPOfKUprYrw3y+IC/mWLIyzcEdwfi1Lv/iIQ+nQTrggC/1wKR
+	LfdO/JXiPjLuq5wNXqFA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goplr-00041q-GL; Wed, 30 Jan 2019 13:19:15 +0000
-Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+	id 1gopof-00061O-BS; Wed, 30 Jan 2019 13:22:09 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gople-0003pG-4W
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 13:19:07 +0000
-Received: by mail-it1-x141.google.com with SMTP id h193so10381515ita.5
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 05:19:01 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=ANeoDmbUb0/8sfBPLXSO9VTANf6KaL0CAlPTKb85IhY=;
- b=O+1VduTU8SIV7R/owFlkvbSyLNgk4wSG1UWLtjayt3FHHoiS0yDasSfXaW5Zi09NcF
- I64aRLi22tdK7lmm5OdRLkFlyjZLM7BuC4OWPYo9pS1JhObF3ebmSIw8hw1jnir/sXov
- K/eyBOlOIpjz+6lPeDxiAegTHCTpQFAyNgYTc=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=ANeoDmbUb0/8sfBPLXSO9VTANf6KaL0CAlPTKb85IhY=;
- b=ets5Mrc8qUSiKcZ+8HZp2vVdzX8wM61QzsNEizgQZRB5mhkZJA3TV7DnxNVzQexh+G
- 3e9fiuq+9c8TS0wn6r7xGaTUZKBbZbUo5C9olCJS9scpsrcqe+t2nxDKWhTqIscUiouq
- NxCc9HpKIy3DqdadfmapiyXJ+V57SfEaWM4CyyHuiKE/5mcja/1r6n+aMXv2ec0B0ecs
- Y9Dlg4W1ooBKpT/o6QQEj3WdgCsEYlUTeE1YBWJJnHxjCohLafLmpLhsw35i4xHOL3d7
- EMoyqudSS7/nHg8HXM/mzNxf+YWCUPU2EDO/k9jpjhsIQxDTeJWYbjhyz+ja8bsDpnKw
- H48g==
-X-Gm-Message-State: AJcUukfa2vEkyBa+atm6ZORDfqg0kgKR0pbfelg6fbbXjpkt9hSEz0BQ
- sD6m38gHXLWMurs2Bhbc7IVdKCGhCUWmuTk7cNhkZA==
-X-Google-Smtp-Source: ALg8bN62J/QuGU0am7/BE/gEge7sczYQSEz/4n1yumxu6JS3Qag/8Pz+XpFV9jXdxAbQerhtFMwQAS6oPrmrbI7gDUA=
-X-Received: by 2002:a02:6019:: with SMTP id i25mr19758965jac.137.1548854340418; 
- Wed, 30 Jan 2019 05:19:00 -0800 (PST)
-MIME-Version: 1.0
-References: <1548846984-2044-1-git-send-email-vincent.guittot@linaro.org>
- <CAJZ5v0gunbCHp_9mDTmtwW1i-_GcXPcjTP48NdV2zv-B6UrD4g@mail.gmail.com>
-In-Reply-To: <CAJZ5v0gunbCHp_9mDTmtwW1i-_GcXPcjTP48NdV2zv-B6UrD4g@mail.gmail.com>
-From: Vincent Guittot <vincent.guittot@linaro.org>
-Date: Wed, 30 Jan 2019 14:18:49 +0100
-Message-ID: <CAKfTPtAO--5rkKAwExbKoKDz9pM7MApbEqe0R9pS1-1avv2Gzw@mail.gmail.com>
-Subject: Re: [PATCH v2 ] PM-runtime: fix deadlock with ktime
-To: "Rafael J. Wysocki" <rafael@kernel.org>
+ id 1gopob-0005qb-MH
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 13:22:07 +0000
+Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <l.stach@pengutronix.de>)
+ id 1gopoZ-0004m3-8i; Wed, 30 Jan 2019 14:22:03 +0100
+Message-ID: <1548854523.6869.25.camel@pengutronix.de>
+Subject: Re: [PATCH V2 3/4] irq: imx-irqsteer: change to use reg_num instead
+ of irq_group
+From: Lucas Stach <l.stach@pengutronix.de>
+To: Aisheng Dong <aisheng.dong@nxp.com>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Date: Wed, 30 Jan 2019 14:22:03 +0100
+In-Reply-To: <1548853196-11447-4-git-send-email-aisheng.dong@nxp.com>
+References: <1548853196-11447-1-git-send-email-aisheng.dong@nxp.com>
+ <1548853196-11447-4-git-send-email-aisheng.dong@nxp.com>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
+X-SA-Exim-Mail-From: l.stach@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_051902_523056_B80AFC73 
-X-CRM114-Status: GOOD (  25.02  )
+X-CRM114-CacheID: sfid-20190130_052205_888555_2CDC8B2A 
+X-CRM114-Status: GOOD (  19.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,148 +73,123 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>, Ladislav Michl <ladis@linux-mips.org>,
- Linux PM <linux-pm@vger.kernel.org>, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Biju Das <biju.das@bp.renesas.com>,
- Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
- Geert Uytterhoeven <geert@linux-m68k.org>,
- Linux OMAP Mailing List <linux-omap@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>, "tglx@linutronix.de" <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 30 Jan 2019 at 14:06, Rafael J. Wysocki <rafael@kernel.org> wrote:
->
-> On Wed, Jan 30, 2019 at 12:16 PM Vincent Guittot
-> <vincent.guittot@linaro.org> wrote:
-> >
-> > A deadlock has been seen when swicthing clocksources which use PM runtime.
-> > The call path is:
-> > change_clocksource
-> >     ...
-> >     write_seqcount_begin
-> >     ...
-> >     timekeeping_update
-> >         ...
-> >         sh_cmt_clocksource_enable
-> >             ...
-> >             rpm_resume
-> >                 pm_runtime_mark_last_busy
-> >                     ktime_get
-> >                         do
-> >                             read_seqcount_begin
-> >                         while read_seqcount_retry
-> >     ....
-> >     write_seqcount_end
-> >
-> > Although we should be safe because we haven't yet changed the clocksource
-> > at that time, we can't because of seqcount protection.
-> >
-> > Use ktime_get_mono_fast_ns() instead which is lock safe for such case
-> >
-> > With ktime_get_mono_fast_ns, the timestamp is not guaranteed to be
-> > monotonic across an update and as a result can goes backward. According to
-> > update_fast_timekeeper() description: "In the worst case, this can
-> > result is a slightly wrong timestamp (a few nanoseconds)". For
-> > PM runtime autosuspend, this means only that the suspend decision can
-> > be slightly sub optimal.
-> >
-> > Fixes: 8234f6734c5d ("PM-runtime: Switch autosuspend over to using hrtimers")
-> > Reported-by: Biju Das <biju.das@bp.renesas.com>
-> > Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->
-> I've queued this one up as a fix for 5.0, but unfortunately it clashes
-> with the patch from Ladislav Michl at
-> https://patchwork.kernel.org/patch/10755477/ which has been dropped
-> now.
-
-Thanks for adding Ladislav in this thread.
-I'm sorry I forgot to add him in the loop.
-
->
-> Can you or Ladislav please rebase that patch on top of this one and repost?
-
-Ladislav,
-
-Let me know if you prefer to rebase and repost your patch of if you
-want me to do.
-
-Regards,
-Vincent
-
->
-> > ---
-> >
-> > - v2: Updated commit message to explain the impact of using
-> >   ktime_get_mono_fast_ns()
-> >
-> >  drivers/base/power/runtime.c | 10 +++++-----
-> >  include/linux/pm_runtime.h   |  2 +-
-> >  2 files changed, 6 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-> > index 457be03..708a13f 100644
-> > --- a/drivers/base/power/runtime.c
-> > +++ b/drivers/base/power/runtime.c
-> > @@ -130,7 +130,7 @@ u64 pm_runtime_autosuspend_expiration(struct device *dev)
-> >  {
-> >         int autosuspend_delay;
-> >         u64 last_busy, expires = 0;
-> > -       u64 now = ktime_to_ns(ktime_get());
-> > +       u64 now = ktime_get_mono_fast_ns();
-> >
-> >         if (!dev->power.use_autosuspend)
-> >                 goto out;
-> > @@ -909,7 +909,7 @@ static enum hrtimer_restart  pm_suspend_timer_fn(struct hrtimer *timer)
-> >          * If 'expires' is after the current time, we've been called
-> >          * too early.
-> >          */
-> > -       if (expires > 0 && expires < ktime_to_ns(ktime_get())) {
-> > +       if (expires > 0 && expires < ktime_get_mono_fast_ns()) {
-> >                 dev->power.timer_expires = 0;
-> >                 rpm_suspend(dev, dev->power.timer_autosuspends ?
-> >                     (RPM_ASYNC | RPM_AUTO) : RPM_ASYNC);
-> > @@ -928,7 +928,7 @@ static enum hrtimer_restart  pm_suspend_timer_fn(struct hrtimer *timer)
-> >  int pm_schedule_suspend(struct device *dev, unsigned int delay)
-> >  {
-> >         unsigned long flags;
-> > -       ktime_t expires;
-> > +       u64 expires;
-> >         int retval;
-> >
-> >         spin_lock_irqsave(&dev->power.lock, flags);
-> > @@ -945,8 +945,8 @@ int pm_schedule_suspend(struct device *dev, unsigned int delay)
-> >         /* Other scheduled or pending requests need to be canceled. */
-> >         pm_runtime_cancel_pending(dev);
-> >
-> > -       expires = ktime_add(ktime_get(), ms_to_ktime(delay));
-> > -       dev->power.timer_expires = ktime_to_ns(expires);
-> > +       expires = ktime_get_mono_fast_ns() + (u64)delay * NSEC_PER_MSEC);
-> > +       dev->power.timer_expires = expires;
-> >         dev->power.timer_autosuspends = 0;
-> >         hrtimer_start(&dev->power.suspend_timer, expires, HRTIMER_MODE_ABS);
-> >
-> > diff --git a/include/linux/pm_runtime.h b/include/linux/pm_runtime.h
-> > index 54af4ee..fed5be7 100644
-> > --- a/include/linux/pm_runtime.h
-> > +++ b/include/linux/pm_runtime.h
-> > @@ -105,7 +105,7 @@ static inline bool pm_runtime_callbacks_present(struct device *dev)
-> >
-> >  static inline void pm_runtime_mark_last_busy(struct device *dev)
-> >  {
-> > -       WRITE_ONCE(dev->power.last_busy, ktime_to_ns(ktime_get()));
-> > +       WRITE_ONCE(dev->power.last_busy, ktime_get_mono_fast_ns());
-> >  }
-> >
-> >  static inline bool pm_runtime_is_irq_safe(struct device *dev)
-> > --
-> > 2.7.4
-> >
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+QW0gTWl0dHdvY2gsIGRlbiAzMC4wMS4yMDE5LCAxMzowNiArMDAwMCBzY2hyaWViIEFpc2hlbmcg
+RG9uZzoKPiBPbmUgZ3JvdXAgY2FuIG1hbmFnZSA2NCBpbnRlcnJ1cHRzIGJ5IHVzaW5nIHR3byBy
+ZWdpc3RlcnMgKGUuZy4gU1RBVFVTL1NFVCkuCj4gSG93ZXZlciwgdGhlIGludGVncmF0ZWQgaXJx
+c3RlZXIgbWF5IHN1cHBvcnQgb25seSAzMiBpbnRlcnJ1cHRzIHdoaWNoCj4gbmVlZHMgb25seSBv
+bmUgcmVnaXN0ZXIgaW4gYSBncm91cC4gQnV0IHRoZSBjdXJyZW50IGRyaXZlciBhc3N1bWUgdGhl
+cmUncwo+IGEgbWluaW51bSBvZiB0d28gcmVnaXN0ZXJzIGluIGEgZ3JvdXAgd2hpY2ggcmVzdWx0
+IGluIGEgd3JvbmcgcmVnaXN0ZXIgbWFwCj4gZm9yIDMyIGludGVycnVwdHMgcGVyIGNoYW5uZWwg
+aXJxc3RlZXIuIExldCdzIHVzZSB0aGUgcmVnX251bSBjYWN1bGF0ZWQgYnkKPiBpbnRlcnJ1cHRz
+IHBlciBjaGFubmVsIGluc3RlYWQgb2YgaXJxX2dyb3VwIHRvIGNvdmVyIHRoaXMgY2FzZS4KPiAK
+PiA+IENjOiBNYXJjIFp5bmdpZXIgPG1hcmMuenluZ2llckBhcm0uY29tPgo+ID4gQ2M6IFJvYiBI
+ZXJyaW5nIDxyb2JoK2R0QGtlcm5lbC5vcmc+Cj4gPiBDYzogTHVjYXMgU3RhY2ggPGwuc3RhY2hA
+cGVuZ3V0cm9uaXguZGU+Cj4gPiBDYzogU2hhd24gR3VvIDxzaGF3bmd1b0BrZXJuZWwub3JnPgo+
+IFNpZ25lZC1vZmYtYnk6IERvbmcgQWlzaGVuZyA8YWlzaGVuZy5kb25nQG54cC5jb20+CgpNaW5v
+ciBuaXQgYmVsb3csIG90aGVyd2lzZToKClJldmlld2VkLWJ5OiBMdWNhcyBTdGFjaCA8bC5zdGFj
+aEBwZW5ndXRyb25peC5kZT4KCj4gLS0tCj4gdjEtPnYyOgo+IMKgKiBUaGUgdXNpbmcgb2YgcHJv
+cGVydHkgbmFtZSB1cGRhdGVkIGFjY29yZGluZ2x5Cj4gLS0tCj4gwqBkcml2ZXJzL2lycWNoaXAv
+aXJxLWlteC1pcnFzdGVlci5jIHwgMzUgKysrKysrKysrKysrKysrKysrKy0tLS0tLS0tLS0tLS0t
+LS0KPiDCoDEgZmlsZSBjaGFuZ2VkLCAxOSBpbnNlcnRpb25zKCspLCAxNiBkZWxldGlvbnMoLSkK
+PiAKPiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9pcnFjaGlwL2lycS1pbXgtaXJxc3RlZXIuYyBiL2Ry
+aXZlcnMvaXJxY2hpcC9pcnEtaW14LWlycXN0ZWVyLmMKPiBpbmRleCA1YjNmMWQ3Li42N2VkODYy
+IDEwMDY0NAo+IC0tLSBhL2RyaXZlcnMvaXJxY2hpcC9pcnEtaW14LWlycXN0ZWVyLmMKPiArKysg
+Yi9kcml2ZXJzL2lycWNoaXAvaXJxLWlteC1pcnFzdGVlci5jCj4gQEAgLTEzLDcgKzEzLDcgQEAK
+PiDCoCNpbmNsdWRlIDxsaW51eC9vZl9wbGF0Zm9ybS5oPgo+IMKgI2luY2x1ZGUgPGxpbnV4L3Nw
+aW5sb2NrLmg+Cj4gwqAKPiA+IC0jZGVmaW5lIENUUkxfU1RSSURFX09GRihfdCwgX3IpCShfdCAq
+IDggKiBfcikKPiA+ICsjZGVmaW5lIENUUkxfU1RSSURFX09GRihfdCwgX3IpCShfdCAqIDQgKiBf
+cikKPiA+IMKgI2RlZmluZSBDSEFOQ1RSTAkJMHgwCj4gPiDCoCNkZWZpbmUgQ0hBTk1BU0sobiwg
+dCkJCShDVFJMX1NUUklERV9PRkYodCwgMCkgKyAweDQgKiAobikgKyAweDQpCj4gPiDCoCNkZWZp
+bmUgQ0hBTlNFVChuLCB0KQkJKENUUkxfU1RSSURFX09GRih0LCAxKSArIDB4NCAqIChuKSArIDB4
+NCkKPiBAQCAtMjYsNyArMjYsNyBAQCBzdHJ1Y3QgaXJxc3RlZXJfZGF0YSB7Cj4gPiA+IMKgCXN0
+cnVjdCBjbGsJCSppcGdfY2xrOwo+ID4gPiDCoAlpbnQJCQlpcnE7Cj4gPiA+IMKgCXJhd19zcGlu
+bG9ja190CQlsb2NrOwo+ID4gPiAtCWludAkJCWlycV9ncm91cHM7Cj4gPiA+ICsJaW50CQkJcmVn
+X251bTsKPiA+ID4gwqAJaW50CQkJY2hhbm5lbDsKPiA+ID4gwqAJc3RydWN0IGlycV9kb21haW4J
+KmRvbWFpbjsKPiA+ID4gwqAJdTMyCQkJKnNhdmVkX3JlZzsKPiBAQCAtMzUsNyArMzUsNyBAQCBz
+dHJ1Y3QgaXJxc3RlZXJfZGF0YSB7Cj4gwqBzdGF0aWMgaW50IGlteF9pcnFzdGVlcl9nZXRfcmVn
+X2luZGV4KHN0cnVjdCBpcnFzdGVlcl9kYXRhICpkYXRhLAo+ID4gwqAJCQkJwqDCoMKgwqDCoMKg
+dW5zaWduZWQgbG9uZyBpcnFudW0pCj4gwqB7Cj4gPiAtCXJldHVybiAoZGF0YS0+aXJxX2dyb3Vw
+cyAqIDIgLSBpcnFudW0gLyAzMiAtIDEpOwo+ID4gKwlyZXR1cm4gKGRhdGEtPnJlZ19udW0gLSBp
+cnFudW0gLyAzMiAtIDEpOwo+IMKgfQo+IMKgCj4gwqBzdGF0aWMgdm9pZCBpbXhfaXJxc3RlZXJf
+aXJxX3VubWFzayhzdHJ1Y3QgaXJxX2RhdGEgKmQpCj4gQEAgLTQ2LDkgKzQ2LDkgQEAgc3RhdGlj
+IHZvaWQgaW14X2lycXN0ZWVyX2lycV91bm1hc2soc3RydWN0IGlycV9kYXRhICpkKQo+ID4gwqAJ
+dTMyIHZhbDsKPiDCoAo+ID4gwqAJcmF3X3NwaW5fbG9ja19pcnFzYXZlKCZkYXRhLT5sb2NrLCBm
+bGFncyk7Cj4gPiAtCXZhbCA9IHJlYWRsX3JlbGF4ZWQoZGF0YS0+cmVncyArIENIQU5NQVNLKGlk
+eCwgZGF0YS0+aXJxX2dyb3VwcykpOwo+ID4gKwl2YWwgPSByZWFkbF9yZWxheGVkKGRhdGEtPnJl
+Z3MgKyBDSEFOTUFTSyhpZHgsIGRhdGEtPnJlZ19udW0pKTsKPiA+IMKgCXZhbCB8PSBCSVQoZC0+
+aHdpcnEgJSAzMik7Cj4gPiAtCXdyaXRlbF9yZWxheGVkKHZhbCwgZGF0YS0+cmVncyArIENIQU5N
+QVNLKGlkeCwgZGF0YS0+aXJxX2dyb3VwcykpOwo+ID4gKwl3cml0ZWxfcmVsYXhlZCh2YWwsIGRh
+dGEtPnJlZ3MgKyBDSEFOTUFTSyhpZHgsIGRhdGEtPnJlZ19udW0pKTsKPiA+IMKgCXJhd19zcGlu
+X3VubG9ja19pcnFyZXN0b3JlKCZkYXRhLT5sb2NrLCBmbGFncyk7Cj4gwqB9Cj4gwqAKPiBAQCAt
+NjAsOSArNjAsOSBAQCBzdGF0aWMgdm9pZCBpbXhfaXJxc3RlZXJfaXJxX21hc2soc3RydWN0IGly
+cV9kYXRhICpkKQo+ID4gwqAJdTMyIHZhbDsKPiDCoAo+ID4gwqAJcmF3X3NwaW5fbG9ja19pcnFz
+YXZlKCZkYXRhLT5sb2NrLCBmbGFncyk7Cj4gPiAtCXZhbCA9IHJlYWRsX3JlbGF4ZWQoZGF0YS0+
+cmVncyArIENIQU5NQVNLKGlkeCwgZGF0YS0+aXJxX2dyb3VwcykpOwo+ID4gKwl2YWwgPSByZWFk
+bF9yZWxheGVkKGRhdGEtPnJlZ3MgKyBDSEFOTUFTSyhpZHgsIGRhdGEtPnJlZ19udW0pKTsKPiA+
+IMKgCXZhbCAmPSB+QklUKGQtPmh3aXJxICUgMzIpOwo+ID4gLQl3cml0ZWxfcmVsYXhlZCh2YWws
+IGRhdGEtPnJlZ3MgKyBDSEFOTUFTSyhpZHgsIGRhdGEtPmlycV9ncm91cHMpKTsKPiA+ICsJd3Jp
+dGVsX3JlbGF4ZWQodmFsLCBkYXRhLT5yZWdzICsgQ0hBTk1BU0soaWR4LCBkYXRhLT5yZWdfbnVt
+KSk7Cj4gPiDCoAlyYXdfc3Bpbl91bmxvY2tfaXJxcmVzdG9yZSgmZGF0YS0+bG9jaywgZmxhZ3Mp
+Owo+IMKgfQo+IMKgCj4gQEAgLTk0LDEzICs5NCwxMyBAQCBzdGF0aWMgdm9pZCBpbXhfaXJxc3Rl
+ZXJfaXJxX2hhbmRsZXIoc3RydWN0IGlycV9kZXNjICpkZXNjKQo+IMKgCj4gPiDCoAljaGFpbmVk
+X2lycV9lbnRlcihpcnFfZGVzY19nZXRfY2hpcChkZXNjKSwgZGVzYyk7Cj4gwqAKPiA+IC0JZm9y
+IChpID0gMDsgaSA8IGRhdGEtPmlycV9ncm91cHMgKiA2NDsgaSArPSAzMikgewo+ID4gKwlmb3Ig
+KGkgPSAwOyBpIDwgZGF0YS0+cmVnX251bSAqIDMyOyBpICs9IDMyKSB7Cj4gPiDCoAkJaW50IGlk
+eCA9IGlteF9pcnFzdGVlcl9nZXRfcmVnX2luZGV4KGRhdGEsIGkpOwo+ID4gwqAJCXVuc2lnbmVk
+IGxvbmcgaXJxbWFwOwo+ID4gwqAJCWludCBwb3MsIHZpcnE7Cj4gwqAKPiA+IMKgCQlpcnFtYXAg
+PSByZWFkbF9yZWxheGVkKGRhdGEtPnJlZ3MgKwo+ID4gLQkJCQnCoMKgwqDCoMKgwqDCoENIQU5T
+VEFUVVMoaWR4LCBkYXRhLT5pcnFfZ3JvdXBzKSk7Cj4gPiArCQkJCcKgwqDCoMKgwqDCoMKgQ0hB
+TlNUQVRVUyhpZHgsIGRhdGEtPnJlZ19udW0pKTsKPiDCoAo+ID4gwqAJCWZvcl9lYWNoX3NldF9i
+aXQocG9zLCAmaXJxbWFwLCAzMikgewo+ID4gwqAJCQl2aXJxID0gaXJxX2ZpbmRfbWFwcGluZyhk
+YXRhLT5kb21haW4sIHBvcyArIGkpOwo+IEBAIC0xNDYsMTIgKzE0NiwxNSBAQCBzdGF0aWMgaW50
+IGlteF9pcnFzdGVlcl9wcm9iZShzdHJ1Y3QgcGxhdGZvcm1fZGV2aWNlICpwZGV2KQo+IMKgCj4g
+PiDCoAlyYXdfc3Bpbl9sb2NrX2luaXQoJmRhdGEtPmxvY2spOwo+IMKgCj4gPiAtCW9mX3Byb3Bl
+cnR5X3JlYWRfdTMyKG5wLCAiZnNsLGlycS1ncm91cHMiLCAmZGF0YS0+aXJxX2dyb3Vwcyk7Cj4g
+PiArCW9mX3Byb3BlcnR5X3JlYWRfdTMyKG5wLCAiZnNsLG51bS1pcnFzIiwgJmRhdGEtPnJlZ19u
+dW0pOwo+ID4gwqAJb2ZfcHJvcGVydHlfcmVhZF91MzIobnAsICJmc2wsY2hhbm5lbCIsICZkYXRh
+LT5jaGFubmVsKTsKPiDCoAo+ID4gKwkvKiBvbmUgcmVnaXN0ZXIgYml0IG1hcCByZXByZXNlbnRz
+IDMyIGlucHV0IGludGVycnVwdHMgKi8KPiA+ICsJZGF0YS0+cmVnX251bSAvPSAzMjsKPiArCj4g
+PiDCoAlpZiAoSVNfRU5BQkxFRChDT05GSUdfUE1fU0xFRVApKSB7Cj4gPiDCoAkJZGF0YS0+c2F2
+ZWRfcmVnID0gZGV2bV9remFsbG9jKCZwZGV2LT5kZXYsCj4gPiAtCQkJCQlzaXplb2YodTMyKSAq
+IGRhdGEtPmlycV9ncm91cHMgKiAyLAo+ID4gKwkJCQkJc2l6ZW9mKHUzMikgKiBkYXRhLT5yZWdf
+bnVtLAo+IMKgCQkJCQlHRlBfS0VSTkVMKTsKCkRvZXMgdGhpcyBsYXN0IHBhcmFtZXRlciBub3cg
+Zml0IG9uIHRoZSBsaW5lIGFib3ZlPwoKPiDCoAkJaWYgKCFkYXRhLT5zYXZlZF9yZWcpCj4gPiDC
+oAkJCXJldHVybiAtRU5PTUVNOwo+IEBAIC0xNjYsNyArMTY5LDcgQEAgc3RhdGljIGludCBpbXhf
+aXJxc3RlZXJfcHJvYmUoc3RydWN0IHBsYXRmb3JtX2RldmljZSAqcGRldikKPiA+IMKgCS8qIHN0
+ZWVyIGFsbCBJUlFzIGludG8gY29uZmlndXJlZCBjaGFubmVsICovCj4gPiDCoAl3cml0ZWxfcmVs
+YXhlZChCSVQoZGF0YS0+Y2hhbm5lbCksIGRhdGEtPnJlZ3MgKyBDSEFOQ1RSTCk7Cj4gwqAKPiA+
+IC0JZGF0YS0+ZG9tYWluID0gaXJxX2RvbWFpbl9hZGRfbGluZWFyKG5wLCBkYXRhLT5pcnFfZ3Jv
+dXBzICogNjQsCj4gPiArCWRhdGEtPmRvbWFpbiA9IGlycV9kb21haW5fYWRkX2xpbmVhcihucCwg
+ZGF0YS0+cmVnX251bSAqIDMyLAo+ID4gwqAJCQkJCcKgwqDCoMKgwqAmaW14X2lycXN0ZWVyX2Rv
+bWFpbl9vcHMsIGRhdGEpOwo+ID4gwqAJaWYgKCFkYXRhLT5kb21haW4pIHsKPiA+IMKgCQlkZXZf
+ZXJyKCZwZGV2LT5kZXYsICJmYWlsZWQgdG8gY3JlYXRlIElSUSBkb21haW5cbiIpOwo+IEBAIC0x
+OTksOSArMjAyLDkgQEAgc3RhdGljIHZvaWQgaW14X2lycXN0ZWVyX3NhdmVfcmVncyhzdHJ1Y3Qg
+aXJxc3RlZXJfZGF0YSAqZGF0YSkKPiDCoHsKPiA+IMKgCWludCBpOwo+IMKgCj4gPiAtCWZvciAo
+aSA9IDA7IGkgPCBkYXRhLT5pcnFfZ3JvdXBzICogMjsgaSsrKQo+ID4gKwlmb3IgKGkgPSAwOyBp
+IDwgZGF0YS0+cmVnX251bTsgaSsrKQo+ID4gwqAJCWRhdGEtPnNhdmVkX3JlZ1tpXSA9IHJlYWRs
+X3JlbGF4ZWQoZGF0YS0+cmVncyArCj4gPiAtCQkJCQkJQ0hBTk1BU0soaSwgZGF0YS0+aXJxX2dy
+b3VwcykpOwo+ID4gKwkJCQkJCUNIQU5NQVNLKGksIGRhdGEtPnJlZ19udW0pKTsKPiDCoH0KPiDC
+oAo+IMKgc3RhdGljIHZvaWQgaW14X2lycXN0ZWVyX3Jlc3RvcmVfcmVncyhzdHJ1Y3QgaXJxc3Rl
+ZXJfZGF0YSAqZGF0YSkKPiBAQCAtMjA5LDkgKzIxMiw5IEBAIHN0YXRpYyB2b2lkIGlteF9pcnFz
+dGVlcl9yZXN0b3JlX3JlZ3Moc3RydWN0IGlycXN0ZWVyX2RhdGEgKmRhdGEpCj4gPiDCoAlpbnQg
+aTsKPiDCoAo+ID4gwqAJd3JpdGVsX3JlbGF4ZWQoQklUKGRhdGEtPmNoYW5uZWwpLCBkYXRhLT5y
+ZWdzICsgQ0hBTkNUUkwpOwo+ID4gLQlmb3IgKGkgPSAwOyBpIDwgZGF0YS0+aXJxX2dyb3VwcyAq
+IDI7IGkrKykKPiA+ICsJZm9yIChpID0gMDsgaSA8IGRhdGEtPnJlZ19udW07IGkrKykKPiA+IMKg
+CQl3cml0ZWxfcmVsYXhlZChkYXRhLT5zYXZlZF9yZWdbaV0sCj4gPiAtCQkJwqDCoMKgwqDCoMKg
+wqBkYXRhLT5yZWdzICsgQ0hBTk1BU0soaSwgZGF0YS0+aXJxX2dyb3VwcykpOwo+ID4gKwkJCcKg
+wqDCoMKgwqDCoMKgZGF0YS0+cmVncyArIENIQU5NQVNLKGksIGRhdGEtPnJlZ19udW0pKTsKPiDC
+oH0KPiDCoAo+IMKgc3RhdGljIGludCBpbXhfaXJxc3RlZXJfc3VzcGVuZChzdHJ1Y3QgZGV2aWNl
+ICpkZXYpCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwps
+aW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJh
+ZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51
+eC1hcm0ta2VybmVsCg==
