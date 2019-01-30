@@ -2,63 +2,70 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5AD33C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:00:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 65CFFC282D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:06:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0986620870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:00:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 342EB20989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 15:06:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pOf+J0V8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0986620870
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZKIToKgY";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="yXKB+Pgb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 342EB20989
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=dbYAJMTGvAtdnnrA9edKh2oH5cfAy70Q9HDHObi8aMI=; b=pOf+J0V8rySM5MrZJ9Y4WmHdf
-	tVv8MJp03I1SWGgRW0bqVQTTW8zWcNaqHJiwuuZtB3sWN2VltZL30IPmiPRefr5cxPO6aZJKYmQfi
-	o89C7fJ9lweTmPQqOThzS2nuOqotK/JVYu9dyYAVu/0c1G1n4jWeddl61Jt7AyRifIA5mmGEStZRu
-	ppkO5iIvg4OBvqer/yIudDbgaTkuKzoAmlBheHE/5aswmJLX3Z9+cXx4lTE90hRUF5Wzd3DH71C26
-	M4lLV/CND/wm+8CzxwJKvqYRSSjenpgH5W9Cdo7YQyF/T8IGGHFYKrzt0IwXZcDDlgjHtNAYwKqBH
-	wbsyoU8rQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=0AyxZasUlTZ1L6lee39A+y5aLUC7kDGjIKnw9Ss7TOs=; b=ZKIToKgYZFuVoP
+	qRwECXQwHO1HOJRHfDIkjn5NDrnKo7R8akcRZlzA/rEoNQD42BH0F+KrXpBkecHZMdRt5oAB7zU1A
+	RWza09LoG3QEwLq/ywvwUrUUgKrrf2FPridxRL3aR27oW3zfxnxbOreEhl8KESKgV4fxriPlbM0e/
+	xw9vJ2PzJm23eZVHtg9YSrpI1ji/FdxPZ4Ie7H5ApZY4MaFGg4YK/+kruAw7l/crO8REcE0YMNkeb
+	2g2nhjJLYYe/uhhhDurS8EuteJ1cDkJZIjk9vgGLnziE1eE3eEL0QeAs+6KQh2qRh6kvlvHqmOFta
+	OypfPow5fz/iTmu9owVg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gorLu-0004Sf-NI; Wed, 30 Jan 2019 15:00:34 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gorLs-0004SG-22
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 15:00:33 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9CAC7EBD;
- Wed, 30 Jan 2019 07:00:31 -0800 (PST)
-Received: from [10.37.9.196] (unknown [10.37.9.196])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D38463F589;
- Wed, 30 Jan 2019 07:00:29 -0800 (PST)
-Subject: Re: [PATCH v3 0/1] arm64: Add workaround for Fujitsu A64FX erratum
- 010001
-To: "Zhang, Lei" <zhang.lei@jp.fujitsu.com>
-References: <8898674D84E3B24BA3A2D289B872026A6A2C04E6@G01JPEXMBKW03>
-From: James Morse <james.morse@arm.com>
-Message-ID: <cb7544e2-bd85-df4c-1f48-0afeedefc962@arm.com>
-Date: Wed, 30 Jan 2019 15:00:28 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
+	id 1gorRU-0006DD-Bw; Wed, 30 Jan 2019 15:06:20 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gorRS-0006Cw-0D
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 15:06:19 +0000
+Received: from localhost (unknown [69.71.4.100])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 2BAA320989;
+ Wed, 30 Jan 2019 15:06:17 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548860777;
+ bh=91akihFMRrpe92l8fZfX0HpMGtuRJLFm6w4kozyFT+o=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=yXKB+PgbsRlZT5qKMU0kzrB4s++v2Q0IV1KgiXJnwMDQ+qLZzVGgAKWtUOltYniMX
+ aK8PIecB8TH5fqOUXyztBsTK3DlfLtdAZSuY4N9uogcbf6TymsFIE5o0Wqy8AKphCU
+ sax+m47zvcxyoW4UlApEP/wWrnJf+JVMDMYSq5tw=
+Date: Wed, 30 Jan 2019 09:06:15 -0600
+From: Bjorn Helgaas <helgaas@kernel.org>
+To: Aleksey Makarov <aleksey.makarov@cavium.com>
+Subject: Re: [PATCH net-next v6 1/2] net: add support for Cavium PTP
+ coprocessor
+Message-ID: <20190130150614.GA229773@google.com>
+References: <20180115124500.14872-1-aleksey.makarov@cavium.com>
+ <20180115124500.14872-2-aleksey.makarov@cavium.com>
 MIME-Version: 1.0
-In-Reply-To: <8898674D84E3B24BA3A2D289B872026A6A2C04E6@G01JPEXMBKW03>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20180115124500.14872-2-aleksey.makarov@cavium.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_070032_280994_EC56B0E6 
-X-CRM114-Status: GOOD (  14.03  )
+X-CRM114-CacheID: sfid-20190130_070618_063965_8315793A 
+X-CRM114-Status: UNSURE (   9.45  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,44 +77,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: 'Mark Rutland' <mark.rutland@arm.com>,
- 'Catalin Marinas' <catalin.marinas@arm.com>,
- "'will.deacon@arm.com'" <will.deacon@arm.com>,
- "'linux-kernel@vger.kernel.org'" <linux-kernel@vger.kernel.org>,
- "'linux-arm-kernel@lists.infradead.org'"
- <linux-arm-kernel@lists.infradead.org>
+Cc: Robert Richter <rric@kernel.org>, "Goutham,
+ Sunil" <Sunil.Goutham@cavium.com>, netdev@vger.kernel.org,
+ Richard Cochran <richardcochran@gmail.com>,
+ Radoslaw Biernacki <rad@semihalf.com>, linux-kernel@vger.kernel.org,
+ David Daney <ddaney@caviumnetworks.com>,
+ Philippe Ombredanne <pombredanne@nexb.com>, Joe Perches <joe@perches.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi!
+On Mon, Jan 15, 2018 at 06:44:56PM +0600, Aleksey Makarov wrote:
+> +++ b/drivers/net/ethernet/cavium/common/cavium_ptp.c
+> @@ -0,0 +1,353 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/* cavium_ptp.c - PTP 1588 clock on Cavium hardware
+> + * Copyright (c) 2003-2015, 2017 Cavium, Inc.
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/module.h>
+> +#include <linux/timecounter.h>
+> +#include <linux/pci.h>
+> +
+> +#include "cavium_ptp.h"
+> +
+> +#define DRV_NAME	"Cavium PTP Driver"
 
-On 01/29/2019 12:29 PM, Zhang, Lei wrote:
-> On some variants of the Fujitsu-A64FX cores ver(1.0, 1.1),
-> memory accesses may cause undefined fault (Data abort, DFSC=0b111111).
-> This problem will be fixed by next version of Fujitsu-A64FX.
-> 
-> This fault occurs under a specific hardware condition
-> when a load/store instruction perform an address translation using:
->    case-1  TTBR0_EL1 with TCR_EL1.NFD0 == 1.
->    case-2  TTBR0_EL2 with TCR_EL2.NFD0 == 1.
->    case-3  TTBR1_EL1 with TCR_EL1.NFD1 == 1.
->    case-4  TTBR1_EL2 with TCR_EL2.NFD1 == 1.
-> And this fault occurs completely spurious.
-> 
-> Since TCR_ELx.NFD1 is set to '1' at the kernel in versions
-> past 4.17, the case-3 or case-4 may happen.
+This is also unconventional and looks funny, e.g., here:
 
-e03e61c3173c ("arm64: kaslr: Set TCR_EL1.NFD1 when 
-CONFIG_RANDOMIZE_BASE=y") ?
-
-So you'd never see it if you disabled CONFIG_RANDOMIZE_BASE?
-
-
-Thanks,
-
-James
+  $ ls /sys/bus/pci/drivers/
+   8250_mid/             exar_serial/         mei_me/       snd_hda_intel/
+   agpgart-intel/        i801_smbus/          parport_pc/   snd_soc_skl/
+   agpgart-sis/          i915/                pcieport/     xen-platform-pci/
+   agpgart-via/          intel_ish_ipc/       rtsx_pci/     xhci_hcd/
+   ahci/                 intel_pch_thermal/   serial/
+  'Cavium PTP Driver'/   iosf_mbi_pci/        shpchp/
+   e1000e/               iwlwifi/             skl_uncore/
 
 _______________________________________________
 linux-arm-kernel mailing list
