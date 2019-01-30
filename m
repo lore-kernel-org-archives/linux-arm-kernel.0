@@ -2,82 +2,132 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 76D96C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:46:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B3CB6C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:53:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 49F2620882
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:46:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 84089218A4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 12:53:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JWNyfGmJ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="GDM2v5pM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 49F2620882
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mS0WkhVC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="sE8aSyij"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84089218A4
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=partner.samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
+	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=O1wHmkeJd4luRipXdoY3c0b/8/kUkl3ewBBz/7winvQ=; b=JWNyfGmJeBl9uL
-	rFa0Go/d4CEC4p69WIuqQ2cp4AI/1W60BT+b+CdPLjCwBqEO7owHXTfll3FgnLNjlg5lYqHE57U6+
-	Zj6KjU8wlIA+cbUXOOMgS2VjXvhHVnONZfWcjGCB/hZMq3qziOyKaptPA4kmvAvBkAiSKOLH0eOhO
-	V3y5HCWO6E8aLtjdlQi9tgJWr048dDHayHw7NKXKEmSrGjyXJiMhAjFj4hAYHe4VyOkJk8ERa1qan
-	8Ez75e+Eu8kop1KijiWocxF41WCNQYUskpQgUj8N3aRYFGwz38tBBfh8TaHTyYYD1DEcrXOAvuhMo
-	4rL/cR8uu5srY+VJldhg==;
+	List-Owner; bh=DPa6Ro+POyoikv7pOQxEueV6Pl2PI7yLPd1RU+lqBO8=; b=mS0WkhVCwLm6XU
+	4UChRLptP1CQhm/z8JaXAq66nZrjasIQzBqnkgNfJkGKCpvVkDFrCRUD9hf1kjhVdUxZuFIv4fu68
+	ec7zr2oOA23g4IIAwN7awaGP1jEWmHc5TrvoWonb/nHMb2u/QRgUCZqiqdwuB6eeNnSiqzoi781tz
+	7l46+egtEolbgm7o0tR7IAqEKy9PhlgO91H9cRsrHRJkDpu9ba2b/nNOYh2kjAkXFvPdiONkhxm/6
+	bKs/2X2Q/nogwhxOnejLHzKeuOtP1zB5ZRgaZAnh4JRcdHJF20CRJUHPxTaunGcxAvgIZbkmoExRi
+	cMTD3fBdYDjsda1BommA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gopGU-0004Sy-M2; Wed, 30 Jan 2019 12:46:50 +0000
-Received: from mail-io1-xd42.google.com ([2607:f8b0:4864:20::d42])
+	id 1gopMU-0006Vx-9y; Wed, 30 Jan 2019 12:53:02 +0000
+Received: from mailout2.w1.samsung.com ([210.118.77.12])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gopGR-0004SW-Gb
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 12:46:49 +0000
-Received: by mail-io1-xd42.google.com with SMTP id t24so19307339ioi.0
+ id 1gopMP-0006Uv-Bf
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 12:52:59 +0000
+Received: from eucas1p1.samsung.com (unknown [182.198.249.206])
+ by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
+ 20190130125252euoutp0269037c951a792078a3713c6c0108381e~_oWPu28xr0936909369euoutp02D
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 04:46:46 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=mzr4ARbu1TjAJHS3g9jhoTSUIRon+Ua3EZgbCU4NmpM=;
- b=GDM2v5pMEse2iQm6bSsuV5UVIP0VjgRMA6ramkeol82YtrVdtd4Par+3h+hCvbrVzw
- 1DV4uxTgUAzZZ2tuMzI/B673fLbs6mWkA5r0byaLmHwtMOgqty7/s/X5Wi/2YPH054i1
- QcbixkX+aEwWjAcSoRHbDhAdr7fON+Ld2lf3Zq0CGQRWC8WCBJVQHv2+yGuQJ7LLogZ5
- xAArSfC1hJwEf6cQ/JlbEWT519L2w7kmn0N36Stmo0Oe8c6vVnyGRTL73UMLYH5hkOVM
- fMJXkIYEWkS4ajs6VF+fmLVeW4cypQjXQHAfke1yKJOX5i5yEaho2RD3tcc6mT5truDw
- gFRA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=mzr4ARbu1TjAJHS3g9jhoTSUIRon+Ua3EZgbCU4NmpM=;
- b=ReL4WBiNtMBM8Xt1ydxSYUZu9yUVVzX3S48JwA57Pst111mXtkv71dVpAh7sjR8jBy
- KOWqQ8V9QXdq0zs8tF8zAktAvXc04mr6Sc4vI+jJXE+eiqSGRXMJZ1cEP7buGV+3qf+t
- R+AwNPL946py0UE+oiaFYKiwhjdGUHBaX3vGNSbBz0HVZl9jUS8iCPh1k4pLOFBwvAKv
- LTWoST+Et2xtBHyIceWgIggdJa04l8nFf7IfO6r7AvIFdSiuTglkm/X7jWsGw3r9XN0C
- AmF6DCvpOTrvyM53nFMiLF20rQiNfDG0W37Wj4xhH/ne87DrFcr/kKJ2sP11PcvMAGzQ
- 2kNw==
-X-Gm-Message-State: AHQUAuZoBc/p9lU595jBUecDvybLzByWM0UP2h7IS1SqulGYBju3B24G
- UIygZpDVU91YYdhbhD9tesU/gFFgK7WasB5TZos=
-X-Google-Smtp-Source: AHgI3Ia2MHeEdqbgKMaIi6axve2Mh8Pu5dfNmgDGM7u3sNA0XqCauHSh9mPjAGD8nYLdiGMG0WWXfiFcrcnOlM0EIdE=
-X-Received: by 2002:a5e:8517:: with SMTP id i23mr15184935ioj.28.1548852406261; 
- Wed, 30 Jan 2019 04:46:46 -0800 (PST)
+ Wed, 30 Jan 2019 12:52:52 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
+ 20190130125252euoutp0269037c951a792078a3713c6c0108381e~_oWPu28xr0936909369euoutp02D
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1548852772;
+ bh=IBPDM6AfRZ8UrMjyIhT1hwhllxDf2XHMgYs+F0ofQuE=;
+ h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
+ b=sE8aSyijwmOcsW9h5Ygrgtg6lcawsviDAfAxby4JyvUZEuXrJm+Tm3IsfzstI2DaM
+ 6S/iIBduHENWGKJdo7Qn9Saxb01PiDEsswdl5BLPhNKO3hVLv0iEhwP+e6/rJjYyNs
+ GzncHEriLInyW3nB+WGjrISh+QBbN/ZU6ue6g3yY=
+Received: from eusmges1new.samsung.com (unknown [203.254.199.242]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTP id
+ 20190130125251eucas1p16ac57d23f63860d2dfd744932695eed4~_oWPGx9qP1276312763eucas1p1z;
+ Wed, 30 Jan 2019 12:52:51 +0000 (GMT)
+Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
+ eusmges1new.samsung.com (EUCPMTA) with SMTP id 20.FE.04441.32E915C5; Wed, 30
+ Jan 2019 12:52:51 +0000 (GMT)
+Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
+ eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
+ 20190130125250eucas1p2394b3ec6073c04ac841e85a4c9cbcc20~_oWOROfkI1276112761eucas1p23;
+ Wed, 30 Jan 2019 12:52:50 +0000 (GMT)
+Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
+ eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
+ 20190130125250eusmtrp1feef69f34f5e9f4412d5200607805f75~_oWOCP8MB2687526875eusmtrp1F;
+ Wed, 30 Jan 2019 12:52:50 +0000 (GMT)
+X-AuditID: cbfec7f2-5c9ff70000001159-8f-5c519e232f1b
+Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
+ eusmgms2.samsung.com (EUCPMTA) with SMTP id F3.7E.04128.22E915C5; Wed, 30
+ Jan 2019 12:52:50 +0000 (GMT)
+Received: from [106.120.51.20] (unknown [106.120.51.20]) by
+ eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
+ 20190130125249eusmtip2cedfb04c24ca7a3abe86c879401bb31d~_oWNaCATz0492804928eusmtip2h;
+ Wed, 30 Jan 2019 12:52:49 +0000 (GMT)
+Subject: Re: [PATCH v2 6/8] DT: arm: exynos: add DMC device for exynos5422
+To: Krzysztof Kozlowski <krzk@kernel.org>
+From: Lukasz Luba <l.luba@partner.samsung.com>
+Message-ID: <267bc3e3-efc1-c6a8-2a32-e298adb40cfe@partner.samsung.com>
+Date: Wed, 30 Jan 2019 13:52:48 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <20190130095749.8952-1-daniel.baluta@nxp.com>
-In-Reply-To: <20190130095749.8952-1-daniel.baluta@nxp.com>
-From: Dong Aisheng <dongas86@gmail.com>
-Date: Wed, 30 Jan 2019 20:46:35 +0800
-Message-ID: <CAA+hA=Tz0p8Ea9f8wuqUZFkmuDrqMHj8_4sLvT8wi6qrTnaVKQ@mail.gmail.com>
-Subject: Re: [PATCH v2] firmware: imx: Add support to start/stop a CPU
-To: Daniel Baluta <daniel.baluta@nxp.com>
+In-Reply-To: <CAJKOXPcfZsZPYStrV-QOd2YJsoaJdbtdz2RX-AJrC6A6B8vJqA@mail.gmail.com>
+Content-Language: en-US
+X-Brightmail-Tracker: H4sIAAAAAAAAA02Se0hTYRjG+3auDk99rsyXiopFYEEzS+hQdpOKEURKBFGDmnVSyXnZ8ZIW
+ qUXqvFSolS1RE0tbmros11XQ0TLvaSmVEE3soibqxC4YOc8k//u9z/u8fM8DH0soOqglbFhE
+ jKCP0IYraTn56OWvtnWrCoM06/tvrOBr8qsovsfxheKLrG0Uf9k+SPDt7dUM33p+iOHN9ncU
+ 3/WkgObHs62Iz29/IeMrrX0Mf7unU8Z/SCmn+YvPrQzfOJRG7VigriisQGqzyUCrH5QmqS/V
+ mpB63Lw8kDos9z8hhIfFCXqfbcfkoYbUHjrKCqcvvWxGyWgKZyA3FrAfXB2pJTOQnFXgcgT2
+ C3mUNDgQDD79yEjDOIKb738ysyemu+cJaVGGICVnxHUyjOBxr4NyuhbivdBdXIecvAivgZ6p
+ yRkTgYtIyEi/N/0iy9JYBRZTtNPD4T1QfP8C5ZRJvBrumPc6ZU98CBqzfyDJ4gFNN/pJJ7vh
+ IKhvmSKcTGAveN9fJJN4BdQNF8yEAzzKwHCrmZBS74KW3AmZxAvhu63W1WYZNOdmkRKL0Jpu
+ oiU+C2lNFpdnCzTaOmeyEdNdqp74SPJOsI/W0U4Z8HzoHfaQIsyHnEfXCUnmID1VIbm9oTar
+ wxVgMZRVXGOuIKVxTjHjnDLGOWWM/98tRqQJeQmxoi5EEH0jhHiVqNWJsREhquOROjOa/mfN
+ f21jFjTxJrgBYRYp3bl5BwI1CkobJyboGhCwhHIR5/tnv0bBndAmJAr6yKP62HBBbEBLWVLp
+ xZ2Z9+mIAodoY4RTghAl6Ge3MtZtSTJaGb28ZsDP/YN/IZ1wsPt1TlOk7o/5maO6s2W3YXc9
+ MzXJeS+92bfv29Uqy57f61I3bBdtJZZszUZr1Y7QAp9rt0bPfT0QV7JV4zmGgwxv++MDMgM+
+ 2ydKo34/70ouSU/s7vLvaxiILj2cZ+IWvNpsUwWPXD+5iXsYWpmZlh8oT1IpSTFU67uW0Iva
+ f/szKBpjAwAA
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFnrCIsWRmVeSWpSXmKPExsVy+t/xe7pK8wJjDO50KltsnLGe1eL6l+es
+ FvOPnGO16H/8mtni/PkN7BZnm96wW2x6fI3V4vKuOWwWn3uPMFrMOL+PyWLtkbvsFkuvX2Sy
+ uN24gs2ide8RdovDb9pZHfg91sxbw+ixaVUnm8fmJfUefVtWMXp83iQXwBqlZ1OUX1qSqpCR
+ X1xiqxRtaGGkZ2hpoWdkYqlnaGwea2VkqqRvZ5OSmpNZllqkb5egl9HZdp2t4IhERd+x04wN
+ jH8Fuhg5OSQETCRWrWxi7mLk4hASWMoo8fvEOVaIhJjEpH3b2SFsYYk/17rYIIpeM0rMPXua
+ BSQhLOAlcWXBdkYQW0RAU+L63++sIEXMAvNZJKY8/c4C0bGMSeLspLVAGQ4ONgE9iR2rCkEa
+ eAXcJBasawYLswioSizb5AUSFhWIkPj4dB8TRImgxMmZT8B2cQoESuw/85cZxGYWMJOYt/kh
+ lC0ucevJfCYIW15i+9s5zBMYhWYhaZ+FpGUWkpZZSFoWMLKsYhRJLS3OTc8tNtIrTswtLs1L
+ 10vOz93ECIzhbcd+btnB2PUu+BCjAAejEg8vQ3BAjBBrYllxZe4hRgkOZiURXsPf/jFCvCmJ
+ lVWpRfnxRaU5qcWHGE2BfpvILCWanA9ML3kl8YamhuYWlobmxubGZhZK4rznDSqjhATSE0tS
+ s1NTC1KLYPqYODilGhiv2D6bIb/kk1TmnpSdnRtn5b/93PTmxETnpde7FkbduS/wLqV8n2wj
+ o2Lmhoc3+g/OSMrPLk2+8c/RbsWtbTtrXm4WUPPP5nXcY//QaHlAYf2M5pb7J9Ob+kRsWfKO
+ rj5uOcfcqHh187uJn/S22v64crRO63ZHizbj0aKUT7tOTFi2922d0c7XSizFGYmGWsxFxYkA
+ bXQC9vcCAAA=
+X-CMS-MailID: 20190130125250eucas1p2394b3ec6073c04ac841e85a4c9cbcc20
+X-Msg-Generator: CA
+X-RootMTR: 20190129175526eucas1p253dc2e8a0d64b34d95c84d585fb0fac0
+X-EPHeader: CA
+CMS-TYPE: 201P
+X-CMS-RootMailID: 20190129175526eucas1p253dc2e8a0d64b34d95c84d585fb0fac0
+References: <CGME20190129175526eucas1p253dc2e8a0d64b34d95c84d585fb0fac0@eucas1p2.samsung.com>
+ <1548784514-26649-1-git-send-email-l.luba@partner.samsung.com>
+ <1548784514-26649-7-git-send-email-l.luba@partner.samsung.com>
+ <CAJKOXPcfZsZPYStrV-QOd2YJsoaJdbtdz2RX-AJrC6A6B8vJqA@mail.gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_044647_575875_B8A500D9 
-X-CRM114-Status: GOOD (  18.54  )
+X-CRM114-CacheID: sfid-20190130_045257_693719_8C6A6273 
+X-CRM114-Status: GOOD (  17.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,116 +139,88 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>,
- "daniel.baluta@gmail.com" <daniel.baluta@gmail.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "festevam@gmail.com" <festevam@gmail.com>, "S.j. Wang" <shengjiu.wang@nxp.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ =?UTF-8?Q?Bart=c5=82omiej_=c5=bbo=c5=82nierkiewicz?=
+ <b.zolnierkie@samsung.com>, linux-pm@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ Chanwoo Choi <cw00.choi@samsung.com>, kyungmin.park@samsung.com,
+ kgene@kernel.org, myungjoo.ham@samsung.com, s.nawrocki@samsung.com,
+ linux-arm-kernel@lists.infradead.org,
+ Marek Szyprowski <m.szyprowski@samsung.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 30, 2019 at 5:59 PM Daniel Baluta <daniel.baluta@nxp.com> wrote:
->
-> This is done via RPC call to SCU.
->
-> Signed-off-by: Daniel Baluta <daniel.baluta@nxp.com>
-> ---
-> Changes since v1:
->         - remove unused variable ret
->         - add documentation for imx_sc_pm_cpu_start function
->
->  drivers/firmware/imx/misc.c           | 38 +++++++++++++++++++++++++++
->  include/linux/firmware/imx/svc/misc.h |  3 +++
->  2 files changed, 41 insertions(+)
->
-> diff --git a/drivers/firmware/imx/misc.c b/drivers/firmware/imx/misc.c
-> index 97f5424dbac9..f511d6f624fd 100644
-> --- a/drivers/firmware/imx/misc.c
-> +++ b/drivers/firmware/imx/misc.c
-> @@ -18,6 +18,14 @@ struct imx_sc_msg_req_misc_set_ctrl {
->         u16 resource;
->  } __packed;
->
-> +struct imx_sc_msg_req_cpu_start {
-> +       struct imx_sc_rpc_msg hdr;
-> +       u32 address_hi;
-> +       u32 address_lo;
-> +       u16 resource;
-> +       u8 enable;
-> +} __packed;
-> +
->  struct imx_sc_msg_req_misc_get_ctrl {
->         struct imx_sc_rpc_msg hdr;
->         u32 ctrl;
-> @@ -97,3 +105,33 @@ int imx_sc_misc_get_control(struct imx_sc_ipc *ipc, u32 resource,
->         return 0;
->  }
->  EXPORT_SYMBOL(imx_sc_misc_get_control);
-> +
-> +/*
-> + * This function starts/stops a CPU identified by @resource
-> + *
-> + * @param[in]     ipc         IPC handle
-> + * @param[in]     resource    resource the control is associated with
-> + * @param[in]     enable      true for start, false for stop
-> + * @param[out]    address     initial instruction address to be executed
-> + *
-> + * @return Returns 0 for success and < 0 for errors.
-> + */
-> +int imx_sc_pm_cpu_start(struct imx_sc_ipc *ipc, u32 resource,
-> +                       bool enable, u64 address)
-> +{
-> +       struct imx_sc_msg_req_cpu_start msg;
-> +       struct imx_sc_rpc_msg *hdr = &msg.hdr;
-> +
-> +       hdr->ver = IMX_SC_RPC_VERSION;
-> +       hdr->svc = (uint8_t)IMX_SC_RPC_SVC_PM;
-> +       hdr->func = (uint8_t)IMX_SC_PM_FUNC_CPU_START;
+Hi Krzysztof,
 
-pls drop the unneccesary unit8_t
+On 1/30/19 10:46 AM, Krzysztof Kozlowski wrote:
+> On Tue, 29 Jan 2019 at 18:55, Lukasz Luba <l.luba@partner.samsung.com> wrote:
+>>
+>> Add description of Dynamic Memory Controller and PPMU counters.
+>> They are used by exynos5422-dmc driver.
+>>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> CC: Mark Rutland <mark.rutland@arm.com>
+>> CC: Kukjin Kim <kgene@kernel.org>
+>> CC: Krzysztof Kozlowski <krzk@kernel.org>
+>> CC: devicetree@vger.kernel.org
+>> CC: linux-arm-kernel@lists.infradead.org
+>> CC: linux-samsung-soc@vger.kernel.org
+>> CC: linux-kernel@vger.kernel.org
+>> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+>> ---
+>>   arch/arm/boot/dts/exynos5420.dtsi             | 69 +++++++++++++++++++++++++++
+>>   arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 22 +++++++++
+>>   2 files changed, 91 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+>> index aaff158..4d76335 100644
+>> --- a/arch/arm/boot/dts/exynos5420.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+>> @@ -235,6 +235,27 @@
+>>                          status = "disabled";
+>>                  };
+>>
+>> +               dmc: memory-controller@10c20000 {
+>> +                       compatible = "samsung,exynos5422-dmc";
+>> +                       reg = <0x10c20000 0x10000>, <0x10c30000 0x10000>,
+>> +                               <0x10030000 0x1000>, <0x10000000 0x1000>;
+>> +                       clocks = <&clock CLK_FOUT_SPLL>,
+>> +                               <&clock CLK_MOUT_SCLK_SPLL>,
+>> +                               <&clock CLK_FF_DOUT_SPLL2>,
+>> +                               <&clock CLK_FOUT_BPLL>, <&clock CLK_MOUT_BPLL>,
+>> +                               <&clock CLK_SCLK_BPLL>,
+>> +                               <&clock CLK_MOUT_MX_MSPLL_CCORE>,
+>> +                               <&clock CLK_MOUT_MX_MSPLL_CCORE_PHY>,
+>> +                               <&clock CLK_MOUT_MCLK_CDREX>,
+>> +                               <&clock CLK_DOUT_CLK2X_PHY0>,
+>> +                               <&clock CLK_CLKM_PHY0>, <&clock CLK_CLKM_PHY1>;
+>> +                       clock-names = "fout_spll", "mout_sclk_spll",
+>> +                               "ff_dout_spll2", "fout_bpll", "mout_bpll",
+>> +                               "sclk_bpll", "mout_mx_mspll_ccore",
+>> +                               "mout_mx_mspll_ccore_phy", "mout_mclk_cdrex",
+>> +                               "dout_clk2x_phy0", "clkm_phy0", "clkm_phy1";
+> 
+> We misunderstood each other. I did not ask for compaction into one
+> continued line but for proper indentation. Having one entry per one
+> line was fine because you have really a lot of entries and it was
+> making things easier to check.
+> It should look like:
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/exynos54xx.dtsi?h=v4.20#n78
+> 
+Yes, we misunderstood each other. I will fix it in v3.
+Thank you for having a look on it. I assume that the other issues
+have been properly addressed.
 
-> +       hdr->size = 4;
-> +
-> +       msg.address_hi = address >> 32;
-> +       msg.address_lo = address;
-> +       msg.resource = resource;
-> +       msg.enable = enable;
-> +
-> +       return imx_scu_call_rpc(ipc, &msg, false);
+Regards,
+Lukasz
 
-s/false/true
-
-> +}
-> +EXPORT_SYMBOL(imx_sc_pm_cpu_start);
-> diff --git a/include/linux/firmware/imx/svc/misc.h b/include/linux/firmware/imx/svc/misc.h
-> index e21c49aba92f..c03bf2a23add 100644
-> --- a/include/linux/firmware/imx/svc/misc.h
-> +++ b/include/linux/firmware/imx/svc/misc.h
-> @@ -52,4 +52,7 @@ int imx_sc_misc_set_control(struct imx_sc_ipc *ipc, u32 resource,
->  int imx_sc_misc_get_control(struct imx_sc_ipc *ipc, u32 resource,
->                             u8 ctrl, u32 *val);
->
-> +int imx_sc_pm_cpu_start(struct imx_sc_ipc *ipc, u32 resource,
-> +                       bool enable, u64 address);
-
-Nitpick: phy_addr
-
-Otherwise, looks good to me.
-
-Regards
-Dong Aisheng
-
-> +
->  #endif /* _SC_MISC_API_H */
-> --
-> 2.17.1
->
+> Best regards,
+> Krzysztof
+> 
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
