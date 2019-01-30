@@ -2,96 +2,73 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DA576C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:28:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ED708C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:29:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AC5412087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:28:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BE1EB2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 16:29:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UqYXDx32";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="NexrhOZO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AC5412087F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NKMnrXgx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BE1EB2087F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=5uQRWOSfsH6RSDHXoo4DS3E1d5ZP0Zf32oj86vghRvo=; b=UqYXDx32CEglWAIj4xhTpLDmQ
-	/wbFTXFjCBLrcYLaK2mMP7ryIYH/ao4uuzVBvb7HmWWv0oZcVooeTTSWSdEUs+C/3GFIbBBiz4uf3
-	3uO3sMTfWQNd2Q/AJSboxtd0CaWlN7fKWjdfekpw13yBwmGx1dFub7Ux3K1Jybe/fXEKDpZym1PnM
-	fZxufSnii8X9rQwBkeLAJxatmyrF1M67onR+rpznkPiLyAGaUhDzaqraPbSx91J5/sdoDZJUkMCGI
-	mbY1XGyNWfy0970AfQhMf3YM8q/R3gvTab2GLS6X/hdwK/Gj4Snloymg3rEtAb4jYVVoWmkavucSI
-	Gy5d1cJlA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=i3nrwslTTFKxNTd+FQjpZQbZw8sgTb1kQRTDajzaB/4=; b=NKMnrXgxecGSfC
+	lf36oZn8ji8Zww/hadLjHoqIWvfEOhS/cBAag9hnBz4ACM3MXm2n9XT3NN9QbJvqAekbh/bkY2Sb2
+	WUq24PH5CrHyY7rbuKwJs/drCX45ztrVILTHcvwSmvHzD+g9bo1rl5NhgpFN3q79CjWZT/s18fRuX
+	t4a0D0vyicScv3xFxzRQGxAy4Jd1+WKcrFxZw01hhy5C/36UPRhLPum/u4CxHzkqKsvnMmyT2/FH0
+	9DnxEsAZU4GkDDShLRiRJkJHkVeF7H0Wb1zZZliC5PqKosYT0IcBZatuzXzeLnVnCKrq44cWuZjiJ
+	Rr1ZpZxu9yCshbXogsFA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gosir-0007Lo-Ul; Wed, 30 Jan 2019 16:28:21 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1goskC-0007vm-F6; Wed, 30 Jan 2019 16:29:44 +0000
+Received: from mail-qt1-f194.google.com ([209.85.160.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gosio-0007LM-KH
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 16:28:20 +0000
-Received: by mail-wm1-x342.google.com with SMTP id y8so150500wmi.4
+ id 1gosk9-0007vN-RT
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 16:29:43 +0000
+Received: by mail-qt1-f194.google.com with SMTP id n32so98789qte.11
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 08:28:16 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=accfh5WT1jHRMAGwXZn+sQk9d/LfJqCpSutfwrpI8Vs=;
- b=NexrhOZOEa+2rWsYfGMB04hVUhbdZ27nTmAx/uNeu9QT3cTDBK9K+7DGMsC9zIIAdt
- GYmS6JcsEO3wPx7wvLgWFMlPiLsTf+4liH80eUwUujg6r/mV+GzbEdMYcXabaEIQUjyu
- E2t/XwXvpuSlXarwoW1m8Cn++LKbldOQ5zhO10cg5GqXFX/Cd3AVNFmhShlF0yjYhXKu
- Qk8hIl+gFW/TpBLNPZtcF0TSTflb9uTGmeXdkN+VRuMUu28xKaB9cWJh0wYPr4wCi7bc
- YKJcJPGybMtu+iu47giZDOwcOsmXM5cSsCGUHITRxsX4/3sI/gptpimL0YPEiaupq+jY
- 33zw==
+ Wed, 30 Jan 2019 08:29:40 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=accfh5WT1jHRMAGwXZn+sQk9d/LfJqCpSutfwrpI8Vs=;
- b=Aq/Esg1u3LlgJEYm8oThhNqpAD4nlItiiFbLesmcqRoZmFzRYdoHoFhF7qwp23jz7R
- 415q6FGy3DuUbaCzDjJwQc0w5NSMRcaZvwbLYZ8dwecaIXpJfhTepTFIYHF403jgXdc2
- e+MkcW6+7DRg6KwrPEvFrCD/peZA+8uY6aQ1IdWiCmLAizaXxrx5Xmf56KIZLKPU8ACM
- e99idrA9dLGIRlTGbEUs7DL8ho6Mr3We5MhxndXrmZSqAGNugusRG2VYH01eCFWYoS/D
- AjDqDeKIgUrGekMvSvapeKy3/ei2A0IlDY63zpkfpRrxBGElxLCWEkocVWWgBCt3jk7F
- +jtA==
-X-Gm-Message-State: AHQUAuZcuvzaMQb/wawrsO7gU17CiJ192FB08D0+7gFfqWD77k3WkD/M
- 3FLD4EpOgdLxY3q09+H/nZmIrtLu
-X-Google-Smtp-Source: AHgI3IZEEBz5zy6cwni0QQdzMi8zm+BcOvr+ODmW5KJ+t48zMVRl6pcBN03B/fW8NmHWhghiN2WVTA==
-X-Received: by 2002:a1c:1b8d:: with SMTP id
- b135mr26189787wmb.115.1548865694890; 
- Wed, 30 Jan 2019 08:28:14 -0800 (PST)
-Received: from ?IPv6:2a02:8071:6a3:700:e52b:4fa:c59b:a6af?
- ([2a02:8071:6a3:700:e52b:4fa:c59b:a6af])
- by smtp.gmail.com with ESMTPSA id o4sm2075559wrq.66.2019.01.30.08.28.13
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 30 Jan 2019 08:28:13 -0800 (PST)
-Subject: Re: [PATCH] ARM: socfpga: fix base address of SDR controller
-To: Dinh Nguyen <dinguyen@kernel.org>, Marek Vasut <marex@denx.de>
-References: <20190129200858.19773-1-goldsimon@gmx.de>
- <0711a2e0-b4fb-fa12-7c5c-0b5da73c8b02@kernel.org>
- <CAAh8qszCQROUZVOyX9GCNF_09DebDDUWf_2cfW3M13yG1aJ_Xg@mail.gmail.com>
- <961ac9bf-d111-2e42-a39b-b26c499afcc0@kernel.org>
-From: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
-Message-ID: <ad197fef-e946-1861-5ace-f4e8e4f1c044@gmail.com>
-Date: Wed, 30 Jan 2019 17:28:04 +0100
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=mz8vRL4Z6pWHl1+rPReutLjlJJgWD0S2+zCwJEakHx4=;
+ b=XEG28SJFmD425aKg5Hz1ON8+GLY/LXV2IJp6VCpqf0mo8drHcte4iKVhPP8N/jZEaU
+ psOiSBAEj+vODsQhgBxJ7uSfiyd5oM66c8Kmt4+EOOvz2U8mH3RTO6VxE9sFicX6UQqQ
+ 1ITTF6zqHh+liBxw6X3cj6cow16aRjPdF33KSqqiw7kMjArK3s6K93I7VAskcmRzhfoC
+ SsHz7WUiDHyY6ztJJ2DFw2B4MGYjFJlX+Di3wLuNBws3Tb1sMG1JCPHyThmm8L+9PiOl
+ dYBwX8v+imMsTscBXkl8glADhQ85llKl/YxTqTWkREH1Pd/yCgly27lDU/jIBF7+pVhI
+ E6oA==
+X-Gm-Message-State: AJcUukfHH3Ido9+NJQFTE/mR+OmyMWzgUI0KA4zclRvFJFAcdTxArput
+ dIsiYLppM72ssvNFtQ705m2zaGwJVfEHWsis8VA=
+X-Google-Smtp-Source: ALg8bN6BkbBm/ASYLIpE7JihldKhc/uWoGOqAWRPj9MLpXXw1QrQbIBiv9MqE6S5KuYNVFX+HPQj54UsupITI0b65a4=
+X-Received: by 2002:a0c:dc0f:: with SMTP id s15mr28506794qvk.40.1548865779684; 
+ Wed, 30 Jan 2019 08:29:39 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <961ac9bf-d111-2e42-a39b-b26c499afcc0@kernel.org>
-Content-Language: en-US
+References: <3fb58758-a67f-3a0f-72d2-abbfd71b6ae0@st.com>
+ <6a490c72-c76a-51ef-7c5d-2178d2adcc83@st.com>
+ <17acd15d-6fdb-c797-c37c-37bab49ac3b6@st.com>
+In-Reply-To: <17acd15d-6fdb-c797-c37c-37bab49ac3b6@st.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 30 Jan 2019 17:29:22 +0100
+Message-ID: <CAK8P3a2g_oMMT75SbhF1aQ0+BXr+D8WUtMthEYbmF+15WfbSqg@mail.gmail.com>
+Subject: Re: [GIT PULL] STM32 DT changes for v4.21 #1
+To: Alexandre Torgue <alexandre.torgue@st.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_082818_697113_C69609C8 
-X-CRM114-Status: GOOD (  25.05  )
+X-CRM114-CacheID: sfid-20190130_082941_882921_5F38AA3C 
+X-CRM114-Status: GOOD (  14.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,85 +80,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Alan Tull <atull@kernel.org>, linux-fpga@vger.kernel.org,
- linux-kernel@vger.kernel.org, Russell King <linux@armlinux.org.uk>,
- Rob Herring <robh+dt@kernel.org>, Moritz Fischer <mdf@kernel.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Olof Johansson <olof@lixom.net>, Kevin Hilman <khilman@baylibre.com>,
+ arm-soc <arm@kernel.org>, Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Am 30.01.2019 um 16:50 schrieb Dinh Nguyen:
-> 
-> 
-> On 1/30/19 12:00 AM, Simon Goldschmidt wrote:
->> + Marek (as I really want to keep the dts in Linux and U-Boot in sync)
->> On Wed, Jan 30, 2019 at 1:16 AM Dinh Nguyen <dinguyen@kernel.org> wrote:
->>>
->>>
->>>
->>> On 1/29/19 2:08 PM, Simon Goldschmidt wrote:
->>>> From: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
->>>>
->>>> The documentation for socfpga gen5 says the base address of the sdram
->>>> controller is 0xffc20000, while the current devicetree says it is at
->>>> 0xffc25000.
->>>>
->>>> While this is not a problem for Linux, as it only accesses the registers
->>>> above 0xffc25000, it *is* a problem for U-Boot because the lower registers
->>>> are used during DDR calibration (up to now, the U-Boot driver does not use
->>>> the dts address, but that should change).
->>>>
->>>> To keep Linux and U-Boot devicetrees in sync, this patch changes the base
->>>> address to 0xffc20000 and adapts the 2 files where it is currently used.
->>>>
->>>> This patch changes the dts and 2 drivers with one commit to prevent
->>>> breaking the code if dts change and driver change would be split.
->>>>
->>>> Signed-off-by: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
->>>> ---
->>>>
->>>>   arch/arm/boot/dts/socfpga.dtsi       | 4 ++--
->>>>   arch/arm/mach-socfpga/self-refresh.S | 4 ++--
->>>>   drivers/fpga/altera-fpga2sdram.c     | 2 +-
->>>>   3 files changed, 5 insertions(+), 5 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
->>>> index f365003f0..8f6c1a5d6 100644
->>>> --- a/arch/arm/boot/dts/socfpga.dtsi
->>>> +++ b/arch/arm/boot/dts/socfpga.dtsi
->>>> @@ -788,9 +788,9 @@
->>>>                        reg = <0xfffec000 0x100>;
->>>>                };
->>>>
->>>> -             sdr: sdr@ffc25000 {
->>>> +             sdr: sdr@ffc20000 {
->>>>                        compatible = "altr,sdr-ctl", "syscon";
->>>> -                     reg = <0xffc25000 0x1000>;
->>>> +                     reg = <0xffc20000 0x6000>;
->>>
->>> I don't see the U-Boot device tree having this change. Yes, the
->>> documentation does state that the SDR address starts at 0xffc20000, but
->>> all of the pertinent registers start at 0x5000 offset. Thus, the
->>> starting address should be 0xffc25000.[1]
->>
->> You don't see it in U-Boot as I'm working on a patch for that.
->> As I wrote in the commit message, U-Boot currently does not use the
->> devicetree for the SDR driver, but I want to convert it to do that.
-> 
-> That's great! Can you elaborate on what is the impetus for converting
-> the SDR driver to use the dts?
+On Tue, Jan 8, 2019 at 9:42 AM Alexandre Torgue <alexandre.torgue@st.com> wrote:
+> On 1/8/19 8:29 AM, Alexandre Torgue wrote:
+> > On 12/3/18 12:18 PM, Alexandre Torgue wrote:
+> >> Hi Arnd, Olof and Kevin,
+> >>
+> >> Please consider this first round of STM32 DT updates for v4.21.
+> >>
+> >> Thanks.
+> >> Alex
+> >>
+> >
+> > This PR has not been merged in 5.0-rc1. Is there an issue (except than
+> > v4.21 doesn't exist :)) ?
+> > If not, is it possible to get it in next 5.0 rc ?
+> >
+>
+> Sorry for the last post. I completely missed Olof answer:
+>
+> "I think you might have missed pushing the tag to the remote?
+> -Olof
+> "
+>
+> My tag is now pushed. Is there a chance to get it in next RC ?
 
-The initial reason to do so was to move its reset handling from U-Boot 
-SPL to the driver itself. Moving from ad-hoc code to using the reset driver.
+I noticed this we were still missing this one, but it's clearly too
+late now for 5.0 now, so I've pulled it into arm/dt for 5.1 now.
 
-And when it's being converted to using the reset handle from dts, I 
-think it should also use the base address from dts.
-
-Regards,
-Simon
+       Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
