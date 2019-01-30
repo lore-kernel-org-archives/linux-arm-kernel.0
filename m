@@ -2,84 +2,93 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0E593C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:21:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 88829C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:22:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D5960218AE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:21:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5D3A92086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:22:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dKloAjBm";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="EGqaOnhS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D5960218AE
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DUzEbg7A";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="kbeEOxjx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D3A92086C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=w7gn4E7ZjALGyk9mgyzjP8bGimyudcirwaUEmkaVVto=; b=dKl
-	oAjBm8Iq0vMxUb1i/hlvazaB0+j8eRBmOe0Lvf/3ubAz/fYwC6WvuSsiKV9yWwAv8pb3PJn6S0plq
-	MXEOwXsNCtIM2pAIUDLaxTHF0YHNUbMihsRYo4HpKXctMUegR4jJCIgY3RkBHze9yQWgk6cuClhUy
-	RrAwwlDG4f9c6YClc+X5UxrdFtaFiDpP7evSA/ApNdwOePauUdQBPLmdHO+aJDkcQrZnK3pvd2jX9
-	8j/cSFmkWqG8bH5vjclPoG1WNeDCsfZl0Als1QzfLErPbEMFxZwg/b4VDCCFQ/pYMLfNcIShnwXkK
-	ufjzkswb0ml1aBmAzdMap/eFRHh2amA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=gA5dxEelFTbcWAEAqoFIJmyh7N5ygOV9h/7b8I4nv2k=; b=DUzEbg7ARyQj5J
+	IaHAr7UdgZEDAm18nFt/TuWq4vBPO8DmwyMLYo2T+cjXwCcBmo5snmHQrhXTCVOEAafl5A2htV27A
+	rYbmeKM6vFVU851b5KmyvryhgZti0ATLFL7NHJAyxVESt6ZoMVm5ovr1G5iU7e2LLVLAC/EPHY+Ld
+	vyHK/TKPk3AoCKjo+bG3yRHzv0h/Ci+XPtyXhcCQXXabd1G0Anas+NwkT0w62RDKbaapuVZPCkjk+
+	l3+TlhwVVDWYYK8hAJIK2v6OfPAz2Jjn7UFmaAEzBdFfLsaSWoPjy4Zy5baseh3TYuwY+8XMQnOmw
+	Dts4kjjecg1+xW8w2cBw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1govQO-00045b-DL; Wed, 30 Jan 2019 19:21:28 +0000
-Received: from mail-qt1-x842.google.com ([2607:f8b0:4864:20::842])
+	id 1govQx-0004NA-BR; Wed, 30 Jan 2019 19:22:03 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1govQG-00044w-Pv
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 19:21:26 +0000
-Received: by mail-qt1-x842.google.com with SMTP id t13so840911qtn.3
+ id 1govQu-0004Mp-MA
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 19:22:02 +0000
+Received: by mail-lj1-x244.google.com with SMTP id l15-v6so548496lja.9
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 11:21:20 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id;
- bh=Mk61zDWO2rvng3ldRiuYr9AGIieZwSLJylIjdFkyVUk=;
- b=EGqaOnhSGpp1MlChw7SgI7j/RK0eaCHvVySBt8KQZgq9Z1hK5IslH0NddJEbV/+rjf
- 6AbrkvGCrsGF1NS3D4xhc7jfZGHfYbexmyekApWpTNl1BzFwNnKOR0JUrNoIzjnlq1NX
- rX4NPlCF1mwbc5+YckE/E5XccuVn00Vi+dD0yFaIfMAwufMdurog2qNS28uOPRwdnXdq
- uTwKqnsOO5IzjKxkCE7uso2pGgqiVZ0JV9UzR738vE6n4JLI7EbH4MJjm3cTTwoEj0tG
- CCVR8EVUWYbJ8PrCXo14Y7x+Q6QPiqauk2pSycdD0mVDyKy67vUmlZtuvU4LMhJVeJgs
- 1Vcw==
+ Wed, 30 Jan 2019 11:22:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=SFTTDZR6YcJzF46vICwfSJ+8tqAs4omNQ9g0nqdfois=;
+ b=kbeEOxjxBB3VUw2oPfJYeJuZpaQWy15eSI71DDEAF5210vDE8pnejqJovUL1RvHtMT
+ VfM5b1Oy5i1GNGm2T56TFvVKWffxvtEr55ALOkbchwvr5Mcr8lOnaLcntRlhPjZ/FTeY
+ dCHUQhk9SK6qAQ76sPxgdz5DhA2eLZMNbEx/A=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=Mk61zDWO2rvng3ldRiuYr9AGIieZwSLJylIjdFkyVUk=;
- b=PrXAN+P1H6sWzyE7RAR+9Z6YfR/xU9KMmx0JNv5yI6/osOgO+QiMSD3lDP8QSPzvFW
- pibqX+zYTN+FwDHOsFURIgP4o+WMZp716AkxUsfXmcQwHyPcjocgLYrJ2RIazN9GNTY+
- ioAL27e1XwNYsR/5aKBuGuVP7Se9Mtd4vPRMvvabiALkzKKHHzpOz08ukw1EL8RS0+Y6
- je6j8OS1+/EcA7W6C94qsizfXNm+63CgcbfUoLPWjZU6UMVIzLMTKGm9VZJ1qJ/K2bks
- Z0jF8vBkpYDAx/c92o/npKql4PFIFg84S8Za8cScv3Ib2godqAAcH4vq04h0M/t1it8x
- YkpQ==
-X-Gm-Message-State: AJcUukfSu0CzpgmJZDlHJvA4ASqWWiMJlwrIuepqe3wKDlRHssGtKXkk
- 1VRLDdQgNnq+hw8ZjQAyXXc=
-X-Google-Smtp-Source: ALg8bN7LibS16BiFY7knoDAJcdbQjGjmEDdhOXa8n5XGevRvSnYoYz2Wbv2qUmCftEYv4384xjagkQ==
-X-Received: by 2002:a0c:95e8:: with SMTP id t37mr29847126qvt.163.1548876079085; 
- Wed, 30 Jan 2019 11:21:19 -0800 (PST)
-Received: from fabio-Latitude-E5450.nxp.com ([2804:14c:482:a73::1])
- by smtp.gmail.com with ESMTPSA id u4sm1775456qkk.51.2019.01.30.11.21.16
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=SFTTDZR6YcJzF46vICwfSJ+8tqAs4omNQ9g0nqdfois=;
+ b=PVJ+tAXHUFwuXzFO8hydPhFCy1jrmlApvpYp54qX9f8uTl+ILjk2ogf/E/iL9XwpvL
+ bhmmkUV2K44Xy41CCzxEA1qbWUC1jh6rE5bAMv233Dk6irAseCDZJT2R+JbL2wmfTK5Q
+ SKUhEuh8SKgCV0Ro75NERy1/NxsfuL3d59UYB8YIVIUhNIn7YWQpfq95fi9fZ/Ctu71/
+ O3TU+vu2kbwz1wXtyKBNpQIQWvmlE/zx4SMK0fKfX5e5EROtdonRRYRTkcAYuDJXoFfU
+ TsJfvUUjFRvqi8cnZQF1boWJ/GEuxyY7hc3BIYe7UoWQWPpC9KgXTNnYXm04fFsnUIFO
+ IXcA==
+X-Gm-Message-State: AJcUukd6Xtmq7Updczyh/8SuJOb/s2wmkDpi25GihF9RzN/4MKfRhfwQ
+ QvhvyhbCcDx40vT9CBieUtUWoK+ctc4=
+X-Google-Smtp-Source: ALg8bN4UjK9QWAH71xjqJlnjts/EmfGMJiMba8bJ93dDJ7y48aXFveUrTWf/5y8XeWR9xiNaenexPw==
+X-Received: by 2002:a2e:7d15:: with SMTP id
+ y21-v6mr24640362ljc.77.1548876118537; 
+ Wed, 30 Jan 2019 11:21:58 -0800 (PST)
+Received: from mail-lf1-f47.google.com (mail-lf1-f47.google.com.
+ [209.85.167.47])
+ by smtp.gmail.com with ESMTPSA id t144sm433965lff.53.2019.01.30.11.21.58
+ for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 30 Jan 2019 11:21:18 -0800 (PST)
-From: Fabio Estevam <festevam@gmail.com>
-To: sboyd@kernel.org
-Subject: [PATCH] clk: imx8mq: Fix the CLKO2 source select list
-Date: Wed, 30 Jan 2019 17:21:02 -0200
-Message-Id: <20190130192102.7065-1-festevam@gmail.com>
-X-Mailer: git-send-email 2.17.1
+ Wed, 30 Jan 2019 11:21:58 -0800 (PST)
+Received: by mail-lf1-f47.google.com with SMTP id f5so463930lfc.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 11:21:58 -0800 (PST)
+X-Received: by 2002:a19:8c1b:: with SMTP id o27mr23897594lfd.90.1548875813284; 
+ Wed, 30 Jan 2019 11:16:53 -0800 (PST)
+MIME-Version: 1.0
+References: <1546314952-15990-1-git-send-email-yong.wu@mediatek.com>
+ <1546314952-15990-21-git-send-email-yong.wu@mediatek.com>
+In-Reply-To: <1546314952-15990-21-git-send-email-yong.wu@mediatek.com>
+From: Evan Green <evgreen@chromium.org>
+Date: Wed, 30 Jan 2019 11:13:02 -0800
+X-Gmail-Original-Message-ID: <CAE=gft6Dje_VF6vr3=iM9BSKB1N8xe3F5EkEzMgC+fyF69csJQ@mail.gmail.com>
+Message-ID: <CAE=gft6Dje_VF6vr3=iM9BSKB1N8xe3F5EkEzMgC+fyF69csJQ@mail.gmail.com>
+Subject: Re: [PATCH v5 20/20] iommu/mediatek: Switch to SPDX license identifier
+To: Yong Wu <yong.wu@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_112124_698140_59FC62F1 
-X-CRM114-Status: GOOD (  10.81  )
+X-CRM114-CacheID: sfid-20190130_112200_747360_41EADE73 
+X-CRM114-Status: UNSURE (   9.64  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,57 +100,30 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fabio Estevam <festevam@gmail.com>, linux-imx@nxp.com,
- kernel@pengutronix.de, rogerio.silva@nxp.com, shawnguo@kernel.org,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: youlin.pei@mediatek.com,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, Nicolas Boichat <drinkcat@chromium.org>,
+ Arnd Bergmann <arnd@arndb.de>, srv_heupstream@mediatek.com,
+ Joerg Roedel <joro@8bytes.org>, Will Deacon <will.deacon@arm.com>,
+ LKML <linux-kernel@vger.kernel.org>, Tomasz Figa <tfiga@google.com>,
+ iommu@lists.linux-foundation.org, Rob Herring <robh+dt@kernel.org>,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ yingjoe.chen@mediatek.com, Robin Murphy <robin.murphy@arm.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The CLKO2 clock source select list is the following as per the i.MX8M
-Reference Manual:
+On Mon, Dec 31, 2018 at 8:00 PM Yong Wu <yong.wu@mediatek.com> wrote:
+>
+> Switch to SPDX license identifier for MediaTek iommu/smi and their
+> header files.
+>
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-000 - 25M_REF_CLK
-001 - SYSTEM_PLL2_DIV5
-010 - SYSTEM_PLL1_DIV2
-011 - SYSTEM_PLL2_DIV6
-100 - SYSTEM_PLL3_CLK
-101 - AUDIO_PLL1_CLK
-110 - VIDEO_PLL1_CLK
-111 - 32K_REF_CLK
-
-However, in imx8mq_clko2_sels[] only the first four entries are correct.
-
-Fix it by adding the missing "sys3_pll2_out" entry in order to match
-the description from the manual.
-
-Fixes: b80522040cd3f ("clk: imx: Add clock driver for i.MX8MQ CCM")
-Reported-by: Rogerio Pimentel <rogerio.silva@nxp.com>
-Signed-off-by: Fabio Estevam <festevam@gmail.com>
----
- drivers/clk/imx/clk-imx8mq.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/imx/clk-imx8mq.c b/drivers/clk/imx/clk-imx8mq.c
-index 398ab0bcd9de..63001bc891d4 100644
---- a/drivers/clk/imx/clk-imx8mq.c
-+++ b/drivers/clk/imx/clk-imx8mq.c
-@@ -264,8 +264,8 @@ static const char * const imx8mq_ecspi3_sels[] = {"osc_25m", "sys2_pll_200m", "s
- 					   "sys1_pll_800m", "sys3_pll2_out", "sys2_pll_250m", "audio_pll2_out", };
- static const char * const imx8mq_dram_core_sels[] = {"dram_pll_out", "dram_alt_root", };
- 
--static const char * const imx8mq_clko2_sels[] = {"osc_25m", "sys2_pll_200m", "sys1_pll_400m", "sys2_pll_166m", "audio_pll1_out",
--					 "video_pll1_out", "ckil", };
-+static const char * const imx8mq_clko2_sels[] = {"osc_25m", "sys2_pll_200m", "sys1_pll_400m", "sys2_pll_166m",
-+					  "sys3_pll2_out", "audio_pll1_out", "video_pll1_out", "ckil", };
- 
- static struct clk_onecell_data clk_data;
- 
--- 
-2.17.1
-
+Reviewed-by: Evan Green <evgreen@chromium.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
