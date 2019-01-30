@@ -2,107 +2,107 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C05B0C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:35:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0524BC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:36:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 78A5020882
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:35:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CA14D20882
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:36:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pYwrvzkn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 78A5020882
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=canonical.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="On99ClC7";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="tnKn1wan";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="KQEP0qOC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CA14D20882
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=O+YX2iYwUV0D3Qm/92o6L02l2aOtFSchRDBsU1Fb96U=; b=pYwrvzknWGg91i
-	GOYntPcoIRmAmNefbQppmUeOJqsy5B91ej+/qHwDCLY/FXW6e4CiBGOhtS+F/50JOkXTYgYVoIrNA
-	H1kV8CvpgJcNiQnL3rZVlQOy7YI7ooNOQd+fJtFL9hThWAC/NbSJQsyPtTGyIb8xJunr/SLn+1oGR
-	GxU69Wkpd0mAgVpnKVWZW7TdOgAG/xjJW7GIv64AGekIqOaxV5cKLDj+QiMOEGRHfpAds17L8Clsc
-	U0HXuTzSP0Ql85VnRwhyR1DCtPsiPxvSc8h2KZWDX+g62/eWIjhm1RPG3IjB2mloSmwLYmZuaYsoi
-	72gjF0W5nhoHJ2ovmcUg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=7rTE8i136sGIero58rIihEnoX6/J3k8ftrMt3fiA3Vg=; b=On99ClC7CdWhej
+	VEehIFdTYH6EK5hmK9GYGRJMtSz2xju7YlGwsVa/Zw0iZXOb/DTMZLJmtz6/oOCqdyD/SajJy/DSv
+	C3nT+9ZDr0WXCvUfTy94rMPNAlmm+6Ge75MH5aWpHL1ArOReOUwRVh+7VCf0kN3McdgpT4L47+vPm
+	k0WEJhuXwS4BIqCwjKJ8ndGM4lEaNkJorO778WYYqSotsKlYVd1F1VglLdVFfaLB16kMC8w2hQsOJ
+	rSipaipzBlOeyS5elzyv/3Ed5E1haTOifAdb9EMFY8SyW5HnTp2vEZ2ho3x9Ixf/6tMnXXlnWJ9GE
+	W6BdYOK6KMg14kbVCihg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gomGx-00012w-Vs; Wed, 30 Jan 2019 09:35:07 +0000
-Received: from youngberry.canonical.com ([91.189.89.112])
+	id 1gomI6-00030m-Ao; Wed, 30 Jan 2019 09:36:18 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gomGU-0000To-NM; Wed, 30 Jan 2019 09:34:41 +0000
-Received: from cpc129250-craw9-2-0-cust139.know.cable.virginm.net
- ([82.43.126.140] helo=[192.168.0.11])
- by youngberry.canonical.com with esmtpsa (TLS1.0:RSA_AES_128_CBC_SHA1:16)
- (Exim 4.76) (envelope-from <colin.king@canonical.com>)
- id 1gomGS-0000N9-B5; Wed, 30 Jan 2019 09:34:36 +0000
-Subject: Re: [PATCH][next] mtd: rawnand: meson: fix missing assignment of ret
- on a call to meson_chip_buffer_init
-To: Miquel Raynal <miquel.raynal@bootlin.com>,
- Liang Yang <liang.yang@amlogic.com>
-References: <20190129105757.19138-1-colin.king@canonical.com>
- <aeadd16e-ed46-28f2-15de-66d1d9f1ed11@amlogic.com>
- <20190130103250.4080a3b3@xps13>
-From: Colin Ian King <colin.king@canonical.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=colin.king@canonical.com; prefer-encrypt=mutual; keydata=
- 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
-Message-ID: <25109367-14bc-90b1-f0a9-ad65aac46bf8@canonical.com>
-Date: Wed, 30 Jan 2019 09:34:35 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gomHy-0002Yv-0G
+ for linux-arm-kernel@bombadil.infradead.org; Wed, 30 Jan 2019 09:36:10 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:Content-Type:Content-ID:
+ Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+ :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
+ List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=5BYwMDxJkDeOSHAu4Y7eWGKdLcHGjaOL/cVYmaAVXxE=; b=tnKn1wanZECUyLXGG4bccRSd8K
+ zO5RpCeZ6ST7VW5nWAiS/OdAnMqoA3UcStzyRlgyIaLy6hDLr9SmwrNP0kQ6qPqOARxWGN1jcOfsv
+ bTGRcR8XLDmNydmBsiTsqfuOhA6yJP53613Glytqs+dDufyuAwuDxeG6ym0SOJncZP7ptgwBPR6rb
+ yQHRD8LVdcBIGsSTrxTAx9dvECbk5jZMzHMsnHzXgMg/1BY5IVROVCvsTdv68kJQxDrT0RSZ801W6
+ 8eqLdzc7Xvnj9rrsK1QyLpjhEcMAxU3jqAA0R7apdpPGCEzNFGD5eNi4Ogsw4rsW4PSln1iACuYe1
+ Hmvsy6aQ==;
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gom2M-0005Nv-GI
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 09:20:05 +0000
+Received: by mail-wm1-x341.google.com with SMTP id f188so20673380wmf.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 01:20:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=5BYwMDxJkDeOSHAu4Y7eWGKdLcHGjaOL/cVYmaAVXxE=;
+ b=KQEP0qOCzE1I7AujnAMWflUAQJZH7vtuBlhSHF+7pLNExB70cjwAkN/37yeogOpyPz
+ OItepokP7MYFYwoRmPQuWZCbSPCvwEpwlb98RribeRJoxJ/v5wWMjP3ji3YZKPLlW9R1
+ 6FvkzVpfbXuGh2ykLUBXcpeD+vXtRE/V8H9oERHH0m6rFsy+6thuRBZXN63q5yDbfFfl
+ eeT3j5hHOxxbgfoUju/mK7j7jJ96oIRODMDxcV9pSODjpZ0zWfF+/qW3VyD9IeH2pzoO
+ eLHEIpEbGweDZZMvPfgkQdYwkDkie8UCMFfvlaDI4kWvcv+9W5n9N9HWMfm+CSV3rhdm
+ pwJQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=5BYwMDxJkDeOSHAu4Y7eWGKdLcHGjaOL/cVYmaAVXxE=;
+ b=ZbFPI9ob+nUqirRGQPVSklHj5l4v4lATPfYsb7gdo7OWfh05T62JaTXjLQpzAf2qQw
+ 4DlmTWXTEOnQ3p0kO8MyraatexKpdaYvB4FKXS6g/SHvRuHe8Z2Wgyq82O6UMN/5nFwd
+ CK4u0NfVakdOQqqTxEXTS4eFNamtyPCVTlbLljF5BYl8CPLknQ6CZ7JIAjPmQfLkJ2b6
+ 6wCwJ6SUdcDeElF0xiIxet2/8djJmMZqYZuiU90BoxTG4CIvd5rBJaTsZauFXUm0Gnnf
+ ywl6ntrTtE+YU4xwco3UPRDxQU1RH4eBMfm8OiM2euDnWqIum8RjE9RYNgSW/JO0ttxN
+ /DZw==
+X-Gm-Message-State: AJcUukf8HWiqbUnWHSytRhuY5zQN6GD9MdXaVpjaJsJJKzGwjkMtXg6N
+ hDpG9BlQeFSljouLKRiAoQZjlw==
+X-Google-Smtp-Source: ALg8bN65JDVw6MdTdoGKUWeBvXoj+VuWxtHbm81v3uRLq0m7VMoXiz7acMfSo/yA9z7ht85NSYGWDA==
+X-Received: by 2002:a7b:c44d:: with SMTP id l13mr24818821wmi.144.1548839998722; 
+ Wed, 30 Jan 2019 01:19:58 -0800 (PST)
+Received: from localhost.localdomain ([2a00:23c4:f7a1:ce00:5105:4b7b:c922:7c6])
+ by smtp.gmail.com with ESMTPSA id f191sm1408562wmg.12.2019.01.30.01.19.57
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 30 Jan 2019 01:19:57 -0800 (PST)
+From: Carlo Caione <ccaione@baylibre.com>
+To: robh+dt@kernel.org, mark.rutland@arm.com, shawnguo@kernel.org,
+ s.hauer@pengutronix.de, kernel@pengutronix.de, festevam@gmail.com,
+ linux-imx@nxp.com, l.stach@pengutronix.de, devicetree@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Subject: [PATCH v2] arm64: dts: imx8mq: Add QuadSPI controller
+Date: Wed, 30 Jan 2019 09:19:53 +0000
+Message-Id: <20190130091953.20131-1-ccaione@baylibre.com>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-In-Reply-To: <20190130103250.4080a3b3@xps13>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_013439_034457_50F547B5 
-X-CRM114-Status: GOOD (  14.97  )
+X-CRM114-CacheID: sfid-20190130_092002_553957_45C944BB 
+X-CRM114-Status: GOOD (  12.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -114,43 +114,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Boris Brezillon <bbrezillon@kernel.org>,
- Richard Weinberger <richard@nod.at>, kernel-janitors@vger.kernel.org,
- linux-kernel@vger.kernel.org, Marek Vasut <marek.vasut@gmail.com>,
- linux-mtd@lists.infradead.org, Kevin Hilman <khilman@baylibre.com>,
- linux-amlogic@lists.infradead.org, Brian Norris <computersforpeace@gmail.com>,
- David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Carlo Caione <ccaione@baylibre.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMzAvMDEvMjAxOSAwOTozMiwgTWlxdWVsIFJheW5hbCB3cm90ZToKPiBIaSBMaWFuZywgQ29s
-aW4sCj4gCj4gTGlhbmcgWWFuZyA8bGlhbmcueWFuZ0BhbWxvZ2ljLmNvbT4gd3JvdGUgb24gV2Vk
-LCAzMCBKYW4gMjAxOSAxNzoyNjo0OQo+ICswODAwOgo+IAo+PiBIaSBDb2xpbiwKPj4KPj4gT24g
-MjAxOS8xLzI5IDE4OjU3LCBDb2xpbiBLaW5nIHdyb3RlOgo+Pj4gRnJvbTogQ29saW4gSWFuIEtp
-bmcgPGNvbGluLmtpbmdAY2Fub25pY2FsLmNvbT4KPj4+Cj4+PiBUaGUgY2FsbCB0byBtZXNvbl9j
-aGlwX2J1ZmZlcl9pbml0IGlzIG5vdCBhc3NpZ25pbmcgcmV0LCBob3dldmVyLCByZXQKPj4+IGlz
-IGJlaW5nIGNoZWNrZWQgZm9yIGZhaWx1cmUuIEZpeCB0aGlzIGJ5IGFkZGluZyBpbiB0aGUgbWlz
-c2luZyBhc3NpZ25tZW50Lgo+Pj4KPj4+IEZpeGVzOiAyZDU3MGIzNGI0MWEgKCJtdGQ6IHJhd25h
-bmQ6IG1lc29uOiBhZGQgc3VwcG9ydCBmb3IgQW1sb2dpYyBOQU5EIGZsYXNoIGNvbnRyb2xsZXIi
-KQo+Pj4gU2lnbmVkLW9mZi1ieTogQ29saW4gSWFuIEtpbmcgPGNvbGluLmtpbmdAY2Fub25pY2Fs
-LmNvbT4KPj4+IC0tLQo+Pj4gICBkcml2ZXJzL210ZC9uYW5kL3Jhdy9tZXNvbl9uYW5kLmMgfCAy
-ICstCj4+PiAgIDEgZmlsZSBjaGFuZ2VkLCAxIGluc2VydGlvbigrKSwgMSBkZWxldGlvbigtKQo+
-Pj4KPj4+IGRpZmYgLS1naXQgYS9kcml2ZXJzL210ZC9uYW5kL3Jhdy9tZXNvbl9uYW5kLmMgYi9k
-cml2ZXJzL210ZC9uYW5kL3Jhdy9tZXNvbl9uYW5kLmMKPj4+IGluZGV4IGU4NThkNThkOTdiMC4u
-YjljNTQzZDEwNTRjIDEwMDY0NAo+Pj4gLS0tIGEvZHJpdmVycy9tdGQvbmFuZC9yYXcvbWVzb25f
-bmFuZC5jCj4+PiArKysgYi9kcml2ZXJzL210ZC9uYW5kL3Jhdy9tZXNvbl9uYW5kLmMKPj4+IEBA
-IC0xMjA2LDcgKzEyMDYsNyBAQCBzdGF0aWMgaW50IG1lc29uX25hbmRfYXR0YWNoX2NoaXAoc3Ry
-dWN0IG5hbmRfY2hpcCAqbmFuZCkKPj4+ICAgCQlkZXZfZXJyKG5mYy0+ZGV2LCAiMTZiaXRzIGJ1
-cyB3aWR0aCBub3Qgc3VwcG9ydGVkIik7Cj4+PiAgIAkJcmV0dXJuIC1FSU5WQUw7Cj4+PiAgIAl9
-Cj4+PiAtCW1lc29uX2NoaXBfYnVmZmVyX2luaXQobmFuZCk7Cj4+PiArCXJldCA9IG1lc29uX2No
-aXBfYnVmZmVyX2luaXQobmFuZCk7ICAKPj4KPj4gTG9va3MgZ29vZCB0byBtZToKPj4KPj4gQWNr
-ZWQtYnk6IExpYW5nIFlhbmcgPGxpYW5nLnlhbmdAYW1sb2dpYy5jb20+Cj4gCj4gVGhpcyBpcyBu
-YW5kL25leHQgbWF0ZXJpYWwsIHNvIGlmIHlvdSBkb24ndCBtaW5kIEkgd291bGQgbGlrZSB0byBz
-cXVhc2gKPiB0aGUgdHdvIGZpeGVzIHlvdSBzZW50IGludG8gdGhlIG9yaWdpbmFsIGNvbW1pdCBp
-bnNlcnRpbmcgdGhlIGRyaXZlci4KClN1cmUsIG9rIHdpdGggbWUsIHNxdWFzaGluZyB0aGVtIG1h
-a2VzIHNlbnNlLgoKQ29saW4KPiAKPiAKPiBUaGFua3MsCj4gTWlxdcOobAo+IAoKCl9fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwg
-bWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8v
-bGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+Add a node for the Freescale/NXP QuadSPI controller with a proper
+pinctrl set and enable it for the i.MX8MQ EVK board.
+Extend also the AIPS3 memory range to accommodate the QuadSPI-memory
+region.
+
+Signed-off-by: Carlo Caione <ccaione@baylibre.com>
+---
+ arch/arm64/boot/dts/freescale/imx8mq-evk.dts | 27 ++++++++++++++++++++
+ arch/arm64/boot/dts/freescale/imx8mq.dtsi    | 16 +++++++++++-
+ 2 files changed, 42 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+index f74b13aa5aa5..ae181c2a5003 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+@@ -137,6 +137,21 @@
+ 	status = "okay";
+ };
+ 
++&spi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_qspi>;
++	status = "okay";
++
++	flash0: n25q256a@0 {
++		reg = <0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "micron,n25q256a", "jedec,spi-nor";
++		spi-max-frequency = <29000000>;
++		spi-nor,ddr-quad-read-dummy = <6>;
++	};
++};
++
+ &usdhc1 {
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc1>;
+@@ -195,6 +210,18 @@
+ 		>;
+ 	};
+ 
++	pinctrl_qspi: qspigrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_NAND_ALE_QSPI_A_SCLK	0x82
++			MX8MQ_IOMUXC_NAND_CE0_B_QSPI_A_SS0_B	0x82
++			MX8MQ_IOMUXC_NAND_DATA00_QSPI_A_DATA0	0x82
++			MX8MQ_IOMUXC_NAND_DATA01_QSPI_A_DATA1	0x82
++			MX8MQ_IOMUXC_NAND_DATA02_QSPI_A_DATA2	0x82
++			MX8MQ_IOMUXC_NAND_DATA03_QSPI_A_DATA3	0x82
++
++		>;
++	};
++
+ 	pinctrl_reg_usdhc2: regusdhc2grpgpio {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_SD2_RESET_B_GPIO2_IO19		0x41
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+index dbedc4a5e7fb..c20f43f63c4e 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
++++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+@@ -379,7 +379,8 @@
+ 			compatible = "fsl,imx8mq-aips-bus", "simple-bus";
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			ranges = <0x30800000 0x30800000 0x400000>;
++			ranges = <0x30800000 0x30800000 0x400000>,
++				 <0x08000000 0x08000000 0x10000000>;
+ 
+ 			uart1: serial@30860000 {
+ 				compatible = "fsl,imx8mq-uart",
+@@ -497,6 +498,19 @@
+ 				status = "disabled";
+ 			};
+ 
++			spi0: spi@30bb0000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx8mq-qspi", "fsl,imx7d-qspi";
++				reg = <0x30bb0000 0x10000>, <0x08000000 0x10000000>;
++				reg-names = "QuadSPI", "QuadSPI-memory";
++				interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clk IMX8MQ_CLK_QSPI_ROOT>,
++					 <&clk IMX8MQ_CLK_QSPI_ROOT>;
++				clock-names = "qspi_en", "qspi";
++				status = "disabled";
++			};
++
+ 			fec1: ethernet@30be0000 {
+ 				compatible = "fsl,imx8mq-fec", "fsl,imx6sx-fec";
+ 				reg = <0x30be0000 0x10000>;
+-- 
+2.19.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
