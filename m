@@ -2,59 +2,61 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C1573C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:55:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 321E5C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:56:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8FAA32087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:55:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 04B8F218A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:56:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="X1jZsFgP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8FAA32087F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P0BERYn+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 04B8F218A3
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=iB1THQccGWLEb6anWAEz6KrEbiTJK2atd2dJ2Hjr2ns=; b=X1j
-	ZsFgP+JqsGjmAXEsVN3bwWx2Bky+u92ZLRJb2CU0VYFjxDdV452Ef+tFhHOG5xs5DdkHoDcE2kzP/
-	+26ceJavH+nQ7jRa7QcBt4oiG2Urj+1WlgQme3nKi8+Ukqp1Chwrs151nlK9KuvxU3FiSsSdN4pPD
-	QEw3xaocqtNrurH/UCjDeYHYV37ssyhU/MP8KkEE39vzjJ+gDEn3k9QVCQBVSoc01A6uDXsDDutwR
-	6BeLGqV+XOHB+eVQUnugasDdUgp3yMfgs9yM7neSbcTJJ5s1A5yEm34Z+/hmjLvLOhWySNJq1L15s
-	l5f4HfEuW9kgsFd3sqNT8qUtyQPkydQ==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=1md17nizV8RCYLIxojuGPDVawJUZpxKVfCar8VHlas8=; b=P0BERYn+faSdjlOv6a6G5PwEd9
+	wK3ILdYUaZTgBxKDNkGLb6jm0TvGR0TR0gcFG4JaHd1q8d3gQyr6qCD1t7hC+HegN4IHHZNYNnDhM
+	REtVae4vyOStI0zupgwMcvW3TSAOV5eR7Vy9eMWxzkZ4AR4O84aya68LtPu6XSmKh/kDWUpQPR5Vx
+	jPNN2QzQDU8iePDRojsTmaDojw0kHa2VcKg6/je2zKW4Irip9Zpao8D2ibkOoTSuFuEp+inmZaFOP
+	+5OhaMwEAqvssZGct6pTEE0RZ9IDlhCXrRnFpF3bRRWtwP8djvRAFsUly6Hiq32Ij4I38wXFup1f7
+	92G4Lj7w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gomar-0006Ni-70; Wed, 30 Jan 2019 09:55:41 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gombF-0006kw-A5; Wed, 30 Jan 2019 09:56:05 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gomao-0006Hx-PX
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 09:55:39 +0000
+ id 1gomap-0006Kd-E4
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 09:55:41 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C882DA78;
- Wed, 30 Jan 2019 01:55:37 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0609E1596;
+ Wed, 30 Jan 2019 01:55:39 -0800 (PST)
 Received: from bc-d3-1-12.euhpc.arm.com. (bc-d3-1-12.euhpc.arm.com
  [10.6.16.77])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id D32DB3F557;
- Wed, 30 Jan 2019 01:55:36 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 1149E3F557;
+ Wed, 30 Jan 2019 01:55:37 -0800 (PST)
 From: Vladimir Murzin <vladimir.murzin@arm.com>
 To: linux-serial@vger.kernel.org
-Subject: [PATCH v2 0/2] serial: mps2-uart: minor improvements
-Date: Wed, 30 Jan 2019 09:55:13 +0000
-Message-Id: <1548842115-14782-1-git-send-email-vladimir.murzin@arm.com>
+Subject: [PATCH v2 1/2] serial: mps2-uart: move to dynamic port allocation
+Date: Wed, 30 Jan 2019 09:55:14 +0000
+Message-Id: <1548842115-14782-2-git-send-email-vladimir.murzin@arm.com>
 X-Mailer: git-send-email 2.0.0
+In-Reply-To: <1548842115-14782-1-git-send-email-vladimir.murzin@arm.com>
+References: <1548842115-14782-1-git-send-email-vladimir.murzin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_015538_837272_C1910A73 
-X-CRM114-Status: UNSURE (   7.71  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190130_015539_490198_4EEB9CE5 
+X-CRM114-Status: GOOD (  15.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,17 +75,133 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This mini series is supposed to improve MPS2 uart driver for:
- 1. platforms with number of virtual serial ports, like MPS3
- 2. platforms with combined irq
+Some designs, like MPS3, expose number of virtual serial ports which
+already close or exceeds MPS2_MAX_PORTS. Increasing MPS2_MAX_PORTS
+would have negative impact (in terms of memory consumption) on tiny
+MPS2 platform which, in fact, has only one physically populated UART.
 
-Vladimir Murzin (2):
-  serial: mps2-uart: move to dynamic port allocation
-  serial: mps2-uart: support combined irq
+Start with converting existent static port array to idr. As a bonus it
+make driver not to fail in case when no alias was specified in device
+tree.
 
- drivers/tty/serial/mps2-uart.c | 138 ++++++++++++++++++++++++++++-------------
- 1 file changed, 96 insertions(+), 42 deletions(-)
+Note: there is no need in idr_destroy() because code doesn't unload
+since ce87122911f8 ("serial: mps2-uart: make driver explicitly non-modular")
 
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+Changelog
+	v1 -> v2
+	   -  added a note about idr_destroy()
+
+ drivers/tty/serial/mps2-uart.c | 47 ++++++++++++++++++++++++++++--------------
+ 1 file changed, 31 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/tty/serial/mps2-uart.c b/drivers/tty/serial/mps2-uart.c
+index 9f8f637..6da0633 100644
+--- a/drivers/tty/serial/mps2-uart.c
++++ b/drivers/tty/serial/mps2-uart.c
+@@ -22,6 +22,7 @@
+ #include <linux/serial_core.h>
+ #include <linux/tty_flip.h>
+ #include <linux/types.h>
++#include <linux/idr.h>
+ 
+ #define SERIAL_NAME	"ttyMPS"
+ #define DRIVER_NAME	"mps2-uart"
+@@ -397,7 +398,7 @@ static const struct uart_ops mps2_uart_pops = {
+ 	.verify_port = mps2_uart_verify_port,
+ };
+ 
+-static struct mps2_uart_port mps2_uart_ports[MPS2_MAX_PORTS];
++static DEFINE_IDR(ports_idr);
+ 
+ #ifdef CONFIG_SERIAL_MPS2_UART_CONSOLE
+ static void mps2_uart_console_putchar(struct uart_port *port, int ch)
+@@ -410,7 +411,8 @@ static void mps2_uart_console_putchar(struct uart_port *port, int ch)
+ 
+ static void mps2_uart_console_write(struct console *co, const char *s, unsigned int cnt)
+ {
+-	struct uart_port *port = &mps2_uart_ports[co->index].port;
++	struct mps2_uart_port *mps_port = idr_find(&ports_idr, co->index);
++	struct uart_port *port = &mps_port->port;
+ 
+ 	uart_console_write(port, s, cnt, mps2_uart_console_putchar);
+ }
+@@ -426,7 +428,10 @@ static int mps2_uart_console_setup(struct console *co, char *options)
+ 	if (co->index < 0 || co->index >= MPS2_MAX_PORTS)
+ 		return -ENODEV;
+ 
+-	mps_port = &mps2_uart_ports[co->index];
++	mps_port = idr_find(&ports_idr, co->index);
++
++	if (!mps_port)
++		return -ENODEV;
+ 
+ 	if (options)
+ 		uart_parse_options(options, &baud, &parity, &bits, &flow);
+@@ -487,27 +492,32 @@ static struct uart_driver mps2_uart_driver = {
+ 	.cons = MPS2_SERIAL_CONSOLE,
+ };
+ 
+-static struct mps2_uart_port *mps2_of_get_port(struct platform_device *pdev)
++static int mps2_of_get_port(struct platform_device *pdev,
++			    struct mps2_uart_port *mps_port)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	int id;
+ 
+ 	if (!np)
+-		return NULL;
++		return -ENODEV;
+ 
+ 	id = of_alias_get_id(np, "serial");
++
++	if (id < 0)
++		id = idr_alloc_cyclic(&ports_idr, (void *)mps_port, 0, MPS2_MAX_PORTS, GFP_KERNEL);
++	else
++		id = idr_alloc(&ports_idr, (void *)mps_port, id, MPS2_MAX_PORTS, GFP_KERNEL);
++
+ 	if (id < 0)
+-		id = 0;
++		return id;
+ 
+-	if (WARN_ON(id >= MPS2_MAX_PORTS))
+-		return NULL;
++	mps_port->port.line = id;
+ 
+-	mps2_uart_ports[id].port.line = id;
+-	return &mps2_uart_ports[id];
++	return 0;
+ }
+ 
+-static int mps2_init_port(struct mps2_uart_port *mps_port,
+-			  struct platform_device *pdev)
++static int mps2_init_port(struct platform_device *pdev,
++			  struct mps2_uart_port *mps_port)
+ {
+ 	struct resource *res;
+ 	int ret;
+@@ -550,11 +560,16 @@ static int mps2_serial_probe(struct platform_device *pdev)
+ 	struct mps2_uart_port *mps_port;
+ 	int ret;
+ 
+-	mps_port = mps2_of_get_port(pdev);
+-	if (!mps_port)
+-		return -ENODEV;
++	mps_port = devm_kzalloc(&pdev->dev, sizeof(struct mps2_uart_port), GFP_KERNEL);
++
++        if (!mps_port)
++                return -ENOMEM;
++
++	ret = mps2_of_get_port(pdev, mps_port);
++	if (ret)
++		return ret;
+ 
+-	ret = mps2_init_port(mps_port, pdev);
++	ret = mps2_init_port(pdev, mps_port);
+ 	if (ret)
+ 		return ret;
+ 
 -- 
 2.7.4
 
