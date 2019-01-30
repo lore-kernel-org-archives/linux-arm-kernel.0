@@ -2,107 +2,86 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DDE11C282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 02:29:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 063F5C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 02:40:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A53B721852
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 02:29:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BD30220870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 02:40:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o/qg/nnV";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="HXWKsmgD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A53B721852
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZaevTdzm";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="KG3A3Ye0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD30220870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rZ3tOYRedoRzW91duKqCgVK2udkZvQW35ucHvL9sWJk=; b=o/qg/nnVZPyIef
-	69Ky/SR03UOoGRAjrNWqDjmif42rO5AFIB1mlv+Y3a7h+hljaalu1Yp9BEbTh4/yqymEz3odOikUS
-	ADa4yrPai4FYISkhVNV718szUku5MpFKAJT7fJ5M86FnRWnWedYRyDe1kC3oB2KKmPuc2lWoEC+xK
-	8WpJDGdY+VDEqMWvQhNj6fgo8BvmyX8cpanzeHg4Jzb0+f5Gk2N/V/ZMIozcSrzT6+JMM3gFZLMqK
-	2UhPGC0IpoOtoohIbGygXVl5zkZ+/TZj4JEVgZeVq1ycMaafxNKxgy8VjdV4M8nXmlXOElQzaHbJi
-	hyBAI5pfihF43FDQ+BZA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=25auAUsDwPYXifdXRHILev6ws3ZOuPuYwTSUbedorXQ=; b=ZaevTdzmNDeX4yyPRlxn0rfT0
+	6GoaAcF2BI8MsVJsTzH05Ws7rFWFwW0nrHu6q8FhpDLoHbqagOB/en26Qd1i6JTjucsLdpxJoZdHa
+	pQomHhkJlGaRN9do6keEwB6EyLtGYJ2vi+h4o4d8igbYXGyuR/8W9ljWQ8UziQG8RkrBhRnUlgKY1
+	/kw0CzV7SW7XJC3GfxZlCHlJjbhl48ARX1pywv2NcnWYFiR0fVwj0E50j2ZVEtJ8A9/bEd9vUVg3d
+	7bPRBHjzubOHfY7UfA8tamOam3NNjnFqK8uLtAYEPwfqGV+yG2BNu9/j8X8y+rg6RJldGbOmvn9B+
+	KhQM6TsdA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gofce-0000mO-7I; Wed, 30 Jan 2019 02:29:04 +0000
-Received: from mail-oi1-x244.google.com ([2607:f8b0:4864:20::244])
+	id 1gofnU-0005yD-Nd; Wed, 30 Jan 2019 02:40:16 +0000
+Received: from hqemgate15.nvidia.com ([216.228.121.64])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gofca-0000lU-Ks
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 02:29:02 +0000
-Received: by mail-oi1-x244.google.com with SMTP id j21so17996609oii.8
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 18:28:59 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=hthliATX6CStMo00A0vGtMXZYxXL92JFmTppLztuTQQ=;
- b=HXWKsmgDRaeLbn2+Gj5Rov/6M7vPWTbRmvH+xEpC3lJC2tMSP8IU6J9KWaMEuddh1E
- W/0B2txGN3CbFyPn3/D+ZE6k4+vhvbh66eUTcXppqxmPSR+OGowZkxt1hLwBUlAf96oS
- pm31rqSgTYAp4zfk2z/u2bSwxiFE9vCojgFRA=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=hthliATX6CStMo00A0vGtMXZYxXL92JFmTppLztuTQQ=;
- b=FgjvZrmh4n9ZETV+eul5ebhbJJsBj7/43lUOih/kr9d+bxrBo9OtJChnIkptJScIa1
- NGJilw4GHI4+w9dzz4d6kDcJ6iq1ZVoRutiA4rlhqJ2sRWIFnBj9mIK9DxxzpK+8DmEn
- 6mWp7B9IWkP6i9EBi5ilEMiM1t4HFuNxl/ZaiR4FUf36FG9oWMVetohd9RGVd4gYobn8
- T2rMyzOc1IRD8nfC9NiEuJ+u5Qz7PKlmMleMN8wJaDnQmzQ0xvL+YfBlpN0WumTZjbxs
- xU4J9IeMF4m/0LLWP00EKNnLSWXGDTKE0ueYN31UktGpdzqszfL7QWf2Qt1xI2S8j/p7
- pEog==
-X-Gm-Message-State: AHQUAuZj5WIWqbY9Aan7S2RWS+Gxnxgqjoe4fVJBKJNdUUgoswxyL3au
- 8bzTfbZ9v2eMwBwjS70s/LLVeyw+64l8NQ==
-X-Google-Smtp-Source: ALg8bN4y4ZgFMINZgIkV6COyFlYem3YXqFgcUVC/NnvMdCbG/aapVEkcoT73ZzJBzjuDilSGvXTaRw==
-X-Received: by 2002:aca:f288:: with SMTP id
- q130mr10659325oih.228.1548815339143; 
- Tue, 29 Jan 2019 18:28:59 -0800 (PST)
-Received: from mail-ot1-f41.google.com (mail-ot1-f41.google.com.
- [209.85.210.41])
- by smtp.gmail.com with ESMTPSA id r184sm77661oif.56.2019.01.29.18.28.57
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 29 Jan 2019 18:28:57 -0800 (PST)
-Received: by mail-ot1-f41.google.com with SMTP id s5so19836193oth.7
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 18:28:57 -0800 (PST)
-X-Received: by 2002:a9d:7319:: with SMTP id e25mr22328418otk.204.1548815337058; 
- Tue, 29 Jan 2019 18:28:57 -0800 (PST)
+ id 1gofnQ-0005rS-Ms
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 02:40:14 +0000
+Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c510e6e0000>; Tue, 29 Jan 2019 18:39:42 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate102.nvidia.com (PGP Universal service);
+ Tue, 29 Jan 2019 18:40:10 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate102.nvidia.com on Tue, 29 Jan 2019 18:40:10 -0800
+Received: from [10.19.108.132] (172.20.13.39) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Wed, 30 Jan
+ 2019 02:40:08 +0000
+Subject: Re: [PATCH V2 2/6] clocksource: tegra: add Tegra210 timer driver
+To: Thierry Reding <thierry.reding@gmail.com>, Peter De Schrijver
+ <pdeschrijver@nvidia.com>
+References: <20190128091815.7040-1-josephl@nvidia.com>
+ <20190128091815.7040-3-josephl@nvidia.com> <20190128150908.GB31317@ulmo>
+ <20190129084155.GX7714@pdeschrijver-desktop.Nvidia.com>
+ <20190129102912.GC28850@ulmo>
+From: Joseph Lo <josephl@nvidia.com>
+Message-ID: <8d5b6a61-8fb8-2f83-5378-9b1a1e5bd03d@nvidia.com>
+Date: Wed, 30 Jan 2019 10:40:06 +0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <20181123130209.11696-1-paul.kocialkowski@bootlin.com>
- <20181123130209.11696-2-paul.kocialkowski@bootlin.com>
- <5515174.7lFZcYkk85@jernej-laptop>
- <ffe9c81db34b599f675ca5bbf02de360bf0a1608.camel@bootlin.com>
- <776e63c9-d4a5-342a-e0f7-200ef144ffc4@rock-chips.com>
- <64c793e08d61181b78125b3956ec38623fa5d261.camel@bootlin.com>
- <D8005130-F7FD-4CBD-8396-1BB08BB08E81@soulik.info>
- <f982ef378a8ade075bc7077b93640e20ecebf9f4.camel@bootlin.com>
- <82FA0C3F-BC54-4D89-AECB-90D81B89B1CE@soulik.info>
- <c3619a00-17e7-fb92-a427-a7478b96f356@soulik.info>
- <bdf14f97e98f2fd06307545ab9038ac3c2086ae7.camel@bootlin.com>
- <42520087-4EAE-4F7F-BCA0-42E422170E91@soulik.info>
- <ab8ca098ad60f209fe97f79bb93b2d1e898da524.camel@bootlin.com>
- <CAPBb6MUJu3cX9A-E32bSSjxc1cvGP83ayzZzUxa5_QMf6niK4g@mail.gmail.com>
- <2442b23d3b0a00c1bd441298a712888e016acf92.camel@ndufresne.ca>
-In-Reply-To: <2442b23d3b0a00c1bd441298a712888e016acf92.camel@ndufresne.ca>
-From: Alexandre Courbot <acourbot@chromium.org>
-Date: Wed, 30 Jan 2019 11:28:45 +0900
-X-Gmail-Original-Message-ID: <CAPBb6MUsbdXvkomtkiq0ygTqj58h4yqVR0PotT=ft94Ai0nbhw@mail.gmail.com>
-Message-ID: <CAPBb6MUsbdXvkomtkiq0ygTqj58h4yqVR0PotT=ft94Ai0nbhw@mail.gmail.com>
-Subject: Re: [linux-sunxi] [PATCH v2 1/2] media: v4l: Add definitions for the
- HEVC slice format and controls
-To: Nicolas Dufresne <nicolas@ndufresne.ca>
+In-Reply-To: <20190129102912.GC28850@ulmo>
+X-Originating-IP: [172.20.13.39]
+X-ClientProxiedBy: HQMAIL106.nvidia.com (172.18.146.12) To
+ HQMAIL101.nvidia.com (172.20.187.10)
+Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1548815982; bh=FrciTN+redRE/lCiDp/HTROkP++nJMtJ9d9VV4lPFqM=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=KG3A3Ye0Sb7XAUGr538f8B6znelawNhxh7Sr36OfdmyBYXqHsPxVloNC41l79e1Dp
+ QD1Hi8WvPF1anHlwPa6an9XA0NfCArJuFja6XMeKmQO54qsKI/jR/y4tBHHA5n1hw/
+ xf+QWgdlDb/RZAVXNsy0Ru3HAH1pfeaLVfmJRHzfbQqvdnxsTZZTAaCEkPLQQmnTzk
+ 6ClMBbfF30v7MjlQ/azBhzyRseDtTJ6mezMqeQLXfNwPlkYz+Fv3eI23AD/Y8pYtm9
+ 9Z3jyHG2BJ5XF954uRjLrxq5sHjoV9/cP6eaCI3qzHgv9h6c0UI2Sp0asQ+xJjlf+w
+ VvOEdZ1CdYhjQ==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_182900_712318_21A221E7 
-X-CRM114-Status: GOOD (  32.49  )
+X-CRM114-CacheID: sfid-20190129_184012_774664_D39045CF 
+X-CRM114-Status: GOOD (  15.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -114,109 +93,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devel@driverdev.osuosl.org, Hans Verkuil <hverkuil@xs4all.nl>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Ayaka <ayaka@soulik.info>,
- Randy Li <randy.li@rock-chips.com>, LKML <linux-kernel@vger.kernel.org>,
- =?UTF-8?Q?Jernej_=C5=A0krabec?= <jernej.skrabec@gmail.com>,
- Tomasz Figa <tfiga@chromium.org>,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- linux-rockchip@lists.infradead.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- Ezequiel Garcia <ezequiel@collabora.com>, linux-arm-kernel@lists.infradead.org,
- Linux Media Mailing List <linux-media@vger.kernel.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
+ Jonathan Hunter <jonathanh@nvidia.com>, linux-tegra@vger.kernel.org,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gV2VkLCBKYW4gMzAsIDIwMTkgYXQgNjo0MSBBTSBOaWNvbGFzIER1ZnJlc25lIDxuaWNvbGFz
-QG5kdWZyZXNuZS5jYT4gd3JvdGU6Cj4KPiBMZSBtYXJkaSAyOSBqYW52aWVyIDIwMTkgw6AgMTY6
-NDQgKzA5MDAsIEFsZXhhbmRyZSBDb3VyYm90IGEgw6ljcml0IDoKPiA+IE9uIEZyaSwgSmFuIDI1
-LCAyMDE5IGF0IDEwOjA0IFBNIFBhdWwgS29jaWFsa293c2tpCj4gPiA8cGF1bC5rb2NpYWxrb3dz
-a2lAYm9vdGxpbi5jb20+IHdyb3RlOgo+ID4gPiBIaSwKPiA+ID4KPiA+ID4gT24gVGh1LCAyMDE5
-LTAxLTI0IGF0IDIwOjIzICswODAwLCBBeWFrYSB3cm90ZToKPiA+ID4gPiBTZW50IGZyb20gbXkg
-aVBhZAo+ID4gPiA+Cj4gPiA+ID4gPiBPbiBKYW4gMjQsIDIwMTksIGF0IDY6MjcgUE0sIFBhdWwg
-S29jaWFsa293c2tpIDxwYXVsLmtvY2lhbGtvd3NraUBib290bGluLmNvbT4gd3JvdGU6Cj4gPiA+
-ID4gPgo+ID4gPiA+ID4gSGksCj4gPiA+ID4gPgo+ID4gPiA+ID4gPiBPbiBUaHUsIDIwMTktMDEt
-MTAgYXQgMjE6MzIgKzA4MDAsIGF5YWthIHdyb3RlOgo+ID4gPiA+ID4gPiBJIGZvcmdldCBhIGlt
-cG9ydGFudCB0aGluZywgZm9yIHRoZSBya3ZkZWMgYW5kIHJrIGhldmMgZGVjb2RlciwgaXQgd291
-bGQKPiA+ID4gPiA+ID4gcmVxdWVzdHMgY2FiYWMgdGFibGUsIHNjYWxpbmcgbGlzdCwgcGljdHVy
-ZSBwYXJhbWV0ZXIgc2V0IGFuZCByZWZlcmVuY2UKPiA+ID4gPiA+ID4gcGljdHVyZSBzdG9yaW5n
-IGluIG9uZSBvciB2YXJpb3VzIG9mIERNQSBidWZmZXJzLiBJIGFtIG5vdCB0YWxraW5nIGFib3V0
-Cj4gPiA+ID4gPiA+IHRoZSBkYXRhIGJlZW4gcGFyc2VkLCB0aGUgZGVjb2RlciB3b3VsZCByZXF1
-ZXN0cyBhIHJhdyBkYXRhLgo+ID4gPiA+ID4gPgo+ID4gPiA+ID4gPiBGb3IgdGhlIHBwcyBhbmQg
-cnBzLCBpdCBpcyBwb3NzaWJsZSB0byByZXVzZSB0aGUgc2xpY2UgaGVhZGVyLCBqdXN0IGxldAo+
-ID4gPiA+ID4gPiB0aGUgZGVjb2RlciBrbm93IHRoZSBvZmZzZXQgZnJvbSB0aGUgYml0c3RyZWFt
-IGJ1ZmVyLCBJIHdvdWxkIHN1Z2dlc3QgdG8KPiA+ID4gPiA+ID4gYWRkIHRocmVlIHByb3BlcnRp
-ZXMod2l0aCBzcHMpIGZvciB0aGVtLiBCdXQgSSB0aGluayB3ZSBuZWVkIGEgbWV0aG9kIHRvCj4g
-PiA+ID4gPiA+IG1hcmsgYSBPVVRQVVQgc2lkZSBidWZmZXIgZm9yIHRob3NlIGF1eCBkYXRhLgo+
-ID4gPiA+ID4KPiA+ID4gPiA+IEknbSBxdWl0ZSBjb25mdXNlZCBhYm91dCB0aGUgaGFyZHdhcmUg
-aW1wbGVtZW50YXRpb24gdGhlbi4gRnJvbSB3aGF0Cj4gPiA+ID4gPiB5b3UncmUgc2F5aW5nLCBp
-dCBzZWVtcyB0aGF0IGl0IHRha2VzIHRoZSByYXcgYml0c3RyZWFtIGVsZW1lbnRzIHJhdGhlcgo+
-ID4gPiA+ID4gdGhhbiBwYXJzZWQgZWxlbWVudHMuIElzIGl0IHJlYWxseSBhIHN0YXRlbGVzcyBp
-bXBsZW1lbnRhdGlvbj8KPiA+ID4gPiA+Cj4gPiA+ID4gPiBUaGUgc3RhdGVsZXNzIGltcGxlbWVu
-dGF0aW9uIHdhcyBkZXNpZ25lZCB3aXRoIHRoZSBpZGVhIHRoYXQgb25seSB0aGUKPiA+ID4gPiA+
-IHJhdyBzbGljZSBkYXRhIHNob3VsZCBiZSBwYXNzZWQgaW4gYml0c3RyZWFtIGZvcm0gdG8gdGhl
-IGRlY29kZXIuIEZvcgo+ID4gPiA+ID4gSC4yNjQsIGl0IHNlZW1zIHRoYXQgc29tZSBkZWNvZGVy
-cyBhbHNvIG5lZWQgdGhlIHNsaWNlIGhlYWRlciBpbiByYXcKPiA+ID4gPiA+IGJpdHN0cmVhbSBm
-b3JtIChiZWNhdXNlIHRoZXkgdGFrZSB0aGUgZnVsbCBzbGljZSBOQUwgdW5pdCksIHNlZSB0aGUK
-PiA+ID4gPiA+IGRpc2N1c3Npb25zIGluIHRoaXMgdGhyZWFkOgo+ID4gPiA+ID4gbWVkaWE6IGRv
-Y3MtcnN0OiBEb2N1bWVudCBtMm0gc3RhdGVsZXNzIHZpZGVvIGRlY29kZXIgaW50ZXJmYWNlCj4g
-PiA+ID4KPiA+ID4gPiBTdGF0ZWxlc3MganVzdCBtZWFuIGl0IHdvbuKAmXQgdHJhY2sgdGhlIHBy
-ZXZpb3VzIHJlc3VsdCwgYnV0IEkgZG9u4oCZdAo+ID4gPiA+IHRoaW5rIHlvdSBjYW4gZGVmaW5l
-IHdoYXQgYSBkYXRlIHRoZSBoYXJkd2FyZSB3b3VsZCBuZWVkLiBFdmVuIHlvdQo+ID4gPiA+IGp1
-c3QgYnVpbGQgYSBkcGIgZm9yIHRoZSBkZWNvZGVyLCBpdCBpcyBzdGlsbCBzdGF0ZWxlc3MsIGJ1
-dCBwYXJzaW5nCj4gPiA+ID4gbGVzcyBvciBtb3JlIGRhdGEgZnJvbSB0aGUgYml0c3RyZWFtIGRv
-ZXNu4oCZdCBzdG9wIGEgZGVjb2RlciBiZWNvbWUgYQo+ID4gPiA+IHN0YXRlbGVzcyBkZWNvZGVy
-Lgo+ID4gPgo+ID4gPiBZZXMgZmFpciBlbm91Z2gsIHRoZSBmb3JtYXQgaW4gd2hpY2ggdGhlIGhh
-cmR3YXJlIGRlY29kZXIgdGFrZXMgdGhlCj4gPiA+IGJpdHN0cmVhbSBwYXJhbWV0ZXJzIGRvZXMg
-bm90IG1ha2UgaXQgc3RhdGVsZXNzIG9yIHN0YXRlZnVsIHBlci1zZS4KPiA+ID4gSXQncyBqdXN0
-IHRoYXQgc3RhdGVsZXNzIGRlY29kZXJzIHNob3VsZCBoYXZlIG5vIHBhcnRpY3VsYXIgcmVhc29u
-IGZvcgo+ID4gPiBwYXJzaW5nIHRoZSBiaXRzdHJlYW0gb24gdGhlaXIgb3duIHNpbmNlIHRoZSBo
-YXJkd2FyZSBjYW4gYmUgZGVzaWduZWQKPiA+ID4gd2l0aCByZWdpc3RlcnMgZm9yIGVhY2ggcmVs
-ZXZhbnQgYml0c3RyZWFtIGVsZW1lbnQgdG8gY29uZmlndXJlIHRoZQo+ID4gPiBkZWNvZGluZyBw
-aXBlbGluZS4gVGhhdCdzIGhvdyBHUFUtYmFzZWQgZGVjb2RlciBpbXBsZW1lbnRhdGlvbnMgYXJl
-Cj4gPiA+IGltcGxlbWVudGVkIChWQUFQSS9WRFBBVS9OVkRFQywgZXRjKS4KPiA+ID4KPiA+ID4g
-U28gdGhlIGZvcm1hdCB3ZSBoYXZlIGFncmVlZCBvbiBzbyBmYXIgZm9yIHRoZSBzdGF0ZWxlc3Mg
-aW50ZXJmYWNlIGlzCj4gPiA+IHRvIHBhc3MgcGFyc2VkIGVsZW1lbnRzIHZpYSB2NGwyIGNvbnRy
-b2wgc3RydWN0dXJlcy4KPiA+ID4KPiA+ID4gSWYgdGhlIGhhcmR3YXJlIGNhbiBvbmx5IHdvcmsg
-YnkgcGFyc2luZyB0aGUgYml0c3RyZWFtIGl0c2VsZiwgSSdtIG5vdAo+ID4gPiBzdXJlIHdoYXQg
-dGhlIGJlc3Qgc29sdXRpb24gd291bGQgYmUuIFJlY29uc3RydWN0aW5nIHRoZSBiaXRzdHJlYW0g
-aW4KPiA+ID4gdGhlIGtlcm5lbCBpcyBhIHByZXR0eSBiYWQgb3B0aW9uLCBidXQgc28gaXMgcGFy
-c2luZyBpbiB0aGUga2VybmVsIG9yCj4gPiA+IGhhdmluZyB0aGUgZGF0YSBib3RoIGluIHBhcnNl
-ZCBhbmQgcmF3IGZvcm1zLiBEbyB5b3Ugc2VlIGFub3RoZXIKPiA+ID4gcG9zc2liaWxpdHk/Cj4g
-Pgo+ID4gSXMgcmVjb25zdHJ1Y3RpbmcgdGhlIGJpdHN0cmVhbSBzbyBiYWQ/IFRoZSB2NGwyIGNv
-bnRyb2xzIHByb3ZpZGUgYQo+ID4gZ2VuZXJpYyBpbnRlcmZhY2UgdG8gYW4gZW5jb2RlZCBmb3Jt
-YXQgd2hpY2ggdGhlIGRyaXZlciBuZWVkcyB0bwo+ID4gY29udmVydCBpbnRvIGEgc2VxdWVuY2Ug
-dGhhdCB0aGUgaGFyZHdhcmUgY2FuIHVuZGVyc3RhbmQuIFR5cGljYWxseQo+ID4gdGhpcyBpcyBk
-b25lIGJ5IHBvcHVsYXRpbmcgaGFyZHdhcmUtc3BlY2lmaWMgc3RydWN0dXJlcy4gQ2FuJ3Qgd2UK
-PiA+IGNvbnNpZGVyIHRoYXQgaW4gdGhpcyBzcGVjaWZpYyBpbnN0YW5jZSwgdGhlIGhhcmR3YXJl
-LXNwZWNpZmljCj4gPiBzdHJ1Y3R1cmUganVzdCBoYXBwZW5zIHRvIGJlIGlkZW50aWNhbCB0byB0
-aGUgb3JpZ2luYWwgYml0c3RyZWFtCj4gPiBmb3JtYXQ/Cj4KPiBBdCBtYXhpbXVtIGFsbG93ZWQg
-Yml0cmF0ZSBmb3IgbGV0J3Mgc2F5IEhFVkMgKDk0ME1CL3MgaWlyYyksIHllcywgaXQKPiB3b3Vs
-ZCBiZSByZWFsbHkgcmVhbGx5IGJhZC4gSW4gR1N0cmVhbWVyIHByb2plY3Qgd2UgaGF2ZSBkaXNj
-dXNzZWQgZm9yCj4gYSB3aGlsZSAoYnV0IGhhdmUgbmV2ZXIgZG9uZSBhbnl0aGluZyBhYm91dCkg
-YWRkaW5nIHRoZSBhYmlsaXR5IHRocm91Z2gKPiBhIGJpdG1hc2sgdG8gc2VsZWN0IHdoaWNoIHBh
-cnQgb2YgdGhlIHN0cmVhbSBuZWVkIHRvIGJlIHBhcnNlZCwgYXMKPiBwYXJzaW5nIGl0c2VsZiB3
-YXMgY2F1c2luZyBzb21lIG92ZXJoZWFkLiBNYXliZSBzaW1pbGFyIHRoaW5nIGFwcGxpZXMsCj4g
-dGhvdWdoIGFzIHBlciBvdXIgbmV3IGRlc2lnbiwgaXQncyB0aGUgZm91cmNjIHRoYXQgZGljdGF0
-ZSB0aGUgZHJpdmVyCj4gYmVoYXZpb3VyLCB3ZSdkIG5lZWQgeWV0IGFub3RoZXIgZm91cmNjIGZv
-ciBkcml2ZXJzIHRoYXQgd2FudHMgdGhlIGZ1bGwKPiBiaXRzdHJlYW0gKHdoaWNoIHNlZW1zIG9k
-ZCBpZiB5b3UgaGF2ZSBhbHJlYWR5IHBhcnNlZCBldmVyeXRoaW5nLCBJCj4gdGhpbmsgdGhpcyBu
-ZWVkIHNvbWUgY2xhcmlmaWNhdGlvbikuCgpOb3RlIHRoYXQgSSBhbSBub3QgcHJvcG9zaW5nIHRv
-IHJlYnVpbGQgdGhlICplbnRpcmUqIGJpdHN0cmVhbQppbi1rZXJuZWwuIFdoYXQgSSBhbSBzYXlp
-bmcgaXMgdGhhdCBpZiB0aGUgaGFyZHdhcmUgaW50ZXJwcmV0cyBzb21lCnN0cnVjdHVyZXMgKGxp
-a2UgU1BTL1BQUykgaW4gdGhlaXIgcmF3IGZvcm1hdCwgdGhpcyByYXcgZm9ybWF0IGNvdWxkCmJl
-IHJlY29uc3RydWN0ZWQgZnJvbSB0aGUgc3RydWN0dXJlcyBwYXNzZWQgYnkgdXNlcnNwYWNlIGF0
-IG5lZ2xpZ2libGUKY29zdC4gU3VjaCBtYW5pcHVsYXRpb24gd291bGQgb25seSBoYXBwZW4gb24g
-YSBzbWFsbCBhbW91bnQgb2YgZGF0YS4KCkV4cG9zaW5nIGZpbmVyLWdyYWluZWQgZHJpdmVyIHJl
-cXVpcmVtZW50cyB0aHJvdWdoIGEgYml0bWFzayBtYXkKZGVzZXJ2ZSBtb3JlIGV4cGxvcmluZy4g
-TWF5YmUgd2UgY291bGQgZW5kIHdpdGggYSBzcGVjdHJ1bSBvZgpjYXBhYmlsaXRpZXMgdGhhdCB3
-b3VsZCBhbGxvdyB1cyB0byBjb3ZlciB0aGUgcmFuZ2UgZnJvbSBmdWxseQpzdGF0ZWxlc3MgdG8g
-ZnVsbHkgc3RhdGVmdWwgSVBzIG1vcmUgc21vb3RobHkuIFJpZ2h0IG5vdyB3ZSBoYXZlIHR3bwpz
-cGVjaWZpY2F0aW9ucyB0aGF0IG9ubHkgY29uc2lkZXIgdGhlIGV4dHJlbWVzIG9mIHRoYXQgcmFu
-Z2UuCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51
-eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVh
-ZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1h
-cm0ta2VybmVsCg==
+On 1/29/19 6:29 PM, Thierry Reding wrote:
+> On Tue, Jan 29, 2019 at 10:41:55AM +0200, Peter De Schrijver wrote:
+>> On Mon, Jan 28, 2019 at 04:09:08PM +0100, Thierry Reding wrote:
+>>
+>> ...
+>>
+>>>
+>>> Up to here this is a duplicate of timer-tegra20.c. And a lot of
+>>> tegra210_timer_init() is the same as tegra20_timer_init() as well. Can't
+>>> we unify the two drivers instead?
+>>>
+>>> The power cycle restrictions of the architected timer, do they not apply
+>>> to chips earlier than Tegra210 either? So don't we need all of these
+>>> additional features on the timer-tegra20.c driver as well? If so that
+>>
+>> No. Chips prior to Tegra114 do not have an arch timer and the arch timer
+>> does work correctly on Cortex-A15 so Tegra114 and Tegra124 can use it.
+>> It's broken on Cortex-A57 though, so we can't use it as a wakeup source
+>> on Tegra210.
+> 
+> If chips prior to Tegra114 don't have an architected timer, then we
+> can't remove the timer-tegra20 driver, because we still need it on
+> Tegra20 and Tegra30, right?
+> 
+
+For Tegra20/30, it's Cortext-A9 with TWD timer. (arch/arm/kernel/smp_twd.c)
+
+Originally, I thought the functionality of timer-tegra20 would be fully 
+replaced by TWD timer driver. But from the log in the kernelci test 
+farm[1][2], it looks to me the timer-tegra20 driver still works as 
+clocksource driver for Tegra20/30. I cannot confirm if the clock event 
+device has been replaced by TWD timer in the log. It could be replaced 
+in the background. And by looking into the driver, it should be.
+
+Compare to the log of Tegra124[3], it has been fully replaced by arch 
+timer driver.
+
+Note, "timer_us" is the name of Tegra20 timer.
+[1]: 
+https://storage.kernelci.org/mainline/master/v5.0-rc4-1-g4aa9fc2a435a/arm/tegra_defconfig/lab-baylibre-seattle/boot-tegra30-beaver.html
+[2]: 
+https://storage.kernelci.org/stable-rc/linux-4.9.y/v4.9.153-43-g6674590d15d2/arm/tegra_defconfig/lab-baylibre-seattle/boot-tegra20-iris-512.html
+[3]: 
+https://storage.kernelci.org/lsk/linux-linaro-lsk-v4.9/lsk-v4.9-18.09-1494-gde3059d32f93/arm/tegra_defconfig/lab-collabora/boot-tegra124-nyan-big.html
+
+Thanks,
+Joseph
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
