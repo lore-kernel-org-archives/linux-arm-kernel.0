@@ -2,72 +2,85 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5EA4AC282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 23:06:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 01404C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 23:41:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0D08C20881
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 23:06:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AD5F6218FD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 23:41:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bcKN6wnW";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="R/XJ8srh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D08C20881
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I+fvU8Qf";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="jIcGm47b"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD5F6218FD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OR3R3z07gcuwg0yuSz4614esDmVTjczXLNjleJwVfLU=; b=bcKN6wnWj1WgrX
-	9vjYDm+gkw22zlIsHnpFSba/9ZN9vNIm7gAvYbtFWkhldUfrWRYQUYVRTwgq+oRJC3UEiwKyA0Sq1
-	ugUT1SOduoj4QPDqEYE18GrfbdCarBsbaZ/p4nETloIvVfiuhGxdCyK3ORg5pODZeFWhPF0ROHm8t
-	wnRpVxo8jjN0iU36biExuTa8ToTrRgIbg77fFOdit+yZ3sD3xMbGiqr3StRhOZDfhxNqIP6AjN05v
-	UugNf0qd4UEiRSwxFE0u4SrI5sNE9HntlcnNrM3LAH56gZsriQpMrEloea5JCf68r+EYXjutDuwlU
-	BEAf7DmEvTK+GUeR1n3A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=HObUGBPsIvhQrNaxPmaqPoXeevglcHs744CkyDuaLO4=; b=I+fvU8Qfchcfbe
+	i3T376rV0tViIIbqIcRaxHeExby+VwQ8d+yd5bEZQuer176E2FwLj7fYAXqHK8KcZWEVrY/w2yT3k
+	AK8neOXNv8fYyw0ND7f1Rtk79ZqWOfVyYV+CifsYPTXXMVz6BfXW0EBACxa6EUOG8rnHUSFCFSPNA
+	lgQ7pQJ/5N7bD4VNI07kIkfparCl18jun1VgKB21hj4N3zV8dvHzox64RhHGor1Cm/Ew2TxspC09s
+	AXsreE7nEn/ZBfsl0Zxl7zFAFWujoT9WwQByL28sZ74LgNd4CbWNg8Q8Tru7QyELhoQoryWE4AZ1y
+	NFW1dao29BB/WY2w1ukA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goyvq-0000u5-MA; Wed, 30 Jan 2019 23:06:10 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gozTa-0005uD-Ar; Wed, 30 Jan 2019 23:41:02 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goyvn-0000sb-5T
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 23:06:08 +0000
-Received: from localhost (unknown [69.71.4.100])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 8F08120881;
- Wed, 30 Jan 2019 23:06:05 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548889565;
- bh=8JaioISvV+UrbOysLb8J9mvbaXx1RT/tB3gVEDxv9b0=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=R/XJ8srhS212cnBf+kAcqyT0XBDKhvLjpxHS7M0QrlzJ3Na0BsBiuKNZbnWIlqhjM
- c8yegt5CMGDZ34sWrMG74B2ZSkEAsY6mB4VpWyFQFYyygmB5CeEUSM+n7+Gk4bhrZL
- c8QqyfF6+Z4I9aiVV1+GGtmBke4l+VSaM7ADgsnk=
-Date: Wed, 30 Jan 2019 17:06:04 -0600
-From: Bjorn Helgaas <helgaas@kernel.org>
-To: Arnd Bergmann <arnd@arndb.de>
-Subject: Re: [PATCH v2 1/2] arm: cns3xxx: fix writing to wrong PCI registers
- after alignment
-Message-ID: <20190130230604.GM229773@google.com>
-References: <20190107134510.32494-1-koen.vandeputte@ncentric.com>
- <20190124115656.GA23362@e107981-ln.cambridge.arm.com>
- <47437c58-d7b3-f77c-7bc7-973373f1e78e@ncentric.com>
- <20190124162759.GA28871@e107981-ln.cambridge.arm.com>
- <CAK8P3a2ftPvdBnVacbGcxDpCW6CvBj3ZGBXuVQE46JocXewvgQ@mail.gmail.com>
+ id 1gozTX-0005t7-6M
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 23:41:00 +0000
+Received: by mail-wr1-x444.google.com with SMTP id 96so1361369wrb.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 15:40:58 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=HoQpmnrQILE9VZn7UG83GWFanQbctVJxciTsFkrKO4c=;
+ b=jIcGm47bwiYMa0K0tJp7cB1ARPhvZ6n8KbAZ7R+wIvmbX/x2T4jqp1+CIP4aOw6mm5
+ wW5CNXjjvxUO0T9gm/eWtF8PYxkcQq9vPJCwZZIDBqRAhRjXHYUV0ExhTXab4exeU8A6
+ awCtpgBE9mN0nfJC82BPx7Zom5n4kBEKBUYmY=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=HoQpmnrQILE9VZn7UG83GWFanQbctVJxciTsFkrKO4c=;
+ b=jrdmuia2YKR9nZeCElioy64RG+w5uEyzFJtsWDt+3ricO39QqI7hYFpM09vMHRaMfR
+ 1mua3Lfs1S8IpCA+jBvnkdV22PpiwwxAJbAio9s71byob5nmDl+1GutSsLL0Me+bW3Ab
+ eB/qA5BkDDpFo8HM6E7vNQwUrBei3OQgUEIYgE5SkBfg8EtpsplXjqRfB2hqMwm1RUVh
+ 6+ziG8+fZyR8K5RcYIjPN9TOOGxo1tRFYbnlPtTdGvXtbGzsa4WxJLHfrYHosu3HBuuW
+ KJ5rSAiRd6+YcZXMgVGmBb+yHWOP77zioM9cXsgLi3LSN1FmqrfnPI0dKGA0IWATf4DO
+ fgLg==
+X-Gm-Message-State: AHQUAuYgsPsoV9wtnNf9iSwDG+7nsCFO2iGvAmQIu1CHpdKW2IeW9Q6E
+ u2xLEE1avuaZkrNyflM57nP8AA==
+X-Google-Smtp-Source: AHgI3Ia9EW7qeAFQ4Tw73Cze4UYXFce9rWOtis57ZG1OR7zM1HfM+J0RttygLOkr+IZMCKhNrCfSdw==
+X-Received: by 2002:adf:f848:: with SMTP id d8mr1285177wrq.178.1548891656790; 
+ Wed, 30 Jan 2019 15:40:56 -0800 (PST)
+Received: from linaro.org ([2a00:23c5:6815:3901:cf0e:17bd:f425:fac3])
+ by smtp.gmail.com with ESMTPSA id s3sm2344770wmj.23.2019.01.30.15.40.55
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Wed, 30 Jan 2019 15:40:56 -0800 (PST)
+From: Mike Leach <mike.leach@linaro.org>
+To: mike.leach@linaro.org, linux-arm-kernel@lists.infradead.org,
+ coresight@lists.linaro.org, linux-kernel@vger.kernel.org
+Subject: [PATCH v4 0/3] Update AMBA driver for enhanced component ID spec.
+Date: Wed, 30 Jan 2019 23:40:48 +0000
+Message-Id: <20190130234051.2294-1-mike.leach@linaro.org>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAK8P3a2ftPvdBnVacbGcxDpCW6CvBj3ZGBXuVQE46JocXewvgQ@mail.gmail.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_150607_225187_CCB5914A 
-X-CRM114-Status: GOOD (  16.52  )
+X-CRM114-CacheID: sfid-20190130_154059_257847_064BE60C 
+X-CRM114-Status: UNSURE (   9.54  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,53 +92,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- linux-pci <linux-pci@vger.kernel.org>, Russell King <linux@armlinux.org.uk>,
- "# 3.4.x" <stable@vger.kernel.org>, Robin Leblon <robin.leblon@ncentric.com>,
- Koen Vandeputte <koen.vandeputte@ncentric.com>,
- Olof Johansson <olof@lixom.net>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: saiprakash.ranjan@codeaurora.org, arm@kernel.org, linux@armlinux.org.uk,
+ mathieu.poirier@linaro.org, suzuki.poulose@arm.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 30, 2019 at 11:08:04PM +0100, Arnd Bergmann wrote:
-> On Thu, Jan 24, 2019 at 5:29 PM Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > On Thu, Jan 24, 2019 at 04:23:05PM +0100, Koen Vandeputte wrote:
-> > > On 24.01.19 12:56, Lorenzo Pieralisi wrote:
-> > > >On Mon, Jan 07, 2019 at 02:45:09PM +0100, Koen Vandeputte wrote:
-> > > Purely for my information:
-> > >
-> > > Testing on a lot of devices here shows a huge improvement towards stability.
-> > > Is it possible to get it merged sooner?
-> > > Does "queued for 5.1" also mean that backporting to stables only will happen
-> > > at 5.1_rc1 release?
-> >
-> > Yes, I will ask Bjorn if we can send them for one of the upcoming -rc*
-> > (so effectively you will get them in v5.0 and propagated to stable
-> > earlier), I do not think it is that urgent either though, let me handle
-> > that.
-> 
-> We can take them through the soc tree if that's easier, but
-> going through Bjorn's tree is also fine.
+The latest ARM CoreSight specification updates the component identification
+requirements for all components attached to an AMBA bus. (ARM IHI 0029E)
 
-I have the following on my for-linus branch and I'll ask Linus to pull them
-this week, so they will appear in v5.0:
+This specification defines bits 15:12 in the ComponentID (CID) value as the
+device class. Identification requirements now depend on this class.
+Class 0xF: Traditional components identified by Peripheral ID (PID) only.
+Class 0x9: CoreSight components may be identified by a Universal Component
+Identifier (UCI) consisting of the PID plus CoreSight DevType and DevArch
+values.
 
-  b8b592a3a8d1 ARM: cns3xxx: use actual size reads for PCIe
-  b3a32f359397 ARM: cns3xxx: fix writing to wrong PCI registers after alignment
+Current and future ARM CoreSight IP will now use the same PID for
+components on the same function - e.g. the ETM, CTI, PMU and Debug elements
+associated with a core. The first core to use this UCI method is the A35,
+which currently has binding entries in the ETMv4 driver.
 
-Neither is currently marked for stable, but I'll add that if you like.
-They're already both marked as:
+This patchset prepares for the addition of the upcoming CTI driver, which
+will need to correctly bind with A35, and reported new devices that share
+PID for multiple components, while overcoming the limitation of binding by
+PID alone, which cannot now work.
 
-  Fixes: 802b7c06adc7 ("ARM: cns3xxx: Convert PCI to use generic config accessors")
+Patch 0001: Adds new UCI data structure and uses it with existing drivers
+that use private data field in amba_id. This fixes issue from prior set.
+Patch 0002: Implements the UCI matching code in the AMBA core code.
+Patch 0003: Update ETMv4 driver to use UCI as appropriate. 
 
-which I think appeared in v4.0.
+Thanks
+Mike
 
-Bjorn
+Tested on DB410, Juno; kernel 5.0-rc4
+
+Changes since v3:
+Fix UCI structure to allow CoreSight drivers to set private data. This
+fixes bug where none-UCI private data would cause a driver binding
+mismatch. (e.g. STM).
+
+Add CS_AMBA macros to simplify building AMBA ID tables, with and without
+UCI settings.
+
+Changes since v2:
+Simplification of amba_cs_uci_id_match().
+Fix CID class bitfield comments.
+Dropped RFC tag on patchset.
+
+Mike Leach (3):
+  drivers: amba: Updates to component identification for driver
+    matching.
+  drivers: amba: Update component matching to use the CoreSight UCI
+    values.
+  coresight: etmv4: Update ID register table to add UCI support
+
+ drivers/amba/bus.c                            | 45 +++++++++++++++----
+ drivers/hwtracing/coresight/coresight-etm3x.c | 44 ++++++------------
+ drivers/hwtracing/coresight/coresight-etm4x.c | 21 +++++----
+ drivers/hwtracing/coresight/coresight-priv.h  | 40 +++++++++++++++++
+ drivers/hwtracing/coresight/coresight-stm.c   | 14 ++----
+ drivers/hwtracing/coresight/coresight-tmc.c   | 30 ++++---------
+ include/linux/amba/bus.h                      | 39 ++++++++++++++++
+ 7 files changed, 153 insertions(+), 80 deletions(-)
+
+-- 
+2.19.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
