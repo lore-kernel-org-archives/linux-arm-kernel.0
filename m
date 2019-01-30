@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AB182C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:41:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8CFB9C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:41:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7C02920989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:41:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5EB92218DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 09:41:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nQBNIS42";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="MnsN1zu4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7C02920989
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ojTft120";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ZdFh7+Lh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5EB92218DA
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,56 +25,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Z8fG67y/1I6fPOmYRQckpupC+oHxsTuzd5jMnIbmBq0=; b=nQBNIS42kG+U/r
-	QpV/JGFhIN8wmCjjRQR/nKZN3umDm3wjgATWdvYEYlr4v7Udg0Kg1OAhEd8rPbCwcz2Ri7VG2N4xH
-	Q9HxLOGTtC+XYIXW1b06sKLCTkEtQNb8sExCDYBNuF7y5NOuIOUuink7Fc+SdoeJ2Nfc/SyZFwFZK
-	2cPbP+b2poyZ6gYhIG7qtMOBOmI3lRMCm1riOKyoCpiUlKcHfgu4VDP/h4AhSOWOB1fRneDutt9Aq
-	dWxdhLdLdHCHgQvRnCVTMdhV2t4ydau1kuQWrWoZsED3Iq1rqc9W2MGPWUxW1QkzUefDX8Zoxkxeh
-	1Ir0q759KM3Dg1pQqCNA==;
+	List-Owner; bh=qhQjRwAj88YnVwy/nxTsSwhDUN7cMTUzwF7PHLUhZEc=; b=ojTft120OQzR6D
+	FLxP6n6dc55kgUV6W69+qan3xhI3huVUvMF0asI9BerFEN3fQHl860nqztLoroCJFAT+bF6sNxZOn
+	QS7VX471FFaNs6/jHXP2sUUU+Hn1HJVInhd2fX43pFW0adEXaGl6lZ53zQ7boxxyAW4Wvz3kBG4uG
+	/S8ceJMdizEe5BHXiFDFhvx8u6gjHOIhYsMYyNC1phcW0bDGQ2pnm/trG26twZVVFZO0jcJRqYQYP
+	VoJ3V7758aVHGv9GAy8DPapRXTI7AJlAxZAiaamGY/AlcV5GQj2atH3J90N/8riL5C5jf5zEnXUoN
+	1h/qom0s5OvxvfghUAuQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gomMc-0005dV-DV; Wed, 30 Jan 2019 09:40:58 +0000
+	id 1gomN9-0005uy-PK; Wed, 30 Jan 2019 09:41:31 +0000
 Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gomMW-0005aK-6P
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 09:40:56 +0000
-Received: by mail-it1-x142.google.com with SMTP id b5so9503359iti.2
+ id 1gomN6-0005uL-9b
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 09:41:29 +0000
+Received: by mail-it1-x142.google.com with SMTP id z7so9262874iti.0
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 01:40:51 -0800 (PST)
+ Wed, 30 Jan 2019 01:41:28 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=jA6sxqmdE5xhLUmdWXW4Y0IJWkPEsnB42d4DPy58FV8=;
- b=MnsN1zu4XTBbRAmbSdSyFZonyCUd1BpWHp/uqPC2GrR6AYh+UQfaaavY+IlG59l+S7
- s8BMb7ReLlnYn4cqBus1Wb7nGBrM2XnTEFFIgDZNWv4MDo1hjCsC9Wf1TAvwCuiS9COh
- fbRWcuCwVqg6DvJriMjpXDt5e3ibl6PRLkZEM=
+ :cc; bh=8p9guxdW2dSYDedRw8V3sEOTdwxjxH/BsBrvfgqOjy8=;
+ b=ZdFh7+Lhxhub53RHgUUM9RREUxH4vj+Bk6LWu3q71VlW0oV46Fr0Tf22AWvvePQ0fc
+ jTZr3dpWZcPFH+74QeiIL9IHAwIsVqyU8O76Oxe3KTsDayGHhUbj4ZIhZWeHD3djGZMZ
+ CD6SgSyevqgMvsMsyRDw+Iu8D+IKMHS42eb3E=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=jA6sxqmdE5xhLUmdWXW4Y0IJWkPEsnB42d4DPy58FV8=;
- b=NY2ak6IVtWAzC8Hrm/T5IsVKCMPLmOaR2qq8YKgvzaerbiAJFxYGi2Gtz3+3N7jogd
- yymNG6rM3ZIV8hwg3JS4NKgG08nYwdEq1DGAozcTOpukewaMnV45FyjqRWKLb9n4y6rt
- Hdf6oKVKdarM7uOWEjsvRPdxYz6xkkFQN10UKeZlNktlUvvV12FBwDi6apNY21zLsU2f
- hY6QcBCFMrxFXMdAtwHbcA+PA0/UjgFXKllY65Nl8GbtBFtf6dWpQshNxMw/eWaLQ6ru
- uc6zi7c3V97tQgKjUf+KL49PAhwM7S588jpKaHswhtQGqfDf7jLS7Mf0Qby70vEcLnk6
- yICQ==
-X-Gm-Message-State: AJcUuked1do9an8JDo7KCRd/sC8UC8S/lBhdwPXXx8iHc5dCCu5KPZCR
- cK5mAHLSK2lKczWk8GfIFOCMK1foSsgJgC63KXmRww==
-X-Google-Smtp-Source: ALg8bN59vK4dHgHYP2MyJsf213NV1ZXUGMEIwFjAxEc4Gss28+6jH1aXuKX1Alcm0WvtXAcvx/9jKTAsCRs7yy5sw+c=
-X-Received: by 2002:a02:183:: with SMTP id 3mr18713951jak.130.1548841250092;
- Wed, 30 Jan 2019 01:40:50 -0800 (PST)
+ bh=8p9guxdW2dSYDedRw8V3sEOTdwxjxH/BsBrvfgqOjy8=;
+ b=uLhZviHPKImMUvfZAtw40C1kyvNfKBed5V3ToUtk6/HfK6kdH85c9SkLI8EoyRUvzT
+ QdcWhv8cpk0QrcaBcuxeg7Mtaw+X2BwN1aMHVj46gsstkPA+GECIWLLrv58yn/513ITB
+ UvnWJX7cTi/OX2Y7vUCmBbPNCOMJqUQ9K0nfmzuqJ7N3nBsj3ByO/E8x9/am9ICK/HQB
+ bxSUpq+VtqeURJv99AsCHcih2KguvR3m0fy52gu09twFMcaIliCOvmDTOPsEZ86jAsG9
+ deSAS8tJ8l0ZwL62GX0mSvXcMsGvKInbqjMxa+qDWNkw5a61HTgwCgG/V07Ftuba/oBc
+ sTCQ==
+X-Gm-Message-State: AJcUukcGgUDqznXw7gdr8fwQ8G4vFjFthCaYMhsV9x64XqFsmJQyurgW
+ KE62r5Ep6BC5iw+ReruZvKhAvLq9bK/omH8PkKeFQafYh6Y=
+X-Google-Smtp-Source: ALg8bN5wn920FaduALkeh2LPYs0Nvrhp5D8Zd6duGp1ooTD7vwwPGF+V+15A3oTd8AWgW0wQ80vD2es1aExkzfw/aiI=
+X-Received: by 2002:a02:7f08:: with SMTP id r8mr15823080jac.20.1548841287480; 
+ Wed, 30 Jan 2019 01:41:27 -0800 (PST)
 MIME-Version: 1.0
-References: <20190126102207.29488-1-ard.biesheuvel@linaro.org>
- <20190130000618.GM31596@builder>
-In-Reply-To: <20190130000618.GM31596@builder>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Wed, 30 Jan 2019 10:40:38 +0100
-Message-ID: <CAKv+Gu-xt9762Lh3A3qAW3kRYUW+pvQa6piEFwOOi0vTdmQAGw@mail.gmail.com>
-Subject: Re: [PATCH] efi: arm/arm64: allow SetVirtualAddressMap() to be omitted
-To: Bjorn Andersson <bjorn.andersson@linaro.org>
+References: <1548836194-15264-1-git-send-email-vincent.guittot@linaro.org>
+ <CAMuHMdWYV-tDD2osdvs4yhD-mu2n8-JSC7rV8Zt5vW4kr8hdWQ@mail.gmail.com>
+ <CAKfTPtBiWunvVHv=tpq7CPqAX+54d_dyPt6BME_m1_Wz+qPaTA@mail.gmail.com>
+ <CAJZ5v0jLJ8Tu7Gpt-4bhW59Q3=PX4wyb2rFBWuPKMFHcFXBxAA@mail.gmail.com>
+In-Reply-To: <CAJZ5v0jLJ8Tu7Gpt-4bhW59Q3=PX4wyb2rFBWuPKMFHcFXBxAA@mail.gmail.com>
+From: Vincent Guittot <vincent.guittot@linaro.org>
+Date: Wed, 30 Jan 2019 10:41:16 +0100
+Message-ID: <CAKfTPtD+Yd7fBw=PhnedYmkGGW-JhNiZ739B-8YD7pFJEe9wig@mail.gmail.com>
+Subject: Re: [PATCH] PM-runtime: fix deadlock with ktime
+To: "Rafael J. Wysocki" <rafael@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_014052_473431_2608958E 
-X-CRM114-Status: GOOD (  22.99  )
+X-CRM114-CacheID: sfid-20190130_014128_337200_B2D6E89D 
+X-CRM114-Status: GOOD (  23.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,74 +88,106 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, linux-efi <linux-efi@vger.kernel.org>,
- Heinrich Schuchardt <xypron.glpk@gmx.de>, Will Deacon <will.deacon@arm.com>,
- Alexander Graf <agraf@suse.de>, Leif Lindholm <leif.lindholm@linaro.org>,
- AKASHI Takahiro <takahiro.akashi@linaro.org>,
- James Morse <james.morse@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>,
+ Linux PM list <linux-pm@vger.kernel.org>,
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Biju Das <biju.das@bp.renesas.com>,
+ Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ Geert Uytterhoeven <geert@linux-m68k.org>,
+ "open list:TI ETHERNET SWITCH DRIVER \(CPSW\)" <linux-omap@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 30 Jan 2019 at 01:06, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
+On Wed, 30 Jan 2019 at 10:39, Rafael J. Wysocki <rafael@kernel.org> wrote:
 >
-> On Sat 26 Jan 02:22 PST 2019, Ard Biesheuvel wrote:
+> On Wed, Jan 30, 2019 at 10:14 AM Vincent Guittot
+> <vincent.guittot@linaro.org> wrote:
+> >
+> > Hi Geert,
+> >
+> > On Wed, 30 Jan 2019 at 09:21, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > >
+> > > Hi Vincent,
+> > >
+> > > On Wed, Jan 30, 2019 at 9:16 AM Vincent Guittot
+> > > <vincent.guittot@linaro.org> wrote:
+> > > > A deadlock has been seen when swicthing clocksources which use PM runtime.
+> > > > The call path is:
+> > > > change_clocksource
+> > > >     ...
+> > > >     write_seqcount_begin
+> > > >     ...
+> > > >     timekeeping_update
+> > > >         ...
+> > > >         sh_cmt_clocksource_enable
+> > > >             ...
+> > > >             rpm_resume
+> > > >                 pm_runtime_mark_last_busy
+> > > >                     ktime_get
+> > > >                         do
+> > > >                             read_seqcount_begin
+> > > >                         while read_seqcount_retry
+> > > >     ....
+> > > >     write_seqcount_end
+> > > >
+> > > > Although we should be safe because we haven't yet changed the clocksource
+> > > > at that time, we can't because of seqcount protection.
+> > > >
+> > > > Use ktime_get_mono_fast_ns instead which is lock safe for such case
+> > > >
+> > > > Fixes: 8234f6734c5d ("PM-runtime: Switch autosuspend over to using hrtimers")
+> > > > Reported-by: Biju Das <biju.das@bp.renesas.com>
+> > > > Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> > >
+> > > Thanks for your patch!
+> > >
+> > > /**
+> > >  * ktime_get_mono_fast_ns - Fast NMI safe access to clock monotonic
+> > >  *
+> > >  * This timestamp is not guaranteed to be monotonic across an update.
+> > >  * The timestamp is calculated by:
+> > >  *
+> > >  *      now = base_mono + clock_delta * slope
+> > >  *
+> > >  * So if the update lowers the slope, readers who are forced to the
+> > >  * not yet updated second array are still using the old steeper slope.
+> > >  *
+> > >  * tmono
+> > >  * ^
+> > >  * |    o  n
+> > >  * |   o n
+> > >  * |  u
+> > >  * | o
+> > >  * |o
+> > >  * |12345678---> reader order
+> > >  *
+> > >  * o = old slope
+> > >  * u = update
+> > >  * n = new slope
+> > >  *
+> > >  * So reader 6 will observe time going backwards versus reader 5.
+> > >  *
+> > >  * While other CPUs are likely to be able observe that, the only way
+> > >  * for a CPU local observation is when an NMI hits in the middle of
+> > >  * the update. Timestamps taken from that NMI context might be ahead
+> > >  * of the following timestamps. Callers need to be aware of that and
+> > >  * deal with it.
+> > >  */
+> > >
+> > > As this function is not guaranteed to be monotonic, have you checked how
+> > > the Runtime PM code behaves if time goes backwards? Does it just make
+> > > a suboptimal decision or does it crash?
+> >
+> > As a worst case this will generate a suboptimal decision around the update
 >
-> > The UEFI spec revision 2.7 errata A section 8.4 has the following to
-> > say about the virtual memory runtime services:
-> >
-> >   "This section contains function definitions for the virtual memory
-> >   support that may be optionally used by an operating system at runtime.
-> >   If an operating system chooses to make EFI runtime service calls in a
-> >   virtual addressing mode instead of the flat physical mode, then the
-> >   operating system must use the services in this section to switch the
-> >   EFI runtime services from flat physical addressing to virtual
-> >   addressing."
-> >
-> > So it is pretty clear that calling SetVirtualAddressMap() is entirely
-> > optional, and so there is no point in doing so unless it achieves
-> > anything useful for us.
-> >
-> > This is not the case for 64-bit ARM. The native mapping used by the OS
-> > is arbitrarily converted into another permutation of userland addresses
-> > (i.e., bits [63:48] cleared), and the runtime code could easily deal
-> > with the original layout in exactly the same way as it deals with the
-> > converted layout. However, due to constraints related to page size
-> > differences if the OS is not running with 4k pages, and related to
-> > systems that may expose the individual sections of PE/COFF runtime
-> > modules as different memory regions, creating the virtual layout is a
-> > bit fiddly, and requires us to sort the memory map and reason about
-> > adjacent regions with identical memory types etc etc.
-> >
-> > So the obvious fix is to stop calling SetVirtualAddressMap() altogether
-> > on arm64 systems. However, to avoid surprises, which are notoriously
-> > hard to diagnose when it comes to OS<->firmware interactions, let's
-> > start by making it an opt-out feature, and implement support for the
-> > 'efi=novamap' kernel command line parameter on ARM and arm64 systems.
-> >
-> > (Note that 32-bit ARM generally does require SetVirtualAddressMap() to be
-> > used, given that the physical memory map and the kernel virtual address
-> > map are not guaranteed to be non-overlapping like on arm64. However,
-> > having support for efi=novamap,noruntime on 32-bit ARM, combined with
-> > the recently proposed support for earlycon=efi, is likely to be useful
-> > to diagnose boot issues on such systems if they have no accessible serial
-> > port)
-> >
-> > Cc: Alexander Graf <agraf@suse.de>
-> > Cc: Heinrich Schuchardt <xypron.glpk@gmx.de>
-> > Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > Cc: Leif Lindholm <leif.lindholm@linaro.org>
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> This makes the SDM850 bootable, thanks.
->
-> Tested-by: Bjorn Andersson <bjorn.andersson@linaro.org>
->
+> So that should be explained in the changelog of the patch.  In detail,
+> if poss, please.
 
-Thanks Bjorn
+Ok, I'm going to update the commit message
 
 _______________________________________________
 linux-arm-kernel mailing list
