@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0BFE2C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 03:27:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A5C36C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 03:30:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CB12C20881
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 03:27:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 724C420881
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 03:30:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p1csi7Ki";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=jms.id.au header.i=@jms.id.au header.b="Iy2a5V9M"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB12C20881
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BQOQojt9";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=jms.id.au header.i=@jms.id.au header.b="O+psazMW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 724C420881
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jms.id.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,56 +25,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=M6kx9+9fGAJ0DnjmeQKhdQ97sRjNl8iTZ8Gwne9Qz9E=; b=p1csi7KiVWpkY2
-	X1n1sp1QhXnT9DTqWZ8lZg7juUY9LcGInpJTnVy6Rf+GTXkz0dzWLQmdjsokm8hegdM0xuvfp5uMJ
-	RnM9HkKUsc10wsQVVt7rknRxLXFlI+VvqWxtQcsjOTlAkDFahW+Nn2t49uGpnClq1PnUme7o9YZZb
-	Wxxz+qXWQgOT2sPA3vW60RakPJFdrpMZpCrQQewRlvrQj/qetcVVA2eAZTPxfxQXA4R2SeK5AO+kF
-	4Ft1S9h3+LB1yhlk+YkBraDr0OZ2NYRwrLqffPtHzv3j+PDrpR4pXSJjGwLs3ozm4pTrDgnd6k9tX
-	U2u6ZhxMhhHaL+fxqitg==;
+	List-Owner; bh=vGzR73T6uF+L88AQXqHETz8qRmK9k5IXGR5J0jyrX/w=; b=BQOQojt9znhPwc
+	h5iOpM7uYLTpchBemqmRGmRPfF7wiqDQ8knLjcljeBz2w7poTwwjHglH8mUm0zpRyRxg6UgD9/7Cm
+	Kwd/Xn0qNMWztiqQjhZ7A/+mwkD07o5msdZvTaxr6em1UYPRmpFyPyEuFdQycKW5uno54Q3DatkRG
+	o+5s5Vx7/7U1TCfqYr+PNmxcJ8ZiZ4Uy6ng1TiY4wtarv+cFsr1MphtxFpU/AZm3NkKCJBiSTNgY5
+	q7jtIEZH/cGakfzpVQeZcT9a1iK3o3gY8cRQ+4Bi27QDNLgqUPtMFnRoeWrPgAuICrxiWtarFeAsD
+	MII0d21JVvf6TpaXWTnw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gogXN-0004KH-0l; Wed, 30 Jan 2019 03:27:41 +0000
-Received: from mail-qk1-x741.google.com ([2607:f8b0:4864:20::741])
+	id 1gogaP-0005tq-3X; Wed, 30 Jan 2019 03:30:49 +0000
+Received: from mail-qt1-x841.google.com ([2607:f8b0:4864:20::841])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gogXJ-0004Jp-S8
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 03:27:39 +0000
-Received: by mail-qk1-x741.google.com with SMTP id o8so12883734qkk.11
+ id 1gogaM-0005tV-07
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 03:30:47 +0000
+Received: by mail-qt1-x841.google.com with SMTP id i7so24778901qtj.10
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 19:27:37 -0800 (PST)
+ Tue, 29 Jan 2019 19:30:45 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=jms.id.au; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=0b2GDl2yieLIyx2pFYrqOUiHxYeTYtmKw6/wCfFz+T4=;
- b=Iy2a5V9MHKAxrlKsnJ9rvNj4qf16/5BykO68Vm7RZa7LecX/MGwVbwNi7xKfBVOtT5
- k8Q5Q5jLXd0GA3BlUfmybllg9sTRLNHMUFzFwBbuCAtT3aGCnHizLffXYtk9vV3wac01
- iDO2opyMPNA4+IjQD82rEXt18DZys6H7bUErg=
+ :cc; bh=EOazp/NWSDbCI8C+71UDBedskrp4jlovZVpb655hqvc=;
+ b=O+psazMWvQoU6qhDFavivE6P9jLDHQZ3zpfhSE/LPFAGiKfXe7TrmCEsw4aNUdKK4K
+ lpJ0kIdBwycUE7Kzr87i4aTSw1FnGlWGQmYfTMzdinb/1XmuW7PbG+rvT+umTqFBzID/
+ ntKSqRUK2r2MzeLpRRXXA55Y33nfT3nVs66f0=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=0b2GDl2yieLIyx2pFYrqOUiHxYeTYtmKw6/wCfFz+T4=;
- b=FaPh1mQ//3sZQmVFsm8yfJtGZS0PftFWIgYJ1DgSBLu1RgyXDv7n6mOLhxu2tdX5HB
- uEn+WKg7Kfj6pv9d5k2C3Lgm37EuxPeVo2bEASU8b0vcm/PhReLCKGjEdwVIuqpFNkf/
- R2jOesWg7+w+q+SvKS5Fx1UxYOk5Mqvkk5zZK1w+0sFtttfmePvcyP3QlsQMjtNVJCAl
- z+vWjvqWFRPjAM4Fd3Lv6k3NpFvDleuWU3vgsldJXJbqFYT2HugheykQoc0j5LP3Wr7w
- MY5y4sS6GxexYw0tkRSmGzl+a24cXKWolm6IYkeyW2rY+EdQPNumkRlIvMF6p0ZscRH4
- fXcA==
-X-Gm-Message-State: AJcUukeZIWMy25D1iqAuTb2btdDbQnVr9UoLZRprtSWOIs0cdFfWiLDB
- 1j2FR1Hc6MNlxFy+9asmtGmnz5naq5x8xVrgEY8=
-X-Google-Smtp-Source: ALg8bN5KS647Oz897o2Lp4q/4anxz45TJI1E5O6Dbhj26ozy8v2BKx5KAQFns7kWbyI/ya5kUEmqLguF66sAaUDJLWM=
-X-Received: by 2002:a37:781:: with SMTP id 123mr26025466qkh.231.1548818856336; 
- Tue, 29 Jan 2019 19:27:36 -0800 (PST)
+ bh=EOazp/NWSDbCI8C+71UDBedskrp4jlovZVpb655hqvc=;
+ b=G1xdy+QLfjOr3tkZT9v7JOt+U4WZaRyaKrEajVvgUYHS4/iyj5ElSW9g0uPgQ+ZEFj
+ VmWHBjwQGIRaY1JbjTMO+fgphjKeZQB2Ze9oKMz8e87tsjY5gH32o1SGIpjn+n8RsQ9/
+ C4k5qJF2+e2ae9Nmb5AbbyAT8sed9voBhkcKaNoJegUMdyW7uGExnBS/e3tkeBTo5jnP
+ Xx4XnChofb+oZmm+la0Ub/xlQzc13RDt7jOy6PoTxIKMrxpdE5sOirfoYY5AeD4Mp+/n
+ LhWymZOie16lrg60jzNoAckYomDfGM7yeishHt4/3W/kDhKmqzD1zQAIsJ76tlD01KGq
+ Qhig==
+X-Gm-Message-State: AJcUukeFYmxPSvuXpD8NAKt/ieUyVE33HKay6m8ONxb4tU8hlG85qOjv
+ KFx3ZJkpbhBFKkQIyrZqThnlysH1jBfgst+m3LA=
+X-Google-Smtp-Source: ALg8bN7LW70WzD86d3+LFpR4kdydSKb/yb44aVGHjpkQPeLKmhko7YcKakMv2eFQDtrtBDy9bist227w4b+PVjN7JKU=
+X-Received: by 2002:a0c:e789:: with SMTP id x9mr27109614qvn.245.1548819044408; 
+ Tue, 29 Jan 2019 19:30:44 -0800 (PST)
 MIME-Version: 1.0
-References: <20190123230733.1821501-1-vijaykhemka@fb.com>
- <20190123230733.1821501-2-vijaykhemka@fb.com>
-In-Reply-To: <20190123230733.1821501-2-vijaykhemka@fb.com>
+References: <20190129230538.1044378-1-vijaykhemka@fb.com>
+In-Reply-To: <20190129230538.1044378-1-vijaykhemka@fb.com>
 From: Joel Stanley <joel@jms.id.au>
-Date: Wed, 30 Jan 2019 14:27:24 +1100
-Message-ID: <CACPK8Xc-abT8Y9f60qt=v3TQ-=fQ3k7YzJGS5Y2MN0MDfRY+tA@mail.gmail.com>
-Subject: Re: [PATCH 2/2] ARM: dts: aspeed: Add uarts for SoL in Facebook
+Date: Wed, 30 Jan 2019 14:30:29 +1100
+Message-ID: <CACPK8Xdg+mjqL-qnNGUnRPw03sqBJGf_ckcsFnw6_F7HA96o6Q@mail.gmail.com>
+Subject: Re: [PATCH v3] dt-bindings: aspeed-lpc: Make parameter optional
 To: Vijay Khemka <vijaykhemka@fb.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_192737_902744_A6C72FF0 
-X-CRM114-Status: UNSURE (   8.57  )
+X-CRM114-CacheID: sfid-20190129_193046_049473_BB0DE3D9 
+X-CRM114-Status: UNSURE (   8.76  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -92,25 +91,23 @@ Cc: Mark Rutland <mark.rutland@arm.com>,
  Andrew Jeffery <andrew@aj.id.au>,
  "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>,
  Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, Lee Jones <lee.jones@linaro.org>,
  Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 24 Jan 2019 at 10:07, Vijay Khemka <vijaykhemka@fb.com> wrote:
+On Wed, 30 Jan 2019 at 10:05, Vijay Khemka <vijaykhemka@fb.com> wrote:
 >
-> Added uart2 and uart3 in Facebook Tiogapass for routing serial input
-> from Host to BMC for SoL via LPC.
+> Memory-region and flash phandle is not a required parameter, it is
+> optional to describe in device tree and needed only use basis.
 >
 > Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
 
-Applied for 5.1.
+Acked-by: Joel Stanley <joel@jms.id.au>
 
-Cheers,
-
-Joel
+Thanks for following this up Vijay.
 
 _______________________________________________
 linux-arm-kernel mailing list
