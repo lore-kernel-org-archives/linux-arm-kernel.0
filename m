@@ -2,112 +2,112 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80E2BC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 00:16:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B7CC5C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 01:56:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4EB442082E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 00:16:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7AD14204EC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 01:56:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nVkEzdsg";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="IKbkJZmm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4EB442082E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MqUWtRXZ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amperemail.onmicrosoft.com header.i=@amperemail.onmicrosoft.com header.b="CKW2Rx5C"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7AD14204EC
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=os.amperecomputing.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BAhboD+b/WHulfMNOH8VzbJfwDK6t1yio8HGvDJ7Aas=; b=nVkEzdsgBJXDpa
-	eGR8YyLnEzohCD2mANRBAeHR0NPEeeeO36bm3eayeMh5LmQnB+BiWgWv77AZ7RpUx+i4oW2y66P+1
-	XLANgc14dtzUmOjDuZ+3B2w1Vi3U6QjqA5+B0VkkwJqfkrMandzHVGI/rL46Z7DyhDTYuKm+C3Tvh
-	rDCrk2Wj9DkpncGZRJR3cOM6whOwFYdCGWbBU3rWEFqn4qDbpMta7D8x3G669T7hPI+PR4iu5XSP9
-	SheqiTSBmOIEUo5//RBK1XWY4pbsQGQVKHLhOWTfed6zncXRDGpPOI0m2nJah4Use+0jbu0JPZlLq
-	2YTRW0x51xRugYx4qNZw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=vuodgsfKCGQCL093W/fnp80HfvrNVuFyrEPzgTJc3Q8=; b=MqUWtRXZqYiZK3
+	9hf+9dYcrBbfTxmnZJEsCOAy6xsI15o+pFcNgxljd8VLhKuINDccGhkk4pwp47+YJld7pu/Z4E/Pv
+	jIjAyiPa3Gm+A2eMgOSQxA3VTFdibUPPJRmD8BaMhqCJ2OdTP6snbE0xH0fQeiFQLvv9IlsjGpJC5
+	HnaoLq8EuOEDc0udnb0IkCssi8Ymg8KhIQZoTfTZHqTnRmfwYDsim5Ka7WJq0RIeRgOFLDZ1+okEz
+	SzWwkpIuRxJBdEVFg7QT1Vt/P+AAYxX93qIslQsEPdoljXvI0DWe0y0feAeZqjd9c2mi5QqLcxoII
+	4xeD2f7+zUL/qFNumo3Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1godY2-0002fx-O4; Wed, 30 Jan 2019 00:16:10 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gof7B-0004EI-FU; Wed, 30 Jan 2019 01:56:33 +0000
+Received: from mail-eopbgr710117.outbound.protection.outlook.com
+ ([40.107.71.117] helo=NAM05-BY2-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1godXz-0002fW-7M
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 00:16:08 +0000
-Received: from [192.168.1.31] (cpe-70-114-128-244.austin.res.rr.com
- [70.114.128.244])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 9F67B2082E;
- Wed, 30 Jan 2019 00:16:05 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548807366;
- bh=kV4y/UKkR9JubxBxOjz4MPk0cVTALkKyVGPebrRFNAQ=;
- h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=IKbkJZmmYd7AWgPNY+WmXpWx2z6MTsAOwva+m53cjcSGo35MMhu8kOtloRaCJLJOg
- LBsk4rBQYrzQfqyhgCDkrBOrKrbdrePWh5Q9WECLQnnA1H90rIKsQMwnlMDIjuOfAh
- i4DW7BTmS5vwLr30uhq4EzrmidsMBMb3ZKYODgFw=
-Subject: Re: [PATCH] ARM: socfpga: fix base address of SDR controller
-To: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
-References: <20190129200858.19773-1-goldsimon@gmx.de>
-From: Dinh Nguyen <dinguyen@kernel.org>
-Openpgp: preference=signencrypt
-Autocrypt: addr=dinguyen@kernel.org; prefer-encrypt=mutual; keydata=
- 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
-Message-ID: <0711a2e0-b4fb-fa12-7c5c-0b5da73c8b02@kernel.org>
-Date: Tue, 29 Jan 2019 18:16:04 -0600
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <20190129200858.19773-1-goldsimon@gmx.de>
+ id 1gof77-0004Db-An
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 01:56:31 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amperemail.onmicrosoft.com; s=selector1-os-amperecomputing-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=oZrKCsAglAIYtZxyPbSzb7vYte9IHoCxVxMdqSNAy+Y=;
+ b=CKW2Rx5CYGWnc6vNCHarTZeeGaTmayLMhp+Pqt13zL4M/HEAwLQy8N9nqChzAIJzW5QDAiVvOF6f4OCoLoKOK3gYE7pql5VrBrYgPUMP7eqdqOyVzXY7nzLJ+A8Ir3D4cuWOpoGEI2ANdhi9YoHvMAFUCXDkPFzWR1ElG9qawZo=
+Received: from BYAPR01MB5494.prod.exchangelabs.com (20.179.63.220) by
+ BYAPR01MB5495.prod.exchangelabs.com (20.179.63.221) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1558.18; Wed, 30 Jan 2019 01:56:25 +0000
+Received: from BYAPR01MB5494.prod.exchangelabs.com
+ ([fe80::c885:e520:4558:4ea2]) by BYAPR01MB5494.prod.exchangelabs.com
+ ([fe80::c885:e520:4558:4ea2%4]) with mapi id 15.20.1558.023; Wed, 30 Jan 2019
+ 01:56:25 +0000
+From: Khuong Dinh <khuong@os.amperecomputing.com>
+To: "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "joe@perches.com" <joe@perches.com>,
+ "arnd@arndb.de" <arnd@arndb.de>, "gregkh@linuxfoundation.org"
+ <gregkh@linuxfoundation.org>
+Subject: [PATCH v2] MAINTAINERS: Update Ampere email address
+Thread-Topic: [PATCH v2] MAINTAINERS: Update Ampere email address
+Thread-Index: AQHUuD8Bl3rwJw87K0qY0JPytNqJ0w==
+Date: Wed, 30 Jan 2019 01:56:24 +0000
+Message-ID: <1548813357-21892-1-git-send-email-khuong@os.amperecomputing.com>
+Accept-Language: en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: CY4PR0601CA0041.namprd06.prod.outlook.com
+ (2603:10b6:910:89::18) To BYAPR01MB5494.prod.exchangelabs.com
+ (2603:10b6:a03:121::28)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=khuong@os.amperecomputing.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 1.8.3.1
+x-originating-ip: [4.28.13.142]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BYAPR01MB5495;
+ 6:MPGSQz/JaIJouY+V06rcSVGeQJ9xexGmlBUQW73f1IJO8I1xQUO4rBh/8ClhIEH6W4xyF8SKWVNaE+Yf4iTxb139nMQw2LN3V9hS2YtsBYPBymW4uZFYhrswmCES/vcbHXksIXohfF52JTwLqNrkbAxFpE/MqQrRS6SSXcMylfeGP4VSMtJsh3yY+OTtnSQh2tokEGPWZkO1k1MOub3FkzXZiiUjnJfs7qnKCWJpQZ0YashVFAdRo7K/d1fJZHJ628yMQsSq+KGROWpPLxg8KFV1ixTlMmiirNXDIehEMLSeXcbv3AV8eZ+roYqDhJ8izpk9UfX/GGp82e9hpZ57Y0wEpdQ2VwTe/p6v6eZK9J7InHLjdQR6U/3zdxSMZNq4NO7NeeQV1RaDODj/57qVvSI2yAOc2+Oc5i1TAw05mdrY2r8mPPHO79p0bfen//fz9A2mFBRG91eNwVydQadk4Q==;
+ 5:V8QgPNXoSKdoNbB6T/o71Dujhy9eDiDERESggiAMI9/sRnJ/hJ+bH69daSRpbDMvD+5yfMN79r7/qfI3ArxGD7Rr7fZHmZkiIUcq2sZ8MOWeR3UlNUuR7bNv/Vrembs1uUIxp60MAj+VFF/rnQ1ib5yk/Xcusc0cvHlWJz9r/XcXzMf+DZCNTH6OQL2G8SZNBXlkvNHE1T8dFf03MvAARQ==;
+ 7:PfANn715RnY4+GBNJ9886oCopQ+0EBGydHIzmb2fv7bk4KFo2rduy/wZJFOvplAeiJTQT/58Z5R0br0FfwMHYcmAv7zfAZcF9WYMIoFujS86ue+VreyV1dQr0A7Tqx1K5NEd7+v9fS22/7Vbqtdy1Q==
+x-ms-office365-filtering-correlation-id: cf50aec3-4393-4e83-eb21-08d6865623e8
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:BYAPR01MB5495; 
+x-ms-traffictypediagnostic: BYAPR01MB5495:
+x-microsoft-antispam-prvs: <BYAPR01MB54950DE5FFDEA971707EF8D3E9900@BYAPR01MB5495.prod.exchangelabs.com>
+x-forefront-prvs: 0933E9FD8D
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(366004)(136003)(346002)(376002)(39840400004)(396003)(189003)(199004)(186003)(53936002)(6436002)(2501003)(7736002)(102836004)(14454004)(6512007)(54906003)(66066001)(71190400001)(316002)(478600001)(110136005)(2906002)(486006)(71200400001)(97736004)(6486002)(386003)(4326008)(2616005)(68736007)(52116002)(6116002)(476003)(3846002)(15650500001)(50226002)(99286004)(6506007)(2201001)(81166006)(256004)(106356001)(81156014)(305945005)(26005)(14444005)(8936002)(25786009)(105586002)(86362001)(4720700003)(107886003)(8676002);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:BYAPR01MB5495;
+ H:BYAPR01MB5494.prod.exchangelabs.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:0; 
+received-spf: None (protection.outlook.com: os.amperecomputing.com does not
+ designate permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: WbILXrH+VqpnYPDgB4Tf1ZcBcJK6z2YmlgBQCuPIUyVFPW5oXD+2+7BO0PCQkpIALsVFCX8NEl3b9ce8fhnI2LLM0y6kH3YDQDtdRsTzyls0h101TApFYyRnnS/CAYKzotsNrZlQ9Dhp8009y3kIVxL4O7lA19slRMOumsDb9n2AgW3rb40Un/fnTptS2WUoodjWTfIw9w1yQUxayC9NEqbqcVHF/GEeODeNBdVlFQ+g+/BmHP2mh1UTsI8QgS7Y6SS3fXpEQIeg9LNGnrWprKCJg+R9rHmCX0zzeR7n5b+Cl6zkbmSuAsX+II2t779lf1C9c/uQT365KfjCbVJgYhrrXDWVbdd5hJYFvUKJYWXHQ5wHMTMrw1d4aGctbtD5L+HAr3s1E1L0/rG7sOhxKs/RiaGAtziACyOGxTl3Qx4=
+MIME-Version: 1.0
+X-OriginatorOrg: os.amperecomputing.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: cf50aec3-4393-4e83-eb21-08d6865623e8
+X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Jan 2019 01:56:24.2037 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3bc2b170-fd94-476d-b0ce-4229bdc904a7
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BYAPR01MB5495
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_161607_301649_70B72DDA 
-X-CRM114-Status: GOOD (  23.53  )
+X-CRM114-CacheID: sfid-20190129_175629_720573_9847C628 
+X-CRM114-Status: UNSURE (   7.11  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -119,67 +119,103 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Alan Tull <atull@kernel.org>, linux-fpga@vger.kernel.org,
- linux-kernel@vger.kernel.org, Russell King <linux@armlinux.org.uk>,
- Rob Herring <robh+dt@kernel.org>, Moritz Fischer <mdf@kernel.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Open Source Submission <patches@amperecomputing.com>,
+ Khuong Dinh <khuong@os.amperecomputing.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+This patch updates all APM email addresses to Ampere new email
+addresses.
 
+Signed-off-by: Khuong Dinh <khuong@os.amperecomputing.com>
+---
+v2:
+ - Update new domain email address
+v1:
+ - Initial version
+---
+ MAINTAINERS | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-On 1/29/19 2:08 PM, Simon Goldschmidt wrote:
-> From: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
-> 
-> The documentation for socfpga gen5 says the base address of the sdram
-> controller is 0xffc20000, while the current devicetree says it is at
-> 0xffc25000.
-> 
-> While this is not a problem for Linux, as it only accesses the registers
-> above 0xffc25000, it *is* a problem for U-Boot because the lower registers
-> are used during DDR calibration (up to now, the U-Boot driver does not use
-> the dts address, but that should change).
-> 
-> To keep Linux and U-Boot devicetrees in sync, this patch changes the base
-> address to 0xffc20000 and adapts the 2 files where it is currently used.
-> 
-> This patch changes the dts and 2 drivers with one commit to prevent
-> breaking the code if dts change and driver change would be split.
-> 
-> Signed-off-by: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
-> ---
-> 
->  arch/arm/boot/dts/socfpga.dtsi       | 4 ++--
->  arch/arm/mach-socfpga/self-refresh.S | 4 ++--
->  drivers/fpga/altera-fpga2sdram.c     | 2 +-
->  3 files changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index f365003f0..8f6c1a5d6 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -788,9 +788,9 @@
->  			reg = <0xfffec000 0x100>;
->  		};
->  
-> -		sdr: sdr@ffc25000 {
-> +		sdr: sdr@ffc20000 {
->  			compatible = "altr,sdr-ctl", "syscon";
-> -			reg = <0xffc25000 0x1000>;
-> +			reg = <0xffc20000 0x6000>;
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 6c27cd7..1cf0801 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1036,26 +1036,26 @@ F:	drivers/net/appletalk/
+ F:	net/appletalk/
+ 
+ APPLIED MICRO (APM) X-GENE DEVICE TREE SUPPORT
+-M:	Duc Dang <dhdang@apm.com>
++M:	Khuong Dinh <khuong@os.amperecomputing.com>
+ S:	Supported
+ F:	arch/arm64/boot/dts/apm/
+ 
+ APPLIED MICRO (APM) X-GENE SOC EDAC
+-M:	Loc Ho <lho@apm.com>
++M:	Khuong Dinh <khuong@os.amperecomputing.com>
+ S:	Supported
+ F:	drivers/edac/xgene_edac.c
+ F:	Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+ 
+ APPLIED MICRO (APM) X-GENE SOC ETHERNET (V2) DRIVER
+-M:	Iyappan Subramanian <isubramanian@apm.com>
+-M:	Keyur Chudgar <kchudgar@apm.com>
++M:	Iyappan Subramanian <iyappan@os.amperecomputing.com>
++M:	Keyur Chudgar <keyur@os.amperecomputing.com>
+ S:	Supported
+ F:	drivers/net/ethernet/apm/xgene-v2/
+ 
+ APPLIED MICRO (APM) X-GENE SOC ETHERNET DRIVER
+-M:	Iyappan Subramanian <isubramanian@apm.com>
+-M:	Keyur Chudgar <kchudgar@apm.com>
+-M:	Quan Nguyen <qnguyen@apm.com>
++M:	Iyappan Subramanian <iyappan@os.amperecomputing.com>
++M:	Keyur Chudgar <keyur@os.amperecomputing.com>
++M:	Quan Nguyen <quan@os.amperecomputing.com>
+ S:	Supported
+ F:	drivers/net/ethernet/apm/xgene/
+ F:	drivers/net/phy/mdio-xgene.c
+@@ -1063,7 +1063,7 @@ F:	Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+ F:	Documentation/devicetree/bindings/net/apm-xgene-mdio.txt
+ 
+ APPLIED MICRO (APM) X-GENE SOC PMU
+-M:	Tai Nguyen <ttnguyen@apm.com>
++M:	Khuong Dinh <khuong@os.amperecomputing.com>
+ S:	Supported
+ F:	drivers/perf/xgene_pmu.c
+ F:	Documentation/perf/xgene-pmu.txt
+@@ -11639,7 +11639,7 @@ F:	Documentation/devicetree/bindings/pci/altera-pcie.txt
+ F:	drivers/pci/controller/pcie-altera.c
+ 
+ PCI DRIVER FOR APPLIEDMICRO XGENE
+-M:	Tanmay Inamdar <tinamdar@apm.com>
++M:	Toan Le <toan@os.amperecomputing.com>
+ L:	linux-pci@vger.kernel.org
+ L:	linux-arm-kernel@lists.infradead.org
+ S:	Maintained
+@@ -11817,7 +11817,7 @@ F:	Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
+ F:	drivers/pci/controller/pcie-altera-msi.c
+ 
+ PCI MSI DRIVER FOR APPLIEDMICRO XGENE
+-M:	Duc Dang <dhdang@apm.com>
++M:	Toan Le <toan@os.amperecomputing.com>
+ L:	linux-pci@vger.kernel.org
+ L:	linux-arm-kernel@lists.infradead.org
+ S:	Maintained
+@@ -14763,7 +14763,7 @@ S:	Maintained
+ F:	drivers/tty/serial/8250/8250_dw.c
+ 
+ SYNOPSYS DESIGNWARE APB GPIO DRIVER
+-M:	Hoan Tran <hotran@apm.com>
++M:	Hoan Tran <hoan@os.amperecomputing.com>
+ L:	linux-gpio@vger.kernel.org
+ S:	Maintained
+ F:	drivers/gpio/gpio-dwapb.c
+-- 
+1.8.3.1
 
-I don't see the U-Boot device tree having this change. Yes, the
-documentation does state that the SDR address starts at 0xffc20000, but
-all of the pertinent registers start at 0x5000 offset. Thus, the
-starting address should be 0xffc25000.[1]
-
-[1]
-https://www.intel.com/content/www/us/en/programmable/documentation/sfo1410143707420.html#sfo1411577366917
-
-Dinh
 
 _______________________________________________
 linux-arm-kernel mailing list
