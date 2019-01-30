@@ -2,109 +2,72 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 28C30C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:22:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5AD95C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:22:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C48FC218A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:22:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2AFD820833
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:22:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rttwpmZf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C48FC218A3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YFMBJWGd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2AFD820833
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YhNAlxFNCAA1KqTSZZ39gtvS7JZWUaPIM08tcy/LQ2o=; b=rttwpmZfqVHPCz
-	YV9hOTdkyR4CsEeVRrPJ9A/wPyH599w1GDZ3yijJD9on7XRJz5viuF511lC5+m+1CPsZyY3W/+wXK
-	Xz7YEbmBwnF8m79x2O3nx2d9jSBHwxXDdQE/4RZY6xlBdfJGk1ZbRvU38pDNOT/X/NzNsvuf5JuXX
-	Tl1/DcqyHr5A2A1+IzipyrXGBuGOoouBh54uj66XBPYIg8h7u6s2UI3drge62FmDjIbQPic/msLU5
-	A57Kx7VFy7s+MzXdrrs1zjmluuk4dakPizkhiINeZBMfd1rWinfdAtNYDZmqfDttk9Y/C4dzSu9S5
-	hWhzCTBM8DBeUKXflmpA==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=AneY0Ng1sVPc3lvNUN+tvZTZAXNEduj57/1BMQQ0Pto=; b=YFMBJWGdQJmbZr
+	Q0KbZn4B4yrBIStNaQ81LE3AIhMUy6W/b/d9vqyyS+OlxdoO9tvRSa6YTOIs6SiKS6pa8dYcQL5Yr
+	2VIO3MttgZ3cICzs6vM4jeqEowYsbn6Bq3LxVkGPvsBXYOEPslsQCJSep6wZNemJyM45ZrU8TxnF+
+	u1jyM3F/TpSMo3OPtRpJ2zlkaKJ69oV69lHZiHlf08ou6NCkmpofT0HIGpli9vRLWiQMCyU2XGMpu
+	VLR8D5A8a2dxS/UVAZm9pNNdPs2oAVhOTfhHdkYkXbkCf57QX3zJGqQnJwy1kck8F3eFnSyF13Q7k
+	uz/84lT3x1llXQ7eWPhg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gon0J-0004o3-Re; Wed, 30 Jan 2019 10:21:59 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gon0H-0004nj-Fa
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 10:21:58 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2DA07A78;
- Wed, 30 Jan 2019 02:21:57 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 812253F71E; Wed, 30 Jan 2019 02:21:55 -0800 (PST)
-Subject: Re: [PATCH] kvm: arm64: Relax the restriction on using stage2 PUD
- huge mapping
-To: Suzuki K Poulose <suzuki.poulose@arm.com>,
- linux-arm-kernel@lists.infradead.org
-References: <1548789137-4446-1-git-send-email-suzuki.poulose@arm.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <ddff61a6-bc43-564e-c1ee-ed2c2764fad6@arm.com>
-Date: Wed, 30 Jan 2019 10:21:53 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gon0g-00054D-Oc; Wed, 30 Jan 2019 10:22:22 +0000
+Received: from mail-qt1-f169.google.com ([209.85.160.169])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gon0e-00053s-GO
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 10:22:21 +0000
+Received: by mail-qt1-f169.google.com with SMTP id t13so25602419qtn.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 02:22:20 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=XCMMsmst+3+HktudzZHx/d439ItgKF2SLn79lrde664=;
+ b=K13TE7iS8nOcOonyA8m4TKcq9ECX5FDaua/Mlds5kysVCAT/YcKVY7y6sr2s6BY5Uh
+ xZw0RtFEM7tztvqzoghs/76qQ3bETJkx0i13VZuVFAZGHlXV9JojGsehqO0a/XpEvgpY
+ WPjDJ4VKAhk0OU+6uTVziy/Y4F5pmWmbVPI2gzguCPbnTWVZ0GTL5W9SZuzPulFu3CN4
+ VtcyTnWzzZ+rXKK24xjwrEuIrYrQhGb7xawlysLkAq1ZHSBK1Jdv0QLxkX6Ac1hG+kQe
+ 0Y3HQIOOGDLpA6BOyxgxj5uDzxAsnn1kNPEQhTJhESPlcZRHizfJ4ClO7s4y+EKQKrin
+ iGYg==
+X-Gm-Message-State: AJcUukeUb1ttmEC60ZhjaRbhwICec6sN0lYaQzVjHiuxqJx1IugRF5Ni
+ nYaD/v8YJNlObmT2P3k/jDggdABtdQA6IpGdFfs=
+X-Google-Smtp-Source: ALg8bN7QMTUbGO832hZG9mmunet9FqNU7Cx7YfRlzGneukWZPgk/H1mgjWbtIcWceV1XhUADfXUlpcsUd2l2NY2gfWg=
+X-Received: by 2002:a0c:d992:: with SMTP id y18mr28638777qvj.161.1548843739290; 
+ Wed, 30 Jan 2019 02:22:19 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <1548789137-4446-1-git-send-email-suzuki.poulose@arm.com>
-Content-Language: en-US
+References: <cover.1548165440.git.horms+renesas@verge.net.au>
+In-Reply-To: <cover.1548165440.git.horms+renesas@verge.net.au>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 30 Jan 2019 11:22:03 +0100
+Message-ID: <CAK8P3a2axojR_otZeDqia_f+YTbsWo2X9v+AQWK2YO0wPuA8mg@mail.gmail.com>
+Subject: Re: [GIT PULL] Second Round of Renesas ARM Based SoC Fixes for v5.0
+To: Simon Horman <horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_022157_529436_CB6E03D0 
-X-CRM114-Status: GOOD (  24.88  )
+X-CRM114-CacheID: sfid-20190130_022220_539395_7D62783B 
+X-CRM114-Status: UNSURE (   9.86  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -116,92 +79,28 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Christoffer Dall <christoffer.dall@arm.com>, cdall@kernel.org,
- linux-kernel@vger.kernel.org, kvm@vger.kernel.org,
- kvmarm@lists.cs.columbia.edu
+Cc: Kevin Hilman <khilman@kernel.org>, Magnus Damm <magnus.damm@gmail.com>,
+ Linux-Renesas <linux-renesas-soc@vger.kernel.org>, arm-soc <arm@kernel.org>,
+ Olof Johansson <olof@lixom.net>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 29/01/2019 19:12, Suzuki K Poulose wrote:
-> We restrict mapping the PUD huge pages in stage2 to only when the
-> stage2 has 4 level page table, leaving the feature unused with
-> the default IPA size. But we could use it even with a 3
-> level page table, i.e, when the PUD level is folded into PGD,
-> just like the stage1. Relax the condition to allow using the
-> PUD huge page mappings at stage2 when it is possible.
-> 
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  virt/kvm/arm/mmu.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index fbdf3ac..30251e2 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1695,11 +1695,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  
->  	vma_pagesize = vma_kernel_pagesize(vma);
->  	/*
-> -	 * PUD level may not exist for a VM but PMD is guaranteed to
-> -	 * exist.
-> +	 * The stage2 has a minimum of 2 level table (For arm64 see
-> +	 * kvm_arm_setup_stage2()). Hence, we are guaranteed that we can
-> +	 * use PMD_SIZE huge mappings (even when the PMD is folded into PGD).
-> +	 * As for PUD huge maps, we must make sure that we have at least
-> +	 * 3 levels, i.e, PMD is not folded.
->  	 */
->  	if ((vma_pagesize == PMD_SIZE ||
-> -	     (vma_pagesize == PUD_SIZE && kvm_stage2_has_pud(kvm))) &&
-> +	     (vma_pagesize == PUD_SIZE && kvm_stage2_has_pmd(kvm))) &&
->  	    !force_pte) {
->  		gfn = (fault_ipa & huge_page_mask(hstate_vma(vma))) >> PAGE_SHIFT;
->  	}
-> 
+On Thu, Jan 24, 2019 at 4:12 PM Simon Horman <horms+renesas@verge.net.au> wrote:
+>
+> Hi Olof, Hi Kevin, Hi Arnd,
+>
+> Please consider these second round of Renesas ARM based SoC fixes for v5.0.
+>
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-fixes-for-v5.0,
+> which you have already accepted.
 
-For the record, it took a 10 minute discussion with Suzuki  to
-understand that the above is actually correct, even if massively
-confusing. Why is it correct:
+Pulled into arm/fixes, thanks!
 
-- In a 4 level stage-2, each of PGD/PUD/PMD exists on its own, and start
-level is 0
-- In a 3 level stage-2, PGD and PUD are fused as the start level is 1,
-and PMD exists on its own
-- In a 2 level stage-2, both PGD, PUD and PMD are fused, and start level
-is 2.
-
-From the above, we can extract that you can always have a block mapping
-at the PUD level if you have a standalone PMD, and that's the logic this
-patch is using.
-
-Now, the *real* reason is that you can map a given size in your S2PT,
-not that some level is fused or not. What we want is probably a helper
-that says:
-
-bool kvm_stage2_can_map_block_size(struct kvm *kvm, size_t sz)
-{
-	return sz >= PMD_SIZE && stage2_pgdir_size(kvm) >= sz);
-}
-
-and the above becomes:
-
-if (kvm_stage2_can_map_block_size(kvm, vma_pagesize)) && !force_pte)
-
-which I find much nicer.
-
-I guess I can still take the above as a fix if Christoffer is happy with
-it, but if you think my above hack is correct, I'd like things to be
-cleaned-up in the near future.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+    Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
