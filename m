@@ -2,111 +2,91 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A2C60C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:35:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3F71BC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:38:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7155B21852
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:35:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1307120844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 11:38:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uYzyR6LA";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="jV/Y9knU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7155B21852
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IBUZwWKm";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="BDwKOLyG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1307120844
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LQ5cJ98VwaNmDgncPDXKsO/WSybDHqeCZWjhSND5Ep4=; b=uYzyR6LAvAN9DG
-	k/heRs08IW1mWodQBL98fkttMmSGsm52zOoYGJaBKNtevTI0vKYwEtl/1GL3wihbLxboJQnNBfQZC
-	G3tz1wlAFvnLeaW+eSlHuPQlp12DemxqngDswSuKHsHnm0A9c/0dauukV+kOXsKVWHuMuP3UPYyxN
-	2cJpS2OJky00pX0F168tpYowxnpMa/zlGawzW+7dk7fr8UEWmx6vwimiAukTujkecQeFq11uA0dBh
-	xgGBozJsNBz8pUv7mvyOir4j9Ad3ulfymhTHmtXTwTH1eL8OpELUa4pDbMUrOBJEP43m+zy+6YM+N
-	OBNGBs8TGjucXJTHvXwg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Lntd9Yx72ZR0Cvyb6vSNQ2j3XoIgKlRdg3Fi45/Nl1A=; b=IBUZwWKmaMomPv
+	/xvSvcHdg6fJ1kcXNApXs1PRs2VIXyElAvlSmJE2eAkZ3XcDzovSkAWPuddjz24+cRSkJdyFRfY5E
+	egFH6f3WI0G+TU7IDxJ7GxBF3K+XIP2VBXbjeoZNYe7GhsPDCYImCRf8GlvfasBz0jT9NnfsPfMaH
+	hC+YVJRyT1wuzSVaqs9DINLEVn0yQJZZQCdlvW+tKNcR4bNWQIZzHBOSlJbqv+0v/nDEdWWUWTeHU
+	yatniZFeMdPbNe2G0wgX73ZfFpgjGU6aA5q0uI+BkilueduDvBjtTRhND0CZaoZX2fQc/v6YocMvI
+	m37C4AUsQawsOYGe43oA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goo9P-00089Y-M0; Wed, 30 Jan 2019 11:35:27 +0000
-Received: from mail-db5eur01on062b.outbound.protection.outlook.com
- ([2a01:111:f400:fe02::62b]
- helo=EUR01-DB5-obe.outbound.protection.outlook.com)
+	id 1gooCJ-0000Fo-Ki; Wed, 30 Jan 2019 11:38:27 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goo8d-0006LW-EM
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 11:34:41 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=4TL88tDdhMmXhdJnfw7o2ml8v1NJyE6HHM/Z05C8noE=;
- b=jV/Y9knUvIV9cPR/JhgQGKcKgfkEVIv1kz8fCj3OzvtRRPRQsQi/irOkPYLtTAlNaN7BDaPOD/lDlDsTL7/ppskNmedL52ptBLC+igdvXftmi3s+FGRYTLHJmvkHkrUg1fBXPNfpQqCO7KsvFFNtddtuklVg94b55KkxGN0B1pM=
-Received: from VI1PR0401MB2496.eurprd04.prod.outlook.com (10.168.65.10) by
- VI1PR0401MB2365.eurprd04.prod.outlook.com (10.169.134.6) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1580.17; Wed, 30 Jan 2019 11:34:31 +0000
-Received: from VI1PR0401MB2496.eurprd04.prod.outlook.com
- ([fe80::208f:755e:b057:2cfe]) by VI1PR0401MB2496.eurprd04.prod.outlook.com
- ([fe80::208f:755e:b057:2cfe%8]) with mapi id 15.20.1558.023; Wed, 30 Jan 2019
- 11:34:31 +0000
-From: Pankaj Bansal <pankaj.bansal@nxp.com>
-To: Leo Li <leoyang.li@nxp.com>
-Subject: [PATCH v2 2/2] fsl: add i2c controlled qixis driver
-Thread-Topic: [PATCH v2 2/2] fsl: add i2c controlled qixis driver
-Thread-Index: AQHUuI/ERBDW6FFeH0Gz/bX0qdGRlQ==
-Date: Wed, 30 Jan 2019 11:34:31 +0000
-Message-ID: <20190130165916.8628-3-pankaj.bansal@nxp.com>
-References: <20190130165916.8628-1-pankaj.bansal@nxp.com>
-In-Reply-To: <20190130165916.8628-1-pankaj.bansal@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: BM1PR01CA0111.INDPRD01.PROD.OUTLOOK.COM (2603:1096:b00::27)
- To VI1PR0401MB2496.eurprd04.prod.outlook.com
- (2603:10a6:800:56::10)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=pankaj.bansal@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-mailer: git-send-email 2.17.1
-x-originating-ip: [92.120.1.69]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR0401MB2365;
- 6:bIl1CdFjBAUkeKg+JJcJDK59RQsey5d5lCMlT8o4UswL8kGn1JoxtvY+WaYDava/lATSLrr/mOYtywVrgN4UXXguAx0X0mRay4LaqHSr0HmxnHbfH5RGLbYx1veWZrp7DXB05WQLVrCMmxwJdMhfmE25ciFWOMk9TGHFtjHvPcQ27KDryoFgdeLot3BqIN90iODOGxjD5eA2/wJsCKknq4VJXbEitak5/t/YRoiGjb5bOEhycpRlBi+ZByVRxrzELIYjGmNg/gHkwjD0gw31r6QCEkZR33IuVfDfW89UYHZp7skmZykgUZpidso3szbRrUyYGOHXUSLZtr4pAL4fl/qcvOa9H+M+gKMSGyy9mHAg9loX0PV4xFCCIHHWJDSmBQUttEpMUdLk5ZtbzjWlE3UDY4LrMgCTimcaN12Ued7oqx/tTM0/L07ZLN5ZxsFzrmn//oR79B81OgcrLJszbA==;
- 5:Xo3Hu+CD268CZ6KxiLGL856euGrTgGRgv5OZmRhPanu198/oM3l/OLkTu4kJiIt8IKkY3uu10kld7i8Oc8+9VMoLP7HhzTryN5ztcmFHHqjIpEAUhj3o77fYwEvH8KSxe8BLCHIEmEoRzSmlNdvQ32JXe8C7tw3ncAKwSrZ+DGySCnH6uv6Kx5MjJa5rJeiCP13W0Y1GOLdmIMlg5yQvSg==;
- 7:bfGesAX/UA64tfYt0vUBnDzm4/xXDqSGrjRkYcVkOrZJNspQk+/iGgNLh4vJHOzyrhuOUitoJTAjHf3JBk0y+ecgEK06XgtThG5XbG45NYG9pXo71UkyyYTV9G+Wfc1dAxVflsZo1svIGVV4LmSKDw==
-x-ms-office365-filtering-correlation-id: bc517950-722c-4b2c-a483-08d686a6e665
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR0401MB2365; 
-x-ms-traffictypediagnostic: VI1PR0401MB2365:
-x-microsoft-antispam-prvs: <VI1PR0401MB2365BCCE097098602C5067AAF1900@VI1PR0401MB2365.eurprd04.prod.outlook.com>
-x-forefront-prvs: 0933E9FD8D
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(979002)(366004)(39860400002)(396003)(346002)(136003)(376002)(189003)(199004)(105586002)(478600001)(6862004)(2906002)(68736007)(25786009)(14454004)(86362001)(66066001)(6306002)(6436002)(6486002)(966005)(6512007)(97736004)(106356001)(4326008)(26005)(52116002)(186003)(99286004)(256004)(6506007)(386003)(54906003)(102836004)(486006)(446003)(44832011)(81156014)(7736002)(11346002)(476003)(81166006)(8676002)(2616005)(3846002)(8936002)(76176011)(37006003)(305945005)(6636002)(53936002)(50226002)(1076003)(71200400001)(71190400001)(6116002)(107886003)(36756003)(316002)(969003)(989001)(999001)(1009001)(1019001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0401MB2365;
- H:VI1PR0401MB2496.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: f4ZmAAZqXGbc5QfbCB4GcJeFbynwiooZRQPA0mVXzyPBokB40NfHNRXkf8/lnxaQkXfpZRqJqFaEGyBAYZorrdnPJ8d0mjKRF/qLAh+fkFanYJPLJQ13ekhutZxyKAtztkBy6C2jMwVmD/Lon8JhnKWlxqaGxfCxEFi+20DvfCJdAn795U/JP0l1sEKNPHCSOrijTO8kjoyjdkF2II6KA2I+KKbUVplX22ZS0F0VuEsvUeRHVI/t5VHOpjoZG5HkM59PwanQgsc5zJ/UjevMZssxA2XzWLebvX9mLB4n1NV/6l1H0W5FzQ/LiTRpgNvllGAnIjzmXHG3Gbw+eE5fKnTRB7wLD6804rAQ1PTthi5PVzd+5yPOS7gBmVWYfD4fGO8SgB4MQcH1+02mjEiLBXajAYNuxIwKU1mhIEOPrNM=
+ id 1gooCG-0000Ee-9X
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 11:38:26 +0000
+Received: by mail-wm1-x341.google.com with SMTP id t200so21394986wmt.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 03:38:24 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=subject:from:to:cc:references:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=Pws+GKp8yzQgeZUGmCTNNkAjBgitoirunLrvoyopzpM=;
+ b=BDwKOLyGOAN8UF7lWBQZog94zQTb43MRJqfkAK4C1R7Wssy3/boI+Y4T8691aR1Fwu
+ Yq2kCu9MPzNq9K+tqg0uw8uO2pltj1lI6fcyPHvS2FjhKdRyM7z+JZ5A0VhcqA9ylC8p
+ NCvrunMUFv/w9Tc1LojR3yB7smTcKf6p5o/Os=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:from:to:cc:references:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=Pws+GKp8yzQgeZUGmCTNNkAjBgitoirunLrvoyopzpM=;
+ b=d3Xt+5SynY81hFQDl3ptqyetM6F7e+dGyD0LZnYuJg5ECwVSObfWpZ5a9i9gt28mzM
+ oNYECgRyNFupR3QJ8F8y3oIJxsos/fadnS9Z+mo2wzSd0czGfoCY0rkK8f862ZBRhA+f
+ JrFuQwAGRNXZ06QlFvVA1nux4SDr0+wun5OWKrykhz/mk+lE8rxgwrSskdd5ulxVYKSr
+ 5XO1y4SXSj9jJdRJbYdhEv4iUQ2Xxk4hckCwi63mEPS8tnz7APi9Y3Sf2Ru0nZx6dFdF
+ oNrCOJXV0MFKi3kmiylEnMgEPzkQMxMYVel74MdlsQ9RYvXy65DvrCIWToDsk7eEXAVe
+ P/pA==
+X-Gm-Message-State: AJcUukdJbztRm4rI539qTh8vrUZQcL6yqRrSVGbLGChOT7u9FjpUQfEh
+ LygWYsm3HLcQeLOLkkT6DGvYZw==
+X-Google-Smtp-Source: ALg8bN4hXEAXeE1ZjOjDi69zhQEtsFcJvcuJdc21L/CLrsWUSckv/gAjPnplD1LpbI1kOyifRDg66A==
+X-Received: by 2002:a1c:48d:: with SMTP id 135mr24454264wme.1.1548848302712;
+ Wed, 30 Jan 2019 03:38:22 -0800 (PST)
+Received: from [192.168.1.2] (99.red-79-146-83.dynamicip.rima-tde.net.
+ [79.146.83.99])
+ by smtp.gmail.com with ESMTPSA id y34sm3326299wrd.68.2019.01.30.03.38.21
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 30 Jan 2019 03:38:21 -0800 (PST)
+Subject: Re: [PATCH v2 2/2] phy: qualcomm: usb: Add Super-Speed PHY driver
+From: Jorge Ramirez <jorge.ramirez-ortiz@linaro.org>
+To: Bjorn Andersson <bjorn.andersson@linaro.org>
+References: <1548761715-4004-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <1548761715-4004-3-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <20190129202726.GA3036@builder>
+ <fbd70494-e2f1-ae04-8b14-2cc97cead8b9@linaro.org>
+Message-ID: <8986d1ea-e009-6f15-e9ca-93cd64284ff7@linaro.org>
+Date: Wed, 30 Jan 2019 12:38:20 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: bc517950-722c-4b2c-a483-08d686a6e665
-X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Jan 2019 11:34:29.1680 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0401MB2365
+In-Reply-To: <fbd70494-e2f1-ae04-8b14-2cc97cead8b9@linaro.org>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_033439_483097_EC7F94CA 
-X-CRM114-Status: GOOD (  16.67  )
+X-CRM114-CacheID: sfid-20190130_033824_344934_75E2CB2F 
+X-CRM114-Status: GOOD (  18.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -118,198 +98,119 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Pankaj Bansal <pankaj.bansal@nxp.com>,
- "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
- Wang Dongsheng <dongsheng.wang@freescale.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, jackp@codeaurora.org,
+ shawn.guo@linaro.org, gregkh@linuxfoundation.org, linux-usb@vger.kernel.org,
+ khasim.mohammed@linaro.org, linux-kernel@vger.kernel.org, swboyd@chromium.org,
+ vkoul@kernel.org, linux-arm-msm@vger.kernel.org, andy.gross@linaro.org,
+ kishon@ti.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-FPGA on LX2160AQDS/LX2160ARDB connected on I2C bus, so add qixis
-driver which is basically an i2c client driver to control FPGA.
+On 1/30/19 10:53, Jorge Ramirez wrote:
+> On 1/29/19 21:27, Bjorn Andersson wrote:
+>> On Tue 29 Jan 03:35 PST 2019, Jorge Ramirez-Ortiz wrote:
+>>> diff --git a/drivers/phy/qualcomm/phy-qcom-usb-ss.c b/drivers/phy/qualcomm/phy-qcom-usb-ss.c
+>>> new file mode 100644
+>>> index 0000000..e6ae96e
+>>> --- /dev/null
+>>> +++ b/drivers/phy/qualcomm/phy-qcom-usb-ss.c
+>>> @@ -0,0 +1,347 @@
+>>> +// SPDX-License-Identifier: GPL-2.0
+>>> +/*
+>>> + * Copyright (c) 2012-2014,2017 The Linux Foundation. All rights reserved.
+>>> + * Copyright (c) 2018, Linaro Limited
+>>> + */
+>>> +
+>>> +#include <linux/clk.h>
+>>> +#include <linux/delay.h>
+>>> +#include <linux/err.h>
+>>> +#include <linux/io.h>
+>>> +#include <linux/kernel.h>
+>>> +#include <linux/module.h>
+>>> +#include <linux/of.h>
+>>> +#include <linux/phy/phy.h>
+>>> +#include <linux/platform_device.h>
+>>> +#include <linux/regulator/consumer.h>
+>>> +#include <linux/reset.h>
+>>> +#include <linux/slab.h>
+>>> +
+>>> +#define PHY_CTRL0			0x6C
+>>> +#define PHY_CTRL1			0x70
+>>> +#define PHY_CTRL2			0x74
+>>> +#define PHY_CTRL4			0x7C
+>>> +
+>>> +/* PHY_CTRL bits */
+>>> +#define REF_PHY_EN			BIT(0)
+>>> +#define LANE0_PWR_ON			BIT(2)
+>>> +#define SWI_PCS_CLK_SEL			BIT(4)
+>>> +#define TST_PWR_DOWN			BIT(4)
+>>> +#define PHY_RESET			BIT(7)
+>>> +
+>>> +enum phy_vdd_ctrl { ENABLE, DISABLE, };
+>>
+>> Use bool to describe boolean values.
+> 
+> um, ok, but these are not booleans, they are actions (ie ctrl = action
+> not true or false).
+> 
+> anyway will change it to something else
+> 
+>>
+>>> +enum phy_regulator { VDD, VDDA1P8, };
+>>
+>> It doesn't look like you need either of these if you remove the
+>> set_voltage calls.
+> 
+> we need to point to the regulator in the array so we need an index to it
+> somehow.
 
-Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
-Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
----
+you are right, we dont
 
-Notes:
-    V2:
-    - Modify the driver to not create platform devices corresponding to subnodes.
-      because the subnodes are not actual devices.
-    - Use mdio_mux_regmap_init/mdio_mux_regmap_uninit
-    - Remove header file from include folder, as no qixis api is called from outside
-    - Add regmap_exit in driver's remove function
-    Dendencies:
-	- https://www.mail-archive.com/netdev@vger.kernel.org/msg281274.html
+> 
+>>
+>>> +
+>>> +struct ssphy_priv {
+>>> +	void __iomem *base;
+>>> +	struct device *dev;
+>>> +	struct reset_control *reset_com;
+>>> +	struct reset_control *reset_phy;
+>>> +	struct regulator *vbus;
+>>> +	struct regulator_bulk_data *regs;
+>>> +	int num_regs;
+>>> +	struct clk_bulk_data *clks;
+>>> +	int num_clks;
+>>> +	enum phy_mode mode;
+>>> +};
+>>> +
+>>> +static inline void qcom_ssphy_updatel(void __iomem *addr, u32 mask, u32 val)
+>>> +{
+>>> +	writel((readl(addr) & ~mask) | val, addr);
+>>> +}
+>>> +
+>>> +static inline int qcom_ssphy_vbus_enable(struct regulator *vbus)
+>>> +{
+>>> +	return !regulator_is_enabled(vbus) ? regulator_enable(vbus) : 0;
+>>
+>> regulator_is_enabled() will check if the actual regulator is on, not if
+>> you already voted for it.
+>>
+>> So if something else is enabling the vbus regulator you will skip your
+>> enable and be in the mercy of them not releasing it. Presumably there's
+>> only one consumer of this particular regulator, but it's a bad habit.
+> 
+> yep
+> 
+>>
+>> Please keep track of this drivers requested state in this driver, if
+>> qcom_ssphy_vbus_ctrl() is called not only for the state changes.
+> 
+> um, there is not such a function: the ctrl function is not for vbus but
+> for vdd
 
- drivers/soc/fsl/Kconfig      |   8 +++
- drivers/soc/fsl/Makefile     |   1 +
- drivers/soc/fsl/qixis_ctrl.c | 121 +++++++++++++++++++++++++++++++++
- 3 files changed, 130 insertions(+)
-
-diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
-index 8a0ba6da6f8a..e787d3e637a4 100644
---- a/drivers/soc/fsl/Kconfig
-+++ b/drivers/soc/fsl/Kconfig
-@@ -36,6 +36,14 @@ config FSL_SLEEP_FSM
- 	  The FSM is used to finish clean-ups at the last stage of system entering deep
- 	  sleep, and also wakes up system when a wake up event happens.
- 
-+config FSL_QIXIS
-+	tristate "QIXIS system controller driver"
-+	depends on REGMAP_I2C
-+	default n
-+	help
-+	  Say y here to enable QIXIS system controller api. The qixis driver
-+	  provides FPGA functions to control system.
-+
- if ARM || ARM64
- source "drivers/soc/fsl/Kconfig.arm"
- endif
-diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
-index ffdf93b34501..db7b09bfbd91 100644
---- a/drivers/soc/fsl/Makefile
-+++ b/drivers/soc/fsl/Makefile
-@@ -5,6 +5,7 @@
- obj-$(CONFIG_FSL_DPAA)                 += qbman/
- obj-$(CONFIG_QUICC_ENGINE)		+= qe/
- obj-$(CONFIG_CPM)			+= qe/
-+obj-$(CONFIG_FSL_QIXIS) 		+= qixis_ctrl.o
- obj-$(CONFIG_FSL_GUTS)			+= guts.o
- obj-$(CONFIG_FSL_MC_DPIO) 		+= dpio/
- obj-$(CONFIG_FSL_LS2_CONSOLE)		+= ls2-console/
-diff --git a/drivers/soc/fsl/qixis_ctrl.c b/drivers/soc/fsl/qixis_ctrl.c
-new file mode 100644
-index 000000000000..336f366e228e
---- /dev/null
-+++ b/drivers/soc/fsl/qixis_ctrl.c
-@@ -0,0 +1,121 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+
-+/* Freescale QIXIS system controller driver.
-+ *
-+ * Copyright 2015 Freescale Semiconductor, Inc.
-+ * Copyright 2018 NXP
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/i2c.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/mdio-mux.h>
-+
-+/* QIXIS MAP */
-+struct fsl_qixis_regs {
-+	u8		id;		/* Identification Registers */
-+	u8		version;	/* Version Register */
-+	u8		qixis_ver;	/* QIXIS Version Register */
-+	u8		reserved1[0x1f];
-+};
-+
-+struct mdio_mux_data {
-+	void			*data;
-+	struct list_head	link;
-+};
-+
-+struct qixis_priv {
-+	struct regmap		*regmap;
-+	struct list_head	mdio_mux_list;
-+};
-+
-+static struct regmap_config qixis_regmap_config = {
-+	.reg_bits = 8,
-+	.val_bits = 8,
-+};
-+
-+static int fsl_qixis_i2c_probe(struct i2c_client *client)
-+{
-+	struct device_node *child;
-+	struct qixis_priv *priv;
-+	int ret;
-+	u32 qver;
-+	struct mdio_mux_data *mux_data;
-+
-+	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA))
-+		return -EOPNOTSUPP;
-+
-+	priv = devm_kzalloc(&client->dev, sizeof(struct qixis_priv),
-+			    GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	priv->regmap = regmap_init_i2c(client, &qixis_regmap_config);
-+	INIT_LIST_HEAD(&priv->mdio_mux_list);
-+
-+	regmap_read(priv->regmap, offsetof(struct fsl_qixis_regs, qixis_ver),
-+		    &qver);
-+	pr_info("Freescale QIXIS Version: 0x%08x\n", qver);
-+
-+	for_each_child_of_node(client->dev.of_node, child) {
-+		if (of_node_name_prefix(child, "mdio-mux")) {
-+			mux_data = devm_kzalloc(&client->dev,
-+						sizeof(struct mdio_mux_data),
-+						GFP_KERNEL);
-+			if (!mux_data)
-+				return -ENOMEM;
-+			ret = mdio_mux_regmap_init(&client->dev, child,
-+						   &mux_data->data);
-+			if (ret)
-+				return ret;
-+			list_add(&mux_data->link, &priv->mdio_mux_list);
-+		}
-+	};
-+
-+	i2c_set_clientdata(client, priv);
-+
-+	return 0;
-+}
-+
-+static int fsl_qixis_i2c_remove(struct i2c_client *client)
-+{
-+	struct qixis_priv *priv;
-+	struct list_head *pos;
-+	struct mdio_mux_data *mux_data;
-+
-+	priv = i2c_get_clientdata(client);
-+	list_for_each(pos, &priv->mdio_mux_list) {
-+		mux_data = list_entry(pos, struct mdio_mux_data, link);
-+		mdio_mux_regmap_uninit(mux_data->data);
-+	}
-+	regmap_exit(priv->regmap);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id fsl_qixis_of_match[] = {
-+	{ .compatible = "fsl,fpga-qixis-i2c" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, fsl_qixis_of_match);
-+
-+static struct i2c_driver fsl_qixis_i2c_driver = {
-+	.driver = {
-+		.name	= "qixis_ctrl",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = of_match_ptr(fsl_qixis_of_match),
-+	},
-+	.probe_new	= fsl_qixis_i2c_probe,
-+	.remove		= fsl_qixis_i2c_remove,
-+};
-+module_i2c_driver(fsl_qixis_i2c_driver);
-+
-+MODULE_AUTHOR("Wang Dongsheng <dongsheng.wang@freescale.com>");
-+MODULE_DESCRIPTION("Freescale QIXIS system controller driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.17.1
-
+argh, sorry, it is me who misread my own driver. ok I know what you
+mean. will send the updated driver shortly.
 
 _______________________________________________
 linux-arm-kernel mailing list
