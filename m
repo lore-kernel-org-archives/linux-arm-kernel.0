@@ -2,66 +2,72 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B9F39C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:19:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DBF07C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:20:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 89EB820833
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:19:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8BFB1218AC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 10:20:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Sa4f14WM";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="b4krw9o8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89EB820833
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K4sATZCo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8BFB1218AC
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=DDU4DOi8mDx4SGPQ02eQXMqqOP6R4Y/gZYAnuD6cMFQ=; b=Sa4f14WMHNM6XVc/LHrmoT0SbG
-	sfH/iLO0GM7sfyte7g3EyBH/hLfAjUQd4Vr0huXRahMGJ5MgtRDL+3LOUTS4N0hw8CX8SDGaYol/o
-	+e8pqUUBpi00zDfiZnDlPo0PkctpeV8KaDTyjFo9FgJMsI2a5O/jI3YyTTDZ6jA5M7LD92/xC8mkq
-	dc+D5cLZ33WpTXGRhaDGcTLotzqCklyxxt5WLidzxdU/6NHffOq3IBkClo0FPny8s3e6NxEtWCykh
-	jx4tUS2mXKfyHQwKgms/8wGOlkoFMjYK/CGDX14cq2Hqy3AuF73kpvUZwvJyLmTcEZeufNsw2NfO7
-	sLkl0wTA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=LVAD7cp80XD0Dw3sxrTC3RscXf/56E5MUM7+5fzSZHc=; b=K4sATZCop+uufU
+	55ERKFKXDv65RL5Df7SMRQj8b95M45cBYmgmvW87IeJmrKd6wmRqVRRQcY7NflwxhLQQ9aHrLYH43
+	q7jglPhD7IHZ7tNHH6GdvQM+PhX6B6b9TC5KR2+CpoJk9nXvEfg2GPajsgTXEMvGH5HRAIqpkvkge
+	yzZo+AuQDDkbNxcvh8esel7oYvIIvDP2pqRRf5ZpxIx9AuyQ6CIYx36PKfcCFanQmVfGeX71AnSt/
+	saV9BW2+6MjC5Pub1/Npj9a9fToMtyLNVdRoiHgB173kvv0vRE3dgUTMIlkVp4BDWWJseqG2zOjnm
+	4w3487A2p6Xr7Ommeq5A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gomxX-0001rU-Od; Wed, 30 Jan 2019 10:19:07 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gomxE-0001bt-2s
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 10:18:49 +0000
-Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id B1C6925B74E;
- Wed, 30 Jan 2019 21:18:44 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1548843525; bh=JR0Zhm4yhP8i17GqLHdQ51FRm+I7Xdgag3WrEBRuKLM=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=b4krw9o8ooMkg8t/07+yto/dzn1/CJBpZoaUYYP9q3ZfTUyaAgcCxl0Zpk9OU5lgg
- /CoGM2ijBU9r1VEYJQDnX0wX9zxaheM/1PCMPFhyEIJXl5IPISRZDquVcA/Vz1XPjj
- OTIEhMxwxOfSr4YjJMI59LcUIyxNmEHUmjR1LEbo=
-Received: by reginn.horms.nl (Postfix, from userid 7100)
- id E76F8940461; Wed, 30 Jan 2019 11:18:42 +0100 (CET)
-From: Simon Horman <horms+renesas@verge.net.au>
-To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 1/1] ARM: dts: r8a7743: Convert to new LVDS DT bindings
-Date: Wed, 30 Jan 2019 11:18:40 +0100
-Message-Id: <6a6a797625b5fe855bf60c798561896e311d58ce.1548843393.git.horms+renesas@verge.net.au>
-X-Mailer: git-send-email 2.11.0
-In-Reply-To: <cover.1548843393.git.horms+renesas@verge.net.au>
-References: <cover.1548843393.git.horms+renesas@verge.net.au>
+	id 1gomzA-0004GK-VZ; Wed, 30 Jan 2019 10:20:48 +0000
+Received: from mail-qk1-f194.google.com ([209.85.222.194])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gomz7-0004Fo-MU
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 10:20:47 +0000
+Received: by mail-qk1-f194.google.com with SMTP id o125so13347056qkf.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 02:20:45 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=01sDoeSyPN9Dr/pgOoxa5as6EaWX2e/vz1MNElb203E=;
+ b=goDcMV6aPy78hBfG+VNt9UUgIXh3L0FmyOP7WZsUbkr/xR1uCBSFcFaB8h39RcSmoM
+ HCWIjjy1Aq7sRilAZJnlztwdtfdHXElRDvPAe6mCqjBYYEttmTTE/xR47JgLVI+Ctm0D
+ 6uzOPudMZsnhcauNTt8VXitUOelui26yKc59m61ZsRUzGUV7Jl7iCmjQ8FZy1xMCJ571
+ WQUN2/NdB+Y7v4nE1msDW0fcYbhqzWt6ue+Rfnr9/dG0c4f+Lx40WAXTNRv9QsClMGFb
+ 03yJm2jHEqvpmR98VT0fRJ3Xu4Yyx/zq4tmdSn4mJPnuo5Jq+rYgsk2+g8u+mtk/R6z6
+ vqhA==
+X-Gm-Message-State: AJcUukeV1wRwATKs7tY7H4JMRnpRXcFT8xclLn6cOiPquKC0gQd1FLdL
+ CKfu1N6Nd7mnLWDa5GMgfF5Tgg6nHS9bNmgtZz8=
+X-Google-Smtp-Source: ALg8bN79ilAD2BiJ8pR/N8f/XguLV9+jYg3Xmc0TtIltcOzi1dt5fWtLV8sQXnKjkKC/Q7gyAu828tfzKa0E/SIzEFk=
+X-Received: by 2002:a37:ad04:: with SMTP id f4mr22240487qkm.291.1548843644810; 
+ Wed, 30 Jan 2019 02:20:44 -0800 (PST)
+MIME-Version: 1.0
+References: <87imyfw0ph.fsf@belgarion.home>
+In-Reply-To: <87imyfw0ph.fsf@belgarion.home>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 30 Jan 2019 11:20:27 +0100
+Message-ID: <CAK8P3a3wu_3ADgo7yKp5pjB9DJz3NzUECGPwaNLr5Bqhyhc5Pg@mail.gmail.com>
+Subject: Re: [GIT PULL] pxa fixes for 5.0
+To: Robert Jarzmik <robert.jarzmik@free.fr>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_021848_272561_B0B165CA 
-X-CRM114-Status: GOOD (  10.60  )
+X-CRM114-CacheID: sfid-20190130_022045_733572_5C19416B 
+X-CRM114-Status: GOOD (  13.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,88 +79,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Simon Horman <horms+renesas@verge.net.au>,
- Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org,
- Biju Das <biju.das@bp.renesas.com>
-MIME-Version: 1.0
+Cc: arm-soc <arm@kernel.org>, Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Haojian Zhuang <haojian.zhuang@gmail.com>, Daniel Mack <zonque@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+On Wed, Jan 23, 2019 at 9:58 PM Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>
+> Hello Arnd, Kevin, Olof,
+>
+> Please consider this pull request for pxa fixes for 4.20.
+>
+> The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
+>
+>   Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
+>
+> are available in the Git repository at:
+>
+>   https://github.com/rjarzmik/linux.git tags/pxa-fixes-5.0
+>
+> for you to fetch changes up to ba16adeb346387eb2d1ada69003588be96f098fa:
+>
+>   ARM: pxa: ssp: unneeded to free devm_ allocated data (2019-01-23 21:32:01 +0100)
+>
+> ----------------------------------------------------------------
+> This is the pxa fixes set for v4.20 cycle:
+>  - only a single devm allocated pointer free fix, which was never
+>    triggered runtime but code analysis found.
+>
 
-The internal LVDS encoder now has DT bindings separate from the DU. Port
-the device tree over to the new model.
+Pulled into arm/fixes, thanks!
 
-Fixes: c6a27fa41fab ("drm: rcar-du: Convert LVDS encoder code to bridge driver")
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7743.dtsi | 36 ++++++++++++++++++++++++++++++------
- 1 file changed, 30 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index 3cc33f7ff7fe..3adc158a40bb 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -1681,15 +1681,12 @@
- 
- 		du: display@feb00000 {
- 			compatible = "renesas,du-r8a7743";
--			reg = <0 0xfeb00000 0 0x40000>,
--			      <0 0xfeb90000 0 0x1c>;
--			reg-names = "du", "lvds.0";
-+			reg = <0 0xfeb00000 0 0x40000>;
- 			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 268 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 724>,
--				 <&cpg CPG_MOD 723>,
--				 <&cpg CPG_MOD 726>;
--			clock-names = "du.0", "du.1", "lvds.0";
-+				 <&cpg CPG_MOD 723>;
-+			clock-names = "du.0", "du.1";
- 			status = "disabled";
- 
- 			ports {
-@@ -1704,6 +1701,33 @@
- 				port@1 {
- 					reg = <1>;
- 					du_out_lvds0: endpoint {
-+						remote-endpoint = <&lvds0_in>;
-+					};
-+				};
-+			};
-+		};
-+
-+		lvds0: lvds@feb90000 {
-+			compatible = "renesas,r8a7743-lvds";
-+			reg = <0 0xfeb90000 0 0x1c>;
-+			clocks = <&cpg CPG_MOD 726>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 726>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port@0 {
-+					reg = <0>;
-+					lvds0_in: endpoint {
-+						remote-endpoint = <&du_out_lvds0>;
-+					};
-+				};
-+				port@1 {
-+					reg = <1>;
-+					lvds0_out: endpoint {
- 					};
- 				};
- 			};
--- 
-2.11.0
-
+     Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
