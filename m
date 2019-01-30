@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 81B97C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:56:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 00C7EC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:02:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 506372184D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 18:56:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C94B52184D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 19:02:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LV5eh2vA";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="hTsBX6nZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 506372184D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NLs/WZrx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Sg/1LAlp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C94B52184D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,69 +25,70 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=u4oKxPsilC+cPPMlHLJHpAIj4AlwI7G4ZL7ImIqxoVo=; b=LV5eh2vACU7xvF
-	0l+8FNfSwo/53QAUfAktnp++fTc0J7FbrjJ4dgmeGNDPA68VWj3djoY8aBGCq75bLsDeZAzbhr9w/
-	/3u5UHOwDjdkai0msArMRAGLlac3HflGBKGVHKNGtDBjLmbRadXzWhxjqoz/+fL7SpzUKeGcvSkXt
-	Vtoj7OTcZfsKtkfg7gg1BT+gbDCAe3UaS1dxqG3qsIV/HAZqYxdmxrioUMsdblRS0CYfsEPMPZVqh
-	WltoMf3aABDb+VJIpGlITOWVS05wD7wny+NP4xXpzr52g0o8ggefthHkDlrScTC3favwTWRdEnb1C
-	T+jBJKzx9Woe/zQ+W5dA==;
+	List-Owner; bh=Qyhn31P3Hr6nyPsdKC0HEBAJ0swwUml1mrcW+Hm3vIA=; b=NLs/WZrxi3tLyO
+	1AAUZfxYrtxokFE+fefeJQ2OOFMj2ochM+p5pZ5oWMidBrzlfN/i1el7gY2eoyCKrn4CuTuQ29RVx
+	5LCmn9Kwjak+fwH5cOyyPPRTFkwgwNSTF3mVJ/7i0iESCOedRPxbcAnK7JKK8DryXj1hS/YVetSZD
+	tjZ+B3Qg1u02W589jqbPtcG8pLQv9lkvls6aiRGdYJQZV/zEweRkpMfHlCjrOyZAD+SeUn4bq4ydl
+	mtMyhFY87bY8L+n3RCFUxzYpmfWQvgT8D4/AemFYFP6IfpzJwUiULzQFDzCT4VIRcUopsfhO1xxZ0
+	MCDj/+oOMogGFoexuE0g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gov2W-0002Ku-J2; Wed, 30 Jan 2019 18:56:48 +0000
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+	id 1gov7m-0004Ks-HJ; Wed, 30 Jan 2019 19:02:14 +0000
+Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gov28-00023u-GD
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 18:56:26 +0000
-Received: by mail-lf1-x144.google.com with SMTP id c16so435340lfj.8
+ id 1gov7j-0004KY-LI
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 19:02:13 +0000
+Received: by mail-lj1-x242.google.com with SMTP id s5-v6so473108ljd.12
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 10:56:24 -0800 (PST)
+ Wed, 30 Jan 2019 11:02:11 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=ncM9ihRYoY9Br1fhJmYOdQ+HKk2h3TZyaw64RU6uDOw=;
- b=hTsBX6nZyMVwIEswxD/WcNLQml5CzOjZ/eIFeenhQo2k9utHzPfOKU6pXzOiqGfI3v
- FCIgXw7/im16Zgta/ZoxDvMysKaz+zFEGf4fXxAS0C8exFQuokKRynieGyP/ZQfKZLlO
- IPk57E1LMea0CIZ8XUDH7fJYup0061Bx3vKBk=
+ :cc; bh=xVAhcBnT4pyU9hfS17+pqFPt/MfKXdwkrExkLukGrKw=;
+ b=Sg/1LAlpcV3YwX9KeMC1DS+dGRdVswUBWA9ft43mbvFV883HZ0jV2tbBDjIVhr2w6B
+ HiL+XjWY/ccQKqZn0qFj4HiYPL3o+xAf9vWTalhnNYLUfhGzHMhcnSAS1C7UJOSNa8zF
+ 1hLD/3B45QNEHe9LC+Zj6hjcc9J5k5J779xKw=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=ncM9ihRYoY9Br1fhJmYOdQ+HKk2h3TZyaw64RU6uDOw=;
- b=Sfz0uzpgNlPXitw7kMKamrEq4wXwH+bzu/lSzI3s3X6IcTo7hrXlO73+Tpn3WlGT8j
- NgqBmHNGtHM4OkTjCSIpGH8IborWAgioOIRScqvRBLmm+JlGjDJ+6J95Wmw93zAsO00/
- CuS4LUzkxjXXYt1Pssg3H4dIrcVX/BDyxXLs2xAX76uN7yW7G5hvVLcoxEqTHMKD/O3U
- 6eSZ6TD1GVSHcQl/RWllzvMJJtD6d+oQ3mv/9bS37V8eqiE0KugLMoJV9cwFLBLC5n2+
- u2xe9SogQQPBEfZ5R/KDH4cKsJS9cIOH8qkwf9kQooK80d9ug7j8COaoTZvn46ANkPT+
- MBTw==
-X-Gm-Message-State: AJcUukdHofRbeBIpSjHXvl9zCnNnRTmzGO4DlxDPaUFD4Lmo6cD8HI1P
- eDOyX1zfRo/hDkC7bTBPIjIuiS3CJrE=
-X-Google-Smtp-Source: ALg8bN6eBWpioLA7rGjRnokPQB/Yxi0rbVwsNrxNLoFUuoO8LPclz1xSS7K2KpmkLDIioi9ehS+T5Q==
-X-Received: by 2002:a19:6a13:: with SMTP id u19mr25840164lfu.46.1548874582655; 
- Wed, 30 Jan 2019 10:56:22 -0800 (PST)
-Received: from mail-lj1-f171.google.com (mail-lj1-f171.google.com.
- [209.85.208.171])
- by smtp.gmail.com with ESMTPSA id y131sm416166lfc.43.2019.01.30.10.56.22
+ bh=xVAhcBnT4pyU9hfS17+pqFPt/MfKXdwkrExkLukGrKw=;
+ b=oUHADjZxg6K0Hg5KujtNchj33DJB+vIwW6w8lX2RxTSpOo+59mRslDG+Yu+hAjbcp6
+ lvMC4mDS3B6tKkt68iNH2PiPKgUwbzVtM670SzGYmgFVFZGeGOdkXrPFNOnqMIwHHrPS
+ CCD7wXbcdEF7fQH3kXKqvWMunA1dhxrTQg9Qn/8/UppiEh6ERuQLxVVd/G2ur6ioBN+U
+ 8mif5wUmDXYtJnq6W02UKzHWv4Xkbzwt2TSlrtiQikoeulKjfiYI3uNg+amh/zo8aqvK
+ BHlHR2gpfOMn3u6oWviuATD7PCDF8yjIZWt74zWOpRzfh285PbzgF+GIeVy/daKAEvgJ
+ agvA==
+X-Gm-Message-State: AHQUAuZmYRnf7tlBhi+Pn68eclceoZwWs6akfcgJio4zbLcLK50suB81
+ xKfL8BaVWdMGnYFcy3tcoNchaWYIqt4=
+X-Google-Smtp-Source: AHgI3IbxH9uQjV9HSPYd0oPp6Cqtp32v+WJr/MEON5BERyGDbjmOx72rOGpJWw7YpJqMwM0iUKN4cg==
+X-Received: by 2002:a2e:561d:: with SMTP id
+ k29-v6mr13851627ljb.91.1548874929445; 
+ Wed, 30 Jan 2019 11:02:09 -0800 (PST)
+Received: from mail-lj1-f180.google.com (mail-lj1-f180.google.com.
+ [209.85.208.180])
+ by smtp.gmail.com with ESMTPSA id y24sm421335lfj.17.2019.01.30.11.02.09
  for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 30 Jan 2019 10:56:22 -0800 (PST)
-Received: by mail-lj1-f171.google.com with SMTP id s5-v6so457819ljd.12
+ Wed, 30 Jan 2019 11:02:09 -0800 (PST)
+Received: by mail-lj1-f180.google.com with SMTP id k19-v6so486741lji.11
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 10:56:22 -0800 (PST)
+ Wed, 30 Jan 2019 11:02:09 -0800 (PST)
 X-Received: by 2002:a2e:6109:: with SMTP id
- v9-v6mr24571224ljb.126.1548874581917; 
- Wed, 30 Jan 2019 10:56:21 -0800 (PST)
+ v9-v6mr24506538ljb.126.1548873054750; 
+ Wed, 30 Jan 2019 10:30:54 -0800 (PST)
 MIME-Version: 1.0
 References: <1546314952-15990-1-git-send-email-yong.wu@mediatek.com>
- <1546314952-15990-15-git-send-email-yong.wu@mediatek.com>
-In-Reply-To: <1546314952-15990-15-git-send-email-yong.wu@mediatek.com>
+ <1546314952-15990-11-git-send-email-yong.wu@mediatek.com>
+In-Reply-To: <1546314952-15990-11-git-send-email-yong.wu@mediatek.com>
 From: Evan Green <evgreen@chromium.org>
-Date: Wed, 30 Jan 2019 10:55:45 -0800
-X-Gmail-Original-Message-ID: <CAE=gft58E0p3KEYLtKZBfvGysNq+CfX5LDR38incdM+tjDr-1g@mail.gmail.com>
-Message-ID: <CAE=gft58E0p3KEYLtKZBfvGysNq+CfX5LDR38incdM+tjDr-1g@mail.gmail.com>
-Subject: Re: [PATCH v5 14/20] iommu/mediatek: Add mmu1 support
+Date: Wed, 30 Jan 2019 10:30:18 -0800
+X-Gmail-Original-Message-ID: <CAE=gft72KfZ9RdDTJeEpQJ7h3_cOXzm1YRQG-U47s64QVOhabA@mail.gmail.com>
+Message-ID: <CAE=gft72KfZ9RdDTJeEpQJ7h3_cOXzm1YRQG-U47s64QVOhabA@mail.gmail.com>
+Subject: Re: [PATCH v5 10/20] iommu/mediatek: Move reset_axi into plat_data
 To: Yong Wu <yong.wu@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_105624_542809_961A1444 
-X-CRM114-Status: GOOD (  19.66  )
+X-CRM114-CacheID: sfid-20190130_110211_702821_F9C224C0 
+X-CRM114-Status: GOOD (  21.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -115,73 +115,42 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 31, 2018 at 7:59 PM Yong Wu <yong.wu@mediatek.com> wrote:
+On Mon, Dec 31, 2018 at 7:58 PM Yong Wu <yong.wu@mediatek.com> wrote:
 >
-> Normally the M4U HW connect EMI with smi. the diagram is like below:
->               EMI
->                |
->               M4U
->                |
->             smi-common
->                |
->        -----------------
->        |    |    |     |    ...
->     larb0 larb1  larb2 larb3
+> In mt8173 and mt8183, 0x48 is REG_MMU_STANDARD_AXI_MODE while
+> it is extended to REG_MMU_CTRL which contains _STANDARD_AXI_MODE in
+> the other SoCs. I move this property to plat_data since both mt8173
+> and mt8183 use this property.
 >
-> Actually there are 2 mmu cells in the M4U HW, like this diagram:
->
->               EMI
->            ---------
->             |     |
->            mmu0  mmu1     <- M4U
->             |     |
->            ---------
->                |
->             smi-common
->                |
->        -----------------
->        |    |    |     |    ...
->     larb0 larb1  larb2 larb3
->
-> This patch add support for mmu1. In order to get better performance,
-> we could adjust some larbs go to mmu1 while the others still go to
-> mmu0. This is controlled by a SMI COMMON register SMI_BUS_SEL(0x220).
->
-> mt2712, mt8173 and mt8183 M4U HW all have 2 mmu cells. the default
-> value of that register is 0 which means all the larbs go to mmu0
-> defaultly.
->
-> This is a preparing patch for adjusting SMI_BUS_SEL for mt8183.
+> It is a preparing patch for mt8183.
 >
 > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 > ---
->  drivers/iommu/mtk_iommu.c | 47 +++++++++++++++++++++++++++++------------------
->  1 file changed, 29 insertions(+), 18 deletions(-)
+>  drivers/iommu/mtk_iommu.c | 4 ++--
+>  drivers/iommu/mtk_iommu.h | 2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
 >
 > diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-> index 66e3615..7fcef19 100644
+> index 35a1263..8d8ab21 100644
 > --- a/drivers/iommu/mtk_iommu.c
 > +++ b/drivers/iommu/mtk_iommu.c
-> @@ -70,27 +70,32 @@
->  #define F_MISS_FIFO_ERR_INT_EN                 BIT(6)
->  #define F_INT_CLR_BIT                          BIT(12)
+> @@ -558,8 +558,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+>         }
+>         writel_relaxed(0, data->base + REG_MMU_DCM_DIS);
 >
-> -#define REG_MMU_INT_MAIN_CONTROL               0x124
-> -#define F_INT_TRANSLATION_FAULT                        BIT(0)
-> -#define F_INT_MAIN_MULTI_HIT_FAULT             BIT(1)
-> -#define F_INT_INVALID_PA_FAULT                 BIT(2)
-> -#define F_INT_ENTRY_REPLACEMENT_FAULT          BIT(3)
-> -#define F_INT_TLB_MISS_FAULT                   BIT(4)
-> -#define F_INT_MISS_TRANSACTION_FIFO_FAULT      BIT(5)
-> -#define F_INT_PRETETCH_TRANSATION_FIFO_FAULT   BIT(6)
-> +#define REG_MMU_INT_MAIN_CONTROL               0x124 /* mmu0 | mmu1 */
+> -       /* It's MISC control register whose default value is ok except mt8173.*/
+> -       if (data->plat_data->m4u_plat == M4U_MT8173)
+> +       if (data->plat_data->reset_axi)
+>                 writel_relaxed(0, data->base + REG_MMU_STANDARD_AXI_MODE);
 
-The comment being on that line is kind of weird, since the comment
-really applies to the lines below it. Maybe the comment should be on
-its own line, or on the TRANSLATION_FAULT line.
-
-Other than that,
-Reviewed-by: Evan Green <evgreen@chromium.org>
+The commit description makes it sound like the overall format of the
+register is the same, but the "other SoCs" have some extra bits they'd
+like to leave alone. Would it be easier to do a read-modify-write to
+always clear some bits in the register, instead of doing something
+based on the SoC? Or do the bits mean completely different things in
+the different versions (in which case what you've got makes sense to
+me)?
+-Evan
 
 _______________________________________________
 linux-arm-kernel mailing list
