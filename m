@@ -2,85 +2,93 @@ Return-Path: <SRS0=csPt=QG=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C0EDC282D4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 06:00:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4EF9DC282D4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 06:00:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3CDAA20989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 06:00:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1C88621848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 30 Jan 2019 06:00:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LTpmrodi";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="sS7aNf51"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3CDAA20989
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lrA/xxOf";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="UiSM1HjJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1C88621848
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LmYgyB6GS2wfLgmceRmqyEOzC/ibMSX9KN4MeBN6kd8=; b=LTpmrodiPEVzqZ
-	QDOW6usT9Da5psYtzK6yVnA3USwqByT1WNm4+k9yTGfRcUq9fKkk4iwxm1TCeY1niPtXlq/VWfCB9
-	kiT/nSYlYlrOKTpdyaM5KE5vsiLUm3KyjytC6E2knGoDckCmONlu/+KhZ7NfIYUZYzeO8xIn3X4Lr
-	3htMrl2x3VwgoY50wgf8lvFZ7XM5dJXFh9Gyd2Dpu/K6TIhYdiz7jec9uh4Trhv56f8Q5Zr6bOyqv
-	6jMyDZGqJ7rZncvl4CtOSclpGIj+ag88SfmMS8my+KuY6+rgILjaQIny+i4DHf65NEPmSx4V3Yo4b
-	hoUGpGC4gtRuEjPIadJw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=Z7JHji1aOihLUDZiXPVWQYcd2T7xENJx68ANiNbMHdI=; b=lrA/xxOfjUzvwGo8iNd/l/6GG
+	7J8tRgAIgpeTe+sAWRNsrUSM7UfnR8cmpa/mb7kDmfq7Lhq180PLRmqKhSWRubCmzIYk/wD6FMceJ
+	Sim4FHZ+6oUlV3CdaeIDrfHbWJSgfcdzkVeGYu5UHbxQJ3fDtkUEXjdLcEKmQ35XxU3DsUJSwCVM7
+	K4pOAhwjWKIa3m7WA9v2VL2IbXtxnzth0OxwTHcXlMe8m4E2EYvU96HarYf1vKmYEdgdv7r/tn4je
+	WIwxuWbMrGpIZY0sDRwyHmZbGFMygTmXSLFBrt+twZBTcIyWM9pKePyDVEUiu93QODG7jQmauNpLI
+	GUjn47zuw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1goivJ-0003hL-M8; Wed, 30 Jan 2019 06:00:33 +0000
-Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
+	id 1goive-0003zM-0z; Wed, 30 Jan 2019 06:00:54 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1goivG-0003h0-Gv
- for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 06:00:32 +0000
-Received: by mail-lj1-x243.google.com with SMTP id x85-v6so19675103ljb.2
+ id 1goivK-0003hZ-1z
+ for linux-arm-kernel@lists.infradead.org; Wed, 30 Jan 2019 06:00:39 +0000
+Received: by mail-pf1-x441.google.com with SMTP id 64so10904415pfr.9
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 29 Jan 2019 22:00:30 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=ZbbuPOyYWoYzUMDSQIZUlEIAOQeW3QT0SpIPcdLMkEw=;
- b=sS7aNf51WECmPlAMT0ufK6LKnnfj0Pc6W8uetZJrXsKet7jXPFN/wYtWgciVTTIgT8
- lGoUWWSec6oYxHAG8hFVbAztnRVB/4tjKarv1yPYivt/sH5TudXacvWgnxFsw7VBaDbZ
- mHmIrMZfLTt/CDv+Hx3yoTbiv3RnqVyhA+TT2FmqwSeAXWUs+eV/hs3fRPdJFvfqsx04
- nxsFQFxbkjIMYjQRpHWalGT+B1i5RFEaKIHDe+8J5WqdQcA0YqhB9tvO/8r+LHQMfTjs
- uYk6wc3uQYZ6Cjbhy5+o2IjS0DjWEj9C/36FpD9a0NGvB+u0Se1cJhKaPncYKb/jDfJh
- I/8Q==
+ Tue, 29 Jan 2019 22:00:33 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=XWZ9IvmdKBF0L6x0dpsHADFxCnzbAOdaGQVcC4KQZwY=;
+ b=UiSM1HjJJWh8FSlwZuSDVlnx0+qTI0NpWEcD92mIRBTn2J7+mt0H/7WwZfZtJSZ3wT
+ 7NgITUTXHpBGQSq8jglG3Oe+WORRC7rEpeKau3FP8cYZN4sXPVm83Cy60cSSfuH4XyZs
+ YkYhQQ8tml4BuuWbkpqzDgARnyd36gUpQizZA=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=ZbbuPOyYWoYzUMDSQIZUlEIAOQeW3QT0SpIPcdLMkEw=;
- b=mKtd+E8nW1Ypfwdnnm35kQOUz9GrCXXUhW2xvT4qb7xqIHjNWaCVgTzu5mwxkvm/Qt
- czmJAfKRPX4js6/mmAPKKc+YSmcPCiohfyVuSq9ysiMrEIRA1quRuV4EFSNNKbbsKhUO
- agCeHflGgQ67PZtjP1EOQBwqJV/jOxtlD+KUAq48aSiK3x2w7UaHujcfMRmTHRljAnr3
- iJexFaE5WGMAHzByLhMQ4iE+3R6JLt3fVaqzfIC5NSxpIyI+dXWyEtjQs8nnIuOQf38w
- xI3tUagTlmhZ2VBzpjeqgx8Poo65dbRsOnGCK9KJiL36I1DNOxVQHQzcZWbCqIQeHUCW
- FF8A==
-X-Gm-Message-State: AJcUukewTx72LnOyMD8tb8hHy5qm3FzUtq5E152BnjE1VZvfV4g/98ux
- f8SD7j8xTCSOwZNS9KtJYlYZlf4cqk3wu3DCnKA=
-X-Google-Smtp-Source: ALg8bN6OclMqIGJu/ivhcmkSwwd8PYB1hwo1RxBbf8K7TccRwIq6njYcK1+kXlrDQsuWZF1OnnNLdpRtAw9tLQ5xRE4=
-X-Received: by 2002:a2e:9356:: with SMTP id
- m22-v6mr23013163ljh.135.1548828028406; 
- Tue, 29 Jan 2019 22:00:28 -0800 (PST)
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=XWZ9IvmdKBF0L6x0dpsHADFxCnzbAOdaGQVcC4KQZwY=;
+ b=SNIe761fmIIyZFvAy+Hebre32mj44qFnG9wcK1333QiR+DjJi9rJSqv2XstgMEgz6I
+ muDddICXe8OxkYCHDPEIrmQcpICUiZzpYctFC7A+U2LDF9sQdMI1WndYaz5O0vyC77PI
+ 9FV4WHi6PFrzS9RKYdcv6sQLjlViNwB0wk6Alld9Qc8H0wDpvuclm5BmkfNI0pe9tOC6
+ WdxmOfObwJspTWftd2/lfe1X2EDLx4qruc0irjYM3Jd72Fl5PlQZhxWR5zCflBekEU/H
+ CdrYk0GVz1kwpxNu1WzQW9VnvOjxjOoxxAK2FYgPctFUq7PvErIq5CGgVZfBneubSw6u
+ z9Tg==
+X-Gm-Message-State: AJcUukf1ERG7496SIW1ag+XkpALT20VGxGSzQeLuJnZG/XoVpEWwtryH
+ sgZKJqw4RowBzxZqKm74Ti6o5A==
+X-Google-Smtp-Source: ALg8bN4c/hZe16eU8bIYTHIh5N91aoEY/p+s0rsCBFxiJV6Vz7Xgp/tQT3fWvvmsXe+X3kdneLOEyw==
+X-Received: by 2002:a63:dd15:: with SMTP id t21mr25326626pgg.347.1548828033231; 
+ Tue, 29 Jan 2019 22:00:33 -0800 (PST)
+Received: from pihsun-z840.tpe.corp.google.com
+ ([2401:fa00:1:10:7889:7a43:f899:134c])
+ by smtp.gmail.com with ESMTPSA id w3sm712259pge.8.2019.01.29.22.00.29
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 29 Jan 2019 22:00:32 -0800 (PST)
+Subject: Re: [PATCH 06/10] soc: mediatek: add register device function
+To: Bibby Hsieh <bibby.hsieh@mediatek.com>,
+ Jassi Brar <jassisinghbrar@gmail.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>, Rob Herring <robh+dt@kernel.org>,
+ CK HU <ck.hu@mediatek.com>
+References: <1548747128-60136-1-git-send-email-bibby.hsieh@mediatek.com>
+ <1548747128-60136-7-git-send-email-bibby.hsieh@mediatek.com>
+From: Pi-Hsun Shih <pihsun@chromium.org>
+Message-ID: <69c8ff46-c34c-c000-631c-a6ea8b4364c7@chromium.org>
+Date: Wed, 30 Jan 2019 14:00:28 +0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
 MIME-Version: 1.0
-References: <20190129200858.19773-1-goldsimon@gmx.de>
- <0711a2e0-b4fb-fa12-7c5c-0b5da73c8b02@kernel.org>
-In-Reply-To: <0711a2e0-b4fb-fa12-7c5c-0b5da73c8b02@kernel.org>
-From: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
-Date: Wed, 30 Jan 2019 07:00:17 +0100
-Message-ID: <CAAh8qszCQROUZVOyX9GCNF_09DebDDUWf_2cfW3M13yG1aJ_Xg@mail.gmail.com>
-Subject: Re: [PATCH] ARM: socfpga: fix base address of SDR controller
-To: Dinh Nguyen <dinguyen@kernel.org>, Marek Vasut <marex@denx.de>
+In-Reply-To: <1548747128-60136-7-git-send-email-bibby.hsieh@mediatek.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190129_220030_612232_7FE66904 
-X-CRM114-Status: GOOD (  30.08  )
+X-CRM114-CacheID: sfid-20190129_220034_328246_3A3F3F88 
+X-CRM114-Status: GOOD (  19.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,105 +100,84 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Alan Tull <atull@kernel.org>, linux-fpga@vger.kernel.org,
- linux-kernel@vger.kernel.org, Russell King <linux@armlinux.org.uk>,
- Rob Herring <robh+dt@kernel.org>, Moritz Fischer <mdf@kernel.org>,
+Cc: devicetree@vger.kernel.org, Nicolas Boichat <drinkcat@chromium.org>,
+ Sascha Hauer <kernel@pengutronix.de>, srv_heupstream@mediatek.com,
+ Daoyuan Huang <daoyuan.huang@mediatek.com>,
+ Sascha Hauer <s.hauer@pengutronix.de>, linux-kernel@vger.kernel.org,
+ Houlong Wei <houlong.wei@mediatek.com>,
+ Dennis-YC Hsieh <dennis-yc.hsieh@mediatek.com>, kendrick.hsu@mediatek.com,
+ linux-mediatek@lists.infradead.org, ginny.chen@mediatek.com,
+ Philipp Zabel <p.zabel@pengutronix.de>,
+ Jiaguang Zhang <jiaguang.zhang@mediatek.com>,
+ Frederic Chen <Frederic.Chen@mediatek.com>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-+ Marek (as I really want to keep the dts in Linux and U-Boot in sync)
-On Wed, Jan 30, 2019 at 1:16 AM Dinh Nguyen <dinguyen@kernel.org> wrote:
->
->
->
-> On 1/29/19 2:08 PM, Simon Goldschmidt wrote:
-> > From: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
-> >
-> > The documentation for socfpga gen5 says the base address of the sdram
-> > controller is 0xffc20000, while the current devicetree says it is at
-> > 0xffc25000.
-> >
-> > While this is not a problem for Linux, as it only accesses the registers
-> > above 0xffc25000, it *is* a problem for U-Boot because the lower registers
-> > are used during DDR calibration (up to now, the U-Boot driver does not use
-> > the dts address, but that should change).
-> >
-> > To keep Linux and U-Boot devicetrees in sync, this patch changes the base
-> > address to 0xffc20000 and adapts the 2 files where it is currently used.
-> >
-> > This patch changes the dts and 2 drivers with one commit to prevent
-> > breaking the code if dts change and driver change would be split.
-> >
-> > Signed-off-by: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
-> > ---
-> >
-> >  arch/arm/boot/dts/socfpga.dtsi       | 4 ++--
-> >  arch/arm/mach-socfpga/self-refresh.S | 4 ++--
-> >  drivers/fpga/altera-fpga2sdram.c     | 2 +-
-> >  3 files changed, 5 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> > index f365003f0..8f6c1a5d6 100644
-> > --- a/arch/arm/boot/dts/socfpga.dtsi
-> > +++ b/arch/arm/boot/dts/socfpga.dtsi
-> > @@ -788,9 +788,9 @@
-> >                       reg = <0xfffec000 0x100>;
-> >               };
-> >
-> > -             sdr: sdr@ffc25000 {
-> > +             sdr: sdr@ffc20000 {
-> >                       compatible = "altr,sdr-ctl", "syscon";
-> > -                     reg = <0xffc25000 0x1000>;
-> > +                     reg = <0xffc20000 0x6000>;
->
-> I don't see the U-Boot device tree having this change. Yes, the
-> documentation does state that the SDR address starts at 0xffc20000, but
-> all of the pertinent registers start at 0x5000 offset. Thus, the
-> starting address should be 0xffc25000.[1]
+On 01/29/2019 03:32 PM, Bibby Hsieh wrote:
+> GCE cannot know the register base address, we store the subsys-base address
+> relationship in the device node, and store the relationship by
+> cmdq_register_device function.
+> 
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> ---
+>   drivers/soc/mediatek/mtk-cmdq-helper.c | 24 ++++++++++++++++++++++++
+>   include/linux/soc/mediatek/mtk-cmdq.h  |  1 +
+>   2 files changed, 25 insertions(+)
+> 
+> diff --git a/drivers/soc/mediatek/mtk-cmdq-helper.c b/drivers/soc/mediatek/mtk-cmdq-helper.c
+> index 6e4b85e..6ad997f 100644
+> --- a/drivers/soc/mediatek/mtk-cmdq-helper.c
+> +++ b/drivers/soc/mediatek/mtk-cmdq-helper.c
+> @@ -32,6 +32,30 @@ u8 cmdq_subsys_base_to_id(struct cmdq_base *clt_base, u32 base)
+>   }
+>   EXPORT_SYMBOL(cmdq_subsys_base_to_id);
+>   
+> +struct cmdq_base *cmdq_register_device(struct device *dev)
+> +{
+> +	struct cmdq_base *clt_base;
+> +	struct of_phandle_args spec;
+> +	u32 idx;
+> +
+> +	clt_base = devm_kzalloc(dev, sizeof(*clt_base), GFP_KERNEL);
+> +	if (!clt_base)
+> +		return NULL;
+> +
+> +	/* parse subsys */
+> +	for (idx = 0; idx < ARRAY_SIZE(clt_base->subsys); idx++) {
+> +		if (of_parse_phandle_with_args(dev->of_node, "gce-subsys",
+> +		    "#gce-subsys-cells", idx, &spec))
 
-You don't see it in U-Boot as I'm working on a patch for that.
-As I wrote in the commit message, U-Boot currently does not use the
-devicetree for the SDR driver, but I want to convert it to do that.
+nit: Should have more indention for the line above. (Align with the
+dev->of_node?)
 
-But before converting, I need to find a clean way to provide the
-register addresses to the driver. That doesn't work with the current dts.
-
->
-> [1]
-> https://www.intel.com/content/www/us/en/programmable/documentation/sfo1410143707420.html#sfo1411577366917
-
-Well, in [2], you see that the peripheral's address range actually starts
-at 0xffc20000. It's only the public documented registers that start at
-0xffc25000. I don't know why the lower address range is undocumented.
-Maybe you can help me here?
-
-But U-Boot needs to use the undocumented registers to bring up the DDR-RAM.
-Even if the registers for that are not (clearly?) documented, I think the
-devicetree should still reflect the correct address range.
-
-The U-Boot driver is made up of 2 files (in drivers/ddr/altera):
-- sdram_gen5.c [3]: using the documented registers from 0xffc25000
-- sequencer.c [4]: using the (undocumented?) registers from 0xffc20000
-
-In both files, you can see the register addresses they use by checking the
-static variables at the top of the file. And for convenience, use [5] to
-search for the values of defines.
-
-[2]
-https://www.intel.com/content/www/us/en/programmable/hps/cyclone-v/hps.html
-[3]
-https://github.com/u-boot/u-boot/blob/master/drivers/ddr/altera/sdram_gen5.c
-[4]
-https://github.com/u-boot/u-boot/blob/master/drivers/ddr/altera/sequencer.c
-[5]
-https://elixir.bootlin.com/u-boot/latest/source
-
-Regards,
-Simon
+> +			break;
+> +		clt_base->subsys[idx].base = spec.args[0];
+> +		clt_base->subsys[idx].id = spec.args[1];
+> +	}
+> +	clt_base->count = idx;
+> +
+> +	return clt_base;
+> +}
+> +EXPORT_SYMBOL(cmdq_register_device);
+> +
+>   static void cmdq_client_timeout(struct timer_list *t)
+>   {
+>   	struct cmdq_client *client = from_timer(client, t, timer);
+> diff --git a/include/linux/soc/mediatek/mtk-cmdq.h b/include/linux/soc/mediatek/mtk-cmdq.h
+> index 0c7a6ee..a1f5eb6 100644
+> --- a/include/linux/soc/mediatek/mtk-cmdq.h
+> +++ b/include/linux/soc/mediatek/mtk-cmdq.h
+> @@ -138,5 +138,6 @@ int cmdq_pkt_flush_async(struct cmdq_pkt *pkt, cmdq_async_flush_cb cb,
+>   int cmdq_pkt_flush(struct cmdq_pkt *pkt);
+>   
+>   u8 cmdq_subsys_base_to_id(struct cmdq_base *clt_base, u32 base);
+> +struct cmdq_base *cmdq_register_device(struct device *dev);
+>   
+>   #endif	/* __MTK_CMDQ_H__ */
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
