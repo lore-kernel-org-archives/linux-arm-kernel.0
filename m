@@ -2,68 +2,85 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F26E8C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 04:43:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D2C7C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 05:55:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C800620870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 04:43:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3523F2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 05:55:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XFhh/jnX";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="bTLSn7be"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C800620870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LHtYDlWB";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="bp269b/5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3523F2087F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=o7cQthDrjl/7MkGaPhRJIq/ApWbzQJ6Vc9GseZA/k/s=; b=XFhh/jnX7RCZd+
-	1Ffi6eAIQaRfFNm+vGgWPVBi0rb5QdFFE6qNOyiPep3OESITXbJdHTTAUtWPhF7PrWntjW0xRv++b
-	BkUc/TZ87ac1loZ4NKg2LYmyVGQlHoqSjacBBoVhY1+WSU+Sb8R40SrItKsOQYvNWRmyRWClAWXte
-	TSnmSsQhXsTSxh9aBjnPb/bbzErhhkdsJVElq4B0Y98GPQxLSZFLiNQm+X4njT8rGbRktrx4h416E
-	2MeHrAMihO2X+k8/6ZSBTAekvnfZO3/i54v6tICAy+nOE0xuhmgqAIodNB11wxnO/jC344Tb2CE8h
-	d76hOWNGPXipq8NSQYeg==;
+	List-Owner; bh=M9MC/0EwdJpE+Np/NeNSU9gjvsCuVAAKr+TWdCTLCqU=; b=LHtYDlWBWBIHEL
+	Cy6FkzVXmcIbcmxVu2NcEI9qI4YITI9LaNC/LFSzyo/Z0bXBAbCwsGazz4rS59JqT1+fgR0FcDZLL
+	EmDKzgZR1P+ay6R2bzLn0kV1TC3AZ04q7COjI/ss1t9mkjbkb79vFkzc1FWO6vAMxxOkGBj5Byyfk
+	MQXWeFWw2AVvsur+LMbH+qT0eaAK5iB8ejYirgtiVBj8u7VzJ4Xi9/WTIeAlP6V+w/GxPTp8gaifJ
+	VnVLICkBrpo+hq/g4J2GAUqR+jMZAJTw+uAZmI9Qnun7rxBhIPXQSeW0nwbNm5imflyPjilg1KBty
+	qMujespewradxq+TCaiw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp4Cf-0003wQ-1O; Thu, 31 Jan 2019 04:43:53 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gp5JF-00028V-TE; Thu, 31 Jan 2019 05:54:45 +0000
+Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp4Bh-00039s-5P
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 04:42:57 +0000
-Received: from sol.localdomain (c-107-3-167-184.hsd1.ca.comcast.net
- [107.3.167.184])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id AD326218D2;
- Thu, 31 Jan 2019 04:42:52 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548909772;
- bh=uan7eHFzhHy193NYxCWSfVM6uH1iwTHV3WbyG4gBwUA=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=bTLSn7beVrag83FIpeXYhWrY6CC3gxPaJz87I2Ol6t6CpAljpQwbgEFW3EmxWHRpT
- 5kOqvQtludzK9EuKivgrlABy8kXm7mR4eFuqBKRZ8J+8Km9VOq202zm1sMhHihDcWA
- t7GKQApQBvXp4w/dW3I0gxuqoO03oD0pI6qnra3o=
-From: Eric Biggers <ebiggers@kernel.org>
-To: linux-crypto@vger.kernel.org,
-	Herbert Xu <herbert@gondor.apana.org.au>
-Subject: [PATCH v4 3/3] crypto: arm64/crct10dif-ce - cleanup and optimizations
-Date: Wed, 30 Jan 2019 20:42:42 -0800
-Message-Id: <20190131044242.31591-4-ebiggers@kernel.org>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190131044242.31591-1-ebiggers@kernel.org>
-References: <20190131044242.31591-1-ebiggers@kernel.org>
+ id 1gp5JB-00027p-Bm
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 05:54:42 +0000
+Received: by mail-lj1-x241.google.com with SMTP id l15-v6so1566213lja.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 30 Jan 2019 21:54:39 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=4F+BIoC5hFXGqBFlBhOZIqVE+Jy7im/3T8WXfXdLwWI=;
+ b=bp269b/5XwF27CgSY7s+wmtEk4znSKlB+M7K1RDVTTco3dDvaKmSLnFFquclkJt18k
+ LZpHSBmntIEUuMDbjTR114tCnjQkr+3lqKcF50ogrKnu7lrWIhkwYqcP6a7MnfbQdUws
+ 9E9jOHe6v1AP0ymA4X1LIsSA1F6uI7ekTxHdfi37rPcTNoHLgIaVv6Qg/tx/ZesCXa4K
+ MCT7nlJUR/T3B+E+eF0NujO4qRatgvsG9aT5bD6XycZ6AGJsWKTcM8pDRWVXL/8sKxo9
+ c/KuhM6CBbyGHgyNibBg8adtha/7r5dnq60ytbuO4unJxjh8QVAcFj5doUN9xxeWmDq/
+ 16Og==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=4F+BIoC5hFXGqBFlBhOZIqVE+Jy7im/3T8WXfXdLwWI=;
+ b=qVIx7XxqDl4wNIiEUAU916JOPyFXa6xFok0xFWWVtiDK5fRSHZ+BnKhVncZmCAmhDj
+ dUgmtJGLRdUac4ADF/3PRt7SjZnKfcArmvMK9LDVwTq/z5E48znfe4KPh6pNgE5e82Kx
+ CnmvdSeMrnPApEn+8Q3GDv+tUSbzWallUqX1xKi7wychmgq+Spru+H8zsEZqGqxKIc3D
+ nHbC196Xf+yM8mVgTTtrCdQ2Ep1Zlk9zhNCPGztly2m344a9+xNAwPA91b9HMvCSlyhA
+ h7JJ6hPyoyLh3ho4JMV1O9ahf7OoNDmRFqVNcPJlPN+hYTiVyg0GzKk3zyNG9PIX2HTV
+ MK6g==
+X-Gm-Message-State: AJcUukc0LSOAOfMvQTIZ5KN5xy/C0J8PBPYK/Qj1SQ5Ar9VOWF9UWm6I
+ +ng2APvNHzqJ8XWwniI2Sozg75IZJW0nzu0QpOE=
+X-Google-Smtp-Source: ALg8bN4UZl+eNXzJK3EHyOKNamr0dpp4Ec4HLveXW/6ZiFj9iQ73NQazBbBLuQK4t9krAIMCTdLCglSsl+6gY6r7o+s=
+X-Received: by 2002:a2e:8643:: with SMTP id
+ i3-v6mr28777535ljj.43.1548914077333; 
+ Wed, 30 Jan 2019 21:54:37 -0800 (PST)
 MIME-Version: 1.0
+References: <20190107172805.GA8462@jordon-HP-15-Notebook-PC>
+ <CAFqt6zbbXvpEEH2rNnLCBpNxEjK3YwNS1kYkyFPBhG7uvsHE1A@mail.gmail.com>
+ <20190117112803.GC3710@rapoport-lnx>
+In-Reply-To: <20190117112803.GC3710@rapoport-lnx>
+From: Souptick Joarder <jrdr.linux@gmail.com>
+Date: Thu, 31 Jan 2019 11:24:24 +0530
+Message-ID: <CAFqt6zb-+hmF-zOrs-_J=m+YZO-R-VdwWKErYVHqtNcShk7sPA@mail.gmail.com>
+Subject: Re: [PATCH] arch/arm/mm: Remove duplicate header
+To: Mike Rapoport <rppt@linux.ibm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_204253_250108_90E373BF 
-X-CRM114-Status: GOOD (  20.48  )
+X-CRM114-CacheID: sfid-20190130_215441_412858_2F66F2DB 
+X-CRM114-Status: GOOD (  14.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,713 +92,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Tim Chen <tim.c.chen@linux.intel.com>, linux-arm-kernel@lists.infradead.org,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Michal Hocko <mhocko@suse.com>,
+ Sabyasachi Gupta <sabyasachi.linux@gmail.com>,
+ Russell King - ARM Linux <linux@armlinux.org.uk>, linux-kernel@vger.kernel.org,
+ rppt@linux.vnet.ibm.com, Brajeswar Ghosh <brajeswar.linux@gmail.com>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Eric Biggers <ebiggers@google.com>
+On Thu, Jan 17, 2019 at 4:58 PM Mike Rapoport <rppt@linux.ibm.com> wrote:
+>
+> On Thu, Jan 17, 2019 at 04:53:44PM +0530, Souptick Joarder wrote:
+> > On Mon, Jan 7, 2019 at 10:54 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
+> > >
+> > > Remove duplicate headers which are included twice.
+> > >
+> > > Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+>
+> Acked-by: Mike Rapoport <rppt@linux.ibm.com>
+>
+> > Any comment on this patch ?
 
-The x86, arm, and arm64 asm implementations of crct10dif are very
-difficult to understand partly because many of the comments, labels, and
-macros are named incorrectly: the lengths mentioned are usually off by a
-factor of two from the actual code.  Many other things are unnecessarily
-convoluted as well, e.g. there are many more fold constants than
-actually needed and some aren't fully reduced.
+If no further comment, can we get this patch in queue for 5.1 ?
 
-This series therefore cleans up all these implementations to be much
-more maintainable.  I also made some small optimizations where I saw
-opportunities, resulting in slightly better performance.
-
-This patch cleans up the arm64 version.
-
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Eric Biggers <ebiggers@google.com>
----
- arch/arm64/crypto/crct10dif-ce-core.S | 496 ++++++++++++--------------
- arch/arm64/crypto/crct10dif-ce-glue.c |   4 +-
- 2 files changed, 233 insertions(+), 267 deletions(-)
-
-diff --git a/arch/arm64/crypto/crct10dif-ce-core.S b/arch/arm64/crypto/crct10dif-ce-core.S
-index f7326259c40de..e545b42e6a468 100644
---- a/arch/arm64/crypto/crct10dif-ce-core.S
-+++ b/arch/arm64/crypto/crct10dif-ce-core.S
-@@ -2,12 +2,14 @@
- // Accelerated CRC-T10DIF using arm64 NEON and Crypto Extensions instructions
- //
- // Copyright (C) 2016 Linaro Ltd <ard.biesheuvel@linaro.org>
-+// Copyright (C) 2019 Google LLC <ebiggers@google.com>
- //
- // This program is free software; you can redistribute it and/or modify
- // it under the terms of the GNU General Public License version 2 as
- // published by the Free Software Foundation.
- //
- 
-+// Derived from the x86 version:
- //
- // Implement fast CRC-T10DIF computation with SSE and PCLMULQDQ instructions
- //
-@@ -54,19 +56,11 @@
- // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- //
--//       Function API:
--//       UINT16 crc_t10dif_pcl(
--//               UINT16 init_crc, //initial CRC value, 16 bits
--//               const unsigned char *buf, //buffer pointer to calculate CRC on
--//               UINT64 len //buffer length in bytes (64-bit data)
--//       );
--//
- //       Reference paper titled "Fast CRC Computation for Generic
- //	Polynomials Using PCLMULQDQ Instruction"
- //       URL: http://www.intel.com/content/dam/www/public/us/en/documents
- //  /white-papers/fast-crc-computation-generic-polynomials-pclmulqdq-paper.pdf
- //
--//
- 
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-@@ -74,14 +68,14 @@
- 	.text
- 	.cpu		generic+crypto
- 
--	arg1_low32	.req	w19
--	arg2		.req	x20
--	arg3		.req	x21
-+	init_crc	.req	w19
-+	buf		.req	x20
-+	len		.req	x21
-+	fold_consts_ptr	.req	x22
- 
--	vzr		.req	v13
-+	fold_consts	.req	v10
- 
- 	ad		.req	v14
--	bd		.req	v10
- 
- 	k00_16		.req	v15
- 	k32_48		.req	v16
-@@ -143,11 +137,11 @@ __pmull_p8_core:
- 	ext		t5.8b, ad.8b, ad.8b, #2			// A2
- 	ext		t6.8b, ad.8b, ad.8b, #3			// A3
- 
--	pmull		t4.8h, t4.8b, bd.8b			// F = A1*B
-+	pmull		t4.8h, t4.8b, fold_consts.8b		// F = A1*B
- 	pmull		t8.8h, ad.8b, bd1.8b			// E = A*B1
--	pmull		t5.8h, t5.8b, bd.8b			// H = A2*B
-+	pmull		t5.8h, t5.8b, fold_consts.8b		// H = A2*B
- 	pmull		t7.8h, ad.8b, bd2.8b			// G = A*B2
--	pmull		t6.8h, t6.8b, bd.8b			// J = A3*B
-+	pmull		t6.8h, t6.8b, fold_consts.8b		// J = A3*B
- 	pmull		t9.8h, ad.8b, bd3.8b			// I = A*B3
- 	pmull		t3.8h, ad.8b, bd4.8b			// K = A*B4
- 	b		0f
-@@ -157,11 +151,11 @@ __pmull_p8_core:
- 	tbl		t5.16b, {ad.16b}, perm2.16b		// A2
- 	tbl		t6.16b, {ad.16b}, perm3.16b		// A3
- 
--	pmull2		t4.8h, t4.16b, bd.16b			// F = A1*B
-+	pmull2		t4.8h, t4.16b, fold_consts.16b		// F = A1*B
- 	pmull2		t8.8h, ad.16b, bd1.16b			// E = A*B1
--	pmull2		t5.8h, t5.16b, bd.16b			// H = A2*B
-+	pmull2		t5.8h, t5.16b, fold_consts.16b		// H = A2*B
- 	pmull2		t7.8h, ad.16b, bd2.16b			// G = A*B2
--	pmull2		t6.8h, t6.16b, bd.16b			// J = A3*B
-+	pmull2		t6.8h, t6.16b, fold_consts.16b		// J = A3*B
- 	pmull2		t9.8h, ad.16b, bd3.16b			// I = A*B3
- 	pmull2		t3.8h, ad.16b, bd4.16b			// K = A*B4
- 
-@@ -203,14 +197,14 @@ __pmull_p8_core:
- ENDPROC(__pmull_p8_core)
- 
- 	.macro		__pmull_p8, rq, ad, bd, i
--	.ifnc		\bd, v10
-+	.ifnc		\bd, fold_consts
- 	.err
- 	.endif
- 	mov		ad.16b, \ad\().16b
- 	.ifb		\i
--	pmull		\rq\().8h, \ad\().8b, bd.8b		// D = A*B
-+	pmull		\rq\().8h, \ad\().8b, \bd\().8b		// D = A*B
- 	.else
--	pmull2		\rq\().8h, \ad\().16b, bd.16b		// D = A*B
-+	pmull2		\rq\().8h, \ad\().16b, \bd\().16b	// D = A*B
- 	.endif
- 
- 	bl		.L__pmull_p8_core\i
-@@ -219,17 +213,19 @@ ENDPROC(__pmull_p8_core)
- 	eor		\rq\().16b, \rq\().16b, t6.16b
- 	.endm
- 
--	.macro		fold64, p, reg1, reg2
--	ldp		q11, q12, [arg2], #0x20
-+	// Fold reg1, reg2 into the next 32 data bytes, storing the result back
-+	// into reg1, reg2.
-+	.macro		fold_32_bytes, p, reg1, reg2
-+	ldp		q11, q12, [buf], #0x20
- 
--	__pmull_\p	v8, \reg1, v10, 2
--	__pmull_\p	\reg1, \reg1, v10
-+	__pmull_\p	v8, \reg1, fold_consts, 2
-+	__pmull_\p	\reg1, \reg1, fold_consts
- 
- CPU_LE(	rev64		v11.16b, v11.16b		)
- CPU_LE(	rev64		v12.16b, v12.16b		)
- 
--	__pmull_\p	v9, \reg2, v10, 2
--	__pmull_\p	\reg2, \reg2, v10
-+	__pmull_\p	v9, \reg2, fold_consts, 2
-+	__pmull_\p	\reg2, \reg2, fold_consts
- 
- CPU_LE(	ext		v11.16b, v11.16b, v11.16b, #8	)
- CPU_LE(	ext		v12.16b, v12.16b, v12.16b, #8	)
-@@ -240,15 +236,16 @@ CPU_LE(	ext		v12.16b, v12.16b, v12.16b, #8	)
- 	eor		\reg2\().16b, \reg2\().16b, v12.16b
- 	.endm
- 
--	.macro		fold16, p, reg, rk
--	__pmull_\p	v8, \reg, v10
--	__pmull_\p	\reg, \reg, v10, 2
--	.ifnb		\rk
--	ldr_l		q10, \rk, x8
--	__pmull_pre_\p	v10
-+	// Fold src_reg into dst_reg, optionally loading the next fold constants
-+	.macro		fold_16_bytes, p, src_reg, dst_reg, load_next_consts
-+	__pmull_\p	v8, \src_reg, fold_consts
-+	__pmull_\p	\src_reg, \src_reg, fold_consts, 2
-+	.ifnb		\load_next_consts
-+	ld1		{fold_consts.2d}, [fold_consts_ptr], #16
-+	__pmull_pre_\p	fold_consts
- 	.endif
--	eor		v7.16b, v7.16b, v8.16b
--	eor		v7.16b, v7.16b, \reg\().16b
-+	eor		\dst_reg\().16b, \dst_reg\().16b, v8.16b
-+	eor		\dst_reg\().16b, \dst_reg\().16b, \src_reg\().16b
- 	.endm
- 
- 	.macro		__pmull_p64, rd, rn, rm, n
-@@ -260,40 +257,27 @@ CPU_LE(	ext		v12.16b, v12.16b, v12.16b, #8	)
- 	.endm
- 
- 	.macro		crc_t10dif_pmull, p
--	frame_push	3, 128
-+	frame_push	4, 128
- 
--	mov		arg1_low32, w0
--	mov		arg2, x1
--	mov		arg3, x2
--
--	movi		vzr.16b, #0		// init zero register
-+	mov		init_crc, w0
-+	mov		buf, x1
-+	mov		len, x2
- 
- 	__pmull_init_\p
- 
--	// adjust the 16-bit initial_crc value, scale it to 32 bits
--	lsl		arg1_low32, arg1_low32, #16
--
--	// check if smaller than 256
--	cmp		arg3, #256
--
--	// for sizes less than 128, we can't fold 64B at a time...
--	b.lt		.L_less_than_128_\@
-+	// For sizes less than 256 bytes, we can't fold 128 bytes at a time.
-+	cmp		len, #256
-+	b.lt		.Lless_than_256_bytes_\@
- 
--	// load the initial crc value
--	// crc value does not need to be byte-reflected, but it needs
--	// to be moved to the high part of the register.
--	// because data will be byte-reflected and will align with
--	// initial crc at correct place.
--	movi		v10.16b, #0
--	mov		v10.s[3], arg1_low32		// initial crc
--
--	// receive the initial 64B data, xor the initial crc value
--	ldp		q0, q1, [arg2]
--	ldp		q2, q3, [arg2, #0x20]
--	ldp		q4, q5, [arg2, #0x40]
--	ldp		q6, q7, [arg2, #0x60]
--	add		arg2, arg2, #0x80
-+	adr_l		fold_consts_ptr, .Lfold_across_128_bytes_consts
- 
-+	// Load the first 128 data bytes.  Byte swapping is necessary to make
-+	// the bit order match the polynomial coefficient order.
-+	ldp		q0, q1, [buf]
-+	ldp		q2, q3, [buf, #0x20]
-+	ldp		q4, q5, [buf, #0x40]
-+	ldp		q6, q7, [buf, #0x60]
-+	add		buf, buf, #0x80
- CPU_LE(	rev64		v0.16b, v0.16b			)
- CPU_LE(	rev64		v1.16b, v1.16b			)
- CPU_LE(	rev64		v2.16b, v2.16b			)
-@@ -302,7 +286,6 @@ CPU_LE(	rev64		v4.16b, v4.16b			)
- CPU_LE(	rev64		v5.16b, v5.16b			)
- CPU_LE(	rev64		v6.16b, v6.16b			)
- CPU_LE(	rev64		v7.16b, v7.16b			)
--
- CPU_LE(	ext		v0.16b, v0.16b, v0.16b, #8	)
- CPU_LE(	ext		v1.16b, v1.16b, v1.16b, #8	)
- CPU_LE(	ext		v2.16b, v2.16b, v2.16b, #8	)
-@@ -312,36 +295,29 @@ CPU_LE(	ext		v5.16b, v5.16b, v5.16b, #8	)
- CPU_LE(	ext		v6.16b, v6.16b, v6.16b, #8	)
- CPU_LE(	ext		v7.16b, v7.16b, v7.16b, #8	)
- 
--	// XOR the initial_crc value
--	eor		v0.16b, v0.16b, v10.16b
--
--	ldr_l		q10, rk3, x8	// xmm10 has rk3 and rk4
--					// type of pmull instruction
--					// will determine which constant to use
--	__pmull_pre_\p	v10
--
--	//
--	// we subtract 256 instead of 128 to save one instruction from the loop
--	//
--	sub		arg3, arg3, #256
--
--	// at this section of the code, there is 64*x+y (0<=y<64) bytes of
--	// buffer. The _fold_64_B_loop will fold 64B at a time
--	// until we have 64+y Bytes of buffer
-+	// XOR the first 16 data *bits* with the initial CRC value.
-+	movi		v8.16b, #0
-+	mov		v8.h[7], init_crc
-+	eor		v0.16b, v0.16b, v8.16b
- 
--	// fold 64B at a time. This section of the code folds 4 vector
--	// registers in parallel
--.L_fold_64_B_loop_\@:
-+	// Load the constants for folding across 128 bytes.
-+	ld1		{fold_consts.2d}, [fold_consts_ptr]
-+	__pmull_pre_\p	fold_consts
- 
--	fold64		\p, v0, v1
--	fold64		\p, v2, v3
--	fold64		\p, v4, v5
--	fold64		\p, v6, v7
-+	// Subtract 128 for the 128 data bytes just consumed.  Subtract another
-+	// 128 to simplify the termination condition of the following loop.
-+	sub		len, len, #256
- 
--	subs		arg3, arg3, #128
-+	// While >= 128 data bytes remain (not counting v0-v7), fold the 128
-+	// bytes v0-v7 into them, storing the result back into v0-v7.
-+.Lfold_128_bytes_loop_\@:
-+	fold_32_bytes	\p, v0, v1
-+	fold_32_bytes	\p, v2, v3
-+	fold_32_bytes	\p, v4, v5
-+	fold_32_bytes	\p, v6, v7
- 
--	// check if there is another 64B in the buffer to be able to fold
--	b.lt		.L_fold_64_B_end_\@
-+	subs		len, len, #128
-+	b.lt		.Lfold_128_bytes_loop_done_\@
- 
- 	if_will_cond_yield_neon
- 	stp		q0, q1, [sp, #.Lframe_local_offset]
-@@ -353,217 +329,207 @@ CPU_LE(	ext		v7.16b, v7.16b, v7.16b, #8	)
- 	ldp		q2, q3, [sp, #.Lframe_local_offset + 32]
- 	ldp		q4, q5, [sp, #.Lframe_local_offset + 64]
- 	ldp		q6, q7, [sp, #.Lframe_local_offset + 96]
--	ldr_l		q10, rk3, x8
--	movi		vzr.16b, #0		// init zero register
-+	ld1		{fold_consts.2d}, [fold_consts_ptr]
- 	__pmull_init_\p
--	__pmull_pre_\p	v10
-+	__pmull_pre_\p	fold_consts
- 	endif_yield_neon
- 
--	b		.L_fold_64_B_loop_\@
--
--.L_fold_64_B_end_\@:
--	// at this point, the buffer pointer is pointing at the last y Bytes
--	// of the buffer the 64B of folded data is in 4 of the vector
--	// registers: v0, v1, v2, v3
--
--	// fold the 8 vector registers to 1 vector register with different
--	// constants
--
--	ldr_l		q10, rk9, x8
--	__pmull_pre_\p	v10
--
--	fold16		\p, v0, rk11
--	fold16		\p, v1, rk13
--	fold16		\p, v2, rk15
--	fold16		\p, v3, rk17
--	fold16		\p, v4, rk19
--	fold16		\p, v5, rk1
--	fold16		\p, v6
--
--	// instead of 64, we add 48 to the loop counter to save 1 instruction
--	// from the loop instead of a cmp instruction, we use the negative
--	// flag with the jl instruction
--	adds		arg3, arg3, #(128-16)
--	b.lt		.L_final_reduction_for_128_\@
--
--	// now we have 16+y bytes left to reduce. 16 Bytes is in register v7
--	// and the rest is in memory. We can fold 16 bytes at a time if y>=16
--	// continue folding 16B at a time
--
--.L_16B_reduction_loop_\@:
--	__pmull_\p	v8, v7, v10
--	__pmull_\p	v7, v7, v10, 2
-+	b		.Lfold_128_bytes_loop_\@
-+
-+.Lfold_128_bytes_loop_done_\@:
-+
-+	// Now fold the 112 bytes in v0-v6 into the 16 bytes in v7.
-+
-+	// Fold across 64 bytes.
-+	add		fold_consts_ptr, fold_consts_ptr, #16
-+	ld1		{fold_consts.2d}, [fold_consts_ptr], #16
-+	__pmull_pre_\p	fold_consts
-+	fold_16_bytes	\p, v0, v4
-+	fold_16_bytes	\p, v1, v5
-+	fold_16_bytes	\p, v2, v6
-+	fold_16_bytes	\p, v3, v7, 1
-+	// Fold across 32 bytes.
-+	fold_16_bytes	\p, v4, v6
-+	fold_16_bytes	\p, v5, v7, 1
-+	// Fold across 16 bytes.
-+	fold_16_bytes	\p, v6, v7
-+
-+	// Add 128 to get the correct number of data bytes remaining in 0...127
-+	// (not counting v7), following the previous extra subtraction by 128.
-+	// Then subtract 16 to simplify the termination condition of the
-+	// following loop.
-+	adds		len, len, #(128-16)
-+
-+	// While >= 16 data bytes remain (not counting v7), fold the 16 bytes v7
-+	// into them, storing the result back into v7.
-+	b.lt		.Lfold_16_bytes_loop_done_\@
-+.Lfold_16_bytes_loop_\@:
-+	__pmull_\p	v8, v7, fold_consts
-+	__pmull_\p	v7, v7, fold_consts, 2
- 	eor		v7.16b, v7.16b, v8.16b
--
--	ldr		q0, [arg2], #16
-+	ldr		q0, [buf], #16
- CPU_LE(	rev64		v0.16b, v0.16b			)
- CPU_LE(	ext		v0.16b, v0.16b, v0.16b, #8	)
- 	eor		v7.16b, v7.16b, v0.16b
--	subs		arg3, arg3, #16
--
--	// instead of a cmp instruction, we utilize the flags with the
--	// jge instruction equivalent of: cmp arg3, 16-16
--	// check if there is any more 16B in the buffer to be able to fold
--	b.ge		.L_16B_reduction_loop_\@
--
--	// now we have 16+z bytes left to reduce, where 0<= z < 16.
--	// first, we reduce the data in the xmm7 register
--
--.L_final_reduction_for_128_\@:
--	// check if any more data to fold. If not, compute the CRC of
--	// the final 128 bits
--	adds		arg3, arg3, #16
--	b.eq		.L_128_done_\@
--
--	// here we are getting data that is less than 16 bytes.
--	// since we know that there was data before the pointer, we can
--	// offset the input pointer before the actual point, to receive
--	// exactly 16 bytes. after that the registers need to be adjusted.
--.L_get_last_two_regs_\@:
--	add		arg2, arg2, arg3
--	ldr		q1, [arg2, #-16]
--CPU_LE(	rev64		v1.16b, v1.16b			)
--CPU_LE(	ext		v1.16b, v1.16b, v1.16b, #8	)
--
--	// get rid of the extra data that was loaded before
--	// load the shift constant
--	adr_l		x4, tbl_shf_table + 16
--	sub		x4, x4, arg3
--	ld1		{v0.16b}, [x4]
--
--	// shift v2 to the left by arg3 bytes
--	tbl		v2.16b, {v7.16b}, v0.16b
--
--	// shift v7 to the right by 16-arg3 bytes
--	movi		v9.16b, #0x80
--	eor		v0.16b, v0.16b, v9.16b
--	tbl		v7.16b, {v7.16b}, v0.16b
--
--	// blend
--	sshr		v0.16b, v0.16b, #7	// convert to 8-bit mask
--	bsl		v0.16b, v2.16b, v1.16b
--
--	// fold 16 Bytes
--	__pmull_\p	v8, v7, v10
--	__pmull_\p	v7, v7, v10, 2
--	eor		v7.16b, v7.16b, v8.16b
--	eor		v7.16b, v7.16b, v0.16b
-+	subs		len, len, #16
-+	b.ge		.Lfold_16_bytes_loop_\@
-+
-+.Lfold_16_bytes_loop_done_\@:
-+	// Add 16 to get the correct number of data bytes remaining in 0...15
-+	// (not counting v7), following the previous extra subtraction by 16.
-+	adds		len, len, #16
-+	b.eq		.Lreduce_final_16_bytes_\@
-+
-+.Lhandle_partial_segment_\@:
-+	// Reduce the last '16 + len' bytes where 1 <= len <= 15 and the first
-+	// 16 bytes are in v7 and the rest are the remaining data in 'buf'.  To
-+	// do this without needing a fold constant for each possible 'len',
-+	// redivide the bytes into a first chunk of 'len' bytes and a second
-+	// chunk of 16 bytes, then fold the first chunk into the second.
-+
-+	// v0 = last 16 original data bytes
-+	add		buf, buf, len
-+	ldr		q0, [buf, #-16]
-+CPU_LE(	rev64		v0.16b, v0.16b			)
-+CPU_LE(	ext		v0.16b, v0.16b, v0.16b, #8	)
- 
--.L_128_done_\@:
--	// compute crc of a 128-bit value
--	ldr_l		q10, rk5, x8		// rk5 and rk6 in xmm10
--	__pmull_pre_\p	v10
-+	// v1 = high order part of second chunk: v7 left-shifted by 'len' bytes.
-+	adr_l		x4, .Lbyteshift_table + 16
-+	sub		x4, x4, len
-+	ld1		{v2.16b}, [x4]
-+	tbl		v1.16b, {v7.16b}, v2.16b
- 
--	// 64b fold
--	ext		v0.16b, vzr.16b, v7.16b, #8
--	mov		v7.d[0], v7.d[1]
--	__pmull_\p	v7, v7, v10
--	eor		v7.16b, v7.16b, v0.16b
-+	// v3 = first chunk: v7 right-shifted by '16-len' bytes.
-+	movi		v3.16b, #0x80
-+	eor		v2.16b, v2.16b, v3.16b
-+	tbl		v3.16b, {v7.16b}, v2.16b
- 
--	// 32b fold
--	ext		v0.16b, v7.16b, vzr.16b, #4
--	mov		v7.s[3], vzr.s[0]
--	__pmull_\p	v0, v0, v10, 2
--	eor		v7.16b, v7.16b, v0.16b
-+	// Convert to 8-bit masks: 'len' 0x00 bytes, then '16-len' 0xff bytes.
-+	sshr		v2.16b, v2.16b, #7
- 
--	// barrett reduction
--	ldr_l		q10, rk7, x8
--	__pmull_pre_\p	v10
--	mov		v0.d[0], v7.d[1]
-+	// v2 = second chunk: 'len' bytes from v0 (low-order bytes),
-+	// then '16-len' bytes from v1 (high-order bytes).
-+	bsl		v2.16b, v1.16b, v0.16b
- 
--	__pmull_\p	v0, v0, v10
--	ext		v0.16b, vzr.16b, v0.16b, #12
--	__pmull_\p	v0, v0, v10, 2
--	ext		v0.16b, vzr.16b, v0.16b, #12
-+	// Fold the first chunk into the second chunk, storing the result in v7.
-+	__pmull_\p	v0, v3, fold_consts
-+	__pmull_\p	v7, v3, fold_consts, 2
- 	eor		v7.16b, v7.16b, v0.16b
--	mov		w0, v7.s[1]
--
--.L_cleanup_\@:
--	// scale the result back to 16 bits
--	lsr		x0, x0, #16
-+	eor		v7.16b, v7.16b, v2.16b
-+
-+.Lreduce_final_16_bytes_\@:
-+	// Reduce the 128-bit value M(x), stored in v7, to the final 16-bit CRC.
-+
-+	movi		v2.16b, #0		// init zero register
-+
-+	// Load 'x^48 * (x^48 mod G(x))' and 'x^48 * (x^80 mod G(x))'.
-+	ld1		{fold_consts.2d}, [fold_consts_ptr], #16
-+	__pmull_pre_\p	fold_consts
-+
-+	// Fold the high 64 bits into the low 64 bits, while also multiplying by
-+	// x^64.  This produces a 128-bit value congruent to x^64 * M(x) and
-+	// whose low 48 bits are 0.
-+	ext		v0.16b, v2.16b, v7.16b, #8
-+	__pmull_\p	v7, v7, fold_consts, 2	// high bits * x^48 * (x^80 mod G(x))
-+	eor		v0.16b, v0.16b, v7.16b	// + low bits * x^64
-+
-+	// Fold the high 32 bits into the low 96 bits.  This produces a 96-bit
-+	// value congruent to x^64 * M(x) and whose low 48 bits are 0.
-+	ext		v1.16b, v0.16b, v2.16b, #12	// extract high 32 bits
-+	mov		v0.s[3], v2.s[0]	// zero high 32 bits
-+	__pmull_\p	v1, v1, fold_consts	// high 32 bits * x^48 * (x^48 mod G(x))
-+	eor		v0.16b, v0.16b, v1.16b	// + low bits
-+
-+	// Load G(x) and floor(x^48 / G(x)).
-+	ld1		{fold_consts.2d}, [fold_consts_ptr]
-+	__pmull_pre_\p	fold_consts
-+
-+	// Use Barrett reduction to compute the final CRC value.
-+	__pmull_\p	v1, v0, fold_consts, 2	// high 32 bits * floor(x^48 / G(x))
-+	ushr		v1.2d, v1.2d, #32	// /= x^32
-+	__pmull_\p	v1, v1, fold_consts	// *= G(x)
-+	ushr		v0.2d, v0.2d, #48
-+	eor		v0.16b, v0.16b, v1.16b	// + low 16 nonzero bits
-+	// Final CRC value (x^16 * M(x)) mod G(x) is in low 16 bits of v0.
-+
-+	umov		w0, v0.h[0]
- 	frame_pop
- 	ret
- 
--.L_less_than_128_\@:
--	cbz		arg3, .L_cleanup_\@
-+.Lless_than_256_bytes_\@:
-+	// Checksumming a buffer of length 16...255 bytes
- 
--	movi		v0.16b, #0
--	mov		v0.s[3], arg1_low32	// get the initial crc value
-+	adr_l		fold_consts_ptr, .Lfold_across_16_bytes_consts
- 
--	ldr		q7, [arg2], #0x10
-+	// Load the first 16 data bytes.
-+	ldr		q7, [buf], #0x10
- CPU_LE(	rev64		v7.16b, v7.16b			)
- CPU_LE(	ext		v7.16b, v7.16b, v7.16b, #8	)
--	eor		v7.16b, v7.16b, v0.16b	// xor the initial crc value
--
--	cmp		arg3, #16
--	b.eq		.L_128_done_\@		// exactly 16 left
- 
--	ldr_l		q10, rk1, x8		// rk1 and rk2 in xmm10
--	__pmull_pre_\p	v10
-+	// XOR the first 16 data *bits* with the initial CRC value.
-+	movi		v0.16b, #0
-+	mov		v0.h[7], init_crc
-+	eor		v7.16b, v7.16b, v0.16b
- 
--	// update the counter. subtract 32 instead of 16 to save one
--	// instruction from the loop
--	subs		arg3, arg3, #32
--	b.ge		.L_16B_reduction_loop_\@
-+	// Load the fold-across-16-bytes constants.
-+	ld1		{fold_consts.2d}, [fold_consts_ptr], #16
-+	__pmull_pre_\p	fold_consts
- 
--	add		arg3, arg3, #16
--	b		.L_get_last_two_regs_\@
-+	cmp		len, #16
-+	b.eq		.Lreduce_final_16_bytes_\@	// len == 16
-+	subs		len, len, #32
-+	b.ge		.Lfold_16_bytes_loop_\@		// 32 <= len <= 255
-+	add		len, len, #16
-+	b		.Lhandle_partial_segment_\@	// 17 <= len <= 31
- 	.endm
- 
-+//
-+// u16 crc_t10dif_pmull_p8(u16 init_crc, const u8 *buf, size_t len);
-+//
-+// Assumes len >= 16.
-+//
- ENTRY(crc_t10dif_pmull_p8)
- 	crc_t10dif_pmull	p8
- ENDPROC(crc_t10dif_pmull_p8)
- 
- 	.align		5
-+//
-+// u16 crc_t10dif_pmull_p64(u16 init_crc, const u8 *buf, size_t len);
-+//
-+// Assumes len >= 16.
-+//
- ENTRY(crc_t10dif_pmull_p64)
- 	crc_t10dif_pmull	p64
- ENDPROC(crc_t10dif_pmull_p64)
- 
--// precomputed constants
--// these constants are precomputed from the poly:
--// 0x8bb70000 (0x8bb7 scaled to 32 bits)
- 	.section	".rodata", "a"
- 	.align		4
--// Q = 0x18BB70000
--// rk1 = 2^(32*3) mod Q << 32
--// rk2 = 2^(32*5) mod Q << 32
--// rk3 = 2^(32*15) mod Q << 32
--// rk4 = 2^(32*17) mod Q << 32
--// rk5 = 2^(32*3) mod Q << 32
--// rk6 = 2^(32*2) mod Q << 32
--// rk7 = floor(2^64/Q)
--// rk8 = Q
--
--rk1:	.octa		0x06df0000000000002d56000000000000
--rk3:	.octa		0x7cf50000000000009d9d000000000000
--rk5:	.octa		0x13680000000000002d56000000000000
--rk7:	.octa		0x000000018bb7000000000001f65a57f8
--rk9:	.octa		0xbfd6000000000000ceae000000000000
--rk11:	.octa		0x713c0000000000001e16000000000000
--rk13:	.octa		0x80a6000000000000f7f9000000000000
--rk15:	.octa		0xe658000000000000044c000000000000
--rk17:	.octa		0xa497000000000000ad18000000000000
--rk19:	.octa		0xe7b50000000000006ee3000000000000
--
--tbl_shf_table:
--// use these values for shift constants for the tbl/tbx instruction
--// different alignments result in values as shown:
--//	DDQ 0x008f8e8d8c8b8a898887868584838281 # shl 15 (16-1) / shr1
--//	DDQ 0x01008f8e8d8c8b8a8988878685848382 # shl 14 (16-3) / shr2
--//	DDQ 0x0201008f8e8d8c8b8a89888786858483 # shl 13 (16-4) / shr3
--//	DDQ 0x030201008f8e8d8c8b8a898887868584 # shl 12 (16-4) / shr4
--//	DDQ 0x04030201008f8e8d8c8b8a8988878685 # shl 11 (16-5) / shr5
--//	DDQ 0x0504030201008f8e8d8c8b8a89888786 # shl 10 (16-6) / shr6
--//	DDQ 0x060504030201008f8e8d8c8b8a898887 # shl 9  (16-7) / shr7
--//	DDQ 0x07060504030201008f8e8d8c8b8a8988 # shl 8  (16-8) / shr8
--//	DDQ 0x0807060504030201008f8e8d8c8b8a89 # shl 7  (16-9) / shr9
--//	DDQ 0x090807060504030201008f8e8d8c8b8a # shl 6  (16-10) / shr10
--//	DDQ 0x0a090807060504030201008f8e8d8c8b # shl 5  (16-11) / shr11
--//	DDQ 0x0b0a090807060504030201008f8e8d8c # shl 4  (16-12) / shr12
--//	DDQ 0x0c0b0a090807060504030201008f8e8d # shl 3  (16-13) / shr13
--//	DDQ 0x0d0c0b0a090807060504030201008f8e # shl 2  (16-14) / shr14
--//	DDQ 0x0e0d0c0b0a090807060504030201008f # shl 1  (16-15) / shr15
- 
-+// Fold constants precomputed from the polynomial 0x18bb7
-+// G(x) = x^16 + x^15 + x^11 + x^9 + x^8 + x^7 + x^5 + x^4 + x^2 + x^1 + x^0
-+.Lfold_across_128_bytes_consts:
-+	.quad		0x0000000000006123	// x^(8*128)	mod G(x)
-+	.quad		0x0000000000002295	// x^(8*128+64)	mod G(x)
-+// .Lfold_across_64_bytes_consts:
-+	.quad		0x0000000000001069	// x^(4*128)	mod G(x)
-+	.quad		0x000000000000dd31	// x^(4*128+64)	mod G(x)
-+// .Lfold_across_32_bytes_consts:
-+	.quad		0x000000000000857d	// x^(2*128)	mod G(x)
-+	.quad		0x0000000000007acc	// x^(2*128+64)	mod G(x)
-+.Lfold_across_16_bytes_consts:
-+	.quad		0x000000000000a010	// x^(1*128)	mod G(x)
-+	.quad		0x0000000000001faa	// x^(1*128+64)	mod G(x)
-+// .Lfinal_fold_consts:
-+	.quad		0x1368000000000000	// x^48 * (x^48 mod G(x))
-+	.quad		0x2d56000000000000	// x^48 * (x^80 mod G(x))
-+// .Lbarrett_reduction_consts:
-+	.quad		0x0000000000018bb7	// G(x)
-+	.quad		0x00000001f65a57f8	// floor(x^48 / G(x))
-+
-+// For 1 <= len <= 15, the 16-byte vector beginning at &byteshift_table[16 -
-+// len] is the index vector to shift left by 'len' bytes, and is also {0x80,
-+// ..., 0x80} XOR the index vector to shift right by '16 - len' bytes.
-+.Lbyteshift_table:
- 	.byte		 0x0, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87
- 	.byte		0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f
- 	.byte		 0x0,  0x1,  0x2,  0x3,  0x4,  0x5,  0x6,  0x7
-diff --git a/arch/arm64/crypto/crct10dif-ce-glue.c b/arch/arm64/crypto/crct10dif-ce-glue.c
-index 242757cc6da91..dd325829ee44f 100644
---- a/arch/arm64/crypto/crct10dif-ce-glue.c
-+++ b/arch/arm64/crypto/crct10dif-ce-glue.c
-@@ -22,8 +22,8 @@
- 
- #define CRC_T10DIF_PMULL_CHUNK_SIZE	16U
- 
--asmlinkage u16 crc_t10dif_pmull_p64(u16 init_crc, const u8 buf[], u64 len);
--asmlinkage u16 crc_t10dif_pmull_p8(u16 init_crc, const u8 buf[], u64 len);
-+asmlinkage u16 crc_t10dif_pmull_p8(u16 init_crc, const u8 *buf, size_t len);
-+asmlinkage u16 crc_t10dif_pmull_p64(u16 init_crc, const u8 *buf, size_t len);
- 
- static int crct10dif_init(struct shash_desc *desc)
- {
--- 
-2.20.1
-
+> >
+> > > ---
+> > >  arch/arm/mm/mmu.c | 2 --
+> > >  1 file changed, 2 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> > > index f5cc1cc..dde3032 100644
+> > > --- a/arch/arm/mm/mmu.c
+> > > +++ b/arch/arm/mm/mmu.c
+> > > @@ -23,7 +23,6 @@
+> > >  #include <asm/sections.h>
+> > >  #include <asm/cachetype.h>
+> > >  #include <asm/fixmap.h>
+> > > -#include <asm/sections.h>
+> > >  #include <asm/setup.h>
+> > >  #include <asm/smp_plat.h>
+> > >  #include <asm/tlb.h>
+> > > @@ -36,7 +35,6 @@
+> > >  #include <asm/mach/arch.h>
+> > >  #include <asm/mach/map.h>
+> > >  #include <asm/mach/pci.h>
+> > > -#include <asm/fixmap.h>
+> > >
+> > >  #include "fault.h"
+> > >  #include "mm.h"
+> > > --
+> > > 1.9.1
+> > >
+> >
+>
+> --
+> Sincerely yours,
+> Mike.
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
