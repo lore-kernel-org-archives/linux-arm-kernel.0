@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3C0E4C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:19:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2E08CC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:20:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0ED5920870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:19:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F208120870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:20:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WtWamUEf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0ED5920870
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S68vzpgD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F208120870
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,49 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zPStiio+FHwgXK4RquWn+F79XjAqNs17xiOxiAPE604=; b=WtWamUEfMVJCUK
-	+1CKToOQUInnTnyojbyABwYkHIr8zVEbI18DxkRCjm1zgDW0/aXzLicDfaDOSXj16qC9IyGjXCHVe
-	rzqnPmuLHXkW/IXiWhXVZwHF8AfD3L/FHGOgfJ4AS70JM06sWP7gE1OoBUColcU5so9AhlJZXUQJk
-	osR3nePre0iTOKxN1lwvpu3KvAlddpZN4rkmyGNO2oRnphmUgOaidrljSGHyNzD++HuTyIBtUAlsT
-	MN0xjYsBbibAOkNntVTIGbvkcXl0DGm6f7Sy/p7ERv26YMfk5rtVlKkC8nK/SmhF3iqQ2FhJ/pXEM
-	raiOy49zmppJpmwkSU5g==;
+	List-Owner; bh=uK+v72vb6la4T6MaXcLvyDA65MRe4BR8KDtKk/fRPhg=; b=S68vzpgDhLB9td
+	xLcxsFR7PJMqQtOh+H9wB4DZ7tfzCYtHS2VTSHIdBKWVF+ITnPnr2+pT/+tH0QCEKjitrXBOZ3kq/
+	cQLwC6Z+DUmCqkedgQ/2FV/sRzE7F2s+0CQCCubLucLfJT64h66zrobO7eXT7dgJP0xUnnlaJJoZG
+	HYgY+ZWSnrtPCEU1+h2BGRy1oSlxW7rL8m2RCpjQ4wY01+kpLE1VI6eBjQRia0+ZTctdQNdf6NoJs
+	xN1uLu6oGSJPUg46zX9sxtcIlf6v1X4LcCxDpjyiTWGp1BWL8bUPkK30885uO6QyRN1VUU8BS7ueq
+	Dvzlm34ZJbVdv6AzJcnQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp2sq-00016f-Nx; Thu, 31 Jan 2019 03:19:20 +0000
+	id 1gp2tY-0001PO-4k; Thu, 31 Jan 2019 03:20:04 +0000
 Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp2sl-00015X-N2; Thu, 31 Jan 2019 03:19:17 +0000
-X-UUID: 05621ad8e1fa4b1383abb32ba3ed7585-20190130
-X-UUID: 05621ad8e1fa4b1383abb32ba3ed7585-20190130
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
+ id 1gp2tS-0001O9-Qk; Thu, 31 Jan 2019 03:20:00 +0000
+X-UUID: 56b83d677e444b26bec10ed706b94213-20190130
+X-UUID: 56b83d677e444b26bec10ed706b94213-20190130
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
  (envelope-from <yong.wu@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 554470306; Wed, 30 Jan 2019 19:19:10 -0800
-Received: from MTKMBS31N1.mediatek.inc (172.27.4.69) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 30 Jan 2019 19:19:08 -0800
-Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31N1.mediatek.inc
- (172.27.4.69) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Thu, 31 Jan 2019 11:19:06 +0800
+ with ESMTP id 1633757321; Wed, 30 Jan 2019 19:19:56 -0800
+Received: from MTKMBS31DR.mediatek.inc (172.27.6.102) by
+ MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 30 Jan 2019 19:19:54 -0800
+Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31DR.mediatek.inc
+ (172.27.6.102) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Thu, 31 Jan 2019 11:19:51 +0800
 Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
  (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Thu, 31 Jan 2019 11:19:05 +0800
-Message-ID: <1548904745.19710.33.camel@mhfsdcap03>
-Subject: Re: [PATCH v5 01/20] dt-bindings: mediatek: Add binding for mt8183
- IOMMU and SMI
+ Transport; Thu, 31 Jan 2019 11:19:51 +0800
+Message-ID: <1548904791.19710.34.camel@mhfsdcap03>
+Subject: Re: [PATCH v5 13/20] iommu/mediatek: Add mt8183 IOMMU support
 From: Yong Wu <yong.wu@mediatek.com>
 To: Evan Green <evgreen@chromium.org>
-Date: Thu, 31 Jan 2019 11:19:05 +0800
-In-Reply-To: <CAE=gft4dQjUw3j52dZJYjvQ4GTf8_KcZOdW5Wn9cFtY9wu_atg@mail.gmail.com>
+Date: Thu, 31 Jan 2019 11:19:51 +0800
+In-Reply-To: <CAE=gft6nQ4uv5kqYO876sQaKo71F0RkMj4d-dKDvxi8pEy-WgQ@mail.gmail.com>
 References: <1546314952-15990-1-git-send-email-yong.wu@mediatek.com>
- <1546314952-15990-2-git-send-email-yong.wu@mediatek.com>
- <CAE=gft4dQjUw3j52dZJYjvQ4GTf8_KcZOdW5Wn9cFtY9wu_atg@mail.gmail.com>
+ <1546314952-15990-14-git-send-email-yong.wu@mediatek.com>
+ <CAE=gft6nQ4uv5kqYO876sQaKo71F0RkMj4d-dKDvxi8pEy-WgQ@mail.gmail.com>
 X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_191915_752958_FF66F73D 
-X-CRM114-Status: GOOD (  33.14  )
+X-CRM114-CacheID: sfid-20190130_191959_097403_77CBED3F 
+X-CRM114-Status: GOOD (  22.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,174 +93,57 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Evan,
-
-Thanks very much for reviewing this patchset.
-
-On Wed, 2019-01-30 at 10:27 -0800, Evan Green wrote:
-> On Mon, Dec 31, 2018 at 7:56 PM Yong Wu <yong.wu@mediatek.com> wrote:
+On Wed, 2019-01-30 at 10:31 -0800, Evan Green wrote:
+> On Mon, Dec 31, 2018 at 7:59 PM Yong Wu <yong.wu@mediatek.com> wrote:
 > >
-> > This patch adds decriptions for mt8183 IOMMU and SMI.
+> > The M4U IP blocks in mt8183 is MediaTek's generation2 M4U which use
+> > the ARM Short-descriptor like mt8173, and most of the HW registers
+> > are the same.
 > >
-> > mt8183 has only one M4U like mt8173 and is also MTK IOMMU gen2 which
-> > uses ARM Short-Descriptor translation table format.
-> >
-> > The mt8183 M4U-SMI HW diagram is as below:
-> >
-> >                           EMI
-> >                            |
-> >                           M4U
-> >                            |
-> >                        ----------
-> >                        |        |
-> >                    gals0-rx   gals1-rx
-> >                        |        |
-> >                        |        |
-> >                    gals0-tx   gals1-tx
-> >                        |        |
-> >                       ------------
-> >                        SMI Common
-> >                       ------------
-> >                            |
-> >   +-----+-----+--------+-----+-----+-------+-------+
-> >   |     |     |        |     |     |       |       |
-> >   |     |  gals-rx  gals-rx  |   gals-rx gals-rx gals-rx
-> >   |     |     |        |     |     |       |       |
-> >   |     |     |        |     |     |       |       |
-> >   |     |  gals-tx  gals-tx  |   gals-tx gals-tx gals-tx
-> >   |     |     |        |     |     |       |       |
-> > larb0 larb1  IPU0    IPU1  larb4  larb5  larb6    CCU
-> > disp  vdec   img     cam    venc   img    cam
-> 
-> It might be cool to put the gals in the picture in the bindings. Not a
-> big deal though.
-
-OK. the picture in the binding should be more generic, I will try add
-gals in the binding picture in next version.
-
-> 
-> >
-> > All the connections are HW fixed, SW can NOT adjust it.
-> >
-> > Compared with mt8173, we add a GALS(Global Async Local Sync) module
-> > between SMI-common and M4U, and additional GALS between larb2/3/5/6
-> > and SMI-common. GALS can help synchronize for the modules in different
-> > clock frequency, it can be seen as a "asynchronous fifo".
-> >
-> > GALS can only help transfer the command/data while it doesn't have
-> > the configuring register, thus it has the special "smi" clock and it
-> > doesn't have the "apb" clock. From the diagram above, we add "gals0"
-> > and "gals1" clocks for smi-common and add a "gals" clock for smi-larb.
-> >
-> > From the diagram above, IPU0/IPU1(Image Processor Unit) and CCU(Camera
-> > Control Unit) is connected with smi-common directly, we can take them
-> > as "larb2", "larb3" and "larb7", and their register spaces are
-> > different with the normal larb.
+> > Here list main differences between mt8183 and mt8173/mt2712:
+> > 1) mt8183 has only one M4U HW like mt8173 while mt2712 has two.
+> > 2) mt8183 don't have the "bclk" clock, it use the EMI clock instead.
+> > 3) mt8183 can support the dram over 4GB, but it doesn't call this "4GB
+> > mode".
+> > 4) mt8183 pgtable base register(0x0) extend bit[1:0] which represent
+> > the bit[33:32] in the physical address of the pgtable base, But the
+> > standard ttbr0[1] means the S bit which is enabled defaultly, Hence,
+> > we add a mask.
+> > 5) mt8183 HW has a GALS modules, SMI should enable "has_gals" support.
+> > 6) mt8183 need reset_axi like mt8173.
+> > 7) the larb-id in smi-common is remapped. M4U should add its larbid_remap.
 > >
 > > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> > Reviewed-by: Rob Herring <robh@kernel.org>
 > > ---
-> >  .../devicetree/bindings/iommu/mediatek,iommu.txt   |  15 ++-
-> >  .../memory-controllers/mediatek,smi-common.txt     |  11 +-
-> >  .../memory-controllers/mediatek,smi-larb.txt       |   3 +
-> >  include/dt-bindings/memory/mt8183-larb-port.h      | 130 +++++++++++++++++++++
-> >  4 files changed, 153 insertions(+), 6 deletions(-)
-> >  create mode 100644 include/dt-bindings/memory/mt8183-larb-port.h
+> >  drivers/iommu/mtk_iommu.c | 15 ++++++++++++---
+> >  drivers/iommu/mtk_iommu.h |  1 +
+> >  drivers/memory/mtk-smi.c  | 20 ++++++++++++++++++++
+> >  3 files changed, 33 insertions(+), 3 deletions(-)
 > >
-> > diff --git a/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt b/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-> > index 6922db5..6e758996 100644
-> > --- a/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-> > +++ b/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-> > @@ -36,6 +36,10 @@ each local arbiter.
-> >  like display, video decode, and camera. And there are different ports
-> >  in each larb. Take a example, There are many ports like MC, PP, VLD in the
-> >  video decode local arbiter, all these ports are according to the video HW.
-> > +  In some SoCs, there may be a GALS(Global Async Local Sync) module between
-> > +smi-common and m4u, and additional GALS module between smi-larb and
-> > +smi-common. GALS can been seen as a "asynchronous fifo" which could help
-> > +synchronize for the modules in different clock frequency.
+> > diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+> > index 2913ddb..66e3615 100644
+> > --- a/drivers/iommu/mtk_iommu.c
+> > +++ b/drivers/iommu/mtk_iommu.c
+> > @@ -36,6 +36,7 @@
+> >  #include "mtk_iommu.h"
 > >
-> >  Required properties:
-> >  - compatible : must be one of the following string:
-> > @@ -44,18 +48,23 @@ Required properties:
-> >         "mediatek,mt7623-m4u", "mediatek,mt2701-m4u" for mt7623 which uses
-> >                                                      generation one m4u HW.
-> >         "mediatek,mt8173-m4u" for mt8173 which uses generation two m4u HW.
-> > +       "mediatek,mt8183-m4u" for mt8183 which uses generation two m4u HW.
-> >  - reg : m4u register base and size.
-> >  - interrupts : the interrupt of m4u.
-> >  - clocks : must contain one entry for each clock-names.
-> > -- clock-names : must be "bclk", It is the block clock of m4u.
-> > +- clock-names : Only 1 optional clock:
-> > +  - "bclk": the block clock of m4u.
-> > +  Note that m4u use the EMI clock which always has been enabled before kernel
-> > +  if there is no this "bclk".
+> >  #define REG_MMU_PT_BASE_ADDR                   0x000
+> > +#define MMU_PT_ADDR_MASK                       GENMASK(31, 7)
+> >
+> >  #define REG_MMU_INVALIDATE                     0x020
+> >  #define F_ALL_INVLD                            0x2
+> > @@ -342,7 +343,7 @@ static int mtk_iommu_attach_device(struct iommu_domain *domain,
+> >         /* Update the pgtable base address register of the M4U HW */
+> >         if (!data->m4u_dom) {
+> >                 data->m4u_dom = dom;
+> > -               writel(dom->cfg.arm_v7s_cfg.ttbr[0],
+> > +               writel(dom->cfg.arm_v7s_cfg.ttbr[0] & MMU_PT_ADDR_MASK,
 > 
-> Ideally bclk could be specified a little more crisply, as this is
-> actually required for some SoCs and not used at all on others (as in
-> patch 7).
+> So there aren't any other bits down below 7 that you need, like the
+> shareable bits?
 
-OK. I will add like this:
-
-+ Here is the list which require the "bclk":
-+   - mt2701, mt2712, mt7623 and mt8173. 
-
-> 
-> >  - mediatek,larbs : List of phandle to the local arbiters in the current Socs.
-> >         Refer to bindings/memory-controllers/mediatek,smi-larb.txt. It must sort
-> >         according to the local arbiter index, like larb0, larb1, larb2...
-> >  - iommu-cells : must be 1. This is the mtk_m4u_id according to the HW.
-> >         Specifies the mtk_m4u_id as defined in
-> >         dt-binding/memory/mt2701-larb-port.h for mt2701, mt7623
-> > -       dt-binding/memory/mt2712-larb-port.h for mt2712, and
-> > -       dt-binding/memory/mt8173-larb-port.h for mt8173.
-> > +       dt-binding/memory/mt2712-larb-port.h for mt2712,
-> > +       dt-binding/memory/mt8173-larb-port.h for mt8173, and
-> > +       dt-binding/memory/mt8183-larb-port.h for mt8183.
-> >
-> >  Example:
-> >         iommu: iommu@10205000 {
-> > diff --git a/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-common.txt b/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-common.txt
-> > index e937ddd..8d3240a 100644
-> > --- a/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-common.txt
-> > +++ b/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-common.txt
-> > @@ -2,9 +2,10 @@ SMI (Smart Multimedia Interface) Common
-> >
-> >  The hardware block diagram please check bindings/iommu/mediatek,iommu.txt
-> >
-> > -Mediatek SMI have two generations of HW architecture, mt2712 and mt8173 use
-> > -the second generation of SMI HW while mt2701 uses the first generation HW of
-> > -SMI.
-> > +Mediatek SMI have two generations of HW architecture, here is the list
-> > +which generation the Socs use:
-> > +generation 1: mt2701 and mt7623.
-> > +generation 2: mt2712, mt8173 and mt8183.
-> >
-> >  There's slight differences between the two SMI, for generation 2, the
-> >  register which control the iommu port is at each larb's register base. But
-> > @@ -19,6 +20,7 @@ Required properties:
-> >         "mediatek,mt2712-smi-common"
-> >         "mediatek,mt7623-smi-common", "mediatek,mt2701-smi-common"
-> >         "mediatek,mt8173-smi-common"
-> > +       "mediatek,mt8183-smi-common"
-> >  - reg : the register and size of the SMI block.
-> >  - power-domains : a phandle to the power domain of this local arbiter.
-> >  - clocks : Must contain an entry for each entry in clock-names.
-> > @@ -30,6 +32,9 @@ Required properties:
-> >             They may be the same if both source clocks are the same.
-> >    - "async" : asynchronous clock, it help transform the smi clock into the emi
-> >               clock domain, this clock is only needed by generation 1 smi HW.
-> > +  and these 2 option clocks for generation 2 smi HW:
-> > +  - "gals0": the path0 clock of GALS(Global Async Local Sync).
-> > +  - "gals1": the path1 clock of GALS(Global Async Local Sync).
-> 
-> It would also be nice to specify these more clearly too, since these
-> are also required for some SoCs and not used on others (as in patch
-> 12).
-
-I will add:
-
-+ Here is the list which has the "gals": mt8183.
+Yes. We don't need all the bits down below 7. As the comment 4) above,
+we mask it just because the S bit.
 
 
 
