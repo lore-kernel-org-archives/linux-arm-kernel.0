@@ -2,20 +2,21 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B198CC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 17:54:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B528C282DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 17:55:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8320420881
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 17:54:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 68556218FC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 17:55:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="szWzRdzl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8320420881
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l7wd8oxb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68556218FC
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,41 +25,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NAMFZ0njvY5mkKxzvwQJBZwU+BbEDXVIoOlNuqpA3+4=; b=szWzRdzlhRYp3L
-	C7JJ9lLFRUfDu8i+080/Gb7yaB2uiBpc7uKCTzKO2hvMX9e+rIoCkQpJ4arKgvQB4FW5/9yAVQQGT
-	6x7o+bKyoVxlXRZ5ZCgQ3k7s93IXXDaPwo844Eyb1MCwjTao0klj+50uif7Ln0N/m8Cfl5eLI/EU8
-	AhFXulqODwInQ/bL4jyRuotZk0wE8w+uMmFuGFkwxMMVqcL/wv+NVGzKEzB+/6PzohcIqWs6IHDIk
-	VCr4Fu5Fm8Imf0K/9tEoiniyI/bwC0fn0s0QXk5vTyhDEgcqxUxggiFdzP/hfBlmjyh4gqtN+6XHw
-	UhW45dfBvtzbQ3v4qgeA==;
+	List-Owner; bh=iAVIfB2IFLmq6BbEXDGCCFUkSJC9HxYYqeov5axjCt8=; b=l7wd8oxb8jQuaF
+	CyAGBnWwOnd41zkJmXsIRgehbXuxBnVFr/keUrq18plMGFg8P8tEFYl/cL6+kYqV9JVbRZBZa/8Oj
+	3vBcSIS1i1QpzAEDm8zvWhfEWDwdJHtX+FUuAiZjdNmW26p8wasyNRFPKUASuLfUSvLFcb8Z/pTbq
+	1AyNxbun7NK5I+SEeR8t6y1Y5Ma4+AmwbBlWmmrh91OjPaK6AkrHU5DXvlBd4c7ppaNITu7NANDuA
+	wCSakvE1c+V95IHqz7kKbzxEvjqj1c4lrvH09yqJbtMPNoGAQSGWGDfMDbiCKkfRsyquSFM4EdSVZ
+	k6wjsOacoN6MvGDiELLw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpGY6-0005OR-Fk; Thu, 31 Jan 2019 17:54:50 +0000
+	id 1gpGYb-0006Xk-4x; Thu, 31 Jan 2019 17:55:21 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpGXy-0005Kz-C7
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 17:54:44 +0000
+ id 1gpGYO-0005sc-MN
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 17:55:18 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E59DFEBD;
- Thu, 31 Jan 2019 09:54:41 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 490F4A78;
+ Thu, 31 Jan 2019 09:55:08 -0800 (PST)
 Received: from donnerap.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 806C13F59C;
- Thu, 31 Jan 2019 09:54:39 -0800 (PST)
-Date: Thu, 31 Jan 2019 17:54:36 +0000
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D82133F59C;
+ Thu, 31 Jan 2019 09:55:05 -0800 (PST)
+Date: Thu, 31 Jan 2019 17:55:02 +0000
 From: Andre Przywara <andre.przywara@arm.com>
 To: Jeremy Linton <jeremy.linton@arm.com>
-Subject: Re: [PATCH v4 08/12] arm64: Advertise mitigation of Spectre-v2, or
- lack thereof
-Message-ID: <20190131175436.1c24f7b8@donnerap.cambridge.arm.com>
-In-Reply-To: <20190125180711.1970973-9-jeremy.linton@arm.com>
+Subject: Re: [PATCH v4 09/12] arm64: Use firmware to detect CPUs that are
+ not affected by Spectre-v2
+Message-ID: <20190131175502.12bed0f0@donnerap.cambridge.arm.com>
+In-Reply-To: <20190125180711.1970973-10-jeremy.linton@arm.com>
 References: <20190125180711.1970973-1-jeremy.linton@arm.com>
- <20190125180711.1970973-9-jeremy.linton@arm.com>
+ <20190125180711.1970973-10-jeremy.linton@arm.com>
 Organization: ARM
 X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; aarch64-unknown-linux-gnu)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_095442_424741_D67E7BB5 
-X-CRM114-Status: GOOD (  14.34  )
+X-CRM114-CacheID: sfid-20190131_095508_857721_029D9EE4 
+X-CRM114-Status: GOOD (  18.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,34 +81,83 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 25 Jan 2019 12:07:07 -0600
+On Fri, 25 Jan 2019 12:07:08 -0600
 Jeremy Linton <jeremy.linton@arm.com> wrote:
 
 > From: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> We currently have a list of CPUs affected by Spectre-v2, for which
-> we check that the firmware implements ARCH_WORKAROUND_1. It turns
-> out that not all firmwares do implement the required mitigation,
-> and that we fail to let the user know about it.
+> The SMCCC ARCH_WORKAROUND_1 service can indicate that although the
+> firmware knows about the Spectre-v2 mitigation, this particular
+> CPU is not vulnerable, and it is thus not necessary to call
+> the firmware on this CPU.
 > 
-> Instead, let's slightly revamp our checks, and rely on a whitelist
-> of cores that are known to be non-vulnerable, and let the user know
-> the status of the mitigation in the kernel log.
-
-Yeah, this looks better, I was scratching my head about that
-blacklist already.
-
+> Let's use this information to our benefit.
+> 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> [This makes more sense in front of the sysfs patch]
-> [Pick pieces of that patch into this and move it earlier]
 > Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+
+Yes, I stumbled over this in the firmware spec as well:
 
 Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 
-> ---  arch/arm64/kernel/cpu_errata.c | 104 +++++++++++++++++----------------
-> 1 file changed, 54 insertions(+), 50 deletions(-)
+Cheers,
+Andre.
+
+> ---
+>  arch/arm64/kernel/cpu_errata.c | 32 +++++++++++++++++++++++---------
+>  1 file changed, 23 insertions(+), 9 deletions(-)
 > 
-....
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index 4d23b4d4cfa8..024c83ffff99 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -217,22 +217,36 @@ static int detect_harden_bp_fw(void)
+>  	case PSCI_CONDUIT_HVC:
+>  		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+>  				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
+> -		if ((int)res.a0 < 0)
+> +		switch ((int)res.a0) {
+> +		case 1:
+> +			/* Firmware says we're just fine */
+> +			return 0;
+> +		case 0:
+> +			cb = call_hvc_arch_workaround_1;
+> +			/* This is a guest, no need to patch KVM vectors */
+> +			smccc_start = NULL;
+> +			smccc_end = NULL;
+> +			break;
+> +		default:
+>  			return -1;
+> -		cb = call_hvc_arch_workaround_1;
+> -		/* This is a guest, no need to patch KVM vectors */
+> -		smccc_start = NULL;
+> -		smccc_end = NULL;
+> +		}
+>  		break;
+>  
+>  	case PSCI_CONDUIT_SMC:
+>  		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+>  				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
+> -		if ((int)res.a0 < 0)
+> +		switch ((int)res.a0) {
+> +		case 1:
+> +			/* Firmware says we're just fine */
+> +			return 0;
+> +		case 0:
+> +			cb = call_smc_arch_workaround_1;
+> +			smccc_start = __smccc_workaround_1_smc_start;
+> +			smccc_end = __smccc_workaround_1_smc_end;
+> +			break;
+> +		default:
+>  			return -1;
+> -		cb = call_smc_arch_workaround_1;
+> -		smccc_start = __smccc_workaround_1_smc_start;
+> -		smccc_end = __smccc_workaround_1_smc_end;
+> +		}
+>  		break;
+>  
+>  	default:
+
 
 _______________________________________________
 linux-arm-kernel mailing list
