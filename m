@@ -2,110 +2,62 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 75EA3C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:04:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F2237C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:05:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4E4972087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:04:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D06202087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:05:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P6q/7yZY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="JF5VEHbp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E4972087F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PiQc8Fn8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D06202087F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=B8g93azmD66pZfkhL+mKgS4ggjXDxArKw2C5sKgf4Ko=; b=P6q/7yZYoWRyXq
-	kTnxuJaz2LWCN4N8AtkeNfgA+a5rH+pJV/D5DuAWxERtTZfvnbFO8BsEhKufGDO731iwg+wdIOSaI
-	zHGp5420nDX/PpizPDjSkYpNZrJRtR9F7gkL/LopxGMorwx/DJu6AbdAiVH4zs6qh1f8Xp2ONYpVx
-	w1uKP2DSpZspygBMFG7oltOfXG9JL2MWwzVBwErob1nT3tKoJYDwOmNLAmY1ZK65gATU8uVNNraxW
-	KNrsBSYWmwRj7eSTnDTCcl0NKrZHoXtpl77I4EjnU/8JVRMG24xOJJu3elsiueIsYUXzrJsjXwjL7
-	pOihoMerpY+6MZtGus5g==;
+	List-Owner; bh=JmDFRs9AFD9yZT/dGdEFH0dXuVX9LXwfKUSsWC6Nyp8=; b=PiQc8Fn8MCvgzp
+	1JWMK2q/2Kd7o10eZrHk84zrvkmGjEvuQILjhu15MRGr+TtJN5t6qDpsNanS5KqWL7czNOhsDrRI7
+	Wg1j591wnM/lGJHo7Q+8J7eaYO8004NlJlZSd3cnbIvnaqjZ/FqaQIxZsST1cOcKRTGnmpsq8Sa+p
+	2X5Cbu/TyS2mHzz/+CkwuiEHk/aCDJ4yV1JKREU7IazYKU6El8yN+jbt7Y8k8/yfjbZwKpXgz7TFb
+	OrLsTN/vNLb9NneqjfLLYFFKpnk2h6TAYtiLytAQ4mWpfB7KBG8vejIRnl/CYxr72iNmsaovbYOJ4
+	FiEXMy6oStBr/V5vRnjw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp7L5-0006XW-Hf; Thu, 31 Jan 2019 08:04:47 +0000
-Received: from mail-eopbgr150059.outbound.protection.outlook.com
- ([40.107.15.59] helo=EUR01-DB5-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp7KI-0005fe-NO
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 08:04:08 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=WqCduKBcshxl+DEEKlQRby/4/v2bbF8FG40FIoXkymI=;
- b=JF5VEHbpPx0qhInARIZtx841OQcQ+PTRKpdhPz1inbVhKZ8HoezKLf3uyWpmW8R21w+r+PufP2+PGESUlHmFO4HEZTElerhz9ZFhDu//RqE+KnTOrQuHptMoXp9ONO75JRtRKxvf1G5V8ZYts7nnxqr36pQf7iIr7QsRxcZWMoc=
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
- AM0PR04MB5796.eurprd04.prod.outlook.com (20.178.202.213) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1558.21; Thu, 31 Jan 2019 08:03:51 +0000
-Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::bd44:e001:ab8d:1c51]) by AM0PR04MB4211.eurprd04.prod.outlook.com
- ([fe80::bd44:e001:ab8d:1c51%2]) with mapi id 15.20.1580.019; Thu, 31 Jan 2019
- 08:03:51 +0000
-From: Aisheng Dong <aisheng.dong@nxp.com>
-To: "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
-Subject: [PATCH V3 4/4] irq: imx: irqsteer: add multi output interrupts support
-Thread-Topic: [PATCH V3 4/4] irq: imx: irqsteer: add multi output interrupts
- support
-Thread-Index: AQHUuTuAmCHwpO5YikqgCmsF+8ZU4g==
-Date: Thu, 31 Jan 2019 08:03:51 +0000
-Message-ID: <1548921464-28917-5-git-send-email-aisheng.dong@nxp.com>
-References: <1548921464-28917-1-git-send-email-aisheng.dong@nxp.com>
-In-Reply-To: <1548921464-28917-1-git-send-email-aisheng.dong@nxp.com>
-Accept-Language: zh-CN, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK2PR02CA0184.apcprd02.prod.outlook.com
- (2603:1096:201:21::20) To AM0PR04MB4211.eurprd04.prod.outlook.com
- (2603:10a6:208:66::21)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=aisheng.dong@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM0PR04MB5796;
- 6:DdwLQ8LnTK4sWHvmTnIkEMkB2O61t1sYmn8sODu+7XGsVC3esDYMeveAorwItETzrt6ENjBvSLJGX9r5wDTz4uac18vHb0kV+pIweD/+GWtm5JeM5aJW0QlFIFutFIFdTbQgHZ5K+ljfXPG8wtxyQZnyQ/SWOE7sLiqTXAzW4tC/IDYEJMn/g7ISiq+Vvicht6buoU97WkFCQC85hNuNInklXo7EuMNawgj5jTUSI5Zwgvn0DX9q46+n1AUNDa2+1JeeZlzQymkC3rCu7mmS/zoFInUxpIu2N7L6laqEiF7+3blCMyngyG4MQp4L7xrE2MhE4NyNl71omuPMDEKxTmKzNMcUKNKHZlc34CNABwXTgpniRGmqAckpsId5sISSIPkV/sl+fI63HDGDvG9o8gI6o2XP+P4rqBusCgLPMOfZsWxsUiyKIvqimb54c+ji7aw4BKBlkE6sTghIeokHgg==;
- 5:jn5/0KP+naxlfAq8GiTl+ankb1sd2r7H7qzkyq2Ssf17j+LuWElx99UvLJrBd60nImZqZjtfk+JvzmmoP+CXCbgvn044GVWylnY33oI0v/kw83pVan17i9JsIquSeDSF3tQni/yVLhZ2uI39M+JM31ML7BV+FLsL57A1xRm4pN1I97RdDgeEiuHm9oG/hvy96PyI+avWjFncb8W+/0c5vg==;
- 7:qQYzCRJNkMZDqnmtDCCREy8t+vi+gDscS3SdxW/fWzguyrFtckaoWuKa+P85Z5WaXEYMHzGqyugKPdew/5Lnrv3w/EjQVaTMwkvQ/0Xp6RX7ejZJkoVoXNccVcN3gXNI/dQ7pgzv/jRFir/olbLWkA==
-x-ms-office365-filtering-correlation-id: 0edae114-4623-42d3-9940-08d68752a2e6
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM0PR04MB5796; 
-x-ms-traffictypediagnostic: AM0PR04MB5796:
-x-microsoft-antispam-prvs: <AM0PR04MB57968D6E795C34ABEA82A90480910@AM0PR04MB5796.eurprd04.prod.outlook.com>
-x-forefront-prvs: 09347618C4
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(396003)(366004)(136003)(376002)(346002)(39860400002)(189003)(54534003)(199004)(36756003)(8936002)(71190400001)(25786009)(6512007)(106356001)(50226002)(4326008)(99286004)(14444005)(81166006)(71200400001)(8676002)(52116002)(6916009)(53936002)(76176011)(81156014)(14454004)(2906002)(256004)(478600001)(2501003)(3846002)(486006)(44832011)(476003)(102836004)(2616005)(7736002)(6436002)(316002)(6116002)(6486002)(5640700003)(68736007)(26005)(186003)(446003)(66066001)(86362001)(97736004)(6506007)(54906003)(105586002)(386003)(2351001)(11346002)(305945005);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5796;
- H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: VYS7SHiD8bwS/YMIPh6npLxqJB1zITS7OcuY7SVd7HXEF0oiAUGYLcvhuSrl/3pyJytaGvzY3pMXwJde7BvGv9JTX/P0Kr/1n50P2pEn7e1iUdBMkeoBj6s9IXxcOcUDEJvoYsXNNsj42CkRHYwkMAyvmnUU9x8x2qY6NZyf+OQvP7PprRHxMQ4C0nm7DiU8/yapS6V1EH+L5H9IteoLaJYo4Eiz/z47QWl+UoqNLIuS1KN8xo0y/cj5H05i1G0Se98ooR44Qwj2jJZMmWFVlTUYMsPCw7DkmCtzdDvVaU/MTsHYW2KS0YQ8KJFV2Ba/C+fRpxTwwqoISlQ6meqyfLN2mMCGg9wWLdoyyL2pK8dT04PlN3wce+P3SH4TMi0bjK5FD/29fdtuuiJXxLEmeDFqr9QCriCHml/+iRRFwT4=
+	id 1gp7Lm-00084i-V9; Thu, 31 Jan 2019 08:05:30 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gp7Ki-0006C2-QX
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 08:04:47 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5A04980D;
+ Thu, 31 Jan 2019 00:04:23 -0800 (PST)
+Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E75F33F589;
+ Thu, 31 Jan 2019 00:04:22 -0800 (PST)
+Date: Thu, 31 Jan 2019 09:04:21 +0100
+From: Christoffer Dall <christoffer.dall@arm.com>
+To: James Morse <james.morse@arm.com>
+Subject: Re: [PATCH v2 3/4] arm64: hyp-stub: Forbid kprobing of the hyp-stub
+Message-ID: <20190131080421.GJ13482@e113682-lin.lund.arm.com>
+References: <20190124163257.233929-1-james.morse@arm.com>
+ <20190124163257.233929-4-james.morse@arm.com>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 0edae114-4623-42d3-9940-08d68752a2e6
-X-MS-Exchange-CrossTenant-originalarrivaltime: 31 Jan 2019 08:03:47.6860 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5796
+Content-Disposition: inline
+In-Reply-To: <20190124163257.233929-4-james.morse@arm.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_000359_230865_AB5A0D21 
-X-CRM114-Status: GOOD (  17.30  )
+X-CRM114-CacheID: sfid-20190131_000425_645330_DD512D2F 
+X-CRM114-Status: GOOD (  21.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -117,214 +69,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Marc Zyngier <marc.zyngier@arm.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>, "tglx@linutronix.de" <tglx@linutronix.de>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+Cc: Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Masami Hiramatsu <mhiramat@kernel.org>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-One irqsteer channel can support up to 8 output interrupts.
+On Thu, Jan 24, 2019 at 04:32:56PM +0000, James Morse wrote:
+> The hyp-stub is loaded by the kernel's early startup code at EL2
+> during boot, before KVM takes ownership later. The hyp-stub's
+> text is part of the regular kernel text, meaning it can be kprobed.
+> 
+> A breakpoint in the hyp-stub causes the CPU to spin in el2_sync_invalid.
+> 
+> Add it to the __hyp_text.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Cc: stable@vger.kernel.org
+> ---
+> 
+> This has been a problem since kprobes was merged, it should
+> probably have been covered in 888b3c8720e0.
+> 
+> I'm not sure __hyp_text is the right place. Its not idmaped,
+> and as it contains a set of vectors, adding it to the host/hyp
+> idmap sections could grow them beyond a page... but it does
+> run with the MMU off, so does need to be cleaned to PoC when
+> anything wacky, like hibernate happens. With this patch,
+> hibernate should clean the __hyp_text to PoC too.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-ChangeLog:
-v2->v3:
- * add error check for imx_irqsteer_get_hwirq_base
- * use DIV_ROUND_UP
- * merge 'hwirq +=32' into for loop
- * common error path in probe to avoid replicating clk_disable_unprepare
-v1->v2:
- * calculate irq_count by fsl,num-irqs instead of parsing interrupts
-   property from devicetree to match the input interrupts and outputs
- * improve output interrupt handler by searching only two registers
-   withint the same group
----
- drivers/irqchip/irq-imx-irqsteer.c | 88 +++++++++++++++++++++++++++++---------
- 1 file changed, 68 insertions(+), 20 deletions(-)
+How did this code get cleaned before?
 
-diff --git a/drivers/irqchip/irq-imx-irqsteer.c b/drivers/irqchip/irq-imx-irqsteer.c
-index 67ed862..d1098f4 100644
---- a/drivers/irqchip/irq-imx-irqsteer.c
-+++ b/drivers/irqchip/irq-imx-irqsteer.c
-@@ -10,6 +10,7 @@
- #include <linux/irqchip/chained_irq.h>
- #include <linux/irqdomain.h>
- #include <linux/kernel.h>
-+#include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/spinlock.h>
- 
-@@ -21,10 +22,13 @@
- #define CHAN_MINTDIS(t)		(CTRL_STRIDE_OFF(t, 3) + 0x4)
- #define CHAN_MASTRSTAT(t)	(CTRL_STRIDE_OFF(t, 3) + 0x8)
- 
-+#define CHAN_MAX_OUTPUT_INT	0x8
-+
- struct irqsteer_data {
- 	void __iomem		*regs;
- 	struct clk		*ipg_clk;
--	int			irq;
-+	int			irq[CHAN_MAX_OUTPUT_INT];
-+	int			irq_count;
- 	raw_spinlock_t		lock;
- 	int			reg_num;
- 	int			channel;
-@@ -87,23 +91,47 @@ static const struct irq_domain_ops imx_irqsteer_domain_ops = {
- 	.xlate		= irq_domain_xlate_onecell,
- };
- 
-+static int imx_irqsteer_get_hwirq_base(struct irqsteer_data *data, u32 irq)
-+{
-+	int i;
-+
-+	for (i = 0; i < data->irq_count; i++) {
-+		if (data->irq[i] == irq)
-+			return i * 64;
-+	}
-+
-+	return -EINVAL;
-+}
-+
- static void imx_irqsteer_irq_handler(struct irq_desc *desc)
- {
- 	struct irqsteer_data *data = irq_desc_get_handler_data(desc);
--	int i;
-+	int hwirq;
-+	int irq, i;
- 
- 	chained_irq_enter(irq_desc_get_chip(desc), desc);
- 
--	for (i = 0; i < data->reg_num * 32; i += 32) {
--		int idx = imx_irqsteer_get_reg_index(data, i);
-+	irq = irq_desc_get_irq(desc);
-+	hwirq = imx_irqsteer_get_hwirq_base(data, irq);
-+	if (hwirq < 0) {
-+		pr_warn("%s: unable to get hwirq base for irq %d\n",
-+			__func__, irq);
-+		return;
-+	}
-+
-+	for (i = 0; i < 2; i++, hwirq += 32) {
-+		int idx = imx_irqsteer_get_reg_index(data, hwirq);
- 		unsigned long irqmap;
- 		int pos, virq;
- 
-+		if (hwirq >= data->reg_num * 32)
-+			break;
-+
- 		irqmap = readl_relaxed(data->regs +
- 				       CHANSTATUS(idx, data->reg_num));
- 
- 		for_each_set_bit(pos, &irqmap, 32) {
--			virq = irq_find_mapping(data->domain, pos + i);
-+			virq = irq_find_mapping(data->domain, pos + hwirq);
- 			if (virq)
- 				generic_handle_irq(virq);
- 		}
-@@ -117,7 +145,8 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
- 	struct device_node *np = pdev->dev.of_node;
- 	struct irqsteer_data *data;
- 	struct resource *res;
--	int ret;
-+	u32 irqs_num;
-+	int i, ret;
- 
- 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
- 	if (!data)
-@@ -130,12 +159,6 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
- 		return PTR_ERR(data->regs);
- 	}
- 
--	data->irq = platform_get_irq(pdev, 0);
--	if (data->irq <= 0) {
--		dev_err(&pdev->dev, "failed to get irq\n");
--		return -ENODEV;
--	}
--
- 	data->ipg_clk = devm_clk_get(&pdev->dev, "ipg");
- 	if (IS_ERR(data->ipg_clk)) {
- 		ret = PTR_ERR(data->ipg_clk);
-@@ -146,11 +169,15 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
- 
- 	raw_spin_lock_init(&data->lock);
- 
--	of_property_read_u32(np, "fsl,num-irqs", &data->reg_num);
-+	of_property_read_u32(np, "fsl,num-irqs", &irqs_num);
- 	of_property_read_u32(np, "fsl,channel", &data->channel);
- 
--	/* one register bit map represents 32 input interrupts */
--	data->reg_num /= 32;
-+	/*
-+	 * There is one output irq for each group of 64 inputs.
-+	 * One register bit map can represent 32 input interrupts.
-+	 */
-+	data->irq_count = DIV_ROUND_UP(irqs_num, 64);
-+	data->reg_num = irqs_num / 32;
- 
- 	if (IS_ENABLED(CONFIG_PM_SLEEP)) {
- 		data->saved_reg = devm_kzalloc(&pdev->dev,
-@@ -173,23 +200,44 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
- 					     &imx_irqsteer_domain_ops, data);
- 	if (!data->domain) {
- 		dev_err(&pdev->dev, "failed to create IRQ domain\n");
--		clk_disable_unprepare(data->ipg_clk);
--		return -ENOMEM;
-+		ret = -ENOMEM;
-+		goto out;
- 	}
- 
--	irq_set_chained_handler_and_data(data->irq, imx_irqsteer_irq_handler,
--					 data);
-+	if (!data->irq_count || data->irq_count > CHAN_MAX_OUTPUT_INT) {
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
-+	for (i = 0; i < data->irq_count; i++) {
-+		data->irq[i] = irq_of_parse_and_map(np, i);
-+		if (!data->irq[i]) {
-+			ret = -EINVAL;
-+			goto out;
-+		}
-+
-+		irq_set_chained_handler_and_data(data->irq[i],
-+						 imx_irqsteer_irq_handler,
-+						 data);
-+	}
- 
- 	platform_set_drvdata(pdev, data);
- 
- 	return 0;
-+out:
-+	clk_disable_unprepare(data->ipg_clk);
-+	return ret;
- }
- 
- static int imx_irqsteer_remove(struct platform_device *pdev)
- {
- 	struct irqsteer_data *irqsteer_data = platform_get_drvdata(pdev);
-+	int i;
-+
-+	for (i = 0; i < irqsteer_data->irq_count; i++)
-+		irq_set_chained_handler_and_data(irqsteer_data->irq[i],
-+						 NULL, NULL);
- 
--	irq_set_chained_handler_and_data(irqsteer_data->irq, NULL, NULL);
- 	irq_domain_remove(irqsteer_data->domain);
- 
- 	clk_disable_unprepare(irqsteer_data->ipg_clk);
--- 
-2.7.4
+Is there a problem you can identify with putting it in __hyp_text?
+Seems to me we should just stick it there if it has no negative
+side-effects and otherwise we have to make up a separate section with a
+specialized meaning.
 
+
+Thanks,
+
+    Christoffer
+
+> ---
+>  arch/arm64/kernel/hyp-stub.S | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+> index e1261fbaa374..17f325ba831e 100644
+> --- a/arch/arm64/kernel/hyp-stub.S
+> +++ b/arch/arm64/kernel/hyp-stub.S
+> @@ -28,6 +28,8 @@
+>  #include <asm/virt.h>
+>  
+>  	.text
+> +	.pushsection	.hyp.text, "ax"
+> +
+>  	.align 11
+>  
+>  ENTRY(__hyp_stub_vectors)
+> -- 
+> 2.20.1
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
