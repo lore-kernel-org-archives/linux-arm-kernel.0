@@ -2,74 +2,89 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5F325C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 13:39:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9032BC282D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 13:39:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 25A602085B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 13:39:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 65412218F0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 13:39:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TRn0qiwP";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="fXscU4ee"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 25A602085B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=alien8.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t2u0xmg0";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="12G4XWtc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 65412218F0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lRU3rDFsXXsGRezXbYDsoGlnP+kUrG2ejk9AXTTEWhc=; b=TRn0qiwP2iAiAT
-	3EOdXrslI3I3k9qpOQuj3MXRhn+zOp3KWrgK1f1PteqkkjwlJ4sDTdXVOnxTu6TOPOl3rkuLd1V6q
-	IreYt9a8UKYKth3B5eOYVUQORRmT5gOtY6rOAlUXfHmaPcwtcZrx3HBZa8CQIW6LUjVqa8nVjLMhh
-	e8uZAhw75T+f6bAy/knAVDwYUc1NlgcI1rRZjC3tKHbcwjejjntEAT8rQWh1CFlBkMo8CqfS/0lX8
-	02v0qcZtQG8S9GnhlZZcj0UnIkju4pm55zEjMuF4nrWqGF6N+MHR/HM1lUyT/peDW2F/pvc2YTj7j
-	3Mz2Awk91PsSD2Ey9yyw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=NBRR67lMUVgZQ19ERellhQuv8J+kbPqKvtCns4U7/UM=; b=t2u0xmg0CVa2jl
+	/QIJQAupCoSul3juDTIL0RkvU/5W61KNN5mMNNic8LNEGsVicVX63KtgWvLMiMhqMD6VjhfdkpK49
+	7lwIIq9nXRN110DLuzvcO6ouxd/sYGftCbOZd/Y5op1GXNN5fdxqaSx/k9evmqcsE0DCUY2T/DSxo
+	lEJfg/1kCLjU2KojREJ7EhbD30StKq6hG8lrlr907+rlIEb70QqbDSGhEgUqqjkgpNU4FDEfY/YS5
+	gcDCQ970ythyoJPdzD24aEj3F/VBhujYzZgBKI4XPBym20Uh92nVKDd75Vio9UJG9cOunsrZcBGGX
+	euLDTLFF9n/q3/riydPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpCYN-0004FE-Un; Thu, 31 Jan 2019 13:38:51 +0000
-Received: from mail.skyhub.de ([5.9.137.197])
+	id 1gpCZG-0004We-1C; Thu, 31 Jan 2019 13:39:46 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpCYK-0004Et-Mz
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 13:38:50 +0000
-Received: from zn.tnic (p200300EC2BCC5900651C63FB93E4C575.dip0.t-ipconnect.de
- [IPv6:2003:ec:2bcc:5900:651c:63fb:93e4:c575])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id 191B41EC059E;
- Thu, 31 Jan 2019 14:38:47 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
- t=1548941927;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
- bh=N9ZfktBJAMGDaOqi63rNj6dpil8IUx1OGdlTeCh4s6w=;
- b=fXscU4eeC2ToGWv6EVxYT5WtmhOF8NW0lZM2/wfvSID9gZS0549ZoFEAJheQvCW+hl03Uj
- wfD84p+pgqW+Tl7C0OAylMfQ5Xd9zmT8Cyt/xLrjf9jDmxW5isLfbUA6QbTK6EZ+Ywtft6
- JzhH2T1j/SxhHenwGC/hy0GjIb2jDrs=
-Date: Thu, 31 Jan 2019 14:38:42 +0100
-From: Borislav Petkov <bp@alien8.de>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v7 20/25] ACPI / APEI: Use separate fixmap pages for
- arm64 NMI-like notifications
-Message-ID: <20190131133842.GK6749@zn.tnic>
-References: <20181203180613.228133-1-james.morse@arm.com>
- <20181203180613.228133-21-james.morse@arm.com>
- <20190121172743.GN29166@zn.tnic>
- <bee87ef4-60ae-d4a4-2855-159543072fc5@arm.com>
+ id 1gpCZC-0004Vf-Ns
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 13:39:44 +0000
+Received: by mail-wr1-x443.google.com with SMTP id l9so3272740wrt.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 31 Jan 2019 05:39:42 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=2GsZ9+PJNS9N+o9+/KD8LoAUK41fA90WItC0890wMYo=;
+ b=12G4XWtcYy1aE7q9Z+nN3iy3d5A9/qP1aADWly33c1yr73JobNK2ElmX0HnSvuxLhf
+ WTJ18JjGw5482KkFhJlw/Ff+ddZs4CCo5t2pFmW8NbDeDxDXL7ILW235A6M0QiJYoG1y
+ iOTikeIIm2NK29qKj9F3+xvZrVsPtwR1YpFaQQOnLXD7k1RnQk4frPSSFtLERdAbzhTC
+ bUf6HNI5vkx8Y3lv9auJPcotTiMgNsU9osZCmLvEjWkGwBP/+oxu4Q/vziCErFzQzUBq
+ 4xaurO3FfyzMOyj4uefocuHiE+XseIZGngpVLZg4Ohj31gaoJnJ4IJ5xHkqkhvMALb0S
+ ctsw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=2GsZ9+PJNS9N+o9+/KD8LoAUK41fA90WItC0890wMYo=;
+ b=IEQKBQpyIR+yQdHUt85bfCFpgyScFWY/3Tqv6m7X4bXyM+j3kOvPv0CpFupdcu1uB3
+ Cj9wncUw7io+aCYKa3hd0OR8nNWJ4XDCXdHsTQHXNRiDiGBzTFJaX5OQX9hM5o8Y7Lmd
+ uPBV/8hExCL3TNgm6BHkA+YLyA0hhEhQ8y9vIBPXohV9EwfiZhbNhHsJPFnpaEIhX70w
+ kK71xwg45HTpg1AQgNc+GKNxFEZC64TrF/gxqfeAdhI1Jco3M0++jSlWqriC+WYVYpL/
+ 6h+J1+i2619xbOOVW/s7jiHuLNmhSmxq7i4iRTLRTgDFCDAtQilpPiStMu7AZvByOt8a
+ RDCg==
+X-Gm-Message-State: AJcUuke9cbBxfnoeJo7jmZq/V1cy7zfQrBH+ecwqujWAqf1e+nqLueN8
+ QnY6FVGCbFGBeSphLt7U89Xm4g==
+X-Google-Smtp-Source: ALg8bN52g9qYqvzY0nMmpSnZw1cWRQHuPDvKfEQalqeVkilXhwJ/vNH67J881SbY+IgA68IKsFAgYQ==
+X-Received: by 2002:adf:9d85:: with SMTP id p5mr33050506wre.41.1548941980577; 
+ Thu, 31 Jan 2019 05:39:40 -0800 (PST)
+Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
+ by smtp.gmail.com with ESMTPSA id h10sm5479768wmf.44.2019.01.31.05.39.39
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 31 Jan 2019 05:39:39 -0800 (PST)
+From: Bartosz Golaszewski <brgl@bgdev.pl>
+To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
+ Marc Zyngier <marc.zyngier@arm.com>
+Subject: [PATCH 00/35] ARM: davinci: modernize the irq support
+Date: Thu, 31 Jan 2019 14:38:53 +0100
+Message-Id: <20190131133928.17985-1-brgl@bgdev.pl>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <bee87ef4-60ae-d4a4-2855-159543072fc5@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_053848_901403_2C1D4BFD 
-X-CRM114-Status: GOOD (  10.53  )
+X-CRM114-CacheID: sfid-20190131_053942_825953_9CC1EDFC 
+X-CRM114-Status: GOOD (  13.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,53 +96,126 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
- Fan Wu <wufan@codeaurora.org>, linux-mm@kvack.org,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
- Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 23, 2019 at 06:33:02PM +0000, James Morse wrote:
-> Was the best I had, but this trips the BUILD_BUG() too early.
-> With it, x86 BUILD_BUG()s. With just the -1 the path gets pruned out, and there
-> are no 'sdei' symbols in the object file.
-> 
-> ...at this point, I stopped caring!
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Yah, you said it: __end_of_fixed_addresses will practically give you the
-BUG behavior:
+This series ports the davinci platform to using SPARSE_IRQ, cleans up
+the irqchip drivers and moves them over to drivers/irqchip.
 
-        if (idx >= __end_of_fixed_addresses) {
-                BUG();
-                return;
-        }
+The series can be logically split into four parts. The first (1-8) aims
+at introducing support for SPARSE_IRQ. It contains a couple changes
+required for that functionality and the final patch actually selecting
+it.
 
-and ARM64 does the same.
+Second part (9-18) makes the aintc driver suitable for drivers/irqchip
+and eventually moves it over there.
 
-> We already skip registering notifiers if the kconfig option wasn't selected.
-> 
-> We can't catch this at compile time, as the dead-code elimination seems to
-> happen in multiple passes.
-> 
-> I'll switch the SDEI ones to __end_of_fixed_addresses, as both architectures
-> BUG() when they see this.
+Part 3 (19-31) does the same for the cp-intc driver.
 
-Right.
+Last part (32-35) aims at removing mach/irqs.h as it's no longer needed
+with SPARSE_IRQ selected.
 
-Thx.
+The series has been tested on da850-lcdk (for cp-intc) and
+dm365-evm (for aintc).
+
+Bartosz Golaszewski (35):
+  ARM: davinci: remove intc_host_map from davinci_soc_info struct
+  ARM: davinci: select GENERIC_IRQ_MULTI_HANDLER
+  ARM: davinci: remove davinci_intc_type
+  ARM: davinci: pull davinci_intc_base into the respective intc drivers
+  ARM: davinci: drop irq defines from default_priorites
+  ARM: davinci: wrap interrupt definitions with a macro for SPARSE_IRQ
+  ARM: davinci: aintc: use irq domain
+  ARM: davinci: select SPARSE_IRQ
+  ARM: davinci: aintc: drop GPL license boilerplate
+  ARM: davinci: aintc: wrap davinci_irq_init() with a helper
+  ARM: davinci: aintc: use a common prefix for symbols in the driver
+  ARM: davinci: aintc: drop the 00 prefix from register offsets
+  ARM: davinci: aintc: add a new config structure
+  ARM: davinci: aintc: use the new irqchip config structure in dm* SoCs
+  ARM: davinci: aintc: use the new config structure
+  ARM: davinci: aintc: move timer-specific irq_set_handler() out of
+    irq.c
+  ARM: davinci: aintc: remove unnecessary includes
+  irqchip: davinci-aintc: move the driver to drivers/irqchip
+  ARM: davinci: cp-intc: remove cp_intc.h
+  ARM: davinci: cp-intc: add a wrapper around cp_intc_init()
+  ARM: davinci: cp-intc: add a new config structure
+  ARM: davinci: cp-intc: add the new config structures for da8xx SoCs
+  ARM: davinci: cp-intc: use a common prefix for all symbols
+  ARM: davinci: cp-intc: convert all hex numbers to lowercase
+  ARM: davinci: cp-intc: use the new-style config structure
+  ARM: davinci: cp-intc: improve coding style
+  ARM: davinci: cp-intc: unify error handling
+  ARM: davinci: cp-intc: remove unneeded include
+  ARM: davinci: cp-intc: drop GPL license boilerplate
+  ARM: davinci: cp-intc: remove redundant comments
+  irqchip: davinci-cp-intc: move the driver to drivers/irqchip
+  ARM: davinci: remove intc related fields from davinci_soc_info
+  ARM: davinci: prepare to remove mach/irqs.h
+  ARM: davinci: stop using defines from mach/irqs.h
+  ARM: davinci: remove mach/irqs.h
+
+ arch/arm/Kconfig                              |   2 +
+ arch/arm/mach-davinci/Kconfig                 |  19 +-
+ arch/arm/mach-davinci/Makefile                |   3 -
+ arch/arm/mach-davinci/asp.h                   |   8 +-
+ arch/arm/mach-davinci/board-da830-evm.c       |   5 +-
+ arch/arm/mach-davinci/board-da850-evm.c       |   7 +-
+ arch/arm/mach-davinci/board-dm355-evm.c       |   2 +-
+ arch/arm/mach-davinci/board-dm355-leopard.c   |   2 +-
+ arch/arm/mach-davinci/board-dm365-evm.c       |   2 +-
+ arch/arm/mach-davinci/board-dm644x-evm.c      |   4 +-
+ arch/arm/mach-davinci/board-dm646x-evm.c      |   7 +-
+ arch/arm/mach-davinci/board-mityomapl138.c    |   3 +-
+ arch/arm/mach-davinci/board-neuros-osd2.c     |   2 +-
+ arch/arm/mach-davinci/board-omapl138-hawk.c   |   3 +-
+ arch/arm/mach-davinci/board-sffsdr.c          |   2 +-
+ arch/arm/mach-davinci/common.c                |   3 -
+ arch/arm/mach-davinci/cp_intc.c               | 215 ---------
+ arch/arm/mach-davinci/cp_intc.h               |  57 ---
+ arch/arm/mach-davinci/da830.c                 | 127 +-----
+ arch/arm/mach-davinci/da850.c                 | 153 ++-----
+ arch/arm/mach-davinci/davinci.h               |   6 +
+ arch/arm/mach-davinci/devices-da8xx.c         | 146 +++----
+ arch/arm/mach-davinci/devices.c               |  31 +-
+ arch/arm/mach-davinci/dm355.c                 | 149 +++----
+ arch/arm/mach-davinci/dm365.c                 | 175 +++-----
+ arch/arm/mach-davinci/dm644x.c                | 145 +++----
+ arch/arm/mach-davinci/dm646x.c                | 159 +++----
+ arch/arm/mach-davinci/include/mach/common.h   |  14 +-
+ arch/arm/mach-davinci/include/mach/da8xx.h    |   2 +
+ .../mach-davinci/include/mach/entry-macro.S   |  39 --
+ arch/arm/mach-davinci/include/mach/irqs.h     | 409 ------------------
+ arch/arm/mach-davinci/irq.c                   | 117 -----
+ arch/arm/mach-davinci/usb-da8xx.c             |   7 +-
+ arch/arm/mach-davinci/usb.c                   |   7 +-
+ drivers/irqchip/Kconfig                       |  10 +
+ drivers/irqchip/Makefile                      |   2 +
+ drivers/irqchip/irq-davinci-aintc.c           | 141 ++++++
+ drivers/irqchip/irq-davinci-cp-intc.c         | 224 ++++++++++
+ include/linux/irqchip/irq-davinci-aintc.h     |  19 +
+ include/linux/irqchip/irq-davinci-cp-intc.h   |  18 +
+ 40 files changed, 829 insertions(+), 1617 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/cp_intc.c
+ delete mode 100644 arch/arm/mach-davinci/cp_intc.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-davinci/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-davinci/irq.c
+ create mode 100644 drivers/irqchip/irq-davinci-aintc.c
+ create mode 100644 drivers/irqchip/irq-davinci-cp-intc.c
+ create mode 100644 include/linux/irqchip/irq-davinci-aintc.h
+ create mode 100644 include/linux/irqchip/irq-davinci-cp-intc.h
 
 -- 
-Regards/Gruss,
-    Boris.
+2.20.1
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
 
 _______________________________________________
 linux-arm-kernel mailing list
