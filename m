@@ -4,76 +4,77 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BAF2DC282D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:47:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 400F1C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:47:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8FB5B218AF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:47:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 134E62086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:47:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z09W+8tU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8FB5B218AF
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eP3kJZ3S"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 134E62086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ossystems.com.br
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=zSM3ECeQq2wRUmIWb527o/jWTbNo2eURxygz9X6kAgg=; b=Z09W+8tU7lYeVo
-	JodIwoJqrGlAVwUdG7YYXAezGUX6UnJefnbBgGIaitoz5LevJtWy2rITNtN2goQ22zHPuoiaxEy15
-	/6exeyO6sK4dE7Z+AP6I1W9IAFxbarlPTKaxn9M5EAGxXlim2x91wUm5Yz4owpOm/imIP0E23JAkA
-	nn3znOWnvHtLYHTeDYtX5FmcJiKckK9eoL1IU7y/hApG1mRS37Pyl9njsaSbnRaVkwCxHUVklKt2p
-	RlmONqFChJmVFgCIauc77AmW32ubga5DpbP9IRGoHEwGO2Q/0XbOP8jK/yM6v8TixUjJquaGY62Gs
-	ByS/HiGUgWy1Y9E65aEA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=e3NuoZ3Cio737bKZDVzeARnbMU7a91fWbZbNxJckljQ=; b=eP3kJZ3SMyUdn7
+	Ufb6UPI+MGL69ZMHU6JXbp0AqyBfZPF48MZgbGXyb9wNUUMgkF9vP1QeyPKjt6uqQWJQ/i37REXLw
+	1oWYrqTXA838dIum4fTYGAf+hlK2DJI4ND8VeeFZN7NTg+Oxjjno6rvGNHUIUFIovKyuyNRSGYlRV
+	9icsE08pjyhK2TTf3grTIs+JiXa/yoi7EN0/3TYEXFqAKJxfHsUGN66pv3Mjzo6o0EO56Whhtq/PT
+	GHvPbxsi03c67Lt8BQVrJANb485tAAMnIFoNEIA48FJqFbzdoawJUvl6NAmNOVxSdKFEBUJz2/Eih
+	5YyFK/wMOWpvpSA0xuOQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpBkb-0005Ei-CE; Thu, 31 Jan 2019 12:47:25 +0000
-Received: from mail-qk1-f194.google.com ([209.85.222.194])
+	id 1gpBky-0005ZK-Uu; Thu, 31 Jan 2019 12:47:49 +0000
+Received: from mail-qt1-f193.google.com ([209.85.160.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpBkY-0005EF-67; Thu, 31 Jan 2019 12:47:23 +0000
-Received: by mail-qk1-f194.google.com with SMTP id z18so1736743qkj.10;
- Thu, 31 Jan 2019 04:47:21 -0800 (PST)
+ id 1gpBkg-0005Je-Bg; Thu, 31 Jan 2019 12:47:36 +0000
+Received: by mail-qt1-f193.google.com with SMTP id d19so3225925qtq.9;
+ Thu, 31 Jan 2019 04:47:30 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :organization:content-transfer-encoding;
- bh=HQswkCzqG31A9o+Cr/uokIq8kA6vxCiTIvuOp30FHCM=;
- b=WHwLTq/Q+r5zVO5oi3UlsHpT6zvExfWOXYsjB4SNjcbLoJyRHwM5jqKcCyylzK2Kj+
- fy/QNI4jNqwnJR8U+5kBLWRDfuZfWC4VFNrzT8pOQ3fRmi4QiXrN0LQMR8DAZVvKwKTR
- pyoMtSf3XRxdcSz1Sc7TKpuyeEdvW87h2JR2Afng5eDv6UfAa7EVmjV2jClAn+u899m0
- o2EPaNt8qSvAl9PBEWpL3jHGRrd2niAl3kczdceBW7X5JHUEeb1T4LnqGNq66IAFcpUA
- j4XIHYG13ZoyNpxU9attIDkgQPhGWexBgJuepe/+MZICaZjjYppnrozqt9th2XU4YFAB
- 1taA==
-X-Gm-Message-State: AJcUukc+/wusSozXIBtTM10Ltj4YWn3VBJHHa2iV7dNdIDS6cGuR1VQA
- a5Xn3F5EcTYUzbjCM43OSzdMlv7k
-X-Google-Smtp-Source: ALg8bN5D4iYg9xlqNIE0ppsqyfPMKXpHpCs7SVzfT0yjmXvVJO0j2uhjcPZTSnci+TeXn4QOaJYFCw==
-X-Received: by 2002:a37:62d3:: with SMTP id
- w202mr30651678qkb.357.1548938840744; 
- Thu, 31 Jan 2019 04:47:20 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:organization:content-transfer-encoding;
+ bh=DOY0na8Wg7iyK4mJ/SZnMyCR5yw4bav4pLPRTRGmFrg=;
+ b=fTtiztswNeTjDJM3YMKRZcdOz75DAyGymbD+Axe2cqNhAf4mQ3LwarGyuchCJeUnhI
+ ZlpS8O85CxyGvkJ3vaSAmzLSrrr+lJ9gZpr0kF7hXdOZDCHqGdfCNX78G5VVweibvuIE
+ QPgz/v2ZvE5r8qTrW5M6sjL/pVlFdqu1qSz3oQnho9yfZxg3qGC9vdvEaQnm6C8NnCSJ
+ BpE4lNA8FKr/IGNI8hiCUfIRi9dkINeqoBvF7E3rJfJpLwPu3mg274q5uyC8GzcfkYoG
+ SfhReL7PlYVx0SwaWsQg82gJ9S+pNidZEPZHxe9uTBzst/dpA7knzA6OpPLCl13GUD4m
+ +Svg==
+X-Gm-Message-State: AJcUukcAEeFnpc5HGFWmTemcAXUuHqvQJcrOaa3tZ57oqRFKvj5/Umjc
+ jFB0cWt2crWF+k2qw0vCqpEDsBN+
+X-Google-Smtp-Source: ALg8bN6ZFd7Wi+q3Xu4AZh7PdCMFxAFu+vydlguUiIFOCGI22nIgqT5+2P09Nq3yMWONZazJQ6WA7Q==
+X-Received: by 2002:a0c:d065:: with SMTP id d34mr31290726qvh.209.1548938848924; 
+ Thu, 31 Jan 2019 04:47:28 -0800 (PST)
 Received: from localhost.localdomain ([181.220.86.121])
- by smtp.gmail.com with ESMTPSA id o21sm3706286qto.18.2019.01.31.04.47.15
+ by smtp.gmail.com with ESMTPSA id y68sm2886835qkd.49.2019.01.31.04.47.23
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 31 Jan 2019 04:47:20 -0800 (PST)
+ Thu, 31 Jan 2019 04:47:27 -0800 (PST)
 Received: by localhost.localdomain (sSMTP sendmail emulation);
- Thu, 31 Jan 2019 10:47:11 -0200
+ Thu, 31 Jan 2019 10:47:21 -0200
 From: Otavio Salvador <otavio@ossystems.com.br>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v2 1/3] ARM: dts: rockchip: rv1108-elgin: Fix vcc5/6-supply
- representation
-Date: Thu, 31 Jan 2019 10:47:07 -0200
-Message-Id: <20190131124710.30238-1-otavio@ossystems.com.br>
+Subject: [PATCH v2 2/3] ARM: dts: rockchip: rv1108-elgin: Use the correct
+ regulator properties
+Date: Thu, 31 Jan 2019 10:47:08 -0200
+Message-Id: <20190131124710.30238-2-otavio@ossystems.com.br>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190131124710.30238-1-otavio@ossystems.com.br>
+References: <20190131124710.30238-1-otavio@ossystems.com.br>
 MIME-Version: 1.0
 Organization: O.S. Systems Software LTDA.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_044722_225752_7C4A7F46 
-X-CRM114-Status: GOOD (  12.71  )
+X-CRM114-CacheID: sfid-20190131_044730_815555_60940664 
+X-CRM114-Status: GOOD (  13.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,53 +98,98 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On rv1108-elgin-r1 board the RK805 VCC5 and VCC6 supplies come from
-the BUCK2 regulator at 2.2V, so fix the representation in the
-device tree.
+The following properties:
 
-While at it, rename it from vdd_cam to vdd_buck2, which is a better
-name for the regulator label.
+- regulator-state-enabled
+- regulator-state-disabled
+- regulator-state-uv
+
+are not valid ones as per
+Documentation/devicetree/bindings/regulator/regulator.txt
+
+Fix it by using the correct properties as per the dt bindings.
 
 Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
 ---
 
 Changes in v2: None
 
- arch/arm/boot/dts/rv1108-elgin-r1.dts | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/rv1108-elgin-r1.dts | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/boot/dts/rv1108-elgin-r1.dts b/arch/arm/boot/dts/rv1108-elgin-r1.dts
-index 658057d871af..66688fdf4fd8 100644
+index 66688fdf4fd8..1c4507b66fdd 100644
 --- a/arch/arm/boot/dts/rv1108-elgin-r1.dts
 +++ b/arch/arm/boot/dts/rv1108-elgin-r1.dts
-@@ -74,8 +74,8 @@
- 		vcc2-supply = <&vcc_sys>;
- 		vcc3-supply = <&vcc_sys>;
- 		vcc4-supply = <&vcc_sys>;
--		vcc5-supply = <&vcc_sys>;
--		vcc6-supply = <&vcc_sys>;
-+		vcc5-supply = <&vdd_buck2>;
-+		vcc6-supply = <&vdd_buck2>;
- 
- 		regulators {
- 			vdd_core: DCDC_REG1 {
-@@ -90,10 +90,12 @@
+@@ -85,8 +85,8 @@
+ 				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+-					regulator-state-enabled;
+-					regulator-state-uv = <900000>;
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <900000>;
  				};
  			};
  
--			vdd_cam: DCDC_REG2 {
--				regulator-name= "vdd_cam";
--				regulator-min-microvolt = <700000>;
--				regulator-max-microvolt = <2000000>;
-+			vdd_buck2: DCDC_REG2 {
-+				regulator-name= "vdd_buck2";
-+				regulator-min-microvolt = <2200000>;
-+				regulator-max-microvolt = <2200000>;
-+				regulator-always-on;
-+				regulator-boot-on;
+@@ -97,7 +97,7 @@
+ 				regulator-always-on;
+ 				regulator-boot-on;
  				regulator-state-mem {
- 					regulator-state-disabled;
+-					regulator-state-disabled;
++					regulator-off-in-suspend;
  				};
+ 			};
+ 
+@@ -106,7 +106,7 @@
+ 				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+-					regulator-state-enabled;
++					regulator-on-in-suspend;
+ 				};
+ 			};
+ 
+@@ -117,8 +117,8 @@
+ 				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+-					regulator-state-enabled;
+-					regulator-state-uv = <3300000>;
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <3300000>;
+ 				};
+ 			};
+ 
+@@ -129,7 +129,7 @@
+ 				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+-					regulator-state-disabled;
++					regulator-off-in-suspend;
+ 				};
+ 			};
+ 
+@@ -140,7 +140,7 @@
+ 				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+-					regulator-state-disabled;
++					regulator-off-in-suspend;
+ 				};
+ 			};
+ 
+@@ -151,8 +151,8 @@
+ 				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+-					regulator-state-enabled;
+-					regulator-state-uv = <1000000>;
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <1000000>;
+ 				};
+ 			};
+ 		};
 -- 
 2.20.1
 
