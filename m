@@ -2,87 +2,127 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9AAB4C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:41:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9DCC7C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:50:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 77E4C218AF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:41:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A3EF2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:50:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AecTvtoz";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="jRlW5tRD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 77E4C218AF
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E4cmz/CY";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="eq1kM6kj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A3EF2087F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=partner.samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QgDI7iCK8PMMh/7goszHtMcLOb0l197aUiPRu3KhllE=; b=AecTvtozCHw9GR
-	O3XM9bi4aRe0/HXDyEC9uoIPr5pavHn/zzCOoH4dNjYsg+uG3d7UfndkAI46Rrn12B5OACebcoU1F
-	+PPgI00CbSjG5o1FVlC+eWyCs1JrJdbdgYwmA+WzHSm/knbhTOV88Snoc6I8DKWRBJ4MFi81Mochb
-	YzokEee0SH1MPYg79PBjzS1Cs2RyDYiYXvRZbBf+9C4tNDr74X3QTPQMPoXbzE8DFR1CQZi5qD3Xd
-	Ftf0HY3ei8znpbMDMsOc8QYMyLwhuB7zvANLKhndNMyPHYt7nyYGd68ZjI/nSNy95IIHFemD21pEL
-	99AEEY7wti3hR3ZR93Og==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=PTWT+sC5C1Vn35rEtPAgCRQXTXKQAekQmB9N6shE/n8=; b=E4cmz/CYDz32iKuTt1nCMvmURn
+	z/OQB8QkCZeddOaTqI9Y0J01firased8qakMmJLhdwVfkT9g4DAWnG5Q9vQ0mOnGW84z5H3SkjVl5
+	v64uNmdTg3Iy001LiSJHGmESqE9+kZ2y0LUK4UByozXG2quoIXl6AZorKtWWKnG5YWh6ia07ydb2X
+	pq29wroSiam4Ebk8zSdm/UiIfbzNMfsvIC4p97Zxgnl1OfJxCdyX3a4muTpg3fWipeMfbf6va1ruz
+	wHVE5MQU2TP0TQjMI6cCWXAnTsRtwgGuk4PwCnFVb8m9MGpp4c5EdVmE7syU4karR6Ki9T0/WbDnf
+	W+OECzOw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp7uy-0001qM-K5; Thu, 31 Jan 2019 08:41:52 +0000
-Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
+	id 1gp836-00053i-PI; Thu, 31 Jan 2019 08:50:16 +0000
+Received: from mailout1.w1.samsung.com ([210.118.77.11])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp7uv-0001q1-BN
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 08:41:51 +0000
-Received: by mail-lj1-x243.google.com with SMTP id k15-v6so1923167ljc.8
+ id 1gp831-00051C-Fd
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 08:50:13 +0000
+Received: from eucas1p1.samsung.com (unknown [182.198.249.206])
+ by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
+ 20190131085009euoutp016392ddf117e9757fd9a2fbeecaa12510~_4rnMgTTJ2234722347euoutp01g
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 31 Jan 2019 00:41:48 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=AtIzf0HGZRPgpt0+xARJvlHbAcFWw8amQ5FeEuPrgzo=;
- b=jRlW5tRDQ4ZJJxS99hOwUiq9v4Mm4NAGKIURjNz9Q+Wjn1UXuCWp7xBlyBM8RZDAZQ
- VzT/ZwIaTkbsk/OD08+kbHpAy4/uUt6yj9MQIs7hZ0saWh7Uyd74YXN1kVQ3kEHDng+6
- DEGpY2R3qg311EipfSK64PSVuW1nHDTTsvJNA=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=AtIzf0HGZRPgpt0+xARJvlHbAcFWw8amQ5FeEuPrgzo=;
- b=qdeqOYif90xrRxLUYneBe7U2CSVe3n7l55RzZf4PEbe14wq0W6cl7nqadH/fZ5fQSG
- LdIc9SiMMz5/5oLR3Rda1M5SOXbDmt8GNarOzNO3aGy5J97TxnMTuIih1ZFymhnzgqdW
- z/dHqkyDDWiaKccEuENu6YA43iQIjLoHBZgrUeWIrjag0v4FNJ4Wt9KHLjYqEYMdvW/n
- nsyzlZS7BhLR9nrsQx9qSMbp8ji/dVCDmQQb5UjQ6VC+2qhei6QTB6cyK2hSvVSnONN7
- 3ePOUbl2pVsOlrQMk7W0WiR+Zkvi+nnBXkWUYf/ko1h/GJWARXAmrNYVmACnIMpYw+Zn
- Gjqg==
-X-Gm-Message-State: AJcUukdlIVBaaXrej6sbj02BZba79/VewkWqm6e3SntHZGwyO8OZSmql
- 9NAdPHLkit/QXReXGyfFrawHCA==
-X-Google-Smtp-Source: ALg8bN7TI6FwVy0odr91FQzGF5FssBBA+RpJVAU+Z3Z7SmuD0Z71r0vxoMxFBDuKjcA0WJjtn7mogw==
-X-Received: by 2002:a2e:9059:: with SMTP id
- n25-v6mr26312168ljg.155.1548924106995; 
- Thu, 31 Jan 2019 00:41:46 -0800 (PST)
-Received: from jax.urgonet (h-84-105.A175.priv.bahnhof.se. [79.136.84.105])
- by smtp.gmail.com with ESMTPSA id o88sm721489lfk.38.2019.01.31.00.41.45
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 31 Jan 2019 00:41:46 -0800 (PST)
-Date: Thu, 31 Jan 2019 09:41:43 +0100
-From: Jens Wiklander <jens.wiklander@linaro.org>
-To: Matt Mackall <mpm@selenic.com>,
-	Herbert Xu <herbert@gondor.apana.org.au>
-Subject: Re: [PATCH v6 0/4] Introduce TEE bus driver framework
-Message-ID: <20190131084142.GA21196@jax.urgonet>
-References: <1548740978-28495-1-git-send-email-sumit.garg@linaro.org>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1548740978-28495-1-git-send-email-sumit.garg@linaro.org>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+ Thu, 31 Jan 2019 08:50:09 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
+ 20190131085009euoutp016392ddf117e9757fd9a2fbeecaa12510~_4rnMgTTJ2234722347euoutp01g
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1548924609;
+ bh=gAM5TRktEeGRdR7DfQ1QhDkjvwroBHzBH5M4lKDBh1Q=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=eq1kM6kjwX3NI2/vmcw1895n+GZVTpS0bDBDqWLPb62r0QFdl5vYz5sDRBQCZ8M6d
+ ksAfdBh3rXwklbqzQOmj1h8IcVYB37qcd4T5y6HYKtJg6uU7JAdG8GHp08wNeFqTlJ
+ nvvKb9G+DM5sM+3x8DZCQaRk4OYqJsqbTOva5q7k=
+Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
+ eucas1p2.samsung.com (KnoxPortal) with ESMTP id
+ 20190131085008eucas1p2ba839b83132ff9ec44e10359baa62cfc~_4rmSVvQu1766917669eucas1p2Q;
+ Thu, 31 Jan 2019 08:50:08 +0000 (GMT)
+Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
+ eusmges2new.samsung.com (EUCPMTA) with SMTP id 32.2C.04294.0C6B25C5; Thu, 31
+ Jan 2019 08:50:08 +0000 (GMT)
+Received: from eusmtrp2.samsung.com (unknown [182.198.249.139]) by
+ eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
+ 20190131085007eucas1p2f16107042b8ce5638811840618bcf017~_4rlfbQr92508525085eucas1p2o;
+ Thu, 31 Jan 2019 08:50:07 +0000 (GMT)
+Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
+ eusmtrp2.samsung.com (KnoxPortal) with ESMTP id
+ 20190131085007eusmtrp2215325dae20568f3f1fe00cb1c4725a3~_4rlOzgi42341223412eusmtrp2b;
+ Thu, 31 Jan 2019 08:50:07 +0000 (GMT)
+X-AuditID: cbfec7f4-84fff700000010c6-9c-5c52b6c0c7b8
+Received: from eusmtip1.samsung.com ( [203.254.199.221]) by
+ eusmgms2.samsung.com (EUCPMTA) with SMTP id B6.7B.04128.FB6B25C5; Thu, 31
+ Jan 2019 08:50:07 +0000 (GMT)
+Received: from AMDC3778.DIGITAL.local (unknown [106.120.51.20]) by
+ eusmtip1.samsung.com (KnoxPortal) with ESMTPA id
+ 20190131085006eusmtip1d88b419e5223447199ba87ec5d9ab703~_4rkeoV8E1303413034eusmtip1G;
+ Thu, 31 Jan 2019 08:50:06 +0000 (GMT)
+From: Lukasz Luba <l.luba@partner.samsung.com>
+To: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-pm@vger.kernel.org, linux-samsung-soc@vger.kernel.org
+Subject: [PATCH v3 3/8] clk: samsung: add BPLL rate table for Exynos 5422 SoC
+Date: Thu, 31 Jan 2019 09:49:49 +0100
+Message-Id: <1548924594-19084-4-git-send-email-l.luba@partner.samsung.com>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1548924594-19084-1-git-send-email-l.luba@partner.samsung.com>
+X-Brightmail-Tracker: H4sIAAAAAAAAA0VSa0hTYRj229nZOYpHj0fJLzODkVBKmhH1gV0MKpYh2gWJMmrpYQ6v7XjJ
+ tJrmdWiKUEpp+kPQlqIulTUv2SaK5mVieEktRWqlZoWjCG85z6p/z/dc3ud94SMx5hnuRspj
+ E1hFrDRaLLITtnT/HtzX2XI+bL+mgEaNpfU4GjObcFTRNYijwrkFDA0NNRBoIGORQO+U7kgz
+ N4qjH/nvcTSiKxOh5YIugEqHOgSormuaQMN9p9Bkeo0IGRZzcLQ+2igMcJJ8G88iJBp1nkjy
+ ouqe5PVSm0DyoEkNJMsajxDRZbsjEWy0PIlV+B67bhfZ3roqjNcytxp0mYQSfHdUAVsS0gdh
+ lumjUAXsSIauAbBW1QP4hxnAeUO3VVkGsLL3E64C5FbEaIrn+WoA+/srRf8SqpJpwmIS0T5Q
+ q75pqXChU+HU2CvM4sFoJQa1GUVCi+BMB8OsX7MCi19Ie8KyNk8LTdGBUDtfQPDrecCJwTzM
+ gm3ps7BKtYbxfAcBzT9xHp+Ea8ZqK+8M53uarFl3uPGyQsBjDg7kqkU8ToM5vVqrxx8aeoa3
+ 7sLovbBe56sCxCZ9ArYH8Mc6wPGvThYvtgmLW0ownqZgbjbDj9gDm/KN1pptsLr2kXW0BBaX
+ F29VMvRTAMc6/IvArsf/myoBUANXNpGLkbHcgVg22YeTxnCJsTKf8LgYDdj8QG/We8xaoFu9
+ oQc0CcT21EzduTAGlyZxKTF6AElM7EL5rQSHMVSENOU2q4i7pkiMZjk92EEKxa5Uqs3MFYaW
+ SRPYKJaNZxV/VQFp66YE3p+nvkTqAwckq0m1FVTb5KFOZmEGKtcNWGeIMWS7FxU6dGluZqIj
+ Sm56GOR9eilNrC6X3fVonn7iN6YevNMbburb2J3ukOzj6BWw2Jxhlgcdbh05XthvjLTJZnc2
+ Jd7vzzxKrVz0g2c8oijD8w+erkZdyQUn+9DKWflb+mq3WMhFSv28MAUn/QPzdQXiPAMAAA==
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFupnkeLIzCtJLcpLzFFi42I5/e/4Xd3924JiDF40CFpsnLGe1eL6l+es
+ FvOPnGO16H/8mtni/PkN7BZnm96wW9xqkLHY9Pgaq8XHnnusFpd3zWGz+Nx7hNFixvl9TBZr
+ j9xlt7h4ytXiduMKNovDb9pZLf5d28jiIOjx/kYru8emVZ1sHpuX1HscfLeHyaNvyypGj8+b
+ 5ALYovRsivJLS1IVMvKLS2yVog0tjPQMLS30jEws9QyNzWOtjEyV9O1sUlJzMstSi/TtEvQy
+ 9u7+w1KwQ6hiw64W9gbGD/xdjBwcEgImEheeF3QxcnEICSxllJizax1TFyMnUFxMYtK+7ewQ
+ trDEn2tdbBBFnxglWpovsoA0swnoSexYVQhSIyJQL9H/5hJYDbNAH7NE4/HFrCAJYQFfiaO/
+ V7CD1LMIqErM2aMKEuYV8JLY8aoXar6cxM1zncwgNqeAt8SSrr9gthBQzY9/HxknMPItYGRY
+ xSiSWlqcm55bbKRXnJhbXJqXrpecn7uJERgZ24793LKDsetd8CFGAQ5GJR7eB2sDY4RYE8uK
+ K3MPMUpwMCuJ8Br+9o8R4k1JrKxKLcqPLyrNSS0+xGgKdNNEZinR5Hxg1OaVxBuaGppbWBqa
+ G5sbm1koifOeN6iMEhJITyxJzU5NLUgtgulj4uCUamDc8krC3jr/htiOv9O8deT+hjqFTTop
+ +bDvf8mJb7F3y6xz5l730vl4XCRv5VrZtf7Wk58efD334jO5vHDFxERm/5BLkrX1lnsq1PQq
+ QtdPb8gJvLsnoj+v5nn3pj0Mwc0Nb0tjzpdN3ndVtqZVzL9+d5vKjVk68g8vyuee1jB84DO7
+ x9T9NrsSS3FGoqEWc1FxIgBD/FAZogIAAA==
+X-CMS-MailID: 20190131085007eucas1p2f16107042b8ce5638811840618bcf017
+X-Msg-Generator: CA
+X-RootMTR: 20190131085007eucas1p2f16107042b8ce5638811840618bcf017
+X-EPHeader: CA
+CMS-TYPE: 201P
+X-CMS-RootMailID: 20190131085007eucas1p2f16107042b8ce5638811840618bcf017
+References: <1548924594-19084-1-git-send-email-l.luba@partner.samsung.com>
+ <CGME20190131085007eucas1p2f16107042b8ce5638811840618bcf017@eucas1p2.samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_004149_400721_6CD6DF92 
-X-CRM114-Status: GOOD (  21.45  )
+X-CRM114-CacheID: sfid-20190131_005011_847653_8B325952 
+X-CRM114-Status: GOOD (  12.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,127 +134,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, Sumit Garg <sumit.garg@linaro.org>,
- daniel.thompson@linaro.org, michal.lkml@markovi.net,
- herbert@gondor.apana.org.au, arnd@arndb.de, ard.biesheuvel@linaro.org,
- bhsharma@redhat.com, linux-kernel@vger.kernel.org, tee-dev@lists.linaro.org,
- yamada.masahiro@socionext.com, robh+dt@kernel.org,
- linux-crypto@vger.kernel.org, mpm@selenic.com, Olof Johansson <olof@lixom.net>,
- linux-arm-kernel@lists.infradead.org
+Cc: b.zolnierkie@samsung.com, Stephen Boyd <sboyd@kernel.org>,
+ Michael Turquette <mturquette@baylibre.com>, krzk@kernel.org,
+ Lukasz Luba <l.luba@partner.samsung.com>, cw00.choi@samsung.com,
+ kyungmin.park@samsung.com, kgene@kernel.org, myungjoo.ham@samsung.com,
+ s.nawrocki@samsung.com, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, m.szyprowski@samsung.com
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Matt and Herbert,
+Add new table rate for BPLL for Exynos5422 SoC supporting Dynamic Memory
+Controller frequencies for driver's DRAM timings.
 
-On Tue, Jan 29, 2019 at 11:19:34AM +0530, Sumit Garg wrote:
-> This series introduces a generic TEE bus driver concept for TEE based
-> kernel drivers which would like to communicate with TEE based devices/
-> services.
-> 
-> Patch #1 adds TEE bus concept where devices/services are identified via
-> Universally Unique Identifier (UUID) and drivers register a table of
-> device UUIDs which they can support. This concept also allows for device
-> enumeration to be specific to corresponding TEE implementation like
-> OP-TEE etc.
-> 
-> Patch #2 adds supp_nowait flag for non-blocking requests arising via
-> TEE internal client interface.
-> 
-> Patch #3 adds TEE bus device enumeration support for OP-TEE. OP-TEE
-> provides a pseudo TA to enumerate TAs which can act as devices/services
-> for TEE bus.
-> 
-> Patch #4 adds OP-TEE based hwrng driver which act as TEE bus driver.
-> On ARM SoC's with TrustZone enabled, peripherals like entropy sources
-> might not be accessible to normal world (linux in this case) and rather
-> accessible to secure world (OP-TEE in this case) only. So this driver
-> aims to provides a generic interface to OP-TEE based random number
-> generator service.
-> 
-> Example case is Developerbox based on Socionext's Synquacer SoC [1]
-> which provides 7 thermal sensors accessible from secure world only which
-> could be used as entropy sources (thermal/measurement noise).
-> 
-> [1] https://www.96boards.org/product/developerbox/
-> 
-> Changes in v6:
-> 
-> 1. Incorporate some nitpicks in patch #1 and #3.
-> 2. Bundle all statics in a data structure in patch #4 and use dev_*
->    instead of pr_*.
-> 3. Add reviewed-by tags for patch #1, #2 and #3.
-> 
-> Changes in v5:
-> 
-> 1. Add support in module device table for TEE bus devices.
-> 2. Correct license for optee-rng module.
-> 
-> Changes in v4:
-> 
-> 1. Use typedef instead of single member tee_client_device_id struct.
-> 2. Incorporate TEE bus nitpicks.
-> 
-> Changes in v3:
-> 
-> 1. Fixed bus error path in Patch #1.
-> 2. Reversed order of Patch #2 and #3.
-> 3. Fixed miscellaneous syntax comments and memory leak.
-> 4. Added comments in Patch #2 for supp_nowait flag.
-> 
-> Changes in v2:
-> 
-> Based on review comments, the scope of this series has increased as
-> follows:
-> 
-> 1. Added TEE bus driver framework.
-> 2. Added OP-TEE based device enumeration.
-> 3. Register optee-rng driver as TEE bus driver.
-> 4. Removed DT dependency for optee-rng device UUID.
-> 5. Added supp_nowait flag.
-> 
-> Sumit Garg (4):
->   tee: add bus driver framework for TEE based devices
->   tee: add supp_nowait flag in tee_context struct
->   tee: optee: add TEE bus device enumeration support
->   hwrng: add OP-TEE based rng driver
-> 
->  MAINTAINERS                        |   5 +
->  drivers/char/hw_random/Kconfig     |  15 ++
->  drivers/char/hw_random/Makefile    |   1 +
->  drivers/char/hw_random/optee-rng.c | 298 +++++++++++++++++++++++++++++++++++++
->  drivers/tee/optee/Makefile         |   1 +
->  drivers/tee/optee/core.c           |   4 +
->  drivers/tee/optee/device.c         | 155 +++++++++++++++++++
->  drivers/tee/optee/optee_private.h  |   3 +
->  drivers/tee/optee/supp.c           |  10 +-
->  drivers/tee/tee_core.c             |  67 ++++++++-
->  include/linux/mod_devicetable.h    |   9 ++
->  include/linux/tee_drv.h            |  38 ++++-
->  scripts/mod/devicetable-offsets.c  |   3 +
->  scripts/mod/file2alias.c           |  19 +++
->  14 files changed, 622 insertions(+), 6 deletions(-)
->  create mode 100644 drivers/char/hw_random/optee-rng.c
->  create mode 100644 drivers/tee/optee/device.c
-> 
-> -- 
-> 2.7.4
-> 
+CC: Sylwester Nawrocki <s.nawrocki@samsung.com>
+CC: Chanwoo Choi <cw00.choi@samsung.com>
+CC: Michael Turquette <mturquette@baylibre.com>
+CC: Stephen Boyd <sboyd@kernel.org>
+CC: Kukjin Kim <kgene@kernel.org>
+CC: Krzysztof Kozlowski <krzk@kernel.org>
+CC: linux-samsung-soc@vger.kernel.org
+CC: linux-clk@vger.kernel.org
+CC: linux-arm-kernel@lists.infradead.org
+CC: linux-kernel@vger.kernel.org
+Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+---
+ drivers/clk/samsung/clk-exynos5420.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-I think this patch series is good now. It has received comments which
-has been addressed and have also gathered a few R-B tags.
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 3e87421..8bf9579 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -1325,6 +1325,19 @@ static const struct samsung_pll_rate_table exynos5420_pll2550x_24mhz_tbl[] __ini
+ 	PLL_35XX_RATE(24 * MHZ, 200000000,  200, 3, 3),
+ };
+ 
++static const struct samsung_pll_rate_table exynos5422_bpll_rate_table[] = {
++	PLL_35XX_RATE(24 * MHZ, 933000000, 311, 4, 1),
++	PLL_35XX_RATE(24 * MHZ, 825000000, 275, 4, 1),
++	PLL_35XX_RATE(24 * MHZ, 728000000, 182, 3, 1),
++	PLL_35XX_RATE(24 * MHZ, 633000000, 211, 4, 1),
++	PLL_35XX_RATE(24 * MHZ, 543000000, 181, 2, 2),
++	PLL_35XX_RATE(24 * MHZ, 413000000, 413, 6, 2),
++	PLL_35XX_RATE(24 * MHZ, 275000000, 275, 3, 3),
++	PLL_35XX_RATE(24 * MHZ, 206000000, 206, 3, 3),
++	PLL_35XX_RATE(24 * MHZ, 165000000, 110, 2, 3),
++	PLL_35XX_RATE(24 * MHZ, 138000000, 184, 2, 4),
++};
++
+ static const struct samsung_pll_rate_table exynos5420_epll_24mhz_tbl[] = {
+ 	PLL_36XX_RATE(24 * MHZ, 600000000U, 100, 2, 1, 0),
+ 	PLL_36XX_RATE(24 * MHZ, 400000000U, 200, 3, 2, 0),
+@@ -1467,7 +1480,7 @@ static void __init exynos5x_clk_init(struct device_node *np,
+ 		exynos5x_plls[apll].rate_table = exynos5420_pll2550x_24mhz_tbl;
+ 		exynos5x_plls[epll].rate_table = exynos5420_epll_24mhz_tbl;
+ 		exynos5x_plls[kpll].rate_table = exynos5420_pll2550x_24mhz_tbl;
+-		exynos5x_plls[bpll].rate_table = exynos5420_pll2550x_24mhz_tbl;
++		exynos5x_plls[bpll].rate_table = exynos5422_bpll_rate_table;
+ 	}
+ 
+ 	samsung_clk_register_pll(ctx, exynos5x_plls, ARRAY_SIZE(exynos5x_plls),
+-- 
+2.7.4
 
-All patches but "hwrng: add OP-TEE based rng driver" covers what I
-normally send pull requests to arm-soc for.
-
-Matt, Herbert, are you fine with the patch
-"hwrng: add OP-TEE based rng driver"?
-If so, is it also OK if I take it via my tree which I then will include
-in a pull request to arm-soc? An Acked-By tag would be nice to have.
-
-Thanks,
-Jens
 
 _______________________________________________
 linux-arm-kernel mailing list
