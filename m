@@ -2,22 +2,22 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 406B7C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:04:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7F0B8C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:04:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1F0A42087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:04:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4317A2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:04:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o4cslFAx";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="dHYHAsU1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1F0A42087F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="knPeDBVQ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="xmZmZaeW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4317A2087F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,41 +26,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RiCm60byVj6jNdeyC5yZ7m2uEESGSpEglFq58OVb2SA=; b=o4cslFAxBFbbLs
-	IGqRcuQW7BPTqWbQM6PmnFNMKpder/Lzw7/pX9FcnHsdE8omGLiDIE7320DLg/9PmW8CE+LROK0uc
-	j/EBlItJL+cJEVxq1JzEjaw1AIGcPR1bMDoIJy1SEaV0breY/6euJpTmkVVAT1AAsvnnk2Zb/m0KV
-	uByAgMtBWBlTK3ZWmK3jHOd6H1M00QArfkqyXD2RPId9W9qK8ON5ACE4xPJXZlyPdeCdpq0/HcQof
-	qhD22uVLyN54xc/l5YrcoD65koIp1ZK8Wb6CyLFqA6iXIzhTUFXLRpvYHckz4LT3GjGt/e9t/jI/a
-	cHjNTbA5V1/+4d97jHog==;
+	List-Owner; bh=3CqJ8bMD9Uj6GCvp2zj/hF6daQASTlbtrkMBV6G1xms=; b=knPeDBVQRDLygu
+	Ab+OD0sRoMFbNgVzfWO1M40lJtzZWWKA200ftGFA1ZydyL074dgnqIo1u9KXZKu8zXVJuW6fYKJI6
+	zgcmzC8dUAGlfZ3KNxbTQx7x9vYQ8gUCgf4EbhZSZ+k6Q/csoNIvqRLISGKxPYQeMR11QNtTgqIo3
+	FUkdsYNf8K+Z/lMssjKiAtfU0HLabzYQMLwfAZCsMdGhoEBwPzM3g+MmnXqiuWbFUZNv7TsKTSmum
+	7Wc149bqsCyQOcnkLfExGMyqRwCnL3/dp4esmhziQxlIrkrU7LgLroPRWzftxU5XA+ffb6jwANxZv
+	10CyPz3f95zK+74cEUNg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp7KT-0005xU-79; Thu, 31 Jan 2019 08:04:09 +0000
+	id 1gp7Kg-00068m-Er; Thu, 31 Jan 2019 08:04:22 +0000
 Received: from mail-eopbgr150059.outbound.protection.outlook.com
  ([40.107.15.59] helo=EUR01-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp7K7-0005cS-0F
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 08:03:50 +0000
+ id 1gp7KA-0005fe-7W
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 08:03:58 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=YpuQ0LSCLl+Zknilxue8oeZxIOd9yYpSy4Mj6G1za8M=;
- b=dHYHAsU1leSyReokHex1tcVoLw8Pzl9EYta4TeuOymnhiSew1rlwiDDZNejPvqkxMbSi5RxxscSIidPLeETNn4BiuarIIalKuH1uHpEmCqTzYZ63tMTiDnTcKxtTiGw/MX+PQurU0Cby93YRjSsTZydRVXYhHEpoO4jVaAbcXaA=
+ bh=yW2lhuIyoeeQJ+rie/Bh1DR7IkliEsQER/dZQJDLces=;
+ b=xmZmZaeW+UMMuVUdhQacNcfJij1ghKMQLaZBTCNAjq4MQmwSWx1+hSk6CKdwsOGHMa10UHAW0SeFnY0oQ4ABqIgg2HlLxr+0uNY4CFVwj4jFtfZNYbC/KSBqphr8ceCNUz/bcNw3t89Hzn5S1dE5qTSvzzuCxj4t1c57Q2YkjKQ=
 Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
- AM0PR04MB5298.eurprd04.prod.outlook.com (20.177.42.83) with Microsoft SMTP
+ AM0PR04MB5796.eurprd04.prod.outlook.com (20.178.202.213) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1558.21; Thu, 31 Jan 2019 08:03:39 +0000
+ 15.20.1558.21; Thu, 31 Jan 2019 08:03:47 +0000
 Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
  ([fe80::bd44:e001:ab8d:1c51]) by AM0PR04MB4211.eurprd04.prod.outlook.com
  ([fe80::bd44:e001:ab8d:1c51%2]) with mapi id 15.20.1580.019; Thu, 31 Jan 2019
- 08:03:39 +0000
+ 08:03:47 +0000
 From: Aisheng Dong <aisheng.dong@nxp.com>
 To: "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
-Subject: [PATCH V3 1/4] dt-binding: irq: imx-irqsteer: use irq number instead
- of group number
-Thread-Topic: [PATCH V3 1/4] dt-binding: irq: imx-irqsteer: use irq number
- instead of group number
-Thread-Index: AQHUuTt5Spk4kSNY5kK4EHnWuE5BYA==
-Date: Thu, 31 Jan 2019 08:03:39 +0000
-Message-ID: <1548921464-28917-2-git-send-email-aisheng.dong@nxp.com>
+Subject: [PATCH V3 3/4] irq: imx-irqsteer: change to use reg_num instead of
+ irq_group
+Thread-Topic: [PATCH V3 3/4] irq: imx-irqsteer: change to use reg_num instead
+ of irq_group
+Thread-Index: AQHUuTt+3c32KigClkm9+7rmTqo/Dg==
+Date: Thu, 31 Jan 2019 08:03:47 +0000
+Message-ID: <1548921464-28917-4-git-send-email-aisheng.dong@nxp.com>
 References: <1548921464-28917-1-git-send-email-aisheng.dong@nxp.com>
 In-Reply-To: <1548921464-28917-1-git-send-email-aisheng.dong@nxp.com>
 Accept-Language: zh-CN, en-US
@@ -76,37 +76,37 @@ authentication-results: spf=none (sender IP is )
 x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; AM0PR04MB5298;
- 6:EHbWy0qkFBiqXH7t/puFTYrFiLZ9SqxjQEmMyhdwHQsbIWKpkbFQ6l33KIfGkoX8szVG8qAr/2BJ9Mmy+LIZHSlZqGXHORihwGLs336gNIkQ7g6bgtc3C03mokWNEtoBUxx1no98XL/ccVwy0vqIiRclxapJpaYG2xxOist9IYGKotTEx1OFVpWxeHy75jeKacnEtuQFiS4FYqWA/Fh771QrpmDTtm2HVWzWapn9p9oeRfAWF493RJRiRTLH7lxFm7wzRD2kb1hIesB3kmciF3uFgjZQ8XXpyuus/FJ55WU7b+31JKIgmO0BGFbwpEaQiErJVG5ydY65A4z6AdUbbpCQ/Yda7Y4pH/9Am9BPtBwTKgU5hRrg3iYFMAFrTYWQX2Tegsi25KWgAry0lQbP68i5Gm2bpT0XAYo1JnsDJTfdv0Y3H0RfL23BPUmnAdtXiZ82ydP0Dfe+L5qUyvS+0Q==;
- 5:ngIniz/skXjVbMjTWW6eKontw7hM3dyp+kwyNXnzL8lyx2nnMqSQpc9YqH1h5KIXTSzYGTkfBROlunu3CFD6h7lQlfnfqXcS5WBt78C0AhnhxWYdBFRcm36zxJa/BjEswnO9DRW7Cq+7tKtsXeCKpoMpq5wuuaK+uzJHD0RPGA/4Oz3Piey+LczPqILJsLvpFwTC3SbS/xzQk90oNyWV8Q==;
- 7:WRgQQeayfTIpUC6jotDEFUBw+o9QrneoEa1gXpitulQhFx2sj17ptvIAMd9vR+TMbrXNGrHYA+4GW0feBSZVjnb1PSICAn30xpA2fPpauyS/5Gml+9w9Fbk2N2OOujf8+OhKmdutwqnYrx0w6qdlgw==
-x-ms-office365-filtering-correlation-id: 9b0747b2-b95b-45f4-904a-08d687529bc9
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB5796;
+ 6:C75flqW07dOR5djipAgLXLkmODDtwXRtcPuyo1fOIw7yOYqEYusRBW9bFGI8m5mbMt0/qDxpWRH1wLEjd7VjsuF0feIvGgXVq+NAsorAP/Kz9Knhjm5C7HEt20LT7Oy4uQvGRra0raEkIRjF0IFHQgEyaK9SO68vMDM3r38m0Q+nHyNuOzi99l0X+JjufRCAAjBkT7FEudSwJMDWqxX4XeQp0U/w2lvnakhB3T+a7cspQgQdeVzna28otPqpeXxXZoCQbFVjkd0YuVtts9vYNGjmujtZ47Fv48iYAQIEGSyoo1eUAYEeyB/O1+E0Nhk/eRtJYWIddeZzwDPMRMjEDPU3LUj6YjRzdHWcNtHWzKcEQHMonyTldQ8hzgfBRwDmlWtYsJ+fgaEl0P6MXsH9FMaf8ib9JDQuuZdR7+G3RmHzGzEIrIsBHEQJqNCeiD8wAEUwKFy5YsgDLTL/rnNUKQ==;
+ 5:T7MCPQA86BVbiZXd9riD648G8578pdxOOSzqHNaZ/at9w/9XdT+Yjen20WyWGyLK3A6zPWM0w/oujQYWcN9/noBHfOK7C2E69Xsy3p61UIosL9wepRODAJD432jbMPv3TLzz5KymHnZwQ8kjLNHq/NERavIzoewiXTlcpuyaD2YrVOShZxzHL46ZDZLiD1kf2peD8XqT52IqKOKH+Chhxg==;
+ 7:BD3HxkpG9YC73d05NLDToOel9V04oJ337wejSe7BKxo1vkhqfhODXCzGDkOzuN4da+o5gwN+bs9RilVPDkaBWpzLv148xC6uJUohJ8JqKZWLF7+rhFSggDzh0tVFyXZE7rhGQ4HPrVzuS7Qq5f8MSg==
+x-ms-office365-filtering-correlation-id: 1734262b-f61c-4372-55df-08d68752a09b
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM0PR04MB5298; 
-x-ms-traffictypediagnostic: AM0PR04MB5298:
-x-microsoft-antispam-prvs: <AM0PR04MB52988E45A83418D3947C1DD280910@AM0PR04MB5298.eurprd04.prod.outlook.com>
+ SRVR:AM0PR04MB5796; 
+x-ms-traffictypediagnostic: AM0PR04MB5796:
+x-microsoft-antispam-prvs: <AM0PR04MB5796801C078DC0909AA5168D80910@AM0PR04MB5796.eurprd04.prod.outlook.com>
 x-forefront-prvs: 09347618C4
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(136003)(39860400002)(346002)(396003)(376002)(189003)(199004)(54534003)(97736004)(256004)(102836004)(5640700003)(316002)(6486002)(386003)(6506007)(71200400001)(71190400001)(2351001)(36756003)(2501003)(4326008)(54906003)(2906002)(6512007)(25786009)(6436002)(99286004)(53936002)(86362001)(305945005)(52116002)(81166006)(44832011)(105586002)(8676002)(486006)(446003)(3846002)(7736002)(76176011)(6116002)(81156014)(11346002)(2616005)(8936002)(476003)(106356001)(50226002)(478600001)(6916009)(14454004)(186003)(68736007)(66066001)(26005);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5298;
+ SFS:(10009020)(396003)(366004)(136003)(376002)(346002)(39860400002)(189003)(199004)(36756003)(8936002)(71190400001)(25786009)(6512007)(106356001)(50226002)(4326008)(99286004)(14444005)(81166006)(71200400001)(8676002)(52116002)(6916009)(53936002)(76176011)(81156014)(14454004)(2906002)(256004)(478600001)(2501003)(3846002)(486006)(44832011)(476003)(102836004)(2616005)(7736002)(6436002)(316002)(6116002)(6486002)(5640700003)(68736007)(26005)(186003)(446003)(66066001)(86362001)(97736004)(6506007)(54906003)(105586002)(386003)(2351001)(11346002)(305945005);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5796;
  H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: gJRU/TufCovAqfzplbdmBxCscdB+LRt+L40vfYrulbJ1nFePjtmic4OcZXB0g52xJuvHaXxmSqoyuutHzYiDOU7RsceluplYIaFeSAOO1BsKa+XdWcdbzsvcyzr9ct1Tprgn3wWLVr1IzvXrEP2B60R469y1eG6430XQk2NcmAjznSWTNPRtMCsGEogcjDVWHxXujCB1ePDfQU9mRJqYiRzrfXWpq5IB1/PzXdgUSishWz0il7LcfBS8SjvgALMTaogw1JeXTpIl2HyUle9IBv0re1crDF3T7PiJubEvtyfPqKK/F9qiSbNfxVngR+dbvbFGj4aIH3OP0jQ6UNjrTIO//t262bKsJiowVs4YmVZOO2PVimEuzWU0Ssem4SbmuGgspNLBL2g1+444atyTQdOzxwSgEOC+RIOOg8+9Pgg=
+x-microsoft-antispam-message-info: CPHWHPMoERdvemyoSo2sx9Qj0++MVvvxqcV0JGDqFZVX7yLY1cQVg5B5zMpBZvXw8TIeBgmByCKIoCvOi0+awW3JPyiBz+3scy/N8fnAc8OKaQzzeG/4z/swV9DONFj69c8sknvHUR3VMXqf/gPiGag6cR6zUWtfu2qo0RHjIXfibETkZ8fRuMx4ck5tO8YdxwOQ7kj1pwQw5DJ8GmbiiDfq/tbG4B/wTeBu8TVhX5cnqMNLdG2LqhE3EIQBv9MihaqTUOqidkRspsH3H22E/qPkrtZd/Gmkw4M7sYeSswoTmMWkp0hacn5+w4JJaq0yY0XmtQMHOTRhJUt0XUh/KK9T1TDsfuLn4HLwGCrs9HDjlqMuNLW0qjMjnHnGFHNGqG7g0Uv6JqYMV2fbbmk+kDkuh6qYW3NJsITzwYPx7Dk=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 9b0747b2-b95b-45f4-904a-08d687529bc9
-X-MS-Exchange-CrossTenant-originalarrivaltime: 31 Jan 2019 08:03:35.7016 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 1734262b-f61c-4372-55df-08d68752a09b
+X-MS-Exchange-CrossTenant-originalarrivaltime: 31 Jan 2019 08:03:43.8503 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5298
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5796
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_000347_228356_841A8435 
-X-CRM114-Status: GOOD (  10.51  )
+X-CRM114-CacheID: sfid-20190131_000350_463021_3986537C 
+X-CRM114-Status: GOOD (  15.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -130,51 +130,149 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Not all 64 interrupts may be used in one group. e.g. most irqsteer in
-imx8qxp and imx8qm subsystems supports only 32 interrupts.
-
-As the IP integration parameters are Channel number and interrupts number,
-let's use fsl,irqs-num to represents how many interrupts supported
-by this irqsteer channel.
+One group can manage 64 interrupts by using two registers (e.g. STATUS/SET).
+However, the integrated irqsteer may support only 32 interrupts which
+needs only one register in a group. But the current driver assume there's
+a mininum of two registers in a group which result in a wrong register map
+for 32 interrupts per channel irqsteer. Let's use the reg_num caculated by
+interrupts per channel instead of irq_group to cover this case.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: devicetree@vger.kernel.org
 Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
-ChangeLog:
- v1->v2:
-  * change property name fsl,irqs-per-chan to fsl,num-irqs.
+v2->v3:
+ * no changes
+v1->v2:
+ * The using of property name updated accordingly
 ---
- .../devicetree/bindings/interrupt-controller/fsl,irqsteer.txt       | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-imx-irqsteer.c | 35 +++++++++++++++++++----------------
+ 1 file changed, 19 insertions(+), 16 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/fsl,irqsteer.txt b/Documentation/devicetree/bindings/interrupt-controller/fsl,irqsteer.txt
-index 45790ce..6d0a41b 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/fsl,irqsteer.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,irqsteer.txt
-@@ -16,8 +16,8 @@ Required properties:
- - #interrupt-cells: Specifies the number of cells needed to encode an
-   interrupt source. The value must be 1.
- - fsl,channel: The output channel that all input IRQs should be steered into.
--- fsl,irq-groups: Number of IRQ groups managed by this controller instance.
--  Each group manages 64 input interrupts.
-+- fsl,num-irqs: Number of input interrupts of this channel.
-+  Should be multiple of 32 input interrupts and up to 512 interrupts.
+diff --git a/drivers/irqchip/irq-imx-irqsteer.c b/drivers/irqchip/irq-imx-irqsteer.c
+index 5b3f1d7..67ed862 100644
+--- a/drivers/irqchip/irq-imx-irqsteer.c
++++ b/drivers/irqchip/irq-imx-irqsteer.c
+@@ -13,7 +13,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/spinlock.h>
  
- Example:
+-#define CTRL_STRIDE_OFF(_t, _r)	(_t * 8 * _r)
++#define CTRL_STRIDE_OFF(_t, _r)	(_t * 4 * _r)
+ #define CHANCTRL		0x0
+ #define CHANMASK(n, t)		(CTRL_STRIDE_OFF(t, 0) + 0x4 * (n) + 0x4)
+ #define CHANSET(n, t)		(CTRL_STRIDE_OFF(t, 1) + 0x4 * (n) + 0x4)
+@@ -26,7 +26,7 @@ struct irqsteer_data {
+ 	struct clk		*ipg_clk;
+ 	int			irq;
+ 	raw_spinlock_t		lock;
+-	int			irq_groups;
++	int			reg_num;
+ 	int			channel;
+ 	struct irq_domain	*domain;
+ 	u32			*saved_reg;
+@@ -35,7 +35,7 @@ struct irqsteer_data {
+ static int imx_irqsteer_get_reg_index(struct irqsteer_data *data,
+ 				      unsigned long irqnum)
+ {
+-	return (data->irq_groups * 2 - irqnum / 32 - 1);
++	return (data->reg_num - irqnum / 32 - 1);
+ }
  
-@@ -28,7 +28,7 @@ Example:
- 		clocks = <&clk IMX8MQ_CLK_DISP_APB_ROOT>;
- 		clock-names = "ipg";
- 		fsl,channel = <0>;
--		fsl,irq-groups = <1>;
-+		fsl,num-irqs = <64>;
- 		interrupt-controller;
- 		#interrupt-cells = <1>;
- 	};
+ static void imx_irqsteer_irq_unmask(struct irq_data *d)
+@@ -46,9 +46,9 @@ static void imx_irqsteer_irq_unmask(struct irq_data *d)
+ 	u32 val;
+ 
+ 	raw_spin_lock_irqsave(&data->lock, flags);
+-	val = readl_relaxed(data->regs + CHANMASK(idx, data->irq_groups));
++	val = readl_relaxed(data->regs + CHANMASK(idx, data->reg_num));
+ 	val |= BIT(d->hwirq % 32);
+-	writel_relaxed(val, data->regs + CHANMASK(idx, data->irq_groups));
++	writel_relaxed(val, data->regs + CHANMASK(idx, data->reg_num));
+ 	raw_spin_unlock_irqrestore(&data->lock, flags);
+ }
+ 
+@@ -60,9 +60,9 @@ static void imx_irqsteer_irq_mask(struct irq_data *d)
+ 	u32 val;
+ 
+ 	raw_spin_lock_irqsave(&data->lock, flags);
+-	val = readl_relaxed(data->regs + CHANMASK(idx, data->irq_groups));
++	val = readl_relaxed(data->regs + CHANMASK(idx, data->reg_num));
+ 	val &= ~BIT(d->hwirq % 32);
+-	writel_relaxed(val, data->regs + CHANMASK(idx, data->irq_groups));
++	writel_relaxed(val, data->regs + CHANMASK(idx, data->reg_num));
+ 	raw_spin_unlock_irqrestore(&data->lock, flags);
+ }
+ 
+@@ -94,13 +94,13 @@ static void imx_irqsteer_irq_handler(struct irq_desc *desc)
+ 
+ 	chained_irq_enter(irq_desc_get_chip(desc), desc);
+ 
+-	for (i = 0; i < data->irq_groups * 64; i += 32) {
++	for (i = 0; i < data->reg_num * 32; i += 32) {
+ 		int idx = imx_irqsteer_get_reg_index(data, i);
+ 		unsigned long irqmap;
+ 		int pos, virq;
+ 
+ 		irqmap = readl_relaxed(data->regs +
+-				       CHANSTATUS(idx, data->irq_groups));
++				       CHANSTATUS(idx, data->reg_num));
+ 
+ 		for_each_set_bit(pos, &irqmap, 32) {
+ 			virq = irq_find_mapping(data->domain, pos + i);
+@@ -146,12 +146,15 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
+ 
+ 	raw_spin_lock_init(&data->lock);
+ 
+-	of_property_read_u32(np, "fsl,irq-groups", &data->irq_groups);
++	of_property_read_u32(np, "fsl,num-irqs", &data->reg_num);
+ 	of_property_read_u32(np, "fsl,channel", &data->channel);
+ 
++	/* one register bit map represents 32 input interrupts */
++	data->reg_num /= 32;
++
+ 	if (IS_ENABLED(CONFIG_PM_SLEEP)) {
+ 		data->saved_reg = devm_kzalloc(&pdev->dev,
+-					sizeof(u32) * data->irq_groups * 2,
++					sizeof(u32) * data->reg_num,
+ 					GFP_KERNEL);
+ 		if (!data->saved_reg)
+ 			return -ENOMEM;
+@@ -166,7 +169,7 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
+ 	/* steer all IRQs into configured channel */
+ 	writel_relaxed(BIT(data->channel), data->regs + CHANCTRL);
+ 
+-	data->domain = irq_domain_add_linear(np, data->irq_groups * 64,
++	data->domain = irq_domain_add_linear(np, data->reg_num * 32,
+ 					     &imx_irqsteer_domain_ops, data);
+ 	if (!data->domain) {
+ 		dev_err(&pdev->dev, "failed to create IRQ domain\n");
+@@ -199,9 +202,9 @@ static void imx_irqsteer_save_regs(struct irqsteer_data *data)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < data->irq_groups * 2; i++)
++	for (i = 0; i < data->reg_num; i++)
+ 		data->saved_reg[i] = readl_relaxed(data->regs +
+-						CHANMASK(i, data->irq_groups));
++						CHANMASK(i, data->reg_num));
+ }
+ 
+ static void imx_irqsteer_restore_regs(struct irqsteer_data *data)
+@@ -209,9 +212,9 @@ static void imx_irqsteer_restore_regs(struct irqsteer_data *data)
+ 	int i;
+ 
+ 	writel_relaxed(BIT(data->channel), data->regs + CHANCTRL);
+-	for (i = 0; i < data->irq_groups * 2; i++)
++	for (i = 0; i < data->reg_num; i++)
+ 		writel_relaxed(data->saved_reg[i],
+-			       data->regs + CHANMASK(i, data->irq_groups));
++			       data->regs + CHANMASK(i, data->reg_num));
+ }
+ 
+ static int imx_irqsteer_suspend(struct device *dev)
 -- 
 2.7.4
 
