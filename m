@@ -2,75 +2,66 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A1776C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:09:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 17511C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:09:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 794F92086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:09:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EA6C320B1F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:09:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aMXP/B1V"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 794F92086C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=rock-chips.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IDs0CxVA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA6C320B1F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=v5QI7fsX6D8titqq9tL9MIqJdyVWkXRiDJhvJ0nmRec=; b=aMXP/B1VgaaconuCo9p9I5D0PD
-	xpPpYZo5Kv/XR0JBHeqkwyqea8wooaBcXEq8DELaA5t8U6uC8H0tEhtwzksT2FUfAszsK+xUzpo78
-	i/m1aHGiUZ7z5lTYcrRiTzhp9JOqj1IXb032/hieCRqYd9/EekoBWcezQ7N6v1/Bwz7TRnpYjfv9u
-	JuuHp48/um4O6KEHAoY56Zodo7tGN0IVVifbZw3dgm4+TxyCjSbm4T3D6E2oPKG+7Y1t5AgaWEKuL
-	ARl87Pr4M0uM+UPJWT5wN7TPmqVtFpZACqercjlEJw8NHSaGEVTyge+CEgknVuHpT55sEEfH6E6eT
-	c6ssT+YA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=JlOESV+K4tDtxwAFKpeOo2SZ5kmnmXMNW5otPQWZHkk=; b=IDs0CxVAEPTXIx
+	NbbYy+4F2ZTOASR8zrT/jW9ltGjeX9so8ykn/yidvU/raGTh0i7aN0WLNU7JoLtxo70h0azbEJnyQ
+	OOkqYw8XU53Xoa4leQ0aaNUMG2+HIGi/ER0oyV0eRpJSDyk7T/F0NYousFH6iPCGMC82OJjGqoqlN
+	/8MCGtW27j0/wXlNj3jKjHzMSvVszlion4CNnuz1SfKedrQifcegRsK4o0v7fZrcLOtd4w29Y2Tvc
+	xHKwufPF2kUax0t2zZctGA/MyU8yLdyG52NZqK4kyYfb/pCm2r0e42ZPSIERmm7BumBvpuLPYFAWC
+	NTu77Mr3gmcHARncoa+g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp8LU-0005FZ-J1; Thu, 31 Jan 2019 09:09:16 +0000
-Received: from lucky1.263xmail.com ([211.157.147.131])
+	id 1gp8Lh-0005UM-Pm; Thu, 31 Jan 2019 09:09:29 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp8Kr-0004i7-Hf; Thu, 31 Jan 2019 09:08:40 +0000
-Received: from tony.xie?rock-chips.com (unknown [192.168.167.239])
- by lucky1.263xmail.com (Postfix) with ESMTP id B6FA756DD;
- Thu, 31 Jan 2019 17:08:30 +0800 (CST)
-X-263anti-spam: KSV:0;
-X-MAIL-GRAY: 1
-X-MAIL-DELIVERY: 0
-X-KSVirus-check: 0
-X-ABS-CHECKED: 4
-Received: from localhost.localdomain (unknown [58.22.7.114])
- by smtp.263.net (postfix) whith ESMTP id
- P15936T140240995997440S1548925701923727_; 
- Thu, 31 Jan 2019 17:08:30 +0800 (CST)
-X-IP-DOMAINF: 1
-X-UNIQUE-TAG: <52771a5e547146586e147716758ac19a>
-X-RL-SENDER: tony.xie@rock-chips.com
-X-SENDER: xxx@rock-chips.com
-X-LOGIN-NAME: tony.xie@rock-chips.com
-X-FST-TO: xxx@rock-chips.com
-X-SENDER-IP: 58.22.7.114
-X-ATTACHMENT-NUM: 0
-X-DNS-TYPE: 0
-From: Tony Xie <tony.xie@rock-chips.com>
-To: tony.xie@rock-chips.com
-Subject: [PATCH v7 4/6] dt-bindings: mfd: rk808: Add binding information for
- RK809 and RK817.
-Date: Thu, 31 Jan 2019 04:08:16 -0500
-Message-Id: <20190131090818.17430-5-tony.xie@rock-chips.com>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190131090818.17430-1-tony.xie@rock-chips.com>
-References: <20190131090818.17430-1-tony.xie@rock-chips.com>
+ id 1gp8Kr-0004iE-1c
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 09:08:40 +0000
+Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <l.stach@pengutronix.de>)
+ id 1gp8Kn-0007k0-RY; Thu, 31 Jan 2019 10:08:33 +0100
+Message-ID: <1548925713.6869.37.camel@pengutronix.de>
+Subject: Re: [PATCH V3 4/4] irq: imx: irqsteer: add multi output interrupts
+ support
+From: Lucas Stach <l.stach@pengutronix.de>
+To: Aisheng Dong <aisheng.dong@nxp.com>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Date: Thu, 31 Jan 2019 10:08:33 +0100
+In-Reply-To: <1548921464-28917-5-git-send-email-aisheng.dong@nxp.com>
+References: <1548921464-28917-1-git-send-email-aisheng.dong@nxp.com>
+ <1548921464-28917-5-git-send-email-aisheng.dong@nxp.com>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
+X-SA-Exim-Mail-From: l.stach@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_010837_945884_FEE6F0A5 
-X-CRM114-Status: GOOD (  11.97  )
+X-CRM114-CacheID: sfid-20190131_010837_242053_60D2C95A 
+X-CRM114-Status: GOOD (  19.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,110 +73,129 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-rockchip@lists.infradead.org, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>, "tglx@linutronix.de" <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add device tree bindings documentation for Rockchip's RK809 & RK817 PMIC.
-
-Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
----
- .../devicetree/bindings/mfd/rk808.txt         | 44 +++++++++++++++++++
- 1 file changed, 44 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/mfd/rk808.txt b/Documentation/devicetree/bindings/mfd/rk808.txt
-index 1683ec3245bc..04df07f6f793 100644
---- a/Documentation/devicetree/bindings/mfd/rk808.txt
-+++ b/Documentation/devicetree/bindings/mfd/rk808.txt
-@@ -3,11 +3,15 @@ RK8XX Power Management Integrated Circuit
- The rk8xx family current members:
- rk805
- rk808
-+rk809
-+rk817
- rk818
- 
- Required properties:
- - compatible: "rockchip,rk805"
- - compatible: "rockchip,rk808"
-+- compatible: "rockchip,rk809"
-+- compatible: "rockchip,rk817"
- - compatible: "rockchip,rk818"
- - reg: I2C slave address
- - interrupts: the interrupt outputs of the controller.
-@@ -45,6 +49,23 @@ Optional RK808 properties:
-   the gpio controller. If DVS GPIOs aren't present, voltage changes will happen
-   very quickly with no slow ramp time.
- 
-+Optional shared RK809 and RK817 properties:
-+- vcc1-supply:  The input supply for DCDC_REG1
-+- vcc2-supply:  The input supply for DCDC_REG2
-+- vcc3-supply:  The input supply for DCDC_REG3
-+- vcc4-supply:  The input supply for DCDC_REG4
-+- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
-+- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
-+- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
-+
-+Optional RK809 properties:
-+- vcc8-supply:  The input supply for SWITCH_REG1
-+- vcc9-supply:  The input supply for DCDC_REG5, SWITCH_REG2
-+
-+Optional RK817 properties:
-+- vcc8-supply:  The input supply for BOOST
-+- vcc9-supply:  The input supply for OTG_SWITCH
-+
- Optional RK818 properties:
- - vcc1-supply:  The input supply for DCDC_REG1
- - vcc2-supply:  The input supply for DCDC_REG2
-@@ -86,6 +107,21 @@ number as described in RK808 datasheet.
- 	- SWITCH_REGn
- 		- valid values for n are 1 to 2
- 
-+Following regulators of the RK809 and RK817 PMIC blocks are supported. Note that
-+the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
-+number as described in RK809 and RK817 datasheets.
-+
-+	- DCDC_REGn
-+		- valid values for n are 1 to 5 for RK809.
-+		- valid values for n are 1 to 4 for RK817.
-+	- LDO_REGn
-+		- valid values for n are 1 to 9 for RK809.
-+		- valid values for n are 1 to 9 for RK817.
-+	- SWITCH_REGn
-+		- valid values for n are 1 to 2 for RK809.
-+	- BOOST for RK817
-+	- OTG_SWITCH for RK817
-+
- Following regulators of the RK818 PMIC block are supported. Note that
- the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
- number as described in RK818 datasheet.
-@@ -98,6 +134,14 @@ number as described in RK818 datasheet.
- 	- HDMI_SWITCH
- 	- OTG_SWITCH
- 
-+It is necessary to configure three pins for both the RK809 and RK817, the three
-+pins are "gpio_ts" "gpio_gt" "gpio_slp".
-+	The gpio_gt and gpio_ts pins support the gpio function.
-+	The gpio_slp pin is for controlling the pmic states, as below:
-+		- reset
-+		- power down
-+		- sleep
-+
- Standard regulator bindings are used inside regulator subnodes. Check
-   Documentation/devicetree/bindings/regulator/regulator.txt
- for more details
--- 
-2.17.1
-
-
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+QW0gRG9ubmVyc3RhZywgZGVuIDMxLjAxLjIwMTksIDA4OjAzICswMDAwIHNjaHJpZWIgQWlzaGVu
+ZyBEb25nOgo+IE9uZSBpcnFzdGVlciBjaGFubmVsIGNhbiBzdXBwb3J0IHVwIHRvIDggb3V0cHV0
+IGludGVycnVwdHMuCj4gCj4gPiBDYzogTWFyYyBaeW5naWVyIDxtYXJjLnp5bmdpZXJAYXJtLmNv
+bT4KPiA+IENjOiBMdWNhcyBTdGFjaCA8bC5zdGFjaEBwZW5ndXRyb25peC5kZT4KPiA+IENjOiBT
+aGF3biBHdW8gPHNoYXduZ3VvQGtlcm5lbC5vcmc+Cj4gU2lnbmVkLW9mZi1ieTogRG9uZyBBaXNo
+ZW5nIDxhaXNoZW5nLmRvbmdAbnhwLmNvbT4KClJldmlld2VkLWJ5OiBMdWNhcyBTdGFjaCA8bC5z
+dGFjaEBwZW5ndXRyb25peC5kZT4KCj4gLS0tCj4gQ2hhbmdlTG9nOgo+IHYyLT52MzoKPiDCoCog
+YWRkIGVycm9yIGNoZWNrIGZvciBpbXhfaXJxc3RlZXJfZ2V0X2h3aXJxX2Jhc2UKPiDCoCogdXNl
+IERJVl9ST1VORF9VUAo+IMKgKiBtZXJnZSAnaHdpcnEgKz0zMicgaW50byBmb3IgbG9vcAo+IMKg
+KiBjb21tb24gZXJyb3IgcGF0aCBpbiBwcm9iZSB0byBhdm9pZCByZXBsaWNhdGluZyBjbGtfZGlz
+YWJsZV91bnByZXBhcmUKPiB2MS0+djI6Cj4gwqAqIGNhbGN1bGF0ZSBpcnFfY291bnQgYnkgZnNs
+LG51bS1pcnFzIGluc3RlYWQgb2YgcGFyc2luZyBpbnRlcnJ1cHRzCj4gwqDCoMKgcHJvcGVydHkg
+ZnJvbSBkZXZpY2V0cmVlIHRvIG1hdGNoIHRoZSBpbnB1dCBpbnRlcnJ1cHRzIGFuZCBvdXRwdXRz
+Cj4gwqAqIGltcHJvdmUgb3V0cHV0IGludGVycnVwdCBoYW5kbGVyIGJ5IHNlYXJjaGluZyBvbmx5
+IHR3byByZWdpc3RlcnMKPiDCoMKgwqB3aXRoaW50IHRoZSBzYW1lIGdyb3VwCj4gLS0tCj4gwqBk
+cml2ZXJzL2lycWNoaXAvaXJxLWlteC1pcnFzdGVlci5jIHwgODggKysrKysrKysrKysrKysrKysr
+KysrKysrKysrKystLS0tLS0tLS0KPiDCoDEgZmlsZSBjaGFuZ2VkLCA2OCBpbnNlcnRpb25zKCsp
+LCAyMCBkZWxldGlvbnMoLSkKPiAKPiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9pcnFjaGlwL2lycS1p
+bXgtaXJxc3RlZXIuYyBiL2RyaXZlcnMvaXJxY2hpcC9pcnEtaW14LWlycXN0ZWVyLmMKPiBpbmRl
+eCA2N2VkODYyLi5kMTA5OGY0IDEwMDY0NAo+IC0tLSBhL2RyaXZlcnMvaXJxY2hpcC9pcnEtaW14
+LWlycXN0ZWVyLmMKPiArKysgYi9kcml2ZXJzL2lycWNoaXAvaXJxLWlteC1pcnFzdGVlci5jCj4g
+QEAgLTEwLDYgKzEwLDcgQEAKPiDCoCNpbmNsdWRlIDxsaW51eC9pcnFjaGlwL2NoYWluZWRfaXJx
+Lmg+Cj4gwqAjaW5jbHVkZSA8bGludXgvaXJxZG9tYWluLmg+Cj4gwqAjaW5jbHVkZSA8bGludXgv
+a2VybmVsLmg+Cj4gKyNpbmNsdWRlIDxsaW51eC9vZl9pcnEuaD4KPiDCoCNpbmNsdWRlIDxsaW51
+eC9vZl9wbGF0Zm9ybS5oPgo+IMKgI2luY2x1ZGUgPGxpbnV4L3NwaW5sb2NrLmg+Cj4gwqAKPiBA
+QCAtMjEsMTAgKzIyLDEzIEBACj4gPiDCoCNkZWZpbmUgQ0hBTl9NSU5URElTKHQpCQkoQ1RSTF9T
+VFJJREVfT0ZGKHQsIDMpICsgMHg0KQo+ID4gwqAjZGVmaW5lIENIQU5fTUFTVFJTVEFUKHQpCShD
+VFJMX1NUUklERV9PRkYodCwgMykgKyAweDgpCj4gwqAKPiA+ICsjZGVmaW5lIENIQU5fTUFYX09V
+VFBVVF9JTlQJMHg4Cj4gKwo+IMKgc3RydWN0IGlycXN0ZWVyX2RhdGEgewo+ID4gPiDCoAl2b2lk
+IF9faW9tZW0JCSpyZWdzOwo+ID4gPiDCoAlzdHJ1Y3QgY2xrCQkqaXBnX2NsazsKPiA+ID4gLQlp
+bnQJCQlpcnE7Cj4gPiA+ICsJaW50CQkJaXJxW0NIQU5fTUFYX09VVFBVVF9JTlRdOwo+ID4gPiAr
+CWludAkJCWlycV9jb3VudDsKPiA+ID4gwqAJcmF3X3NwaW5sb2NrX3QJCWxvY2s7Cj4gPiA+IMKg
+CWludAkJCXJlZ19udW07Cj4gPiA+IMKgCWludAkJCWNoYW5uZWw7Cj4gQEAgLTg3LDIzICs5MSw0
+NyBAQCBzdGF0aWMgY29uc3Qgc3RydWN0IGlycV9kb21haW5fb3BzIGlteF9pcnFzdGVlcl9kb21h
+aW5fb3BzID0gewo+ID4gPiDCoAkueGxhdGUJCT0gaXJxX2RvbWFpbl94bGF0ZV9vbmVjZWxsLAo+
+IMKgfTsKPiDCoAo+ICtzdGF0aWMgaW50IGlteF9pcnFzdGVlcl9nZXRfaHdpcnFfYmFzZShzdHJ1
+Y3QgaXJxc3RlZXJfZGF0YSAqZGF0YSwgdTMyIGlycSkKPiArewo+ID4gKwlpbnQgaTsKPiArCj4g
+PiArCWZvciAoaSA9IDA7IGkgPCBkYXRhLT5pcnFfY291bnQ7IGkrKykgewo+ID4gKwkJaWYgKGRh
+dGEtPmlycVtpXSA9PSBpcnEpCj4gPiArCQkJcmV0dXJuIGkgKiA2NDsKPiA+ICsJfQo+ICsKPiA+
+ICsJcmV0dXJuIC1FSU5WQUw7Cj4gK30KPiArCj4gwqBzdGF0aWMgdm9pZCBpbXhfaXJxc3RlZXJf
+aXJxX2hhbmRsZXIoc3RydWN0IGlycV9kZXNjICpkZXNjKQo+IMKgewo+ID4gwqAJc3RydWN0IGly
+cXN0ZWVyX2RhdGEgKmRhdGEgPSBpcnFfZGVzY19nZXRfaGFuZGxlcl9kYXRhKGRlc2MpOwo+ID4g
+LQlpbnQgaTsKPiA+ICsJaW50IGh3aXJxOwo+ID4gKwlpbnQgaXJxLCBpOwo+IMKgCj4gPiDCoAlj
+aGFpbmVkX2lycV9lbnRlcihpcnFfZGVzY19nZXRfY2hpcChkZXNjKSwgZGVzYyk7Cj4gwqAKPiA+
+IC0JZm9yIChpID0gMDsgaSA8IGRhdGEtPnJlZ19udW0gKiAzMjsgaSArPSAzMikgewo+ID4gLQkJ
+aW50IGlkeCA9IGlteF9pcnFzdGVlcl9nZXRfcmVnX2luZGV4KGRhdGEsIGkpOwo+ID4gKwlpcnEg
+PSBpcnFfZGVzY19nZXRfaXJxKGRlc2MpOwo+ID4gKwlod2lycSA9IGlteF9pcnFzdGVlcl9nZXRf
+aHdpcnFfYmFzZShkYXRhLCBpcnEpOwo+ID4gKwlpZiAoaHdpcnEgPCAwKSB7Cj4gPiArCQlwcl93
+YXJuKCIlczogdW5hYmxlIHRvIGdldCBod2lycSBiYXNlIGZvciBpcnEgJWRcbiIsCj4gPiArCQkJ
+X19mdW5jX18sIGlycSk7Cj4gPiArCQlyZXR1cm47Cj4gPiArCX0KPiArCj4gPiArCWZvciAoaSA9
+IDA7IGkgPCAyOyBpKyssIGh3aXJxICs9IDMyKSB7Cj4gPiArCQlpbnQgaWR4ID0gaW14X2lycXN0
+ZWVyX2dldF9yZWdfaW5kZXgoZGF0YSwgaHdpcnEpOwo+ID4gwqAJCXVuc2lnbmVkIGxvbmcgaXJx
+bWFwOwo+ID4gwqAJCWludCBwb3MsIHZpcnE7Cj4gwqAKPiA+ICsJCWlmIChod2lycSA+PSBkYXRh
+LT5yZWdfbnVtICogMzIpCj4gPiArCQkJYnJlYWs7Cj4gKwo+ID4gwqAJCWlycW1hcCA9IHJlYWRs
+X3JlbGF4ZWQoZGF0YS0+cmVncyArCj4gPiDCoAkJCQnCoMKgwqDCoMKgwqDCoENIQU5TVEFUVVMo
+aWR4LCBkYXRhLT5yZWdfbnVtKSk7Cj4gwqAKPiA+IMKgCQlmb3JfZWFjaF9zZXRfYml0KHBvcywg
+JmlycW1hcCwgMzIpIHsKPiA+IC0JCQl2aXJxID0gaXJxX2ZpbmRfbWFwcGluZyhkYXRhLT5kb21h
+aW4sIHBvcyArIGkpOwo+ID4gKwkJCXZpcnEgPSBpcnFfZmluZF9tYXBwaW5nKGRhdGEtPmRvbWFp
+biwgcG9zICsgaHdpcnEpOwo+ID4gwqAJCQlpZiAodmlycSkKPiA+IMKgCQkJCWdlbmVyaWNfaGFu
+ZGxlX2lycSh2aXJxKTsKPiA+IMKgCQl9Cj4gQEAgLTExNyw3ICsxNDUsOCBAQCBzdGF0aWMgaW50
+IGlteF9pcnFzdGVlcl9wcm9iZShzdHJ1Y3QgcGxhdGZvcm1fZGV2aWNlICpwZGV2KQo+ID4gwqAJ
+c3RydWN0IGRldmljZV9ub2RlICpucCA9IHBkZXYtPmRldi5vZl9ub2RlOwo+ID4gwqAJc3RydWN0
+IGlycXN0ZWVyX2RhdGEgKmRhdGE7Cj4gPiDCoAlzdHJ1Y3QgcmVzb3VyY2UgKnJlczsKPiA+IC0J
+aW50IHJldDsKPiA+ICsJdTMyIGlycXNfbnVtOwo+ID4gKwlpbnQgaSwgcmV0Owo+IMKgCj4gPiDC
+oAlkYXRhID0gZGV2bV9remFsbG9jKCZwZGV2LT5kZXYsIHNpemVvZigqZGF0YSksIEdGUF9LRVJO
+RUwpOwo+ID4gwqAJaWYgKCFkYXRhKQo+IEBAIC0xMzAsMTIgKzE1OSw2IEBAIHN0YXRpYyBpbnQg
+aW14X2lycXN0ZWVyX3Byb2JlKHN0cnVjdCBwbGF0Zm9ybV9kZXZpY2UgKnBkZXYpCj4gPiDCoAkJ
+cmV0dXJuIFBUUl9FUlIoZGF0YS0+cmVncyk7Cj4gPiDCoAl9Cj4gwqAKPiA+IC0JZGF0YS0+aXJx
+ID0gcGxhdGZvcm1fZ2V0X2lycShwZGV2LCAwKTsKPiA+IC0JaWYgKGRhdGEtPmlycSA8PSAwKSB7
+Cj4gPiAtCQlkZXZfZXJyKCZwZGV2LT5kZXYsICJmYWlsZWQgdG8gZ2V0IGlycVxuIik7Cj4gPiAt
+CQlyZXR1cm4gLUVOT0RFVjsKPiA+IC0JfQo+IC0KPiA+IMKgCWRhdGEtPmlwZ19jbGsgPSBkZXZt
+X2Nsa19nZXQoJnBkZXYtPmRldiwgImlwZyIpOwo+ID4gwqAJaWYgKElTX0VSUihkYXRhLT5pcGdf
+Y2xrKSkgewo+ID4gwqAJCXJldCA9IFBUUl9FUlIoZGF0YS0+aXBnX2Nsayk7Cj4gQEAgLTE0Niwx
+MSArMTY5LDE1IEBAIHN0YXRpYyBpbnQgaW14X2lycXN0ZWVyX3Byb2JlKHN0cnVjdCBwbGF0Zm9y
+bV9kZXZpY2UgKnBkZXYpCj4gwqAKPiA+IMKgCXJhd19zcGluX2xvY2tfaW5pdCgmZGF0YS0+bG9j
+ayk7Cj4gwqAKPiA+IC0Jb2ZfcHJvcGVydHlfcmVhZF91MzIobnAsICJmc2wsbnVtLWlycXMiLCAm
+ZGF0YS0+cmVnX251bSk7Cj4gPiArCW9mX3Byb3BlcnR5X3JlYWRfdTMyKG5wLCAiZnNsLG51bS1p
+cnFzIiwgJmlycXNfbnVtKTsKPiA+IMKgCW9mX3Byb3BlcnR5X3JlYWRfdTMyKG5wLCAiZnNsLGNo
+YW5uZWwiLCAmZGF0YS0+Y2hhbm5lbCk7Cj4gwqAKPiA+IC0JLyogb25lIHJlZ2lzdGVyIGJpdCBt
+YXAgcmVwcmVzZW50cyAzMiBpbnB1dCBpbnRlcnJ1cHRzICovCj4gPiAtCWRhdGEtPnJlZ19udW0g
+Lz0gMzI7Cj4gPiArCS8qCj4gPiArCcKgKiBUaGVyZSBpcyBvbmUgb3V0cHV0IGlycSBmb3IgZWFj
+aCBncm91cCBvZiA2NCBpbnB1dHMuCj4gPiArCcKgKiBPbmUgcmVnaXN0ZXIgYml0IG1hcCBjYW4g
+cmVwcmVzZW50IDMyIGlucHV0IGludGVycnVwdHMuCj4gPiArCcKgKi8KPiA+ICsJZGF0YS0+aXJx
+X2NvdW50ID0gRElWX1JPVU5EX1VQKGlycXNfbnVtLCA2NCk7Cj4gPiArCWRhdGEtPnJlZ19udW0g
+PSBpcnFzX251bSAvIDMyOwo+IMKgCj4gPiDCoAlpZiAoSVNfRU5BQkxFRChDT05GSUdfUE1fU0xF
+RVApKSB7Cj4gPiDCoAkJZGF0YS0+c2F2ZWRfcmVnID0gZGV2bV9remFsbG9jKCZwZGV2LT5kZXYs
+Cj4gQEAgLTE3MywyMyArMjAwLDQ0IEBAIHN0YXRpYyBpbnQgaW14X2lycXN0ZWVyX3Byb2JlKHN0
+cnVjdCBwbGF0Zm9ybV9kZXZpY2UgKnBkZXYpCj4gPiDCoAkJCQkJwqDCoMKgwqDCoCZpbXhfaXJx
+c3RlZXJfZG9tYWluX29wcywgZGF0YSk7Cj4gPiDCoAlpZiAoIWRhdGEtPmRvbWFpbikgewo+ID4g
+wqAJCWRldl9lcnIoJnBkZXYtPmRldiwgImZhaWxlZCB0byBjcmVhdGUgSVJRIGRvbWFpblxuIik7
+Cj4gPiAtCQljbGtfZGlzYWJsZV91bnByZXBhcmUoZGF0YS0+aXBnX2Nsayk7Cj4gPiAtCQlyZXR1
+cm4gLUVOT01FTTsKPiA+ICsJCXJldCA9IC1FTk9NRU07Cj4gPiArCQlnb3RvIG91dDsKPiA+IMKg
+CX0KPiDCoAo+ID4gLQlpcnFfc2V0X2NoYWluZWRfaGFuZGxlcl9hbmRfZGF0YShkYXRhLT5pcnEs
+IGlteF9pcnFzdGVlcl9pcnFfaGFuZGxlciwKPiA+IC0JCQkJCcKgZGF0YSk7Cj4gPiArCWlmICgh
+ZGF0YS0+aXJxX2NvdW50IHx8IGRhdGEtPmlycV9jb3VudCA+IENIQU5fTUFYX09VVFBVVF9JTlQp
+IHsKPiA+ICsJCXJldCA9IC1FSU5WQUw7Cj4gPiArCQlnb3RvIG91dDsKPiA+ICsJfQo+ICsKPiA+
+ICsJZm9yIChpID0gMDsgaSA8IGRhdGEtPmlycV9jb3VudDsgaSsrKSB7Cj4gPiArCQlkYXRhLT5p
+cnFbaV0gPSBpcnFfb2ZfcGFyc2VfYW5kX21hcChucCwgaSk7Cj4gPiArCQlpZiAoIWRhdGEtPmly
+cVtpXSkgewo+ID4gKwkJCXJldCA9IC1FSU5WQUw7Cj4gPiArCQkJZ290byBvdXQ7Cj4gPiArCQl9
+Cj4gKwo+ID4gKwkJaXJxX3NldF9jaGFpbmVkX2hhbmRsZXJfYW5kX2RhdGEoZGF0YS0+aXJxW2ld
+LAo+ID4gKwkJCQkJCcKgaW14X2lycXN0ZWVyX2lycV9oYW5kbGVyLAo+ID4gKwkJCQkJCcKgZGF0
+YSk7Cj4gPiArCX0KPiDCoAo+ID4gwqAJcGxhdGZvcm1fc2V0X2RydmRhdGEocGRldiwgZGF0YSk7
+Cj4gwqAKPiA+IMKgCXJldHVybiAwOwo+ICtvdXQ6Cj4gPiArCWNsa19kaXNhYmxlX3VucHJlcGFy
+ZShkYXRhLT5pcGdfY2xrKTsKPiA+ICsJcmV0dXJuIHJldDsKPiDCoH0KPiDCoAo+IMKgc3RhdGlj
+IGludCBpbXhfaXJxc3RlZXJfcmVtb3ZlKHN0cnVjdCBwbGF0Zm9ybV9kZXZpY2UgKnBkZXYpCj4g
+wqB7Cj4gPiDCoAlzdHJ1Y3QgaXJxc3RlZXJfZGF0YSAqaXJxc3RlZXJfZGF0YSA9IHBsYXRmb3Jt
+X2dldF9kcnZkYXRhKHBkZXYpOwo+ID4gKwlpbnQgaTsKPiArCj4gPiArCWZvciAoaSA9IDA7IGkg
+PCBpcnFzdGVlcl9kYXRhLT5pcnFfY291bnQ7IGkrKykKPiA+ICsJCWlycV9zZXRfY2hhaW5lZF9o
+YW5kbGVyX2FuZF9kYXRhKGlycXN0ZWVyX2RhdGEtPmlycVtpXSwKPiA+ICsJCQkJCQnCoE5VTEws
+IE5VTEwpOwo+IMKgCj4gPiAtCWlycV9zZXRfY2hhaW5lZF9oYW5kbGVyX2FuZF9kYXRhKGlycXN0
+ZWVyX2RhdGEtPmlycSwgTlVMTCwgTlVMTCk7Cj4gPiDCoAlpcnFfZG9tYWluX3JlbW92ZShpcnFz
+dGVlcl9kYXRhLT5kb21haW4pOwo+IMKgCj4gPiDCoAljbGtfZGlzYWJsZV91bnByZXBhcmUoaXJx
+c3RlZXJfZGF0YS0+aXBnX2Nsayk7CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2Vy
+bmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1h
+bi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
