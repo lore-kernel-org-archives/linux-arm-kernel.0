@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 459A1C282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:56:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 14218C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 10:00:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1B4F2218AC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:56:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D22C020B1F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 10:00:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ASjVlWsO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1B4F2218AC
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lz6VJJ1l"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D22C020B1F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,30 +24,32 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=J5x6SyzEe+bNB+jFLx+k6eppNLbl4jfw/whEfcuIfD8=; b=ASjVlWsOTIQtUW
-	Vx//imlz9mxTlbhZqRm3WU8os0eSJgnqb5UDzzJUTexo2QzCOljIovajc3ELCTYsU6u3l09Dn87V1
-	h01tmJrtHm6zO2tNIYZe/P+hDcOkQaPwMxIfV5Hkg7ztUw7Ds0JE1Vza1f0ew8qTR9blKvzKQKeON
-	p+zkM58rIYjIsIYZp8i959H5pBdSwrcP5DKI0qBRdbUYf9lW2iofxc5oPBblGglW3j5shmcExsHFd
-	qnPXjl0iIKvOFQmNuDiRM3FYVISoBFZdGSNYDfVbjlEVwlZ4Zv1tnqSPCprVSjn+oaQhQxrwMx3Vo
-	SNTsT/cpeQGHnUZYvjoA==;
+	List-Owner; bh=dYHMLTCAQdHr/QEHX/45wcO1ym9jyL2VtMFuswhDTAY=; b=lz6VJJ1l0OZzVy
+	zVpBQ3YL4OJ9BXlrFXZYmjACmMlWpBYYbCQ4p4t6VN4uApZ4AmHy9NEa2pmOBGoIeUT6wpqfyBkKP
+	aCf6OsX1KvRVAgvO/a2MMttMO96lLZ7reaiwqM2ppYEi6oZ1HQEm3WbvQQIqrfLhqPNaVFHUm8hd6
+	Cs1mteriVaPBX0iSEr9q46UXq9mFw5a0a1QdI3OTU2wUSN6HBkYrQWPLltrwTC6GLyeFOBQXNPTbu
+	ujK1FfhqhDRO1bryD2i5LeZuRI1YO/YbEUu5kWK0eDKFfkMgXyrwMuRgakyrqMOLETVnP4m7JmWpX
+	36FG/YtoJLqA0ZkT3ibw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp95P-0005dU-Es; Thu, 31 Jan 2019 09:56:43 +0000
+	id 1gp98o-0007oK-UI; Thu, 31 Jan 2019 10:00:14 +0000
 Received: from j217100.upc-j.chello.nl ([24.132.217.100]
  helo=hirez.programming.kicks-ass.net)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp95M-0005cu-J7; Thu, 31 Jan 2019 09:56:40 +0000
+ id 1gp98m-0007o7-Au; Thu, 31 Jan 2019 10:00:12 +0000
 Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
- id 3164A20423039; Thu, 31 Jan 2019 10:56:38 +0100 (CET)
-Date: Thu, 31 Jan 2019 10:56:38 +0100
+ id C070C20423039; Thu, 31 Jan 2019 11:00:09 +0100 (CET)
+Date: Thu, 31 Jan 2019 11:00:09 +0100
 From: Peter Zijlstra <peterz@infradead.org>
 To: Alex Kogan <alex.kogan@oracle.com>
-Subject: Re: [PATCH 0/3] Add NUMA-awareness to qspinlock
-Message-ID: <20190131095638.GA31534@hirez.programming.kicks-ass.net>
+Subject: Re: [PATCH 3/3] locking/qspinlock: Introduce starvation avoidance
+ into CNA
+Message-ID: <20190131100009.GB31534@hirez.programming.kicks-ass.net>
 References: <20190131030136.56999-1-alex.kogan@oracle.com>
+ <20190131030136.56999-4-alex.kogan@oracle.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190131030136.56999-1-alex.kogan@oracle.com>
+In-Reply-To: <20190131030136.56999-4-alex.kogan@oracle.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -63,68 +65,36 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
 Cc: linux-arch@vger.kernel.org, arnd@arndb.de, dave.dice@oracle.com,
  will.deacon@arm.com, linux@armlinux.org.uk, linux-kernel@vger.kernel.org,
  rahul.x.yadav@oracle.com, mingo@redhat.com, steven.sistare@oracle.com,
- longman@redhat.com, daniel.m.jordan@oracle.com,
- linux-arm-kernel@lists.infradead.org
+ longman@redhat.com, Thomas Gleixner <tglx@linutronix.de>,
+ daniel.m.jordan@oracle.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 30, 2019 at 10:01:32PM -0500, Alex Kogan wrote:
-> Lock throughput can be increased by handing a lock to a waiter on the
-> same NUMA socket as the lock holder, provided care is taken to avoid
-> starvation of waiters on other NUMA sockets. This patch introduces CNA
-> (compact NUMA-aware lock) as the slow path for qspinlock.
-
-Since you use NUMA, use the term node, not socket. The two are not
-strictly related.
-
-> CNA is a NUMA-aware version of the MCS spin-lock. Spinning threads are
-> organized in two queues, a main queue for threads running on the same
-> socket as the current lock holder, and a secondary queue for threads
-> running on other sockets. Threads record the ID of the socket on which
-> they are running in their queue nodes. At the unlock time, the lock
-> holder scans the main queue looking for a thread running on the same
-> socket. If found (call it thread T), all threads in the main queue
-> between the current lock holder and T are moved to the end of the
-> secondary queue, and the lock is passed to T. If such T is not found, the
-> lock is passed to the first node in the secondary queue. Finally, if the
-> secondary queue is empty, the lock is passed to the next thread in the
-> main queue.
+On Wed, Jan 30, 2019 at 10:01:35PM -0500, Alex Kogan wrote:
+> Choose the next lock holder among spinning threads running on the same
+> socket with high probability rather than always. With small probability,
+> hand the lock to the first thread in the secondary queue or, if that
+> queue is empty, to the immediate successor of the current lock holder
+> in the main queue.  Thus, assuming no failures while threads hold the
+> lock, every thread would be able to acquire the lock after a bounded
+> number of lock transitions, with high probability.
 > 
-> Full details are available at https://arxiv.org/abs/1810.05600.
+> Note that we could make the inter-socket transition deterministic,
+> by sticking a counter of intra-socket transitions in the head node
+> of the secondary queue. At the handoff time, we could increment
+> the counter and check if it is below a threshold. This adds another
+> field to queue nodes and nearly-certain local cache miss to read and
+> update this counter during the handoff. While still beating stock,
+> this variant adds certain overhead over the probabilistic variant.
 
-Full details really should also be in the Changelog. You can skip much
-of the academic bla-bla, but the Changelog should be self contained.
+(also heavily suffers from the socket == node confusion)
 
-> We have done some performance evaluation with the locktorture module
-> as well as with several benchmarks from the will-it-scale repo.
-> The following locktorture results are from an Oracle X5-4 server
-> (four Intel Xeon E7-8895 v3 @ 2.60GHz sockets with 18 hyperthreaded
-> cores each). Each number represents an average (over 5 runs) of the
-> total number of ops (x10^7) reported at the end of each run. The stock
-> kernel is v4.20.0-rc4+ compiled in the default configuration.
-> 
-> #thr  stock  patched speedup (patched/stock)
->   1   2.710   2.715  1.002
->   2   3.108   3.001  0.966
->   4   4.194   3.919  0.934
+How would you suggest RT 'tunes' this?
 
-So low contention is actually worse. Funnily low contention is the
-majority of our locks and is _really_ important.
-
->   8   5.309   6.894  1.299
->  16   6.722   9.094  1.353
->  32   7.314   9.885  1.352
->  36   7.562   9.855  1.303
->  72   6.696  10.358  1.547
-> 108   6.364  10.181  1.600
-> 142   6.179  10.178  1.647
-> 
-> When the kernel is compiled with lockstat enabled, CNA 
-
-I'll ignore that, lockstat/lockdep enabled runs are not what one would
-call performance relevant.
+RT relies on FIFO fairness of the basic spinlock primitives; you just
+completely wrecked that.
 
 _______________________________________________
 linux-arm-kernel mailing list
