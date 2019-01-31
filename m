@@ -2,80 +2,109 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C361EC282C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:03:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D16CC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:03:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9FF65218AF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:03:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3C12C218D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:03:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eiJAIJhm";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="cMtiRJa9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9FF65218AF
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T4h6AhNT";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="iNNaCx1l"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C12C218D9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DSO6Zmds52u21W+XdNrAmrc6LwkfjQxjrFB1FQCO4E8=; b=eiJAIJhmXkZOm2
-	qQoxDNxL87qjJqj/L7Pa4DMSIrmnDjrfvbYm33H08t2b3D+Y7o8BGzb6aGi9iiC6y0kkXn0L79r5G
-	Ktt4RTSIJ6AcVE/b+flp+BjpGBcg2ygU+SUvX6cdKPBy0yFutV4ye9hrLKn/xavOKw+5TYp/Mz2e5
-	MOR2DN60L5alnfMRQlkqP/NAONDs6RMbppWlylCZITqCqRGsz35HXFnYNWEDmgEeD1WeSzOSFIu8M
-	2AtfpNOGX/pR/1EZqsmVU5YPVeYNeK413+fyEsuu4JWE7EXjP5pzq8spYOTNIFeaquX4MtDT/kSoF
-	grjwTPmlmAGh3RTqOY1A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=x+TnDi8cYxtUKC8kipwp/Un2uBJyfhlHI7bf8cTtNV4=; b=T4h6AhNT8/Thnf
+	8KlwMdQYEuMIY/D2hpI06PT1V+CWtu5iVtBqztHr0wJug7gJFrzys6u5AlDcpKi4jpUPS1bFO9IUg
+	ri9EjIwGW+17lXwbr4fuVqmektQbNxEMMP3EA/mt1WXcQaM+Euonb4SyVaj2MAGo3SBkyphGDpLVY
+	Umba2PpniidP37F6LQVI3ehM4SmMNEFEwz60XaiNAWvc8bTrP47HCZe2hpUNbD83F82fAnsiNyEen
+	OkfIGNfHiVgJzlHm6O3y2Zl9yZfOg5PQGfUBqKEQKw9Gwy9h2xUlZbA60Mn1g6i6lTf4m/70nuuBd
+	l7g9tFQhwhaP+17YJs+Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp7JZ-0005I4-Ix; Thu, 31 Jan 2019 08:03:13 +0000
-Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
+	id 1gp7K7-0005dF-Ni; Thu, 31 Jan 2019 08:03:47 +0000
+Received: from mail-eopbgr150043.outbound.protection.outlook.com
+ ([40.107.15.43] helo=EUR01-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp7JN-0005AB-Qf
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 08:03:07 +0000
-Received: by mail-lj1-x243.google.com with SMTP id t18-v6so1865404ljd.4
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 31 Jan 2019 00:03:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=th0n7sJ1kpbg6jUTHvOwcYdoG8LZVB3dE8mGIZUNN44=;
- b=cMtiRJa9xzaXgKRLjIMljKdSvq27GQ1YWXO5LpxqkQcWn0Gixt6z9qihODgFX0goGd
- 5fIBSdrJQYV6RuH8I2sxnZooJoJtWHdPrFtd79zwYc8qT1qZaKOHpeziwm6lxivDPdKw
- cqSAYCVlbjGKHooKkIwnbFoF/qcuEBCPGcUZ0=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=th0n7sJ1kpbg6jUTHvOwcYdoG8LZVB3dE8mGIZUNN44=;
- b=RyqXtLXoSqwUvwCGjyXE803g0ra2t32mUM9HqfTLDxQCsTX/OqsD8lw/koztBgYppg
- tTX6iuyMJoJBAIq3uiqkDcytM+GogI+e3+6hdq7mWk6ZGiY8xVxVhwH0yEE8iSy36Kv3
- zRrF3YIN9FKBqovc0j8gvuBsS01Mrrx2+qgK8fA//mXghZWL3/WQKybesDPgJzHWjmRa
- /yz6fkPoZ2WeO/YIogEEUestJ+FgFQR3zFgvxg2g0K8+1/e6BIw9QP+Ew268mR3+Tp6g
- ToyVfX7wRsiYo39BvsWGxpEwfjuzrk4P/YKg2PKpdzIvudaVxO6Rolm6fIlX13CnMJcZ
- pYLw==
-X-Gm-Message-State: AJcUukfUsQI8k8TD8EVkp6XIXCtMJIRjFAuMhXf4iMITq+xpQTy47RiP
- 04kP0a1DjitNxkAcOncJbXq0Ru7fN61Mg8tu7Az8Pg==
-X-Google-Smtp-Source: ALg8bN75Gm7w8La1x1kzmW3VrQK2OGP14iOpRLWufBN4sGtaDJCRFi7vsmAJnQ8SiSbRBxQI8/v2LflzKX8g6hpeYWs=
-X-Received: by 2002:a2e:9356:: with SMTP id
- m22-v6mr26913706ljh.135.1548921779254; 
- Thu, 31 Jan 2019 00:02:59 -0800 (PST)
+ id 1gp7Jz-0005ZV-9y
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 08:03:44 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=klJ2GYCzCHxBLG7H+hS3UneMwlpUMVkl6VYssk6RblI=;
+ b=iNNaCx1ll4wBq3goqqYtZ9h7A2TM7kYNWy+fjlbGJbCHKbGyWbko/ouTohEmyIOMLqixJXAzzHuFDuSacRB6++4SP79gjA55KVFKgG1FtWzgwn/93JFsMKCc7yUquc82BPqj4tCnUBjiz0BUyF0/JyKxfaUm2Zn+8gQl1wBEfZ0=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB5298.eurprd04.prod.outlook.com (20.177.42.83) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1558.21; Thu, 31 Jan 2019 08:03:35 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::bd44:e001:ab8d:1c51]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::bd44:e001:ab8d:1c51%2]) with mapi id 15.20.1580.019; Thu, 31 Jan 2019
+ 08:03:35 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+Subject: [PATCH V3 0/4] irq: imx-irqsteer: add 32 interrupts chan and multi
+ outputs support
+Thread-Topic: [PATCH V3 0/4] irq: imx-irqsteer: add 32 interrupts chan and
+ multi outputs support
+Thread-Index: AQHUuTt3gHGMIiTe50SSroR3Hc4rgw==
+Date: Thu, 31 Jan 2019 08:03:35 +0000
+Message-ID: <1548921464-28917-1-git-send-email-aisheng.dong@nxp.com>
+Accept-Language: zh-CN, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK2PR02CA0184.apcprd02.prod.outlook.com
+ (2603:1096:201:21::20) To AM0PR04MB4211.eurprd04.prod.outlook.com
+ (2603:10a6:208:66::21)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB5298;
+ 6:KjAuIO60IU9SgG0CkidFCxvpRgIllcvQmrkOsHu4xjRoQK6g2sWIEsqV03R5/jtKmL/YszrCtOfWRh76iknOBzruqBSURdlgXxW2GNiLn3W35wAoRtCzKBSRgF8d/dGdYyxIySNlZRDwX4tx0HPSmV1ojvpeKOZY6hP3Mg1Ntb6GoV34linQbMeXqdHOPNwOg8HIZQzV623C6EluVhlqmz6I7A9xP6CZhnrHa7ALS4vdS9pkf0GGjCwWe3il1qlO4G4u/d0AndIMGI1WcPK+l92PQChTWFCqZ5Pa3lXSwJrgfspWXjY01RjxbzZjsoKutzYjvjxerFi5LJEzYH5pjSQMt96GoCdTSgn3Fs5vRX1z/aDpsnaxlww9dyLt5L80XDgMPlLXtiapfyAZduk9fvAjDPJwdj4MLcCBxtmA4QchPeO75GwC5CQbnFNoBlnBGSQr648L+yFUBfCanaY5sw==;
+ 5:aZagzyv9c61FYG1OsZGuvxyRDyuf7247tAu8Dk2VdO7qLwaCfkhIEt5VbK/0EiqRScU33W72eHKezgcoxaoydhv1GuRIpUPeFNk2dPAEVxKOKHz1lx2e5Zl+4+HonJp7sd9J/X6UkoG+5HUCHdbXGa57krPnroPkcQ6TxMWb1YhBGrcwL56gzEHKxPmgR6rMGfNt78W6ib2Pp6HGoSHXgQ==;
+ 7:r2h25FlKJQliRUAIhwrA4wEj8LZT1zByxrbPEVl8NQHKL/e7RO7sUaUuPqXc65zfqiRn0PJCnD3mn6Q1uiTwRdh3o5hZqLRsN98yjgW8rJPEp//PE+kYF0ZSCk4cPUOeXdfVoMYDLkm98DmLtejurg==
+x-ms-office365-filtering-correlation-id: 325105ba-4dff-4174-9b22-08d68752994b
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB5298; 
+x-ms-traffictypediagnostic: AM0PR04MB5298:
+x-microsoft-antispam-prvs: <AM0PR04MB5298AFE4BC8EA98C4112553E80910@AM0PR04MB5298.eurprd04.prod.outlook.com>
+x-forefront-prvs: 09347618C4
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(136003)(39860400002)(346002)(396003)(376002)(189003)(199004)(97736004)(256004)(102836004)(5640700003)(316002)(6486002)(386003)(6506007)(71200400001)(71190400001)(114624004)(2351001)(36756003)(2501003)(4326008)(54906003)(4744005)(2906002)(6512007)(25786009)(6436002)(99286004)(53936002)(86362001)(305945005)(52116002)(81166006)(44832011)(105586002)(8676002)(486006)(3846002)(7736002)(6116002)(81156014)(2616005)(8936002)(476003)(106356001)(50226002)(478600001)(6916009)(14454004)(186003)(68736007)(66066001)(26005);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5298;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: HjohCTGebRUTI360qlsDZZ9iGKKks0EWyb7F2V4/A9uR6v5fuQUj+3aSiR7T2eZsELBx2mj0HLUp5LvNr1ZV/riL2s2UPN4xxwfsy2Yno/4/PSnkrXWrpU0aXQwopbrBnpP+4Xi9R6eBoWzXGKMeBrTMrrrTMYnPorFKIozC6+c5dNq2qniqtqNcJbF+IoC59I9zP8INd7nQsUHMPyf31y+3CflotibRLhaFzFFfLtKJa0V3SBS4bq69RGnTDTgkSGm5kHn+2SFLyEgNH8CdTvP9r5ds8f3tpVrkIfXmSXD0gCxI5xucSjw6r1o08VG9AyFNGE9X+/YiZ1fUnVkncal/WxhSWH728K8+H59kISlOTvQD3bHN+L7ARF1/hxlwyU11wuioRjuR6HXbVuV3Yfl6GzEH17vx3jvwKUDGHB0=
 MIME-Version: 1.0
-References: <CACRpkdYRiWZbkduBRxQdPC_1hJjQJCYhX9NFB31t1Su1CSBNyw@mail.gmail.com>
- <CAK8P3a1GK3sZ+1pFS-4y5EgsV0ttA0OsYrmdmSzrJc8me26J7A@mail.gmail.com>
-In-Reply-To: <CAK8P3a1GK3sZ+1pFS-4y5EgsV0ttA0OsYrmdmSzrJc8me26J7A@mail.gmail.com>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Thu, 31 Jan 2019 09:02:47 +0100
-Message-ID: <CACRpkdancbk84o+wEvMPA-+qjeAQDo5Ob24KzaEc9TUH=x5Y3Q@mail.gmail.com>
-Subject: Re: [GIT PULL] SPEAr defconfig update
-To: Arnd Bergmann <arnd@arndb.de>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 325105ba-4dff-4174-9b22-08d68752994b
+X-MS-Exchange-CrossTenant-originalarrivaltime: 31 Jan 2019 08:03:31.8479 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5298
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_000303_036559_4EBF0CF4 
-X-CRM114-Status: GOOD (  15.25  )
+X-CRM114-CacheID: sfid-20190131_000339_349015_3AB9E836 
+X-CRM114-Status: UNSURE (   7.21  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,49 +116,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: viresh kumar <viresh.kumar@linaro.org>, arm-soc <arm@kernel.org>,
- shiraz hashim <shiraz.linux.kernel@gmail.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Aisheng Dong <aisheng.dong@nxp.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "tglx@linutronix.de" <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 30, 2019 at 10:52 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> On Mon, Jan 21, 2019 at 1:30 PM Linus Walleij <linus.walleij@linaro.org> wrote:
-> >
-> > Hi ARM SoC maintainers,
-> >
-> > this:
-> > 1. updates the SPEAr 3xx defconfig
-> > 2. replaces the fbdev PL11x framebuffer driver with the DRM PL11x driver
-> >    in the defconfig
-> >
-> > This has the ACK of the SPEAr maintainer Viresh Kumar. I don't think
-> > there even is a SPEAr git tree so I send this from my GPIO tree. If they
-> > have other plans, they can say so now :D
-> >
-> > Please pull it into ARM SoC in the appropriate place, next kernel is
->
-> I have a similar comment to the nomadik update, though there
-> is only one non-obvious option: why do you turn on CONFIG_PREEMPT=y?
+Not all 64 interrupts may be used in one group. e.g. most irqsteer in
+imx8qxp and imx8qm subsystems supports only 32 interrupts.
+And one irqsteer channel can support up to 8 output interrupts.
 
-Oh that's just something from my script, sorry.
+This patch series aims to support 32 interrupts chan and multi output
+interrupts.
 
-It'd good that it comes up but I guess it should be a
-separate patch.
+Tested on:
+iMX8QXP MEK with MIPI CSI capture and DC Display
+iMX8MQ EVK with MIPI DSI Display
 
-These are not servers so any other configuration than
-CONFIG_PREEMPT is probably just wrong, as is any
-other setting than Tickless idle and HRTimers on.
+Dong Aisheng (4):
+  dt-binding: irq: imx-irqsteer: use irq number instead of group number
+  dt-bindings: irq: imx-irqsteer: add multi output interrupts support
+  irq: imx-irqsteer: change to use reg_num instead of irq_group
+  irq: imx: irqsteer: add multi output interrupts support
 
-I am thinking maybe we should actually have ARMv7 and
-ARMv8 multi Kconfig simply select these things, I don't
-really see why anyone would want to configure these
-differently, it just seems vaguely cargoculty and overcautious.
+ .../bindings/interrupt-controller/fsl,irqsteer.txt |  11 +-
+ drivers/irqchip/irq-imx-irqsteer.c                 | 115 +++++++++++++++------
+ 2 files changed, 89 insertions(+), 37 deletions(-)
 
-Yours,
-Linus Walleij
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
