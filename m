@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 95976C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:08:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 53C76C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:09:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5B01220869
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:08:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 20B6E2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 08:09:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e5XjRj5N"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B01220869
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BsF50kAB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 20B6E2087F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5Q3a6+VgGUd2YdrW2eVuHKD48ejl5acN+zDvht/S430=; b=e5XjRj5NzMC70U
-	ICEk4zRXTLvi1hL9N+Jto80fkMrIPcRiB18neF/kkL4QRyqx0kfTrVKi2jiSNds3qIjThyrsoSTtk
-	+G2Dc/GPf1ha54yD10ln0Ie3wZ4WPXCEA8Q+GLyV+KEhfadrbHk0SSZVWhtANU7RoeC0QcYjxcNs4
-	+8u+f5RdS1CKscid4/QOF0FEHFlNH/K2Rgl8WIsKkJsx98KX6ZdMjnrvHfIewRX6IyY42T8SHyV5C
-	Mv16qVlrlAJEmYJTWDDn0ZTj86mf/NJiazXSHcTbC9334+0ZMAoDSD10KV4MOhNuQy1WvV+y5dMca
-	CrfuzFmrQQRFe74zkrlg==;
+	List-Owner; bh=m34eKa8IAVgKCtgflKImDXAj//M8NmQyridcxNaqFbQ=; b=BsF50kAByAkHTy
+	eSmyRshWs4N5Ai3bCsetDGqo6SAnaWIY6gRl0BbOmmWGX/pZjztSNgG7TaOIYtrHlbekSOwKWqHKt
+	BsY4tXe7Pz/HN9dRjaQE8At/x4+tYFJAYf3ELMbtkapuGopmnNO/cZ+6MCljj7lOxPYVAMu6xSVui
+	b2Q5zUvma7PZIGNRGVSnQq07w3WRPq3MMnwO0N805mKExQNjIxgjIfSM3SH0jg7NlnK1zPTJkjlSN
+	85CIBbafnYXRyukIvxJXSAKvDQNmTIyICN5Ah/6H/PUJNwTserLBdHYHwPfo//Y77HqVzEozlBxKz
+	zKInnxNzk+alAdojtF2Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp7P5-0000aw-96; Thu, 31 Jan 2019 08:08:55 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gp7PQ-0000qV-3g; Thu, 31 Jan 2019 08:09:16 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp7Ow-0000a7-J7
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 08:08:53 +0000
+ id 1gp7P2-0000aP-Bm
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 08:08:54 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1AD0080D;
- Thu, 31 Jan 2019 00:08:44 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 91FC515AD;
+ Thu, 31 Jan 2019 00:08:51 -0800 (PST)
 Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7F5DA3F589;
- Thu, 31 Jan 2019 00:08:43 -0800 (PST)
-Date: Thu, 31 Jan 2019 09:08:41 +0100
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 031783F589;
+ Thu, 31 Jan 2019 00:08:50 -0800 (PST)
+Date: Thu, 31 Jan 2019 09:08:49 +0100
 From: Christoffer Dall <christoffer.dall@arm.com>
 To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v2 1/4] KVM: arm64: Forbid kprobing of the VHE
+Subject: Re: [PATCH v2 2/4] arm64: kprobe: Always blacklist the KVM
  world-switch code
-Message-ID: <20190131080841.GK13482@e113682-lin.lund.arm.com>
+Message-ID: <20190131080849.GL13482@e113682-lin.lund.arm.com>
 References: <20190124163257.233929-1-james.morse@arm.com>
- <20190124163257.233929-2-james.morse@arm.com>
+ <20190124163257.233929-3-james.morse@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190124163257.233929-2-james.morse@arm.com>
+In-Reply-To: <20190124163257.233929-3-james.morse@arm.com>
 User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_000850_677002_76130BF0 
-X-CRM114-Status: GOOD (  24.02  )
+X-CRM114-CacheID: sfid-20190131_000852_404699_06091143 
+X-CRM114-Status: GOOD (  21.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,185 +80,53 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 24, 2019 at 04:32:54PM +0000, James Morse wrote:
+On Thu, Jan 24, 2019 at 04:32:55PM +0000, James Morse wrote:
 > On systems with VHE the kernel and KVM's world-switch code run at the
 > same exception level. Code that is only used on a VHE system does not
 > need to be annotated as __hyp_text as it can reside anywhere in the
-> kernel text.
+>  kernel text.
 > 
 > __hyp_text was also used to prevent kprobes from patching breakpoint
 > instructions into this region, as this code runs at a different
 > exception level. While this is no longer true with VHE, KVM still
 > switches VBAR_EL1, meaning a kprobe's breakpoint executed in the
 > world-switch code will cause a hyp-panic.
-
-Forgive potentially very stupid questions here, but:
-
- (1) Would it make sense to move the save/restore VBAR_EL1 to the last
-     possible moment, and would that actually allow kprobes to work for
-     the world-switch code, or does that just result in other weird
-     problems?
-
- (2) Are we sure that this catches every call path of every non-inlined
-     function called after switchign VBAR_EL1?  Can kprobes only be
-     called on exported symbols, or can you (if you know the address
-     somehow) put a kprobe on a static function as well.  If there are
-     any concerns in this area, we might want to consider (1) more
-     closely.
-
-
-Thanks,
-
-    Christoffer
-
 > 
-> echo "p:weasel sysreg_save_guest_state_vhe" > /sys/kernel/debug/tracing/kprobe_events
-> echo 1 > /sys/kernel/debug/tracing/events/kprobes/weasel/enable
-> lkvm run -k /boot/Image --console serial -p "console=ttyS0 earlycon=uart,mmio,0x3f8"
+> Move the __hyp_text check in the kprobes blacklist so it applies on
+> VHE systems too, to cover the common code and guest enter/exit
+> assembly.
 > 
->   # lkvm run -k /boot/Image -m 384 -c 3 --name guest-1474
->   Info: Placing fdt at 0x8fe00000 - 0x8fffffff
->   Info: virtio-mmio.devices=0x200@0x10000:36
-> 
->   Info: virtio-mmio.devices=0x200@0x10200:37
-> 
->   Info: virtio-mmio.devices=0x200@0x10400:38
-> 
-> [  614.178186] Kernel panic - not syncing: HYP panic:
-> [  614.178186] PS:404003c9 PC:ffff0000100d70e0 ESR:f2000004
-> [  614.178186] FAR:0000000080080000 HPFAR:0000000000800800 PAR:1d00007edbadc0de
-> [  614.178186] VCPU:00000000f8de32f1
-> [  614.178383] CPU: 2 PID: 1482 Comm: kvm-vcpu-0 Not tainted 5.0.0-rc2 #10799
-> [  614.178446] Call trace:
-> [  614.178480]  dump_backtrace+0x0/0x148
-> [  614.178567]  show_stack+0x24/0x30
-> [  614.178658]  dump_stack+0x90/0xb4
-> [  614.178710]  panic+0x13c/0x2d8
-> [  614.178793]  hyp_panic+0xac/0xd8
-> [  614.178880]  kvm_vcpu_run_vhe+0x9c/0xe0
-> [  614.178958]  kvm_arch_vcpu_ioctl_run+0x454/0x798
-> [  614.179038]  kvm_vcpu_ioctl+0x360/0x898
-> [  614.179087]  do_vfs_ioctl+0xc4/0x858
-> [  614.179174]  ksys_ioctl+0x84/0xb8
-> [  614.179261]  __arm64_sys_ioctl+0x28/0x38
-> [  614.179348]  el0_svc_common+0x94/0x108
-> [  614.179401]  el0_svc_handler+0x38/0x78
-> [  614.179487]  el0_svc+0x8/0xc
-> [  614.179558] SMP: stopping secondary CPUs
-> [  614.179661] Kernel Offset: disabled
-> [  614.179695] CPU features: 0x003,2a80aa38
-> [  614.179758] Memory Limit: none
-> [  614.179858] ---[ end Kernel panic - not syncing: HYP panic:
-> [  614.179858] PS:404003c9 PC:ffff0000100d70e0 ESR:f2000004
-> [  614.179858] FAR:0000000080080000 HPFAR:0000000000800800 PAR:1d00007edbadc0de
-> [  614.179858] VCPU:00000000f8de32f1 ]---
-> 
-> Annotate the VHE world-switch functions that aren't marked
-> __hyp_text using NOKPROBE_SYMBOL().
-> 
+> Fixes: 888b3c8720e0 ("arm64: Treat all entry code as non-kprobe-able")
 > Signed-off-by: James Morse <james.morse@arm.com>
-> Fixes: 3f5c90b890ac ("KVM: arm64: Introduce VHE-specific kvm_vcpu_run")
+> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+
+Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+
 > ---
+>  arch/arm64/kernel/probes/kprobes.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> This has been an issue since the VHE/non-VHE world-switch paths were
-> split.
-> 
-> 
-> Changes since v1:
->  * Switched to NOKPROBE_SYMBOL() as this doesn't move code between
->    sections.
-> 
-> ---
->  arch/arm64/kvm/hyp/switch.c    | 5 +++++
->  arch/arm64/kvm/hyp/sysreg-sr.c | 5 +++++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index b0b1478094b4..421ebf6f7086 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -23,6 +23,7 @@
->  #include <kvm/arm_psci.h>
+> diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+> index 2a5b338b2542..f17afb99890c 100644
+> --- a/arch/arm64/kernel/probes/kprobes.c
+> +++ b/arch/arm64/kernel/probes/kprobes.c
+> @@ -478,13 +478,13 @@ bool arch_within_kprobe_blacklist(unsigned long addr)
+>  	    addr < (unsigned long)__entry_text_end) ||
+>  	    (addr >= (unsigned long)__idmap_text_start &&
+>  	    addr < (unsigned long)__idmap_text_end) ||
+> +	    (addr >= (unsigned long)__hyp_text_start &&
+> +	    addr < (unsigned long)__hyp_text_end) ||
+>  	    !!search_exception_tables(addr))
+>  		return true;
 >  
->  #include <asm/cpufeature.h>
-> +#include <asm/kprobes.h>
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_host.h>
-> @@ -107,6 +108,7 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
->  
->  	write_sysreg(kvm_get_hyp_vector(), vbar_el1);
->  }
-> +NOKPROBE_SYMBOL(activate_traps_vhe);
->  
->  static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
->  {
-> @@ -154,6 +156,7 @@ static void deactivate_traps_vhe(void)
->  	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
->  	write_sysreg(vectors, vbar_el1);
->  }
-> +NOKPROBE_SYMBOL(deactivate_traps_vhe);
->  
->  static void __hyp_text __deactivate_traps_nvhe(void)
->  {
-> @@ -513,6 +516,7 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
->  
->  	return exit_code;
->  }
-> +NOKPROBE_SYMBOL(kvm_vcpu_run_vhe);
->  
->  /* Switch to the guest for legacy non-VHE systems */
->  int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
-> @@ -620,6 +624,7 @@ static void __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
->  	      read_sysreg_el2(esr),   read_sysreg_el2(far),
->  	      read_sysreg(hpfar_el2), par, vcpu);
->  }
-> +NOKPROBE_SYMBOL(__hyp_call_panic_vhe);
->  
->  void __hyp_text __noreturn hyp_panic(struct kvm_cpu_context *host_ctxt)
->  {
-> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> index 68d6f7c3b237..b426e2cf973c 100644
-> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> @@ -18,6 +18,7 @@
->  #include <linux/compiler.h>
->  #include <linux/kvm_host.h>
->  
-> +#include <asm/kprobes.h>
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_hyp.h>
-> @@ -98,12 +99,14 @@ void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt)
->  {
->  	__sysreg_save_common_state(ctxt);
->  }
-> +NOKPROBE_SYMBOL(sysreg_save_host_state_vhe);
->  
->  void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt)
->  {
->  	__sysreg_save_common_state(ctxt);
->  	__sysreg_save_el2_return_state(ctxt);
->  }
-> +NOKPROBE_SYMBOL(sysreg_save_guest_state_vhe);
->  
->  static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
->  {
-> @@ -188,12 +191,14 @@ void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt)
->  {
->  	__sysreg_restore_common_state(ctxt);
->  }
-> +NOKPROBE_SYMBOL(sysreg_restore_host_state_vhe);
->  
->  void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
->  {
->  	__sysreg_restore_common_state(ctxt);
->  	__sysreg_restore_el2_return_state(ctxt);
->  }
-> +NOKPROBE_SYMBOL(sysreg_restore_guest_state_vhe);
->  
->  void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
->  {
+>  	if (!is_kernel_in_hyp_mode()) {
+> -		if ((addr >= (unsigned long)__hyp_text_start &&
+> -		    addr < (unsigned long)__hyp_text_end) ||
+> -		    (addr >= (unsigned long)__hyp_idmap_text_start &&
+> +		if ((addr >= (unsigned long)__hyp_idmap_text_start &&
+>  		    addr < (unsigned long)__hyp_idmap_text_end))
+>  			return true;
+>  	}
 > -- 
 > 2.20.1
 > 
