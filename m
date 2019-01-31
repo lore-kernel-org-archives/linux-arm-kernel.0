@@ -2,57 +2,63 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AD377C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 16:25:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A993FC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 16:26:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7F06C20B1F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 16:25:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 678F520B1F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 16:26:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NLT1Tv98"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7F06C20B1F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aC2nGf/W"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 678F520B1F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Mby4AcMoiyktmmKCmTLYZQIB1H6tyBJqv6wJXZ7y4ak=; b=NLT1Tv989TdFZz
-	ty7MLF3QXbb95rSrk+93Yi41+fYnk+G9y7frGsZERfVlHxnJ4/dj997kbOhKseFSO5rN2aF2h+0TX
-	8P8Z9BQcHTXBA1h9n+xQMIMvHiZUmm9Vh9aO4yFtvisiRF8o2QQd2/CpH5m2TZYoR/ThBnI1zOimy
-	bK8OZy7r3M49Z1oz6Xh3hBlePkVewcUHutut8i4f4vefOp//AdMd/5vvJlj6r+haA0hpq9wXJB/iO
-	qfEizAuEQqFUl8/ADOsUZsG6iaVQhVCdGZVhjfoX6TN32dkuHTtfRPIxOFlBN6SQ/2ngSZlvvXBGH
-	HlfVbAwedSfYNzDnJ7AQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=gcvoC7ioEOsyUzz5XQLoFobnhZvStSNuH7wWOCoIDr8=; b=aC2nGf/WTydNxD
+	thIaEBpcPUqXC72WWGg8oOfsy2W+Xp005eznj4mH8qBYmdiotsKJ6yhqXwIW4XjrJjvwmaDQJJQld
+	OvNqRYlvG2XksJylSHgRTKAZRgzWOco05hOOvrzGFPbPIsO4dzOD482ble7mKm6/5i4j06Ew431Fz
+	P+RXBg2g26Z7+j3GyXG5swOkRucpi7pfxuJnTmAF0BKLvZFCuFmVBLzc22Rbm/OMpcoV/zdYsBhtL
+	F07IuDM7oDExLoGD27DyI2Nt1EBetVRBysse/ROOVW0LAyXZ0Rg/1L7UjAs6PiEvmv3VMyBt8bw9t
+	ohykj2Mnz0qADQN9imxQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpF9P-00042L-4S; Thu, 31 Jan 2019 16:25:15 +0000
-Received: from muru.com ([72.249.23.125])
+	id 1gpFA8-0005K2-Dr; Thu, 31 Jan 2019 16:26:00 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpF8R-00033b-CH
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 16:24:16 +0000
-Received: from hillo.muru.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTP id BF122809F;
- Thu, 31 Jan 2019 16:24:23 +0000 (UTC)
-From: Tony Lindgren <tony@atomide.com>
-To: arm@kernel.org
-Subject: [GIT PULL 3/3] dts changes for omaps for v5.1
-Date: Thu, 31 Jan 2019 08:23:56 -0800
-Message-Id: <pull-1548951676-587288@atomide.com-3>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <pull-1548951676-587288@atomide.com>
-References: <pull-1548951676-587288@atomide.com>
+ id 1gpF9V-0004d2-TR
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 16:25:38 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 63CBD80D;
+ Thu, 31 Jan 2019 08:25:21 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 75EA83F557;
+ Thu, 31 Jan 2019 08:25:19 -0800 (PST)
+Subject: Re: [PATCH v5 3/5] arm64/kvm: context-switch ptrauth register
+To: Amit Daniel Kachhap <amit.kachhap@arm.com>
+References: <1548658727-14271-1-git-send-email-amit.kachhap@arm.com>
+ <1548658727-14271-4-git-send-email-amit.kachhap@arm.com>
+From: James Morse <james.morse@arm.com>
+Message-ID: <d862316b-5b2e-8187-04e0-c0be350c1624@arm.com>
+Date: Thu, 31 Jan 2019 16:25:15 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
+In-Reply-To: <1548658727-14271-4-git-send-email-amit.kachhap@arm.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_082415_455901_917789B9 
-X-CRM114-Status: GOOD (  10.09  )
+X-CRM114-CacheID: sfid-20190131_082522_645290_C5757C8C 
+X-CRM114-Status: GOOD (  32.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,77 +70,213 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Tony Lindgren <tony@atomide.com>, linux-omap@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Kristina Martsenko <kristina.martsenko@arm.com>,
+ Dave Martin <Dave.Martin@arm.com>,
+ Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+Hi Amit,
 
-The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
+On 28/01/2019 06:58, Amit Daniel Kachhap wrote:
+> When pointer authentication is supported, a guest may wish to use it.
+> This patch adds the necessary KVM infrastructure for this to work, with
+> a semi-lazy context switch of the pointer auth state.
+> 
+> Pointer authentication feature is only enabled when VHE is built
+> into the kernel and present into CPU implementation so only VHE code
 
-  Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
+~s/into/in the/?
 
-are available in the Git repository at:
+> paths are modified.
+> 
+> When we schedule a vcpu, we disable guest usage of pointer
+> authentication instructions and accesses to the keys. While these are
+> disabled, we avoid context-switching the keys. When we trap the guest
+> trying to use pointer authentication functionality, we change to eagerly
+> context-switching the keys, and enable the feature. The next time the
+> vcpu is scheduled out/in, we start again.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v5.1/dt-signed
+> Pointer authentication consists of address authentication and generic
+> authentication, and CPUs in a system might have varied support for
+> either. Where support for either feature is not uniform, it is hidden
+> from guests via ID register emulation, as a result of the cpufeature
+> framework in the host.
 
-for you to fetch changes up to b4c30df0eb354d8e081132b7b7449f6d17619614:
 
-  ARM: dts: omap4-sdp: Make ethernet working even if booted with latest u-boot (2019-01-24 08:23:43 -0800)
+> Unfortunately, address authentication and generic authentication cannot
+> be trapped separately, as the architecture provides a single EL2 trap
+> covering both. If we wish to expose one without the other, we cannot
+> prevent a (badly-written) guest from intermittently using a feature
+> which is not uniformly supported (when scheduled on a physical CPU which
+> supports the relevant feature). When the guest is scheduled on a
+> physical CPU lacking the feature, these attempts will result in an UNDEF
+> being taken by the guest.
 
-----------------------------------------------------------------
-dts updates for omap variants for v5.1 merge window
+This won't be fun. Can't KVM check that both are supported on all CPUs to avoid
+this? ...
 
-This series contains board specific dts updates and few minor
-clean-up changes:
 
-- add stdout-path for am335x-chiliboard
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index dfcfba7..e1bf2a5 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -612,6 +612,11 @@ static inline bool system_supports_generic_auth(void)
+>  		 cpus_have_const_cap(ARM64_HAS_GENERIC_AUTH_IMP_DEF));
+>  }
+>  
+> +static inline bool kvm_supports_ptrauth(void)
+> +{
+> +	return system_supports_address_auth() && system_supports_generic_auth();
+> +}
 
-- add wlcore wakeirq for omap3-evm, pandaboard and omap4-droid4
+... oh you do check. Could you cover this in the commit message? (to avoid an
+UNDEF being taken by the guest we ... )
 
-- remove unnecessary address-cells and io-cells for am33xx
+cpufeature.h is a strange place to put this, there are no other kvm symbols in
+there. But there are users of system_supports_foo() in kvm_host.h.
 
-- replace deprecated linux,wakeup with wakeup-source property
 
-- use spdx license for am335x-shc
+> diff --git a/arch/arm64/kvm/hyp/ptrauth-sr.c b/arch/arm64/kvm/hyp/ptrauth-sr.c
+> new file mode 100644
+> index 0000000..0576c01
+> --- /dev/null
+> +++ b/arch/arm64/kvm/hyp/ptrauth-sr.c
+> @@ -0,0 +1,44 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * arch/arm64/kvm/hyp/ptrauth-sr.c: Guest/host ptrauth save/restore
+> + *
+> + * Copyright 2018 Arm Limited
+> + * Author: Mark Rutland <mark.rutland@arm.com>
+> + *         Amit Daniel Kachhap <amit.kachhap@arm.com>
+> + */
+> +#include <linux/compiler.h>
+> +#include <linux/kvm_host.h>
+> +
+> +#include <asm/cpucaps.h>
+> +#include <asm/cpufeature.h>
+> +#include <asm/kvm_asm.h>
+> +#include <asm/kvm_hyp.h>
+> +#include <asm/pointer_auth.h>
+> +
+> +static __always_inline bool __hyp_text __ptrauth_is_enabled(struct kvm_vcpu *vcpu)
 
-- configure ethernet pins for omap4-sdp
+Why __always_inline? Doesn't the compiler decide for 'static' symbols in C files?
 
-----------------------------------------------------------------
-Felix Brack (1):
-      ARM: dts: am33xx: Remove unnecessary properties
 
-Heiko Schocher (1):
-      ARM: dts: am335x-shc.dts: Switch to SPDX identifier
+> +{
+> +	return IS_ENABLED(CONFIG_ARM64_PTR_AUTH) &&
+> +			vcpu->arch.ctxt.hcr_el2 & (HCR_API | HCR_APK);
+> +}
+> +
+> +void __no_ptrauth __hyp_text __ptrauth_switch_to_guest(struct kvm_vcpu *vcpu,
+> +					  struct kvm_cpu_context *host_ctxt,
+> +					  struct kvm_cpu_context *guest_ctxt)
+> +{
+> +	if (!__ptrauth_is_enabled(vcpu))
+> +		return;
+> +
 
-Marcin Niestroj (1):
-      ARM: dts: am335x-chiliboard: Add stdout-path property
+> +	ptrauth_keys_store((struct ptrauth_keys *) &host_ctxt->sys_regs[APIAKEYLO_EL1]);
 
-Peter Ujfalusi (1):
-      ARM: dts: omap4-sdp: Make ethernet working even if booted with latest u-boot
+We can't cast part of an array to a structure like this. What happens if the
+compiler inserts padding in struct-ptrauth_keys, or the struct randomization
+thing gets hold of it: https://lwn.net/Articles/722293/
 
-Sudeep Holla (1):
-      ARM: dts: am437x: replace linux,wakeup with wakeup-source property
+If we want to use the helpers that take a struct-ptrauth_keys, we need to keep
+the keys in a struct-ptrauth_keys. To do this we'd need to provide accessors so
+that GET_ONE_REG() of APIAKEYLO_EL1 comes from the struct-ptrauth_keys, instead
+of the sys_reg array.
 
-Tony Lindgren (4):
-      ARM: dts: Add wlcore wakeirq for omap3-evm
-      ARM: dts: Configure wlcore wakeirq for pandaboard
-      ARM: dts: omap4-droid4: Configure wlcore wakeirq
-      Merge branch 'omap-for-v4.21/dt' into omap-for-v5.1/dt
 
- arch/arm/boot/dts/am335x-chiliboard.dts           |  4 +++
- arch/arm/boot/dts/am335x-shc.dts                  |  4 +--
- arch/arm/boot/dts/am33xx-l4.dtsi                  |  2 --
- arch/arm/boot/dts/am437x-gp-evm.dts               |  2 +-
- arch/arm/boot/dts/omap3-evm-common.dtsi           |  7 ++++--
- arch/arm/boot/dts/omap3-evm-processor-common.dtsi | 10 +++++++-
- arch/arm/boot/dts/omap4-droid4-xt894.dts          | 10 +++++---
- arch/arm/boot/dts/omap4-panda-common.dtsi         |  6 +++--
- arch/arm/boot/dts/omap4-sdp.dts                   | 30 +++++++++++++++++++++++
- 9 files changed, 61 insertions(+), 14 deletions(-)
+Wouldn't the host keys be available somewhere else? (they must get transfer to
+secondary CPUs somehow). Can we skip the save step when switching from the host?
+
+
+> +	ptrauth_keys_switch((struct ptrauth_keys *) &guest_ctxt->sys_regs[APIAKEYLO_EL1]);
+> +}
+
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 1f2d237..c798d0c 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -439,6 +451,18 @@ static inline bool kvm_arch_requires_vhe(void)
+>  	return false;
+>  }
+>
+> +void kvm_arm_vcpu_ptrauth_enable(struct kvm_vcpu *vcpu);
+> +void kvm_arm_vcpu_ptrauth_disable(struct kvm_vcpu *vcpu);
+> +
+> +static inline void kvm_arm_vcpu_ptrauth_reset(struct kvm_vcpu *vcpu)
+> +{
+> +	/* Disable ptrauth and use it in a lazy context via traps */
+> +	if (has_vhe() && kvm_supports_ptrauth())
+> +		kvm_arm_vcpu_ptrauth_disable(vcpu);
+> +}
+
+(Could you move 'has_vhe()' into kvm_supports_ptrauth()? It fits with testing
+the other cpufeatures, and makes this a little more readable when you add
+'allowed' to it later.)
+
+
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 03b36f1..301d332 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -483,6 +483,8 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  	sysreg_restore_guest_state_vhe(guest_ctxt);
+>  	__debug_switch_to_guest(vcpu);
+>  
+> +	__ptrauth_switch_to_guest(vcpu, host_ctxt, guest_ctxt);
+> +
+>  	__set_guest_arch_workaround_state(vcpu);
+>  
+>  	do {
+> @@ -494,6 +496,8 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  
+>  	__set_host_arch_workaround_state(vcpu);
+>  
+> +	__ptrauth_switch_to_host(vcpu, host_ctxt, guest_ctxt);
+> +
+>  	sysreg_save_guest_state_vhe(guest_ctxt);
+>  
+>  	__deactivate_traps(vcpu);
+
+...This makes me nervous...
+
+__guest_enter() is a function that (might) change the keys, then we change them
+again here. We can't have any signed return address between these two points. I
+don't trust the compiler not to generate any.
+
+~
+
+I had a chat with some friendly compiler folk... because there are two identical
+sequences in kvm_vcpu_run_vhe() and __kvm_vcpu_run_nvhe(), the compiler could
+move the common code to a function it then calls. Apparently this is called
+'function outlining'.
+
+If the compiler does this, and the guest changes the keys, I think we would fail
+the return address check.
+
+Painting the whole thing with no_prauth would solve this, but this code then
+becomes a target.
+Because the compiler can't anticipate the keys changing, we ought to treat them
+the same way we do the callee saved registers, stack-pointer etc, and
+save/restore them in the __guest_enter() assembly code.
+
+(we can still keep the save/restore in C, but call it from assembly so we know
+nothing new is going on the stack).
+
+
+Thanks,
+
+James
 
 _______________________________________________
 linux-arm-kernel mailing list
