@@ -2,66 +2,74 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 17511C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:09:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A7236C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:10:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA6C320B1F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:09:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8052F2086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:10:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IDs0CxVA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA6C320B1F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kg6lUQjs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8052F2086C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=rock-chips.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=JlOESV+K4tDtxwAFKpeOo2SZ5kmnmXMNW5otPQWZHkk=; b=IDs0CxVAEPTXIx
-	NbbYy+4F2ZTOASR8zrT/jW9ltGjeX9so8ykn/yidvU/raGTh0i7aN0WLNU7JoLtxo70h0azbEJnyQ
-	OOkqYw8XU53Xoa4leQ0aaNUMG2+HIGi/ER0oyV0eRpJSDyk7T/F0NYousFH6iPCGMC82OJjGqoqlN
-	/8MCGtW27j0/wXlNj3jKjHzMSvVszlion4CNnuz1SfKedrQifcegRsK4o0v7fZrcLOtd4w29Y2Tvc
-	xHKwufPF2kUax0t2zZctGA/MyU8yLdyG52NZqK4kyYfb/pCm2r0e42ZPSIERmm7BumBvpuLPYFAWC
-	NTu77Mr3gmcHARncoa+g==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=Y97vIRe51riZ6sLDCKaFCoShg4ckBs3uanET+YUwdm0=; b=kg6lUQjsYNSM2MTlLnELFJzxXF
+	GQKYJAKaixBn1ul3FKSDlmQcRjrWIiHVxtneUUKSlUfR78+JHxQNZ4YgkszPeg2nd/wT0yE2sgbCr
+	O90OF40A1coYndwYYuKlz3dh2YYttWQ11w+7mVU33TsJ7/UnH+1YX/KvVXayGolHUigNMRb4ZMiBz
+	djeABe33Kb5QOmggZVYw8VK8+gpuzCkbdZR6UuClZeAmMZC9yE8wdaR53Ws1L2PCVvx0cRXgXxIhS
+	rFzX89977HNM0jA2GDXfERoEYiGD1nX52ebYpm9HvmNQF32vMKcJ2JyH2aU3xy2nDOez1mYtNPKDy
+	MSznrLjg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp8Lh-0005UM-Pm; Thu, 31 Jan 2019 09:09:29 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gp8MF-0005xt-0q; Thu, 31 Jan 2019 09:10:03 +0000
+Received: from lucky1.263xmail.com ([211.157.147.132])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp8Kr-0004iE-1c
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 09:08:40 +0000
-Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
- by metis.ext.pengutronix.de with esmtp (Exim 4.89)
- (envelope-from <l.stach@pengutronix.de>)
- id 1gp8Kn-0007k0-RY; Thu, 31 Jan 2019 10:08:33 +0100
-Message-ID: <1548925713.6869.37.camel@pengutronix.de>
-Subject: Re: [PATCH V3 4/4] irq: imx: irqsteer: add multi output interrupts
- support
-From: Lucas Stach <l.stach@pengutronix.de>
-To: Aisheng Dong <aisheng.dong@nxp.com>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>
-Date: Thu, 31 Jan 2019 10:08:33 +0100
-In-Reply-To: <1548921464-28917-5-git-send-email-aisheng.dong@nxp.com>
-References: <1548921464-28917-1-git-send-email-aisheng.dong@nxp.com>
- <1548921464-28917-5-git-send-email-aisheng.dong@nxp.com>
-X-Mailer: Evolution 3.22.6-1+deb9u1 
-Mime-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
-X-SA-Exim-Mail-From: l.stach@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+ id 1gp8Kr-0004i5-HW; Thu, 31 Jan 2019 09:08:40 +0000
+Received: from tony.xie?rock-chips.com (unknown [192.168.167.239])
+ by lucky1.263xmail.com (Postfix) with ESMTP id 4F24C3F6D;
+ Thu, 31 Jan 2019 17:08:28 +0800 (CST)
+X-263anti-spam: KSV:0;
+X-MAIL-GRAY: 1
+X-MAIL-DELIVERY: 0
+X-KSVirus-check: 0
+X-ABS-CHECKED: 4
+Received: from localhost.localdomain (unknown [58.22.7.114])
+ by smtp.263.net (postfix) whith ESMTP id
+ P15936T140240995997440S1548925701923727_; 
+ Thu, 31 Jan 2019 17:08:27 +0800 (CST)
+X-IP-DOMAINF: 1
+X-UNIQUE-TAG: <3fb3092957874f1d9fa8886015fa6ec9>
+X-RL-SENDER: tony.xie@rock-chips.com
+X-SENDER: xxx@rock-chips.com
+X-LOGIN-NAME: tony.xie@rock-chips.com
+X-FST-TO: xxx@rock-chips.com
+X-SENDER-IP: 58.22.7.114
+X-ATTACHMENT-NUM: 0
+X-DNS-TYPE: 0
+From: Tony Xie <tony.xie@rock-chips.com>
+To: tony.xie@rock-chips.com
+Subject: [PATCH v7 2/6] mfd: rk808: Add RK817 and RK809 support
+Date: Thu, 31 Jan 2019 04:08:14 -0500
+Message-Id: <20190131090818.17430-3-tony.xie@rock-chips.com>
+X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20190131090818.17430-1-tony.xie@rock-chips.com>
+References: <20190131090818.17430-1-tony.xie@rock-chips.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_010837_242053_60D2C95A 
-X-CRM114-Status: GOOD (  19.83  )
+X-CRM114-CacheID: sfid-20190131_010837_941396_D8F0228F 
+X-CRM114-Status: GOOD (  25.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,129 +81,568 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Marc Zyngier <marc.zyngier@arm.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>, "tglx@linutronix.de" <tglx@linutronix.de>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-rockchip@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-QW0gRG9ubmVyc3RhZywgZGVuIDMxLjAxLjIwMTksIDA4OjAzICswMDAwIHNjaHJpZWIgQWlzaGVu
-ZyBEb25nOgo+IE9uZSBpcnFzdGVlciBjaGFubmVsIGNhbiBzdXBwb3J0IHVwIHRvIDggb3V0cHV0
-IGludGVycnVwdHMuCj4gCj4gPiBDYzogTWFyYyBaeW5naWVyIDxtYXJjLnp5bmdpZXJAYXJtLmNv
-bT4KPiA+IENjOiBMdWNhcyBTdGFjaCA8bC5zdGFjaEBwZW5ndXRyb25peC5kZT4KPiA+IENjOiBT
-aGF3biBHdW8gPHNoYXduZ3VvQGtlcm5lbC5vcmc+Cj4gU2lnbmVkLW9mZi1ieTogRG9uZyBBaXNo
-ZW5nIDxhaXNoZW5nLmRvbmdAbnhwLmNvbT4KClJldmlld2VkLWJ5OiBMdWNhcyBTdGFjaCA8bC5z
-dGFjaEBwZW5ndXRyb25peC5kZT4KCj4gLS0tCj4gQ2hhbmdlTG9nOgo+IHYyLT52MzoKPiDCoCog
-YWRkIGVycm9yIGNoZWNrIGZvciBpbXhfaXJxc3RlZXJfZ2V0X2h3aXJxX2Jhc2UKPiDCoCogdXNl
-IERJVl9ST1VORF9VUAo+IMKgKiBtZXJnZSAnaHdpcnEgKz0zMicgaW50byBmb3IgbG9vcAo+IMKg
-KiBjb21tb24gZXJyb3IgcGF0aCBpbiBwcm9iZSB0byBhdm9pZCByZXBsaWNhdGluZyBjbGtfZGlz
-YWJsZV91bnByZXBhcmUKPiB2MS0+djI6Cj4gwqAqIGNhbGN1bGF0ZSBpcnFfY291bnQgYnkgZnNs
-LG51bS1pcnFzIGluc3RlYWQgb2YgcGFyc2luZyBpbnRlcnJ1cHRzCj4gwqDCoMKgcHJvcGVydHkg
-ZnJvbSBkZXZpY2V0cmVlIHRvIG1hdGNoIHRoZSBpbnB1dCBpbnRlcnJ1cHRzIGFuZCBvdXRwdXRz
-Cj4gwqAqIGltcHJvdmUgb3V0cHV0IGludGVycnVwdCBoYW5kbGVyIGJ5IHNlYXJjaGluZyBvbmx5
-IHR3byByZWdpc3RlcnMKPiDCoMKgwqB3aXRoaW50IHRoZSBzYW1lIGdyb3VwCj4gLS0tCj4gwqBk
-cml2ZXJzL2lycWNoaXAvaXJxLWlteC1pcnFzdGVlci5jIHwgODggKysrKysrKysrKysrKysrKysr
-KysrKysrKysrKystLS0tLS0tLS0KPiDCoDEgZmlsZSBjaGFuZ2VkLCA2OCBpbnNlcnRpb25zKCsp
-LCAyMCBkZWxldGlvbnMoLSkKPiAKPiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9pcnFjaGlwL2lycS1p
-bXgtaXJxc3RlZXIuYyBiL2RyaXZlcnMvaXJxY2hpcC9pcnEtaW14LWlycXN0ZWVyLmMKPiBpbmRl
-eCA2N2VkODYyLi5kMTA5OGY0IDEwMDY0NAo+IC0tLSBhL2RyaXZlcnMvaXJxY2hpcC9pcnEtaW14
-LWlycXN0ZWVyLmMKPiArKysgYi9kcml2ZXJzL2lycWNoaXAvaXJxLWlteC1pcnFzdGVlci5jCj4g
-QEAgLTEwLDYgKzEwLDcgQEAKPiDCoCNpbmNsdWRlIDxsaW51eC9pcnFjaGlwL2NoYWluZWRfaXJx
-Lmg+Cj4gwqAjaW5jbHVkZSA8bGludXgvaXJxZG9tYWluLmg+Cj4gwqAjaW5jbHVkZSA8bGludXgv
-a2VybmVsLmg+Cj4gKyNpbmNsdWRlIDxsaW51eC9vZl9pcnEuaD4KPiDCoCNpbmNsdWRlIDxsaW51
-eC9vZl9wbGF0Zm9ybS5oPgo+IMKgI2luY2x1ZGUgPGxpbnV4L3NwaW5sb2NrLmg+Cj4gwqAKPiBA
-QCAtMjEsMTAgKzIyLDEzIEBACj4gPiDCoCNkZWZpbmUgQ0hBTl9NSU5URElTKHQpCQkoQ1RSTF9T
-VFJJREVfT0ZGKHQsIDMpICsgMHg0KQo+ID4gwqAjZGVmaW5lIENIQU5fTUFTVFJTVEFUKHQpCShD
-VFJMX1NUUklERV9PRkYodCwgMykgKyAweDgpCj4gwqAKPiA+ICsjZGVmaW5lIENIQU5fTUFYX09V
-VFBVVF9JTlQJMHg4Cj4gKwo+IMKgc3RydWN0IGlycXN0ZWVyX2RhdGEgewo+ID4gPiDCoAl2b2lk
-IF9faW9tZW0JCSpyZWdzOwo+ID4gPiDCoAlzdHJ1Y3QgY2xrCQkqaXBnX2NsazsKPiA+ID4gLQlp
-bnQJCQlpcnE7Cj4gPiA+ICsJaW50CQkJaXJxW0NIQU5fTUFYX09VVFBVVF9JTlRdOwo+ID4gPiAr
-CWludAkJCWlycV9jb3VudDsKPiA+ID4gwqAJcmF3X3NwaW5sb2NrX3QJCWxvY2s7Cj4gPiA+IMKg
-CWludAkJCXJlZ19udW07Cj4gPiA+IMKgCWludAkJCWNoYW5uZWw7Cj4gQEAgLTg3LDIzICs5MSw0
-NyBAQCBzdGF0aWMgY29uc3Qgc3RydWN0IGlycV9kb21haW5fb3BzIGlteF9pcnFzdGVlcl9kb21h
-aW5fb3BzID0gewo+ID4gPiDCoAkueGxhdGUJCT0gaXJxX2RvbWFpbl94bGF0ZV9vbmVjZWxsLAo+
-IMKgfTsKPiDCoAo+ICtzdGF0aWMgaW50IGlteF9pcnFzdGVlcl9nZXRfaHdpcnFfYmFzZShzdHJ1
-Y3QgaXJxc3RlZXJfZGF0YSAqZGF0YSwgdTMyIGlycSkKPiArewo+ID4gKwlpbnQgaTsKPiArCj4g
-PiArCWZvciAoaSA9IDA7IGkgPCBkYXRhLT5pcnFfY291bnQ7IGkrKykgewo+ID4gKwkJaWYgKGRh
-dGEtPmlycVtpXSA9PSBpcnEpCj4gPiArCQkJcmV0dXJuIGkgKiA2NDsKPiA+ICsJfQo+ICsKPiA+
-ICsJcmV0dXJuIC1FSU5WQUw7Cj4gK30KPiArCj4gwqBzdGF0aWMgdm9pZCBpbXhfaXJxc3RlZXJf
-aXJxX2hhbmRsZXIoc3RydWN0IGlycV9kZXNjICpkZXNjKQo+IMKgewo+ID4gwqAJc3RydWN0IGly
-cXN0ZWVyX2RhdGEgKmRhdGEgPSBpcnFfZGVzY19nZXRfaGFuZGxlcl9kYXRhKGRlc2MpOwo+ID4g
-LQlpbnQgaTsKPiA+ICsJaW50IGh3aXJxOwo+ID4gKwlpbnQgaXJxLCBpOwo+IMKgCj4gPiDCoAlj
-aGFpbmVkX2lycV9lbnRlcihpcnFfZGVzY19nZXRfY2hpcChkZXNjKSwgZGVzYyk7Cj4gwqAKPiA+
-IC0JZm9yIChpID0gMDsgaSA8IGRhdGEtPnJlZ19udW0gKiAzMjsgaSArPSAzMikgewo+ID4gLQkJ
-aW50IGlkeCA9IGlteF9pcnFzdGVlcl9nZXRfcmVnX2luZGV4KGRhdGEsIGkpOwo+ID4gKwlpcnEg
-PSBpcnFfZGVzY19nZXRfaXJxKGRlc2MpOwo+ID4gKwlod2lycSA9IGlteF9pcnFzdGVlcl9nZXRf
-aHdpcnFfYmFzZShkYXRhLCBpcnEpOwo+ID4gKwlpZiAoaHdpcnEgPCAwKSB7Cj4gPiArCQlwcl93
-YXJuKCIlczogdW5hYmxlIHRvIGdldCBod2lycSBiYXNlIGZvciBpcnEgJWRcbiIsCj4gPiArCQkJ
-X19mdW5jX18sIGlycSk7Cj4gPiArCQlyZXR1cm47Cj4gPiArCX0KPiArCj4gPiArCWZvciAoaSA9
-IDA7IGkgPCAyOyBpKyssIGh3aXJxICs9IDMyKSB7Cj4gPiArCQlpbnQgaWR4ID0gaW14X2lycXN0
-ZWVyX2dldF9yZWdfaW5kZXgoZGF0YSwgaHdpcnEpOwo+ID4gwqAJCXVuc2lnbmVkIGxvbmcgaXJx
-bWFwOwo+ID4gwqAJCWludCBwb3MsIHZpcnE7Cj4gwqAKPiA+ICsJCWlmIChod2lycSA+PSBkYXRh
-LT5yZWdfbnVtICogMzIpCj4gPiArCQkJYnJlYWs7Cj4gKwo+ID4gwqAJCWlycW1hcCA9IHJlYWRs
-X3JlbGF4ZWQoZGF0YS0+cmVncyArCj4gPiDCoAkJCQnCoMKgwqDCoMKgwqDCoENIQU5TVEFUVVMo
-aWR4LCBkYXRhLT5yZWdfbnVtKSk7Cj4gwqAKPiA+IMKgCQlmb3JfZWFjaF9zZXRfYml0KHBvcywg
-JmlycW1hcCwgMzIpIHsKPiA+IC0JCQl2aXJxID0gaXJxX2ZpbmRfbWFwcGluZyhkYXRhLT5kb21h
-aW4sIHBvcyArIGkpOwo+ID4gKwkJCXZpcnEgPSBpcnFfZmluZF9tYXBwaW5nKGRhdGEtPmRvbWFp
-biwgcG9zICsgaHdpcnEpOwo+ID4gwqAJCQlpZiAodmlycSkKPiA+IMKgCQkJCWdlbmVyaWNfaGFu
-ZGxlX2lycSh2aXJxKTsKPiA+IMKgCQl9Cj4gQEAgLTExNyw3ICsxNDUsOCBAQCBzdGF0aWMgaW50
-IGlteF9pcnFzdGVlcl9wcm9iZShzdHJ1Y3QgcGxhdGZvcm1fZGV2aWNlICpwZGV2KQo+ID4gwqAJ
-c3RydWN0IGRldmljZV9ub2RlICpucCA9IHBkZXYtPmRldi5vZl9ub2RlOwo+ID4gwqAJc3RydWN0
-IGlycXN0ZWVyX2RhdGEgKmRhdGE7Cj4gPiDCoAlzdHJ1Y3QgcmVzb3VyY2UgKnJlczsKPiA+IC0J
-aW50IHJldDsKPiA+ICsJdTMyIGlycXNfbnVtOwo+ID4gKwlpbnQgaSwgcmV0Owo+IMKgCj4gPiDC
-oAlkYXRhID0gZGV2bV9remFsbG9jKCZwZGV2LT5kZXYsIHNpemVvZigqZGF0YSksIEdGUF9LRVJO
-RUwpOwo+ID4gwqAJaWYgKCFkYXRhKQo+IEBAIC0xMzAsMTIgKzE1OSw2IEBAIHN0YXRpYyBpbnQg
-aW14X2lycXN0ZWVyX3Byb2JlKHN0cnVjdCBwbGF0Zm9ybV9kZXZpY2UgKnBkZXYpCj4gPiDCoAkJ
-cmV0dXJuIFBUUl9FUlIoZGF0YS0+cmVncyk7Cj4gPiDCoAl9Cj4gwqAKPiA+IC0JZGF0YS0+aXJx
-ID0gcGxhdGZvcm1fZ2V0X2lycShwZGV2LCAwKTsKPiA+IC0JaWYgKGRhdGEtPmlycSA8PSAwKSB7
-Cj4gPiAtCQlkZXZfZXJyKCZwZGV2LT5kZXYsICJmYWlsZWQgdG8gZ2V0IGlycVxuIik7Cj4gPiAt
-CQlyZXR1cm4gLUVOT0RFVjsKPiA+IC0JfQo+IC0KPiA+IMKgCWRhdGEtPmlwZ19jbGsgPSBkZXZt
-X2Nsa19nZXQoJnBkZXYtPmRldiwgImlwZyIpOwo+ID4gwqAJaWYgKElTX0VSUihkYXRhLT5pcGdf
-Y2xrKSkgewo+ID4gwqAJCXJldCA9IFBUUl9FUlIoZGF0YS0+aXBnX2Nsayk7Cj4gQEAgLTE0Niwx
-MSArMTY5LDE1IEBAIHN0YXRpYyBpbnQgaW14X2lycXN0ZWVyX3Byb2JlKHN0cnVjdCBwbGF0Zm9y
-bV9kZXZpY2UgKnBkZXYpCj4gwqAKPiA+IMKgCXJhd19zcGluX2xvY2tfaW5pdCgmZGF0YS0+bG9j
-ayk7Cj4gwqAKPiA+IC0Jb2ZfcHJvcGVydHlfcmVhZF91MzIobnAsICJmc2wsbnVtLWlycXMiLCAm
-ZGF0YS0+cmVnX251bSk7Cj4gPiArCW9mX3Byb3BlcnR5X3JlYWRfdTMyKG5wLCAiZnNsLG51bS1p
-cnFzIiwgJmlycXNfbnVtKTsKPiA+IMKgCW9mX3Byb3BlcnR5X3JlYWRfdTMyKG5wLCAiZnNsLGNo
-YW5uZWwiLCAmZGF0YS0+Y2hhbm5lbCk7Cj4gwqAKPiA+IC0JLyogb25lIHJlZ2lzdGVyIGJpdCBt
-YXAgcmVwcmVzZW50cyAzMiBpbnB1dCBpbnRlcnJ1cHRzICovCj4gPiAtCWRhdGEtPnJlZ19udW0g
-Lz0gMzI7Cj4gPiArCS8qCj4gPiArCcKgKiBUaGVyZSBpcyBvbmUgb3V0cHV0IGlycSBmb3IgZWFj
-aCBncm91cCBvZiA2NCBpbnB1dHMuCj4gPiArCcKgKiBPbmUgcmVnaXN0ZXIgYml0IG1hcCBjYW4g
-cmVwcmVzZW50IDMyIGlucHV0IGludGVycnVwdHMuCj4gPiArCcKgKi8KPiA+ICsJZGF0YS0+aXJx
-X2NvdW50ID0gRElWX1JPVU5EX1VQKGlycXNfbnVtLCA2NCk7Cj4gPiArCWRhdGEtPnJlZ19udW0g
-PSBpcnFzX251bSAvIDMyOwo+IMKgCj4gPiDCoAlpZiAoSVNfRU5BQkxFRChDT05GSUdfUE1fU0xF
-RVApKSB7Cj4gPiDCoAkJZGF0YS0+c2F2ZWRfcmVnID0gZGV2bV9remFsbG9jKCZwZGV2LT5kZXYs
-Cj4gQEAgLTE3MywyMyArMjAwLDQ0IEBAIHN0YXRpYyBpbnQgaW14X2lycXN0ZWVyX3Byb2JlKHN0
-cnVjdCBwbGF0Zm9ybV9kZXZpY2UgKnBkZXYpCj4gPiDCoAkJCQkJwqDCoMKgwqDCoCZpbXhfaXJx
-c3RlZXJfZG9tYWluX29wcywgZGF0YSk7Cj4gPiDCoAlpZiAoIWRhdGEtPmRvbWFpbikgewo+ID4g
-wqAJCWRldl9lcnIoJnBkZXYtPmRldiwgImZhaWxlZCB0byBjcmVhdGUgSVJRIGRvbWFpblxuIik7
-Cj4gPiAtCQljbGtfZGlzYWJsZV91bnByZXBhcmUoZGF0YS0+aXBnX2Nsayk7Cj4gPiAtCQlyZXR1
-cm4gLUVOT01FTTsKPiA+ICsJCXJldCA9IC1FTk9NRU07Cj4gPiArCQlnb3RvIG91dDsKPiA+IMKg
-CX0KPiDCoAo+ID4gLQlpcnFfc2V0X2NoYWluZWRfaGFuZGxlcl9hbmRfZGF0YShkYXRhLT5pcnEs
-IGlteF9pcnFzdGVlcl9pcnFfaGFuZGxlciwKPiA+IC0JCQkJCcKgZGF0YSk7Cj4gPiArCWlmICgh
-ZGF0YS0+aXJxX2NvdW50IHx8IGRhdGEtPmlycV9jb3VudCA+IENIQU5fTUFYX09VVFBVVF9JTlQp
-IHsKPiA+ICsJCXJldCA9IC1FSU5WQUw7Cj4gPiArCQlnb3RvIG91dDsKPiA+ICsJfQo+ICsKPiA+
-ICsJZm9yIChpID0gMDsgaSA8IGRhdGEtPmlycV9jb3VudDsgaSsrKSB7Cj4gPiArCQlkYXRhLT5p
-cnFbaV0gPSBpcnFfb2ZfcGFyc2VfYW5kX21hcChucCwgaSk7Cj4gPiArCQlpZiAoIWRhdGEtPmly
-cVtpXSkgewo+ID4gKwkJCXJldCA9IC1FSU5WQUw7Cj4gPiArCQkJZ290byBvdXQ7Cj4gPiArCQl9
-Cj4gKwo+ID4gKwkJaXJxX3NldF9jaGFpbmVkX2hhbmRsZXJfYW5kX2RhdGEoZGF0YS0+aXJxW2ld
-LAo+ID4gKwkJCQkJCcKgaW14X2lycXN0ZWVyX2lycV9oYW5kbGVyLAo+ID4gKwkJCQkJCcKgZGF0
-YSk7Cj4gPiArCX0KPiDCoAo+ID4gwqAJcGxhdGZvcm1fc2V0X2RydmRhdGEocGRldiwgZGF0YSk7
-Cj4gwqAKPiA+IMKgCXJldHVybiAwOwo+ICtvdXQ6Cj4gPiArCWNsa19kaXNhYmxlX3VucHJlcGFy
-ZShkYXRhLT5pcGdfY2xrKTsKPiA+ICsJcmV0dXJuIHJldDsKPiDCoH0KPiDCoAo+IMKgc3RhdGlj
-IGludCBpbXhfaXJxc3RlZXJfcmVtb3ZlKHN0cnVjdCBwbGF0Zm9ybV9kZXZpY2UgKnBkZXYpCj4g
-wqB7Cj4gPiDCoAlzdHJ1Y3QgaXJxc3RlZXJfZGF0YSAqaXJxc3RlZXJfZGF0YSA9IHBsYXRmb3Jt
-X2dldF9kcnZkYXRhKHBkZXYpOwo+ID4gKwlpbnQgaTsKPiArCj4gPiArCWZvciAoaSA9IDA7IGkg
-PCBpcnFzdGVlcl9kYXRhLT5pcnFfY291bnQ7IGkrKykKPiA+ICsJCWlycV9zZXRfY2hhaW5lZF9o
-YW5kbGVyX2FuZF9kYXRhKGlycXN0ZWVyX2RhdGEtPmlycVtpXSwKPiA+ICsJCQkJCQnCoE5VTEws
-IE5VTEwpOwo+IMKgCj4gPiAtCWlycV9zZXRfY2hhaW5lZF9oYW5kbGVyX2FuZF9kYXRhKGlycXN0
-ZWVyX2RhdGEtPmlycSwgTlVMTCwgTlVMTCk7Cj4gPiDCoAlpcnFfZG9tYWluX3JlbW92ZShpcnFz
-dGVlcl9kYXRhLT5kb21haW4pOwo+IMKgCj4gPiDCoAljbGtfZGlzYWJsZV91bnByZXBhcmUoaXJx
-c3RlZXJfZGF0YS0+aXBnX2Nsayk7CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2Vy
-bmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1h
-bi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+The RK809 and RK817 are a Power Management IC (PMIC) for multimedia
+and handheld devices. They contains the following components:
+  - Regulators
+  - RTC
+  - Clocking
+
+Both RK809 and RK817 chips are using a similar register map,
+so we can reuse the RTC and Clocking functionality.
+Most of regulators have a some implementation also.
+
+Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
+Acked-by: Stephen Boyd <sboyd@kernel.org>
+---
+ drivers/mfd/Kconfig       |   6 +-
+ drivers/mfd/rk808.c       | 192 +++++++++++++++++++++++++++++++++++++-
+ include/linux/mfd/rk808.h | 172 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 364 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 8c5dfdce4326..a8a2833407b1 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -1006,14 +1006,14 @@ config MFD_RC5T583
+ 	  different functionality of the device.
+ 
+ config MFD_RK808
+-	tristate "Rockchip RK805/RK808/RK818 Power Management Chip"
++	tristate "Rockchip RK805/RK808/RK809/RK817/RK818 Power Management Chip"
+ 	depends on I2C && OF
+ 	select MFD_CORE
+ 	select REGMAP_I2C
+ 	select REGMAP_IRQ
+ 	help
+-	  If you say yes here you get support for the RK805, RK808 and RK818
+-	  Power Management chips.
++	  If you say yes here you get support for the RK805, RK808, RK809,
++	  RK817 and RK818 Power Management chips.
+ 	  This driver provides common support for accessing the device
+ 	  through I2C interface. The device supports multiple sub-devices
+ 	  including interrupts, RTC, LDO & DCDC regulators, and onkey.
+diff --git a/drivers/mfd/rk808.c b/drivers/mfd/rk808.c
+index 94377782d208..6ee1c461a3bb 100644
+--- a/drivers/mfd/rk808.c
++++ b/drivers/mfd/rk808.c
+@@ -27,6 +27,7 @@
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+ #include <linux/regmap.h>
++#include <linux/syscore_ops.h>
+ 
+ struct rk808_reg_data {
+ 	int addr;
+@@ -62,6 +63,27 @@ static bool rk808_is_volatile_reg(struct device *dev, unsigned int reg)
+ 	return false;
+ }
+ 
++static bool rk817_is_volatile_reg(struct device *dev, unsigned int reg)
++{
++	/*
++	 * Notes:
++	 * - Technically the ROUND_30s bit makes RTC_CTRL_REG volatile, but
++	 *   we don't use that feature.  It's better to cache.
++	 */
++
++	switch (reg) {
++	case RK817_SECONDS_REG ... RK817_WEEKS_REG:
++	case RK817_RTC_STATUS_REG:
++	case RK817_INT_STS_REG0:
++	case RK817_INT_STS_REG1:
++	case RK817_INT_STS_REG2:
++	case RK817_SYS_STS:
++		return true;
++	}
++
++	return true;
++}
++
+ static const struct regmap_config rk818_regmap_config = {
+ 	.reg_bits = 8,
+ 	.val_bits = 8,
+@@ -86,6 +108,14 @@ static const struct regmap_config rk808_regmap_config = {
+ 	.volatile_reg = rk808_is_volatile_reg,
+ };
+ 
++static const struct regmap_config rk817_regmap_config = {
++	.reg_bits = 8,
++	.val_bits = 8,
++	.max_register = RK817_GPIO_INT_CFG,
++	.cache_type = REGCACHE_NONE,
++	.volatile_reg = rk817_is_volatile_reg,
++};
++
+ static struct resource rtc_resources[] = {
+ 	{
+ 		.start  = RK808_IRQ_RTC_ALARM,
+@@ -94,6 +124,10 @@ static struct resource rtc_resources[] = {
+ 	}
+ };
+ 
++static struct resource rk817_rtc_resources[] = {
++	DEFINE_RES_IRQ(RK817_IRQ_RTC_ALARM),
++};
++
+ static struct resource rk805_key_resources[] = {
+ 	{
+ 		.start  = RK805_IRQ_PWRON_FALL,
+@@ -107,6 +141,11 @@ static struct resource rk805_key_resources[] = {
+ 	}
+ };
+ 
++static struct resource rk817_pwrkey_resources[] = {
++	DEFINE_RES_IRQ(RK817_IRQ_PWRON_RISE),
++	DEFINE_RES_IRQ(RK817_IRQ_PWRON_FALL),
++};
++
+ static const struct mfd_cell rk805s[] = {
+ 	{ .name = "rk808-clkout", },
+ 	{ .name = "rk808-regulator", },
+@@ -132,6 +171,21 @@ static const struct mfd_cell rk808s[] = {
+ 	},
+ };
+ 
++static const struct mfd_cell rk817s[] = {
++	{ .name = "rk808-clkout",},
++	{ .name = "rk808-regulator",},
++	{
++		.name = "rk8xx-pwrkey",
++		.num_resources = ARRAY_SIZE(rk817_pwrkey_resources),
++		.resources = &rk817_pwrkey_resources[0],
++	},
++	{
++		.name = "rk808-rtc",
++		.num_resources = ARRAY_SIZE(rk817_rtc_resources),
++		.resources = &rk817_rtc_resources[0],
++	},
++};
++
+ static const struct mfd_cell rk818s[] = {
+ 	{ .name = "rk808-clkout", },
+ 	{ .name = "rk808-regulator", },
+@@ -167,6 +221,13 @@ static const struct rk808_reg_data rk808_pre_init_reg[] = {
+ 						    VB_LO_SEL_3500MV },
+ };
+ 
++static const struct rk808_reg_data rk817_pre_init_reg[] = {
++	{RK817_RTC_CTRL_REG, RTC_STOP, RTC_STOP},
++	{RK817_GPIO_INT_CFG, RK817_INT_POL_MSK, RK817_INT_POL_H},
++	{RK817_SYS_CFG(1), RK817_HOTDIE_TEMP_MSK | RK817_TSD_TEMP_MSK,
++					   RK817_HOTDIE_105 | RK817_TSD_140},
++};
++
+ static const struct rk808_reg_data rk818_pre_init_reg[] = {
+ 	/* improve efficiency */
+ 	{ RK818_BUCK2_CONFIG_REG, BUCK2_RATE_MASK,  BUCK_ILMIN_250MA },
+@@ -332,6 +393,33 @@ static const struct regmap_irq rk818_irqs[] = {
+ 	},
+ };
+ 
++static const struct regmap_irq rk817_irqs[RK817_IRQ_END] = {
++	REGMAP_IRQ_REG_LINE(0, 8),
++	REGMAP_IRQ_REG_LINE(1, 8),
++	REGMAP_IRQ_REG_LINE(2, 8),
++	REGMAP_IRQ_REG_LINE(3, 8),
++	REGMAP_IRQ_REG_LINE(4, 8),
++	REGMAP_IRQ_REG_LINE(5, 8),
++	REGMAP_IRQ_REG_LINE(6, 8),
++	REGMAP_IRQ_REG_LINE(7, 8),
++	REGMAP_IRQ_REG_LINE(8, 8),
++	REGMAP_IRQ_REG_LINE(9, 8),
++	REGMAP_IRQ_REG_LINE(10, 8),
++	REGMAP_IRQ_REG_LINE(11, 8),
++	REGMAP_IRQ_REG_LINE(12, 8),
++	REGMAP_IRQ_REG_LINE(13, 8),
++	REGMAP_IRQ_REG_LINE(14, 8),
++	REGMAP_IRQ_REG_LINE(15, 8),
++	REGMAP_IRQ_REG_LINE(16, 8),
++	REGMAP_IRQ_REG_LINE(17, 8),
++	REGMAP_IRQ_REG_LINE(18, 8),
++	REGMAP_IRQ_REG_LINE(19, 8),
++	REGMAP_IRQ_REG_LINE(20, 8),
++	REGMAP_IRQ_REG_LINE(21, 8),
++	REGMAP_IRQ_REG_LINE(22, 8),
++	REGMAP_IRQ_REG_LINE(23, 8)
++};
++
+ static struct regmap_irq_chip rk805_irq_chip = {
+ 	.name = "rk805",
+ 	.irqs = rk805_irqs,
+@@ -355,6 +443,18 @@ static const struct regmap_irq_chip rk808_irq_chip = {
+ 	.init_ack_masked = true,
+ };
+ 
++static struct regmap_irq_chip rk817_irq_chip = {
++	.name = "rk817",
++	.irqs = rk817_irqs,
++	.num_irqs = ARRAY_SIZE(rk817_irqs),
++	.num_regs = 3,
++	.irq_reg_stride = 2,
++	.status_base = RK817_INT_STS_REG0,
++	.mask_base = RK817_INT_STS_MSK_REG0,
++	.ack_base = RK817_INT_STS_REG0,
++	.init_ack_masked = true,
++};
++
+ static const struct regmap_irq_chip rk818_irq_chip = {
+ 	.name = "rk818",
+ 	.irqs = rk818_irqs,
+@@ -423,9 +523,33 @@ static void rk818_device_shutdown(void)
+ 		dev_err(&rk808_i2c_client->dev, "power off error!\n");
+ }
+ 
++static void rk8xx_syscore_shutdown(void)
++{
++	struct rk808 *rk808 = i2c_get_clientdata(rk808_i2c_client);
++	int ret;
++
++	if (system_state == SYSTEM_POWER_OFF &&
++	    (rk808->variant == RK809_ID || rk808->variant == RK817_ID)) {
++		ret = regmap_update_bits(rk808->regmap,
++					 RK817_SYS_CFG(3),
++					 RK817_SLPPIN_FUNC_MSK,
++					 SLPPIN_DN_FUN);
++		if (ret) {
++			dev_warn(&rk808_i2c_client->dev,
++				 "Cannot switch to power down function\n");
++		}
++	}
++}
++
++static struct syscore_ops rk808_syscore_ops = {
++	.shutdown = rk8xx_syscore_shutdown,
++};
++
+ static const struct of_device_id rk808_of_match[] = {
+ 	{ .compatible = "rockchip,rk805" },
+ 	{ .compatible = "rockchip,rk808" },
++	{ .compatible = "rockchip,rk809" },
++	{ .compatible = "rockchip,rk817" },
+ 	{ .compatible = "rockchip,rk818" },
+ 	{ },
+ };
+@@ -438,10 +562,11 @@ static int rk808_probe(struct i2c_client *client,
+ 	struct rk808 *rk808;
+ 	const struct rk808_reg_data *pre_init_reg;
+ 	const struct mfd_cell *cells;
+-	void (*pm_pwroff_fn)(void);
++	void (*pm_pwroff_fn)(void) = NULL;
+ 	int nr_pre_init_regs;
+ 	int nr_cells;
+ 	int pm_off = 0, msb, lsb;
++	unsigned char pmic_id_msb, pmic_id_lsb;
+ 	int ret;
+ 	int i;
+ 
+@@ -449,15 +574,24 @@ static int rk808_probe(struct i2c_client *client,
+ 	if (!rk808)
+ 		return -ENOMEM;
+ 
++	if (of_device_is_compatible(np, "rockchip,rk817") ||
++	    of_device_is_compatible(np, "rockchip,rk809")) {
++		pmic_id_msb = RK817_ID_MSB;
++		pmic_id_lsb = RK817_ID_LSB;
++	} else {
++		pmic_id_msb = RK808_ID_MSB;
++		pmic_id_lsb = RK808_ID_LSB;
++	}
++
+ 	/* Read chip variant */
+-	msb = i2c_smbus_read_byte_data(client, RK808_ID_MSB);
++	msb = i2c_smbus_read_byte_data(client, pmic_id_msb);
+ 	if (msb < 0) {
+ 		dev_err(&client->dev, "failed to read the chip id at 0x%x\n",
+ 			RK808_ID_MSB);
+ 		return msb;
+ 	}
+ 
+-	lsb = i2c_smbus_read_byte_data(client, RK808_ID_LSB);
++	lsb = i2c_smbus_read_byte_data(client, pmic_id_lsb);
+ 	if (lsb < 0) {
+ 		dev_err(&client->dev, "failed to read the chip id at 0x%x\n",
+ 			RK808_ID_LSB);
+@@ -495,6 +629,16 @@ static int rk808_probe(struct i2c_client *client,
+ 		nr_cells = ARRAY_SIZE(rk818s);
+ 		pm_pwroff_fn = rk818_device_shutdown;
+ 		break;
++	case RK809_ID:
++	case RK817_ID:
++		rk808->regmap_cfg = &rk817_regmap_config;
++		rk808->regmap_irq_chip = &rk817_irq_chip;
++		pre_init_reg = rk817_pre_init_reg;
++		nr_pre_init_regs = ARRAY_SIZE(rk817_pre_init_reg);
++		cells = rk817s;
++		nr_cells = ARRAY_SIZE(rk817s);
++		register_syscore_ops(&rk808_syscore_ops);
++		break;
+ 	default:
+ 		dev_err(&client->dev, "Unsupported RK8XX ID %lu\n",
+ 			rk808->variant);
+@@ -568,10 +712,52 @@ static int rk808_remove(struct i2c_client *client)
+ 	return 0;
+ }
+ 
++static int rk8xx_suspend(struct device *dev)
++{
++	struct rk808 *rk808 = i2c_get_clientdata(rk808_i2c_client);
++	int ret = 0;
++
++	switch (rk808->variant) {
++	case RK809_ID:
++	case RK817_ID:
++		ret = regmap_update_bits(rk808->regmap,
++					 RK817_SYS_CFG(3),
++					 RK817_SLPPIN_FUNC_MSK,
++					 SLPPIN_SLP_FUN);
++		break;
++	default:
++		break;
++	}
++
++	return ret;
++}
++
++static int rk8xx_resume(struct device *dev)
++{
++	struct rk808 *rk808 = i2c_get_clientdata(rk808_i2c_client);
++	int ret = 0;
++
++	switch (rk808->variant) {
++	case RK809_ID:
++	case RK817_ID:
++		ret = regmap_update_bits(rk808->regmap,
++					 RK817_SYS_CFG(3),
++					 RK817_SLPPIN_FUNC_MSK,
++					 SLPPIN_NULL_FUN);
++		break;
++	default:
++		break;
++	}
++
++	return ret;
++}
++SIMPLE_DEV_PM_OPS(rk8xx_pm_ops, rk8xx_suspend, rk8xx_resume);
++
+ static struct i2c_driver rk808_i2c_driver = {
+ 	.driver = {
+ 		.name = "rk808",
+ 		.of_match_table = rk808_of_match,
++		.pm = &rk8xx_pm_ops,
+ 	},
+ 	.probe    = rk808_probe,
+ 	.remove   = rk808_remove,
+diff --git a/include/linux/mfd/rk808.h b/include/linux/mfd/rk808.h
+index d3156594674c..0fd9eedf3c20 100644
+--- a/include/linux/mfd/rk808.h
++++ b/include/linux/mfd/rk808.h
+@@ -382,6 +382,7 @@ enum rk805_reg {
+ #define SWITCH1_EN	BIT(5)
+ #define DEV_OFF_RST	BIT(3)
+ #define DEV_OFF		BIT(0)
++#define RTC_STOP	BIT(0)
+ 
+ #define VB_LO_ACT		BIT(4)
+ #define VB_LO_SEL_3500MV	(7 << 0)
+@@ -396,6 +397,175 @@ enum rk805_reg {
+ #define SLEEP_FUN			(0x1 << 2)
+ #define RK8XX_ID_MSK			0xfff0
+ #define FPWM_MODE			BIT(7)
++enum rk817_reg_id {
++	RK817_ID_DCDC1 = 0,
++	RK817_ID_DCDC2,
++	RK817_ID_DCDC3,
++	RK817_ID_DCDC4,
++	RK817_ID_LDO1,
++	RK817_ID_LDO2,
++	RK817_ID_LDO3,
++	RK817_ID_LDO4,
++	RK817_ID_LDO5,
++	RK817_ID_LDO6,
++	RK817_ID_LDO7,
++	RK817_ID_LDO8,
++	RK817_ID_LDO9,
++	RK817_ID_BOOST,
++	RK817_ID_BOOST_OTG_SW,
++	RK817_NUM_REGULATORS
++};
++
++enum rk809_reg_id {
++	RK809_ID_DCDC5 = RK817_ID_BOOST,
++	RK809_ID_SW1,
++	RK809_ID_SW2,
++	RK809_NUM_REGULATORS
++};
++
++#define RK817_SECONDS_REG		0x00
++#define RK817_MINUTES_REG		0x01
++#define RK817_HOURS_REG			0x02
++#define RK817_DAYS_REG			0x03
++#define RK817_MONTHS_REG		0x04
++#define RK817_YEARS_REG			0x05
++#define RK817_WEEKS_REG			0x06
++#define RK817_ALARM_SECONDS_REG		0x07
++#define RK817_ALARM_MINUTES_REG		0x08
++#define RK817_ALARM_HOURS_REG		0x09
++#define RK817_ALARM_DAYS_REG		0x0a
++#define RK817_ALARM_MONTHS_REG		0x0b
++#define RK817_ALARM_YEARS_REG		0x0c
++#define RK817_RTC_CTRL_REG		0xd
++#define RK817_RTC_STATUS_REG		0xe
++#define RK817_RTC_INT_REG		0xf
++#define RK817_RTC_COMP_LSB_REG		0x10
++#define RK817_RTC_COMP_MSB_REG		0x11
++
++#define RK817_POWER_EN_REG(i)		(0xb1 + (i))
++#define RK817_POWER_SLP_EN_REG(i)	(0xb5 + (i))
++
++#define RK817_POWER_CONFIG		(0xb9)
++
++#define RK817_BUCK_CONFIG_REG(i)	(0xba + (i) * 3)
++
++#define RK817_BUCK1_ON_VSEL_REG		0xBB
++#define RK817_BUCK1_SLP_VSEL_REG	0xBC
++
++#define RK817_BUCK2_CONFIG_REG		0xBD
++#define RK817_BUCK2_ON_VSEL_REG		0xBE
++#define RK817_BUCK2_SLP_VSEL_REG	0xBF
++
++#define RK817_BUCK3_CONFIG_REG		0xC0
++#define RK817_BUCK3_ON_VSEL_REG		0xC1
++#define RK817_BUCK3_SLP_VSEL_REG	0xC2
++
++#define RK817_BUCK4_CONFIG_REG		0xC3
++#define RK817_BUCK4_ON_VSEL_REG		0xC4
++#define RK817_BUCK4_SLP_VSEL_REG	0xC5
++
++#define RK817_LDO_ON_VSEL_REG(idx)	(0xcc + (idx) * 2)
++#define RK817_BOOST_OTG_CFG		(0xde)
++
++#define RK817_ID_MSB			0xed
++#define RK817_ID_LSB			0xee
++
++#define RK817_SYS_STS			0xf0
++#define RK817_SYS_CFG(i)		(0xf1 + (i))
++
++#define RK817_ON_SOURCE_REG		0xf5
++#define RK817_OFF_SOURCE_REG		0xf6
++
++/* INTERRUPT REGISTER */
++#define RK817_INT_STS_REG0		0xf8
++#define RK817_INT_STS_MSK_REG0		0xf9
++#define RK817_INT_STS_REG1		0xfa
++#define RK817_INT_STS_MSK_REG1		0xfb
++#define RK817_INT_STS_REG2		0xfc
++#define RK817_INT_STS_MSK_REG2		0xfd
++#define RK817_GPIO_INT_CFG		0xfe
++
++/* IRQ Definitions */
++#define RK817_IRQ_PWRON_FALL		0
++#define RK817_IRQ_PWRON_RISE		1
++#define RK817_IRQ_PWRON			2
++#define RK817_IRQ_PWMON_LP		3
++#define RK817_IRQ_HOTDIE		4
++#define RK817_IRQ_RTC_ALARM		5
++#define RK817_IRQ_RTC_PERIOD		6
++#define RK817_IRQ_VB_LO			7
++#define RK817_IRQ_PLUG_IN		8
++#define RK817_IRQ_PLUG_OUT		9
++#define RK817_IRQ_CHRG_TERM		10
++#define RK817_IRQ_CHRG_TIME		11
++#define RK817_IRQ_CHRG_TS		12
++#define RK817_IRQ_USB_OV		13
++#define RK817_IRQ_CHRG_IN_CLMP		14
++#define RK817_IRQ_BAT_DIS_ILIM		15
++#define RK817_IRQ_GATE_GPIO		16
++#define RK817_IRQ_TS_GPIO		17
++#define RK817_IRQ_CODEC_PD		18
++#define RK817_IRQ_CODEC_PO		19
++#define RK817_IRQ_CLASSD_MUTE_DONE	20
++#define RK817_IRQ_CLASSD_OCP		21
++#define RK817_IRQ_BAT_OVP               22
++#define RK817_IRQ_CHRG_BAT_HI		23
++#define RK817_IRQ_END			(RK817_IRQ_CHRG_BAT_HI + 1)
++
++/*
++ * rtc_ctrl 0xd
++ * same as 808, except bit4
++ */
++#define RK817_RTC_CTRL_RSV4		BIT(4)
++
++/* power config 0xb9 */
++#define RK817_BUCK3_FB_RES_MSK		BIT(6)
++#define RK817_BUCK3_FB_RES_INTER	BIT(6)
++#define RK817_BUCK3_FB_RES_EXT		0
++
++/* buck config 0xba */
++#define RK817_RAMP_RATE_OFFSET		6
++#define RK817_RAMP_RATE_MASK		(0x3 << RK817_RAMP_RATE_OFFSET)
++#define RK817_RAMP_RATE_3MV_PER_US	(0x0 << RK817_RAMP_RATE_OFFSET)
++#define RK817_RAMP_RATE_6_3MV_PER_US	(0x1 << RK817_RAMP_RATE_OFFSET)
++#define RK817_RAMP_RATE_12_5MV_PER_US	(0x2 << RK817_RAMP_RATE_OFFSET)
++#define RK817_RAMP_RATE_25MV_PER_US	(0x3 << RK817_RAMP_RATE_OFFSET)
++
++/* sys_cfg1 0xf2 */
++#define RK817_HOTDIE_TEMP_MSK		(0x3 << 4)
++#define RK817_HOTDIE_85			(0x0 << 4)
++#define RK817_HOTDIE_95			(0x1 << 4)
++#define RK817_HOTDIE_105		(0x2 << 4)
++#define RK817_HOTDIE_115		(0x3 << 4)
++
++#define RK817_TSD_TEMP_MSK		BIT(6)
++#define RK817_TSD_140			0
++#define RK817_TSD_160			BIT(6)
++
++#define RK817_CLK32KOUT2_EN		BIT(7)
++
++/* sys_cfg3 0xf4 */
++#define RK817_SLPPIN_FUNC_MSK		(0x3 << 3)
++#define SLPPIN_NULL_FUN			(0x0 << 3)
++#define SLPPIN_SLP_FUN			(0x1 << 3)
++#define SLPPIN_DN_FUN			(0x2 << 3)
++#define SLPPIN_RST_FUN			(0x3 << 3)
++
++#define RK817_RST_FUNC_MSK		(0x3 << 6)
++#define RK817_RST_FUNC_SFT		(6)
++#define RK817_RST_FUNC_CNT		(3)
++#define RK817_RST_FUNC_DEV		(0) /* reset the dev */
++#define RK817_RST_FUNC_REG		(0x1 << 6) /* reset the reg only */
++
++#define RK817_SLPPOL_MSK		BIT(5)
++#define RK817_SLPPOL_H			BIT(5)
++#define RK817_SLPPOL_L			(0)
++
++/* gpio&int 0xfe */
++#define RK817_INT_POL_MSK		BIT(1)
++#define RK817_INT_POL_H			BIT(1)
++#define RK817_INT_POL_L			0
++#define RK809_BUCK5_CONFIG(i)		(RK817_BOOST_OTG_CFG + (i) * 1)
+ 
+ enum {
+ 	BUCK_ILMIN_50MA,
+@@ -443,6 +613,8 @@ enum {
+ enum {
+ 	RK805_ID = 0x8050,
+ 	RK808_ID = 0x0000,
++	RK809_ID = 0x8090,
++	RK817_ID = 0x8170,
+ 	RK818_ID = 0x8181,
+ };
+ 
+-- 
+2.17.1
+
+
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
