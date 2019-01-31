@@ -2,21 +2,20 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNPARSEABLE_RELAY autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DCE6CC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:21:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 87257C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:21:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AF8AE20870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:21:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4CF8720870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:21:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qltyHATS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF8AE20870
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iYJ0/p8i"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4CF8720870
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,48 +24,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IbnBZmuHjI7KtORWbGF/uM5IiM5/45F+emZZHpNVhy0=; b=qltyHATSFjEukr
-	da3tKWvksZ7vg4PaQiptvLv9y6BQq0epfte4yLkBN1uDxia2b+tJJJwXe/tHPawkuI7kyfuFfuE1A
-	uASWAy+ANkLSZISOUCZoY6WHzi42hiGneNed3ibG9AD4A9WJIVRANNGl56frZVoVHwJY8dh+gVscD
-	n54/DqRCxBLyi3kpt8cPHc713C7RZ5zCFLJvGUV5uen6UAG62kZBo6Av+q/nDS8jZ4+ySk9hsZP/N
-	6UqpGzUaWZ43f9ugSnoo59kznpFTx1B7LR71JNUlZtTaSj0diQZud6qOL4My5Vm232W3Io4UsO00v
-	R3/g80Ot9rFCo7cmR+jw==;
+	List-Owner; bh=D0kvsTFAxD8taYalmehxvz+AB74U4bbFYp8M+njjF6o=; b=iYJ0/p8i3AKMx7
+	qzBkEzCPLhlzfcgX0l8AVC0+oqH70WN25T/4Lq3aHXNqObGRQWQ4mZpCPMg3qeSawECuZo0dQbc1T
+	+WaLFrcQdEsY0YeHgjGn6X5RwM5zq4OnIOVbEjaZe26rw9rsjeGtNZyDRavMNunBz4yOWxnWO2zcn
+	1uq/9Cs1s4/c+17CkEa0O+jPjDJcTjALWkIHM0W3roIP+8b5SOfci4KAeRF4AqQ2/rOQTsDGhtJQe
+	hXQW7jYkdE7ilN5rSMDj5jbhuRDz84y9jP8NGv7mV0CWf2G0hUFLj5DuOP7BRZxRromKoK1hulGeP
+	/T4dM2+pgH3XdCp7UhkA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp2uT-0003HQ-Do; Thu, 31 Jan 2019 03:21:01 +0000
+	id 1gp2uv-0003ZV-5k; Thu, 31 Jan 2019 03:21:29 +0000
 Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp2uN-0003GY-Jy; Thu, 31 Jan 2019 03:20:58 +0000
-X-UUID: 78f4763cd00148a885a0c80bda7c2312-20190130
-X-UUID: 78f4763cd00148a885a0c80bda7c2312-20190130
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
+ id 1gp2uq-0003YZ-DK; Thu, 31 Jan 2019 03:21:27 +0000
+X-UUID: f20373853a8747d1a5e4de2dadd6aa02-20190130
+X-UUID: f20373853a8747d1a5e4de2dadd6aa02-20190130
+Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
  (envelope-from <yong.wu@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 370504304; Wed, 30 Jan 2019 19:20:46 -0800
-Received: from MTKMBS31N1.mediatek.inc (172.27.4.69) by
- MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 30 Jan 2019 19:20:44 -0800
-Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31N1.mediatek.inc
- (172.27.4.69) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Thu, 31 Jan 2019 11:20:42 +0800
+ with ESMTP id 1455084985; Wed, 30 Jan 2019 19:21:10 -0800
+Received: from MTKMBS31DR.mediatek.inc (172.27.6.102) by
+ MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 30 Jan 2019 19:21:08 -0800
+Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31DR.mediatek.inc
+ (172.27.6.102) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Thu, 31 Jan 2019 11:21:06 +0800
 Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
  (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Thu, 31 Jan 2019 11:20:41 +0800
-Message-ID: <1548904841.19710.36.camel@mhfsdcap03>
-Subject: Re: [PATCH v5 11/20] iommu/mediatek: Move vld_pa_rng into plat_data
+ Transport; Thu, 31 Jan 2019 11:21:05 +0800
+Message-ID: <1548904865.19710.37.camel@mhfsdcap03>
+Subject: Re: [PATCH v5 19/20] iommu/mediatek: Add shutdown callback
 From: Yong Wu <yong.wu@mediatek.com>
 To: Evan Green <evgreen@chromium.org>
-Date: Thu, 31 Jan 2019 11:20:41 +0800
-In-Reply-To: <CAE=gft4=4h_1MAnrC8CosSe3gOWx+DwFJSLvGNtOFNMZN8oZ3w@mail.gmail.com>
+Date: Thu, 31 Jan 2019 11:21:05 +0800
+In-Reply-To: <CAE=gft4g4HbDG7shtiqUP5vw9tiyRr4VEheMGM2uhEL_65yYmg@mail.gmail.com>
 References: <1546314952-15990-1-git-send-email-yong.wu@mediatek.com>
- <1546314952-15990-12-git-send-email-yong.wu@mediatek.com>
- <CAE=gft4=4h_1MAnrC8CosSe3gOWx+DwFJSLvGNtOFNMZN8oZ3w@mail.gmail.com>
+ <1546314952-15990-20-git-send-email-yong.wu@mediatek.com>
+ <CAE=gft4g4HbDG7shtiqUP5vw9tiyRr4VEheMGM2uhEL_65yYmg@mail.gmail.com>
 X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_192055_655992_AC730A5E 
-X-CRM114-Status: GOOD (  21.28  )
+X-CRM114-CacheID: sfid-20190130_192124_599213_1C702EFC 
+X-CRM114-Status: GOOD (  11.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,60 +92,24 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 2019-01-30 at 10:30 -0800, Evan Green wrote:
-> On Mon, Dec 31, 2018 at 7:58 PM Yong Wu <yong.wu@mediatek.com> wrote:
+On Wed, 2019-01-30 at 11:12 -0800, Evan Green wrote:
+> On Mon, Dec 31, 2018 at 8:00 PM Yong Wu <yong.wu@mediatek.com> wrote:
 > >
-> > Both mt8173 and mt8183 don't have this vld_pa_rng(valid physical address
-> > range) register while mt2712 have. Move it into the plat_data.
-> >
-> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> > ---
-> >  drivers/iommu/mtk_iommu.c | 3 ++-
-> >  drivers/iommu/mtk_iommu.h | 1 +
-> >  2 files changed, 3 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-> > index 8d8ab21..2913ddb 100644
-> > --- a/drivers/iommu/mtk_iommu.c
-> > +++ b/drivers/iommu/mtk_iommu.c
-> > @@ -548,7 +548,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
-> >                          upper_32_bits(data->protect_base);
-> >         writel_relaxed(regval, data->base + REG_MMU_IVRP_PADDR);
-> >
-> > -       if (data->enable_4GB && data->plat_data->m4u_plat != M4U_MT8173) {
-> > +       if (data->enable_4GB && data->plat_data->vld_pa_rng) {
-> >                 /*
-> >                  * If 4GB mode is enabled, the validate PA range is from
-> >                  * 0x1_0000_0000 to 0x1_ffff_ffff. here record bit[32:30].
-> > @@ -741,6 +741,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
-> >         .m4u_plat     = M4U_MT2712,
-> >         .has_4gb_mode = true,
-> >         .has_bclk     = true,
-> > +       .vld_pa_rng   = true,
-> >         .larbid_remap = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-> >  };
-> >
-> > diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
-> > index b46aeaa..a8c5d1e 100644
-> > --- a/drivers/iommu/mtk_iommu.h
-> > +++ b/drivers/iommu/mtk_iommu.h
-> > @@ -48,6 +48,7 @@ struct mtk_iommu_plat_data {
-> >         /* HW will use the EMI clock if there isn't the "bclk". */
-> >         bool                has_bclk;
-> >         bool                reset_axi;
-> > +       bool                vld_pa_rng;
+> > In the reboot burning test, if some Multimedia HW has something wrong,
+> > It may keep send the invalid request to IOMMU. In order to avoid
+> > affect the reboot flow, we add the shutdown callback to disable
+> > M4U HW when shutdown.
 > 
-> I agree with Nicolas that valid_pa_range would be much clearer...
-> although, even now that I know what it's supposed to mean, I don't get
-> what it represents. What is this saying?
+> Sounds unpleasant. Hopefully the reboot flow still continues properly
+> even in that case, since this shutdown code may not run during some
+> rougher resets.
 
-This register in the coda is called "vld_pa_rng".
-
-How about I change it to "has_vld_pa_rng"?. In the comment above, I have
-explained the meaning(valid physical address range).
+Thanks this hint. I will reword the comment avoid writing reboot.
 
 > 
-> -Evan
+> Reviewed-by: Evan Green <evgreen@chromium.org>
+
+Thanks.
 
 
 
