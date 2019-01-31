@@ -2,93 +2,74 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A867DC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:11:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0EC1FC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:18:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 845CD2086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:11:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DA83120B1F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:18:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="awfbiZoV";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="koMMPUOP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 845CD2086C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dBYiEo3O"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA83120B1F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=rock-chips.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=fX/UA/C6fsD3Cry9HpghTIFd/YBTRcqDHbiGAdMvt3s=; b=awfbiZoV5MKzNseOxaBxn3tjT
-	X4Yz8ShR+HQRj6gZ5DRIK+EIbrrHVPVpGGdM6rIJ6kJWS2Z5SBI1QdGLCW2pa8kncCaRQGik+3ilf
-	AnmJXVJuL0pPLg+I74v5st1TL+06hbDBHcPn8Rjyf3iBoHY+rs6iEeQxQ4xXm7aj2IaXdM3aRAvJC
-	Qxh5fk/zwtZwwRtPB96M6VH461Wf2nukO7m3DJRXhVUZ2FNwgnSgl0irhTObhAl5bZWHnHE29uvDE
-	kbu4NVO/8IkF3qgrDQ2KoiLM9zHEMv9aNbOrwOQJU3nB1iTQ0hcvkdr3hKHVNraKfLwkGfTbAe46t
-	UCP0bV4+Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=eZFVDmMeTdpgsUHA2Q9zYUWK8HDmfCd5FmeGPChl0VU=; b=dBYiEo3ObeKZZ7drQ5v56FoGfW
+	/mrdHIht2rweGCN4Y/touJWKtx3J04airU4V3I5x3iGwvCi8QcfyqCV53Ifd1s4X6Q3PwNhvyGzfV
+	jxh07h8TW0MeBz/WTcEbgbcUSe4kMI3XlwFu6f46HtpL6ez1TlJxIKugJzssb4n/NOEG+a3dKyLX5
+	c4FW0awcdOLi8NpSaY3oqTDLPJjFDzXgdqk0yWI56DpOBR8UizRtI2/uaZGk8f9i+ynPJScPP0NaW
+	9O1uoAp7idgFxKobJL8EY/aoreUP7cx/wxOnY4BmyDOXYtOKggHkUhtIP1UM05deCGnIgHVrC8os+
+	Lf/dTNJA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp8Nn-0008ML-JK; Thu, 31 Jan 2019 09:11:39 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gp8U3-0002D8-5H; Thu, 31 Jan 2019 09:18:07 +0000
+Received: from lucky1.263xmail.com ([211.157.147.133])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp8M8-0005tu-B5
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 09:10:40 +0000
-Received: by mail-wr1-x443.google.com with SMTP id z5so2338617wrt.11
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 31 Jan 2019 01:09:55 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=p7g2oiiMuH9TCi0rtrHnCkxhA/O1w9HJBCPx/mBRROU=;
- b=koMMPUOPjakYYN8cqkDDEtvcwewqQugA2RTHF8bkoznj8SN2p6X9PE7VukZjtyLp1P
- 78ENy+MQgd5r3cF06fBQ/NKDDIMJahr1ThnqVWIuqZY4pzcI1m/g7xffyx4kUB44DdDG
- y/9lLUgJM4U5Aaqsdp2GRX6ui8l7aLHfAS8oMgsCCzp0qf1elirCPtuehshI1HzZ4N/u
- c1LnEmQqhP+INU0wEm1amBbRSyPb1ZY4j869B954iaarOoFoFNI/5G4YK+5yWBcSKcvX
- nIJDq5lInEPisvyuCVJ/4gY4xhNLWCXs6pWVmKZOkGv6azJy3Y/9tPd7vmbIZbP4IuVU
- SVPQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=p7g2oiiMuH9TCi0rtrHnCkxhA/O1w9HJBCPx/mBRROU=;
- b=rYQKdcXdFl6SjfsL+AumeFiM3lRvODCGPilr7FnvuTEGabYw+Z6g1FUPsJPtKyh3pB
- Liu9InLulT7Mz7DJ5YeV+RoV6QcqePGjd7nhVmqcmS7wq96PBy72yma9YpsUGwicA2Sm
- J1tIGmUoxW8K6nHXSy4u3Rv/f+AdllFlptrAWuy9N/D9JCsdd+Fx3nbGyqZexneT5xKD
- g2cBz7ndjsi6y2Cwzg6iksPsqOAOFVsISXuFdmr4fG0GzcPZ5DSqdct6Isc4Lo6hB7Nd
- ShulpefOkFWwC5GUfvdnJkZWuJWllAz4OyM2E+nAx++S93lUE9r06R1Z5zBNrmUmM5lM
- HEFw==
-X-Gm-Message-State: AJcUukeDZVB5PCYkYxvk1AaGk4iLivAiq23ia7EDJrCVQjElHBtPRaWa
- OSlF5m2RBB15vlEWFNtcGY1U5Q==
-X-Google-Smtp-Source: ALg8bN5vJCMbiBxtTau90dYL84RIZwPTpRPWtnfA6tD/qhTWhOn4vtLiLhKyAIosqeLCR1KkewBgdg==
-X-Received: by 2002:a5d:6684:: with SMTP id l4mr36493053wru.154.1548925794574; 
- Thu, 31 Jan 2019 01:09:54 -0800 (PST)
-Received: from ?IPv6:2a00:23c4:f7a1:ce00:5105:4b7b:c922:7c6?
- ([2a00:23c4:f7a1:ce00:5105:4b7b:c922:7c6])
- by smtp.gmail.com with ESMTPSA id l20sm9519547wrb.93.2019.01.31.01.09.53
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 31 Jan 2019 01:09:53 -0800 (PST)
-Subject: Re: [PATCH] clk: imx8mq: Add missing M4 clocks
-To: Fabio Estevam <festevam@gmail.com>
-References: <20190130201725.18961-1-ccaione@baylibre.com>
- <CAOMZO5AU8y1mf1DCMcJ6Y_AN_rP47jx1uVhj9pLRtgL6P70ksw@mail.gmail.com>
-From: Carlo Caione <ccaione@baylibre.com>
-Message-ID: <0590fb7b-4934-9ef8-dce1-6fd251864522@baylibre.com>
-Date: Thu, 31 Jan 2019 09:09:52 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <CAOMZO5AU8y1mf1DCMcJ6Y_AN_rP47jx1uVhj9pLRtgL6P70ksw@mail.gmail.com>
-Content-Language: en-US
+ id 1gp8Tz-0002Cj-O4; Thu, 31 Jan 2019 09:18:05 +0000
+Received: from tony.xie?rock-chips.com (unknown [192.168.167.223])
+ by lucky1.263xmail.com (Postfix) with ESMTP id 8E773418E;
+ Thu, 31 Jan 2019 17:18:01 +0800 (CST)
+X-263anti-spam: KSV:0;
+X-MAIL-GRAY: 1
+X-MAIL-DELIVERY: 0
+X-KSVirus-check: 0
+X-ABS-CHECKED: 4
+Received: from localhost.localdomain (unknown [58.22.7.114])
+ by smtp.263.net (postfix) whith ESMTP id
+ P16712T140080807139072S1548926279943619_; 
+ Thu, 31 Jan 2019 17:18:01 +0800 (CST)
+X-IP-DOMAINF: 1
+X-UNIQUE-TAG: <a3304165029c50d1e75fc6db5e70da09>
+X-RL-SENDER: tony.xie@rock-chips.com
+X-SENDER: xxx@rock-chips.com
+X-LOGIN-NAME: tony.xie@rock-chips.com
+X-FST-TO: xxx@rock-chips.com
+X-SENDER-IP: 58.22.7.114
+X-ATTACHMENT-NUM: 0
+X-DNS-TYPE: 0
+From: Tony Xie <tony.xie@rock-chips.com>
+To: tony.xie@rock-chips.com
+Subject: [PATCH v7 5/6] rtc: rk808: add RK809 and RK817 support.
+Date: Thu, 31 Jan 2019 04:17:53 -0500
+Message-Id: <20190131091753.17533-1-tony.xie@rock-chips.com>
+X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20190131090818.17430-1-tony.xie@rock-chips.com>
+References: <20190131090818.17430-1-tony.xie@rock-chips.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_010956_583984_4D4EA71B 
-X-CRM114-Status: GOOD (  12.50  )
+X-CRM114-CacheID: sfid-20190131_011804_189149_3D042AAF 
+X-CRM114-Status: GOOD (  19.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,30 +81,237 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>, Stephen Boyd <sboyd@kernel.org>,
- Michael Turquette <mturquette@baylibre.com>,
- NXP Linux Team <linux-imx@nxp.com>, Sascha Hauer <kernel@pengutronix.de>,
- Shawn Guo <shawnguo@kernel.org>, linux-clk <linux-clk@vger.kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>, Lucas Stach <l.stach@pengutronix.de>
+Cc: linux-rockchip@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 30/01/2019 22:46, Fabio Estevam wrote:
-> On Wed, Jan 30, 2019 at 6:17 PM Carlo Caione <ccaione@baylibre.com> wrote:
->>
->> The clocks list is missing the clocks for the the M4 core.
-> 
-> There is a repeated "the" in this phrase.
+RK809 and RK817 are power management IC chips for multimedia products.
+Most of their functions and registers are same, including the rtc.
 
-Ouch! Can I count on the maintainer to fix this while merging? ;)
+Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+---
+ drivers/rtc/Kconfig     |  4 +--
+ drivers/rtc/rtc-rk808.c | 68 ++++++++++++++++++++++++++++++++---------
+ 2 files changed, 56 insertions(+), 16 deletions(-)
 
-Thanks,
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index a819ef07b7ec..8c34f7ec0a59 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -363,11 +363,11 @@ config RTC_DRV_MAX77686
+ 	  will be called rtc-max77686.
+ 
+ config RTC_DRV_RK808
+-	tristate "Rockchip RK805/RK808/RK818 RTC"
++	tristate "Rockchip RK805/RK808/RK809/RK817/RK818 RTC"
+ 	depends on MFD_RK808
+ 	help
+ 	  If you say yes here you will get support for the
+-	  RTC of RK805, RK808 and RK818 PMIC.
++	  RTC of RK805, RK809 and RK817, RK808 and RK818 PMIC.
+ 
+ 	  This driver can also be built as a module. If so, the module
+ 	  will be called rk808-rtc.
+diff --git a/drivers/rtc/rtc-rk808.c b/drivers/rtc/rtc-rk808.c
+index 739c0d42e835..5bacdafb7b21 100644
+--- a/drivers/rtc/rtc-rk808.c
++++ b/drivers/rtc/rtc-rk808.c
+@@ -50,9 +50,18 @@
+ #define NUM_TIME_REGS	(RK808_WEEKS_REG - RK808_SECONDS_REG + 1)
+ #define NUM_ALARM_REGS	(RK808_ALARM_YEARS_REG - RK808_ALARM_SECONDS_REG + 1)
+ 
++struct rk_rtc_compat_reg {
++	unsigned int ctrl_reg;
++	unsigned int status_reg;
++	unsigned int alarm_seconds_reg;
++	unsigned int int_reg;
++	unsigned int seconds_reg;
++};
++
+ struct rk808_rtc {
+ 	struct rk808 *rk808;
+ 	struct rtc_device *rtc;
++	struct rk_rtc_compat_reg *creg;
+ 	int irq;
+ };
+ 
+@@ -101,7 +110,7 @@ static int rk808_rtc_readtime(struct device *dev, struct rtc_time *tm)
+ 	int ret;
+ 
+ 	/* Force an update of the shadowed registers right now */
+-	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
++	ret = regmap_update_bits(rk808->regmap, rk808_rtc->creg->ctrl_reg,
+ 				 BIT_RTC_CTRL_REG_RTC_GET_TIME,
+ 				 BIT_RTC_CTRL_REG_RTC_GET_TIME);
+ 	if (ret) {
+@@ -115,7 +124,7 @@ static int rk808_rtc_readtime(struct device *dev, struct rtc_time *tm)
+ 	 * 32khz. If we clear the GET_TIME bit here, the time of i2c transfer
+ 	 * certainly more than 31.25us: 16 * 2.5us at 400kHz bus frequency.
+ 	 */
+-	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
++	ret = regmap_update_bits(rk808->regmap, rk808_rtc->creg->ctrl_reg,
+ 				 BIT_RTC_CTRL_REG_RTC_GET_TIME,
+ 				 0);
+ 	if (ret) {
+@@ -123,7 +132,7 @@ static int rk808_rtc_readtime(struct device *dev, struct rtc_time *tm)
+ 		return ret;
+ 	}
+ 
+-	ret = regmap_bulk_read(rk808->regmap, RK808_SECONDS_REG,
++	ret = regmap_bulk_read(rk808->regmap, rk808_rtc->creg->seconds_reg,
+ 			       rtc_data, NUM_TIME_REGS);
+ 	if (ret) {
+ 		dev_err(dev, "Failed to bulk read rtc_data: %d\n", ret);
+@@ -166,7 +175,7 @@ static int rk808_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ 	rtc_data[6] = bin2bcd(tm->tm_wday);
+ 
+ 	/* Stop RTC while updating the RTC registers */
+-	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
++	ret = regmap_update_bits(rk808->regmap, rk808_rtc->creg->ctrl_reg,
+ 				 BIT_RTC_CTRL_REG_STOP_RTC_M,
+ 				 BIT_RTC_CTRL_REG_STOP_RTC_M);
+ 	if (ret) {
+@@ -174,14 +183,14 @@ static int rk808_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ 		return ret;
+ 	}
+ 
+-	ret = regmap_bulk_write(rk808->regmap, RK808_SECONDS_REG,
++	ret = regmap_bulk_write(rk808->regmap, rk808_rtc->creg->seconds_reg,
+ 				rtc_data, NUM_TIME_REGS);
+ 	if (ret) {
+ 		dev_err(dev, "Failed to bull write rtc_data: %d\n", ret);
+ 		return ret;
+ 	}
+ 	/* Start RTC again */
+-	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
++	ret = regmap_update_bits(rk808->regmap, rk808_rtc->creg->ctrl_reg,
+ 				 BIT_RTC_CTRL_REG_STOP_RTC_M, 0);
+ 	if (ret) {
+ 		dev_err(dev, "Failed to update RTC control: %d\n", ret);
+@@ -199,8 +208,13 @@ static int rk808_rtc_readalarm(struct device *dev, struct rtc_wkalrm *alrm)
+ 	uint32_t int_reg;
+ 	int ret;
+ 
+-	ret = regmap_bulk_read(rk808->regmap, RK808_ALARM_SECONDS_REG,
++	ret = regmap_bulk_read(rk808->regmap,
++			       rk808_rtc->creg->alarm_seconds_reg,
+ 			       alrm_data, NUM_ALARM_REGS);
++	if (ret) {
++		dev_err(dev, "Failed to read RTC alarm date REG: %d\n", ret);
++		return ret;
++	}
+ 
+ 	alrm->time.tm_sec = bcd2bin(alrm_data[0] & SECONDS_REG_MSK);
+ 	alrm->time.tm_min = bcd2bin(alrm_data[1] & MINUTES_REG_MAK);
+@@ -210,7 +224,7 @@ static int rk808_rtc_readalarm(struct device *dev, struct rtc_wkalrm *alrm)
+ 	alrm->time.tm_year = (bcd2bin(alrm_data[5] & YEARS_REG_MSK)) + 100;
+ 	rockchip_to_gregorian(&alrm->time);
+ 
+-	ret = regmap_read(rk808->regmap, RK808_RTC_INT_REG, &int_reg);
++	ret = regmap_read(rk808->regmap, rk808_rtc->creg->int_reg, &int_reg);
+ 	if (ret) {
+ 		dev_err(dev, "Failed to read RTC INT REG: %d\n", ret);
+ 		return ret;
+@@ -231,7 +245,7 @@ static int rk808_rtc_stop_alarm(struct rk808_rtc *rk808_rtc)
+ 	struct rk808 *rk808 = rk808_rtc->rk808;
+ 	int ret;
+ 
+-	ret = regmap_update_bits(rk808->regmap, RK808_RTC_INT_REG,
++	ret = regmap_update_bits(rk808->regmap, rk808_rtc->creg->int_reg,
+ 				 BIT_RTC_INTERRUPTS_REG_IT_ALARM_M, 0);
+ 
+ 	return ret;
+@@ -242,7 +256,7 @@ static int rk808_rtc_start_alarm(struct rk808_rtc *rk808_rtc)
+ 	struct rk808 *rk808 = rk808_rtc->rk808;
+ 	int ret;
+ 
+-	ret = regmap_update_bits(rk808->regmap, RK808_RTC_INT_REG,
++	ret = regmap_update_bits(rk808->regmap, rk808_rtc->creg->int_reg,
+ 				 BIT_RTC_INTERRUPTS_REG_IT_ALARM_M,
+ 				 BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
+ 
+@@ -274,7 +288,8 @@ static int rk808_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
+ 	alrm_data[4] = bin2bcd(alrm->time.tm_mon + 1);
+ 	alrm_data[5] = bin2bcd(alrm->time.tm_year - 100);
+ 
+-	ret = regmap_bulk_write(rk808->regmap, RK808_ALARM_SECONDS_REG,
++	ret = regmap_bulk_write(rk808->regmap,
++				rk808_rtc->creg->alarm_seconds_reg,
+ 				alrm_data, NUM_ALARM_REGS);
+ 	if (ret) {
+ 		dev_err(dev, "Failed to bulk write: %d\n", ret);
+@@ -318,7 +333,7 @@ static irqreturn_t rk808_alarm_irq(int irq, void *data)
+ 	struct i2c_client *client = rk808->i2c;
+ 	int ret;
+ 
+-	ret = regmap_write(rk808->regmap, RK808_RTC_STATUS_REG,
++	ret = regmap_write(rk808->regmap, rk808_rtc->creg->status_reg,
+ 			   RTC_STATUS_MASK);
+ 	if (ret) {
+ 		dev_err(&client->dev,
+@@ -371,6 +386,22 @@ static int rk808_rtc_resume(struct device *dev)
+ static SIMPLE_DEV_PM_OPS(rk808_rtc_pm_ops,
+ 	rk808_rtc_suspend, rk808_rtc_resume);
+ 
++static struct rk_rtc_compat_reg rk808_creg = {
++	.ctrl_reg = RK808_RTC_CTRL_REG,
++	.status_reg = RK808_RTC_STATUS_REG,
++	.alarm_seconds_reg = RK808_ALARM_SECONDS_REG,
++	.int_reg = RK808_RTC_INT_REG,
++	.seconds_reg = RK808_SECONDS_REG,
++};
++
++static struct rk_rtc_compat_reg rk817_creg = {
++	.ctrl_reg = RK817_RTC_CTRL_REG,
++	.status_reg = RK817_RTC_STATUS_REG,
++	.alarm_seconds_reg = RK817_ALARM_SECONDS_REG,
++	.int_reg = RK817_RTC_INT_REG,
++	.seconds_reg = RK817_SECONDS_REG,
++};
++
+ static int rk808_rtc_probe(struct platform_device *pdev)
+ {
+ 	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
+@@ -381,11 +412,20 @@ static int rk808_rtc_probe(struct platform_device *pdev)
+ 	if (rk808_rtc == NULL)
+ 		return -ENOMEM;
+ 
++	switch (rk808->variant) {
++	case RK809_ID:
++	case RK817_ID:
++		rk808_rtc->creg = &rk817_creg;
++		break;
++	default:
++		rk808_rtc->creg = &rk808_creg;
++		break;
++	}
+ 	platform_set_drvdata(pdev, rk808_rtc);
+ 	rk808_rtc->rk808 = rk808;
+ 
+ 	/* start rtc running by default, and use shadowed timer. */
+-	ret = regmap_update_bits(rk808->regmap, RK808_RTC_CTRL_REG,
++	ret = regmap_update_bits(rk808->regmap, rk808_rtc->creg->ctrl_reg,
+ 				 BIT_RTC_CTRL_REG_STOP_RTC_M |
+ 				 BIT_RTC_CTRL_REG_RTC_READSEL_M,
+ 				 BIT_RTC_CTRL_REG_RTC_READSEL_M);
+@@ -395,7 +435,7 @@ static int rk808_rtc_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	ret = regmap_write(rk808->regmap, RK808_RTC_STATUS_REG,
++	ret = regmap_write(rk808->regmap, rk808_rtc->creg->status_reg,
+ 			   RTC_STATUS_MASK);
+ 	if (ret) {
+ 		dev_err(&pdev->dev,
+-- 
+2.17.1
 
---
-Carlo Caione
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
