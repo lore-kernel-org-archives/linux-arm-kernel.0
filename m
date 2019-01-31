@@ -2,71 +2,90 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D17AAC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:50:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DD296C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:57:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A196C2086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:50:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A637E218AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:57:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XMUO851c"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A196C2086C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jZ0bjGVD";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="J/+GlGEm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A637E218AF
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yspy9x6rPZCURgzP2rJvi+hffNUfb67M6ur7MQ2Pnzw=; b=XMUO851cFEJjrZ
-	pdFFlK8Xyexno6jOowYXswKMMulO+CWJ5w9AemOK56HMbzEKYj6qe7sTGSjOjNrChOlK+ERHqItlJ
-	OBM+AmD4qcyXDpYBmVXa9plwZp/l+CbWz3PqVhGAN6KlriE0QkN353XTvIz0f0IkT0wHKjcJDfncw
-	UgS+waFXEpAoQZSCJzskDJlDK5jWoogGaTuLZH999Hs230/KNb+trJZCN4+Oih9LN94whFSocgupm
-	HaVF2WkGVOgBTuZxgP967IqgqiQeTW2ejtQw88Q6Rwm0+IXHIWBIeecrJ6Nk/vyxqlKxaxa350SkH
-	S2ykN8H5u8+v3xj7tuTg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=baDHK5hN0uPdCIJWJJGZEA59aYa9RSrior+FbUB0M/I=; b=jZ0bjGVDhrhT2J9LExV1jCrMU
+	43XC11Bb1sASoPbUbCEcbW4VgeCjSnYQsCe1Tg2Sg+pZfywkgzJ1/4llAlz1Q0bMp8d4gjaav1mob
+	AWRUvCJJB4sDugdQYF4PbdfUHIxPCXa+RffrZFEFQ6HnQo1bq8hIE9w29nNK5BSQrFfJHTO3AJT94
+	GOgdtbGzrQKZqiUFYbEWWjSBTE6bu2he8ixM7Z0A69q7xA/ssTGuCxaCMZxG7zuD7vFHYU+bKziVH
+	NRtjCgwf70rF0l4UJ7mBTydnZ3kEZh8f9v5QG0URjEmt7P1TOGOOevY3tN2WZSImnXos4i7Nz2/wL
+	YzRSDKq4Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpBnO-0007yl-KF; Thu, 31 Jan 2019 12:50:18 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gpBuB-0001U5-6E; Thu, 31 Jan 2019 12:57:19 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpBnI-0007kH-6C; Thu, 31 Jan 2019 12:50:15 +0000
-X-UUID: 330bd4c66f8440e9a7b5868a973f6622-20190131
-X-UUID: 330bd4c66f8440e9a7b5868a973f6622-20190131
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
- (envelope-from <jianjun.wang@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 920504667; Thu, 31 Jan 2019 04:50:02 -0800
-Received: from MTKMBS31DR.mediatek.inc (172.27.6.102) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 31 Jan 2019 04:50:00 -0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31DR.mediatek.inc
- (172.27.6.102) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Thu, 31 Jan 2019 20:49:58 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Thu, 31 Jan 2019 20:49:57 +0800
-Message-ID: <1548938997.6292.52.camel@mhfsdcap03>
-Subject: Re: [v1] PCI: mediatek: Remove MSI inner domain
-From: Jianjun Wang <jianjun.wang@mediatek.com>
-To: Marc Zyngier <marc.zyngier@arm.com>
-Date: Thu, 31 Jan 2019 20:49:57 +0800
-In-Reply-To: <10e8e731-5749-f6fb-eb33-ab67aa0e2c3f@arm.com>
-References: <1548149855-3225-1-git-send-email-jianjun.wang@mediatek.com>
- <1548926367.4980.14.camel@mhfsdcap03>
- <10e8e731-5749-f6fb-eb33-ab67aa0e2c3f@arm.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gpBu7-0001TS-Bf
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 12:57:16 +0000
+Received: by mail-wm1-x344.google.com with SMTP id p6so2459515wmc.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 31 Jan 2019 04:57:14 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=xdrkkZ8zNkyyvwabg8/Kce1vs/Znds+4PLfa9cPBjTE=;
+ b=J/+GlGEmBN+mGEThHz4QyaD8Q3fqc32W5wDJgC+SL3+e3N+IqKCRzG4A0lGK4alXla
+ HDekhBH9KhrLADVyvrs2gbExXl5NDc7hijyJFPhlSCt3xFOO55wbE9c7pCPZvHY1J0FY
+ mUyC1oAPU/qex6fU8aLSKW6lNLvxcCVsN1oS6w5yIshUmTEcxSbCGSM9uwYywgz/6bwK
+ Kd+Vhs0qNlgDaBwJ9vgJyChKEL8skyV2SQ7DIi2wRWEJDzmd5BlG0rRz56JidS2uVnL4
+ S0DyHnwU7a4nSD55ZEUelbjn8XPw2Mt9U/TNNILxtPeSAcNq9C5KRvRnPf0Mjd5M/HKX
+ irWg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=xdrkkZ8zNkyyvwabg8/Kce1vs/Znds+4PLfa9cPBjTE=;
+ b=MYh9AgIXsBU+PyEdeX+NUKfVlbQe8xjyrpWlqwjFBPLuxlbr5Y+aEYHsu2kZoIR1Vn
+ j2xX1w2U+oKesuzzLJhr3QhX2n7CXGUd339gwcuKmhgujgJ0XkbcH38VGYATWIc5qTxN
+ UcC9b4131SsgpvA7q6YjIOMIWdcOKtARaqVwZBjRW+qNp83jpOEchZJbOMmU8S7rRfk8
+ jLQetPSdwYOKj/LirkoEcTTpIrRa7+rQ7dKB43mJU+9LZYSKn9xf9MYyKpxHFQJ2mVWw
+ 6TMpAAm1747Rd1u98gErG8KnzV6aQ/YkaopZlPVzfUEUJ9ldDk814kqxeRKzeOftRMkD
+ Zm3w==
+X-Gm-Message-State: AHQUAuZAcWte5pu2Pnr1d/1TYbijUqKjnJGt5K7/ApU+IGBUSGs0AreH
+ eOZfq7M1r3mdbfNQK8gm42U=
+X-Google-Smtp-Source: AHgI3IZKwyYinxH1QpCn8T++BYqKF/F0QBUlpXMajxfO7CiQPRgc97YSkFcSyPZT4Lfu+ARYxguLrQ==
+X-Received: by 2002:a7b:c315:: with SMTP id k21mr2180942wmj.145.1548939433307; 
+ Thu, 31 Jan 2019 04:57:13 -0800 (PST)
+Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
+ by smtp.gmail.com with ESMTPSA id k15sm5821823wru.8.2019.01.31.04.57.12
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 31 Jan 2019 04:57:12 -0800 (PST)
+Date: Thu, 31 Jan 2019 13:57:11 +0100
+From: Thierry Reding <thierry.reding@gmail.com>
+To: Joseph Lo <josephl@nvidia.com>
+Subject: Re: [PATCH V4 6/7] arm64: dts: tegra210-p2180: Enable CPU idle support
+Message-ID: <20190131125711.GL23438@ulmo>
+References: <20190131092410.28222-1-josephl@nvidia.com>
+ <20190131092410.28222-7-josephl@nvidia.com>
 MIME-Version: 1.0
-X-MTK: N
+In-Reply-To: <20190131092410.28222-7-josephl@nvidia.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_045012_238839_60143918 
-X-CRM114-Status: GOOD (  29.54  )
+X-CRM114-CacheID: sfid-20190131_045715_420388_AA9C5734 
+X-CRM114-Status: GOOD (  16.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,281 +97,96 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, lorenzo.pieralisi@arm.com,
- linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org,
- matthias.bgg@gmail.com, ryder.lee@mediatek.com,
- linux-mediatek@lists.infradead.org, Honghui Zhang <honghui.zhang@mediatek.com>,
- bhelgaas@google.com, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Jonathan Hunter <jonathanh@nvidia.com>
+Content-Type: multipart/mixed; boundary="===============6831676933274225653=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 2019-01-31 at 09:44 +0000, Marc Zyngier wrote:
-> On 31/01/2019 09:19, Honghui Zhang wrote:
-> > On Tue, 2019-01-22 at 17:37 +0800, Jianjun Wang wrote:
-> >> There is no need to create the inner domain as a parent for MSI domian,
-> >> some feature has been implemented by MSI framework.
-> >>
-> >> Remove the inner domain and its irq chip, it will be more closer to
-> >> hardware implementation.
-> 
-> This is not about being closer to any HW implementation. This is about
-> having a uniform way to deal with MSI controllers, no matter how they
-> are implemented by the HW.
-> 
-> So maybe you could start by explaining what this is trying to achieve.
-> 
-> >>
-> > Hi, jianjun, I'm not quite familiar with the irq_chip framework, It was
-> > under Marc's great help with the first version of irq_chip solution
-> > code. I would like you to add him for the review.
-> > 
-> > Thanks.
-> > 
-> >> Signed-off-by: Jianjun Wang <jianjun.wang@mediatek.com>
-> >> ---
-> >>  drivers/pci/controller/pcie-mediatek.c | 86 +++++++++++---------------
-> >>  1 file changed, 37 insertions(+), 49 deletions(-)
-> >>
-> >> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> >> index 8d05df56158b..f996a9a6331f 100644
-> >> --- a/drivers/pci/controller/pcie-mediatek.c
-> >> +++ b/drivers/pci/controller/pcie-mediatek.c
-> >> @@ -169,7 +169,6 @@ struct mtk_pcie_soc {
-> >>   * @slot: port slot
-> >>   * @irq: GIC irq
-> >>   * @irq_domain: legacy INTx IRQ domain
-> >> - * @inner_domain: inner IRQ domain
-> >>   * @msi_domain: MSI IRQ domain
-> >>   * @lock: protect the msi_irq_in_use bitmap
-> >>   * @msi_irq_in_use: bit map for assigned MSI IRQ
-> >> @@ -190,7 +189,6 @@ struct mtk_pcie_port {
-> >>  	u32 slot;
-> >>  	int irq;
-> >>  	struct irq_domain *irq_domain;
-> >> -	struct irq_domain *inner_domain;
-> >>  	struct irq_domain *msi_domain;
-> >>  	struct mutex lock;
-> >>  	DECLARE_BITMAP(msi_irq_in_use, MTK_MSI_IRQS_NUM);
-> >> @@ -418,22 +416,15 @@ static void mtk_msi_ack_irq(struct irq_data *data)
-> >>  	u32 hwirq = data->hwirq;
-> >>  
-> >>  	writel(1 << hwirq, port->base + PCIE_IMSI_STATUS);
-> >> +	writel(MSI_STATUS, port->base + PCIE_INT_STATUS);
-> >>  }
-> >>  
-> >> -static struct irq_chip mtk_msi_bottom_irq_chip = {
-> >> -	.name			= "MTK MSI",
-> >> -	.irq_compose_msi_msg	= mtk_compose_msi_msg,
-> >> -	.irq_set_affinity	= mtk_msi_set_affinity,
-> >> -	.irq_ack		= mtk_msi_ack_irq,
-> >> -};
-> >> -
-> >> -static int mtk_pcie_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> >> -				     unsigned int nr_irqs, void *args)
-> >> +static irq_hw_number_t mtk_pcie_msi_get_hwirq(struct msi_domain_info *info,
-> >> +					      msi_alloc_info_t *arg)
-> >>  {
-> >> -	struct mtk_pcie_port *port = domain->host_data;
-> >> -	unsigned long bit;
-> >> +	struct mtk_pcie_port *port = info->chip_data;
-> >> +	irq_hw_number_t bit;
-> >>  
-> >> -	WARN_ON(nr_irqs != 1);
-> >>  	mutex_lock(&port->lock);
-> >>  
-> >>  	bit = find_first_zero_bit(port->msi_irq_in_use, MTK_MSI_IRQS_NUM);
-> >> @@ -446,18 +437,14 @@ static int mtk_pcie_irq_domain_alloc(struct irq_domain *domain, unsigned int vir
-> >>  
-> >>  	mutex_unlock(&port->lock);
-> >>  
-> >> -	irq_domain_set_info(domain, virq, bit, &mtk_msi_bottom_irq_chip,
-> >> -			    domain->host_data, handle_edge_irq,
-> >> -			    NULL, NULL);
-> >> -
-> >> -	return 0;
-> >> +	return bit;
-> 
-> Why do you need to override the get_hwirq method? Using the generic
-> PCI/MSI version has the advantage of giving you a universal encoding
-> which makes debugging much easier.
 
-Hi Marc,
-
-In previous patch, we create a inner_domain as a parent for msi_domain,
-when we allocate a irq for MSI, the work flow of each domain will be the
-following:
-
-inner_domain:
-1. Allocated a irq bit from bitmap as this domain's hwirq;
-2. Mapping with system virtual irq number;
-3. Set irq chip and irq handler;
-4. Send MSI message to EP.
-
-msi_domain:
-1. Calculate a hwirq;
-2. Mapping with system virtual irq number;
-3. Set irq chip which from info->chip and irq handler if defined in
-info.
-4. Send MSI message to EP or trigger parent domain to send the message.
-
-The last three steps looks similar, if we override the get_hwirq method
-and set irq chip and handler to info structure, MSI framework will do
-the rest of thing. I think it will be more simple and easy to understand
-the driver's work flow.
-
-Further more, if we try to enhance the interrupt performance, such as
-connect the MSI interrupt line to GIC directly in hardware, we will need
-to set gic domain as the parent, in that case, there will be a lot of
-work to do to replace the inner domain.
-
-Thanks.
-> 
-> >>  }
-> >>  
-> >> -static void mtk_pcie_irq_domain_free(struct irq_domain *domain,
-> >> -				     unsigned int virq, unsigned int nr_irqs)
-> >> +static void mtk_pcie_msi_free(struct irq_domain *domain,
-> >> +			      struct msi_domain_info *info, unsigned int virq)
-> >>  {
-> >>  	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
-> >> -	struct mtk_pcie_port *port = irq_data_get_irq_chip_data(d);
-> >> +	struct mtk_pcie_port *port = info->chip_data;
-> >>  
-> >>  	mutex_lock(&port->lock);
-> >>  
-> >> @@ -468,46 +455,50 @@ static void mtk_pcie_irq_domain_free(struct irq_domain *domain,
-> >>  		__clear_bit(d->hwirq, port->msi_irq_in_use);
-> >>  
-> >>  	mutex_unlock(&port->lock);
-> >> -
-> >> -	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
-> >>  }
-> >>  
-> >> -static const struct irq_domain_ops msi_domain_ops = {
-> >> -	.alloc	= mtk_pcie_irq_domain_alloc,
-> >> -	.free	= mtk_pcie_irq_domain_free,
-> >> +static struct msi_domain_ops mtk_msi_domain_ops = {
-> >> +	.get_hwirq	= mtk_pcie_msi_get_hwirq,
-> >> +	.msi_free	= mtk_pcie_msi_free,
-> >>  };
-> >>  
-> >>  static struct irq_chip mtk_msi_irq_chip = {
-> >> -	.name		= "MTK PCIe MSI",
-> >> -	.irq_ack	= irq_chip_ack_parent,
-> >> -	.irq_mask	= pci_msi_mask_irq,
-> >> -	.irq_unmask	= pci_msi_unmask_irq,
-> >> +	.name			= "MTK PCIe",
-> >> +	.irq_compose_msi_msg	= mtk_compose_msi_msg,
-> >> +	.irq_write_msi_msg	= pci_msi_domain_write_msg,
-> >> +	.irq_set_affinity	= mtk_msi_set_affinity,
-> >> +	.irq_ack		= mtk_msi_ack_irq,
-> >> +	.irq_mask		= pci_msi_mask_irq,
-> >> +	.irq_unmask		= pci_msi_unmask_irq,
-> >>  };
-> >>  
-> >>  static struct msi_domain_info mtk_msi_domain_info = {
-> >> -	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
-> >> -		   MSI_FLAG_PCI_MSIX),
-> >> -	.chip	= &mtk_msi_irq_chip,
-> >> +	.flags		= (MSI_FLAG_USE_DEF_DOM_OPS |
-> >> +			   MSI_FLAG_USE_DEF_CHIP_OPS | MSI_FLAG_PCI_MSIX),
-> >> +	.ops		= &mtk_msi_domain_ops,
-> >> +	.chip		= &mtk_msi_irq_chip,
-> >> +	.handler	= handle_edge_irq,
-> >> +	.handler_name	= "MSI",
-> >>  };
-> >>  
-> >>  static int mtk_pcie_allocate_msi_domains(struct mtk_pcie_port *port)
-> >>  {
-> >> -	struct fwnode_handle *fwnode = of_node_to_fwnode(port->pcie->dev->of_node);
-> >> +	struct device *dev = port->pcie->dev;
-> >> +	struct fwnode_handle *fwnode = of_node_to_fwnode(dev->of_node);
-> >> +	struct msi_domain_info *info;
-> >>  
-> >>  	mutex_init(&port->lock);
-> >>  
-> >> -	port->inner_domain = irq_domain_create_linear(fwnode, MTK_MSI_IRQS_NUM,
-> >> -						      &msi_domain_ops, port);
-> >> -	if (!port->inner_domain) {
-> >> -		dev_err(port->pcie->dev, "failed to create IRQ domain\n");
-> >> +	info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
-> >> +	if (!info)
-> >>  		return -ENOMEM;
-> >> -	}
-> >>  
-> >> -	port->msi_domain = pci_msi_create_irq_domain(fwnode, &mtk_msi_domain_info,
-> >> -						     port->inner_domain);
-> >> +	memcpy(info, &mtk_msi_domain_info, sizeof(*info));
-> >> +	info->chip_data = port;
-> >> +
-> > 
-> > I'm not really like this memcpy of msi_domain_info, but I do not have a
-> > better idea to prevent the mixed of mtk_pcie_port data.
-> 
-> So we're basically trading an indirection for another. What's the gain?
-
-There is usually more than one PCIe port in each SoC, we use
-mtk_pcie_port data to describe it, in previous version, we pass the port
-data as inner domain's host_data. When remove the inner domain, we also
-need to pass the port data and should prevent to mix with another port,
-so I thank maybe we can make a copy for each port and set port data as
-it's chip_data.
-> 
-> > 
-> >> +	port->msi_domain = pci_msi_create_irq_domain(fwnode, info, NULL);
-> >>  	if (!port->msi_domain) {
-> >> -		dev_err(port->pcie->dev, "failed to create MSI domain\n");
-> >> -		irq_domain_remove(port->inner_domain);
-> >> +		dev_err(dev, "failed to create MSI domain\n");
-> >>  		return -ENOMEM;
-> >>  	}
-> >>  
-> >> @@ -541,8 +532,6 @@ static void mtk_pcie_irq_teardown(struct mtk_pcie *pcie)
-> >>  		if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> >>  			if (port->msi_domain)
-> >>  				irq_domain_remove(port->msi_domain);
-> >> -			if (port->inner_domain)
-> >> -				irq_domain_remove(port->inner_domain);
-> >>  		}
-> >>  
-> >>  		irq_dispose_mapping(port->irq);
-> >> @@ -619,12 +608,11 @@ static void mtk_pcie_intr_handler(struct irq_desc *desc)
-> >>  
-> >>  			while ((imsi_status = readl(port->base + PCIE_IMSI_STATUS))) {
-> >>  				for_each_set_bit(bit, &imsi_status, MTK_MSI_IRQS_NUM) {
-> >> -					virq = irq_find_mapping(port->inner_domain, bit);
-> >> +					virq = irq_find_mapping(
-> >> +							port->msi_domain, bit);
-> >>  					generic_handle_irq(virq);
-> >>  				}
-> >>  			}
-> >> -			/* Clear MSI interrupt status */
-> >> -			writel(MSI_STATUS, port->base + PCIE_INT_STATUS);
-> >>  		}
-> > 
-> > why change this irq status clear flow?
-> 
-> I think this is trying move everything to the irq_ack callback. But
-> that's a change of semantics, and I'd like it explained. It certainly
-> feels wrong.
-Yes, I confused with each irq's ack callback, it doesn't need to be
-changed.
-
-Thanks.
-> 
-> Overall, this patch as it stands (without any real explanation) doesn't
-> feel me with confidence. It introduces significant differences in the
-> way we build PCI/MSI domains, and I'd like to understand why.
-> 
-> Thanks,
-> 
-> 	M.
+--===============6831676933274225653==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="gmhhrsDozM2n+uz5"
+Content-Disposition: inline
 
 
+--gmhhrsDozM2n+uz5
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Thu, Jan 31, 2019 at 05:24:09PM +0800, Joseph Lo wrote:
+> Enable CPU idle support for Jetson TX1 platform.
+>=20
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> ---
+> v4:
+>  * no change
+> v3:
+>  * no change
+> v2:
+>  * no change
+> ---
+>  arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>=20
+> diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi b/arch/arm64/=
+boot/dts/nvidia/tegra210-p2180.dtsi
+> index 053458a5db55..d1a492c63e96 100644
+> --- a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
+> +++ b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
+> @@ -305,6 +305,12 @@
+>  		cpu@3 {
+>  			enable-method =3D "psci";
+>  		};
+> +
+> +		idle-states {
+> +			c7 {
+> +				status =3D "okay";
+
+Doesn't seem like the code currently cares, but the bindings are
+specific, so this looks good to me.
+
+Given that we need the timer in order to get out of this state, I'm
+assuming that I should hold back on these patches until the driver
+changes have been merged to make sure we don't regress. Is that
+correct?
+
+Thierry
+
+--gmhhrsDozM2n+uz5
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlxS8KcACgkQ3SOs138+
+s6F85w//ZZmfY0LXgFe/SNF2zAqb+A8PuEpwhY1vyW3fIlGZih2CcGLC5hqvP0T5
+Mvj1dUpvwuTxWc03OK208/+HTPKlGaV7L2zsZFxETVZqEGNxSicUtdbSM6E0j7t6
+swRUWgpDsG+5IBXFLSqhD7fJoZBlqVUSGs7Qi+nHGg+U9HKZjxGRZlB1SKZXSb79
+4b50pyIQcXlIcxclIeKKWg6JhANqTcZz5biVIcSLRlF98TcMTwwkit7wrwBIFcN6
+SbFo8VOoDD6mFGHbNylLNK4Ze/hTBB4/DrE+oy6FCJ9p5DrDrZZx4JCOTFKfYUYU
+l/JTaxkNvZ7IvP8T3y0DqB8FMTflkdDlHi4jciPkUgiKYyNBhrSGojlO5SMRL5rE
+dIeTTVMpJZi1MDvALazq5ldhe+iZnKWXmKYro+QCTaS5m4zxs3KK4F6ELN/h0AOv
+NJzluQ3c/4QoCJ6aFr+a+hyU0yWn7BjGebGhaqsN2c9CGygX6LdFYuXy7O+jMGEB
+rmFZf4oeyOPDdMt4wijTzpmhNyzQYhRpibktGhqDxpL2nlrAHLhsKDKocZEyeqyS
+w/pNjVpLWlHBFbj6S+DfNN5atlIbQx5wgouEMrnWQgvwW4+Ko+kYzB7WcAsXJoWw
+suhlLUGMS36clexmesvR14idfDLTmqM1r4O3LtTjarL8NCx+Bxc=
+=NAvK
+-----END PGP SIGNATURE-----
+
+--gmhhrsDozM2n+uz5--
+
+
+--===============6831676933274225653==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============6831676933274225653==--
+
