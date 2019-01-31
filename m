@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EA6F3C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 15:01:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 881F4C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 15:02:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BCE24218AF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 15:01:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5942F218AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 15:02:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PtbQKiT1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BCE24218AF
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aYYP+a1D"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5942F218AF
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,38 +26,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=RMROh6rk+HZMv9Y7+O06STJP5f9KCNLvob+d/LTOkjo=; b=PtbQKiT10bnc7Tg7lky9ZIclqd
-	p+tzbY5lExS1sbeSCAKzdSBNjIsk8cdY67KOSp0lKZ5+WsbxufCr9hGI5umt59hzglld2ZvDt+SuO
-	blKX/n11UIKMg0rcJhbLgz1h48zgGI8sZo2k5rOcVsXo09cwXFF/Xs70vlgRZOL4A9Jv44NITABnz
-	tDJfu5FvEUlBI5AEqLgegzVpftFB9tyjPsf4R2DZbRiVRTd25ZQwJ30qkcq4Won6+5OBxM4H6JN5t
-	4H1RYTw4MKhpvSK3BevCPWHzD61Woa93/7fRrmP2iM9NOkpqxfm14vVwy81mHOrzAKw6cEuQ0LMNE
-	G9dBzLWA==;
+	bh=+ngcZwGxDOC5wYbdG+wHDvJ4CdeA3eSBQ9LLNBvbKAg=; b=aYYP+a1Dd0CrqfMfXpuEMtHYGD
+	FEwUHz0+bzcqKjOQBCH7m1f93wLbbP/9kuleOe4vurTCBbLLcRmM7Qwe+PAA5gC87D9DH5xb63kN1
+	4HBrq0ftFJPzCskhdRFyvWDZv8O3BWUJbTM6khnQoG4Sjxp7QwpegRwU6B+YhklQO0zBB0J+g8hl4
+	BleZNQVE9KeIwNVpp8gwhXmjtMON9+Bmoh9iV34ik3P6XGe1/hxDyqd7m6v9fRtSU5e5RYYEkStQi
+	r7GySyV/AZ+2wLbMKEXFeUmc5pSAjjLvvxM07qASUGC2bEcu9IGIeL0MNul5ZpRaW4vKTtKKri14h
+	kxVYTVHg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpDqX-0001Go-5a; Thu, 31 Jan 2019 15:01:41 +0000
+	id 1gpDrb-0001dA-7r; Thu, 31 Jan 2019 15:02:47 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpDoX-0006It-JB
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 14:59:39 +0000
+ id 1gpDof-0006Tg-69
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 14:59:56 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 804BBEBD;
- Thu, 31 Jan 2019 06:59:37 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BAFC6EBD;
+ Thu, 31 Jan 2019 06:59:44 -0800 (PST)
 Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 86D693F59C;
- Thu, 31 Jan 2019 06:59:35 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id A77ED3F59C;
+ Thu, 31 Jan 2019 06:59:42 -0800 (PST)
 From: Julien Thierry <julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v10 09/25] arm64: Unmask PMR before going idle
-Date: Thu, 31 Jan 2019 14:58:47 +0000
-Message-Id: <1548946743-38979-10-git-send-email-julien.thierry@arm.com>
+Subject: [PATCH v10 12/25] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
+ masking
+Date: Thu, 31 Jan 2019 14:58:50 +0000
+Message-Id: <1548946743-38979-13-git-send-email-julien.thierry@arm.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1548946743-38979-1-git-send-email-julien.thierry@arm.com>
 References: <1548946743-38979-1-git-send-email-julien.thierry@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_065937_713113_731AC4C3 
-X-CRM114-Status: GOOD (  16.03  )
+X-CRM114-CacheID: sfid-20190131_065945_484685_CED4F0F7 
+X-CRM114-Status: GOOD (  15.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,119 +72,204 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
  Julien Thierry <julien.thierry@arm.com>, marc.zyngier@arm.com,
- catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- christoffer.dall@arm.com, james.morse@arm.com, joel@joelfernandes.org
+ catalin.marinas@arm.com, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
+ james.morse@arm.com, Oleg Nesterov <oleg@redhat.com>, joel@joelfernandes.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-CPU does not received signals for interrupts with a priority masked by
-ICC_PMR_EL1. This means the CPU might not come back from a WFI
-instruction.
+Instead disabling interrupts by setting the PSR.I bit, use a priority
+higher than the one used for interrupts to mask them via PMR.
 
-Make sure ICC_PMR_EL1 does not mask interrupts when doing a WFI.
-
-Since the logic of cpu_do_idle is becoming a bit more complex than just
-two instructions, lets turn it from ASM to C.
+When using PMR to disable interrupts, the value of PMR will be used
+instead of PSR.[DAIF] for the irqflags.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Oleg Nesterov <oleg@redhat.com>
 ---
- arch/arm64/kernel/process.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/proc.S        | 11 -----------
- 2 files changed, 45 insertions(+), 11 deletions(-)
+ arch/arm64/include/asm/efi.h      |  11 +++++
+ arch/arm64/include/asm/irqflags.h | 100 +++++++++++++++++++++++++++-----------
+ 2 files changed, 83 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 6d410fc..3767fb2 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -51,6 +51,7 @@
- #include <linux/thread_info.h>
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index 7ed3208..c9e9a69 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -44,6 +44,17 @@
  
- #include <asm/alternative.h>
-+#include <asm/arch_gicv3.h>
- #include <asm/compat.h>
- #include <asm/cacheflush.h>
- #include <asm/exec.h>
-@@ -74,6 +75,50 @@
+ #define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
  
- void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
- 
-+static void __cpu_do_idle(void)
-+{
-+	dsb(sy);
-+	wfi();
-+}
++/*
++ * Even when Linux uses IRQ priorities for IRQ disabling, EFI does not.
++ * And EFI shouldn't really play around with priority masking as it is not aware
++ * which priorities the OS has assigned to its interrupts.
++ */
++#define arch_efi_save_flags(state_flags)		\
++	((void)((state_flags) = read_sysreg(daif)))
 +
-+static void __cpu_do_idle_irqprio(void)
-+{
-+	unsigned long pmr;
++#define arch_efi_restore_flags(state_flags)	write_sysreg(state_flags, daif)
++
++
+ /* arch specific definitions used by the stub code */
+ 
+ /*
+diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+index 24692ed..d4597b2 100644
+--- a/arch/arm64/include/asm/irqflags.h
++++ b/arch/arm64/include/asm/irqflags.h
+@@ -18,7 +18,9 @@
+ 
+ #ifdef __KERNEL__
+ 
++#include <asm/alternative.h>
+ #include <asm/ptrace.h>
++#include <asm/sysreg.h>
+ 
+ /*
+  * Aarch64 has flags for masking: Debug, Asynchronous (serror), Interrupts and
+@@ -36,33 +38,27 @@
+ /*
+  * CPU interrupt mask handling.
+  */
+-static inline unsigned long arch_local_irq_save(void)
+-{
+-	unsigned long flags;
+-	asm volatile(
+-		"mrs	%0, daif		// arch_local_irq_save\n"
+-		"msr	daifset, #2"
+-		: "=r" (flags)
+-		:
+-		: "memory");
+-	return flags;
+-}
+-
+ static inline void arch_local_irq_enable(void)
+ {
+-	asm volatile(
+-		"msr	daifclr, #2		// arch_local_irq_enable"
+-		:
++	asm volatile(ALTERNATIVE(
++		"msr	daifclr, #2		// arch_local_irq_enable\n"
++		"nop",
++		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0\n"
++		"dsb	sy",
++		ARM64_HAS_IRQ_PRIO_MASKING)
+ 		:
++		: "r" (GIC_PRIO_IRQON)
+ 		: "memory");
+ }
+ 
+ static inline void arch_local_irq_disable(void)
+ {
+-	asm volatile(
+-		"msr	daifset, #2		// arch_local_irq_disable"
+-		:
++	asm volatile(ALTERNATIVE(
++		"msr	daifset, #2		// arch_local_irq_disable",
++		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ", %0",
++		ARM64_HAS_IRQ_PRIO_MASKING)
+ 		:
++		: "r" (GIC_PRIO_IRQOFF)
+ 		: "memory");
+ }
+ 
+@@ -71,12 +67,44 @@ static inline void arch_local_irq_disable(void)
+  */
+ static inline unsigned long arch_local_save_flags(void)
+ {
 +	unsigned long daif_bits;
+ 	unsigned long flags;
+-	asm volatile(
+-		"mrs	%0, daif		// arch_local_save_flags"
+-		: "=r" (flags)
+-		:
 +
 +	daif_bits = read_sysreg(daif);
-+	write_sysreg(daif_bits | PSR_I_BIT, daif);
 +
 +	/*
-+	 * Unmask PMR before going idle to make sure interrupts can
-+	 * be raised.
++	 * The asm is logically equivalent to:
++	 *
++	 * if (system_uses_irq_prio_masking())
++	 *	flags = (daif_bits & PSR_I_BIT) ?
++	 *			GIC_PRIO_IRQOFF :
++	 *			read_sysreg_s(SYS_ICC_PMR_EL1);
++	 * else
++	 *	flags = daif_bits;
 +	 */
-+	pmr = gic_read_pmr();
-+	gic_write_pmr(GIC_PRIO_IRQON);
++	asm volatile(ALTERNATIVE(
++			"mov	%0, %1\n"
++			"nop\n"
++			"nop",
++			"mrs_s	%0, " __stringify(SYS_ICC_PMR_EL1) "\n"
++			"ands	%1, %1, " __stringify(PSR_I_BIT) "\n"
++			"csel	%0, %0, %2, eq",
++			ARM64_HAS_IRQ_PRIO_MASKING)
++		: "=&r" (flags), "+r" (daif_bits)
++		: "r" (GIC_PRIO_IRQOFF)
+ 		: "memory");
 +
-+	__cpu_do_idle();
-+
-+	gic_write_pmr(pmr);
-+	write_sysreg(daif_bits, daif);
++	return flags;
 +}
 +
-+/*
-+ *	cpu_do_idle()
-+ *
-+ *	Idle the processor (wait for interrupt).
-+ *
-+ *	If the CPU supports priority masking we must do additional work to
-+ *	ensure that interrupts are not masked at the PMR (because the core will
-+ *	not wake up if we block the wake up signal in the interrupt controller).
-+ */
-+void cpu_do_idle(void)
++static inline unsigned long arch_local_irq_save(void)
 +{
-+	if (system_uses_irq_prio_masking())
-+		__cpu_do_idle_irqprio();
-+	else
-+		__cpu_do_idle();
-+}
++	unsigned long flags;
 +
- /*
-  * This is our default idle handler.
++	flags = arch_local_save_flags();
++
++	arch_local_irq_disable();
++
+ 	return flags;
+ }
+ 
+@@ -85,16 +113,32 @@ static inline unsigned long arch_local_save_flags(void)
   */
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 73886a5..3ea4f3b 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -55,17 +55,6 @@
+ static inline void arch_local_irq_restore(unsigned long flags)
+ {
+-	asm volatile(
+-		"msr	daif, %0		// arch_local_irq_restore"
+-	:
+-	: "r" (flags)
+-	: "memory");
++	asm volatile(ALTERNATIVE(
++			"msr	daif, %0\n"
++			"nop",
++			"msr_s	" __stringify(SYS_ICC_PMR_EL1) ", %0\n"
++			"dsb	sy",
++			ARM64_HAS_IRQ_PRIO_MASKING)
++		: "+r" (flags)
++		:
++		: "memory");
+ }
  
- #define MAIR(attr, mt)	((attr) << ((mt) * 8))
- 
--/*
-- *	cpu_do_idle()
-- *
-- *	Idle the processor (wait for interrupt).
-- */
--ENTRY(cpu_do_idle)
--	dsb	sy				// WFI may enter a low-power mode
--	wfi
--	ret
--ENDPROC(cpu_do_idle)
--
- #ifdef CONFIG_CPU_PM
- /**
-  * cpu_do_suspend - save CPU registers context
+ static inline int arch_irqs_disabled_flags(unsigned long flags)
+ {
+-	return flags & PSR_I_BIT;
++	int res;
++
++	asm volatile(ALTERNATIVE(
++			"and	%w0, %w1, #" __stringify(PSR_I_BIT) "\n"
++			"nop",
++			"cmp	%w1, #" __stringify(GIC_PRIO_IRQOFF) "\n"
++			"cset	%w0, ls",
++			ARM64_HAS_IRQ_PRIO_MASKING)
++		: "=&r" (res)
++		: "r" ((int) flags)
++		: "memory");
++
++	return res;
+ }
+ #endif
+ #endif
 -- 
 1.9.1
 
