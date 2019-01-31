@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 400F1C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:47:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BF937C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:48:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 134E62086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:47:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8BBFE218AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:48:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eP3kJZ3S"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 134E62086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qATP4hvW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8BBFE218AF
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ossystems.com.br
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,56 +25,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=e3NuoZ3Cio737bKZDVzeARnbMU7a91fWbZbNxJckljQ=; b=eP3kJZ3SMyUdn7
-	Ufb6UPI+MGL69ZMHU6JXbp0AqyBfZPF48MZgbGXyb9wNUUMgkF9vP1QeyPKjt6uqQWJQ/i37REXLw
-	1oWYrqTXA838dIum4fTYGAf+hlK2DJI4ND8VeeFZN7NTg+Oxjjno6rvGNHUIUFIovKyuyNRSGYlRV
-	9icsE08pjyhK2TTf3grTIs+JiXa/yoi7EN0/3TYEXFqAKJxfHsUGN66pv3Mjzo6o0EO56Whhtq/PT
-	GHvPbxsi03c67Lt8BQVrJANb485tAAMnIFoNEIA48FJqFbzdoawJUvl6NAmNOVxSdKFEBUJz2/Eih
-	5YyFK/wMOWpvpSA0xuOQ==;
+	List-Owner; bh=auniOuPgQxw7/Dpyjj7NVXlcg3FJ2YEKgfBbMQzQwcQ=; b=qATP4hvWlneoUg
+	CYL7ktTsWx8TH+XTSsipUJW2C4VaWxT7D5gFxZgOfSwVEiKwqcOGO3tzuwGWdgo2i9ATa+BHQfx6/
+	lVE+v6qh55awL8jx1BSbdJ3ZS2hELMudOg9l4GCt84uytBo16/abrfVHwy3cgmd5Oih6vgASnmy3g
+	voSDJwT9nnD3Pg4RChkK5nFxFI2AnCRlroMn90R2wTmyuWgCjwhycNkxMcI/MJUAYUnhXUF+8vz72
+	L7gw5v/NvQsw+ITMAje3Ewc1VbwHtCc8SVCLkHDMjpqOe3d8rSgIdJHhLPK4aAECOLIIEiEE6sB4N
+	nO5KMdg4+YordC9ZSa6w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpBky-0005ZK-Uu; Thu, 31 Jan 2019 12:47:49 +0000
-Received: from mail-qt1-f193.google.com ([209.85.160.193])
+	id 1gpBlI-0005qm-H0; Thu, 31 Jan 2019 12:48:08 +0000
+Received: from mail-qt1-f194.google.com ([209.85.160.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpBkg-0005Je-Bg; Thu, 31 Jan 2019 12:47:36 +0000
-Received: by mail-qt1-f193.google.com with SMTP id d19so3225925qtq.9;
- Thu, 31 Jan 2019 04:47:30 -0800 (PST)
+ id 1gpBko-0005T2-4h; Thu, 31 Jan 2019 12:47:41 +0000
+Received: by mail-qt1-f194.google.com with SMTP id t33so3265106qtt.4;
+ Thu, 31 Jan 2019 04:47:37 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:organization:content-transfer-encoding;
- bh=DOY0na8Wg7iyK4mJ/SZnMyCR5yw4bav4pLPRTRGmFrg=;
- b=fTtiztswNeTjDJM3YMKRZcdOz75DAyGymbD+Axe2cqNhAf4mQ3LwarGyuchCJeUnhI
- ZlpS8O85CxyGvkJ3vaSAmzLSrrr+lJ9gZpr0kF7hXdOZDCHqGdfCNX78G5VVweibvuIE
- QPgz/v2ZvE5r8qTrW5M6sjL/pVlFdqu1qSz3oQnho9yfZxg3qGC9vdvEaQnm6C8NnCSJ
- BpE4lNA8FKr/IGNI8hiCUfIRi9dkINeqoBvF7E3rJfJpLwPu3mg274q5uyC8GzcfkYoG
- SfhReL7PlYVx0SwaWsQg82gJ9S+pNidZEPZHxe9uTBzst/dpA7knzA6OpPLCl13GUD4m
- +Svg==
-X-Gm-Message-State: AJcUukcAEeFnpc5HGFWmTemcAXUuHqvQJcrOaa3tZ57oqRFKvj5/Umjc
- jFB0cWt2crWF+k2qw0vCqpEDsBN+
-X-Google-Smtp-Source: ALg8bN6ZFd7Wi+q3Xu4AZh7PdCMFxAFu+vydlguUiIFOCGI22nIgqT5+2P09Nq3yMWONZazJQ6WA7Q==
-X-Received: by 2002:a0c:d065:: with SMTP id d34mr31290726qvh.209.1548938848924; 
- Thu, 31 Jan 2019 04:47:28 -0800 (PST)
+ bh=xBSoSCuZb2B8/w9VdnWvUIjsj7+NlFgkfKIRaCleZIs=;
+ b=VN8PkNFGuth6zve469LD8VFV1/wj3kzZQXofGwwZMhT9pcvudY2eGGVqg/L0Ec3Kz/
+ PR/3TA8iFMjWebl531xKdgdOa4tMfir8Ak0DYJje5z7fP1nIdPRW1z33f2BePrMeLiKe
+ deqTAmjTKt/gHI0rZwGESH0JbduIVfxnjwjwNXfDl0yNEv2V6sSVbGGOUxc3FghFLsqv
+ TIxOvDUtikNlJ0Uw770Ds17sX9K5u/HB15Ypd+WehjUxV5At3QY6Il5d4UBIcZ8gdUya
+ pxx2SiYQJGy8ywpRBNfdSqFTBW5uKosoO1n1TpwWpS1Epm+o5xz2RWVbuk4vnNW9S0L+
+ UwEA==
+X-Gm-Message-State: AJcUukevNUS8Zf0o/x5EVrLzelq7c8ye7Xz3ftKKb9dcHNf3jlia4MZX
+ aB9AOI3Ac9OFrGSBBbD+TxZm9nCu
+X-Google-Smtp-Source: ALg8bN7Vt/DN3dGcKPypW64rUyzI/Ix7TXSRmoZ2DvcnRg3hiD8bWHiztP/xiQXleq1pK3cqDCTEwQ==
+X-Received: by 2002:aed:242e:: with SMTP id r43mr34659813qtc.128.1548938856744; 
+ Thu, 31 Jan 2019 04:47:36 -0800 (PST)
 Received: from localhost.localdomain ([181.220.86.121])
- by smtp.gmail.com with ESMTPSA id y68sm2886835qkd.49.2019.01.31.04.47.23
+ by smtp.gmail.com with ESMTPSA id c17sm5675052qtb.14.2019.01.31.04.47.31
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 31 Jan 2019 04:47:27 -0800 (PST)
+ Thu, 31 Jan 2019 04:47:35 -0800 (PST)
 Received: by localhost.localdomain (sSMTP sendmail emulation);
- Thu, 31 Jan 2019 10:47:21 -0200
+ Thu, 31 Jan 2019 10:47:29 -0200
 From: Otavio Salvador <otavio@ossystems.com.br>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v2 2/3] ARM: dts: rockchip: rv1108-elgin: Use the correct
+Subject: [PATCH v2 3/3] ARM: dts: rockchip: rv1108-evb: Use the correct
  regulator properties
-Date: Thu, 31 Jan 2019 10:47:08 -0200
-Message-Id: <20190131124710.30238-2-otavio@ossystems.com.br>
+Date: Thu, 31 Jan 2019 10:47:09 -0200
+Message-Id: <20190131124710.30238-3-otavio@ossystems.com.br>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190131124710.30238-1-otavio@ossystems.com.br>
 References: <20190131124710.30238-1-otavio@ossystems.com.br>
 MIME-Version: 1.0
 Organization: O.S. Systems Software LTDA.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_044730_815555_60940664 
-X-CRM114-Status: GOOD (  13.11  )
+X-CRM114-CacheID: sfid-20190131_044738_664633_F67A5A3A 
+X-CRM114-Status: GOOD (  13.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,16 +112,17 @@ Fix it by using the correct properties as per the dt bindings.
 Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
 ---
 
-Changes in v2: None
+Changes in v2:
+- rebase on top of linux-next
 
- arch/arm/boot/dts/rv1108-elgin-r1.dts | 20 ++++++++++----------
+ arch/arm/boot/dts/rv1108-evb.dts | 20 ++++++++++----------
  1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rv1108-elgin-r1.dts b/arch/arm/boot/dts/rv1108-elgin-r1.dts
-index 66688fdf4fd8..1c4507b66fdd 100644
---- a/arch/arm/boot/dts/rv1108-elgin-r1.dts
-+++ b/arch/arm/boot/dts/rv1108-elgin-r1.dts
-@@ -85,8 +85,8 @@
+diff --git a/arch/arm/boot/dts/rv1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
+index 203d83e3bbf5..30f3d0470ad9 100644
+--- a/arch/arm/boot/dts/rv1108-evb.dts
++++ b/arch/arm/boot/dts/rv1108-evb.dts
+@@ -97,8 +97,8 @@
  				regulator-always-on;
  				regulator-boot-on;
  				regulator-state-mem {
@@ -132,16 +133,16 @@ index 66688fdf4fd8..1c4507b66fdd 100644
  				};
  			};
  
-@@ -97,7 +97,7 @@
- 				regulator-always-on;
- 				regulator-boot-on;
+@@ -107,7 +107,7 @@
+ 				regulator-min-microvolt = <700000>;
+ 				regulator-max-microvolt = <2000000>;
  				regulator-state-mem {
 -					regulator-state-disabled;
 +					regulator-off-in-suspend;
  				};
  			};
  
-@@ -106,7 +106,7 @@
+@@ -116,7 +116,7 @@
  				regulator-always-on;
  				regulator-boot-on;
  				regulator-state-mem {
@@ -150,7 +151,7 @@ index 66688fdf4fd8..1c4507b66fdd 100644
  				};
  			};
  
-@@ -117,8 +117,8 @@
+@@ -127,8 +127,8 @@
  				regulator-always-on;
  				regulator-boot-on;
  				regulator-state-mem {
@@ -161,7 +162,7 @@ index 66688fdf4fd8..1c4507b66fdd 100644
  				};
  			};
  
-@@ -129,7 +129,7 @@
+@@ -139,7 +139,7 @@
  				regulator-always-on;
  				regulator-boot-on;
  				regulator-state-mem {
@@ -170,7 +171,7 @@ index 66688fdf4fd8..1c4507b66fdd 100644
  				};
  			};
  
-@@ -140,7 +140,7 @@
+@@ -150,7 +150,7 @@
  				regulator-always-on;
  				regulator-boot-on;
  				regulator-state-mem {
@@ -179,7 +180,7 @@ index 66688fdf4fd8..1c4507b66fdd 100644
  				};
  			};
  
-@@ -151,8 +151,8 @@
+@@ -161,8 +161,8 @@
  				regulator-always-on;
  				regulator-boot-on;
  				regulator-state-mem {
