@@ -2,85 +2,65 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EEBA5C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 13:25:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 82D59C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 13:25:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C368A218FD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 13:25:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 56DB2218FC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 13:25:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KHGwk2CS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C368A218FD
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=fi.rohmeurope.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b1zSa4EH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 56DB2218FC
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Cc:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mMCt3LbMLr1VoS5sk2zWmLfVSLM4ey0IuV3t5wqvDnQ=; b=KHGwk2CSN7FCAT
-	C5rc9PVMSFB3kVbEhnQcj5awjjf2xb+tpzK18K4cVHspyNocqdmNl09CbGjADZylPbrJiiGqhumbX
-	vAHvyl3ztFDzJgK8eZb8V8xtVpRyG0MxShYyQLZ3bfkehjxTEZJQdxePVuhsB3Y1DSvHa4Wrjw1eq
-	xiJ+wbO5ImKeHqDLn6Rkob1Zr7Q/bTnm4lD5ph9feftZIu3FImO+9tiOOCa/VdGZ07blypjO/2quk
-	+LWfRk6kS4alVZo14Hxqma2d0l8H7uVFWB9Gmn4/h8YLe0aIk9rd2f2Pjts03POUVRh5mHfZ2OAr8
-	zu1cmBH3z08CDuh3WpmQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=OpIanaLUi8c7npTiTl9kbjCqohVAWPK0bjJcFSewvaM=; b=b1zSa4EHN53FbvYEAXujnovXZ
+	c/V19DQ/lv/Am3wFGzf5z69uqANg32Ag02Bd8Mppk4b50ufK4YIW+l2M4A2jWVyzBL12FypKFxCG+
+	ePfEqIRmtp2yBJMlRRM68xJrYKWgBmSy/w/Rxw3ozxxfRlEth2od+6QkLgHrn9XAetdMWA8OCFmT7
+	EGc5Bmbt8R0sMgtElBF8fUuSzHUcdfnNfjzvtrHrIOKdEurYI4BEOwTYdA3Bn51W9CaW4Uhv1qYcz
+	wf+lfhkRQyCypk0A7qwhH4PKc0KMLXEL4Qe1ubkzV4w/ZsV+aO3dBh0o0IBvhO5KqVrgV7vre9KpU
+	ALyybJZbA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpCL1-0005nA-GC; Thu, 31 Jan 2019 13:25:03 +0000
-Received: from mail-lf1-f68.google.com ([209.85.167.68])
+	id 1gpCLO-0007Gh-Fm; Thu, 31 Jan 2019 13:25:26 +0000
+Received: from szxga07-in.huawei.com ([45.249.212.35] helo=huawei.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpCKw-0005kM-ND
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 13:25:00 +0000
-Received: by mail-lf1-f68.google.com with SMTP id a8so2312391lfk.5
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 31 Jan 2019 05:24:58 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=e1Bd1cCVqTtCOw27nTYpAu2mxybnfDj+re/fe+Iiy0g=;
- b=jNeuRh5wfcrP5klFi0eyZYxrV99NJwbDTXjHgU5aAXV21jRJXenniBsJyjET0BeKA1
- xmVu2G8RlzztYfv4xmyzVr3oTYO19BNeXUeDngD7vnKGgBN2ubRQSHXOd4rgpsN/+MJe
- DKBzVccmmMVXLGwWqHcgakdZYF5iowileB7gU8HAsqDC4Dq4xoe9yogYRA2vtRn1fTqM
- CkPhYmpUtfeR/KXkTHroh+SYfWrtmVpTG7ek2lUszHLLWaiLxT1DI7PP0GZRFVPAcS0z
- XF7tSbdOXtMMCbaLu9syisvIXXAdqoNv7VELSThOdUD2ObTI6EK+7cnIToL0MEISIoLy
- MnDQ==
-X-Gm-Message-State: AJcUukez0SmBfcMEo3YD72jUVPG6oAngVoujnPRNBGW23bh2W7/ikpqR
- rCNj5AaIHK+uIsWjA+7Ecig=
-X-Google-Smtp-Source: ALg8bN4efzqtBk1zd7HtH/kCne6U5aCoxdZyUXqayOQqlVDcECcmH/i/TG1Cqmbq+QuGZ7JWafBieA==
-X-Received: by 2002:a19:e601:: with SMTP id d1mr29038753lfh.71.1548941096383; 
- Thu, 31 Jan 2019 05:24:56 -0800 (PST)
-Received: from localhost.localdomain ([213.255.186.46])
- by smtp.gmail.com with ESMTPSA id a2-v6sm803332lji.13.2019.01.31.05.24.54
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 31 Jan 2019 05:24:55 -0800 (PST)
-Date: Thu, 31 Jan 2019 15:24:52 +0200
-From: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
-To: mazziesaccount@gmail.com, corbet@lwn.net, cw00.choi@samsung.com,
- krzk@kernel.org, b.zolnierkie@samsung.com, mturquette@baylibre.com,
- sboyd@kernel.org, linux@armlinux.org.uk, pombredanne@nexb.com,
- sre@kernel.org, vkoul@kernel.org, linux@roeck-us.net, pavel@ucw.cz,
- sjhuang@iluvatar.ai, andrew.smirnov@gmail.com, djkurtz@chromium.org,
- akshu.agrawal@amd.com, rafael.j.wysocki@intel.com,
- linux-doc@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Subject: Re: [PATCH v7 0/3] clk: clkdev add managed lookup registrations
-Message-ID: <20190131132452.GD23791@localhost.localdomain>
-References: <cover.1544177090.git.matti.vaittinen@fi.rohmeurope.com>
+ id 1gpCL4-0005oI-0C
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 13:25:11 +0000
+Received: from DGGEMS404-HUB.china.huawei.com (unknown [172.30.72.58])
+ by Forcepoint Email with ESMTP id 2583F6669A5BB3B6B6C5;
+ Thu, 31 Jan 2019 21:25:00 +0800 (CST)
+Received: from [127.0.0.1] (10.184.12.158) by DGGEMS404-HUB.china.huawei.com
+ (10.3.19.204) with Microsoft SMTP Server id 14.3.408.0; Thu, 31 Jan 2019
+ 21:24:49 +0800
+Subject: Re: [PATCH] irqchip/gic-v3-its: Fix probing for ITT_entry_size
+To: Marc Zyngier <marc.zyngier@arm.com>
+References: <1548933583-12504-1-git-send-email-yuzenghui@huawei.com>
+ <b25b4419-d552-4829-027f-3b676afc7fbf@arm.com>
+From: Zenghui Yu <yuzenghui@huawei.com>
+Message-ID: <232b35f6-ecff-4e84-881c-bf1805cfab07@huawei.com>
+Date: Thu, 31 Jan 2019 21:21:48 +0800
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:64.0) Gecko/20100101
+ Thunderbird/64.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <cover.1544177090.git.matti.vaittinen@fi.rohmeurope.com>
-User-Agent: Mutt/1.9.2 (2017-12-15)
+In-Reply-To: <b25b4419-d552-4829-027f-3b676afc7fbf@arm.com>
+Content-Language: en-US
+X-Originating-IP: [10.184.12.158]
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_052458_773393_E4FD1E9E 
-X-CRM114-Status: GOOD (  16.04  )
+X-CRM114-CacheID: sfid-20190131_052506_852031_6D3D2CB8 
+X-CRM114-Status: GOOD (  12.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,43 +72,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Content-Type: text/plain; charset="us-ascii"
+Cc: wanghaibin.wang@huawei.com, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello All,
 
-On Fri, Dec 07, 2018 at 01:09:00PM +0200, Matti Vaittinen wrote:
-> Series adds managed clkdev lookup interfaces and cleans few drivers
+
+On 2019/1/31 20:48, Marc Zyngier wrote:
+> On 31/01/2019 11:19, Zenghui Yu wrote:
+>> According to ARM IHI 0069C (ID070116), we should use GITS_TYPER's
+>> bits [7:4] as ITT_entry_size.
+>>
+>> Signed-off-by: Zenghui Yu <yuzenghui@huawei.com>
+>> ---
+>>   include/linux/irqchip/arm-gic-v3.h | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index 071b4cb..c848a7c 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -319,7 +319,7 @@
+>>   #define GITS_TYPER_PLPIS		(1UL << 0)
+>>   #define GITS_TYPER_VLPIS		(1UL << 1)
+>>   #define GITS_TYPER_ITT_ENTRY_SIZE_SHIFT	4
+>> -#define GITS_TYPER_ITT_ENTRY_SIZE(r)	((((r) >> GITS_TYPER_ITT_ENTRY_SIZE_SHIFT) & 0x1f) + 1)
+>> +#define GITS_TYPER_ITT_ENTRY_SIZE(r)	((((r) >> GITS_TYPER_ITT_ENTRY_SIZE_SHIFT) & 0xf) + 1)
+>>   #define GITS_TYPER_IDBITS_SHIFT		8
+>>   #define GITS_TYPER_DEVBITS_SHIFT	13
+>>   #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
+>>
 > 
-> Few clk drivers appear to be leaking clkdev lookup registrations at
-> driver remove. The patch series adds devm versions of lookup
-> registrations and cleans up few drivers. Driver clean-up patches have
-> not been tested as I lack the HW. All testing and comments if
-> driver/device removal is even possible for changed drivers is highly
-> appreciated. If removal is not possible I will gladly drop the patches
-> from series - although leaking lookups may serve as bad example for new
-> developers =)
+> Well spotted. I've applied this as a fix after having added the relevant
+> Fixes: tag and massaged the commit message a bit.
+
+Thanks Marc!
+
+Zenghui
+
 > 
-> Changed drivers are:
-> clk-max77686 and clk-st
+> Thanks,
 > 
-> Please note that the patch #2 requires this change to work correctly:
-> https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/commit/?h=clk-next&id=05502bf9eb7a7297f5fa6f1d17b169b3d5b53570
+> 	M.
+> 
 
-I guess the dependency mentioned abowe is already in (most) of the
-trees. (I can't say for sure as I don't know what is the correct tree
-for clkdev - is it linux-arm.git as Russel is maintaining clkdev? If
-yes, then the commit 05502bf9eb7a7297f5fa6f1d17b169b3d5b53570
-"clk: of-provider: look at parent if registered device has no
-provider info" seems to be sitting in maser branch).
-
-So should I rebase this series to some other tree and resend? Or is this
-something that is not wanted?
-
-Br,
-	Matti Vaittinen
 
 _______________________________________________
 linux-arm-kernel mailing list
