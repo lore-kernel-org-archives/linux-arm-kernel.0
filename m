@@ -2,96 +2,115 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ED8A5C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 14:24:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 72C51C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 14:52:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BEBA5218AC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 14:24:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 466052086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 14:52:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="szeoC0aQ";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="c+hKm0rs";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="LUs5s5N1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BEBA5218AC
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i4JRmCut"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 466052086C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SlFFXr5Rv2dORAR5fZC+Jva92NTk9M6kV4D6VMRlZrI=; b=szeoC0aQuP6QFB
-	GABlqEjwhN7oLQGskErH5dvb0aKe63wqcJnzUSYBmymAaEOGoJ0r3/rnQdEcEHnzs7fUVdaB9NrLX
-	5tVZdFzk+Qyo6cxKXL1NwWDo1nDWol8PI6L1ZH68c/m+/wJpDM4ApqQm16PlweniqLlVMTzxU32bD
-	RQox7ostcMeXR9sCuuiVK5obsjmIcO3eDfF+DHM0cmxrkjOwIAAmCOOCh8anqWIHoux5mA8Toz9FS
-	FS2j9wKbcoNx7msZHv8gxWBPymd/gGheS1BalUWp/sJAjpPrKxwhQed7O6MpN/2BNMf7KKmHvxbKI
-	7UgmXkBriyCW+my5FFhA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=aK6VUpNon0HgesrJZqe7jzqAOnyGuObXklfrga8GYgA=; b=i4JRmCut6bTXAu
+	3tKjCOYR+Pe4ukKv4mp1MSz20Ec2LgrdIzIsQa/wGIJWPASjqdangP9gyQSSXhXkG6TRdh3N/9dM5
+	NN3f3CunqKVjKomarqqyhTSQPkU2F6lyX4Yslod1RaVRg7LcPcuVWhgPd6VNfrxPrDsePqR1VwMIT
+	MSqkP2MejNPD333kb4NfiM9o2Um6LUzFvnvXczzX4oZyDCDfqKceFr+g1mV6DDI7ddx5ellS4ezUG
+	viy4IZ8sTfAu2+h8bB0jofzhkmHOqFEnr/upzAVpuVvYwO7ztdXsUZaEOqBWO0YDSZJCPFwCUPUIw
+	BXgmPTyFJMjGda8e3WNg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpDGx-000793-ES; Thu, 31 Jan 2019 14:24:55 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpDG9-0006ZM-H5
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 14:24:11 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id 8AAA660DD4; Thu, 31 Jan 2019 14:23:36 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548944644;
- bh=YVfU0vvHyXFYOipNj0PgiEFupDcA967znBrdf6Y3SD0=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=c+hKm0rs/e1B+fnZxup2aZc1jLTtwMs0GfIZSuwHdZMXw03xoNqogXsI1Hypaiuz2
- ZS2LnpVKrQN0Filvoyi/sGnp5GSuz7472ZnyoXxfMoylpWJJRpcAAQ4ZL6A5nVxjQI
- VLYOVGfxQMXgWf3fj5WJM8vl/L9KQ78dzdsjI5Dw=
-Received: from blr-ubuntu-253.qualcomm.com
- (blr-bdr-fw-01_globalnat_allzones-outside.qualcomm.com [103.229.18.19])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: saiprakash.ranjan@codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 6B45660FB4;
- Thu, 31 Jan 2019 14:23:27 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548944614;
- bh=YVfU0vvHyXFYOipNj0PgiEFupDcA967znBrdf6Y3SD0=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=LUs5s5N1Nfyuo93pAjroQHMWPumA6en1KvY0xL94SAC78MP7Gmka/3JtKi2lwxQ2+
- 8xXgNBhqYjNI70juR4JpNtKLRGv0zPDpkf9ysQ7thWddMxwG2KkCIogim8+5dGceM2
- ICre931IR4qdEw4cxY6QJVOe04FDcyzpZGj5Vceo=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 6B45660FB4
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
- smtp.mailfrom=saiprakash.ranjan@codeaurora.org
-From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-To: Rob Herring <robh+dt@kernel.org>,
- Mathieu Poirier <mathieu.poirier@linaro.org>,
- Suzuki K Poulose <suzuki.poulose@arm.com>,
- Mike Leach <mike.leach@linaro.org>, Leo Yan <leo.yan@linaro.org>,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Andy Gross <andy.gross@linaro.org>, David Brown <david.brown@linaro.org>,
- Vivek Gautam <vivek.gautam@codeaurora.org>,
- Jeffrey Hugo <jhugo@codeaurora.org>, Doug Anderson <dianders@chromium.org>,
- Stephen Boyd <sboyd@kernel.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>, devicetree@vger.kernel.org,
- Mark Rutland <mark.rutland@arm.com>,
- Marc Gonzalez <marc.w.gonzalez@free.fr>
-Subject: [PATCHv6 6/6] coresight: debug: Add Unique Component Identifier (UCI)
- table
-Date: Thu, 31 Jan 2019 19:52:24 +0530
-Message-Id: <f724b28e5bfd7bca062aa5380cfd9328289559bf.1548943727.git.saiprakash.ranjan@codeaurora.org>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <cover.1548943727.git.saiprakash.ranjan@codeaurora.org>
-References: <cover.1548943727.git.saiprakash.ranjan@codeaurora.org>
+	id 1gpDhT-0003Jh-7h; Thu, 31 Jan 2019 14:52:19 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gpDhQ-0003J1-3q
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 14:52:17 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0C18380D;
+ Thu, 31 Jan 2019 06:52:15 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ E93613F59C; Thu, 31 Jan 2019 06:52:13 -0800 (PST)
+Subject: Re: [PATCH 2/5] arm/arm64: KVM: Allow a VCPU to fully reset itself
+To: Andrew Jones <drjones@redhat.com>,
+ Christoffer Dall <christoffer.dall@arm.com>
+References: <20190125094656.5026-1-christoffer.dall@arm.com>
+ <20190125094656.5026-3-christoffer.dall@arm.com>
+ <20190129160347.fcbry76igwyatqzx@kamzik.brq.redhat.com>
+ <20190130093431.GE13482@e113682-lin.lund.arm.com>
+ <20190130152721.7fbiza3glifvzlqk@kamzik.brq.redhat.com>
+ <20190131074353.GI13482@e113682-lin.lund.arm.com>
+ <20190131101254.rh23ntvwxtq3yqsz@kamzik.brq.redhat.com>
+ <20190131115156.GP13482@e113682-lin.lund.arm.com>
+ <20190131125712.pwupvf4favbqi6hu@kamzik.brq.redhat.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <b356cded-fc12-d996-a860-1ef94b6a8ffb@arm.com>
+Date: Thu, 31 Jan 2019 14:52:11 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
+In-Reply-To: <20190131125712.pwupvf4favbqi6hu@kamzik.brq.redhat.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_062406_129246_1703193F 
-X-CRM114-Status: GOOD (  14.89  )
+X-CRM114-CacheID: sfid-20190131_065216_166840_6F14B9C1 
+X-CRM114-Status: GOOD (  15.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,95 +122,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>,
- Rajendra Nayak <rnayak@codeaurora.org>, linux-arm-msm@vger.kernel.org,
- linux-kernel@vger.kernel.org, Sibi Sankar <sibis@codeaurora.org>,
- Tingwei Zhang <tingwei@codeaurora.org>, linux-arm-kernel@lists.infradead.org
+Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
+ kvm@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add UCI table for coresight CPU debug module. This patch adds
-the UCI entries for Kryo CPUs found on MSM8996 which shares
-the same PIDs as ETMs.
+On 31/01/2019 12:57, Andrew Jones wrote:
+> On Thu, Jan 31, 2019 at 12:51:56PM +0100, Christoffer Dall wrote:
 
-Without this, below error is observed on MSM8996:
+[...]
 
-[    5.429867] OF: graph: no port node found in /soc/debug@3810000
-[    5.429938] coresight-etm4x: probe of 3810000.debug failed with error -22
-[    5.435415] coresight-cpu-debug 3810000.debug: Coresight debug-CPU0 initialized
-[    5.446474] OF: graph: no port node found in /soc/debug@3910000
-[    5.448927] coresight-etm4x: probe of 3910000.debug failed with error -22
-[    5.454681] coresight-cpu-debug 3910000.debug: Coresight debug-CPU1 initialized
-[    5.487765] OF: graph: no port node found in /soc/debug@3a10000
-[    5.488007] coresight-etm4x: probe of 3a10000.debug failed with error -22
-[    5.493024] coresight-cpu-debug 3a10000.debug: Coresight debug-CPU2 initialized
-[    5.501802] OF: graph: no port node found in /soc/debug@3b10000
-[    5.512901] coresight-etm4x: probe of 3b10000.debug failed with error -22
-[    5.513192] coresight-cpu-debug 3b10000.debug: Coresight debug-CPU3 initialized
+>> I don't think there's anything very unconventional here.
+> 
+> Normally if a thread observes a change to vcpu->requests, then we ensure a
+> change to some accompanying data is also observable. We're reversing that
+> here, which adds a need for additional barriers and a strict request
+> checking order.
+> 
+>>
+>> Let's try this:  If you have a better way of implementing this, how
+>> about you write a patch?
+> 
+> It would just be this patch minus the unnecessary barriers. I can send it
+> if you like, but I wouldn't want to change the authorship for such a small
+> change.
 
-Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+Having these barriers makes it explicit (at least to me) what data we
+expect to be visible in other threads and in which order. You keep
+saying that order doesn't matter and we disagree on this. Yes, you've
+listed cases where we can survive things coming in out of order, but
+that's not a proof that we don't need them.
 
----
-For testing, all dependent patches are in below tree:
- * https://github.com/saiprakash-ranjan/linux/tree/coresight-next
+So at the end of the day, and unless you can prove that the barriers are
+not necessary by providing the same form of validation tool, I'm
+inclined to go with the verified approach.
 
-This patch depends on UCI support by Mike Leach in below link:
- * https://lore.kernel.org/lkml/20190130234051.2294-1-mike.leach@linaro.org/
----
- .../hwtracing/coresight/coresight-cpu-debug.c | 33 +++++++++----------
- 1 file changed, 16 insertions(+), 17 deletions(-)
+Thanks,
 
-diff --git a/drivers/hwtracing/coresight/coresight-cpu-debug.c b/drivers/hwtracing/coresight/coresight-cpu-debug.c
-index e8819d750938..915d86a39cee 100644
---- a/drivers/hwtracing/coresight/coresight-cpu-debug.c
-+++ b/drivers/hwtracing/coresight/coresight-cpu-debug.c
-@@ -655,24 +655,23 @@ static int debug_remove(struct amba_device *adev)
- 	return 0;
- }
- 
-+static struct amba_cs_uci_id uci_id_debug[] = {
-+	{
-+		/*  CPU Debug UCI data */
-+		.devarch	= 0x47706a15,
-+		.devarch_mask	= 0xfff0ffff,
-+		.devtype	= 0x00000015,
-+	}
-+};
-+
- static const struct amba_id debug_ids[] = {
--	{       /* Debug for Cortex-A53 */
--		.id	= 0x000bbd03,
--		.mask	= 0x000fffff,
--	},
--	{       /* Debug for Cortex-A57 */
--		.id	= 0x000bbd07,
--		.mask	= 0x000fffff,
--	},
--	{       /* Debug for Cortex-A72 */
--		.id	= 0x000bbd08,
--		.mask	= 0x000fffff,
--	},
--	{       /* Debug for Cortex-A73 */
--		.id	= 0x000bbd09,
--		.mask	= 0x000fffff,
--	},
--	{ 0, 0 },
-+	CS_AMBA_ID(0x000bbd03),				/* Cortex-A53 */
-+	CS_AMBA_ID(0x000bbd07),				/* Cortex-A57 */
-+	CS_AMBA_ID(0x000bbd08),				/* Cortex-A72 */
-+	CS_AMBA_ID(0x000bbd09),				/* Cortex-A73 */
-+	CS_AMBA_UCI_ID(0x000f0205, uci_id_debug),	/* Qualcomm Kryo */
-+	CS_AMBA_UCI_ID(0x000f0211, uci_id_debug),	/* Qualcomm Kryo */
-+	{},
- };
- 
- static struct amba_driver debug_driver = {
+	M.
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
-
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
