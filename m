@@ -7,18 +7,18 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 948FCC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 13:59:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 737D8C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 13:59:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6664620869
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 13:59:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 45C8320869
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 13:59:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AsMvHAhJ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="EFPNVUfj";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="yXsqvJsg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6664620869
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mqu8sfMB";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="JcruZhx5";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="ZGCCYjok"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 45C8320869
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,83 +27,83 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zY7WnUox9yz03mWa4IjDJAH47PuQMAurBIUAr7zyZuk=; b=AsMvHAhJuMCPvR
-	3PbNBDVDjxFEJ93bv40I69gk81zq0901M/PeE4j0xM5yVfLLpTUssTO6Xyk+FzHBG7Z6QFhKNDhdx
-	7M+h4h7I1HdYNrUQOMEWcgCZw0fRuXv6mDh2Q83G/CLOw/mRjemo9BUCKowXsTtV8TJB4mljWz8wn
-	VNa9Wcko/Lz6j7FW/NlPjyk1iyQu47nHahWA11OKp/ocT0Lb/CQ8WAHIQhWLqVhOBYxQzMaph2/az
-	XrAemX/B+FLfsPMMP1GChfittVTvomqg7ucJAuYo1GcV9hpMQuo3iEeUxhg3NbexM7waLxL8Lh5li
-	9bnFPrlGsq0fBla2M24A==;
+	List-Owner; bh=r18lC/spfIxHruEEUt1jHEa5O/hKo4P1JrehNoKZcO8=; b=Mqu8sfMBcVAH9K
+	8Ay9wV13TziANYXSIEZUd5X+iQPNxjDXyzcmY9BjASZ6TVYYDS9maCl51lPpLTrY54xPnifv8/iYd
+	dmuPwhgK/kxUccufWHCDfNcOL0ilb74nVE3YKLPXHUWS6xGacuX01rhIZ3m7wa0RbpVsRjR24pg1S
+	/VNnKq0VTroR0FHiXRFaDQMuYJb1/tNmnhxjoGLLbSkbw5dfV99pK269sTUlBEMjGDx5PG8/olFK6
+	Ht/ppCNwTKDZoy4g7FnLjry6L+pf/zdjmCttjHT+u5P3K54UwvRvFMNWPozOnWO0wJ/oPrEXmWtmc
+	enkTtKUa5uULBBVG4joA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpCry-00035z-6E; Thu, 31 Jan 2019 13:59:06 +0000
+	id 1gpCsC-0003Kn-Mj; Thu, 31 Jan 2019 13:59:20 +0000
 Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpCqs-0002L9-L9
- for linux-arm-kernel@bombadil.infradead.org; Thu, 31 Jan 2019 13:57:58 +0000
+ id 1gpCqu-0002L9-2J
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 31 Jan 2019 13:58:00 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
  References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
  Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=k1HTTn1zj1MT4j+ZQRh8biG0PnZ1oRBNNapN+dBPCQc=; b=EFPNVUfjzGHcj58RQRP3jULZoj
- nlbpYOpFLcqP3IOVdcodCso1xmvvD28nWnjLvWZnxCPFQ2nbkH/G60H56uccN5VbWHHdToZdX/0iq
- 3pSLGNRnzLf8Pfgj/JqtPyqu8MEn57E+NjQb+3RYgT3HuVUe1z4JoVKn7EhSveOeHOvfha+xT9F4K
- 2FYm5b0oRXib3ux1tWTdUSKsKHRGbVY9U6ISc30Ftd4GZ8/+EUh51yViBVRaLfNDfQfj4IR27SeAu
- 8oiqaDLimwm9LPWlrBlJirNTQjzqDu9fNHarrna4EYGgznC++RqZA6GcFncAXrGk2sqKWF2UwgWBM
- Ra77W1tg==;
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+ bh=rYTaet1Bgd+3TjusLrnLJTwwFR4I7lsLwRcAysaeRos=; b=JcruZhx5CrwKGDusc33kHojLch
+ PAPHOPnC+OOELnYUPXoeFnu6seQRsVLmVfb6KJz6l/gWmoYVhpsXd5qs3easDI2r6FyJ6QiNGom8u
+ Fs5Wdzjt7w32q8O/H+ZhllGN73d2qogAD7pCeb/edoc9PNyttsAi1WEUOnswuBXD97RYIXNxOXT2u
+ za6SLB0arB3b/1MbI9ya+sUwU2SC9+q3Gzn+enU5WX/cpO4QJE8kpi3PgkaivvnYKfmUV7fvgUc7R
+ GkQPkAPxoaHFTRKh2djH6LPHb4b4SHC1D2ZSIxBngJlEvWlYQr9m5bDy2r3modWvmjmjq5JY0uLiQ
+ t7Qpb1Ww==;
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpCZi-000687-Ic
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 13:40:16 +0000
-Received: by mail-wm1-x342.google.com with SMTP id r24so2157211wmh.0
+ id 1gpCZe-000678-QF
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 13:40:11 +0000
+Received: by mail-wm1-x343.google.com with SMTP id p6so2604233wmc.1
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 31 Jan 2019 05:40:14 -0800 (PST)
+ Thu, 31 Jan 2019 05:40:08 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=k1HTTn1zj1MT4j+ZQRh8biG0PnZ1oRBNNapN+dBPCQc=;
- b=yXsqvJsgY0gXnH7Bhgddj++HS6M1/Mg/ntCKI/aXRWNdAEdnbki//I/WxKRK+J1W7s
- +xyKHgCe4FgJkPTgve5sxnI9ebBjgsRPR6qxic3g97nQ9J3ZhflMuop4CMqqB2kR5ZwE
- byqrOtHObAyNu38zWDaUfuGrSUaJ/ErrWnyFfJSpBj1sWI1/ITjec3IqRvP9uQfiY47V
- lJH9kqFEr5hhFw3gUej2hAL19d7saNoAVft4PEKt5ZqF/iFdCUwB7a0y+v1zOhfEmaVB
- Tn5g2gVzoWH4RkQlA3mXX5Ll8FFGYkXn+/kh6wTLpe3vscW33fHqxjYF6G4dEdNsdCYb
- UjqA==
+ bh=rYTaet1Bgd+3TjusLrnLJTwwFR4I7lsLwRcAysaeRos=;
+ b=ZGCCYjokBLcG5+KDM3mpQsBIIl1KK0uLF3aZDEa40VBxsh7Wg1y3Nj9MV3VJyEbulz
+ 4Utd1wYLRAhicO1NU8j6De7dOoG7f00tKpmAAx0fmE4BePp6IO0n4YMs1w+/OrtKQHQN
+ efVendyAQfiJFg0cdvLQPsSGw6wC+C7T/hvpMd7jhf8dmDgwyaQqMTCKbLfeuNxRoaZc
+ fJh8fQ0B2tQsereO+uRmwNXO49LbNZHC6DHpIgPtn7zzcUywJ4OSO92+yazh/UpNbf/n
+ 2cG2BKvuhjhQ3fh0/wIEoeWJqNMx70iDsW5rEd0AKx9DWAtLh7ySLwL7BuNN40SREWpp
+ gLeg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=k1HTTn1zj1MT4j+ZQRh8biG0PnZ1oRBNNapN+dBPCQc=;
- b=YMPkVuQI8IlWccCM4FVksFhzEqSqmR8E0lwNvYDXwJKZ5+/J6/3+p6Z2wFhU8BXQXM
- kUWQmuJLR6b/UMpiNVgctBpOWvD67EdMl8uRXkv4fTKEPskLHacgW1HlfZU+czcOe67C
- AKPqmLK0Ywmz0PgrwKHSu5Y9IrBi3rEzxplHUOXwrm+vp9OrWdpTuZXArFz8cBua1F+B
- YGULUnkMIYUWiu5pn+LNsJUbZ/oypDsNLh17f7dPZOT3Bg0ULZ30Ig+C9lD5d8+KKg53
- wK739HneRadS8ZQrVpT7RhcPIsUbv872Vbvgh9EqBF8TcKRn5qwdkft1ihzkUefHh9t7
- JjEQ==
-X-Gm-Message-State: AJcUukd565xi0zx6tNXMFbbjqZ8PKRVQrCS21Ab/Om5/+iahgS/n8Uc3
- q43KmLX9c39yN4CcVbwToNMT1A==
-X-Google-Smtp-Source: ALg8bN4fZmcsLxh6VIkBDvi3YojOuyTp7UWE4fZ6I6gO0T9djSicgcYPZ9ew+621Hws57Xi9IezELA==
-X-Received: by 2002:a7b:c218:: with SMTP id x24mr29382352wmi.58.1548942012453; 
- Thu, 31 Jan 2019 05:40:12 -0800 (PST)
+ bh=rYTaet1Bgd+3TjusLrnLJTwwFR4I7lsLwRcAysaeRos=;
+ b=TFupalBpCWQlj+50BpOZuzPijEsJPBp+Ft5cxCBHa0Y8okXfCWrjnVRVmHVbWb/hsi
+ SC6n81g3uuQNoJp3RJZrP4nY+Izogl6HW6T2wlFoB2sNtY3HQQLtb4KeVJ0rDedTFsn5
+ W6qFJs4MIjXS2DnjIMfHgsu2zqpvGjbtUFAfwxJfLZUrUJyAdLYpxKUlx8nL4rSqLC7N
+ cdDu6FwiBsZwzU3pRBzY52yN84swD24RjYksKa78HJrtCDMRz65DHKTQC0rgE7tV1V6U
+ rn9ESYEvRmC7AOjwDkf+T5IQcrOVtJjS5OErarGIHZlxW571N7FOhO0kpmZonbgKn+uy
+ lJig==
+X-Gm-Message-State: AJcUukc+qceaFbdaQypWlENTKent0J0T4WEeBhymLYoqfdSx8yeopBwj
+ H9AqoADN21QFhUtvjy56LMCjJw==
+X-Google-Smtp-Source: ALg8bN4LVGdrNflpToPu7R9czul7RQOtNw9JpZEVkxbcEEd1feqZh6dBdnAJ+ilPRgPQUdhEiEUylw==
+X-Received: by 2002:a1c:f613:: with SMTP id w19mr29676094wmc.0.1548942006556; 
+ Thu, 31 Jan 2019 05:40:06 -0800 (PST)
 Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id h10sm5479768wmf.44.2019.01.31.05.40.11
+ by smtp.gmail.com with ESMTPSA id h10sm5479768wmf.44.2019.01.31.05.40.05
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 31 Jan 2019 05:40:11 -0800 (PST)
+ Thu, 31 Jan 2019 05:40:05 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
  Marc Zyngier <marc.zyngier@arm.com>
-Subject: [PATCH 26/35] ARM: davinci: cp-intc: improve coding style
-Date: Thu, 31 Jan 2019 14:39:19 +0100
-Message-Id: <20190131133928.17985-27-brgl@bgdev.pl>
+Subject: [PATCH 21/35] ARM: davinci: cp-intc: add a new config structure
+Date: Thu, 31 Jan 2019 14:39:14 +0100
+Message-Id: <20190131133928.17985-22-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190131133928.17985-1-brgl@bgdev.pl>
 References: <20190131133928.17985-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_084014_654991_9A8DD10F 
-X-CRM114-Status: GOOD (  12.50  )
+X-CRM114-CacheID: sfid-20190131_084010_873175_BB76D35E 
+X-CRM114-Status: GOOD (  14.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -124,45 +124,37 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Drop tabs from variable initialization. Arrange variables in reverse
-christmas-tree order. Add a newline before a return.
+Add a config structure that will be used by cp-intc-based platforms.
+It contains the register range resource and the number of interrupts.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/cp_intc.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ include/linux/irqchip/irq-davinci-cp-intc.h | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 include/linux/irqchip/irq-davinci-cp-intc.h
 
-diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
-index 2ce0b7653c88..4cd515b507f4 100644
---- a/arch/arm/mach-davinci/cp_intc.c
-+++ b/arch/arm/mach-davinci/cp_intc.c
-@@ -76,12 +76,12 @@ static void cp_intc_unmask_irq(struct irq_data *d)
- static int davinci_cp_intc_set_irq_type(struct irq_data *d,
- 					unsigned int flow_type)
- {
--	unsigned reg		= BIT_WORD(d->hwirq);
--	unsigned mask		= BIT_MASK(d->hwirq);
--	unsigned polarity	= davinci_cp_intc_read(
--					DAVINCI_CP_INTC_SYS_POLARITY(reg));
--	unsigned type		= davinci_cp_intc_read(
--					DAVINCI_CP_INTC_SYS_TYPE(reg));
-+	unsigned int reg, mask, polarity, type;
+diff --git a/include/linux/irqchip/irq-davinci-cp-intc.h b/include/linux/irqchip/irq-davinci-cp-intc.h
+new file mode 100644
+index 000000000000..9b0c7d6189eb
+--- /dev/null
++++ b/include/linux/irqchip/irq-davinci-cp-intc.h
+@@ -0,0 +1,16 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Copyright (C) 2019 Texas Instruments
++ */
 +
-+	reg = BIT_WORD(d->hwirq);
-+	mask = BIT_MASK(d->hwirq);
-+	polarity = davinci_cp_intc_read(DAVINCI_CP_INTC_SYS_POLARITY(reg));
-+	type = davinci_cp_intc_read(DAVINCI_CP_INTC_SYS_TYPE(reg));
- 
- 	switch (flow_type) {
- 	case IRQ_TYPE_EDGE_RISING:
-@@ -137,6 +137,7 @@ static int davinci_cp_intc_host_map(struct irq_domain *h, unsigned int virq,
- 	irq_set_chip(virq, &davinci_cp_intc_irq_chip);
- 	irq_set_probe(virq);
- 	irq_set_handler(virq, handle_edge_irq);
++#ifndef _LINUX_IRQ_DAVINCI_CP_INTC_
++#define _LINUX_IRQ_DAVINCI_CP_INTC_
 +
- 	return 0;
- }
- 
++#include <linux/ioport.h>
++
++struct davinci_cp_intc_config {
++	struct resource reg;
++	unsigned int num_irqs;
++};
++
++#endif /* _LINUX_IRQ_DAVINCI_CP_INTC_ */
 -- 
 2.20.1
 
