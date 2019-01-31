@@ -2,79 +2,106 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BF937C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:48:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 44588C282D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:48:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8BBFE218AF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:48:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 180A62086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:48:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qATP4hvW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8BBFE218AF
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ossystems.com.br
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jwsGH48D"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 180A62086C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=auniOuPgQxw7/Dpyjj7NVXlcg3FJ2YEKgfBbMQzQwcQ=; b=qATP4hvWlneoUg
-	CYL7ktTsWx8TH+XTSsipUJW2C4VaWxT7D5gFxZgOfSwVEiKwqcOGO3tzuwGWdgo2i9ATa+BHQfx6/
-	lVE+v6qh55awL8jx1BSbdJ3ZS2hELMudOg9l4GCt84uytBo16/abrfVHwy3cgmd5Oih6vgASnmy3g
-	voSDJwT9nnD3Pg4RChkK5nFxFI2AnCRlroMn90R2wTmyuWgCjwhycNkxMcI/MJUAYUnhXUF+8vz72
-	L7gw5v/NvQsw+ITMAje3Ewc1VbwHtCc8SVCLkHDMjpqOe3d8rSgIdJHhLPK4aAECOLIIEiEE6sB4N
-	nO5KMdg4+YordC9ZSa6w==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=HfVgzw5BpmwEzuhKzMf4RoI8qygY1SibsdfWdSXcf7s=; b=jwsGH48D8Xf8dr
+	luuc+ihT7QFdEswYOK+G2w2Uaw2wkcrWqKS2cYoLNaypTrBKSK05opoOr1RPDIOz2CXH4hAGH7RzJ
+	k3b8rsAEdNdKt1k4mHOIsE9hQDrcgMKBUFEDoqXofIgLIK9y1i9LKIbu3PAGsiFc0RODyl/591Vms
+	AgZeqvi96TDQR7nN4DNrc/vog7UB4dEfOzd2Q725X/NnopZ7+VIwba3C236G7K2f60qols3btX9oC
+	fMb2WmtuHq3EtqBeBpGNGRuJiQbppwbPAG2UstZT9IUcQl17icTCN/fTez4CWjsQn9/lTk6ualr+p
+	cicLzd6DINxwkuWTQY8Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpBlI-0005qm-H0; Thu, 31 Jan 2019 12:48:08 +0000
-Received: from mail-qt1-f194.google.com ([209.85.160.194])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpBko-0005T2-4h; Thu, 31 Jan 2019 12:47:41 +0000
-Received: by mail-qt1-f194.google.com with SMTP id t33so3265106qtt.4;
- Thu, 31 Jan 2019 04:47:37 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:organization:content-transfer-encoding;
- bh=xBSoSCuZb2B8/w9VdnWvUIjsj7+NlFgkfKIRaCleZIs=;
- b=VN8PkNFGuth6zve469LD8VFV1/wj3kzZQXofGwwZMhT9pcvudY2eGGVqg/L0Ec3Kz/
- PR/3TA8iFMjWebl531xKdgdOa4tMfir8Ak0DYJje5z7fP1nIdPRW1z33f2BePrMeLiKe
- deqTAmjTKt/gHI0rZwGESH0JbduIVfxnjwjwNXfDl0yNEv2V6sSVbGGOUxc3FghFLsqv
- TIxOvDUtikNlJ0Uw770Ds17sX9K5u/HB15Ypd+WehjUxV5At3QY6Il5d4UBIcZ8gdUya
- pxx2SiYQJGy8ywpRBNfdSqFTBW5uKosoO1n1TpwWpS1Epm+o5xz2RWVbuk4vnNW9S0L+
- UwEA==
-X-Gm-Message-State: AJcUukevNUS8Zf0o/x5EVrLzelq7c8ye7Xz3ftKKb9dcHNf3jlia4MZX
- aB9AOI3Ac9OFrGSBBbD+TxZm9nCu
-X-Google-Smtp-Source: ALg8bN7Vt/DN3dGcKPypW64rUyzI/Ix7TXSRmoZ2DvcnRg3hiD8bWHiztP/xiQXleq1pK3cqDCTEwQ==
-X-Received: by 2002:aed:242e:: with SMTP id r43mr34659813qtc.128.1548938856744; 
- Thu, 31 Jan 2019 04:47:36 -0800 (PST)
-Received: from localhost.localdomain ([181.220.86.121])
- by smtp.gmail.com with ESMTPSA id c17sm5675052qtb.14.2019.01.31.04.47.31
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 31 Jan 2019 04:47:35 -0800 (PST)
-Received: by localhost.localdomain (sSMTP sendmail emulation);
- Thu, 31 Jan 2019 10:47:29 -0200
-From: Otavio Salvador <otavio@ossystems.com.br>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v2 3/3] ARM: dts: rockchip: rv1108-evb: Use the correct
- regulator properties
-Date: Thu, 31 Jan 2019 10:47:09 -0200
-Message-Id: <20190131124710.30238-3-otavio@ossystems.com.br>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190131124710.30238-1-otavio@ossystems.com.br>
-References: <20190131124710.30238-1-otavio@ossystems.com.br>
+	id 1gpBlr-0006E8-GW; Thu, 31 Jan 2019 12:48:43 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gpBlj-0006Cx-MO
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 12:48:42 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 61030A78;
+ Thu, 31 Jan 2019 04:48:34 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 803203F589; Thu, 31 Jan 2019 04:48:33 -0800 (PST)
+Subject: Re: [PATCH] irqchip/gic-v3-its: Fix probing for ITT_entry_size
+To: Zenghui Yu <yuzenghui@huawei.com>
+References: <1548933583-12504-1-git-send-email-yuzenghui@huawei.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <b25b4419-d552-4829-027f-3b676afc7fbf@arm.com>
+Date: Thu, 31 Jan 2019 12:48:32 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Organization: O.S. Systems Software LTDA.
+In-Reply-To: <1548933583-12504-1-git-send-email-yuzenghui@huawei.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_044738_664633_F67A5A3A 
-X-CRM114-Status: GOOD (  13.89  )
+X-CRM114-CacheID: sfid-20190131_044835_865414_D6D6425C 
+X-CRM114-Status: GOOD (  14.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,114 +113,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jason Zhu <jason.zhu@rock-chips.com>, devicetree@vger.kernel.org,
- Heiko Stuebner <heiko@sntech.de>, Otavio Salvador <otavio@ossystems.com.br>,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-rockchip@lists.infradead.org, Tony Xie <tony.xie@rock-chips.com>,
- Vicent Chi <vicent.chi@rock-chips.com>, Andy Yan <andy.yan@rock-chips.com>,
- Mark Rutland <mark.rutland@arm.com>,
- Philipp Tomsic <philipp.tomsich@theobroma-systems.com>
+Cc: wanghaibin.wang@huawei.com, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The following properties:
+On 31/01/2019 11:19, Zenghui Yu wrote:
+> According to ARM IHI 0069C (ID070116), we should use GITS_TYPER's
+> bits [7:4] as ITT_entry_size.
+> 
+> Signed-off-by: Zenghui Yu <yuzenghui@huawei.com>
+> ---
+>  include/linux/irqchip/arm-gic-v3.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index 071b4cb..c848a7c 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -319,7 +319,7 @@
+>  #define GITS_TYPER_PLPIS		(1UL << 0)
+>  #define GITS_TYPER_VLPIS		(1UL << 1)
+>  #define GITS_TYPER_ITT_ENTRY_SIZE_SHIFT	4
+> -#define GITS_TYPER_ITT_ENTRY_SIZE(r)	((((r) >> GITS_TYPER_ITT_ENTRY_SIZE_SHIFT) & 0x1f) + 1)
+> +#define GITS_TYPER_ITT_ENTRY_SIZE(r)	((((r) >> GITS_TYPER_ITT_ENTRY_SIZE_SHIFT) & 0xf) + 1)
+>  #define GITS_TYPER_IDBITS_SHIFT		8
+>  #define GITS_TYPER_DEVBITS_SHIFT	13
+>  #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
+> 
 
-- regulator-state-enabled
-- regulator-state-disabled
-- regulator-state-uv
+Well spotted. I've applied this as a fix after having added the relevant
+Fixes: tag and massaged the commit message a bit.
 
-are not valid ones as per
-Documentation/devicetree/bindings/regulator/regulator.txt
+Thanks,
 
-Fix it by using the correct properties as per the dt bindings.
-
-Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
----
-
-Changes in v2:
-- rebase on top of linux-next
-
- arch/arm/boot/dts/rv1108-evb.dts | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/boot/dts/rv1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
-index 203d83e3bbf5..30f3d0470ad9 100644
---- a/arch/arm/boot/dts/rv1108-evb.dts
-+++ b/arch/arm/boot/dts/rv1108-evb.dts
-@@ -97,8 +97,8 @@
- 				regulator-always-on;
- 				regulator-boot-on;
- 				regulator-state-mem {
--					regulator-state-enabled;
--					regulator-state-uv = <900000>;
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <900000>;
- 				};
- 			};
- 
-@@ -107,7 +107,7 @@
- 				regulator-min-microvolt = <700000>;
- 				regulator-max-microvolt = <2000000>;
- 				regulator-state-mem {
--					regulator-state-disabled;
-+					regulator-off-in-suspend;
- 				};
- 			};
- 
-@@ -116,7 +116,7 @@
- 				regulator-always-on;
- 				regulator-boot-on;
- 				regulator-state-mem {
--					regulator-state-enabled;
-+					regulator-on-in-suspend;
- 				};
- 			};
- 
-@@ -127,8 +127,8 @@
- 				regulator-always-on;
- 				regulator-boot-on;
- 				regulator-state-mem {
--					regulator-state-enabled;
--					regulator-state-uv = <3300000>;
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
- 				};
- 			};
- 
-@@ -139,7 +139,7 @@
- 				regulator-always-on;
- 				regulator-boot-on;
- 				regulator-state-mem {
--					regulator-state-disabled;
-+					regulator-off-in-suspend;
- 				};
- 			};
- 
-@@ -150,7 +150,7 @@
- 				regulator-always-on;
- 				regulator-boot-on;
- 				regulator-state-mem {
--					regulator-state-disabled;
-+					regulator-off-in-suspend;
- 				};
- 			};
- 
-@@ -161,8 +161,8 @@
- 				regulator-always-on;
- 				regulator-boot-on;
- 				regulator-state-mem {
--					regulator-state-enabled;
--					regulator-state-uv = <1000000>;
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
- 				};
- 			};
- 		};
+	M.
 -- 
-2.20.1
-
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
