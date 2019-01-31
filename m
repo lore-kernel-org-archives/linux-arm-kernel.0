@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 107D0C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 11:52:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5092DC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 11:52:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D4B362087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 11:52:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DD45E2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 11:52:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="prQeZdnQ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="hkKGJRhU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D4B362087F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oaQU3Pnn";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="jnV6OeKi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DD45E2087F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,63 +26,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OZvGWt36BJfvT9vMTrLRDKPYn6KYOhqmyE+roH/XZ2Y=; b=prQeZdnQlkr/UI
-	6T+WRzuAMCyJDRaT41FA+twsYSt8UxQ8XMTzFcjfKM2oRjeFgaiazG7bYfpHSlnVPMgpKMUxcAK/8
-	tCiaPHDK0wOkpoLKFzlrzagC+B5GiS05Je1LHrJIP8yM7uneNkb3S3D2kyQbEhRDm0JiRdKDTi8l5
-	yI835ekdxkjwb7DCecotZoygjp5pj8ItKviGAboO8MWyDXkXc4ZuIB5Fff2+oHDlMqq3uFcYnYF5/
-	ik/0ukCBqzXB2xVIyfsSnmlYptIkNBt41rovSJbfHbfXqKczDzfZpFHAz3e5yJCzRo6qWIklWMqNr
-	CCDsVJYeFvC+J+BhUOdw==;
+	List-Owner; bh=jey5lRh70cWr+hlO6ozvfA3RznF4y4T4fUrrqbeqde0=; b=oaQU3PnniIFhwA
+	haL6T3QSDsdwnS3pW7MziFTtkcSRnHhy2InE1nIU84oGy6XQzZczvy7mIVCG8oMFmedrv90UWZVaf
+	wFDdwImGFxUZCzynHimApFnopyhGY5ENXHFbLCe+OiwPzjFOFDn393LaQ2m+Q/zlFvEM6mIT8l+TM
+	pa9bfKUt3/781cznt4a32DfB6bqNcbUXZk9DtqYLSlZCjT/omsERbcwADxt5fZzqEVdDFrBnMs/Xq
+	RQeSOL3uOVeAl0n3leaMOAZmgWDpxGwN5g2T9x8Dd8XF1hMcuk2mY4P/3MJBIHlA9/vEK4VORYbgX
+	b4QqwI1VzGJ9LPVmLUkA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpAtE-0004VQ-Hs; Thu, 31 Jan 2019 11:52:16 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gpAtS-0004hO-Nk; Thu, 31 Jan 2019 11:52:30 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpAst-0004EC-H4
+ id 1gpAst-0004Ey-By
  for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 11:51:58 +0000
-Received: by mail-wr1-x443.google.com with SMTP id t6so2894404wrr.12
+Received: by mail-wr1-x441.google.com with SMTP id p7so2993058wru.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 31 Jan 2019 03:51:53 -0800 (PST)
+ Thu, 31 Jan 2019 03:51:55 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=4/VoXADw9TGpzOH4HUtc8S5BN+42h6eZM7HvNc5Yxz4=;
- b=hkKGJRhUXfkhPW+avct+oPnArS8giyN/dEKIuCONEk4ShmT0Fz21/8a3dWm4ZSPVbA
- EDAYKN2j817R09yoDKUYTusd3oARfQe/6sgpJR6ndle2AS/vudHKrfa79wrg3L57fZTa
- b36KKOLKOOaD6VR+jQMFxUaab/HWTv8vS7/uM=
+ bh=wbMPzpn8NfRgi7RFPH4XE4+uwdPNc56zI0O9bxK6Lg4=;
+ b=jnV6OeKi40I3j9lndUeZXwG6TGAcis1nStHp2Ah/zfxLsgeEkthu7OQfjT2jDkwrxS
+ QWA3sYMkEycGAwfZi+j0GNoJqFXNvqPqsQS+2tbQBM0FWCv66j28D/7a1wsM1WkkuMSb
+ 7dcA9ozZf5FFaTlq/f1zFqrCLHVr8rAIDptC0=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=4/VoXADw9TGpzOH4HUtc8S5BN+42h6eZM7HvNc5Yxz4=;
- b=M3yRCa8HVBdBKA6yAl9T5q6U6QU2RDGDmWtI19DzePKxi+FUu8DrIILD33Sp5uSXmw
- sDHXawuarAfvN1kjjJ/L8+SDL0VXBbG5GmujqwXgR9Dc3xgmDS0bPGibetBTqBsr+TBq
- avbJ7XMZ5pxz/FbWlCTz3pb/NhJuT9o6/9mNjgy2PM7lAoy0t/QfdgI4h5R1PuKi82RF
- cHCCr4wbJ1J4SWWFEHs5rfFtRvPJm+KYyPvN84nZ8Kj/IdG9BVb13d825feRlsBKFPGQ
- YAdjP7z2IS0x0DVtYcifnciYXvFuIUlB9jjUnE3Pa7DoQ4UyvcIsAqqu4yhxTyBS+6Tk
- z6lQ==
-X-Gm-Message-State: AJcUukcHn2Eyf0bAeJMG5PuNw+xeHXYxbM6PrjYacZoq5vrc18zWuUXU
- 8SH4UBNvpnCxRjPJ6Vkx2IszGQ==
-X-Google-Smtp-Source: ALg8bN4U4ysoREZ4RhZglRbahqWwQUUmrWo4bQRYACvVUV2atEePFKX4tqLT0BqHidPvoHuITIeJBg==
-X-Received: by 2002:a5d:530a:: with SMTP id e10mr35201107wrv.151.1548935512133; 
- Thu, 31 Jan 2019 03:51:52 -0800 (PST)
+ bh=wbMPzpn8NfRgi7RFPH4XE4+uwdPNc56zI0O9bxK6Lg4=;
+ b=mIsogt4rUzvU/vC2xkB/v2+jD8yuuQvVGVzWTlbL0lkK2A/XYfRMOcP3sTXXvrBtsR
+ 8s9QnfZvIqwdlYrluO+yP/YuOWKEIgiMDEjhDbwYZMZlkTmGJDK/EIT3nrYOGxdiTfoP
+ 2mai3jd58fjwNA+wl42Zn56CK/rOkhtndR5vz+j3NadIEba2P+TQvAgHiwSToQWci4+O
+ ltF4E/mpEkRWa4kYe7q8ZrGJ4RpdFyQ/zSCYm1yi58QzqH6doxeTic44jvqgje6Jg1PM
+ oxa6dZJwsARY0KoBdQqw1GkDzNs+UZum9MZ0Q/O3Jwb+PRMGvYxFzPYS4K+SKLz651yf
+ m+EA==
+X-Gm-Message-State: AJcUukexiOo2/cv3cNl0Hr38Z96icGV/8fHFXU+bTPUD1Fqp2VeIpfzG
+ 7FCnfG+6Elxp9TDJWfuq2dpPPg==
+X-Google-Smtp-Source: ALg8bN42DydoMVwegFD/F8SROPV7s999cqvg7zHs+gygQrSzwc+sXNvrPHGXiKl8uNteD3C+aOZL9A==
+X-Received: by 2002:adf:e891:: with SMTP id d17mr36704197wrm.140.1548935513681; 
+ Thu, 31 Jan 2019 03:51:53 -0800 (PST)
 Received: from localhost.localdomain
  (aputeaux-684-1-39-7.w90-86.abo.wanadoo.fr. [90.86.94.7])
- by smtp.gmail.com with ESMTPSA id w10sm5807714wmb.1.2019.01.31.03.51.50
+ by smtp.gmail.com with ESMTPSA id w10sm5807714wmb.1.2019.01.31.03.51.52
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 31 Jan 2019 03:51:51 -0800 (PST)
+ Thu, 31 Jan 2019 03:51:52 -0800 (PST)
 From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 To: linux-efi@vger.kernel.org
-Subject: [PATCH v3 1/2] x86: make ARCH_USE_MEMREMAP_PROT a generic Kconfig
- symbol
-Date: Thu, 31 Jan 2019 12:51:44 +0100
-Message-Id: <20190131115145.4634-2-ard.biesheuvel@linaro.org>
+Subject: [PATCH v3 2/2] efi: x86: convert x86 EFI earlyprintk into generic
+ earlycon implementation
+Date: Thu, 31 Jan 2019 12:51:45 +0100
+Message-Id: <20190131115145.4634-3-ard.biesheuvel@linaro.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190131115145.4634-1-ard.biesheuvel@linaro.org>
 References: <20190131115145.4634-1-ard.biesheuvel@linaro.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_035155_569102_93AA0C1C 
-X-CRM114-Status: GOOD (  13.60  )
+X-CRM114-CacheID: sfid-20190131_035155_430151_C64F766B 
+X-CRM114-Status: GOOD (  24.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,98 +103,384 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Turn ARCH_USE_MEMREMAP_PROT into a generic Kconfig symbol, and fix the
-dependency expression to reflect that AMD_MEM_ENCRYPT depends on it,
-instead of the other way around. This will permit ARCH_USE_MEMREMAP_PROT
-to be selected by other architectures and other subsystems, such as
-earlycon for efifb in a subsequent patch.
+Move the x86 EFI earlyprintk implementation to a shared location under
+drivers/firmware and tweak it slightly so we can expose it as an earlycon
+implementation (which is generic) rather than earlyprintk (which is only
+implemented for a few architectures)
 
-Note that this will cause the encryption related early memremap routines
-in arch/x86/mm/ioremap.c to be built for 32-bit x86 as well, which triggers
-the following warning:
+This also involves switching to write-combine mappings by default (which
+is required on ARM since device mappings lack memory semantics, and so
+memcpy/memset may not be used on them), and adding support for shared
+memory framebuffers on cache coherent non-x86 systems (which do not
+tolerate mismatched attributes)
 
-     arch/x86//mm/ioremap.c: In function 'early_memremap_encrypted':
-  >> arch/x86/include/asm/pgtable_types.h:193:27: warning: conversion from
-                     'long long unsigned int' to 'long unsigned int' changes
-                     value from '9223372036854776163' to '355' [-Woverflow]
-      #define __PAGE_KERNEL_ENC (__PAGE_KERNEL | _PAGE_ENC)
-                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-     arch/x86//mm/ioremap.c:713:46: note: in expansion of macro '__PAGE_KERNEL_ENC'
-       return early_memremap_prot(phys_addr, size, __PAGE_KERNEL_ENC);
+Note that 32-bit ARM does not populate its struct screen_info early
+enough for earlycon=efifb to work, nor is its early_memremap operational
+early enough, so it is disabled there. Itanium has its own
+asm/early_ioremap.h header which does not declare early_memremap_prot
+(and it never implemented earlyprintk=efi in the first place) so
+let's just disable it there as well.
 
-which essentially means they are 64-bit only anyway. However, we cannot
-make them dependent on CONFIG_ARCH_HAS_MEM_ENCRYPT, since that is always
-defined, even for i386 (and changing that results in a slew of build errors)
-
-So instead, build those routines only if CONFIG_AMD_MEM_ENCRYPT is
-defined.
-
+Reviewed-by: Alexander Graf <agraf@suse.de>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/Kconfig          | 3 +++
- arch/x86/Kconfig      | 5 +----
- arch/x86/mm/ioremap.c | 4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
+ Documentation/admin-guide/kernel-parameters.txt                         |   8 +-
+ arch/x86/Kconfig.debug                                                  |  10 --
+ arch/x86/include/asm/efi.h                                              |   1 -
+ arch/x86/kernel/early_printk.c                                          |   4 -
+ arch/x86/platform/efi/Makefile                                          |   1 -
+ drivers/firmware/efi/Kconfig                                            |   6 +
+ drivers/firmware/efi/Makefile                                           |   1 +
+ arch/x86/platform/efi/early_printk.c => drivers/firmware/efi/earlycon.c | 130 ++++++++------------
+ 8 files changed, 63 insertions(+), 98 deletions(-)
 
-diff --git a/arch/Kconfig b/arch/Kconfig
-index 4cfb6de48f79..9f0213213da8 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -885,6 +885,9 @@ config HAVE_ARCH_PREL32_RELOCATIONS
- 	  architectures, and don't require runtime relocation on relocatable
- 	  kernels.
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index b799bcf67d7b..76dd3baa31e0 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -1073,9 +1073,15 @@
+ 			specified address. The serial port must already be
+ 			setup and configured. Options are not yet supported.
  
-+config ARCH_USE_MEMREMAP_PROT
-+	bool
++		efifb,[options]
++			Start an early, unaccelerated console on the EFI
++			memory mapped framebuffer (if available). On cache
++			coherent non-x86 systems that use system memory for
++			the framebuffer, pass the 'ram' option so that it is
++			mapped with the correct attributes.
 +
- source "kernel/gcov/Kconfig"
+ 	earlyprintk=	[X86,SH,ARM,M68k,S390]
+ 			earlyprintk=vga
+-			earlyprintk=efi
+ 			earlyprintk=sclp
+ 			earlyprintk=xen
+ 			earlyprintk=serial[,ttySn[,baudrate]]
+diff --git a/arch/x86/Kconfig.debug b/arch/x86/Kconfig.debug
+index 0723dff17e6c..15d0fbe27872 100644
+--- a/arch/x86/Kconfig.debug
++++ b/arch/x86/Kconfig.debug
+@@ -40,16 +40,6 @@ config EARLY_PRINTK_DBGP
+ 	  with klogd/syslogd or the X server. You should normally say N here,
+ 	  unless you want to debug such a crash. You need usb debug device.
  
- source "scripts/gcc-plugins/Kconfig"
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 15af091611e2..09c2c5600579 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -1510,6 +1510,7 @@ config AMD_MEM_ENCRYPT
- 	bool "AMD Secure Memory Encryption (SME) support"
- 	depends on X86_64 && CPU_SUP_AMD
- 	select DYNAMIC_PHYSICAL_MASK
-+	select ARCH_USE_MEMREMAP_PROT
- 	---help---
- 	  Say yes to enable support for the encryption of system memory.
- 	  This requires an AMD processor that supports Secure Memory
-@@ -1529,10 +1530,6 @@ config AMD_MEM_ENCRYPT_ACTIVE_BY_DEFAULT
- 	  If set to N, then the encryption of system memory can be
- 	  activated with the mem_encrypt=on command line option.
- 
--config ARCH_USE_MEMREMAP_PROT
--	def_bool y
--	depends on AMD_MEM_ENCRYPT
+-config EARLY_PRINTK_EFI
+-	bool "Early printk via the EFI framebuffer"
+-	depends on EFI && EARLY_PRINTK
+-	select FONT_SUPPORT
+-	---help---
+-	  Write kernel log output directly into the EFI framebuffer.
 -
- # Common NUMA Features
- config NUMA
- 	bool "Numa Memory Allocation and Scheduler Support"
-diff --git a/arch/x86/mm/ioremap.c b/arch/x86/mm/ioremap.c
-index 5378d10f1d31..0029604af8a4 100644
---- a/arch/x86/mm/ioremap.c
-+++ b/arch/x86/mm/ioremap.c
-@@ -705,7 +705,7 @@ bool phys_mem_access_encrypted(unsigned long phys_addr, unsigned long size)
- 	return arch_memremap_can_ram_remap(phys_addr, size, 0);
+-	  This is useful for kernel debugging when your machine crashes very
+-	  early before the console code is initialized.
+-
+ config EARLY_PRINTK_USB_XDBC
+ 	bool "Early printk via the xHCI debug port"
+ 	depends on EARLY_PRINTK && PCI
+diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
+index a37378f986ec..08ebb2270d87 100644
+--- a/arch/x86/include/asm/efi.h
++++ b/arch/x86/include/asm/efi.h
+@@ -170,7 +170,6 @@ static inline bool efi_runtime_supported(void)
+ 	return false;
  }
  
--#ifdef CONFIG_ARCH_USE_MEMREMAP_PROT
-+#ifdef CONFIG_AMD_MEM_ENCRYPT
- /* Remap memory with encryption */
- void __init *early_memremap_encrypted(resource_size_t phys_addr,
- 				      unsigned long size)
-@@ -747,7 +747,7 @@ void __init *early_memremap_decrypted_wp(resource_size_t phys_addr,
+-extern struct console early_efi_console;
+ extern void parse_efi_setup(u64 phys_addr, u32 data_len);
  
- 	return early_memremap_prot(phys_addr, size, __PAGE_KERNEL_NOENC_WP);
+ extern void efifb_setup_from_dmi(struct screen_info *si, const char *opt);
+diff --git a/arch/x86/kernel/early_printk.c b/arch/x86/kernel/early_printk.c
+index 374a52fa5296..9b33904251a9 100644
+--- a/arch/x86/kernel/early_printk.c
++++ b/arch/x86/kernel/early_printk.c
+@@ -388,10 +388,6 @@ static int __init setup_early_printk(char *buf)
+ 		if (!strncmp(buf, "xen", 3))
+ 			early_console_register(&xenboot_console, keep);
+ #endif
+-#ifdef CONFIG_EARLY_PRINTK_EFI
+-		if (!strncmp(buf, "efi", 3))
+-			early_console_register(&early_efi_console, keep);
+-#endif
+ #ifdef CONFIG_EARLY_PRINTK_USB_XDBC
+ 		if (!strncmp(buf, "xdbc", 4))
+ 			early_xdbc_parse_parameter(buf + 4);
+diff --git a/arch/x86/platform/efi/Makefile b/arch/x86/platform/efi/Makefile
+index e4dc3862d423..fe29f3f5d384 100644
+--- a/arch/x86/platform/efi/Makefile
++++ b/arch/x86/platform/efi/Makefile
+@@ -3,5 +3,4 @@ OBJECT_FILES_NON_STANDARD_efi_thunk_$(BITS).o := y
+ OBJECT_FILES_NON_STANDARD_efi_stub_$(BITS).o := y
+ 
+ obj-$(CONFIG_EFI) 		+= quirks.o efi.o efi_$(BITS).o efi_stub_$(BITS).o
+-obj-$(CONFIG_EARLY_PRINTK_EFI)	+= early_printk.o
+ obj-$(CONFIG_EFI_MIXED)		+= efi_thunk_$(BITS).o
+diff --git a/drivers/firmware/efi/Kconfig b/drivers/firmware/efi/Kconfig
+index 89110dfc7127..190be0b1d109 100644
+--- a/drivers/firmware/efi/Kconfig
++++ b/drivers/firmware/efi/Kconfig
+@@ -198,3 +198,9 @@ config EFI_DEV_PATH_PARSER
+ 	bool
+ 	depends on ACPI
+ 	default n
++
++config EFI_EARLYCON
++	def_bool y
++	depends on SERIAL_EARLYCON && !ARM && !IA64
++	select FONT_SUPPORT
++	select ARCH_USE_MEMREMAP_PROT
+diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
+index 5f9f5039de50..d2d0d2030620 100644
+--- a/drivers/firmware/efi/Makefile
++++ b/drivers/firmware/efi/Makefile
+@@ -30,5 +30,6 @@ arm-obj-$(CONFIG_EFI)			:= arm-init.o arm-runtime.o
+ obj-$(CONFIG_ARM)			+= $(arm-obj-y)
+ obj-$(CONFIG_ARM64)			+= $(arm-obj-y)
+ obj-$(CONFIG_EFI_CAPSULE_LOADER)	+= capsule-loader.o
++obj-$(CONFIG_EFI_EARLYCON)		+= earlycon.o
+ obj-$(CONFIG_UEFI_CPER_ARM)		+= cper-arm.o
+ obj-$(CONFIG_UEFI_CPER_X86)		+= cper-x86.o
+diff --git a/arch/x86/platform/efi/early_printk.c b/drivers/firmware/efi/earlycon.c
+similarity index 45%
+rename from arch/x86/platform/efi/early_printk.c
+rename to drivers/firmware/efi/earlycon.c
+index 7138bc7a265c..163d8204b190 100644
+--- a/arch/x86/platform/efi/early_printk.c
++++ b/drivers/firmware/efi/earlycon.c
+@@ -10,104 +10,68 @@
+ #include <linux/font.h>
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+-#include <asm/setup.h>
++#include <linux/serial_core.h>
++#include <linux/screen_info.h>
++
++#include <asm/early_ioremap.h>
+ 
+ static const struct font_desc *font;
+ static u32 efi_x, efi_y;
+-static void *efi_fb;
+-static bool early_efi_keep;
+-
+-/*
+- * efi earlyprintk need use early_ioremap to map the framebuffer.
+- * But early_ioremap is not usable for earlyprintk=efi,keep, ioremap should
+- * be used instead. ioremap will be available after paging_init() which is
+- * earlier than initcall callbacks. Thus adding this early initcall function
+- * early_efi_map_fb to map the whole efi framebuffer.
+- */
+-static __init int early_efi_map_fb(void)
+-{
+-	u64 base, size;
++static u64 fb_base;
++static pgprot_t fb_prot;
+ 
+-	if (!early_efi_keep)
+-		return 0;
+-
+-	base = boot_params.screen_info.lfb_base;
+-	if (boot_params.screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
+-		base |= (u64)boot_params.screen_info.ext_lfb_base << 32;
+-	size = boot_params.screen_info.lfb_size;
+-	efi_fb = ioremap(base, size);
+-
+-	return efi_fb ? 0 : -ENOMEM;
+-}
+-early_initcall(early_efi_map_fb);
+-
+-/*
+- * early_efi_map maps efi framebuffer region [start, start + len -1]
+- * In case earlyprintk=efi,keep we have the whole framebuffer mapped already
+- * so just return the offset efi_fb + start.
+- */
+-static __ref void *early_efi_map(unsigned long start, unsigned long len)
++static __ref void *efi_earlycon_map(unsigned long start, unsigned long len)
+ {
+-	u64 base;
+-
+-	base = boot_params.screen_info.lfb_base;
+-	if (boot_params.screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
+-		base |= (u64)boot_params.screen_info.ext_lfb_base << 32;
+-
+-	if (efi_fb)
+-		return (efi_fb + start);
+-	else
+-		return early_ioremap(base + start, len);
++	return early_memremap_prot(fb_base + start, len, pgprot_val(fb_prot));
  }
--#endif	/* CONFIG_ARCH_USE_MEMREMAP_PROT */
-+#endif	/* CONFIG_AMD_MEM_ENCRYPT */
  
- static pte_t bm_pte[PAGE_SIZE/sizeof(pte_t)] __page_aligned_bss;
+-static __ref void early_efi_unmap(void *addr, unsigned long len)
++static __ref void efi_earlycon_unmap(void *addr, unsigned long len)
+ {
+-	if (!efi_fb)
+-		early_iounmap(addr, len);
++	early_memunmap(addr, len);
+ }
  
+-static void early_efi_clear_scanline(unsigned int y)
++static void efi_earlycon_clear_scanline(unsigned int y)
+ {
+ 	unsigned long *dst;
+ 	u16 len;
+ 
+-	len = boot_params.screen_info.lfb_linelength;
+-	dst = early_efi_map(y*len, len);
++	len = screen_info.lfb_linelength;
++	dst = efi_earlycon_map(y*len, len);
+ 	if (!dst)
+ 		return;
+ 
+ 	memset(dst, 0, len);
+-	early_efi_unmap(dst, len);
++	efi_earlycon_unmap(dst, len);
+ }
+ 
+-static void early_efi_scroll_up(void)
++static void efi_earlycon_scroll_up(void)
+ {
+ 	unsigned long *dst, *src;
+ 	u16 len;
+ 	u32 i, height;
+ 
+-	len = boot_params.screen_info.lfb_linelength;
+-	height = boot_params.screen_info.lfb_height;
++	len = screen_info.lfb_linelength;
++	height = screen_info.lfb_height;
+ 
+ 	for (i = 0; i < height - font->height; i++) {
+-		dst = early_efi_map(i*len, len);
++		dst = efi_earlycon_map(i*len, len);
+ 		if (!dst)
+ 			return;
+ 
+-		src = early_efi_map((i + font->height) * len, len);
++		src = efi_earlycon_map((i + font->height) * len, len);
+ 		if (!src) {
+-			early_efi_unmap(dst, len);
++			efi_earlycon_unmap(dst, len);
+ 			return;
+ 		}
+ 
+ 		memmove(dst, src, len);
+ 
+-		early_efi_unmap(src, len);
+-		early_efi_unmap(dst, len);
++		efi_earlycon_unmap(src, len);
++		efi_earlycon_unmap(dst, len);
+ 	}
+ }
+ 
+-static void early_efi_write_char(u32 *dst, unsigned char c, unsigned int h)
++static void efi_earlycon_write_char(u32 *dst, unsigned char c, unsigned int h)
+ {
+ 	const u32 color_black = 0x00000000;
+ 	const u32 color_white = 0x00ffffff;
+@@ -128,14 +92,14 @@ static void early_efi_write_char(u32 *dst, unsigned char c, unsigned int h)
+ }
+ 
+ static void
+-early_efi_write(struct console *con, const char *str, unsigned int num)
++efi_earlycon_write(struct console *con, const char *str, unsigned int num)
+ {
+ 	struct screen_info *si;
+ 	unsigned int len;
+ 	const char *s;
+ 	void *dst;
+ 
+-	si = &boot_params.screen_info;
++	si = &screen_info;
+ 	len = si->lfb_linelength;
+ 
+ 	while (num) {
+@@ -155,7 +119,7 @@ early_efi_write(struct console *con, const char *str, unsigned int num)
+ 		for (h = 0; h < font->height; h++) {
+ 			unsigned int n, x;
+ 
+-			dst = early_efi_map((efi_y + h) * len, len);
++			dst = efi_earlycon_map((efi_y + h) * len, len);
+ 			if (!dst)
+ 				return;
+ 
+@@ -164,12 +128,12 @@ early_efi_write(struct console *con, const char *str, unsigned int num)
+ 			x = efi_x;
+ 
+ 			while (n-- > 0) {
+-				early_efi_write_char(dst + x*4, *s, h);
++				efi_earlycon_write_char(dst + x*4, *s, h);
+ 				x += font->width;
+ 				s++;
+ 			}
+ 
+-			early_efi_unmap(dst, len);
++			efi_earlycon_unmap(dst, len);
+ 		}
+ 
+ 		num -= count;
+@@ -192,26 +156,39 @@ early_efi_write(struct console *con, const char *str, unsigned int num)
+ 			u32 i;
+ 
+ 			efi_y -= font->height;
+-			early_efi_scroll_up();
++			efi_earlycon_scroll_up();
+ 
+ 			for (i = 0; i < font->height; i++)
+-				early_efi_clear_scanline(efi_y + i);
++				efi_earlycon_clear_scanline(efi_y + i);
+ 		}
+ 	}
+ }
+ 
+-static __init int early_efi_setup(struct console *con, char *options)
++static int __init efi_earlycon_setup(struct earlycon_device *device,
++				     const char *opt)
+ {
+ 	struct screen_info *si;
+ 	u16 xres, yres;
+ 	u32 i;
+ 
+-	si = &boot_params.screen_info;
++	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
++		return -ENODEV;
++
++	fb_base = screen_info.lfb_base;
++	if (screen_info.capabilities & VIDEO_CAPABILITY_64BIT_BASE)
++		fb_base |= (u64)screen_info.ext_lfb_base << 32;
++
++	if (opt && !strcmp(opt, "ram"))
++		fb_prot = PAGE_KERNEL;
++	else
++		fb_prot = pgprot_writecombine(PAGE_KERNEL);
++
++	si = &screen_info;
+ 	xres = si->lfb_width;
+ 	yres = si->lfb_height;
+ 
+ 	/*
+-	 * early_efi_write_char() implicitly assumes a framebuffer with
++	 * efi_earlycon_write_char() implicitly assumes a framebuffer with
+ 	 * 32-bits per pixel.
+ 	 */
+ 	if (si->lfb_depth != 32)
+@@ -223,18 +200,9 @@ static __init int early_efi_setup(struct console *con, char *options)
+ 
+ 	efi_y = rounddown(yres, font->height) - font->height;
+ 	for (i = 0; i < (yres - efi_y) / font->height; i++)
+-		early_efi_scroll_up();
++		efi_earlycon_scroll_up();
+ 
+-	/* early_console_register will unset CON_BOOT in case ,keep */
+-	if (!(con->flags & CON_BOOT))
+-		early_efi_keep = true;
++	device->con->write = efi_earlycon_write;
+ 	return 0;
+ }
+-
+-struct console early_efi_console = {
+-	.name =		"earlyefi",
+-	.write =	early_efi_write,
+-	.setup =	early_efi_setup,
+-	.flags =	CON_PRINTBUFFER,
+-	.index =	-1,
+-};
++EARLYCON_DECLARE(efifb, efi_earlycon_setup);
 -- 
 2.20.1
 
