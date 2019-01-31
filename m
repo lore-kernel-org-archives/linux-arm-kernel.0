@@ -2,69 +2,90 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C1813C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 18:02:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 85959C282DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 18:07:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8823320881
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 18:02:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5BA1D218AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 18:07:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LlP/jBwD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8823320881
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q5jYNA1e";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="kaVku2eO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5BA1D218AF
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=56FQhJfvf19HLxbz3phPYl4WsAgvuZjjKE2VDp2sl/g=; b=LlP/jBwD3tPo6QkSbzWca8PBQ
-	MfIVnxgaFduAi2TrXAifdKqQpts4LvDq/kEySprd3o9GDt6mV1HQ0vAvIYqSPegINSyke0rAISgAY
-	zAY0b6qHNMlQxJTBRAWIdcYSIeyJzebTJq3WCuj5nOvcRaJ3tiXs8igt0VN8XBcJ755Bf4hNulDyV
-	Q5W5G7JZDUqEtvjC8wKyHrIFGwvnM/f0zzm5WmeblT30EwCpN+dIsy9amOhBUeJTgSf/Jwzg4qu+5
-	17j+lNQyvnyyNkqQwtU6cMj2HcKYEI4nrJesmjVgXOgzYK0HYZyZUMBS3w/UHo6rQJqcXwKPiuO/Y
-	3jz4/vKTg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=RDPVEnQHyzNoSe1p8vKBf6bFrSBoxFGY56wqAT5qKCw=; b=q5jYNA1echRGj8
+	dlCJ3ZS2xZiebS3VXsw+B19fn7zEZsJ3qIZZEjXoePjWuJUZ0PZ5mPEosVYJw1viKNLzA8TAP8KBs
+	OCUxC587RcifNR9CrjFV54eb73ZVbO2aZAx+T0yLXYD/By5dI2SuePOmcEoiRoHyf9P08piQymNHT
+	hYxaZP8bNO9WLzXElp5/nJ1B922Sws+9EUFmocxofDGKCWAOnFs4Kc1xXxlVkVbqbhtNJzRDTdw2d
+	WhKLQxvRisWoZ5RE461pwYqM4WXCdHe6OPj4gQGXfO+R2PbkRm1UQ8sqV097D+wVK/E1efJ9CLcmx
+	0nTnSk0fQWWFA7y9Tgew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpGfH-0002A1-UQ; Thu, 31 Jan 2019 18:02:15 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpGfE-000299-Jf
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 18:02:14 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 61B98A78;
- Thu, 31 Jan 2019 10:02:10 -0800 (PST)
-Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1D84C3F59C;
- Thu, 31 Jan 2019 10:02:00 -0800 (PST)
-Subject: Re: [PATCHv6 6/6] coresight: debug: Add Unique Component Identifier
- (UCI) table
-To: saiprakash.ranjan@codeaurora.org, robh+dt@kernel.org,
- mathieu.poirier@linaro.org, mike.leach@linaro.org, leo.yan@linaro.org,
- alexander.shishkin@linux.intel.com, andy.gross@linaro.org,
- david.brown@linaro.org, vivek.gautam@codeaurora.org, jhugo@codeaurora.org,
- dianders@chromium.org, sboyd@kernel.org, bjorn.andersson@linaro.org,
- devicetree@vger.kernel.org, mark.rutland@arm.com, marc.w.gonzalez@free.fr
-References: <cover.1548943727.git.saiprakash.ranjan@codeaurora.org>
- <f724b28e5bfd7bca062aa5380cfd9328289559bf.1548943727.git.saiprakash.ranjan@codeaurora.org>
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-Message-ID: <304febd7-da9a-92d6-47bb-d9983d4bc5d4@arm.com>
-Date: Thu, 31 Jan 2019 18:01:59 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gpGjr-00045p-S9; Thu, 31 Jan 2019 18:06:59 +0000
+Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gpGjo-00045O-5O
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 18:06:57 +0000
+Received: by mail-ed1-x544.google.com with SMTP id g22so3338499edr.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 31 Jan 2019 10:06:55 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=Spvj1aXjtPpiHKV6tIt1Dff7PW1cp6KBnnoKkHYDIwo=;
+ b=kaVku2eOA5PY99iDda5fa6jQcUgVZVErdLGHjsUrhm7dfj/uD2PlvQNh2qgZwD1qsX
+ xLoM2IxZp0UpHDFs8hRSVYRdc2ZLnXKa28ZVTaSCQZgOum+HWmRarE2v8p2oWDklOnC0
+ x8bnXg0XO09BBcPn8HuBYBnuWES7mqgZGKNZ3zQ7rVYuiE+JU7R2neSYa1U+yjvITQok
+ 6Ql9VfWrox6aRlKfonQHzuGWRrjxZfep1sVl7dN/0bVfRHMQbadQpSinPMeZDSjm4ECj
+ 0v/KVV8V95U4608BsUgi577OSncF8Vn4mpPvBsaXbhwL9BeDCxbwOHM3e+Pe+2sG9mxE
+ pdiA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=Spvj1aXjtPpiHKV6tIt1Dff7PW1cp6KBnnoKkHYDIwo=;
+ b=i2Pa2ZD5Yz6/O/wRZiNdIMYt988EIHx3gHw/aJw6dGuW8WTdypRyZW/wz/8vNToSNY
+ 4BHXf3OrmI/QQeAG9ShOGpjRefaEPv/j53Qd1raWMdwOLFk6j0B6QwUOT0+td0OnmjAM
+ jFpAxagPd3ddxdPeZrv6C7JPf4Vk29LujAScuR+4YqCamSlUZeGRPInXZYbfCN9TaXfF
+ /FRHaibmui+uPA7GIvkdKbU/CRnhiAmbQoIDA9j1L7CvoCle4ICbW0hfWaKD+Na2nCyP
+ yh/uoz1emfCgS5IfyeeLP/3p7eMJeKz2diJJLHLvBhkjn9BsneJCxmCDcW1MsK67TMXl
+ TYvg==
+X-Gm-Message-State: AJcUukc8uj5C/NvTRvKcp8iA/Ix7Ooew0OJ9pWRi0IdsuV32u2QRrf5R
+ /QB50Sh4zP8WAoCKSdZyqx4MIsrb
+X-Google-Smtp-Source: ALg8bN6I044GGdctYhw7YLNI+sj6rT1xzCGad80eNZdVzssn4k/JWMMAsThg0pC4VzDabf3nextjgQ==
+X-Received: by 2002:aa7:c248:: with SMTP id y8mr34675650edo.205.1548958013470; 
+ Thu, 31 Jan 2019 10:06:53 -0800 (PST)
+Received: from localhost.localdomain ([2a01:4f9:2a:1fae::2])
+ by smtp.gmail.com with ESMTPSA id e51sm1476890edd.35.2019.01.31.10.06.52
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 31 Jan 2019 10:06:52 -0800 (PST)
+From: Nathan Chancellor <natechancellor@gmail.com>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Vladimir Murzin <vladimir.murzin@arm.com>
+Subject: [PATCH] serial: mps2-uart: Add parentheses around conditional in
+ mps2_uart_shutdown
+Date: Thu, 31 Jan 2019 11:06:28 -0700
+Message-Id: <20190131180627.19944-1-natechancellor@gmail.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-In-Reply-To: <f724b28e5bfd7bca062aa5380cfd9328289559bf.1548943727.git.saiprakash.ranjan@codeaurora.org>
-Content-Language: en-US
+X-Patchwork-Bot: notify
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_100212_654173_822E078B 
-X-CRM114-Status: GOOD (  16.92  )
+X-CRM114-CacheID: sfid-20190131_100656_210181_664C1C47 
+X-CRM114-Status: GOOD (  13.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,69 +97,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: rnayak@codeaurora.org, linux-arm-msm@vger.kernel.org,
- linux-kernel@vger.kernel.org, sibis@codeaurora.org, tingwei@codeaurora.org,
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Nick Desaulniers <ndesaulniers@google.com>, Jiri Slaby <jslaby@suse.com>,
+ Liviu Dudau <liviu.dudau@arm.com>, linux-kernel@vger.kernel.org,
+ linux-serial@vger.kernel.org, Sudeep Holla <sudeep.holla@arm.com>,
+ Nathan Chancellor <natechancellor@gmail.com>,
  linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Clang warns:
 
+drivers/tty/serial/mps2-uart.c:351:6: warning: logical not is only
+applied to the left hand side of this bitwise operator
+[-Wlogical-not-parentheses]
+        if (!mps_port->flags & UART_PORT_COMBINED_IRQ) {
+            ^                ~
+drivers/tty/serial/mps2-uart.c:351:6: note: add parentheses after the
+'!' to evaluate the bitwise operator first
+        if (!mps_port->flags & UART_PORT_COMBINED_IRQ) {
+            ^
+             (                                       )
+drivers/tty/serial/mps2-uart.c:351:6: note: add parentheses around left
+hand side expression to silence this warning
+        if (!mps_port->flags & UART_PORT_COMBINED_IRQ) {
+            ^
+            (               )
+1 warning generated.
 
-On 31/01/2019 14:22, Sai Prakash Ranjan wrote:
-> Add UCI table for coresight CPU debug module. This patch adds
-> the UCI entries for Kryo CPUs found on MSM8996 which shares
-> the same PIDs as ETMs.
-> 
-> Without this, below error is observed on MSM8996:
+As it was intended for this check to be the inverse of the one at the
+bottom of mps2_init_port, add parentheses around the whole conditional.
 
-nit: Subject doesn't match the patch contents. You could simply say :
+Fixes: 775ea4ea2fd9 ("serial: mps2-uart: support combined irq")
+Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+---
+ drivers/tty/serial/mps2-uart.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-coresight: cpu-debug: Add support for Qualcomm Kryo
+diff --git a/drivers/tty/serial/mps2-uart.c b/drivers/tty/serial/mps2-uart.c
+index 4404eb7d118f..587b42f754cb 100644
+--- a/drivers/tty/serial/mps2-uart.c
++++ b/drivers/tty/serial/mps2-uart.c
+@@ -348,7 +348,7 @@ static void mps2_uart_shutdown(struct uart_port *port)
+ 
+ 	mps2_uart_write8(port, control, UARTn_CTRL);
+ 
+-	if (!mps_port->flags & UART_PORT_COMBINED_IRQ) {
++	if (!(mps_port->flags & UART_PORT_COMBINED_IRQ)) {
+ 		free_irq(mps_port->rx_irq, mps_port);
+ 		free_irq(mps_port->tx_irq, mps_port);
+ 	}
+-- 
+2.20.1
 
-
-> 
-> [    5.429867] OF: graph: no port node found in /soc/debug@3810000
-> [    5.429938] coresight-etm4x: probe of 3810000.debug failed with error -22
-> [    5.435415] coresight-cpu-debug 3810000.debug: Coresight debug-CPU0 initialized
-> [    5.446474] OF: graph: no port node found in /soc/debug@3910000
-> [    5.448927] coresight-etm4x: probe of 3910000.debug failed with error -22
-> [    5.454681] coresight-cpu-debug 3910000.debug: Coresight debug-CPU1 initialized
-> [    5.487765] OF: graph: no port node found in /soc/debug@3a10000
-> [    5.488007] coresight-etm4x: probe of 3a10000.debug failed with error -22
-> [    5.493024] coresight-cpu-debug 3a10000.debug: Coresight debug-CPU2 initialized
-> [    5.501802] OF: graph: no port node found in /soc/debug@3b10000
-> [    5.512901] coresight-etm4x: probe of 3b10000.debug failed with error -22
-> [    5.513192] coresight-cpu-debug 3b10000.debug: Coresight debug-CPU3 initialized
-> 
-> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-> 
-> ---
-> For testing, all dependent patches are in below tree:
->   * https://github.com/saiprakash-ranjan/linux/tree/coresight-next
-> 
-> This patch depends on UCI support by Mike Leach in below link:
->   * https://lore.kernel.org/lkml/20190130234051.2294-1-mike.leach@linaro.org/
-> ---
->   .../hwtracing/coresight/coresight-cpu-debug.c | 33 +++++++++----------
->   1 file changed, 16 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-cpu-debug.c b/drivers/hwtracing/coresight/coresight-cpu-debug.c
-> index e8819d750938..915d86a39cee 100644
-> --- a/drivers/hwtracing/coresight/coresight-cpu-debug.c
-> +++ b/drivers/hwtracing/coresight/coresight-cpu-debug.c
-> @@ -655,24 +655,23 @@ static int debug_remove(struct amba_device *adev)
->   	return 0;
->   }
->   
-> +static struct amba_cs_uci_id uci_id_debug[] = {
-
-As Stephen mentioned, this must be "const".
-
-Rest looks fine.
-
-Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
