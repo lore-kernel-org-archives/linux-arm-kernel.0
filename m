@@ -2,72 +2,68 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2FED3C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:42:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2BDF9C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 04:09:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F07B4218AF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:42:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EDCE320870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 04:09:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lfxfrT/e"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F07B4218AF
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KUcGnMXV";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="M8htlJAs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EDCE320870
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4bip4WNcl+pabceTBRFuu37SKkBV94llOvMs1AxfVSU=; b=lfxfrT/eZqBaBR
-	EI7Wx5Uw9J64zWooxHFTNvrV25QV2vleeyScMrkTZMM2w+G3sGhOx7krM5vB1mRJNTPkeqIePZm6Y
-	zpjsBs2pThK6c2uEAFp6uCCMDb85rmxHMD2BwQff8WGg6/KthRwLmXw2sW/paj7Bz+xlZ620edIYU
-	9lffAMGHsGxtRMsgMOQSus/hDrtIjl/cLqNtLnjHZI2RHiOr2id/womUgGCRWo1w4IhA6PhOYIJb9
-	/8Lt0jqts26yasd01YR0eUAKZmxxGodHZf4Sm2TSfsbH/k7jXHn+4Z3Sff8cedGA+MKplBSPGGnaw
-	LwyQKRrpuANxyGTZH17A==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=4r/GzwXuXIVInVn/77iE5YBkwTU0lkqvlBLzL3VHiww=; b=KUc
+	GnMXVpNZ1yymPgYDpj3Djr4+2bQmNTB4hvgpD6jOz//CMwOaJl5bPlsDCW11HuSnrSAx/GVHcGWom
+	PU7+8ZAuYasLLfaslMYrxHCpQAjs/S+5vsw1qt8btnq8NCa6BQn1HNfK3s/oZrNm1oFve3S3Opmdq
+	cv+5E7MK8DuiaJL1rApHgUxaGtShNctToAwiV8ytfVGdnv7JKcuaei9yqj63xCsI0U2A+8pdzy1j+
+	1IB0xRCKhCnELpC0/pWswsCZsI9D6VHF4T5IpaGHtziTACm/2qRp8lf/Ria52Kzyiq1KaEWfWl07B
+	fKCeFrUXQLjETZfGyBQLIo2nGp3ZpxQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp3Fd-0002vV-IN; Thu, 31 Jan 2019 03:42:53 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gp3fU-0001nz-TC; Thu, 31 Jan 2019 04:09:36 +0000
+Received: from conuserg-12.nifty.com ([210.131.2.79])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp3FZ-0002ub-S1; Thu, 31 Jan 2019 03:42:51 +0000
-X-UUID: 3b1b74d80bb843c6af62ab37237a3dcd-20190130
-X-UUID: 3b1b74d80bb843c6af62ab37237a3dcd-20190130
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
- (envelope-from <yong.wu@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1809021718; Wed, 30 Jan 2019 19:42:45 -0800
-Received: from MTKMBS31N1.mediatek.inc (172.27.4.69) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 30 Jan 2019 19:42:44 -0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31N1.mediatek.inc
- (172.27.4.69) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Thu, 31 Jan 2019 11:42:41 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Thu, 31 Jan 2019 11:42:41 +0800
-Message-ID: <1548906161.19710.47.camel@mhfsdcap03>
-Subject: Re: [PATCH v5 15/20] memory: mtk-smi: Invoke pm runtime_callback to
- enable clocks
-From: Yong Wu <yong.wu@mediatek.com>
-To: Evan Green <evgreen@chromium.org>
-Date: Thu, 31 Jan 2019 11:42:41 +0800
-In-Reply-To: <CAE=gft6XDC3YGe20iDOpCO0ASg99hucu7rKJwt+5i+3vgrEFvg@mail.gmail.com>
-References: <1546314952-15990-1-git-send-email-yong.wu@mediatek.com>
- <1546314952-15990-16-git-send-email-yong.wu@mediatek.com>
- <CAE=gft6XDC3YGe20iDOpCO0ASg99hucu7rKJwt+5i+3vgrEFvg@mail.gmail.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
-MIME-Version: 1.0
-X-MTK: N
+ id 1gp3fQ-0001nZ-59; Thu, 31 Jan 2019 04:09:34 +0000
+Received: from pug.e01.socionext.com (p14092-ipngnfx01kyoto.kyoto.ocn.ne.jp
+ [153.142.97.92]) (authenticated)
+ by conuserg-12.nifty.com with ESMTP id x0V48g7O028416;
+ Thu, 31 Jan 2019 13:08:43 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conuserg-12.nifty.com x0V48g7O028416
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
+ s=dec2015msa; t=1548907724;
+ bh=qtR6JBtIsv5On0l3JmbxwP6woOzsFy3pXGV1XwsD1qA=;
+ h=From:To:Cc:Subject:Date:From;
+ b=M8htlJAsWH4ih4sVLUMTMj2J3B+IhkWeIHlb/UEEkhq935jetcJg0Joh17Pk2wtMP
+ QNJThFcEybUvB44JaY/mSYwL398kiNgSKyCppNFu+GupfDOTrQosw8QLtIvw10Kqil
+ J0+UKyBCmnmCBOpIA7+Pzo0T/VMzcA2CQcuSSfioycqk2TntGBCutlFoiOLEMH3Mgw
+ pm7Ij9TmU1nMwJSBqDi5WHE7zWEzzGJ9FQH7AE1Gk8Yb4E+IbUZtdM/wrahWKMOPau
+ 9gZVTsKGhRnETxsly5g2v29xf7W4PTX8hnTPe8YIP3di60U7oOBVa8ZkWsP/MRRBWl
+ /6qr92DmoJwpQ==
+X-Nifty-SrcIP: [153.142.97.92]
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, devel@driverdev.osuosl.org
+Subject: [PATCH] staging: prefix header search paths with $(srctree)/
+Date: Thu, 31 Jan 2019 13:08:33 +0900
+Message-Id: <1548907713-24160-1-git-send-email-yamada.masahiro@socionext.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_194249_910760_1FD585FD 
-X-CRM114-Status: GOOD (  28.75  )
+X-CRM114-CacheID: sfid-20190130_200932_438928_52234B0D 
+X-CRM114-Status: UNSURE (   9.87  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,245 +75,221 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, "open
- list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Nicolas Boichat <drinkcat@chromium.org>,
- Arnd Bergmann <arnd@arndb.de>, srv_heupstream@mediatek.com,
- Joerg Roedel <joro@8bytes.org>, Will Deacon <will.deacon@arm.com>,
- LKML <linux-kernel@vger.kernel.org>, Tomasz Figa <tfiga@google.com>,
- iommu@lists.linux-foundation.org, Rob Herring <robh+dt@kernel.org>,
- linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
- yingjoe.chen@mediatek.com, Robin Murphy <robin.murphy@arm.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Stefan Wahren <stefan.wahren@i2se.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>, Gao Xiang <gaoxiang25@huawei.com>,
+ Scott Branden <sbranden@broadcom.com>, Eric Anholt <eric@anholt.net>,
+ Ray Jui <rjui@broadcom.com>, sparmaintainer@unisys.com,
+ linux-kernel@vger.kernel.org, Chao Yu <yuchao0@huawei.com>,
+ Masahiro Yamada <yamada.masahiro@socionext.com>,
+ Florian Fainelli <f.fainelli@gmail.com>, bcm-kernel-feedback-list@broadcom.com,
+ linux-rpi-kernel@lists.infradead.org,
+ David Kershner <david.kershner@unisys.com>, linux-erofs@lists.ozlabs.org,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 2019-01-30 at 11:05 -0800, Evan Green wrote:
-> On Mon, Dec 31, 2018 at 7:59 PM Yong Wu <yong.wu@mediatek.com> wrote:
-> >
-> > This patch only move the clk_prepare_enable and config_port into the
-> > runtime suspend/resume callback. It doesn't change the code content
-> > and sequence.
-> >
-> > This is a preparing patch for adjusting SMI_BUS_SEL for mt8183.
-> > (SMI_BUS_SEL need to be restored after smi-common resume every time.)
-> > Also it gives a chance to get rid of mtk_smi_larb_get/put which could
-> > be a next topic.
-> >
-> > CC: Matthias Brugger <matthias.bgg@gmail.com>
-> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> 
-> I believe this refactoring is a no-op as described, because the order is still:
-> 1) mtk_smi_clk_enable(common)
-> 2) mtk_smi_clk_enable(larb)
-> 3) larb_gen->config_port()
-> 
-> And teardown still happens in the opposite order, except for
+Currently, the Kbuild core manipulates header search paths in a crazy
+way [1].
 
-Thanks your confirm.
+To fix this mess, I want all Makefiles to add explicit $(srctree)/ to
+the search paths in the srctree. Some Makefiles are already written in
+that way, but not all. The goal of this work is to make the notation
+consistent, and finally get rid of the gross hacks.
 
-> config_port, which they seem not to do in suspend.
+Having whitespaces after -I does not matter since commit 48f6e3cf5bc6
+("kbuild: do not drop -I without parameter").
 
-After suspend, the HW engine should not work. config_port is not
-helpful. At that time, use the HW default value.
+[1]: https://patchwork.kernel.org/patch/9632347/
 
-> So, looks good to me.
-> 
-> Reviewed-by: Evan Green <evgreen@chromium.org>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Thanks.
+ drivers/staging/erofs/Makefile                        | 2 +-
+ drivers/staging/media/davinci_vpfe/Makefile           | 2 +-
+ drivers/staging/most/Makefile                         | 2 +-
+ drivers/staging/most/cdev/Makefile                    | 2 +-
+ drivers/staging/most/dim2/Makefile                    | 2 +-
+ drivers/staging/most/i2c/Makefile                     | 2 +-
+ drivers/staging/most/net/Makefile                     | 2 +-
+ drivers/staging/most/sound/Makefile                   | 2 +-
+ drivers/staging/most/usb/Makefile                     | 2 +-
+ drivers/staging/most/video/Makefile                   | 2 +-
+ drivers/staging/rtl8192u/Makefile                     | 2 +-
+ drivers/staging/unisys/visorhba/Makefile              | 3 +--
+ drivers/staging/unisys/visornic/Makefile              | 3 +--
+ drivers/staging/vc04_services/bcm2835-audio/Makefile  | 3 +--
+ drivers/staging/vc04_services/bcm2835-camera/Makefile | 2 +-
+ 15 files changed, 15 insertions(+), 18 deletions(-)
 
-> 
-> > ---
-> >  drivers/memory/mtk-smi.c | 113 ++++++++++++++++++++++++++++++-----------------
-> >  1 file changed, 72 insertions(+), 41 deletions(-)
-> >
-> > diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
-> > index a430721..9790801 100644
-> > --- a/drivers/memory/mtk-smi.c
-> > +++ b/drivers/memory/mtk-smi.c
-> > @@ -86,17 +86,13 @@ struct mtk_smi_larb { /* larb: local arbiter */
-> >         u32                             *mmu;
-> >  };
-> >
-> > -static int mtk_smi_enable(const struct mtk_smi *smi)
-> > +static int mtk_smi_clk_enable(const struct mtk_smi *smi)
-> >  {
-> >         int ret;
-> >
-> > -       ret = pm_runtime_get_sync(smi->dev);
-> > -       if (ret < 0)
-> > -               return ret;
-> > -
-> >         ret = clk_prepare_enable(smi->clk_apb);
-> >         if (ret)
-> > -               goto err_put_pm;
-> > +               return ret;
-> >
-> >         ret = clk_prepare_enable(smi->clk_smi);
-> >         if (ret)
-> > @@ -118,59 +114,28 @@ static int mtk_smi_enable(const struct mtk_smi *smi)
-> >         clk_disable_unprepare(smi->clk_smi);
-> >  err_disable_apb:
-> >         clk_disable_unprepare(smi->clk_apb);
-> > -err_put_pm:
-> > -       pm_runtime_put_sync(smi->dev);
-> >         return ret;
-> >  }
-> >
-> > -static void mtk_smi_disable(const struct mtk_smi *smi)
-> > +static void mtk_smi_clk_disable(const struct mtk_smi *smi)
-> >  {
-> >         clk_disable_unprepare(smi->clk_gals1);
-> >         clk_disable_unprepare(smi->clk_gals0);
-> >         clk_disable_unprepare(smi->clk_smi);
-> >         clk_disable_unprepare(smi->clk_apb);
-> > -       pm_runtime_put_sync(smi->dev);
-> >  }
-> >
-> >  int mtk_smi_larb_get(struct device *larbdev)
-> >  {
-> > -       struct mtk_smi_larb *larb = dev_get_drvdata(larbdev);
-> > -       const struct mtk_smi_larb_gen *larb_gen = larb->larb_gen;
-> > -       struct mtk_smi *common = dev_get_drvdata(larb->smi_common_dev);
-> > -       int ret;
-> > +       int ret = pm_runtime_get_sync(larbdev);
-> >
-> > -       /* Enable the smi-common's power and clocks */
-> > -       ret = mtk_smi_enable(common);
-> > -       if (ret)
-> > -               return ret;
-> > -
-> > -       /* Enable the larb's power and clocks */
-> > -       ret = mtk_smi_enable(&larb->smi);
-> > -       if (ret) {
-> > -               mtk_smi_disable(common);
-> > -               return ret;
-> > -       }
-> > -
-> > -       /* Configure the iommu info for this larb */
-> > -       larb_gen->config_port(larbdev);
-> > -
-> > -       return 0;
-> > +       return (ret < 0) ? ret : 0;
-> >  }
-> >  EXPORT_SYMBOL_GPL(mtk_smi_larb_get);
-> >
-> >  void mtk_smi_larb_put(struct device *larbdev)
-> >  {
-> > -       struct mtk_smi_larb *larb = dev_get_drvdata(larbdev);
-> > -       struct mtk_smi *common = dev_get_drvdata(larb->smi_common_dev);
-> > -
-> > -       /*
-> > -        * Don't de-configure the iommu info for this larb since there may be
-> > -        * several modules in this larb.
-> > -        * The iommu info will be reset after power off.
-> > -        */
-> > -
-> > -       mtk_smi_disable(&larb->smi);
-> > -       mtk_smi_disable(common);
-> > +       pm_runtime_put_sync(larbdev);
-> >  }
-> >  EXPORT_SYMBOL_GPL(mtk_smi_larb_put);
-> >
-> > @@ -385,12 +350,52 @@ static int mtk_smi_larb_remove(struct platform_device *pdev)
-> >         return 0;
-> >  }
-> >
-> > +static int __maybe_unused mtk_smi_larb_resume(struct device *dev)
-> > +{
-> > +       struct mtk_smi_larb *larb = dev_get_drvdata(dev);
-> > +       const struct mtk_smi_larb_gen *larb_gen = larb->larb_gen;
-> > +       int ret;
-> > +
-> > +       /* Power on smi-common. */
-> > +       ret = pm_runtime_get_sync(larb->smi_common_dev);
-> > +       if (ret < 0) {
-> > +               dev_err(dev, "Failed to pm get for smi-common(%d).\n", ret);
-> > +               return ret;
-> > +       }
-> > +
-> > +       ret = mtk_smi_clk_enable(&larb->smi);
-> > +       if (ret < 0) {
-> > +               dev_err(dev, "Failed to enable clock(%d).\n", ret);
-> > +               pm_runtime_put_sync(larb->smi_common_dev);
-> > +               return ret;
-> > +       }
-> > +
-> > +       /* Configure the basic setting for this larb */
-> > +       larb_gen->config_port(dev);
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int __maybe_unused mtk_smi_larb_suspend(struct device *dev)
-> > +{
-> > +       struct mtk_smi_larb *larb = dev_get_drvdata(dev);
-> > +
-> > +       mtk_smi_clk_disable(&larb->smi);
-> > +       pm_runtime_put_sync(larb->smi_common_dev);
-> > +       return 0;
-> > +}
-> > +
-> > +static const struct dev_pm_ops smi_larb_pm_ops = {
-> > +       SET_RUNTIME_PM_OPS(mtk_smi_larb_suspend, mtk_smi_larb_resume, NULL)
-> > +};
-> > +
-> >  static struct platform_driver mtk_smi_larb_driver = {
-> >         .probe  = mtk_smi_larb_probe,
-> >         .remove = mtk_smi_larb_remove,
-> >         .driver = {
-> >                 .name = "mtk-smi-larb",
-> >                 .of_match_table = mtk_smi_larb_of_ids,
-> > +               .pm             = &smi_larb_pm_ops,
-> >         }
-> >  };
-> >
-> > @@ -489,12 +494,38 @@ static int mtk_smi_common_remove(struct platform_device *pdev)
-> >         return 0;
-> >  }
-> >
-> > +static int __maybe_unused mtk_smi_common_resume(struct device *dev)
-> > +{
-> > +       struct mtk_smi *common = dev_get_drvdata(dev);
-> > +       int ret;
-> > +
-> > +       ret = mtk_smi_clk_enable(common);
-> > +       if (ret) {
-> > +               dev_err(common->dev, "Failed to enable clock(%d).\n", ret);
-> > +               return ret;
-> > +       }
-> > +       return 0;
-> > +}
-> > +
-> > +static int __maybe_unused mtk_smi_common_suspend(struct device *dev)
-> > +{
-> > +       struct mtk_smi *common = dev_get_drvdata(dev);
-> > +
-> > +       mtk_smi_clk_disable(common);
-> > +       return 0;
-> > +}
-> > +
-> > +static const struct dev_pm_ops smi_common_pm_ops = {
-> > +       SET_RUNTIME_PM_OPS(mtk_smi_common_suspend, mtk_smi_common_resume, NULL)
-> > +};
-> > +
-> >  static struct platform_driver mtk_smi_common_driver = {
-> >         .probe  = mtk_smi_common_probe,
-> >         .remove = mtk_smi_common_remove,
-> >         .driver = {
-> >                 .name = "mtk-smi-common",
-> >                 .of_match_table = mtk_smi_common_of_ids,
-> > +               .pm             = &smi_common_pm_ops,
-> >         }
-> >  };
-> >
-> > --
-> > 1.9.1
-> >
-
+diff --git a/drivers/staging/erofs/Makefile b/drivers/staging/erofs/Makefile
+index c91b652..38ab344 100644
+--- a/drivers/staging/erofs/Makefile
++++ b/drivers/staging/erofs/Makefile
+@@ -6,7 +6,7 @@ ccflags-y += -Wall -DEROFS_VERSION=\"$(EROFS_VERSION)\"
+ 
+ obj-$(CONFIG_EROFS_FS) += erofs.o
+ # staging requirement: to be self-contained in its own directory
+-ccflags-y += -I$(src)/include
++ccflags-y += -I $(srctree)/$(src)/include
+ erofs-objs := super.o inode.o data.o namei.o dir.o utils.o
+ erofs-$(CONFIG_EROFS_FS_XATTR) += xattr.o
+ erofs-$(CONFIG_EROFS_FS_ZIP) += unzip_vle.o unzip_vle_lz4.o
+diff --git a/drivers/staging/media/davinci_vpfe/Makefile b/drivers/staging/media/davinci_vpfe/Makefile
+index 9c57042..9268e50 100644
+--- a/drivers/staging/media/davinci_vpfe/Makefile
++++ b/drivers/staging/media/davinci_vpfe/Makefile
+@@ -6,5 +6,5 @@ davinci-vfpe-objs := \
+ 
+ # Allow building it with COMPILE_TEST on other archs
+ ifndef CONFIG_ARCH_DAVINCI
+-ccflags-y += -Iarch/arm/mach-davinci/include/
++ccflags-y += -I $(srctree)/arch/arm/mach-davinci/include/
+ endif
+diff --git a/drivers/staging/most/Makefile b/drivers/staging/most/Makefile
+index f8bcf48..c7662f6 100644
+--- a/drivers/staging/most/Makefile
++++ b/drivers/staging/most/Makefile
+@@ -1,7 +1,7 @@
+ # SPDX-License-Identifier: GPL-2.0
+ obj-$(CONFIG_MOST) += most_core.o
+ most_core-y := core.o
+-ccflags-y += -Idrivers/staging/
++ccflags-y += -I $(srctree)/drivers/staging/
+ 
+ obj-$(CONFIG_MOST_CDEV)	+= cdev/
+ obj-$(CONFIG_MOST_NET)	+= net/
+diff --git a/drivers/staging/most/cdev/Makefile b/drivers/staging/most/cdev/Makefile
+index afb9870..21b0bd7 100644
+--- a/drivers/staging/most/cdev/Makefile
++++ b/drivers/staging/most/cdev/Makefile
+@@ -1,4 +1,4 @@
+ obj-$(CONFIG_MOST_CDEV) += most_cdev.o
+ 
+ most_cdev-objs := cdev.o
+-ccflags-y += -Idrivers/staging/
++ccflags-y += -I $(srctree)/drivers/staging/
+diff --git a/drivers/staging/most/dim2/Makefile b/drivers/staging/most/dim2/Makefile
+index 66676f5..6d15f04 100644
+--- a/drivers/staging/most/dim2/Makefile
++++ b/drivers/staging/most/dim2/Makefile
+@@ -1,4 +1,4 @@
+ obj-$(CONFIG_MOST_DIM2) += most_dim2.o
+ 
+ most_dim2-objs := dim2.o hal.o sysfs.o
+-ccflags-y += -Idrivers/staging/
++ccflags-y += -I $(srctree)/drivers/staging/
+diff --git a/drivers/staging/most/i2c/Makefile b/drivers/staging/most/i2c/Makefile
+index a7d094c..c032fea 100644
+--- a/drivers/staging/most/i2c/Makefile
++++ b/drivers/staging/most/i2c/Makefile
+@@ -1,4 +1,4 @@
+ obj-$(CONFIG_MOST_I2C) += most_i2c.o
+ 
+ most_i2c-objs := i2c.o
+-ccflags-y += -Idrivers/staging/
++ccflags-y += -I $(srctree)/drivers/staging/
+diff --git a/drivers/staging/most/net/Makefile b/drivers/staging/most/net/Makefile
+index 54500aa..820faec 100644
+--- a/drivers/staging/most/net/Makefile
++++ b/drivers/staging/most/net/Makefile
+@@ -1,4 +1,4 @@
+ obj-$(CONFIG_MOST_NET) += most_net.o
+ 
+ most_net-objs := net.o
+-ccflags-y += -Idrivers/staging/
++ccflags-y += -I $(srctree)/drivers/staging/
+diff --git a/drivers/staging/most/sound/Makefile b/drivers/staging/most/sound/Makefile
+index eee8774..5bb55bb 100644
+--- a/drivers/staging/most/sound/Makefile
++++ b/drivers/staging/most/sound/Makefile
+@@ -1,4 +1,4 @@
+ obj-$(CONFIG_MOST_SOUND) += most_sound.o
+ 
+ most_sound-objs := sound.o
+-ccflags-y += -Idrivers/staging/
++ccflags-y += -I $(srctree)/drivers/staging/
+diff --git a/drivers/staging/most/usb/Makefile b/drivers/staging/most/usb/Makefile
+index 18d28cb..910cd08 100644
+--- a/drivers/staging/most/usb/Makefile
++++ b/drivers/staging/most/usb/Makefile
+@@ -1,4 +1,4 @@
+ obj-$(CONFIG_MOST_USB) += most_usb.o
+ 
+ most_usb-objs := usb.o
+-ccflags-y += -Idrivers/staging/
++ccflags-y += -I $(srctree)/drivers/staging/
+diff --git a/drivers/staging/most/video/Makefile b/drivers/staging/most/video/Makefile
+index 1c8e520..c6e01b6e 100644
+--- a/drivers/staging/most/video/Makefile
++++ b/drivers/staging/most/video/Makefile
+@@ -1,4 +1,4 @@
+ obj-$(CONFIG_MOST_VIDEO) += most_video.o
+ 
+ most_video-objs := video.o
+-ccflags-y += -Idrivers/staging/
++ccflags-y += -I $(srctree)/drivers/staging/
+diff --git a/drivers/staging/rtl8192u/Makefile b/drivers/staging/rtl8192u/Makefile
+index 3022728..dcd51bf 100644
+--- a/drivers/staging/rtl8192u/Makefile
++++ b/drivers/staging/rtl8192u/Makefile
+@@ -7,7 +7,7 @@ ccflags-y += -O2
+ ccflags-y += -DCONFIG_FORCE_HARD_FLOAT=y
+ ccflags-y += -DJACKSON_NEW_8187 -DJACKSON_NEW_RX
+ ccflags-y += -DTHOMAS_BEACON -DTHOMAS_TASKLET -DTHOMAS_SKB -DTHOMAS_TURBO
+-ccflags-y += -Idrivers/staging/rtl8192u/ieee80211
++ccflags-y += -I $(srctree)/$(src)/ieee80211
+ 
+ r8192u_usb-y := r8192U_core.o r8180_93cx6.o r8192U_wx.o		\
+ 		  r8190_rtl8256.o r819xU_phy.o r819xU_firmware.o	\
+diff --git a/drivers/staging/unisys/visorhba/Makefile b/drivers/staging/unisys/visorhba/Makefile
+index a8a8e0e..97e4875 100644
+--- a/drivers/staging/unisys/visorhba/Makefile
++++ b/drivers/staging/unisys/visorhba/Makefile
+@@ -6,5 +6,4 @@ obj-$(CONFIG_UNISYS_VISORHBA)	+= visorhba.o
+ 
+ visorhba-y := visorhba_main.o
+ 
+-ccflags-y += -Idrivers/staging/unisys/include
+-
++ccflags-y += -I $(srctree)/$(src)/../include
+diff --git a/drivers/staging/unisys/visornic/Makefile b/drivers/staging/unisys/visornic/Makefile
+index 439e95e..336a746f 100644
+--- a/drivers/staging/unisys/visornic/Makefile
++++ b/drivers/staging/unisys/visornic/Makefile
+@@ -6,5 +6,4 @@ obj-$(CONFIG_UNISYS_VISORNIC)	+= visornic.o
+ 
+ visornic-y := visornic_main.o
+ 
+-ccflags-y += -Idrivers/staging/unisys/include
+-
++ccflags-y += -I $(srctree)/$(src)/../include
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/Makefile b/drivers/staging/vc04_services/bcm2835-audio/Makefile
+index d7b88d1..536bd0c 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/Makefile
++++ b/drivers/staging/vc04_services/bcm2835-audio/Makefile
+@@ -1,5 +1,4 @@
+ obj-$(CONFIG_SND_BCM2835)	+= snd-bcm2835.o
+ snd-bcm2835-objs		:= bcm2835.o bcm2835-ctl.o bcm2835-pcm.o bcm2835-vchiq.o
+ 
+-ccflags-y += -Idrivers/staging/vc04_services -D__VCCOREVER__=0x04000000
+-
++ccflags-y += -I $(srctree)/$(src)/.. -D__VCCOREVER__=0x04000000
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/Makefile b/drivers/staging/vc04_services/bcm2835-camera/Makefile
+index 2a4565e..472f21e 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/Makefile
++++ b/drivers/staging/vc04_services/bcm2835-camera/Makefile
+@@ -7,5 +7,5 @@ bcm2835-v4l2-$(CONFIG_VIDEO_BCM2835) := \
+ obj-$(CONFIG_VIDEO_BCM2835) += bcm2835-v4l2.o
+ 
+ ccflags-y += \
+-	-Idrivers/staging/vc04_services \
++	-I $(srctree)/$(src)/.. \
+ 	-D__VCCOREVER__=0x04000000
+-- 
+2.7.4
 
 
 _______________________________________________
