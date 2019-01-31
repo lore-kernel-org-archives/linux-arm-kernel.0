@@ -2,88 +2,83 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	FROM_LOCAL_NOVOWEL,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 868E5C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 15:21:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5009FC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 15:23:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5990B20863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 15:21:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2115B20863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 15:23:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BMi4JfT8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="FzYNB9vh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5990B20863
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CypoCM2z";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ZsyLjm/2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2115B20863
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xQwMwbnqBiVDsl3DRs3hc6bUqXM596oaZUPprwB7JLU=; b=BMi4JfT8D0XOjf
-	b28RkFcQqdVKB0E8kChmvIZiD01899k0KXk0GgAlhI4AMUN2GIZkyY3faGzHdNIYZawVcB0ORa4yD
-	3nlcCyxhkIX7SSPpi46ZGKBDePbHlGz1HkxxKaEN33CaO11clTyc9SO/4apuZJZuoZmkKakrErNl8
-	LgXnbWCLt0JrK27+57fJQfG0K+WoUR1iJE/xGXikoMsXhE7I5GlrrKaAUDaAc0WulfGak9H2Gh93Y
-	OiUGbDxUtilwgJjiS74EOyHor5EoDS9RlEz/QJfxeedobGIHUDO8hHogx+G/yeo81z7OsNrP6Zy9C
-	ewCfAM7bxOURZ7BAntCA==;
+	List-Owner; bh=Nq/u+rThu/fE1INRmgavSkne7/kWQHU+Ws3mMyljG7s=; b=CypoCM2zifHSDr
+	jp2z2i/f4NR3Fa5bPUC3dZbal5BE108U/YsgJt42dXdZxre3FTTzr67TtpYY8doazez/aJjcHQoaY
+	Gby4xBEa5UysMM4MRJCVVEC38RupbF8ZO65P7prWnLFhVHoZUFZ3aStLOIjEW2Mrk1psWBxaPHuJl
+	ncx9F6WdOXjoqFyVbuUc4zhiR2HmZyL/mnl4GYnt77UcEapcwQPPse5syxoQPlYPCGld7Wvn1yk1A
+	j9ajyD/62MUiF51LJ1MOabezn/KkDRHxnnnw718s4kDjrrj9XQooWk2Cz3d+TD4p0Qc4pvtO5AmXB
+	Xesad7OGtMja9Vtg7ojg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpE9P-0005il-6c; Thu, 31 Jan 2019 15:21:11 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
+	id 1gpEBT-00060w-Qp; Thu, 31 Jan 2019 15:23:19 +0000
+Received: from mail-yw1-xc42.google.com ([2607:f8b0:4864:20::c42])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpE96-0005Se-GP
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 15:20:56 +0000
-Received: by mail-pf1-x441.google.com with SMTP id i12so1609164pfo.7
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 31 Jan 2019 07:20:52 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=SO2+hNh+R2hjZNepqm+Cb6kTtGpzyd/D4ehTmz8FUkc=;
- b=FzYNB9vhS2LCUsuU8GYXrmhSim8C3MhNXkqQlapiN7bonJ4QZdpjlSeC9S4Vg0uBLj
- a6DBGrVtPnLdEd02Vj6ieQMl3ench8M1MroKxaEfJjsrxrJLk38kvXT1iC0lPRvqOdrZ
- qWK5/RpeneSveKoEd3vzG+ILuOxwyw86iFKt8=
+ id 1gpEBQ-00060V-45; Thu, 31 Jan 2019 15:23:17 +0000
+Received: by mail-yw1-xc42.google.com with SMTP id t13so1380122ywe.13;
+ Thu, 31 Jan 2019 07:23:15 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=FEGsjMX0dp8RIKABY7YbpDek7VAiBMQ5lvDJ9kXcOns=;
+ b=ZsyLjm/2i8qflJj65Hki7ZjvX/p5TsVDbFLDy7tSrA+zq8/rmQhKZ5yU4Bl9kcqNBG
+ CY9HOGBpR1srhF7u4H9mYJcYyDuPjhrBD47VmrCaaN1SX2ExDlH0GQYz6bDNKGIeER/N
+ DF6b1r3SOqJa9XC74nY0HVQaA3twQDl0/0usSyHts9dncP4v3Vg8voOJ8+jyAG7v0bUA
+ B6+B6kriQluxGxRJeHVpFuS3YlZmyHiGWyoenK6JbziwuNQ+Alt9qkijGVE2SEtb3tDq
+ 9pqtKFQFBYtBJG7fxZ1NDZFxq1qNSGZFFtsmGMF43OGLzTtwPolkWURu5aoBZtbx+lxK
+ 2bIQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=SO2+hNh+R2hjZNepqm+Cb6kTtGpzyd/D4ehTmz8FUkc=;
- b=mkPvG6UjRyWMww1QrhCH8UUD432Fxs6NVCnlEpglj1NiKmKvCsZNNiFafeZxsFE3VZ
- u/9Me8wATZxZeiP1I0aQJcV8pUqQioJ5XaQeS4hkX2ltXEIzbRvO/Z0vqbgToIWA6x2e
- Um9TIHmyNzoGVd6LbLbiBmWvEkOhSKgRa9DTNpYOHYY5COaO6ERi/DoVS4v0oOwW2M9Y
- JEIm2Ft89Qm4PLPhzlfaqKpmBMMd8XoxyniKq+qEy/qXltwHKws1HK6Assb00L5khdjH
- UYV/kyRwlLdaXDY1fSyXawH/wiZvz1xylUniM0yxu9q5QVfkngnoUh8t/2gh8uLaepNP
- H5eg==
-X-Gm-Message-State: AJcUukdhAI8agwVl+BBpXx2mt6f6GpIiAC3SFxKuSKK/VwjYrOI35ozm
- +MKwC0jrCsmSQ23iSlNxkTTEgQ==
-X-Google-Smtp-Source: ALg8bN51eKzYXlDOqbuxHYxN2tP+wpZh8Qn72GxxDM9wicOyaEGMz3B22L3Li+/I0eHRzI3TR5irNg==
-X-Received: by 2002:a63:1321:: with SMTP id i33mr32408980pgl.380.1548948051950; 
- Thu, 31 Jan 2019 07:20:51 -0800 (PST)
-Received: from localhost.localdomain ([115.97.179.75])
- by smtp.gmail.com with ESMTPSA id u186sm6633664pfu.51.2019.01.31.07.20.48
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 31 Jan 2019 07:20:51 -0800 (PST)
-From: Jagan Teki <jagan@amarulasolutions.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>
-Subject: [PATCH v2 2/2] arm64: defconfig: Enable SUN6I Camera sensor interface
-Date: Thu, 31 Jan 2019 20:50:35 +0530
-Message-Id: <20190131152035.7138-2-jagan@amarulasolutions.com>
-X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
-In-Reply-To: <20190131152035.7138-1-jagan@amarulasolutions.com>
-References: <20190131152035.7138-1-jagan@amarulasolutions.com>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=FEGsjMX0dp8RIKABY7YbpDek7VAiBMQ5lvDJ9kXcOns=;
+ b=D80AAiI2mwe2iMcz90cVK1QdEyNLzD6Hpa8putnn24nCq4qWe4+MZPLs+psoYeyU6Q
+ 2jeyt5XwCmOJ1F9nU5OfQrocL+8rLTqvU0nf8bWLad9t41GKmTpU2EmeGMk8l4J6yZJq
+ zabxI50JCYJM/cRLyvM7IezPS6CRW0zgIMld9guXDmjlYafTpcr3jZpPGk4QlQgx1jlu
+ sjrRI9wbNF+t1SQULkDIarIh9pwB4ZxhCbMx0FGk6B2VYIcQ4sDK7p2YPXgbjebiXMLa
+ uqsDyo/de/rQiEV1GlYtKop/oqge2tdYAyYEfVHTGFneQPD7fW9wbl684yyz80fkA9tb
+ pQ3Q==
+X-Gm-Message-State: AJcUukep6WdMhHV0FHQ1KClreK6ffvXctuQuiqCT/mugX35Qy1DhoxtS
+ yLClBPJi2x0Ojsectft63Lx2fFnFyOoiUcuxdrQ=
+X-Google-Smtp-Source: ALg8bN6VKPBr8Isk9xxBy7E56UDJe1SXYMfF3Ab4zY9Hf3yytlNnD8xLHhr8GacDmx2eMD/3OVRnEkNlKLgL+Q7RzmY=
+X-Received: by 2002:a81:5b07:: with SMTP id p7mr34659637ywb.468.1548948194353; 
+ Thu, 31 Jan 2019 07:23:14 -0800 (PST)
 MIME-Version: 1.0
+References: <1548057848-15136-1-git-send-email-rppt@linux.ibm.com>
+ <1548057848-15136-20-git-send-email-rppt@linux.ibm.com>
+In-Reply-To: <1548057848-15136-20-git-send-email-rppt@linux.ibm.com>
+From: Max Filippov <jcmvbkbc@gmail.com>
+Date: Thu, 31 Jan 2019 07:23:02 -0800
+Message-ID: <CAMo8BfKhjwimXrGCcPjmS0+w8o6yW=ohG-hZ7caWnGpPSF6qJA@mail.gmail.com>
+Subject: Re: [PATCH v2 19/21] treewide: add checks for the return value of
+ memblock_alloc*()
+To: Mike Rapoport <rppt@linux.ibm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_072052_913232_800E9A87 
-X-CRM114-Status: GOOD (  11.58  )
+X-CRM114-CacheID: sfid-20190131_072316_186472_E47515EE 
+X-CRM114-Status: GOOD (  12.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,48 +90,74 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-sunxi <linux-sunxi@googlegroups.com>, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, Jagan Teki <jagan@amarulasolutions.com>
+Cc: Rich Felker <dalias@libc.org>,
+ "open list:IA64 \(Itanium\) PL..." <linux-ia64@vger.kernel.org>,
+ devicetree@vger.kernel.org, Catalin Marinas <catalin.marinas@arm.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>,
+ "maintainer:X86 ARCHITECTURE..." <x86@kernel.org>, linux-mips@vger.kernel.org,
+ linux-mm@kvack.org, Guo Ren <guoren@kernel.org>,
+ "open list:SPARC + UltraSPAR..." <sparclinux@vger.kernel.org>,
+ Christoph Hellwig <hch@lst.de>, linux-s390 <linux-s390@vger.kernel.org>,
+ linux-c6x-dev@linux-c6x.org, Yoshinori Sato <ysato@users.sourceforge.jp>,
+ Richard Weinberger <richard@nod.at>,
+ "open list:SUPERH" <linux-sh@vger.kernel.org>,
+ Russell King <linux@armlinux.org.uk>, kasan-dev@googlegroups.com,
+ Geert Uytterhoeven <geert@linux-m68k.org>, Mark Salter <msalter@redhat.com>,
+ Dennis Zhou <dennis@kernel.org>, Matt Turner <mattst88@gmail.com>,
+ linux-snps-arc@lists.infradead.org,
+ "moderated list:H8/300 ARCHITECTURE" <uclinux-h8-devel@lists.sourceforge.jp>,
+ Petr Mladek <pmladek@suse.com>, linux-xtensa@linux-xtensa.org,
+ "open list:ALPHA PORT" <linux-alpha@vger.kernel.org>,
+ linux-um@lists.infradead.org,
+ "open list:M68K ARCHITECTURE" <linux-m68k@lists.linux-m68k.org>,
+ Rob Herring <robh+dt@kernel.org>, Greentime Hu <green.hu@gmail.com>,
+ xen-devel@lists.xenproject.org, Stafford Horne <shorne@gmail.com>,
+ Guan Xuetao <gxt@pku.edu.cn>, linux-arm-kernel@lists.infradead.org,
+ Michal Simek <monstr@monstr.eu>, Tony Luck <tony.luck@intel.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ USB list <linux-usb@vger.kernel.org>, LKML <linux-kernel@vger.kernel.org>,
+ Paul Burton <paul.burton@mips.com>, Vineet Gupta <vgupta@synopsys.com>,
+ Michael Ellerman <mpe@ellerman.id.au>,
+ Andrew Morton <akpm@linux-foundation.org>, linuxppc-dev@lists.ozlabs.org,
+ "David S. Miller" <davem@davemloft.net>, openrisc@lists.librecores.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Enable Camera sensor interface for Allwinner SUN6I SoC's.
+On Mon, Jan 21, 2019 at 12:06 AM Mike Rapoport <rppt@linux.ibm.com> wrote:
+>
+> Add check for the return value of memblock_alloc*() functions and call
+> panic() in case of error.
+> The panic message repeats the one used by panicing memblock allocators with
+> adjustment of parameters to include only relevant ones.
+>
+> The replacement was mostly automated with semantic patches like the one
+> below with manual massaging of format strings.
+>
+> @@
+> expression ptr, size, align;
+> @@
+> ptr = memblock_alloc(size, align);
+> + if (!ptr)
+> +       panic("%s: Failed to allocate %lu bytes align=0x%lx\n", __func__,
+> size, align);
+>
+> Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
+> Reviewed-by: Guo Ren <ren_guo@c-sky.com>             # c-sky
+> Acked-by: Paul Burton <paul.burton@mips.com>         # MIPS
+> Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com> # s390
+> Reviewed-by: Juergen Gross <jgross@suse.com>         # Xen
+> ---
+>  arch/xtensa/mm/kasan_init.c               |  4 ++++
+>  arch/xtensa/mm/mmu.c                      |  3 +++
 
-This support enable V4L2 platform drivers static and
-VIDEO_SUN6I_CSI as module.
+For xtensa:
+Acked-by: Max Filippov <jcmvbkbc@gmail.com>
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v2:
-- rebase on master
-
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 8f36b1e8017a..67132c1f0072 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -467,12 +467,14 @@ CONFIG_MEDIA_DIGITAL_TV_SUPPORT=y
- CONFIG_MEDIA_CONTROLLER=y
- CONFIG_VIDEO_V4L2_SUBDEV_API=y
- # CONFIG_DVB_NET is not set
-+CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_MEDIA_USB_SUPPORT=y
- CONFIG_USB_VIDEO_CLASS=m
- CONFIG_V4L_MEM2MEM_DRIVERS=y
- CONFIG_VIDEO_SAMSUNG_S5P_JPEG=m
- CONFIG_VIDEO_SAMSUNG_S5P_MFC=m
- CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC=m
-+CONFIG_VIDEO_SUN6I_CSI=m
- CONFIG_VIDEO_RENESAS_FCP=m
- CONFIG_VIDEO_RENESAS_VSP1=m
- CONFIG_DRM=m
 -- 
-2.18.0.321.gffc6fa0e3
-
+Thanks.
+-- Max
 
 _______________________________________________
 linux-arm-kernel mailing list
