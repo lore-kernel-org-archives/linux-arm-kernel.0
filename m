@@ -2,82 +2,90 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8F53DC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 11:24:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F00BEC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 11:27:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5F480218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 11:24:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B864520881
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 11:27:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZDtplh3M";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="CG35HE1m"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F480218D3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KZ5aVJFl";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="eTFZo5hI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B864520881
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=K/BLI/sEyUqvRQ7Em+bYs5QadCPBn22BIVp3hxbpdD4=; b=ZDtplh3MMDHJ0c
-	pabDIjBOQkGzynQwZpgfMYr9HE90b0f7b2RoHRJt+ZrjKF4X19f9q1Hr4C43ybkmEo+gzE8aFR7nO
-	mCWPhn04JVuO2aLdw03X+Sxf1U2BWc4fL8od993VMKa7nY+g9AdzMGBwaVKBgSTwWLkbXSgezs0+w
-	cXnYhFfvwabi3H4Hj9rS4Os52XQPQi/NnNIw1SV+/74qvoZkt2brH2b5cyJWLb3tZLG1AU8Osz/bq
-	zx28yuHoeqqMMXNoVOCODYIPLN1PAg5xu4CXjiFycEs19Edg7IaFQN/e6zhaQW/rhhCJI0dC8VVMI
-	VmCD2tqh5uJlzRntaqcw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=uzNXU481TtleZUJ43IIO1tWMvZwY2hcVwfSxSNsyhT0=; b=KZ5aVJFlTbKLjn0t2OJRN0aqy
+	6oMTeiOpSnexzLIDPCALZgszW76uTJz8Vt1hOnzDOYyAggXLsp9yt00XTkNJOHLRXWu+BnTuLGm6J
+	v2A6Iw9ZEfUo1f4OPduNXogBJAhZe4xHza1+UvE3JSuooXx587e1S+/Z3ENGPQUNrP19r6uHesx32
+	fpiuVAghRDAm5vo7wwZ8skZqDZlpUGtp43LDboO5ZRT3OXQHgpo8pkdGWzkfvMlNFChQxQYNZVolj
+	4oidxAuJ+xUaUT8PWX9jgNBsfaeQg3hbY7Fe2uLhwgd4J623LPpyHSfxxWx1VLNqCvFyQEC7dRcjL
+	74TipgErg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpASc-0001Nq-QM; Thu, 31 Jan 2019 11:24:46 +0000
-Received: from mail-io1-xd43.google.com ([2607:f8b0:4864:20::d43])
+	id 1gpAUn-00031f-9s; Thu, 31 Jan 2019 11:27:01 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpASZ-0001NV-D8
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 11:24:45 +0000
-Received: by mail-io1-xd43.google.com with SMTP id g8so2338730iok.4
+ id 1gpAUk-0002tT-GW
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 11:26:59 +0000
+Received: by mail-wr1-x441.google.com with SMTP id s12so2866176wrt.4
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 31 Jan 2019 03:24:43 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=I5OMypIKRK4bx3JfLqOto8dp8O0Bsd1uyJBVudMAbOc=;
- b=CG35HE1m7XdtD+yrl+jGzKj0nx2T/pGVxLwbZGIhsp9XFVxqNH0e5eRs5yDBxcRox6
- 6YtKHmaGTGC79yh+tEF3nJWFnCXr/54TeHt8JgwBQTcb9GtmH3jkQ1+8N6AZCtlncX9N
- upzZmejWeCY4HkNV1G6NxqdPbyAAwVdgpSg3I=
+ Thu, 31 Jan 2019 03:26:58 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=Yp1UYm9tTXohwaujlcFwTfnSpZe9hbG7sald6QJOr6g=;
+ b=eTFZo5hI9iQ9HnWX1kVYzX/9P2Zn1kUu5+FgPntJd50ZPM/iguzRroI7r1IQDSRhhJ
+ o8+scDvVpgQqb6v//IkrBzsrZPmD84K0u60B67wAWRd1ch5xr5vWktw5UN0xHLVGObWu
+ elScg0f6acVElWgyXPyhEmNvc9lzoYLXnmUbC/4kTLT2isZ9SyZ2Zz6ypj96wyfBC9Pa
+ Lxhm6qKYqLgfgT586XTUahJ0oRX3aP3hd34YqoD+0lMRnnU9vkdoibcfsYIrHQ8tnXTM
+ Q9KD7VWDNaCIiqVspZk7z5ACjtTT1wQ+WuaYwSurkmGYW6hvrWZoaZAbl4pGghI9BdQR
+ G4MQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=I5OMypIKRK4bx3JfLqOto8dp8O0Bsd1uyJBVudMAbOc=;
- b=Rb2SEXzwXoU3HV5ygJv8q6BPjpOlMuouGrbPhiZkTn2W/HLCFMFvvdQwmTYhI2kFvF
- MKgcz5k6u8NIzorbNMFt0fTpTL5YPiHbuWIJcXlcMgp3wTd4uUB2kh3zWw8KdFGV3FsH
- xx0BWEuo7Hp4vncL3qP7kL/XmSaq2dSBWRS97SYXT141zu5vL6kRq3lKf2Q7VUOCeHFG
- 6hzNvmEjtBfhQ4HpQvwJ9iPyE+R/mcFByZl3Huw8uv8lV+YUpexB1s3N+cxcSSHBemHT
- RL068lG7g1hIXjy2NbR7bQ6KhAEFDMVg72YAyme5dHAk3974uMGAedRg9KT+Q2j+FZR1
- 6OEQ==
-X-Gm-Message-State: AHQUAuanRs//ZZmTAiDnD5tNi4rZeFwxikGDNeTHgOA2zzMMiSGl1MRt
- ZTOR24D2Jq3V1fwNgvcEzFj0eTJ17mw+urFFCZBk7SmO
-X-Google-Smtp-Source: AHgI3IYpoUuh7L8d8q31IY2JsThqIN9lI9hUzvi+ZFqGfg+c5tCCfIaGY0s7CSKItmNyZk5DfPWk16vhoMd5ORwQN4o=
-X-Received: by 2002:a5e:c206:: with SMTP id v6mr16260082iop.60.1548933882306; 
- Thu, 31 Jan 2019 03:24:42 -0800 (PST)
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=Yp1UYm9tTXohwaujlcFwTfnSpZe9hbG7sald6QJOr6g=;
+ b=Hh1Jt7Zl3XZbaCJCPyogXcqBhbzjjHC+7E6cQePo5icJhKgg77rOHg8areRQy/wfti
+ vL8/ZgrCUAXZ3vMILun0TTKmWIemmWwYCsqzwUOhSERImduZDkAaf0+wQk+f5R90ZQq0
+ JCzVrWDnrqrCKJ6wx1iSD7FoKjwoN9jukpXeB8kU1kIgkdeSvnWlUIclEVCTpx5++Rig
+ lbEKFZ1jPBdbw1yyTGfekIwEYZ6dYNRZSmJ0cuE5/z5tZk6Ua1zsG/oY0lFcAqQRKEHc
+ buHZlaQ2CWQs2zHjiao56+LHy6An/KxL+WkfjWfAAeZSPeJUZnpx83CVI8l6iJPXQcXe
+ iM5Q==
+X-Gm-Message-State: AJcUukdritZZcwR4g/Drhc/DZ35igZfwnNvLU34BGyfTvJNClCeP/GjS
+ 4GOCikG0GntyACQWO75W7T0=
+X-Google-Smtp-Source: ALg8bN6FSI20BzcFnqpLY2AT9BDybT8cdllx4zARuDYEmZg4j/begNmYW5rpM1r0ne9Xth4B4+i5SQ==
+X-Received: by 2002:a05:6000:104b:: with SMTP id
+ c11mr34606219wrx.303.1548934016697; 
+ Thu, 31 Jan 2019 03:26:56 -0800 (PST)
+Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
+ by smtp.gmail.com with ESMTPSA id d4sm6346704wrp.89.2019.01.31.03.26.55
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 31 Jan 2019 03:26:56 -0800 (PST)
+Date: Thu, 31 Jan 2019 12:26:55 +0100
+From: Thierry Reding <thierry.reding@gmail.com>
+To: Joseph Lo <josephl@nvidia.com>
+Subject: Re: [PATCH V4 3/7] soc/tegra: default select TEGRA_TIMER for Tegra210
+Message-ID: <20190131112655.GC23438@ulmo>
+References: <20190131092410.28222-1-josephl@nvidia.com>
+ <20190131092410.28222-4-josephl@nvidia.com>
 MIME-Version: 1.0
-References: <20181217150205.27981-1-ard.biesheuvel@linaro.org>
- <20181217150205.27981-2-ard.biesheuvel@linaro.org>
- <0ca1ffad-9588-dd85-9276-98644d089b6c@arm.com>
-In-Reply-To: <0ca1ffad-9588-dd85-9276-98644d089b6c@arm.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Thu, 31 Jan 2019 12:24:30 +0100
-Message-ID: <CAKv+Gu-q7KOMPWK+g+AAFZtJKSFAEHGMB1ANz3oDLd48UsPjTg@mail.gmail.com>
-Subject: Re: [RFC PATCH 1/2] arm64: kvm: expose sanitised cache type register
- to guest
-To: Marc Zyngier <marc.zyngier@arm.com>
+In-Reply-To: <20190131092410.28222-4-josephl@nvidia.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_032443_449515_1BD5C035 
-X-CRM114-Status: GOOD (  25.54  )
+X-CRM114-CacheID: sfid-20190131_032658_577378_9DFAB878 
+X-CRM114-Status: GOOD (  14.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,191 +97,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Christoffer Dall <christoffer.dall@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- "Suzuki K. Poulose" <Suzuki.Poulose@arm.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Jonathan Hunter <jonathanh@nvidia.com>
+Content-Type: multipart/mixed; boundary="===============3969646089766168489=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 31 Jan 2019 at 12:22, Marc Zyngier <marc.zyngier@arm.com> wrote:
->
-> Hi Ard,
->
-> On 17/12/2018 15:02, Ard Biesheuvel wrote:
-> > We currently permit CPUs in the same system to deviate in the exact
-> > topology of the caches, and we subsequently hide this fact from user
-> > space by exposing a sanitised value of the cache type register CTR_EL0.
-> >
-> > However, guests running under KVM see the bare value of CTR_EL0, which
-> > could potentially result in issues with, e.g., JITs or other pieces of
-> > code that are sensitive to misreported cache line sizes.
-> >
-> > So let's start trapping cache ID instructions, and expose the sanitised
-> > version of CTR_EL0 to guests. Note that CTR_EL0 is treated as an invariant
-> > to KVM user space, so update that part as well.
->
-> I'm a bit uneasy with this. We rely on the kernel to perform this
-> sanitization for userspace when absolutely required, and this is so far
-> the exception.
->
-> If we start trapping it unconditionally, we're likely to introduce
-> performance regressions on system where there is no need to perform any
-> form of sanitization.
->
-> Could we instead only do this if ARM64_MISMATCHED_CACHE_TYPE is set?
->
 
-I suppose. Note that the next patch relies on the trapping as well,
-but we could enable that piece for only 32-bit guests.
+--===============3969646089766168489==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="LwW0XdcUbUexiWVK"
+Content-Disposition: inline
 
 
-> >
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/kvm_arm.h |  3 +-
-> >  arch/arm64/include/asm/sysreg.h  |  1 +
-> >  arch/arm64/kvm/sys_regs.c        | 59 +++++++++++++++++++-
-> >  3 files changed, 60 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> > index 6f602af5263c..628dcb0cfea3 100644
-> > --- a/arch/arm64/include/asm/kvm_arm.h
-> > +++ b/arch/arm64/include/asm/kvm_arm.h
-> > @@ -81,9 +81,10 @@
-> >   * IMO:              Override CPSR.I and enable signaling with VI
-> >   * FMO:              Override CPSR.F and enable signaling with VF
-> >   * SWIO:     Turn set/way invalidates into set/way clean+invalidate
-> > + * TID2:     Trap cache identification instructions
-> >   */
-> >  #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
-> > -                      HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
-> > +                      HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | HCR_TID2 | \
-> >                        HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW | HCR_TLOR | \
-> >                        HCR_FMO | HCR_IMO)
-> >  #define HCR_VIRT_EXCP_MASK (HCR_VSE | HCR_VI | HCR_VF)
-> > diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> > index 842fb9572661..3b8e51874da4 100644
-> > --- a/arch/arm64/include/asm/sysreg.h
-> > +++ b/arch/arm64/include/asm/sysreg.h
-> > @@ -342,6 +342,7 @@
-> >
-> >  #define SYS_CNTKCTL_EL1                      sys_reg(3, 0, 14, 1, 0)
-> >
-> > +#define SYS_CCSIDR_EL1                       sys_reg(3, 1, 0, 0, 0)
-> >  #define SYS_CLIDR_EL1                        sys_reg(3, 1, 0, 0, 1)
-> >  #define SYS_AIDR_EL1                 sys_reg(3, 1, 0, 0, 7)
-> >
-> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> > index 22fbbdbece3c..464e794b5bc5 100644
-> > --- a/arch/arm64/kvm/sys_regs.c
-> > +++ b/arch/arm64/kvm/sys_regs.c
-> > @@ -1140,6 +1140,49 @@ static int set_raz_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
-> >       return __set_id_reg(rd, uaddr, true);
-> >  }
-> >
-> > +static bool access_ctr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> > +                    const struct sys_reg_desc *r)
-> > +{
-> > +     if (p->is_write)
-> > +             return write_to_read_only(vcpu, p, r);
-> > +
-> > +     p->regval = read_sanitised_ftr_reg(SYS_CTR_EL0);
-> > +     return true;
-> > +}
-> > +
-> > +static bool access_clidr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> > +                      const struct sys_reg_desc *r)
-> > +{
-> > +     if (p->is_write)
-> > +             return write_to_read_only(vcpu, p, r);
-> > +
-> > +     p->regval = read_sysreg(clidr_el1);
-> > +     return true;
-> > +}
-> > +
-> > +static bool access_csselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> > +                       const struct sys_reg_desc *r)
-> > +{
-> > +     if (p->is_write)
-> > +             vcpu_write_sys_reg(vcpu, p->regval, r->reg);
-> > +     else
-> > +             p->regval = vcpu_read_sys_reg(vcpu, r->reg);
-> > +     return true;
-> > +}
-> > +
-> > +static bool access_ccsidr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-> > +                       const struct sys_reg_desc *r)
-> > +{
-> > +     u32 csselr;
-> > +
-> > +     if (p->is_write)
-> > +             return write_to_read_only(vcpu, p, r);
-> > +
-> > +     csselr = vcpu_read_sys_reg(vcpu, CSSELR_EL1);
-> > +     p->regval = get_ccsidr(csselr);
-> > +     return true;
-> > +}
-> > +
-> >  /* sys_reg_desc initialiser for known cpufeature ID registers */
-> >  #define ID_SANITISED(name) {                 \
-> >       SYS_DESC(SYS_##name),                   \
-> > @@ -1357,7 +1400,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
-> >
-> >       { SYS_DESC(SYS_CNTKCTL_EL1), NULL, reset_val, CNTKCTL_EL1, 0},
-> >
-> > -     { SYS_DESC(SYS_CSSELR_EL1), NULL, reset_unknown, CSSELR_EL1 },
-> > +     { SYS_DESC(SYS_CCSIDR_EL1), access_ccsidr },
-> > +     { SYS_DESC(SYS_CLIDR_EL1), access_clidr },
-> > +     { SYS_DESC(SYS_CSSELR_EL1), access_csselr, reset_unknown, CSSELR_EL1 },
-> > +     { SYS_DESC(SYS_CTR_EL0), access_ctr },
-> >
-> >       { SYS_DESC(SYS_PMCR_EL0), access_pmcr, reset_pmcr, },
-> >       { SYS_DESC(SYS_PMCNTENSET_EL0), access_pmcnten, reset_unknown, PMCNTENSET_EL0 },
-> > @@ -1657,6 +1703,7 @@ static const struct sys_reg_desc cp14_64_regs[] = {
-> >   * register).
-> >   */
-> >  static const struct sys_reg_desc cp15_regs[] = {
-> > +     { Op1( 0), CRn( 0), CRm( 0), Op2( 1), access_ctr },
-> >       { Op1( 0), CRn( 1), CRm( 0), Op2( 0), access_vm_reg, NULL, c1_SCTLR },
-> >       { Op1( 0), CRn( 2), CRm( 0), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
-> >       { Op1( 0), CRn( 2), CRm( 0), Op2( 1), access_vm_reg, NULL, c2_TTBR1 },
-> > @@ -1774,6 +1821,10 @@ static const struct sys_reg_desc cp15_regs[] = {
-> >       PMU_PMEVTYPER(30),
-> >       /* PMCCFILTR */
-> >       { Op1(0), CRn(14), CRm(15), Op2(7), access_pmu_evtyper },
-> > +
-> > +     { Op1(1), CRn( 0), CRm( 0), Op2(0), access_ccsidr },
-> > +     { Op1(1), CRn( 0), CRm( 0), Op2(1), access_clidr },
-> > +     { Op1(2), CRn( 0), CRm( 0), Op2(0), access_csselr, NULL, c0_CSSELR },
-> >  };
-> >
-> >  static const struct sys_reg_desc cp15_64_regs[] = {
-> > @@ -2196,11 +2247,15 @@ static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
-> >       }
-> >
-> >  FUNCTION_INVARIANT(midr_el1)
-> > -FUNCTION_INVARIANT(ctr_el0)
-> >  FUNCTION_INVARIANT(revidr_el1)
-> >  FUNCTION_INVARIANT(clidr_el1)
-> >  FUNCTION_INVARIANT(aidr_el1)
-> >
-> > +static void get_ctr_el0(struct kvm_vcpu *v, const struct sys_reg_desc *r)
-> > +{
-> > +     ((struct sys_reg_desc *)r)->val = read_sanitised_ftr_reg(SYS_CTR_EL0);
-> > +}
-> > +
-> >  /* ->val is filled in by kvm_sys_reg_table_init() */
-> >  static struct sys_reg_desc invariant_sys_regs[] = {
-> >       { SYS_DESC(SYS_MIDR_EL1), NULL, get_midr_el1 },
-> >
->
->
-> --
-> Jazz is not dead. It just smells funny...
+--LwW0XdcUbUexiWVK
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Thu, Jan 31, 2019 at 05:24:06PM +0800, Joseph Lo wrote:
+> The tegra timer is necessary for Tegra210 to support CPU idle power-down
+> state. So select it by default.
+>=20
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> ---
+> v4:
+>  * new added in this version
+> ---
+>  drivers/soc/tegra/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+
+So this technically depends on patch 2/7, so it would make sense for
+Daniel or Thomas to pick this up along with 2/7, but you didn't Cc them,
+so they're not aware of this.
+
+I think you need to either resend the series and Cc both Daniel and
+Thomas on all the patches in the series, or we have to make sure that
+this patch is not applied before patch 2/7, otherwise Kconfig will
+complain. If you decide to resend, this patch is:
+
+Acked-by: Thierry Reding <treding@nvidia.com>
+
+Thierry
+
+--LwW0XdcUbUexiWVK
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlxS234ACgkQ3SOs138+
+s6Ha+g/+KksMkDLC2hmHrQkoFq3UeuPezAUmE3S5RGAUgg6/YsHdIfe2nyEWa9R9
+CipRPytWvf8LarYPfrGVDLw2/xjPwaG5ksMPmYmbp7JTtFnIMjal4wD+E5gBMYai
+vFqrzwKPyNBEpbuS00N+buJdPy8NbMr6uPmyQNBtYlpkFMEhXv5Nv5eHgECkX2i9
+UY+sNcXRDSf7SaDK4y3ot3T8+K6hGfTPAhw9d0SwTmrxpUYfamOo8Y7qUJC83nac
+705WMAG++oulqEUXuajZmvCuCMQXQ0NANjL/74j6i7hWb1RFCrS1OkgfgO0V1XD0
+AzFYaHhPT0eFB2EkP3XBDhYZ9YtKEU88iNXjlnV+zt/Dup/CkojOM0C/28Z7JE+g
+YYYTmEHXTCdY9ilPiyF4hgxI9EHpxj1PtwZLJSh/BxPGoIf7c7+w4uzmMIXzkcqz
+nCgVsn8VTpEIW/dN749+BVWma40CtNPglJF7AnzV7zAuMfgnue4wknndd2+n7U8a
+KFFUw4EbU4YM7msVtfz57i95X64h/HpVi+dkIR97znr+X+z78tE62c1TFBqRxEzL
+x+Hxc/Zf0XgSxS90sx8nboxgnhVn/KVRgLhMXNv+Zi8PJ2QkfbXM207UafE+WC+e
+dciyOw3hf2U7qHiqXQJ/VUYzFMpwzeZv3CaShkHPM6g6dbUJf4M=
+=Y6zP
+-----END PGP SIGNATURE-----
+
+--LwW0XdcUbUexiWVK--
+
+
+--===============3969646089766168489==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============3969646089766168489==--
+
