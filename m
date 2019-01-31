@@ -2,69 +2,88 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 820E9C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 19:38:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 81F65C282DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 20:43:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 53461218EA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 19:38:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4F982218AC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 20:43:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r1JKskXc";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="QoR16dRF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 53461218EA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hInOP8Ob";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="GaxTy9XL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F982218AC
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:In-Reply-To:To:References:
-	Message-ID:From:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Pg7cQMyLtJr5c0TDQIsPbcw6wg7CzbOZLnZWXDGYxrc=; b=r1JKskXcruFaEH
-	G//vjnd7hIzEmDFaj3HZPQFYXYWPTmcbAFUAUuTDGULfl1Abu0Fmacf3w3YGKPfBLaqihpWDcmSFX
-	6H9z444XFiI/uKPAwV0/wNXBzg52DRbZElBvyoEBIrvMIMFWyVGSfBo8PeiZaWk0RoCuiuUZWK7O3
-	34nDG7sU1Kz9iLnBlWigwe1G9ngOeJdB6sReVa9+v2v3Oqd+RiQGQS8aHwA0QZxmOU1eucHc5zzBR
-	gv4WpAn5Nqk87uoUJpzwgFpm07m6ZSjM/iyDkI2BwKCT0Co3JSUCBZcpDX29NkuJEZkvtVFnEqNLp
-	ii0NiSibw9BeOo2tM2pw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=8uaItWTEorGyw4WijUZmrwLkYZRtgHeLi4co31D89vQ=; b=hInOP8Ob1VD910
+	OF08/haKlUnrQpf/vEQhKlXs+2BtM0WHZGWg5/9oHU8vnIJZRDU5Jq1dys2XWUQxd5/WdnlcHlYiu
+	yO43HTtVaBaOnEEhRaj+RmtHeA7IMmj6T6w9JSMaDcco3pBpeA/1enTIWomwTJyC+ErieIPlPXG3j
+	VoJEjNEtrTPV75wwrZKyqFgAQSATm3ChKjQ45PuYn4Y+4dyP7zL2+0iYLNW4Qp4ade37PpOuS4cHV
+	RjVhbgYXpW4eJAjwmlBfGgWi+NOwlzprqkry0rAyFWMXuChgZJDtyX8mteA0C9lOniHWV8LrXuhYJ
+	w/xWHRarW57O41JtbHtw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpIAc-0007E8-PT; Thu, 31 Jan 2019 19:38:42 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gpJBh-0002yb-Fc; Thu, 31 Jan 2019 20:43:53 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpIAZ-0007DC-LB
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 19:38:41 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 8477C218AF;
- Thu, 31 Jan 2019 19:38:38 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1548963518;
- bh=/orb6LlXlqwfpLqH+r5f7QWR8XolTwgXzwCXJ3B0XOc=;
- h=Subject:From:Cc:References:To:In-Reply-To:Date:From;
- b=QoR16dRFTs1h6vnEYujbfUUEgseLuTgENlWoxPo+O6BgITTFZZaChEpwqXomZXu0I
- AGkz7cQbWpXrMVLug2ev8AFxd89ljHJc6x8uy8c4cDP30MamuKv4/ZfTQANfWM78QG
- NqndphmyeBxor6/6gR6Z++9qPf7QFli4icacU3tY=
+ id 1gpJBb-0002xH-R5
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 20:43:51 +0000
+Received: by mail-pg1-x544.google.com with SMTP id s198so1872551pgs.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 31 Jan 2019 12:43:47 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=AsNqhd3AQ8kfGW/zqflxwaEu1SwORSDLfajLFA1ecCU=;
+ b=GaxTy9XLNm9jhcs+wAH5Cl5F9Ipnm2SN2TXJydN8fxbltt/t0GdeUvmDPdo3y4B+ND
+ rI7a9TEPoqlJTt5QQqDL/CtcMhovnZXszKi9zeBHIAePdzwuKpnxUrpsyAtFA2cihBap
+ TR84nw7vMteZaN6MOxRk5sj4GL3NK0KkZ0OXHUsmxUJ+NHbjw7Uk8MG1a2u+5WANJ5FO
+ DrEMPScj0wV84Z03eJhIdE/AZLOLma7wJYWoFj4hqnWPReLNBZYNPQJIpyq0jat7w1a6
+ Np9Clreut/3M+fpuMbEGlIkMJVJgXKmuXUnWcaCePjHHEqIA2HZK4suCQylb08/bXHNj
+ orMg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=AsNqhd3AQ8kfGW/zqflxwaEu1SwORSDLfajLFA1ecCU=;
+ b=WjH32oKquGqhBe9s/xeNv9Z4gzj1ngh3v2VlkDp8cXaZvtnY1ICmzihW7gfz6SdzCu
+ sPqEr/C3tP/Yb+00fFfVhulPKLKY+H5LW/ODF/OvlbmsgB8rCN/EM5ZvWnpGwaFNX1ss
+ tcERnfn2JstedkwJokWxjTPOEp4UMXNU4T5BCr2KXBWmQqbdRyYlDzPxfmkie3kEGxi7
+ 0WtxgGuHAc+IBePSBUBw9nBNiKN9xUIeIBbqatmJK+l6DUAg45JPxTv+BgGqpWsGh6Rk
+ uGNpyCI5WG7SiD0yn71EVEOPbapSNjRGrcr2wrpwyEKbGvDyFZ0Xcf6JYgNf1CQzHWqk
+ Ya4g==
+X-Gm-Message-State: AJcUukfznOHkY9Iqp67kYiMw8ZFppjddtKhLqQ/Se36e9KrmgO98+FFN
+ pF9/izhU/nDl8be9agSRQMB9J32q
+X-Google-Smtp-Source: ALg8bN6o09sFrkB9q7ygq997cdHJTaNdKpagPeBV+8R5s7eDCd5OVuoK+ch11yfpJjdANgNXxNZ2fw==
+X-Received: by 2002:a63:e156:: with SMTP id h22mr32979730pgk.255.1548967426739; 
+ Thu, 31 Jan 2019 12:43:46 -0800 (PST)
+Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
+ [24.22.235.96])
+ by smtp.gmail.com with ESMTPSA id s190sm7272034pfb.103.2019.01.31.12.43.44
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 31 Jan 2019 12:43:45 -0800 (PST)
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
+To: Shawn Guo <shawnguo@kernel.org>
+Subject: [RFC 0/5] PCIE support for i.MX8MQ (DT changes)
+Date: Thu, 31 Jan 2019 12:43:28 -0800
+Message-Id: <20190131204333.31846-1-andrew.smirnov@gmail.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-Subject: Re: [PATCH v7 0/3] clk: clkdev add managed lookup registrations
-From: Stephen Boyd <sboyd@kernel.org>
-Message-ID: <154896351763.169292.2557542540041822337@swboyd.mtv.corp.google.com>
-References: <cover.1544177090.git.matti.vaittinen@fi.rohmeurope.com>
- <20190131132452.GD23791@localhost.localdomain>
- <20190131152147.tzxabhyhlyy2rwhy@e5254000004ec.dyn.armlinux.org.uk>
-User-Agent: alot/0.8
-To: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>,
- Russell King - ARM Linux admin <linux@armlinux.org.uk>
-In-Reply-To: <20190131152147.tzxabhyhlyy2rwhy@e5254000004ec.dyn.armlinux.org.uk>
-Date: Thu, 31 Jan 2019 11:38:37 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_113839_732987_E311C3B9 
-X-CRM114-Status: GOOD (  23.70  )
+X-CRM114-CacheID: sfid-20190131_124347_881894_2F0DBBA7 
+X-CRM114-Status: UNSURE (   9.56  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,67 +95,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, djkurtz@chromium.org,
- rafael.j.wysocki@intel.com, linux-clk@vger.kernel.org,
- b.zolnierkie@samsung.com, andrew.smirnov@gmail.com,
- linux-kernel@vger.kernel.org, mturquette@baylibre.com, corbet@lwn.net,
- linux-doc@vger.kernel.org, sre@kernel.org, krzk@kernel.org,
- akshu.agrawal@amd.com, cw00.choi@samsung.com, vkoul@kernel.org,
- linux@roeck-us.net, pavel@ucw.cz, pombredanne@nexb.com, sjhuang@iluvatar.ai,
- mazziesaccount@gmail.com
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Andrey Smirnov <andrew.smirnov@gmail.com>, linux-kernel@vger.kernel.org,
+ linux-imx@nxp.com, Fabio Estevam <fabio.estevam@nxp.com>,
+ Leonard Crestez <leonard.crestez@nxp.com>, Chris Healy <cphealy@gmail.com>,
+ Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Russell King - ARM Linux admin (2019-01-31 07:21:47)
-> On Thu, Jan 31, 2019 at 03:24:52PM +0200, Matti Vaittinen wrote:
-> > Hello All,
-> > 
-> > On Fri, Dec 07, 2018 at 01:09:00PM +0200, Matti Vaittinen wrote:
-> > > Series adds managed clkdev lookup interfaces and cleans few drivers
-> > > 
-> > > Few clk drivers appear to be leaking clkdev lookup registrations at
-> > > driver remove. The patch series adds devm versions of lookup
-> > > registrations and cleans up few drivers. Driver clean-up patches have
-> > > not been tested as I lack the HW. All testing and comments if
-> > > driver/device removal is even possible for changed drivers is highly
-> > > appreciated. If removal is not possible I will gladly drop the patches
-> > > from series - although leaking lookups may serve as bad example for new
-> > > developers =)
-> > > 
-> > > Changed drivers are:
-> > > clk-max77686 and clk-st
-> > > 
-> > > Please note that the patch #2 requires this change to work correctly:
-> > > https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/commit/?h=clk-next&id=05502bf9eb7a7297f5fa6f1d17b169b3d5b53570
-> > 
-> > I guess the dependency mentioned abowe is already in (most) of the
-> > trees. (I can't say for sure as I don't know what is the correct tree
-> > for clkdev - is it linux-arm.git as Russel is maintaining clkdev?
-> 
-> Yes, I'm supposed to be maintaining clkdev, but I'm busy with other
-> stuff (such as reorganising my network, helping people with SFP issues,
-> I'm supposed to be replying to Arend over a brcmfmac issue that has been
-> on-going since Christmas which I haven't yet been able to doing the next
-> test...)
-> 
-> > If yes, then the commit 05502bf9eb7a7297f5fa6f1d17b169b3d5b53570
-> > "clk: of-provider: look at parent if registered device has no
-> > provider info" seems to be sitting in maser branch).
-> 
-> It's there because it's part of the mainline kernel and has been
-> since v5.0-rc1.  So, if you depend on that commit, basing off
-> v5.0-rc1 is probably sane, unless there's something else that
-> conflicts.
-> 
+Everyone:
 
-I can pick up the patches in the clk tree. Clk drivers will be the users
-so it's probably simplest to merge the clkdev patch in clk tree and then
-consumers can be updated at the same time in a patch stack on top of
-that. Otherwise, if I can get a stable branch/tag to pile the clk driver
-patches on I can apply them that way and then the clkdev patch can go
-via Russell.
+This series contains all of the i.MX Device Tree changes I made to
+enable support of PCIe on i.MX8MQ EVK. Marked as RFC since PCIe
+support patch series is still waiting to be applied to PCI tree. I
+anticipate that PCIe patches going through is just a maater of time,
+so this series should be mature enough to solicit feedback.
+
+NOTE: Immutable brach containing imx8mq-reset.h used in "arm64: dts:
+Add nodes for PCIe IP blocks" is availible in [reset-imx8mq]
+
+Feedback is welcome!
+
+Thanks,
+Andrey Smirnov
+
+[reset-imx8mq] git://git.pengutronix.de/pza/linux reset/imx8mq
+
+Andrey Smirnov (5):
+  arm64: dts: imx8mq: Mark iomuxc_gpr as i.MX6Q compatible
+  arm64: dts: imx8mq: Add a node for SRC IP block
+  arm64: dts: imx8mq: Combine PCIE power domains
+  arm64: dts: Add nodes for PCIe IP blocks
+  arm64: dts: imx8mq-evk: Enable PCIE0 interface
+
+ arch/arm64/boot/dts/freescale/imx8mq-evk.dts | 23 +++++
+ arch/arm64/boot/dts/freescale/imx8mq.dtsi    | 97 +++++++++++++++++++-
+ 2 files changed, 118 insertions(+), 2 deletions(-)
+
+-- 
+2.20.1
 
 
 _______________________________________________
