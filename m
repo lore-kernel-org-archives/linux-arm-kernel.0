@@ -2,73 +2,65 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5CDE2C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 02:34:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D17AC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 02:41:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2562320B1F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 02:34:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1BB9A20870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 02:41:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kNFvQZn9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2562320B1F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TJ+tLB+9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1BB9A20870
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4vuA1ej3kqGxhoNKmWmzm8yRyn5S/KMgdCcg50Gf0nE=; b=kNFvQZn9GD3KwE
-	p9QUX5TAGTBBhbPzOPc9ka5rXaU7m6IknT8QrjIEZ56Oi9TeI/OWL28xbYd+wEFMueWOhUIpJhgDC
-	JYqF+c8XHGWA5QHx1lOC6UUqz2AuqndACWP41UXQsEvjT2nRzE6DnzuHOMMCa9g5D1gyJDPqxikNs
-	a55Iof52CRnj/PZk3uTfjRlQcb0deP4eE4RcE5Wh1lJueuM6rES968gfcAD2Y6XUYLkpIpglWdCHA
-	PtpwF0wi7KHIdp1CqPMG0KrIDLstcIdIV2l216+TJ1ENHT2jRQHHnlVEk6nwCx1Yp7M3vi6wziVq4
-	qRoEGaeCyco+Qdh+tq7w==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=VL2lZ5qKGIy6FWVfbpxYlNLdIQDQnz/iH+BAzVmsn7I=; b=TJ+tLB+9Ikawe4Vst4rxtqCce
+	cu1qQZifhNMLGklwbnkOhBdlNd/GPZJra7ICE8dzaKdG0M8SendC1tPWuTG/nZ7ILIwx+uWV1c81X
+	9blCow3yyoeTbTqj5pjRiWexW4XVmeFWJR948B2aHVkNnnKNdcF5tuqVzuashMzNT9PAp2CA+WoNB
+	v72EWnhwspHA101oX5VEHfVk+L3VcauKRwn8EzAZcGQlZonlOuolPzjhG7mfbpONoDxp137shqbsv
+	U1kjG6iSqB8mUNSGlnGwMoZ/Hfeq9UQboVJ/vkiLLbNWInoXSInQcHYi+spjQtG560iQtd6OlD/d2
+	jl1+DvJ3g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp2BK-0008C7-3D; Thu, 31 Jan 2019 02:34:22 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gp2IF-00037i-By; Thu, 31 Jan 2019 02:41:31 +0000
+Received: from mail-sz.amlogic.com ([211.162.65.117])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp2BG-0008BN-28; Thu, 31 Jan 2019 02:34:19 +0000
-X-UUID: b85c90f6745c4de882f32a589e15b102-20190130
-X-UUID: b85c90f6745c4de882f32a589e15b102-20190130
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
- (envelope-from <erin.lo@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1379432377; Wed, 30 Jan 2019 18:34:14 -0800
-Received: from mtkmbs08n2.mediatek.inc (172.21.101.56) by
- MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 30 Jan 2019 18:34:13 -0800
-Received: from mtkcas07.mediatek.inc (172.21.101.84) by
- mtkmbs08n2.mediatek.inc (172.21.101.56) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 31 Jan 2019 10:34:10 +0800
-Received: from [172.21.77.4] (172.21.77.4) by mtkcas07.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Thu, 31 Jan 2019 10:34:10 +0800
-Message-ID: <1548902050.23230.4.camel@mtksdaap41>
-Subject: Re: [PATCH v6 6/6] arm64: dts: Add Mediatek SoC MT8183 and
- evaluation board dts and Makefile
-From: Erin Lo <erin.lo@mediatek.com>
-To: Rob Herring <robh@kernel.org>
-Date: Thu, 31 Jan 2019 10:34:10 +0800
-In-Reply-To: <20190130162204.GA1521@bogus>
-References: <1548317240-44682-1-git-send-email-erin.lo@mediatek.com>
- <1548317240-44682-7-git-send-email-erin.lo@mediatek.com>
- <20190130162204.GA1521@bogus>
-X-Mailer: Evolution 3.10.4-0ubuntu2 
+ id 1gp2IB-00036b-FH; Thu, 31 Jan 2019 02:41:28 +0000
+Received: from [10.28.18.236] (10.28.18.236) by mail-sz.amlogic.com
+ (10.28.11.5) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id 15.1.1591.10; Thu, 31 Jan
+ 2019 10:42:04 +0800
+Subject: Re: [PATCH] mtd: rawnand: meson: Fix linking error on 32-bit platforms
+To: Nathan Chancellor <natechancellor@gmail.com>, Miquel Raynal
+ <miquel.raynal@bootlin.com>
+References: <20190129214657.5877-1-natechancellor@gmail.com>
+ <42d2e92e-9f5a-62b2-c0af-b7f3544d79d2@amlogic.com>
+ <20190130103220.27b13ab9@xps13> <20190130152706.GA31999@archlinux-ryzen>
+From: Liang Yang <liang.yang@amlogic.com>
+Message-ID: <2b8866ac-073d-0077-79a7-67b47d79996f@amlogic.com>
+Date: Thu, 31 Jan 2019 10:42:03 +0800
+User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 14330CE4A278BEFC08A742B7265A20949BB9CE8105936BB5CFA505010BB319132000:8
-X-MTK: N
+In-Reply-To: <20190130152706.GA31999@archlinux-ryzen>
+Content-Language: en-US
+X-Originating-IP: [10.28.18.236]
+X-ClientProxiedBy: mail-sz.amlogic.com (10.28.11.5) To mail-sz.amlogic.com
+ (10.28.11.5)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_183418_105591_21C42D50 
-X-CRM114-Status: GOOD (  14.22  )
+X-CRM114-CacheID: sfid-20190130_184127_510772_0FC26FAB 
+X-CRM114-Status: GOOD (  12.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,90 +72,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Ben Ho <Ben.Ho@mediatek.com>,
- mars.cheng@mediatek.com, Mengqi Zhang <Mengqi.Zhang@mediatek.com>,
- linux-clk@vger.kernel.org, Hsin-Hsiung Wang <hsin-hsiung.wang@mediatek.com>,
- Weiyi Lu <weiyi.lu@mediatek.com>, Marc Zyngier <marc.zyngier@arm.com>,
- linux-serial@vger.kernel.org, yingjoe.chen@mediatek.com,
- devicetree@vger.kernel.org, Jason Cooper <jason@lakedaemon.net>, Seiya
- Wang <seiya.wang@mediatek.com>, linux-mediatek@lists.infradead.org,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Thomas Gleixner <tglx@linutronix.de>, eddie.huang@mediatek.com,
- linux-arm-kernel@lists.infradead.org,
- srv_heupstream <srv_heupstream@mediatek.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Stephen Boyd <sboyd@codeaurora.org>, linux-kernel@vger.kernel.org,
- Zhiyong Tao <zhiyong.tao@mediatek.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Boris Brezillon <bbrezillon@kernel.org>,
+ Richard Weinberger <richard@nod.at>, linux-kernel@vger.kernel.org,
+ linux-mtd@lists.infradead.org, Kevin Hilman <khilman@baylibre.com>,
+ linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 2019-01-30 at 10:22 -0600, Rob Herring wrote:
-> On Thu, Jan 24, 2019 at 04:07:20PM +0800, Erin Lo wrote:
-> > From: Ben Ho <Ben.Ho@mediatek.com>
-> > 
-> > Add basic chip support for Mediatek 8183, include
-> > pinctrl file, uart node with correct uart clocks, pwrap device
-> > 
-> > Add clock controller nodes, include topckgen, infracfg,
-> > apmixedsys and subsystem.
-> > 
-> > Signed-off-by: Ben Ho <Ben.Ho@mediatek.com>
-> > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> > Signed-off-by: Seiya Wang <seiya.wang@mediatek.com>
-> > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> > Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
-> > Signed-off-by: Mengqi Zhang <Mengqi.Zhang@mediatek.com>
-> > Signed-off-by: Hsin-Hsiung Wang <hsin-hsiung.wang@mediatek.com>
-> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> > ---
-> 
-> 
-> > +	sysirq: intpol-controller@c530a80 {
-> 
-> interrupt-controller@...
-
-I will modify it in next version.
-> 
-> 
-> Place all the MMIO peripherals under one or more simple-bus nodes.
-> 
-> Rob
-> 
-
-Do you mean need to add simple-bus like this?
-
-+   soc: soc {
-+                #address-cells = <0x1>;
-+                #size-cells = <0x1>;
-+                ranges = <0 0 0 0xffffffff>;
-+                compatible = "simple-bus";
-
-	        soc_data: soc_data@08000000 {
-	                compatible = "mediatek,mt8183-efuse",
-	                             "mediatek,efuse";
-	                reg = <0 0x08000000 0 0x0010>;
-	                #address-cells = <1>;
-	                #size-cells = <1>;
-	                status = "disabled";
-	        };
-
-	        gic: interrupt-controller@0c000000 {
-	                compatible = "arm,gic-v3";
-	                #interrupt-cells = <4>;
-	
-Best Regards,
-Erin
-
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
-
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgTWlxdWVsLCBOYXRoYW4sCgpPbiAyMDE5LzEvMzAgMjM6MjcsIE5hdGhhbiBDaGFuY2VsbG9y
+IHdyb3RlOgo+IE9uIFdlZCwgSmFuIDMwLCAyMDE5IGF0IDEwOjMyOjIwQU0gKzAxMDAsIE1pcXVl
+bCBSYXluYWwgd3JvdGU6Cj4+IEhpIExpYW5nLCBOYXRoYW4sCj4+Cj4+IExpYW5nIFlhbmcgPGxp
+YW5nLnlhbmdAYW1sb2dpYy5jb20+IHdyb3RlIG9uIFdlZCwgMzAgSmFuIDIwMTkgMTc6MjY6MzkK
+Pj4gKzA4MDA6Cj4+Cj4+PiBIaSBOYXRoYW4sCj4+Pgo+Pj4gT24gMjAxOS8xLzMwIDU6NDYsIE5h
+dGhhbiBDaGFuY2VsbG9yIHdyb3RlOgo+Pj4+IE9uIGFybSBsaXR0bGUgZW5kaWFuIGFsbHllc2Nv
+bmZpZzoKPj4+Pgo+Pj4+ICAgICBsZC5sbGQ6IGVycm9yOiB1bmRlZmluZWQgc3ltYm9sOiBfX2Fl
+YWJpX3VsZGl2bW9kCj4+Pj4gICAgID4+PiByZWZlcmVuY2VkIGJ5IG1lc29uX25hbmQuYwo+Pj4+
+ICAgICA+Pj4gbXRkL25hbmQvcmF3L21lc29uX25hbmQubzoobWVzb25fbmZjX3NldHVwX2RhdGFf
+aW50ZXJmYWNlKSBpbiBhcmNoaXZlIGRyaXZlcnMvYnVpbHQtaW4uYQo+Pj4+Cj4+Pj4gVGhlIGRp
+dmlkZW5kIHRCRVJTX21heCBpcyB1NjQsIG1lYW5pbmcgd2UgbmVlZCB0byB1c2UgRElWX1JPVU5E
+X1VQX1VMTAo+Pj4+ICh3aGljaCB3cmFwcyBkb19kaXYpIHRvIHByZXZlbnQgdGhlIGNvbXBpbGVy
+IGZyb20gZW1pdHRpbmcKPj4+PiBfX2FlYmlfdWxkaXZtb2QuCj4+Pj4KPj4+PiBGaXhlczogMmQ1
+NzBiMzRiNDFhICgibXRkOiByYXduYW5kOiBtZXNvbjogYWRkIHN1cHBvcnQgZm9yIEFtbG9naWMg
+TkFORCBmbGFzaCBjb250cm9sbGVyIikKPj4+PiBTaWduZWQtb2ZmLWJ5OiBOYXRoYW4gQ2hhbmNl
+bGxvciA8bmF0ZWNoYW5jZWxsb3JAZ21haWwuY29tPgo+Pj4+IC0tLQo+Pj4+ICAgIGRyaXZlcnMv
+bXRkL25hbmQvcmF3L21lc29uX25hbmQuYyB8IDQgKystLQo+Pj4+ICAgIDEgZmlsZSBjaGFuZ2Vk
+LCAyIGluc2VydGlvbnMoKyksIDIgZGVsZXRpb25zKC0pCj4+Pj4KPj4+PiBkaWZmIC0tZ2l0IGEv
+ZHJpdmVycy9tdGQvbmFuZC9yYXcvbWVzb25fbmFuZC5jIGIvZHJpdmVycy9tdGQvbmFuZC9yYXcv
+bWVzb25fbmFuZC5jCj4+Pj4gaW5kZXggZTg1OGQ1OGQ5N2IwLi42ZjEyYTk2MTk1ZDEgMTAwNjQ0
+Cj4+Pj4gLS0tIGEvZHJpdmVycy9tdGQvbmFuZC9yYXcvbWVzb25fbmFuZC5jCj4+Pj4gKysrIGIv
+ZHJpdmVycy9tdGQvbmFuZC9yYXcvbWVzb25fbmFuZC5jCj4+Pj4gQEAgLTExMTYsOCArMTExNiw4
+IEBAIGludCBtZXNvbl9uZmNfc2V0dXBfZGF0YV9pbnRlcmZhY2Uoc3RydWN0IG5hbmRfY2hpcCAq
+bmFuZCwgaW50IGNzbGluZSwKPj4+PiAgICAJCQkJICAgICAgIGRpdiAqIE5GQ19DTEtfQ1lDTEUp
+Owo+Pj4+ICAgIAltZXNvbl9jaGlwLT50YWRsID0gRElWX1JPVU5EX1VQKFBTRUNfVE9fTlNFQyh0
+aW1pbmdzLT50QURMX21pbiksCj4+Pj4gICAgCQkJCQlkaXYgKiBORkNfQ0xLX0NZQ0xFKTsKPj4+
+PiAtCXRiZXJzX2Nsb2NrcyA9IERJVl9ST1VORF9VUChQU0VDX1RPX05TRUModGltaW5ncy0+dEJF
+UlNfbWF4KSwKPj4+PiAtCQkJCSAgICBkaXYgKiBORkNfQ0xLX0NZQ0xFKTsKPj4+PiArCXRiZXJz
+X2Nsb2NrcyA9IERJVl9ST1VORF9VUF9VTEwoUFNFQ19UT19OU0VDKHRpbWluZ3MtPnRCRVJTX21h
+eCksCj4+Pj4gKwkJCQkJZGl2ICogTkZDX0NMS19DWUNMRSk7Cj4+Pgo+Pj4gTG9va3MgZ29vZCB0
+byBtZToKPj4+Cj4+PiBBY2tlZC1ieTogTGlhbmcgWWFuZyA8bGlhbmcueWFuZ0BhbWxvZ2ljLmNv
+bT4KPj4KPj4gVGhpcyBpcyBuYW5kL25leHQgbWF0ZXJpYWwsIHNvIGlmIHlvdSBkb24ndCBtaW5k
+IEkgd291bGQgbGlrZSB0byBzcXVhc2gKPj4gdGhpcyBmaXggaW50byB0aGUgb3JpZ2luYWwgY29t
+bWl0IGluc2VydGluZyB0aGUgZHJpdmVyLgo+Pgo+Pgo+PiBUaGFua3MsCj4+IE1pcXXDqGwKPiAK
+PiBIaSBNaXF1ZWwsCj4gCj4gVGhhdCBpcyB0b3RhbGx5IGZpbmUgYnkgbWUsIHRoYW5rcyBmb3Ig
+dGhlIHF1aWNrIHJlc3BvbnNlIQo+IAo+IE5hdGhhbgo+IAppdCBpcyBvayB3aXRoIG1lLgo+IC4K
+PiAKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4
+LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFk
+Lm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFy
+bS1rZXJuZWwK
