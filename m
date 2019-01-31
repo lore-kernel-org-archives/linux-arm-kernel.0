@@ -2,90 +2,81 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A0BD0C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:08:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4739BC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:18:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6F4FC2084A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:08:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1AA23218AC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 12:18:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RPqv4J2R";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="TztSpLaW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F4FC2084A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="akpJ6iB3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="gFD87IvT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1AA23218AC
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7HEzol839+Hno46PU8zH8o68hc3CkOBxC3h2q8pA/XQ=; b=RPqv4J2RSWKace
-	t7+zSADNvUOXXwbhX1BfqWdxKo+2QJwoC5xvDEgJhI2jG0p4SsiGuWvML4tUnMRyBemeGgv1o+Vza
-	tj1Wl4Qk9g/uwnW4cabXgQE0YaOR8nCVTPt6gotANM8SKXYMua+v6A/GSZrcNglHLij0nKA2ZTIB8
-	FcFnqKJ6QTDEIP3M3T+rMZhV4WVmGRk6ZXuG2IKG62gohYRhu8AFGjd5+uQMuw21U/VIbSy8WjN7a
-	8JZKhhpYqYioO+vH9KsTIuXLOLF/byVcYTR/dKByDCn3Jp90Zndj0XsGnObF62eQJZYrqJgHpA/K3
-	8plaRfVgPRYIuD7TpABA==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=3mlU+hXXMnvLFnX0tI1lnWJm33P5ReKid3S4CvoWvqA=; b=akpJ6iB3yu3pvO
+	Y5ikXOFENbwK+NJoGYWTSZVk/X+IUXno77IPSIpo/ODDVSn/sBBbPU5d5Zb/frKGdYQhsMxR8CVuv
+	0owldW4ze3BbhahNofPQYAoGyr9VWfDvx6TBbDsiBj4av/OvJb+6GwuVFZ/fAZJ7g0KNkxnseH7Kz
+	9/CVmVpQRtuM3EUStOXqlUmHrw9oRQmWtGuf6BxFhR+BHz46PzvsNr1JRqhs7a/lcpO3JvhbyNLyJ
+	HkgJdJfo7eF+l3X9Thg3mEVL9kwbkijx/Q7PBF6ROPpW2tpXnL+JcoXyEXnfkhXLcZGxnAtc1F4Xu
+	8bzkTlDZ3mIhy+aqbUfw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpB9E-0003m6-Vb; Thu, 31 Jan 2019 12:08:49 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
+	id 1gpBID-00072O-EM; Thu, 31 Jan 2019 12:18:05 +0000
+Received: from mail-ua1-x943.google.com ([2607:f8b0:4864:20::943])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpB99-0003kv-TI; Thu, 31 Jan 2019 12:08:45 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x0VC8NGp130852;
- Thu, 31 Jan 2019 06:08:23 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1548936503;
- bh=ZMOZUzLV4yZ9WKpPBnWSUn8UWpC0a4CfQgkUrNoRKLM=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=TztSpLaWjcTW5LI7+FiJ8iUrT+Uo79++Xb6mlNNeaoilT6FbBku4xJbKH+934jtMQ
- SEyWzsJjFCmrYRfusSB6mhNk640qCheFNpUwrWvYlNGQOwZVUcSjkf7Y72oO5kNeHr
- xJf1K+jhfUw05E3EpsiIEbC/KEYKVWmznOMB7weo=
-Received: from DFLE103.ent.ti.com (dfle103.ent.ti.com [10.64.6.24])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x0VC8NF2084831
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 31 Jan 2019 06:08:23 -0600
-Received: from DFLE103.ent.ti.com (10.64.6.24) by DFLE103.ent.ti.com
- (10.64.6.24) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 31
- Jan 2019 06:08:23 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE103.ent.ti.com
- (10.64.6.24) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 31 Jan 2019 06:08:23 -0600
-Received: from [192.168.2.6] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x0VC8I7s007940;
- Thu, 31 Jan 2019 06:08:19 -0600
-Subject: Re: [PATCH v7 0/4] drm: add support for Cadence MHDP DPI/DP bridge.
-To: Damian Kos <dkos@cadence.com>, David Airlie <airlied@linux.ie>, Daniel
- Vetter <daniel@ffwll.ch>, Rob Herring <robh+dt@kernel.org>, Mark Rutland
- <mark.rutland@arm.com>, Andrzej Hajda <a.hajda@samsung.com>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>, Maarten Lankhorst
- <maarten.lankhorst@linux.intel.com>, Maxime Ripard
- <maxime.ripard@bootlin.com>, Sean Paul <sean@poorly.run>, Sandy Huang
- <hjc@rock-chips.com>, =?UTF-8?Q?Heiko_St=c3=bcbner?= <heiko@sntech.de>,
- <dri-devel@lists.freedesktop.org>, <devicetree@vger.kernel.org>,
- <linux-kernel@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>,
- <linux-rockchip@lists.infradead.org>
-References: <1548846209-16406-1-git-send-email-dkos@cadence.com>
-From: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Message-ID: <0f11a4d8-d576-5af8-b7f4-afe3ff26678f@ti.com>
-Date: Thu, 31 Jan 2019 14:08:18 +0200
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gpBI9-00071n-IQ
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 12:18:03 +0000
+Received: by mail-ua1-x943.google.com with SMTP id d21so935857uap.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 31 Jan 2019 04:18:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=rMkf0gd68B0VNf8LFPErOfYHBzTvWTZG+O/rTFihV4I=;
+ b=gFD87IvTWMiYTaX30KLruBsENu70SjUoCtKw7J911orOOt5Ddm9wDSyGsu1pVrMfHX
+ y/O4khowAnb+sz2/xFi9VudhcqfKlOXfD3vQU92jqLcJwmOjRlCgYwN3fA6/nJDbjspr
+ nGO9f+MyuxEniJsWS+nnG/DLp6MtBSrNaP1uA=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=rMkf0gd68B0VNf8LFPErOfYHBzTvWTZG+O/rTFihV4I=;
+ b=D6xDDG4G0cEZLFXG1qbEaQBxA3Qh1UFubVtSoJ02w79hxdnXxt3onYj2XKU0WNd1Pj
+ ScrWgkKoxHz5bcdQaJiDZuIfzfdYRyMsCDITyVbFgBaubyxwHXwDQeTqC2HwbzDdyi5F
+ jRJp9O1vIpEI7BWh1v45uV3osOj9+/JVwe0DSQrIwvvIlyWOvFdvYegOdkGl3SuApm0D
+ dggpwPWqHFHfruPoRJ6vWdv1nLy7445BaSvELxmYMv6HmQZQfB5Gv/XsxwKNMzrmNy/y
+ aEr4SR92ZAMWCwfGyNTYT6LyBVvYXOINDN3iyYfitIKDY5aXEiWXeEpctL8UnK58Oiog
+ 7euw==
+X-Gm-Message-State: AJcUukdwQEUQ7MggdjeUfJpKwL3WNkfrPeLCcqNURNL3EHxzGgoIBy1Y
+ Rn2yrlrbEPNzOky4XVq1NgMc8SoutitOguxzrIGQbQ==
+X-Google-Smtp-Source: ALg8bN7ktqEXXIqjs7dcG1Y5IfwWm3F6nAamftV06uNn09EaLKy7ATV1Khoz1PWYVxgTRgaGBfqQgHkmoLD4xBww2dc=
+X-Received: by 2002:ab0:31d5:: with SMTP id e21mr14563931uan.107.1548937079489; 
+ Thu, 31 Jan 2019 04:17:59 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <1548846209-16406-1-git-send-email-dkos@cadence.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+References: <20190128144119.10092-1-martink@posteo.de>
+ <CAPDyKFo7949rcxEX5U2QUS0c2xhC_z+JGeOiF2HC6+QukVpEaQ@mail.gmail.com>
+ <20190131092006.363d1dd4@erd987>
+In-Reply-To: <20190131092006.363d1dd4@erd987>
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Thu, 31 Jan 2019 13:17:23 +0100
+Message-ID: <CAPDyKFr=kcoGK0C2A8JH-nhfgUgoRVa-E=6KPRjFO51QQxjJLA@mail.gmail.com>
+Subject: Re: [PATCH v4] mmc: mxs-mmc: Introduce regulator support
+To: Robin van der Gracht <robin@protonic.nl>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_040844_075859_B0A10D67 
-X-CRM114-Status: GOOD (  27.91  )
+X-CRM114-CacheID: sfid-20190131_041801_612327_30A01084 
+X-CRM114-Status: GOOD (  27.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,76 +88,164 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: jbergsagel@ti.com, rafalc@cadence.com, quentin.schulz@bootlin.com,
- piotrs@cadence.com
+Cc: Sascha Hauer <s.hauer@pengutronix.de>,
+ Martin Kepplinger <martin.kepplinger@ginzinger.com>,
+ "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>, Martin Kepplinger <martink@posteo.de>,
+ Shawn Guo <shawnguo@kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Thu, 31 Jan 2019 at 09:20, Robin van der Gracht <robin@protonic.nl> wrote:
+>
+> On Mon, 28 Jan 2019 22:15:23 +0100
+> Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>
+> > On Mon, 28 Jan 2019 at 15:41, Martin Kepplinger <martink@posteo.de> wrote:
+> > >
+> > > From: Martin Kepplinger <martin.kepplinger@ginzinger.com>
+> > >
+> > > This adds support for explicitly switching the mmc's power on and off
+> > > which is needed for example for WL1837 WL1271 wifi controllers on imx28.
+> > >
+> > > While the wifi's vmmc-supply regulator can be configured in devicetree,
+> > > "ip link set wlan0 down" doesn't turn off the VMMC regulator which leads
+> > > to hangs when loading firmware, for example.
+> > >
+> > > Signed-off-by: Martin Kepplinger <martin.kepplinger@ginzinger.com>
+> > > ---
+> > >
+> > >
+> > > revision history
+> > > ----------------
+> > > v4: re-added forgotten regulator_enable() during probe
+> > > v3: improve API usage as suggested by Ulf
+> > > v2: tested patch with changes suggested by Robin
+> > > v1: question, why https://patchwork.kernel.org/patch/4365751/ didn't get in
+> > >
+> > >
+> > >  drivers/mmc/host/mxs-mmc.c | 34 +++++++++++++++++++++++++---------
+> > >  1 file changed, 25 insertions(+), 9 deletions(-)
+> > >
+> > > diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
+> > > index add1e70195ea..23d275269d61 100644
+> > > --- a/drivers/mmc/host/mxs-mmc.c
+> > > +++ b/drivers/mmc/host/mxs-mmc.c
+> > > @@ -517,6 +517,22 @@ static void mxs_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+> > >         else
+> > >                 host->bus_width = 0;
+> > >
+> > > +       switch (ios->power_mode) {
+> > > +       case MMC_POWER_OFF:
+> > > +               if (!IS_ERR(host->mmc->supply.vmmc))
+> > > +                       mmc_regulator_set_ocr(host->mmc,
+> > > +                                             host->mmc->supply.vmmc, 0);
+> > > +               break;
+> > > +       case MMC_POWER_UP:
+> > > +               if (!IS_ERR(host->mmc->supply.vmmc))
+> > > +                       mmc_regulator_set_ocr(host->mmc,
+> > > +                                             host->mmc->supply.vmmc,
+> > > +                                             ios->vdd);
+> > > +               break;
+> > > +       default:
+> > > +               break;
+> > > +       }
+> > > +
+> > >         if (ios->clock)
+> > >                 mxs_ssp_set_clk_rate(&host->ssp, ios->clock);
+> > >  }
+> > > @@ -588,7 +604,6 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+> > >         struct mmc_host *mmc;
+> > >         struct resource *iores;
+> > >         int ret = 0, irq_err;
+> > > -       struct regulator *reg_vmmc;
+> > >         struct mxs_ssp *ssp;
+> > >
+> > >         irq_err = platform_get_irq(pdev, 0);
+> > > @@ -614,14 +629,15 @@ static int mxs_mmc_probe(struct platform_device *pdev)
+> > >         host->mmc = mmc;
+> > >         host->sdio_irq_en = 0;
+> > >
+> > > -       reg_vmmc = devm_regulator_get(&pdev->dev, "vmmc");
+> > > -       if (!IS_ERR(reg_vmmc)) {
+> > > -               ret = regulator_enable(reg_vmmc);
+> > > -               if (ret) {
+> > > -                       dev_err(&pdev->dev,
+> > > -                               "Failed to enable vmmc regulator: %d\n", ret);
+> > > -                       goto out_mmc_free;
+> > > -               }
+> > > +       ret = mmc_regulator_get_supply(mmc);
+> > > +       if (ret == -EPROBE_DEFER)
+> > > +               goto out_mmc_free;
+> > > +
+> > > +       ret = regulator_enable(mmc->supply.vmmc);
+> >
+> > This is wrong, as it may cause the regulator usage count to become
+> > wrongly balanced.
+> >
+> > Instead, via ->set_ios() when calling mmc_regulator_set_ocr(), it will
+> > take care of enabling and disabling the regulator depending of the
+> > requested vdd voltage level.
+> >
+> > > +       if (ret) {
+> > > +               dev_err(&pdev->dev,
+> > > +                       "Failed to enable vmmc regulator: %d\n", ret);
+> > > +               goto out_mmc_free;
+> > >         }
+> > >
+> > >         ssp->clk = devm_clk_get(&pdev->dev, NULL);
+> > > --
+> > > 2.20.1
+> > >
+> >
+> > BTW, you didn't really answer my earlier question about the TI WiFi
+> > chip. Doesn't you need a special clock for WiFi chip as well? How do
+> > you intend to manage that?
+>
+> I used an external 32K oscillator (SLOW_CLK) for my wl1271. Other
+> clocks ware generated on the module.
 
-On 30/01/2019 13:03, Damian Kos wrote:
-> Hello!
-> 
-> This is the series of patches that will add support for the Cadence's DPI/DP
-> bridge. Please note that this is a preliminary version of the driver and there
-> will be more patches in the future with updates, fixes and improvements.
-> Please keep that in mind when looking at FIXME/TODO/XXX comments.
-> 
-> Initially, MHDP driver was developed as a DRM bridge driver and was planed to
-> be placed in drivers/gpu/drm/bridge/mhdp.c.  However, there was already
-> a driver for Cadence's DP controller developed by RockChip, but that driver
-> uses the different DRM framework and looks like a part of a bigger system.
-> Both controllers (including firmware) are quite different internally
-> (MST/FEC/DSC support, link training done by driver, additional commands, IRQ's
-> etc.) but they have similar register map, except for Framer/Streamer (which is
-> noticeably different), so they appear similar.
-> 
-> The following patches contain:
-> - Moving common code to drivers/gpu/drm/bridge/cdns-mhdp-common.* and
->   modifying it a bit (mostly new prefixes for functions and data types) so it
->   can be used by two, higher level, drivers.
-> - Modifying existing RockChip's DP driver to use the common code after changes
->   made to it (use the new cdns_mhdp_device structure and new function names).
-> - Modifying DRM helpers a bit. Some are required for new driver, some are
->   updates from DP 1.2 to 1.3 or 1.4.
-> - Adding documentation for device tree bindings.
-> - Adding preliminary Cadence DPI/DP bridge driver.
-> 
-> Some of the things that will be added later on include (but are not limited
-> to):
-> - DSC support
-> - FEC support
-> - HDCP support
+Right. How do you control that clock? Did you model it as clock via
+the common clock framework?
 
-A few random comments/questions after a quick look at the patches.
+>
+> I had to supply a 'vmmc-supply' in your wl1271 devicetree node,
+> which will be used to power on/off the wlan module. The supply should
+> be a (delayed) GPIO controlled 'fixed-regulator' attached to the
+> wlan_en pin on the module.
 
-The names of the source files and the kernel Kconfig are only about
-"Cadence DP". But the DT bindings is for cdns,mhdp8546, and the
-resulting module file is mhdp8546.ko. I think more consistency here
-would be good.
+Right, thanks for explaining.
 
-I presume the part number (or family? are there other similar parts with
-similar part numbers?) is relevant, so it should be in the Kconfig
-option and help text, and probably in the file names too. The module
-name should have "cdns" prefix there, similar to the source files and
-the cdns-dsi.ko.
+>
+> 1: Documentation/devicetree/bindings/net/wireless/ti,wlcore.txt
+>
 
-Or maybe the same driver will handle all Cadence DP parts, in which case
-generic filenames are fine, but then the resulting kernel module should
-also be just "cdns-mhdp.ko".
+This sounds like a good fit for mmc pwrseq simple. There are already
+similar users for it.
 
-I see some audio functions in the code, but it's not mentioned in the DT
-bindings. I'm not an audio guy, but the display bridges with audio
-support I have seen have had DT bindings for the audio source too. Is
-audio supported in the current driver?
+Have a look at: /drivers/mmc/core/pwrseq*
+If the mmc host driver calls mmc_of_parse() during ->probe(), a pwrseq
+instance will be hooked up to it. Once the mmc core tries to power up
+the card it will make use of the attached pwrseq for the mmc host in
+question.
 
- Tomi
+In this way, you can control the clock and GPIO line, in more exact
+ways that is needed by the WiFi chip.
 
--- 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Here is a DT example (look for "mmc-pwrseq-simple"):
+arch/arm/boot/dts/imx6qdl-sr-som-ti.dtsi
+
+This should do the trick for you. On the other hand, I don't mind that
+you still add regulator support to the driver, along the lines of what
+$subject patch does, however it may not be exactly what you need for
+the WiFi case.
+
+Kind regards
+Uffe
 
 _______________________________________________
 linux-arm-kernel mailing list
