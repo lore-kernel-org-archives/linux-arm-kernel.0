@@ -2,87 +2,70 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7084BC282D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:28:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 41E7DC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:37:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4189320989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:28:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 15F82218AC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 03:37:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cQgK73Yn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4189320989
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n5/dKwyc";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="jYoakLSX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 15F82218AC
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AXNgQ7hFI4g81ahE+r9cnl5ie1tbeJET0VD5u6srEHc=; b=cQgK73YnRJjTmw
-	+v4T5dKs5UA3tsOv8KvkJM1387wKJwT6CjxuujK/7Fgp6uLyeIX5vfBzvP7rFR0fjB6qfnhcpfwWD
-	UgBDGmTvTPyU29UfraXFr/sNAk8reWz2DKJq9DmxEq0SWNfahKK8lQUa2sCGY3foU3V4FWGnI+DGg
-	i6cv/IBRqoFQ7NOFTKOxsWbsqTEQxFZn4OdU+1EeRnz+eAWJCbdf0FLODWKmtN7zhtozfE3CcSJ1g
-	nvEezWGk2hjUfrQALASMc7ETwsFD5dzoVDDc16Z5W4DJSF9AHvRP9BpLlPZf+Ic8PkFZyGq/AXS2I
-	VRSQ/60U1f8otwGoscSw==;
+	List-Owner; bh=hsbaTxeanu+I+vfGRJK0fH0LDmomdTsaUe8cNXAQZkI=; b=n5/dKwycAA28hH
+	SwbddZuBxs1namYXKCnouuWZqUp5mVQF1ZNLDHJz+U12cAGsvrl1LhCMIc+qduK1oxbP0To6bjaPG
+	ksXfK+hM26wRPpMXoKqNCLSmJ12tSyjaa9k1DXn/j9VEv8HSWgXZj3I4SfUn5UZlOsFYo1pwBwdMy
+	czWCAw2pa42oVVMHgmgiINEC+RKDky8OpvghIYrpxZF1oznvEWUTvgdl8Be9BC3oyqnrj8s9UgELU
+	NAcgy+tXWpq/4Q1KYMrUcyeAowK2Zqedg5bxMBZFbzfBIQe3BuERtBMQEKlHFNP3Lx3vVIZmjVBtm
+	6uCsDkdv80qt3U88pEfw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp31t-0006Vn-VX; Thu, 31 Jan 2019 03:28:41 +0000
-Received: from mail-ed1-f66.google.com ([209.85.208.66])
+	id 1gp3Ao-0001KO-2E; Thu, 31 Jan 2019 03:37:54 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp31q-0006Uk-2k
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 03:28:40 +0000
-Received: by mail-ed1-f66.google.com with SMTP id h15so1420448edb.4
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 19:28:37 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=15XSS+f8Da6LSGwP1uW4xYq3+UFXhrjBBfi+sQNl2lY=;
- b=EPtV59yC7oDNQOlYS6vzgCpqXUlh8StPWDYfNn3L1TE5iIBZHV8nffMy/R3sxGHOPu
- h6kvEUswMXMCCOSYvXrTSpd9M4FFzC7iywzm/7DqpknGvidh0YRFm/kTge3nDBsdd+gD
- xIUo9ICLVx0Obpez9hTlJudokHNur/sJp3HjQwPEtVieOFYdxQsWdky9yegIBm/kIu1P
- ZXNotKus77eteaHriwE/eR+JZmRGgtnWM7545diFxv2dt4Haic6Gthtw5/pyHXbAuAtX
- zwgh0laRoU2AkG1tsQscoYy2MpdaHOxIBuIfGmgqxt+v5p5fnxvwhbFmh7JV/qzMxeaY
- uVpA==
-X-Gm-Message-State: AJcUukfzkg1bdNQ41yg3LZtguyQkfvbjKLRppT0VMdJbMMcqv87/OOqS
- 3lG4Db/9hGypaLe6MTjgIWdgzINV+yo=
-X-Google-Smtp-Source: ALg8bN7mtZHw4ZyqDpTVEUQyRZ1zHfM8DPOOCfR2sMCC2oIcYBpZ60/EPrOqtd1D+7+1iuxHkS10mg==
-X-Received: by 2002:a50:d6c5:: with SMTP id l5mr32602824edj.145.1548905314746; 
- Wed, 30 Jan 2019 19:28:34 -0800 (PST)
-Received: from mail-wm1-f53.google.com (mail-wm1-f53.google.com.
- [209.85.128.53])
- by smtp.gmail.com with ESMTPSA id i7sm589180ejc.62.2019.01.30.19.28.33
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 30 Jan 2019 19:28:34 -0800 (PST)
-Received: by mail-wm1-f53.google.com with SMTP id y185so1061130wmd.1
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 30 Jan 2019 19:28:33 -0800 (PST)
-X-Received: by 2002:a1c:494:: with SMTP id 142mr27581378wme.111.1548905313480; 
- Wed, 30 Jan 2019 19:28:33 -0800 (PST)
+ id 1gp3Ak-0001K1-Fa
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 03:37:51 +0000
+Received: from sol.localdomain (c-107-3-167-184.hsd1.ca.comcast.net
+ [107.3.167.184])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id D27132070C;
+ Thu, 31 Jan 2019 03:37:48 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548905869;
+ bh=Dmgi66vQgQ7yUKTRSzSzUpl7LyI7r0hsGU61xwmThtg=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=jYoakLSXh2XdF7gcVPFlLwzorJAedNTa5K6UdzVj1sKjm6Xajs+Ar2apkKG1TyHeE
+ +oygArFD1RBHEMtucuQsJNCqTz6y+i13phrEkgeVRAeNL+Snq8P0/RrXgFSVd2q3vu
+ pZU7NxuSDnDQG4b40OIFfczBF9pBCkMrqhtOKDMo=
+Date: Wed, 30 Jan 2019 19:37:47 -0800
+From: Eric Biggers <ebiggers@kernel.org>
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Subject: Re: [PATCH v3 0/3] crypto: crct10dif assembly cleanup and
+ optimizations
+Message-ID: <20190131033746.GA661@sol.localdomain>
+References: <20190130031444.28935-1-ebiggers@kernel.org>
+ <CAKv+Gu95j-ZJC7vbUzJKqNczht1cjgx09sBiSRcwg+qn-HtXew@mail.gmail.com>
 MIME-Version: 1.0
-References: <20190130084203.25053-1-wens@csie.org>
- <20190130084203.25053-11-wens@csie.org>
- <20190130092927.x65ihy3je5n6324w@flea>
- <CAGb2v64ZFZty-jeeKmPU8Ecg+rAE6zEm65tedb_ZZTTSXMEPOA@mail.gmail.com>
-In-Reply-To: <CAGb2v64ZFZty-jeeKmPU8Ecg+rAE6zEm65tedb_ZZTTSXMEPOA@mail.gmail.com>
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Thu, 31 Jan 2019 11:28:20 +0800
-X-Gmail-Original-Message-ID: <CAGb2v670VszWfTNK9vtoBFWAuHVVHXmwrA84YfBFLLM5XX_6xg@mail.gmail.com>
-Message-ID: <CAGb2v670VszWfTNK9vtoBFWAuHVVHXmwrA84YfBFLLM5XX_6xg@mail.gmail.com>
-Subject: Re: [PATCH 10/10] arm64: dts: allwinner: h5: Add CPU Operating
- Performance Points table
-To: Maxime Ripard <maxime.ripard@bootlin.com>
+Content-Disposition: inline
+In-Reply-To: <CAKv+Gu95j-ZJC7vbUzJKqNczht1cjgx09sBiSRcwg+qn-HtXew@mail.gmail.com>
+User-Agent: Mutt/1.11.2 (2019-01-07)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190130_192838_122437_954EC2F0 
-X-CRM114-Status: GOOD (  16.85  )
+X-CRM114-CacheID: sfid-20190130_193750_554921_F2C8C9E3 
+X-CRM114-Status: GOOD (  26.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,115 +77,86 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree <devicetree@vger.kernel.org>,
- Sergey Matyukevich <geomatsi@gmail.com>,
- Andre Przywara <andre.przywara@arm.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, Emmanuel Vadot <manu@freebsd.org>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- Jagan Teki <jagan@amarulasolutions.com>, Hauke Mehrtens <hauke@hauke-m.de>,
+Cc: Tim Chen <tim.c.chen@linux.intel.com>,
+ "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
+ <linux-crypto@vger.kernel.org>,
  linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
+ Herbert Xu <herbert@gondor.apana.org.au>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Jan 30, 2019 at 5:41 PM Chen-Yu Tsai <wens@csie.org> wrote:
->
-> On Wed, Jan 30, 2019 at 5:29 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+On Wed, Jan 30, 2019 at 09:33:57AM +0100, Ard Biesheuvel wrote:
+> On Wed, 30 Jan 2019 at 04:15, Eric Biggers <ebiggers@kernel.org> wrote:
 > >
-> > On Wed, Jan 30, 2019 at 04:42:03PM +0800, Chen-Yu Tsai wrote:
-> > >                       enable-method = "psci";
-> > >                       clocks = <&ccu CLK_CPUX>;
-> > >                       clock-latency-ns = <244144>; /* 8 32k periods */
-> > > +                     operating-points-v2 = <&cpu_opp_table>;
-> > > +                     #cooling-cells = <2>;
-> > > +             };
-> > > +     };
-> > > +
-> > > +     cpu_opp_table: opp_table {
-> > > +             compatible = "operating-points-v2";
-> > > +             opp-shared;
-> > > +
-> > > +             opp@408000000 {
-> > > +                     opp-hz = /bits/ 64 <408000000>;
-> > > +                     opp-microvolt = <1000000 1000000 1310000>;
-> > > +                     clock-latency-ns = <244144>; /* 8 32k periods */
-> > > +             };
-> > > +
-> > > +             opp@648000000 {
-> > > +                     opp-hz = /bits/ 64 <648000000>;
-> > > +                     opp-microvolt = <1040000 1040000 1310000>;
-> > > +                     clock-latency-ns = <244144>; /* 8 32k periods */
-> > > +             };
-> > > +
-> > > +             opp@816000000 {
-> > > +                     opp-hz = /bits/ 64 <816000000>;
-> > > +                     opp-microvolt = <1080000 1080000 1310000>;
-> > > +                     clock-latency-ns = <244144>; /* 8 32k periods */
-> > > +             };
-> > > +
-> > > +             opp@912000000 {
-> > > +                     opp-hz = /bits/ 64 <912000000>;
-> > > +                     opp-microvolt = <1120000 1120000 1310000>;
-> > > +                     clock-latency-ns = <244144>; /* 8 32k periods */
-> > > +             };
-> > > +
-> > > +             opp@960000000 {
-> > > +                     opp-hz = /bits/ 64 <960000000>;
-> > > +                     opp-microvolt = <1160000 1160000 1310000>;
-> > > +                     clock-latency-ns = <244144>; /* 8 32k periods */
-> > > +             };
-> > > +
-> > > +             opp@1008000000 {
-> > > +                     opp-hz = /bits/ 64 <1008000000>;
-> > > +                     opp-microvolt = <1200000 1200000 1310000>;
-> > > +                     clock-latency-ns = <244144>; /* 8 32k periods */
-> > > +             };
-> > > +
-> > > +             opp@1056000000 {
-> > > +                     opp-hz = /bits/ 64 <1056000000>;
-> > > +                     opp-microvolt = <1240000 1240000 1310000>;
-> > > +                     clock-latency-ns = <244144>; /* 8 32k periods */
-> > > +             };
-> > > +
-> > > +             opp@1104000000 {
-> > > +                     opp-hz = /bits/ 64 <1104000000>;
-> > > +                     opp-microvolt = <1260000 1260000 1310000>;
-> > > +                     clock-latency-ns = <244144>; /* 8 32k periods */
-> > > +             };
-> > > +
-> > > +             opp@1152000000 {
-> > > +                     opp-hz = /bits/ 64 <1152000000>;
-> > > +                     opp-microvolt = <1300000 1300000 1310000>;
-> > > +                     clock-latency-ns = <244144>; /* 8 32k periods */
+> > The x86, arm, and arm64 asm implementations of crct10dif are very
+> > difficult to understand partly because many of the comments, labels, and
+> > macros are named incorrectly: the lengths mentioned are usually off by a
+> > factor of two from the actual code.  Many other things are unnecessarily
+> > convoluted as well, e.g. there are many more fold constants than
+> > actually needed and some aren't fully reduced.
 > >
-> > What is the frequency and voltage that U-Boot sets up?
->
-> 1008 MHz, and whatever voltage the board design defaults to (typically
-> the higher setting).
+> > This series therefore cleans up all these implementations to be much
+> > more maintainable.  I also made some small optimizations where I saw
+> > opportunities, resulting in slightly better performance.
+> >
+> > This is based on top of the pending patches from Ard Biesheuvel.
+> >
+> > These all pass the new extra self-tests.
+> >
+> 
+> Hi Eric,
+> 
+> As a FYI, the issue that broke ARM and arm64 with your updated
+> selftests was the 1 byte length special case that you also have
+> special handling for in the x86 version (but while fixing that, I
+> noticed my version was reading beyond the end of the input). I think
+> it hardly matters, though, given the way T10-DIF appears to be used in
+> practice (disk blocks), although it is hard to be sure from reading
+> the code, and the algo should be correct in any case.
 
-FYI I got this wrong. U-boot's default is 816 MHz. However it seems even
-this is misleading, as cpufreq in Linux reports:
+Yes, on second thought I'm thinking the len < 16 support in the x86 assembly
+isn't worthwhile.  Actually it's much slower than the generic table-based code
+on those lengths due to the overhead of kernel_fpu_begin().  And even if
+kernel_fpu_begin() were free, the generic code is faster until about len=11.
 
-    cpufreq: cpufreq_online: CPU0: Running at unlisted freq: 792000 KHz
-    cpufreq: cpufreq_online: CPU0: Unlisted initial frequency changed
-to: 816000 KHz
+There's a theoretical niceness to using pclmul for all lengths so that no table
+is needed.  But we still need the table for the !irq_fpu_usable() case anyway.
 
-So there seems tp be an off-by-1 error in some multiplier calculation.
+So I'll drop the len < 16 case.
 
->
-> > We've had the issue with the A33 that it's started at 1008MHz, with
-> > the matching voltage, and ramping up the frequency to 1.2GHz on boards
-> > without PMIC support would increase the frequency but not the voltage,
-> > resulting in a brownout.
->
-> Which is why I added the regulator to all boards before this patch. At
-> least for Linux, once the regulator supply is described in the device
-> tree, if the driver is missing, regulator_get_* and thus cpufreq should
-> fail with -EPROBE_DEFER.
+> 
+> So what remains is the way these implementations are encapsulated by
+> the crct10dif() library function, which is raster nasty, making
+> CRC-T10DIF an excellent use case to discuss whether we can make any
+> improvements to address some of the concerns that were also raised in
+> the zinc discussion. I threw some code together a while ago [0] (and
+> posted it as well, IIRC). In the mean time, a 'static call'
+> infrastructure is being proposed that could be used in a similar way
+> to avoid function pointers. I'm also interested in hearing opinions on
+> whether the indirect call overhead is actually significant in use
+> cases such as this one.
+> 
 
-I believe despite the above, this still stands. So we should be OK.
+I agree that lib/crc-t10dif.c is very ugly, and we need to find a better way to
+provide simple crypto library functions.  But I'm not sure how to make everyone
+happy.  I actually think the Zinc approach of centrally dispatching to all the
+software implementations of each algorithm (with one module per algorithm rather
+than one per implementation) is fine for the vast majority of users.  So maybe
+we should just go with that along with per-implementation knobs so that users
+can still disable unwanted implementations at build or boot time if they want.
+
+E.g., CONFIG_ZINC_CHACHA would be a module that has all the software ChaCha
+implementations for the architecture.  But people building the kernel who do not
+want or need, say, the NEON implementation could unset the bool
+CONFIG_ZINC_CHACHA_NEON to exclude it from the zinc_chacha module at build time.
+Alternatively, users with a precompiled kernel who don't want to use the NEON
+implementation despite their CPU supporting it could set zinc_chacha.neon=0 on
+the kernel command line (when CONFIG_ZINC_CHACHA=y) or when loading the
+zinc_chacha module (when CONFIG_ZINC_CHACHA=m).
+
+- Eric
 
 _______________________________________________
 linux-arm-kernel mailing list
