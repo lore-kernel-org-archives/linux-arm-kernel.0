@@ -2,68 +2,86 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 225BCC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:40:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DD848C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:41:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DB502218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:40:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B5F24218AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:41:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mBS0ZygQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB502218D3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Pxib5IPl";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="g8zwTgNp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B5F24218AF
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KueI7EJ570q+FfbobEdFRFe8OAnmIISJRz0qIyuS4BU=; b=mBS0ZygQa9htlj
-	xy5aiqqaoy+WYeWqdfkJYVQ/gXygHW9Pn/adVtBxqyHVBPdcdZ/JIOHkc99nvsLnG29U7ZtKZIHhq
-	gqP+0bJiCRwgnWGVhscNiCs52H92KGvcmpGLgVNpNBCzLJAcLq0wPMP+iLBbyQmCfOo/fep7jFQye
-	IfuqA+m5mghTBMbbVxMjmitzXp31tj4a0LtIxTt2D3pYhrYMwhtwTpgFfD0m58eJVjLc3rX4pFcLz
-	Xjfg+VCOKa5T2xilYTyfmqcX/vU4qoGvTIxcZaIiZnEZHjiHLCJK2jy92zMpD7MPXq3isbAEdaXDZ
-	20LgKM3efvp8OgtcJzJA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=uJYsD7eWHwngtSlSadJORYlevYNoyMPKRGvqQtr/cmM=; b=Pxib5IPloipRSU
+	YPZHvCisDINZPpdNOiOjHfhKFzg7lDr46eCHiBcBzzWj4eRZt0wbB9koJVBXwGW7NCfJKKlBLiMiF
+	wplvEe2W4nnQPJZG5aTrEQ28ME8uoJguMv5M8nJ2U06fKNEXCU86uiGiTiNkEI/ET+MCWQraa+FQ1
+	ufMKaCmIqY873plIXed1V6Nm2nZiLi8EnfZjyQoiIq1Y/jZ4EgQ7mi13A/VyfJ9kPBbiCSD+Jof1+
+	I4pb6EEOzNoHgGVUhNlL7W5Y1AJdaR2BeplUF1K+GnJ0aPqFKcxkB0tL0Izd1x6Damgl7lhznKqKV
+	SSveS1nXNKpf0I5ApdKQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp8pt-0006rH-HF; Thu, 31 Jan 2019 09:40:41 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp8pN-0005TX-8x
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 09:40:13 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3A7C5A78;
- Thu, 31 Jan 2019 01:40:08 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BCD5F3F71E;
- Thu, 31 Jan 2019 01:40:05 -0800 (PST)
-Subject: Re: [PATCH v9 01/26] arm64: Fix HCR.TGE status for NMI contexts
-To: Christoffer Dall <christoffer.dall@arm.com>
-References: <1548084825-8803-1-git-send-email-julien.thierry@arm.com>
- <1548084825-8803-2-git-send-email-julien.thierry@arm.com>
- <8e8c4f5b-5b83-7bbc-1b84-36d68e210968@arm.com>
- <847c54ef-ea41-eea5-8aff-72e0cea465f8@arm.com>
- <20190131081900.GM13482@e113682-lin.lund.arm.com>
- <32af4a5c-7aeb-0171-1b4a-2cbee5f78bca@arm.com>
- <20190131092706.GN13482@e113682-lin.lund.arm.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <7a2c92ca-f0eb-1391-4dc4-005e1dbadc30@arm.com>
-Date: Thu, 31 Jan 2019 09:40:02 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gp8qF-0007Ai-Vc; Thu, 31 Jan 2019 09:41:03 +0000
+Received: from hqemgate14.nvidia.com ([216.228.121.143])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gp8aG-0004ls-Cw
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 09:24:35 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c52bed10000>; Thu, 31 Jan 2019 01:24:33 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Thu, 31 Jan 2019 01:24:31 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Thu, 31 Jan 2019 01:24:31 -0800
+Received: from HQMAIL104.nvidia.com (172.18.146.11) by HQMAIL106.nvidia.com
+ (172.18.146.12) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 31 Jan
+ 2019 09:24:30 +0000
+Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL104.nvidia.com
+ (172.18.146.11) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
+ Frontend Transport; Thu, 31 Jan 2019 09:24:30 +0000
+Received: from josephl-linux.nvidia.com (Not Verified[10.19.108.132]) by
+ hqnvemgw02.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
+ id <B5c52bece0001>; Thu, 31 Jan 2019 01:24:30 -0800
+From: Joseph Lo <josephl@nvidia.com>
+To: Thierry Reding <thierry.reding@gmail.com>, Jonathan Hunter
+ <jonathanh@nvidia.com>
+Subject: [PATCH V4 7/7] arm64: dts: tegra210-smaug: Enable CPU idle support
+Date: Thu, 31 Jan 2019 17:24:10 +0800
+Message-ID: <20190131092410.28222-8-josephl@nvidia.com>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190131092410.28222-1-josephl@nvidia.com>
+References: <20190131092410.28222-1-josephl@nvidia.com>
 MIME-Version: 1.0
-In-Reply-To: <20190131092706.GN13482@e113682-lin.lund.arm.com>
-Content-Language: en-US
+X-NVConfidentiality: public
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1548926673; bh=20KZoYwg3LJftlzb4M1+rj3lAOjkZJ7FzeZw38JO9Rk=;
+ h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
+ In-Reply-To:References:MIME-Version:X-NVConfidentiality:
+ Content-Transfer-Encoding:Content-Type;
+ b=g8zwTgNphig3fpgSZX94lXHC0O7RN3F3opz3QJycvYmYJogV5rXs3CnPa36I9JM8R
+ y1aLAoelvx6bBKbWjLPsBYs87/493VdYml/JRnOqqUfR4m04KiYnjlc/ZabWJJKr8Y
+ XuuJ1aoExPJ0P84WR5ie/Pi4+uE4eHPDw3vM2woocakodLPI8+AdGlBQxbMZaWSg9S
+ WbBFhLw0mgHO9B0dWJ3KkD6nOFL8WsASz9aJ12ya1Ksf+WqGCX0IHWixHtSMvHPhvf
+ Tv/vzPVgUTzB09wjMz/UTkGWEKRsOWf2+ZZ2eMp2nyjjNzNqk9YwNA1QViKO63NpmI
+ RpS4PpSL4hYhQ==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_014009_835508_09BA10B4 
-X-CRM114-Status: GOOD (  20.33  )
+X-CRM114-CacheID: sfid-20190131_012432_615696_2118B3BF 
+X-CRM114-Status: UNSURE (   6.83  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,100 +93,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, linux-arch@vger.kernel.org,
- daniel.thompson@linaro.org, Arnd Bergmann <arnd@arndb.de>,
- marc.zyngier@arm.com, catalin.marinas@arm.com, will.deacon@arm.com,
- linux-kernel@vger.kernel.org, stable@vger.kernel.org,
- James Morse <james.morse@arm.com>, joel@joelfernandes.org,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Joseph Lo <josephl@nvidia.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Enable CPU idle support for Smaug platform.
 
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+v4:
+ * no change
+v3:
+ * no change
+v2:
+ * no change
+---
+ arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-On 31/01/2019 09:27, Christoffer Dall wrote:
-> On Thu, Jan 31, 2019 at 08:56:04AM +0000, Julien Thierry wrote:
->>
->>
->> On 31/01/2019 08:19, Christoffer Dall wrote:
->>> On Mon, Jan 28, 2019 at 03:42:42PM +0000, Julien Thierry wrote:
->>>> Hi James,
->>>>
->>>> On 28/01/2019 11:48, James Morse wrote:
->>>>> Hi Julien,
->>>>>
->>>>> On 21/01/2019 15:33, Julien Thierry wrote:
->>>>>> When using VHE, the host needs to clear HCR_EL2.TGE bit in order
->>>>>> to interract with guest TLBs, switching from EL2&0 translation regime
->>>>>
->>>>> (interact)
->>>>>
->>>>>
->>>>>> to EL1&0.
->>>>>>
->>>>>> However, some non-maskable asynchronous event could happen while TGE is
->>>>>> cleared like SDEI. Because of this address translation operations
->>>>>> relying on EL2&0 translation regime could fail (tlb invalidation,
->>>>>> userspace access, ...).
->>>>>>
->>>>>> Fix this by properly setting HCR_EL2.TGE when entering NMI context and
->>>>>> clear it if necessary when returning to the interrupted context.
->>>>>
->>>>> Yes please. This would not have been fun to debug!
->>>>>
->>>>> Reviewed-by: James Morse <james.morse@arm.com>
->>>>>
->>>>>
->>>>
->>>> Thanks.
->>>>
->>>>>
->>>>> I was looking for why we need core code to do this, instead of updating the
->>>>> arch's call sites. Your 'irqdesc: Add domain handlers for NMIs' patch (pointed
->>>>> to from the cover letter) is the reason: core-code calls nmi_enter()/nmi_exit()
->>>>> itself.
->>>>>
->>>>
->>>> Yes, that's the main reason.
->>>>
->>> I wondered the same thing, but I don't understand the explanation :(
->>>
->>> Why can't we do a local_daif_mask() around the (very small) calls that
->>> clear TGE instead?
->>>
->>
->> That would protect against the pseudo-NMIs, but you can still get an
->> SDEI at that point even with all daif bits set. Or did I misunderstand
->> how SDEI works?
->>
-> 
-> I don't know the details of SDEI.  From looking at this patch, the
-> logical conclusion would be that SDEIs can then only be delivered once
-> we've called nmi_enter, but since we don't call this directly from the
-> code that clears TGE for doing guest TLB invalidation (or do we?) then
-> masking interrupts at the PSTATE level should be sufficient.
-> 
-> Surely I'm missing some part of the bigger picture here.
-> 
-
-I'm not sure I understand. SDEI uses the NMI context and AFAIU, it is an
-interrupt that the firmware sends to the OS, and it is sent regardless
-of the PSTATE at the OS EL.
-
-So, the worrying part is:
-- Hyp clears TGE
-- Exception/interrupt taken to EL3
-- Firmware decides it's a good time to send an SDEI to the OS
-- SDEI handler (at EL2 for VHE) does nmi_enter()
-- SDEI handler needs to do cache invalidation or something with the
-EL2&0 translation regime but TGE is cleared
-
-We don't expect the code that clears TGE to call nmi_enter().
-
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+index 5a67890cfb7a..da0eb4530acf 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
++++ b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+@@ -1751,6 +1751,13 @@
+ 		cpu@3 {
+ 			enable-method = "psci";
+ 		};
++
++		idle-states {
++			c7 {
++				arm,psci-suspend-param = <0x00010007>;
++				status = "okay";
++			};
++		};
+ 	};
+ 
+ 	gpio-keys {
 -- 
-Julien Thierry
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
