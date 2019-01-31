@@ -2,83 +2,83 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 40460C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 11:46:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 57AFCC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 11:52:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0E5B82087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 11:46:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 19C6B2087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 11:52:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JgEPUKok";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="JcLLdT9U"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0E5B82087F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dKOi62ZS";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="UiAKLLJp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 19C6B2087F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1qN9pe4/OH8ygzanxdZ3u+qoHNLIgl63SX3NdX4rhtg=; b=JgEPUKoksgd4q0
-	AOHhLtj7NYgUdhdiyIHsiIisyytkFZ8N/LAeUwkHrhxegcn+qHVAhFEJCwibwwUMfJJvStbXXxLu6
-	zM9kB9foKslrtQM3mZa/kbszbMQT80m/pRE2enZcd5e44drRe5Lghjh4BUihxCyo4WgVslMqMf4GA
-	ZLaYW6nEGnEk6jjcxQftHHRlor2mbRyLi+nW2OEOhCMwteg3XtBtRDhRzJA5OB8CporQN1p95c59f
-	vvceCAjsQdws0+8o6CtaPzGBJOJFwScfrv1lWiyNHu3QpUZwpf4uV1Ecf3aUDnCt+hfvjf4zjErhA
-	HMHZzcl3f2Edfca6xyww==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=+20UDlKh2Z7D+IqqszEbESdyvztG1LPlb7KiFz/E5OU=; b=dKOi62ZS7+gqMH
+	c8BLmjG/ugWtiwaC7W1fzFDzCPXBSzeGynJ7QV2XPhRfVR4gadUodEHlORuUqgv64AA0RCa3D8xTQ
+	9pA5I/NVxgJ79/rReIvP6Ul9wwMfDcwlhVk/n9jcnoPymNrddLBnFTzNyjmtqKfS97HT89brgZpGb
+	RW4dJmQ6v143td7IXIMqT8UaNP3gIR12P9I5BFmxbfmQNR0gD81n/iaF+mBROM62wt1UBpSXISvyJ
+	6F0RQMVSQ5EELi4uW1024hh3YaAKkUIr9iK91eaL9LLqohQ9BJPEdrduKu8BzikoNcSza/nSUnO+t
+	oQeGRFWOf5cFYJMq8KOg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpAnB-0002Ro-HU; Thu, 31 Jan 2019 11:46:01 +0000
-Received: from mail-io1-xd44.google.com ([2607:f8b0:4864:20::d44])
+	id 1gpAsx-0004G5-4M; Thu, 31 Jan 2019 11:51:59 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpAn8-0002RT-8g
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 11:45:59 +0000
-Received: by mail-io1-xd44.google.com with SMTP id m19so2391201ioh.3
+ id 1gpAst-0004E6-9r
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 11:51:56 +0000
+Received: by mail-wr1-x442.google.com with SMTP id s12so2954260wrt.4
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 31 Jan 2019 03:45:57 -0800 (PST)
+ Thu, 31 Jan 2019 03:51:51 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=Se37DkAzmG8Re0tNDcDE+NMRwds5kKz3h/p0nImakfw=;
- b=JcLLdT9UeG5kdQ/EJyO8Tpj2g2U95TjQgTMGfrYqRi5m2rbIL9RayN5Hj6WwCQ8BEc
- hfy5qTl+d1PbcToSaMIEyF0T76JMCWC5pD5bMgqrinJT/COdWqwuoc45EcPh295YOUdF
- Z6tlhB3a2H3v0EVkmuCaiakAOH3cge6nT8afg=
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=0enek0A8jDFsVAl11N/G0bNAcwpoDOHHfp9X7OErNIc=;
+ b=UiAKLLJpMbaRW1WPDY7uU1MbIdFjJD642saDeJRF3+5ZBZjcCnMPkTh4kO9bpa7aFA
+ ldUR4G771E1tbyWClkLhgjx50tZ7uBnLhe5ivTL6ZRyFBR/RTaPfL3Hg71ihd2x/hyIP
+ M4oqCcbKyyuSET0lPnb21lxSkHf8GVoQqIlx0=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=Se37DkAzmG8Re0tNDcDE+NMRwds5kKz3h/p0nImakfw=;
- b=Sh3EF48K7uqdXdKbDmQkPTlfZLOfwHl1NT9KiiWLI6drqtOCMpO7CYzPxTTE/LBSS7
- dcbvL1ITMJpTSJyAatVHot1fP2Mlb4L0E9H5YNnDyeeMXEsJSClC4BFsRaYJ18DlyjN6
- fPoKLfp5kI4pK9TvmJdOa90MDfIvthbWhy5/qWFHm5QizoiPEJBDeDCDm856bokR0hGL
- dVWF/GgPhYCfxkRbs8ev4SHpSW8yOv/Ak+v7JSvSbS6zi5OWs9AXi8JK66SrzyH3Anox
- Awr4zlUP14N5fOBsGp+6tvRS+2boLxqOB2wlO/TUlb7K7ju7ia0Iov/R5NBCmj+GIZ5J
- sqpw==
-X-Gm-Message-State: AHQUAuZoleYqDMg8wmenGhwr7yU4WLu1QsdMrfR86ljMgfuTCa+MgpWh
- MrOAH1HP5Rl+wv4KJADYTZuk92t/JmMc0JR6A2d6xScJ
-X-Google-Smtp-Source: AHgI3IbEJom0danOQy04nS4FMlahrprO4Ol0x0BM230pTAjeZoiT4mU+Z/+5/1ECRkUXOa6UhvBkIPWUv2R6jhvC20g=
-X-Received: by 2002:a6b:5d01:: with SMTP id r1mr4996154iob.170.1548935157104; 
- Thu, 31 Jan 2019 03:45:57 -0800 (PST)
-MIME-Version: 1.0
-References: <20181217150205.27981-1-ard.biesheuvel@linaro.org>
- <20181217150205.27981-2-ard.biesheuvel@linaro.org>
- <0ca1ffad-9588-dd85-9276-98644d089b6c@arm.com>
- <CAKv+Gu-q7KOMPWK+g+AAFZtJKSFAEHGMB1ANz3oDLd48UsPjTg@mail.gmail.com>
- <a4661531-259b-eb6a-1b2c-43b9bfa00ee0@arm.com>
-In-Reply-To: <a4661531-259b-eb6a-1b2c-43b9bfa00ee0@arm.com>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=0enek0A8jDFsVAl11N/G0bNAcwpoDOHHfp9X7OErNIc=;
+ b=Dnh3KPv2s+8QHvLyaCUe05sA4lCLoMMSWpwPQjyR4/l/q7nxie7b3dNbyNIQeJoAST
+ OuOPFAbF0xVuSdZvW75fcU9o6d2/MgoH6kdl3JNffPa3c/CUlHiuJf1se3xwILIlT/yA
+ 5rvbwvPxs6fiDlcPJXPYhJvyEjT72VifSR0L34cs6O+GM0HJhFH4Va07S7MTeWO2pPcD
+ 68hNs/4eRIApCTzHBOMRbubap6BKojJiM5+Fwjom/2PWMpHBw+Uspl1sQSCOfBD9HKSH
+ ajVRxqqj3/PwYNH5nme2OdxxjnCFcrB9cb9MZstpaVmy7jlg6IJsKxdAWh1oqEkwbnkw
+ XU7g==
+X-Gm-Message-State: AJcUukeqNtFXLrw3a0pNF+qNjwFyqGYR3pgVR4x8yMSmGBejQjrVlcuj
+ dO+Gkq51Hc2OFFHF0e49YnrIQg==
+X-Google-Smtp-Source: ALg8bN5CLUqtybYo/fEiBU45Kdz6zyOA6SI+vGezuHH3V8Xm4b1wCOOSOHm8/pLtK02jlYPI372BJA==
+X-Received: by 2002:adf:fd50:: with SMTP id h16mr36589622wrs.231.1548935510469; 
+ Thu, 31 Jan 2019 03:51:50 -0800 (PST)
+Received: from localhost.localdomain
+ (aputeaux-684-1-39-7.w90-86.abo.wanadoo.fr. [90.86.94.7])
+ by smtp.gmail.com with ESMTPSA id w10sm5807714wmb.1.2019.01.31.03.51.48
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 31 Jan 2019 03:51:49 -0800 (PST)
 From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Thu, 31 Jan 2019 12:45:45 +0100
-Message-ID: <CAKv+Gu80YOXDQTCudzP4pzYqfNR-GZ9XX6XB7L4_NukAoUqD4A@mail.gmail.com>
-Subject: Re: [RFC PATCH 1/2] arm64: kvm: expose sanitised cache type register
- to guest
-To: Marc Zyngier <marc.zyngier@arm.com>
+To: linux-efi@vger.kernel.org
+Subject: [PATCH v3 0/2] efi: arm: add support for earlycon on EFI framebuffer
+Date: Thu, 31 Jan 2019 12:51:43 +0100
+Message-Id: <20190131115145.4634-1-ard.biesheuvel@linaro.org>
+X-Mailer: git-send-email 2.20.1
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_034558_311600_115D679C 
-X-CRM114-Status: GOOD (  16.53  )
+X-CRM114-CacheID: sfid-20190131_035155_354574_E1238D68 
+X-CRM114-Status: GOOD (  14.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,55 +90,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Christoffer Dall <christoffer.dall@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- "Suzuki K. Poulose" <Suzuki.Poulose@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>, graeme.gregory@linaro.org,
+ corbet@lwn.net, pjones@redhat.com, x86@kernel.org, linux-doc@vger.kernel.org,
+ agraf@suse.de, leif.lindholm@linaro.org, mingo@redhat.com, tglx@linutronix.de,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 31 Jan 2019 at 12:44, Marc Zyngier <marc.zyngier@arm.com> wrote:
->
-> On 31/01/2019 11:24, Ard Biesheuvel wrote:
-> > On Thu, 31 Jan 2019 at 12:22, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >>
-> >> Hi Ard,
-> >>
-> >> On 17/12/2018 15:02, Ard Biesheuvel wrote:
-> >>> We currently permit CPUs in the same system to deviate in the exact
-> >>> topology of the caches, and we subsequently hide this fact from user
-> >>> space by exposing a sanitised value of the cache type register CTR_EL0.
-> >>>
-> >>> However, guests running under KVM see the bare value of CTR_EL0, which
-> >>> could potentially result in issues with, e.g., JITs or other pieces of
-> >>> code that are sensitive to misreported cache line sizes.
-> >>>
-> >>> So let's start trapping cache ID instructions, and expose the sanitised
-> >>> version of CTR_EL0 to guests. Note that CTR_EL0 is treated as an invariant
-> >>> to KVM user space, so update that part as well.
-> >>
-> >> I'm a bit uneasy with this. We rely on the kernel to perform this
-> >> sanitization for userspace when absolutely required, and this is so far
-> >> the exception.
-> >>
-> >> If we start trapping it unconditionally, we're likely to introduce
-> >> performance regressions on system where there is no need to perform any
-> >> form of sanitization.
-> >>
-> >> Could we instead only do this if ARM64_MISMATCHED_CACHE_TYPE is set?
-> >>
-> >
-> > I suppose. Note that the next patch relies on the trapping as well,
-> > but we could enable that piece for only 32-bit guests.
->
-> I think that'd be fine. 32bit has no EL0 access to this, so it shouldn't
-> see any major hit (nor should it use S/W ops, but hey, odd fixes).
->
-> Do you mind trying to have a go at that?
->
+Repurpose the existing EFI earlyprintk code to implement support for
+'earlycon=efi' for arm64 systems, allowing the graphical console
+to be used instead of the serial port for early debug output.
 
-Not at all.
+Changes since v2:
+- update patch #1 so that no attempts are made to build the memencrypt related
+  early memremap routines for 32-bit x86
+- update patch #2 so earlycon=efifb is not enabled on Itanium
+
+Changes since v1:
+- Rename earlycon= argument to 'efifb' to emphasize that this is specific
+  to the EFI framebuffer.
+- Replace earlyprintk=efi entirely, rather than keep it alongside earlycon.
+  Since earlycon is typically enabled (along with the infrastructure), and
+  earlyprintk isn't, this does not result in a lot more code to be included,
+  but does make it more likely that a given [distro] kernel has support for
+  this enabled out of the box.
+- Switch to write-combine mappings by default. This is the default for efifb,
+  and is actually required on arm64, since device attributes do not tolerate
+  unaligned accesses or other operations (such as DC ZVA) that rely on memory
+  semantics. This requires ARCH_USE_MEMREMAP_PROT to be wired up, which is
+  why a new patch #1 has been added.
+- Since adding the 'ram' parameter for framebuffers in shared memory on cache
+  coherent devices is trivial after the switch to WC mappings, fold the change
+  into the main patch.
+
+If there are no objections, I will proceed to queue these in efi/next for v5.1
+
+Cc: corbet@lwn.net
+Cc: leif.lindholm@linaro.org
+Cc: graeme.gregory@linaro.org
+Cc: mingo@redhat.com
+Cc: tglx@linutronix.de
+Cc: linux-doc@vger.kernel.org
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: agraf@suse.de
+Cc: pjones@redhat.com
+
+Ard Biesheuvel (2):
+  x86: make ARCH_USE_MEMREMAP_PROT a generic Kconfig symbol
+  efi: x86: convert x86 EFI earlyprintk into generic earlycon
+    implementation
+
+ Documentation/admin-guide/kernel-parameters.txt                         |   8 +-
+ arch/Kconfig                                                            |   3 +
+ arch/x86/Kconfig                                                        |   5 +-
+ arch/x86/Kconfig.debug                                                  |  10 --
+ arch/x86/include/asm/efi.h                                              |   1 -
+ arch/x86/kernel/early_printk.c                                          |   4 -
+ arch/x86/mm/ioremap.c                                                   |   4 +-
+ arch/x86/platform/efi/Makefile                                          |   1 -
+ drivers/firmware/efi/Kconfig                                            |   6 +
+ drivers/firmware/efi/Makefile                                           |   1 +
+ arch/x86/platform/efi/early_printk.c => drivers/firmware/efi/earlycon.c | 130 ++++++++------------
+ 11 files changed, 69 insertions(+), 104 deletions(-)
+ rename arch/x86/platform/efi/early_printk.c => drivers/firmware/efi/earlycon.c (45%)
+
+-- 
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
