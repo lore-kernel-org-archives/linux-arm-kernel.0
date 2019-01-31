@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D5F24C282D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 15:01:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EA6F3C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 15:01:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A2DB5218AF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 15:01:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BCE24218AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 15:01:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gLu0MWPI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A2DB5218AF
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PtbQKiT1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BCE24218AF
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,37 +26,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=uvDDA0pLLk90Q4zTVL+Hd2+8AN0+oQ+sGYAJ4vP1Byw=; b=gLu0MWPIPuiGdjQ6q2vd29r/Qa
-	7LEuJ/4F6GR1X1cods9W9cx918ak/i/KUw1RE89U3CjRS9tk6ZVG/ZsFqnbxnJLYixgC8EfJbxoe0
-	4aBuTSugEDhjHfdV+gLtcCCmJW614fsWhl52NswZUiIOYj4ipm1TT0Rxz20I7U8kntH/lAzoukFYf
-	uAIhZ5M9WbyQYUEXYA+J+Y++B8si0jPX9h0BN95t8IyOy6LCt5pWzyk2A8Cbxs5XvpDN/yK/CJ0Nc
-	xO3EeicPXvSKSnYB78zD9r7dLHgwTV5mdIRrVHN1OMFIIo1frQGV4tS2lYlvvVPMW0e7s1KJ3btyL
-	WXYVhkzg==;
+	bh=RMROh6rk+HZMv9Y7+O06STJP5f9KCNLvob+d/LTOkjo=; b=PtbQKiT10bnc7Tg7lky9ZIclqd
+	p+tzbY5lExS1sbeSCAKzdSBNjIsk8cdY67KOSp0lKZ5+WsbxufCr9hGI5umt59hzglld2ZvDt+SuO
+	blKX/n11UIKMg0rcJhbLgz1h48zgGI8sZo2k5rOcVsXo09cwXFF/Xs70vlgRZOL4A9Jv44NITABnz
+	tDJfu5FvEUlBI5AEqLgegzVpftFB9tyjPsf4R2DZbRiVRTd25ZQwJ30qkcq4Won6+5OBxM4H6JN5t
+	4H1RYTw4MKhpvSK3BevCPWHzD61Woa93/7fRrmP2iM9NOkpqxfm14vVwy81mHOrzAKw6cEuQ0LMNE
+	G9dBzLWA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpDqI-000116-J0; Thu, 31 Jan 2019 15:01:26 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gpDqX-0001Go-5a; Thu, 31 Jan 2019 15:01:41 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpDoV-0006LO-Dp
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 14:59:38 +0000
+ id 1gpDoX-0006It-JB
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 14:59:39 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 480D680D;
- Thu, 31 Jan 2019 06:59:35 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 804BBEBD;
+ Thu, 31 Jan 2019 06:59:37 -0800 (PST)
 Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 347B33F59C;
- Thu, 31 Jan 2019 06:59:33 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 86D693F59C;
+ Thu, 31 Jan 2019 06:59:35 -0800 (PST)
 From: Julien Thierry <julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v10 08/25] arm64: Make PMR part of task context
-Date: Thu, 31 Jan 2019 14:58:46 +0000
-Message-Id: <1548946743-38979-9-git-send-email-julien.thierry@arm.com>
+Subject: [PATCH v10 09/25] arm64: Unmask PMR before going idle
+Date: Thu, 31 Jan 2019 14:58:47 +0000
+Message-Id: <1548946743-38979-10-git-send-email-julien.thierry@arm.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1548946743-38979-1-git-send-email-julien.thierry@arm.com>
 References: <1548946743-38979-1-git-send-email-julien.thierry@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_065935_578469_78AA93D9 
-X-CRM114-Status: GOOD (  13.20  )
+X-CRM114-CacheID: sfid-20190131_065937_713113_731AC4C3 
+X-CRM114-Status: GOOD (  16.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,159 +72,118 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
 Cc: mark.rutland@arm.com, daniel.thompson@linaro.org,
  Julien Thierry <julien.thierry@arm.com>, marc.zyngier@arm.com,
  catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- christoffer.dall@arm.com, james.morse@arm.com, Oleg Nesterov <oleg@redhat.com>,
- joel@joelfernandes.org, Dave Martin <Dave.Martin@arm.com>
+ christoffer.dall@arm.com, james.morse@arm.com, joel@joelfernandes.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-In order to replace PSR.I interrupt disabling/enabling with ICC_PMR_EL1
-interrupt masking, ICC_PMR_EL1 needs to be saved/restored when
-taking/returning from an exception. This mimics the way hardware saves
-and restores PSR.I bit in spsr_el1 for exceptions and ERET.
+CPU does not received signals for interrupts with a priority masked by
+ICC_PMR_EL1. This means the CPU might not come back from a WFI
+instruction.
 
-Add PMR to the registers to save in the pt_regs struct upon kernel entry,
-and restore it before ERET. Also, initialize it to a sane value when
-creating new tasks.
+Make sure ICC_PMR_EL1 does not mask interrupts when doing a WFI.
+
+Since the logic of cpu_do_idle is becoming a bit more complex than just
+two instructions, lets turn it from ASM to C.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Oleg Nesterov <oleg@redhat.com>
-Cc: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/asm/processor.h |  3 +++
- arch/arm64/include/asm/ptrace.h    | 14 +++++++++++---
- arch/arm64/kernel/asm-offsets.c    |  1 +
- arch/arm64/kernel/entry.S          | 14 ++++++++++++++
- arch/arm64/kernel/process.c        |  6 ++++++
- 5 files changed, 35 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/process.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/proc.S        | 11 -----------
+ 2 files changed, 45 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index f1a7ab1..5d9ce62 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -191,6 +191,9 @@ static inline void start_thread_common(struct pt_regs *regs, unsigned long pc)
- 	memset(regs, 0, sizeof(*regs));
- 	forget_syscall(regs);
- 	regs->pc = pc;
-+
-+	if (system_uses_irq_prio_masking())
-+		regs->pmr_save = GIC_PRIO_IRQON;
- }
- 
- static inline void start_thread(struct pt_regs *regs, unsigned long pc,
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 8b131bc..ec60174 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -19,6 +19,8 @@
- #ifndef __ASM_PTRACE_H
- #define __ASM_PTRACE_H
- 
-+#include <asm/cpufeature.h>
-+
- #include <uapi/asm/ptrace.h>
- 
- /* Current Exception Level values, as contained in CurrentEL */
-@@ -179,7 +181,8 @@ struct pt_regs {
- #endif
- 
- 	u64 orig_addr_limit;
--	u64 unused;	// maintain 16 byte alignment
-+	/* Only valid when ARM64_HAS_IRQ_PRIO_MASKING is enabled. */
-+	u64 pmr_save;
- 	u64 stackframe[2];
- };
- 
-@@ -214,8 +217,13 @@ static inline void forget_syscall(struct pt_regs *regs)
- #define processor_mode(regs) \
- 	((regs)->pstate & PSR_MODE_MASK)
- 
--#define interrupts_enabled(regs) \
--	(!((regs)->pstate & PSR_I_BIT))
-+#define irqs_priority_unmasked(regs)					\
-+	(system_uses_irq_prio_masking() ?				\
-+		(regs)->pmr_save == GIC_PRIO_IRQON :			\
-+		true)
-+
-+#define interrupts_enabled(regs)			\
-+	(!((regs)->pstate & PSR_I_BIT) && irqs_priority_unmasked(regs))
- 
- #define fast_interrupts_enabled(regs) \
- 	(!((regs)->pstate & PSR_F_BIT))
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 65b8afc..90ab2cf 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -81,6 +81,7 @@ int main(void)
-   DEFINE(S_ORIG_X0,		offsetof(struct pt_regs, orig_x0));
-   DEFINE(S_SYSCALLNO,		offsetof(struct pt_regs, syscallno));
-   DEFINE(S_ORIG_ADDR_LIMIT,	offsetof(struct pt_regs, orig_addr_limit));
-+  DEFINE(S_PMR_SAVE,		offsetof(struct pt_regs, pmr_save));
-   DEFINE(S_STACKFRAME,		offsetof(struct pt_regs, stackframe));
-   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
-   BLANK();
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 0ec0c46..35a47f6 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -249,6 +249,12 @@ alternative_else_nop_endif
- 	msr	sp_el0, tsk
- 	.endif
- 
-+	/* Save pmr */
-+alternative_if ARM64_HAS_IRQ_PRIO_MASKING
-+	mrs_s	x20, SYS_ICC_PMR_EL1
-+	str	x20, [sp, #S_PMR_SAVE]
-+alternative_else_nop_endif
-+
- 	/*
- 	 * Registers that may be useful after this macro is invoked:
- 	 *
-@@ -269,6 +275,14 @@ alternative_else_nop_endif
- 	/* No need to restore UAO, it will be restored from SPSR_EL1 */
- 	.endif
- 
-+	/* Restore pmr */
-+alternative_if ARM64_HAS_IRQ_PRIO_MASKING
-+	ldr	x20, [sp, #S_PMR_SAVE]
-+	msr_s	SYS_ICC_PMR_EL1, x20
-+	/* Ensure priority change is seen by redistributor */
-+	dsb	sy
-+alternative_else_nop_endif
-+
- 	ldp	x21, x22, [sp, #S_PC]		// load ELR, SPSR
- 	.if	\el == 0
- 	ct_user_enter
 diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index a0f985a..6d410fc 100644
+index 6d410fc..3767fb2 100644
 --- a/arch/arm64/kernel/process.c
 +++ b/arch/arm64/kernel/process.c
-@@ -232,6 +232,9 @@ void __show_regs(struct pt_regs *regs)
+@@ -51,6 +51,7 @@
+ #include <linux/thread_info.h>
  
- 	printk("sp : %016llx\n", sp);
+ #include <asm/alternative.h>
++#include <asm/arch_gicv3.h>
+ #include <asm/compat.h>
+ #include <asm/cacheflush.h>
+ #include <asm/exec.h>
+@@ -74,6 +75,50 @@
  
+ void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+ 
++static void __cpu_do_idle(void)
++{
++	dsb(sy);
++	wfi();
++}
++
++static void __cpu_do_idle_irqprio(void)
++{
++	unsigned long pmr;
++	unsigned long daif_bits;
++
++	daif_bits = read_sysreg(daif);
++	write_sysreg(daif_bits | PSR_I_BIT, daif);
++
++	/*
++	 * Unmask PMR before going idle to make sure interrupts can
++	 * be raised.
++	 */
++	pmr = gic_read_pmr();
++	gic_write_pmr(GIC_PRIO_IRQON);
++
++	__cpu_do_idle();
++
++	gic_write_pmr(pmr);
++	write_sysreg(daif_bits, daif);
++}
++
++/*
++ *	cpu_do_idle()
++ *
++ *	Idle the processor (wait for interrupt).
++ *
++ *	If the CPU supports priority masking we must do additional work to
++ *	ensure that interrupts are not masked at the PMR (because the core will
++ *	not wake up if we block the wake up signal in the interrupt controller).
++ */
++void cpu_do_idle(void)
++{
 +	if (system_uses_irq_prio_masking())
-+		printk("pmr_save: %08llx\n", regs->pmr_save);
++		__cpu_do_idle_irqprio();
++	else
++		__cpu_do_idle();
++}
 +
- 	i = top_reg;
+ /*
+  * This is our default idle handler.
+  */
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 73886a5..3ea4f3b 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -55,17 +55,6 @@
  
- 	while (i >= 0) {
-@@ -363,6 +366,9 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 		if (arm64_get_ssbd_state() == ARM64_SSBD_FORCE_DISABLE)
- 			childregs->pstate |= PSR_SSBS_BIT;
+ #define MAIR(attr, mt)	((attr) << ((mt) * 8))
  
-+		if (system_uses_irq_prio_masking())
-+			childregs->pmr_save = GIC_PRIO_IRQON;
-+
- 		p->thread.cpu_context.x19 = stack_start;
- 		p->thread.cpu_context.x20 = stk_sz;
- 	}
+-/*
+- *	cpu_do_idle()
+- *
+- *	Idle the processor (wait for interrupt).
+- */
+-ENTRY(cpu_do_idle)
+-	dsb	sy				// WFI may enter a low-power mode
+-	wfi
+-	ret
+-ENDPROC(cpu_do_idle)
+-
+ #ifdef CONFIG_CPU_PM
+ /**
+  * cpu_do_suspend - save CPU registers context
 -- 
 1.9.1
 
