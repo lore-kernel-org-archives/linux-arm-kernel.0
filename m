@@ -2,117 +2,65 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 142E7C282D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 17:39:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D46A7C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 17:52:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DCB622085B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 17:39:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AA1E320881
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 17:52:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tPb6Vgha"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DCB622085B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RWsYn8AP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AA1E320881
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7HWOywZkOHd+6j+5+8Aa/qY+v5ZzBjpqlvf0jFqe8GM=; b=tPb6VghaagpoWj
-	rJ25EkTuVNQvW8PoMvQ4j/htAv6pF2gj0n6GjOX2svzfX0rtqUsnG4uwYbsVkC7nXx3eS1hhTIJmN
-	COZ7ehVvdPPJL+SuNHvQJTNXpA/4l8De79LyNJ98EmGvXv6r4kc7K/t+EgWlQjoc8b5OjOrH5Ta44
-	01x4VCP2rpAPSxggDW/MG2RStjbgYs1+NZ/7GqKTl3i3pGJwA/ezo1teIczutRlscW1E2wocF19L8
-	6wrd2USqxo3AZ0PdExrHg7mSQKpG44bsc490UaLv2M/LiZyGVOGbbnvBeIyUBEHGLxGkmvJk6IFph
-	zZ0cja24PsqnF0dtUkzg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ca3KdX3/7ujsbN9jCwRViVPt8FrjZBiDaSyn2W+ADeA=; b=RWsYn8APYmQo4s
+	x70TYwTLd86adeoJVl3/9knfgGZzxjM/fG0Hhpr7g1KbeJ7spychwf4BKSf+6rZXx6lKmQJZbsmZz
+	qgWLhYkZfoYGZE8AoqztvhKQHJ5OMX8AErTIXIT3MYC5SjEXlQjs2dTlBcWg2QbkSTMNoTUY+fXsH
+	AW/0Lkjky4zfZbfk5puk2ipFpT5tKbHjlrQCV91R41yR6M2LpGKjdnsEZzbM7gzYSpQHOXYfONG8D
+	26wBbB6sS1e3jpEZnRhmZOxlFNdGJTDg3y3B/yTWdOGg0d43xDfGbvFM7YDzykgLSYMFOoxOG5D2q
+	eA0JUcTuJlMj2Gemtvwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpGIp-0008H0-Ku; Thu, 31 Jan 2019 17:39:03 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpGIm-0008GI-Fb
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 17:39:01 +0000
-Received: from smtp.corp.redhat.com (int-mx07.intmail.prod.int.phx2.redhat.com
- [10.5.11.22])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
- (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 738888AE56;
- Thu, 31 Jan 2019 17:38:59 +0000 (UTC)
-Received: from llong.remote.csb (dhcp-17-59.bos.redhat.com [10.18.17.59])
- by smtp.corp.redhat.com (Postfix) with ESMTP id 1375C1019627;
- Thu, 31 Jan 2019 17:38:57 +0000 (UTC)
-Subject: Re: [PATCH 2/3] locking/qspinlock: Introduce CNA into the slow path
- of qspinlock
-To: Alex Kogan <alex.kogan@oracle.com>, linux@armlinux.org.uk,
- peterz@infradead.org, mingo@redhat.com, will.deacon@arm.com, arnd@arndb.de,
- linux-arch@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
-References: <20190131030136.56999-1-alex.kogan@oracle.com>
- <20190131030136.56999-3-alex.kogan@oracle.com>
-From: Waiman Long <longman@redhat.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=longman@redhat.com; prefer-encrypt=mutual; keydata=
- xsFNBFgsZGsBEAC3l/RVYISY3M0SznCZOv8aWc/bsAgif1H8h0WPDrHnwt1jfFTB26EzhRea
- XQKAJiZbjnTotxXq1JVaWxJcNJL7crruYeFdv7WUJqJzFgHnNM/upZuGsDIJHyqBHWK5X9ZO
- jRyfqV/i3Ll7VIZobcRLbTfEJgyLTAHn2Ipcpt8mRg2cck2sC9+RMi45Epweu7pKjfrF8JUY
- r71uif2ThpN8vGpn+FKbERFt4hW2dV/3awVckxxHXNrQYIB3I/G6mUdEZ9yrVrAfLw5M3fVU
- CRnC6fbroC6/ztD40lyTQWbCqGERVEwHFYYoxrcGa8AzMXN9CN7bleHmKZrGxDFWbg4877zX
- 0YaLRypme4K0ULbnNVRQcSZ9UalTvAzjpyWnlnXCLnFjzhV7qsjozloLTkZjyHimSc3yllH7
- VvP/lGHnqUk7xDymgRHNNn0wWPuOpR97J/r7V1mSMZlni/FVTQTRu87aQRYu3nKhcNJ47TGY
- evz/U0ltaZEU41t7WGBnC7RlxYtdXziEn5fC8b1JfqiP0OJVQfdIMVIbEw1turVouTovUA39
- Qqa6Pd1oYTw+Bdm1tkx7di73qB3x4pJoC8ZRfEmPqSpmu42sijWSBUgYJwsziTW2SBi4hRjU
- h/Tm0NuU1/R1bgv/EzoXjgOM4ZlSu6Pv7ICpELdWSrvkXJIuIwARAQABzR9Mb25nbWFuIExv
- bmcgPGxsb25nQHJlZGhhdC5jb20+wsF/BBMBAgApBQJYLGRrAhsjBQkJZgGABwsJCAcDAgEG
- FQgCCQoLBBYCAwECHgECF4AACgkQbjBXZE7vHeYwBA//ZYxi4I/4KVrqc6oodVfwPnOVxvyY
- oKZGPXZXAa3swtPGmRFc8kGyIMZpVTqGJYGD9ZDezxpWIkVQDnKM9zw/qGarUVKzElGHcuFN
- ddtwX64yxDhA+3Og8MTy8+8ZucM4oNsbM9Dx171bFnHjWSka8o6qhK5siBAf9WXcPNogUk4S
- fMNYKxexcUayv750GK5E8RouG0DrjtIMYVJwu+p3X1bRHHDoieVfE1i380YydPd7mXa7FrRl
- 7unTlrxUyJSiBc83HgKCdFC8+ggmRVisbs+1clMsK++ehz08dmGlbQD8Fv2VK5KR2+QXYLU0
- rRQjXk/gJ8wcMasuUcywnj8dqqO3kIS1EfshrfR/xCNSREcv2fwHvfJjprpoE9tiL1qP7Jrq
- 4tUYazErOEQJcE8Qm3fioh40w8YrGGYEGNA4do/jaHXm1iB9rShXE2jnmy3ttdAh3M8W2OMK
- 4B/Rlr+Awr2NlVdvEF7iL70kO+aZeOu20Lq6mx4Kvq/WyjZg8g+vYGCExZ7sd8xpncBSl7b3
- 99AIyT55HaJjrs5F3Rl8dAklaDyzXviwcxs+gSYvRCr6AMzevmfWbAILN9i1ZkfbnqVdpaag
- QmWlmPuKzqKhJP+OMYSgYnpd/vu5FBbc+eXpuhydKqtUVOWjtp5hAERNnSpD87i1TilshFQm
- TFxHDzbOwU0EWCxkawEQALAcdzzKsZbcdSi1kgjfce9AMjyxkkZxcGc6Rhwvt78d66qIFK9D
- Y9wfcZBpuFY/AcKEqjTo4FZ5LCa7/dXNwOXOdB1Jfp54OFUqiYUJFymFKInHQYlmoES9EJEU
- yy+2ipzy5yGbLh3ZqAXyZCTmUKBU7oz/waN7ynEP0S0DqdWgJnpEiFjFN4/ovf9uveUnjzB6
- lzd0BDckLU4dL7aqe2ROIHyG3zaBMuPo66pN3njEr7IcyAL6aK/IyRrwLXoxLMQW7YQmFPSw
- drATP3WO0x8UGaXlGMVcaeUBMJlqTyN4Swr2BbqBcEGAMPjFCm6MjAPv68h5hEoB9zvIg+fq
- M1/Gs4D8H8kUjOEOYtmVQ5RZQschPJle95BzNwE3Y48ZH5zewgU7ByVJKSgJ9HDhwX8Ryuia
- 79r86qZeFjXOUXZjjWdFDKl5vaiRbNWCpuSG1R1Tm8o/rd2NZ6l8LgcK9UcpWorrPknbE/pm
- MUeZ2d3ss5G5Vbb0bYVFRtYQiCCfHAQHO6uNtA9IztkuMpMRQDUiDoApHwYUY5Dqasu4ZDJk
- bZ8lC6qc2NXauOWMDw43z9He7k6LnYm/evcD+0+YebxNsorEiWDgIW8Q/E+h6RMS9kW3Rv1N
- qd2nFfiC8+p9I/KLcbV33tMhF1+dOgyiL4bcYeR351pnyXBPA66ldNWvABEBAAHCwWUEGAEC
- AA8FAlgsZGsCGwwFCQlmAYAACgkQbjBXZE7vHeYxSQ/+PnnPrOkKHDHQew8Pq9w2RAOO8gMg
- 9Ty4L54CsTf21Mqc6GXj6LN3WbQta7CVA0bKeq0+WnmsZ9jkTNh8lJp0/RnZkSUsDT9Tza9r
- GB0svZnBJMFJgSMfmwa3cBttCh+vqDV3ZIVSG54nPmGfUQMFPlDHccjWIvTvyY3a9SLeamaR
- jOGye8MQAlAD40fTWK2no6L1b8abGtziTkNh68zfu3wjQkXk4kA4zHroE61PpS3oMD4AyI9L
- 7A4Zv0Cvs2MhYQ4Qbbmafr+NOhzuunm5CoaRi+762+c508TqgRqH8W1htZCzab0pXHRfywtv
- 0P+BMT7vN2uMBdhr8c0b/hoGqBTenOmFt71tAyyGcPgI3f7DUxy+cv3GzenWjrvf3uFpxYx4
- yFQkUcu06wa61nCdxXU/BWFItryAGGdh2fFXnIYP8NZfdA+zmpymJXDQeMsAEHS0BLTVQ3+M
- 7W5Ak8p9V+bFMtteBgoM23bskH6mgOAw6Cj/USW4cAJ8b++9zE0/4Bv4iaY5bcsL+h7TqQBH
- Lk1eByJeVooUa/mqa2UdVJalc8B9NrAnLiyRsg72Nurwzvknv7anSgIkL+doXDaG21DgCYTD
- wGA5uquIgb8p3/ENgYpDPrsZ72CxVC2NEJjJwwnRBStjJOGQX4lV1uhN1XsZjBbRHdKF2W9g
- weim8xU=
-Organization: Red Hat
-Message-ID: <2c8aabab-1bb0-0708-94c4-305fd860609e@redhat.com>
-Date: Thu, 31 Jan 2019 12:38:57 -0500
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
+	id 1gpGVp-0004Zh-G2; Thu, 31 Jan 2019 17:52:29 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gpGVm-0004Z1-4i
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 17:52:27 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5A37AA78;
+ Thu, 31 Jan 2019 09:52:23 -0800 (PST)
+Received: from donnerap.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E834E3F59C;
+ Thu, 31 Jan 2019 09:52:20 -0800 (PST)
+Date: Thu, 31 Jan 2019 17:52:17 +0000
+From: Andre Przywara <andre.przywara@arm.com>
+To: Jeremy Linton <jeremy.linton@arm.com>
+Subject: Re: [PATCH v4 06/12] arm64: add sysfs vulnerability show for
+ spectre v1
+Message-ID: <20190131175217.4ff452d5@donnerap.cambridge.arm.com>
+In-Reply-To: <20190125180711.1970973-7-jeremy.linton@arm.com>
+References: <20190125180711.1970973-1-jeremy.linton@arm.com>
+ <20190125180711.1970973-7-jeremy.linton@arm.com>
+Organization: ARM
+X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; aarch64-unknown-linux-gnu)
 MIME-Version: 1.0
-In-Reply-To: <20190131030136.56999-3-alex.kogan@oracle.com>
-Content-Language: en-US
-X-Scanned-By: MIMEDefang 2.84 on 10.5.11.22
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.25]); Thu, 31 Jan 2019 17:38:59 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_093900_560659_D5EDD4DD 
-X-CRM114-Status: GOOD (  18.01  )
+X-CRM114-CacheID: sfid-20190131_095226_193848_382A9F96 
+X-CRM114-Status: GOOD (  15.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -124,45 +72,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: rahul.x.yadav@oracle.com, dave.dice@oracle.com, steven.sistare@oracle.com,
- daniel.m.jordan@oracle.com
+Cc: stefan.wahren@i2se.com, mlangsdo@redhat.com, suzuki.poulose@arm.com,
+ marc.zyngier@arm.com, catalin.marinas@arm.com, julien.thierry@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, steven.price@arm.com,
+ shankerd@codeaurora.org, ykaukab@suse.de, dave.martin@arm.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 01/30/2019 10:01 PM, Alex Kogan wrote:
-> In CNA, spinning threads are organized in two queues, a main queue for
-> threads running on the same socket as the current lock holder, and a
-> secondary queue for threads running on other sockets. For details,
-> see https://arxiv.org/abs/1810.05600.
->
-> Note that this variant of CNA may introduce starvation by continuously
-> passing the lock to threads running on the same socket. This issue
-> will be addressed later in the series.
->
-> Signed-off-by: Alex Kogan <alex.kogan@oracle.com>
-> Reviewed-by: Steve Sistare <steven.sistare@oracle.com>
+On Fri, 25 Jan 2019 12:07:05 -0600
+Jeremy Linton <jeremy.linton@arm.com> wrote:
 
-Just wondering if you have tried include PARVIRT_SPINLOCKS option to see
-if that patch may screw up the PV qspinlock code.
+Hi,
 
-Anyway, I do believe your claim that NUMA-aware qspinlock is good for
-large systems with many nodes. However, all these extra code are
-overhead for small systems that have a single node/socket, for instance.
+> From: Mian Yousaf Kaukab <ykaukab@suse.de>
+> 
+> spectre v1, has been mitigated, and the mitigation is
+> always active.
+> 
+> Signed-off-by: Mian Yousaf Kaukab <ykaukab@suse.de>
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/kernel/cpu_errata.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index de09a3537cd4..ef636acf5604 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -730,3 +730,13 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+>  	{
+>  	}
+>  };
+> +
+> +#ifdef CONFIG_GENERIC_CPU_VULNERABILITIES
+> +
+> +ssize_t cpu_show_spectre_v1(struct device *dev, struct device_attribute *attr,
+> +		char *buf)
 
-I will support doing something similar to what had been done to support
-PV qspinlock. IOW, a separate slowpath function that can be patched to
-become the default depending on the system being run on or a kernel boot
-option setting.
+w/s issue. Other than that:
 
-I would like to keep the core slowpath function simple and easy to
-understand. So most of the CNA code should be encapsulated into some
-helper functions and put into a separated file.
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 
-Thanks,
-Longman
+Cheers,
+Andre.
 
+> +{
+> +	return sprintf(buf, "Mitigation: __user pointer sanitization\n");
+> +}
+> +
+> +#endif
 
 _______________________________________________
 linux-arm-kernel mailing list
