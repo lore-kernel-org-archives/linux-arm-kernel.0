@@ -2,82 +2,89 @@ Return-Path: <SRS0=sKCI=QH=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 938C5C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:24:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A6114C282C7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:24:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6D04920B1F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:24:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 81C8220B1F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 31 Jan 2019 09:24:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hdQAHnhE";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="UWDR0ZHW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D04920B1F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M1USBIq2";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="eQlH0d45"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 81C8220B1F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=ZIZq6Jo7WBzDujxUeOXbXhKtZwFwDv5V28zw8BVmx7E=; b=hdQAHnhEHhlv7N
-	f+irRg34hKLQMB2D7O1hTL8sCbCHG7GKL9Meh3hkR5Bwgc2loH2cygKF6z37HuGSdHIybk+BTDne8
-	xcXF7JzQFRBAXTRIf0855jEe0sNqWorQsqxHXVL9+Qeaw73Oy4ssRGv3LOka1ZCR8eUqfO9Ci1FGE
-	581Xri6quzbyz34gznW28ROsMT9FhdPaYA/pxJg4cmIE77RR18Je1UnU1NgNB1K2RY82NYUnCTdp9
-	JlHi7U21tefeNfjaJ4EC3DhDmXpvAyt7e1qo5eNJELopG5NpGlNNqj6l3r+9QnHjJ1x5T1MLBo1bb
-	C1EELMJEixERe8Mm2ebA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=758PcEMR+6eU+8rzjkoDyptZatf4ugCQIRq9+CTZ/G0=; b=M1USBIq2bkTU3Z
+	1fZESwji00OQmxVlkN2rl6Cf0701AI/FWgpx1dH18JqJ9pJH0FAuSmhfZ0pkQr7eix+FJ0chUIjme
+	5N7DeWb8B14Z3CrWz4XesRYGMBeFkFdA4SXI1c5/80rEemu+W10hrq6CVm5kF3kLYwffIQq30mkmC
+	VpkUbOtSce7z2KwoZf3624h6Y2Gqb9Yp83rds7nGjJ1OV0bzCui6iHm+OcQUkj5dwst+JvTI/kbVs
+	nyF2I/zrRC7bhYzux/4FH+Z417tagDuSGwCjLE4nTEBDK0GI/B+klFpNdZhtMvHhuNYrfQNOge2k9
+	LPVhUEHuFVFdxunH7UYg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gp8a3-0004Xt-Rh; Thu, 31 Jan 2019 09:24:19 +0000
+	id 1gp8aO-0004p8-6b; Thu, 31 Jan 2019 09:24:40 +0000
 Received: from hqemgate14.nvidia.com ([216.228.121.143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gp8a0-0004XZ-RR
- for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 09:24:18 +0000
+ id 1gp8a3-0004Xw-Nz
+ for linux-arm-kernel@lists.infradead.org; Thu, 31 Jan 2019 09:24:25 +0000
 Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
  hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c52bec20000>; Thu, 31 Jan 2019 01:24:18 -0800
+ id <B5c52bec50001>; Thu, 31 Jan 2019 01:24:21 -0800
 Received: from hqmail.nvidia.com ([172.20.161.6])
  by hqpgpgate101.nvidia.com (PGP Universal service);
- Thu, 31 Jan 2019 01:24:16 -0800
+ Thu, 31 Jan 2019 01:24:19 -0800
 X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Thu, 31 Jan 2019 01:24:16 -0800
-Received: from HQMAIL102.nvidia.com (172.18.146.10) by HQMAIL107.nvidia.com
- (172.20.187.13) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 31 Jan
- 2019 09:24:16 +0000
-Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL102.nvidia.com
- (172.18.146.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
- Frontend Transport; Thu, 31 Jan 2019 09:24:16 +0000
+ by hqpgpgate101.nvidia.com on Thu, 31 Jan 2019 01:24:19 -0800
+Received: from HQMAIL102.nvidia.com (172.18.146.10) by HQMAIL103.nvidia.com
+ (172.20.187.11) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 31 Jan
+ 2019 09:24:18 +0000
+Received: from HQMAIL104.nvidia.com (172.18.146.11) by HQMAIL102.nvidia.com
+ (172.18.146.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 31 Jan
+ 2019 09:24:19 +0000
+Received: from hqnvemgw02.nvidia.com (172.16.227.111) by HQMAIL104.nvidia.com
+ (172.18.146.11) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via
+ Frontend Transport; Thu, 31 Jan 2019 09:24:18 +0000
 Received: from josephl-linux.nvidia.com (Not Verified[10.19.108.132]) by
  hqnvemgw02.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
- id <B5c52bebf0001>; Thu, 31 Jan 2019 01:24:16 -0800
+ id <B5c52bec10001>; Thu, 31 Jan 2019 01:24:18 -0800
 From: Joseph Lo <josephl@nvidia.com>
 To: Thierry Reding <thierry.reding@gmail.com>, Jonathan Hunter
  <jonathanh@nvidia.com>
-Subject: [PATCH V4 0/7] Add CPUidle support for Tegra210
-Date: Thu, 31 Jan 2019 17:24:03 +0800
-Message-ID: <20190131092410.28222-1-josephl@nvidia.com>
+Subject: [PATCH V4 1/7] dt-bindings: timer: add Tegra210 timer
+Date: Thu, 31 Jan 2019 17:24:04 +0800
+Message-ID: <20190131092410.28222-2-josephl@nvidia.com>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190131092410.28222-1-josephl@nvidia.com>
+References: <20190131092410.28222-1-josephl@nvidia.com>
 MIME-Version: 1.0
 X-NVConfidentiality: public
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1548926658; bh=ENHYVgcqOP6xBR3gwZRGINRwAQgtBFPqvTozpD28GI0=;
+ t=1548926661; bh=AtUj36W3zYQHBmv+noQJcmd4x5qNY3mVboxC574zoyc=;
  h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
- MIME-Version:X-NVConfidentiality:Content-Transfer-Encoding:
- Content-Type;
- b=UWDR0ZHWDVrmOB29Q3eKa4JCgvg3cMPVudpjVQBwfNWBl1+muV0kBfpnG/MomjvOm
- GQJ0oK1I9QLon1rZdv7CuhWg8GhOumDogzJi06QBhlxcMEJwTejR5fu5ZYhriMwGWK
- /XF8RVsDXSuL4ujbtG6ETOCpFCDS4FtUYTXGUvbhCVkrA5+sPVmhFjdrgAcF5ydek+
- FLEsrehk9dwVtwMflm9u9mI6aC4oSwHUw4OnBG6o8ybYOxzTOgcXz/JNZNXP3Du78j
- DqqIaH67QbgmiuK2nZMCvzmnePZHd8jT0K2Krzx+JPUtBPeeCbgws3KGGbGtaWY04J
- V6/ETX0jrS4tA==
+ In-Reply-To:References:MIME-Version:X-NVConfidentiality:
+ Content-Transfer-Encoding:Content-Type;
+ b=eQlH0d45d7dFMrSrkIfyyJMxN4L0sqxMoQG6cGpNq0LMUZL7DoGTJaQVCvbgUfCiH
+ 8fcbQlQ2/dQFYKcCzClaq/++HzOBVtuKV+k6XOzsoS+m1NXeE/zlGI8YfckhWizCHg
+ rCFperZMi9qRdmvV6dAVDCI2bL/dDgYdYfzKs7UHLLVTJ1MaKdDa2T5XTcneFy3vTB
+ yNox2a4fMLLrbOC+1WOsEl5RhNvMIQx3LAxvKSx6IZr2qcG4H4wQn5n8aXG2EjgpcB
+ T35aiZ9BRlz3rmPGKgUWsXBPYlPbZI0V/dRaCKZ1k4FhszngPpaTPiCF6U3nQSyNc1
+ b9XgVtTnjvkpQ==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_012416_894737_EAC1B913 
-X-CRM114-Status: GOOD (  10.01  )
+X-CRM114-CacheID: sfid-20190131_012420_008969_596E8B66 
+X-CRM114-Status: UNSURE (   8.94  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,52 +96,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Joseph Lo <josephl@nvidia.com>
+Cc: devicetree@vger.kernel.org, Rob Herring <robh@kernel.org>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
+ Joseph Lo <josephl@nvidia.com>, linux-tegra@vger.kernel.org,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch series adds CPUidle support for Tegra210, which supports
-power-down state (C7) for CPU cores. And due to arch timer cannot work
-across CPU core power-down and power on reset signal event. We introduce
-Tegra210 timer driver to work as clock event device. So it can be the
-wake-up source of CPU cores when they idled in the power-down state.
+The Tegra210 timer provides fourteen 29-bit timer counters and one 32-bit
+timestamp counter. The TMRs run at either a fixed 1 MHz clock rate derived
+from the oscillator clock (TMR0-TMR9) or directly at the oscillator clock
+(TMR10-TMR13). Each TMR can be programmed to generate one-shot periodic,
+or watchdog interrupts.
 
-Fixed in V4:
- * merge timer-tegra210.c into timer-tegra20.c
- * add a new patch to select TEGRA_TIMER by default for Tegra210
-
-Fixed in V3:
- * use timer-of API for Tegra210 timer driver
-
-Fixed in V2:
- * list all the timer IRQs in the binding doc and dts file
- * add error clean-up code in timer driver
- * add entry-latency-us and exit-latency-us properties for idle-states
-   DT node
-
-Joseph Lo (7):
-  dt-bindings: timer: add Tegra210 timer
-  clocksource: tegra: add Tegra210 timer support
-  soc/tegra: default select TEGRA_TIMER for Tegra210
-  arm64: dts: tegra210: fix timer node
-  arm64: dts: tegra210: add CPU idle states properties
-  arm64: dts: tegra210-p2180: Enable CPU idle support
-  arm64: dts: tegra210-smaug: Enable CPU idle support
-
- .../bindings/timer/nvidia,tegra210-timer.txt  |  36 ++
- .../arm64/boot/dts/nvidia/tegra210-p2180.dtsi |   6 +
- arch/arm64/boot/dts/nvidia/tegra210-smaug.dts |   7 +
- arch/arm64/boot/dts/nvidia/tegra210.dtsi      |  33 +-
- drivers/clocksource/Kconfig                   |   2 +-
- drivers/clocksource/timer-tegra20.c           | 369 +++++++++++++-----
- drivers/soc/tegra/Kconfig                     |   1 +
- include/linux/cpuhotplug.h                    |   1 +
- 8 files changed, 352 insertions(+), 103 deletions(-)
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: linux-kernel@vger.kernel.org
+Cc: devicetree@vger.kernel.org
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+V4:
+ * no change
+v3:
+ * no change
+v2:
+ * list all the interrupts that are supported by tegra210 timers block
+ * add RB tag from Rob.
+---
+ .../bindings/timer/nvidia,tegra210-timer.txt  | 36 +++++++++++++++++++
+ 1 file changed, 36 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/timer/nvidia,tegra210-timer.txt
 
+diff --git a/Documentation/devicetree/bindings/timer/nvidia,tegra210-timer.txt b/Documentation/devicetree/bindings/timer/nvidia,tegra210-timer.txt
+new file mode 100644
+index 000000000000..032cda96fe0d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/nvidia,tegra210-timer.txt
+@@ -0,0 +1,36 @@
++NVIDIA Tegra210 timer
++
++The Tegra210 timer provides fourteen 29-bit timer counters and one 32-bit
++timestamp counter. The TMRs run at either a fixed 1 MHz clock rate derived
++from the oscillator clock (TMR0-TMR9) or directly at the oscillator clock
++(TMR10-TMR13). Each TMR can be programmed to generate one-shot, periodic,
++or watchdog interrupts.
++
++Required properties:
++- compatible : "nvidia,tegra210-timer".
++- reg : Specifies base physical address and size of the registers.
++- interrupts : A list of 14 interrupts; one per each timer channels 0 through
++  13.
++- clocks : Must contain one entry, for the module clock.
++  See ../clocks/clock-bindings.txt for details.
++
++timer@60005000 {
++	compatible = "nvidia,tegra210-timer";
++	reg = <0x0 0x60005000 0x0 0x400>;
++	interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 177 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>;
++	clocks = <&tegra_car TEGRA210_CLK_TIMER>;
++	clock-names = "timer";
++};
 -- 
 2.20.1
 
