@@ -2,59 +2,59 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9F571C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 22:09:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6CFF6C4151A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 22:09:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6925B21872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 22:09:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 38752218A6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 22:09:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fM3wZx/L";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="y4y5Zheb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6925B21872
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qgD4d18w";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="sswKfz66"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 38752218A6
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=Jf4LhwBwRQq9DZimmfNkzUDaTo7QqHIL35URnijxE1o=; b=fM3wZx/LPVZ3R7
-	YboXyNOx6ItD1rwD1o0v8u4JCy3blW7DiHzwxaE8c3Mf8aj9eNH9nys5cMEn7zUU1NvolsJTzWKmy
-	V+Esey9LRkB/G15rBmOVGDtrOi7VBV6myzz74xtlE550RNajluCAC7DBkgKS7k250tLxFc4JI6mmI
-	9PYH0XYXf3cZATvf2Gaa0JTUWhnP5pn1AEloXtanpKLN5Z6nCDdZHXmAIEXo9+o5E7Qmo4XmN6y+o
-	b6HTZQzU4qFeIpk9kX2bXq00jYpt2zPzskOnpL7bUwPy8GPUHXQvFNwciBM7L+adBF7V81+xaq3Gr
-	KBsmcvX+QWDJE4Hqgw4w==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=kzSvEuQD2CIUSeYecrDqAN7ryejKKTphav6jysDRK0g=; b=qgD4d18wgsrw0/
+	EVj4Rn07FtTAVxRXpUUFV7tHReiS3uwNic9OwJKpIRV/UW5UMB4olBrzCeZf6KMw6Bv9ZQm4Deh9r
+	8X7qlpKjxMaF7FtdgxPGrdBgrjzCpT8DQTLl3md6PvrTZm6eGIbVrcLu7hpJKQQSdsbW3byivuKkU
+	GMHnlqfRkMGaO8DCTGBesaNXsKyANDPv6tnd5SrlS4veJa09rigPiJpHC3Arn64N3O14EUiiiKYLy
+	VQjKNEXHtmr+cmtjJvQBk2zRjwNVqkfR9l57o8dGSPb70LdcPFAy2KrcGLXeGlgYeQ5ku8mWEzZzz
+	htreNuGJLkB/98I3sD+A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gph09-000197-8J; Fri, 01 Feb 2019 22:09:33 +0000
-Received: from mail-co1nam03on0603.outbound.protection.outlook.com
- ([2a01:111:f400:fe48::603]
- helo=NAM03-CO1-obe.outbound.protection.outlook.com)
+	id 1gph0P-0001Qs-75; Fri, 01 Feb 2019 22:09:49 +0000
+Received: from mail-co1nam05on0601.outbound.protection.outlook.com
+ ([2a01:111:f400:fe50::601]
+ helo=NAM05-CO1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpgzv-0000xm-3L
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 22:09:20 +0000
+ id 1gpgzv-0000xo-Dc
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 22:09:21 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=7rv08A0eLwyaLrv3WAXSTZ9hcVX+PCe9xJNqFuJaFzk=;
- b=y4y5Zheb9lvTRXujjEnAWxDmN9yOG04Tal+7UAsW/g9WGhwSzD41oP9QgL3uiEFsAXp24TiyFR2XnixAkfMF0qa/XUkrRZjblp9VBmiKSun7tFyUqm6zG/Msw6+yOXetSsjJjTwlCHiD3rxcX1Q1CUeaPh0U2u1T4TvNUXzOvaY=
-Received: from DM6PR02CA0010.namprd02.prod.outlook.com (2603:10b6:5:1c::23) by
- BYAPR02MB5016.namprd02.prod.outlook.com (2603:10b6:a03:71::21) with
- Microsoft
- SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1558.21; Fri, 1 Feb 2019 22:09:15 +0000
-Received: from BL2NAM02FT058.eop-nam02.prod.protection.outlook.com
- (2a01:111:f400:7e46::200) by DM6PR02CA0010.outlook.office365.com
- (2603:10b6:5:1c::23) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1580.17 via Frontend
+ bh=oRpVOCM6ngbHXXWym1UvBWBRbMKIWQaU+4lzzI3Adro=;
+ b=sswKfz66LP1DtTvOjNp4XbF8a1HxMo9Y8IZHjRHfmWzXF12uTK8o3UNxlUdoeatt4O7kK8DOMZLUGuu+q4+q2xaNiWnKeoV/98kiPnAfiHBTqdHv3cB5mwxAwi6abhzIak0Up+pXcwOkah1xns6icDDoENgBaE61AVo2O0F8Zrg=
+Received: from SN4PR0201CA0035.namprd02.prod.outlook.com
+ (2603:10b6:803:2e::21) by BL2PR02MB2145.namprd02.prod.outlook.com
+ (2a01:111:e400:c74b::19) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1558.21; Fri, 1 Feb
+ 2019 22:09:15 +0000
+Received: from SN1NAM02FT009.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e44::206) by SN4PR0201CA0035.outlook.office365.com
+ (2603:10b6:803:2e::21) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1580.20 via Frontend
  Transport; Fri, 1 Feb 2019 22:09:15 +0000
 Authentication-Results: spf=pass (sender IP is 149.199.60.83)
  smtp.mailfrom=xilinx.com; vger.kernel.org; dkim=none (message not signed)
@@ -64,34 +64,35 @@ Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
  149.199.60.83 as permitted sender) receiver=protection.outlook.com;
  client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
 Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
- BL2NAM02FT058.mail.protection.outlook.com (10.152.76.176) with Microsoft SMTP
+ SN1NAM02FT009.mail.protection.outlook.com (10.152.73.32) with Microsoft SMTP
  Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1580.10
  via Frontend Transport; Fri, 1 Feb 2019 22:09:14 +0000
 Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
  by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
  (envelope-from <jolly.shah@xilinx.com>)
- id 1gpgzq-0007Tt-Bv; Fri, 01 Feb 2019 14:09:14 -0800
+ id 1gpgzq-0007Ts-6x; Fri, 01 Feb 2019 14:09:14 -0800
 Received: from [127.0.0.1] (helo=localhost)
  by xsj-pvapsmtp01 with smtp (Exim 4.63)
  (envelope-from <jolly.shah@xilinx.com>)
- id 1gpgzl-0000P8-8b; Fri, 01 Feb 2019 14:09:09 -0800
-Received: from xsj-pvapsmtp01 (mailman.xilinx.com [149.199.38.66])
- by xsj-smtp-dlp1.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x11M8w7Q027117; 
+ id 1gpgzl-0000P8-3z; Fri, 01 Feb 2019 14:09:09 -0800
+Received: from xsj-pvapsmtp01 (mail.xilinx.com [149.199.38.66] (may be forged))
+ by xsj-smtp-dlp2.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x11M8wLp030350; 
  Fri, 1 Feb 2019 14:08:58 -0800
 Received: from [172.19.2.91] (helo=xsjjollys50.xilinx.com)
  by xsj-pvapsmtp01 with esmtp (Exim 4.63)
  (envelope-from <jollys@xilinx.com>)
- id 1gpgza-0000LK-Ht; Fri, 01 Feb 2019 14:08:58 -0800
+ id 1gpgza-0000LK-LD; Fri, 01 Feb 2019 14:08:58 -0800
 From: Jolly Shah <jolly.shah@xilinx.com>
 To: <matthias.bgg@gmail.com>, <andy.gross@linaro.org>, <shawnguo@kernel.org>, 
  <geert+renesas@glider.be>, <bjorn.andersson@linaro.org>,
  <sean.wang@mediatek.com>, <m.szyprowski@samsung.com>,
  <michal.simek@xilinx.com>, <robh+dt@kernel.org>, <mark.rutland@arm.com>
-Subject: [PATCH v4 0/3] drivers: soc: xilinx: Add support for ZynqMP power
- domain driver
-Date: Fri, 1 Feb 2019 14:08:47 -0800
-Message-ID: <1549058930-18644-1-git-send-email-jollys@xilinx.com>
+Subject: [PATCH v4 2/3] firmware: xilinx: Add APIs to control node status/power
+Date: Fri, 1 Feb 2019 14:08:49 -0800
+Message-ID: <1549058930-18644-3-git-send-email-jollys@xilinx.com>
 X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1549058930-18644-1-git-send-email-jollys@xilinx.com>
+References: <1549058930-18644-1-git-send-email-jollys@xilinx.com>
 X-RCIS-Action: ALLOW
 X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
 X-TM-AS-User-Approved-Sender: Yes;Yes
@@ -99,68 +100,70 @@ X-EOPAttributedMessage: 0
 X-MS-Office365-Filtering-HT: Tenant
 X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
  SFV:NSPM;
- SFS:(10009020)(396003)(39860400002)(346002)(376002)(136003)(2980300002)(189003)(199004)(72206003)(8936002)(39060400002)(478600001)(305945005)(16586007)(110136005)(4326008)(316002)(7696005)(7416002)(106002)(51416003)(107886003)(48376002)(14444005)(81156014)(36386004)(50226002)(77096007)(8676002)(81166006)(186003)(26005)(50466002)(2201001)(426003)(126002)(6666004)(2906002)(356004)(486006)(44832011)(9786002)(336012)(47776003)(54906003)(63266004)(106466001)(2616005)(476003)(36756003)(107986001)(921003)(1121003)(2101003)(83996005);
- DIR:OUT; SFP:1101; SCL:1; SRVR:BYAPR02MB5016; H:xsj-pvapsmtpgw01; FPR:;
- SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; MX:1; A:1; 
-X-Microsoft-Exchange-Diagnostics: 1; BL2NAM02FT058;
- 1:Hxp28AZYhmsRyXppU9HaFPhpt1AL+TGAP+0DXKeQWBQBohN5OpTa9O6VHDQOz8IvyuqTyZn5Fx6NTpZmq2isiRLdWWh7coV1zifEqYC979GBI640MJKJe8aZK89O3eRgifn6JQFl+sZ/OKXCX9xj6lOhFtrTnwDXs9snKzO3WDM=
+ SFS:(10009020)(346002)(136003)(376002)(39860400002)(396003)(2980300002)(199004)(189003)(39060400002)(486006)(476003)(2201001)(126002)(6666004)(356004)(4326008)(63266004)(50226002)(44832011)(106002)(26005)(426003)(11346002)(336012)(50466002)(48376002)(2616005)(446003)(14444005)(107886003)(77096007)(186003)(478600001)(36386004)(2906002)(9786002)(7696005)(72206003)(76176011)(110136005)(51416003)(81156014)(16586007)(305945005)(106466001)(8936002)(8676002)(47776003)(81166006)(36756003)(316002)(54906003)(7416002)(107986001)(921003)(42866002)(83996005)(2101003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BL2PR02MB2145; H:xsj-pvapsmtpgw01; FPR:;
+ SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; A:1; MX:1; 
+X-Microsoft-Exchange-Diagnostics: 1; SN1NAM02FT009;
+ 1:g2Qb4n9ExSejUGUljR8ZhXiIVh92O7CqKv1RLbr+O463koj8tb2NRtT9le330FI/QayHUJE/0UMZDMEUHX4Wh074rr7JRedGb1GjKSDVWljM/dCHOI0UmQMWMxAcWzxj6s5k/3Yd7m/xO9eyC/57KUGWBFrlwrrQSCgjesBNE5I=
 MIME-Version: 1.0
 X-MS-PublicTrafficType: Email
-X-MS-Office365-Filtering-Correlation-Id: eae3b530-d734-4808-8bdb-08d68891e744
+X-MS-Office365-Filtering-Correlation-Id: f5ca038a-cc8c-4772-5f81-08d68891e75a
 X-Microsoft-Antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4608076)(4709027)(2017052603328)(7153060);
- SRVR:BYAPR02MB5016; 
-X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB5016;
- 3:QZTSWWqXVT2vTTWTRSZVmxXBpg+3wujce9cpV9ri1FlRgIKru1gItvL8ZHFcgIh5XPX5ULKd+prM83rB5YtAT1nx7VusBRTIhRnSOtN9gk7L3rJI/7n1XCAuNAiglrXHYzi6TCwB4V0epSFEFA6xJzhWG8IgrRPs+ZZfnFUlhZjWgH57zwJi2Y7UYv8J7aRD/YA0T7qJ5cYiwtD68d3UrEvoPil2pTuuHg+1LfWFJsqAy3E85iwf3Vb81Sz7aBJFHUfLa+5DpUIQ3dEV20Meq9q+/4N6faC2oSn2cYQCDj0FFR0/lslqgIgWvOiLq4r5ub4zyUtChyY7VlA+oQjBS86BrKIWj5UBl5jF1Le2mlTnppgnRqOvLINimC8980s2;
- 25:wR+Fhg2zZKanauYyq/41BZ9M3oFhy12TvTfIJ2Fbi4l0PRF92VuzVEGxrrb73UPeQfC4bq6CZcJMrqpidJYWw/A9DRnpLf/RavdTztfyr8CJAAR1r4DE8ASJJnk+hX0kFOTewouumaXpQg19DqbYjTcC042jWJlzD5q1EVpjl7dl31/kW+0JN7ryloz3fyNmJFdRyKbWWKiMR+iCkJIateAnZcxS578KZDoC4J+KFzV92QZpMS/Cazbf9q879fCEDNRVPlajSZ1+3WL/3konrrWTzkWUoJLZP88Jri0pm2eW/XiJhM33dB10k7soHmNVldKtl3kHDCts2yPH2djrVQ==
-X-MS-TrafficTypeDiagnostic: BYAPR02MB5016:
-X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB5016;
- 31:tOwynl7X7FAqoyTHUdvwZRNNRML1AOla7nAfB9ehy2QQ3mHAUotUZxxWZ7YH+S+Y/g8bWDsC5d8eOsnbRKgriNt5vk8D0hxzGCv2l/jh68iLqYqHwAJNBU/6kKxn1ngyOyqueaDLNNtWiPuJD4KV2EDE70fpeOPS8mL6lQAYs2s5gifsm4G030+durqWSJLDJx6P7TT4noAuvwlFW8DCEthsF+N6dWH/i3ZLpJNT3SA=;
- 20:KwsVz3HPei6B0wfTKJ5nRsBnUvtmYAKCxzVMoR6XRJnxhmAFE8JiwP2PGRAbGVCIQrXB8Vz8rz7J3OCGVUZYA2VmmlziL7WWFt5pLQtDoG5X+jqMaJACVKJ4fGZmpEiFvQ1kTZYDzRdXgVfgUmcaUZGzSvBfOCA5G9dCWIJBzaVjXvDXF2gsZFKwOpsbbVvWk2bjVTeo8HhjT/2UNWfxbzXlnnxcE/VqTXNG+LYbD6js12OJijn35RwxQi+tNLmDainIwaBIqA/CB/4kvEVN/v0gBGviNGwQkb2NwCf8ICck1hMfztrjR9eaJ1mJf+ve3lt98SvES3QTGSXN2LPGra6Yk0r1TY2LK3btttq/HzUPT/58tb1E04RfDXsfjsS9OpcqgY5F2SdqQ1c3+tu9cKJitgsctqTb1MTHsq/UAikNAe4nOyUAJqwuxVIyenqSjxeKNRElFJY433xe40xiw11Cu54zMg6XWJYDVR09vlLutxqzgdTxTNkiR22s3i3l
+ SRVR:BL2PR02MB2145; 
+X-Microsoft-Exchange-Diagnostics: 1; BL2PR02MB2145;
+ 3:KzAuRigncdHIu4T7frxxm0HFba0BNs6GmRWkauAfEYGhQibbJAgVpmv1eprgWRosqNfSN2RYx7yVaSVLTjYoqa/bX7JWDFz14gkvwwhsFrDWV02sPZf4dwPqq/BcGK/gyCPUM1fh9wH9lF1ZxM4w1TWaPgYNCKyztrR4+kq8nl7083VrCiA0GZ4y2j1hIGmbLmukSUCPaJaoisWuOdZjHQu0EHczreYeB0suIL9jko4NymaAnSJIRTzNptAeG5C58zwc2FKGuUtMoXgUUaxnQ8pFNZyGCD2Vi1kYzpFWOIHZrBEUZxj/daF52UiT7bUe6Rlq53U5PR8a0xHqcqMfHaSHS3AlM+a5H8FOcM/ZamcSQBFtXHUeFRub9W3dm2Oc;
+ 25:OarPgWi5+MPOIORUHoRnPAbSXKr6IvG7jlC1UevdzRY1k/6GV0+TJtm+Ur9upT+RNjyIuDQ1pCHh9LLY1OmHNveQyTjxJYHQbui0DbBrU4/3MtkeC1hiaONdm5b5Nq4aBUBgdnpAfBS8Ib51GCgzTKOOhK2sDoxomlMoThg+LkZWIWsgn5nHF2FuSp+HHhBhbkXSX1xzR7rveLUvBA8UjwJVFRwwRHE5qtkIJzVbFSOMcHund7d1y2HTO/sJoNeZHVm3zDMWjf6GzYmdOwkwpL8q1xjzCPy8hd4L8O7KPQLG4eBueKegPiPtxZBqA0YUAC8gzGEwmxP3BViu9zhULA==
+X-MS-TrafficTypeDiagnostic: BL2PR02MB2145:
+X-Microsoft-Exchange-Diagnostics: 1; BL2PR02MB2145;
+ 31:tcL2bJfECYiDrz7uLamYpHY1jVU8cHDlvS2Z2SnmkniBmqWE4t/arTB3QVnuQ/wzNzTCAY9U1qwqmkDltdtKHsgl5Iu7KOFJR3zCcXPtJUtBSCLjEkTrwqClaeGP9nHnaVGFiOdJts7UMr7t3RpnQc5Dw7KEku0GxwDbeiIB+HGwoVydEefpxj+2TKaW8HblOMREo6peVit53VYljJVZ5hOniTqATa8D/PQK1PJWeLM=;
+ 20:1yIzgBEYB49Vsak+Nys9AfeyIxAIwhmmoOLv3xjoJKe30XWRqTPyVETpJz3kLOG/DgxpiUmKSX5NmJnThUuacMQT6hQ8kkZQaelCalQc9WS17Xfr+ohnbWnT3elzHjTGVyLYi9GT1WoO1DzD60d+ShnzU/uiRL+atwluNIQh6Z+Mcl83+E8Y9QHKXBbBR5CAjVUjYOT0O4dgRgpQsAlGce0FdimbsW+0sdA3yLGA4puKyIc9VrthkkbUi1eQ99zRbQm1Ygv1KF7IZMPblrlsgvIjJYT8+6F1ekmnSn3dVxIdjJxdbRb+EICqqbgjelxZyrFqm6C4MWu+y2JXjgvFjsKTOX/AC5vw9IvJsx/wvyxU+cskSv4TEmgSdhQuqi3Ai4Cjch6zgQ73ZnsqbPrZVgKpcru3OuiiJYVOOkZsLffqx10qgacluxwVsGwDL4Ip3jK5cuWJwZTmdD2qQSH4KAXNN3FvKP1uLevyF4PDt0bBRTYpbs2pVuBdO82WUIgu
 X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
-X-Microsoft-Antispam-PRVS: <BYAPR02MB5016BF7C9CB9D82BEF777DBAB8920@BYAPR02MB5016.namprd02.prod.outlook.com>
-X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB5016;
- 4:k3Hb0DwnqYHwSyVlyEPZJrZ8F3nx6NwoUdd7eb9z6tT6E/4OKEuHHKszvU2v8peZXWsNi0ud3yFEAgClPAQYWGQSfyQxOtspzo9G7rIesFIc27tzHhUNIPF0w1JuXtSov9rt3gvrpUmeg+4sEflYEcG/9lY5vqvNUw5ehuwhApDGxeMyFrlkosSZNHbbS6kRve3GMPyflMMMsln2+i43zgLfTYlA/guKSUytTOi0B3IcmyDbiXemK9bikW+QYznpCe43ROm4zTnXIv8+kJH5RM0w4zxnorLvhJS7v/TkARE0CHDBOnbc8/y3//eHLpIg
+X-Microsoft-Antispam-PRVS: <BL2PR02MB214582530707385D50E4348EB8920@BL2PR02MB2145.namprd02.prod.outlook.com>
+X-Microsoft-Exchange-Diagnostics: 1; BL2PR02MB2145;
+ 4:2Tk45V29ClMwXPS1Y0t1j16rQ9Fo/bYXGkHq7gKxsB4eAVLU/cyYqI6QlsWQSVWEgTkljOYRjTrwMcMufi4EQi8BlemaP5EzcoiuLnKL5t/LrbshYb+j+z+YX/T4yisHtS2XZ8yngTKKPa8weeUBaTc8EU9AzigTvjkXWJSoU2LVip08N53T+yYdRfwNk7YsLsgLvMScXBu9fbCwXSnXi1+Qz1KlO/NRV1VhUYYRjurIh+vBqJjbFaktbPlOPErdPdT7c6edJ367r+KbtthprGA0isdkpr1a3yazdTL83b0lUzw5P8zbEDSEqatJ6+RU
 X-Forefront-PRVS: 09352FD734
-X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; BYAPR02MB5016;
- 23:3OP2eBJPfmyA6+RRyeTl5QrFmp32a6ublYUaDsoq3?=
- =?us-ascii?Q?mIL3nbOXFeSsFq5yTOGJxHxRGbFWaluZjBRpMXVLtuWufI3NU+WQlrStml/V?=
- =?us-ascii?Q?0VRJimpTa6LyyZ4X9K/j9gWwCmrC1qIOcao8+eTAqcuhIxvKhTiLVTmWzbw2?=
- =?us-ascii?Q?Wa2DgWEZAB/Uw0unywp3sWxDUVTMM4dBWRP1QKOgWorG90mn+TEZRinmoTEJ?=
- =?us-ascii?Q?jUad+nCSSRg2UEOD0v96qO9hBAYJBVFtAR8sKDalCgGXiNCjxcKUTPn/VsrE?=
- =?us-ascii?Q?rMtEjXfg6KDmKthLarbIzIkH5uP18xZbw7XZ0N8IRBuOj6lile9L3p94VETv?=
- =?us-ascii?Q?LApTdvrLGwTW5pbmHQaS03UUkYrfC796XUWf9C3Xe0FrcaWoqSSk17D9zDMf?=
- =?us-ascii?Q?tYH/bysiFmDexX5Rq5VAOVc7qE86bJYzpCXCn3xfzW+whVMd5SfUlWT02XDw?=
- =?us-ascii?Q?tk7IyjvLaKiadmvL0aifr3nqA2ZyjXRRKwoB9i66JIE/gMEC3lX9hM2z8ubC?=
- =?us-ascii?Q?bSWqtZaPYHwdSCHh6/DppQyJ0cIM/c7cHI72MhhN1Q/r8fKsPlpsw3M4318C?=
- =?us-ascii?Q?PL13RiaU65VmVDU2kGjERx1vkA9n0LPwUpo+UClYRoXEPXT4oi/dQ1DA1ppq?=
- =?us-ascii?Q?QT6EZXHftqRpdfetLLBvgQtNUPQvYYa2YxSkDdphEqsYJJVgj4rdoecYhmbq?=
- =?us-ascii?Q?5WVy9q6kPQo4ADEOrylP7L7pEcMfNqmMprZIOTnstw7B7qUOKiqBZGmRJtyq?=
- =?us-ascii?Q?ZpQEOB7XlBL55KjlzY7AwUEKvxJSu/iKkuH6udpm3wGPi3r0iCiAKlSZ5OTX?=
- =?us-ascii?Q?AAzDhMfaHjHZo/5ey+w01XT3aVQbEEXQEFcf0z7i2vgDLkhfZt5YpT7j+PH6?=
- =?us-ascii?Q?mb3z4vSvJ6+PLRhLisXInSET96KVVQEJ1gGOKJF6CXeZ/UucAXNOR2/FpPoa?=
- =?us-ascii?Q?YvFLC1va8f25+aez7bkS213gu9fPwXWX6prOnHkWi/a0hTg46KRTK4Ep0n+G?=
- =?us-ascii?Q?Jqi99PyajRq8q4RKjzph8Aaw6nMQxqFHAPrFVjnb8KD5X90Vb3stXifRI6qP?=
- =?us-ascii?Q?+kxaDSyCDPlRCtQu5tP3UOBRnR31ZcSp4Et5UjTc11OtYcL8eZJO6EwgGVHA?=
- =?us-ascii?Q?D3nXO29zKfw2EjcTyQJQnhNpN709uay/9Ss2nFgt3W3JfGtg6dbbLnpLd+jN?=
- =?us-ascii?Q?SuKRTw1MKMrO869g/X7Y4/X0I99i4YJv7wm?=
+X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; BL2PR02MB2145;
+ 23:6SGGBM8r3o2DwEX+tSU6xXV2sVBSSPWi/Zb3GaFNS?=
+ =?us-ascii?Q?FhrBsyliYu7VsPDHsEeBjkNd4x44WlIa7fs9/rZShkS7+47iYIxeN9vvssY+?=
+ =?us-ascii?Q?PKdJji93yt4vpCl4UWlyymAWhYJmIWtEl2Ziwgt32f/7Pb++U2M9kBHV5eaf?=
+ =?us-ascii?Q?V/EAUhIGcbmSebJjUT6fpLXrMk6jPm33qfX9mPgBqWrnl+Wo4DjaHvYIUh1q?=
+ =?us-ascii?Q?Uxb6xruzblAboMdr4iqc2MLpIouWYVzsKDM5R8zH5S7xBEAo0DTvXKHGtOWy?=
+ =?us-ascii?Q?PeDo46PTExVO/qd5aL92BSAQduO2Rci3VKvdRj0Xitz7KFNQaS8AZu32lVqg?=
+ =?us-ascii?Q?mf+faEeLkCmsYHPJXDmqbOh4Pt7S/M6Xc8X1WU/J6S1GFgJNa2rXUiesSudF?=
+ =?us-ascii?Q?pDYBEYJO78/LDql5fqAg8vBJt+LcDq37DktgezBCjVDvQqDLw+OV2PzB0mSa?=
+ =?us-ascii?Q?8+Ay1gfPiifETU72KCtQMrex0PSxr9xQTfSBg3LVq4ColyxQKVo04AKTy9OR?=
+ =?us-ascii?Q?z2PG4ZWL6MILfsX9pjQDdjf7DJriqLnGHBo2ulJaaAt3CeNOnlBGtwIl3w8+?=
+ =?us-ascii?Q?NWOuFWrE/BFEOb6ND5f50skhQdAW6nmeM5v80zU+fMw/pjGncH3amz5IXi9j?=
+ =?us-ascii?Q?LBJ5Y+Kcizgo1OhyJWUNkIyIFvin9iG42DQce5dFpwrtHHOqDF8gNj25kSGt?=
+ =?us-ascii?Q?vKw4VgrsXLkxA3vbz274tPTe/51jNJjTPg6+lSCpLafnZjzxiH4WvGPP/xyu?=
+ =?us-ascii?Q?xqeuHetMKm/8V97ajjFVLySGCqK873PiSqZFNS14ai6DhLUGiTANfyhYIuny?=
+ =?us-ascii?Q?Qs+2WZPk80ctp+m1FPSzUo8XF91FywU7nTtWC+GB9VUX4EiJRwzB+GKG11cZ?=
+ =?us-ascii?Q?ORQfWtXhspZtyGX6neuIWE1OgM8AzNKizjz0C7LcMMU49x226f2uDn+ojg0F?=
+ =?us-ascii?Q?QB+aza2O/Q014P3/cZHy92fI6C+57NVYAn+YeHREl8VOZB9MnCRHpUFRQ1XV?=
+ =?us-ascii?Q?kIbqlyXE16CVcUhOS+0vMJ9Voiz4gOOdb1dR6UVPMU6/d/1uoplczCAiqaFI?=
+ =?us-ascii?Q?E97cEIouRw0En2GdDiWj1yVKkVRC/HY/f1AFpRIqN2WaAkVzFbbLyu2qQa/t?=
+ =?us-ascii?Q?ndUvIqXWzPLS1kG1VPr4pwuPEmlF4xX2cLZk6oQKUzEHxMopNw1PMaHnOjDz?=
+ =?us-ascii?Q?wb9KuKlzbk50kftgtKyNdrl6xLmSWX95x3mecHLiMugy8YehN9b0MHLvu2J5?=
+ =?us-ascii?Q?8W0eHr3FEqifms1lvlIAS91tUfA+CakGZ1GwF02HmP8G3QwBMoHhYzSHYqi4?=
+ =?us-ascii?B?UT09?=
 X-MS-Exchange-SenderADCheck: 1
-X-Microsoft-Antispam-Message-Info: L62bjvg2i6O6+DIjuaxT+NCMWkmcH4Bx2SCNVThJQSHrNq7FSNkAvne7ip1gfiKsfn806tnZdhYTZFe0oIbmGC2MpIIsHDL1WvZDCw4JNaWVNG2Frd1KjfGZxG7PNKb5qXUnsuqsN2/I2dYir5DVNcHQGceSKHeKxqfcCxmC3goplSsOD4bhf8STtc7w5bfmLVXdWyxlJv3NLsEz3HhPFYbFIcxhtJNN6hSWrLlYGvV2G2QPGRn3lcmFA+yJsZPrKfn81pfAXaZjhHVR6zo8gwrlhVXCMoZRULy4RZ94BvCKMK6Pua0sWydtmTRTeStFAfeNrltzBWQsNIdYyY2WLyIxV8JCF6X7+3eN5hIMvnicP60jEsN5YEoOsV09R8glGshXvXYRKqzoG7qojKFW7Ez0wQfPX/WITSKBHDc8nF0=
-X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB5016;
- 6:w5bfCoYk0zXpr5DMEF8JNEW3QStiuGKP0IS+ML4hpKo+D5T0NtRHhyhp4F6XXm45t5xWfyf1GuMZZAbC54XlAMtW6XG41H5xmpsDOp2fI++ozWmtaN0LoPEhj19sC5ZZ4W/jicyV4ss05Yg2GcA6geIRAGH/ut1Q5yL2ZABfYY87ieSAJnyA/KTMYf4TUG9GtWT4SNVzgDRqowGAW0G4+SF+kDGbU89xDyQQ2rvUDzaB+YVrtWc+k0pnHwiTGZkoiLklkkbZ5t7qqA9M3eEbL4CNggK8WjrEouz0rzU1W8AUWASYyLmOXABll2wW+YGDw+0dVwCiM9xjHuMp3lHbsTdwHEjAr9LSpxizg2LjE3xU8J5fJgyQMMcdm/uH5OJKkswxCUraDYMg4Cg53P3d04pLvlkRtkmREYC2A/lU/n8jFbfJO3R8yhDsCZHPRIZx5JcqlGk4UxK3e36DQ2tKUg==;
- 5:Unz0rKKU9VyeaLIHTu0tTDLXSPUxJ+nCfKKcW0Mcj4tiTix0/jxCHAgRzzOOcr2enz5uNVLu6fhHwvClVhbWF7895y+hh65YZ7sd4GEoylBbOwsLjAoQnoa8tzGi6N4v9lGHD0okaqeUWalvX0w3ljGhbEypFXTSL9DA06+ixHegKWB+dPhdhH5WCxV/MHrue/JKpZfbRFS9yUWaffLNmQ==;
- 7:AKu8KhHtGn+RMZswQIHBag1fRkpNnmm2XifGisUBxVA6w8kU+4vAqZtsm1b/Z71bwaZc4iVP4GbA0MgCSoYFvAPiY/+F5Ju+D9crRRb8/EkC+6gB+/9YHPGZAgFwLGnMeJEDoNbJabjWQA517bUjvg==
+X-Microsoft-Antispam-Message-Info: 1FpFka4VlzTgKBAx51TSg1sQGr025OzVxQgDIx66ndjW0XxRc+RiYkD6JjZMwINBPagfJ/xf752bcQV+H3X74vuI/mPKi/2wluqQhxk8HiuTdRSLynZxPeo9IgtFsAtPzp4lbukwkoj00ivObRGy6kbjiK+yOffqJLGDcZ6K402zkjPKhq1U6yL09IAEocALUNnHfG5HfL+Enfxr5msXDvsOIpFohniq56Pz4/lGGba17RajaKyNEzLOSFVb2Ll8LIbV9YeixXKZ4hhcF1/VnpYb1gHVQPELvh5/iH3r/RdS55+E34Ru5ViQ/bt+R7DSUBU9VJ6SsSJqWBBpSxQOWZTwfFWxOt0mVfsgkE8RtTF2X6ohPj59WvcmRq8c6rbWbPUtqinPdJqE7yW0TXR/XkIcjdKKeYUuTs93Nq7roL0=
+X-Microsoft-Exchange-Diagnostics: 1; BL2PR02MB2145;
+ 6:7CPCQJ7DOkmUdor5sSFOuBLbupH2Q6Hfw4bHCJx3LMM5a23HdwV96xwoWlygyYMSYhpZXES1ue6kiZKBjolL53mJXesa/igHJ1S3XhI2/XNSNEpfwOyJZ7bElKOx+08gZ+M4I7aGoGtF7ZXV2kSeQd0naiZxNcQUTFzUUUaEwk6zfYVc3sXY+seotebfNAeD9bZKAw6c/UyGBcRrde8xcmcLf2zrR1YgFQgWWxu96PNyD6sCHFEtQq/zJ2gWrwmZ/WylB3wumpV3pWXa02CLFYALVWCw9YIwxKOWS77JMd99p7AQonImjf1Nzq9KLrBk7PW/PHfw97YWUCL1R6+yA7nMw5oPB4O1rRZfdFp+o9d1l6BA1YDOUT+sshAw+K7lqreyk7c5G85dN4qOwTn2BrBZvPtb3FhazBMjLTvLdGp5kfOajg8zKfXvQw215S6z9DyG+0hBJdRBm/jsjP9BSQ==;
+ 5:xbOYeoW2Beh0aL03i0v5wx73Mk3vYMrY1o/7yHN0ZI2bCRih2qC+YwgrwrTnPF16ujzxcZotLsuOd/A3vjHXV8wby7rj+dMRBBByVXSbD1JURDO4wX3Xlwnv1jHIDM1OsCR/BzOMEyRvOt9GUL/XeU1S5rcaaOivus6D8UEZIn5+w4wsLGSXm2cwnUP1kBgzyxgdkIGnLO7Q//NaEGPYtA==;
+ 7:eddyK+kgrLHh32GU+jvV0jriDdSTOt4v5/wknwlzfx5auininG+FCITdAY8obP0ZXqDDyEr7lxs+Xb/tbdY6N6Rurumd47/wpRLhz88WY5H2lowfqDwXmi3TBTFSEojfNtnXYYlQGr+TbeNcMKix4g==
 X-OriginatorOrg: xilinx.com
-X-MS-Exchange-CrossTenant-OriginalArrivalTime: 01 Feb 2019 22:09:14.9416 (UTC)
-X-MS-Exchange-CrossTenant-Network-Message-Id: eae3b530-d734-4808-8bdb-08d68891e744
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 01 Feb 2019 22:09:14.6984 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: f5ca038a-cc8c-4772-5f81-08d68891e75a
 X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
 X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
  Helo=[xsj-pvapsmtpgw01]
 X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BYAPR02MB5016
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BL2PR02MB2145
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_140919_144821_9E7E8DB8 
-X-CRM114-Status: GOOD (  11.08  )
+X-CRM114-CacheID: sfid-20190201_140919_634441_1CF4D6FE 
+X-CRM114-Status: GOOD (  12.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -172,54 +175,156 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, rajanv@xilinx.com, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, Jolly Shah <jollys@xilinx.com>
+Cc: devicetree@vger.kernel.org, Rajan Vaja <rajan.vaja@xilinx.com>,
+ linux-kernel@vger.kernel.org, Jolly Shah <jollys@xilinx.com>,
+ rajanv@xilinx.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The zynqmp power domain driver communicates the usage requirements
-for logical power domains / devices to the platform FW.
-FW is responsible for choosing appropriate power states,
-taking Linux' usage information into account.
+From: Rajan Vaja <rajan.vaja@xilinx.com>
 
-v4:
- - Added reviewed tag for dt bindings
- - Remove local device list for each domain and use list maintained in core genpd structure
- - Remove hardcoded pd-id to node ID mapping. Instead use argument passed in peripheral node as node ID. 
-   Firmware would validate node ID when APIs requested from genpd ops.
+Add Xilinx ZynqMP firmware APIs to control node status
+and power. These APIs allows turning on/off power domain
+and setting capabilities of devices present in power domain.
 
-v3:
- - Changed binding to have FW node as a power controller as suggested by Rob
- - Updated FW driver to register it as mfd child devices from firmware probe
- - Move bindings location as suggested
+Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
+Signed-off-by: Jolly Shah <jollys@xilinx.com>
+---
+ drivers/firmware/xilinx/zynqmp.c     | 58 ++++++++++++++++++++++++++++++++++++
+ include/linux/firmware/xlnx-zynqmp.h | 26 ++++++++++++++++
+ 2 files changed, 84 insertions(+)
 
-v2:
- - Rebased on top of latest firmware driver patch series
- - Updated driver name from zynqmp-genpd to zynqmp-power-controller
- - Updated device tree bindings to move power controller node under firmware node
-
-Jolly Shah (1):
-  drivers: soc: xilinx: Add ZynqMP power domain driver
-
-Rajan Vaja (2):
-  dt-bindings: power: Add ZynqMP power domain bindings
-  firmware: xilinx: Add APIs to control node status/power
-
- .../bindings/power/xlnx,zynqmp-genpd.txt           |  34 +++
- drivers/firmware/xilinx/Kconfig                    |   1 +
- drivers/firmware/xilinx/zynqmp.c                   |  73 +++++
- drivers/soc/xilinx/Kconfig                         |   9 +
- drivers/soc/xilinx/Makefile                        |   1 +
- drivers/soc/xilinx/zynqmp_pm_domains.c             | 321 +++++++++++++++++++++
- include/dt-bindings/power/xlnx-zynqmp-power.h      |  39 +++
- include/linux/firmware/xlnx-zynqmp.h               |  26 ++
- 8 files changed, 504 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/xlnx,zynqmp-genpd.txt
- create mode 100644 drivers/soc/xilinx/zynqmp_pm_domains.c
- create mode 100644 include/dt-bindings/power/xlnx-zynqmp-power.h
-
+diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
+index 8065e33..6660b8c 100644
+--- a/drivers/firmware/xilinx/zynqmp.c
++++ b/drivers/firmware/xilinx/zynqmp.c
+@@ -534,6 +534,61 @@ static int zynqmp_pm_set_suspend_mode(u32 mode)
+ 	return zynqmp_pm_invoke_fn(PM_SET_SUSPEND_MODE, mode, 0, 0, 0, NULL);
+ }
+ 
++/**
++ * zynqmp_pm_request_node() - Request a node with specific capabilities
++ * @node:		Node ID of the slave
++ * @capabilities:	Requested capabilities of the slave
++ * @qos:		Quality of service (not supported)
++ * @ack:		Flag to specify whether acknowledge is requested
++ *
++ * This function is used by master to request particular node from firmware.
++ * Every master must request node before using it.
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_request_node(const u32 node, const u32 capabilities,
++				  const u32 qos,
++				  const enum zynqmp_pm_request_ack ack)
++{
++	return zynqmp_pm_invoke_fn(PM_REQUEST_NODE, node, capabilities,
++				   qos, ack, NULL);
++}
++
++/**
++ * zynqmp_pm_release_node() - Release a node
++ * @node:	Node ID of the slave
++ *
++ * This function is used by master to inform firmware that master
++ * has released node. Once released, master must not use that node
++ * without re-request.
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_release_node(const u32 node)
++{
++	return zynqmp_pm_invoke_fn(PM_RELEASE_NODE, node, 0, 0, 0, NULL);
++}
++
++/**
++ * zynqmp_pm_set_requirement() - PM call to set requirement for PM slaves
++ * @node:		Node ID of the slave
++ * @capabilities:	Requested capabilities of the slave
++ * @qos:		Quality of service (not supported)
++ * @ack:		Flag to specify whether acknowledge is requested
++ *
++ * This API function is to be used for slaves a PU already has requested
++ * to change its capabilities.
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_set_requirement(const u32 node, const u32 capabilities,
++				     const u32 qos,
++				     const enum zynqmp_pm_request_ack ack)
++{
++	return zynqmp_pm_invoke_fn(PM_SET_REQUIREMENT, node, capabilities,
++				   qos, ack, NULL);
++}
++
+ static const struct zynqmp_eemi_ops eemi_ops = {
+ 	.get_api_version = zynqmp_pm_get_api_version,
+ 	.query_data = zynqmp_pm_query_data,
+@@ -551,6 +606,9 @@ static const struct zynqmp_eemi_ops eemi_ops = {
+ 	.reset_get_status = zynqmp_pm_reset_get_status,
+ 	.init_finalize = zynqmp_pm_init_finalize,
+ 	.set_suspend_mode = zynqmp_pm_set_suspend_mode,
++	.request_node = zynqmp_pm_request_node,
++	.release_node = zynqmp_pm_release_node,
++	.set_requirement = zynqmp_pm_set_requirement,
+ };
+ 
+ /**
+diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
+index f84d700..c7a7748 100644
+--- a/include/linux/firmware/xlnx-zynqmp.h
++++ b/include/linux/firmware/xlnx-zynqmp.h
+@@ -40,8 +40,19 @@
+ /* Payload size (consists of callback API ID + arguments) */
+ #define CB_PAYLOAD_SIZE (CB_ARG_CNT + 1)
+ 
++#define ZYNQMP_PM_MAX_QOS		100U
++
++/* Node capabilities */
++#define	ZYNQMP_PM_CAPABILITY_ACCESS	0x1U
++#define	ZYNQMP_PM_CAPABILITY_CONTEXT	0x2U
++#define	ZYNQMP_PM_CAPABILITY_WAKEUP	0x4U
++#define	ZYNQMP_PM_CAPABILITY_POWER	0x8U
++
+ enum pm_api_id {
+ 	PM_GET_API_VERSION = 1,
++	PM_REQUEST_NODE = 13,
++	PM_RELEASE_NODE,
++	PM_SET_REQUIREMENT,
+ 	PM_RESET_ASSERT = 17,
+ 	PM_RESET_GET_STATUS,
+ 	PM_PM_INIT_FINALIZE = 21,
+@@ -223,6 +234,12 @@ enum zynqmp_pm_suspend_reason {
+ 	SUSPEND_SYSTEM_SHUTDOWN,
+ };
+ 
++enum zynqmp_pm_request_ack {
++	ZYNQMP_PM_REQUEST_ACK_NO = 1,
++	ZYNQMP_PM_REQUEST_ACK_BLOCKING,
++	ZYNQMP_PM_REQUEST_ACK_NON_BLOCKING,
++};
++
+ /**
+  * struct zynqmp_pm_query_data - PM query data
+  * @qid:	query ID
+@@ -255,6 +272,15 @@ struct zynqmp_eemi_ops {
+ 	int (*reset_get_status)(const enum zynqmp_pm_reset reset, u32 *status);
+ 	int (*init_finalize)(void);
+ 	int (*set_suspend_mode)(u32 mode);
++	int (*request_node)(const u32 node,
++			    const u32 capabilities,
++			    const u32 qos,
++			    const enum zynqmp_pm_request_ack ack);
++	int (*release_node)(const u32 node);
++	int (*set_requirement)(const u32 node,
++			       const u32 capabilities,
++			       const u32 qos,
++			       const enum zynqmp_pm_request_ack ack);
+ };
+ 
+ int zynqmp_pm_invoke_fn(u32 pm_api_id, u32 arg0, u32 arg1,
 -- 
 2.7.4
 
