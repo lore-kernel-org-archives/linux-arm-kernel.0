@@ -2,77 +2,100 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 129C7C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:59:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A9981C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:59:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D6046218EA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:59:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 767B7218AC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:59:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EAb29NsP";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="sI9ai46m"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D6046218EA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Nv/FbnQU";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="wR8KPdsh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="FiI6uIUL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 767B7218AC
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4QemetPgonXOp169Rcxxz9TEuEe0k2zm5bYJkHsvk/4=; b=EAb29NsPZlcA7t
-	HAN21612OEqs9InpTOkxvW2Ug71VgjYiy1Pu7zgThcnm16qqedga1Y28hfLBJJy2KyY/TxbRdJmKv
-	wEYILIo9x5LeCF0V+jzGzrWr8xlsXb0dqsurrEAcEpCR8uDh9SJhWDoirgJTCSPU8giNCO1tPzFvB
-	R1qwB8q/PDpNub419EbgwsMiKBouXeh8ql92tBEZKfeKoJwxQ5PfD8DhtV1C6zeaBoQrz2+VCWlXN
-	1w1dxCc3VHUAYMAXeUUb46GLRtleZ8C9aK8m7X8k8Cz5N5RiBE+cRaiL3mrJ54h/AhIl4cC2kKPBo
-	zc6kFbK7gxGQqS3tKzYQ==;
+	List-Owner; bh=jbNawVXPO2e4NgcGro0ZJ7WS6TN00ogFvfm+yIvMTyI=; b=Nv/FbnQUjwTVJK
+	D0tokfYAyUVhGXWH9GQXJFV8PQq9NnggS9V5C0w8R4rswSfMi0OoAhEL2MwEY9/WFzI+PEBV9OJ+i
+	8IP6fO/LQhBItK0YIMV7vuhY8oK5v9pAroFRqS2X8w87yc0PQnZVH1aQ2uwxzkyTJU6VH06IgLh6B
+	vJmGCbtcDxhpfgto45i87O6LxjblGfU0XP06sO4194Nx6Tm2pU/0KUyYhV640etZ2cQqoWQWjDjjY
+	04zIt5X0ztvuG4UqcWVqwBvrXWZ+hbMxY4kDlm+DurNPtmuEhG0nzaDMRdGQr3qz8aF6KNXZ5cA8l
+	QGBwdbDjCXdyhq9FIzeg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpbDV-0007IJ-7Q; Fri, 01 Feb 2019 15:58:57 +0000
+	id 1gpbDg-0007Vr-EE; Fri, 01 Feb 2019 15:59:08 +0000
 Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpbDT-0007C3-62
- for linux-arm-kernel@bombadil.infradead.org; Fri, 01 Feb 2019 15:58:55 +0000
+ id 1gpbDV-0007C3-C7
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 01 Feb 2019 15:58:57 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=In-Reply-To:Content-Transfer-Encoding:
- Content-Type:MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:
- Sender:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=X0cxztK3jkAfoO2oxcxQsOze8zblZ/atKlS6P1BWd8o=; b=sI9ai46mWLp5K91EE1ES6Dmn2a
- 2TDa5t8cZA79WgVnQ+H3JeWRwpt4LsmsotctDgfi7dGSRWYB3dFenS6k57N3/eCiP/qt0htqiLdLt
- smZDaBIrZIa7e6kyiZFt3B0VRnQtE170XYMtoQ5NcFdSJvg6nw2weSuxIKT2ahPpq6duMCNdBxqE8
- w6+DRTJKL8HutuTUg7J1oMeiD+MVxU3Jq561qhP0CRkoXzeXL3WC+tRWC44co1vV2DrR+iuTBdFQH
- XXUpGXaSQCpjU0mGPlE2WpIz4Oyhq3a9Z2Yzv2vpPPzfJwm2M/vAIg6Ae3cEyu5SAb36s4RHB4nM2
- /uO1fTCg==;
-Received: from relay7-d.mail.gandi.net ([217.70.183.200])
+ d=infradead.org; s=casper.20170209; h=Content-Type:Cc:To:Subject:Message-ID:
+ Date:From:In-Reply-To:References:MIME-Version:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=4rCyBtEKCCb1eZWTDjgbspn9weqSBCPy3DAAWxTxy2g=; b=wR8KPdshojxIl97che+SiKMKo
+ rnbqfo0dOjlootTlOLVnZnCKiFftJ24McJf2d6CoEkJ8DyU6tPkmtfvcd+Jb2+gfkKhQnKJ4+hupr
+ OcpaK1NT07GenFxENBznu/m2YIhnyBdGZD6C2Xrl9luhc7N/f4Z3ZXfD3atNtILWIsgu2/4/YPz43
+ ETC56AoJV8PfJFow+isiZ0h7mjZ+wM8DEKrOAQGnKzp+S+WEx4PS4f1JZc6P/btialgzhGMZpZ8k9
+ D2n7botuSg1GeE+z/MeZsZ+6+2Nk4uIR8qDfgntWI4Twp6eEIughuyfZJPV9sYzzi4VHMq/Lw/mEu
+ s9NbaRQ/g==;
+Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
  by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpb4P-00061o-SB
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:49:36 +0000
-X-Originating-IP: 90.88.147.226
-Received: from localhost (aaubervilliers-681-1-27-226.w90-88.abo.wanadoo.fr
- [90.88.147.226]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay7-d.mail.gandi.net (Postfix) with ESMTPSA id 2B9C52000E;
- Fri,  1 Feb 2019 15:48:58 +0000 (UTC)
-Date: Fri, 1 Feb 2019 16:48:58 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Jagan Teki <jagan@amarulasolutions.com>
-Subject: Re: [PATCH v7 00/23] drm/sun4i: Allwinner A64 MIPI-DSI support
-Message-ID: <20190201154858.z6xqdaxccxya2wqr@flea>
-References: <20190201154232.10505-1-jagan@amarulasolutions.com>
+ id 1gpb3O-0005vO-N7
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:48:33 +0000
+Received: by mail-it1-x143.google.com with SMTP id h193so10357254ita.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 01 Feb 2019 07:48:30 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=4rCyBtEKCCb1eZWTDjgbspn9weqSBCPy3DAAWxTxy2g=;
+ b=FiI6uIULRsNcp0eYNZYhfzDKwYukr6QM0eMUE4YOqYnqOkkQx47LsxM37Gza7bq/8a
+ 9hYnkEl51IPjAyZCXiXNdcVsm/6LyPOMv9E1htvpUpJww1buNWBcg/g7xiDCmMpmSB/N
+ pER/hPha25QF/vPiDTEvqD7yifj7HDj4ynEe8=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=4rCyBtEKCCb1eZWTDjgbspn9weqSBCPy3DAAWxTxy2g=;
+ b=i9WKFsyG1RcA5wAz5Sd5Ipv6rm2KthSyV3fycd3GejkNiHDYLS9kLO2Wi73Lbvx9IZ
+ k4gFhKY4uWTlKdebcC41xv4tU2ioUhe/3yM1sx+hPBt/tc4UoW1616AyNWR6f6hkeaed
+ JRDJhWsjXpxSgShYol0yd7qqAA9T2SW3khLmblqII5Hhvdj8W1s2EsZdGZDtHAkQt3N3
+ E8j8sktTDoMsxIIgVvehzgRiPpZv3mLi/gzZFpDeho8KORGDg9E9S622Yj86khVfAeU0
+ D8HPOgN/JyF17ET54FbYp11BMvHwrZP6NzSc4JH8x9wzf6k/+OwAH+Q0BXaBVeS5Sg8i
+ HxvQ==
+X-Gm-Message-State: AJcUukfp0HlkxIBCOd53UUsfAAaYOtICUFlTmop5wZvHQrttflkKmCbl
+ RAHF6A+fZ/uHSY8RuYeYKL2oNnPMsdufatcW+OQgaw==
+X-Google-Smtp-Source: ALg8bN74vFX/djwmkAtex0lYtObB5+K0/sYKTFG0AK6rJEZ5yq6eh+9N820nn6eNGCIB6/3zMP2qO+Aif+/cVO/kHSc=
+X-Received: by 2002:a02:7f08:: with SMTP id r8mr22572099jac.20.1549036108472; 
+ Fri, 01 Feb 2019 07:48:28 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190201154232.10505-1-jagan@amarulasolutions.com>
-User-Agent: NeoMutt/20180716
+References: <CAJZ5v0gunbCHp_9mDTmtwW1i-_GcXPcjTP48NdV2zv-B6UrD4g@mail.gmail.com>
+ <1548869162-6223-1-git-send-email-vincent.guittot@linaro.org>
+ <CAJZ5v0gnJ5DKvOO9OcJoMrGYpHfeQBt2Ec0pMW6=2q5aMoFpww@mail.gmail.com>
+ <OSBPR01MB210387DEC42870D8E5688CE9B8920@OSBPR01MB2103.jpnprd01.prod.outlook.com>
+ <CAKfTPtDNMV+HFsqc9A0VcMHOO=MvxWYZt8XkmWepso7SpfeAqA@mail.gmail.com>
+ <OSBPR01MB21031D92553AD16A1F206273B8920@OSBPR01MB2103.jpnprd01.prod.outlook.com>
+In-Reply-To: <OSBPR01MB21031D92553AD16A1F206273B8920@OSBPR01MB2103.jpnprd01.prod.outlook.com>
+From: Vincent Guittot <vincent.guittot@linaro.org>
+Date: Fri, 1 Feb 2019 16:48:17 +0100
+Message-ID: <CAKfTPtB9Ke167hQCKB7wgRpDarn_uFmL3B4QnzHhHUGmuhnejA@mail.gmail.com>
+Subject: Re: [PATCH v3] PM-runtime: fix deadlock with ktime
+To: Biju Das <biju.das@bp.renesas.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_154933_974501_D8DBB85E 
-X-CRM114-Status: GOOD (  13.45  )
+X-CRM114-CacheID: sfid-20190201_154830_768978_6F0FA579 
+X-CRM114-Status: GOOD (  43.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,56 +107,210 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- David Airlie <airlied@linux.ie>, Michael Turquette <mturquette@baylibre.com>,
- linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Daniel Vetter <daniel@ffwll.ch>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Ulf Hansson <ulf.hansson@linaro.org>, Linux PM <linux-pm@vger.kernel.org>,
+ "Rafael J. Wysocki" <rafael@kernel.org>,
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ Geert Uytterhoeven <geert@linux-m68k.org>,
+ Linux OMAP Mailing List <linux-omap@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 01, 2019 at 09:12:09PM +0530, Jagan Teki wrote:
-> Here is next version changes for Allwinner A64 MIPI-DSI support
-> 
-> This series grouped the changes like previous version[1] with different
-> sets to support three different panels types that can fit into the DSI
-> controller.
-> 
-> set:1, for 4-lane, burst mode support
-> - patch 0001: 0009, DSI controller changes that support burst mode.
-> 
-> set:2, for A64 DSI support
-> - patch 0010: tcon dclk divider computation based on A64 BSP. 
-> - patch 0011: 0017, Allwinner A64 DSI controller changes.
-> 
-> set:3, enable 4-lane burst mode panel:
-> - patch 0018: Overlay patch that enable Feiyang FY07024DI26A30-D
->   burst mode panel on Pine64-LTS
-> 
-> set:4, enable 4-lane video mode panel:
-> - patch 0019: msg type MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM support
-> - patch 0020: Overlay patch that enable Bananapi S070WV20-CT16 ICN6211 
->   panel on Bananapi M64
-> 
-> set:5, enable 2-lane video mode panel:
-> - patch 0021, 0022: DSI hfp and hbp timings fixes
-> - patch 0023: Enable Techstar TS8550B panel on Amarula A64-Relic
+On Fri, 1 Feb 2019 at 16:44, Biju Das <biju.das@bp.renesas.com> wrote:
+>
+> Hi Vincent,
+>
+> Thanks for the feedback. Instead of reverting.  I just modified the patch like this and it fixed the issue.
+>
+> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+> index 4eaf166..145a182 100644
+> --- a/drivers/base/power/runtime.c
+> +++ b/drivers/base/power/runtime.c
+> @@ -66,7 +66,7 @@ static int rpm_suspend(struct device *dev, int rpmflags);
+>   */
+>  void update_pm_runtime_accounting(struct device *dev)
+>  {
+> -       u64 now = ktime_to_ns(ktime_get());
+> +       u64 now = ktime_get_mono_fast_ns();
+>         u64 delta;
 
-You do realise that pushing through a series while the previous
-version's discussion hasn't settled yet will not get you anywhere,
-right?
+yes.
+This probably also need to be changed in another place
+(pm_runtime_enable) to be safe
+Our email have crossed. I just sent something similar
 
-Maxime
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+
+>
+> regards,
+> Biju
+>
+> > -----Original Message-----
+> > From: linux-renesas-soc-owner@vger.kernel.org <linux-renesas-soc-
+> > owner@vger.kernel.org> On Behalf Of Vincent Guittot
+> > Sent: 01 February 2019 15:29
+> > To: Biju Das <biju.das@bp.renesas.com>
+> > Cc: Rafael J. Wysocki <rafael@kernel.org>; Linux PM <linux-
+> > pm@vger.kernel.org>; Linux Kernel Mailing List <linux-
+> > kernel@vger.kernel.org>; Linux ARM <linux-arm-
+> > kernel@lists.infradead.org>; Linux OMAP Mailing List <linux-
+> > omap@vger.kernel.org>; Rafael J. Wysocki <rjw@rjwysocki.net>; Ulf
+> > Hansson <ulf.hansson@linaro.org>; Geert Uytterhoeven <geert@linux-
+> > m68k.org>; Linux-Renesas <linux-renesas-soc@vger.kernel.org>
+> > Subject: Re: [PATCH v3] PM-runtime: fix deadlock with ktime
+> >
+> > On Fri, 1 Feb 2019 at 16:02, Biju Das <biju.das@bp.renesas.com> wrote:
+> > >
+> > > Hi Vincent,
+> > >
+> > > I have rebased my kernel to "next-20190201".  Still I am seeing dead lock.
+> > >
+> > > Am I missing any patch?
+> >
+> > No you don't miss anything.
+> > I think that it's the opposite.
+> >
+> > Modification in time accounting in PM runtime has been queued but it has
+> > not moved (yet) to ktime_get_mono_fast_ns()
+> >
+> > Can you try to revert c669560be6c8 ("PM-runtime: Replace jiffies-based
+> > accounting with ktime-based accounting") ?
+> >
+> > >
+> > > root@ek874:/# echo e61e0000.timer >
+> > > /sys/devices/system/clocksource/clocksource0/current_clocksource
+> > > [  193.869423]
+> > > [  193.870963] ============================================
+> > > [  193.876292] WARNING: possible recursive locking detected [
+> > > 193.881625] 5.0.0-rc4-next-20190201-00007-g731346f #3 Not tainted [
+> > > 193.887737] --------------------------------------------
+> > > [  193.893066] migration/0/11 is trying to acquire lock:
+> > > [  193.898136] (____ptrval____) (tk_core.seq){----}, at:
+> > > update_pm_runtime_accounting+0x14/0x68
+> > > [  193.906632]
+> > > [  193.906632] but task is already holding lock:
+> > > [  193.912483] (____ptrval____) (tk_core.seq){----}, at:
+> > > multi_cpu_stop+0x8c/0x140 [  193.919828] [  193.919828] other info
+> > > that might help us debug this:
+> > > [  193.926377]  Possible unsafe locking scenario:
+> > > [  193.926377]
+> > > [  193.932314]        CPU0
+> > > [  193.934765]        ----
+> > > [  193.937216]   lock(tk_core.seq);
+> > > [  193.940453]   lock(tk_core.seq);
+> > > [  193.943691]
+> > > [  193.943691]  *** DEADLOCK ***
+> > > [  193.943691]
+> > > [  193.949634]  May be due to missing lock nesting notation [
+> > > 193.949634] [  193.956446] 3 locks held by migration/0/11:
+> > > [  193.960642]  #0: (____ptrval____) (timekeeper_lock){-.-.}, at:
+> > > change_clocksource+0x2c/0x118 [  193.969125]  #1: (____ptrval____)
+> > > (tk_core.seq){----}, at: multi_cpu_stop+0x8c/0x140 [  193.976903]  #2:
+> > > (____ptrval____) (&(&dev->power.lock)->rlock){....}, at:
+> > > __pm_runtime_resume+0x40/0x98 [  193.986339] [  193.986339] stack
+> > backtrace:
+> > > [  193.990715] CPU: 0 PID: 11 Comm: migration/0 Not tainted
+> > > 5.0.0-rc4-next-20190201-00007-g731346f #3 [  193.999707] Hardware
+> > > name: Silicon Linux RZ/G2E evaluation kit EK874 (CAT874 + CAT875) (DT) [
+> > 194.008089] Call trace:
+> > > [  194.010553]  dump_backtrace+0x0/0x178 [  194.014227]
+> > > show_stack+0x14/0x20 [  194.017562]  dump_stack+0xb0/0xec [
+> > > 194.020895]  __lock_acquire+0xfb4/0x1c08 [  194.024832]
+> > > lock_acquire+0xd0/0x268 [  194.028420]  ktime_get+0x5c/0x108 [
+> > > 194.031747]  update_pm_runtime_accounting+0x14/0x68
+> > > [  194.036643]  rpm_resume+0x4ec/0x698 [  194.040144]
+> > > __pm_runtime_resume+0x50/0x98 [  194.044264]
+> > > sh_tmu_enable.part.1+0x24/0x50 [  194.048462]
+> > > sh_tmu_clocksource_enable+0x48/0x70
+> > > [  194.053097]  change_clocksource+0x84/0x118 [  194.057208]
+> > > multi_cpu_stop+0x8c/0x140 [  194.060970]
+> > > cpu_stopper_thread+0xac/0x120 [  194.065087]
+> > > smpboot_thread_fn+0x1ac/0x2c8 [  194.069198]  kthread+0x128/0x130 [
+> > > 194.072439]  ret_from_fork+0x10/0x18
+> > >
+> > >
+> > > Regards,
+> > > Biju
+> > >
+> > > > -----Original Message-----
+> > > > From: Rafael J. Wysocki <rafael@kernel.org>
+> > > > Sent: 30 January 2019 21:53
+> > > > To: Vincent Guittot <vincent.guittot@linaro.org>
+> > > > Cc: Linux PM <linux-pm@vger.kernel.org>; Linux Kernel Mailing List
+> > > > <linux- kernel@vger.kernel.org>; Linux ARM <linux-arm-
+> > > > kernel@lists.infradead.org>; Linux OMAP Mailing List <linux-
+> > > > omap@vger.kernel.org>; Rafael J. Wysocki <rjw@rjwysocki.net>; Ulf
+> > > > Hansson <ulf.hansson@linaro.org>; Biju Das
+> > > > <biju.das@bp.renesas.com>; Geert Uytterhoeven
+> > > > <geert@linux-m68k.org>; Linux-Renesas <linux-
+> > > > renesas-soc@vger.kernel.org>
+> > > > Subject: Re: [PATCH v3] PM-runtime: fix deadlock with ktime
+> > > >
+> > > > On Wed, Jan 30, 2019 at 6:26 PM Vincent Guittot
+> > > > <vincent.guittot@linaro.org> wrote:
+> > > > >
+> > > > > A deadlock has been seen when swicthing clocksources which use PM
+> > > > runtime.
+> > > > > The call path is:
+> > > > > change_clocksource
+> > > > >     ...
+> > > > >     write_seqcount_begin
+> > > > >     ...
+> > > > >     timekeeping_update
+> > > > >         ...
+> > > > >         sh_cmt_clocksource_enable
+> > > > >             ...
+> > > > >             rpm_resume
+> > > > >                 pm_runtime_mark_last_busy
+> > > > >                     ktime_get
+> > > > >                         do
+> > > > >                             read_seqcount_begin
+> > > > >                         while read_seqcount_retry
+> > > > >     ....
+> > > > >     write_seqcount_end
+> > > > >
+> > > > > Although we should be safe because we haven't yet changed the
+> > > > > clocksource at that time, we can't because of seqcount protection.
+> > > > >
+> > > > > Use ktime_get_mono_fast_ns() instead which is lock safe for such
+> > > > > case
+> > > > >
+> > > > > With ktime_get_mono_fast_ns, the timestamp is not guaranteed to be
+> > > > > monotonic across an update and as a result can goes backward.
+> > > > > According to
+> > > > > update_fast_timekeeper() description: "In the worst case, this can
+> > > > > result is a slightly wrong timestamp (a few nanoseconds)". For PM
+> > > > > runtime autosuspend, this means only that the suspend decision can
+> > > > > be slightly sub optimal.
+> > > > >
+> > > > > Fixes: 8234f6734c5d ("PM-runtime: Switch autosuspend over to using
+> > > > > hrtimers")
+> > > > > Reported-by: Biju Das <biju.das@bp.renesas.com>
+> > > > > Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> > > > > ---
+> > > > >
+> > > > > Hi Rafael,
+> > > > >
+> > > > > Sorry, I sent the version with the typo mistake that generated the
+> > > > > compilation error reported by kbuild-test-robot
+> > > > >
+> > > > > This version doesn't have the typo.
+> > > >
+> > > > OK, I've applied this one, thanks!
+> > >
+> > >
+> > >
+> > > Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne
+> > End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under
+> > Registered No. 04586709.
+>
+>
+>
+> Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
 
 _______________________________________________
 linux-arm-kernel mailing list
