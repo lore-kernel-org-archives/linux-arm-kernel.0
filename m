@@ -2,86 +2,121 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 63575C282DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 14:39:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A3BBDC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 14:43:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 32531218AC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 14:39:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 72AEC20870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 14:43:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uYaDowrp";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="hMwyHfxa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 32531218AC
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="syys2kJ/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="pA4DnOpZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 72AEC20870
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=Cqv5C7eVumQi01tY2wj5BTC3yHY9wF4RBrT2pvI+86I=; b=uYaDowrpIy4izu4LpsldypLiE
-	pdxMqpGZnQcDm3Sczreb0OAph/ChoVCpJyVysAbhX6FrDDiX5avJPl5FJXbEDV3856KZI1ypbk0yu
-	t1/2wMk7Rs8Leq0FeAQ9v8SlR7BmbimKjKqdgxZn1IWU4DMLhWNHdaUjfeFD2+FOtcKfI0Uzmit26
-	meM4DOmeq21OhHQyCqgPADtkwg2UCIawzNfDWG9r+bbp8I22+eSFt2lW5jD1j7ElBxXD0gH56HHdg
-	yOgAbg+GKgxBbv+HcJZ66DmyzaLEl9dWBNx7tzjruzaTaHbLPAsWwTvWuQBLHuvLuHbaf5oX5YoYL
-	KweTyFS7g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=DQE0WAxTW70aYA5LMb538yMiov+20OBa/cVuAKD6oGM=; b=syys2kJ/Io/CK8
+	CdLOxJmpZB00FUuLMfA2mNW5A+aLG0ErdWiS9NexmeuTqfjU8xYdQZaIHXk4AG865NrpI9vp/JHeJ
+	OrKzM4JV7YwhSq7ihPwHsxA+BbXAQCF1R6hThK59eXNSaNve9WaUraBsc8JzVlH/vc7xpH7imzzh8
+	AFq0p6R9HaW8XPBC3tOox/1RouuZ3AeIJ6QbOiZ3EQaDJAIyt/HICN3GgtmRZhIQG/eF47EIboJwg
+	Y5neJIUmvmPwwsMRg290EvNu8uQ6pri+dBjgxyE3ve4atzFN4kWuTTQ69zD0/+s9Zd7mAtmL54U82
+	MPnPfEad9c4yD/0+vPwA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpZyz-0004Kg-VZ; Fri, 01 Feb 2019 14:39:53 +0000
-Received: from hqemgate16.nvidia.com ([216.228.121.65])
+	id 1gpa2i-0007bk-1s; Fri, 01 Feb 2019 14:43:44 +0000
+Received: from esa2.microchip.iphmx.com ([68.232.149.84])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpZyx-0004KL-3q
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 14:39:52 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c545a0c0000>; Fri, 01 Feb 2019 06:39:08 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Fri, 01 Feb 2019 06:39:50 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Fri, 01 Feb 2019 06:39:50 -0800
-Received: from [10.19.108.132] (10.124.1.5) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 1 Feb
- 2019 14:39:48 +0000
-Subject: Re: [PATCH V5 2/7] clocksource: tegra: add Tegra210 timer support
-To: Jon Hunter <jonathanh@nvidia.com>, Thierry Reding
- <thierry.reding@gmail.com>, Daniel Lezcano <daniel.lezcano@linaro.org>,
- Thomas Gleixner <tglx@linutronix.de>
-References: <20190201033621.16814-1-josephl@nvidia.com>
- <20190201033621.16814-3-josephl@nvidia.com>
- <5490ad66-7d20-7093-7025-1d0ec8da6dec@nvidia.com>
-From: Joseph Lo <josephl@nvidia.com>
-Message-ID: <3c9b86ba-32dd-76b2-9a51-6cd86782cadf@nvidia.com>
-Date: Fri, 1 Feb 2019 22:39:46 +0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <5490ad66-7d20-7093-7025-1d0ec8da6dec@nvidia.com>
-X-Originating-IP: [10.124.1.5]
-X-ClientProxiedBy: HQMAIL104.nvidia.com (172.18.146.11) To
- HQMAIL101.nvidia.com (172.20.187.10)
+ id 1gpa2R-0007RL-06; Fri, 01 Feb 2019 14:43:29 +0000
+X-IronPort-AV: E=Sophos;i="5.56,549,1539673200"; d="scan'208";a="26032028"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 01 Feb 2019 07:43:22 -0700
+Received: from NAM01-SN1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.105) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Fri, 1 Feb 2019 07:43:22 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=vXjBO4r1Ndv1n4EYS1f7eGRa4lF+0zWT9KgdPUIAsyI=;
+ b=pA4DnOpZMe4kReF5hsZ1GRxlWR9R+A34SmS1lSjY105EUzEkjkWc9PumkGjuJIPw57ZnHagnQyKlpBWFIYUFiGdtXPqWj0muG2bj2Muyv2uEozTNcT/4sVX5lrt0un0jxaRhsJT2racVwhcTNOdFSnWJN7f1kIqxA+nUscGcueI=
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.98.146) by
+ BN6PR11MB1841.namprd11.prod.outlook.com (10.175.99.19) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1558.18; Fri, 1 Feb 2019 14:43:18 +0000
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::847:4296:13b9:fc9f]) by BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::847:4296:13b9:fc9f%8]) with mapi id 15.20.1580.017; Fri, 1 Feb 2019
+ 14:43:18 +0000
+From: <Tudor.Ambarus@microchip.com>
+To: <bbrezillon@kernel.org>
+Subject: Re: [PATCH v2 10/10] spi: atmel-quadspi: add support for sam9x60 qspi
+ controller
+Thread-Topic: [PATCH v2 10/10] spi: atmel-quadspi: add support for sam9x60
+ qspi controller
+Thread-Index: AQHUuYA85AgiqORGIUCz49OB4RqXzKXJkgKAgAD0mICAAH9LgA==
+Date: Fri, 1 Feb 2019 14:43:18 +0000
+Message-ID: <af691fb9-e972-5590-77f7-754bc1018b05@microchip.com>
+References: <20190131161515.21605-1-tudor.ambarus@microchip.com>
+ <20190131161515.21605-11-tudor.ambarus@microchip.com>
+ <20190131173207.56481a42@bbrezillon>
+ <947f148d-3fd8-4e7d-4301-9d67715fbf7d@microchip.com>
+In-Reply-To: <947f148d-3fd8-4e7d-4301-9d67715fbf7d@microchip.com>
+Accept-Language: en-US
 Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1549031948; bh=EL4s8J9EU1lgweojudTQigL7fn7EhHyYwrggAt8RS8Y=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=hMwyHfxanluywANsNqTLCc+bZZS1DSp1Fu/B1V8K6xV0wsqWaNZdn6zjZjeQBgWpN
- hgdHCb38NlobVxsk7HnXLvPyqG3aut2Q2KnInPoxvb5u6YVrZ7nT6JAA5gbHTG6a92
- Anc6aIDkthHPZsug+hl19+V50C/RrEApGzNvVBaaP7BHNMin9KdrKfuaVYKmiE0LIF
- HhFTy+xXQ9l2y3k6aiz9+V69XRfQWRMjfGJBRNqWGBubetZUoRiux0fYAkUN/7FQnf
- ObKiO06CLaNjX5idF50MCCSBvTwDybB4u1ZtBUHAFGsNn6+VJoYnJ4JjGigFAte/LE
- jnZA6sM4CIgUA==
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR03CA0052.eurprd03.prod.outlook.com
+ (2603:10a6:803:50::23) To BN6PR11MB1842.namprd11.prod.outlook.com
+ (2603:10b6:404:101::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Tudor.Ambarus@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BN6PR11MB1841;
+ 6:xVEO7lrbliwBLnDQ2K45x84/MPEa2g6kg3HqaYQRDKqIWxUXOf2fMssg8RTf93Zywf9MmXgWUG54QAxrB4mr3fUn9gsLEvQ0riux8Q7bnd+5Ss+1WPRiicQ1l1ydPR4G1iZRAnU+Q+lxs2O2xuhWdrAX7tCvyEK0zYkKcHGnrSr+hc9JcdzlwliRaqFRzu4jS0HXcfiKDdKeNGhD8kvTUWVhfwOaRZtGk0m6koWJ9wPriXnOHbRsOB8a+lhpoEyq2ESUct7uCsTW7dpmxByac+E2BAVom8A5yShNhCBZWRv/tj7jBaQ7F3ZwHCoCXR4sTmfOkJmyqk8RrJatUsaBLETG5rsU2f/f+I57HsE1P86Y+9fAChokQr0hu6UQI2vmmF8gZWbdK1hS4CajZxX3DWwTxEmN6zF80JTjCl4lqnbaV6/oRE47VrN2TPJsGmqWmzg2nMcvyvM8Cxgz43YIFA==;
+ 5:BUf9DC5QVicmX6Aa1ULAyqCapzJ/TndfDxUs2+oPDHzwgfMaxvBGbh9Bm+jNfTWpRWl5r1LBtHjhl4huihqqlSq3n4AxhIuNRkr64oZu5Gz+G5lLzM4Bw2nE6QCN1xcEewaTIM7d9yCDjmXMa/vLzuSsRkaw6jMe2xIEqRAV7ucanhfppEGUAGJ3A2QVoQFPhFqIvcmGaSPxLerC54F4Ew==;
+ 7:5BZDVsxYROJnVAWJObuXLTdWqxGW8hSBVGes5Z1huv+MDwn75sx+8DmIxTTe9mKbuBxI4IQiOnD8GgYrZ/P1ue9D6GzS5bnlG+2ahhQ8r8keHcP4wij4+2Jjrb4uF8bSwDnHUg05WzwSLh7ek11Gwg==
+x-ms-office365-filtering-correlation-id: 19a49ad3-bcd8-49de-ef9a-08d688539ace
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:BN6PR11MB1841; 
+x-ms-traffictypediagnostic: BN6PR11MB1841:
+x-microsoft-antispam-prvs: <BN6PR11MB1841634D6C67632F42F5CE52F0920@BN6PR11MB1841.namprd11.prod.outlook.com>
+x-forefront-prvs: 09352FD734
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(346002)(376002)(39860400002)(396003)(366004)(199004)(189003)(2501003)(386003)(7416002)(68736007)(76176011)(102836004)(6116002)(3846002)(6916009)(11346002)(31696002)(6246003)(476003)(7736002)(6506007)(53546011)(446003)(316002)(53936002)(2616005)(486006)(26005)(86362001)(305945005)(186003)(256004)(36756003)(54906003)(99286004)(93886005)(14454004)(2906002)(4326008)(6436002)(71200400001)(71190400001)(8676002)(25786009)(478600001)(1730700003)(5640700003)(8936002)(72206003)(229853002)(52116002)(106356001)(2351001)(6486002)(31686004)(105586002)(97736004)(81156014)(66066001)(81166006)(6512007);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1841;
+ H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: u36L+Y9IVERvihAAV+qxZ11DAh4uopZO91ctDonmfo0aKlv8u7AHDI6NEbMZ5lcMJQv7wS+FWgISGkcZZhNUBaoQgs2P2smvcC2mvMwWBmjKqayaJ0i/lmWHQA+83JYd5AiEAgWkzIbTr847ruBJBZF48D62gCXONgnPDscMxR926DGjwVV4dl86w/jjKF77UBmcGNNXyosy+gbCiCvE0NxYIt8yDadoGIdYlJy50MGJBrRMSMvLR661dJYX/dQuYRn1Q9NYE4/n29uwYEGtDiK1Vo+3GZpppSBgl2s57M0gG8C4FUbpk/I2XwVVmnOj1kqLqklPBKtQm0eHj4UcCXe6GJXXpSdDBF6saQzcrKmL8kz6iOwblDUiqr0Q6e+g0JKIbaWIwnE6luYK4kdoRcJ2sC1s+TbXvZcaxOpy/OI=
+Content-ID: <B1A32B394A61DF4C8AD769D0FF5E83AD@namprd11.prod.outlook.com>
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 19a49ad3-bcd8-49de-ef9a-08d688539ace
+X-MS-Exchange-CrossTenant-originalarrivaltime: 01 Feb 2019 14:43:16.1904 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1841
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_063951_169364_6AF0F87B 
-X-CRM114-Status: GOOD (  20.18  )
+X-CRM114-CacheID: sfid-20190201_064327_082741_4556D1C9 
+X-CRM114-Status: UNSURE (   8.33  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,164 +128,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Thierry Reding <treding@nvidia.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ alexandre.belloni@bootlin.com, broonie@kernel.org,
+ linux-kernel@vger.kernel.org, Ludovic.Desroches@microchip.com,
+ robh+dt@kernel.org, linux-mtd@lists.infradead.org, linux-spi@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2/1/19 8:44 PM, Jon Hunter wrote:
-> 
-> On 01/02/2019 03:36, Joseph Lo wrote:
->> Add support for the Tegra210 timer that runs at oscillator clock
->> (TMR10-TMR13). We need these timers to work as clock event device and to
->> replace the ARMv8 architected timer due to it can't survive across the
->> power cycle of the CPU core or CPUPORESET signal. So it can't be a wake-up
->> source when CPU suspends in power down state.
+
+
+On 02/01/2019 09:07 AM, Tudor.Ambarus@microchip.com wrote:
+
+cut
+
+>>> diff --git a/drivers/spi/atmel-quadspi.c b/drivers/spi/atmel-quadspi.c
+
+cut
+
+>>> +static int atmel_sam9x60_qspi_set_cfg(void __iomem *base,
+>>> +				      const struct spi_mem_op *op,
+>>> +				      struct atmel_qspi_cfg *cfg)
+>>> +{
+>>> +	int ret = atmel_qspi_set_mode(cfg, op);
+>>> +
+>>> +	if (ret)
+>>> +		return ret;
+>>> +
+>>> +	ret = atmel_qspi_set_address_mode(cfg, op);
+>>> +	if (ret)
+>>> +		return ret;
+>>> +
+>>> +	cfg->ifr |= QSPI_IFR_INSTEN;
+>>> +	cfg->icr |= QSPI_ICR_INST(op->cmd.opcode);
+>>> +
+>>> +	/* Set data enable */
+>>> +	if (op->data.nbytes)
+>>> +		cfg->ifr |= QSPI_IFR_DATAEN;
+>>> +
+>>> +	if (!op->addr.nbytes) {
+>>> +		cfg->ifr |= QSPI_IFR_TFRTYP_TRSFR_REG;
+>>> +		if (op->data.dir == SPI_MEM_DATA_OUT)
+>>> +			cfg->ifr |= QSPI_IFR_APBTFRTYP_WRITE;
+>>> +		else
+>>> +			cfg->ifr |= QSPI_IFR_APBTFRTYP_READ;
+>>> +	} else {
+>>> +		cfg->ifr |= QSPI_IFR_TFRTYP_TRSFR_MEM;
 >>
->> Also convert the original driver to use timer-of API.
+>> Can you try doing only regular transfers and let me know if it still
+>> works. Support for mem transfers can then be added along with dirmap
+>> support.
 > 
-> It may have been nice to split this into 2 patches to make it easier to
-> see what is going on but not a big deal.
-> 
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: linux-kernel@vger.kernel.org
->> Signed-off-by: Joseph Lo <josephl@nvidia.com>
->> Acked-by: Thierry Reding <treding@nvidia.com>
->> ---
->> v5:
->>   * add ack tag from Thierry
->> v4:
->>   * merge timer-tegra210.c in previous version into timer-tegra20.c
->> v3:
->>   * use timer-of API
->> v2:
->>   * add error clean-up code
->> ---
->>   drivers/clocksource/Kconfig         |   2 +-
->>   drivers/clocksource/timer-tegra20.c | 369 ++++++++++++++++++++--------
->>   include/linux/cpuhotplug.h          |   1 +
->>   3 files changed, 272 insertions(+), 100 deletions(-)
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index a9e26f6a81a1..6af78534a285 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -131,7 +131,7 @@ config SUN5I_HSTIMER
->>   config TEGRA_TIMER
->>   	bool "Tegra timer driver" if COMPILE_TEST
->>   	select CLKSRC_MMIO
->> -	depends on ARM
->> +	select TIMER_OF
->>   	help
->>   	  Enables support for the Tegra driver.
->>   
->> diff --git a/drivers/clocksource/timer-tegra20.c b/drivers/clocksource/timer-tegra20.c
->> index 4293943f4e2b..96a809341c9b 100644
->> --- a/drivers/clocksource/timer-tegra20.c
->> +++ b/drivers/clocksource/timer-tegra20.c
->> @@ -15,21 +15,24 @@
->>    *
->>    */
->>   
->> -#include <linux/init.h>
->> +#include <linux/clk.h>
->> +#include <linux/clockchips.h>
->> +#include <linux/cpu.h>
->> +#include <linux/cpumask.h>
->> +#include <linux/delay.h>
->>   #include <linux/err.h>
->> -#include <linux/time.h>
->>   #include <linux/interrupt.h>
->> -#include <linux/irq.h>
->> -#include <linux/clockchips.h>
->> -#include <linux/clocksource.h>
->> -#include <linux/clk.h>
->> -#include <linux/io.h>
->>   #include <linux/of_address.h>
->>   #include <linux/of_irq.h>
->> -#include <linux/sched_clock.h>
->> -#include <linux/delay.h>
->> +#include <linux/percpu.h>
->> +#include <linux/syscore_ops.h>
->> +#include <linux/time.h>
->> +
->> +#include "timer-of.h"
->>   
->> +#ifdef CONFIG_ARM
->>   #include <asm/mach/time.h>
->> +#endif
->>   
->>   #define RTC_SECONDS            0x08
->>   #define RTC_SHADOW_SECONDS     0x0c
->> @@ -43,70 +46,147 @@
->>   #define TIMER2_BASE 0x8
->>   #define TIMER3_BASE 0x50
->>   #define TIMER4_BASE 0x58
->> -
->> -#define TIMER_PTV 0x0
->> -#define TIMER_PCR 0x4
->> -
->> +#define TIMER10_BASE 0x90
->> +
->> +#define TIMER_PTV		0x0
->> +#define TIMER_PTV_EN		BIT(31)
->> +#define TIMER_PTV_PER		BIT(30)
->> +#define TIMER_PCR		0x4
->> +#define TIMER_PCR_INTR_CLR	BIT(30)
->> +
->> +#ifdef CONFIG_ARM
->> +#define TIMER_BASE TIMER3_BASE
->> +#else
->> +#define TIMER_BASE TIMER10_BASE
->> +#endif
->> +#define TIMER10_IRQ_IDX		10
->> +#define TIMER_FOR_CPU(cpu) (TIMER_BASE + (cpu) * 8)
->> +#define IRQ_IDX_FOR_CPU(cpu)	(TIMER10_IRQ_IDX + cpu)
-> 
-> TIMER10_IRQ_IDX and IRQ_IDX_FOR_CPU are only applicable to ARM64 and so
-> we should probably not defined for ARM to avoid any confusion.
-Okay, will do.
-> 
-> Furthermore, a lot of these TIMERx_BASE definitions are unused AFAICT.
-> Would be good to get rid of these.
+> should work. Will try and let you know.
 
-Okay.
-> 
-> Maybe we could just have ...
-> 
->   +#ifdef CONFIG_ARM
->   +#define TIMER_CPU0 3
->   +#else
->   +#define TIMER_CPU0 10
->   +#endif
->   +#define TIMER_BASE_FOR_CPU(cpu) ((TIMER_CPU0 + cpu) * 8)
->   +#define TIMER_FOR_CPU(cpu) (TIMER_CPU0 + cpu)
-> 
-This can't get the timer base address. I think you mean ...
+you were right, it works. I will let mem transfer logic for dirmap support.
 
-+#ifdef CONFIG_ARM
-+#define TIMER_CPU0 0x50 /* TIMER3 */
-+#else
-+#define TIMER_CPU0 0x90 /* TIMER10 */
-+#endif
-+#define TIMER_BASE_FOR_CPU(cpu) (TIMER_CPU0 + (cpu) * 8)
-
-This doesn't need.
-+#define TIMER_FOR_CPU(cpu) (TIMER_CPU0 + cpu)
-
-Will fix above accordingly and adding your ack tag.
-
-Thanks,
-Joseph
-
-> Otherwise looks good to me.
-> 
-> Cheers
-> Jon
-> 
+Cheers,
+ta
 
 _______________________________________________
 linux-arm-kernel mailing list
