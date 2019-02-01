@@ -2,63 +2,58 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DF22CC282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 16:27:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 65E79C282DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 16:28:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AEDF42086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 16:27:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3622B218AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 16:28:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YcN3VQx5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AEDF42086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U+1AMKLc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3622B218AF
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MpPH8P4rw+ib+DJ6b2fRbe0ywcPFNzf+YlRRBgjsRRs=; b=YcN3VQx51SlD9w
-	CTajuUPBlFJAbm4A8xUBNpoYUzzbX4IRKlRwOkF6TkkGIRlh6D6NH/BnAwZYXNRyiUWI3CHjhVyxj
-	cn03H/whVlmCBxHwSb23bd25XJzH06aR1trQa5gownttGtXhkv9XwY4wuvKhh6ka3EjE5/38lJNVT
-	VC8WLOIgHuEnquP3VeI+aDg19iqgNkadvm7KReAEzWEGlMbekC8G1lFbJ29fQnRpzgbA57inGMeUF
-	r7pCHpeS+R4dp2KchpSExaMqlmIWJBNES2Y73xjfrG53+juLaetd0n5Dw9M0U1cMYqCVmGRS4KI06
-	UN2M9wsnU/ML23Fnpv1Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=DBVPjWqpSAXpIFQ2kgAgaVnOjs7PSjBJYnoG+15uSl8=; b=U+1AMKLcOqJvSN
+	O4JkIZH/5edEy+8CcOGqqKHxVphP6BqgBBe7/DW2bvr99VY7GZcut2OgLVb5eRRAwQrydb66VY8BB
+	g6vKuKNdQBPG2ktKmOQvWX/dvHJpdkmqkfCX1E5XfJ8SOJVrJpuIJrZvTm5hxp3w/QjjbYIVF/EIU
+	21alDra+ktbM1K/qyr9UaTYDyFCSzYGqSx3Iwzed1FmCy1DhrNDjS/wmGNb0xUsvUyluhZugcTeaS
+	Qe3BfL069GkviWrrCe+eM2M9JtZoM/W28hmrSrqnS9e1YNK6N8RtohE9uALH4q57OAE6T0Lo3E5BC
+	SHlTWfEsL5/NI3w4ufXQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpbfK-0003zY-KC; Fri, 01 Feb 2019 16:27:42 +0000
+	id 1gpbfz-0004GI-2b; Fri, 01 Feb 2019 16:28:23 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpbfH-0003zB-N7
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 16:27:41 +0000
+ id 1gpbfv-0004Ft-Nt
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 16:28:20 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B706815BE;
- Fri,  1 Feb 2019 08:27:36 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 80A203F71E;
- Fri,  1 Feb 2019 08:27:34 -0800 (PST)
-Date: Fri, 1 Feb 2019 16:27:29 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Andrey Smirnov <andrew.smirnov@gmail.com>,
- Lucas Stach <l.stach@pengutronix.de>
-Subject: Re: [PATCH v2 00/20] i.MX6, DesignWare PCI improvements
-Message-ID: <20190201162729.GA22030@e107981-ln.cambridge.arm.com>
-References: <20190104174925.17153-1-andrew.smirnov@gmail.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2B10D15BE;
+ Fri,  1 Feb 2019 08:28:19 -0800 (PST)
+Received: from ostrya.cambridge.arm.com (ostrya.cambridge.arm.com [10.1.197.2])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 59B183F71E;
+ Fri,  1 Feb 2019 08:28:18 -0800 (PST)
+From: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH] arm64: kexec_file: handle empty command-line
+Date: Fri,  1 Feb 2019 16:26:08 +0000
+Message-Id: <20190201162608.20815-1-jean-philippe.brucker@arm.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190104174925.17153-1-andrew.smirnov@gmail.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_082739_759071_F3689302 
-X-CRM114-Status: GOOD (  17.38  )
+X-CRM114-CacheID: sfid-20190201_082819_777189_834C0979 
+X-CRM114-Status: GOOD (  10.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,86 +65,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
- linux-arm-kernel@lists.infradead.org, linux-pci@vger.kernel.org,
- linux-kernel@vger.kernel.org, Fabio Estevam <fabio.estevam@nxp.com>,
- linux-imx@nxp.com, Bjorn Helgaas <bhelgaas@google.com>,
- Leonard Crestez <leonard.crestez@nxp.com>, Chris Healy <cphealy@gmail.com>,
- Lucas Stach <l.stach@pengutronix.de>
+Cc: catalin.marinas@arm.com, will.deacon@arm.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 04, 2019 at 09:49:05AM -0800, Andrey Smirnov wrote:
-> Everyone:
-> 
-> This is the series containing various small improvements that I made
-> while reading the code and researching commit history of pci-imx6.c
-> and pcie-designware*.c files. All changes are optional, so commits
-> that don't seem like an improvement can be easily dropped. Hopefully
-> each patch is self-explanatory.
+Calling strlen() on cmdline == NULL produces a segfault. Since having a
+NULL cmdline is valid, handle this case explicitly.
 
-Side note: You should trim the CC list, eg I do not think CC LKML is
-needed at all for this series.
+Fixes: 52b2a8af7436 ("arm64: kexec_file: load initrd and device-tree")
+Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+---
+ arch/arm64/kernel/machine_kexec_file.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-@Lucas: May I ask you to consider please which patches you deem
-worth for inclusion ? I will have a look too but I would be grateful
-if the driver maintainers can chime in to help.
+diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+index f2c211a6229b..58871333737a 100644
+--- a/arch/arm64/kernel/machine_kexec_file.c
++++ b/arch/arm64/kernel/machine_kexec_file.c
+@@ -120,10 +120,12 @@ static int create_dtb(struct kimage *image,
+ {
+ 	void *buf;
+ 	size_t buf_size;
++	size_t cmdline_len;
+ 	int ret;
+ 
++	cmdline_len = cmdline ? strlen(cmdline) : 0;
+ 	buf_size = fdt_totalsize(initial_boot_params)
+-			+ strlen(cmdline) + DTB_EXTRA_SPACE;
++			+ cmdline_len + DTB_EXTRA_SPACE;
+ 
+ 	for (;;) {
+ 		buf = vmalloc(buf_size);
+-- 
+2.20.1
 
-Thanks,
-Lorenzo
-
-> I tested this series on i.MX6Q, i.MX7D and i.MX8MQ.
-> 
-> Feedback is welcome!
-> 
-> Thanks,
-> Andrey Smirnov
-> 
-> Changes since [v1]:
-> 
->   - Dropped "PCI: imx6: Drop imx6_pcie_link_up()" due to the matter
->     already having been addressed by "PCI: imx6: Fix link training
->     status detection in link up check" from Trent Piepho
-> 
->   - Changed "designware" -> "dwc" for all subject lines
-> 
->   - Collected Acked-by's from Gustavo Pimentel
-> 
-> [v1] lkml.kernel.org/r/20181221072716.29017-1-andrew.smirnov@gmail.com
-> 
-> Andrey Smirnov (20):
->   PCI: imx6: Simplify imx7d_pcie_wait_for_phy_pll_lock()
->   PCI: imx6: Remove redundant debug tracing
->   PCI: imx6: Return -ETIMEOUT from imx6_pcie_wait_for_speed_change()
->   PCI: imx6: Remove duplicate macro definitions
->   PCI: imx6: Remove PCIE_PL_PFLR_* constants
->   PCI: imx6: Remove PCIE_PHY_RX_ASIC_OUT* constants
->   PCI: dwc: Make use of IS_ALIGNED()
->   PCI: dwc: Share code for dw_pcie_rd/wr_other_conf()
->   PCI: dwc: imx6: Share PHY debug register definitions
->   PCI: dwc: Make use of BIT() in constant definitions
->   PCI: imx6: Make use of BIT() in constant definitions
->   PCI: imx6: Simplify bit operations in PHY functions
->   PCI: imx6: Simplify pcie_phy_poll_ack()
->   PCI: imx6: Restrict PHY register data to 16-bit
->   PCI: imx6: Pass data to dw_pcie_writel_dbi() directly
->   PCI: imx6: Use common mask in imx6_pcie_reset_phy()
->   PCI: imx6: Simplify bit operations in imx6_setup_phy_mpll()
->   PCI: imx6: Remove magic numbers from imx6_pcie_establish_link()
->   PCI: dwc: Make use of GENMASK/FIELD_PREP
->   PCI: dwc: Remove superfluous shifting in definitions
-> 
->  drivers/pci/controller/dwc/pci-imx6.c         | 139 +++++++-----------
->  .../pci/controller/dwc/pcie-designware-host.c |  61 +++-----
->  drivers/pci/controller/dwc/pcie-designware.c  |  18 +--
->  drivers/pci/controller/dwc/pcie-designware.h  |  60 ++++----
->  4 files changed, 115 insertions(+), 163 deletions(-)
-> 
-> -- 
-> 2.20.1
-> 
 
 _______________________________________________
 linux-arm-kernel mailing list
