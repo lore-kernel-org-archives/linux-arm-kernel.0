@@ -2,71 +2,73 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 85EC9C282DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:36:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DDD27C282DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:36:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5843320863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:36:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AF24020863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:36:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TIn/9RsZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5843320863
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B60oltIc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF24020863
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=ghAaO4L3SMpa4gfZBllTI1a4BDheE0Hb0aCcfqmVlZs=; b=TIn/9RsZqiEYnm
-	T2Mxcynf4R/TNZ7ibIgzpKcrUQnrhlXhx3VQoqorsPLMK+p28P/4sNAzlw1dc0gpGc8/qqnAPq4Ya
-	8zLGGfkiI2KXx5TbMyhDCdOXcUAja2eSJRN34VyVF/aCSzqM8SJobM9v+D83kpy4t+TyBlkNv3vtM
-	7TUhteERPRLZjFdf4ZJXCYnvF8ft39nY5Bd6mVbCRnjkfWChZw/s8hnyA105oIsKA9D2A56uNGBDw
-	dHdwU4hldhHIR0RcCunseMQjE7bwjNbKfFGPCa1xdYKSv2MJbPCmVlBSlpvnD2NW60MAZ5loAi9aG
-	nzFjEkP2vHhkKyN8KrsQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=7/L1/wxHRGRvoYYZDIu2Vm7YoX2dMA0WrYSYgDm3I/w=; b=B60oltIcPJ8xUW
+	haSmpY6RDk63JayVHKg9qz//nVvsK4WUrNXE2EMTy2HVQwecgI/yl9nLhA7c8k/+pD00C9E1g62d7
+	eSEXIJDtvGfeaYrOlTbBs2TxUohUuSBkg1S+VSPx7TyNFoJDoCzL9RzzHD2KTKMO1iCmbMlEQQq9m
+	KlF84p8EPqreK0BdaVdEe4GGIRaKsiF93OljFzs7jbvkkN40ko/E+bXcFFV0S5V/yqBkHa5k5LtPl
+	YzhsJGGpTIrImW53AJoj/McyW7jOlEDcEHBduGxsv/QSYTFOZWMvjSrn6M6pOeUdH990lt9CWufgr
+	7yXI2FIMNsbx0mM7k7kA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpRUz-0004Pj-Oc; Fri, 01 Feb 2019 05:36:21 +0000
+	id 1gpRVC-0004dr-DK; Fri, 01 Feb 2019 05:36:34 +0000
 Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpRUu-0004Nu-I5; Fri, 01 Feb 2019 05:36:18 +0000
-X-UUID: 2dc057a9fbb343109ffd3c7d3f595a9a-20190131
-X-UUID: 2dc057a9fbb343109ffd3c7d3f595a9a-20190131
+ id 1gpRUu-0004Ny-Kr; Fri, 01 Feb 2019 05:36:18 +0000
+X-UUID: d5b99feb1bba4cd2b1b2907f6dfbaceb-20190131
+X-UUID: d5b99feb1bba4cd2b1b2907f6dfbaceb-20190131
 Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
  (envelope-from <honghui.zhang@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1111101032; Thu, 31 Jan 2019 21:36:13 -0800
+ with ESMTP id 971059362; Thu, 31 Jan 2019 21:36:13 -0800
 Received: from mtkmbs08n1.mediatek.inc (172.21.101.55) by
  MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
  15.0.1395.4; Thu, 31 Jan 2019 21:36:12 -0800
 Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
  mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 1 Feb 2019 13:36:10 +0800
+ 15.0.1395.4; Fri, 1 Feb 2019 13:36:11 +0800
 Received: from localhost.localdomain (10.17.3.153) by MTKCAS06.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 1 Feb 2019 13:36:09 +0800
+ Transport; Fri, 1 Feb 2019 13:36:11 +0800
 From: <honghui.zhang@mediatek.com>
 To: <lorenzo.pieralisi@arm.com>, <bhelgaas@google.com>,
  <linux-arm-kernel@lists.infradead.org>, <linux-mediatek@lists.infradead.org>, 
  <linux-pci@vger.kernel.org>, <linux-kernel@vger.kernel.org>,
  <ryder.lee@mediatek.com>
-Subject: [PATCH v3 0/2] PCI: mediatek: enable whole MMIO range and enlarge the
- PCIe2AHB window size
-Date: Fri, 1 Feb 2019 13:36:05 +0800
-Message-ID: <1548999367-11733-1-git-send-email-honghui.zhang@mediatek.com>
+Subject: [PATCH v3 2/2] PCI: mediatek: Enlarge PCIe2AHB window size to support
+ 4GB DRAM
+Date: Fri, 1 Feb 2019 13:36:07 +0800
+Message-ID: <1548999367-11733-3-git-send-email-honghui.zhang@mediatek.com>
 X-Mailer: git-send-email 2.6.4
+In-Reply-To: <1548999367-11733-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1548999367-11733-1-git-send-email-honghui.zhang@mediatek.com>
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_213616_600450_D0C7562F 
-X-CRM114-Status: UNSURE (   6.54  )
+X-CRM114-CacheID: sfid-20190131_213616_685558_B3C8F344 
+X-CRM114-Status: UNSURE (   8.64  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -89,26 +91,46 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-Two patches:
-patch 1 enable whole MMIO range which also fix the complain of scripts/coccinelle/api/resource_size.cocci
-patch 2 enlarge the PCIe2AHB window size to support fully access of 4GB DRAM from EP DMA.
+The PCIE_AXI_WINDOW0 defines the translate window size for the request
+from EP side. Request outside of this window will be treated as
+unsupported request.
 
-v3:
- - update the changlog title for patch1 and update commit message following Bjorn's suggestion
- - move the "|" into the previous line.
+Enlarge this window size from fls(0xffffffff) to 2^33 to support 8GB
+translate address range then EP DMA is capable of fully access 4GB
+DRAM range(physical DRAM is start from 0x40000000).
 
-v2:
- - Fix the checkpatch complains for patch 1.
- - update the commit message and change title of patch 1 for changelog conventions.
- - Add patch 2.
+Reported-by: Bjorn Helgaas <bhelgaas@google.com>
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+---
+ drivers/pci/controller/pcie-mediatek.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Honghui Zhang (2):
-  PCI: mediatek: Enable the whole memory mapped IO range
-  PCI: mediatek: Enlarge PCIe2AHB window size to support 4GB DRAM
-
- drivers/pci/controller/pcie-mediatek.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+index c42fe5c..0b6c728 100644
+--- a/drivers/pci/controller/pcie-mediatek.c
++++ b/drivers/pci/controller/pcie-mediatek.c
+@@ -90,6 +90,12 @@
+ #define AHB2PCIE_SIZE(x)	((x) & GENMASK(4, 0))
+ #define PCIE_AXI_WINDOW0	0x448
+ #define WIN_ENABLE		BIT(7)
++/*
++ * Define PCIe to AHB window size as 2^33 to support max 8GB address space
++ * translate, support least 4GB DRAM size access from EP DMA(physical DRAM
++ * start from 0x40000000).
++ */
++#define PCIE2AHB_SIZE	0x21
+ 
+ /* PCIe V2 configuration transaction header */
+ #define PCIE_CFG_HEADER0	0x460
+@@ -713,7 +719,7 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+ 	writel(val, port->base + PCIE_AHB_TRANS_BASE0_H);
+ 
+ 	/* Set PCIe to AXI translation memory space.*/
+-	val = fls(0xffffffff) | WIN_ENABLE;
++	val = PCIE2AHB_SIZE | WIN_ENABLE;
+ 	writel(val, port->base + PCIE_AXI_WINDOW0);
+ 
+ 	return 0;
 -- 
 2.6.4
 
