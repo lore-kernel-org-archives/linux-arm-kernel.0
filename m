@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 435F0C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:46:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1EAA1C282DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:46:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 14F7520855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:46:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E75F520855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:46:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LGJz97cs";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="E8nhCi+5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 14F7520855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xw5+76XD";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="T9xbKLou"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E75F520855
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,65 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/AbTxWJLZwmf3Hf08zzeX0IEUsvqG8Fe4xdqa4Ni0Jo=; b=LGJz97csJ6ZBOR
-	RYJ58R9aF8TMTskHS3DBNdoJ1WnLP//0wkKAJJI6VgQikuDnwGMG7yJfhAHjHggNhnO0K3Qh9o9H8
-	5a7+hdxH6hG32K1qS5+N2y6QZWw6E746w9KADxqkWlQS+GdeoS9XBB4G7Iln8k9BmxMWyjPA+p9Uk
-	TIvfZpum0zKkfOqb5hY7t8KCICH7iXSZpcvDTyKsaavbV27s32ug4zPoPyc0o4a9IjiimABbSreeP
-	fdhyBEjBC28+hXf7tKgmI+7JDy44D/vbTZORo/vgwQy8ikAWI0+UBALVLM1UExJ6OPRsw4rtARYNP
-	ykwImiImGB0DgvAh2euQ==;
+	List-Owner; bh=jFHgN+iu5MyPabQmEf52OyONTPzSneJ/s0ek45oeh58=; b=Xw5+76XDTBk8Y2
+	V6NGYUyudMajvzwMlFb/p/nWLXFYds4O2lqtkViOXFaOaM9WGiWZS4QiFg4OM5xhDgD1StwBqOHO+
+	5my00yYIkG8XtRsX0vJpo3h/c3ovT84CMDl0fjPZT2uRiusJHtynK3q2IjkZOkM9s41Dgc25xlIIW
+	hdHekjxMjK0voQs5yqsbFfS58D4RNVVyUe+FhmfbvuuZWAxYsG8xit6N54Ju5Ua5D4B88IaFNuWvR
+	LqSUIu3gwA+HX9R8k7pfOksKN4iVj1wxGW9bmcxG/Inhaq6D8rREncuVqabdk0AHyfpc8kwJL1Qnw
+	c7qqiodNfdoizBIjFXzQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpb0y-0006Hv-JY; Fri, 01 Feb 2019 15:46:00 +0000
+	id 1gpb1C-0006UP-QN; Fri, 01 Feb 2019 15:46:14 +0000
 Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpayD-0002Mz-B4
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:43:12 +0000
-Received: by mail-lf1-x143.google.com with SMTP id x201so4081418lff.10
+ id 1gpay9-0002It-OQ
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:43:13 +0000
+Received: by mail-lf1-x143.google.com with SMTP id z13so5358840lfe.11
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 07:43:09 -0800 (PST)
+ Fri, 01 Feb 2019 07:43:05 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=ckydVo2IPZQfXMKYGz1uqlUzm7n70fMIZ1xjq1PJknE=;
- b=E8nhCi+51LFS/kCsQ1K0KO5+96kzYaeX7hDXRUYltlI6GmQF3+G8oEy6e0xFYms18b
- vZRdpwrd1Ds1h5VfxOPgZFMabM7zq0/aRARe0iYvgzPEbJSk89y0exU+yNvSzCgj0q7d
- 8dhqP53svf3j5DCMJccHQgTKYIx346UKMJg5Y=
+ bh=LwL9AwGWtKYUFgkk+kHgF189NcSW5g0gFHkQNio/TBM=;
+ b=T9xbKLou+YYzTb7vsInTFQ4hJHJKIgaD6jdrOH/x7BqslOkfMjcR80XTmg5zuTRnbH
+ J379SJC1zUanC/pjMN1iSliblVoSm5UcZRiouZ9eDOGbt1SjF5LSd4f4Oj681beyenSb
+ XpAnZoqJb/w5NkTjk0Z5e0Clfcn9p1iJB8nOo=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=ckydVo2IPZQfXMKYGz1uqlUzm7n70fMIZ1xjq1PJknE=;
- b=jnIql6Odr+Ii9KctHQx+HqyX9lXQfLvxVwDsevkY5jfzNtlYiZTEuwjlzFmVpT/MRs
- uhGw6SjzICPUlXRC+4e2yk5dhAJUtxIOYcFjS8nNsZiHvBV1XOEEYbQgPCu5rSaIoDvZ
- ty1OByDuNjk0rcZkuBXd66f4D5/DixihJzhdHR/N9Xn5+uzj0s8kj3WlNDh3ankA+OlL
- uBeTpfrGpyhwwjk16q+3A/BPvuc66StScb8xbrrY3ryUQHg+2GYkZxZDfbz/Dls2Rc5O
- AkURPswp+ZvVaBwt6lWNiAUrrL3d2HPOgVppJoJIZ5L2uZ8UA+PbxxveiEZgX3GG7CHu
- idmA==
-X-Gm-Message-State: AHQUAubLdZRbx1wGko8VEOuLc5Nw6E52HyDizlfJ22ug87UqE7U9uSq6
- y58vNWqXAsfHFfCA3ijAVnjOrA==
-X-Google-Smtp-Source: AHgI3IZXZu3/LqaYemTmfQvJ+qkjvAYaHJ7++ebH1U4g7xMEGGgRaGFNyutXQx6O1Wipu4jnjxT0rg==
-X-Received: by 2002:a19:c18d:: with SMTP id r135mr1692116lff.59.1549035787575; 
- Fri, 01 Feb 2019 07:43:07 -0800 (PST)
+ bh=LwL9AwGWtKYUFgkk+kHgF189NcSW5g0gFHkQNio/TBM=;
+ b=lDymodmIBocDwmVVGWElLr8fjjDXn//2X9h2IU5rNWihZeprAD4xfPk/7acXrSywTh
+ NPKzszmI8Qj0INe+PZ23unHLoj86nnoY04HlEw3LzkkywzfmVlBkbUxkEjkWM2PERVMD
+ Z7FTMCBib7yK2m8ggBjE1ddFs2KoyhFq4SS1h91LqUDi59T5JTyn3QSwGI78dVqnt/vZ
+ jfaPd3ucgN72GZk8MSrqWyRdOd9HFf0qCPkTJbKElhXptHW+KXhp7t2mr47Uo+8iOgL6
+ 1vS8uXmW/dUkUpAI5Uc8z3ROrwOUvKyNkgvaSKWqcE94gur7oBaY+biaxw13PlRmMKOr
+ abjg==
+X-Gm-Message-State: AJcUukf3NiYBPlHoyxJBc995U6d7SQVF5WXONs8Hmx7P0tKtWEjlSVUK
+ f/BO82Gg3zhjhRIMPQjhlGFmrA==
+X-Google-Smtp-Source: ALg8bN7W0afO2/5f8oyYpC6gy6IJMm1inSnlPS3TXUKEJJL4w7yiydvNGX5mlUum3341zT/+a7DOFw==
+X-Received: by 2002:ac2:42c5:: with SMTP id n5mr22488995lfl.115.1549035784118; 
+ Fri, 01 Feb 2019 07:43:04 -0800 (PST)
 Received: from localhost.localdomain ([217.76.202.68])
- by smtp.gmail.com with ESMTPSA id i13-v6sm1305712ljg.82.2019.02.01.07.43.05
+ by smtp.gmail.com with ESMTPSA id i13-v6sm1305712ljg.82.2019.02.01.07.43.02
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 01 Feb 2019 07:43:06 -0800 (PST)
+ Fri, 01 Feb 2019 07:43:03 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
  Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>,
  Michael Turquette <mturquette@baylibre.com>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH v7 13/23] dt-bindings: sun6i-dsi: Add A64 MIPI-DSI compatible
-Date: Fri,  1 Feb 2019 21:12:22 +0530
-Message-Id: <20190201154232.10505-14-jagan@amarulasolutions.com>
+Subject: [PATCH v7 11/23] dt-bindings: sun6i-dsi: Add VCC-DSI supply property
+Date: Fri,  1 Feb 2019 21:12:20 +0530
+Message-Id: <20190201154232.10505-12-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 In-Reply-To: <20190201154232.10505-1-jagan@amarulasolutions.com>
 References: <20190201154232.10505-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_074309_948442_5395C53C 
-X-CRM114-Status: GOOD (  13.06  )
+X-CRM114-CacheID: sfid-20190201_074306_637288_EE7172BE 
+X-CRM114-Status: GOOD (  12.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,10 +107,12 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The MIPI DSI controller in Allwinner A64 is similar to A33.
+Allwinner MIPI DSI controllers are supplied with SoC DSI
+power rails via VCC-DSI pin.
 
-But unlike A33, A64 doesn't have DSI_SCLK gating so it is valid
-to with separate compatible for A64 on the same driver.
+Some board still work without supplying this but give more
+faith on datasheet and hardware schematics and document this
+supply property in required property list.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 Reviewed-by: Rob Herring <robh@kernel.org>
@@ -120,17 +122,17 @@ Tested-by: Merlijn Wajer <merlijn@wizzup.org>
  1 file changed, 1 insertion(+)
 
 diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-index 1cc40663b7a2..9877398be69a 100644
+index 6a6cf5de08b0..1cc40663b7a2 100644
 --- a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
 +++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
-@@ -12,6 +12,7 @@ The DSI Encoder generates the DSI signal from the TCON's.
- Required properties:
-   - compatible: value must be one of:
-     * allwinner,sun6i-a31-mipi-dsi
-+    * allwinner,sun50i-a64-mipi-dsi
-   - reg: base address and size of memory-mapped region
-   - interrupts: interrupt associated to this IP
-   - clocks: phandles to the clocks feeding the DSI encoder
+@@ -21,6 +21,7 @@ Required properties:
+   - phys: phandle to the D-PHY
+   - phy-names: must be "dphy"
+   - resets: phandle to the reset controller driving the encoder
++  - vcc-dsi-supply: the VCC-DSI power supply of the DSI encoder
+ 
+   - ports: A ports node with endpoint definitions as defined in
+     Documentation/devicetree/bindings/media/video-interfaces.txt. The
 -- 
 2.18.0.321.gffc6fa0e3
 
