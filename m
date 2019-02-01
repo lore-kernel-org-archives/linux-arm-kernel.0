@@ -3,21 +3,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 97D3CC282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 10:49:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F3AADC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 10:52:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 65EAF20870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 10:49:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C4C3621916
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 10:52:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mYlX39HE";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="eHzwBlYO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 65EAF20870
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UkiXYOY7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C4C3621916
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,48 +24,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=B6Ge9CK16LuuxygBjoUU045vtECNocMv+NlH3W2FriY=; b=mYlX39HEebmcPs
-	cBd6LBESHeCU44Qjerudt1fJ1oQ/L2B1ELURPXc7fGQWVYIIuVRIRuA8CBWaCjspn5abU51kLE1rh
-	bFjc4cN/IwhFXQFznHtife2k8vL9pA1vYbpoxcDaHfJ/WSOiya0cGDbJ6FSINJmEHTwMyI1F1DYYb
-	WFm+pEonAGuPBapm4rRMypT2QvnBhjPcgvJv/WJpGcG0+etb6PYNDv45wIQuJseXNLkaqTnYqhIp5
-	JsWmIaFY4g/GP5iDl6w0EeE9uX1P5zsXIaHr1rf55mVCogSCftbPV3tzFPPFdFbFOScLj9sYxYLgS
-	En/esYGipNGEhh+CdJFQ==;
+	List-Owner; bh=urJ8u+ov05UCCVS5aZLhcthFam1v3gIYFQr6PIuLrz8=; b=UkiXYOY7hl5CcU
+	O1V2X7ej7Xgu3QT1Pj8QIjj7mbS8cjCVzjABvxTKqGugcacaMhENEPYJB36hp2LGPVx6hEpUNa4F9
+	gV5Djmfr1Ci+H9vfTa7WQ95FuLs67NzdpKyBNROF1BziJ7t9EjW1m4zi7SNTuX5vB/cSoWPEybhG4
+	ovLrEp400R441XavJ4ED00E+R4YvR8Pt2We/qlrIGUByStNaoGUkVx9Gg4f8x8BYzMAzcaMvbcrX1
+	+2FNiveWSUVJsi3c0CMKYSf3/bSOKSOHzC/1ODJ/QfWrbtv9CmrL96Vm61M8XcTH8htE+cvcALa2f
+	XqybFZH/MOtuSmOw/r9A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpWNm-0000zI-HB; Fri, 01 Feb 2019 10:49:14 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpWNj-0000yv-68
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 10:49:13 +0000
-Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
- (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 973192082E;
- Fri,  1 Feb 2019 10:49:07 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549018150;
- bh=fCiv8BZlQAWNGqGQur4bOHQMIcOF3JPaGMWug0JgEjw=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=eHzwBlYO2BEEWmhjv3KSIf/Wgu0vibRQW8KY8AFFZj/XBS4xmpv/AiT/OHQ6chpcX
- j/eVc/5QyCk0eTseEs6c7u0GXG16S1WusvFMdB4W4rwDr7ZofpYiVe+Phrq5+p2+7q
- 0RdNtWFB2+iZgt3mulyfjkivSDwkoLbSofkDvFsc=
-Date: Fri, 1 Feb 2019 18:49:00 +0800
-From: Shawn Guo <shawnguo@kernel.org>
-To: Fabio Estevam <festevam@gmail.com>
-Subject: Re: [PATCH v2 2/2] arm64: dts: imx8mq-evk: Add fsl,magic-packet
- property
-Message-ID: <20190201104859.GA22413@dragon>
-References: <20190128095212.14681-1-ccaione@baylibre.com>
- <20190128095212.14681-3-ccaione@baylibre.com>
- <CAOMZO5B1M9VPB=yXhyKDA8diXo7YuAusTa=uY1Uv6E+hWDqQHA@mail.gmail.com>
+	id 1gpWQS-0002if-5K; Fri, 01 Feb 2019 10:52:00 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gpWQO-0002i0-Dz
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 10:51:57 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AD6B280D;
+ Fri,  1 Feb 2019 02:51:54 -0800 (PST)
+Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7A82B3F71E;
+ Fri,  1 Feb 2019 02:51:53 -0800 (PST)
+Date: Fri, 1 Feb 2019 10:51:44 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: "Zhang, Lei" <zhang.lei@jp.fujitsu.com>
+Subject: Re: [PATCH v3 0/1] arm64: Add workaround for Fujitsu A64FX erratum
+ 010001
+Message-ID: <20190201105144.GA27140@fuggles.cambridge.arm.com>
+References: <8898674D84E3B24BA3A2D289B872026A6A2C04E6@G01JPEXMBKW03>
+ <cb7544e2-bd85-df4c-1f48-0afeedefc962@arm.com>
+ <8898674D84E3B24BA3A2D289B872026A6A3090AC@G01JPEXMBKW03>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CAOMZO5B1M9VPB=yXhyKDA8diXo7YuAusTa=uY1Uv6E+hWDqQHA@mail.gmail.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
+In-Reply-To: <8898674D84E3B24BA3A2D289B872026A6A3090AC@G01JPEXMBKW03>
+User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_024911_247376_849578ED 
-X-CRM114-Status: UNSURE (   8.21  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190201_025156_485549_D319F079 
+X-CRM114-Status: GOOD (  11.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,31 +72,33 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Carlo Caione <ccaione@baylibre.com>,
- Sascha Hauer <s.hauer@pengutronix.de>, Rob Herring <robh+dt@kernel.org>,
- NXP Linux Team <linux-imx@nxp.com>, Sascha Hauer <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+Cc: 'Mark Rutland' <mark.rutland@arm.com>,
+ 'Catalin Marinas' <catalin.marinas@arm.com>,
+ 'James Morse' <james.morse@arm.com>,
+ "'linux-kernel@vger.kernel.org'" <linux-kernel@vger.kernel.org>,
+ "'linux-arm-kernel@lists.infradead.org'"
  <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 28, 2019 at 10:11:56AM -0200, Fabio Estevam wrote:
-> On Mon, Jan 28, 2019 at 7:53 AM Carlo Caione <ccaione@baylibre.com> wrote:
-> >
-> > Add the fsl,magic-packet property in the fec nome.
-> 
-> s/nome/node/
-
-Fixed it up and applied both patches.
-
-Shawn
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gRnJpLCBGZWIgMDEsIDIwMTkgYXQgMDU6NTM6NTBBTSArMDAwMCwgWmhhbmcsIExlaSB3cm90
+ZToKPiA+IC0tLS0tT3JpZ2luYWwgTWVzc2FnZS0tLS0tCj4gPiBGcm9tOiBsaW51eC1hcm0ta2Vy
+bmVsCj4gPiBbbWFpbHRvOmxpbnV4LWFybS1rZXJuZWwtYm91bmNlc0BsaXN0cy5pbmZyYWRlYWQu
+b3JnXSBPbiBCZWhhbGYgT2YKPiA+IEphbWVzIE1vcnNlCj4gPiBTZW50OiBUaHVyc2RheSwgSmFu
+dWFyeSAzMSwgMjAxOSAxMjowMCBBTQo+ID4gVG86IFpoYW5nLCBMZWkv5by1IOmbtwo+ID4gQ2M6
+ICdNYXJrIFJ1dGxhbmQnOyAnQ2F0YWxpbiBNYXJpbmFzJzsgJ3dpbGwuZGVhY29uQGFybS5jb20n
+Owo+ID4gJ2xpbnV4LWtlcm5lbEB2Z2VyLmtlcm5lbC5vcmcnOwo+ID4gJ2xpbnV4LWFybS1rZXJu
+ZWxAbGlzdHMuaW5mcmFkZWFkLm9yZycKPiA+IFN1YmplY3Q6IFJlOiBbUEFUQ0ggdjMgMC8xXSBh
+cm02NDogQWRkIHdvcmthcm91bmQgZm9yIEZ1aml0c3UgQTY0RlgKPiA+IGVycmF0dW0gMDEwMDAx
+Cj4gPiAKPiA+IAo+ID4gZTAzZTYxYzMxNzNjICgiYXJtNjQ6IGthc2xyOiBTZXQgVENSX0VMMS5O
+RkQxIHdoZW4KPiA+IENPTkZJR19SQU5ET01JWkVfQkFTRT15IikgPwo+ID4gCj4gPiBTbyB5b3Un
+ZCBuZXZlciBzZWUgaXQgaWYgeW91IGRpc2FibGVkIENPTkZJR19SQU5ET01JWkVfQkFTRT8KPiBG
+b3Igc2VjdXJpdHksIGl0IGlzIG5lY2Vzc2FyeSB0byBzZXQgQ09ORklHX1JBTkRPTUlaRV9CQVNF
+PXkuCgpTbyBJIGd1ZXNzIHdlIHNob3VsZCBib290IHdpdGggTkZEMSBjbGVhciwgYW5kIHRoZW4g
+c2V0IGl0IG9ubHkgd2hlbiB3ZQpyZWFsaXNlIHdlJ3JlIG5vdCBvbiBhbiBBNjRGWD8KCldpbGwK
+Cl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFy
+bS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9y
+ZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1r
+ZXJuZWwK
