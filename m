@@ -2,84 +2,64 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 28199C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 11:27:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5F584C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 11:38:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E7ADD21901
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 11:27:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2D68621872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 11:38:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G7/wzl3k";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="DZtYWaAe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E7ADD21901
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CRf67kSp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D68621872
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ccbib.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vGXNEMbmamCtOLrc76rsrRQRG0yUktdUjAiE4arll60=; b=G7/wzl3kSIhqA3
-	ETCWnqULi4AxGkS5M/PNFsuoT3TKSv6ZcFStxdFGhj4506DsdEBf13v4NlVelVmLg+qx+Mx+3Pth0
-	3NZ11nS7Qf7zZsay5nq8lZJVpTBDGRApl9S2z+Tn9q/7rd7kDRQGRqGN7iqOE5Fsygom8a/AugkwW
-	WLIn9McfPKndRmLDJvE18L5XAYodEZlPCZgr0rhuIZI7lF6E3j9Nqb79YmSFTqTEQDjZZb3BQPx2H
-	JtH2quuLPDRBL4fNqG/iXDZY9k+j1n2rz5ggGQgSOkGCgIQ6JJF4fxEzPe7ZqWZO0RGENiFVBhKVr
-	GnM/CKpiFAuG8N/cnANg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=naHyk3dNc6z8u1px+065PwkENYwV3Hc7NaZHl72SlCM=; b=CRf67kSpWQqPG1
+	FbNsngK4YTp/ntNtmR6msgfIRl390h14edmSdxM4CQECCIYTRQpgrOjHr3xYaK5a+13Tfw1WF7Udt
+	t66NmASlE0Sl8i65T9/dYEWs0ITFnqhm+YT+RA0/ukO4e72e0N7uCKcU36aBPKhtSriZg2ZRa7WaG
+	Ex2+jZgkw9ScEKuuLx7FgxIel2mQkMn0oDpcB+LiiUJ4sh7dJWYkB0NRq15Hm9td9WsbzGsHJ3AkH
+	X9NdjRDCbZPsi3xkE3Sg4MkWjChEB6xvOsHXUWxOe1rFHA+701HMermI1Ep+J6sRa2Zw3Z8Pux4hr
+	sUhiqnxivtrOnDX5pVNA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpWyO-0000oo-Ks; Fri, 01 Feb 2019 11:27:04 +0000
-Received: from mail-oi1-x244.google.com ([2607:f8b0:4864:20::244])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpWyK-0000o7-97
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 11:27:01 +0000
-Received: by mail-oi1-x244.google.com with SMTP id r62so5529434oie.1
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 03:26:59 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=kqa5FD1UczOx5th+4jguj6QLWTqUNHaleLsrc8W5hBY=;
- b=DZtYWaAeCi7Xai5PckpWC6B9yYHyUpb8BleXrTyHeMAjSEPPkXId6yzNgf/nMbrvz4
- zQ4i4Wv5UV4xwYO+6WPP6oEElgdbgAFuq762mqK4aZIEpy/OfM39O3gBiwQFP/25DX26
- j9V2B4bXsOFWaUQ8YCuKlEq8LRe08j6ny5o0LIKe8AaHAw09dFg/dS1B/EiX06O+fWLe
- BAAhKYiHBSWAMcGrNwYbBbTvomZODPimeuHB+0BR1VBjRZwCQ48DvpIMnuMiuYKMR4NL
- vG7fl1GOH1Um8RMmoiwz3z+93jSgBGqtpuqJCnMC7/R6je7HRUJCyqZ8oRfxGXjO8fzS
- XuaQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=kqa5FD1UczOx5th+4jguj6QLWTqUNHaleLsrc8W5hBY=;
- b=NZW+6rCgeA/G8/9wzN2OXSulVunuCDshH6XcFVbYeRBko6XPDmbJVyaCziNTvbuTbh
- sRZHkaJmZ9FsAA8Y2SlQ2f3fI2T1Z7rxpwl7sBiBBMPyJBxK7FSHm8YmM46KknEJIABa
- ctpUJqfVGZOQVIOx19rOLvDj9wf8pB19Ab2tm4SutYC9QR7oG6vF1DRBjULnpZXGLJP4
- 4szlZQB+gb7lk2tmxQDDu6xjue+Ruhi4bDRtRK5BirSyDfrL+deI7uBY/mZESjKuShBH
- 9RTK/FaVi5Z/dm/Av9IBlqDz4ROjb2npm+W3xtjoAX4ro8LpyW0sQQOdKpxPR5m2qdFa
- QXiw==
-X-Gm-Message-State: AHQUAuYLxjd+xcXsuENAG/hdvfKZWBfMMwgIJFOJWxwwqIJC9f6liE3F
- NTMFOhG3PL4WZ5x8ezeH1n5PBnRdmm+Ng8R2COs=
-X-Google-Smtp-Source: ALg8bN6IeDTrru4/HyCzmQoaYtgeaUByWS8bj6+b0nmLFpmFZ8h7jb88SnabI/su9IeiUKwdsEDQln+rNDjDxWMlDKY=
-X-Received: by 2002:aca:ab53:: with SMTP id u80mr18863171oie.261.1549020419084; 
- Fri, 01 Feb 2019 03:26:59 -0800 (PST)
+	id 1gpX91-0004WX-IM; Fri, 01 Feb 2019 11:38:03 +0000
+Received: from mail.cosmopool.net ([2a01:4f8:160:20c1::10:107])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gpX8x-0004W8-DH
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 11:38:01 +0000
+Received: from localhost (localhost [127.0.0.1])
+ by mail.cosmopool.net (Postfix) with ESMTP id 76B7F901674;
+ Fri,  1 Feb 2019 12:37:52 +0100 (CET)
+Received: from mail.cosmopool.net ([127.0.0.1])
+ by localhost (mail.b.radempa.de [127.0.0.1]) (amavisd-new, port 10024)
+ with ESMTP id EES6LgBXtyvu; Fri,  1 Feb 2019 12:37:49 +0100 (CET)
+Received: from hdev.ccbib.org (unknown [IPv6:2a01:4f8:160:20c1::10:110])
+ by mail.cosmopool.net (Postfix) with SMTP id B7914901500;
+ Fri,  1 Feb 2019 12:37:48 +0100 (CET)
+Received: by hdev.ccbib.org (sSMTP sendmail emulation);
+ Fri, 01 Feb 2019 11:37:48 +0000
+From: Harald Geyer <harald@ccbib.org>
+To: Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
+Subject: [PATCH RFC] arm64: dts: allwinner: a64: teres-i: Enable audio
+Date: Fri,  1 Feb 2019 11:37:43 +0000
+Message-Id: <20190201113743.10058-1-harald@ccbib.org>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-References: <cover.1549010639.git.agx@sigxcpu.org>
- <4889791c13375ac927c964f888d66b678675916d.1549010639.git.agx@sigxcpu.org>
-In-Reply-To: <4889791c13375ac927c964f888d66b678675916d.1549010639.git.agx@sigxcpu.org>
-From: Fabio Estevam <festevam@gmail.com>
-Date: Fri, 1 Feb 2019 09:26:50 -0200
-Message-ID: <CAOMZO5BpdWrD4tUpu7Z2+Ou4GBN54dg55sum_Jb3cqO=rM8dpQ@mail.gmail.com>
-Subject: Re: [PATCH v2 3/3] phy: Add driver for mixel dphy found on imx8
-To: =?UTF-8?Q?Guido_G=C3=BCnther?= <agx@sigxcpu.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_032700_318213_A6149922 
-X-CRM114-Status: GOOD (  20.55  )
+X-CRM114-CacheID: sfid-20190201_033759_757989_455662FF 
+X-CRM114-Status: GOOD (  16.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,142 +71,144 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
- Robert Chiras <robert.chiras@nxp.com>, Sam Ravnborg <sam@ravnborg.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>,
- DRI mailing list <dri-devel@lists.freedesktop.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: devicetree@vger.kernel.org, info@olimex.com,
+ Mark Brown <broonie@kernel.org>, Harald Geyer <harald@ccbib.org>,
+ ibu@radempa.de, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgR3VpZG8sCgpUaGFua3MgZm9yIHRoZSByZXNwaW4uIEl0IGxvb2tzIGJldHRlciA6LSkKCk9u
-IEZyaSwgRmViIDEsIDIwMTkgYXQgNjo1MCBBTSBHdWlkbyBHw7xudGhlciA8YWd4QHNpZ3hjcHUu
-b3JnPiB3cm90ZToKCj4gK2NvbmZpZyBQSFlfTUlYRUxfTUlQSV9EUEhZCj4gKyAgICAgICB0cmlz
-dGF0ZSAiTWl4ZWwgTUlQSSBEU0kgUEhZIHN1cHBvcnQiCj4gKyAgICAgICBkZXBlbmRzIG9uIE9G
-Cj4gKyAgICAgICBzZWxlY3QgR0VORVJJQ19QSFkKPiArICAgICAgIHNlbGVjdCBHRU5FUklDX1BI
-WV9NSVBJX0RQSFkKClNpbmNlIHlvdSBjb252ZXJ0ZWQgdG8gcmVnbWFwLCBJIGd1ZXNzIHlvdSBu
-ZWVkOgpzZWxlY3QgUkVHTUFQX01NSU8gbm93PwoKPiArICAgICAgIGhlbHAKPiArICAgICAgICAg
-RW5hYmxlIHRoaXMgdG8gYWRkIHN1cHBvcnQgZm9yIHRoZSBNaXhlbCBEU0kgUEhZIGFzIGZvdW5k
-Cj4gKyAgICAgICAgIG9uIE5YUCdzIGkuTVg4IGZhbWlseSBvZiBTT0NzLgo+IGRpZmYgLS1naXQg
-YS9kcml2ZXJzL3BoeS9mcmVlc2NhbGUvTWFrZWZpbGUgYi9kcml2ZXJzL3BoeS9mcmVlc2NhbGUv
-TWFrZWZpbGUKPiBpbmRleCBkYzJiM2YxZjJmODAuLjA3NDkxYzkyNmEyYyAxMDA2NDQKPiAtLS0g
-YS9kcml2ZXJzL3BoeS9mcmVlc2NhbGUvTWFrZWZpbGUKPiArKysgYi9kcml2ZXJzL3BoeS9mcmVl
-c2NhbGUvTWFrZWZpbGUKPiBAQCAtMSArMSwyIEBACj4gIG9iai0kKENPTkZJR19QSFlfRlNMX0lN
-WDhNUV9VU0IpICAgICAgICs9IHBoeS1mc2wtaW14OG1xLXVzYi5vCj4gK29iai0kKENPTkZJR19Q
-SFlfTUlYRUxfTUlQSV9EUEhZKSAgICAgICs9IHBoeS1mc2wtaW14OC1taXBpLWRwaHkubwo+IGRp
-ZmYgLS1naXQgYS9kcml2ZXJzL3BoeS9mcmVlc2NhbGUvcGh5LWZzbC1pbXg4LW1pcGktZHBoeS5j
-IGIvZHJpdmVycy9waHkvZnJlZXNjYWxlL3BoeS1mc2wtaW14OC1taXBpLWRwaHkuYwo+IG5ldyBm
-aWxlIG1vZGUgMTAwNjQ0Cj4gaW5kZXggMDAwMDAwMDAwMDAwLi40YjE4MmYyZWFhNmUKPiAtLS0g
-L2Rldi9udWxsCj4gKysrIGIvZHJpdmVycy9waHkvZnJlZXNjYWxlL3BoeS1mc2wtaW14OC1taXBp
-LWRwaHkuYwo+IEBAIC0wLDAgKzEsNDk0IEBACj4gKy8vIFNQRFgtTGljZW5zZS1JZGVudGlmaWVy
-OiBHUEwtMi4wKwo+ICsvKgo+ICsgKiBDb3B5cmlnaHQgMjAxNywyMDE4IE5YUAo+ICsgKiBDb3B5
-cmlnaHQgMjAxOSBQdXJpc20gU1BDCj4gKyAqLwo+ICsKPiArI2luY2x1ZGUgPGxpbnV4L2Nsay5o
-Pgo+ICsjaW5jbHVkZSA8bGludXgvY2xrLXByb3ZpZGVyLmg+Cj4gKyNpbmNsdWRlIDxsaW51eC9k
-ZWxheS5oPgo+ICsjaW5jbHVkZSA8bGludXgvaW8uaD4KPiArI2luY2x1ZGUgPGxpbnV4L2tlcm5l
-bC5oPgo+ICsjaW5jbHVkZSA8bGludXgvbW9kdWxlLmg+Cj4gKyNpbmNsdWRlIDxsaW51eC9vZi5o
-Pgo+ICsjaW5jbHVkZSA8bGludXgvb2ZfcGxhdGZvcm0uaD4KPiArI2luY2x1ZGUgPGxpbnV4L3Jl
-Z21hcC5oPgo+ICsjaW5jbHVkZSA8bGludXgvcGh5L3BoeS5oPgo+ICsjaW5jbHVkZSA8bGludXgv
-cGxhdGZvcm1fZGV2aWNlLmg+Cj4gKwo+ICsvKiBEUEhZIHJlZ2lzdGVycyAqLwo+ICsjZGVmaW5l
-IERQSFlfUERfRFBIWSAgICAgICAgICAgICAgICAgICAweDAwCj4gKyNkZWZpbmUgRFBIWV9NX1BS
-R19IU19QUkVQQVJFICAgICAgICAgIDB4MDQKPiArI2RlZmluZSBEUEhZX01DX1BSR19IU19QUkVQ
-QVJFICAgICAgICAgMHgwOAo+ICsjZGVmaW5lIERQSFlfTV9QUkdfSFNfWkVSTyAgICAgICAgICAg
-ICAweDBjCj4gKyNkZWZpbmUgRFBIWV9NQ19QUkdfSFNfWkVSTyAgICAgICAgICAgIDB4MTAKPiAr
-I2RlZmluZSBEUEhZX01fUFJHX0hTX1RSQUlMICAgICAgICAgICAgMHgxNAo+ICsjZGVmaW5lIERQ
-SFlfTUNfUFJHX0hTX1RSQUlMICAgICAgICAgICAweDE4Cj4gKyNkZWZpbmUgRFBIWV9QRF9QTEwg
-ICAgICAgICAgICAgICAgICAgIDB4MWMKPiArI2RlZmluZSBEUEhZX1RTVCAgICAgICAgICAgICAg
-ICAgICAgICAgMHgyMAo+ICsjZGVmaW5lIERQSFlfQ04gICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgIDB4MjQKPiArI2RlZmluZSBEUEhZX0NNICAgICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAweDI4Cj4gKyNkZWZpbmUgRFBIWV9DTyAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgMHgyYwo+ICsjZGVmaW5lIERQSFlfTE9DSyAgICAgICAgICAgICAgICAgICAgICAweDMwCj4g
-KyNkZWZpbmUgRFBIWV9MT0NLX0JZUCAgICAgICAgICAgICAgICAgIDB4MzQKPiArI2RlZmluZSBE
-UEhZX1JFR19CWVBBU1NfUExMICAgICAgICAgICAgMHg0Qwo+ICsKPiArI2RlZmluZSBNQlBTKHgp
-ICgoeCkgKiAxMDAwMDAwKQo+ICsKPiArI2RlZmluZSBEQVRBX1JBVEVfTUFYX1NQRUVEIE1CUFMo
-MTUwMCkKPiArI2RlZmluZSBEQVRBX1JBVEVfTUlOX1NQRUVEIE1CUFMoODApCj4gKwo+ICsjZGVm
-aW5lIENOX0JVRiAweGNiN2E4OWMwCj4gKyNkZWZpbmUgQ09fQlVGIDB4NjMKPiArI2RlZmluZSBD
-TSh4KSAgKCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBcCj4gKyAgICAgICAgICAgICAg
-ICgoeCkgPCAgMzIpPzB4ZTB8KCh4KS0xNikgOiAgICAgXAoKRG9lc24ndCBjaGVja3BhdGNoIGNv
-bXBsYWluIGFib3V0IHRoZSBuZWVkIG9mIHNwYWNlIGJldHdlZW4gb3BlcmF0b3JzPwoKPiArICAg
-ICAgICAgICAgICAgKCh4KSA8ICA2NCk/MHhjMHwoKHgpLTMyKSA6ICAgICBcCj4gKyAgICAgICAg
-ICAgICAgICgoeCkgPCAxMjgpPzB4ODB8KCh4KS02NCkgOiAgICAgXAo+ICsgICAgICAgICAgICAg
-ICAoKHgpIC0gMTI4KSkKPiArI2RlZmluZSBDTih4KSAgKCgoeCkgPT0gMSk/MHgxZiA6ICgoKENO
-X0JVRik+PigoeCktMSkpJjB4MWYpKQo+ICsjZGVmaW5lIENPKHgpICAoKENPX0JVRik+Pig4LSh4
-KSkmMHgzKQo+ICsKPiArLyogUEhZIHBvd2VyIG9uIGlzIExPV19FTkFCTEUgKi8KCmFjdGl2ZSBs
-b3cgaXMgcHJvYmFibHkgYSBiZXR0ZXIgdGVybS4KCj4gKyNkZWZpbmUgUFdSX09OIDAKPiArI2Rl
-ZmluZSBQV1JfT0ZGICAgICAgICAxCgo+ICtzdGF0aWMgaW5saW5lIHUzMiBwaHlfcmVhZChzdHJ1
-Y3QgcGh5ICpwaHksIHVuc2lnbmVkIGludCByZWcpCgpBZnRlciB0aGUgY29udmVyc2lvbiB0byBy
-ZWdtYXAgdGhpcyBmdW5jdGlvbiBpcyB1bnVzZWQgbm93IGFuZCB5b3UKc2hvdWxkIHJlbW92ZSBp
-dC4KCj4gK3N0YXRpYyBpbmxpbmUgdm9pZCBwaHlfd3JpdGUoc3RydWN0IHBoeSAqcGh5LCB1MzIg
-dmFsdWUsIHVuc2lnbmVkIGludCByZWcpCgpObyBuZWVkIGZvciAiaW5saW5lIi4KCk1ha2UgaXQg
-c3RhdGljIGludCBpbnN0ZWFkLgoKPiArewo+ICsgICAgICAgc3RydWN0IG1peGVsX2RwaHlfcHJp
-diAqcHJpdiA9IHBoeV9nZXRfZHJ2ZGF0YShwaHkpOwo+ICsgICAgICAgaW50IHJldDsKPiArCj4g
-KyAgICAgICByZXQgPSByZWdtYXBfd3JpdGUocHJpdi0+cmVncywgcmVnLCB2YWx1ZSk7CgpPciBt
-YXliZSBnZXQgcmlkIG9mIHRoaXMgZnVuY3Rpb24gYW5kIHVzZSByZWdtYXBfd3JpdGUoKSBpbnN0
-ZWFkLgoKPiArICAgICAgIGZyZXF1ZW5jeSA9IHJlZl9jbGsgKiBudW1lcmF0b3IgLyAoMiAqIGRl
-bm9taW5hdG9yKTsKPiArICAgICAgIGRldl9pbmZvKCZwaHktPmRldiwgImZyZXE9JWxkLCBoc19j
-bGsvcmVmX2Nsaz0lbGQvJWxkIOKpsCAlbGQvJWxkXG4iLAoKZGV2X2RiZygpIHdvdWxkIGJlIGJl
-dHRlcj8KCj4gKyAgICAgICAgICAgICAgICBmcmVxdWVuY3ksIGRwaHlfb3B0cy0+aHNfY2xrX3Jh
-dGUsIHJlZl9jbGssCj4gKyAgICAgICAgICAgICAgICBudW1lcmF0b3IsIGRlbm9taW5hdG9yKTsK
-PiArCj4gKyAgICAgICAvKiBMUCBjbG9jayBwZXJpb2QgKi8KPiArICAgICAgIGxwX3QgPSAxMDAw
-MDAwMDAwMDAwTCAvIGRwaHlfb3B0cy0+bHBfY2xrX3JhdGU7IC8qIHBzICovCj4gKyAgICAgICBk
-ZXZfZGJnKCZwaHktPmRldiwgIkxQIGNsb2NrICVsdSwgcGVyaW9kOiAlbHUgcHNcbiIsCj4gKyAg
-ICAgICAgICAgICAgIGRwaHlfb3B0cy0+bHBfY2xrX3JhdGUsIGxwX3QpOwo+ICsgICAgICAgLyoK
-PiArICAgICAgICAqICBoc19wcmVwYXJlOiBpbiBscCBjbG9jayBwZXJpb2RzCj4gKyAgICAgICAg
-Ki8KClBsZWFzZSB1c2Ugc2luZ2xlIGxpbmUgY29tbWVudCBzdHlsZSBpbnN0ZWFkLgoKPiArICAg
-ICAgIGlmICgyICogZHBoeV9vcHRzLT5oc19wcmVwYXJlID4gNSAqIGxwX3QpIHsKPiArICAgICAg
-ICAgICAgICAgZGV2X2VycigmcGh5LT5kZXYsCj4gKyAgICAgICAgICAgICAgICAgICAgICAgImhz
-X3ByZXBhcmUgKCV1KSA+IDIuNSAqIGxwIGNsb2NrIHBlcmlvZCAoJWx1KSIsCj4gKyAgICAgICAg
-ICAgICAgICAgICAgICAgZHBoeV9vcHRzLT5oc19wcmVwYXJlLCBscF90KTsKPiArICAgICAgICAg
-ICAgICAgcmV0dXJuIC1FSU5WQUw7Cj4gKyAgICAgICB9Cj4gKyAgICAgICAvKiAwMDogbHBfdCwg
-MDE6IDEuNSAqIGxwX3QsIDEwOiAyICogbHBfdCwgMTE6IDIuNSAqIGxwX3QgKi8KPiArICAgICAg
-IGlmIChkcGh5X29wdHMtPmhzX3ByZXBhcmUgPCBscF90KQo+ICsgICAgICAgICAgICAgICBuID0g
-MDsKPiArICAgICAgIGVsc2UKPiArICAgICAgICAgICAgICAgbiA9IDIgKiAoZHBoeV9vcHRzLT5o
-c19wcmVwYXJlIC0gbHBfdCkgLyBscF90Owo+ICsgICAgICAgY2ZnLT5tX3ByZ19oc19wcmVwYXJl
-ID0gbjsKPiArCj4gKyAgICAgICAvKgo+ICsgICAgICAgICogY2xrX3ByZXBhcmU6IGluIGxwIGNs
-b2NrIHBlcmlvZHMKPiArICAgICAgICAqLwoKU2FtZSBoZXJlLgoKPiArICAgICAgIGlmICgyICog
-ZHBoeV9vcHRzLT5jbGtfcHJlcGFyZSA+IDMgKiBscF90KSB7Cj4gKyAgICAgICAgICAgICAgIGRl
-dl9lcnIoJnBoeS0+ZGV2LAo+ICsgICAgICAgICAgICAgICAgICAgICAgICJjbGtfcHJlcGFyZSAo
-JXUpID4gMS41ICogbHAgY2xvY2sgcGVyaW9kICglbHUpIiwKPiArICAgICAgICAgICAgICAgICAg
-ICAgICBkcGh5X29wdHMtPmNsa19wcmVwYXJlLCBscF90KTsKPiArICAgICAgICAgICAgICAgcmV0
-dXJuIC1FSU5WQUw7Cj4gKyAgICAgICB9Cj4gKyAgICAgICAvKiAwMDogbHBfdCwgMDE6IDEuNSAq
-IGxwX3QgKi8KPiArICAgICAgIGNmZy0+bWNfcHJnX2hzX3ByZXBhcmUgPSBkcGh5X29wdHMtPmNs
-a19wcmVwYXJlID4gbHBfdCA/IDEgOiAwOwo+ICsKPiArICAgICAgIC8qCj4gKyAgICAgICAgKiBo
-c196ZXJvOiBmb3J1bXVsYSBmcm9tIE5YUCBCU1AKClR5cG86IGZvcm11bGEKCj4gKyAgICAgICAg
-Ki8KPiArICAgICAgIG4gPSAoMTQ0ICogKGRwaHlfb3B0cy0+aHNfY2xrX3JhdGUgLyAxMDAwMDAw
-KSAtIDQ3NTAwKSAvIDEwMDAwOwo+ICsgICAgICAgY2ZnLT5tX3ByZ19oc196ZXJvID0gbiA8IDEg
-PyAxIDogbjsKPiArCj4gKyAgICAgICAvKgo+ICsgICAgICAgICogY2xrX3plcm86IGZvcnVtdWxh
-IGZyb20gTlhQIEJTUAoKVHlwbzogZm9ybXVsYQoKPiArc3RhdGljIGludCBtaXhlbF9kcGh5X2Nv
-bmZpZ3VyZShzdHJ1Y3QgcGh5ICpwaHksIHVuaW9uIHBoeV9jb25maWd1cmVfb3B0cyAqb3B0cykK
-PiArewo+ICsgICAgICAgc3RydWN0IG1peGVsX2RwaHlfcHJpdiAqcHJpdiA9IHBoeV9nZXRfZHJ2
-ZGF0YShwaHkpOwo+ICsgICAgICAgc3RydWN0IG1peGVsX2RwaHlfY2ZnIGNmZyA9IHsgMCB9Owo+
-ICsgICAgICAgaW50IHJldDsKPiArCj4gKyAgICAgICByZXQgPSBtaXhlbF9kcGh5X2NvbmZpZ19m
-cm9tX29wdHMocGh5LCAmb3B0cy0+bWlwaV9kcGh5LCAmY2ZnKTsKPiArICAgICAgIGlmIChyZXQp
-Cj4gKyAgICAgICAgICAgICAgIHJldHVybiByZXQ7Cj4gKwo+ICsgICAgICAgLyogVXBkYXRlIHRo
-ZSBjb25maWd1cmF0aW9uICovCj4gKyAgICAgICBtZW1jcHkoJnByaXYtPmNmZywgJmNmZywgc2l6
-ZW9mKHN0cnVjdCBtaXhlbF9kcGh5X2NmZykpOwo+ICsKPiArICAgICAgIGRldl9kYmcoJnBoeS0+
-ZGV2LCAiVXNpbmcgQ006JXUgQ046JXUgQ086JXVcbiIsCgpZb3UgaGF2ZSBhbHJlYWR5IHByaW50
-ZWQgQ00sIENOLCBDTyBhYm92ZS4gTm8gbmVlZCB0byBwcmludGVkIGFnYWluLgoKPiArc3RhdGlj
-IGludCBtaXhlbF9kcGh5X3Bvd2VyX29uKHN0cnVjdCBwaHkgKnBoeSkKPiArewo+ICsgICAgICAg
-c3RydWN0IG1peGVsX2RwaHlfcHJpdiAqcHJpdiA9IHBoeV9nZXRfZHJ2ZGF0YShwaHkpOwo+ICsg
-ICAgICAgdTMyIGxvY2tlZDsKPiArCj4gKyAgICAgICBjbGtfcHJlcGFyZV9lbmFibGUocHJpdi0+
-cGh5X3JlZl9jbGspOwoKY2xrX3ByZXBhcmVfZW5hYmxlKCkgbWF5IGZhaWwuIEJldHRlciBkbzoK
-CnJldCA9IGNsa19wcmVwYXJlX2VuYWJsZShwcml2LT5waHlfcmVmX2Nsayk7CmlmIChyZXQgPCAw
-KQogICAgcmV0dXJuIHJldDsKCj4gKwo+ICsgICAgICAgcGh5X3dyaXRlKHBoeSwgUFdSX09OLCBE
-UEhZX1BEX0RQSFkpOwo+ICsgICAgICAgcGh5X3dyaXRlKHBoeSwgUFdSX09OLCBEUEhZX1BEX1BM
-TCk7Cj4gKwo+ICsgICAgICAgaWYgKHJlZ21hcF9yZWFkX3BvbGxfdGltZW91dChwcml2LT5yZWdz
-LCBEUEhZX0xPQ0ssIGxvY2tlZCwKPiArICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgbG9ja2VkLCAxMCwgMTAwMCkgPCAwKSB7Cj4gKyAgICAgICAgICAgICAgIGRldl9lcnIoJnBo
-eS0+ZGV2LCAiQ291bGQgbm90IGdldCBEUEhZIGxvY2shXG4iKTsKPiArICAgICAgICAgICAgICAg
-cmV0dXJuIC1FSU5WQUw7CgpQbGVhc2UgYWRkIGRlZmluZXMgZm9yIDEwIGFuZCAxMDAwLgoKQmV0
-dGVyIHByb3BhZ2F0ZSB0aGUgcmVhbCBlcnJvciB2YWx1ZSBoZXJlOgoKcmV0ID0gcmVnbWFwX3Jl
-YWRfcG9sbF90aW1lb3V0KC4uLikKaWYgKHJldCkgewogICBkZXZfZXJyKCk7CiAgIGdvdG8gY2xv
-Y2tfZGlzYWJsZQp9Cgo+ICsgICAgICAgcmVzID0gcGxhdGZvcm1fZ2V0X3Jlc291cmNlKHBkZXYs
-IElPUkVTT1VSQ0VfTUVNLCAwKTsKPiArICAgICAgIGlmICghcmVzKQo+ICsgICAgICAgICAgICAg
-ICByZXR1cm4gLUVOT0RFVjsKCllvdSBjYW4gcmVtb3ZlIHRoZSBOVUxMIGNoZWNrIC4uLgoKPiAr
-Cj4gKyAgICAgICByZWdzID0gZGV2bV9pb3JlbWFwKGRldiwgcmVzLT5zdGFydCwgcmVzb3VyY2Vf
-c2l6ZShyZXMpKTsKCklmIHlvdSB1c2UgZGV2bV9pb3JlbWFwX3Jlc291cmNlKCkgaW5zdGVhZC4K
-Cl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFy
-bS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9y
-ZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1r
-ZXJuZWwK
+The TERES-I has internal speakers (left, right), internal microphone
+and a headset combo jack (headphones + mic).
+
+The headphone lines are multiplexed with the debug console.
+The headphone and mic detect lines of the A64 are connected properly,
+but AFAIK currently unsupported by the driver.
+
+Signed-off-by: Harald Geyer <harald@ccbib.org>
+---
+Hi all,
+
+a couple of issues make this patch RFC:
+
+hpvcc-supply vs. cpvdd-supply:
+On the A64 manual the pin is called CPVDD and the binding documents
+requires a cpvdd-supply property. However in the actual driver and
+devicetrees so far hpvcc-supply is used. This is a very new binding,
+so we have the luxury to decide either way, I think. Any input from
+the devicetree maintainers would be appreciated.
+
+debug console multiplexing:
+Olimex have a userspace script that controls gpio PL9 during boot,
+to select between HP and serial console. I guess this is not acceptable
+for mainline.
+
+The best solution I can see is to switch the HP jack from serial console
+to audio once the audio drivers load. With this people can still capture
+the bootlogs but everybody gets audio once the system is up and
+switching back to console output is as simple as unloading the audio
+drivers.
+
+However the current implementation with a pinctrl group doesn't work:
+The audio card device correctly claims the pin (ie I can't export the
+gpio in sysfs anymore), but the pinctrl driver doesn't set the pin
+to output.
+
+Testing:
+I don't have a headset with combo connector, so I could only test the
+headphones output, but not the headset mic. If somebody happens to
+have a TERES-I and a suitable headset, testing this would be nice.
+
+TIA,
+Harald
+
+ .../boot/dts/allwinner/sun50i-a64-teres-i.dts | 53 +++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+index f9eede0a8bd3..d57049fbdaca 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+@@ -70,6 +70,26 @@
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+ 	};
++
++	speaker_amp: audio-amplifier {
++		compatible = "simple-audio-amplifier";
++		enable-gpios = <&r_pio 0 12 GPIO_ACTIVE_HIGH>; /* PL12 */
++		sound-name-prefix = "Speaker Amp";
++	};
++};
++
++&codec {
++	status = "okay";
++};
++
++&codec_analog {
++	hpvcc-supply = <&reg_eldo1>; /* TODO: Use only one of these */
++	cpvdd-supply = <&reg_eldo1>;
++	status = "okay";
++};
++
++&dai {
++	status = "okay";
+ };
+ 
+ &ehci1 {
+@@ -131,6 +151,14 @@
+ 	status = "okay";
+ };
+ 
++&r_pio {
++	r_debug_select_pin: debug-select {
++		pins = "PL9";
++		function = "gpio_out";
++		output-high;
++	};
++};
++
+ &r_rsb {
+ 	status = "okay";
+ 
+@@ -258,6 +286,31 @@
+ 	vcc-hdmi-supply = <&reg_dldo1>;
+ };
+ 
++&sound {
++	pinctrl-names = "default";
++	pinctrl-0 = <&r_debug_select_pin>;
++	simple-audio-card,aux-devs = <&codec_analog>, <&speaker_amp>;
++	simple-audio-card,widgets = "Headphone", "Headphone Jack",
++				    "Microphone", "Headset Microphone",
++				    "Microphone", "Internal Microphone",
++				    "Speaker", "Internal Speaker";
++	simple-audio-card,routing =
++			"Left DAC", "AIF1 Slot 0 Left",
++			"Right DAC", "AIF1 Slot 0 Right",
++			"AIF1 Slot 0 Left ADC", "Left ADC",
++			"AIF1 Slot 0 Right ADC", "Right ADC",
++			"Headphone Jack", "HP",
++			"Speaker Amp INL", "LINEOUT",
++			"Speaker Amp INR", "LINEOUT",
++			"Internal Speaker", "Speaker Amp OUTL",
++			"Internal Speaker", "Speaker Amp OUTR",
++			"Internal Microphone", "MBIAS",
++			"MIC1", "Internal Microphone",
++			"Headset Microphone", "HBIAS",
++			"MIC2", "Headset Microphone";
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb_pins>;
+-- 
+2.20.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
