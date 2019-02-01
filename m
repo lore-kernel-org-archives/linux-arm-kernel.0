@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 29C58C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:39:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 96E30C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:39:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CFE83218AF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:39:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5277E218AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:39:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CgQ5h8+n";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ZxBxJhTx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CFE83218AF
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Gxrto1um";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="YbqF7rO3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5277E218AF
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,62 +27,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=OLtWacyzc1ZrTMdKOJ3m95TmGInAV5X2BC9KUj4Ga6I=; b=CgQ5h8+nJRMHkGYZWbh7r3mpjn
-	06c6DN89Acmruc4puyFsu79lIK/JxMXOQ+uZY33IKVbUuFmTt57XAuQMjzg8itmwzPDbpDFo6BUNr
-	LZtLZ5ClFSFttb/b4wXS+uAf9SXsc5kyx/MHHZHrju0e9yJU/fTol80dMk7MuWR7JVv+ykKE0QVsb
-	o4k5L2aZjMtJ1fs089YUAOh1kBoE3xM5iokroXpMPl4voW3ttMmdMCYdEynGfmrrVrIIKMrhD+XfI
-	25NKx/0Xe64X47HcE93zJaSG/AZwk6cHgzpwrzrom1ArkzUNhv7h5v6UZtYz+mJoTwVEAKu2RgNrX
-	QN4L+4ag==;
+	bh=bkt2Up/+XmBRFYfLg5DcViM3TlelM3ylihSd+9ODBhE=; b=Gxrto1umEzbSO1H+TtQik38VqX
+	JJnlCBx5dLnAM7L87zBr0zIq8lYYghuC0+LTJWaliWWu6GGCRFnhFHx/7KCKcO5IyZVOQ1C3oIm+B
+	oO2iMbSiuMkR/X0CPU8R/YuQY5roNEdHRub6qFuQlqwflehFxzruZOB+rGhrG/tb/YVDQ2ncFiNJJ
+	DERN9d3+IT7+FfNtFH4beCXT2fkrxExCGs8onIfQ1R+CaZIqLb+Zy9DBcH0Pwp1jAL2auBDFCn/SK
+	lO2je2Ha9XSPcLRfnxr6opvoYlomEuNWxMch3Fie7kXjTHzm53k2d2L92FDj1cFG/sP4+AF4nTeF9
+	syJHImUw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpaue-000879-RF; Fri, 01 Feb 2019 15:39:28 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1gpaus-0008S3-RL; Fri, 01 Feb 2019 15:39:42 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpauK-0007ln-0I
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:39:12 +0000
-Received: by mail-pg1-x543.google.com with SMTP id y4so3085371pgc.12
+ id 1gpauO-0007rW-DR
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:39:18 +0000
+Received: by mail-pl1-x642.google.com with SMTP id u6so3376483plm.8
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 07:39:07 -0800 (PST)
+ Fri, 01 Feb 2019 07:39:12 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=0Cu6Y4NgGPq834+9r8xbAgMcrjgdAO4jdlaY8h/KB5k=;
- b=ZxBxJhTxNyLl57XCNVBfXuPnFgMe8rrcSD6px+9D5r7RLlyl5zmSi0KQ+g852QlXgI
- 5ihWhRfII+GH8AGaNZEjVwOBwOZKPb4ZlYzdQ6oJcGvOgX5pB+aVJllx1XX/Iwr9bHX3
- D7fRDey5ten/CCeDMghceNHaqofUr6ubpF9ME=
+ bh=tJ0vVOL8XD9yWBH7fkHAUlpmy1k8wF+axXxeAyBhZsE=;
+ b=YbqF7rO3XIv9/Gh2ZRe5z22Mt3MOBU5/xMQRWkCA5MMMIftPZdOknSTxzLdaPkRMZW
+ DKWwTa/TauZYrWDCtNTUw2+z+AGiUTRPsteQMlhjGsAPEe+YxozS9eDgqYcPDx91X2uV
+ Hyq7pM3LidN+yC88pOFL6VmfmF+G2wRqKS3FI=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=0Cu6Y4NgGPq834+9r8xbAgMcrjgdAO4jdlaY8h/KB5k=;
- b=nCC2RQDgGq01m2cLteZpciHvoe6i6GddrJOObuOqUq8u1i8K72FONQEvEMpHnO7bn9
- js1ZjP62INtcPMN3kR/1ZRa5ft7OrG3o8viN3PwcJJWYWNcQGQNBtukaTglzVXBaUeJ+
- K8MEK5lSC10xFqIoCG3zyBcXSXv44NRk4YxkT1gjIwdkXifeE9d5Y7GdLN9EAmbzezwK
- yio9SxyTW388nhE7Z7Vzz4F7KEq7ND9pPojAuk7co8ZgxqXnWfeGT7lPN2CGRJvd5hv6
- 7BKqTC8zgMEj+GYdNX9MH6EpZPjUoaJD82dQEhF2PtWRJvUcPitAKWVVT1PczA4eRGus
- fAyQ==
-X-Gm-Message-State: AJcUukd/hys6v2rf3asRAXgSSTUyRcskrhiOkBPWmxlZVASgRvK2U+Th
- EhkxBxjvvG1v/JMYf9lGvm7k
-X-Google-Smtp-Source: ALg8bN6JUmLF3cJ3F+yTU63JFwBLEosCiwp4JunyZHkv7r85JovROQ8QVcsaXfwF0niyMaFadEwiCA==
-X-Received: by 2002:a62:4587:: with SMTP id n7mr39482017pfi.118.1549035547340; 
- Fri, 01 Feb 2019 07:39:07 -0800 (PST)
+ bh=tJ0vVOL8XD9yWBH7fkHAUlpmy1k8wF+axXxeAyBhZsE=;
+ b=eK56t5zfWy3/a8uoUZkOlnkh1Y1zCinU5oOXKS3FO/j7C6Bw72qParh96Q/pgkZK3F
+ xpj6xhqQbdFlCmQwWG3RTTOj9HSAP1IJznNhw1nKkyVACpku1mvuPrnMG7AKY1M0iDhi
+ 8MrWFcOYNO9+OIHvNnvNztPivCh3KZnw8HuPGAXxjcAz4CoA+IA/hFsiQCrawtZ9q7Or
+ 7ThCidu2YV7GpH0lT59NO0DvJynU39exspVWKM/th984aEz2AC2m7oFl71wF7OOaICof
+ 5xiU77kl2Sei2tfgxqGI6W3qCImytm+nXVrbw6ameWY0HqDmOmw6TTSTVLCY5B33ysMa
+ cY9Q==
+X-Gm-Message-State: AJcUukejUhrD420HyxCrzHuSoVggYu636E+p5M6vfPtSNJFaXyJ23TkK
+ kwmSqszACAuEgmPXdYIH9irk
+X-Google-Smtp-Source: ALg8bN6+HfmmOQ85GQbZHWRafETMzY8x00axa1Uv2OdB9M2YxpRZzGYf9AbXQFfKG/DWKoKKzwACqw==
+X-Received: by 2002:a17:902:4a0c:: with SMTP id
+ w12mr40360250pld.8.1549035551741; 
+ Fri, 01 Feb 2019 07:39:11 -0800 (PST)
 Received: from localhost.localdomain ([2405:204:7348:9f93:3db9:68de:e3db:c028])
- by smtp.gmail.com with ESMTPSA id l22sm12350035pfj.179.2019.02.01.07.39.02
+ by smtp.gmail.com with ESMTPSA id l22sm12350035pfj.179.2019.02.01.07.39.07
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 01 Feb 2019 07:39:06 -0800 (PST)
+ Fri, 01 Feb 2019 07:39:11 -0800 (PST)
 From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 To: p.zabel@pengutronix.de,
 	xuwei5@hisilicon.com,
 	robh+dt@kernel.org
-Subject: [PATCH 2/3] arm64: dts: hisilicon: hi3670: Add reset controller
- support
-Date: Fri,  1 Feb 2019 21:08:40 +0530
-Message-Id: <20190201153841.21903-3-manivannan.sadhasivam@linaro.org>
+Subject: [PATCH 3/3] reset: hisilicon: Add HiSilicon HI3670 reset support
+Date: Fri,  1 Feb 2019 21:08:41 +0530
+Message-Id: <20190201153841.21903-4-manivannan.sadhasivam@linaro.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190201153841.21903-1-manivannan.sadhasivam@linaro.org>
 References: <20190201153841.21903-1-manivannan.sadhasivam@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_073908_750005_99BCE548 
-X-CRM114-Status: GOOD (  11.35  )
+X-CRM114-CacheID: sfid-20190201_073912_790089_88C63C1B 
+X-CRM114-Status: GOOD (  12.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,30 +103,26 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add reset controller support for HiSilicon HI3670 SoC.
+HI3670 SoC is architecturally same as the HI3660 SoC. Hence, add the
+HI3670 compatible to HI3660 reset driver in order to reuse it.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi3670.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/reset/hisilicon/reset-hi3660.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3670.dtsi b/arch/arm64/boot/dts/hisilicon/hi3670.dtsi
-index a5bd6d80b226..83950119100e 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3670.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3670.dtsi
-@@ -151,6 +151,12 @@
- 			#clock-cells = <1>;
- 		};
+diff --git a/drivers/reset/hisilicon/reset-hi3660.c b/drivers/reset/hisilicon/reset-hi3660.c
+index 17d8bb128e6e..1c22f3457ba7 100644
+--- a/drivers/reset/hisilicon/reset-hi3660.c
++++ b/drivers/reset/hisilicon/reset-hi3660.c
+@@ -103,6 +103,7 @@ static int hi3660_reset_probe(struct platform_device *pdev)
  
-+		crg_rst: crg_rst_controller {
-+			compatible = "hisilicon,hi3670-reset";
-+			#reset-cells = <2>;
-+			hisi,rst-syscon = <&crg_ctrl>;
-+		};
-+
- 		pctrl: pctrl@e8a09000 {
- 			compatible = "hisilicon,hi3670-pctrl", "syscon";
- 			reg = <0x0 0xe8a09000 0x0 0x1000>;
+ static const struct of_device_id hi3660_reset_match[] = {
+ 	{ .compatible = "hisilicon,hi3660-reset", },
++	{ .compatible = "hisilicon,hi3670-reset", },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, hi3660_reset_match);
 -- 
 2.17.1
 
