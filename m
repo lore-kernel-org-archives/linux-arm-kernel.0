@@ -2,65 +2,64 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 12088C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 16:57:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BDAE0C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 17:00:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D364D2086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 16:57:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8C18D2086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 17:00:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u8Kpexjy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D364D2086C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=hisilicon.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K0KqSy8V"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C18D2086C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wrnZiDAIZyoDWHVdFbn0vmfhQb8yl4BkhVz9l4LUuK8=; b=u8KpexjyN2irlC
-	8pbbq/EGvPxTdoUku00RPXcWPRglL6Ea1RihGvlbI6OOARSKWiv5KWoshh94IXv5cYcIQ/DOcDSbR
-	Dvp12GI9nh7CHzl8CuRrdjhgZygAL3cuBrS/aBpjZFSwyzxHdPWUcxfWlA5l4HKdZbporjkITJMnT
-	ry0lu1/oFdGV6UHuM4UR575TRRf56m6HTR8Ilf7C1dUa5cE3kXvzghfeevLagN2XIxvixzlMQU9u6
-	TANfcpZJTpfH0g1sRFVatguvITbKeUzK9FWnoPZ3LZIJmBY1KrnoLtiaxr00HmqsKfiThyxZPrTvk
-	/JfdhXzwUew5AARlrQsg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=oaNDJBCkV/wjunaT8iHT12O7/0q6f/tWPu+Q2zgdy2s=; b=K0KqSy8V1lAizb
+	kG0DeuPVOM9MqZdPCVvIjDbAdX/licAT2oqcUml8ELcDWYSTg/VLnxzzvvtplT8XsYP9vKFZLyxV4
+	QJ8KNWrpoUHHoyRsTqmm1BsTMLpXlPUnCtJ3cI7Vyy0gHuD32aKiRLfs2E9Vusdx2Q/Ig1XXoDsPu
+	aV+JJnKEx5oZ2V04G1DCUCiX7Na8B1fWGYJqQtOJu1lDMf4IWQAsm/IfmTULPy3nBpGY8LKhDu35T
+	TY7HUZgrtQ0RhMZJMfgY6wJF5XrC6M30MiHlYTws9XpggPvP4R7ma/a45Xka7zThjZcw+fkiJLE0a
+	YHkJsZnwTHlKFrq0uA4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpc7s-0002xd-JM; Fri, 01 Feb 2019 16:57:12 +0000
-Received: from lhrrgout.huawei.com ([185.176.76.210] helo=huawei.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpc7o-0002uy-LC
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 16:57:10 +0000
-Received: from LHREML714-CAH.china.huawei.com (unknown [172.18.7.107])
- by Forcepoint Email with ESMTP id A29306BFA94FD377B0A8;
- Fri,  1 Feb 2019 16:57:05 +0000 (GMT)
-Received: from [127.0.0.1] (10.202.226.46) by LHREML714-CAH.china.huawei.com
- (10.201.108.37) with Microsoft SMTP Server id 14.3.408.0; Fri, 1 Feb 2019
- 16:57:02 +0000
-Subject: Re: [PATCH] arm64: dts: hi3798cv200: fix malformed SPDX license
- identifier
-To: Shawn Guo <shawnguo@kernel.org>
-References: <20190118005404.10452-1-shawnguo@kernel.org>
-From: Wei Xu <xuwei5@hisilicon.com>
-Message-ID: <585b4540-6d51-72c0-730f-9bb6cfefaa85@hisilicon.com>
-Date: Fri, 1 Feb 2019 16:57:02 +0000
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gpcAc-0003aX-Ls; Fri, 01 Feb 2019 17:00:02 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gpcAY-0003Zx-Nf
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 17:00:00 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3331B15BE;
+ Fri,  1 Feb 2019 08:59:58 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EFCEF3F71E;
+ Fri,  1 Feb 2019 08:59:55 -0800 (PST)
+Date: Fri, 1 Feb 2019 16:59:50 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Andrey Smirnov <andrew.smirnov@gmail.com>
+Subject: Re: [PATCH v6 2/4] PCI: imx6: Mark PHY functions as i.MX6 specific
+Message-ID: <20190201165950.GA22887@e107981-ln.cambridge.arm.com>
+References: <20190124201522.8973-1-andrew.smirnov@gmail.com>
+ <20190124201522.8973-3-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20190118005404.10452-1-shawnguo@kernel.org>
-Content-Language: en-US
-X-Originating-IP: [10.202.226.46]
-X-CFilter-Loop: Reflected
+Content-Disposition: inline
+In-Reply-To: <20190124201522.8973-3-andrew.smirnov@gmail.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_085708_843415_6685247F 
-X-CRM114-Status: GOOD (  12.30  )
+X-CRM114-CacheID: sfid-20190201_085958_769253_2E03865C 
+X-CRM114-Status: GOOD (  18.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,66 +71,99 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Trent Piepho <tpiepho@impinj.com>,
+ Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
+ linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org,
+ Fabio Estevam <fabio.estevam@nxp.com>, linux-imx@nxp.com,
+ Bjorn Helgaas <bhelgaas@google.com>, Leonard Crestez <leonard.crestez@nxp.com>,
+ Chris Healy <cphealy@gmail.com>, Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Shawn,
+On Thu, Jan 24, 2019 at 12:15:20PM -0800, Andrey Smirnov wrote:
+> PCIE PHY IP block on i.MX7D differs from the one used on i.MX6 family,
+> so none of the code in current implementation of imx6_setup_phy_mpll()
+> is applicable.
 
-On 1/18/2019 12:54 AM, Shawn Guo wrote:
-> It fixes malformed SPDX license identifier in Hi3798CV200 and Poplar
-> DTS, accroding to Documentation/process/license-rules.rst.
-> 
-> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+So :) ? Add a conclusive statement to the commit log.
 
-Applied to the hisilicon soc dt tree.
-Thanks!
+Lorenzo
 
-Best Regards,
-Wei
-
+> Tested-by: Trent Piepho <tpiepho@impinj.com>
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Chris Healy <cphealy@gmail.com>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Leonard Crestez <leonard.crestez@nxp.com>
+> Cc: "A.s. Dong" <aisheng.dong@nxp.com>
+> Cc: Richard Zhu <hongxing.zhu@nxp.com>
+> Cc: linux-imx@nxp.com
+> Cc: linux-arm-kernel@lists.infradead.org
+> Cc: linux-kernel@vger.kernel.org
+> Cc: linux-pci@vger.kernel.org
 > ---
->  arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts | 4 +---
->  arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi       | 4 +---
->  2 files changed, 2 insertions(+), 6 deletions(-)
+>  drivers/pci/controller/dwc/pci-imx6.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
-> index 32716c96b457..c563d3eb2d98 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
-> @@ -1,10 +1,8 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * DTS File for HiSilicon Poplar Development Board
->   *
->   * Copyright (c) 2016-2017 HiSilicon Technologies Co., Ltd.
-> - *
-> - * Released under the GPLv2 only.
-> - * SPDX-License-Identifier: GPL-2.0
->   */
+> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+> index efff3d5e9162..c55d93c1187d 100644
+> --- a/drivers/pci/controller/dwc/pci-imx6.c
+> +++ b/drivers/pci/controller/dwc/pci-imx6.c
+> @@ -41,8 +41,11 @@ enum imx6_pcie_variants {
+>  	IMX7D,
+>  };
 >  
->  /dts-v1/;
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi b/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
-> index 7c0fddd7c8cf..13821a0ff524 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
-> @@ -1,10 +1,8 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * DTS File for HiSilicon Hi3798cv200 SoC.
->   *
->   * Copyright (c) 2016-2017 HiSilicon Technologies Co., Ltd.
-> - *
-> - * Released under the GPLv2 only.
-> - * SPDX-License-Identifier: GPL-2.0
->   */
+> +#define IMX6_PCIE_FLAG_IMX6_PHY			BIT(0)
+> +
+>  struct imx6_pcie_drvdata {
+>  	enum imx6_pcie_variants variant;
+> +	u32 flags;
+>  };
 >  
->  #include <dt-bindings/clock/histb-clock.h>
+>  struct imx6_pcie {
+> @@ -256,6 +259,9 @@ static void imx6_pcie_reset_phy(struct imx6_pcie *imx6_pcie)
+>  {
+>  	u32 tmp;
+>  
+> +	if (!(imx6_pcie->drvdata->flags & IMX6_PCIE_FLAG_IMX6_PHY))
+> +		return;
+> +
+>  	pcie_phy_read(imx6_pcie, PHY_RX_OVRD_IN_LO, &tmp);
+>  	tmp |= (PHY_RX_OVRD_IN_LO_RX_DATA_EN |
+>  		PHY_RX_OVRD_IN_LO_RX_PLL_EN);
+> @@ -573,6 +579,9 @@ static int imx6_setup_phy_mpll(struct imx6_pcie *imx6_pcie)
+>  	int mult, div;
+>  	u32 val;
+>  
+> +	if (!(imx6_pcie->drvdata->flags & IMX6_PCIE_FLAG_IMX6_PHY))
+> +		return 0;
+> +
+>  	switch (phy_rate) {
+>  	case 125000000:
+>  		/*
+> @@ -1088,12 +1097,15 @@ static void imx6_pcie_shutdown(struct platform_device *pdev)
+>  static const struct imx6_pcie_drvdata drvdata[] = {
+>  	[IMX6Q] = {
+>  		.variant = IMX6Q,
+> +		.flags = IMX6_PCIE_FLAG_IMX6_PHY,
+>  	},
+>  	[IMX6SX] = {
+>  		.variant = IMX6SX,
+> +		.flags = IMX6_PCIE_FLAG_IMX6_PHY,
+>  	},
+>  	[IMX6QP] = {
+>  		.variant = IMX6QP,
+> +		.flags = IMX6_PCIE_FLAG_IMX6_PHY,
+>  	},
+>  	[IMX7D] = {
+>  		.variant = IMX7D,
+> -- 
+> 2.20.1
 > 
-
 
 _______________________________________________
 linux-arm-kernel mailing list
