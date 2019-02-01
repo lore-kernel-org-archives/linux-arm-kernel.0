@@ -2,122 +2,65 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C39A8C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 14:20:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 885D2C282DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 14:22:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8336A218AC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 14:20:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5A2FD218EA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 14:22:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l6/vBTgw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="sLoibvHO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8336A218AC
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="irKuKfZH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A2FD218EA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-reply-to:MIME-version:
-	Date:Message-id:From:To:Subject:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pNPX2GBWvnHJXMIfBJScEcuBB9jKNWpp0lXHd+rDHPY=; b=l6/vBTgw4XN2pU
-	wQXefFlG+x4XCKjCRJZRy1GFEK6Ex0JKWPmRK0q8jeng0dbQj8WvBtWL6aCoYaPEcLp7Af4QIC76+
-	XSZjKId0RC/0teGl5WY/S4c5Bi35zApRB799WsnkPzh1ydOxwId+1hihG4x+F79CFKdaDquPm0jZ5
-	A9Jmq2hogqwA/+G9rhsB0f6pa1ex+GLXDzMkx3NeHBZvhYpvrvIahe0hmGA3tfQ4ePLH2D+ffYTVq
-	1mng8Me2Z9k8tBWlPYJcj8hS+0y0S7Eimrwz/G3nZykxx4E2CkGUglYTWjdRVQhH4v4QnWbsgQAib
-	db2VbKjVkBSYvS7nXFNg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=ShNIt2/8mft4x+un+ZTrOUGkgeo/8G0S3Z2yxsVtQG4=; b=irKuKfZHSXzW6xGLjK6hD4FOY
+	rTnLoHfkQdmJrY3I/JkGjmvI1wiBCvHbuNOyLoCruQZiZGqVMOLxquENEfwkhShXfIG9kCYAcQTok
+	Xl6pLUzpig5+4Mwl5y0xohzs5glUfF45rFUZIbWS9GpqpPP+cJbZWFGzgujPOHa/d0dlcJsj2YKtp
+	hLsoXpbeH0kqJDAhjDIRRQyQkY/iDitM+sqkTxSZ4yIe+L2SXjFDX5g6in7Dv1BTtRyS22J4+dI9g
+	UI79q10hwWKCBGJpNvz8TMu6h2UMYxCwPFmxfGGKO1GpKk3LoBXGaBr7FY+mMFFx1CQQ+mcZeqo8H
+	dLPRMbycQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpZff-00039m-6D; Fri, 01 Feb 2019 14:19:55 +0000
-Received: from mailout4.samsung.com ([203.254.224.34])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpZfb-000393-22
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 14:19:53 +0000
-Received: from epcas2p2.samsung.com (unknown [182.195.41.54])
- by mailout4.samsung.com (KnoxPortal) with ESMTP id
- 20190201141938epoutp04543245b3980c8ec99cd23bf18c113d1a~-Q0kcntSt1988219882epoutp04X;
- Fri,  1 Feb 2019 14:19:38 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout4.samsung.com
- 20190201141938epoutp04543245b3980c8ec99cd23bf18c113d1a~-Q0kcntSt1988219882epoutp04X
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1549030778;
- bh=MrYW9SGeXPqzNlO8fzNlXVd4D3gzWxke3OV7sQG8G1Y=;
- h=Subject:To:Cc:From:Date:In-reply-to:References:From;
- b=sLoibvHOJ925aDj95BE+6RVOKmyYQr4Ffu1G/RJ//CrV6I3j5aG2xcrsjRNJnfVKL
- P3rkhZ3edsfxhxpId4f5Zr3k8NbWNw1joJc1LL4/4ZbAOiQKxA8jcc4/r+SJdlsDN6
- gpYHpUd6pexbKpXWukfhATyfmJDmce5SQXPF1uec=
-Received: from epsmges2p1.samsung.com (unknown [182.195.42.69]) by
- epcas2p2.samsung.com (KnoxPortal) with ESMTP id
- 20190201141937epcas2p2c6953795561ef4161e7953b079ff9d36~-Q0kQNmsI2593325933epcas2p29;
- Fri,  1 Feb 2019 14:19:37 +0000 (GMT)
-Received: from epcas2p3.samsung.com ( [182.195.41.55]) by
- epsmges2p1.samsung.com (Symantec Messaging Gateway) with SMTP id
- 5D.D7.04138.975545C5; Fri,  1 Feb 2019 23:19:37 +0900 (KST)
-Received: from epsmgms2p2new.samsung.com (unknown [182.195.42.143]) by
- epcas2p1.samsung.com (KnoxPortal) with ESMTP id
- 20190201141937epcas2p110a50912ef48b17f7bd27350fabcc608~-Q0j42TDm2547825478epcas2p1l;
- Fri,  1 Feb 2019 14:19:37 +0000 (GMT)
-X-AuditID: b6c32a45-5f3ff7000000102a-7b-5c545579aa09
-Received: from epmmp1.local.host ( [203.254.227.16]) by
- epsmgms2p2new.samsung.com (Symantec Messaging Gateway) with SMTP id
- C8.D3.03689.975545C5; Fri,  1 Feb 2019 23:19:37 +0900 (KST)
-Received: from [106.116.147.40] by mmp1.samsung.com (Oracle Communications
- Messaging Server 7.0.5.31.0 64bit (built May  5 2014)) with ESMTPA id
- <0PM900M283SJVW20@mmp1.samsung.com>; Fri, 01 Feb 2019 23:19:37 +0900 (KST)
-Subject: Re: [PATCH v3 3/8] clk: samsung: add BPLL rate table for Exynos
- 5422 SoC
-To: Lukasz Luba <l.luba@partner.samsung.com>, Chanwoo Choi
- <cw00.choi@samsung.com>
-From: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Message-id: <08850f80-0cc1-8e0d-6a8a-286a750d3a8c@samsung.com>
-Date: Fri, 01 Feb 2019 15:19:30 +0100
+	id 1gpZib-0004ml-E5; Fri, 01 Feb 2019 14:22:57 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gpZiX-0004le-SY
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 14:22:55 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B4D3780D;
+ Fri,  1 Feb 2019 06:22:49 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5BE763F59C;
+ Fri,  1 Feb 2019 06:22:48 -0800 (PST)
+Subject: Re: [PATCH 01/19] dma-mapping: add a Kconfig symbol to indicated
+ arch_dma_prep_coherent presence
+To: Christoph Hellwig <hch@lst.de>
+References: <20190114094159.27326-1-hch@lst.de>
+ <20190114094159.27326-2-hch@lst.de>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <b3883403-f9b5-34ec-ff5d-9f2ddc9bf8e6@arm.com>
+Date: Fri, 1 Feb 2019 14:22:46 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
-MIME-version: 1.0
-In-reply-to: <0ca15b4c-ddaa-1be5-35be-e76b008b28a8@partner.samsung.com>
-Content-language: en-GB
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFlrNKsWRmVeSWpSXmKPExsWy7bCmuW5laEiMwdErhhYbZ6xntbj+5Tmr
- xfwj51gt+h+/ZrY4f34Du8XZpjfsFrcaZCw2Pb7GavGx5x6rxeVdc9gsPvceYbSYcX4fk8Xa
- I3fZLS6ecrW43biCzeLftY0sDgIe72+0sntsWtXJ5rF5Sb3HwXd7mDz6tqxi9Pi8SS6ALYrL
- JiU1J7MstUjfLoErY8GXioJ9LBXXbqxnbmA8ydzFyMkhIWAisfLoBvYuRi4OIYEdjBJ/Lm5i
- g3C+M0pcmrGVFabq3qznrBCJ3YwSa35NZIRw7jNKbPjXBDZLWCBYYu6xm2wgtohAiMSfNdfA
- bGaBBcwSp77rg9hsAoYSvUf7GEFsXgE7iYbj28B6WQRUJZY0fmAHsUUFIiQO976DqhGU+DH5
- HguIzSngLrHk+0GomZoSL75MYoGwxSWO3b/JCGHLS2xe85YZ5DgJgensElu//WaHeMFF4mf/
- BUYIW1ri2aqNUHa1xK7t3VANHYwSLRe2Q0PGWuLw8YusEFP5JDoO/wUaxAEU55XoaBOCKPGQ
- mDR3EjS8LjJJbH61nmkCo8wsJIfPQnLsLCTHzkJy7AJGllWMYqkFxbnpqcVGBYZ6xYm5xaV5
- 6XrJ+bmbGMFJSMt1B+OMcz6HGAU4GJV4eDf8CooRYk0sK67MPcQowcGsJMK7wiUkRog3JbGy
- KrUoP76oNCe1+BCjNAeLkjjvI+m50UIC6YklqdmpqQWpRTBZJg5OqQbGy4scH3w9Gi2UyXRu
- vVfrisazr28WzMm+t2ar4JnwBgv7TR6f6xe7Lt1Uaf56/+2VVdFNMSrTwji3fpbSTV5YLWTV
- 8HmOMkds3d9olV2WP7cqLtovPO3xYf8MMc2XMx8nsCw57ctUN+nb9iUlv3UZ6+KOHv9wUNrq
- 4rmIefM6K31434dsimfpVWIpzkg01GIuKk4EACX7Ha8+AwAA
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFprFIsWRmVeSWpSXmKPExsVy+t9jAd3K0JAYg48d0hYbZ6xntbj+5Tmr
- xfwj51gt+h+/ZrY4f34Du8XZpjfsFrcaZCw2Pb7GavGx5x6rxeVdc9gsPvceYbSYcX4fk8Xa
- I3fZLS6ecrW43biCzeLftY0sDgIe72+0sntsWtXJ5rF5Sb3HwXd7mDz6tqxi9Pi8SS6ALYrL
- JiU1J7MstUjfLoErY8GXioJ9LBXXbqxnbmA8ydzFyMkhIWAicW/Wc9YuRi4OIYGdjBId0xYx
- QzgPGSVeHVnKAlIlLBAs8aX1HSOILSIQInH++DUmkCJmgXnMEhNO/oXquMgk8fhnJ1gHm4Ch
- RO/RPrAOXgE7iYbj28D2sQioSixp/MAOYosKREh8fLqPCaJGUOLH5HtgvZwC7hJLvh9k62Lk
- ANqgLjFlSi5ImFlAXOLY/ZuMELa8xOY1b5knMArMQtI9C6FjFpKOWUg6FjCyrGKUTC0ozk3P
- LTYqMMpLLdcrTswtLs1L10vOz93ECIyxbYe1+ncwPl4Sf4hRgINRiYd3w6+gGCHWxLLiytxD
- jBIczEoivCtcQmKEeFMSK6tSi/Lji0pzUosPMUpzsCiJ8/LnH4sUEkhPLEnNTk0tSC2CyTJx
- cEo1MB75rdvCuGkv/+4qndeOTgJbLi3/MJ1ZpPHWvp72O/tXWjr8cd2i/+RlwkFN+bjJnN1K
- P7g2tDIdmX9nsm5DjPaX1RGXr/8+s+z3tIv2Nqr2i3prOFLsJO/+2/Xa75CGhc+s6wv5/pg4
- Jfqp3knPebBqmmht2t3W8FBZx60b7dbFPHzJ2HTfpkuJpTgj0VCLuag4EQDZOOXErQIAAA==
-X-CMS-MailID: 20190201141937epcas2p110a50912ef48b17f7bd27350fabcc608
-CMS-TYPE: 102P
-X-CMS-RootMailID: 20190131085007eucas1p2f16107042b8ce5638811840618bcf017
-References: <1548924594-19084-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20190131085007eucas1p2f16107042b8ce5638811840618bcf017@eucas1p2.samsung.com>
- <1548924594-19084-4-git-send-email-l.luba@partner.samsung.com>
- <d5b8d165-564e-b776-77de-31a069118067@samsung.com>
- <0ca15b4c-ddaa-1be5-35be-e76b008b28a8@partner.samsung.com>
+MIME-Version: 1.0
+In-Reply-To: <20190114094159.27326-2-hch@lst.de>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_061951_449450_082A96CD 
-X-CRM114-Status: GOOD (  13.07  )
+X-CRM114-CacheID: sfid-20190201_062253_928170_5D38CE7B 
+X-CRM114-Status: GOOD (  24.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -129,33 +72,93 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-samsung-soc@vger.kernel.org,
- b.zolnierkie@samsung.com, Stephen Boyd <sboyd@kernel.org>,
- Michael Turquette <mturquette@baylibre.com>, linux-pm@vger.kernel.org,
- linux-kernel@vger.kernel.org, krzk@kernel.org, kyungmin.park@samsung.com,
- kgene@kernel.org, myungjoo.ham@samsung.com, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, m.szyprowski@samsung.com
-Content-Type: text/plain; charset="us-ascii"
+Cc: Tom Lendacky <thomas.lendacky@amd.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Joerg Roedel <joro@8bytes.org>,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ iommu@lists.linux-foundation.org, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2/1/19 14:56, Lukasz Luba wrote:
->> Exynos5422 used the same PLL table for apll, kpll, bpll and so on.
->> You don't need to make the separate pll table. Just add new entries
->> to exynos5420_pll2550x_24mhz_tbl table.
-> OK, I will extend the exynos5420_pll2550x_24mhz_tbl table.
+On 14/01/2019 09:41, Christoph Hellwig wrote:
+> Add a Kconfig symbol that indicates an architecture provides a
+> arch_dma_prep_coherent implementation, and provide a stub otherwise.
 > 
-> In v4 patch set, it will be fixed.
+> This will allow the generic dma-iommu code to it while still allowing
+> to be built for cache coherent architectures.
 
-I would prefer to keep the rate table separate for BPLL, until correctness
-of new rates introduced in the patch and their applicability to the other PLLs
-is confirmed by the hardware team and verified in tests.
+I've been pondering this for a while now, and I still can't really come 
+up with a case where arch_dma_prep_coherent() would need to behave 
+differently from arch_sync_dma_for_device(..., DMA_BIDIRECTIONAL). I 
+wonder if we could just save ourselves this little bit of complexity by 
+using that instead...
 
+Robin.
 
--- 
-Regards,
-Sylwester
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>   arch/arm64/Kconfig              | 1 +
+>   arch/csky/Kconfig               | 1 +
+>   include/linux/dma-noncoherent.h | 6 ++++++
+>   kernel/dma/Kconfig              | 3 +++
+>   4 files changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index a4168d366127..ae3f581a9bcc 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -13,6 +13,7 @@ config ARM64
+>   	select ARCH_HAS_DEVMEM_IS_ALLOWED
+>   	select ARCH_HAS_DMA_COHERENT_TO_PFN
+>   	select ARCH_HAS_DMA_MMAP_PGPROT
+> +	select ARCH_HAS_DMA_PREP_COHERENT
+>   	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
+>   	select ARCH_HAS_ELF_RANDOMIZE
+>   	select ARCH_HAS_FAST_MULTIPLIER
+> diff --git a/arch/csky/Kconfig b/arch/csky/Kconfig
+> index 398113c845f5..8b84d4362ff6 100644
+> --- a/arch/csky/Kconfig
+> +++ b/arch/csky/Kconfig
+> @@ -1,5 +1,6 @@
+>   config CSKY
+>   	def_bool y
+> +	select ARCH_HAS_DMA_PREP_COHERENT
+>   	select ARCH_HAS_SYNC_DMA_FOR_CPU
+>   	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
+>   	select ARCH_USE_BUILTIN_BSWAP
+> diff --git a/include/linux/dma-noncoherent.h b/include/linux/dma-noncoherent.h
+> index 69b36ed31a99..9741767e400f 100644
+> --- a/include/linux/dma-noncoherent.h
+> +++ b/include/linux/dma-noncoherent.h
+> @@ -72,6 +72,12 @@ static inline void arch_sync_dma_for_cpu_all(struct device *dev)
+>   }
+>   #endif /* CONFIG_ARCH_HAS_SYNC_DMA_FOR_CPU_ALL */
+>   
+> +#ifdef CONFIG_ARCH_HAS_DMA_PREP_COHERENT
+>   void arch_dma_prep_coherent(struct page *page, size_t size);
+> +#else
+> +static inline void arch_dma_prep_coherent(struct page *page, size_t size)
+> +{
+> +}
+> +#endif /* CONFIG_ARCH_HAS_DMA_PREP_COHERENT */
+>   
+>   #endif /* _LINUX_DMA_NONCOHERENT_H */
+> diff --git a/kernel/dma/Kconfig b/kernel/dma/Kconfig
+> index ca88b867e7fe..541128a32c5d 100644
+> --- a/kernel/dma/Kconfig
+> +++ b/kernel/dma/Kconfig
+> @@ -29,6 +29,9 @@ config ARCH_HAS_SYNC_DMA_FOR_CPU
+>   config ARCH_HAS_SYNC_DMA_FOR_CPU_ALL
+>   	bool
+>   
+> +config ARCH_HAS_DMA_PREP_COHERENT
+> +	bool
+> +
+>   config ARCH_HAS_DMA_COHERENT_TO_PFN
+>   	bool
+>   
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
