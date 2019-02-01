@@ -3,81 +3,82 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 39663C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:44:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4FF33C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:54:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0C7BD20857
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:44:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2321720857
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:54:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k1pU0JVY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C7BD20857
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ebs-systart.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="niZhCR/w"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2321720857
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jp.fujitsu.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:To:
-	Subject:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
-	List-Owner; bh=CZcy7ob6dQv4QIMH0Lck8sfMeqhdSIRkrDL63DmBrV4=; b=k1pU0JVYduAx69
-	1Nki/ye2ZUcrfqxiYPiaSG+YbRBFGw0+qSb6r0FTMQcsvX3eLcmjsCjRSfRMMLxhFxhT/bV5w6ORP
-	HBgvMtU8IN6ZuRe5Qpk9owK7dZkSvwBd1rh5CLtHN5yB7FuutZZzyOzMW0NMtD29Uce7q3ZBHA/XQ
-	HbsUOCTyKOMVhZj/aqDviE4dcVr3V3TDsDKhJCW5LKdU99GDT92UwIh7WW7+n/JFv3D+1/l/+Mfjf
-	Eaudv0/1r+Fao3s7j9MCONMNcb6o6jyfU6+wKGwmuqcCI09O4415HjXbsOMNtE+qNDYbxqt6mZ9RS
-	S1ydO+P/g36e9Awy+oPg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=dR1luziYvW5gvtODetj6+3ShH+QjkCRH48PGq1wtVYM=; b=niZhCR/wKDYQ5E
+	Yifj4qbYYN6g+OShZd0GQw0r845+n5dv+AkBTI0zEuLG0++jssNFQEKAeW8byCBo2bQ2eWqkAgdoP
+	S3srI9vV3Yc7h03cfTdsarhwt2wCGKaeFflzugumnRSalPERBGGhgi6rmT1YP6jnsAnm63dAhn8Cs
+	WAquIf8gjC1Dccyar/xjShHkZcwjdjLLRSJ8cnyzQh8ugQQj/Er7R0QJoZQNd8fr1iC3DLBAxMBzm
+	KDcnfeHvQ8Ew8IJF09JasLpfsHXw9zn+JSKdLhypr6K4zyfjGLp0JgbPqc8yma0+da+FJ1u9yK74s
+	eR69eLwqBMWTA+gxo0ig==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpRcY-0006sE-RM; Fri, 01 Feb 2019 05:44:10 +0000
-Received: from mout.kundenserver.de ([217.72.192.74])
+	id 1gpRmE-0001wI-6u; Fri, 01 Feb 2019 05:54:10 +0000
+Received: from mgwym01.jp.fujitsu.com ([211.128.242.40])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpRcV-0006rp-1F
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 05:44:09 +0000
-Received: from mail.ebs-systart.com ([24.134.95.109]) by
- mrelayeu.kundenserver.de (mreue106 [212.227.15.183]) with ESMTPSA (Nemesis)
- id 1MV5G4-1gh9tf0JPC-00S5RV; Fri, 01 Feb 2019 06:44:01 +0100
-Received: from CLIENT08.ebs-systart.intranet by [192.168.1.201] (MDaemon PRO
- v18.5.1) 
- with ESMTPSA id md50000251727.msg; Fri, 01 Feb 2019 06:43:59 +0100
-X-MDArrival-Date: Fri, 01 Feb 2019 06:43:59 +0100
-X-Authenticated-Sender: m.bittner@ebs-systart.com
-X-Return-Path: m.bittner@ebs-systart.com
-X-Envelope-From: m.bittner@ebs-systart.com
-Date: Fri, 01 Feb 2019 06:43:58 +0100
-From: Michael Bittner <m.bittner@ebs-systart.com>
-Subject: AW: [PATCH v3 0/5] Add Oxalis board support
-To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- shawnguo@kernel.org
-In-Reply-To: <20190201032817.GA3008@Mani-XPS-13-9360>
-Message-ID: <209ab7e9.1d4b9f1.197c0e38.52d9@ebs-systart.com>
-X-Priority: 3
-Organization: EBS-SYSTART GmbH
-X-Mailer: MDaemon Connector 5.6.0
+ id 1gpRmA-0001vW-Lv
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 05:54:08 +0000
+Received: from yt-mxauth.gw.nic.fujitsu.com (unknown [192.168.229.68]) by
+ mgwym01.jp.fujitsu.com with smtp
+ id 719c_141d_c9ffbbf8_523f_4f4e_a212_e56aaf489f8d;
+ Fri, 01 Feb 2019 14:53:53 +0900
+Received: from g01jpfmpwkw03.exch.g01.fujitsu.local
+ (g01jpfmpwkw03.exch.g01.fujitsu.local [10.0.193.57])
+ by yt-mxauth.gw.nic.fujitsu.com (Postfix) with ESMTP id 3B2F0AC00C3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri,  1 Feb 2019 14:53:53 +0900 (JST)
+Received: from G01JPEXCHKW14.g01.fujitsu.local
+ (G01JPEXCHKW14.g01.fujitsu.local [10.0.194.53])
+ by g01jpfmpwkw03.exch.g01.fujitsu.local (Postfix) with ESMTP id 23075BD646B;
+ Fri,  1 Feb 2019 14:53:52 +0900 (JST)
+Received: from G01JPEXMBKW03.g01.fujitsu.local ([10.0.194.67]) by
+ g01jpexchkw14 ([10.0.194.53]) with mapi id 14.03.0415.000; Fri, 1 Feb 2019
+ 14:53:51 +0900
+From: "Zhang, Lei" <zhang.lei@jp.fujitsu.com>
+To: 'James Morse' <james.morse@arm.com>
+Subject: RE: [PATCH v3 0/1] arm64: Add workaround for Fujitsu A64FX erratum
+ 010001
+Thread-Topic: [PATCH v3 0/1] arm64: Add workaround for Fujitsu A64FX erratum
+ 010001
+Thread-Index: AQHUuKy5V4yTFdOO5Emj9g0aGwlQl6XKckPA
+Date: Fri, 1 Feb 2019 05:53:50 +0000
+Message-ID: <8898674D84E3B24BA3A2D289B872026A6A3090AC@G01JPEXMBKW03>
+References: <8898674D84E3B24BA3A2D289B872026A6A2C04E6@G01JPEXMBKW03>
+ <cb7544e2-bd85-df4c-1f48-0afeedefc962@arm.com>
+In-Reply-To: <cb7544e2-bd85-df4c-1f48-0afeedefc962@arm.com>
+Accept-Language: ja-JP, en-US
+Content-Language: ja-JP
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-securitypolicycheck: OK by SHieldMailChecker v2.2.3
+x-shieldmailcheckerpolicyversion: FJ-ISEC-20140219
+x-originating-ip: [10.18.70.198]
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:JDCO4xFHA+rypI5+Wm65UPzGL8vA0S3b5QDd4TLYztPt0tzutrL
- zsYUH1x0NcqFQeWoZCdWbSWem5sC1/Vf/zAmld8EVdRIZ+O6CUMXuH4L5c55klqtk11T7J6
- iRTZRHfLDJK5rSVO23D0OBA9tuDwbYK8x+nzHm3ZrhZ744aclpQFnK785nHhypW/uKpFaxp
- G22PXeBiZcios/DlXPYRg==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:Cq0Kt2UxxOs=:wMlSJ4XJy6sW31C63SqxlZ
- V2S5GksA+dZLRGdkD2Xnj3D3iUnbMIJAL0zfq+8b+0Aq+SPzy0gBlYqsxWVBikYMzMhknjP82
- T0ZeT7p+0TJHxyLX2lVKjwNR1cTo+JpXNoJY6Qphax1wCF+SJ/bZO+ghdnHmEqimgioXXa8Rk
- pg1ExXAV98LRDywq3Klz7K6Iq9MTxq6jn7FU6vvgliCMACiLasE5NMt8WRHaqGFZs2a+c2bQ1
- 6aiBNe1/x2lBDbqOb3lKuF2HWVIg3Z/t+J4Oq1F/Twu1FBJAQmhvODZrYFZTLfQVWIV54/8fp
- WQJCKHYejI9VxiEP6qVTYpJisrItIC9B2ihrOToU2+2j4tyN4y/68dYjCtDwNELXY+kYHCTAu
- Z+sjYdKe7yTN4g9zdO3NDBeg3u/BSHev9Y9V7iLwZBvCQyKdu35uN7j7WOq9tZHbeW5okxjW1
- 5XcGNLekYyqXla9qA+5MTastXbTfWfHPQmi3Kj8/M7MeS0nOJxGrcOueOc/5AkaRYHWDSF6Ui
- CtVgrEEqO8iLwrD+6+4QEJdpNNNjrmI8M2pfZxCiSIy8XYFqWPkn7mzK9WOYx+B+7VQHRsxhR
- Yj7JHseGKus4CYlrqImqqoyQLa0fiqDUHlhlGlczYqMSF5ODYd2YqihozCx7IYf10E7s3hKZ6
- ES4vInn+6xDqktAVl37UHVaeP3JCEwXzIJJU1NtAhj1Vpo3dlubwKoxgCUy5D8WbxZJZMORfd
- XM+LLmYr9Km4TJ989Q7ZtAlHsu28UTRW0Q7OmmFYX0tkjSPnvKzKGt9NQnZrJw0a/UaXTNG6I
- MeWp88T
+X-SecurityPolicyCheck-GC: OK by FENCE-Mail
+X-TM-AS-MML: disable
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_214407_383000_F65B9139 
-X-CRM114-Status: GOOD (  15.20  )
+X-CRM114-CacheID: sfid-20190131_215406_962854_EF899F4D 
+X-CRM114-Status: UNSURE (   5.87  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,146 +90,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, a.tropschug@ebs-systart.com,
- linux-kernel@vger.kernel.org, amit.kucheria@linaro.org, leoyang.li@nxp.com,
- robh+dt@kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: 'Mark Rutland' <mark.rutland@arm.com>,
+ 'Catalin Marinas' <catalin.marinas@arm.com>,
+ "'will.deacon@arm.com'" <will.deacon@arm.com>,
+ "'linux-kernel@vger.kernel.org'" <linux-kernel@vger.kernel.org>,
+ "'linux-arm-kernel@lists.infradead.org'"
+ <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="iso-2022-jp"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello @all,
+Hi James,
 
-in the meantime all interfaces are supported. Following a short overview.
-
-> * RAM: 2GB (!) DDR3L
-> * PMU: NXP VR5100
-> * Storage: 64MByte SPI Flash for bootloader and RCW, MicroSD Card, =
-
-> * mSATA 3.0
-> * Connectivity: 2x Ethernet
-> * miniPCIe
-> * SD Card
-> * USB: 2x USB3.0
-> * I2C x 2: 2x 96Boards Expansion Connector
-> * UART x 2: 1 x Terminal and 1x 96Boards Expansion Connector
-> * SPI: 1x 96Boards Expansion Connector
-> * GPIOs =
-
-
-The first 96Board Community Header Board will be available in March, this i=
-s currently in production.
-I will put the schematics online soon. If you have any information missing =
-please let me know. =
-
-
-Best regards,
-Michael
-
---
-Tel.: +49 (0)8142/30505-0
-Fax: +49 (0)8142/30505-50
-Mail: m.bittner@ebs-systart.com
-Internet: www.ebs-systart.com
-
-EBS-SYSTART GmbH
-Industriestra=DFe 33a
-D-82194 Gr=F6benzell
-
-Amtsgericht M=FCnchen, HRB 70338, UST-IdNr. DE128221970
-Gesch=E4ftsf=FChrer: Michael Bittner
-
-
------Urspr=FCngliche Nachricht-----
-Von: Manivannan Sadhasivam [mailto:manivannan.sadhasivam@linaro.org] =
-
-Gesendet: Freitag, 1. Februar 2019 04:28
-An: shawnguo@kernel.org
-Cc: leoyang.li@nxp.com; robh+dt@kernel.org; linux-arm-kernel@lists.infradea=
-d.org; devicetree@vger.kernel.org; linux-kernel@vger.kernel.org; a.tropschu=
-g@ebs-systart.com; m.bittner@ebs-systart.com; amit.kucheria@linaro.org
-Betreff: Re: [PATCH v3 0/5] Add Oxalis board support
-
-On Tue, Jan 22, 2019 at 09:51:42AM +0530, Manivannan Sadhasivam wrote:
-> Hello,
-> =
-
-> This patchset adds Oxalis board support. This board is one of the
-> 96Boards Enterprise Edition platform from EBS-SYSTART GmbH. Below are some
-> of the key features of this board:
-> =
-
-> * SoC: NXP Layerscape LS1012A
-> * RAM: 1GB DDR3L
-> * PMU: NXP VR5100
-> * Storage: 64MByte SPI Flash for bootloader and RCW, MicroSD Card, SATA
-> * Connectivity: 2x Ethernet
-> * USB: 2x USB3.0
-> =
-
-> More information about this board can be found in 96Boards product
-> page: https://www.96boards.org/product/oxalis/
-> =
-
-> Ethernet and SPI flash are not supported yet!
-> =
-
-> Thanks,
-> Mani
-> =
-
-
-Hi Shawn,
-
-Any update on this patchset?
+> -----Original Message-----
+> From: linux-arm-kernel
+> [mailto:linux-arm-kernel-bounces@lists.infradead.org] On Behalf Of
+> James Morse
+> Sent: Thursday, January 31, 2019 12:00 AM
+> To: Zhang, Lei/張 雷
+> Cc: 'Mark Rutland'; 'Catalin Marinas'; 'will.deacon@arm.com';
+> 'linux-kernel@vger.kernel.org';
+> 'linux-arm-kernel@lists.infradead.org'
+> Subject: Re: [PATCH v3 0/1] arm64: Add workaround for Fujitsu A64FX
+> erratum 010001
+> 
+> 
+> e03e61c3173c ("arm64: kaslr: Set TCR_EL1.NFD1 when
+> CONFIG_RANDOMIZE_BASE=y") ?
+> 
+> So you'd never see it if you disabled CONFIG_RANDOMIZE_BASE?
+For security, it is necessary to set CONFIG_RANDOMIZE_BASE=y.
 
 Thanks,
-Mani
-
-> Changes in v3:
-> =
-
-> * Fixed LS1012A and LS1021A bindings
-> * Added missing devicetree compatibles for LS1021A based boards
-> * Added Rob's Reviewed-by tag for Vendor prefix patch
-> =
-
-> Changes in v2:
-> =
-
-> As per Rob's review:
-> =
-
-> * Adopted the Oxalis board binding to JSON format.
-> * Sorted the EBS-SYSTART vendor prefix alphabetically.
-> * Used the generic node name for audio codec.
-> =
-
-> Manivannan Sadhasivam (5):
->   dt-bindings: arm: fsl: Fix bindings for LS1012A and LS1021A based
->     boards
->   ARM: dts: Add devicetree compatibles for LS1021A based boards
->   dt-bindings: vendor-prefixes: Add EBS-SYSTART GmbH Vendor Prefix
->   dt-bindings: arm: fsl: Add devicetree binding for Oxalis
->   arm64: dts: freescale: Add devicetree for Oxalis
-> =
-
->  .../devicetree/bindings/arm/fsl.yaml          | 11 ++-
->  .../devicetree/bindings/vendor-prefixes.txt   |  1 +
->  arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts   |  1 +
->  arch/arm/boot/dts/ls1021a-qds.dts             |  1 +
->  arch/arm/boot/dts/ls1021a-twr.dts             |  1 +
->  arch/arm64/boot/dts/freescale/Makefile        |  1 +
->  .../boot/dts/freescale/fsl-ls1012a-oxalis.dts | 96 +++++++++++++++++++
->  7 files changed, 111 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-oxalis.dts
-> =
-
-> -- =
-
-> 2.17.1
-> =
-
+Zhang Lei 
 
 
 _______________________________________________
