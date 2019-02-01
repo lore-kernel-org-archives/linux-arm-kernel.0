@@ -2,73 +2,82 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D6ADAC282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:37:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 39663C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:44:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AACB520863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:37:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0C7BD20857
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:44:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P+DNuZ6n"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AACB520863
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k1pU0JVY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C7BD20857
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ebs-systart.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=enoP2qKkqjGltn/5Knp8HhIKtQTIHVtj3hWo62NLss8=; b=P+DNuZ6nMtmKGH
-	sLDKt3ZmUbo9b0tHepThW8EnxQRAu80LXSG89pRu6QFIAEdsn/HQ8J0OUSEkUVw89yRFv3eto5dsz
-	jVQ60fm9t3rX1OTA62i1Lnfkotf3BheMA/+8zbI2V5hMFDxI61JQa7/P34d7PMQ49X6I0MUnZ0V6f
-	jfZaiUsdaIT54qfedaWZzyJzc8Z8k/0SveP5XxYz3fWjcdGtNkwSqyqIXbVT3uvSbgih325zvQKMQ
-	F7nbsJS7zi1QmxBUcIsLOb4xda2VpNeJvn0uRkb29JpD49zSmFyA1QQueXfwoPfsQGkFt73GV4hdm
-	6BFUYQsXa4ddzHjlLNMg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:To:
+	Subject:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
+	List-Owner; bh=CZcy7ob6dQv4QIMH0Lck8sfMeqhdSIRkrDL63DmBrV4=; b=k1pU0JVYduAx69
+	1Nki/ye2ZUcrfqxiYPiaSG+YbRBFGw0+qSb6r0FTMQcsvX3eLcmjsCjRSfRMMLxhFxhT/bV5w6ORP
+	HBgvMtU8IN6ZuRe5Qpk9owK7dZkSvwBd1rh5CLtHN5yB7FuutZZzyOzMW0NMtD29Uce7q3ZBHA/XQ
+	HbsUOCTyKOMVhZj/aqDviE4dcVr3V3TDsDKhJCW5LKdU99GDT92UwIh7WW7+n/JFv3D+1/l/+Mfjf
+	Eaudv0/1r+Fao3s7j9MCONMNcb6o6jyfU6+wKGwmuqcCI09O4415HjXbsOMNtE+qNDYbxqt6mZ9RS
+	S1ydO+P/g36e9Awy+oPg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpRVd-00051K-2a; Fri, 01 Feb 2019 05:37:01 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gpRcY-0006sE-RM; Fri, 01 Feb 2019 05:44:10 +0000
+Received: from mout.kundenserver.de ([217.72.192.74])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpRV1-0004Qh-EM; Fri, 01 Feb 2019 05:36:28 +0000
-X-UUID: 89f47488da6d4edca29b81f3d7c88f6e-20190131
-X-UUID: 89f47488da6d4edca29b81f3d7c88f6e-20190131
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
- (envelope-from <honghui.zhang@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 880612553; Thu, 31 Jan 2019 21:36:21 -0800
-Received: from mtkmbs08n2.mediatek.inc (172.21.101.56) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 31 Jan 2019 21:36:19 -0800
-Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
- mtkmbs08n2.mediatek.inc (172.21.101.56) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 1 Feb 2019 13:36:10 +0800
-Received: from localhost.localdomain (10.17.3.153) by MTKCAS06.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 1 Feb 2019 13:36:10 +0800
-From: <honghui.zhang@mediatek.com>
-To: <lorenzo.pieralisi@arm.com>, <bhelgaas@google.com>,
- <linux-arm-kernel@lists.infradead.org>, <linux-mediatek@lists.infradead.org>, 
- <linux-pci@vger.kernel.org>, <linux-kernel@vger.kernel.org>,
- <ryder.lee@mediatek.com>
-Subject: [PATCH v3 1/2] PCI: mediatek: Enable the whole memory mapped IO range
-Date: Fri, 1 Feb 2019 13:36:06 +0800
-Message-ID: <1548999367-11733-2-git-send-email-honghui.zhang@mediatek.com>
-X-Mailer: git-send-email 2.6.4
-In-Reply-To: <1548999367-11733-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1548999367-11733-1-git-send-email-honghui.zhang@mediatek.com>
+ id 1gpRcV-0006rp-1F
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 05:44:09 +0000
+Received: from mail.ebs-systart.com ([24.134.95.109]) by
+ mrelayeu.kundenserver.de (mreue106 [212.227.15.183]) with ESMTPSA (Nemesis)
+ id 1MV5G4-1gh9tf0JPC-00S5RV; Fri, 01 Feb 2019 06:44:01 +0100
+Received: from CLIENT08.ebs-systart.intranet by [192.168.1.201] (MDaemon PRO
+ v18.5.1) 
+ with ESMTPSA id md50000251727.msg; Fri, 01 Feb 2019 06:43:59 +0100
+X-MDArrival-Date: Fri, 01 Feb 2019 06:43:59 +0100
+X-Authenticated-Sender: m.bittner@ebs-systart.com
+X-Return-Path: m.bittner@ebs-systart.com
+X-Envelope-From: m.bittner@ebs-systart.com
+Date: Fri, 01 Feb 2019 06:43:58 +0100
+From: Michael Bittner <m.bittner@ebs-systart.com>
+Subject: AW: [PATCH v3 0/5] Add Oxalis board support
+To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ shawnguo@kernel.org
+In-Reply-To: <20190201032817.GA3008@Mani-XPS-13-9360>
+Message-ID: <209ab7e9.1d4b9f1.197c0e38.52d9@ebs-systart.com>
+X-Priority: 3
+Organization: EBS-SYSTART GmbH
+X-Mailer: MDaemon Connector 5.6.0
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 18A9FA841BB559D2EFB2D7B455CE214262B6A26F60324E17095F577292C51CA82000:8
-X-MTK: N
+X-Provags-ID: V03:K1:JDCO4xFHA+rypI5+Wm65UPzGL8vA0S3b5QDd4TLYztPt0tzutrL
+ zsYUH1x0NcqFQeWoZCdWbSWem5sC1/Vf/zAmld8EVdRIZ+O6CUMXuH4L5c55klqtk11T7J6
+ iRTZRHfLDJK5rSVO23D0OBA9tuDwbYK8x+nzHm3ZrhZ744aclpQFnK785nHhypW/uKpFaxp
+ G22PXeBiZcios/DlXPYRg==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:Cq0Kt2UxxOs=:wMlSJ4XJy6sW31C63SqxlZ
+ V2S5GksA+dZLRGdkD2Xnj3D3iUnbMIJAL0zfq+8b+0Aq+SPzy0gBlYqsxWVBikYMzMhknjP82
+ T0ZeT7p+0TJHxyLX2lVKjwNR1cTo+JpXNoJY6Qphax1wCF+SJ/bZO+ghdnHmEqimgioXXa8Rk
+ pg1ExXAV98LRDywq3Klz7K6Iq9MTxq6jn7FU6vvgliCMACiLasE5NMt8WRHaqGFZs2a+c2bQ1
+ 6aiBNe1/x2lBDbqOb3lKuF2HWVIg3Z/t+J4Oq1F/Twu1FBJAQmhvODZrYFZTLfQVWIV54/8fp
+ WQJCKHYejI9VxiEP6qVTYpJisrItIC9B2ihrOToU2+2j4tyN4y/68dYjCtDwNELXY+kYHCTAu
+ Z+sjYdKe7yTN4g9zdO3NDBeg3u/BSHev9Y9V7iLwZBvCQyKdu35uN7j7WOq9tZHbeW5okxjW1
+ 5XcGNLekYyqXla9qA+5MTastXbTfWfHPQmi3Kj8/M7MeS0nOJxGrcOueOc/5AkaRYHWDSF6Ui
+ CtVgrEEqO8iLwrD+6+4QEJdpNNNjrmI8M2pfZxCiSIy8XYFqWPkn7mzK9WOYx+B+7VQHRsxhR
+ Yj7JHseGKus4CYlrqImqqoyQLa0fiqDUHlhlGlczYqMSF5ODYd2YqihozCx7IYf10E7s3hKZ6
+ ES4vInn+6xDqktAVl37UHVaeP3JCEwXzIJJU1NtAhj1Vpo3dlubwKoxgCUy5D8WbxZJZMORfd
+ XM+LLmYr9Km4TJ989Q7ZtAlHsu28UTRW0Q7OmmFYX0tkjSPnvKzKGt9NQnZrJw0a/UaXTNG6I
+ MeWp88T
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_213623_938075_E0100BA9 
-X-CRM114-Status: GOOD (  11.93  )
+X-CRM114-CacheID: sfid-20190131_214407_383000_F65B9139 
+X-CRM114-Status: GOOD (  15.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,83 +89,146 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, poza@codeaurora.org, fred@fredlawl.com,
- rafael.j.wysocki@intel.com, jianjun.wang@mediatek.com,
- Honghui Zhang <honghui.zhang@mediatek.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org, a.tropschug@ebs-systart.com,
+ linux-kernel@vger.kernel.org, amit.kucheria@linaro.org, leoyang.li@nxp.com,
+ robh+dt@kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+Hello @all,
 
-Mediatek's HW assigned a bus address range(typically start from
-0x2000_0000 to 0x2fff_ffff for both mt2712 and mt7622) for PCIe usage.
-This bus address range is called memory mapped IO range, when CPU or
-other HW access those address, PCIe RC HW should response to this
-access. Normally the RC will translate those access request to TLPs
-and send to corresponding EP side. It's like the total memory address
-resource which could be allocated by EP and RC's BARs.
+in the meantime all interfaces are supported. Following a short overview.
 
-Although those address range is available for allocated, but it should
-be enabled by the PCIE_AHB_TRANS_BASE register, what size will be
-enabled is determined by AHB2PCIE_SIZE bits in this register.
+> * RAM: 2GB (!) DDR3L
+> * PMU: NXP VR5100
+> * Storage: 64MByte SPI Flash for bootloader and RCW, MicroSD Card, =
 
-In previous code we did not enable the full size of HW assigned address
-range, if the EP's BAR requested size is bigger than the size we enabled
-and smaller than the HW available size. The access request which target
-at these un-enabled address will be blocked by RC, and EP side will
-never get those TLPs.
+> * mSATA 3.0
+> * Connectivity: 2x Ethernet
+> * miniPCIe
+> * SD Card
+> * USB: 2x USB3.0
+> * I2C x 2: 2x 96Boards Expansion Connector
+> * UART x 2: 1 x Terminal and 1x 96Boards Expansion Connector
+> * SPI: 1x 96Boards Expansion Connector
+> * GPIOs =
 
-Previous code never run into a system error in production because even
-half of those range(128MB) is bigger enough for typical EP device's BAR
-request(4MB).
 
-But all those HW assigned bus range should be enabled. And it's Okay to
-do that. RC will never forward a request to EP when this request is not
-suitable for EP's BAR range.
+The first 96Board Community Header Board will be available in March, this i=
+s currently in production.
+I will put the schematics online soon. If you have any information missing =
+please let me know. =
 
-Using resource_size(mem) instead of mem->end - mem->start to fix this,
-since the MMIO window size for both MT2712 and MT7622 are all
-0x1000_0000, this change will change the values of fls(size) from
-fls(0xfff_ffff) to fls(0x1000_0000) and calcalate the whole memory
-mapped IO range size.
 
-This change also eliminate the following complain generated by
-scripts/coccinelle/api/resource_size.cocci:
+Best regards,
+Michael
 
-pcie-mediatek.c:720:13-16: WARNING: Suspicious code. resource_size is maybe missing with mem
+--
+Tel.: +49 (0)8142/30505-0
+Fax: +49 (0)8142/30505-50
+Mail: m.bittner@ebs-systart.com
+Internet: www.ebs-systart.com
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
----
- drivers/pci/controller/pcie-mediatek.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+EBS-SYSTART GmbH
+Industriestra=DFe 33a
+D-82194 Gr=F6benzell
 
-diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-index 55e471c..c42fe5c 100644
---- a/drivers/pci/controller/pcie-mediatek.c
-+++ b/drivers/pci/controller/pcie-mediatek.c
-@@ -654,7 +654,6 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
- 	struct resource *mem = &pcie->mem;
- 	const struct mtk_pcie_soc *soc = port->pcie->soc;
- 	u32 val;
--	size_t size;
- 	int err;
- 
- 	/* MT7622 platforms need to enable LTSSM and ASPM from PCIe subsys */
-@@ -706,8 +705,8 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
- 		mtk_pcie_enable_msi(port);
- 
- 	/* Set AHB to PCIe translation windows */
--	size = mem->end - mem->start;
--	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(size));
-+	val = lower_32_bits(mem->start) |
-+	      AHB2PCIE_SIZE(fls(resource_size(mem)));
- 	writel(val, port->base + PCIE_AHB_TRANS_BASE0_L);
- 
- 	val = upper_32_bits(mem->start);
--- 
-2.6.4
+Amtsgericht M=FCnchen, HRB 70338, UST-IdNr. DE128221970
+Gesch=E4ftsf=FChrer: Michael Bittner
+
+
+-----Urspr=FCngliche Nachricht-----
+Von: Manivannan Sadhasivam [mailto:manivannan.sadhasivam@linaro.org] =
+
+Gesendet: Freitag, 1. Februar 2019 04:28
+An: shawnguo@kernel.org
+Cc: leoyang.li@nxp.com; robh+dt@kernel.org; linux-arm-kernel@lists.infradea=
+d.org; devicetree@vger.kernel.org; linux-kernel@vger.kernel.org; a.tropschu=
+g@ebs-systart.com; m.bittner@ebs-systart.com; amit.kucheria@linaro.org
+Betreff: Re: [PATCH v3 0/5] Add Oxalis board support
+
+On Tue, Jan 22, 2019 at 09:51:42AM +0530, Manivannan Sadhasivam wrote:
+> Hello,
+> =
+
+> This patchset adds Oxalis board support. This board is one of the
+> 96Boards Enterprise Edition platform from EBS-SYSTART GmbH. Below are some
+> of the key features of this board:
+> =
+
+> * SoC: NXP Layerscape LS1012A
+> * RAM: 1GB DDR3L
+> * PMU: NXP VR5100
+> * Storage: 64MByte SPI Flash for bootloader and RCW, MicroSD Card, SATA
+> * Connectivity: 2x Ethernet
+> * USB: 2x USB3.0
+> =
+
+> More information about this board can be found in 96Boards product
+> page: https://www.96boards.org/product/oxalis/
+> =
+
+> Ethernet and SPI flash are not supported yet!
+> =
+
+> Thanks,
+> Mani
+> =
+
+
+Hi Shawn,
+
+Any update on this patchset?
+
+Thanks,
+Mani
+
+> Changes in v3:
+> =
+
+> * Fixed LS1012A and LS1021A bindings
+> * Added missing devicetree compatibles for LS1021A based boards
+> * Added Rob's Reviewed-by tag for Vendor prefix patch
+> =
+
+> Changes in v2:
+> =
+
+> As per Rob's review:
+> =
+
+> * Adopted the Oxalis board binding to JSON format.
+> * Sorted the EBS-SYSTART vendor prefix alphabetically.
+> * Used the generic node name for audio codec.
+> =
+
+> Manivannan Sadhasivam (5):
+>   dt-bindings: arm: fsl: Fix bindings for LS1012A and LS1021A based
+>     boards
+>   ARM: dts: Add devicetree compatibles for LS1021A based boards
+>   dt-bindings: vendor-prefixes: Add EBS-SYSTART GmbH Vendor Prefix
+>   dt-bindings: arm: fsl: Add devicetree binding for Oxalis
+>   arm64: dts: freescale: Add devicetree for Oxalis
+> =
+
+>  .../devicetree/bindings/arm/fsl.yaml          | 11 ++-
+>  .../devicetree/bindings/vendor-prefixes.txt   |  1 +
+>  arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts   |  1 +
+>  arch/arm/boot/dts/ls1021a-qds.dts             |  1 +
+>  arch/arm/boot/dts/ls1021a-twr.dts             |  1 +
+>  arch/arm64/boot/dts/freescale/Makefile        |  1 +
+>  .../boot/dts/freescale/fsl-ls1012a-oxalis.dts | 96 +++++++++++++++++++
+>  7 files changed, 111 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-oxalis.dts
+> =
+
+> -- =
+
+> 2.17.1
+> =
+
 
 
 _______________________________________________
