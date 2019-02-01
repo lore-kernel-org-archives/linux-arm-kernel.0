@@ -2,68 +2,132 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 86C3CC282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:05:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CEB57C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:05:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5304B20869
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:05:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9E38B20B1F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:05:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jUz1v/KL";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="qj6gObb8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5304B20869
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xyly59m7";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="MG8KYwqA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E38B20B1F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
+	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kih2jrpgPHltd8/6ksOitOpLoaoLxPWtRMgs2yXL3OU=; b=jUz1v/KLAYf7cx
-	LCBgds3P4Y1go2dKojiWB8kYMCu8Oxe5y/fI2DLqXpvd9Q9+EuHe2kWPRmcmmVbtmjG7eY9p9zvlG
-	l19eO5iKJXBYj6psF73ofKPaiGF9v7vTm0TaGHjC4Y8LwzRwL7G6t5QQLOKXAvGPyPNiFpnrxvsTk
-	1zPX0aACmsoYDqrKfv5e+DcDd/GuA6aeaKkCktzd4k9hePlpxz/hWsp6SrZuGHNAYLYOvWVheNrwS
-	p8UP7YOvEXMe2uNvLnaQLxptu58A+FOTZuCRStVarf8YtL5voDm7y+C428kx0aAMGzgjwzhIkr3cV
-	jZFISNNTDJ3eUHfmcUUA==;
+	List-Owner; bh=n1IHErLzljeVpmQR/HE4uNVPeCt+r4tLDcGlM7ImHBY=; b=Xyly59m7BHunLV
+	d67EmfZC14Z4xfpPgEOt1LmHesJOa8AmKfz5xAsGg9oB/ovyZyh0u3s49da7AxWW+O+Z2pbs+rJop
+	ed0Lb3ssR+gLzskuIuJzWM9WCESut94YA3cnK9MnlIyZzV5eddCQ6WmACZ8VuTEDcPEmeXD3NeRgW
+	ncAcL5aXRKvkMDbWBm03VRgmAI47rk6TNtXNsHMSPeaGyX99iugMKiUfZnpHGX8xv70JCq6BwSqTp
+	tck7unakAd2bSKpiOhEkGm5216hZs0QVeFJ2W3zEsSZcRQ6yBUINd89iC2tXvVz19QDfERfnFcl3n
+	+YtsIL/qUhA8RtnWDjwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpSso-0000zT-Ey; Fri, 01 Feb 2019 07:05:02 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gpStH-0002Rk-P9; Fri, 01 Feb 2019 07:05:31 +0000
+Received: from mailout1.w1.samsung.com ([210.118.77.11])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpSsk-0000xO-Uc
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 07:05:00 +0000
-Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
- (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 614B820869;
- Fri,  1 Feb 2019 07:04:56 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549004698;
- bh=bZFiw75arQLQOPqp8cL/g8T026dAWeoutdfgPS25hVA=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=qj6gObb8DHU942hey06Mfrt7KoLkd1shSdRjhUr6jLcV9I/Nc/Ico/s1fWwUlOn1t
- hRkmsJT8AKJ9j746jpXzHU6rKlIqPRMsukb6mzyTVMY+BPQ0lLyhmCuME/mBHSTZFC
- Pk/nPqIXBaZf6bu//jhOFCcJJjcAIGSu0/nWtCw0=
-Date: Fri, 1 Feb 2019 15:04:48 +0800
-From: Shawn Guo <shawnguo@kernel.org>
-To: Lucas Stach <l.stach@pengutronix.de>
-Subject: Re: [PATCH v2] arm64: imx8mq: select PM support
-Message-ID: <20190201070447.GO19882@dragon>
-References: <20190125162437.14176-1-l.stach@pengutronix.de>
+ id 1gpStD-0002RF-F9
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 07:05:29 +0000
+Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
+ by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
+ 20190201070524euoutp01c15b055094b5ca683993422c25d7de0f~-K5ckFIWg0318903189euoutp01E
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri,  1 Feb 2019 07:05:24 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
+ 20190201070524euoutp01c15b055094b5ca683993422c25d7de0f~-K5ckFIWg0318903189euoutp01E
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1549004725;
+ bh=LhAbpAXv7b/Jn7o325o9y8sGGKskPWyhIXvcBW6qwkw=;
+ h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
+ b=MG8KYwqANB69uO/4zY6Gk0LdoZarp9Cs7FUx70iN6vx6iMthi2rmUrJchyElhuCXI
+ ue8GKuQtrC7k9TPz7Ux2mrPclngbw/w4DjABEufGVXjqX6685rZfpqaLnSZ6UVDyku
+ xRjOqc9xptqOaOL5mSRoZogADQEPWlwdMa3RE1PM=
+Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
+ eucas1p2.samsung.com (KnoxPortal) with ESMTP id
+ 20190201070524eucas1p229ba0acf0035070676f91a8a232641fd~-K5cCzkFj1110511105eucas1p29;
+ Fri,  1 Feb 2019 07:05:24 +0000 (GMT)
+Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
+ eusmges2new.samsung.com (EUCPMTA) with SMTP id 3F.07.04294.4BFE35C5; Fri,  1
+ Feb 2019 07:05:24 +0000 (GMT)
+Received: from eusmtrp2.samsung.com (unknown [182.198.249.139]) by
+ eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
+ 20190201070523eucas1p28a8a40b06589f725d1facf7a67f730e1~-K5a6jZqr0928209282eucas1p2_;
+ Fri,  1 Feb 2019 07:05:23 +0000 (GMT)
+Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
+ eusmtrp2.samsung.com (KnoxPortal) with ESMTP id
+ 20190201070522eusmtrp26d172e9535374389e9895d570bce24d3~-K5ar7rc10763207632eusmtrp2r;
+ Fri,  1 Feb 2019 07:05:22 +0000 (GMT)
+X-AuditID: cbfec7f4-835ff700000010c6-6e-5c53efb4fa2d
+Received: from eusmtip1.samsung.com ( [203.254.199.221]) by
+ eusmgms2.samsung.com (EUCPMTA) with SMTP id 9F.1D.04128.2BFE35C5; Fri,  1
+ Feb 2019 07:05:22 +0000 (GMT)
+Received: from [106.116.147.30] (unknown [106.116.147.30]) by
+ eusmtip1.samsung.com (KnoxPortal) with ESMTPA id
+ 20190201070522eusmtip1cb186b54c52224a98fdf4e190acba454~-K5aKnxyo0176601766eusmtip1H;
+ Fri,  1 Feb 2019 07:05:22 +0000 (GMT)
+Subject: Re: fix a layering violation in videobuf2 and improve
+ dma_map_resource v2
+To: Christoph Hellwig <hch@lst.de>, Pawel Osciak <pawel@osciak.com>,
+ Kyungmin Park <kyungmin.park@samsung.com>, =?UTF-8?Q?Niklas_S=c3=b6derlund?=
+ <niklas.soderlund+renesas@ragnatech.se>
+From: Marek Szyprowski <m.szyprowski@samsung.com>
+Message-ID: <774dc557-b690-203f-898f-38755b099068@samsung.com>
+Date: Fri, 1 Feb 2019 08:05:21 +0100
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190125162437.14176-1-l.stach@pengutronix.de>
-User-Agent: Mutt/1.5.21 (2010-09-15)
+In-Reply-To: <20190118113727.3270-1-hch@lst.de>
+Content-Language: en-US
+X-Brightmail-Tracker: H4sIAAAAAAAAA01SbUhTYRjt9e7e3a1m12n4kJI0QjLKaURdNCTT4NKfoiLIj2zmxUSnsqVl
+ RvkRZkstv1CHlIFpWU2by9TUcpnDcpbOaiqCNT/QMgkzy8xyu1r+e895zvOec+AhMbEZX09G
+ xZ5mFbGyGAkh5NW1/+zapps6HOI1li6g7957YUeXPfWljWmf+bTW8g6nTY2lBJ1V8win9YXN
+ iP41u4DTFdp5O3qwYytdMPmTv2c1Y3rXjTHaqisEU1t+kck3VyLmdfEtxDzpSyEYy9w4wYyZ
+ ZgkmR1eFmGnthoPCIOHuCDYmKpFVSP1OCE9dff8Fi9fgZ4tUhXgKKuepkIAEagekaloxFRKS
+ YuoOggeGbMSBbwg+jY/wODCNoKWngr+8Mq038rlBJQLN1ZdLqikEprxWwqpypI5AsXHANnCi
+ mhF0ZVzDrQCj5hEYbhiRVUVQ3qCaVNk2RJQfjP/us3nwqE2Qasyw8euoECjoauNzGgfoKBm2
+ RRdQUujsrLTxGOUGjydLMe7tDP3DN+2sZkDN8GFq5ivOBQ+EhuLRpd6OMGHQLRVyhT8Nywvp
+ CC4Xq/kcyELwqLSe4FS+8NzQvfgTuWjhAdWNUo72h/L2Ab6VBsoezJMOXAh7yKsrwjhaBJkZ
+ Yk7tDmqD5p9t65se7DqSqFdUU6+oo15RR/3ftwzxqpAzm6CUR7LK7bHsGU+lTK5MiI30PBkn
+ 16LFe3u1YPhWjxrnw/WIIpFkjahm7lCIGJclKpPkegQkJnEStQ0eDhGLImRJ51hFXJgiIYZV
+ 6pELyZM4i5JXDQWLqUjZaTaaZeNZxfLUjhSsT0EuvftyiImOtXPhX5NDHds8RJn3049XvR14
+ OGQO2BgdvrpHeiz/vCl41N7i5d79LMDHbO/TtPlSmdt31wY31lAbkNJiTKtbE6RP1h3IsuwM
+ vt30gy7p3S+4c6K3yUyHtkStPZTbu7cxg9THfezPzbbk5tTnVYZNVO/6MEJEXfA/GijhKU/J
+ vLdgCqXsL8NRby1rAwAA
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFnrJIsWRmVeSWpSXmKPExsVy+t/xu7qb3gfHGLS/NrdYufook8WC/dYW
+ Z5vesFtsenyN1eLyrjlsFj0btrJaHJq6l9Hi9/d/rBbLNv1hsrh7Usdiytuf7A7cHpevXWT2
+ 2LSqk81j85J6j8k3ljN6nJ+xkNFj980GNo/Hv16yeTy//J3No2/LKkaPz5vkArii9GyK8ktL
+ UhUy8otLbJWiDS2M9AwtLfSMTCz1DI3NY62MTJX07WxSUnMyy1KL9O0S9DK6r79jLljHWjG9
+ ayprA+MSli5GTg4JAROJz4fOsncxcnEICSxllNhz+ygbREJG4uS0BlYIW1jiz7UuNoiit4wS
+ vS8nM4IkhAVCJGacvc0CkhAR2Msocf/0XbAqZoF/jBLze3cwQrQ0MUosWHsebBabgKFE19su
+ sB28AnYSL//eZAexWQRUJBrPtgHFOThEBWIkrp5jhCgRlDg58wnYrZwC+hJnziwHK2cWUJf4
+ M+8SM4QtL7H97RwoW1zi1pP5TBMYhWYhaZ+FpGUWkpZZSFoWMLKsYhRJLS3OTc8tNtIrTswt
+ Ls1L10vOz93ECIzmbcd+bgH6513wIUYBDkYlHt4Nv4JihFgTy4orcw8xSnAwK4nwHrkbHCPE
+ m5JYWZValB9fVJqTWnyI0RTot4nMUqLJ+cBEk1cSb2hqaG5haWhubG5sZqEkznveoDJKSCA9
+ sSQ1OzW1ILUIpo+Jg1OqgfGmNnP5FrFrlx4dt7ksHT4xLoZPWPHhXyGnJW4OUYJmtWJ2r84v
+ ex+iFL1oy8tTSi9Y5gVvdrjf33f9zgSOH6wTf53SfHnjpFf3j470ht6ZDjfWvPeOZp1l4GRx
+ sO/PCvU761brpmzYKeb3iC+x+4yEVKfUjX+rOLST35nobX+wyaIzec2DDF4lluKMREMt5qLi
+ RAADa/MU/AIAAA==
+X-CMS-MailID: 20190201070523eucas1p28a8a40b06589f725d1facf7a67f730e1
+X-Msg-Generator: CA
+X-RootMTR: 20190118113751epcas2p2d7d678dcf247806a119316aabb4dde21
+X-EPHeader: CA
+CMS-TYPE: 201P
+X-CMS-RootMailID: 20190118113751epcas2p2d7d678dcf247806a119316aabb4dde21
+References: <CGME20190118113751epcas2p2d7d678dcf247806a119316aabb4dde21@epcas2p2.samsung.com>
+ <20190118113727.3270-1-hch@lst.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_230459_004428_8A274DFE 
-X-CRM114-Status: UNSURE (   8.70  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190131_230527_985198_95540168 
+X-CRM114-Status: GOOD (  11.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,27 +139,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>, patchwork-lst@pengutronix.de,
- NXP Linux Team <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
- linux-arm-kernel@lists.infradead.org
+Cc: Russell King <linux@armlinux.org.uk>, linux-kernel@vger.kernel.org,
+ iommu@lists.linux-foundation.org, Mauro Carvalho Chehab <mchehab@kernel.org>,
+ linuxppc-dev@lists.ozlabs.org, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 25, 2019 at 05:24:37PM +0100, Lucas Stach wrote:
-> The ATF on the i.MX8MQ device disables all non-essential power
-> domains. For correct on-SoC peripheral operation we need both
-> the power domain driver and generic domains, so device driver
-> probe gets ordered behind the power domain controller driver.
-> 
-> Select those options, as those being absent can lead to very
-> hard to debug failures.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Hi All,
 
-Applied, thanks.
+On 2019-01-18 12:37, Christoph Hellwig wrote:
+> Hi all,
+>
+> this series fixes a rather gross layering violation in videobuf2, which
+> pokes into arm DMA mapping internals to get a DMA address for memory that
+> does not have a page structure, and to do so fixes up the dma_map_resource
+> implementation to not provide a somewhat dangerous default and improve
+> the error handling.
+>
+> Changes since v1:
+>  - don't apply bus offsets in dma_direct_map_resource
+
+Works fine on older Exynos based boards with IOMMU and CMA disabled.
+
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
+
 
 _______________________________________________
 linux-arm-kernel mailing list
