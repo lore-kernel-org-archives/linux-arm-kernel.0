@@ -2,138 +2,85 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.9 required=3.0 tests=DATE_IN_PAST_96_XX,
+	DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 211D0C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:00:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5FA21C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:01:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E0A812080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:00:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 271932080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:01:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="txgufC5m";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="aNe3d+Zj";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="YVxaFcY+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E0A812080F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gySUdquE";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="WSV81ETS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 271932080F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UJe3bcyBO1TozD88S/+ZAUche2VqUrOHBT48wnYoTRg=; b=txgufC5mOXFtcS
-	x95hW6pjiJlzXfIFVJNY1+XZzaU0QCjzZrYmyAOCPlVV8liW8HMqUiK3YwDxUBMi+pLXW/c1bsn6g
-	YbC8lDvrbpi1DELF6tH8/nvbi0FfQXXsgKOWCQc09rvzs5Y255CzUOY57CJkyoRkVz1rCnwCIV9kN
-	H+O0AFAxb88hHnwIbZewLX7VFN8+Hx7HMGE7Ll+yIZZsWTQLpaFQICnMxYWmQ7znWDEatQvCiEyIf
-	HwKKRFGIX50bRLc/Arnp+Gd83Ss1N74KuRiv0ay4nZ6zWA95eU0n3r/hgImCgfyma1i4iaqQqa2Hg
-	1AKPGoWSQpGsQhBMveFg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=a6M/xNycioX79R9wyPD4KMdTAIBYDQEpfUgaym1vOLc=; b=gySUdquE1ywTn7
+	NPVRSOZ74fy6ynELKmAaScPqpzr0W3s57UC3fTXIy2RcNcAhZdbf/rSBgaICuTcTVrakWygF/Bx52
+	pG5aOYltHTBWjP4X3nh5w1MhsnOQyOcpK/Zg4t6wU4/4tatBoIikhgVi3iyo4617NDP7P+cZS7yB+
+	dWC6BMuf1g9cVcS9KI9FyXHRuqqNhmk5trhQ7e5r38vdNIzVxc4QZv82HyfugSXUqyVrKXsyqE7mI
+	RejNgeQpiD3oG2LugsYfYrgyjPQVKM9Ek9M6k1hGbXii6tRdGOgxOZzKOcfnxx9vlG+GsVF6H74L5
+	ccpQgcWRYK/cuRinxt/g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr39Q-0000Qv-3c; Tue, 05 Feb 2019 16:00:44 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gr3AO-0001Pd-62; Tue, 05 Feb 2019 16:01:44 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr37S-0005X1-0d; Tue, 05 Feb 2019 15:58:42 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=MIME-Version:Content-Transfer-Encoding:
- Content-Type:In-Reply-To:References:Message-ID:Date:Subject:CC:To:From:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=VvaFAVtxh1FzCS9vTA5F9tv8KSJbbKczIA7KA0A8KUc=; b=aNe3d+ZjuwuN6J27S2U7uWLCDJ
- EjYb8ic1CJYVa5eQPZ0X7NSQFIvD76orFPTvyd4mMNnwzh5jc1hGAi0KfT8i1olLmSiOkRDyO+Tl8
- 3twO5oUy6ZQskwrDMWqMV66kkJkO1YcSxvXiVjbmTxI5QTIwHEDixUE4fTfQHsfZil/u1tlGl7gWH
- Qm2TTe2qzr6ZzumJVP7Hx3odAmRHMRCUjX94wyVkw3GTwhipyEHUKC05sxONdYaJocuoy2NXrJPg+
- f3mrL242zhYRR2HB9sKcjVUHjn7Cg4h6sLPkx6lRWKzF1P5+FxKQPb55VRIHww57mEuqVhfMN3D/9
- b7OpIeiw==;
-Received: from esa5.microchip.iphmx.com ([216.71.150.166])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr2sX-0005rg-9X; Tue, 05 Feb 2019 15:43:20 +0000
-X-IronPort-AV: E=Sophos;i="5.56,564,1539673200"; d="scan'208";a="24251437"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa5.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 05 Feb 2019 08:43:12 -0700
-Received: from NAM01-BY2-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.108) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Tue, 5 Feb 2019 08:43:11 -0700
+ id 1gr38Y-0006m9-ON
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 16:00:58 +0000
+Received: by mail-wm1-x343.google.com with SMTP id z5so4197461wmf.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 05 Feb 2019 07:59:49 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=VvaFAVtxh1FzCS9vTA5F9tv8KSJbbKczIA7KA0A8KUc=;
- b=YVxaFcY+kah1Yjcvs4BQeLbm+CLqp3Wy8mojR6QSETH8GfWBKdNkrrBev6dByfdX5XweS9i4k1R05eH5UHyy5T9kP8cCLoSARie6VB6g/RhZTkLtWtJa2bbjT0lp+Br67hLYZJJ4q/UtcLiQgeFy3wqd+McpB29hEBf3Lr0nb5Q=
-Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.98.146) by
- BN6PR11MB2019.namprd11.prod.outlook.com (10.173.27.135) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1580.22; Tue, 5 Feb 2019 15:43:10 +0000
-Received: from BN6PR11MB1842.namprd11.prod.outlook.com
- ([fe80::847:4296:13b9:fc9f]) by BN6PR11MB1842.namprd11.prod.outlook.com
- ([fe80::847:4296:13b9:fc9f%8]) with mapi id 15.20.1580.019; Tue, 5 Feb 2019
- 15:43:10 +0000
-From: <Tudor.Ambarus@microchip.com>
-To: <broonie@kernel.org>, <robh+dt@kernel.org>, <mark.rutland@arm.com>,
- <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
- <Ludovic.Desroches@microchip.com>, <bbrezillon@kernel.org>,
- <Cyrille.Pitchen@microchip.com>, <bugalski.piotr@gmail.com>
-Subject: [PATCH v5 01/13] spi: atmel-quadspi: cache MR value to avoid a write
- access
-Thread-Topic: [PATCH v5 01/13] spi: atmel-quadspi: cache MR value to avoid a
- write access
-Thread-Index: AQHUvWl/HvQyFcNUUkq4L8FUfCKzJA==
-Date: Tue, 5 Feb 2019 15:43:10 +0000
-Message-ID: <20190205154257.29529-2-tudor.ambarus@microchip.com>
-References: <20190205154257.29529-1-tudor.ambarus@microchip.com>
-In-Reply-To: <20190205154257.29529-1-tudor.ambarus@microchip.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: AM5P190CA0017.EURP190.PROD.OUTLOOK.COM
- (2603:10a6:206:14::30) To BN6PR11MB1842.namprd11.prod.outlook.com
- (2603:10b6:404:101::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Tudor.Ambarus@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-mailer: git-send-email 2.9.5
-x-originating-ip: [94.177.32.154]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; BN6PR11MB2019;
- 6:VOytPV+hvnzmPI0U5oc0/lWquecAzS5Hq6E5QyD6YQeL/4qy5Y1GlFRSl205HBwvjfRXW2ZlAf1nYD9yyg8BiWBNtPrd9h4JX+/gwQxdnHFsf35mD2ydeA3DPDekGd/8y++vKbEYopnlhv7Q8nydr6l/Rl+Hz7zm9/zyOw1lSpRvVIfXXzn6PkRKETgB70Y4CJNloOz4Xh0MT8cu1O62oeCBt1sXF5pyVwvTqKKFK0eI8dZBKUgQ/79+ztdwrG2UNJ0VDVL5uC0n/fpD4IwqTcibXF3yWV6vgMdYX1AgAuJyALrNfPyjCqa5Pk6VWLgIZ465najy2eX8jwCX2mX+yXYXPuUa0lRcTFsXlX5Orc37Cm6BskXTNquiIcV7txwUpZCt2xi1GrPkJzUWAsyQFylD9CkMb2pcQ/6JF81nwJDOhpwYlYDjH+Ngvp0xKGtG2HtlbhD7DhNSxSHK6kgLow==;
- 5:sqk9aBC04lt9ZE0EyGWWWwXHW7s7mO+PhAoE+31lDIXy3UwEMeRz3qWYplRlPMhf07VTEZ3vxDAmrBdtgzwwRviMJbZ6frZVrt+lpYrxHKKDRR6qOUsiiXzSl+BKSoku0OCQn/UXJKFCX2+sSs1Ymb5x7MvVwOaOaJPjFr4iu0u+AwXU/Vs5BeR/qwzXarCbdKSH0mWc635DFKkcUUmJDg==;
- 7:v5vRr5pTQ4OwLKktknAw2HHp3h/ByL0+Q6ihR9XR8rRVeUzcCpVGUALob5/0GHvXS4DvdtfJrrL+3XtvZppK2XlB4HxSFOHstyg/4zERLyabfxkAv5BEsNRVFM9aE/ftICs4aACQ31wFYFmbZSa6rQ==
-x-ms-office365-filtering-correlation-id: 02a8755a-57e7-494d-1de3-08d68b80a183
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
- SRVR:BN6PR11MB2019; 
-x-ms-traffictypediagnostic: BN6PR11MB2019:
-x-microsoft-antispam-prvs: <BN6PR11MB2019E916C70FA84658D89992F06E0@BN6PR11MB2019.namprd11.prod.outlook.com>
-x-forefront-prvs: 0939529DE2
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(376002)(136003)(39860400002)(396003)(366004)(199004)(189003)(7416002)(72206003)(478600001)(8676002)(81166006)(71190400001)(71200400001)(256004)(14444005)(97736004)(305945005)(186003)(86362001)(6486002)(53936002)(52116002)(2501003)(8936002)(6512007)(6436002)(50226002)(110136005)(25786009)(11346002)(1076003)(54906003)(68736007)(102836004)(6506007)(316002)(386003)(81156014)(105586002)(4326008)(106356001)(7736002)(486006)(6116002)(36756003)(3846002)(446003)(26005)(2906002)(476003)(14454004)(107886003)(66066001)(99286004)(76176011)(2616005);
- DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB2019;
- H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: UQMelGuJzE/d1OvgIxHqwyIVKv3u1BQjy3HfmxppLcu9p9Ib70P4bK3PG3IOnUr7qTDcLjiY78Hn+G9v+WiPaAEgn9lhZRj4n4AG9MAqiPgDNxV9TDOjEgW25qzLIuWIcGWNwV7E3RMFW3eyaea/i9r/Rmv/OkiIeBejLlWBmEGBiIlGltoZwxVeQVFPglyBK+c1XhKJfQ1YPG5ZmYL5/XLUkjcoNWI6YVhWOKmMgfveEL5MEEAKp6/ZQNULgWd1lcke/VIv52ZF5VaYVMrN12yucwud13DAm781abEDUvoGKHIZ8UeYwICoVCdB/94Q1//0xq1aMY4vNJae2VtoCk7dLVIYyLWy77ZbwbXlB6v2NwDbrKshy4c/wXzItJHuO8D0yX10N3Qwt3qkDykBP0MuJKI+Js3prYoJES2uCOo=
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:mime-version;
+ bh=obC/o0x/Of+oiYvDNo+3FmUgPGJAQl+NE5x85eXAQHI=;
+ b=WSV81ETS+kogLHB4BvEl6z/BdttOBfQ9jLyogcbwsk8O19p2eJ0F87NbLRjxhPSY5m
+ jru04119WHfN5Ojw0FqEIYDTbm883PI2wFjbPV4qVeN6TE1SfV707mJos0aAAXrdVjGd
+ UVZ5O98son0kInTPtFBdl31QBQT018TiJbDlPq7hHUXTPeGDswp1xUuOQQZ8kCCNFzvM
+ 0jLnZk08zYrCG96BfpERA2AJPeweqEfm5iBeW6P6cOHy5hGmAzVKwOA3hR5EeQ1MzCL6
+ DacGQGFQCsj1er9+HxPHY6gwsKFFNujj76py9cyjFI5vhpJzinV5mzWrxZX+qJW771AT
+ AZ5g==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version;
+ bh=obC/o0x/Of+oiYvDNo+3FmUgPGJAQl+NE5x85eXAQHI=;
+ b=NRxrutLlnuDvD4EbsumYHqKxV6yel5E8jrgucDMIobsItE7zmE+t1WKIGVjww4WnRB
+ CgjBo/v3uM9LFaaS0nR5R4SUK8F49m7UhpFkjmAAoMQ2bKWpk5Q28O0vRN3qn1tHbi/U
+ bTB5Bcp0mh6U1mJzHtgNdakSxM7JXzHN0mUBz1XuetVRvOEO1d5iKL3qEYQ26fVaoPTy
+ 8Jvay5vs6lLmCWFu5BE26nZXsL/pj2jnYR1jW7oz0XxkIpDIhWmBAWAAswg9GGN+6bY0
+ mXjMlDdJwe/WNEnpijhcjnFjK2OTmGZm4yQqXtDFNkBMEEKKShUK+9hUXSzNRBAIvViJ
+ EuTA==
+X-Gm-Message-State: AHQUAubn+FKRMQcKU/XSUHn/LgfYfrxpZzK2DAPYkULgIVK9Q7sIX0aH
+ 4fT07TeG9SPB2nJh30RIlbYxAg==
+X-Google-Smtp-Source: AHgI3IYSrGj7kHlF8uGsZVxlBXMYAo+pXQSmbx+a+mIkXGS/XNkMYdNI1G7+AD7n1YIQ7vnG8Tm7QQ==
+X-Received: by 2002:a1c:d082:: with SMTP id h124mr4071012wmg.21.1549382388516; 
+ Tue, 05 Feb 2019 07:59:48 -0800 (PST)
+Received: from localhost ([2620:10d:c092:180::1:a0f9])
+ by smtp.gmail.com with ESMTPSA id s66sm11635832wmf.34.2019.02.05.07.59.47
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 05 Feb 2019 07:59:47 -0800 (PST)
+From: Julien Masson <jmasson@baylibre.com>
+To: Kevin Hilman <khilman@baylibre.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Subject: [PATCH 1/2] tty: serial: meson_uart: Add support for kernel debugger
+Date: Fri, 1 Feb 2019 08:36:59 +0100
+Message-ID: <864l9i1b0t.fsf@baylibre.com>
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 02a8755a-57e7-494d-1de3-08d68b80a183
-X-MS-Exchange-CrossTenant-originalarrivaltime: 05 Feb 2019 15:43:07.5301 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB2019
-X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_154317_633839_D546AA46 
-X-CRM114-Status: GOOD (  12.06  )
+X-CRM114-CacheID: sfid-20190205_075951_293160_1B061D8D 
+X-CRM114-Status: GOOD (  11.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -145,72 +92,89 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Tudor.Ambarus@microchip.com,
- linux-kernel@vger.kernel.org, linux-spi@vger.kernel.org,
- linux-mtd@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-amlogic@lists.infradead.org, linux-kernel@vger.kernel.org,
+ linux-serial@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Jiri Slaby <jslaby@suse.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Tudor Ambarus <tudor.ambarus@microchip.com>
+The kgdb invokes the poll_put_char and poll_get_char when communicating
+with the host. This patch implement the serial polling hooks for the
+meson_uart to be used for KGDB debugging over serial line.
 
-Set the controller by default in Serial Memory Mode (SMM) at probe.
-Cache Mode Register (MR) value to avoid write access when setting
-the controller in serial memory mode at exec_op().
-
-Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
-Reviewed-by: Boris Brezillon <bbrezillon@kernel.org>
+Signed-off-by: Julien Masson <jmasson@baylibre.com>
 ---
-v5: collect R-b
-v4: s/smm/mr, init controller in serial memory mode by default
-v3: update smm value when different. rename mr/smm
-v2: cache MR value instead of moving the write access at probe
+ drivers/tty/serial/meson_uart.c | 46 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-drivers/spi/atmel-quadspi.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/spi/atmel-quadspi.c b/drivers/spi/atmel-quadspi.c
-index ddc712410812..d6864d29f294 100644
---- a/drivers/spi/atmel-quadspi.c
-+++ b/drivers/spi/atmel-quadspi.c
-@@ -155,6 +155,7 @@ struct atmel_qspi {
- 	struct clk		*clk;
- 	struct platform_device	*pdev;
- 	u32			pending;
-+	u32			mr;
- 	struct completion	cmd_completion;
+diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
+index 8a84259..49b20da 100644
+--- a/drivers/tty/serial/meson_uart.c
++++ b/drivers/tty/serial/meson_uart.c
+@@ -426,6 +426,48 @@ static void meson_uart_config_port(struct uart_port *port, int flags)
+ 	}
+ }
+ 
++#ifdef CONFIG_CONSOLE_POLL
++/*
++ * Console polling routines for writing and reading from the uart while
++ * in an interrupt or debug context (i.e. kgdb).
++ */
++
++static int meson_uart_poll_get_char(struct uart_port *port)
++{
++	u32 c;
++	unsigned long flags;
++
++	spin_lock_irqsave(&port->lock, flags);
++
++	if (readl(port->membase + AML_UART_STATUS) & AML_UART_RX_EMPTY)
++		c = NO_POLL_CHAR;
++	else
++		c = readl(port->membase + AML_UART_RFIFO);
++
++	spin_unlock_irqrestore(&port->lock, flags);
++
++	return c;
++}
++
++static void meson_uart_poll_put_char(struct uart_port *port, unsigned char c)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&port->lock, flags);
++
++	while (!(readl(port->membase + AML_UART_STATUS) & AML_UART_TX_EMPTY))
++		cpu_relax();
++
++	writel(c, port->membase + AML_UART_WFIFO);
++
++	while (!(readl(port->membase + AML_UART_STATUS) & AML_UART_TX_EMPTY))
++		cpu_relax();
++
++	spin_unlock_irqrestore(&port->lock, flags);
++}
++
++#endif /* CONFIG_CONSOLE_POLL */
++
+ static const struct uart_ops meson_uart_ops = {
+ 	.set_mctrl      = meson_uart_set_mctrl,
+ 	.get_mctrl      = meson_uart_get_mctrl,
+@@ -441,6 +483,10 @@ static const struct uart_ops meson_uart_ops = {
+ 	.request_port	= meson_uart_request_port,
+ 	.release_port	= meson_uart_release_port,
+ 	.verify_port	= meson_uart_verify_port,
++#ifdef CONFIG_CONSOLE_POLL
++	.poll_get_char	= meson_uart_poll_get_char,
++	.poll_put_char	= meson_uart_poll_put_char,
++#endif
  };
  
-@@ -238,7 +239,14 @@ static int atmel_qspi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
- 	icr = QSPI_ICR_INST(op->cmd.opcode);
- 	ifr = QSPI_IFR_INSTEN;
- 
--	qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
-+	/*
-+	 * If the QSPI controller is set in regular SPI mode, set it in
-+	 * Serial Memory Mode (SMM).
-+	 */
-+	if (aq->mr != QSPI_MR_SMM) {
-+		qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
-+		aq->mr = QSPI_MR_SMM;
-+	}
- 
- 	mode = find_mode(op);
- 	if (mode < 0)
-@@ -381,6 +389,10 @@ static int atmel_qspi_init(struct atmel_qspi *aq)
- 	/* Reset the QSPI controller */
- 	qspi_writel(aq, QSPI_CR, QSPI_CR_SWRST);
- 
-+	/* Set the QSPI controller by default in Serial Memory Mode */
-+	qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
-+	aq->mr = QSPI_MR_SMM;
-+
- 	/* Enable the QSPI controller */
- 	qspi_writel(aq, QSPI_CR, QSPI_CR_QSPIEN);
- 
+ #ifdef CONFIG_SERIAL_MESON_CONSOLE
 -- 
-2.9.5
+2.7.4
 
 
 _______________________________________________
