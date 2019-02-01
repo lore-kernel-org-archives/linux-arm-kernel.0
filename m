@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 081F7C282DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:44:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D6BE0C282DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:44:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CD019218EA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:44:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A7ECB20855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:44:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HiZ8kv+6";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="TFDss/Rb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD019218EA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fwUvzN2N";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="APv9oV/P"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A7ECB20855
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=khixQA6qeUvyFzww23kq3wPm4f0fnQX3MTpGyqdpa7M=; b=HiZ8kv+6WCODRW
-	4B3/5GEDsaT3+1LQQ2WC/qgedAJDU6Mr5enTQLUFo/1nB6A8QOWADt8GCHD6S2OjTsg8l+L6HbQaE
-	sMUbai212sTzHPEASGoUqjRP822FC3FT0Bm3+81pA+ldc4MCJmeCN+xNwqt9HIu2l8psxXs1XK9eW
-	DCoeUHEFfGz44pAoEh8ID3CusTP4SMmRzwtIzJxzEv87uWy4lSC5qFu0CO3pG0St6kkY2/BB4pyiO
-	FfEBRzSkSdNvKT2gTciJUrszpGVZpsjeU1s22+d5FmAPiQUVv64GiSEC3AqFpw4Yt+f1RW4SgCcXZ
-	lOI+JBPqrFHpGmCxjzoA==;
+	List-Owner; bh=CGJrVpWra/jIQspuvvWNC97bEYyr3SaglKeO0j4lg9c=; b=fwUvzN2N4xybYb
+	McJwW4r8xKWbw78bJvgC10YCC6xAy8s4DDGh77Q0L1TUbkCB7nti2t+MwpMY5SQUCaCLVtkv45Tv0
+	3FcSXxwNRv/jLyEi/EAfdKz/WqMIrN0CFea7+xerkdEMLD3JObcJS2oZ611TupWyrDNDfqF6XItF5
+	ZXLvagMkETTI9Uo/gbPwIrzO477wK69ZJ+rTmEx6ZW6I/fG69NQfIQAFbupz3hJfp5kMixyMWqHUh
+	UobbovXPBbs9yhtdRcOn6Dqnoc7kYb5jkaG5S1+KR6lorgkJGCshLsOQnJGQNOLyKgZPs/vGt7h7X
+	uC5iWdDZ2cCNHtYnbZQg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpayz-0003CV-SC; Fri, 01 Feb 2019 15:43:57 +0000
-Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
+	id 1gpazF-0003Ql-Dq; Fri, 01 Feb 2019 15:44:13 +0000
+Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpaxy-00024v-5u
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:42:59 +0000
-Received: by mail-lf1-x141.google.com with SMTP id l10so5358883lfh.9
+ id 1gpay1-00029S-Br
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:43:02 +0000
+Received: by mail-lj1-x242.google.com with SMTP id n18-v6so6167893lji.7
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 07:42:53 -0800 (PST)
+ Fri, 01 Feb 2019 07:42:57 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=TFKtwWbXDyUWT8qfJQdNKmTE4M3/0ezirQXsds5l2UY=;
- b=TFDss/RbpOFlaY0pWWUTNxWwScvM6xjusFKv0iPtef7zFK/kvLYAlgDybWbhac398K
- fSO9j4Q92zuJCwOI0Bf2W4fgV2Ru6//VyG8oEMG+cr3hml2NaPvTD4x/Sbd2YhDxcSQt
- YYqXzbcdn3lxNnXm0Ezdev5F1ZXUBfEZWAQw0=
+ bh=Yb+noxi69zQOu7k+JslI3G7pP5MYsH91QeSM30jJfwQ=;
+ b=APv9oV/PqBKX0Lnwopd7p67DYrueF3honf/B8EziKXHh/Pt43sjd8oCsTgEzAwfgvk
+ jDp527SdJ5xe54oX7Mjh0paH9byvjdEto5uUyGATHDr+VYO7Md1dQM78a/FDZCYeLBTw
+ geL1BHYUl1a/vm1clYe/NzkUnlcfXQzNR09Jw=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=TFKtwWbXDyUWT8qfJQdNKmTE4M3/0ezirQXsds5l2UY=;
- b=KtaCUN/S6sz6u53i9FeOhMP5pUWYGBYYYp+DfoIF07D8ee+wcYuNx8UlTHAi9imz9x
- ExDZJnf7o6qZPHXeMymBhfoeJ8iXf+oUk3ffKUFDiwF6ht3VUkt5YVbA7hZtyCbqQZ31
- BHQGZcyOBCtKamXsFOEjghnbnUNpB1bnUcPdiCF541/pHgNz+WGAjMNAvqTT31rEJNP4
- +QrvlcD7JwEM8V97lEpVTqJ7dL0ge6e7Z//D36+xsmkIiPgcGwP/llcPjYujPsNvo9mz
- pM/5g56hkqLbV/3kpd3vo2ZBJFI+h0KgmhBKgQB9nIK12wR+x1Uq4eU9Rkz+/FTztmES
- cl+Q==
-X-Gm-Message-State: AHQUAuYohWvYKyTa6GZhop6dd9Z/qWgi2I6z9fVCJRkI8JROJx3fiji2
- KKTPrRe17Rth4CpkkHWR5HOBgg==
-X-Google-Smtp-Source: AHgI3IZ0Z2Ru8GyS56Z09JmdGKrORyR6EsHkGG9PJJ1Tsacbdb7LlqphoL23RjCgnvd1ilES3r1KVA==
-X-Received: by 2002:ac2:4254:: with SMTP id m20mr354627lfl.131.1549035772005; 
- Fri, 01 Feb 2019 07:42:52 -0800 (PST)
+ bh=Yb+noxi69zQOu7k+JslI3G7pP5MYsH91QeSM30jJfwQ=;
+ b=f2n6UOcHNKB0lZfwZoGlwFzYFLnG9P0cmZA/BFbqdGSpUH278XlPWXeIeV7plukRHr
+ KDS9NhbpzHXfV9IRIQe4D4wN0M9ic9nYcgROucPNMyoBX6B0WelZcGUKprnhm7l0im0X
+ 637vR5shNkKy0CJdmlRfUxaxmWcF9FQrpnJyrndVOs2kPpOidMbiRtjNfxAxr6VGqx1+
+ R27YsXGMAvaIGVfCMKyZ/yyF/g8i+Me1JGbCdyJyVXNabEae7dheVAr8dwO3wxB0gzvm
+ rdWR0+FEefF10A9eUGhfBzdRq59hwvdMvBXxnAZnGH4mCFrAfdg7DQbfzs4ILr2W/Vh5
+ H3FA==
+X-Gm-Message-State: AJcUukf5fkZEMrZ6EI/xXz3iMDWd6n0KTzsUDBM3kMBefhw+hnNaREld
+ bYemcxsR4IrKNF8p8WqzjpLjDQ==
+X-Google-Smtp-Source: ALg8bN7/wQSinHisGGaql3kcec2ekLGLreLus3/j+iTO/2x/47Ych+ECPa4/rLbZskFzRIzooYX1ZQ==
+X-Received: by 2002:a2e:974a:: with SMTP id
+ f10-v6mr34782408ljj.61.1549035775668; 
+ Fri, 01 Feb 2019 07:42:55 -0800 (PST)
 Received: from localhost.localdomain ([217.76.202.68])
- by smtp.gmail.com with ESMTPSA id i13-v6sm1305712ljg.82.2019.02.01.07.42.50
+ by smtp.gmail.com with ESMTPSA id i13-v6sm1305712ljg.82.2019.02.01.07.42.53
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 01 Feb 2019 07:42:51 -0800 (PST)
+ Fri, 01 Feb 2019 07:42:54 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
  Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>,
  Michael Turquette <mturquette@baylibre.com>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH v7 04/23] drm/sun4i: sun6i_mipi_dsi: Simplify drq to support
- all modes
-Date: Fri,  1 Feb 2019 21:12:13 +0530
-Message-Id: <20190201154232.10505-5-jagan@amarulasolutions.com>
+Subject: [PATCH v7 06/23] drm/sun4i: sun6i_mipi_dsi: Probe tcon0 during
+ dsi_bind
+Date: Fri,  1 Feb 2019 21:12:15 +0530
+Message-Id: <20190201154232.10505-7-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 In-Reply-To: <20190201154232.10505-1-jagan@amarulasolutions.com>
 References: <20190201154232.10505-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_074254_867550_E66075E7 
-X-CRM114-Status: GOOD (  15.28  )
+X-CRM114-CacheID: sfid-20190201_074257_971315_28C0CF9B 
+X-CRM114-Status: GOOD (  13.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,79 +109,60 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Allwinner MIPI DSI drq has enable mode bit and set bits.
-1) drq for non-burst, with front porch less than 20 would need to
-   set both enable mode bit and set bits.
-2) drq for non-burst, with front porch greater or equal to 20 would
-   not require to do any drq bit setup.
-3) drq for burst mode, would only need to set enable mode bit.
-
-This patch simplifies existing drq code by grouping into
-sun6i_dsi_get_drq and support all video modes.
+Probe tcon0 during dsi_bind, so-that the tcon attributes like
+divider value, clock rate can get whenever it need.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 Tested-by: Merlijn Wajer <merlijn@wizzup.org>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 39 ++++++++++++++++----------
- 1 file changed, 24 insertions(+), 15 deletions(-)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 7 +++++++
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h | 1 +
+ 2 files changed, 8 insertions(+)
 
 diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 0f02bcc997a5..16a86d35dc5a 100644
+index 16a86d35dc5a..2aeaa19a8d1e 100644
 --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -354,6 +354,28 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
- 		     SUN6I_DSI_INST_JUMP_CFG_NUM(1));
+@@ -24,6 +24,7 @@
+ #include <drm/drm_panel.h>
+ 
+ #include "sun4i_drv.h"
++#include "sun4i_tcon.h"
+ #include "sun6i_mipi_dsi.h"
+ 
+ #include <video/mipi_display.h>
+@@ -947,6 +948,7 @@ static int sun6i_dsi_bind(struct device *dev, struct device *master,
+ 	struct drm_device *drm = data;
+ 	struct sun4i_drv *drv = drm->dev_private;
+ 	struct sun6i_dsi *dsi = dev_get_drvdata(dev);
++	struct sun4i_tcon *tcon0 = sun4i_get_tcon0(drm);
+ 	int ret;
+ 
+ 	if (!dsi->panel)
+@@ -954,6 +956,11 @@ static int sun6i_dsi_bind(struct device *dev, struct device *master,
+ 
+ 	dsi->drv = drv;
+ 
++	if (!tcon0)
++		return -EINVAL;
++
++	dsi->tcon = tcon0;
++
+ 	drm_encoder_helper_add(&dsi->encoder,
+ 			       &sun6i_dsi_enc_helper_funcs);
+ 	ret = drm_encoder_init(drm,
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+index dbbc5b3ecbda..257cca660da0 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+@@ -33,6 +33,7 @@ struct sun6i_dsi {
+ 
+ 	struct device		*dev;
+ 	struct sun4i_drv	*drv;
++	struct sun4i_tcon	*tcon;
+ 	struct mipi_dsi_device	*device;
+ 	struct drm_panel	*panel;
  };
- 
-+static int sun6i_dsi_get_drq(struct sun6i_dsi *dsi,
-+			      struct drm_display_mode *mode)
-+{
-+	struct mipi_dsi_device *device = dsi->device;
-+
-+	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
-+		return SUN6I_DSI_TCON_DRQ_ENABLE_MODE;
-+
-+	if ((mode->hsync_start - mode->hdisplay) > 20) {
-+		/* Maaaaaagic */
-+		u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
-+
-+		drq *= mipi_dsi_pixel_format_to_bpp(device->format);
-+		drq /= 32;
-+
-+		return (SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
-+			SUN6I_DSI_TCON_DRQ_SET(drq));
-+	}
-+
-+	return 0;
-+}
-+
- static u16 sun6i_dsi_setup_inst_delay(struct sun6i_dsi *dsi,
- 				      struct drm_display_mode *mode)
- {
-@@ -381,21 +403,8 @@ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
- static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
- 				  struct drm_display_mode *mode)
- {
--	struct mipi_dsi_device *device = dsi->device;
--	u32 val = 0;
--
--	if ((mode->hsync_end - mode->hdisplay) > 20) {
--		/* Maaaaaagic */
--		u16 drq = (mode->hsync_end - mode->hdisplay) - 20;
--
--		drq *= mipi_dsi_pixel_format_to_bpp(device->format);
--		drq /= 32;
--
--		val = (SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
--		       SUN6I_DSI_TCON_DRQ_SET(drq));
--	}
--
--	regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG, val);
-+	regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG,
-+		     sun6i_dsi_get_drq(dsi, mode));
- }
- 
- static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
 -- 
 2.18.0.321.gffc6fa0e3
 
