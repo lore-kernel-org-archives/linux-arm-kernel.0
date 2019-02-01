@@ -2,87 +2,68 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6FF6CC282DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 02:49:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F0D51C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 02:54:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4153121872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 02:49:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C161420863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 02:54:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aFtzqf2M";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="E4aHoFW9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4153121872
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VLpI5K2Q";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="p7BWOEbn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C161420863
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=Q9qtcIsPwmv18DSIp9mML/Yr0VAcDj9cG/0Z3B0iNrA=; b=aFtzqf2MJt8mDAJwWS+gVLAOR
-	T3OVxoZxxwzH5WdYjecH7c/UAyDBZwfqQEE9R1dLHwu3obDeiK70748CiEO6QdZcpp34RPKvCkDGD
-	qmDlaApzJ7ld7hidPfcErZB1fhXMFNbTGIVSQus643s8BDGFjFW1IINX4C4GHcs4NWeKnRRaedh97
-	JdFy5sHw7BNSB+j/yMc7VtjmjEuMwk7MSJguZZ0E3NM6g6EnsohHEMxBdW3k6ZFfwMVwHVpIEi2Gu
-	ySu7hYgo5BKPIkmaKxzqWCttzki7QVU+RqdHvlC/0n0IPSdI54PqpbnjFPjHJnqBGs7Y2y02CrIbB
-	cKELiRhog==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=8DQ85w6H4WgBoUfG3FGTMi4K41bnfpfXRAJMT0pWbiM=; b=VLpI5K2QDHK5rh
+	hJzzUclZN8hKy6B2UuZGPS8FGHQJkA40nbWRAI308VkvPPpOS84R5WK6s7/aaND8gCYjIjJ8Ty3jT
+	vjXYouIiXurk7dzlxIy1oN/bJ8voEh61i5Layynd/HzJPYd3gS0hMRAAj/iJC3wPJw+g1m1lMCY/5
+	jyzgZOOCW1ffbcL34vD2NOVeMwlfM2Y9t4pB6pVZ9LEY5grsxznf0PR37HVa373QykrVtNp7kBarZ
+	P1F8tI8zMW8wOPSkoOvIFPrWWZsnLluxkoAgkp/Nk67bm4B8RNmVxWBpGvn0tbqwJm9CNzB+nnLtp
+	rAAHamz7LTNdOJVi5QHg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpOtn-0002Fe-E6; Fri, 01 Feb 2019 02:49:47 +0000
-Received: from hqemgate14.nvidia.com ([216.228.121.143])
+	id 1gpOyG-0004ew-2l; Fri, 01 Feb 2019 02:54:24 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpOti-0002FJ-Uu
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 02:49:44 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c53b3c80001>; Thu, 31 Jan 2019 18:49:44 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Thu, 31 Jan 2019 18:49:42 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Thu, 31 Jan 2019 18:49:42 -0800
-Received: from [10.19.108.132] (10.124.1.5) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 1 Feb
- 2019 02:49:40 +0000
-Subject: Re: [PATCH V4 00/20] Tegra210 DFLL support
-To: Thierry Reding <thierry.reding@gmail.com>, "Rafael J. Wysocki"
- <rjw@rjwysocki.net>, Michael Turquette <mturquette@baylibre.com>, Stephen
- Boyd <sboyd@kernel.org>
-References: <20190104030702.8684-1-josephl@nvidia.com>
- <20190125134617.GE22565@ulmo>
- <0a7abeee-1b78-4f90-e94f-43c19eddb9b1@nvidia.com>
- <20190128075442.GA18124@ulmo>
-From: Joseph Lo <josephl@nvidia.com>
-Message-ID: <a2cf3ccd-658a-e004-1e66-d4f9cf1026f1@nvidia.com>
-Date: Fri, 1 Feb 2019 10:49:38 +0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gpOyC-0004eS-N7; Fri, 01 Feb 2019 02:54:22 +0000
+Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
+ (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 6EB6720863;
+ Fri,  1 Feb 2019 02:54:14 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1548989659;
+ bh=8RCVc/UR6RQLUvQQQztdVUBfDTbSQz/Ra9DMj49JNqU=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=p7BWOEbn/9OIQs+CILDKvZ8zwagUsVRXIQWJ/Q06cwIG+Ggq95/AExJS/4GLxw5Th
+ NEenY/+eKCv73QR11RpDeI3goTknhZo5yphL90+/05TgFjLoFN2tPkKeWfVRdduUaW
+ PpdtofQUD6W53M35qG+VpOcyh3zlRG//VnAPhvac=
+Date: Fri, 1 Feb 2019 10:54:07 +0800
+From: Shawn Guo <shawnguo@kernel.org>
+To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+Subject: Re: [PATCH v8 3/5] arm64: dts: lx2160a: add FlexSPI node property
+Message-ID: <20190201025405.GA19882@dragon>
+References: <1547553487-9936-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1547553487-9936-4-git-send-email-yogeshnarayan.gaur@nxp.com>
 MIME-Version: 1.0
-In-Reply-To: <20190128075442.GA18124@ulmo>
-X-Originating-IP: [10.124.1.5]
-X-ClientProxiedBy: HQMAIL108.nvidia.com (172.18.146.13) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1548989385; bh=/FBDcfoeMx/+oM04WRXhXoapZLNfebKUcVEPlQV7+gU=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=E4aHoFW9rShupo4AeqJ3XIaDQKtgvhIEFR1ddGp9CDOG4BmW6rnYNlUz0kJx7Eg44
- 2lb3uInpk5PuAgztJbPDLt144B+oTXE3Zt3dNv6DGnAYYNGGLszJJnlm3RAwiNiRyo
- DfYxIGEyFpa3yTjwN/mvxJC0MLnPnDKcaMdUOfXYNfj3clgM3ZdmhkyIGItSoH5Evo
- VrjfJt5sGlge+7Bx/ZrkQPsCsp2cEj1kp+zsfmbjN8bfrYscALO03C0PDtYoW8MXB7
- MXFG7Ck1y7PJnW5qNs7Byx+Omd71+6Le2j6S5J1paetK0qQ1bPbQ2WQyAP5Qr1i6ib
- gRh4ooRnyrHiw==
+Content-Disposition: inline
+In-Reply-To: <1547553487-9936-4-git-send-email-yogeshnarayan.gaur@nxp.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_184943_002476_F7B51DD3 
-X-CRM114-Status: GOOD (  23.31  )
+X-CRM114-CacheID: sfid-20190131_185420_790753_FD77A5B5 
+X-CRM114-Status: GOOD (  16.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,88 +75,130 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pm@vger.kernel.org, Peter De Schrijver <pdeschrijver@nvidia.com>,
- Jonathan Hunter <jonathanh@nvidia.com>, linux-tegra@vger.kernel.org,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "bbrezillon@kernel.org" <bbrezillon@kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "frieder.schrempf@kontron.de" <frieder.schrempf@kontron.de>,
+ "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
+ "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
+ "broonie@kernel.org" <broonie@kernel.org>,
+ "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
+ "robh@kernel.org" <robh@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 1/28/19 3:54 PM, Thierry Reding wrote:
-> On Mon, Jan 28, 2019 at 09:43:00AM +0800, Joseph Lo wrote:
->> On 1/25/19 9:46 PM, Thierry Reding wrote:
->>> On Fri, Jan 04, 2019 at 11:06:42AM +0800, Joseph Lo wrote:
->>>> This series introduces support for the DFLL as a CPU clock source
->>>> on Tegra210. As Jetson TX1 uses a PWM controlled regulator IC which
->>>> is driven directly by the DFLLs PWM output, we also introduce support
->>>> for PWM regulators next to I2C controlled regulators. The DFLL output
->>>> frequency is directly controlled by the regulator voltage. The registers
->>>> for controlling the PWM are part of the DFLL IP block, so there's no
->>>> separate linux regulator object involved because the regulator IC only
->>>> supplies the rail powering the CPUs. It doesn't have any other controls.
-[snip]
->>> Joseph,
->>>
->>> can you detail the dependencies between the various patches. From a
->>> brief look the CPU frequency driver changes are completely separate
->>> bits and it should be possible to apply them to the cpufreq tree.
->>>
->>> The clock changes also seem independent of the rest.
->>>
->>> Are there any dependencies at all that we need to be mindful about?
->>> Or can individual maintainers just pick up the subseries directly?
->>>
->>
->> Yes, no dependence with each other. We can apply them separately.
->> Please let me know if I need to inform cpufreq or clk maintainer to pick
->> them up.
+On Tue, Jan 15, 2019 at 12:00:26PM +0000, Yogesh Narayan Gaur wrote:
+> Add fspi node property for LX2160A SoC for FlexSPI driver.
+> Property added for the FlexSPI controller and for the connected
+> slave device for the LX2160ARDB target.
+> This is having two SPI-NOR flash device, mt35xu512aba, connected
+> at CS0 and CS1.
 > 
-> Rafael,
+> Signed-off-by: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> ---
+> Changes for v8:
+> - None
+> Changes for v7:
+> - None
+> Changes for v6:
+> - None
+> Changes for v5:
+> - None
+> Changes for v4:
+> - Incorporated Rob review comments.
+> Changes for v3:
+> - None.
+> Changes for v2:
+> - Incorporated Shawn review comments.
 > 
-> the three CPU frequency patches in this series were acked by Viresh
-> already, but unfortunately you don't seem to be Cc'ed on these. Are
-> you okay with me picking these up into the Tegra tree and send you
-> a pull request in a couple of days? That way we can get the whole
-> set tested a bit in linux-next. If you'd prefer to pick these up in
-> the PM tree, here are the corresponding patchwork links:
+>  .../boot/dts/freescale/fsl-lx2160a-rdb.dts    | 22 +++++++++++++++++++
+>  .../arm64/boot/dts/freescale/fsl-lx2160a.dtsi | 13 +++++++++++
+>  2 files changed, 35 insertions(+)
 > 
-> 	https://patchwork.kernel.org/patch/10747943/
-> 	https://patchwork.kernel.org/patch/10747947/
-> 	https://patchwork.kernel.org/patch/10747953/
-> 
-> I'll go and give my Acked-by on these patches if the latter is the
-> way you prefer.
-> 
-> 
-> Stephen, Mike,
-> 
-> the same applies for clk patches. Stephen's acked all of them and I
-> think all of the series is good to go. How about if I pick up these
-> up in the Tegra tree and let this all cook in linux-next for a week
-> or so and then send you a pull request with these? Stephen already
-> picked up a couple of fixes for clk/tegra, but I don't think any of
-> those would conflict with this series.
-> 
-> All of that said, Joseph confirmed that there are no dependencies
-> between these subsystem subseries, so if you'd prefer to pick up the
-> patches into your respective trees, I have no objections to that.
-> 
-> Thierry
-> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> index 6481e5f20e69..70658946fbbe 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> @@ -50,6 +50,28 @@
+>  	status = "okay";
+>  };
+>  
+> +&fspi {
+> +	status = "okay";
+> +
+> +	mt35xu512aba0: flash@0 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "spansion,m25p80";
+> +		m25p,fast-read;
+> +		spi-max-frequency = <50000000>;
+> +		reg = <0>;
+> +	};
+> +
+> +	mt35xu512aba1: flash@1 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "spansion,m25p80";
+> +		m25p,fast-read;
+> +		spi-max-frequency = <50000000>;
+> +		reg = <1>;
+> +	};
+> +};
+> +
+>  &i2c0 {
+>  	status = "okay";
+>  
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> index a79f5c1ea56d..e3ff86201f73 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> @@ -762,5 +762,18 @@
+>  				     <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
+>  			dma-coherent;
+>  		};
+> +
+> +		fspi: spi@20c0000 {
 
-Hi Rafael, Stephen,
+To keep the nodes sorted in unit-address, it should go after
+i2c@2070000.
 
-Gental ping. Please let Thierry know if the cpufreq and DFLL clock 
-related changes can go through Tegra tree.
+> +			compatible = "nxp,lx2160a-fspi";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0x0 0x20c0000 0x0 0x10000>,
+> +				<0x0 0x20000000 0x0 0x10000000>;
 
-I know Rafael did say [1] it's okay to go through Tegra tree in earlier 
-comment.
+I would align the indentation with the above.
 
-Thanks,
-Joseph
+> +			reg-names = "fspi_base", "fspi_mmap";
+> +			interrupts = <0 25 0x4>; /* Level high type */
 
-[1]: http://patchwork.ozlabs.org/patch/1015181/
+interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>; so that we can save the
+comment there.
+
+I fixed up all these small things and applied the patch.
+
+Shawn
+
+> +			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
+> +			clock-names = "fspi_en", "fspi";
+> +			status = "disabled";
+> +		};
+>  	};
+>  };
+> -- 
+> 2.17.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 _______________________________________________
 linux-arm-kernel mailing list
