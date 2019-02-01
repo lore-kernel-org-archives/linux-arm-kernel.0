@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 93815C282DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:46:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2210CC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:46:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 62C4B20855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:46:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D7A4220855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:46:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O7ngpw4k";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="UCcTSHtq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 62C4B20855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qVmBIsgl";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="fuSJpcZN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D7A4220855
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qYZbQwaUxAVUOhZRgJWMxYxcTnotmDQVhHelHdiGyhk=; b=O7ngpw4ko9Kfor
-	Po3IQ/SUZHLa7Z/yrwFN48fjeI961Dp85gqQHokfnSLhxh+fbbWGuK43CUuo2WacSo4mR0ek2qPko
-	UtevchE+NLw4sOX8ryxQ5lMwA5+YhY0nNLPwvyTEmZkdFAXMJKxxCaiuWVKt9LV/a24Mud0WsGbJ7
-	zsxXSs1ve5i5bjMxjBJzaH0tCFQvQRZ8YgUnAT01G0iiQ15h8HAMb6dihSbZu8HnBdrNFvg07vnux
-	SfXI0PuRSgwKMM4m7EOVnGKFry5uePZHqpAFb4fq01xttxbApLiUQg1OwHPXWPHJ0Sbcq9M+kpfQU
-	ZCmZoPx7n7e7/KCqTuOA==;
+	List-Owner; bh=2/5/wWX0X2yp8tbyOHbletDPmQh5/tknBIHDqmSjnyQ=; b=qVmBIsglBxB3yJ
+	gnLGiGoD3DHV68wHnWXcxvb0dQp20Cc/mGODMFccJO3sKubsUeW9TeY0tqyngdQ4guBSFTx78pJkK
+	nszj7+0aOI/wzutgqIA4arAWa54VH8FdsqRyQQ9YFOVUoNqridz/PtpuCZ9uJzPQU/6qwClb3O/Y8
+	GMW9nGxrnIeDlC72Ow+0zDr+YthCiru92nKDoz6b5lHqBCdS0reiwQM1rU7qpb3gPswpp4EDu5cAA
+	85ZkM5SYDvrwflpUHK3W7buKFSLNIE6rXTXOeUG/6FIqjhbnE8Yl48rnwQo7BERWyUYe9iMkMAAIr
+	ze7blyPbD2spOzza+fHg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpb1S-0006mG-IE; Fri, 01 Feb 2019 15:46:30 +0000
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+	id 1gpb1j-00071t-Vz; Fri, 01 Feb 2019 15:46:47 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpayB-0002L4-Kl
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:43:17 +0000
-Received: by mail-lf1-x144.google.com with SMTP id z13so5358930lfe.11
+ id 1gpayF-0002Ou-2c
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:43:28 +0000
+Received: by mail-lf1-x143.google.com with SMTP id b20so5344055lfa.12
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 07:43:07 -0800 (PST)
+ Fri, 01 Feb 2019 07:43:10 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=6Z4BLOysdiax7MmotMn3MzsppFr/+7u52EIpu5QtmCQ=;
- b=UCcTSHtqQyZnzSq/YCVjITgW9SL+rYOWamwIZt/a5GRcUvNWOJ5KLBekDrH+KyPWaE
- ROZmEU5+1wuoPb0TpLjEW9suvFeBv6eR2IRCFJMuBkouqkqNBTM98+nOSDHM+51yU9mT
- rgz821U034S3Ug+MUGsGWw2oGIQzV2Xt5nh50=
+ bh=RkT9METwUUSf5QTEToG7HBPINV4tos+GivD1TLgNTbs=;
+ b=fuSJpcZNCoygctJX7n5myqfviNkMrtTfal+KUTcqzhZTYZmOUvONI/NqQktM7dDAAz
+ g88EPytgTbpF6fIHV9zFZMMFRWHYW7+O8+U2X7CM4EhFHOz8X4fJ2w+i5HWv2/JvzyL5
+ lvVaORZInY6yDpy6pfIzCa/81v2xbhksnRNFI=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=6Z4BLOysdiax7MmotMn3MzsppFr/+7u52EIpu5QtmCQ=;
- b=QEdWz9vqTas9nxlh/HIM1D4ksEFefXe0VrfwG2JdDrsiWAGJ6Qw423KiJoIvTaBRkf
- Eq8ylAzVX3usbk80YBHpfmhwStvP++X+FsQFb9VLsULxiq2P5DZMUKg5+JLawxLSGhQ0
- stArCK8tmCEiaEWe2aDsHUBzvumNTC47kk/2qRAVbBKL7fHGQVMR623ZkgNeNVESGm/p
- lKHHRoUFXM6Zx+ENmtLipMFc2FU9Y7az/nQkys15o+puHEBvhGPIJhZv5alFeBHc7Jhy
- ka6x4fZmwq0tCo8ExGgUXhVwvx02f79mV0chgeSoVkNeowbAkcgdFD4GhytpLi+ZBagA
- zdmA==
-X-Gm-Message-State: AHQUAuZp6RHUeW1hRbZXshbTT4474hRTL66PCAxktzUbsPDeY3d0fe6f
- 5IhTYalDUOWHYyTWy/jRz1haGA==
-X-Google-Smtp-Source: AHgI3IbtqSTHpuA1aj1DJ/6/kF0i3pJ6sxisD5EjqO/e0D8GaujIUdZrlwN79CvMYK7jeQLgGsFonA==
-X-Received: by 2002:a19:ae1a:: with SMTP id f26mr373674lfc.86.1549035785900;
- Fri, 01 Feb 2019 07:43:05 -0800 (PST)
+ bh=RkT9METwUUSf5QTEToG7HBPINV4tos+GivD1TLgNTbs=;
+ b=D4rsDxUUUtLfvrPHGkZGDVokMFtZ2pHY7HdtPy/eFV33CCfgqNEVOes0rK0YHC5YF4
+ rt8YRsGQZDBDXWMtztBL1EqW1gMIAdl684gMEYdb0toS4vYYhiLtE5mQIgTgjCJhw364
+ k4gt6jPlKi2pf/XherK96SQB2DokaokUqnhSghEf56E9HygWHP7UYnXOKaaE2ZGcizq5
+ Tmvnt/sOgeeloDqUHML21hLNKEBC9g0OFz/RxOgbLkHOLYzNgTI8Uo2I18Bj4ws2Y2Og
+ 8gmfGQ7E6mXPnXBCmvuEyDz+UkRI1D2R8bS4S/TsJLgm6XWqVg3J1W9L3M5e4baOD00h
+ bsqQ==
+X-Gm-Message-State: AJcUukerAsWbnx/JH9uy0IdIC4ukT35VkxYbUCIzG6DBPyDWSgwN4uD/
+ 6BYE4n9mWfmGVaQtBA1uJAr8kQ==
+X-Google-Smtp-Source: ALg8bN7Kxw6Pf/EAOmaIxz8Mx9Obn9sKEf9HWZo8iulGMFl1o3mrN3mA3vv/zvG2r+/EChgFTcCU7w==
+X-Received: by 2002:ac2:4116:: with SMTP id b22mr30132103lfi.19.1549035789216; 
+ Fri, 01 Feb 2019 07:43:09 -0800 (PST)
 Received: from localhost.localdomain ([217.76.202.68])
- by smtp.gmail.com with ESMTPSA id i13-v6sm1305712ljg.82.2019.02.01.07.43.04
+ by smtp.gmail.com with ESMTPSA id i13-v6sm1305712ljg.82.2019.02.01.07.43.07
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 01 Feb 2019 07:43:05 -0800 (PST)
+ Fri, 01 Feb 2019 07:43:08 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
  Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>,
  Michael Turquette <mturquette@baylibre.com>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH v7 12/23] drm/sun4i: sun6i_mipi_dsi: Add support for VCC-DSI
- voltage regulator
-Date: Fri,  1 Feb 2019 21:12:21 +0530
-Message-Id: <20190201154232.10505-13-jagan@amarulasolutions.com>
+Subject: [PATCH v7 14/23] dt-bindings: sun6i-dsi: Add A64 DPHY compatible (w/
+ A31 fallback)
+Date: Fri,  1 Feb 2019 21:12:23 +0530
+Message-Id: <20190201154232.10505-15-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 In-Reply-To: <20190201154232.10505-1-jagan@amarulasolutions.com>
 References: <20190201154232.10505-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_074308_486383_CE376D8B 
-X-CRM114-Status: GOOD (  14.45  )
+X-CRM114-CacheID: sfid-20190201_074312_332628_B4631214 
+X-CRM114-Status: GOOD (  12.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,79 +108,30 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Allwinner MIPI DSI controllers are supplied with SoC DSI power rails
-via VCC-DSI pin.
+The MIPI DSI PHY controller on Allwinner A64 is similar
+on the one on A31.
 
-Add support for this supply pin by adding voltage regulator handling
-code to MIPI DSI driver.
+Add A64 compatible and append A31 compatible as fallback.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Tested-by: Merlijn Wajer <merlijn@wizzup.org>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 14 ++++++++++++++
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h |  3 +++
- 2 files changed, 17 insertions(+)
+ Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 3d7c03161954..9be414131460 100644
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -1107,6 +1107,12 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
- 		return PTR_ERR(base);
- 	}
- 
-+	dsi->regulator = devm_regulator_get(dev, "vcc-dsi");
-+	if (IS_ERR(dsi->regulator)) {
-+		dev_err(dev, "Couldn't get VCC-DSI supply\n");
-+		return PTR_ERR(dsi->regulator);
-+	}
-+
- 	dsi->regs = devm_regmap_init_mmio_clk(dev, "bus", base,
- 					      &sun6i_dsi_regmap_config);
- 	if (IS_ERR(dsi->regs)) {
-@@ -1183,6 +1189,13 @@ static int sun6i_dsi_remove(struct platform_device *pdev)
- static int __maybe_unused sun6i_dsi_runtime_resume(struct device *dev)
- {
- 	struct sun6i_dsi *dsi = dev_get_drvdata(dev);
-+	int err;
-+
-+	err = regulator_enable(dsi->regulator);
-+	if (err) {
-+		dev_err(dsi->dev, "failed to enable VCC-DSI supply: %d\n", err);
-+		return err;
-+	}
- 
- 	reset_control_deassert(dsi->reset);
- 	clk_prepare_enable(dsi->mod_clk);
-@@ -1215,6 +1228,7 @@ static int __maybe_unused sun6i_dsi_runtime_suspend(struct device *dev)
- 
- 	clk_disable_unprepare(dsi->mod_clk);
- 	reset_control_assert(dsi->reset);
-+	regulator_disable(dsi->regulator);
- 
- 	return 0;
- }
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
-index 257cca660da0..06cce0d0d3ad 100644
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
-+++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
-@@ -13,6 +13,8 @@
- #include <drm/drm_encoder.h>
- #include <drm/drm_mipi_dsi.h>
- 
-+#include <linux/regulator/consumer.h>
-+
- struct sun6i_dphy {
- 	struct clk		*bus_clk;
- 	struct clk		*mod_clk;
-@@ -28,6 +30,7 @@ struct sun6i_dsi {
- 	struct clk		*bus_clk;
- 	struct clk		*mod_clk;
- 	struct regmap		*regs;
-+	struct regulator	*regulator;
- 	struct reset_control	*reset;
- 	struct sun6i_dphy	*dphy;
- 
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
+index 9877398be69a..d0ce51fea103 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
+@@ -38,6 +38,7 @@ D-PHY
+ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun6i-a31-mipi-dphy
++    * allwinner,sun50i-a64-mipi-dphy, allwinner,sun6i-a31-mipi-dphy
+   - reg: base address and size of memory-mapped region
+   - clocks: phandles to the clocks feeding the DSI encoder
+     * bus: the DSI interface clock
 -- 
 2.18.0.321.gffc6fa0e3
 
