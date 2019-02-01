@@ -4,78 +4,134 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DFCFBC282DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:42:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 88824C282DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:44:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AF0EA21726
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:42:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4B2E421726
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:44:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tGh0tlSt";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ASQkEC1X"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF0EA21726
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jnjblXpa";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="qiLvC6aE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B2E421726
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
+	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=k+mdMPZOoqpbihuBhbCyX76VApi15DhFdR7tlBuEHyM=; b=tGh0tlStrcL6Cr
-	NMOGwe5AXSreOH0dM1zaX2CP3cb69gqdeu7oHLOyzJ2olQBNePWS52Kqa41sJPICzvQHp7b49CBDN
-	OYeVYOJOZW6H4pKCjg2SxEpQKIRUwJPWTFGl30wLxUCQu8fo7NxokTXqd+DqQqCDkvnbsvStOjjPc
-	TMuayvDD0b6/8BlvTNpHJaoIG50yUrzETp8YvcEzrYee+GoKJeMd4NhSv0SuwHBqY961bZk0gW0vG
-	TT4ZCbgFQfvK4X2EPoeKdFC+YHDk4rzBEEF7rpINIxyP8csTYXiqiNtit3womw8kZD2XbZdDP4R+r
-	JTzooPKjlDw6xb15AwAw==;
+	List-Owner; bh=JdnSFiQCxopKeXbOOQTGCLLmHHVSarpaGInBbbMcJoI=; b=jnjblXpaVTTxvy
+	iuEPpydfLRxeYqEgCt9JXAPIvJ+NePb0t0ydlKoiutqpsKdRFQIEY/1ACHzTzbfYbl0oyUXD68pp/
+	jS70Tkwt6ZcU3R3KIj4D4Qj4uI67ItkNAvcwpg7nNBe+CLQH7+NksaVfGZQ1+aUxFKQqoXryDIxL1
+	6Qu1mmxP3tQEGEHAyvkKQwM6DeNvojL3bTixF+2cDAn8Ad0AQnB9bOWG2lt4o9nKgikL7d0zZk4Tn
+	MI86kRdz14pAe2JQhWsZgnaA/HPR8LU/iZtfZCEMSlsLvS9j3R1ywxl2nMBNqy2epsRc/2OU4yJEO
+	1G5Gb30SdMNvA3XIR4XQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpUPN-0006o5-HJ; Fri, 01 Feb 2019 08:42:45 +0000
-Received: from mail-ua1-x944.google.com ([2607:f8b0:4864:20::944])
+	id 1gpUR1-0007Eo-3x; Fri, 01 Feb 2019 08:44:27 +0000
+Received: from mailout3.samsung.com ([203.254.224.33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpUPJ-0006nY-9f
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 08:42:43 +0000
-Received: by mail-ua1-x944.google.com with SMTP id c12so1960914uas.6
+ id 1gpUQx-00074n-2L
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 08:44:25 +0000
+Received: from epcas1p3.samsung.com (unknown [182.195.41.47])
+ by mailout3.samsung.com (KnoxPortal) with ESMTP id
+ 20190201084419epoutp03360072c93d11355e2a226a3b5f2b92b3~-MPzpi4so0407604076epoutp03D
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 00:42:40 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=i+Gp5jaVCOt92KDq1sA7Q9owziG7gAjhSETFMgPAZgo=;
- b=ASQkEC1Xyt1LCtglVGnNcAJ0eIj6N5ZlCGNnQybr3mTNuihNJhdlu/UUSwJZY7RzKm
- 7j/Xguyzs4TY7zi03S546bNUn1QE2xYBA3c9U/iXb23QdEl2uteYxEC7wj95mQyriGwN
- hw24qaAvBY0sq6xyT/ONhEbQZaR2aY4zxAGKA=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=i+Gp5jaVCOt92KDq1sA7Q9owziG7gAjhSETFMgPAZgo=;
- b=HF2SBEPZ8Nf+pavtkH5o0ilzSTfqzOpU8w7jbZt9a/PU5nlT6Z0bPx79dewAXr78wi
- nYfidqKDZ8wnHI+pqIzK9PjFfBo+cccHQm3wDK6EItH+9gLD716grSf3VmDIF6s/YNJG
- qQRLpSLjZEclYcpDC+2M5Jo5GgNLOe5MMJYa0gaY1UUbSgvG85ipC1xqH0JUJTm7KHF3
- Ouh1r8YAlRemJx144mitwd7Pki9uWLTbEH0FEtK3iub2mct4RqOA3ABkgI17CFX/xtpf
- VhtpdDerm/AmCByn6qT79qtmtYxKXEH+Ru21bPVkXyCYE1r9K0iiAY8fiCWzyzNHNY8k
- O3fw==
-X-Gm-Message-State: AHQUAuZ0n0Ofc3/xSZ9HQ9OBWsZu+Aul+y6L3ggteblO34ZcIQt/iaH3
- y2nrPq7B1swKcasEJtgChSQ5+tl4sXDOtT8ZZcz1iw==
-X-Google-Smtp-Source: AHgI3IY6F/TPkBJC9rmAR9aeUJRwtvy9CwMBrwq4v0Q00d9Cew5vq+6PL10WOcWSIcSJVD5rmTZ6D/WC4ovYlO+quxw=
-X-Received: by 2002:ab0:148e:: with SMTP id d14mr582565uae.23.1549010559929;
- Fri, 01 Feb 2019 00:42:39 -0800 (PST)
+ Fri,  1 Feb 2019 08:44:19 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout3.samsung.com
+ 20190201084419epoutp03360072c93d11355e2a226a3b5f2b92b3~-MPzpi4so0407604076epoutp03D
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1549010659;
+ bh=ZhVPXQJDOYPfOvRAQbEOsJtAluOWxGuxTxMUeSiN9r4=;
+ h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
+ b=qiLvC6aEcMxxmFRVBccmPIaxFbm/qcLEmGrHpMTcKKY5BcBCYv0SGf3dlYjRe8Uua
+ Om7t7iRfUref25eCx7u+Hl7YoUP6ad+s34kIiw03Or0Vn62slV/O7r0wrQLrMTnMPP
+ Lg2lmIGNJgg+M/j6j1dPhSmMWqFB1afCLN5VuUtI=
+Received: from epsmges1p1.samsung.com (unknown [182.195.40.155]) by
+ epcas1p3.samsung.com (KnoxPortal) with ESMTP id
+ 20190201084415epcas1p3491fc42304671bef4dbf2d26eab31a71~-MPvWkBeq1970119701epcas1p3P;
+ Fri,  1 Feb 2019 08:44:15 +0000 (GMT)
+Received: from epcas1p4.samsung.com ( [182.195.41.48]) by
+ epsmges1p1.samsung.com (Symantec Messaging Gateway) with SMTP id
+ F0.46.04074.ED6045C5; Fri,  1 Feb 2019 17:44:14 +0900 (KST)
+Received: from epsmtrp1.samsung.com (unknown [182.195.40.13]) by
+ epcas1p3.samsung.com (KnoxPortal) with ESMTPA id
+ 20190201084414epcas1p3f302302313e90b13966aca98289aadd1~-MPu6Ma3o2143721437epcas1p3H;
+ Fri,  1 Feb 2019 08:44:14 +0000 (GMT)
+Received: from epsmgms1p1new.samsung.com (unknown [182.195.42.41]) by
+ epsmtrp1.samsung.com (KnoxPortal) with ESMTP id
+ 20190201084414epsmtrp1c90129596bafeba042d9ab70ae8b09d4~-MPu4qcKu3138631386epsmtrp1i;
+ Fri,  1 Feb 2019 08:44:14 +0000 (GMT)
+X-AuditID: b6c32a35-27fff70000000fea-3e-5c5406de1515
+Received: from epsmtip2.samsung.com ( [182.195.34.31]) by
+ epsmgms1p1new.samsung.com (Symantec Messaging Gateway) with SMTP id
+ 41.7C.03971.ED6045C5; Fri,  1 Feb 2019 17:44:14 +0900 (KST)
+Received: from [10.113.221.102] (unknown [10.113.221.102]) by
+ epsmtip2.samsung.com (KnoxPortal) with ESMTPA id
+ 20190201084414epsmtip2eec3b5cddd11d74f61de0ffbf62bc084~-MPumtpms2316023160epsmtip2H;
+ Fri,  1 Feb 2019 08:44:14 +0000 (GMT)
+Subject: Re: [PATCH v3 3/8] clk: samsung: add BPLL rate table for Exynos
+ 5422 SoC
+To: Lukasz Luba <l.luba@partner.samsung.com>, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-pm@vger.kernel.org,
+ linux-samsung-soc@vger.kernel.org
+From: Chanwoo Choi <cw00.choi@samsung.com>
+Organization: Samsung Electronics
+Message-ID: <d5b8d165-564e-b776-77de-31a069118067@samsung.com>
+Date: Fri, 1 Feb 2019 17:44:14 +0900
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <1548740978-28495-1-git-send-email-sumit.garg@linaro.org>
- <1548740978-28495-4-git-send-email-sumit.garg@linaro.org>
- <20190201082809.GA5329@jax.urgonet>
-In-Reply-To: <20190201082809.GA5329@jax.urgonet>
-From: Sumit Garg <sumit.garg@linaro.org>
-Date: Fri, 1 Feb 2019 14:12:28 +0530
-Message-ID: <CAFA6WYN_xMambVCUdKxUg3AcS_pteDyitXgw4+9ZDA=tabQf5g@mail.gmail.com>
-Subject: Re: [PATCH v6 3/4] tee: optee: add TEE bus device enumeration support
-To: Jens Wiklander <jens.wiklander@linaro.org>
+In-Reply-To: <1548924594-19084-4-git-send-email-l.luba@partner.samsung.com>
+Content-Language: en-US
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFrrCJsWRmVeSWpSXmKPExsWy7bCmge49tpAYg9uLbCw2zljPajH/yDlW
+ i/7Hr5ktzp/fwG5xtukNu8WtBhmLTY+vsVp87LnHanF51xw2i8+9RxgtZpzfx2Sx9shddouL
+ p1wtbjeuYLM4/Kad1eLftY0sDgIe72+0sntsWtXJ5rF5Sb3HwXd7mDz6tqxi9Pi8SS6ALSrb
+ JiM1MSW1SCE1Lzk/JTMv3VbJOzjeOd7UzMBQ19DSwlxJIS8xN9VWycUnQNctMwfoaiWFssSc
+ UqBQQGJxsZK+nU1RfmlJqkJGfnGJrVJqQUpOgWWBXnFibnFpXrpecn6ulaGBgZEpUGFCdsbs
+ JWsZCx5LVry8F9PAeFi0i5GTQ0LAROLgpIfsXYxcHEICOxglFs9+ywThfGKU2NB8GCrzjVGi
+ 98p6dpiWc3++MYLYQgJ7GSX+Pq2EKHrPKNE8tw+sSFggWGLusZtsIAkRgeWMEvum3mUEcZgF
+ 9jJJLLrRA9bOJqAlsf/FDTYQm19AUeLqj8dgcV4BO4kn7b/B4iwCKhKXFs8FmyoqECFxuPcd
+ VI2gxMmZT1hAbE4Bb4mXuyA2MwuIS9x6Mp8JwpaXaN46mxni7H3sEte250DYLhJPPv+CekdY
+ 4tXxLVC2lMTL/jYou1pi5ckjYB9ICHQwSmzZf4EVImEssX/pZKAFHEALNCXW79KH2MUn8e5r
+ DytIWEKAV6KjTQiiWlni8oO7TBC2pMTi9k42CNtDYtLcSWwTGBVnIflmFpIPZiH5YBbCsgWM
+ LKsYxVILinPTU4sNCwyRY3sTIzhFa5nuYJxyzucQowAHoxIP74ZfQTFCrIllxZW5hxglOJiV
+ RHhns4TECPGmJFZWpRblxxeV5qQWH2I0BQb2RGYp0eR8YP7IK4k3NDUyNja2MDE0MzU0VBLn
+ Xe/gHCMkkJ5YkpqdmlqQWgTTx8TBKdXAmLO0f8WGPxGne75urRX+wfnurtn+9WLzPXaLLM+9
+ N0u6Vfl7pPHJZGnZ8vcZB791Tcw8aOv75FaTjMxKpc5d+T4WWz9Xz9+z6JKeqNyxY2cemV6c
+ UXST07zeOplzlpqNc5vIiZbpaQ8+TPERSV7mxp902eltn5+du3TtSvbVE84lqKdY/szbqcRS
+ nJFoqMVcVJwIAKl6majnAwAA
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFtrPIsWRmVeSWpSXmKPExsWy7bCSvO49tpAYg/enpS02zljPajH/yDlW
+ i/7Hr5ktzp/fwG5xtukNu8WtBhmLTY+vsVp87LnHanF51xw2i8+9RxgtZpzfx2Sx9shddouL
+ p1wtbjeuYLM4/Kad1eLftY0sDgIe72+0sntsWtXJ5rF5Sb3HwXd7mDz6tqxi9Pi8SS6ALYrL
+ JiU1J7MstUjfLoErY/aStYwFjyUrXt6LaWA8LNrFyMkhIWAice7PN8YuRi4OIYHdjBJfO2ex
+ QiQkJaZdPMrcxcgBZAtLHD5cDBIWEnjLKLG9lQPEFhYIlvjS+g6sV0RgOaPE3L9LWUAcZoG9
+ TBITei6zQky9zyjxZ99TRpAWNgEtif0vbrCB2PwCihJXfzwGi/MK2Ek8af8NFmcRUJG4tHgu
+ O4gtKhAh8fHpPiaIGkGJkzOfsIDYnALeEi939YHVMAuoS/yZd4kZwhaXuPVkPhOELS/RvHU2
+ 8wRG4VlI2mchaZmFpGUWkpYFjCyrGCVTC4pz03OLDQsM81LL9YoTc4tL89L1kvNzNzGCo1VL
+ cwfj5SXxhxgFOBiVeHg3/AqKEWJNLCuuzD3EKMHBrCTCO5slJEaINyWxsiq1KD++qDQntfgQ
+ ozQHi5I479O8Y5FCAumJJanZqakFqUUwWSYOTqkGRnG7rZ/r+d849G/pbfq/sO50yXKdW2tb
+ ax01jy6W8l3w6kGz/GWHOdsvfQo//9hZ+8vDm4e2Zmxd/vHGWasc86MTjn/l4zzOqqP6mut5
+ XMk03QU+bLpyv5+YZXXNc2eqXyqV/ffJx9RLWgs7Eic//n/Y20z4/rLHzxf/tE7qYyj4LxcR
+ 92n2/m9KLMUZiYZazEXFiQBEQO800gIAAA==
+X-CMS-MailID: 20190201084414epcas1p3f302302313e90b13966aca98289aadd1
+X-Msg-Generator: CA
+CMS-TYPE: 101P
+DLP-Filter: Pass
+X-CFilter-Loop: Reflected
+X-CMS-RootMailID: 20190131085007eucas1p2f16107042b8ce5638811840618bcf017
+References: <1548924594-19084-1-git-send-email-l.luba@partner.samsung.com>
+ <CGME20190131085007eucas1p2f16107042b8ce5638811840618bcf017@eucas1p2.samsung.com>
+ <1548924594-19084-4-git-send-email-l.luba@partner.samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_004241_342279_A05AF5EE 
-X-CRM114-Status: GOOD (  24.64  )
+X-CRM114-CacheID: sfid-20190201_004423_445701_4C8AC407 
+X-CRM114-Status: GOOD (  19.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,270 +143,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Daniel Thompson <daniel.thompson@linaro.org>, michal.lkml@markovi.net,
- Herbert Xu <herbert@gondor.apana.org.au>, Arnd Bergmann <arnd@arndb.de>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Bhupesh Sharma <bhsharma@redhat.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- tee-dev@lists.linaro.org, yamada.masahiro@socionext.com,
- Rob Herring <robh+dt@kernel.org>,
- "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
- <linux-crypto@vger.kernel.org>, Matt Mackall <mpm@selenic.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: b.zolnierkie@samsung.com, Stephen Boyd <sboyd@kernel.org>,
+ Michael Turquette <mturquette@baylibre.com>, krzk@kernel.org,
+ kyungmin.park@samsung.com, kgene@kernel.org, myungjoo.ham@samsung.com,
+ s.nawrocki@samsung.com, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, m.szyprowski@samsung.com
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 1 Feb 2019 at 13:58, Jens Wiklander <jens.wiklander@linaro.org> wrote:
->
-> On Tue, Jan 29, 2019 at 11:19:37AM +0530, Sumit Garg wrote:
-> > OP-TEE provides a pseudo TA to enumerate TAs which can act as devices/
-> > services for TEE bus. So implement device enumeration using invoke
-> > function: PTA_CMD_GET_DEVICES provided by pseudo TA to fetch array of
-> > device UUIDs. Also register these enumerated devices with TEE bus as
-> > "optee-clntX" device.
-> >
-> > Signed-off-by: Sumit Garg <sumit.garg@linaro.org>
-> > Reviewed-by: Daniel Thompson <daniel.thompson@linaro.org>
-> > ---
-> >  drivers/tee/optee/Makefile        |   1 +
-> >  drivers/tee/optee/core.c          |   4 +
-> >  drivers/tee/optee/device.c        | 155 ++++++++++++++++++++++++++++++++++++++
-> >  drivers/tee/optee/optee_private.h |   3 +
-> >  4 files changed, 163 insertions(+)
-> >  create mode 100644 drivers/tee/optee/device.c
-> >
-> > diff --git a/drivers/tee/optee/Makefile b/drivers/tee/optee/Makefile
-> > index 48d262a..56263ae 100644
-> > --- a/drivers/tee/optee/Makefile
-> > +++ b/drivers/tee/optee/Makefile
-> > @@ -5,3 +5,4 @@ optee-objs += call.o
-> >  optee-objs += rpc.o
-> >  optee-objs += supp.o
-> >  optee-objs += shm_pool.o
-> > +optee-objs += device.o
-> > diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-> > index e5efce3..ac59c77 100644
-> > --- a/drivers/tee/optee/core.c
-> > +++ b/drivers/tee/optee/core.c
-> > @@ -634,6 +634,10 @@ static struct optee *optee_probe(struct device_node *np)
-> >       if (optee->sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
-> >               pr_info("dynamic shared memory is enabled\n");
-> >
-> > +     rc = optee_enumerate_devices();
-> > +     if (rc)
-> > +             goto err;
-> > +
-> >       pr_info("initialized driver\n");
-> >       return optee;
-> >  err:
-> > diff --git a/drivers/tee/optee/device.c b/drivers/tee/optee/device.c
-> > new file mode 100644
-> > index 0000000..c24c37f
-> > --- /dev/null
-> > +++ b/drivers/tee/optee/device.c
-> > @@ -0,0 +1,155 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * Copyright (C) 2019 Linaro Ltd.
-> > + */
-> > +
-> > +#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-> > +
-> > +#include <linux/kernel.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/tee_drv.h>
-> > +#include <linux/uuid.h>
-> > +#include "optee_private.h"
-> > +
-> > +/*
-> > + * Get device UUIDs
-> > + *
-> > + * [out]     memref[0]        Array of device UUIDs
-> > + *
-> > + * Return codes:
-> > + * TEE_SUCCESS - Invoke command success
-> > + * TEE_ERROR_BAD_PARAMETERS - Incorrect input param
-> > + * TEE_ERROR_SHORT_BUFFER - Output buffer size less than required
-> > + */
-> > +#define PTA_CMD_GET_DEVICES          0x0
-> > +
-> > +static int optee_ctx_match(struct tee_ioctl_version_data *ver, const void *data)
-> > +{
-> > +     if (ver->impl_id == TEE_IMPL_ID_OPTEE)
-> > +             return 1;
-> > +     else
-> > +             return 0;
-> > +}
-> > +
-> > +static int get_devices(struct tee_context *ctx, u32 session,
-> > +                    struct tee_shm *device_shm, u32 *shm_size)
-> > +{
-> > +     u32 ret = 0;
-> > +     struct tee_ioctl_invoke_arg inv_arg = {0};
-> > +     struct tee_param param[4] = {0};
-> > +
-> > +     /* Invoke PTA_CMD_GET_DEVICES function */
-> > +     inv_arg.func = PTA_CMD_GET_DEVICES;
-> > +     inv_arg.session = session;
-> > +     inv_arg.num_params = 4;
-> > +
-> > +     /* Fill invoke cmd params */
-> > +     param[0].attr = TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT;
-> > +     param[0].u.memref.shm = device_shm;
-> > +     param[0].u.memref.size = *shm_size;
-> > +     param[0].u.memref.shm_offs = 0;
-> > +
-> > +     ret = tee_client_invoke_func(ctx, &inv_arg, param);
-> > +     if ((ret < 0) || ((inv_arg.ret != TEEC_SUCCESS) &&
-> > +                       (inv_arg.ret != TEEC_ERROR_SHORT_BUFFER))) {
-> > +             pr_err("PTA_CMD_GET_DEVICES invoke function err: %x\n",
-> > +                    inv_arg.ret);
-> > +             return -EINVAL;
-> > +     }
-> > +
-> > +     *shm_size = param[0].u.memref.size;
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static int optee_register_device(const uuid_t *device_uuid, u32 device_id)
-> > +{
-> > +     struct tee_client_device *optee_device = NULL;
-> > +     int rc;
-> > +
-> > +     optee_device = kzalloc(sizeof(*optee_device), GFP_KERNEL);
-> > +     if (!optee_device)
-> > +             return -ENOMEM;
-> > +
-> > +     optee_device->dev.bus = &tee_bus_type;
-> > +     dev_set_name(&optee_device->dev, "optee-clnt%u", device_id);
-> > +     uuid_copy(&optee_device->id.uuid, device_uuid);
-> > +
-> > +     rc = device_register(&optee_device->dev);
-> > +     if (rc) {
-> > +             pr_err("device registration failed, err: %d\n", rc);
-> > +             kfree(optee_device);
-> > +     }
-> > +
-> > +     return rc;
-> > +}
-> > +
-> > +int optee_enumerate_devices(void)
-> > +{
-> > +     const uuid_t pta_uuid =
-> > +             UUID_INIT(0x7011a688, 0xddde, 0x4053,
-> > +                       0xa5, 0xa9, 0x7b, 0x3c, 0x4d, 0xdf, 0x13, 0xb8);
-> > +     struct tee_ioctl_open_session_arg sess_arg = {0};
-> > +     struct tee_shm *device_shm = NULL;
-> > +     const uuid_t *device_uuid = NULL;
-> > +     struct tee_context *ctx = NULL;
-> > +     u32 shm_size = 0, idx, num_devices = 0;
-> > +     int rc;
-> > +
-> > +     /* Open context with OP-TEE driver */
-> > +     ctx = tee_client_open_context(NULL, optee_ctx_match, NULL, NULL);
-> > +     if (IS_ERR(ctx))
-> > +             return -ENODEV;
-> > +
-> > +     /* Open session with device enumeration pseudo TA */
-> > +     memcpy(sess_arg.uuid, pta_uuid.b, TEE_IOCTL_UUID_LEN);
-> > +     sess_arg.clnt_login = TEE_IOCTL_LOGIN_PUBLIC;
-> > +     sess_arg.num_params = 0;
-> > +
-> > +     rc = tee_client_open_session(ctx, &sess_arg, NULL);
-> > +     if ((rc < 0) || (sess_arg.ret != TEEC_SUCCESS)) {
-> > +             /* Device enumeration pseudo TA not found */
-> > +             rc = 0;
-> > +             goto out_ctx;
-> > +     }
-> > +
-> > +     rc = get_devices(ctx, sess_arg.session, NULL, &shm_size);
-> > +     if (rc < 0)
->
-> While testing I discovered that this line should be:
->         if (rc < 0 || !shm_size)
->
-
-Ah, yes you are correct. BTW, thanks for testing.
-
-> to cover the common case where there's no devices. I'll fixup the commit
-> with this trivial change.
->
-
-Thanks,
--Sumit
-
-> Cheers,
-> Jens
->
-> > +             goto out_sess;
-> > +
-> > +     device_shm = tee_shm_alloc(ctx, shm_size,
-> > +                                TEE_SHM_MAPPED | TEE_SHM_DMA_BUF);
-> > +     if (IS_ERR(device_shm)) {
-> > +             pr_err("tee_shm_alloc failed\n");
-> > +             rc = PTR_ERR(device_shm);
-> > +             goto out_sess;
-> > +     }
-> > +
-> > +     rc = get_devices(ctx, sess_arg.session, device_shm, &shm_size);
-> > +     if (rc < 0)
-> > +             goto out_shm;
-> > +
-> > +     device_uuid = tee_shm_get_va(device_shm, 0);
-> > +     if (IS_ERR(device_uuid)) {
-> > +             pr_err("tee_shm_get_va failed\n");
-> > +             rc = PTR_ERR(device_uuid);
-> > +             goto out_shm;
-> > +     }
-> > +
-> > +     num_devices = shm_size / sizeof(uuid_t);
-> > +
-> > +     for (idx = 0; idx < num_devices; idx++) {
-> > +             rc = optee_register_device(&device_uuid[idx], idx);
-> > +             if (rc)
-> > +                     goto out_shm;
-> > +     }
-> > +
-> > +out_shm:
-> > +     tee_shm_free(device_shm);
-> > +out_sess:
-> > +     tee_client_close_session(ctx, sess_arg.session);
-> > +out_ctx:
-> > +     tee_client_close_context(ctx);
-> > +
-> > +     return rc;
-> > +}
-> > diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
-> > index 35e7938..a5e84af 100644
-> > --- a/drivers/tee/optee/optee_private.h
-> > +++ b/drivers/tee/optee/optee_private.h
-> > @@ -28,6 +28,7 @@
-> >  #define TEEC_ERROR_BAD_PARAMETERS    0xFFFF0006
-> >  #define TEEC_ERROR_COMMUNICATION     0xFFFF000E
-> >  #define TEEC_ERROR_OUT_OF_MEMORY     0xFFFF000C
-> > +#define TEEC_ERROR_SHORT_BUFFER              0xFFFF0010
-> >
-> >  #define TEEC_ORIGIN_COMMS            0x00000002
-> >
-> > @@ -181,6 +182,8 @@ void optee_free_pages_list(void *array, size_t num_entries);
-> >  void optee_fill_pages_list(u64 *dst, struct page **pages, int num_pages,
-> >                          size_t page_offset);
-> >
-> > +int optee_enumerate_devices(void);
-> > +
-> >  /*
-> >   * Small helpers
-> >   */
-> > --
-> > 2.7.4
-> >
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGksCgpPbiAxOS4gMS4gMzEuIOyYpO2bhCA1OjQ5LCBMdWthc3ogTHViYSB3cm90ZToKPiBBZGQg
+bmV3IHRhYmxlIHJhdGUgZm9yIEJQTEwgZm9yIEV4eW5vczU0MjIgU29DIHN1cHBvcnRpbmcgRHlu
+YW1pYyBNZW1vcnkKPiBDb250cm9sbGVyIGZyZXF1ZW5jaWVzIGZvciBkcml2ZXIncyBEUkFNIHRp
+bWluZ3MuCj4gCj4gQ0M6IFN5bHdlc3RlciBOYXdyb2NraSA8cy5uYXdyb2NraUBzYW1zdW5nLmNv
+bT4KPiBDQzogQ2hhbndvbyBDaG9pIDxjdzAwLmNob2lAc2Ftc3VuZy5jb20+Cj4gQ0M6IE1pY2hh
+ZWwgVHVycXVldHRlIDxtdHVycXVldHRlQGJheWxpYnJlLmNvbT4KPiBDQzogU3RlcGhlbiBCb3lk
+IDxzYm95ZEBrZXJuZWwub3JnPgo+IENDOiBLdWtqaW4gS2ltIDxrZ2VuZUBrZXJuZWwub3JnPgo+
+IENDOiBLcnp5c3p0b2YgS296bG93c2tpIDxrcnprQGtlcm5lbC5vcmc+Cj4gQ0M6IGxpbnV4LXNh
+bXN1bmctc29jQHZnZXIua2VybmVsLm9yZwo+IENDOiBsaW51eC1jbGtAdmdlci5rZXJuZWwub3Jn
+Cj4gQ0M6IGxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwo+IENDOiBsaW51eC1r
+ZXJuZWxAdmdlci5rZXJuZWwub3JnCj4gU2lnbmVkLW9mZi1ieTogTHVrYXN6IEx1YmEgPGwubHVi
+YUBwYXJ0bmVyLnNhbXN1bmcuY29tPgo+IC0tLQo+ICBkcml2ZXJzL2Nsay9zYW1zdW5nL2Nsay1l
+eHlub3M1NDIwLmMgfCAxNSArKysrKysrKysrKysrKy0KPiAgMSBmaWxlIGNoYW5nZWQsIDE0IGlu
+c2VydGlvbnMoKyksIDEgZGVsZXRpb24oLSkKPiAKPiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9jbGsv
+c2Ftc3VuZy9jbGstZXh5bm9zNTQyMC5jIGIvZHJpdmVycy9jbGsvc2Ftc3VuZy9jbGstZXh5bm9z
+NTQyMC5jCj4gaW5kZXggM2U4NzQyMS4uOGJmOTU3OSAxMDA2NDQKPiAtLS0gYS9kcml2ZXJzL2Ns
+ay9zYW1zdW5nL2Nsay1leHlub3M1NDIwLmMKPiArKysgYi9kcml2ZXJzL2Nsay9zYW1zdW5nL2Ns
+ay1leHlub3M1NDIwLmMKPiBAQCAtMTMyNSw2ICsxMzI1LDE5IEBAIHN0YXRpYyBjb25zdCBzdHJ1
+Y3Qgc2Ftc3VuZ19wbGxfcmF0ZV90YWJsZSBleHlub3M1NDIwX3BsbDI1NTB4XzI0bWh6X3RibFtd
+IF9faW5pCj4gIAlQTExfMzVYWF9SQVRFKDI0ICogTUhaLCAyMDAwMDAwMDAsICAyMDAsIDMsIDMp
+LAo+ICB9Owo+ICAKPiArc3RhdGljIGNvbnN0IHN0cnVjdCBzYW1zdW5nX3BsbF9yYXRlX3RhYmxl
+IGV4eW5vczU0MjJfYnBsbF9yYXRlX3RhYmxlW10gPSB7Cj4gKwlQTExfMzVYWF9SQVRFKDI0ICog
+TUhaLCA5MzMwMDAwMDAsIDMxMSwgNCwgMSksCj4gKwlQTExfMzVYWF9SQVRFKDI0ICogTUhaLCA4
+MjUwMDAwMDAsIDI3NSwgNCwgMSksCj4gKwlQTExfMzVYWF9SQVRFKDI0ICogTUhaLCA3MjgwMDAw
+MDAsIDE4MiwgMywgMSksCj4gKwlQTExfMzVYWF9SQVRFKDI0ICogTUhaLCA2MzMwMDAwMDAsIDIx
+MSwgNCwgMSksCj4gKwlQTExfMzVYWF9SQVRFKDI0ICogTUhaLCA1NDMwMDAwMDAsIDE4MSwgMiwg
+MiksCj4gKwlQTExfMzVYWF9SQVRFKDI0ICogTUhaLCA0MTMwMDAwMDAsIDQxMywgNiwgMiksCj4g
+KwlQTExfMzVYWF9SQVRFKDI0ICogTUhaLCAyNzUwMDAwMDAsIDI3NSwgMywgMyksCj4gKwlQTExf
+MzVYWF9SQVRFKDI0ICogTUhaLCAyMDYwMDAwMDAsIDIwNiwgMywgMyksCj4gKwlQTExfMzVYWF9S
+QVRFKDI0ICogTUhaLCAxNjUwMDAwMDAsIDExMCwgMiwgMyksCj4gKwlQTExfMzVYWF9SQVRFKDI0
+ICogTUhaLCAxMzgwMDAwMDAsIDE4NCwgMiwgNCksCgpFeGNlcHQgZm9yIDgyNU1oeiwgSSBjYW4n
+dCBmaW5kIHRoZSB0YXJnZXQgZnJlcXVlbmN5Cm9uIEV4eW5vczU0MjIgVFJNIGRvY3VtZW50LiBV
+c3VhbGx5LCBFeHlub3MgVFJNIHNwZWNpZmllZAp0aGUgc3VwcG9ydGVkIHN0YWJsZSBjbG9ja3Mu
+IEl0IG1lYW5zIHRoYXQgdW5kZWZpbmVkIGNsb2NrcwphcmUgbm90IHN0YWJsZSBhcyBJIGtuZXcu
+IFdoZXJlIGRvIHlvdSBmaW5kIHRoZW0/CgpXaGVuIEkgY2FsY3VsYXRlZCB0aGUgUExMIGZyZXF1
+ZW5jeSB3aXRoIFBNUyB2YWx1ZSwgaXQgaXMgY29ycmVjdC4KQnV0LCBqdXN0IHdlIG5lZWQgdG8g
+Y2hlY2sgdGhlIHJlZmVyZW5jZSBvZiB1bmRlZmluZWQgY2xvY2tzIG9uIFRSTQppbiBvcmRlciB0
+byBndWFyYW50ZWUgdGhlIHN0YWJsZSBvcGVyYXRpb24uCgpSZW1vdmUgOTMzLzEzOE1oeiBiZWNh
+dXNlIGV4eW5vczU0MzMtZG1jLmMgZG9lc24ndCB1c2UgOTMzTWh6IGFuZCAxMzhNaHoKYW5kIGFs
+c28gRXh5bm9zNTQyMiBUUk0gZG9lc24ndCBkZWZpbmUgOTMzLzEzOE1oeiBvbiBwbGwgdGFibGUu
+Cgo+ICt9Owo+ICsKPiAgc3RhdGljIGNvbnN0IHN0cnVjdCBzYW1zdW5nX3BsbF9yYXRlX3RhYmxl
+IGV4eW5vczU0MjBfZXBsbF8yNG1oel90YmxbXSA9IHsKPiAgCVBMTF8zNlhYX1JBVEUoMjQgKiBN
+SFosIDYwMDAwMDAwMFUsIDEwMCwgMiwgMSwgMCksCj4gIAlQTExfMzZYWF9SQVRFKDI0ICogTUha
+LCA0MDAwMDAwMDBVLCAyMDAsIDMsIDIsIDApLAo+IEBAIC0xNDY3LDcgKzE0ODAsNyBAQCBzdGF0
+aWMgdm9pZCBfX2luaXQgZXh5bm9zNXhfY2xrX2luaXQoc3RydWN0IGRldmljZV9ub2RlICpucCwK
+PiAgCQlleHlub3M1eF9wbGxzW2FwbGxdLnJhdGVfdGFibGUgPSBleHlub3M1NDIwX3BsbDI1NTB4
+XzI0bWh6X3RibDsKPiAgCQlleHlub3M1eF9wbGxzW2VwbGxdLnJhdGVfdGFibGUgPSBleHlub3M1
+NDIwX2VwbGxfMjRtaHpfdGJsOwo+ICAJCWV4eW5vczV4X3BsbHNba3BsbF0ucmF0ZV90YWJsZSA9
+IGV4eW5vczU0MjBfcGxsMjU1MHhfMjRtaHpfdGJsOwo+IC0JCWV4eW5vczV4X3BsbHNbYnBsbF0u
+cmF0ZV90YWJsZSA9IGV4eW5vczU0MjBfcGxsMjU1MHhfMjRtaHpfdGJsOwo+ICsJCWV4eW5vczV4
+X3BsbHNbYnBsbF0ucmF0ZV90YWJsZSA9IGV4eW5vczU0MjJfYnBsbF9yYXRlX3RhYmxlOwoKRXh5
+bm9zNTQyMiB1c2VkIHRoZSBzYW1lIFBMTCB0YWJsZSBmb3IgYXBsbCwga3BsbCwgYnBsbCBhbmQg
+c28gb24uCllvdSBkb24ndCBuZWVkIHRvIG1ha2UgdGhlIHNlcGFyYXRlIHBsbCB0YWJsZS4gSnVz
+dCBhZGQgbmV3IGVudHJpZXMKdG8gZXh5bm9zNTQyMF9wbGwyNTUweF8yNG1oel90YmwgdGFibGUu
+Cgo+ICAJfQo+ICAKPiAgCXNhbXN1bmdfY2xrX3JlZ2lzdGVyX3BsbChjdHgsIGV4eW5vczV4X3Bs
+bHMsIEFSUkFZX1NJWkUoZXh5bm9zNXhfcGxscyksCj4gCgotLSAKQmVzdCBSZWdhcmRzLApDaGFu
+d29vIENob2kKU2Ftc3VuZyBFbGVjdHJvbmljcwoKX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgt
+YXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3Jn
+L21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
