@@ -2,71 +2,72 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BE2CCC282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:39:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F3B40C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:40:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8D602204EC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:39:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C2069204EC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:40:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eYHXOUc/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D602204EC
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Cy7ZNctr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C2069204EC
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=EOwLXpqNA+JNVya1SouKWL+U4Rio09F0tg8RqMNmYEI=; b=eYHXOUc/t3LZjf
-	YJu8jL4hm67l0/YdBYMqwjzZ7UtLFgS/yK24F/dAt/iw3RyV6ymJ39u/uBUyYRsS7jbvyeX0q9r23
-	o41nO9PdzjCAkdet2c/LkmbMSIwfrLUm0M0zbizRZJ8v6wtdL5t91qy44BUeZW4RxgCnbVWZ0YaHR
-	cXqaBekT8XhoI2GkgcY/7uloL7fbeGQi/cVFKp2LzMFK8rtoCNdLDhzKgQg41Zjpz/QUuR8G+DWB0
-	v8wneHazz9epkhTc8zxrTlSjLN5Kar8oqRf/J1xWAZtkp9D6Bd3q/Qy3cmkEN1SedvOA0xgS50+9f
-	8SCHHCdS6LqIeJW8Dmqw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=8mtGNcE+5WD6qLasVz6K8cUAj2VT+60GiM+IKTgGBRE=; b=Cy7ZNctr/Xrvcq
+	zzpwdbtK3gC9h8LXhEP/aikEM6Z323EI7aZFKlcxGTQU7BLc6XxUx24jsSsgZ40crQqLGt0wSZlVl
+	BKNP9SOQ05y7xvwy9XhITr+3MZoPK8NTYBM+yfP2fLGGLhzaGV++unFD7uNkcD/mzSztiEnggTpOD
+	zsPx67LzqLK8WkJnT+RcHaT3GSyOFg8ZWKIQSUdKmBGukWbt48SarqYmAyNtQYlPi7RRMRb4SurnQ
+	WcOGgEonKI+K7nUj28HXa5+sRqdB99zFx96ZmbbNRUX5g4rLHUQI/CtiRX5AE9GN1MV9LR4nKblXt
+	07PKfuysX0zVv2WaYe4Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpTQK-0006Xj-2L; Fri, 01 Feb 2019 07:39:40 +0000
+	id 1gpTQe-0006qQ-Iu; Fri, 01 Feb 2019 07:40:00 +0000
 Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpTPB-0005Ni-R7; Fri, 01 Feb 2019 07:38:34 +0000
-X-UUID: a87f0a64483f4527a0333087449e2ecf-20190131
-X-UUID: a87f0a64483f4527a0333087449e2ecf-20190131
+ id 1gpTPA-0005Nk-7S; Fri, 01 Feb 2019 07:38:30 +0000
+X-UUID: 31b700b3de84443e809c8d8635a6bbb9-20190131
+X-UUID: 31b700b3de84443e809c8d8635a6bbb9-20190131
 Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
  (envelope-from <michael.kao@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 672280733; Thu, 31 Jan 2019 23:38:18 -0800
+ with ESMTP id 436164654; Thu, 31 Jan 2019 23:38:18 -0800
 Received: from MTKMBS01N1.mediatek.inc (172.21.101.68) by
  MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 31 Jan 2019 23:38:17 -0800
+ 15.0.1395.4; Thu, 31 Jan 2019 23:38:18 -0800
 Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
  mtkmbs01n1.mediatek.inc (172.21.101.68) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 1 Feb 2019 15:38:15 +0800
+ 15.0.1395.4; Fri, 1 Feb 2019 15:38:16 +0800
 Received: from mtksdccf07.mediatek.inc (172.21.84.99) by MTKCAS06.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
- Frontend Transport; Fri, 1 Feb 2019 15:38:15 +0800
+ Frontend Transport; Fri, 1 Feb 2019 15:38:16 +0800
 From: <michael.kao@mediatek.com>
 To: =Zhang Rui <rui.zhang@intel.com>, =Eduardo Valentin <edubezval@gmail.com>, 
  =Daniel Lezcano <daniel.lezcano@linaro.org>, =Rob Herring
  <robh+dt@kernel.org>, =Mark Rutland <mark.rutland@arm.com>, =Matthias Brugger
  <matthias.bgg@gmail.com>
-Subject: [PATCH 0/7] Add Mediatek thermal dirver for mt8183
-Date: Fri, 1 Feb 2019 15:38:06 +0800
-Message-ID: <1549006693-11659-1-git-send-email-michael.kao@mediatek.com>
+Subject: [PATCH 7/7] thermal: mediatek: add support for MT8183
+Date: Fri, 1 Feb 2019 15:38:13 +0800
+Message-ID: <1549006693-11659-8-git-send-email-michael.kao@mediatek.com>
 X-Mailer: git-send-email 1.9.1
+In-Reply-To: <1549006693-11659-1-git-send-email-michael.kao@mediatek.com>
+References: <1549006693-11659-1-git-send-email-michael.kao@mediatek.com>
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_233830_078024_FDD34293 
-X-CRM114-Status: UNSURE (   6.65  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190131_233828_345659_69459DB2 
+X-CRM114-Status: GOOD (  13.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,26 +90,180 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Michael Kao <michael.kao@mediatek.com>
 
-This patchset supports for mt8183 chip to mtk_thermal.c.
-MT8183 has six temperature sensors and two thermal
-controllers. It has different calibration coefficent with
-past project, and doesn't need to select bank.
-As a result, we add the common architecture for scalability.
+MT8183 has two built-in thermal controllers with total six thermal
+sensors. And it doesn't have bank, so doesn't need to select bank.
+This patch adds support for mt8183.
 
-Michael Kao (7):
-  thermal: mediatek: fix register index error
-  thermal: mediatek: add common index of vts settings.
-  thermal: mediatek: add calibration item
-  thermal: mediatek: add thermal controller offset
-  thermal: mediatek: add flag for bank selection
-  dt-bindings: thermal: add binding document for mt8183 thermal
-    controller
-  thermal: mediatek: add support for MT8183
+Signed-off-by: Michael Kao <michael.kao@mediatek.com>
+---
+ drivers/thermal/mtk_thermal.c | 98 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 97 insertions(+), 1 deletion(-)
 
- .../bindings/thermal/mediatek-thermal.txt          |   1 +
- drivers/thermal/mtk_thermal.c                      | 315 +++++++++++++++++----
- 2 files changed, 257 insertions(+), 59 deletions(-)
-
+diff --git a/drivers/thermal/mtk_thermal.c b/drivers/thermal/mtk_thermal.c
+index 3e97638..e449177 100644
+--- a/drivers/thermal/mtk_thermal.c
++++ b/drivers/thermal/mtk_thermal.c
+@@ -71,6 +71,15 @@
+ 
+ #define TEMP_SPARE0		0x0f0
+ 
++#define TEMP_ADCPNP0_1          0x148
++#define TEMP_ADCPNP1_1          0x14c
++#define TEMP_ADCPNP2_1          0x150
++#define TEMP_MSR0_1             0x190
++#define TEMP_MSR1_1             0x194
++#define TEMP_MSR2_1             0x198
++#define TEMP_ADCPNP3_1          0x1b4
++#define TEMP_MSR3_1             0x1B8
++
+ #define PTPCORESEL		0x400
+ 
+ #define TEMP_MONCTL1_PERIOD_UNIT(x)	((x) & 0x3ff)
+@@ -113,7 +122,8 @@
+ 
+ /*
+  * Layout of the fuses providing the calibration data
+- * These macros could be used for MT8173, MT2701, and MT2712.
++ * These macros could be used for MT8183, MT8173, MT2701, and MT2712.
++ * MT8183 has 6 sensors and needs 6 VTS calibration data.
+  * MT8173 has 5 sensors and needs 5 VTS calibration data.
+  * MT2701 has 3 sensors and needs 3 VTS calibration data.
+  * MT2712 has 4 sensors and needs 4 VTS calibration data.
+@@ -124,6 +134,7 @@
+ #define CALIB_BUF0_VTS_TS2(x)		(((x) >> 8) & 0x1ff)
+ #define CALIB_BUF1_VTS_TS3(x)		(((x) >> 0) & 0x1ff)
+ #define CALIB_BUF2_VTS_TS4(x)		(((x) >> 23) & 0x1ff)
++#define CALIB_BUF2_VTS_TS5(x)		(((x) >> 5) & 0x1ff)
+ #define CALIB_BUF2_VTS_TSABB(x)		(((x) >> 14) & 0x1ff)
+ #define CALIB_BUF0_DEGC_CALI(x)		(((x) >> 1) & 0x3f)
+ #define CALIB_BUF0_O_SLOPE(x)		(((x) >> 26) & 0x3f)
+@@ -135,6 +146,7 @@ enum {
+ 	VTS2,
+ 	VTS3,
+ 	VTS4,
++	VTS5,
+ 	VTSABB,
+ 	MAX_NUM_VTS,
+ };
+@@ -190,6 +202,29 @@ enum {
+ /* The calibration coefficient of sensor  */
+ #define MT7622_CALIBRATION	165
+ 
++/* MT8183 thermal sensors */
++#define MT8183_TS1	0
++#define MT8183_TS2	1
++#define MT8183_TS3	2
++#define MT8183_TS4	3
++#define MT8183_TS5	4
++#define MT8183_TSABB	5
++
++/* AUXADC channel  is used for the temperature sensors */
++#define MT8183_TEMP_AUXADC_CHANNEL	11
++
++/* The total number of temperature sensors in the MT8183 */
++#define MT8183_NUM_SENSORS	6
++
++/* The number of sensing points per bank */
++#define MT8183_NUM_SENSORS_PER_ZONE	 6
++
++/* The number of controller in the MT8183 */
++#define MT8183_NUM_CONTROLLER		2
++
++/* The calibration coefficient of sensor  */
++#define MT8183_CALIBRATION	153
++
+ struct mtk_thermal;
+ 
+ struct thermal_bank_cfg {
+@@ -236,6 +271,27 @@ struct mtk_thermal {
+ 	struct mtk_thermal_bank banks[];
+ };
+ 
++/* MT8183 thermal sensor data */
++static const int mt8183_bank_data[MT8183_NUM_SENSORS] = {
++	MT8183_TS1, MT8183_TS2, MT8183_TS3, MT8183_TS4, MT8183_TS5, MT8183_TSABB
++};
++
++static const int mt8183_msr[MT8183_NUM_SENSORS_PER_ZONE] = {
++	TEMP_MSR0_1, TEMP_MSR1_1, TEMP_MSR2_1, TEMP_MSR1, TEMP_MSR0, TEMP_MSR3_1
++};
++
++static const int mt8183_adcpnp[MT8183_NUM_SENSORS_PER_ZONE] = {
++	TEMP_ADCPNP0_1, TEMP_ADCPNP1_1, TEMP_ADCPNP2_1,
++	TEMP_ADCPNP1, TEMP_ADCPNP0, TEMP_ADCPNP3_1
++};
++
++static const int mt8183_mux_values[MT8183_NUM_SENSORS] = { 0, 1, 2, 3, 4, 0 };
++static const int mt8183_tc_offset[MT8183_NUM_CONTROLLER] = {0x0, 0x100};
++
++static const int mt8183_vts_index[MT8183_NUM_SENSORS] = {
++	VTS1, VTS2, VTS3, VTS4, VTS5, VTSABB
++};
++
+ /* MT8173 thermal sensor data */
+ static const int mt8173_bank_data[MT8173_NUM_ZONES][3] = {
+ 	{ MT8173_TS2, MT8173_TS3 },
+@@ -434,6 +490,39 @@ struct mtk_thermal {
+ };
+ 
+ /**
++ * The MT8183 thermal controller has one bank for the current SW framework.
++ * The MT8183 has a total of 6 temperature sensors.
++ * There are two thermal controller to control the six sensor.
++ * The first one bind 2 sensor, and the other bind 4 sensors.
++ * The thermal core only gets the maximum temperature of all sensor, so
++ * the bank concept wouldn't be necessary here. However, the SVS (Smart
++ * Voltage Scaling) unit makes its decisions based on the same bank
++ * data, and this indeed needs the temperatures of the individual banks
++ * for making better decisions.
++ */
++
++static const struct mtk_thermal_data mt8183_thermal_data = {
++	.auxadc_channel = MT8183_TEMP_AUXADC_CHANNEL,
++	.num_banks = MT8183_NUM_SENSORS_PER_ZONE,
++	.num_sensors = MT8183_NUM_SENSORS,
++	.vts_index = mt8183_vts_index,
++	.cali_val = MT8183_CALIBRATION,
++	.num_controller = MT8183_NUM_CONTROLLER,
++	.controller_offset = mt8183_tc_offset,
++	.need_switch_bank = false,
++	.bank_data = {
++		{
++			.num_sensors = 6,
++			.sensors = mt8183_bank_data,
++		},
++	},
++
++	.msr = mt8183_msr,
++	.adcpnp = mt8183_adcpnp,
++	.sensor_mux_values = mt8183_mux_values,
++};
++
++/**
+  * raw_to_mcelsius - convert a raw ADC value to mcelsius
+  * @mt:		The thermal controller
+  * @raw:	raw ADC value
+@@ -726,6 +815,9 @@ static int mtk_thermal_get_calibration_data(struct device *dev,
+ 			case VTS4:
+ 				mt->vts[VTS4] = CALIB_BUF2_VTS_TS4(buf[2]);
+ 				break;
++			case VTS5:
++				mt->vts[VTS5] = CALIB_BUF2_VTS_TS5(buf[2]);
++				break;
+ 			case VTSABB:
+ 				mt->vts[VTSABB] = CALIB_BUF2_VTS_TSABB(buf[2]);
+ 				break;
+@@ -766,6 +858,10 @@ static int mtk_thermal_get_calibration_data(struct device *dev,
+ 	{
+ 		.compatible = "mediatek,mt7622-thermal",
+ 		.data = (void *)&mt7622_thermal_data,
++	},
++	{
++		.compatible = "mediatek,mt8183-thermal",
++		.data = (void *)&mt8183_thermal_data,
+ 	}, {
+ 	},
+ };
 -- 
 1.9.1
 
