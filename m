@@ -2,65 +2,67 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9BA3EC282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:49:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 01793C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:50:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6D65B20844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:49:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C41CC2184A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:50:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cqYqooc0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D65B20844
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="utILODew"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C41CC2184A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sigxcpu.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VVuKnvxq1FJHyh6f5/vfT0OcvaWT5sKbam/Ckz68Ztk=; b=cqYqooc0CA8w/I
-	x3T5gQnY/XiOiqqzcGE3lOBxLXm/R44ji5EviIAchAW2R5Z4mB/10o0jjDYXmVTc1UW0wga4u7e2D
-	QBQLsC0D00sZfr8wc7CWbImjjvnttRQrzq0IZxHTOaFSaaQRHuctXmcxmiqInZ8yRCFZXuK/pI3dq
-	8VWu58iwWHBukETjlH1VMYq64+368mZssbPk3grohBQxBjZd5yvcCnKXabyk/ksfzH8T9Sf0lbvga
-	9YcNDqjV2iOBxMbUsxcgyDvXIRs34N9aMa9HUbOGaRbGIEomwNRsVMbI8R1pQl8BrQs1HKAPaz63m
-	XzJ5niPa5xI5cRfT6Dyg==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Cc:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=4TSECCsu9Hg47uWnqoAZJlrw0y1ZEjox9YZLiaXVNuo=; b=utILODew2eWhH7
+	jKlJ+JXKILgUZZ7VdiT6KvfZugPTM9ntBhGYsF1dWE/6UUBFK0aj5oEBzf18yVAUNpzAU+kfXiPGF
+	ZKJnG37kQUFefkVU5eGvqyCHQ/Ha4SQjjqn0ghoh17mgBlngAlEx0L7B/rMqg8MbxfNtXZV8+WwS9
+	f94B6oa57XjR8oEwVLziSreQPY7p1n8MXP/Q7VCnThPzWxd6FLcgPvwzlkDU0//q0bGhAgh420L9N
+	2wiKgKEmcZJohqYjqUxONUjhcH/NP9nuuBFk2ntWt19cWcCwusdXx/s4aFUsL/ldnXyGwofeflQyf
+	0RhAKOVl0WVrpxQT5yyg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpUW9-0001cQ-DI; Fri, 01 Feb 2019 08:49:45 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpUW6-0001bz-MW
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 08:49:44 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 20B45A78;
- Fri,  1 Feb 2019 00:49:42 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 3EE583F71E;
- Fri,  1 Feb 2019 00:49:40 -0800 (PST)
-Subject: Re: [RFC PATCH 2/3] ARM: entry: Remove unneeded need_resched() loop
-To: Valentin Schneider <valentin.schneider@arm.com>,
- linux-kernel@vger.kernel.org
-References: <20190131182339.9835-1-valentin.schneider@arm.com>
- <20190131182339.9835-3-valentin.schneider@arm.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <fa090a80-5579-5dac-da19-56c9a6c5c423@arm.com>
-Date: Fri, 1 Feb 2019 08:49:37 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gpUWU-00029g-VU; Fri, 01 Feb 2019 08:50:07 +0000
+Received: from honk.sigxcpu.org ([24.134.29.49])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gpUWP-0001qT-8I
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 08:50:03 +0000
+Received: from localhost (localhost [127.0.0.1])
+ by honk.sigxcpu.org (Postfix) with ESMTP id DB935FB06;
+ Fri,  1 Feb 2019 09:49:56 +0100 (CET)
+X-Virus-Scanned: Debian amavisd-new at honk.sigxcpu.org
+Received: from honk.sigxcpu.org ([127.0.0.1])
+ by localhost (honk.sigxcpu.org [127.0.0.1]) (amavisd-new, port 10024)
+ with ESMTP id k231Fiwot59T; Fri,  1 Feb 2019 09:49:56 +0100 (CET)
+Received: by bogon.sigxcpu.org (Postfix, from userid 1000)
+ id 82A9B44AB2; Fri,  1 Feb 2019 09:49:55 +0100 (CET)
+From: =?UTF-8?q?Guido=20G=C3=BCnther?= <agx@sigxcpu.org>
+To: Maxime Ripard <maxime.ripard@bootlin.com>, dri-devel@lists.freedesktop.org,
+ linux-arm-kernel@lists.infradead.org,
+ Robert Chiras <robert.chiras@nxp.com>, Sam Ravnborg <sam@ravnborg.org>,
+ Fabio Estevam <festevam@gmail.com>
+Subject: [PATCH v2 1/3] dt-bindings: Add vendor prefix for Mixel Inc
+Date: Fri,  1 Feb 2019 09:49:53 +0100
+Message-Id: <bd4526d2f5c6addce952c50dbb246f130660f9e0.1549010639.git.agx@sigxcpu.org>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <cover.1549010639.git.agx@sigxcpu.org>
+References: <cover.1549010639.git.agx@sigxcpu.org>
 MIME-Version: 1.0
-In-Reply-To: <20190131182339.9835-3-valentin.schneider@arm.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_004942_744840_FFB14AC0 
-X-CRM114-Status: GOOD (  18.04  )
+X-CRM114-CacheID: sfid-20190201_005001_612951_AC8A6BDD 
+X-CRM114-Status: UNSURE (   8.35  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,71 +74,26 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Thomas Gleixner <tglx@linutronix.de>, Will Deacon <will.deacon@arm.com>,
- Russell King <linux@armlinux.org.uk>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Valentin,
-
-On 31/01/2019 18:23, Valentin Schneider wrote:
-> Since the enabling and disabling of IRQs within preempt_schedule_irq()
-> is contained in a need_resched() loop, we don't need the outer arch
-> code loop.
-> 
-> Signed-off-by: Valentin Schneider <valentin.schneider@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Julien Thierry <julien.thierry@arm.com>
-> Cc: linux-arm-kernel@lists.infradead.org
-
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-
-Cheers,
-
-> ---
->  arch/arm/kernel/entry-armv.S | 12 +-----------
->  1 file changed, 1 insertion(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index e85a3af9ddeb..a7ac22e09bb2 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -220,7 +220,7 @@ __irq_svc:
->  	teq	r8, #0				@ if preempt count != 0
->  	movne	r0, #0				@ force flags to 0
->  	tst	r0, #_TIF_NEED_RESCHED
-> -	blne	svc_preempt
-> +	blne	preempt_schedule_irq            @ irq en/disable is done inside
->  #endif
->  
->  	svc_exit r5, irq = 1			@ return from exception
-> @@ -229,16 +229,6 @@ ENDPROC(__irq_svc)
->  
->  	.ltorg
->  
-> -#ifdef CONFIG_PREEMPT
-> -svc_preempt:
-> -	mov	r8, lr
-> -1:	bl	preempt_schedule_irq		@ irq en/disable is done inside
-> -	ldr	r0, [tsk, #TI_FLAGS]		@ get new tasks TI_FLAGS
-> -	tst	r0, #_TIF_NEED_RESCHED
-> -	reteq	r8				@ go again
-> -	b	1b
-> -#endif
-> -
->  __und_fault:
->  	@ Correct the PC such that it is pointing at the instruction
->  	@ which caused the fault.  If the faulting instruction was ARM
-> 
-
--- 
-Julien Thierry
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+QWRkIHZlbmRvciBwcmVmaXggIm1peGVsIiBmb3IgTWl4ZWwgSW5jLiBXaWxsIGJlIHVzZWQgZm9y
+IGEgTUlQSSBEU0kKUEhZIGRyaXZlci4KClNpZ25lZC1vZmYtYnk6IEd1aWRvIEfDvG50aGVyIDxh
+Z3hAc2lneGNwdS5vcmc+Ci0tLQogRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL3Zl
+bmRvci1wcmVmaXhlcy50eHQgfCAxICsKIDEgZmlsZSBjaGFuZ2VkLCAxIGluc2VydGlvbigrKQoK
+ZGlmZiAtLWdpdCBhL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy92ZW5kb3ItcHJl
+Zml4ZXMudHh0IGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL3ZlbmRvci1wcmVm
+aXhlcy50eHQKaW5kZXggODhkY2RjMDRjOGM5Li5hNzRjMTA1NzZmYjkgMTAwNjQ0Ci0tLSBhL0Rv
+Y3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy92ZW5kb3ItcHJlZml4ZXMudHh0CisrKyBi
+L0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy92ZW5kb3ItcHJlZml4ZXMudHh0CkBA
+IC0yNDcsNiArMjQ3LDcgQEAgbWlrcm9lCQlNaWtyb0VsZWt0cm9uaWthIGQuby5vLgogbWluaXgJ
+TUlOSVggVGVjaG5vbG9neSBMdGQuCiBtaXJhbWVtcwlNaXJhTUVNUyBTZW5zaW5nIFRlY2hub2xv
+Z3kgQ28uLCBMdGQuCiBtaXRzdWJpc2hpCU1pdHN1YmlzaGkgRWxlY3RyaWMgQ29ycG9yYXRpb24K
+K21peGVsCU1peGVsLCBJbmMuCiBtb3NhaXh0ZWNoCU1vc2FpeCBUZWNobm9sb2dpZXMsIEluYy4K
+IG1vdG9yb2xhCU1vdG9yb2xhLCBJbmMuCiBtb3hhCU1veGEgSW5jLgotLSAKMi4yMC4xCgoKX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtl
+cm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0
+dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5l
+bAo=
