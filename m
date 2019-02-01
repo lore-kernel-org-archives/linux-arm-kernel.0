@@ -2,84 +2,87 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 93C08C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 12:49:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EF79FC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 12:50:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6046F21872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 12:49:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ADF8A218EA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 12:50:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cF8+AwKm";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="nJ/UAZaW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6046F21872
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PW2XlHhB";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="Y4Jt/4xM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ADF8A218EA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=j8JvxOa7aNREFy3QkatDnVDofTSAB1VkowHHwh0bH2A=; b=cF8+AwKmRsy8fN
-	dmPrZmXErmLNxF9UkN8/Yrsqfcob6toOoM20FtzG3e6Av3ry2++bvtrFh19VxBZx9MIzywobhdqR7
-	JM2tSPAr8cW62rY8Gqsx5X8nYHrvE6ftHdjtRYjCADRTritUc6sxwT3ym8d43vmehyZLAoEsYlGKy
-	ncn8Wl4iqWlnwbmuCXwehJGN3Uh0Hal5oaKO50zYmnZb6Wndv2GAtZN26PsRYHS+aZwfv0dMlH0NH
-	QBbsd0zuc7kJFcLyZFoVMltfj4mvoN55+MIQRW/vKb6cn40KzR1yWYKRYZPG8p2kPq8290LSGWoug
-	z4UDGC4DlPnonD2zULHQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=83PQNHPJi208MYeJ/Y3YhOY9Pkohxh67jS8ySl9TGMM=; b=PW2XlHhBxaXaag
+	ooux2z98dWsF3nDPY5NQJZmPIIjXN/Bc6HNFnc4jFrg/uCgihTz/Gv55Tso3PYmi1OgUscAPhsDs4
+	d/6BXHgY6U94DCxOo00hFYamcQykUbBavJs9x9DjODfJ7Rbhp0nhuRZv29rwAaEMqpBaE+H2KmHu5
+	QfnUerJSqFwS6IbdqHh639HoF6rV1lwXdgR73aYZI6WZ8/Hiz7IEZhNCj8QH42l1dxf/liW1mu6pn
+	PfpDnUnEpT/T4mtQRwQcehMpmDMfsBALCZinGAeQbP/rhtlF/iLvev9LSYPW4ROUXMSje/AEXJfQg
+	DLpQ2mez/EM38X5bH/Ug==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpYFt-0008O5-5c; Fri, 01 Feb 2019 12:49:13 +0000
-Received: from hqemgate16.nvidia.com ([216.228.121.65])
+	id 1gpYGu-0001TP-2y; Fri, 01 Feb 2019 12:50:16 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpYFp-0008Nk-6e
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 12:49:10 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c54401b0000>; Fri, 01 Feb 2019 04:48:27 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Fri, 01 Feb 2019 04:49:08 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Fri, 01 Feb 2019 04:49:08 -0800
-Received: from [10.26.11.142] (10.124.1.5) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 1 Feb
- 2019 12:49:06 +0000
-Subject: Re: [PATCH V5 0/7] Add CPUidle support for Tegra210
-To: Joseph Lo <josephl@nvidia.com>, Thierry Reding <thierry.reding@gmail.com>, 
- Daniel Lezcano <daniel.lezcano@linaro.org>, Thomas Gleixner
- <tglx@linutronix.de>
-References: <20190201033621.16814-1-josephl@nvidia.com>
-From: Jon Hunter <jonathanh@nvidia.com>
-Message-ID: <1e8434d3-99aa-5d5f-3f2a-15f87f03e2e4@nvidia.com>
-Date: Fri, 1 Feb 2019 12:49:03 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gpYGp-0001Sn-RC
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 12:50:13 +0000
+Received: by mail-wm1-x342.google.com with SMTP id r24so4477754wmh.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 01 Feb 2019 04:50:11 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=yI5dyFXD0eCpqICzl94AW1c+UhnXLPpf4lVwvl+KCoM=;
+ b=Y4Jt/4xMCEgiOTu0QPE/DzgKbL1z6clS0ZyJp2ss28pRxNNk8n/gvQxw9aezLog4Im
+ MCD6T0mleFBR6kE8SS7sKd75uy7R+O4VzYqrGPcBMXrgX/kwqd/lQDLoJtGpy7NZ/C5v
+ QzCRY8mAxq3vnjeE/8Hn/VixXd5dj7LKoAVz6wV9zB+pmyPV0WhJPMvyyvdlK8m4FdDh
+ VhMddhv0WvdddG8aBgzVfVP9D3hsdCFyjlRW6Os+IBdJjJfQu1Uj0VY2jKJmucAy0bff
+ QFBNK23SMOdAaXINh2qyO0CENUH/fbWnqY1y4MemREIropXR5JJPcz4wbJMLxamrYkjl
+ Ux8w==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=yI5dyFXD0eCpqICzl94AW1c+UhnXLPpf4lVwvl+KCoM=;
+ b=FMDDiH+jFDQNdBURxnkeCbUMvK2xpEH5GKXLS0BcgMn/x0/i8Yfb9ha51ULqtXe4Vb
+ AyOt/F6C/IGydtENvUWyPmvMOoEnKv8wxHEAc55OPjWyVdQdVhDnmLocaP3GjKR4Gduy
+ 9HJEBKkUDmSHqfnouuWGkFfvZRZgOIK3DNAz91cHSu4SFbtcMCAYXLiGKfjekjKT4S5k
+ wqktGywr3oPBC0gKxsQPIVPmZAIkAu5iDDz0dFnyLDVwYiD5pQXPoRQJA9u+/fjEe/GC
+ cwiuyQBYyqNPTTyqYRDFIiuMS43UEqcsb6BvlnEYLCOXp8t9uzjlot5+vww7wIAu97KF
+ CCew==
+X-Gm-Message-State: AHQUAuYwDwCV72d3J1BDuB+RdUUKYfJBISPHwMWrBjgmPIVvYmZy3spl
+ LXvnhPesARKn3Hwn7MS0IqJPIg==
+X-Google-Smtp-Source: AHgI3Iagcxe5g+mTm+PlYI+lapgobHLUmmz5WFNAIkFaWEE4g5QJgWZZLBmL7mXUlnjN1TJFipaTGg==
+X-Received: by 2002:a1c:b455:: with SMTP id d82mr2425856wmf.78.1549025409830; 
+ Fri, 01 Feb 2019 04:50:09 -0800 (PST)
+Received: from boomer.local ([2a01:e34:eeb6:4690:106b:bae3:31ed:7561])
+ by smtp.googlemail.com with ESMTPSA id w10sm4115884wmb.1.2019.02.01.04.50.08
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 01 Feb 2019 04:50:09 -0800 (PST)
+From: Jerome Brunet <jbrunet@baylibre.com>
+To: Philipp Zabel <p.zabel@pengutronix.de>, Kevin Hilman <khilman@baylibre.com>
+Subject: [PATCH v3] dt-bindings: reset: meson: add g12a bindings
+Date: Fri,  1 Feb 2019 13:50:03 +0100
+Message-Id: <20190201125003.25022-1-jbrunet@baylibre.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-In-Reply-To: <20190201033621.16814-1-josephl@nvidia.com>
-X-Originating-IP: [10.124.1.5]
-X-ClientProxiedBy: HQMAIL105.nvidia.com (172.20.187.12) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1549025307; bh=J9MKiGDgbt3DZ3Yoyv/WrVTRWtDRMwHTEqeTt4Vsw20=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=nJ/UAZaWW0O52dQs/eSI8g0TG6iOwl4TiU1WJdTkjbqrxI4VF6bV4ipR70THfhgWz
- JmyexHewwG34L8kh+gG6mAh2iKAs9ZBc+sTRPUKMYZSBuLV3Pp71AsZdFuuE+cXCq6
- vlRpzBDLi3IunT5J6GrF0De0TnCU7v+pCd8gwxyYgIknrvYcZtMftk08AgkAe9OfTn
- 7jybRPV62EAue6lk8RElWlT1fP3yPLQyQ4pZskMjeNMjwO2a+rbDXkV1bTQAAdeOxF
- Ef4vMxEobbg89fdvusC6n08I7SKvLA7d95H9YSuo65kB2ry4A2DNYN5RtcBZyxF1r+
- aiFpt25w1I8Uw==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_044909_317696_F2314268 
-X-CRM114-Status: GOOD (  17.15  )
+X-CRM114-CacheID: sfid-20190201_045011_937970_A49FD804 
+X-CRM114-Status: GOOD (  10.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,67 +94,172 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, Neil Armstrong <narmstrong@baylibre.com>,
+ linux-kernel@vger.kernel.org, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org, Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Add device tree bindings for the reset controller of g12a SoC family.
 
-On 01/02/2019 03:36, Joseph Lo wrote:
-> This patch series adds CPUidle support for Tegra210, which supports
-> power-down state (C7) for CPU cores. And due to arch timer cannot work
-> across CPU core power-down and power on reset signal event. We introduce
-> Tegra210 timer driver to work as clock event device. So it can be the
-> wake-up source of CPU cores when they idled in the power-down state.
-> 
-> Fixed in V5:
->  * Just resend this whole series again with timer and Tegra maintainers
->    included
-> 
-> Fixed in V4:
->  * merge timer-tegra210.c into timer-tegra20.c
->  * add a new patch to select TEGRA_TIMER by default for Tegra210
-> 
-> Fixed in V3:
->  * use timer-of API for Tegra210 timer driver
-> 
-> Fixed in V2:
->  * list all the timer IRQs in the binding doc and dts file
->  * add error clean-up code in timer driver
->  * add entry-latency-us and exit-latency-us properties for idle-states
->    DT node
-> 
-> Joseph Lo (7):
->   dt-bindings: timer: add Tegra210 timer
->   clocksource: tegra: add Tegra210 timer support
->   soc/tegra: default select TEGRA_TIMER for Tegra210
->   arm64: dts: tegra210: fix timer node
->   arm64: dts: tegra210: add CPU idle states properties
->   arm64: dts: tegra210-p2180: Enable CPU idle support
->   arm64: dts: tegra210-smaug: Enable CPU idle support
-> 
->  .../bindings/timer/nvidia,tegra210-timer.txt  |  36 ++
->  .../arm64/boot/dts/nvidia/tegra210-p2180.dtsi |   6 +
->  arch/arm64/boot/dts/nvidia/tegra210-smaug.dts |   7 +
->  arch/arm64/boot/dts/nvidia/tegra210.dtsi      |  33 +-
->  drivers/clocksource/Kconfig                   |   2 +-
->  drivers/clocksource/timer-tegra20.c           | 369 +++++++++++++-----
->  drivers/soc/tegra/Kconfig                     |   1 +
->  include/linux/cpuhotplug.h                    |   1 +
->  8 files changed, 352 insertions(+), 103 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/timer/nvidia,tegra210-timer.txt
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
 
-Series looks good to me. Just a minor comment on patch 2/7 but otherwise
-for the series ...
+Changes since v2 [0]:
+* Dropped useless g12a compatible
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
+[0]: https://lkml.kernel.org/r/20190128181316.30814-1-jbrunet@baylibre.com
 
-Cheers
-Jon
+ .../reset/amlogic,meson-g12a-reset.h          | 134 ++++++++++++++++++
+ 1 file changed, 134 insertions(+)
+ create mode 100644 include/dt-bindings/reset/amlogic,meson-g12a-reset.h
 
+diff --git a/include/dt-bindings/reset/amlogic,meson-g12a-reset.h b/include/dt-bindings/reset/amlogic,meson-g12a-reset.h
+new file mode 100644
+index 000000000000..8063e8314eef
+--- /dev/null
++++ b/include/dt-bindings/reset/amlogic,meson-g12a-reset.h
+@@ -0,0 +1,134 @@
++/* SPDX-License-Identifier: GPL-2.0+ OR BSD-3-Clause */
++/*
++ * Copyright (c) 2019 BayLibre, SAS.
++ * Author: Jerome Brunet <jbrunet@baylibre.com>
++ *
++ */
++
++#ifndef _DT_BINDINGS_AMLOGIC_MESON_G12A_RESET_H
++#define _DT_BINDINGS_AMLOGIC_MESON_G12A_RESET_H
++
++/*	RESET0					*/
++#define RESET_HIU			0
++/*					1	*/
++#define RESET_DOS			2
++/*					3-4	*/
++#define RESET_VIU			5
++#define RESET_AFIFO			6
++#define RESET_VID_PLL_DIV		7
++/*					8-9	*/
++#define RESET_VENC			10
++#define RESET_ASSIST			11
++#define RESET_PCIE_CTRL_A		12
++#define RESET_VCBUS			13
++#define RESET_PCIE_PHY			14
++#define RESET_PCIE_APB			15
++#define RESET_GIC			16
++#define RESET_CAPB3_DECODE		17
++/*					18	*/
++#define RESET_HDMITX_CAPB3		19
++#define RESET_DVALIN_CAPB3		20
++#define RESET_DOS_CAPB3			21
++/*					22	*/
++#define RESET_CBUS_CAPB3		23
++#define RESET_AHB_CNTL			24
++#define RESET_AHB_DATA			25
++#define RESET_VCBUS_CLK81		26
++/*					27-31	*/
++/*	RESET1					*/
++/*					32	*/
++#define RESET_DEMUX			33
++#define RESET_USB			34
++#define RESET_DDR			35
++/*					36	*/
++#define RESET_BT656			37
++#define RESET_AHB_SRAM			38
++/*					39	*/
++#define RESET_PARSER			40
++/*					41	*/
++#define RESET_ISA			42
++#define RESET_ETHERNET			43
++#define RESET_SD_EMMC_A			44
++#define RESET_SD_EMMC_B			45
++#define RESET_SD_EMMC_C			46
++/*					47-60 */
++#define RESET_AUDIO_CODEC		61
++/*					62-63	*/
++/*	RESET2					*/
++/*					64	*/
++#define RESET_AUDIO			65
++#define RESET_HDMITX_PHY		66
++/*					67	*/
++#define RESET_MIPI_DSI_HOST		68
++#define RESET_ALOCKER			69
++#define RESET_GE2D			70
++#define RESET_PARSER_REG		71
++#define RESET_PARSER_FETCH		72
++#define RESET_CTL			73
++#define RESET_PARSER_TOP		74
++/*					75-77	*/
++#define RESET_DVALIN			78
++#define RESET_HDMITX			79
++/*					80-95	*/
++/*	RESET3					*/
++/*					96-95	*/
++#define RESET_DEMUX_TOP			105
++#define RESET_DEMUX_DES_PL		106
++#define RESET_DEMUX_S2P_0		107
++#define RESET_DEMUX_S2P_1		108
++#define RESET_DEMUX_0			109
++#define RESET_DEMUX_1			110
++#define RESET_DEMUX_2			111
++/*					112-127	*/
++/*	RESET4					*/
++/*					128-129	*/
++#define RESET_MIPI_DSI_PHY		130
++/*					131-132	*/
++#define RESET_RDMA			133
++#define RESET_VENCI			134
++#define RESET_VENCP			135
++/*					136	*/
++#define RESET_VDAC			137
++/*					138-139 */
++#define RESET_VDI6			140
++#define RESET_VENCL			141
++#define RESET_I2C_M1			142
++#define RESET_I2C_M2			143
++/*					144-159	*/
++/*	RESET5					*/
++/*					160-191	*/
++/*	RESET6					*/
++#define RESET_GEN			192
++#define RESET_SPICC0			193
++#define RESET_SC			194
++#define RESET_SANA_3			195
++#define RESET_I2C_M0			196
++#define RESET_TS_PLL			197
++#define RESET_SPICC1			198
++#define RESET_STREAM			199
++#define RESET_TS_CPU			200
++#define RESET_UART0			201
++#define RESET_UART1_2			202
++#define RESET_ASYNC0			203
++#define RESET_ASYNC1			204
++#define RESET_SPIFC0			205
++#define RESET_I2C_M3			206
++/*					207-223	*/
++/*	RESET7					*/
++#define RESET_USB_DDR_0			224
++#define RESET_USB_DDR_1			225
++#define RESET_USB_DDR_2			226
++#define RESET_USB_DDR_3			227
++#define RESET_TS_GPU			228
++#define RESET_DEVICE_MMC_ARB		229
++#define RESET_DVALIN_DMC_PIPL		230
++#define RESET_VID_LOCK			231
++#define RESET_NIC_DMC_PIPL		232
++#define RESET_DMC_VPU_PIPL		233
++#define RESET_GE2D_DMC_PIPL		234
++#define RESET_HCODEC_DMC_PIPL		235
++#define RESET_WAVE420_DMC_PIPL		236
++#define RESET_HEVCF_DMC_PIPL		237
++/*					238-255	*/
++
++#endif
 -- 
-nvpublic
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
