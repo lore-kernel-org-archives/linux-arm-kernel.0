@@ -2,67 +2,61 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EA2F1C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 17:00:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BDA8AC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 17:01:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ABDB72086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 17:00:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8C9B62086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 17:01:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i/90kYsj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ABDB72086C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=hisilicon.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sGsm93bX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C9B62086C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Cc:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=IPN46qC5yd/PbmVaYjQC0VFcgG7kbU0yuSZynmYFYPw=; b=i/90kYsjHFiEPNyNOmEawXYOZ8
-	C2RwMAW6RP6ZuaDFS/9aqEPflRog1AyuN9qiTKoKVeUDBBPrS98atNBtnBCPV3lv+TqrvOL0NtX1z
-	4V4eHeunS+tNtSF/aktm5F9DARi5KmOlxGrTjkhRJuMd96KJstg5fORueMu2Dop0VzTLD0c+Dhmaa
-	5iTt18h5YtVaebY/nSMstEMdalDCnn3ar2oHI2q2DES27KQq+YRj4ilmvSkk5nr8wBRST+tngl6K0
-	PlQI1yXc3c0dD1TmIu3bWCnFPaQnGS9m73ue1G15nUsxKJUDcs0npRmg21340D4K97rqj3YowG9vh
-	SfkpB+RQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=9fcCDGXlaUnllLgWalJ8vwd2/RespXa/oKh1/PmBUUQ=; b=sGsm93bXLZbGog
+	bjlkziZ8AQ7Y/VRhhOx4ZuQxbIKXFQpuRjHt+PISOzDUMcviwtoLEtUYVkPPr6xORr+T53/2L2xLD
+	dkiJpE6SCEZrDDmGlYAr4FVE9WPB10iAVarKF2STUJsWzJ41e9A2XSz23C3FRyJVnTb9E5QfhQGhP
+	3612ly8NAQvB6SGXesFrZIcAaS9+X5b1W3HpHr7hdkterrDy/A0Th1wDubwjD6iMjGC5GQyr9IFcB
+	tcZfQLyXH8s/mur3Rx/ob0lknRQ6LwsPtYhCQFQVZEqMO2I1SEGtEdVwpB+uPhtbCDRXE9sz+NU/2
+	KR7IjxV1s4Pc3LVpx3tQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpcB3-00056O-1x; Fri, 01 Feb 2019 17:00:29 +0000
-Received: from lhrrgout.huawei.com ([185.176.76.210] helo=huawei.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpcAz-00055n-Gn
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 17:00:27 +0000
-Received: from lhreml709-cah.china.huawei.com (unknown [172.18.7.108])
- by Forcepoint Email with ESMTP id C64D34F342B631B14FBD;
- Fri,  1 Feb 2019 17:00:22 +0000 (GMT)
-Received: from [127.0.0.1] (10.202.226.46) by lhreml709-cah.china.huawei.com
- (10.201.108.32) with Microsoft SMTP Server id 14.3.408.0; Fri, 1 Feb 2019
- 17:00:20 +0000
-Subject: Re: [PATCH v2] arm64/hisilicon: fix SDcard detection
-To: Vincent Guittot <vincent.guittot@linaro.org>, <robh+dt@kernel.org>,
- <mark.rutland@arm.com>, <linux-arm-kernel@lists.infradead.org>,
- <devicetree@vger.kernel.org>, <linux-kernel@vger.kernel.org>,
- <linus.walleij@linaro.org>
-References: <1547454274-1674-1-git-send-email-vincent.guittot@linaro.org>
-From: Wei Xu <xuwei5@hisilicon.com>
-Message-ID: <3722223a-4f06-3e1c-86ca-542289c7c918@hisilicon.com>
-Date: Fri, 1 Feb 2019 17:00:18 +0000
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gpcBl-0005Oi-SP; Fri, 01 Feb 2019 17:01:13 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gpcBf-0005Nk-MU
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 17:01:11 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 173C215BE;
+ Fri,  1 Feb 2019 09:01:07 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A2BCE3F71E;
+ Fri,  1 Feb 2019 09:01:04 -0800 (PST)
+Date: Fri, 1 Feb 2019 17:01:01 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Andrey Smirnov <andrew.smirnov@gmail.com>
+Subject: Re: [PATCH v6 0/4] PCIE support for i.MX8MQ
+Message-ID: <20190201170101.GB22887@e107981-ln.cambridge.arm.com>
+References: <20190124201522.8973-1-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <1547454274-1674-1-git-send-email-vincent.guittot@linaro.org>
-Content-Language: en-US
-X-Originating-IP: [10.202.226.46]
-X-CFilter-Loop: Reflected
+Content-Disposition: inline
+In-Reply-To: <20190124201522.8973-1-andrew.smirnov@gmail.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_090025_706679_956D3127 
-X-CRM114-Status: GOOD (  14.84  )
+X-CRM114-CacheID: sfid-20190201_090110_417299_C38B823E 
+X-CRM114-Status: GOOD (  17.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,52 +68,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
+ linux-arm-kernel@lists.infradead.org, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Fabio Estevam <fabio.estevam@nxp.com>,
+ linux-imx@nxp.com, Bjorn Helgaas <bhelgaas@google.com>,
+ Leonard Crestez <leonard.crestez@nxp.com>, Chris Healy <cphealy@gmail.com>,
+ Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Vincent,
-
-On 1/14/2019 8:24 AM, Vincent Guittot wrote:
-> The SDcard detection of hikey960 is active low so cd-inverted is wrong.
-> Instead of adding cd-inverted, we should better set correctly cd-gpios
-> to use GPIO_ACTIVE_LOW.
+On Thu, Jan 24, 2019 at 12:15:18PM -0800, Andrey Smirnov wrote:
+> Everyone:
 > 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-
-Updated the subject as Leo suggested and applied to the hisilicon tree.
-Thanks!
-
-Best Regards,
-Wei
-
-> ---
+> This series contains changes I made in order to enable support of PCIE
+> IP block on i.MX8MQ SoCs.
 > 
-> SD card detection was not working on v5.0-rc1 but patch
-> https://marc.info/?l=linux-mmc&m=154637189021211&w=2 makes it work.
-> Nevertheles, latest changes in of_mmc_detection makes possible to have 
-> a correct DT config.
+> Changes since [v5]:
 > 
->  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+>  - Reformatted commit messages to adhere to
+>    https://lore.kernel.org/linux-pci/20171026223701.GA25649@bhelgaas-glaptop.roam.corp.google.com/
 > 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> index 71bfe41..dc314e7 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> @@ -665,8 +665,7 @@
->  	sd-uhs-sdr50;
->  	sd-uhs-sdr104;
->  	disable-wp;
-> -	cd-inverted;
-> -	cd-gpios = <&gpio25 3 0>;
-> +	cd-gpios = <&gpio25 3 GPIO_ACTIVE_LOW>;
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&sd_pmx_func
->  		     &sd_clk_cfg_func
+> Changes since [v4]:
 > 
+>  - Collected Reviewed-by from Lucas
+> 
+>  - Replaced ((ARM || ARM64) && COMPILE_TEST) with COMPILE_TEST as per
+>    suggestion from Rob
+> 
+> Changes since [v3]:
+> 
+>  - Based on feedback from NXP, DIRECT_SPEED_CHANGE quirk was expanded
+>    to cover both i.MX7 and i.MX8MQ
+> 
+>  - Code setting device type in GPR12 moved to a standalone function
+> 
+>  - Explicit "fsl,controller-id" binding was dropped, replaced by using
+>    controller physical address to determine logical ID
+> 
+>  - Dropped Reviewed-by from Lucas for patch 4/4 due to the change
+>    above (haven't heard explicit "yea" for it from him)
+> 
+> Changes since [v2], [fixes]:
+> 
+>  - Incorporated [patch] introducing drvdata
+> 
+>  - i.MX6 PHY operation gating converted to a single patch and to use a
+>    dedicated flag instead of doing explicit variant check
+> 
+>  - Kconfig entry changed to use ARM64 && ARCH_MXC
+> 
+>  - Dropped FALLTHROUGH annotations
+> 
+> Changes since [v1]:
+> 
+>  - Driver changed to use single "fsl,controller-id" property to
+>    distinguish between two intances of PCIE IP block
+> 
+>  - All code pertaining to L1SS was dropped to simplify the patch
+> 
+>  - Documented additions to DT bindings
+> 
+> Feedback is welcome!
+> 
+> Thanks,
+> Andrey Smirnov
+> 
+> [v4] https://lore.kernel.org/linux-arm-kernel/20190104165335.13205-1-andrew.smirnov@gmail.com
+> [v3] https://lore.kernel.org/linux-arm-kernel/20181218040702.29231-1-andrew.smirnov@gmail.com
+> [patch] https://patchwork.kernel.org/patch/10712261/
+> [fixes] https://lore.kernel.org/linux-arm-kernel/20181216230916.22982-1-andrew.smirnov@gmail.com
+> [v2] https://lore.kernel.org/linux-arm-kernel/20181206073545.10967-1-andrew.smirnov@gmail.com
+> [v1] https://lore.kernel.org/linux-arm-kernel/20181117181225.10737-1-andrew.smirnov@gmail.com/
+> 
+> Andrey Smirnov (4):
+>   PCI: imx6: Introduce drvdata
+>   PCI: imx6: Mark PHY functions as i.MX6 specific
+>   PCI: imx6: Convert DIRECT_SPEED_CHANGE quirk code to use a flag
+>   PCI: imx6: Add support for i.MX8MQ
+> 
+>  .../bindings/pci/fsl,imx6q-pcie.txt           |   3 +-
+>  drivers/pci/controller/dwc/Kconfig            |   4 +-
+>  drivers/pci/controller/dwc/pci-imx6.c         | 150 +++++++++++++++---
+>  3 files changed, 133 insertions(+), 24 deletions(-)
 
+Can you rebase it on top of my pci/dwc branch please and repost it ?
+
+Thanks,
+Lorenzo
 
 _______________________________________________
 linux-arm-kernel mailing list
