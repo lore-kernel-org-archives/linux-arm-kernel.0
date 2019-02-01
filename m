@@ -4,69 +4,83 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9BBAAC282D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 01:38:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 54902C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 01:42:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6F2CC20869
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 01:38:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2670920B1F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 01:42:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OeDmxahP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F2CC20869
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pm4nFSN4";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="CU4KYip1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2670920B1F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SF2OtYiB2M5sOOjmHRcYe3xNuPVmWoHQJXoXPZcj05A=; b=OeDmxahPtyki8c
-	114VrQe2HlYTswBiwLO6XHBelAqiWwjkAAKi8RvHqa5UEaieKnbuPBqg24V1I7blCkeGHVKUmU22q
-	ZpKnMHfU50f4+JYYXuPz/supJoPunei83+bWOUsYeWRWPLzu+6xONqLQ+E+mNYFtqpmnB/ORnwOAN
-	qBxEOmh/KZNQOdrwKmpxqhANoM+i2cyDGj0D6cnw7C3DT36MWbnXUosWpsUFX7RwBpRCUANFJHpdJ
-	2H4P/QKYr5z/1Z8YLQG7E+5BHIzitrAz8ieJMAch/EVRTD9RFimTiHOvJ+F2Gk8vhdX3db7eNnff7
-	uiC5MilsaifGJPT+2rnQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=RO3+LKTcaW3P4R9YLz7B2HMRfIup+qLE1MT5wRfYYnk=; b=pm4nFSN48ElO+QGD5/gSgrQws
+	uXvf3R7yDrnMS72hdfxz/Eo/Eu7dub08Xm5TppTcDjIbXJMkfWa3FOxFieh1jDmUp5qoj3Q3EA9bh
+	12Ub10b3ib5ITLD9gwgiYqbnLuF0eP488/hoWkYqmg5RaCd993crYW92zMJCLD5Q/wezJfTUMZP79
+	+GWvwx0rOYsRyhHF81RvJpDZchbDqzxpzZmmF3SNf+l3QX3j/PyiQwjUNN1HZAnRYoOf6Z9BCVFMV
+	/sHmv79wrGh4UyYqZ+S5LtmZokXEvRrGcY/wtdcGlyLCP6XuSSqyKzWHIBJ47voRbRyiupI8FAkjd
+	Y1DS/w0Tg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpNn0-0003y0-7e; Fri, 01 Feb 2019 01:38:42 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gpNqz-0005hZ-SM; Fri, 01 Feb 2019 01:42:49 +0000
+Received: from hqemgate16.nvidia.com ([216.228.121.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpNmw-0003xE-Co; Fri, 01 Feb 2019 01:38:39 +0000
-X-UUID: ddd3245a37564a438199facafc933c8e-20190131
-X-UUID: ddd3245a37564a438199facafc933c8e-20190131
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
- (envelope-from <chaotian.jing@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1670104885; Thu, 31 Jan 2019 17:38:17 -0800
-Received: from mtkmbs03n2.mediatek.inc (172.21.101.182) by
- MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 31 Jan 2019 17:38:15 -0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by mtkmbs03n2.mediatek.inc
- (172.21.101.182) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Fri, 1 Feb 2019 09:38:13 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 1 Feb 2019 09:38:12 +0800
-Message-ID: <1548985091.10251.26.camel@mhfsdcap03>
-Subject: Re: [PATCH] mmc: mmc: Fix HS setting in mmc_hs400_to_hs200()
-From: Chaotian Jing <chaotian.jing@mediatek.com>
-To: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Fri, 1 Feb 2019 09:38:11 +0800
-In-Reply-To: <CAPDyKFruCCs_un1oR-gd1P=ZGryyHwKuY0SkvLO2=Jm1bGV6sQ@mail.gmail.com>
-References: <1548921212-5219-1-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFruCCs_un1oR-gd1P=ZGryyHwKuY0SkvLO2=Jm1bGV6sQ@mail.gmail.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gpNqw-0005hA-51
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 01:42:47 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c53a3eb0000>; Thu, 31 Jan 2019 17:42:03 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Thu, 31 Jan 2019 17:42:45 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Thu, 31 Jan 2019 17:42:45 -0800
+Received: from [10.19.108.132] (172.20.13.39) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 1 Feb
+ 2019 01:42:43 +0000
+Subject: Re: [PATCH] cpuidle: dt: bail out if the idle-state DT node is not
+ compatible
+To: Sudeep Holla <sudeep.holla@arm.com>
+References: <20190131022749.19046-1-josephl@nvidia.com>
+ <20190131103823.GA19907@e107155-lin>
+From: Joseph Lo <josephl@nvidia.com>
+Message-ID: <fc49e8b2-cc32-3074-9aa7-04bbc561dfe6@nvidia.com>
+Date: Fri, 1 Feb 2019 09:42:41 +0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: B537CDA27EF59E3B1B84E492B269AE1FB2207C44900CE4F37535641C42AF7ECF2000:8
-X-MTK: N
+In-Reply-To: <20190131103823.GA19907@e107155-lin>
+X-Originating-IP: [172.20.13.39]
+X-ClientProxiedBy: HQMAIL107.nvidia.com (172.20.187.13) To
+ HQMAIL101.nvidia.com (172.20.187.10)
+Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1548985324; bh=kajs44y47x/hymVRwUhzh7iHdJc/oH126Cqtxv/IoV4=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=CU4KYip1DKLf0+bld/PL6jFEy2vzGh4bDdVMdRv2TMFIk0fkLmZuRtTDIeJ00l2Wh
+ xCAlV1XmaLUioJJPH9cBmMgNuqw1gZ+WQklzUnVw4TjYSHCHVsALck7lA5P5d33taD
+ 1qcjuhx+20wnyZI+K9CJQcakyMIlCxtYC3IxfMSHfoIP3aWLphTbljdUTupM6Rik4e
+ MtRK7zHIy9xJqPKrtkFhAd/q/fP9OXVpCUG+neRxINa3C1z1TYexRWfb0rEPiLXcBp
+ 5sN6QpS+DXlR7JTuZXFRA8I8MPe2CFtqlNJaBXV4RDyeOr7rQ3bwWD28iXv6922C5H
+ Tn/V6taxlqRRg==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_173838_438891_EBBD1311 
-X-CRM114-Status: GOOD (  30.08  )
+X-CRM114-CacheID: sfid-20190131_174246_259203_B3E61376 
+X-CRM114-Status: GOOD (  15.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,133 +92,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: srv_heupstream <srv_heupstream@mediatek.com>,
- Shawn Lin <shawn.lin@rock-chips.com>,
- "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- linux-mediatek@lists.infradead.org,
- Harish Jenny K N <harish_kandiga@mentor.com>,
- Hongjie Fang <hongjiefang@asrmicro.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Simon Horman <horms+renesas@verge.net.au>, Kyle
- Roeschley <kyle.roeschley@ni.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: linux-tegra@vger.kernel.org, Daniel Lezcano <daniel.lezcano@linaro.org>,
+ "Rafael J . Wysocki" <rjw@rjwysocki.net>, linux-arm-kernel@lists.infradead.org,
+ linux-pm@vger.kernel.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 2019-01-31 at 16:58 +0100, Ulf Hansson wrote:
-> On Thu, 31 Jan 2019 at 08:53, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> >
-> > mmc_hs400_to_hs200() begins with the card and host in HS400 mode.
-> > Therefore, any commands sent to the card should use HS400 timing.
-> > It is incorrect to reduce frequency to 50Mhz before sending the switch
-> > command, in this case, only reduce clock frequency to 50Mhz but without
-> > host timming change, host is still in hs400 mode but clock changed from
-> > 200Mhz to 50Mhz, which makes the tuning result unsuitable and cause
-> > the switch command gets response CRC error.
+On 1/31/19 6:38 PM, Sudeep Holla wrote:
+> On Thu, Jan 31, 2019 at 10:27:49AM +0800, Joseph Lo wrote:
+>> Currently, the DT of the idle states will be parsed first whether it's
+>> compatible or not. This could cause a warning message that comes from if
+>> the CPU doesn't support identical idle states. E.g. Tegra186 can run
+>> with 2 Cortex-A57 and 2 Denver cores with different idle states on
+>> different types of these cores.
+>>
+>> We fix it to check the compatible string before the parsing procedures.
+>> So it can make sure it only goes through the idle states that the CPU
+>> supported.
+>>
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> ---
+>>   drivers/cpuidle/dt_idle_states.c | 5 +++++
+>>   1 file changed, 5 insertions(+)
+>>
+>> diff --git a/drivers/cpuidle/dt_idle_states.c b/drivers/cpuidle/dt_idle_states.c
+>> index 53342b7f1010..4a528908abb3 100644
+>> --- a/drivers/cpuidle/dt_idle_states.c
+>> +++ b/drivers/cpuidle/dt_idle_states.c
+>> @@ -180,6 +180,11 @@ int dt_init_idle_driver(struct cpuidle_driver *drv,
+>>   		if (!state_node)
+>>   			break;
+>>
+>> +		if (!of_device_is_compatible(state_node, matches->compatible)) {
+>> +			err = -EINVAL;
+>> +			break;
+>> +		}
+>> +
 > 
-> According the eMMC spec there is no violation by decreasing the clock
-> frequency like this. We can use whatever value <=200MHz.
-> 
-> However, perhaps in practice this becomes an issue, due to the tuning
-> for HS400 has been done on the "current" frequency.
-> 
-> As as start, I think you need to clarify this in the changelog.
-> 
-Yes, reduce clock frequency to 50Mhz is no Spec violation, but it may
-cause __mmc_switch() gets response CRC error, decreasing the clock but
-without HOST mode change, on the host side, host driver do not know
-what's operation the core layer want to do and can only set current bus
-clock to 50Mhz, without tuning parameter change, it has a chance lead to
-response CRC error. even lower clock frequency, but with the wrong
-tuning parameter setting(the setting is of hs400 tuning @200Mhz).
-> >
-> > this patch refers to mmc_select_hs400(), make the reduce clock frequency
-> > after card timing change.
-> >
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >  drivers/mmc/core/mmc.c | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> > index da892a5..21b811e 100644
-> > --- a/drivers/mmc/core/mmc.c
-> > +++ b/drivers/mmc/core/mmc.c
-> > @@ -1239,10 +1239,6 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
-> >         int err;
-> >         u8 val;
-> >
-> > -       /* Reduce frequency to HS */
-> > -       max_dtr = card->ext_csd.hs_max_dtr;
-> > -       mmc_set_clock(host, max_dtr);
-> > -
-> 
-> As far as I can tell, the reason to why we change the clock frequency
-> *before* the call to __mmc_switch() below, is probably to try to be on
-> the safe side and conform to the spec.
-> 
-Agree, it Must be more safe with lower clock frequency, but the
-precondition is to make the host side recognize current timing is not
-HS400 mode. it has no method to find a safe setting to ensure no
-response CRC error when reduce clock from 200Mhz to 50Mhz.
-> However, I think you have a point, as the call to __mmc_switch(),
-> passes the "send_status" parameter as false, no other command than the
-> CMD6 is sent to the card.
-> 
-yes, the send status command was sent only after __mmc_switch() done.
-> >         /* Switch HS400 to HS DDR */
-> >         val = EXT_CSD_TIMING_HS;
-> >         err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
-> > @@ -1253,6 +1249,10 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
-> >
-> >         mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
-> >
-> > +       /* Reduce frequency to HS */
-> > +       max_dtr = card->ext_csd.hs_max_dtr;
-> > +       mmc_set_clock(host, max_dtr);
-> > +
-> 
-> Perhaps it's even more correct to change the clock frequency before
-> the call to mmc_set_timing(host, MMC_TIMING_MMC_DDR52). Otherwise you
-> will be using the DDR52 timing in the controller, but with a too high
-> frequency.
-> 
-for Our host, it has no impact to change the clock before or after
-change timing, as the mmc_set_timing() is only for host side, not
-related to MMC card side and no commands sent do card before the
-timing/clock change completed.
-> >         err = mmc_switch_status(card);
-> >         if (err)
-> >                 goto out_err;
-> > --
-> > 1.8.1.1.dirty
-> >
-> 
-> Finally, it sounds like you are trying to fix a real problem, can you
-> please provide some more information what is happening when the
-> problem occurs at your side?
-> 
-Yes, I got a problem with new kernel version. with
-commit:57da0c042f4af52614f4bd1a148155a299ae5cd8, this commit makes
-re-tuning every time when access RPMB partition.
+> Does it make sense to use of_match_node to get the matching device id and
+> just pass that to init_state_node instead of the complete array to find the
+> match.
 
-in fact, our host tuning result of hs400 is very stable and almost never
-get response CRC error with clock frequency at 200Mhz. but cannot ensure
-this tuning result also suitable when running at HS400 mode @50Mhz. as I
-mentioned before, the host side does not know the reason of reduce clock
-frequency to 50Mhz at HS400 mode, so what's the host side can do is only
-reduce the bus clock to 50Mhz, even it can just only set the tuning
-setting to default when clock frequency lower than 50Mhz, but both card
-& host side are still at HS400 mode, still cannot ensure this setting is
-suitable.
+Yes, that would be even better.
 
-> Kind regards
-> Uffe
-
-
+Thanks,
+Joseph
 
 _______________________________________________
 linux-arm-kernel mailing list
