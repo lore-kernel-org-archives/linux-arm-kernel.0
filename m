@@ -2,125 +2,105 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D6BBAC282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:02:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 545F2C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:06:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A16B820857
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:02:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1056720857
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 05:06:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hT1MtoQ8";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Sy6Ysniv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A16B820857
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AIHc3o6N";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="mARIrqCm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1056720857
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9vjta9X4wG3r1VfhkZjHVcUwJ4K2gfCJMRgzn7POuKE=; b=hT1MtoQ8cFv8Xz
-	IHTRBVeXOcWv2i1jmH2/Hn8vrYEZJ8qcitaq12iWE6LyYUKZyJ2lKRRL6ovbtY8GsvRzMf3sO2yiT
-	55tLu/oCupdiyXb8qEibVAyGvFRZwhbD7QS3tjc1XanvE+Xf1D2d7rPJAG8kD/HTedZ3AvOzGYz58
-	R5uX4bwdmUJkEjcgNVmfd2nSn2QUIOc6xXsebk0v14F227Pv8yYMLE+ukKcqch3xgpSOehaoqm7GA
-	lOP4oRgMb5KS05Itw7wcMTKVRbBRKkHzIjCgy0+Qv0O5VKCHSfGVzK7jhILHNxRbn3lcQh8sEE2i7
-	qFeYfp6fD+mUtTI5EPvA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=TM7UwU/ASJZAluV83b5bCgDMPrt5LLEFv8qJ8Osk7sE=; b=AIHc3o6N+vLlea
+	sVFn1vFxgiDRVCqUHFAXcfeg1lHlGy6C+cjTjlZjqruQCRFwJFpy0JMZhO/oQeY7+UucYafnZZze2
+	TbP58rVwsdidH6cl+wx0T3dzZCUvP7En00c7t5FPmqDfaph3+H0O7HiwFU5MRdqMJNpe977Ke2XJq
+	mh2BglONjrdBIhX8lA3apd0n6ZIlQrHPS3ym0edG0zug+OoFeZhW0OBIiy51Smajpf/5B6kSZkZW8
+	KkLWh6Vv4L2vR3mIOAT4F2t2ATTBeZJtbEc/DJC9eFIxhrLmem3xWPGg6Knfcto4Vee83guPRGTTl
+	RF6Pk6HYxTKkvo85tKSQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpQyA-0000rg-7w; Fri, 01 Feb 2019 05:02:26 +0000
-Received: from mail-yb1-xb42.google.com ([2607:f8b0:4864:20::b42])
+	id 1gpR1k-0002bT-Db; Fri, 01 Feb 2019 05:06:08 +0000
+Received: from mail-eopbgr80070.outbound.protection.outlook.com ([40.107.8.70]
+ helo=EUR04-VI1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpQy6-0000r9-Lg; Fri, 01 Feb 2019 05:02:24 +0000
-Received: by mail-yb1-xb42.google.com with SMTP id m132so2213719ybf.0;
- Thu, 31 Jan 2019 21:02:19 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=qUhTbPCsO1jrFKUgbQA//w6RlZBwF6axtVnQtjKwisM=;
- b=Sy6YsnivoVLUgmSIDfL05vlpLRjFDqu0KUUW74NmN1b0LqGyZkDBgB00wbNidysx5Z
- X1mBxS+RlEc6y46irnWFfGP9anFvIMkbAcvRqRa5URRjTbZ5PxNIDoCz3nES2lMY+DUX
- a5kS53DNWA9p+mrjB6zg6N2Fz0wgIW3OThrTGs4RK63c+gKUDXjR1bDdG25E3R+WiRHu
- WquitCrKJYEGKdYQHsMXBBKtaFz82i8xdJiHcOWM2PvJ6vVgIyzVkJHj9spyVy5Q1CYs
- AyRQ5cBFg6eZ190WuIs3Pv9iuRUXZcbdn7RBro8LQlBJ+G9ZnXGt0FlfAmYFQPLQIomk
- m+fQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=qUhTbPCsO1jrFKUgbQA//w6RlZBwF6axtVnQtjKwisM=;
- b=CNO4HxJiT5xozO0uFJWB4bZdeP+uItIBQtaLHhJjC5CY/cbieBvly1hDwYvbXErLnc
- QBdnR+8Txld2PN3GZfBJzxQ0E5TCGuOknJgdB3ydu2YoFd1UmC6p2Eel3IJJ5xrfsirP
- tLuHLSOWgDUbF3NGY+tDgaXAUVoYbV6FrNX8gX2mYLRabwQgS+N4NHWunH0KDzGIcCDH
- 2q8+u++Q6/sN+SQ19urLZXHVk3sRPK8JPGVLFdoG8bhICBYg+MUQg8jcF0mo6TJRN41F
- 9FvMhEi/RlOQKWNts/DCNywNUdrH4LKW3k5Zj/xDgTGhIe6acj2zCUGMyf26V7D/W82t
- naZQ==
-X-Gm-Message-State: AJcUukf9RoZ9DJuGS2bJy0nXBy2O/llvsPdhWdv86rdsgFa4F7P5wxgP
- PW3Cg1JjlSCla7YZeddAo/S2edWD
-X-Google-Smtp-Source: ALg8bN5D3/yWqi9E8DgxniNMauXZlaQbVZ66beY+qgL+S/Q2XJ/FAovYMIvFLLEdRSB9QVJbMmj9sw==
-X-Received: by 2002:a5b:903:: with SMTP id a3mr35898645ybq.184.1548997337774; 
- Thu, 31 Jan 2019 21:02:17 -0800 (PST)
-Received: from [10.10.116.34] ([192.19.218.250])
- by smtp.gmail.com with ESMTPSA id d85sm2448336ywd.22.2019.01.31.21.02.14
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 31 Jan 2019 21:02:16 -0800 (PST)
-Subject: Re: [GIT PULL 1/3] bcm2835-dt-next-2019-01-29
-To: Florian Fainelli <f.fainelli@gmail.com>,
- Stefan Wahren <stefan.wahren@i2se.com>
-References: <1548788008-4733-1-git-send-email-stefan.wahren@i2se.com>
- <92b0b6d9-ced1-4a0a-e0d5-d72751dacfcb@gmail.com>
-From: Florian Fainelli <f.fainelli@gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=florian.fainelli@broadcom.com; keydata=
- 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
- w0j9Sw==
-Message-ID: <10832eda-69a1-1c47-3fe6-7e8da02884d6@gmail.com>
-Date: Thu, 31 Jan 2019 21:02:13 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <92b0b6d9-ced1-4a0a-e0d5-d72751dacfcb@gmail.com>
+ id 1gpR1W-0002Sg-EG; Fri, 01 Feb 2019 05:05:56 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=9OdoRb1a1czrOXVcFLPFbUPT8SCfyI7ybYJuekEUO4o=;
+ b=mARIrqCmqXCnnl1GqTSb4mwfG9jaRXe2kGLdbf3a26dWcnr9M3pL+as/ztV2hOybSrvmjsdMbxQVvShQRSahf5CO7GjmXpaBkNYOmYKKAVhJBqcOl7y8B6hfHqm+7CEUv9TXYfxvfPWxbhxnWBBHrkrbPmJOHnl5RlvFMRDe1PM=
+Received: from VI1PR04MB5726.eurprd04.prod.outlook.com (20.178.127.24) by
+ VI1PR04MB4109.eurprd04.prod.outlook.com (52.133.14.148) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1580.17; Fri, 1 Feb 2019 05:05:49 +0000
+Received: from VI1PR04MB5726.eurprd04.prod.outlook.com
+ ([fe80::a1c2:cc79:80f3:3bcb]) by VI1PR04MB5726.eurprd04.prod.outlook.com
+ ([fe80::a1c2:cc79:80f3:3bcb%5]) with mapi id 15.20.1558.026; Fri, 1 Feb 2019
+ 05:05:49 +0000
+From: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+To: Shawn Guo <shawnguo@kernel.org>
+Subject: RE: [PATCH v8 3/5] arm64: dts: lx2160a: add FlexSPI node property
+Thread-Topic: [PATCH v8 3/5] arm64: dts: lx2160a: add FlexSPI node property
+Thread-Index: AQHUrMnmG0R4tGWK7UOvqbFnAen7xaXKWTiAgAAkn1A=
+Date: Fri, 1 Feb 2019 05:05:49 +0000
+Message-ID: <VI1PR04MB5726460C6F341F0DFEA8BA8899920@VI1PR04MB5726.eurprd04.prod.outlook.com>
+References: <1547553487-9936-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1547553487-9936-4-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <20190201025405.GA19882@dragon>
+In-Reply-To: <20190201025405.GA19882@dragon>
+Accept-Language: en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=yogeshnarayan.gaur@nxp.com; 
+x-originating-ip: [92.120.0.7]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR04MB4109;
+ 6:NgcPvjHrEAtf2R6Grka3a+asUbVTZlgT9xIWkQgZtcsjVioag36pCvtcAb/oERoNn/5pGTSQaCijuJI3lparbQ+DypMWHjSasbMPpHhaieJ5uAoeSQk9YcdNCBNRQxu510HTWclJHNnfWblZRlyBGIME8cWTGuWqMyK0hyqJ/ijS3c4Lq/gfy/kRvyW4ra8cs2rv2WSiXU+suHe6Ik7BohInsQELRqHw7K2xYCEqJwCQOXz/BiDGLfYGwfxpLeZ3yHp0jjY6HMuHXCzy6m/r0ZXQfrMDcAOJ9VNJkiXZJEZMOmmIHONikJbnf6PhKy8KMfMqLobkF7ePSR/Op+py1yzuVSabiixtj4qrbQ+aOongC2Dl0wldaUdgwRGcE5kxkP3Cty3wSh758Zc0N6+l48ecAte5DQD0C1yPoGieiWgCN4nZyYEY2jq7YlfayXvaXlaSgcE+xr2R9wMd3CoovQ==;
+ 5:aDltuWC3uyaXq7xLkL6THd8U7nKN76y/0jNYUfSnT7iH2bERi9elwU8mmmCdOxls4/Y+65Xu+gksdkiopGCBt4l5QY2eFh0zmjcIX9V08YaVVJLuUVxb4FfpAczMdwoEMe8zKONsJk+bVr1dLeybl5bNpIEv1Fc0C7tgIV7LFVrY1+SJjVpWFiqypqUy/ByJeARBCKn2vNDRVMoG9ajxrg==;
+ 7:GvR3Ndd+/ib1K1F//qVIixsNSnd3O09USL1L+EoLA24gfPaxtRfbTjsOFYeapCQ/9sSgIyvCRPs4QEoghd6O9l87P5E1o1uyD5ZjIjUPqtN8utUzHAOdl30eEocx0D4bpBpveIQLH8xWQdAUaAPdNA==
+x-ms-office365-filtering-correlation-id: 69aa749f-7813-4705-620a-08d68802eef2
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB4109; 
+x-ms-traffictypediagnostic: VI1PR04MB4109:
+x-microsoft-antispam-prvs: <VI1PR04MB4109AC5CA7DBAB0113DE9FA899920@VI1PR04MB4109.eurprd04.prod.outlook.com>
+x-forefront-prvs: 09352FD734
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(39860400002)(136003)(346002)(396003)(366004)(13464003)(199004)(189003)(11346002)(6506007)(26005)(7696005)(53546011)(7736002)(4326008)(186003)(476003)(76176011)(6436002)(6916009)(229853002)(6306002)(86362001)(81166006)(14454004)(55016002)(99286004)(9686003)(81156014)(66066001)(25786009)(7416002)(8676002)(68736007)(305945005)(53936002)(102836004)(105586002)(6246003)(8936002)(478600001)(33656002)(97736004)(14444005)(6116002)(3846002)(54906003)(2906002)(39060400002)(966005)(446003)(486006)(45080400002)(256004)(316002)(106356001)(74316002)(71200400001)(71190400001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4109;
+ H:VI1PR04MB5726.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: TDYgXrKzxVrYRbxbp5+7Z0Hw5eDfW9K0GYgfh/bone1w67PZcThCETbOY5DSa/1e2M1DXuNI4a5INUyxwzJB7pmm0YWOd/luiwwvJhht5j9ovKY1Rm2vqnXnniscU+R2zYaBKeA6GgjQ52+TEDapw2VQZG5nH0UCYzzUWDh85dxCJG9bmfxmM0ovOYX1fBZCjdy3J/rhBepPJk04FE0h3onDJJrl27EUEysqTTnqF8qjDZIpJYfAgX2DHTmB6kmGNVzZHrwi92qLavBheGWxwHWCc18kn/Z6huiSCRZXiPBUSjTExIoQDngdsb6M6kDbf7OOx7GXlPZUcXN69i+/F0MuVOyuj8he7g+QzgHmpXq7IFcQuDOOtYe73y3ReUqIJR6ZQxqr7cVcC97DiX8NLntWoulcPAkikJZLDVyMIqk=
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 69aa749f-7813-4705-620a-08d68802eef2
+X-MS-Exchange-CrossTenant-originalarrivaltime: 01 Feb 2019 05:05:49.8427 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4109
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_210222_735989_F9202791 
+X-CRM114-CacheID: sfid-20190131_210554_549663_3C7ADFAB 
 X-CRM114-Status: GOOD (  18.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -133,9 +113,18 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Eric Anholt <eric@anholt.net>, bcm-kernel-feedback-list@broadcom.com,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-rpi-kernel@lists.infradead.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "bbrezillon@kernel.org" <bbrezillon@kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "frieder.schrempf@kontron.de" <frieder.schrempf@kontron.de>,
+ "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
+ "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
+ "broonie@kernel.org" <broonie@kernel.org>,
+ "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
+ "robh@kernel.org" <robh@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
@@ -143,80 +132,142 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 
 
-On 1/31/19 8:10 PM, Florian Fainelli wrote:
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo@kernel.org]
+> Sent: Friday, February 1, 2019 8:24 AM
+> To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> Cc: linux-mtd@lists.infradead.org; bbrezillon@kernel.org;
+> marek.vasut@gmail.com; broonie@kernel.org; linux-spi@vger.kernel.org;
+> devicetree@vger.kernel.org; mark.rutland@arm.com; robh@kernel.org; linux-
+> kernel@vger.kernel.org; frieder.schrempf@kontron.de;
+> computersforpeace@gmail.com; linux-arm-kernel@lists.infradead.org
+> Subject: Re: [PATCH v8 3/5] arm64: dts: lx2160a: add FlexSPI node property
 > 
+> On Tue, Jan 15, 2019 at 12:00:26PM +0000, Yogesh Narayan Gaur wrote:
+> > Add fspi node property for LX2160A SoC for FlexSPI driver.
+> > Property added for the FlexSPI controller and for the connected slave
+> > device for the LX2160ARDB target.
+> > This is having two SPI-NOR flash device, mt35xu512aba, connected at
+> > CS0 and CS1.
+> >
+> > Signed-off-by: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> > ---
+> > Changes for v8:
+> > - None
+> > Changes for v7:
+> > - None
+> > Changes for v6:
+> > - None
+> > Changes for v5:
+> > - None
+> > Changes for v4:
+> > - Incorporated Rob review comments.
+> > Changes for v3:
+> > - None.
+> > Changes for v2:
+> > - Incorporated Shawn review comments.
+> >
+> >  .../boot/dts/freescale/fsl-lx2160a-rdb.dts    | 22 +++++++++++++++++++
+> >  .../arm64/boot/dts/freescale/fsl-lx2160a.dtsi | 13 +++++++++++
+> >  2 files changed, 35 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> > b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> > index 6481e5f20e69..70658946fbbe 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> > @@ -50,6 +50,28 @@
+> >  	status = "okay";
+> >  };
+> >
+> > +&fspi {
+> > +	status = "okay";
+> > +
+> > +	mt35xu512aba0: flash@0 {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		compatible = "spansion,m25p80";
+> > +		m25p,fast-read;
+> > +		spi-max-frequency = <50000000>;
+> > +		reg = <0>;
+> > +	};
+> > +
+> > +	mt35xu512aba1: flash@1 {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		compatible = "spansion,m25p80";
+> > +		m25p,fast-read;
+> > +		spi-max-frequency = <50000000>;
+> > +		reg = <1>;
+> > +	};
+> > +};
+> > +
+> >  &i2c0 {
+> >  	status = "okay";
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> > b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> > index a79f5c1ea56d..e3ff86201f73 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> > @@ -762,5 +762,18 @@
+> >  				     <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
+> >  			dma-coherent;
+> >  		};
+> > +
+> > +		fspi: spi@20c0000 {
 > 
-> On 1/29/19 10:53 AM, Stefan Wahren wrote:
->> Hi Florian,
->>
->> sorry for being that late and hoping it's not too late.
->>
->> The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
->>
->>   Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
->>
->> are available in the git repository at:
->>
->>   git://github.com/anholt/linux tags/bcm2835-dt-next-2019-01-29
->>
->> for you to fetch changes up to 14117e0af4a853b2b37925f526b2bfe1cfc7b285:
->>
->>   ARM: dts: bcm2835-rpi-zero-w: Drop unnecessary pinctrl (2019-01-22 07:25:59 +0100)
->>
->> ----------------------------------------------------------------
->> This pull request adds the necessary changes for the new BCM2835 PM driver,
->> support for the new Raspberry Pi 3 A+ and the missing GPIO labels for RPi 2/3.
->> Additionally it contains some minor DT fixes.
->>
->> ----------------------------------------------------------------
+> To keep the nodes sorted in unit-address, it should go after i2c@2070000.
 > 
-> Merged into devicetree/next, thanks Stefan!
+> > +			compatible = "nxp,lx2160a-fspi";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			reg = <0x0 0x20c0000 0x0 0x10000>,
+> > +				<0x0 0x20000000 0x0 0x10000000>;
+> 
+> I would align the indentation with the above.
+> 
+> > +			reg-names = "fspi_base", "fspi_mmap";
+> > +			interrupts = <0 25 0x4>; /* Level high type */
+> 
+> interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>; so that we can save the
+> comment there.
+> 
+> I fixed up all these small things and applied the patch.
+> 
+Ok, Thanks.
 
-And backed out, integration failed with the following results:
+--
+Regards
+Yogesh Gaur.
 
-[X] aiaiai build results:
-Tested the patch(es) on top of the following commits:
-bfeffd155283 Linux 5.0-rc1
-85e1ffbd42f6 Merge tag 'kbuild-v4.21-3' of
-git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-kbuild
-ac5eed2b4177 Merge branch 'perf-urgent-for-linus' of
-git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip
-574823bfab82 Change mincore() to count "mapped" pages rather than
-"cached" pages
-
---------------------------------------------------------------------------------
-Failed to build : 22065550c391 ARM: dts: bcm2835-rpi-zero-w: Drop
-unnecessary pinctrl
-Configuration: "multi_v7_defconfig, architecture arm".
-
-
-In file included from arch/arm/boot/dts/bcm2835.dtsi:2:0,
-                 from arch/arm/boot/dts/bcm2835-rpi-a.dts:3:
-arch/arm/boot/dts/bcm283x.dtsi:6:10: fatal error:
-dt-bindings/soc/bcm2835-pm.h: No such file or directory
- #include <dt-bindings/soc/bcm2835-pm.h>
-          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-compilation terminated.
-make[2]: *** [arch/arm/boot/dts/bcm2835-rpi-a.dtb] Error 1
-
---------------------------------------------------------------------------------
-Failed to build : 22065550c391 ARM: dts: bcm2835-rpi-zero-w: Drop
-unnecessary pinctrl
-Configuration: "bcm2835_defconfig, architecture arm".
-
-It looks like commit "ARM: bcm283x: Switch V3D over to using the PM
-driver instead of firmware." is failing here and we should also have
-"soc: bcm: bcm2835-pm: Add support for power domains under a new
-binding." present as a preriquisite to build this branch.
-
-Alternatively, if you prefer to put "ARM: bcm283x: Switch V3D over to
-using the PM driver instead of firmware." in your drivers pull request,
-that might work too.
-
-I have kept pull request 2 and 3 applied for now, let me know how you
-want to proceed.
--- 
-Florian
+> Shawn
+> 
+> > +			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
+> > +			clock-names = "fspi_en", "fspi";
+> > +			status = "disabled";
+> > +		};
+> >  	};
+> >  };
+> > --
+> > 2.17.1
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel@lists.infradead.org
+> > https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Flist
+> > s.infradead.org%2Fmailman%2Flistinfo%2Flinux-arm-
+> kernel&amp;data=02%7C
+> >
+> 01%7Cyogeshnarayan.gaur%40nxp.com%7C6308464db1a541247dfd08d687f09
+> 124%7
+> >
+> C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636845864632818753&a
+> mp;sda
+> >
+> ta=urGFUKDP6ZZZOTXS1ccfLceCV2OBV5%2BiZq9foCu7ZX8%3D&amp;reserved=
+> 0
 
 _______________________________________________
 linux-arm-kernel mailing list
