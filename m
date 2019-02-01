@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D656C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:40:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B08D3C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:40:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5D41B204EC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:40:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 620D3204EC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:40:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WwPElcwx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D41B204EC
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uIZ6as8L"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 620D3204EC
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,29 +25,29 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rB4/rVN5bGbvljbNov8/JOH/1VntIDKUjxXMGAGRAHU=; b=WwPElcwxwpnhCd
-	Osw/FyYbgqBYLT/C641BVBp3hfJ7glo5NJjTDscb5IF6mI9SKQZZ4wVQXCWAsCx1q5n5pupXfncBV
-	xP60FcjVedfWZT2Ndk3OgXcb3GnQMxH3uog/II77bRMSWzarZgM8Y0w8S4HWeAibmAeyV/a3RAmNY
-	JUllMoqUmfdE81S/tDfXBLdBMVBqZxl30yKztntC/YtYSft9H/MstlBSKPFU36NA2uCu+EKEqJsCU
-	RhdoptNvzNarDRTLqpxIC9PfCAnyB2SUGd4Bcbj/bf+1G53LKdWMhi3LXf82Rz1ShLZdsm3Wr8JR/
-	BjkT4WNYtfmDgLS1iCIg==;
+	List-Owner; bh=LWd/X0RadUgNgvRiH6dye9F8g1500gEuP19QXtlgN7w=; b=uIZ6as8LxZUjCi
+	HHNapNhLCjJjRKmEdIMWtij4qIV7HhzzbaHofk1b9KxQqaUFMZ8lEQO6u7a+6I9dXFtFiBqFlTLjn
+	pSBnCRebTOz77QRHAyMS30fvycT0OWW6RlvxHFtr8JcJb8moAkrUeK0wMXWVdgZof4Zl8QDHA+XGB
+	/eSfGht1qpRgSn4TZoNu+aOixp2tfEp8yf2oJvnM2WtQlqwci0lN+hkQWX0mefpp93+jqHOzJCnHS
+	Jlxr+ixC+Gp0bO+6mKfFr6bb6HZ2e6oBVBZzoiJF4Sf1cXF33roB+2x2aC5K+uRjDKCPYD81A/JZY
+	tcE/xA1W3vWHSLAHqQVw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpTQx-0007nQ-Ss; Fri, 01 Feb 2019 07:40:19 +0000
+	id 1gpTRC-0000B7-Az; Fri, 01 Feb 2019 07:40:34 +0000
 Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpTP9-0005Ni-0g; Fri, 01 Feb 2019 07:38:29 +0000
-X-UUID: d5811bfd90ba4ed9aaea3d7019f8764e-20190131
-X-UUID: d5811bfd90ba4ed9aaea3d7019f8764e-20190131
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
+ id 1gpTPC-0005Nk-4J; Fri, 01 Feb 2019 07:38:35 +0000
+X-UUID: f7c63890c23f4176a1cd5e908e019e98-20190131
+X-UUID: f7c63890c23f4176a1cd5e908e019e98-20190131
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
  (envelope-from <michael.kao@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1619003453; Thu, 31 Jan 2019 23:38:19 -0800
-Received: from mtkmbs03n2.mediatek.inc (172.21.101.182) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ with ESMTP id 500161509; Thu, 31 Jan 2019 23:38:18 -0800
+Received: from MTKMBS01N2.mediatek.inc (172.21.101.79) by
+ MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
  15.0.1395.4; Thu, 31 Jan 2019 23:38:18 -0800
 Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
- mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
+ mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
  15.0.1395.4; Fri, 1 Feb 2019 15:38:15 +0800
 Received: from mtksdccf07.mediatek.inc (172.21.84.99) by MTKCAS06.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
@@ -57,18 +57,18 @@ To: =Zhang Rui <rui.zhang@intel.com>, =Eduardo Valentin <edubezval@gmail.com>,
  =Daniel Lezcano <daniel.lezcano@linaro.org>, =Rob Herring
  <robh+dt@kernel.org>, =Mark Rutland <mark.rutland@arm.com>, =Matthias Brugger
  <matthias.bgg@gmail.com>
-Subject: [PATCH 3/7] thermal: mediatek: add calibration item
-Date: Fri, 1 Feb 2019 15:38:09 +0800
-Message-ID: <1549006693-11659-4-git-send-email-michael.kao@mediatek.com>
+Subject: [PATCH 4/7] thermal: mediatek: add thermal controller offset
+Date: Fri, 1 Feb 2019 15:38:10 +0800
+Message-ID: <1549006693-11659-5-git-send-email-michael.kao@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1549006693-11659-1-git-send-email-michael.kao@mediatek.com>
 References: <1549006693-11659-1-git-send-email-michael.kao@mediatek.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: C4ADFAE3290338AA62FF0C4E2A82435AEE7CA07CF566417FC364522C8B91CF892000:8
+X-TM-SNTS-SMTP: 79A4413EFF942FB8429F75347807C272EE27671DC8EF9EDAA8521C785C587BFB2000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_233827_067709_7B140CE4 
-X-CRM114-Status: GOOD (  10.63  )
+X-CRM114-CacheID: sfid-20190131_233830_459720_36E3960F 
+X-CRM114-Status: GOOD (  15.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,106 +91,281 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Michael Kao <michael.kao@mediatek.com>
 
-Add calibration item in thermal_data to support
-the project with different calibration coefficient.
+One thermal controller can read four sensors at most,
+so we need to add controller_offset for the project with
+more than four sensors to reuse the same register settings.
 
 Signed-off-by: Michael Kao <michael.kao@mediatek.com>
 ---
- drivers/thermal/mtk_thermal.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ drivers/thermal/mtk_thermal.c | 79 +++++++++++++++++++++++++++++--------------
+ 1 file changed, 54 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/thermal/mtk_thermal.c b/drivers/thermal/mtk_thermal.c
-index 07f8ad7..45c6587 100644
+index 45c6587..e5cf3f4 100644
 --- a/drivers/thermal/mtk_thermal.c
 +++ b/drivers/thermal/mtk_thermal.c
 @@ -105,6 +105,9 @@
  /* The number of sensing points per bank */
  #define MT8173_NUM_SENSORS_PER_ZONE	4
  
-+/* The calibration coefficient of sensor  */
-+#define MT8173_CALIBRATION	165
++/* The number of controller in the MT8173 */
++#define MT8173_NUM_CONTROLLER		1
 +
- /*
-  * Layout of the fuses providing the calibration data
-  * These macros could be used for MT8173, MT2701, and MT2712.
-@@ -147,6 +150,9 @@ enum {
+ /* The calibration coefficient of sensor  */
+ #define MT8173_CALIBRATION	165
+ 
+@@ -150,6 +153,9 @@ enum {
  /* The number of sensing points per bank */
  #define MT2701_NUM_SENSORS_PER_ZONE	3
  
-+/* The calibration coefficient of sensor  */
-+#define MT2701_CALIBRATION	165
++/* The number of controller in the MT2701 */
++#define MT2701_NUM_CONTROLLER		1
 +
- /* MT2712 thermal sensors */
- #define MT2712_TS1	0
- #define MT2712_TS2	1
-@@ -162,12 +168,18 @@ enum {
+ /* The calibration coefficient of sensor  */
+ #define MT2701_CALIBRATION	165
+ 
+@@ -168,6 +174,9 @@ enum {
  /* The number of sensing points per bank */
  #define MT2712_NUM_SENSORS_PER_ZONE	4
  
-+/* The calibration coefficient of sensor  */
-+#define MT2712_CALIBRATION	165
++/* The number of controller in the MT2712 */
++#define MT2712_NUM_CONTROLLER		1
 +
- #define MT7622_TEMP_AUXADC_CHANNEL	11
- #define MT7622_NUM_SENSORS		1
+ /* The calibration coefficient of sensor  */
+ #define MT2712_CALIBRATION	165
+ 
+@@ -176,6 +185,7 @@ enum {
  #define MT7622_NUM_ZONES		1
  #define MT7622_NUM_SENSORS_PER_ZONE	1
  #define MT7622_TS1	0
++#define MT7622_NUM_CONTROLLER		1
  
-+/* The calibration coefficient of sensor  */
-+#define MT7622_CALIBRATION	165
-+
- struct mtk_thermal;
- 
- struct thermal_bank_cfg {
-@@ -188,6 +200,7 @@ struct mtk_thermal_data {
- 	const int *sensor_mux_values;
+ /* The calibration coefficient of sensor  */
+ #define MT7622_CALIBRATION	165
+@@ -201,6 +211,8 @@ struct mtk_thermal_data {
  	const int *msr;
  	const int *adcpnp;
-+	const int cali_val;
+ 	const int cali_val;
++	const int num_controller;
++	const int *controller_offset;
  	struct thermal_bank_cfg bank_data[];
  };
  
-@@ -295,6 +308,7 @@ struct mtk_thermal {
- 	.num_banks = MT8173_NUM_ZONES,
+@@ -240,6 +252,7 @@ struct mtk_thermal {
+ };
+ 
+ static const int mt8173_mux_values[MT8173_NUM_SENSORS] = { 0, 1, 2, 3, 16 };
++static const int mt8173_tc_offset[MT8173_NUM_CONTROLLER] = { 0x0, };
+ 
+ static const int mt8173_vts_index[MT8173_NUM_SENSORS] = {
+ 	VTS1, VTS2, VTS3, VTS4, VTSABB
+@@ -259,6 +272,7 @@ struct mtk_thermal {
+ };
+ 
+ static const int mt2701_mux_values[MT2701_NUM_SENSORS] = { 0, 1, 16 };
++static const int mt2701_tc_offset[MT2701_NUM_CONTROLLER] = { 0x0, };
+ 
+ static const int mt2701_vts_index[MT2701_NUM_SENSORS] = {
+ 	VTS1, VTS2, VTS3
+@@ -278,6 +292,7 @@ struct mtk_thermal {
+ };
+ 
+ static const int mt2712_mux_values[MT2712_NUM_SENSORS] = { 0, 1, 2, 3 };
++static const int mt2712_tc_offset[MT2712_NUM_CONTROLLER] = { 0x0, };
+ 
+ static const int mt2712_vts_index[MT2712_NUM_SENSORS] = {
+ 	VTS1, VTS2, VTS3, VTS4
+@@ -289,6 +304,7 @@ struct mtk_thermal {
+ static const int mt7622_adcpnp[MT7622_NUM_SENSORS_PER_ZONE] = { TEMP_ADCPNP0, };
+ static const int mt7622_mux_values[MT7622_NUM_SENSORS] = { 0, };
+ static const int mt7622_vts_index[MT7622_NUM_SENSORS] = { VTS1 };
++static const int mt7622_tc_offset[MT7622_NUM_CONTROLLER] = { 0x0, };
+ 
+ /**
+  * The MT8173 thermal controller has four banks. Each bank can read up to
+@@ -309,6 +325,8 @@ struct mtk_thermal {
  	.num_sensors = MT8173_NUM_SENSORS,
  	.vts_index = mt8173_vts_index,
-+	.cali_val = MT8173_CALIBRATION,
+ 	.cali_val = MT8173_CALIBRATION,
++	.num_controller = MT8173_NUM_CONTROLLER,
++	.controller_offset = mt8173_tc_offset,
  	.bank_data = {
  		{
  			.num_sensors = 2,
-@@ -330,6 +344,7 @@ struct mtk_thermal {
- 	.num_banks = 1,
+@@ -345,6 +363,8 @@ struct mtk_thermal {
  	.num_sensors = MT2701_NUM_SENSORS,
  	.vts_index = mt2701_vts_index,
-+	.cali_val = MT2701_CALIBRATION,
+ 	.cali_val = MT2701_CALIBRATION,
++	.num_controller = MT2701_NUM_CONTROLLER,
++	.controller_offset = mt2701_tc_offset,
  	.bank_data = {
  		{
  			.num_sensors = 3,
-@@ -356,6 +371,7 @@ struct mtk_thermal {
- 	.num_banks = 1,
+@@ -372,6 +392,8 @@ struct mtk_thermal {
  	.num_sensors = MT2712_NUM_SENSORS,
  	.vts_index = mt2712_vts_index,
-+	.cali_val = MT2712_CALIBRATION,
+ 	.cali_val = MT2712_CALIBRATION,
++	.num_controller = MT2712_NUM_CONTROLLER,
++	.controller_offset = mt2712_tc_offset,
  	.bank_data = {
  		{
  			.num_sensors = 4,
-@@ -376,6 +392,7 @@ struct mtk_thermal {
- 	.num_banks = MT7622_NUM_ZONES,
+@@ -393,6 +415,8 @@ struct mtk_thermal {
  	.num_sensors = MT7622_NUM_SENSORS,
  	.vts_index = mt7622_vts_index,
-+	.cali_val = MT7622_CALIBRATION,
+ 	.cali_val = MT7622_CALIBRATION,
++	.num_controller = MT7622_NUM_CONTROLLER,
++	.controller_offset = mt7622_tc_offset,
  	.bank_data = {
  		{
  			.num_sensors = 1,
-@@ -402,7 +419,7 @@ static int raw_to_mcelsius(struct mtk_thermal *mt, int sensno, s32 raw)
- 	raw &= 0xfff;
+@@ -523,19 +547,23 @@ static int mtk_read_temp(void *data, int *temperature)
+ };
  
- 	tmp = 203450520 << 3;
--	tmp /= 165 + mt->o_slope;
-+	tmp /= mt->conf->cali_val + mt->o_slope;
- 	tmp /= 10000 + mt->adc_ge;
- 	tmp *= raw - mt->vts[sensno] - 3350;
- 	tmp >>= 3;
+ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
+-				  u32 apmixed_phys_base, u32 auxadc_phys_base)
++				  u32 apmixed_phys_base, u32 auxadc_phys_base,
++				  int ctrl_id)
+ {
+ 	struct mtk_thermal_bank *bank = &mt->banks[num];
+ 	const struct mtk_thermal_data *conf = mt->conf;
+ 	int i;
+ 
++	int offset = mt->conf->controller_offset[ctrl_id];
++	void *controller_base = mt->thermal_base + offset;
++
+ 	bank->id = num;
+ 	bank->mt = mt;
+ 
+ 	mtk_thermal_get_bank(bank);
+ 
+ 	/* bus clock 66M counting unit is 12 * 15.15ns * 256 = 46.540us */
+-	writel(TEMP_MONCTL1_PERIOD_UNIT(12), mt->thermal_base + TEMP_MONCTL1);
++	writel(TEMP_MONCTL1_PERIOD_UNIT(12), controller_base + TEMP_MONCTL1);
+ 
+ 	/*
+ 	 * filt interval is 1 * 46.540us = 46.54us,
+@@ -543,21 +571,21 @@ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
+ 	 */
+ 	writel(TEMP_MONCTL2_FILTER_INTERVAL(1) |
+ 			TEMP_MONCTL2_SENSOR_INTERVAL(429),
+-			mt->thermal_base + TEMP_MONCTL2);
++			controller_base + TEMP_MONCTL2);
+ 
+ 	/* poll is set to 10u */
+ 	writel(TEMP_AHBPOLL_ADC_POLL_INTERVAL(768),
+-	       mt->thermal_base + TEMP_AHBPOLL);
++	       controller_base + TEMP_AHBPOLL);
+ 
+ 	/* temperature sampling control, 1 sample */
+-	writel(0x0, mt->thermal_base + TEMP_MSRCTL0);
++	writel(0x0, controller_base + TEMP_MSRCTL0);
+ 
+ 	/* exceed this polling time, IRQ would be inserted */
+-	writel(0xffffffff, mt->thermal_base + TEMP_AHBTO);
++	writel(0xffffffff, controller_base + TEMP_AHBTO);
+ 
+ 	/* number of interrupts per event, 1 is enough */
+-	writel(0x0, mt->thermal_base + TEMP_MONIDET0);
+-	writel(0x0, mt->thermal_base + TEMP_MONIDET1);
++	writel(0x0, controller_base + TEMP_MONIDET0);
++	writel(0x0, controller_base + TEMP_MONIDET1);
+ 
+ 	/*
+ 	 * The MT8173 thermal controller does not have its own ADC. Instead it
+@@ -572,44 +600,44 @@ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
+ 	 * this value will be stored to TEMP_PNPMUXADDR (TEMP_SPARE0)
+ 	 * automatically by hw
+ 	 */
+-	writel(BIT(conf->auxadc_channel), mt->thermal_base + TEMP_ADCMUX);
++	writel(BIT(conf->auxadc_channel), controller_base + TEMP_ADCMUX);
+ 
+ 	/* AHB address for auxadc mux selection */
+ 	writel(auxadc_phys_base + AUXADC_CON1_CLR_V,
+-	       mt->thermal_base + TEMP_ADCMUXADDR);
++	       controller_base + TEMP_ADCMUXADDR);
+ 
+ 	/* AHB address for pnp sensor mux selection */
+ 	writel(apmixed_phys_base + APMIXED_SYS_TS_CON1,
+-	       mt->thermal_base + TEMP_PNPMUXADDR);
++	       controller_base + TEMP_PNPMUXADDR);
+ 
+ 	/* AHB value for auxadc enable */
+-	writel(BIT(conf->auxadc_channel), mt->thermal_base + TEMP_ADCEN);
++	writel(BIT(conf->auxadc_channel), controller_base + TEMP_ADCEN);
+ 
+ 	/* AHB address for auxadc enable (channel 0 immediate mode selected) */
+ 	writel(auxadc_phys_base + AUXADC_CON1_SET_V,
+-	       mt->thermal_base + TEMP_ADCENADDR);
++	       controller_base + TEMP_ADCENADDR);
+ 
+ 	/* AHB address for auxadc valid bit */
+ 	writel(auxadc_phys_base + AUXADC_DATA(conf->auxadc_channel),
+-	       mt->thermal_base + TEMP_ADCVALIDADDR);
++	       controller_base + TEMP_ADCVALIDADDR);
+ 
+ 	/* AHB address for auxadc voltage output */
+ 	writel(auxadc_phys_base + AUXADC_DATA(conf->auxadc_channel),
+-	       mt->thermal_base + TEMP_ADCVOLTADDR);
++	       controller_base + TEMP_ADCVOLTADDR);
+ 
+ 	/* read valid & voltage are at the same register */
+-	writel(0x0, mt->thermal_base + TEMP_RDCTRL);
++	writel(0x0, controller_base + TEMP_RDCTRL);
+ 
+ 	/* indicate where the valid bit is */
+ 	writel(TEMP_ADCVALIDMASK_VALID_HIGH | TEMP_ADCVALIDMASK_VALID_POS(12),
+-	       mt->thermal_base + TEMP_ADCVALIDMASK);
++	       controller_base + TEMP_ADCVALIDMASK);
+ 
+ 	/* no shift */
+-	writel(0x0, mt->thermal_base + TEMP_ADCVOLTAGESHIFT);
++	writel(0x0, controller_base + TEMP_ADCVOLTAGESHIFT);
+ 
+ 	/* enable auxadc mux write transaction */
+ 	writel(TEMP_ADCWRITECTRL_ADC_MUX_WRITE,
+-	       mt->thermal_base + TEMP_ADCWRITECTRL);
++		controller_base + TEMP_ADCWRITECTRL);
+ 
+ 	for (i = 0; i < conf->bank_data[num].num_sensors; i++)
+ 		writel(conf->sensor_mux_values[conf->bank_data[num].sensors[i]],
+@@ -617,11 +645,11 @@ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
+ 		       conf->adcpnp[conf->bank_data[num].sensors[i]]);
+ 
+ 	writel((1 << conf->bank_data[num].num_sensors) - 1,
+-	       mt->thermal_base + TEMP_MONCTL0);
++	       controller_base + TEMP_MONCTL0);
+ 
+ 	writel(TEMP_ADCWRITECTRL_ADC_PNP_WRITE |
+ 	       TEMP_ADCWRITECTRL_ADC_MUX_WRITE,
+-	       mt->thermal_base + TEMP_ADCWRITECTRL);
++	       controller_base + TEMP_ADCWRITECTRL);
+ 
+ 	mtk_thermal_put_bank(bank);
+ }
+@@ -737,7 +765,7 @@ static int mtk_thermal_get_calibration_data(struct device *dev,
+ 
+ static int mtk_thermal_probe(struct platform_device *pdev)
+ {
+-	int ret, i;
++	int ret, i, ctrl_id;
+ 	struct device_node *auxadc, *apmixedsys, *np = pdev->dev.of_node;
+ 	struct mtk_thermal *mt;
+ 	struct resource *res;
+@@ -817,9 +845,10 @@ static int mtk_thermal_probe(struct platform_device *pdev)
+ 		goto err_disable_clk_auxadc;
+ 	}
+ 
+-	for (i = 0; i < mt->conf->num_banks; i++)
+-		mtk_thermal_init_bank(mt, i, apmixed_phys_base,
+-				      auxadc_phys_base);
++	for (ctrl_id = 0; ctrl_id < mt->conf->num_controller ; ctrl_id++)
++		for (i = 0; i < mt->conf->num_banks; i++)
++			mtk_thermal_init_bank(mt, i, apmixed_phys_base,
++					      auxadc_phys_base, ctrl_id);
+ 
+ 	platform_set_drvdata(pdev, mt);
+ 
 -- 
 1.9.1
 
