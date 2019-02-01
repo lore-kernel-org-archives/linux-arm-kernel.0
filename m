@@ -2,74 +2,71 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 771F5C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 11:19:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3A914C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 11:22:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 44EAF21905
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 11:19:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 03D1B21904
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 11:22:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W/VTPj2z";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="YYfOOly8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 44EAF21905
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i7q2wytd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 03D1B21904
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
-	:Date:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=ZVWwFQFyQxxZcCiqa3t3nvtuEMPfj+emqOtJwMEvWfM=; b=W/VTPj2z5+OYyN
-	mii6OC5kXPfJkKmQTX9bsKHx8dJIBa1ojX2DKQNTNuN7Dauq6TgQZSENEjxb97xRuXE3Ja9hUNYTQ
-	XWYRrbdMBCaPmFB4MVNposSNMY/8Bix2zmDLBXeCYfsWIO4a5jWiGbNWVm9y4Uf/01bRuC4aowI7F
-	mAQ2b55zd0NCjrtvrzd0M6FxM2wmhK/ZPiGOAtcYSuqsYbCyIiONsy1jP1xFhAWlKqhKF8wI1iFbZ
-	qLxuawo6Hkd7Zcf45Kgu+3r50T50WbyigAOzOHKr76d5BuqUMZ64ve3IS1IJsUtHJZt5GEZcOyfzf
-	Djzz590rCYVhkfrJPGEg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=f3spK7Em0ZaZMLPZrDHyX/5DeTcIff6qEK5YNAVHRxs=; b=i7q2wytdz8/R2i
+	QtVSLmCNOmr9AITItOiAmdHeU37OAGFZVMV/TlcZARuwSgt3xpfb3mmlyloy4cXFQTeqln3UeINTX
+	uPahNdnPcZJo/I83UreApR0ZXWP3mESIuHsky978mTStl/0ZACHot5qewclTd0o5HqKq2pa6rfamo
+	AeIpehEmr3N/iSg6jeDx//iEnnv6clmYlwc4Dyrbl3UgRZKy/YXUM+lwT5l/VAM1gimf196ZZXpuh
+	K3a2HRfyHLPKFAxpBm6Rcgrvw568ucPUgGHdt8Sh9BsDUIMFtZdHFHPr7lK+B3wiwcLcxA+QaOD5e
+	dS/GowcWtlyhXMvHr7vQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpWr1-0003Jn-VW; Fri, 01 Feb 2019 11:19:27 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+	id 1gpWtq-0004xM-PQ; Fri, 01 Feb 2019 11:22:22 +0000
+Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpWqx-0003Iw-1h
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 11:19:25 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:Content-Type:MIME-Version:
- Message-ID:Subject:To:From:Date:Reply-To:Cc:Content-Transfer-Encoding:
- Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:
- Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=etEMu4dK8YnAAGhLK/P57KxP6SobE6kl0g3zT6LYrhs=; b=YYfOOly8sJnMoDPQaKXCv1h4t
- 5yzmpGeCoyxYmlKaZiw3Et2rmafxxJJGhgvdqST2QMDD35kJIp0/h14xMpvVWAxt3SrNEjU5mH7iL
- PCzPV1piRkyRMUYLpqaURD3BF3WmmAL4uAlRhJri4uVw8tNnVgpqZQki0rYq3UQ/nWOX0=;
-Received: from shell.armlinux.org.uk
- ([2002:4e20:1eda:1:5054:ff:fe00:4ec]:36430)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>) id 1gpWqs-0005th-RQ
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 11:19:19 +0000
-Received: from linux by shell.armlinux.org.uk with local (Exim 4.89)
- (envelope-from <linux@shell.armlinux.org.uk>) id 1gpWqs-0000jZ-4l
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 11:19:18 +0000
-Date: Fri, 1 Feb 2019 11:19:18 +0000
-From: Russell King - ARM Linux admin <linux@armlinux.org.uk>
-To: linux-arm-kernel@lists.infradead.org
-Subject: ARM64 boot failure on Macchiatobin with Marvell 18.12 firmware
-Message-ID: <20190201111917.y6vv6ouh7esf5uiw@e5254000004ec.dyn.armlinux.org.uk>
+ id 1gpWtn-0004wG-8y; Fri, 01 Feb 2019 11:22:20 +0000
+X-UUID: 1f019b796316433185d959f080157683-20190201
+X-UUID: 1f019b796316433185d959f080157683-20190201
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
+ (envelope-from <frederic.chen@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 119992495; Fri, 01 Feb 2019 03:22:08 -0800
+Received: from MTKMBS01N1.mediatek.inc (172.21.101.68) by
+ MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Fri, 1 Feb 2019 03:22:06 -0800
+Received: from mtkcas07.mediatek.inc (172.21.101.84) by
+ mtkmbs01n1.mediatek.inc (172.21.101.68) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Fri, 1 Feb 2019 19:21:58 +0800
+Received: from mtkslt306.mediatek.inc (10.21.14.136) by mtkcas07.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
+ Frontend Transport; Fri, 1 Feb 2019 19:21:58 +0800
+From: Frederic Chen <frederic.chen@mediatek.com>
+To: <hans.verkuil@cisco.com>, <laurent.pinchart+renesas@ideasonboard.com>,
+ <tfiga@chromium.org>, <matthias.bgg@gmail.com>, <mchehab@kernel.org>
+Subject: [RFC PATCH V0 1/7] [media] dt-bindings: mt8183: Add binding for DIP
+ shared memory
+Date: Fri, 1 Feb 2019 19:21:25 +0800
+Message-ID: <1549020091-42064-2-git-send-email-frederic.chen@mediatek.com>
+X-Mailer: git-send-email 1.9.1
+In-Reply-To: <1549020091-42064-1-git-send-email-frederic.chen@mediatek.com>
+References: <1549020091-42064-1-git-send-email-frederic.chen@mediatek.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-User-Agent: NeoMutt/20170113 (1.7.2)
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_031923_775482_A800F3D8 
-X-CRM114-Status: UNSURE (   7.46  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190201_032219_319329_7AFBCEFA 
+X-CRM114-Status: GOOD (  11.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,82 +78,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: Sean.Cheng@mediatek.com, Rynn.Wu@mediatek.com, srv_heupstream@mediatek.com,
+ holmes.chiou@mediatek.com, Jerry-ch.Chen@mediatek.com, jungo.lin@mediatek.com,
+ sj.huang@mediatek.com, christie.yu@mediatek.com,
+ linux-mediatek@lists.infradead.org, frederic.chen@mediatek.com,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+This patch adds the binding for describing the shared memory
+used to exchange configuration and tuning data between the
+co-processor and Digital Image Processing (DIP) unit of the
+camera ISP system on Mediatek SoCs.
 
-I've updated the ATF, DDR and Marvell binaries firmware from 17.10
-to 18.12 on a Macchiatobin Single-shot board, while keeping u-boot
-the same version (17.10).
+Signed-off-by: Frederic Chen <frederic.chen@mediatek.com>
+---
+ .../mediatek,reserve-memory-dip_smem.txt           | 45 ++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reserved-memory/mediatek,reserve-memory-dip_smem.txt
 
-When booting a previously working 4.20 kernel, I now get:
-
-Booting Linux on physical CPU 0x0000000000 [0x410fd081]
-Linux version 4.20.0+ (rmk@rmk-PC.armlinux.org.uk) (gcc version 4.9.2
-(GCC)) #212 SMP PREEMPT Thu Jan 31 15:33:31 GMT 2019
-Machine model: Marvell 8040 MACCHIATOBin Single-shot
-earlycon: uart0 at MMIO 0x00000000f0512000 (options '115200n8')
-printk: bootconsole [uart0] enabled
-SError Interrupt on CPU0, code 0xbf000002 -- SError
-CPU: 0 PID: 0 Comm: swapper Not tainted 4.20.0+ #212
-Hardware name: Marvell 8040 MACCHIATOBin Single-shot (DT)
-pstate: 00400085 (nzcv daIf +PAN -UAO)
-pc : setup_arch+0xe8/0x56c
-lr : setup_arch+0xe0/0x56c
-sp : ffffff8008b03f10
-x29: ffffff8008b03f10 x28: 0000000000a50018
-x27: 0000000000000000 x26: 000000007ffa2e88
-x25: 000000007f7a2c68 x24: 0000000000000003
-x23: 0000000000000000 x22: ffffffbefe90005c
-x21: 0000000000000001 x20: ffffff8008b46000
-x19: ffffff8008080000 x18: 00000000000000ff
-x17: 0000000000001000 x16: 0000000000001000
-x15: 446e1c00644a0615 x14: 2e392e34206e6f69
-x13: 7372657620636367 x12: 0000000000000008
-x11: 0000000000000007 x10: 0101010101010101
-x9 : fffffffffffffffb x8 : 0000000000000008
-x7 : 0000000000000003 x6 : 0080000000008080
-x5 : 000000000000005f x4 : 000000000000006c
-x3 : 0000000000000063 x2 : 000000000000006c
-x1 : ffffff8008961ff9 x0 : 0000000000000080
-Kernel panic - not syncing: Asynchronous SError Interrupt
-CPU: 0 PID: 0 Comm: swapper Not tainted 4.20.0+ #212
-Hardware name: Marvell 8040 MACCHIATOBin Single-shot (DT)
-Call trace:
- dump_backtrace+0x0/0x158
- show_stack+0x14/0x1c
- dump_stack+0x90/0xb0
- panic+0x148/0x2b8
- print_tainted+0x0/0xa8
- arm64_serror_panic+0x74/0x80
- do_serror+0x5c/0xb8
- el1_error+0xb4/0x144
- setup_arch+0xe8/0x56c
- start_kernel+0x64/0x408
-
-If I'm reading the Cortex-A72 ESR information correctly, this is a
-Slave Error SError interrupt.
-
-The failing code sequence appears to be:
-
-ffffff8008a53098:       9401506a        bl      ffffff8008aa7240 <dump_stack_set_arch_desc>
-ffffff8008a5309c:       97fff636        bl      ffffff8008a50974 <parse_early_param>
-ffffff8008a530a0:       d2801000        mov     x0, #0x80
-// #128
-ffffff8008a530a4:       d51b4220        msr     daif, x0
-ffffff8008a530a8:       d0fffcdb        adrp    x27, ffffff80089ed000 <kallsyms_token_index+0x8b300>
-
-If I downgrade the firmware back to 17.10, the kernel boots fine again.
-
-Any ideas what's going on here?
-
+diff --git a/Documentation/devicetree/bindings/reserved-memory/mediatek,reserve-memory-dip_smem.txt b/Documentation/devicetree/bindings/reserved-memory/mediatek,reserve-memory-dip_smem.txt
+new file mode 100644
+index 0000000..0ded478
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reserved-memory/mediatek,reserve-memory-dip_smem.txt
+@@ -0,0 +1,45 @@
++Mediatek DIP Shared Memory binding
++
++This binding describes the shared memory, which serves the purpose of
++describing the shared memory region used to exchange data between Digital
++Image Processing (DIP) and co-processor in Mediatek SoCs.
++
++The co-processor doesn't have the iommu so we need to use the physical
++address to access the shared buffer in the firmware.
++
++The Digital Image Processing (DIP) can access memory through mt8183 IOMMU so
++it can use dma address to access the memory region.
++(See iommu/mediatek,iommu.txt for the detailed description of Mediatek IOMMU)
++
++
++Required properties:
++
++- compatible: must be "mediatek,reserve-memory-dip_smem"
++
++- reg: required for static allocation (see reserved-memory.txt for
++  the detailed usage)
++
++- alloc-range: required for dynamic allocation. The range must
++  between 0x00000400 and 0x100000000 due to the co-processer's
++  addressing limitation
++
++- size: required for dynamic allocation. The unit is bytes.
++  If you want to enable the full feature of Digital Processing Unit,
++  you need 20 MB at least.
++
++
++Example:
++
++The following example shows the DIP shared memory setup for MT8183.
++
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		reserve-memory-isp_smem {
++			compatible = "mediatek,reserve-memory-dip_smem";
++			size = <0 0x1400000>;
++			alignment = <0 0x1000>;
++			alloc-ranges = <0 0x40000000 0 0x50000000>;
++		};
++	};
 -- 
-RMK's Patch system: https://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+1.9.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
