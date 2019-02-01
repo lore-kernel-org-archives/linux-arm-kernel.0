@@ -2,95 +2,80 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E35A6C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:51:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 45912C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:52:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AE59D2086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:51:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 16A8921726
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:52:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YnEZ5KhF";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="C6/HaNf1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE59D2086C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a1FbE1eo";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="d0Rqitjp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16A8921726
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=ospxmk6rXFU+L26gmuGf3+emDoUGDny0ZbAHFve4dvU=; b=YnEZ5KhFc/PubJ9JQKbSamkJh
-	Eq8ItlDg1MjAIoByEzyH4giMBlCMOwAIs63WWeHPfSdy+Gy9nfHC6SkzvvlQ5TZeiAQxPESh9qFUh
-	U46zsb1H3TQIwiyYGkuvYpFzfd6runjDJ4fVC2qUAyENyHh9Bhl+rcMuMumX2foseGmelWETFE5zp
-	YIZagmlDf5Yago5jXze/4v5aVQ8nu7bKMT8SlKXfhgBQ/7OqkwnTJNljiy5IFlO8R5WPvYxh2jzMg
-	QB+uFPnnZcOnX2LUwNaueDF5I+GD1RDA9t7XImV4XxN4AshAhL7XkRhy/39CeC7tmC0Yb5bylLH0V
-	3KDerWYrA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=MmpGyjK8IsEmdv2D8HzmY4B8Oys/4NcxutpQc3fbLjM=; b=a1FbE1eolz0E2H
+	ocx06lcHKuWLpgx49qiaSN0fsIJ33bJN9hm6tKD8oFydOTzzSK3RSHVJ9oDgx4JrmbWRi//wDuLQ8
+	zWOczcaPAGjMeAdrI1Yv6/sGsH6kz6rSmBoUGd7yt9A+4uG1ic7uXKIIjea5m44FwGiKinwxfiULs
+	cBnaGklb4+wVZ4JQSyR7832WgrnRVbuD4l5ZG0ra+mcCaahskPQ8jWg7BtJqjDYuLnhMMbXGSgmsS
+	V7kg6AwzOjDEqOU4UQa4Nz9tBj6pWcg06xtcUGFRmddEzOfIn2355uOL6zZMqBNvzaQ9IT5ydZ9Ni
+	zX3NmzyFcWipmnaSw9rg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpb61-0003xv-PE; Fri, 01 Feb 2019 15:51:13 +0000
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
+	id 1gpb6q-0004Wi-DU; Fri, 01 Feb 2019 15:52:04 +0000
+Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpb5O-0003Pu-Ro
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:51:11 +0000
-Received: by mail-wr1-x444.google.com with SMTP id v13so7594598wrw.5
+ id 1gpb6h-0004VI-Nd
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:52:02 +0000
+Received: by mail-it1-x144.google.com with SMTP id h193so10373906ita.5
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 07:50:34 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=L6vOcIJpjK9OcozAFWiyHaLssJG+aBVI05aeTxUznjY=;
- b=C6/HaNf1iGGTFZzDcthxq7cOmbMcnMTvN71vugTJoS1Qm8FBERiwQS+sfo0OkeBUBb
- rU3ikZypozX1Aqxx3UrdNb/BrLmIJeMXaebudD3bgb69URsmTIsOGlHOS2BKRUCB3zp6
- U2Y4bM7fsjNBqfBA5SAiHKKMA0yxsfozNpvyjySN5SySi8lHiIAbA+czlKeZ8eboOfkI
- YDRqOEfPXy5O2meBO+Jy8TMVV5Ty17P86L29ToGSuiDpCbMoQCODNsQVr6D38XxcyBck
- 8puJHjL9frZkxeQ0C/h81gqO9dyg/uWrD4AD8FuOZTruIa4rbLL0du0IXZSwEaBA2FlK
- Fftw==
+ Fri, 01 Feb 2019 07:51:55 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=0QFjyQzPSYzw+9+y4qZ/LyQWmOtJ5IEIvYW5d38ofMs=;
+ b=d0RqitjpPh0bfgADVQiUErX7Oq0fAVi7hGNyJginAoNMR5mUyrf68ASSNQN7udEOib
+ 18vCmO/si2kLX3HGaP2XijLSJqdQ1pQgDLrgZdme0pTfQK7zQ60IJ2FzUDEr/voEEOzC
+ E/HGtJelMdNvHlcqBENqfoRogdUp9lQzIKh3g=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=L6vOcIJpjK9OcozAFWiyHaLssJG+aBVI05aeTxUznjY=;
- b=PccwkRmAFXD3S/cMPo+svLY950brFeEFS1zaK5Sgy4K7n0HwD52OCT6BjyRr1Laynr
- f9J9BxImffiepy08I2ZcuMwnfKHZegzH5vpTFjvuDwRuiV0zDVVKNn+APtyuqYfrNKS5
- HcBQAkgiGgngZI8EqqL5qvlfy9XlQxtNNyxLVm2hDt/Ph6Lfo41wg6jv+p3289fNWp8t
- SY+WffxkA4YXOrBQz8o54Wj0+3w5qUgtOvYSWZK7hhWq0Vxw+YZn4NOaWtAvPG32DpY8
- pC6wreAY1o0797Frk7m+7y0W8bmWfRaHXGZ05VNnSg0Z0ZEVm+zIDPn7SZoKJqa2W3QZ
- Qk7Q==
-X-Gm-Message-State: AJcUukdowieqLGeJhmBTqSOC8j0qDoqZvxid0r29ORWjHbirsDtL++nS
- glNKz2l+oqU8aECEwa7mcZEv8pTJ
-X-Google-Smtp-Source: ALg8bN6BgsKNaEZZz0FywYtvgiSMzHhYiFFcfmG7jdjF8mHuDkSihOzCGkU6f7wcf7GSJOv5ngjpZQ==
-X-Received: by 2002:adf:92a4:: with SMTP id 33mr38753603wrn.11.1549036232337; 
- Fri, 01 Feb 2019 07:50:32 -0800 (PST)
-Received: from ?IPv6:2a02:8071:6a3:700:e52b:4fa:c59b:a6af?
- ([2a02:8071:6a3:700:e52b:4fa:c59b:a6af])
- by smtp.gmail.com with ESMTPSA id r200sm5183583wmb.36.2019.02.01.07.50.31
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 01 Feb 2019 07:50:31 -0800 (PST)
-Subject: Re: [PATCH] ARM: socfpga: fix base address of SDR controller
-To: Dinh Nguyen <dinguyen@kernel.org>, Marek Vasut <marex@denx.de>
-References: <20190129200858.19773-1-goldsimon@gmx.de>
- <0711a2e0-b4fb-fa12-7c5c-0b5da73c8b02@kernel.org>
- <CAAh8qszCQROUZVOyX9GCNF_09DebDDUWf_2cfW3M13yG1aJ_Xg@mail.gmail.com>
- <080c0900-4c34-e097-3e0e-4508951b0ddd@kernel.org>
-From: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
-Message-ID: <e7c314cf-294d-e80a-c9f2-b5e183af6af5@gmail.com>
-Date: Fri, 1 Feb 2019 16:50:21 +0100
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=0QFjyQzPSYzw+9+y4qZ/LyQWmOtJ5IEIvYW5d38ofMs=;
+ b=MGeR4UOsvIgELeEki7BoPhVFUXYYqdrzTfTgPX5wB5ioU6hoBRPLtoRIjqObE86wmD
+ 9nS3076vqazvROibqv/QQ1vzi6LuG2s4UlcS0oYZU8i6ceG6cw4MTKjSWtI/VViVCBxQ
+ GWlWXguOh9c0r1128YdVBttbIlDhP/NsBvnwoq0XsVtLlHnDyNdZxx2p89F5pM2qPtEn
+ 3C3ohRLKy7DLwd9DTIvAuGzGCviSr5xDsIf2awJgkpatRx+ZJYbNfxdYH8cR9lq+Bm51
+ YzaGNPJfiKwyfB9+aGTWLEiS5DC79xFXbdl3vsPsCXSj0/5AezBIs4j3+gJ4pxZnDIOn
+ h37Q==
+X-Gm-Message-State: AHQUAubutMRDesGPOLGACn9NfSVT9ynH4j/o4NsaqZF94KiYZtwkk5EB
+ KVv6VwuvLphhWxfJEkAJSPio6jdO2NmjmR4/yxnndJys6ICdxg==
+X-Google-Smtp-Source: AHgI3Iax7m0R3CTnvGhVwQ5NsgaAl+q8ict/I+2M4JaBHhb2jqQQ/mfTJSZi2Vq4cox+x8pAU/3DB/2MXwmBw3pKong=
+X-Received: by 2002:a24:385:: with SMTP id e127mr1748296ite.32.1549036314638; 
+ Fri, 01 Feb 2019 07:51:54 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <080c0900-4c34-e097-3e0e-4508951b0ddd@kernel.org>
-Content-Language: en-US
+References: <20190201154232.10505-1-jagan@amarulasolutions.com>
+ <20190201154858.z6xqdaxccxya2wqr@flea>
+In-Reply-To: <20190201154858.z6xqdaxccxya2wqr@flea>
+From: Jagan Teki <jagan@amarulasolutions.com>
+Date: Fri, 1 Feb 2019 21:21:43 +0530
+Message-ID: <CAMty3ZABvrb+Eu8D7uiGvBALRetnphsRg-RennRSNH5-_q-9bw@mail.gmail.com>
+Subject: Re: [PATCH v7 00/23] drm/sun4i: Allwinner A64 MIPI-DSI support
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_075035_352792_CA989602 
-X-CRM114-Status: GOOD (  29.84  )
+X-CRM114-CacheID: sfid-20190201_075155_768413_0DA08E7C 
+X-CRM114-Status: GOOD (  13.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,110 +87,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Alan Tull <atull@kernel.org>, linux-fpga@vger.kernel.org,
- linux-kernel@vger.kernel.org, Russell King <linux@armlinux.org.uk>,
- Rob Herring <robh+dt@kernel.org>, Moritz Fischer <mdf@kernel.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, David Airlie <airlied@linux.ie>,
+ Michael Turquette <mturquette@baylibre.com>,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Daniel Vetter <daniel@ffwll.ch>,
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Am 01.02.2019 um 16:13 schrieb Dinh Nguyen:
-> 
-> 
-> On 1/30/19 12:00 AM, Simon Goldschmidt wrote:
->> + Marek (as I really want to keep the dts in Linux and U-Boot in sync)
-> 
-> So can you wait until your patch in U-Boot is in?
+On Fri, Feb 1, 2019 at 9:19 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> On Fri, Feb 01, 2019 at 09:12:09PM +0530, Jagan Teki wrote:
+> > Here is next version changes for Allwinner A64 MIPI-DSI support
+> >
+> > This series grouped the changes like previous version[1] with different
+> > sets to support three different panels types that can fit into the DSI
+> > controller.
+> >
+> > set:1, for 4-lane, burst mode support
+> > - patch 0001: 0009, DSI controller changes that support burst mode.
+> >
+> > set:2, for A64 DSI support
+> > - patch 0010: tcon dclk divider computation based on A64 BSP.
+> > - patch 0011: 0017, Allwinner A64 DSI controller changes.
+> >
+> > set:3, enable 4-lane burst mode panel:
+> > - patch 0018: Overlay patch that enable Feiyang FY07024DI26A30-D
+> >   burst mode panel on Pine64-LTS
+> >
+> > set:4, enable 4-lane video mode panel:
+> > - patch 0019: msg type MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM support
+> > - patch 0020: Overlay patch that enable Bananapi S070WV20-CT16 ICN6211
+> >   panel on Bananapi M64
+> >
+> > set:5, enable 2-lane video mode panel:
+> > - patch 0021, 0022: DSI hfp and hbp timings fixes
+> > - patch 0023: Enable Techstar TS8550B panel on Amarula A64-Relic
+>
+> You do realise that pushing through a series while the previous
+> version's discussion hasn't settled yet will not get you anywhere,
+> right?
 
-Well, yes, this could wait. The problem is we wanted to keep Linux and 
-U-Boot dts in sync.
-
-I guess I'll just finish preparing my patch for U-Boot changing the dts 
-there and then we'll see which part gets pushed first...
-
-> 
->> On Wed, Jan 30, 2019 at 1:16 AM Dinh Nguyen <dinguyen@kernel.org> wrote:
->>>
->>>
->>>
->>> On 1/29/19 2:08 PM, Simon Goldschmidt wrote:
->>>> From: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
->>>>
->>>> The documentation for socfpga gen5 says the base address of the sdram
->>>> controller is 0xffc20000, while the current devicetree says it is at
->>>> 0xffc25000.
->>>>
->>>> While this is not a problem for Linux, as it only accesses the registers
->>>> above 0xffc25000, it *is* a problem for U-Boot because the lower registers
->>>> are used during DDR calibration (up to now, the U-Boot driver does not use
->>>> the dts address, but that should change).
->>>>
->>>> To keep Linux and U-Boot devicetrees in sync, this patch changes the base
->>>> address to 0xffc20000 and adapts the 2 files where it is currently used.
->>>>
->>>> This patch changes the dts and 2 drivers with one commit to prevent
->>>> breaking the code if dts change and driver change would be split.
->>>>
->>>> Signed-off-by: Simon Goldschmidt <simon.k.r.goldschmidt@gmail.com>
->>>> ---
->>>>
->>>>   arch/arm/boot/dts/socfpga.dtsi       | 4 ++--
->>>>   arch/arm/mach-socfpga/self-refresh.S | 4 ++--
->>>>   drivers/fpga/altera-fpga2sdram.c     | 2 +-
->>>>   3 files changed, 5 insertions(+), 5 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
->>>> index f365003f0..8f6c1a5d6 100644
->>>> --- a/arch/arm/boot/dts/socfpga.dtsi
->>>> +++ b/arch/arm/boot/dts/socfpga.dtsi
->>>> @@ -788,9 +788,9 @@
->>>>                        reg = <0xfffec000 0x100>;
->>>>                };
->>>>
->>>> -             sdr: sdr@ffc25000 {
->>>> +             sdr: sdr@ffc20000 {
->>>>                        compatible = "altr,sdr-ctl", "syscon";
->>>> -                     reg = <0xffc25000 0x1000>;
->>>> +                     reg = <0xffc20000 0x6000>;
->>>
->>> I don't see the U-Boot device tree having this change. Yes, the
->>> documentation does state that the SDR address starts at 0xffc20000, but
->>> all of the pertinent registers start at 0x5000 offset. Thus, the
->>> starting address should be 0xffc25000.[1]
->>
->> You don't see it in U-Boot as I'm working on a patch for that.
->> As I wrote in the commit message, U-Boot currently does not use the
->> devicetree for the SDR driver, but I want to convert it to do that.
->>
->> But before converting, I need to find a clean way to provide the
->> register addresses to the driver. That doesn't work with the current dts.
->>
->>>
->>> [1]
->>> https://www.intel.com/content/www/us/en/programmable/documentation/sfo1410143707420.html#sfo1411577366917
->>
->> Well, in [2], you see that the peripheral's address range actually starts
->> at 0xffc20000. It's only the public documented registers that start at
->> 0xffc25000. I don't know why the lower address range is undocumented.
->> Maybe you can help me here?
->>
-> 
-> Yes, the reason these register are not documented is that the ddr
-> engineers didn't really want anyone outside of their team messing around
-> with the calibration. These registers, from the limited documentation I
-> have, are related to the PHY settings. I've been told the calibration
-> sequence is something of a "black" magic.
-
-That's exactly how I thought it would be. However, that's not the best 
-attitued for getting code into an open source project like U-Boot. For 
-example, I wanted to take a look at the code to see if it can be made 
-smaller, but that's unnecessary hard if the registers are not documented...
-
-Regards,
-Simon
+Except the clock, I made few changes with your previous comments. Yes
+we can still under clock discussion page, no issues on that. just to
+group the remaining patches to finalize if any issues on those.
 
 _______________________________________________
 linux-arm-kernel mailing list
