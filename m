@@ -2,86 +2,103 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,UNPARSEABLE_RELAY,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E81CAC282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 18:04:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CD346C282DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 18:08:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AAA60218AF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 18:04:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A2095218AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 18:08:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rOHxM5VK";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="fX6d3sgH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AAA60218AF
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tqGd+MeP";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="cCo4l0uN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A2095218AF
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=6dBXNywU4OirseMkTndZ9rsx4kVMCbg6GYOPhGo1/7w=; b=rOH
-	xM5VKP0hzmwzXETlHCN+XGDBHhPwi1mCUfQb+JSND4QisWZ65rAnCxnk8q9pkXIaV02QhRCyBlgha
-	lGCXb53u1aTVPNccKqqGCpB9cZMvNSP1qWx/vBIzWdn7XzsCTrOA6eVEuqh9k99a8NIuKkDikUEcu
-	BOb/mvugvDW5vN9lZmEyEuwQueMkzzorcAdjypDXD+j1oEcR62ttq5OmjzroChCR50GT+B0CCtpXr
-	oRJxm3cSGTWzA5BntROWHdQhQNZI2bT/Gi1oUgkpBJW00sXyv1Qr8W21AgwxbaOPT7hzlgscVNacz
-	RIU1Xjnxbz82e6ujSg1o26d0rOvJwYA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ZQwH8qrP768qNHI4TBENctzZciISV88cQGAply3OMjA=; b=tqGd+MePXROD0G
+	xSaVtu/jklgaOz8nljaPh9YPztaNlZwycrEuznfHZuMj2b9nNx2SOzVoaD8buRRREFxKxpDZsUuG+
+	SLpyq2MUD4FHQK7TjilNwK3BbxE0Va8XKjJYSjsA/Kn5Uon3yv6ISkIrLJj+h05SoYS6hWi5ZxHSN
+	8SaHDstAJRByXOEZ1drqdZ2kds+TwQ4uwmKBADOtEdmne1G968Kl5lf4Y9v6NUa/IhxeJL/OaYTd8
+	ht+utOF2zGy1/K8r9Ting+9nwMqRm+tbTkRJpfYJVm45YPzTDs6LnZzLTCWQC3AzO8Habab7e11J/
+	kEdbPUCBJwOvuKooaxEg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpdBL-0001p5-AZ; Fri, 01 Feb 2019 18:04:51 +0000
-Received: from userp2120.oracle.com ([156.151.31.85])
+	id 1gpdEy-0003P0-AT; Fri, 01 Feb 2019 18:08:36 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpdBH-0001oV-V6
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 18:04:49 +0000
-Received: from pps.filterd (userp2120.oracle.com [127.0.0.1])
- by userp2120.oracle.com (8.16.0.22/8.16.0.22) with SMTP id x11HwxWt144083;
- Fri, 1 Feb 2019 18:04:41 GMT
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
- h=from : to : cc :
- subject : date : message-id; s=corp-2018-07-02;
- bh=drD3YgQGMc9qJL9fvvYzJTyq8vsLPd1gLpS/tANbDzo=;
- b=fX6d3sgHdIYaUkLv0OdxC/+0cnHeGuUkMlKs8+OE1dKz9ztsvqYS6EKq9Mpk0BPs/95c
- FXog4rdFnVlG/WWpS3cMKNwnHOS9E7z3ia11R9oV8kxLEi0B94T5HF1A6oy3WsanuWUP
- qETxYec70IRcC7NatqT+6UZNl9iBATCIdnUB0XMgwzvg1PBqQ9c/wF+sc1b3pOXE/ZLV
- XyPeOM3NbvCNVOEqGoRTdkbrWhxZuF5zHzrzp2k4gjjEh8zX7GTLzpM7f8+ZiaqBhlgF
- qUETUwkF73tew92L+axSyNCUbZ3cTtk+q8BSYe+1N8GzZrFxQaDtJm5FpP8q39Y056x6 Rg== 
-Received: from userv0021.oracle.com (userv0021.oracle.com [156.151.31.71])
- by userp2120.oracle.com with ESMTP id 2q8g6rr1wa-1
- (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Fri, 01 Feb 2019 18:04:40 +0000
-Received: from userv0121.oracle.com (userv0121.oracle.com [156.151.31.72])
- by userv0021.oracle.com (8.14.4/8.14.4) with ESMTP id x11I4eXV027485
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Fri, 1 Feb 2019 18:04:40 GMT
-Received: from abhmp0009.oracle.com (abhmp0009.oracle.com [141.146.116.15])
- by userv0121.oracle.com (8.14.4/8.13.8) with ESMTP id x11I4ceD001522;
- Fri, 1 Feb 2019 18:04:39 GMT
-Received: from aserv0021.oracle.com (/10.11.38.116)
- by default (Oracle Beehive Gateway v4.0)
- with ESMTP ; Fri, 01 Feb 2019 10:04:38 -0800
-From: Santosh Shilimkar <santosh.shilimkar@oracle.com>
-To: arm@kernel.org, linux-arm-kernel@lists.infradead.org
-Subject: [GIT PULL] soc: ti: couple of non critical fixes for v5.1
-Date: Fri,  1 Feb 2019 10:04:23 -0800
-Message-Id: <1549044263-5862-1-git-send-email-santosh.shilimkar@oracle.com>
-X-Mailer: git-send-email 1.9.1
-X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9154
- signatures=668682
-X-Proofpoint-Spam-Details: rule=notspam policy=default score=0
- priorityscore=1501 malwarescore=0
- suspectscore=0 phishscore=0 bulkscore=0 spamscore=0 clxscore=1011
- lowpriorityscore=0 mlxscore=0 impostorscore=0 mlxlogscore=608 adultscore=0
- classifier=spam adjust=0 reason=mlx scancount=1 engine=8.0.1-1810050000
- definitions=main-1902010132
+ id 1gpdEv-0003Oh-1W
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 18:08:34 +0000
+Received: by mail-lj1-x244.google.com with SMTP id s5-v6so6524079ljd.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 01 Feb 2019 10:08:32 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=X66VDD5j3wVMeVwL1gCe9s2UIzfODti4ltV24Ti6j84=;
+ b=cCo4l0uNXwx0nEvPT5/u8epEzgK+aB/tM5PfZqq/I57qtOuEp2E+8xkTwAYG9LVnE8
+ ZTw1Mvq2nIk8CKa1RigFZB6DeLe5qjGV/HHPmdFHJ7OlV1jovt49AkDhkaKHs5gSyTU4
+ l9vxpjIxGP/wIkLixvMEYqpWVazjGeKZTP8qVn1NQEw/gRp6mciN2Ki0JT/9RAZ3bzu+
+ 3zg+3U0vhS87uik1rgtG6vcezYriCU7C0wD3MAWsW7MiPpJhyMKEAFpa5Gk7legGBhyH
+ OBQHV8OkBlSOwuCyQfaj+dPS00GbbsZzxtvb6pjACSDk4mTy4rgHAN9I0xVWXsAxMKCx
+ 8KRQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=X66VDD5j3wVMeVwL1gCe9s2UIzfODti4ltV24Ti6j84=;
+ b=qsLUqsLR1HKVsyDD7x8h/YgqnDSFgFXgK/3z0m/+t96FNLOEuJ1ScNU9szObr3eym9
+ 2mvNdTGk+lMO0VwRlnIU0Ym1ZBkydZypk6tMTkDH3JEd8J/U+J9C7KltapFpKQDZkLfC
+ waEJOlLYE9IfaqvDft4MaCl94XSuc2T8KPkALs+1n8HYNFCyDob9fCQMD5ZEhHT1n/ud
+ NGaKDdaG/3d+dZunHSByfxApPc5oT/E6yUiBBcF4VXdAI0ruIqGRhTch95Uda9EjOnur
+ 3fUWpC0suJ7v8+AQkYAAR7c7VbG3TOlYbXVa17iZWv9NoPqzczuSCiUxdbmpX8hQNQCx
+ FHTQ==
+X-Gm-Message-State: AHQUAuYWcKeMICjElQRjlmGYFfj8zTi32FVblhAJrLVpqR/XVlyb6/gu
+ IXl6hNkOcPLdZirZ801YwDo=
+X-Google-Smtp-Source: AHgI3IaeU5pXv8FhbtlZYopQ8Y04gFrfrJGe6iYcDr7ly+EyjqlXX7o9Wax64/3QYVX+ajbXMcEuQw==
+X-Received: by 2002:a2e:8446:: with SMTP id
+ u6-v6mr20418295ljh.74.1549044510925; 
+ Fri, 01 Feb 2019 10:08:30 -0800 (PST)
+Received: from [192.168.2.145] (ppp91-79-175-49.pppoe.mtu-net.ru.
+ [91.79.175.49])
+ by smtp.googlemail.com with ESMTPSA id u30sm1632637lfc.90.2019.02.01.10.08.29
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 01 Feb 2019 10:08:30 -0800 (PST)
+Subject: Re: [PATCH V5 2/7] clocksource: tegra: add Tegra210 timer support
+To: Joseph Lo <josephl@nvidia.com>, Jon Hunter <jonathanh@nvidia.com>,
+ Thierry Reding <thierry.reding@gmail.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Thomas Gleixner <tglx@linutronix.de>
+References: <20190201033621.16814-1-josephl@nvidia.com>
+ <20190201033621.16814-3-josephl@nvidia.com>
+ <9370a0e4-2c76-6e9e-9219-121f92cdb14a@gmail.com>
+ <46a1a62f-29b1-caac-ba68-e1394a76b3af@gmail.com>
+ <85988378-0c88-6b71-00df-0700a7b4cdf7@nvidia.com>
+ <4c89fd38-eacd-4643-52d3-da4760ecb4c5@nvidia.com>
+ <57549882-4d0a-64ac-da04-7e790ac2d80e@gmail.com>
+ <9437d5b5-5af0-9393-169c-2ebaf384c75c@nvidia.com>
+From: Dmitry Osipenko <digetx@gmail.com>
+Message-ID: <705a0eff-cb1e-0e7d-add7-fb1a993291dc@gmail.com>
+Date: Fri, 1 Feb 2019 21:08:28 +0300
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
+MIME-Version: 1.0
+In-Reply-To: <9437d5b5-5af0-9393-169c-2ebaf384c75c@nvidia.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_100448_086222_BB44014F 
-X-CRM114-Status: GOOD (  17.86  )
+X-CRM114-CacheID: sfid-20190201_100833_110832_D210BCCE 
+X-CRM114-Status: GOOD (  17.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,44 +110,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: olof@lixom.net, santosh.shilimkar@oracle.com, linux-kernel@vger.kernel.org,
- arnd@arndb.de, khilman@kernel.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-tegra@vger.kernel.org, Thierry Reding <treding@nvidia.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The following changes since commit 1c7fc5cbc33980acd13d668f1c8f0313d6ae9fd8:
-
-  Linux 5.0-rc2 (2019-01-14 10:41:12 +1200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/drivers_soc_for_5.1
-
-for you to fetch changes up to 2b13ef1f4261688c2dc5d67dbee69ed2fdddf53e:
-
-  soc: ti: knav_dma: Use proper enum in pktdma_init_chan (2019-01-30 10:22:17 -0800)
-
-----------------------------------------------------------------
-soc: ti: couple of non critical fixes for v5.1
-
- - Fix the Clang warning for enum in Navigator dma
- - Simplify code in ti_sci with DEFINE_SHOW_ATTRIBUTE macro
-
-----------------------------------------------------------------
-Nathan Chancellor (1):
-      soc: ti: knav_dma: Use proper enum in pktdma_init_chan
-
-Yangtao Li (1):
-      firmware: ti_sci: Change to use DEFINE_SHOW_ATTRIBUTE macro
-
- drivers/firmware/ti_sci.c | 21 ++-------------------
- drivers/soc/ti/knav_dma.c |  2 +-
- 2 files changed, 3 insertions(+), 20 deletions(-)
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+MDEuMDIuMjAxOSAxODozNywgSm9zZXBoIExvINC/0LjRiNC10YI6Cj4gT24gMi8xLzE5IDExOjEz
+IFBNLCBEbWl0cnkgT3NpcGVua28gd3JvdGU6Cj4+IDAxLjAyLjIwMTkgMTc6MTMsIEpvc2VwaCBM
+byDQv9C40YjQtdGCOgo+Pj4gT24gMi8xLzE5IDk6NTQgUE0sIEpvbiBIdW50ZXIgd3JvdGU6Cj4+
+Pj4KPj4+PiBPbiAwMS8wMi8yMDE5IDEzOjExLCBEbWl0cnkgT3NpcGVua28gd3JvdGU6Cj4+Pj4+
+IDAxLjAyLjIwMTkgMTY6MDYsIERtaXRyeSBPc2lwZW5rbyDQv9C40YjQtdGCOgo+Pj4+Pj4gMDEu
+MDIuMjAxOSA2OjM2LCBKb3NlcGggTG8g0L/QuNGI0LXRgjoKPj4+Pj4+PiBBZGQgc3VwcG9ydCBm
+b3IgdGhlIFRlZ3JhMjEwIHRpbWVyIHRoYXQgcnVucyBhdCBvc2NpbGxhdG9yIGNsb2NrCj4+Pj4+
+Pj4gKFRNUjEwLVRNUjEzKS4gV2UgbmVlZCB0aGVzZSB0aW1lcnMgdG8gd29yayBhcyBjbG9jayBl
+dmVudCBkZXZpY2UgYW5kIHRvCj4+Pj4+Pj4gcmVwbGFjZSB0aGUgQVJNdjggYXJjaGl0ZWN0ZWQg
+dGltZXIgZHVlIHRvIGl0IGNhbid0IHN1cnZpdmUgYWNyb3NzIHRoZQo+Pj4+Pj4+IHBvd2VyIGN5
+Y2xlIG9mIHRoZSBDUFUgY29yZSBvciBDUFVQT1JFU0VUIHNpZ25hbC4gU28gaXQgY2FuJ3QgYmUg
+YSB3YWtlLXVwCj4+Pj4+Pj4gc291cmNlIHdoZW4gQ1BVIHN1c3BlbmRzIGluIHBvd2VyIGRvd24g
+c3RhdGUuCj4+Pj4+Pj4KPj4+Pj4+PiBBbHNvIGNvbnZlcnQgdGhlIG9yaWdpbmFsIGRyaXZlciB0
+byB1c2UgdGltZXItb2YgQVBJLgo+Pj4+Pj4+Cj4+Pj4+Pj4gQ2M6IERhbmllbCBMZXpjYW5vIDxk
+YW5pZWwubGV6Y2Fub0BsaW5hcm8ub3JnPgo+Pj4+Pj4+IENjOiBUaG9tYXMgR2xlaXhuZXIgPHRn
+bHhAbGludXRyb25peC5kZT4KPj4+Pj4+PiBDYzogbGludXgta2VybmVsQHZnZXIua2VybmVsLm9y
+Zwo+Pj4+Pj4+IFNpZ25lZC1vZmYtYnk6IEpvc2VwaCBMbyA8am9zZXBobEBudmlkaWEuY29tPgo+
+Pj4+Pj4+IEFja2VkLWJ5OiBUaGllcnJ5IFJlZGluZyA8dHJlZGluZ0BudmlkaWEuY29tPgo+Pj4+
+Pj4+IC0tLQo+IHNuaXAuCj4+Pj4+Pj4gK30KPj4+Pj4+PiArVElNRVJfT0ZfREVDTEFSRSh0ZWdy
+YTIxMF90aW1lciwgIm52aWRpYSx0ZWdyYTIxMC10aW1lciIsIHRlZ3JhMjEwX3RpbWVyX2luaXQp
+Owo+Pj4+Pj4+ICsjZWxzZSAvKiBDT05GSUdfQVJNICovCj4+Pj4+Pj4gK3N0YXRpYyBpbnQgX19p
+bml0IHRlZ3JhMjBfaW5pdF90aW1lcihzdHJ1Y3QgZGV2aWNlX25vZGUgKm5wKQo+Pj4+Pj4+ICt7
+Cj4+Pj4+PiBXaGF0IGFib3V0IFQxMzI/IElzbid0IGl0IEFSTTY0IHdoaWNoIHVzZXMgdGVncmEy
+MC10aW1lciBJUD8gQXQgbGVhc3QgVDEzMiBEVCBzdWdnZXN0cyBzbyBhbmQgc2VlbXMgdGhpcyBj
+aGFuZ2Ugd2lsbCBicmVhayBpdC4KPj4+Pj4+Cj4+Pj4+PiBbc25pcF0KPj4+Pj4+Cj4+Pj4+Cj4+
+Pj4+IEFoLCBub3RpY2VkIHRoZSAiZGVwZW5kcyBvbiBBUk0iIGluIEtjb25maWcuLiBTZWVtcyBv
+a2F5IHRoZW4uCj4+Pj4+Cj4+Pj4KPj4+Pgo+Pj4+IFRoaXMgaXMgYSBnb29kIHBvaW50LCBiZWNh
+dXNlIGV2ZW4gdGhvdWdoIHdlIGhhZCAnZGVwZW5kcyBvbiBBUk0nLCB0aGlzCj4+Pj4gc3RpbGwg
+bWVhbnMgdGhhdCB0aGUgVGVncmExMzIgRFQgaXMgaW5jb3JyZWN0Lgo+Pj4+Cj4+Pj4gSm9zZXBo
+LCBjYW4geW91IHRha2UgYSBxdWljayBsb29rIGF0IFRlZ3JhMTMyPwo+Pj4KPj4+IEhpIEpvbiBh
+bmQgRG1pdHJ5LAo+Pj4KPj4+IE5vIHdvcnJ5IGFib3V0IFQxMzIsIFQxMzIgdXNlcyBhcmNoIHRp
+bWVyICh2NykuIFRoZSB0ZWdyYTIwIHRpbWVyIGRyaXZlciBoYXMgbmV2ZXIgYmVlbiB1c2VkLiBX
+ZSBzaG91bGQgZml4IHRoZSBkdHNpIGZpbGUgbGF0ZXIuCj4+Cj4+IEhpIEpvc2VwaCwKPj4KPj4g
+U28gaXMgVDEzMiBIVyBhY3R1YWxseSBpbmNvbXBhdGlibGUgd2l0aCB0aGUgdGVncmEyMC10aW1l
+cj8gSWYgaXQncyBjb21wYXRpYmxlLCB0aGVuIEkgdGhpbmsgdGhlIGRyaXZlcidzIGNvZGUgc2hv
+dWxkIGJlIG1hZGUgbW9yZSB1bml2ZXJzYWwgdG8gc3VwcG9ydCBUMTMyLgo+Pgo+IAo+IEZyb20g
+SFcgcG9pbnQgb2YgdmlldywgdGhlIFRJTUVSMSB+IFRJTUVSNCBpcyBjb21wYXRpYmxlIHdpdGgg
+Im52aWRpYSx0ZWdyYTIwLXRpbWVyIi4gQnV0IFRlZ3JhMTMyIGFjdHVhbGx5IGhhcyAxMCB0aW1l
+cnMgd2hpY2ggYXJlIGV4YWN0bHkgdGhlIHNhbWUgYXMgVGVncmEzMC4gU28gaXQgc2hvdWxkIGJh
+Y2t3YXJkIGNvbXBhdGlibGUgd2l0aCAibnZpZGlhLHRlZ3JhMzAtdGltZXIiLCB3aGljaCBpcyB0
+ZWdyYV93ZHQgZHJpdmVyIG5vdy4gQW5kIFRlZ3JhMTMyIHNob3VsZCBuZXZlciB1c2UgdGhpcyBk
+cml2ZXIuCj4gCj4gVGhlIFRlZ3JhIHRpbWVyIGRyaXZlciBzaG91bGQgb25seSBiZSB1c2VkIG9u
+IFRlZ3JhMjAvMzAvMjEwLCB0aHJlZSBwbGF0Zm9ybXMgb25seS4gT3RoZXJzIHVzZSBhcmNoIHRp
+bWVyIGRyaXZlciBmb3Igc3lzdGVtIHRpbWVyIGRyaXZlci4KPiAKPiBTbyB3ZSBkb24ndCByZWFs
+bHkgbmVlZCB0byB0YWtlIGNhcmUgdGhlIHVzYWdlIG9uIG90aGVyIFRlZ3JhIHBsYXRmb3Jtcy4K
+CkRvZXNuJ3QgTGludXgga2VybmVsIHB1dCBpbiB1c2UgYWxsIG9mIGF2YWlsYWJsZSB0aW1lcnM/
+IElmIHllcywgdGhlbiB3ZSBwcm9iYWJseSB3b3VsZCB3YW50IHRvIGV4cG9zZSBhbGwgYXZhaWxh
+YmxlIHRpbWVycy4gSXQgbG9va3MgdG8gbWUgdGhhdCByaWdodCBub3cgdGVncmEyMC10aW1lciBl
+eHBvc2VzIG9ubHkgYSBzaW5nbGUtc2hhcmVkIHRpbWVyIHRvIHRoZSBzeXN0ZW0gW3BsZWFzZSBj
+b3JyZWN0IG1lIGlmIEknbSB3cm9uZ10uIFdvdWxkbid0IG1ha2Ugc2Vuc2UgYXQgbGVhc3QgdG8g
+Z2l2ZSBhIHRpbWVyIHBlciBDUFUgY29yZT8KCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFy
+bS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9t
+YWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
