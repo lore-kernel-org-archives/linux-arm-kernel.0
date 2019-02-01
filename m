@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 97A29C282DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 10:22:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 44763C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 10:24:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 66BC12086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 10:22:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 15D39218AC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 10:24:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sd734EI+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 66BC12086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XzlCpNdO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 15D39218AC
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,41 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=g+nsNxmD+lqsQIHyiWpocaSA1nl90cy16Veo661Vlcs=; b=sd734EI+rV2D7J
-	1DUvX9LDs62OMnGsuWxZTf8UF0f6Pc3mr8I+oTMyncY2eiLcmB8hKeZjnOY17hn8O7lsGMTClj3dd
-	op96l3Y77BbHfS7YXjvLkmfD3Z4ZoY1qfCeKd+mdY43sueFhh70cHJ1R9Pqi4gYImiiyCoGpqb01M
-	i7pb8XQbfJeiLwuLmZkMJWedvRDRJXEnLWHlD+OdAPUTAloYHgbclYmKsQ9iolSP6w6WtFbYaqx+6
-	kHflOXUd+OQMQ9WPoXQYVTat1y7iM7mExkj8VRJWetRCoxvxEnNXX00Ei9StTwJDXDRZPVsVa98h9
-	EVp4MpuzUyJeoXTURz1A==;
+	List-Owner; bh=363ExrcxwRlzRTP56WmiOnExSRFjkFuaxCh52yaH+KY=; b=XzlCpNdOlUmX2x
+	uDZdWP2xGdt60omLXwRnfiQH5BETl5drthsFeCv+evKpb5erHIwGUmglURC2hMXianJ1AwebuKC7J
+	rLLMhuD+cik/IKgtxc4MgEG69uYww0eZFPalV/j6UZl4vcQ+2BJVvYjDK9NNw7b4vEnpQIsAg0Qms
+	kxUXeC6p8Acf7S7Zo3tI6M9pzeydQdfg2DZvVB8dxztlCoiwsT5Mc1Po0JJ+P6JKY93Da2qqpUVul
+	M4s3dQ9T9ULYKOsEG/3COMFzH8cghgRKU5Ijj53Oznp0m0p9kZccPYz92ulJRkyuuQGA/97SyQ442
+	CfjkvCJc+mvjTzuhi1xQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpVxS-0000tc-EZ; Fri, 01 Feb 2019 10:22:02 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gpW01-0001DX-7T; Fri, 01 Feb 2019 10:24:41 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpVxO-0000tI-G4
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 10:21:59 +0000
+ id 1gpVzx-0001D9-Hr
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 10:24:38 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2D47715BE;
- Fri,  1 Feb 2019 02:21:58 -0800 (PST)
-Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CC52E15BE;
+ Fri,  1 Feb 2019 02:24:35 -0800 (PST)
+Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 82F5F3F71E;
- Fri,  1 Feb 2019 02:21:56 -0800 (PST)
-Date: Fri, 1 Feb 2019 10:21:54 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Valentin Schneider <valentin.schneider@arm.com>
-Subject: Re: [RFC PATCH 1/3] arm64: entry: Remove unneeded need_resched() loop
-Message-ID: <20190201102154.GB26637@fuggles.cambridge.arm.com>
-References: <20190131182339.9835-1-valentin.schneider@arm.com>
- <20190131182339.9835-2-valentin.schneider@arm.com>
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DB3A33F71E;
+ Fri,  1 Feb 2019 02:24:33 -0800 (PST)
+Date: Fri, 1 Feb 2019 10:24:27 +0000
+From: Mark Rutland <mark.rutland@arm.com>
+To: Carlo Caione <ccaione@baylibre.com>
+Subject: Re: [PATCH] arm64: dts: imx8mq: Add ARM PMU node
+Message-ID: <20190201102427.GA31409@lakrids.cambridge.arm.com>
+References: <20190131185422.7813-1-ccaione@baylibre.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190131182339.9835-2-valentin.schneider@arm.com>
-User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
+In-Reply-To: <20190131185422.7813-1-ccaione@baylibre.com>
+User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_022158_542403_9560548D 
-X-CRM114-Status: GOOD (  16.46  )
+X-CRM114-CacheID: sfid-20190201_022437_595669_77984018 
+X-CRM114-Status: GOOD (  14.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,68 +69,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Julien Thierry <julien.thierry@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, linux-kernel@vger.kernel.org,
- Julien Grall <julien.grall@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, abel.vesa@nxp.com, shawnguo@kernel.org,
+ s.hauer@pengutronix.de, robh+dt@kernel.org, linux-imx@nxp.com,
+ kernel@pengutronix.de, festevam@gmail.com,
+ linux-arm-kernel@lists.infradead.org, l.stach@pengutronix.de
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Jan 31, 2019 at 06:23:37PM +0000, Valentin Schneider wrote:
-> Since the enabling and disabling of IRQs within preempt_schedule_irq()
-> is contained in a need_resched() loop, we don't need the outer arch
-> code loop.
+On Thu, Jan 31, 2019 at 06:54:22PM +0000, Carlo Caione wrote:
+> Add the node for the ARM Performance Monitor Units.
 > 
-> Reported-by: Julien Thierry <julien.thierry@arm.com>
-> Reported-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Valentin Schneider <valentin.schneider@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Julien Grall <julien.grall@arm.com>
-> Cc: Julien Thierry <julien.thierry@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: linux-arm-kernel@lists.infradead.org
+> Signed-off-by: Carlo Caione <ccaione@baylibre.com>
 > ---
->  arch/arm64/kernel/entry.S | 11 +----------
->  1 file changed, 1 insertion(+), 10 deletions(-)
+>  arch/arm64/boot/dts/freescale/imx8mq.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 0ec0c46b2c0c..4d0c81f29a60 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -611,7 +611,7 @@ el1_irq:
->  #ifdef CONFIG_PREEMPT
->  	ldr	x24, [tsk, #TSK_TI_PREEMPT]	// get preempt count
->  	cbnz	x24, 1f				// preempt count != 0
-> -	bl	el1_preempt
-> +	bl	preempt_schedule_irq		// irq en/disable is done inside
->  1:
->  #endif
->  #ifdef CONFIG_TRACE_IRQFLAGS
-> @@ -620,15 +620,6 @@ el1_irq:
->  	kernel_exit 1
->  ENDPROC(el1_irq)
+> diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+> index dbedc4a5e7fb..8b3107643ed4 100644
+> --- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+> @@ -118,6 +118,13 @@
+>  		};
+>  	};
 >  
-> -#ifdef CONFIG_PREEMPT
-> -el1_preempt:
-> -	mov	x24, lr
-> -1:	bl	preempt_schedule_irq		// irq en/disable is done inside
-> -	ldr	x0, [tsk, #TSK_TI_FLAGS]	// get new tasks TI_FLAGS
-> -	tbnz	x0, #TIF_NEED_RESCHED, 1b	// needs rescheduling?
-> -	ret	x24
-> -#endif
-> -
+> +	pmu {
+> +		compatible = "arm,armv8-pmuv3";
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Please use "arm,cortex-a53-pmu".
 
-Catalin can pick this up for 5.1.
+Thanks,
+Mark.
 
-Will
+> +		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-parent = <&gic>;
+> +		interrupt-affinity = <&A53_0>, <&A53_1>, <&A53_2>, <&A53_3>;
+> +	};
+> +
+>  	psci {
+>  		compatible = "arm,psci-1.0";
+>  		method = "smc";
+> -- 
+> 2.19.1
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
