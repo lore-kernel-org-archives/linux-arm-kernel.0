@@ -2,93 +2,93 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B431FC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 00:51:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DCC89C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 00:53:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7341E20B1F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 00:51:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A845F20B1F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 00:53:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EBHZJBfp";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="Z2Copjvd";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="Is5gbo6D"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7341E20B1F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZvCoZ8d2";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="oUTSfuBP";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="cTbIdPrD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A845F20B1F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:References:
-	To:From:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=QZCQWaWso0akGKU/3lne0HZiN+HS6ljktT1cMP/z2uw=; b=EBHZJBfpJn/n3PFDw07wmxjIX
-	4mu/muUasBIO02fCGEPedooBRPcV75pusUsKE+MBIFERumUdW4jz87H8rWkp0n804vHOu7WCz+zqp
-	bvE5Wksj1KzDygrY8FihyBnS2w4xCHGrfZaznU1hyhq9KsDWGPDMZwFRA337vwughL0O5nMiJx91/
-	5cjyJX1BUTR6sy9Vse2qMugNh+qcnUm8XmW+nsjdcyIVdJiBoNHRR4J0H/vBPytMhywxOp77+63Cr
-	idJKkw/10B/frc9UU+5nDN78IuN3ohm5C8RuOxIZckCOpka3mKIbd0MhV3JCRyS1wHjVzn8g0ubWa
-	+Oaa+fp8w==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=/xnhOrPBvY8q0r8EZP04Jq1ffzNpjOh6GuhV9kj/M0Q=; b=ZvCoZ8d2QrAtOE
+	qr8AhtJ84bLGggjsnAI+J1ijHIqXFW9TyW2d8P9SsJwK21HXHncAmuCAUF1AnMXXosxXYbNUxLoAx
+	WMhbkaj38Ob1Ijg5GF34Idsf3QouYGi+pjxiXYYLPNkWSyMT1kUYmhlm3UwwTCGJMMJ80aKi44IDC
+	61Iu0LyUJMrX0nn1GPOw2i9wzixY7INDlwVNkk10E80JtgUnDjO2cxgc0yZNxzqZtYwyYjBmfgKOS
+	Rt+QERgDQZnRosE4+IRvi7/FDCiySuiY2V9SvC2wUiVfnqkyS6FNLWp+Tu3dJJHq3vj4V3SxJlMN8
+	Vrz3k9QKjzCjRzypJizA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpN31-0004UK-79; Fri, 01 Feb 2019 00:51:11 +0000
+	id 1gpN5I-0004oF-Ic; Fri, 01 Feb 2019 00:53:32 +0000
 Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpN2x-0004Tk-Hx
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 00:51:09 +0000
+ id 1gpN5F-0004nr-LD
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 00:53:31 +0000
 Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id C319660929; Fri,  1 Feb 2019 00:51:04 +0000 (UTC)
+ id 53D29608D2; Fri,  1 Feb 2019 00:53:28 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548982266;
- bh=RV9CfmcwP8zRx8TUmRdbkhNyhGkS4YjCAsge9hdXd0k=;
- h=Subject:From:To:Cc:References:Date:In-Reply-To:From;
- b=Z2Copjvd+3B3an5wa9QJpcp7kWlTylBmI8Ia48aSSHpx3NW7/OvdEmqdIR57F80bd
- VP3hmQKqoDAb+X63+YH5/NaIC+MBP0v/YuH/V6iA2LZTfRIPgA3vimDAQ270dssoo+
- HoROuAtvPqGfGxcjEfa2QZ2jaWCuZx1SSJLiq8BA=
-Received: from [192.168.43.47] (unknown [223.186.125.207])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ s=default; t=1548982409;
+ bh=pwEG+1C3uTQU0fDiavHvzWQydrSqNc7kF+Uc6gYs9Vg=;
+ h=From:To:Cc:Subject:Date:From;
+ b=oUTSfuBPKgqzQ4xgW1hnHODqoyk/jTMIUllnRsh+/wGayJrmrXfnzASh44Qu787U2
+ /KzuZAIoXQVBOnGbufSiL27x7+7zmZdLCmDZnDKX4AzeMUYOAKX40EE4LoiUd3NGlj
+ fcsPIHomGQBIi3AsDBFbYHyLfDQu6N18u/xz7ESY=
+Received: from blr-ubuntu-253.qualcomm.com
+ (blr-bdr-fw-01_globalnat_allzones-outside.qualcomm.com [103.229.18.19])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-SHA256 (128/128 bits))
  (No client certificate requested)
- (Authenticated sender: saiprakash.ranjan@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 98CA960590;
- Fri,  1 Feb 2019 00:50:54 +0000 (UTC)
+ (Authenticated sender: saiprakash.ranjan@codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 9C8C960590;
+ Fri,  1 Feb 2019 00:53:21 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1548982263;
- bh=RV9CfmcwP8zRx8TUmRdbkhNyhGkS4YjCAsge9hdXd0k=;
- h=Subject:From:To:Cc:References:Date:In-Reply-To:From;
- b=Is5gbo6DnMh/w9Mj4NS5cPerYfuXPB3ONJOrcOQY9P4RNWOcyHq/5fAmc69s9ItMQ
- Z25Qm9PTocOXw4DV/xk/XXK8em5vRGCuks2A4f+nhn2n1b0pLe25vG7ooP1d4aujd6
- LY5TuMrSzvZRQQO0lEXIR7OKaQbSQsEmX5AKqNVU=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 98CA960590
+ s=default; t=1548982407;
+ bh=pwEG+1C3uTQU0fDiavHvzWQydrSqNc7kF+Uc6gYs9Vg=;
+ h=From:To:Cc:Subject:Date:From;
+ b=cTbIdPrD9ABjcPnpRTF8RZlj30nY0A0LHREF64w0VtNU0Y6ikyz8UjmzlXuDlVZGW
+ jN1UqnEHwae+PlhV9gN84SQQDu0GJhLvuxFFpMH4+4tGO6eGFhTU2LFbMMormZ305C
+ dMwbecW1zPeQqXMdGwRARx+TsS6uZPCYWDeQSILo=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 9C8C960590
 Authentication-Results: pdx-caf-mail.web.codeaurora.org;
  dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
  smtp.mailfrom=saiprakash.ranjan@codeaurora.org
-Subject: Re: [PATCHv6 6/6] coresight: debug: Add Unique Component Identifier
- (UCI) table
 From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-To: Suzuki K Poulose <suzuki.poulose@arm.com>, robh+dt@kernel.org,
- mathieu.poirier@linaro.org, mike.leach@linaro.org, leo.yan@linaro.org,
- alexander.shishkin@linux.intel.com, andy.gross@linaro.org,
- david.brown@linaro.org, vivek.gautam@codeaurora.org, jhugo@codeaurora.org,
- dianders@chromium.org, sboyd@kernel.org, bjorn.andersson@linaro.org,
- devicetree@vger.kernel.org, mark.rutland@arm.com, marc.w.gonzalez@free.fr
-References: <cover.1548943727.git.saiprakash.ranjan@codeaurora.org>
- <f724b28e5bfd7bca062aa5380cfd9328289559bf.1548943727.git.saiprakash.ranjan@codeaurora.org>
- <304febd7-da9a-92d6-47bb-d9983d4bc5d4@arm.com>
- <2801964a-ba35-9393-593b-c5108a8825e4@codeaurora.org>
-Message-ID: <0896a3f6-e2c3-49a0-8420-5127972b410b@codeaurora.org>
-Date: Fri, 1 Feb 2019 06:20:50 +0530
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+To: Rob Herring <robh+dt@kernel.org>,
+ Mathieu Poirier <mathieu.poirier@linaro.org>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Mike Leach <mike.leach@linaro.org>, Leo Yan <leo.yan@linaro.org>,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ Andy Gross <andy.gross@linaro.org>, David Brown <david.brown@linaro.org>,
+ Vivek Gautam <vivek.gautam@codeaurora.org>,
+ Jeffrey Hugo <jhugo@codeaurora.org>, Doug Anderson <dianders@chromium.org>,
+ Stephen Boyd <sboyd@kernel.org>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>, devicetree@vger.kernel.org,
+ Mark Rutland <mark.rutland@arm.com>,
+ Marc Gonzalez <marc.w.gonzalez@free.fr>
+Subject: [PATCHv7 0/6] Add coresight support for SDM845, MSM8998 and MSM8996
+Date: Fri,  1 Feb 2019 06:23:08 +0530
+Message-Id: <cover.1548981329.git.saiprakash.ranjan@codeaurora.org>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
-In-Reply-To: <2801964a-ba35-9393-593b-c5108a8825e4@codeaurora.org>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_165107_633927_EF32837F 
-X-CRM114-Status: GOOD (  14.92  )
+X-CRM114-CacheID: sfid-20190131_165329_737090_495977B0 
+X-CRM114-Status: GOOD (  13.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,52 +100,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: rnayak@codeaurora.org, linux-arm-msm@vger.kernel.org,
- linux-kernel@vger.kernel.org, sibis@codeaurora.org, tingwei@codeaurora.org,
- linux-arm-kernel@lists.infradead.org
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>,
+ Rajendra Nayak <rnayak@codeaurora.org>, linux-arm-msm@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Sibi Sankar <sibis@codeaurora.org>,
+ Tingwei Zhang <tingwei@codeaurora.org>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMi8xLzIwMTkgNjoxNyBBTSwgU2FpIFByYWthc2ggUmFuamFuIHdyb3RlOgo+IE9uIDEvMzEv
-MjAxOSAxMTozMSBQTSwgU3V6dWtpIEsgUG91bG9zZSB3cm90ZToKPj4KPj4KPj4gT24gMzEvMDEv
-MjAxOSAxNDoyMiwgU2FpIFByYWthc2ggUmFuamFuIHdyb3RlOgo+Pj4gQWRkIFVDSSB0YWJsZSBm
-b3IgY29yZXNpZ2h0IENQVSBkZWJ1ZyBtb2R1bGUuIFRoaXMgcGF0Y2ggYWRkcwo+Pj4gdGhlIFVD
-SSBlbnRyaWVzIGZvciBLcnlvIENQVXMgZm91bmQgb24gTVNNODk5NiB3aGljaCBzaGFyZXMKPj4+
-IHRoZSBzYW1lIFBJRHMgYXMgRVRNcy4KPj4+Cj4+PiBXaXRob3V0IHRoaXMsIGJlbG93IGVycm9y
-IGlzIG9ic2VydmVkIG9uIE1TTTg5OTY6Cj4+Cj4+IG5pdDogU3ViamVjdCBkb2Vzbid0IG1hdGNo
-IHRoZSBwYXRjaCBjb250ZW50cy4gWW91IGNvdWxkIHNpbXBseSBzYXkgOgo+Pgo+PiBjb3Jlc2ln
-aHQ6IGNwdS1kZWJ1ZzogQWRkIHN1cHBvcnQgZm9yIFF1YWxjb21tIEtyeW8KPj4KPiAKPiBEb25l
-Lgo+IAo+Pj4KPj4+IGRpZmYgLS1naXQgYS9kcml2ZXJzL2h3dHJhY2luZy9jb3Jlc2lnaHQvY29y
-ZXNpZ2h0LWNwdS1kZWJ1Zy5jIAo+Pj4gYi9kcml2ZXJzL2h3dHJhY2luZy9jb3Jlc2lnaHQvY29y
-ZXNpZ2h0LWNwdS1kZWJ1Zy5jCj4+PiBpbmRleCBlODgxOWQ3NTA5MzguLjkxNWQ4NmEzOWNlZSAx
-MDA2NDQKPj4+IC0tLSBhL2RyaXZlcnMvaHd0cmFjaW5nL2NvcmVzaWdodC9jb3Jlc2lnaHQtY3B1
-LWRlYnVnLmMKPj4+ICsrKyBiL2RyaXZlcnMvaHd0cmFjaW5nL2NvcmVzaWdodC9jb3Jlc2lnaHQt
-Y3B1LWRlYnVnLmMKPj4+IEBAIC02NTUsMjQgKzY1NSwyMyBAQCBzdGF0aWMgaW50IGRlYnVnX3Jl
-bW92ZShzdHJ1Y3QgYW1iYV9kZXZpY2UgKmFkZXYpCj4+PiDCoMKgwqDCoMKgIHJldHVybiAwOwo+
-Pj4gwqAgfQo+Pj4gK3N0YXRpYyBzdHJ1Y3QgYW1iYV9jc191Y2lfaWQgdWNpX2lkX2RlYnVnW10g
-PSB7Cj4+Cj4+IEFzIFN0ZXBoZW4gbWVudGlvbmVkLCB0aGlzIG11c3QgYmUgImNvbnN0Ii4KPj4K
-Pj4gUmVzdCBsb29rcyBmaW5lLgo+IAo+IERvbmUuCj4gCgpBbHNvIGl0IHNob3VsZCBiZSBjaGFu
-Z2VkIGluIE1pa2UncyBwYXRjaCBJIHN1cHBvc2Ugb3IgZWxzZToKCkluIGZpbGUgaW5jbHVkZWQg
-ZnJvbSAKZHJpdmVycy9od3RyYWNpbmcvY29yZXNpZ2h0L2NvcmVzaWdodC1jcHUtZGVidWcuYzoy
-NjowOgpkcml2ZXJzL2h3dHJhY2luZy9jb3Jlc2lnaHQvY29yZXNpZ2h0LWNwdS1kZWJ1Zy5jOjY3
-MjoyOTogd2FybmluZzogCmluaXRpYWxpemF0aW9uIGRpc2NhcmRzIOKAmGNvbnN04oCZIHF1YWxp
-ZmllciBmcm9tIHBvaW50ZXIgdGFyZ2V0IHR5cGUgClstV2Rpc2NhcmRlZC1xdWFsaWZpZXJzXQog
-ICBDU19BTUJBX1VDSV9JRCgweDAwMGYwMjA1LCB1Y2lfaWRfZGVidWcpLCAvKiBRdWFsY29tbSBL
-cnlvICovCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIF4KZHJpdmVycy9od3RyYWNpbmcv
-Y29yZXNpZ2h0L2NvcmVzaWdodC1wcml2Lmg6MTkyOjExOiBub3RlOiBpbiBkZWZpbml0aW9uIApv
-ZiBtYWNybyDigJhDU19BTUJBX1VDSV9JROKAmQogICAgLmRhdGEgPSB1Y2lfcHRyIFwKICAgICAg
-ICAgICAgXn5+fn5+fgpkcml2ZXJzL2h3dHJhY2luZy9jb3Jlc2lnaHQvY29yZXNpZ2h0LWNwdS1k
-ZWJ1Zy5jOjY3MzoyOTogd2FybmluZzogCmluaXRpYWxpemF0aW9uIGRpc2NhcmRzIOKAmGNvbnN0
-4oCZIHF1YWxpZmllciBmcm9tIHBvaW50ZXIgdGFyZ2V0IHR5cGUgClstV2Rpc2NhcmRlZC1xdWFs
-aWZpZXJzXQogICBDU19BTUJBX1VDSV9JRCgweDAwMGYwMjExLCB1Y2lfaWRfZGVidWcpLCAvKiBR
-dWFsY29tbSBLcnlvICovCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIF4KZHJpdmVycy9o
-d3RyYWNpbmcvY29yZXNpZ2h0L2NvcmVzaWdodC1wcml2Lmg6MTkyOjExOiBub3RlOiBpbiBkZWZp
-bml0aW9uIApvZiBtYWNybyDigJhDU19BTUJBX1VDSV9JROKAmQogICAgLmRhdGEgPSB1Y2lfcHRy
-IFwKICAgICAgICAgICAgXn5+fn5+fgoKLS0gClFVQUxDT01NIElORElBLCBvbiBiZWhhbGYgb2Yg
-UXVhbGNvbW0gSW5ub3ZhdGlvbiBDZW50ZXIsIEluYy4gaXMgYSBtZW1iZXIKb2YgQ29kZSBBdXJv
-cmEgRm9ydW0sIGhvc3RlZCBieSBUaGUgTGludXggRm91bmRhdGlvbgoKX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5n
-IGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5p
-bmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+This patch series adds support for coresight on SDM845, MSM8998, and MSM8996.
+
+* Patch 1 adds device tree nodes for SDM845 coresight components.
+
+* Patch 2 adds device tree nodes for MSM8998 coresight components.
+
+* Patch 3 adds device tree nodes for MSM8996 coresight components.
+
+* Patch 4 enables support for ETMv4.2 and enables SDM845 to make
+  use of same driver(etm4x).
+
+* Patch 5 adds ETM PIDs for SDM845 and MSM8996.
+
+* Patch 6 adds coresight CPU debug module for Qualcomm Kryo.
+
+NOTE: All the dependent patches are applied in the below tree,
+      the first 12 commits represent the dependent patches.
+ * https://github.com/saiprakash-ranjan/linux/tree/coresight-next
+
+Patch 1 and 4 depends on below AOSS QMP, AMBA bus pclk and address cell change:
+ * https://lore.kernel.org/lkml/20190131003933.11436-5-bjorn.andersson@linaro.org/
+ * https://lore.kernel.org/lkml/20190131003933.11436-6-bjorn.andersson@linaro.org/
+ * https://lore.kernel.org/lkml/20190131003933.11436-7-bjorn.andersson@linaro.org/
+ * https://lore.kernel.org/lkml/20190131003933.11436-10-bjorn.andersson@linaro.org/
+ * https://lore.kernel.org/lkml/20190131020141.28352-1-bjorn.andersson@linaro.org/
+ * https://lore.kernel.org/lkml/20190117042940.25487-2-bjorn.andersson@linaro.org/
+
+Patch 2 depends on MSM8998 rpm clocks and rpmcc nodes:
+ * https://lore.kernel.org/lkml/1545099336-5615-1-git-send-email-jhugo@codeaurora.org/
+ * https://lore.kernel.org/lkml/1548866144-30265-1-git-send-email-jhugo@codeaurora.org/
+ * https://lore.kernel.org/lkml/6da00186-e7c9-c93d-a80a-65eda2516451@free.fr/
+
+Patch 5 and 6 depends on UCI support by Mike Leach:
+ * https://lore.kernel.org/lkml/20190130234051.2294-1-mike.leach@linaro.org/ 
+
+This patch series has been tested on SDM845 MTP and MSM8996
+based Dragonboard 820c and MSM8998 MTP.
+
+v7:
+ * Change uci_id_debug struct to const.
+ * Update the subject as suggested by Suzuki.
+
+v6:
+ * Update the UCI table with the new macro introduced by
+   Mike.
+ * Rebase on top of coresight-next and provide a tree with
+   all the dependent patches applied.
+
+v5:
+ * Added coresight support for MSM8998.
+ * Added ETM PIDs for SDM845 and MSM8996 as suggested
+   by Suzuki.
+ * Added UCI table for Coresight CPU debug module.
+
+v4:
+ * Mask out the minor version as suggested by Mathieu.
+ * Added the dependent patch description in patch 1.
+
+v3:
+ * Added arm,scatter-gather property as suggested by Suzuki.
+
+v2:
+ * Added coresight support for msm8996 based on Vivek's patch.
+   Cleaned up and added coresight cpu debug nodes for msm8996.
+ * Merged coresight dtsi file into sdm845.dtsi as suggested by Bjorn
+ * Addressed Mathieu's feedback about masking the minor version in
+   etm4_arch_supported() and added a comment for reason to bypass
+   the AMBA bus discovery method.
+
+Sai Prakash Ranjan (5):
+  arm64: dts: qcom: sdm845: Add Coresight support
+  arm64: dts: qcom: msm8998: Add Coresight support
+  coresight: etm4x: Add support to enable ETMv4.2
+  coresight: etm4x: Add ETM PIDs for SDM845 and MSM8996
+  coresight: cpu-debug: Add support for Qualcomm Kryo
+
+Vivek Gautam (1):
+  arm64: dts: qcom: msm8996: Add Coresight support
+
+ arch/arm64/boot/dts/qcom/msm8996.dtsi         | 434 +++++++++++++++++
+ arch/arm64/boot/dts/qcom/msm8998.dtsi         | 435 ++++++++++++++++++
+ arch/arm64/boot/dts/qcom/sdm845.dtsi          | 434 +++++++++++++++++
+ .../hwtracing/coresight/coresight-cpu-debug.c |  33 +-
+ drivers/hwtracing/coresight/coresight-etm4x.c |  17 +-
+ 5 files changed, 1330 insertions(+), 23 deletions(-)
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
