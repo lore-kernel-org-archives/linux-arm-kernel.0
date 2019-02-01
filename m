@@ -2,72 +2,73 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 69AA0C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:41:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 20790C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:42:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2673921872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:41:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CC8CD2184A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:42:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sfiwTskA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2673921872
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kIeD8K1S"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC8CD2184A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=npxZHUc044CU3qOwPx9tX7wqqZ1+RIqatsw5XJv2Vvw=; b=sfiwTskAvjQgH4
-	iTKBMD3FlyQaeBgRFMbkdtqCpNFdVZYRfspUeIM2bD969UNzpvUm93D/2SuT4K0+xE4rRhYVsevjM
-	qDh1HO7c02PsvAqFAwqmxgwM7shMZG3+3jRyNtQjGyWlWa874PaTANXBsytSMoEDNVpu0JhB9/W+E
-	OzDyUdcrV1IvQ6Q7GE79a2QIBe8X3eUL87bD93ukU3dpxgEib3tApHMSV3GdHACIG3iYe3T2HDYN0
-	F1Y+TBXaoE1oIaAdEHQXnoABh36qMhT2M3phjOOH2XCnPhzS36BGPe9CwQc+oD2B9G+XA5T8+sIAi
-	y8353y/Pa2TcLmnhcJhw==;
+	List-Owner; bh=9AYrUQtfGASg4lOVVJz+SpJjb8fjK8mFg/3cyl7gKLQ=; b=kIeD8K1SRtaYFR
+	Wlc7lllNwNP/r0mu/auRSxq+0i+Wb510s6ztkznDg+O/M3cQiD38IkRWP/h15RdPGBi0Y1SqKmcjE
+	cBA/+2pX/xApdFK7a5rdibGE3pNtpkHalQhIeJ3PMaYJ2wAKSk9je/FoIMjxMQhY8lftVYVFzoHf9
+	qzXqvTRAb+yiBDxPDOzoYV9fnmCwftwCTbCJu3KShaYTKwzqGPEt7inlHk5yu0EjQqkz7NyaiRl8x
+	k9/iyyP+tchwX3jBVTgVKbUFgHHro4dizP2yT0E7+tGr5/e4HL8BRPWzg5ie8Xw7TBI8yafXqQav0
+	sstVBndppIszZM/OVY3w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpUNh-0005uL-76; Fri, 01 Feb 2019 08:41:01 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gpUOs-0006S6-QY; Fri, 01 Feb 2019 08:42:14 +0000
+Received: from mail-qt1-f196.google.com ([209.85.160.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpUDb-0007GQ-Dx; Fri, 01 Feb 2019 08:30:44 +0000
-X-UUID: 76dfbb11821047de9bd12ea426641ece-20190201
-X-UUID: 76dfbb11821047de9bd12ea426641ece-20190201
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
- (envelope-from <weiyi.lu@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 134006222; Fri, 01 Feb 2019 00:30:28 -0800
-Received: from mtkmbs03n1.mediatek.inc (172.21.101.181) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 1 Feb 2019 00:30:27 -0800
-Received: from mtkcas08.mediatek.inc (172.21.101.126) by
- mtkmbs03n1.mediatek.inc (172.21.101.181) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 1 Feb 2019 16:30:25 +0800
-Received: from mtkslt210.mediatek.inc (10.21.14.14) by mtkcas08.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 1 Feb 2019 16:30:25 +0800
-From: Weiyi Lu <weiyi.lu@mediatek.com>
-To: Nicolas Boichat <drinkcat@chromium.org>, Matthias Brugger
- <matthias.bgg@gmail.com>, Stephen Boyd <sboyd@codeaurora.org>, Rob Herring
- <robh@kernel.org>
-Subject: [PATCH v4 01/12] clk: mediatek: Disable tuner_en before change PLL
- rate
-Date: Fri, 1 Feb 2019 16:30:05 +0800
-Message-ID: <20190201083016.25856-3-weiyi.lu@mediatek.com>
-X-Mailer: git-send-email 2.18.0
-In-Reply-To: <20190201083016.25856-1-weiyi.lu@mediatek.com>
-References: <20190201083016.25856-1-weiyi.lu@mediatek.com>
+ id 1gpUOp-0006Rk-Bu
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 08:42:12 +0000
+Received: by mail-qt1-f196.google.com with SMTP id l12so6542540qtf.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 01 Feb 2019 00:42:11 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=xBU2TNZakMyKOC4KxmPqNQYRaxeZHiXAJWu2gQGpFiM=;
+ b=nmBqkZpmX1ulIidWeQXA7LFGud+fVOyImPvDqxvMGW8rhayV8TI5Z+7Gkp3zq27p+f
+ 6J5VFlCNfchoj3wFHo6npurqUKM6SY58Z+WQUUnGHsRkXLibNM18s6HTZx0XOOfprRKW
+ LGvpn2mSjze3ViedmA+f8fJxFFFpmBwJxRBf4YmIBHvrMPRIfPL7XPDT4DY2nBPmoUv8
+ o20Ca8IXx2YNUuU69MPmct1uW+2SXEusxK1wkuRgzAACVAkaXelZ34M39xIAkpRPq+sp
+ uykCwFbTLyuciv7Pcb96fdfkiRNK8wMsSlugf8We16RuvT52CYZgHsXQH3QwZYm0SmAv
+ DDZg==
+X-Gm-Message-State: AJcUukebWAbBHaI2QSaHTQfv1LDXhIFh2KDj9MtyGE0cN5VUbD1c4uO4
+ wf2vIgbqr55FSYwjVkAWo5H6bknvQzP2EbPuy5o=
+X-Google-Smtp-Source: ALg8bN404msL6/fDmHYgSbisuiK3UViMZuqgpO9BZAt1LX1eLUijpX2MXOEsNjlrBP7uSKgfh4ceMVr6lSeEHxfP0I8=
+X-Received: by 2002:aed:35c5:: with SMTP id d5mr37347128qte.212.1549010530162; 
+ Fri, 01 Feb 2019 00:42:10 -0800 (PST)
 MIME-Version: 1.0
-X-MTK: N
+References: <20190126041041.13173-1-manivannan.sadhasivam@linaro.org>
+ <CAK8P3a3Y_w5_ZavpyUh0VKrS8FeUPTJKkchtGGLc1qe3nG2mfA@mail.gmail.com>
+ <20190201035005.GA4283@Mani-XPS-13-9360>
+In-Reply-To: <20190201035005.GA4283@Mani-XPS-13-9360>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 1 Feb 2019 09:41:52 +0100
+Message-ID: <CAK8P3a3DVniy47azCP=NAWecCZST_huaeXjLKRczBsit7e4uKQ@mail.gmail.com>
+Subject: Re: [PATCH 0/5] Add initial Bitmain BM1880 SoC/Board support
+To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_003035_855487_7066B648 
-X-CRM114-Status: GOOD (  11.86  )
+X-CRM114-CacheID: sfid-20190201_004211_402396_B57DF398 
+X-CRM114-Status: GOOD (  15.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,102 +80,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: James Liao <jamesjj.liao@mediatek.com>, Weiyi Lu <weiyi.lu@mediatek.com>,
- srv_heupstream@mediatek.com, linux-kernel@vger.kernel.org,
- stable@vger.kernel.org, Fan Chen <fan.chen@mediatek.com>,
- linux-mediatek@lists.infradead.org, Owen Chen <owen.chen@mediatek.com>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: DTML <devicetree@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Amit Kucheria <amit.kucheria@linaro.org>, darren.tsao@bitmain.com,
+ Rob Herring <robh+dt@kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>, haitao.suo@bitmain.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Owen Chen <owen.chen@mediatek.com>
+On Fri, Feb 1, 2019, 04:50 Manivannan Sadhasivam
+<manivannan.sadhasivam@linaro.org wrote:
+> On Sun, Jan 27, 2019 at 10:24:09AM +0100, Arnd Bergmann wrote:
+> > On Sat, Jan 26, 2019 at 5:11 AM Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org> wrote:
+> > >
+> > > This patchset adds initial support for Bitmain BM1880 SoC and Sophon
+> > > Edge board. BM1880 SoC consists of a Dual Core ARM Cortex A53 Application
+> > > processor subsystem, a single core RISC-V subsystem and a Tensor
+> > > Processor subsystem. This patchset adds support for only ARM Cortex
+> > > A53 Application processor subsystem with UART, which enables the board to
+> > > boot into initramfs with 2 CPUs.
+> >
+> > Nice work! All patches in this series
+> >
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+>
+> Thanks. What is the merge strategy for this patchset? Shall I send a
+> Pull Request to arm@kernel.org with topic branches?
 
-PLLs with tuner_en bit, such as APLL1, need to disable
-tuner_en before apply new frequency settings, or the new frequency
-settings (pcw) will not be applied.
-The tuner_en bit will be disabled during changing PLL rate
-and be restored after new settings applied.
-Another minor change is to correct the macro name of pcw change bit
-to CON1_PCW_CHG because PCW_CHG(BIT31) is on CON1.
+I think we should take new platforms as a single topic branch separate
+from the normal branches, so please send a single pull request for this
+one.
 
-Fixes: e2f744a82d725 (clk: mediatek: Add MT2712 clock support)
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Owen Chen <owen.chen@mediatek.com>
----
- drivers/clk/mediatek/clk-pll.c | 33 +++++++++++++++++++++++++++++++--
- 1 file changed, 31 insertions(+), 2 deletions(-)
+Also, if you have drivers that are closely tied to this platform, that
+branch include those as well, provided that you have an Ack from the
+respective subsystem maintainers.
 
-diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-index f54e4015b0b1..f0ff5f535c7e 100644
---- a/drivers/clk/mediatek/clk-pll.c
-+++ b/drivers/clk/mediatek/clk-pll.c
-@@ -27,7 +27,7 @@
- #define CON0_BASE_EN		BIT(0)
- #define CON0_PWR_ON		BIT(0)
- #define CON0_ISO_EN		BIT(1)
--#define CON0_PCW_CHG		BIT(31)
-+#define CON1_PCW_CHG		BIT(31)
- 
- #define AUDPLL_TUNER_EN		BIT(31)
- 
-@@ -93,9 +93,31 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
- {
- 	u32 con1, val;
- 	int pll_en;
-+	u32 tuner_en = 0;
-+	u32 tuner_en_mask;
-+	void __iomem *tuner_en_addr = NULL;
- 
- 	pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
- 
-+	/* disable tuner */
-+	if (pll->tuner_en_addr) {
-+		tuner_en_addr = pll->tuner_en_addr;
-+		tuner_en_mask = BIT(pll->data->tuner_en_bit);
-+	} else if (pll->tuner_addr) {
-+		tuner_en_addr = pll->tuner_addr;
-+		tuner_en_mask = AUDPLL_TUNER_EN;
-+	}
-+
-+	if (tuner_en_addr) {
-+		val = readl(tuner_en_addr);
-+		tuner_en = val & tuner_en_mask;
-+
-+		if (tuner_en) {
-+			val &= ~tuner_en_mask;
-+			writel(val, tuner_en_addr);
-+		}
-+	}
-+
- 	/* set postdiv */
- 	val = readl(pll->pd_addr);
- 	val &= ~(POSTDIV_MASK << pll->data->pd_shift);
-@@ -116,12 +138,19 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
- 	con1 = readl(pll->base_addr + REG_CON1);
- 
- 	if (pll_en)
--		con1 |= CON0_PCW_CHG;
-+		con1 |= CON1_PCW_CHG;
- 
- 	writel(con1, pll->base_addr + REG_CON1);
- 	if (pll->tuner_addr)
- 		writel(con1 + 1, pll->tuner_addr);
- 
-+	/* restore tuner_en */
-+	if (tuner_en_addr && tuner_en) {
-+		val = readl(tuner_en_addr);
-+		val |= tuner_en_mask;
-+		writel(val, tuner_en_addr);
-+	}
-+
- 	if (pll_en)
- 		udelay(20);
- }
--- 
-2.18.0
-
+     Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
