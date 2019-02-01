@@ -4,134 +4,79 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D2EC4C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:07:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D72E4C282DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:10:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A0DFE20863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:07:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A6BD72184A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:10:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B6elCJS0";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="j8pLf+bj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A0DFE20863
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F07H12Pt";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Sg/9JcAw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6BD72184A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=K8pdEBlt4pYuiJKXrd5SuMmQkKqWA+CuPA1iIogYiDE=; b=B6elCJS0XzKkd9
-	CaOmQF9HrxqkkHD+qx1ssJ4QvzGPo/9VUqgM5DVXKjLh0hb1+hzZ9mIeMvVu7+syqCxJ0ZEv4Qrit
-	epPz17cPjjiuYoG1xp4qjCcJ/Qfap4DUAWahQVC/eEdKs6KEx2KYMRTPsTyM65jt8K1vjDKDuhFii
-	Vk4EAbYz0fCA15UZLBBBhKfg/rCdB5RuuQAcC4lcLfExq7GxwNAOfDRiCBeqpvfR5WfM8s07vPzZN
-	A/9lRPn3zcdabElaOrSBmO0W5FpObW9+MfIVnvSA9GJL+1e8DlJJmf8+XimE3xWVM+nO41DKMVwo1
-	9ixWNIfEGLYjq5pfddtA==;
+	List-Owner; bh=U2rFRYSE+geethHpEPoLlhWXnKBvSkCf45SpQAGAnss=; b=F07H12PtZaCpLx
+	fFdd1PRzi0+F4pe/BnUywml81N4MLHIU8h3ElV0AtKBV53dE+xbnK1x3jWS5347B9ztXrjvs6b+co
+	XZQdfJSvLsguEqYLILce0GnNGCwXG8ZRxHfYiEfzp4oS64mesfxr8HnBoPpj8/t1JYh5yyDjJpxF/
+	lKTd4EkqMZ2qWx4B/GNuk8Vbq14OafXo38NSbMYmrUGnj8r4gl7wVyRebTUwzb2fsUJUfhni+IENw
+	BsW1DQtGePgAeWuZZYkTYYg4jiCRlPZW6e7jBEqgkeuujUcvvgcmy6+YBZEmFbqk5SD77rd1RiHVu
+	SAl0MAf7m+u6qlUHgmTA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpTr9-0003KF-H7; Fri, 01 Feb 2019 08:07:23 +0000
-Received: from mailout4.samsung.com ([203.254.224.34])
+	id 1gpTuZ-0004zC-0e; Fri, 01 Feb 2019 08:10:55 +0000
+Received: from mail-vs1-xe44.google.com ([2607:f8b0:4864:20::e44])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpTr5-0003Iq-Cz
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 08:07:21 +0000
-Received: from epcas1p1.samsung.com (unknown [182.195.41.45])
- by mailout4.samsung.com (KnoxPortal) with ESMTP id
- 20190201080716epoutp048e8cefd825f7f548f117d6bd73fc9eb7~-LvcwnV_w2514725147epoutp04e
+ id 1gpTuU-0004xf-Eo
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 08:10:52 +0000
+Received: by mail-vs1-xe44.google.com with SMTP id n10so3620503vso.13
  for <linux-arm-kernel@lists.infradead.org>;
- Fri,  1 Feb 2019 08:07:16 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout4.samsung.com
- 20190201080716epoutp048e8cefd825f7f548f117d6bd73fc9eb7~-LvcwnV_w2514725147epoutp04e
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1549008436;
- bh=pyxBMs6MTuw3kCIeU6zbfvPs53Vj/qIIz8fzrJrQVXA=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=j8pLf+bjmiAhGLW0QQbdXVO2w14vjw7jPL7u9bVZNa1aDHUYWx07KqhxdoxrMa0IZ
- 7DXpbtIqgaoT/OPXO+954tCaQSEQX31p5tvFPC9aUQHsD417yzO4r2OgUykNhg7SbZ
- 8QTMNbjgY3H5p86ytiN4lWal2GGJpiN7qbMCHWpw=
-Received: from epsmges1p3.samsung.com (unknown [182.195.40.155]) by
- epcas1p4.samsung.com (KnoxPortal) with ESMTP id
- 20190201080710epcas1p4901eaa8db027d56a8e2863170988293c~-LvXvy-ym1919719197epcas1p4h;
- Fri,  1 Feb 2019 08:07:10 +0000 (GMT)
-Received: from epcas1p4.samsung.com ( [182.195.41.48]) by
- epsmges1p3.samsung.com (Symantec Messaging Gateway) with SMTP id
- 40.63.04069.E2EF35C5; Fri,  1 Feb 2019 17:07:10 +0900 (KST)
-Received: from epsmtrp2.samsung.com (unknown [182.195.40.14]) by
- epcas1p1.samsung.com (KnoxPortal) with ESMTPA id
- 20190201080709epcas1p13fb55c34af5e55eaa7bc0f48829bf97f~-LvXBX_y23104831048epcas1p1-;
- Fri,  1 Feb 2019 08:07:09 +0000 (GMT)
-Received: from epsmgms1p2new.samsung.com (unknown [182.195.42.42]) by
- epsmtrp2.samsung.com (KnoxPortal) with ESMTP id
- 20190201080709epsmtrp24f22cb47e75e1e153bf47c077990f500~-LvW-D5ND0749607496epsmtrp2S;
- Fri,  1 Feb 2019 08:07:09 +0000 (GMT)
-X-AuditID: b6c32a37-971ff70000000fe5-0f-5c53fe2e3240
-Received: from epsmtip1.samsung.com ( [182.195.34.30]) by
- epsmgms1p2new.samsung.com (Symantec Messaging Gateway) with SMTP id
- A5.7A.03601.D2EF35C5; Fri,  1 Feb 2019 17:07:09 +0900 (KST)
-Received: from [10.113.221.102] (unknown [10.113.221.102]) by
- epsmtip1.samsung.com (KnoxPortal) with ESMTPA id
- 20190201080709epsmtip1c9a25b67372f8f96ff2490e2e6795678~-LvWu12v52764827648epsmtip1J;
- Fri,  1 Feb 2019 08:07:09 +0000 (GMT)
-Subject: Re: [PATCH v3 2/8] clk: samsung: add new clocks for DMC for
- Exynos5422 SoC
-To: Lukasz Luba <l.luba@partner.samsung.com>, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-pm@vger.kernel.org,
- linux-samsung-soc@vger.kernel.org
-From: Chanwoo Choi <cw00.choi@samsung.com>
-Organization: Samsung Electronics
-Message-ID: <768b4147-35fb-64ad-5da8-6b348e962c70@samsung.com>
-Date: Fri, 1 Feb 2019 17:07:09 +0900
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ Fri, 01 Feb 2019 00:10:48 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=7ww/6315LqyCbySb8JvfKS4rD8EINaOp8BfcXcUCvwg=;
+ b=Sg/9JcAwOynQzdUrOW8mwXjovM7aJMbv1zVZLknDg0Vl8/dNyngM9NOa49FN5/Eig5
+ jr7BIFDlJaWKkBKrg9efRFyaXc8NzSjZL1zae6gbhFQ7SO+F9sIBqV92lO8F/3uaos+n
+ h8Bhgs/UjPVpqVPA5JERcyeYAyrBOizXqP3SU=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=7ww/6315LqyCbySb8JvfKS4rD8EINaOp8BfcXcUCvwg=;
+ b=GnayfIi5Y/+t9O0jYh6ir0xUAoLZU0tuHuOy92g3NjgsRmSdARLHPHvkqc6EkBFM4T
+ h2zt8n4Vyh+ELusXL6LWiIj0IwR17GXyO7jhYWTSSinu3s9lQTtP2XnCzMHT6R3yfge9
+ +Ko37y9OL3uxEuNXT6q3tVN7hr4chuxDjfETuMHMI/iwhMZFt/IzWN7uQSVeQFCokZWH
+ 2n+0EYnDwIk70k3oPD34zaqWxYHjpRqVnndbvc8eER4MynG8goaoW4yS7i2LaaBnff2X
+ UKoTAvfjdaAGdWvs4gIMidLRnphE30Ot0Xg4oOHM5Q/bS61FL/4+fw9BvADLcLx60CTG
+ zJgA==
+X-Gm-Message-State: AJcUukcKWdJVsLF1DsB26IyrejxYn2DBBMy8AwZu3QeugVz9XrGANlGT
+ eXD01LHSiW+OgUYFYdI8nzPRyuG5LgDe2y7Pd0nyRA==
+X-Google-Smtp-Source: ALg8bN5kZMa0aIRlR0/gBiEJyFJXY5hZlr0qv+JgRYwj3J5T7PeTS0atnrGdkCT8ST7aZiFY66JebpSvnWK7v/Rkrow=
+X-Received: by 2002:a67:d00f:: with SMTP id r15mr16063232vsi.191.1549008647810; 
+ Fri, 01 Feb 2019 00:10:47 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <1548924594-19084-3-git-send-email-l.luba@partner.samsung.com>
-Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFrrOJsWRmVeSWpSXmKPExsWy7bCmga7ev+AYg56ZahYbZ6xntZh/5Byr
- Rf/j18wW589vYLc42/SG3eJWg4zFpsfXWC0+9txjtbi8aw6bxefeI4wWM87vY7JYe+Quu8XF
- U64WtxtXsFkcftPOavHv2kYWBwGP9zda2T02repk89i8pN7j4Ls9TB59W1YxenzeJBfAFpVt
- k5GamJJapJCal5yfkpmXbqvkHRzvHG9qZmCoa2hpYa6kkJeYm2qr5OIToOuWmQN0tZJCWWJO
- KVAoILG4WEnfzqYov7QkVSEjv7jEVim1ICWnwLJArzgxt7g0L10vOT/XytDAwMgUqDAhO2Pf
- khb2gil2Fa+XHWJuYOw16WLk5JAQMJF4s3g5WxcjF4eQwA5GiRUvLjFCOJ8YJVYta2WCcL4x
- SuzfcYMRpuXziacsEIm9jBIH1r6EqnrPKPHxcgcTSJWwQKhEf/8cdpCEiMByRol9U++CDWYW
- 2MsksehGD9gsNgEtif0vbrCB2PwCihJXfzwGi/MK2El8f72XHcRmEVCR6Nu8CCwuKhAhcbj3
- HVSNoMTJmU9YQGxOAW+Jh0d2gcWZBcQlbj2ZzwRhy0s0b53NDLJYQmAfu8SEhYeYIZ5wkWjd
- vJwFwhaWeHV8CzuELSXx+d1eNgi7WmLlySNsEM0djBJb9l9ghUgYS+xfOhloAwfQBk2J9bv0
- IZbxSbz72sMKEpYQ4JXoaBOCqFaWuPzgLhOELSmxuL0TaryHxIZnW5knMCrOQvLOLCQvzELy
- wiyEZQsYWVYxiqUWFOempxYbFhgjR/gmRnCi1jLfwbjhnM8hRgEORiUe3g2/gmKEWBPLiitz
- DzFKcDArifBm/QqOEeJNSaysSi3Kjy8qzUktPsRoCgzticxSosn5wCySVxJvaGpkbGxsYWJo
- ZmpoqCTOu97BOUZIID2xJDU7NbUgtQimj4mDU6qBMfzFm40LMk8ee+ub8TNuaq9q/MIfu38U
- SBjbbw4s+ef6cLft863sJxdNvf/BZ3bZ+msKXQe2+4pnT8tVXtYdLVn8+4xccLPpvg2Pv56Y
- 9CM7fmnc5v1qy3bJbRCf0uQrfXry2YIMueRNjvNS/Q8X++ybPYuxQkuyJc/ZrMPqJqeX0dL5
- TgfabymxFGckGmoxFxUnAgB7rxBw6gMAAA==
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFjrIIsWRmVeSWpSXmKPExsWy7bCSnK7uv+AYgz+rDCw2zljPajH/yDlW
- i/7Hr5ktzp/fwG5xtukNu8WtBhmLTY+vsVp87LnHanF51xw2i8+9RxgtZpzfx2Sx9shddouL
- p1wtbjeuYLM4/Kad1eLftY0sDgIe72+0sntsWtXJ5rF5Sb3HwXd7mDz6tqxi9Pi8SS6ALYrL
- JiU1J7MstUjfLoErY9+SFvaCKXYVr5cdYm5g7DXpYuTkkBAwkfh84ilLFyMXh5DAbkaJLV0r
- WSESkhLTLh5l7mLkALKFJQ4fLoaoecsosX/FD7AaYYFQif7+OewgCRGB5YwSc/8uBZvELLCX
- SWJCz2VWiJb7jBKHvk1hBGlhE9CS2P/iBhuIzS+gKHH1x2OwOK+AncT313vZQWwWARWJvs2L
- wOKiAhESH5/uY4KoEZQ4OfMJC4jNKeAt8fDILrAaZgF1iT/zLjFD2OISt57MZ4Kw5SWat85m
- nsAoPAtJ+ywkLbOQtMxC0rKAkWUVo2RqQXFuem6xYYFRXmq5XnFibnFpXrpecn7uJkZwxGpp
- 7WA8cSL+EKMAB6MSD++GX0ExQqyJZcWVuYcYJTiYlUR4s34FxwjxpiRWVqUW5ccXleakFh9i
- lOZgURLnlc8/FikkkJ5YkpqdmlqQWgSTZeLglGpgNGEQOKrZ7XXFXn3GZJZLUwUPvPu4f2n7
- jPLVR78VGn/QfXMv/9js4sMBusfm37/L8/XUwvp2jaBoc1ZJ/2mf04J8WB25uHkdrvZvPPU/
- L0j12eyG7S9z9iyJvLf8wF6/tTsnPjn5TkJuU0qd2mfxltoXnB85rhpXPgo42mshfqfpyruT
- HO4/HiixFGckGmoxFxUnAgDuebTQ1AIAAA==
-X-CMS-MailID: 20190201080709epcas1p13fb55c34af5e55eaa7bc0f48829bf97f
-X-Msg-Generator: CA
-CMS-TYPE: 101P
-DLP-Filter: Pass
-X-CFilter-Loop: Reflected
-X-CMS-RootMailID: 20190131085006eucas1p1ca478545c107086d427909c88d3b232e
-References: <1548924594-19084-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20190131085006eucas1p1ca478545c107086d427909c88d3b232e@eucas1p1.samsung.com>
- <1548924594-19084-3-git-send-email-l.luba@partner.samsung.com>
+References: <1548921212-5219-1-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFruCCs_un1oR-gd1P=ZGryyHwKuY0SkvLO2=Jm1bGV6sQ@mail.gmail.com>
+ <1548985091.10251.26.camel@mhfsdcap03>
+In-Reply-To: <1548985091.10251.26.camel@mhfsdcap03>
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Fri, 1 Feb 2019 09:10:11 +0100
+Message-ID: <CAPDyKFqHJn9uVkd5z4D5JvNKOtbn3E3SwL_WSgLb1=Lw1SgyUg@mail.gmail.com>
+Subject: Re: [PATCH] mmc: mmc: Fix HS setting in mmc_hs400_to_hs200()
+To: Chaotian Jing <chaotian.jing@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_000719_785656_531212A5 
-X-CRM114-Status: GOOD (  25.19  )
+X-CRM114-CacheID: sfid-20190201_001050_503834_DD0BFB29 
+X-CRM114-Status: GOOD (  35.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -143,153 +88,154 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: b.zolnierkie@samsung.com, Stephen Boyd <sboyd@kernel.org>,
- Michael Turquette <mturquette@baylibre.com>, krzk@kernel.org,
- kyungmin.park@samsung.com, kgene@kernel.org, myungjoo.ham@samsung.com,
- s.nawrocki@samsung.com, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, m.szyprowski@samsung.com
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: srv_heupstream <srv_heupstream@mediatek.com>,
+ Shawn Lin <shawn.lin@rock-chips.com>,
+ "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ linux-mediatek@lists.infradead.org,
+ Harish Jenny K N <harish_kandiga@mentor.com>,
+ Hongjie Fang <hongjiefang@asrmicro.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ Simon Horman <horms+renesas@verge.net.au>,
+ Kyle Roeschley <kyle.roeschley@ni.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGksCgpXaGVuIEkgcmV2aWV3ZWQgdGhpcyBwYXRjaCwgdGhlIGFsbW9zdCBjaGFuZ2VzIGFyZSB3
-cm9uZy4KRnJhbmtseSwgSSBjYW4ndCBiZWxpZXZlIHRoYXQgeW91IGhhZCB0ZXN0ZWQgYW5kIHZl
-cmlmaWVkIGl0Cm9uIHJlYWwgYm9hcmQuIFBsZWFzZSBjaGVjayBteSBjb21tZW50cy4KSWYgSSBt
-aXN1bmRlcnN0b29kLCBwbGVhc2UgbGV0IG1lIGtub3cuCgpPbiAxOS4gMS4gMzEuIOyYpO2bhCA1
-OjQ5LCBMdWthc3ogTHViYSB3cm90ZToKPiBUaGlzIHBhdGNoIHByb3ZpZGVzIHN1cHBvcnQgZm9y
-IGNsb2NrcyBuZWVkZWQgZm9yIER5bmFtaWMgTWVtb3J5IENvbnRyb2xsZXIKPiBpbiBFeHlub3M1
-NDIyIFNvQy4gSXQgYWRkcyBDRFJFWCBiYXNlIHJlZ2lzdGVyIGFkZHJlc3NlcywgbmV3IERJViwg
-TVVYIGFuZAo+IEdBVEUgZW50cmllcy4KPiAKPiBDQzogU3lsd2VzdGVyIE5hd3JvY2tpIDxzLm5h
-d3JvY2tpQHNhbXN1bmcuY29tPgo+IENDOiBDaGFud29vIENob2kgPGN3MDAuY2hvaUBzYW1zdW5n
-LmNvbT4KPiBDQzogTWljaGFlbCBUdXJxdWV0dGUgPG10dXJxdWV0dGVAYmF5bGlicmUuY29tPgo+
-IENDOiBTdGVwaGVuIEJveWQgPHNib3lkQGtlcm5lbC5vcmc+Cj4gQ0M6IEt1a2ppbiBLaW0gPGtn
-ZW5lQGtlcm5lbC5vcmc+Cj4gQ0M6IEtyenlzenRvZiBLb3psb3dza2kgPGtyemtAa2VybmVsLm9y
-Zz4KPiBDQzogbGludXgtc2Ftc3VuZy1zb2NAdmdlci5rZXJuZWwub3JnCj4gQ0M6IGxpbnV4LWNs
-a0B2Z2VyLmtlcm5lbC5vcmcKPiBDQzogbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQu
-b3JnCj4gQ0M6IGxpbnV4LWtlcm5lbEB2Z2VyLmtlcm5lbC5vcmcKPiBTaWduZWQtb2ZmLWJ5OiBM
-dWthc3ogTHViYSA8bC5sdWJhQHBhcnRuZXIuc2Ftc3VuZy5jb20+Cj4gLS0tCj4gIGRyaXZlcnMv
-Y2xrL3NhbXN1bmcvY2xrLWV4eW5vczU0MjAuYyB8IDQ4ICsrKysrKysrKysrKysrKysrKysrKysr
-KysrKysrKysrKy0tLQo+ICAxIGZpbGUgY2hhbmdlZCwgNDQgaW5zZXJ0aW9ucygrKSwgNCBkZWxl
-dGlvbnMoLSkKPiAKPiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9jbGsvc2Ftc3VuZy9jbGstZXh5bm9z
-NTQyMC5jIGIvZHJpdmVycy9jbGsvc2Ftc3VuZy9jbGstZXh5bm9zNTQyMC5jCj4gaW5kZXggMzRj
-Y2UzYy4uM2U4NzQyMSAxMDA2NDQKPiAtLS0gYS9kcml2ZXJzL2Nsay9zYW1zdW5nL2Nsay1leHlu
-b3M1NDIwLmMKPiArKysgYi9kcml2ZXJzL2Nsay9zYW1zdW5nL2Nsay1leHlub3M1NDIwLmMKPiBA
-QCAtMTMyLDYgKzEzMiw4IEBACj4gICNkZWZpbmUgQlBMTF9MT0NLCQkweDIwMDEwCj4gICNkZWZp
-bmUgQlBMTF9DT04wCQkweDIwMTEwCj4gICNkZWZpbmUgU1JDX0NEUkVYCQkweDIwMjAwCj4gKyNk
-ZWZpbmUgR0FURV9CVVNfQ0RSRVgwCQkweDIwNzAwCj4gKyNkZWZpbmUgR0FURV9CVVNfQ0RSRVgx
-CQkweDIwNzA0Cj4gICNkZWZpbmUgRElWX0NEUkVYMAkJMHgyMDUwMAo+ICAjZGVmaW5lIERJVl9D
-RFJFWDEJCTB4MjA1MDQKPiAgI2RlZmluZSBLUExMX0xPQ0sJCTB4MjgwMDAKPiBAQCAtMjQ4LDYg
-KzI1MCw4IEBAIHN0YXRpYyBjb25zdCB1bnNpZ25lZCBsb25nIGV4eW5vczV4X2Nsa19yZWdzW10g
-X19pbml0Y29uc3QgPSB7Cj4gIAlESVZfQ0RSRVgxLAo+ICAJU1JDX0tGQywKPiAgCURJVl9LRkMw
-LAo+ICsJR0FURV9CVVNfQ0RSRVgwLAo+ICsJR0FURV9CVVNfQ0RSRVgxLAo+ICB9Owo+ICAKPiAg
-c3RhdGljIGNvbnN0IHVuc2lnbmVkIGxvbmcgZXh5bm9zNTgwMF9jbGtfcmVnc1tdIF9faW5pdGNv
-bnN0ID0gewo+IEBAIC00MjUsNiArNDI5LDEwIEBAIFBOQU1FKG1vdXRfZ3JvdXAxM181ODAwX3Ap
-CT0geyAiZG91dF9vc2NfZGl2IiwgIm1vdXRfc3dfYWNsa2ZsMV81NTBfY2FtIiB9Owo+ICBQTkFN
-RShtb3V0X2dyb3VwMTRfNTgwMF9wKQk9IHsgImRvdXRfYWNsazU1MF9jYW0iLCAiZG91dF9zY2xr
-X3N3IiB9Owo+ICBQTkFNRShtb3V0X2dyb3VwMTVfNTgwMF9wKQk9IHsgImRvdXRfb3NjX2RpdiIs
-ICJtb3V0X3N3X2FjbGs1NTBfY2FtIiB9Owo+ICBQTkFNRShtb3V0X2dyb3VwMTZfNTgwMF9wKQk9
-IHsgImRvdXRfb3NjX2RpdiIsICJtb3V0X21hdV9lcGxsX2NsayIgfTsKPiArUE5BTUUobW91dF9t
-eF9tc3BsbF9jY29yZV9waHlfcCkgPSB7ICJzY2xrX2JwbGwiLCAibW91dF9kcGxsX2N0cmwiLAo+
-ICsJCQkJCSJtb3V0X21wbGxfY3RybCIsICJmZl9kb3V0X3NwbGwyIiwKPiArCQkJCQkibW91dF9z
-Y2xrX3NwbGwifTsKCi0gbW91dF9kcGxsX2N0cmwgd2FzIG5vdCBkZWZpbmVkLiBUaGlzIHBhdGNo
-IGRvZXNuJ3QgZGVmaW5lIGl0LgotIG1vdXRfbXBsbF9jdHJsIHdhcyBub3QgZGVmaW5lZC4gZGl0
-dG8uCi0gZmZfZG91dF9zcGxsMiB3YXMgb25seSByZWdpc3RlcmVkIHdoZW4gU09DIGlzIEVYWU5P
-UzU4MDAuCiAgSXQgbWVhbnQgdGhhdCBmZl9kb3V0X3NwbGwyIHdhcyBub3QgcmVnaXN0ZXJlZCBv
-biBleHlub3M1NDIyIGJvYXJkLgoKSXQgaXMgd3JvbmcgcGF0Y2guIFlvdSB3b3VsZCBoYXZlIG5v
-dCBjaGVja2VkIHRoZSBwYXJlbnQgY2xvY2tzCmV4Y2VwdCBmb3Igc2Nsa19icGxsLgoKQWxzbywK
-SW4gdGhlIGV4eW5vczU0MjIgZGF0YXNoZWV0LCBNVVhfTVhfTVNQTExfQ0NPUkVfUEhZX1NFTCBp
-cyBwb3NzaWJsZQpoYXZpbmcgdGhlIHNpeCBwYXJlbnRzIGFzIGZvbGxvd2luZzoKLSBzY2xrX2Jw
-bGwKLSBzY2xrX2RwbGwKLSBzY2xrX21wbGwKLSBzY2xrX3NwbGwyCi0gc2Nsa19zcGxsCi0gc2Ns
-a19lcGxsCgpXaHkgZG8geW91IG1pc3NpbmcgbGFzdCAnc2Nsa19lcGxsJz8KCgo+ICsKPiAgCj4g
-IC8qIGZpeGVkIHJhdGUgY2xvY2tzIGdlbmVyYXRlZCBvdXRzaWRlIHRoZSBzb2MgKi8KPiAgc3Rh
-dGljIHN0cnVjdCBzYW1zdW5nX2ZpeGVkX3JhdGVfY2xvY2sKPiBAQCAtNDUwLDcgKzQ1OCw3IEBA
-IHN0YXRpYyBjb25zdCBzdHJ1Y3Qgc2Ftc3VuZ19maXhlZF9mYWN0b3JfY2xvY2sKPiAgc3RhdGlj
-IGNvbnN0IHN0cnVjdCBzYW1zdW5nX2ZpeGVkX2ZhY3Rvcl9jbG9jawo+ICAJCWV4eW5vczU4MDBf
-Zml4ZWRfZmFjdG9yX2Nsa3NbXSBfX2luaXRjb25zdCA9IHsKPiAgCUZGQUNUT1IoMCwgImZmX2Rv
-dXRfZXBsbDIiLCAibW91dF9zY2xrX2VwbGwiLCAxLCAyLCAwKSwKPiAtCUZGQUNUT1IoMCwgImZm
-X2RvdXRfc3BsbDIiLCAibW91dF9zY2xrX3NwbGwiLCAxLCAyLCAwKSwKPiArCUZGQUNUT1IoQ0xL
-X0ZGX0RPVVRfU1BMTDIsICJmZl9kb3V0X3NwbGwyIiwgIm1vdXRfc2Nsa19zcGxsIiwgMSwgMiwg
-MCksCgpJdCBkb2Vzbid0IGFmZmVjdCB0aGUgRXh5bm9zNTQyMiBiZWNhdXNlIGV4eW5vczU4MDBf
-Zml4ZWRfZmFjdG9yX2Nsa3NbXQppcyByZWdpc3RlcmVkIHdoZW4gU09DIGlzIEVYWU5PUzU4MDAu
-IEV4eW5vczU0MjIgYm9hcmQgY2Fubm90IHVzZSB0aGlzIGNsb2NrLgoKPiAgfTsKPiAgCj4gIHN0
-YXRpYyBjb25zdCBzdHJ1Y3Qgc2Ftc3VuZ19tdXhfY2xvY2sgZXh5bm9zNTgwMF9tdXhfY2xrc1td
-IF9faW5pdGNvbnN0ID0gewo+IEBAIC00NzIsMTEgKzQ4MCwxNCBAQCBzdGF0aWMgY29uc3Qgc3Ry
-dWN0IHNhbXN1bmdfbXV4X2Nsb2NrIGV4eW5vczU4MDBfbXV4X2Nsa3NbXSBfX2luaXRjb25zdCA9
-IHsKPiAgCU1VWCgwLCAibW91dF9hY2xrMzAwX2Rpc3AxIiwgbW91dF9ncm91cDVfNTgwMF9wLCBT
-UkNfVE9QMiwgMjQsIDIpLAo+ICAJTVVYKDAsICJtb3V0X2FjbGszMDBfZ3NjbCIsIG1vdXRfZ3Jv
-dXA1XzU4MDBfcCwgU1JDX1RPUDIsIDI4LCAyKSwKPiAgCj4gKwlNVVgoQ0xLX01PVVRfTVhfTVNQ
-TExfQ0NPUkVfUEhZLCAibW91dF9teF9tc3BsbF9jY29yZV9waHkiLAo+ICsJCW1vdXRfbXhfbXNw
-bGxfY2NvcmVfcGh5X3AsIFNSQ19UT1A3LCAwLCAzKSwKPiArCgpXaHkgZG8geW91IG1vZGlmeSB0
-aGUgZXh5bm9zNTgwMF9tdXhfY2xrcyBpbnN0ZWFkIG9mIGV4eW5vczU0MjBfbXV4X2Nsa3MKb3Ig
-ZXh5bm9zNXhfbXV4X2Nsa3M/IEluIHRoZSBjb3ZlcmxldHRlciB0aGlzIHBhdGNoIGlzIGZvciBF
-eHlub3M1NDIyIGJvYXJkLgpEaWQgeW91IHRlc3QgaXQ/Cgo+ICAJTVVYKENMS19NT1VUX01YX01T
-UExMX0NDT1JFLCAibW91dF9teF9tc3BsbF9jY29yZSIsCj4gLQkJCW1vdXRfbXhfbXNwbGxfY2Nv
-cmVfcCwgU1JDX1RPUDcsIDE2LCAyKSwKPiArCQkJbW91dF9teF9tc3BsbF9jY29yZV9wLCBTUkNf
-VE9QNywgMTYsIDMpLAoKZGl0dG8uCgo+ICAJTVVYX0YoQ0xLX01PVVRfTUFVX0VQTEwsICJtb3V0
-X21hdV9lcGxsX2NsayIsIG1vdXRfbWF1X2VwbGxfY2xrXzU4MDBfcCwKPiAgCQkJU1JDX1RPUDcs
-IDIwLCAyLCBDTEtfU0VUX1JBVEVfUEFSRU5ULCAwKSwKPiAtCU1VWCgwLCAic2Nsa19icGxsIiwg
-bW91dF9icGxsX3AsIFNSQ19UT1A3LCAyNCwgMSksCj4gKwlNVVgoQ0xLX1NDTEtfQlBMTCwgInNj
-bGtfYnBsbCIsIG1vdXRfYnBsbF9wLCBTUkNfVE9QNywgMjQsIDEpLAoKZGl0dG8uCgo+ICAJTVVY
-KDAsICJtb3V0X2VwbGwyIiwgbW91dF9lcGxsMl81ODAwX3AsIFNSQ19UT1A3LCAyOCwgMSksCj4g
-IAo+ICAJTVVYKDAsICJtb3V0X2FjbGs1NTBfY2FtIiwgbW91dF9ncm91cDNfNTgwMF9wLCBTUkNf
-VE9QOCwgMTYsIDMpLAo+IEBAIC02NDgsNyArNjU5LDcgQEAgc3RhdGljIGNvbnN0IHN0cnVjdCBz
-YW1zdW5nX211eF9jbG9jayBleHlub3M1eF9tdXhfY2xrc1tdIF9faW5pdGNvbnN0ID0gewo+ICAK
-PiAgCU1VWCgwLCAibW91dF9zY2xrX21wbGwiLCBtb3V0X21wbGxfcCwgU1JDX1RPUDYsIDAsIDEp
-LAo+ICAJTVVYKENMS19NT1VUX1ZQTEwsICJtb3V0X3NjbGtfdnBsbCIsIG1vdXRfdnBsbF9wLCBT
-UkNfVE9QNiwgNCwgMSksCj4gLQlNVVgoMCwgIm1vdXRfc2Nsa19zcGxsIiwgbW91dF9zcGxsX3As
-IFNSQ19UT1A2LCA4LCAxKSwKPiArCU1VWChDTEtfTU9VVF9TQ0xLX1NQTEwsICJtb3V0X3NjbGtf
-c3BsbCIsIG1vdXRfc3BsbF9wLCBTUkNfVE9QNiwgOCwgMSksCj4gIAlNVVgoMCwgIm1vdXRfc2Ns
-a19pcGxsIiwgbW91dF9pcGxsX3AsIFNSQ19UT1A2LCAxMiwgMSksCj4gIAlNVVgoMCwgIm1vdXRf
-c2Nsa19ycGxsIiwgbW91dF9ycGxsX3AsIFNSQ19UT1A2LCAxNiwgMSksCj4gIAlNVVhfRihDTEtf
-TU9VVF9FUExMLCAibW91dF9zY2xrX2VwbGwiLCBtb3V0X2VwbGxfcCwgU1JDX1RPUDYsIDIwLCAx
-LAo+IEBAIC04MTQsOSArODI1LDEzIEBAIHN0YXRpYyBjb25zdCBzdHJ1Y3Qgc2Ftc3VuZ19kaXZf
-Y2xvY2sgZXh5bm9zNXhfZGl2X2Nsa3NbXSBfX2luaXRjb25zdCA9IHsKPiAgCQkJRElWX0NEUkVY
-MCwgMTYsIDMpLAo+ICAJRElWKENMS19ET1VUX0NDTEtfRFJFWDAsICJkb3V0X2NjbGtfZHJleDAi
-LCAiZG91dF9jbGsyeF9waHkwIiwKPiAgCQkJRElWX0NEUkVYMCwgOCwgMyksCj4gKwlESVYoMCwg
-ImRvdXRfY2Nsa19kcmV4MSIsICJkb3V0X2NsazJ4X3BoeTAiLCBESVZfQ0RSRVgwLCA4LCAzKSwK
-CkhtbS4gQ0xLX0RJVl9DRFJFWDBbMTA6OF0gb2YgRElWX0NEUkVYMCByZWdpc3RlciB3YXMgYWxy
-ZWFkeSBpbXBsZW1lbnRlZApieSBDTEtfRE9VVF9DQ0xLX0RSRVgwLiBJdCBpcyBmYXVsdC4KCkFs
-c28sIFBDTEtfQ09SRV9NRU1fUkFUSU9bMTA6OF0gb2YgRElWX0NEUkVYMSByZWdpc3RlciB3YXMg
-ZGVmaW5lZCBhcyBmb2xsb3dpbmcKaW4gY2xvY2stZXh5bm9zNTQyMC5jLgotIERJVihDTEtfRE9V
-VF9QQ0xLX0NPUkVfTUVNLCAiZG91dF9wY2xrX2NvcmVfbWVtIiwgIm1vdXRfbWNsa19jZHJleCIs
-IERJVl9DRFJFWDEsIDgsIDMpLCAKCgo+ICAJRElWKENMS19ET1VUX0NMSzJYX1BIWTAsICJkb3V0
-X2NsazJ4X3BoeTAiLCAiZG91dF9zY2xrX2NkcmV4IiwKPiAgCQkJRElWX0NEUkVYMCwgMywgNSks
-Cj4gIAo+ICsJRElWKDAsICJkb3V0X3BjbGtfZHJleDAiLCAiZG91dF9jY2xrX2RyZXgwIiwgRElW
-X0NEUkVYMCwgMjgsIDMpLAo+ICsJRElWKDAsICJkb3V0X3BjbGtfZHJleDEiLCAiZG91dF9jY2xr
-X2RyZXgxIiwgRElWX0NEUkVYMCwgMjgsIDMpLAoKZG91dF9jY2xrX2RyZXgxIGlzIHdyb25nLiBJ
-dCBpcyBmYXVsdC4KCj4gKwo+ICAJRElWKENMS19ET1VUX1BDTEtfQ09SRV9NRU0sICJkb3V0X3Bj
-bGtfY29yZV9tZW0iLCAibW91dF9tY2xrX2NkcmV4IiwKPiAgCQkJRElWX0NEUkVYMSwgOCwgMyks
-Cj4gIAo+IEBAIC0xMTcwLDYgKzExODUsMzEgQEAgc3RhdGljIGNvbnN0IHN0cnVjdCBzYW1zdW5n
-X2dhdGVfY2xvY2sgZXh5bm9zNXhfZ2F0ZV9jbGtzW10gX19pbml0Y29uc3QgPSB7Cj4gIAkJCUdB
-VEVfVE9QX1NDTEtfSVNQLCAxMiwgQ0xLX1NFVF9SQVRFX1BBUkVOVCwgMCksCj4gIAo+ICAJR0FU
-RShDTEtfRzNELCAiZzNkIiwgIm1vdXRfdXNlcl9hY2xrX2czZCIsIEdBVEVfSVBfRzNELCA5LCAw
-LCAwKSwKPiArCj4gKwlHQVRFKENMS19DTEtNX1BIWTAsICJjbGttX3BoeTAiLCAiZG91dF9zY2xr
-X2NkcmV4IiwKPiArCQkJR0FURV9CVVNfQ0RSRVgwLCAwLCAwLCAwKSwKPiArCUdBVEUoQ0xLX0NM
-S01fUEhZMSwgImNsa21fcGh5MSIsICJkb3V0X3NjbGtfY2RyZXgiLAo+ICsJCQlHQVRFX0JVU19D
-RFJFWDAsIDEsIDAsIDApLAo+ICsJR0FURSgwLCAibXhfbXNwbGxfY2NvcmVfcGh5IiwgIm1vdXRf
-bXhfbXNwbGxfY2NvcmVfcGh5IiwKPiArCQkJU1JDX01BU0tfVE9QNywgMCwgQ0xLX0lHTk9SRV9V
-TlVTRUQsIDApLAo+ICsKPiArCUdBVEUoQ0xLX0FDTEtfUFBNVV9EUkVYMF8wLCAiYWNsa19wcG11
-X2RyZXgwXzAiLCAiZG91dF9hY2xrX2NkcmV4MSIsCj4gKwkJCUdBVEVfQlVTX0NEUkVYMSwgMTUs
-IENMS19JR05PUkVfVU5VU0VELCAwKSwKPiArCUdBVEUoQ0xLX0FDTEtfUFBNVV9EUkVYMF8xLCAi
-YWNsa19wcG11X2RyZXgwXzEiLCAiZG91dF9hY2xrX2NkcmV4MSIsCj4gKwkJCUdBVEVfQlVTX0NE
-UkVYMSwgMTQsIENMS19JR05PUkVfVU5VU0VELCAwKSwKPiArCUdBVEUoQ0xLX0FDTEtfUFBNVV9E
-UkVYMV8wLCAiYWNsa19wcG11X2RyZXgxXzAiLCAiZG91dF9hY2xrX2NkcmV4MSIsCj4gKwkJCUdB
-VEVfQlVTX0NEUkVYMSwgMTMsIENMS19JR05PUkVfVU5VU0VELCAwKSwKPiArCUdBVEUoQ0xLX0FD
-TEtfUFBNVV9EUkVYMV8xLCAiYWNsa19wcG11X2RyZXgxXzEiLCAiZG91dF9hY2xrX2NkcmV4MSIs
-Cj4gKwkJCUdBVEVfQlVTX0NEUkVYMSwgMTIsIENMS19JR05PUkVfVU5VU0VELCAwKSwKPiArCj4g
-KwlHQVRFKENMS19QQ0xLX1BQTVVfRFJFWDBfMCwgInBjbGtfcHBtdV9kcmV4MF8wIiwgImRvdXRf
-cGNsa19jZHJleCIsCj4gKwkJCUdBVEVfQlVTX0NEUkVYMSwgMjksIENMS19JR05PUkVfVU5VU0VE
-LCAwKSwKPiArCUdBVEUoQ0xLX1BDTEtfUFBNVV9EUkVYMF8xLCAicGNsa19wcG11X2RyZXgwXzEi
-LCAiZG91dF9wY2xrX2NkcmV4IiwKPiArCQkJR0FURV9CVVNfQ0RSRVgxLCAyOCwgQ0xLX0lHTk9S
-RV9VTlVTRUQsIDApLAo+ICsJR0FURShDTEtfUENMS19QUE1VX0RSRVgxXzAsICJwY2xrX3BwbXVf
-ZHJleDFfMCIsICJkb3V0X3BjbGtfY2RyZXgiLAo+ICsJCQlHQVRFX0JVU19DRFJFWDEsIDI3LCBD
-TEtfSUdOT1JFX1VOVVNFRCwgMCksCj4gKwlHQVRFKENMS19QQ0xLX1BQTVVfRFJFWDFfMSwgInBj
-bGtfcHBtdV9kcmV4MV8xIiwgImRvdXRfcGNsa19jZHJleCIsCj4gKwkJCUdBVEVfQlVTX0NEUkVY
-MSwgMjYsIENMS19JR05PUkVfVU5VU0VELCAwKSwKPiAgfTsKPiAgCj4gIHN0YXRpYyBjb25zdCBz
-dHJ1Y3Qgc2Ftc3VuZ19kaXZfY2xvY2sgZXh5bm9zNXhfZGlzcF9kaXZfY2xrc1tdIF9faW5pdGNv
-bnN0ID0gewo+IAoKCi0tIApCZXN0IFJlZ2FyZHMsCkNoYW53b28gQ2hvaQpTYW1zdW5nIEVsZWN0
-cm9uaWNzCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwps
-aW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJh
-ZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51
-eC1hcm0ta2VybmVsCg==
+On Fri, 1 Feb 2019 at 02:38, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+>
+> On Thu, 2019-01-31 at 16:58 +0100, Ulf Hansson wrote:
+> > On Thu, 31 Jan 2019 at 08:53, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> > >
+> > > mmc_hs400_to_hs200() begins with the card and host in HS400 mode.
+> > > Therefore, any commands sent to the card should use HS400 timing.
+> > > It is incorrect to reduce frequency to 50Mhz before sending the switch
+> > > command, in this case, only reduce clock frequency to 50Mhz but without
+> > > host timming change, host is still in hs400 mode but clock changed from
+> > > 200Mhz to 50Mhz, which makes the tuning result unsuitable and cause
+> > > the switch command gets response CRC error.
+> >
+> > According the eMMC spec there is no violation by decreasing the clock
+> > frequency like this. We can use whatever value <=200MHz.
+> >
+> > However, perhaps in practice this becomes an issue, due to the tuning
+> > for HS400 has been done on the "current" frequency.
+> >
+> > As as start, I think you need to clarify this in the changelog.
+> >
+> Yes, reduce clock frequency to 50Mhz is no Spec violation, but it may
+> cause __mmc_switch() gets response CRC error, decreasing the clock but
+> without HOST mode change, on the host side, host driver do not know
+> what's operation the core layer want to do and can only set current bus
+> clock to 50Mhz, without tuning parameter change, it has a chance lead to
+> response CRC error. even lower clock frequency, but with the wrong
+> tuning parameter setting(the setting is of hs400 tuning @200Mhz).
+
+Right, makes sense.
+
+> > >
+> > > this patch refers to mmc_select_hs400(), make the reduce clock frequency
+> > > after card timing change.
+> > >
+> > > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > > ---
+> > >  drivers/mmc/core/mmc.c | 8 ++++----
+> > >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > >
+> > > diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> > > index da892a5..21b811e 100644
+> > > --- a/drivers/mmc/core/mmc.c
+> > > +++ b/drivers/mmc/core/mmc.c
+> > > @@ -1239,10 +1239,6 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
+> > >         int err;
+> > >         u8 val;
+> > >
+> > > -       /* Reduce frequency to HS */
+> > > -       max_dtr = card->ext_csd.hs_max_dtr;
+> > > -       mmc_set_clock(host, max_dtr);
+> > > -
+> >
+> > As far as I can tell, the reason to why we change the clock frequency
+> > *before* the call to __mmc_switch() below, is probably to try to be on
+> > the safe side and conform to the spec.
+> >
+> Agree, it Must be more safe with lower clock frequency, but the
+> precondition is to make the host side recognize current timing is not
+> HS400 mode. it has no method to find a safe setting to ensure no
+> response CRC error when reduce clock from 200Mhz to 50Mhz.
+> > However, I think you have a point, as the call to __mmc_switch(),
+> > passes the "send_status" parameter as false, no other command than the
+> > CMD6 is sent to the card.
+> >
+> yes, the send status command was sent only after __mmc_switch() done.
+> > >         /* Switch HS400 to HS DDR */
+> > >         val = EXT_CSD_TIMING_HS;
+> > >         err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
+> > > @@ -1253,6 +1249,10 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
+> > >
+> > >         mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
+> > >
+> > > +       /* Reduce frequency to HS */
+> > > +       max_dtr = card->ext_csd.hs_max_dtr;
+> > > +       mmc_set_clock(host, max_dtr);
+> > > +
+> >
+> > Perhaps it's even more correct to change the clock frequency before
+> > the call to mmc_set_timing(host, MMC_TIMING_MMC_DDR52). Otherwise you
+> > will be using the DDR52 timing in the controller, but with a too high
+> > frequency.
+> >
+> for Our host, it has no impact to change the clock before or after
+> change timing, as the mmc_set_timing() is only for host side, not
+> related to MMC card side and no commands sent do card before the
+> timing/clock change completed.
+
+Alright. After a second thought, it actually looks more consistent
+with mmc_select_hs400() to do it after, as what you propose in
+$subject patch.
+
+So, let's keep it as is.
+
+> > >         err = mmc_switch_status(card);
+> > >         if (err)
+> > >                 goto out_err;
+> > > --
+> > > 1.8.1.1.dirty
+> > >
+> >
+> > Finally, it sounds like you are trying to fix a real problem, can you
+> > please provide some more information what is happening when the
+> > problem occurs at your side?
+> >
+> Yes, I got a problem with new kernel version. with
+> commit:57da0c042f4af52614f4bd1a148155a299ae5cd8, this commit makes
+> re-tuning every time when access RPMB partition.
+
+Okay, could you please add this as fixes tag for the next version of the patch.
+
+>
+> in fact, our host tuning result of hs400 is very stable and almost never
+> get response CRC error with clock frequency at 200Mhz. but cannot ensure
+> this tuning result also suitable when running at HS400 mode @50Mhz. as I
+> mentioned before, the host side does not know the reason of reduce clock
+> frequency to 50Mhz at HS400 mode, so what's the host side can do is only
+> reduce the bus clock to 50Mhz, even it can just only set the tuning
+> setting to default when clock frequency lower than 50Mhz, but both card
+> & host side are still at HS400 mode, still cannot ensure this setting is
+> suitable.
+
+Right, thanks for clarifying.
+
+So I am expecting a new version with a fixes tag and some
+clarification of the changelog, then I am ready to apply this to give
+it some test.
+
+Kind regards
+Uffe
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
