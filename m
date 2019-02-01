@@ -2,73 +2,108 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5AB6BC282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 13:21:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BBC85C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 13:34:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2C24B20869
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 13:21:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8328521872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 13:34:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Nw3kvF1p";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="P4GKAA7J"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2C24B20869
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=alien8.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m3gACg+Q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8328521872
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uOVFDjIgSn+puRwy+inzfQlKdRHeIGWpCDKqpN8U6SY=; b=Nw3kvF1ppl+jQ8
-	tKAy8og43NwsG6rsYqLm1/v/KOC55yazAm+sT6N0eaaidhStjtGW1x17o9ff0MaJn+ZBiMPMZcJVT
-	2+13bVDMgSRcOGX5mZMCJDnrIxdLjSBy8JxSqG+DILPPIcjRDZGfAtzuxw/ZkaXlNEKim+NA4JTQ7
-	1sL2cfooHZkA2YVgbm6SwB6zGLRrJCsN1V+mGrpqc9ssAlaXWG3FPFJYSJA5E4rNxbEnCK+Xs8t1g
-	ryu9moIaGhJZYWL8NEyd+Smsux1i95Qykfc7TaY4jH38Yihp3S7qP3uqbKGZ8nhSL3IdLiMe4UmMI
-	alhRik+nEE2V5QfLHX1A==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=gILDiyEHs8r+k0LEZDDCweT55sFaSXeqo2O9sRrgOlA=; b=m3gACg+QssXzbN
+	I59yGiFNpFwxkZEkVuySTH8ptOKUkGjVrkVs/eJWuQM/tBsSrxc5oQx9wxvA5rp3pHPq6uoOGF5Yi
+	7X+NDN75H1N8qFXV/j4PwuyAjrUvD9U0liI17z0IR19JHBkhNo0Fu0YqY32HEcpuaVjs9UzlZbF+4
+	yAHxwWeFsaAqqLZ8uy/t0hDVFakW0L32JdaSf56gjzP5vSa37c05ejWhQ/y4otKcKwXD52PnwdDoh
+	vQPLPBYNoPas7QVVoKQDV/sq0DTBRYb5tC0fzuztKKAVBX/GidjX7Wj2cBaUex7UbGwMWuOwA7P2r
+	WK4gVkTxIVMU0T3GjcQw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpYkn-0007cE-Rs; Fri, 01 Feb 2019 13:21:09 +0000
-Received: from mail.skyhub.de ([2a01:4f8:190:11c2::b:1457])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpYkj-0007bg-8U
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 13:21:08 +0000
-Received: from zn.tnic (p200300EC2BCC5000206D6264C5583287.dip0.t-ipconnect.de
- [IPv6:2003:ec:2bcc:5000:206d:6264:c558:3287])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id 456CD1EC04F3;
- Fri,  1 Feb 2019 14:20:56 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
- t=1549027256;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
- bh=7L1X6vKf/wnbcTvmjqUAGShbPUgIPy8g7a7ScRxOFMM=;
- b=P4GKAA7JCnK8zMwSkARxItVovCaDmkYO3eSkRp4d1+WS0j+ZngXPe/Eux9wZ8zOzUVBsUJ
- AVicI0193MpIC9IQL10Brr8pLyCcYcRVv2K8fxgQtKkFCMjrvJi3WRKo560iAY+P0xYnEb
- vp7v7QRkio8eq24FzVGVezsW7d/Bnic=
-Date: Fri, 1 Feb 2019 14:20:46 +0100
-From: Borislav Petkov <bp@alien8.de>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v8 04/26] ACPI / APEI: Make hest.c manage the estatus
- memory pool
-Message-ID: <20190201132046.GH31854@zn.tnic>
-References: <20190129184902.102850-1-james.morse@arm.com>
- <20190129184902.102850-5-james.morse@arm.com>
+	id 1gpYxY-0002Pg-Px; Fri, 01 Feb 2019 13:34:20 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gpYxV-0002PF-Nd
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 13:34:18 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 97C0880D;
+ Fri,  1 Feb 2019 05:34:16 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ CBD3C3F59C; Fri,  1 Feb 2019 05:34:13 -0800 (PST)
+Subject: Re: [PATCH v2 1/4] KVM: arm64: Forbid kprobing of the VHE
+ world-switch code
+To: James Morse <james.morse@arm.com>, linux-arm-kernel@lists.infradead.org
+References: <20190124163257.233929-1-james.morse@arm.com>
+ <20190124163257.233929-2-james.morse@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <e0b2aac7-f5b0-52c7-b4de-2c31c9b9d19d@arm.com>
+Date: Fri, 1 Feb 2019 13:34:11 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190129184902.102850-5-james.morse@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20190124163257.233929-2-james.morse@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_052105_604326_90576E51 
-X-CRM114-Status: GOOD (  17.34  )
+X-CRM114-CacheID: sfid-20190201_053417_784501_A75DC85D 
+X-CRM114-Status: GOOD (  14.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,55 +115,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rafael Wysocki <rjw@rjwysocki.net>, Tony Luck <tony.luck@intel.com>,
- linux-mm@kvack.org, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Xie XiuQi <xiexiuqi@huawei.com>,
- Will Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
- Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
- Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ Masami Hiramatsu <mhiramat@kernel.org>, Will Deacon <will.deacon@arm.com>,
+ kvmarm@lists.cs.columbia.edu, Christoffer Dall <christoffer.dall@arm.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 29, 2019 at 06:48:40PM +0000, James Morse wrote:
-> ghes.c has a memory pool it uses for the estatus cache and the estatus
-> queue. The cache is initialised when registering the platform driver.
-> For the queue, an NMI-like notification has to grow/shrink the pool
-> as it is registered and unregistered.
+On 24/01/2019 16:32, James Morse wrote:
+> On systems with VHE the kernel and KVM's world-switch code run at the
+> same exception level. Code that is only used on a VHE system does not
+> need to be annotated as __hyp_text as it can reside anywhere in the
+> kernel text.
 > 
-> This is all pretty noisy when adding new NMI-like notifications, it
-> would be better to replace this with a static pool size based on the
-> number of users.
-> 
-> As a precursor, move the call that creates the pool from ghes_init(),
-> into hest.c. Later this will take the number of ghes entries and
-> consolidate the queue allocations.
-> Remove ghes_estatus_pool_exit() as hest.c doesn't have anywhere to put
-> this.
-> 
-> The pool is now initialised as part of ACPI's subsys_initcall():
-> (acpi_init(), acpi_scan_init(), acpi_pci_root_init(), acpi_hest_init())
-> Before this patch it happened later as a GHES specific device_initcall().
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
-> Changes since v7:
-> * Moved the pool init later, the driver isn't probed until device_init.
-> ---
->  drivers/acpi/apei/ghes.c | 33 ++++++---------------------------
->  drivers/acpi/apei/hest.c | 10 +++++++++-
->  include/acpi/ghes.h      |  2 ++
->  3 files changed, 17 insertions(+), 28 deletions(-)
+> __hyp_text was also used to prevent kprobes from patching breakpoint
+> instructions into this region, as this code runs at a different
+> exception level. While this is no longer true with VHE, KVM still
+> switches VBAR_EL1, meaning a kprobe's breakpoint executed in the
+> world-switch code will cause a hyp-panic.
 
-Reviewed-by: Borislav Petkov <bp@suse.de>
+[...]
 
+For what it is worth, I've now queued this patch as a fix for 5.0.
+
+Thanks,
+
+	M.
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
