@@ -2,132 +2,121 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CEB57C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:05:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 41CF3C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:08:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9E38B20B1F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:05:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0AF5520869
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 07:08:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xyly59m7";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="MG8KYwqA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E38B20B1F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MqCh7UuR";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="a9qnJdDy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0AF5520869
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=n1IHErLzljeVpmQR/HE4uNVPeCt+r4tLDcGlM7ImHBY=; b=Xyly59m7BHunLV
-	d67EmfZC14Z4xfpPgEOt1LmHesJOa8AmKfz5xAsGg9oB/ovyZyh0u3s49da7AxWW+O+Z2pbs+rJop
-	ed0Lb3ssR+gLzskuIuJzWM9WCESut94YA3cnK9MnlIyZzV5eddCQ6WmACZ8VuTEDcPEmeXD3NeRgW
-	ncAcL5aXRKvkMDbWBm03VRgmAI47rk6TNtXNsHMSPeaGyX99iugMKiUfZnpHGX8xv70JCq6BwSqTp
-	tck7unakAd2bSKpiOhEkGm5216hZs0QVeFJ2W3zEsSZcRQ6yBUINd89iC2tXvVz19QDfERfnFcl3n
-	+YtsIL/qUhA8RtnWDjwg==;
+	List-Owner; bh=W2kVfGLgFY0qMhpt9BhOvGgsgYz//YvXBbo2dTjTYS8=; b=MqCh7UuRQa3ssy
+	ZBK0noO+Qhy9jknGdHeIeC6QYaudoMJyAxgZgbrXLbEtTM5gh5vObFHVtf/OKgeInF+8nmpaxShmx
+	2u57M1vNGdDTeDJpYvSTMt957RXKcsRC46D6h1iMKU++VUmTRS5zQLOOex19a8w75QJEcplr3gtnX
+	OGzQ3wVR5EAGxpZP+DzmWLeETzv8uHjWVMs1RmClHE91BHSoOlbOtdiVrlLiei9ibEu2D7ChjXLKg
+	4w7f9Zk0KM8Oi9RoR+gSVfvMLqtNsd3dLRw+EsFECXv9Fvsvwxa2i5q191kuqtV7b8yaVuyZ5OP+f
+	T9EzbiXMX1frQw8BfKJw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpStH-0002Rk-P9; Fri, 01 Feb 2019 07:05:31 +0000
-Received: from mailout1.w1.samsung.com ([210.118.77.11])
+	id 1gpSvf-00035u-HQ; Fri, 01 Feb 2019 07:07:59 +0000
+Received: from esa3.microchip.iphmx.com ([68.232.153.233])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpStD-0002RF-F9
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 07:05:29 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
- by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190201070524euoutp01c15b055094b5ca683993422c25d7de0f~-K5ckFIWg0318903189euoutp01E
- for <linux-arm-kernel@lists.infradead.org>;
- Fri,  1 Feb 2019 07:05:24 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
- 20190201070524euoutp01c15b055094b5ca683993422c25d7de0f~-K5ckFIWg0318903189euoutp01E
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1549004725;
- bh=LhAbpAXv7b/Jn7o325o9y8sGGKskPWyhIXvcBW6qwkw=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=MG8KYwqANB69uO/4zY6Gk0LdoZarp9Cs7FUx70iN6vx6iMthi2rmUrJchyElhuCXI
- ue8GKuQtrC7k9TPz7Ux2mrPclngbw/w4DjABEufGVXjqX6685rZfpqaLnSZ6UVDyku
- xRjOqc9xptqOaOL5mSRoZogADQEPWlwdMa3RE1PM=
-Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTP id
- 20190201070524eucas1p229ba0acf0035070676f91a8a232641fd~-K5cCzkFj1110511105eucas1p29;
- Fri,  1 Feb 2019 07:05:24 +0000 (GMT)
-Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
- eusmges2new.samsung.com (EUCPMTA) with SMTP id 3F.07.04294.4BFE35C5; Fri,  1
- Feb 2019 07:05:24 +0000 (GMT)
-Received: from eusmtrp2.samsung.com (unknown [182.198.249.139]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
- 20190201070523eucas1p28a8a40b06589f725d1facf7a67f730e1~-K5a6jZqr0928209282eucas1p2_;
- Fri,  1 Feb 2019 07:05:23 +0000 (GMT)
-Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
- eusmtrp2.samsung.com (KnoxPortal) with ESMTP id
- 20190201070522eusmtrp26d172e9535374389e9895d570bce24d3~-K5ar7rc10763207632eusmtrp2r;
- Fri,  1 Feb 2019 07:05:22 +0000 (GMT)
-X-AuditID: cbfec7f4-835ff700000010c6-6e-5c53efb4fa2d
-Received: from eusmtip1.samsung.com ( [203.254.199.221]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id 9F.1D.04128.2BFE35C5; Fri,  1
- Feb 2019 07:05:22 +0000 (GMT)
-Received: from [106.116.147.30] (unknown [106.116.147.30]) by
- eusmtip1.samsung.com (KnoxPortal) with ESMTPA id
- 20190201070522eusmtip1cb186b54c52224a98fdf4e190acba454~-K5aKnxyo0176601766eusmtip1H;
- Fri,  1 Feb 2019 07:05:22 +0000 (GMT)
-Subject: Re: fix a layering violation in videobuf2 and improve
- dma_map_resource v2
-To: Christoph Hellwig <hch@lst.de>, Pawel Osciak <pawel@osciak.com>,
- Kyungmin Park <kyungmin.park@samsung.com>, =?UTF-8?Q?Niklas_S=c3=b6derlund?=
- <niklas.soderlund+renesas@ragnatech.se>
-From: Marek Szyprowski <m.szyprowski@samsung.com>
-Message-ID: <774dc557-b690-203f-898f-38755b099068@samsung.com>
-Date: Fri, 1 Feb 2019 08:05:21 +0100
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
-MIME-Version: 1.0
-In-Reply-To: <20190118113727.3270-1-hch@lst.de>
+ id 1gpSvR-0002vK-Pw; Fri, 01 Feb 2019 07:07:47 +0000
+X-IronPort-AV: E=Sophos;i="5.56,547,1539673200"; d="scan'208";a="26178735"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa3.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 01 Feb 2019 00:07:43 -0700
+Received: from NAM03-CO1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.49) with Microsoft SMTP Server (TLS) id
+ 14.3.352.0; Fri, 1 Feb 2019 00:07:43 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=4JBaRi8LU1Z3gmlyIZ5YXMpT0chDW7YkYJmC9oyAqYM=;
+ b=a9qnJdDyt7KwYFJG/dpIMKMcjc2qENiHnzGBs3cRCrbVcypu/13d13K0ol9kUlWSglb/vFoBVKxBtaRhNnEs9o9QgJzXZqrM224md7mI2WdjsRaTojFuDLqgq/NxUc0gryctIdgwoIdNieLBOAtymp+Zms8ypyixG9gdWaddRLA=
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.98.146) by
+ BN6PR11MB1970.namprd11.prod.outlook.com (10.175.95.18) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1580.17; Fri, 1 Feb 2019 07:07:40 +0000
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::847:4296:13b9:fc9f]) by BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::847:4296:13b9:fc9f%8]) with mapi id 15.20.1580.017; Fri, 1 Feb 2019
+ 07:07:40 +0000
+From: <Tudor.Ambarus@microchip.com>
+To: <bbrezillon@kernel.org>
+Subject: Re: [PATCH v2 10/10] spi: atmel-quadspi: add support for sam9x60 qspi
+ controller
+Thread-Topic: [PATCH v2 10/10] spi: atmel-quadspi: add support for sam9x60
+ qspi controller
+Thread-Index: AQHUuYA85AgiqORGIUCz49OB4RqXzKXJkgKAgAD0mIA=
+Date: Fri, 1 Feb 2019 07:07:40 +0000
+Message-ID: <947f148d-3fd8-4e7d-4301-9d67715fbf7d@microchip.com>
+References: <20190131161515.21605-1-tudor.ambarus@microchip.com>
+ <20190131161515.21605-11-tudor.ambarus@microchip.com>
+ <20190131173207.56481a42@bbrezillon>
+In-Reply-To: <20190131173207.56481a42@bbrezillon>
+Accept-Language: en-US
 Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA01SbUhTYRjt9e7e3a1m12n4kJI0QjLKaURdNCTT4NKfoiLIj2zmxUSnsqVl
- RvkRZkstv1CHlIFpWU2by9TUcpnDcpbOaiqCNT/QMgkzy8xyu1r+e895zvOec+AhMbEZX09G
- xZ5mFbGyGAkh5NW1/+zapps6HOI1li6g7957YUeXPfWljWmf+bTW8g6nTY2lBJ1V8win9YXN
- iP41u4DTFdp5O3qwYytdMPmTv2c1Y3rXjTHaqisEU1t+kck3VyLmdfEtxDzpSyEYy9w4wYyZ
- ZgkmR1eFmGnthoPCIOHuCDYmKpFVSP1OCE9dff8Fi9fgZ4tUhXgKKuepkIAEagekaloxFRKS
- YuoOggeGbMSBbwg+jY/wODCNoKWngr+8Mq038rlBJQLN1ZdLqikEprxWwqpypI5AsXHANnCi
- mhF0ZVzDrQCj5hEYbhiRVUVQ3qCaVNk2RJQfjP/us3nwqE2Qasyw8euoECjoauNzGgfoKBm2
- RRdQUujsrLTxGOUGjydLMe7tDP3DN+2sZkDN8GFq5ivOBQ+EhuLRpd6OMGHQLRVyhT8Nywvp
- CC4Xq/kcyELwqLSe4FS+8NzQvfgTuWjhAdWNUo72h/L2Ab6VBsoezJMOXAh7yKsrwjhaBJkZ
- Yk7tDmqD5p9t65se7DqSqFdUU6+oo15RR/3ftwzxqpAzm6CUR7LK7bHsGU+lTK5MiI30PBkn
- 16LFe3u1YPhWjxrnw/WIIpFkjahm7lCIGJclKpPkegQkJnEStQ0eDhGLImRJ51hFXJgiIYZV
- 6pELyZM4i5JXDQWLqUjZaTaaZeNZxfLUjhSsT0EuvftyiImOtXPhX5NDHds8RJn3049XvR14
- OGQO2BgdvrpHeiz/vCl41N7i5d79LMDHbO/TtPlSmdt31wY31lAbkNJiTKtbE6RP1h3IsuwM
- vt30gy7p3S+4c6K3yUyHtkStPZTbu7cxg9THfezPzbbk5tTnVYZNVO/6MEJEXfA/GijhKU/J
- vLdgCqXsL8NRby1rAwAA
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFnrJIsWRmVeSWpSXmKPExsVy+t/xu7qb3gfHGLS/NrdYufook8WC/dYW
- Z5vesFtsenyN1eLyrjlsFj0btrJaHJq6l9Hi9/d/rBbLNv1hsrh7Usdiytuf7A7cHpevXWT2
- 2LSqk81j85J6j8k3ljN6nJ+xkNFj980GNo/Hv16yeTy//J3No2/LKkaPz5vkArii9GyK8ktL
- UhUy8otLbJWiDS2M9AwtLfSMTCz1DI3NY62MTJX07WxSUnMyy1KL9O0S9DK6r79jLljHWjG9
- ayprA+MSli5GTg4JAROJz4fOsncxcnEICSxllNhz+ygbREJG4uS0BlYIW1jiz7UuNoiit4wS
- vS8nM4IkhAVCJGacvc0CkhAR2Msocf/0XbAqZoF/jBLze3cwQrQ0MUosWHsebBabgKFE19su
- sB28AnYSL//eZAexWQRUJBrPtgHFOThEBWIkrp5jhCgRlDg58wnYrZwC+hJnziwHK2cWUJf4
- M+8SM4QtL7H97RwoW1zi1pP5TBMYhWYhaZ+FpGUWkpZZSFoWMLKsYhRJLS3OTc8tNtIrTswt
- Ls1L10vOz93ECIzmbcd+bgH6513wIUYBDkYlHt4Nv4JihFgTy4orcw8xSnAwK4nwHrkbHCPE
- m5JYWZValB9fVJqTWnyI0RTot4nMUqLJ+cBEk1cSb2hqaG5haWhubG5sZqEkznveoDJKSCA9
- sSQ1OzW1ILUIpo+Jg1OqgfGmNnP5FrFrlx4dt7ksHT4xLoZPWPHhXyGnJW4OUYJmtWJ2r84v
- ex+iFL1oy8tTSi9Y5gVvdrjf33f9zgSOH6wTf53SfHnjpFf3j470ht6ZDjfWvPeOZp1l4GRx
- sO/PCvU761brpmzYKeb3iC+x+4yEVKfUjX+rOLST35nobX+wyaIzec2DDF4lluKMREMt5qLi
- RAADa/MU/AIAAA==
-X-CMS-MailID: 20190201070523eucas1p28a8a40b06589f725d1facf7a67f730e1
-X-Msg-Generator: CA
-X-RootMTR: 20190118113751epcas2p2d7d678dcf247806a119316aabb4dde21
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20190118113751epcas2p2d7d678dcf247806a119316aabb4dde21
-References: <CGME20190118113751epcas2p2d7d678dcf247806a119316aabb4dde21@epcas2p2.samsung.com>
- <20190118113727.3270-1-hch@lst.de>
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1P194CA0024.EURP194.PROD.OUTLOOK.COM
+ (2603:10a6:800:be::34) To BN6PR11MB1842.namprd11.prod.outlook.com
+ (2603:10b6:404:101::18)
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [188.25.201.46]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BN6PR11MB1970;
+ 6:qIdJaipCHZEI3uxriKSAwaojpkLG6gv34hDZSE/l8fES2U0ssFTl7To9Qpl8hJ0nCKHW6JsSJ6FoH1X+iPsHvhlKjvGaVkMHOwNuLIOwctGAd93mKrHNMTctae37cCKMrip6RK+IGlW7a8CEbZaDXxtJYgMcRq8vwN4D1zY8XCFhL+exS6N51bL5Wj8hOHOgTvpuOUePH70nNjRui5qsmIFak/rS2Pd7H6raSG7s4Hgf1JMYcMBeSCFAO7SdNdjNb7WdZ5W8o25/p3HWlM8Hp5jKZQb5yaf2XFJNfMh5P9qtoeaLUP6mOocZECbjRkidPaVylqIJb1/lF9kOTkqn+erwGnPDwuOcU/e5SQk1oVgXJHXEAU4R0R40UyVH4AV7o/q8VMIA0VQ4KdZHwem9ZFvfxaleejw2VJcevqEBKYysCn9EPftLi6EumE7HAqS1M041F5tI5aNsS60xZg+vaQ==;
+ 5:W+FSPbARazi9fIEvRfyotxVBcqnZafi4Sx8nZ4pBCPzm7JzIJYIttEQ+wyFbm5YLcmDwgm832WfGnCrTvBFdpZb1991qGA3Zr3j4aCivFCVQnjtHrcv0wANajd1VjRc+GnqL1OLcql6nqBg+GR7jAljj3qVLhUL/qw2MO+8Q3tGNpeW+w2Rm/0p6sspFyvn4qQOpQm8W66Zd+uBojwvdsw==;
+ 7:8OfFZIM7+n+lbQKrhORpm02zUSKfDjolP9ddLd4WxD54KTCyHuekaCNJIkT4h8EQuZ7NLWBPpmWckkx9UQm4qtDxClLhFVUZGSH3RKym6s3QyLz+5WVdemTVsdMWxvSl4iJN+pH13l/U5/vAePJLAA==
+x-ms-office365-filtering-correlation-id: 7c91381c-9ed8-4c13-c746-08d68813f3d5
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605077)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:BN6PR11MB1970; 
+x-ms-traffictypediagnostic: BN6PR11MB1970:
+x-microsoft-antispam-prvs: <BN6PR11MB197007F2FD27B8C880DB360EF0920@BN6PR11MB1970.namprd11.prod.outlook.com>
+x-forefront-prvs: 09352FD734
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(346002)(366004)(136003)(376002)(39860400002)(396003)(189003)(199004)(68736007)(25786009)(476003)(186003)(66066001)(97736004)(6116002)(2906002)(3846002)(102836004)(229853002)(53546011)(6506007)(6916009)(6346003)(11346002)(4326008)(386003)(31696002)(105586002)(36756003)(86362001)(14444005)(26005)(256004)(486006)(31686004)(2616005)(446003)(106356001)(6246003)(76176011)(7416002)(305945005)(71190400001)(71200400001)(54906003)(81166006)(81156014)(8936002)(99286004)(8676002)(53936002)(72206003)(316002)(7736002)(6512007)(14454004)(6436002)(6486002)(478600001)(52116002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1970;
+ H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Tudor.Ambarus@microchip.com; 
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 44fsTJUl5oZroB2jSQLzjYMPkuzBoN1RJvIxspc8O6YZ8SglQmlhg3HIAjehWujvMcuDXUxhTnsyX/L0ddQVNH5FyIfEweoMe0Jr/ffXh+xEfxE+Uf4DtIt3cmptYeBiylGyrb9+s7IUwVfHZBhex0xSUmQWECO2mBapuMEsLlufYJZifxngus2Z450HrSL3o4Vyi5Y/XheLVkNelhl1eYJQfkpzjImuuook1Fw4W1qBEjGZYRS09tChwU5XNJTzj9UMg1Xq5B6wCnGgy3iOLBSsjGbndaOSCWkAe6y6PpfILBiizkd9qvWUGN4sx18XWOHjJF8vUWN2q5ksqs3IRhqwg97s44h/orO48Zwa61v5dUCA89qKjhXAPFKPOACLfLuKhVjfAqN+fQCvD+cD9nP6zD1hoLFRr18ckV5gqkI=
+Content-ID: <FDE3A9ADDF16244C80058B0BF4938DDC@namprd11.prod.outlook.com>
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 7c91381c-9ed8-4c13-c746-08d68813f3d5
+X-MS-Exchange-CrossTenant-originalarrivaltime: 01 Feb 2019 07:07:37.7908 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1970
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_230527_985198_95540168 
-X-CRM114-Status: GOOD (  11.76  )
+X-CRM114-CacheID: sfid-20190131_230746_009343_7921C9EA 
+X-CRM114-Status: GOOD (  21.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -139,39 +128,286 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Russell King <linux@armlinux.org.uk>, linux-kernel@vger.kernel.org,
- iommu@lists.linux-foundation.org, Mauro Carvalho Chehab <mchehab@kernel.org>,
- linuxppc-dev@lists.ozlabs.org, linux-arm-kernel@lists.infradead.org,
- linux-media@vger.kernel.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ alexandre.belloni@bootlin.com, linux-kernel@vger.kernel.org,
+ robh+dt@kernel.org, linux-spi@vger.kernel.org, Ludovic.Desroches@microchip.com,
+ broonie@kernel.org, linux-mtd@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi All,
-
-On 2019-01-18 12:37, Christoph Hellwig wrote:
-> Hi all,
->
-> this series fixes a rather gross layering violation in videobuf2, which
-> pokes into arm DMA mapping internals to get a DMA address for memory that
-> does not have a page structure, and to do so fixes up the dma_map_resource
-> implementation to not provide a somewhat dangerous default and improve
-> the error handling.
->
-> Changes since v1:
->  - don't apply bus offsets in dma_direct_map_resource
-
-Works fine on older Exynos based boards with IOMMU and CMA disabled.
-
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
 
 
+On 01/31/2019 06:32 PM, Boris Brezillon wrote:
+> On Thu, 31 Jan 2019 16:15:51 +0000
+> <Tudor.Ambarus@microchip.com> wrote:
+> 
+>> From: Tudor Ambarus <tudor.ambarus@microchip.com>
+>>
+>> The sam9x60 qspi controller uses 2 clocks, one for the peripheral register
+>> access, the other for the qspi core and phy. Both are mandatory. It uses
+>> dedicated register for Read Instruction Code Register (RICR) and
+>> Write Instruction Code Register (WICR). ICR/RICR/WICR have identical
+>> fields.
+>>
+>> Tested with sst26vf064b jedec,spi-nor flash. Backward compatibility test
+>> done on sama5d2 qspi controller and mx25l25635e jedec,spi-nor flash.
+>>
+>> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+>> ---
+>> v2:
+>> - rework clock handling
+>> - reorder setting of register values in set_cfg() calls -> move functions
+>>   that can fail in the upper part of the function body.
+>>
+>>  drivers/spi/atmel-quadspi.c | 296 +++++++++++++++++++++++++++++++++++---------
+>>  1 file changed, 239 insertions(+), 57 deletions(-)
+>>
+>> diff --git a/drivers/spi/atmel-quadspi.c b/drivers/spi/atmel-quadspi.c
+>> index d3e76acf8517..80c934f3e479 100644
+>> --- a/drivers/spi/atmel-quadspi.c
+>> +++ b/drivers/spi/atmel-quadspi.c
+>> @@ -19,6 +19,7 @@
+>>  #include <linux/kernel.h>
+>>  #include <linux/module.h>
+>>  #include <linux/of.h>
+>> +#include <linux/of_platform.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/spi/spi-mem.h>
+>>  
+>> @@ -35,7 +36,9 @@
+>>  
+>>  #define QSPI_IAR     0x0030  /* Instruction Address Register */
+>>  #define QSPI_ICR     0x0034  /* Instruction Code Register */
+>> +#define QSPI_WICR    0x0034  /* Write Instruction Code Register */
+>>  #define QSPI_IFR     0x0038  /* Instruction Frame Register */
+>> +#define QSPI_RICR    0x003C  /* Read Instruction Code Register */
+>>  
+>>  #define QSPI_SMR     0x0040  /* Scrambling Mode Register */
+>>  #define QSPI_SKR     0x0044  /* Scrambling Key Register */
+>> @@ -88,7 +91,7 @@
+>>  #define QSPI_SCR_DLYBS_MASK             GENMASK(23, 16)
+>>  #define QSPI_SCR_DLYBS(n)               (((n) << 16) & QSPI_SCR_DLYBS_MASK)
+>>  
+>> -/* Bitfields in QSPI_ICR (Instruction Code Register) */
+>> +/* Bitfields in QSPI_ICR (Read/Write Instruction Code Register) */
+>>  #define QSPI_ICR_INST_MASK              GENMASK(7, 0)
+>>  #define QSPI_ICR_INST(inst)             (((inst) << 0) & QSPI_ICR_INST_MASK)
+>>  #define QSPI_ICR_OPT_MASK               GENMASK(23, 16)
+>> @@ -113,6 +116,8 @@
+>>  #define QSPI_IFR_OPTL_4BIT              (2 << 8)
+>>  #define QSPI_IFR_OPTL_8BIT              (3 << 8)
+>>  #define QSPI_IFR_ADDRL                  BIT(10)
+>> +#define QSPI_IFR_TFRTYP_TRSFR_MEM	BIT(12)
+>> +#define QSPI_IFR_TFRTYP_TRSFR_REG	(0 << 12)
+> 
+> You don't need to define TRSFR_REG, just set QSPI_IFR_TFRTYP_TRSFR_MEM
+> when you do a mem transfer and do nothing when this is a regular
+> transfer.
+
+
+I chose to introduce macros with zero value for better code readability. I would
+expect that the NOP operations to be optimized at compile time. I will remove them
+if you prefer, it will result in fewer lines of code.
+
+> 
+>>  #define QSPI_IFR_TFRTYP_MASK            GENMASK(13, 12)
+>>  #define QSPI_IFR_TFRTYP_TRSFR_READ      (0 << 12)
+>>  #define QSPI_IFR_TFRTYP_TRSFR_READ_MEM  (1 << 12)
+> 
+> Looks like the read/write flag is on bit 13. Can we just add
+
+for sama5d2 only
+
+> 
+> #define QSPI_IFR_TFRTYP_TRSFR_WRITE	BIT(13)
+> 
+> and drop all others def? This way the implementation is consistent
+> between sam9x60 and sama5d2.
+
+BIT(13) has no meaning for sam9x60. I can drop the macros with zero value for
+sama5d2 in a separate patch.
+
+> 
+>> @@ -121,6 +126,8 @@
+>>  #define QSPI_IFR_CRM                    BIT(14)
+>>  #define QSPI_IFR_NBDUM_MASK             GENMASK(20, 16)
+>>  #define QSPI_IFR_NBDUM(n)               (((n) << 16) & QSPI_IFR_NBDUM_MASK)
+>> +#define QSPI_IFR_APBTFRTYP_WRITE	(0 << 24)
+> 
+> As for the other defs, I don't think you need to define _WRITE.
+
+understood
+
+> 
+>> +#define QSPI_IFR_APBTFRTYP_READ		BIT(24)
+>>  
+>>  /* Bitfields in QSPI_SMR (Scrambling Mode Register) */
+>>  #define QSPI_SMR_SCREN                  BIT(0)
+>> @@ -137,16 +144,37 @@
+>>  #define QSPI_WPSR_WPVSRC(src)           (((src) << 8) & QSPI_WPSR_WPVSRC)
+>>  
+>>  
+>> +/* Describes register values. */
+>> +struct atmel_qspi_cfg {
+>> +	u32 icr;
+>> +	u32 iar;
+>> +	u32 ifr;
+>> +};
+>> +
+>> +struct atmel_qspi_caps;
+>> +
+>>  struct atmel_qspi {
+>>  	void __iomem		*regs;
+>>  	void __iomem		*mem;
+>>  	struct clk		*clk;
+> 
+> Can we rename that on pclk?
+
+will rename it, together with the support for unnamed clock of sama5d2 in a separate
+patch. The dt-bindings patch that imposes "pclk" for sama5d2 should be separated too.
+
+> 
+>> +	struct clk		*qspick;
+>>  	struct platform_device	*pdev;
+>> +	const struct atmel_qspi_caps *caps;
+>>  	u32			pending;
+>>  	u32			mr;
+>>  	struct completion	cmd_completion;
+>>  };
+>>  
+> 
+> ...
+> 
+>> +
+>> +static int atmel_sam9x60_qspi_set_cfg(void __iomem *base,
+>> +				      const struct spi_mem_op *op,
+>> +				      struct atmel_qspi_cfg *cfg)
+>> +{
+>> +	int ret = atmel_qspi_set_mode(cfg, op);
+>> +
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	ret = atmel_qspi_set_address_mode(cfg, op);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	cfg->ifr |= QSPI_IFR_INSTEN;
+>> +	cfg->icr |= QSPI_ICR_INST(op->cmd.opcode);
+>> +
+>> +	/* Set data enable */
+>> +	if (op->data.nbytes)
+>> +		cfg->ifr |= QSPI_IFR_DATAEN;
+>> +
+>> +	if (!op->addr.nbytes) {
+>> +		cfg->ifr |= QSPI_IFR_TFRTYP_TRSFR_REG;
+>> +		if (op->data.dir == SPI_MEM_DATA_OUT)
+>> +			cfg->ifr |= QSPI_IFR_APBTFRTYP_WRITE;
+>> +		else
+>> +			cfg->ifr |= QSPI_IFR_APBTFRTYP_READ;
+>> +	} else {
+>> +		cfg->ifr |= QSPI_IFR_TFRTYP_TRSFR_MEM;
+> 
+> Can you try doing only regular transfers and let me know if it still
+> works. Support for mem transfers can then be added along with dirmap
+> support.
+
+should work. Will try and let you know.
+
+> 
+>> +	}
+>>  
+>>  	/* Clear pending interrupts */
+>>  	(void)readl_relaxed(base + QSPI_SR);
+>>  
+>>  	/* Set QSPI Instruction Frame registers */
+>> -	writel_relaxed(iar, base + QSPI_IAR);
+>> -	writel_relaxed(icr, base + QSPI_ICR);
+>> -	writel_relaxed(ifr, base + QSPI_IFR);
+>> +	writel_relaxed(cfg->iar, base + QSPI_IAR);
+>> +	if (op->data.dir == SPI_MEM_DATA_OUT)
+>> +		writel_relaxed(cfg->icr, base + QSPI_ICR);
+>> +	else
+>> +		writel_relaxed(cfg->icr, base + QSPI_RICR);
+>> +	writel_relaxed(cfg->ifr, base + QSPI_IFR);
+>> +
+>> +	return 0;
+>> +}
+>> +
+> 
+> ...
+> 
+>> @@ -443,32 +578,52 @@ static int atmel_qspi_probe(struct platform_device *pdev)
+>>  	/* Enable the peripheral clock */
+>>  	err = clk_prepare_enable(aq->clk);
+>>  	if (err) {
+>> -		dev_err(&pdev->dev, "failed to enable the peripheral clock\n");
+>> +		dev_err(dev, "failed to enable the peripheral clock\n");
+>>  		goto exit;
+>>  	}
+>>  
+>> +	if (caps->has_qspick) {
+>> +		/* Get the QSPI system clock */
+>> +		aq->qspick = devm_clk_get(dev, "qspick");
+>> +		if (IS_ERR(aq->qspick)) {
+>> +			dev_err(dev, "missing system clock\n");
+>> +			err = PTR_ERR(aq->qspick);
+>> +			goto disable_clk;
+>> +		}
+>> +
+>> +		/* Enable the QSPI system clock */
+>> +		err = clk_prepare_enable(aq->qspick);
+>> +		if (err) {
+>> +			dev_err(dev,
+>> +				"failed to enable the QSPI system clock\n");
+>> +			goto disable_clk;
+>> +		}
+>> +	}
+>> +
+>>  	/* Request the IRQ */
+>>  	irq = platform_get_irq(pdev, 0);
+>>  	if (irq < 0) {
+>> -		dev_err(&pdev->dev, "missing IRQ\n");
+>> +		dev_err(dev, "missing IRQ\n");
+>>  		err = irq;
+>> -		goto disable_clk;
+>> +		goto disable_qspick;
+>>  	}
+>> -	err = devm_request_irq(&pdev->dev, irq, atmel_qspi_interrupt,
+>> -			       0, dev_name(&pdev->dev), aq);
+>> +	err = devm_request_irq(dev, irq, atmel_qspi_interrupt, 0,
+>> +			       dev_name(dev), aq);
+>>  	if (err)
+>> -		goto disable_clk;
+>> +		goto disable_qspick;
+>>  
+>>  	err = atmel_qspi_init(aq);
+>>  	if (err)
+>> -		goto disable_clk;
+>> +		goto disable_qspick;
+>>  
+>>  	err = spi_register_controller(ctrl);
+>>  	if (err)
+>> -		goto disable_clk;
+>> +		goto disable_qspick;
+>>  
+>>  	return 0;
+>>  
+>> +disable_qspick:
+>> +	clk_disable_unprepare(aq->qspick);
+>>  disable_clk:
+> 
+> We should probably rename this label disable_pclk.
+
+sure. Thanks, Boris!
+
+> 
+>>  	clk_disable_unprepare(aq->clk);
+>>  exit:
+> 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
