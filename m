@@ -2,82 +2,87 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 889DBC282DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:39:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9592FC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:39:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3FA4F218F0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:39:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 33972218AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:39:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VcWVY2AJ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="OQ7IshS1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3FA4F218F0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Bx0G//sh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="MbTYOZJv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 33972218AF
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=rPmb1XDkeKgogu7ZvdzdV9UhL6qwQAUG7uEzuydZFQQ=; b=VcW
-	VY2AJbmSiiZ3l3UL07/b4DWk08sJmuKc1FptgB0AeqkzgGJ7tEKoRh0u29sglmbs82OcLBcGMU2P5
-	2FUvROfRqlOECrm78PBr00V1BnC5VrAmYwXu4nJh7xPmI7iuawrkxNZuYzJX4IZ9gf0trUD8EBpZD
-	T5ppk4+yJCJkkUGIpp5O6IRaD0XW82Ge6I16El5XVSCqDXQl43yMXhFt7zoe+V9Eo1PSv+tb6P9TU
-	o9nB85vpva8my+YtGDtEAdSX0OgueUptFInFPcpyQQq7nu0gZ9dmxE61CuVSSHt+KN2DcWC1UlFtH
-	OawLgTP/wjcM/B5lh65c/rIu98lpCmg==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=tNetQPVWLEPRNiEjBMb3qN5qLo39Qby7oSK/jGRLNYE=; b=Bx0G//shltPuidCOlSHgbtnYgz
+	XEl3pN2uymQIkHILdS8LSwE4nwpfz08Pwfqe4JDYIRfaJXjPIg/SVx6TRsmbHQTK27YbIqdunnceo
+	XArBxfrndwDEX3+GIsFG09RMGfczu51eTm2uoEb2nzWv1tV7BYASq0jHT27HkvCNLL+5u1FaY1+Ww
+	GeuGYaXn10uKJVkGel6uFg9rDGDES/Jm0z+bjk+OkHy5VRCbTOMNdYUUA7xUp7SKnysKnoZdWHABi
+	UIH7xyFjH44pXhFYT1JFpnYbYH8BUnQBC8S4Eg/+WIg+Ow9Pt8+42rrjJma75XCjt5H20IMk7kq4W
+	+vBbK1LA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpauE-0007fG-GF; Fri, 01 Feb 2019 15:39:02 +0000
-Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+	id 1gpauO-0007q8-9f; Fri, 01 Feb 2019 15:39:12 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpauB-0007en-6k
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:39:00 +0000
-Received: by mail-pl1-x644.google.com with SMTP id p4so108311plq.11
+ id 1gpauF-0007fs-0U
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:39:06 +0000
+Received: by mail-pl1-x643.google.com with SMTP id g9so3399617plo.3
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 07:38:58 -0800 (PST)
+ Fri, 01 Feb 2019 07:39:02 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=3NTv5eHd28mLCpqTEB1R7+7g3e4rlfMjMSD3f2Dc//A=;
- b=OQ7IshS1vh2MyN6bnmPd41J15BQEYSEsas9mRLTYWMaNH7KejRPcHc3AEI72ZThfPH
- 0e+hn3p88HsjXYUHTLIRujNcqcD3GwH0yFxw0d8855EAFS3R0wZQ18gTyXmo8tyxx4z8
- +X0hD5zoFvVOuM4xadpYChNckWIldSZyrqI8Y=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=/eDFiU+7KNoLYdpw1NkuAhHQ88OLOmPVAtIDTQWvTdE=;
+ b=MbTYOZJvuRP6utRpezSOD/+w9RM8L9RrQYTDP7+H3mZbry+fDTp+hHmpgRqWsH0mRF
+ ow0r1MF5zGmTc9TqnuAIc1+KwylQ6aV+8tCiEFl5UkKqOffRCG2Q/nBA3t9PQNh1k0pN
+ 96/D4U46eE1N8zkqpifQss6UDUtgabGDnpozk=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=3NTv5eHd28mLCpqTEB1R7+7g3e4rlfMjMSD3f2Dc//A=;
- b=bSATUEfKT8qxAyRbdWNe/cmsaGYxHlcwFlmYLbpUA26EqZf4AdO4j+MlcPyXwe5v8/
- KhrWuBCtJsIGazH7q+NsjZ+mmZT3hroP5xwv19uiR0eI046MGZhc9vj2B1/2V04Cs5A4
- C1pVzceeXukXxR+PkhC95dmbS+qGhuv0k7ioYgwIw7ySb492gNVMpsF7MKCPjvv7JX9G
- 8pP8Y+rOcCsY7hfy5hF10HQZjy9tl0kKruNiY9QNWGQ1TWn3NknJLIwFAXnl9tOwfDTW
- E9hRUy+UpwIKCHOPDllVfrSF90HvJnsieWmBgyORcR5hfRj6WhpjAdK8yeo+XSxx/dtH
- 93hQ==
-X-Gm-Message-State: AJcUukf9+mI+ioqZ6B3V+H3zMvjWgd/eZ8uNkO5ddobd4tI1/0pJvv0E
- LmEgbsVta+BPibaeFsJNizpi
-X-Google-Smtp-Source: ALg8bN6MFbgIMYeKqXUWMofngJPgyLZiFAw9uaV5ssz3uxqpyNVTWZUYrEfrNEWeVvV9WMcGinvLvg==
-X-Received: by 2002:a17:902:b707:: with SMTP id
- d7mr38120490pls.29.1549035538080; 
- Fri, 01 Feb 2019 07:38:58 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=/eDFiU+7KNoLYdpw1NkuAhHQ88OLOmPVAtIDTQWvTdE=;
+ b=mx7ENcoO/ue06YJ3vA89jljUbsWE25naUWx+lGb3qf6KMPT1SM1vEFo22mRfAfMKuB
+ 9k7ymAk7JVz5Y9sO0CDQNLGWZHgCvkjtma/vUzIG0sAa0f1uk+rjKn7FUFS0eGMt57Yz
+ NN9vROOY57th/C23sXWmoJBLfvd3wLy37k8Sc0iek5LgNl+jxOoS9nZdq/End8GszdCQ
+ bnG3AImUzwFVy1W8CouEaxl++Q12vh/HkQf2shW6ql0r2LR3cigwAHx0lSnLtGtna4L+
+ Yc/lkcyriwUZLSLU3/cHdRorcX7uZgtXeo357/7myLVdF0mU33EjOzr+4xaKGWQu0uZt
+ oPRg==
+X-Gm-Message-State: AJcUukcg5m1TTNH4l8ij4uDYhkVDwtGseAy/7gjw9kgrq9yxDgxpsPj3
+ qkY+vpoX06Qve/Om/Dq1BzQX
+X-Google-Smtp-Source: ALg8bN50b+qQrPq+/IZNPw8Lb/zo7wXHou8HW8efg6X4yWh/qpN4TgSjhUgYjtHuv3bpXqg9ByZxbA==
+X-Received: by 2002:a17:902:7b91:: with SMTP id
+ w17mr40015197pll.111.1549035542441; 
+ Fri, 01 Feb 2019 07:39:02 -0800 (PST)
 Received: from localhost.localdomain ([2405:204:7348:9f93:3db9:68de:e3db:c028])
- by smtp.gmail.com with ESMTPSA id l22sm12350035pfj.179.2019.02.01.07.38.51
+ by smtp.gmail.com with ESMTPSA id l22sm12350035pfj.179.2019.02.01.07.38.58
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 01 Feb 2019 07:38:57 -0800 (PST)
+ Fri, 01 Feb 2019 07:39:01 -0800 (PST)
 From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 To: p.zabel@pengutronix.de,
 	xuwei5@hisilicon.com,
 	robh+dt@kernel.org
-Subject: [PATCH 0/3] Add Reset controller support for HI3670 SoC
-Date: Fri,  1 Feb 2019 21:08:38 +0530
-Message-Id: <20190201153841.21903-1-manivannan.sadhasivam@linaro.org>
+Subject: [PATCH 1/3] dt-bindings: reset: Add HI3670 reset controller binding
+Date: Fri,  1 Feb 2019 21:08:39 +0530
+Message-Id: <20190201153841.21903-2-manivannan.sadhasivam@linaro.org>
 X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20190201153841.21903-1-manivannan.sadhasivam@linaro.org>
+References: <20190201153841.21903-1-manivannan.sadhasivam@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_073859_244099_D368F5BF 
-X-CRM114-Status: GOOD (  11.05  )
+X-CRM114-CacheID: sfid-20190201_073903_362940_4401ED34 
+X-CRM114-Status: GOOD (  13.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,27 +103,33 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello,
+HI3670 SoC is architecturally same as the HI3660 SoC. Hence, the same
+driver is reused for HI3670 SoC and the binding is documented here.
 
-This patchset adds Reset controller support for HiSilicon HI3670 SoC.
-HI3670 SoC is architecturally same as HI3660 SoC, hence the same driver
-is reused.
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ .../devicetree/bindings/reset/hisilicon,hi3660-reset.txt     | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-This patchset has been tested on HiKey970 board.
-
-Thanks,
-Mani
-
-Manivannan Sadhasivam (3):
-  dt-bindings: reset: Add HI3670 reset controller binding
-  arm64: dts: hisilicon: hi3670: Add reset controller support
-  reset: hisilicon: Add HiSilicon HI3670 reset support
-
- .../devicetree/bindings/reset/hisilicon,hi3660-reset.txt    | 5 +++--
- arch/arm64/boot/dts/hisilicon/hi3670.dtsi                   | 6 ++++++
- drivers/reset/hisilicon/reset-hi3660.c                      | 1 +
- 3 files changed, 10 insertions(+), 2 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+index 2bf3344b2a02..5d60ec541331 100644
+--- a/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
++++ b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+@@ -5,11 +5,12 @@ Please also refer to reset.txt in this directory for common reset
+ controller binding usage.
+ 
+ The reset controller registers are part of the system-ctl block on
+-hi3660 SoC.
++hi3660 and hi3670 SoCs.
+ 
+ Required properties:
+-- compatible: should be
++- compatible: should be one of the following:
+ 		 "hisilicon,hi3660-reset"
++		 "hisilicon,hi3670-reset"
+ - hisi,rst-syscon: phandle of the reset's syscon.
+ - #reset-cells : Specifies the number of cells needed to encode a
+   reset source.  The type shall be a <u32> and the value shall be 2.
 -- 
 2.17.1
 
