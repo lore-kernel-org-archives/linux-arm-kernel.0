@@ -2,91 +2,77 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 46D40C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:56:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 129C7C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:59:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 175102086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:56:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D6046218EA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:59:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rzFBg3IM";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="bdX9sXiy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 175102086C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EAb29NsP";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="sI9ai46m"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D6046218EA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+Pr55dtx+Fo00d/IZWzLmmQRPH04KkIiVvGFwQ3XzSg=; b=rzFBg3IMx952IB
-	ifgjAy1kzDog7tVWnNiNFeEItUlTjX0XYbxRKyUpRiDYcP6pHBdyYI4da3sKWHuGIk5L8yRe5yOzq
-	BbfdxS1LQGQ1pHnNirXTUPPnCl5xOEre5MW7+S0lGuHsH9eVZnLULIwI4+3s5wN7A/gQMd282fwpO
-	oOV967t9tEo+DSOGp9l7gyhgfIq8JLqEAV1OhKyW8/3QOwzuCt+C6f8bek8CHzoa3+bZSZrqy0P2S
-	E4EA6lNMCiguncb9PHPvdZ5xLa/fC0jtLcPBOTkZawMQ0MdAcsNzn2EPEy3oIqoqDRmJK9XNx8LxT
-	udX6TxCR3gwgA4xYG2DA==;
+	List-Owner; bh=4QemetPgonXOp169Rcxxz9TEuEe0k2zm5bYJkHsvk/4=; b=EAb29NsPZlcA7t
+	HAN21612OEqs9InpTOkxvW2Ug71VgjYiy1Pu7zgThcnm16qqedga1Y28hfLBJJy2KyY/TxbRdJmKv
+	wEYILIo9x5LeCF0V+jzGzrWr8xlsXb0dqsurrEAcEpCR8uDh9SJhWDoirgJTCSPU8giNCO1tPzFvB
+	R1qwB8q/PDpNub419EbgwsMiKBouXeh8ql92tBEZKfeKoJwxQ5PfD8DhtV1C6zeaBoQrz2+VCWlXN
+	1w1dxCc3VHUAYMAXeUUb46GLRtleZ8C9aK8m7X8k8Cz5N5RiBE+cRaiL3mrJ54h/AhIl4cC2kKPBo
+	zc6kFbK7gxGQqS3tKzYQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpbAg-0006xD-8y; Fri, 01 Feb 2019 15:56:02 +0000
-Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
+	id 1gpbDV-0007IJ-7Q; Fri, 01 Feb 2019 15:58:57 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpay6-0002FR-AF
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:43:06 +0000
-Received: by mail-lj1-x244.google.com with SMTP id u89-v6so6229222lje.1
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 07:43:02 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=rS6sGbJP+zjY5kJm8iT11B1WuOcwYEUOTtJGe88GIrs=;
- b=bdX9sXiywy0BGPdJwc5OTztIqQo0WTncpb/ZlqVFxOTBr0j9Hc/hOb3la6YN6Krgxq
- BJY376aZ5qf4y4aNLn3kGIXsqow0XD6fQnpCsjs++yoDdrMR77yh8ZJThJo0lBUp+5ID
- EdgNlkBPPGibaIaBvITW1dJxiVrNqSlL1Fpy8=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=rS6sGbJP+zjY5kJm8iT11B1WuOcwYEUOTtJGe88GIrs=;
- b=Ukk8EsYMTaXhh5llSjeoUxC/VyaxH9aueqzUA5OHN9o8hvrA5PevLNnj7BFxKeZYbZ
- aP2/4y4LPOy+1FBMGU4bI+LZmoy+ZdjwSZGWT1dBsERM9ZIT1zStPNg8lXz6x1yPe4SX
- dTiUeK0b/lLf/VTVYcDjLMfmuKe0EuI4hb+ZgM+Ewv3rXoeSNa7C0wzL7FUy7ab8h+UM
- 0cO28o5nDf8yuUuGdfwE2Ysd3oBVqAAluzP9M6nGw58PojJBrpwpkmnH1008RZCXdSQr
- /YjI5hcdK0droMuajB16HeqCGNombr+J7UaP/ynZksSTp1dqglVK34QhWX9A3NNXFhnB
- 9Uag==
-X-Gm-Message-State: AJcUukfBBIdbcEQ3cGhw/nQai+B8/bBkWWqqBwDOCTqk0XjCziJfBkxb
- D9y3qcIYiyK7c+Lgkx8iP0+TcQ==
-X-Google-Smtp-Source: ALg8bN6wZLRx3APZR1H/AYjNK+cdvIN3IPrZAwkaLn+hv3CJ4/x48AjmcKpGiIL9oGehk6sBp0t6Dg==
-X-Received: by 2002:a2e:4218:: with SMTP id
- p24-v6mr31408690lja.58.1549035780689; 
- Fri, 01 Feb 2019 07:43:00 -0800 (PST)
-Received: from localhost.localdomain ([217.76.202.68])
- by smtp.gmail.com with ESMTPSA id i13-v6sm1305712ljg.82.2019.02.01.07.42.59
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 01 Feb 2019 07:43:00 -0800 (PST)
-From: Jagan Teki <jagan@amarulasolutions.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
- Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>,
- Michael Turquette <mturquette@baylibre.com>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH v7 09/23] drm/sun4i: sun6i_mipi_dsi: Enable HBP,
- HSA_HSE for burst mode
-Date: Fri,  1 Feb 2019 21:12:18 +0530
-Message-Id: <20190201154232.10505-10-jagan@amarulasolutions.com>
-X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
-In-Reply-To: <20190201154232.10505-1-jagan@amarulasolutions.com>
+ id 1gpbDT-0007C3-62
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 01 Feb 2019 15:58:55 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=In-Reply-To:Content-Transfer-Encoding:
+ Content-Type:MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:
+ Sender:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=X0cxztK3jkAfoO2oxcxQsOze8zblZ/atKlS6P1BWd8o=; b=sI9ai46mWLp5K91EE1ES6Dmn2a
+ 2TDa5t8cZA79WgVnQ+H3JeWRwpt4LsmsotctDgfi7dGSRWYB3dFenS6k57N3/eCiP/qt0htqiLdLt
+ smZDaBIrZIa7e6kyiZFt3B0VRnQtE170XYMtoQ5NcFdSJvg6nw2weSuxIKT2ahPpq6duMCNdBxqE8
+ w6+DRTJKL8HutuTUg7J1oMeiD+MVxU3Jq561qhP0CRkoXzeXL3WC+tRWC44co1vV2DrR+iuTBdFQH
+ XXUpGXaSQCpjU0mGPlE2WpIz4Oyhq3a9Z2Yzv2vpPPzfJwm2M/vAIg6Ae3cEyu5SAb36s4RHB4nM2
+ /uO1fTCg==;
+Received: from relay7-d.mail.gandi.net ([217.70.183.200])
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gpb4P-00061o-SB
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:49:36 +0000
+X-Originating-IP: 90.88.147.226
+Received: from localhost (aaubervilliers-681-1-27-226.w90-88.abo.wanadoo.fr
+ [90.88.147.226]) (Authenticated sender: maxime.ripard@bootlin.com)
+ by relay7-d.mail.gandi.net (Postfix) with ESMTPSA id 2B9C52000E;
+ Fri,  1 Feb 2019 15:48:58 +0000 (UTC)
+Date: Fri, 1 Feb 2019 16:48:58 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Jagan Teki <jagan@amarulasolutions.com>
+Subject: Re: [PATCH v7 00/23] drm/sun4i: Allwinner A64 MIPI-DSI support
+Message-ID: <20190201154858.z6xqdaxccxya2wqr@flea>
 References: <20190201154232.10505-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190201154232.10505-1-jagan@amarulasolutions.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_074302_858700_3F3D7F6D 
-X-CRM114-Status: GOOD (  13.19  )
+X-CRM114-CacheID: sfid-20190201_154933_974501_D8DBB85E 
+X-CRM114-Status: GOOD (  13.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,9 +84,11 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- dri-devel@lists.freedesktop.org, linux-sunxi@googlegroups.com,
- Jagan Teki <jagan@amarulasolutions.com>,
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ David Airlie <airlied@linux.ie>, Michael Turquette <mturquette@baylibre.com>,
+ linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Daniel Vetter <daniel@ffwll.ch>,
  Michael Trimarchi <michael@amarulasolutions.com>,
  linux-amarula@amarulasolutions.com, linux-clk@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
@@ -109,51 +97,43 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Horizontal back porch, sync active and sync end bits are
-needed to disable for burst mode panel operations.
+On Fri, Feb 01, 2019 at 09:12:09PM +0530, Jagan Teki wrote:
+> Here is next version changes for Allwinner A64 MIPI-DSI support
+> 
+> This series grouped the changes like previous version[1] with different
+> sets to support three different panels types that can fit into the DSI
+> controller.
+> 
+> set:1, for 4-lane, burst mode support
+> - patch 0001: 0009, DSI controller changes that support burst mode.
+> 
+> set:2, for A64 DSI support
+> - patch 0010: tcon dclk divider computation based on A64 BSP. 
+> - patch 0011: 0017, Allwinner A64 DSI controller changes.
+> 
+> set:3, enable 4-lane burst mode panel:
+> - patch 0018: Overlay patch that enable Feiyang FY07024DI26A30-D
+>   burst mode panel on Pine64-LTS
+> 
+> set:4, enable 4-lane video mode panel:
+> - patch 0019: msg type MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM support
+> - patch 0020: Overlay patch that enable Bananapi S070WV20-CT16 ICN6211 
+>   panel on Bananapi M64
+> 
+> set:5, enable 2-lane video mode panel:
+> - patch 0021, 0022: DSI hfp and hbp timings fixes
+> - patch 0023: Enable Techstar TS8550B panel on Amarula A64-Relic
 
-So, disable them via dsi base control register.
+You do realise that pushing through a series while the previous
+version's discussion hasn't settled yet will not get you anywhere,
+right?
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Tested-by: Merlijn Wajer <merlijn@wizzup.org>
----
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+Maxime
 
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index a2ad9fa7f8d5..3d7c03161954 100644
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -549,12 +549,17 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
- 	u16 hbp, hfp, hsa, hblk, vblk;
- 	size_t bytes;
- 	u8 *buffer;
-+	u32 val = 0;
- 
- 	/* Do all timing calculations up front to allocate buffer space */
- 
- 	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) {
- 		hbp = hfp = hsa = vblk = 0;
- 		hblk = (mode->hdisplay * Bpp);
-+
-+		regmap_read(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, &val);
-+		val |= SUN6I_DSI_BASIC_CTL_HBP_DIS;
-+		val |= SUN6I_DSI_BASIC_CTL_HSA_HSE_DIS;
- 		goto alloc_buf;
- 	}
- 
-@@ -603,7 +608,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
- 	if (WARN_ON(!buffer))
- 		return;
- 
--	regmap_write(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, 0);
-+	regmap_write(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, val);
- 
- 	regmap_write(dsi->regs, SUN6I_DSI_SYNC_HSS_REG,
- 		     sun6i_dsi_build_sync_pkt(MIPI_DSI_H_SYNC_START,
 -- 
-2.18.0.321.gffc6fa0e3
-
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
