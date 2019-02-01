@@ -4,91 +4,71 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4EE15C282DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:17:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E88B2C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:26:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2016020811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:17:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B293720863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:26:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mqu67ZQw";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="b1aRZWN1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2016020811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XAp4EMp6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B293720863
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:
-	In-reply-to:Subject:To:From:References:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=KHRibiPbZd1DXM4WAlI/FqoJ7UUOFjycrLFsEUEU/Ts=; b=Mqu67ZQwTmVReO/jbGSy1ZvQw3
-	mOWNsWLjfM0tQ0ZPKjTu4fYqW5DY/bdSE87rkzvDwxTc5uT/dIOVed/p9nvZ1mh8OBlet8Bj5Kmj2
-	91c2VfOlED9il5Be43RiuPJYRVvbolEQ8mgStZxSWy3MNBz3YyQfV0l8ocXYMq4TWFuCFhMttbnoD
-	5WZlO0v5MG1nkQ+8oZ4ZAgbo5oUrE7uKdaxGvh9bThEPMim3M/Du8K9OAOYeOa7Ny+fhBDpcLW15h
-	V6/wXJ3cE0J3VCx8Aa80srnIH496PdHgfM1av31RjBsecOSxUMonjVKEWVEbXsW5u0euQ8UMhy09i
-	ShB7MK3A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=+KUMwKm4fKPGfeeZ22fcXuBkZGUo3keG/i4GBu0Do70=; b=XAp4EMp6vvBLH8
+	k0NtKFoXJI/EUPGzh+wU0scg8j3Go5Lgp01uQgbQtoDfRrw9cNalhTlDWCddvLqDm1zvL02tqjsWt
+	Hmn+OKD6aPzHPoeqZQO2Z2Xc0GX8ttDDRnzr7giFXkAgCGcxgQo0xAbBnhQCX756sWte1ZjHPJchz
+	1wS4Siso2sZ6prWGG3wUvsQU/zooIcUPD6/mYCgzNa4WP2t/8UX99mVF8iwAfW6B+w691xCD70Coh
+	t3dzpn7CMu9PsjaiCBRfHU7bLTB8bJ5JHM/tPNi9qGaYDL15b3J8MSBTh1EKmUIrP2zNQvWWx/wu5
+	IijAH9D9qOsyWjxivgHg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpU0w-0007FQ-EV; Fri, 01 Feb 2019 08:17:30 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gpU9t-0003Tp-MW; Fri, 01 Feb 2019 08:26:45 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpU0s-0007Dj-0a
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 08:17:27 +0000
-Received: by mail-wr1-x441.google.com with SMTP id p4so6037725wrt.7
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 00:17:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=references:user-agent:from:to:cc:subject:in-reply-to:date
- :message-id:mime-version;
- bh=hMhn/HTa/qYSZQG2pgokIUdkGkKp08wdGnM7svsUcXE=;
- b=b1aRZWN16i8ymJT6jms0uhE+xBqyzSWZD37o/CnUeqlfRnPgZZ1elzHfXkwdHL6kHC
- u7VEJ+4w323rnwkUfgE4FuUQgYWAcXmEzJd6uTkan+vZo3Brr9JVIxlgRZSpapPzOUkW
- TvL0p2SaIVS8dc3EuWc97ZlfpnEMjt6NhrrUYJ196yd+3/wMSSZGENSluhKFH6Hbsa3H
- KPmGh4UJxdNpS6NJEudlkjgCXFzzZsFy6rHw8tMni8fFVHLHMC/d/d93WF7CDGOH+oYf
- qBZGG9DqTvgOO08q8YvFrhM1lJHe5DuaCpPflSOwPWrjzVLuzRcexNakQprsuMoTYXJG
- E5Tg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:references:user-agent:from:to:cc:subject
- :in-reply-to:date:message-id:mime-version;
- bh=hMhn/HTa/qYSZQG2pgokIUdkGkKp08wdGnM7svsUcXE=;
- b=DafulafAphjJQHkw0JXCJFiy80YDko3ZYY5kXjKoenj0wodZSInA3yy9CArOBkD28L
- UaTKZyz1jJPOx+UppPv/BpiCdauUCIDHI6nPby7C15g+StaaGc+NJrnTio7RWJ4MfMah
- 8P8aJFP9bEcXcXFy6heTgfAU1OGlpqLFk7jg9qIAOrm5JzsPJouJaIgiXpmsCIj/O2ya
- 0HrGfpGBoduBP/UEn6759408+WBSPLBA7P6fyKb3H3LMFMM1ToupCYQdv+mGxDm+YQjX
- zuKgG0bVF5+e+scFA7G17ZkmwuukMzbsyjYSuP+SI74vZt5n1r+QZaD+hdtcJBD5nkKc
- 3qYw==
-X-Gm-Message-State: AJcUuke5DEC2Bil7bOLXmZwdrFPzUlq9v7Lgs3pZLg1ijhUYIN7V05VY
- YpnJXw422Q6FhJ4UBARpmsAlhg==
-X-Google-Smtp-Source: ALg8bN5Zd5spjX/pV23rK/hUUGJ7dFezrvWFGyZNbqRuiuoalGir3/lBABKAOBYZczT5UM8Y1QPvXw==
-X-Received: by 2002:a05:6000:1251:: with SMTP id
- j17mr36437112wrx.315.1549009041493; 
- Fri, 01 Feb 2019 00:17:21 -0800 (PST)
-Received: from localhost ([2a01:cb1d:12c:8800:1e45:34e8:9e5f:f03])
- by smtp.gmail.com with ESMTPSA id v133sm1810559wmf.19.2019.02.01.00.17.20
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 01 Feb 2019 00:17:20 -0800 (PST)
-References: <1548693481-1162-1-git-send-email-lollivier@baylibre.com>
- <1548693481-1162-2-git-send-email-lollivier@baylibre.com>
- <20190130154851.GA25794@bogus>
-User-agent: mu4e 1.0; emacs 25.3.2
-From: Loys Ollivier <lollivier@baylibre.com>
-To: Rob Herring <robh@kernel.org>
-Subject: Re: [PATCH v3 1/4] dt-bindings: Add vendor prefix for "GlobalTop
- Technology, Inc."
-In-reply-to: <20190130154851.GA25794@bogus>
-Date: Fri, 01 Feb 2019 09:17:18 +0100
-Message-ID: <86womj3ott.fsf@baylibre.com>
+ id 1gpU9p-0003Sf-W3; Fri, 01 Feb 2019 08:26:43 +0000
+X-UUID: 44f90e95f89d4d46b9f6236245e6250a-20190201
+X-UUID: 44f90e95f89d4d46b9f6236245e6250a-20190201
+Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
+ (envelope-from <weiyi.lu@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 1613893412; Fri, 01 Feb 2019 00:22:16 -0800
+Received: from mtkmbs03n2.mediatek.inc (172.21.101.182) by
+ MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Fri, 1 Feb 2019 00:22:15 -0800
+Received: from mtkcas08.mediatek.inc (172.21.101.126) by
+ mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Fri, 1 Feb 2019 16:21:59 +0800
+Received: from [172.21.77.4] (172.21.77.4) by mtkcas08.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Fri, 1 Feb 2019 16:21:59 +0800
+Message-ID: <1549009319.22634.0.camel@mtksdaap41>
+Subject: Re: [PATCH v3 01/12] clk: mediatek: fixup: Disable tuner_en before
+ change PLL rate
+From: Weiyi Lu <weiyi.lu@mediatek.com>
+To: Stephen Boyd <sboyd@kernel.org>
+Date: Fri, 1 Feb 2019 16:21:59 +0800
+In-Reply-To: <154482465853.19322.3763394015657394960@swboyd.mtv.corp.google.com>
+References: <20181210073240.32278-1-weiyi.lu@mediatek.com>
+ <20181210073240.32278-3-weiyi.lu@mediatek.com>
+ <154482465853.19322.3763394015657394960@swboyd.mtv.corp.google.com>
+X-Mailer: Evolution 3.10.4-0ubuntu2 
 MIME-Version: 1.0
+X-TM-SNTS-SMTP: 1C943B2EDB332A25667006B6380681675011916E18904E5C47EB34786F5F0E832000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_001726_082619_5F4EDA85 
-X-CRM114-Status: GOOD (  12.53  )
+X-CRM114-CacheID: sfid-20190201_002642_036350_48463EA9 
+X-CRM114-Status: GOOD (  13.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,11 +80,12 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Kevin Hilman <khilman@baylibre.com>, Loys Ollivier <lollivier@baylibre.com>,
- Johan Hovold <johan@kernel.org>, linux-kernel@vger.kernel.org,
- linux-mediatek@lists.infradead.org, linux-amlogic@lists.infradead.org,
+Cc: Rob Herring <robh@kernel.org>, Nicolas Boichat <drinkcat@chromium.org>,
+ srv_heupstream@mediatek.com, James Liao <jamesjj.liao@mediatek.com>,
+ Stephen Boyd <sboyd@codeaurora.org>, linux-kernel@vger.kernel.org,
+ stable@vger.kernel.org, Fan Chen <fan.chen@mediatek.com>,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ Owen Chen <owen.chen@mediatek.com>, linux-clk@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -112,32 +93,40 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 
-On Wed 30 Jan 2019 at 15:48, Rob Herring <robh@kernel.org> wrote:
+On Fri, 2018-12-14 at 13:57 -0800, Stephen Boyd wrote:
+> Why is "fixup" in the subject of this patch?
+> 
 
-> On Mon, 28 Jan 2019 17:37:58 +0100, Loys Ollivier wrote:
->> Add globaltop vendor definition.
->> 
->> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
->> ---
->> 
->> v3: No changes
->> 
->> v2: Alphabetical order
->> 
->>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->>  1 file changed, 1 insertion(+)
->> 
->
-> Please add Acked-by/Reviewed-by tags when posting new versions. However,
-> there's no need to repost patches *only* to add the tags. The upstream
-> maintainer will do that for acks received on the version they apply.
->
-> If a tag was not added on purpose, please state why and what changed.
+I'll fix in next version.
 
-Oops apologies. I'll remember that for future submissions.
+> Quoting Weiyi Lu (2018-12-09 23:32:29)
+> > From: Owen Chen <owen.chen@mediatek.com>
+> > 
+> > PLLs with tuner_en bit, such as APLL1, need to disable
+> > tuner_en before apply new frequency settings, or the new frequency
+> > settings (pcw) will not be applied.
+> > The tuner_en bit will be disabled during changing PLL rate
+> > and be restored after new settings applied.
+> > Another minor change is to correct the macro name of pcw change bit
+> > to CON1_PCW_CHG because PCW_CHG(BIT31) is on CON1.
+> > 
+> > Cc: <stable@vger.kernel.org>
+> > Signed-off-by: Owen Chen <owen.chen@mediatek.com>
+> 
+> So there should be some Fixes: tag here too so we know what commit is
+> being fixed?
+> 
 
--- 
--L
+I'll add in next version.
+
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
