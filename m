@@ -2,86 +2,121 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 40990C282DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 14:48:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 32EB2C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 14:49:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0C2D3218FC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 14:48:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 001CB218AC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 14:49:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WW+iKeFA";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="VclUM1Gr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C2D3218FC
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EMmU0o/N";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="MaKHUSxJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 001CB218AC
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=gSPumaI017l2mFMEJpRUZMkpsAX4aG4Bf6KbjNKNdTw=; b=WW+
-	iKeFA95o3Lc2QFUz3SK3MwGrs9goGTRs8EVxou6vgU6vzVBwnaRyaLbFBTNEmJoJj9SryZH6JeYmg
-	rZVuKGlNCl1q+zTOUZJc8RAgPkhOkipmhFBQRKGebGpRrf/wkJ9uAly/wRBoIubrdsNmK4nWi9aMX
-	KniR/lvEvrBV61QJFj/r/NgVV8LfceOKxn3uFJiPxh9ZL19WjovGxPNqBXRChOm8xg/aj2R84EmEc
-	+fJ5eEt3M6iHOnskqHAV9LTHYOkPZgSwvbnZdsYfHEFa9qCFtfFBdNm0spPT3sJKXeGgeH7L+JdZU
-	tjQ+2DQ3d54zV5DGbZbQdQSLG5cDV9w==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=rqPgf6Ie9Y6ag3pRHW7GmRakTD/mRkHaafNNnjElh30=; b=EMmU0o/Npc0goX
+	y3pk1FPmDlHDSTGY2PwHBtfNS3GXoxYbxZPRpta8rJKSOWVlbsbk3IvDt1aMS0Y4zrvC8FsKD48iB
+	2hmCK/oKpOP4gDfWO1FzvixPrP4r3/N1G1eecHJejkwm+91keBb+y1PhHkybHGdL70YK7ZnE7Shrl
+	nS4TeyaCPeNyyI+NnLYUuwQUdDXeZeEMc+rZKcqH+Ve8Snteqvykb0OlPkrTAPigLwimP5orUJoFY
+	pVLV9OK/NWz/kDxXhsi7pskE7XHLiA2EGtbn1HZY5MPRmaegJxdyWKrU8feSrwCwVzQakBG1+aJRv
+	pqhFNhcQyFrsdv59aI7w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpa7a-0001Jo-Rl; Fri, 01 Feb 2019 14:48:46 +0000
-Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
+	id 1gpa8Z-0001kZ-5p; Fri, 01 Feb 2019 14:49:47 +0000
+Received: from esa6.microchip.iphmx.com ([216.71.154.253])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpa7Y-0001JU-5Y
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 14:48:45 +0000
-Received: by mail-pl1-x642.google.com with SMTP id e5so3321826plb.5
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 06:48:42 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id;
- bh=BQS7eYX9HGve9LVug8wOO94RnbbcOyjLdKnO/lDDp2I=;
- b=VclUM1Gr6vplH2lc6Ex2uMcst7OpLUwzYdrhBjSpiDgIZg76ZHVjpKJ4U4SExjF3QV
- Od3ncVcWLzN8HgUVQB3KUYeup4HFmP2iE1LT+/OtaQTbCvbGUwggPiD6Pm/POl+Qa6BJ
- Md0Xm3LYjrStc9gxfllVcDGzfzcB78fp+FLJTEFRLG/J+Vi+TlYL2STO78l/1+ysLbe9
- gHtU5rJNNQMbJbNDj9yPz7VuQ6bZrSfnwP1kjrFJlgoKfVOTkOp5Qj/mst+wK1BwGFRm
- 5YHV9KRzExaWbwjLj7uIzqTVFmXCxOB44fYAqN5swmaQaifUYQagLR1fr/V7merQuAco
- YdpQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=BQS7eYX9HGve9LVug8wOO94RnbbcOyjLdKnO/lDDp2I=;
- b=K2Fo+BevCNW6W3hMD2F2OLqW4UtdFWk9qHqvYROvEdoLz1MoCXIuEuIyxGAwGNwbv1
- mkZ0U0QJBg3IiQEv54Q0P2EzXwCPmdk1+TwTfK5wUyQSjvEWEC3t7kvxo5sODAGFS5Z7
- H2EzzJYt81CVBJ6ChISW3LAnTn/01AmTWaHT1y5KkTlmboCIy6BCif99Jd62oopf84ma
- BXyuHpNVhfElOuQPfPoJ5Y+JhpidrWJPWn28hMSQ+tnMghIbKb2TXZvHExQRejL7eMTl
- 8sFw178IoczkN6QCmrZI+d0BWyZcBcRxi5R6JozQBDG0gUSsrngjizpi+0/63dH0ipvX
- cbWg==
-X-Gm-Message-State: AJcUukdFJs+ZUXzbnJTKHPTzKH2hesZCarhM5nF5pO7b+wJv9EKxR0fD
- yj+qnV301cD5JT5ziwowCSg=
-X-Google-Smtp-Source: ALg8bN5eyyO1GjD67omoBBXbC4wUV9Hny7kZddb4cDJA6juGAKguzsu8tLq3FRvPinM9K65VT/+xzg==
-X-Received: by 2002:a17:902:8641:: with SMTP id
- y1mr39725750plt.159.1549032522270; 
- Fri, 01 Feb 2019 06:48:42 -0800 (PST)
-Received: from localhost.corp.microsoft.com ([167.220.255.67])
- by smtp.googlemail.com with ESMTPSA id n74sm2309674pfi.163.2019.02.01.06.48.33
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 01 Feb 2019 06:48:41 -0800 (PST)
-From: lantianyu1986@gmail.com
-X-Google-Original-From: Tianyu.Lan@microsoft.com
-To: 
-Subject: [PATCH V2 00/10] X86/KVM/Hyper-V: Add HV ept tlb range list flush
- support in KVM 
-Date: Fri,  1 Feb 2019 22:48:12 +0800
-Message-Id: <20190201144821.50409-1-Tianyu.Lan@microsoft.com>
-X-Mailer: git-send-email 2.14.4
+ id 1gpa8M-0001ad-TO; Fri, 01 Feb 2019 14:49:36 +0000
+X-IronPort-AV: E=Sophos;i="5.56,549,1539673200"; d="scan'208";a="23304111"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa6.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 01 Feb 2019 07:49:31 -0700
+Received: from NAM02-BL2-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.49) with Microsoft SMTP Server (TLS) id
+ 14.3.352.0; Fri, 1 Feb 2019 07:49:31 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=lGyvDOjuUGYx8sP6qUZPFxnHD/04D/tDI5VRzkafaRo=;
+ b=MaKHUSxJ8nEYrOr2Gs0YevQzKclUdSGWAJZ2vEkDuyGUzdfNqMnL1PhvKzPJOeEjfFJ9p5fwyoPywHsJoQYaYDk4/G3e126XXvSYNaxSxt6D6b02qNekIYnIAwrVRvVlI8lmgUY0HGUo3LDkX9hYIVXBXC4ChgYSbxyx5Ji/zrw=
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.98.146) by
+ BN6PR11MB1635.namprd11.prod.outlook.com (10.172.22.138) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1558.23; Fri, 1 Feb 2019 14:49:28 +0000
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::847:4296:13b9:fc9f]) by BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::847:4296:13b9:fc9f%8]) with mapi id 15.20.1580.017; Fri, 1 Feb 2019
+ 14:49:28 +0000
+From: <Tudor.Ambarus@microchip.com>
+To: <bbrezillon@kernel.org>
+Subject: Re: [PATCH v2 10/10] spi: atmel-quadspi: add support for sam9x60 qspi
+ controller
+Thread-Topic: [PATCH v2 10/10] spi: atmel-quadspi: add support for sam9x60
+ qspi controller
+Thread-Index: AQHUuYA85AgiqORGIUCz49OB4RqXzKXJkgKAgAD0mICAAA3/gIAAcwQA
+Date: Fri, 1 Feb 2019 14:49:27 +0000
+Message-ID: <8b935a95-0aaa-3430-e2c2-f5793fd9cf11@microchip.com>
+References: <20190131161515.21605-1-tudor.ambarus@microchip.com>
+ <20190131161515.21605-11-tudor.ambarus@microchip.com>
+ <20190131173207.56481a42@bbrezillon>
+ <947f148d-3fd8-4e7d-4301-9d67715fbf7d@microchip.com>
+ <20190201085739.775add3f@bbrezillon>
+In-Reply-To: <20190201085739.775add3f@bbrezillon>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR08CA0124.eurprd08.prod.outlook.com
+ (2603:10a6:800:d4::26) To BN6PR11MB1842.namprd11.prod.outlook.com
+ (2603:10b6:404:101::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Tudor.Ambarus@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BN6PR11MB1635;
+ 6:D5JYhjSQvNWgExdAiocQtBCKDe0oL+zliZIaXGteza9KMmzZwADgJd96yhQv2qS8K+22TRp9d9ynTagFbHpiMF0fp8xNcSLQuK7BA9wjfC+u1C27n2aY4+ig7CZ2QNIj8J0iF51pAN9DkGU+zZ/WJeko1lTxtvVu/GJLk+nE/K5I+BDdIIqc8K/f50F5sqqPLJNB7e3Cn85DJcp4sDJs+Uet5oGNihzw4cDaY5bn6+KuVRHuXvAerj7legftl+SUniwhWgGkAQG09ieqTGAmB0pkS+AefyxlxGvwEjR/jr4IqYokDv3Ex1nvdmsj/6Y9b+fQHZ31cf+AtbWD8d2E3oG6h+aveTLRmznnBHKE/MzTAoUz8omtEL6mj0RRPgiCGeySAljqgzIZ9mbdlpC6Wa6C9O6Jt/tg4oeDH8csyDzOV2KzUKTE5ZdmdwW5catT1CTEUDUu4FoAUqAxxog61g==;
+ 5:Lnj8K1eGdLBUDtoPpg1S/wRAzrmJ8UHLeTYzwmbPBAhCwqvWuY2qOR3pvz1yDgDpI5jp9VQtYan1eDoe3buZHod9rhX5YhdhRkr0ksGvn4QiMEvNaO1xNIKwT1vyT/yKEl3hWnl28nGRBKCCJ4z6VclRUS5u35OUe6mPg5ysVc/lWJBxJPDt3WSnFKxfyhLW9vtxqulciE8ZBnau+9gbOQ==;
+ 7:h+UgHB7Q9VgBr6vHt7ZcT0Q0GlfYxWxBhR47RfTw1EaIyNkf0XJTspFYYaemNh1jYhenEAJZkVZ7Ssj1N+PG3hVVk4vKjJygJVfo0z7ferjP/sR3065AjhGdWkMHSryLOk1SwzkeBdu23nNsHwVhrA==
+x-ms-office365-filtering-correlation-id: 390e6d20-d65a-4e55-fce2-08d6885476f2
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:BN6PR11MB1635; 
+x-ms-traffictypediagnostic: BN6PR11MB1635:
+x-microsoft-antispam-prvs: <BN6PR11MB16357957C2F366FD4A2D2D60F0920@BN6PR11MB1635.namprd11.prod.outlook.com>
+x-forefront-prvs: 09352FD734
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(366004)(136003)(396003)(39860400002)(346002)(189003)(199004)(446003)(31696002)(186003)(2616005)(476003)(99286004)(486006)(68736007)(229853002)(26005)(2906002)(7736002)(11346002)(66066001)(3846002)(6116002)(305945005)(106356001)(93886005)(8936002)(81156014)(81166006)(14454004)(86362001)(4744005)(8676002)(6436002)(4326008)(31686004)(6916009)(6246003)(71200400001)(54906003)(76176011)(25786009)(102836004)(478600001)(71190400001)(105586002)(52116002)(6486002)(72206003)(53936002)(97736004)(7416002)(6506007)(386003)(53546011)(36756003)(6512007)(316002)(256004);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1635;
+ H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: /l+12Kpr8u7N1YUudJBufhpoJk9jwM6Pj/mt/B0JA6Lh+qYUCj/lWhFqFYP9Qka/87rpWZt2ZsSBW7yRSBzqk0A3wOSzFnfOmrkTkTBsMNmEWBxPafMSbnBoYwSA9omTHDRtyfxgRp22EBQg03Sc3I9E9oslDSxlhM03KMcyEoCSLWfDrahS4Ps4lRT/iqFaXSuEKTaqn9hFyqFoVDn0F6+8cBAyRAG6py/C+NNCYYtedn+wtZE/71VlXxmTpwhh+GMYNniYmQ6xtNDGpDJvY0gNqCjW69PQSxgNv8/7jpBFIa8gtW3FMcf0P5OG1+gdhJJNb21EdmXg8dkYNlEQvOzWNRXUj0ZkaGYRx7n99rmPY7yO1LYOMSZsidlMfYbmun4TYgruwZx8q+FMnVOcfek/koaDyPTwNG2muFWldMc=
+Content-ID: <CDEBE13018FC9646BCC995CB63ADBC6C@namprd11.prod.outlook.com>
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 390e6d20-d65a-4e55-fce2-08d6885476f2
+X-MS-Exchange-CrossTenant-originalarrivaltime: 01 Feb 2019 14:49:23.8670 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1635
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_064844_228443_AA75F458 
-X-CRM114-Status: GOOD (  10.09  )
+X-CRM114-CacheID: sfid-20190201_064934_981817_8243AA73 
+X-CRM114-Status: GOOD (  10.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,77 +128,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvm@vger.kernel.org, rkrcmar@redhat.com, benh@kernel.crashing.org,
- will.deacon@arm.com, christoffer.dall@arm.com, paulus@ozlabs.org,
- hpa@zytor.com, kys@microsoft.com, kvmarm@lists.cs.columbia.edu,
- sashal@kernel.org, sthemmin@microsoft.com, mpe@ellerman.id.au, x86@kernel.org,
- linux@armlinux.org.uk, michael.h.kelley@microsoft.com, mingo@redhat.com,
- catalin.marinas@arm.com, jhogan@kernel.org, linux-mips@vger.kernel.org,
- Lan Tianyu <Tianyu.Lan@microsoft.com>, marc.zyngier@arm.com,
- haiyangz@microsoft.com, kvm-ppc@vger.kernel.org, bp@alien8.de,
- pbonzini@redhat.com, tglx@linutronix.de, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org, ralf@linux-mips.org, paul.burton@mips.com,
- devel@linuxdriverproject.org, vkuznets@redhat.com,
- linuxppc-dev@lists.ozlabs.org
-MIME-Version: 1.0
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ alexandre.belloni@bootlin.com, broonie@kernel.org,
+ linux-kernel@vger.kernel.org, linux-spi@vger.kernel.org,
+ Ludovic.Desroches@microchip.com, robh+dt@kernel.org,
+ linux-mtd@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Lan Tianyu <Tianyu.Lan@microsoft.com>
-
-This patchset is to introduce hv ept tlb range list flush function
-support in the KVM MMU component. Flushing ept tlbs of several address
-range can be done via single hypercall and new list flush function is
-used in the kvm_mmu_commit_zap_page() and FNAME(sync_page). This patchset
-also adds more hv ept tlb range flush support in more KVM MMU function.
-
-Change since v1:
-       1) Make flush list as a hlist instead of list in order to 
-       keep struct kvm_mmu_page size.
-       2) Add last_level flag in the struct kvm_mmu_page instead
-       of spte pointer
-       3) Move tlb flush from kvm_mmu_notifier_clear_flush_young() to kvm_age_hva()
-       4) Use range flush in the kvm_vm_ioctl_get/clear_dirty_log()
-
-Lan Tianyu (10):
-  X86/Hyper-V: Add parameter offset for
-    hyperv_fill_flush_guest_mapping_list()
-  KVM/VMX: Fill range list in kvm_fill_hv_flush_list_func()
-  KVM/MMU: Add last_level in the struct mmu_spte_page
-  KVM/MMU: Introduce tlb flush with range list
-  KVM/MMU: Flush tlb with range list in sync_page()
-  KVM/MMU: Flush tlb directly in the kvm_mmu_slot_gfn_write_protect()
-  KVM: Add kvm_get_memslot() to get memslot via slot id
-  KVM: Use tlb range flush in the kvm_vm_ioctl_get/clear_dirty_log()
-  KVM: Add flush parameter for kvm_age_hva()
-  KVM/MMU: Use tlb range flush  in the kvm_age_hva()
-
- arch/arm/include/asm/kvm_host.h     |  3 ++-
- arch/arm64/include/asm/kvm_host.h   |  3 ++-
- arch/mips/include/asm/kvm_host.h    |  3 ++-
- arch/mips/kvm/mmu.c                 | 11 ++++++--
- arch/powerpc/include/asm/kvm_host.h |  3 ++-
- arch/powerpc/kvm/book3s.c           | 10 ++++++--
- arch/powerpc/kvm/e500_mmu_host.c    |  3 ++-
- arch/x86/hyperv/nested.c            |  4 +--
- arch/x86/include/asm/kvm_host.h     | 11 +++++++-
- arch/x86/include/asm/mshyperv.h     |  2 +-
- arch/x86/kvm/mmu.c                  | 51 +++++++++++++++++++++++++++++--------
- arch/x86/kvm/mmu.h                  |  7 +++++
- arch/x86/kvm/paging_tmpl.h          | 15 ++++++++---
- arch/x86/kvm/vmx/vmx.c              | 18 +++++++++++--
- arch/x86/kvm/x86.c                  | 16 +++++++++---
- include/linux/kvm_host.h            |  1 +
- virt/kvm/arm/mmu.c                  | 13 ++++++++--
- virt/kvm/kvm_main.c                 | 51 +++++++++++++++----------------------
- 18 files changed, 160 insertions(+), 65 deletions(-)
-
--- 
-2.14.4
 
 
+On 02/01/2019 09:57 AM, Boris Brezillon wrote:
+> On Fri, 1 Feb 2019 07:07:40 +0000
+> <Tudor.Ambarus@microchip.com> wrote:
+> 
+>>>   
+>>>>  #define QSPI_IFR_TFRTYP_MASK            GENMASK(13, 12)
+>>>>  #define QSPI_IFR_TFRTYP_TRSFR_READ      (0 << 12)
+>>>>  #define QSPI_IFR_TFRTYP_TRSFR_READ_MEM  (1 << 12)  
+>>>
+>>> Looks like the read/write flag is on bit 13. Can we just add  
+>>
+>> for sama5d2 only
+> 
+> Feel free to prefix macros with the SoC name to make it clear:
+> 
+> #define QSPI_IFR_SAMA5D2_WRITE_TRSFR		BIT(13)
+
+agreed
+
+> 
+
+cut
+
+>>>> +#define QSPI_IFR_APBTFRTYP_READ		BIT(24)
+> 
+> And this one would be
+> 
+> define QSPI_IFR_SAM9X60_READ_TRSFR		BIT(24)
+
+I prefer letting this bit named as in the datasheet, QSPI_IFR_APBTFRTYP_READ,
+and change it if future versions of the IP will modify its sense. It is a READ
+transfer done on APB, it is more generic this way. If you have a strong opinion
+on this, please let me know.
+
+ta
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
