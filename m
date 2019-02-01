@@ -2,89 +2,64 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 72816C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 18:16:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D341EC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 18:43:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 33C8221726
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 18:16:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A84AF218AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 18:43:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RydDyoCU";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="FlVKo4WP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 33C8221726
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p2ltGATs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A84AF218AF
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=p1J1RU+O9fBZ20oXiMWIVkZiWOvbsIwTxYk7mubVTiU=; b=RydDyoCUn8Y/lR
-	H0Nz0Ee5TCeUFggNt8trcVMLBtIRJtyZ6hzw04X3MqYZ/qmyE+1sC3vdjuRWmjwjrF7WAJO2TKWsQ
-	7/Xs6W1YRxYwSmEMnJA1mHjmOlJ62EGm3SBM3mEcMp7+c/ZF1Frs0hXzKwZf5Pwz8t0LB27NqMtSA
-	fq4F7O0q8dfyal/YzdgXXV6u7qdlFsvDd/l+AXn13UAenWVWqPXoA5tQvtti1NrQ6h7u8gSBtOCsX
-	ejdS4pHvURBQX1xZRRrx+lDRbHwOEh6AD45XEs34DeFn66KPRiJvR2KitEoZtBUnBuJZ6lGX9LKsJ
-	o89sHXrwUcWkxlJwBqCw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=bMCtUys1PD13+iSHg4IPo3gw7ixlCk1VFJ62UVOXByg=; b=p2ltGATsPUEgRh4eNjuBppwAU
+	xsw1E43nrglzPGP2E5h1LaDbBCzO5PT1AIl8kbRGc6jbh8LGfGgHDObw9LChYRMY1+qrMUMU2mmRp
+	8z5qfSS5a4Jrf+HUpEWN4pwZOmXRefXTDKoF0+RIlgt21zFl3r82F9bakpKMge2DwXaZ1oTtsagLM
+	h3UzhXvZ/UxN6Xmn60ixr+R/p3BfAicZ/UC1kf88qdO7EC0dDyvwG4ISVEsvXiiCHum9ZW67qj8El
+	kW1V2PsRQ/hbfIs4x1Ez32soxE0hr/2OzvzINLrW+dzOpUS/HmvRkmm26MZNEcWXrLAYJnWGulmmD
+	91AkitYvQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpdMd-0006XY-06; Fri, 01 Feb 2019 18:16:31 +0000
-Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpdMZ-0006X5-Aq
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 18:16:28 +0000
-Received: by mail-pl1-x641.google.com with SMTP id u6so3594136plm.8
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 10:16:26 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=92MOdog3g1rrw+f0J4sSvR6V++80ocs0no7dR7ocrno=;
- b=FlVKo4WP1AXLtLNweC08tJa5XVhzLfJgqqPfED848lSKiTYbhecepqtwhP87iyY8Zt
- 6we/5ajnxrzWcT2zPEz1/+m8ngA+204ozijvxDZDtmP4vTJfz6jqeEcTubQmbGQdzYMh
- 2qRjfHDEvux4nUnatffG6ZWyZo/cBI4EoCbbw=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=92MOdog3g1rrw+f0J4sSvR6V++80ocs0no7dR7ocrno=;
- b=k6hLQrlnUdFw1IrpigFE0alSPjrfWhCwR8n32PSd4GQCEZRGkkE5LVUQZOTIrBhpiO
- GLpdh6An2npqkU6Zvw7LhWPUrAAYLvQS/mzKXtCES4GVbNpmbUcn2k8aBCZXCQm6aFbs
- brwk/k3a2LDtE5FOhUw1PXFwmiFo3sPlD9zNlYXG4cGvo5yfJBa/ukpWsYQBPi94Adxz
- NtveCFvxawOk3TeMSQQyXfr3FX14Snee9woS5Q1VovPzGDIerIyeypt+PNC8VykBCNWD
- 9nis83K5hcV+BxCZ6S4jLsSV82KP7lNHVJ8eIYNK1skCBeQyzSBS0CkC0AqleQ2R0dfl
- tfeg==
-X-Gm-Message-State: AJcUukddNP05+QsJRrX5YYwaR9LmJFSywHcrkyZi8YedG+LmdR5MhuGZ
- jxCwC3GSBT9ebHZ5o2hJDE2h2A==
-X-Google-Smtp-Source: ALg8bN4IDqSqlDP2zwoW0jr1vLZp93tJbSIl54f5/UrjpRB7BHhRFbG+L5T2RBbRyAsVRjzDiZZJVg==
-X-Received: by 2002:a17:902:20c6:: with SMTP id
- v6mr40982572plg.156.1549044985773; 
- Fri, 01 Feb 2019 10:16:25 -0800 (PST)
-Received: from localhost ([2620:15c:202:1:75a:3f6e:21d:9374])
- by smtp.gmail.com with ESMTPSA id v190sm11060784pfv.26.2019.02.01.10.16.24
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 01 Feb 2019 10:16:24 -0800 (PST)
-Date: Fri, 1 Feb 2019 10:16:24 -0800
-From: Matthias Kaehlcke <mka@chromium.org>
-To: Quentin Perret <quentin.perret@arm.com>
-Subject: Re: [PATCH v3 1/5] PM / OPP: Introduce a power estimation helper
-Message-ID: <20190201181624.GQ81583@google.com>
-References: <20190201093101.31869-1-quentin.perret@arm.com>
- <20190201093101.31869-2-quentin.perret@arm.com>
- <20190201120453.GC10042@e107155-lin>
- <20190201120951.lqxy4u7kxfzfmmub@queper01-lin>
+	id 1gpdmB-0005tp-MO; Fri, 01 Feb 2019 18:42:55 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gpdm7-0005t9-Kz
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 18:42:53 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3109480D;
+ Fri,  1 Feb 2019 10:42:49 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1E8B83F589;
+ Fri,  1 Feb 2019 10:42:47 -0800 (PST)
+Subject: Re: Could you please help to have a look a bug trace in pmu arm-cci.c
+To: Will Deacon <will.deacon@arm.com>
+References: <529F9A9100AE8045A7A5B5A00A39FBB862099B8E@ALA-MBD.corp.ad.wrs.com>
+ <20190130182128.GM18558@fuggles.cambridge.arm.com>
+ <e28ec0ff-aaab-da22-44c3-19b5eaba0f32@arm.com>
+ <20190201180112.GA14755@fuggles.cambridge.arm.com>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <1d06152a-44ee-a786-41b9-25085a6643de@arm.com>
+Date: Fri, 1 Feb 2019 18:42:46 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190201120951.lqxy4u7kxfzfmmub@queper01-lin>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20190201180112.GA14755@fuggles.cambridge.arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_101627_426851_9386296F 
-X-CRM114-Status: GOOD (  20.62  )
+X-CRM114-CacheID: sfid-20190201_104251_698953_F030F163 
+X-CRM114-Status: GOOD (  22.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,62 +71,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: nm@ti.com, linux-pm@vger.kernel.org, sboyd@kernel.org,
- viresh.kumar@linaro.org, rjw@rjwysocki.net, linux-kernel@vger.kernel.org,
- Sudeep Holla <sudeep.holla@arm.com>, dietmar.eggemann@arm.com,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>, "Li,
+ Meng" <Meng.Li@windriver.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ suzuki.poulose@arm.com
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 01, 2019 at 12:09:53PM +0000, Quentin Perret wrote:
-> Hi Sudeep,
+On 01/02/2019 18:01, Will Deacon wrote:
+> On Wed, Jan 30, 2019 at 07:09:42PM +0000, Robin Murphy wrote:
+>> On 2019-01-30 6:21 pm, Will Deacon wrote:
+>>> [+Suzuki and Robin]
+>>>
+>>> On Mon, Jan 28, 2019 at 07:19:20AM +0000, Li, Meng wrote:
+>>>> When enable kernel configure CONFIG_DEBUG_ATOMIC_SLEEP, there is below trace
+>>>> during pmu arm cci driver probe phase.
+>>>>
+>>>> [ 1.983337] BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:2004
+>>>> [ 1.983340] in_atomic(): 1, irqs_disabled(): 0, pid: 1, name: swapper/0
+>>>> [ 1.983342] Preemption disabled at:
+>>>> [ 1.983353] [<ffffff80089801f4>] cci_pmu_probe+0x1dc/0x488
+>>>> [ 1.983360] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.18.20-rt8-yocto-preempt-rt #1
+>>>> [ 1.983362] Hardware name: ZynqMP ZCU102 Rev1.0 (DT)
+>>>> [ 1.983364] Call trace:
+>>>> [ 1.983369] dump_backtrace+0x0/0x158
+>>>> [ 1.983372] show_stack+0x24/0x30
+>>>> [ 1.983378] dump_stack+0x80/0xa4
+>>>> [ 1.983383] ___might_sleep+0x138/0x160
+>>>> [ 1.983386] __might_sleep+0x58/0x90
+>>>> [ 1.983391] __rt_mutex_lock_state+0x30/0xc0
+>>>> [ 1.983395] _mutex_lock+0x24/0x30
+>>>> [ 1.983400] perf_pmu_register+0x2c/0x388
+>>>> [ 1.983404] cci_pmu_probe+0x2bc/0x488
+>>>> [ 1.983409] platform_drv_probe+0x58/0xa8
+>>>>
+>>>> Because get_cpu() is invoked, preempt is disable, finally, trace occurs when
+>>>> call might_sleep()
+>>>
+>>> Hmm, the {get,put}_cpu() usage here looks very broken to me. There's the
+>>> fact that it might sleep, but also the assignment to g_cci_pmu is done after
+>>> we've re-enabled preemption, so there's a race with CPU hotplug there too.
+>>
+>> Hmm, looks like I failed to appreciate that particular race at the time -
+>> indeed the global should probably be assigned immediately after
+>> cci_pmu_init() has succeeded.
+>>
+>>> I don't think we can simply register the hotplug notifier before registering
+>>> the PMU, because we can't call into perf_pmu_migrate_context() until the PMU
+>>> has been registered. Perhaps we need to use the _cpuslocked() versions of
+>>> the hotplug notifier registration functions.
+>>>
+>>> I tried looking at some other drivers, but they all look broken to me, so
+>>> there's a good chance I'm missing something. Anybody know how this is
+>>> supposed to work?
+>>
+>> As I understand the general pattern, we register the notifier last to avoid
+>> taking a hotplug callback with a partly-initialised PMU state, however since
+>> the CPU we've picked is part of that PMU state, we also want to avoid
+>> getting migrated off that CPU before the notifier is in place lest things
+>> get out of sync, hence disabling preemption. As far as the correctness of
+>> implementing that logic, though, it was like that when I got here so I've
+>> always just assumed it was fine :)
+>>
+>> I guess the question is whether we actually need to pick our nominal CPU
+>> before perf_pmu_register(), or if something like the below would suffice -
+>> what do you reckon?
+>>
+>> Robin.
+>>
+>> ----->8-----
+>> diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
+>> index 1bfeb160c5b1..da9309ff80d7 100644
+>> --- a/drivers/perf/arm-cci.c
+>> +++ b/drivers/perf/arm-cci.c
+>> @@ -1692,19 +1692,18 @@ static int cci_pmu_probe(struct platform_device
+>> *pdev)
+>>          raw_spin_lock_init(&cci_pmu->hw_events.pmu_lock);
+>>          mutex_init(&cci_pmu->reserve_mutex);
+>>          atomic_set(&cci_pmu->active_events, 0);
+>> -       cci_pmu->cpu = get_cpu();
+>> +       cci_pmu->cpu = -1; /* Avoid races until hotplug notifier is alive */
+>>
+>>          ret = cci_pmu_init(cci_pmu, pdev);
 > 
-> On Friday 01 Feb 2019 at 12:04:53 (+0000), Sudeep Holla wrote:
-> > On Fri, Feb 01, 2019 at 09:30:57AM +0000, Quentin Perret wrote:
-> > > +void dev_pm_opp_of_register_em(struct cpumask *cpus, int nr_opp)
-> > > +{
-> > > +	struct em_data_callback em_cb = EM_DATA_CB(_get_cpu_power);
-> > > +	int ret, cpu = cpumask_first(cpus);
-> > > +	struct device *cpu_dev;
-> > > +	struct device_node *np;
-> > > +	u32 cap;
-> > > +
-> > > +	cpu_dev = get_cpu_device(cpu);
-> > > +	if (!cpu_dev)
-> > > +		return;
-> > > +
-> > > +	np = of_node_get(cpu_dev->of_node);
-> > > +	if (!np)
-> > > +		return;
-> > > +
-> > 
-> > Does it make sense to add the check for OPP count here. You need not pass
-> > that as parameter. Just makes one less thing to check in new drivers adding
-> > this support. Thoughts ?
+> So at this point we've registered the PMU with perf, so I think we're open
+> to userspace. Given that things like pmu_cpumask_attr_show() call
+> cpumask_of(cci_pmu->cpu), having a cpu of -1 seems like a bad idea.
 > 
-> Yeah Matthias had the same suggestion. I don't mind moving it here TBH.
-> It's just that some users already do the opp count before calling this
-> function, so I figured I could as well use that data instead of counting
-> again.
-> 
-> But yeah, that's one less thing to worry about on the driver side so
-> I'll move the OPP count in there for v4 and we'll see if people ask me
-> to move it out to optimize things ;-)
+> Why not just use the _cpuslocked() notifier registration functions so that
+> we don't need to disable preemption?
 
-From an API perspective it would be nice to get rid of the nr_opp
-parameter, it seems somewhat arbitrary. Moving dev_pm_opp_get_opp_count()
-from the drivers into dev_pm_opp_of_register_em() (instead of calling
-it twice) also sounds good in general, as long as the error handling
-doesn't become too messy. In the current version
-dev_pm_opp_of_register_em() doesn't return a value, with the change it
-would have to return one to catch an empty OPP table, and it needs
-to be distinguished from other cases where the EM registration fails
-but the cpufreq driver is still functional (e.g. no
-'dynamic-power-coefficient'). Maybe return -ENOTSUPP in those cases?
+Because that alone doesn't necessarily help, but what I failed to grasp 
+is the implication that in order to do it you need to manually take the 
+hotplug lock, and if you do *that* in the right places, it removes the 
+race condition altogether. Now that I've made sense of it, I think 
+that's actually the only valid way to solve the problem. Let me spin a 
+proper patch...
 
-Well, let's see how it looks like :)
+Robin.
 
 _______________________________________________
 linux-arm-kernel mailing list
