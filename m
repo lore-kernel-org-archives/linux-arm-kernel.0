@@ -2,72 +2,87 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1AEDDC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 02:48:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6FF6CC282DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 02:49:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D8EFC20863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 02:48:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4153121872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 02:49:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OqEuE8hq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D8EFC20863
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aFtzqf2M";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="E4aHoFW9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4153121872
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=D1XmubFdM44CjjXWGuAFJxjW2431iMnDUec6Pmo9O/M=; b=OqEuE8hqYx4100
-	TKTaQOd6VdzRmV0qBVSNuE2M3IiFy3Ng3YCT9EJBQVdiYdIg9j1nuMbGJOakKcvKAEQ0UfJfoho07
-	vvkBkb1VcT5eYErFu7oLYiLaRQF8+ae7td4HVPmA9L9S1pwmZxmlkfBoj09yQ/3R/4KALWzxONu1i
-	/xTnDEIDuQQA2RpQqEdh8CzNpgYmX+cXII60PTORiDbb7cW+GxnYpPmVtJ7qqdKwc8TAsGkz7IpfJ
-	yNio7qaXRTOQfZaf3x1BGUBHksxs2mxNg51UJmorHyN1sI5DXCO4wRmVuMc+mgrlykVBTUehy96OS
-	S2PeuCr8XBbYlPc1PftA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=Q9qtcIsPwmv18DSIp9mML/Yr0VAcDj9cG/0Z3B0iNrA=; b=aFtzqf2MJt8mDAJwWS+gVLAOR
+	T3OVxoZxxwzH5WdYjecH7c/UAyDBZwfqQEE9R1dLHwu3obDeiK70748CiEO6QdZcpp34RPKvCkDGD
+	qmDlaApzJ7ld7hidPfcErZB1fhXMFNbTGIVSQus643s8BDGFjFW1IINX4C4GHcs4NWeKnRRaedh97
+	JdFy5sHw7BNSB+j/yMc7VtjmjEuMwk7MSJguZZ0E3NM6g6EnsohHEMxBdW3k6ZFfwMVwHVpIEi2Gu
+	ySu7hYgo5BKPIkmaKxzqWCttzki7QVU+RqdHvlC/0n0IPSdI54PqpbnjFPjHJnqBGs7Y2y02CrIbB
+	cKELiRhog==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpOs8-0001xZ-JC; Fri, 01 Feb 2019 02:48:04 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gpOtn-0002Fe-E6; Fri, 01 Feb 2019 02:49:47 +0000
+Received: from hqemgate14.nvidia.com ([216.228.121.143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpOs4-0001wa-7S; Fri, 01 Feb 2019 02:48:02 +0000
-X-UUID: 5effbbbd3a304995bb22f0623d896cbb-20190131
-X-UUID: 5effbbbd3a304995bb22f0623d896cbb-20190131
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
- (envelope-from <honghui.zhang@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1218113656; Thu, 31 Jan 2019 18:47:51 -0800
-Received: from MTKMBS31DR.mediatek.inc (172.27.6.102) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 31 Jan 2019 18:47:49 -0800
-Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31DR.mediatek.inc
- (172.27.6.102) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Fri, 1 Feb 2019 10:47:46 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 1 Feb 2019 10:47:46 +0800
-Message-ID: <1548989266.4980.39.camel@mhfsdcap03>
-Subject: Re: [PATCH v2 1/2] PCI: mediatek: Use resource_size function on
- resource object
-From: Honghui Zhang <honghui.zhang@mediatek.com>
-To: Bjorn Helgaas <helgaas@kernel.org>
-Date: Fri, 1 Feb 2019 10:47:46 +0800
-In-Reply-To: <20190131213647.GP229773@google.com>
-References: <1548921713-5355-1-git-send-email-honghui.zhang@mediatek.com>
- <1548921713-5355-2-git-send-email-honghui.zhang@mediatek.com>
- <20190131213647.GP229773@google.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gpOti-0002FJ-Uu
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 02:49:44 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c53b3c80001>; Thu, 31 Jan 2019 18:49:44 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Thu, 31 Jan 2019 18:49:42 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Thu, 31 Jan 2019 18:49:42 -0800
+Received: from [10.19.108.132] (10.124.1.5) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 1 Feb
+ 2019 02:49:40 +0000
+Subject: Re: [PATCH V4 00/20] Tegra210 DFLL support
+To: Thierry Reding <thierry.reding@gmail.com>, "Rafael J. Wysocki"
+ <rjw@rjwysocki.net>, Michael Turquette <mturquette@baylibre.com>, Stephen
+ Boyd <sboyd@kernel.org>
+References: <20190104030702.8684-1-josephl@nvidia.com>
+ <20190125134617.GE22565@ulmo>
+ <0a7abeee-1b78-4f90-e94f-43c19eddb9b1@nvidia.com>
+ <20190128075442.GA18124@ulmo>
+From: Joseph Lo <josephl@nvidia.com>
+Message-ID: <a2cf3ccd-658a-e004-1e66-d4f9cf1026f1@nvidia.com>
+Date: Fri, 1 Feb 2019 10:49:38 +0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-MTK: N
+In-Reply-To: <20190128075442.GA18124@ulmo>
+X-Originating-IP: [10.124.1.5]
+X-ClientProxiedBy: HQMAIL108.nvidia.com (172.18.146.13) To
+ HQMAIL101.nvidia.com (172.20.187.10)
+Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1548989385; bh=/FBDcfoeMx/+oM04WRXhXoapZLNfebKUcVEPlQV7+gU=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=E4aHoFW9rShupo4AeqJ3XIaDQKtgvhIEFR1ddGp9CDOG4BmW6rnYNlUz0kJx7Eg44
+ 2lb3uInpk5PuAgztJbPDLt144B+oTXE3Zt3dNv6DGnAYYNGGLszJJnlm3RAwiNiRyo
+ DfYxIGEyFpa3yTjwN/mvxJC0MLnPnDKcaMdUOfXYNfj3clgM3ZdmhkyIGItSoH5Evo
+ VrjfJt5sGlge+7Bx/ZrkQPsCsp2cEj1kp+zsfmbjN8bfrYscALO03C0PDtYoW8MXB7
+ MXFG7Ck1y7PJnW5qNs7Byx+Omd71+6Le2j6S5J1paetK0qQ1bPbQ2WQyAP5Qr1i6ib
+ gRh4ooRnyrHiw==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190131_184800_278011_B4D86120 
-X-CRM114-Status: GOOD (  25.65  )
+X-CRM114-CacheID: sfid-20190131_184943_002476_F7B51DD3 
+X-CRM114-Status: GOOD (  23.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,129 +94,88 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, lorenzo.pieralisi@arm.com, poza@codeaurora.org,
- fred@fredlawl.com, linux-pci@vger.kernel.org, rafael.j.wysocki@intel.com,
- linux-kernel@vger.kernel.org, jianjun.wang@mediatek.com,
- ryder.lee@mediatek.com, linux-mediatek@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: linux-pm@vger.kernel.org, Peter De Schrijver <pdeschrijver@nvidia.com>,
+ Jonathan Hunter <jonathanh@nvidia.com>, linux-tegra@vger.kernel.org,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 2019-01-31 at 15:36 -0600, Bjorn Helgaas wrote:
-> On Thu, Jan 31, 2019 at 04:01:52PM +0800, honghui.zhang@mediatek.com wrote:
-> > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > 
-> > scripts/coccinelle/api/resource_size.cocci complain about the
-> > following warning:
-> > 
-> > pcie-mediatek.c:720:13-16: WARNING: Suspicious code. resource_size is maybe missing with mem
-> > 
-> > Use resource_size(mem) instead of mem->end - mem->start to eliminate the
-> > complain. Since the MMIO window size for both MT2712 and MT7622 are all
-> > 0x1000_0000, this change also fix the AHB2PCIe window size smaller than
-> > HW MMIO window size issue by change the values of fls(size) from
-> > fls(0xfff_ffff) to fls(0x1000_0000).
+On 1/28/19 3:54 PM, Thierry Reding wrote:
+> On Mon, Jan 28, 2019 at 09:43:00AM +0800, Joseph Lo wrote:
+>> On 1/25/19 9:46 PM, Thierry Reding wrote:
+>>> On Fri, Jan 04, 2019 at 11:06:42AM +0800, Joseph Lo wrote:
+>>>> This series introduces support for the DFLL as a CPU clock source
+>>>> on Tegra210. As Jetson TX1 uses a PWM controlled regulator IC which
+>>>> is driven directly by the DFLLs PWM output, we also introduce support
+>>>> for PWM regulators next to I2C controlled regulators. The DFLL output
+>>>> frequency is directly controlled by the regulator voltage. The registers
+>>>> for controlling the PWM are part of the DFLL IP block, so there's no
+>>>> separate linux regulator object involved because the regulator IC only
+>>>> supplies the rail powering the CPUs. It doesn't have any other controls.
+[snip]
+>>> Joseph,
+>>>
+>>> can you detail the dependencies between the various patches. From a
+>>> brief look the CPU frequency driver changes are completely separate
+>>> bits and it should be possible to apply them to the cpufreq tree.
+>>>
+>>> The clock changes also seem independent of the rest.
+>>>
+>>> Are there any dependencies at all that we need to be mindful about?
+>>> Or can individual maintainers just pick up the subseries directly?
+>>>
+>>
+>> Yes, no dependence with each other. We can apply them separately.
+>> Please let me know if I need to inform cpufreq or clk maintainer to pick
+>> them up.
 > 
-> Good, I'm glad this actually fixes a bug.  The warning was actually
-> useful!
+> Rafael,
 > 
-> Since that's the case, the *bug* is the important thing (not the
-> warning), and the subject line should be about the bug fix.  The fact
-> that it also happens to remove a warning is really just incidental.
+> the three CPU frequency patches in this series were acked by Viresh
+> already, but unfortunately you don't seem to be Cc'ed on these. Are
+> you okay with me picking these up into the Tegra tree and send you
+> a pull request in a couple of days? That way we can get the whole
+> set tested a bit in linux-next. If you'd prefer to pick these up in
+> the PM tree, here are the corresponding patchwork links:
 > 
-> You say "the AHB2PCIe window size smaller than HW MMIO window size
-> issue" as though it should be familiar to us.  But it's not :)
+> 	https://patchwork.kernel.org/patch/10747943/
+> 	https://patchwork.kernel.org/patch/10747947/
+> 	https://patchwork.kernel.org/patch/10747953/
 > 
-
-Oh, My bad.
-
-The HW design assigned a bus address range(typically start from
-0x2000_0000 to 0x2fff_ffff for both mt2712 and mt7622) for PCIe usage.
-This means, when CPU or other HW access address in this range, PCIe RC
-HW should response to this access. Normally it will translate those
-access request to TLPs and send to EP side. Tt's like the total memory
-resource which could be allocated by EP's BAR and RC's itself BAR.
-
-Although those address range is available for allocated, but it should
-be enabled by this PCIE_AHB_TRANS_BASE register, what size should be
-enabled is determined by AHB2PCIE_SIZE bits in this register.
-
-In previous code we did not enable the full size of HW assigned address
-range, if the EP's BAR requested size is bigger than the size we enabled
-and smaller than the HW available size. The access request from CPU
-which address is bigger than the address we enabled but smaller that HW
-available address, then RC will block those request and those request
-will never get to EP side by TLPs.
-
-Previous code never run into a system error in production because even
-half of those range(128MB) is bigger enough for typical EP device's BAR
-request(4MB).
-
-But all those HW assigned bus range should be enabled. And it's Okay to
-do that. RC will never forward a request to EP when this request is not
-suitable for EP's BAR range.
-
-
-> So the changelog needs to start by explaining what the AHB2PCIe window
-> size issue is, mention what user-visible problem that causes, then
-> explain how you're fixing it by using resource_size().
+> I'll go and give my Acked-by on these patches if the latter is the
+> way you prefer.
 > 
-> Then you can mention that this also incidentally removes a coccinelle
-> warning.
+> 
+> Stephen, Mike,
+> 
+> the same applies for clk patches. Stephen's acked all of them and I
+> think all of the series is good to go. How about if I pick up these
+> up in the Tegra tree and let this all cook in linux-next for a week
+> or so and then send you a pull request with these? Stephen already
+> picked up a couple of fixes for clk/tegra, but I don't think any of
+> those would conflict with this series.
+> 
+> All of that said, Joseph confirmed that there are no dependencies
+> between these subsystem subseries, so if you'd prefer to pick up the
+> patches into your respective trees, I have no objections to that.
+> 
+> Thierry
 > 
 
-Okay, thanks for your advise.
+Hi Rafael, Stephen,
 
-> Bjorn
-> 
-> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> > ---
-> >  drivers/pci/controller/pcie-mediatek.c | 5 ++---
-> >  1 file changed, 2 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> > index 55e471c..01126b8 100644
-> > --- a/drivers/pci/controller/pcie-mediatek.c
-> > +++ b/drivers/pci/controller/pcie-mediatek.c
-> > @@ -654,7 +654,6 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
-> >  	struct resource *mem = &pcie->mem;
-> >  	const struct mtk_pcie_soc *soc = port->pcie->soc;
-> >  	u32 val;
-> > -	size_t size;
-> >  	int err;
-> >  
-> >  	/* MT7622 platforms need to enable LTSSM and ASPM from PCIe subsys */
-> > @@ -706,8 +705,8 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
-> >  		mtk_pcie_enable_msi(port);
-> >  
-> >  	/* Set AHB to PCIe translation windows */
-> > -	size = mem->end - mem->start;
-> > -	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(size));
-> > +	val = lower_32_bits(mem->start)
-> > +	      | AHB2PCIE_SIZE(fls(resource_size(mem)));
-> 
-> Nit: I think it's more typical to put the "|" on the first line.
+Gental ping. Please let Thierry know if the cpufreq and DFLL clock 
+related changes can go through Tegra tree.
 
-Okay, will update this in next version.
+I know Rafael did say [1] it's okay to go through Tegra tree in earlier 
+comment.
 
-Thanks for your comments.
+Thanks,
+Joseph
 
-> 
-> >  	writel(val, port->base + PCIE_AHB_TRANS_BASE0_L);
-> >  
-> >  	val = upper_32_bits(mem->start);
-> > -- 
-> > 2.6.4
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel@lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
+[1]: http://patchwork.ozlabs.org/patch/1015181/
 
 _______________________________________________
 linux-arm-kernel mailing list
