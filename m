@@ -2,100 +2,108 @@ Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A9981C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:59:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B0AD2C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:59:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 767B7218AC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:59:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7E336218AC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 15:59:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Nv/FbnQU";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="wR8KPdsh";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="FiI6uIUL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 767B7218AC
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NAeHXhj7";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="nj9B61bS";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="M1VoXvE1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E336218AC
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jbNawVXPO2e4NgcGro0ZJ7WS6TN00ogFvfm+yIvMTyI=; b=Nv/FbnQUjwTVJK
-	D0tokfYAyUVhGXWH9GQXJFV8PQq9NnggS9V5C0w8R4rswSfMi0OoAhEL2MwEY9/WFzI+PEBV9OJ+i
-	8IP6fO/LQhBItK0YIMV7vuhY8oK5v9pAroFRqS2X8w87yc0PQnZVH1aQ2uwxzkyTJU6VH06IgLh6B
-	vJmGCbtcDxhpfgto45i87O6LxjblGfU0XP06sO4194Nx6Tm2pU/0KUyYhV640etZ2cQqoWQWjDjjY
-	04zIt5X0ztvuG4UqcWVqwBvrXWZ+hbMxY4kDlm+DurNPtmuEhG0nzaDMRdGQr3qz8aF6KNXZ5cA8l
-	QGBwdbDjCXdyhq9FIzeg==;
+	List-Owner; bh=+CFFxBtJ2RjMNkskMfK4xb5Dxoiwx/Pfiim4o6CLzuM=; b=NAeHXhj7kBL+Bq
+	F5rRJSEz77PKMmNJQbOEi8WOZCGdBIY2L5d1ZSSyxpHTr4POI6wMWyKAr9hDB02VM/6BuAY7Yrefg
+	pPObG2Odo9VxNx0CucTWu70JSJ3KcLkpWFYpRycXgLM1TJSCMBQQE8UG8utg20lw+Z+a5rPTqFsYB
+	uXWJfY4W9OfAqlsdYjmM4R4nypGmpbYO2sIQ36hHuOJ1rXSg1JJN91CGD28Rw5K152tipl9qoi47V
+	rEIwa3RPKrFMc/JA3eHh7KROPAr1gIka0aIkh1hhdtttBXiDaI4uwynizmX44qHoP8ZV8nikG/6mt
+	/e2rDjomxdnfq9iMslGw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpbDg-0007Vr-EE; Fri, 01 Feb 2019 15:59:08 +0000
+	id 1gpbE3-00084P-2y; Fri, 01 Feb 2019 15:59:31 +0000
 Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpbDV-0007C3-C7
- for linux-arm-kernel@bombadil.infradead.org; Fri, 01 Feb 2019 15:58:57 +0000
+ id 1gpbDu-0007GL-GK
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 01 Feb 2019 15:59:22 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Type:Cc:To:Subject:Message-ID:
- Date:From:In-Reply-To:References:MIME-Version:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=4rCyBtEKCCb1eZWTDjgbspn9weqSBCPy3DAAWxTxy2g=; b=wR8KPdshojxIl97che+SiKMKo
- rnbqfo0dOjlootTlOLVnZnCKiFftJ24McJf2d6CoEkJ8DyU6tPkmtfvcd+Jb2+gfkKhQnKJ4+hupr
- OcpaK1NT07GenFxENBznu/m2YIhnyBdGZD6C2Xrl9luhc7N/f4Z3ZXfD3atNtILWIsgu2/4/YPz43
- ETC56AoJV8PfJFow+isiZ0h7mjZ+wM8DEKrOAQGnKzp+S+WEx4PS4f1JZc6P/btialgzhGMZpZ8k9
- D2n7botuSg1GeE+z/MeZsZ+6+2Nk4uIR8qDfgntWI4Twp6eEIughuyfZJPV9sYzzi4VHMq/Lw/mEu
- s9NbaRQ/g==;
-Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=87uAT10+TXiQ8RUQObJ13rsTWKA95oUQQrz1NYnUkkc=; b=nj9B61bSp9UgmaWuJJmlTnVrJ7
+ ifx52geukE1HaLxIL4MaO6bcVv6U2n41W3IwFtdF7qRbnsgdAiqlCEUaj2xyotsHYhXziUuutm2lM
+ ZkXQ2go4rT1XhG9GoACv7EdR2WPXZlrakmS0oJOFK7GIci7gJAjXnxs7YqD5hjYNyGvhr9EJe+Hl1
+ s5wOq/XzdFnMY45B7EG7LjUFRFb90ERf6H8Zy6JKcWSAaTLr9/1s6xc9HUshf+GV7f/XZ6f10oD6c
+ LaSx5AkHEfCbNiJio2SJ1qEl6Sd1VPA7wngS7jdLXgpv/8f/6BaiqajX4xHmWzftqqYd0DZXT+PfF
+ RycH9HXg==;
+Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
  by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpb3O-0005vO-N7
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:48:33 +0000
-Received: by mail-it1-x143.google.com with SMTP id h193so10357254ita.5
+ id 1gpayU-0005Kk-Ac
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 15:43:27 +0000
+Received: by mail-lj1-x243.google.com with SMTP id x85-v6so6211851ljb.2
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 07:48:30 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=4rCyBtEKCCb1eZWTDjgbspn9weqSBCPy3DAAWxTxy2g=;
- b=FiI6uIULRsNcp0eYNZYhfzDKwYukr6QM0eMUE4YOqYnqOkkQx47LsxM37Gza7bq/8a
- 9hYnkEl51IPjAyZCXiXNdcVsm/6LyPOMv9E1htvpUpJww1buNWBcg/g7xiDCmMpmSB/N
- pER/hPha25QF/vPiDTEvqD7yifj7HDj4ynEe8=
+ Fri, 01 Feb 2019 07:43:25 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=87uAT10+TXiQ8RUQObJ13rsTWKA95oUQQrz1NYnUkkc=;
+ b=M1VoXvE1Szk5NA7GJTJMsRcCil+0rnZt7ypHyOVEdwDVa4dZSQ+kppG5DCm4N0JTOE
+ GT62Ww17WS3ODFsfZmD48Jz54ZXKIU3Kse/Ckp2XT1JRwZtGhS5ltyuC9bMky2+s35ei
+ /GjtCGUkPWOp4cXCDJ3h5p5wDVeHg0LndW2LM=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=4rCyBtEKCCb1eZWTDjgbspn9weqSBCPy3DAAWxTxy2g=;
- b=i9WKFsyG1RcA5wAz5Sd5Ipv6rm2KthSyV3fycd3GejkNiHDYLS9kLO2Wi73Lbvx9IZ
- k4gFhKY4uWTlKdebcC41xv4tU2ioUhe/3yM1sx+hPBt/tc4UoW1616AyNWR6f6hkeaed
- JRDJhWsjXpxSgShYol0yd7qqAA9T2SW3khLmblqII5Hhvdj8W1s2EsZdGZDtHAkQt3N3
- E8j8sktTDoMsxIIgVvehzgRiPpZv3mLi/gzZFpDeho8KORGDg9E9S622Yj86khVfAeU0
- D8HPOgN/JyF17ET54FbYp11BMvHwrZP6NzSc4JH8x9wzf6k/+OwAH+Q0BXaBVeS5Sg8i
- HxvQ==
-X-Gm-Message-State: AJcUukfp0HlkxIBCOd53UUsfAAaYOtICUFlTmop5wZvHQrttflkKmCbl
- RAHF6A+fZ/uHSY8RuYeYKL2oNnPMsdufatcW+OQgaw==
-X-Google-Smtp-Source: ALg8bN74vFX/djwmkAtex0lYtObB5+K0/sYKTFG0AK6rJEZ5yq6eh+9N820nn6eNGCIB6/3zMP2qO+Aif+/cVO/kHSc=
-X-Received: by 2002:a02:7f08:: with SMTP id r8mr22572099jac.20.1549036108472; 
- Fri, 01 Feb 2019 07:48:28 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=87uAT10+TXiQ8RUQObJ13rsTWKA95oUQQrz1NYnUkkc=;
+ b=kizFiRd6HisGn2N1ox/deydkMa3kHsQz4XUAKLd5n5t6twPYr3zh1i9Tn3q3k+bGSg
+ 1I7rHakQIJwBc/Q8yCkavsKvvc6yKLHeTp/I73PNUeBntDk+lkvzCEN1KpgGgWFg0blv
+ 5vqFspft/aQ+raHGhkPu3z/vpn9qEoquzC7D5QzeTPXZfEc8lSeR8YISAn0YI/c7j252
+ AllFZyJo0CCs7/6//2bAtWxcKZOjDnoPgc/M0suLLsfTyMxjgLovbEO6rgnr6lQEhx0q
+ +riA7LL7GQLECor+n5pbczxcbbWOW6KIqLQ5Knm12lJR3l40gCKvkZrhzKSCZMkkonGe
+ 2k1g==
+X-Gm-Message-State: AJcUukeOlf9HcT5s1lyiixVp5hIlvXydCkrQhQv5HCxAvUGKIFk6+zU6
+ y0krnYWPzt08vy/wgE7H1MESsw==
+X-Google-Smtp-Source: ALg8bN4Q3v+ELltV8yrXXTQiDUCRBw/HFQzvbq5ATN7sdZy1/CP4lI5ssgFWBSQmOj1gE+dKktvsug==
+X-Received: by 2002:a2e:5dd9:: with SMTP id
+ v86-v6mr31776125lje.86.1549035804241; 
+ Fri, 01 Feb 2019 07:43:24 -0800 (PST)
+Received: from localhost.localdomain ([217.76.202.68])
+ by smtp.gmail.com with ESMTPSA id i13-v6sm1305712ljg.82.2019.02.01.07.43.22
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 01 Feb 2019 07:43:23 -0800 (PST)
+From: Jagan Teki <jagan@amarulasolutions.com>
+To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
+ Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
+Subject: [PATCH v7 23/23] arm64: dts: allwinner: a64-amarula-relic: Add
+ Techstar TS8550B MIPI-DSI panel
+Date: Fri,  1 Feb 2019 21:12:32 +0530
+Message-Id: <20190201154232.10505-24-jagan@amarulasolutions.com>
+X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
+In-Reply-To: <20190201154232.10505-1-jagan@amarulasolutions.com>
+References: <20190201154232.10505-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
-References: <CAJZ5v0gunbCHp_9mDTmtwW1i-_GcXPcjTP48NdV2zv-B6UrD4g@mail.gmail.com>
- <1548869162-6223-1-git-send-email-vincent.guittot@linaro.org>
- <CAJZ5v0gnJ5DKvOO9OcJoMrGYpHfeQBt2Ec0pMW6=2q5aMoFpww@mail.gmail.com>
- <OSBPR01MB210387DEC42870D8E5688CE9B8920@OSBPR01MB2103.jpnprd01.prod.outlook.com>
- <CAKfTPtDNMV+HFsqc9A0VcMHOO=MvxWYZt8XkmWepso7SpfeAqA@mail.gmail.com>
- <OSBPR01MB21031D92553AD16A1F206273B8920@OSBPR01MB2103.jpnprd01.prod.outlook.com>
-In-Reply-To: <OSBPR01MB21031D92553AD16A1F206273B8920@OSBPR01MB2103.jpnprd01.prod.outlook.com>
-From: Vincent Guittot <vincent.guittot@linaro.org>
-Date: Fri, 1 Feb 2019 16:48:17 +0100
-Message-ID: <CAKfTPtB9Ke167hQCKB7wgRpDarn_uFmL3B4QnzHhHUGmuhnejA@mail.gmail.com>
-Subject: Re: [PATCH v3] PM-runtime: fix deadlock with ktime
-To: Biju Das <biju.das@bp.renesas.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_154830_768978_6F0FA579 
-X-CRM114-Status: GOOD (  43.90  )
+X-CRM114-CacheID: sfid-20190201_154326_370588_39462DBD 
+X-CRM114-Status: GOOD (  14.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,210 +115,106 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>, Linux PM <linux-pm@vger.kernel.org>,
- "Rafael J. Wysocki" <rafael@kernel.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
- Geert Uytterhoeven <geert@linux-m68k.org>,
- Linux OMAP Mailing List <linux-omap@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, linux-sunxi@googlegroups.com,
+ Jagan Teki <jagan@amarulasolutions.com>,
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-amarula@amarulasolutions.com, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 1 Feb 2019 at 16:44, Biju Das <biju.das@bp.renesas.com> wrote:
->
-> Hi Vincent,
->
-> Thanks for the feedback. Instead of reverting.  I just modified the patch like this and it fixed the issue.
->
-> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-> index 4eaf166..145a182 100644
-> --- a/drivers/base/power/runtime.c
-> +++ b/drivers/base/power/runtime.c
-> @@ -66,7 +66,7 @@ static int rpm_suspend(struct device *dev, int rpmflags);
->   */
->  void update_pm_runtime_accounting(struct device *dev)
->  {
-> -       u64 now = ktime_to_ns(ktime_get());
-> +       u64 now = ktime_get_mono_fast_ns();
->         u64 delta;
+Amarula A64-Relic board by default bound with Techstar TS8550B
+MIPI-DSI panel, add support for it.
 
-yes.
-This probably also need to be changed in another place
-(pm_runtime_enable) to be safe
-Our email have crossed. I just sent something similar
+DSI panel connected via board DSI port with,
+- DLDO2 as VCC supply
+- DLDO2 as IOVCC supply
+- DLDO1 as VCC-DSI supply
+- PD24 gpio for reset pin
+- PD23 gpio for backlight enable pin
 
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ .../allwinner/sun50i-a64-amarula-relic.dts    | 39 +++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
+index df0de0772d6b..a5a0a650b589 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
+@@ -9,6 +9,7 @@
+ #include "sun50i-a64.dtsi"
+ 
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pwm/pwm.h>
+ 
+ / {
+ 	model = "Amarula A64-Relic";
+@@ -18,6 +19,14 @@
+ 		serial0 = &uart0;
+ 	};
+ 
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
++		brightness-levels = <1 2 4 8 16 32 64 128 512>;
++		default-brightness-level = <2>;
++		enable-gpios = <&pio 3 23 GPIO_ACTIVE_HIGH>; /* LCD-BL-EN: PD23 */
++	};
++
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
+@@ -83,6 +92,30 @@
+ 	};
+ };
+ 
++&de {
++	status = "okay";
++};
++
++&dphy {
++	status = "okay";
++};
++
++&dsi {
++	vcc-dsi-supply = <&reg_dldo1>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	status = "okay";
++
++	panel@0 {
++		compatible = "techstar,ts8550b", "sitronix,st7701";
++		reg = <0>;
++		VCC-supply = <&reg_dldo2>;
++		IOVCC-supply = <&reg_dldo2>;
++		reset-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* LCD-RST: PD24 */
++		backlight = <&backlight>;
++	};
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -160,6 +193,12 @@
+ 	status = "okay";
+ };
+ 
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm_pin>;
++	status = "okay";
++};
++
+ &r_rsb {
+ 	status = "okay";
+ 
+-- 
+2.18.0.321.gffc6fa0e3
 
->
-> regards,
-> Biju
->
-> > -----Original Message-----
-> > From: linux-renesas-soc-owner@vger.kernel.org <linux-renesas-soc-
-> > owner@vger.kernel.org> On Behalf Of Vincent Guittot
-> > Sent: 01 February 2019 15:29
-> > To: Biju Das <biju.das@bp.renesas.com>
-> > Cc: Rafael J. Wysocki <rafael@kernel.org>; Linux PM <linux-
-> > pm@vger.kernel.org>; Linux Kernel Mailing List <linux-
-> > kernel@vger.kernel.org>; Linux ARM <linux-arm-
-> > kernel@lists.infradead.org>; Linux OMAP Mailing List <linux-
-> > omap@vger.kernel.org>; Rafael J. Wysocki <rjw@rjwysocki.net>; Ulf
-> > Hansson <ulf.hansson@linaro.org>; Geert Uytterhoeven <geert@linux-
-> > m68k.org>; Linux-Renesas <linux-renesas-soc@vger.kernel.org>
-> > Subject: Re: [PATCH v3] PM-runtime: fix deadlock with ktime
-> >
-> > On Fri, 1 Feb 2019 at 16:02, Biju Das <biju.das@bp.renesas.com> wrote:
-> > >
-> > > Hi Vincent,
-> > >
-> > > I have rebased my kernel to "next-20190201".  Still I am seeing dead lock.
-> > >
-> > > Am I missing any patch?
-> >
-> > No you don't miss anything.
-> > I think that it's the opposite.
-> >
-> > Modification in time accounting in PM runtime has been queued but it has
-> > not moved (yet) to ktime_get_mono_fast_ns()
-> >
-> > Can you try to revert c669560be6c8 ("PM-runtime: Replace jiffies-based
-> > accounting with ktime-based accounting") ?
-> >
-> > >
-> > > root@ek874:/# echo e61e0000.timer >
-> > > /sys/devices/system/clocksource/clocksource0/current_clocksource
-> > > [  193.869423]
-> > > [  193.870963] ============================================
-> > > [  193.876292] WARNING: possible recursive locking detected [
-> > > 193.881625] 5.0.0-rc4-next-20190201-00007-g731346f #3 Not tainted [
-> > > 193.887737] --------------------------------------------
-> > > [  193.893066] migration/0/11 is trying to acquire lock:
-> > > [  193.898136] (____ptrval____) (tk_core.seq){----}, at:
-> > > update_pm_runtime_accounting+0x14/0x68
-> > > [  193.906632]
-> > > [  193.906632] but task is already holding lock:
-> > > [  193.912483] (____ptrval____) (tk_core.seq){----}, at:
-> > > multi_cpu_stop+0x8c/0x140 [  193.919828] [  193.919828] other info
-> > > that might help us debug this:
-> > > [  193.926377]  Possible unsafe locking scenario:
-> > > [  193.926377]
-> > > [  193.932314]        CPU0
-> > > [  193.934765]        ----
-> > > [  193.937216]   lock(tk_core.seq);
-> > > [  193.940453]   lock(tk_core.seq);
-> > > [  193.943691]
-> > > [  193.943691]  *** DEADLOCK ***
-> > > [  193.943691]
-> > > [  193.949634]  May be due to missing lock nesting notation [
-> > > 193.949634] [  193.956446] 3 locks held by migration/0/11:
-> > > [  193.960642]  #0: (____ptrval____) (timekeeper_lock){-.-.}, at:
-> > > change_clocksource+0x2c/0x118 [  193.969125]  #1: (____ptrval____)
-> > > (tk_core.seq){----}, at: multi_cpu_stop+0x8c/0x140 [  193.976903]  #2:
-> > > (____ptrval____) (&(&dev->power.lock)->rlock){....}, at:
-> > > __pm_runtime_resume+0x40/0x98 [  193.986339] [  193.986339] stack
-> > backtrace:
-> > > [  193.990715] CPU: 0 PID: 11 Comm: migration/0 Not tainted
-> > > 5.0.0-rc4-next-20190201-00007-g731346f #3 [  193.999707] Hardware
-> > > name: Silicon Linux RZ/G2E evaluation kit EK874 (CAT874 + CAT875) (DT) [
-> > 194.008089] Call trace:
-> > > [  194.010553]  dump_backtrace+0x0/0x178 [  194.014227]
-> > > show_stack+0x14/0x20 [  194.017562]  dump_stack+0xb0/0xec [
-> > > 194.020895]  __lock_acquire+0xfb4/0x1c08 [  194.024832]
-> > > lock_acquire+0xd0/0x268 [  194.028420]  ktime_get+0x5c/0x108 [
-> > > 194.031747]  update_pm_runtime_accounting+0x14/0x68
-> > > [  194.036643]  rpm_resume+0x4ec/0x698 [  194.040144]
-> > > __pm_runtime_resume+0x50/0x98 [  194.044264]
-> > > sh_tmu_enable.part.1+0x24/0x50 [  194.048462]
-> > > sh_tmu_clocksource_enable+0x48/0x70
-> > > [  194.053097]  change_clocksource+0x84/0x118 [  194.057208]
-> > > multi_cpu_stop+0x8c/0x140 [  194.060970]
-> > > cpu_stopper_thread+0xac/0x120 [  194.065087]
-> > > smpboot_thread_fn+0x1ac/0x2c8 [  194.069198]  kthread+0x128/0x130 [
-> > > 194.072439]  ret_from_fork+0x10/0x18
-> > >
-> > >
-> > > Regards,
-> > > Biju
-> > >
-> > > > -----Original Message-----
-> > > > From: Rafael J. Wysocki <rafael@kernel.org>
-> > > > Sent: 30 January 2019 21:53
-> > > > To: Vincent Guittot <vincent.guittot@linaro.org>
-> > > > Cc: Linux PM <linux-pm@vger.kernel.org>; Linux Kernel Mailing List
-> > > > <linux- kernel@vger.kernel.org>; Linux ARM <linux-arm-
-> > > > kernel@lists.infradead.org>; Linux OMAP Mailing List <linux-
-> > > > omap@vger.kernel.org>; Rafael J. Wysocki <rjw@rjwysocki.net>; Ulf
-> > > > Hansson <ulf.hansson@linaro.org>; Biju Das
-> > > > <biju.das@bp.renesas.com>; Geert Uytterhoeven
-> > > > <geert@linux-m68k.org>; Linux-Renesas <linux-
-> > > > renesas-soc@vger.kernel.org>
-> > > > Subject: Re: [PATCH v3] PM-runtime: fix deadlock with ktime
-> > > >
-> > > > On Wed, Jan 30, 2019 at 6:26 PM Vincent Guittot
-> > > > <vincent.guittot@linaro.org> wrote:
-> > > > >
-> > > > > A deadlock has been seen when swicthing clocksources which use PM
-> > > > runtime.
-> > > > > The call path is:
-> > > > > change_clocksource
-> > > > >     ...
-> > > > >     write_seqcount_begin
-> > > > >     ...
-> > > > >     timekeeping_update
-> > > > >         ...
-> > > > >         sh_cmt_clocksource_enable
-> > > > >             ...
-> > > > >             rpm_resume
-> > > > >                 pm_runtime_mark_last_busy
-> > > > >                     ktime_get
-> > > > >                         do
-> > > > >                             read_seqcount_begin
-> > > > >                         while read_seqcount_retry
-> > > > >     ....
-> > > > >     write_seqcount_end
-> > > > >
-> > > > > Although we should be safe because we haven't yet changed the
-> > > > > clocksource at that time, we can't because of seqcount protection.
-> > > > >
-> > > > > Use ktime_get_mono_fast_ns() instead which is lock safe for such
-> > > > > case
-> > > > >
-> > > > > With ktime_get_mono_fast_ns, the timestamp is not guaranteed to be
-> > > > > monotonic across an update and as a result can goes backward.
-> > > > > According to
-> > > > > update_fast_timekeeper() description: "In the worst case, this can
-> > > > > result is a slightly wrong timestamp (a few nanoseconds)". For PM
-> > > > > runtime autosuspend, this means only that the suspend decision can
-> > > > > be slightly sub optimal.
-> > > > >
-> > > > > Fixes: 8234f6734c5d ("PM-runtime: Switch autosuspend over to using
-> > > > > hrtimers")
-> > > > > Reported-by: Biju Das <biju.das@bp.renesas.com>
-> > > > > Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> > > > > ---
-> > > > >
-> > > > > Hi Rafael,
-> > > > >
-> > > > > Sorry, I sent the version with the typo mistake that generated the
-> > > > > compilation error reported by kbuild-test-robot
-> > > > >
-> > > > > This version doesn't have the typo.
-> > > >
-> > > > OK, I've applied this one, thanks!
-> > >
-> > >
-> > >
-> > > Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne
-> > End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under
-> > Registered No. 04586709.
->
->
->
-> Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
 
 _______________________________________________
 linux-arm-kernel mailing list
