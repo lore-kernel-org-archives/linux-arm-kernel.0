@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5DB15C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:46:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9BA3EC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:49:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2E34121726
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:46:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6D65B20844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 08:49:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aV9p7tvQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E34121726
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cqYqooc0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D65B20844
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,42 +25,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=P7+wCZFhWJBeY2hGDPonp9ErDN2Ooy57EH1HcIWpE8g=; b=aV9p7tvQ0XNkZp
-	uKwszmUywMaDAlbAzMMyd1jTRIy0ICPxSl4vk8v7D2Cix1Phr4KyO7e+8xJ4ANMi+o0lA3WTVV0iT
-	D2MKFBazMQRd26vVAQObh8rirSflB89gsQFYgr4fIoFfBu6z7P+LLHRyspsxnAISxvQMmTzOkj17B
-	XMoe0TjmkjfvsCb+uhAaUU9kmZfIDPTZfivot3Zqc2edCuMeUhHHhY8jnWxLP89Skaw7ZMK5GkJad
-	cpy2JOAaJZXPIbEomnQ96S73O8iUINJrNxAAh7iDX0G27V92ZMM5hAawMoFmL7HddUV9RtL8YgOwc
-	1nlzD3/EcOnuHbcDWaFw==;
+	List-Owner; bh=VVuKnvxq1FJHyh6f5/vfT0OcvaWT5sKbam/Ckz68Ztk=; b=cqYqooc0CA8w/I
+	x3T5gQnY/XiOiqqzcGE3lOBxLXm/R44ji5EviIAchAW2R5Z4mB/10o0jjDYXmVTc1UW0wga4u7e2D
+	QBQLsC0D00sZfr8wc7CWbImjjvnttRQrzq0IZxHTOaFSaaQRHuctXmcxmiqInZ8yRCFZXuK/pI3dq
+	8VWu58iwWHBukETjlH1VMYq64+368mZssbPk3grohBQxBjZd5yvcCnKXabyk/ksfzH8T9Sf0lbvga
+	9YcNDqjV2iOBxMbUsxcgyDvXIRs34N9aMa9HUbOGaRbGIEomwNRsVMbI8R1pQl8BrQs1HKAPaz63m
+	XzJ5niPa5xI5cRfT6Dyg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpUT0-00014o-Ef; Fri, 01 Feb 2019 08:46:30 +0000
+	id 1gpUW9-0001cQ-DI; Fri, 01 Feb 2019 08:49:45 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpUSx-00014H-00
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 08:46:28 +0000
+ id 1gpUW6-0001bz-MW
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 08:49:44 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 83E36A78;
- Fri,  1 Feb 2019 00:46:26 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 20B45A78;
+ Fri,  1 Feb 2019 00:49:42 -0800 (PST)
 Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 059613F71E;
- Fri,  1 Feb 2019 00:46:24 -0800 (PST)
-Subject: Re: [RFC PATCH 1/3] arm64: entry: Remove unneeded need_resched() loop
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 3EE583F71E;
+ Fri,  1 Feb 2019 00:49:40 -0800 (PST)
+Subject: Re: [RFC PATCH 2/3] ARM: entry: Remove unneeded need_resched() loop
 To: Valentin Schneider <valentin.schneider@arm.com>,
  linux-kernel@vger.kernel.org
 References: <20190131182339.9835-1-valentin.schneider@arm.com>
- <20190131182339.9835-2-valentin.schneider@arm.com>
+ <20190131182339.9835-3-valentin.schneider@arm.com>
 From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <d7b5db35-0906-4ac2-d51e-905790020eaf@arm.com>
-Date: Fri, 1 Feb 2019 08:46:23 +0000
+Message-ID: <fa090a80-5579-5dac-da19-56c9a6c5c423@arm.com>
+Date: Fri, 1 Feb 2019 08:49:37 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20190131182339.9835-2-valentin.schneider@arm.com>
+In-Reply-To: <20190131182339.9835-3-valentin.schneider@arm.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_004627_153812_14B99499 
-X-CRM114-Status: GOOD (  16.92  )
+X-CRM114-CacheID: sfid-20190201_004942_744840_FFB14AC0 
+X-CRM114-Status: GOOD (  18.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,10 +72,8 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- Julien Grall <julien.grall@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org
+Cc: Thomas Gleixner <tglx@linutronix.de>, Will Deacon <will.deacon@arm.com>,
+ Russell King <linux@armlinux.org.uk>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
@@ -88,53 +86,51 @@ On 31/01/2019 18:23, Valentin Schneider wrote:
 > is contained in a need_resched() loop, we don't need the outer arch
 > code loop.
 > 
-> Reported-by: Julien Thierry <julien.thierry@arm.com>
-> Reported-by: Will Deacon <will.deacon@arm.com>
 > Signed-off-by: Valentin Schneider <valentin.schneider@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Julien Grall <julien.grall@arm.com>
-> Cc: Julien Thierry <julien.thierry@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
 > Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Julien Thierry <julien.thierry@arm.com>
 > Cc: linux-arm-kernel@lists.infradead.org
 
 Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 
+Cheers,
+
 > ---
->  arch/arm64/kernel/entry.S | 11 +----------
->  1 file changed, 1 insertion(+), 10 deletions(-)
+>  arch/arm/kernel/entry-armv.S | 12 +-----------
+>  1 file changed, 1 insertion(+), 11 deletions(-)
 > 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 0ec0c46b2c0c..4d0c81f29a60 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -611,7 +611,7 @@ el1_irq:
->  #ifdef CONFIG_PREEMPT
->  	ldr	x24, [tsk, #TSK_TI_PREEMPT]	// get preempt count
->  	cbnz	x24, 1f				// preempt count != 0
-> -	bl	el1_preempt
-> +	bl	preempt_schedule_irq		// irq en/disable is done inside
->  1:
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index e85a3af9ddeb..a7ac22e09bb2 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -220,7 +220,7 @@ __irq_svc:
+>  	teq	r8, #0				@ if preempt count != 0
+>  	movne	r0, #0				@ force flags to 0
+>  	tst	r0, #_TIF_NEED_RESCHED
+> -	blne	svc_preempt
+> +	blne	preempt_schedule_irq            @ irq en/disable is done inside
 >  #endif
->  #ifdef CONFIG_TRACE_IRQFLAGS
-> @@ -620,15 +620,6 @@ el1_irq:
->  	kernel_exit 1
->  ENDPROC(el1_irq)
+>  
+>  	svc_exit r5, irq = 1			@ return from exception
+> @@ -229,16 +229,6 @@ ENDPROC(__irq_svc)
+>  
+>  	.ltorg
 >  
 > -#ifdef CONFIG_PREEMPT
-> -el1_preempt:
-> -	mov	x24, lr
-> -1:	bl	preempt_schedule_irq		// irq en/disable is done inside
-> -	ldr	x0, [tsk, #TSK_TI_FLAGS]	// get new tasks TI_FLAGS
-> -	tbnz	x0, #TIF_NEED_RESCHED, 1b	// needs rescheduling?
-> -	ret	x24
+> -svc_preempt:
+> -	mov	r8, lr
+> -1:	bl	preempt_schedule_irq		@ irq en/disable is done inside
+> -	ldr	r0, [tsk, #TI_FLAGS]		@ get new tasks TI_FLAGS
+> -	tst	r0, #_TIF_NEED_RESCHED
+> -	reteq	r8				@ go again
+> -	b	1b
 > -#endif
 > -
->  /*
->   * EL0 mode handlers.
->   */
+>  __und_fault:
+>  	@ Correct the PC such that it is pointing at the instruction
+>  	@ which caused the fault.  If the faulting instruction was ARM
 > 
 
 -- 
