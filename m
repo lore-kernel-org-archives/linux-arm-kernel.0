@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B8B1C282DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 09:31:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 95A9CC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 09:31:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5B32720870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 09:31:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 58FC32086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 09:31:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vsy/v61c"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B32720870
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VkD8mnpc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 58FC32086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tFNUkGx/zwosFGFFBCziEHzLOhErM0aj2nRPhKvD4H8=; b=Vsy/v61cDFZyiC
-	1Jzm2Vm0hbUMbRx+qyVUayMt7glIUMzOrZ4jx7qQxozsIAIKlgdcucBJCH5JmI3RijmSHPObOGAkv
-	AlxUlzN6gvpfrXTgztAQKPHTqILtg8duLgJmXJqialALbzthL160WovjIblUNm6w3B2j15r093gKH
-	dErtMdVdInu9R6Lc/lPfpHMp1L9yQk9siHyM/5g8pHzDHqZG8QzDhCAUlJkRB1kT9e8UMVJHk0Eaa
-	z/ycqti6Pk6sWtCw78T5OUVXHLLnrj0/Lbeb6ZblPtPyviyPFHlCXTwroecuDf3Ytd5s62Fk52OsH
-	41G0Px6T4152rRKcHa/Q==;
+	List-Owner; bh=IGBBehaw8aj0+fpDfYFLry1H1pXkwCt6r/Kj07+1qQw=; b=VkD8mnpc1uxxo2
+	3XvVYyIOpusNlqurVbCAZAWN2X7ddMDWhWmPNsP3oiNsqHwqAgMw1njlGOVy5AO7myxZoeQfkYsK+
+	jzaicpLEAH6U1okiSKfedoQzkqMnrgtuu8roeVwpXJK43CFpPc2T2Itg3Rwiq4poQKFaUN+qE+c2o
+	1u3Uh/NDTVVF1W+9yOM1rzf4Ev1xvkE1oWnU7H28QItwbkmo/v3f+DtrwAaB6wFpa16GqX/sKPA7P
+	7icS9L5gk/LDJ85ehutgJIvtBs81NkqM3ysJ/o6EmEzJ1CxKqQBPyAesli3dseIO9lX6213rcvkIx
+	A07u5tOImxI5K9KJotsA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpVAS-0002rm-9H; Fri, 01 Feb 2019 09:31:24 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gpVAg-00039k-NH; Fri, 01 Feb 2019 09:31:38 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpVAF-0002fw-0p
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 09:31:12 +0000
+ id 1gpVAH-0002gk-2z
+ for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 09:31:16 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7908515BF;
- Fri,  1 Feb 2019 01:31:10 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A668A15BE;
+ Fri,  1 Feb 2019 01:31:12 -0800 (PST)
 Received: from queper01-lin.cambridge.arm.com (queper01-lin.cambridge.arm.com
  [10.1.195.48])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 892A23F71E;
- Fri,  1 Feb 2019 01:31:08 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B64B33F71E;
+ Fri,  1 Feb 2019 01:31:10 -0800 (PST)
 From: Quentin Perret <quentin.perret@arm.com>
 To: viresh.kumar@linaro.org, sudeep.holla@arm.com, rjw@rjwysocki.net,
  nm@ti.com, sboyd@kernel.org, mka@chromium.org
-Subject: [PATCH v3 1/5] PM / OPP: Introduce a power estimation helper
-Date: Fri,  1 Feb 2019 09:30:57 +0000
-Message-Id: <20190201093101.31869-2-quentin.perret@arm.com>
+Subject: [PATCH v3 2/5] cpufreq: dt: Register an Energy Model
+Date: Fri,  1 Feb 2019 09:30:58 +0000
+Message-Id: <20190201093101.31869-3-quentin.perret@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190201093101.31869-1-quentin.perret@arm.com>
 References: <20190201093101.31869-1-quentin.perret@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_013111_076334_31A73D73 
-X-CRM114-Status: GOOD (  21.08  )
+X-CRM114-CacheID: sfid-20190201_013113_297570_039F10F6 
+X-CRM114-Status: GOOD (  15.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,173 +78,49 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Energy Model (EM) framework provides an API to let drivers register
-the active power of CPUs. The drivers are expected to provide a callback
-method which estimates the power consumed by a CPU at each available
-performance levels. How exactly this should be implemented, however,
-depends on the platform.
-
-On some systems, PM_OPP knows the voltage and frequency at which CPUs
-can run. When coupled with the CPU 'capacitance' (as provided by the
-'dynamic-power-coefficient' devicetree binding), it is possible to
-estimate the dynamic power consumption of a CPU as P = C * V^2 * f, with
-C its capacitance and V and f respectively the voltage and frequency of
-the OPP. The Intelligent Power Allocator (IPA) thermal governor already
-implements that estimation method, in the thermal framework.
-
-However, this power estimation method can be applied to any platform
-where all the parameters are known (C, V and f), and not only those
-suffering thermal issues. As such, the code implementing this feature
-can be re-used to also populate the EM framework now used by EAS.
-
-As a first step, introduce in PM_OPP a helper function which CPUFreq
-drivers can use to register into the EM framework. This duplicates the
-power estimation done in IPA until it can be migrated to using the EM
-framework. This will be done later, once the EM framework has support
-for at least all platforms currently supported by IPA.
+Now that PM_OPP provides a helper function to estimate the power
+consumed by CPUs, make sure to try and register an Energy Model (EM)
+from cpufreq-dt, hence ensuring interested subsystems (the task
+scheduler, for example) can make use of that information when available.
 
 Signed-off-by: Quentin Perret <quentin.perret@arm.com>
-Tested-by: Matthias Kaehlcke <mka@chromium.org>
 ---
- drivers/opp/of.c       | 96 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/pm_opp.h |  6 +++
- 2 files changed, 102 insertions(+)
+ drivers/cpufreq/cpufreq-dt.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/opp/of.c b/drivers/opp/of.c
-index 06f0f632ec47..4bde13d94dc2 100644
---- a/drivers/opp/of.c
-+++ b/drivers/opp/of.c
-@@ -20,6 +20,7 @@
- #include <linux/pm_domain.h>
- #include <linux/slab.h>
- #include <linux/export.h>
-+#include <linux/energy_model.h>
+diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+index e58bfcb1169e..1d4ad6f67408 100644
+--- a/drivers/cpufreq/cpufreq-dt.c
++++ b/drivers/cpufreq/cpufreq-dt.c
+@@ -160,7 +160,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 	unsigned int transition_latency;
+ 	bool fallback = false;
+ 	const char *name;
+-	int ret;
++	int ret, nr_opp;
  
- #include "opp.h"
+ 	cpu_dev = get_cpu_device(policy->cpu);
+ 	if (!cpu_dev) {
+@@ -231,8 +231,8 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 	 * But we need OPP table to function so if it is not there let's
+ 	 * give platform code chance to provide it for us.
+ 	 */
+-	ret = dev_pm_opp_get_opp_count(cpu_dev);
+-	if (ret <= 0) {
++	nr_opp = dev_pm_opp_get_opp_count(cpu_dev);
++	if (nr_opp <= 0) {
+ 		dev_dbg(cpu_dev, "OPP table is not ready, deferring probe\n");
+ 		ret = -EPROBE_DEFER;
+ 		goto out_free_opp;
+@@ -280,6 +280,8 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 	policy->cpuinfo.transition_latency = transition_latency;
+ 	policy->dvfs_possible_from_any_cpu = true;
  
-@@ -1047,3 +1048,98 @@ struct device_node *dev_pm_opp_get_of_node(struct dev_pm_opp *opp)
- 	return of_node_get(opp->np);
- }
- EXPORT_SYMBOL_GPL(dev_pm_opp_get_of_node);
++	dev_pm_opp_of_register_em(policy->cpus, nr_opp);
 +
-+/*
-+ * Callback function provided to the Energy Model framework upon registration.
-+ * This computes the power estimated by @CPU at @kHz if it is the frequency
-+ * of an existing OPP, or at the frequency of the first OPP above @kHz otherwise
-+ * (see dev_pm_opp_find_freq_ceil()). This function updates @kHz to the ceiled
-+ * frequency and @mW to the associated power. The power is estimated as
-+ * P = C * V^2 * f with C being the CPU's capacitance and V and f respectively
-+ * the voltage and frequency of the OPP.
-+ *
-+ * Returns -ENODEV if the CPU device cannot be found, -EINVAL if the power
-+ * calculation failed because of missing parameters, 0 otherwise.
-+ */
-+static int __maybe_unused _get_cpu_power(unsigned long *mW, unsigned long *kHz,
-+					 int cpu)
-+{
-+	struct device *cpu_dev;
-+	struct dev_pm_opp *opp;
-+	struct device_node *np;
-+	unsigned long mV, Hz;
-+	u32 cap;
-+	u64 tmp;
-+	int ret;
-+
-+	cpu_dev = get_cpu_device(cpu);
-+	if (!cpu_dev)
-+		return -ENODEV;
-+
-+	np = of_node_get(cpu_dev->of_node);
-+	if (!np)
-+		return -EINVAL;
-+
-+	ret = of_property_read_u32(np, "dynamic-power-coefficient", &cap);
-+	of_node_put(np);
-+	if (ret)
-+		return -EINVAL;
-+
-+	Hz = *kHz * 1000;
-+	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &Hz);
-+	if (IS_ERR(opp))
-+		return -EINVAL;
-+
-+	mV = dev_pm_opp_get_voltage(opp) / 1000;
-+	dev_pm_opp_put(opp);
-+	if (!mV)
-+		return -EINVAL;
-+
-+	tmp = (u64)cap * mV * mV * (Hz / 1000000);
-+	do_div(tmp, 1000000000);
-+
-+	*mW = (unsigned long)tmp;
-+	*kHz = Hz / 1000;
-+
-+	return 0;
-+}
-+
-+/**
-+ * dev_pm_opp_of_register_em() - Attempt to register an Energy Model
-+ * @cpus	: CPUs for which an Energy Model has to be registered
-+ * @nr_opp	: Number of OPPs to register in the Energy Model
-+ *
-+ * This checks whether the "dynamic-power-coefficient" devicetree property has
-+ * been specified, and tries to register an Energy Model with it if it has.
-+ */
-+void dev_pm_opp_of_register_em(struct cpumask *cpus, int nr_opp)
-+{
-+	struct em_data_callback em_cb = EM_DATA_CB(_get_cpu_power);
-+	int ret, cpu = cpumask_first(cpus);
-+	struct device *cpu_dev;
-+	struct device_node *np;
-+	u32 cap;
-+
-+	cpu_dev = get_cpu_device(cpu);
-+	if (!cpu_dev)
-+		return;
-+
-+	np = of_node_get(cpu_dev->of_node);
-+	if (!np)
-+		return;
-+
-+	/*
-+	 * Register an EM _only_ if the 'dynamic-power-coefficient' property is
-+	 * set in devicetree. It is assumed the voltage values are known if that
-+	 * property is set since it is useless otherwise. If voltages are not
-+	 * known, just let the EM registration fail with an error to alert the
-+	 * user about the inconsistent configuration.
-+	 */
-+	ret = of_property_read_u32(np, "dynamic-power-coefficient", &cap);
-+	of_node_put(np);
-+	if (ret || !cap)
-+		return;
-+
-+	em_register_perf_domain(cpus, nr_opp, &em_cb);
-+}
-+EXPORT_SYMBOL_GPL(dev_pm_opp_of_register_em);
-diff --git a/include/linux/pm_opp.h b/include/linux/pm_opp.h
-index b895f4e79868..58ae08b024bd 100644
---- a/include/linux/pm_opp.h
-+++ b/include/linux/pm_opp.h
-@@ -327,6 +327,7 @@ int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpuma
- struct device_node *dev_pm_opp_of_get_opp_desc_node(struct device *dev);
- struct device_node *dev_pm_opp_get_of_node(struct dev_pm_opp *opp);
- int of_get_required_opp_performance_state(struct device_node *np, int index);
-+void dev_pm_opp_of_register_em(struct cpumask *cpus, int nr_opp);
- #else
- static inline int dev_pm_opp_of_add_table(struct device *dev)
- {
-@@ -365,6 +366,11 @@ static inline struct device_node *dev_pm_opp_get_of_node(struct dev_pm_opp *opp)
- {
- 	return NULL;
- }
-+
-+static inline void dev_pm_opp_of_register_em(struct cpumask *cpus, int nr_opp)
-+{
-+}
-+
- static inline int of_get_required_opp_performance_state(struct device_node *np, int index)
- {
- 	return -ENOTSUPP;
+ 	return 0;
+ 
+ out_free_cpufreq_table:
 -- 
 2.20.1
 
