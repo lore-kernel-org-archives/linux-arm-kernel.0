@@ -2,68 +2,68 @@ Return-Path: <SRS0=Q9BQ=QJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8045BC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 10:21:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6A121C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 10:27:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 50931217D6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 10:21:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3B5F62146E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 10:27:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Lmcjmqh+";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="i2bZLGxz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 50931217D6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Op8SYZQq";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="E/B1et1b"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B5F62146E
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ROjVcVDqMChM16asDSWUSMy0jB9XL3rHLV1U4Ltalrk=; b=Lmcjmqh+E5OMQR
-	nRVVfeAglmbmS0rqGwZw5HXyuQbGJ9HMSC/1pAbn3zXxA1maqZHHvYxNJes6eehItIf0Krlxkqg/O
-	A7IjC0UmLN+hLQfsjvJ1vhFnW1Uw8vWPEs5AoUXxnDHRPZWKtJOyMQ1d6mhABKOUhdbphORij13Yh
-	IFl2thsMEIIlrdAwicErjCYRHDkohFi+MVN2GaLe0LoIcp/UcIE+VxyvteY2cTjX1w/kAeGBh5lBY
-	0lhfaFSzAsSPRafpj2wnI+hZtvTtroSqktxDsDWPlihftBop3SF5Cmq3R/OakwhBkKOI6xX0dFLjY
-	Kf7p+Mf6KFL+iF2UTMvA==;
+	List-Owner; bh=1GzzRyQRh/rC83jDfkCIQyCAGaL/3mm8qArXJrTi0kg=; b=Op8SYZQq+ZyTuk
+	TnqikD5jcSj8x4enh6X9DhuTzl1Td+hkMRpRn6hCfD4Amy3KFhAghHdu8QU5sOxN94PZEDI2Su5Yg
+	ReN6mWnfQaaq4Ym8+589+0+j40j/nS9DWxpfYe0c60DcxGb3ry3vBux2w3Byt4k9vHYUv3G/Vb8BY
+	QNiR6jRWi8JmpPmy6R2oDTIaJTM4GvOhWHFeeoLcQq6SvEcyHN2w1Y7z8hrTfkjZn/HnabAL7BseX
+	vKGAdKNQk7jlEFxvTHHH5HCoMagvBCqhYeGEqvxZnU6ZMRnC9IvZ8/PLLVMysCVN6gWEaAt8UATVA
+	OJ2E1pm5YbYCKcoRsEzQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpsQ0-00073i-HP; Sat, 02 Feb 2019 10:21:00 +0000
+	id 1gpsW2-0000RT-Hk; Sat, 02 Feb 2019 10:27:14 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpsPw-00073M-HK
- for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 10:20:58 +0000
-Received: from archlinux (cpc91196-cmbg18-2-0-cust659.5-4.cable.virginm.net
- [81.96.234.148])
+ id 1gpsVz-0000R6-SO
+ for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 10:27:13 +0000
+Received: from localhost (unknown [125.16.100.118])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id B247020870;
- Sat,  2 Feb 2019 10:20:51 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 57314217D6;
+ Sat,  2 Feb 2019 10:27:10 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549102855;
- bh=+fdH/w2zAugmHdwEMMQcXoW9UFPDCuiV2igdmI2iw1I=;
- h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=i2bZLGxzujncRYN/k8bXege1x2mJt3q3jmNUPvLeKJc6HDt+ixFcXRK1iouTUsjZE
- H4JcxMZMFuSjj/da+1GyIWu8+6qtY7QkABU+rToJefd5jmUkKvpm6IUMQduWFeJXkN
- co9qcgROXoXKQljTiJtyNSKa2zSTzJ7SzRjw+ISM=
-Date: Sat, 2 Feb 2019 10:20:48 +0000
-From: Jonathan Cameron <jic23@kernel.org>
-To: <g.ottinger@abatec.at>
-Subject: Re: [PATCH] iio: adc: at91: disable adc channel interrupt in
- timeout case
-Message-ID: <20190202102021.12bb0a72@archlinux>
-In-Reply-To: <20190130134202.5831-1-g.ottinger@abatec.at>
-References: <20190130134202.5831-1-g.ottinger@abatec.at>
-X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+ s=default; t=1549103231;
+ bh=GS/fdapWnmzoOb1gHr/sWftx5rSEkr7c8Rf7n8mX+ak=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=E/B1et1b2uCqjJGTFBrGngFuW8z1AfcmKNWBRFnTSfe9LPkEGZJa+3oKXlE2ou3Jv
+ kjUia/oCPMnmL66bduRAm+zmhktVHZzCOFeVocsQ7L8LNYOCg4ZDWzml+Mxf1aMD2E
+ VI85NGBcOeo0IX4Qv8utHeJjqPMQYsnZOjy1ccmc=
+Date: Sat, 2 Feb 2019 15:55:40 +0530
+From: Vinod Koul <vkoul@kernel.org>
+To: Codrin.Ciubotariu@microchip.com
+Subject: Re: [PATCH v2] dmaengine: at_xdmac: Fix wrongfull report of a
+ channel as in use
+Message-ID: <20190202102540.GF4296@vkoul-mobl>
+References: <20190123163339.17506-1-codrin.ciubotariu@microchip.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190123163339.17506-1-codrin.ciubotariu@microchip.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190202_022056_612280_E65241F0 
-X-CRM114-Status: GOOD (  20.90  )
+X-CRM114-CacheID: sfid-20190202_022711_937145_F397FC45 
+X-CRM114-Status: GOOD (  13.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,95 +75,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Lars-Peter Clausen <lars@metafoo.de>, Kees Cook <keescook@chromium.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, linux-iio@vger.kernel.org,
- linux-kernel@vger.kernel.org, Maxime Ripard <maxime.ripard@bootlin.com>,
- Ludovic Desroches <ludovic.desroches@microchip.com>,
- Peter Meerwald-Stadler <pmeerw@pmeerw.net>, Hartmut Knaack <knaack.h@gmx.de>,
- eugen.hristev@microchip.com, s.etzlstorfer@abatec.at,
- "David S. Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org
+Cc: dmaengine@vger.kernel.org, Ludovic.Desroches@microchip.com,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 30 Jan 2019 14:42:02 +0100
-<g.ottinger@abatec.at> wrote:
-
-> From: Georg Ottinger <g.ottinger@abatec.at>
+On 23-01-19, 16:33, Codrin.Ciubotariu@microchip.com wrote:
+> From: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
 > 
-> Having a brief look at at91_adc_read_raw() it is obvious that in the case
-> of a timeout the setting of AT91_ADC_CHDR and AT91_ADC_IDR registers is
-> omitted. If 2 different channels are queried we can end up with a
-> situation where two interrupts are enabled, but only one interrupt is
-> cleared in the interrupt handler. Resulting in a interrupt loop and a
-> system hang.
+> atchan->status variable is used to store two different information:
+>  - pass channel interrupts status from interrupt handler to tasklet;
+>  - channel information like whether it is cyclic or paused;
 > 
-> Signed-off-by: Georg Ottinger <g.ottinger@abatec.at>
-
-Whilst I agree this looks like a correct change, I would like Maxime
-to take a look as he is obviously much more familiar with the driver
-than I am.
-
-I suspect you can only actually get there in the event of a hardware
-failure as that isn't actually a timeout you should ever see.
-Could be wrong though!
-
-Thanks,
-
-Jonathan
-
-> ---
->  drivers/iio/adc/at91_adc.c | 28 +++++++++++++++++-----------
->  1 file changed, 17 insertions(+), 11 deletions(-)
+> This causes a bug when device_terminate_all() is called,
+> (AT_XDMAC_CHAN_IS_CYCLIC cleared on atchan->status) and then a late End
+> of Block interrupt arrives (AT_XDMAC_CIS_BIS), which sets bit 0 of
+> atchan->status. Bit 0 is also used for AT_XDMAC_CHAN_IS_CYCLIC, so when
+> a new descriptor for a cyclic transfer is created, the driver reports
+> the channel as in use:
 > 
-> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index 75d2f7358..596841a3c 100644
-> --- a/drivers/iio/adc/at91_adc.c
-> +++ b/drivers/iio/adc/at91_adc.c
-> @@ -704,23 +704,29 @@ static int at91_adc_read_raw(struct iio_dev *idev,
->  		ret = wait_event_interruptible_timeout(st->wq_data_avail,
->  						       st->done,
->  						       msecs_to_jiffies(1000));
-> -		if (ret == 0)
-> -			ret = -ETIMEDOUT;
-> -		if (ret < 0) {
-> -			mutex_unlock(&st->lock);
-> -			return ret;
-> -		}
-> -
-> -		*val = st->last_value;
->  
-> +		/* Disable interrupts, regardless if adc conversion was
-> +		 * successful or not
-> +		 */
->  		at91_adc_writel(st, AT91_ADC_CHDR,
->  				AT91_ADC_CH(chan->channel));
->  		at91_adc_writel(st, AT91_ADC_IDR, BIT(chan->channel));
->  
-> -		st->last_value = 0;
-> -		st->done = false;
-> +		if (ret > 0) {
-> +			/* a valid conversion took place */
-> +			*val = st->last_value;
-> +			st->last_value = 0;
-> +			st->done = false;
-> +			ret = IIO_VAL_INT;
-> +		} else if (ret == 0) {
-> +			/* conversion timeout */
-> +			dev_err(&idev->dev, "ADC Channel %d timeout.\n",
-> +				chan->channel);
-> +			ret = -ETIMEDOUT;
-> +		}
-> +
->  		mutex_unlock(&st->lock);
-> -		return IIO_VAL_INT;
-> +		return ret;
->  
->  	case IIO_CHAN_INFO_SCALE:
->  		*val = st->vref_mv;
+> if (test_and_set_bit(AT_XDMAC_CHAN_IS_CYCLIC, &atchan->status)) {
+> 	dev_err(chan2dev(chan), "channel currently used\n");
+> 	return NULL;
+> }
+> 
+> This patch fixes the bug by adding a different struct member to keep
+> the interrupts status separated from the channel status bits.
 
+Applied, thanks
+
+-- 
+~Vinod
 
 _______________________________________________
 linux-arm-kernel mailing list
