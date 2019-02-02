@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EC964C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 08:38:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3D0B6C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 08:44:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B2FF620870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 08:38:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0BBA720869
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 08:44:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iw6bKbMc";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="VdKfaip/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B2FF620870
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EnYgjbd4";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="keB1vkCZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0BBA720869
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,59 +26,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
 	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=P2ua0Xc+QfOOqBmEh1O0TKPTFTa2C632xb0Pr3gSajQ=; b=iw6bKbMc4CdRCx
-	RBFhBEEfnvaH2AIqdfY7M5HgdxY3ESOZuIKmsWZXE1rl+6FX2AC5yreXlHTUK5xiG25xMHBUMza0V
-	yP+iOxA9u3DuwhdP/Vl0hWNuN7n6C+UZ63qXSqTnouXGhLtF6kT5Io5x7UJvWRmr/GmKv5O4YxtC6
-	44F2vwOGU3YQh3sGfQ85P2GXBJEe7sn87HbnqVe6OpDiDVAErKBqGRmQrsoTZYfKNJdEJsni/xxRI
-	cbKrP6YpaLAVw3P9MAz/+2OI4yqG2ArsYNdeO5rLtkOd5KsgLRGYJljYFNse3nDdQgo1g3nUF7aWj
-	QXsFs56wtwXo28cHd/GA==;
+	List-Owner; bh=AI8UcCUoJpcaZIAvCPS2cw6QZLPUb5TInr5NQjJ89Ik=; b=EnYgjbd4uZ/z0W
+	KTkahbWD0RNxbUl9eNEuoTR4FhXXYwfeue3RYnZT+sXJrWxMr3ZKnSBXtYVR+q2TUTAa0mOfwJjkf
+	E6Yfq/xCUg0vOEL/fbNEUdwgY9gtw999vHlr+5Nl2F3IzA52rjPXs7WF4cX+JQRFu16rSBfcD7QYJ
+	aOM68h5n8Uhy/aX+Iz7Qngjg0Lm0HyRoCb27H+RPq7FqX95jXS/n/4V1oyBoCGDUhgSjlGwa0ZhQL
+	gpanooxP6cdrfA+/O02GuTJnUrBR3QdTAPInyzZlv7p+BQV/X0CyFLuWO0sPbNJPQ2/DNrRj1/sBI
+	/qqTjVtbSoA+3BwpIB8g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpqpD-000462-Kn; Sat, 02 Feb 2019 08:38:55 +0000
-Received: from esa5.microchip.iphmx.com ([216.71.150.166])
+	id 1gpqug-0006Ek-19; Sat, 02 Feb 2019 08:44:34 +0000
+Received: from esa2.microchip.iphmx.com ([68.232.149.84])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpqp9-00045E-6Z; Sat, 02 Feb 2019 08:38:53 +0000
-X-IronPort-AV: E=Sophos;i="5.56,551,1539673200"; d="scan'208";a="24149870"
+ id 1gpquc-0006DU-SD; Sat, 02 Feb 2019 08:44:32 +0000
+X-IronPort-AV: E=Sophos;i="5.56,551,1539673200"; d="scan'208";a="26065106"
 Received: from smtpout.microchip.com (HELO email.microchip.com)
  ([198.175.253.82])
- by esa5.microchip.iphmx.com with ESMTP/TLS/AES128-SHA;
- 02 Feb 2019 01:38:44 -0700
-Received: from NAM01-BN3-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.37) with Microsoft SMTP Server (TLS) id
- 14.3.352.0; Sat, 2 Feb 2019 01:38:44 -0700
+ by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 02 Feb 2019 01:44:29 -0700
+Received: from NAM02-BL2-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.108) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Sat, 2 Feb 2019 01:44:29 -0700
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=microchiptechnology.onmicrosoft.com;
  s=selector1-microchiptechnology-onmicrosoft-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=JQ2T7XKEtfASLBg202ZllOssDx09WpS+ngu+ab+5YTA=;
- b=VdKfaip/7si+oXtva+2PL9pjZYoTctMbHCg4VF1iEs6to8sK0CuluP0jgYvZythdeUIZmCEL4WlwrNhUUfPEiztopxlnkRzb+P+NaPRO9z92WogGUEXlJr0tW7Rn9te/koSnJSp8EMiA7Y0sRNwRbEtiZQwYLVH12OfHZl0ai5Y=
+ bh=06Xm15afEM4Px9j8FoRyu/eKLb0Rq9lUUS60Q0iqmp4=;
+ b=keB1vkCZU6nF1nTtr+M//joGfgXKFaI2HHTRn4V2M44J1L8RfdXQW3D+aWNKNtN+qkm6abfQ3W4KY4D4q33KIvbx1+//lbTN00yLD9BJCerF+26r0Zni7jUJjtTI+haZDwCdKHQQuv30nUD4LFlBY49FqLecgMI9ucq4VUyyrY4=
 Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.98.146) by
  BN6PR11MB2035.namprd11.prod.outlook.com (10.173.26.17) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1580.17; Sat, 2 Feb 2019 08:38:40 +0000
+ 15.20.1580.17; Sat, 2 Feb 2019 08:44:27 +0000
 Received: from BN6PR11MB1842.namprd11.prod.outlook.com
  ([fe80::847:4296:13b9:fc9f]) by BN6PR11MB1842.namprd11.prod.outlook.com
  ([fe80::847:4296:13b9:fc9f%8]) with mapi id 15.20.1580.017; Sat, 2 Feb 2019
- 08:38:40 +0000
+ 08:44:27 +0000
 From: <Tudor.Ambarus@microchip.com>
 To: <bbrezillon@kernel.org>
-Subject: Re: [PATCH v3 01/13] spi: atmel-quadspi: cache MR value to avoid a
- write access
-Thread-Topic: [PATCH v3 01/13] spi: atmel-quadspi: cache MR value to avoid a
- write access
-Thread-Index: AQHUuqzGfGfknscimE6zODgQQX/E96XMFmIAgAAZnoA=
-Date: Sat, 2 Feb 2019 08:38:40 +0000
-Message-ID: <adf1d099-b8fd-6f91-75d7-6eee256b470b@microchip.com>
+Subject: Re: [PATCH v3 03/13] spi: atmel-quadspi: drop wrappers for iomem
+ accesses
+Thread-Topic: [PATCH v3 03/13] spi: atmel-quadspi: drop wrappers for iomem
+ accesses
+Thread-Index: AQHUuqzK70j+j/B0dE+wG5hbzKgwl6XMF5mAgAAaBoA=
+Date: Sat, 2 Feb 2019 08:44:27 +0000
+Message-ID: <53c9f4b2-7022-e13d-65a4-2e1bed4d76b1@microchip.com>
 References: <20190202040653.1217-1-tudor.ambarus@microchip.com>
- <20190202040653.1217-2-tudor.ambarus@microchip.com>
- <20190202080650.44becc2d@bbrezillon>
-In-Reply-To: <20190202080650.44becc2d@bbrezillon>
+ <20190202040653.1217-4-tudor.ambarus@microchip.com>
+ <20190202081111.0bbc4443@bbrezillon>
+In-Reply-To: <20190202081111.0bbc4443@bbrezillon>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
-x-clientproxiedby: VI1PR0901CA0093.eurprd09.prod.outlook.com
- (2603:10a6:800:7e::19) To BN6PR11MB1842.namprd11.prod.outlook.com
+x-clientproxiedby: VI1PR09CA0113.eurprd09.prod.outlook.com
+ (2603:10a6:803:78::36) To BN6PR11MB1842.namprd11.prod.outlook.com
  (2603:10b6:404:101::18)
 authentication-results: spf=none (sender IP is )
  smtp.mailfrom=Tudor.Ambarus@microchip.com; 
@@ -85,37 +86,37 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [188.25.201.137]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; BN6PR11MB2035;
- 6:tE3TQLDaNKhwwQxRXYeuyn5ScRAbXCYoRmfIgHgk120TUrWhpiUkXXfT3Vex+veMJggUWX0Tyhl7jq2eESrK2a+WtGkmHT4VVhTe0xKpk0vHq7LzzyGFPTB//j8mrCHkzxKtrZSPzI8WWQVIZ/UnR68jiiF2dEpyLBaD0zQjL1cq7idB8CA4ZiKfWqpH5a8/4zTXqzGBdQbTQkXHeE2orq4P2K1e0MjYtGmYfktVYuPCJWTzdTxPJwZXbsMiHsPRd8IIfkbPRn6RZmVHC22BZxN69fobl0NaO4yMnPS9BPU5gB7qd79ZwGfsTn0xTDRSyNcBQcGKTafLB6UGgMTwPayQvBxSzTxXJwu4UzGjZPEd2llAxocVAU/PpuPUZgUw8unTktkb9Df5XGSF8SSu4+iamZSLZX1VC2FvQOVXeJPft5HVTVrz011li5XbwiQZDSPwBfGTkMHqMKnaABjXPA==;
- 5:YrUVJhv4rPLVepkgv6adLsSLDgeExQ5HiTzV0IN/6c5jxvnJ19/cwTkQyaHjCpNjoUk8G4iaYFlOfKrLyREAGhtHMIoGuuUpnRp35V30tmGzJDKV07dvgkvCx/ceIjB0/MFxADNfTQ5Y8PVrWoxdVBKxLINjIstr7dPC7iAIX8H1WpLHqTVbN/xcADkT1o2h7ZAw2Ky5C8v48SqP8xntTQ==;
- 7:Wj/3qpt+pk3h9W9/Ewbt3tL4//cyscqdXikW4JmLgFPFtMkAs/WISVvvB5isoaBtMUf0GciJ5asl0ce5dqdOomhgD9+T081CExBONT1ENpi+GKdua4pvZSlyLsGiZ4L4bTpQxgcMQPIbAo/6vFYh+A==
-x-ms-office365-filtering-correlation-id: 8086988f-8c79-4035-131f-08d688e9d4dc
+ 6:6VtBruGU6zll4SCefrbHyRwD31wVQyoqTnT/cH4o1fClD0Z9AfKR26QDjs2erakjKi23xw/7MNWT8+hYmOizuQKiZgtXV1+RelIcMUITQBhsxJd1127vmT0vNhKb/pWTBJz1myx+Cg06vt9XXFgnEKKlQT+9AF5CseakMrqYlMuhEfccrD96M+Q+4m/4mkqH1JSbBgrXGTsJrgzyjKuslgHQwjEszv6iZEOhrokwXlxYrP1OoGivx3Q94MSp48MdppZDGVz/hJeMjv8ZmWx4O+PvPBaehB7d7AZvoa9JH/dSPMDNGjrwuSw3C/sHgSLfKvpPS+TdUDYbgooxEWI1HuWFE8AXsbvtgvTnU/cQedd78j0yoCuFvtlo3wHs9+nkn1ckkqZqqEmBSztbGvMShMqPPDHlnPn8pSF1PGjMjh1rnT4TtnYHWeSykXpPPiKnTKtxyudkC67Med3ECDT4WA==;
+ 5:CYGHxXh4gaw1bOQaBBL8f6QxMYeoJRhOMBJMPjy01x7wvDilouYYxcq+vbR0z9AoDi2Tgvpy/qePN2ZdIOD2Wl+jRrFw+zTdGcCqSkNl2++D0nq16uytSg5pqEQH8KPwTgssAosKGsMEJX48Kv/J2DbKSuMk1I3332+3gZV7DvekuwTS4X/IIv0byQ7SbDmMvI5JUEfdwTH9qktCZulW8A==;
+ 7:OsHFUmGewgAryL6ehU6LSA5O8lumv50t4BJ+KFE2mvU1eZvE2oA7zyhpcl6xraddDIv2kKg75BlrvB2SWVOj6MaRAkdA/CvZ94KAB9e5tILFOKf0rHAIsaibnNkVB5yV1Z13z0TC1RCrCGgAdZAHRA==
+x-ms-office365-filtering-correlation-id: 348ff2a2-f321-4f3e-1248-08d688eaa3a7
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
  SRVR:BN6PR11MB2035; 
 x-ms-traffictypediagnostic: BN6PR11MB2035:
-x-microsoft-antispam-prvs: <BN6PR11MB20356B50F2AE9650521BEE71F0930@BN6PR11MB2035.namprd11.prod.outlook.com>
+x-microsoft-antispam-prvs: <BN6PR11MB2035EFFD5018A810B55C8DC9F0930@BN6PR11MB2035.namprd11.prod.outlook.com>
 x-forefront-prvs: 09368DB063
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(39860400002)(396003)(366004)(376002)(136003)(189003)(199004)(2616005)(8936002)(7416002)(11346002)(31686004)(105586002)(71190400001)(14454004)(71200400001)(81156014)(36756003)(8676002)(81166006)(486006)(97736004)(966005)(446003)(2906002)(3846002)(476003)(68736007)(6116002)(102836004)(39060400002)(106356001)(6246003)(229853002)(25786009)(6306002)(6512007)(4326008)(99286004)(52116002)(72206003)(6506007)(53936002)(6436002)(54906003)(186003)(256004)(31696002)(66066001)(26005)(14444005)(86362001)(53546011)(478600001)(6486002)(386003)(305945005)(7736002)(316002)(76176011)(6916009);
+ SFS:(10009020)(346002)(39860400002)(396003)(366004)(376002)(136003)(189003)(199004)(2616005)(8936002)(7416002)(11346002)(31686004)(105586002)(71190400001)(14454004)(71200400001)(81156014)(36756003)(8676002)(81166006)(486006)(97736004)(446003)(2906002)(3846002)(476003)(68736007)(6116002)(102836004)(39060400002)(106356001)(6246003)(229853002)(25786009)(6512007)(4326008)(99286004)(52116002)(72206003)(6506007)(53936002)(6436002)(54906003)(186003)(256004)(31696002)(66066001)(26005)(14444005)(86362001)(53546011)(478600001)(6486002)(386003)(305945005)(7736002)(316002)(76176011)(6916009)(21314003);
  DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB2035;
  H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: microchip.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: 9QP5TYLaK6B20r/n7h0rR85xLQAh/ToQUhFhbjzY6dwvC15PB0WiA0JRthbUJ13xL5YBg4vRmxXnXZSA9DVW+zQtdbXjojJ+UVVWxkjI74dvlJpPLpoK7ngvqLc4z3uQQu53FxcSR0MjnJgAPEMtd0Rktl7Z4LJkFXr3wBn7Z/fF7fPw35trRkDWu3fY68Oq5fYEaXAlU8xDntLJXiOmWXHlfENW/9WDWWxig1u+wZURYLtCJohISSwhXl9qnQ9OPhbIJGJfHxn/ePUWG4hjkuMpBqtgl5U1grsEmMSYcI7ZjMVBshfTSP+ezdC2nffvHF/nAv+48bgO/wk4ZR/5pswY6a0TroFitZjJ1mZs0TLlzNvg3uvNehP74PhVgZ9rn1zCzLGxmlDJ2ENNWY3p4+vapgZsZKw+2RvsxJuIpyA=
-Content-ID: <5481712A5D9E7D4CB4C58E8754D3914A@namprd11.prod.outlook.com>
+x-microsoft-antispam-message-info: /dyDInrd8l2U7fwofZMFJUt0iUermzeba3imOEu3r4xd0wk9Y3kDpDHKbkbdvYWMr2vFuYbs1ZGxgtmR7aT+EvgPaKMYSFozWdYjrWahVRnPYAd1uaqZQgFocxjn5svofftSwI4LquT7hqGtg6i6EOZsng3tZEF6E/X1RCTt2oyabaN5Z+1LXpFFCKx9SiMBn2i5+o1JothGHoVe4OjWPrmmONVq0MciQ5y8f+fIhmr9voGT155gXi5mrt27cJMFnM4PUs74fLV/E+LEZr5C6quz2XUcnnXmejP8KBpaTblZ17W8sF724Nmg7TD/RmseeVotca1dPa8WUoda09wJpyaZlyFnewQ1yvbqx+Oe7VyyoFLQpL+2Achy5dLCiO60PoDk2fUspUVIwe2fSXYIpV8To9sjFCoAyiR+fwhjI0c=
+Content-ID: <DCD794DE2C183345BDE83BB586E8540E@namprd11.prod.outlook.com>
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 8086988f-8c79-4035-131f-08d688e9d4dc
-X-MS-Exchange-CrossTenant-originalarrivaltime: 02 Feb 2019 08:38:38.0938 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 348ff2a2-f321-4f3e-1248-08d688eaa3a7
+X-MS-Exchange-CrossTenant-originalarrivaltime: 02 Feb 2019 08:44:24.7535 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB2035
 X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190202_003851_397140_421AB08E 
-X-CRM114-Status: GOOD (  18.05  )
+X-CRM114-CacheID: sfid-20190202_004430_948589_12DA3E1E 
+X-CRM114-Status: GOOD (  14.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -129,10 +130,10 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
  alexandre.belloni@bootlin.com, broonie@kernel.org,
- linux-kernel@vger.kernel.org, robh+dt@kernel.org, linux-spi@vger.kernel.org,
+ linux-kernel@vger.kernel.org, robh+dt@kernel.org,
  Ludovic.Desroches@microchip.com, Cyrille.Pitchen@microchip.com,
  linux-mtd@lists.infradead.org, bugalski.piotr@gmail.com,
- linux-arm-kernel@lists.infradead.org
+ linux-spi@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
@@ -140,77 +141,61 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 
 
-On 02/02/2019 09:06 AM, Boris Brezillon wrote:
-> On Sat, 2 Feb 2019 04:07:13 +0000
+On 02/02/2019 09:11 AM, Boris Brezillon wrote:
+> On Sat, 2 Feb 2019 04:07:19 +0000
 > <Tudor.Ambarus@microchip.com> wrote:
 > 
 >> From: Tudor Ambarus <tudor.ambarus@microchip.com>
 >>
->> Cache Serial Memory Mode (SMM) value to avoid write access when
->> setting the controller in serial memory mode. SMM is set in
->> exec_op() and not at probe time, to let room for future regular
->> SPI support.
+>> The wrappers hid that the accesses are relaxed. Drop them.
 >>
+>> Suggested-by: Boris Brezillon <bbrezillon@kernel.org>
 >> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
 >> ---
->> v3: update smm value when different. rename mr/smm
->> v2: cache MR value instead of moving the write access at probe
+>> v3: no change
+>> v2: new patch
 >>
->>  drivers/spi/atmel-quadspi.c | 7 ++++++-
->>  1 file changed, 6 insertions(+), 1 deletion(-)
+>>  drivers/spi/atmel-quadspi.c | 47 +++++++++++++++++++--------------------------
+>>  1 file changed, 20 insertions(+), 27 deletions(-)
 >>
 >> diff --git a/drivers/spi/atmel-quadspi.c b/drivers/spi/atmel-quadspi.c
->> index ddc712410812..645284c6ec9a 100644
+>> index feeddcb25e1f..131374db0db4 100644
 >> --- a/drivers/spi/atmel-quadspi.c
 >> +++ b/drivers/spi/atmel-quadspi.c
->> @@ -155,6 +155,7 @@ struct atmel_qspi {
->>  	struct clk		*clk;
->>  	struct platform_device	*pdev;
->>  	u32			pending;
->> +	u32			smm;
->>  	struct completion	cmd_completion;
+>> @@ -175,17 +175,6 @@ static const struct qspi_mode sama5d2_qspi_modes[] = {
+>>  	{ 4, 4, 4, QSPI_IFR_WIDTH_QUAD_CMD },
 >>  };
 >>  
->> @@ -238,7 +239,11 @@ static int atmel_qspi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
->>  	icr = QSPI_ICR_INST(op->cmd.opcode);
->>  	ifr = QSPI_IFR_INSTEN;
->>  
->> -	qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
->> +	/* Set the QSPI controller in Serial Memory Mode */
->> +	if (aq->smm != QSPI_MR_SMM) {
+>> -/* Register access functions */
+>> -static inline u32 qspi_readl(struct atmel_qspi *aq, u32 reg)
+>> -{
+>> -	return readl_relaxed(aq->regs + reg);
+>> -}
+>> -
+>> -static inline void qspi_writel(struct atmel_qspi *aq, u32 reg, u32 value)
+>> -{
+>> -	writel_relaxed(value, aq->regs + reg);
+>> -}
+>> -
+>>  static inline bool is_compatible(const struct spi_mem_op *op,
+>>  				 const struct qspi_mode *mode)
+>>  {
+>> @@ -229,6 +218,7 @@ static bool atmel_qspi_supports_op(struct spi_mem *mem,
+>>  static int atmel_qspi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
+>>  {
+>>  	struct atmel_qspi *aq = spi_controller_get_devdata(mem->spi->master);
+>> +	void __iomem *base = aq->regs;
 > 
-> Sorry, I think I misunderstood your previous suggestion, I thought the
-> reg was called SMM. If the reg is called MR and the value you expect in
-> there is SMM, then the field should be named ->mr as it caches the
-> whole reg, not only the SMM bit. So it's actually:
+> Can we name this variable regs instead of base or even get rid of it
+> and dereference aq->regs in the xxx_relaxed() calls (doesn't look like
+> the lines would be over 80 chars even when doing that). With this
+> addressed, you can add:
 > 
-> 	if (aq->mr != QSPI_MR_SMM) {
+> Reviewed-by: Boris Brezillon <bbrezillon@kernel.org>
 
-No worries. When keeping the reg name, and not the bit itself, I would expect to
-do the check as in v2, to let room for checking other bits too:
-
-+	if (!(aq->mr & QSPI_MR_SMM))
-
-I don't have any problems to keep "mr" name, but I would like to understand your
-reasons.
-
-Thanks,
-ta
-
-> 
->> +		qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
->> +		aq->smm = QSPI_MR_SMM;
->> +	}
->>  
->>  	mode = find_mode(op);
->>  	if (mode < 0)
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+I chose to introduce the "base" variable when I have at least 2 dereferences in
+a function, as an optimization. In exec_op() for example, there are 6
+dereferences of aq->reqs. Why do you prefer keeping aq->regs?
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
