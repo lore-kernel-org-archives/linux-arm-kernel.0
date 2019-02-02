@@ -2,75 +2,67 @@ Return-Path: <SRS0=Q9BQ=QJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C3E45C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 06:18:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B734EC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 07:07:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8C30020870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 06:18:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8887B20870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 07:07:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r4zyHyIl";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kemnade.info header.i=@kemnade.info header.b="HTlTPhiV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C30020870
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kemnade.info
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dl/yflYX";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="nlOcOcvr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8887B20870
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	MIME-Version:References:In-Reply-To:Message-ID:Subject:To:From:Date:Reply-To:
-	Cc:Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=8IB++kyQT8rbKhFryrY599GKOSinybXe6LzzlBOrkro=; b=r4zyHyIlvYr3qAwlz3HrRLsO7
-	GAmLYRKWgOQVzpUc1y635zIQrO55tSlEyC2lo5dsgJB2xraRs/9bmyv9kPJGGqGA78QV//T2ipJii
-	ywTNK5EyLHC0Dt/Hfx7/Hv9zpqW7zsB3K7tmcPysOIk81v6LcWcm25ljZNPMXLj2k2OzoGBb9z/ga
-	3aoe64XDOGsxq/xz4ZcijvXsw6s8+qN9XTAIeb7b80o/nFQaTCb11U1C6Z+WMe8OIG5ggVDsraoGl
-	RcRzEIFr8oiErZ/2Fm8YjSQNfDa0ht1IGlLxyNrklMxyy1Dcrn6evqvl8J7TYc1GBiIfmXDrAndLw
-	FaA7CJzJA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=sho5KXuUuqIaFPBZBwEv6dGy7aAj4RYbUv3zcY3xNhk=; b=dl/yflYXHdtypZ
+	QHI6GnILtVmXK145GrfsgIc4wdW9en/TV3CyBg7ULCJjCoa8oOYl8VI/jEcTlIpfIlrchzqws0Rkh
+	9BYK9KUlOg6SHvbPhV3HD/t03Z9lDoBbB5E3Hhv8CyBha2XaWDHNZiK/AJs/QhoCU37UMif0Qc+5L
+	YpulMeu+qJ6AcKdYHF3oMLj379ILk9i4Prk+fLmpNOSfXR/lbSfzLlw7qMPPR2mRAFfSVUP4goYpN
+	SNqB41HVzKZtE1aELn7J4IZI7h5Wz025nx3AUhUQLQBHF4F80UA9yOt94yPxzWI+/6e6249IUOR6G
+	kba+dT/DMMEp5p45t1qQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpodW-0006XB-Gs; Sat, 02 Feb 2019 06:18:42 +0000
-Received: from mail.andi.de1.cc ([2a01:238:43f3:0:615b:ee97:1f81:cbf2]
- helo=h2641619.stratoserver.net)
+	id 1gppON-0006Gd-D9; Sat, 02 Feb 2019 07:07:07 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpodT-0006Wt-B9
- for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 06:18:40 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=kemnade.info; s=20180802; h=Content-Type:MIME-Version:References:
- In-Reply-To:Message-ID:Subject:To:From:Date:Sender:Reply-To:Cc:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=K4d/74SfSGpowEs1tW9V6SK3qE76OJNqK+WcVbDexCk=; b=HTlTPhiVN+QQ0V8mMhQQ8YQVl
- QC/LZICoq51omWnOXBdkl+7V7pEDeWpEBgzHJVXMocKwwNeXesgyrutofQmMBAFN+YDHpC7JhvIiT
- DPm2rp7VV/UGy4Pgq43yobF2kbprkspDAQYxHFAA9E8Qo16liREz7LCksx2lWz63XTlTI=;
-Received: from x2f7f150.dyn.telefonica.de ([2.247.241.80] helo=localhost)
- by h2641619.stratoserver.net with esmtpsa
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <andreas@kemnade.info>)
- id 1gpodJ-0004UG-Lw; Sat, 02 Feb 2019 07:18:29 +0100
-Received: from localhost ([::1]) by localhost with esmtp (Exim 4.89)
- (envelope-from <andreas@kemnade.info>)
- id 1gpodG-0003Un-Sh; Sat, 02 Feb 2019 07:18:26 +0100
-Date: Sat, 2 Feb 2019 07:18:13 +0100
-From: Andreas Kemnade <andreas@kemnade.info>
-To: tony@atomide.com, linux@armlinux.org.uk, khilman@kernel.org,
- linux-omap@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org, letux-kernel@openphoenux.org
-Subject: Re: [PATCH] omap3: give off mode enable a more prominent place
-Message-ID: <20190202071813.6234d8a6@kemnade.info>
-In-Reply-To: <20190202055827.12956-1-andreas@kemnade.info>
-References: <20190202055827.12956-1-andreas@kemnade.info>
-X-Mailer: Claws Mail 3.14.1 (GTK+ 2.24.31; i686-pc-linux-gnu)
+ id 1gppOJ-0006GH-QH; Sat, 02 Feb 2019 07:07:05 +0000
+Received: from bbrezillon (91-160-177-164.subs.proxad.net [91.160.177.164])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 6B55B20870;
+ Sat,  2 Feb 2019 07:06:58 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549091223;
+ bh=E3FJCRyIlElVvR6dxcgGbiQIi5lKYbeOzntDFZu4bJg=;
+ h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
+ b=nlOcOcvrBqYWCQ3vNMPwvYhANUhKW+CJo5jIRvgL7zmJJckqXp3GQR/81RvP/wYKP
+ jFhKV7VXZlzR9XuaGcicB3w3eSX1bJIs13A7jz51cV6SEnyyedDH2OjmYniKONjUO0
+ OnDqvFf6hrT07g+UuvanbCCOM6IydxM8cFLxkhQ4=
+Date: Sat, 2 Feb 2019 08:06:50 +0100
+From: Boris Brezillon <bbrezillon@kernel.org>
+To: <Tudor.Ambarus@microchip.com>
+Subject: Re: [PATCH v3 01/13] spi: atmel-quadspi: cache MR value to avoid a
+ write access
+Message-ID: <20190202080650.44becc2d@bbrezillon>
+In-Reply-To: <20190202040653.1217-2-tudor.ambarus@microchip.com>
+References: <20190202040653.1217-1-tudor.ambarus@microchip.com>
+ <20190202040653.1217-2-tudor.ambarus@microchip.com>
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_221839_533772_5187051C 
-X-CRM114-Status: UNSURE (   7.24  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190201_230703_876311_9C91E271 
+X-CRM114-Status: GOOD (  17.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,65 +74,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Content-Type: multipart/mixed; boundary="===============1433797329975995673=="
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ alexandre.belloni@bootlin.com, linux-kernel@vger.kernel.org,
+ Cyrille.Pitchen@microchip.com, robh+dt@kernel.org, linux-spi@vger.kernel.org,
+ Ludovic.Desroches@microchip.com, broonie@kernel.org,
+ linux-mtd@lists.infradead.org, bugalski.piotr@gmail.com,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
---===============1433797329975995673==
-Content-Type: multipart/signed; micalg=pgp-sha256;
- boundary="Sig_/brBhm643RtDYZ=JIaq78N0f"; protocol="application/pgp-signature"
+On Sat, 2 Feb 2019 04:07:13 +0000
+<Tudor.Ambarus@microchip.com> wrote:
 
---Sig_/brBhm643RtDYZ=JIaq78N0f
-Content-Type: text/plain; charset=US-ASCII
-Content-Transfer-Encoding: quoted-printable
+> From: Tudor Ambarus <tudor.ambarus@microchip.com>
+> 
+> Cache Serial Memory Mode (SMM) value to avoid write access when
+> setting the controller in serial memory mode. SMM is set in
+> exec_op() and not at probe time, to let room for future regular
+> SPI support.
+> 
+> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+> ---
+> v3: update smm value when different. rename mr/smm
+> v2: cache MR value instead of moving the write access at probe
+> 
+>  drivers/spi/atmel-quadspi.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/spi/atmel-quadspi.c b/drivers/spi/atmel-quadspi.c
+> index ddc712410812..645284c6ec9a 100644
+> --- a/drivers/spi/atmel-quadspi.c
+> +++ b/drivers/spi/atmel-quadspi.c
+> @@ -155,6 +155,7 @@ struct atmel_qspi {
+>  	struct clk		*clk;
+>  	struct platform_device	*pdev;
+>  	u32			pending;
+> +	u32			smm;
+>  	struct completion	cmd_completion;
+>  };
+>  
+> @@ -238,7 +239,11 @@ static int atmel_qspi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
+>  	icr = QSPI_ICR_INST(op->cmd.opcode);
+>  	ifr = QSPI_IFR_INSTEN;
+>  
+> -	qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
+> +	/* Set the QSPI controller in Serial Memory Mode */
+> +	if (aq->smm != QSPI_MR_SMM) {
 
-On Sat,  2 Feb 2019 06:58:27 +0100
-Andreas Kemnade <andreas@kemnade.info> wrote:
+Sorry, I think I misunderstood your previous suggestion, I thought the
+reg was called SMM. If the reg is called MR and the value you expect in
+there is SMM, then the field should be named ->mr as it caches the
+whole reg, not only the SMM bit. So it's actually:
 
-> Enabling off mode was only reachable deeply hidden
-> in the debugfs. As powersaving is an important feature,
-> move the option out of its shady place.
-> The debugfs file can still be used to override the default.
+	if (aq->mr != QSPI_MR_SMM) {
 
-oops, this should be an rfc. So take it a bit with care.
+> +		qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
+> +		aq->smm = QSPI_MR_SMM;
+> +	}
+>  
+>  	mode = find_mode(op);
+>  	if (mode < 0)
 
-Regards,
-Andreas
-
---Sig_/brBhm643RtDYZ=JIaq78N0f
-Content-Type: application/pgp-signature
-Content-Description: OpenPGP digital signature
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAEBCAAdFiEEPIWxmAFyOaBcwCpFl4jFM1s/ye8FAlxVNiUACgkQl4jFM1s/
-ye8pEw/+L6fsxsK4dvYlZo/y0VgLNEYvdJs2w2yZEVoWmygXS2stsavD/y6Ap3my
-hSUIbVNJ438d5CFjQjgeSYhdhYHofuRDbZNuPv1JxKeIPvLlRanfL0OCmolOZJhA
-VO2ptqAM571hmbrfuT5ejB/uAO/jFEMX3DJWskHJbW3aaUm1OfLplw7GKa+zK5+A
-kc+vss0BHhFDJoSOI00qr9v1h57QHV6xsSqnBkWozbnPM5Cyqvzq2Kqx3Vjw/RkG
-CAB+dbIrS3YUISMAbglnSSgoJQCHA3u+Kx3zoXxP/0MV6pYHqtn8knjW+lxRAqlr
-u1SuN4zvWs60hb6vh6E9kmUrYzGm0ewLlbbNq3ICZC8EBxvPXPVZNoM+phgLIF9U
-ixTLjN/5oDmJmCEblLXKsMhtzAwCj5iip1yxaMMmER9PNERSR9YLoAWOfDt/aycu
-VqJK8FA4pmruclyHD6tgGaVVQ/WiGV5snp/IkvlD9iRQ5EPXxaF5pz+LVOIywyp/
-Hxvs8d76qUhBgqqPxVQJy1gMO2uOUA2jOzeAWVWQe/FRJSt+wcdQbEHegiBO8E6a
-A1SMOsFGiI06myc4US2YtfkN5UiKDUnNoZKNwgjNjzXaqI64O0H+MZDyI7IEBDSU
-h6c9cgLJKuY9TNWo4X0tfGBiOhx2pqSS+94/IdXgPffEDORBB9c=
-=USJC
------END PGP SIGNATURE-----
-
---Sig_/brBhm643RtDYZ=JIaq78N0f--
-
-
---===============1433797329975995673==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============1433797329975995673==--
-
