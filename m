@@ -3,20 +3,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A6B7C282DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 07:16:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8DFB5C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 07:17:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 69D6E21479
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 07:16:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2E69A20869
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 07:17:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rLF/Wjg1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="XV10zHJb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 69D6E21479
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HGcZAw5M";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="mtn6KXj3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E69A20869
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,44 +25,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=stb+rT+zRfHr6PhtI87K+nTeczlq6DV+SpX2hl0kF+s=; b=rLF/Wjg15rLCWr
-	qwPCWpfNUloi0T40l+uXRKO9/LgbOK9G/y3ujKJs6zLt5r+a3t18YHozqJoHXgl+yrMPNke1vB6FT
-	j/16p/GsHZtfx1Exy0BoTelJ+NdEjsiZRHZq8cniTmlnszNV1p26IzG5qIFCTaX+hG26k6Ze5pqIh
-	bB5+LZWXQDx6kKeUVyxxYQI5WE+uda6yySII4G///9fnz9wm6zBZjnWL9CyUVtDJRmoGmm7bo5Ral
-	Wmb31zz/4bKBxirAbwt7ExENEOJwlZiEHYTkokKMushQ26jOrJd90jsXNnNfdikuqiwqytuzcESK4
-	zkpmninZVpsqFZL0aHIw==;
+	List-Owner; bh=bq012NbrOxzy9MdzeMdiFKo7VIh0MY/zkN4++kJv5JA=; b=HGcZAw5MWDkvmB
+	tQsrjQE6MKxHeMpg3O8zC93yrEnIjcsfsntBclydjoSdc+okvAp3BCqPBYkJTpZbDoPGc887f6/pw
+	vC3BFNX/aljU6BhUL4+q20ThChLi9sZBanQbFaetLt9r8ITiXwBfVUVriC70VmFq3E/YQNHYKpAdD
+	gQP1rfruT98P+AjwRttOEdwQoXV+zR6FcGbDafSbLY96utKfkqdWolMB0Bo9PuFvhEYUZUrN2BwgI
+	IBa3/6q8vE8nAaVKLOGXDWdD5xoSIx0+aRSyQ7274r5A18hdxwsjA1uxW+dMOlV5cDdZzueLTUkq8
+	u1Hbn3TkSZ69Qes1s0aQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gppXg-0003YL-A9; Sat, 02 Feb 2019 07:16:44 +0000
+	id 1gppYc-00046t-20; Sat, 02 Feb 2019 07:17:42 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gppXd-0003Xw-8I; Sat, 02 Feb 2019 07:16:42 +0000
+ id 1gppYY-00046T-HL; Sat, 02 Feb 2019 07:17:39 +0000
 Received: from bbrezillon (91-160-177-164.subs.proxad.net [91.160.177.164])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 76D1420869;
- Sat,  2 Feb 2019 07:16:35 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id AAF7E20869;
+ Sat,  2 Feb 2019 07:17:32 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549091800;
- bh=LbbWCY52MZJlTmK3M5ALRbknLFOVhDeo6yjUTIUVON4=;
+ s=default; t=1549091858;
+ bh=Sm2sNfK0Px+6ifmL2BMseCNQTGFB1pCiTCawVraGZE0=;
  h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=XV10zHJblF6h4vbJVPvIyVrzQD8uDn6PSM2LNL4FdmV0Y5YlRRmhdpLGRScahI4OF
- JWKEq830IrJPSm4Tn10+FlfsukSxQq0gQi4ooYffqCsE2GpCmUnnK977u1cRW2PWxO
- mj7xmS39AtqyhePekiP6LVOQ7xJsJHdqOuH6K/rw=
-Date: Sat, 2 Feb 2019 08:16:25 +0100
+ b=mtn6KXj3BXUp6FrM3PIVdIDzcOl5e2wv9+w5HjFtL/MLVGJtnMZrcYejQckmwxdzw
+ mz+9LjNZhuRPuRlIOh8SSsux5Y/kZu25oMF72uuQhH35EOjnp9mr0gXQPPU9JynnH2
+ WnZSL35j5lli5duk5BN0xihnUmTPjEiIUd0b16Uc=
+Date: Sat, 2 Feb 2019 08:17:23 +0100
 From: Boris Brezillon <bbrezillon@kernel.org>
 To: <Tudor.Ambarus@microchip.com>
-Subject: Re: [PATCH v3 11/13] spi: atmel-quadspi: add support for named
- peripheral clock
-Message-ID: <20190202081625.58a0be1d@bbrezillon>
-In-Reply-To: <20190202040653.1217-12-tudor.ambarus@microchip.com>
+Subject: Re: [PATCH v3 12/13] dt-bindings: spi: atmel-quadspi: QuadSPI
+ driver for Microchip SAM9X60
+Message-ID: <20190202081723.30645d03@bbrezillon>
+In-Reply-To: <20190202040653.1217-13-tudor.ambarus@microchip.com>
 References: <20190202040653.1217-1-tudor.ambarus@microchip.com>
- <20190202040653.1217-12-tudor.ambarus@microchip.com>
+ <20190202040653.1217-13-tudor.ambarus@microchip.com>
 X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_231641_323846_3F808987 
-X-CRM114-Status: GOOD (  17.30  )
+X-CRM114-CacheID: sfid-20190201_231738_593152_7D210C9B 
+X-CRM114-Status: GOOD (  16.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,131 +85,56 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, 2 Feb 2019 04:07:41 +0000
+On Sat, 2 Feb 2019 04:07:44 +0000
 <Tudor.Ambarus@microchip.com> wrote:
 
 > From: Tudor Ambarus <tudor.ambarus@microchip.com>
 > 
-> Naming clocks is a good practice. Keep supporting unnamed
-> peripheral clock, to be backward compatible with old DTs.
-> While here, rename clk to pclk, to indicate that it is a
-> peripheral clock.
+> The sam9x60 qspi controller uses 2 clocks, one for the peripheral register
+> access, the other for the qspi core and phy. Both are mandatory.
 > 
-> Suggested-by: Boris Brezillon <bbrezillon@kernel.org>
 > Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
 
 Reviewed-by: Boris Brezillon <bbrezillon@kernel.org>
 
 > ---
-> v3: new patch
+> v3: "pclk" was made mandatory in previous patch. Reword clock
+> descriptions.
+> v2:
+> - make "pclk" mandatory even for sama5d2. Unnamed clk will be
+> supported in the driver.
+> - drop unneeded example
 > 
->  drivers/spi/atmel-quadspi.c | 33 ++++++++++++++++++---------------
->  1 file changed, 18 insertions(+), 15 deletions(-)
+>  Documentation/devicetree/bindings/spi/atmel-quadspi.txt | 10 +++++++---
+>  1 file changed, 7 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/spi/atmel-quadspi.c b/drivers/spi/atmel-quadspi.c
-> index bfa5f5e92d96..c9548942535a 100644
-> --- a/drivers/spi/atmel-quadspi.c
-> +++ b/drivers/spi/atmel-quadspi.c
-> @@ -136,7 +136,7 @@
->  struct atmel_qspi {
->  	void __iomem		*regs;
->  	void __iomem		*mem;
-> -	struct clk		*clk;
-> +	struct clk		*pclk;
->  	struct platform_device	*pdev;
->  	u32			pending;
->  	u32			smm;
-> @@ -338,7 +338,7 @@ static int atmel_qspi_setup(struct spi_device *spi)
->  	if (!spi->max_speed_hz)
->  		return -EINVAL;
+> diff --git a/Documentation/devicetree/bindings/spi/atmel-quadspi.txt b/Documentation/devicetree/bindings/spi/atmel-quadspi.txt
+> index 1de54e87f5d6..fc7e83adab36 100644
+> --- a/Documentation/devicetree/bindings/spi/atmel-quadspi.txt
+> +++ b/Documentation/devicetree/bindings/spi/atmel-quadspi.txt
+> @@ -1,15 +1,19 @@
+>  * Atmel Quad Serial Peripheral Interface (QSPI)
 >  
-> -	src_rate = clk_get_rate(aq->clk);
-> +	src_rate = clk_get_rate(aq->pclk);
->  	if (!src_rate)
->  		return -EINVAL;
+>  Required properties:
+> -- compatible:     Should be "atmel,sama5d2-qspi".
+> +- compatible:     Should be one of the following:
+> +		  - "atmel,sama5d2-qspi"
+> +		  - "microchip,sam9x60-qspi"
+>  - reg:            Should contain the locations and lengths of the base registers
+>                    and the mapped memory.
+>  - reg-names:      Should contain the resource reg names:
+>                    - qspi_base: configuration register address space
+>                    - qspi_mmap: memory mapped address space
+>  - interrupts:     Should contain the interrupt for the device.
+> -- clocks:         The phandle of the clock needed by the QSPI controller.
+> -- clock-names:    Should contain "pclk" for the peripheral clock.
+> +- clocks:         Should reference the peripheral clock and the QSPI system
+> +                  clock if available.
+> +- clock-names:    Should contain "pclk" for the peripheral clock and "qspick"
+> +                  for the system clock when available.
+>  - #address-cells: Should be <1>.
+>  - #size-cells:    Should be <0>.
 >  
-> @@ -429,15 +429,18 @@ static int atmel_qspi_probe(struct platform_device *pdev)
->  	}
->  
->  	/* Get the peripheral clock */
-> -	aq->clk = devm_clk_get(&pdev->dev, NULL);
-> -	if (IS_ERR(aq->clk)) {
-> +	aq->pclk = devm_clk_get(&pdev->dev, "pclk");
-> +	if (IS_ERR(aq->pclk))
-> +		aq->pclk = devm_clk_get(&pdev->dev, NULL);
-> +
-> +	if (IS_ERR(aq->pclk)) {
->  		dev_err(&pdev->dev, "missing peripheral clock\n");
-> -		err = PTR_ERR(aq->clk);
-> +		err = PTR_ERR(aq->pclk);
->  		goto exit;
->  	}
->  
->  	/* Enable the peripheral clock */
-> -	err = clk_prepare_enable(aq->clk);
-> +	err = clk_prepare_enable(aq->pclk);
->  	if (err) {
->  		dev_err(&pdev->dev, "failed to enable the peripheral clock\n");
->  		goto exit;
-> @@ -448,25 +451,25 @@ static int atmel_qspi_probe(struct platform_device *pdev)
->  	if (irq < 0) {
->  		dev_err(&pdev->dev, "missing IRQ\n");
->  		err = irq;
-> -		goto disable_clk;
-> +		goto disable_pclk;
->  	}
->  	err = devm_request_irq(&pdev->dev, irq, atmel_qspi_interrupt,
->  			       0, dev_name(&pdev->dev), aq);
->  	if (err)
-> -		goto disable_clk;
-> +		goto disable_pclk;
->  
->  	err = atmel_qspi_init(aq);
->  	if (err)
-> -		goto disable_clk;
-> +		goto disable_pclk;
->  
->  	err = spi_register_controller(ctrl);
->  	if (err)
-> -		goto disable_clk;
-> +		goto disable_pclk;
->  
->  	return 0;
->  
-> -disable_clk:
-> -	clk_disable_unprepare(aq->clk);
-> +disable_pclk:
-> +	clk_disable_unprepare(aq->pclk);
->  exit:
->  	spi_controller_put(ctrl);
->  
-> @@ -480,7 +483,7 @@ static int atmel_qspi_remove(struct platform_device *pdev)
->  
->  	spi_unregister_controller(ctrl);
->  	writel_relaxed(QSPI_CR_QSPIDIS, aq->regs + QSPI_CR);
-> -	clk_disable_unprepare(aq->clk);
-> +	clk_disable_unprepare(aq->pclk);
->  	return 0;
->  }
->  
-> @@ -488,7 +491,7 @@ static int __maybe_unused atmel_qspi_suspend(struct device *dev)
->  {
->  	struct atmel_qspi *aq = dev_get_drvdata(dev);
->  
-> -	clk_disable_unprepare(aq->clk);
-> +	clk_disable_unprepare(aq->pclk);
->  
->  	return 0;
->  }
-> @@ -497,7 +500,7 @@ static int __maybe_unused atmel_qspi_resume(struct device *dev)
->  {
->  	struct atmel_qspi *aq = dev_get_drvdata(dev);
->  
-> -	clk_prepare_enable(aq->clk);
-> +	clk_prepare_enable(aq->pclk);
->  
->  	return atmel_qspi_init(aq);
->  }
 
 
 _______________________________________________
