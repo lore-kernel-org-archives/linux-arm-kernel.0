@@ -5,20 +5,20 @@ X-Spam-Level:
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 02396C282DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:39:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B29EDC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:39:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C6C6B2075B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:39:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 786BA2075B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:39:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IFXY5IEi";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Qo2D+LA2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C6C6B2075B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AXJ8OLFc";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="JKl4t9Ss"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 786BA2075B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -28,65 +28,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=eV44gW/vqxd1VC/HVqcGR5Y6gAFRdCHfupmcQC7Iulo=; b=IFXY5IEiEVLnJ9aUSbRCHHm682
-	Df2ZnOOGqfpI7+E2HjS/na2SP6EV4Y0QrqlCyA9kKY2yVp6wbEcz3mvbyOH49Q3Qn5roJL/atiLyl
-	XJoVStTe9kaQEcMR+LbsREiSWsUWsvfQBh+gKM2EQlnjafT/O/b6CmRtBeo5n4GGggBV6AqWVmCWq
-	L4W6e44hmKfhjPX8GeIwwric7LpPrUQUD4XkvbaPJxVmQzIep/P0XyIBAZvUWFgtHHD0gougmPoFd
-	ZTe+twPORKbwQ4/VeYXzfx3HOJoqFx2cuY6f6CVuER5flnvVzYLv5RiPTyqEOj0iYj9jMis7GbjuO
-	DIwXqFcg==;
+	bh=OqMS8ORDM1zjjVAJrxI8WZnrOS8Vh0CU3TAJC+XYGVI=; b=AXJ8OLFcTUNKk3URsydlPLCx1F
+	riSGx8MBEN9r4wtAsAN9AwFX/eJDWY4Ba4varKuAF5Lrl4fLQ/XrmZo89/FdBdbJqPeAQ5If4fZHk
+	oHJgHNli/dSi5RGOjulpyFAtfE9APZfuEG0/n5NauaNfXy7pvtoJewcR0U3tXIUMwHbZJcJ7Yt4fU
+	lP7inKXPPNbEryYCPpmFP3X4pPgWFNiSzcPzM4mupCcGP6to8z9q6CVAUK65gwzdztn948MgYKVRC
+	FxhbHKJek8cUW1lGqF/WwCx9d2cMPd41tq/olJZHS+F+ARF3GFIpH63mhtynxsprjtm1jidg60OJI
+	rRHWdrsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpkH8-0003rf-6A; Sat, 02 Feb 2019 01:39:18 +0000
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
+	id 1gpkHN-00048h-US; Sat, 02 Feb 2019 01:39:33 +0000
+Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpkGs-0003b3-GJ
- for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 01:39:08 +0000
-Received: by mail-pg1-x541.google.com with SMTP id g189so3760023pgc.5
+ id 1gpkH0-0003kQ-IJ
+ for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 01:39:19 +0000
+Received: by mail-pg1-x543.google.com with SMTP id n2so3760757pgm.3
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 17:39:02 -0800 (PST)
+ Fri, 01 Feb 2019 17:39:10 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=xNQ01b3YQcncQcyZ7/8o/Bl5YsleBiAszwwH1EpMGyk=;
- b=Qo2D+LA2DH0Xd98ZgKOyGosKOaLUNvRcl8albFhAHWIgW4SuiFPDTPXliCZhxwU9lo
- KuuHRNm0DC2NEuc+wOFl8VdvU8buZBjimk+zdX1acGwI0ZOAf1OgyamVONKBCjgRenKp
- GxbK6DvdmvX4NKNFXt2+kraiR1ZDN4arbq3lKp/4zhu+A2145+lTvVbUti6VrRcOGkoV
- a4QDX0M3aYO8xuOOntVq9CTNfb+ooOC9th262XOMJZlEEjaJSWChR0+LEBoFacmJsJxV
- tGoUdzOf2NlbeOOo8kF7j5yZgsQg6E/LAjE4U2dpcaLJgFYeA3umIkUnyJFgteWFffI2
- Rlfw==
+ bh=QkCKWdNQDd7n0mb8dlG6t1culFOMAQghK/Ej0OwX5M0=;
+ b=JKl4t9SsRWFQRqm/2ykkdDbszCjiZIyL9GEDu1emOACGiirfjKR4PU2Y1yFEaeqHLe
+ 4Gg4rW7yrPMnpiI0rSIwiM8z2uBBUK/Ol8t+l1N1VxwoceQdtJBxJeNkd4oXCXGX81Ln
+ /mA+Fi7RDYkiSi5AJlTWoN2SUEgpHbUuXQrcQbSmKlwxk2aHCImQkJLlezWkOovxwH/r
+ pdVkbF/4t7THhVIvbGyuKG1ZlsttuJYikvG2qecvpaGfUuC9O3QNWZVxRbeg1svaAD8C
+ EQJQrmp2Uw8Htj/sc9HDeAQO0XwYAHiepwQfXGOUnd4F6iyTf9QGL+LEgTPPwhG6DHWC
+ qGOg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=xNQ01b3YQcncQcyZ7/8o/Bl5YsleBiAszwwH1EpMGyk=;
- b=Sdkc3vAQLSH0B5yN5wR0q5STiGoznKJXF3kztbizr7oUykWUVreDpXJf+jqvNY9gJO
- AJ77t7mkSNXi7k1Ta5xzbspoTZBTiEm+9v0FvTcAUU0Pxtuxlr3Eh+LqEgnoyfJS4iZA
- aarS8I0e/YUT83+OGGy2CQtyp2gFCY3dH8jYUvICpMpq3Ctsot22GpcI4ks2Kh6xSuR5
- 3kGh4pujadVWqz0yPW23G30C7hCVOfuUJ2YEEw4sWYLeUMMrql3zRvsE+Yx3+8ujBYi1
- WDlrHyExOscrUWZr3w2LGsqeojydv9napgIDpUz++dusWQ4nNQQJ55nPxyuTGWUhaaeH
- YLdw==
-X-Gm-Message-State: AJcUukemeayfQNnHQIqnayO7JFyzqm3GQnKq9d4VwhTNzXmGaRr1eVP5
- DDqXwLhtfIz6cilfKSXwPNA=
-X-Google-Smtp-Source: ALg8bN52qHZIAftboT3KzOVgAevCJ9IrwTwxVL8yULXyNRr/rVn5RkQZ3gqqqU8ZvuoQTn18Iq1NIQ==
-X-Received: by 2002:a62:1e87:: with SMTP id
- e129mr41458755pfe.221.1549071542091; 
- Fri, 01 Feb 2019 17:39:02 -0800 (PST)
+ bh=QkCKWdNQDd7n0mb8dlG6t1culFOMAQghK/Ej0OwX5M0=;
+ b=pEQokPQBFzeXZrTIdbIHqJUuVsu0WMuXSvK9DbcrsGTllIF4qHcjLBqZU13KWzq3h0
+ bevD571HLl5KrEW9k8H+1oOcEE7Ei/s7kSaT321FEuO29yZPIG5VVKZalPys40pPui4t
+ 5pcVfvCwAKaSTdyBOs3uk4Nyf/0OO9TB2TBZCXP2fTHsOqSUluVHvQj74CFJstIJQtDM
+ TXuRFsleYrZpqwHz95nt3MfX1dXYCGuGSEGEe6G0UDubN2y14GOnNudJvjKWiwbBp/hc
+ 38J5LsxD+cXPJs55RuxjoeKtdFFR+zp6/a/DkHfzxYZrplPY+UcHtgwI8/Jebjju3sg4
+ JNzw==
+X-Gm-Message-State: AHQUAuYsOpjqxBWvedPl3f1Vfvn8CdYHjeR+yjSQjJi6HXYJrVLnQeys
+ 5B0Dyah0+3AK+NSLBbUT0iE=
+X-Google-Smtp-Source: AHgI3IYtiYj+YWXlKinAagZU+CzzWQGsIguvJwkSw/9h/aC/bdhFYr+TlIVLI3IuHned8yzL8VgVKw==
+X-Received: by 2002:a65:6542:: with SMTP id a2mr4544721pgw.389.1549071549793; 
+ Fri, 01 Feb 2019 17:39:09 -0800 (PST)
 Received: from localhost.corp.microsoft.com ([167.220.255.67])
- by smtp.googlemail.com with ESMTPSA id d3sm9183425pgl.64.2019.02.01.17.38.54
+ by smtp.googlemail.com with ESMTPSA id d3sm9183425pgl.64.2019.02.01.17.39.02
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 01 Feb 2019 17:39:01 -0800 (PST)
+ Fri, 01 Feb 2019 17:39:09 -0800 (PST)
 From: lantianyu1986@gmail.com
 X-Google-Original-From: Tianyu.Lan@microsoft.com
 To: 
-Subject: [PATCH V2 2/10] KVM/VMX: Fill range list in
- kvm_fill_hv_flush_list_func()
-Date: Sat,  2 Feb 2019 09:38:18 +0800
-Message-Id: <20190202013825.51261-3-Tianyu.Lan@microsoft.com>
+Subject: [PATCH V2 3/10] KVM/MMU: Add last_level in the struct mmu_spte_page
+Date: Sat,  2 Feb 2019 09:38:19 +0800
+Message-Id: <20190202013825.51261-4-Tianyu.Lan@microsoft.com>
 X-Mailer: git-send-email 2.14.4
 In-Reply-To: <20190202013825.51261-1-Tianyu.Lan@microsoft.com>
 References: <20190202013825.51261-1-Tianyu.Lan@microsoft.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_173903_092959_06F86606 
-X-CRM114-Status: GOOD (  14.68  )
+X-CRM114-CacheID: sfid-20190201_173911_187740_96A8D5CD 
+X-CRM114-Status: GOOD (  12.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -117,74 +115,42 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Lan Tianyu <Tianyu.Lan@microsoft.com>
 
-Populate ranges on the flush list into struct hv_guest_mapping_flush_list
-when flush list is available in the struct kvm_tlb_range.
+This patch is to add last_level in the struct kvm_mmu_page. When build
+flush tlb range list, last_level will be used to identify whehter the
+page should be added into list.
 
 Signed-off-by: Lan Tianyu <Tianyu.Lan@microsoft.com>
 ---
-Change since v1:
-       Make flush list as a "hlist" instead of a "list" in order to 
-       keep struct kvm_mmu_page size.
-
-arch/x86/include/asm/kvm_host.h |  7 +++++++
- arch/x86/kvm/vmx/vmx.c          | 18 ++++++++++++++++--
- 2 files changed, 23 insertions(+), 2 deletions(-)
+ arch/x86/include/asm/kvm_host.h | 1 +
+ arch/x86/kvm/mmu.c              | 3 +++
+ 2 files changed, 4 insertions(+)
 
 diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
-index 49f449f56434..4a3d3e58fe0a 100644
+index 4a3d3e58fe0a..9d858d68c17a 100644
 --- a/arch/x86/include/asm/kvm_host.h
 +++ b/arch/x86/include/asm/kvm_host.h
-@@ -317,6 +317,12 @@ struct kvm_rmap_head {
- 
- struct kvm_mmu_page {
- 	struct list_head link;
-+
-+	/*
-+	 * Tlb flush with range list uses struct kvm_mmu_page as list entry
-+	 * and all list operations should be under protection of mmu_lock.
-+	 */
-+	struct hlist_node flush_link;
+@@ -325,6 +325,7 @@ struct kvm_mmu_page {
+ 	struct hlist_node flush_link;
  	struct hlist_node hash_link;
  	bool unsync;
++	bool last_level;
  
-@@ -443,6 +449,7 @@ struct kvm_mmu {
- struct kvm_tlb_range {
- 	u64 start_gfn;
- 	u64 pages;
-+	struct hlist_head *flush_list;
- };
+ 	/*
+ 	 * The following two entries are used to key the shadow page in the
+diff --git a/arch/x86/kvm/mmu.c b/arch/x86/kvm/mmu.c
+index ce770b446238..70cafd3f95ab 100644
+--- a/arch/x86/kvm/mmu.c
++++ b/arch/x86/kvm/mmu.c
+@@ -2918,6 +2918,9 @@ static int set_spte(struct kvm_vcpu *vcpu, u64 *sptep,
  
- enum pmc_type {
-diff --git a/arch/x86/kvm/vmx/vmx.c b/arch/x86/kvm/vmx/vmx.c
-index 9d954b4adce3..6452d0efd2cc 100644
---- a/arch/x86/kvm/vmx/vmx.c
-+++ b/arch/x86/kvm/vmx/vmx.c
-@@ -427,9 +427,23 @@ int kvm_fill_hv_flush_list_func(struct hv_guest_mapping_flush_list *flush,
- 		void *data)
- {
- 	struct kvm_tlb_range *range = data;
-+	struct kvm_mmu_page *sp;
- 
--	return hyperv_fill_flush_guest_mapping_list(flush, 0, range->start_gfn,
--			range->pages);
-+	if (!range->flush_list) {
-+		return hyperv_fill_flush_guest_mapping_list(flush,
-+			0, range->start_gfn, range->pages);
-+	} else {
-+		int offset = 0;
+ 	if (level > PT_PAGE_TABLE_LEVEL)
+ 		spte |= PT_PAGE_SIZE_MASK;
 +
-+		hlist_for_each_entry(sp, range->flush_list, flush_link) {
-+			int pages = KVM_PAGES_PER_HPAGE(sp->role.level);
++	sp->last_level = is_last_spte(spte, level);
 +
-+			offset = hyperv_fill_flush_guest_mapping_list(flush,
-+					offset, sp->gfn, pages);
-+		}
-+
-+		return offset;
-+	}
- }
- 
- static inline int __hv_remote_flush_tlb_with_range(struct kvm *kvm,
+ 	if (tdp_enabled)
+ 		spte |= kvm_x86_ops->get_mt_mask(vcpu, gfn,
+ 			kvm_is_mmio_pfn(pfn));
 -- 
 2.14.4
 
