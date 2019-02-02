@@ -1,93 +1,89 @@
-Return-Path: <SRS0=JyYb=QI=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=Q9BQ=QJ=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6E9BDC282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 23:54:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 09DA2C3E8A4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 00:15:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 413E52080A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  1 Feb 2019 23:54:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CD40221872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 00:15:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LzCbLGWS";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="mL9+BsfI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 413E52080A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TGIybg21";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="RkCpzawB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD40221872
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=dr4TyyBkQjMHcJ2EiJ0YHUD2kv7JB93cmvRg88q+CUg=; b=LzCbLGWSb4p5G2lcNZfffM0W3
-	OKcwNRxfzcv60tGJuUL890GgeywhhoCC3UaKrkWuR/AygzPXE8XkOpAhS9SIwSoD6UMwvSnArGt0v
-	R6ooB+5LGt9dNul3eSnQ6X5qVOfAp3wvsFnLDXuI0Si3PcpgE4WeoIWNRry19jum6rIVLuxJK09+Q
-	S3YUGWkR0rjzZ6NKh5TBXncR3z2s8fi0TezSeR7pkZMMmDBXXqzTghqq4Vofh+ZyOSI+MMxU4E446
-	FU6BnvK4mYRp+/jAlqDNQSfckqw1YFgDd3r7By7K30/iIEWzgmoJXF8Lgq92Hk72SP/s+la1jOv9u
-	nELY9RcJA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=fwWZKLjkXtwM9wwnOvd8bZOlfFiVknI7blK+GztHIEA=; b=TGIybg21xeId68
+	qYgKhfiNHLt4z6O9lINgoOhNHyD2gSzD4RTiIDeVnRr9/w7tnfepA7Z9FmYi+kzxt/+slNPsyGE/h
+	TkhlgjOUByJH2OmsJjO7X3OOv69aucHVO6s7qgbnBDvMwi3zRcczoeswMypvwVlbzk+ndqos3dHek
+	zoQG0RbMQyWKmHGcuAnByA9keykP5pfmxsjF33FQQxcyonweQ3C+qtuliV3+MN4RELgZsL0EOhtZI
+	WtOpRYoAe6N1VIL6HThVFIV4IC3tfK10thDr7nl4ETMRZxAN+LCp2T5vgAqx5b8KePeNm3/Mf2ddq
+	zxq5DAGUghH3UtWV10ig==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpidD-0001nl-Ib; Fri, 01 Feb 2019 23:53:59 +0000
-Received: from hqemgate14.nvidia.com ([216.228.121.143])
+	id 1gpiyC-0001UH-Di; Sat, 02 Feb 2019 00:15:40 +0000
+Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpidA-0001nR-MX
- for linux-arm-kernel@lists.infradead.org; Fri, 01 Feb 2019 23:53:58 +0000
-Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c54dc110000>; Fri, 01 Feb 2019 15:53:53 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate102.nvidia.com (PGP Universal service);
- Fri, 01 Feb 2019 15:53:50 -0800
-X-PGP-Universal: processed;
- by hqpgpgate102.nvidia.com on Fri, 01 Feb 2019 15:53:50 -0800
-Received: from [10.19.108.132] (172.20.13.39) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 1 Feb
- 2019 23:53:48 +0000
-Subject: Re: [PATCH V5 2/7] clocksource: tegra: add Tegra210 timer support
-To: Dmitry Osipenko <digetx@gmail.com>, Jon Hunter <jonathanh@nvidia.com>,
- Thierry Reding <thierry.reding@gmail.com>, Daniel Lezcano
- <daniel.lezcano@linaro.org>, Thomas Gleixner <tglx@linutronix.de>
-References: <20190201033621.16814-1-josephl@nvidia.com>
- <20190201033621.16814-3-josephl@nvidia.com>
- <9370a0e4-2c76-6e9e-9219-121f92cdb14a@gmail.com>
- <46a1a62f-29b1-caac-ba68-e1394a76b3af@gmail.com>
- <85988378-0c88-6b71-00df-0700a7b4cdf7@nvidia.com>
- <4c89fd38-eacd-4643-52d3-da4760ecb4c5@nvidia.com>
- <57549882-4d0a-64ac-da04-7e790ac2d80e@gmail.com>
- <9437d5b5-5af0-9393-169c-2ebaf384c75c@nvidia.com>
- <705a0eff-cb1e-0e7d-add7-fb1a993291dc@gmail.com>
-From: Joseph Lo <josephl@nvidia.com>
-Message-ID: <a24d9152-2bcd-7276-478c-63ee6923178e@nvidia.com>
-Date: Sat, 2 Feb 2019 07:53:46 +0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gpiy9-0001TC-4K
+ for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 00:15:38 +0000
+Received: by mail-pf1-x443.google.com with SMTP id c123so4034759pfb.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 01 Feb 2019 16:15:35 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=jEfHVg5adgM29Wvz/BKP6/4kELk5ivTcvMeeOgWs9Bo=;
+ b=RkCpzawBmG/DUG20vkHE8nM+/HZVsIgcbpJyA134UvLrxUKAeotdXxP/iHwhWMRqf4
+ AYkRiZkuGV/+zU2tcznCbc59WslEiNG6EiZmbGibznA8UipVmyJ3xpQFQ6E/wtfTh2wQ
+ ywyxQ9t2CNl2X7nQMG+Hf+Msb70CD0mgzN3QnC7eCxktCYk0S8yRvYLAdAiv/yPfgj7T
+ IlLKgFQZx5Typ45zO+71rCWwLA89wNy1MsycW/+dWac3Bf1iq3nqoZAz/72MdCC0Ycia
+ k9pAXJ1cUgfjQWaVUlMlzi9nQX/3mpJ3mvnRYWGOnKGL9rx4WkDl6pTDXFflgefs1l0W
+ LAQA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=jEfHVg5adgM29Wvz/BKP6/4kELk5ivTcvMeeOgWs9Bo=;
+ b=S0q/R1AkyKKpgj3XNZ/JJctZJ5TktakdZlkrhWxKgOOOOoDcyqTtyKZz1cyracBXJT
+ GPLcV4jc8KA0E22MBdo/L4ByMyRXnZcj2yEtnjr10+cujgKvnIqbinZZTEC+A9iVTXRJ
+ jmLXqAYrifYvLdLHHJFApexVGkMNdSDTY2/fBjxIRXNiQeJ8sBY8Ru5UVmsePrddq+CA
+ 2UXOy4MHh+hljdYz74J+ab4UoRoscB6fFGVQqYe81MpbhuRu16YrJqe9rAGKYseZmlgW
+ eBIzHt+g/PdC4PcugPN+eD7b9Rp2FMy6Or8/vrpQIC5pplE81jfcDMEfgSH8T562mogs
+ pdbQ==
+X-Gm-Message-State: AJcUukeIYv9GYx2LRfoUydVeUgfOEK6IzjaiO55ULJ1KN6GmZpUkmdHK
+ EBqcTGW+PL4czz2eOHVo0tq72zC/
+X-Google-Smtp-Source: ALg8bN7CwYfzPenhtI9KfgSMrD9gYvxUtOH9Knxhz3A5up69TRXJk2mfCuNzwvmmXgNtOi20Cj16jQ==
+X-Received: by 2002:a62:32c4:: with SMTP id
+ y187mr43076304pfy.195.1549066534634; 
+ Fri, 01 Feb 2019 16:15:34 -0800 (PST)
+Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
+ [24.22.235.96])
+ by smtp.gmail.com with ESMTPSA id w6sm28374545pga.72.2019.02.01.16.15.32
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 01 Feb 2019 16:15:33 -0800 (PST)
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
+To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Subject: [PATCH v7 0/4] PCIE support for i.MX8MQ
+Date: Fri,  1 Feb 2019 16:15:19 -0800
+Message-Id: <20190202001523.12517-1-andrew.smirnov@gmail.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-In-Reply-To: <705a0eff-cb1e-0e7d-add7-fb1a993291dc@gmail.com>
-X-Originating-IP: [172.20.13.39]
-X-ClientProxiedBy: HQMAIL106.nvidia.com (172.18.146.12) To
- HQMAIL101.nvidia.com (172.20.187.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1549065233; bh=AbRDpXbwp6+qYEAdxol5TgBZ8HOHYAv4/5mMKo4Zc1Q=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=mL9+BsfIbeOfk9sFcoyXJ8LMYpEivkJOW6GzjzsqBbF198aQ9HbHpaEk5G7iwVegO
- lbN1uJQTVn/jX2eYzbkA5o49UYMQ6BQ+OZeb7nBINClcF7DAp2mpJNv93X7EVOVK/o
- 93pxuPIUOtorgG75BfqhLceJAh7xHOHYZZAE/4ZD611jTcSxaG1g2QD2R4xjLHhW2f
- 2daPLixscu6n8rBBPH/sfwShTPSooYc6pU1pLrIoQ9dBRImcZxeFsZU8WEUhQNG5T+
- A2Q8VDYAvhKY32/KV1uIKI+zlkRnn13h6UMl/2H+/O0cjHWBNj3WLieRPY6PEC9P80
- h6gcGuIIauAWQ==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_155356_750933_6065552E 
-X-CRM114-Status: GOOD (  14.91  )
+X-CRM114-CacheID: sfid-20190201_161537_204757_A1E2B738 
+X-CRM114-Status: GOOD (  11.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,76 +95,105 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Thierry Reding <treding@nvidia.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Andrey Smirnov <andrew.smirnov@gmail.com>, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Fabio Estevam <fabio.estevam@nxp.com>,
+ linux-imx@nxp.com, Bjorn Helgaas <bhelgaas@google.com>,
+ Leonard Crestez <leonard.crestez@nxp.com>, Chris Healy <cphealy@gmail.com>,
+ Lucas Stach <l.stach@pengutronix.de>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMi8yLzE5IDI6MDggQU0sIERtaXRyeSBPc2lwZW5rbyB3cm90ZToKPiAwMS4wMi4yMDE5IDE4
-OjM3LCBKb3NlcGggTG8g0L/QuNGI0LXRgjoKPj4gT24gMi8xLzE5IDExOjEzIFBNLCBEbWl0cnkg
-T3NpcGVua28gd3JvdGU6Cj4+PiAwMS4wMi4yMDE5IDE3OjEzLCBKb3NlcGggTG8g0L/QuNGI0LXR
-gjoKPj4+PiBPbiAyLzEvMTkgOTo1NCBQTSwgSm9uIEh1bnRlciB3cm90ZToKPj4+Pj4KPj4+Pj4g
-T24gMDEvMDIvMjAxOSAxMzoxMSwgRG1pdHJ5IE9zaXBlbmtvIHdyb3RlOgo+Pj4+Pj4gMDEuMDIu
-MjAxOSAxNjowNiwgRG1pdHJ5IE9zaXBlbmtvINC/0LjRiNC10YI6Cj4+Pj4+Pj4gMDEuMDIuMjAx
-OSA2OjM2LCBKb3NlcGggTG8g0L/QuNGI0LXRgjoKPj4+Pj4+Pj4gQWRkIHN1cHBvcnQgZm9yIHRo
-ZSBUZWdyYTIxMCB0aW1lciB0aGF0IHJ1bnMgYXQgb3NjaWxsYXRvciBjbG9jawo+Pj4+Pj4+PiAo
-VE1SMTAtVE1SMTMpLiBXZSBuZWVkIHRoZXNlIHRpbWVycyB0byB3b3JrIGFzIGNsb2NrIGV2ZW50
-IGRldmljZSBhbmQgdG8KPj4+Pj4+Pj4gcmVwbGFjZSB0aGUgQVJNdjggYXJjaGl0ZWN0ZWQgdGlt
-ZXIgZHVlIHRvIGl0IGNhbid0IHN1cnZpdmUgYWNyb3NzIHRoZQo+Pj4+Pj4+PiBwb3dlciBjeWNs
-ZSBvZiB0aGUgQ1BVIGNvcmUgb3IgQ1BVUE9SRVNFVCBzaWduYWwuIFNvIGl0IGNhbid0IGJlIGEg
-d2FrZS11cAo+Pj4+Pj4+PiBzb3VyY2Ugd2hlbiBDUFUgc3VzcGVuZHMgaW4gcG93ZXIgZG93biBz
-dGF0ZS4KPj4+Pj4+Pj4KPj4+Pj4+Pj4gQWxzbyBjb252ZXJ0IHRoZSBvcmlnaW5hbCBkcml2ZXIg
-dG8gdXNlIHRpbWVyLW9mIEFQSS4KPj4+Pj4+Pj4KPj4+Pj4+Pj4gQ2M6IERhbmllbCBMZXpjYW5v
-IDxkYW5pZWwubGV6Y2Fub0BsaW5hcm8ub3JnPgo+Pj4+Pj4+PiBDYzogVGhvbWFzIEdsZWl4bmVy
-IDx0Z2x4QGxpbnV0cm9uaXguZGU+Cj4+Pj4+Pj4+IENjOiBsaW51eC1rZXJuZWxAdmdlci5rZXJu
-ZWwub3JnCj4+Pj4+Pj4+IFNpZ25lZC1vZmYtYnk6IEpvc2VwaCBMbyA8am9zZXBobEBudmlkaWEu
-Y29tPgo+Pj4+Pj4+PiBBY2tlZC1ieTogVGhpZXJyeSBSZWRpbmcgPHRyZWRpbmdAbnZpZGlhLmNv
-bT4KPj4+Pj4+Pj4gLS0tCj4+IHNuaXAuCj4+Pj4+Pj4+ICt9Cj4+Pj4+Pj4+ICtUSU1FUl9PRl9E
-RUNMQVJFKHRlZ3JhMjEwX3RpbWVyLCAibnZpZGlhLHRlZ3JhMjEwLXRpbWVyIiwgdGVncmEyMTBf
-dGltZXJfaW5pdCk7Cj4+Pj4+Pj4+ICsjZWxzZSAvKiBDT05GSUdfQVJNICovCj4+Pj4+Pj4+ICtz
-dGF0aWMgaW50IF9faW5pdCB0ZWdyYTIwX2luaXRfdGltZXIoc3RydWN0IGRldmljZV9ub2RlICpu
-cCkKPj4+Pj4+Pj4gK3sKPj4+Pj4+PiBXaGF0IGFib3V0IFQxMzI/IElzbid0IGl0IEFSTTY0IHdo
-aWNoIHVzZXMgdGVncmEyMC10aW1lciBJUD8gQXQgbGVhc3QgVDEzMiBEVCBzdWdnZXN0cyBzbyBh
-bmQgc2VlbXMgdGhpcyBjaGFuZ2Ugd2lsbCBicmVhayBpdC4KPj4+Pj4+Pgo+Pj4+Pj4+IFtzbmlw
-XQo+Pj4+Pj4+Cj4+Pj4+Pgo+Pj4+Pj4gQWgsIG5vdGljZWQgdGhlICJkZXBlbmRzIG9uIEFSTSIg
-aW4gS2NvbmZpZy4uIFNlZW1zIG9rYXkgdGhlbi4KPj4+Pj4+Cj4+Pj4+Cj4+Pj4+Cj4+Pj4+IFRo
-aXMgaXMgYSBnb29kIHBvaW50LCBiZWNhdXNlIGV2ZW4gdGhvdWdoIHdlIGhhZCAnZGVwZW5kcyBv
-biBBUk0nLCB0aGlzCj4+Pj4+IHN0aWxsIG1lYW5zIHRoYXQgdGhlIFRlZ3JhMTMyIERUIGlzIGlu
-Y29ycmVjdC4KPj4+Pj4KPj4+Pj4gSm9zZXBoLCBjYW4geW91IHRha2UgYSBxdWljayBsb29rIGF0
-IFRlZ3JhMTMyPwo+Pj4+Cj4+Pj4gSGkgSm9uIGFuZCBEbWl0cnksCj4+Pj4KPj4+PiBObyB3b3Jy
-eSBhYm91dCBUMTMyLCBUMTMyIHVzZXMgYXJjaCB0aW1lciAodjcpLiBUaGUgdGVncmEyMCB0aW1l
-ciBkcml2ZXIgaGFzIG5ldmVyIGJlZW4gdXNlZC4gV2Ugc2hvdWxkIGZpeCB0aGUgZHRzaSBmaWxl
-IGxhdGVyLgo+Pj4KPj4+IEhpIEpvc2VwaCwKPj4+Cj4+PiBTbyBpcyBUMTMyIEhXIGFjdHVhbGx5
-IGluY29tcGF0aWJsZSB3aXRoIHRoZSB0ZWdyYTIwLXRpbWVyPyBJZiBpdCdzIGNvbXBhdGlibGUs
-IHRoZW4gSSB0aGluayB0aGUgZHJpdmVyJ3MgY29kZSBzaG91bGQgYmUgbWFkZSBtb3JlIHVuaXZl
-cnNhbCB0byBzdXBwb3J0IFQxMzIuCj4+Pgo+Pgo+PiAgRnJvbSBIVyBwb2ludCBvZiB2aWV3LCB0
-aGUgVElNRVIxIH4gVElNRVI0IGlzIGNvbXBhdGlibGUgd2l0aCAibnZpZGlhLHRlZ3JhMjAtdGlt
-ZXIiLiBCdXQgVGVncmExMzIgYWN0dWFsbHkgaGFzIDEwIHRpbWVycyB3aGljaCBhcmUgZXhhY3Rs
-eSB0aGUgc2FtZSBhcyBUZWdyYTMwLiBTbyBpdCBzaG91bGQgYmFja3dhcmQgY29tcGF0aWJsZSB3
-aXRoICJudmlkaWEsdGVncmEzMC10aW1lciIsIHdoaWNoIGlzIHRlZ3JhX3dkdCBkcml2ZXIgbm93
-LiBBbmQgVGVncmExMzIgc2hvdWxkIG5ldmVyIHVzZSB0aGlzIGRyaXZlci4KPj4KPj4gVGhlIFRl
-Z3JhIHRpbWVyIGRyaXZlciBzaG91bGQgb25seSBiZSB1c2VkIG9uIFRlZ3JhMjAvMzAvMjEwLCB0
-aHJlZSBwbGF0Zm9ybXMgb25seS4gT3RoZXJzIHVzZSBhcmNoIHRpbWVyIGRyaXZlciBmb3Igc3lz
-dGVtIHRpbWVyIGRyaXZlci4KPj4KPj4gU28gd2UgZG9uJ3QgcmVhbGx5IG5lZWQgdG8gdGFrZSBj
-YXJlIHRoZSB1c2FnZSBvbiBvdGhlciBUZWdyYSBwbGF0Zm9ybXMuCj4gCj4gRG9lc24ndCBMaW51
-eCBrZXJuZWwgcHV0IGluIHVzZSBhbGwgb2YgYXZhaWxhYmxlIHRpbWVycz8gSWYgeWVzLCB0aGVu
-IHdlIHByb2JhYmx5IHdvdWxkIHdhbnQgdG8gZXhwb3NlIGFsbCBhdmFpbGFibGUgdGltZXJzLiBJ
-dCBsb29rcyB0byBtZSB0aGF0IHJpZ2h0IG5vdyB0ZWdyYTIwLXRpbWVyIGV4cG9zZXMgb25seSBh
-IHNpbmdsZS1zaGFyZWQgdGltZXIgdG8gdGhlIHN5c3RlbSBbcGxlYXNlIGNvcnJlY3QgbWUgaWYg
-SSdtIHdyb25nXS4gV291bGRuJ3QgbWFrZSBzZW5zZSBhdCBsZWFzdCB0byBnaXZlIGEgdGltZXIg
-cGVyIENQVSBjb3JlPwo+IAoKTm8sIG9ubHkgb25lIHRpbWVyIGRyaXZlciB3b3JrcyBhdCBhIHRp
-bWUuICggc2VlIC9wcm9jL3RpbWVyX2xpc3QgdG8gCmNoZWNrIHdoaWNoIHRpbWVyIGlzIHdvcmtp
-bmcuKQoKID4gSXQgbG9va3MgdG8gbWUgdGhhdCByaWdodCBub3cgdGVncmEyMC10aW1lciBleHBv
-c2VzIG9ubHkgYSAKc2luZ2xlLXNoYXJlZCB0aW1lciB0byB0aGUgc3lzdGVtIFtwbGVhc2UgY29y
-cmVjdCBtZSBpZiBJJ20gd3JvbmddLiAKV291bGRuJ3QgbWFrZSBzZW5zZSBhdCBsZWFzdCB0byBn
-aXZlIGEgdGltZXIgcGVyIENQVSBjb3JlPwoKWWVzLCBpdCdzIGNvcnJlY3QuIHRoZSB0aW1lci10
-ZWdyYTIwIG9ubHkgcHJvdmlkZXMgYSBzaW5nbGUtc2hhcmVkIAp0aW1lci4gQW5kIHllcywgLGl0
-IHNob3VsZCBwcm92aWRlIGEgdGltZXIgcGVyIENQVSBjb3JlLiBCdXQgdGhhdCBpcyAKYW5vdGhl
-ciB0YXNrLCB0aGlzIHBhdGNoIG9ubHkgaW50cm9kdWNlIHRoZSB0aW1lciBzdXBwb3J0IGZvciBU
-ZWdyYTIxMC4gCk90aGVycyB0aGF0IG9yaWdpbmFsbHkgZnJvbSB0aW1lci10ZWdyYTIwIGRyaXZl
-ciBzdGlsbCByZW1haW4gdGhlIHNhbWUuCgpUaGFua3MsCkpvc2VwaAoKX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5n
-IGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5p
-bmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+Everyone:
+
+This series contains changes I made in order to enable support of PCIE
+IP block on i.MX8MQ SoCs.
+
+Changes since [v6]:
+
+ - Patches rebased on Lorenzo's pci/dwc branch
+
+ - Reworded commit message of "PCI: imx6: Mark PHY functions as i.MX6
+   specific"
+
+Changes since [v5]:
+
+ - Reformatted commit messages to adhere to
+   https://lore.kernel.org/linux-pci/20171026223701.GA25649@bhelgaas-glaptop.roam.corp.google.com/
+
+Changes since [v4]:
+
+ - Collected Reviewed-by from Lucas
+
+ - Replaced ((ARM || ARM64) && COMPILE_TEST) with COMPILE_TEST as per
+   suggestion from Rob
+
+Changes since [v3]:
+
+ - Based on feedback from NXP, DIRECT_SPEED_CHANGE quirk was expanded
+   to cover both i.MX7 and i.MX8MQ
+
+ - Code setting device type in GPR12 moved to a standalone function
+
+ - Explicit "fsl,controller-id" binding was dropped, replaced by using
+   controller physical address to determine logical ID
+
+ - Dropped Reviewed-by from Lucas for patch 4/4 due to the change
+   above (haven't heard explicit "yea" for it from him)
+
+Changes since [v2], [fixes]:
+
+ - Incorporated [patch] introducing drvdata
+
+ - i.MX6 PHY operation gating converted to a single patch and to use a
+   dedicated flag instead of doing explicit variant check
+
+ - Kconfig entry changed to use ARM64 && ARCH_MXC
+
+ - Dropped FALLTHROUGH annotations
+
+Changes since [v1]:
+
+ - Driver changed to use single "fsl,controller-id" property to
+   distinguish between two intances of PCIE IP block
+
+ - All code pertaining to L1SS was dropped to simplify the patch
+
+ - Documented additions to DT bindings
+
+Feedback is welcome!
+
+Thanks,
+Andrey Smirnov
+
+[v6] https://lore.kernel.org/linux-arm-kernel/https://lore.kernel.org/linux-arm-kernel/20190124201522.8973-1-andrew.smirnov@gmail.com
+[v5] https://lore.kernel.org/linux-arm-kernel/20190112215601.9535-1-andrew.smirnov@gmail.com
+[v4] https://lore.kernel.org/linux-arm-kernel/20190104165335.13205-1-andrew.smirnov@gmail.com
+[v3] https://lore.kernel.org/linux-arm-kernel/20181218040702.29231-1-andrew.smirnov@gmail.com
+[patch] https://patchwork.kernel.org/patch/10712261/
+[fixes] https://lore.kernel.org/linux-arm-kernel/20181216230916.22982-1-andrew.smirnov@gmail.com
+[v2] https://lore.kernel.org/linux-arm-kernel/20181206073545.10967-1-andrew.smirnov@gmail.com
+[v1] https://lore.kernel.org/linux-arm-kernel/20181117181225.10737-1-andrew.smirnov@gmail.com/
+
+Andrey Smirnov (4):
+  PCI: imx6: Introduce drvdata
+  PCI: imx6: Mark PHY functions as i.MX6 specific
+  PCI: imx6: Convert DIRECT_SPEED_CHANGE quirk code to use a flag
+  PCI: imx6: Add support for i.MX8MQ
+
+ .../bindings/pci/fsl,imx6q-pcie.txt           |   3 +-
+ drivers/pci/controller/dwc/Kconfig            |   4 +-
+ drivers/pci/controller/dwc/pci-imx6.c         | 150 +++++++++++++++---
+ 3 files changed, 133 insertions(+), 24 deletions(-)
+
+-- 
+2.20.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
