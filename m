@@ -2,65 +2,123 @@ Return-Path: <SRS0=Q9BQ=QJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0A1C7C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 03:08:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E18C1C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 04:07:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C67C120870
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 03:08:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B036720870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 04:07:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="feD320kS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C67C120870
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=windriver.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GkwRgvnE";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="k5ec38+x"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B036720870
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=/YhBbmzKgwIMf5pB8p7hM9WJG0lIvJUqD3W8JgcSmyA=; b=feD320kSw1obUc1VhCHXD4p9O
-	/euo2LFMn1Qitr8tMr5tdqHDJXiOLadLgUrdqNY5Za8w/zKFOVtMXTh82Yus7YPbi7G0KzE8Ti0O3
-	YxAsf9ynl05UnWc2OQNTtlTkLHHuw53Ol06dPODUirk3ZFChVzsT+Tc+pqnA+JsgSUS1vnDTJcLga
-	RSdmIoj5izytYiZ0XofPZs3CTUF20GueeUMCGBVPWeZXCDwmN5EA9PBbOHvR8jeWF66eh/wzHittp
-	STMnrDDAfuu3kGZeKMI2vjoM2Y0RfPdlh3xRCHwEIys1QNDSdlSo2XCPCRpfUP3AcMq5GSuDlnTSg
-	vjaL55MJA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ZIe8ePDs1AFnCsJ2VKKC6URTz9XSWUMKRLwQkHyoozU=; b=GkwRgvnEakBkvP
+	mRWpl+oBJpEY9+XycOoRgO2h6d4LdZG65FZ6KhlmdFsUgQVhuJQ6+II9i6gbxwLGxMlPo5leuKacK
+	qZvOjXOLPuiNksj8Hjrf5ic2uvPSV6l/TGuEWZ1+e7zJifO5/l8GIzcsXxFok568AAoZI6M+55ues
+	/a7fvTI6u4CmR1lXcrJszHMSPwmOCduG20O9dhPFfrYh/Kuqk8y3sg+snhNHggFU/qy7tNeEbB5Oj
+	FGPDiOH5O6GKQsqd01MW1BVrdeMFxcrh8vq/V1x6+pDinZd/gFiWb+1OdngqWxitE/GpzsDUqlgrk
+	jZ3DiHicfYAd+CzmsJfw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gplfP-0008BU-65; Sat, 02 Feb 2019 03:08:27 +0000
-Received: from mail5.windriver.com ([192.103.53.11] helo=mail5.wrs.com)
+	id 1gpmaQ-0000Of-LS; Sat, 02 Feb 2019 04:07:22 +0000
+Received: from esa6.microchip.iphmx.com ([216.71.154.253])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gplfH-0008B9-EX
- for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 03:08:26 +0000
-Received: from ALA-HCA.corp.ad.wrs.com (ala-hca.corp.ad.wrs.com
- [147.11.189.40])
- by mail5.wrs.com (8.15.2/8.15.2) with ESMTPS id x1235Cuh002449
- (version=TLSv1 cipher=AES128-SHA bits=128 verify=FAIL);
- Fri, 1 Feb 2019 19:05:53 -0800
-Received: from [128.224.162.152] (128.224.162.152) by ALA-HCA.corp.ad.wrs.com
- (147.11.189.50) with Microsoft SMTP Server id 14.3.435.0;
- Fri, 1 Feb 2019 19:05:10 -0800
-Subject: Re: [PATCH 00/10] GICv3 support for kexec/kdump on EFI systems
-To: Marc Zyngier <marc.zyngier@arm.com>, Sun Ted <xulinsun@gmail.com>
-References: <20180921195954.21574-1-marc.zyngier@arm.com>
- <CACiNFG5r2Czfy_kXA2PPQa=xdyzq0vUgoQZ=XNME4d_h=O1oBw@mail.gmail.com>
- <b4594318-9ebf-91ce-b845-3fac92ba6476@arm.com>
-From: Xulin Sun <xulin.sun@windriver.com>
-Message-ID: <6f209705-dcc9-425b-d65c-db11f45e8096@windriver.com>
-Date: Sat, 2 Feb 2019 11:05:08 +0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.5.0
-MIME-Version: 1.0
-In-Reply-To: <b4594318-9ebf-91ce-b845-3fac92ba6476@arm.com>
+ id 1gpmaL-0000NK-7n; Sat, 02 Feb 2019 04:07:18 +0000
+X-IronPort-AV: E=Sophos;i="5.56,550,1539673200"; d="scan'208";a="23335987"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa6.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 01 Feb 2019 21:07:15 -0700
+Received: from NAM01-SN1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.107) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Fri, 1 Feb 2019 21:07:14 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=1rxlCOv40W7jFAfqNY4lvVhJcaiajAM9zDTOjWkm6sU=;
+ b=k5ec38+xq9fHgAlYGfhCq1aQpoQYz72qgmhebRdpmSyCKzUxbED2bs1CsMtSXeHGnvjeNJrolMthPFWHSFtQMNMTFP1seVrEMxXfrWm3KdH1QwsNuzvdJ9GJUi4KnsaNHthbZQw9umeyy2z5eRGSxmlDtz7lo+nSuO/oqgG00Jk=
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.98.146) by
+ BN6PR11MB1300.namprd11.prod.outlook.com (10.173.26.9) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1580.17; Sat, 2 Feb 2019 04:07:13 +0000
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::847:4296:13b9:fc9f]) by BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::847:4296:13b9:fc9f%8]) with mapi id 15.20.1580.017; Sat, 2 Feb 2019
+ 04:07:13 +0000
+From: <Tudor.Ambarus@microchip.com>
+To: <broonie@kernel.org>, <robh+dt@kernel.org>, <mark.rutland@arm.com>,
+ <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
+ <Ludovic.Desroches@microchip.com>, <bbrezillon@kernel.org>,
+ <Cyrille.Pitchen@microchip.com>, <bugalski.piotr@gmail.com>
+Subject: [PATCH v3 01/13] spi: atmel-quadspi: cache MR value to avoid a write
+ access
+Thread-Topic: [PATCH v3 01/13] spi: atmel-quadspi: cache MR value to avoid a
+ write access
+Thread-Index: AQHUuqzGfGfknscimE6zODgQQX/E9w==
+Date: Sat, 2 Feb 2019 04:07:13 +0000
+Message-ID: <20190202040653.1217-2-tudor.ambarus@microchip.com>
+References: <20190202040653.1217-1-tudor.ambarus@microchip.com>
+In-Reply-To: <20190202040653.1217-1-tudor.ambarus@microchip.com>
+Accept-Language: en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR09CA0062.eurprd09.prod.outlook.com
+ (2603:10a6:802:28::30) To BN6PR11MB1842.namprd11.prod.outlook.com
+ (2603:10b6:404:101::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Tudor.Ambarus@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 2.9.5
+x-originating-ip: [188.25.201.137]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BN6PR11MB1300;
+ 6:FjPg9bQQXdLxRWflJHRzEwnZVvhzor/SCAoI86QAqjTHIUiG9/vQHO4fXIhCTbA4f21fGCZAWUFZA6Z1q77rmPGf8NLoL5IKrcwhg8DsBYIGWyX/3J0Bs7BTXXy+xQDTelmF2EmEDXqf9tU+yzoo006O4+myo1+aZMk0S2Yl9xkTeBUbdwETcO6XmYeFLIWL+o5Cfm40BB+iToEL9+1bP4vhtdx4TDtSMbZG4f70jGTuklfNV44Qz2Ef6Y1dFghmkW6NBYciogwAOx/8EzM57xuDSQpYwySKgNY9wjXKAjkC7reRGOyMVfnop+TwMLnDxSY3rcZBsL8mwVOIxRa8jQbKYWDgmu7nlBEhZVhRGkIg5hu7nzhXH3pQj3nhp9n6IQ5yqa0awHks+l8GrKAGzCa9DeLkcCtoGXMJVSxX89qGoTTO4SWbaWWJkWzAvbSXTNzZySX1UILhqnRUGRseoQ==;
+ 5:ZAInrhYkqmGNH3MF6MTbcgREKWZ6I0SYPVqcN8USTR+H5wu2n4oRFIyoOeEHiDVS27LbaRU29eZlaJD534FkGBuLurmJbm4a+XNCLeu2jdkxlWts5sOg8qs1rCg+sGauWfRSwf71XrZvt1HSuO5AZu+wi856TEWj2DfOn469U9JSljeFc2jyB9kCFVgyTzNuYns7ZVTHiKdKlT8p2Xe1Aw==;
+ 7:dW6uFLFtCbzxb2btsK/FiedtQP06khDo4+LdrdxJJFNfWHGLmHPDGRYGHFZvIwZkW+WHLUndx+taw8tuV0PxO963m+klAvgija08KAQIDy5CXkkQ4s9N/miKIvlgdcgRBhE+ZShdF0kWeIUoYYAKuw==
+x-ms-office365-filtering-correlation-id: 01cc9d58-3a81-42a3-abe7-08d688c3e927
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:BN6PR11MB1300; 
+x-ms-traffictypediagnostic: BN6PR11MB1300:
+x-microsoft-antispam-prvs: <BN6PR11MB13001EC8308535D2CBDF0D81F0930@BN6PR11MB1300.namprd11.prod.outlook.com>
+x-forefront-prvs: 09368DB063
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39860400002)(376002)(366004)(346002)(136003)(396003)(199004)(189003)(14454004)(52116002)(50226002)(105586002)(6436002)(102836004)(72206003)(81156014)(81166006)(2906002)(26005)(7736002)(478600001)(3846002)(6116002)(53936002)(256004)(14444005)(106356001)(8936002)(68736007)(36756003)(97736004)(76176011)(107886003)(4326008)(39060400002)(2616005)(99286004)(476003)(446003)(86362001)(66066001)(71200400001)(11346002)(7416002)(71190400001)(6486002)(6512007)(316002)(110136005)(1076003)(305945005)(186003)(8676002)(2501003)(25786009)(486006)(54906003)(386003)(6506007);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1300;
+ H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: kVHmo5wh59+ZPJbuyFsGJiwrDhgzUre3FdP9PF44cXK5oejCu6wSGXHQ4YhOplSWmnhC3iJz2/wduUAMpwJT75is+uC1eVuU02EsiqvWAc9i5wa/Fb5pcw6+iE/qI9Av8LFPtv7IEWu2Nv4qFePfY/jpdehhsFuniN9Roe77pmY+3baD/r7cbBMqmC1Td8tXt11gCP7tmHLpPJbWA4bS9/zuNNUs6A0xTjqN8Jo1FLcVn1s/m99nU1kizQUrKhzs31WnOp4y9X49LIVrorRZeMm3ao60Evf2Z5o20LZYpDobvcaW+z1Gs/IAtgw+BwvsYYwr83GOu3B4uQ+Z0SQBg2YgDBLGd1VOp5ZB2CF98YS8fnfvHkDiTUvhtAcVXvI+la+ArSWFKSaOaI3z9JbMmWEVtWVrow8jqdRRwpxTfAI=
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 01cc9d58-3a81-42a3-abe7-08d688c3e927
+X-MS-Exchange-CrossTenant-originalarrivaltime: 02 Feb 2019 04:07:11.0518 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1300
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_190824_687338_1F745466 
-X-CRM114-Status: GOOD (  26.64  )
+X-CRM114-CacheID: sfid-20190201_200717_360638_4DC4A7C3 
+X-CRM114-Status: UNSURE (   9.61  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,81 +130,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jason Cooper <jason@lakedaemon.net>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Jeffrey Hugo <jhugo@codeaurora.org>, linux-kernel@vger.kernel.org,
- Jeremy Linton <jeremy.linton@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: devicetree@vger.kernel.org, Tudor.Ambarus@microchip.com,
+ linux-kernel@vger.kernel.org, linux-spi@vger.kernel.org,
+ linux-mtd@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMDIvMDEvMjAxOSAwNToxNSBQTSwgTWFyYyBaeW5naWVyIHdyb3RlOgo+IEhpIFh1bGluLAo+
-Cj4gT24gMDEvMDIvMjAxOSAwNjoxMSwgU3VuIFRlZCB3cm90ZToKPj4gSGkgTWFyYywKPj4KPj4g
-TWFyYyBaeW5naWVyIDxtYXJjLnp5bmdpZXJAYXJtLmNvbSA8bWFpbHRvOm1hcmMuenluZ2llckBh
-cm0uY29tPj4g5LqOMjAxOAo+PiDlubQ55pyIMjLml6Xlkajlha0g5LiK5Y2INDowM+WGmemBk++8
-mgo+Pgo+PiAgICAgIFRoZSBHSUN2MyBhcmNoaXRlY3R1cmUgaGFzIHRoZSByZW1hcmthYmxlIGZl
-YXR1cmUgdGhhdCBvbmNlIExQSSB0YWJsZXMKPj4gICAgICBoYXZlIGJlZW4gYXNzaWduZWQgdG8g
-cmVkaXN0cmlidXRvcnMgYW5kIHRoYXQgTFBJIGRlbGl2ZXJ5IGlzIGVuYWJsZWQsCj4+ICAgICAg
-dGhlcmUgaXMgbm8gZ3VhcmFudGVlIHRoYXQgTFBJcyBjYW4gYmUgdHVybmVkIG9mZiAoYW5kIG1v
-c3QKPj4gICAgICBpbXBsZW1lbnRhdGlvbnMgZG8gbm90IGFsbG93IGl0KSwgbm9yIGNhbiBpdCBi
-ZSByZXByb2dyYW1tZWQgdG8gdXNlCj4+ICAgICAgb3RoZXIgdGFibGVzLgo+Pgo+PiAgICAgIFRo
-aXMgaXMgYSBiaXQgb2YgYSBwcm9ibGVtIGZvciBrZXhlYywgd2hlcmUgdGhlIHNlY29uZGFyeSBr
-ZXJuZWwKPj4gICAgICBjb21wbGV0ZWx5IGxvb3NlcyB0cmFjayBvZiB0aGUgcHJldmlvdXMgYWxs
-b2NhdGlvbnMuIElmIHRoZSBzZWNvbmRhcnkKPj4gICAgICBrZXJuZWwgZG9lc24ndCBhbGxvY2F0
-ZSB0aGUgdGFibGVzIGV4YWN0bHkgdGhlIHNhbWUgd2F5LCBubyBMUElzIHdpbGwKPj4gICAgICBi
-ZSBkZWxpdmVyZWQgYnkgdGhlIEdJQyAod2hpY2ggY29udGludWVzIHRvIHVzZSB0aGUgb2xkIHRh
-YmxlcyksIGFuZAo+PiAgICAgIG1lbW9yeSBwcmV2aW91c2x5IGFsbG9jYXRlZCBmb3IgdGhlIHBl
-bmRpbmcgdGFibGVzIHdpbGwgYmUgc2xvd2x5Cj4+ICAgICAgY29ycnVwdGVkLCBvbmUgYml0IGF0
-IGEgdGltZS4KPj4KPj4gICAgICBUaGUgd29ya2Fyb3VuZCBmb3IgdGhpcyBpcyBiYXNlZCBvbiBh
-IHNlcmllc1sxXSBieSBBcmQgQmllc2hldXZlbCwKPj4gICAgICB3aGljaCBhZGRzIHRoZSByZXF1
-aXJlZCBpbmZyYXN0cnVjdHVyZSBmb3IgbWVtb3J5IHJlc2VydmF0aW9ucyB0byBiZQo+PiAgICAg
-IHBhc3NlZCBmcm9tIG9uZSBrZXJuZWwgdG8gYW5vdGhlciB1c2luZyBhbiBFRkkgdGFibGUuCj4+
-Cj4+ICAgICAgVGhpcyBpbmZyYXN0cnVjdHVyZSBpcyB0aGVuIHVzZWQgdG8gcmVnaXN0ZXIgdGhl
-IGFsbG9jYXRpb24gb2YgR0lDCj4+ICAgICAgdGFibGVzIHdpdGggRUZJLCBhbmQgYWxsb3cgdGhl
-IEdJQyBkcml2ZXIgdG8gc2FmZWx5IHJldXNlIHRoZSBleGlzdGluZwo+PiAgICAgIHByb2dyYW1t
-aW5nIGlmIGl0IGRldGVjdHMgdGhhdCB0aGUgdGFibGVzIGhhdmUgYmVlbiBjb3JyZWN0bHkKPj4g
-ICAgICByZWdpc3RlcmVkLiBPbiBub24tRUZJIHN5c3RlbXMsIHRoZXJlIGlzIG5vdCBtdWNoIHdl
-IGNhbiBkby4KPj4KPj4KPj4gU29ycnkgdG8gdHVybiB0aGlzIHF1ZXN0aW9uIG91dCBhZ2Fpbi4K
-Pj4gRm9yIG90aGVycyBub24tRUZJIHN5c3RlbXMsIGp1c3QgYXMgeW91ciBzYWlkIHRpbGwgbm93
-IHdlIGRpZCBkbwo+PiBhbnl0aGluZywgcmlnaHQ/Cj4gV2UgZGlkbid0IGRvIGFueXRoaW5nLCBi
-ZWNhdXNlIHRoZXJlIGlzIG5vdGhpbmcgd2UgY2FuIGRvLgo+Cj4+IEkgZGlkIHNlZSB0aGUga2V4
-ZWMgYm9vdGluZyBmYWlsdXJlIHNpbmNlIHJlLXNldHRpbmcKPj4gdGhlwqBHSUNSX0NUTFIuRW5h
-YmxlTFBJIGZyb20gIjEiIHRvICIwIiB1bnN1Y2Nlc3NmdWwuCj4+Cj4+IFRoZcKgIGJlbG93IGNv
-bW1pdCBhZGRzIHRoZcKganVkZ2VtZW50IGZvciBkaXNhYmxpbmcgTFBJcywgYW5kIHJldHVybmVk
-Cj4+IGVycm9yLiBDYXVzZWQgImtleGVjIiBib290aW5nwqBmYWlsdXJlLgo+IEFuZCBJIGZ1bGx5
-IGV4cGVjdGVkIHRoaXMuIFdoZW4gSSBzYWlkICJ3ZSBkb24ndCBkbyBhbnl0aGluZyIsIEkgbWVh
-bnQKPiAid2UgZG9uJ3QgZG8gYW55dGhpbmcgdG8gbWFrZSBMUElzIHdvcmsiLgo+Cj4+IDZlYjQ4
-NmI2NmEgKGlycWNoaXAvZ2ljLXYzOiBFbnN1cmUgR0lDUl9DVExSLkVuYWJsZUxQST0wIGlzIG9i
-c2VydmVkCj4+IGJlZm9yZSBlbmFibGluZykuCj4+Cj4+IDxzbmlwIHBhdGNoPgo+PiAgwqBpbnQg
-aXRzX2NwdV9pbml0KHZvaWQpCj4+ICDCoHsKPj4gIMKgIMKgIMKgIMKgIGlmICghbGlzdF9lbXB0
-eSgmaXRzX25vZGVzKSkgewo+PiAtwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqBpZiAoIWdpY19yZGlz
-dHNfc3VwcG9ydHNfcGxwaXMoKSkgewo+PiAtwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAg
-wqAgwqBwcl9pbmZvKCJDUFUlZDogTFBJcyBub3Qgc3VwcG9ydGVkXG4iLAo+PiBzbXBfcHJvY2Vz
-c29yX2lkKCkpOwo+PiAtwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqByZXR1cm4g
-LUVOWElPOwo+PiAtwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqB9Cj4+ICvCoCDCoCDCoCDCoCDCoCDC
-oCDCoCDCoGludCByZXQ7Cj4+ICsKPj4gK8KgIMKgIMKgIMKgIMKgIMKgIMKgIMKgcmV0ID0gcmVk
-aXN0X2Rpc2FibGVfbHBpcygpOwo+PiArwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqBpZiAocmV0KQo+
-PiArwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqByZXR1cm4gcmV0Owo+PiArCj4g
-QW5kIEkgbWFpbnRhaW4gdGhhdCB0aGlzIGlzIHRoZSByaWdodCB0aGluZyB0byBkby4gSWYgTFBJ
-cyBhcmUgb24gYW5kCj4gdGhlIG1lbW9yeSBoYXMgbm90IGJlZW4gcmVzZXJ2ZWQsIGl0IGlzIHRo
-ZW4gbGlrZWx5IHRoYXQgdGhpcyBtZW1vcnkgaXMKPiBub3cgYmVpbmcgdXNlZCBieSB0aGUga2Vy
-bmVsIGZvciBzb21ldGhpbmcgZWxzZS4gVGhlIHN5c3RlbSBpcyB0aHVzCj4gZ29pbmcgdG8gc2Vl
-IHNpbmdsZS1iaXQgY29ycnVwdGlvbiBpbiBzb21lIHJhbmRvbSBwbGFjZXMuCj4KPiBBdCB0aGF0
-IHN0YWdlLCB5b3VyIHN5c3RlbSBpcyBob3JyaWJseSB1bnNhZmUsIGFuZCBJIHdpbGwgbm90IGxl
-dCBpdAo+IGJvb3QgdW5kZXIgdGhlc2UgY29uZGl0aW9ucy4gSWYgaXQgd2FzIHdvcmtpbmcgYmVm
-b3JlLCB0aGF0J3MgYmVjYXVzZQo+IHlvdSB3ZXJlIGx1Y2t5LCBhbmQgSSBwbGFjZSBubyBmYWl0
-aCBpbiBsdWNrLgo+Cj4gTm93IHlvdSBoYXZlIHR3byBhbHRlcm5hdGl2ZXM6Cj4KPiAtIFlvdSBz
-d2l0Y2ggdG8gYW4gRUZJLWJhc2VkIGZpcm13YXJlLiBUaGVzZSBkYXlzLCBldmVuIHUtYm9vdCBo
-YXMgYW4KPiBFRkkgaW1wbGVtZW50YXRpb24uIENPbnNpZGVyIGRvaW5nIHRoYXQgaWYgeW91IGNh
-bi4KPgo+IC0gSWYgdGhlcmUgaXMgbm8gRUZJIGltcGxlbWVudGF0aW9uIGZvciB5b3VyIFNvQywg
-eW91IGNhbiBwYXNzIHRoZQo+ICJpcnFjaGlwLmdpY3YzX25vbHBpPTEiIG9wdGlvbiB0byB0aGUg
-Zmlyc3Qga2VybmVsLiBUaGlzIHdpbGwga2VlcCBMUEkKPiBkaXNhYmxlZCwgYW5kIHlvdSdsbCBi
-ZSBhYmxlIHRvIGtleGVjIGEgc2Vjb25kYXJ5IGtlcm5lbCAoYW5kIGdldAo+IHdvcmtpbmcgTFBJ
-cyB0aGVyZSkuIFRoaXMgaXMgd2hhdCBJIGRvIG9uIG15IENocm9tZWJvb2suCgpIaSBNYXJjLAoK
-VGhhbmtzIGZvciBkZXRhaWxlZCBleHBsYW5hdGlvbi4KClRoYW5rcwpYdWxpbgo+Cj4gVGhhbmtz
-LAo+Cj4gCU0uCgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5p
-bmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8v
-bGludXgtYXJtLWtlcm5lbAo=
+From: Tudor Ambarus <tudor.ambarus@microchip.com>
+
+Cache Serial Memory Mode (SMM) value to avoid write access when
+setting the controller in serial memory mode. SMM is set in
+exec_op() and not at probe time, to let room for future regular
+SPI support.
+
+Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+---
+v3: update smm value when different. rename mr/smm
+v2: cache MR value instead of moving the write access at probe
+
+ drivers/spi/atmel-quadspi.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/spi/atmel-quadspi.c b/drivers/spi/atmel-quadspi.c
+index ddc712410812..645284c6ec9a 100644
+--- a/drivers/spi/atmel-quadspi.c
++++ b/drivers/spi/atmel-quadspi.c
+@@ -155,6 +155,7 @@ struct atmel_qspi {
+ 	struct clk		*clk;
+ 	struct platform_device	*pdev;
+ 	u32			pending;
++	u32			smm;
+ 	struct completion	cmd_completion;
+ };
+ 
+@@ -238,7 +239,11 @@ static int atmel_qspi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
+ 	icr = QSPI_ICR_INST(op->cmd.opcode);
+ 	ifr = QSPI_IFR_INSTEN;
+ 
+-	qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
++	/* Set the QSPI controller in Serial Memory Mode */
++	if (aq->smm != QSPI_MR_SMM) {
++		qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
++		aq->smm = QSPI_MR_SMM;
++	}
+ 
+ 	mode = find_mode(op);
+ 	if (mode < 0)
+-- 
+2.9.5
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
