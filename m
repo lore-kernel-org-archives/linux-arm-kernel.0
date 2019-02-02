@@ -5,20 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6AE62C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:39:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 700EEC282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:40:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 385072075B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:39:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 412D420844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:40:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XLmx8Bh3";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="I7hI1OJI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Qcua337T"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 385072075B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mP6Na6yh";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="rYWWdogH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 412D420844
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -28,79 +27,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=fV8UDZ5hGTbD7qt7t9eszeiTIjnrlP/HDG3JGOLdWjw=; b=XLmx8Bh332gBb+Gvw9A0hP1bDL
-	9zv9NseoPZ9gUW1T+LwDS7SQ67QQCEEV8g+uRV0bY5SGqpY2cZdbNt4ZVuQyLTW6wAq2TnQPK7nBV
-	a4oxbp0VciKJRTJQcmmQPP1lg2M3qLd5FuNeNMJbcoU6YhZCk6PFWXq4pAGHwcWHXDPCx6cyQiE2J
-	/qTu2EPqxkrUqUzIiq8VaoII4JzVg92254gzzX6d3xvx2Eso5zNmrWWcCa9JPwNQBkXBYRxF+Ns1s
-	u4nnqQVLzvMXM2c+yRC1KR9vbtdS5mzFVNil9Gk+G/oAH7YYrxeu6BfJOkbIc6K6vG01GfBQINyFg
-	fTxx7DYA==;
+	bh=NRfD7QQJoZEAfPnl5AR95aD6iweGjPkGfMkXob96miM=; b=mP6Na6yhoDAiyliGqCpZcmq2bN
+	xoZTrq0S8V5dbKfc68v41r8AnCxG8DZODt2Hc2SoipgaT/2K5R6Bf7XBz2hRchlDqor1jbYyU3nb/
+	lwWfzES8CkUxm10Vni7iTAS6KxPYVeBBF5F+EVVtfLpXSr6zRXex+lU17uW8NgUcB1RpOzZ8rk/ET
+	aGi7ZkB/NlWDdN1kVGUCkw19QtK85aDnerufO7W+CJZfCtWcQ18c7r6YYEqbH1c5OskDZcwa1JE8R
+	sNuDL1irE/5ZmcmnF6WZhXh2iBW5QorSgX9DLgCI2VccHX7qj7axrtCsar/7pHgRuUDvCrchU6Tjm
+	u2IRT7gg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpkHf-0004RU-D9; Sat, 02 Feb 2019 01:39:51 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gpkI0-00052e-Hu; Sat, 02 Feb 2019 01:40:12 +0000
+Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpkHb-0004Nh-Nx
- for linux-arm-kernel@bombadil.infradead.org; Sat, 02 Feb 2019 01:39:47 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=mzJwBxC9uXB//tA5PSpVVWly8ERu6+h2503MPrKjGcg=; b=I7hI1OJItI7zly9Rx+OiHnFqp
- V2EBXIHoKF6pFt2zQgpn9An9v3HT745wNRzPlwanoTrPd3hUwOXCE94o4+1bhssyC0R43fzkpkS5N
- z1uuwI5bm3hMqoW6Amt6hmkKI9XowLU3uoVhxap6OlOHiIoUzE1wMZmfj6K2FR64M+fXlmsG07ZRn
- 5+u62nNGImASQH3GbCQbCx8AgVuaJV8B/72OVw/DA/xTVb4ljZl6BjJX1bArPZ8N5pCiTi0s/I3gm
- k/ycwhixAeDcYct5U2c3x0ZQ5piOZMbJUWCrcfrxCYxh/5Vx1IudJXMvW+GdkwaeQYc5uC+1UH8+d
- FVOIOGyOQ==;
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpkHY-0005VA-SH
- for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 01:39:45 +0000
-Received: by mail-pf1-x442.google.com with SMTP id c123so4109732pfb.0
+ id 1gpkH9-0003tT-9O
+ for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 01:39:55 +0000
+Received: by mail-pg1-x542.google.com with SMTP id n2so3760854pgm.3
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 17:39:42 -0800 (PST)
+ Fri, 01 Feb 2019 17:39:18 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=mzJwBxC9uXB//tA5PSpVVWly8ERu6+h2503MPrKjGcg=;
- b=Qcua337T8myRK46Z4hgHoGruUwG/fSBmBnSudxXeOK8Fr05S1ddajw6sNis92exhPt
- 91bfxvoG8/bj38NRAvNU0VbnuCvp1IA4d3IBZPg2VR1jcdjTbhnH5tw2+33fXRCQwfQQ
- PaDqBTFs1gd7oq8qgZfqsi2SbuGsCOYckgitb24/j+YFida+o8CNJlvt7C9YK+XTKiwv
- WYBig8UHSHrJymgn0spCgGoXWwY5pEG92CWOozExwelAWAsFbnHnTJ/FSOAY5PSKSzsU
- aYlGJgXbwgix947+4Tlt8Xx3oCLgEiw9P0s3gscqbJo7fHZNSqzBDJlv6JwINZfn2oDM
- 6skw==
+ bh=6fivvub99Xix9SC3KKfxY3DnEgPVHfJZb9qun3OaRWg=;
+ b=rYWWdogHyyfoXHNw5vYGz1rLozTLpmOkP0KHq197u7SHmMLbh+SkNqa7NpQtSdMfQq
+ Sg2+fJLGoIFUvNopzkSuf+xcc4vTZubXH7cPBLLLEF9z9cMpKmuLzM00WWcaWtYOlYoY
+ 8QZOVzS/gUsOqXwweSfmeSAQirZ8DFeZxbW/1g1BV9EA1eQNZMAK5En0+ASsQb0IFPtW
+ 9ehITCoiqh4YiLLPrNJ9/A5Hqo5hIs9LcngkxxNaQ7bQ2DORxuesRxtd5sJsPHHiZCUq
+ iuLVUhdb9FEKI7KaHoyxW5MzXqgNtzYoWOuflVepi2+pqZY5pl9G0HkcTbOHhVZ1b240
+ 7JiQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=mzJwBxC9uXB//tA5PSpVVWly8ERu6+h2503MPrKjGcg=;
- b=aOK4LYakIbs6vjtUIRJDCVNARzJVL+PjanjKmQjkWYaSszZy4eYuiEXr/h1Ct8c+oe
- EwvVEbqiiuF3QkeKx8GSmADNMefd4OXuxWpukWTmclqESccIqqB9qKn7GRRUBnZoHN2G
- 4nZfDLByslwbJZP3pRz8wnVw/Q4NOHKZCENJTpr9mqsAcQZtq1u6atBVCDu/ciNyWEo2
- DAn2kIL92BmrKhuQ6EcEaAY12VEXJrYEbw7mvnFYpZoF6jhZ2c+LMAu6nLir+JvvdRi9
- PWSRYrSusbZ/PxQHcJsUS28D5vOLkgSJSHmx3TEdu7YyhCM3pZwbnQ4fe2VFZsThKNw/
- pZvA==
-X-Gm-Message-State: AHQUAubIrpakJmakvJvQdUQ2ZcALslpekjFUd8x8RBxj6rIO0wVcoP23
- RIfFKZEJYfQ2uXbr7HB9mP8=
-X-Google-Smtp-Source: AHgI3IYabhaPzvhFuMYVtOsFddmUk5xY+xDep8I/zRTsc2nUVkd3NGA16u1jhZqEAaNh3r6MH4P4EQ==
-X-Received: by 2002:a65:560e:: with SMTP id l14mr4576873pgs.168.1549071580503; 
- Fri, 01 Feb 2019 17:39:40 -0800 (PST)
+ bh=6fivvub99Xix9SC3KKfxY3DnEgPVHfJZb9qun3OaRWg=;
+ b=pcRGXAMpqDRk6Ms4lcybhUJKMsNTV2/j/bWnYfRNzeRbzr99yKGckHCMufzhc460Xw
+ plqvB0KDo+kZzh7dXPTf4PoXciTVhu22G7T1I23UKj8C/vWh9YuC3z/8U4Jvy+1u42ID
+ czQHSUZpXzsRJkZ21BixVtWDXQggqViobN2xcX29KXi9nRJMmeLHVdNCkij3ipm50jfv
+ /nv0/8W6BZW+lSL4nmkpIyzX60elmukOXMbnn+vcLf4DJa5ujBtXveVUcm1BpUSPvE8F
+ mlffqxcVruemD0vWkIU/02hsvWKOUmEoNSurfIC7setZgDvcoBGVX3CPZ1MfiubvBgdZ
+ VW1g==
+X-Gm-Message-State: AJcUukcNfcIHB8EeknuWgqw9c1Nl3Upn6fuGXVJjcun+ZQQDlqIz9rhF
+ YpxYcFTBFVMhzRLdPQThl5E=
+X-Google-Smtp-Source: ALg8bN7W+aadejbG7oa19lQl7G9yPYUZCeqRb9Yml4K7aisKFkTmeYC8Fchg3oAyUGiZP9Vgewt9Xw==
+X-Received: by 2002:a62:16d6:: with SMTP id 205mr41603341pfw.256.1549071557589; 
+ Fri, 01 Feb 2019 17:39:17 -0800 (PST)
 Received: from localhost.corp.microsoft.com ([167.220.255.67])
- by smtp.googlemail.com with ESMTPSA id d3sm9183425pgl.64.2019.02.01.17.39.33
+ by smtp.googlemail.com with ESMTPSA id d3sm9183425pgl.64.2019.02.01.17.39.10
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 01 Feb 2019 17:39:39 -0800 (PST)
+ Fri, 01 Feb 2019 17:39:16 -0800 (PST)
 From: lantianyu1986@gmail.com
 X-Google-Original-From: Tianyu.Lan@microsoft.com
 To: 
-Subject: [PATCH V2 7/10] KVM: Add kvm_get_memslot() to get memslot via slot id
-Date: Sat,  2 Feb 2019 09:38:23 +0800
-Message-Id: <20190202013825.51261-8-Tianyu.Lan@microsoft.com>
+Subject: [PATCH V2 4/10] KVM/MMU: Introduce tlb flush with range list
+Date: Sat,  2 Feb 2019 09:38:20 +0800
+Message-Id: <20190202013825.51261-5-Tianyu.Lan@microsoft.com>
 X-Mailer: git-send-email 2.14.4
 In-Reply-To: <20190202013825.51261-1-Tianyu.Lan@microsoft.com>
 References: <20190202013825.51261-1-Tianyu.Lan@microsoft.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_203944_923835_9410DD85 
-X-CRM114-Status: GOOD (  15.19  )
+X-CRM114-CacheID: sfid-20190201_173920_062418_E292BA04 
+X-CRM114-Status: GOOD (  12.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -131,120 +114,65 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Lan Tianyu <Tianyu.Lan@microsoft.com>
 
-This patch is to add kvm_get_memslot() to get struct kvm_memory_slot
-via slot it and remove redundant codes. The function will also be used
-in the following changes.
+This patch is to introduce tlb flush with range list interface and use
+struct kvm_mmu_page as list entry. Use flush list function in the
+kvm_mmu_commit_zap_page().
 
 Signed-off-by: Lan Tianyu <Tianyu.Lan@microsoft.com>
 ---
- include/linux/kvm_host.h |  1 +
- virt/kvm/kvm_main.c      | 45 +++++++++++++++++++--------------------------
- 2 files changed, 20 insertions(+), 26 deletions(-)
+ arch/x86/kvm/mmu.c | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index c38cc5eb7e73..aaa2b57eeb19 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -758,6 +758,7 @@ int kvm_get_dirty_log_protect(struct kvm *kvm,
- 			      struct kvm_dirty_log *log, bool *flush);
- int kvm_clear_dirty_log_protect(struct kvm *kvm,
- 				struct kvm_clear_dirty_log *log, bool *flush);
-+struct kvm_memory_slot *kvm_get_memslot(struct kvm *kvm, u32 slot);
+diff --git a/arch/x86/kvm/mmu.c b/arch/x86/kvm/mmu.c
+index 70cafd3f95ab..d57574b49823 100644
+--- a/arch/x86/kvm/mmu.c
++++ b/arch/x86/kvm/mmu.c
+@@ -289,6 +289,20 @@ static void kvm_flush_remote_tlbs_with_address(struct kvm *kvm,
  
- void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
- 					struct kvm_memory_slot *slot,
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 7ebe36a13045..b2097fa4b618 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -1095,22 +1095,30 @@ static int kvm_vm_ioctl_set_memory_region(struct kvm *kvm,
- 	return kvm_set_memory_region(kvm, mem);
- }
- 
-+struct kvm_memory_slot *kvm_get_memslot(struct kvm *kvm, u32 slot)
-+{
-+	struct kvm_memslots *slots;
-+	int as_id, id;
+ 	range.start_gfn = start_gfn;
+ 	range.pages = pages;
++	range.flush_list = NULL;
 +
-+	as_id = slot >> 16;
-+	id = (u16)slot;
-+	if (as_id >= KVM_ADDRESS_SPACE_NUM || id >= KVM_USER_MEM_SLOTS)
-+		return NULL;
-+
-+	slots = __kvm_memslots(kvm, as_id);
-+	return id_to_memslot(slots, id);
++	kvm_flush_remote_tlbs_with_range(kvm, &range);
 +}
 +
- int kvm_get_dirty_log(struct kvm *kvm,
- 			struct kvm_dirty_log *log, int *is_dirty)
++static void kvm_flush_remote_tlbs_with_list(struct kvm *kvm,
++		struct hlist_head *flush_list)
++{
++	struct kvm_tlb_range range;
++
++	if (hlist_empty(flush_list))
++		return;
++
++	range.flush_list = flush_list;
+ 
+ 	kvm_flush_remote_tlbs_with_range(kvm, &range);
+ }
+@@ -2708,6 +2722,7 @@ static void kvm_mmu_commit_zap_page(struct kvm *kvm,
+ 				    struct list_head *invalid_list)
  {
--	struct kvm_memslots *slots;
- 	struct kvm_memory_slot *memslot;
--	int i, as_id, id;
- 	unsigned long n;
- 	unsigned long any = 0;
-+	int i;
+ 	struct kvm_mmu_page *sp, *nsp;
++	HLIST_HEAD(flush_list);
  
--	as_id = log->slot >> 16;
--	id = (u16)log->slot;
--	if (as_id >= KVM_ADDRESS_SPACE_NUM || id >= KVM_USER_MEM_SLOTS)
--		return -EINVAL;
-+	memslot = kvm_get_memslot(kvm, log->slot);
+ 	if (list_empty(invalid_list))
+ 		return;
+@@ -2721,7 +2736,15 @@ static void kvm_mmu_commit_zap_page(struct kvm *kvm,
+ 	 * In addition, kvm_flush_remote_tlbs waits for all vcpus to exit
+ 	 * guest mode and/or lockless shadow page table walks.
+ 	 */
+-	kvm_flush_remote_tlbs(kvm);
++	if (kvm_available_flush_tlb_with_range()) {
++		list_for_each_entry(sp, invalid_list, link)
++			if (sp->last_level)
++				hlist_add_head(&sp->flush_link, &flush_list);
++
++		kvm_flush_remote_tlbs_with_list(kvm, &flush_list);
++	} else {
++		kvm_flush_remote_tlbs(kvm);
++	}
  
--	slots = __kvm_memslots(kvm, as_id);
--	memslot = id_to_memslot(slots, id);
- 	if (!memslot->dirty_bitmap)
- 		return -ENOENT;
- 
-@@ -1154,20 +1162,13 @@ EXPORT_SYMBOL_GPL(kvm_get_dirty_log);
- int kvm_get_dirty_log_protect(struct kvm *kvm,
- 			struct kvm_dirty_log *log, bool *flush)
- {
--	struct kvm_memslots *slots;
- 	struct kvm_memory_slot *memslot;
--	int i, as_id, id;
- 	unsigned long n;
- 	unsigned long *dirty_bitmap;
- 	unsigned long *dirty_bitmap_buffer;
-+	int i;
- 
--	as_id = log->slot >> 16;
--	id = (u16)log->slot;
--	if (as_id >= KVM_ADDRESS_SPACE_NUM || id >= KVM_USER_MEM_SLOTS)
--		return -EINVAL;
--
--	slots = __kvm_memslots(kvm, as_id);
--	memslot = id_to_memslot(slots, id);
-+	memslot = kvm_get_memslot(kvm, log->slot);
- 
- 	dirty_bitmap = memslot->dirty_bitmap;
- 	if (!dirty_bitmap)
-@@ -1225,24 +1226,16 @@ EXPORT_SYMBOL_GPL(kvm_get_dirty_log_protect);
- int kvm_clear_dirty_log_protect(struct kvm *kvm,
- 				struct kvm_clear_dirty_log *log, bool *flush)
- {
--	struct kvm_memslots *slots;
- 	struct kvm_memory_slot *memslot;
--	int as_id, id;
- 	gfn_t offset;
- 	unsigned long i, n;
- 	unsigned long *dirty_bitmap;
- 	unsigned long *dirty_bitmap_buffer;
- 
--	as_id = log->slot >> 16;
--	id = (u16)log->slot;
--	if (as_id >= KVM_ADDRESS_SPACE_NUM || id >= KVM_USER_MEM_SLOTS)
--		return -EINVAL;
--
- 	if ((log->first_page & 63) || (log->num_pages & 63))
- 		return -EINVAL;
- 
--	slots = __kvm_memslots(kvm, as_id);
--	memslot = id_to_memslot(slots, id);
-+	memslot = kvm_get_memslot(kvm, log->slot);
- 
- 	dirty_bitmap = memslot->dirty_bitmap;
- 	if (!dirty_bitmap)
+ 	list_for_each_entry_safe(sp, nsp, invalid_list, link) {
+ 		WARN_ON(!sp->role.invalid || sp->root_count);
 -- 
 2.14.4
 
