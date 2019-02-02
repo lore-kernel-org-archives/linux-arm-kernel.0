@@ -2,93 +2,75 @@ Return-Path: <SRS0=Q9BQ=QJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B25CEC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 15:07:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 96582C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 15:24:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8412720857
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 15:07:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5F82320818
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 15:24:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jvnJOOQ/";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="ZXuSvBDE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8412720857
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pS0SkC6f";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="sPsU5EMR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F82320818
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2DV8xeuE5tKck6XTLnnW4HiLU8KOm7AQDJHmBkqOfNw=; b=jvnJOOQ/VTXO16
-	EthAotu0x+k/m19GMg8WgcMQFWTNZeoJQugMtUswDmVCgoyDhUGFNFw+G/op1aStPjmGDciJJrUdC
-	EJSNzqfHHDMa0+NWswUCPRMzQJ16xvTbQ2gK9O729tTb4BRfg0f3lSPgeaa0J9r2huvOq8K7eUHhv
-	CEUKi5OFj55Wxk8S0ortTNn3yPPto13ic99R3G5RYfQMfDBS5Q+s6tgWAX3gFu7/X33bi5WNpPRrW
-	ctNj9uQeVcTZnTj22/nfDpZLsb/6Gan1brCqLzBT6IPdIMWPI4HB1xmOsPoAwB/g4uCKzWoVXhqfC
-	v+l/8REyoUZb00Sik32g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=FMc9EqifnX0EuP8rTKJ3xlF2TnMLBMSixr5SQEBenVM=; b=pS0SkC6fN5sezSwSbLwLj21zN
+	l/VSQzj16t2it1twTSpCao0xWhgWmogJRu6RpamugOjQJyGNgHC1h0i1AhzN96nhCynjY4y9O8Hh3
+	4rxFk3k9UqkiasHmuWDjpFYXewFUQzR7uuap22Rloxm2Jc57Qz2Y+WYIXrBJsQqJ68owNU0PNN0Kf
+	467Edhb3UNSSUvAHEDKjjnLHWahuwzg5NPaM2kog6eYB6YMzkPi8xH0DtVqG5CfEiYr3qFTsdxFnB
+	JC3iffB/m6hPVeLRhYuF4Er5DsZ1ukiPTuw07f58Cy+z+G+xIm6ixrHtau296E4o/kAQeIKgyf/3k
+	T9gBvGEbw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpwtQ-00081p-9Z; Sat, 02 Feb 2019 15:07:40 +0000
-Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
+	id 1gpx9B-0004nO-8G; Sat, 02 Feb 2019 15:23:57 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpwsv-0007UK-2B
- for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 15:07:11 +0000
-Received: by mail-ed1-x541.google.com with SMTP id d39so7829044edb.12
- for <linux-arm-kernel@lists.infradead.org>;
- Sat, 02 Feb 2019 07:07:07 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=/km09EJcwL4AcPz2jLd4Z8bPwMU/0Bbc9m2RMAmmW6s=;
- b=ZXuSvBDE5uoVExt1KbhJTeU7zncJdsI96L59a5t0TrSnPY/mjNj88IPi0JMgoLsg5q
- SrZOKJP/7llyklJchStwoIAaBpsRRA0TE3YJpdhTaVCk/PMAz7U/i5imoMoe5onVBZaG
- NJRGmBLddkWaIgro5k8bVyaijP1bv1qpbnbx1BbUK55yccM1nhg+0CIKto9ZZzsdIkg+
- pAvA/QO28YcZihXRo6IRbu5l/zl6Q464uN0zSZQq1uJKuSNDWJ9Jr5c6eXztyezXEQLR
- TCFP+ISzPV1YAXassdV1Fl0V+UfAAG6hsgr0rt8HUYGGucj4vA/CaQG75Fzb6dSr4HTs
- 41vg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=/km09EJcwL4AcPz2jLd4Z8bPwMU/0Bbc9m2RMAmmW6s=;
- b=S1aX4sWbnlpISLhYRxRSDH4A2h2PvEAXA9/yjNbN0+tUTp7vcGFKkMkZKcVVGw8w9p
- jepyngF3TBLzWamGNn5RtlyutBet/4Bm9zQSwm9FcDBd4LEyt3TJ6zZ3wIx1vmyAf3mC
- dRzxvA6jIyRzBdhGKpcJC1od3HMj9hvylFPidK7GNMg08V51EzgcMQwKpyACN0gnYacc
- 9Arcf9Ahew8A5jODuf2tGQqfGqtvWWff3kDM253DyxMGfklcAU46aF5UaxkFmLcCNVBH
- RHWRY1k8VXU33O4WqYhmSfk1LAjDPyPOSwdc+M21sDfKRbZBYqOxDoybFoRvsxu18hq+
- +rcw==
-X-Gm-Message-State: AHQUAuYafjZo2B+6PZKQLsHYKz2unMnaAiq7muljbAUnhin1D+Yr4rd3
- AHKnOD2+ZddsGaaHs8+WTl5NEA==
-X-Google-Smtp-Source: AHgI3Iapz39/3yQZRCF+uHmfXu69Xop0ni4M2S3ZgnrOAG5XW0ZRDiVdZ0Gxs2XeXVFRNtbe8Nw78g==
-X-Received: by 2002:a17:906:e0d6:: with SMTP id
- gl22mr18660163ejb.239.1549120025766; 
- Sat, 02 Feb 2019 07:07:05 -0800 (PST)
-Received: from xps.fosdem.net ([2001:67c:1810:f051:b8ff:4dac:8778:256f])
- by smtp.gmail.com with ESMTPSA id d15sm2753023edv.20.2019.02.02.07.07.04
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 02 Feb 2019 07:07:05 -0800 (PST)
-From: Carlo Caione <ccaione@baylibre.com>
-To: robh+dt@kernel.org, mark.rutland@arm.com, shawnguo@kernel.org,
- s.hauer@pengutronix.de, kernel@pengutronix.de, festevam@gmail.com,
- linux-imx@nxp.com, l.stach@pengutronix.de, devicetree@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v2 1/2] arm64: dts: imx8mq: Add on-chip OTP controller node
-Date: Sat,  2 Feb 2019 15:06:37 +0000
-Message-Id: <20190202150638.13672-2-ccaione@baylibre.com>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20190202150638.13672-1-ccaione@baylibre.com>
-References: <20190202150638.13672-1-ccaione@baylibre.com>
+ id 1gpx97-0004n3-6L
+ for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 15:23:54 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=I9/JZlnq2N8rh4U3EZjlUbv7HbaTh7zlNjpL/wdd2QE=; b=sPsU5EMR8CQcQcH9kkRJcpXBB
+ Y12HP+MB0bL6AO1TE8W6mlusXpMyjZ3M3HFBu0SVLyKahn2ylgc77hDclvpsNHjCRTZDrENaLHdtE
+ mGT5bUYDifG1iI+7EOXR6kB72vwlGyM5ncb3B+QZbdEALfHI3ijB7DVotlPC4yKt4rrdo=;
+Received: from [2001:67c:1810:f055:877d:5801:eba7:24a1]
+ (helo=finisterre.ee.mobilebroadband)
+ by heliosphere.sirena.org.uk with esmtpsa
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1gpx90-0007NF-RB; Sat, 02 Feb 2019 15:23:46 +0000
+Received: by finisterre.ee.mobilebroadband (Postfix, from userid 1000)
+ id 86287440082; Sat,  2 Feb 2019 15:23:40 +0000 (GMT)
+Date: Sat, 2 Feb 2019 15:23:40 +0000
+From: Mark Brown <broonie@kernel.org>
+To: Thierry Reding <treding@nvidia.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Jassi Brar <jaswinder.singh@linaro.org>
+Subject: Re: next-20190201 build: 2 failures 19 warnings (next-20190201)
+Message-ID: <20190202152340.GJ20797@sirena.org.uk>
+References: <E1gpgTf-0002ZN-NF@optimist>
 MIME-Version: 1.0
+In-Reply-To: <E1gpgTf-0002ZN-NF@optimist>
+X-Cookie: What!?  Me worry?
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190202_070709_113979_3A3CD9E8 
-X-CRM114-Status: GOOD (  11.95  )
+X-CRM114-CacheID: sfid-20190202_072353_401553_C20297F1 
+X-CRM114-Status: UNSURE (   7.00  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,43 +82,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Carlo Caione <ccaione@baylibre.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-tegra@vger.kernel.org, linaro-kernel@lists.linaro.org,
+ linux-next@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ kernel-build-reports@lists.linaro.org
+Content-Type: multipart/mixed; boundary="===============6822374599801915661=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add the node for the OTP controller. The IP is the same as on the imx7d.
 
-Signed-off-by: Carlo Caione <ccaione@baylibre.com>
----
- arch/arm64/boot/dts/freescale/imx8mq.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+--===============6822374599801915661==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="ONvqYzh+7ST5RsLk"
+Content-Disposition: inline
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-index c34cabe9b356..f37f17b71151 100644
---- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-@@ -241,6 +241,14 @@
- 				reg = <0x30340000 0x10000>;
- 			};
- 
-+			ocotp: ocotp-ctrl@30350000 {
-+				compatible = "fsl,imx8mq-ocotp", "fsl,imx7d-ocotp", "syscon";
-+				reg = <0x30350000 0x10000>;
-+				clocks = <&clk IMX8MQ_CLK_OCOTP_ROOT>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+			};
-+
- 			anatop: syscon@30360000 {
- 				compatible = "fsl,imx8mq-anatop", "syscon";
- 				reg = <0x30360000 0x10000>;
--- 
-2.19.1
 
+--ONvqYzh+7ST5RsLk
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+On Fri, Feb 01, 2019 at 09:35:59PM +0000, Build bot for Mark Brown wrote:
+
+Friday's -next fails to build an arm64 allmodconfig due to (among other
+things):
+
+> 	arm64-allmodconfig
+> ERROR: "mbox_flush" [drivers/tty/serial/tegra-tcu.ko] undefined!
+
+since that symbol isn't exported by the mailbox API.  Either the driver
+shouldn't be using it or we need an EXPORT_SYMBOL_GPL() adding.
+
+--ONvqYzh+7ST5RsLk
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlxVtfgACgkQJNaLcl1U
+h9BsKAf/Z6iYF+BgN8DfIusRTt8yh7ByRZhzG/sbm/VGBbavEWTm3aYiYqQxqvAW
+kBBM4m4+bLTtq5YJuDVbc3eycZHYVcVkfz8COH2jtg+Q5PbCmJUrR1o0QAzebBAe
+wuwqPgitfFKY0tbwl3cR+HkW75iZTGiV/S7gyU10qZMbHga/ggMQAWqnnVgcdKkI
+H3oZijOAI734uNepeFgHn4xhI0gn5KQyOFaTe6aE15cWQMPW1b64b99P+rnNwQin
+UfO+2ZRtj40mm/+fnVJSTHAy0k3qRtPdpXDD4KdM8pOAWNl3Tw35Ba103g+phuom
+y6EKFaSlL3YGQD5P/D3W1kdamn3dSw==
+=3mWK
+-----END PGP SIGNATURE-----
+
+--ONvqYzh+7ST5RsLk--
+
+
+--===============6822374599801915661==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============6822374599801915661==--
+
