@@ -2,90 +2,65 @@ Return-Path: <SRS0=Q9BQ=QJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8CF74C282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:41:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0A1C7C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 03:08:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5C61F2075B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:41:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C67C120870
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 03:08:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K6SSzoFF";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="OmsMeUBz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5C61F2075B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="feD320kS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C67C120870
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=windriver.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=UZ+/dqtm+bcWffcCgatqhieFIgzS0PSjaLyFSVsrpus=; b=K6SSzoFF2EdAA6B+CnbI7gJ39T
-	sd13YRdLHs+Ia0hVBnUn2qnqHqVRV9E76+Qom64ewhkuvpRgfO3wFNO0qJbWsNsxOjj3HnIxIBj+B
-	7dzhuoEAhozhvKk9ol8xxT/q7yhVPm9PoTrXjxjiVjgpnFfrM41VRT/F+dYA+bEg6zM36kIvbJa4E
-	0/jSzOoUqZJTnjaPdXTv13RRNDtc5HotiBa1Pgauxhj67pyC9Mtg9Q/yS3j0DljRbcMbpk6Xbmf90
-	msFRXo4xqgTSFPwTzz78dr9RQCrEoEMGPbmo8PwW6qHBG4sxY/BC9JtULiQjlSc9Ej/3tPHmEiYvc
-	Sf9dXX8w==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=/YhBbmzKgwIMf5pB8p7hM9WJG0lIvJUqD3W8JgcSmyA=; b=feD320kSw1obUc1VhCHXD4p9O
+	/euo2LFMn1Qitr8tMr5tdqHDJXiOLadLgUrdqNY5Za8w/zKFOVtMXTh82Yus7YPbi7G0KzE8Ti0O3
+	YxAsf9ynl05UnWc2OQNTtlTkLHHuw53Ol06dPODUirk3ZFChVzsT+Tc+pqnA+JsgSUS1vnDTJcLga
+	RSdmIoj5izytYiZ0XofPZs3CTUF20GueeUMCGBVPWeZXCDwmN5EA9PBbOHvR8jeWF66eh/wzHittp
+	STMnrDDAfuu3kGZeKMI2vjoM2Y0RfPdlh3xRCHwEIys1QNDSdlSo2XCPCRpfUP3AcMq5GSuDlnTSg
+	vjaL55MJA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpkIy-0006th-0I; Sat, 02 Feb 2019 01:41:12 +0000
-Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+	id 1gplfP-0008BU-65; Sat, 02 Feb 2019 03:08:27 +0000
+Received: from mail5.windriver.com ([192.103.53.11] helo=mail5.wrs.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpkHk-0004Vi-FU
- for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 01:40:32 +0000
-Received: by mail-pf1-x444.google.com with SMTP id h3so4110326pfg.1
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 17:39:56 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=ncHRx3RUiEOWOAX5Gukbkm3enT6QMzHfm6n/G4i+bhI=;
- b=OmsMeUBzmFvHNDd7YKcgOCwIafvkVAE6LBEXIGoPD86pec1udYcFe1R5QFkC4T/juW
- g5LoQ3IuZqvbWA3aOn+CNIlATnxam+Sa/ePgtSadcLoYzOFn7PbUqdTjUWGuT/mm0+qQ
- KZBJoWXBENbKjLMxRUJz09LuduSa4FKXPTF6j98evc4PLWTYrk+9IN7uneI3oogzefFG
- oqNoymHcaycnKfZCYa3zP5UO9UxEB0AZYKnOOANg7+dko4NICPhKUs7cLj3d71zPpMHO
- fGqoXqZl/uE17yvE0IRFUL3QRkFj1xu+O4GdK3J8pP9mP7ijbLhrFdxNCa3/w6NkJZOt
- x9RA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=ncHRx3RUiEOWOAX5Gukbkm3enT6QMzHfm6n/G4i+bhI=;
- b=dE6Pu5eKX0P64C9jAsxWIt13R2AniYOmGt4J5j4bY5vbUiyiRA2kL65QsnGOqY9mNa
- ISbba7OgPD2tsxwEnxB9KBr0Zllm7o9CQngYJbcYEBtp6/x59MkdRUtk+tRxaD+c25nr
- PvEdOkTTvy6WlefzrZKNe7hvG3LXu0M7yzLrqci3YSopAu6VVcQZB89e/jOYJwble5p9
- dWcES31uCIMADgAet++IyHwvKn2Hqm/p8t/Y+pLsGDMEB8zQnMufEkzD/6r3PI2Ph0qT
- uGGb/jZvoCk7muXqOB94MLDwAoC3IsejII0OiCEG4Jg54taI3zbv68HujGDpxCexFPRI
- grpg==
-X-Gm-Message-State: AJcUukfRWg1PH4Mjfm6SyOguKMjYLNdcT5HJ14vV2TUBXgE1ZNj0CFxu
- Vk61wYyCIMyH8YieHDdQK18=
-X-Google-Smtp-Source: ALg8bN7tsH42VGjHxDpDzHBNGLVraHFnufB3G+lMQShhIiLqXFILDx/Wxg58PpFk+8c1cqzCFYtHzw==
-X-Received: by 2002:a62:7dcb:: with SMTP id
- y194mr42103554pfc.113.1549071595849; 
- Fri, 01 Feb 2019 17:39:55 -0800 (PST)
-Received: from localhost.corp.microsoft.com ([167.220.255.67])
- by smtp.googlemail.com with ESMTPSA id d3sm9183425pgl.64.2019.02.01.17.39.48
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 01 Feb 2019 17:39:55 -0800 (PST)
-From: lantianyu1986@gmail.com
-X-Google-Original-From: Tianyu.Lan@microsoft.com
-To: 
-Subject: [PATCH V2 9/10] KVM: Add flush parameter for kvm_age_hva()
-Date: Sat,  2 Feb 2019 09:38:25 +0800
-Message-Id: <20190202013825.51261-10-Tianyu.Lan@microsoft.com>
-X-Mailer: git-send-email 2.14.4
-In-Reply-To: <20190202013825.51261-1-Tianyu.Lan@microsoft.com>
-References: <20190202013825.51261-1-Tianyu.Lan@microsoft.com>
+ id 1gplfH-0008B9-EX
+ for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 03:08:26 +0000
+Received: from ALA-HCA.corp.ad.wrs.com (ala-hca.corp.ad.wrs.com
+ [147.11.189.40])
+ by mail5.wrs.com (8.15.2/8.15.2) with ESMTPS id x1235Cuh002449
+ (version=TLSv1 cipher=AES128-SHA bits=128 verify=FAIL);
+ Fri, 1 Feb 2019 19:05:53 -0800
+Received: from [128.224.162.152] (128.224.162.152) by ALA-HCA.corp.ad.wrs.com
+ (147.11.189.50) with Microsoft SMTP Server id 14.3.435.0;
+ Fri, 1 Feb 2019 19:05:10 -0800
+Subject: Re: [PATCH 00/10] GICv3 support for kexec/kdump on EFI systems
+To: Marc Zyngier <marc.zyngier@arm.com>, Sun Ted <xulinsun@gmail.com>
+References: <20180921195954.21574-1-marc.zyngier@arm.com>
+ <CACiNFG5r2Czfy_kXA2PPQa=xdyzq0vUgoQZ=XNME4d_h=O1oBw@mail.gmail.com>
+ <b4594318-9ebf-91ce-b845-3fac92ba6476@arm.com>
+From: Xulin Sun <xulin.sun@windriver.com>
+Message-ID: <6f209705-dcc9-425b-d65c-db11f45e8096@windriver.com>
+Date: Sat, 2 Feb 2019 11:05:08 +0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.5.0
+MIME-Version: 1.0
+In-Reply-To: <b4594318-9ebf-91ce-b845-3fac92ba6476@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_173956_974342_4B3820B3 
-X-CRM114-Status: GOOD (  14.32  )
+X-CRM114-CacheID: sfid-20190201_190824_687338_1F745466 
+X-CRM114-Status: GOOD (  26.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,254 +72,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvm@vger.kernel.org, rkrcmar@redhat.com, catalin.marinas@arm.com,
- will.deacon@arm.com, christoffer.dall@arm.com, paulus@ozlabs.org,
- hpa@zytor.com, kys@microsoft.com, kvmarm@lists.cs.columbia.edu,
- mpe@ellerman.id.au, x86@kernel.org, linux@armlinux.org.uk,
- michael.h.kelley@microsoft.com, mingo@redhat.com, benh@kernel.crashing.org,
- jhogan@kernel.org, linux-mips@vger.kernel.org,
- Lan Tianyu <Tianyu.Lan@microsoft.com>, marc.zyngier@arm.com,
- kvm-ppc@vger.kernel.org, bp@alien8.de, tglx@linutronix.de,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- ralf@linux-mips.org, paul.burton@mips.com, pbonzini@redhat.com,
- vkuznets@redhat.com, linuxppc-dev@lists.ozlabs.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Jason Cooper <jason@lakedaemon.net>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Jeffrey Hugo <jhugo@codeaurora.org>, linux-kernel@vger.kernel.org,
+ Jeremy Linton <jeremy.linton@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Lan Tianyu <Tianyu.Lan@microsoft.com>
-
-This patch is to add flush parameter for kvm_aga_hva() and move tlb
-flush from kvm_mmu_notifier_clear_flush_young() to kvm_age_hva().
-kvm_age_hva() can check whether tlb flush is necessary when
-return value young is more than 0. Flush tlb if both conditions
-are met.
-
-Signed-off-by: Lan Tianyu <Tianyu.Lan@microsoft.com>
----
- arch/arm/include/asm/kvm_host.h     |  3 ++-
- arch/arm64/include/asm/kvm_host.h   |  3 ++-
- arch/mips/include/asm/kvm_host.h    |  3 ++-
- arch/mips/kvm/mmu.c                 | 11 +++++++++--
- arch/powerpc/include/asm/kvm_host.h |  3 ++-
- arch/powerpc/kvm/book3s.c           | 10 ++++++++--
- arch/powerpc/kvm/e500_mmu_host.c    |  3 ++-
- arch/x86/include/asm/kvm_host.h     |  3 ++-
- arch/x86/kvm/mmu.c                  | 10 ++++++++--
- virt/kvm/arm/mmu.c                  | 13 +++++++++++--
- virt/kvm/kvm_main.c                 |  6 ++----
- 11 files changed, 50 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index ca56537b61bc..b3c6a6db8173 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -229,7 +229,8 @@ int kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
- 
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
- int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
--int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end);
-+int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end,
-+		bool flush);
- int kvm_test_age_hva(struct kvm *kvm, unsigned long hva);
- 
- struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 7732d0ba4e60..182bbb2de60a 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -361,7 +361,8 @@ int __kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
- int kvm_unmap_hva_range(struct kvm *kvm,
- 			unsigned long start, unsigned long end);
- int kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
--int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end);
-+int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end,
-+		bool flush);
- int kvm_test_age_hva(struct kvm *kvm, unsigned long hva);
- 
- struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
-diff --git a/arch/mips/include/asm/kvm_host.h b/arch/mips/include/asm/kvm_host.h
-index d2abd98471e8..e055f49532c8 100644
---- a/arch/mips/include/asm/kvm_host.h
-+++ b/arch/mips/include/asm/kvm_host.h
-@@ -937,7 +937,8 @@ enum kvm_mips_fault_result kvm_trap_emul_gva_fault(struct kvm_vcpu *vcpu,
- int kvm_unmap_hva_range(struct kvm *kvm,
- 			unsigned long start, unsigned long end);
- int kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
--int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end);
-+int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end,
-+		bool flush);
- int kvm_test_age_hva(struct kvm *kvm, unsigned long hva);
- 
- /* Emulation */
-diff --git a/arch/mips/kvm/mmu.c b/arch/mips/kvm/mmu.c
-index 97e538a8c1be..288a22d70cf8 100644
---- a/arch/mips/kvm/mmu.c
-+++ b/arch/mips/kvm/mmu.c
-@@ -579,9 +579,16 @@ static int kvm_test_age_hva_handler(struct kvm *kvm, gfn_t gfn, gfn_t gfn_end,
- 	return pte_young(*gpa_pte);
- }
- 
--int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end)
-+int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end,
-+		bool flush)
- {
--	return handle_hva_to_gpa(kvm, start, end, kvm_age_hva_handler, NULL);
-+	int young = handle_hva_to_gpa(kvm, start, end,
-+			kvm_age_hva_handler, NULL);
-+
-+	if (flush && young > 0)
-+		kvm_flush_remote_tlbs(kvm);
-+
-+	return young;
- }
- 
- int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
-diff --git a/arch/powerpc/include/asm/kvm_host.h b/arch/powerpc/include/asm/kvm_host.h
-index 0f98f00da2ea..d160e6b8ccfb 100644
---- a/arch/powerpc/include/asm/kvm_host.h
-+++ b/arch/powerpc/include/asm/kvm_host.h
-@@ -70,7 +70,8 @@
- 
- extern int kvm_unmap_hva_range(struct kvm *kvm,
- 			       unsigned long start, unsigned long end);
--extern int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end);
-+extern int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end,
-+		       bool flush);
- extern int kvm_test_age_hva(struct kvm *kvm, unsigned long hva);
- extern int kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
- 
-diff --git a/arch/powerpc/kvm/book3s.c b/arch/powerpc/kvm/book3s.c
-index bd1a677dd9e4..09a67ebbde8a 100644
---- a/arch/powerpc/kvm/book3s.c
-+++ b/arch/powerpc/kvm/book3s.c
-@@ -841,9 +841,15 @@ int kvm_unmap_hva_range(struct kvm *kvm, unsigned long start, unsigned long end)
- 	return kvm->arch.kvm_ops->unmap_hva_range(kvm, start, end);
- }
- 
--int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end)
-+int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end,
-+		bool flush)
- {
--	return kvm->arch.kvm_ops->age_hva(kvm, start, end);
-+	int young = kvm->arch.kvm_ops->age_hva(kvm, start, end);
-+
-+	if (flush && young > 0)
-+		kvm_flush_remote_tlbs(kvm);
-+
-+	return young;
- }
- 
- int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
-diff --git a/arch/powerpc/kvm/e500_mmu_host.c b/arch/powerpc/kvm/e500_mmu_host.c
-index c3f312b2bcb3..e2f6c23ec39a 100644
---- a/arch/powerpc/kvm/e500_mmu_host.c
-+++ b/arch/powerpc/kvm/e500_mmu_host.c
-@@ -745,7 +745,8 @@ int kvm_unmap_hva_range(struct kvm *kvm, unsigned long start, unsigned long end)
- 	return 0;
- }
- 
--int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end)
-+int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end,
-+		bool flush)
- {
- 	/* XXX could be more clever ;) */
- 	return 0;
-diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
-index 9d858d68c17a..4233481a202d 100644
---- a/arch/x86/include/asm/kvm_host.h
-+++ b/arch/x86/include/asm/kvm_host.h
-@@ -1519,7 +1519,8 @@ asmlinkage void kvm_spurious_fault(void);
- 
- #define KVM_ARCH_WANT_MMU_NOTIFIER
- int kvm_unmap_hva_range(struct kvm *kvm, unsigned long start, unsigned long end);
--int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end);
-+int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end,
-+		bool flush);
- int kvm_test_age_hva(struct kvm *kvm, unsigned long hva);
- int kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
- int kvm_cpu_has_injectable_intr(struct kvm_vcpu *v);
-diff --git a/arch/x86/kvm/mmu.c b/arch/x86/kvm/mmu.c
-index 63b3e36530e3..50b8417a8c21 100644
---- a/arch/x86/kvm/mmu.c
-+++ b/arch/x86/kvm/mmu.c
-@@ -1977,9 +1977,15 @@ static void rmap_recycle(struct kvm_vcpu *vcpu, u64 *spte, gfn_t gfn)
- 			KVM_PAGES_PER_HPAGE(sp->role.level));
- }
- 
--int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end)
-+int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end,
-+		bool flush)
- {
--	return kvm_handle_hva_range(kvm, start, end, 0, kvm_age_rmapp);
-+	int young = kvm_handle_hva_range(kvm, start, end, 0, kvm_age_rmapp);
-+
-+	if (flush && young > 0)
-+		kvm_flush_remote_tlbs(kvm);
-+
-+	return young;
- }
- 
- int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index fbdf3ac2f001..3483ca11865b 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -2107,12 +2107,21 @@ static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *
- 		return pte_young(*pte);
- }
- 
--int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end)
-+int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end,
-+		bool flush)
- {
-+	int young;
-+
- 	if (!kvm->arch.pgd)
- 		return 0;
- 	trace_kvm_age_hva(start, end);
--	return handle_hva_to_gpa(kvm, start, end, kvm_age_hva_handler, NULL);
-+
-+	young = handle_hva_to_gpa(kvm, start, end, kvm_age_hva_handler, NULL);
-+
-+	if (flush && young > 0)
-+		kvm_flush_remote_tlbs(kvm);
-+
-+	return young;
- }
- 
- int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index b2097fa4b618..2bdc827b9ee9 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -428,9 +428,7 @@ static int kvm_mmu_notifier_clear_flush_young(struct mmu_notifier *mn,
- 	idx = srcu_read_lock(&kvm->srcu);
- 	spin_lock(&kvm->mmu_lock);
- 
--	young = kvm_age_hva(kvm, start, end);
--	if (young)
--		kvm_flush_remote_tlbs(kvm);
-+	young = kvm_age_hva(kvm, start, end, true);
- 
- 	spin_unlock(&kvm->mmu_lock);
- 	srcu_read_unlock(&kvm->srcu, idx);
-@@ -461,7 +459,7 @@ static int kvm_mmu_notifier_clear_young(struct mmu_notifier *mn,
- 	 * cadence. If we find this inaccurate, we might come up with a
- 	 * more sophisticated heuristic later.
- 	 */
--	young = kvm_age_hva(kvm, start, end);
-+	young = kvm_age_hva(kvm, start, end, false);
- 	spin_unlock(&kvm->mmu_lock);
- 	srcu_read_unlock(&kvm->srcu, idx);
- 
--- 
-2.14.4
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMDIvMDEvMjAxOSAwNToxNSBQTSwgTWFyYyBaeW5naWVyIHdyb3RlOgo+IEhpIFh1bGluLAo+
+Cj4gT24gMDEvMDIvMjAxOSAwNjoxMSwgU3VuIFRlZCB3cm90ZToKPj4gSGkgTWFyYywKPj4KPj4g
+TWFyYyBaeW5naWVyIDxtYXJjLnp5bmdpZXJAYXJtLmNvbSA8bWFpbHRvOm1hcmMuenluZ2llckBh
+cm0uY29tPj4g5LqOMjAxOAo+PiDlubQ55pyIMjLml6Xlkajlha0g5LiK5Y2INDowM+WGmemBk++8
+mgo+Pgo+PiAgICAgIFRoZSBHSUN2MyBhcmNoaXRlY3R1cmUgaGFzIHRoZSByZW1hcmthYmxlIGZl
+YXR1cmUgdGhhdCBvbmNlIExQSSB0YWJsZXMKPj4gICAgICBoYXZlIGJlZW4gYXNzaWduZWQgdG8g
+cmVkaXN0cmlidXRvcnMgYW5kIHRoYXQgTFBJIGRlbGl2ZXJ5IGlzIGVuYWJsZWQsCj4+ICAgICAg
+dGhlcmUgaXMgbm8gZ3VhcmFudGVlIHRoYXQgTFBJcyBjYW4gYmUgdHVybmVkIG9mZiAoYW5kIG1v
+c3QKPj4gICAgICBpbXBsZW1lbnRhdGlvbnMgZG8gbm90IGFsbG93IGl0KSwgbm9yIGNhbiBpdCBi
+ZSByZXByb2dyYW1tZWQgdG8gdXNlCj4+ICAgICAgb3RoZXIgdGFibGVzLgo+Pgo+PiAgICAgIFRo
+aXMgaXMgYSBiaXQgb2YgYSBwcm9ibGVtIGZvciBrZXhlYywgd2hlcmUgdGhlIHNlY29uZGFyeSBr
+ZXJuZWwKPj4gICAgICBjb21wbGV0ZWx5IGxvb3NlcyB0cmFjayBvZiB0aGUgcHJldmlvdXMgYWxs
+b2NhdGlvbnMuIElmIHRoZSBzZWNvbmRhcnkKPj4gICAgICBrZXJuZWwgZG9lc24ndCBhbGxvY2F0
+ZSB0aGUgdGFibGVzIGV4YWN0bHkgdGhlIHNhbWUgd2F5LCBubyBMUElzIHdpbGwKPj4gICAgICBi
+ZSBkZWxpdmVyZWQgYnkgdGhlIEdJQyAod2hpY2ggY29udGludWVzIHRvIHVzZSB0aGUgb2xkIHRh
+YmxlcyksIGFuZAo+PiAgICAgIG1lbW9yeSBwcmV2aW91c2x5IGFsbG9jYXRlZCBmb3IgdGhlIHBl
+bmRpbmcgdGFibGVzIHdpbGwgYmUgc2xvd2x5Cj4+ICAgICAgY29ycnVwdGVkLCBvbmUgYml0IGF0
+IGEgdGltZS4KPj4KPj4gICAgICBUaGUgd29ya2Fyb3VuZCBmb3IgdGhpcyBpcyBiYXNlZCBvbiBh
+IHNlcmllc1sxXSBieSBBcmQgQmllc2hldXZlbCwKPj4gICAgICB3aGljaCBhZGRzIHRoZSByZXF1
+aXJlZCBpbmZyYXN0cnVjdHVyZSBmb3IgbWVtb3J5IHJlc2VydmF0aW9ucyB0byBiZQo+PiAgICAg
+IHBhc3NlZCBmcm9tIG9uZSBrZXJuZWwgdG8gYW5vdGhlciB1c2luZyBhbiBFRkkgdGFibGUuCj4+
+Cj4+ICAgICAgVGhpcyBpbmZyYXN0cnVjdHVyZSBpcyB0aGVuIHVzZWQgdG8gcmVnaXN0ZXIgdGhl
+IGFsbG9jYXRpb24gb2YgR0lDCj4+ICAgICAgdGFibGVzIHdpdGggRUZJLCBhbmQgYWxsb3cgdGhl
+IEdJQyBkcml2ZXIgdG8gc2FmZWx5IHJldXNlIHRoZSBleGlzdGluZwo+PiAgICAgIHByb2dyYW1t
+aW5nIGlmIGl0IGRldGVjdHMgdGhhdCB0aGUgdGFibGVzIGhhdmUgYmVlbiBjb3JyZWN0bHkKPj4g
+ICAgICByZWdpc3RlcmVkLiBPbiBub24tRUZJIHN5c3RlbXMsIHRoZXJlIGlzIG5vdCBtdWNoIHdl
+IGNhbiBkby4KPj4KPj4KPj4gU29ycnkgdG8gdHVybiB0aGlzIHF1ZXN0aW9uIG91dCBhZ2Fpbi4K
+Pj4gRm9yIG90aGVycyBub24tRUZJIHN5c3RlbXMsIGp1c3QgYXMgeW91ciBzYWlkIHRpbGwgbm93
+IHdlIGRpZCBkbwo+PiBhbnl0aGluZywgcmlnaHQ/Cj4gV2UgZGlkbid0IGRvIGFueXRoaW5nLCBi
+ZWNhdXNlIHRoZXJlIGlzIG5vdGhpbmcgd2UgY2FuIGRvLgo+Cj4+IEkgZGlkIHNlZSB0aGUga2V4
+ZWMgYm9vdGluZyBmYWlsdXJlIHNpbmNlIHJlLXNldHRpbmcKPj4gdGhlwqBHSUNSX0NUTFIuRW5h
+YmxlTFBJIGZyb20gIjEiIHRvICIwIiB1bnN1Y2Nlc3NmdWwuCj4+Cj4+IFRoZcKgIGJlbG93IGNv
+bW1pdCBhZGRzIHRoZcKganVkZ2VtZW50IGZvciBkaXNhYmxpbmcgTFBJcywgYW5kIHJldHVybmVk
+Cj4+IGVycm9yLiBDYXVzZWQgImtleGVjIiBib290aW5nwqBmYWlsdXJlLgo+IEFuZCBJIGZ1bGx5
+IGV4cGVjdGVkIHRoaXMuIFdoZW4gSSBzYWlkICJ3ZSBkb24ndCBkbyBhbnl0aGluZyIsIEkgbWVh
+bnQKPiAid2UgZG9uJ3QgZG8gYW55dGhpbmcgdG8gbWFrZSBMUElzIHdvcmsiLgo+Cj4+IDZlYjQ4
+NmI2NmEgKGlycWNoaXAvZ2ljLXYzOiBFbnN1cmUgR0lDUl9DVExSLkVuYWJsZUxQST0wIGlzIG9i
+c2VydmVkCj4+IGJlZm9yZSBlbmFibGluZykuCj4+Cj4+IDxzbmlwIHBhdGNoPgo+PiAgwqBpbnQg
+aXRzX2NwdV9pbml0KHZvaWQpCj4+ICDCoHsKPj4gIMKgIMKgIMKgIMKgIGlmICghbGlzdF9lbXB0
+eSgmaXRzX25vZGVzKSkgewo+PiAtwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqBpZiAoIWdpY19yZGlz
+dHNfc3VwcG9ydHNfcGxwaXMoKSkgewo+PiAtwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAg
+wqAgwqBwcl9pbmZvKCJDUFUlZDogTFBJcyBub3Qgc3VwcG9ydGVkXG4iLAo+PiBzbXBfcHJvY2Vz
+c29yX2lkKCkpOwo+PiAtwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqByZXR1cm4g
+LUVOWElPOwo+PiAtwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqB9Cj4+ICvCoCDCoCDCoCDCoCDCoCDC
+oCDCoCDCoGludCByZXQ7Cj4+ICsKPj4gK8KgIMKgIMKgIMKgIMKgIMKgIMKgIMKgcmV0ID0gcmVk
+aXN0X2Rpc2FibGVfbHBpcygpOwo+PiArwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqBpZiAocmV0KQo+
+PiArwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqAgwqByZXR1cm4gcmV0Owo+PiArCj4g
+QW5kIEkgbWFpbnRhaW4gdGhhdCB0aGlzIGlzIHRoZSByaWdodCB0aGluZyB0byBkby4gSWYgTFBJ
+cyBhcmUgb24gYW5kCj4gdGhlIG1lbW9yeSBoYXMgbm90IGJlZW4gcmVzZXJ2ZWQsIGl0IGlzIHRo
+ZW4gbGlrZWx5IHRoYXQgdGhpcyBtZW1vcnkgaXMKPiBub3cgYmVpbmcgdXNlZCBieSB0aGUga2Vy
+bmVsIGZvciBzb21ldGhpbmcgZWxzZS4gVGhlIHN5c3RlbSBpcyB0aHVzCj4gZ29pbmcgdG8gc2Vl
+IHNpbmdsZS1iaXQgY29ycnVwdGlvbiBpbiBzb21lIHJhbmRvbSBwbGFjZXMuCj4KPiBBdCB0aGF0
+IHN0YWdlLCB5b3VyIHN5c3RlbSBpcyBob3JyaWJseSB1bnNhZmUsIGFuZCBJIHdpbGwgbm90IGxl
+dCBpdAo+IGJvb3QgdW5kZXIgdGhlc2UgY29uZGl0aW9ucy4gSWYgaXQgd2FzIHdvcmtpbmcgYmVm
+b3JlLCB0aGF0J3MgYmVjYXVzZQo+IHlvdSB3ZXJlIGx1Y2t5LCBhbmQgSSBwbGFjZSBubyBmYWl0
+aCBpbiBsdWNrLgo+Cj4gTm93IHlvdSBoYXZlIHR3byBhbHRlcm5hdGl2ZXM6Cj4KPiAtIFlvdSBz
+d2l0Y2ggdG8gYW4gRUZJLWJhc2VkIGZpcm13YXJlLiBUaGVzZSBkYXlzLCBldmVuIHUtYm9vdCBo
+YXMgYW4KPiBFRkkgaW1wbGVtZW50YXRpb24uIENPbnNpZGVyIGRvaW5nIHRoYXQgaWYgeW91IGNh
+bi4KPgo+IC0gSWYgdGhlcmUgaXMgbm8gRUZJIGltcGxlbWVudGF0aW9uIGZvciB5b3VyIFNvQywg
+eW91IGNhbiBwYXNzIHRoZQo+ICJpcnFjaGlwLmdpY3YzX25vbHBpPTEiIG9wdGlvbiB0byB0aGUg
+Zmlyc3Qga2VybmVsLiBUaGlzIHdpbGwga2VlcCBMUEkKPiBkaXNhYmxlZCwgYW5kIHlvdSdsbCBi
+ZSBhYmxlIHRvIGtleGVjIGEgc2Vjb25kYXJ5IGtlcm5lbCAoYW5kIGdldAo+IHdvcmtpbmcgTFBJ
+cyB0aGVyZSkuIFRoaXMgaXMgd2hhdCBJIGRvIG9uIG15IENocm9tZWJvb2suCgpIaSBNYXJjLAoK
+VGhhbmtzIGZvciBkZXRhaWxlZCBleHBsYW5hdGlvbi4KClRoYW5rcwpYdWxpbgo+Cj4gVGhhbmtz
+LAo+Cj4gCU0uCgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5p
+bmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8v
+bGludXgtYXJtLWtlcm5lbAo=
