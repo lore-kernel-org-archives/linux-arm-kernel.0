@@ -5,19 +5,20 @@ X-Spam-Level:
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 700EEC282D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:40:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 70FE2C282D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:40:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 412D420844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:40:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3852D2075B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  2 Feb 2019 01:40:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mP6Na6yh";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="rYWWdogH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 412D420844
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cCpT1AZC";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="JcBSvhg6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3852D2075B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,63 +28,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=NRfD7QQJoZEAfPnl5AR95aD6iweGjPkGfMkXob96miM=; b=mP6Na6yhoDAiyliGqCpZcmq2bN
-	xoZTrq0S8V5dbKfc68v41r8AnCxG8DZODt2Hc2SoipgaT/2K5R6Bf7XBz2hRchlDqor1jbYyU3nb/
-	lwWfzES8CkUxm10Vni7iTAS6KxPYVeBBF5F+EVVtfLpXSr6zRXex+lU17uW8NgUcB1RpOzZ8rk/ET
-	aGi7ZkB/NlWDdN1kVGUCkw19QtK85aDnerufO7W+CJZfCtWcQ18c7r6YYEqbH1c5OskDZcwa1JE8R
-	sNuDL1irE/5ZmcmnF6WZhXh2iBW5QorSgX9DLgCI2VccHX7qj7axrtCsar/7pHgRuUDvCrchU6Tjm
-	u2IRT7gg==;
+	bh=BqHBXDuB3JlBSLFwvgpALBievshGnIcQxP18hRt2erk=; b=cCpT1AZCcPrVSR1EO7CMlgLU5j
+	kI/GMX6c0vgmCriV3AQv3Rsp5bACIRUPLjou2pcr9BcSk7bRmBzTiYSYjyFvBu5BCbBDDuHBHsOmu
+	CVLrt0USihYFLR/x0Ngaw6jpGY3/kadfJ+ZQ/NCj+eqZq0hceU5j0nvLcVou7hOov5dmfl4Z/sr9y
+	/mrRPa/32cuHk58Gh0aX6AFhM8sIt3cE4YBaB9rIdUgtK/+rZARoHJD1t8Dx5ZhKK1PQMtgnfvirf
+	/bpN84uXaUBsVbMbCS3sRu/XodYbhPnsge49K61/1PlxozbJCwZHHKTFpOyCN2oIvSqNYEJ/j48E0
+	25kDzJVQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gpkI0-00052e-Hu; Sat, 02 Feb 2019 01:40:12 +0000
-Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+	id 1gpkIH-0006BR-6s; Sat, 02 Feb 2019 01:40:29 +0000
+Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gpkH9-0003tT-9O
- for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 01:39:55 +0000
-Received: by mail-pg1-x542.google.com with SMTP id n2so3760854pgm.3
+ id 1gpkHF-00041n-Oj
+ for linux-arm-kernel@lists.infradead.org; Sat, 02 Feb 2019 01:39:59 +0000
+Received: by mail-pf1-x442.google.com with SMTP id c73so4070878pfe.13
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 01 Feb 2019 17:39:18 -0800 (PST)
+ Fri, 01 Feb 2019 17:39:25 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=6fivvub99Xix9SC3KKfxY3DnEgPVHfJZb9qun3OaRWg=;
- b=rYWWdogHyyfoXHNw5vYGz1rLozTLpmOkP0KHq197u7SHmMLbh+SkNqa7NpQtSdMfQq
- Sg2+fJLGoIFUvNopzkSuf+xcc4vTZubXH7cPBLLLEF9z9cMpKmuLzM00WWcaWtYOlYoY
- 8QZOVzS/gUsOqXwweSfmeSAQirZ8DFeZxbW/1g1BV9EA1eQNZMAK5En0+ASsQb0IFPtW
- 9ehITCoiqh4YiLLPrNJ9/A5Hqo5hIs9LcngkxxNaQ7bQ2DORxuesRxtd5sJsPHHiZCUq
- iuLVUhdb9FEKI7KaHoyxW5MzXqgNtzYoWOuflVepi2+pqZY5pl9G0HkcTbOHhVZ1b240
- 7JiQ==
+ bh=rByqLCOGvQ8nC7iVvwCr6DlPApr36fgfZWbbNDw3cPc=;
+ b=JcBSvhg6DtXatbgMnyQPHGvUT0KXMV+vsEQvkE+bwnES3r8FwaD6AuXKWbGneMDz3s
+ aEP9gz3gTzw9afwA1Vn2/whKrqSfJnjlvkxH/60fVrq78G65y2YhzxhMqoSMw/VRwiZC
+ dgP1qtfqZasGPDUNv4b3GGuTWfjRYD5EqS8hLpq/97GVas2CizzxVgexa58vT7e4WITd
+ azMgVpqULEKmZfeGFvw+m2BQka6NAtIoGdwOu76ZznsaS+VBDxpRT71E0Mc1h19Q5OlU
+ d1sJPU2mHk8QHI42wWDvTqlVz6u7A3UgRLvity26FGTvlrRKwNuldw6wMGzlTElyz/zh
+ iOMw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=6fivvub99Xix9SC3KKfxY3DnEgPVHfJZb9qun3OaRWg=;
- b=pcRGXAMpqDRk6Ms4lcybhUJKMsNTV2/j/bWnYfRNzeRbzr99yKGckHCMufzhc460Xw
- plqvB0KDo+kZzh7dXPTf4PoXciTVhu22G7T1I23UKj8C/vWh9YuC3z/8U4Jvy+1u42ID
- czQHSUZpXzsRJkZ21BixVtWDXQggqViobN2xcX29KXi9nRJMmeLHVdNCkij3ipm50jfv
- /nv0/8W6BZW+lSL4nmkpIyzX60elmukOXMbnn+vcLf4DJa5ujBtXveVUcm1BpUSPvE8F
- mlffqxcVruemD0vWkIU/02hsvWKOUmEoNSurfIC7setZgDvcoBGVX3CPZ1MfiubvBgdZ
- VW1g==
-X-Gm-Message-State: AJcUukcNfcIHB8EeknuWgqw9c1Nl3Upn6fuGXVJjcun+ZQQDlqIz9rhF
- YpxYcFTBFVMhzRLdPQThl5E=
-X-Google-Smtp-Source: ALg8bN7W+aadejbG7oa19lQl7G9yPYUZCeqRb9Yml4K7aisKFkTmeYC8Fchg3oAyUGiZP9Vgewt9Xw==
-X-Received: by 2002:a62:16d6:: with SMTP id 205mr41603341pfw.256.1549071557589; 
- Fri, 01 Feb 2019 17:39:17 -0800 (PST)
+ bh=rByqLCOGvQ8nC7iVvwCr6DlPApr36fgfZWbbNDw3cPc=;
+ b=BVSoCvjfLmiwq1ZjRHM4wULFQYpyvDZMKhExjMoym9g46k72w5u3Nzf2OH5rn/BdsM
+ YyhJV5Ok0mxQPax4Yt/E7Es5rvMgoDvRUlNrjLlneefSF2PNjv/RmGxZIRCUnWKq9vXT
+ mbjG7PQXynvMBkEc1OxL43iIydZNT+tCwyp4JTOQ6fTL/FOoJbtyTrolEYYdt047++v1
+ UxV5Sz/ldSLC3y2HxmPWStU6nArf9ehD2NLmNF/L7Mh+c3fmjBzdpFHBsEn72ZOGzFbn
+ zYXnoPtq/QhdM7RKvBGHZKui78Tve4BnbeR3x7hmPnBToPjVuFZpifB5JSR8+WUNQEBD
+ /6Zw==
+X-Gm-Message-State: AHQUAuZpsqQMYnw1e6tHJfvetih0f25zTE8M8EI0Hhq4JcTF65+BUWUH
+ 2dzeX2lyCictvE7q8DAEwBI=
+X-Google-Smtp-Source: AHgI3IY4pbsGdSsiplWwzuSajzIs74vE3bWXmAl9AhEm/chKi5rYt5/pCLZhODFUahdG52LiNoncsw==
+X-Received: by 2002:a63:e5c:: with SMTP id 28mr4247053pgo.369.1549071565234;
+ Fri, 01 Feb 2019 17:39:25 -0800 (PST)
 Received: from localhost.corp.microsoft.com ([167.220.255.67])
- by smtp.googlemail.com with ESMTPSA id d3sm9183425pgl.64.2019.02.01.17.39.10
+ by smtp.googlemail.com with ESMTPSA id d3sm9183425pgl.64.2019.02.01.17.39.17
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 01 Feb 2019 17:39:16 -0800 (PST)
+ Fri, 01 Feb 2019 17:39:24 -0800 (PST)
 From: lantianyu1986@gmail.com
 X-Google-Original-From: Tianyu.Lan@microsoft.com
 To: 
-Subject: [PATCH V2 4/10] KVM/MMU: Introduce tlb flush with range list
-Date: Sat,  2 Feb 2019 09:38:20 +0800
-Message-Id: <20190202013825.51261-5-Tianyu.Lan@microsoft.com>
+Subject: [PATCH V2 5/10] KVM/MMU: Flush tlb with range list in sync_page()
+Date: Sat,  2 Feb 2019 09:38:21 +0800
+Message-Id: <20190202013825.51261-6-Tianyu.Lan@microsoft.com>
 X-Mailer: git-send-email 2.14.4
 In-Reply-To: <20190202013825.51261-1-Tianyu.Lan@microsoft.com>
 References: <20190202013825.51261-1-Tianyu.Lan@microsoft.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190201_173920_062418_E292BA04 
-X-CRM114-Status: GOOD (  12.88  )
+X-CRM114-CacheID: sfid-20190201_173926_449879_49408258 
+X-CRM114-Status: GOOD (  13.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -114,65 +115,67 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Lan Tianyu <Tianyu.Lan@microsoft.com>
 
-This patch is to introduce tlb flush with range list interface and use
-struct kvm_mmu_page as list entry. Use flush list function in the
-kvm_mmu_commit_zap_page().
+This patch is to flush tlb via flush list function. Put
+page into flush list when return value of set_spte()
+includes flag SET_SPTE_NEED_REMOTE_TLB_FLUSH. kvm_flush_remote_
+tlbs_with_list() checks whether the flush list is empty
+or not. It also checks whether range tlb flush is available
+and go back to tradiion flush if not.
 
 Signed-off-by: Lan Tianyu <Tianyu.Lan@microsoft.com>
 ---
- arch/x86/kvm/mmu.c | 25 ++++++++++++++++++++++++-
- 1 file changed, 24 insertions(+), 1 deletion(-)
+Change since v1:
+       Use check of list_empty in the kvm_flush_remote_tlbs_with_list()
+       to determine flush or not instead of checking set_spte_ret.
+ 
+arch/x86/kvm/paging_tmpl.h | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
-diff --git a/arch/x86/kvm/mmu.c b/arch/x86/kvm/mmu.c
-index 70cafd3f95ab..d57574b49823 100644
---- a/arch/x86/kvm/mmu.c
-+++ b/arch/x86/kvm/mmu.c
-@@ -289,6 +289,20 @@ static void kvm_flush_remote_tlbs_with_address(struct kvm *kvm,
- 
- 	range.start_gfn = start_gfn;
- 	range.pages = pages;
-+	range.flush_list = NULL;
-+
-+	kvm_flush_remote_tlbs_with_range(kvm, &range);
-+}
-+
-+static void kvm_flush_remote_tlbs_with_list(struct kvm *kvm,
-+		struct hlist_head *flush_list)
-+{
-+	struct kvm_tlb_range range;
-+
-+	if (hlist_empty(flush_list))
-+		return;
-+
-+	range.flush_list = flush_list;
- 
- 	kvm_flush_remote_tlbs_with_range(kvm, &range);
- }
-@@ -2708,6 +2722,7 @@ static void kvm_mmu_commit_zap_page(struct kvm *kvm,
- 				    struct list_head *invalid_list)
- {
- 	struct kvm_mmu_page *sp, *nsp;
+diff --git a/arch/x86/kvm/paging_tmpl.h b/arch/x86/kvm/paging_tmpl.h
+index 6bdca39829bc..d84486e75345 100644
+--- a/arch/x86/kvm/paging_tmpl.h
++++ b/arch/x86/kvm/paging_tmpl.h
+@@ -970,7 +970,7 @@ static int FNAME(sync_page)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
+ 	int i, nr_present = 0;
+ 	bool host_writable;
+ 	gpa_t first_pte_gpa;
+-	int set_spte_ret = 0;
 +	HLIST_HEAD(flush_list);
  
- 	if (list_empty(invalid_list))
- 		return;
-@@ -2721,7 +2736,15 @@ static void kvm_mmu_commit_zap_page(struct kvm *kvm,
- 	 * In addition, kvm_flush_remote_tlbs waits for all vcpus to exit
- 	 * guest mode and/or lockless shadow page table walks.
- 	 */
--	kvm_flush_remote_tlbs(kvm);
-+	if (kvm_available_flush_tlb_with_range()) {
-+		list_for_each_entry(sp, invalid_list, link)
-+			if (sp->last_level)
-+				hlist_add_head(&sp->flush_link, &flush_list);
-+
-+		kvm_flush_remote_tlbs_with_list(kvm, &flush_list);
-+	} else {
-+		kvm_flush_remote_tlbs(kvm);
-+	}
+ 	/* direct kvm_mmu_page can not be unsync. */
+ 	BUG_ON(sp->role.direct);
+@@ -978,6 +978,7 @@ static int FNAME(sync_page)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
+ 	first_pte_gpa = FNAME(get_level1_sp_gpa)(sp);
  
- 	list_for_each_entry_safe(sp, nsp, invalid_list, link) {
- 		WARN_ON(!sp->role.invalid || sp->root_count);
+ 	for (i = 0; i < PT64_ENT_PER_PAGE; i++) {
++		int set_spte_ret = 0;
+ 		unsigned pte_access;
+ 		pt_element_t gpte;
+ 		gpa_t pte_gpa;
+@@ -1027,14 +1028,20 @@ static int FNAME(sync_page)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
+ 
+ 		host_writable = sp->spt[i] & SPTE_HOST_WRITEABLE;
+ 
+-		set_spte_ret |= set_spte(vcpu, &sp->spt[i],
++		set_spte_ret = set_spte(vcpu, &sp->spt[i],
+ 					 pte_access, PT_PAGE_TABLE_LEVEL,
+ 					 gfn, spte_to_pfn(sp->spt[i]),
+ 					 true, false, host_writable);
++
++		if (set_spte_ret & SET_SPTE_NEED_REMOTE_TLB_FLUSH) {
++			struct kvm_mmu_page *leaf_sp = page_header(sp->spt[i]
++					& PT64_BASE_ADDR_MASK);
++			hlist_add_head(&leaf_sp->flush_link, &flush_list);
++		}
++
+ 	}
+ 
+-	if (set_spte_ret & SET_SPTE_NEED_REMOTE_TLB_FLUSH)
+-		kvm_flush_remote_tlbs(vcpu->kvm);
++	kvm_flush_remote_tlbs_with_list(vcpu->kvm, &flush_list);
+ 
+ 	return nr_present;
+ }
 -- 
 2.14.4
 
