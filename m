@@ -2,66 +2,89 @@ Return-Path: <SRS0=H3s0=QK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3C4ADC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 10:25:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BDC68C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 10:47:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0AE0620855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 10:25:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8F1B221773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 10:47:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Tc2ar4xt";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="k/cVNsSY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0AE0620855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xh9x+DJz";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="gj8RW6Jv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F1B221773
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9dVYZt7l3iq7BdrBVf1gK5M5q9a4762yZIFTUojT7Ng=; b=Tc2ar4xtb1F4rX
-	4ppMvUtfWA2q+cvJqAi/HZu5h3YYJqy0gCUJ6/tWbj9JixURb5N7BKbDWxsi5MWuQEgkD460iswaj
-	4zxb3yeEQUdvThBGJevvOoYF6kY/Snd8cMapb49rPZklfdLPlwiw5AnwdOoyyYMl5VFsEtg1eAS3w
-	mttSDpwUQRsx37J7Z98xauEuBldHrkdngwdnPUIi6byGWSeqmhT4XFaPRz2glJYiIkqT3rswsAUGX
-	L8urSpCZNwZOU1iexFl8r/W2aGptB7/UrznybrQqOGu9z19Kb5eBJahKiubBV+s/CuktIkfMEk72I
-	4DNPsK7Nx46Tfv5SQ4zQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=wKXfNxScUpHAE3sZKppNi3NNYhb6mazd0ID1qpJGqII=; b=Xh9x+DJzEA7GGT
+	HSPfRHAmhrs/wVYUmkb0BApGZfDoWc+c/zkAJnU/Jlhs8LtKK/HaRq4ytT1/ixl7er1XXkTKv9gr0
+	3875CnJXrALNfosNidF3LCFQYN7FnK4PH2g3f4F5boMIcRaNqfkjchrsaN3LbgukD5Fm+8lNcEPof
+	6nEbUJu1whImjrK4DCrbrONHBVu02DuY9zHIS1S08MUNrEx2rMYn8UFuXUXrULWQbOetxW+ukrQ4j
+	ZeMxRdXzLXrGRxao7vgF1k6Pfb2nfvwrUKBijogz4G5mttzgje+JGZj7X6xtTXu2R7czBDvlcljsz
+	5qbOYSHorHqK+KpBV8Nw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqEyC-0004Dr-Tq; Sun, 03 Feb 2019 10:25:48 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gqFJT-0002kv-Nr; Sun, 03 Feb 2019 10:47:47 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqEy8-0004D9-6h; Sun, 03 Feb 2019 10:25:46 +0000
-Received: from bbrezillon (91-160-177-164.subs.proxad.net [91.160.177.164])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 8258920855;
- Sun,  3 Feb 2019 10:25:38 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549189543;
- bh=SjK88TvLdzOJBa9K/8vtx9sSV/IoeN/fyPFyvUXlTU4=;
- h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=k/cVNsSYxiIvsUdzT/F34wCUabYYexl9v6FYmerncKRFQ+OtdjCykp2Z/r3POpKgG
- RmP6ICJynQkvCJe6bu+APAupWXUdznrCMk69BGnpX6H9D8B24vF0zrcwWb3pPPYCD6
- 0xghyzeqwmLfF9tdu5tb3xHjf/ly/pylo+SdrcHk=
-Date: Sun, 3 Feb 2019 11:25:31 +0100
-From: Boris Brezillon <bbrezillon@kernel.org>
-To: wen yang <yellowriver2010@hotmail.com>
-Subject: Re: [PATCH] mtd: nand: fix object reference leaks in
- atmel_pmecc_get_by_node
-Message-ID: <20190203112531.080c15a7@bbrezillon>
-In-Reply-To: <HK0PR02MB363421DE59A282A65E86E589B26C0@HK0PR02MB3634.apcprd02.prod.outlook.com>
-References: <HK0PR02MB363421DE59A282A65E86E589B26C0@HK0PR02MB3634.apcprd02.prod.outlook.com>
-X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+ id 1gqFJP-0002kF-J9
+ for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 10:47:45 +0000
+Received: by mail-wr1-x441.google.com with SMTP id z3so440941wrv.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 03 Feb 2019 02:47:42 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=2oFjeI0j/c0fWIH9q7P4tOfETnpU6mMj5SgV/gv7eMo=;
+ b=gj8RW6JvjXlGZA2nMGj95MdTDvvmvdBAEBBpxo9omiQhsMvRSSX4/3E1RV6tAfk8Zs
+ ldUTXNEiEIdu3SeNgFOiILkixmSVKWvCAsHwf0Ja7JJAMcj2d8eNHCx8/sMOd1Vq/+Ow
+ YmYd8MKH4tcLRge7rLpjS3RAkqsoRLwtZshjLAKfX1gwc6l75JMYAvOSH6I8pV4BphuA
+ +r7gOJBkYC+jk2eUjBFYRyonGP374zLFdNf4Vgiu5Vf9mtV3BCmvLyaB8jFhXwjJ1laP
+ qEs5LCgg+y51cbPJImNkXW6ZhL4wEp9iv7qQ8SeUVP0kTGnxsyEGCYjHovM7TzmeCHVz
+ dzMA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=2oFjeI0j/c0fWIH9q7P4tOfETnpU6mMj5SgV/gv7eMo=;
+ b=bwfTY8oPECYS/qFHhBEop9j/Z677/hDXUX0klu0G6d9PmVQYJN/0ySP5nXyonRMUYn
+ qV8AlI6ASrkLAIjQYDKAQ+kvrrdE3JdWucznvqvtcfAFftcBwAJMlNJUSFrk+wvFGOVO
+ AdK7yF92lYZIoG9FTxDsHEdqypYjSkbzV7X0w6SqVsJAoqk7NFY7svm5B/e9ZKpa+UKp
+ epEejBfYxnsOC4QALnim/YtAPovFZCBAUxd2AsbouOUi/Xj5HZ00Pnm89DEcXtvQ0sym
+ u4I/pXZtyq1d1t+Pfb2Ug9/Zb8cri7j4oqGk6WvRzX939pwfcEzlQ8+774aa3AbBL6y5
+ tspg==
+X-Gm-Message-State: AHQUAuaBNhCLVEGW7r6rcl+nFGLv7ILzidY4ikoQUe1PHUQXUrqyEX76
+ Hg9RicSjrcM2BcyjkGvrsT3U5Q==
+X-Google-Smtp-Source: AHgI3IbOYPIibgyvxsOaUIEAVVMLabHQW5SKNW6m1FuLtW1EswHYkuyRKw3+j/ckYgithODTJMs2Bw==
+X-Received: by 2002:a5d:6803:: with SMTP id w3mr7005601wru.272.1549190861330; 
+ Sun, 03 Feb 2019 02:47:41 -0800 (PST)
+Received: from boomer.lan (cag06-3-82-243-161-21.fbx.proxad.net.
+ [82.243.161.21])
+ by smtp.googlemail.com with ESMTPSA id q12sm4702470wmf.2.2019.02.03.02.47.38
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Sun, 03 Feb 2019 02:47:40 -0800 (PST)
+From: Jerome Brunet <jbrunet@baylibre.com>
+To: Neil Armstrong <narmstrong@baylibre.com>, Stephen Boyd <sboyd@kernel.org>,
+ Michael Turquette <mturquette@baylibre.com>
+Subject: [PATCH] clk: meson: fix pll settings calculation with arm32
+Date: Sun,  3 Feb 2019 11:47:16 +0100
+Message-Id: <20190203104716.10479-1-jbrunet@baylibre.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190203_022544_380773_D001B4C7 
-X-CRM114-Status: GOOD (  18.56  )
+X-CRM114-CacheID: sfid-20190203_024743_680777_F71854A1 
+X-CRM114-Status: GOOD (  11.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,76 +96,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "alexandre.belloni@bootlin.com" <alexandre.belloni@bootlin.com>,
- "tudor.ambarus@microchip.com" <tudor.ambarus@microchip.com>,
- "richard@nod.at" <richard@nod.at>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
- "ludovic.desroches@microchip.com" <ludovic.desroches@microchip.com>,
- "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
- "miquel.raynal@bootlin.com" <miquel.raynal@bootlin.com>,
- "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
- "dwmw2@infradead.org" <dwmw2@infradead.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Kevin Hilman <khilman@baylibre.com>, linux-kernel@vger.kernel.org,
+ linux-amlogic@lists.infradead.org, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, 3 Feb 2019 09:37:31 +0000
-wen yang <yellowriver2010@hotmail.com> wrote:
+fix undefined reference to `__aeabi_uldivmod' when dividing
+u64 on arm32.
 
-> of_find_device_by_node() takes a reference to the struct device
-> when it finds a match via get_device, there is no need to call
-> get_device() twice.
-> We also should make sure to drop the reference to the device
-> taken by of_find_device_by_node() on driver unbind.
-> 
+Fixes: 496c0462b46f ("clk: meson: pll: update driver for the g12a")
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
 
-Missing Fixes tag.
+ Neil,
 
-> Signed-off-by: Wen Yang <yellowriver2010@hotmail.com>
-> Cc: Tudor Ambarus <tudor.ambarus@microchip.com>
-> Cc: Boris Brezillon <bbrezillon@kernel.org>
-> Cc: Miquel Raynal <miquel.raynal@bootlin.com>
-> Cc: Richard Weinberger <richard@nod.at>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Brian Norris <computersforpeace@gmail.com>
-> Cc: Marek Vasut <marek.vasut@gmail.com>
-> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> Cc: Ludovic Desroches <ludovic.desroches@microchip.com>
-> Cc: linux-mtd@lists.infradead.org
-> Cc: linux-arm-kernel@lists.infradead.org
-> Cc: linux-kernel@vger.kernel.org
-> ---
->  drivers/mtd/nand/raw/atmel/pmecc.c | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/raw/atmel/pmecc.c b/drivers/mtd/nand/raw/atmel/pmecc.c
-> index 555a74e..bee6551 100644
-> --- a/drivers/mtd/nand/raw/atmel/pmecc.c
-> +++ b/drivers/mtd/nand/raw/atmel/pmecc.c
-> @@ -878,14 +878,17 @@ static struct atmel_pmecc *atmel_pmecc_get_by_node(struct device *userdev,
->  	struct atmel_pmecc *pmecc, **ptr;
->  
->  	pdev = of_find_device_by_node(np);
-> -	if (!pdev || !platform_get_drvdata(pdev))
-> +	if (!pdev)
->  		return ERR_PTR(-EPROBE_DEFER);
-> +	if (!platform_get_drvdata(pdev)) {
-> +		put_device(&pdev->dev);
-> +		return ERR_PTR(-EPROBE_DEFER);
-> +	}
->  
->  	ptr = devres_alloc(devm_atmel_pmecc_put, sizeof(*ptr), GFP_KERNEL);
->  	if (!ptr)
->  		return ERR_PTR(-ENOMEM);
->  
-> -	get_device(&pdev->dev);
->  	pmecc = platform_get_drvdata(pdev);
->  
->  	*ptr = pmecc;
+ Feel free to squash this with the offending change. If you prefer,
+ I can submit a v7.
+
+ Cheers
+ Jerome
+
+ drivers/clk/meson/clk-pll.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/meson/clk-pll.c b/drivers/clk/meson/clk-pll.c
+index 7946d21a4ff4..41e16dd7272a 100644
+--- a/drivers/clk/meson/clk-pll.c
++++ b/drivers/clk/meson/clk-pll.c
+@@ -151,7 +151,7 @@ static unsigned int meson_clk_get_pll_range_m(unsigned long rate,
+ 	if (__pll_round_closest_mult(pll))
+ 		return DIV_ROUND_CLOSEST_ULL(val, parent_rate);
+ 
+-	return val / parent_rate;
++	return div_u64(val,  parent_rate);
+ }
+ 
+ static int meson_clk_get_pll_range_index(unsigned long rate,
+-- 
+2.20.1
 
 
 _______________________________________________
