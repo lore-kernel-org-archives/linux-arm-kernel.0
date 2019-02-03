@@ -5,20 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0A7DDC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 18:58:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E38D0C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 19:06:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C7DEA217D6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 18:58:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B11B2217D6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 19:06:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bYzv/h3b";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="s8ZPUEca"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7DEA217D6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W0dFyOCH";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="aQbuOg+i"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B11B2217D6
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,53 +26,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Cc:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EGpf0UNhhTvxE17GcpkQP7pJDE4NCXxpc4g06sPbxoY=; b=bYzv/h3bd2OBxz
-	Nh1HEElJYXgkdli09hWpRfx2Q2cEWvnrZTqXrsPIkWQL3Evszde9B5BnhBwlSG/bGlPrsxBaoLyAH
-	1s5U/MzS0H257FoZSrPA9Dr4Lprh5AB7fx0z62toGqh9ysi74NMnlnknGUYuvmxo+WaYE6nJlGLwo
-	9vCwoSbOn+vcmWH/Du8oZArHi+xoqdUAsBRbFjDlTWgZbBfTrfg2tM4EKcQSFrsrAeV2pLI4Tr8xI
-	fgMfOmgocDE3McPNkHn0dxEAaE7e4h/G6/+9UGua13nfXd/3gpy5wA+U+fXWijqee2A0xk1MRV7HA
-	1j7eHMmBlltg7xjOBzrA==;
+	List-Owner; bh=N1LVR1LDwlT1P595eA/hqPvAK2TynctiMmUNzN0btlc=; b=W0dFyOCHw/Zi1n
+	8UO63wsusWPsGOxy+Ci1vE3ECzXOW8+MOM2x7ZU5c2moewkfBh66TowIuqivzAGe8JZsnYAQCveXV
+	U7wI5J1AywtOkb8nBwKaDdWy9DSewLh5egDdagIILQZu8QYtY+1HYhKo8z1opUV7C0r2xQQ5IrA+/
+	tjroMIEGeHLKELaVVNbLptweB9n9QZ1x28C5o/Qo0Tk0i+8RUTMGr3fGhunFITvYPuDZC4UY/mHyN
+	6RrlofJq9QLfi+lYXqEOjKQ9COjJu6umSfUpHzVG6KlLqvLj8yC/claFdNcSU5Uc9gBPaUem0jNlw
+	/v/rdOFnbjNlBlJhU5TA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqMyC-0007nC-6s; Sun, 03 Feb 2019 18:58:20 +0000
-Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+	id 1gqN6G-0002pP-Qw; Sun, 03 Feb 2019 19:06:40 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqMvj-0005KP-Fs
- for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 18:56:02 +0000
-Received: by mail-pf1-x444.google.com with SMTP id h3so5739972pfg.1
+ id 1gqMvi-0005JI-IQ
+ for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 18:56:01 +0000
+Received: by mail-pl1-x642.google.com with SMTP id z23so5765960plo.0
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 03 Feb 2019 10:55:47 -0800 (PST)
+ Sun, 03 Feb 2019 10:55:46 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=kR6J6Jtzwbwm5txsJfmr27+abRHklHlAdhM5mSBvkvM=;
- b=s8ZPUEca/BAlvashTKFiJSlvewxYdXpTROJF9LwiTHujpHSJrUhOygNeWxy+yhn9vl
- i8tTxq/MDKI55JLKdOfft5oT4TJHe8/hMyYhkZFnsVEiGe5VAvTWroM7wQ3JTNQU+NlE
- wU9CTt7YUJb90bkhZTN5wn94EoMqwL5LAxC9oahi0RXKC9IgVzBsZ1x4bvgkCiZo5dG0
- GWPRkKcfh6t2tYB6i9Ce6Tx8mbegKLrKh8kaht0rTToi1OMe+hHOPmHi3npoIH3VI7gl
- FghrEarqESU0lsaPoX267EFV/0m7XOb3jMGR3j60phepumL+3+Ij2F8vfuBAJ5U/N4YD
- EiIg==
+ bh=SrvFVouaYjNTy08YBCU5WIYZS8Tl/vfILBmGEJvEU9c=;
+ b=aQbuOg+iWAKPen9xDikaYua9cPAeiuccbuMzSzSzEL52sUnWSKru07/5ypsO1Z2/hm
+ LEbLhIFGG77DYeV1ERML6CtwLGYUiRHmz3BT8IVOBbKH2oSFKJi7A50E9kht9YWtrYjX
+ s7PTzkYjdmC6ycENBdSONPosKMZ9THoZ2RgZlW3zOZuFf31PtS+wxELX/ojNGYzUwKLp
+ uhLnjAYtH8Tw6oVMzhlPe2xUzdkVW/FUjOkFHDpyokjTmj2ouSvTwxvv+9PkaevBQmKk
+ 6ppx2vKsiUfuJn5Y5gy6qf/SLkmEkzSA2GMJOjUKF52XVLgDGtmm43ETCDdk2cXY6pYH
+ WcyQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=kR6J6Jtzwbwm5txsJfmr27+abRHklHlAdhM5mSBvkvM=;
- b=e7Id/I5uzlIGoeNnzK1YkHlaa4LludS2zQu0FkrIae4i1+LsCH/8mRoMPRW4X8h00l
- bBlCRxVw7EmzcQaQHVflDbOEGI1kQU56OvBwwiKXMSqxF/tJwPNfJLysuirLB4QVepcE
- j0/OnpOtM1flgDk8h0qaNcvlhWNNBB+2C4gNT8NsHSD3KVfLOwdkWHexfW9KbFzHKD1q
- a+4Xb/JxqyF7MkHPsbtmyRpWNNVWsQwxXvz4uUkgheXeqf8V26VQZUR4iYo4Uw/Vy86S
- 0sFcH3FVHV/vBUUXMKUTZKC/x2W9Nz7NPpd/s26o0b8jY708AZ/QmdTjdAk0qjNlgpC/
- 1Llw==
-X-Gm-Message-State: AJcUukc2gZ6Hb0hn0WOa08K2hkeMFapSCgIyMna/5US3tpM4Sjqx6zR2
- mcxy1+fiK/RdinHYoENb8+Q=
-X-Google-Smtp-Source: ALg8bN5LzsKHNoCXyuQAFQq1H1+UUHwSZMfSUic42loJlQIDA6h7MNb4vJKj1gimOAGRnk77J3/VjA==
-X-Received: by 2002:a62:39cb:: with SMTP id u72mr47982735pfj.223.1549220146907; 
- Sun, 03 Feb 2019 10:55:46 -0800 (PST)
+ bh=SrvFVouaYjNTy08YBCU5WIYZS8Tl/vfILBmGEJvEU9c=;
+ b=M6zwP/z5Q8mc3b8xRwgFiPCbYRmPeKlJcJhQ8mulLotGmdNoJU8yYdykYf2947cI+n
+ /fcwsge5OtVWabsgZMaXb1g+/eI1MwFZX/AoGPf4z8+2da6rvCbBBtLXsOQuwvmSyhts
+ SUn+rroXdmijvrum1yGSlwTr5ZiTeAKTJ6JC+4Fk+KGkgQ5Y5zGwlt2KV/vuvcG7xc7C
+ LQpbbIU9hF4MeYu8IE1lgbQZTFWtsrGCEx0bmYhnMfrZRqYD9sgQ7A0R9TD+1i9BOA5x
+ fubtB+vE1bEuFaYka3ANT2Cn0EBGEAaliXCl9gFIBCQrZv1d0YFgT6/T7Hobb7Zre9+S
+ 7ZBQ==
+X-Gm-Message-State: AJcUukemPUGqIxDsII9Tm67KtnKyXYbueO4uJSwQ16fu9X93nQWxXiDA
+ 9ER8aH+l0HD5gji95MkoSQshRhtvPNU=
+X-Google-Smtp-Source: ALg8bN6dQkkPe/sAz4pJxu4gnRWdTn37Wt/+v8rzVRb4YZQoYiuJQfh3kQs/xVMJxe8AZfT1gKmJJw==
+X-Received: by 2002:a17:902:bc3:: with SMTP id
+ 61mr48893735plr.15.1549220145889; 
+ Sun, 03 Feb 2019 10:55:45 -0800 (PST)
 Received: from anarsoul-thinkpad.lan (216-71-213-236.dyn.novuscom.net.
  [216.71.213.236])
- by smtp.gmail.com with ESMTPSA id g28sm19524553pfd.100.2019.02.03.10.55.45
+ by smtp.gmail.com with ESMTPSA id g28sm19524553pfd.100.2019.02.03.10.55.44
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sun, 03 Feb 2019 10:55:46 -0800 (PST)
+ Sun, 03 Feb 2019 10:55:45 -0800 (PST)
 From: Vasily Khoruzhick <anarsoul@gmail.com>
 To: David Airlie <airlied@linux.ie>, Daniel Vetter <daniel@ffwll.ch>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
@@ -85,17 +85,17 @@ To: David Airlie <airlied@linux.ie>, Daniel Vetter <daniel@ffwll.ch>,
  Icenowy Zheng <icenowy@aosc.io>, Sean Paul <seanpaul@chromium.org>,
  dri-devel@lists.freedesktop.org, devicetree@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, linux-sunxi@googlegroups.com
-Subject: [PATCH RESEND v2 11/12] arm64: allwinner: a64: enable LCD-related
- hardware for Pinebook
-Date: Sun,  3 Feb 2019 10:55:00 -0800
-Message-Id: <20190203185501.8958-12-anarsoul@gmail.com>
+Subject: [PATCH RESEND v2 10/12] arm64: allwinner: a64: add pinmux for RGB666
+ LCD
+Date: Sun,  3 Feb 2019 10:54:59 -0800
+Message-Id: <20190203185501.8958-11-anarsoul@gmail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190203185501.8958-1-anarsoul@gmail.com>
 References: <20190203185501.8958-1-anarsoul@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190203_105548_256693_FA4DC4EB 
-X-CRM114-Status: GOOD (  13.00  )
+X-CRM114-CacheID: sfid-20190203_105547_392250_17AC3A7C 
+X-CRM114-Status: GOOD (  11.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -114,131 +114,36 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Icenowy Zheng <icenowy@aosc.io>
 
-Pinebook has an ANX6345 bridge connected to the RGB666 LCD output and
-eDP panel input. The bridge is controlled via I2C that's connected to
-R_I2C bus.
+Allwinner A64's TCON0 can output RGB666 LCD signal.
 
-Enable all this hardware in device tree.
+Add its pinmux.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- .../dts/allwinner/sun50i-a64-pinebook.dts     | 74 +++++++++++++++++++
- 1 file changed, 74 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-index d22736a62481..49f5d4b0c7f4 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-@@ -63,6 +63,18 @@
- 		};
- 	};
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 837a03dee875..4fc3ca5fa53e 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -559,6 +559,15 @@
+ 				function = "i2c1";
+ 			};
  
-+	edp_panel: edp-panel {
-+		compatible = "panel-edp", "simple-panel";
-+		backlight = <&backlight>;
-+		power-supply = <&reg_dc1sw>;
-+
-+		port {
-+			panel_in_edp: endpoint {
-+				remote-endpoint = <&anx6345_out_panel>;
-+			};
-+		};
-+	};
-+
- 	reg_vcc3v3: vcc3v3 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc3v3";
-@@ -102,6 +114,10 @@
- 	status = "okay";
- };
- 
-+&de {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	phys = <&usbphy 0>;
- 	phy-names = "usb";
-@@ -112,6 +128,10 @@
- 	status = "okay";
- };
- 
-+&mixer0 {
-+	status = "okay";
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
-@@ -163,6 +183,46 @@
- 	status = "okay";
- };
- 
-+&r_i2c {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&r_i2c_pins_a>;
-+	status = "okay";
-+
-+	anx6345: anx6345@38 {
-+		compatible = "analogix,anx6345";
-+		reg = <0x38>;
-+		reset-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
-+		dvdd25-supply = <&reg_dldo2>;
-+		dvdd12-supply = <&reg_fldo1>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			anx6345_in: port@0 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0>;
-+				anx6345_in_tcon0: endpoint@0 {
-+					reg = <0>;
-+					remote-endpoint = <&tcon0_out_anx6345>;
-+				};
++			lcd_rgb666_pins: lcd-rgb666 {
++				pins = "PD0", "PD1", "PD2", "PD3", "PD4",
++				       "PD5", "PD6", "PD7", "PD8", "PD9",
++				       "PD10", "PD11", "PD12", "PD13",
++				       "PD14", "PD15", "PD16", "PD17",
++				       "PD18", "PD19", "PD20", "PD21";
++				function = "lcd0";
 +			};
 +
-+			anx6345_out: port@1 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <1>;
-+
-+				anx6345_out_panel: endpoint@0 {
-+					reg = <0>;
-+					remote-endpoint = <&panel_in_edp>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
- &r_rsb {
- 	status = "okay";
- 
-@@ -334,6 +394,20 @@
- 			"MIC2", "Internal Microphone Right";
- };
- 
-+&tcon0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_rgb666_pins>;
-+
-+	status = "okay";
-+};
-+
-+&tcon0_out {
-+	tcon0_out_anx6345: endpoint@0 {
-+		reg = <0>;
-+		remote-endpoint = <&anx6345_in_tcon0>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pb_pins>;
+ 			mmc0_pins: mmc0-pins {
+ 				pins = "PF0", "PF1", "PF2", "PF3",
+ 				       "PF4", "PF5";
 -- 
 2.20.1
 
