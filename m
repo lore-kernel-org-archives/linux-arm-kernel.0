@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1731FC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 18:57:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 45D57C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 18:57:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B9CA3217D6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 18:57:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F0FD9217D6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 18:57:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ysau79Lj";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="pjFccvht"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B9CA3217D6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d8rmGR9x";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="VRa47VnX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F0FD9217D6
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,54 +27,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Cc:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2CvnOjrUi52uJ63Gp1cNu5+Xwm3CFkSPnjHo4rk/iTk=; b=Ysau79LjiuQ+Qe
-	jHDc3MrXvy7MnYBkV8K5iFp9BX5j6O0Zv1161xUJdAtggcu4zwy05OMVhZiUCg12fcmTFLjYZArMP
-	YozizMS5nO01jk8wGWNySYdQ/g/81gpXOcOKPj6zIj+im/J9zTP92t0z/iyc/3vT0Edhnk466UT7Y
-	E2IEQZSVUlk5yos9zl6GekjD6l/kH1u3PHvxOqcAtBJs/3UDvCN1jlK5B/jtp7iVcYYrxjq1xuGoa
-	tNxXp34N5bD+qTbBJ03bIB6JjluqIyYiQwsNQh9LeFw733glapvmX+5Jidri+0p7qsoVlrh1f2Xao
-	Sm+xOXpqQbxAF44qpuXw==;
+	List-Owner; bh=d6UMrrd0dyqe7V862CTUAuU41sGColVs+aBGJBaJEJA=; b=d8rmGR9xpjyO3h
+	wCVoMONDI9CL1zVDphK2/CgXy2sVC92CbVZYyhLqHnE0C4/j2INwige7Z14VMfCdu7Gg21OPWBXlC
+	hc4jcvDgZBGecHQYpMjScRixl21YC614C4AsK2OesMwSiAQL5fXNe6FHhra0UzY75/M7mWgf8D9gZ
+	+mdfYRcAb5JWTKlTzhLwytczw6yWV+pnjHemWvxbtwQr6DjNdb0RHbAOb0W9bkLDzDpt7YJk1JFYs
+	27KQ+eSFO1qDxXqow5Fi3iwMVgUmm0PvUY5P+gpjDpScQJqGq8hUmGDtvqEn/uhypnUtedCuSC7gM
+	4Q60yxu4GEjxqnbMo75g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqMx6-0006h4-Hh; Sun, 03 Feb 2019 18:57:12 +0000
-Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
+	id 1gqMxO-00070M-DW; Sun, 03 Feb 2019 18:57:30 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqMvd-0005E6-QA
- for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 18:55:53 +0000
-Received: by mail-pl1-x643.google.com with SMTP id w4so5762263plz.1
+ id 1gqMvc-0005Cl-Sq
+ for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 18:55:54 +0000
+Received: by mail-pl1-x642.google.com with SMTP id w4so5762241plz.1
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 03 Feb 2019 10:55:41 -0800 (PST)
+ Sun, 03 Feb 2019 10:55:40 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=J3HkVQyg1bgdqlOuNsd9gIG4QKbDWhLCCN+a7fE0LAQ=;
- b=pjFccvhtiQ9mgd7Wq60ksQR0Rhp+s9Ory4pFo+eyVD1qki2BYEBScTzNa7gz3hpMKe
- oFK6i9fF+/J6dJbs+s6o2iy0mIVG4S+2H829Ma04kx7bJYsyEaO0HRZ+PU3iU2zjtk54
- 4BzdbDZr5YiIovAn795WG+7aYXCr+yYDY6Sc9vBwt4MNLHABq1C4KTuSpXMl//sqc1Wq
- 5xe5m0uG/79nUq/iVUATWfcHUXjaCUxpWCFwg+rPyllQQwTRKDAMdQrg8Emy79kMMRF+
- Uofx8NXLB7RAF00a6gL11CzvwJNOxj3WqpaSZJsyr9FsMhmxKEar8vzWrGQiewrZsxoh
- ukFA==
+ bh=3boBwPz84wKOTuMSt6x2S3V4gv4HON5vQaFKv3xMX4s=;
+ b=VRa47VnXRlbni7LIoQLfQ7w/R0O32ecl9wN3l2TgHLPDkoyEVoyelD23n8z0y2UPvB
+ 2bFz7c8ii36Z8DHKyhTh2fFL9DGzzyWViEq4+zbnlCcvsQsgNa/x4gGZqgZB0aE0Vmt9
+ 3jyECZNCJ1kC1pnrlB3PSLhuHq+IwS3Doo0eEyUPU8eRxk84hCeElirLgbYKSWQ+PCBz
+ d4Vks9yH5ZWg9IXXemvF3swQ04aHFqIpRvXTUcCyTY+rp2C31dYF4CFk79Xxg8LRV7x1
+ vv5AV4j5FkgdcTelZ6RJpmz1I0sZEn+uwZLRSDMJrx/5i5/VgpLSV5Iua+nn7/qBoGvD
+ fMQg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=J3HkVQyg1bgdqlOuNsd9gIG4QKbDWhLCCN+a7fE0LAQ=;
- b=Vl+rRw4kVecsWBHp64AkWrx5VfcEvlVg8ezgNySM2h7/rc+2ybiX+b6//l3cXyli87
- QbBPqZLvgiuTQCZtd9ir6Na623Kpepfm3Zcail6fNjLYtKtqhklm0sukGIM343ZkWjMe
- e21+VDzVBRiYMS03iQL21QauOsrQX6ET2LTO+8RQt5DhI1y/gWS1JfF6xMO+fVtme1eC
- awf6dfYaEvBVS1Fr4bYVrj4lywp6W2ID7QeYh6dgDV8XtcYFl4isWBNJJEerrb6Xo5dG
- 6a3HKSkKUey507+6fi0g+LUsi/4Oi+dJTsUUnLuBm8NhvcnnS5c0lFupgfcEMv7WSdY3
- CWDQ==
-X-Gm-Message-State: AJcUukeuGbt0fKW229lxe5MrSmQTfv2MVUqGlCfiLDpvDEaGzUGNGcyB
- FWOGm/rS8hXiJekbEdLp7o4=
-X-Google-Smtp-Source: ALg8bN5OwbywqHdgK7IjsCHN0cVGCDeCzrTGt/EjjFJJ+udYOHB2pigM5vvLSPoTSpzuzVCQojptww==
-X-Received: by 2002:a17:902:690c:: with SMTP id
- j12mr48089523plk.206.1549220141232; 
- Sun, 03 Feb 2019 10:55:41 -0800 (PST)
+ bh=3boBwPz84wKOTuMSt6x2S3V4gv4HON5vQaFKv3xMX4s=;
+ b=H01y+0M3qmMsjzShTxzTn0GVfw7kIIMfm5M4PmnDzA9Eph/q0R+sUi78cmj1BFWpLy
+ 8BzuJ2Z6JQwXqTlgVnH75M/jqlIV+i2M080AtmVjgagaTnmThKLWpkzOQ1MxxSwL2VSL
+ uwMKbKE/07Of+4aHUCHhHMA4a3kGPXW4eti16k8KR9ft6HI6j9jJZSlvJumY07KZ0nVa
+ Gt0lnlRXs7JYLOqBYrKxzq8a4pjHWJDWzdgt/vnPlUrucl0ROZqWAWFCPLJsx4Dx2C7l
+ FhYsHGZfTuKwBxAoTP9UoFJf8yoS43hwfoYD63sHtkqkFSGZIOTDJrPFAzo+bxcyQAis
+ 9ynQ==
+X-Gm-Message-State: AJcUukf0oTQ0T/ff9RmySXVTP2q5TqLfz/Cz9virtaRpJ2Eg3QO4xK5x
+ H+luNjS+V/gTy6MAAzgvatM=
+X-Google-Smtp-Source: ALg8bN7pGdVJacaLeRgswxYNzmK9dFHp9AowmcotFeiJcV7PrMeQ1R8AubNvAkhu5B3Xy6MEow+sTw==
+X-Received: by 2002:a17:902:8a95:: with SMTP id
+ p21mr49734150plo.183.1549220140249; 
+ Sun, 03 Feb 2019 10:55:40 -0800 (PST)
 Received: from anarsoul-thinkpad.lan (216-71-213-236.dyn.novuscom.net.
  [216.71.213.236])
- by smtp.gmail.com with ESMTPSA id g28sm19524553pfd.100.2019.02.03.10.55.40
+ by smtp.gmail.com with ESMTPSA id g28sm19524553pfd.100.2019.02.03.10.55.39
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sun, 03 Feb 2019 10:55:40 -0800 (PST)
+ Sun, 03 Feb 2019 10:55:39 -0800 (PST)
 From: Vasily Khoruzhick <anarsoul@gmail.com>
 To: David Airlie <airlied@linux.ie>, Daniel Vetter <daniel@ffwll.ch>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
@@ -86,17 +86,17 @@ To: David Airlie <airlied@linux.ie>, Daniel Vetter <daniel@ffwll.ch>,
  Icenowy Zheng <icenowy@aosc.io>, Sean Paul <seanpaul@chromium.org>,
  dri-devel@lists.freedesktop.org, devicetree@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, linux-sunxi@googlegroups.com
-Subject: [PATCH RESEND v2 07/12] drm/panel: simple: don't fail if we don't
- have panel desc
-Date: Sun,  3 Feb 2019 10:54:56 -0800
-Message-Id: <20190203185501.8958-8-anarsoul@gmail.com>
+Subject: [PATCH RESEND v2 06/12] drm/sun4i: rgb: Add 1% tolerance to dclk
+ frequency check when bridge is connected
+Date: Sun,  3 Feb 2019 10:54:55 -0800
+Message-Id: <20190203185501.8958-7-anarsoul@gmail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190203185501.8958-1-anarsoul@gmail.com>
 References: <20190203185501.8958-1-anarsoul@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190203_105542_564764_6F6EBFA6 
-X-CRM114-Status: GOOD (  14.02  )
+X-CRM114-CacheID: sfid-20190203_105541_415939_2E0E5A91 
+X-CRM114-Status: GOOD (  16.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -113,74 +113,97 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This is preparation for addition of generic eDP panel that
-doesn't have any modes or delays defined.
+Clock rate check that was added in commit bb43d40d7c83 ("drm/sun4i: rgb:
+Validate the clock rate") prevents some panel and bridges from working with
+sun4i driver.
+
+Unfortunately, dotclock frequency for some modes are not achievable on
+sunxi hardware, and there's a slight deviation in rate returned by
+clk_round_rate(), so they fail this check.
+
+Experiments show that panels and bridges work fine with this slight
+deviation, e.g. Pinebook that uses ANX6345 bridge with 768p eDP panel
+requests 73 MHz, gets 72.296MHz instead (0.96% difference) and works just
+fine.
+
+This patch adds a 1% tolerence to the dot clock check when bridge is
+connected.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- drivers/gpu/drm/panel/panel-simple.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_rgb.c  | 16 ++++++++++------
+ drivers/gpu/drm/sun4i/sun4i_tcon.h |  1 +
+ 2 files changed, 11 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index 9c69e739a524..2f2cb2d81f2b 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -176,7 +176,7 @@ static int panel_simple_disable(struct drm_panel *panel)
- 		backlight_update_status(p->backlight);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index f4a22689eb54..3f04446120f6 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -61,6 +61,7 @@ static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
+ 	u32 vsync = mode->vsync_end - mode->vsync_start;
+ 	unsigned long rate = mode->clock * 1000;
+ 	long rounded_rate;
++	long tolerance = 0;
+ 
+ 	DRM_DEBUG_DRIVER("Validating modes...\n");
+ 
+@@ -95,10 +96,14 @@ static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
+ 	tcon->dclk_min_div = 6;
+ 	tcon->dclk_max_div = 127;
+ 	rounded_rate = clk_round_rate(tcon->dclk, rate);
+-	if (rounded_rate < rate)
++	if (tcon->bridge)
++		/* Check against a 1% tolerance for the dot clock for bridge */
++		tolerance = rate / 100;
++
++	if (rounded_rate < (rate - tolerance))
+ 		return MODE_CLOCK_LOW;
+ 
+-	if (rounded_rate > rate)
++	if (rounded_rate > (rate + tolerance))
+ 		return MODE_CLOCK_HIGH;
+ 
+ 	DRM_DEBUG_DRIVER("Clock rate OK\n");
+@@ -172,7 +177,6 @@ static struct drm_encoder_funcs sun4i_rgb_enc_funcs = {
+ int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
+ {
+ 	struct drm_encoder *encoder;
+-	struct drm_bridge *bridge;
+ 	struct sun4i_rgb *rgb;
+ 	int ret;
+ 
+@@ -183,7 +187,7 @@ int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
+ 	encoder = &rgb->encoder;
+ 
+ 	ret = drm_of_find_panel_or_bridge(tcon->dev->of_node, 1, 0,
+-					  &tcon->panel, &bridge);
++					  &tcon->panel, &tcon->bridge);
+ 	if (ret) {
+ 		dev_info(drm->dev, "No panel or bridge found... RGB output disabled\n");
+ 		return 0;
+@@ -225,8 +229,8 @@ int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
+ 		}
  	}
  
--	if (p->desc->delay.disable)
-+	if (p->desc && p->desc->delay.disable)
- 		msleep(p->desc->delay.disable);
+-	if (bridge) {
+-		ret = drm_bridge_attach(encoder, bridge, NULL);
++	if (tcon->bridge) {
++		ret = drm_bridge_attach(encoder, tcon->bridge, NULL);
+ 		if (ret) {
+ 			dev_err(drm->dev, "Couldn't attach our bridge\n");
+ 			goto err_cleanup_connector;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index b5214d71610f..487cb070b25c 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -258,6 +258,7 @@ struct sun4i_tcon {
+ 	struct reset_control		*lvds_rst;
  
- 	p->enabled = false;
-@@ -195,7 +195,7 @@ static int panel_simple_unprepare(struct drm_panel *panel)
+ 	struct drm_panel		*panel;
++	struct drm_bridge		*bridge;
  
- 	regulator_disable(p->supply);
- 
--	if (p->desc->delay.unprepare)
-+	if (p->desc && p->desc->delay.unprepare)
- 		msleep(p->desc->delay.unprepare);
- 
- 	p->prepared = false;
-@@ -220,11 +220,13 @@ static int panel_simple_prepare(struct drm_panel *panel)
- 
- 	gpiod_set_value_cansleep(p->enable_gpio, 1);
- 
--	delay = p->desc->delay.prepare;
--	if (p->no_hpd)
--		delay += p->desc->delay.hpd_absent_delay;
--	if (delay)
--		msleep(delay);
-+	if (p->desc) {
-+		delay = p->desc->delay.prepare;
-+		if (p->no_hpd)
-+			delay += p->desc->delay.hpd_absent_delay;
-+		if (delay)
-+			msleep(delay);
-+	}
- 
- 	p->prepared = true;
- 
-@@ -238,7 +240,7 @@ static int panel_simple_enable(struct drm_panel *panel)
- 	if (p->enabled)
- 		return 0;
- 
--	if (p->desc->delay.enable)
-+	if (p->desc && p->desc->delay.enable)
- 		msleep(p->desc->delay.enable);
- 
- 	if (p->backlight) {
-@@ -280,6 +282,9 @@ static int panel_simple_get_timings(struct drm_panel *panel,
- 	struct panel_simple *p = to_panel_simple(panel);
- 	unsigned int i;
- 
-+	if (!p->desc)
-+		return 0;
-+
- 	if (p->desc->num_timings < num_timings)
- 		num_timings = p->desc->num_timings;
- 
+ 	/* Platform adjustments */
+ 	const struct sun4i_tcon_quirks	*quirks;
 -- 
 2.20.1
 
