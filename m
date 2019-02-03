@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 45D57C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 18:57:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5E647C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 18:57:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F0FD9217D6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 18:57:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2C258217D6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 18:57:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d8rmGR9x";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="VRa47VnX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F0FD9217D6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MpItcUHK";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="LzrQ0U0v"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2C258217D6
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,54 +27,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Cc:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=d6UMrrd0dyqe7V862CTUAuU41sGColVs+aBGJBaJEJA=; b=d8rmGR9xpjyO3h
-	wCVoMONDI9CL1zVDphK2/CgXy2sVC92CbVZYyhLqHnE0C4/j2INwige7Z14VMfCdu7Gg21OPWBXlC
-	hc4jcvDgZBGecHQYpMjScRixl21YC614C4AsK2OesMwSiAQL5fXNe6FHhra0UzY75/M7mWgf8D9gZ
-	+mdfYRcAb5JWTKlTzhLwytczw6yWV+pnjHemWvxbtwQr6DjNdb0RHbAOb0W9bkLDzDpt7YJk1JFYs
-	27KQ+eSFO1qDxXqow5Fi3iwMVgUmm0PvUY5P+gpjDpScQJqGq8hUmGDtvqEn/uhypnUtedCuSC7gM
-	4Q60yxu4GEjxqnbMo75g==;
+	List-Owner; bh=McQPQD/HeKs0i+3XmamFNrOKgNCCVQyu4+z4810LVFc=; b=MpItcUHKhz3Evy
+	9OmVnsoo0H3CL/IWV2uZVLrmqiOXuCWpv7gnyCNNCL+LP9BcrE4t/0bY3S/SsFNh5zFuVGz2j/BpG
+	LnkFvUI6ZPLLkyIlpncJP1cir6oKFtUk07qbgj4JQQR0nAt4invA16YbVidZZcaTNY8Uhw32cEvtW
+	Ehc7ah01q49HIQpGe6ig9lzQS69RWc13gYnnkerYjwRZi4FvJ2piLO/h4C32Sd6bOGH2+QNDnXBXI
+	diMj8cRc+EWX0vwExGx+DHEfcn7ZIp1BJBmaaCGBmCoW3HuIm3ucbkfJf4QEwhyChsC/s9ER3jIkM
+	csTdq5mkerCTwgJzc3Xg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqMxO-00070M-DW; Sun, 03 Feb 2019 18:57:30 +0000
-Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
+	id 1gqMxj-0007IE-2u; Sun, 03 Feb 2019 18:57:51 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqMvc-0005Cl-Sq
+ id 1gqMvh-0005Ho-DT
  for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 18:55:54 +0000
-Received: by mail-pl1-x642.google.com with SMTP id w4so5762241plz.1
+Received: by mail-pf1-x444.google.com with SMTP id b7so5714329pfi.8
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 03 Feb 2019 10:55:40 -0800 (PST)
+ Sun, 03 Feb 2019 10:55:45 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=3boBwPz84wKOTuMSt6x2S3V4gv4HON5vQaFKv3xMX4s=;
- b=VRa47VnXRlbni7LIoQLfQ7w/R0O32ecl9wN3l2TgHLPDkoyEVoyelD23n8z0y2UPvB
- 2bFz7c8ii36Z8DHKyhTh2fFL9DGzzyWViEq4+zbnlCcvsQsgNa/x4gGZqgZB0aE0Vmt9
- 3jyECZNCJ1kC1pnrlB3PSLhuHq+IwS3Doo0eEyUPU8eRxk84hCeElirLgbYKSWQ+PCBz
- d4Vks9yH5ZWg9IXXemvF3swQ04aHFqIpRvXTUcCyTY+rp2C31dYF4CFk79Xxg8LRV7x1
- vv5AV4j5FkgdcTelZ6RJpmz1I0sZEn+uwZLRSDMJrx/5i5/VgpLSV5Iua+nn7/qBoGvD
- fMQg==
+ bh=JXna/PKJx8iZ1/h/UpVLA2d4bN5zqtBh3+Z+QQelLRs=;
+ b=LzrQ0U0vJ9MY2N7rISkI0LywYCiMOgMCyeu/cl/zb7wl0/7SJNhJahupTLX+f2hd36
+ 3zDQPC7ZMlGVl+Txc/H/PiTcb5kgDT9oLGhcMDHhzhMGD2Pn+sOdkXVEXxDdtoOppsxB
+ 7n0OhLtHv97Zp3BEWH1fMezymlXIb5oX7mjkMnkvGloRkuILu1FwZG5hHukhB+l+Kbee
+ zOyDu2euU7Hbb6LGEFkyMajvGuR+H/vrAQ+UcxY/S3eQqTmHk/Hpm92bU2Caiyz0B9D9
+ XclKgfUkr1H2KIPTBUQyEYi8MBmCFZRNM4eBlS8AoXSt3xc28tEeMp1FYIhxKFBmlCDy
+ GdQQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=3boBwPz84wKOTuMSt6x2S3V4gv4HON5vQaFKv3xMX4s=;
- b=H01y+0M3qmMsjzShTxzTn0GVfw7kIIMfm5M4PmnDzA9Eph/q0R+sUi78cmj1BFWpLy
- 8BzuJ2Z6JQwXqTlgVnH75M/jqlIV+i2M080AtmVjgagaTnmThKLWpkzOQ1MxxSwL2VSL
- uwMKbKE/07Of+4aHUCHhHMA4a3kGPXW4eti16k8KR9ft6HI6j9jJZSlvJumY07KZ0nVa
- Gt0lnlRXs7JYLOqBYrKxzq8a4pjHWJDWzdgt/vnPlUrucl0ROZqWAWFCPLJsx4Dx2C7l
- FhYsHGZfTuKwBxAoTP9UoFJf8yoS43hwfoYD63sHtkqkFSGZIOTDJrPFAzo+bxcyQAis
- 9ynQ==
-X-Gm-Message-State: AJcUukf0oTQ0T/ff9RmySXVTP2q5TqLfz/Cz9virtaRpJ2Eg3QO4xK5x
- H+luNjS+V/gTy6MAAzgvatM=
-X-Google-Smtp-Source: ALg8bN7pGdVJacaLeRgswxYNzmK9dFHp9AowmcotFeiJcV7PrMeQ1R8AubNvAkhu5B3Xy6MEow+sTw==
-X-Received: by 2002:a17:902:8a95:: with SMTP id
- p21mr49734150plo.183.1549220140249; 
- Sun, 03 Feb 2019 10:55:40 -0800 (PST)
+ bh=JXna/PKJx8iZ1/h/UpVLA2d4bN5zqtBh3+Z+QQelLRs=;
+ b=MyYOhCugMMBqrJ+WLTw/YjBFvCJsvHqM63Gf4W+r4MSkSnG0EbNFW4xW2nk2BX+G3C
+ rMbGwfCEyKZOiMlNgWh71GjT/xEYs8S7hOq/czyWYrxUHVs7hVs3iQzReCJe4gNfdKz5
+ rKg+85dT44dZYuKosLjZbvpHssLI/XGyX2BfgmA7EGMjH3tG+NoJ8cfhXE3XjEf/QzjC
+ YUBZczxNPQZUmdwahTiCuy0aEyQVY+0nHyZn2Dh+hfdKokQf/1tISz3MBX+jbeEW6xRu
+ 7Ujd9BkBo7B2Rpi16D2aKsmgGM07JZT6rll2035Zl2Bp3RIJcaWTCgbwv53Q5D3iqnLu
+ GAeA==
+X-Gm-Message-State: AJcUukc+YQIvm6JxDfcw1e84n93LqrxdgmwPsUGUAyUpVgX38gdiCN1J
+ 0obwUj6Pgx4Dr09/B/sUzZs=
+X-Google-Smtp-Source: ALg8bN4fUwIFgj9n18VVIXKsCceVoMkcienuhAU0LGUUh8HmVQ63praAF2+1yHMch2Sr5e8Pq/B0SQ==
+X-Received: by 2002:a62:ca9c:: with SMTP id y28mr47778752pfk.236.1549220144789; 
+ Sun, 03 Feb 2019 10:55:44 -0800 (PST)
 Received: from anarsoul-thinkpad.lan (216-71-213-236.dyn.novuscom.net.
  [216.71.213.236])
- by smtp.gmail.com with ESMTPSA id g28sm19524553pfd.100.2019.02.03.10.55.39
+ by smtp.gmail.com with ESMTPSA id g28sm19524553pfd.100.2019.02.03.10.55.43
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sun, 03 Feb 2019 10:55:39 -0800 (PST)
+ Sun, 03 Feb 2019 10:55:44 -0800 (PST)
 From: Vasily Khoruzhick <anarsoul@gmail.com>
 To: David Airlie <airlied@linux.ie>, Daniel Vetter <daniel@ffwll.ch>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
@@ -86,17 +85,16 @@ To: David Airlie <airlied@linux.ie>, Daniel Vetter <daniel@ffwll.ch>,
  Icenowy Zheng <icenowy@aosc.io>, Sean Paul <seanpaul@chromium.org>,
  dri-devel@lists.freedesktop.org, devicetree@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, linux-sunxi@googlegroups.com
-Subject: [PATCH RESEND v2 06/12] drm/sun4i: rgb: Add 1% tolerance to dclk
- frequency check when bridge is connected
-Date: Sun,  3 Feb 2019 10:54:55 -0800
-Message-Id: <20190203185501.8958-7-anarsoul@gmail.com>
+Subject: [PATCH RESEND v2 09/12] drm/panel: simple: add generic eDP panel
+Date: Sun,  3 Feb 2019 10:54:58 -0800
+Message-Id: <20190203185501.8958-10-anarsoul@gmail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190203185501.8958-1-anarsoul@gmail.com>
 References: <20190203185501.8958-1-anarsoul@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190203_105541_415939_2E0E5A91 
-X-CRM114-Status: GOOD (  16.57  )
+X-CRM114-CacheID: sfid-20190203_105546_185253_D94ACC37 
+X-CRM114-Status: GOOD (  13.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -113,97 +111,32 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Clock rate check that was added in commit bb43d40d7c83 ("drm/sun4i: rgb:
-Validate the clock rate") prevents some panel and bridges from working with
-sun4i driver.
+eDP panels usually have EDID EEPROM, so there's no need to define panel
+width/height or any modes/timings in dts. But this panel still has
+regulator and backlight.
 
-Unfortunately, dotclock frequency for some modes are not achievable on
-sunxi hardware, and there's a slight deviation in rate returned by
-clk_round_rate(), so they fail this check.
-
-Experiments show that panels and bridges work fine with this slight
-deviation, e.g. Pinebook that uses ANX6345 bridge with 768p eDP panel
-requests 73 MHz, gets 72.296MHz instead (0.96% difference) and works just
-fine.
-
-This patch adds a 1% tolerence to the dot clock check when bridge is
-connected.
+Add compatible for generic eDP panel so such kind of panel can be
+defined in dts.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_rgb.c  | 16 ++++++++++------
- drivers/gpu/drm/sun4i/sun4i_tcon.h |  1 +
- 2 files changed, 11 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/panel/panel-simple.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index f4a22689eb54..3f04446120f6 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -61,6 +61,7 @@ static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
- 	u32 vsync = mode->vsync_end - mode->vsync_start;
- 	unsigned long rate = mode->clock * 1000;
- 	long rounded_rate;
-+	long tolerance = 0;
- 
- 	DRM_DEBUG_DRIVER("Validating modes...\n");
- 
-@@ -95,10 +96,14 @@ static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
- 	tcon->dclk_min_div = 6;
- 	tcon->dclk_max_div = 127;
- 	rounded_rate = clk_round_rate(tcon->dclk, rate);
--	if (rounded_rate < rate)
-+	if (tcon->bridge)
-+		/* Check against a 1% tolerance for the dot clock for bridge */
-+		tolerance = rate / 100;
-+
-+	if (rounded_rate < (rate - tolerance))
- 		return MODE_CLOCK_LOW;
- 
--	if (rounded_rate > rate)
-+	if (rounded_rate > (rate + tolerance))
- 		return MODE_CLOCK_HIGH;
- 
- 	DRM_DEBUG_DRIVER("Clock rate OK\n");
-@@ -172,7 +177,6 @@ static struct drm_encoder_funcs sun4i_rgb_enc_funcs = {
- int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
- {
- 	struct drm_encoder *encoder;
--	struct drm_bridge *bridge;
- 	struct sun4i_rgb *rgb;
- 	int ret;
- 
-@@ -183,7 +187,7 @@ int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
- 	encoder = &rgb->encoder;
- 
- 	ret = drm_of_find_panel_or_bridge(tcon->dev->of_node, 1, 0,
--					  &tcon->panel, &bridge);
-+					  &tcon->panel, &tcon->bridge);
- 	if (ret) {
- 		dev_info(drm->dev, "No panel or bridge found... RGB output disabled\n");
- 		return 0;
-@@ -225,8 +229,8 @@ int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
- 		}
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index 2f2cb2d81f2b..9698f5819930 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -2759,6 +2759,9 @@ static const struct of_device_id platform_of_match[] = {
+ 	}, {
+ 		.compatible = "winstar,wf35ltiacd",
+ 		.data = &winstar_wf35ltiacd,
++	}, {
++		.compatible = "panel-edp",
++		.data = NULL,
+ 	}, {
+ 		/* sentinel */
  	}
- 
--	if (bridge) {
--		ret = drm_bridge_attach(encoder, bridge, NULL);
-+	if (tcon->bridge) {
-+		ret = drm_bridge_attach(encoder, tcon->bridge, NULL);
- 		if (ret) {
- 			dev_err(drm->dev, "Couldn't attach our bridge\n");
- 			goto err_cleanup_connector;
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index b5214d71610f..487cb070b25c 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -258,6 +258,7 @@ struct sun4i_tcon {
- 	struct reset_control		*lvds_rst;
- 
- 	struct drm_panel		*panel;
-+	struct drm_bridge		*bridge;
- 
- 	/* Platform adjustments */
- 	const struct sun4i_tcon_quirks	*quirks;
 -- 
 2.20.1
 
