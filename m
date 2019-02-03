@@ -4,20 +4,21 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C6597C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 21:44:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3FC8FC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 21:44:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 828E82084A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 21:44:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0463B2084A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 21:44:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sO6JeOzG";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ekwuabZk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 828E82084A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CJI3c0vM";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="b71CLaUy";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="GtE8m/zJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0463B2084A
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,63 +27,79 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=F0FcIC5azFkJU2KBCG/g5/BOEDN7M6OoL+6P/bl8fwo=; b=sO6JeOzG55GeVh
-	9/rswEvjGquSLOgKYKCo52F/GPaX1CWPzEPiN0cIUStQZhs/r67RjzO5W54hSHbuz0uOYioOqIZRi
-	fG+T161JVngW3PApGYd3d7paOstrxPzU8x+8EzbQPSRPwFVa3VFH/QxNwpyvPLIt32COQ16xl7ZYz
-	yXMMPSCKM/n5QexkzbeUtbW86RCTtMmswxnZ6Q6pCBx6/NQTsi7GQdJPOShBptTQGglFfaWGBRh/p
-	lGqGktvFRPQBDRAhNx1ExfuMTKyK/PIiVRamw8Fewq9c6KTyIuKS7VqxqAVd6FWfDNWEDdHbIKcVm
-	0XZZciNy6mYyNnVe8BTQ==;
+	List-Owner; bh=nMPvwmNaAJv1RlJ4tDrJXGOQD2nv6GCaeD870qqDZj4=; b=CJI3c0vM2lbnkE
+	cyXJleQojsol+IhfDFSGKeE+fwq3V+KxCYLFoHXdBndOgzgNOcAPnLDO4m06yL9ST9txmWuQrd2M2
+	h1Y+6S79tN4k+DlmqLCssTKdzkaKVmu+jZcmGgZKZV8uGEfVJeY1a6fUyQtYBLqCt13XENw+KiCu7
+	7UdxsRukqXUwXjummqagse6+wcqF50zN4wCX/PvP//9XFN/9FzPxgU3Ig2s7sGq7mzAFjCZ2hSgsc
+	8X+FOECGlyldsXLo7zdg0fz4hGGimWoYvHWgS5p7t8Zac2sroPnCTCjGdtlzDVKEZhDOnfMTGLd4d
+	Wfrcn/X+a0sdYcEt/CDA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqPYu-0001dF-Jn; Sun, 03 Feb 2019 21:44:24 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gqPZ9-0001s4-Ck; Sun, 03 Feb 2019 21:44:39 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqPXB-0008N9-77
- for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 21:42:56 +0000
-Received: by mail-lf1-x142.google.com with SMTP id i26so8924900lfc.0
+ id 1gqPXa-0000KL-HV
+ for linux-arm-kernel@bombadil.infradead.org; Sun, 03 Feb 2019 21:43:02 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=Zx/5JxMVusTMHFnhLbV8UPjk17nKNBSljoA6c483QbE=; b=b71CLaUyIOA6hsXnGbOTUlXL4u
+ F6fdrYgFAmdaO09QXCxVJ0kbZOLWKCF0YuhwFqxvw5kviI9sYe3Zar83wMGrtyO9noP25CNSexLXi
+ FHko1kF1AFWF1pLQ9/bvslQ3OY+DktO+C10A8REuwgMbgP45wYcr4SgNqoAqPVCuMYp/2ah0hRNIl
+ ipmIav1vHBAdXACkRAt0VhzVpvGJS/5C2uDjLlpdzvYWMOTCE1etASWRspERhzi2qBib0fP+39Lxe
+ qx9i5rLjxuZz4Ji/KM8RwEFjvbgyQt9n7ghUG24jziUgIhZeBeoIwDYQjQiLZWfhCr77c6AaYitqi
+ +5l7hXaA==;
+Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqPXX-0001yM-1I
+ for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 21:43:01 +0000
+Received: by mail-lf1-x144.google.com with SMTP id z26so3156796lfj.6
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 03 Feb 2019 13:42:37 -0800 (PST)
+ Sun, 03 Feb 2019 13:42:58 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=IkKADZznkEQmQ+KwrhSzI2McdxMD2GahdXj+RHxHxTE=;
- b=ekwuabZksT42Y+d5CfIUNEHoltMCC+97velPi7omKcl1uwBhYfLbG3tdYLFzN2Tbqs
- +nM7+MIAwcklIN6oL6oeRtmh2LS34RJFL8O4ldiYlDkjlUNHIhU+5vhHdUtFeH8dewfo
- wTCofEL+U+w8QPEfsabEgANRPetXAy22/AbOY=
+ bh=Zx/5JxMVusTMHFnhLbV8UPjk17nKNBSljoA6c483QbE=;
+ b=GtE8m/zJPBYqDbyQ6xxa7TJ3hsPqf9Arbp3S5rRRsHaL4+LxJucySgxiXUlapOkRXy
+ hg1FHFp4pndHUtcduDVeOIzQxzuBwiwvRc0q1uzSdzWJRFxKuzynRmEyfye8jzzY0dCr
+ wR8igw7Zh04bLs2e28KDIFCufdllSYIjcpw5c=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=IkKADZznkEQmQ+KwrhSzI2McdxMD2GahdXj+RHxHxTE=;
- b=CcknEBjD1sVXAY3p36jQ+h2jUv4KO378SGlJiogkIlJvB3/u8jjhpSfSGBgfZtfhrZ
- 29IVWZtWcwXAN+CzdvPQ1CAEVKFxqFnafFA3kDfDrWghfzmqExAGekgd0BjbnM5OBx2T
- hZKab4hRZ1fXelQq2LozGTe90Mshb7IKO1h5CedIH6G88efXiDYqnHG8dnXM+DkOS48r
- InqMKYDpUfd6VVAse9w03Hgy+2cqbZ2SdNJEh4xDNJK9+JtTrwqSBO2xEWizR0z1dVap
- Q3iTsBTdYmArXAmHf70gjUY0dQVXVgamjuvLEExFVo862e3hfkDf+FO1A/SgaQDi2NK8
- z8pQ==
-X-Gm-Message-State: AJcUukd1XFRc2PEVvWPYYOZ7Qb9TN+ERjh9bZIPrfDW+d7I1oGctFTCu
- qXBIFgpt8hEtHIOoE+SgsOhW64CuasM=
-X-Google-Smtp-Source: ALg8bN4c+DJbiKA1FJpWfDGzyvwYYQDbdKc8SXyzkjwl9GXw5R4Uo7hBiYHOQ+QlwM87+gHfdwRymA==
-X-Received: by 2002:ac2:42c5:: with SMTP id n5mr28711193lfl.115.1549230155206; 
- Sun, 03 Feb 2019 13:42:35 -0800 (PST)
+ bh=Zx/5JxMVusTMHFnhLbV8UPjk17nKNBSljoA6c483QbE=;
+ b=QJWlzFoVDWvb12GNra+X+i6RA2UI2h/HEtzs3uuOvthCQf4IMfevE7av3+YEZjXb3g
+ u1qOo277Jv36O9Qqzzd59ag13cdV/wKHYnvcZHf5lOTvBlQI49DbboX3/tNsbiyk1gpM
+ y3lKPax+VFtUhGqp7nNeQXpxXleswpiRQKEER8J4ZOhKWzl1i9B9X2NSTIOU6YfxDw/m
+ GPeAKAFMsNjLFg6nxNPKNNzJvLwB38d+GSVrJJyL0ffC0A9OYwlwVlZHsnSgF+zjEyFl
+ syuBLUesZlDTovqbYXgu8Ldpi7ZabWjaIzf75oPGojz+dj7Q0XNrTq2yq/wmpkCJ4zY4
+ oKmw==
+X-Gm-Message-State: AHQUAuYDCaySog+Db+TWTwXSEQnC1Iwu7iFS0h/C5jyd0Xi6jp8nu61Q
+ j4eQ432oC9DPGGK5W5dj7HIW+Hq1JkA=
+X-Google-Smtp-Source: AHgI3IZZhBn61wDmJWEHSk8LtGfvhjU3UR/V+5IftNV/PcnykGOVP3igq48v0VDDYkz9KH5YdDphfQ==
+X-Received: by 2002:a19:9bc2:: with SMTP id d185mr2045768lfe.21.1549230174671; 
+ Sun, 03 Feb 2019 13:42:54 -0800 (PST)
 Received: from linux.local (c-ae7b71d5.014-348-6c756e10.bbcust.telenor.se.
  [213.113.123.174])
- by smtp.gmail.com with ESMTPSA id 85-v6sm2456868lja.16.2019.02.03.13.42.33
+ by smtp.gmail.com with ESMTPSA id 85-v6sm2456868lja.16.2019.02.03.13.42.53
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Sun, 03 Feb 2019 13:42:34 -0800 (PST)
+ Sun, 03 Feb 2019 13:42:53 -0800 (PST)
 From: Linus Walleij <linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org, Imre Kaloz <kaloz@openwrt.org>,
  Krzysztof Halasa <khalasa@piap.pl>
-Subject: [PATCH 07/17 v1] clocksource/drivers/ixp4xx: Add driver
-Date: Sun,  3 Feb 2019 22:41:55 +0100
-Message-Id: <20190203214205.13594-8-linus.walleij@linaro.org>
+Subject: [PATCH 16/17 v1] ARM: ixp4xx: Add device tree boot support
+Date: Sun,  3 Feb 2019 22:42:04 +0100
+Message-Id: <20190203214205.13594-17-linus.walleij@linaro.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190203214205.13594-1-linus.walleij@linaro.org>
 References: <20190203214205.13594-1-linus.walleij@linaro.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190203_134238_493060_611546AD 
-X-CRM114-Status: GOOD (  20.72  )
+X-CRM114-CacheID: sfid-20190203_214259_101125_9A6944FE 
+X-CRM114-Status: GOOD (  27.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,352 +111,234 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, Tim Harvey <tharvey@gateworks.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>, Olof Johansson <olof@lixom.net>,
- Thomas Gleixner <tglx@linutronix.de>, Linus Walleij <linus.walleij@linaro.org>
+Cc: Olof Johansson <olof@lixom.net>, Tim Harvey <tharvey@gateworks.com>,
+ Linus Walleij <linus.walleij@linaro.org>, Arnd Bergmann <arnd@arndb.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This adds a new slightly rewritten timer driver for the
-Intel IXP4xx clocksource, clockevent and delay timer.
+This adds a minimal support for booting IXP4xx systems
+from device tree.
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
+We have to add hacks to the QMGR, NPE and notably also
+ethernet and watchdog drivers so that they don't crash
+the platform: these drivers are unconditionally starting
+to grab regions of statically remapped IO space with no
+concern of the device model or other platforms.
+
+We will go in and properly fix these drivers as we go
+along but for now this hack gets us to a place where we
+can start working on proper device tree support for these
+platforms.
+
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Clocksource/timer maintainers: I am requesting an ACK for
-this once you're happy with the driver, as I intend to
-merge all of this IXP4xx rework through ARM SoC.
----
- MAINTAINERS                                |   2 +
- drivers/clocksource/Kconfig                |   7 +
- drivers/clocksource/Makefile               |   1 +
- drivers/clocksource/timer-ixp4xx.c         | 249 +++++++++++++++++++++
- include/linux/platform_data/timer-ixp4xx.h |  11 +
- 5 files changed, 270 insertions(+)
- create mode 100644 drivers/clocksource/timer-ixp4xx.c
- create mode 100644 include/linux/platform_data/timer-ixp4xx.h
+ arch/arm/mach-ixp4xx/Kconfig             | 14 +++++++
+ arch/arm/mach-ixp4xx/Makefile            |  3 ++
+ arch/arm/mach-ixp4xx/ixp4xx-of.c         | 49 ++++++++++++++++++++++++
+ arch/arm/mach-ixp4xx/ixp4xx_npe.c        |  5 +++
+ arch/arm/mach-ixp4xx/ixp4xx_qmgr.c       |  5 +++
+ drivers/net/ethernet/xscale/ixp4xx_eth.c | 10 +++++
+ drivers/watchdog/ixp4xx_wdt.c            |  9 +++++
+ 7 files changed, 95 insertions(+)
+ create mode 100644 arch/arm/mach-ixp4xx/ixp4xx-of.c
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6c161bd82238..a2fb67b75026 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1651,9 +1651,11 @@ M:	Krzysztof Halasa <khalasa@piap.pl>
- L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-ixp4xx/
-+F:	drivers/clocksource/timer-ixp4xx.c
- F:	drivers/gpio/gpio-ixp4xx.c
- F:	drivers/irqchip/irq-ixp4xx.c
- F:	include/linux/irqchip/irq-ixp4xx.h
-+F:	include/linux/platform_data/timer-ixp4xx.h
+diff --git a/arch/arm/mach-ixp4xx/Kconfig b/arch/arm/mach-ixp4xx/Kconfig
+index fea008123eb1..0973270f4863 100644
+--- a/arch/arm/mach-ixp4xx/Kconfig
++++ b/arch/arm/mach-ixp4xx/Kconfig
+@@ -4,6 +4,20 @@ menu "Intel IXP4xx Implementation Options"
  
- ARM/INTEL RESEARCH IMOTE/STARGATE 2 MACHINE SUPPORT
- M:	Jonathan Cameron <jic23@cam.ac.uk>
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index a9e26f6a81a1..d290d6c6576d 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -69,6 +69,13 @@ config FTTMR010_TIMER
- 	  Enables support for the Faraday Technology timer block
- 	  FTTMR010.
+ comment "IXP4xx Platforms"
  
-+config IXP4XX_TIMER
-+	bool "Intel XScale IXP4xx timer driver" if COMPILE_TEST
-+	depends on HAS_IOMEM
-+	select CLKSRC_MMIO
++config MACH_IXP4XX_OF
++	bool
++	prompt "Devce Tree IXP4xx boards"
++	default y
++	select ARM_APPENDED_DTB # Old Redboot bootloaders deployed
++	select I2C
++	select I2C_IOP3XX
++	select PCI
++	select SERIAL_OF_PLATFORM
++	select TIMER_OF
++	select USE_OF
 +	help
-+	  Enables support for the Intel XScale IXP4xx SoC timer.
++	  Say 'Y' here to support Device Tree-based IXP4xx platforms.
 +
- config ROCKCHIP_TIMER
- 	bool "Rockchip timer driver" if COMPILE_TEST
- 	depends on ARM || ARM64
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index cdd210ff89ea..18158257ebb3 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -20,6 +20,7 @@ obj-$(CONFIG_OMAP_DM_TIMER)	+= timer-ti-dm.o
- obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
- obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
- obj-$(CONFIG_FTTMR010_TIMER)	+= timer-fttmr010.o
-+obj-$(CONFIG_IXP4XX_TIMER)	+= timer-ixp4xx.o
- obj-$(CONFIG_ROCKCHIP_TIMER)      += timer-rockchip.o
- obj-$(CONFIG_CLKSRC_NOMADIK_MTU)	+= nomadik-mtu.o
- obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
-diff --git a/drivers/clocksource/timer-ixp4xx.c b/drivers/clocksource/timer-ixp4xx.c
+ config MACH_NSLU2
+ 	bool
+ 	prompt "Linksys NSLU2"
+diff --git a/arch/arm/mach-ixp4xx/Makefile b/arch/arm/mach-ixp4xx/Makefile
+index f09994500a34..5f63b3012826 100644
+--- a/arch/arm/mach-ixp4xx/Makefile
++++ b/arch/arm/mach-ixp4xx/Makefile
+@@ -6,6 +6,9 @@
+ obj-pci-y	:=
+ obj-pci-n	:=
+ 
++# Device tree platform
++obj-pci-$(CONFIG_MACH_IXP4XX_OF)	+= ixp4xx-of.o
++
+ obj-pci-$(CONFIG_ARCH_IXDP4XX)		+= ixdp425-pci.o
+ obj-pci-$(CONFIG_MACH_AVILA)		+= avila-pci.o
+ obj-pci-$(CONFIG_MACH_IXDPG425)		+= ixdpg425-pci.o
+diff --git a/arch/arm/mach-ixp4xx/ixp4xx-of.c b/arch/arm/mach-ixp4xx/ixp4xx-of.c
 new file mode 100644
-index 000000000000..fa78f80792db
+index 000000000000..17540fb9b5e7
 --- /dev/null
-+++ b/drivers/clocksource/timer-ixp4xx.c
-@@ -0,0 +1,249 @@
++++ b/arch/arm/mach-ixp4xx/ixp4xx-of.c
+@@ -0,0 +1,49 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * IXP4 timer driver
-+ * Copyright (C) 2019 Linus Walleij <linus.walleij@linaro.org>
-+ *
-+ * Based on arch/arm/mach-ixp4xx/common.c
-+ * Copyright 2002 (C) Intel Corporation
-+ * Copyright 2003-2004 (C) MontaVista, Software, Inc.
-+ * Copyright (C) Deepak Saxena <dsaxena@plexity.net>
++ * IXP4xx Device Tree boot support
 + */
-+#include <linux/interrupt.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
 +#include <linux/io.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/sched_clock.h>
-+#include <linux/slab.h>
-+#include <linux/bitops.h>
-+#include <linux/delay.h>
-+/* Goes away with OF conversion */
-+#include <linux/platform_data/timer-ixp4xx.h>
 +
-+/*
-+ * Constants to make it easy to access Timer Control/Status registers
-+ */
-+#define IXP4XX_OSTS_OFFSET	0x00  /* Continuous Timestamp */
-+#define IXP4XX_OST1_OFFSET	0x04  /* Timer 1 Timestamp */
-+#define IXP4XX_OSRT1_OFFSET	0x08  /* Timer 1 Reload */
-+#define IXP4XX_OST2_OFFSET	0x0C  /* Timer 2 Timestamp */
-+#define IXP4XX_OSRT2_OFFSET	0x10  /* Timer 2 Reload */
-+#define IXP4XX_OSWT_OFFSET	0x14  /* Watchdog Timer */
-+#define IXP4XX_OSWE_OFFSET	0x18  /* Watchdog Enable */
-+#define IXP4XX_OSWK_OFFSET	0x1C  /* Watchdog Key */
-+#define IXP4XX_OSST_OFFSET	0x20  /* Timer Status */
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
 +
-+/*
-+ * Timer register values and bit definitions
-+ */
-+#define IXP4XX_OST_ENABLE		0x00000001
-+#define IXP4XX_OST_ONE_SHOT		0x00000002
-+/* Low order bits of reload value ignored */
-+#define IXP4XX_OST_RELOAD_MASK		0x00000003
-+#define IXP4XX_OST_DISABLED		0x00000000
-+#define IXP4XX_OSST_TIMER_1_PEND	0x00000001
-+#define IXP4XX_OSST_TIMER_2_PEND	0x00000002
-+#define IXP4XX_OSST_TIMER_TS_PEND	0x00000004
-+#define IXP4XX_OSST_TIMER_WDOG_PEND	0x00000008
-+#define IXP4XX_OSST_TIMER_WARM_RESET	0x00000010
++#include <mach/hardware.h>
 +
-+#define	IXP4XX_WDT_KEY			0x0000482E
-+#define	IXP4XX_WDT_RESET_ENABLE		0x00000001
-+#define	IXP4XX_WDT_IRQ_ENABLE		0x00000002
-+#define	IXP4XX_WDT_COUNT_ENABLE		0x00000004
-+
-+struct ixp4xx_timer {
-+	void __iomem *base;
-+	unsigned int tick_rate;
-+	u32 latch;
-+	struct clock_event_device clkevt;
-+#ifdef CONFIG_ARM
-+	struct delay_timer delay_timer;
-+#endif
++#ifdef CONFIG_DEBUG_UART_8250
++/* This is needed for LL-debug/earlyprintk/debug-macro.S */
++static struct map_desc ixp4xx_of_io_desc[] __initdata = {
++	{
++		.virtual = CONFIG_DEBUG_UART_VIRT,
++		.pfn = __phys_to_pfn(CONFIG_DEBUG_UART_PHYS),
++		.length = SZ_4K,
++		.type = MT_DEVICE,
++	},
 +};
 +
-+/*
-+ * A local singleton used by sched_clock and delay timer reads, which are
-+ * fast and stateless
-+ */
-+static struct ixp4xx_timer *local_ixp4xx_timer;
-+
-+static inline struct ixp4xx_timer *
-+to_ixp4xx_timer(struct clock_event_device *evt)
++static void __init ixp4xx_of_map_io(void)
 +{
-+	return container_of(evt, struct ixp4xx_timer, clkevt);
++	iotable_init(ixp4xx_of_io_desc, ARRAY_SIZE(ixp4xx_of_io_desc));
 +}
-+
-+static u64 notrace ixp4xx_read_sched_clock(void)
-+{
-+	return __raw_readl(local_ixp4xx_timer->base + IXP4XX_OSTS_OFFSET);
-+}
-+
-+static u64 ixp4xx_clocksource_read(struct clocksource *c)
-+{
-+	return __raw_readl(local_ixp4xx_timer->base + IXP4XX_OSTS_OFFSET);
-+}
-+
-+static irqreturn_t ixp4xx_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct ixp4xx_timer *tmr = dev_id;
-+	struct clock_event_device *evt = &tmr->clkevt;
-+
-+	/* Clear Pending Interrupt */
-+	__raw_writel(IXP4XX_OSST_TIMER_1_PEND,
-+		     tmr->base + IXP4XX_OSST_OFFSET);
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int ixp4xx_set_next_event(unsigned long cycles,
-+				 struct clock_event_device *evt)
-+{
-+	struct ixp4xx_timer *tmr = to_ixp4xx_timer(evt);
-+	u32 val;
-+
-+	val = __raw_readl(tmr->base + IXP4XX_OSRT1_OFFSET);
-+	/* Keep enable/oneshot bits */
-+	val &= IXP4XX_OST_RELOAD_MASK;
-+	__raw_writel((cycles & ~IXP4XX_OST_RELOAD_MASK) | val,
-+		     tmr->base + IXP4XX_OSRT1_OFFSET);
-+
-+	return 0;
-+}
-+
-+static int ixp4xx_shutdown(struct clock_event_device *evt)
-+{
-+	struct ixp4xx_timer *tmr = to_ixp4xx_timer(evt);
-+	u32 val;
-+
-+	val = __raw_readl(tmr->base + IXP4XX_OSRT1_OFFSET);
-+	val &= ~IXP4XX_OST_ENABLE;
-+	__raw_writel(val, tmr->base + IXP4XX_OSRT1_OFFSET);
-+
-+	return 0;
-+}
-+
-+static int ixp4xx_set_oneshot(struct clock_event_device *evt)
-+{
-+	struct ixp4xx_timer *tmr = to_ixp4xx_timer(evt);
-+
-+	__raw_writel(IXP4XX_OST_ENABLE | IXP4XX_OST_ONE_SHOT,
-+		     tmr->base + IXP4XX_OSRT1_OFFSET);
-+
-+	return 0;
-+}
-+
-+static int ixp4xx_set_periodic(struct clock_event_device *evt)
-+{
-+	struct ixp4xx_timer *tmr = to_ixp4xx_timer(evt);
-+	u32 val;
-+
-+	val = tmr->latch & ~IXP4XX_OST_RELOAD_MASK;
-+	val |= IXP4XX_OST_ENABLE;
-+	__raw_writel(val, tmr->base + IXP4XX_OSRT1_OFFSET);
-+
-+	return 0;
-+}
-+
-+static int ixp4xx_resume(struct clock_event_device *evt)
-+{
-+	struct ixp4xx_timer *tmr = to_ixp4xx_timer(evt);
-+	u32 val;
-+
-+	val = __raw_readl(tmr->base + IXP4XX_OSRT1_OFFSET);
-+	val |= IXP4XX_OST_ENABLE;
-+	__raw_writel(val, tmr->base + IXP4XX_OSRT1_OFFSET);
-+
-+	return 0;
-+}
++#else
++#define ixp4xx_of_map_io NULL
++#endif
 +
 +/*
-+ * IXP4xx timer tick
-+ * We use OS timer1 on the CPU for the timer tick and the timestamp
-+ * counter as a source of real clock ticks to account for missed jiffies.
++ * We handle 4 differen SoC families. These compatible strings are enough
++ * to provide the core so that different boards can add their more detailed
++ * specifics.
 + */
-+static __init int ixp4xx_timer_register(void __iomem *base,
-+					int timer_irq,
-+					unsigned int timer_freq)
-+{
-+	struct ixp4xx_timer *tmr;
-+	int ret;
++static const char *ixp4xx_of_board_compat[] = {
++	"intel,ixp42x",
++	"intel,ixp43x",
++	"intel,ixp45x",
++	"intel,ixp46x",
++	NULL,
++};
 +
-+	tmr = kzalloc(sizeof(*tmr), GFP_KERNEL);
-+	if (!tmr)
-+		return -ENOMEM;
-+	tmr->base = base;
-+	tmr->tick_rate = timer_freq;
++DT_MACHINE_START(IXP4XX_DT, "IXP4xx (Device Tree)")
++	.map_io		= ixp4xx_of_map_io,
++	.dt_compat	= ixp4xx_of_board_compat,
++MACHINE_END
+diff --git a/arch/arm/mach-ixp4xx/ixp4xx_npe.c b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
+index d4eb09a62863..e0ce22cd9bfc 100644
+--- a/arch/arm/mach-ixp4xx/ixp4xx_npe.c
++++ b/arch/arm/mach-ixp4xx/ixp4xx_npe.c
+@@ -20,6 +20,7 @@
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <mach/npe.h>
+ 
+ #define DEBUG_MSG			0
+@@ -688,6 +689,10 @@ static int __init npe_init_module(void)
+ 
+ 	int i, found = 0;
+ 
++	/* This driver does not work with device tree */
++	if (of_have_populated_dt())
++		return -ENODEV;
++
+ 	for (i = 0; i < NPE_COUNT; i++) {
+ 		struct npe *npe = &npe_tab[i];
+ 		if (!(ixp4xx_read_feature_bits() &
+diff --git a/arch/arm/mach-ixp4xx/ixp4xx_qmgr.c b/arch/arm/mach-ixp4xx/ixp4xx_qmgr.c
+index 4c7c960e1b4c..2665347a2c6f 100644
+--- a/arch/arm/mach-ixp4xx/ixp4xx_qmgr.c
++++ b/arch/arm/mach-ixp4xx/ixp4xx_qmgr.c
+@@ -12,6 +12,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <mach/qmgr.h>
+ 
+ #include "irqs.h"
+@@ -289,6 +290,10 @@ static int qmgr_init(void)
+ 	int i, err;
+ 	irq_handler_t handler1, handler2;
+ 
++	/* This driver does not work with device tree */
++	if (of_have_populated_dt())
++		return -ENODEV;
++
+ 	mem_res = request_mem_region(IXP4XX_QMGR_BASE_PHYS,
+ 				     IXP4XX_QMGR_REGION_SIZE,
+ 				     "IXP4xx Queue Manager");
+diff --git a/drivers/net/ethernet/xscale/ixp4xx_eth.c b/drivers/net/ethernet/xscale/ixp4xx_eth.c
+index aee55c03def0..7ad3c3b56a77 100644
+--- a/drivers/net/ethernet/xscale/ixp4xx_eth.c
++++ b/drivers/net/ethernet/xscale/ixp4xx_eth.c
+@@ -31,6 +31,7 @@
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+ #include <linux/net_tstamp.h>
++#include <linux/of.h>
+ #include <linux/phy.h>
+ #include <linux/platform_device.h>
+ #include <linux/ptp_classify.h>
+@@ -1497,6 +1498,15 @@ static struct platform_driver ixp4xx_eth_driver = {
+ static int __init eth_init_module(void)
+ {
+ 	int err;
 +
 +	/*
-+	 * The timer register doesn't allow to specify the two least
-+	 * significant bits of the timeout value and assumes them being zero.
-+	 * So make sure the latch is the best value with the two least
-+	 * significant bits unset.
++	 * FIXME: we bail out on device tree boot but this really needs
++	 * to be fixed in a nicer way: this registers the MDIO bus before
++	 * even matching the driver infrastructure, we should only probe
++	 * detected hardware.
 +	 */
-+	tmr->latch = DIV_ROUND_CLOSEST(timer_freq,
-+				       (IXP4XX_OST_RELOAD_MASK + 1) * HZ)
-+		* (IXP4XX_OST_RELOAD_MASK + 1);
-+
-+	local_ixp4xx_timer = tmr;
-+
-+	/* Reset/disable counter */
-+	__raw_writel(0, tmr->base + IXP4XX_OSRT1_OFFSET);
-+
-+	/* Clear any pending interrupt on timer 1 */
-+	__raw_writel(IXP4XX_OSST_TIMER_1_PEND,
-+		     tmr->base + IXP4XX_OSST_OFFSET);
-+
-+	/* Reset time-stamp counter */
-+	__raw_writel(0, tmr->base + IXP4XX_OSTS_OFFSET);
-+
-+	clocksource_mmio_init(NULL, "OSTS", timer_freq, 200, 32,
-+			      ixp4xx_clocksource_read);
-+
-+	tmr->clkevt.name = "ixp4xx timer1";
-+	tmr->clkevt.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
-+	tmr->clkevt.rating = 200;
-+	tmr->clkevt.set_state_shutdown = ixp4xx_shutdown;
-+	tmr->clkevt.set_state_periodic = ixp4xx_set_periodic;
-+	tmr->clkevt.set_state_oneshot = ixp4xx_set_oneshot;
-+	tmr->clkevt.tick_resume = ixp4xx_resume;
-+	tmr->clkevt.set_next_event = ixp4xx_set_next_event;
-+	tmr->clkevt.cpumask = cpumask_of(0);
-+	tmr->clkevt.irq = timer_irq;
-+	ret = request_irq(timer_irq, ixp4xx_timer_interrupt,
-+			  IRQF_TIMER, "IXP4XX-TIMER1", tmr);
-+	if (ret) {
-+		pr_crit("no timer IRQ\n");
++	if (of_have_populated_dt())
 +		return -ENODEV;
-+	}
-+	clockevents_config_and_register(&tmr->clkevt, timer_freq,
-+					0xf, 0xfffffffe);
-+
-+#ifdef CONFIG_ARM
-+	sched_clock_register(ixp4xx_read_sched_clock, 32, timer_freq);
-+#endif
-+
-+	return 0;
-+}
-+
-+/**
-+ * ixp4xx_timer_setup() - Timer setup function to be called from boardfiles
-+ * @timerbase: physical base of timer block
-+ * @timer_irq: Linux IRQ number for the timer
-+ * @timer_freq: Fixed frequency of the timer
-+ */
-+void __init ixp4xx_timer_setup(resource_size_t timerbase,
-+			       int timer_irq,
-+			       unsigned int timer_freq)
-+{
-+	void __iomem *base;
-+
-+	base = ioremap(timerbase, 0x100);
-+	if (!base) {
-+		pr_crit("IXP4xx: can't remap timer\n");
-+		return;
-+	}
-+	ixp4xx_timer_register(base, timer_irq, timer_freq);
-+}
-+EXPORT_SYMBOL_GPL(ixp4xx_timer_setup);
-diff --git a/include/linux/platform_data/timer-ixp4xx.h b/include/linux/platform_data/timer-ixp4xx.h
-new file mode 100644
-index 000000000000..ee92ae7edaed
---- /dev/null
-+++ b/include/linux/platform_data/timer-ixp4xx.h
-@@ -0,0 +1,11 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+#ifndef __TIMER_IXP4XX_H
-+#define __TIMER_IXP4XX_H
-+
-+#include <linux/ioport.h>
-+
-+void __init ixp4xx_timer_setup(resource_size_t timerbase,
-+			       int timer_irq,
-+			       unsigned int timer_freq);
-+
-+#endif
+ 	if ((err = ixp4xx_mdio_register()))
+ 		return err;
+ 	return platform_driver_register(&ixp4xx_eth_driver);
+diff --git a/drivers/watchdog/ixp4xx_wdt.c b/drivers/watchdog/ixp4xx_wdt.c
+index f20cc53ff719..a80449bb36f0 100644
+--- a/drivers/watchdog/ixp4xx_wdt.c
++++ b/drivers/watchdog/ixp4xx_wdt.c
+@@ -21,6 +21,7 @@
+ #include <linux/kernel.h>
+ #include <linux/fs.h>
+ #include <linux/miscdevice.h>
++#include <linux/of.h>
+ #include <linux/watchdog.h>
+ #include <linux/init.h>
+ #include <linux/bitops.h>
+@@ -176,6 +177,14 @@ static int __init ixp4xx_wdt_init(void)
+ {
+ 	int ret;
+ 
++	/*
++	 * FIXME: we bail out on device tree boot but this really needs
++	 * to be fixed in a nicer way: this registers the MDIO bus before
++	 * even matching the driver infrastructure, we should only probe
++	 * detected hardware.
++	 */
++	if (of_have_populated_dt())
++		return -ENODEV;
+ 	if (!(read_cpuid_id() & 0xf) && !cpu_is_ixp46x()) {
+ 		pr_err("Rev. A0 IXP42x CPU detected - watchdog disabled\n");
+ 
 -- 
 2.20.1
 
