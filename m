@@ -6,50 +6,52 @@ X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7BA0AC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 15:57:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 68659C282DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 15:59:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4AAEF217D6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 15:57:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 373AA217D6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 15:59:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i/iQ+KWv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4AAEF217D6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l/QsF7Pb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 373AA217D6
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=5vOJSkwD6XC0fr8Ywc7bc8jVpDXlJJARXgsFAFKCeL4=; b=i/iQ+KWvc/Idk7
-	p00jB/rd4nUIfK3BjJZOPGlliwKryAxzUQMyurFfVvJFYdMGx5R7WmiXE5Tir1vA9PxX6F+emI2CT
-	6fMKRr9GLZZP5EHd82o1eYVJWqdqsIP6ijV9LzKX9n/hIyanNCoT2/SfHUnLkrQ9eeH36dtg+5r26
-	rVLbugOyIKuo9vHZmX6KwyXxbxnxKsGGxt4ftIfQpeK0UWHr7b1QWzkxnutqXlPPbcMzbS9y/14p2
-	MeQUGTugP8AEqz3YHDXS6RKdZ/8vdhb9sxaNmycq+bMAae12eSC6hvaRwlBhWxrzqg8EBN4sd6c1o
-	hAI5fcPm6zyqTzQ2/1AA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=nl5gt8tiB+zjLCLo280qPgUv7WHeA039N+LQObXQXY0=; b=l/QsF7Pb4l3wv4
+	glVGYMeERZaHy0mYyvz411ujvDpSnl+U6igss6vSPilvkp+wwVctoBTo9C51BS0ZEpl1MkmTA96oP
+	6TcPm+QvN1zLKXtJN1LrzSrybtrJmwGo/RBazz5MYffbSRjMkxF9OiCOltXdc3D01iAOnk+fh0lnU
+	xuR4Ue+HYIOiN6fh8AZesQ1HdpeCj5nXA+B/+X1tcgTPH2eFNeBWd0QEIi5dzMaNmZaU5D8h0nWb5
+	CbR23qjJoVSWJ8Z4ouj5pqMvpOnzmV9pHi1VIdYYD6NCSednXAbkM33bua08kyUNAwCcHbsBChRpH
+	7TofIVq1K6DgKQI4RNMA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqK96-0001g2-Eq; Sun, 03 Feb 2019 15:57:24 +0000
+	id 1gqKBQ-0002DG-Eu; Sun, 03 Feb 2019 15:59:48 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqK8N-0000x5-7Y
- for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 15:56:42 +0000
+ id 1gqKBM-0002Cu-RF
+ for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 15:59:46 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 804845FD06; Sun,  3 Feb 2019 23:56:28 +0800 (CST)
+ id B44D25FD06; Sun,  3 Feb 2019 23:59:43 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Ulf Hansson <ulf.hansson@linaro.org>,
  Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: mmc: sunxi: Fix eMMC usage on H5 boards
-Date: Sun,  3 Feb 2019 23:56:25 +0800
-Message-Id: <20190203155628.16767-1-wens@csie.org>
+Subject: [PATCH 0/3] mmc: sunxi: Fix eMMC usage on H5 boards
+Date: Sun,  3 Feb 2019 23:59:40 +0800
+Message-Id: <20190203155940.18977-1-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190203155628.16767-1-wens@csie.org>
+References: <20190203155628.16767-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190203_075639_411314_05ECFA25 
-X-CRM114-Status: GOOD (  13.58  )
+X-CRM114-CacheID: sfid-20190203_075945_140576_193AA660 
+X-CRM114-Status: GOOD (  14.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,6 +71,8 @@ Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
+
+(Resent with proper subject tag.)
 
 Hi everyone,
 
