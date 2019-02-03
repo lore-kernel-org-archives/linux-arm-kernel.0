@@ -2,57 +2,59 @@ Return-Path: <SRS0=H3s0=QK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 97C15C282DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 16:04:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C3BD0C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 16:04:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5C3AE218F0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 16:04:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8279421841
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 16:04:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="beqefetd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5C3AE218F0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CE9vZXW3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8279421841
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=2xyoyxPcKGduF08qBQpAZ1K5AlaFVj1jxnCpVio6ExY=; b=beqefetdFxiE5k
-	XNSq8YMbZSmzeJMJ4vxWQ6dC3BMkBPoZkezNL9+stSf+IvDh5dkKlsyCQFEPXHOng2JX7p58Lf7vC
-	WSW/lFrW4bA7VjYle29Akay8m+z6cYtYzlULaAsuc0N+DFsWVEhyu05Xjd3qOYqQfjOZxdzmLxhh+
-	9j5OLv0W7ny/ScE4vliV23nEKI7iqlfjmSLfm1uM9L1c5CnBVMnThGBB2YAMihURSsHofHu+bF117
-	P37guP3iQBe4aNq1Fl+BNA/P3VCaACggMWVYwfUbOm3cDo4Xitlu5hhr067hCxKjnB4zdiZWSl355
-	13PS/Ksko1hzEV6o8vmw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=OUPeVNbJeOmZYhtbMmWfUZsQY6YBnrapOXNuxsPv2SE=; b=CE9vZXW3YlN2rs
+	igLdem0Mc+X+FsOtyqolluNa/3Et0q35e8OaZqgbq1Aotv56Xx1aZk8xffqZaTOPVaJnN87pdQrYD
+	RO//ddVLSJHqem8yOdty/vRho1zwruy/4MwC4URikvkCdKh4pNdBkXagAp7BjxYzJloW3y/iv37GR
+	fEwYn47B9LwSOhmIc2lL5djWwN5EQa0Cqpe4CsfiW+Uh+GXOVPv6UpBQUTP/cU2xKR+0Wg/icAwQx
+	9RvjpmVb18eUfuAaozbl+UpjuDud3UfTODF0WzZH5yhTMntOXXFWHHnRKyZe8SB48xzj7hXwUOZmL
+	oJ1zYSVl9ZRgI62EO2oQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqKFa-0003ye-OP; Sun, 03 Feb 2019 16:04:06 +0000
+	id 1gqKFk-00047j-5w; Sun, 03 Feb 2019 16:04:16 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqKFX-0003xP-65
+ id 1gqKFX-0003xO-63
  for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 16:04:04 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 9547A5FD06; Mon,  4 Feb 2019 00:04:01 +0800 (CST)
+ id 9E56B5FB7A; Mon,  4 Feb 2019 00:04:01 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Yong Deng <yong.deng@magewell.com>,
  Maxime Ripard <maxime.ripard@bootlin.com>,
  Mauro Carvalho Chehab <mchehab@kernel.org>,
  Sakari Ailus <sakari.ailus@linux.intel.com>
-Subject: [PATCH 0/3] media: sun6i: One regmap fix and support RGB565 and JPEG
-Date: Mon,  4 Feb 2019 00:03:55 +0800
-Message-Id: <20190203160358.21050-1-wens@csie.org>
+Subject: [PATCH 1/3] media: sun6i: Fix CSI regmap's max_register
+Date: Mon,  4 Feb 2019 00:03:56 +0800
+Message-Id: <20190203160358.21050-2-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190203160358.21050-1-wens@csie.org>
+References: <20190203160358.21050-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190203_080403_369000_DE14CB6C 
-X-CRM114-Status: UNSURE (   8.78  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190203_080403_360326_D47D4A33 
+X-CRM114-Status: GOOD (  13.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,44 +66,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Chen-Yu Tsai <wens@csie.org>, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Cc: stable@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi everyone,
+max_register is currently set to 0x1000. This is beyond the mapped
+address range of the hardware, so attempts to dump the regmap from
+debugfs would trigger a kernel exception.
 
-This series is adds support for two (three if you count big / little
-endian) media bus formats to the sun6i-csi driver. There's also a small
-fix for an exception I encountered while working on this.
+Furthermore, the useful registers only occupy a small section at the
+beginning of the full range. Change the value to 0x9c, the last known
+register on the V3s and H3.
 
-Both modes were tested using an OV5640 sensor. To use JPEG, the patch
-"media: ov5640: Set JPEG output timings when outputting JPEG data" from
-my "media: ov5640: JPEG and test pattern improvements" series is also
-needed.
+On the A31, the register range is extended to support additional
+capture channels. Since this is not yet supported, ignore it for now.
 
-I prepared this series on 1/18, alone with the "media: ov5640: Set JPEG
-output timings when outputting JPEG data", but ended up forgetting to
-send out this one.
+Fixes: 5cc7522d8965 ("media: sun6i: Add support for Allwinner CSI V3s")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Please have a look.
-
-
-Regards
-ChenYu
-
-Chen-Yu Tsai (3):
-  media: sun6i: Fix CSI regmap's max_register
-  media: sun6i: Add support for RGB565 formats
-  media: sun6i: Add support for JPEG media bus format
-
- .../platform/sunxi/sun6i-csi/sun6i_csi.c      | 27 ++++++++++++++++---
- .../platform/sunxi/sun6i-csi/sun6i_csi.h      |  3 +++
- .../platform/sunxi/sun6i-csi/sun6i_video.c    |  3 +++
- 3 files changed, 30 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+index ee882b66a5ea..332cf81a7ecf 100644
+--- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
++++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+@@ -793,7 +793,7 @@ static const struct regmap_config sun6i_csi_regmap_config = {
+ 	.reg_bits       = 32,
+ 	.reg_stride     = 4,
+ 	.val_bits       = 32,
+-	.max_register	= 0x1000,
++	.max_register	= 0x9c,
+ };
+ 
+ static int sun6i_csi_resource_request(struct sun6i_csi_dev *sdev,
 -- 
 2.20.1
 
