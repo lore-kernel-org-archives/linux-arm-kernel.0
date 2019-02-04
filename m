@@ -2,68 +2,82 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D698DC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:30:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CC217C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:39:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A929F2083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:30:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 801042087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:39:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eoPjRVsa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A929F2083B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=aosc.io
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UwUWmkCY";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="eD+kEoOq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 801042087C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-ID:From:To:Subject:MIME-Version
-	:References:In-Reply-To:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iTD+inB9xCg86DbEK8S7EExqpK3itwVBHk1vdWNeMGs=; b=eoPjRVsacjpbW6
-	y84EfpkPq9hSxecOvrBiw3fdoOOIJz17YpHVnIsYUg/bbHkpmnLNk8KZIFbmGozmfctfTMCWQpV8Z
-	TrMYUd6ng1sxGMXvjTc/lDkikgv7P1k356mLZM9LLxn+ziLyAF7za0eXKMOMedWi6B+01p2ZqTLJ/
-	aOtArCa/DUwEGQTc2GHP+Otcip4QGgw81LniDh6Ta8ak4Y2bdC1Tl/ihGXTRx4adGQrQlW7VhhTIk
-	v8JGViRye6UzbBQntSptsnqSYz5c+FKz1r87BlGm/jpZGafvc63V2ky7UffKvvItwl99WzVO9tLRn
-	csJMtXqZI9DX8tG+gdXw==;
+	List-Owner; bh=7l2idyi2zD/pkkmCjIwukL3AhehfgiUYp6OSN0xolWU=; b=UwUWmkCYjiZVks
+	CF17vqHs/xVI7u62hwY307tFT8yHtCB/YbQG6hyrUZHyCgdhwUWlqTfbO52pAwZ+7tsGYgKwX4zhC
+	Ji6w1uB1ZL2h+FAVfQ52Lny2uC7QMoAAtYCv5t+MaWL3H7Y0YQoSZEr572JnLSdPKsml5lJX+wDxp
+	2VgMWekOil80LeSaIUAxDUS5p1cTYuCMBOBGRY6+ZG8xcL0a3Ww/PdMsBcg1LobVHSzlUOEyQhHpI
+	i/Cz8/va+GYzujBsCOlUhAQ+kKaS/fyzekAxCoy8QwGwZB4vq4aSnE+0vVSvH2apfiABVgE7dWvzk
+	8l0c7S7xBX3tlmIZz4pQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqh8T-0003S6-Kg; Mon, 04 Feb 2019 16:30:17 +0000
-Received: from haggis.mythic-beasts.com ([2a00:1098:0:86:1000:0:2:1])
+	id 1gqhHH-0005vU-KO; Mon, 04 Feb 2019 16:39:23 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqh8P-0003Rk-Cv
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:30:15 +0000
-Received: from [199.195.250.187] (port=45014 helo=hermes.aosc.io)
- by haggis.mythic-beasts.com with esmtpsa
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.90_1)
- (envelope-from <icenowy@aosc.io>)
- id 1gqh8B-0002D4-M2; Mon, 04 Feb 2019 16:30:04 +0000
-Received: from localhost (localhost [127.0.0.1]) (Authenticated sender:
- icenowy@aosc.io)
- by hermes.aosc.io (Postfix) with ESMTPSA id EF0C06A034;
- Mon,  4 Feb 2019 16:29:29 +0000 (UTC)
-Date: Tue, 05 Feb 2019 00:28:21 +0800
-In-Reply-To: <CA+E=qVfTfJ9E29gz83tdVGx5_KGWSQVJOAxKTzC+-n7=gdj0cA@mail.gmail.com>
-References: <20190203185501.8958-1-anarsoul@gmail.com>
- <20190203185501.8958-7-anarsoul@gmail.com>
- <20190204142036.vd42nvyjnjr5yeoi@flea>
- <CA+E=qVfTfJ9E29gz83tdVGx5_KGWSQVJOAxKTzC+-n7=gdj0cA@mail.gmail.com>
+ id 1gqhHF-0005vA-1E
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:39:22 +0000
+Received: from mail-qt1-f174.google.com (mail-qt1-f174.google.com
+ [209.85.160.174])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 710C0218B0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon,  4 Feb 2019 16:39:20 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549298360;
+ bh=jV7Lv15oSKC92H7pCYB+ZCNF9iW8VUOlSifjXD8OVis=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=eD+kEoOqIFgJ5hWMZPYdAvenN/ctyFI+hyuGI9x00ySSzl1xcML6HP0PUTj/KwtOk
+ ik0XLY8d/hqUcp0xdWFt9A9YbM/nESuTLEa7krCYSoNAP3AIGUUZP6emqU/LM9cMj+
+ X45sFDtQt0Hh84e8I5mmDMkY/zIYKSG6C37vEt+U=
+Received: by mail-qt1-f174.google.com with SMTP id k12so560523qtf.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 04 Feb 2019 08:39:20 -0800 (PST)
+X-Gm-Message-State: AHQUAubXFtU1kAEoZUwisY1aSXTUrtKP7nJfHtcJp02K037qZkFJtMZR
+ tXaLsNXWGJRNBc+03x7m3GrrfIWhsRpyp/SLNA==
+X-Google-Smtp-Source: AHgI3IbI6QIritiNy6W1m0yxbNnetf34MseZ+Z5sN292CV9mzbXOy9X/W+PL31CJwhSC6b1CZxAH+z+HGG9uTA0s84Q=
+X-Received: by 2002:aed:3ecf:: with SMTP id o15mr231384qtf.26.1549298359505;
+ Mon, 04 Feb 2019 08:39:19 -0800 (PST)
 MIME-Version: 1.0
-Subject: Re: [PATCH RESEND v2 06/12] drm/sun4i: rgb: Add 1% tolerance to dclk
- frequency check when bridge is connected
-To: linux-arm-kernel@lists.infradead.org,
- Vasily Khoruzhick <anarsoul@gmail.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>
-From: Icenowy Zheng <icenowy@aosc.io>
-Message-ID: <0F6CBEA4-6DB6-40F1-A2FD-65101AF64F1F@aosc.io>
-X-BlackCat-Spam-Score: 0
+References: <20190203185501.8958-1-anarsoul@gmail.com>
+ <20190203185501.8958-9-anarsoul@gmail.com>
+ <20190204074350.GC16448@ulmo>
+ <CA+E=qVecudACOEXt74Kf=UA_F-uuHgEqHzKpYAq1ocMx3Sx+eQ@mail.gmail.com>
+ <20190204082353.GE19087@ulmo>
+ <CA+E=qVew+8__yrAud1gFnLQ8HCwDdGhVjV=c173HGvZxH=7zZQ@mail.gmail.com>
+In-Reply-To: <CA+E=qVew+8__yrAud1gFnLQ8HCwDdGhVjV=c173HGvZxH=7zZQ@mail.gmail.com>
+From: Rob Herring <robh+dt@kernel.org>
+Date: Mon, 4 Feb 2019 10:39:08 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqLAODca_U94hCi9O3E6XiUjAYCoL7_0gkf_eMY0nnT8Ag@mail.gmail.com>
+Message-ID: <CAL_JsqLAODca_U94hCi9O3E6XiUjAYCoL7_0gkf_eMY0nnT8Ag@mail.gmail.com>
+Subject: Re: [PATCH RESEND v2 08/12] dt-bindings: add binding for generic eDP
+ panel
+To: Vasily Khoruzhick <anarsoul@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_083013_438794_0BBE5492 
-X-CRM114-Status: GOOD (  17.33  )
+X-CRM114-CacheID: sfid-20190204_083921_105642_081A0B11 
+X-CRM114-Status: GOOD (  20.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,53 +91,63 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>,
  devicetree <devicetree@vger.kernel.org>,
- Archit Taneja <architt@codeaurora.org>, David Airlie <airlied@linux.ie>,
- Chen-Yu Tsai <wens@csie.org>, dri-devel <dri-devel@lists.freedesktop.org>,
- Andrzej Hajda <a.hajda@samsung.com>,
- linux-sunxi <linux-sunxi@googlegroups.com>, Rob Herring <robh+dt@kernel.org>,
- Thierry Reding <thierry.reding@gmail.com>,
+ Archit Taneja <architt@codeaurora.org>, Andrzej Hajda <a.hajda@samsung.com>,
+ David Airlie <airlied@linux.ie>, linux-sunxi <linux-sunxi@googlegroups.com>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ Thierry Reding <thierry.reding@gmail.com>, Sean Paul <seanpaul@chromium.org>,
  Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Daniel Vetter <daniel@ffwll.ch>, Sean Paul <seanpaul@chromium.org>,
- arm-linux <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+ Daniel Vetter <daniel@ffwll.ch>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>,
+ Icenowy Zheng <icenowy@aosc.io>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Cgrkuo4gMjAxOeW5tDLmnIg15pelIEdNVCswODowMCDkuIrljYgxMjoyNjo0MywgVmFzaWx5IEto
-b3J1emhpY2sgPGFuYXJzb3VsQGdtYWlsLmNvbT4g5YaZ5YiwOgo+T24gTW9uLCBGZWIgNCwgMjAx
-OSBhdCA2OjIwIEFNIE1heGltZSBSaXBhcmQKPjxtYXhpbWUucmlwYXJkQGJvb3RsaW4uY29tPiB3
-cm90ZToKPj4KPj4gSGksCj4+Cj4+IE9uIFN1biwgRmViIDAzLCAyMDE5IGF0IDEwOjU0OjU1QU0g
-LTA4MDAsIFZhc2lseSBLaG9ydXpoaWNrIHdyb3RlOgo+PiA+IENsb2NrIHJhdGUgY2hlY2sgdGhh
-dCB3YXMgYWRkZWQgaW4gY29tbWl0IGJiNDNkNDBkN2M4MyAoImRybS9zdW40aToKPnJnYjoKPj4g
-PiBWYWxpZGF0ZSB0aGUgY2xvY2sgcmF0ZSIpIHByZXZlbnRzIHNvbWUgcGFuZWwgYW5kIGJyaWRn
-ZXMgZnJvbQo+d29ya2luZyB3aXRoCj4+ID4gc3VuNGkgZHJpdmVyLgo+PiA+Cj4+ID4gVW5mb3J0
-dW5hdGVseSwgZG90Y2xvY2sgZnJlcXVlbmN5IGZvciBzb21lIG1vZGVzIGFyZSBub3QgYWNoaWV2
-YWJsZQo+b24KPj4gPiBzdW54aSBoYXJkd2FyZSwgYW5kIHRoZXJlJ3MgYSBzbGlnaHQgZGV2aWF0
-aW9uIGluIHJhdGUgcmV0dXJuZWQgYnkKPj4gPiBjbGtfcm91bmRfcmF0ZSgpLCBzbyB0aGV5IGZh
-aWwgdGhpcyBjaGVjay4KPj4gPgo+PiA+IEV4cGVyaW1lbnRzIHNob3cgdGhhdCBwYW5lbHMgYW5k
-IGJyaWRnZXMgd29yayBmaW5lIHdpdGggdGhpcyBzbGlnaHQKPj4gPiBkZXZpYXRpb24sIGUuZy4g
-UGluZWJvb2sgdGhhdCB1c2VzIEFOWDYzNDUgYnJpZGdlIHdpdGggNzY4cCBlRFAKPnBhbmVsCj4+
-ID4gcmVxdWVzdHMgNzMgTUh6LCBnZXRzIDcyLjI5Nk1IeiBpbnN0ZWFkICgwLjk2JSBkaWZmZXJl
-bmNlKSBhbmQKPndvcmtzIGp1c3QKPj4gPiBmaW5lLgo+PiA+Cj4+ID4gVGhpcyBwYXRjaCBhZGRz
-IGEgMSUgdG9sZXJlbmNlIHRvIHRoZSBkb3QgY2xvY2sgY2hlY2sgd2hlbiBicmlkZ2UKPmlzCj4+
-ID4gY29ubmVjdGVkLgo+PiA+Cj4+ID4gU2lnbmVkLW9mZi1ieTogVmFzaWx5IEtob3J1emhpY2sg
-PGFuYXJzb3VsQGdtYWlsLmNvbT4KPj4KPj4gSSdtIG5vdCBzdXJlIHdlIHdhbnQgdG8gbWFrZSBl
-eGNlcHRpb25zIGZvciBhbGwgdGhlIGhhcmR3YXJlCj4+IGNvbWJpbmF0aW9uIHdlIGZhY2UsIGJ1
-dCB3ZSBzaG91bGQgZ28gZm9yIHNvbWV0aGluZyBtb3JlIGdlbmVyaWMgKGFuZAo+PiBlYXNpZXIg
-dG8gbWFpbnRhaW4gaW5zdGVhZCkuCj4+Cj4+IElJUkMsIGZyb20gdGhlIHByZXZpb3VzIGRpc2N1
-c3Npb24sIEhETUkgaGFkIGEgdG9sZXJhbmN5IHJlcXVpcmVtZW50Cj4+IGluIHRoZSBzdGFuZGFy
-ZC4gRG8geW91IGtub3cgaWYgdGhlcmUncyBzdWNoIGEgdGhpbmcgZm9yIGVEUD8gVGhhdAo+PiB3
-b3VsZCBzb2x2ZSB0aGUgaXNzdWUgZm9yIGFsbCB0aGUgZURQIGRpc3BsYXlzIGF0IG9uY2UuCj4K
-PkkgZG9uJ3QgaGF2ZSBhY2Nlc3MgdG8gZURQIHN0YW5kYXJkIC0gdmVzYS5vcmcgc2F5cyBpdCdz
-IGF2YWlsYWJsZSB0bwo+bWVtYmVycyBvbmx5LgoKVHJ5IG91dCB0byBncmFiIGFuIG9sZCB2ZXJz
-aW9uPwoKSSByZW1lbWJlciAxLjAgaXMgb3Blbi4KCj4KPj4gTWF4aW1lCj4+Cj4+IC0tCj4+IE1h
-eGltZSBSaXBhcmQsIEJvb3RsaW4KPj4gRW1iZWRkZWQgTGludXggYW5kIEtlcm5lbCBlbmdpbmVl
-cmluZwo+PiBodHRwczovL2Jvb3RsaW4uY29tCj4KPl9fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fCj5saW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdAo+bGlu
-dXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCj5odHRwOi8vbGlzdHMuaW5mcmFkZWFk
-Lm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwKCi0tIArkvb/nlKggSy05IE1h
-aWwg5Y+R6YCB6Ieq5oiR55qEQW5kcm9pZOiuvuWkh+OAggoKX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QK
-bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRl
-YWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+On Mon, Feb 4, 2019 at 10:11 AM Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+>
+> On Mon, Feb 4, 2019 at 12:24 AM Thierry Reding <thierry.reding@gmail.com> wrote:
+> > >
+> > > Pinebook used several 768p panels that have slightly different timings
+> > > and recent batch uses 1080p panel.
+> > >
+> > > What panel descriptor should I use as fallback?
+> >
+> > You don't use panel descriptors as fallback. The simple-panel driver
+> > will bind to a panel device and use the corresponding descriptor. If
+> > your device tree contains the correct information, the descriptor is
+> > correct for the panel you have.
+> >
+> > In other words you need to ensure that you have the correct panel in
+> > device tree for the board that you're using. This is exactly the same
+> > thing as for other devices.
+> >
+> > One way to to this is to have separate device trees for each variant
+> > of the board that you want to support. Another variant may be to have
+> > a common device tree and then have some early firmware update the DTB
+> > with the correct panel information.
+>
+> That defeats the purpose of using eDP panels. Panel can identify
+> itself and report what timings it supports.
+
+If you are confident that this works for all panels, then the firmware
+can identify the right panel and update the DTB with the correct
+information. If this doesn't work in the firmware, then it is not
+going to work in the kernel either and you are SOL without specific
+panel information in the DT.
+
+> If we use separate DTBs then users will have to figure out what panel
+> is installed in their hardware and use appropriate software image -
+> that's something I'd like to avoid.
+
+I think Thierry meant either way this is a firmware problem. If you
+have a SKU per device and panel type, then the firmware just picks a
+dtb among a set.
+
+Rob
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
