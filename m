@@ -2,115 +2,114 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D883BC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:27:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7F168C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:34:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A43272075D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:27:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4E3D92070C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:34:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ujwWRuWx";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armh.onmicrosoft.com header.i=@armh.onmicrosoft.com header.b="p38WYivM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A43272075D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qdXn0LJr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E3D92070C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oxOFIHirvUNzfj32fRlFRX5o466aIbmzPxk++Vw20Nk=; b=ujwWRuWxccDQcW
-	tFUvw6Q0WKa1TSWaYGNSk4pxefUeUB50IgXpDQBrox7zCxGl52q2vQlDl3o3zZF+rPX7LJAqGzAYL
-	u9Neh3JPoWyIRvzsOK4O4XiiKhqJNUxZvi6DqkqFQfh3EmPcu0hMtu1+EVyonhpzCZ1g5At1rQmQw
-	15ru46XwqggRdY+Eu48aC0wcSp33oidI8wlUVkfcXTWonJs/bJJu7/vsUkvSipRtx6dXZ/P4T9ri5
-	jG1X9AGLlxeZD8ng3rWP9H0T3oAyNCsdtQ2mAK6YUeDctGe+E/5UUf///a3tZOQrIOkFuQC9N9IJ6
-	iFeAjc1+/HxPfzxPW28A==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=LsS2YI4mVI9zdJxyEpXmMOde8Judzu45fCgtlQveVr0=; b=qdXn0LJrVGMJ4/
+	CqVDsPJ5CtuVlFdJw3hIOJ1M64PAe0P59UjATenDzp85up5zAUy4EC5WitftMjdK/17O5n1o3/olb
+	SsN75E6xqZMIU4JEH76QX12v7o7KZSksiafxw1wts5Qgk5KrWEcKqsysA8sZXwFGqkAinnnuhXZhK
+	yLri6zKKl5VwaswehJLe1H6hK0H2dPnSjPtSMqnwf7reAr6Y1i3dRf4qu96igztoJq/PQZYLK/pGz
+	UIFqv5GxnfZu47qdfm4CDtWpwOZZmQIURCs3/J1xHyJhBpRGXK3DiuRRIeUlzRr1nImZw7posN9GT
+	iSd3EHq2HdSmVM8bZN5w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqbTR-0001PR-4S; Mon, 04 Feb 2019 10:27:33 +0000
-Received: from mail-eopbgr00089.outbound.protection.outlook.com ([40.107.0.89]
- helo=EUR02-AM5-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqbTN-0001Oz-2j
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 10:27:31 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=armh.onmicrosoft.com; 
- s=selector1-arm-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=XVO1ugM2VAR4/7GJDgrDFKElwXZHsfqVk7QvyjCEyi8=;
- b=p38WYivM/jTPfOpE00oSJL/5w0wBYhGk26qf+dU/ySOH6yVzfixcWMPznIZ7h4bCLR9OCFr3ZdEMGzjF1r7XlCyFEpYynUf3Gnq0NsNTnm6IxyB0RLIz7vkqM4ttp8d8eSHET5uElZkdmirA2HuKFBhB5icf4Q5O7xTJpl4pKnc=
-Received: from DB8PR08MB4105.eurprd08.prod.outlook.com (20.179.12.12) by
- DB8SPR01MB0003.eurprd08.prod.outlook.com (20.179.8.204) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1580.17; Mon, 4 Feb 2019 10:27:24 +0000
-Received: from DB8PR08MB4105.eurprd08.prod.outlook.com
- ([fe80::3d06:58c4:a969:554b]) by DB8PR08MB4105.eurprd08.prod.outlook.com
- ([fe80::3d06:58c4:a969:554b%3]) with mapi id 15.20.1580.019; Mon, 4 Feb 2019
- 10:27:24 +0000
-From: Steve Capper <Steve.Capper@arm.com>
-To: Qian Cai <cai@lca.pw>
-Subject: Re: kernel_page_tables issue with CONFIG_ARM64_USER_VA_BITS_52=y
-Thread-Topic: kernel_page_tables issue with CONFIG_ARM64_USER_VA_BITS_52=y
-Thread-Index: AQHUueLfvk3wiqo4IEK25Z94vYKAOaXK9e+AgAB1awCABAlFgA==
-Date: Mon, 4 Feb 2019 10:27:24 +0000
-Message-ID: <20190204102715.GA11645@capper-debian.cambridge.arm.com>
-References: <fe7fa86a-42ed-ee58-be26-4d8ae45fadab@lca.pw>
- <20190201134847.GC29903@fuggles.cambridge.arm.com>
- <1549054142.6911.25.camel@lca.pw>
-In-Reply-To: <1549054142.6911.25.camel@lca.pw>
-Accept-Language: en-GB, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-user-agent: Mutt/1.10.1 (2018-07-13)
-x-originating-ip: [217.140.106.32]
-x-clientproxiedby: DM5PR18CA0067.namprd18.prod.outlook.com
- (2603:10b6:3:22::29) To DB8PR08MB4105.eurprd08.prod.outlook.com
- (2603:10a6:10:b0::12)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Steve.Capper@arm.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB8SPR01MB0003;
- 6:AAG0zcYvsrM0MhAcrBymsf22vgq924qSnFy6+I8Gf7eZBNx10Nj2jLVLsvIQ75LESRAum/CLVG1WkDKfqXjUTGa/4ZPOzIcqsSdukE99za6InAV7KqOeuhRYOWUlqLo8umS5NPFnWmfG4+V5FtN5Jvlk7pfemT89X8n9kwUKrAWb3MT/hm9eJx7o92f4H/3p/4c+yh6KYb9cuz9pPpfaA5M3KiWyKt5XD7Pvfodk9veVb2xhfU/8rrfWXvnscKBcT3BNgSAJpAx+7cUfx+SAWfxa6YAmMkGjgr3XAZcLeaiiivLAzZrqmj0saXvOmhqPd9zA2GHx7dd1X35HKEf30zllQqv8+S8frvdCBVGY31MWVXYiyK6m/E33HrPHC1Qh4U4FzZpsj/MPRS7OF0QWyYXbqmekfByuecVatqsqAU/mc84qQNOlB3WHD+QuH8OLREJqqmkZpM8ROqFvKmavOg==;
- 5:DIdkDssKxUlhPxr8YjMUwdC9MZzWh/oMO1xRBSSrZSc6Nl0wW6sKsO4l4FFX1d04EpJF9Oq2L89hYNhuenUjSryMRZ5poMajp+4ifw7ETVa/9EYBAz0osiOKvUFajtWMROjDxzrEHk8BPjPTHK9h6dJhcSkUTNpr+LohAZpwRQ9BgxDDH/uKWIbiZLyeVUA3cN97XmXN+l4Z9lGEoQwCMQ==;
- 7:810dQXcGO1NOQeeolaxU6myiKtvsx/de3d+GP2AR0ezaX9eY53YnmoVCghgQLM5k9q8T/r76lFKC9mWUUT8ssiS8a8/pKUXxv64JrzD4rRlF+2YWLh4nofyFw7vsohTKjY/5AW+Q2tsMTF62M4MkSg==
-x-ms-office365-filtering-correlation-id: 8aa65243-4dd1-4231-8bb4-08d68a8b5a33
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB8SPR01MB0003; 
-x-ms-traffictypediagnostic: DB8SPR01MB0003:
-nodisclaimer: True
-x-microsoft-antispam-prvs: <DB8SPR01MB000320DA7B6E3AE616AFE8CA816D0@DB8SPR01MB0003.eurprd08.prod.outlook.com>
-x-forefront-prvs: 0938781D02
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(376002)(366004)(39850400004)(396003)(346002)(199004)(189003)(6916009)(3846002)(105586002)(66066001)(58126008)(316002)(6486002)(54906003)(6436002)(229853002)(1076003)(256004)(6116002)(2906002)(6512007)(6246003)(25786009)(6506007)(386003)(4326008)(26005)(8936002)(76176011)(8676002)(52116002)(81156014)(81166006)(186003)(99286004)(71190400001)(71200400001)(53936002)(7736002)(102836004)(305945005)(486006)(86362001)(97736004)(106356001)(68736007)(33656002)(478600001)(72206003)(476003)(44832011)(14454004)(11346002)(446003)(18370500001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB8SPR01MB0003;
- H:DB8PR08MB4105.eurprd08.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: arm.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: juNvuFNwLL0pNgkkU1p8/tc6jQb/7oZHCxDESv9kSyf761mwjaBB23lVmf7+LpjKVs0YuFdH8W/Gj+IP9PE/tvWAPWFEG/FkKIF1d7bf/zB3H1+y5JVZA5BZ2hNOXDN7oNHtTu4fZxHg4FofDt7gcxCWnk8PxRaArR2mN/4IIn58dnK4miN74En6TLoBCmWVi6B5R87HjcdmbATuVoDx8EzzPYoxB98Hykt/zJoxrosQYX8KyZx9wM6b72sLlgo0U+HA3/JJebw5uMUl156lg8xvON+Kw/qNw1+rrhlPJfNkOc/lC2miL9gbZDN0+KZ0+eWjTWoJtRiGDZ1DRwkRpVyvxH+o+NOPT5HsSMxW4I9aL4ao5C1RJnXR2TRynlMcl7i1+g9eAxN7Regpiqv+Y0pYJ0icsU4DNHjBQPI9728=
-Content-ID: <4F36AF25760EAA409820892C5CD27437@eurprd08.prod.outlook.com>
+	id 1gqbZf-0003H6-4k; Mon, 04 Feb 2019 10:33:59 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqbZc-0003Gi-68
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 10:33:58 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CACBDA78;
+ Mon,  4 Feb 2019 02:33:52 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ E47613F675; Mon,  4 Feb 2019 02:33:49 -0800 (PST)
+Subject: Re: [RFC PATCH v4 08/13] genirq/msi: Add support for allocating
+ single MSI for a device
+To: Lokesh Vutla <lokeshvutla@ti.com>, Nishanth Menon <nm@ti.com>,
+ Santosh Shilimkar <ssantosh@kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ "tglx@linutronix.de" <tglx@linutronix.de>,
+ "jason@lakedaemon.net" <jason@lakedaemon.net>
+References: <20181227060829.5080-1-lokeshvutla@ti.com>
+ <20181227061313.5451-1-lokeshvutla@ti.com>
+ <20181227061313.5451-8-lokeshvutla@ti.com>
+ <5be38277-3348-a6d9-4b67-3ead308c009a@arm.com>
+ <faad8e90-2f97-1dbb-fb98-e0f1462e29c5@ti.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ mQINBE6Jf0UBEADLCxpix34Ch3kQKA9SNlVQroj9aHAEzzl0+V8jrvT9a9GkK+FjBOIQz4KE
+ g+3p+lqgJH4NfwPm9H5I5e3wa+Scz9wAqWLTT772Rqb6hf6kx0kKd0P2jGv79qXSmwru28vJ
+ t9NNsmIhEYwS5eTfCbsZZDCnR31J6qxozsDHpCGLHlYym/VbC199Uq/pN5gH+5JHZyhyZiNW
+ ozUCjMqC4eNW42nYVKZQfbj/k4W9xFfudFaFEhAf/Vb1r6F05eBP1uopuzNkAN7vqS8XcgQH
+ qXI357YC4ToCbmqLue4HK9+2mtf7MTdHZYGZ939OfTlOGuxFW+bhtPQzsHiW7eNe0ew0+LaL
+ 3wdNzT5abPBscqXWVGsZWCAzBmrZato+Pd2bSCDPLInZV0j+rjt7MWiSxEAEowue3IcZA++7
+ ifTDIscQdpeKT8hcL+9eHLgoSDH62SlubO/y8bB1hV8JjLW/jQpLnae0oz25h39ij4ijcp8N
+ t5slf5DNRi1NLz5+iaaLg4gaM3ywVK2VEKdBTg+JTg3dfrb3DH7ctTQquyKun9IVY8AsxMc6
+ lxl4HxrpLX7HgF10685GG5fFla7R1RUnW5svgQhz6YVU33yJjk5lIIrrxKI/wLlhn066mtu1
+ DoD9TEAjwOmpa6ofV6rHeBPehUwMZEsLqlKfLsl0PpsJwov8TQARAQABtCNNYXJjIFp5bmdp
+ ZXIgPG1hcmMuenluZ2llckBhcm0uY29tPokCOwQTAQIAJQIbAwYLCQgHAwIGFQgCCQoLBBYC
+ AwECHgECF4AFAk6NvYYCGQEACgkQI9DQutE9ekObww/+NcUATWXOcnoPflpYG43GZ0XjQLng
+ LQFjBZL+CJV5+1XMDfz4ATH37cR+8gMO1UwmWPv5tOMKLHhw6uLxGG4upPAm0qxjRA/SE3LC
+ 22kBjWiSMrkQgv5FDcwdhAcj8A+gKgcXBeyXsGBXLjo5UQOGvPTQXcqNXB9A3ZZN9vS6QUYN
+ TXFjnUnzCJd+PVI/4jORz9EUVw1q/+kZgmA8/GhfPH3xNetTGLyJCJcQ86acom2liLZZX4+1
+ 6Hda2x3hxpoQo7pTu+XA2YC4XyUstNDYIsE4F4NVHGi88a3N8yWE+Z7cBI2HjGvpfNxZnmKX
+ 6bws6RQ4LHDPhy0yzWFowJXGTqM/e79c1UeqOVxKGFF3VhJJu1nMlh+5hnW4glXOoy/WmDEM
+ UMbl9KbJUfo+GgIQGMp8mwgW0vK4HrSmevlDeMcrLdfbbFbcZLNeFFBn6KqxFZaTd+LpylIH
+ bOPN6fy1Dxf7UZscogYw5Pt0JscgpciuO3DAZo3eXz6ffj2NrWchnbj+SpPBiH4srfFmHY+Y
+ LBemIIOmSqIsjoSRjNEZeEObkshDVG5NncJzbAQY+V3Q3yo9og/8ZiaulVWDbcpKyUpzt7pv
+ cdnY3baDE8ate/cymFP5jGJK++QCeA6u6JzBp7HnKbngqWa6g8qDSjPXBPCLmmRWbc5j0lvA
+ 6ilrF8m5Ag0ETol/RQEQAM/2pdLYCWmf3rtIiP8Wj5NwyjSL6/UrChXtoX9wlY8a4h3EX6E3
+ 64snIJVMLbyr4bwdmPKULlny7T/R8dx/mCOWu/DztrVNQiXWOTKJnd/2iQblBT+W5W8ep/nS
+ w3qUIckKwKdplQtzSKeE+PJ+GMS+DoNDDkcrVjUnsoCEr0aK3cO6g5hLGu8IBbC1CJYSpple
+ VVb/sADnWF3SfUvJ/l4K8Uk4B4+X90KpA7U9MhvDTCy5mJGaTsFqDLpnqp/yqaT2P7kyMG2E
+ w+eqtVIqwwweZA0S+tuqput5xdNAcsj2PugVx9tlw/LJo39nh8NrMxAhv5aQ+JJ2I8UTiHLX
+ QvoC0Yc/jZX/JRB5r4x4IhK34Mv5TiH/gFfZbwxd287Y1jOaD9lhnke1SX5MXF7eCT3cgyB+
+ hgSu42w+2xYl3+rzIhQqxXhaP232t/b3ilJO00ZZ19d4KICGcakeiL6ZBtD8TrtkRiewI3v0
+ o8rUBWtjcDRgg3tWx/PcJvZnw1twbmRdaNvsvnlapD2Y9Js3woRLIjSAGOijwzFXSJyC2HU1
+ AAuR9uo4/QkeIrQVHIxP7TJZdJ9sGEWdeGPzzPlKLHwIX2HzfbdtPejPSXm5LJ026qdtJHgz
+ BAb3NygZG6BH6EC1NPDQ6O53EXorXS1tsSAgp5ZDSFEBklpRVT3E0NrDABEBAAGJAh8EGAEC
+ AAkFAk6Jf0UCGwwACgkQI9DQutE9ekMLBQ//U+Mt9DtFpzMCIHFPE9nNlsCm75j22lNiw6mX
+ mx3cUA3pl+uRGQr/zQC5inQNtjFUmwGkHqrAw+SmG5gsgnM4pSdYvraWaCWOZCQCx1lpaCOl
+ MotrNcwMJTJLQGc4BjJyOeSH59HQDitKfKMu/yjRhzT8CXhys6R0kYMrEN0tbe1cFOJkxSbV
+ 0GgRTDF4PKyLT+RncoKxQe8lGxuk5614aRpBQa0LPafkirwqkUtxsPnarkPUEfkBlnIhAR8L
+ kmneYLu0AvbWjfJCUH7qfpyS/FRrQCoBq9QIEcf2v1f0AIpA27f9KCEv5MZSHXGCdNcbjKw1
+ 39YxYZhmXaHFKDSZIC29YhQJeXWlfDEDq6nIhvurZy3mSh2OMQgaIoFexPCsBBOclH8QUtMk
+ a3jW/qYyrV+qUq9Wf3SKPrXf7B3xB332jFCETbyZQXqmowV+2b3rJFRWn5hK5B+xwvuxKyGq
+ qDOGjof2dKl2zBIxbFgOclV7wqCVkhxSJi/QaOj2zBqSNPXga5DWtX3ekRnJLa1+ijXxmdjz
+ hApihi08gwvP5G9fNGKQyRETePEtEAWt0b7dOqMzYBYGRVr7uS4uT6WP7fzOwAJC4lU7ZYWZ
+ yVshCa0IvTtp1085RtT3qhh9mobkcZ+7cQOY+Tx2RGXS9WeOh2jZjdoWUv6CevXNQyOUXMM=
+Organization: ARM Ltd
+Message-ID: <523c4a23-b5b9-ff10-051d-c90e6e8341d4@arm.com>
+Date: Mon, 4 Feb 2019 10:33:44 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-OriginatorOrg: arm.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 8aa65243-4dd1-4231-8bb4-08d68a8b5a33
-X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Feb 2019 10:27:22.2177 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: f34e5979-57d9-4aaa-ad4d-b122a662184d
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB8SPR01MB0003
+In-Reply-To: <faad8e90-2f97-1dbb-fb98-e0f1462e29c5@ti.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_022729_121114_D0E56FFE 
-X-CRM114-Status: GOOD (  11.99  )
+X-CRM114-CacheID: sfid-20190204_023356_240662_01F0783C 
+X-CRM114-Status: GOOD (  31.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -122,110 +121,237 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <Catalin.Marinas@arm.com>, nd <nd@arm.com>,
- Will Deacon <Will.Deacon@arm.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Device Tree Mailing List <devicetree@vger.kernel.org>,
+ Peter Ujfalusi <peter.ujfalusi@ti.com>, Sekhar Nori <nsekhar@ti.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Tero Kristo <t-kristo@ti.com>,
+ Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 01, 2019 at 03:49:02PM -0500, Qian Cai wrote:
-> On Fri, 2019-02-01 at 13:48 +0000, Will Deacon wrote:
-> > Hi Qian Cai,
+On 24/01/2019 10:19, Lokesh Vutla wrote:
+> Hi Marc,
+> 	Sorry for the delayed response. Just back from vacation.
+> 
+> On 17/01/19 12:00 AM, Marc Zyngier wrote:
+>> On 27/12/2018 06:13, Lokesh Vutla wrote:
+>>> Previously all msi for a device are allocated in one go
+>>> by calling msi_domain_alloc_irq() from a bus layer. This might
+>>> not be the case when a device is trying to allocate interrupts
+>>> dynamically based on a request to it.
+>>>
+>>> So introduce msi_domain_alloc/free_irq() apis to allocate a single
+>>> msi. prepare and activate operations to be handled by bus layer
+>>> calling msi_domain_alloc/free_irq() apis.
+>>>
+>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>> ---
+>>>  include/linux/msi.h |  3 +++
+>>>  kernel/irq/msi.c    | 62 +++++++++++++++++++++++++++++----------------
+>>>  2 files changed, 43 insertions(+), 22 deletions(-)
+>>>
+>>> diff --git a/include/linux/msi.h b/include/linux/msi.h
+>>> index 784fb52b9900..474490826f8c 100644
+>>> --- a/include/linux/msi.h
+>>> +++ b/include/linux/msi.h
+>>> @@ -301,8 +301,11 @@ int msi_domain_set_affinity(struct irq_data *data, const struct cpumask *mask,
+>>>  struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
+>>>   struct msi_domain_info *info,
+>>>   struct irq_domain *parent);
+>>> +int msi_domain_alloc_irq(struct irq_domain *domain, struct device *dev,
+>>> + struct msi_desc *desc,  msi_alloc_info_t *arg);
+>>>  int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
+>>>    int nvec);
+>>> +void msi_domain_free_irq(struct msi_desc *desc);
+>>>  void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev);
+>>>  struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain);
+>>>
+>>> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+>>> index ad26fbcfbfc8..eb7459324113 100644
+>>> --- a/kernel/irq/msi.c
+>>> +++ b/kernel/irq/msi.c
+>>> @@ -387,6 +387,35 @@ static bool msi_check_reservation_mode(struct irq_domain *domain,
+>>>  return desc->msi_attrib.is_msix || desc->msi_attrib.maskbit;
+>>>  }
+>>>
+>>> +int msi_domain_alloc_irq(struct irq_domain *domain, struct device *dev,
+>>> + struct msi_desc *desc,  msi_alloc_info_t *arg)
+>>> +{
+>>> +struct msi_domain_info *info = domain->host_data;
+>>> +struct msi_domain_ops *ops = info->ops;
+>>> +int i, ret, virq;
+>>> +
+>>> +ops->set_desc(arg, desc);
+>>> +
+>>> +virq = __irq_domain_alloc_irqs(domain, -1, desc->nvec_used,
+>>> +       dev_to_node(dev), arg, false,
+>>> +       desc->affinity);
+>>> +if (virq < 0) {
+>>> +ret = -ENOSPC;
+>>> +if (ops->handle_error)
+>>> +ret = ops->handle_error(domain, desc, ret);
+>>> +if (ops->msi_finish)
+>>> +ops->msi_finish(arg, ret);
+>>> +return ret;
+>>> +}
+>>> +
+>>> +for (i = 0; i < desc->nvec_used; i++) {
+>>> +irq_set_msi_desc_off(virq, i, desc);
+>>> +irq_debugfs_copy_devname(virq + i, dev);
+>>> +}
+>>> +
+>>> +return 0;
+>>> +}
+>>> +
+>>>  /**
+>>>   * msi_domain_alloc_irqs - Allocate interrupts from a MSI interrupt domain
+>>>   * @domain:The domain to allocate from
+>>> @@ -404,7 +433,7 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
+>>>  struct irq_data *irq_data;
+>>>  struct msi_desc *desc;
+>>>  msi_alloc_info_t arg;
+>>> -int i, ret, virq;
+>>> +int ret, virq;
+>>>  bool can_reserve;
+>>>
+>>>  ret = msi_domain_prepare_irqs(domain, dev, nvec, &arg);
+>>> @@ -412,24 +441,9 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
+>>>  return ret;
+>>>
+>>>  for_each_msi_entry(desc, dev) {
+>>> -ops->set_desc(&arg, desc);
+>>> -
+>>> -virq = __irq_domain_alloc_irqs(domain, -1, desc->nvec_used,
+>>> -       dev_to_node(dev), &arg, false,
+>>> -       desc->affinity);
+>>> -if (virq < 0) {
+>>> -ret = -ENOSPC;
+>>> -if (ops->handle_error)
+>>> -ret = ops->handle_error(domain, desc, ret);
+>>> -if (ops->msi_finish)
+>>> -ops->msi_finish(&arg, ret);
+>>> +ret = msi_domain_alloc_irq(domain, dev, desc, &arg);
+>>> +if (ret)
+>>>  return ret;
+>>> -}
+>>> -
+>>> -for (i = 0; i < desc->nvec_used; i++) {
+>>> -irq_set_msi_desc_off(virq, i, desc);
+>>> -irq_debugfs_copy_devname(virq + i, dev);
+>>> -}
+>>>  }
+>>>
+>>>  if (ops->msi_finish)
+>>> @@ -487,6 +501,12 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
+>>>  return ret;
+>>>  }
+>>>
+>>> +void msi_domain_free_irq(struct msi_desc *desc)
+>>> +{
+>>> +irq_domain_free_irqs(desc->irq, desc->nvec_used);
+>>> +desc->irq = 0;
+>>> +}
+>>> +
+>>>  /**
+>>>   * msi_domain_free_irqs - Free interrupts from a MSI interrupt @domain associated tp @dev
+>>>   * @domain:The domain to managing the interrupts
+>>> @@ -503,10 +523,8 @@ void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev)
+>>>   * enough that there is no IRQ associated to this
+>>>   * entry. If that's the case, don't do anything.
+>>>   */
+>>> -if (desc->irq) {
+>>> -irq_domain_free_irqs(desc->irq, desc->nvec_used);
+>>> -desc->irq = 0;
+>>> -}
+>>> +if (desc->irq)
+>>> +msi_domain_free_irq(desc);
+>>>  }
+>>>  }
+>>>
+>>>
+>>
+>> I can see some interesting issues with this API.
+>>
+>> At the moment, MSIs are allocated upfront, and that's usually done
+>> before the driver can do anything else. With what you're suggesting
+>> here, MSIs can now be allocated at any time, which sounds great. But how
+>> does it work when MSIs get added/freed in parallel? I can't see any
+>> locking here...
+>>
+>> It is also pretty nasty that the user of this API has to know about the
+>> MSI descriptor. Really, nobody should have to deal with this outside of
+>> the MSI layer.
+>>
+>> The real question is why you need to need to allocate MSIs on demand for
+>> a given device. Usually, you allocate them because this is a per-CPU
+>> resource, or something similar. What makes it so variable that you need
+>> to resort to fine grained MSI allocation?
+> 
+> I added this after the discussion we had in the previous version[1] of this
+> series. Let me provide the details again:
+> 
+> As you must be aware INTR is interrupt re-director and INTA is the interrupt
+> multiplexer is the SoC. Here we are trying to address the interrupt connection
+> route as below:
+> Device(Global event) --> INTA --> INTR --> GIC
+> 
+> For the above case you suggested to have the following sw IRQ domain hierarchy:
+> INTA multi MSI --> INTA  -->  INTR  --> GIC
+> 
+> The problem here with the INTA MSI is that all the interrupts for a device
+> should be pre-allocated during the device probe time. But this is not what we
+> wanted especially for the DMA case.
+> 
+> An example DMA ring connection would look like below[2]:
+> 
+>                       +---------------------+
+>                        |         IA                |
+> +--------+        |            +------+   |        +--------+         +------+
+> | ring 1 +----->evtA+->VintX+-------->+   IR   +-- --->  GIC +-->
+> +--------+       |             +------+   |        +--------+         +------+
+> Linux IRQ Y
+>    evtA            |                             |
+>                        |                             |
+>                       +----------------------+
+> 
+> So when a DMA client driver requests a dma channel during probe, the DMA driver
+> gets a free ring in its allocated range. Then DMA driver requests MSI layer for
+> an IRQ. This is why I had to introduce on demand allocation of MSIs for a device.
+> 
+> The reason why we avoided DMA driver to allocate interrupts during its probe as
+> it is not aware of the exact no of channels that are going to be used. Also max
+> allocation of interrupts will overrun the gic IRQs available to this INTA and
+> the IPs that are connected to INTR directly will not get any interrupts.
 
-[...]
+But surely there is an upper bound that does exist for a given system,
+right?  DMA rings are not allocated out of nowhere. Or are you saying
+that when a DMA client requests DMA rings, it doesn't know how many it
+wants? Or does it? I don't think this is new in any of TI's design (the
+crossbar already had such limitation).
 
-> Unfortunately, although this takes care of kernel_page_tables, it breaks
-> efi_page_tables.
-> =
+That being said, I'm open to revisiting this, but you must then
+introduce the right level of mutual exclusion in core code, as the
+msi_desc list now becomes much more dynamic and things would otherwise
+break badly. This has implications all over the place, and probably
+requires quite a bit of work (things like for_each_msi_desc_entry will
+break).
 
-> # cat /sys/kernel/debug/efi_page_tables
-> BUG()
-> =
+Between the two solutions outlined above, the first one is much easier
+to achieve than the second one.
 
-> # ./scripts/faddr2line vmlinux walk_pgd+0x84/0x254
-> walk_pgd+0x84/0x254:
-> __read_once_size at include/linux/compiler.h:193 (discriminator 1)
-> (inlined by) walk_pgd at arch/arm64/mm/dump.c:345 (discriminator 1)
-> =
+Another avenue to explore would be to let the clients allocate as many
+MSIs as they want upfront, and use the "activate" callback to actually
+perform the assignment when such interrupt gets requested. In a way,
+this is not that different from what x86 does with the "early
+reservation, late assignment" type mechanism.
 
-> 344:=A0=A0=A0=A0=A0=A0=A0=A0do {
-> 345:=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0pgd_t pgd =3D READ_ON=
-CE(*pgdp);
-> 346:=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0next =3D pgd_addr_end=
-(addr, 0);
-> =
+Thanks,
 
-> kernel BUG at arch/arm64/mm/dump.c:332!
-> =
-
-> =A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0} else {
-> =A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0B=
-UG_ON(pud_bad(pud));
-> =A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0=A0w=
-alk_pmd(st, pudp, addr, next);
->
-
-Hi Qian Cai,
-Apologies for missing the efi_page_tables.
-
-Does the following (applied to Will's fix) help?
-
-Cheers,
--- =
-
-Steve
-
---->8
-
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index 00ca2adeb5ef..42ac8fd15e59 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -339,11 +339,12 @@ static void walk_pgd(struct pg_state *st, struct mm_s=
-truct *mm,
- 		     unsigned long start)
- {
- 	unsigned long next, addr =3D start;
-+	unsigned long end =3D (start < TASK_SIZE_64) ? TASK_SIZE_64 : 0;
- 	pgd_t *pgdp =3D pgd_offset(mm, addr);
- =
-
- 	do {
- 		pgd_t pgd =3D READ_ONCE(*pgdp);
--		next =3D pgd_addr_end(addr, 0);
-+		next =3D pgd_addr_end(addr, end);
- =
-
- 		if (pgd_none(pgd)) {
- 			note_page(st, addr, 1, pgd_val(pgd));
-@@ -351,7 +352,7 @@ static void walk_pgd(struct pg_state *st, struct mm_str=
-uct *mm,
- 			BUG_ON(pgd_bad(pgd));
- 			walk_pud(st, pgdp, addr, next);
- 		}
--	} while (pgdp++, addr =3D next, addr);
-+	} while (pgdp++, addr =3D next, addr !=3D end);
- }
- =
-
- void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
-diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-=
-runtime.c
-index 23ea1ed409d1..16757966c3bf 100644
---- a/drivers/firmware/efi/arm-runtime.c
-+++ b/drivers/firmware/efi/arm-runtime.c
-@@ -38,7 +38,8 @@ static struct ptdump_info efi_ptdump_info =3D {
- 	.mm		=3D &efi_mm,
- 	.markers	=3D (struct addr_marker[]){
- 		{ 0,		"UEFI runtime start" },
--		{ DEFAULT_MAP_WINDOW_64, "UEFI runtime end" }
-+		{ DEFAULT_MAP_WINDOW_64, "UEFI runtime end" },
-+		{ -1, NULL }
- 	},
- 	.base_addr	=3D 0,
- };
+	M.
+-- 
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
