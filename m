@@ -2,83 +2,58 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 29C35C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:51:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F183DC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:53:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EDB962087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:51:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B985C2073D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:53:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fssvtgSp";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mobiveil.co.in header.i=@mobiveil.co.in header.b="JsrHP1Nv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EDB962087C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mobiveil.co.in
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i1W5p62B"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B985C2073D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LjuX3RPezEIs8Hu3xg0bG64qpN/d6RK0Jnja6w10Puc=; b=fssvtgSpfn5xUu
-	YzVlKQBOivebD4ROziIxrphDdhbyOXOm9YBLAFsLJjNfa5zOFbF4MX2bh1bOBNmCcB4Oj6wi9dcVh
-	jW07Aq90nNac6F7VK0nIHn4BCJIMkhz0xb2FycZqnHu4kjkMzt1DiPZyayyVNC1FlyUbv7jtS7je5
-	1b0VeaiC431e69KGcXxW0H3p4z8hMClXa7HbE9z8OwOaELcAiKh5XD4+1or/SvGhZhfxc7U6mxm3D
-	aEhOzX/H6n+Y9GSDzi3wBAc9jz5UT2GQDzg2mya5Qsia/nuPPn4tQ6f/U8fKnbrlHfq54VnC5MU5O
-	lm6uUtPfgTdmM9gngsGg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=ZjE0Jxr8zue926cyn2Lua5NwUF9SHKBYBAqqID8wqQY=; b=i1W
+	5p62BmFi84GU4rESr/lx5mJfyZ9kQUzXJ4K1eGkEx4KASm2tWTBbFjtFBlfoVV0Ja4cFlkaKlplBy
+	oNjLGSQVe0l4pFFHk/VtlSU2F7KiZEgYD81/biaphTBQGbCUL7KeZKlRzKzVFqYS4upx45WEV9clq
+	TAk0M4dJE5BDW63ylTNv8WKjAbZD4i8FI63pOsuoLp0/Dqqh+DuqnxutyzJv31EzwlkWIHYfrUfmb
+	UN4EWz1ncLrWyig2ylT47lpjhIWdCzTtNKFzSnOgrPVwN8kRM/5ep/pKUH/0YUvku8Rh0tYHelxc9
+	6m2GZfz5aEV8A3A5Bv9cENG0WAWuyKA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqhSu-00033W-6m; Mon, 04 Feb 2019 16:51:24 +0000
-Received: from mail-wm1-x32a.google.com ([2a00:1450:4864:20::32a])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqhSn-0002vv-Nj
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:51:21 +0000
-Received: by mail-wm1-x32a.google.com with SMTP id t200so667656wmt.0
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 08:51:16 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=mobiveil.co.in; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=X+d6h2hPheL1wABUYomV4RG/k4ucsF58Nr90D8kQKXY=;
- b=JsrHP1Nv55hfPbWXTiHNYGANohhmQNezM47Gek0gnHqxKcYvOTNlGM4ZZ38I13w0R3
- JNGFBG1rWg1m8OrXfpxTuJ4Kg7CcYsSTvdEjlBGhWI3yNAebNPiuQUd+r5q25krXt10t
- /3B5bUQY29RrClicTd64FkvNd7qJj41gTl8nY=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=X+d6h2hPheL1wABUYomV4RG/k4ucsF58Nr90D8kQKXY=;
- b=pXu0tsk2jwUj6kCrIB60vIV2Um2O4zwda7ZYlZbSdwVX62OcZu3W4yy3zHBClHZFZ5
- F9WDvZRbeHXAilunxDUhwGNEgSZnFq+St34C5SzcedY1ldk9zljxwTZTOssDq6X+08AN
- g+PPsWyUtE1pywDWwJijpA2NiF/xpexz2uGw0SqkFg5IOkBqXrT7jOG9wNqKrYuIFGtM
- d7O2OmJjBOEDsRCgF8jzwkXAW1k7tlnsCsZ/Reb4a8ifxYWOsHUAxMaPYjRXtpmRA2ju
- zs/6trtCR1WHsuNrLXGfHDwedAEAsnq8gQzQoukcfPdGuWcToGHCh5LjHmm8uLPIS4so
- MNGg==
-X-Gm-Message-State: AHQUAuba4eOLpuOKat5m8/xh2AHFVS2fjbsezGlepDFpH2MfO3HJYOV3
- h0GCCaN7ID4Ip71sl0g92nWUT0XTJc+PYWGpgQ8r3A==
-X-Google-Smtp-Source: AHgI3IamC1rQ8M8KColegEMFaDRwnU7HU25unHdW7ghPmgbofYZpEGZsq8R+PYKRnBwdkc/C0lV7gaAg3jOBGKMezyI=
-X-Received: by 2002:a1c:b455:: with SMTP id d82mr265418wmf.78.1549299075096;
- Mon, 04 Feb 2019 08:51:15 -0800 (PST)
-MIME-Version: 1.0
-References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
- <20190129113910.GA7467@e107981-ln.cambridge.arm.com>
- <CAFZiPx002HED+YH2GysS7a7uoEDQuHGjxa_CQtwb9nSDH-XNuA@mail.gmail.com>
- <20190204161303.GA18220@red-moon>
-In-Reply-To: <20190204161303.GA18220@red-moon>
-From: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-Date: Mon, 4 Feb 2019 22:21:04 +0530
-Message-ID: <CAFZiPx3DTCgRtSehsQKOAfZoSpBgyU-JZXwVhmDvWesefW-32w@mail.gmail.com>
-Subject: Re: [PATCHv3 00/27] PCI: refactor Mobiveil driver and add PCIe Gen4
- driver for NXP Layerscape SoCs
-To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+	id 1gqhVG-0003Yd-Un; Mon, 04 Feb 2019 16:53:50 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqhVE-0003XX-1R
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:53:49 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B06EA15AB;
+ Mon,  4 Feb 2019 08:53:44 -0800 (PST)
+Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.16])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4CDB93F589;
+ Mon,  4 Feb 2019 08:53:43 -0800 (PST)
+From: Andrew Murray <andrew.murray@arm.com>
+To: Christoffer Dall <christoffer.dall@arm.com>,
+ Marc Zyngier <marc.zyngier@arm.com>
+Subject: [PATCH v2 0/5] KVM: arm/arm64: add support for chained counters
+Date: Mon,  4 Feb 2019 16:53:33 +0000
+Message-Id: <1549299218-44714-1-git-send-email-andrew.murray@arm.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_085118_289013_91AFA4C9 
-X-CRM114-Status: GOOD (  22.41  )
+X-CRM114-CacheID: sfid-20190204_085348_092685_51FE54A6 
+X-CRM114-Status: GOOD (  13.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,140 +65,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Xiaowei Bao <xiaowei.bao@nxp.com>,
- "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
- "Z.q. Hou" <zhiqiang.hou@nxp.com>, "will.deacon@arm.com" <will.deacon@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Leo Li <leoyang.li@nxp.com>, "M.h. Lian" <minghuan.lian@nxp.com>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, Mingkai Hu <mingkai.hu@nxp.com>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- "bhelgaas@google.com" <bhelgaas@google.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Julien Thierry <julien.thierry@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org, suzuki.poulose@arm.com
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Lorenzo,
-My apologies again,
+ARMv8 provides support for chained PMU counters, where an event type
+of 0x001E is set for odd-numbered counters, the event counter will
+increment by one for each overflow of the preceding even-numbered
+counter. Let's emulate this in KVM by creating a 64 bit perf counter
+when a user chains two emulated counters together.
 
-I have started looking into these.
+Testing has been performed by hard-coding hwc->sample_period in
+__hw_perf_event_init (arm_pmu.c) to a small value, this results in
+regular overflows (for non sampling events). The following command
+was then used to measure chained and non-chained instruction cycles:
 
-Thanks,
+perf stat -e armv8_pmuv3/long=1,inst_retired/u \
+          -e armv8_pmuv3/long=0,inst_retired/u dd if=/dev/zero bs=1M \
+	  count=10 | gzip > /dev/null
 
+The reported values were identical (and for non-chained was in the
+same ballpark when running on a kernel without this patchset). Debug
+was added to verify that the guest received overflow interrupts for
+the chain counter.
 
+Changes since v1:
 
+ - Rename kvm_pmu_{enable,disable}_counter to reflect that they can
+   operate on multiple counters at once and use these functions where
+   possible
 
-On Mon, Feb 4, 2019 at 9:43 PM Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
->
-> On Mon, Feb 04, 2019 at 07:44:25PM +0530, Subrahmanya Lingappa wrote:
-> >    Bjorn,
-> >    My apologies, I was away for a while from this work.
-> >    I am starting to review now.
->
-> Hi,
->
-> I am not Bjorn and as I told you before you should not reply
-> with html context (ie use plain text, the public lists will
-> reject your emails otherwise) and top-post.
->
-> You are supposed to maintain this code, if you can't it is fine but I
-> should know because there are developers who are waiting for your
-> review, please understand.
->
-> Thanks,
-> Lorenzo
->
-> >    Thanks,
-> >    ~subbu
-> >    On Tue, Jan 29, 2019 at 5:09 PM Lorenzo Pieralisi
-> >    <lorenzo.pieralisi@arm.com> wrote:
-> >
-> >      On Tue, Jan 29, 2019 at 08:08:28AM +0000, Z.q. Hou wrote:
-> >      > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> >      >
-> >      > This patch set is aim to refactor the Mobiveil driver and add
-> >      > PCIe support for NXP Layerscape series SoCs integrated Mobiveil's
-> >      > PCIe Gen4 controller.
-> >      >
-> >      > Hou Zhiqiang (27):
-> >      >   PCI: mobiveil: uniform the register accessors
-> >      >   PCI: mobiveil: format the code without function change
-> >      >   PCI: mobiveil: correct the returned error number
-> >      >   PCI: mobiveil: remove flag MSI_FLAG_MULTI_PCI_MSI
-> >      >   PCI: mobiveil: correct PCI base address in MEM/IO outbound windows
-> >      >   PCI: mobiveil: replace the resource list iteration function
-> >      >   PCI: mobiveil: use WIN_NUM_0 explicitly for CFG outbound window
-> >      >   PCI: mobiveil: use the 1st inbound window for MEM inbound
-> >      transactions
-> >      >   PCI: mobiveil: correct inbound/outbound window setup routines
-> >      >   PCI: mobiveil: fix the INTx process error
-> >      >   PCI: mobiveil: only fix up the Class Code field
-> >      >   PCI: mobiveil: move out the link up waiting from mobiveil_host_init
-> >      >   PCI: mobiveil: move irq chained handler setup out of DT parse
-> >      >   PCI: mobiveil: initialize Primary/Secondary/Subordinate bus number
-> >      >   dt-bindings: pci: mobiveil: change gpio_slave and apb_csr to
-> >      optional
-> >      >   PCI: mobiveil: refactor Mobiveil PCIe Host Bridge IP driver
-> >      >   PCI: mobiveil: fix the checking of valid device
-> >      >   PCI: mobiveil: continue to initialize the host upon no PCIe link
-> >      >   PCI: mobiveil: disabled IB and OB windows set by bootloader
-> >      >   PCI: mobiveil: add Byte and Half-Word width register accessors
-> >      >   PCI: mobiveil: make mobiveil_host_init can be used to re-init host
-> >      >   dt-bindings: pci: Add NXP Layerscape SoCs PCIe Gen4 controller
-> >      >   PCI: mobiveil: add PCIe Gen4 RC driver for NXP Layerscape SoCs
-> >      >   PCI: mobiveil: ls_pcie_g4: add Workaround for A-011577
-> >      >   PCI: mobiveil: ls_pcie_g4: add Workaround for A-011451
-> >      >   arm64: dts: freescale: lx2160a: add pcie DT nodes
-> >      >   arm64: defconfig: Enable CONFIG_PCI_LAYERSCAPE_GEN4
-> >
-> >      Subrahmanya,
-> >
-> >      Either you review this series or I will have to drop you from
-> >      the MAINTAINERS list for this driver, I am sorry but I asked you
-> >      before to no avail.
-> >
-> >      Thanks,
-> >      Lorenzo
-> >
-> >      >  .../bindings/pci/layerscape-pci-gen4.txt      |  52 ++
-> >      >  .../devicetree/bindings/pci/mobiveil-pcie.txt |   2 +
-> >      >  MAINTAINERS                                   |  10 +-
-> >      >  .../arm64/boot/dts/freescale/fsl-lx2160a.dtsi | 163 ++++
-> >      >  arch/arm64/configs/defconfig                  |   1 +
-> >      >  drivers/pci/controller/Kconfig                |  11 +-
-> >      >  drivers/pci/controller/Makefile               |   2 +-
-> >      >  drivers/pci/controller/mobiveil/Kconfig       |  34 +
-> >      >  drivers/pci/controller/mobiveil/Makefile      |   5 +
-> >      >  .../controller/mobiveil/pci-layerscape-gen4.c | 306 +++++++
-> >      >  .../controller/mobiveil/pcie-mobiveil-host.c  | 640 +++++++++++++
-> >      >  .../controller/mobiveil/pcie-mobiveil-plat.c  |  54 ++
-> >      >  .../pci/controller/mobiveil/pcie-mobiveil.c   | 246 +++++
-> >      >  .../pci/controller/mobiveil/pcie-mobiveil.h   | 229 +++++
-> >      >  drivers/pci/controller/pcie-mobiveil.c        | 861
-> >      ------------------
-> >      >  15 files changed, 1743 insertions(+), 873 deletions(-)
-> >      >  create mode 100644
-> >      Documentation/devicetree/bindings/pci/layerscape-pci-gen4.txt
-> >      >  create mode 100644 drivers/pci/controller/mobiveil/Kconfig
-> >      >  create mode 100644 drivers/pci/controller/mobiveil/Makefile
-> >      >  create mode 100644
-> >      drivers/pci/controller/mobiveil/pci-layerscape-gen4.c
-> >      >  create mode 100644
-> >      drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> >      >  create mode 100644
-> >      drivers/pci/controller/mobiveil/pcie-mobiveil-plat.c
-> >      >  create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil.c
-> >      >  create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil.h
-> >      >  delete mode 100644 drivers/pci/controller/pcie-mobiveil.c
-> >      >
-> >      > --
-> >      > 2.17.1
-> >      >
+ - Fix bugs with overflow handing, kvm_pmu_get_counter_value did not
+   take into consideration the perf counter value overflowing the low
+   counter
+
+ - Ensure PMCCFILTR_EL0 is used when operating on the cycle counter
+
+ - Rename kvm_pmu_reenable_enabled_{pair, single} and similar
+
+ - Always create perf event disabled to simplify logic elsewhere
+
+ - Move PMCNTENSET_EL0 test to kvm_pmu_enable_counter_mask
+
+Andrew Murray (5):
+  KVM: arm/arm64: rename kvm_pmu_{enable/disable}_counter functions
+  KVM: arm/arm64: extract duplicated code to own function
+  KVM: arm/arm64: re-create event when setting counter value
+  KVM: arm/arm64: lazily create perf events on enable
+  KVM: arm/arm64: support chained PMU counters
+
+ arch/arm64/kvm/sys_regs.c |   4 +-
+ include/kvm/arm_pmu.h     |   9 +-
+ virt/kvm/arm/pmu.c        | 409 ++++++++++++++++++++++++++++++++++++++--------
+ 3 files changed, 352 insertions(+), 70 deletions(-)
+
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
