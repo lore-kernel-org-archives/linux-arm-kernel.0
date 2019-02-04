@@ -2,72 +2,83 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 197C1C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 19:28:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D3D8C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 20:03:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DB8902176F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 19:28:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 59AD72081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 20:03:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KrdksRDf";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="LlrzRCmS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB8902176F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SuiCgF7T";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="gshQC59i"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59AD72081B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RNZnxlEUBL2pSfFL2boISbbdk279upMRVkhlxONWIH0=; b=KrdksRDf1jfzD+
-	WGSYmy3mY0fMlawLpBZqnccr0seYJqLSIvuTFRl8DD2VyV7nrWQ6H5hiBn9KpzT12cTcIvBB0le/A
-	U0fSaehpKB0Z7oF00fMqZx6BA/dOj23T15kqqXKX6/opnmCwevFNGthwQLSNzRupFYWneNf89Ka4A
-	nrI3YyNRvBamsStcgqYEO9aM1tTk06EPCmWSVqXeoZTI8Va2/734agzm9HYHccikOCIlUaPCjjySD
-	n2GHahHaqbRGNVoTB9uByPyGK0hQaSDbhckUkClZLUszr5r7qs6rxor6ZE8I5Zv/utMAcfghHuoOy
-	6cKmC817rW+CBmfps/eA==;
+	List-Owner; bh=x40Ty6REk9TN70dmwTyfaemDJlCp7j52RbZYe+JCnws=; b=SuiCgF7Two0Wmr
+	hVNzuxQXDMIrBML/A0JuxbBb7QGb4IUTMxOmRRwZoUeRHP/JOfod2qPohGq0OobigRyVo945zJjyn
+	nt/8cB/CPkAzhJU+JllqIbUkbbnzTWMdStZs+FeHak3oMFZvMycpC+qv99OdBoNyecj/uOfnz7ShA
+	OkUOk7W14+f0/YaiUwxsxL4wf/818IsOxLW5QL4cgO0EBE2Gvx2P6FUiEFOOh8fPaJblTvH23GYqq
+	GvKiwrJjBfwshZ6u0W3UnCRy9/iwb5wcnnRvOHO0xxsy/dVQrrABPOrPSD74M6jU7uRa8/oE5/Szv
+	bWkm5ZzL5b6EZp6hZvBQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqjug-0007Tk-9d; Mon, 04 Feb 2019 19:28:14 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gqkSQ-0001a6-Eg; Mon, 04 Feb 2019 20:03:06 +0000
+Received: from mail-ot1-x330.google.com ([2607:f8b0:4864:20::330])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqjue-0007Te-HR
- for linux-arm-kernel@bombadil.infradead.org; Mon, 04 Feb 2019 19:28:12 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=ddpLCpUtntO4q2hH/ZOtsI1KfXO6kOTHtpv7ewThn44=; b=LlrzRCmSgUhGcqyvxAPinBDJG
- lwK7CEyBcvn8GsnT/HJQgmkPOYqV5LdnbHe4MhR3Tbut3fpdR6iimJOvctYmsv8JnC86nRC03zEb/
- 7n50i8E5TPzzmeDI2fGFzoSSdIVQz8R/oLf/SwjbVdFenehrBa5TE0aAtTkc1XcvCU0K69m/mYu1W
- H6wxghZhltIm/KeYqlKXR1yOOnaDHXx5+6oDr68zBzvYd4IorZ3iPQEISIBXpKgrRoUDvCtqqLZMX
- eN8jdZUxVJDdp13sJ/7dbQhQs2+M2joDICRJdCm19VVD0M4sSSJ6fxfgK1xYhmumRB5bh7aTHVVgi
- Fdb0pWMww==;
-Received: from [190.15.121.82] (helo=quaco.ghostprotocols.net)
- by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqjuc-0006Qu-Cp
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 19:28:10 +0000
-Received: by quaco.ghostprotocols.net (Postfix, from userid 1000)
- id D6AD34034F; Mon,  4 Feb 2019 16:27:58 -0300 (-03)
-Date: Mon, 4 Feb 2019 16:27:58 -0300
-From: Arnaldo Carvalho de Melo <acme@kernel.org>
-To: Mathieu Poirier <mathieu.poirier@linaro.org>
-Subject: Re: [PATCH v7 0/8] perf cs-etm: Add support for sample flags
-Message-ID: <20190204192758.GJ5593@kernel.org>
-References: <20190129122842.32041-1-leo.yan@linaro.org>
- <CANLsYky9fUcCkek3CWh8vXpRN07YbnnPirWxtRLum13a1FEQ2g@mail.gmail.com>
+ id 1gqkSN-0001Zh-4g; Mon, 04 Feb 2019 20:03:04 +0000
+Received: by mail-ot1-x330.google.com with SMTP id a11so1896125otr.10;
+ Mon, 04 Feb 2019 12:03:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=dlSy7ECNsSOP0ebJimbZXxzz0cJdouA4zM6hfDf3yDI=;
+ b=gshQC59iQ0pgScLv8PD958XLzI0YMkfEt8du66Gke2M8dV8J7Kiz6APAiZWwwTo3nf
+ H3rGsL/Sbc7a0/Wlh+0eencU1PllvoJAKxR+9QHK3XTrsee6tn24qGWe4c3fDOsQGy/A
+ OGBt0grCE7VRH3pkxlaXtu8Ua8bjUiBWUVzoXHMYpFIhI7MRQHdo96uwMIHOibhY34A1
+ S0AKcIbr3agOwW1XEnHut+PnNXjBG/AdvPA2nGCcdp8yNwaG2/It6gprgSKG7+cNWZjC
+ L2GO49Tbi19IdnUsCeVlRIQwbS8nwT0yJkVS/DCk/0T8QZ8XM/6AlPmQbwDLi1yd0kTJ
+ ijqQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=dlSy7ECNsSOP0ebJimbZXxzz0cJdouA4zM6hfDf3yDI=;
+ b=PKz8FhxCuUYrVPu6oRdLzbenveTr8lyla+Z8ZZs5dy6JMU5aMEHaTb0nyU2n9TwWMj
+ ZOjIrPo9RIEbibGeEMQO+GQUDo80XZ9C7kdsGZgiqqmt3kTQyF6rglBoa+PEKrM7S5JB
+ 5BN+An81XpG9g98FL6TpK7sw7Bo+rHJy61Bi22ul98WITmFvWMO1rQE/zOIm++cqTMS+
+ RBna6XdeZF3eSqNUJY62QtRGjgwZM+wmq4tShkVQmEFerQ2B8QtSl7bnDe/s5GTqhZrJ
+ 2tGmXeVje08hm4lLfTuIJxjEJmsG6FpnT1yKekP+B9fX1BRGiyGmKWdpvhyDEyIJlKO6
+ bBrw==
+X-Gm-Message-State: AHQUAub0SBgMJAnbF5Crw1c9JTugKqicC3zXfn9nTqLA7j2tPQ5PhhWo
+ GMDD1tE7/R6ZUDeX1mGgBbHEVmS8ouM/jy3fZtI=
+X-Google-Smtp-Source: AHgI3IYC1aeGh1mhE5emDQfTD1PoOgBc+rJ9MT3+lnlFnyHK2CXmOwg71wB1WCbZlHQSjjqPZ1RmE8pJ2K6DskPA+ws=
+X-Received: by 2002:a05:6830:186:: with SMTP id q6mr618591ota.76.1549310579846; 
+ Mon, 04 Feb 2019 12:02:59 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CANLsYky9fUcCkek3CWh8vXpRN07YbnnPirWxtRLum13a1FEQ2g@mail.gmail.com>
-X-Url: http://acmel.wordpress.com
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <20190123151209.2080-1-linux.amoon@gmail.com>
+ <20190123151209.2080-2-linux.amoon@gmail.com>
+ <CAFBinCCOQ_GqHZuYf6n8ba_ZMbOwKmUzc4EJAuXRpn4tTTCUKA@mail.gmail.com>
+In-Reply-To: <CAFBinCCOQ_GqHZuYf6n8ba_ZMbOwKmUzc4EJAuXRpn4tTTCUKA@mail.gmail.com>
+From: Anand Moon <linux.amoon@gmail.com>
+Date: Tue, 5 Feb 2019 01:32:45 +0530
+Message-ID: <CANAwSgSQH2zta+tOcqnM3JPZ45XkqWEJAWOL3Do0Mnrbam8VSw@mail.gmail.com>
+Subject: Re: [RFCv1 1/3] phy: meson8b-usb2: Enable otg phy controller on
+ Meson8b SoCs
+To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190204_120303_233505_4392DDC3 
+X-CRM114-Status: GOOD (  27.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,188 +90,143 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Coresight ML <coresight@lists.linaro.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Leo Yan <leo.yan@linaro.org>, Namhyung Kim <namhyung@kernel.org>,
- Robert Walker <robert.walker@arm.com>, Jiri Olsa <jolsa@redhat.com>,
+Cc: devicetree <devicetree@vger.kernel.org>,
+ Neil Armstrong <narmstrong@baylibre.com>, Kevin Hilman <khilman@baylibre.com>,
+ Kishon Vijay Abraham I <kishon@ti.com>, Rob Herring <robh+dt@kernel.org>,
+ linux-amlogic@lists.infradead.org,
  linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Mike Leach <mike.leach@linaro.org>
+ Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Em Mon, Feb 04, 2019 at 11:41:28AM -0700, Mathieu Poirier escreveu:
-> On Tue, 29 Jan 2019 at 05:29, Leo Yan <leo.yan@linaro.org> wrote:
+Hi Martin,
+
+Thanks for your review comment.
+Please find my comments below.
+
+On Mon, 4 Feb 2019 at 18:51, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+>
+> Hi Anand,
+>
+> On Wed, Jan 23, 2019 at 4:12 PM Anand Moon <linux.amoon@gmail.com> wrote:
 > >
-> > This patch seris adds support for sample flags so can facilitate perf
-> > to print sample flags for branch instruction.
+> > Meson8b support two USB phy controller, one with otg port and
+> > other usb host controller. USB OTG controller ie. otg port can
+> > be used to power on board or host port for usb device.
+> > Changes enable usb otg host controller when dr_mode is set to otg.
+> can you please add a sentence explaining *why* this allows enabling USB OTG?
+>
+> > Currenly otg port can be used to power on the board.
+> typo, should be "Currently"
+
+Ok I will fix this next version.
+
+>
+> > Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> > Cc: Jerome Brunet <jbrunet@baylibre.com>
+> > Cc: Neil Armstrong <narmstrong@baylibre.com>
+> > Cc: Kevin Hilman <khilman@baylibre.com>
+> > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> > ---
+> > New patch in this series.
+> > --TOTO enable OTG port to work as host.
+> > --Currently we can power on the board from this OTG port.
 > >
-> > Patch 0001 is used to save last branch information in packet structure,
-> > this includes instruction type, subtype and condition flag to help
-> > making decision for which branch instruction it is.  It passes related
-> > information from decoder layer to cs-etm.c, so we use cs-etm.c as a
-> > central place to set sample flags.
+> > /:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
+> >     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
+> >         |__ Port 1: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+> >         |__ Port 3: Dev 3, If 0, Class=Video, Driver=uvcvideo, 480M
+> >         |__ Port 3: Dev 3, If 1, Class=Video, Driver=uvcvideo, 480M
+> >         |__ Port 3: Dev 3, If 2, Class=Audio, Driver=snd-usb-audio, 480M
+> >         |__ Port 3: Dev 3, If 3, Class=Audio, Driver=snd-usb-audio, 480M
+> > /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
+> > ---
+> >  drivers/phy/amlogic/phy-meson8b-usb2.c | 15 +++++++++++++++
+> >  1 file changed, 15 insertions(+)
 > >
-> > Patch 0002 is used to set sample flags for instruction range packet.
+> > diff --git a/drivers/phy/amlogic/phy-meson8b-usb2.c b/drivers/phy/amlogic/phy-meson8b-usb2.c
+> > index 9c01b7e19b06..1333c77e9172 100644
+> > --- a/drivers/phy/amlogic/phy-meson8b-usb2.c
+> > +++ b/drivers/phy/amlogic/phy-meson8b-usb2.c
+> > @@ -109,6 +109,7 @@
 > >
-> > Patch 0003 is used to set sample flags for trace discontinuity packet.
+> >  #define RESET_COMPLETE_TIME                            500
+> >  #define ACA_ENABLE_COMPLETE_TIME                       50
+> > +#define DCD_ENABLE_COMPLETE_TIME                       10
 > >
-> > Patches 0004/0005/0006 are preparation for exception packet handling:
-> > Patch 0004 addes exception number in packet; pacth 0005/0006 is to use
-> > traceID/metadata tuple to access metadata pointer based on traceID, this
-> > can help decide if the CPU is connected with ETMv3 or ETMv4, ETMv3 and
-> > ETMv4 have totally different definition for exception numbers.
+> >  struct phy_meson8b_usb2_priv {
+> >         void __iomem            *regs;
+> > @@ -188,6 +189,20 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
 > >
-> > Patch 0007 sets sample flags for exception packet; patch 0008 support
-> > sample flags for exception return packet.
+> >                 udelay(ACA_ENABLE_COMPLETE_TIME);
 > >
-> > This patch set is applied on the acme's perf core branch with the latest
-> > commit bdec77cfe58d ("Merge remote-tracking branch 'tip/perf/urgent'
-> > into perf/core").
-> >
-> > This patch set has been verified for x86 and arm64 perf building and
-> > also is verified with below command:
-> >
-> > Before:
-> >
-> >   # perf script -F,-time,+flags -k vmlinux
-> >
-> >   [...]
-> >
-> >   main  6650 [001]          1              branches:                                f7b08490 lib_loop_test+0xc (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:                                f7b084a2 lib_loop_test+0x1e (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:                                f7b084a2 lib_loop_test+0x1e (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:                                f7b084a2 lib_loop_test+0x1e (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:                                f7b084a2 lib_loop_test+0x1e (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:                                f7b084a2 lib_loop_test+0x1e (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:                                f7b084b0 lib_loop_test+0x2c (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:                                  6b65a8 main+0x1c (/root/coresight_test/main)
-> >   main  6650 [001]          1              branches:                                  6b6448 printf@plt+0x8 (/root/coresight_test/main)
-> >   main  6650 [001]          1              branches:                                  6b642c _init+0x18 (/root/coresight_test/main)
-> >   main  6650 [001]          1              branches:                                f7b2d23c [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:                                f7b2906e [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:                                f7b2559a [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:                                f7b2559a [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:                                f7b2559a [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:                                f7b2559a [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:                                f7b2559a [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:                                f7b255ee [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:                                f7b25634 [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >
-> >   [...]
-> >
-> >
-> > After:
-> >
-> >   # perf script -F,-time,+flags -k vmlinux
-> >
-> >   [...]
-> >
-> >   main  6650 [001]          1              branches:   jmp                          f7b08490 lib_loop_test+0xc (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:   jcc                          f7b084a2 lib_loop_test+0x1e (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:   jcc                          f7b084a2 lib_loop_test+0x1e (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:   jcc                          f7b084a2 lib_loop_test+0x1e (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:   jcc                          f7b084a2 lib_loop_test+0x1e (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:   jcc                          f7b084a2 lib_loop_test+0x1e (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:   return                       f7b084b0 lib_loop_test+0x2c (/root/coresight_test/libcstest.so)
-> >   main  6650 [001]          1              branches:   call                           6b65a8 main+0x1c (/root/coresight_test/main)
-> >   main  6650 [001]          1              branches:   return                         6b6448 printf@plt+0x8 (/root/coresight_test/main)
-> >   main  6650 [001]          1              branches:   return                         6b642c _init+0x18 (/root/coresight_test/main)
-> >   main  6650 [001]          1              branches:   call                         f7b2d23c [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:   call                         f7b2906e [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:   jcc                          f7b2559a [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:   jcc                          f7b2559a [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:   jcc                          f7b2559a [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:   jcc                          f7b2559a [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:   jcc                          f7b2559a [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:   jmp                          f7b255ee [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >   main  6650 [001]          1              branches:   call                         f7b25634 [unknown] (/usr/lib/arm-linux-gnueabihf/ld-2.27.so)
-> >
-> >   [...]
-> 
-> Good day Arnaldo,
-> 
-> I have reviewed, compiled and tested this patchset - please consider
-> for inclusion.
+> > +               if (phy_meson8b_usb2_read(priv, REG_ADP_BC) &
+> > +                       REG_ADP_BC_ACA_PIN_FLOAT) {
+> > +                       dev_warn(&phy->dev, "USB ID detect failed!\n");
+> > +                       clk_disable_unprepare(priv->clk_usb);
+> > +                       clk_disable_unprepare(priv->clk_usb_general);
+> > +                       return -EINVAL;
+> > +               }
+> > +       } else if (priv->dr_mode == USB_DR_MODE_OTG) {
+> > +               phy_meson8b_usb2_mask_bits(priv, REG_ADP_BC,
+> > +                                          REG_ADP_BC_DCD_ENABLE,
+> > +                                          REG_ADP_BC_DCD_ENABLE);
+> where did you take this from?
+
+As per the schematic it's otg phy,
+I study the code to enable "host" mode for phy1 and on similar line I
+tried to enable otg phy.
+this changes will come into effect when we set dr_mode="otg" in dts.
+but it do not enable this as host port.
+
+*Second thought this enable DCD which seem the be wrong. Thanks for porting out*
+We could set this to 0 at initial state for now and it will work as it should.
+I will send the correct fix later.
+
+> $ grep -iR DCD arm-src-kernel-2015-01-15-321cfb5a46/drivers/amlogic/usb/dwc_otg/310/
+> -> I only find code which clears REG_ADP_BC_DCD_ENABLE (your patch sets it):
+>   adp_bc.b.dcd_enable = 0;
+
+This usb port act as a changer port but it also depend on the how this
+port is tuned to various states as shown below.
+
+Standard Downstream Port (SDP) is a downstream port that complies
+              with the USB 2.0 or USB 3.0 definition of a host or hub.
+Charging Downstream Port (CDP) is a downstream port that complies
+              with the USB 2.0 or USB 3.0 definition of a host or a hub.
+Dedicated Charging Port (DCP)  is a downstream port on a device
+              that outputs power through a USB connector.
+
+We cannot observe this now because this behave like a states machine which
+is possible handled both in kernel driver and u-boot of Amlogic.
+As per schematics this (page 7)  we have a external jumper set to
+control the power path of the port.
+
+Odroid Wiki also says so.
+[0] https://wiki.odroid.com/odroid-c1/hardware/otg_power_enable
+
+>
+> > +               udelay(DCD_ENABLE_COMPLETE_TIME);
+> from Amlogic's code: DWC_MDELAY(T_DCD_TIMEOUT);
+> while you are also using a delay of "10" the unit is different (your
+> patch: us, Amlogic: ms)
+>
+
+This timeout is basically used in the state machine in the kernel and
+u-boot to tune the phy
+Not sure this changes will affect the phy power state.
+
+>
+> Regards
+> Martin
+
+Best Regards
 
 
-Thanks, I'll check it after I push perf/urgent, that is almost ready.
-
-> Regards,
-> Mathieu
-> 
-> >
-> >
-> > Changes from v6:
-> > * Addressed Mathieu's suggestion for patch 0005, refined its commit log
-> >   and comment and fixed cs_etm__get_cpu() definitions in header file;
-> >   also tested with perf for Arm and x86 buildings.
-> > * Added Mathieu's review tags.
-> >
-> > Changes from v5:
-> > * Addressed Rob's suggestion to add specification info for exception
-> >   number encoding;
-> > * Added Rob's review tag in patch 0007.
-> >
-> > Changes from v4:
-> > * Fixed typos in comments, and removed redundant info from commit log;
-> > * Addressed Mathieu's suggestion to add helper functions for metadata
-> >   fields (CS_ETM_CPU and CS_ETM_MAGIC) accessing;
-> > * Addressed Mathieu's suggestion to include headers with alphabetical
-> >   order.
-> >
-> > Changes from v3:
-> > * Fixed typos in commit logs;
-> > * Rearranged fields in cs_etm_packet by grouping with same variable
-> >   types;
-> > * Fixed ETMv4 exception number which pointed by Mike;
-> > * Fixed ETMv4 SVC / SMC / HVC in the same CALL, by checking svc
-> >   instruction to distinguish them;
-> > * Refine ETMv4 return exception packet handling.
-> >
-> > Changes from v2:
-> > * Addressed Mathieu's suggestion to split one big patch to 3 small
-> >   patches for setting sample flags, one is for instruction range
-> >   packet, one is for discontinuity packet and one is for exception
-> >   packet.
-> > * Added supporting for ETMv3 exception packet.
-> > * Followed Mathieu's suggestion to move all sample flags handling
-> >   from decoder layer to cs-etm.c, thus it has enough info to set flags
-> >   based on trace context in single place.
-> >
-> > Changes from v1:
-> > * Moved exception packets handling patches into patch series 'perf
-> >   cs-etm: Correct packets handling'.
-> > * Added sample flags fixing up for TRACE_OFF packet.
-> > * Created a new function which is used to maintain flags fixing up.
-> >
-> >
-> > Leo Yan (8):
-> >   perf cs-etm: Add last instruction information in packet
-> >   perf cs-etm: Set sample flags for instruction range packet
-> >   perf cs-etm: Set sample flags for trace discontinuity
-> >   perf cs-etm: Add exception number in exception packet
-> >   perf cs-etm: Change tuple from traceID-CPU# to traceID-metadata
-> >   perf cs-etm: Add traceID in packet
-> >   perf cs-etm: Set sample flags for exception packet
-> >   perf cs-etm: Set sample flags for exception return packet
-> >
-> >  .../perf/util/cs-etm-decoder/cs-etm-decoder.c |  41 +-
-> >  .../perf/util/cs-etm-decoder/cs-etm-decoder.h |   6 +
-> >  tools/perf/util/cs-etm.c                      | 394 +++++++++++++++++-
-> >  tools/perf/util/cs-etm.h                      |  53 ++-
-> >  4 files changed, 476 insertions(+), 18 deletions(-)
-> >
-> > --
-> > 2.17.1
-> >
-
--- 
-
-- Arnaldo
+-Anand
 
 _______________________________________________
 linux-arm-kernel mailing list
