@@ -2,63 +2,83 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5FA50C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:12:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 80611C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:21:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2EB752082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:12:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4C5C32082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:21:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CNbvxvtn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2EB752082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QhQX8HPv";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="KCLZCedu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C5C32082F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=O6xTBadxTd5+pmzaFStjdm5sXhcv7zxx1aCXpSicA4c=; b=CNbvxvtnmSfYmA
-	cJO6mPeJ3YA7InE12r6RH9j8ApX0o/l13MPucwqNP0/vnG+JVWjc0tVJsyXO1tiJS1MdMJudEkQAy
-	/wd8sCduZJaxyoxsAy/7pqELPw3AM61ByHMAER7Xyg711AH7oTmhzXoxwq7tAw0NhJaxlxctklgBi
-	ev5bQlsZfKiulSYTYC5VWwafdVvkZzjPUVzZlq6CVNXyMHVZoIkaw/FzwvgRJdSDOY/2GMbOYn55N
-	jZTHqQgELeMX3LNaX87WW6EVuYStvK1yloY9sW9STA3Z6tSckPuLxC7n2W6JB+8j83fIkq/TaDAV7
-	aCiBmLUHjl+bkWXT/6ig==;
+	List-Owner; bh=2LiiGHhNKoZQzAjWZlvWFUyGJa77PwWAu2LpJTqPobg=; b=QhQX8HPvc5uIYr
+	Dnn9onXkjvxFtkEwuFEV7M18gi/cPDCRmfMhMnpVR5raQg6gRj9V3GTLZeziWI13HIygENLa1DmDA
+	ycSwvrAH/0k+e4Ifv4wNQ6hmkqvO0+q5GhhJu24GS3a9dIivCf2f2mjS8uEPHeLK0duNQRz5KWYfD
+	/xqizBOZarun9gGNIhcyFkJIOJvmn7afg2jzIQpZsG3C9UaD0ntjvjfeGLDepZ1CUrLrA1KOv6TDl
+	iCaqtPnHly7CAQ3dGLgMdZ8Vz4+/0SRCpQWxk1c9+2DlwWnJIbjFFucOtoR62d7NhlSoA6+5oINCL
+	bBt5UYSWxMN7JookM96Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqe3Q-00065b-4x; Mon, 04 Feb 2019 13:12:52 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqe3L-00065I-MU
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 13:12:49 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 17F7515AB;
- Mon,  4 Feb 2019 05:12:45 -0800 (PST)
-Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D87853F557;
- Mon,  4 Feb 2019 05:12:43 -0800 (PST)
-Date: Mon, 4 Feb 2019 13:12:41 +0000
-From: Mark Rutland <mark.rutland@arm.com>
-To: Doug Anderson <dianders@chromium.org>
-Subject: Re: Possible to annotate ARM64 IRQ handling to help gdb?
-Message-ID: <20190204131241.GB46085@lakrids.cambridge.arm.com>
-References: <CAD=FV=X+YOf6Pt8bwuh0KCs=H3KTAW3atLLEP_X-5BMqtYMyZQ@mail.gmail.com>
+	id 1gqeBX-0000hT-Bl; Mon, 04 Feb 2019 13:21:15 +0000
+Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqeBT-0000h7-Vl; Mon, 04 Feb 2019 13:21:13 +0000
+Received: by mail-ot1-x344.google.com with SMTP id v23so12828286otk.9;
+ Mon, 04 Feb 2019 05:21:11 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=googlemail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=uZVG5DUNwChyTDNZ2apKIXVpZJJyZiLAB7MMLhzKa68=;
+ b=KCLZCedutreYPysnbSc8b8RxwO58xZsrrQBi9JekcpkBQVWntBqAzQ0wYixP3ytunc
+ cAHlqUUsEi5iD7MUHQNo2UZP1MX9zAiOllMWi6FmnkUAT1MF9pqJZJWsA9LMVVbnzr0V
+ fOcHAJgb1tNhTKbKkeU68ajpXaBk3O+HOFBnfJoWwE7+S8pfyiG+s/ut2tpJlZDmet+U
+ rMR/t6xO/0lueaTn+Snl85NuhqF9wP1MRltKBb4DXc6LREL3CwGyLaH1OMxDCe5RSySz
+ dGWBfXvIW0fO0Pgr14Cp2CS+NpFSC5XGmT/oRgg5gwDoQXOIqSbCNUD8Uk/ZbenqF5Rc
+ PVPw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=uZVG5DUNwChyTDNZ2apKIXVpZJJyZiLAB7MMLhzKa68=;
+ b=EbjelTuSZBsdua94X7OWP7s0qyL6SwHcIAS6hmGljtE3kGvHUqBcRPfyd+k9tmiRUu
+ PIeRQxPmNZVwGIh8sip3jRCln+VCn6w25RxJH496GxY8HS17v4150972U7iIAf5WfQF3
+ 0wq5UtKbT5ssztobjdM3Tv+mRXRk3fQiYkF5V5HEZdH87hebbCSdI30MmPEFWPcvQUfi
+ WSj3zJQ4rIVqg/fe2Y7FQlnUKhxANPK+L58fjQRBfTDToO1WytDjGpCGqxMVk+BxBhLY
+ r08ToGEZ287ZnJF7zfLpKT4r4S1YUZPVVRMGhMZbtBKY6StNEnAphMJbEXxs5dKMF60B
+ QLGw==
+X-Gm-Message-State: AHQUAuYoWAQHrSapdL4DitN+JV8G0NZ4EwAvs7OMw6GJ6rBGntzDyH70
+ wl6TFV1mV11VpnMs7f5Url998a+BmtmcsYQMjoY=
+X-Google-Smtp-Source: ALg8bN5D/5xTQtm5YXR+JIeIdc8P/hfby9TCD9bpta4V9UwzGzyXvvkuHr2n1wlH7noN51JEHPRZLsKsP78Cwovx428=
+X-Received: by 2002:aca:3586:: with SMTP id c128mr27585274oia.47.1549286470256; 
+ Mon, 04 Feb 2019 05:21:10 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAD=FV=X+YOf6Pt8bwuh0KCs=H3KTAW3atLLEP_X-5BMqtYMyZQ@mail.gmail.com>
-User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
+References: <20190123151209.2080-1-linux.amoon@gmail.com>
+ <20190123151209.2080-2-linux.amoon@gmail.com>
+In-Reply-To: <20190123151209.2080-2-linux.amoon@gmail.com>
+From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Date: Mon, 4 Feb 2019 14:20:59 +0100
+Message-ID: <CAFBinCCOQ_GqHZuYf6n8ba_ZMbOwKmUzc4EJAuXRpn4tTTCUKA@mail.gmail.com>
+Subject: Re: [RFCv1 1/3] phy: meson8b-usb2: Enable otg phy controller on
+ Meson8b SoCs
+To: Anand Moon <linux.amoon@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_051247_906412_CC0E24C0 
-X-CRM114-Status: GOOD (  18.52  )
+X-CRM114-CacheID: sfid-20190204_052112_050786_E0EEB238 
+X-CRM114-Status: GOOD (  18.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,60 +90,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kgdb-bugreport@lists.sourceforge.net, Will Deacon <will.deacon@arm.com>,
- Dave Martin <Dave.Martin@arm.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Stephen Boyd <swboyd@chromium.org>
+Cc: devicetree@vger.kernel.org, Neil Armstrong <narmstrong@baylibre.com>,
+ Kevin Hilman <khilman@baylibre.com>, Kishon Vijay Abraham I <kishon@ti.com>,
+ Rob Herring <robh+dt@kernel.org>, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org, Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 01, 2019 at 01:38:05PM -0800, Doug Anderson wrote:
-> Hi,
+Hi Anand,
 
-Hi Doug,
+On Wed, Jan 23, 2019 at 4:12 PM Anand Moon <linux.amoon@gmail.com> wrote:
+>
+> Meson8b support two USB phy controller, one with otg port and
+> other usb host controller. USB OTG controller ie. otg port can
+> be used to power on board or host port for usb device.
+> Changes enable usb otg host controller when dr_mode is set to otg.
+can you please add a sentence explaining *why* this allows enabling USB OTG?
 
-> I was wondering if anyone out there has given any thought to
-> annotating the ARM64 IRQ handling in such a way that we could stack
-> crawl past el1_irq() when in gdb.
-> 
-> I spent a bit of time on this a few months ago and documented all my
-> findings in:
-> 
-> https://bugs.chromium.org/p/chromium/issues/detail?id=908721
+> Currenly otg port can be used to power on the board.
+typo, should be "Currently"
 
-There, the error from GDB is:
+> Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Cc: Jerome Brunet <jbrunet@baylibre.com>
+> Cc: Neil Armstrong <narmstrong@baylibre.com>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> ---
+> New patch in this series.
+> --TOTO enable OTG port to work as host.
+> --Currently we can power on the board from this OTG port.
+>
+> /:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
+>     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
+>         |__ Port 1: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+>         |__ Port 3: Dev 3, If 0, Class=Video, Driver=uvcvideo, 480M
+>         |__ Port 3: Dev 3, If 1, Class=Video, Driver=uvcvideo, 480M
+>         |__ Port 3: Dev 3, If 2, Class=Audio, Driver=snd-usb-audio, 480M
+>         |__ Port 3: Dev 3, If 3, Class=Audio, Driver=snd-usb-audio, 480M
+> /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
+> ---
+>  drivers/phy/amlogic/phy-meson8b-usb2.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+>
+> diff --git a/drivers/phy/amlogic/phy-meson8b-usb2.c b/drivers/phy/amlogic/phy-meson8b-usb2.c
+> index 9c01b7e19b06..1333c77e9172 100644
+> --- a/drivers/phy/amlogic/phy-meson8b-usb2.c
+> +++ b/drivers/phy/amlogic/phy-meson8b-usb2.c
+> @@ -109,6 +109,7 @@
+>
+>  #define RESET_COMPLETE_TIME                            500
+>  #define ACA_ENABLE_COMPLETE_TIME                       50
+> +#define DCD_ENABLE_COMPLETE_TIME                       10
+>
+>  struct phy_meson8b_usb2_priv {
+>         void __iomem            *regs;
+> @@ -188,6 +189,20 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
+>
+>                 udelay(ACA_ENABLE_COMPLETE_TIME);
+>
+> +               if (phy_meson8b_usb2_read(priv, REG_ADP_BC) &
+> +                       REG_ADP_BC_ACA_PIN_FLOAT) {
+> +                       dev_warn(&phy->dev, "USB ID detect failed!\n");
+> +                       clk_disable_unprepare(priv->clk_usb);
+> +                       clk_disable_unprepare(priv->clk_usb_general);
+> +                       return -EINVAL;
+> +               }
+> +       } else if (priv->dr_mode == USB_DR_MODE_OTG) {
+> +               phy_meson8b_usb2_mask_bits(priv, REG_ADP_BC,
+> +                                          REG_ADP_BC_DCD_ENABLE,
+> +                                          REG_ADP_BC_DCD_ENABLE);
+where did you take this from?
+$ grep -iR DCD arm-src-kernel-2015-01-15-321cfb5a46/drivers/amlogic/usb/dwc_otg/310/
+-> I only find code which clears REG_ADP_BC_DCD_ENABLE (your patch sets it):
+  adp_bc.b.dcd_enable = 0;
 
-    Backtrace stopped: previous frame identical to this frame (corrupt
-    stack?)
+> +               udelay(DCD_ENABLE_COMPLETE_TIME);
+from Amlogic's code: DWC_MDELAY(T_DCD_TIMEOUT);
+while you are also using a delay of "10" the unit is different (your
+patch: us, Amlogic: ms)
 
-... is that misleading?
 
-... or do we have some duplicate stack frame that we somewhow skip in
-the kernel unwinder?
-
-> I can copy and paste all the discussion from that bug here, but since
-> it's public hopefully folks can read the discussion / investigation
-> there.  To put it briefly, though: I can stack crawl past "el1_irq"
-> with the normal linux stack crawl (which is what kdb uses) but I can't
-> crawl past "el1_irq" in gdb().  After talking to some of our tools
-> guys here I'm fairly certain that we could solve this with the right
-> CFI directives, but when I poked at it I wasn't able to figure out the
-> magic.
-
-AFAICT, we don't know why GDB is terminating early. Could we please
-figure that out first? e.g. by looking for the above message in the GDB
-sources.
-
-If we do need CFI annotations, I'd rather move that entry code to C
-first, to minimize how painful that is. I have an ongoing project [1] to
-do just that...
-
-Thanks,
-Mark.
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git/log/?h=arm64/entry-deasm
+Regards
+Martin
 
 _______________________________________________
 linux-arm-kernel mailing list
