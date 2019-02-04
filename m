@@ -2,61 +2,65 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2DF7CC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:06:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 907B1C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:06:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EE2982087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:06:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 540802087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:06:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Oh48wYJy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE2982087C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e9NuTTcJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 540802087C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=IVXdX/bgxkwUhpMSGzj99dkefpfTkNGDTeZDY5IHA5Q=; b=Oh48wYJyVK39Fz+mAL2xJfKSne
-	QUd0Z93adMAoXs9C8J6UuNQ/ieRQXUzWMYQoBj/xNwySr+8retFWpTGpJmTS9dYEeu1mH3frOLzxq
-	Apt7QYnS1NZQiLbk1aUzGVUfvI2RjyFeHk/gtRlDfTXdCBbtpPeKK7ZIidPsIjXp6D0LYs08UnTxu
-	2O9R+YzFfsIAAllzqm+8Ki4WkRFcbVHkr4xwGFfxNqOt1f5BQ3QOQvJanBZVbjZRWP8CBUkbaeM2V
-	YDhscdMfb18asCsSMoSfLlXyngWETug+HO6LGnyos1D5amsEgXXx7y9EaV4VfAP6KzqBcJiJ/Rc8N
-	O+gwYj5A==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=4Ac/pPA2yJQirzQUusJvAvI1/2B/YOu94I/HhOWGq/g=; b=e9NuTTcJafKNSk
+	7BYvytlgP6k6QeXovwg42YsD7ggtIhe1k49Gfq+d9IZJQBMlTfi7xziAeWgEQiW8Qcln5jAc7X6qU
+	W5SLn60ZcbTvG7K/CEbjK+QKR4M8z0HayaaCM6dCoG5WqiOzdepnJJEJd4NCFJuWS5Sm4RH3d0Cp+
+	wTsZO1zw/w+Wy75Ku8icVwkecGSUk19OsBiiwVa/wbZSFNjWPPpS+LYVEvuk3LHuj5So8+xaAuawP
+	iZmwQDc8nHIHsAEWiEPMhar/GYyfARkGKz2LYTqLMPfsXL9p2PgvAvsBuDjgMQZZF34YvZ54w7rGu
+	fUdsoznw5e9PgF4eolJg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqhho-0002Mw-W8; Mon, 04 Feb 2019 17:06:49 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gqhht-0002Rf-CN; Mon, 04 Feb 2019 17:06:53 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqhVK-0003c0-61
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:54:14 +0000
+ id 1gqhWM-0004bj-V6; Mon, 04 Feb 2019 16:55:36 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 88F6815AD;
- Mon,  4 Feb 2019 08:53:53 -0800 (PST)
-Received: from e119886-lin.cambridge.arm.com (unknown [10.37.6.16])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id F190A3F589;
- Mon,  4 Feb 2019 08:53:51 -0800 (PST)
-From: Andrew Murray <andrew.murray@arm.com>
-To: Christoffer Dall <christoffer.dall@arm.com>,
- Marc Zyngier <marc.zyngier@arm.com>
-Subject: [PATCH v2 5/5] KVM: arm/arm64: support chained PMU counters
-Date: Mon,  4 Feb 2019 16:53:38 +0000
-Message-Id: <1549299218-44714-6-git-send-email-andrew.murray@arm.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1549299218-44714-1-git-send-email-andrew.murray@arm.com>
-References: <1549299218-44714-1-git-send-email-andrew.murray@arm.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2CB3615AB;
+ Mon,  4 Feb 2019 08:54:57 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 409D93F589;
+ Mon,  4 Feb 2019 08:54:55 -0800 (PST)
+Subject: Re: [PATCH 1/2] arm64: Expose address bits (physical/virtual) via
+ cpuinfo
+To: Bhupesh Sharma <bhsharma@redhat.com>
+References: <1548709076-22317-1-git-send-email-bhsharma@redhat.com>
+ <1548709076-22317-2-git-send-email-bhsharma@redhat.com>
+ <afa2417a-10d0-21f6-007f-e8eb7055f3d7@arm.com>
+ <8659c949-a588-387b-3cb6-1dd8ea86723e@redhat.com>
+From: James Morse <james.morse@arm.com>
+Message-ID: <be9ad470-6f24-36cc-aeb8-a7cea3ec984a@arm.com>
+Date: Mon, 4 Feb 2019 16:54:51 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
+MIME-Version: 1.0
+In-Reply-To: <8659c949-a588-387b-3cb6-1dd8ea86723e@redhat.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_085354_927304_E9CDBD7C 
-X-CRM114-Status: GOOD (  22.41  )
+X-CRM114-CacheID: sfid-20190204_085459_194048_F109C379 
+X-CRM114-Status: GOOD (  31.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,527 +72,113 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Julien Thierry <julien.thierry@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, suzuki.poulose@arm.com
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, Steve.Capper@arm.com, catalin.marinas@arm.com,
+ ard.biesheuvel@linaro.org, will.deacon@arm.com, bhupesh.linux@gmail.com,
+ Suzuki K Poulose <suzuki.poulose@arm.com>, kexec@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Emulate chained PMU counters by creating a single 64 bit event counter
-for a pair of chained KVM counters.
-
-Signed-off-by: Andrew Murray <andrew.murray@arm.com>
----
- include/kvm/arm_pmu.h |   1 +
- virt/kvm/arm/pmu.c    | 321 +++++++++++++++++++++++++++++++++++++++++---------
- 2 files changed, 269 insertions(+), 53 deletions(-)
-
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index b73f31b..8e691ee 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -29,6 +29,7 @@ struct kvm_pmc {
- 	u8 idx;	/* index into the pmu->pmc array */
- 	struct perf_event *perf_event;
- 	u64 bitmask;
-+	u64 overflow_count;
- };
- 
- struct kvm_pmu {
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index a64aeb2..9318130 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -24,9 +24,25 @@
- #include <kvm/arm_pmu.h>
- #include <kvm/arm_vgic.h>
- 
-+#define ARMV8_PMUV3_PERFCTR_CHAIN 0x1E
-+static void kvm_pmu_stop_release_perf_event_pair(struct kvm_vcpu *vcpu,
-+					    u64 pair_low);
-+static void kvm_pmu_stop_release_perf_event(struct kvm_vcpu *vcpu,
-+					      u64 select_idx);
-+static void kvm_pmu_sync_counter_enable_pair(struct kvm_vcpu *vcpu, u64 pair_low);
- static void kvm_pmu_sync_counter_enable(struct kvm_vcpu *vcpu, u64 select_idx);
- static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 select_idx);
--static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc);
-+
-+/**
-+ * kvm_pmu_counter_is_high_word - is select_idx high counter of 64bit event
-+ * @pmc: The PMU counter pointer
-+ * @select_idx: The counter index
-+ */
-+static inline bool kvm_pmu_counter_is_high_word(struct kvm_pmc *pmc)
-+{
-+	return ((pmc->perf_event->attr.config1 & 0x1)
-+		&& (pmc->idx % 2));
-+}
- 
- /**
-  * kvm_pmu_get_counter_value - get PMU counter value
-@@ -35,22 +51,70 @@ static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc);
-  */
- u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
- {
--	u64 counter, reg, enabled, running;
-+	u64 counter_idx, reg, enabled, running, incr;
- 	struct kvm_pmu *pmu = &vcpu->arch.pmu;
- 	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
- 
- 	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
- 	      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx;
--	counter = __vcpu_sys_reg(vcpu, reg);
-+	counter_idx = __vcpu_sys_reg(vcpu, reg);
- 
- 	/* The real counter value is equal to the value of counter register plus
- 	 * the value perf event counts.
- 	 */
--	if (pmc->perf_event)
--		counter += perf_event_read_value(pmc->perf_event, &enabled,
-+	if (pmc->perf_event) {
-+		incr = perf_event_read_value(pmc->perf_event, &enabled,
- 						 &running);
- 
--	return counter & pmc->bitmask;
-+		if (kvm_pmu_counter_is_high_word(pmc)) {
-+			u64 counter_low, counter;
-+
-+			reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
-+			      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx - 1;
-+			counter_low = __vcpu_sys_reg(vcpu, reg);
-+			counter = lower_32_bits(counter_low) | (counter_idx << 32);
-+			counter_idx = upper_32_bits(counter + incr);
-+		} else {
-+			counter_idx += incr;
-+		}
-+	}
-+
-+	return counter_idx & pmc->bitmask;
-+}
-+
-+/**
-+ * kvm_pmu_counter_is_enabled - is a counter active
-+ * @vcpu: The vcpu pointer
-+ * @select_idx: The counter index
-+ */
-+static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
-+{
-+	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
-+
-+	return (__vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E) &&
-+	       (__vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & mask & BIT(select_idx));
-+}
-+
-+/**
-+ * kvnm_pmu_event_is_chained - is a pair of counters chained and enabled
-+ * @vcpu: The vcpu pointer
-+ * @select_idx: The low counter index
-+ */
-+static bool kvm_pmu_event_is_chained(struct kvm_vcpu *vcpu, u64 pair_low)
-+{
-+	u64 eventsel, reg;
-+
-+	reg = (pair_low + 1 == ARMV8_PMU_CYCLE_IDX)
-+	      ? PMCCFILTR_EL0 : PMEVTYPER0_EL0 + pair_low + 1;
-+	eventsel = __vcpu_sys_reg(vcpu, reg) & ARMV8_PMU_EVTYPE_EVENT;
-+	if (eventsel != ARMV8_PMUV3_PERFCTR_CHAIN)
-+		return false;
-+
-+	if (kvm_pmu_counter_is_enabled(vcpu, pair_low) !=
-+	    kvm_pmu_counter_is_enabled(vcpu, pair_low + 1))
-+		return false;
-+
-+	return true;
- }
- 
- /**
-@@ -61,29 +125,45 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
-  */
- void kvm_pmu_set_counter_value(struct kvm_vcpu *vcpu, u64 select_idx, u64 val)
- {
--	u64 reg;
--	struct kvm_pmu *pmu = &vcpu->arch.pmu;
--	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-+	u64 reg, pair_low;
- 
- 	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
- 	      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx;
- 	__vcpu_sys_reg(vcpu, reg) += (s64)val - kvm_pmu_get_counter_value(vcpu, select_idx);
- 
--	kvm_pmu_stop_counter(vcpu, pmc);
--	kvm_pmu_sync_counter_enable(vcpu, select_idx);
-+	pair_low = (select_idx % 2) ? select_idx - 1 : select_idx;
-+
-+	/* Recreate the perf event to reflect the updated sample_period */
-+	if (kvm_pmu_event_is_chained(vcpu, pair_low)) {
-+		kvm_pmu_stop_release_perf_event_pair(vcpu, pair_low);
-+		kvm_pmu_sync_counter_enable_pair(vcpu, pair_low);
-+	} else {
-+		kvm_pmu_stop_release_perf_event(vcpu, select_idx);
-+		kvm_pmu_sync_counter_enable(vcpu, select_idx);
-+	}
- }
- 
- /**
-  * kvm_pmu_release_perf_event - remove the perf event
-  * @pmc: The PMU counter pointer
-  */
--static void kvm_pmu_release_perf_event(struct kvm_pmc *pmc)
-+static void kvm_pmu_release_perf_event(struct kvm_vcpu *vcpu,
-+				       struct kvm_pmc *pmc)
- {
--	if (pmc->perf_event) {
--		perf_event_disable(pmc->perf_event);
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	struct kvm_pmc *pmc_alt;
-+	u64 pair_alt;
-+
-+	pair_alt = (pmc->idx % 2) ? pmc->idx - 1 : pmc->idx + 1;
-+	pmc_alt = &pmu->pmc[pair_alt];
-+
-+	if (pmc->perf_event)
- 		perf_event_release_kernel(pmc->perf_event);
--		pmc->perf_event = NULL;
--	}
-+
-+	if (pmc->perf_event == pmc_alt->perf_event)
-+		pmc_alt->perf_event = NULL;
-+
-+	pmc->perf_event = NULL;
- }
- 
- /**
-@@ -91,22 +171,65 @@ static void kvm_pmu_release_perf_event(struct kvm_pmc *pmc)
-  * @vcpu: The vcpu pointer
-  * @pmc: The PMU counter pointer
-  *
-- * If this counter has been configured to monitor some event, release it here.
-+ * If this counter has been configured to monitor some event, stop it here.
-  */
- static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc)
- {
- 	u64 counter, reg;
- 
- 	if (pmc->perf_event) {
-+		perf_event_disable(pmc->perf_event);
- 		counter = kvm_pmu_get_counter_value(vcpu, pmc->idx);
- 		reg = (pmc->idx == ARMV8_PMU_CYCLE_IDX)
- 		       ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + pmc->idx;
- 		__vcpu_sys_reg(vcpu, reg) = counter;
--		kvm_pmu_release_perf_event(pmc);
- 	}
- }
- 
- /**
-+ * kvm_pmu_stop_release_perf_event_pair - stop and release a pair of counters
-+ * @vcpu: The vcpu pointer
-+ * @pmc_low: The PMU counter pointer for lower word
-+ * @pmc_high: The PMU counter pointer for higher word
-+ *
-+ * As chained counters share the underlying perf event, we stop them
-+ * both first before discarding the underlying perf event
-+ */
-+static void kvm_pmu_stop_release_perf_event_pair(struct kvm_vcpu *vcpu,
-+					    u64 idx_low)
-+{
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	struct kvm_pmc *pmc_low = &pmu->pmc[idx_low];
-+	struct kvm_pmc *pmc_high = &pmu->pmc[idx_low + 1];
-+
-+	/* Stopping a counter involves adding the perf event value to the
-+	 * vcpu sys register value prior to releasing the perf event. As
-+	 * kvm_pmu_get_counter_value may depend on the low counter value we
-+	 * must always stop the high counter first
-+	 */
-+	kvm_pmu_stop_counter(vcpu, pmc_high);
-+	kvm_pmu_stop_counter(vcpu, pmc_low);
-+
-+	kvm_pmu_release_perf_event(vcpu, pmc_high);
-+	kvm_pmu_release_perf_event(vcpu, pmc_low);
-+}
-+
-+/**
-+ * kvm_pmu_stop_release_perf_event - stop and release a counter
-+ * @vcpu: The vcpu pointer
-+ * @select_idx: The counter index
-+ */
-+static void kvm_pmu_stop_release_perf_event(struct kvm_vcpu *vcpu,
-+					      u64 select_idx)
-+{
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-+
-+	kvm_pmu_stop_counter(vcpu, pmc);
-+	kvm_pmu_release_perf_event(vcpu, pmc);
-+}
-+
-+/**
-  * kvm_pmu_vcpu_reset - reset pmu state for cpu
-  * @vcpu: The vcpu pointer
-  *
-@@ -117,7 +240,7 @@ void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
- 	struct kvm_pmu *pmu = &vcpu->arch.pmu;
- 
- 	for (i = 0; i < ARMV8_PMU_MAX_COUNTERS; i++) {
--		kvm_pmu_stop_counter(vcpu, &pmu->pmc[i]);
-+		kvm_pmu_stop_release_perf_event(vcpu, i);
- 		pmu->pmc[i].idx = i;
- 		pmu->pmc[i].bitmask = 0xffffffffUL;
- 	}
-@@ -134,7 +257,7 @@ void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu)
- 	struct kvm_pmu *pmu = &vcpu->arch.pmu;
- 
- 	for (i = 0; i < ARMV8_PMU_MAX_COUNTERS; i++)
--		kvm_pmu_release_perf_event(&pmu->pmc[i]);
-+		kvm_pmu_release_perf_event(vcpu, &pmu->pmc[i]);
- }
- 
- u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
-@@ -167,53 +290,115 @@ static void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 select_idx)
- }
- 
- /**
-+ * kvm_pmu_sync_counter_enable - reenable a counter if it should be enabled
-+ * @vcpu: The vcpu pointer
-+ * @select_idx: The counter index
-+ */
-+static void kvm_pmu_sync_counter_enable(struct kvm_vcpu *vcpu,
-+					    u64 select_idx)
-+{
-+	kvm_pmu_enable_counter_mask(vcpu, BIT(select_idx));
-+}
-+
-+/**
-+ * kvm_pmu_sync_counter_enable_pair - reenable a pair if they should be enabled
-+ * @vcpu: The vcpu pointer
-+ * @pair_low: The low counter index
-+ */
-+static void kvm_pmu_sync_counter_enable_pair(struct kvm_vcpu *vcpu, u64 pair_low)
-+{
-+	kvm_pmu_enable_counter_mask(vcpu, BIT(pair_low) | BIT(pair_low + 1));
-+}
-+
-+/**
-+ * kvm_pmu_enable_counter_pair - enable counters pair at a time
-+ * @vcpu: The vcpu pointer
-+ * @val: counters to enable
-+ * @pair_low: The low counter index
-+ */
-+static void kvm_pmu_enable_counter_pair(struct kvm_vcpu *vcpu, u64 val,
-+					u64 pair_low)
-+{
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	struct kvm_pmc *pmc_low = &pmu->pmc[pair_low];
-+	struct kvm_pmc *pmc_high = &pmu->pmc[pair_low + 1];
-+
-+	if (kvm_pmu_event_is_chained(vcpu, pair_low)) {
-+		if (pmc_low->perf_event != pmc_high->perf_event)
-+			kvm_pmu_stop_release_perf_event_pair(vcpu, pair_low);
-+	}
-+
-+	if (val & BIT(pair_low))
-+		kvm_pmu_enable_counter(vcpu, pair_low);
-+
-+	if (val & BIT(pair_low+1))
-+		kvm_pmu_enable_counter(vcpu, pair_low + 1);
-+}
-+
-+/**
-  * kvm_pmu_enable_counter_mask - enable selected PMU counters
-  * @vcpu: The vcpu pointer
-- * @val: the value guest writes to PMCNTENSET register
-+ * @val: the value guest writes to PMCNTENSET register or a subset
-  *
-  * Call perf_event_enable to start counting the perf event
-  */
- void kvm_pmu_enable_counter_mask(struct kvm_vcpu *vcpu, u64 val)
- {
- 	int i;
-+	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
-+	u64 set = __vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & mask;
- 
- 	if (!(__vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E) || !val)
- 		return;
- 
--	for (i = 0; i < ARMV8_PMU_MAX_COUNTERS; i++) {
--		if (!(val & BIT(i)))
--			continue;
--
--		kvm_pmu_enable_counter(vcpu, i);
--	}
-+	for (i = 0; i < ARMV8_PMU_MAX_COUNTERS; i += 2)
-+		kvm_pmu_enable_counter_pair(vcpu, val & set, i);
- }
- 
- /**
-- * kvm_pmu_sync_counter_enable - reenable a counter if it should be enabled
-+ * kvm_pmu_disable_counter - disable selected PMU counter
-  * @vcpu: The vcpu pointer
-  * @select_idx: The counter index
-  */
--static void kvm_pmu_sync_counter_enable(struct kvm_vcpu *vcpu,
--					    u64 select_idx)
-+static void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 select_idx)
- {
--	u64 set = __vcpu_sys_reg(vcpu, PMCNTENSET_EL0);
-+	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
- 
--	if (set & BIT(select_idx))
--		kvm_pmu_enable_counter_mask(vcpu, BIT(select_idx));
-+	if (pmc->perf_event) {
-+		perf_event_disable(pmc->perf_event);
-+		if (pmc->perf_event->state != PERF_EVENT_STATE_ACTIVE)
-+			kvm_debug("fail to enable perf event\n");
-+	}
- }
- 
- /**
-- * kvm_pmu_disable_counter - disable selected PMU counter
-- * @vcpu: The vcpu pointer
-- * @pmc: The counter to disable
-+ * kvm_pmu_disable_counter_pair - disable counters pair at a time
-+ * @val: counters to disable
-+ * @pair_low: The low counter index
-  */
--static void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 select_idx)
-+static void kvm_pmu_disable_counter_pair(struct kvm_vcpu *vcpu, u64 val,
-+					 u64 pair_low)
- {
- 	struct kvm_pmu *pmu = &vcpu->arch.pmu;
--	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-+	struct kvm_pmc *pmc_low = &pmu->pmc[pair_low];
-+	struct kvm_pmc *pmc_high = &pmu->pmc[pair_low + 1];
-+
-+	if (!kvm_pmu_event_is_chained(vcpu, pair_low)) {
-+		if (pmc_low->perf_event == pmc_high->perf_event) {
-+			if (pmc_low->perf_event) {
-+				kvm_pmu_stop_release_perf_event_pair(vcpu,
-+								pair_low);
-+				kvm_pmu_sync_counter_enable_pair(vcpu, pair_low);
-+			}
-+		}
-+	}
- 
--	if (pmc->perf_event)
--		perf_event_disable(pmc->perf_event);
-+	if (val & BIT(pair_low))
-+		kvm_pmu_disable_counter(vcpu, pair_low);
-+
-+	if (val & BIT(pair_low + 1))
-+		kvm_pmu_disable_counter(vcpu, pair_low + 1);
- }
- 
- /**
-@@ -230,12 +415,8 @@ void kvm_pmu_disable_counter_mask(struct kvm_vcpu *vcpu, u64 val)
- 	if (!val)
- 		return;
- 
--	for (i = 0; i < ARMV8_PMU_MAX_COUNTERS; i++) {
--		if (!(val & BIT(i)))
--			continue;
--
--		kvm_pmu_disable_counter(vcpu, i);
--	}
-+	for (i = 0; i < ARMV8_PMU_MAX_COUNTERS; i += 2)
-+		kvm_pmu_disable_counter_pair(vcpu, val, i);
- }
- 
- static u64 kvm_pmu_overflow_status(struct kvm_vcpu *vcpu)
-@@ -346,6 +527,17 @@ static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
- 
- 	__vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= BIT(idx);
- 
-+	if (kvm_pmu_event_is_chained(vcpu, idx)) {
-+		struct kvm_pmu *pmu = &vcpu->arch.pmu;
-+		struct kvm_pmc *pmc_high = &pmu->pmc[idx + 1];
-+
-+		if (!(--pmc_high->overflow_count)) {
-+			__vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= BIT(idx + 1);
-+			pmc_high->overflow_count = U32_MAX + 1UL;
-+		}
-+
-+	}
-+
- 	if (kvm_pmu_overflow_status(vcpu)) {
- 		kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
- 		kvm_vcpu_kick(vcpu);
-@@ -440,6 +632,10 @@ static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 select_idx)
- 	    select_idx != ARMV8_PMU_CYCLE_IDX)
- 		return;
- 
-+	/* Handled by even event */
-+	if (eventsel == ARMV8_PMUV3_PERFCTR_CHAIN)
-+		return;
-+
- 	memset(&attr, 0, sizeof(struct perf_event_attr));
- 	attr.type = PERF_TYPE_RAW;
- 	attr.size = sizeof(attr);
-@@ -452,6 +648,9 @@ static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 select_idx)
- 	attr.config = (select_idx == ARMV8_PMU_CYCLE_IDX) ?
- 		ARMV8_PMUV3_PERFCTR_CPU_CYCLES : eventsel;
- 
-+	if (kvm_pmu_event_is_chained(vcpu, select_idx))
-+		attr.config1 |= 0x1;
-+
- 	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
- 	/* The initial sample period (overflow count) of an event. */
- 	attr.sample_period = (-counter) & pmc->bitmask;
-@@ -464,6 +663,14 @@ static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 select_idx)
- 		return;
- 	}
- 
-+	if (kvm_pmu_event_is_chained(vcpu, select_idx)) {
-+		struct kvm_pmc *pmc_next = &pmu->pmc[select_idx + 1];
-+
-+		pmc_next->perf_event = event;
-+		counter = kvm_pmu_get_counter_value(vcpu, select_idx + 1);
-+		pmc_next->overflow_count = (-counter) & pmc->bitmask;
-+	}
-+
- 	pmc->perf_event = event;
- }
- 
-@@ -480,17 +687,25 @@ static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 select_idx)
- void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 				    u64 select_idx)
- {
--	struct kvm_pmu *pmu = &vcpu->arch.pmu;
--	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
--	u64 reg, event_type = data & ARMV8_PMU_EVTYPE_MASK;
--
--	kvm_pmu_stop_counter(vcpu, pmc);
-+	u64 eventsel, event_type, pair_low, reg;
- 
- 	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
- 	      ? PMCCFILTR_EL0 : PMEVTYPER0_EL0 + select_idx;
- 
--	__vcpu_sys_reg(vcpu, reg) = event_type;
--	kvm_pmu_sync_counter_enable(vcpu, select_idx);
-+	eventsel = data & ARMV8_PMU_EVTYPE_EVENT;
-+	event_type = data & ARMV8_PMU_EVTYPE_MASK;
-+	pair_low = (select_idx % 2) ? select_idx - 1 : select_idx;
-+
-+	if (kvm_pmu_event_is_chained(vcpu, pair_low) ||
-+	    eventsel == ARMV8_PMUV3_PERFCTR_CHAIN) {
-+		kvm_pmu_stop_release_perf_event_pair(vcpu, pair_low);
-+		__vcpu_sys_reg(vcpu, reg) = event_type;
-+		kvm_pmu_sync_counter_enable_pair(vcpu, pair_low);
-+	} else {
-+		kvm_pmu_stop_release_perf_event(vcpu, pair_low);
-+		__vcpu_sys_reg(vcpu, reg) = event_type;
-+		kvm_pmu_sync_counter_enable(vcpu, pair_low);
-+	}
- }
- 
- bool kvm_arm_support_pmu_v3(void)
--- 
-2.7.4
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgQmh1cGVzaCwKCk9uIDMwLzAxLzIwMTkgMTk6NDgsIEJodXBlc2ggU2hhcm1hIHdyb3RlOgo+
+IE9uIDAxLzI5LzIwMTkgMDM6MzkgUE0sIFN1enVraSBLIFBvdWxvc2Ugd3JvdGU6Cj4+IE9uIDI4
+LzAxLzIwMTkgMjA6NTcsIEJodXBlc2ggU2hhcm1hIHdyb3RlOgo+Pj4gV2l0aCBBUk12OC4yLUxW
+QSBhbmQgTFBBIGFyY2hpdGVjdHVyZSBleHRlbnNpb25zLCBhcm02NCBoYXJkd2FyZSB3aGljaAo+
+Pj4gc3VwcG9ydHMgdGhlc2UgZXh0ZW5zaW9ucyBjYW4gc3VwcG9ydCB1cHRvIDUyLWJpdCB2aXJ0
+dWFsIGFuZCA1Mi1iaXQKPj4+IHBoeXNpY2FsIGFkZHJlc3NlcyByZXNwZWN0aXZlbHkuCj4+Pgo+
+Pj4gU2luY2UgYXQgdGhlIG1vbWVudCB3ZSBlbmFibGUgdGhlIHN1cHBvcnQgb2YgdGhlc2UgZXh0
+ZW5zaW9ucyB2aWEgQ09ORklHCj4+PiBmbGFncywgZS5nLgo+Pj4gwqAgLSBMUEEgdmlhIENPTkZJ
+R19BUk02NF9QQV9CSVRTXzUyLCBhbmQKPj4+IMKgIC0gTFZBIHZpYSBDT05GSUdfQVJNNjRfRk9S
+Q0VfNTJCSVQKPj4+Cj4+PiBUaGUgZWFzaWVzdCB3YXkgYSB1c2VyIGNhbiBkZXRlcm1pbmUgdGhl
+IHBoeXNpY2FsL3ZpcnR1YWwKPj4+IGFkZHJlc3NlcyBzdXBwb3J0ZWQgb24gdGhlIGhhcmR3YXJl
+LCBpcyB2aWEgdGhlICcvcHJvYy9jcHVpbmZvJwo+Pj4gaW50ZXJmYWNlLgo+Pgo+PiBXaHkgZG8g
+d2UgbmVlZCB0aGlzIGluZm9ybWF0aW9uID8KPiAKPiBTb3JyeSBmb3IgdGhlIGRlbGF5IGluIHJl
+cGx5LCBidXQgSSB3YW50ZWQgdG8gY29sbGVjdCBhcyBtdWNoIGluZm9ybWF0aW9uIGZyb20KPiBv
+dXIgdGVzdCB0ZWFtcyBhcyBwb3NzaWJsZSBiZWZvcmUgcmVwbHlpbmcgdG8gdGhpcyB0aHJlYWQu
+Cj4gCj4gU28gaGVyZSBpcyBicmllZiBsaXN0IG9mIHJlYXNvbnMsIGFzIHRvIHdoeSB3ZSBuZWVk
+IHRoaXMgaW5mb3JtYXRpb24gaW4gdXNlci1zcGFjZToKPiAKPiAxLiBUaGlzIGluZm9ybWF0aW9u
+IGlzIHVzZWZ1bCBmb3IgYSBub24tZXhwZXJ0IHVzZXIsIHVzaW5nIExpbnV4IGRpc3RyaWJ1dGlv
+bnMKPiAobGlrZSBGZWRvcmEpIG9uIGRpZmZlcmVudCBhcm02NCBwbGF0Zm9ybXMuIFRoZSBkZWZh
+dWx0IGNvbmZpZ3VyYXRpb24gKC5jb25maWcpCj4gd2lsbCBiZSB0aGUgc2FtZSBmb3IgYSBkaXN0
+cmlidXRpb24gZmxhdm9yIGFuZCBpcyBzdXBwb3NlZCB0byB3b3JrIGZpbmUgb24gYWxsCj4gdW5k
+ZXJseWluZyBhcm02NCBwbGF0Zm9ybXMuCj4gCj4gYSkuIE5vdyBzb21lIG9mIHRoZXNlIHVuZGVy
+bHlpbmcgcGxhdGZvcm1zIG1heSBzdXBwb3J0IEFSTXY4LTguMiBleHRlbnNpb24gd2hpbGUKPiBv
+dGhlcnMgZG9uJ3QuCj4gCj4gYikuIFVzZXJzIHBlcmZvcm1pbmcgcGVyZm9ybWFuY2UgYmVuY2gt
+bWFya2luZyBvbiB0aGVzZSBwbGF0Zm9ybXMgcnVuIGJlbmNobWFya3MKPiB3aXRoIGRpZmZlcmVu
+dCBwYWdlLXNpemVzIGFuZCBhZGRyZXNzIHJhbmdlcy4KCj4gYykuIFJpZ2h0IG5vdyB0aGV5IGhh
+dmUgbm8gd2F5IHRvIGtub3csIGFib3V0IHRoZSB1bmRlcmx5aW5nIFZBUmFuZ2UgYW5kIFBBUmFu
+Z2UKPiB2YWx1ZXMgb3RoZXIgdGhhbiByZWFkaW5nIHRoZSBjb25maWcgZmlsZSBhbmQgc2VhcmNo
+IGZvciB0aGUgZmxhZ3MuCgpXaHkgZG8gdGhleSBuZWVkIHRvIGtub3c/IFdoYXQgZGVjaXNpb24g
+Y2FuIHlvdSBtYWtlIHdpdGggdGhpcyBpbmZvcm1hdGlvbiB0aGF0CnlvdSBjYW4ndCBtYWtlIHdp
+dGhvdXQgaXQ/CgoKPiBGb3IgZS5nLiBsZXRzIGNvbnNpZGVyIHRoZSAncGctdGFibGVfdGVzdHMn
+IChTZWUgLQo+IDxodHRwczovL2dpdGh1Yi5jb20vc2Fuc2tyaXRpLXMvcGctdGFibGVfdGVzdHM+
+KSwgd2hpY2ggaXMgdXNlZCB0byB0ZXN0IGFuZAo+IHZlcmlmeSA1LWxldmVsIHBhZ2UgdGFibGUg
+YmVoYXZpb3Igb24geDg2XzY0IExpbnV4LiBJdCByZXF1aXJlcyBkZXRlcm1pbmluZyBpZgo+IDUt
+bGV2ZWwgcGFnZSB0YWJsZXMgYXJlIGZ1bGx5IHN1cHBvcnRlZCwgCgouLi4gYnV0IHdlIGRvbid0
+IGhhdmUgNS1sZXZlbCBwYWdlcyB0YWJsZXMgLi4uCgoKPiBmb3Igd2hpY2ggaXQgdXNlcyBlaXRo
+ZXIgJ0ludGVsICdsYTU3Jwo+IGNwdSBmbGFnJyBpbjoKPiAKPiAkIGNhdCAvcHJvYy9jcHVpbmZv
+Jywgb3IKPiAKPiAkIGdyZXAgQ09ORklHX1g4Nl81TEVWRUwgL2Jvb3QvY29uZmlnLSQodW5hbWUg
+LXIpCj4gQ09ORklHX1g4Nl81TEVWRUw9eQo+IAo+IFRoaXMgdGVzdCBzdWl0ZSBpcyBlYXNpbHkg
+bW9kaWZpYWJsZSBmb3IgdmVyaWZ5aW5nIDUyLWJpdCBBUk12OC4yLUxWQSBzdXBwb3J0LgoKVGhp
+cyBsb29rcyBsaWtlIGEgdGVzdCB0byBjaGVjayBhbGwga2VybmVsIHBhZ2UtdGFibGUgd2Fsa2Vy
+cyBoYXZlIGJlZW4gdXBkYXRlZApmb3IgYSBmaWZ0aCBsZXZlbC4gV2UgZG9uJ3QgbmVlZCB0byB3
+b3JyeSBhYm91dCB0aGlzLgoKWW91IHNob3VsZCBqdXN0IG5lZWQgdG8gcmVtb3ZlIHRoZSBhcmNo
+LXNwZWNpZmljIHRlc3QuIElmIHlvdSBwcm92aWRlIHRoZSBoaW50Cm9uIHBsYXRmb3JtcyB0aGF0
+IHN1cHBvcnQgaXQsIHRoZSBtYXBwaW5nIHNob3VsZCBzdWNjZWVkLiBPbiBwbGF0Zm9ybXMgdGhh
+dApkb24ndCwgaXQgd29uJ3QuCgpXaHkgZG9lcyB1c2VyIHNwYWNlIG5lZWQgdG8ga25vdyBpbiBh
+ZHZhbmNlIG9mIG1ha2luZyB0aGUgaGludD8KCgo+IGQpLiBOb3cgd2hlbiBydW5uaW5nIHRoZSBh
+Ym92ZSBzdWl0ZSBhbmQgc2hhcmluZyByZXN1bHRzLCBpdCBtaWdodCBiZSB0aGF0IHRoZQo+IC5j
+b25maWcgZmlsZSBpcyBub3QgYXZhaWxhYmxlIG9yIGV2ZW4gaW4gdGhlIGNhc2UgaXQgaXMgYXZh
+aWxhYmxlIHRoZSBDT05GSUcKPiBmbGFnIHNldHRpbmdzIGluIC5jb25maWcgZmlsZSBhcmUgbm90
+IGludHVpdGl2ZSB0byBhIG5vbi1leHBlcnQgdXNlciBmb3IgYXJtNjQKPiAodGhlIGV4YW1wbGUg
+YmVsb3cgaXMgb2YgNjRLIHBhZ2Ugc2l6ZSwgNDgtYml0IGtlcm5lbCBWQSwgNTItYml0IFVzZXIg
+c3BhY2UgVkEKPiBhbmQgNTItYml0IFBBKToKCkkgYWdyZWUgaW5zcGVjdGluZyB0aGUgS2NvbmZp
+ZyBpcyBhbiBpbmFwcHJvcHJpYXRlIHdheSBmb3IgdXNlci1zcGFjZSAndG8ga25vdycKd2hhdCB0
+aGUga2VybmVsIHN1cHBvcnRzLgoKSSBjYW4gb25seSBzZWUgYSAnc3VwcG9ydHMgNTJiaXQgdmEn
+IGZsYWcgYXMgYmVpbmcgdXNlZnVsIHRvIGEgcHJvZ3JhbSB0aGF0CmRvZXNuJ3QgYWN0dWFsbHkg
+d2FudCB0byB1c2UgaXQsIGJ1dCBmb3Igc29tZSBiaXphcnJlIHJlYXNvbiB3YW50cyB0byBrbm93
+LgoKRm9yIGNvcmVkdW1wcyB0aGUgcXVlc3Rpb24gaXNuJ3QgIndhcyBpdCBzdXBwb3J0ZWQiLCBi
+dXQgIndhcyBpdCBpbiB1c2UiLCB3aGljaAp5b3UgY2FuIHRlbGwgZnJvbSB0aGUgcGFnZXRhYmxl
+cy4KCgo+IEFsc28gcmlnaHQgbm93IHRoZXJlIGlzIGFuIGFic2VuY2Ugb2YgYSBzdGFuZGFyZCBB
+QkkgYmV0d2VlbiB0aGUgdXNlci1zcGFjZSBhbmQKPiBrZXJuZWwgZm9yIGV4cG9ydGluZyB0aGlz
+IGluZm9ybWF0aW9uIHRvIHRoZSB1c2VyLXNwYWNlLCB3aXRoIHR3byBleGNlcHRpb25zOgo+IAo+
+IDEuIEZvciB2bWNvcmVpbmZvIHNwZWNpZmljIHVzZXItc3BhY2UgdXRpbGl0aWVzIChsaWtlIG1h
+a2VkdW1wZmlsZSBhbmQgY3Jhc2gpIEkKPiBoYXZlIHByb3Bvc2VkIGEgY291cGxlIG9mIENPTkZJ
+RyBmbGFncyB0byBiZSBhZGRlZCB0byB0aGUgdm1jb3JlaW5mbywgc28gdGhhdAo+IHVzZXItc3Bh
+Y2UgdXRpbGl0aWVzIGNhbiB1c2UgdGhlIHNhbWUgKFNlZQo+IDxodHRwOi8vbGlzdHMuaW5mcmFk
+ZWFkLm9yZy9waXBlcm1haWwva2V4ZWMvMjAxOS1KYW51YXJ5LzAyMjM4Ny5odG1sPiBmb3IgZGV0
+YWlscykuCgp2bWNvcmVpbmZvIGlzIGZvciB0aGluZ3MgbGlrZSBjcmFzaC9nZGIvbWFrZWR1bXBm
+aWxlIHRvIHByb3ZpZGUga2VybmVsLXNwZWNpZmljCmluZm9ybWF0aW9uIHRoYXQgdGhleSBjb3Vs
+ZG4ndCBwb3NzaWJseSB3b3JrIHdpdGhvdXQuIExpa2UgdGhlIHBhZ2Ugc2l6ZS4gNTJiaXQKc3Vw
+cG9ydCBkb2Vzbid0IGZpdCBoZXJlIGFzIGEgNTJiaXQtYXdhcmUgd2Fsa2VyIHdvcmtzIHJlZ2Fy
+ZGxlc3Mgb2Ygd2hldGhlcgo1MmJpdCB3YXMgaW4gdXNlLgoKCj4gMi4gRm9yIG90aGVyIHVzZXIt
+c3BhY2UgdXRpbGl0aWVzIChlc3BlY2lhbGx5IHRob3NlIHdoaWNoIG1ha2UgYSAnbW1hcCcgY2Fs
+bCBhbmQKPiBwYXNzIGFuIGFkZHJlc3MgaGludCB0byB0aGUgZ2V0IHRoZSBrZXJuZWwgdG8gcHJv
+dmlkZSBhIGhpZ2ggYWRkcmVzcyksIAoKPiBJIGNhbiBzZWUgb25seSB0d28gbWV0aG9kcyB0byBk
+ZXRlcm1pbmUgdGhlIHVuZGVybHlpbmcga2VybmVsIHN1cHBvcnQ6Cj4gCj4gYSkuIFJlYWQgdGhl
+IENPTkZJRyBmbGFncyBmcm9tIC5jb25maWcgKGFzIEkgY2FwdHVyZWQgc29tZSBwYXJhZ3JhcGhz
+IGFib3ZlKSwgb3IKPiAKPiBiKS4gSW4gYWJzZW5jZSBvZiAuY29uZmlnIGZpbGUgb24gdGhlIHN5
+c3RlbSwgcmVhZCB0aGUgc3lzdGVtIElEIHJlZ2lzdGVycyBsaWtlCj4gJ0lEX0FBNjRNTUZSMF9F
+TDEnIGFuZCAnSURfQUE2NE1NRlIyX0VMMScgKHdoaWNoIFBBVENIIDIvMiBvZiB0aGlzIHNlcmll
+cyB0cmllcwo+IHRvIGVuYWJsZSBmcm9tIGtlcm5lbCBzaWRlKSBhbmQgdGhlbiBtYWtlIGEgZGVj
+aXNpb24gb24gd2hldGhlciB0byBwYXNzIGEgaGludAo+IHRvICdtbWFwJy4KCkl0IHNlZW1zIHlv
+dSdyZSBleHBlY3RpbmcgdG8ga25vdyB3aGV0aGVyIDUyYml0LVZBIGlzIHN1cHBvcnRlZCB3aXRo
+b3V0IGFjdHVhbGx5CnVzaW5nIGl0LiBXaGF0IGlzIHRoaXMgdXNlZnVsIGZvcj8KClRoZSBwb2lu
+dCBvZiB0aGUgaGludCBpcyB5b3Ugd2FudCB0byBhbGxvY2F0ZSBtZW1vcnksIGFuZCBjYW4gd29y
+ayB3aXRoIDUyYml0LVZBCmlmIHRoZSBwbGF0Zm9ybSBzdXBwb3J0cyBpdC4gSWYgaXQgZG9lc24n
+dCwgeW91IHN0aWxsIHdhbnQgdG8gYWxsb2NhdGUgdGhlCm1lbW9yeS4gV2Ugc2hvdWxkbid0IG5l
+ZWQgYSBoaW50IHRoYXQgdGhlIDUyYml0LXZhIGhpbnQgaXMgc3VwcG9ydGVkLgoKCj4gSXQgbWln
+aHQgYmUgdGhhdCBJIGFtIG1pc3Npbmcgb3RoZXIgc3RhbmRhcmQgQUJJIG1lY2hhbmlzbXMuIElm
+IHNvLCBwbGVhc2UgcG9pbnQKPiBtZSB0byB0aGUgc2FtZS4KV2UgYWxzbyBoYXZlIEhXQ0FQOiBE
+b2N1bWVudGF0aW9uL2FybTY0L2VsZl9od2NhcHMudHh0CgpUaGVzZSBhcmUgdXNlZCBmb3IgdGhp
+bmdzIHRoZSBwcm9ncmFtIG1heSBuZWVkIHRvIHJ1bjogbGlrZSBmbG9hdGluZyBwb2ludCwgb3IK
+dGhlIHByZXNlbmNlIG9mIHBhcnRpY3VsYXIgaW5zdHJ1Y3Rpb25zLiBVc2VyLXNwYWNlIGFic29s
+dXRlbHkgaGFzIHRvIGtub3cgYWJvdXQKdGhlc2UgaW4gYWR2YW5jZSwgYXMgaXQgd2lsbCBnZXQg
+YSBTSUdJTEwgaWYgc3VwcG9ydCBpcyBub3QgcHJlc2VudC4KCjUyYml0IFZBIGRvZXNuJ3QgZml0
+IGhlcmU6IG1lbW9yeSBpcyBtZW1vcnkuIE5lZWRpbmcgdG8ga25vdyBpbXBsaWVzIHVzZXItc3Bh
+Y2UKaXMgdW53aWxsaW5nIHRvIHVzZSBtZW1vcnkgaWYgdGhlIGJpdHMgYWJvdmUgNDhiaXRzIGFy
+ZW4ndCBzZXQuCgoKVGhhbmtzLAoKSmFtZXMKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFy
+bS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9t
+YWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
