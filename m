@@ -7,58 +7,58 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 01BAFC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:10:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A70FC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:10:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C7B5E2147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:10:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 43EF020844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:10:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jEchfvk8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="VzYAvzzv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7B5E2147A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UiCfYHCq";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="M6+vIV4E"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43EF020844
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5nk6Wip1IKJAJp9X1Xqqquzxx+YJLgDx983HAxlQDVw=; b=jEchfvk8+QPcEA
-	Mt/oy46OulEvJ6LPS2s082qKdhZ6AiiIOeNh6schy0fQCBKFELE54wDnyGOLW5ccN91etKdtkxkM3
-	fnCSFnbgniNRE9fbCE3EGKueYS9NUzKc5DSIWO7cMWjEdG8OLr0t0Y5rGTr39Lnrlx/kmknj6x2MF
-	DFb5f+OdkMZ6DWPrdJxzddnHMhFY84G6BDRJeIX6ZLSZ0PY6vu/UPYvlX51AZ1NFHiwqpL1GA35f+
-	2DhtGeu8L3k9as1AynLGs+xk+SvFGGgnANMl7BgXUl3A8iOB2Rsz1QxDgZY3EBS7J8sVIza0tvBof
-	lzSCduoVHiQBnqFKzhng==;
+	List-Owner; bh=Fpk+MMLiyHOFQbfC1Uea8Yy7DDifwuACAIugQtJ9lvk=; b=UiCfYHCq34xYXT
+	APBXCjvIz74D+lDLZ+qytNtdcs7chCXQ3cMm1ltPbnabMJFL60ulKJCf+uE6qQfsNvQ4AcxKEScgY
+	BdErdmLXP2SGqsDnnlsf/6LtZup48pp/PxXa3zzdwVbNAcpEaPD9m70XC0efNd/UyEXMtoJZBqZmu
+	pI1allWy13SOLBjtnmSPJ9EML/kE+9Ro260QeTOHD5T8e0r6DbVeWK6SYCu7rKJlp6cXjKBEoV3F7
+	FarqWL+a3WFl9XDOw7JpQdq23LILtD9mSXcL/TkZKrzIuqqD0rCj8DwVh0U18MhfK2AUuYbQpgndO
+	PZzgLNuob3pVgu5ilv3w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqaGm-0005JC-45; Mon, 04 Feb 2019 09:10:24 +0000
-Received: from mail-eopbgr150050.outbound.protection.outlook.com
- ([40.107.15.50] helo=EUR01-DB5-obe.outbound.protection.outlook.com)
+	id 1gqaH1-0005cL-Mf; Mon, 04 Feb 2019 09:10:39 +0000
+Received: from mail-eopbgr00061.outbound.protection.outlook.com ([40.107.0.61]
+ helo=EUR02-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqaGV-00040E-Oq
+ id 1gqaGV-0004NR-SG
  for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 09:10:09 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=+xCn1TuqJK3ooi3+YgZ3ERaV+/AgrR/a1YnHqRGvXZs=;
- b=VzYAvzzvJvs4g7R6dMFD+eHpuypPwIwpOAwvNxTtycJls/c4pjQQBVX2eA4JrJo3kDqmLGmsB5pS0pLHhb0IDnApkj9o6C+OMubWPxFAuMWvgboGLT0Dgu4riR1q80oDmdQKmfwLMgAmyCV0FhaBcnNLMEBG7ReNrzx2wIV8DNM=
+ bh=zQlrlWaQuEhOTis0NBAUjBQuKzyqCo+n/zGPGbJESAM=;
+ b=M6+vIV4EGa4h9BMykC/q1GP8C/X7u/COKeT9zN6SeM5VQ8SfF5h6bepS3EqkIxZhWhpbHUzae/pzEa4vQorRSqyYK1frABT5mFWqr7b6Ck1v4VA2O/Om/cFTmksHbOMINxq0yIZRL+YJuyOfh/yKQ50NgEyOXxJK4KyalWZn5TY=
 Received: from VI1PR0401MB2496.eurprd04.prod.outlook.com (10.168.65.10) by
- VI1PR0401MB2640.eurprd04.prod.outlook.com (10.168.66.12) with Microsoft SMTP
+ VI1PR0401MB2448.eurprd04.prod.outlook.com (10.168.64.143) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1580.17; Mon, 4 Feb 2019 09:10:02 +0000
+ 15.20.1580.22; Mon, 4 Feb 2019 09:10:04 +0000
 Received: from VI1PR0401MB2496.eurprd04.prod.outlook.com
  ([fe80::208f:755e:b057:2cfe]) by VI1PR0401MB2496.eurprd04.prod.outlook.com
  ([fe80::208f:755e:b057:2cfe%8]) with mapi id 15.20.1580.019; Mon, 4 Feb 2019
- 09:10:02 +0000
+ 09:10:04 +0000
 From: Pankaj Bansal <pankaj.bansal@nxp.com>
 To: Leo Li <leoyang.li@nxp.com>
-Subject: [PATCH v3 1/2] dt-bindings: soc: fsl: Document Qixis FPGA usage
-Thread-Topic: [PATCH v3 1/2] dt-bindings: soc: fsl: Document Qixis FPGA usage
-Thread-Index: AQHUvGlp8uj3aRTwvE2rsi77vi3Hgg==
-Date: Mon, 4 Feb 2019 09:10:02 +0000
-Message-ID: <20190204143449.25040-2-pankaj.bansal@nxp.com>
+Subject: [PATCH v3 2/2] drivers: soc: fsl: add qixis driver
+Thread-Topic: [PATCH v3 2/2] drivers: soc: fsl: add qixis driver
+Thread-Index: AQHUvGlq5QpFuw3iE0KaAu9EZS6m4A==
+Date: Mon, 4 Feb 2019 09:10:04 +0000
+Message-ID: <20190204143449.25040-3-pankaj.bansal@nxp.com>
 References: <20190204143449.25040-1-pankaj.bansal@nxp.com>
 In-Reply-To: <20190204143449.25040-1-pankaj.bansal@nxp.com>
 Accept-Language: en-US
@@ -74,39 +74,38 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-mailer: git-send-email 2.17.1
 x-originating-ip: [92.120.1.69]
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR0401MB2640;
- 6:PxTxXbObeFy6uLRI2/mIF2m4jP1oKzmiY2O7h25six5uNCGuI6LfZ6z6HQmko3OloMh1cn9A4+AGp1ZHuyNOEqTQ7p8ai/KGLqBsW9KE6oYTKD2Z5K5XLAf83R8+UZFkx34RnA5r3dsZVubIh3eeIwhLG7OSrcIuCEN8rc/4HZ0EnrRQxdE4se3ttydtxkfP8k+isZ1QGm9M3qDSKshTCaGH6klqizFKW6T8SzjszKp/9wQRaKBA7yv3faXWQm5lmPvJRIyOJfH0PEPkuJBDEw+zemydcWfB2a8pr850fyyQ8rdTb9tbHikelWabARky4aCgEGk68Jn/dDkhe8dTcZS0AnmSYyfV4aTlmSDIWenoXWLqDbHZbp645N/YoK6gOgz/veCoIDAS3jhzpDgCKUjLW2dpJ9roNFOrTCgPswX6xbAzTTGbGXQb2QO4r4dLXn8Y3Pu3Qnb/EKM0ZBcJiA==;
- 5:InPSz1n5evyYfaZIVvd5F8ucMjBxkxzqd/zWa2zD/UcftljPh67dIC2vq/ONiUhRBSRqGgmIMJkyzdZEgWk3W4jJhY2LGRFCwix1+we9F7eNbhOoSyNEzLqs4OE2YcHnkKKrODUH0wdu87e354OiZ9u6P8EzhnDDODktLhQWZBEjLJVnK3r2vaLMun5Qdx3LggmP969V7oQDGlYvVf8+Ow==;
- 7:bCxK+ImMj72ySGrmdEhM58JFpRPC7l1dGOduzoxsV7qok0V5LGdnHE6ibp98K9gQ+mE40IZJ32n2Kni09U3P0H6SdYb8t0syXYX5M7zKIopxkArOkikPVbiCMvJgSji5Q+Q8Ba+nbtRFujzyPCjq6Q==
-x-ms-office365-filtering-correlation-id: 9249f6c5-8052-4a4e-a064-08d68a808b8a
+x-microsoft-exchange-diagnostics: 1; VI1PR0401MB2448;
+ 6:4xBxZ8EGaJIlvJ72ugQQX7v4LiejvXt8Tsvl4uOrVj3Ifa2/WDB0gwEfBKV0t7FbUXn+RXTHj+C6jCD6i4+MQJTcMoDKfm+hcacLuQUhuQK3sy/VQjPryF4VBAmMRmxV5G42MrwQ2sDVcIrul5n9bpOCxXvPhrL0adH3iUnWOWKHchqGB5RR7bbKvJYLYglfFO/8qWxXahf163riUlwpPBWBkUzLsjo24AMvUcCPadd8m+yAVdvKsuiPSoOge69o1/VpFz1yXU5GjNiGBhTGIZFTUfkw3jg9pq4/OaDss74K4Fx7vnSZbB1fm6yKuVUY1+BitO7S4Iw59VgzdM8AkHVtPTeYaS9AUua+ORAaeOqXh5VTQXrXbsHkE/dHpc6C7GHRtmIYnAWMk2kbZTAcOkH6teVVkaXGqPbpUONNPevB0Ow24kjy7j8TKjyldgVnF5gJLZlszHIjjl3IOuaWNQ==;
+ 5:eQUv3AiP1sNumsW70OEorQ5FBtr4xH/EomYsfhgJALWg/sodjbdl4YnKsTjFoZwu9+3bVEoKVCeIUx2+Fcoj82B69v9al09QhOtEJBkvc8knETaqP6TZgx31GaFHg14AE6VdyFCQepcoDhFUteb8jCx8Q7JbT/LGijmN7thpayumlN/loQ2kVo2QCBxNyipyVSxJ8KY2sZoVUO5eIk5T9Q==;
+ 7:hniWtLSAEnpSIUUk4jdVDs2mew+09b7LTAIjiuywyM1IcL0DzURRNwZngqa14SeKrsmTwxCOw0VxdLVYeddPoghyw+kKIQuSkUSNKLDTpaGa+DBwLfniPhCXnkVS2Kkh+w7vy2gnWDx1dqfwiBWfNQ==
+x-ms-office365-filtering-correlation-id: 1888f5b6-e3a4-4f31-7168-08d68a808c7d
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR0401MB2640; 
-x-ms-traffictypediagnostic: VI1PR0401MB2640:
-x-microsoft-antispam-prvs: <VI1PR0401MB264095241AFB7103F8D7C85DF16D0@VI1PR0401MB2640.eurprd04.prod.outlook.com>
+ SRVR:VI1PR0401MB2448; 
+x-ms-traffictypediagnostic: VI1PR0401MB2448:
+x-microsoft-antispam-prvs: <VI1PR0401MB244877D19E5E5F5A586189A4F16D0@VI1PR0401MB2448.eurprd04.prod.outlook.com>
 x-forefront-prvs: 0938781D02
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(376002)(136003)(396003)(366004)(39860400002)(346002)(189003)(199004)(66066001)(37006003)(316002)(6636002)(36756003)(99286004)(2906002)(54906003)(6512007)(53936002)(478600001)(14454004)(76176011)(256004)(52116002)(6486002)(6436002)(7736002)(6506007)(386003)(102836004)(186003)(26005)(68736007)(105586002)(97736004)(106356001)(305945005)(3846002)(6116002)(486006)(8936002)(44832011)(50226002)(11346002)(446003)(81166006)(81156014)(8676002)(476003)(2616005)(86362001)(6862004)(1076003)(25786009)(71200400001)(71190400001)(4326008);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0401MB2640;
+ SFS:(10009020)(376002)(366004)(396003)(346002)(136003)(39860400002)(189003)(199004)(36756003)(6486002)(186003)(106356001)(6306002)(6116002)(476003)(14454004)(486006)(7736002)(305945005)(6512007)(966005)(44832011)(8936002)(6436002)(2616005)(3846002)(1076003)(26005)(50226002)(6506007)(386003)(99286004)(11346002)(446003)(102836004)(76176011)(81166006)(81156014)(8676002)(52116002)(86362001)(2906002)(316002)(71200400001)(6636002)(71190400001)(37006003)(478600001)(25786009)(54906003)(105586002)(68736007)(256004)(4326008)(6862004)(97736004)(66066001)(107886003)(53936002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0401MB2448;
  H:VI1PR0401MB2496.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: eFYoPeRKfZbjrm4ExEeemSB04C3bNvs0mbzif7aO7jdKIe3b/U9s+NffLNtrs0r+jFY6NS6LHQOarn6udNgPGSg0eBWVe3Bi0LmVxej+EN2sEWL5zm7IHfwXY8pMbXLZY7QkbGRNlQ/5fu8OagScb5iAukqAbuYaNc3xdfdx3nstrehfPm1dlpawNuaClMB9WDMhJ1nHxZ3OKvrfn5COD9kXOUl9WGagL5pgItLRlyKJNx2JDMYpbL2uyIV3KzyughDe3xBIlmlDUvMuxpp+IpUbfpjm493NGT+8IKkWlpxKysE28zdZmufdguAgVXhowy5f12e97Dm4Mai8cE6KulOTuvPuENBAkQ7aG6hJXKJRzCcXHksIrudAPFTvJUTquzbJDt2oTd6i3qcA21B6fwt4Kci/TFbiMwk5NfI7Vsc=
-Content-ID: <F8D246FAB5B3944AA5A950C9C75D3417@eurprd04.prod.outlook.com>
+x-microsoft-antispam-message-info: g+wNJ1BdS+ZcWmhrcJGiIYZuvkBV1r9c6NrPz/aPPJpFFNggQ5Fzh+RR+0zkSnorVVrzgX2IxFf2t3OY5GWHZtqrc2B4zKdLOYBEpKKnusxK4GtLMKLiNzudOOBu6fMtjONmbwk1s9/qxak82x7688/3POr5a+SfnoZOFpS+UUpX8iMDywn5Su2o94oZmtt+NWyjdaM0NI6XunyuSOoWPZ0GXhA5gcpAw1mdhoYKnos7xrcNWpVxaZG3+uZkbOra5uY1qRS6hZP1mLkaBWgNFqGpXNyrnZGVuIOt68fkYRXzutJgz6wKUyhGnK3/sf8TcOc0wDNoFT1UgPfsZZsuJIXApRwrQnFCx3oC5WRDEz3NcVK/myAU7sBEx9sLFOMWtWku1L1WWJYE3rMGYHIh9iUSZcN8VpgEKIhsuxuEz70=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 9249f6c5-8052-4a4e-a064-08d68a808b8a
-X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Feb 2019 09:10:01.1600 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 1888f5b6-e3a4-4f31-7168-08d68a808c7d
+X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Feb 2019 09:10:02.5892 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0401MB2640
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0401MB2448
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_011007_813708_AA31B144 
-X-CRM114-Status: GOOD (  13.40  )
+X-CRM114-CacheID: sfid-20190204_011007_921040_9BCC2735 
+X-CRM114-Status: GOOD (  16.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -120,60 +119,289 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Pankaj Bansal <pankaj.bansal@nxp.com>,
  "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
+ Wang Dongsheng <dongsheng.wang@freescale.com>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-YW4gRlBHQS1iYXNlZCBzeXN0ZW0gY29udHJvbGxlciwgY2FsbGVkIOKAnFFpeGlz4oCdLCB3aGlj
-aA0KbWFuYWdlcyBzZXZlcmFsIGNyaXRpY2FsIHN5c3RlbSBmZWF0dXJlcywgaW5jbHVkaW5nOg0K
-4oCiIFJlc2V0IHNlcXVlbmNpbmcNCuKAoiBQb3dlciBzdXBwbHkgY29uZmlndXJhdGlvbg0K4oCi
-IEJvYXJkIGNvbmZpZ3VyYXRpb24NCuKAoiBoYXJkd2FyZSBjb25maWd1cmF0aW9uDQoNClRoZSBx
-aXhpcyByZWdpc3RlcnMgYXJlIGFjY2Vzc2libGUgb3ZlciBvbmUgb3IgbW9yZSBzeXN0ZW0tc3Bl
-Y2lmaWMNCmludGVyZmFjZXMsIHR5cGljYWxseSBJMkMsIEpUQUcgb3IgYW4gZW1iZWRkZWQgcHJv
-Y2Vzc29yLg0KDQpTaWduZWQtb2ZmLWJ5OiBQYW5rYWogQmFuc2FsIDxwYW5rYWouYmFuc2FsQG54
-cC5jb20+DQotLS0NCg0KTm90ZXM6DQogICAgVjM6DQogICAgLSBBZGRlZCBib2FyZG5hbWUgYmFz
-ZWQgY29tcGF0aWJsZSBmaWVsZCBpbiBiaW5kaW5ncw0KICAgIC0gQWRkZWQgYmluZGluZ3MgZm9y
-IE1NSU8gYmFzZWQgRlBHQQ0KICAgIFYyOg0KICAgIC0gTm8gY2hhbmdlDQoNCiAuLi4vYmluZGlu
-Z3Mvc29jL2ZzbC9xaXhpc19jdHJsLnR4dCAgICAgICAgICB8IDUzICsrKysrKysrKysrKysrKysr
-Kw0KIDEgZmlsZSBjaGFuZ2VkLCA1MyBpbnNlcnRpb25zKCspDQoNCmRpZmYgLS1naXQgYS9Eb2N1
-bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3Mvc29jL2ZzbC9xaXhpc19jdHJsLnR4dCBiL0Rv
-Y3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9zb2MvZnNsL3FpeGlzX2N0cmwudHh0DQpu
-ZXcgZmlsZSBtb2RlIDEwMDY0NA0KaW5kZXggMDAwMDAwMDAwMDAwLi41ZDUxMGRmMTRiZTgNCi0t
-LSAvZGV2L251bGwNCisrKyBiL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9zb2Mv
-ZnNsL3FpeGlzX2N0cmwudHh0DQpAQCAtMCwwICsxLDUzIEBADQorKiBRSVhJUyBGUEdBIGJsb2Nr
-DQorDQorYW4gRlBHQS1iYXNlZCBzeXN0ZW0gY29udHJvbGxlciwgY2FsbGVkIOKAnFFpeGlz4oCd
-LCB3aGljaA0KK21hbmFnZXMgc2V2ZXJhbCBjcml0aWNhbCBzeXN0ZW0gZmVhdHVyZXMsIGluY2x1
-ZGluZzoNCivigKIgQ29uZmlndXJhdGlvbiBzd2l0Y2ggbW9uaXRvcmluZw0KK+KAoiBQb3dlciBv
-bi9vZmYgc2VxdWVuY2luZw0KK+KAoiBSZXNldCBzZXF1ZW5jaW5nDQor4oCiIFBvd2VyIHN1cHBs
-eSBjb25maWd1cmF0aW9uDQor4oCiIEJvYXJkIGNvbmZpZ3VyYXRpb24NCivigKIgaGFyZHdhcmUg
-Y29uZmlndXJhdGlvbg0KK+KAoiBCYWNrZ3JvdW5kIHBvd2VyIGRhdGEgY29sbGVjdGlvbiAoRENN
-KQ0KK+KAoiBGYXVsdCBtb25pdG9yaW5nDQor4oCiIFJDVyBieXBhc3MgU1JBTSAocmVwbGFjZSBm
-bGFzaCBSQ1cgd2l0aCBpbnRlcm5hbCBSQ1cpIChOT1Igb25seSkNCivigKIgRGVkaWNhdGVkIGZ1
-bmN0aW9uYWwgdmFsaWRhdGlvbiBibG9ja3MgKFBPU3QvSVJTLCB0cmlnZ2VyZWQgZXZlbnQsIGFu
-ZCBzbyBvbikNCivigKIgSTJDIG1hc3RlciBmb3IgcmVtb3RlIGJvYXJkIGNvbnRyb2wgZXZlbiB3
-aXRoIG5vIERVVCBhdmFpbGFibGUNCisNCitUaGUgcWl4aXMgcmVnaXN0ZXJzIGFyZSBhY2Nlc3Np
-YmxlIG92ZXIgb25lIG9yIG1vcmUgc3lzdGVtLXNwZWNpZmljIGludGVyZmFjZXMsDQordHlwaWNh
-bGx5IEkyQywgSlRBRyBvciBhbiBlbWJlZGRlZCBwcm9jZXNzb3IuDQorDQorRlBHQSBjb25uZWN0
-ZWQgdG8gSTJDOg0KK1JlcXVpcmVkIHByb3BlcnRpZXM6DQorDQorIC0gY29tcGF0aWJsZTogc2hv
-dWxkIGJlIGEgYm9hcmQtc3BlY2lmaWMgc3RyaW5nIGZvbGxvd2VkIGJ5IGEgc3RyaW5nDQorICAg
-aW5kaWNhdGluZyB0aGUgdHlwZSBvZiBGUEdBLiAgRXhhbXBsZToNCisJImZzbCw8Ym9hcmQ+LWZw
-Z2EiLCAiZnNsLGZwZ2EtcWl4aXMtaTJjIg0KKyAtIHJlZyA6IGkyYyBhZGRyZXNzIG9mIHRoZSBx
-aXhpcyBkZXZpY2UuDQorDQorRXhhbXBsZSAoTFgyMTYwQS1RRFMpOg0KKwkvKiBUaGUgRlBHQSBu
-b2RlICovDQorICAgICAgICBmcGdhQDY2IHsNCisJCWNvbXBhdGlibGUgPSAiZnNsLGx4MjE2MGFx
-ZHMtZnBnYSIsICJmc2wsZnBnYS1xaXhpcy1pMmMiOw0KKwkJcmVnID0gPDB4NjY+Ow0KKwkJI2Fk
-ZHJlc3MtY2VsbHMgPSA8MT47DQorCQkjc2l6ZS1jZWxscyA9IDwwPjsNCisJfQ0KKw0KKyogRnJl
-ZXNjYWxlIG9uLWJvYXJkIEZQR0ENCisNCitUaGlzIGlzIHRoZSBtZW1vcnktbWFwcGVkIHJlZ2lz
-dGVycyBmb3Igb24gYm9hcmQgRlBHQS4NCisNCitSZXF1aXJlZCBwcm9wZXJ0aWVzOg0KKy0gY29t
-cGF0aWJsZTogc2hvdWxkIGJlIGEgYm9hcmQtc3BlY2lmaWMgc3RyaW5nIGZvbGxvd2VkIGJ5IGEg
-c3RyaW5nDQorICBpbmRpY2F0aW5nIHRoZSB0eXBlIG9mIEZQR0EuICBFeGFtcGxlOg0KKwkiZnNs
-LDxib2FyZD4tZnBnYSIsICJmc2wsZnBnYS1xaXhpcyINCistIHJlZzogc2hvdWxkIGNvbnRhaW4g
-dGhlIGFkZHJlc3MgYW5kIHRoZSBsZW5ndGggb2YgdGhlIEZQR0EgcmVnaXN0ZXIgc2V0Lg0KKw0K
-K0V4YW1wbGUgKExTMjA4MEEtUkRCKToNCisNCisgICAgICAgIGNwbGRAMywwIHsNCisgICAgICAg
-ICAgICAgICAgY29tcGF0aWJsZSA9ICJmc2wsbHMyMDgwYXJkYi1mcGdhIiwgImZzbCxmcGdhLXFp
-eGlzIjsNCisgICAgICAgICAgICAgICAgcmVnID0gPDB4MyAwIDB4MTAwMDA+Ow0KKyAgICAgICAg
-fTsNCisNCi0tIA0KMi4xNy4xDQoNCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJu
-ZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFu
-L2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+FPGA on LX2160AQDS/LX2160ARDB connected on I2C bus, so add qixis
+driver which is basically an i2c client driver to control FPGA.
+
+Also added platform driver for MMIO based FPGA, like the one available
+on LS2088ARDB/LS2088AQDS.
+
+Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
+---
+
+Notes:
+    V3:
+    - Add MMIO based FPGA driver
+    V2:
+    - Modify the driver to not create platform devices corresponding to subnodes.
+      because the subnodes are not actual devices.
+    - Use mdio_mux_regmap_init/mdio_mux_regmap_uninit
+    - Remove header file from include folder, as no qixis api is called from outside
+    - Add regmap_exit in driver's remove function
+    Dendencies:
+    - https://www.mail-archive.com/netdev@vger.kernel.org/msg281274.html
+
+ drivers/soc/fsl/Kconfig      |  11 ++
+ drivers/soc/fsl/Makefile     |   1 +
+ drivers/soc/fsl/qixis_ctrl.c | 207 +++++++++++++++++++++++++++++++++
+ 3 files changed, 219 insertions(+)
+
+diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
+index 8f80e8bbf29e..75993be04e42 100644
+--- a/drivers/soc/fsl/Kconfig
++++ b/drivers/soc/fsl/Kconfig
+@@ -28,4 +28,15 @@ config FSL_MC_DPIO
+ 	  other DPAA2 objects. This driver does not expose the DPIO
+ 	  objects individually, but groups them under a service layer
+ 	  API.
++
++config FSL_QIXIS
++	tristate "QIXIS system controller driver"
++	depends on OF
++	select REGMAP_I2C
++	select REGMAP_MMIO
++	default n
++	help
++	  Say y here to enable QIXIS system controller api. The qixis driver
++	  provides FPGA functions to control system.
++
+ endmenu
+diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
+index 803ef1bfb5ff..47e0cfc66ca4 100644
+--- a/drivers/soc/fsl/Makefile
++++ b/drivers/soc/fsl/Makefile
+@@ -5,5 +5,6 @@
+ obj-$(CONFIG_FSL_DPAA)                 += qbman/
+ obj-$(CONFIG_QUICC_ENGINE)		+= qe/
+ obj-$(CONFIG_CPM)			+= qe/
++obj-$(CONFIG_FSL_QIXIS) 		+= qixis_ctrl.o
+ obj-$(CONFIG_FSL_GUTS)			+= guts.o
+ obj-$(CONFIG_FSL_MC_DPIO) 		+= dpio/
+diff --git a/drivers/soc/fsl/qixis_ctrl.c b/drivers/soc/fsl/qixis_ctrl.c
+new file mode 100644
+index 000000000000..36a3e1abc465
+--- /dev/null
++++ b/drivers/soc/fsl/qixis_ctrl.c
+@@ -0,0 +1,207 @@
++// SPDX-License-Identifier: GPL-2.0+
++
++/* Freescale QIXIS system controller driver.
++ *
++ * Copyright 2015 Freescale Semiconductor, Inc.
++ * Copyright 2018-2019 NXP
++ */
++
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/mdio-mux.h>
++
++/* QIXIS MAP */
++struct fsl_qixis_regs {
++	u8		id;		/* Identification Registers */
++	u8		version;	/* Version Register */
++	u8		qixis_ver;	/* QIXIS Version Register */
++	u8		reserved1[0x1f];
++};
++
++struct mdio_mux_data {
++	void			*data;
++	struct list_head	link;
++};
++
++struct qixis_priv {
++	struct regmap		*regmap;
++	struct list_head	mdio_mux_list;
++};
++
++static struct regmap_config qixis_regmap_config = {
++	.reg_bits = 8,
++	.val_bits = 8,
++};
++
++static int fsl_qixis_mdio_mux_init(struct device *dev, struct qixis_priv *priv)
++{
++	struct device_node *child;
++	struct mdio_mux_data *mux_data;
++	int ret;
++
++	INIT_LIST_HEAD(&priv->mdio_mux_list);
++	for_each_child_of_node(dev->of_node, child) {
++		if (!of_node_name_prefix(child, "mdio-mux"))
++			continue;
++
++		mux_data = devm_kzalloc(dev, sizeof(struct mdio_mux_data),
++					GFP_KERNEL);
++		if (!mux_data)
++			return -ENOMEM;
++		ret = mdio_mux_regmap_init(dev, child, &mux_data->data);
++		if (ret)
++			return ret;
++		list_add(&mux_data->link, &priv->mdio_mux_list);
++	}
++
++	return 0;
++}
++
++static int fsl_qixis_mdio_mux_uninit(struct qixis_priv *priv)
++{
++	struct list_head *pos;
++	struct mdio_mux_data *mux_data;
++
++	list_for_each(pos, &priv->mdio_mux_list) {
++		mux_data = list_entry(pos, struct mdio_mux_data, link);
++		mdio_mux_regmap_uninit(mux_data->data);
++	}
++
++	return 0;
++}
++
++static int fsl_qixis_probe(struct platform_device *pdev)
++{
++	static struct fsl_qixis_regs __iomem *qixis;
++	struct qixis_priv *priv;
++	int ret;
++	u32 qver;
++
++	qixis = of_iomap(pdev->dev.of_node, 0);
++	if (IS_ERR_OR_NULL(qixis)) {
++		pr_err("%s: Could not map qixis registers\n", __func__);
++		return -ENODEV;
++	}
++
++	priv = devm_kzalloc(&pdev->dev, sizeof(struct qixis_priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->regmap = devm_regmap_init_mmio(&pdev->dev, qixis,
++					     &qixis_regmap_config);
++	regmap_read(priv->regmap, offsetof(struct fsl_qixis_regs, qixis_ver),
++		    &qver);
++	pr_info("Freescale QIXIS Version: 0x%08x\n", qver);
++
++	ret = fsl_qixis_mdio_mux_init(&pdev->dev, priv);
++	if (ret)
++		goto error;
++
++	platform_set_drvdata(pdev, priv);
++
++	return 0;
++error:
++	regmap_exit(priv->regmap);
++
++	return ret;
++}
++
++static int fsl_qixis_remove(struct platform_device *pdev)
++{
++	struct qixis_priv *priv;
++
++	priv = platform_get_drvdata(pdev);
++	fsl_qixis_mdio_mux_uninit(priv);
++	regmap_exit(priv->regmap);
++
++	return 0;
++}
++
++static const struct of_device_id fsl_qixis_of_match[] = {
++	{ .compatible = "fsl,fpga-qixis", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, fsl_qixis_of_match);
++
++static struct platform_driver fsl_qixis_driver = {
++	.driver = {
++		.name = "qixis_ctrl",
++		.owner = THIS_MODULE,
++		.of_match_table = of_match_ptr(fsl_qixis_of_match),
++	},
++	.probe = fsl_qixis_probe,
++	.remove = fsl_qixis_remove,
++};
++module_platform_driver(fsl_qixis_driver);
++
++static int fsl_qixis_i2c_probe(struct i2c_client *client)
++{
++	struct qixis_priv *priv;
++	int ret;
++	u32 qver;
++
++	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA))
++		return -EOPNOTSUPP;
++
++	priv = devm_kzalloc(&client->dev, sizeof(struct qixis_priv),
++			    GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->regmap = regmap_init_i2c(client, &qixis_regmap_config);
++	regmap_read(priv->regmap, offsetof(struct fsl_qixis_regs, qixis_ver),
++		    &qver);
++	pr_info("Freescale QIXIS Version: 0x%08x\n", qver);
++
++	ret = fsl_qixis_mdio_mux_init(&client->dev, priv);
++	if (ret)
++		goto error;
++
++	i2c_set_clientdata(client, priv);
++
++	return 0;
++error:
++	regmap_exit(priv->regmap);
++
++	return ret;
++}
++
++static int fsl_qixis_i2c_remove(struct i2c_client *client)
++{
++	struct qixis_priv *priv;
++
++	priv = i2c_get_clientdata(client);
++	fsl_qixis_mdio_mux_uninit(priv);
++	regmap_exit(priv->regmap);
++
++	return 0;
++}
++
++static const struct of_device_id fsl_qixis_i2c_of_match[] = {
++	{ .compatible = "fsl,fpga-qixis-i2c" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, fsl_qixis_i2c_of_match);
++
++static struct i2c_driver fsl_qixis_i2c_driver = {
++	.driver = {
++		.name	= "qixis_ctrl",
++		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(fsl_qixis_i2c_of_match),
++	},
++	.probe_new	= fsl_qixis_i2c_probe,
++	.remove		= fsl_qixis_i2c_remove,
++};
++module_i2c_driver(fsl_qixis_i2c_driver);
++
++MODULE_AUTHOR("Wang Dongsheng <dongsheng.wang@freescale.com>");
++MODULE_DESCRIPTION("Freescale QIXIS system controller driver");
++MODULE_LICENSE("GPL");
++
+-- 
+2.17.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
