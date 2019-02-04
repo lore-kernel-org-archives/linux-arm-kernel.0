@@ -2,94 +2,68 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 444D4C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:59:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 92DFAC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:02:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0C5D02082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:59:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3AD7E2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:02:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aAcDm/Wf";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ffwll.ch header.i=@ffwll.ch header.b="Es+9cvA0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C5D02082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ffwll.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="exq0Azmn";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="xmmI3FGr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3AD7E2082F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=m350VT2R75EX6EXRqz8myBqudoMbseZSO2PUgN158YQ=; b=aAcDm/WfAby4bs
-	J90oFcu85/1VoKHJdFTghRNC4wvDES/C1K5f52HxSrQB/ZAU3LcBtXo/ULXkXfsGcXzgur5lvT2lJ
-	IDwp6cSMVS0MQcFIIZc5uziyamrMhgsS0OoCqS0GGgiIto3TWHv7RYD/pfs+9wZnCoKKHKD/uoxEd
-	Kcp2kQFDdze8u/V1WZttyyuVeuSDfREGDoS26cbf43OZnpiq/BEH+8UOXWjnDtnnSwpEmrRCRBsc7
-	wu9dmbnX3mYCyqVdLbytqR4B6U5eZFadxYQtqBI1lSDhz+Mi21hijpvJSvyQGtR9nGCARiqaMpPfo
-	fwH2rE0UyMD+9JlbZ+hQ==;
+	List-Owner; bh=CrSpVWnIoNw0017cZ8xkUiJE4w1IK5SiD6KILWDox/s=; b=exq0Azmn1nOzEj
+	E6SCzHVY2Spubz7+KaaLlupfSmB2x68mtQAZnNodtjcAsf8faoHnG/5nmfZQiodTEByu6IpRj91gP
+	bgGSKYGu7/s7ql5HDWoSdrJLRccGF/Xt9H5vzP8UQ5ujt/ZLSVjOdx9G0uT+5w61Z6ug34lkCaI7F
+	RgqcL6xq63gMqG3jF9PYYbfr04QG5HhNKvvYRVI/LcIxoSZvKjLr20E2SQ/gl/DE7q90Kh7l51fVW
+	YrXu1P3MbafzK+nXp4v4a7tC4rrEo2Qvgm0/CW1c5YLcyJshkWLJpSN3GVrUE7Go72mlqS62TSGdT
+	YbJriCWTxMCmyX2m0aGw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqgeg-0005QJ-Lq; Mon, 04 Feb 2019 15:59:30 +0000
-Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
+	id 1gqghM-0007ZF-T5; Mon, 04 Feb 2019 16:02:16 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqgeR-0005Pw-Mi
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 15:59:17 +0000
-Received: by mail-ed1-x544.google.com with SMTP id f9so267598eds.10
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 07:59:15 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ffwll.ch; s=google;
- h=sender:date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=+moUqLFIksdrkO8M/2OLXqAd+++oeaNZy6XKM+d2eOA=;
- b=Es+9cvA0yc0gReLoh9L/NcvW6e3wHYVZweF7VaNh82OJHNv3TfvrisUa3HqqDY4dzn
- boUQmwGx6TixWKG+/5xjfkaXLeYpE7uPlA9++jvIQHJ9qjIClFzPGKJmErXY9W9SfBVY
- hRVzXbKICsnpIGlxBCprXQ3lHpb4RcB2156u0=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
- :references:mime-version:content-disposition:in-reply-to:user-agent;
- bh=+moUqLFIksdrkO8M/2OLXqAd+++oeaNZy6XKM+d2eOA=;
- b=AAmWzN51XfGDkzfYSMW3a8tIOZacYJnwwgGLerVtSQLEziaGUQYP6OPYhKHp/4x7e9
- 4rlfK2f8pWeUU10mPvY91/2Na+rJf0444FQAIO7AWyOasDSTQKVfwFgF2fcVd4vo88P1
- Y458H93G7i/wFzb04FwB3LlF7I7Yt0AVtX9HFFZq99pZrLU47Dhizz8XkzHPy/wHLme5
- bbvUpGAy/TUVnWk8CmfzUjvy7PfbAe/xZg3TOzxOStExJ25HU1/GBRXrldRW0qhcktXV
- JXl9R4at6+1p3iNVzYLSI1QRV7tUfUliEll7BduZ18UmqcZb1qHWuqLjNYtQ9hXF4j/V
- lkOQ==
-X-Gm-Message-State: AHQUAuY8zMQmdTD5QFF3gpeRFlq+dNvMSITBIWzP/mZtNnBI5wyrAaHG
- TsXL8eMq0QWytYGHMQvvtmHjbg==
-X-Google-Smtp-Source: AHgI3IYAvsRxSkm7SU0+AMrTfx6iMcqQhiQRvvDea04c6xpneat//g4UnjATW1xU5nZ72LdzRtlmeA==
-X-Received: by 2002:a17:906:4344:: with SMTP id z4mr43292ejm.27.1549295953773; 
- Mon, 04 Feb 2019 07:59:13 -0800 (PST)
-Received: from phenom.ffwll.local ([2a02:168:569e:0:3106:d637:d723:e855])
- by smtp.gmail.com with ESMTPSA id x38sm4385515edx.24.2019.02.04.07.59.11
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 04 Feb 2019 07:59:12 -0800 (PST)
-Date: Mon, 4 Feb 2019 16:59:09 +0100
-From: Daniel Vetter <daniel@ffwll.ch>
-To: Thierry Reding <thierry.reding@gmail.com>
-Subject: Re: [PATCH RESEND v2 08/12] dt-bindings: add binding for generic eDP
- panel
-Message-ID: <20190204155909.GU3271@phenom.ffwll.local>
-References: <20190203185501.8958-1-anarsoul@gmail.com>
- <20190203185501.8958-9-anarsoul@gmail.com>
- <20190204074350.GC16448@ulmo>
- <CA+E=qVecudACOEXt74Kf=UA_F-uuHgEqHzKpYAq1ocMx3Sx+eQ@mail.gmail.com>
- <20190204082353.GE19087@ulmo>
- <20190204094012.GP3271@phenom.ffwll.local>
- <20190204112218.GB10412@ulmo>
+ id 1gqghJ-0007Yk-Jv
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:02:14 +0000
+Received: from localhost.localdomain (cpe-70-114-128-244.austin.res.rr.com
+ [70.114.128.244])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id B5C582175B;
+ Mon,  4 Feb 2019 16:02:12 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549296133;
+ bh=1qDgcDVfU0jIttXiwMM3WKuU9P4YShjHvQCGPXAszos=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=xmmI3FGrc8s5Ga9e2evNBV8JRe946cJlXsOF0+a5uuZ1rxBPutGeXdwcoq2uVeTYi
+ vfqVBv/HQt4oTCVMo3/NunFQM0BaPGR8gy48JrIptfxZ3wR7k3vDnDi58VlyZWfoi6
+ DT+FmPu/39yxKnb+rnJFA2J+6JNy9TFarFPRRA+w=
+From: Dinh Nguyen <dinguyen@kernel.org>
+To: arm@kernel.org
+Subject: [GIT PULL 2/2] ARM: dts: socfpga: updates for v5.1
+Date: Mon,  4 Feb 2019 10:02:10 -0600
+Message-Id: <20190204160210.18046-2-dinguyen@kernel.org>
+X-Mailer: git-send-email 2.20.0
+In-Reply-To: <20190204160210.18046-1-dinguyen@kernel.org>
+References: <20190204160210.18046-1-dinguyen@kernel.org>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190204112218.GB10412@ulmo>
-X-Operating-System: Linux phenom 4.19.0-1-amd64 
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_075915_861553_C6809577 
-X-CRM114-Status: GOOD (  41.80  )
+X-CRM114-CacheID: sfid-20190204_080213_651140_A8011724 
+X-CRM114-Status: GOOD (  13.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,139 +75,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Archit Taneja <architt@codeaurora.org>, Andrzej Hajda <a.hajda@samsung.com>,
- David Airlie <airlied@linux.ie>, linux-sunxi <linux-sunxi@googlegroups.com>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Sean Paul <seanpaul@chromium.org>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Daniel Vetter <daniel@ffwll.ch>,
- arm-linux <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
+Cc: dinguyen@kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 04, 2019 at 12:22:18PM +0100, Thierry Reding wrote:
-> On Mon, Feb 04, 2019 at 10:40:12AM +0100, Daniel Vetter wrote:
-> > On Mon, Feb 04, 2019 at 09:23:59AM +0100, Thierry Reding wrote:
-> > > On Mon, Feb 04, 2019 at 12:13:55AM -0800, Vasily Khoruzhick wrote:
-> > > > On Sun, Feb 3, 2019 at 11:43 PM Thierry Reding <thierry.reding@gmail.com> wrote:
-> > > > >
-> > > > > On Sun, Feb 03, 2019 at 10:54:57AM -0800, Vasily Khoruzhick wrote:
-> > > > > > eDP panels usually have EDID EEPROM, so there's no need to define panel
-> > > > > > width/height or any modes/timings in dts. But this panel still may have
-> > > > > > regulator and/or backlight.
-> > > > > >
-> > > > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > > > > > ---
-> > > > > >  .../devicetree/bindings/display/panel/panel-edp.txt        | 7 +++++++
-> > > > > >  1 file changed, 7 insertions(+)
-> > > > > >  create mode 100644 Documentation/devicetree/bindings/display/panel/panel-edp.txt
-> > > > >
-> > > > > Please don't try to make panels look more generic than they really are.
-> > > > > You're going to have to provide a compatible string for your device that
-> > > > > is more specific than "panel-edp". You claim that you don't need any
-> > > > > extra information that is panel specific, but you don't know that now.
-> > > > > We have in the past thought that we didn't need things like prepare
-> > > > > delay, but then we ran into situations where we did need them.
-> > > > >
-> > > > > Just do what everybody else does. Provide a specific compatible string
-> > > > > and match on that in the panel-simple driver. Even if you can read all
-> > > > > the video timings from an EDID EEPROM, you can still provide a mode in
-> > > > > the panel descriptor to serve as a fallback if for example the EEPROM
-> > > > > is faulty on some device.
-> > > > 
-> > > > Pinebook used several 768p panels that have slightly different timings
-> > > > and recent batch uses 1080p panel.
-> > > > 
-> > > > What panel descriptor should I use as fallback?
-> > > 
-> > > You don't use panel descriptors as fallback. The simple-panel driver
-> > > will bind to a panel device and use the corresponding descriptor. If
-> > > your device tree contains the correct information, the descriptor is
-> > > correct for the panel you have.
-> > > 
-> > > In other words you need to ensure that you have the correct panel in
-> > > device tree for the board that you're using. This is exactly the same
-> > > thing as for other devices.
-> > > 
-> > > One way to to this is to have separate device trees for each variant
-> > > of the board that you want to support. Another variant may be to have
-> > > a common device tree and then have some early firmware update the DTB
-> > > with the correct panel information.
-> > 
-> > This would defeat the point of edp, which is to standardize the mess of
-> > panels (at least somewhat) and avoid having to change the DT/ACPI
-> > tables/firmware for every board you ship. Also, we do have DP quirking
-> > infrastructure already (using the OUI), I think if there's something that
-> > doesn't work then we should quirk it there.
-> 
-> The problem is that while the attempt may have been to standardize, it
-> failed. It doesn't take into account any of the details such as timing
-> between things like powering up the display and enabling the backlight
-> or similar. I don't know how you'd want to "quirk" those kinds of
-> requirements because they are highly panel specific.
+Hi Arnd, Kevin, and Olof:
 
-Hm right, we get these from some firmware tables (and mix them with the
-spec one, since some of the firmware values are nonsense). I don't even
-know whether we can read the timings over dp aux somehow (you can power up
-the panel with some pessimistic values to figure those out, and you only
-need dp aux to work, which is much simpler than the entire panel).
+Please pull in these DTS updates for v5.1.
 
-> > What does make sense though imo is if we try not to stuff the edp panel
-> > into panel-simple, because it's anything like a simple dumb panel. There's
-> > also some integration awkwardness since with this panel you need to do dp
-> > aux/i2c transactions to get at the information (edid alone isn't good
-> > enough for edp), and I'm not sure how exactly that's supposed to be
-> > instantiated. Maybe a special function to instantiate an edp panel, which
-> > takes both a DT node and the dp_aux controller would be much better,
-> > instead of trying to auto-match against a DT compatible string and load a
-> > panel driver which is almost all fake.
-> > 
-> > Or we teach dp_aux to register itself and somehow teach panel-edp how it
-> > can get hold of the dp_aux channel it needs.
-> 
-> We already do that. drm_dp_aux registers as an I2C adapter that can be
-> used to read EDID EEPROMs using I2C-over-AUX transactions. We already
-> use that on some platforms.
-> 
-> Also note that simple-panel already supports getting video timings from
-> EDID. If a DDC link is present in DT, the driver will load the modes
-> from EDID and use them.
+Thanks,
+Dinh
 
-Could we extend this to dp aux somehow? For edp you need the dp aux (which
-then gives you the ddc link automatically).
+The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 
-> > But fake mode in panel-simple sounds like the wrong approach. At least
-> > from our experience with i915 (and I think other drivers supporting edp),
-> > the standardization of panels for basic stuff at least worked.
-> > Self-refresh seems an entirely different story unfortunately ... but again
-> > quirking that for DP stuff should be done using the OUI I think.
-> 
-> I can imagine that on x86 platforms OEMs can also easily hide some of
-> the necessary quirks in ACPI. None of that exists on ARM or other
-> architectures that solely rely on device tree to describe the device.
-> Since there's no way of specifying power sequences in DT (there have
-> been attempts in the past to make that work, but they failed miserably)
-> all we can do is match on a compatible string and encode the necessary
-> logic in the driver. Luckily we haven't run into anything too fancy up
-> to now and we've been able to make things work mostly with just a couple
-> of fairly generic parameters.
-> 
-> Also note that initially people thought this wasn't going to be
-> necessary and we only added the various "delay" parameters later on
-> because it did turn out that not all panels are created equal.
+  Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
 
-Yeah this sucks, but oh well.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v5.1
+
+for you to fetch changes up to 1c909b2dfe6a21de2c24dc1c1405593e40e3a88c:
+
+  ARM: dts: socfpga: update more missing reset properties (2019-01-29 17:12:52 -0600)
+
+----------------------------------------------------------------
+SoCFPGA DTS updates for v5.1
+- Add SMMU node for Stratix10
+- Add vendor prefix fo Novtech
+- Add a new 96Boards Chameleon96 board that uses a Cyclone5 SoCFPGA
+- Add missing reset properties for all IP on Cyclone5 and Arria10
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      ARM: dts: socfpga: update missing reset property peripherals
+
+Manivannan Sadhasivam (2):
+      dt-bindings: vendor-prefixes: Add Novtech Vendor Prefix
+      ARM: dts: Add support for 96Boards Chameleon96 board
+
+Simon Goldschmidt (1):
+      ARM: dts: socfpga: update more missing reset properties
+
+Thor Thayer (1):
+      arm64: dts: stratix10: Add Stratix10 SMMU support
+
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/socfpga.dtsi                     |  16 +++
+ arch/arm/boot/dts/socfpga_arria10.dtsi             |  18 +++
+ arch/arm/boot/dts/socfpga_cyclone5_chameleon96.dts | 130 +++++++++++++++++++++
+ arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  |  29 +++++
+ 6 files changed, 195 insertions(+)
+ create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_chameleon96.dts
 
 _______________________________________________
 linux-arm-kernel mailing list
