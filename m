@@ -2,22 +2,21 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CE25EC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 22:32:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EA5A6C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 22:38:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 99F5A2081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 22:32:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AF85F20818
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 22:38:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DuGl118M";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="xUK0yY4U"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 99F5A2081B
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Wur0+Ifc";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="blDRwHh8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF85F20818
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lechnology.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,50 +25,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=iMKp4Yr0RVSrW+G7okwl7hLVVv0svpghwi045ShDZ28=; b=DuGl118MUxtD+tVcmdn3A/nNW
-	D0NHun4yhHzwR+sWyEkaJYrEcTSVCc+nShIlH4jDECRwjDDh5ne4LxIO+sQ7W1Wo+SqKNq4mjRpVF
-	tW1OQhc8miywMcJ7OGILrqUpQsaUlUKKmTC7TA2hiBzva7EElq0PP4E9k5PqfQ2o9qNbopV8InfNA
-	o0LXQ40oLsLb6KZGIKNSXAxIhS5kyyzyOcLsHJo4lfboGT+UedeyjeXUlM0jMt8tkhq8Tmy/0ottL
-	Q2MEA5j4YGF3V8YG7Dzcy+s83HamX9CgH5SFL7bRd4K1Q1LUC6zvh8R/wDw5nN0v3LKY4wbk2VdTe
-	L8kxEbMpw==;
+	 bh=ESNU4PMnXuGpMEnSprBc1qsdr4iny6nGopuqvsqZRYs=; b=Wur0+Ifc0qacMRJ/HEBmIVecU
+	sKFEfHHGMcfefDkMFy/HTF/8oXEYNKjaLzU2zamK/U9BdWzLpOxTdOthasCy2hIzdkForZpS4A2Qr
+	1HJc38iv5zJvmaJraQKLOe1rb8e5KWsIXiWuqLbTVht7RsxcRlOm7MZq1hGN0dLUn2FCnvzsZZGSF
+	tHiRXtKahQdgo9pLXslCIOL1f10tBWUmBbt2fz8AlTEyyfzXPWrDALPK6LjL/ZA/Wb5/e1knMHVVO
+	YI/iTBRq97FTk2g6OWPv55VJDHR3SLI9Ehn9YJKQj2WRFziFCL17XqJDbr7rEcs8GG6DMPps82wNh
+	5Uw4z83Qg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqmnD-0007By-3e; Mon, 04 Feb 2019 22:32:43 +0000
+	id 1gqmsY-0000Qx-Gw; Mon, 04 Feb 2019 22:38:14 +0000
 Received: from vern.gendns.com ([98.142.107.122])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqmn9-0007Bc-Us
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 22:32:41 +0000
+ id 1gqmsV-0000Qc-GH
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 22:38:13 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=lechnology.com; s=default; h=Content-Transfer-Encoding:Content-Type:
  In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
  :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=c5a+DhB4fFRi20eTBRlbGs3mejq5cz+PvuGy8QjZFfg=; b=xUK0yY4U9P/6fCEAac0Q9yNziS
- YKpq9hMmIbVAiINR2hhwo+Cuox4QNHvKmZ2MiI1akcU1i2Z0iAxPwpgatp6BEvjIUnnW0tDiaSgoX
- 6E+1umcpbbngoEa7Yaf17P6L6NXmhxUL0Lh9h4ksD8vrBHPcziUNwdjGRyau7FQAS6uPao+PqA+4q
- RrQgMMfgfXb9eSV6V5JWoJ1jT4AvtSiiOg6/CprA4gFBie2pP8J043fsQ0k/q1trAdrDNEYhdgGLL
- TRemD6bXTXUlrVYyY52Xl+T203nM77VfQicGrlQ9Kitkt49+HW8w/idtzeBUNkY2HzYQbD19WzNiF
- XG9qaFTw==;
+ bh=XhKOl4CdXzp63gFI5VYkC/AWTzTO9B2+72xRjsqsRDA=; b=blDRwHh82m1iKcNJz03nLKB6SP
+ a+xrnHdlLlgcWUD9Rk6s101En+k5I61TMbVDsnWzI0BXf3GBlrO85LATzwKphSB/4cS5pht9wupIY
+ 8JA9H6omidnd0UHrZxhg2PK43AaJFlU+KlAbOQe0J4071vSewYY4tmD/C0U/WZT+QqKcy0Ff9fWSs
+ MMuVbKo4LtKV3LTBGNAPhdac/Q9SmX7Bj7U7vhe4P/7xnI6GYzPUGMmTMZ/sKo6qGpQoDyg+5Jr3T
+ Zo5FjZZCTNYcWmS4bQ0du04NEovIo/ey2sGkghNOnd5agQ5/4WxM8auzjDy6J3uVwvIHEKNhNYXFm
+ KTf8Zrdw==;
 Received: from 108-198-5-147.lightspeed.okcbok.sbcglobal.net
- ([108.198.5.147]:58228 helo=[192.168.0.134])
+ ([108.198.5.147]:58010 helo=[192.168.0.134])
  by vern.gendns.com with esmtpsa (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128)
  (Exim 4.91) (envelope-from <david@lechnology.com>)
- id 1gqmje-00021c-Os; Mon, 04 Feb 2019 17:29:02 -0500
-Subject: Re: [PATCH 06/35] ARM: davinci: wrap interrupt definitions with a
- macro for SPARSE_IRQ
+ id 1gqmYc-0007Iz-Sn; Mon, 04 Feb 2019 17:17:38 -0500
+Subject: Re: [PATCH 05/35] ARM: davinci: drop irq defines from
+ default_priorites
 To: Bartosz Golaszewski <brgl@bgdev.pl>, Sekhar Nori <nsekhar@ti.com>,
  Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
  Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>
 References: <20190131133928.17985-1-brgl@bgdev.pl>
- <20190131133928.17985-7-brgl@bgdev.pl>
+ <20190131133928.17985-6-brgl@bgdev.pl>
 From: David Lechner <david@lechnology.com>
-Message-ID: <b06cd3b4-b960-15cb-1bf4-f389e18248ac@lechnology.com>
-Date: Mon, 4 Feb 2019 16:32:36 -0600
+Message-ID: <3038ba79-f411-9aa1-00ec-689060ed13d4@lechnology.com>
+Date: Mon, 4 Feb 2019 16:21:12 -0600
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <20190131133928.17985-7-brgl@bgdev.pl>
+In-Reply-To: <20190131133928.17985-6-brgl@bgdev.pl>
 Content-Language: en-US
 X-AntiAbuse: This header was added to track abuse,
  please include it with any abuse report
@@ -84,8 +83,8 @@ X-Source:
 X-Source-Args: 
 X-Source-Dir: 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_143240_073728_8A5210CA 
-X-CRM114-Status: GOOD (  10.87  )
+X-CRM114-CacheID: sfid-20190204_143811_701528_3273F49F 
+X-CRM114-Status: GOOD (  11.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,30 +106,95 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 On 1/31/19 7:38 AM, Bartosz Golaszewski wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> This is done in preparation for selecting CONFIG_SPARSE_IRQ. The
-> interrupt numbers will then start at the predefined NR_IRQS offset.
+> In order to select SPARSE_IRQ we need to make the interrupt numbers
+> dynamic (at least at build-time for the top-level controller). The
+> interrupt numbers are used as array indexes for irq priorities.
 > 
-> For now wrap all interrupt numbers with a macro and define
-> DAVINCI_INTC_START to 0. Logically nothing changes for now.
+> Drop the defines and just initialize the arrays in a linear manner.
 > 
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
 
-Reviewed-by: David Lechner <david@lechnology.com>
+...
 
-> diff --git a/arch/arm/mach-davinci/include/mach/irqs.h b/arch/arm/mach-davinci/include/mach/irqs.h
-> index 03c446635301..14fa668d4e8d 100644
-> --- a/arch/arm/mach-davinci/include/mach/irqs.h
-> +++ b/arch/arm/mach-davinci/include/mach/irqs.h
-> @@ -30,371 +30,374 @@
->   /* Base address */
->   #define DAVINCI_ARM_INTC_BASE 0x01C48000
->   
-> +#define DAVINCI_INTC_START		0
-> +#define DAVINCI_INTC_IRQ(_irqnum)	(DAVINCI_INTC_START + (_irqnum))
+> -static u8 dm355_default_priorities[DAVINCI_N_AINTC_IRQ] = {
+> -	[IRQ_DM355_CCDC_VDINT0]		= 2,
+> -	[IRQ_DM355_CCDC_VDINT1]		= 6,
+> -	[IRQ_DM355_CCDC_VDINT2]		= 6,
+> -	[IRQ_DM355_IPIPE_HST]		= 6,
+> -	[IRQ_DM355_H3AINT]		= 6,
+> -	[IRQ_DM355_IPIPE_SDR]		= 6,
+> -	[IRQ_DM355_IPIPEIFINT]		= 6,
+> -	[IRQ_DM355_OSDINT]		= 7,
+> -	[IRQ_DM355_VENCINT]		= 6,
+> -	[IRQ_ASQINT]			= 6,
+> -	[IRQ_IMXINT]			= 6,
+> -	[IRQ_USBINT]			= 4,
+> -	[IRQ_DM355_RTOINT]		= 4,
+> -	[IRQ_DM355_UARTINT2]		= 7,
+> -	[IRQ_DM355_TINT6]		= 7,
+> -	[IRQ_CCINT0]			= 5,	/* dma */
+> -	[IRQ_CCERRINT]			= 5,	/* dma */
+> -	[IRQ_TCERRINT0]			= 5,	/* dma */
+> -	[IRQ_TCERRINT]			= 5,	/* dma */
+> -	[IRQ_DM355_SPINT2_1]		= 7,
+> -	[IRQ_DM355_TINT7]		= 4,
+> -	[IRQ_DM355_SDIOINT0]		= 7,
+> -	[IRQ_MBXINT]			= 7,
+> -	[IRQ_MBRINT]			= 7,
+> -	[IRQ_MMCINT]			= 7,
+> -	[IRQ_DM355_MMCINT1]		= 7,
+> -	[IRQ_DM355_PWMINT3]		= 7,
+> -	[IRQ_DDRINT]			= 7,
+> -	[IRQ_AEMIFINT]			= 7,
+> -	[IRQ_DM355_SDIOINT1]		= 4,
+> -	[IRQ_TINT0_TINT12]		= 2,	/* clockevent */
+> -	[IRQ_TINT0_TINT34]		= 2,	/* clocksource */
+> -	[IRQ_TINT1_TINT12]		= 7,	/* DSP timer */
+> -	[IRQ_TINT1_TINT34]		= 7,	/* system tick */
+> -	[IRQ_PWMINT0]			= 7,
+> -	[IRQ_PWMINT1]			= 7,
+> -	[IRQ_PWMINT2]			= 7,
+> -	[IRQ_I2C]			= 3,
+> -	[IRQ_UARTINT0]			= 3,
+> -	[IRQ_UARTINT1]			= 3,
+> -	[IRQ_DM355_SPINT0_0]		= 3,
+> -	[IRQ_DM355_SPINT0_1]		= 3,
+> -	[IRQ_DM355_GPIO0]		= 3,
+> -	[IRQ_DM355_GPIO1]		= 7,
+> -	[IRQ_DM355_GPIO2]		= 4,
+> -	[IRQ_DM355_GPIO3]		= 4,
+> -	[IRQ_DM355_GPIO4]		= 7,
+> -	[IRQ_DM355_GPIO5]		= 7,
+> -	[IRQ_DM355_GPIO6]		= 7,
+> -	[IRQ_DM355_GPIO7]		= 7,
+> -	[IRQ_DM355_GPIO8]		= 7,
+> -	[IRQ_DM355_GPIO9]		= 7,
+> -	[IRQ_DM355_GPIOBNK0]		= 7,
+> -	[IRQ_DM355_GPIOBNK1]		= 7,
+> -	[IRQ_DM355_GPIOBNK2]		= 7,
+> -	[IRQ_DM355_GPIOBNK3]		= 7,
+> -	[IRQ_DM355_GPIOBNK4]		= 7,
+> -	[IRQ_DM355_GPIOBNK5]		= 7,
+> -	[IRQ_DM355_GPIOBNK6]		= 7,
+> -	[IRQ_COMMTX]			= 7,
+> -	[IRQ_COMMRX]			= 7,
+> -	[IRQ_EMUINT]			= 7,
+> +static u8 dm355_aintc_prios[] = {
+> +	2, 6, 6, 6, 6, 6, 6, 7,
+> +	6, 6, 6, 4, 4, 7, 7, 5,
+> +	5, 5, 5, 7, 4, 7, 7, 7,
+> +	7, 7, 7, 7, 7, 4, 2, 2,
+> +	7, 7, 7, 7, 7, 3, 3, 3,
+> +	3, 3, 3, 7, 4, 4, 7, 7,
+> +	7, 7, 7, 7, 7, 7, 7, 7,
+> +	7, 7, 7, 7, 7, 7, 0, 0,
+>   };
 
-Almost not worth mentioning, but DAVINCI_INTC_START is only
-ever used once, so it could be omitted.
+Hmm... this makes it harder to see what is going on here.
+You can no longer see which priority corresponds to which
+IRQ without consulting a manual.
+
 
 _______________________________________________
 linux-arm-kernel mailing list
