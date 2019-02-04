@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 17F29C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:15:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B3F91C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:16:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DDC462080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:15:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 83A812080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:16:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dTwznTR7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DDC462080F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mj3zj0F0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 83A812080F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=B8XU7Ch2q/UxdofLayT7r1z4B26a/vweY6ic9PKqeMM=; b=dTwznTR7B7f2m5
-	w/Chit5UDzYJUkj/Z4I4EYC+wbV9sGFv1tQ6RPUdcIrdGifdFxvZMIqy1FW1At9Sr73mZvejtrhF2
-	yfbFKAa+9iIRqh7jIxUjfVfMFVuemxwewP/Q/yhbaqqrfn5qP/h1eOQ9k3+UWvAYvVw+H9NQyETkg
-	qj+E9sl78S+rGpKa+iba7H7G6w5hUioyGAKuyI33+4uZtoVB9jZzLMRPSAwQb9YKKyPNDDjF13dzA
-	Ncoz0HceNkmyKaD8Jo75yx7Aj5iil8kkqvBCM9IPoOrnvBctYai6WsoaXFCkqDLNPQnHLdI2bDOcQ
-	8Av+1EYb/w2rT79NK81w==;
+	List-Owner; bh=B5jeUHjr3gBKJCYhIO8bTGsXf42spNVR5ohiduHjHpQ=; b=mj3zj0F0NtU07/
+	6BUiSGNkJvcrwB0iJO0i2WbdFDKs25wWDwtdv/tYLHIFe+MG/9uUtL5a/Mkhzq2l3nbIPFJ6OeuVP
+	J3dT435vQ8RJv3jrI086SR5zta7QUkAWL3lgoaGF0iaAF1Sf/dQSafAS6r///mIODprSyaCJCWZ1p
+	JV2cBkrUWPkF9XGTeiLVbo/immPYLqGTVs2gScTyuX+5CAnnEf9nImzvAsh87mcVxaNDJruiVPO1T
+	r/fbM+yeXRXCficAm9Rx3ycJDckhJIV3czH9XSA+ti5iBe/THQ5m5sKDmanqDP/7KDP57ulgUCNwW
+	U9xIkilvwAM3vRnTdMjg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqfxl-0003As-JL; Mon, 04 Feb 2019 15:15:09 +0000
+	id 1gqfyg-0003yT-UI; Mon, 04 Feb 2019 15:16:06 +0000
 Received: from mx1.redhat.com ([209.132.183.28])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqfxi-0002la-0G
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 15:15:08 +0000
-Received: from smtp.corp.redhat.com (int-mx04.intmail.prod.int.phx2.redhat.com
- [10.5.11.14])
+ id 1gqfyd-0003xq-7c
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 15:16:04 +0000
+Received: from smtp.corp.redhat.com (int-mx07.intmail.prod.int.phx2.redhat.com
+ [10.5.11.22])
  (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 3807EFA28E;
- Mon,  4 Feb 2019 15:15:05 +0000 (UTC)
+ by mx1.redhat.com (Postfix) with ESMTPS id 926081393D4;
+ Mon,  4 Feb 2019 15:16:02 +0000 (UTC)
 Received: from kamzik.brq.redhat.com (unknown [10.43.2.160])
- by smtp.corp.redhat.com (Postfix) with ESMTPS id E09EC74144;
- Mon,  4 Feb 2019 15:15:03 +0000 (UTC)
-Date: Mon, 4 Feb 2019 16:15:01 +0100
+ by smtp.corp.redhat.com (Postfix) with ESMTPS id 3F24B1048103;
+ Mon,  4 Feb 2019 15:16:01 +0000 (UTC)
+Date: Mon, 4 Feb 2019 16:15:58 +0100
 From: Andrew Jones <drjones@redhat.com>
 To: Christoffer Dall <christoffer.dall@arm.com>
-Subject: Re: [PATCH 2/5] arm/arm64: KVM: Allow a VCPU to fully reset itself
-Message-ID: <20190204151501.mebefojnm6rhyg6v@kamzik.brq.redhat.com>
+Subject: Re: [PATCH 1/5] KVM: arm/arm64: Reset the VCPU without preemption
+ and vcpu state loaded
+Message-ID: <20190204151558.44tkfko3xh36ojbf@kamzik.brq.redhat.com>
 References: <20190125094656.5026-1-christoffer.dall@arm.com>
- <20190125094656.5026-3-christoffer.dall@arm.com>
+ <20190125094656.5026-2-christoffer.dall@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190125094656.5026-3-christoffer.dall@arm.com>
+In-Reply-To: <20190125094656.5026-2-christoffer.dall@arm.com>
 User-Agent: NeoMutt/20180716
-X-Scanned-By: MIMEDefang 2.79 on 10.5.11.14
+X-Scanned-By: MIMEDefang 2.84 on 10.5.11.22
 X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.28]); Mon, 04 Feb 2019 15:15:05 +0000 (UTC)
+ (mx1.redhat.com [10.5.110.38]); Mon, 04 Feb 2019 15:16:02 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_071506_083816_54912F3B 
-X-CRM114-Status: GOOD (  17.97  )
+X-CRM114-CacheID: sfid-20190204_071603_303360_1FBA72B8 
+X-CRM114-Status: GOOD (  14.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,32 +83,23 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 25, 2019 at 10:46:53AM +0100, Christoffer Dall wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
+On Fri, Jan 25, 2019 at 10:46:52AM +0100, Christoffer Dall wrote:
+> Resetting the VCPU state modifies the system register state in memory,
+> but this may interact with vcpu_load/vcpu_put if running with preemption
+> disabled, which in turn may lead to corrupted system register state.
 > 
-> The current kvm_psci_vcpu_on implementation will directly try to
-> manipulate the state of the VCPU to reset it.  However, since this is
-> not done on the thread that runs the VCPU, we can end up in a strangely
-> corrupted state when the source and target VCPUs are running at the same
-> time.
+> Address this by disabling preemption and doing put/load if required
+> around the reset logic.
 > 
-> Fix this by factoring out all reset logic from the PSCI implementation
-> and forwarding the required information along with a request to the
-> target VCPU.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/include/asm/kvm_host.h   | 10 +++++++++
->  arch/arm/kvm/reset.c              | 24 +++++++++++++++++++++
->  arch/arm64/include/asm/kvm_host.h | 11 ++++++++++
->  arch/arm64/kvm/reset.c            | 24 +++++++++++++++++++++
->  virt/kvm/arm/arm.c                | 10 +++++++++
->  virt/kvm/arm/psci.c               | 36 ++++++++++++++-----------------
->  6 files changed, 95 insertions(+), 20 deletions(-)
+>  arch/arm64/kvm/reset.c | 26 ++++++++++++++++++++++++--
+>  1 file changed, 24 insertions(+), 2 deletions(-)
 >
 
- 
+I believe this should come after the next patch, but anyway
+
 Reviewed-by: Andrew Jones <drjones@redhat.com>
 
 _______________________________________________
