@@ -2,23 +2,22 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D4C35C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 18:03:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 30253C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 18:51:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A384920820
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 18:03:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 00A802082E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 18:51:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sbL2pRui";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="F/MuCsy0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A384920820
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LHHDaXKL";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="CCSvXKHR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 00A802082E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,64 +25,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+efsRQMEwX92zJivaHCbATGKAAuCEzVnwFKWNy08aRA=; b=sbL2pRuimwMFoC
-	IioZw3QVtSh9sn+H99VvqKlxXRvM2PkoPHwiJD2L+OFnsk2F9/nMKWkDO8PKhQNFhGuodM+wNa5B0
-	uUAoOggmJ9LpZIBgYP7MdltaqJwY87Hlj+vL+q43ZEdzG3cfkFPviU/lym0KS/0oD/Zb28Dybk9SR
-	U4DcBJi//GeY9HbknSZUwoiE7ijCYbgB2TGM/3q6hizdx806M2EI2Mnpa1+yoh00pJ+K6/938pOF5
-	UBNy9sUr3H5FdfzqNJqbrlA0WvCOoYgHEAiXEjA5xmRT2RKhBXtFhUeKDEfUnX9BzKfKae3VmpELP
-	dgzZjm8bmFEleUpJuciw==;
+	List-Owner; bh=iWi8c3+aSl6KW4152TZjbBk6knuiVJ4KFrq6cCAk+5Q=; b=LHHDaXKLLrsC5M
+	cgQqoBCbBlNGckIKWTeN9cK3vIsF17rx4hEtugVUe0f+ftCN7XaaHGL2FYZ9irl+w1y2rrzqXaORA
+	UClXu2tRHQ/kigpdbEAnFPDy27/oxAKRWnG1cIYr9+GGfTPtlkk++qo/repG6WmdlIL2XNRUGFZSx
+	HVeAh/jHTVJLCgw2RojLK6xWPqnLjj+bcSe5fL7yxO31s5CdBRVxTEEA7PmL1TyNmorkf3Zd78R5n
+	CW4UIetHYg5j4VNvFhbANnLT6imPX7hOA9P8NttQ766o0DufdQ/OxFkfkydOu4vjLdCPEmBYp0uLK
+	aP83iZjnr077sbXdE6Ug==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqiaM-00058G-7m; Mon, 04 Feb 2019 18:03:10 +0000
-Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+	id 1gqjKb-0000Dd-JO; Mon, 04 Feb 2019 18:50:57 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqiaI-00056a-Ec
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 18:03:08 +0000
-Received: by mail-pl1-x644.google.com with SMTP id g9so284271plo.3
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 10:03:05 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=pa+Vc7SY0LoQnG2/tXw6TGPTX86UGYys3lkAel8SuIw=;
- b=F/MuCsy04csfh0tIaC4dehv6E2hS3A6dyoUz+BDIet6FsoHnz/ZVJfYL56jG0munBE
- 4yDLI2XKbL03jrxzf9D/SWU9YYTxS1taQFIFyXdpXQSMhaNeoFnuLIVXRyLtms+kxhZk
- qaOC/b3Tbd53oYDt4b58JtHSAyDRDvzcwdLuo=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=pa+Vc7SY0LoQnG2/tXw6TGPTX86UGYys3lkAel8SuIw=;
- b=O0bZ+70I7pX6laMygMMFB2IQy63f4kjkEbLnb64Iew5p9pdDKdqETLNgoaS1+VGl+m
- lFYYMaThu4r7Ng81jveoYXZVC5UKlUvZWY1pbm5Ots+JxQOK4PoTakZiUyhyUcx7IRtr
- Uh0OdK9s1p63UKIwiRcUs6T0AiRYuVIIdwnhFWKZ+YPRr59EX0rT1q6rr3IcMjHLEkot
- txDb6ctsR+QO2XLp7yZk6wAbQfLoQbF9cJaf1pDotpPI7WX2a5SPpUkGWV9XqnLJrVRh
- imx2tJeergiBEbq1Sgq9P92vm1SZ2+vf+q6AQxpPHwqTXJ0RZDuWhJk6fHaz+kCWbKym
- NyXw==
-X-Gm-Message-State: AHQUAual5MnYI9oaSuATmxCbafjLZJKGd+QrH5jWp//gHnNRe0kNYfEV
- KQ6ROoqGQCXZSG7rKn1NiAt7xA==
-X-Google-Smtp-Source: AHgI3Ia2MdcklPsX7BhkL3jYEmVjX2yyZgFn3/yfyAoM614ZdmlSLjM/F1zdgeg+EbFgvgjrjNZmIg==
-X-Received: by 2002:a17:902:50e3:: with SMTP id
- c32mr632085plj.318.1549303384891; 
- Mon, 04 Feb 2019 10:03:04 -0800 (PST)
-Received: from localhost ([2620:15c:202:1:75a:3f6e:21d:9374])
- by smtp.gmail.com with ESMTPSA id d129sm966231pfc.31.2019.02.04.10.03.04
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 04 Feb 2019 10:03:04 -0800 (PST)
-Date: Mon, 4 Feb 2019 10:03:03 -0800
-From: Matthias Kaehlcke <mka@chromium.org>
-To: Quentin Perret <quentin.perret@arm.com>
-Subject: Re: [PATCH v4 1/5] PM / OPP: Introduce a power estimation helper
-Message-ID: <20190204180303.GD117604@google.com>
-References: <20190204110952.16025-1-quentin.perret@arm.com>
- <20190204110952.16025-2-quentin.perret@arm.com>
+ id 1gqjKZ-0004UC-Mj
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 04 Feb 2019 18:50:55 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=In-Reply-To:Content-Transfer-Encoding:
+ Content-Type:MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:
+ Sender:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=rjDm323sA1rHjFNzXvp8mog88pX71pbusVrp8s829yE=; b=CCSvXKHRkKQu1hLD0WB0Tk1iKJ
+ 6awWzvGoUtuX31v6gclVBjIcwgiqn1Vw6WI+nBW4+0KHwpnl5jJL2QzxAYa+JpsHx0El7pzo6vgNb
+ vyuv8AZ7NqwnpQL4zIj6PBXP/JNyCJk/sFD1fhElDMDdAyMuPggNoLZxsBBM5IgzPk/HWpWVRoMrj
+ E0QCKm2cFIVp1quzxr3jmKs/5T7MPvOz8Ee3PHSIF852sqlzvKLwm8wnUW36Jc1dF6E5Ji8Jwcq/S
+ AklOnN/4A94Wuax/yGEKsgcRZLDf/vYYv7Plu7WJ+I0JVbCuts3eOctufQNiLdv8LOLP2x0HO16rY
+ +GJPBz8w==;
+Received: from muru.com ([72.249.23.125])
+ by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqjDc-0001nu-VU
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 18:43:46 +0000
+Received: from atomide.com (localhost [127.0.0.1])
+ by muru.com (Postfix) with ESMTPS id 44333808C;
+ Mon,  4 Feb 2019 18:43:29 +0000 (UTC)
+Date: Mon, 4 Feb 2019 10:43:17 -0800
+From: Tony Lindgren <tony@atomide.com>
+To: Andreas Kemnade <andreas@kemnade.info>
+Subject: Re: [PATCH] omap3: give off mode enable a more prominent place
+Message-ID: <20190204184317.GO5720@atomide.com>
+References: <20190202055827.12956-1-andreas@kemnade.info>
+ <20190204155604.GH5720@atomide.com>
+ <20190204193311.102a60e6@kemnade.info>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190204110952.16025-2-quentin.perret@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20190204193311.102a60e6@kemnade.info>
+User-Agent: Mutt/1.11.2 (2019-01-07)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_100306_511762_F50C51A5 
-X-CRM114-Status: GOOD (  33.91  )
+X-CRM114-CacheID: sfid-20190204_184345_136734_11F3DFB6 
+X-CRM114-Status: GOOD (  20.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,193 +83,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: nm@ti.com, linux-pm@vger.kernel.org, sboyd@kernel.org,
- viresh.kumar@linaro.org, rjw@rjwysocki.net, linux-kernel@vger.kernel.org,
- sudeep.holla@arm.com, dietmar.eggemann@arm.com,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-omap@vger.kernel.org, khilman@kernel.org,
+ linux-kernel@vger.kernel.org, linux@armlinux.org.uk,
+ letux-kernel@openphoenux.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 04, 2019 at 11:09:48AM +0000, Quentin Perret wrote:
-> The Energy Model (EM) framework provides an API to let drivers register
-> the active power of CPUs. The drivers are expected to provide a callback
-> method which estimates the power consumed by a CPU at each available
-> performance levels. How exactly this should be implemented, however,
-> depends on the platform.
+* Andreas Kemnade <andreas@kemnade.info> [190204 18:33]:
+> On Mon, 4 Feb 2019 07:56:04 -0800
+> Tony Lindgren <tony@atomide.com> wrote:
 > 
-> On some systems, PM_OPP knows the voltage and frequency at which CPUs
-> can run. When coupled with the CPU 'capacitance' (as provided by the
-> 'dynamic-power-coefficient' devicetree binding), it is possible to
-> estimate the dynamic power consumption of a CPU as P = C * V^2 * f, with
-> C its capacitance and V and f respectively the voltage and frequency of
-> the OPP. The Intelligent Power Allocator (IPA) thermal governor already
-> implements that estimation method, in the thermal framework.
-> 
-> However, this power estimation method can be applied to any platform
-> where all the parameters are known (C, V and f), and not only those
-> suffering thermal issues. As such, the code implementing this feature
-> can be re-used to also populate the EM framework now used by EAS.
-> 
-> As a first step, introduce in PM_OPP a helper function which CPUFreq
-> drivers can use to register into the EM framework. This duplicates the
-> power estimation done in IPA until it can be migrated to using the EM
-> framework. This will be done later, once the EM framework has support
-> for at least all platforms currently supported by IPA.
-> 
-> Signed-off-by: Quentin Perret <quentin.perret@arm.com>
-> Tested-by: Matthias Kaehlcke <mka@chromium.org>
-> ---
->  drivers/opp/of.c       | 99 ++++++++++++++++++++++++++++++++++++++++++
->  include/linux/pm_opp.h |  6 +++
->  2 files changed, 105 insertions(+)
-> 
-> diff --git a/drivers/opp/of.c b/drivers/opp/of.c
-> index 06f0f632ec47..cd58959e5158 100644
-> --- a/drivers/opp/of.c
-> +++ b/drivers/opp/of.c
-> @@ -20,6 +20,7 @@
->  #include <linux/pm_domain.h>
->  #include <linux/slab.h>
->  #include <linux/export.h>
-> +#include <linux/energy_model.h>
->  
->  #include "opp.h"
->  
-> @@ -1047,3 +1048,101 @@ struct device_node *dev_pm_opp_get_of_node(struct dev_pm_opp *opp)
->  	return of_node_get(opp->np);
->  }
->  EXPORT_SYMBOL_GPL(dev_pm_opp_get_of_node);
-> +
-> +/*
-> + * Callback function provided to the Energy Model framework upon registration.
-> + * This computes the power estimated by @CPU at @kHz if it is the frequency
-> + * of an existing OPP, or at the frequency of the first OPP above @kHz otherwise
-> + * (see dev_pm_opp_find_freq_ceil()). This function updates @kHz to the ceiled
-> + * frequency and @mW to the associated power. The power is estimated as
-> + * P = C * V^2 * f with C being the CPU's capacitance and V and f respectively
-> + * the voltage and frequency of the OPP.
-> + *
-> + * Returns -ENODEV if the CPU device cannot be found, -EINVAL if the power
-> + * calculation failed because of missing parameters, 0 otherwise.
-> + */
-> +static int __maybe_unused _get_cpu_power(unsigned long *mW, unsigned long *kHz,
-> +					 int cpu)
-> +{
-> +	struct device *cpu_dev;
-> +	struct dev_pm_opp *opp;
-> +	struct device_node *np;
-> +	unsigned long mV, Hz;
-> +	u32 cap;
-> +	u64 tmp;
-> +	int ret;
-> +
-> +	cpu_dev = get_cpu_device(cpu);
-> +	if (!cpu_dev)
-> +		return -ENODEV;
-> +
-> +	np = of_node_get(cpu_dev->of_node);
-> +	if (!np)
-> +		return -EINVAL;
-> +
-> +	ret = of_property_read_u32(np, "dynamic-power-coefficient", &cap);
-> +	of_node_put(np);
-> +	if (ret)
-> +		return -EINVAL;
-> +
-> +	Hz = *kHz * 1000;
-> +	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &Hz);
-> +	if (IS_ERR(opp))
-> +		return -EINVAL;
-> +
-> +	mV = dev_pm_opp_get_voltage(opp) / 1000;
-> +	dev_pm_opp_put(opp);
-> +	if (!mV)
-> +		return -EINVAL;
-> +
-> +	tmp = (u64)cap * mV * mV * (Hz / 1000000);
-> +	do_div(tmp, 1000000000);
-> +
-> +	*mW = (unsigned long)tmp;
-> +	*kHz = Hz / 1000;
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * dev_pm_opp_of_register_em() - Attempt to register an Energy Model
-> + * @cpus	: CPUs for which an Energy Model has to be registered
-> + *
-> + * This checks whether the "dynamic-power-coefficient" devicetree property has
-> + * been specified, and tries to register an Energy Model with it if it has.
-> + */
-> +void dev_pm_opp_of_register_em(struct cpumask *cpus)
-> +{
-> +	struct em_data_callback em_cb = EM_DATA_CB(_get_cpu_power);
-> +	int ret, nr_opp, cpu = cpumask_first(cpus);
-> +	struct device *cpu_dev;
-> +	struct device_node *np;
-> +	u32 cap;
-> +
-> +	cpu_dev = get_cpu_device(cpu);
-> +	if (!cpu_dev)
-> +		return;
-> +
-> +	nr_opp = dev_pm_opp_get_opp_count(cpu_dev);
-> +	if (nr_opp <= 0)
-> +		return;
-> +
-> +	np = of_node_get(cpu_dev->of_node);
-> +	if (!np)
-> +		return;
-> +
-> +	/*
-> +	 * Register an EM only if the 'dynamic-power-coefficient' property is
-> +	 * set in devicetree. It is assumed the voltage values are known if that
-> +	 * property is set since it is useless otherwise. If voltages are not
-> +	 * known, just let the EM registration fail with an error to alert the
-> +	 * user about the inconsistent configuration.
-> +	 */
-> +	ret = of_property_read_u32(np, "dynamic-power-coefficient", &cap);
-> +	of_node_put(np);
-> +	if (ret || !cap)
-> +		return;
-> +
-> +	em_register_perf_domain(cpus, nr_opp, &em_cb);
-> +}
-> +EXPORT_SYMBOL_GPL(dev_pm_opp_of_register_em);
-> diff --git a/include/linux/pm_opp.h b/include/linux/pm_opp.h
-> index b895f4e79868..c9c76310865a 100644
-> --- a/include/linux/pm_opp.h
-> +++ b/include/linux/pm_opp.h
-> @@ -327,6 +327,7 @@ int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpuma
->  struct device_node *dev_pm_opp_of_get_opp_desc_node(struct device *dev);
->  struct device_node *dev_pm_opp_get_of_node(struct dev_pm_opp *opp);
->  int of_get_required_opp_performance_state(struct device_node *np, int index);
-> +void dev_pm_opp_of_register_em(struct cpumask *cpus);
->  #else
->  static inline int dev_pm_opp_of_add_table(struct device *dev)
->  {
-> @@ -365,6 +366,11 @@ static inline struct device_node *dev_pm_opp_get_of_node(struct dev_pm_opp *opp)
->  {
->  	return NULL;
->  }
-> +
-> +static inline void dev_pm_opp_of_register_em(struct cpumask *cpus)
-> +{
-> +}
-> +
->  static inline int of_get_required_opp_performance_state(struct device_node *np, int index)
->  {
->  	return -ENOTSUPP;
+> > * Andreas Kemnade <andreas@kemnade.info> [190202 06:01]:
+> > > Enabling off mode was only reachable deeply hidden
+> > > in the debugfs. As powersaving is an important feature,
+> > > move the option out of its shady place.  
+> > 
+> > How about let's enable always if we have the twl4030
+> > configured to allow it? You can just check if the dts has
+> > "ti,twl4030-power-idle" or "ti,twl4030-power-idle-osc-off"
+> > properties set.
+> > 
+> > In order to enable deeper idle states, the user space still
+> > needs to idle the UARTs and possibly other hardware blocking
+> > idle. So we should be safe there.
+> > 
+> Let us not mix up runtime pm and system pm. The uarts need
+> to be idled for runtime suspend, but they are off/ret for
+> system suspend without userspace intervention, so allowing off mode
+> will have an influence even without uart runtime suspend,
+> and also probably for other powerdomains (non-core/per).
+> So we still need to be sure to handle at least some erratas and
+> context save/restore correctly.
 
-There is the option to remove the OPP check from the cpufreq drivers
-and instead return an error from dev_pm_opp_of_register_em(), but with
-the more complex error handling it might be more hassle than it's
-worth.
+True that's a good point.
 
-Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+> Your Idea seems to be in pseudocode
+> if (powersaving_wanted)
+> 	enable_off_mode()
+> 
+> I had something in mind like
+> if (system_is_trusted_to_handle_offmode()
+> 	enable_off_mode()
+
+For omap3, the properties for "ti,twl4030-power-idle" or
+"ti,twl4030-power-idle-osc-off" mean just that.
+
+The PMIC is wired and configured for off mode, and those
+properties should not be set unless the system is truly capable
+of entering off mode. If not set, we should not enable off
+idle by default.
+
+Otherwise the boards should be already using just
+"ti,twl4030-power" or "ti,twl4030-power-reset".
+
+So it should be safe to set a flag for off_mode based
+on that flag during boot, or set a flag for off
+mode allowed if the flag is needed later on.
+
+Regards,
+
+Tony
+
 
 _______________________________________________
 linux-arm-kernel mailing list
