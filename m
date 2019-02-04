@@ -2,85 +2,85 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0A918C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:26:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 47631C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:27:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CEF612083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:26:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 10F482083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:27:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ljU77Gi2";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="aVSLiJos"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CEF612083B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OG71cBJI";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="mI6LlaLu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 10F482083B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=seeTPMeHCDhguSgH+2KfD5fcACp77+WxVsXXNQZNpIE=; b=ljU77Gi2VfpvIJhWSsZPJXQUlD
-	WzvXb35t0c0+iDYJo1EKy+WQqRBFWMs6km3ljDkzjx07gVkZWLrd/fjjaM55YwqBX5HPPLOkm4AwL
-	FfiMAg7o06GdbIC+7Xt9GUDeoczblIlytqrAc5gXSpkCcyFVOO5qRvk8RLC0ytQ0jBtFxTXcq+f9l
-	4PIAMdkMCrL9ibMEU1f1m91cS6cmWev4/AU03lrnBjfSCPBSKeVdDHMvethX3NS2ZBLhEuWWPdi1G
-	2l/OnyF5stnPwLbKMm6dkKxHTA6F1tzXxLGWO4RaDeDXhWvNKA0Oq2dCE1au++h2zWYFaQHjbsJ9J
-	lzB2vvog==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=eLgHWOk6J2im/SiOMMuyyXKYtmqooTbIdE1DcxJ4Ijw=; b=OG71cBJI0LD5yl
+	WlqV3RgRHvG16qCxXo0uPkHttCbuI/tzTXhOxuqUn+cAbhFfnXWWgfDVkYmEy+worNqS6HG77VVPj
+	GSrjHzrrEhRBGYOPfjaK816g9k0+Ta8HpXHjJ834a4jQ46Qf1w0c31GNa3Tszst2neYWJ4qvBEJ2H
+	Z/hPyi7J7fwQ6uvOYiiV6Gjw68aNdKOKiOfOJCYxX12a33RUUdG2aKaiPxptiEC2qegQA4zt9AOPF
+	TMoMX30lEq5n9l6pcPT7v0IeB7xVkrnzZG5DaxaKIw3D2+cFimpzSW+r8JlaxdK5ITQXkPhyXhnAs
+	OMQFNjLDmAcE4+5XhrCQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqh4k-0000qC-Uw; Mon, 04 Feb 2019 16:26:26 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gqh5W-0001Hd-8q; Mon, 04 Feb 2019 16:27:14 +0000
+Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqh4L-0000NM-P5
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:26:05 +0000
-Received: by mail-wm1-x344.google.com with SMTP id f188so520162wmf.5
+ id 1gqh5S-0001H9-Fn
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:27:12 +0000
+Received: by mail-ot1-x342.google.com with SMTP id 32so671736ota.12
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 08:26:01 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=9lKepzvlFqSdyTmpHqFOS3txG3e1Qlnve7EeoiMfLO0=;
- b=aVSLiJosF7nsn2YlMbkWjfe/sQt+HQvDzUEKw4RhgQWgOVm70k9HPSiS5kbBVP/nE1
- uxICapIcLqWzWM7keOzeU4tTM3C0LF+hWtIqKxl8GXPDB84dVtX59Ewhs+KjNoSXstgm
- a7axZ2Vk2Aky3bhhwgyM5lpXXxhrlCVDzQPX4=
+ Mon, 04 Feb 2019 08:27:10 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=Z33S2/tBASL7ZYU7PMw+LhaeD0w+rofBnoyglbKaVZE=;
+ b=mI6LlaLuvt0WpBSvnW2+qWKjvkIN1gm3MU7oog3EHZTyrdkwxujwjY60CHCcqWdws1
+ O5emGNNcG8ym/3beXvwBCossM7IpOks37K9+blFOotl2m4HzJLQvIYGxTcSON6zRBkNa
+ GBIPwF0w2Wo53kSZGNhesPqDOWAF6p+seIEVhUlbA2/oRsPl/rLqKM0eR+vF9p8C0Y6d
+ 5hCmjjqVebeYlsUWpRVyZdRO0ilM7rBJf/kcsWjyN5jYtxG7ghCBqqIiW4lW+PrNslIv
+ jMBFcDm3l+sySiY2R+DI7cBjdzPz55NF+/1HCQmxAtpwo1rpDugtRyXPXI/rFwaf1Yrb
+ xNQA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=9lKepzvlFqSdyTmpHqFOS3txG3e1Qlnve7EeoiMfLO0=;
- b=Xy30z5kqGLIQhIWPsIostegbKlR1soxcjBgJfi27d0FzGafyyPB2kAMg5tFKfU2Cm1
- GFEYYiSV4zTZ4pnypioqk43kF/Gnje5U2BcaOIxrHRDlDf186gtvmvYa+irdKyvp3nL9
- wbv1zo/N7RDYeYizv0qtNdVHcy5xw+pA6aP9aWqHBuwzTj3Wd09e9qMtuLJFVxQzxAL4
- dA3PGPzwIjEdZfzwmBXHEyYSk7Y5ex08Fwg7mU2FhBFzcs2CK3rZSDUzU8YnVvsY7f0F
- w5tSChHkgqrHsw3NpiPrAxEqw1ckG/xQPt5wCVksC2RQFoIzIa6ItwjS0tWBAdP3ccZZ
- GEhg==
-X-Gm-Message-State: AHQUAuZrb7/BYF/FtKt8TlMfg5LBNvtSCZhcadYY+QgKURCqqu+EU9m8
- SiNbFX8CM2crRTJLLhV2SUmYzg==
-X-Google-Smtp-Source: AHgI3IZ7M0ze84wTX8DLxUv882QQUfhGHmbTLyFg1PCjFq7A45aNiEqTtsmhl2YBtsRd3HsDJdr2vw==
-X-Received: by 2002:a1c:b456:: with SMTP id d83mr127459wmf.115.1549297559980; 
- Mon, 04 Feb 2019 08:25:59 -0800 (PST)
-Received: from localhost.localdomain ([2a01:e0a:f:6020:70b6:b9c6:89e2:36a])
- by smtp.gmail.com with ESMTPSA id a4sm1251992wrt.37.2019.02.04.08.25.58
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 04 Feb 2019 08:25:59 -0800 (PST)
-From: Vincent Guittot <vincent.guittot@linaro.org>
-To: linux-pm@vger.kernel.org, linux-kernel@vger.kernel.org, rjw@rjwysocki.net,
- ulf.hansson@linaro.org, biju.das@bp.renesas.com
-Subject: [PATCH 2/2] PM-runtime: update time accounting only when enabled
-Date: Mon,  4 Feb 2019 17:25:53 +0100
-Message-Id: <1549297553-17647-3-git-send-email-vincent.guittot@linaro.org>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1549297553-17647-1-git-send-email-vincent.guittot@linaro.org>
-References: <1549297553-17647-1-git-send-email-vincent.guittot@linaro.org>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=Z33S2/tBASL7ZYU7PMw+LhaeD0w+rofBnoyglbKaVZE=;
+ b=AIeOBPONvf4gZ/q+ERKjLvPrWBB6/9Ybt+00SgegR9LFxlL4td6PY68I18iIlGgfDD
+ 5A2O1tZfQVTn9ASHkr2bNwGDCBkX1EsrbLvb023zi00PX1x82yPOWPv14iLtiWp47msA
+ +p+8fgbOKh+P8DGb2Zapt3rQC52LKsITCudJhDjSxafBSvCy4/qPJKWr3aNCIiNmTuQj
+ b4/iloWwHY5uR87ioC/FyC+ti6K1K2/0s029ZsVpGsN7IZVS1wjYac2B6Sg60/XRU/g7
+ Fh6sKIpoZMfkvJm+VsYWAd6yuT1v6pGNAcGJUCNmRuqs8ojv+H0ut08eRJMPucJOPsj7
+ oeuw==
+X-Gm-Message-State: AHQUAuZvyrMv2DkqjQt8YfDRhE1l3zuzvpCjlUzJ7w97ipi+SZninnW4
+ hmRvrh1OszxXqby6JWO6xWBfHydDWSgHwr577rE=
+X-Google-Smtp-Source: AHgI3IYVA4Alm+TtRbL8Io50aFGjQNRP6R1wUWcD1/lW403mq6kcD2XsDLN8diQ7mCnY3D17ABLrCyAOclAkPqy3vbk=
+X-Received: by 2002:a9d:60c4:: with SMTP id b4mr81717otk.221.1549297629419;
+ Mon, 04 Feb 2019 08:27:09 -0800 (PST)
+MIME-Version: 1.0
+References: <20190203185501.8958-1-anarsoul@gmail.com>
+ <20190203185501.8958-7-anarsoul@gmail.com>
+ <20190204142036.vd42nvyjnjr5yeoi@flea>
+In-Reply-To: <20190204142036.vd42nvyjnjr5yeoi@flea>
+From: Vasily Khoruzhick <anarsoul@gmail.com>
+Date: Mon, 4 Feb 2019 08:26:43 -0800
+Message-ID: <CA+E=qVfTfJ9E29gz83tdVGx5_KGWSQVJOAxKTzC+-n7=gdj0cA@mail.gmail.com>
+Subject: Re: [PATCH RESEND v2 06/12] drm/sun4i: rgb: Add 1% tolerance to dclk
+ frequency check when bridge is connected
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_082602_123827_2E241630 
-X-CRM114-Status: GOOD (  14.78  )
+X-CRM114-CacheID: sfid-20190204_082710_523337_BDFBA6B4 
+X-CRM114-Status: GOOD (  18.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,78 +92,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-renesas-soc@vger.kernel.org,
- Vincent Guittot <vincent.guittot@linaro.org>, geert@linux-m68k.org,
- thara.gopinath@linaro.org, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Archit Taneja <architt@codeaurora.org>, David Airlie <airlied@linux.ie>,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Andrzej Hajda <a.hajda@samsung.com>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Thierry Reding <thierry.reding@gmail.com>,
+ Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
+ Daniel Vetter <daniel@ffwll.ch>, Sean Paul <seanpaul@chromium.org>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>,
+ Icenowy Zheng <icenowy@aosc.io>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Update accounting_timestamp field only when PM runtime is enable
-and don't forget to account the last state before disabling it.
+On Mon, Feb 4, 2019 at 6:20 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> Hi,
+>
+> On Sun, Feb 03, 2019 at 10:54:55AM -0800, Vasily Khoruzhick wrote:
+> > Clock rate check that was added in commit bb43d40d7c83 ("drm/sun4i: rgb:
+> > Validate the clock rate") prevents some panel and bridges from working with
+> > sun4i driver.
+> >
+> > Unfortunately, dotclock frequency for some modes are not achievable on
+> > sunxi hardware, and there's a slight deviation in rate returned by
+> > clk_round_rate(), so they fail this check.
+> >
+> > Experiments show that panels and bridges work fine with this slight
+> > deviation, e.g. Pinebook that uses ANX6345 bridge with 768p eDP panel
+> > requests 73 MHz, gets 72.296MHz instead (0.96% difference) and works just
+> > fine.
+> >
+> > This patch adds a 1% tolerence to the dot clock check when bridge is
+> > connected.
+> >
+> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+>
+> I'm not sure we want to make exceptions for all the hardware
+> combination we face, but we should go for something more generic (and
+> easier to maintain instead).
+>
+> IIRC, from the previous discussion, HDMI had a tolerancy requirement
+> in the standard. Do you know if there's such a thing for eDP? That
+> would solve the issue for all the eDP displays at once.
 
-Suggested-by: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
----
- drivers/base/power/runtime.c | 18 ++++++++++--------
- 1 file changed, 10 insertions(+), 8 deletions(-)
+I don't have access to eDP standard - vesa.org says it's available to
+members only.
 
-diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-index 50740da..ed62cca 100644
---- a/drivers/base/power/runtime.c
-+++ b/drivers/base/power/runtime.c
-@@ -66,11 +66,14 @@ static int rpm_suspend(struct device *dev, int rpmflags);
-  */
- void update_pm_runtime_accounting(struct device *dev)
- {
--	u64 now = ktime_get_mono_fast_ns();
--	u64 last = dev->power.accounting_timestamp;
--	u64 delta;
-+	u64 now, last, delta;
- 
--	dev->power.accounting_timestamp = now;
-+	if (dev->power.disable_depth > 0)
-+		return;
-+
-+	last = dev->power.accounting_timestamp;
-+
-+	dev->power.accounting_timestamp = now = ktime_get_mono_fast_ns();
- 
- 	/*
- 	 * Because ktime_get_mono_fast_ns() is not monotonic during
-@@ -82,9 +85,6 @@ void update_pm_runtime_accounting(struct device *dev)
- 
- 	delta = now - last;
- 
--	if (dev->power.disable_depth > 0)
--		return;
--
- 	if (dev->power.runtime_status == RPM_SUSPENDED)
- 		dev->power.suspended_time += delta;
- 	else
-@@ -1298,6 +1298,9 @@ void __pm_runtime_disable(struct device *dev, bool check_resume)
- 		pm_runtime_put_noidle(dev);
- 	}
- 
-+	/* Update time accounting before disabling pm runtime */
-+	update_pm_runtime_accounting(dev);
-+
- 	if (!dev->power.disable_depth++)
- 		__pm_runtime_barrier(dev);
- 
-@@ -1521,7 +1524,6 @@ void pm_runtime_init(struct device *dev)
- 	dev->power.request_pending = false;
- 	dev->power.request = RPM_REQ_NONE;
- 	dev->power.deferred_resume = false;
--	dev->power.accounting_timestamp = 0;
- 	INIT_WORK(&dev->power.work, pm_runtime_work);
- 
- 	dev->power.timer_expires = 0;
--- 
-2.7.4
-
+> Maxime
+>
+> --
+> Maxime Ripard, Bootlin
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
