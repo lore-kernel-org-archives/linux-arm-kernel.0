@@ -2,87 +2,64 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54413C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:11:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AE58BC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:13:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 229FB205C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:11:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7EFA0205C9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:13:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SrYApELJ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="iEFbtNHn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 229FB205C9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mKaTZ8C8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7EFA0205C9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=P7lV1YwMnWHXpzUxq/RbPb7ZkwfCRcy/ubddvH6ces8=; b=SrYApELJhcG2k+
-	ih78ISPUCiANp8t5bGAjxP76b8JZVMO2sQQLgIdpsSaJPVGyQpIc8kRNb8oF5K1kZOa/CmebcRjLT
-	NDGrBtFs5s5dDOgaMoVG/8tmO1FCOEOLoSJuFKHpBwkw2K2Axri6wOv5o3o9MGuqdeA1h87G0IFo0
-	QbFMg7PJYYFqsPeL/mDCZTFhyUbV/zULc6O9IPDhX7mp0I4jhN+3JS1JjcKcfbZMcTYJsHY9o+AtQ
-	8/OsJ+S9bLQqMEZb1EhokNN8uM9XQrW8ZhisztBOdG8MmlZ4WmGOlmQbaU0L5WANXbmfFO68E+G2g
-	LypeEjYhQuC4sFRLkdmA==;
+	List-Owner; bh=BFfTSdH7BFrdJYzy/B4tCN9WvP5+c2kGankgQ4RxN4c=; b=mKaTZ8C8hzC5H1
+	ukdyl0SdndXscPTi9CmsnZCt0uDOch2xWyo84VJKC/b87d0PfCow5wPtklZhrA3ERx0a6+pjd/2dY
+	iYuOPbtdhQzpKN8MYMb5oRSfx/l7cm7kOK8n1s/X6xf3DjYO5g7ZEOZdkfxAai5IhEo8VlqsD5gAe
+	fK82AEoTIoiPH3b1pidZvTSvS8BfCJ/7+yL8t+pFxjb3dyLmdM4pWX0SDGtSYrIUc8nikkcjtkaTs
+	c2RlCc08lNA98iB4dYhwf0YgJ9OmGanI6A0vgiViMFi95O5BiqKkn/su0fPmbWBoKHnz25bCunNqf
+	rLnV0mwSC4QAJ089JARg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqgqO-0003Cw-3j; Mon, 04 Feb 2019 16:11:36 +0000
-Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqgqL-0003CZ-DK
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:11:34 +0000
-Received: by mail-ot1-x343.google.com with SMTP id s5so635410oth.7
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 08:11:32 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=Ta4gq+4XCOrDKvsTKBwqWoYQvSY8Y3FBsAFTQJENqfU=;
- b=iEFbtNHnWZfhpGaOgXUShnGgEC5sfcBoaouMLzlOhBO9LYmG0OQQf4fnOsDI+a2Fux
- QVZQzB1ch7b4yL7eLUAeX2MvuwQxkykzBuyesVtwPQ3d7UAs7zPnwtKgFRgqV1l2Rb5T
- aE6+YmTz6qxr1yMd+Jpq/AT222DRCFnCrg/yzPiJ9nddJBRBZk4cUXro2OODnUw4J51k
- b3aGhG3P9AmQBHvSNEQQuoVFAbNMRPqGDVX38+U58bthbYLEEaLNGulApVoAOEHIIg5Y
- zR5aP2z6KYuZ0ORH2b5y86NF4qrjuyZOaHBOGaI9MagpOedzaYKsb70uuwG9RgXlU/HO
- rY0g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=Ta4gq+4XCOrDKvsTKBwqWoYQvSY8Y3FBsAFTQJENqfU=;
- b=hL61/maTJOW7t6tEYY3/1iUuaM3jaPgX7OmFDQNfEQammN/XfBWIBrDyYbapHMF7G+
- sI2zT8uiLvjvNftLVwHEEUAPqXJ1obeNt/KmRiS0CjEZwPHQ9HlgNQlEtYar8AV/hH3I
- gbtPGVAJFhto5FZm+gNXeOE9T9vdAeHQG4G8qGkrk33fQ3JRuwd6XBXfp7DM92QiOhHA
- s3WtldJqynNn11UjSYDZ7flKaa4Ix88+d3Rr5R4wbwzZ9mzKtB60vRZdN11KMGQLBS+F
- qlGGGkRG3R4M7XprGaRV+vf1Y3/A3G+UBAIgbzBaKQHf3wAEaszFB0yC6mcqhvwhQ1Wx
- VjmQ==
-X-Gm-Message-State: AHQUAuZa4oe8yfIOC8/735Ip+cXJs4YBxj4zZYuaex0bj2xx7zdQIedM
- iciOvVjcH5kF85HWBEDponHupe/givAMYyBh8oU=
-X-Google-Smtp-Source: AHgI3IYQB9tKwlIX2AuRBqsh57zpjluRefAPK0yBfNypRHQnAljWIMOY9V13Q+hlCkxXOxHyulFEE7mBRYqWRqehfLk=
-X-Received: by 2002:aca:6545:: with SMTP id j5mr76001oiw.70.1549296692150;
- Mon, 04 Feb 2019 08:11:32 -0800 (PST)
+	id 1gqgrv-0003Wr-DW; Mon, 04 Feb 2019 16:13:11 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqgrs-0003WU-LG
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:13:10 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C08C080D;
+ Mon,  4 Feb 2019 08:13:07 -0800 (PST)
+Received: from red-moon (red-moon.cambridge.arm.com [10.1.197.39])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1E1C43F589;
+ Mon,  4 Feb 2019 08:13:04 -0800 (PST)
+Date: Mon, 4 Feb 2019 16:13:03 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
+Subject: Re: [PATCHv3 00/27] PCI: refactor Mobiveil driver and add PCIe Gen4
+ driver for NXP Layerscape SoCs
+Message-ID: <20190204161303.GA18220@red-moon>
+References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
+ <20190129113910.GA7467@e107981-ln.cambridge.arm.com>
+ <CAFZiPx002HED+YH2GysS7a7uoEDQuHGjxa_CQtwb9nSDH-XNuA@mail.gmail.com>
 MIME-Version: 1.0
-References: <20190203185501.8958-1-anarsoul@gmail.com>
- <20190203185501.8958-9-anarsoul@gmail.com>
- <20190204074350.GC16448@ulmo>
- <CA+E=qVecudACOEXt74Kf=UA_F-uuHgEqHzKpYAq1ocMx3Sx+eQ@mail.gmail.com>
- <20190204082353.GE19087@ulmo>
-In-Reply-To: <20190204082353.GE19087@ulmo>
-From: Vasily Khoruzhick <anarsoul@gmail.com>
-Date: Mon, 4 Feb 2019 08:11:05 -0800
-Message-ID: <CA+E=qVew+8__yrAud1gFnLQ8HCwDdGhVjV=c173HGvZxH=7zZQ@mail.gmail.com>
-Subject: Re: [PATCH RESEND v2 08/12] dt-bindings: add binding for generic eDP
- panel
-To: Thierry Reding <thierry.reding@gmail.com>
+Content-Disposition: inline
+In-Reply-To: <CAFZiPx002HED+YH2GysS7a7uoEDQuHGjxa_CQtwb9nSDH-XNuA@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_081133_476874_82A6C95F 
-X-CRM114-Status: GOOD (  15.64  )
+X-CRM114-CacheID: sfid-20190204_081308_708952_B6E0E5CD 
+X-CRM114-Status: GOOD (  23.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,52 +71,127 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Archit Taneja <architt@codeaurora.org>, Andrzej Hajda <a.hajda@samsung.com>,
- David Airlie <airlied@linux.ie>, linux-sunxi <linux-sunxi@googlegroups.com>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Sean Paul <seanpaul@chromium.org>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Daniel Vetter <daniel@ffwll.ch>,
- arm-linux <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Xiaowei Bao <xiaowei.bao@nxp.com>,
+ "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
+ "Z.q. Hou" <zhiqiang.hou@nxp.com>, "will.deacon@arm.com" <will.deacon@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Leo Li <leoyang.li@nxp.com>, "M.h. Lian" <minghuan.lian@nxp.com>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, Mingkai Hu <mingkai.hu@nxp.com>,
+ "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
+ "bhelgaas@google.com" <bhelgaas@google.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 4, 2019 at 12:24 AM Thierry Reding <thierry.reding@gmail.com> wrote:
-> >
-> > Pinebook used several 768p panels that have slightly different timings
-> > and recent batch uses 1080p panel.
-> >
-> > What panel descriptor should I use as fallback?
->
-> You don't use panel descriptors as fallback. The simple-panel driver
-> will bind to a panel device and use the corresponding descriptor. If
-> your device tree contains the correct information, the descriptor is
-> correct for the panel you have.
->
-> In other words you need to ensure that you have the correct panel in
-> device tree for the board that you're using. This is exactly the same
-> thing as for other devices.
->
-> One way to to this is to have separate device trees for each variant
-> of the board that you want to support. Another variant may be to have
-> a common device tree and then have some early firmware update the DTB
-> with the correct panel information.
+On Mon, Feb 04, 2019 at 07:44:25PM +0530, Subrahmanya Lingappa wrote:
+>    Bjorn,
+>    My apologies, I was away for a while from this work.
+>    I am starting to review now.
 
-That defeats the purpose of using eDP panels. Panel can identify
-itself and report what timings it supports.
+Hi,
 
-If we use separate DTBs then users will have to figure out what panel
-is installed in their hardware and use appropriate software image -
-that's something I'd like to avoid.
+I am not Bjorn and as I told you before you should not reply
+with html context (ie use plain text, the public lists will
+reject your emails otherwise) and top-post.
 
-I can add a descriptor for something like "pinebook eDP panel" if it
-works for you, but it won't have any display timings in it.
+You are supposed to maintain this code, if you can't it is fine but I
+should know because there are developers who are waiting for your
+review, please understand.
+
+Thanks,
+Lorenzo
+
+>    Thanks,
+>    ~subbu
+>    On Tue, Jan 29, 2019 at 5:09 PM Lorenzo Pieralisi
+>    <lorenzo.pieralisi@arm.com> wrote:
+> 
+>      On Tue, Jan 29, 2019 at 08:08:28AM +0000, Z.q. Hou wrote:
+>      > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+>      >
+>      > This patch set is aim to refactor the Mobiveil driver and add
+>      > PCIe support for NXP Layerscape series SoCs integrated Mobiveil's
+>      > PCIe Gen4 controller.
+>      >
+>      > Hou Zhiqiang (27):
+>      >   PCI: mobiveil: uniform the register accessors
+>      >   PCI: mobiveil: format the code without function change
+>      >   PCI: mobiveil: correct the returned error number
+>      >   PCI: mobiveil: remove flag MSI_FLAG_MULTI_PCI_MSI
+>      >   PCI: mobiveil: correct PCI base address in MEM/IO outbound windows
+>      >   PCI: mobiveil: replace the resource list iteration function
+>      >   PCI: mobiveil: use WIN_NUM_0 explicitly for CFG outbound window
+>      >   PCI: mobiveil: use the 1st inbound window for MEM inbound
+>      transactions
+>      >   PCI: mobiveil: correct inbound/outbound window setup routines
+>      >   PCI: mobiveil: fix the INTx process error
+>      >   PCI: mobiveil: only fix up the Class Code field
+>      >   PCI: mobiveil: move out the link up waiting from mobiveil_host_init
+>      >   PCI: mobiveil: move irq chained handler setup out of DT parse
+>      >   PCI: mobiveil: initialize Primary/Secondary/Subordinate bus number
+>      >   dt-bindings: pci: mobiveil: change gpio_slave and apb_csr to
+>      optional
+>      >   PCI: mobiveil: refactor Mobiveil PCIe Host Bridge IP driver
+>      >   PCI: mobiveil: fix the checking of valid device
+>      >   PCI: mobiveil: continue to initialize the host upon no PCIe link
+>      >   PCI: mobiveil: disabled IB and OB windows set by bootloader
+>      >   PCI: mobiveil: add Byte and Half-Word width register accessors
+>      >   PCI: mobiveil: make mobiveil_host_init can be used to re-init host
+>      >   dt-bindings: pci: Add NXP Layerscape SoCs PCIe Gen4 controller
+>      >   PCI: mobiveil: add PCIe Gen4 RC driver for NXP Layerscape SoCs
+>      >   PCI: mobiveil: ls_pcie_g4: add Workaround for A-011577
+>      >   PCI: mobiveil: ls_pcie_g4: add Workaround for A-011451
+>      >   arm64: dts: freescale: lx2160a: add pcie DT nodes
+>      >   arm64: defconfig: Enable CONFIG_PCI_LAYERSCAPE_GEN4
+> 
+>      Subrahmanya,
+> 
+>      Either you review this series or I will have to drop you from
+>      the MAINTAINERS list for this driver, I am sorry but I asked you
+>      before to no avail.
+> 
+>      Thanks,
+>      Lorenzo
+> 
+>      >  .../bindings/pci/layerscape-pci-gen4.txt      |  52 ++
+>      >  .../devicetree/bindings/pci/mobiveil-pcie.txt |   2 +
+>      >  MAINTAINERS                                   |  10 +-
+>      >  .../arm64/boot/dts/freescale/fsl-lx2160a.dtsi | 163 ++++
+>      >  arch/arm64/configs/defconfig                  |   1 +
+>      >  drivers/pci/controller/Kconfig                |  11 +-
+>      >  drivers/pci/controller/Makefile               |   2 +-
+>      >  drivers/pci/controller/mobiveil/Kconfig       |  34 +
+>      >  drivers/pci/controller/mobiveil/Makefile      |   5 +
+>      >  .../controller/mobiveil/pci-layerscape-gen4.c | 306 +++++++
+>      >  .../controller/mobiveil/pcie-mobiveil-host.c  | 640 +++++++++++++
+>      >  .../controller/mobiveil/pcie-mobiveil-plat.c  |  54 ++
+>      >  .../pci/controller/mobiveil/pcie-mobiveil.c   | 246 +++++
+>      >  .../pci/controller/mobiveil/pcie-mobiveil.h   | 229 +++++
+>      >  drivers/pci/controller/pcie-mobiveil.c        | 861
+>      ------------------
+>      >  15 files changed, 1743 insertions(+), 873 deletions(-)
+>      >  create mode 100644
+>      Documentation/devicetree/bindings/pci/layerscape-pci-gen4.txt
+>      >  create mode 100644 drivers/pci/controller/mobiveil/Kconfig
+>      >  create mode 100644 drivers/pci/controller/mobiveil/Makefile
+>      >  create mode 100644
+>      drivers/pci/controller/mobiveil/pci-layerscape-gen4.c
+>      >  create mode 100644
+>      drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+>      >  create mode 100644
+>      drivers/pci/controller/mobiveil/pcie-mobiveil-plat.c
+>      >  create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil.c
+>      >  create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil.h
+>      >  delete mode 100644 drivers/pci/controller/pcie-mobiveil.c
+>      >
+>      > --
+>      > 2.17.1
+>      >
 
 _______________________________________________
 linux-arm-kernel mailing list
