@@ -5,19 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2F482C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:24:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 475FBC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:31:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 02A762083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:24:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EE8792081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:31:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sRFQSq25";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ZJuMcBHR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 02A762083B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gaa52oFr";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="uzE6gkv1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE8792081B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,59 +26,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8FVFhyJq57h6CbAl5ZzZIb/kuL4083yeuz2u9CoE94A=; b=sRFQSq25qbQ8G/
-	dSCzZwFywUtuSonBoSyTlGGzoPcaMtURJH5Jrq13TwenKn+EaDEGKIuHtf7LQa5kC+G1GsC9RegNa
-	SGiIVk0UG6RZ4WN1vWg9Khj6MH2VomH9hH2b4RP9OQPMXcydhaMB5f3qWoELnMixjaMbsnkS4Nl3l
-	6WZNSzbFKkDZN68odQDBs5CnzmGykWvPLXWy0YfEIrYw/EtFc9E6/HVmLjVdx/EmHsTTNaN3+d5TQ
-	Ua6EuELmHeUSBmSwIKy2PmiQNG5AOjCRPdf2j8IzxV9iuu+Yg4M0YP+Ey6TWf+v7YiMaRhiyWLyDQ
-	eXmkdtiQ0+m7Gx7e1YRA==;
+	List-Owner; bh=pXtdvckidFvL69BWaZnVjrVMm2va+PA8nh2VwVflVrg=; b=gaa52oFrVFGhIp
+	bIC498mfGT6ObYPSz2ybVJGPGnWHa8Fvm2132J+hPmYNoFdGRSdC2VjBCx9QgEx4W9wFz7ixwTQ56
+	ZUQ/3Rm5piyfR5IPQLyChFZ8Xf7Ux0+iOEISbG/n7mKRngy4Pe7zxKokZDSSpGp5v6OxhGLDDM5UZ
+	hWAE8bZh3Zo/07XidavqIJDUxcmd3yBk6i6a/WdKDwsCFkWr36B4qBHRCsfO1ltibgRqltPpzBBME
+	yFjAGEADk72WxdTlGgJWtfh8603RHy8PGevgfFj6VsRnfmREWQj5EcfseghPEfucdgWFSSiFFrP5c
+	L3LGe+AaWI26s0JE76dg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqhyi-0005Md-St; Mon, 04 Feb 2019 17:24:16 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gqi60-0000Qp-U8; Mon, 04 Feb 2019 17:31:48 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqhyf-0005Lq-4H; Mon, 04 Feb 2019 17:24:14 +0000
-Received: by mail-wr1-x443.google.com with SMTP id f7so744435wrp.1;
- Mon, 04 Feb 2019 09:24:12 -0800 (PST)
+ id 1gqi5x-0000PR-1n; Mon, 04 Feb 2019 17:31:46 +0000
+Received: by mail-wm1-x343.google.com with SMTP id p6so811392wmc.1;
+ Mon, 04 Feb 2019 09:31:44 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
  :user-agent:mime-version:in-reply-to:content-language
  :content-transfer-encoding;
- bh=bNQahjlh6/f1zlzGZm/QB/lQEQCEr84K327vnYTTRoM=;
- b=ZJuMcBHRDHjSdFP8Hiv5F/4eDCHMelErPDEIKg8fw0OzkD2TIvdIl1hwGaTtc8l4c7
- k6/ZsEUzZnkQZhocoTzFNfYqvfn7lzng1occpfk4/iN86u0rCPIwozC/h38OlqMZua2x
- N9/aRLQfutB4SiKfe5aOEtddpTcbT2UvSEetoE+8BNJw1srF4pMI9yNQx36tiZTvku6Z
- le8rFG3+XOobu0eN0mmpuiL9rXlhP25Jhgduai7UadRaoukhxcWGcWS7kGvvOZQ6F8U1
- 3blb3T2FYj6YqAWMP8nRGG6Ab2tJgwIlOeg11pf9sOWP4TXqwRLvmps6X2HAfDPUX6Sm
- oO5A==
+ bh=caD5u/qhAgnE6ylSSSO8BPqTJ4pD00lLJE1xEfGqcIY=;
+ b=uzE6gkv1HKuiBuEDW4Kjj3WPSL8zeVXk1bq+qet7BN9e5Wh0bg2gQAZoxZrRwJuCLc
+ 6ai1A3PtztQ67MK2Z84JvNy8KJECbAdBo4LG7vV3/UjR94eBrPyw6wNXpbsXwTQD0+Pd
+ 21/MSOe4Yvt9DIr123d/MS0vePAHI/p8RXBl5el94QBBZzO4yS4KK3Rg+pXffLvwqwRh
+ cwU0XLzZynsW9kK8zKvfiBVwLUbgmoozrBSjiogsRGl39vO4HscnMjgFsR7y+QqoJTYG
+ Xi4zsoqZyOPjLc5pZ1TgCaG0w3+EoSxzbYJlaIcJSd9D88ShGq2Yf/XnxEGETOfx4ggT
+ i0SA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
  :message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=bNQahjlh6/f1zlzGZm/QB/lQEQCEr84K327vnYTTRoM=;
- b=rMJEpEV4CZxOcqO+nAOYjB8bzV04P327k55+dhvwKDR0YDoePl+6qadDGKyR9nInuA
- glF5Cr5+TnWVSoPK9a9spapt7+jPclQzpjlvWyzVSgt8Pt5JvraQxwVTOT1aSAjLZXqX
- VE0aCN3po+xX2ahoJ3dNBTHNUwISAChZNUe0l6TCUQLEwJoD/gr6e4S5bwsuiSZ+/XG2
- xyKQws/DEIlaHNV5kEszUvKlxhtr88AoHd8mpQxvv8/rtF/fFo1LNsPtvL1zh/YNsAOX
- P74X27mIdlkVcuz2t/9wJdBpY4aDGYZkqPFCsk0APLT5MdZiQxSQgnnL2Fi/EkQaAe1y
- QSdA==
-X-Gm-Message-State: AHQUAub4uK22hKyjB3vunG5on13RuM58BqZ9JJOIaoydQVPem4bfy8xg
- 6Obq9RTPyWikDb34nkoQL5s=
-X-Google-Smtp-Source: AHgI3IYAwy+LPmSsFkEJ4x4DEDtjxoDn2JBAGp6Tp41iFn5o+izWOgyd+A+fcEE+gcSHs9g+ZzLa9w==
-X-Received: by 2002:a5d:694d:: with SMTP id r13mr302094wrw.323.1549301051055; 
- Mon, 04 Feb 2019 09:24:11 -0800 (PST)
+ bh=caD5u/qhAgnE6ylSSSO8BPqTJ4pD00lLJE1xEfGqcIY=;
+ b=uYkF9Orr8KGTpS+S9lqMqKCvaRcYDys9hghBpuBKrdBBqezowuUhbUZDNAjcB4Nw2v
+ 0Sc1TWWQs3L8kuYHuuRVpGHXF9HlTyxqwFpCs7V8c/DfaA4VnfHjlew1lWsqo7DlIA9J
+ zwdjcdyqW2FBSKtZqIQvQK1L6Hb6yficds3l5ku0LBAZ5mxYm071JrOoHiBYQ/tuYTrW
+ Y4COngSeZmUgRXJuWE7KSkCKeqI9nLoaahB8J8KjDsR04TvSD6M0Wjvopov1HTbhjCRo
+ 6djIrJ2z39lRrV6q7AuCZOtQ5KVS5twC4uWo0PV+kLTeRetbI3v5z9xTbNHtQuYpbWbo
+ kTRQ==
+X-Gm-Message-State: AHQUAuajsDqkUZvzD36xhZ+C04KMImeHFsFfy1WaFOdc7N8VA55hhQDv
+ tQQAg/gQZeFCqza5yyTEXfg=
+X-Google-Smtp-Source: AHgI3IaFubZtYHBglVNvczmvhEsGBP9Ox/TCqQHH4JfHSXkYW8QAC8gecFw1LhTCQ3kdLyFmNHvf2w==
+X-Received: by 2002:a1c:cf82:: with SMTP id f124mr356153wmg.95.1549301503468; 
+ Mon, 04 Feb 2019 09:31:43 -0800 (PST)
 Received: from ziggy.stardust ([212.187.182.165])
- by smtp.gmail.com with ESMTPSA id o2sm12965954wmo.33.2019.02.04.09.24.10
+ by smtp.gmail.com with ESMTPSA id o6sm10043483wra.55.2019.02.04.09.31.42
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 04 Feb 2019 09:24:10 -0800 (PST)
-Subject: Re: [PATCH 1/7] thermal: mediatek: fix register index error
+ Mon, 04 Feb 2019 09:31:42 -0800 (PST)
+Subject: Re: [PATCH 3/7] thermal: mediatek: add calibration item
 To: michael.kao@mediatek.com, =Zhang Rui <rui.zhang@intel.com>,
  =Eduardo Valentin <edubezval@gmail.com>,
  =Daniel Lezcano <daniel.lezcano@linaro.org>,
  =Rob Herring <robh+dt@kernel.org>, =Mark Rutland <mark.rutland@arm.com>
 References: <1549006693-11659-1-git-send-email-michael.kao@mediatek.com>
- <1549006693-11659-2-git-send-email-michael.kao@mediatek.com>
+ <1549006693-11659-4-git-send-email-michael.kao@mediatek.com>
 From: Matthias Brugger <matthias.bgg@gmail.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
@@ -174,16 +174,16 @@ Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  pac005PuhxCWkKTJz3gCmznnoat4GCnL5gy/m0Qk45l4PFqwWXVLo9AQg2Kp3mlIFZ6fsEKI
  AN5hxlbNvNb9V2Zo5bFZjPWPFTxOteM0omUAS+QopwU0yPLLGJVf2iCmItHcUXI+r2JwH1CJ
  jrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <6496b13f-57e4-af86-bb59-91a4705d91b0@gmail.com>
-Date: Mon, 4 Feb 2019 18:24:08 +0100
+Message-ID: <dcc04c1e-eb7d-024e-abc8-7b75504947c2@gmail.com>
+Date: Mon, 4 Feb 2019 18:31:41 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.3
 MIME-Version: 1.0
-In-Reply-To: <1549006693-11659-2-git-send-email-michael.kao@mediatek.com>
+In-Reply-To: <1549006693-11659-4-git-send-email-michael.kao@mediatek.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_092413_168473_8B5F0153 
-X-CRM114-Status: GOOD (  19.80  )
+X-CRM114-CacheID: sfid-20190204_093145_149908_D9BAC0A9 
+X-CRM114-Status: GOOD (  19.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -208,47 +208,114 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 On 01/02/2019 08:38, michael.kao@mediatek.com wrote:
 > From: Michael Kao <michael.kao@mediatek.com>
 > 
-> The index of msr and adcpnp should match the sensor
-> which belongs to the selected bank in the for loop.
+> Add calibration item in thermal_data to support
+> the project with different calibration coefficient.
 > 
-
-If I get that right, this fixes
-b7cf0053738c ("thermal: Add Mediatek thermal driver for mt2701.")
-
-So please add a fixes tag to the commit.
-
-Thanks,
-Matthias
-
 > Signed-off-by: Michael Kao <michael.kao@mediatek.com>
 > ---
->  drivers/thermal/mtk_thermal.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+>  drivers/thermal/mtk_thermal.c | 19 ++++++++++++++++++-
+>  1 file changed, 18 insertions(+), 1 deletion(-)
 > 
 > diff --git a/drivers/thermal/mtk_thermal.c b/drivers/thermal/mtk_thermal.c
-> index 0691f26..f646436 100644
+> index 07f8ad7..45c6587 100644
 > --- a/drivers/thermal/mtk_thermal.c
 > +++ b/drivers/thermal/mtk_thermal.c
-> @@ -431,7 +431,8 @@ static int mtk_thermal_bank_temperature(struct mtk_thermal_bank *bank)
->  	u32 raw;
+> @@ -105,6 +105,9 @@
+>  /* The number of sensing points per bank */
+>  #define MT8173_NUM_SENSORS_PER_ZONE	4
 >  
->  	for (i = 0; i < conf->bank_data[bank->id].num_sensors; i++) {
-> -		raw = readl(mt->thermal_base + conf->msr[i]);
-> +		raw = readl(mt->thermal_base +
-> +			    conf->msr[conf->bank_data[bank->id].sensors[i]]);
+> +/* The calibration coefficient of sensor  */
+> +#define MT8173_CALIBRATION	165
+> +
+
+Calibration value is the same for all SoCs (including mt8183), we can define it
+once and use it in all mtk_thermal structs.
+
+Regards,
+Matthias
+
+
+>  /*
+>   * Layout of the fuses providing the calibration data
+>   * These macros could be used for MT8173, MT2701, and MT2712.
+> @@ -147,6 +150,9 @@ enum {
+>  /* The number of sensing points per bank */
+>  #define MT2701_NUM_SENSORS_PER_ZONE	3
 >  
->  		temp = raw_to_mcelsius(mt,
->  				       conf->bank_data[bank->id].sensors[i],
-> @@ -568,7 +569,8 @@ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
+> +/* The calibration coefficient of sensor  */
+> +#define MT2701_CALIBRATION	165
+> +
+>  /* MT2712 thermal sensors */
+>  #define MT2712_TS1	0
+>  #define MT2712_TS2	1
+> @@ -162,12 +168,18 @@ enum {
+>  /* The number of sensing points per bank */
+>  #define MT2712_NUM_SENSORS_PER_ZONE	4
 >  
->  	for (i = 0; i < conf->bank_data[num].num_sensors; i++)
->  		writel(conf->sensor_mux_values[conf->bank_data[num].sensors[i]],
-> -		       mt->thermal_base + conf->adcpnp[i]);
-> +		       mt->thermal_base +
-> +		       conf->adcpnp[conf->bank_data[num].sensors[i]]);
+> +/* The calibration coefficient of sensor  */
+> +#define MT2712_CALIBRATION	165
+> +
+>  #define MT7622_TEMP_AUXADC_CHANNEL	11
+>  #define MT7622_NUM_SENSORS		1
+>  #define MT7622_NUM_ZONES		1
+>  #define MT7622_NUM_SENSORS_PER_ZONE	1
+>  #define MT7622_TS1	0
 >  
->  	writel((1 << conf->bank_data[num].num_sensors) - 1,
->  	       mt->thermal_base + TEMP_MONCTL0);
+> +/* The calibration coefficient of sensor  */
+> +#define MT7622_CALIBRATION	165
+> +
+>  struct mtk_thermal;
+>  
+>  struct thermal_bank_cfg {
+> @@ -188,6 +200,7 @@ struct mtk_thermal_data {
+>  	const int *sensor_mux_values;
+>  	const int *msr;
+>  	const int *adcpnp;
+> +	const int cali_val;
+>  	struct thermal_bank_cfg bank_data[];
+>  };
+>  
+> @@ -295,6 +308,7 @@ struct mtk_thermal {
+>  	.num_banks = MT8173_NUM_ZONES,
+>  	.num_sensors = MT8173_NUM_SENSORS,
+>  	.vts_index = mt8173_vts_index,
+> +	.cali_val = MT8173_CALIBRATION,
+>  	.bank_data = {
+>  		{
+>  			.num_sensors = 2,
+> @@ -330,6 +344,7 @@ struct mtk_thermal {
+>  	.num_banks = 1,
+>  	.num_sensors = MT2701_NUM_SENSORS,
+>  	.vts_index = mt2701_vts_index,
+> +	.cali_val = MT2701_CALIBRATION,
+>  	.bank_data = {
+>  		{
+>  			.num_sensors = 3,
+> @@ -356,6 +371,7 @@ struct mtk_thermal {
+>  	.num_banks = 1,
+>  	.num_sensors = MT2712_NUM_SENSORS,
+>  	.vts_index = mt2712_vts_index,
+> +	.cali_val = MT2712_CALIBRATION,
+>  	.bank_data = {
+>  		{
+>  			.num_sensors = 4,
+> @@ -376,6 +392,7 @@ struct mtk_thermal {
+>  	.num_banks = MT7622_NUM_ZONES,
+>  	.num_sensors = MT7622_NUM_SENSORS,
+>  	.vts_index = mt7622_vts_index,
+> +	.cali_val = MT7622_CALIBRATION,
+>  	.bank_data = {
+>  		{
+>  			.num_sensors = 1,
+> @@ -402,7 +419,7 @@ static int raw_to_mcelsius(struct mtk_thermal *mt, int sensno, s32 raw)
+>  	raw &= 0xfff;
+>  
+>  	tmp = 203450520 << 3;
+> -	tmp /= 165 + mt->o_slope;
+> +	tmp /= mt->conf->cali_val + mt->o_slope;
+>  	tmp /= 10000 + mt->adc_ge;
+>  	tmp *= raw - mt->vts[sensno] - 3350;
+>  	tmp >>= 3;
 > 
 
 _______________________________________________
