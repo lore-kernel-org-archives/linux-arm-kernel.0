@@ -4,79 +4,83 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3042FC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 04:31:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 955EDC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 04:31:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EB5882147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 04:31:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 636112147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 04:31:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QRQYxmh+";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ifMby+g+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EB5882147A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E5N5NLJB";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="jK6YoPD7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 636112147A
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=EWb3HzcD8XqoiEjTqNdnaKwX48gXHxfKyVJpkdXguaM=; b=QRQ
-	Yxmh+QNLk9iTDi9IxFRBpkMr/V/hxWoQ37J3ghzMxgMVyx4sAfPKA8Jx+mwWl5g2wob9SzZ4MnIlE
-	VtgbEYfJI+BFFmWd9bTM57xWFlyZ9bIzLfdM28T09lQoGK8wJ9GdMddTBNBXZgd9aZyNLNgTfodZA
-	pYXex0Wz0T7UqUGcwfekewhRetNyLWw8vPIIudfTJEDcjpXpRqiY8q58B/A4gEGKOdRhRScw4Pp0B
-	QMroLvWE/AhrI9Uj2Oegfr5R/JTgqzNxaQV1A4z7BTrxnUG6TxkUmWSeWrQFm7p/8p+OY3b+UJ/BC
-	cEW9dljmHpZ9eRmVlUluOoD7jOlapqw==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=G+nF1sSppelexpz/X67XftQdb2YNQHs1V8Hyw8Yf5ms=; b=E5N5NLJBbKe6ZuQNJrMyswkj07
+	lR5SD1t5r8rfnCgSYq71Khx/Z69ue24t1CHnjErZrUrnfuGyimArrH/2e7p5k6Az7NWu2xXgrDJg6
+	HTJhPIEJOiAu/OJnM9Vuy3AREC3NcOfE5Wv3s1tLy0QtiBTFKKtk63IU+FWkwXXB2rwwwR25TgckD
+	KOKzf16x+emKAVZj2N9AEIRSEl8sFr/iTA0fnBmMX6wNRSp4b5wqG8TCG88mO4S+GQRfFkXtW4XiD
+	jnoJaWzFlEi43X0FX0lCYkIZrXvlfl87CcMkdMx6YUKsBey9QoeENnoizjXAe8LJ+5sFZBcSKTm/P
+	IreTXZcA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqVuu-0007ju-Iz; Mon, 04 Feb 2019 04:31:32 +0000
-Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
+	id 1gqVv7-0007wy-1R; Mon, 04 Feb 2019 04:31:45 +0000
+Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqVuq-0007iO-Lq
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 04:31:30 +0000
-Received: by mail-ot1-x344.google.com with SMTP id e12so11045492otl.5
+ id 1gqVut-0007js-Bx
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 04:31:32 +0000
+Received: by mail-oi1-x242.google.com with SMTP id u18so10431603oie.10
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 03 Feb 2019 20:31:26 -0800 (PST)
+ Sun, 03 Feb 2019 20:31:30 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=qEzKBKR16O+a7aFr7X7ANpIIB/owQ0L/InSlFqZvDMg=;
- b=ifMby+g+V5X9N2c+F2yuDWmw9E1FGXIDBgRcErkzO2nYnhlgDatnFcYCa0AasGgSkM
- sZ2TbHkrPcc7gPeHfmxgXOKrOzQ0cdtPaTXe3lajfIW1YCWUc6deYzcsLVglE9VTJMAY
- k1JTYCvMMtesric+Xn9OKbYSlPi30PSclUHo0=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=s/QI9V7azNjREpO8PpBZGiPOGxr7gO2Kz/Xe8P+g5Ds=;
+ b=jK6YoPD7Ut85loQlJ/nGw3xmE2soDDNPvB8ej+AUNn7uXLuVPqXkVsjVWI1ExNhgAc
+ D+5c+82j+tlBRE5Veg7WVyjhjcPLj2zLR2eH5Vyx+Ya4rm+whznveg5LqX1TjvXMFBkG
+ rwLQSRDDai32aI282yS8zWM9+72fhDy1nR5lI=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=qEzKBKR16O+a7aFr7X7ANpIIB/owQ0L/InSlFqZvDMg=;
- b=o7Qh3qs9WlJfiBwO7bDQn+B5eGusfgGiX1hY3CnBu9J9/ACzdFCIPtxTWt52dMKfmw
- lwt89FsRfNSGJtq7X4tiNQjeodsdXX+DPcZ99nHdO8MVIjkRBwGViqPHWWWUGXUqpYn1
- /JrY/Xd+pA6To4BF57CsDWbooCr7pTIUkqoyYW0y74L/hmHMEBmVMzJn33ppMFLk1Jsx
- oWfWw5c8jnP325/jkcmvS86vHCu91uExkG7rWspdPMMmIUyM7wbepkAq8tZob/6mcl8g
- bUQONrVkbrFywz9WEmfNNOZHkCj+5uISszdx4XgmQeTHK+dgDhWpJNRIyvY00XCnmWTy
- COig==
-X-Gm-Message-State: AJcUukeBSrwMwHw7JUr0SC9EoSj25+4QPkYvEvDwOng/Ed+jMdHlHm6y
- MetfMN4o6bOVCLx6xE5anbm/3A==
-X-Google-Smtp-Source: ALg8bN5EYxqs67gzrbLkqxrnawKkHCyELeBANbnVk0Mgf8jVJIYD+/GlvYoW501Wdm7sp6CwXnq+WQ==
-X-Received: by 2002:a9d:7059:: with SMTP id x25mr37324622otj.35.1549254685724; 
- Sun, 03 Feb 2019 20:31:25 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=s/QI9V7azNjREpO8PpBZGiPOGxr7gO2Kz/Xe8P+g5Ds=;
+ b=Y6MxGqh7r6IAZ/bLpYH8Ei6EkYB8E2S7+6F3wdbzQqfqpqGWWWiwXrIH4+Sp+gl38d
+ pce/KkjFlDHCQDaBYE3jCTMaYlw0sTH+x4v+sQHWusYJ/rCvlU3xW2g5PM1Qb4W6bV+J
+ NL5giLHB89H57j+zkRlJKIUNmStwARNgXG+CFGDfGINXDHpvNDHV1Z3eKZQExT6NcLle
+ 5vdpw+OBo/XjQlkeMmKVrXA38NH04fB9g3B9WCa56h/QszDd4gCzsFT8Srffx3zXvRiZ
+ iyAJ+UZKfRNX9SC1H4F5AZhwi3H/9+bR4g2fJ2DSQFbt1uwSvNSIt0/mRLOuTApmp5ji
+ ATNw==
+X-Gm-Message-State: AJcUukeTU1xHnfqzz1R4rMByJ9VIlL/3Fw4OilwotW450Tl9XL5qhADJ
+ WE2cZaRXE4jNJdVsxlWcQ3qJGw==
+X-Google-Smtp-Source: ALg8bN6qLpI27EkoMV7OmzoN0HALiuL4qJOfzk8pS3q8hZ5qcYoXZ2ENkx2HT5ktziWRejdn7cY+9A==
+X-Received: by 2002:aca:d705:: with SMTP id o5mr24563772oig.124.1549254690037; 
+ Sun, 03 Feb 2019 20:31:30 -0800 (PST)
 Received: from localhost (107-207-74-175.lightspeed.austtx.sbcglobal.net.
  [107.207.74.175])
- by smtp.gmail.com with ESMTPSA id r1sm6972741oie.44.2019.02.03.20.31.23
+ by smtp.gmail.com with ESMTPSA id h24sm6032586otq.11.2019.02.03.20.31.29
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sun, 03 Feb 2019 20:31:24 -0800 (PST)
+ Sun, 03 Feb 2019 20:31:29 -0800 (PST)
 From: Andy Gross <andy.gross@linaro.org>
 To: arm@kernel.org
-Subject: [GIT PULL] Qualcomm ARM64 DT updates for 5.1
-Date: Sun,  3 Feb 2019 22:31:18 -0600
-Message-Id: <1549254680-1282-1-git-send-email-andy.gross@linaro.org>
+Subject: [GIT PULL] Qualcomm Driver updates for 5.1
+Date: Sun,  3 Feb 2019 22:31:19 -0600
+Message-Id: <1549254680-1282-2-git-send-email-andy.gross@linaro.org>
 X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1549254680-1282-1-git-send-email-andy.gross@linaro.org>
+References: <1549254680-1282-1-git-send-email-andy.gross@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190203_203128_739665_0AAF7EE3 
-X-CRM114-Status: GOOD (  13.60  )
+X-CRM114-CacheID: sfid-20190203_203131_406911_4284315D 
+X-CRM114-Status: GOOD (  15.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -104,125 +108,84 @@ The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-5.1
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-5.1
 
-for you to fetch changes up to 5e8204893f62792ebeed88ae505cf658b216eaa0:
+for you to fetch changes up to 4e2256d31f0f24107c36dae35a1d84dff0fced30:
 
-  arm64: dts: sdm845: Add interconnect provider DT nodes (2019-02-01 20:16:27 -0600)
-
-----------------------------------------------------------------
-Qualcomm ARM64 Updates for v5.1
-
-* Add MSM8998 RPMCC, I2C, and USB related nodes
-* Add MSM8996 rpmpd node
-* Fix typo in MSM8996 pin definitions
-* Disable MSM8996 VFE smmu to fix security violation
-* Add I2C, SPI, rpmcc, uart, and WCN3990 wlan nodes on QCS404
-* Enable SDCC1 HS400 support on QCS404
-* Add a multitude of nodes on SDM845:
-  SD, UFS, USB, LPASS, SCM, QSPI, PDC, DPU, videocc, GPU, RPMh
-  bus interconnect, WCN3990 WLAN
-* Add gpio ranges to SDM845 TLMM
-* Fix regulator load on sdcard on MSM8998-mtp board
+  soc: qcom: smd-rpm: Add sdm660 compatible (2019-02-01 16:08:58 -0600)
 
 ----------------------------------------------------------------
+Qualcomm ARM Based Driver Updates for v5.1
+
+* Add Qualcomm RPMh power domain driver and related changes
+* Fix issues with sleep/wake sets and batch API in RPMh
+* Update MAINTAINERS Qualcomm entry
+* Fixup RMTFS-mem sysfs and uevents
+* Fix error handling in GSBI
+* Add SMD-RPM compatible entry for SDM660
+
+----------------------------------------------------------------
+Alexey Khoroshilov (1):
+      soc: qcom: gsbi: Fix error handling in gsbi_probe()
+
 Amit Kucheria (1):
-      arm64: dts: pms405: Export PMIC temperature to thermal framework
+      MAINTAINERS: update list of qcom drivers
 
-Andy Gross (2):
-      Merge tag 'qcom-fixes-for-5.0-rc3' into arm64-for-5.1-2
-      Merge branch 'arm64-for-5.1' into arm64-for-5.1-2
+Andy Gross (1):
+      Merge tag 'qcom-fixes-for-5.0-rc1' into drivers-for-5.1
 
-Bjorn Andersson (8):
-      arm64: dts: qcom: sdm845: Increase address and size cells for soc
-      arm64: dts: qcom: sdm845: Extend ranges and describe DMA space
-      arm64: dts: qcom: sdm845: Fix lpasscc reg
-      arm64: dts: qcom: qcs404: Specify pinctrl state for UART
-      arm64: dts: qcom: qcs404: Define remaining UARTs
-      arm64: dts: qcom: qcs404: Add QUP I2C and SPI nodes
-      arm64: dts: qcom: qcs404: Add rpmcc node
-      arm64: dts: qcom: msm8996: Disabled VFE SMMU
+Bjorn Andersson (1):
+      soc: qcom: rpmpd: Drop family A RPM dependency
 
-Can Guo (1):
-      arm64: dts: qcom: sdm845: Add UFS nodes for sdm845-mtp
+Craig Tatlor (1):
+      soc: qcom: smd-rpm: Add sdm660 compatible
 
-David Dai (1):
-      arm64: dts: sdm845: Add interconnect provider DT nodes
+Evan Green (2):
+      soc: qcom: rmtfs-mem: Add class to enable uevents
+      soc: qcom: rmtfs-mem: Make sysfs attributes world-readable
 
-Douglas Anderson (2):
-      arm64: dts: qcom: sdm845: Add qspi (quad SPI) node
-      arm64: dts: sdm845: Add gpu clock controller node
+Fabio Estevam (1):
+      qcom-scm: Include <linux/err.h> header
 
-Evan Green (5):
-      arm64: dts: qcom: sdm845: Add SD node
-      arm64: dts: qcom: sdm845: Add SD nodes for sdm845-mtp
-      arm64: dts: qcom: sdm845: add UFS controller
-      arm64: dts: qcom: sdm845: Add USB PHY lane two
-      arm64: dts: qcom: sdm845: Add gpio-ranges to TLMM node
+Rajendra Nayak (8):
+      dt-bindings: opp: Introduce opp-level bindings
+      OPP: Add support for parsing the 'opp-level' property
+      dt-bindings: power: Add qcom rpm power domain driver bindings
+      soc: qcom: rpmpd: Add a Power domain driver to model corners
+      soc: qcom: rpmpd: Add support for get/set performance state
+      soc: qcom: rpmhpd: Add RPMh power domain driver
+      soc: qcom: rpmhpd: Mark mx as a parent for cx
+      soc: qcom: update config dependencies for QCOM_RPMPD
 
-Govind Singh (2):
-      arm64: dts: qcom: qcs404: Add WCN3990 WLAN module device node
-      arm64: dts: sdm845: Add WCN3990 WLAN module device node
+Raju P.L.S.S.S.N (1):
+      drivers: qcom: rpmh: avoid sending sleep/wake sets immediately
 
-Jakob Wuhrer (1):
-      arm64: dts: qcom: Correct "gpiio" typo in msm8996-pins
+Stephen Boyd (1):
+      soc: qcom: rpmh: Avoid accessing freed memory from batch API
 
-Jeffrey Hugo (3):
-      arm64: dts: qcom: msm8998-mtp: Increase load on l21 for sdcard
-      arm64: dts: qcom: msm8998: Enumerate i2c controllers
-      arm64: dts: qcom: msm8998: Add USB-related nodes
-
-Jeykumar Sankaran (1):
-      arm64: dts: qcom: sdm845: Add dpu to sdm845 dts file
-
-Jorge Ramirez-Ortiz (1):
-      arm64: dts: qcom: qcs404: sdcc1: enable HS400
-
-Loic Poulain (2):
-      arm64: dts: apq8016-sbc: Increase load on l11 for SDCARD
-      arm64: dts: qcom: pm8916: Add PON watchdog node
-
-Manu Gautam (1):
-      arm64: dts: qcom: sdm845: Fix pcs_misc region address for UNI PHY
-
-Marc Gonzalez (1):
-      arm64: dts: qcom: msm8998: Add rpmcc node
-
-Rajendra Nayak (2):
-      arm64: dts: msm8996: Add rpmpd device node
-      arm64: dts: sdm845: Add rpmh powercontroller node
-
-Sai Prakash Ranjan (1):
-      arm64: dts: qcom: sdm845: Remove the duplicate header inclusion
-
-Sibi Sankar (3):
-      arm64: dts: qcom: sdm845: Add SCM DT node
-      arm64: dts: qcom: sdm845: Add PDC Global reset driver node
-      arm64: dts: qcom: sdm845: Add reserve-memory nodes
-
-Srinivas Kandagatla (1):
-      arm64: dts: add msm8996 compatible to gicv3
-
-Taniya Das (3):
-      arm64: dts: sdm845: Add cpufreq device node
-      arm64: dts: sdm845: Add videocc node
-      arm64: dts: sdm845: Add lpasscc node
-
-Vivek Gautam (1):
-      arm64: dts: sdm845: Add node for arm,mmu-500
-
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi  |   2 +
- arch/arm64/boot/dts/qcom/msm8996-pins.dtsi |   2 +-
- arch/arm64/boot/dts/qcom/msm8996.dtsi      |  38 +-
- arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi  |  24 +
- arch/arm64/boot/dts/qcom/msm8998.dtsi      | 278 ++++++++++
- arch/arm64/boot/dts/qcom/pm8916.dtsi       |   6 +
- arch/arm64/boot/dts/qcom/pms405.dtsi       |  79 +++
- arch/arm64/boot/dts/qcom/qcs404-evb.dtsi   |  19 +
- arch/arm64/boot/dts/qcom/qcs404.dtsi       | 359 +++++++++++++
- arch/arm64/boot/dts/qcom/sdm845-mtp.dts    |  84 ++-
- arch/arm64/boot/dts/qcom/sdm845.dtsi       | 799 ++++++++++++++++++++++++-----
- 11 files changed, 1564 insertions(+), 126 deletions(-)
+ Documentation/devicetree/bindings/opp/opp.txt      |   3 +
+ .../devicetree/bindings/power/qcom,rpmpd.txt       | 145 ++++++++
+ .../devicetree/bindings/soc/qcom/qcom,smd-rpm.txt  |   1 +
+ MAINTAINERS                                        |  32 +-
+ drivers/opp/core.c                                 |  18 +
+ drivers/opp/of.c                                   |   2 +
+ drivers/opp/opp.h                                  |   2 +
+ drivers/soc/qcom/Kconfig                           |  18 +
+ drivers/soc/qcom/Makefile                          |   2 +
+ drivers/soc/qcom/qcom_gsbi.c                       |   7 +-
+ drivers/soc/qcom/rmtfs_mem.c                       |  32 +-
+ drivers/soc/qcom/rpmh.c                            |  37 +-
+ drivers/soc/qcom/rpmhpd.c                          | 406 +++++++++++++++++++++
+ drivers/soc/qcom/rpmpd.c                           | 315 ++++++++++++++++
+ drivers/soc/qcom/smd-rpm.c                         |   1 +
+ include/dt-bindings/power/qcom-rpmpd.h             |  39 ++
+ include/linux/pm_opp.h                             |   7 +
+ include/linux/qcom_scm.h                           |   1 +
+ 18 files changed, 1036 insertions(+), 32 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/qcom,rpmpd.txt
+ create mode 100644 drivers/soc/qcom/rpmhpd.c
+ create mode 100644 drivers/soc/qcom/rpmpd.c
+ create mode 100644 include/dt-bindings/power/qcom-rpmpd.h
 
 _______________________________________________
 linux-arm-kernel mailing list
