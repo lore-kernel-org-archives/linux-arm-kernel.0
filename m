@@ -2,22 +2,23 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 02B96C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:51:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6601DC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:52:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BA9792081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:51:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 35F4F2081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:52:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="erfSz0Go";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="T27lCmRd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BA9792081B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rm0LBrJu";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="Cb2eESD5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35F4F2081B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,58 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=S3qxHOlDSD6B9nQ3Cb23USFjAwZuyXJfaDrUEx7DKDA=; b=erfSz0Goav/Msv
-	DCZaN2IP8SIjMasg9suLCdUI5ztKSU60w6phlyadF2q0lJygyJ59DAwz/Vpmm0D4pI9yF7PT8mvKT
-	nUocqYGBVruFykveB1uJtKnOtjlp3DpXO4B3wMxPO9htCp2xJ/xvqxHXwGq1h3QsLWGNHvgTRJss1
-	CnxEyE1+eCD8Ae5quJG0AMvvcB5d6wn5mktIKYOjnwK6k/4DjY3OT2GQPIhBld3YJFdgFGmKwuvJX
-	pE+2OaeLO1FdybK9VaA6kHh4NT2PD9vu3SnyylY6VZYKIkpZ50FjoTgCin9dxxwMdXqbMwO9kKS0S
-	n9H+6p+BjnwR9l/TUBoQ==;
+	List-Owner; bh=cO+oiTMLlLCMBPDaKQ0lwtn2zWJG9K49cPJiAwUvexc=; b=Rm0LBrJuWphqU4
+	HECWI/AqwhN9tz2Glzh6O9VmbxNqW6DQ2Zj9KJzxXAatSydLslx2pQ7IxH5uzFCnwkI6S/xwMnOq+
+	CkWRHQhzR/uZi1wFn7Psp7hB2U1lgL2rTPhQnhwAL+s+90wZ8cbWyJfp0/51DDfjwmTYa0Hd1aUfi
+	HE/7TlxzHTvEorhvXH2ED5hGx3cyrGPOjxfj73bBTyGS6Gf/tpIQMGT9SmKVEcFeTtDQdPAsBxve8
+	U86pcvV5m+FlVITedXiCTWxEoJ0MECQT1PaPzorJezYqcJGFK4wpCdiRYqG2W6MQ6GDlRggO3C53b
+	x74rnmxg38NQZ3tJcTQQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqeei-0003pQ-99; Mon, 04 Feb 2019 13:51:24 +0000
-Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
+	id 1gqefD-0004Jd-Jo; Mon, 04 Feb 2019 13:51:55 +0000
+Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqeeZ-0003fZ-QZ
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 13:51:21 +0000
-Received: by mail-it1-x143.google.com with SMTP id a6so21056144itl.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 05:51:15 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ id 1gqef9-0004GC-JN; Mon, 04 Feb 2019 13:51:53 +0000
+Received: by mail-ot1-x342.google.com with SMTP id s5so12994676oth.7;
+ Mon, 04 Feb 2019 05:51:51 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=googlemail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=yWRevMXFNpbxuvqzTy7dEBAKGR7R1aJnsJ95RwqNsIE=;
- b=T27lCmRdUNDkqdUgBHyeTzzsb9P5jTw46dSCXdTmm9HiKq8O0H5JqSafq/YM4JG/3I
- lgn5rd0796iFafK/hr97kpCmsW0g2iWJxljl+qNx/xV9664a6qxwTB0WzGxy4I6XIGXt
- F6HuotaeZ/YHSdJsv8ldkozEdfBLTF+Shy2uo=
+ :cc; bh=hX/Gv3eAPoFqfRH+eg7JFdfk4B9734x08+y90NP/qZE=;
+ b=Cb2eESD5D+XNsn0ZoKHC+vPGpMJjt2COzGVp8vZfiOrnK/izxjGCH6YFprEkzQSlRy
+ hQvqRcwNtfnk37LdhV1xsca0fx9pvRV/69Nlb/GJsnbNaRH6crJUFxN65teZMu+ABk+O
+ J6v3G0q4TLG4Wqop4MDx556aUzKeeeWWRwb4Zzb/HDK911rF5x1mpsiad3REETUvt0RV
+ OsBobzZ97EcF3p8KFpf7rXQS12o2jeGLe7Ij4F+o3SFxte53kb8yjNQa/i3w1tsoH3QK
+ UxCpIeI0c7wbrLhM+jEF0zsIqnDs6TYpy5EMBOi589b/4+8iQq1bheeLbJqDQk1Dc4Da
+ IsVg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=yWRevMXFNpbxuvqzTy7dEBAKGR7R1aJnsJ95RwqNsIE=;
- b=Mn8DrZx1JBKPXkPIsKk8tviJRNJ5eJS+d7dZdAKZSc0gcBdOxIvfZRjllT56k2Kwhg
- ECG+1dF9SH+vGg2Xgmz4ogLJYHsxrzJ8WSuG8bHKXXLx1Mk0nXANLac99Br1kvw+joE/
- 5SPlE8WINHKHRJLktPZ/cqmAKyE1ECo9XeZHQuxGUcA6G0snVzdT9oY+ahbGkz62DlAN
- oCsdXFCzDj18fYMHEgHVDBzG72rS5tqpji8ElJZGzK60SIQPjmnmEf1Ebz5VmQj4VLio
- ZicSxI9LRvGfbDM/9KVQqqUQTz/pxP+LqqEeUYEfAZI7n8rzzG6xxzCN87tXpG+6YYuv
- GGuQ==
-X-Gm-Message-State: AHQUAuYOjGQgcbA0dMKmvQthIPXq+m0YP4UYnV4yCnifNBE514kAx117
- uEIVQXRiLpghfI9rFLD6kyyKPa5G1Vi6zXUJXz1l0g==
-X-Google-Smtp-Source: AHgI3IZgVyAzAJ8FFiLNyXeQJJfGuc9kq8AVJ2YkLcsJNTo5Vfw2GZXFeqVkxehVeImEEdMHh33qgKdd5ENNDQt//uk=
-X-Received: by 2002:a05:6638:14:: with SMTP id z20mr714314jao.2.1549288274710; 
- Mon, 04 Feb 2019 05:51:14 -0800 (PST)
+ bh=hX/Gv3eAPoFqfRH+eg7JFdfk4B9734x08+y90NP/qZE=;
+ b=tn3egtsgHo56EeIKsQb6Luxv3MfVAo+r48SRe8PNkSY4DkMTj826UiJlcghUhyhj8e
+ WuDWqXu5uwR+BX1V0nt8H9Pnwb0JqURFbT1Yvh9UFBAGbQcJxuFYn13iZoz2b85M1hEK
+ KXdEYLcU5DIBojJjVAi7ozU9FUgBESBtUumQ/lWO7ugAz+KQcqKTDs1UW4M6+AYe+T+J
+ tL3GbyQ37X8ta68eylmBrxJDgIRvIW6JXf7xSbu0cgNB/edsMP2RI6C81jXmDGC4j6jn
+ efEsDqQb+UkJb+g5Ry53FX6nEVQqMTAhZsXEKFnARy5T698Nip1YGFYJiyoF9ygfdNdt
+ q1vg==
+X-Gm-Message-State: AHQUAuY8hbem/sda0z5aE9lzuFTEF24ZRv84ZstCq9V12LbsdamDEPHx
+ 48zNbxGWZjSYaLw80BW0M0NnB6DydB1m9Rh30ow=
+X-Google-Smtp-Source: AHgI3IZNFa42ANomdKRJBxYMahYuCaUmu8PVxmRLoI5CDbPN2G/jq6AufyAZFOQ+0I69yISqUV9k09JXdH3pDlahi48=
+X-Received: by 2002:aca:58d7:: with SMTP id
+ m206mr27349786oib.140.1549288310656; 
+ Mon, 04 Feb 2019 05:51:50 -0800 (PST)
 MIME-Version: 1.0
-References: <fe7fa86a-42ed-ee58-be26-4d8ae45fadab@lca.pw>
- <20190201134847.GC29903@fuggles.cambridge.arm.com>
- <1549054142.6911.25.camel@lca.pw>
- <20190204102715.GA11645@capper-debian.cambridge.arm.com>
-In-Reply-To: <20190204102715.GA11645@capper-debian.cambridge.arm.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Mon, 4 Feb 2019 14:51:03 +0100
-Message-ID: <CAKv+Gu8KQLHfq3L1Xjd0RSbvs2eEokyUkT+7v4df=BRdqmjrnQ@mail.gmail.com>
-Subject: Re: kernel_page_tables issue with CONFIG_ARM64_USER_VA_BITS_52=y
-To: Steve Capper <Steve.Capper@arm.com>
+References: <20190123151209.2080-1-linux.amoon@gmail.com>
+In-Reply-To: <20190123151209.2080-1-linux.amoon@gmail.com>
+From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Date: Mon, 4 Feb 2019 14:51:39 +0100
+Message-ID: <CAFBinCC1xjqogcLm94gu+iLS_b_zB8eNEXL+4bYhog==zN0S+A@mail.gmail.com>
+Subject: Re: [RFCv1 0/3] Odroid c1+ usb fixs
+To: Anand Moon <linux.amoon@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_055116_329115_38D80C62 
-X-CRM114-Status: GOOD (  16.78  )
+X-CRM114-CacheID: sfid-20190204_055151_931315_4D93B8AA 
+X-CRM114-Status: GOOD (  12.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,101 +89,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <Catalin.Marinas@arm.com>, nd <nd@arm.com>,
- Qian Cai <cai@lca.pw>, Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Will Deacon <Will.Deacon@arm.com>
+Cc: devicetree@vger.kernel.org, Kevin Hilman <khilman@baylibre.com>,
+ Kishon Vijay Abraham I <kishon@ti.com>, Rob Herring <robh+dt@kernel.org>,
+ linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Steve,
+Hi Anand,
 
-On Mon, 4 Feb 2019 at 11:27, Steve Capper <Steve.Capper@arm.com> wrote:
+On Wed, Jan 23, 2019 at 4:12 PM Anand Moon <linux.amoon@gmail.com> wrote:
 >
-> On Fri, Feb 01, 2019 at 03:49:02PM -0500, Qian Cai wrote:
-> > On Fri, 2019-02-01 at 13:48 +0000, Will Deacon wrote:
-> > > Hi Qian Cai,
+> This is follow up on my previous patches.
 >
-> [...]
+> [0] https://lore.kernel.org/patchwork/patch/1031616/
+> [1] https://lore.kernel.org/patchwork/patch/1031617/
 >
-> > Unfortunately, although this takes care of kernel_page_tables, it breaks
-> > efi_page_tables.
-> >
-> > # cat /sys/kernel/debug/efi_page_tables
-> > BUG()
-> >
-> > # ./scripts/faddr2line vmlinux walk_pgd+0x84/0x254
-> > walk_pgd+0x84/0x254:
-> > __read_once_size at include/linux/compiler.h:193 (discriminator 1)
-> > (inlined by) walk_pgd at arch/arm64/mm/dump.c:345 (discriminator 1)
-> >
-> > 344:        do {
-> > 345:                pgd_t pgd = READ_ONCE(*pgdp);
-> > 346:                next = pgd_addr_end(addr, 0);
-> >
-> > kernel BUG at arch/arm64/mm/dump.c:332!
-> >
-> >                 } else {
-> >                         BUG_ON(pud_bad(pud));
-> >                         walk_pmd(st, pudp, addr, next);
-> >
+> As per Martin's suggestion and input I have tried to fix below issue.
 >
-> Hi Qian Cai,
-> Apologies for missing the efi_page_tables.
+> Fixed the phy power issue on the usb port.
+> # cat /sys/kernel/debug/regulator/regulator_summary
+>     USB_VBUS                      4    2      0 unknown  5000mV     0mA  5000mV  5000mV
+>        phy-c1108820.phy.1         2                                 0mA     0mV     0mV
+>        phy-c1108800.phy.0         2                                 0mA     0mV     0mV
 >
-> Does the following (applied to Will's fix) help?
+> Fixed the OTG phy warning and initilizaion of usb0_phy
+> # lsusb -t
+> /:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
+>     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
+>         |__ Port 1: Dev 5, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+>         |__ Port 2: Dev 3, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+>         |__ Port 3: Dev 4, If 1, Class=Video, Driver=uvcvideo, 480M
+>         |__ Port 3: Dev 4, If 2, Class=Audio, Driver=snd-usb-audio, 480M
+>         |__ Port 3: Dev 4, If 0, Class=Video, Driver=uvcvideo, 480M
+>         |__ Port 3: Dev 4, If 3, Class=Audio, Driver=snd-usb-audio, 480M
+> /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
 >
-> Cheers,
-> --
-> Steve
->
-> --->8
->
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> index 00ca2adeb5ef..42ac8fd15e59 100644
-> --- a/arch/arm64/mm/dump.c
-> +++ b/arch/arm64/mm/dump.c
-> @@ -339,11 +339,12 @@ static void walk_pgd(struct pg_state *st, struct mm_struct *mm,
->                      unsigned long start)
->  {
->         unsigned long next, addr = start;
-> +       unsigned long end = (start < TASK_SIZE_64) ? TASK_SIZE_64 : 0;
->         pgd_t *pgdp = pgd_offset(mm, addr);
->
->         do {
->                 pgd_t pgd = READ_ONCE(*pgdp);
-> -               next = pgd_addr_end(addr, 0);
-> +               next = pgd_addr_end(addr, end);
->
->                 if (pgd_none(pgd)) {
->                         note_page(st, addr, 1, pgd_val(pgd));
-> @@ -351,7 +352,7 @@ static void walk_pgd(struct pg_state *st, struct mm_struct *mm,
->                         BUG_ON(pgd_bad(pgd));
->                         walk_pud(st, pgdp, addr, next);
->                 }
-> -       } while (pgdp++, addr = next, addr);
-> +       } while (pgdp++, addr = next, addr != end);
->  }
->
->  void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
-> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-> index 23ea1ed409d1..16757966c3bf 100644
-> --- a/drivers/firmware/efi/arm-runtime.c
-> +++ b/drivers/firmware/efi/arm-runtime.c
-> @@ -38,7 +38,8 @@ static struct ptdump_info efi_ptdump_info = {
->         .mm             = &efi_mm,
->         .markers        = (struct addr_marker[]){
->                 { 0,            "UEFI runtime start" },
-> -               { DEFAULT_MAP_WINDOW_64, "UEFI runtime end" }
-> +               { DEFAULT_MAP_WINDOW_64, "UEFI runtime end" },
-> +               { -1, NULL }
->         },
->         .base_addr      = 0,
->  };
->
+> Now hotpluing of usb device is working on odroid c1+ boards.
+unfortunately it's still not working for me :(
 
-FYI this last hunk went into v5.0-rc5 as a fix (proposed by Qian)
+all following descriptions are seen when looking at the PCB with the
+40-pin connector on the bottom, USB ports on the left, micro USB
+connector on the top right.
+
+my test-case is:
+- power-cycle the board
+- enter u-boot command prompt
+- gset GPIOAO_5 out high (or replace high with low)
+- measure
+
+I checked the voltage at RT9715EGB (U19) with a volt meter:
+GPIOAO_5 HIGH:
+- EN pin (bottom, left): 3.3V
+- VOUT pin (top right): 5V
+GPIOAO_5 LOW:
+- EN pin (bottom, left). 0V
+- VOUT pin (top right): 5V (not sure why...)
+
+I also checked the voltage at Q5 2N7002W with a volt meter:
+- gate (bottom, right): 0V
+- source (top, right): 3.3V
+- drain (left): 0V
+this is always the same, regardless of whether GPIOAO_5 is HIGH or LOW.
+however, with Armbian booted (which uses some Amlogic 3.10 kernel
+where USB works) I get:
+- gate (bottom, right): 0V
+- source (top, right): 0V
+- drain (left): 3.3V
+
+what do you get on your board?
+
+
+Regards
+Martin
 
 _______________________________________________
 linux-arm-kernel mailing list
