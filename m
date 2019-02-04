@@ -2,23 +2,23 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80611C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:21:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 48AFFC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:22:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4C5C32082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:21:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 15A682082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:22:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QhQX8HPv";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="KCLZCedu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C5C32082F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QeFIXhDg";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Ex/9PbAA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 15A682082F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,59 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2LiiGHhNKoZQzAjWZlvWFUyGJa77PwWAu2LpJTqPobg=; b=QhQX8HPvc5uIYr
-	Dnn9onXkjvxFtkEwuFEV7M18gi/cPDCRmfMhMnpVR5raQg6gRj9V3GTLZeziWI13HIygENLa1DmDA
-	ycSwvrAH/0k+e4Ifv4wNQ6hmkqvO0+q5GhhJu24GS3a9dIivCf2f2mjS8uEPHeLK0duNQRz5KWYfD
-	/xqizBOZarun9gGNIhcyFkJIOJvmn7afg2jzIQpZsG3C9UaD0ntjvjfeGLDepZ1CUrLrA1KOv6TDl
-	iCaqtPnHly7CAQ3dGLgMdZ8Vz4+/0SRCpQWxk1c9+2DlwWnJIbjFFucOtoR62d7NhlSoA6+5oINCL
-	bBt5UYSWxMN7JookM96Q==;
+	List-Owner; bh=JyB9eZ2+Wi6xbOH4ytL9pQ2Y02DePrZ4QzmfpVPjITQ=; b=QeFIXhDg7X1fee
+	ZF1x6Qs44PLNsqIKQSJ/8a9ZNuoS+UrcS0X8U7IGeFfZNPqbY4nGfQ33Tfl0ke0ND9sdMQYK5XifR
+	PK+UPWDeW3Jcv/DSM7+id4RLJ7Xxhwv09lpA+CfBqZTImA7fsuB0XCxqI2lzGUno3qtB/Y/U2dop0
+	mdWbmyOOlXZEXRIn5U5hzjZbyonjf+bXjzUjxod6hVLE+OM6H/+CGN1JwSmGqK7GJ1wNiJ6QJPpEZ
+	CZIGlwdHnNNzZEDyzM6Y1oKRoWAhQnmMK92V6UIrWmiegn4FBixMAz7KQ0ZzLQHS6yr2j/deqzTsd
+	taQPj5zoMOFKHmXIuYtg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqeBX-0000hT-Bl; Mon, 04 Feb 2019 13:21:15 +0000
+	id 1gqeCm-00010f-7g; Mon, 04 Feb 2019 13:22:32 +0000
 Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqeBT-0000h7-Vl; Mon, 04 Feb 2019 13:21:13 +0000
-Received: by mail-ot1-x344.google.com with SMTP id v23so12828286otk.9;
- Mon, 04 Feb 2019 05:21:11 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=googlemail.com; s=20161025;
+ id 1gqeCi-00010K-Ns
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 13:22:30 +0000
+Received: by mail-ot1-x344.google.com with SMTP id s5so12845351oth.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 04 Feb 2019 05:22:27 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=uZVG5DUNwChyTDNZ2apKIXVpZJJyZiLAB7MMLhzKa68=;
- b=KCLZCedutreYPysnbSc8b8RxwO58xZsrrQBi9JekcpkBQVWntBqAzQ0wYixP3ytunc
- cAHlqUUsEi5iD7MUHQNo2UZP1MX9zAiOllMWi6FmnkUAT1MF9pqJZJWsA9LMVVbnzr0V
- fOcHAJgb1tNhTKbKkeU68ajpXaBk3O+HOFBnfJoWwE7+S8pfyiG+s/ut2tpJlZDmet+U
- rMR/t6xO/0lueaTn+Snl85NuhqF9wP1MRltKBb4DXc6LREL3CwGyLaH1OMxDCe5RSySz
- dGWBfXvIW0fO0Pgr14Cp2CS+NpFSC5XGmT/oRgg5gwDoQXOIqSbCNUD8Uk/ZbenqF5Rc
- PVPw==
+ :cc; bh=lSQdmd2kcJrVrwD0q0YsTpo8ja87IdZnCDO1avYLAAA=;
+ b=Ex/9PbAABf4BXTVDGixv5v+Vwhs4JBt2B/yxr5mfbDLeHr+EoMeZtQXzAR3io1uTkx
+ GSIj9As7Qcx+xG5rAoy0iCZa2nIo4MjkfybYNgF8RdplkmZxLzb6wuoDA5TA2nKSr+rR
+ dnTXi8d6DziSPuaHABON3ZeCjs9vwLY0goHqed+3uwUhT3KF3D110q08a/EClGZRDzrF
+ iiuu9moP/n3Tr8EOiC8am7RQyfdOByynO5y733jhgasbvVf4rm2Ax49o7L5QvfRoaZ2Y
+ 9vVdJ9XCIwWYrzB1GVwnwfFcywIjqQZYM0qNNq/pj6gjQEv/gRYpAamX1g35mN2jbHcT
+ iHdg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=uZVG5DUNwChyTDNZ2apKIXVpZJJyZiLAB7MMLhzKa68=;
- b=EbjelTuSZBsdua94X7OWP7s0qyL6SwHcIAS6hmGljtE3kGvHUqBcRPfyd+k9tmiRUu
- PIeRQxPmNZVwGIh8sip3jRCln+VCn6w25RxJH496GxY8HS17v4150972U7iIAf5WfQF3
- 0wq5UtKbT5ssztobjdM3Tv+mRXRk3fQiYkF5V5HEZdH87hebbCSdI30MmPEFWPcvQUfi
- WSj3zJQ4rIVqg/fe2Y7FQlnUKhxANPK+L58fjQRBfTDToO1WytDjGpCGqxMVk+BxBhLY
- r08ToGEZ287ZnJF7zfLpKT4r4S1YUZPVVRMGhMZbtBKY6StNEnAphMJbEXxs5dKMF60B
- QLGw==
-X-Gm-Message-State: AHQUAuYoWAQHrSapdL4DitN+JV8G0NZ4EwAvs7OMw6GJ6rBGntzDyH70
- wl6TFV1mV11VpnMs7f5Url998a+BmtmcsYQMjoY=
-X-Google-Smtp-Source: ALg8bN5D/5xTQtm5YXR+JIeIdc8P/hfby9TCD9bpta4V9UwzGzyXvvkuHr2n1wlH7noN51JEHPRZLsKsP78Cwovx428=
-X-Received: by 2002:aca:3586:: with SMTP id c128mr27585274oia.47.1549286470256; 
- Mon, 04 Feb 2019 05:21:10 -0800 (PST)
+ bh=lSQdmd2kcJrVrwD0q0YsTpo8ja87IdZnCDO1avYLAAA=;
+ b=Ygh5AAZH8tIQABGp3FhMOutRridV+KgBFfqktZDN1k4EJ5vkmhQQOCz48g/hkNIBEx
+ sZYgdHmjmNewpiMoFo7lZobTCF7Sp7xtPomUhldi6ZXx4qOqdT4gw7OTB8C4udubPyAi
+ xImyKSs6ClcWoA5UybNqVd6Tt9KisrnpRKsC2+RJQ2SB64pS/tf/Xr+uEp7EvsJG4fao
+ KpQSkTOMmVVwRK0WWwF769A7uSKV17vThhAw9//ci+bX9PfV98MrGmwuGQwb3bFYO6yF
+ Hq2r4CuordQRTKWV1FO4ZKMWqQrqr7xhsklPJqZmQpKTWYntrWgk6646qeHKBCqRDiVG
+ i4eg==
+X-Gm-Message-State: AHQUAuZ1Iym+1yci3V1iaGubbGB7GgffjQ6MSvmhxYzpbfj3QTkaGDqg
+ M/tonLwo7II6YJTvexvJ0xGDvWgpKU8yIx7giLs=
+X-Google-Smtp-Source: ALg8bN4T5wE0BmGjYGMLuC0d5JWohewsUqguCamal61iHGds9rz3sxc3sYrs7e61GoVwasuM9DnQbuKHauagDPiFLhU=
+X-Received: by 2002:aca:ab53:: with SMTP id u80mr27435127oie.261.1549286547053; 
+ Mon, 04 Feb 2019 05:22:27 -0800 (PST)
 MIME-Version: 1.0
-References: <20190123151209.2080-1-linux.amoon@gmail.com>
- <20190123151209.2080-2-linux.amoon@gmail.com>
-In-Reply-To: <20190123151209.2080-2-linux.amoon@gmail.com>
-From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Date: Mon, 4 Feb 2019 14:20:59 +0100
-Message-ID: <CAFBinCCOQ_GqHZuYf6n8ba_ZMbOwKmUzc4EJAuXRpn4tTTCUKA@mail.gmail.com>
-Subject: Re: [RFCv1 1/3] phy: meson8b-usb2: Enable otg phy controller on
- Meson8b SoCs
-To: Anand Moon <linux.amoon@gmail.com>
+References: <20190129231711.21844-1-andrew@lunn.ch>
+In-Reply-To: <20190129231711.21844-1-andrew@lunn.ch>
+From: Fabio Estevam <festevam@gmail.com>
+Date: Mon, 4 Feb 2019 11:22:21 -0200
+Message-ID: <CAOMZO5At_YthgUOexhNMwiZZcqh2bG5D_B8ZLXQbtfkeKYHf=w@mail.gmail.com>
+Subject: Re: [PATCH] ARM: dts: vf610: Add ZII SSMB DTU board
+To: Andrew Lunn <andrew@lunn.ch>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_052112_050786_E0EEB238 
-X-CRM114-Status: GOOD (  18.75  )
+X-CRM114-CacheID: sfid-20190204_052228_811393_5317C295 
+X-CRM114-Status: GOOD (  10.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,90 +89,74 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Neil Armstrong <narmstrong@baylibre.com>,
- Kevin Hilman <khilman@baylibre.com>, Kishon Vijay Abraham I <kishon@ti.com>,
- Rob Herring <robh+dt@kernel.org>, linux-amlogic@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org, Jerome Brunet <jbrunet@baylibre.com>
+Cc: Shawn Guo <shawnguo@kernel.org>, Stefan Agner <stefan@agner.ch>,
+ linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Anand,
+Hi Andrew,
 
-On Wed, Jan 23, 2019 at 4:12 PM Anand Moon <linux.amoon@gmail.com> wrote:
+On Tue, Jan 29, 2019 at 9:17 PM Andrew Lunn <andrew@lunn.ch> wrote:
 >
-> Meson8b support two USB phy controller, one with otg port and
-> other usb host controller. USB OTG controller ie. otg port can
-> be used to power on board or host port for usb device.
-> Changes enable usb otg host controller when dr_mode is set to otg.
-can you please add a sentence explaining *why* this allows enabling USB OTG?
+> Add the Zodiac Digital Tapping Unit, a VF610 based network device with
+> 5 Ethernet ports. One of these ports supports 1000Base-T2.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-> Currenly otg port can be used to power on the board.
-typo, should be "Currently"
+Looks good. Only minor comments:
 
-> Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Cc: Jerome Brunet <jbrunet@baylibre.com>
-> Cc: Neil Armstrong <narmstrong@baylibre.com>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> ---
-> New patch in this series.
-> --TOTO enable OTG port to work as host.
-> --Currently we can power on the board from this OTG port.
->
-> /:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
->     |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
->         |__ Port 1: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
->         |__ Port 3: Dev 3, If 0, Class=Video, Driver=uvcvideo, 480M
->         |__ Port 3: Dev 3, If 1, Class=Video, Driver=uvcvideo, 480M
->         |__ Port 3: Dev 3, If 2, Class=Audio, Driver=snd-usb-audio, 480M
->         |__ Port 3: Dev 3, If 3, Class=Audio, Driver=snd-usb-audio, 480M
-> /:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
-> ---
->  drivers/phy/amlogic/phy-meson8b-usb2.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->
-> diff --git a/drivers/phy/amlogic/phy-meson8b-usb2.c b/drivers/phy/amlogic/phy-meson8b-usb2.c
-> index 9c01b7e19b06..1333c77e9172 100644
-> --- a/drivers/phy/amlogic/phy-meson8b-usb2.c
-> +++ b/drivers/phy/amlogic/phy-meson8b-usb2.c
-> @@ -109,6 +109,7 @@
->
->  #define RESET_COMPLETE_TIME                            500
->  #define ACA_ENABLE_COMPLETE_TIME                       50
-> +#define DCD_ENABLE_COMPLETE_TIME                       10
->
->  struct phy_meson8b_usb2_priv {
->         void __iomem            *regs;
-> @@ -188,6 +189,20 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
->
->                 udelay(ACA_ENABLE_COMPLETE_TIME);
->
-> +               if (phy_meson8b_usb2_read(priv, REG_ADP_BC) &
-> +                       REG_ADP_BC_ACA_PIN_FLOAT) {
-> +                       dev_warn(&phy->dev, "USB ID detect failed!\n");
-> +                       clk_disable_unprepare(priv->clk_usb);
-> +                       clk_disable_unprepare(priv->clk_usb_general);
-> +                       return -EINVAL;
-> +               }
-> +       } else if (priv->dr_mode == USB_DR_MODE_OTG) {
-> +               phy_meson8b_usb2_mask_bits(priv, REG_ADP_BC,
-> +                                          REG_ADP_BC_DCD_ENABLE,
-> +                                          REG_ADP_BC_DCD_ENABLE);
-where did you take this from?
-$ grep -iR DCD arm-src-kernel-2015-01-15-321cfb5a46/drivers/amlogic/usb/dwc_otg/310/
--> I only find code which clears REG_ADP_BC_DCD_ENABLE (your patch sets it):
-  adp_bc.b.dcd_enable = 0;
+> +&i2c0 {
+> +       clock-frequency = <100000>;
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_i2c0>;
+> +       status = "okay";
+> +
+> +       gpio6: pca9505@22 {
 
-> +               udelay(DCD_ENABLE_COMPLETE_TIME);
-from Amlogic's code: DWC_MDELAY(T_DCD_TIMEOUT);
-while you are also using a delay of "10" the unit is different (your
-patch: us, Amlogic: ms)
+Node names should be generic:
 
+gpio-expander@22
 
-Regards
-Martin
+> +               compatible = "nxp,pca9554";
+> +               reg = <0x22>;
+> +               gpio-controller;
+> +               #gpio-cells = <2>;
+> +       };
+> +
+> +       /* On SSMB */
+> +       lm75@48 {
+
+temperature-sensor@48
+
+> +               compatible = "national,lm75";
+> +               reg = <0x48>;
+> +       };
+> +
+> +       /* On DSB */
+> +       lm75@4d {
+
+temperature-sensor@4d
+
+> +               compatible = "national,lm75";
+> +               reg = <0x4d>;
+> +       };
+> +
+> +       at24c04@50 {
+
+eeprom@50
+
+> +               compatible = "atmel,24c04";
+> +               reg = <0x50>;
+> +               label = "nameplate";
+> +       };
+> +
+> +       at24c04@52 {
+
+eeprom@52
+
+Reviewed-by: Fabio Estevam <festevam@gmail.com>
 
 _______________________________________________
 linux-arm-kernel mailing list
