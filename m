@@ -2,73 +2,75 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 86AE6C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:02:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E5314C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:09:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5337A2082E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:02:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B4E0C2082E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:09:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WcU+XTbH";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="FPrOEkE3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5337A2082E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P7KzYXN/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B4E0C2082E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Kpjp6XcpaUzNRq5ethc3/FFeVVcOgorMjdE0hSQ+HU0=; b=WcU+XTbHiFXHWt
-	P3rmIi+2uYPyv16LmjyrOf08k9Q0QyCW+e5EKwuzMADMA2azWQcE0DOk76OFYm/YlVS3mSP64g+Vm
-	8hYBPAYyr3Q9Y01vwFmQNATEQOzS63ntW3yU9c/7n6tpgbuTXIUYNJGbbNKrHhrq3anJbfyo5OMgg
-	+Mcu6dsYT5Zqp8GWcafMuvHnWvC1b8ruKpFMJzc5vcq8xNQNKO47rCjjd1vukATTxvIbk7fVzIPZ3
-	twavWj3RSkkPAbNkWu+ng0sazH7+B7nkoFLwNl14JFg6YkA1NxYPv6930Is7Iz0fn8li2f58njLtY
-	xOFRj2HCIXYytAl5HS0A==;
+	List-Owner; bh=I8FLw1dsRZ1r4jh+Vu/nbGKtYItSOee41r+hnXb8b2k=; b=P7KzYXN/ncyXie
+	BFSNvQCq4rAlVoZdrepzicWGnf4a0DgoP4kViuKTbWHxuYpyOa9tLpZOPMzdhPLPg8eFtNjHK1NVo
+	tI4xxtJSOIavV+aWEJAe5Y3xMNtEPfHi6jU/vJa39aLWjmeptdprq7auIQmLPV9tvzG+XFEr1RyNO
+	aA6SoxHRt4G7lB5xBLHLQA8olwxDkf4GV4e4QVxzWwkv5GIUmWPerWMIihfsQWnFiIiwrHZTlW5TT
+	V2ou4a2zy8ueEMoOF+nu3oxUfs/LzzqYNO3Cl44KLSEzmDyXpwAOQeGEXEPArsWaHKWtCmGc5IKrX
+	oMT1XZRPISt2KC7lfuWA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqfkn-0006cw-Uq; Mon, 04 Feb 2019 15:01:45 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gqfrv-0000XW-L5; Mon, 04 Feb 2019 15:09:07 +0000
+Received: from mx1.redhat.com ([209.132.183.28])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqfkj-0006ca-Jn; Mon, 04 Feb 2019 15:01:44 +0000
-Received: from mail-qt1-f174.google.com (mail-qt1-f174.google.com
- [209.85.160.174])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ id 1gqfrr-0000Wl-DI
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 15:09:05 +0000
+Received: from smtp.corp.redhat.com (int-mx07.intmail.prod.int.phx2.redhat.com
+ [10.5.11.22])
+ (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 882CE2082E;
- Mon,  4 Feb 2019 15:01:40 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549292500;
- bh=oypoNwm+6B+QKs1jDDcQsVgcF3/t9rNZenmbGSfPzEw=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=FPrOEkE3Ru0DYvGluOHQZb0rP/SvozTYkVGnyPF8qp6MrjyypyhJ+18SDkipqy+OS
- VC6TAjlMqOEYW/AGlAc1mej79lAEQThQy/O4lq8D5DOtE7cSnKHBhFXHNQ9uba1Y2Q
- fYmWHcWM+X7iVeP5tFvxXsu1J2wwI40VP+kmKhRE=
-Received: by mail-qt1-f174.google.com with SMTP id r9so182635qtt.3;
- Mon, 04 Feb 2019 07:01:40 -0800 (PST)
-X-Gm-Message-State: AJcUukcxU5JK9G9i1Z1z2SakGihjRd0J8PDTGthfkTasWS5LNUAzy0vY
- NXQ/voFK7BnVUMo8IMUIAgZ/jmPbavOx6W685Q==
-X-Google-Smtp-Source: ALg8bN6yvS2jXf8BPoLz+KHLzdv8BIA5Bd452FNOpFd3TYWGhjgNnW+L3P5N9HAxtO9Ep0DyXo7d3MBMqvbbyC4idbI=
-X-Received: by 2002:a0c:9e05:: with SMTP id p5mr47587667qve.246.1549292499728; 
- Mon, 04 Feb 2019 07:01:39 -0800 (PST)
+ by mx1.redhat.com (Postfix) with ESMTPS id C7C1783F40;
+ Mon,  4 Feb 2019 15:09:01 +0000 (UTC)
+Received: from kamzik.brq.redhat.com (unknown [10.43.2.160])
+ by smtp.corp.redhat.com (Postfix) with ESMTPS id 649FB101963B;
+ Mon,  4 Feb 2019 15:09:00 +0000 (UTC)
+Date: Mon, 4 Feb 2019 16:08:57 +0100
+From: Andrew Jones <drjones@redhat.com>
+To: Christoffer Dall <christoffer.dall@arm.com>
+Subject: Re: [PATCH 2/5] arm/arm64: KVM: Allow a VCPU to fully reset itself
+Message-ID: <20190204150857.wea2t5z7ogt7bdgq@kamzik.brq.redhat.com>
+References: <20190129160347.fcbry76igwyatqzx@kamzik.brq.redhat.com>
+ <20190130093431.GE13482@e113682-lin.lund.arm.com>
+ <20190130152721.7fbiza3glifvzlqk@kamzik.brq.redhat.com>
+ <20190131074353.GI13482@e113682-lin.lund.arm.com>
+ <20190131101254.rh23ntvwxtq3yqsz@kamzik.brq.redhat.com>
+ <20190131115156.GP13482@e113682-lin.lund.arm.com>
+ <20190131125712.pwupvf4favbqi6hu@kamzik.brq.redhat.com>
+ <b356cded-fc12-d996-a860-1ef94b6a8ffb@arm.com>
+ <20190131170609.3e7pvmyrcsm2xgq2@kamzik.brq.redhat.com>
+ <20190201075834.GQ13482@e113682-lin.lund.arm.com>
 MIME-Version: 1.0
-References: <20190202170711.29471-1-robh@kernel.org>
- <bebcbda6-1059-857b-4e7d-9751248f6804@tronnes.org>
-In-Reply-To: <bebcbda6-1059-857b-4e7d-9751248f6804@tronnes.org>
-From: Rob Herring <robh@kernel.org>
-Date: Mon, 4 Feb 2019 09:01:28 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqL-7bOCS+T1xuJBmSgwRN1shCSNeQPxreCH76_s9hEYWw@mail.gmail.com>
-Message-ID: <CAL_JsqL-7bOCS+T1xuJBmSgwRN1shCSNeQPxreCH76_s9hEYWw@mail.gmail.com>
-Subject: Re: [PATCH] drm/rockchip: Use drm_fbdev_generic_setup()
-To: =?UTF-8?Q?Noralf_Tr=C3=B8nnes?= <noralf@tronnes.org>
+Content-Disposition: inline
+In-Reply-To: <20190201075834.GQ13482@e113682-lin.lund.arm.com>
+User-Agent: NeoMutt/20180716
+X-Scanned-By: MIMEDefang 2.84 on 10.5.11.22
+X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
+ (mx1.redhat.com [10.5.110.27]); Mon, 04 Feb 2019 15:09:02 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_070141_684404_EBC3BA97 
-X-CRM114-Status: GOOD (  15.64  )
+X-CRM114-CacheID: sfid-20190204_070903_494212_D195662E 
+X-CRM114-Status: GOOD (  38.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,66 +82,127 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: =?UTF-8?Q?Heiko_St=C3=BCbner?= <heiko@sntech.de>,
- David Airlie <airlied@linux.ie>, Sandy Huang <hjc@rock-chips.com>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- "open list:ARM/Rockchip SoC..." <linux-rockchip@lists.infradead.org>,
- Daniel Vetter <daniel@ffwll.ch>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Marc Zyngier <marc.zyngier@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org, kvm@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gU2F0LCBGZWIgMiwgMjAxOSBhdCAxMjoyMiBQTSBOb3JhbGYgVHLDuG5uZXMgPG5vcmFsZkB0
-cm9ubmVzLm9yZz4gd3JvdGU6Cj4gRGVuIDAyLjAyLjIwMTkgMTguMDcsIHNrcmV2IFJvYiBIZXJy
-aW5nOgo+ID4gT3RoZXIgdGhhbiB1c2luZyBhIHJvY2tjaGlwX2dlbV9vYmplY3QgZGlyZWN0bHks
-IHRoZSBSb2NrY2hpcCBmYmRldgo+ID4gc2V0dXAgaGFzIG5vdGhpbmcgc3BlY2lhbCBhbmQgY2Fu
-IGJlIGNvbnZlcnRlZCB0byB1c2UgdGhlIGdlbmVyaWMgZmJkZXYKPiA+IGVtdWxhdGlvbiBpbnN0
-ZWFkLgoKWy4uLl0KCj4gPiAtc3RhdGljIGludCByb2NrY2hpcF9kcm1fZmJkZXZfY3JlYXRlKHN0
-cnVjdCBkcm1fZmJfaGVscGVyICpoZWxwZXIsCj4gPiAtICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgIHN0cnVjdCBkcm1fZmJfaGVscGVyX3N1cmZhY2Vfc2l6ZSAqc2l6ZXMpCj4gPiAt
-ewo+ID4gLSAgICAgc3RydWN0IHJvY2tjaGlwX2RybV9wcml2YXRlICpwcml2YXRlID0gdG9fZHJt
-X3ByaXZhdGUoaGVscGVyKTsKPiA+IC0gICAgIHN0cnVjdCBkcm1fbW9kZV9mYl9jbWQyIG1vZGVf
-Y21kID0geyAwIH07Cj4gPiAtICAgICBzdHJ1Y3QgZHJtX2RldmljZSAqZGV2ID0gaGVscGVyLT5k
-ZXY7Cj4gPiAtICAgICBzdHJ1Y3Qgcm9ja2NoaXBfZ2VtX29iamVjdCAqcmtfb2JqOwo+ID4gLSAg
-ICAgc3RydWN0IGRybV9mcmFtZWJ1ZmZlciAqZmI7Cj4gPiAtICAgICB1bnNpZ25lZCBpbnQgYnl0
-ZXNfcGVyX3BpeGVsOwo+ID4gLSAgICAgdW5zaWduZWQgbG9uZyBvZmZzZXQ7Cj4gPiAtICAgICBz
-dHJ1Y3QgZmJfaW5mbyAqZmJpOwo+ID4gLSAgICAgc2l6ZV90IHNpemU7Cj4gPiAtICAgICBpbnQg
-cmV0Owo+ID4gLQo+ID4gLSAgICAgYnl0ZXNfcGVyX3BpeGVsID0gRElWX1JPVU5EX1VQKHNpemVz
-LT5zdXJmYWNlX2JwcCwgOCk7Cj4gPiAtCj4gPiAtICAgICBtb2RlX2NtZC53aWR0aCA9IHNpemVz
-LT5zdXJmYWNlX3dpZHRoOwo+ID4gLSAgICAgbW9kZV9jbWQuaGVpZ2h0ID0gc2l6ZXMtPnN1cmZh
-Y2VfaGVpZ2h0Owo+ID4gLSAgICAgbW9kZV9jbWQucGl0Y2hlc1swXSA9IHNpemVzLT5zdXJmYWNl
-X3dpZHRoICogYnl0ZXNfcGVyX3BpeGVsOwo+ID4gLSAgICAgbW9kZV9jbWQucGl4ZWxfZm9ybWF0
-ID0gZHJtX21vZGVfbGVnYWN5X2ZiX2Zvcm1hdChzaXplcy0+c3VyZmFjZV9icHAsCj4gPiAtICAg
-ICAgICAgICAgIHNpemVzLT5zdXJmYWNlX2RlcHRoKTsKPiA+IC0KPiA+IC0gICAgIHNpemUgPSBt
-b2RlX2NtZC5waXRjaGVzWzBdICogbW9kZV9jbWQuaGVpZ2h0Owo+ID4gLQo+ID4gLSAgICAgcmtf
-b2JqID0gcm9ja2NoaXBfZ2VtX2NyZWF0ZV9vYmplY3QoZGV2LCBzaXplLCB0cnVlKTsKPgo+IEkg
-ZG9uJ3QgdGhpbmsgdGhlIGdlbmVyaWMgZW11bGF0aW9uIGluIGl0J3MgY3VycmVudCBmb3JtIHdp
-bGwgd29yayBmb3IKPiByb2NrY2hpcC4gcm9ja2NoaXAgdHJlYXRzIGZiZGV2IGJ1ZmZlcnMgYW5k
-IGR1bWIgYnVmZmVycyBkaWZmZXJlbnRseS4gSWYKPiBpdCB1c2VzIERNQSBidWZmZXJzLCB0aGVu
-IHRoZSBkdW1iIGJ1ZmZlciBjYW4ndCBnZXQgYSB2aXJ0dWFsIGFkZHJlc3MuCgpZZXMsIHlvdSBh
-cmUgcmlnaHQuIEkgdGVzdGVkIHRoZSBpb21tdSBjYXNlLgoKPiBGcm9tIHJvY2tjaGlwX2dlbV9h
-bGxvY19kbWEoKToKPgo+ICAgICAgICAgaWYgKCFhbGxvY19rbWFwKQo+ICAgICAgICAgICAgICAg
-ICBya19vYmotPmRtYV9hdHRycyB8PSBETUFfQVRUUl9OT19LRVJORUxfTUFQUElORzsKPgo+IEZy
-b20gcm9ja2NoaXBfZ2VtX3ByaW1lX3ZtYXAoKToKPgo+ICAgICAgICAgaWYgKHJrX29iai0+ZG1h
-X2F0dHJzICYgRE1BX0FUVFJfTk9fS0VSTkVMX01BUFBJTkcpCj4gICAgICAgICAgICAgICAgIHJl
-dHVybiBOVUxMOwo+Cj4gTWF5YmUgaXQncyBwb3NzaWJsZSB0byB2bWFwIGEgYnVmZmVyIGNyZWF0
-ZWQgdXNpbmcgZG1hX2FsbG9jX2F0dHJzKCkKPiBhZnRlciB0aGUgYWxsb2NhdGlvbj8KCkl0IHNo
-b3VsZCBiZSBwb3NzaWJsZSBJIHRoaW5rIGFzIHRoYXQgaXMgd2hhdApkcm1fZ2VtX2NtYV9wcmlt
-ZV9pbXBvcnRfc2dfdGFibGVfdm1hcCgpIGRvZXMuIE9uZSBwcm9ibGVtIHRob3VnaCBpcwp5b3Ug
-bWF5IGFscmVhZHkgaGF2ZSBhIG1hcHBpbmcgYmVjYXVzZSBETUFfQVRUUl9OT19LRVJORUxfTUFQ
-UElORyBpcwpqdXN0IGEgc3VnZ2VzdGlvbiAob25seSAzMi1iaXQgQVJNIGltcGxlbWVudHMpIGFu
-ZCB0aGVyZSdzIG5vdCBhIHdheQp0byB0ZWxsIGlmIHlvdSBnb3QgYSBtYXBwaW5nIG9yIG5vdC4g
-TWF5YmUgaXQncyBub3QgYWxsIHRoYXQgaW1wb3J0YW50CmlmIHRoZXJlIGFyZSAyIG1hcHBpbmdz
-IGJlY2F1c2UgSSB0aGluayBvbmx5IGZiY29uIG5lZWRzIGEga2VybmVsCm1hcHBpbmcuCgpNeSBm
-b2xsb3ctdXAgdG8gdGhpcyB3YXMgZ29pbmcgdG8gYmUgY29udmVydGluZyBSb2NrY2hpcCB0byB1
-c2UgQ01BCmFuZCB0aGUgc2htZW0gaGVscGVycy4gU28gSSB3YXMgYWxyZWFkeSB3b25kZXJpbmcg
-YWJvdXQgd2hhdCB0byBkbwp3aXRoIERNQV9BVFRSX05PX0tFUk5FTF9NQVBQSU5HLiBUaGVyZSdz
-IHNldmVyYWwgZHJpdmVycyBub3QgdXNpbmcgQ01BCmp1c3QgdG8gc2V0IERNQV9BVFRSX05PX0tF
-Uk5FTF9NQVBQSU5HLiBTbyBpdCB3b3VsZCBiZSBnb29kIHRvIGNvbWUgdXAKd2l0aCBhIHNvbHV0
-aW9uIGhlcmUuCgpSb2IKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlz
-dHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3Rp
-bmZvL2xpbnV4LWFybS1rZXJuZWwK
+On Fri, Feb 01, 2019 at 08:58:34AM +0100, Christoffer Dall wrote:
+> On Thu, Jan 31, 2019 at 06:06:09PM +0100, Andrew Jones wrote:
+> > On Thu, Jan 31, 2019 at 02:52:11PM +0000, Marc Zyngier wrote:
+> > > On 31/01/2019 12:57, Andrew Jones wrote:
+> > > > On Thu, Jan 31, 2019 at 12:51:56PM +0100, Christoffer Dall wrote:
+> > > 
+> > > [...]
+> > > 
+> > > >> I don't think there's anything very unconventional here.
+> > > > 
+> > > > Normally if a thread observes a change to vcpu->requests, then we ensure a
+> > > > change to some accompanying data is also observable. We're reversing that
+> > > > here, which adds a need for additional barriers and a strict request
+> > > > checking order.
+> > > > 
+> > > >>
+> > > >> Let's try this:  If you have a better way of implementing this, how
+> > > >> about you write a patch?
+> > > > 
+> > > > It would just be this patch minus the unnecessary barriers. I can send it
+> > > > if you like, but I wouldn't want to change the authorship for such a small
+> > > > change.
+> > > 
+> > > Having these barriers makes it explicit (at least to me) what data we
+> > > expect to be visible in other threads and in which order. You keep
+> > > saying that order doesn't matter and we disagree on this. Yes, you've
+> > > listed cases where we can survive things coming in out of order, but
+> > > that's not a proof that we don't need them.
+> > > 
+> > > So at the end of the day, and unless you can prove that the barriers are
+> > > not necessary by providing the same form of validation tool, I'm
+> > > inclined to go with the verified approach.
+> > 
+> > I don't know how to compile and run the litmus test, but I'd be happy to
+> > try if given some pointers.
+> 
+> You can look in tools/memory-model/README as a start.
+
+Thanks. Neat tool.
+
+> 
+> 
+> > If I did know how, I would add vcpu->mode to
+> > the P1 inputs and some additional lines that look similar to what's in
+> > "Ensuring Requests Are Seen" of Documentation/virtual/kvm/vcpu-requests.rst
+> > Even without the litmus test please allow me to try again to describe why
+> > I think the barriers may be removed.
+> > 
+> > Any vcpu we're attempting to power on must be on its way to sleep with a
+> > SLEEP request, or already be sleeping. This means that it's outside guest
+> > mode, or will be shortly. If the vcpu observes power_off=false in
+> > vcpu_req_sleep(), whether it was awaken or never even got to sleep, we
+> > know that observation is taking place with vcpu->mode != IN_GUEST_MODE.
+> > 
+> > We now no longer need to be concerned with the relationship between
+> > power_off and the RESET vcpu request. 
+> 
+> I disagree.  That argument requires more explanation.
+> 
+> If you set power_off = false before posting the reset
+> request, then if the VCPU thread is awoken (for any reason) it can run
+> the VCPU without observing the reset request and that's the problem.
+> 
+> If you are making assumptions about only being woken up as a result of a
+> reset request, or the interaction with the pause flag, or setting the
+> sleep request to prevent the guest from executing again, that is a more
+> complex argument (which you haven't made yet!) and I add that it's a
+> brittle construction.
+
+Yes, I was attempting to integrate more of the expected state of the
+is / will be sleeping vcpu into the analysis. I was hoping that it was
+provable to make stronger statements about the use of vcpu requests.
+I failed to do so though, both with logical arguments and I couldn't
+come up with a way to model outside-guest mode with the litmus test.
+
+> 
+> What we have here are three pieces of state:
+> 
+>   reset_state->reset
+>   vcpu->requests
+>   vcpu->arch.power_state
+> 
+> They must be written to, and the writes must be observed, in that
+> particular order without any additional assumptions.
+> 
+> You keep arguing that you can enforce an ordering between these three
+> states with a single barrier which is clearly not possible.
+
+There's also the mode state and barriers in place that ensure the order
+of observation for that and requests, but as I said I couldn't model it
+well enough to prove anything.
+
+> 
+> So this boils down to you making additional assumptions (see above,
+> brittle) without explaining what they are.  I suspect you want this to
+> fit in your mental model of how vcpu requests solve the world, otherwise
+> I'm not sure what your concern with this patch, which we all agree is
+> correct, really is.
+
+Well, I don't expect the vcpu requests to solve the world (if only!),
+but I was hoping that they could be used with a simpler pattern. I.e.
+on the sending side the vcpu request is fired off (probably with a kick
+too) and then forgotten. On the receiving side path only a check and
+handler need to be added, with no concern for the order of the handlers
+nor of other data that we cannot observe without also observing the
+request. I surrender though, because I do agree there's nothing wrong
+with the additional barriers in this patch, only that it no longer fits
+my opinion of the simplest pattern.
+
+Anyway, thanks for your patience and sorry for the noise.
+
+drew
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
