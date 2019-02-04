@@ -2,23 +2,22 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 658F0C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 20:06:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 94E0BC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 20:12:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3364920821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 20:06:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5363820821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 20:12:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KSkhBtAv";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Tn1zR+H0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3364920821
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ioYhjlAj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5363820821
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,59 +25,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=WkfP3H8ZjBLzwOcRY7gLbIywV66dm1Mq7Zp6WZbUySs=; b=KSkhBtAv4uTem9
-	8oKu3UrWRP09ixdrrxHb2WtYt8q98PmmGhs0GilEwIsTaUoeZfRTf8YmAheOxDGr1berNhKNFqoL6
-	tF5gYaSW5psCpq8/gA+1H5prqM4T7TpMgFFikBbFM+/AitcYjvYmkLIg0UNrsQieaHoJ0GYO16u99
-	i/TpWcuhDWB9bXFqIi1PzmrrHcHRg9Xezq0v8EmERrptrCbDaffaEgcU3U9tid5HEVBliejXDef//
-	UEimP+VQwOzKqGrG1GsB8EQzz0JWvaWx1QCPJzDuDhDiPPELYLG/U5Wh+fz9K4C4sWMkVjbPK1ERK
-	Ct8JLalnWIGJvHrgBbPQ==;
+	List-Owner; bh=XqKn5Xrsc9C8sP1gnu8PS8doCkKq0q0mi1tEZaIvc7o=; b=ioYhjlAjuLadYt
+	QVfXexcb5aCNMR65A2w/0KUaoIwA5jYOj3Ryvs4560a9mcNGdweH45c9PSWblYejcnRCwh+nR1tu1
+	faS13g4vtt6kyJ4145nDBmVXloOnxwQlASGQ9falEkNjf6e+NQ5394TrtLHNtFiE0n91tJmLe/+Wb
+	bevXgTtMpS0ekU5byr3b+7Zv1a3uHhW2fKSExlDCNtFrCCFqwjBgcbt2vxAY3Q6wqLTpwcNCFoHXD
+	M9PU+3Xd2D+JbApKSeeat4W1JYazTya8mFXZQ0ac2WpzIUI8vTC23ZGn++t2PmXfjoCsKBHxaw0pv
+	6vDcEjGDXcgZelGP6dBg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqkVI-0004Ae-5e; Mon, 04 Feb 2019 20:06:04 +0000
-Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
+	id 1gqkbQ-0006Aq-48; Mon, 04 Feb 2019 20:12:24 +0000
+Received: from mail-ot1-f66.google.com ([209.85.210.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqkVE-0004A3-O0; Mon, 04 Feb 2019 20:06:02 +0000
-Received: by mail-ot1-x341.google.com with SMTP id n8so1959275otl.6;
- Mon, 04 Feb 2019 12:06:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=sidxCzUNKwcFHzntOo5HzEGEGZsF+y25S6tfJdHRD+k=;
- b=Tn1zR+H0UcR2T70CJ++JUSojjK+jSq3Q5ttMZEgsVy2dLJLgzzaU/Z5C2zkFS0T8f6
- peGPlgQ85lQIcLg3S+x5V11IWBLd0L+J1nCoLcZ0Et6+Wpwosy0OLTsIiGNp2cnBOqHR
- Ocy2k3jSojXeiuVQ9q6IP0+cOEFEvRF/SFOuoq0mUU+DVY5hc7tKgpSjFNynENAoUESm
- 4IvibzqsEiJhpTQoltinynZ6/4pjPmlEnS/5xPIInuAbONNpw4MLUkOg1dI6XZ/lOZgm
- M6mikNylQSyUkI1ygTArBZReaXUI6hZ3uVJB8yUUK29qEemcgQtSwtAgICRM/4u40g6u
- m+pg==
+ id 1gqkbM-0006AG-M1
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 20:12:22 +0000
+Received: by mail-ot1-f66.google.com with SMTP id 81so2047276otj.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 04 Feb 2019 12:12:20 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=sidxCzUNKwcFHzntOo5HzEGEGZsF+y25S6tfJdHRD+k=;
- b=qQl3BJ7tqub1VOqXNlyRXTvuVQG/69hsXvrkZTnoXTRmA8eXkRyetlM51zj2M6L5zc
- 4Ze+RvTkIP2iJ9N3KvQjRfCBJKz2/iMZQwYeMPCrWaKRuaKtIxCYQnhDMFjA60Jenkm+
- mIIheqQ5Fcorgiyv3USuhvcueWrUk4h8ZWrM3aM/0fBqYFlKkpra5ojNumQmUP0MAdBZ
- YQrKHLSCUtbp4+QcU4PufS5SrMzb/cKVASmoShcvs5IAcOpN0+EHQ218ESam/gNjf454
- GhpuP27IIrDllbXjpKHAp2YsLEMZI52YqPVh74lhXiGDLLjk8b1rVpvXmJ8oIbs6Q9p3
- nezQ==
-X-Gm-Message-State: AHQUAuZ3iNMnScUZFcPu50DRbpjVVp4PMZop5ZCaY9EPwZ8T/p8p167B
- xm/TS+531GWqvddW0AWD+F7zqFPF5c9dj7j6+Q4=
-X-Google-Smtp-Source: AHgI3Ia8snY0q2MFSSBuHMKS2J8kYImctzaKFvsQCN+BHmC1vG3EF2uDgCjbDE5LgkmNiqwbnp1UWnoY2skTNyCZx8k=
-X-Received: by 2002:a9d:3464:: with SMTP id v91mr678565otb.102.1549310760049; 
- Mon, 04 Feb 2019 12:06:00 -0800 (PST)
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=05TcC0mVNsG1FXSCe7mkTG+0mFL2ljeP6sQuGrocubQ=;
+ b=rm4r4G4RwrzGIXEVjHCEDF46d8CW0G7K0C23J2XI08ycLcaIQQaDqoCKqvaWp5qYU+
+ gh9KSVIlBRe9IZWQGY/8HX2vDV0a7YJ17N/cC+T3fFyKq0RvshHLLms+Iuj35vN1mgOY
+ Md93WASGGqwo764Jw+zZKCyd+xvV93EXOcAlCyWZD3cm0Ft+PxXycDk9Ey3Qljfy3jX5
+ egpeAXNMqTr8Ajg4gXDC2fCntpuiPNK5xGcHuLPEEjL5eGuCjH5bPyuPW7TVD1rLajVo
+ 4m2362F9DMtwSbDnbGA2tMo3Rccj8PUW5/xGosXB7WcMvXxh4qWc1HErZ7pEMTTUxFqs
+ t8qQ==
+X-Gm-Message-State: AHQUAuaXG0KvbhL7dDQ66d3/2xTSAYmWmQ7ecy3VYulsKKq7sixHXNUC
+ FIoxVr0q3HuMRyo5amQskGxAGKMi
+X-Google-Smtp-Source: AHgI3IZ9AqVDO3rwhKHEJcPo5zLSMhY1q5ubePF3DSF+iB9tKIjDJQLUT+WO0KqsVkpM5kzn9K7Qxg==
+X-Received: by 2002:a05:6830:110:: with SMTP id
+ i16mr699085otp.72.1549311139201; 
+ Mon, 04 Feb 2019 12:12:19 -0800 (PST)
+Received: from mail-ot1-f45.google.com (mail-ot1-f45.google.com.
+ [209.85.210.45])
+ by smtp.gmail.com with ESMTPSA id k130sm8052227oia.47.2019.02.04.12.12.17
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 04 Feb 2019 12:12:18 -0800 (PST)
+Received: by mail-ot1-f45.google.com with SMTP id n8so1991497otl.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 04 Feb 2019 12:12:17 -0800 (PST)
+X-Received: by 2002:aca:31cb:: with SMTP id x194mr580917oix.213.1549311137614; 
+ Mon, 04 Feb 2019 12:12:17 -0800 (PST)
 MIME-Version: 1.0
-References: <20190129102521.4141-1-linux.amoon@gmail.com>
- <20190129102521.4141-3-linux.amoon@gmail.com>
- <CAFBinCDRTeO9FWoJ-=BUc8uizN5_mhJE9EBYv0X6pse7Rxsxew@mail.gmail.com>
-In-Reply-To: <CAFBinCDRTeO9FWoJ-=BUc8uizN5_mhJE9EBYv0X6pse7Rxsxew@mail.gmail.com>
-From: Anand Moon <linux.amoon@gmail.com>
-Date: Tue, 5 Feb 2019 01:35:45 +0530
-Message-ID: <CANAwSgRUqXiDLMxQ4bTE0M8-UT_1=S5Om5PCR2S94iZsRuS0Zw@mail.gmail.com>
-Subject: Re: [PATCHv3 2/2] ARM64: dts: meson-gxbb-odroidc2: Fix usb phy
- regulator power failed warning
-To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+References: <20190204143449.25040-1-pankaj.bansal@nxp.com>
+ <20190204143449.25040-2-pankaj.bansal@nxp.com>
+In-Reply-To: <20190204143449.25040-2-pankaj.bansal@nxp.com>
+From: Li Yang <leoyang.li@nxp.com>
+Date: Mon, 4 Feb 2019 14:12:06 -0600
+X-Gmail-Original-Message-ID: <CADRPPNTjD1nN2eoyV6NucFYjH4vG8TaCG0u3YgEJd1699d07bQ@mail.gmail.com>
+Message-ID: <CADRPPNTjD1nN2eoyV6NucFYjH4vG8TaCG0u3YgEJd1699d07bQ@mail.gmail.com>
+Subject: Re: [PATCH v3 1/2] dt-bindings: soc: fsl: Document Qixis FPGA usage
+To: Pankaj Bansal <pankaj.bansal@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_120600_801192_8CDB4585 
-X-CRM114-Status: GOOD (  14.87  )
+X-CRM114-CacheID: sfid-20190204_121220_732005_85A40526 
+X-CRM114-Status: GOOD (  18.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,132 +93,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree <devicetree@vger.kernel.org>,
- Neil Armstrong <narmstrong@baylibre.com>, Kevin Hilman <khilman@baylibre.com>,
- Linux Kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
- linux-amlogic@lists.infradead.org,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Jerome Brunet <jbrunet@baylibre.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Martin,
-
-On Mon, 4 Feb 2019 at 19:36, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
->
-> Hi Anand,
->
-> On Tue, Jan 29, 2019 at 11:25 AM Anand Moon <linux.amoon@gmail.com> wrote:
-> >
-> > Override the dr_mode from "host" to "otg" for USB_HOST controller (usb0)
-> > changes help usb_phy0->usb0 initialization of OTG bus port.
-> >
-> > Changes fix the below warning.
-> >
-> > [    1.183681] dwc2 c9000000.usb: c9000000.usb supply vusb_d not found, using dummy regulator
-> > [    1.190627] dwc2 c9000000.usb: Linked as a consumer to regulator.0
-> > [    1.196696] dwc2 c9000000.usb: c9000000.usb supply vusb_a not found, using dummy regulator
-> > [    1.206094] phy phy-c0000000.phy.0: USB ID detect failed!
-> > [    1.210243] phy phy-c0000000.phy.0: phy poweron failed --> -22
-> I wonder if the warning below are a side-effect of "phy poweron failed"...
-
-As pointed by you we need the fix this issue earlier email.
-unless we enable the phy and set the correct dr_mode to tune the phy
-we cannot the tune and power on phy bus properly.
-
-After this patch we get phy and power correctly registered.
-
-# cat /sys/kernel/debug/regulator/regulator_summary
- regulator                      use open bypass  opmode voltage
-current     min     max
----------------------------------------------------------------------------------------
- regulator-dummy                  5    4      0 unknown     0mV
-0mA     0mV     0mV
-    c9100000.usb                  1
-0mA     0mV     0mV
-    c9100000.usb                  1
-0mA     0mV     0mV
-    c9000000.usb                  1
-0mA     0mV     0mV
-    c9000000.usb                  1
-0mA     0mV     0mV
- P5V0                             1    1      0 unknown  5000mV
-0mA  5000mV  5000mV
-    USB_OTG_PWR                   4    2      0 unknown  5000mV
-0mA  5000mV  5000mV
-       phy-c0000020.phy.1         2
-0mA     0mV     0mV
-       phy-c0000000.phy.0         2
-0mA     0mV     0mV
-
->
-> > [    1.216072] WARNING: CPU: 0 PID: 78 at drivers/regulator/core.c:2054 _regulator_put.part.11+0xf0/0xf8
-> > [    1.225147] Modules linked in:
-> > [    1.228169] CPU: 0 PID: 78 Comm: kworker/0:1 Not tainted 5.0.0-rc4-xc2ml #1
-> > [    1.235066] Hardware name: Hardkernel ODROID-C2 (DT)
-> > [    1.239987] Workqueue: events deferred_probe_work_func
-> > [    1.245072] pstate: 80000005 (Nzcv daif -PAN -UAO)
-> > [    1.249816] pc : _regulator_put.part.11+0xf0/0xf8
-> > [    1.254473] lr : regulator_put+0x34/0x48
-> > [    1.258353] sp : ffff0000117b3b00
-> > [    1.261630] x29: ffff0000117b3b00 x28: 0000000000000000
-> > [    1.266891] x27: ffff80007ec1a7b8 x26: ffff000010eec280
-> > [    1.272153] x25: 0000000000000000 x24: 0000000000000009
-> > [    1.277414] x23: ffff0000117b3bc8 x22: ffff80007ecd3c00
-> > [    1.282675] x21: ffff0000111ad6c8 x20: ffff80007ecd3e00
-> > [    1.287936] x19: ffff80007ecd3e00 x18: 0000000000000124
-> > [    1.293198] x17: 0000000000000000 x16: 0000000000000000
-> > [    1.298459] x15: 0000000000000400 x14: 0000000000000400
-> > [    1.303720] x13: ff00000000000000 x12: ffffffffffffffff
-> > [    1.308981] x11: 0000000000000038 x10: 0000000000000040
-> > [    1.314243] x9 : ffff0000111c58b0 x8 : ffff0000111c58a8
-> > [    1.319504] x7 : ffff80006b055200 x6 : ffff80007edd2880
-> > [    1.324765] x5 : ffff80007f400248 x4 : ffff80007fb92b00
-> > [    1.330026] x3 : ffff0000112c9d58 x2 : ffff80007edd2880
-> > [    1.335288] x1 : 0000000000000000 x0 : 0000000000000001
-> > [    1.340549] Call trace:
-> > [    1.342966]  _regulator_put.part.11+0xf0/0xf8
-> > [    1.347278]  regulator_put+0x34/0x48
-> > [    1.350814]  regulator_bulk_free+0x30/0x50
-> > [    1.354868]  devm_regulator_bulk_release+0x18/0x20
-> > [    1.359612]  release_nodes+0x1b0/0x220
-> > [    1.363320]  devres_release_all+0x34/0x50
-> > [    1.367288]  really_probe+0xec/0x290
-> > [    1.370824]  driver_probe_device+0x54/0xe8
-> > [    1.374878]  __device_attach_driver+0xb8/0xe8
-> > [    1.379190]  bus_for_each_drv+0x78/0xc8
-> > [    1.382985]  __device_attach+0xd4/0x130
-> > [    1.386780]  device_initial_probe+0x10/0x18
-> > [    1.390920]  bus_probe_device+0x90/0x98
-> > [    1.394715]  deferred_probe_work_func+0x6c/0xa0
-> > [    1.399203]  process_one_work+0x1e0/0x318
-> > [    1.403168]  worker_thread+0x228/0x428
-> > [    1.406877]  kthread+0x124/0x128
-> > [    1.410070]  ret_from_fork+0x10/0x18
-> > [    1.413603] ---[ end trace 498aca4cb07e5377 ]---
-> phy_power_on fails above with -EINVAL and then something else breaks
-> (it seems like you're hitting the WARN_ON in drivers/regulator/core.c
-> below the comment which states: "Docs say you must disable before
-> calling regulator_put()")
-
-Ok will look into this later.
-
-> so this looks like a bug in either the dwc2 driver or the PHY
-> framework. can you please report that to the dwc2 and PHY maintainers
-> so it can be fixed independently?
->
->
-> Regards
-> Martin
-
-Best Regards
-
--Anand
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+UGxlYXNlIGluY2x1ZGUgZGV2aWNlIHRyZWUgYmluZGluZyBtYWlsaW5nIGxpc3QgYW5kIG1haW50
+YWluZXJzIGZvcgpiaW5kaW5nIHBhdGNoZXMoY2MnZWQgbm93KS4KCk9uIE1vbiwgRmViIDQsIDIw
+MTkgYXQgMzoxNSBBTSBQYW5rYWogQmFuc2FsIDxwYW5rYWouYmFuc2FsQG54cC5jb20+IHdyb3Rl
+Ogo+Cj4gYW4gRlBHQS1iYXNlZCBzeXN0ZW0gY29udHJvbGxlciwgY2FsbGVkIOKAnFFpeGlz4oCd
+LCB3aGljaAo+IG1hbmFnZXMgc2V2ZXJhbCBjcml0aWNhbCBzeXN0ZW0gZmVhdHVyZXMsIGluY2x1
+ZGluZzoKPiDigKIgUmVzZXQgc2VxdWVuY2luZwo+IOKAoiBQb3dlciBzdXBwbHkgY29uZmlndXJh
+dGlvbgo+IOKAoiBCb2FyZCBjb25maWd1cmF0aW9uCj4g4oCiIGhhcmR3YXJlIGNvbmZpZ3VyYXRp
+b24KPgo+IFRoZSBxaXhpcyByZWdpc3RlcnMgYXJlIGFjY2Vzc2libGUgb3ZlciBvbmUgb3IgbW9y
+ZSBzeXN0ZW0tc3BlY2lmaWMKPiBpbnRlcmZhY2VzLCB0eXBpY2FsbHkgSTJDLCBKVEFHIG9yIGFu
+IGVtYmVkZGVkIHByb2Nlc3Nvci4KPgo+IFNpZ25lZC1vZmYtYnk6IFBhbmthaiBCYW5zYWwgPHBh
+bmthai5iYW5zYWxAbnhwLmNvbT4KPiAtLS0KPgo+IE5vdGVzOgo+ICAgICBWMzoKPiAgICAgLSBB
+ZGRlZCBib2FyZG5hbWUgYmFzZWQgY29tcGF0aWJsZSBmaWVsZCBpbiBiaW5kaW5ncwo+ICAgICAt
+IEFkZGVkIGJpbmRpbmdzIGZvciBNTUlPIGJhc2VkIEZQR0EKPiAgICAgVjI6Cj4gICAgIC0gTm8g
+Y2hhbmdlCj4KPiAgLi4uL2JpbmRpbmdzL3NvYy9mc2wvcWl4aXNfY3RybC50eHQgICAgICAgICAg
+fCA1MyArKysrKysrKysrKysrKysrKysKPiAgMSBmaWxlIGNoYW5nZWQsIDUzIGluc2VydGlvbnMo
+KykKPgo+IGRpZmYgLS1naXQgYS9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3Mvc29j
+L2ZzbC9xaXhpc19jdHJsLnR4dCBiL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9z
+b2MvZnNsL3FpeGlzX2N0cmwudHh0Cj4gbmV3IGZpbGUgbW9kZSAxMDA2NDQKPiBpbmRleCAwMDAw
+MDAwMDAwMDAuLjVkNTEwZGYxNGJlOAo+IC0tLSAvZGV2L251bGwKPiArKysgYi9Eb2N1bWVudGF0
+aW9uL2RldmljZXRyZWUvYmluZGluZ3Mvc29jL2ZzbC9xaXhpc19jdHJsLnR4dAo+IEBAIC0wLDAg
+KzEsNTMgQEAKPiArKiBRSVhJUyBGUEdBIGJsb2NrCj4gKwo+ICthbiBGUEdBLWJhc2VkIHN5c3Rl
+bSBjb250cm9sbGVyLCBjYWxsZWQg4oCcUWl4aXPigJ0sIHdoaWNoCj4gK21hbmFnZXMgc2V2ZXJh
+bCBjcml0aWNhbCBzeXN0ZW0gZmVhdHVyZXMsIGluY2x1ZGluZzoKPiAr4oCiIENvbmZpZ3VyYXRp
+b24gc3dpdGNoIG1vbml0b3JpbmcKPiAr4oCiIFBvd2VyIG9uL29mZiBzZXF1ZW5jaW5nCj4gK+KA
+oiBSZXNldCBzZXF1ZW5jaW5nCj4gK+KAoiBQb3dlciBzdXBwbHkgY29uZmlndXJhdGlvbgo+ICvi
+gKIgQm9hcmQgY29uZmlndXJhdGlvbgo+ICvigKIgaGFyZHdhcmUgY29uZmlndXJhdGlvbgo+ICvi
+gKIgQmFja2dyb3VuZCBwb3dlciBkYXRhIGNvbGxlY3Rpb24gKERDTSkKPiAr4oCiIEZhdWx0IG1v
+bml0b3JpbmcKPiAr4oCiIFJDVyBieXBhc3MgU1JBTSAocmVwbGFjZSBmbGFzaCBSQ1cgd2l0aCBp
+bnRlcm5hbCBSQ1cpIChOT1Igb25seSkKPiAr4oCiIERlZGljYXRlZCBmdW5jdGlvbmFsIHZhbGlk
+YXRpb24gYmxvY2tzIChQT1N0L0lSUywgdHJpZ2dlcmVkIGV2ZW50LCBhbmQgc28gb24pCj4gK+KA
+oiBJMkMgbWFzdGVyIGZvciByZW1vdGUgYm9hcmQgY29udHJvbCBldmVuIHdpdGggbm8gRFVUIGF2
+YWlsYWJsZQo+ICsKPiArVGhlIHFpeGlzIHJlZ2lzdGVycyBhcmUgYWNjZXNzaWJsZSBvdmVyIG9u
+ZSBvciBtb3JlIHN5c3RlbS1zcGVjaWZpYyBpbnRlcmZhY2VzLAo+ICt0eXBpY2FsbHkgSTJDLCBK
+VEFHIG9yIGFuIGVtYmVkZGVkIHByb2Nlc3Nvci4KPiArCj4gK0ZQR0EgY29ubmVjdGVkIHRvIEky
+QzoKPiArUmVxdWlyZWQgcHJvcGVydGllczoKPiArCj4gKyAtIGNvbXBhdGlibGU6IHNob3VsZCBi
+ZSBhIGJvYXJkLXNwZWNpZmljIHN0cmluZyBmb2xsb3dlZCBieSBhIHN0cmluZwo+ICsgICBpbmRp
+Y2F0aW5nIHRoZSB0eXBlIG9mIEZQR0EuICBFeGFtcGxlOgo+ICsgICAgICAgImZzbCw8Ym9hcmQ+
+LWZwZ2EiLCAiZnNsLGZwZ2EtcWl4aXMtaTJjIgo+ICsgLSByZWcgOiBpMmMgYWRkcmVzcyBvZiB0
+aGUgcWl4aXMgZGV2aWNlLgo+ICsKPiArRXhhbXBsZSAoTFgyMTYwQS1RRFMpOgo+ICsgICAgICAg
+LyogVGhlIEZQR0Egbm9kZSAqLwo+ICsgICAgICAgIGZwZ2FANjYgewo+ICsgICAgICAgICAgICAg
+ICBjb21wYXRpYmxlID0gImZzbCxseDIxNjBhcWRzLWZwZ2EiLCAiZnNsLGZwZ2EtcWl4aXMtaTJj
+IjsKPiArICAgICAgICAgICAgICAgcmVnID0gPDB4NjY+Owo+ICsgICAgICAgICAgICAgICAjYWRk
+cmVzcy1jZWxscyA9IDwxPjsKPiArICAgICAgICAgICAgICAgI3NpemUtY2VsbHMgPSA8MD47Cj4g
+KyAgICAgICB9Cj4gKwo+ICsqIEZyZWVzY2FsZSBvbi1ib2FyZCBGUEdBCj4gKwo+ICtUaGlzIGlz
+IHRoZSBtZW1vcnktbWFwcGVkIHJlZ2lzdGVycyBmb3Igb24gYm9hcmQgRlBHQS4KPiArCj4gK1Jl
+cXVpcmVkIHByb3BlcnRpZXM6Cj4gKy0gY29tcGF0aWJsZTogc2hvdWxkIGJlIGEgYm9hcmQtc3Bl
+Y2lmaWMgc3RyaW5nIGZvbGxvd2VkIGJ5IGEgc3RyaW5nCj4gKyAgaW5kaWNhdGluZyB0aGUgdHlw
+ZSBvZiBGUEdBLiAgRXhhbXBsZToKPiArICAgICAgICJmc2wsPGJvYXJkPi1mcGdhIiwgImZzbCxm
+cGdhLXFpeGlzIgo+ICstIHJlZzogc2hvdWxkIGNvbnRhaW4gdGhlIGFkZHJlc3MgYW5kIHRoZSBs
+ZW5ndGggb2YgdGhlIEZQR0EgcmVnaXN0ZXIgc2V0Lgo+ICsKPiArRXhhbXBsZSAoTFMyMDgwQS1S
+REIpOgo+ICsKPiArICAgICAgICBjcGxkQDMsMCB7Cj4gKyAgICAgICAgICAgICAgICBjb21wYXRp
+YmxlID0gImZzbCxsczIwODBhcmRiLWZwZ2EiLCAiZnNsLGZwZ2EtcWl4aXMiOwo+ICsgICAgICAg
+ICAgICAgICAgcmVnID0gPDB4MyAwIDB4MTAwMDA+Owo+ICsgICAgICAgIH07Cj4gKwo+IC0tCj4g
+Mi4xNy4xCj4KCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+CmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5m
+cmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xp
+bnV4LWFybS1rZXJuZWwK
