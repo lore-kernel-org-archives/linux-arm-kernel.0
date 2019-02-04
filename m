@@ -2,90 +2,64 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C4C07C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:14:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7CFA2C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:20:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 927EB206DD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:14:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4D68D2070C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:20:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="myomf1Ps";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="F/EZWYl4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 927EB206DD
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QRZjPJik"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4D68D2070C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ApPjJKOsC5aw3CH5lHsB8hXEKFCYeRkJ4/acSMjLBn0=; b=myomf1PsV3b2E7
-	DtsiS1bKZcttXu4Jjv4RhpqdwTAYIka9yYkKo+5LLE9iMXZHPbKeud/A3m9zm98GENUzgQn8utC7/
-	F+ThTEvvuTO7Uc4MIdCjjJ187jAlyj6cBKbiTs0eWQr/TvRe0cn16MvXMKaBS0rWtc3cU8RfHovnL
-	OPLoUgXk5wXKdTOa7cFQkv2+k/tR6hLUnqaT24WrLUwIzxNHoqLbWAhqRDeSP60/567f25Ql3NUn1
-	9hSh8hP2iAUjx8jgr/s9CBGu+flytfnh2mwu8vFjn4pze9Yh8lwL7s8H0KhdVqdEOyL4Fe0M1wrb9
-	dKAh0PSGw+0gPj52SeBA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=Guiq9E4pM9oNSWLyPeOLq1cQR/4eAgACq+sOXf5rxn4=; b=QRZjPJik7ch4y8r95vxDJ1j+v
+	N/+GPvZk7i98FYd9tQGl0ZFsSgFikFpbZP4RewT1z3tNVIwchtybiROJsQXDbn7JQ2UZqhSUBL+QM
+	XflNIMhkaiIUOweRxSqZbfttPyb2/dYxu7MUTlCNBgs0x2c8kpovS6qUD6srfe2i2y/eDzZaS4i2L
+	ofXgjG6m4Sei1UQwG/advP1Vfezy1Bg+2G/1lja+25xlbC2RYhXNHC7pPl6cjgXq3dCxXRGKNbRTp
+	6V4t33kNj7mkzz6nJXYcWgzSPcummcbOtueTpehHqp/6twVYHZjRnoUHdC97mMSimV8dq/aSueIfO
+	dL0PMKpRg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqaKW-0006fF-Aq; Mon, 04 Feb 2019 09:14:16 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqaJu-00062i-72
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 09:13:40 +0000
-Received: by mail-wm1-x344.google.com with SMTP id f188so12469756wmf.5
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 01:13:38 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=3UarI4+3W7mnMe4XUlsYu1e+5Y7QEWwmpbhYQfY/fuY=;
- b=F/EZWYl4NVTlc9AFWCj+7+uToXz1gI/nz3s4gbzVPZ+ZTDCjlZRTjHcgauy89ZOlaC
- vJOOLbQ+h2RsSt2H7seiEQp42f0BqjZrYlosK72tnddbS4b5PdeA6iGJExYWRRLH79IK
- h0BRKONM4s9EVdNVyXNezoCkfWA7ueZl4/tSx9CJWEutS6K9+LIXSpJ8xul1BGq24zkx
- 23bxt7PB9a0ruYrQLzbLYqblN97QlqVS5hGGJmRMl2MuXdI9mVkuN4603Ze9p/nATe/z
- FtQJjVaxinrx7EC1vvfzk4QNLcLoKTGimAZrL1U1G84ytbLgrzUf+JDTSFrYKfyMIPZS
- QO4Q==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=3UarI4+3W7mnMe4XUlsYu1e+5Y7QEWwmpbhYQfY/fuY=;
- b=sET6Gki0zc/t+/MaWZNIHzv6d8W0bNLPY3OAk0wQ4NMgGkkOdY1p4uU8xsRdvbPMfi
- W44KX13mUu2/1X37hcNyf4ihSFBmSESrHuLOR4DKdQPWNdLhVfWyn5YmshpPnmgZv/5r
- 8ALEqNBAxR2CqapqHmlbhy4M3Z0v9tFnZ6Uu/eQHcnoLqayiHqv5RgbTcH7B8s8cNfzX
- ctkgcbv5oOAOvuxmlYAHkSXytfjdRLWJ53gtg6pEWGMY4iwfwAQvpYt+IbaiFvRIEXge
- 8gGeagl16uOg5Z2La99XEp0KzsvKzKg9XFZ1i2OWtT3Pc1pmbgMD9lOfCf2JGUYURnCP
- wpDw==
-X-Gm-Message-State: AHQUAubVNzTMoM8+MPF+FmqHEFBla+NUNzyt6m5pBBOPWlIIwp2s7DE5
- 5q62PR5BZhiCLSi3wEKIdXZIGQ==
-X-Google-Smtp-Source: AHgI3IZAccSzhVXDnohjF17hqiFlLMg02NtGY7Yukq8xNScoFub47LYt3Y+x9MSeHcVcjxV80ZSPqg==
-X-Received: by 2002:a7b:c08f:: with SMTP id r15mr12751908wmh.118.1549271616569; 
- Mon, 04 Feb 2019 01:13:36 -0800 (PST)
-Received: from bender.baylibre.local
- (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr. [90.63.244.31])
- by smtp.gmail.com with ESMTPSA id m21sm9371390wmi.43.2019.02.04.01.13.35
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 04 Feb 2019 01:13:35 -0800 (PST)
-From: Neil Armstrong <narmstrong@baylibre.com>
-To: jbrunet@baylibre.com
-Subject: [PATCH 2/2] clk: meson: Add G12A AO Clock + Reset Controller
-Date: Mon,  4 Feb 2019 10:13:30 +0100
-Message-Id: <20190204091331.9298-3-narmstrong@baylibre.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190204091331.9298-1-narmstrong@baylibre.com>
-References: <20190204091331.9298-1-narmstrong@baylibre.com>
+	id 1gqaQW-0001uU-Vm; Mon, 04 Feb 2019 09:20:28 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqaQT-0001u1-8q
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 09:20:26 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AE377A78;
+ Mon,  4 Feb 2019 01:20:20 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A43793F557;
+ Mon,  4 Feb 2019 01:20:17 -0800 (PST)
+Subject: Re: [kvmarm:master 7/8]
+ arch/arm/kvm/../../../virt/kvm/arm/mmu.c:1705:36: error: implicit declaration
+ of function 'kvm_stage2_has_pmd'; did you mean 'kvm_stage2_has_pud'?
+To: lkp@intel.com
+References: <201902021846.dWX0ezZV%fengguang.wu@intel.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <f915d215-7f04-b048-b7ae-4cd6183096ae@arm.com>
+Date: Mon, 4 Feb 2019 09:20:15 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <201902021846.dWX0ezZV%fengguang.wu@intel.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_011338_406297_6A9471FA 
-X-CRM114-Status: GOOD (  15.40  )
+X-CRM114-CacheID: sfid-20190204_012025_320050_D5D5C28C 
+X-CRM114-Status: GOOD (  12.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,535 +71,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, linux-kernel@vger.kernel.org,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Neil Armstrong <narmstrong@baylibre.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: marc.zyngier@arm.com, kbuild-all@01.org,
+ linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add the Amlogic G12A AO Clock and Reset controller driver handling
-generation of Always-On clocks :
-- AO Clocks and Reset for Always-On modules
-- 32K Generation for USB and CEC
-- SAR ADC controller clock
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- drivers/clk/meson/Kconfig      |   2 +
- drivers/clk/meson/Makefile     |   2 +-
- drivers/clk/meson/g12a-aoclk.c | 448 +++++++++++++++++++++++++++++++++
- drivers/clk/meson/g12a-aoclk.h |  15 ++
- 4 files changed, 466 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/meson/g12a-aoclk.c
- create mode 100644 drivers/clk/meson/g12a-aoclk.h
 
-diff --git a/drivers/clk/meson/Kconfig b/drivers/clk/meson/Kconfig
-index b72439315340..3858747f5438 100644
---- a/drivers/clk/meson/Kconfig
-+++ b/drivers/clk/meson/Kconfig
-@@ -98,8 +98,10 @@ config COMMON_CLK_G12A
- 	bool
- 	depends on ARCH_MESON
- 	select COMMON_CLK_MESON_REGMAP
-+	select COMMON_CLK_MESON_DUALDIV
- 	select COMMON_CLK_MESON_MPLL
- 	select COMMON_CLK_MESON_PLL
-+	select COMMON_CLK_MESON_AO_CLKC
- 	select COMMON_CLK_MESON_EE_CLKC
- 	select MFD_SYSCON
- 	help
-diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
-index 32d17f18541e..021fc290e749 100644
---- a/drivers/clk/meson/Makefile
-+++ b/drivers/clk/meson/Makefile
-@@ -16,5 +16,5 @@ obj-$(CONFIG_COMMON_CLK_MESON_VID_PLL_DIV) += vid-pll-div.o
- obj-$(CONFIG_COMMON_CLK_AXG) += axg.o axg-aoclk.o
- obj-$(CONFIG_COMMON_CLK_AXG_AUDIO) += axg-audio.o
- obj-$(CONFIG_COMMON_CLK_GXBB) += gxbb.o gxbb-aoclk.o
--obj-$(CONFIG_COMMON_CLK_G12A) += g12a.o
-+obj-$(CONFIG_COMMON_CLK_G12A) += g12a.o g12a-aoclk.o
- obj-$(CONFIG_COMMON_CLK_MESON8B) += meson8b.o
-diff --git a/drivers/clk/meson/g12a-aoclk.c b/drivers/clk/meson/g12a-aoclk.c
-new file mode 100644
-index 000000000000..3398cae86b45
---- /dev/null
-+++ b/drivers/clk/meson/g12a-aoclk.c
-@@ -0,0 +1,448 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Amlogic Meson-AXG Clock Controller Driver
-+ *
-+ * Copyright (c) 2016 Baylibre SAS.
-+ * Author: Michael Turquette <mturquette@baylibre.com>
-+ *
-+ * Copyright (c) 2019 Baylibre SAS.
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ */
-+#include <linux/clk-provider.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/mfd/syscon.h>
-+#include "meson-aoclk.h"
-+#include "g12a-aoclk.h"
-+
-+#include "clk-regmap.h"
-+#include "clk-dualdiv.h"
-+
-+#define IN_PREFIX "ao-in-"
-+
-+/*
-+ * AO Configuration Clock registers offsets
-+ * Register offsets from the data sheet must be multiplied by 4.
-+ */
-+#define AO_RTI_STATUS_REG3	0x0C
-+#define AO_RTI_PWR_CNTL_REG0	0x10
-+#define AO_RTI_GEN_CNTL_REG0	0x40
-+#define AO_CLK_GATE0		0x4c
-+#define AO_CLK_GATE0_SP		0x50
-+#define AO_OSCIN_CNTL		0x58
-+#define AO_CEC_CLK_CNTL_REG0	0x74
-+#define AO_CEC_CLK_CNTL_REG1	0x78
-+#define AO_SAR_CLK		0x90
-+#define AO_RTC_ALT_CLK_CNTL0	0x94
-+#define AO_RTC_ALT_CLK_CNTL1	0x98
-+
-+#define AXG_AO_GATE(_name, _reg, _bit)					\
-+static struct clk_regmap g12a_aoclk_##_name = {				\
-+	.data = &(struct clk_regmap_gate_data) {			\
-+		.offset = (_reg),					\
-+		.bit_idx = (_bit),					\
-+	},								\
-+	.hw.init = &(struct clk_init_data) {				\
-+		.name =  "g12a_ao_" #_name,				\
-+		.ops = &clk_regmap_gate_ops,				\
-+		.parent_names = (const char *[]){ IN_PREFIX "mpeg-clk" }, \
-+		.num_parents = 1,					\
-+		.flags = CLK_IGNORE_UNUSED,				\
-+	},								\
-+}
-+
-+AXG_AO_GATE(ahb, AO_CLK_GATE0, 0);
-+AXG_AO_GATE(ir_in, AO_CLK_GATE0, 1);
-+AXG_AO_GATE(i2c_m0, AO_CLK_GATE0, 2);
-+AXG_AO_GATE(i2c_s0, AO_CLK_GATE0, 3);
-+AXG_AO_GATE(uart, AO_CLK_GATE0, 4);
-+AXG_AO_GATE(prod_i2c, AO_CLK_GATE0, 5);
-+AXG_AO_GATE(uart2, AO_CLK_GATE0, 6);
-+AXG_AO_GATE(ir_out, AO_CLK_GATE0, 7);
-+AXG_AO_GATE(saradc, AO_CLK_GATE0, 8);
-+AXG_AO_GATE(mailbox, AO_CLK_GATE0_SP, 0);
-+AXG_AO_GATE(m3, AO_CLK_GATE0_SP, 1);
-+AXG_AO_GATE(ahb_sram, AO_CLK_GATE0_SP, 2);
-+AXG_AO_GATE(rti, AO_CLK_GATE0_SP, 3);
-+AXG_AO_GATE(m4_fclk, AO_CLK_GATE0_SP, 4);
-+AXG_AO_GATE(m4_hclk, AO_CLK_GATE0_SP, 5);
-+
-+static struct clk_regmap g12a_aoclk_cts_oscin = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = AO_RTI_PWR_CNTL_REG0,
-+		.bit_idx = 14,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "cts_oscin",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ IN_PREFIX "xtal" },
-+		.num_parents = 1,
-+	},
-+};
-+
-+static const struct meson_clk_dualdiv_param g12a_32k_div_table[] = {
-+	{
-+		.dual	= 1,
-+		.n1	= 733,
-+		.m1	= 8,
-+		.n2	= 732,
-+		.m2	= 11,
-+	}, {}
-+};
-+
-+/* 32k_by_oscin clock */
-+
-+static struct clk_regmap g12a_aoclk_32k_by_oscin_pre = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = AO_RTC_ALT_CLK_CNTL0,
-+		.bit_idx = 31,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_ao_32k_by_oscin_pre",
-+		.ops = &clk_regmap_gate_ops,
-+		.parent_names = (const char *[]){ "cts_oscin" },
-+		.num_parents = 1,
-+	},
-+};
-+
-+static struct clk_regmap g12a_aoclk_32k_by_oscin_div = {
-+	.data = &(struct meson_clk_dualdiv_data){
-+		.n1 = {
-+			.reg_off = AO_RTC_ALT_CLK_CNTL0,
-+			.shift   = 0,
-+			.width   = 12,
-+		},
-+		.n2 = {
-+			.reg_off = AO_RTC_ALT_CLK_CNTL0,
-+			.shift   = 12,
-+			.width   = 12,
-+		},
-+		.m1 = {
-+			.reg_off = AO_RTC_ALT_CLK_CNTL1,
-+			.shift   = 0,
-+			.width   = 12,
-+		},
-+		.m2 = {
-+			.reg_off = AO_RTC_ALT_CLK_CNTL1,
-+			.shift   = 12,
-+			.width   = 12,
-+		},
-+		.dual = {
-+			.reg_off = AO_RTC_ALT_CLK_CNTL0,
-+			.shift   = 28,
-+			.width   = 1,
-+		},
-+		.table = g12a_32k_div_table,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_ao_32k_by_oscin_div",
-+		.ops = &meson_clk_dualdiv_ops,
-+		.parent_names = (const char *[]){ "g12a_ao_32k_by_oscin_pre" },
-+		.num_parents = 1,
-+	},
-+};
-+
-+static struct clk_regmap g12a_aoclk_32k_by_oscin_sel = {
-+	.data = &(struct clk_regmap_mux_data) {
-+		.offset = AO_RTC_ALT_CLK_CNTL1,
-+		.mask = 0x1,
-+		.shift = 24,
-+		.flags = CLK_MUX_ROUND_CLOSEST,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_ao_32k_by_oscin_sel",
-+		.ops = &clk_regmap_mux_ops,
-+		.parent_names = (const char *[]){ "g12a_ao_32k_by_oscin_div",
-+						  "g12a_ao_32k_by_oscin_pre" },
-+		.num_parents = 2,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap g12a_aoclk_32k_by_oscin = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = AO_RTC_ALT_CLK_CNTL0,
-+		.bit_idx = 30,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_ao_32k_by_oscin",
-+		.ops = &clk_regmap_gate_ops,
-+		.parent_names = (const char *[]){ "g12a_ao_32k_by_oscin_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+/* cec clock */
-+
-+static struct clk_regmap g12a_aoclk_cec_pre = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = AO_CEC_CLK_CNTL_REG0,
-+		.bit_idx = 31,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_ao_cec_pre",
-+		.ops = &clk_regmap_gate_ops,
-+		.parent_names = (const char *[]){ "cts_oscin" },
-+		.num_parents = 1,
-+	},
-+};
-+
-+static struct clk_regmap g12a_aoclk_cec_div = {
-+	.data = &(struct meson_clk_dualdiv_data){
-+		.n1 = {
-+			.reg_off = AO_CEC_CLK_CNTL_REG0,
-+			.shift   = 0,
-+			.width   = 12,
-+		},
-+		.n2 = {
-+			.reg_off = AO_CEC_CLK_CNTL_REG0,
-+			.shift   = 12,
-+			.width   = 12,
-+		},
-+		.m1 = {
-+			.reg_off = AO_CEC_CLK_CNTL_REG1,
-+			.shift   = 0,
-+			.width   = 12,
-+		},
-+		.m2 = {
-+			.reg_off = AO_CEC_CLK_CNTL_REG1,
-+			.shift   = 12,
-+			.width   = 12,
-+		},
-+		.dual = {
-+			.reg_off = AO_CEC_CLK_CNTL_REG0,
-+			.shift   = 28,
-+			.width   = 1,
-+		},
-+		.table = g12a_32k_div_table,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_ao_cec_div",
-+		.ops = &meson_clk_dualdiv_ops,
-+		.parent_names = (const char *[]){ "g12a_ao_cec_pre" },
-+		.num_parents = 1,
-+	},
-+};
-+
-+static struct clk_regmap g12a_aoclk_cec_sel = {
-+	.data = &(struct clk_regmap_mux_data) {
-+		.offset = AO_CEC_CLK_CNTL_REG1,
-+		.mask = 0x1,
-+		.shift = 24,
-+		.flags = CLK_MUX_ROUND_CLOSEST,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_ao_cec_sel",
-+		.ops = &clk_regmap_mux_ops,
-+		.parent_names = (const char *[]){ "g12a_ao_cec_div",
-+						  "g12a_ao_cec_pre" },
-+		.num_parents = 2,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap g12a_aoclk_cec = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = AO_CEC_CLK_CNTL_REG0,
-+		.bit_idx = 30,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_ao_cec",
-+		.ops = &clk_regmap_gate_ops,
-+		.parent_names = (const char *[]){ "g12a_ao_cec_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap g12a_aoclk_cts_rtc_oscin = {
-+	.data = &(struct clk_regmap_mux_data) {
-+		.offset = AO_RTI_PWR_CNTL_REG0,
-+		.mask = 0x1,
-+		.shift = 10,
-+		.flags = CLK_MUX_ROUND_CLOSEST,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_ao_cts_rtc_oscin",
-+		.ops = &clk_regmap_mux_ops,
-+		.parent_names = (const char *[]){ "g12a_ao_32k_by_oscin",
-+						  IN_PREFIX "ext_32k-0" },
-+		.num_parents = 2,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap g12a_aoclk_clk81 = {
-+	.data = &(struct clk_regmap_mux_data) {
-+		.offset = AO_RTI_PWR_CNTL_REG0,
-+		.mask = 0x1,
-+		.shift = 8,
-+		.flags = CLK_MUX_ROUND_CLOSEST,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_ao_clk81",
-+		.ops = &clk_regmap_mux_ro_ops,
-+		.parent_names = (const char *[]){ IN_PREFIX "mpeg-clk",
-+						  "g12a_ao_cts_rtc_oscin"},
-+		.num_parents = 2,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap g12a_aoclk_saradc_mux = {
-+	.data = &(struct clk_regmap_mux_data) {
-+		.offset = AO_SAR_CLK,
-+		.mask = 0x3,
-+		.shift = 9,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_ao_saradc_mux",
-+		.ops = &clk_regmap_mux_ops,
-+		.parent_names = (const char *[]){ IN_PREFIX "xtal",
-+						  "g12a_ao_clk81" },
-+		.num_parents = 2,
-+	},
-+};
-+
-+static struct clk_regmap g12a_aoclk_saradc_div = {
-+	.data = &(struct clk_regmap_div_data) {
-+		.offset = AO_SAR_CLK,
-+		.shift = 0,
-+		.width = 8,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_ao_saradc_div",
-+		.ops = &clk_regmap_divider_ops,
-+		.parent_names = (const char *[]){ "g12a_ao_saradc_mux" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap g12a_aoclk_saradc_gate = {
-+	.data = &(struct clk_regmap_gate_data) {
-+		.offset = AO_SAR_CLK,
-+		.bit_idx = 8,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_ao_saradc_gate",
-+		.ops = &clk_regmap_gate_ops,
-+		.parent_names = (const char *[]){ "g12a_ao_saradc_div" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static const unsigned int g12a_aoclk_reset[] = {
-+	[RESET_AO_IR_IN]	= 16,
-+	[RESET_AO_UART]		= 17,
-+	[RESET_AO_I2C_M]	= 18,
-+	[RESET_AO_I2C_S]	= 19,
-+	[RESET_AO_SAR_ADC]	= 20,
-+	[RESET_AO_UART2]	= 22,
-+	[RESET_AO_IR_OUT]	= 23,
-+};
-+
-+static struct clk_regmap *g12a_aoclk_regmap[] = {
-+	&g12a_aoclk_ahb,
-+	&g12a_aoclk_ir_in,
-+	&g12a_aoclk_i2c_m0,
-+	&g12a_aoclk_i2c_s0,
-+	&g12a_aoclk_uart,
-+	&g12a_aoclk_prod_i2c,
-+	&g12a_aoclk_uart2,
-+	&g12a_aoclk_ir_out,
-+	&g12a_aoclk_saradc,
-+	&g12a_aoclk_mailbox,
-+	&g12a_aoclk_m3,
-+	&g12a_aoclk_ahb_sram,
-+	&g12a_aoclk_rti,
-+	&g12a_aoclk_m4_fclk,
-+	&g12a_aoclk_m4_hclk,
-+	&g12a_aoclk_cts_oscin,
-+	&g12a_aoclk_32k_by_oscin_pre,
-+	&g12a_aoclk_32k_by_oscin_div,
-+	&g12a_aoclk_32k_by_oscin_sel,
-+	&g12a_aoclk_32k_by_oscin,
-+	&g12a_aoclk_cec_pre,
-+	&g12a_aoclk_cec_div,
-+	&g12a_aoclk_cec_sel,
-+	&g12a_aoclk_cec,
-+	&g12a_aoclk_cts_rtc_oscin,
-+	&g12a_aoclk_clk81,
-+	&g12a_aoclk_saradc_mux,
-+	&g12a_aoclk_saradc_div,
-+	&g12a_aoclk_saradc_gate,
-+};
-+
-+static const struct clk_hw_onecell_data g12a_aoclk_onecell_data = {
-+	.hws = {
-+		[CLKID_AO_AHB]		= &g12a_aoclk_ahb.hw,
-+		[CLKID_AO_IR_IN]	= &g12a_aoclk_ir_in.hw,
-+		[CLKID_AO_I2C_M0]	= &g12a_aoclk_i2c_m0.hw,
-+		[CLKID_AO_I2C_S0]	= &g12a_aoclk_i2c_s0.hw,
-+		[CLKID_AO_UART]		= &g12a_aoclk_uart.hw,
-+		[CLKID_AO_PROD_I2C]	= &g12a_aoclk_prod_i2c.hw,
-+		[CLKID_AO_UART2]	= &g12a_aoclk_uart2.hw,
-+		[CLKID_AO_IR_OUT]	= &g12a_aoclk_ir_out.hw,
-+		[CLKID_AO_SAR_ADC]	= &g12a_aoclk_saradc.hw,
-+		[CLKID_AO_MAILBOX]	= &g12a_aoclk_mailbox.hw,
-+		[CLKID_AO_M3]		= &g12a_aoclk_m3.hw,
-+		[CLKID_AO_AHB_SRAM]	= &g12a_aoclk_ahb_sram.hw,
-+		[CLKID_AO_RTI]		= &g12a_aoclk_rti.hw,
-+		[CLKID_AO_M4_FCLK]	= &g12a_aoclk_m4_fclk.hw,
-+		[CLKID_AO_M4_HCLK]	= &g12a_aoclk_m4_hclk.hw,
-+		[CLKID_AO_CLK81]	= &g12a_aoclk_clk81.hw,
-+		[CLKID_AO_SAR_ADC_SEL]	= &g12a_aoclk_saradc_mux.hw,
-+		[CLKID_AO_SAR_ADC_DIV]	= &g12a_aoclk_saradc_div.hw,
-+		[CLKID_AO_SAR_ADC_CLK]	= &g12a_aoclk_saradc_gate.hw,
-+		[CLKID_AO_CTS_OSCIN]	= &g12a_aoclk_cts_oscin.hw,
-+		[CLKID_AO_32K_PRE]	= &g12a_aoclk_32k_by_oscin_pre.hw,
-+		[CLKID_AO_32K_DIV]	= &g12a_aoclk_32k_by_oscin_div.hw,
-+		[CLKID_AO_32K_SEL]	= &g12a_aoclk_32k_by_oscin_sel.hw,
-+		[CLKID_AO_32K]		= &g12a_aoclk_32k_by_oscin.hw,
-+		[CLKID_AO_CEC_PRE]	= &g12a_aoclk_cec_pre.hw,
-+		[CLKID_AO_CEC_DIV]	= &g12a_aoclk_cec_div.hw,
-+		[CLKID_AO_CEC_SEL]	= &g12a_aoclk_cec_sel.hw,
-+		[CLKID_AO_CEC]		= &g12a_aoclk_cec.hw,
-+		[CLKID_AO_CTS_RTC_OSCIN] = &g12a_aoclk_cts_rtc_oscin.hw,
-+	},
-+	.num = NR_CLKS,
-+};
-+
-+static const struct meson_aoclk_input g12a_aoclk_inputs[] = {
-+	{ .name = "xtal",	.required = true  },
-+	{ .name = "mpeg-clk",	.required = true  },
-+	{ .name = "ext-32k-0",	.required = false },
-+};
-+
-+static const struct meson_aoclk_data g12a_aoclkc_data = {
-+	.reset_reg	= AO_RTI_GEN_CNTL_REG0,
-+	.num_reset	= ARRAY_SIZE(g12a_aoclk_reset),
-+	.reset		= g12a_aoclk_reset,
-+	.num_clks	= ARRAY_SIZE(g12a_aoclk_regmap),
-+	.clks		= g12a_aoclk_regmap,
-+	.hw_data	= &g12a_aoclk_onecell_data,
-+	.inputs		= g12a_aoclk_inputs,
-+	.num_inputs	= ARRAY_SIZE(g12a_aoclk_inputs),
-+	.input_prefix	= IN_PREFIX,
-+};
-+
-+static const struct of_device_id g12a_aoclkc_match_table[] = {
-+	{
-+		.compatible	= "amlogic,meson-g12a-aoclkc",
-+		.data		= &g12a_aoclkc_data,
-+	},
-+	{ }
-+};
-+
-+static struct platform_driver g12a_aoclkc_driver = {
-+	.probe		= meson_aoclkc_probe,
-+	.driver		= {
-+		.name	= "g12a-aoclkc",
-+		.of_match_table = g12a_aoclkc_match_table,
-+	},
-+};
-+
-+builtin_platform_driver(g12a_aoclkc_driver);
-diff --git a/drivers/clk/meson/g12a-aoclk.h b/drivers/clk/meson/g12a-aoclk.h
-new file mode 100644
-index 000000000000..9ebfa25688eb
---- /dev/null
-+++ b/drivers/clk/meson/g12a-aoclk.h
-@@ -0,0 +1,15 @@
-+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-+/*
-+ * Copyright (c) 2019 BayLibre, SAS
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ */
-+
-+#ifndef __G12A_AOCLKC_H
-+#define __G12A_AOCLKC_H
-+
-+#define NR_CLKS	29
-+
-+#include <dt-bindings/clock/g12a-aoclkc.h>
-+#include <dt-bindings/reset/g12a-aoclkc.h>
-+
-+#endif /* __G12A_AOCLKC_H */
--- 
-2.20.1
+On 02/02/2019 10:50, kbuild test robot wrote:
+> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git master
+> head:   a7d7d3ebc7d441ee48e1fd87d9a8abbf7d528127
+> commit: 4cc936fd184a2641801c906ea320326317895397 [7/8] KVM: arm64: Relax the restriction on using stage2 PUD huge mapping
+> config: arm-axm55xx_defconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 8.2.0-11) 8.2.0
+> reproduce:
+>          wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>          chmod +x ~/bin/make.cross
+>          git checkout 4cc936fd184a2641801c906ea320326317895397
+>          # save the attached .config to linux build tree
+>          GCC_VERSION=8.2.0 make.cross ARCH=arm
+> 
+> All errors (new ones prefixed by >>):
+> 
+>     arch/arm/kvm/../../../virt/kvm/arm/mmu.c: In function 'user_mem_abort':
+>>> arch/arm/kvm/../../../virt/kvm/arm/mmu.c:1705:36: error: implicit declaration of function 'kvm_stage2_has_pmd'; did you mean 'kvm_stage2_has_pud'? [-Werror=implicit-function-declaration]
+>            (vma_pagesize == PUD_SIZE && kvm_stage2_has_pmd(kvm))) &&
+>                                         ^~~~~~~~~~~~~~~~~~
+>                                         kvm_stage2_has_pud
+>     cc1: some warnings being treated as errors
+> 
+> vim +1705 arch/arm/kvm/../../../virt/kvm/arm/mmu.c
 
+
+Thanks for the report. I will fix this by adding dummy definitions for arm32.
+
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
