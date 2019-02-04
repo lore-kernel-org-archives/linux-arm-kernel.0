@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DAF24C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 23:16:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 476CCC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 23:17:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 89A7C20844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 23:16:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 120332081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 23:17:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U0dXIzW0";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=broadcom.com header.i=@broadcom.com header.b="FHVJQ2pA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89A7C20844
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q9PdD3Wm";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=broadcom.com header.i=@broadcom.com header.b="Qbm2V3lL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 120332081B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=broadcom.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,60 +27,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=cHPfGIntJ2tX8QXx4cfQyqhqTAsUDkT/1piXwXubG88=; b=U0dXIzW0poaPhiObDtxPA2mH/T
-	Oc24vtzg0I2annKHc6h85dx+RN/CncxiU3obwKZzPpGIiYDAaIyW/ZV531rd0SzD8dNZKwrxVJvlo
-	hN0ox5FdXNOLFipxc4+oLAYih3oz1jde80xkVmoMXHynGYc4dFmziwr8hvWk9E5mmrZmwMb3Hz8wH
-	DEfRISfSfeIKDGFIXchCcKEEQwcGqJlLx221BNfoMul4LwXl9eTGyKV/D2fvVZd9z5RM2K0kcUupc
-	lb5ALjHCInPUCF3NHBwnm27PuK5/pqmxbpt2AlbfFix8oco1JqK8ao9KFb1GY9DWLRewY1/esfHC4
-	BHMPVmIA==;
+	bh=MZZgjuyoxBkGaEqDNYBcWXyoNydmVZ2xdJGXAynaZd0=; b=Q9PdD3Wm31jBBo8/fyYf4QAZsi
+	2rJTA2G69+q2Ckcxb7IK/U2e+QUD5gV2X/3rsQal8mAgvzwrskAZGb1PrrE0ETaBTQdC57kxsZS5P
+	n7GQ8HbSj7SSHc5UJs/Nu4IE853rZIGacLkZ4SD/NHKqdDzFwMZRi3J9J7yrMDHdS3VJV/hnkXrsG
+	B+gWp832OSGm6eU9V13w4rX/WO7s4fMytJ4tMYSu1CSPPMLHGkEq86Z3evSmZ4es7IVZXjMpXRSmj
+	Hfm/ww5d5E3mNeiT1PUtrmT26OYCFiqM3J2JCskZxe/IFInQ8yEqe9t5J+NVIo4ZUeXtE0g5I/JCA
+	p54R3HcQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqnTm-00074U-7X; Mon, 04 Feb 2019 23:16:42 +0000
-Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
+	id 1gqnU2-0007Kh-FZ; Mon, 04 Feb 2019 23:16:58 +0000
+Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqnTN-0006f5-GR
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 23:16:22 +0000
-Received: by mail-pl1-x643.google.com with SMTP id w4so659098plz.1
+ id 1gqnTK-0006b6-E5
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 23:16:27 +0000
+Received: by mail-pg1-x543.google.com with SMTP id y4so587561pgc.12
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 15:16:17 -0800 (PST)
+ Mon, 04 Feb 2019 15:16:14 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=broadcom.com; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=+CqdFjUbPsFcXmKSPDmmDo194EYEoBLQtAS5/cHaV78=;
- b=FHVJQ2pABaLxUpn0N8klmC8ZSLpOloU2rvX6bShNOiqNIFCDcdFghxrkWw9ASWiQVm
- FYHKqZH7MkK5nFH/ibfcDrMQqxdQFCDWnf86Gj5IftY7CtRvWGsi+nQEOKI63jm8vE9a
- Zoy3My9xvdcZtUiy9GGsbjjyIjZ9l8WpPAvYQ=
+ bh=3i4gUCnYFw3ZLY5kdJTtqJXFky8h7lyhLbYuAvzEmCA=;
+ b=Qbm2V3lLqggiXTxKMgB+tyYRXNfsS9Mdto2xO4v0YCWRpCmyFQan3NIISe6tggVwHn
+ Eb6P3vr89iXIwRY6KKQL58PV62d1TWIeoEABHO3iiQv0LiYhbaY0GRfAbhw9F6dxa4Oc
+ /P36xqMvhatgP5TgY1ZHZTtzufbuegrUzu4Ww=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=+CqdFjUbPsFcXmKSPDmmDo194EYEoBLQtAS5/cHaV78=;
- b=LHMZE+sTZzHL3YjB+gRNXGwZNgCb4UqYI3V4QOyCLOFhfF0nIRh7Scosyy9PMeMOP8
- NJpffzO22axFHMdHjlWkXphpSyw5VI/u+y/1sooh6rISUguCRq+4K371E7gPGqZQ7PgO
- Cs7HsxiNDspPydQZE2Pb/BvJ84M8TodSldLeiKK/QW5rfKYnukAyvXADx3zaHC2USl5R
- h+JHH+ICnVReP5WUoXBaBurILsZW0w6BPfi/uq2sXkEQf+PjaWdWYQh5aR3SOnFQoQnr
- 4fiY4RMxcouna5ov9PCBa1clnOwtIC7a3xMKGdu3XX1fk3S5S6the2BkFgJKl4uqV3cb
- ng8A==
-X-Gm-Message-State: AHQUAubnwV6kDbHGdQQ1Sm3lvc/VKnqcOIDlZvuyiaEr/jLaFXDjFbBW
- OnS9AM9pwZO1+0LAxBX12ob53w==
-X-Google-Smtp-Source: AHgI3IY6t26oNneZecWK9LK0xxErUcIldANCTGKwUto6a/tOQEcRVc6vlnb04dcNM3K72pZBZae59w==
-X-Received: by 2002:a17:902:bc3:: with SMTP id 61mr1926546plr.15.1549322176854; 
- Mon, 04 Feb 2019 15:16:16 -0800 (PST)
+ bh=3i4gUCnYFw3ZLY5kdJTtqJXFky8h7lyhLbYuAvzEmCA=;
+ b=I9dbPnnohvhKnNdB2DA1uIjZ2u1511FfuHypkq+hh1yB388naYWzUvszogTYNklmAy
+ +6W0fblzRc+iBRTqYGyAks42UMRlZ/fOJCqtn9bIDTZUht2IMlofP+Kz0tMCR4BQtSOL
+ wdeH0C4tDuxnFqW7QCPG9n0X/K0yXCamevJRhOLUbC4jqz4Yn5ZuodnVpFoBLXhRMbTd
+ LlWMeYvZWJlPG5XfUuZ0Ikfr9QDg5si9vqA3iGSyhUBYa3Ef1Dxo0TwqfyObG9KwwY9D
+ jF5Vb4SGE8TLdwHfLpR+z49n01lDt8O7wTIjGNzSagipJs8lDiVW7H7/bBZlmX5DtzXw
+ lefw==
+X-Gm-Message-State: AHQUAuahFOn6M3f03O/RBkks3057mFIJ4EDWiw9Tel8cQG2pA60DkTro
+ CKRofqpdUfQqzPSIRcyseF9byA==
+X-Google-Smtp-Source: AHgI3IbU52pU/qF3j/ez2czBoDkUtIJttY83tslh2DeitySCO8CjZVHvne5RANzl2dk+t0C1ph8jIA==
+X-Received: by 2002:a62:528e:: with SMTP id g136mr1899638pfb.111.1549322173294; 
+ Mon, 04 Feb 2019 15:16:13 -0800 (PST)
 Received: from rj-aorus.ric.broadcom.com ([192.19.228.250])
- by smtp.gmail.com with ESMTPSA id z14sm1281499pgv.47.2019.02.04.15.16.14
+ by smtp.gmail.com with ESMTPSA id z14sm1281499pgv.47.2019.02.04.15.16.10
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 04 Feb 2019 15:16:15 -0800 (PST)
+ Mon, 04 Feb 2019 15:16:12 -0800 (PST)
 From: Ray Jui <ray.jui@broadcom.com>
 To: Wolfram Sang <wsa@the-dreams.de>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH v4 3/8] dt-bindings: i2c: iproc: make 'interrupts' optional
-Date: Mon,  4 Feb 2019 15:15:49 -0800
-Message-Id: <20190204231554.87666-4-ray.jui@broadcom.com>
+Subject: [PATCH v4 2/8] i2c: iproc: Add slave mode support
+Date: Mon,  4 Feb 2019 15:15:48 -0800
+Message-Id: <20190204231554.87666-3-ray.jui@broadcom.com>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190204231554.87666-1-ray.jui@broadcom.com>
 References: <20190204231554.87666-1-ray.jui@broadcom.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_151618_019004_66A84B94 
-X-CRM114-Status: GOOD (  12.27  )
+X-CRM114-CacheID: sfid-20190204_151615_133919_C3A2700A 
+X-CRM114-Status: GOOD (  22.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,8 +94,10 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: devicetree@vger.kernel.org,
  Rayagonda Kokatanur <rayagonda.kokatanur@broadcom.com>,
- linux-kernel@vger.kernel.org, bcm-kernel-feedback-list@broadcom.com,
- linux-i2c@vger.kernel.org, Ray Jui <ray.jui@broadcom.com>,
+ linux-kernel@vger.kernel.org,
+ Shreesha Rajashekar <shreesha.rajashekar@broadcom.com>,
+ bcm-kernel-feedback-list@broadcom.com, linux-i2c@vger.kernel.org,
+ Michael Cheng <ccheng@broadcom.com>, Ray Jui <ray.jui@broadcom.com>,
  linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -103,43 +105,472 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-In prep for the introduction of polling mode into the driver, update the
-binding document to make the 'interrupts' property optional
+From: Shreesha Rajashekar <shreesha.rajashekar@broadcom.com>
 
-Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+Add slave mode support to the iProc I2C driver.
+
 Signed-off-by: Rayagonda Kokatanur <rayagonda.kokatanur@broadcom.com>
+Signed-off-by: Michael Cheng <ccheng@broadcom.com>
+Signed-off-by: Shreesha Rajashekar <shreesha.rajashekar@broadcom.com>
+Signed-off-by: Ray Jui <ray.jui@broadcom.com>
 ---
- .../devicetree/bindings/i2c/brcm,iproc-i2c.txt         | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/Kconfig         |   1 +
+ drivers/i2c/busses/i2c-bcm-iproc.c | 314 ++++++++++++++++++++++++++++-
+ 2 files changed, 309 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-index 81f982ccca31..d3a3620b1f06 100644
---- a/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-+++ b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-@@ -9,9 +9,6 @@ Required properties:
-     Define the base and range of the I/O address space that contain the iProc
-     I2C controller registers
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index f2c681971201..e0798b82b3bc 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -424,6 +424,7 @@ config I2C_BCM_IPROC
+ 	tristate "Broadcom iProc I2C controller"
+ 	depends on ARCH_BCM_IPROC || COMPILE_TEST
+ 	default ARCH_BCM_IPROC
++	select I2C_SLAVE
+ 	help
+ 	  If you say yes to this option, support will be included for the
+ 	  Broadcom iProc I2C controller.
+diff --git a/drivers/i2c/busses/i2c-bcm-iproc.c b/drivers/i2c/busses/i2c-bcm-iproc.c
+index eb7339a0280e..775b3d89a9c4 100644
+--- a/drivers/i2c/busses/i2c-bcm-iproc.c
++++ b/drivers/i2c/busses/i2c-bcm-iproc.c
+@@ -23,11 +23,30 @@
+ #define CFG_OFFSET                   0x00
+ #define CFG_RESET_SHIFT              31
+ #define CFG_EN_SHIFT                 30
++#define CFG_SLAVE_ADDR_0_SHIFT       28
+ #define CFG_M_RETRY_CNT_SHIFT        16
+ #define CFG_M_RETRY_CNT_MASK         0x0f
  
--- interrupts:
--    Should contain the I2C interrupt
--
- - clock-frequency:
-     This is the I2C bus clock. Need to be either 100000 or 400000
+ #define TIM_CFG_OFFSET               0x04
+ #define TIM_CFG_MODE_400_SHIFT       31
++#define TIM_RAND_SLAVE_STRETCH_SHIFT      24
++#define TIM_RAND_SLAVE_STRETCH_MASK       0x7f
++#define TIM_PERIODIC_SLAVE_STRETCH_SHIFT  16
++#define TIM_PERIODIC_SLAVE_STRETCH_MASK   0x7f
++
++#define S_CFG_SMBUS_ADDR_OFFSET           0x08
++#define S_CFG_EN_NIC_SMB_ADDR3_SHIFT      31
++#define S_CFG_NIC_SMB_ADDR3_SHIFT         24
++#define S_CFG_NIC_SMB_ADDR3_MASK          0x7f
++#define S_CFG_EN_NIC_SMB_ADDR2_SHIFT      23
++#define S_CFG_NIC_SMB_ADDR2_SHIFT         16
++#define S_CFG_NIC_SMB_ADDR2_MASK          0x7f
++#define S_CFG_EN_NIC_SMB_ADDR1_SHIFT      15
++#define S_CFG_NIC_SMB_ADDR1_SHIFT         8
++#define S_CFG_NIC_SMB_ADDR1_MASK          0x7f
++#define S_CFG_EN_NIC_SMB_ADDR0_SHIFT      7
++#define S_CFG_NIC_SMB_ADDR0_SHIFT         0
++#define S_CFG_NIC_SMB_ADDR0_MASK          0x7f
  
-@@ -21,6 +18,13 @@ Required properties:
- - #size-cells:
-     Always 0
+ #define M_FIFO_CTRL_OFFSET           0x0c
+ #define M_FIFO_RX_FLUSH_SHIFT        31
+@@ -37,6 +56,14 @@
+ #define M_FIFO_RX_THLD_SHIFT         8
+ #define M_FIFO_RX_THLD_MASK          0x3f
  
-+Optional properties:
++#define S_FIFO_CTRL_OFFSET           0x10
++#define S_FIFO_RX_FLUSH_SHIFT        31
++#define S_FIFO_TX_FLUSH_SHIFT        30
++#define S_FIFO_RX_CNT_SHIFT          16
++#define S_FIFO_RX_CNT_MASK           0x7f
++#define S_FIFO_RX_THLD_SHIFT         8
++#define S_FIFO_RX_THLD_MASK          0x3f
 +
-+- interrupts:
-+    Should contain the I2C interrupt. If unspecified, driver will fall back to
-+    polling mode
+ #define M_CMD_OFFSET                 0x30
+ #define M_CMD_START_BUSY_SHIFT       31
+ #define M_CMD_STATUS_SHIFT           25
+@@ -46,6 +73,8 @@
+ #define M_CMD_STATUS_NACK_ADDR       0x2
+ #define M_CMD_STATUS_NACK_DATA       0x3
+ #define M_CMD_STATUS_TIMEOUT         0x4
++#define M_CMD_STATUS_FIFO_UNDERRUN   0x5
++#define M_CMD_STATUS_RX_FIFO_FULL    0x6
+ #define M_CMD_PROTOCOL_SHIFT         9
+ #define M_CMD_PROTOCOL_MASK          0xf
+ #define M_CMD_PROTOCOL_BLK_WR        0x7
+@@ -54,17 +83,36 @@
+ #define M_CMD_RD_CNT_SHIFT           0
+ #define M_CMD_RD_CNT_MASK            0xff
+ 
++#define S_CMD_OFFSET                 0x34
++#define S_CMD_START_BUSY_SHIFT       31
++#define S_CMD_STATUS_SHIFT           23
++#define S_CMD_STATUS_MASK            0x07
++#define S_CMD_STATUS_SUCCESS         0x0
++#define S_CMD_STATUS_TIMEOUT         0x5
 +
+ #define IE_OFFSET                    0x38
+ #define IE_M_RX_FIFO_FULL_SHIFT      31
+ #define IE_M_RX_THLD_SHIFT           30
+ #define IE_M_START_BUSY_SHIFT        28
+ #define IE_M_TX_UNDERRUN_SHIFT       27
++#define IE_S_RX_FIFO_FULL_SHIFT      26
++#define IE_S_RX_THLD_SHIFT           25
++#define IE_S_RX_EVENT_SHIFT          24
++#define IE_S_START_BUSY_SHIFT        23
++#define IE_S_TX_UNDERRUN_SHIFT       22
++#define IE_S_RD_EVENT_SHIFT          21
+ 
+ #define IS_OFFSET                    0x3c
+ #define IS_M_RX_FIFO_FULL_SHIFT      31
+ #define IS_M_RX_THLD_SHIFT           30
+ #define IS_M_START_BUSY_SHIFT        28
+ #define IS_M_TX_UNDERRUN_SHIFT       27
++#define IS_S_RX_FIFO_FULL_SHIFT      26
++#define IS_S_RX_THLD_SHIFT           25
++#define IS_S_RX_EVENT_SHIFT          24
++#define IS_S_START_BUSY_SHIFT        23
++#define IS_S_TX_UNDERRUN_SHIFT       22
++#define IS_S_RD_EVENT_SHIFT          21
+ 
+ #define M_TX_OFFSET                  0x40
+ #define M_TX_WR_STATUS_SHIFT         31
+@@ -78,6 +126,18 @@
+ #define M_RX_DATA_SHIFT              0
+ #define M_RX_DATA_MASK               0xff
+ 
++#define S_TX_OFFSET                  0x48
++#define S_TX_WR_STATUS_SHIFT         31
++#define S_TX_DATA_SHIFT              0
++#define S_TX_DATA_MASK               0xff
 +
- Example:
- 	i2c0: i2c@18008000 {
- 		compatible = "brcm,iproc-i2c";
++#define S_RX_OFFSET                  0x4c
++#define S_RX_STATUS_SHIFT            30
++#define S_RX_STATUS_MASK             0x03
++#define S_RX_PEC_ERR_SHIFT           29
++#define S_RX_DATA_SHIFT              0
++#define S_RX_DATA_MASK               0xff
++
+ #define I2C_TIMEOUT_MSEC             50000
+ #define M_TX_RX_FIFO_SIZE            64
+ #define M_RX_FIFO_MAX_THLD_VALUE     (M_TX_RX_FIFO_SIZE - 1)
+@@ -85,6 +145,30 @@
+ #define M_RX_MAX_READ_LEN            255
+ #define M_RX_FIFO_THLD_VALUE         50
+ 
++#define IE_M_ALL_INTERRUPT_SHIFT     27
++#define IE_M_ALL_INTERRUPT_MASK      0x1e
++
++#define SLAVE_READ_WRITE_BIT_MASK    0x1
++#define SLAVE_READ_WRITE_BIT_SHIFT   0x1
++#define SLAVE_MAX_SIZE_TRANSACTION   64
++#define SLAVE_CLOCK_STRETCH_TIME     25
++
++#define IE_S_ALL_INTERRUPT_SHIFT     21
++#define IE_S_ALL_INTERRUPT_MASK      0x3f
++
++enum i2c_slave_read_status {
++	I2C_SLAVE_RX_FIFO_EMPTY = 0,
++	I2C_SLAVE_RX_START,
++	I2C_SLAVE_RX_DATA,
++	I2C_SLAVE_RX_END,
++};
++
++enum i2c_slave_xfer_dir {
++	I2C_SLAVE_DIR_READ = 0,
++	I2C_SLAVE_DIR_WRITE,
++	I2C_SLAVE_DIR_NONE,
++};
++
+ enum bus_speed_index {
+ 	I2C_SPD_100K = 0,
+ 	I2C_SPD_400K,
+@@ -104,6 +188,9 @@ struct bcm_iproc_i2c_dev {
+ 
+ 	struct i2c_msg *msg;
+ 
++	struct i2c_client *slave;
++	enum i2c_slave_xfer_dir xfer_dir;
++
+ 	/* bytes that have been transferred */
+ 	unsigned int tx_bytes;
+ 	/* bytes that have been read */
+@@ -117,6 +204,156 @@ struct bcm_iproc_i2c_dev {
+ #define ISR_MASK (BIT(IS_M_START_BUSY_SHIFT) | BIT(IS_M_TX_UNDERRUN_SHIFT)\
+ 		| BIT(IS_M_RX_THLD_SHIFT))
+ 
++#define ISR_MASK_SLAVE (BIT(IS_S_START_BUSY_SHIFT)\
++		| BIT(IS_S_RX_EVENT_SHIFT) | BIT(IS_S_RD_EVENT_SHIFT))
++
++static int bcm_iproc_i2c_reg_slave(struct i2c_client *slave);
++static int bcm_iproc_i2c_unreg_slave(struct i2c_client *slave);
++static void bcm_iproc_i2c_enable_disable(struct bcm_iproc_i2c_dev *iproc_i2c,
++					 bool enable);
++
++static void bcm_iproc_i2c_slave_init(
++	struct bcm_iproc_i2c_dev *iproc_i2c, bool need_reset)
++{
++	u32 val;
++
++	if (need_reset) {
++		/* put controller in reset */
++		val = readl(iproc_i2c->base + CFG_OFFSET);
++		val |= BIT(CFG_RESET_SHIFT);
++		writel(val, iproc_i2c->base + CFG_OFFSET);
++
++		/* wait 100 usec per spec */
++		udelay(100);
++
++		/* bring controller out of reset */
++		val &= ~(BIT(CFG_RESET_SHIFT));
++		writel(val, iproc_i2c->base + CFG_OFFSET);
++	}
++
++	/* flush TX/RX FIFOs */
++	val = (BIT(S_FIFO_RX_FLUSH_SHIFT) | BIT(S_FIFO_TX_FLUSH_SHIFT));
++	writel(val, iproc_i2c->base + S_FIFO_CTRL_OFFSET);
++
++	/* RANDOM SLAVE STRETCH time - 20ms*/
++	val = readl(iproc_i2c->base + TIM_CFG_OFFSET);
++	val &= ~(TIM_RAND_SLAVE_STRETCH_MASK << TIM_RAND_SLAVE_STRETCH_SHIFT);
++	val |= (SLAVE_CLOCK_STRETCH_TIME << TIM_RAND_SLAVE_STRETCH_SHIFT);
++	writel(val, iproc_i2c->base + TIM_CFG_OFFSET);
++
++	/* Configure the slave address */
++	val = readl(iproc_i2c->base + S_CFG_SMBUS_ADDR_OFFSET);
++	val |= BIT(S_CFG_EN_NIC_SMB_ADDR3_SHIFT);
++	val &= ~(S_CFG_NIC_SMB_ADDR3_MASK << S_CFG_NIC_SMB_ADDR3_SHIFT);
++	val |= (iproc_i2c->slave->addr << S_CFG_NIC_SMB_ADDR3_SHIFT);
++	writel(val, iproc_i2c->base + S_CFG_SMBUS_ADDR_OFFSET);
++
++	/* clear all pending slave interrupts */
++	writel(ISR_MASK_SLAVE, iproc_i2c->base + IS_OFFSET);
++
++	/* Enable interrupt register for any READ event */
++	val = BIT(IE_S_RD_EVENT_SHIFT);
++	/* Enable interrupt register to indicate a valid byte in receive fifo */
++	val |= BIT(IE_S_RX_EVENT_SHIFT);
++	/* Enable interrupt register for the Slave BUSY command */
++	val |= BIT(IE_S_START_BUSY_SHIFT);
++	writel(val, iproc_i2c->base + IE_OFFSET);
++
++	iproc_i2c->xfer_dir = I2C_SLAVE_DIR_NONE;
++}
++
++static void bcm_iproc_i2c_check_slave_status(
++	struct bcm_iproc_i2c_dev *iproc_i2c)
++{
++	u32 val;
++
++	val = readl(iproc_i2c->base + S_CMD_OFFSET);
++	val = (val >> S_CMD_STATUS_SHIFT) & S_CMD_STATUS_MASK;
++
++	if (val == S_CMD_STATUS_TIMEOUT) {
++		dev_err(iproc_i2c->device, "slave random stretch time timeout\n");
++
++		/* re-initialize i2c for recovery */
++		bcm_iproc_i2c_enable_disable(iproc_i2c, false);
++		bcm_iproc_i2c_slave_init(iproc_i2c, true);
++		bcm_iproc_i2c_enable_disable(iproc_i2c, true);
++	}
++}
++
++static bool bcm_iproc_i2c_slave_isr(struct bcm_iproc_i2c_dev *iproc_i2c,
++				u32 status)
++{
++	u8 value;
++	u32 val;
++	u32 rd_status;
++	u32 tmp;
++
++	/* Start of transaction. check address and populate the direction */
++	if (iproc_i2c->xfer_dir == I2C_SLAVE_DIR_NONE) {
++		tmp = readl(iproc_i2c->base + S_RX_OFFSET);
++		rd_status = (tmp >> S_RX_STATUS_SHIFT) & S_RX_STATUS_MASK;
++		/* This condition checks whether the request is a new request */
++		if (((rd_status == I2C_SLAVE_RX_START) &&
++			(status & BIT(IS_S_RX_EVENT_SHIFT))) ||
++			((rd_status == I2C_SLAVE_RX_END) &&
++			(status & BIT(IS_S_RD_EVENT_SHIFT)))) {
++
++			/* Last bit is W/R bit.
++			 * If 1 then its a read request(by master).
++			 */
++			iproc_i2c->xfer_dir = tmp & SLAVE_READ_WRITE_BIT_MASK;
++			if (iproc_i2c->xfer_dir == I2C_SLAVE_DIR_WRITE)
++				i2c_slave_event(iproc_i2c->slave,
++					I2C_SLAVE_READ_REQUESTED, &value);
++			else
++				i2c_slave_event(iproc_i2c->slave,
++					I2C_SLAVE_WRITE_REQUESTED, &value);
++		}
++	}
++
++	/* read request from master */
++	if ((status & BIT(IS_S_RD_EVENT_SHIFT)) &&
++		(iproc_i2c->xfer_dir == I2C_SLAVE_DIR_WRITE)) {
++		i2c_slave_event(iproc_i2c->slave,
++			I2C_SLAVE_READ_PROCESSED, &value);
++		writel(value, iproc_i2c->base + S_TX_OFFSET);
++
++		val = BIT(S_CMD_START_BUSY_SHIFT);
++		writel(val, iproc_i2c->base + S_CMD_OFFSET);
++	}
++
++	/* write request from master */
++	if ((status & BIT(IS_S_RX_EVENT_SHIFT)) &&
++		(iproc_i2c->xfer_dir == I2C_SLAVE_DIR_READ)) {
++		val = readl(iproc_i2c->base + S_RX_OFFSET);
++		/* Its a write request by Master to Slave.
++		 * We read data present in receive FIFO
++		 */
++		value = (u8)((val >> S_RX_DATA_SHIFT) & S_RX_DATA_MASK);
++		i2c_slave_event(iproc_i2c->slave,
++			I2C_SLAVE_WRITE_RECEIVED, &value);
++
++		/* check the status for the last byte of the transaction */
++		rd_status = (val >> S_RX_STATUS_SHIFT) & S_RX_STATUS_MASK;
++		if (rd_status == I2C_SLAVE_RX_END)
++			iproc_i2c->xfer_dir = I2C_SLAVE_DIR_NONE;
++
++		dev_dbg(iproc_i2c->device, "\nread value = 0x%x\n", value);
++	}
++
++	/* Stop */
++	if (status & BIT(IS_S_START_BUSY_SHIFT)) {
++		i2c_slave_event(iproc_i2c->slave, I2C_SLAVE_STOP, &value);
++		iproc_i2c->xfer_dir = I2C_SLAVE_DIR_NONE;
++	}
++
++	/* clear interrupt status */
++	writel(status, iproc_i2c->base + IS_OFFSET);
++
++	bcm_iproc_i2c_check_slave_status(iproc_i2c);
++	return true;
++}
++
+ static void bcm_iproc_i2c_read_valid_bytes(struct bcm_iproc_i2c_dev *iproc_i2c)
+ {
+ 	struct i2c_msg *msg = iproc_i2c->msg;
+@@ -142,6 +379,18 @@ static irqreturn_t bcm_iproc_i2c_isr(int irq, void *data)
+ 	u32 status = readl(iproc_i2c->base + IS_OFFSET);
+ 	u32 tmp;
+ 
++
++	bool ret;
++	u32 sl_status = status & ISR_MASK_SLAVE;
++
++	if (sl_status) {
++		ret = bcm_iproc_i2c_slave_isr(iproc_i2c, sl_status);
++		if (ret)
++			return IRQ_HANDLED;
++		else
++			return IRQ_NONE;
++	}
++
+ 	status &= ISR_MASK;
+ 
+ 	if (!status)
+@@ -224,22 +473,25 @@ static int bcm_iproc_i2c_init(struct bcm_iproc_i2c_dev *iproc_i2c)
+ 
+ 	/* put controller in reset */
+ 	val = readl(iproc_i2c->base + CFG_OFFSET);
+-	val |= 1 << CFG_RESET_SHIFT;
+-	val &= ~(1 << CFG_EN_SHIFT);
++	val |= BIT(CFG_RESET_SHIFT);
++	val &= ~(BIT(CFG_EN_SHIFT));
+ 	writel(val, iproc_i2c->base + CFG_OFFSET);
+ 
+ 	/* wait 100 usec per spec */
+ 	udelay(100);
+ 
+ 	/* bring controller out of reset */
+-	val &= ~(1 << CFG_RESET_SHIFT);
++	val &= ~(BIT(CFG_RESET_SHIFT));
+ 	writel(val, iproc_i2c->base + CFG_OFFSET);
+ 
+ 	/* flush TX/RX FIFOs and set RX FIFO threshold to zero */
+-	val = (1 << M_FIFO_RX_FLUSH_SHIFT) | (1 << M_FIFO_TX_FLUSH_SHIFT);
++	val = (BIT(M_FIFO_RX_FLUSH_SHIFT) | BIT(M_FIFO_TX_FLUSH_SHIFT));
+ 	writel(val, iproc_i2c->base + M_FIFO_CTRL_OFFSET);
+ 	/* disable all interrupts */
+-	writel(0, iproc_i2c->base + IE_OFFSET);
++	val = readl(iproc_i2c->base + IE_OFFSET);
++	val &= ~(IE_M_ALL_INTERRUPT_MASK <<
++			IE_M_ALL_INTERRUPT_SHIFT);
++	writel(val, iproc_i2c->base + IE_OFFSET);
+ 
+ 	/* clear all pending interrupts */
+ 	writel(0xffffffff, iproc_i2c->base + IS_OFFSET);
+@@ -288,6 +540,14 @@ static int bcm_iproc_i2c_check_status(struct bcm_iproc_i2c_dev *iproc_i2c,
+ 		dev_dbg(iproc_i2c->device, "bus timeout\n");
+ 		return -ETIMEDOUT;
+ 
++	case M_CMD_STATUS_FIFO_UNDERRUN:
++		dev_dbg(iproc_i2c->device, "FIFO under-run\n");
++		return -ENXIO;
++
++	case M_CMD_STATUS_RX_FIFO_FULL:
++		dev_dbg(iproc_i2c->device, "Master Rx FIFO full > 10ms\n");
++		return -ETIMEDOUT;
++
+ 	default:
+ 		dev_dbg(iproc_i2c->device, "unknown error code=%d\n", val);
+ 
+@@ -442,12 +702,14 @@ static int bcm_iproc_i2c_xfer(struct i2c_adapter *adapter,
+ 
+ static uint32_t bcm_iproc_i2c_functionality(struct i2c_adapter *adap)
+ {
+-	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
++	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_SLAVE;
+ }
+ 
+ static const struct i2c_algorithm bcm_iproc_algo = {
+ 	.master_xfer = bcm_iproc_i2c_xfer,
+ 	.functionality = bcm_iproc_i2c_functionality,
++	.reg_slave = bcm_iproc_i2c_reg_slave,
++	.unreg_slave = bcm_iproc_i2c_unreg_slave,
+ };
+ 
+ static struct i2c_adapter_quirks bcm_iproc_i2c_quirks = {
+@@ -612,6 +874,46 @@ static const struct dev_pm_ops bcm_iproc_i2c_pm_ops = {
+ #define BCM_IPROC_I2C_PM_OPS NULL
+ #endif /* CONFIG_PM_SLEEP */
+ 
++
++static int bcm_iproc_i2c_reg_slave(struct i2c_client *slave)
++{
++	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(slave->adapter);
++
++	if (iproc_i2c->slave)
++		return -EBUSY;
++
++	if (slave->flags & I2C_CLIENT_TEN)
++		return -EAFNOSUPPORT;
++
++	iproc_i2c->slave = slave;
++	bcm_iproc_i2c_slave_init(iproc_i2c, false);
++	return 0;
++}
++
++static int bcm_iproc_i2c_unreg_slave(struct i2c_client *slave)
++{
++	u32 tmp;
++	struct bcm_iproc_i2c_dev *iproc_i2c = i2c_get_adapdata(slave->adapter);
++
++	if (!iproc_i2c->slave)
++		return -EINVAL;
++
++	iproc_i2c->slave = NULL;
++
++	/* disable all slave interrupts */
++	tmp = readl(iproc_i2c->base + IE_OFFSET);
++	tmp &= ~(IE_S_ALL_INTERRUPT_MASK <<
++			IE_S_ALL_INTERRUPT_SHIFT);
++	writel(tmp, iproc_i2c->base + IE_OFFSET);
++
++	/* Erase the slave address programmed */
++	tmp = readl(iproc_i2c->base + S_CFG_SMBUS_ADDR_OFFSET);
++	tmp &= ~BIT(S_CFG_EN_NIC_SMB_ADDR3_SHIFT);
++	writel(tmp, iproc_i2c->base + S_CFG_SMBUS_ADDR_OFFSET);
++
++	return 0;
++}
++
+ static const struct of_device_id bcm_iproc_i2c_of_match[] = {
+ 	{ .compatible = "brcm,iproc-i2c" },
+ 	{ /* sentinel */ }
 -- 
 2.17.1
 
