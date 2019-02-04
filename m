@@ -2,92 +2,66 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C641C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:40:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AE7DDC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:46:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 40AC32147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:40:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 789032147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:46:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VacvPsCy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ffwll.ch header.i=@ffwll.ch header.b="BbiNwtic"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 40AC32147A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ffwll.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c6jfdvaO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 789032147A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Bm8rt+KJcj0sbsyBjBcwD1IVibxqjgCodODMlUKVeks=; b=VacvPsCyG68pA0
-	uGqzoIOQsNX6R66nuYRPw5LV9ckKzeJ820FK525RvvrJzFs2P3PukxqFDLqacKC40o1UhhkO8T5UV
-	NHJLJJ2jCf2wbBWB2O64+ebXAhSOxCtgHN4VyZ3KY/r6819cRUeBgWXPV2Dy6juWyNVAoNDV9nnEA
-	DIJyqTDtdDkP7mFZLFnyqbqWw8r0qUNtHqon8dCG+iIiuI9Mcao4q013wexvSObcm2j4OFoSQN+gy
-	qe1HI4d93296Blr5yLbtkSoV6RV4V4az4xydKyUqWdaaaED8Ro8cZSzI0HdDuD5fpv3lluACwOz8U
-	6k/3WHzF+rjhv5YUt1+A==;
+	List-Owner; bh=GmcDq2OonUSB8p5RbuRa6ciou9vC3xz0eCwfcl+kB54=; b=c6jfdvaOcHSVom
+	wVtn93ll6/HoajTPFhAVj9EeMrbL0MMtDyAEqhCETAXUwEqw44ySaieDgn1eU6SIDzJsO9RzEyYtM
+	rHXFBZ/4o+nbagXUL9sApCJwhxZxihqVDDYcLwh8+dnh7pMQiDkxEgN9LZVMtM//jKpDLCciKCnt+
+	kquv+bD6l9UWoie5M3lO/EBDoYekLaJ2iilzqBx8AS23A3BnG6gHX1unN1oPMthBEl1kiGTaiGOWT
+	j6NfXiICKOEgVHZ8DAmF8xx+VQAkLcxuXDwmJsqARPF/7GQ+6bbdE9IQFwfAWqnIq5+xcI08h1oe5
+	0nXtvQlvqwawuoPLnyaA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqajn-0001yU-57; Mon, 04 Feb 2019 09:40:23 +0000
-Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
+	id 1gqapP-0003r9-Gv; Mon, 04 Feb 2019 09:46:11 +0000
+Received: from szxga07-in.huawei.com ([45.249.212.35] helo=huawei.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqaji-0001y0-OF
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 09:40:20 +0000
-Received: by mail-ed1-x541.google.com with SMTP id b3so10705724ede.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 01:40:17 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ffwll.ch; s=google;
- h=sender:date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=Pb3lUw7DjM/W91nlG1PjwpEOuXLFtGd6iTfqfZ2ZHEE=;
- b=BbiNwticcXE6YYALiJ1tlqKCHhki2N7vG37ojLnI3eNHY/mIAeFYPtRH69AB+pB/kJ
- 7h4FaqN5v4+JIiEuhTulk2VGK9llrHjdFlDa4WA3dxnNRk61Nk2J+Y0jw5AjAD/xmOVS
- uE2/wauNO2EvsH3vKWY1jfblspuU5GpzT4QkU=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
- :references:mime-version:content-disposition:in-reply-to:user-agent;
- bh=Pb3lUw7DjM/W91nlG1PjwpEOuXLFtGd6iTfqfZ2ZHEE=;
- b=um12lWj+T701ZCHFVuqvO8y7yr5jh32PSsMWGgOJzlUccSKZ6n4sQEng1DTEvJgYgx
- 5sHEPf0t9dBDXDI52BKiLpQS6LbeXK2ohCRR1U+OhZ+klbr/qqqyQZ6CiabIn+da22yT
- hZrbdWvVV1vMqKCvDtHaZeENgFDR2lApxgAvgz03AduLoqLGVXnFrB/Qgm52PzghJXCo
- oLxWUZISb+NMMPHagHJGsfLnPX7tPS+akdprXl3fE+wCOndq5MPmJjPZC6r9sZdhGAQt
- Wr/G/vE973MeZgOEE9OVNXpMeVyDhfE3ukXQ5ENN9qfEilsyf15g3XUIaEDKMxDXFgfC
- w8fA==
-X-Gm-Message-State: AJcUukeGAXqHwkD+M1Ts142kZGhKFA1uRUEmY63tXHjrBNJaFVLCWPAj
- jpwmBjpUPCkGFNZ+vwlF8vMgtg==
-X-Google-Smtp-Source: ALg8bN6pVNVS3EOUrTJ540ORIKI0g0hUh0hLARW5O3RgmVw0qWEQwF81qo3TJ5FUBAkYIHnsbTBiAg==
-X-Received: by 2002:aa7:d394:: with SMTP id x20mr43535336edq.193.1549273216275; 
- Mon, 04 Feb 2019 01:40:16 -0800 (PST)
-Received: from phenom.ffwll.local ([2a02:168:569e:0:3106:d637:d723:e855])
- by smtp.gmail.com with ESMTPSA id f35sm4072761edd.80.2019.02.04.01.40.14
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 04 Feb 2019 01:40:14 -0800 (PST)
-Date: Mon, 4 Feb 2019 10:40:12 +0100
-From: Daniel Vetter <daniel@ffwll.ch>
-To: Thierry Reding <thierry.reding@gmail.com>
-Subject: Re: [PATCH RESEND v2 08/12] dt-bindings: add binding for generic eDP
- panel
-Message-ID: <20190204094012.GP3271@phenom.ffwll.local>
-References: <20190203185501.8958-1-anarsoul@gmail.com>
- <20190203185501.8958-9-anarsoul@gmail.com>
- <20190204074350.GC16448@ulmo>
- <CA+E=qVecudACOEXt74Kf=UA_F-uuHgEqHzKpYAq1ocMx3Sx+eQ@mail.gmail.com>
- <20190204082353.GE19087@ulmo>
+ id 1gqapM-0003qN-5M
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 09:46:10 +0000
+Received: from DGGEMS409-HUB.china.huawei.com (unknown [172.30.72.60])
+ by Forcepoint Email with ESMTP id 1263A392EDC18905213B;
+ Mon,  4 Feb 2019 17:45:58 +0800 (CST)
+Received: from localhost (10.202.226.61) by DGGEMS409-HUB.china.huawei.com
+ (10.3.19.209) with Microsoft SMTP Server id 14.3.408.0; Mon, 4 Feb 2019
+ 17:45:54 +0800
+Date: Mon, 4 Feb 2019 09:45:40 +0000
+From: Jonathan Cameron <jonathan.cameron@huawei.com>
+To: Georg Ottinger <g.ottinger@abatec.at>
+Subject: Re: [PATCH] iio: adc: at91: disable adc channel interrupt in
+ timeout case
+Message-ID: <20190204094540.00003072@huawei.com>
+In-Reply-To: <0974ce54b3da4d82b6bd3026a3de5ff3@abatec.at>
+References: <20190130134202.5831-1-g.ottinger@abatec.at>
+ <20190202102021.12bb0a72@archlinux>
+ <0974ce54b3da4d82b6bd3026a3de5ff3@abatec.at>
+Organization: Huawei
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; i686-w64-mingw32)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190204082353.GE19087@ulmo>
-X-Operating-System: Linux phenom 4.19.0-1-amd64 
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-Originating-IP: [10.202.226.61]
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_014018_855007_15347D9F 
-X-CRM114-Status: GOOD (  30.07  )
+X-CRM114-CacheID: sfid-20190204_014608_373655_092EB083 
+X-CRM114-Status: GOOD (  25.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,98 +73,224 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Archit Taneja <architt@codeaurora.org>, Andrzej Hajda <a.hajda@samsung.com>,
- David Airlie <airlied@linux.ie>, linux-sunxi <linux-sunxi@googlegroups.com>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Sean Paul <seanpaul@chromium.org>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Daniel Vetter <daniel@ffwll.ch>,
- arm-linux <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ Lars-Peter Clausen <lars@metafoo.de>, Kees Cook <keescook@chromium.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ "linux-iio@vger.kernel.org" <linux-iio@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Ludovic Desroches <ludovic.desroches@microchip.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ Peter Meerwald-Stadler <pmeerw@pmeerw.net>, Hartmut Knaack <knaack.h@gmx.de>,
+ "eugen.hristev@microchip.com" <eugen.hristev@microchip.com>,
+ Stefan Etzlstorfer <s.etzlstorfer@abatec.at>,
+ "David S. Miller" <davem@davemloft.net>, Jonathan Cameron <jic23@kernel.org>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 04, 2019 at 09:23:59AM +0100, Thierry Reding wrote:
-> On Mon, Feb 04, 2019 at 12:13:55AM -0800, Vasily Khoruzhick wrote:
-> > On Sun, Feb 3, 2019 at 11:43 PM Thierry Reding <thierry.reding@gmail.com> wrote:
-> > >
-> > > On Sun, Feb 03, 2019 at 10:54:57AM -0800, Vasily Khoruzhick wrote:
-> > > > eDP panels usually have EDID EEPROM, so there's no need to define panel
-> > > > width/height or any modes/timings in dts. But this panel still may have
-> > > > regulator and/or backlight.
-> > > >
-> > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > > > ---
-> > > >  .../devicetree/bindings/display/panel/panel-edp.txt        | 7 +++++++
-> > > >  1 file changed, 7 insertions(+)
-> > > >  create mode 100644 Documentation/devicetree/bindings/display/panel/panel-edp.txt
-> > >
-> > > Please don't try to make panels look more generic than they really are.
-> > > You're going to have to provide a compatible string for your device that
-> > > is more specific than "panel-edp". You claim that you don't need any
-> > > extra information that is panel specific, but you don't know that now.
-> > > We have in the past thought that we didn't need things like prepare
-> > > delay, but then we ran into situations where we did need them.
-> > >
-> > > Just do what everybody else does. Provide a specific compatible string
-> > > and match on that in the panel-simple driver. Even if you can read all
-> > > the video timings from an EDID EEPROM, you can still provide a mode in
-> > > the panel descriptor to serve as a fallback if for example the EEPROM
-> > > is faulty on some device.
-> > 
-> > Pinebook used several 768p panels that have slightly different timings
-> > and recent batch uses 1080p panel.
-> > 
-> > What panel descriptor should I use as fallback?
-> 
-> You don't use panel descriptors as fallback. The simple-panel driver
-> will bind to a panel device and use the corresponding descriptor. If
-> your device tree contains the correct information, the descriptor is
-> correct for the panel you have.
-> 
-> In other words you need to ensure that you have the correct panel in
-> device tree for the board that you're using. This is exactly the same
-> thing as for other devices.
-> 
-> One way to to this is to have separate device trees for each variant
-> of the board that you want to support. Another variant may be to have
-> a common device tree and then have some early firmware update the DTB
-> with the correct panel information.
+On Mon, 4 Feb 2019 07:17:07 +0000
+Georg Ottinger <g.ottinger@abatec.at> wrote:
 
-This would defeat the point of edp, which is to standardize the mess of
-panels (at least somewhat) and avoid having to change the DT/ACPI
-tables/firmware for every board you ship. Also, we do have DP quirking
-infrastructure already (using the OUI), I think if there's something that
-doesn't work then we should quirk it there.
+> Actually this issue occurred to us with an concrete product, where we exp=
+erienced a system hang at -20 =B0C.
+> It was triggered by a race condition between the Touch Trigger and the Ch=
+annel Trigger of the ADC. Once triggered we got in to the situation where a=
+n ongoing Channel Conversion was lost (Timeout case).When we queried a seco=
+nd channel than we got a system hang. Investigating this issue we developed=
+ an error demonstrator - reading alternating two channels as fast as possib=
+le (when Touch is enabled). This also provokes this issue at room temperatu=
+re.
+> =
 
-What does make sense though imo is if we try not to stuff the edp panel
-into panel-simple, because it's anything like a simple dumb panel. There's
-also some integration awkwardness since with this panel you need to do dp
-aux/i2c transactions to get at the information (edid alone isn't good
-enough for edp), and I'm not sure how exactly that's supposed to be
-instantiated. Maybe a special function to instantiate an edp panel, which
-takes both a DT node and the dp_aux controller would be much better,
-instead of trying to auto-match against a DT compatible string and load a
-panel driver which is almost all fake.
+> For the error demonstrator use following commandline to compile:
+> =
 
-Or we teach dp_aux to register itself and somehow teach panel-edp how it
-can get hold of the dp_aux channel it needs.
+> $ arm-buildroot-linux-gnueabihf-gcc adc_demo_error.c -D2ND_CHANNEL -o adc=
+_demo_error2
+> =
 
-But fake mode in panel-simple sounds like the wrong approach. At least
-from our experience with i915 (and I think other drivers supporting edp),
-the standardization of panels for basic stuff at least worked.
-Self-refresh seems an entirely different story unfortunately ... but again
-quirking that for DP stuff should be done using the OUI I think.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+> -------------
+> // adc_demo_error.c
+> #include <unistd.h>
+> #include <fcntl.h>
+> =
+
+> #define VLEN 10
+> =
+
+> int main()
+> {
+>   int fd_adc,fd_adc2;
+>   int ret;
+>   char dummy[VLEN];
+>   =
+
+>   fd_adc =3D open ("/sys/devices/platform/ahb/ahb:apb/f8018000.adc/iio:de=
+vice0/in_voltage4_raw",O_RDONLY);  =
+
+> #ifdef 2ND_CHANNEL
+>   fd_adc2 =3D open ("/sys/devices/platform/ahb/ahb:apb/f8018000.adc/iio:d=
+evice0/in_voltage5_raw",O_RDONLY);
+> #endif
+> =
+
+>   while(1) {
+> =
+
+>     lseek(fd_adc, 0, SEEK_SET);
+>     ret =3D read(fd_adc, dummy, VLEN);
+> #ifdef 2ND_CHANNEL
+>     lseek(fd_adc2, 0, SEEK_SET);
+>     ret =3D read(fd_adc2, dummy, VLEN);
+> #endif
+> =
+
+>   }
+> }
+> =
+
+> ------------
+> =
+
+> =
+
+> Greeting, Georg
+Hi Georg,
+
+Thanks for the detailed error report and reproducer.
+
+What has me wondering now is where the race is that is triggering this?
+Could you talk us through it?  I don't know this driver that well so
+probably much quicker for you to fill in the gaps rather than me try
+to figure out the race path!
+
+I have no problem with defense in depth (with appropriate comments) but
+I'd like to close that down as well.  If it really is unsolvable I'd
+like at least to have some clear comments in the code explaining why.
+
+Thanks,
+
+Jonathan
+
+> =
+
+> -----Urspr=FCngliche Nachricht-----
+> Von: Jonathan Cameron [mailto:jic23@kernel.org] =
+
+> Gesendet: Samstag, 02. Februar 2019 11:21
+> An: Georg Ottinger <g.ottinger@abatec.at>
+> Cc: eugen.hristev@microchip.com; Stefan Etzlstorfer <s.etzlstorfer@abatec=
+.at>; Hartmut Knaack <knaack.h@gmx.de>; Lars-Peter Clausen <lars@metafoo.de=
+>; Peter Meerwald-Stadler <pmeerw@pmeerw.net>; Nicolas Ferre <nicolas.ferre=
+@microchip.com>; Alexandre Belloni <alexandre.belloni@bootlin.com>; Ludovic=
+ Desroches <ludovic.desroches@microchip.com>; David S. Miller <davem@daveml=
+oft.net>; Ard Biesheuvel <ard.biesheuvel@linaro.org>; Kees Cook <keescook@c=
+hromium.org>; linux-iio@vger.kernel.org; linux-arm-kernel@lists.infradead.o=
+rg; linux-kernel@vger.kernel.org; Maxime Ripard <maxime.ripard@bootlin.com>
+> Betreff: Re: [PATCH] iio: adc: at91: disable adc channel interrupt in tim=
+eout case
+> =
+
+> On Wed, 30 Jan 2019 14:42:02 +0100
+> <g.ottinger@abatec.at> wrote:
+> =
+
+> > From: Georg Ottinger <g.ottinger@abatec.at>
+> > =
+
+> > Having a brief look at at91_adc_read_raw() it is obvious that in the =
+
+> > case of a timeout the setting of AT91_ADC_CHDR and AT91_ADC_IDR =
+
+> > registers is omitted. If 2 different channels are queried we can end =
+
+> > up with a situation where two interrupts are enabled, but only one =
+
+> > interrupt is cleared in the interrupt handler. Resulting in a =
+
+> > interrupt loop and a system hang.
+> > =
+
+> > Signed-off-by: Georg Ottinger <g.ottinger@abatec.at>  =
+
+> =
+
+> Whilst I agree this looks like a correct change, I would like Maxime to t=
+ake a look as he is obviously much more familiar with the driver than I am.
+> =
+
+> I suspect you can only actually get there in the event of a hardware fail=
+ure as that isn't actually a timeout you should ever see.
+> Could be wrong though!
+> =
+
+> Thanks,
+> =
+
+> Jonathan
+> =
+
+> > ---
+> >  drivers/iio/adc/at91_adc.c | 28 +++++++++++++++++-----------
+> >  1 file changed, 17 insertions(+), 11 deletions(-)
+> > =
+
+> > diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c =
+
+> > index 75d2f7358..596841a3c 100644
+> > --- a/drivers/iio/adc/at91_adc.c
+> > +++ b/drivers/iio/adc/at91_adc.c
+> > @@ -704,23 +704,29 @@ static int at91_adc_read_raw(struct iio_dev *idev,
+> >  		ret =3D wait_event_interruptible_timeout(st->wq_data_avail,
+> >  						       st->done,
+> >  						       msecs_to_jiffies(1000));
+> > -		if (ret =3D=3D 0)
+> > -			ret =3D -ETIMEDOUT;
+> > -		if (ret < 0) {
+> > -			mutex_unlock(&st->lock);
+> > -			return ret;
+> > -		}
+> > -
+> > -		*val =3D st->last_value;
+> >  =
+
+> > +		/* Disable interrupts, regardless if adc conversion was
+> > +		 * successful or not
+> > +		 */
+> >  		at91_adc_writel(st, AT91_ADC_CHDR,
+> >  				AT91_ADC_CH(chan->channel));
+> >  		at91_adc_writel(st, AT91_ADC_IDR, BIT(chan->channel));
+> >  =
+
+> > -		st->last_value =3D 0;
+> > -		st->done =3D false;
+> > +		if (ret > 0) {
+> > +			/* a valid conversion took place */
+> > +			*val =3D st->last_value;
+> > +			st->last_value =3D 0;
+> > +			st->done =3D false;
+> > +			ret =3D IIO_VAL_INT;
+> > +		} else if (ret =3D=3D 0) {
+> > +			/* conversion timeout */
+> > +			dev_err(&idev->dev, "ADC Channel %d timeout.\n",
+> > +				chan->channel);
+> > +			ret =3D -ETIMEDOUT;
+> > +		}
+> > +
+> >  		mutex_unlock(&st->lock);
+> > -		return IIO_VAL_INT;
+> > +		return ret;
+> >  =
+
+> >  	case IIO_CHAN_INFO_SCALE:
+> >  		*val =3D st->vref_mv;  =
+
+> =
+
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
