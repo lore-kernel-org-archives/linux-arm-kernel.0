@@ -2,63 +2,75 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0023FC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:41:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B860C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:49:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C4EB020823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:41:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 16FBC20823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:49:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JYK6Alfr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C4EB020823
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uDxrrrHJ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="YHEzl9VW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16FBC20823
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2tcrcjoNaBpaFgrl3lFMTj0WdAgVwJs9ZLQO+NjL5z0=; b=JYK6Alfrvr8+5N
-	4HwznhdwCSXkvs/Ccksjl9Zppg9poEt2/n8/p3TkVYwpPrQsIXyK5PvX8YK27c6m+/whj//lrU8BH
-	L+xTzEOHD1g1vKcqrlGRLpyZcMsTepnxHFMykcFa03JBfQLqB6QH0Eo3qL3GyBuqwZ6GUUS0Phts0
-	CYpsYGDZHEvjhXE7tzFMXq6QxHsdRG8JfqCz0qFPGkFn5UBU3NfKsf3nFzZRG+0pUHgx/Gxmxg9iH
-	9kUHocZ5OIgdgMHNvMTOkSvltDrJQTPDl5fHPt62mIW33wswcCAfyCt+pexDxPTcyqhojMieIms5M
-	tWIbliMGTVmBW6ZC2AOw==;
+	List-Owner; bh=bwx/j772QVCGmCTAjRU+h2FCmb204o08A6ksJ9FPdc0=; b=uDxrrrHJUEUvYg
+	skl2JDq4g8KzUujeFFVoDz0Uvq30BVUGvURZgt5VtCvHlXcJieWEfpKOpZHBiue9h4LgB7S50TTTy
+	p03/hGNw8meGb2DT/c1evpYXFPO2OeiHRyjGT1fzPC8QJJJEYENHFFMfH4uYJ1TMAv/4HoD03k2su
+	C4JXOURzQXWKaEo3ar7u5hFmZFBJRve1H6JhPViA29cv1lDK1KSqL/HqrOwBynSGRLASGxjiTVfbR
+	Je7Tf6DaRj4C7B/rSuZhb7Q9IyJAHLH/KjATv3OtkSATE0gPdGTHRke5XSGSHr2bDAM8MWaoHd5RB
+	7rj/9E+1mGuI4dyDXBLQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqhIz-0007Wh-OM; Mon, 04 Feb 2019 16:41:09 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqhIw-0007WN-VD
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:41:08 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2CF41EBD;
- Mon,  4 Feb 2019 08:41:06 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 807313F589;
- Mon,  4 Feb 2019 08:41:03 -0800 (PST)
-Date: Mon, 4 Feb 2019 16:40:54 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Kishon Vijay Abraham I <kishon@ti.com>
-Subject: Re: [PATCH 00/24] Add support for PCIe RC and EP mode in TI's AM654
- SoC
-Message-ID: <20190204164054.GA21488@e107981-ln.cambridge.arm.com>
-References: <20190114132424.6445-1-kishon@ti.com>
+	id 1gqhQm-0001Ef-Pw; Mon, 04 Feb 2019 16:49:12 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqhQj-0001EF-Qf; Mon, 04 Feb 2019 16:49:11 +0000
+Received: from mail-qk1-f182.google.com (mail-qk1-f182.google.com
+ [209.85.222.182])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 5C274214DA;
+ Mon,  4 Feb 2019 16:49:09 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549298949;
+ bh=Mpmh6LaI22ykge7dX8aUasPmahQKEE51CwSLQRoJCkc=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=YHEzl9VWcs89TbQ+ycTxLcrUxwl50ufvaBR/C4O2/vnGKIEkfNAFpSbOqylZE4qZw
+ tmkQ8R8l6lUEQ+Z84debtiJfaSYsrsZWNS5ve97ZFLdPWUWRKRp23NiZfuxhnnFz0Z
+ ld0+PwjSP7rgaJ/3COAbs3E1H8X6Cas2/hHGceoI=
+Received: by mail-qk1-f182.google.com with SMTP id m17so333970qki.5;
+ Mon, 04 Feb 2019 08:49:09 -0800 (PST)
+X-Gm-Message-State: AHQUAuZ7CkiA5PjuuUyEcK800LIO41ohUBIynv316gqOJT4+v/YTVV3X
+ JUBIo3WE1xT1gqMo2IgeBsxPrEKaJho0ZXZTDA==
+X-Google-Smtp-Source: AHgI3IbPiJR4gIgh9R1NHxtat41pdZ3Mnt1ZPtuUMayE4VMjibU2jjxn5gVbgM9FBKTMhX84Fy+w4tU3U1XDVkmggbI=
+X-Received: by 2002:a37:6451:: with SMTP id y78mr197590qkb.147.1549298948546; 
+ Mon, 04 Feb 2019 08:49:08 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190114132424.6445-1-kishon@ti.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+References: <20190202170711.29471-1-robh@kernel.org>
+ <bebcbda6-1059-857b-4e7d-9751248f6804@tronnes.org>
+ <CAL_JsqL-7bOCS+T1xuJBmSgwRN1shCSNeQPxreCH76_s9hEYWw@mail.gmail.com>
+In-Reply-To: <CAL_JsqL-7bOCS+T1xuJBmSgwRN1shCSNeQPxreCH76_s9hEYWw@mail.gmail.com>
+From: Rob Herring <robh@kernel.org>
+Date: Mon, 4 Feb 2019 10:48:57 -0600
+X-Gmail-Original-Message-ID: <CAL_Jsq+s=Y1P+0S=Q=+UgrXZQQO4mLrvEg7TmzWfKfXJmPCuPg@mail.gmail.com>
+Message-ID: <CAL_Jsq+s=Y1P+0S=Q=+UgrXZQQO4mLrvEg7TmzWfKfXJmPCuPg@mail.gmail.com>
+Subject: Re: [PATCH] drm/rockchip: Use drm_fbdev_generic_setup()
+To: =?UTF-8?Q?Noralf_Tr=C3=B8nnes?= <noralf@tronnes.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_084107_013405_497F8C70 
-X-CRM114-Status: GOOD (  22.12  )
+X-CRM114-CacheID: sfid-20190204_084909_899890_DF25A104 
+X-CRM114-Status: GOOD (  17.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,108 +82,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Jesper Nilsson <jesper.nilsson@axis.com>, Arnd Bergmann <arnd@arndb.de>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>, linux-pci@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@axis.com,
- Rob Herring <robh+dt@kernel.org>, Murali Karicheri <m-karicheri2@ti.com>,
- Jingoo Han <jingoohan1@gmail.com>, Bjorn Helgaas <bhelgaas@google.com>,
- linux-omap@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: =?UTF-8?Q?Heiko_St=C3=BCbner?= <heiko@sntech.de>,
+ David Airlie <airlied@linux.ie>, Sandy Huang <hjc@rock-chips.com>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ "open list:ARM/Rockchip SoC..." <linux-rockchip@lists.infradead.org>,
+ Daniel Vetter <daniel@ffwll.ch>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 14, 2019 at 06:54:00PM +0530, Kishon Vijay Abraham I wrote:
-> Add PCIe RC support for TI's AM654 SoC. The PCIe controller in AM654
-> uses Synopsys core revision 4.90a and uses the same TI wrapper as used
-> in keystone2 with certain modification. Hence AM654 will use the same
-> pci wrapper driver pci-keystone.c
-> 
-> This series was initially part of [1]. This series only includes patches
-> that has to be merged via Lorenzo's tree. The PHY patches and dt patches
-> will be sent separately.
-> 
-> This series is created over my keystone MSI cleanup series [2] and EPC
-> features series [3].
-
-Hi Kishon,
-
-so I would suggest we merge those series first, starting from the MSI
-clean-up.
-
-I will mark this series as awaiting upstream, it is on my radar but
-we have to get the two others done first.
-
-Thanks,
-Lorenzo
-
-> This series:
-> *) Cleanup pci-keystone driver so that both RC mode and EP mode of
->    AM654 can be supported
-> *) Modify epc-core to support allocation of aligned buffers required for
->    AM654
-> *) Fix ATU unroll identification
-> *) Add support for both host mode and device mode in AM654    
-> 
-> [1] -> https://lore.kernel.org/patchwork/cover/989487/
-> [2] -> https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg1883081.html
-> [3] -> https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg1899011.html
-> 
-> Kishon Vijay Abraham I (24):
->   PCI: keystone: Add start_link/stop_link dw_pcie_ops
->   PCI: keystone: Cleanup error_irq configuration
->   dt-bindings: PCI: keystone: Add "reg-names" binding information
->   PCI: keystone: Perform host initialization in a single function
->   PCI: keystone: Use platform_get_resource_byname to get memory
->     resources
->   PCI: keystone: Move initializations to appropriate places
->   dt-bindings: PCI: Add dt-binding to configure PCIe mode
->   PCI: keystone: Explicitly set the PCIe mode
->   dt-bindings: PCI: Document "atu" reg-names
->   PCI: dwc: Enable iATU unroll for endpoint too
->   PCI: dwc: Fix ATU identification for designware version >= 4.80
->   PCI: keystone: Prevent ARM32 specific code to be compiled for ARM64
->   dt-bindings: PCI: Add PCI RC dt binding documentation for AM654
->   PCI: keystone: Add support for PCIe RC in AM654x Platforms
->   PCI: keystone: Invoke phy_reset API before enabling PHY
->   PCI: endpoint: Add support to allocate aligned buffers to be mapped in
->     BARs
->   PCI: dwc: Add const qualifier to struct dw_pcie_ep_ops
->   PCI: dwc: Fix dw_pcie_ep_find_capability to return correct capability
->     offset
->   PCI: dwc: Add callbacks for accessing dbi2 address space
->   PCI: keystone: Add support for PCIe EP in AM654x Platforms
->   PCI: designware-ep: Configure RESBAR to advertise the smallest size
->   PCI: designware-ep: Use aligned ATU window for raising MSI interrupts
->   misc: pci_endpoint_test: Add support to test PCI EP in AM654x
->   misc: pci_endpoint_test: Fix test_reg_bar to be updated in
->     pci_endpoint_test
-> 
->  .../bindings/pci/designware-pcie.txt          |   7 +-
->  .../devicetree/bindings/pci/pci-keystone.txt  |  14 +-
->  drivers/misc/pci_endpoint_test.c              |  17 +
->  drivers/pci/controller/dwc/Kconfig            |  25 +-
->  drivers/pci/controller/dwc/pci-dra7xx.c       |   2 +-
->  drivers/pci/controller/dwc/pci-keystone.c     | 505 ++++++++++++++----
->  drivers/pci/controller/dwc/pcie-artpec6.c     |   2 +-
->  .../pci/controller/dwc/pcie-designware-ep.c   |  55 +-
->  .../pci/controller/dwc/pcie-designware-host.c |  19 -
->  .../pci/controller/dwc/pcie-designware-plat.c |   2 +-
->  drivers/pci/controller/dwc/pcie-designware.c  |  52 ++
->  drivers/pci/controller/dwc/pcie-designware.h  |  15 +-
->  drivers/pci/endpoint/functions/pci-epf-test.c |   5 +-
->  drivers/pci/endpoint/pci-epf-core.c           |  10 +-
->  include/linux/pci-epc.h                       |   2 +
->  include/linux/pci-epf.h                       |   3 +-
->  16 files changed, 587 insertions(+), 148 deletions(-)
-> 
-> -- 
-> 2.17.1
-> 
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gTW9uLCBGZWIgNCwgMjAxOSBhdCA5OjAxIEFNIFJvYiBIZXJyaW5nIDxyb2JoQGtlcm5lbC5v
+cmc+IHdyb3RlOgo+Cj4gT24gU2F0LCBGZWIgMiwgMjAxOSBhdCAxMjoyMiBQTSBOb3JhbGYgVHLD
+uG5uZXMgPG5vcmFsZkB0cm9ubmVzLm9yZz4gd3JvdGU6Cj4gPiBEZW4gMDIuMDIuMjAxOSAxOC4w
+Nywgc2tyZXYgUm9iIEhlcnJpbmc6Cj4gPiA+IE90aGVyIHRoYW4gdXNpbmcgYSByb2NrY2hpcF9n
+ZW1fb2JqZWN0IGRpcmVjdGx5LCB0aGUgUm9ja2NoaXAgZmJkZXYKPiA+ID4gc2V0dXAgaGFzIG5v
+dGhpbmcgc3BlY2lhbCBhbmQgY2FuIGJlIGNvbnZlcnRlZCB0byB1c2UgdGhlIGdlbmVyaWMgZmJk
+ZXYKPiA+ID4gZW11bGF0aW9uIGluc3RlYWQuCj4KPiBbLi4uXQo+Cj4gPiA+IC1zdGF0aWMgaW50
+IHJvY2tjaGlwX2RybV9mYmRldl9jcmVhdGUoc3RydWN0IGRybV9mYl9oZWxwZXIgKmhlbHBlciwK
+PiA+ID4gLSAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHJ1Y3QgZHJtX2ZiX2hl
+bHBlcl9zdXJmYWNlX3NpemUgKnNpemVzKQo+ID4gPiAtewo+ID4gPiAtICAgICBzdHJ1Y3Qgcm9j
+a2NoaXBfZHJtX3ByaXZhdGUgKnByaXZhdGUgPSB0b19kcm1fcHJpdmF0ZShoZWxwZXIpOwo+ID4g
+PiAtICAgICBzdHJ1Y3QgZHJtX21vZGVfZmJfY21kMiBtb2RlX2NtZCA9IHsgMCB9Owo+ID4gPiAt
+ICAgICBzdHJ1Y3QgZHJtX2RldmljZSAqZGV2ID0gaGVscGVyLT5kZXY7Cj4gPiA+IC0gICAgIHN0
+cnVjdCByb2NrY2hpcF9nZW1fb2JqZWN0ICpya19vYmo7Cj4gPiA+IC0gICAgIHN0cnVjdCBkcm1f
+ZnJhbWVidWZmZXIgKmZiOwo+ID4gPiAtICAgICB1bnNpZ25lZCBpbnQgYnl0ZXNfcGVyX3BpeGVs
+Owo+ID4gPiAtICAgICB1bnNpZ25lZCBsb25nIG9mZnNldDsKPiA+ID4gLSAgICAgc3RydWN0IGZi
+X2luZm8gKmZiaTsKPiA+ID4gLSAgICAgc2l6ZV90IHNpemU7Cj4gPiA+IC0gICAgIGludCByZXQ7
+Cj4gPiA+IC0KPiA+ID4gLSAgICAgYnl0ZXNfcGVyX3BpeGVsID0gRElWX1JPVU5EX1VQKHNpemVz
+LT5zdXJmYWNlX2JwcCwgOCk7Cj4gPiA+IC0KPiA+ID4gLSAgICAgbW9kZV9jbWQud2lkdGggPSBz
+aXplcy0+c3VyZmFjZV93aWR0aDsKPiA+ID4gLSAgICAgbW9kZV9jbWQuaGVpZ2h0ID0gc2l6ZXMt
+PnN1cmZhY2VfaGVpZ2h0Owo+ID4gPiAtICAgICBtb2RlX2NtZC5waXRjaGVzWzBdID0gc2l6ZXMt
+PnN1cmZhY2Vfd2lkdGggKiBieXRlc19wZXJfcGl4ZWw7Cj4gPiA+IC0gICAgIG1vZGVfY21kLnBp
+eGVsX2Zvcm1hdCA9IGRybV9tb2RlX2xlZ2FjeV9mYl9mb3JtYXQoc2l6ZXMtPnN1cmZhY2VfYnBw
+LAo+ID4gPiAtICAgICAgICAgICAgIHNpemVzLT5zdXJmYWNlX2RlcHRoKTsKPiA+ID4gLQo+ID4g
+PiAtICAgICBzaXplID0gbW9kZV9jbWQucGl0Y2hlc1swXSAqIG1vZGVfY21kLmhlaWdodDsKPiA+
+ID4gLQo+ID4gPiAtICAgICBya19vYmogPSByb2NrY2hpcF9nZW1fY3JlYXRlX29iamVjdChkZXYs
+IHNpemUsIHRydWUpOwo+ID4KPiA+IEkgZG9uJ3QgdGhpbmsgdGhlIGdlbmVyaWMgZW11bGF0aW9u
+IGluIGl0J3MgY3VycmVudCBmb3JtIHdpbGwgd29yayBmb3IKPiA+IHJvY2tjaGlwLiByb2NrY2hp
+cCB0cmVhdHMgZmJkZXYgYnVmZmVycyBhbmQgZHVtYiBidWZmZXJzIGRpZmZlcmVudGx5LiBJZgo+
+ID4gaXQgdXNlcyBETUEgYnVmZmVycywgdGhlbiB0aGUgZHVtYiBidWZmZXIgY2FuJ3QgZ2V0IGEg
+dmlydHVhbCBhZGRyZXNzLgo+Cj4gWWVzLCB5b3UgYXJlIHJpZ2h0LiBJIHRlc3RlZCB0aGUgaW9t
+bXUgY2FzZS4KPgo+ID4gRnJvbSByb2NrY2hpcF9nZW1fYWxsb2NfZG1hKCk6Cj4gPgo+ID4gICAg
+ICAgICBpZiAoIWFsbG9jX2ttYXApCj4gPiAgICAgICAgICAgICAgICAgcmtfb2JqLT5kbWFfYXR0
+cnMgfD0gRE1BX0FUVFJfTk9fS0VSTkVMX01BUFBJTkc7Cj4gPgo+ID4gRnJvbSByb2NrY2hpcF9n
+ZW1fcHJpbWVfdm1hcCgpOgo+ID4KPiA+ICAgICAgICAgaWYgKHJrX29iai0+ZG1hX2F0dHJzICYg
+RE1BX0FUVFJfTk9fS0VSTkVMX01BUFBJTkcpCj4gPiAgICAgICAgICAgICAgICAgcmV0dXJuIE5V
+TEw7Cj4gPgo+ID4gTWF5YmUgaXQncyBwb3NzaWJsZSB0byB2bWFwIGEgYnVmZmVyIGNyZWF0ZWQg
+dXNpbmcgZG1hX2FsbG9jX2F0dHJzKCkKPiA+IGFmdGVyIHRoZSBhbGxvY2F0aW9uPwo+Cj4gSXQg
+c2hvdWxkIGJlIHBvc3NpYmxlIEkgdGhpbmsgYXMgdGhhdCBpcyB3aGF0Cj4gZHJtX2dlbV9jbWFf
+cHJpbWVfaW1wb3J0X3NnX3RhYmxlX3ZtYXAoKSBkb2VzLiBPbmUgcHJvYmxlbSB0aG91Z2ggaXMK
+PiB5b3UgbWF5IGFscmVhZHkgaGF2ZSBhIG1hcHBpbmcgYmVjYXVzZSBETUFfQVRUUl9OT19LRVJO
+RUxfTUFQUElORyBpcwo+IGp1c3QgYSBzdWdnZXN0aW9uIChvbmx5IDMyLWJpdCBBUk0gaW1wbGVt
+ZW50cykgYW5kIHRoZXJlJ3Mgbm90IGEgd2F5Cj4gdG8gdGVsbCBpZiB5b3UgZ290IGEgbWFwcGlu
+ZyBvciBub3QuIE1heWJlIGl0J3Mgbm90IGFsbCB0aGF0IGltcG9ydGFudAo+IGlmIHRoZXJlIGFy
+ZSAyIG1hcHBpbmdzIGJlY2F1c2UgSSB0aGluayBvbmx5IGZiY29uIG5lZWRzIGEga2VybmVsCj4g
+bWFwcGluZy4KCkFzIGFub3RoZXIgZGF0YSBwb2ludCwgZXh5bm9zIGFsd2F5cyB1c2VzIERNQV9B
+VFRSX05PX0tFUk5FTF9NQVBQSU5HCmFuZCB0aGVuIHZtYXAncyBpdHMgZmJkZXYgYnVmZmVyLgoK
+Um9iCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51
+eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVh
+ZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1h
+cm0ta2VybmVsCg==
