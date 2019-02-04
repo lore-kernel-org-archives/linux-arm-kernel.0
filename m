@@ -7,66 +7,62 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E8C7DC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:59:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2986CC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:59:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B99A92081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:59:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E0F7A2081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:59:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cwtSBTXL";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=onstation.org header.i=@onstation.org header.b="tBbZ2BK6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B99A92081B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P86n7k+Q";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=onstation.org header.i=@onstation.org header.b="o0347q27"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E0F7A2081B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=onstation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=7CrwBhMR4lUZ3fJu1rUr6fpXGNIPqgzQt8/AFRbp30U=; b=cwtSBTXLyKIqvGFbbBZUwU42Zo
-	UY44gA7gveIirm0UwyHf7LruqNvJ/MFPGz2lJFt5mPt9ih+sU5hHQsapYtZRChD5qdSPpYxKb6S77
-	ZQwrAtphIi6qJGcdZdBZbGtTWkQy0HwQ9YNLeokw7Ip1p52Afu+Nu+G/9hfShaLp6xLZio1nRbQYW
-	YjKRrB3SttgwEnnlUklOxxoyZulNkErBTf0zXmZdxC8g8SvjK6/ilV85RtQwV6sCsXw4xQN5CradW
-	JztIB0R1KgFAFBZXrxHSa972QhNxaYaCNPKqBFry0AU/ToTuV+wpEMDib3ezItEkRGnP1xRXzPNfD
-	vzXhhjzA==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=Izk+/nmFop5WVXxHhSUvoSGN2ITSKzSNCRHNF70nlvw=; b=P86
+	n7k+QUfB9w1zO4tCEQadMuxJ+1opeP1bB1Lyd+J/M/ryFPOYadA3OOrJqxF7c3zCThyu11YEZxm8d
+	akmCdC6M1x3JrmgGFn4PsiwtOC6MvVb6hrlh+/KDMrZFM63H8ps7V6AMZuVKHs9ImIGGesDEAGYgK
+	2JdnfrUqNA8G37vhftfkWnozMadUhw+zjg+TJc0b/HQNu/F3yKNGBf+j+SbMdSYifq2KUp9qHI9eP
+	OBBjq7K2/i9Tlg3chVk706pyxUIgT/9YCYpQo86cXx/Hi8MvbVMNkP4qp15f6t6O68kv5YQe0kKOo
+	p8f92Q/EeGRbMMVhCF5D6pvq5S5x1tQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqb1o-0000la-VE; Mon, 04 Feb 2019 09:59:00 +0000
+	id 1gqb1z-0000wZ-3h; Mon, 04 Feb 2019 09:59:11 +0000
 Received: from onstation.org ([52.200.56.107])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqb1k-0000kO-SH
+ id 1gqb1k-0000kN-SI
  for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 09:58:58 +0000
 Received: from xilitla.corp.homestore.net
  (c-98-239-145-235.hsd1.wv.comcast.net [98.239.145.235])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested) (Authenticated sender: masneyb)
- by onstation.org (Postfix) with ESMTPSA id 686DA17E;
- Mon,  4 Feb 2019 09:58:55 +0000 (UTC)
+ by onstation.org (Postfix) with ESMTPSA id 889BE16B;
+ Mon,  4 Feb 2019 09:58:54 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=onstation.org;
  s=default; t=1549274335;
- bh=+ofySgnOmc3kbIqs61R1JSx+oM6/RKMpkCHAI5puzO8=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=tBbZ2BK6chS8S+emOfFBTi2txutJxXDz5BNtVYvic5ZKn6A5U5v+MCdYw22jnyDO9
- 07sgbEh4dHsqb+Z3LPuRx2BhO348n9dbitlWAQFGdUThnG3VVHCL5hmQ9togFN968y
- rQsq5YOkfuGa47qJzUm2VTCKobQck5nwYtjkGW4g=
+ bh=b7lxn7IPmC16lhSHLt4y4k56qUSfLfZNL9DqQEZGjiI=;
+ h=From:To:Cc:Subject:Date:From;
+ b=o0347q27xIJpPKgG7j5Ry+qJ9Xvn+JX4r6iKW0C5tyss8717JmTx6b3PDlv8ukTyQ
+ Vj5q8TTyCU2F0DNIbrGX3X3ng6FhujUQ9R/cs/ljmSM0vyme1jwCykrq4SL+qg47Mu
+ FvLMLlsakQmmnkgLDENMy1wwDp/FZIDF7F+3pY6g=
 From: Brian Masney <masneyb@onstation.org>
 To: linus.walleij@linaro.org,
 	tglx@linutronix.de,
 	marc.zyngier@arm.com
-Subject: [PATCH v2 -next 2/2] pinctrl: qcom: spmi-gpio: select
- IRQ_DOMAIN_HIERARCHY in Kconfig
-Date: Mon,  4 Feb 2019 04:58:53 -0500
-Message-Id: <20190204095853.12212-2-masneyb@onstation.org>
+Subject: [PATCH v2 -next 1/2] genirq: export irq_chip_set_wake_parent symbol
+Date: Mon,  4 Feb 2019 04:58:52 -0500
+Message-Id: <20190204095853.12212-1-masneyb@onstation.org>
 X-Mailer: git-send-email 2.17.2
-In-Reply-To: <20190204095853.12212-1-masneyb@onstation.org>
-References: <20190204095853.12212-1-masneyb@onstation.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_015857_089112_B9FC8FF8 
-X-CRM114-Status: UNSURE (   9.60  )
+X-CRM114-CacheID: sfid-20190204_015857_069798_ABB104FF 
+X-CRM114-Status: UNSURE (   8.97  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -90,29 +86,36 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Select IRQ_DOMAIN_HIERARCHY for spmi-gpio in Kconfig since this driver
-is now setup as a hierarchical IRQ chip.
+Export the irq_chip_set_wake_parent symbol so that drivers with
+hierarchical IRQ chips can be built as a module.
 
 Signed-off-by: Brian Masney <masneyb@onstation.org>
+Reported-by: Mark Brown <broonie@kernel.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-Changes since v1:
-- None
+This fixes a build failure in linux-next's spmi-gpio when using
+allmodconfig. See https://www.spinics.net/lists/linux-next/msg46362.html
+for Mark's message.
 
- drivers/pinctrl/qcom/Kconfig | 1 +
+Changes since v1:
+- Moved message about build failure out of the commit message and into
+  the notes field.
+
+ kernel/irq/chip.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/pinctrl/qcom/Kconfig b/drivers/pinctrl/qcom/Kconfig
-index 836e9f3eae4c..93efbffcd3a4 100644
---- a/drivers/pinctrl/qcom/Kconfig
-+++ b/drivers/pinctrl/qcom/Kconfig
-@@ -137,6 +137,7 @@ config PINCTRL_QCOM_SPMI_PMIC
-        select PINMUX
-        select PINCONF
-        select GENERIC_PINCONF
-+       select IRQ_DOMAIN_HIERARCHY
-        help
-          This is the pinctrl, pinmux, pinconf and gpiolib driver for the
-          Qualcomm GPIO and MPP blocks found in the Qualcomm PMIC's chips,
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index 34e969069488..086d5a34b5a0 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -1381,6 +1381,7 @@ int irq_chip_set_wake_parent(struct irq_data *data, unsigned int on)
+ 
+ 	return -ENOSYS;
+ }
++EXPORT_SYMBOL_GPL(irq_chip_set_wake_parent);
+ #endif
+ 
+ /**
 -- 
 2.17.2
 
