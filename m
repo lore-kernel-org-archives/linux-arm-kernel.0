@@ -2,77 +2,67 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C8A9FC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:16:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BED24C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:30:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 99F3A214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:16:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 807122082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:30:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hxmsqSlL";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="iY+QPL8K"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 99F3A214DA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VXr4GS0T"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 807122082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=g9BXxWG0CTjpl4TCB6Sm9ayfkntFsDNrrWXvbxyvI/A=; b=hxmsqSlLh6yJDT
-	W/Q1ek/57RqgrAitD+pfDrBNeRfPhaNtySG0lP7mIrv9qsJqCLkP38/qGawwX5Li4cQqWn/9clrCb
-	TzBgiDnSxTjPzV5E5wuCN1AoxSofyQNtqd61Yjd/+qr5sV80OsBRousbibQsqtJPfBk2AqEanES5p
-	K3/VFJcokIU1q3PtPhBiGnWJ30c69dndb1oD+m5Kl+uxl0vC/RhrDUlusZ+YNZ4Chv14f8j7qd/PL
-	gwjXS0bq6hbWCGXrAdzXaXknROJSVeUF/xBl8ZsY0/6MM5ax/QwtQx0z97xPiiP9LSOsDor/a5PNi
-	/FQGPivh6wNnv1/yHa1w==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=bmWlLfJ5pcQf2uPgoo9YQR96wIpKrxiiDStBUN/G0EI=; b=VXr4GS0TevJphl
+	PEnI05MOQHPZebLMgBmJfkR9j7ovJbYuAld50qpb/B4Fzkl3VzOvjLKy4hsgl2R0hgvf0TdHA5C2H
+	on7zj6qGsAti6unFTHTLu/Dj0DSL35IIP7VTZkm8dytUxcImN0c7z9lbR0tFHJGUD4XW7+9rx7X7t
+	X+BYoczBqRZIP2sAThqsJn08Ho+ecDrFtOdM+NUFhEg+fFYkIWG+MIhmLd0LPl2M8dZKpBlNCw3NU
+	0Dj7HauHeAcyGJKqGa7Mke+zeqGk7RzKI6OrLC5zfBMyjGufShcaR5lzBxXPIiOJ4wKwHjbHhR9Po
+	CFry2m4ULrpx0gwpBgMA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqfyz-0004P2-DE; Mon, 04 Feb 2019 15:16:25 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gqgCQ-0001Gw-I4; Mon, 04 Feb 2019 15:30:18 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqfyv-0004Gl-7T
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 15:16:24 +0000
-Received: from mail-qk1-f173.google.com (mail-qk1-f173.google.com
- [209.85.222.173])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 79D35214DA
- for <linux-arm-kernel@lists.infradead.org>;
- Mon,  4 Feb 2019 15:16:20 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549293380;
- bh=0pqxl6izDyu/4SjeCOSt5eCkgS4E4c3y11DBXPBa5VU=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=iY+QPL8K5NA5bJJQhVEdrc+igWFvWYjrVBrjdp5XxWnga+RvgblqtiA4d7wOvpZ+4
- 968b1PaXQ+JHQkiDvJimvTSXweDSQsMCqKaXpW6GOqryRBeazSvzE5JHXXouBc5dMQ
- JdgJPdNbQiDR8ML4NqzKcd2hPm1LcM2WWU/7JkU8=
-Received: by mail-qk1-f173.google.com with SMTP id o125so132469qkf.3
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 07:16:20 -0800 (PST)
-X-Gm-Message-State: AJcUukccy7GBkJYCKa3poq+Hr7v3wKkCIKBXDT4Z6J2vBgqetAa04Rmp
- 2N3Pvr6JsrtQDglHZb5zVJV/KuXzNtJ+B8KEJg==
-X-Google-Smtp-Source: ALg8bN6XXnUKIMrpmiD9grXsHw9JigaEBKawUdOgXXEktI4BLoccbjDykbmuLx+YC9273YS1f6Dq+mglzP0PUK872r8=
-X-Received: by 2002:a37:b646:: with SMTP id g67mr46978245qkf.326.1549293379667; 
- Mon, 04 Feb 2019 07:16:19 -0800 (PST)
+ id 1gqgCM-0001GC-Nt
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 15:30:16 +0000
+Received: from dude02.hi.pengutronix.de ([2001:67c:670:100:1d::28]
+ helo=dude02.lab.pengutronix.de)
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <mfe@pengutronix.de>)
+ id 1gqgCG-0005g2-Mc; Mon, 04 Feb 2019 16:30:08 +0100
+Received: from mfe by dude02.lab.pengutronix.de with local (Exim 4.89)
+ (envelope-from <mfe@pengutronix.de>)
+ id 1gqgCF-00089R-Rj; Mon, 04 Feb 2019 16:30:07 +0100
+From: Marco Felsch <m.felsch@pengutronix.de>
+To: shawnguo@kernel.org, kernel@pengutronix.de, fabio.estevam@nxp.com,
+ linux-imx@nxp.com, robh+dt@kernel.org, c.hemp@phytec.de
+Subject: [PATCH 1/2] ARM: dts: pfla02: prepare storage devices to add paritions
+Date: Mon,  4 Feb 2019 16:29:55 +0100
+Message-Id: <20190204152956.13471-1-m.felsch@pengutronix.de>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-References: <20190203214205.13594-1-linus.walleij@linaro.org>
- <20190203214205.13594-16-linus.walleij@linaro.org>
-In-Reply-To: <20190203214205.13594-16-linus.walleij@linaro.org>
-From: Rob Herring <robh@kernel.org>
-Date: Mon, 4 Feb 2019 09:16:08 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqKEWtDN0VYwZaJqajcvomptbML_rQeBavh_kCYeVFZSPQ@mail.gmail.com>
-Message-ID: <CAL_JsqKEWtDN0VYwZaJqajcvomptbML_rQeBavh_kCYeVFZSPQ@mail.gmail.com>
-Subject: Re: [PATCH 15/17 v1] ARM: ixp4xx: Add DT bindings
-To: Linus Walleij <linus.walleij@linaro.org>
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::28
+X-SA-Exim-Mail-From: mfe@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_071621_532991_0636B9F8 
-X-CRM114-Status: GOOD (  16.75  )
+X-CRM114-CacheID: sfid-20190204_073014_932940_D2122FA7 
+X-CRM114-Status: GOOD (  10.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,43 +74,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
- Tim Harvey <tharvey@gateworks.com>, Krzysztof Halasa <khalasa@piap.pl>,
- Olof Johansson <olof@lixom.net>, Imre Kaloz <kaloz@openwrt.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, Feb 3, 2019 at 3:42 PM Linus Walleij <linus.walleij@linaro.org> wrote:
->
-> This adds initial device tree bindings for the IXP4xx machines.
-> This time I tried something wild and crazy and try to make proper
-> JSON-style YAML bindings for the top level.
->
-> Cc: devicetree@vger.kernel.org
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> I have no clear idea on how to auto-test this schema for validity,
-> since it is a bit of a new thing I hope to figure it out as
-> we go.
+Partitions in the NOR and EEPROM are application specific. Prepare the
+SoM device tree so platform device tree's can add partitions.
 
-Is Documentation/devicetree/writing-schema.md missing something on how to?
+Signed-off-by: Marco Felsch <m.felsch@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-The DT patchwork instance will have test results too, but in this case
-it couldn't apply the patch since MAINTAINERS has a dependency...
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+index 1bfa41e01a0c..35d56e25c4a0 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+@@ -79,7 +79,7 @@
+ 	status = "okay";
+ 	cs-gpios = <&gpio4 24 0>;
+ 
+-	flash@0 {
++	som_flash: flash@0 {
+ 		compatible = "m25p80", "jedec,spi-nor";
+ 		spi-max-frequency = <20000000>;
+ 		reg = <0>;
+@@ -107,7 +107,7 @@
+ 	pinctrl-0 = <&pinctrl_i2c1>;
+ 	status = "okay";
+ 
+-	eeprom@50 {
++	som_eeprom: eeprom@50 {
+ 		compatible = "atmel,24c32";
+ 		reg = <0x50>;
+ 	};
+-- 
+2.20.1
 
-> ---
->  .../devicetree/bindings/arm/intel-ixp4xx.yaml | 22 +++++++++++++++++++
->  MAINTAINERS                                   |  1 +
->  2 files changed, 23 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/intel-ixp4xx.yaml
-
-In any case, the manual checker thinks this looks fine.
-
-Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
