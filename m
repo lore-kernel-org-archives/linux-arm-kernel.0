@@ -2,23 +2,23 @@ Return-Path: <SRS0=H3s0=QK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.8 required=3.0 tests=BAD_ENC_HEADER,
-	DATE_IN_FUTURE_24_48,DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,
+X-Spam-Status: No, score=-6.5 required=3.0 tests=BAD_ENC_HEADER,
+	DATE_IN_FUTURE_12_24,DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 91DEAC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 07:09:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4812AC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 07:10:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 57A9C2083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 07:09:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1209321773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 07:10:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a+cC8mv+";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="WUJyg2QG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57A9C2083B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OFd3NKMG";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="eusAR+r5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1209321773
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,34 +27,34 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Cc:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IDjaJaS6ToKa0mze/smoFF3Y8rwb6WTzB4Jlvfws/CQ=; b=a+cC8mv+0hcVuC
-	5arsQPztfU84X9Kf2eSRe3y4FzIf1z/A/lXmZ0xZl8gNRlVjPJtCCipt+0UhNrG8PL1Agu2xPz1Yz
-	Bq06IU9NJSmOCurCYrcvrN0d3+B2jRoJjBlN8f1qQwMyJA9zbDAitNzK1o8wwbxwhmtSoyEoxcJdT
-	0mCukTvMi2UQKl2ElZ4DOJlltMJ3g9VuXpGZUKKzXlZxmyRY5s1Y6t7+Vzl8Cx1eyy0+t+xScmMJA
-	/Qd1xsIRXAeB3BodoGr8inA4245VvAbw5T2wxv2iQL16UdLaLfEeOUoTlhkn5aJoVqaUvs0h2+oWs
-	QOo17NoHtlYKNQA8HUIQ==;
+	List-Owner; bh=8JTLK67ueQ1Q6VAYwqJs2kofiUo5nS4Lq3nbQzvGi0g=; b=OFd3NKMGAJVt/y
+	C5lUE8Q5IhtA6VhXDgkQgXr0G4wsSiuyQJfdB3Vbo0swx/lqHbanpCZh8b+I0mkcbCGlzRL0yFzvD
+	3/gaygh5bwwbxjZIxan9kEOFizQpovvlSxWIsKfEKcpsMEHW3a6EMRGO8OuZjm1ssbk3Hr9v2Strh
+	gOi2+tx8LL55xXotKCbwcLAaEir5/ClCRi9BFbn66oJ9EXIiwxgOzrY1d1/5msuFZZ+g4YkUODgfS
+	lH5V4jq3qRbbvTKGRBwTiO1HkwwO0DjhHXy9zrnRf6x0PBbfxHKu5zyx84+iZFDhC6q7keEp4qJJL
+	5qz0TM5F7rEb4HigUk9w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqBuW-00034V-Gw; Sun, 03 Feb 2019 07:09:48 +0000
-Received: from mail-eopbgr780072.outbound.protection.outlook.com
- ([40.107.78.72] helo=NAM03-BY2-obe.outbound.protection.outlook.com)
+	id 1gqBum-0003LB-TG; Sun, 03 Feb 2019 07:10:04 +0000
+Received: from mail-eopbgr800044.outbound.protection.outlook.com
+ ([40.107.80.44] helo=NAM03-DM3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqBuO-0002wP-Ng
- for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 07:09:44 +0000
+ id 1gqBuO-0002wK-Vt
+ for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 07:09:45 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=mHrHe4BTaOJ4pY5V1Dgt8VzZYC0cCr7iOJq1Ry4jvnI=;
- b=WUJyg2QGXVMdl6A4Hsb09A0CB1OFkNbvboYzwbHb96OUaa+m/NHh0btD/OIVCJX2SF25jrHbMS7YNJ3isSIp+tnbmlXoI/YgGiLBfN1EUBNiV/t68YxfiUM7YiKlmlPmNv1Pg/W2b0BqdBUvm+oIH81eZk5dk7jEeNEG9DOlnZQ=
-Received: from BYAPR02CA0069.namprd02.prod.outlook.com (2603:10b6:a03:54::46)
- by DM5PR02MB2652.namprd02.prod.outlook.com (2603:10b6:3:41::18) with
- Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1580.20; Sun, 3 Feb
+ bh=+VPpJWatAVauEfGM00K/2YJ8HXVAzPLhnhrytnyCSx0=;
+ b=eusAR+r5q102tlQROpseCm2IsG2YqmGlbK2kekfgEuE6JdO84PB4UztwbOwTa60U4Si7U1Szqedi0+xMC8bD463gonqlcUwaF314npBEAczEWcDJAQOXhR9Txf/BXTtV0kMf2xmB97pCBN1wHZAc1QrtDujT5OWJBDfR/kZRJGo=
+Received: from SN4PR0201CA0042.namprd02.prod.outlook.com
+ (2603:10b6:803:2e::28) by BL2PR02MB2145.namprd02.prod.outlook.com
+ (2a01:111:e400:c74b::19) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1580.22; Sun, 3 Feb
  2019 07:09:38 +0000
-Received: from CY1NAM02FT018.eop-nam02.prod.protection.outlook.com
- (2a01:111:f400:7e45::208) by BYAPR02CA0069.outlook.office365.com
- (2603:10b6:a03:54::46) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1580.20 via Frontend
+Received: from SN1NAM02FT057.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e44::204) by SN4PR0201CA0042.outlook.office365.com
+ (2603:10b6:803:2e::28) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1580.17 via Frontend
  Transport; Sun, 3 Feb 2019 07:09:37 +0000
 Authentication-Results: spf=pass (sender IP is 149.199.60.100)
  smtp.mailfrom=xilinx.com; vger.kernel.org; dkim=none (message not signed)
@@ -64,32 +64,33 @@ Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
  149.199.60.100 as permitted sender) receiver=protection.outlook.com;
  client-ip=149.199.60.100; helo=xsj-pvapsmtpgw02;
 Received: from xsj-pvapsmtpgw02 (149.199.60.100) by
- CY1NAM02FT018.mail.protection.outlook.com (10.152.75.183) with Microsoft SMTP
+ SN1NAM02FT057.mail.protection.outlook.com (10.152.73.105) with Microsoft SMTP
  Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1580.10
  via Frontend Transport; Sun, 3 Feb 2019 07:09:37 +0000
-Received: from unknown-38-66.xilinx.com ([149.199.38.66]:49945
+Received: from unknown-38-66.xilinx.com ([149.199.38.66]:49946
  helo=xsj-pvapsmtp01) by xsj-pvapsmtpgw02 with esmtp (Exim 4.63)
  (envelope-from <nava.manne@xilinx.com>)
- id 1gqBuK-0008Jk-Pz; Sat, 02 Feb 2019 23:09:36 -0800
+ id 1gqBuK-0008Jl-Rj; Sat, 02 Feb 2019 23:09:36 -0800
 Received: from [127.0.0.1] (helo=localhost)
  by xsj-pvapsmtp01 with smtp (Exim 4.63)
  (envelope-from <nava.manne@xilinx.com>)
- id 1gqBuF-0002QL-Lc; Sat, 02 Feb 2019 23:09:31 -0800
-Received: from xsj-pvapsmtp01 (mailhost.xilinx.com [149.199.38.66])
- by xsj-smtp-dlp2.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x1379Owa001986; 
- Sat, 2 Feb 2019 23:09:24 -0800
+ id 1gqBuF-0002QL-NA; Sat, 02 Feb 2019 23:09:31 -0800
+Received: from xsj-pvapsmtp01 (mailhub.xilinx.com [149.199.38.66])
+ by xsj-smtp-dlp2.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x1379U9r002044; 
+ Sat, 2 Feb 2019 23:09:30 -0800
 Received: from [172.23.37.118] (helo=xhdnavam40.xilinx.com)
  by xsj-pvapsmtp01 with esmtp (Exim 4.63)
  (envelope-from <nava.manne@xilinx.com>)
- id 1gqBu7-0002P8-Cm; Sat, 02 Feb 2019 23:09:23 -0800
+ id 1gqBuD-0002P8-C3; Sat, 02 Feb 2019 23:09:29 -0800
 From: Nava kishore Manne <nava.manne@xilinx.com>
 To: <srinivas.kandagatla@linaro.org>, <robh+dt@kernel.org>,
  <mark.rutland@arm.com>, <michal.simek@xilinx.com>, <jollys@xilinx.com>,
  <rajanv@xilinx.com>, <nava.manne@xilinx.com>, <devicetree@vger.kernel.org>,
  <linux-arm-kernel@lists.infradead.org>, <linux-kernel@vger.kernel.org>
-Subject: [PATCH v2 1/3] firmware: xilinx: Add zynqmp_pm_get_chipid() API
-Date: Mon, 4 Feb 2019 12:39:49 +0530
-Message-ID: <20190204070951.6933-2-nava.manne@xilinx.com>
+Subject: [PATCH v2 2/3] dt-bindings: nvmem: Add bindings for ZynqMP nvmem
+ driver
+Date: Mon, 4 Feb 2019 12:39:50 +0530
+Message-ID: <20190204070951.6933-3-nava.manne@xilinx.com>
 X-Mailer: git-send-email 2.18.0
 In-Reply-To: <20190204070951.6933-1-nava.manne@xilinx.com>
 References: <20190204070951.6933-1-nava.manne@xilinx.com>
@@ -100,67 +101,67 @@ X-EOPAttributedMessage: 0
 X-MS-Office365-Filtering-HT: Tenant
 X-Forefront-Antispam-Report: CIP:149.199.60.100; IPV:NLI; CTRY:US; EFV:NLI;
  SFV:NSPM;
- SFS:(10009020)(376002)(39850400004)(346002)(136003)(396003)(2980300002)(189003)(199004)(11346002)(6666004)(50466002)(126002)(110136005)(7696005)(2906002)(356004)(2616005)(36386004)(8676002)(9786002)(81156014)(76176011)(77096007)(476003)(81166006)(26005)(336012)(50226002)(486006)(48376002)(186003)(2201001)(426003)(478600001)(446003)(63266004)(1076003)(305945005)(106466001)(14444005)(8936002)(47776003)(106002)(36756003)(316002)(51416003)(16586007)(921003)(107986001)(2101003)(83996005)(5001870100001)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DM5PR02MB2652; H:xsj-pvapsmtpgw02; FPR:;
- SPF:Pass; LANG:en; PTR:unknown-60-100.xilinx.com,xapps1.xilinx.com; MX:1; A:1;
-X-Microsoft-Exchange-Diagnostics: 1; CY1NAM02FT018;
- 1:cktlacDj5jI3YU7g2xqkB2ckK1Q8FnqP6yKXcfI2O1V8nyEp7MPp8Gig5OlwVFSifg7Y/NomNkKk/3OdnT9lI6ajjex4p9J3ypRxBswlYm0YwvTOtkF/sS0Q2Cns2z85GmIjaYLC7xOXgYSiTr3gHg==
+ SFS:(10009020)(396003)(376002)(39850400004)(136003)(346002)(2980300002)(189003)(199004)(1076003)(36756003)(16586007)(14444005)(26005)(106466001)(6666004)(356004)(63266004)(77096007)(186003)(7696005)(51416003)(106002)(76176011)(2201001)(110136005)(478600001)(305945005)(47776003)(50466002)(336012)(426003)(81166006)(81156014)(2616005)(126002)(11346002)(446003)(476003)(486006)(48376002)(9786002)(8936002)(8676002)(316002)(2906002)(36386004)(50226002)(107986001)(921003)(2101003)(5001870100001)(83996005)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BL2PR02MB2145; H:xsj-pvapsmtpgw02; FPR:;
+ SPF:Pass; LANG:en; PTR:xapps1.xilinx.com,unknown-60-100.xilinx.com; MX:1; A:1;
+X-Microsoft-Exchange-Diagnostics: 1; SN1NAM02FT057;
+ 1:yJBdbDGPDvHJHTXswX1f95lqc7mhKQYAZDbKV+kRjbmXXXpE7lTdcW0Lt1LyPAx8CAUVNANmQBPdWCs/wNe6n9qNToL7rVHE4ycLIZU1pG7wFcDiJi2mPAX9cP4BDY/MPW05BR6e31ysA5AFWEgaGw==
 MIME-Version: 1.0
 X-MS-PublicTrafficType: Email
-X-MS-Office365-Filtering-Correlation-Id: 2e0469c6-c7f6-47d3-2f42-08d689a68efa
+X-MS-Office365-Filtering-Correlation-Id: 3c6c802a-d605-4f8c-2974-08d689a68efa
 X-Microsoft-Antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4608076)(4709027)(2017052603328)(7153060);
- SRVR:DM5PR02MB2652; 
-X-Microsoft-Exchange-Diagnostics: 1; DM5PR02MB2652;
- 3:jdMnbPfvMxIq58rbrj4FYZS+WLKNXog9QkVIhwhLNQsrlJ36aZl8u5Y/WrJP072Ev/cv3fha9yp0eq9/r/AdIa5My9Id5D4JGihSJhOCL8MLi2YJ5rSGs0umpxcAOfWqyUGJnA/FmlIdzf6UfjwEot6JU56hfZAEvUFRpfP2ORgT3pq+6KFzStzqxW3QcpK1WmIme/qWbZd6yP5TGX0cyW8eZWAjmZctkpWCy6tY9yNRRide2LAtnMHs2Ys5HrsCrp4HfVG1vYPElCu2KhgoXlyvXdTrR8NTp9P+yNk/B/IJSWaEUSu7eYv/qrhwquMS2dOw6YvmMuCEIsYsCT5pu0nq6KQIyMeWSXYtlnWp8LDRC7cnk+U8rbQKD+XHoF+d;
- 25:nt4pO45RcbZUJURq0UoZMG63PnRyGsMNZigOAPLgWSLS40plFbXcrMbkSHDpW/wfBrN00QzCO3uFzgxxQFpuLhXzpwL2EYE8dNnzLw6InEKLHbQERGYQ7iTSvPvNDx10RKRYtqQkec04oFMMD4pnhMenM7HkIUdSynQpC3uSgT/eJVM5bEe53jAyMpbFqD4CktAz7FxFeW5bf+G8dYx2NBsCRqdDZtHcsDFCk6skNaeF2Q35CVqbXSt2BK7bwCXIdPTHy8N8Mp92JsuIiBaSBY258mmreLAjoHY087avZyX5ERqB/g7YvW+SDpH9Zq/tpwCpN+VBrHhn3bpRYEaBgQ==
-X-MS-TrafficTypeDiagnostic: DM5PR02MB2652:
-X-Microsoft-Exchange-Diagnostics: 1; DM5PR02MB2652;
- 31:m7x5Sm9Ig7gHMu51BtqZsT1F2VGETrZ2bJLpeAMo5ZHn8RM4A5gHoewLoDevGNzKKPJddpVNPxPHIufMVfX+X+ZD9k38j45/gpSJ4KBRCH66o4YTvUtQstYd8xwCg6XYsnSsZVkZzYtM2mEeudjYKo9/a3BZmQbGulMHi+8SiF/ii87ehhRMR/0oP/5djqXu33BndgujEMZg2ln6eCWKYhOC6nfyyl/TEP3EaNTVFHs=;
- 20:fkFbjK2U3aXeQPZP6vm6+ZByUOeYqHr7AkkOvkBBnm/DsOKUqvKxhg59Mo20FduEHTugF4HU8pG5Elj7I8sim6cfVF/AnG1NljwVC166HoQ9xR6EtuSGYJfZt2e4OrYAIbL3StJi/kdzNzGDy34ZptvXW6khWHsXgZkdXW8SC+CTZpG4PjIatKimEDktSHJWG8AtaL+PvseaQb4YH62GudwtqjOACpNqs3OQWob2fBHd10ZLtEyoh0/g+3/WJyzQyMjmUmo/6nrp43Cg03wq2n+2oBnOkTy2BCJXEFdjg4NB14qUi8PRJiC1gZdruuW43uagvjFhQC4vzBSPEjkirg26nfI6NaUBynhKRCmAHp2CC0cQrFP2bAnHl+ra4PqmeAqHY5uhstyeoEXRQ7VGdhtf9nwFOWK9sngtRVE4wKhJMrRpWrqZ9UW2RX4vSsw0Wr9DemrFObFEhjYD5AvukGnEtR3FFxpK0AgSI4RnmOEQBip4RjX8iMG/evLIIaJg
+ SRVR:BL2PR02MB2145; 
+X-Microsoft-Exchange-Diagnostics: 1; BL2PR02MB2145;
+ 3:3EWHxSpS1HICMBSrIKTIa2CvAufPRzXE7M4aIj5lCPxfR2u1biKNwlx8Iv4bYdxfZC4A1kq5mJG4q4yrL/fqrE27EEwQBU+Ve6sxCHuTDb8V9/GDrAysEX2WHPR+tYSp8sTOuB5dbr0Bk013uho1yTeCxJoR3MRCtzSp7LMO+4ziPWcNYPTCo7+l7GED3S9d2E+ZTFd7d/Ake8TJX0b7ewQdpF8vp4jA/vSiptKDDX/UXITFKAtV0Sb7FHuKlRWnvMOAVER5lfUEkcOVEjPu5Ov2RhPsm5Tr/BNN0AsYvzpDvY8KZxZbspgqia93whu3WghP2rYgPyrSXuXNXX+oeLvELYaOP/tL/ULIDQSV5VqhhTxs4b3sQdrd0GQJf4mm;
+ 25:e72VyRQu0Z2qUnqtIT4AoeqlPh/Rkb7nNRm43CVpid23hPUpBwXqHrcCuYIQCU4cXJMgoPU0AenoRK6Hdlc43FglMJhax2pM4jo+kBBjIIoq/SyvVAi0nYdocuyhm5U16K/h1AlHZQqiVjIh8k3/QXzUoGGwgnM/LcAs46bEM2LontcNVlPpze/kvxiJHW5Py/rBUeBO6R4mV/4Um4+z2MbmHvBYVxYM0WVTFpR5B3eb50+XBnGb5bwyXNP3K0IaR7Id3cD46yT6ONMIEsxQ9J8C4d7o4dPo3nBWbmUgenjam62sUrh2cz4vFkbyWkYvVqdydj//hw1C1bzq9fdHug==
+X-MS-TrafficTypeDiagnostic: BL2PR02MB2145:
+X-Microsoft-Exchange-Diagnostics: 1; BL2PR02MB2145;
+ 31:0ci2ojIgQQ7o35Yewim/iT8H1OGA/ws/YRV5hQ8WK2PX3iqJQXyQNBZYwVsaJR7434/14QLSLRK4YjlwMqjytRfeX4ZdSJsr/0Afm12iYBlLfcgDWYbfPxoEunjWK9KE//GsTO096ggtdjfgLhaDX7MJ6IciB/kRt264DtIbZtk8L+aAOTVAqZcphQ9DOf3VZOzwhFQ5RlWw7YE8/O5RoioQOpBSrX7G22gtU2W7CMw=;
+ 20:ghbIPfNyCAI4ZYY0W2O31ln6sdUw0L4ZMnSqp1XrqsZrWJGW2F3aujq37bC8YBJngdpLyCc3YAMxQOBBMcwoNWol+18G9Sf7c1/E5wdgJoGKzJFsA4SREqxM1fKlHsXPaTWBqMI2IYZZyyTI9u2IsWR39i/6eqTU8aqvYvOjJ6P9zP1dLYG0Tf9zdYwYSsryCI15Df4S8nuieOfDJIlnAVOtrt2XOV3VYA8nVI9pU/xj6raM2M/7Fu/6j49+6A8FUdmXICzzRDpDuJDeK+Ixmni54Z0dPrWD3ipuh5gM+w0sYplQx2IqVfMKssmDSi2wUQgKNiPFYGaNlDpuIHEFh3K4+MKnQoNZEC/RJ78u3xDcyofOh+a/sPjY2HpKWJqjggq8i25yizAWAfSPdWOJwMwz8lHbWFLAN6TKCHw2/2Tb55oYspLgDaD6Y78bEb45MUE50wABlrXh3sRtyaj4JrV2IT6rZaQhaErIFcwGwHpbLPv4AtJpMBSU5QFMFJqq
 X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
-X-Microsoft-Antispam-PRVS: <DM5PR02MB265237918CD87D5F0E2A075DC26C0@DM5PR02MB2652.namprd02.prod.outlook.com>
-X-Microsoft-Exchange-Diagnostics: 1; DM5PR02MB2652;
- 4:Oc4LFGW9B3rZSImebNG5uz5llZbISdbNxhabRtK5n5+DlCTrSM0Vrx/gwyj1V6xs3VzaAc2I1MYwoA3dmA2c2gZIqilq8RrY3Pf3pxGB8tZwutp0U3owGfwN/MuOV6IywCrKIZL1l7C5BySBI0/oB2qRXz3mg1n/ibvxggeJQ/vVyNLBMkdJQiLqZHA8pQrsUCXriaiHLbFs4ffqZTFunbsQYVNDfyZwpq+uDTEX26GutSY9BLATCOp+vbW85bvgMa98SfDfIbn69ZzDiNH1VkM06pmtAe+v2RtE08qE37PgJggRZU+hIgnkEYrnwTBZ
+X-Microsoft-Antispam-PRVS: <BL2PR02MB21456F95E31F1FE588242524C26C0@BL2PR02MB2145.namprd02.prod.outlook.com>
+X-Microsoft-Exchange-Diagnostics: 1; BL2PR02MB2145;
+ 4:OEWFcN7PVumugTFxGAf1p22QsKDN4FpTVGsO15QDo/HKDvwH6fdaaeAICntZbGPiEcD+mPafu6dEmPGJmhNdhD3nvWMEs8YzhiRuNlzuKrhYWP4yAkoeSorExhOSXKxMgB2oiplLgz5DGRM9UN0UvXiBd51rHnniC650NPD51hxXEEHDlY9px4gkPNqEkFha8swJNhN+Gzt4oY0+NK4wm8eYQy+TXLCVuqSuPMTJmtanVzjemE7S3oPd9a/QVN4z799J/oV2si6oHR2uMBhPZ4dxNGAJzYhnNTyHaqGstQ3lc3552eDEz7HRjKmxa4yh
 X-Forefront-PRVS: 0937FB07C5
-X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; DM5PR02MB2652;
- 23:IT2vMqf4sq8sgXy3RxL7dh7o+3IryhHg3GYXtv79N?=
- =?us-ascii?Q?lptqyPAoyMyVbQ30cxf2lTOIJfNwOL0Qgh4TQjiPBd6xjppAkEUXSukE/4a/?=
- =?us-ascii?Q?SATXm00iXKpEkTIjwN4Fd5SpvGHIQecc7saJa3zWiMhiEmK4WkOys+GdmIqx?=
- =?us-ascii?Q?hw3WckSDz5UOR1OTLiYFEYY+bqYOjhqjaqboRkzJF6mPFHkryk57lZMnEkM/?=
- =?us-ascii?Q?TJk9iBfyRm9mhD5b+uT6GR1dF1Z5YEVQkv4MChrk+gKyqT/7a/94zirQi8JU?=
- =?us-ascii?Q?A+lj3Oc4evd/6ZHvlv2Xh7Ph/5qxpkKBk4ly5s5l6EaAQTw65UPwhM0j7qlz?=
- =?us-ascii?Q?K2Rz3ULX9lEjFoK8giv1lnIw/OesePndJUrCOPhyiPSVKr+8SxHvZh6kTfso?=
- =?us-ascii?Q?N7mh/es49jMXv/nBN1XgveZgLy8S2VyVRga1RrNyu0788hePe8TNnerEy/u5?=
- =?us-ascii?Q?5rJaa3k/m3sESmskywy51NdLbuIUeTg5gW10nnRamdEryd4mBxiHHrQTkfps?=
- =?us-ascii?Q?DbaKayPUy7zoK8dqOaPGhARsy9tsEQiwopPub0+NkQGRI0/I4aMakxUEY+dR?=
- =?us-ascii?Q?CJ9i59t0XHMI74mR0BOpg3WCTf7KIpotiE5btk9LPTBnkp/OxRb8J/dznQN6?=
- =?us-ascii?Q?0vfJ6/UGV6Hv+kq+/73JYs7+TSsGVHQrSx73V/RlrwBp6/VW9+bJm+w5TZ6J?=
- =?us-ascii?Q?bxjoDLHEvAyH2aGeeXrFSOIFMG5yjT+Exduf09VQW1wCePwP4IooMswuDfdx?=
- =?us-ascii?Q?YzByoO2DY792lTS2Rg+3PyiuflXAi1C8XokTi1gIg2hxJh2ahoYPMJH66WfJ?=
- =?us-ascii?Q?4g4TI//dpGbAy/ufgTK2yPi6wu/Tp8gt+ax7brutRbXc/2qh+VLpVaHf4Cbp?=
- =?us-ascii?Q?rc3C+BHBahRLpPy8tMKYy24L8Wctjmqw7bu2H0f8JU0xnprBB1oDcGIpPTSc?=
- =?us-ascii?Q?u+ioKygRniv/FtjsM8R4zzMZbu9mEsBNf7un3MNXagR7Ytih/wCIeaD7E0VA?=
- =?us-ascii?Q?U1bwt1C0tvLUASw3uMc5Yn6F+x4gTkhDIod0S+F2kkiGWmEp7oUlxgPgaYcX?=
- =?us-ascii?Q?hAy7v39Aj28maRqkDg6oqUwrkI07fK/E5t0UMiz/muPH5jnxQCfqQgmReZyd?=
- =?us-ascii?Q?TNwBI1yo1+49Qm8gCFjNyShwxv/KqMYarDOGl5i6uVnRLHB+fOhgw=3D=3D?=
+X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; BL2PR02MB2145;
+ 23:FEcXl6JhsQtebv21BS851RK5MedJcAmjqnmXv/R3e?=
+ =?us-ascii?Q?iizcmYY1gFO4NttKbP/BFlo78shF5X/0ub+6LvghX2OfLF0D92z7VyLjFU5I?=
+ =?us-ascii?Q?+Gz9dkfWeFKr3Mjy/KSaeRfVcrR3D19viQFsyZZsfkkk70fDAf/v5YsgLmrn?=
+ =?us-ascii?Q?1sRRbz6jvahG+gWxhoD3YSAOSTVixnM6U43GGNrK2or7iOHkXfngy7OLCkOD?=
+ =?us-ascii?Q?OSb8HXj2nOo5n8+9bkbSiXzoNMizaPnqBZ2nTHNH0hTBi5+OyBFInDqDPD5Y?=
+ =?us-ascii?Q?R9FZbHajvzs4BGnZBBuFCUSd1FBoFWe3hT5YfPUof3SwYBUsaCs3WW+A6oMJ?=
+ =?us-ascii?Q?3q7q5iqr+6qJJToA6t8xaGz/AO2U93N/7+B3Af+GrT9cIZKB/7/X62iiXQKf?=
+ =?us-ascii?Q?jCZbwkrRYETWZqPjMxiHThogdBGmapWENqejOSE/VrvgNKaFQhxxL2xNd3GB?=
+ =?us-ascii?Q?+G7tnHlV85VZMeaolyvT49yWIcKEg/lmV2SMxFQO1S2BtpY0bWZAkdHMfN7Y?=
+ =?us-ascii?Q?s1tqgr8hVqhIEvP8i6+/T/kalCRU7Bne5OM3tyKYSZtSIAmLrsThsmD7Y0dC?=
+ =?us-ascii?Q?LjnjlG6kr57V/XgKNo3i9M/1ZOUvQWgE9WDIriomCIqCjrNh3VTyZtE6UUFz?=
+ =?us-ascii?Q?tz8rOQu0GMyhczsilmk5wQm/4kazqizE3CNCW59ggWfeiACBktCJd/R89lzx?=
+ =?us-ascii?Q?/uxT8B4QgoSpXXl/QBOCNxSqpSv1dnmBm4qOjdZRs6nsXh3K32kiu7Ybob8H?=
+ =?us-ascii?Q?Fw8YRo/bu7ak7cA8uTRua2QIk6NEtwAPXzrG6Z7rEBcCItM9CIU0Xyct/61v?=
+ =?us-ascii?Q?lNf55oYh2UXLKOX/Axh4EfQPCAwvnZkA9OBBY79usFCYqUR/MbZopyrFrQLW?=
+ =?us-ascii?Q?yfVtw4zT2SdJ/Wyqex1Cmcn1HZfNPoxJ9UFcDcGjcd6LJL8QVXKrWv2E+XNv?=
+ =?us-ascii?Q?gMl+I5d+/Oaki15Osfv7bwOjKzzNxX9pk/6K/6R9/Sso3JppyOVZwmcG57/j?=
+ =?us-ascii?Q?npMmIXoEFvzAtKZj1JjKywzQ3cEZJCdv6R+sems+zbStVJOil545BkSru/pr?=
+ =?us-ascii?Q?nefn2RDle05n2cvBk70AxzcmklpSnRLDYC0l8pi0pm/Dhx7J5ykbPMNVXzLZ?=
+ =?us-ascii?Q?BZfSHT674y2hJFF6wzKmt6pMwHDbMUhgE1I1+nl7z2ez53TaQqxag=3D=3D?=
 X-MS-Exchange-SenderADCheck: 1
-X-Microsoft-Antispam-Message-Info: bELBhRYTqMj2otBCgMR1VT0+xNS7N6eujNSbSb9cmEU4nWxejy8O0mJINAqrmBrTD2y3oNFUef2hdq5YrWez7LPls862nWjDd5Hir5VfS75igP429WO3nkvhiwkWeRWue2c9EBFh8g5N4xN5YchDPkAMlevi01fY67w/Z2UK1sCrPaCxlmBpeG5xEmgCFoCegLC7bG0QcOrlmrM5l5nOrqWXgGBuRvNh1phPnchOEieZuGmxLatwSg4rcAa/65jMaAttRaDfND+le1Ta5hgMVkaFtPlW3U6gScqkHQBzkGgxi4QwUTkzOttc01zJ/IHO4Dvw39wf5uj/MZ6uqaO5lMVmKEFzHWctbWJDZCB/jSwbJka/uWuRzcfRigz093SfrRKOcg9a/79ieU0wygvXU8d3rZ4/Y9N9Js7MR40KBwI=
-X-Microsoft-Exchange-Diagnostics: 1; DM5PR02MB2652;
- 6:XyXrnAbL3xpZ669aIhjTCnqPD2ir6QKUvokS/oxz+rzX1pes37KekFkFiQrUfmOdEMPuMqO4Z92HVGPrb4yBLQzvttHHgioQ1Cgu7ZQTNFyCsNwTZWucqdyy+XqoWw8jgNuUElMflRgjtw8OEGQ0a5hRtEQ53HdWWAIYqOARsnLUIwBq6NT07WrO9MMx9IFv0GoHb8BK1r5QGgP4TOA6bvxfXkvXkefZtInC5CJ5LV42c9RbKY9QVa1CBFY6KWeAngPOJHh5z+jUMGOo+WYO9ML/D1710CwqV0ZUmILAXUq/CFqmvvmIHDXvMnC7FJKLtuh7cMDKKUrYMyv9OgTwfiEAQpGO9Hqxc0pdK4kc8OFwM2Bz2IQ5NJGl/jZYGX6d2RVyCXa3u+zrWeh0QgkIhHggTZc4MjZVzYUN4Z/L57JYMkFcNMqLpr4ebikv/JrtCFlW/glAM6whT08YLDdHAw==;
- 5:kEIwDJAcBEQ/C1cY2l4WSuEp1nrVP9yNa0IXXOvpHfaOFQaGoGNSsRbslhVKKX4YkKungfun+R/yyn/UPw0zsXCSfrbB2dcL9VbApW0v0Kt90SscWxAuexzHN1AGGrMMfY5ocA7UVYanqvFt/qh5giKSdSUBk+9RkYJg1otJZdJBQIn0M4MLav/q4pAyfAo3etV3lAsPbPhlMaDU49p5DA==;
- 7:bG6Vs0LAPzcYYUL6R/gQe1pOoa50B1PkppmH26nnlL98I9lUB0w3L154W2dZJZHE8xGwg3IQaTF7pbeYCLvWf2IaAtvnkRW7q+G4iI3FrMT8UV+cd+Q1hO3VtVZ/QucUNXpyUmQD+7EL/7Of1fYYoQ==
+X-Microsoft-Antispam-Message-Info: 3FzxJa0fEBDgShAt5sb9ZKrbbdtzsrVkCJjVJaHJ+eOslyPVkjtFcnBUSF/B4y2EQOLMyRmYwWIFIlD1tsfsZ3YjmST8/oLaIPl41IUNdJ04b3I6FAKQ2mh0TfN6a2v94h4dH99UEOCzSK0OcHyHLeHu8y1jYuMmwnEYc+ahMLgruDUGRYlnexPqQQOSPdwN0ILTrB6Wi43tpd+Llt4Ny/Kd/O1kDrvcvZS1/Jy8oNTInzgDo8mEckFTpG/H+YMBb3qgNPRYq7HLqtBNh4YBaxSya/mn9PsbHZSRIsZMBPDDm1377To/beFS4qsuRW4LqrBXuE2kvqjC84NCjCfHX6/ewewJ8tu+7h8sqgvEGMQCy9haSUvmQW+I4ejBwgoHEuqQBh04j1YcPNZ5ie8dgQPmT+UcRzy1XmiIJ+kpO5U=
+X-Microsoft-Exchange-Diagnostics: 1; BL2PR02MB2145;
+ 6:yek58ipmWyluvR42CweQAgy003ZghDlvXjUyS7YkXMpXV4rkOEqBAGe4Ga+126pD7M703NtNJ1hi4soFHckPS2Kt6kg+pAKuioK9nradbcM2SF/v84+A9AXoN/8+9nyTCbeGJRkLyZmU/ZMZF58mHAaiGqSUGmVfOnT7Q9n2GIUP8PSJL+T0HXpJSpR3uHX5fDhst2Kuc71n5TbqACpgPwqnRQgxgKyCgIUY6fO9JcAqeB2ZN9SRQNi9x7jX7H1ThuLtzVdTj63ns6t0eCM2mkAPzRy60xf3s1DHaUA4BtvrIc9AsP/w+RMEyQ+mzHRaQYI60oSPc+Elxwlf1BW5Onwv5yelUxHOUsuyxN4uF6Hjh9xT00mXiZaI7TXRpKgqpXfiv+Sv01CSNPSFN7y6JbQg4Ve09LvFqz4QzA6fEZd3pU+Gs2gqLVnWCuL8h3WJlNPiGG434rlBNM0a5zmO9g==;
+ 5:IMRqNK5/dSVHnHK+5gjtFIr9x2UuCYnMkmgcM2cDKB2jzqDolxax2opnh4xwQfB9vNWLrHFbG9YfRhyaiu/UCPVTnBUpHB1cwu7QNhLBWnPgp32F13/0CgpRO/eCNt9eJRFVQJ21VKlSP0oQHI+N6WfVIyjEAy006XKrFcEVXoxQsAWL6iXQnN1WeabasZfvMv/CrFVh+0/5hs/543hqbA==;
+ 7:K1++VvWjTrPE9onuRJ/cUrusB3hZiFbq6E5Wq4sh2/XW7MsracBdXrfUJewwRaftvYiyvRdWMw469zoJFVriljwsZnRDqayWRRdIdsUfrKPQOD1f5qCOQWl/zZoYloaX7ntqRf9JTFml0R/450nUHg==
 X-OriginatorOrg: xilinx.com
-X-MS-Exchange-CrossTenant-OriginalArrivalTime: 03 Feb 2019 07:09:37.2474 (UTC)
-X-MS-Exchange-CrossTenant-Network-Message-Id: 2e0469c6-c7f6-47d3-2f42-08d689a68efa
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 03 Feb 2019 07:09:37.3027 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 3c6c802a-d605-4f8c-2974-08d689a68efa
 X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
 X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.100];
  Helo=[xsj-pvapsmtpgw02]
 X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DM5PR02MB2652
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BL2PR02MB2145
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190202_230941_239946_FFBC854E 
-X-CRM114-Status: GOOD (  10.30  )
+X-CRM114-CacheID: sfid-20190202_230941_430633_BA6F9E10 
+X-CRM114-Status: GOOD (  10.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -177,88 +178,69 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds a new API to provide access to the
-hardware related data like soc revision, IDCODE... etc.
+Add documentation to describe Xilinx ZynqMP nvmem driver
+bindings.
 
 Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
-Changes for v2:
-		-None.
-Changes for v1:
-                -None.
+ .../bindings/nvmem/xlnx,zynqmp-nvmem.txt      | 47 +++++++++++++++++++
+ 1 file changed, 47 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/xlnx,zynqmp-nvmem.txt
 
-Changes for RFC-V3:
-                -corrected typo error in commit msg.
-
-Changes for RFC-v2:
-                -New Patch.
-
- drivers/firmware/xilinx/zynqmp.c     | 24 ++++++++++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h |  2 ++
- 2 files changed, 26 insertions(+)
-
-diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-index 9a1c72a9280f..af2a209fc2da 100644
---- a/drivers/firmware/xilinx/zynqmp.c
-+++ b/drivers/firmware/xilinx/zynqmp.c
-@@ -186,6 +186,29 @@ static int zynqmp_pm_get_api_version(u32 *version)
- 	return ret;
- }
- 
-+/**
-+ * zynqmp_pm_get_chipid - Get silicon ID registers
-+ * @idcode:     IDCODE register
-+ * @version:    version register
-+ *
-+ * Return:      Returns the status of the operation and the idcode and version
-+ *              registers in @idcode and @version.
-+ */
-+static int zynqmp_pm_get_chipid(u32 *idcode, u32 *version)
-+{
-+	u32 ret_payload[PAYLOAD_ARG_CNT];
-+	int ret;
+diff --git a/Documentation/devicetree/bindings/nvmem/xlnx,zynqmp-nvmem.txt b/Documentation/devicetree/bindings/nvmem/xlnx,zynqmp-nvmem.txt
+new file mode 100644
+index 000000000000..2043c8284f8c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/nvmem/xlnx,zynqmp-nvmem.txt
+@@ -0,0 +1,47 @@
++--------------------------------------------------------------------------
++=  Zynq UltraScale+ MPSoC nvmem firmware driver binding =
++--------------------------------------------------------------------------
++The nvmem_firmware node provides access to the hardware related data
++like soc revision, IDCODE... etc, By using the firmware interface.
 +
-+	if (!idcode || !version)
-+		return -EINVAL;
++Required properties:
++- compatible: should be "xlnx,zynqmp-nvmem-fw"
 +
-+	ret = zynqmp_pm_invoke_fn(PM_GET_CHIPID, 0, 0, 0, 0, ret_payload);
-+	*idcode = ret_payload[1];
-+	*version = ret_payload[2];
++= Data cells =
++Are child nodes of silicon id, bindings of which as described in
++bindings/nvmem/nvmem.txt
 +
-+	return ret;
-+}
++-------
++ Example
++-------
++firmware {
++	zynqmp_firmware: zynqmp-firmware {
++		compatible = "xlnx,zynqmp-firmware";
++		method = "smc";
 +
- /**
-  * zynqmp_pm_get_trustzone_version() - Get secure trustzone firmware version
-  * @version:	Returned version value
-@@ -471,6 +494,7 @@ static int zynqmp_pm_ioctl(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2,
- 
- static const struct zynqmp_eemi_ops eemi_ops = {
- 	.get_api_version = zynqmp_pm_get_api_version,
-+	.get_chipid = zynqmp_pm_get_chipid,
- 	.query_data = zynqmp_pm_query_data,
- 	.clock_enable = zynqmp_pm_clock_enable,
- 	.clock_disable = zynqmp_pm_clock_disable,
-diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
-index 3c3c28eff56a..c435f4b35adf 100644
---- a/include/linux/firmware/xlnx-zynqmp.h
-+++ b/include/linux/firmware/xlnx-zynqmp.h
-@@ -34,6 +34,7 @@
- 
- enum pm_api_id {
- 	PM_GET_API_VERSION = 1,
-+	PM_GET_CHIPID = 22,
- 	PM_IOCTL = 34,
- 	PM_QUERY_DATA,
- 	PM_CLOCK_ENABLE,
-@@ -91,6 +92,7 @@ struct zynqmp_pm_query_data {
- 
- struct zynqmp_eemi_ops {
- 	int (*get_api_version)(u32 *version);
-+	int (*get_chipid)(u32 *idcode, u32 *version);
- 	int (*query_data)(struct zynqmp_pm_query_data qdata, u32 *out);
- 	int (*clock_enable)(u32 clock_id);
- 	int (*clock_disable)(u32 clock_id);
++		nvmem_firmware {
++			compatible = "xlnx,zynqmp-nvmem-fw";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			/* Data cells */
++			soc_revision: soc_revision {
++				reg = <0x0 0x4>;
++			};
++		};
++	};
++};
++
++= Data consumers =
++Are device nodes which consume nvmem data cells.
++
++For example:
++	pcap {
++		...
++
++		nvmem-cells = <&soc_revision>;
++		nvmem-cell-names = "soc_revision";
++
++		...
++	};
++
 -- 
 2.18.0
 
