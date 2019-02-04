@@ -2,69 +2,77 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B3F91C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:16:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C8A9FC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:16:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 83A812080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:16:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 99F3A214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:16:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mj3zj0F0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 83A812080F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hxmsqSlL";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="iY+QPL8K"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 99F3A214DA
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=B5jeUHjr3gBKJCYhIO8bTGsXf42spNVR5ohiduHjHpQ=; b=mj3zj0F0NtU07/
-	6BUiSGNkJvcrwB0iJO0i2WbdFDKs25wWDwtdv/tYLHIFe+MG/9uUtL5a/Mkhzq2l3nbIPFJ6OeuVP
-	J3dT435vQ8RJv3jrI086SR5zta7QUkAWL3lgoaGF0iaAF1Sf/dQSafAS6r///mIODprSyaCJCWZ1p
-	JV2cBkrUWPkF9XGTeiLVbo/immPYLqGTVs2gScTyuX+5CAnnEf9nImzvAsh87mcVxaNDJruiVPO1T
-	r/fbM+yeXRXCficAm9Rx3ycJDckhJIV3czH9XSA+ti5iBe/THQ5m5sKDmanqDP/7KDP57ulgUCNwW
-	U9xIkilvwAM3vRnTdMjg==;
+	List-Owner; bh=g9BXxWG0CTjpl4TCB6Sm9ayfkntFsDNrrWXvbxyvI/A=; b=hxmsqSlLh6yJDT
+	W/Q1ek/57RqgrAitD+pfDrBNeRfPhaNtySG0lP7mIrv9qsJqCLkP38/qGawwX5Li4cQqWn/9clrCb
+	TzBgiDnSxTjPzV5E5wuCN1AoxSofyQNtqd61Yjd/+qr5sV80OsBRousbibQsqtJPfBk2AqEanES5p
+	K3/VFJcokIU1q3PtPhBiGnWJ30c69dndb1oD+m5Kl+uxl0vC/RhrDUlusZ+YNZ4Chv14f8j7qd/PL
+	gwjXS0bq6hbWCGXrAdzXaXknROJSVeUF/xBl8ZsY0/6MM5ax/QwtQx0z97xPiiP9LSOsDor/a5PNi
+	/FQGPivh6wNnv1/yHa1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqfyg-0003yT-UI; Mon, 04 Feb 2019 15:16:06 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
+	id 1gqfyz-0004P2-DE; Mon, 04 Feb 2019 15:16:25 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqfyd-0003xq-7c
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 15:16:04 +0000
-Received: from smtp.corp.redhat.com (int-mx07.intmail.prod.int.phx2.redhat.com
- [10.5.11.22])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
+ id 1gqfyv-0004Gl-7T
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 15:16:24 +0000
+Received: from mail-qk1-f173.google.com (mail-qk1-f173.google.com
+ [209.85.222.173])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 926081393D4;
- Mon,  4 Feb 2019 15:16:02 +0000 (UTC)
-Received: from kamzik.brq.redhat.com (unknown [10.43.2.160])
- by smtp.corp.redhat.com (Postfix) with ESMTPS id 3F24B1048103;
- Mon,  4 Feb 2019 15:16:01 +0000 (UTC)
-Date: Mon, 4 Feb 2019 16:15:58 +0100
-From: Andrew Jones <drjones@redhat.com>
-To: Christoffer Dall <christoffer.dall@arm.com>
-Subject: Re: [PATCH 1/5] KVM: arm/arm64: Reset the VCPU without preemption
- and vcpu state loaded
-Message-ID: <20190204151558.44tkfko3xh36ojbf@kamzik.brq.redhat.com>
-References: <20190125094656.5026-1-christoffer.dall@arm.com>
- <20190125094656.5026-2-christoffer.dall@arm.com>
+ by mail.kernel.org (Postfix) with ESMTPSA id 79D35214DA
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon,  4 Feb 2019 15:16:20 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549293380;
+ bh=0pqxl6izDyu/4SjeCOSt5eCkgS4E4c3y11DBXPBa5VU=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=iY+QPL8K5NA5bJJQhVEdrc+igWFvWYjrVBrjdp5XxWnga+RvgblqtiA4d7wOvpZ+4
+ 968b1PaXQ+JHQkiDvJimvTSXweDSQsMCqKaXpW6GOqryRBeazSvzE5JHXXouBc5dMQ
+ JdgJPdNbQiDR8ML4NqzKcd2hPm1LcM2WWU/7JkU8=
+Received: by mail-qk1-f173.google.com with SMTP id o125so132469qkf.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 04 Feb 2019 07:16:20 -0800 (PST)
+X-Gm-Message-State: AJcUukccy7GBkJYCKa3poq+Hr7v3wKkCIKBXDT4Z6J2vBgqetAa04Rmp
+ 2N3Pvr6JsrtQDglHZb5zVJV/KuXzNtJ+B8KEJg==
+X-Google-Smtp-Source: ALg8bN6XXnUKIMrpmiD9grXsHw9JigaEBKawUdOgXXEktI4BLoccbjDykbmuLx+YC9273YS1f6Dq+mglzP0PUK872r8=
+X-Received: by 2002:a37:b646:: with SMTP id g67mr46978245qkf.326.1549293379667; 
+ Mon, 04 Feb 2019 07:16:19 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190125094656.5026-2-christoffer.dall@arm.com>
-User-Agent: NeoMutt/20180716
-X-Scanned-By: MIMEDefang 2.84 on 10.5.11.22
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.38]); Mon, 04 Feb 2019 15:16:02 +0000 (UTC)
+References: <20190203214205.13594-1-linus.walleij@linaro.org>
+ <20190203214205.13594-16-linus.walleij@linaro.org>
+In-Reply-To: <20190203214205.13594-16-linus.walleij@linaro.org>
+From: Rob Herring <robh@kernel.org>
+Date: Mon, 4 Feb 2019 09:16:08 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqKEWtDN0VYwZaJqajcvomptbML_rQeBavh_kCYeVFZSPQ@mail.gmail.com>
+Message-ID: <CAL_JsqKEWtDN0VYwZaJqajcvomptbML_rQeBavh_kCYeVFZSPQ@mail.gmail.com>
+Subject: Re: [PATCH 15/17 v1] ARM: ixp4xx: Add DT bindings
+To: Linus Walleij <linus.walleij@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_071603_303360_1FBA72B8 
-X-CRM114-Status: GOOD (  14.56  )
+X-CRM114-CacheID: sfid-20190204_071621_532991_0636B9F8 
+X-CRM114-Status: GOOD (  16.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,31 +84,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, kvm@vger.kernel.org
+Cc: devicetree@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
+ Tim Harvey <tharvey@gateworks.com>, Krzysztof Halasa <khalasa@piap.pl>,
+ Olof Johansson <olof@lixom.net>, Imre Kaloz <kaloz@openwrt.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Jan 25, 2019 at 10:46:52AM +0100, Christoffer Dall wrote:
-> Resetting the VCPU state modifies the system register state in memory,
-> but this may interact with vcpu_load/vcpu_put if running with preemption
-> disabled, which in turn may lead to corrupted system register state.
-> 
-> Address this by disabling preemption and doing put/load if required
-> around the reset logic.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/reset.c | 26 ++++++++++++++++++++++++--
->  1 file changed, 24 insertions(+), 2 deletions(-)
+On Sun, Feb 3, 2019 at 3:42 PM Linus Walleij <linus.walleij@linaro.org> wrote:
 >
+> This adds initial device tree bindings for the IXP4xx machines.
+> This time I tried something wild and crazy and try to make proper
+> JSON-style YAML bindings for the top level.
+>
+> Cc: devicetree@vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I have no clear idea on how to auto-test this schema for validity,
+> since it is a bit of a new thing I hope to figure it out as
+> we go.
 
-I believe this should come after the next patch, but anyway
+Is Documentation/devicetree/writing-schema.md missing something on how to?
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+The DT patchwork instance will have test results too, but in this case
+it couldn't apply the patch since MAINTAINERS has a dependency...
+
+> ---
+>  .../devicetree/bindings/arm/intel-ixp4xx.yaml | 22 +++++++++++++++++++
+>  MAINTAINERS                                   |  1 +
+>  2 files changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/intel-ixp4xx.yaml
+
+In any case, the manual checker thinks this looks fine.
+
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
