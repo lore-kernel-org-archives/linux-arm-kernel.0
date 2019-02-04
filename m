@@ -2,23 +2,22 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 47631C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:27:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6D87BC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:27:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 10F482083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:27:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3D7102083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:27:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OG71cBJI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="mI6LlaLu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 10F482083B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dn0zYeSy";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="2qNrI2h/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3D7102083B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,61 +25,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=eLgHWOk6J2im/SiOMMuyyXKYtmqooTbIdE1DcxJ4Ijw=; b=OG71cBJI0LD5yl
-	WlqV3RgRHvG16qCxXo0uPkHttCbuI/tzTXhOxuqUn+cAbhFfnXWWgfDVkYmEy+worNqS6HG77VVPj
-	GSrjHzrrEhRBGYOPfjaK816g9k0+Ta8HpXHjJ834a4jQ46Qf1w0c31GNa3Tszst2neYWJ4qvBEJ2H
-	Z/hPyi7J7fwQ6uvOYiiV6Gjw68aNdKOKiOfOJCYxX12a33RUUdG2aKaiPxptiEC2qegQA4zt9AOPF
-	TMoMX30lEq5n9l6pcPT7v0IeB7xVkrnzZG5DaxaKIw3D2+cFimpzSW+r8JlaxdK5ITQXkPhyXhnAs
-	OMQFNjLDmAcE4+5XhrCQ==;
+	List-Owner; bh=SA0EvpSK9DCilRhCXJlImcwwiXPa7rHZOqQMV6PDTQg=; b=Dn0zYeSyX9B8kL
+	djGoYdruoelacS9urURavgZPHbk2U5ziPXyoihs1H7QLq12Qu4fLnno2BzZFVWQ+CM70KqrWSR9Ds
+	B3zTPIu/xi6vGlGDVzYPizgnPGe6rPn0MIwPXI+C0SmrtDSloM43ofHNyDucCvx52g7mQdo6KUGdE
+	xpxFTAPeMbKhfX0hlH4DALnAYdiJJrUBKLmF3dLoAXIXzhNHUysROtznc2brXPg9X1foBXS5scbPc
+	zyLgX2AH0WxgVHJ2YP5WSWXQQK4h4BeugEYFjDh3IScTsMqoov8ZRuGep7voBc5rM500r8icRGKwd
+	YsARfzCTN3dpNnPk60uQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqh5W-0001Hd-8q; Mon, 04 Feb 2019 16:27:14 +0000
-Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
+	id 1gqh5m-0001Ym-Bk; Mon, 04 Feb 2019 16:27:30 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqh5S-0001H9-Fn
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:27:12 +0000
-Received: by mail-ot1-x342.google.com with SMTP id 32so671736ota.12
+ id 1gqh5e-0001RT-Nr
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:27:27 +0000
+Received: from mail-qt1-f170.google.com (mail-qt1-f170.google.com
+ [209.85.160.170])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id C3DCD218B0
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 08:27:10 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=Z33S2/tBASL7ZYU7PMw+LhaeD0w+rofBnoyglbKaVZE=;
- b=mI6LlaLuvt0WpBSvnW2+qWKjvkIN1gm3MU7oog3EHZTyrdkwxujwjY60CHCcqWdws1
- O5emGNNcG8ym/3beXvwBCossM7IpOks37K9+blFOotl2m4HzJLQvIYGxTcSON6zRBkNa
- GBIPwF0w2Wo53kSZGNhesPqDOWAF6p+seIEVhUlbA2/oRsPl/rLqKM0eR+vF9p8C0Y6d
- 5hCmjjqVebeYlsUWpRVyZdRO0ilM7rBJf/kcsWjyN5jYtxG7ghCBqqIiW4lW+PrNslIv
- jMBFcDm3l+sySiY2R+DI7cBjdzPz55NF+/1HCQmxAtpwo1rpDugtRyXPXI/rFwaf1Yrb
- xNQA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=Z33S2/tBASL7ZYU7PMw+LhaeD0w+rofBnoyglbKaVZE=;
- b=AIeOBPONvf4gZ/q+ERKjLvPrWBB6/9Ybt+00SgegR9LFxlL4td6PY68I18iIlGgfDD
- 5A2O1tZfQVTn9ASHkr2bNwGDCBkX1EsrbLvb023zi00PX1x82yPOWPv14iLtiWp47msA
- +p+8fgbOKh+P8DGb2Zapt3rQC52LKsITCudJhDjSxafBSvCy4/qPJKWr3aNCIiNmTuQj
- b4/iloWwHY5uR87ioC/FyC+ti6K1K2/0s029ZsVpGsN7IZVS1wjYac2B6Sg60/XRU/g7
- Fh6sKIpoZMfkvJm+VsYWAd6yuT1v6pGNAcGJUCNmRuqs8ojv+H0ut08eRJMPucJOPsj7
- oeuw==
-X-Gm-Message-State: AHQUAuZvyrMv2DkqjQt8YfDRhE1l3zuzvpCjlUzJ7w97ipi+SZninnW4
- hmRvrh1OszxXqby6JWO6xWBfHydDWSgHwr577rE=
-X-Google-Smtp-Source: AHgI3IYVA4Alm+TtRbL8Io50aFGjQNRP6R1wUWcD1/lW403mq6kcD2XsDLN8diQ7mCnY3D17ABLrCyAOclAkPqy3vbk=
-X-Received: by 2002:a9d:60c4:: with SMTP id b4mr81717otk.221.1549297629419;
- Mon, 04 Feb 2019 08:27:09 -0800 (PST)
+ Mon,  4 Feb 2019 16:27:21 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549297641;
+ bh=7nzZc/yD4khUaljlNkylKpCEst+tqzkOtBkucskv23A=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=2qNrI2h/2SyaajCFNWyVIU+rzJ+BRhSIIH12cPDJBLQcIylUQDYh+JsGT5omDp0nB
+ 8zs9GlugqXNDEmsASYxpZA2o2Dju2CvDJoJzu/iw/rt/ZaT3woxx5FWZ6Urvpozw7n
+ kMJtEGu47WmWMHxR1D0LQHhpDHZZLCYuISqSz2tE=
+Received: by mail-qt1-f170.google.com with SMTP id y20so461480qtm.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 04 Feb 2019 08:27:21 -0800 (PST)
+X-Gm-Message-State: AHQUAuY7G5Lrag8h3/uKzBaAt1uTZmMvrsFfejnDpRF39bIzL4MTMSdS
+ k6sb3UL9Z1x53uKQCv3y9PvzXvAvOgwEYTNN3A==
+X-Google-Smtp-Source: AHgI3IYtkw6mhtKs/McwJGg3ygf31wr7UsHyWhT/pzLjBzgtl7Yee6yhO4RlLZPY/emx2zyK0xfa53bcomat+NXSVng=
+X-Received: by 2002:a0c:9e05:: with SMTP id p5mr157588qve.246.1549297640760;
+ Mon, 04 Feb 2019 08:27:20 -0800 (PST)
 MIME-Version: 1.0
 References: <20190203185501.8958-1-anarsoul@gmail.com>
- <20190203185501.8958-7-anarsoul@gmail.com>
- <20190204142036.vd42nvyjnjr5yeoi@flea>
-In-Reply-To: <20190204142036.vd42nvyjnjr5yeoi@flea>
-From: Vasily Khoruzhick <anarsoul@gmail.com>
-Date: Mon, 4 Feb 2019 08:26:43 -0800
-Message-ID: <CA+E=qVfTfJ9E29gz83tdVGx5_KGWSQVJOAxKTzC+-n7=gdj0cA@mail.gmail.com>
-Subject: Re: [PATCH RESEND v2 06/12] drm/sun4i: rgb: Add 1% tolerance to dclk
- frequency check when bridge is connected
-To: Maxime Ripard <maxime.ripard@bootlin.com>
+ <20190203185501.8958-9-anarsoul@gmail.com>
+ <20190204074350.GC16448@ulmo>
+ <CA+E=qVecudACOEXt74Kf=UA_F-uuHgEqHzKpYAq1ocMx3Sx+eQ@mail.gmail.com>
+ <20190204082353.GE19087@ulmo>
+In-Reply-To: <20190204082353.GE19087@ulmo>
+From: Rob Herring <robh+dt@kernel.org>
+Date: Mon, 4 Feb 2019 10:27:09 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqKt1kOXmRNvkYsQ6AL69+TPZURKpDbKkkEUb2+KZ5hKjQ@mail.gmail.com>
+Message-ID: <CAL_JsqKt1kOXmRNvkYsQ6AL69+TPZURKpDbKkkEUb2+KZ5hKjQ@mail.gmail.com>
+Subject: Re: [PATCH RESEND v2 08/12] dt-bindings: add binding for generic eDP
+ panel
+To: Thierry Reding <thierry.reding@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_082710_523337_BDFBA6B4 
-X-CRM114-Status: GOOD (  18.29  )
+X-CRM114-CacheID: sfid-20190204_082723_540253_F1CEAC2B 
+X-CRM114-Status: GOOD (  25.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,13 +90,13 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>,
  devicetree <devicetree@vger.kernel.org>,
- Archit Taneja <architt@codeaurora.org>, David Airlie <airlied@linux.ie>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
+ Archit Taneja <architt@codeaurora.org>, Andrzej Hajda <a.hajda@samsung.com>,
+ David Airlie <airlied@linux.ie>, linux-sunxi <linux-sunxi@googlegroups.com>,
  dri-devel <dri-devel@lists.freedesktop.org>,
- Andrzej Hajda <a.hajda@samsung.com>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Thierry Reding <thierry.reding@gmail.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ Sean Paul <seanpaul@chromium.org>,
  Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Daniel Vetter <daniel@ffwll.ch>, Sean Paul <seanpaul@chromium.org>,
+ Daniel Vetter <daniel@ffwll.ch>,
  arm-linux <linux-arm-kernel@lists.infradead.org>,
  Icenowy Zheng <icenowy@aosc.io>
 Content-Type: text/plain; charset="us-ascii"
@@ -108,46 +104,63 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 4, 2019 at 6:20 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+On Mon, Feb 4, 2019 at 2:24 AM Thierry Reding <thierry.reding@gmail.com> wrote:
 >
-> Hi,
+> On Mon, Feb 04, 2019 at 12:13:55AM -0800, Vasily Khoruzhick wrote:
+> > On Sun, Feb 3, 2019 at 11:43 PM Thierry Reding <thierry.reding@gmail.com> wrote:
+> > >
+> > > On Sun, Feb 03, 2019 at 10:54:57AM -0800, Vasily Khoruzhick wrote:
+> > > > eDP panels usually have EDID EEPROM, so there's no need to define panel
+> > > > width/height or any modes/timings in dts. But this panel still may have
+> > > > regulator and/or backlight.
+> > > >
+> > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > > ---
+> > > >  .../devicetree/bindings/display/panel/panel-edp.txt        | 7 +++++++
+> > > >  1 file changed, 7 insertions(+)
+> > > >  create mode 100644 Documentation/devicetree/bindings/display/panel/panel-edp.txt
+> > >
+> > > Please don't try to make panels look more generic than they really are.
+> > > You're going to have to provide a compatible string for your device that
+> > > is more specific than "panel-edp". You claim that you don't need any
+> > > extra information that is panel specific, but you don't know that now.
+> > > We have in the past thought that we didn't need things like prepare
+> > > delay, but then we ran into situations where we did need them.
+> > >
+> > > Just do what everybody else does. Provide a specific compatible string
+> > > and match on that in the panel-simple driver. Even if you can read all
+> > > the video timings from an EDID EEPROM, you can still provide a mode in
+> > > the panel descriptor to serve as a fallback if for example the EEPROM
+> > > is faulty on some device.
+> >
+> > Pinebook used several 768p panels that have slightly different timings
+> > and recent batch uses 1080p panel.
+> >
+> > What panel descriptor should I use as fallback?
 >
-> On Sun, Feb 03, 2019 at 10:54:55AM -0800, Vasily Khoruzhick wrote:
-> > Clock rate check that was added in commit bb43d40d7c83 ("drm/sun4i: rgb:
-> > Validate the clock rate") prevents some panel and bridges from working with
-> > sun4i driver.
-> >
-> > Unfortunately, dotclock frequency for some modes are not achievable on
-> > sunxi hardware, and there's a slight deviation in rate returned by
-> > clk_round_rate(), so they fail this check.
-> >
-> > Experiments show that panels and bridges work fine with this slight
-> > deviation, e.g. Pinebook that uses ANX6345 bridge with 768p eDP panel
-> > requests 73 MHz, gets 72.296MHz instead (0.96% difference) and works just
-> > fine.
-> >
-> > This patch adds a 1% tolerence to the dot clock check when bridge is
-> > connected.
-> >
-> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> You don't use panel descriptors as fallback. The simple-panel driver
+> will bind to a panel device and use the corresponding descriptor. If
+> your device tree contains the correct information, the descriptor is
+> correct for the panel you have.
 >
-> I'm not sure we want to make exceptions for all the hardware
-> combination we face, but we should go for something more generic (and
-> easier to maintain instead).
+> In other words you need to ensure that you have the correct panel in
+> device tree for the board that you're using. This is exactly the same
+> thing as for other devices.
 >
-> IIRC, from the previous discussion, HDMI had a tolerancy requirement
-> in the standard. Do you know if there's such a thing for eDP? That
-> would solve the issue for all the eDP displays at once.
+> One way to to this is to have separate device trees for each variant
+> of the board that you want to support. Another variant may be to have
+> a common device tree and then have some early firmware update the DTB
+> with the correct panel information.
 
-I don't have access to eDP standard - vesa.org says it's available to
-members only.
+That can be a pain to manage especially if panels are swapped run to
+run with 2nd sources.
 
-> Maxime
->
-> --
-> Maxime Ripard, Bootlin
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+I think it is perfectly fine to have a generic-ish fallback as long as
+it is just that, a fallback. If the panel has quirks, then you'd
+better make sure the firmware is stuffing in the right compatibles or
+that you can update the firmware.
+
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
