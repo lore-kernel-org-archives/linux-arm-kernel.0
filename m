@@ -2,67 +2,108 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D616C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:03:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9BF34C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:10:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DC3E3214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:03:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5D3512147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:10:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IoKmil7h";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="BsFBVisa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC3E3214DA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nH5kSSHU";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="RfOEfc9Y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D3512147A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=O4FP2yjkpmqgNGeF8goI76JRuA/W91haeTyqzqQnVfA=; b=IoKmil7hOLipRT
-	nEGHZt3OLA29ng3BZ3cMyq59rkf7/CVlJEGzLcYkOiQlNMwJI9+pKfRN/skoj7rNPGnI9F5Ieq+h9
-	bbYpxxs2bXjuNzmgHVWUhhKExMAoBaJedTdBHOb67PMpiZK7VL2BaGRxrXId5KxQLnb2dzrPeWBTY
-	iRM6MwpXINqLiiHl1sCeifKV3eBs/pQagerZUKTpYxmr8jK2BT9u2nQ+GLb0Iucb8wwn+c0zJR4sR
-	Gu9apvrOA+M2oKGhNxvdFpon4S+yE5gDj6va4gsqjPXYvlk0Smb+DWVZgl8J4waDCKGG2L7D9i7yd
-	5D14Sm9n3A4D/0m9hcfw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:Message-ID:Date
+	:Subject:To:From:Reply-To:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=pJ6OPTddznNmsGD2wFRov/B1rbxoWn9BCvnfEZ5xgM8=; b=nH5kSSHUTXdolb
+	WhY5I4B3fAi/i2Cryi2DbsoAJLRdTTo22i/n2qmyO4aiP622mdWB/dTFkrGZ3pw9cR3nGOeutp1JJ
+	Z8chX5xgwU+ps+FYlnqSGehrTIpdM+IAP1i8UTy1j27op7LyD9xX2eQKG28hABQoBpjsf7fv/d8Kl
+	bJsNQUrucQEKQD+ODPa4Nu+3tLMI86QltMIeB+WC9HQv0nBgR3E6DVohykN328l+YSnuTtz8RoPW0
+	jJ5hPk09H0rSOAsa5waBEvySQadfMwDiibRxDiTEUjuRwBO4W4QQRAZ7e4KgWM5aKtMFz5z6IMhZp
+	aKIpfEwucM9ZE9GMlU6w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqaA5-0001m3-3q; Mon, 04 Feb 2019 09:03:29 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gqaGX-0004oB-66; Mon, 04 Feb 2019 09:10:09 +0000
+Received: from mail-eopbgr150050.outbound.protection.outlook.com
+ ([40.107.15.50] helo=EUR01-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqaA0-0001ja-36
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 09:03:26 +0000
-Received: from localhost (unknown [171.76.74.253])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id A292F214DA;
- Mon,  4 Feb 2019 09:03:22 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549271003;
- bh=gCCaxUI2ihsRU8je4qmeQg7XDZWRUxyYtyadjn+1yu0=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=BsFBVisap5WIzXG+1TD7mHBiNEAdJHQ0IloO4oSvpN5No458kgFYJUx+sg47Dxvqh
- LoVjjkNj+fPWfSCVXC9JhgNgVCe65JR9GCj0I8DX3fENuRoh1EdGfogiue1ah7PnOe
- SulgsHR76cmRWLe/hxe6DY/9azrTeZNwfgmZNzB4=
-Date: Mon, 4 Feb 2019 14:31:54 +0530
-From: Vinod Koul <vkoul@kernel.org>
-To: John Stultz <john.stultz@linaro.org>
-Subject: Re: [PATCH 0/8 v5] k3dma patches to add support for hi3660/HiKey960
-Message-ID: <20190204090154.GM4296@vkoul-mobl>
-References: <1548361463-28372-1-git-send-email-john.stultz@linaro.org>
+ id 1gqaGT-00040E-Bd
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 09:10:07 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=92FhkxR2k2N6UHpMDSv82Gx55fUz4fm2m5erdCvyWdc=;
+ b=RfOEfc9YuYgRgsCNXSXSBkuju1dp35lIefs1Cc65/1H5j9EG4Ob5gsOz3nO72ACdgVAb7LXQw6/UYjNNpfM7ZeRpv8lq9UmZb0zx4Fd8ZY9lnGm724x8h4VNXQOGqzWwiYEtKRYAZlNkg3BhuTFXS6+Vc4NsBrkwEO7vp9cxbtY=
+Received: from VI1PR0401MB2496.eurprd04.prod.outlook.com (10.168.65.10) by
+ VI1PR0401MB2640.eurprd04.prod.outlook.com (10.168.66.12) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1580.17; Mon, 4 Feb 2019 09:10:01 +0000
+Received: from VI1PR0401MB2496.eurprd04.prod.outlook.com
+ ([fe80::208f:755e:b057:2cfe]) by VI1PR0401MB2496.eurprd04.prod.outlook.com
+ ([fe80::208f:755e:b057:2cfe%8]) with mapi id 15.20.1580.019; Mon, 4 Feb 2019
+ 09:10:01 +0000
+From: Pankaj Bansal <pankaj.bansal@nxp.com>
+To: Leo Li <leoyang.li@nxp.com>
+Subject: [PATCH v3 0/2] add qixis driver
+Thread-Topic: [PATCH v3 0/2] add qixis driver
+Thread-Index: AQHUvGloYp719U5yW0it7u7DV+gjxQ==
+Date: Mon, 4 Feb 2019 09:10:00 +0000
+Message-ID: <20190204143449.25040-1-pankaj.bansal@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: BMXPR01CA0037.INDPRD01.PROD.OUTLOOK.COM
+ (2603:1096:b00:c::23) To VI1PR0401MB2496.eurprd04.prod.outlook.com
+ (2603:10a6:800:56::10)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=pankaj.bansal@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 2.17.1
+x-originating-ip: [92.120.1.69]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR0401MB2640;
+ 6:nRaAhPgsfPoQYiZQkQYRdK5h0EOIh1tmiPCQNsb3U0/8bqzbLyOWKxvEeqP6+Yetjug9MfyYti0QSfX3MLMwmCWVOTmrcLfLWy5Z+u4fq52vLB7kw3oSXWtFGH0jvsJhUUskKrvWqRGrXWfdvV9s3Aqiy/w4yK1/DdHKGZkwav+yqfzhSFMWhIlVHnUMQpNzxvAidFUkSM8xgNDO00Q3jvCbc+q2qtUB4BHHcDzQrhGjgqM1i8HdQOLfwouPVQwmQjozawiahXzi96BNcY8fVAdwcCfujFGLF0NoslZuyea65FU7BJdjG/vzdyhbMLiNtOBkiriss3MBndXuNVy4csNeT8tY2F0PVLTSy3UmAZhFqY2wGibbDG8sz4IWnaUJwOdEul5ymHUmkNclsh5c6cPl8NBe1pwaXxo1hObTgVoqE0L+Trcz6Mwx7ItHtm/lZkkOSew8NKp20FhqFdISwA==;
+ 5:4Gu0Um57T1ln+47mah97jK3rCrbl4ZoU1xndNtk+JOh8xQDYtxClmKA13zju+7eeNjLqtQOd3c9xN2yANH4oDd7VTZ35sM3xSEYWq3kHQiUr+wvHPbqqGk4uydWnx6vlon3SahdH1czukVujvNCtXuTm5OYsiatvj0uQI8ZIFJkCdXinqdGiOuFZDcETrUnti/GDjyA6RcHAUsuZ8NIjUQ==;
+ 7:4h10snF6xRfHsj6f/CQ1eq+LGI0M439lCciccWX4y8jNvMGKA0CAxnr28kUxJDff1eIO/P1Z3JGr4rLhXrJdjTY3t07rXdgfalgF+4RFqrgxC9dHwPbNSAtalg5wy2lvXg3mimkE1qMZykCVx3yKaQ==
+x-ms-office365-filtering-correlation-id: 13925d73-a175-4625-929f-08d68a808a98
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR0401MB2640; 
+x-ms-traffictypediagnostic: VI1PR0401MB2640:
+x-microsoft-antispam-prvs: <VI1PR0401MB26405A09E088274A4E2908F0F16D0@VI1PR0401MB2640.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0938781D02
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(136003)(396003)(366004)(39860400002)(346002)(189003)(199004)(66066001)(37006003)(316002)(6636002)(36756003)(99286004)(2906002)(54906003)(6512007)(6306002)(53936002)(966005)(478600001)(14454004)(256004)(52116002)(6486002)(6436002)(7736002)(6506007)(386003)(102836004)(186003)(26005)(68736007)(105586002)(97736004)(106356001)(305945005)(3846002)(6116002)(486006)(8936002)(44832011)(50226002)(81166006)(81156014)(8676002)(476003)(2616005)(86362001)(6862004)(1076003)(25786009)(71200400001)(4744005)(71190400001)(4326008);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0401MB2640;
+ H:VI1PR0401MB2496.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: H1QTit5qRX13y3IItJnL5kh1w3zUOnBle4w1vyVSR7D84O4kydLXAcPbhADf3fHlf7ARKRrMMwNnSnVeSJZAdPdQJn8W93gUeiIqTMM0SMmZT+cw2JKm9iv8UkIp9UM0/EZHZJ26f7GY8Yz3n8X+kHJm07npa69SSfIjPr8t7YthyFNDwnH/mxtSyTqlzQp2OiWJlbfwGwMMVXvDSnYC/rMQNsQNPGS4SpdTkS0DGPvyVwokIheagHz/w5zsPu+wVHa7F7RnIxgvt92WlbhI63bThG/0ZFETKGlk45FSeztIejq+b/MOdyzCjIE/N4Ta0tstPirUElQ2DcJFkkbPuaivQvEGh/C6AjhHpa1vMRBbP10I80f3F2Y06bvjkxo6byLp4PjKZIaneuMWkN97eAPLHABlpuky8B+Z2K/9PPE=
+Content-ID: <85281D6AD7A9FF4DB7E8D11AA684A809@eurprd04.prod.outlook.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1548361463-28372-1-git-send-email-john.stultz@linaro.org>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 13925d73-a175-4625-929f-08d68a808a98
+X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Feb 2019 09:09:59.4166 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0401MB2640
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_010324_153996_C194CAAD 
-X-CRM114-Status: GOOD (  11.23  )
+X-CRM114-CacheID: sfid-20190204_011005_423414_BF1CBDD6 
+X-CRM114-Status: GOOD (  10.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,28 +115,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Guodong Xu <guodong.xu@linaro.org>, Ryan Grachek <ryan@edited.us>,
- Zhuangluan Su <suzhuangluan@hisilicon.com>,
- Tanglei Han <hantanglei@huawei.com>, lkml <linux-kernel@vger.kernel.org>,
- Wei Xu <xuwei5@hisilicon.com>, Rob Herring <robh+dt@kernel.org>,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- dmaengine@vger.kernel.org, Dan Williams <dan.j.williams@intel.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Pankaj Bansal <pankaj.bansal@nxp.com>,
+ "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
+ Varun Sethi <V.Sethi@nxp.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 24-01-19, 12:24, John Stultz wrote:
-> This patch series is based on recent work by Tanglei Han, and
-> adds support for hi3660 SoCs as found on the HiKey960 board,
-> along with a few patches I've been carrying.
+FPGA on LX2160AQDS/LX2160ARDB connected on I2C bus,
+so add qixis driver which is basically an i2c client driver to control FPGA.
 
-Applied and fixed the minor style issues in patch 5, and retagged 3 thru
-5 to dmaengine: xxx, thanks
+Also added platform driver for MMIO based FPGA, like the one available
+on LS2088ARDB/LS2088AQDS.
+
+This driver is essential to control MDIO mux multiplexing.
+
+This driver is dependent on below patches:
+https://www.mail-archive.com/netdev@vger.kernel.org/msg281274.html
+
+Cc: Varun Sethi <V.Sethi@nxp.com>
+
+---
+Notes:
+    V2:
+    - https://patchwork.kernel.org/cover/10788341/
+    V1:
+    - https://patchwork.kernel.org/cover/10627297/
+
+Pankaj Bansal (2):
+  dt-bindings: soc: fsl: Document Qixis FPGA usage
+  drivers: soc: fsl: add qixis driver
+
+ .../bindings/soc/fsl/qixis_ctrl.txt           |  53 +++++
+ drivers/soc/fsl/Kconfig                       |  11 +
+ drivers/soc/fsl/Makefile                      |   1 +
+ drivers/soc/fsl/qixis_ctrl.c                  | 207 ++++++++++++++++++
+ 4 files changed, 272 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/fsl/qixis_ctrl.txt
+ create mode 100644 drivers/soc/fsl/qixis_ctrl.c
+
 -- 
-~Vinod
+2.17.1
 
 _______________________________________________
 linux-arm-kernel mailing list
