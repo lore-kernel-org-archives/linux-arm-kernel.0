@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BECEEC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 11:10:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B6534C282CC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 11:11:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7925D207E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 11:10:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8C2462087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 11:11:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LLUSvKqJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7925D207E0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EOJizyP7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C2462087C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=z7WBe6wf0JuQQWoOBSHLI1+/7NTMx6nNfI1kUuqqA88=; b=LLUSvKqJGtY5gQ
-	Wxs4BzHv/Xku+H4y6bZceho7Xn4fn2o91LmviewIsAyz/VlJPM9VT3w45Bha/YTg5B51CmSK8Mnh2
-	gJt5/uNBXTjWf0ZosJHXXo6uMpi3oWOKsos5Bi6YeAauiDjO9xAV6HJMfdjqYg8kxV89Dvsu32lxQ
-	1uRNgQyXCuTDZNkAoC578Hn9Rb/vay1n/wZ7isjVdC5ezhDZnTiLFngBzhgTTktjOLaiNjNc6u4b7
-	/9PZwEWHLDFe5kox31/DmGEoET3UWRhLQp8aZtVJil3JCpiTJkfV058nrLhx87lIIxuhRHD/H8Tp/
-	HDaV6futw2lWC26tJ7zg==;
+	List-Owner; bh=+CsTx7Qt3XM9faZVwWYPxUFTwQJt8vJYl5WEJUMS6vI=; b=EOJizyP79eQRl6
+	nZZ9WVYIvLrZYQc3C7skKTLFWKD9GYjoNuF5wlh60Cea1m/EesbGdKBispSZckOYeQqGi9lkGPms9
+	flkCzF5dhxaEqCReTDQ3P+nfqabNpqG0AbudF7Zx6QM2wc2zYdtWw30j8WAn5Ezh7Jv0xDEOazoov
+	NylwyouYfnoWGEKB8rYd/NHms9JmmYz3Btotwnstm3p1nCTiT5euS0AnBnLEFjILFUtrXBRH3Te3X
+	gWWymtFtzLkkDX67ZdCPU0yqhWedXu8o7/uyQ7wWjPxKylWqVR1QtTJomibS+u3DmGrzIv+/XBPTg
+	w9wcYuS9KGp+vTvZCi1g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqc9G-0001oc-58; Mon, 04 Feb 2019 11:10:46 +0000
+	id 1gqc9W-0002BL-8L; Mon, 04 Feb 2019 11:11:02 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqc8a-0008Ss-1u
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 11:10:06 +0000
+ id 1gqc8c-00007a-E3
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 11:10:13 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 75A7CA78;
- Mon,  4 Feb 2019 03:10:03 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A32CA15BE;
+ Mon,  4 Feb 2019 03:10:05 -0800 (PST)
 Received: from queper01-lin.cambridge.arm.com (queper01-lin.cambridge.arm.com
  [10.1.195.48])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 858D53F675;
- Mon,  4 Feb 2019 03:10:01 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B2D1F3F675;
+ Mon,  4 Feb 2019 03:10:03 -0800 (PST)
 From: Quentin Perret <quentin.perret@arm.com>
 To: viresh.kumar@linaro.org, sudeep.holla@arm.com, rjw@rjwysocki.net,
  nm@ti.com, sboyd@kernel.org, mka@chromium.org
-Subject: [PATCH v4 2/5] cpufreq: dt: Register an Energy Model
-Date: Mon,  4 Feb 2019 11:09:49 +0000
-Message-Id: <20190204110952.16025-3-quentin.perret@arm.com>
+Subject: [PATCH v4 3/5] cpufreq: scpi: Register an Energy Model
+Date: Mon,  4 Feb 2019 11:09:50 +0000
+Message-Id: <20190204110952.16025-4-quentin.perret@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190204110952.16025-1-quentin.perret@arm.com>
 References: <20190204110952.16025-1-quentin.perret@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_031004_142535_A82BC3F7 
-X-CRM114-Status: GOOD (  11.87  )
+X-CRM114-CacheID: sfid-20190204_031006_992810_69734406 
+X-CRM114-Status: GOOD (  11.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,22 +80,23 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 Now that PM_OPP provides a helper function to estimate the power
 consumed by CPUs, make sure to try and register an Energy Model (EM)
-from cpufreq-dt, hence ensuring interested subsystems (the task
+from scpi-cpufreq, hence ensuring interested subsystems (the task
 scheduler, for example) can make use of that information when available.
 
 Signed-off-by: Quentin Perret <quentin.perret@arm.com>
 ---
- drivers/cpufreq/cpufreq-dt.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/cpufreq/scpi-cpufreq.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
-index e58bfcb1169e..d74e0402512a 100644
---- a/drivers/cpufreq/cpufreq-dt.c
-+++ b/drivers/cpufreq/cpufreq-dt.c
-@@ -280,6 +280,8 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- 	policy->cpuinfo.transition_latency = transition_latency;
- 	policy->dvfs_possible_from_any_cpu = true;
+diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
+index 99449738faa4..b279f94d82f7 100644
+--- a/drivers/cpufreq/scpi-cpufreq.c
++++ b/drivers/cpufreq/scpi-cpufreq.c
+@@ -170,6 +170,9 @@ static int scpi_cpufreq_init(struct cpufreq_policy *policy)
+ 	policy->cpuinfo.transition_latency = latency;
  
+ 	policy->fast_switch_possible = false;
++
 +	dev_pm_opp_of_register_em(policy->cpus);
 +
  	return 0;
