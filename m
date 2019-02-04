@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C247EC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 21:50:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67E25C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 22:04:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8BE2220823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 21:50:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 328E120818
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 22:04:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rfUQc0/B";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="uSZSYeP6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8BE2220823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FEWeK4CJ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="r69Eij2/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 328E120818
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lechnology.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,50 +25,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=gzbkBzSmyEyOo76gbmNgY/48POuKPJtYqiyecZ4Ul9I=; b=rfUQc0/BsAVFqrSOcHu7HC7A8
-	8yptsoasEG2vJu1gNPdkp2j30+BUUJu8JZDfMqbhXA0vl0pcLGMlheRKpj1PUBLC8mzA/Ke2uK7Oj
-	d38+mNNkaJbyLj3wAGZwX3E0PHO9oN5N7AzA8/lOCkFmPm2iR9wJiuXVD8yvvgqgciVAn3pM1PQgg
-	l2WLfaClKv56v/yaBtrHbsrNIHNhFL5c1VgKHkdNxjtZyL6b7QQ0de2XitvDCvEiSs10GS0TMvcEY
-	2pCM3h7dfLyUXrPLCTJwkvB32DQWr9Jo8Sx75OcJ0Nf7iZwtn7hJ03n1SNfloYx8Em/C3RINN1QQ/
-	huo5vgt5Q==;
+	 bh=ymjhfQUf76HON8b7Mjy7GVGKmv9QXUYjLTRYJ8g1pb4=; b=FEWeK4CJbvMlcITIgyfZPLsC2
+	qDIVN11pHX/Qb+GNHy/zgMmYWT3OU8tYqhvjiBoUD+Lyb0Dn6PNSYRGy4s9x/koR4v+GXelBufu0T
+	i5mKuTXQ2+/s0iKBKBEKW7Dfg8AYtXMvQhXS042uXyZwSW8E5BzNrEnB9aVyUAlJpXFDZOAveg8GS
+	eSejMS+uYjg9vEjZZYL6C2MBNepLjRZbRVdouxh3VpONEELa0MYifdE+Tl3pQU4FRyrE85a9VTq1x
+	BwtwHegB4SDtKYQBD+Sv+dblhJFBWxPKv1y//3wYmkhvHF2OOuyOTPMGTEpa7T59j6MrWbtqluBqF
+	ENK5x+1rw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqm8g-0002Er-R5; Mon, 04 Feb 2019 21:50:50 +0000
+	id 1gqmM5-00062m-M1; Mon, 04 Feb 2019 22:04:41 +0000
 Received: from vern.gendns.com ([98.142.107.122])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqm8d-0002EJ-Ft
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 21:50:48 +0000
+ id 1gqmM2-00062V-C5
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 22:04:39 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=lechnology.com; s=default; h=Content-Transfer-Encoding:Content-Type:
  In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
  :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=pnZ2eNzSqRIV3BOyNRCUkV4ZpEWk1sYLXUKYGiR6+Oc=; b=uSZSYeP6q3MhMVSyJd+FsvkJ2G
- lpGfE2Gr55w8dzDSKkfnmyEkOcj7V8xnQU1+ZN6f11fD73qsBjIqRkDnMXdzfKCJqzBPUllzn9vH8
- RvIfFtr3kfZsEtmbjFlLzu/Q00KQlb16FiF2ULCF1N2ovahqvy4nkh1d6toBdALMJ92DBDKFx+yP+
- DPV7KIx7kfBy3oq8WHjeAgybRe0rW0uUQ+R1fOXvnL16NhmPHgJ/tTuTrjYk0l1IFo93gAEBWOgd4
- wzUAwXYbVb/1JCh7Wi4eSVfcUJ8YjEI8yzhd9RvV44K9SuVqA4fWRv9fBlETE3qDhXTI/3sv5mHGq
- e4OGsjbQ==;
+ bh=+v2C/wqMqi/Brk0S0mcJIRicWeGdZEj7P+0Hb8N2zMs=; b=r69Eij2/nTqXzRcp7niOi5wHND
+ xtf104B0zjfIyjWeFvsPOiTbkbcaMAmVSm8SF7yyuvk0QZ/6iPFEdik04uO5Pz4ZagLgWnImRcKJ+
+ pOICpYjvPM996ac4qRDOQ9If86pW7CWrhvZh4y1+indQ/ca83M3pt0HXf+JcIYc2jCimpxpiHOOMN
+ 5fmtPAnDAitlhrl7sEEYfYvmkRqw97G+7vHS8oF+iv1FuFf1puc6oWzXn80wqqKDRTPHLj771eeO4
+ IR7ThpNzcCYW+bRPQDtacyDpgK/I82/YAsdGfBYtFlnyj5dIa6I5CtOclzj70V3a+da3FrBtdUHMl
+ yVnXZrFw==;
 Received: from 108-198-5-147.lightspeed.okcbok.sbcglobal.net
- ([108.198.5.147]:57350 helo=[192.168.0.134])
+ ([108.198.5.147]:57576 helo=[192.168.0.134])
  by vern.gendns.com with esmtpsa (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128)
  (Exim 4.91) (envelope-from <david@lechnology.com>)
- id 1gqm58-0006vy-1C; Mon, 04 Feb 2019 16:47:10 -0500
-Subject: Re: [PATCH 01/35] ARM: davinci: remove intc_host_map from
- davinci_soc_info struct
+ id 1gqmIW-0002PE-Tf; Mon, 04 Feb 2019 17:01:00 -0500
+Subject: Re: [PATCH 03/35] ARM: davinci: remove davinci_intc_type
 To: Bartosz Golaszewski <brgl@bgdev.pl>, Sekhar Nori <nsekhar@ti.com>,
  Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
  Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>
 References: <20190131133928.17985-1-brgl@bgdev.pl>
- <20190131133928.17985-2-brgl@bgdev.pl>
+ <20190131133928.17985-4-brgl@bgdev.pl>
 From: David Lechner <david@lechnology.com>
-Message-ID: <ae1dafd9-13dd-8b8c-dc8a-d1c80d4499e3@lechnology.com>
-Date: Mon, 4 Feb 2019 15:50:43 -0600
+Message-ID: <12f030d6-ad5d-460b-2c8e-cfa37e903bbe@lechnology.com>
+Date: Mon, 4 Feb 2019 16:04:34 -0600
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <20190131133928.17985-2-brgl@bgdev.pl>
+In-Reply-To: <20190131133928.17985-4-brgl@bgdev.pl>
 Content-Language: en-US
 X-AntiAbuse: This header was added to track abuse,
  please include it with any abuse report
@@ -83,8 +82,8 @@ X-Source:
 X-Source-Args: 
 X-Source-Dir: 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_135047_608450_0330E6C7 
-X-CRM114-Status: UNSURE (   7.88  )
+X-CRM114-CacheID: sfid-20190204_140438_763576_67886580 
+X-CRM114-Status: UNSURE (   7.60  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -107,12 +106,15 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 On 1/31/19 7:38 AM, Bartosz Golaszewski wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> This field is not used by any board. Remove it as part of the interrupt
-> support cleanup.
+> We now use the generic ARM irq handler on davinci. There are no more
+> users that check davinci_intc_type. Remove the variable and all its
+> references.
 > 
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
 
 Reviewed-by: David Lechner <david@lechnology.com>
+
 
 
 _______________________________________________
