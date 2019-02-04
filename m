@@ -2,65 +2,89 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 907B1C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:06:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 15EFEC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:08:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 540802087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:06:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D78B22087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:08:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e9NuTTcJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 540802087C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eODkOE7E";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="otYvbE23"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D78B22087C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4Ac/pPA2yJQirzQUusJvAvI1/2B/YOu94I/HhOWGq/g=; b=e9NuTTcJafKNSk
-	7BYvytlgP6k6QeXovwg42YsD7ggtIhe1k49Gfq+d9IZJQBMlTfi7xziAeWgEQiW8Qcln5jAc7X6qU
-	W5SLn60ZcbTvG7K/CEbjK+QKR4M8z0HayaaCM6dCoG5WqiOzdepnJJEJd4NCFJuWS5Sm4RH3d0Cp+
-	wTsZO1zw/w+Wy75Ku8icVwkecGSUk19OsBiiwVa/wbZSFNjWPPpS+LYVEvuk3LHuj5So8+xaAuawP
-	iZmwQDc8nHIHsAEWiEPMhar/GYyfARkGKz2LYTqLMPfsXL9p2PgvAvsBuDjgMQZZF34YvZ54w7rGu
-	fUdsoznw5e9PgF4eolJg==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=0CnNrE4TshEOpbqCJYtLqLmKQTAu2ZbA3MWW0Fp1NKA=; b=eODkOE7Ek0gbyo
+	6DwySt65cTQGQTbt41ffPZ+/3vOkxVthkgDCWTz4EeS3Dvmxuj8q42G5hwtPMAS4/zHflSLwlDWBb
+	d3/o2SjaRL0y0KRmgitgtDz8uFnMZBcnMv4MiFnH1HSnZbionbWRx8RVEl7g6m9TKS4b0phbAUHWd
+	tAw1QlBYBeo7lp5mZFLs4wNGs3w39r+hJLCv64Kzb1jMmy4QxS0u3ugp0giEZjBvs5l92Qe7kQmUk
+	rVHZhA1NbEiC4DZZkS37JWalkPM3H4RK3BMtHb69P2ppUS/AuGslBfT8g4SGIMiqGzlk8+Qwl55C4
+	IE4pBhX1qX9wLsvvSXcg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqhht-0002Rf-CN; Mon, 04 Feb 2019 17:06:53 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqhWM-0004bj-V6; Mon, 04 Feb 2019 16:55:36 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2CB3615AB;
- Mon,  4 Feb 2019 08:54:57 -0800 (PST)
-Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 409D93F589;
- Mon,  4 Feb 2019 08:54:55 -0800 (PST)
-Subject: Re: [PATCH 1/2] arm64: Expose address bits (physical/virtual) via
- cpuinfo
-To: Bhupesh Sharma <bhsharma@redhat.com>
-References: <1548709076-22317-1-git-send-email-bhsharma@redhat.com>
- <1548709076-22317-2-git-send-email-bhsharma@redhat.com>
- <afa2417a-10d0-21f6-007f-e8eb7055f3d7@arm.com>
- <8659c949-a588-387b-3cb6-1dd8ea86723e@redhat.com>
-From: James Morse <james.morse@arm.com>
-Message-ID: <be9ad470-6f24-36cc-aeb8-a7cea3ec984a@arm.com>
-Date: Mon, 4 Feb 2019 16:54:51 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gqhjI-0002ze-7O; Mon, 04 Feb 2019 17:08:20 +0000
+Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqhjF-0002zK-VR
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 17:08:19 +0000
+Received: by mail-ot1-x343.google.com with SMTP id s13so1016315otq.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 04 Feb 2019 09:08:17 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=nBUljq0NN0GSjY6fHkehNH9BR5Buu4ANotBVP2vhoIo=;
+ b=otYvbE23c/iWX+hgo3xYhzYfwlfro16/QfoemYLn21aD5uokuJpiJA/eRkXTxd0E4V
+ mVhfVxER+5ZOjSiTS05q7m5Pf0VGD+LbOsjG+VuuBZcQxj3RFf8VlZa95U5Z6+2p+1VY
+ Q4GwYUPGqz4nvNJb4a4VhnpJsPkukpWlxq3Y45HIyEW/LpAseS0duaWKtbc7R8JiiaFW
+ 0BokNTJo7agvf4OPDV/gmhyvT+C8ZKGaQSz4vEjoTDeawWFLa0VHVRK7Qmk/eeltyl3L
+ fqwmoQ4b5drxkHsU8RykF9QT/T7dQR+3kknEp+s9p2pnHw6IrWKURq0JtBeZA2l5NbYy
+ sQJA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=nBUljq0NN0GSjY6fHkehNH9BR5Buu4ANotBVP2vhoIo=;
+ b=LXM1i9sCmoQ7ajbzIQ9bBDAeOtXVeIiO6HV4ixxrwfT3ev+9Jqf8pDmQGdk2cPGlbT
+ NKe8s7sWHjf5lSOKItl/S0zNno20RYZcnWB0rdpzv0V4LtswVRYwW2WgNQAx5qWA4sFf
+ pBhQiS4sJ0VafN2qWd7zVgxWPF/RyXx5luGcw9z8mrA3zMhnDyV9gfyDmS01Mb3JdSCs
+ z6lwGVS70g9zRXJjiy6F7IXOWdm1cH2OPrRjvP263o05g5HPwUL2rkCVezW5TmySyaRm
+ dLL8idZweVYBdTZfGXHH1127w1r5Oy51tlsEMLnbbtrVda9ZKYjOLrh1HVUI3L0QzZZd
+ fmCA==
+X-Gm-Message-State: AHQUAuaU2YnD+27i8tMcJnm43KKLtCf4mgBREwJTv5yE1DsRNc1L7xdI
+ GTceJgf34ESu70/yO2bKnm45rv/cUSlOz01GN/o=
+X-Google-Smtp-Source: AHgI3IYVuC0PBVVduJr6LxiLQxEkUr1YyzbSbHLE9NBeyASV5jKza0okC+RzJaf9V1RHFqujrYdATglJhDeHqzhe+rQ=
+X-Received: by 2002:aca:f044:: with SMTP id o65mr172390oih.145.1549300096718; 
+ Mon, 04 Feb 2019 09:08:16 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <8659c949-a588-387b-3cb6-1dd8ea86723e@redhat.com>
-Content-Language: en-GB
+References: <20190203185501.8958-1-anarsoul@gmail.com>
+ <20190203185501.8958-9-anarsoul@gmail.com>
+ <20190204074350.GC16448@ulmo>
+ <CA+E=qVecudACOEXt74Kf=UA_F-uuHgEqHzKpYAq1ocMx3Sx+eQ@mail.gmail.com>
+ <20190204082353.GE19087@ulmo>
+ <CAL_JsqKt1kOXmRNvkYsQ6AL69+TPZURKpDbKkkEUb2+KZ5hKjQ@mail.gmail.com>
+ <20190204165637.GA30876@ulmo>
+In-Reply-To: <20190204165637.GA30876@ulmo>
+From: Vasily Khoruzhick <anarsoul@gmail.com>
+Date: Mon, 4 Feb 2019 09:07:50 -0800
+Message-ID: <CA+E=qVca2g1tkpvYZo-+nJ+v8d7UXFtoxV6t8mAkQkftYDFkZw@mail.gmail.com>
+Subject: Re: [PATCH RESEND v2 08/12] dt-bindings: add binding for generic eDP
+ panel
+To: Thierry Reding <thierry.reding@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_085459_194048_F109C379 
-X-CRM114-Status: GOOD (  31.13  )
+X-CRM114-CacheID: sfid-20190204_090818_032424_AA745E3F 
+X-CRM114-Status: GOOD (  20.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,113 +96,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, Steve.Capper@arm.com, catalin.marinas@arm.com,
- ard.biesheuvel@linaro.org, will.deacon@arm.com, bhupesh.linux@gmail.com,
- Suzuki K Poulose <suzuki.poulose@arm.com>, kexec@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Archit Taneja <architt@codeaurora.org>, Andrzej Hajda <a.hajda@samsung.com>,
+ David Airlie <airlied@linux.ie>, linux-sunxi <linux-sunxi@googlegroups.com>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Sean Paul <seanpaul@chromium.org>,
+ Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
+ Daniel Vetter <daniel@ffwll.ch>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>,
+ Icenowy Zheng <icenowy@aosc.io>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgQmh1cGVzaCwKCk9uIDMwLzAxLzIwMTkgMTk6NDgsIEJodXBlc2ggU2hhcm1hIHdyb3RlOgo+
-IE9uIDAxLzI5LzIwMTkgMDM6MzkgUE0sIFN1enVraSBLIFBvdWxvc2Ugd3JvdGU6Cj4+IE9uIDI4
-LzAxLzIwMTkgMjA6NTcsIEJodXBlc2ggU2hhcm1hIHdyb3RlOgo+Pj4gV2l0aCBBUk12OC4yLUxW
-QSBhbmQgTFBBIGFyY2hpdGVjdHVyZSBleHRlbnNpb25zLCBhcm02NCBoYXJkd2FyZSB3aGljaAo+
-Pj4gc3VwcG9ydHMgdGhlc2UgZXh0ZW5zaW9ucyBjYW4gc3VwcG9ydCB1cHRvIDUyLWJpdCB2aXJ0
-dWFsIGFuZCA1Mi1iaXQKPj4+IHBoeXNpY2FsIGFkZHJlc3NlcyByZXNwZWN0aXZlbHkuCj4+Pgo+
-Pj4gU2luY2UgYXQgdGhlIG1vbWVudCB3ZSBlbmFibGUgdGhlIHN1cHBvcnQgb2YgdGhlc2UgZXh0
-ZW5zaW9ucyB2aWEgQ09ORklHCj4+PiBmbGFncywgZS5nLgo+Pj4gwqAgLSBMUEEgdmlhIENPTkZJ
-R19BUk02NF9QQV9CSVRTXzUyLCBhbmQKPj4+IMKgIC0gTFZBIHZpYSBDT05GSUdfQVJNNjRfRk9S
-Q0VfNTJCSVQKPj4+Cj4+PiBUaGUgZWFzaWVzdCB3YXkgYSB1c2VyIGNhbiBkZXRlcm1pbmUgdGhl
-IHBoeXNpY2FsL3ZpcnR1YWwKPj4+IGFkZHJlc3NlcyBzdXBwb3J0ZWQgb24gdGhlIGhhcmR3YXJl
-LCBpcyB2aWEgdGhlICcvcHJvYy9jcHVpbmZvJwo+Pj4gaW50ZXJmYWNlLgo+Pgo+PiBXaHkgZG8g
-d2UgbmVlZCB0aGlzIGluZm9ybWF0aW9uID8KPiAKPiBTb3JyeSBmb3IgdGhlIGRlbGF5IGluIHJl
-cGx5LCBidXQgSSB3YW50ZWQgdG8gY29sbGVjdCBhcyBtdWNoIGluZm9ybWF0aW9uIGZyb20KPiBv
-dXIgdGVzdCB0ZWFtcyBhcyBwb3NzaWJsZSBiZWZvcmUgcmVwbHlpbmcgdG8gdGhpcyB0aHJlYWQu
-Cj4gCj4gU28gaGVyZSBpcyBicmllZiBsaXN0IG9mIHJlYXNvbnMsIGFzIHRvIHdoeSB3ZSBuZWVk
-IHRoaXMgaW5mb3JtYXRpb24gaW4gdXNlci1zcGFjZToKPiAKPiAxLiBUaGlzIGluZm9ybWF0aW9u
-IGlzIHVzZWZ1bCBmb3IgYSBub24tZXhwZXJ0IHVzZXIsIHVzaW5nIExpbnV4IGRpc3RyaWJ1dGlv
-bnMKPiAobGlrZSBGZWRvcmEpIG9uIGRpZmZlcmVudCBhcm02NCBwbGF0Zm9ybXMuIFRoZSBkZWZh
-dWx0IGNvbmZpZ3VyYXRpb24gKC5jb25maWcpCj4gd2lsbCBiZSB0aGUgc2FtZSBmb3IgYSBkaXN0
-cmlidXRpb24gZmxhdm9yIGFuZCBpcyBzdXBwb3NlZCB0byB3b3JrIGZpbmUgb24gYWxsCj4gdW5k
-ZXJseWluZyBhcm02NCBwbGF0Zm9ybXMuCj4gCj4gYSkuIE5vdyBzb21lIG9mIHRoZXNlIHVuZGVy
-bHlpbmcgcGxhdGZvcm1zIG1heSBzdXBwb3J0IEFSTXY4LTguMiBleHRlbnNpb24gd2hpbGUKPiBv
-dGhlcnMgZG9uJ3QuCj4gCj4gYikuIFVzZXJzIHBlcmZvcm1pbmcgcGVyZm9ybWFuY2UgYmVuY2gt
-bWFya2luZyBvbiB0aGVzZSBwbGF0Zm9ybXMgcnVuIGJlbmNobWFya3MKPiB3aXRoIGRpZmZlcmVu
-dCBwYWdlLXNpemVzIGFuZCBhZGRyZXNzIHJhbmdlcy4KCj4gYykuIFJpZ2h0IG5vdyB0aGV5IGhh
-dmUgbm8gd2F5IHRvIGtub3csIGFib3V0IHRoZSB1bmRlcmx5aW5nIFZBUmFuZ2UgYW5kIFBBUmFu
-Z2UKPiB2YWx1ZXMgb3RoZXIgdGhhbiByZWFkaW5nIHRoZSBjb25maWcgZmlsZSBhbmQgc2VhcmNo
-IGZvciB0aGUgZmxhZ3MuCgpXaHkgZG8gdGhleSBuZWVkIHRvIGtub3c/IFdoYXQgZGVjaXNpb24g
-Y2FuIHlvdSBtYWtlIHdpdGggdGhpcyBpbmZvcm1hdGlvbiB0aGF0CnlvdSBjYW4ndCBtYWtlIHdp
-dGhvdXQgaXQ/CgoKPiBGb3IgZS5nLiBsZXRzIGNvbnNpZGVyIHRoZSAncGctdGFibGVfdGVzdHMn
-IChTZWUgLQo+IDxodHRwczovL2dpdGh1Yi5jb20vc2Fuc2tyaXRpLXMvcGctdGFibGVfdGVzdHM+
-KSwgd2hpY2ggaXMgdXNlZCB0byB0ZXN0IGFuZAo+IHZlcmlmeSA1LWxldmVsIHBhZ2UgdGFibGUg
-YmVoYXZpb3Igb24geDg2XzY0IExpbnV4LiBJdCByZXF1aXJlcyBkZXRlcm1pbmluZyBpZgo+IDUt
-bGV2ZWwgcGFnZSB0YWJsZXMgYXJlIGZ1bGx5IHN1cHBvcnRlZCwgCgouLi4gYnV0IHdlIGRvbid0
-IGhhdmUgNS1sZXZlbCBwYWdlcyB0YWJsZXMgLi4uCgoKPiBmb3Igd2hpY2ggaXQgdXNlcyBlaXRo
-ZXIgJ0ludGVsICdsYTU3Jwo+IGNwdSBmbGFnJyBpbjoKPiAKPiAkIGNhdCAvcHJvYy9jcHVpbmZv
-Jywgb3IKPiAKPiAkIGdyZXAgQ09ORklHX1g4Nl81TEVWRUwgL2Jvb3QvY29uZmlnLSQodW5hbWUg
-LXIpCj4gQ09ORklHX1g4Nl81TEVWRUw9eQo+IAo+IFRoaXMgdGVzdCBzdWl0ZSBpcyBlYXNpbHkg
-bW9kaWZpYWJsZSBmb3IgdmVyaWZ5aW5nIDUyLWJpdCBBUk12OC4yLUxWQSBzdXBwb3J0LgoKVGhp
-cyBsb29rcyBsaWtlIGEgdGVzdCB0byBjaGVjayBhbGwga2VybmVsIHBhZ2UtdGFibGUgd2Fsa2Vy
-cyBoYXZlIGJlZW4gdXBkYXRlZApmb3IgYSBmaWZ0aCBsZXZlbC4gV2UgZG9uJ3QgbmVlZCB0byB3
-b3JyeSBhYm91dCB0aGlzLgoKWW91IHNob3VsZCBqdXN0IG5lZWQgdG8gcmVtb3ZlIHRoZSBhcmNo
-LXNwZWNpZmljIHRlc3QuIElmIHlvdSBwcm92aWRlIHRoZSBoaW50Cm9uIHBsYXRmb3JtcyB0aGF0
-IHN1cHBvcnQgaXQsIHRoZSBtYXBwaW5nIHNob3VsZCBzdWNjZWVkLiBPbiBwbGF0Zm9ybXMgdGhh
-dApkb24ndCwgaXQgd29uJ3QuCgpXaHkgZG9lcyB1c2VyIHNwYWNlIG5lZWQgdG8ga25vdyBpbiBh
-ZHZhbmNlIG9mIG1ha2luZyB0aGUgaGludD8KCgo+IGQpLiBOb3cgd2hlbiBydW5uaW5nIHRoZSBh
-Ym92ZSBzdWl0ZSBhbmQgc2hhcmluZyByZXN1bHRzLCBpdCBtaWdodCBiZSB0aGF0IHRoZQo+IC5j
-b25maWcgZmlsZSBpcyBub3QgYXZhaWxhYmxlIG9yIGV2ZW4gaW4gdGhlIGNhc2UgaXQgaXMgYXZh
-aWxhYmxlIHRoZSBDT05GSUcKPiBmbGFnIHNldHRpbmdzIGluIC5jb25maWcgZmlsZSBhcmUgbm90
-IGludHVpdGl2ZSB0byBhIG5vbi1leHBlcnQgdXNlciBmb3IgYXJtNjQKPiAodGhlIGV4YW1wbGUg
-YmVsb3cgaXMgb2YgNjRLIHBhZ2Ugc2l6ZSwgNDgtYml0IGtlcm5lbCBWQSwgNTItYml0IFVzZXIg
-c3BhY2UgVkEKPiBhbmQgNTItYml0IFBBKToKCkkgYWdyZWUgaW5zcGVjdGluZyB0aGUgS2NvbmZp
-ZyBpcyBhbiBpbmFwcHJvcHJpYXRlIHdheSBmb3IgdXNlci1zcGFjZSAndG8ga25vdycKd2hhdCB0
-aGUga2VybmVsIHN1cHBvcnRzLgoKSSBjYW4gb25seSBzZWUgYSAnc3VwcG9ydHMgNTJiaXQgdmEn
-IGZsYWcgYXMgYmVpbmcgdXNlZnVsIHRvIGEgcHJvZ3JhbSB0aGF0CmRvZXNuJ3QgYWN0dWFsbHkg
-d2FudCB0byB1c2UgaXQsIGJ1dCBmb3Igc29tZSBiaXphcnJlIHJlYXNvbiB3YW50cyB0byBrbm93
-LgoKRm9yIGNvcmVkdW1wcyB0aGUgcXVlc3Rpb24gaXNuJ3QgIndhcyBpdCBzdXBwb3J0ZWQiLCBi
-dXQgIndhcyBpdCBpbiB1c2UiLCB3aGljaAp5b3UgY2FuIHRlbGwgZnJvbSB0aGUgcGFnZXRhYmxl
-cy4KCgo+IEFsc28gcmlnaHQgbm93IHRoZXJlIGlzIGFuIGFic2VuY2Ugb2YgYSBzdGFuZGFyZCBB
-QkkgYmV0d2VlbiB0aGUgdXNlci1zcGFjZSBhbmQKPiBrZXJuZWwgZm9yIGV4cG9ydGluZyB0aGlz
-IGluZm9ybWF0aW9uIHRvIHRoZSB1c2VyLXNwYWNlLCB3aXRoIHR3byBleGNlcHRpb25zOgo+IAo+
-IDEuIEZvciB2bWNvcmVpbmZvIHNwZWNpZmljIHVzZXItc3BhY2UgdXRpbGl0aWVzIChsaWtlIG1h
-a2VkdW1wZmlsZSBhbmQgY3Jhc2gpIEkKPiBoYXZlIHByb3Bvc2VkIGEgY291cGxlIG9mIENPTkZJ
-RyBmbGFncyB0byBiZSBhZGRlZCB0byB0aGUgdm1jb3JlaW5mbywgc28gdGhhdAo+IHVzZXItc3Bh
-Y2UgdXRpbGl0aWVzIGNhbiB1c2UgdGhlIHNhbWUgKFNlZQo+IDxodHRwOi8vbGlzdHMuaW5mcmFk
-ZWFkLm9yZy9waXBlcm1haWwva2V4ZWMvMjAxOS1KYW51YXJ5LzAyMjM4Ny5odG1sPiBmb3IgZGV0
-YWlscykuCgp2bWNvcmVpbmZvIGlzIGZvciB0aGluZ3MgbGlrZSBjcmFzaC9nZGIvbWFrZWR1bXBm
-aWxlIHRvIHByb3ZpZGUga2VybmVsLXNwZWNpZmljCmluZm9ybWF0aW9uIHRoYXQgdGhleSBjb3Vs
-ZG4ndCBwb3NzaWJseSB3b3JrIHdpdGhvdXQuIExpa2UgdGhlIHBhZ2Ugc2l6ZS4gNTJiaXQKc3Vw
-cG9ydCBkb2Vzbid0IGZpdCBoZXJlIGFzIGEgNTJiaXQtYXdhcmUgd2Fsa2VyIHdvcmtzIHJlZ2Fy
-ZGxlc3Mgb2Ygd2hldGhlcgo1MmJpdCB3YXMgaW4gdXNlLgoKCj4gMi4gRm9yIG90aGVyIHVzZXIt
-c3BhY2UgdXRpbGl0aWVzIChlc3BlY2lhbGx5IHRob3NlIHdoaWNoIG1ha2UgYSAnbW1hcCcgY2Fs
-bCBhbmQKPiBwYXNzIGFuIGFkZHJlc3MgaGludCB0byB0aGUgZ2V0IHRoZSBrZXJuZWwgdG8gcHJv
-dmlkZSBhIGhpZ2ggYWRkcmVzcyksIAoKPiBJIGNhbiBzZWUgb25seSB0d28gbWV0aG9kcyB0byBk
-ZXRlcm1pbmUgdGhlIHVuZGVybHlpbmcga2VybmVsIHN1cHBvcnQ6Cj4gCj4gYSkuIFJlYWQgdGhl
-IENPTkZJRyBmbGFncyBmcm9tIC5jb25maWcgKGFzIEkgY2FwdHVyZWQgc29tZSBwYXJhZ3JhcGhz
-IGFib3ZlKSwgb3IKPiAKPiBiKS4gSW4gYWJzZW5jZSBvZiAuY29uZmlnIGZpbGUgb24gdGhlIHN5
-c3RlbSwgcmVhZCB0aGUgc3lzdGVtIElEIHJlZ2lzdGVycyBsaWtlCj4gJ0lEX0FBNjRNTUZSMF9F
-TDEnIGFuZCAnSURfQUE2NE1NRlIyX0VMMScgKHdoaWNoIFBBVENIIDIvMiBvZiB0aGlzIHNlcmll
-cyB0cmllcwo+IHRvIGVuYWJsZSBmcm9tIGtlcm5lbCBzaWRlKSBhbmQgdGhlbiBtYWtlIGEgZGVj
-aXNpb24gb24gd2hldGhlciB0byBwYXNzIGEgaGludAo+IHRvICdtbWFwJy4KCkl0IHNlZW1zIHlv
-dSdyZSBleHBlY3RpbmcgdG8ga25vdyB3aGV0aGVyIDUyYml0LVZBIGlzIHN1cHBvcnRlZCB3aXRo
-b3V0IGFjdHVhbGx5CnVzaW5nIGl0LiBXaGF0IGlzIHRoaXMgdXNlZnVsIGZvcj8KClRoZSBwb2lu
-dCBvZiB0aGUgaGludCBpcyB5b3Ugd2FudCB0byBhbGxvY2F0ZSBtZW1vcnksIGFuZCBjYW4gd29y
-ayB3aXRoIDUyYml0LVZBCmlmIHRoZSBwbGF0Zm9ybSBzdXBwb3J0cyBpdC4gSWYgaXQgZG9lc24n
-dCwgeW91IHN0aWxsIHdhbnQgdG8gYWxsb2NhdGUgdGhlCm1lbW9yeS4gV2Ugc2hvdWxkbid0IG5l
-ZWQgYSBoaW50IHRoYXQgdGhlIDUyYml0LXZhIGhpbnQgaXMgc3VwcG9ydGVkLgoKCj4gSXQgbWln
-aHQgYmUgdGhhdCBJIGFtIG1pc3Npbmcgb3RoZXIgc3RhbmRhcmQgQUJJIG1lY2hhbmlzbXMuIElm
-IHNvLCBwbGVhc2UgcG9pbnQKPiBtZSB0byB0aGUgc2FtZS4KV2UgYWxzbyBoYXZlIEhXQ0FQOiBE
-b2N1bWVudGF0aW9uL2FybTY0L2VsZl9od2NhcHMudHh0CgpUaGVzZSBhcmUgdXNlZCBmb3IgdGhp
-bmdzIHRoZSBwcm9ncmFtIG1heSBuZWVkIHRvIHJ1bjogbGlrZSBmbG9hdGluZyBwb2ludCwgb3IK
-dGhlIHByZXNlbmNlIG9mIHBhcnRpY3VsYXIgaW5zdHJ1Y3Rpb25zLiBVc2VyLXNwYWNlIGFic29s
-dXRlbHkgaGFzIHRvIGtub3cgYWJvdXQKdGhlc2UgaW4gYWR2YW5jZSwgYXMgaXQgd2lsbCBnZXQg
-YSBTSUdJTEwgaWYgc3VwcG9ydCBpcyBub3QgcHJlc2VudC4KCjUyYml0IFZBIGRvZXNuJ3QgZml0
-IGhlcmU6IG1lbW9yeSBpcyBtZW1vcnkuIE5lZWRpbmcgdG8ga25vdyBpbXBsaWVzIHVzZXItc3Bh
-Y2UKaXMgdW53aWxsaW5nIHRvIHVzZSBtZW1vcnkgaWYgdGhlIGJpdHMgYWJvdmUgNDhiaXRzIGFy
-ZW4ndCBzZXQuCgoKVGhhbmtzLAoKSmFtZXMKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFy
-bS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9t
-YWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+On Mon, Feb 4, 2019 at 8:56 AM Thierry Reding <thierry.reding@gmail.com> wrote:
+
+> > I think it is perfectly fine to have a generic-ish fallback as long as
+> > it is just that, a fallback. If the panel has quirks, then you'd
+> > better make sure the firmware is stuffing in the right compatibles or
+> > that you can update the firmware.
+>
+> simple-panel would probably work if you stuck in some mostly compatible
+> string and provided a ddc-i2c-bus property in the device tree node. The
+> generic-ish fallback case could be implemented by providing a fallback
+> compatible string (we used to have "simple-panel", which I think would
+> still be adequate for this I suppose) and adding a dummy descriptor in
+> the driver, perhaps one with pre-defined delays that could be adjusted
+> to work for all cases, or they could just be 0. At least that way we'd
+> be explicitly documenting that we support this as a fallback.
+>
+> I'm not sure how you'd want to enforce that people provide the right
+> compatible strings that way. Currently there's no way to make your panel
+> work without adding a panel driver, so people are forced to write the
+> DT bindings and a driver, or add support to an existing one. If we open
+> this backdoor, I suspect many people will just take the easy route and
+> rely on the fallback. And then what do we do when we get bug reports
+> about panels not working, or requiring some quirks. How do we go and
+> find out what the right compatible strings are for each board, or how to
+> fix things for something we don't have access to.
+>
+> This all sounds like a Pandora's box to me.
+
+OK, just give me an option that will work on this platform with a
+single software image (keep in mind that u-boot aka "firmware" is part
+of this image) and that is acceptable for upstream and I'll try to
+implement it.
+
+> Thierry
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
