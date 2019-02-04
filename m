@@ -2,67 +2,86 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7475CC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 14:00:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A350AC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 14:01:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3CBA32087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 14:00:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 703DC2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 14:01:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V02BNRc0";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="UOMvXWSV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3CBA32087C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZOwGDXJv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 703DC2082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=altlinux.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Cc:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GAJ+oKG63ebJhrOn+eut+Wr3cbV1a/IjKKXC82RvxnI=; b=V02BNRc0++1uAQ
-	n7S6fR9Xwl7MsXfLl3GVeyF+RAWUFqbEB6VmmCmeGhoPzkVLSZ7EKwNuzN8hGSxfm2OwXdzVZELWE
-	7BusCKhwgIhH4UyW4KJ2o+tW+KJYSktjHTYh8g6+KRv09aeLQ9Z+bGl5TAP0Bop3IbwwUqccZFwUt
-	fPz6f6ntNKixEaclm/ar/gkdr30npFPoDCdSL58p/fW696c8yFMtHh3bhVUVdwR1glrfk6vUgEDX2
-	Be/I03bezwcDGGVwLZhvB8aAOEzI4OIa9doAQdK/fmLLeLQimspMfs9LHu/tB8AWoIBqNBwc8iESQ
-	QdOdgAt4urYc4UCiiA5g==;
+	List-Owner; bh=C8gmyqTQpmqtPwkLgyhIhQNiHYynX7zR1ag9FoGMgqE=; b=ZOwGDXJvAfh9k6
+	xWnte8wZrTWJqzbSScVy2to6N0xnJxr7fMndOK0imNld4vPAMtlCpUUQWbC9aAa5+rU4UHWnXumGF
+	/MGFW+dPjTpCPqokribO6yWatRMvVTy5+RMuBYSkbXDI1OaCeQeqNyeracUIJ7WtuciUU/D1r/Lst
+	CVbv64agOrTnl8QBlTBeRARi8/kNzNwb9+tpbEM5ncI/L+HRBawFQSdpsipK2WSyZ1pN9V2v/kGDS
+	He81K5x/OjmdIm4w+R3b/29J/ER9zw0Mryx/xLd10xVUQR5pWkFsiaemVTDkvBMjzeijaErchngRK
+	Pb+YvrpPignr5OmQ/bJg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqenJ-0008Es-0a; Mon, 04 Feb 2019 14:00:17 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqenG-0008ER-3K; Mon, 04 Feb 2019 14:00:15 +0000
-Received: from bbrezillon (unknown [91.160.177.164])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id BAB872082F;
- Mon,  4 Feb 2019 14:00:10 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549288813;
- bh=rWhYzT7UjHT4ejUyjxjI9R2JCrNUWzH8DfYNDXDEMWQ=;
- h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=UOMvXWSVLM1sjqhzgedjrPZL37SAyM1KYnh7VZyQg2PSGoYC3sDIuu5cIEP1vQ9DR
- +fY4kuf+1qOBbEBxOmhTEaM/tCGhPUCcTc3iENUI8ThCz9bxr/07wH+/+oV5gD+5EF
- w/E25sENpGxO2KcI583sv9xwcFWozi2YpC8Gll5A=
-Date: Mon, 4 Feb 2019 15:00:05 +0100
-From: Boris Brezillon <bbrezillon@kernel.org>
-To: <Tudor.Ambarus@microchip.com>
-Subject: Re: [PATCH v4 01/13] spi: atmel-quadspi: cache MR value to avoid a
- write access
-Message-ID: <20190204150005.3567bf29@bbrezillon>
-In-Reply-To: <20190204100910.26701-2-tudor.ambarus@microchip.com>
-References: <20190204100910.26701-1-tudor.ambarus@microchip.com>
- <20190204100910.26701-2-tudor.ambarus@microchip.com>
-X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+	id 1gqenv-0000IH-M6; Mon, 04 Feb 2019 14:00:55 +0000
+Received: from vmicros1.altlinux.org ([194.107.17.57])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqenl-0000FB-Ho
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 14:00:53 +0000
+Received: from imap.altlinux.org (imap.altlinux.org [194.107.17.38])
+ by vmicros1.altlinux.org (Postfix) with ESMTP id 6C81C72CCAC;
+ Mon,  4 Feb 2019 17:00:41 +0300 (MSK)
+Received: from altlinux.org (sole.flsd.net [185.75.180.6])
+ by imap.altlinux.org (Postfix) with ESMTPSA id 4DE984A4A14;
+ Mon,  4 Feb 2019 17:00:41 +0300 (MSK)
+Date: Mon, 4 Feb 2019 17:00:40 +0300
+From: Vitaly Chikunov <vt@altlinux.org>
+To: Herbert Xu <herbert@gondor.apana.org.au>,
+ "David S. Miller" <davem@davemloft.net>,
+ David Howells <dhowells@redhat.com>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ Alexandre Torgue <alexandre.torgue@st.com>,
+ Horia =?utf-8?Q?Geant=C4=83?= <horia.geanta@nxp.com>,
+ Aymen Sghaier <aymen.sghaier@nxp.com>,
+ Tom Lendacky <thomas.lendacky@amd.com>, Gary Hook <gary.hook@amd.com>,
+ Giovanni Cabiddu <giovanni.cabiddu@intel.com>,
+ linux-crypto@vger.kernel.org, linux-kernel@vger.kernel.org,
+ keyrings@vger.kernel.org, linux-stm32@st-md-mailman.stormreply.com,
+ linux-arm-kernel@lists.infradead.org, qat-linux@intel.com
+Subject: Re: [RFC PATCH v4] akcipher: new verify API for public key algorithms
+Message-ID: <20190204140040.wpxoojf4rgx56ppu@altlinux.org>
+Mail-Followup-To: Herbert Xu <herbert@gondor.apana.org.au>,
+ "David S. Miller" <davem@davemloft.net>,
+ David Howells <dhowells@redhat.com>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ Alexandre Torgue <alexandre.torgue@st.com>,
+ Horia =?utf-8?Q?Geant=C4=83?= <horia.geanta@nxp.com>,
+ Aymen Sghaier <aymen.sghaier@nxp.com>,
+ Tom Lendacky <thomas.lendacky@amd.com>,
+ Gary Hook <gary.hook@amd.com>,
+ Giovanni Cabiddu <giovanni.cabiddu@intel.com>,
+ linux-crypto@vger.kernel.org, linux-kernel@vger.kernel.org,
+ keyrings@vger.kernel.org, linux-stm32@st-md-mailman.stormreply.com,
+ linux-arm-kernel@lists.infradead.org, qat-linux@intel.com
+References: <20190125180116.13702-1-vt@altlinux.org>
+ <20190201062655.hmxeqo5hprhcgtfx@gondor.apana.org.au>
+ <20190201070922.nvopn4kxz7jbcoey@altlinux.org>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190201070922.nvopn4kxz7jbcoey@altlinux.org>
+User-Agent: NeoMutt/20171215-106-ac61c7
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_060014_159222_B632C2ED 
-X-CRM114-Status: GOOD (  16.50  )
+X-CRM114-CacheID: sfid-20190204_060046_766272_CC8393CC 
+X-CRM114-Status: GOOD (  15.91  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,78 +93,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- alexandre.belloni@bootlin.com, linux-kernel@vger.kernel.org,
- Cyrille.Pitchen@microchip.com, robh+dt@kernel.org, linux-spi@vger.kernel.org,
- Ludovic.Desroches@microchip.com, broonie@kernel.org,
- linux-mtd@lists.infradead.org, bugalski.piotr@gmail.com,
- linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 4 Feb 2019 10:09:22 +0000
-<Tudor.Ambarus@microchip.com> wrote:
+Herbert,
 
-> From: Tudor Ambarus <tudor.ambarus@microchip.com>
-> 
-> Set the controller by default in Serial Memory Mode (SMM) at probe.
-> Cache Mode Register (MR) value to avoid write access when setting
-> the controller in serial memory mode at exec_op().
-> 
-> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+On Fri, Feb 01, 2019 at 10:09:23AM +0300, Vitaly Chikunov wrote:
+> On Fri, Feb 01, 2019 at 02:26:55PM +0800, Herbert Xu wrote:
+> > On Fri, Jan 25, 2019 at 09:01:16PM +0300, Vitaly Chikunov wrote:
+> > >
+> > > @@ -781,36 +780,17 @@ static int tpm_key_verify_signature(const struct key *key,
+> > >  	if (!req)
+> > >  		goto error_free_tfm;
+> > >  
+> > > -	ret = -ENOMEM;
+> > > -	outlen = crypto_akcipher_maxsize(tfm);
+> > > -	output = kmalloc(outlen, GFP_KERNEL);
+> > > -	if (!output)
+> > > -		goto error_free_req;
+> > > -
+> > > -	sg_init_one(&sig_sg, sig->s, sig->s_size);
+> > > -	sg_init_one(&digest_sg, output, outlen);
+> > > -	akcipher_request_set_crypt(req, &sig_sg, &digest_sg, sig->s_size,
+> > > -				   outlen);
+> > > +	sg_init_table(&src_sg, 2);
+> > > +	sg_set_buf(&src_sg[0], sig->s, sig->s_size);
+> > > +	sg_set_buf(&src_sg[1], sig->digest, sig->digest_size);
+> > > +	akcipher_request_set_crypt(req, &src_sg, NULL, sig->s_size,
+> > > +				   sig->digest_size);
+> > 
+> > It's not clear that sig->digest is guaranteed to be kmalloc memory.
+> > In any case, it's best not to mix unrelated changes in a single
+> > patch.  So please keep the kmalloc on output and then copy
+> > sig->digest into it and put output into the SG list.
 
-Reviewed-by: Boris Brezillon <bbrezillon@kernel.org>
+I will do that.
 
-> ---
-> v4: s/smm/mr, init controller in serial memory mode by default
-> v3: update smm value when different. rename mr/smm
-> v2: cache MR value instead of moving the write access at probe
-> 
->  drivers/spi/atmel-quadspi.c | 14 +++++++++++++-
->  1 file changed, 13 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/spi/atmel-quadspi.c b/drivers/spi/atmel-quadspi.c
-> index ddc712410812..d6864d29f294 100644
-> --- a/drivers/spi/atmel-quadspi.c
-> +++ b/drivers/spi/atmel-quadspi.c
-> @@ -155,6 +155,7 @@ struct atmel_qspi {
->  	struct clk		*clk;
->  	struct platform_device	*pdev;
->  	u32			pending;
-> +	u32			mr;
->  	struct completion	cmd_completion;
->  };
->  
-> @@ -238,7 +239,14 @@ static int atmel_qspi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
->  	icr = QSPI_ICR_INST(op->cmd.opcode);
->  	ifr = QSPI_IFR_INSTEN;
->  
-> -	qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
-> +	/*
-> +	 * If the QSPI controller is set in regular SPI mode, set it in
-> +	 * Serial Memory Mode (SMM).
-> +	 */
-> +	if (aq->mr != QSPI_MR_SMM) {
-> +		qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
-> +		aq->mr = QSPI_MR_SMM;
-> +	}
->  
->  	mode = find_mode(op);
->  	if (mode < 0)
-> @@ -381,6 +389,10 @@ static int atmel_qspi_init(struct atmel_qspi *aq)
->  	/* Reset the QSPI controller */
->  	qspi_writel(aq, QSPI_CR, QSPI_CR_SWRST);
->  
-> +	/* Set the QSPI controller by default in Serial Memory Mode */
-> +	qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
-> +	aq->mr = QSPI_MR_SMM;
-> +
->  	/* Enable the QSPI controller */
->  	qspi_writel(aq, QSPI_CR, QSPI_CR_QSPIEN);
->  
+Thanks,
 
+> It is not guaranteed that sig->s will be kmalloc memory either. (Except
+> we know it for sure like we know the same about sig->digest).
+> 
+> You can see in public_key_signature_free() that both fields are kfree'd
+> together.
+> 
+> So, I don't understand why we should treat sig->digest differently than
+> sig->s.
+> 
+> I was just removing kmalloc'ed output as crypto_akcipher_verify() does
+> not need any output anymore. So, it's not some sort of mixing unrelated
+> changes, from my point of view.
+> 
+> Thanks,
+> 
+> > 
+> > Thanks,
+> > -- 
+> > Email: Herbert Xu <herbert@gondor.apana.org.au>
+> > Home Page: http://gondor.apana.org.au/~herbert/
+> > PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
 
 _______________________________________________
 linux-arm-kernel mailing list
