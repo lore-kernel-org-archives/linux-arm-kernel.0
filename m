@@ -2,66 +2,88 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AE7DDC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:46:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8548C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:49:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 789032147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:46:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 66BF22147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 09:49:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c6jfdvaO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 789032147A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h8am5ppA";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="U45XSPt3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 66BF22147A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GmcDq2OonUSB8p5RbuRa6ciou9vC3xz0eCwfcl+kB54=; b=c6jfdvaOcHSVom
-	wVtn93ll6/HoajTPFhAVj9EeMrbL0MMtDyAEqhCETAXUwEqw44ySaieDgn1eU6SIDzJsO9RzEyYtM
-	rHXFBZ/4o+nbagXUL9sApCJwhxZxihqVDDYcLwh8+dnh7pMQiDkxEgN9LZVMtM//jKpDLCciKCnt+
-	kquv+bD6l9UWoie5M3lO/EBDoYekLaJ2iilzqBx8AS23A3BnG6gHX1unN1oPMthBEl1kiGTaiGOWT
-	j6NfXiICKOEgVHZ8DAmF8xx+VQAkLcxuXDwmJsqARPF/7GQ+6bbdE9IQFwfAWqnIq5+xcI08h1oe5
-	0nXtvQlvqwawuoPLnyaA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=JAN4XVCHKz7vxH0/QgEjSCtlcV/D3eofF8B8p8EY118=; b=h8am5ppA/+kFZn
+	TEdgu4cfBhq4psuiK20ysXMNvoA1XpG7W6p5pR0M258wWng1ICLtnLLkW52QqKYhCYw2WiXyj6xOG
+	X/0O7UlaklvRuJ+p2+IXyoaGBURvkRqMumAnPmWcxtimdvin/oq487yF4r3p384itJNdAwgej4Dua
+	0YYpNAACmQSTp7+Ddkn0GYAJoU3g++SAeAVmcovPnCfwSL+ozIjQcLV/AOqRaTC4ePBW47Ebbjb56
+	PueUKpjQ/MTQz2yIeVMB2UGIm0yZ445fPKTFayaoEp1mu7+iFEG+M2RFdfDdokSbWpE8J1VtuelxB
+	Bc5TBn6VbF3MOmKPOQNw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqapP-0003r9-Gv; Mon, 04 Feb 2019 09:46:11 +0000
-Received: from szxga07-in.huawei.com ([45.249.212.35] helo=huawei.com)
+	id 1gqasv-0004KB-8Y; Mon, 04 Feb 2019 09:49:49 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqapM-0003qN-5M
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 09:46:10 +0000
-Received: from DGGEMS409-HUB.china.huawei.com (unknown [172.30.72.60])
- by Forcepoint Email with ESMTP id 1263A392EDC18905213B;
- Mon,  4 Feb 2019 17:45:58 +0800 (CST)
-Received: from localhost (10.202.226.61) by DGGEMS409-HUB.china.huawei.com
- (10.3.19.209) with Microsoft SMTP Server id 14.3.408.0; Mon, 4 Feb 2019
- 17:45:54 +0800
-Date: Mon, 4 Feb 2019 09:45:40 +0000
-From: Jonathan Cameron <jonathan.cameron@huawei.com>
-To: Georg Ottinger <g.ottinger@abatec.at>
-Subject: Re: [PATCH] iio: adc: at91: disable adc channel interrupt in
- timeout case
-Message-ID: <20190204094540.00003072@huawei.com>
-In-Reply-To: <0974ce54b3da4d82b6bd3026a3de5ff3@abatec.at>
-References: <20190130134202.5831-1-g.ottinger@abatec.at>
- <20190202102021.12bb0a72@archlinux>
- <0974ce54b3da4d82b6bd3026a3de5ff3@abatec.at>
-Organization: Huawei
-X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; i686-w64-mingw32)
+ id 1gqasn-0004CJ-1g
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 09:49:43 +0000
+Received: by mail-wr1-x443.google.com with SMTP id v13so13613517wrw.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 04 Feb 2019 01:49:40 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=1aJKpDy3gSru5/yeZkdF8qEEYyeLbGINpZQT5a5qGfg=;
+ b=U45XSPt3vXXADrNKM1Cn4aYrHY1JoG/c8vqzxpbzdEswLo9kIU7WvMm52WehCXJ6MP
+ JPxmPAm1z7W3XWiB4eJ0K/NgLgdBR6oK72IyU4ra9F1t7mIwLWP0xRCPn/CLUTjwhEm5
+ yLf5yVNmDG+E/lOcDLtyBIjGtOorCk6o/bKIitmlg6tDJlaVSG0/XwII/rBWFzOiUsYt
+ AGsZcZ5iJ6KY9KK5139AN76yyYM41z0g9ZA+HLoHbIfyaTPNRpslF2E7/oSbJ33kUnRk
+ Vw8TMT4KrQTkcT1H/cinaEsAYzh37d3xrBREP/19Bz7rOk8EaQ1FXfHEicLn6BEuNMaW
+ LY6A==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=1aJKpDy3gSru5/yeZkdF8qEEYyeLbGINpZQT5a5qGfg=;
+ b=CKJnfwzet+x4+0M8ESxcsJVVFhJV7/IQXPqRGcumJPVDEWRkjuON9x+XJnY773qcXm
+ lNxgan6k0jX4K+QmRSAAGa+R+c3LjQRavzVD431o8FRxkNzKTqIg0gt+8SplkrwDJM0o
+ TptK9W++rwx++08+uyj+XQIPnOcsaw7NLzKWZhQFoqotdHsdfPhgsZzUC98zLBcLwM2c
+ VtcvqXnpug8T/PLaFxVSsZzMktd6Qo8NAawrx9yNB0e5AWURMfVshTFOzxmtmbtaKst6
+ tb6NUGsx0NKG30CbPBprEnn5syT1yCwAPyEJ8WqUJPORLqn/NBomfMwRuIYPOlSgknmd
+ zVFQ==
+X-Gm-Message-State: AJcUukdJoEjAGSmzjicTkGMfq/CZa91cG1UZrbzMPVcRX3fTNJnxP0bP
+ yq77ObvHwiY/fy+PjmH+8u/CcQ==
+X-Google-Smtp-Source: ALg8bN63COmWcluxOx4nbtfWy7lq6CO1QBOGik3CaPZ36RwQvhhuGEGhIfXSjdfZSa+GA7ZgZQf7jg==
+X-Received: by 2002:adf:f101:: with SMTP id r1mr49558677wro.32.1549273779348; 
+ Mon, 04 Feb 2019 01:49:39 -0800 (PST)
+Received: from bender.baylibre.local
+ (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr. [90.63.244.31])
+ by smtp.gmail.com with ESMTPSA id y20sm10248655wra.51.2019.02.04.01.49.38
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Mon, 04 Feb 2019 01:49:38 -0800 (PST)
+From: Neil Armstrong <narmstrong@baylibre.com>
+To: khilman@baylibre.com
+Subject: [PATCH] soc: amlogic: canvas: Fix meson_canvas_get when probe failed
+Date: Mon,  4 Feb 2019 10:49:37 +0100
+Message-Id: <20190204094937.22763-1-narmstrong@baylibre.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-X-Originating-IP: [10.202.226.61]
-X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_014608_373655_092EB083 
-X-CRM114-Status: GOOD (  25.78  )
+X-CRM114-CacheID: sfid-20190204_014941_404752_498693F7 
+X-CRM114-Status: GOOD (  11.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,223 +95,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Lars-Peter Clausen <lars@metafoo.de>, Kees Cook <keescook@chromium.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- "linux-iio@vger.kernel.org" <linux-iio@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Ludovic Desroches <ludovic.desroches@microchip.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- Peter Meerwald-Stadler <pmeerw@pmeerw.net>, Hartmut Knaack <knaack.h@gmx.de>,
- "eugen.hristev@microchip.com" <eugen.hristev@microchip.com>,
- Stefan Etzlstorfer <s.etzlstorfer@abatec.at>,
- "David S. Miller" <davem@davemloft.net>, Jonathan Cameron <jic23@kernel.org>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: linux-amlogic@lists.infradead.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, Neil Armstrong <narmstrong@baylibre.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 4 Feb 2019 07:17:07 +0000
-Georg Ottinger <g.ottinger@abatec.at> wrote:
+When probe fails, a platforn_device is still associated to the node,
+but dev_get_drvdata() returns NULL.
 
-> Actually this issue occurred to us with an concrete product, where we exp=
-erienced a system hang at -20 =B0C.
-> It was triggered by a race condition between the Touch Trigger and the Ch=
-annel Trigger of the ADC. Once triggered we got in to the situation where a=
-n ongoing Channel Conversion was lost (Timeout case).When we queried a seco=
-nd channel than we got a system hang. Investigating this issue we developed=
- an error demonstrator - reading alternating two channels as fast as possib=
-le (when Touch is enabled). This also provokes this issue at room temperatu=
-re.
-> =
+Handle this case by returning a consistent error.
 
-> For the error demonstrator use following commandline to compile:
-> =
+Fixes: d4983983d987 ("soc: amlogic: add meson-canvas driver")
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/soc/amlogic/meson-canvas.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-> $ arm-buildroot-linux-gnueabihf-gcc adc_demo_error.c -D2ND_CHANNEL -o adc=
-_demo_error2
-> =
+This fix depends on "soc: amlogic: add missing of_node_put()" at [1]
 
-> -------------
-> // adc_demo_error.c
-> #include <unistd.h>
-> #include <fcntl.h>
-> =
+[1] https://patchwork.kernel.org/patch/10794545/
 
-> #define VLEN 10
-> =
-
-> int main()
-> {
->   int fd_adc,fd_adc2;
->   int ret;
->   char dummy[VLEN];
->   =
-
->   fd_adc =3D open ("/sys/devices/platform/ahb/ahb:apb/f8018000.adc/iio:de=
-vice0/in_voltage4_raw",O_RDONLY);  =
-
-> #ifdef 2ND_CHANNEL
->   fd_adc2 =3D open ("/sys/devices/platform/ahb/ahb:apb/f8018000.adc/iio:d=
-evice0/in_voltage5_raw",O_RDONLY);
-> #endif
-> =
-
->   while(1) {
-> =
-
->     lseek(fd_adc, 0, SEEK_SET);
->     ret =3D read(fd_adc, dummy, VLEN);
-> #ifdef 2ND_CHANNEL
->     lseek(fd_adc2, 0, SEEK_SET);
->     ret =3D read(fd_adc2, dummy, VLEN);
-> #endif
-> =
-
->   }
-> }
-> =
-
-> ------------
-> =
-
-> =
-
-> Greeting, Georg
-Hi Georg,
-
-Thanks for the detailed error report and reproducer.
-
-What has me wondering now is where the race is that is triggering this?
-Could you talk us through it?  I don't know this driver that well so
-probably much quicker for you to fill in the gaps rather than me try
-to figure out the race path!
-
-I have no problem with defense in depth (with appropriate comments) but
-I'd like to close that down as well.  If it really is unsolvable I'd
-like at least to have some clear comments in the code explaining why.
-
-Thanks,
-
-Jonathan
-
-> =
-
-> -----Urspr=FCngliche Nachricht-----
-> Von: Jonathan Cameron [mailto:jic23@kernel.org] =
-
-> Gesendet: Samstag, 02. Februar 2019 11:21
-> An: Georg Ottinger <g.ottinger@abatec.at>
-> Cc: eugen.hristev@microchip.com; Stefan Etzlstorfer <s.etzlstorfer@abatec=
-.at>; Hartmut Knaack <knaack.h@gmx.de>; Lars-Peter Clausen <lars@metafoo.de=
->; Peter Meerwald-Stadler <pmeerw@pmeerw.net>; Nicolas Ferre <nicolas.ferre=
-@microchip.com>; Alexandre Belloni <alexandre.belloni@bootlin.com>; Ludovic=
- Desroches <ludovic.desroches@microchip.com>; David S. Miller <davem@daveml=
-oft.net>; Ard Biesheuvel <ard.biesheuvel@linaro.org>; Kees Cook <keescook@c=
-hromium.org>; linux-iio@vger.kernel.org; linux-arm-kernel@lists.infradead.o=
-rg; linux-kernel@vger.kernel.org; Maxime Ripard <maxime.ripard@bootlin.com>
-> Betreff: Re: [PATCH] iio: adc: at91: disable adc channel interrupt in tim=
-eout case
-> =
-
-> On Wed, 30 Jan 2019 14:42:02 +0100
-> <g.ottinger@abatec.at> wrote:
-> =
-
-> > From: Georg Ottinger <g.ottinger@abatec.at>
-> > =
-
-> > Having a brief look at at91_adc_read_raw() it is obvious that in the =
-
-> > case of a timeout the setting of AT91_ADC_CHDR and AT91_ADC_IDR =
-
-> > registers is omitted. If 2 different channels are queried we can end =
-
-> > up with a situation where two interrupts are enabled, but only one =
-
-> > interrupt is cleared in the interrupt handler. Resulting in a =
-
-> > interrupt loop and a system hang.
-> > =
-
-> > Signed-off-by: Georg Ottinger <g.ottinger@abatec.at>  =
-
-> =
-
-> Whilst I agree this looks like a correct change, I would like Maxime to t=
-ake a look as he is obviously much more familiar with the driver than I am.
-> =
-
-> I suspect you can only actually get there in the event of a hardware fail=
-ure as that isn't actually a timeout you should ever see.
-> Could be wrong though!
-> =
-
-> Thanks,
-> =
-
-> Jonathan
-> =
-
-> > ---
-> >  drivers/iio/adc/at91_adc.c | 28 +++++++++++++++++-----------
-> >  1 file changed, 17 insertions(+), 11 deletions(-)
-> > =
-
-> > diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c =
-
-> > index 75d2f7358..596841a3c 100644
-> > --- a/drivers/iio/adc/at91_adc.c
-> > +++ b/drivers/iio/adc/at91_adc.c
-> > @@ -704,23 +704,29 @@ static int at91_adc_read_raw(struct iio_dev *idev,
-> >  		ret =3D wait_event_interruptible_timeout(st->wq_data_avail,
-> >  						       st->done,
-> >  						       msecs_to_jiffies(1000));
-> > -		if (ret =3D=3D 0)
-> > -			ret =3D -ETIMEDOUT;
-> > -		if (ret < 0) {
-> > -			mutex_unlock(&st->lock);
-> > -			return ret;
-> > -		}
-> > -
-> > -		*val =3D st->last_value;
-> >  =
-
-> > +		/* Disable interrupts, regardless if adc conversion was
-> > +		 * successful or not
-> > +		 */
-> >  		at91_adc_writel(st, AT91_ADC_CHDR,
-> >  				AT91_ADC_CH(chan->channel));
-> >  		at91_adc_writel(st, AT91_ADC_IDR, BIT(chan->channel));
-> >  =
-
-> > -		st->last_value =3D 0;
-> > -		st->done =3D false;
-> > +		if (ret > 0) {
-> > +			/* a valid conversion took place */
-> > +			*val =3D st->last_value;
-> > +			st->last_value =3D 0;
-> > +			st->done =3D false;
-> > +			ret =3D IIO_VAL_INT;
-> > +		} else if (ret =3D=3D 0) {
-> > +			/* conversion timeout */
-> > +			dev_err(&idev->dev, "ADC Channel %d timeout.\n",
-> > +				chan->channel);
-> > +			ret =3D -ETIMEDOUT;
-> > +		}
-> > +
-> >  		mutex_unlock(&st->lock);
-> > -		return IIO_VAL_INT;
-> > +		return ret;
-> >  =
-
-> >  	case IIO_CHAN_INFO_SCALE:
-> >  		*val =3D st->vref_mv;  =
-
-> =
-
-
+diff --git a/drivers/soc/amlogic/meson-canvas.c b/drivers/soc/amlogic/meson-canvas.c
+index 87a6c6e23591..151aa84bc593 100644
+--- a/drivers/soc/amlogic/meson-canvas.c
++++ b/drivers/soc/amlogic/meson-canvas.c
+@@ -51,6 +51,7 @@ struct meson_canvas *meson_canvas_get(struct device *dev)
+ {
+ 	struct device_node *canvas_node;
+ 	struct platform_device *canvas_pdev;
++	struct meson_canvas *canvas;
+ 
+ 	canvas_node = of_parse_phandle(dev->of_node, "amlogic,canvas", 0);
+ 	if (!canvas_node)
+@@ -63,7 +64,17 @@ struct meson_canvas *meson_canvas_get(struct device *dev)
+ 	}
+ 
+ 	of_node_put(canvas_node);
+-	return dev_get_drvdata(&canvas_pdev->dev);
++
++	/*
++	 * If priv is NULL, it's probably because the canvas hasn't
++	 * properly initialized. Bait out with -EINVAL because, in the
++	 * current state, this driver probe cannot return -EPROBE_DEFER
++	 */
++	canvas = dev_get_drvdata(&canvas_pdev->dev);
++	if (!canvas)
++		return ERR_PTR(-EINVAL);
++
++	return canvas;
+ }
+ EXPORT_SYMBOL_GPL(meson_canvas_get);
+ 
+-- 
+2.20.1
 
 
 _______________________________________________
