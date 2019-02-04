@@ -2,20 +2,21 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 740C2C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 11:03:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D045C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 11:09:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3EFFC20823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 11:03:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E59F02082E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 11:09:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DNNLZD5B"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3EFFC20823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t76LKiFA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E59F02082E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=abatec.at
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,35 +25,35 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7QZ9gGvA5yXTf9DDLr1zoxPfDP0FPLwr089lY2tXoX4=; b=DNNLZD5BzMHwFa
-	pQ1+yVUb1InrOwIASfDMk7wj3vxB6pAyS7xiAZr0RNI5iGwwNQKzWkAw//6fvVhRjBRurLOWSalEl
-	suCabsHfj5QlrM6oTKPa3y1Bkb2apTZ9rdqzodURtyyHJbYtBYuovXigYMofDJ4xT3ehIv8DYX06I
-	dA+kCXAJRSOPbyuRxrofw/h3bjeVmKesB1qKk0cVVSxUczI+xtq0OR+YuQxUku7omUfYVDN8PEaUo
-	4i+RY0DzgHc1zAKD8UlTNLfKYcfAi/r1B0kUgDyXDA6OWo4Hnazw3XegLYtdb6z+TOs+vaqV8EcUM
-	C3fOLCZCB6kRssVM63nQ==;
+	List-Owner; bh=uC0ZcPKWO6AG2sA/m2Uq5T+M4a9WPt/0eRMbZ3Mltj8=; b=t76LKiFAPo631L
+	xtx51xsUHFPPmjeHB8v7Hdnp6a5gA8ToU5nYTOvY2oyHqPNWRHAl34mwHzpj1khs8PMSrsUekKMpF
+	Vj+svjChyAORwBkyg8pLJEZ4nh3j3nInOn+7LKsTPxFHnEspNxSu989xcI/QaqFRBfe7ICO8OeIL5
+	rrfTiLTxV9Gf9IdTDmBRiOsleEm6IqOe81nnU+GRecwowLuoGzxmN5o3+gMoYNZQHmsDRPPrlbdam
+	0MGvTEuzvIgTYlrsbC51snlPdO2PT3QRHGwnIe5DPA8nd6pW9VDuhzWr6EWvz+uAYAVQfQHIB6UIF
+	F7meMH0Yl02cLm95OjXw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqc2B-00068L-Oo; Mon, 04 Feb 2019 11:03:27 +0000
+	id 1gqc83-000821-Jk; Mon, 04 Feb 2019 11:09:31 +0000
 Received: from mail1.abatec.at ([81.10.186.19])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqc26-00067X-Fk
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 11:03:25 +0000
+ id 1gqc7y-00081J-Vd
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 11:09:29 +0000
 Received: from exchange02.regau.abatec.at (192.168.100.22) by
  exchange02.regau.abatec.at (192.168.100.22) with Microsoft SMTP Server
  (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id
- 15.1.1415.2; Mon, 4 Feb 2019 12:03:18 +0100
+ 15.1.1415.2; Mon, 4 Feb 2019 12:09:25 +0100
 Received: from exchange02.regau.abatec.at ([::1]) by
  exchange02.regau.abatec.at ([::1]) with mapi id 15.01.1415.002; Mon, 4 Feb
- 2019 12:03:18 +0100
+ 2019 12:09:25 +0100
 From: Georg Ottinger <g.ottinger@abatec.at>
 To: Jonathan Cameron <jonathan.cameron@huawei.com>
 Subject: AW: [PATCH] iio: adc: at91: disable adc channel interrupt in timeout
  case
 Thread-Topic: [PATCH] iio: adc: at91: disable adc channel interrupt in timeout
  case
-Thread-Index: AQHUuKGafWrpkxg4ckeOny6mkh/hBaXMP+cAgAMB7lCAABjqAIAAIvuQ
-Date: Mon, 4 Feb 2019 11:03:18 +0000
-Message-ID: <040567eeda7b40b38816da2df354386f@abatec.at>
+Thread-Index: AQHUuKGafWrpkxg4ckeOny6mkh/hBaXMP+cAgAMB7lCAABjqAIAAJ52w
+Date: Mon, 4 Feb 2019 11:09:25 +0000
+Message-ID: <28fa70e41bad4a9f814683c078e89a12@abatec.at>
 References: <20190130134202.5831-1-g.ottinger@abatec.at>
  <20190202102021.12bb0a72@archlinux>
  <0974ce54b3da4d82b6bd3026a3de5ff3@abatec.at>
@@ -65,8 +66,8 @@ X-MS-TNEF-Correlator:
 x-originating-ip: [192.168.115.56]
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_030322_883235_10400972 
-X-CRM114-Status: GOOD (  33.33  )
+X-CRM114-CacheID: sfid-20190204_030927_365509_E7873AE7 
+X-CRM114-Status: GOOD (  27.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,123 +96,98 @@ Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-I don't know how the race condition is triggered in detail.  All I know is =
-that if Touch Acquisition is enabled the adc_demo_error2 will provoke a sys=
-temhang. If Touch is disabled the issue goes away. The architecture of at91=
-_adc.c uses (at least) two trigger mechanisms of the ADC peripheral: Touch =
-Trigger and Channel Trigger (started by at91_adc_read_raw() ). In my theory=
- the following happens:
+The following is the patch that we are using internally to workaround the i=
+ssues - I first wanted to publish the timeout/systemhang patch, because I d=
+on't have the feeling that our workaround is suitable to be mainlined:
 
-1.) at91_adc_read_raw is called, a ADC conversation gets started
-2.) Touch trigger initiates a new conversation (killing the first conversat=
-ion)
+----
+static int at91_adc_read_raw(struct iio_dev *idev,
+			     struct iio_chan_spec const *chan,
+			     int *val, int *val2, long mask)
+{
+	struct at91_adc_state *st =3D iio_priv(idev);
+	const int retry_timeouts[ADC_READ_RAW_RETRIES] =3D {200,300,500}; /* split=
+ 1 second timeout into retry intervals 200ms, 300ms, 500ms */
+	int retries;
+	int ret;
 
-.... the conversation started from  at91_adc_read_raw() never finishes -> T=
-IMEOUT!
+	switch (mask) {
+	case IIO_CHAN_INFO_RAW:
+		mutex_lock(&st->lock);
 
-The following Email is a summary of our findings (I mailed to the microchip=
- people):
+		st->chnb =3D chan->channel;
+		at91_adc_writel(st, AT91_ADC_CHER,
+				AT91_ADC_CH(chan->channel));
+		at91_adc_writel(st, AT91_ADC_IER, BIT(chan->channel));
+		=
 
------
+		retries =3D 0;
+		do {
+			/* In some situations with high NOPEN/PEN Interrupt load, a started ADC =
+conversion
+                           might get smashed by the periodic trigger enable=
+/disable procedure. As a workaround
+                           we are allowing the at91_adc_read_raw() function=
+ to restart the ADC conversion. */
+	=
 
-I want to let you know our findings of our ADC bughunting marathon. We put =
-around 100 hours of work to identify this issues and I think we found 4  of=
- them (one of them is more hardware related). Although we could develop wor=
-karounds for this issues - not all of them are fully understood - so if pos=
-sible including someone experienced with the ADC peripheral (maybe from the=
- hardware team) should be considered.
+			at91_adc_writel(st, AT91_ADC_CR, AT91_ADC_START);
+			ret =3D wait_event_interruptible_timeout(st->wq_data_avail,
+							       st->done,
+							       msecs_to_jiffies(retry_timeouts[retries]));
 
-Attached you will find our version of at91_adc.c together with a simple err=
-or demonstrator program called adc_demo_error.c
-
-* 1st issue: Unwanted PEN/NOPEN Interrupts at low temperatures
-
-When in Pendetect mode we received a lot of unwanted interrupts. This issue=
- only appeared in our test settings when our board approached -20 degrees C=
-elsius. We suspect that the internal Pull-down Resistor connected before th=
-e Pendetect-Schmitt trigger (selected by PENDETSENS), has a negative temper=
-ature coefficient and at low temperature the impedance might be too high an=
-d so false detects are triggered by capturing surrounding noise -> we could=
- solve this issue by changing the value  ts_pen_detect_sensitivity =3D 2 to=
- ts_pen_detect_sensitivity =3D 3.
-
-This issue can be considered to be related to our specific configuration, n=
-evertheless we want to mention that the current Datasheet States on Page 17=
-11 states the following:
-
-"PENDETSENS: Pen Detection Sensitivity-Modifies the pen detection input pul=
-l-up resistor value. See the section 'Electrical Characteristics' for furth=
-er details."
-
-There are two issues with this description. First: This resistor is a pull-=
-down resistor (measured and logical). Second the 'Electrical Characteristic=
-s' sections is lacking the detailed description of this resistor value.
-
-* 2nd issue: at91_adc_read_raw() keeps Channel and corresponding interrupt =
-enabled in case of timeout.
-
-Having a brief look at at91_adc_read_raw() it is obvious that in the case o=
-f a timeout the setting of AT91_ADC_CHDR and AT91_ADC_IDR registers is omit=
-ted.
-If 2 different channels are queried  we can end up with a situation where t=
-wo Interrupts are enabled - but only one Interrupt is cleared in the Interr=
-upt handler. Resulting in a interrupt loop and a system hang.
-
-This Issue can be reproduced by compiling and running the error demonstrati=
-on with two channel support. (-D2ND_CHANNEL)
-
-$ arm-buildroot-linux-gnueabihf-gcc adc_demo_error.c -D2ND_CHANNEL -o adc_d=
-emo_error2
-
-* 3rd issue: Race condition between PEN/NOPEN Interrupts using periodic tri=
-gger and ADC_START in at91_adc_read_raw()
-
-This issue represents one way how timeout situations are provoked. Actually=
- we consider the architecture of at91_adc.c a bit risky because it is using=
- two trigger sources (periodic trigger for Touch, and ADC_START for reading=
- raw values). We believe that changing the trigger source during an ongoing=
- conversion can have unwanted side effects, like destroying an ongoing conv=
-ersion. We currently don't fully understand what is going on, but we develo=
-ped a workaround that is enhancing the timeout handling in at91_adc_read_ra=
-w() with a simple retry mechanism. (restarting with ADC_START)
-
-* 4th issue: when touch operation is enabled (TSMODE) a delay time between =
-a channel disable (AT91_ADC_CHDR) and channel enable (AT91_ADC_CHER) is nee=
-ded otherwise the following conversion will fail.
-
-This issue represents the second way how timeout situations can arise. We m=
-easured around 40 to 42 ADC Cycles (at different ADC Clocks 500khz, 1mhz, 2=
-mhz, 3mhz, 5mhz) of delay needed between the channel disable and the channe=
-l enable. At higher adc clock frequency (10mhz, 20 mhz) the issue doesn't s=
-how up (most likely because the function calls are delaying already enough)=
-. We also observed that the need delay time increases further according to =
-the transfer time settings (TRANSFER) by 0, 2, 4 or 8  ADC cycles.
-
-This Issue can be reproduced by compiling and running the error demonstrato=
-r (single channel) and including a simple error message in the kernel modul=
-e in the timeout case.
-
-$ arm-buildroot-linux-gnueabihf-gcc adc_demo_error.c -o adc_demo_error
-
-This issue is least understood by us and I think that talking to the hardwa=
-re people regarding this issue can be worthwhile. =
-
-As a workaround we put at91_adc_read_raw() to sleep after the writing AT91_=
-ADC_CHDR for 50 to 75 ADC Cycles. =
+		} while ((++retries < ADC_READ_RAW_RETRIES) && (ret <=3D 0));
 
 
-------------------------------------
+		at91_adc_writel(st, AT91_ADC_IDR, BIT(chan->channel));
+		at91_adc_writel(st, AT91_ADC_CHDR,
+				AT91_ADC_CH(chan->channel));
+		=
 
-We will run another round of tests next week - and after that I would like =
-to prepare a pull request concerning the 2nd Issue. For the 3rd and the 4th=
- Issue I would like to hear your opinion if our modifications are sound bef=
-ore I will write an pull request.
+		/* if touch is enabled (TSMODE) a delay time between channel disable and =
+channel enable is needed =
 
-Thanks for your time,
-Best wishes,
-Georg Ottinger
+		otherwise the following conversion will fail. This time needs to be aroun=
+d 42 ADC cycles.
+		The needed delay time increases further according to the transfer time se=
+tting (TRANSFER) by 0, 2, 4
+		or 8 ADC cycles */
+ =
 
------
+		usleep_range(st->channel_disable_wait_us, (st->channel_disable_wait_us * =
+3) / 2);
+ =
+
+
+	=
+
+		if (ret > 0) {
+			/* A valid conversion took place. */
+			*val =3D st->last_value;
+			st->last_value =3D 0;
+			st->done =3D false;
+			ret =3D IIO_VAL_INT;
+		} else if (ret =3D=3D 0) {
+			dev_err(&idev->dev, "ADC channel %d timeout.\n", chan->channel);
+			ret =3D -ETIMEDOUT;
+
+		}
+
+		mutex_unlock(&st->lock);
+		return ret;
+
+	case IIO_CHAN_INFO_SCALE:
+		*val =3D st->vref_mv;
+		*val2 =3D chan->scan_type.realbits;
+		return IIO_VAL_FRACTIONAL_LOG2;
+	default:
+		break;
+	}
+	return -EINVAL;
+}
+---
+
+Best wishes, Georg
 
 -----Urspr=FCngliche Nachricht-----
 Von: Jonathan Cameron [mailto:jonathan.cameron@huawei.com] =
