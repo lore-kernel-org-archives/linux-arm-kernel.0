@@ -1,111 +1,164 @@
 Return-Path: <SRS0=H3s0=QK=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
-X-Spam-Level: 
-X-Spam-Status: No, score=-4.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FORGED_HOTMAIL_RCVD2,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,UNWANTED_LANGUAGE_BODY,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Level: *
+X-Spam-Status: No, score=1.0 required=3.0 tests=BAD_ENC_HEADER,
+	DATE_IN_FUTURE_24_48,DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNWANTED_LANGUAGE_BODY,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 51790C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 05:41:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AD085C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 07:09:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1E66B2083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 05:41:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6F99D2083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  3 Feb 2019 07:09:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CrSi39fI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=hotmail.com header.i=@hotmail.com header.b="MPRXyUV7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E66B2083B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=hotmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VXUL6aep";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="ru48E2/w"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F99D2083B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	:From:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=DmSQzZAgq2JOac/J4k+qThEItFeHR1eo4hy81UP7OMg=; b=CrSi39fIrwaBLT
-	it3/TeSarmkaCFaB97Kdg3aOCjCb9vzILZA992pmWwZ5gC+9wxOtwz7b2pwq2T9bKeOxnOyeaZr6W
-	lVXfriKI9eJzMTPeUBF2UOjXQlhyDF2KNbAJADaL6v5KPuX0E4jCdVTF0bvh+kl1XaQpMlCVqQvSw
-	d5gdSC8xF8rBlVjtyYMEPLWo+4Qr6Ujtns12NoH0MJL14BltSLxZ5SqrIjfTIpFWBv6qSiXnF3kKi
-	B67nGALdQdFc7rY6jbaSDaukh3vOz5rMjLp5NM8QEhlgMfIRvMY4UDp3Gmr65r+vswdMyCMqFzTKS
-	O3nAuCTUGRlQ6rTSLhyw==;
+	List-Owner; bh=agLnIuy3abwZNl5DCA4cLhmJBI+pHYBf3JLLxBn46+E=; b=VXUL6aepBqjp3R
+	Q9qIvtqCqYPlWRVg331V9oTzgrMddTsjusXtWi6ESWg+7b0w4k+2IMFcYCg4l7fHwyIAdX6DQho6H
+	wft1ogJO0+xhBgP0DaZECgTOu96D6v90l5jS7bo76bD0VeH4elAsDhBAIIhKUv7EFxoeUvH8e3nMM
+	RF6sugttm17HehDjY4MGqMx42NdBd+BWXgbcNXra8ouuK4A5WaFBy+EgysT2UBQskIj1bFsfPdBpD
+	h7fsdH2ueNmhoU6YSnF5v0zdtOCIWAwrIC4NfpV3cz64rxm84yx5T2rA1+/xGXDoO4pDli7Q54Fk9
+	KPPk6pDujYUVuvwUCUpA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqAX7-0003vz-Ob; Sun, 03 Feb 2019 05:41:33 +0000
-Received: from mail-oln040092255075.outbound.protection.outlook.com
- ([40.92.255.75] helo=APC01-HK2-obe.outbound.protection.outlook.com)
+	id 1gqBuK-0002sc-Je; Sun, 03 Feb 2019 07:09:36 +0000
+Received: from mail-eopbgr680088.outbound.protection.outlook.com
+ ([40.107.68.88] helo=NAM04-BN3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqAX5-0003va-0f; Sun, 03 Feb 2019 05:41:32 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=hotmail.com;
- s=selector1;
+ id 1gqBuG-0002sI-CW
+ for linux-arm-kernel@lists.infradead.org; Sun, 03 Feb 2019 07:09:34 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=At2cY9lCMfKnMwboHUEVK8QXiutkhaUte/pT8vvS8vc=;
- b=MPRXyUV7PwR/gK/jcGGmLXJp7RYYDcHE02U9FttbjoWHa/mkO/jM80KGnbT31HHvPH1NWvlCC9JqQbA0RvySmKNhjWFBxygfqnHmX2+am5hzMJ+LhF5jCxL6S6WeamZqutRz8cCHVaPMAhPjGKEM8814t96zeFvEIYC7qtjU5lRCZ8hoCUtUvAM2TvvqrLQzbyzcqEl5HD4nr/6mn6Z5rLmqggrN85+8zc/b6Tz2s5fbNjzAAuwsHpKVF9C8IckFEmV0V+TWcXIykmLmxlJC+0HkB7Ja2MsIdOmXp0W2s3/iEu42j5G9l46iChJVnWVu47m9o7u0Nl9uOocu4EHTjw==
-Received: from PU1APC01FT052.eop-APC01.prod.protection.outlook.com
- (10.152.252.51) by PU1APC01HT008.eop-APC01.prod.protection.outlook.com
- (10.152.252.211) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1580.10; Sun, 3 Feb
- 2019 05:41:25 +0000
-Received: from HK0PR02MB3634.apcprd02.prod.outlook.com (10.152.252.52) by
- PU1APC01FT052.mail.protection.outlook.com (10.152.253.137) with Microsoft
+ bh=KjNG9zTOhYwF+USYWsutbTQET/27oZW1mKN46DUawf8=;
+ b=ru48E2/wiMXxJr050jWHuiQ1XcaHCuqkdN+k4whpDVdCW3UsFAtr7lpZkDOjX8BfoFHQvSobd18Z9I/KFQ9nZ3FaXnmFFHa/KjFHKtR9xwdjbcO80YaE0l5i11mVAa8ws4mNq/TQQYeGDDxHcqSWygNgBAoxgoquiRJRog1bNHA=
+Received: from DM6PR02CA0025.namprd02.prod.outlook.com (2603:10b6:5:1c::38) by
+ BYAPR02MB5015.namprd02.prod.outlook.com (2603:10b6:a03:71::20) with
+ Microsoft
  SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1580.10 via Frontend Transport; Sun, 3 Feb 2019 05:41:25 +0000
-Received: from HK0PR02MB3634.apcprd02.prod.outlook.com
- ([fe80::d582:b3ef:f46a:4735]) by HK0PR02MB3634.apcprd02.prod.outlook.com
- ([fe80::d582:b3ef:f46a:4735%3]) with mapi id 15.20.1580.019; Sun, 3 Feb 2019
- 05:41:25 +0000
-From: wen yang <yellowriver2010@hotmail.com>
-To: "khilman@baylibre.com" <khilman@baylibre.com>
-Subject: [RESEND PATCH] soc: amlogic: add missing of_node_put()
-Thread-Topic: [RESEND PATCH] soc: amlogic: add missing of_node_put()
-Thread-Index: AQHUu4MadwEf7ebhMUW9TPdpzWWDrw==
-Date: Sun, 3 Feb 2019 05:41:25 +0000
-Message-ID: <HK0PR02MB3634BF379E6F17F7FC82906BB26C0@HK0PR02MB3634.apcprd02.prod.outlook.com>
-Accept-Language: zh-CN, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: BYAPR07CA0007.namprd07.prod.outlook.com
- (2603:10b6:a02:bc::20) To HK0PR02MB3634.apcprd02.prod.outlook.com
- (2603:1096:203:97::14)
-x-incomingtopheadermarker: OriginalChecksum:FA6FDDE675ABF2F7FA824DF4D970CD7711D99921CC34D64E17DC8C76295E6EBB;
- UpperCasedChecksum:9F975FF06900F81F70D78D0AE4A7DA9649465E5DE30E4BC17ED54CF77B10722E;
- SizeAsReceived:8655; Count:63
-x-ms-exchange-messagesentrepresentingtype: 1
-x-mailer: git-send-email 2.7.4
-x-tmn: [6W36GddR9ssEDqfNf9p1AJuJwrMnsbYM]
-x-microsoft-original-message-id: <1549172315-6683-1-git-send-email-yellowriver2010@hotmail.com>
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; PU1APC01HT008;
- 6:za1cxJJueFgc3iVHxpBrpuSNJmIOLF0x4lPmruOEjUsLidyiCHjMn4SNU+2EuJlzH6rNBbo44XHbQIfKnnMxP28cHsWSXnWObJnLEakh1VIT3zbXqWEDxDDB2+ugKvUCCUtFytJVxLJPehnkdYkLZbW5s01cbZQ8d6L0M0IlaWaqVJ8zKTJNXYWxHFl1AgOu+mgFEmS245bkYgrV32nfL0bLk676u9wLvU07tpgVG6l1w5X3BWnckHYYUIVUcuowc7E9+pLRdJDKFaCCJ25Q2DeiIQRYRQDSuUEDykE700/w1oxULKb1QltTp6yHTvkeIc0UhGp+ytnbREcpYck1EwBsGXIiN65lb+PvtshuRFAMavmiSpzCI1q37UlFn3Y2Gl6g58GtbuPkn/kbHGwrnqzzJI9pH8NGgNWIUVK+WQbQExerFg+hQ1IncNYgnoflC4igcPooLxPbZJIJALi8Aw==;
- 5:B52/kwUT7XxMGZ5K1Q1vCp2njs154h/OrXG0MvHesOTC5AOXAAzxd3BVNgSw7sI/j2iTxAD127QJl07G7wYKndjuTlG0FrDW+vtpYqkEsFk3vujbnSUp1WSegqlByHd+r6oLKqKWPPC7o+iwqdyiFBEoY2zd2wiXo2shWTAc8lx8rIEgQY20c5uW6UdkFQMmLNuWef6iH2oIhbJARZx6/w==;
- 7:m/pusGS1/rc8sCdsghQbHCTRZfoKiSVgyPXmI1D+CE6P/WighupHv78TbyGe6CFY+B2OS/hsm0gIt+UEyx51y1qedv4IYgr43NtQWX/a9iICsoB+o/q0jwsBbSaNmYIzAjzBXbjBKCwp8dbsj6mZJg==
-x-incomingheadercount: 63
-x-eopattributedmessage: 0
-x-ms-exchange-slblob-mailprops: S/btQ8cKWiQqoVwXX3ck2v8S52F+JOpJSR1zu4YvCnw1MHcmYyLS+dm4/7ucc9sHNX7OiS/0aBC27QDsSnfqS6nqxhqdRqBllFwoOSesPOpswMZPaZWvaRo9k/j6MVqyAaXdqXdd47VngMd4rjYoYLlqSjALqT5YCZOj9oS4Jk1IvTkoEOo3vRX403O1Kwj7xWrVZlM3OPFplWZh3GOTF2TRCBt9EOcCJ+2YsGbxWjbYZ7O1enZKC9Elq4s+X/+rxVb0+sGZNjiHronAfMIuI7jfgAEmJPhvAMPunCcx/A5WDxm1hdgqEud09oZodMnJGq8UHmdV/1/NC0bS5RxpkFeFBgULiG2CEPQY9txejP0tPqh8/FRee5Z2idb5hYdMA5JpRaQK6B7P5mUUc8o7IX5IsvmP7s42E+Uatd/Vao72H6hWXwam9Dob+Zw0PJGcplGC+gRlV39ilZ/ZZPhZa9Pd8KF/E+CP6gFOGhLWer/dJFyHBIOilS+fqEBR/+gyC8xaEC+C5Slg07S20tURTV2O/bjaVz7eACKp4HEem4LeZdCFwNiLvpBkru1VLt3P+R9za2IXWjQsq18EUqpZGqQZgwBr54A0Uz5Z3WuOBNxKdIWl4ZFjY6ovAzRKclE2crT4czSPM+jRgJXZG0/JRTZQwcAzE0wulQL8u2sIqHfwAOKTCL2VRTtwKRjjGGyCDyFVFjSw6mcYD9kHcRW+MTcbJQeitRj3wHjJPeBYwGckFaNkd2yGoXYFQn1KQ20O6nbNI6aLvYI=
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(20181119070)(201702061078)(5061506573)(5061507331)(1603103135)(2017031320274)(201702181274)(2017031323274)(2017031324274)(2017031322404)(1601125500)(1603101475)(1701031045);
- SRVR:PU1APC01HT008; 
-x-ms-traffictypediagnostic: PU1APC01HT008:
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0; RULEID:(4566010)(82015058);
- SRVR:PU1APC01HT008; BCL:0; PCL:0; RULEID:; SRVR:PU1APC01HT008; 
-x-microsoft-antispam-message-info: bOXI2y5s2Wrrp7f1NBXFiYzpwUKrBx0hdqNK8qaQkUDpTkyk9bhaOL+CgSmfjbjz
+ 15.20.1580.22; Sun, 3 Feb 2019 07:09:27 +0000
+Received: from BL2NAM02FT015.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e46::208) by DM6PR02CA0025.outlook.office365.com
+ (2603:10b6:5:1c::38) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1580.22 via Frontend
+ Transport; Sun, 3 Feb 2019 07:09:27 +0000
+Authentication-Results: spf=pass (sender IP is 149.199.60.100)
+ smtp.mailfrom=xilinx.com; vger.kernel.org; dkim=none (message not signed)
+ header.d=none;vger.kernel.org; dmarc=bestguesspass action=none
+ header.from=xilinx.com;
+Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
+ 149.199.60.100 as permitted sender) receiver=protection.outlook.com;
+ client-ip=149.199.60.100; helo=xsj-pvapsmtpgw02;
+Received: from xsj-pvapsmtpgw02 (149.199.60.100) by
+ BL2NAM02FT015.mail.protection.outlook.com (10.152.77.167) with Microsoft SMTP
+ Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1580.10
+ via Frontend Transport; Sun, 3 Feb 2019 07:09:27 +0000
+Received: from unknown-38-66.xilinx.com ([149.199.38.66]:49879
+ helo=xsj-pvapsmtp01) by xsj-pvapsmtpgw02 with esmtp (Exim 4.63)
+ (envelope-from <nava.manne@xilinx.com>)
+ id 1gqBuA-0008Je-HI; Sat, 02 Feb 2019 23:09:26 -0800
+Received: from [127.0.0.1] (helo=localhost)
+ by xsj-pvapsmtp01 with smtp (Exim 4.63)
+ (envelope-from <nava.manne@xilinx.com>)
+ id 1gqBu5-0002Pe-Cw; Sat, 02 Feb 2019 23:09:21 -0800
+Received: from xsj-pvapsmtp01 (xsj-mail.xilinx.com [149.199.38.66])
+ by xsj-smtp-dlp1.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x1379HwB026900; 
+ Sat, 2 Feb 2019 23:09:18 -0800
+Received: from [172.23.37.118] (helo=xhdnavam40.xilinx.com)
+ by xsj-pvapsmtp01 with esmtp (Exim 4.63)
+ (envelope-from <nava.manne@xilinx.com>)
+ id 1gqBu1-0002P8-7t; Sat, 02 Feb 2019 23:09:17 -0800
+From: Nava kishore Manne <nava.manne@xilinx.com>
+To: <srinivas.kandagatla@linaro.org>, <robh+dt@kernel.org>,
+ <mark.rutland@arm.com>, <michal.simek@xilinx.com>, <jollys@xilinx.com>,
+ <rajanv@xilinx.com>, <nava.manne@xilinx.com>, <devicetree@vger.kernel.org>,
+ <linux-arm-kernel@lists.infradead.org>, <linux-kernel@vger.kernel.org>
+Subject: [PATCH v2 0/3] Add nvmem driver support for ZynqMP 
+Date: Mon, 4 Feb 2019 12:39:48 +0530
+Message-ID: <20190204070951.6933-1-nava.manne@xilinx.com>
+X-Mailer: git-send-email 2.18.0
+X-RCIS-Action: ALLOW
+X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
+X-TM-AS-User-Approved-Sender: Yes;Yes
+X-EOPAttributedMessage: 0
+X-MS-Office365-Filtering-HT: Tenant
+X-Forefront-Antispam-Report: CIP:149.199.60.100; IPV:NLI; CTRY:US; EFV:NLI;
+ SFV:NSPM;
+ SFS:(10009020)(136003)(396003)(376002)(346002)(39850400004)(2980300002)(189003)(199004)(47776003)(110136005)(305945005)(2906002)(4743002)(8936002)(36386004)(8676002)(316002)(50226002)(81166006)(81156014)(50466002)(336012)(426003)(9786002)(48376002)(126002)(2616005)(476003)(486006)(106466001)(77096007)(186003)(63266004)(356004)(6666004)(4744005)(478600001)(1076003)(26005)(36756003)(16586007)(2201001)(106002)(7696005)(51416003)(107986001)(921003)(1121003)(2101003)(5001870100001)(83996005);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BYAPR02MB5015; H:xsj-pvapsmtpgw02; FPR:;
+ SPF:Pass; LANG:en; PTR:unknown-60-100.xilinx.com,xapps1.xilinx.com; MX:1; A:1;
+X-Microsoft-Exchange-Diagnostics: 1; BL2NAM02FT015;
+ 1:CJr9ka3SpBVwYNzhxnWOmOj89zQCOsSJhcaRs2VJPZcd3m3LpD2N8Rl147w6kowlDjzVDiFsRql6wHp/l4Ho+EH1pnE/riCT9VB0J2sW84/+VN3h1FSAS81NESaPxVyPKYqhANyO/lGLeg+M+YNBWA==
 MIME-Version: 1.0
-X-OriginatorOrg: hotmail.com
-X-MS-Exchange-CrossTenant-RMS-PersistedConsumerOrg: 9a4e3081-9524-43cf-bfc3-dcaef82d5da1
-X-MS-Exchange-CrossTenant-Network-Message-Id: a6c2d972-c09c-4978-e7d1-08d6899a3c88
-X-MS-Exchange-CrossTenant-rms-persistedconsumerorg: 9a4e3081-9524-43cf-bfc3-dcaef82d5da1
-X-MS-Exchange-CrossTenant-originalarrivaltime: 03 Feb 2019 05:41:22.6639 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Internet
-X-MS-Exchange-CrossTenant-id: 84df9e7f-e9f6-40af-b435-aaaaaaaaaaaa
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: PU1APC01HT008
+X-MS-PublicTrafficType: Email
+X-MS-Office365-Filtering-Correlation-Id: f79aa4aa-27be-4e7e-26da-08d689a688d4
+X-Microsoft-Antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4608076)(4709027)(2017052603328)(7153060);
+ SRVR:BYAPR02MB5015; 
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB5015;
+ 3:Upt2NZtdZyk9IAT6Gg/xnGoK/cCVqOBtp2D03c3D6JDPXeFYR8EilAAsi+6F038ME0Vd1FLcmB/5n1dpzpKXJjifQuw4a3Gh/VbJTYkHY07REIKO9lc6DCuczaFehSXarGLtZDdP2ajgVdclxLZEU8q/IVsni9fMVGOgGQ+fQ8YC7B61JAUT2miL5Yq/svqo7jxf+pbdCBP+eiWPxtJm0jo8ILpt2s6CW7wFAyYwg+t2etCAhTwEDuJPVmSHZFDrK0SYYQA1we2sBMyLMlGbkVymQ93Eiccigxazoe72XtM3Vu3lAb6wN0pgLwkTrgcAHuW66ecFLNLSMC1GqJFwgGc2tjidQ9BXpkPXYlpbPH46C09Vi5E3rHPw/ek76N+b;
+ 25:RTDUpRsYNwqam8oWvL5u2900MW2x7K832AKAabt4Mdb2RKMQEO24mIbD0ybMbbuQsUf9BjmYtLJWsdA4hRIoVJxQx3ajf812aWvqESCJg47qjukMT6DIZoclzLqLXSC+ZaT31TX4nvKTCWNgHODuhEzVbMYcgCpiLRnvL3GDUGV0ENTs9Tq5WWMMdeyxm6VCsmJGqlv+Onpl9GT0t3Kg06d0G9IA9nz5nZ+Qz/V2szYDBwRloSnFwaBCa+DVSeQQkuXUrKJZIcDnI5a8YUaJfs4gj+87sDaX5/sy3pmhqZSBSivTtJnwEYyWDX06AB69wOxfR7ZevDBNnIW3q8zRnw==
+X-MS-TrafficTypeDiagnostic: BYAPR02MB5015:
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB5015;
+ 31:LBrTZvSbN9rrhEkY7NYZA84O2FYNqt4ctSmIPYgUCweQVgO+9FOMqDBrodOPCUyM8m5hUB6zFZkZc+YfrRxpfsfCZ1blKCMgS5Ti/HeUH36/+JGLjBmOF6zIlw7zXNl0plVApWYlXbtXt5fwPVCKjWG+YKYt0wTXRsZMQvBrOHvT/jmRdpAmshDyNgCrP+phCpDXrd7hx54LpgbmgRPYPcO70HvKZuHIYSTP70V2xrk=;
+ 20:uwP26qxxo4C0ox6UNqPDCkFpn2AhxxNyF2KeiCs9flPoBi9QFeSazWlzmDIPwf8++axOGij/NaBF+sBS/lKYEWql51nBxKsKZT6XU2XDlsgnA2KtfuFgCTrTIKtSJnPbOUJ3aOFG8wSVuY1+lXRFtyL3YHvYvx5NWvrVSXd8zpfP31s47mcfK+PeIAFfEsm4qg22F7+fbNGVAAUK/Ie1YigBEkp9FJH39uYHl1M0aOWsEG95nwUOGcGfRyFg29cBIsee2p5V3wouN9VwcjIM7kRqNkrY07Vp56x+t2dns2L652Ac3HqsulEiTn5vjbVwwIP4VP7k3W3BOOkZPsVWNYwRKcXnaKGIFF8BP9gs4Mm72P8ZDbUZFx1T9Y9q2XRuo7XYMyj5czFYsB457+CJKcEvfyi/zWeq6aZrbTpFMrsJAUPm2i2Sd2rP3l2zjaIWieOnvyWd0QjWeIjy06vjSJ01g+1k2Ept4a1A1LOS7dAvI9dpAJ6Gl4neuztCe5i1
+X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
+X-Microsoft-Antispam-PRVS: <BYAPR02MB5015C8505F72A7ED9B5AA451C26C0@BYAPR02MB5015.namprd02.prod.outlook.com>
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB5015;
+ 4:/JEUDVPowpGa6jmNQ2h3M5+xM5Nv5PnmcqGKuQ1r68srPfMzpupF1K4HCheTc+5X3NBQVDZV6THl0/ZDYhGPuS4IXFtbXK3lxa5+7avW2Nv7F0ll9ytue1p1e7ls6OeFb7m+Fg36tH8frd1zT9mtzEjNJtMfbbCGPQYgyX3WNX0mPt4EiLjgEgSJqSr9qsIUsnzTwa05j0cPVlpEgUfISSNRoxjRfT00HugA/zGp0ydhO14To6QrwcgPKl1L+FtpcYWLRJHFhnIIygZoUHfBDh4/sFNaV7IerIMeTpiM/sdNV4Y52rJ6ZeaLdrm1p+wN
+X-Forefront-PRVS: 0937FB07C5
+X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; BYAPR02MB5015;
+ 23:dLzbMrK+ojbHTB4SPUm7200WoQYQW9uXwA/PBQqMG?=
+ =?us-ascii?Q?muiIzt/1smqhQyppigplfoyJ1dFZ2ql7XqevBSXN0pg7Qi+eUT1U/Fe4Mgvk?=
+ =?us-ascii?Q?G/1xFWyGd+nFUk8wFdJ0FVNb4erEIsMQrtC3F+gBYEouxRrCG7GaG7NBtYEg?=
+ =?us-ascii?Q?04qLNSMpLgtS2m37ZFOe19bydIDOPggdj1BiYuNOqzZL/yUhvb5tKf/h0nmF?=
+ =?us-ascii?Q?TqDBK4KJFf/rWm3SiJ1yeg0N0zkh4qlmzqt4uKiiIE3z9VUhP9vCc096vOXs?=
+ =?us-ascii?Q?EW77HSwKjv3Utry+pmnS07NSPuwXJg8wjYABSFLUTUoQOJZaSh0vZkLrI2z3?=
+ =?us-ascii?Q?eLSg90M5Rwec3Ix+PC1kmVJKRcA8O5bDllCA9I30JXiVCzVfGGj+lwy7KH/H?=
+ =?us-ascii?Q?yiDZBoOhRksYYlaAKyomL4RKcGYZUHtzXCoYmZOK7fsfAwfCFfxF6i0Q1oix?=
+ =?us-ascii?Q?dS4+bDmHeyw0hCXopB9r4UF7IyATzFdjp1ZSJ3/n+vpBXxHEtABgsI1IbMFp?=
+ =?us-ascii?Q?wEHeQNoqn8GI1hnCvMkHa7t1ZjSHe9lOn4i2bn2URzwRaftck3vrInnaCxlu?=
+ =?us-ascii?Q?g0KWGJKt1xH8GH8XCu69RQTcHnWv8m4P4qL92QWqPlGESllyaY4pb1Hn1XPT?=
+ =?us-ascii?Q?gkfBPqaiFvWqLdsAPadJUzQAXeDPHkA/nJ3cwmf4cPpSbGKAW1jq7OZizW1G?=
+ =?us-ascii?Q?PfWzXPyzy0snKaSsOo0ro+AZqAcLGfsKsZ4pxb1gx4S8emgCl01Y+IdwTkig?=
+ =?us-ascii?Q?Qsu135YF8J47G9GfJhc7BJDMAdNXnqxAYwvaO0JzFbAy59N3BCjvQ+1r+ei+?=
+ =?us-ascii?Q?nqrDtuHrDFsVf6b+L1jLv66i3njoLSNammb5QVZx3TRTQeSqFmIYfbI41gIx?=
+ =?us-ascii?Q?GS9NI32w9Jvv0oF7z/QGMoFjtRKq65lz9LbuPHG0Awvb2ALFqwW6dIcdHfu1?=
+ =?us-ascii?Q?N5Sp+xzLMrnrahJuDH68iRrLD7c3oWgTm7VYrMtoBhiEb5kdg+l6Pvje+1kU?=
+ =?us-ascii?Q?92uGCWsZdz9Zx8NHBXiJh1IJUotk0PcCYRYqWKFFbsy4Ymm7UcByYBqdddMn?=
+ =?us-ascii?Q?M64dvQK5IYa/i1jyDRyVxGLe4Ba2Sw6EUnunopsR/JjKVG0DOac2Hw3w9Bht?=
+ =?us-ascii?Q?d3kt837A04=3D?=
+X-MS-Exchange-SenderADCheck: 1
+X-Microsoft-Antispam-Message-Info: 4JtExJzsinVpQ14eYf5y4IGaC8taZu2KTJ6Kg2+KUSGkb6rkUlxSPz1dfmkGQGxhDzNAFlCyAKRxIJQQuX1iS9UI+rlYVc+uiOXaHb2CL4kDFNGvHqFWPLinOHWIVYIhi9mrWGnA++J5hETpdVeJ7qoba1GHQtLM/s+3YxaNsr2L4bwQG7hnJUBMVeb34hm9F1enenKun7JyGmbAKMSlxiwFJBIDdTAyUn7EIZ/jgWa6QnFFspc26Ax/NITL1yVaNCBBLlpckrkz2SoodCu+12RUBb0kWGujgxYCb3c/3sEFdRzqkNs4XGCqXVifBmT92rPWyGwyhSg9Lop+R4bPIYkl9uP0pTnWqk8mxDMw4DB3r6SOo3ZkhbCRkP4Vihaugm4NIqMAH7xjjXklgU4hw/7h8eKgGHL0yNIzuYbWifI=
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB5015;
+ 6:guy0u742O8Oh/j3aXcDgjvMMJGymYw6DBhhqSvo0OlEXJCSJDc9PhZh1xMkcE+28RUJUYwPRwNWWbZWuVonOuWXjj9JxviN7B5AQzJl4JyJV28d4DBhohJwYhBlUybAg8Qn8+l7tBHYEvrtp3b1J+0t5j+OoBKVw+qxPynvO6Tm6Pbc9mQZaA9th+6SaGzRFnvymUi56jeiZB9j8EIgfBwv5+6/rsBsNmfi/gidAwkVN3+QQw9lGauY1Hon2pVHI/4ozuP8WdeqVlgDC+aHmok1zEZoAlh+v2v5EeUapKrIumWbclCUpO6J8+5ApR1mLlzKIJn/cRh+wSezTz/PBOhEG7Wc3RCFR2TjjRG1qllqSef80H3hCkfsofY2krAjtHA7IkvXy4DP3O4JEVi71Sswmf1cM8mh2oJz35aOvPqe9jAsnPbQiW+TtvxK0qXG0IXE1fgtgEiccj6vRwq067w==;
+ 5:9WJxcA+s6iUUgrGtiTzEnThfPsFskHSdulzrqtb1DTv6yEFTILNo9Xsm9SN8fx/mNzNThnL+f+2+VUgOaZIX/PWqIh6oKtVQUJf2gAhkpE1bBTtMYD10f0rSyl+rnmBB9I9CsOXMDnlC8AsThUx24n1oH0TuO3mr8N+R+tVXlEXFo6Y4o8YPGUNz/nHcwXhCqiPoWHzWQOi/azOFduGCCg==;
+ 7:NwZ88Yi4Rm0/A31g7xjX/InVUA8+mAy9lO4uzVxfEBNdbAfqlR2sQqwoUbC83bX+uSvliQ/Y7B1D/SMv6YploVzyC/wZGl8rt7hCsD9TDrZc1qVCCS5sFGT/iw9hCKpqaxvRaS3OlvhVUwjgp2DDFg==
+X-OriginatorOrg: xilinx.com
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 03 Feb 2019 07:09:27.0943 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: f79aa4aa-27be-4e7e-26da-08d689a688d4
+X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.100];
+ Helo=[xsj-pvapsmtpgw02]
+X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BYAPR02MB5015
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190202_214131_076114_C72B6F88 
-X-CRM114-Status: UNSURE (   8.63  )
+X-CRM114-CacheID: sfid-20190202_230932_482584_1888B5CF 
+X-CRM114-Status: UNSURE (   7.79  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -118,48 +171,28 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-amlogic@lists.infradead.org" <linux-amlogic@lists.infradead.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- wen yang <yellowriver2010@hotmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The call to of_parse_phandle returns a node pointer with refcount
-incremented thus it must be explicitly decremented here after the last
-usage.
+Nava kishore Manne (3):
+  firmware: xilinx: Add zynqmp_pm_get_chipid() API
+  dt-bindings: nvmem: Add bindings for ZynqMP nvmem driver
+  nvmem: zynqmp: Added zynqmp nvmem firmware driver
 
-Signed-off-by: Wen Yang <yellowriver2010@hotmail.com>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: linux-amlogic@lists.infradead.org
-Cc: linux-kernel@vger.kernel.org
----
- drivers/soc/amlogic/meson-canvas.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ .../bindings/nvmem/xlnx,zynqmp-nvmem.txt      | 47 ++++++++++
+ drivers/firmware/xilinx/zynqmp.c              | 24 ++++++
+ drivers/nvmem/Kconfig                         | 15 ++--
+ drivers/nvmem/Makefile                        |  5 +-
+ drivers/nvmem/zynqmp_nvmem.c                  | 86 +++++++++++++++++++
+ include/linux/firmware/xlnx-zynqmp.h          |  2 +
+ 6 files changed, 169 insertions(+), 10 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/xlnx,zynqmp-nvmem.txt
+ create mode 100644 drivers/nvmem/zynqmp_nvmem.c
 
-diff --git a/drivers/soc/amlogic/meson-canvas.c b/drivers/soc/amlogic/meson-canvas.c
-index fce33ca..87a6c6e 100644
---- a/drivers/soc/amlogic/meson-canvas.c
-+++ b/drivers/soc/amlogic/meson-canvas.c
-@@ -57,9 +57,12 @@ struct meson_canvas *meson_canvas_get(struct device *dev)
- 		return ERR_PTR(-ENODEV);
- 
- 	canvas_pdev = of_find_device_by_node(canvas_node);
--	if (!canvas_pdev)
-+	if (!canvas_pdev) {
-+		of_node_put(canvas_node);
- 		return ERR_PTR(-EPROBE_DEFER);
-+	}
- 
-+	of_node_put(canvas_node);
- 	return dev_get_drvdata(&canvas_pdev->dev);
- }
- EXPORT_SYMBOL_GPL(meson_canvas_get);
 -- 
-2.7.4
+2.18.0
 
 
 _______________________________________________
