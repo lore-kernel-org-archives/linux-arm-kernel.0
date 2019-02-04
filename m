@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EDB7BC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 11:21:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 49AB0C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 11:22:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B9395207E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 11:21:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1C57520815
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 11:22:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q8LuYZGk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B9395207E0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VCbButJj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1C57520815
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5udqQ9ovsZ7LF5H6n7uPHziqY4GcdL0p/ecT+q9D6vc=; b=Q8LuYZGkYbd1br
-	E8zsQHUhurTSK8ZN+oGUtkctzbA3rFywUr1GDfxpc5ckyil+3HVC+JfIbqtBxz2cLoMft+Ix8JVJx
-	u3PvoLBE2zIHyLRNy5iPJ540zKUtcFzmsljD+wxO9YHN9wM/Ci8zgnM3TQSoq74nN+d+GiHZkY9Dk
-	BzlKapdsMzSuwl+kPfQG1s0awbdwP3Xxihi/1xJDnbHLi+e7frnguJ1DUdPjE/MP/nfmFGL1HfArQ
-	J0zCwh6hJM6D2TFf1MoXaoBw/vgIBVvvf/wjOSuiQP3sKl5m1h1Djj+rTZ6LrYcxOv8ttxeYDH9Cl
-	fjLqJC8mHyn/X/RzahfQ==;
+	List-Owner; bh=COzuW53St3EF51cDZyEYdUd8izkXOKLkP6Q+7SPc9mQ=; b=VCbButJjBqd38I
+	8XO6mxxTk33nv+Nf9hXZM7I5dp4T+XOrFYmPtFOqlDHAW4iRoj2aYjeQVUo3PSJ2ucDKoPsaBAYRD
+	OjhgQgVSX+mXSuIaf+rFY3Cbx28tmar2Siopc/axdOL1+VZFkjTJv5PznhMBrFKCjpeXXzWCkBlPQ
+	UMBNiLXKA5xDNUq3CeCBG/x1Az540Krh5H51XWgPwyboxQ+Twgww3/3tkUwnCX8e74Dqh3p9sLCFZ
+	fHf0cMN6+AN4V5Et7zYSaSzi6DGmWA9guRmPF7PKxGI/dcI0VqT6QZlJXdpBG42o4jqe599JCuis1
+	NCTPztkag0F7oDZgm7cQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqcJu-0000Uu-DT; Mon, 04 Feb 2019 11:21:46 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gqcK4-0000f7-7G; Mon, 04 Feb 2019 11:21:56 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqc8g-0000LY-DS
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 11:10:18 +0000
+ id 1gqc8i-0000U8-0w
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 11:10:22 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D0E40A78;
- Mon,  4 Feb 2019 03:10:07 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0A46315BF;
+ Mon,  4 Feb 2019 03:10:10 -0800 (PST)
 Received: from queper01-lin.cambridge.arm.com (queper01-lin.cambridge.arm.com
  [10.1.195.48])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E05683F675;
- Mon,  4 Feb 2019 03:10:05 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1A0533F675;
+ Mon,  4 Feb 2019 03:10:07 -0800 (PST)
 From: Quentin Perret <quentin.perret@arm.com>
 To: viresh.kumar@linaro.org, sudeep.holla@arm.com, rjw@rjwysocki.net,
  nm@ti.com, sboyd@kernel.org, mka@chromium.org
-Subject: [PATCH v4 4/5] cpufreq: arm_big_little: Register an Energy Model
-Date: Mon,  4 Feb 2019 11:09:51 +0000
-Message-Id: <20190204110952.16025-5-quentin.perret@arm.com>
+Subject: [PATCH v4 5/5] cpufreq: scmi: Register an Energy Model
+Date: Mon,  4 Feb 2019 11:09:52 +0000
+Message-Id: <20190204110952.16025-6-quentin.perret@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190204110952.16025-1-quentin.perret@arm.com>
 References: <20190204110952.16025-1-quentin.perret@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_031010_743806_81E64E2C 
-X-CRM114-Status: GOOD (  10.48  )
+X-CRM114-CacheID: sfid-20190204_031012_832879_B89A0D84 
+X-CRM114-Status: GOOD (  16.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,33 +78,94 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Dietmar Eggemann <dietmar.eggemann@arm.com>
+The Energy Model (EM) framework provides an API to register the active
+power of CPUs. Call this API from the scmi-cpufreq driver by using the
+power costs obtained from firmware. This is done to ensure interested
+subsystems (the task scheduler, for example) can make use of the EM
+when available.
 
-Now that PM_OPP provides a helper function to estimate the power
-consumed by CPUs, make sure to try and register an Energy Model (EM)
-from the arm_big_little CPUFreq driver, hence ensuring interested
-subsystems (the task scheduler, for example) can make use of that
-information when available.
-
-Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
 Signed-off-by: Quentin Perret <quentin.perret@arm.com>
 ---
- drivers/cpufreq/arm_big_little.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/cpufreq/scmi-cpufreq.c | 39 +++++++++++++++++++++++++++++++---
+ 1 file changed, 36 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-index cf62a1f64dd7..7fe52fcddcf1 100644
---- a/drivers/cpufreq/arm_big_little.c
-+++ b/drivers/cpufreq/arm_big_little.c
-@@ -487,6 +487,8 @@ static int bL_cpufreq_init(struct cpufreq_policy *policy)
- 	policy->cpuinfo.transition_latency =
- 				arm_bL_ops->get_transition_latency(cpu_dev);
+diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
+index 242c3370544e..0d87e1433296 100644
+--- a/drivers/cpufreq/scmi-cpufreq.c
++++ b/drivers/cpufreq/scmi-cpufreq.c
+@@ -12,6 +12,7 @@
+ #include <linux/cpufreq.h>
+ #include <linux/cpumask.h>
+ #include <linux/cpu_cooling.h>
++#include <linux/energy_model.h>
+ #include <linux/export.h>
+ #include <linux/module.h>
+ #include <linux/pm_opp.h>
+@@ -103,13 +104,42 @@ scmi_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask)
+ 	return 0;
+ }
  
-+	dev_pm_opp_of_register_em(policy->cpus);
++static int __maybe_unused
++scmi_get_cpu_power(unsigned long *power, unsigned long *KHz, int cpu)
++{
++	struct device *cpu_dev = get_cpu_device(cpu);
++	unsigned long Hz;
++	int ret, domain;
 +
- 	if (is_bL_switching_enabled())
- 		per_cpu(cpu_last_req_freq, policy->cpu) = clk_get_cpu_rate(policy->cpu);
++	if (!cpu_dev) {
++		pr_err("failed to get cpu%d device\n", cpu);
++		return -ENODEV;
++	}
++
++	domain = handle->perf_ops->device_domain_id(cpu_dev);
++	if (domain < 0)
++		return domain;
++
++	/* Get the power cost of the performance domain. */
++	Hz = *KHz * 1000;
++	ret = handle->perf_ops->est_power_get(handle, domain, &Hz, power);
++	if (ret)
++		return ret;
++
++	/* The EM framework specifies the frequency in KHz. */
++	*KHz = Hz / 1000;
++
++	return 0;
++}
++
+ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
+ {
+-	int ret;
++	int ret, nr_opp;
+ 	unsigned int latency;
+ 	struct device *cpu_dev;
+ 	struct scmi_data *priv;
+ 	struct cpufreq_frequency_table *freq_table;
++	struct em_data_callback em_cb = EM_DATA_CB(scmi_get_cpu_power);
  
+ 	cpu_dev = get_cpu_device(policy->cpu);
+ 	if (!cpu_dev) {
+@@ -136,8 +166,8 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
+ 		return ret;
+ 	}
+ 
+-	ret = dev_pm_opp_get_opp_count(cpu_dev);
+-	if (ret <= 0) {
++	nr_opp = dev_pm_opp_get_opp_count(cpu_dev);
++	if (nr_opp <= 0) {
+ 		dev_dbg(cpu_dev, "OPP table is not ready, deferring probe\n");
+ 		ret = -EPROBE_DEFER;
+ 		goto out_free_opp;
+@@ -171,6 +201,9 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
+ 	policy->cpuinfo.transition_latency = latency;
+ 
+ 	policy->fast_switch_possible = true;
++
++	em_register_perf_domain(policy->cpus, nr_opp, &em_cb);
++
+ 	return 0;
+ 
+ out_free_priv:
 -- 
 2.20.1
 
