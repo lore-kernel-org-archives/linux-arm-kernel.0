@@ -2,84 +2,69 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7178AC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 14:35:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C1FFC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 14:37:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2CECB2087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 14:35:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E1ABD2083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 14:37:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AEGqMRRY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2CECB2087C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QlH7hFwd";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="W9wcUqx1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1ABD2083B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:References:
-	To:From:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=w5a0Q1hw0Z8JNdzfYko/DmoIy1f4QLoJ+VQzX1us0DQ=; b=AEGqMRRYdKgWDel95Aj+iZaBf
-	xBcAEI8CPkTrWsKz3DX5xpQCdXLZ8JlAEGJTFq71SpdHjNRvAZOjMy7743nkT3otHCZQdiww0b96Q
-	rDWhdINeQsA6SgCLnluZx3vEh0B/nyeWgMx+lLjwCnX7Sdn3rqEIerrvQQygVtqZFljoTD7Ww9roA
-	H/qjZPoHaUBGUi3NQzragjfY03F5pbifqOPgfYt8gRWX2JJvRQ2Aah7L86uAWlXHyEGMW9cONbzaK
-	Mo7SzYlpqAFyxFhqymiHpZwN8SZAHC8mPrTkB8ZhG5jBk9jJI8rfN8avsP1MNZAxI2V52by0yeWqu
-	v90RDxYoA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=zjHIFxZ04+joWiezH87iVQKpByQTV6IN7drrD6F6858=; b=QlH7hFwdAROAEa
+	dEtncsS4ijfm9/D5++vLWod9qb1imNZYq4hA/c2lo/R4hZ5ALsFBNoscikXbfOh/ZaC/TpscvxGaS
+	n3jkb8kZieM35mov9noHEiTJ4JNB98NiOtWMtES5kzOStpv97GbANyH63InBfvCrHkES+1zpq4aO4
+	y6b93SJyoGfVoNrcgPfXvgRVBjI5aDSMmKqM7rFNLYsQ02RG19SHa8lMN7VgDzI+uVxP0tt9PvzO9
+	B3wFbMMXZ+RNx4DTm0BNAd0pgNCvWlqFmzxD2Ce1h9qAMFGwtOZYDFmQHG6nKlpmFKoGQxW3Gx2t7
+	clyxwR1iYl4t75TpLRAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqfLl-0005ql-9I; Mon, 04 Feb 2019 14:35:53 +0000
-Received: from mail-pl1-f193.google.com ([209.85.214.193])
+	id 1gqfND-0006Fa-Ut; Mon, 04 Feb 2019 14:37:23 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqfLh-0005q7-BU
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 14:35:51 +0000
-Received: by mail-pl1-f193.google.com with SMTP id u18so15313plq.7
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 06:35:48 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:from:to:cc:references:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=Jb2dEdIJPlYMUWuChgsMn1OsPBE4PAVQzFnQeq5WYIU=;
- b=Goi9YSJxfMPO3CY6Agq/F5E7dIIfiXG7xwFb7mGdmLEOlg2b/U+pB2X4l9j8GkcccI
- q7H38fh8ICwlcU0Q0QCqOfZI4q0EfeLdTAiLapeTNSCJKoWO/kpHynIFfqig2QaQbNoi
- 6Kjd5cyyp/8cYDFtLYU3Dm0EqXNu/dIeO2rUXiAj7k0tIDHxDpdYl4lzhxxC2zmTQy7I
- NL0VJ9O9vku5QafLv9N65P7oJpcY8tGSxamiGJLuC8aaacU9ZswwlZv88iKeFVSV/bQQ
- HOVsY1nk3No72XO4JPLiQTnm7PcezIc5Qw7NdoKWHZuzS+vLBlbcd/7vzG3LQZ/qsNY5
- fM+w==
-X-Gm-Message-State: AHQUAuZ/hep7UEBJrlCifsq8z5qEEST66wm/4l+f1zWiAcOmlH0k09Md
- E5OGz2a9nKsCaJfRLhhIbp2LpQ==
-X-Google-Smtp-Source: AHgI3IY1tiQmMvcVxcauzf163bLk+7dJDY4oZ6QeZwdm33KICQC0RISU2Jee2SR6WgfPdxE0gD/GpA==
-X-Received: by 2002:a17:902:b214:: with SMTP id
- t20mr9696740plr.248.1549290947666; 
- Mon, 04 Feb 2019 06:35:47 -0800 (PST)
-Received: from localhost.localdomain ([122.177.95.151])
- by smtp.gmail.com with ESMTPSA id y16sm997076pgk.22.2019.02.04.06.35.43
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 04 Feb 2019 06:35:46 -0800 (PST)
-Subject: Re: [PATCH] arm64, vmcoreinfo : Append 'MAX_USER_VA_BITS' and
- 'MAX_PHYSMEM_BITS' to vmcoreinfo
-From: Bhupesh Sharma <bhsharma@redhat.com>
-To: James Morse <james.morse@arm.com>
-References: <1548850991-11879-1-git-send-email-bhsharma@redhat.com>
- <239cdca4-1c7d-f236-f4a9-a0a3fe98f966@arm.com>
- <86c0dd9f-a55b-8ce8-69ca-893f63087d1a@redhat.com>
-Message-ID: <a646e38d-9351-e187-1571-c49d3558b164@redhat.com>
-Date: Mon, 4 Feb 2019 20:05:41 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.2.1
+ id 1gqfNA-0006FD-PF; Mon, 04 Feb 2019 14:37:22 +0000
+Received: from bbrezillon (unknown [91.160.177.164])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id D45D02083B;
+ Mon,  4 Feb 2019 14:37:17 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549291040;
+ bh=AvnNVAT8ciem9UZ+hOBYnQRHq5c1WtwKWaoN/SqJE1o=;
+ h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
+ b=W9wcUqx16D0Z44oXAovv0qLuy8bpGQs+aMSlqCZXzffcFJmKWlBUjK5ogbIGVwKg0
+ g8MtQN46FSizXq4NUpNzF3mDpNvCbEJ5oL1BBmN8yk98YCq+3AteWrUZbeP/yTS5H+
+ eigbPgDylxQsz8W2VCwWZwQMPKiLCAZhXxajmkmg=
+Date: Mon, 4 Feb 2019 15:37:13 +0100
+From: Boris Brezillon <bbrezillon@kernel.org>
+To: <Tudor.Ambarus@microchip.com>
+Subject: Re: [PATCH v4 13/13] spi: atmel-quadspi: add support for sam9x60
+ qspi controller
+Message-ID: <20190204153713.2fd02769@bbrezillon>
+In-Reply-To: <25f6ee72-e6e1-7014-6e4b-abe0a1a0eebc@microchip.com>
+References: <20190204100910.26701-1-tudor.ambarus@microchip.com>
+ <20190204100910.26701-14-tudor.ambarus@microchip.com>
+ <20190204151643.0354180d@bbrezillon>
+ <25f6ee72-e6e1-7014-6e4b-abe0a1a0eebc@microchip.com>
+X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-In-Reply-To: <86c0dd9f-a55b-8ce8-69ca-893f63087d1a@redhat.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_063549_554638_92E4B5DC 
-X-CRM114-Status: GOOD (  29.56  )
+X-CRM114-CacheID: sfid-20190204_063720_837343_84869859 
+X-CRM114-Status: GOOD (  12.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,135 +76,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, ard.biesheuvel@linaro.org,
- catalin.marinas@arm.com, kexec@lists.infradead.org,
- Will Deacon <will.deacon@arm.com>,
- AKASHI Takahiro <takahiro.akashi@linaro.org>, bhupesh.linux@gmail.com,
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ alexandre.belloni@bootlin.com, linux-kernel@vger.kernel.org,
+ Cyrille.Pitchen@microchip.com, robh+dt@kernel.org, linux-spi@vger.kernel.org,
+ Ludovic.Desroches@microchip.com, broonie@kernel.org,
+ linux-mtd@lists.infradead.org, bugalski.piotr@gmail.com,
  linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi James, All,
+On Mon, 4 Feb 2019 14:28:27 +0000
+<Tudor.Ambarus@microchip.com> wrote:
 
-On 01/31/2019 03:09 AM, Bhupesh Sharma wrote:
-> Hi James,
+> >   
+> >> +	writel_relaxed(cfg->ifr, aq->regs + QSPI_IFR);
+> >> +}  
+> > 
+> > Hm, so the only difference we have is the RICR vs ICR reg and the
+> > APBTFRTYP_READ vs SAMA5D2_WRITE_TRSFR bit. Not sure it deserves
+> > creating 2 hooks for that. Can we have something like ->has_ricr in
+> > the caps and then have an if/else block directly in
+> > atmel_qspi_set_cfg()?
+> >   
 > 
-> Thanks for review.
-> Please see my comments inline.
-> 
-> 
-> On 01/30/2019 08:51 PM, James Morse wrote:
->> Hi Bhupesh,
->>
->> On 01/30/2019 12:23 PM, Bhupesh Sharma wrote:
->>> With ARMv8.2-LVA and LPA architecture extensions, arm64 hardware which
->>> supports these extensions can support upto 52-bit virtual and 52-bit
->>> physical addresses respectively.
->>>
->>> Since at the moment we enable the support of these extensions via CONFIG
->>> flags, e.g.
->>>   - LPA via CONFIG_ARM64_PA_BITS_52
->>>
->>> there are no clear mechanisms in user-space right now to
->>> deteremine these CONFIG flag values and also determine the PARange and
->>> VARange address values.
->>> User-space tools like 'makedumpfile' and 'crash-utility' can instead
->>> use the 'MAX_USER_VA_BITS' and 'MAX_PHYSMEM_BITS' values to determine
->>> the maximum virtual address and physical address (respectively)
->>> supported by underlying kernel.
->>>
->>> A reference 'makedumpfile' implementation which uses this approach to
->>> determining the maximum physical address is available in [0].
->>
->> Why does it need to know?
->>
->> (Suzuki asked the same question on your earlier version)
->> https://lore.kernel.org/linux-arm-kernel/cff44754-7fe4-efea-bc8e-4dde2277c821@arm.com/ 
-> 
-> 
-> I have shared some details (after discussion with our test teams) in 
-> reply to the review comments from Suzuki here:
-> http://lists.infradead.org/pipermail/kexec/2019-January/022389.html, and
-> http://lists.infradead.org/pipermail/kexec/2019-January/022390.html
-> 
-> Just to summarize, I mentioned in my replies to the review comments tha 
-> the makedumpfile implementation (for decoding the PTE) was just as an 
-> example, however there can be other user-space applications, for e.g a 
-> user-space application running with 48-bit kernel VA and 52-bit user 
-> space VA and requesting allocation in 'high' address via a 'hint' to mmap.
-> 
->>  From your github link it looks like you use this to re-assemble the 
->> two bits of the PFN from the pte. Can't you always do this for 64K 
->> pages? CPUs with the feature always do this too, its not something the 
->> kernel turns on.
-> 
-> Ok, let me try to give some perspective of a common makedumpfile 
-> use-case before I jump into the details:
-> 
-> (a) makedumpfile tool can be used to generate a vmcore and analyze it 
-> later. So for example we can create vmcore for a system running with 
-> page-size = 64K and analyze it later on a different system using 
-> page-size = 4K.
-> 
-> Since several makedumpfile code legs (for page-table walk) are common in 
-> both the paths (creating a vmcore and analyzing a vmcore), we cannot 
-> hardcode the PTE calculation masks for either 48-bit or 52-bit address 
-> spaces (or 4K/64K page sizes). The example invocations for the two cases 
-> is given below:
-> 
-> Create a vmcore dump on a 64K machine:
-> # makedumpfile -l --message-level 1 -d 31 /proc/vmcore vmcore
-> 
-> Analyze the vmcore dump on a 4K machine:
-> # makedumpfile -d 31 -x vmlinux vmcore dumpfile
-> 
-> Also hardcoding the PTE calculation to use the high address bit mask 
-> always will break the backward compatibility with older kernels (which 
-> don't support 52-bit address space extensions).
-> 
-> (b). Also x86_64 already has a vmcoreinfo export for 'pgtable_l5_enabled':
-> 
-> void arch_crash_save_vmcoreinfo(void)
-> {
->      <.. snip..>
->      vmcoreinfo_append_str("NUMBER(pgtable_l5_enabled)=%d\n",
->              pgtable_l5_enabled());
-> }
-> 
-> And the makedumpfile code uses the same to determine support for 5-level 
-> page tables in x86_64, see 
-> <https://github.com/bhupesh-sharma/makedumpfile/blob/52-bit-pa-support-via-vmcore-v1/arch/x86_64.c#L36> 
-> for example.
+> Correct. It is a cost of an extra if, I tried to avoid it. I like it better with
+> these two hooks, but if you have a strong opinion I'll do it, just confirm it again.
 
-Ping. Since this patch fixes a regression with user-space tools like 
-makedumpfile and crash-utility which are broken since arm64 kernels 
-with 52-bit VA and PA support are available (and distributions which 
-enable them), would request review comments/ack on this simple change.
-
-Thanks,
-Bhupesh
-
->>
->>> diff --git a/arch/arm64/kernel/crash_core.c 
->>> b/arch/arm64/kernel/crash_core.c
->>> index ca4c3e12d8c5..ad231be5c0d8 100644
->>> --- a/arch/arm64/kernel/crash_core.c
->>> +++ b/arch/arm64/kernel/crash_core.c
->>> @@ -10,6 +10,8 @@
->>>   void arch_crash_save_vmcoreinfo(void)
->>>   {
->>>       VMCOREINFO_NUMBER(VA_BITS);
->>> +    VMCOREINFO_NUMBER(MAX_USER_VA_BITS);
->>> +    VMCOREINFO_NUMBER(MAX_PHYSMEM_BITS);
->>>       /* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
->>>       vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
->>>                           kimage_voffset);
->>>
->>
-> 
-
+The cost of an indirect call is actually higher than an extra if/else
+block. I'm not against paying this extra cost when implementations are
+completely different, but that does not seem to be the case here.
+Moreover, if you get rid of these hooks, you can also get rid of the
+cfg struct.
 
 _______________________________________________
 linux-arm-kernel mailing list
