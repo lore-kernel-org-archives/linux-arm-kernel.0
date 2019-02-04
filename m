@@ -2,83 +2,123 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B4B26C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:05:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8834AC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:09:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8629D214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:05:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 58A032176F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:09:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ATM0KLLy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="Pc5Th6NR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8629D214DA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EQy33QJ3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="kWtyc6cI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 58A032176F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0YLGAtHKHRqNpKZJ5fLWtk5LdPKC/iZEtRvdlwTFpPI=; b=ATM0KLLyydlPRr
-	HGBuAbyP9Wtr5YoAGVu5irx93Q0aNSOWahVJpQw8Bphq/oxi0R4bU/nwQfSURPLNxX4l7uZ/i8x8Z
-	SmBRTUI9HqF5j7epVD3hccdmuXtn7CuEol5bgRgwr4bqIM6A2e4zgPhBTyGR9PsZo+6Qqvy6IdTMK
-	AGHCpWOSimKsUJZ2HqEUTxYcO2xzs42wdB9M6nlYRTjfGrn5pcxz2Y7S7RGp+369JlgBit6H5TaWs
-	NFe+cpyrCNDTZoCe4a8p4Zc8uCSEz+hbzs34VlY1gi7v2JiNPG8dCBrp7+6qEERjCP1qnrX+C5bzA
-	mCaZb7FBrpkU+mUOfEJQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=EknfWIcjhz5GK47o4vHiE0qCtK6pNjdBQGmN0qY9JWI=; b=EQy33QJ3sKNS2s
+	ekEAodc4eUHsoGpuSvc+WcpfmnjLeJQNAFpAphh6MFRZMVEBrIxO2sVkhkc6adVFWLuyWPhkhFyL1
+	qUdQ7H42o2XitLWwf0dCy+Zw9ztbpYmdm/T/WZIG/J5WpIbY961abUsVN5iDxCBPyZYFgpvRgpliC
+	+32FlR6hXpvUhfEwpEhcGi8TYZrwWAR6v7p5NOqe+cbXJmCd6qxbFRILsyXsJtlDkxwzF8grlKPr4
+	/lvbN9eozhvJuOTm4gBx3gGjB7Xfzj2LZPv+YaSW+KMyRT5yLZcFFPZMsAD/FNiUA2IyGneJ5bdo4
+	sb5PKohfBqd2DPwDxjyA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqb7w-0005CS-N7; Mon, 04 Feb 2019 10:05:20 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
+	id 1gqbBx-0005xL-IM; Mon, 04 Feb 2019 10:09:29 +0000
+Received: from esa6.microchip.iphmx.com ([216.71.154.253])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqb7e-0004A2-T4
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 10:05:17 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x14A4ECW087525;
- Mon, 4 Feb 2019 04:04:14 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549274654;
- bh=TkodRTwL2r31W/aCoQYwLYKMmuzKfs8DJ/AgFFd9J4E=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=Pc5Th6NRo4uGbLux2dyu/Db6g/poZD8s00BydCgOgojCGRZGigB2zsim5mhrmfb73
- qEa3TlJy9Gt//DkrXbFriBfgOAF7hNzcIoYUHcmR9r8CdDC0tbV6wsWVjXEPFCTuOY
- BdzQbxhn8NdCY6fLiWibUw0xxesynlXGbbU6RlFM=
-Received: from DLEE109.ent.ti.com (dlee109.ent.ti.com [157.170.170.41])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x14A4DPc003020
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 4 Feb 2019 04:04:14 -0600
-Received: from DLEE115.ent.ti.com (157.170.170.26) by DLEE109.ent.ti.com
- (157.170.170.41) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 4
- Feb 2019 04:04:13 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE115.ent.ti.com
- (157.170.170.26) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Mon, 4 Feb 2019 04:04:13 -0600
-Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x14A47XP012974;
- Mon, 4 Feb 2019 04:04:08 -0600
-Subject: Re: [PATCH v5 0/9] phy: Add configuration interface for MIPI D-PHY
- devices
-To: Maxime Ripard <maxime.ripard@bootlin.com>
-References: <cover.fbf0776c70c0cfb7b7fd88ce6a96b4597d620cac.1548085432.git-series.maxime.ripard@bootlin.com>
-From: Kishon Vijay Abraham I <kishon@ti.com>
-Message-ID: <fc5427d3-674e-cebc-99b9-11493f976a20@ti.com>
-Date: Mon, 4 Feb 2019 15:33:31 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <cover.fbf0776c70c0cfb7b7fd88ce6a96b4597d620cac.1548085432.git-series.maxime.ripard@bootlin.com>
+ id 1gqbBt-0005wL-4Y; Mon, 04 Feb 2019 10:09:28 +0000
+X-IronPort-AV: E=Sophos;i="5.56,559,1539673200"; d="scan'208";a="23387561"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa6.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 04 Feb 2019 03:09:24 -0700
+Received: from NAM04-BN3-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.108) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Mon, 4 Feb 2019 03:09:24 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=gWHKIK4fFjTkNuJ6sIdaTUYwPTegVccQ7ogOIV84gQg=;
+ b=kWtyc6cIGvIrwYDfANcRwZCVC9eHjff+5BM/yaIN+BT6kl2alpGKnWAttVUh+YEQxi+VhwxBKjpB2DB2PzHX0yTFHt8Fi+5mX9iqUCSkvcKvy0ibxSLIPbHsPVTjpKlLtp8VNPA+T7obEaBxw6S7kl3bjRTkI8qNfwFC3pmiaAU=
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.98.146) by
+ BN6PR11MB1473.namprd11.prod.outlook.com (10.172.21.16) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1580.16; Mon, 4 Feb 2019 10:09:23 +0000
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::847:4296:13b9:fc9f]) by BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::847:4296:13b9:fc9f%8]) with mapi id 15.20.1580.019; Mon, 4 Feb 2019
+ 10:09:23 +0000
+From: <Tudor.Ambarus@microchip.com>
+To: <broonie@kernel.org>, <robh+dt@kernel.org>, <mark.rutland@arm.com>,
+ <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
+ <Ludovic.Desroches@microchip.com>, <bbrezillon@kernel.org>,
+ <Cyrille.Pitchen@microchip.com>, <bugalski.piotr@gmail.com>
+Subject: [PATCH v4 01/13] spi: atmel-quadspi: cache MR value to avoid a write
+ access
+Thread-Topic: [PATCH v4 01/13] spi: atmel-quadspi: cache MR value to avoid a
+ write access
+Thread-Index: AQHUvHGzRPeVO5Si6USSpYr2BTVPaw==
+Date: Mon, 4 Feb 2019 10:09:22 +0000
+Message-ID: <20190204100910.26701-2-tudor.ambarus@microchip.com>
+References: <20190204100910.26701-1-tudor.ambarus@microchip.com>
+In-Reply-To: <20190204100910.26701-1-tudor.ambarus@microchip.com>
+Accept-Language: en-US
 Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR08CA0270.eurprd08.prod.outlook.com
+ (2603:10a6:803:dc::43) To BN6PR11MB1842.namprd11.prod.outlook.com
+ (2603:10b6:404:101::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Tudor.Ambarus@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 2.9.5
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BN6PR11MB1473;
+ 6:aPUXR5tjg2tH3OAmjHaZvqeqr2LGGV0eeiyyV9FP8Q7FVyGHVBKm63kBiKmq0WuQN2g+wRp1OQ3JHDHfpe/OXnrjvmhlP0S5y4okhYPov+8jHBViB7HI6ice/4ZZok49gdtDMcMp5Ipeyhfm+EpBJkI7IsD34SH1kTGzM5gkoUM/Q55MO3McITC/NpwLmDo+0U4eWHLcjWncBMDwtDHiVdvkx0YecuW5NTMdu7N+gYcmbyQgsIdcOlDAphuV3csxkap0XKHyQqCmbE2y2hAWkElqtAvdFUyv8De5OpSLf/22BqKKzIuzE8xulem7aOAHVTTjhDaS3S118hT6emVicZTxuet4D3rd/jsDCHOQL93wt7H4URXSNzDQL5S34PlkbI31uySUCHci2n1JeixMZnQOI6u7jZU/NUGGAboCSXHr8itMTQSbmH7j1U8FxysLr8sF6i77oqHVda+/kdqY8A==;
+ 5:W9fEJB96CvoFUi3G60+3e+iYowS4lkZIVlEmoZ35vBi05nNaZY8PaPsASwBaURg7v8zCnpIVcO66R+ZVsLi84CtMMRZcMKconyGiTHUqjCbFn9K50wo6ThB067+xA0cYA7TohIfqe2heyM9KWC333VWBTCd7c0Ago0uPBKZ8FL4fXnnQXUqdphoI870N9veGLz0+g2MJFkOP7KxPuqs6Vw==;
+ 7:wV+fdxcfinPV+l3T0vZVZrDJrLxKarf1tW25t7hdmWkjaRQhqD8u3bj633m7OBOzDeAeJgwIv7kTnK/hAvcwglmITjeIdl4N/yjyb5BolOMDqQu3/XcwattAjuI8ZDC36MRdBn5mxY1rBdxnVeVEfg==
+x-ms-office365-filtering-correlation-id: 0fd42ea1-2271-4595-9e3e-08d68a88d5ba
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:BN6PR11MB1473; 
+x-ms-traffictypediagnostic: BN6PR11MB1473:
+x-microsoft-antispam-prvs: <BN6PR11MB147348383C87A78474627D99F06D0@BN6PR11MB1473.namprd11.prod.outlook.com>
+x-forefront-prvs: 0938781D02
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(366004)(136003)(346002)(396003)(39860400002)(199004)(189003)(52116002)(8676002)(478600001)(2906002)(26005)(2501003)(186003)(50226002)(53936002)(4326008)(81156014)(316002)(66066001)(8936002)(3846002)(81166006)(6116002)(1076003)(386003)(6506007)(106356001)(68736007)(6436002)(6512007)(39060400002)(76176011)(102836004)(107886003)(71200400001)(54906003)(71190400001)(105586002)(476003)(99286004)(36756003)(7736002)(14444005)(6486002)(97736004)(446003)(11346002)(14454004)(2616005)(86362001)(305945005)(7416002)(256004)(72206003)(486006)(110136005)(25786009);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1473;
+ H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: TnSCwZ0JXxklfTLhPPkmMPRO6yrP1ZVGzCJuvaFZajVJ3HYqtv6AJKlpG27CxIsmWmohUowmHXwKewAWQ6SMNMNOTyaimexiqpivrOI5+M99UGn1xAvr70GbXAQe4p63NUn+Mqk4gmzfuznjh9JvGF7LzPRmjtv1NIdnJWVjqSQOcFOW9Mkj0RnVW3+WOEZISgC4z3bFc37NUfXdLqBiPqDq0zM1WuDiC8a4ropXkNSeCuJIQvBOZsrAdISbeQGGT+DdwO1uy3rBzfPduHqU69ZD89ycfSJ/9Wwjvg15xMXpaZ4tQHbK0uorvZ0i3HuEgHtrwaJo5E2xBGS3BfkowH3eRobhD4gwtQNbv0+0N1DQz53n7kiqcsYe1zzlOkbyQVphLvnB3BcDsRsqI48J45Cr3sGaNkbiUzMoYXNKDzU=
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 0fd42ea1-2271-4595-9e3e-08d68a88d5ba
+X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Feb 2019 10:09:20.3187 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1473
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_020503_669302_9743B574 
-X-CRM114-Status: GOOD (  32.40  )
+X-CRM114-CacheID: sfid-20190204_020925_219940_693B96E8 
+X-CRM114-Status: UNSURE (   9.83  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,125 +130,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Archit Taneja <architt@codeaurora.org>, Rafal Ciepiela <rafalc@cadence.com>,
- Krzysztof Witos <kwitos@cadence.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
- Andrzej Hajda <a.hajda@samsung.com>, Chen-Yu Tsai <wens@csie.org>,
- Sean Paul <seanpaul@chromium.org>,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Cc: devicetree@vger.kernel.org, Tudor.Ambarus@microchip.com,
+ linux-kernel@vger.kernel.org, linux-spi@vger.kernel.org,
+ linux-mtd@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+From: Tudor Ambarus <tudor.ambarus@microchip.com>
 
+Set the controller by default in Serial Memory Mode (SMM) at probe.
+Cache Mode Register (MR) value to avoid write access when setting
+the controller in serial memory mode at exec_op().
 
-On 21/01/19 9:15 PM, Maxime Ripard wrote:
-> Hi,
-> 
-> Here is a set of patches to allow the phy framework consumers to test and
-> apply runtime configurations.
-> 
-> This is needed to support more phy classes that require tuning based on
-> parameters depending on the current use case of the device, in addition to
-> the power state management already provided by the current functions.
-> 
-> A first test bed for that API are the MIPI D-PHY devices. There's a number
-> of solutions that have been used so far to support these phy, most of the
-> time being an ad-hoc driver in the consumer.
-> 
-> That approach has a big shortcoming though, which is that this is quite
-> difficult to deal with consumers integrated with multiple variants of phy,
-> of multiple consumers integrated with the same phy.
-> 
-> The latter case can be found in the Cadence DSI bridge, and the CSI
-> transceiver and receivers. All of them are integrated with the same phy, or
-> can be integrated with different phy, depending on the implementation.
-> 
-> I've looked at all the MIPI DSI drivers I could find, and gathered all the
-> parameters I could find. The interface should be complete, and most of the
-> drivers can be converted in the future. The current set converts two of
-> them: the above mentionned Cadence DSI driver so that the v4l2 drivers can
-> use them, and the Allwinner MIPI-DSI driver.
+Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+---
+v4: s/smm/mr, init controller in serial memory mode by default
+v3: update smm value when different. rename mr/smm
+v2: cache MR value instead of moving the write access at probe
 
-Can the PHY changes go independently of the consumer drivers? or else I'll need
-ACKs from the GPU MAINTAINER.
+ drivers/spi/atmel-quadspi.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-Thanks
-Kishon
+diff --git a/drivers/spi/atmel-quadspi.c b/drivers/spi/atmel-quadspi.c
+index ddc712410812..d6864d29f294 100644
+--- a/drivers/spi/atmel-quadspi.c
++++ b/drivers/spi/atmel-quadspi.c
+@@ -155,6 +155,7 @@ struct atmel_qspi {
+ 	struct clk		*clk;
+ 	struct platform_device	*pdev;
+ 	u32			pending;
++	u32			mr;
+ 	struct completion	cmd_completion;
+ };
+ 
+@@ -238,7 +239,14 @@ static int atmel_qspi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
+ 	icr = QSPI_ICR_INST(op->cmd.opcode);
+ 	ifr = QSPI_IFR_INSTEN;
+ 
+-	qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
++	/*
++	 * If the QSPI controller is set in regular SPI mode, set it in
++	 * Serial Memory Mode (SMM).
++	 */
++	if (aq->mr != QSPI_MR_SMM) {
++		qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
++		aq->mr = QSPI_MR_SMM;
++	}
+ 
+ 	mode = find_mode(op);
+ 	if (mode < 0)
+@@ -381,6 +389,10 @@ static int atmel_qspi_init(struct atmel_qspi *aq)
+ 	/* Reset the QSPI controller */
+ 	qspi_writel(aq, QSPI_CR, QSPI_CR_SWRST);
+ 
++	/* Set the QSPI controller by default in Serial Memory Mode */
++	qspi_writel(aq, QSPI_MR, QSPI_MR_SMM);
++	aq->mr = QSPI_MR_SMM;
++
+ 	/* Enable the QSPI controller */
+ 	qspi_writel(aq, QSPI_CR, QSPI_CR_QSPIEN);
+ 
+-- 
+2.9.5
 
-> 
-> Let me know what you think,
-> Maxime
-> 
-> Changes from v4:
->   - Removed regression on the variable calculation
->   - Fixed the wakeup unit
->   - Collected Sean Acked-by on the last patch
->   - Collected Sakari Reviewed-by on the first patch
-> 
-> Changes from v3
->   - Rebased on 5.0-rc1
->   - Added the fixes suggested by Sakari
-> 
-> Changes from v2:
->   - Rebased on next
->   - Changed the interface to accomodate for the new submodes
->   - Changed the timings units from nanoseconds to picoseconds
->   - Added minimum and maximum boundaries to the documentation
->   - Moved the clock enabling to phy_power_on in the Cadence DPHY driver
->   - Exported the phy_configure and phy_validate symbols
->   - Rework the phy pll divider computation in the cadence dphy driver
-> 
-> Changes from v1:
->   - Rebased on top of 4.20-rc1
->   - Removed the bus mode and timings parameters from the MIPI D-PHY
->     parameters, since that shouldn't have any impact on the PHY itself.
->   - Reworked the Cadence DSI and D-PHY drivers to take this into account.
->   - Remove the mode parameter from phy_configure
->   - Added phy_configure and phy_validate stubs
->   - Return -EOPNOTSUPP in phy_configure and phy_validate when the operation
->     is not implemented
-> 
-> Maxime Ripard (9):
->   phy: dphy: Remove unused header
->   phy: dphy: Change units of wakeup and init parameters
->   phy: dphy: Clarify lanes parameter documentation
->   sun6i: dsi: Convert to generic phy handling
->   phy: Move Allwinner A31 D-PHY driver to drivers/phy/
->   drm/bridge: cdns: Separate DSI and D-PHY configuration
->   dt-bindings: phy: Move the Cadence D-PHY bindings
->   phy: Add Cadence D-PHY support
->   drm/bridge: cdns: Convert to phy framework
-> 
->  Documentation/devicetree/bindings/display/bridge/cdns,dsi.txt |  21 +-
->  Documentation/devicetree/bindings/phy/cdns,dphy.txt           |  20 +-
->  drivers/gpu/drm/bridge/Kconfig                                |   1 +-
->  drivers/gpu/drm/bridge/cdns-dsi.c                             | 538 +------
->  drivers/gpu/drm/sun4i/Kconfig                                 |   3 +-
->  drivers/gpu/drm/sun4i/Makefile                                |   5 +-
->  drivers/gpu/drm/sun4i/sun6i_mipi_dphy.c                       | 292 +----
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c                        |  31 +-
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h                        |  17 +-
->  drivers/phy/allwinner/Kconfig                                 |  12 +-
->  drivers/phy/allwinner/Makefile                                |   1 +-
->  drivers/phy/allwinner/phy-sun6i-mipi-dphy.c                   | 318 ++++-
->  drivers/phy/cadence/Kconfig                                   |  13 +-
->  drivers/phy/cadence/Makefile                                  |   1 +-
->  drivers/phy/cadence/cdns-dphy.c                               | 389 +++++-
->  drivers/phy/phy-core-mipi-dphy.c                              |   8 +-
->  include/linux/phy/phy-mipi-dphy.h                             |  13 +-
->  17 files changed, 894 insertions(+), 789 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/phy/cdns,dphy.txt
->  delete mode 100644 drivers/gpu/drm/sun4i/sun6i_mipi_dphy.c
->  create mode 100644 drivers/phy/allwinner/phy-sun6i-mipi-dphy.c
->  create mode 100644 drivers/phy/cadence/cdns-dphy.c
-> 
-> base-commit: bfeffd155283772bbe78c6a05dec7c0128ee500c
-> 
 
 _______________________________________________
 linux-arm-kernel mailing list
