@@ -2,22 +2,22 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F1088C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:59:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 93225C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 18:02:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C2C3C20820
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 17:59:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 61D4720820
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 18:02:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VoHdQl4l";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ncXtIGPc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C2C3C20820
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mQ3jT0AK";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="RhF2nUX/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 61D4720820
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,56 +26,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=JYxAZ+wMbWe+biCvnsnDMevCh2bMpblQrFCtU6J2MSk=; b=VoHdQl4lDkMN0t
-	XrzYmATAfGaaP9IZVL7snOW8SMt0IAqBSukPqdxsSiaZ9jWveMrguEy8vn0nrgKteHQfvpqdmzM3a
-	VqPHUtaS0GXk8DXorNt2SEAnRYfcp76wLBM06XsA3qKWSnX56yiO1D6QqHzY5QpAS69wtggPJFDJK
-	odpmlYkZHqHDVgrNRnkm95vsA+UOYlP+DAcCglwSsy1wjzpXsVYjezYJ/1mGlAoZnKtKyVGvCleXF
-	Kxy+yeTyA9lL38gkW6bZarhHlCXdczsPgcw/nZAeKnOwiJd1wULgsnkIz55SnNs0tEXEYknf0S2DZ
-	Gg83RfAATVCui1pmwJTA==;
+	List-Owner; bh=bKE0oBTXLszs0A96g34EyKJxTdvdnG7bgx+q2DeEwTw=; b=mQ3jT0AKdQmuc5
+	NQa5lAYzYfJbIhuVY5PVGWLBgycf2ERu3aah1+DAtWdEjtCaAILTzhta6EF5WiR/sQx0FkiHtmK1n
+	vNKEXQeEbcVE549W6djdtqazRleqvpUOO6rsB7fjFhDWAd+y4DTLGccPPv/QJHryX746FaG4hyIxn
+	OLlMkxz/WeBPInhFRlz/wKCoeovGwwx6ChROn9Z/I7+Old6p9OMAKVExCEngeWM6apTjbekP33aKt
+	aAvBuie7A/AC92jEym0/vY+oyf832EmCOFonpZXUCB2Gv1lFuYuHP+OEA0McztNvLHwjctaVboV8W
+	bnX9suAjFNGEvW9kR59g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqiWu-0002ux-24; Mon, 04 Feb 2019 17:59:36 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
+	id 1gqiZd-0004l6-PX; Mon, 04 Feb 2019 18:02:25 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqiWp-0002tw-IJ; Mon, 04 Feb 2019 17:59:32 +0000
-Received: by mail-wm1-x343.google.com with SMTP id d15so846481wmb.3;
- Mon, 04 Feb 2019 09:59:31 -0800 (PST)
+ id 1gqiZY-0004jZ-Kq; Mon, 04 Feb 2019 18:02:22 +0000
+Received: by mail-wr1-x444.google.com with SMTP id a16so887309wrv.0;
+ Mon, 04 Feb 2019 10:02:20 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
  :user-agent:mime-version:in-reply-to:content-language
  :content-transfer-encoding;
- bh=fNm5ntMkvJqR5V2lrUjdXd9GzVz+hF3rXykPtPdgi58=;
- b=ncXtIGPcbq0G/lRxQs+oXdPuVds1W254fKfWvX+weUjm20ua8aJAILLTm8PVuMD4h3
- 8q2lavFhpx4NVTqZgrZsJIZ7G89FQBIYheFlRccyjWhbAGOSOZofl55AWx+wMCS8lVSK
- IQJEeGj/mWTku1hn51GkaI4neJm7tI1YyG6jU4DuHQ4HyntPxMwNkkP3yyUSuwo307qS
- ZjbFl7WNrGt3U+1Em4DTRkDkPVpP8VixgHYVIbjNT7xhGNElKHlZMz5sBpsfDZyRUoK7
- k/W3c+DvuBboV6mej80qqDy2S35PcrqKrOd1CJgm7D4wlrgfnljIhDT4nC5WOuXz3I8f
- orWg==
+ bh=j72Yne9eYAlbQVHMKjJISGf6hyfVo1V2l8XTQA3iemk=;
+ b=RhF2nUX/1XnceLQFgfmi0JZ4g5gpHIZY/PmsRQ+VmRDe9UbbnwS4mDt9l5G0sSLZNz
+ ZQbrCmcngZwiwXamCymHXyozwg4TXcFfjI65KFRG4qyiHpYtFQr7CnJ0Vr2Yp0S4kWHB
+ bl+5nWhguG61OH69uWUwZbV/1ei6UftQr42gFxNXBALouHwUaCNwKfoC+or1btladu3f
+ oLSHfaMDQyvE2sy5iAm0hfzUwW3F3F6InlDvrfYShyifQQtZ8i9QzQcussXFggiVRe50
+ s0jxWT/Do2JyUfOC2BdoYeZSWJ+1IBwFqb+Sn2DIne3ZAN0DAJbSRhZE6IwYzuZpuO3a
+ ZWAw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
  :message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=fNm5ntMkvJqR5V2lrUjdXd9GzVz+hF3rXykPtPdgi58=;
- b=lVXCtxaORfa3FKnGLgNJimzFY9kP1X/FLOvdbADp10McKtzcKeYBRI7WHBT91HxtHv
- hI7UrGuE2QK88hn8M/wMh8ay9RPvTC5cqMTr6DK00cIOmTLskqKnC3h2glLwfOCd91LK
- qfvb9C/f4pJYvvc9KlsNrxAfngO3me5Pax36gyEStAiu32jwyG0LMN6zOM3c/eP98lW3
- Eb9ahDSMzikdP1fq0IPk4Wh4bKRZwTumuFcYutJryu/xiBIl1DiLJigUmyHY9TJOVFiS
- dkj9SQrZ1UFJ3e+X9vy17+RXhJ68L2PlB7V034fpppukEBlFiFeUT91Sz90xQ7Mb/uZl
- W5LA==
-X-Gm-Message-State: AHQUAuai1C4bLbXDpF4ETkjKOvFceBQ/JSK2KN3lZ87swpWWCNK6tx1H
- j/ldaCOOowC+UF5YX4zJ7N6+u0Uzhro=
-X-Google-Smtp-Source: AHgI3IaNu8OV435Q/RquSkIGCR0JWmKtUf5y0H6OgDpSD06uHWoJTTHmyKk5/1KfBYB5cHB5BEXkow==
-X-Received: by 2002:a1c:544f:: with SMTP id p15mr445882wmi.37.1549303169791;
- Mon, 04 Feb 2019 09:59:29 -0800 (PST)
+ bh=j72Yne9eYAlbQVHMKjJISGf6hyfVo1V2l8XTQA3iemk=;
+ b=YKENrZskZnMIX3qeY2jD+Y5CKLrqlcu2EcdAMWgR8tq4peEfNxZMIUgAZ1XEKfeYXn
+ mVg6FUnNlZp0FpzAbgnVwLuA73m5Gfiw9G4vspKfXJ2Tbe/e3VddMf/ewSRzvMpBNQF3
+ 9tvvuiPx3qylE843EQ6rg+HmMf5mj4N43e78MTUZC2taLlE2ycFdZTqK2KFx6cxZifbz
+ gaOOSSMQe1jUCL+/Cjud6H/f/QTyfXHjSLDFXr8ha9bhN1nuVSCVfiUJiPagZMrEJbIw
+ UYy9juoTol7IPygUy2I3eKanlWnHq5AIxDehUy+iAe8CLRmqUzVj9rPjGi5JvymxleYg
+ 4dmw==
+X-Gm-Message-State: AHQUAubA9D5cpyDp8Ac73dd5mrPy+IBJCtb5/2LYN4tDE8VkYkLreAh/
+ mUlCgLWeJF07l7kJf6AqYaJchGm2Gak=
+X-Google-Smtp-Source: AHgI3IYMYhWTFFPWmjO0SF4e8U7IoRzvzje6BjUFAf7bm/sOrHqo5qin89B+Om1SD4xN2WbrmGVe/w==
+X-Received: by 2002:a5d:4b01:: with SMTP id v1mr449811wrq.5.1549303338627;
+ Mon, 04 Feb 2019 10:02:18 -0800 (PST)
 Received: from ziggy.stardust ([212.187.182.165])
- by smtp.gmail.com with ESMTPSA id g3sm1676629wmh.20.2019.02.04.09.59.28
+ by smtp.gmail.com with ESMTPSA id s16sm16011451wrt.77.2019.02.04.10.02.17
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 04 Feb 2019 09:59:29 -0800 (PST)
+ Mon, 04 Feb 2019 10:02:18 -0800 (PST)
 Subject: Re: [PATCH v4 2/6] remoteproc/mediatek: add SCP support for mt8183
-To: Pi-Hsun Shih <pihsun@chromium.org>
+To: Matthias Kaehlcke <mka@chromium.org>, Pi-Hsun Shih <pihsun@chromium.org>
 References: <20190131093131.245531-1-pihsun@chromium.org>
  <20190131093131.245531-3-pihsun@chromium.org>
+ <20190202001749.GT81583@google.com>
 From: Matthias Brugger <matthias.bgg@gmail.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
@@ -171,16 +172,16 @@ Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  pac005PuhxCWkKTJz3gCmznnoat4GCnL5gy/m0Qk45l4PFqwWXVLo9AQg2Kp3mlIFZ6fsEKI
  AN5hxlbNvNb9V2Zo5bFZjPWPFTxOteM0omUAS+QopwU0yPLLGJVf2iCmItHcUXI+r2JwH1CJ
  jrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <f0aeabf4-1ebe-ddf5-1ea3-27db5e51e04d@gmail.com>
-Date: Mon, 4 Feb 2019 18:59:28 +0100
+Message-ID: <cc1407f1-c236-f0af-a6c1-366aeac259f4@gmail.com>
+Date: Mon, 4 Feb 2019 19:02:17 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.3
 MIME-Version: 1.0
-In-Reply-To: <20190131093131.245531-3-pihsun@chromium.org>
+In-Reply-To: <20190202001749.GT81583@google.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_095931_607722_17C56FDD 
-X-CRM114-Status: GOOD (  11.11  )
+X-CRM114-CacheID: sfid-20190204_100220_803384_6F43227A 
+X-CRM114-Status: GOOD (  22.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -207,21 +208,76 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 
 
-On 31/01/2019 10:31, Pi-Hsun Shih wrote:
-> From: Erin Lo <erin.lo@mediatek.com>
-[...]
-> +struct platform_device *scp_get_plat_device(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *scp_node;
-> +	struct platform_device *scp_pdev;
-> +
-> +	scp_node = of_parse_phandle(dev->of_node, "mediatek,scp", 0);
+On 02/02/2019 01:17, Matthias Kaehlcke wrote:
+> Hi Pi-Hsun,
+> 
+> a few comments inline.
+> 
+> It's the first time I dabble into remoteproc, I don't claim to have a
+> complete understanding of the driver at this point ;-)
+> 
+> On Thu, Jan 31, 2019 at 05:31:27PM +0800, Pi-Hsun Shih wrote:
+>> From: Erin Lo <erin.lo@mediatek.com>
+>>
+>> Provide a basic driver to control Cortex M4 co-processor
+>>
+>> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+>> Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+>> ---
+>> Changes from v3:
+>>  - Fix some issue found by checkpatch.
+>>  - Make writes aligned in scp_ipi_send.
+>>
+>> Changes from v2:
+>>  - Squash patch 3 from v2 (separate the ipi interface) into this patch.
+>>  - Remove unused name argument from scp_ipi_register.
+>>  - Add scp_ipi_unregister for proper cleanup.
+>>  - Move IPI ids in sync with firmware.
+>>  - Add mb() in proper place, and correctly clear the run->signaled.
+>>
+>> Changes from v1:
+>>  - Extract functions and rename variables in mtk_scp.c.
+>> ---
+>>  drivers/remoteproc/Kconfig            |   9 +
+>>  drivers/remoteproc/Makefile           |   1 +
+>>  drivers/remoteproc/mtk_common.h       |  73 +++++
+>>  drivers/remoteproc/mtk_scp.c          | 441 ++++++++++++++++++++++++++
+>>  drivers/remoteproc/mtk_scp_ipi.c      | 157 +++++++++
+>>  include/linux/platform_data/mtk_scp.h | 135 ++++++++
+>>  6 files changed, 816 insertions(+)
+>>  create mode 100644 drivers/remoteproc/mtk_common.h
+>>  create mode 100644 drivers/remoteproc/mtk_scp.c
+>>  create mode 100644 drivers/remoteproc/mtk_scp_ipi.c
+>>  create mode 100644 include/linux/platform_data/mtk_scp.h
+>>
+>> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+>> index f0abd260804473..ee0bda23768938 100644
+>> --- a/drivers/remoteproc/Kconfig
+>> +++ b/drivers/remoteproc/Kconfig
+>> @@ -22,6 +22,15 @@ config IMX_REMOTEPROC
+>>  
+>>  	  It's safe to say N here.
+>>  
+>> +config MTK_SCP
+>> +        tristate "Mediatek SCP support"
+>> +        depends on ARCH_MEDIATEK
+>> +        help
+>> +          Say y here to support Mediatek's SCP (Cortex M4
+>> +          on MT8183) via the remote processor framework.
+> 
+> It would be good to spell out SCP somewhere, e.g.
+> 
+> "... support Mediatek's system control processor (SCP) via ..."
+> 
+> the example is less important IMO, though it's prefectly fine if you
+> can still squeeze it in ;-)
+> 
 
-IHMO this should be reflected in the binding description
+In which way is this different from
+drivers/soc/mediatek/mtk-scpsys.c ?
 
 Regards,
-Matthias
+Matthias (the other one ;)
 
 _______________________________________________
 linux-arm-kernel mailing list
