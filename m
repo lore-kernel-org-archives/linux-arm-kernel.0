@@ -2,98 +2,83 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C05BC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:04:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B4B26C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:05:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4C5092087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:04:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8629D214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:05:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K/nnxz8w";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="rGbIsZb1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="K2v2mR0B"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C5092087C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ATM0KLLy";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="Pc5Th6NR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8629D214DA
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=m2+6xxayVL0ecd1gTYzl4OgyGMkYseLz4bgzl+P0BAY=; b=K/nnxz8wmnOlzY
-	moRXBfH+p+tihlv34X/CFfVvHK2oLfLVcFPRC8srBbSUyYaJV9isEzaasLld7wztk0c2kSgbM7zPw
-	TcKs8aPY5OtMl4PTfTOBMUUmM5eTAvz+zca8j2xG9ABl/i94XfDS8jYWiQx9IaWdfiXE+aZVDYmy8
-	HkNux4EEdMl08iJquDtns4ndcKCqM+WVmAdqEr4fbeUY9Ly11AqI7YpEryAgt9MIpjbCd10/Kiqvr
-	bbgU4w/SBGcxcznQHgNGEDMnj+UJ0JGfgzpxl+HVZC70JSKYVBlzzIFB3/1RXKMIgpqIf4Hvlx+F0
-	YL7xBsoA1OhxRedIdVEw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=0YLGAtHKHRqNpKZJ5fLWtk5LdPKC/iZEtRvdlwTFpPI=; b=ATM0KLLyydlPRr
+	HGBuAbyP9Wtr5YoAGVu5irx93Q0aNSOWahVJpQw8Bphq/oxi0R4bU/nwQfSURPLNxX4l7uZ/i8x8Z
+	SmBRTUI9HqF5j7epVD3hccdmuXtn7CuEol5bgRgwr4bqIM6A2e4zgPhBTyGR9PsZo+6Qqvy6IdTMK
+	AGHCpWOSimKsUJZ2HqEUTxYcO2xzs42wdB9M6nlYRTjfGrn5pcxz2Y7S7RGp+369JlgBit6H5TaWs
+	NFe+cpyrCNDTZoCe4a8p4Zc8uCSEz+hbzs34VlY1gi7v2JiNPG8dCBrp7+6qEERjCP1qnrX+C5bzA
+	mCaZb7FBrpkU+mUOfEJQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqb7Q-0003z0-86; Mon, 04 Feb 2019 10:04:48 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gqb7w-0005CS-N7; Mon, 04 Feb 2019 10:05:20 +0000
+Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqb7M-0003yE-Ky
- for linux-arm-kernel@bombadil.infradead.org; Mon, 04 Feb 2019 10:04:44 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Type:Cc:To:Subject:Message-ID:
- Date:From:In-Reply-To:References:MIME-Version:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=K7FHYP4WCte0n2jLKNs3+2YvyzzFVKlfPJ8JKEwhsWI=; b=rGbIsZb1PxhYbyJ2wiGLJc6sQ
- x94Oh2WSbR+gLA6i74nx0dyllWeUgkoI0Han9qorHxZ6z2pYANe+hec2QvzV6yxo/hOH8aK3iWeb3
- c6obBetb6hFUEVUccDw2p76+O95lzwlhudoSriTOp0+bwWXVL0T6nDMVg5w5jCKDgsetxO2HaukRZ
- 4NXaKTpuTRSUsno6hdL1DFgUBbhwbQCIp64RFTagjETW/nSrEJqAlEpVR2PBD2RKvJppK2VAAjfd8
- VqJOu8iMApKFymV/GPMJ+kBc7RtINOitlqt12vK8ioj166Ql7HbaTrStAGoUp8hf8PNzmHjpWJbRr
- YHElhBdFA==;
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqb7J-0005H3-QM
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 10:04:43 +0000
-Received: by mail-lf1-x144.google.com with SMTP id i26so9890176lfc.0
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 02:04:39 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=K7FHYP4WCte0n2jLKNs3+2YvyzzFVKlfPJ8JKEwhsWI=;
- b=K2v2mR0BPGCK9AUrcRtb7Lq6y0NUQlwdMXAHqEKYG7FaG3wzhASDvPnIX5J8ULPW+3
- iSzwa56BLYjhvCQNUE8cVOuD2tXiII4buXdFvOuwg+vxr4ApCsB4sR4Ulqqs5Fwq4OTP
- nPfu1C6IN89R0VwNDHRHob5mnDj4e03SEBlys=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=K7FHYP4WCte0n2jLKNs3+2YvyzzFVKlfPJ8JKEwhsWI=;
- b=otOPCADEakZ/N0Kt/RbQ4sdnM+XU3pLn+Inzrin/xrPitahVcALU6kQajphiumo4fr
- njKNIr4cyc3BNsYlyJqGCNBHyZybxTKC4OB1NdEZd8vSYjMeL8fE9aI4+/g7ByE9TcrE
- tzha9ICpGgVKMWDB9znSIb+vwcbMzNcFZ7mcKRG/5K0Ssil0KG8HTn3mg1+2K1QVtPjy
- ptp31y8QNTJPFJz8CCdUmF5c3ShBValHXDIryIfHGCGYRgIl1gTWJwNH7Rko4KgUftTL
- 1rPmecrL9LYRmX04fmEfAMLL4J+VTiuUheqGdo4FIkCQVPkILTdHL2ImpynLfRcrER7B
- 2LKA==
-X-Gm-Message-State: AJcUukegz9cUs3cEvNIlbQ/eOE2VWpMAQN2yuTbUgBryXHwTKP4xi8lk
- WdTg5Bi+PEvGTQJNPpD7cH2BRu3izILvSqEts+64hg==
-X-Google-Smtp-Source: ALg8bN63d5+JEf+EaXiUaRPcWX8h0ld88o//YdCI/FGHzpksxGTQD6ARuazMzHyNPu3PFbLDQCBi/JGk2FrWQ2Jo690=
-X-Received: by 2002:ac2:53b1:: with SMTP id j17mr37596335lfh.167.1549274678234; 
- Mon, 04 Feb 2019 02:04:38 -0800 (PST)
+ id 1gqb7e-0004A2-T4
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 10:05:17 +0000
+Received: from fllv0034.itg.ti.com ([10.64.40.246])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x14A4ECW087525;
+ Mon, 4 Feb 2019 04:04:14 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1549274654;
+ bh=TkodRTwL2r31W/aCoQYwLYKMmuzKfs8DJ/AgFFd9J4E=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=Pc5Th6NRo4uGbLux2dyu/Db6g/poZD8s00BydCgOgojCGRZGigB2zsim5mhrmfb73
+ qEa3TlJy9Gt//DkrXbFriBfgOAF7hNzcIoYUHcmR9r8CdDC0tbV6wsWVjXEPFCTuOY
+ BdzQbxhn8NdCY6fLiWibUw0xxesynlXGbbU6RlFM=
+Received: from DLEE109.ent.ti.com (dlee109.ent.ti.com [157.170.170.41])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x14A4DPc003020
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Mon, 4 Feb 2019 04:04:14 -0600
+Received: from DLEE115.ent.ti.com (157.170.170.26) by DLEE109.ent.ti.com
+ (157.170.170.41) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 4
+ Feb 2019 04:04:13 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE115.ent.ti.com
+ (157.170.170.26) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Mon, 4 Feb 2019 04:04:13 -0600
+Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x14A47XP012974;
+ Mon, 4 Feb 2019 04:04:08 -0600
+Subject: Re: [PATCH v5 0/9] phy: Add configuration interface for MIPI D-PHY
+ devices
+To: Maxime Ripard <maxime.ripard@bootlin.com>
+References: <cover.fbf0776c70c0cfb7b7fd88ce6a96b4597d620cac.1548085432.git-series.maxime.ripard@bootlin.com>
+From: Kishon Vijay Abraham I <kishon@ti.com>
+Message-ID: <fc5427d3-674e-cebc-99b9-11493f976a20@ti.com>
+Date: Mon, 4 Feb 2019 15:33:31 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-References: <20190204095853.12212-1-masneyb@onstation.org>
- <20190204095853.12212-2-masneyb@onstation.org>
-In-Reply-To: <20190204095853.12212-2-masneyb@onstation.org>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Mon, 4 Feb 2019 11:04:26 +0100
-Message-ID: <CACRpkdapj4xo2JBBw=xo3gVAWOb1dMG8DUVvyW4qw5CAVupEfA@mail.gmail.com>
-Subject: Re: [PATCH v2 -next 2/2] pinctrl: qcom: spmi-gpio: select
- IRQ_DOMAIN_HIERARCHY in Kconfig
-To: Brian Masney <masneyb@onstation.org>
+In-Reply-To: <cover.fbf0776c70c0cfb7b7fd88ce6a96b4597d620cac.1548085432.git-series.maxime.ripard@bootlin.com>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_100441_872525_2C51FC55 
-X-CRM114-Status: UNSURE (   9.29  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190204_020503_669302_9743B574 
+X-CRM114-Status: GOOD (  32.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,35 +90,125 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linaro-kernel <linaro-kernel@lists.linaro.org>,
- Kernel Build Reports Mailman List <kernel-build-reports@lists.linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, linux-arm-msm@vger.kernel.org,
- "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>, Stephen Boyd <sboyd@kernel.org>,
- Linux-Next Mailing List <linux-next@vger.kernel.org>,
- Mark Brown <broonie@kernel.org>, Andy Gross <andy.gross@linaro.org>,
- Thomas Gleixner <tglx@linutronix.de>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Archit Taneja <architt@codeaurora.org>, Rafal Ciepiela <rafalc@cadence.com>,
+ Krzysztof Witos <kwitos@cadence.com>,
+ Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
+ linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
+ Andrzej Hajda <a.hajda@samsung.com>, Chen-Yu Tsai <wens@csie.org>,
+ Sean Paul <seanpaul@chromium.org>,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 4, 2019 at 10:58 AM Brian Masney <masneyb@onstation.org> wrote:
 
-> Select IRQ_DOMAIN_HIERARCHY for spmi-gpio in Kconfig since this driver
-> is now setup as a hierarchical IRQ chip.
->
-> Signed-off-by: Brian Masney <masneyb@onstation.org>
-> ---
-> Changes since v1:
-> - None
 
-Patch applied!
+On 21/01/19 9:15 PM, Maxime Ripard wrote:
+> Hi,
+> 
+> Here is a set of patches to allow the phy framework consumers to test and
+> apply runtime configurations.
+> 
+> This is needed to support more phy classes that require tuning based on
+> parameters depending on the current use case of the device, in addition to
+> the power state management already provided by the current functions.
+> 
+> A first test bed for that API are the MIPI D-PHY devices. There's a number
+> of solutions that have been used so far to support these phy, most of the
+> time being an ad-hoc driver in the consumer.
+> 
+> That approach has a big shortcoming though, which is that this is quite
+> difficult to deal with consumers integrated with multiple variants of phy,
+> of multiple consumers integrated with the same phy.
+> 
+> The latter case can be found in the Cadence DSI bridge, and the CSI
+> transceiver and receivers. All of them are integrated with the same phy, or
+> can be integrated with different phy, depending on the implementation.
+> 
+> I've looked at all the MIPI DSI drivers I could find, and gathered all the
+> parameters I could find. The interface should be complete, and most of the
+> drivers can be converted in the future. The current set converts two of
+> them: the above mentionned Cadence DSI driver so that the v4l2 drivers can
+> use them, and the Allwinner MIPI-DSI driver.
 
-Yours,
-Linus Walleij
+Can the PHY changes go independently of the consumer drivers? or else I'll need
+ACKs from the GPU MAINTAINER.
+
+Thanks
+Kishon
+
+> 
+> Let me know what you think,
+> Maxime
+> 
+> Changes from v4:
+>   - Removed regression on the variable calculation
+>   - Fixed the wakeup unit
+>   - Collected Sean Acked-by on the last patch
+>   - Collected Sakari Reviewed-by on the first patch
+> 
+> Changes from v3
+>   - Rebased on 5.0-rc1
+>   - Added the fixes suggested by Sakari
+> 
+> Changes from v2:
+>   - Rebased on next
+>   - Changed the interface to accomodate for the new submodes
+>   - Changed the timings units from nanoseconds to picoseconds
+>   - Added minimum and maximum boundaries to the documentation
+>   - Moved the clock enabling to phy_power_on in the Cadence DPHY driver
+>   - Exported the phy_configure and phy_validate symbols
+>   - Rework the phy pll divider computation in the cadence dphy driver
+> 
+> Changes from v1:
+>   - Rebased on top of 4.20-rc1
+>   - Removed the bus mode and timings parameters from the MIPI D-PHY
+>     parameters, since that shouldn't have any impact on the PHY itself.
+>   - Reworked the Cadence DSI and D-PHY drivers to take this into account.
+>   - Remove the mode parameter from phy_configure
+>   - Added phy_configure and phy_validate stubs
+>   - Return -EOPNOTSUPP in phy_configure and phy_validate when the operation
+>     is not implemented
+> 
+> Maxime Ripard (9):
+>   phy: dphy: Remove unused header
+>   phy: dphy: Change units of wakeup and init parameters
+>   phy: dphy: Clarify lanes parameter documentation
+>   sun6i: dsi: Convert to generic phy handling
+>   phy: Move Allwinner A31 D-PHY driver to drivers/phy/
+>   drm/bridge: cdns: Separate DSI and D-PHY configuration
+>   dt-bindings: phy: Move the Cadence D-PHY bindings
+>   phy: Add Cadence D-PHY support
+>   drm/bridge: cdns: Convert to phy framework
+> 
+>  Documentation/devicetree/bindings/display/bridge/cdns,dsi.txt |  21 +-
+>  Documentation/devicetree/bindings/phy/cdns,dphy.txt           |  20 +-
+>  drivers/gpu/drm/bridge/Kconfig                                |   1 +-
+>  drivers/gpu/drm/bridge/cdns-dsi.c                             | 538 +------
+>  drivers/gpu/drm/sun4i/Kconfig                                 |   3 +-
+>  drivers/gpu/drm/sun4i/Makefile                                |   5 +-
+>  drivers/gpu/drm/sun4i/sun6i_mipi_dphy.c                       | 292 +----
+>  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c                        |  31 +-
+>  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h                        |  17 +-
+>  drivers/phy/allwinner/Kconfig                                 |  12 +-
+>  drivers/phy/allwinner/Makefile                                |   1 +-
+>  drivers/phy/allwinner/phy-sun6i-mipi-dphy.c                   | 318 ++++-
+>  drivers/phy/cadence/Kconfig                                   |  13 +-
+>  drivers/phy/cadence/Makefile                                  |   1 +-
+>  drivers/phy/cadence/cdns-dphy.c                               | 389 +++++-
+>  drivers/phy/phy-core-mipi-dphy.c                              |   8 +-
+>  include/linux/phy/phy-mipi-dphy.h                             |  13 +-
+>  17 files changed, 894 insertions(+), 789 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/phy/cdns,dphy.txt
+>  delete mode 100644 drivers/gpu/drm/sun4i/sun6i_mipi_dphy.c
+>  create mode 100644 drivers/phy/allwinner/phy-sun6i-mipi-dphy.c
+>  create mode 100644 drivers/phy/cadence/cdns-dphy.c
+> 
+> base-commit: bfeffd155283772bbe78c6a05dec7c0128ee500c
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
