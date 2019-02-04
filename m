@@ -2,123 +2,87 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E0C16C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:12:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 42D56C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:16:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B0ACC20823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:12:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 10DE82081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 10:16:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OQCi6C+X";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="RJMASlnh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B0ACC20823
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LdDfP4mR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 10DE82081B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7JzFRPi04T9zyHAmhj8dSxxKgodxSRWS3I1yiPTEQ9g=; b=OQCi6C+XyEfLjx
-	lxmFVsmuMyfBcG4pGe1CK2XbavkODL3HWa2Ut22DVD2Iqn+nqIkh5FythYI5FgXy7oHIRXRuHhOtw
-	p/keOu2+phsKp5U8o23xKM64kNwNFHuoeP9wYPVMAWjWYEW96KIJImpFOJY7LQ191q1IK0Ue18ZI7
-	0zC8VZFS6gLmrtVUUls9BdloRK7E2zSlWIUtYNwLXMTsSNkyPx3acDGQJQkGFsVHwgK7zleBAieSw
-	JtuRcHCotVlQ/QXLYvVUwML8UTx7iWcRiwUyfMKByzG4VEkhSueT2n1pCvY3xI2IRMH93sJI5SQMw
-	/qtYK5N1VLcmgkti1Lsg==;
+	List-Owner; bh=DTQfMJG9oH8BqxyQhC5/YKe9d4nGYUXqgg36kunPF68=; b=LdDfP4mRTwNCz8
+	PihrQFE4UMk1mPer4CvUYoDwt860/Qol+EkBzLVTW/p1P5evyUphljJ8WNNY5abjSNvcw42rBTiwg
+	cNw2QuK1Drf0z93HhDtEPbivJ2FtROwxcP4llDx0uSQiJSXp5cYrJsDzmWXQDDiNK0XyASA2de2Q3
+	5GPlzLy5Nu7uTeACoEhjrZaLzlPH4pAz/dELiX0v55zTzW0w6hPBBsg8OUOud+/MAuiPH6iaz6/oq
+	+ogQck4WWM8LxdEbeZjyMnTe2KzuIkoSwiVBgDPlKlyZzQScMlfbyIwt7utfvDFtdbXP/5rEircvZ
+	pl2USmpTULLIjHUxXsAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqbEd-0001QS-BS; Mon, 04 Feb 2019 10:12:15 +0000
-Received: from esa2.microchip.iphmx.com ([68.232.149.84])
+	id 1gqbIx-0003Sw-M5; Mon, 04 Feb 2019 10:16:43 +0000
+Received: from mail-ed1-f68.google.com ([209.85.208.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqbCR-0006Sl-Ea; Mon, 04 Feb 2019 10:10:41 +0000
-X-IronPort-AV: E=Sophos;i="5.56,559,1539673200"; d="scan'208";a="26111701"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 04 Feb 2019 03:09:58 -0700
-Received: from NAM04-BN3-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.108) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Mon, 4 Feb 2019 03:09:58 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=sl0ZxzuWZAR77THBGi7a4o9ip4vZenzv5gkGL1ZO2/Y=;
- b=RJMASlnhu/chu9QNTyAWg/rVsrsflLhDNv+hqXb3WKxE8m7SHmwGr+Yo0CTtgmRgTnYHBZyU6XvEkLvlWru7EAB+ZANYljQxTabiYfqnExFDqJmAm2SN5RDv8WRI3m7L9OV4SnTbMMXYwsEpBZTxk82vP9mVoAcoKMqFoBrnenA=
-Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.98.146) by
- BN6PR11MB1508.namprd11.prod.outlook.com (10.172.21.148) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1580.16; Mon, 4 Feb 2019 10:09:57 +0000
-Received: from BN6PR11MB1842.namprd11.prod.outlook.com
- ([fe80::847:4296:13b9:fc9f]) by BN6PR11MB1842.namprd11.prod.outlook.com
- ([fe80::847:4296:13b9:fc9f%8]) with mapi id 15.20.1580.019; Mon, 4 Feb 2019
- 10:09:57 +0000
-From: <Tudor.Ambarus@microchip.com>
-To: <broonie@kernel.org>, <robh+dt@kernel.org>, <mark.rutland@arm.com>,
- <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
- <Ludovic.Desroches@microchip.com>, <bbrezillon@kernel.org>,
- <Cyrille.Pitchen@microchip.com>, <bugalski.piotr@gmail.com>
-Subject: [PATCH v4 09/13] dt-bindings: spi: atmel-quadspi: update example to
- new clock binding
-Thread-Topic: [PATCH v4 09/13] dt-bindings: spi: atmel-quadspi: update example
- to new clock binding
-Thread-Index: AQHUvHHHgJu9moC3XEqdb/LUZheacg==
-Date: Mon, 4 Feb 2019 10:09:56 +0000
-Message-ID: <20190204100910.26701-10-tudor.ambarus@microchip.com>
-References: <20190204100910.26701-1-tudor.ambarus@microchip.com>
-In-Reply-To: <20190204100910.26701-1-tudor.ambarus@microchip.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: VI1PR08CA0270.eurprd08.prod.outlook.com
- (2603:10a6:803:dc::43) To BN6PR11MB1842.namprd11.prod.outlook.com
- (2603:10b6:404:101::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Tudor.Ambarus@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-mailer: git-send-email 2.9.5
-x-originating-ip: [94.177.32.154]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; BN6PR11MB1508;
- 6:yoIXTVPaDh6GAiOXATzb1MyGXincU5eyeRa1yfFkoDNx0uZfID3zDjhshNpDBtZg5aJp8zjudIUKgKnFcCHrqhSzA8pTpxhw4p3aQxI+FAMGdFRR1PKwSJUtXFQBy/Zo/+IgpL2rNm3+Yp0fp1OBcRpUQqrG5lZn13UPZm6btHVnWwQ9lpz5naORT18quBIcQLADfi3KeSex4nWMUDSaUUz0LUSemnmbPRXNxePpfVCRPDRuOrvK7GmQmxjVGBusmxW4fNyCsv/Hft1gfDrWAJdv4hrEL+NAoRn7I26E250QVsrQMgM3+GUb5hg0L6TzUoAshsqs14T1o2dxTOLDmT4Qktl8Rij1i0fKCokUkm0wVQWFuMWkUwtGsF4X+cFoHhTUIYxtoNo95z+dBPve2zH75oJD11SpbFY36U2K4RxAdWG3FX4HZ+h30w+JCqDxlvnLgGabkIUk1KQchQb0Ag==;
- 5:5S6o+v8t2Lyxcu3nlcGcchIEsWwR6ZlYTyyemmaFWpGi8Gw73GttO+GITo1m/Mx1a8kqWdAC++LPM6ZcIWHD4oADd093fKvMVZYvhJZh1xwOe370Pi/h/qC5ixKjJJGtGWvTuiJj1zatrpviY2ybXkYfUyYsU5KQXMNTHd18vcygGLgWSX5oyrdPvuculZs+QSC93AAG+MsTDV1DQwJm4w==;
- 7:8iSExSVYDN3VhJdKupGoGgljn9zN613ipSHujtMtUJA407swI2DURGaVog2g0BBI+Yj2rUDrTEIL7nADO7XIxtwDqF/aZDtue+zoYDQdN7hgih9xo4UraCTNsTLRfuDll1ovB3uxlo7MCM0qp6bh0A==
-x-ms-office365-filtering-correlation-id: 0fa432ae-4bbe-4571-5c75-08d68a88e9f1
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
- SRVR:BN6PR11MB1508; 
-x-ms-traffictypediagnostic: BN6PR11MB1508:
-x-microsoft-antispam-prvs: <BN6PR11MB1508C442BEED8A99BB893BF5F06D0@BN6PR11MB1508.namprd11.prod.outlook.com>
-x-forefront-prvs: 0938781D02
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(396003)(39860400002)(376002)(366004)(346002)(136003)(189003)(199004)(6486002)(11346002)(446003)(2616005)(486006)(106356001)(99286004)(6436002)(4326008)(105586002)(478600001)(476003)(76176011)(186003)(53936002)(305945005)(3846002)(6116002)(7736002)(81156014)(102836004)(26005)(81166006)(6512007)(107886003)(8676002)(25786009)(68736007)(39060400002)(52116002)(50226002)(110136005)(8936002)(2906002)(386003)(54906003)(6506007)(86362001)(1076003)(36756003)(4744005)(71190400001)(71200400001)(316002)(97736004)(7416002)(14454004)(256004)(2501003)(14444005)(72206003)(66066001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1508;
- H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: x2CgSAf52F0RezGIWtdvpVXiVBvuyDby12e5aaoT4w8q1gehn06XQBA/X27zJ7iTTtIHNddHHvFL+oz+oB63Mj/Qdt1SxnWiZWSnfxEh9C3ksXrilMBBOEpXAHdqNlsX5WjEUE+MRkRpwOoEJt4rvgkCrrfl8fegbS3I50iW84rocfXGBHN6shPPmPpVuEPh2tTuI/8xYisuhj3XEb74ShMIKZBVaHw+FxPcOkXZcHIcPTThB4EI8CTZbbcvV5yS4WdwAKfSwOvNkKEUpMOkuxNVuxycPGCUBXa9FwCZbfHUB766QuwI9weX0AflI38JY3jfqfv4F/uqb9HjSxXJjfcAg5me+CVqN75S8Qc4WIrFzTpvlxUMDdbi/1B+GwKKszAsHtm1bhlQR8h+/ITijOi8u7FeoTVsSHh9o3IZlTA=
+ id 1gqbIu-0003SW-Hi
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 10:16:42 +0000
+Received: by mail-ed1-f68.google.com with SMTP id y56so10707521edd.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 04 Feb 2019 02:16:39 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=wpzWuORgBg636KF1R4KFV5Q+sc913BynZzqrcQjMm0g=;
+ b=MKAuGBYr8mvZ2ij/rjik68gZ4YB49B1/JzZUiBw3CCeRCIUFym6Vv+pP7pAdv2B+C+
+ E0Lt+aQNrRfADpm4vYmpY+bENOqJZMdDU3diJPdol2XFM8Eu286CyiuXVnr73RdvStZX
+ TEsqih3nos2XcKZ3M6qrSFTcCF3OgsnjwqnFNc0+11hLJ/pA/wuFBHpHBernJ6PHOkFk
+ DPhCjiXmceVrsMM7HjqdJt0PJ1X0qAp9LKdOfk+lplcGCgvjQWqysRZ73TMBV76mRv+a
+ fway6aN5pq6o0XtCwMLfdPmrQHG75HncWsySTbVqB8T9oKat+LmlnV832R2CJwph8vzt
+ dP5A==
+X-Gm-Message-State: AJcUukegHq9jn22FZ302PCHcUoroS8R1o0zxf8WmVwdQtKb/1jvD7d7c
+ uWnafUkowf/hjD+JU4dWjLMbD+Vo6iQ=
+X-Google-Smtp-Source: ALg8bN6zTKCqjiSsBwciEzzcOy9aQIeb0U+8bYd57gsax2roJGPGFXYr+9l3SLRMdVKdU1sg/LauhA==
+X-Received: by 2002:a50:aa9b:: with SMTP id q27mr50098560edc.93.1549275397923; 
+ Mon, 04 Feb 2019 02:16:37 -0800 (PST)
+Received: from mail-wr1-f45.google.com (mail-wr1-f45.google.com.
+ [209.85.221.45])
+ by smtp.gmail.com with ESMTPSA id f20sm4341140edf.19.2019.02.04.02.16.37
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 04 Feb 2019 02:16:37 -0800 (PST)
+Received: by mail-wr1-f45.google.com with SMTP id a16so8139166wrv.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 04 Feb 2019 02:16:37 -0800 (PST)
+X-Received: by 2002:adf:eb12:: with SMTP id s18mr7407806wrn.120.1549275396962; 
+ Mon, 04 Feb 2019 02:16:36 -0800 (PST)
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 0fa432ae-4bbe-4571-5c75-08d68a88e9f1
-X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Feb 2019 10:09:53.9287 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1508
-X-OriginatorOrg: microchip.com
+References: <20190203155628.16767-1-wens@csie.org>
+ <20190203155628.16767-3-wens@csie.org>
+ <20190204093427.vg63e5xmd7u52leh@flea>
+In-Reply-To: <20190204093427.vg63e5xmd7u52leh@flea>
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Mon, 4 Feb 2019 18:16:24 +0800
+X-Gmail-Original-Message-ID: <CAGb2v64-3Cs_RaO4erAr96JStEUzZ7ZRDjAYYjK2QsWfxusKxQ@mail.gmail.com>
+Message-ID: <CAGb2v64-3Cs_RaO4erAr96JStEUzZ7ZRDjAYYjK2QsWfxusKxQ@mail.gmail.com>
+Subject: Re: [PATCH 2/3] mmc: sunxi: Filter out unsupported modes declared in
+ the device tree
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_021000_675305_972CA808 
-X-CRM114-Status: UNSURE (   8.33  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190204_021640_587429_C6F8925E 
+X-CRM114-Status: GOOD (  26.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -130,44 +94,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Tudor.Ambarus@microchip.com,
- linux-kernel@vger.kernel.org, linux-spi@vger.kernel.org,
- linux-mtd@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: devicetree <devicetree@vger.kernel.org>,
+ Ulf Hansson <ulf.hansson@linaro.org>, Chris Blake <chrisrblake93@gmail.com>,
+ linux-mmc@vger.kernel.org, linux-kernel <linux-kernel@vger.kernel.org>,
+ stable <stable@vger.kernel.org>, linux-sunxi <linux-sunxi@googlegroups.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Tudor Ambarus <tudor.ambarus@microchip.com>
+On Mon, Feb 4, 2019 at 5:34 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> On Sun, Feb 03, 2019 at 11:56:27PM +0800, Chen-Yu Tsai wrote:
+> > The MMC device tree bindings include properties used to signal various
+> > signalling speed modes. Until now the sunxi driver was accepting them
+> > without any further filtering, while the sunxi device trees were not
+> > actually using them.
+> >
+> > Since some of the H5 boards can not run at higher speed modes stably,
+> > we are resorting to declaring the higher speed modes per-board.
+> >
+> > Regardless, having boards declare modes and blindly following them,
+> > even without proper support in the driver, is generally a bad thing.
+> >
+> > Filter out all unsupported modes from the capabilities mask after
+> > the device tree properties have been parsed.
+> >
+> > Cc: <stable@vger.kernel.org>
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >
+> > ---
+> >
+> > This should be backported to stable kernels in case people try to run
+> > new device trees (that declare newly supported modes) with old kernels.
+> > ---
+> >  drivers/mmc/host/sunxi-mmc.c | 16 ++++++++++++++++
+> >  1 file changed, 16 insertions(+)
+> >
+> > diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> > index 7415af8c8ff6..a01433012db0 100644
+> > --- a/drivers/mmc/host/sunxi-mmc.c
+> > +++ b/drivers/mmc/host/sunxi-mmc.c
+> > @@ -1415,6 +1415,22 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+> >       if (ret)
+> >               goto error_free_dma;
+> >
+> > +     /*
+> > +      * If we don't support delay chains in the SoC, we can't use any
+> > +      * of the DDR speed modes. Mask them out in case the device
+> > +      * tree specifies the properties for them, which gets added to
+> > +      * the caps by mmc_of_parse() above.
+> > +      */
+> > +     if (!(host->cfg->clk_delays || host->use_new_timings))
+> > +             mmc->caps &= ~(MMC_CAP_3_3V_DDR | MMC_CAP_1_8V_DDR |
+> > +                            MMC_CAP_1_2V_DDR);
+> > +
+> > +     /* TODO: UHS modes untested due to lack of supporting boards */
+> > +     mmc->caps &= ~MMC_CAP_UHS;
+>
+> I've tested up to SDR104 and it works on the A64 at least
 
-Introduced in:
-commit b60557876849 ("ARM: dts: at91: sama5d2: switch to new clock binding")
+That's good to know. What board was this on? I had given up hope waiting
+for a vendor to produce a board that could do proper voltage switching for
+SD cards.
 
-Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
-Reviewed-by: Boris Brezillon <bbrezillon@kernel.org>
----
-v4: no change
-v3: new patch
+> > +     /* TODO: This driver doesn't support HS200 and HS400 modes yet */
+> > +     mmc->caps2 &= ~(MMC_CAP2_HS200 | MMC_CAP2_HS400);
+>
+> And HS200 works too.
 
- Documentation/devicetree/bindings/spi/atmel-quadspi.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+OK. I thought there was some special magic required in the driver. Maybe
+that was for HS400 only? Again, what board was this on?
 
-diff --git a/Documentation/devicetree/bindings/spi/atmel-quadspi.txt b/Documentation/devicetree/bindings/spi/atmel-quadspi.txt
-index b93c1e2f25dd..e9dae6264d89 100644
---- a/Documentation/devicetree/bindings/spi/atmel-quadspi.txt
-+++ b/Documentation/devicetree/bindings/spi/atmel-quadspi.txt
-@@ -19,7 +19,7 @@ spi@f0020000 {
- 	reg = <0xf0020000 0x100>, <0xd0000000 0x8000000>;
- 	reg-names = "qspi_base", "qspi_mmap";
- 	interrupts = <52 IRQ_TYPE_LEVEL_HIGH 7>;
--	clocks = <&spi0_clk>;
-+	clocks = <&pmc PMC_TYPE_PERIPHERAL 52>;
- 	#address-cells = <1>;
- 	#size-cells = <0>;
- 	pinctrl-names = "default";
--- 
-2.9.5
-
+Thanks
+ChenYu
 
 _______________________________________________
 linux-arm-kernel mailing list
