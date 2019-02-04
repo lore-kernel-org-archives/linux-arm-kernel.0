@@ -2,21 +2,23 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B9F9C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:56:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 444D4C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:59:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D1DD72082E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:56:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0C5D02082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 15:59:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KQOsCRWp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D1DD72082E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aAcDm/Wf";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ffwll.ch header.i=@ffwll.ch header.b="Es+9cvA0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C5D02082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ffwll.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,35 +26,70 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SDHRX7cwUxvLxTdllcHNtXMWtQoi57fvs30k+00GTpQ=; b=KQOsCRWpCeppAE
-	GlGG7nFoczfiJRUnxOuxHlJ9xfEAqgG2VX8PpJbhy3nWmYW+X6bh5n+Dz21w8EH/Y2lIxCWZZaL5G
-	ODjfl4qZzc8X5KWuxYZA5zIJvV3md9UzaxMOISCbNbNnw+xs1NUSMjGHvJCKs8iRY5ZDcJ+N9IAB3
-	hOvum4OW9Of7uBGTSjLtRn8pd1H4EmMEr5MpwRGohfAV0oJUSkatN5Gdx3phGDLSij9Wjwsje/D4M
-	h+WJJ91x+OLDs3fPvbvuFKZlyBqUs0dctCxuZFC7v30vuf2Y+QjwOKXO8bj1dnlQp3MkWgfSPez8u
-	jD5adkkphhOse13U50eA==;
+	List-Owner; bh=m350VT2R75EX6EXRqz8myBqudoMbseZSO2PUgN158YQ=; b=aAcDm/WfAby4bs
+	J90oFcu85/1VoKHJdFTghRNC4wvDES/C1K5f52HxSrQB/ZAU3LcBtXo/ULXkXfsGcXzgur5lvT2lJ
+	IDwp6cSMVS0MQcFIIZc5uziyamrMhgsS0OoCqS0GGgiIto3TWHv7RYD/pfs+9wZnCoKKHKD/uoxEd
+	Kcp2kQFDdze8u/V1WZttyyuVeuSDfREGDoS26cbf43OZnpiq/BEH+8UOXWjnDtnnSwpEmrRCRBsc7
+	wu9dmbnX3mYCyqVdLbytqR4B6U5eZFadxYQtqBI1lSDhz+Mi21hijpvJSvyQGtR9nGCARiqaMpPfo
+	fwH2rE0UyMD+9JlbZ+hQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqgbX-0004Wr-36; Mon, 04 Feb 2019 15:56:15 +0000
-Received: from muru.com ([72.249.23.125])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqgbT-0004W4-4d
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 15:56:12 +0000
-Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id B9D1E808C;
- Mon,  4 Feb 2019 15:56:16 +0000 (UTC)
-Date: Mon, 4 Feb 2019 07:56:04 -0800
-From: Tony Lindgren <tony@atomide.com>
-To: Andreas Kemnade <andreas@kemnade.info>
-Subject: Re: [PATCH] omap3: give off mode enable a more prominent place
-Message-ID: <20190204155604.GH5720@atomide.com>
-References: <20190202055827.12956-1-andreas@kemnade.info>
+	id 1gqgeg-0005QJ-Lq; Mon, 04 Feb 2019 15:59:30 +0000
+Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqgeR-0005Pw-Mi
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 15:59:17 +0000
+Received: by mail-ed1-x544.google.com with SMTP id f9so267598eds.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 04 Feb 2019 07:59:15 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ffwll.ch; s=google;
+ h=sender:date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=+moUqLFIksdrkO8M/2OLXqAd+++oeaNZy6XKM+d2eOA=;
+ b=Es+9cvA0yc0gReLoh9L/NcvW6e3wHYVZweF7VaNh82OJHNv3TfvrisUa3HqqDY4dzn
+ boUQmwGx6TixWKG+/5xjfkaXLeYpE7uPlA9++jvIQHJ9qjIClFzPGKJmErXY9W9SfBVY
+ hRVzXbKICsnpIGlxBCprXQ3lHpb4RcB2156u0=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
+ :references:mime-version:content-disposition:in-reply-to:user-agent;
+ bh=+moUqLFIksdrkO8M/2OLXqAd+++oeaNZy6XKM+d2eOA=;
+ b=AAmWzN51XfGDkzfYSMW3a8tIOZacYJnwwgGLerVtSQLEziaGUQYP6OPYhKHp/4x7e9
+ 4rlfK2f8pWeUU10mPvY91/2Na+rJf0444FQAIO7AWyOasDSTQKVfwFgF2fcVd4vo88P1
+ Y458H93G7i/wFzb04FwB3LlF7I7Yt0AVtX9HFFZq99pZrLU47Dhizz8XkzHPy/wHLme5
+ bbvUpGAy/TUVnWk8CmfzUjvy7PfbAe/xZg3TOzxOStExJ25HU1/GBRXrldRW0qhcktXV
+ JXl9R4at6+1p3iNVzYLSI1QRV7tUfUliEll7BduZ18UmqcZb1qHWuqLjNYtQ9hXF4j/V
+ lkOQ==
+X-Gm-Message-State: AHQUAuY8zMQmdTD5QFF3gpeRFlq+dNvMSITBIWzP/mZtNnBI5wyrAaHG
+ TsXL8eMq0QWytYGHMQvvtmHjbg==
+X-Google-Smtp-Source: AHgI3IYAvsRxSkm7SU0+AMrTfx6iMcqQhiQRvvDea04c6xpneat//g4UnjATW1xU5nZ72LdzRtlmeA==
+X-Received: by 2002:a17:906:4344:: with SMTP id z4mr43292ejm.27.1549295953773; 
+ Mon, 04 Feb 2019 07:59:13 -0800 (PST)
+Received: from phenom.ffwll.local ([2a02:168:569e:0:3106:d637:d723:e855])
+ by smtp.gmail.com with ESMTPSA id x38sm4385515edx.24.2019.02.04.07.59.11
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 04 Feb 2019 07:59:12 -0800 (PST)
+Date: Mon, 4 Feb 2019 16:59:09 +0100
+From: Daniel Vetter <daniel@ffwll.ch>
+To: Thierry Reding <thierry.reding@gmail.com>
+Subject: Re: [PATCH RESEND v2 08/12] dt-bindings: add binding for generic eDP
+ panel
+Message-ID: <20190204155909.GU3271@phenom.ffwll.local>
+References: <20190203185501.8958-1-anarsoul@gmail.com>
+ <20190203185501.8958-9-anarsoul@gmail.com>
+ <20190204074350.GC16448@ulmo>
+ <CA+E=qVecudACOEXt74Kf=UA_F-uuHgEqHzKpYAq1ocMx3Sx+eQ@mail.gmail.com>
+ <20190204082353.GE19087@ulmo>
+ <20190204094012.GP3271@phenom.ffwll.local>
+ <20190204112218.GB10412@ulmo>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190202055827.12956-1-andreas@kemnade.info>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+In-Reply-To: <20190204112218.GB10412@ulmo>
+X-Operating-System: Linux phenom 4.19.0-1-amd64 
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_075611_220313_CBCF4B76 
-X-CRM114-Status: GOOD (  12.30  )
+X-CRM114-CacheID: sfid-20190204_075915_861553_C6809577 
+X-CRM114-Status: GOOD (  41.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,61 +101,139 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-omap@vger.kernel.org, khilman@kernel.org,
- linux-kernel@vger.kernel.org, linux@armlinux.org.uk,
- letux-kernel@openphoenux.org, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Archit Taneja <architt@codeaurora.org>, Andrzej Hajda <a.hajda@samsung.com>,
+ David Airlie <airlied@linux.ie>, linux-sunxi <linux-sunxi@googlegroups.com>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Sean Paul <seanpaul@chromium.org>,
+ Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
+ Daniel Vetter <daniel@ffwll.ch>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>,
+ Icenowy Zheng <icenowy@aosc.io>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-* Andreas Kemnade <andreas@kemnade.info> [190202 06:01]:
-> Enabling off mode was only reachable deeply hidden
-> in the debugfs. As powersaving is an important feature,
-> move the option out of its shady place.
+On Mon, Feb 04, 2019 at 12:22:18PM +0100, Thierry Reding wrote:
+> On Mon, Feb 04, 2019 at 10:40:12AM +0100, Daniel Vetter wrote:
+> > On Mon, Feb 04, 2019 at 09:23:59AM +0100, Thierry Reding wrote:
+> > > On Mon, Feb 04, 2019 at 12:13:55AM -0800, Vasily Khoruzhick wrote:
+> > > > On Sun, Feb 3, 2019 at 11:43 PM Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > > >
+> > > > > On Sun, Feb 03, 2019 at 10:54:57AM -0800, Vasily Khoruzhick wrote:
+> > > > > > eDP panels usually have EDID EEPROM, so there's no need to define panel
+> > > > > > width/height or any modes/timings in dts. But this panel still may have
+> > > > > > regulator and/or backlight.
+> > > > > >
+> > > > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > > > > ---
+> > > > > >  .../devicetree/bindings/display/panel/panel-edp.txt        | 7 +++++++
+> > > > > >  1 file changed, 7 insertions(+)
+> > > > > >  create mode 100644 Documentation/devicetree/bindings/display/panel/panel-edp.txt
+> > > > >
+> > > > > Please don't try to make panels look more generic than they really are.
+> > > > > You're going to have to provide a compatible string for your device that
+> > > > > is more specific than "panel-edp". You claim that you don't need any
+> > > > > extra information that is panel specific, but you don't know that now.
+> > > > > We have in the past thought that we didn't need things like prepare
+> > > > > delay, but then we ran into situations where we did need them.
+> > > > >
+> > > > > Just do what everybody else does. Provide a specific compatible string
+> > > > > and match on that in the panel-simple driver. Even if you can read all
+> > > > > the video timings from an EDID EEPROM, you can still provide a mode in
+> > > > > the panel descriptor to serve as a fallback if for example the EEPROM
+> > > > > is faulty on some device.
+> > > > 
+> > > > Pinebook used several 768p panels that have slightly different timings
+> > > > and recent batch uses 1080p panel.
+> > > > 
+> > > > What panel descriptor should I use as fallback?
+> > > 
+> > > You don't use panel descriptors as fallback. The simple-panel driver
+> > > will bind to a panel device and use the corresponding descriptor. If
+> > > your device tree contains the correct information, the descriptor is
+> > > correct for the panel you have.
+> > > 
+> > > In other words you need to ensure that you have the correct panel in
+> > > device tree for the board that you're using. This is exactly the same
+> > > thing as for other devices.
+> > > 
+> > > One way to to this is to have separate device trees for each variant
+> > > of the board that you want to support. Another variant may be to have
+> > > a common device tree and then have some early firmware update the DTB
+> > > with the correct panel information.
+> > 
+> > This would defeat the point of edp, which is to standardize the mess of
+> > panels (at least somewhat) and avoid having to change the DT/ACPI
+> > tables/firmware for every board you ship. Also, we do have DP quirking
+> > infrastructure already (using the OUI), I think if there's something that
+> > doesn't work then we should quirk it there.
+> 
+> The problem is that while the attempt may have been to standardize, it
+> failed. It doesn't take into account any of the details such as timing
+> between things like powering up the display and enabling the backlight
+> or similar. I don't know how you'd want to "quirk" those kinds of
+> requirements because they are highly panel specific.
 
-How about let's enable always if we have the twl4030
-configured to allow it? You can just check if the dts has
-"ti,twl4030-power-idle" or "ti,twl4030-power-idle-osc-off"
-properties set.
+Hm right, we get these from some firmware tables (and mix them with the
+spec one, since some of the firmware values are nonsense). I don't even
+know whether we can read the timings over dp aux somehow (you can power up
+the panel with some pessimistic values to figure those out, and you only
+need dp aux to work, which is much simpler than the entire panel).
 
-In order to enable deeper idle states, the user space still
-needs to idle the UARTs and possibly other hardware blocking
-idle. So we should be safe there.
+> > What does make sense though imo is if we try not to stuff the edp panel
+> > into panel-simple, because it's anything like a simple dumb panel. There's
+> > also some integration awkwardness since with this panel you need to do dp
+> > aux/i2c transactions to get at the information (edid alone isn't good
+> > enough for edp), and I'm not sure how exactly that's supposed to be
+> > instantiated. Maybe a special function to instantiate an edp panel, which
+> > takes both a DT node and the dp_aux controller would be much better,
+> > instead of trying to auto-match against a DT compatible string and load a
+> > panel driver which is almost all fake.
+> > 
+> > Or we teach dp_aux to register itself and somehow teach panel-edp how it
+> > can get hold of the dp_aux channel it needs.
+> 
+> We already do that. drm_dp_aux registers as an I2C adapter that can be
+> used to read EDID EEPROMs using I2C-over-AUX transactions. We already
+> use that on some platforms.
+> 
+> Also note that simple-panel already supports getting video timings from
+> EDID. If a DDC link is present in DT, the driver will load the modes
+> from EDID and use them.
 
-> The debugfs file can still be used to override the default.
+Could we extend this to dp aux somehow? For edp you need the dp aux (which
+then gives you the ddc link automatically).
 
-Yes let's keep the debugfs switch around. But it should
-be optional for CONFIG_DEBUGFS like I think it now is.
+> > But fake mode in panel-simple sounds like the wrong approach. At least
+> > from our experience with i915 (and I think other drivers supporting edp),
+> > the standardization of panels for basic stuff at least worked.
+> > Self-refresh seems an entirely different story unfortunately ... but again
+> > quirking that for DP stuff should be done using the OUI I think.
+> 
+> I can imagine that on x86 platforms OEMs can also easily hide some of
+> the necessary quirks in ACPI. None of that exists on ARM or other
+> architectures that solely rely on device tree to describe the device.
+> Since there's no way of specifying power sequences in DT (there have
+> been attempts in the past to make that work, but they failed miserably)
+> all we can do is match on a compatible string and encode the necessary
+> logic in the driver. Luckily we haven't run into anything too fancy up
+> to now and we've been able to make things work mostly with just a couple
+> of fairly generic parameters.
+> 
+> Also note that initially people thought this wasn't going to be
+> necessary and we only added the various "delay" parameters later on
+> because it did turn out that not all panels are created equal.
 
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -416,7 +416,12 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
->  	if (!pwrst)
->  		return -ENOMEM;
->  	pwrst->pwrdm = pwrdm;
-> -	pwrst->next_state = PWRDM_POWER_RET;
-> +
-> +	if (IS_ENABLED(CONFIG_OMAP3_PM_OFFMODE))
-> +		pwrst->next_state = PWRDM_POWER_OFF;
-> +	else
-> +		pwrst->next_state = PWRDM_POWER_RET;
-> +
->  	list_add(&pwrst->node, &pwrst_list);
->  
->  	if (pwrdm_has_hdwr_sar(pwrdm))
-
-You can check for the PMIC properties by adding a function
-for omap3_pm_check_pmic() or similar and call it
-from omap3_pm_init(). And then you can set the needed flags
-in omap3_pm_check_pmic() such as omap3_has_twl and off mode.
-You might want to make it somewhat PMIC independent as in
-theory somebody may still want to add support for other
-PMICs such as cpacp for omap3 although that's unlikely.
-
-Regards,
-
-Tony
+Yeah this sucks, but oh well.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
 
 _______________________________________________
 linux-arm-kernel mailing list
