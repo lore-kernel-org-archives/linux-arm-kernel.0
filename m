@@ -2,60 +2,81 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CAD32C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:51:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 02B96C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:51:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9BCFD2081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:51:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BA9792081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:51:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="is7Cgtwy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9BCFD2081B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="erfSz0Go";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="T27lCmRd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BA9792081B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=s3Zp920OsZU4l9chOsa7lZRdRU9xzeE+Wt9byn+NqAo=; b=is7CgtwyOnH6fb2ydr6XNFzA/
-	KzNl/j/BzsuLET0FPrMCYIWsdMgDd+nagqYni7V2XrU0JDLACctl2JNsjgdHTJB/zTtqji4iYdIsf
-	0N/RVX3+62iIecV/f/r1gTxcrLSqorjmooiM0TQMvXQH03Gid7lf4lIonQOXTpLrXyHsguUxhA8NQ
-	5gOXbYMMgul9CVbi52+yGVMF/GTnSO83c9b3Nb1lsqg1c4LQPAR5VnLq363J6QkXCKoNn2WF5oE+w
-	vX9MUdTS+ixiRAQaGeIVni4UQhJyIJxeGiyisO9WkVs5AaqiuBFqo92o0TU1w0QHzNBAFkJ2tV/L5
-	viu3a6UcQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=S3qxHOlDSD6B9nQ3Cb23USFjAwZuyXJfaDrUEx7DKDA=; b=erfSz0Goav/Msv
+	DCZaN2IP8SIjMasg9suLCdUI5ztKSU60w6phlyadF2q0lJygyJ59DAwz/Vpmm0D4pI9yF7PT8mvKT
+	nUocqYGBVruFykveB1uJtKnOtjlp3DpXO4B3wMxPO9htCp2xJ/xvqxHXwGq1h3QsLWGNHvgTRJss1
+	CnxEyE1+eCD8Ae5quJG0AMvvcB5d6wn5mktIKYOjnwK6k/4DjY3OT2GQPIhBld3YJFdgFGmKwuvJX
+	pE+2OaeLO1FdybK9VaA6kHh4NT2PD9vu3SnyylY6VZYKIkpZ50FjoTgCin9dxxwMdXqbMwO9kKS0S
+	n9H+6p+BjnwR9l/TUBoQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqeeW-0003d9-Rl; Mon, 04 Feb 2019 13:51:12 +0000
-Received: from relay4-d.mail.gandi.net ([217.70.183.196])
+	id 1gqeei-0003pQ-99; Mon, 04 Feb 2019 13:51:24 +0000
+Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqeeT-0003cW-1v
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 13:51:11 +0000
-X-Originating-IP: 185.94.189.188
-Received: from localhost (unknown [185.94.189.188])
- (Authenticated sender: maxime.ripard@bootlin.com)
- by relay4-d.mail.gandi.net (Postfix) with ESMTPSA id 35569E0002;
- Mon,  4 Feb 2019 13:51:00 +0000 (UTC)
-Date: Mon, 4 Feb 2019 14:51:00 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Kishon Vijay Abraham I <kishon@ti.com>
-Subject: Re: [PATCH v5 0/9] phy: Add configuration interface for MIPI D-PHY
- devices
-Message-ID: <20190204135100.cnlf2dpnng6fad2t@flea>
-References: <cover.fbf0776c70c0cfb7b7fd88ce6a96b4597d620cac.1548085432.git-series.maxime.ripard@bootlin.com>
- <fc5427d3-674e-cebc-99b9-11493f976a20@ti.com>
+ id 1gqeeZ-0003fZ-QZ
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 13:51:21 +0000
+Received: by mail-it1-x143.google.com with SMTP id a6so21056144itl.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 04 Feb 2019 05:51:15 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=yWRevMXFNpbxuvqzTy7dEBAKGR7R1aJnsJ95RwqNsIE=;
+ b=T27lCmRdUNDkqdUgBHyeTzzsb9P5jTw46dSCXdTmm9HiKq8O0H5JqSafq/YM4JG/3I
+ lgn5rd0796iFafK/hr97kpCmsW0g2iWJxljl+qNx/xV9664a6qxwTB0WzGxy4I6XIGXt
+ F6HuotaeZ/YHSdJsv8ldkozEdfBLTF+Shy2uo=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=yWRevMXFNpbxuvqzTy7dEBAKGR7R1aJnsJ95RwqNsIE=;
+ b=Mn8DrZx1JBKPXkPIsKk8tviJRNJ5eJS+d7dZdAKZSc0gcBdOxIvfZRjllT56k2Kwhg
+ ECG+1dF9SH+vGg2Xgmz4ogLJYHsxrzJ8WSuG8bHKXXLx1Mk0nXANLac99Br1kvw+joE/
+ 5SPlE8WINHKHRJLktPZ/cqmAKyE1ECo9XeZHQuxGUcA6G0snVzdT9oY+ahbGkz62DlAN
+ oCsdXFCzDj18fYMHEgHVDBzG72rS5tqpji8ElJZGzK60SIQPjmnmEf1Ebz5VmQj4VLio
+ ZicSxI9LRvGfbDM/9KVQqqUQTz/pxP+LqqEeUYEfAZI7n8rzzG6xxzCN87tXpG+6YYuv
+ GGuQ==
+X-Gm-Message-State: AHQUAuYOjGQgcbA0dMKmvQthIPXq+m0YP4UYnV4yCnifNBE514kAx117
+ uEIVQXRiLpghfI9rFLD6kyyKPa5G1Vi6zXUJXz1l0g==
+X-Google-Smtp-Source: AHgI3IZgVyAzAJ8FFiLNyXeQJJfGuc9kq8AVJ2YkLcsJNTo5Vfw2GZXFeqVkxehVeImEEdMHh33qgKdd5ENNDQt//uk=
+X-Received: by 2002:a05:6638:14:: with SMTP id z20mr714314jao.2.1549288274710; 
+ Mon, 04 Feb 2019 05:51:14 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <fc5427d3-674e-cebc-99b9-11493f976a20@ti.com>
-User-Agent: NeoMutt/20180716
+References: <fe7fa86a-42ed-ee58-be26-4d8ae45fadab@lca.pw>
+ <20190201134847.GC29903@fuggles.cambridge.arm.com>
+ <1549054142.6911.25.camel@lca.pw>
+ <20190204102715.GA11645@capper-debian.cambridge.arm.com>
+In-Reply-To: <20190204102715.GA11645@capper-debian.cambridge.arm.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Mon, 4 Feb 2019 14:51:03 +0100
+Message-ID: <CAKv+Gu8KQLHfq3L1Xjd0RSbvs2eEokyUkT+7v4df=BRdqmjrnQ@mail.gmail.com>
+Subject: Re: kernel_page_tables issue with CONFIG_ARM64_USER_VA_BITS_52=y
+To: Steve Capper <Steve.Capper@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_055109_460248_59975BC9 
-X-CRM114-Status: GOOD (  22.42  )
+X-CRM114-CacheID: sfid-20190204_055116_329115_38D80C62 
+X-CRM114-Status: GOOD (  16.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,117 +88,103 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Archit Taneja <architt@codeaurora.org>, Rafal Ciepiela <rafalc@cadence.com>,
- Krzysztof Witos <kwitos@cadence.com>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
- Andrzej Hajda <a.hajda@samsung.com>, Chen-Yu Tsai <wens@csie.org>,
- Sean Paul <seanpaul@chromium.org>,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
-Content-Type: multipart/mixed; boundary="===============6602575349748320551=="
+Cc: Catalin Marinas <Catalin.Marinas@arm.com>, nd <nd@arm.com>,
+ Qian Cai <cai@lca.pw>, Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Will Deacon <Will.Deacon@arm.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Steve,
 
---===============6602575349748320551==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="d5cpay2p6yr7wia2"
-Content-Disposition: inline
+On Mon, 4 Feb 2019 at 11:27, Steve Capper <Steve.Capper@arm.com> wrote:
+>
+> On Fri, Feb 01, 2019 at 03:49:02PM -0500, Qian Cai wrote:
+> > On Fri, 2019-02-01 at 13:48 +0000, Will Deacon wrote:
+> > > Hi Qian Cai,
+>
+> [...]
+>
+> > Unfortunately, although this takes care of kernel_page_tables, it breaks
+> > efi_page_tables.
+> >
+> > # cat /sys/kernel/debug/efi_page_tables
+> > BUG()
+> >
+> > # ./scripts/faddr2line vmlinux walk_pgd+0x84/0x254
+> > walk_pgd+0x84/0x254:
+> > __read_once_size at include/linux/compiler.h:193 (discriminator 1)
+> > (inlined by) walk_pgd at arch/arm64/mm/dump.c:345 (discriminator 1)
+> >
+> > 344:        do {
+> > 345:                pgd_t pgd = READ_ONCE(*pgdp);
+> > 346:                next = pgd_addr_end(addr, 0);
+> >
+> > kernel BUG at arch/arm64/mm/dump.c:332!
+> >
+> >                 } else {
+> >                         BUG_ON(pud_bad(pud));
+> >                         walk_pmd(st, pudp, addr, next);
+> >
+>
+> Hi Qian Cai,
+> Apologies for missing the efi_page_tables.
+>
+> Does the following (applied to Will's fix) help?
+>
+> Cheers,
+> --
+> Steve
+>
+> --->8
+>
+> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+> index 00ca2adeb5ef..42ac8fd15e59 100644
+> --- a/arch/arm64/mm/dump.c
+> +++ b/arch/arm64/mm/dump.c
+> @@ -339,11 +339,12 @@ static void walk_pgd(struct pg_state *st, struct mm_struct *mm,
+>                      unsigned long start)
+>  {
+>         unsigned long next, addr = start;
+> +       unsigned long end = (start < TASK_SIZE_64) ? TASK_SIZE_64 : 0;
+>         pgd_t *pgdp = pgd_offset(mm, addr);
+>
+>         do {
+>                 pgd_t pgd = READ_ONCE(*pgdp);
+> -               next = pgd_addr_end(addr, 0);
+> +               next = pgd_addr_end(addr, end);
+>
+>                 if (pgd_none(pgd)) {
+>                         note_page(st, addr, 1, pgd_val(pgd));
+> @@ -351,7 +352,7 @@ static void walk_pgd(struct pg_state *st, struct mm_struct *mm,
+>                         BUG_ON(pgd_bad(pgd));
+>                         walk_pud(st, pgdp, addr, next);
+>                 }
+> -       } while (pgdp++, addr = next, addr);
+> +       } while (pgdp++, addr = next, addr != end);
+>  }
+>
+>  void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
+> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+> index 23ea1ed409d1..16757966c3bf 100644
+> --- a/drivers/firmware/efi/arm-runtime.c
+> +++ b/drivers/firmware/efi/arm-runtime.c
+> @@ -38,7 +38,8 @@ static struct ptdump_info efi_ptdump_info = {
+>         .mm             = &efi_mm,
+>         .markers        = (struct addr_marker[]){
+>                 { 0,            "UEFI runtime start" },
+> -               { DEFAULT_MAP_WINDOW_64, "UEFI runtime end" }
+> +               { DEFAULT_MAP_WINDOW_64, "UEFI runtime end" },
+> +               { -1, NULL }
+>         },
+>         .base_addr      = 0,
+>  };
+>
 
-
---d5cpay2p6yr7wia2
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-Hi Kishon,
-
-On Mon, Feb 04, 2019 at 03:33:31PM +0530, Kishon Vijay Abraham I wrote:
-> On 21/01/19 9:15 PM, Maxime Ripard wrote:
-> > Here is a set of patches to allow the phy framework consumers to test a=
-nd
-> > apply runtime configurations.
-> >=20
-> > This is needed to support more phy classes that require tuning based on
-> > parameters depending on the current use case of the device, in addition=
- to
-> > the power state management already provided by the current functions.
-> >=20
-> > A first test bed for that API are the MIPI D-PHY devices. There's a num=
-ber
-> > of solutions that have been used so far to support these phy, most of t=
-he
-> > time being an ad-hoc driver in the consumer.
-> >=20
-> > That approach has a big shortcoming though, which is that this is quite
-> > difficult to deal with consumers integrated with multiple variants of p=
-hy,
-> > of multiple consumers integrated with the same phy.
-> >=20
-> > The latter case can be found in the Cadence DSI bridge, and the CSI
-> > transceiver and receivers. All of them are integrated with the same phy=
-, or
-> > can be integrated with different phy, depending on the implementation.
-> >=20
-> > I've looked at all the MIPI DSI drivers I could find, and gathered all =
-the
-> > parameters I could find. The interface should be complete, and most of =
-the
-> > drivers can be converted in the future. The current set converts two of
-> > them: the above mentionned Cadence DSI driver so that the v4l2 drivers =
-can
-> > use them, and the Allwinner MIPI-DSI driver.
->=20
-> Can the PHY changes go independently of the consumer drivers? or else I'l=
-l need
-> ACKs from the GPU MAINTAINER.
-
-At least for the Allwinner driver, they can go through through the
-drm-misc tree. Since we have a number of patches in flight for that
-driver, it would even be easier to handle there.
-
-For the cadence driver, since it doesn't really work on any system but
-simulators for now, I guess the wakeup regression isn't super
-important either.
-
-So I'd say we can have the phy related patches go through your tree,
-and the other through drm-misc.
-
-Would that work for you?
-
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---d5cpay2p6yr7wia2
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXFhDRAAKCRDj7w1vZxhR
-xR5PAP9L3aHo233MQj0fTl0YnxIvU8ZLGWSGvGIfnSolldJHeQD/aoCag+19/Lcp
-PeiLEU1SeJW4FCAggKQBNWjcd+D5uwM=
-=YUnh
------END PGP SIGNATURE-----
-
---d5cpay2p6yr7wia2--
-
-
---===============6602575349748320551==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+FYI this last hunk went into v5.0-rc5 as a fix (proposed by Qian)
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============6602575349748320551==--
-
