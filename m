@@ -2,65 +2,83 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4403FC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:27:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CAA7BC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:29:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 16F812087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:27:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 964432081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 13:29:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A4bmKE0x"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16F812087C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q2FkkmJR";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="FC/Lj5os"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 964432081B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0d0/Bt7WHhOEwIv1j3szYUBu+oCYBU55Is9cGzw23/Q=; b=A4bmKE0x0CfZ4r
-	OZ7LjmGQhz/dsimEIar3ZyKSmjSCGEOMEg41N3JX/JxpWGsEVN8c6ZhDjr1FLg4lUEDFIPiRiqmQk
-	LTXxUt/otgVUiMKfFf7eXTi5aAVIhXrXwxv2JX99UREAhUQVJezx2+8sYBsE0w5lzQgZ+yWhGeIIr
-	Rde2c4TQOXI0v4SasuqZefgvuEWCQp/Q/UTGzuNey9EXRsggPw4bO5sH94zdNC3GtPHCNvxzN9xDq
-	kIUSnJoTRboxvBjTY1zHFvI9xuYplwDAOYpAMcUnHsVJtgb43jV7HaLBUIOlz1jnR38HWrVnIEmNK
-	FzC9zVyPy+dq2//YYErA==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=2vlCVLSMvntEjVOmq7w6MYwzL3au0WsYx3iGTQM1tYU=; b=Q2FkkmJRt8iurM
+	Aq2LSMalRSqgfNHpeq1Na5rhLON9pLxGGnVcLJMZ7hqfWB/R0hf4cIG/pe9KLMCsuApnuLjcWCVjV
+	QZL+dQBtYp2g8JXVDAK1WSbphU19CvE9s6cpJZVCJxDTwgFhGGDBEi5M9XRSXBlnfv0PwC4g/hlk2
+	d4vDuEEixc+wDRE/d2OUUh85t8zlfuZeGMeENrgqep3Ct71/rqcOaEH2GW4oKMYbm9UOFAKBVq7CT
+	E+gDrXJBWfnItjdeQAda4hux/o9ZSpZFVGMS+iZEkTnCQELB/vEoERUs1SeMUGh7TQzuAUGc66YF7
+	ntmpl4S/lE3UG+7OU95A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqeHc-0002ak-0C; Mon, 04 Feb 2019 13:27:32 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqeHW-0002a4-SL
- for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 13:27:29 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9B46815AB;
- Mon,  4 Feb 2019 05:27:23 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A943B3F557;
- Mon,  4 Feb 2019 05:27:21 -0800 (PST)
-Subject: Re: [PATCH v3 3/4] uaccess: Check no rescheduling function is called
- in unsafe region
-To: Valentin Schneider <valentin.schneider@arm.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-References: <1547560709-56207-1-git-send-email-julien.thierry@arm.com>
- <1547560709-56207-4-git-send-email-julien.thierry@arm.com>
- <9ba3c7a7-80a8-da29-ffb7-3841ea8548b5@arm.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <f2e6ea55-40fa-6d4d-3262-6f6b3791c9d4@arm.com>
-Date: Mon, 4 Feb 2019 13:27:17 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gqeJV-0002vT-Gk; Mon, 04 Feb 2019 13:29:29 +0000
+Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqeJR-0002u9-Qu; Mon, 04 Feb 2019 13:29:27 +0000
+Received: by mail-ot1-x342.google.com with SMTP id s5so12878937oth.7;
+ Mon, 04 Feb 2019 05:29:24 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=googlemail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=PX2nUzOGWM+v+00iyKADhvLbXKt1XtuA7NyX41AbHds=;
+ b=FC/Lj5osIryTBPylmcglOuuMp/bV+WbMVVYEMTgclPIFBe8f8xm7+D0aEjvXYLEhij
+ EdrNG7ymwb3bRtyBN7uyV0KWk+34H21Ji+if6JxHGzd9qiJPMdt7zj3M7cGBpozHcUMO
+ coqBccAtqVZ4TtlaRkTqNvBeZsz3o/QhrkvNINMAmGYH1lN6WD7FnETa6RQIffojZ/T0
+ KLJafKzFIlSyA7D7fJAZjkMsEZKObea+EAxGxA5aCWtXzQzF/JRWtmJroe+jmIcXTpLE
+ WZ6BCCmvbwy+cXUgjPHNqKKNDOT4m8dRQXiGcc0Uh1u98DLoBMus9H/drb2pCnTAXXY2
+ RS0Q==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=PX2nUzOGWM+v+00iyKADhvLbXKt1XtuA7NyX41AbHds=;
+ b=bYazpDnfcKFBXb/mhgsl3r8Rm9LOE3b5b+MC6NtBNznhR9MLekwfx0QVSnU2t209u0
+ x4iPFVX6vyUOrMIpjEZKlRz42Czg15vz1s1UOy0UNGbv0pDWW6MjNiwSPfORDX/aGbdJ
+ lG4tpDiV3xP7xYft+3R7S3rHwF9zV0M8W+kTcKYA0Rvdm3SpNjio3lIRHreCzZBtTdEr
+ z9AWTn8hy3rsZkMahDA2dWW3/MDu0V9g7S4+Je9R89YLNYTllk0sSoSs48XZxMTTPTzH
+ SIigCx+H8/uOekztEDVfRl49FeM4VEAtd/lvHPANdVusvjUKA1piBrJLENfymND9cXUS
+ dK3Q==
+X-Gm-Message-State: AHQUAuaDT5CgYcTfAlqYszJyhqREyHQLhU5ywb0sj+JMMIhx3moTu456
+ /6mSLAQinS34/LuLnuDz0kFi2ttsPTVT7veJbTgnXA==
+X-Google-Smtp-Source: ALg8bN5AbN5bptebWAOliyvj2C8cUFjuUpD2hmKz69j2eyEWTPWLnmRiP6pfskvLHkKGq7mDGwJkxsz3ocmvgOkur3s=
+X-Received: by 2002:aca:3586:: with SMTP id c128mr27603341oia.47.1549286963850; 
+ Mon, 04 Feb 2019 05:29:23 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <9ba3c7a7-80a8-da29-ffb7-3841ea8548b5@arm.com>
-Content-Language: en-US
+References: <20190123151209.2080-1-linux.amoon@gmail.com>
+ <20190123151209.2080-3-linux.amoon@gmail.com>
+In-Reply-To: <20190123151209.2080-3-linux.amoon@gmail.com>
+From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Date: Mon, 4 Feb 2019 14:29:13 +0100
+Message-ID: <CAFBinCAdf0rtt-7tON_LRNH_cpvGJXX3LX8g-i4xsC3wahZSVA@mail.gmail.com>
+Subject: Re: [RFCv1 2/3] ARM: dts: meson8b: odroidc1: fix USB power supplies
+ for phy
+To: Anand Moon <linux.amoon@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_052726_924865_53821EFB 
-X-CRM114-Status: GOOD (  21.04  )
+X-CRM114-CacheID: sfid-20190204_052925_875953_129FB9D8 
+X-CRM114-Status: GOOD (  22.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,91 +90,110 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: peterz@infradead.org, catalin.marinas@arm.com, will.deacon@arm.com,
- mingo@redhat.com, james.morse@arm.com, hpa@zytor.com
+Cc: devicetree@vger.kernel.org, Neil Armstrong <narmstrong@baylibre.com>,
+ Kevin Hilman <khilman@baylibre.com>, Kishon Vijay Abraham I <kishon@ti.com>,
+ Rob Herring <robh+dt@kernel.org>, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org, Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Anand,
+
+On Wed, Jan 23, 2019 at 4:12 PM Anand Moon <linux.amoon@gmail.com> wrote:
+>
+> This patch enables the USB Host controller (USB0) and the relative USB0 PHY.
+> From the shematics GPIOAO.BIT5 gpio input for the PWREN signal of the
+> USB_OTG controller (usb0) which is also linked to USB_HOST controller (usb1).
+> Add missing phy-supply link to both  USB0 and USB1 phy controller
+> This changes fixed the power issue on usb ports. Changes help fix usb reset warning.
+I prefer to change the way patches 2 and 3 are split:
+- this one should only add the regulators and link it with the USB controller
+- patch 3 should enable usb0 and usb0_phy
+
+the reason behind this is the "Fixes" tag below. it's good to have it,
+so please keep it in this patch!
+however, enabling usb0 is not a fix for a commit which enables the
+"USB host controller on Odroid-C1/C1+" (which is why enabling usb0 and
+usb0_phy should be part of patch 3)
+
+> [  821.991470] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> [  825.243385] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> [  828.151310] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> [  830.991241] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+>
+> Fixes: 2eb79a4d15ff ("ARM: dts: meson: enabling the USB Host controller on Odroid-C1/C1+ board")
+> Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Cc: Jerome Brunet <jbrunet@baylibre.com>
+> Cc: Neil Armstrong <narmstrong@baylibre.com>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> ---
+> Changes from previous patch.
+>
+> Fix the subject and commit message as per Martin's request
+>  --Add the signal name in the comment
+>  --Replace vbus-supply with phy-supply linking the power supply to phy node as pointed by Marine
+>    which a PWREN signal in the USB_HOST controller (usb1)
+>
+> USB_VBUS                      4    2      0 unknown  5000mV     0mA  5000mV  5000mV
+>    phy-c1108820.phy.1         2                                 0mA     0mV     0mV
+>    phy-c1108800.phy.0         2                                 0mA     0mV     0mV
+> ---
+>  arch/arm/boot/dts/meson8b-odroidc1.dts | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/meson8b-odroidc1.dts b/arch/arm/boot/dts/meson8b-odroidc1.dts
+> index 58669abda259..bfa472a679d9 100644
+> --- a/arch/arm/boot/dts/meson8b-odroidc1.dts
+> +++ b/arch/arm/boot/dts/meson8b-odroidc1.dts
+> @@ -83,6 +83,22 @@
+>                 regulator-max-microvolt = <5000000>;
+>         };
+>
+> +       usb_vbus: regulator-usb-vbus {
+> +               compatible = "regulator-fixed";
+> +
+> +               regulator-name = "USB_VBUS";
+> +               regulator-min-microvolt = <5000000>;
+> +               regulator-max-microvolt = <5000000>;
+> +
+> +               vin-supply = <&p5v0>;
+> +
+> +               /*
+> +                * signal name from schematics: PWREN
+> +                */
+> +               gpio = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
+> +               enable-active-high;
+> +       };
+> +
+>         tflash_vdd: regulator-tflash_vdd {
+>                 /*
+>                  * signal name from schematics: TFLASH_VDD_EN
+> @@ -295,8 +311,18 @@
+>         pinctrl-names = "default";
+>  };
+>
+> +&usb0_phy {
+> +       status = "okay";
+> +       phy-supply = <&usb_vbus>;
+I'm not sure whether phy-supply is correct here
+with the PHY framework and the dwc2 controller regulators can be set as:
+- phy-supply (inside the PHY node)
+- vbus-supply (inside the dwc2 controller node)
+
+phy-supply is always enabled when the PHY is enabled.
+vbus-supply is smarter: it's enabled whenever the controller is in
+host mode (or OTG detects hosts mode), but disabled in
+device/peripheral mode
+
+as far as I understand we don't want to send power to the "Micro USB"
+port if we're in device/peripheral mode.
 
 
-On 30/01/2019 16:58, Valentin Schneider wrote:
-> On 15/01/2019 13:58, Julien Thierry wrote:
-> [...]> @@ -6151,6 +6159,20 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
->>  EXPORT_SYMBOL(___might_sleep);
->>  #endif
->>
->> +#ifdef CONFIG_DEBUG_UACCESS_SLEEP
->> +void __might_resched(const char *file, int line)
->> +{
->> +	if (!unsafe_user_region_active())
->> +		return;
->> +
->> +	printk(KERN_ERR
->> +		"BUG: rescheduling function called from user access context at %s:%d\n",
->> +			file, line);
->> +	dump_stack();
-> 
-> Since I've been staring intensely at ___might_sleep() lately, I was thinking
-> we could "copy" it a bit more closely (sorry for going back on what I said
-> earlier).
-> 
-> Coming back to the double warnings (__might_resched() + schedule_debug()),
-> it might be better to drop the schedule_debug() warning and just have the
-> one in __might_resched() - if something goes wrong, there'll already be a
-> "BUG" in the log.
-> 
-
-My only worry with that approach is that if someone has a function that
-does resched but does not include the annotation __might_resched() we'd
-miss the fact that something went wrong.
-
-But that might be a lot of "if"s since that assumes that something does
-go wrong.
-
-Could I have a maintainers opinion on this to know if I respin it?
-
->> +}
->> +EXPORT_SYMBOL(__might_resched);
->> +#endif
->> +
->>  #ifdef CONFIG_MAGIC_SYSRQ
->>  void normalize_rt_tasks(void)
->>  {
->> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
->> index d4df5b2..d030e31 100644
->> --- a/lib/Kconfig.debug
->> +++ b/lib/Kconfig.debug
->> @@ -2069,6 +2069,14 @@ config IO_STRICT_DEVMEM
->>
->>  	  If in doubt, say Y.
->>
->> +config DEBUG_UACCESS_SLEEP
->> +	bool "Check sleep inside a user access region"
->> +	depends on DEBUG_KERNEL
->> +	help
->> +	  If you say Y here, various routines which may sleep will become very
->> +	  noisy if they are called inside a user access region (i.e. between
->> +	  a user_access_begin() and a user_access_end())
-> 
-> If it does get noisy, we should go for some ratelimiting - it's probably
-> good practice even if it is not noisy actually.
-> 
-> ___might_sleep() has this:
-> 
->   if (time_before(jiffies, prev_jiffy + HZ) && prev_jiffy)
->   	return;
->   prev_jiffy = jiffies;
-> 
-
-I guess the noisiness could depend on the arch specific handling of user
-accesses. So yes I guess it might be a good idea to add this.
-
-Thanks,
-
--- 
-Julien Thierry
+Regards
+Martin
 
 _______________________________________________
 linux-arm-kernel mailing list
