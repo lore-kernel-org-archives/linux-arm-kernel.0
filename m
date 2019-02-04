@@ -2,22 +2,22 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 28ED6C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 20:05:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 658F0C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 20:06:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E60D22081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 20:05:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3364920821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 20:06:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rrjo5yL1";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="RgzrVt+C"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E60D22081B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KSkhBtAv";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Tn1zR+H0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3364920821
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,59 +26,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=eUbYWhip0IzOU4duxUbSkS8upY7v48XMZ3OxkQrFXPo=; b=Rrjo5yL11mQlSz
-	xLPf/plGTAw69L9Hu9w6pTCUiy5+Z1NJ9O7bxe9HAemQQKDP6pBg0E397TN1Xqjv8ZwxuQyF1PO3D
-	f+XfuVZg/jFZ+3QGXMVQaDTalAQsP4s/ANMcKygz8y0xtgQaoYMN8oNYPqaS2UR8t0FOtd+L2R2cz
-	q/Pmu5wRQiTy4O8bxaeLMIGW/LwjichUFrUhRZTTIkVz2R/R2XDxJWKxWxR6vHjKAh2AgTYUnmptm
-	xfmSOmQY0KJj1+zlR0faRC5ArYq9+XGAZBMMsyZ5Ok1Yf2mQObfWmhk5V7xyqWV+yvtFdZ6vIixgc
-	VL/6YQSdbgU/0fjGZumg==;
+	List-Owner; bh=WkfP3H8ZjBLzwOcRY7gLbIywV66dm1Mq7Zp6WZbUySs=; b=KSkhBtAv4uTem9
+	8oKu3UrWRP09ixdrrxHb2WtYt8q98PmmGhs0GilEwIsTaUoeZfRTf8YmAheOxDGr1berNhKNFqoL6
+	tF5gYaSW5psCpq8/gA+1H5prqM4T7TpMgFFikBbFM+/AitcYjvYmkLIg0UNrsQieaHoJ0GYO16u99
+	i/TpWcuhDWB9bXFqIi1PzmrrHcHRg9Xezq0v8EmERrptrCbDaffaEgcU3U9tid5HEVBliejXDef//
+	UEimP+VQwOzKqGrG1GsB8EQzz0JWvaWx1QCPJzDuDhDiPPELYLG/U5Wh+fz9K4C4sWMkVjbPK1ERK
+	Ct8JLalnWIGJvHrgBbPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqkUG-0002Vj-9G; Mon, 04 Feb 2019 20:05:00 +0000
+	id 1gqkVI-0004Ae-5e; Mon, 04 Feb 2019 20:06:04 +0000
 Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqkUC-0002Uw-LY; Mon, 04 Feb 2019 20:04:58 +0000
-Received: by mail-ot1-x341.google.com with SMTP id k98so1986123otk.3;
- Mon, 04 Feb 2019 12:04:56 -0800 (PST)
+ id 1gqkVE-0004A3-O0; Mon, 04 Feb 2019 20:06:02 +0000
+Received: by mail-ot1-x341.google.com with SMTP id n8so1959275otl.6;
+ Mon, 04 Feb 2019 12:06:00 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=OdNKk9nvat9w/9d/QSXjnvAWHsniXIPePf5/7xOPDAQ=;
- b=RgzrVt+Ciu+oAPB0kbcPF38EMaJMR8p7PU3D8ldh+wR8G7MSXdFCtrQSWzIQNI7A1h
- ChcZz0TZUKJX2wlQeSb7LEjGoXk2Q2vnv51Vlncr7hSaUU8qYgel3CXaWySO6k93VAbL
- a+14udI0zDz31HB3yM+IfZBuju8CAbx1f+UsTyW8j8IT/VXc6lEL1lv9rFBBW94mwk/i
- JTdaVh15hiMHgx/T35lgbHuiIuIp7xVYKz/qtfYBhEEbBjg+OFj8jV8XSbAOxY7qqaxU
- SCWHqIU23obclGrRcBaHEdtYn1QvBqXaZ8DLSjO4GQxYwesNzrlXU1A8W8IFuJG0CmQA
- yKWg==
+ :cc; bh=sidxCzUNKwcFHzntOo5HzEGEGZsF+y25S6tfJdHRD+k=;
+ b=Tn1zR+H0UcR2T70CJ++JUSojjK+jSq3Q5ttMZEgsVy2dLJLgzzaU/Z5C2zkFS0T8f6
+ peGPlgQ85lQIcLg3S+x5V11IWBLd0L+J1nCoLcZ0Et6+Wpwosy0OLTsIiGNp2cnBOqHR
+ Ocy2k3jSojXeiuVQ9q6IP0+cOEFEvRF/SFOuoq0mUU+DVY5hc7tKgpSjFNynENAoUESm
+ 4IvibzqsEiJhpTQoltinynZ6/4pjPmlEnS/5xPIInuAbONNpw4MLUkOg1dI6XZ/lOZgm
+ M6mikNylQSyUkI1ygTArBZReaXUI6hZ3uVJB8yUUK29qEemcgQtSwtAgICRM/4u40g6u
+ m+pg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=OdNKk9nvat9w/9d/QSXjnvAWHsniXIPePf5/7xOPDAQ=;
- b=TZfXN8NeJayU6lJiDS6WTDIws2QkV3jeP8aiM1quGBxdQqwjvBExArwnE9FwkUzNkr
- vENKK6Zc4yfL0cBDamX+Z+AEOVZNR6Ul52a47KTOWYw1B1/7mPp8UiQfiYWqA4NYZqrW
- 484qFDqqYMwpN07UnpfY0um3cLpiYSl9LRwlGY8zSpsIyNlFztqOhmc3yk6QituudFtF
- TMBM0d25G+crcpZ77cDXLX8UHCWa0L7oK4u74z/7eZvxelBv9KEd/N2Q1KbS8Hs2kBMF
- 38RMtMUvQxdvkHMSiDlmqyL9rK51WrfOaah/9eqAuJJVseikIl2VrPwtSGunWqNYoffm
- oT9Q==
-X-Gm-Message-State: AHQUAubL6yDYG1oFpbTQYlWvFpMLQQ4OlKw+UJriamuzjjPwYcCP7wbm
- kWh8KDOPaYAtSpLJsznjtB46VBXUlQ8EYWncIRY=
-X-Google-Smtp-Source: AHgI3IZMvbXODUZBbxu1Pth4DtEM4TyJk5Z7WPQKgsybgsckgchpBvI/XwLh4pbBKJY04tqF8HrGjzV/AHRArxLBZ0M=
-X-Received: by 2002:aca:39c6:: with SMTP id g189mr591597oia.201.1549310695898; 
- Mon, 04 Feb 2019 12:04:55 -0800 (PST)
+ bh=sidxCzUNKwcFHzntOo5HzEGEGZsF+y25S6tfJdHRD+k=;
+ b=qQl3BJ7tqub1VOqXNlyRXTvuVQG/69hsXvrkZTnoXTRmA8eXkRyetlM51zj2M6L5zc
+ 4Ze+RvTkIP2iJ9N3KvQjRfCBJKz2/iMZQwYeMPCrWaKRuaKtIxCYQnhDMFjA60Jenkm+
+ mIIheqQ5Fcorgiyv3USuhvcueWrUk4h8ZWrM3aM/0fBqYFlKkpra5ojNumQmUP0MAdBZ
+ YQrKHLSCUtbp4+QcU4PufS5SrMzb/cKVASmoShcvs5IAcOpN0+EHQ218ESam/gNjf454
+ GhpuP27IIrDllbXjpKHAp2YsLEMZI52YqPVh74lhXiGDLLjk8b1rVpvXmJ8oIbs6Q9p3
+ nezQ==
+X-Gm-Message-State: AHQUAuZ3iNMnScUZFcPu50DRbpjVVp4PMZop5ZCaY9EPwZ8T/p8p167B
+ xm/TS+531GWqvddW0AWD+F7zqFPF5c9dj7j6+Q4=
+X-Google-Smtp-Source: AHgI3Ia8snY0q2MFSSBuHMKS2J8kYImctzaKFvsQCN+BHmC1vG3EF2uDgCjbDE5LgkmNiqwbnp1UWnoY2skTNyCZx8k=
+X-Received: by 2002:a9d:3464:: with SMTP id v91mr678565otb.102.1549310760049; 
+ Mon, 04 Feb 2019 12:06:00 -0800 (PST)
 MIME-Version: 1.0
 References: <20190129102521.4141-1-linux.amoon@gmail.com>
- <20190129102521.4141-2-linux.amoon@gmail.com>
- <CAFBinCDj=Y9HWEhJYMjo9FviAosxpHW5d61CceZ7HPV4ObZ79Q@mail.gmail.com>
-In-Reply-To: <CAFBinCDj=Y9HWEhJYMjo9FviAosxpHW5d61CceZ7HPV4ObZ79Q@mail.gmail.com>
+ <20190129102521.4141-3-linux.amoon@gmail.com>
+ <CAFBinCDRTeO9FWoJ-=BUc8uizN5_mhJE9EBYv0X6pse7Rxsxew@mail.gmail.com>
+In-Reply-To: <CAFBinCDRTeO9FWoJ-=BUc8uizN5_mhJE9EBYv0X6pse7Rxsxew@mail.gmail.com>
 From: Anand Moon <linux.amoon@gmail.com>
-Date: Tue, 5 Feb 2019 01:34:42 +0530
-Message-ID: <CANAwSgSnR-DWffg3vKStuXQXahLf8ONssxr4+byL=PSr5JR=xA@mail.gmail.com>
-Subject: Re: [PATCHv3 1/2] ARM64: dts: meson-gxbb-odroidc2: Fix usb phy reset
- warning
+Date: Tue, 5 Feb 2019 01:35:45 +0530
+Message-ID: <CANAwSgRUqXiDLMxQ4bTE0M8-UT_1=S5Om5PCR2S94iZsRuS0Zw@mail.gmail.com>
+Subject: Re: [PATCHv3 2/2] ARM64: dts: meson-gxbb-odroidc2: Fix usb phy
+ regulator power failed warning
 To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_120456_701316_C2C4D65F 
-X-CRM114-Status: GOOD (  20.76  )
+X-CRM114-CacheID: sfid-20190204_120600_801192_8CDB4585 
+X-CRM114-Status: GOOD (  14.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,97 +103,115 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 Hi Martin,
 
-Thanks for your review comments.
-
-On Mon, 4 Feb 2019 at 19:29, Martin Blumenstingl
+On Mon, 4 Feb 2019 at 19:36, Martin Blumenstingl
 <martin.blumenstingl@googlemail.com> wrote:
 >
 > Hi Anand,
 >
 > On Tue, Jan 29, 2019 at 11:25 AM Anand Moon <linux.amoon@gmail.com> wrote:
 > >
-> > Add missing vin-supply node 5.0V regulator setting to power
-> > to usb ports, changes help fix the usb reset warning.
+> > Override the dr_mode from "host" to "otg" for USB_HOST controller (usb0)
+> > changes help usb_phy0->usb0 initialization of OTG bus port.
 > >
-> > [  795.380156] usb 1-1.2: reset high-speed USB device number 3 using dwc2
-> > [  798.356073] usb 1-1.2: reset high-speed USB device number 3 using dwc2
-> > [  801.331999] usb 1-1.2: reset high-speed USB device number 3 using dwc2
-> > [  804.307919] usb 1-1.2: reset high-speed USB device number 3 using dwc2
-> > [  807.283844] usb 1-1.2: reset high-speed USB device number 3 using dwc2
+> > Changes fix the below warning.
 > >
-> > Fixes: 5a0803bd5ae (ARM64: dts: meson-gxbb-odroidc2: Enable USB Nodes)
-> > Tested-by: Kevin Hilman <khilman@baylibre.com>
-> > Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> > Cc: Jerome Brunet <jbrunet@baylibre.com>
-> > Cc: Neil Armstrong <narmstrong@baylibre.com>
-> > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> > ---
-> > changes from prevoius
-> >
-> >  regulator                      use open bypass  opmode voltage current     min     max
-> > ---------------------------------------------------------------------------------------
-> >  regulator-dummy                  5    4      0 unknown     0mV     0mA     0mV     0mV
-> >     c9100000.usb                  1                                 0mA     0mV     0mV
-> >     c9100000.usb                  1                                 0mA     0mV     0mV
-> >     c9000000.usb                  1                                 0mA     0mV     0mV
-> >     c9000000.usb                  1                                 0mA     0mV     0mV
-> >  P5V0                             1    1      0 unknown  5000mV     0mA  5000mV  5000mV
-> >     USB_OTG_PWR                   4    2      0 unknown  5000mV     0mA  5000mV  5000mV
-> >        phy-c0000020.phy.1         2                                 0mA     0mV     0mV
-> >        phy-c0000000.phy.0         2                                 0mA     0mV     0mV
-> > --
-> > ---
-> >  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> > index 2e1cd5e3a246..da729ed00408 100644
-> > --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> > +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> > @@ -28,6 +28,13 @@
-> >                 reg = <0x0 0x0 0x0 0x80000000>;
-> >         };
-> >
-> > +       p5v0: regulator-p5v0 {
-> > +               compatible = "regulator-fixed";
-> > +               regulator-name = "P5V0";
-> > +               regulator-min-microvolt = <5000000>;
-> > +               regulator-max-microvolt = <5000000>;
-> > +       };
-> > +
-> >         usb_otg_pwr: regulator-usb-pwrs {
-> >                 compatible = "regulator-fixed";
-> >
-> > @@ -36,6 +43,8 @@
-> >                 regulator-min-microvolt = <5000000>;
-> >                 regulator-max-microvolt = <5000000>;
-> >
-> > +               vin-supply = <&p5v0>;
-> did you find out why this patch fixes the USB_OTG_PWR regulator?
-> based on just reading the patch I can't find an explanation myself
+> > [    1.183681] dwc2 c9000000.usb: c9000000.usb supply vusb_d not found, using dummy regulator
+> > [    1.190627] dwc2 c9000000.usb: Linked as a consumer to regulator.0
+> > [    1.196696] dwc2 c9000000.usb: c9000000.usb supply vusb_a not found, using dummy regulator
+> > [    1.206094] phy phy-c0000000.phy.0: USB ID detect failed!
+> > [    1.210243] phy phy-c0000000.phy.0: phy poweron failed --> -22
+> I wonder if the warning below are a side-effect of "phy poweron failed"...
+
+As pointed by you we need the fix this issue earlier email.
+unless we enable the phy and set the correct dr_mode to tune the phy
+we cannot the tune and power on phy bus properly.
+
+After this patch we get phy and power correctly registered.
+
+# cat /sys/kernel/debug/regulator/regulator_summary
+ regulator                      use open bypass  opmode voltage
+current     min     max
+---------------------------------------------------------------------------------------
+ regulator-dummy                  5    4      0 unknown     0mV
+0mA     0mV     0mV
+    c9100000.usb                  1
+0mA     0mV     0mV
+    c9100000.usb                  1
+0mA     0mV     0mV
+    c9000000.usb                  1
+0mA     0mV     0mV
+    c9000000.usb                  1
+0mA     0mV     0mV
+ P5V0                             1    1      0 unknown  5000mV
+0mA  5000mV  5000mV
+    USB_OTG_PWR                   4    2      0 unknown  5000mV
+0mA  5000mV  5000mV
+       phy-c0000020.phy.1         2
+0mA     0mV     0mV
+       phy-c0000000.phy.0         2
+0mA     0mV     0mV
+
 >
+> > [    1.216072] WARNING: CPU: 0 PID: 78 at drivers/regulator/core.c:2054 _regulator_put.part.11+0xf0/0xf8
+> > [    1.225147] Modules linked in:
+> > [    1.228169] CPU: 0 PID: 78 Comm: kworker/0:1 Not tainted 5.0.0-rc4-xc2ml #1
+> > [    1.235066] Hardware name: Hardkernel ODROID-C2 (DT)
+> > [    1.239987] Workqueue: events deferred_probe_work_func
+> > [    1.245072] pstate: 80000005 (Nzcv daif -PAN -UAO)
+> > [    1.249816] pc : _regulator_put.part.11+0xf0/0xf8
+> > [    1.254473] lr : regulator_put+0x34/0x48
+> > [    1.258353] sp : ffff0000117b3b00
+> > [    1.261630] x29: ffff0000117b3b00 x28: 0000000000000000
+> > [    1.266891] x27: ffff80007ec1a7b8 x26: ffff000010eec280
+> > [    1.272153] x25: 0000000000000000 x24: 0000000000000009
+> > [    1.277414] x23: ffff0000117b3bc8 x22: ffff80007ecd3c00
+> > [    1.282675] x21: ffff0000111ad6c8 x20: ffff80007ecd3e00
+> > [    1.287936] x19: ffff80007ecd3e00 x18: 0000000000000124
+> > [    1.293198] x17: 0000000000000000 x16: 0000000000000000
+> > [    1.298459] x15: 0000000000000400 x14: 0000000000000400
+> > [    1.303720] x13: ff00000000000000 x12: ffffffffffffffff
+> > [    1.308981] x11: 0000000000000038 x10: 0000000000000040
+> > [    1.314243] x9 : ffff0000111c58b0 x8 : ffff0000111c58a8
+> > [    1.319504] x7 : ffff80006b055200 x6 : ffff80007edd2880
+> > [    1.324765] x5 : ffff80007f400248 x4 : ffff80007fb92b00
+> > [    1.330026] x3 : ffff0000112c9d58 x2 : ffff80007edd2880
+> > [    1.335288] x1 : 0000000000000000 x0 : 0000000000000001
+> > [    1.340549] Call trace:
+> > [    1.342966]  _regulator_put.part.11+0xf0/0xf8
+> > [    1.347278]  regulator_put+0x34/0x48
+> > [    1.350814]  regulator_bulk_free+0x30/0x50
+> > [    1.354868]  devm_regulator_bulk_release+0x18/0x20
+> > [    1.359612]  release_nodes+0x1b0/0x220
+> > [    1.363320]  devres_release_all+0x34/0x50
+> > [    1.367288]  really_probe+0xec/0x290
+> > [    1.370824]  driver_probe_device+0x54/0xe8
+> > [    1.374878]  __device_attach_driver+0xb8/0xe8
+> > [    1.379190]  bus_for_each_drv+0x78/0xc8
+> > [    1.382985]  __device_attach+0xd4/0x130
+> > [    1.386780]  device_initial_probe+0x10/0x18
+> > [    1.390920]  bus_probe_device+0x90/0x98
+> > [    1.394715]  deferred_probe_work_func+0x6c/0xa0
+> > [    1.399203]  process_one_work+0x1e0/0x318
+> > [    1.403168]  worker_thread+0x228/0x428
+> > [    1.406877]  kthread+0x124/0x128
+> > [    1.410070]  ret_from_fork+0x10/0x18
+> > [    1.413603] ---[ end trace 498aca4cb07e5377 ]---
+> phy_power_on fails above with -EINVAL and then something else breaks
+> (it seems like you're hitting the WARN_ON in drivers/regulator/core.c
+> below the comment which states: "Docs say you must disable before
+> calling regulator_put()")
 
-As per the device tree binding we need this setting to enable power input source
-[0] Documentation/devicetree/bindings/regulator/fixed-regulator.txt
+Ok will look into this later.
 
-*I have observed few more place where this setting is missing*
-
-> have you tested without this patch to rule out that you hit some bug
-> in the regulator framework back when you wrote the patch?
-> (I don't have an Odroid-C2 so I can't test this myself).
+> so this looks like a bug in either the dwc2 driver or the PHY
+> framework. can you please report that to the dwc2 and PHY maintainers
+> so it can be fixed independently?
 >
-
-Yes I have tested this patch.Some device like usb camera and usb hard drive
-when connected to usb port will generate warning message.
-which shows us that not enough power is being set to the port.
-
 >
 > Regards
 > Martin
 
 Best Regards
-
-
 
 -Anand
 
