@@ -2,65 +2,94 @@ Return-Path: <SRS0=7SeU=QL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 329B0C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:56:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3E984C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:56:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA90020815
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:56:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0E56120815
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  4 Feb 2019 16:56:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lwHtVksb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA90020815
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZP2Xjv1r";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="MrkD3eEE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0E56120815
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SwaFDWit7DZI+XIl5VvcXU66t7Umg5LlN35UhsDLRfI=; b=lwHtVksba6b7Sk
-	ui8rFCqcYR26EttqDGmV1jRtBRJfsL27IjyMNlUjtBOwn/WEc3M02xEey42NzVAKBdfxkJehbwqU+
-	DSh213DdcNW1UW+NiE0QWOzDmWoecfTvr1QAUlrzJ8xFkIwXsRXeBHwGCF6qyROqjxN8yAZcYe0jr
-	7ce/7jg04KcXXt6auIHqUpUeURtjz162dyrpv/AOkXcoNeUN4m97FxsEdQaI2+YHQcn8qXADiWU++
-	4alTErzRRx6I0w8lgU0qg/3gUgsFeh4Crgxcm0uth6HrMEzw60WdeGHTg6jXv720sECXxCCKyaO5d
-	a+oisYyrGlHFNJid5pLw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=59r1Z5oIxjkJ8j439qxCqX1197XeFwUx0MggY8ooaGc=; b=ZP2Xjv1rF3y19YECKSQK+t0Dk
+	lScz2FFMG1b2G1Ir+Sb24KiRgGlGaokRPzrR18Yyi10s4akwgQSVclGwkMJFptcYU40U6CgyL87Un
+	GRpWsW843V9JHYRBCcKVcSlilq9NLzjHc3/YIchHD4nhAEjSjHuKtQ0q7w2/xDAfYmQAFhACbHgus
+	9nm0/ps9GylMCNKA6EPE7y1+ZFkxwwTGF1+baGAInO296nIopNGmSIKZga1BQv8zh5XduAHimQyLZ
+	O5TWSsApokPWc63H48r9yLY7fQEIiHLYjyjzAkcfiwhT7htYcLvqJoEDjJV0Mdzrr3qP+M3FO3AhP
+	s1IyxRPYA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqhY3-0006tv-G6; Mon, 04 Feb 2019 16:56:43 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqhXy-0006sc-S5; Mon, 04 Feb 2019 16:56:40 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7F4CDEBD;
- Mon,  4 Feb 2019 08:56:38 -0800 (PST)
-Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 04D693F589;
- Mon,  4 Feb 2019 08:56:36 -0800 (PST)
-Subject: Re: [PATCH] arm64, vmcoreinfo : Append 'MAX_USER_VA_BITS' and
- 'MAX_PHYSMEM_BITS' to vmcoreinfo
-To: Bhupesh Sharma <bhsharma@redhat.com>
-References: <1548850991-11879-1-git-send-email-bhsharma@redhat.com>
- <239cdca4-1c7d-f236-f4a9-a0a3fe98f966@arm.com>
- <86c0dd9f-a55b-8ce8-69ca-893f63087d1a@redhat.com>
- <a646e38d-9351-e187-1571-c49d3558b164@redhat.com>
-From: James Morse <james.morse@arm.com>
-Message-ID: <d2f193ef-0fb9-f76b-073d-746304cffc44@arm.com>
-Date: Mon, 4 Feb 2019 16:56:35 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gqhYF-00075V-1S; Mon, 04 Feb 2019 16:56:55 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqhY1-0006ss-Li
+ for linux-arm-kernel@lists.infradead.org; Mon, 04 Feb 2019 16:56:43 +0000
+Received: by mail-wr1-x444.google.com with SMTP id z5so558947wrt.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 04 Feb 2019 08:56:41 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=kbKoOVDuK8DhkRmfyLVaiVFtUSegi/X8WGX0tp+jIaA=;
+ b=MrkD3eEEpTPMFi3TDOKVKxkevbGgIohF0ebB0h409CPBCrh0mstsbVoV7HcE2IX5j9
+ izej8yTyB20bb9uwlrvMZG8UnZmOv5rF2awmaxU+grFqVxHuC4x+BpjHFnTEmAOJBZbd
+ XgurngksBLChqkp/Mu9WcbQ/48OCBkWrc1h66DEtfA6O5qTh0rXlWcaEff9HHBpZINcU
+ Rs7iOWiRP3uD0Toe2XT/+uPL0h1lRbl9iUIzNg/h628l80TqJSYcSOsgEtJXyj9Nrzdx
+ 7IR8Sux3DF56pHPUhbNqQjdXALLilEvPRMiff0/mkNu+nai/hdRt1bxfOUfqMZ2+TF41
+ yOxg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=kbKoOVDuK8DhkRmfyLVaiVFtUSegi/X8WGX0tp+jIaA=;
+ b=ks0p7wW8MEms4m6Bm0XfltpZpHEqvS3xtV32kcfoU5PC+cPvIYK30Mn/GjmsB937Bw
+ LS+3t3sw78GX+wDRVyHQxhBE6l46+6nPkCULOJL86hybVgpBJR7Qr0rdaaIvnYGuY2PS
+ v9YQvmOhGJYuUL3EaPWRckW+RTwtmpceMj9ZSbANmQ2VTKHCMbzNeE9o8vj+nE7z8+oU
+ zoNKIzwxfC1x1D0oMkuU/F84KH4TKUOLaHA2Le5tbSxhw7C/rLz5lud1p0sr4L8TEfTP
+ vtGEZseibQ3FlTeHlNRxu4pw+iTm5RhA+jhvvk7Zj5RcCVJ5im852KAn6tJPtOjurvht
+ P4uQ==
+X-Gm-Message-State: AHQUAuY4AKx9cLWHUzrjmI3Zrr2mK3HDz3yISJqlQmNFy0CqiYgh0aZ5
+ faSW313ngBXNQ0XEiOxwS2k=
+X-Google-Smtp-Source: AHgI3IZzcQvHbVVHrfaWpw1Qmj1NQKqfqrYKH7yYIXNuN6rB5PAx6TTNxoSBg6t+SUls3RLNB5mjSw==
+X-Received: by 2002:adf:e98e:: with SMTP id h14mr248719wrm.115.1549299399619; 
+ Mon, 04 Feb 2019 08:56:39 -0800 (PST)
+Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
+ by smtp.gmail.com with ESMTPSA id p10sm10543101wrt.25.2019.02.04.08.56.38
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 04 Feb 2019 08:56:38 -0800 (PST)
+Date: Mon, 4 Feb 2019 17:56:37 +0100
+From: Thierry Reding <thierry.reding@gmail.com>
+To: Rob Herring <robh+dt@kernel.org>
+Subject: Re: [PATCH RESEND v2 08/12] dt-bindings: add binding for generic eDP
+ panel
+Message-ID: <20190204165637.GA30876@ulmo>
+References: <20190203185501.8958-1-anarsoul@gmail.com>
+ <20190203185501.8958-9-anarsoul@gmail.com>
+ <20190204074350.GC16448@ulmo>
+ <CA+E=qVecudACOEXt74Kf=UA_F-uuHgEqHzKpYAq1ocMx3Sx+eQ@mail.gmail.com>
+ <20190204082353.GE19087@ulmo>
+ <CAL_JsqKt1kOXmRNvkYsQ6AL69+TPZURKpDbKkkEUb2+KZ5hKjQ@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <a646e38d-9351-e187-1571-c49d3558b164@redhat.com>
-Content-Language: en-GB
+In-Reply-To: <CAL_JsqKt1kOXmRNvkYsQ6AL69+TPZURKpDbKkkEUb2+KZ5hKjQ@mail.gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_085638_916428_CA3A7773 
-X-CRM114-Status: GOOD (  18.37  )
+X-CRM114-CacheID: sfid-20190204_085641_733878_DF57963B 
+X-CRM114-Status: GOOD (  33.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,80 +101,159 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, ard.biesheuvel@linaro.org,
- catalin.marinas@arm.com, kexec@lists.infradead.org,
- Will Deacon <will.deacon@arm.com>,
- AKASHI Takahiro <takahiro.akashi@linaro.org>, bhupesh.linux@gmail.com,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Archit Taneja <architt@codeaurora.org>, Andrzej Hajda <a.hajda@samsung.com>,
+ David Airlie <airlied@linux.ie>, linux-sunxi <linux-sunxi@googlegroups.com>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ Sean Paul <seanpaul@chromium.org>,
+ Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
+ Daniel Vetter <daniel@ffwll.ch>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>,
+ Icenowy Zheng <icenowy@aosc.io>
+Content-Type: multipart/mixed; boundary="===============2933498473242532027=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgQmh1cGVzaCwKCk9uIDA0LzAyLzIwMTkgMTQ6MzUsIEJodXBlc2ggU2hhcm1hIHdyb3RlOgo+
-IE9uIDAxLzMxLzIwMTkgMDM6MDkgQU0sIEJodXBlc2ggU2hhcm1hIHdyb3RlOgo+PiBPbiAwMS8z
-MC8yMDE5IDA4OjUxIFBNLCBKYW1lcyBNb3JzZSB3cm90ZToKPj4+IE9uIDAxLzMwLzIwMTkgMTI6
-MjMgUE0sIEJodXBlc2ggU2hhcm1hIHdyb3RlOgo+Pj4+IFdpdGggQVJNdjguMi1MVkEgYW5kIExQ
-QSBhcmNoaXRlY3R1cmUgZXh0ZW5zaW9ucywgYXJtNjQgaGFyZHdhcmUgd2hpY2gKPj4+PiBzdXBw
-b3J0cyB0aGVzZSBleHRlbnNpb25zIGNhbiBzdXBwb3J0IHVwdG8gNTItYml0IHZpcnR1YWwgYW5k
-IDUyLWJpdAo+Pj4+IHBoeXNpY2FsIGFkZHJlc3NlcyByZXNwZWN0aXZlbHkuCj4+Pj4KPj4+PiBT
-aW5jZSBhdCB0aGUgbW9tZW50IHdlIGVuYWJsZSB0aGUgc3VwcG9ydCBvZiB0aGVzZSBleHRlbnNp
-b25zIHZpYSBDT05GSUcKPj4+PiBmbGFncywgZS5nLgo+Pj4+IMKgIC0gTFBBIHZpYSBDT05GSUdf
-QVJNNjRfUEFfQklUU181Mgo+Pj4+Cj4+Pj4gdGhlcmUgYXJlIG5vIGNsZWFyIG1lY2hhbmlzbXMg
-aW4gdXNlci1zcGFjZSByaWdodCBub3cgdG8KPj4+PiBkZXRlcmVtaW5lIHRoZXNlIENPTkZJRyBm
-bGFnIHZhbHVlcyBhbmQgYWxzbyBkZXRlcm1pbmUgdGhlIFBBUmFuZ2UgYW5kCj4+Pj4gVkFSYW5n
-ZSBhZGRyZXNzIHZhbHVlcy4KPj4+PiBVc2VyLXNwYWNlIHRvb2xzIGxpa2UgJ21ha2VkdW1wZmls
-ZScgYW5kICdjcmFzaC11dGlsaXR5JyBjYW4gaW5zdGVhZAo+Pj4+IHVzZSB0aGUgJ01BWF9VU0VS
-X1ZBX0JJVFMnIGFuZCAnTUFYX1BIWVNNRU1fQklUUycgdmFsdWVzIHRvIGRldGVybWluZQo+Pj4+
-IHRoZSBtYXhpbXVtIHZpcnR1YWwgYWRkcmVzcyBhbmQgcGh5c2ljYWwgYWRkcmVzcyAocmVzcGVj
-dGl2ZWx5KQo+Pj4+IHN1cHBvcnRlZCBieSB1bmRlcmx5aW5nIGtlcm5lbC4KPj4+Pgo+Pj4+IEEg
-cmVmZXJlbmNlICdtYWtlZHVtcGZpbGUnIGltcGxlbWVudGF0aW9uIHdoaWNoIHVzZXMgdGhpcyBh
-cHByb2FjaCB0bwo+Pj4+IGRldGVybWluaW5nIHRoZSBtYXhpbXVtIHBoeXNpY2FsIGFkZHJlc3Mg
-aXMgYXZhaWxhYmxlIGluIFswXS4KPj4+Cj4+PiBXaHkgZG9lcyBpdCBuZWVkIHRvIGtub3c/Cj4+
-Pgo+Pj4gKFN1enVraSBhc2tlZCB0aGUgc2FtZSBxdWVzdGlvbiBvbiB5b3VyIGVhcmxpZXIgdmVy
-c2lvbikKPj4+IGh0dHBzOi8vbG9yZS5rZXJuZWwub3JnL2xpbnV4LWFybS1rZXJuZWwvY2ZmNDQ3
-NTQtN2ZlNC1lZmVhLWJjOGUtNGRkZTIyNzdjODIxQGFybS5jb20vCgoKPj4gSSBoYXZlIHNoYXJl
-ZCBzb21lIGRldGFpbHMgKGFmdGVyIGRpc2N1c3Npb24gd2l0aCBvdXIgdGVzdCB0ZWFtcykgaW4g
-cmVwbHkgdG8KPj4gdGhlIHJldmlldyBjb21tZW50cyBmcm9tIFN1enVraSBoZXJlOgo+PiBodHRw
-Oi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9waXBlcm1haWwva2V4ZWMvMjAxOS1KYW51YXJ5LzAyMjM4
-OS5odG1sLCBhbmQKPj4gaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvcGlwZXJtYWlsL2tleGVj
-LzIwMTktSmFudWFyeS8wMjIzOTAuaHRtbAo+Pgo+PiBKdXN0IHRvIHN1bW1hcml6ZSwgSSBtZW50
-aW9uZWQgaW4gbXkgcmVwbGllcyB0byB0aGUgcmV2aWV3IGNvbW1lbnRzIHRoYSB0aGUKPj4gbWFr
-ZWR1bXBmaWxlIGltcGxlbWVudGF0aW9uIChmb3IgZGVjb2RpbmcgdGhlIFBURSkgd2FzIGp1c3Qg
-YXMgYW4gZXhhbXBsZSwKPj4gaG93ZXZlciB0aGVyZSBjYW4gYmUgb3RoZXIgdXNlci1zcGFjZSBh
-cHBsaWNhdGlvbnMsIGZvciBlLmcgYSB1c2VyLXNwYWNlCj4+IGFwcGxpY2F0aW9uIHJ1bm5pbmcg
-d2l0aCA0OC1iaXQga2VybmVsIFZBIGFuZCA1Mi1iaXQgdXNlciBzcGFjZSBWQSBhbmQKPj4gcmVx
-dWVzdGluZyBhbGxvY2F0aW9uIGluICdoaWdoJyBhZGRyZXNzIHZpYSBhICdoaW50JyB0byBtbWFw
-LgoKQnV0IHZtY29yZWluZm8gaXMgdGhlIHdyb25nIHBsYWNlIHRvIGV4cG9zZSB0aGlzIGluZm9y
-bWF0aW9uLiAoaXQgY2FuIGJlCmNvbmZpZ3VyZWQgb2ZmLCBhbmQgaXMgb25seSBhY2Nlc3NpYmxl
-IHRvIHJvb3QpCgoKPj4+IMKgRnJvbSB5b3VyIGdpdGh1YiBsaW5rIGl0IGxvb2tzIGxpa2UgeW91
-IHVzZSB0aGlzIHRvIHJlLWFzc2VtYmxlIHRoZSB0d28gYml0cwo+Pj4gb2YgdGhlIFBGTiBmcm9t
-IHRoZSBwdGUuIENhbid0IHlvdSBhbHdheXMgZG8gdGhpcyBmb3IgNjRLIHBhZ2VzPyBDUFVzIHdp
-dGgKPj4+IHRoZSBmZWF0dXJlIGFsd2F5cyBkbyB0aGlzIHRvbywgaXRzIG5vdCBzb21ldGhpbmcg
-dGhlIGtlcm5lbCB0dXJucyBvbi4KPj4KPj4gT2ssIGxldCBtZSB0cnkgdG8gZ2l2ZSBzb21lIHBl
-cnNwZWN0aXZlIG9mIGEgY29tbW9uIG1ha2VkdW1wZmlsZSB1c2UtY2FzZQo+PiBiZWZvcmUgSSBq
-dW1wIGludG8gdGhlIGRldGFpbHM6CgoKPj4gQWxzbyBoYXJkY29kaW5nIHRoZSBQVEUgY2FsY3Vs
-YXRpb24gdG8gdXNlIHRoZSBoaWdoIGFkZHJlc3MgYml0IG1hc2sgYWx3YXlzCj4+IHdpbGwgYnJl
-YWsgdGhlIGJhY2t3YXJkIGNvbXBhdGliaWxpdHkgd2l0aCBvbGRlciBrZXJuZWxzICh3aGljaCBk
-b24ndCBzdXBwb3J0Cj4+IDUyLWJpdCBhZGRyZXNzIHNwYWNlIGV4dGVuc2lvbnMpLgoKV2hhdCB3
-b3VsZCBnbyB3cm9uZz8KClRoZSBoYXJkd2FyZSBpZ25vcmVzIHRob3NlIGJpdHMgYW5kIHN1cHBs
-aWVzIHplcm8uIEFzIGZhciBhcyBJIGNhbiBzZWUgdGhlCmtlcm5lbCBoYXMgYWx3YXlzIGdlbmVy
-YXRlZCB6ZXJvIHRoZXJlLgoKCj4+IChiKS4gQWxzbyB4ODZfNjQgYWxyZWFkeSBoYXMgYSB2bWNv
-cmVpbmZvIGV4cG9ydCBmb3IgJ3BndGFibGVfbDVfZW5hYmxlZCc6CgpTbz8gNS1sZXZlbCBwYWdl
-IHRhYmxlcyBpcyBhIGRpZmZlcmVudCBmZWF0dXJlLiBJIGFncmVlIHlvdSBuZWVkIHRvIGtub3cg
-dGhlCm51bWJlciBvZiBsZXZlbHMgdG8gd2FsayB0aGUgcGFnZS10YWJsZXMsIGJ1dCB0aGF0IGlz
-bid0IGhvdyBhcm02NCdzIDUyYml0IHN0dWZmCndvcmtzLgoKCj4gUGluZy4gU2luY2UgdGhpcyBw
-YXRjaCBmaXhlcyBhIHJlZ3Jlc3Npb24gd2l0aCB1c2VyLXNwYWNlIHRvb2xzIGxpa2UKPiBtYWtl
-ZHVtcGZpbGUgYW5kIGNyYXNoLXV0aWxpdHkgd2hpY2ggYXJlIGJyb2tlbiBzaW5jZSBhcm02NCBr
-ZXJuZWxzIHdpdGggNTItYml0Cj4gVkEgYW5kIFBBIHN1cHBvcnQgYXJlIGF2YWlsYWJsZSAoYW5k
-IGRpc3RyaWJ1dGlvbnMgd2hpY2ggZW5hYmxlIHRoZW0pLCB3b3VsZAo+IHJlcXVlc3QgcmV2aWV3
-IGNvbW1lbnRzL2FjayBvbiB0aGlzIHNpbXBsZSBjaGFuZ2UuCgpCcm9rZW4gaG93PyBXaGF0IGdv
-ZXMgd3Jvbmc/CgpJIGNhbiBzZWUgaG93IGEgbm90LTUyYml0LWF3YXJlIGNyYXNoL2dkYi93aGF0
-ZXZlciB3b3VsZCBiZSBjb25mdXNlZCBieSBoaWdoCmJpdHMgYmVpbmcgc2V0IGluIHRoZSBwaHlz
-aWNhbCBhZGRyZXNzLCBhbmQgcG9zc2libHkgdGhyb3cgdGhlbSBhd2F5LgpCdXQgb25jZSBpdCBz
-dXBwb3J0cyB0aGlzIGZvciA2NEsgcGFnZXMsIEkgZG9uJ3Qgc2VlIHdoYXQgY2FuIGdvIHdyb25n
-IGlmIHRob3NlCmJpdHMgYXJlbid0IHNldC4gV2h5IGRvZXMgaXQgbmVlZCB0byBrbm93PwoKClRo
-YW5rcywKCkphbWVzCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3Rz
-LmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5m
-by9saW51eC1hcm0ta2VybmVsCg==
+
+--===============2933498473242532027==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="k+w/mQv8wyuph6w0"
+Content-Disposition: inline
+
+
+--k+w/mQv8wyuph6w0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Mon, Feb 04, 2019 at 10:27:09AM -0600, Rob Herring wrote:
+> On Mon, Feb 4, 2019 at 2:24 AM Thierry Reding <thierry.reding@gmail.com> =
+wrote:
+> >
+> > On Mon, Feb 04, 2019 at 12:13:55AM -0800, Vasily Khoruzhick wrote:
+> > > On Sun, Feb 3, 2019 at 11:43 PM Thierry Reding <thierry.reding@gmail.=
+com> wrote:
+> > > >
+> > > > On Sun, Feb 03, 2019 at 10:54:57AM -0800, Vasily Khoruzhick wrote:
+> > > > > eDP panels usually have EDID EEPROM, so there's no need to define=
+ panel
+> > > > > width/height or any modes/timings in dts. But this panel still ma=
+y have
+> > > > > regulator and/or backlight.
+> > > > >
+> > > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > > > ---
+> > > > >  .../devicetree/bindings/display/panel/panel-edp.txt        | 7 +=
+++++++
+> > > > >  1 file changed, 7 insertions(+)
+> > > > >  create mode 100644 Documentation/devicetree/bindings/display/pan=
+el/panel-edp.txt
+> > > >
+> > > > Please don't try to make panels look more generic than they really =
+are.
+> > > > You're going to have to provide a compatible string for your device=
+ that
+> > > > is more specific than "panel-edp". You claim that you don't need any
+> > > > extra information that is panel specific, but you don't know that n=
+ow.
+> > > > We have in the past thought that we didn't need things like prepare
+> > > > delay, but then we ran into situations where we did need them.
+> > > >
+> > > > Just do what everybody else does. Provide a specific compatible str=
+ing
+> > > > and match on that in the panel-simple driver. Even if you can read =
+all
+> > > > the video timings from an EDID EEPROM, you can still provide a mode=
+ in
+> > > > the panel descriptor to serve as a fallback if for example the EEPR=
+OM
+> > > > is faulty on some device.
+> > >
+> > > Pinebook used several 768p panels that have slightly different timings
+> > > and recent batch uses 1080p panel.
+> > >
+> > > What panel descriptor should I use as fallback?
+> >
+> > You don't use panel descriptors as fallback. The simple-panel driver
+> > will bind to a panel device and use the corresponding descriptor. If
+> > your device tree contains the correct information, the descriptor is
+> > correct for the panel you have.
+> >
+> > In other words you need to ensure that you have the correct panel in
+> > device tree for the board that you're using. This is exactly the same
+> > thing as for other devices.
+> >
+> > One way to to this is to have separate device trees for each variant
+> > of the board that you want to support. Another variant may be to have
+> > a common device tree and then have some early firmware update the DTB
+> > with the correct panel information.
+>=20
+> That can be a pain to manage especially if panels are swapped run to
+> run with 2nd sources.
+>=20
+> I think it is perfectly fine to have a generic-ish fallback as long as
+> it is just that, a fallback. If the panel has quirks, then you'd
+> better make sure the firmware is stuffing in the right compatibles or
+> that you can update the firmware.
+
+simple-panel would probably work if you stuck in some mostly compatible
+string and provided a ddc-i2c-bus property in the device tree node. The
+generic-ish fallback case could be implemented by providing a fallback
+compatible string (we used to have "simple-panel", which I think would
+still be adequate for this I suppose) and adding a dummy descriptor in
+the driver, perhaps one with pre-defined delays that could be adjusted
+to work for all cases, or they could just be 0. At least that way we'd
+be explicitly documenting that we support this as a fallback.
+
+I'm not sure how you'd want to enforce that people provide the right
+compatible strings that way. Currently there's no way to make your panel
+work without adding a panel driver, so people are forced to write the
+DT bindings and a driver, or add support to an existing one. If we open
+this backdoor, I suspect many people will just take the easy route and
+rely on the fallback. And then what do we do when we get bug reports
+about panels not working, or requiring some quirks. How do we go and
+find out what the right compatible strings are for each board, or how to
+fix things for something we don't have access to.
+
+This all sounds like a Pandora's box to me.
+
+Thierry
+
+--k+w/mQv8wyuph6w0
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlxYbsIACgkQ3SOs138+
+s6FfYQ//YjhRSI/DwPvLu34LouUyCxmfu7m6aIszNrWbobnc+o2QjK0Vy7bZolRV
+4gUFXCFJpIzPrjPjtiJ1O1vpdPakNX3qzJMf186MCWcYSe+CY/Nnso7LgY7JXEwz
+ufqNZnF5ngEQponLP4cLIh3UDhijDWKOKrn/V/p0CSuiVHUETCqREy8hwD3InyXB
+iwlyjyTzGmHYCmdi9hCTU9K5nr8DUcvgutUuD6BPVdYtCWGMeGhBHV8R9BdynYwW
+1Yzqmp2llZkwW1S0hyqc8GANeOWzfPdIWJI09+z1B3lZrqaf4oQEZQlW+OwVPrXG
+m0f6kC63hP8yiQMGpTeTIHKplOGJhIBMHWtnbB3CNrom0lmREjYwuT1NxcHzMNwm
+3EkvAYRcpvyKGarlzqCXsBSldfk0CE9T2t3nnWHaPD8gZ8AlLiM/ungoMOG7oTY/
+/uEjXQRWJ/dz+/uBSUCqiUUAyYYdeAzEIpcsTCnaFeoWADdVDFhzDiTR5toqIcNR
+S0fF3MLB/MvaNpB9dHZjzM0/xVZoV/+lnMDm7gqA4nbnHnXaXrg+7nWLxPvPnjs/
+vEeo216FT8g7sWpC2+cWPv+rDoQ92dUa/IgDZSO5kQN8BHVDcF50rWr+YCoIqiha
+l8tZfUXOy8DE1lb/GnWSSFMgAQ7jVT3yHA8rFI8jODGdkoMd/wY=
+=1ItP
+-----END PGP SIGNATURE-----
+
+--k+w/mQv8wyuph6w0--
+
+
+--===============2933498473242532027==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============2933498473242532027==--
+
