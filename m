@@ -2,60 +2,59 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A6A1BC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:17:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 371BEC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:19:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6C254206DD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:17:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 04D71206DD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:19:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gepVro2S"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C254206DD
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ClYu84oF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 04D71206DD
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CP62A/e8s4BvnBKULhQCKTV3Yaqg9UI+HMCzOVi9yQw=; b=gepVro2SQMMzHc
-	xsQ2fYcDJdFOMlkk8oiPeVM2nOp0VvAmbx1mxrth5xKphzYtL6bNIDyKIzmgBEyPolyc9i9KCg0mH
-	I9ZQOoKxMCo9M92kJnpEdIOaBgJfh00ZXetO55gtoEpDvBGKup6b7QsZ4/1sMvDlUCqYznKo9+1FE
-	J7G0JFIPm8IFsmxU/98BcGaOjQq4+7oGRLzSuHwt6sOECyk5czynhbXV7BPmbyqQKuVrDUXPKVwXx
-	zkCPt842DCQ55pvHNnYmZffDMBWRl9V04/YsF0vT7eb9Y+rJt2dR7m+XYY40qUes2yHZwwaJrZSEM
-	Zp5v4SrwEWEJ81VRtLdg==;
+	List-Owner; bh=LjGMRW+hRa1GcIJUwoiepNAj+TLjyzcGelGT8DPxuO4=; b=ClYu84oFvCAqro
+	mh4ml062CyDCCYz3Eymd8h/PEXXHcDsNDrZJpWyzF1sCZDNu2QlMh3PNBkURECI7s+6BnzHjhpBFU
+	Zh+Vz5+XzdBy59zv77yQhQyPvZW5/5DYrsrb+4+kU//F0+nj2iE7OikqAEMKZ3ObgMcs3vtvsFjyb
+	IJ8IAB6oF6FlH3iqDT3XhT9CCZO25Xy9JDIa4SL596lRxhawGvNZevvEMR6gCxoU79bMyngQDmtr3
+	jFiwAzh1CSEpk8BrL1ZuIZKaR/Pi3H/PFCEmm9wb244nGVNcpXr/dz16/r05AQG110jTUbT/D+iB5
+	xUwIbmJUB4Y6sX/s8iGw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr0bM-0003F2-IC; Tue, 05 Feb 2019 13:17:24 +0000
-Received: from relay1-d.mail.gandi.net ([217.70.183.193])
+	id 1gr0d8-0003xb-4A; Tue, 05 Feb 2019 13:19:14 +0000
+Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr0bI-0003EM-5k; Tue, 05 Feb 2019 13:17:22 +0000
-X-Originating-IP: 90.88.22.177
-Received: from xps13 (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
- [90.88.22.177]) (Authenticated sender: miquel.raynal@bootlin.com)
- by relay1-d.mail.gandi.net (Postfix) with ESMTPSA id 8B836240011;
- Tue,  5 Feb 2019 13:17:10 +0000 (UTC)
-Date: Tue, 5 Feb 2019 14:17:09 +0100
-From: Miquel Raynal <miquel.raynal@bootlin.com>
-To: wen yang <yellowriver2010@hotmail.com>
-Subject: Re: [PATCH v2] mtd: nand: fix object reference leaks in
- atmel_pmecc_get_by_node
-Message-ID: <20190205141709.5a8b80d1@xps13>
-In-Reply-To: <HK0PR02MB36342EEC848C39F479D0063CB26C0@HK0PR02MB3634.apcprd02.prod.outlook.com>
-References: <HK0PR02MB36342EEC848C39F479D0063CB26C0@HK0PR02MB3634.apcprd02.prod.outlook.com>
-Organization: Bootlin
-X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+ id 1gr0d2-0003mH-6n
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 13:19:12 +0000
+Received: by newverein.lst.de (Postfix, from userid 2005)
+ id CE54468D93; Tue,  5 Feb 2019 14:19:02 +0100 (CET)
+Date: Tue, 5 Feb 2019 14:19:02 +0100
+From: Torsten Duwe <duwe@lst.de>
+To: Vasily Khoruzhick <anarsoul@gmail.com>
+Subject: Re: [PATCH RESEND v2 05/12] drm/bridge: Add Analogix anx6345 support
+Message-ID: <20190205131902.GA7432@lst.de>
+References: <20181018073327.64942-1-icenowy@aosc.io>
+ <20190204122250.GB7660@lst.de>
+ <CA+E=qVfHMqo_ZWPTgvr+5G2J29Yy-TU4aceVD0oHLeyaOxVogA@mail.gmail.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190203185501.8958-6-anarsoul@gmail.com>
+User-Agent: Mutt/1.5.17 (2007-11-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_051720_361223_EDDF467D 
-X-CRM114-Status: GOOD (  16.05  )
+X-CRM114-CacheID: sfid-20190205_051909_203141_D1C627B4 
+X-CRM114-Status: UNSURE (   9.75  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,60 +66,74 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "alexandre.belloni@bootlin.com" <alexandre.belloni@bootlin.com>,
- "bbrezillon@kernel.org" <bbrezillon@kernel.org>,
- "richard@nod.at" <richard@nod.at>,
- "tudor.ambarus@microchip.com" <tudor.ambarus@microchip.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
- "ludovic.desroches@microchip.com" <ludovic.desroches@microchip.com>,
- "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
- "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
- "dwmw2@infradead.org" <dwmw2@infradead.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Archit Taneja <architt@codeaurora.org>, David Airlie <airlied@linux.ie>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Andrzej Hajda <a.hajda@samsung.com>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Thierry Reding <thierry.reding@gmail.com>,
+ Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
+ Daniel Vetter <daniel@ffwll.ch>, Maxime Ripard <maxime.ripard@bootlin.com>,
+ Sean Paul <seanpaul@chromium.org>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>,
+ Icenowy Zheng <icenowy@aosc.io>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgd2VuLAoKQ2FuIHlvdSBjaGFuZ2UgdGhlIGNvbW1pdCBtZXNzYWdlOgoKIm10ZDogcmF3bmFu
-ZDogYXRtZWw6IGZpeCBwb3NzaWJsZSBvYmplY3QgcmVmZXJlbmNlIGxlYWsiCgp3ZW4geWFuZyA8
-eWVsbG93cml2ZXIyMDEwQGhvdG1haWwuY29tPiB3cm90ZSBvbiBTdW4sIDMgRmViIDIwMTkKMTI6
-NDE6NDQgKzAwMDA6Cgo+IG9mX2ZpbmRfZGV2aWNlX2J5X25vZGUoKSB0YWtlcyBhIHJlZmVyZW5j
-ZSB0byB0aGUgc3RydWN0IGRldmljZQo+IHdoZW4gaXQgZmluZHMgYSBtYXRjaCB2aWEgZ2V0X2Rl
-dmljZSwgdGhlcmUgaXMgbm8gbmVlZCB0byBjYWxsCj4gZ2V0X2RldmljZSgpIHR3aWNlLgo+IFdl
-IGFsc28gc2hvdWxkIG1ha2Ugc3VyZSB0byBkcm9wIHRoZSByZWZlcmVuY2UgdG8gdGhlIGRldmlj
-ZQo+IHRha2VuIGJ5IG9mX2ZpbmRfZGV2aWNlX2J5X25vZGUoKSBvbiBkcml2ZXIgdW5iaW5kLgo+
-IAo+IEZpeGVzOiBmODhmYzEyMmNjMzQgKCJtdGQ6IG5hbmQ6IENsZWFudXAvcmV3b3JrIHRoZSBh
-dG1lbF9uYW5kIGRyaXZlciIpCj4gU2lnbmVkLW9mZi1ieTogV2VuIFlhbmcgPHllbGxvd3JpdmVy
-MjAxMEBob3RtYWlsLmNvbT4KPiBTdWdnZXN0ZWQtYnk6IEJvcmlzIEJyZXppbGxvbiA8YmJyZXpp
-bGxvbkBrZXJuZWwub3JnPgo+IFJldmlld2VkLWJ5OiBCb3JpcyBCcmV6aWxsb24gPGJicmV6aWxs
-b25Aa2VybmVsLm9yZz4KClVubGVzcyBJIGFtIG1pc3Npbmcgc29tZXRoaW5nLCBCb3JpcyBkaWRu
-J3QgZ2F2ZSBoaXMgUi1iIHlldC4KClsuLi5dCiAKPiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9tdGQv
-bmFuZC9yYXcvYXRtZWwvcG1lY2MuYyBiL2RyaXZlcnMvbXRkL25hbmQvcmF3L2F0bWVsL3BtZWNj
-LmMKPiBpbmRleCA1NTVhNzRlLi4xNDc3MzY4IDEwMDY0NAo+IC0tLSBhL2RyaXZlcnMvbXRkL25h
-bmQvcmF3L2F0bWVsL3BtZWNjLmMKPiArKysgYi9kcml2ZXJzL210ZC9uYW5kL3Jhdy9hdG1lbC9w
-bWVjYy5jCj4gQEAgLTg3NiwxNiArODc2LDIyIEBAIHN0YXRpYyBzdHJ1Y3QgYXRtZWxfcG1lY2Mg
-KmF0bWVsX3BtZWNjX2dldF9ieV9ub2RlKHN0cnVjdCBkZXZpY2UgKnVzZXJkZXYsCj4gIHsKPiAg
-CXN0cnVjdCBwbGF0Zm9ybV9kZXZpY2UgKnBkZXY7Cj4gIAlzdHJ1Y3QgYXRtZWxfcG1lY2MgKnBt
-ZWNjLCAqKnB0cjsKPiArCWludCByZXQ7Cj4gIAo+ICAJcGRldiA9IG9mX2ZpbmRfZGV2aWNlX2J5
-X25vZGUobnApOwo+IC0JaWYgKCFwZGV2IHx8ICFwbGF0Zm9ybV9nZXRfZHJ2ZGF0YShwZGV2KSkK
-PiArCWlmICghcGRldikKPiAgCQlyZXR1cm4gRVJSX1BUUigtRVBST0JFX0RFRkVSKTsKPiArCWlm
-ICghcGxhdGZvcm1fZ2V0X2RydmRhdGEocGRldikpIHsKPiArCQlyZXQgPSAtRVBST0JFX0RFRkVS
-Owo+ICsJCWdvdG8gZXJyX3B1dF9kZXZpY2U7Cj4gKwl9Cj4gIAo+ICAJcHRyID0gZGV2cmVzX2Fs
-bG9jKGRldm1fYXRtZWxfcG1lY2NfcHV0LCBzaXplb2YoKnB0ciksIEdGUF9LRVJORUwpOwo+IC0J
-aWYgKCFwdHIpCj4gLQkJcmV0dXJuIEVSUl9QVFIoLUVOT01FTSk7Cj4gKwlpZiAoIXB0cikgewo+
-ICsJCXJldCA9IC1FTk9NRU07Cj4gKwkJZ290byBlcnJfcHV0X2RldmljZTsKPiArCX0KPiAgCj4g
-LQlnZXRfZGV2aWNlKCZwZGV2LT5kZXYpOwo+ICAJcG1lY2MgPSBwbGF0Zm9ybV9nZXRfZHJ2ZGF0
-YShwZGV2KTsKPiAgCj4gIAkqcHRyID0gcG1lY2M7Cj4gQEAgLTg5Myw2ICs4OTksMTAgQEAgc3Rh
-dGljIHN0cnVjdCBhdG1lbF9wbWVjYyAqYXRtZWxfcG1lY2NfZ2V0X2J5X25vZGUoc3RydWN0IGRl
-dmljZSAqdXNlcmRldiwKPiAgCWRldnJlc19hZGQodXNlcmRldiwgcHRyKTsKPiAgCj4gIAlyZXR1
-cm4gcG1lY2M7Cj4gKwo+ICtlcnJfcHV0X2RldmljZToKPiArCXB1dF9kZXZpY2UoJnBkZXYtPmRl
-dik7Cj4gKwlyZXR1cm4gRVJSX1BUUihyZXQpOwo+ICB9Cj4gIAo+ICBzdGF0aWMgY29uc3QgaW50
-IGF0bWVsX3BtZWNjX3N0cmVuZ3Roc1tdID0geyAyLCA0LCA4LCAxMiwgMjQsIDMyIH07CgpXaXRo
-IHRoZSBjb21taXQgdGl0bGUgY2hhbmdlZCwgeW91IGNhbiBhZGQgbXkKCkFja2VkLWJ5OiBNaXF1
-ZWwgUmF5bmFsIDxtaXF1ZWwucmF5bmFsQGJvb3RsaW4uY29tPgoKClRoYW5rcywKTWlxdcOobAoK
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJt
-LWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3Jn
-Cmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtl
-cm5lbAo=
+First thing that struck me is that the chip's reset is actually low active
+
+   reset-gpios = <&pio 3 24 GPIO_ACTIVE_LOW>; /* PD24 */
+                                        ^^^^
+(please correct this in patches 11 and 12)
+
+Consequently, you're using inverted values here in the driver:
+
+> +static void anx6345_poweron(struct anx6345 *anx6345)
+> +{
+[...]
+> +	gpiod_set_value_cansleep(pdata->gpiod_reset, 0);
+
+0 = reset on, ok.
+
+> +	usleep_range(1000, 2000);
+> +
+> +	gpiod_set_value_cansleep(pdata->gpiod_reset, 1);
+
+1 = reset off, also fine.
+
+> +
+> +	/* Power on registers module */
+> +	anx6345_set_bits(anx6345->map[I2C_IDX_TXCOM], SP_POWERDOWN_CTRL_REG,
+> +			 SP_HDCP_PD | SP_AUDIO_PD | SP_VIDEO_PD | SP_LINK_PD);
+> +	anx6345_clear_bits(anx6345->map[I2C_IDX_TXCOM], SP_POWERDOWN_CTRL_REG,
+> +			   SP_REGISTER_PD | SP_TOTAL_PD);
+> +
+> +	anx6345->powered = true;
+> +}
+> +
+> +static void anx6345_poweroff(struct anx6345 *anx6345)
+> +{
+> +	struct anx6345_platform_data *pdata = &anx6345->pdata;
+> +	int err;
+> +
+> +	if (WARN_ON(!anx6345->powered))
+> +		return;
+> +
+> +	gpiod_set_value_cansleep(pdata->gpiod_reset, 1);
+> +	usleep_range(1000, 2000);
+
+This one got me a bit confused. Assert or deassert reset (again) before
+poweroff?
+
+Please stick to the logical value of the reset line.
+
+	Torsten
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
