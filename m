@@ -2,21 +2,23 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E28B2C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 08:09:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3C557C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 08:10:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B2C822083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 08:09:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0C4402145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 08:10:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B27o3qD6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B2C822083B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g34HQZPt";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="CwiIy9+8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C4402145D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,50 +26,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4Bc5Od1NDveGWHrA1fBQpPYWFyuPMJQNhTEP28ldyas=; b=B27o3qD6Z/6Mmj
-	HH58c5X5HBa4dmvGlidN9MFd4tipjXmIvHIDgMZVf2lAin389XYBz0rS5x3UrjXKc1OHhUG8LboJj
-	plR5fwbGrRWqFnh/O5EH3G0Jw3Fls0HxeefW2uoMxe1goFZghRIRtNFwe0ZydjDRmWtaU3CoNyilR
-	6xS7Py7zdKhCUtYuq2aiUHmx+SA66P1ADdV7wgDZKYqG5tPN0Nw3iQezqTU7FVagB0iQmZDtj9ZsB
-	/e3ZrVv1TS19mfWuAazmoEtKBp0vzhN6jK/22KUlrTCMytoMt4ST/Ln11+6xwRd1H6qYc45nOUVSn
-	5DtQdCDKv6CQAFq/Sytg==;
+	List-Owner; bh=bBW3p79EUPup7vKE36ZCSwZGgJRrpV7WEfvLFoJlVXQ=; b=g34HQZPtn9324M
+	CzF/r0jtLf+qMQRtKu2X3YjHMoRih7/uJTPmIcZFnwKrgech9HmmS+CVeAHQBaqJAdLJDqXMkJ5mV
+	VkNUgZDi6dq+J6KsYpp5Lkaugqm0DKVXHyXaI9alMboMrGt+xgKC6Y5TagHhhtpXNTTrinyXGVkxS
+	p2Q9JzZCEPs9pfna/lUVgT2rVRwZ4rMqOjO+OH7w5dQqg9wMNq/XkaGssNsQODTMGGFQn9jS0jjA5
+	MVyRZ0sdbUmomnqYYHwpTr50PciPmFL8A97UvC0xzbOjbKptau5Ot89gtGklq3eYC/7ZtneTQbsd4
+	ReApb2cYotFGWQdACBeA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqvnQ-0005eu-9y; Tue, 05 Feb 2019 08:09:32 +0000
-Received: from mail-ua1-f68.google.com ([209.85.222.68])
+	id 1gqvoQ-0007Dm-Ar; Tue, 05 Feb 2019 08:10:34 +0000
+Received: from mail-ua1-x943.google.com ([2607:f8b0:4864:20::943])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqvnN-0005eX-AI
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 08:09:30 +0000
-Received: by mail-ua1-f68.google.com with SMTP id v24so829418uap.13
+ id 1gqvoM-0007Cg-Ce
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 08:10:31 +0000
+Received: by mail-ua1-x943.google.com with SMTP id u19so851901uae.4
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 05 Feb 2019 00:09:28 -0800 (PST)
+ Tue, 05 Feb 2019 00:10:28 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=gxoEnVe+Vjte4GPkatgNUZFr6HlYZiQ/Ql2mHZyW+BE=;
+ b=CwiIy9+8bQhetX3jE/IloHLl00yjggv0xrVSzfSfNonBSIkyGmMy0siLmglUFGH1CU
+ 1xZT8ehXbPTXlUminWUjuW/XJ/zsClZXDVbci8oSax9EhVyBmVqUF9UmR6n0XgLFcPz+
+ QOGm/q7UgiaZ9vzfQE9OUz7QLsJ0rIdKJwfzI=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=4f0mxm4pSfyynVg3Goy8qkhLVS9QN/bqzJBvFBfgEcY=;
- b=Y9CKnsY4KGt/zLCGKnPINwrEgkgGVJHuuFhhcSO9tKCuSDS2BpLlbNkAsied9/khZH
- 2vXEW2ahjEzkKB8mKB7lhqoq89Gup4e38P97CNtnK0bBId5k9m53/5dRCW7VXmQkbEOQ
- YEIbsDldDx8C0upyGbpUUGus8ta6vxuGaNfr8t7GxEYTG0GcYloYczaubZmca2WIuvaw
- AWkN0nMYEq19n8IaPOlmEGTze8nYNmvITGChdEA40wzLgVk6f8GYzYDr7EMbxOdnLSLk
- 2HcbAmLRRllDn/lPntAD13ozPIRjAEJ8jv2duhaPMuYjnG+uFV38zh3WfjBDsM6B94wk
- 2AMg==
-X-Gm-Message-State: AHQUAubS2Z/BB864MvI57VB+nkCs/Vc0ypXD3pTwqIOpYxjGZBIkuCiC
- hO3KcV/ZKM22Ac1PntoNR9JYcFAwXRV6cAkbpbA=
-X-Google-Smtp-Source: AHgI3Ia0bT7YAXn+IYW/x2UQQfwjuOSOmO6PWGZAMIo0Fb9bwf8Z/2c186Fh8+gWYagHGPaiad3Y0wLRA/+Yz/sFXag=
-X-Received: by 2002:a9f:364a:: with SMTP id s10mr1339032uad.78.1549354167812; 
- Tue, 05 Feb 2019 00:09:27 -0800 (PST)
+ bh=gxoEnVe+Vjte4GPkatgNUZFr6HlYZiQ/Ql2mHZyW+BE=;
+ b=jBML5CoBF55oYI9wcrqHkZxVSSwoIdRmvY70UKVFCdU7gMRlGLovasoebCa6d1FPRC
+ 9KtJ4fVR2CP1OMXuo4jvPGtvhjX17LbvcwYg/5mQ+V3XGb/T60XDqf0KNpgjsIQex7ux
+ y+4E0JchAkJAieIHhk9aAyPfNDSER1VA3VANC45rWR0oUzew5gRNs45Jj7nqkHXX1cey
+ PfvpAnkzuVtj5xNgybaaH0SLIvCS4g3tj/4hdAn6IsOuPtf8z9bH0DTFbhHdhoBSsgz/
+ i9Vw6IKXnXrHXUcaQFS5Nm41zpuUmE9O5O251pd7tQBTOT+1aoMiEdWfZEJvikY0Jaad
+ FtgQ==
+X-Gm-Message-State: AHQUAuY3JZep86Lrv8wSjdJc1ycaZuCcAgS70usTbgVZj3lHVcXeygng
+ zE56fh15q0i1QGVDXyAPqPjzKdlXB0QSXKd5YJZtRP4v
+X-Google-Smtp-Source: AHgI3IYdcq4Qsyb1csuGEXT3J5FqsCuk81iMJIjnMeZ3ljIufq8VriCbdiW+TQeYNOMH0TKiv0PmLU3SlDnHXCnWRrs=
+X-Received: by 2002:ab0:31d5:: with SMTP id e21mr1387608uan.107.1549354227865; 
+ Tue, 05 Feb 2019 00:10:27 -0800 (PST)
 MIME-Version: 1.0
-References: <20190204203747.7376-1-tony@atomide.com>
- <20190204203747.7376-2-tony@atomide.com>
-In-Reply-To: <20190204203747.7376-2-tony@atomide.com>
-From: Geert Uytterhoeven <geert@linux-m68k.org>
-Date: Tue, 5 Feb 2019 09:09:16 +0100
-Message-ID: <CAMuHMdV68HxMzyMAgy6Cy_ECussJmpVTh5=vDAHwD8rA-BWsTg@mail.gmail.com>
-Subject: Re: [PATCH 2/2] ARM: multi_v7_defconfig: Update for moved options
-To: Tony Lindgren <tony@atomide.com>
+References: <1549297553-17647-1-git-send-email-vincent.guittot@linaro.org>
+ <1549297553-17647-2-git-send-email-vincent.guittot@linaro.org>
+In-Reply-To: <1549297553-17647-2-git-send-email-vincent.guittot@linaro.org>
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Tue, 5 Feb 2019 09:09:50 +0100
+Message-ID: <CAPDyKFrzs5PvrK_23HARKYkytPr3LF4S7j5rJ6LJANKmm7BMrA@mail.gmail.com>
+Subject: Re: [PATCH 1/2] PM-runtime: move runtime accounting on
+ ktime_get_mono_fast_ns()
+To: Vincent Guittot <vincent.guittot@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_000929_353132_BF88AA87 
-X-CRM114-Status: GOOD (  10.43  )
+X-CRM114-CacheID: sfid-20190205_001030_451651_F622E43D 
+X-CRM114-Status: GOOD (  18.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,45 +88,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, Geert Uytterhoeven <geert+renesas@glider.be>,
- Russell King <linux@armlinux.org.uk>, Olof Johansson <olof@lixom.net>,
- Simon Horman <horms+renesas@verge.net.au>,
- "open list:TI ETHERNET SWITCH DRIVER \(CPSW\)" <linux-omap@vger.kernel.org>,
+Cc: Linux PM <linux-pm@vger.kernel.org>,
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Thara Gopinath <thara.gopinath@linaro.org>, Biju Das <biju.das@bp.renesas.com>,
+ Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ Geert Uytterhoeven <geert@linux-m68k.org>,
  Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Tony,
-
-On Mon, Feb 4, 2019 at 9:37 PM Tony Lindgren <tony@atomide.com> wrote:
-> These options have just moved around, let's update with make
-> savedefconfig to make patching the file easier.
+On Mon, 4 Feb 2019 at 17:25, Vincent Guittot <vincent.guittot@linaro.org> wrote:
 >
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Simon Horman <horms+renesas@verge.net.au>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Similarly to what happened whith autosuspend, a deadlock has been raised
+> with runtime accounting in the sequence:
+>
+> change_clocksource
+>     ...
+>     write_seqcount_begin
+>     ...
+>     timekeeping_update
+>         ...
+>         sh_cmt_clocksource_enable
+>             ...
+>             rpm_resume
+>                 update_pm_runtime_accounting
+>                     ktime_get
+>                         do
+>                             read_seqcount_begin
+>                         while read_seqcount_retry
+>     ....
+>     write_seqcount_end
+>
+> Move runtime accounting on ktime_get_mono_fast_ns()
+> With ktime_get_mono_fast_ns, the timestamp is not guaranteed to be
+> monotonic across an update of timekeeping and as a result time can goes
+> backward. Add a test to skip accounting for such situation which should
+> stay exceptional.
+>
+> Fixes: a08c2a5a3194 ("PM-runtime: Replace jiffies-based accounting with ktime-based accounting")
+> Reported-by: Biju Das <biju.das@bp.renesas.com>
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 
-Thanks, this matches similar changes to shmobile_defconfig in commit
-4162325afd0d553c ("ARM: shmobile: defconfig: Refresh for v5.0-rc1")
-in next.
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Kind regards
+Uffe
 
-Gr{oetje,eeting}s,
 
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> ---
+>  drivers/base/power/runtime.c | 17 +++++++++++++----
+>  1 file changed, 13 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+> index 1caa394..50740da 100644
+> --- a/drivers/base/power/runtime.c
+> +++ b/drivers/base/power/runtime.c
+> @@ -66,13 +66,22 @@ static int rpm_suspend(struct device *dev, int rpmflags);
+>   */
+>  void update_pm_runtime_accounting(struct device *dev)
+>  {
+> -       u64 now = ktime_to_ns(ktime_get());
+> +       u64 now = ktime_get_mono_fast_ns();
+> +       u64 last = dev->power.accounting_timestamp;
+>         u64 delta;
+>
+> -       delta = now - dev->power.accounting_timestamp;
+> -
+>         dev->power.accounting_timestamp = now;
+>
+> +       /*
+> +        * Because ktime_get_mono_fast_ns() is not monotonic during
+> +        * timekeeping update, we must ensure that now is after the last saved
+> +        * timesptamp
+> +        */
+> +       if (now < last)
+> +               return;
+> +
+> +       delta = now - last;
+> +
+>         if (dev->power.disable_depth > 0)
+>                 return;
+>
+> @@ -1312,7 +1321,7 @@ void pm_runtime_enable(struct device *dev)
+>
+>                 /* About to enable runtime pm, set accounting_timestamp to now */
+>                 if (!dev->power.disable_depth)
+> -                       dev->power.accounting_timestamp = ktime_to_ns(ktime_get());
+> +                       dev->power.accounting_timestamp = ktime_get_mono_fast_ns();
+>         } else {
+>                 dev_warn(dev, "Unbalanced %s!\n", __func__);
+>         }
+> --
+> 2.7.4
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
