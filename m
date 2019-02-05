@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B4619C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:18:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D7F6C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:18:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 729A620821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:18:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 20E0C2080D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:18:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l3qvJ/t3";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=impinj.com header.i=@impinj.com header.b="VXle8e/V"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 729A620821
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hN1MWa3t";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=impinj.com header.i=@impinj.com header.b="cbdGrco8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 20E0C2080D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=impinj.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,42 +26,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XMIJte48gdjj8TfKadO0vSZiSW8bGARHimNk2gqOuoM=; b=l3qvJ/t3MVwoBG
-	habiCc4SNMl02Gdj0El0/99FpLDNECLNwY2f6GXgu3rv17u2WctAf9JYYSo2MadzAzF7ebTd47A4m
-	yTeLR2PHxZndWA0JJk8rKC4fue8YKtqHWJnrB1ss45DnueapaBy56B2NOAwBWyhGF2Wr9uqRr8Mxg
-	lw9uULBXeAUFvMFSiWjYry5431g1NSu1e/nHtLeMMBq+xXcRRbhizf6q8Ankjv1jJ6ZKg++HfAFKE
-	QSRs204no+6Em7MK/nfOPngEpVSKHZXOIraigEUpqH6jXRwHOjUXp+O+DUmS0cT/IPetXD+rvE9Ua
-	sBFwfqa+rZK73Wb2Dlpg==;
+	List-Owner; bh=ZFaA/B3ChkROLlEQNBblW3zFdQQVV/Afys3kX5vZ0T8=; b=hN1MWa3tr+5mT7
+	7338xTj0M46qnxyBRHUYvIf+rCOLlhAfkB7liiWuyvsRSW1WpiKvXEHoM8Qq0ZkjazKsGJQQhAm6/
+	qZaX6gLNtXm0dvSOyYfnb79Xetux5sNyJfWipkE8MH7Uy1jeaw5yHyDozmVkfUsFm3jYaNrBmudXo
+	LJjGrHbGOG3PkLZInYSRECjo0zKk0dyJNx/fh+wleeZeNw07DdFCTL95hwy9Dzeaslno8GpYBOYyv
+	l7Q44xRvmMn3ufQeswNVfCzBfjnL0TlKyPvOmVNmx1zcykWhq4QKUWTd1OytTkUk2g1xNsmPMiOwV
+	Y3NeQW5UPuCO/DOG0sHw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqoR7-0004VL-92; Tue, 05 Feb 2019 00:18:01 +0000
-Received: from mail-eopbgr730113.outbound.protection.outlook.com
- ([40.107.73.113] helo=NAM05-DM3-obe.outbound.protection.outlook.com)
+	id 1gqoRr-0005C3-LL; Tue, 05 Feb 2019 00:18:47 +0000
+Received: from mail-dm3nam05on0701.outbound.protection.outlook.com
+ ([2a01:111:f400:fe51::701]
+ helo=NAM05-DM3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqoQq-0004Ee-7q
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 00:17:45 +0000
+ id 1gqoR1-0004P6-S2
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 00:18:11 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=impinj.com;
  s=selector1;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=Y7h3EZ0HmYkXJjdIuCaxWqT43OnGBdb65kFXsTiikS8=;
- b=VXle8e/V3mWbWk3ZQslVrY5Sr8H5LX2fs2Y+G+C1uDp2NmEZBMrQ+B9AOilgQk0rxUHt+3Nlc2/pWyNtUKT+07JoxCSrpi6aSCYbs1Dz0bEirBDsi7GRKTpmjsV7Yi0eMH73zw6WRrzp8hf0HHEWGXQZEE0gNMQKRZ2SyrcLNAg=
+ bh=Q7RiZACcNA+wyuttLTr7HU4ezOYEzdjsUyq1kCjCgzc=;
+ b=cbdGrco8gY55eSnVmEnAVl/6avBj18RkKr7Y2ZMOunZdwYNWVC+WnlRUZwc2DPCylYcJFZUZezsZKFpBDnTpLeiGcRCYnPosCKuy0CT9X4p9e9nftInlZkplKi2J0aAtWfJrGemPbfBCYwdKiYr7q7RKS3lOOFwoAFQjsXmft4o=
 Received: from MWHPR0601MB3708.namprd06.prod.outlook.com (10.167.236.38) by
  MWHPR0601MB3722.namprd06.prod.outlook.com (10.167.236.139) with Microsoft
  SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1580.16; Tue, 5 Feb 2019 00:17:39 +0000
+ 15.20.1580.16; Tue, 5 Feb 2019 00:17:41 +0000
 Received: from MWHPR0601MB3708.namprd06.prod.outlook.com
  ([fe80::ac0c:a03e:77c7:fa85]) by MWHPR0601MB3708.namprd06.prod.outlook.com
  ([fe80::ac0c:a03e:77c7:fa85%5]) with mapi id 15.20.1580.019; Tue, 5 Feb 2019
- 00:17:39 +0000
+ 00:17:41 +0000
 From: Trent Piepho <tpiepho@impinj.com>
 To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>
-Subject: [PATCH v2 1/3] dt-bindings: imx6q-pcie: Add description of imx7d pcie
- phy
-Thread-Topic: [PATCH v2 1/3] dt-bindings: imx6q-pcie: Add description of imx7d
- pcie phy
-Thread-Index: AQHUvOg0yfKeVdvB5EO36YCp85y+3Q==
-Date: Tue, 5 Feb 2019 00:17:39 +0000
-Message-ID: <20190205001721.18639-2-tpiepho@impinj.com>
+Subject: [PATCH v2 3/3] PCI: imx: Add workaround for e10728, IMX7d PCIe PLL
+ failure
+Thread-Topic: [PATCH v2 3/3] PCI: imx: Add workaround for e10728, IMX7d PCIe
+ PLL failure
+Thread-Index: AQHUvOg1I9SIwv2NIEC65G+x/YIYYw==
+Date: Tue, 5 Feb 2019 00:17:41 +0000
+Message-ID: <20190205001721.18639-4-tpiepho@impinj.com>
 References: <20190205001721.18639-1-tpiepho@impinj.com>
 In-Reply-To: <20190205001721.18639-1-tpiepho@impinj.com>
 Accept-Language: en-US
@@ -78,37 +79,36 @@ x-mailer: git-send-email 2.14.4
 x-originating-ip: [216.207.205.253]
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; MWHPR0601MB3722;
- 6:n0U5M84G1nIa6rj2tsch7B91B6T1pT3Vz9gbTK/Tx2MrZpCGyX5YN+uyJMDlm9sN3IveOdzsY1plJqnIR24QrE+9uDUbAwdB3GcaZSe5i9Wm+Y+g90nzezIYj6MnhMhUOvoEVhBiYM70uLfiGXnHrSbeEYfQDjXL382iA04prJ9BuQ6npUEeTLvm1Je72gCFoWKbky7/JquYxF4bJ8qYPHZtBh82B/4mawFawoh8areklSyMmy2KA+pGbb7N3CkqTsQGC/pe+zgfhjSBzo+q0usmykd4W0uMqvUt1P7d4I6ve6smU7+ePKzjpUurF/bfN8iOLFx81+kxrtDcSAy0ZjT19i1tv6JFKI+QFx/mXob8YuD/ggFrsWv2r35ihLkv6rR9SYngyIMM/YvMRNv2l6s3E9S7WBaPS8D8RBsWtqtko98vejgN0NBMqb3aFPY5upXWB3AoPbw/vmf3J2bXDw==;
- 5:Q4ZQgqRXH1agH+SKiRmsweW+rqwXQcBAjELNpbeI7+NdZUfyh0h+wXBDmZH7sKh5A1LYL8/Tz6BwKG7FqmU4Um63PnzN/Ed0ofaHyAmbGqk3zUUU48gtG1hZqgaFFYuONo61cPsLruAUtBOFxJQWRzi1eJGyjASs19kwGblDxuOjr+Dasw419fuVqpCLN0A/C2Pz+4572pEfbpfNlVBpIA==;
- 7:1CC+MLHpuA08nK/Srxu3e4JrXC0/AMTStSS7c7PDC4haHCRgHBNPczhtvG7Fv/4lkvaHdMelfXi3OmJYl5h0nNervgFneJPl4FH9So63OTLpU/U0LCOpUF1p//j1vIczHUgKkQRRFHd4W6HRuY4xEw==
-x-ms-office365-filtering-correlation-id: 598336be-130b-49d1-b2f7-08d68aff567b
+ 6:rScQydgHaMNq65zSLTOco5AsfA8mpCe1qbCPSkWbLyU9PPKIIUIgzFshDvf4OKIxH8cGyq3awXlZUBRnV3MzdOE7KzMxUWKAgpHAISdH7lobipEjjbTwoPStxAjLvH6l7yGFnhzaDCUOcEpC3cHmukZPs2jEbg532vcgTmW3c7OMhwZK9hciMq5BLOw+ehVa9jWwlq6KUvksnUlFForVu8jxGYxrR1dbON91ZV/hy47rIxO/9RV05p9GwXdD5E23fgsgY9Ys6ySg5vt5jqDr9mp5pRRdg7fffnmlkKTPEDCyDuKN8V1QVAd+yFRfaT1lKlDeadxFTMbUKErumnDvCdqoHd4k31bMGbO66FrezWPiQSrUdu53HK7dvzj4AkrnQvAZCx5jaION9c8BIms9HdkJlXs8LSShp2NGj6OXc6XXdB3a7Now4o/vbvHG9M8yeXglieiYDI5pF30N+XrzKg==;
+ 5:s8gdbLbt8ScHhRq+JQlF6sdCmP5lBICYUSO+eUO20iy8LX0NoluIAUUiKIBi/77R1MUE7V4ETsd6hmKwYxg/tc+fD/p0rBmw8zNLkQGFDBJAN0dqd9M/jfB8yhnJZTGDeb2oWKYchjidzGGbhAex/tE2nB7k4ZeCaz2hdQ5MVyxImoQvbdHZBQLqH9klrGuz5qr0V+3un9//18MAU/VsqQ==;
+ 7:9YK0uW2JOzBIKhSF6r5+QZoFLVCj85gSWwShCx8U9RqzJPgmPzowc7cHSzXDZ7qPW7u0KQq/61M5FyZ+tCQInQcuPSIjtOGmQugp6jNmKTikVoyG6D9MjDdFXa/iYyCVHtCeFT274Bh0yMyGY+dE/w==
+x-ms-office365-filtering-correlation-id: 42d04db9-692d-422d-f194-08d68aff578d
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
  SRVR:MWHPR0601MB3722; 
 x-ms-traffictypediagnostic: MWHPR0601MB3722:
-x-microsoft-antispam-prvs: <MWHPR0601MB372230D178F0812DFB36FB68D36E0@MWHPR0601MB3722.namprd06.prod.outlook.com>
+x-microsoft-antispam-prvs: <MWHPR0601MB37226C47B7B646257A615FA3D36E0@MWHPR0601MB3722.namprd06.prod.outlook.com>
 x-forefront-prvs: 0939529DE2
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10019020)(376002)(346002)(136003)(396003)(39850400004)(366004)(199004)(189003)(2616005)(476003)(105586002)(25786009)(305945005)(7736002)(2906002)(6116002)(107886003)(3846002)(11346002)(66066001)(486006)(86362001)(4326008)(97736004)(186003)(2351001)(446003)(1076003)(71190400001)(71200400001)(256004)(6486002)(102836004)(6436002)(26005)(50226002)(386003)(6506007)(53936002)(14454004)(6916009)(5640700003)(316002)(8936002)(478600001)(6512007)(76176011)(2501003)(99286004)(81166006)(81156014)(68736007)(52116002)(54906003)(36756003)(106356001)(8676002)(32563001);
+ SFS:(10019020)(376002)(346002)(136003)(396003)(39850400004)(366004)(199004)(189003)(2616005)(476003)(105586002)(25786009)(305945005)(7736002)(2906002)(6116002)(107886003)(3846002)(11346002)(66066001)(486006)(86362001)(4326008)(97736004)(186003)(2351001)(446003)(1076003)(71190400001)(71200400001)(256004)(6486002)(102836004)(6436002)(26005)(50226002)(386003)(6506007)(53936002)(14454004)(6916009)(5640700003)(316002)(8936002)(478600001)(6512007)(76176011)(2501003)(99286004)(81166006)(81156014)(68736007)(14444005)(52116002)(54906003)(36756003)(106356001)(8676002);
  DIR:OUT; SFP:1102; SCL:1; SRVR:MWHPR0601MB3722;
  H:MWHPR0601MB3708.namprd06.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: impinj.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: L0Rwfd8xS3SAtKJysLGXBzpJBYvxSmm+hhu+2hcB+6bfP1f322ZKYXNSdraW1Zp8PRs5NB2SZtil/nyHLycIhwc5Us/9C8hb+rHBPhX0Sayy4nF9YIiT97h/6rg8vo7H/jexcnQEiRQ360VlXvib/17TM/JMPgq6uALKw1FBXGgoWWCgwSCsVL24/pksY7zbh2zoCJQ69Oyx4KuMDr13EV793U4WFT2Aw3m6nbpLQuU79WYmrkNwxzmEu/3eRYm1mkflmJkX69SEufSWO7dM2fTn5FycvLSG14pcCBe5yIayndHrdAp/P0X5KTQGY576775TzdVwMH9lO5WjvzEqeoWQS1uMNin2G3V2m0upLqhZp3KoId6WojDJdiyjfjsaTdHZUPZ7odwG4oalGtqQ5Rp1uD4Nt5tJB7lOQ2UaYc0=
+x-microsoft-antispam-message-info: dZs41GfsuRSAtrtSxR7f+qgOVBlVbxSigREn5qHa7ms12i7H+4LCn0lzhEfm6F6g0xpKVyK0+oWgB0GjnVg5Zqj8KFHaVw4yXM9SQSxig+0M1cU6PKYH87heSYbiH5ZO+Q4hpcVCeRsgsxRmO8clJotPeRgoQhCg4OANEM11YP+S6M+VSOoXLw0VM8Wj7OlfgWol/Z7ICR/lahhcAi9IMY1QImM6ZXOkMfHO6WdAop99sLWoOey1UqrPsm1ELXlIFPl/vrjkKuKQSMld1vtdKtcntbWD2Aazmn/beWBa+FNrkIYFuNFSfZcaI8xII4iMK0jBbe+bJvk7i5qkObeoBFKIobIOXUTtfFhEM1xSLgwuagXM6pcfC+zNhSaNfAYJzMubTEGiWF3GeZcrfuFiBdqRXsbY3NSovQeXVt0yocg=
 MIME-Version: 1.0
 X-OriginatorOrg: impinj.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 598336be-130b-49d1-b2f7-08d68aff567b
-X-MS-Exchange-CrossTenant-originalarrivaltime: 05 Feb 2019 00:17:38.7831 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 42d04db9-692d-422d-f194-08d68aff578d
+X-MS-Exchange-CrossTenant-originalarrivaltime: 05 Feb 2019 00:17:40.5774 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 6de70f0f-7357-4529-a415-d8cbb7e93e5e
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR0601MB3722
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_161744_276669_FF58A858 
-X-CRM114-Status: UNSURE (   7.53  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190204_161756_484055_0D041498 
+X-CRM114-Status: GOOD (  13.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -130,41 +130,128 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-There is a separate PHY device with its own registers on imx7d.  It's
-currently unused, but a PCIe erratum on imx7d will require it for the
-workaround.
+This implements the workound described in the NXP IMX7d erratum e10728.
+
+Initial VCO oscillation may fail under corner conditions such as cold
+temperature.  It causes PCIe PLL to fail to lock in the initialization
+phase, which results in the PCIe link failing to come up.
+
+The workaround is to disable Duty-cycle Corrector (DCC) calibration
+after G_RST.
+
+To do this it is necessary to gain access to the undocumented and
+currently unused PCIe PHY register bank.  A new device tree node of type
+"fsl,imx7d-pcie-phy" is created for the PHY block and the existing PCIe
+device uses a phandle named "fsl,imx7d-pcie-phy" to point to it.
 
 Signed-off-by: Trent Piepho <tpiepho@impinj.com>
 ---
- Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/pci/controller/dwc/pci-imx6.c | 57 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-index d514c1f2365f..f4933c8951bc 100644
---- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-@@ -53,6 +53,7 @@ Additional required properties for imx7d-pcie:
- 	       - "pciephy"
- 	       - "apps"
- 	       - "turnoff"
-+- fsl,imx7d-pcie-phy: A phandle to an fsl,imx7d-pcie-phy node.
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index 80f843030e36..06dd6aa927d4 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -18,6 +18,7 @@
+ #include <linux/module.h>
+ #include <linux/of_gpio.h>
+ #include <linux/of_device.h>
++#include <linux/of_address.h>
+ #include <linux/pci.h>
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
+@@ -61,6 +62,7 @@ struct imx6_pcie {
+ 	u32			tx_swing_low;
+ 	int			link_gen;
+ 	struct regulator	*vpcie;
++	void __iomem		*phy_base;
  
- Example:
+ 	/* power domain for pcie */
+ 	struct device		*pd_pcie;
+@@ -117,6 +119,23 @@ struct imx6_pcie {
+ #define PCIE_PHY_RX_ASIC_OUT 0x100D
+ #define PCIE_PHY_RX_ASIC_OUT_VALID	(1 << 0)
  
-@@ -79,3 +80,13 @@ Example:
- 		clocks = <&clks 144>, <&clks 206>, <&clks 189>;
- 		clock-names = "pcie", "pcie_bus", "pcie_phy";
- 	};
++/* iMX7 PCIe PHY registers */
++#define PCIE_PHY_CMN_REG4		0x14
++/* These are probably the bits that *aren't* DCC_FB_EN */
++#define PCIE_PHY_CMN_REG4_DCC_FB_EN	0x29
 +
-+* Freescale i.MX7d PCIe PHY
++#define PCIE_PHY_CMN_REG15	        0x54
++#define PCIE_PHY_CMN_REG15_DLY_4	BIT(2)
++#define PCIE_PHY_CMN_REG15_PLL_PD	BIT(5)
++#define PCIE_PHY_CMN_REG15_OVRD_PLL_PD	BIT(7)
 +
-+This is the PHY associated with the IMX7d PCIe controller.  It's used by the
-+PCI-e controller via the fsl,imx7d-pcie-phy phandle.
++#define PCIE_PHY_CMN_REG24		0x90
++#define PCIE_PHY_CMN_REG24_RX_EQ	BIT(6)
++#define PCIE_PHY_CMN_REG24_RX_EQ_SEL	BIT(3)
 +
-+Required properties:
-+- compatible:
-+	- "fsl,imx7d-pcie-phy"
-+- reg: base address and length of the PCIe PHY controller
++#define PCIE_PHY_CMN_REG26		0x98
++#define PCIE_PHY_CMN_REG26_ATT_MODE	0xBC
++
+ #define PHY_RX_OVRD_IN_LO 0x1005
+ #define PHY_RX_OVRD_IN_LO_RX_DATA_EN (1 << 5)
+ #define PHY_RX_OVRD_IN_LO_RX_PLL_EN (1 << 3)
+@@ -490,6 +509,26 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
+ 	switch (imx6_pcie->variant) {
+ 	case IMX7D:
+ 		reset_control_deassert(imx6_pcie->pciephy_reset);
++
++		/* Workaround for ERR010728, failure of PCI-e PLL VCO to
++		 * oscillate, especially when cold.  This turns off "Duty-cycle
++		 * Corrector" and other mysterious undocumented things.
++		 */
++		if (likely(imx6_pcie->phy_base)) {
++			/* De-assert DCC_FB_EN */
++			writel(PCIE_PHY_CMN_REG4_DCC_FB_EN,
++			       imx6_pcie->phy_base + PCIE_PHY_CMN_REG4);
++			/* Assert RX_EQS and RX_EQS_SEL */
++			writel(PCIE_PHY_CMN_REG24_RX_EQ_SEL
++				| PCIE_PHY_CMN_REG24_RX_EQ,
++			       imx6_pcie->phy_base + PCIE_PHY_CMN_REG24);
++			/* Assert ATT_MODE */
++			writel(PCIE_PHY_CMN_REG26_ATT_MODE,
++			       imx6_pcie->phy_base + PCIE_PHY_CMN_REG26);
++		} else {
++			dev_warn(dev, "DT lacks imx7d-pcie-phy, unable to apply ERR010728 workaround\n");
++		}
++
+ 		imx7d_pcie_wait_for_phy_pll_lock(imx6_pcie);
+ 		break;
+ 	case IMX6SX:
+@@ -919,6 +958,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct dw_pcie *pci;
+ 	struct imx6_pcie *imx6_pcie;
++	struct device_node *np;
+ 	struct resource *dbi_base;
+ 	struct device_node *node = dev->of_node;
+ 	int ret;
+@@ -939,6 +979,23 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 	imx6_pcie->variant =
+ 		(enum imx6_pcie_variants)of_device_get_match_data(dev);
+ 
++	/* Find the PHY if one is defined, only imx7d uses it */
++	np = of_parse_phandle(node, "fsl,imx7d-pcie-phy", 0);
++	if (np) {
++		struct resource res;
++
++		ret = of_address_to_resource(np, 0, &res);
++		if (ret) {
++			dev_err(dev, "Unable to map PCIe PHY\n");
++			return ret;
++		}
++		imx6_pcie->phy_base = devm_ioremap_resource(dev, &res);
++		if (IS_ERR(imx6_pcie->phy_base)) {
++			dev_err(dev, "Unable to map PCIe PHY\n");
++			return PTR_ERR(imx6_pcie->phy_base);
++		}
++	}
++
+ 	dbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	pci->dbi_base = devm_ioremap_resource(dev, dbi_base);
+ 	if (IS_ERR(pci->dbi_base))
 -- 
 2.14.4
 
