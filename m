@@ -2,97 +2,75 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1DE0CC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:37:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4FF98C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:37:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DCB2620818
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:37:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1E53720818
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:37:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IQkCvyx+";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ffwll.ch header.i=@ffwll.ch header.b="RbWgzM3m"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DCB2620818
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ffwll.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Jo7BU26a"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E53720818
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GhTWtkgdo1FmvqlgAThJCkUxDrcvSyAUg1qrewacW60=; b=IQkCvyx+TQv8Sv
-	3FCiS2C1sQuxm1E+DiFrX/PWcTivRglwNmIrajI/eyqXSwsxUt1g27e+uZc9W3DJHWm0hPjTOi7Gu
-	hyKnAHIWQLH1zEOtkhQRkUuaFCTd6ZloWPdCXh0YZrTb2ZNyMEU9Ic4w1eSUjG8Cjzb4UjPkdgXeL
-	6XevEwpADiQWQNyskixoSKm1rEUF4EHtE4eRTrnDyfmTEWoZxRW+c+EZ65p4WyjHOJOOs1ZYq4ZWb
-	q9/RZw8OXHlqHSL+LQPL668zMSdeEPtkSkwKDz3X8SQbsFbv/2ktJAkf2qm9zbpTYNR4VAisuY0mP
-	AI5zMPPeQ2Gbc2CkG4IA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=CtlKFykwlg6O2Oty0k4BoZ8jTMFccRBctt+wgNeR3zQ=; b=Jo7BU26aayfcZ1
+	GWBCIEdPnqjyShsjQ2S/ITgz1hwPQiv82/RHjwbHaHRWQdx93YxEgR/jDveJv9ARgP1xnhrZzknDR
+	m3ol9iJeG4BBFDlNyLE0WR0ufWBqi34afYEj8EnINzqnUZgVumy0IxCUy7XAzb/HrSttUzMob6hhx
+	bQS24qTkqLXJYP4K7w2Me9NysoSfESKRYjALYI2qQ+SrcD6gwfdbht0paYYDHO8uAAGLaCcPajwsR
+	NgglykwpbWaVkq/ZjBXb+GuEBCHkbztSCK+PBKnuJNTo9Wq74xR68yTOxAQC8bT9FzD/ni1U5f8So
+	LCPv4LB56CZzC5Bcw8Pw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr3iV-0008GU-EE; Tue, 05 Feb 2019 16:36:59 +0000
-Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
+	id 1gr3j9-00007Y-OJ; Tue, 05 Feb 2019 16:37:39 +0000
+Received: from mail-ot1-f65.google.com ([209.85.210.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr3iR-00086E-FX
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 16:36:58 +0000
-Received: by mail-ed1-x541.google.com with SMTP id t6so2125048edw.12
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 05 Feb 2019 08:36:54 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ffwll.ch; s=google;
- h=sender:date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=NCWl2rZuNpmuusiByoU99JE1aHjQzvnYqy/GbvIQvoA=;
- b=RbWgzM3mDmGqXDOz0+0PTRedcCYRzi3bdd808ItyyvzujLq8PEb5ThuiydoHwnnqIz
- ieTq1qEkuAyI90wmc9DjSw1SYh3otPBW89TBw9aiD2s+USkkDFOYCUMkEEd1/agQt+ic
- AA/sWicjoIoT6tQRKrnTcMCqbD5NFlSO6vJQw=
+ id 1gr3j5-000078-Rp; Tue, 05 Feb 2019 16:37:37 +0000
+Received: by mail-ot1-f65.google.com with SMTP id k98so6773107otk.3;
+ Tue, 05 Feb 2019 08:37:34 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
- :references:mime-version:content-disposition:in-reply-to:user-agent;
- bh=NCWl2rZuNpmuusiByoU99JE1aHjQzvnYqy/GbvIQvoA=;
- b=JdX306DWXNVMdND3zq49+IweHvYU2D0gjJmeUPp+i+MZ2/gH+2ncOrgyIVJGym15vS
- EDyHBvpUNRRGZkxoH2VytudQFG0n1iEXyUSpRJZqbtUEEeBg6f8ADZBxcmF9K/5xZaov
- ysbX1dCRZYANMP6tmQk4GUMm+H3dKpA8RlysbiPFzFWPuEsRujvp5fcaj/pfrKlcX3uI
- 9nrQtpLUOHnII0O3cE2X/ji0VWxfw8L3mNzWdqIhRhK0RB62oS4mBVhAMCy5vygvo+lR
- +95aarj5bTcvZNyKOMgoXA2gU3wzv3yl4hFviNQ1/RE3peMXQNtdZC84gBpH+GnWHwPY
- XYzA==
-X-Gm-Message-State: AHQUAubGbIhsiKblcBCQ+KUEwzfR/biskjTRmi48CwH/DCYgqRW1LfI3
- W9KM+F+w0x6WFaJDk0+SBnzTKQ==
-X-Google-Smtp-Source: AHgI3IbOwL8i3nelCsc5CZiGfI797G8earx/7I4na0s3SjRSA96IVDpC5VPuwcCKoeAdl2aX3XfQiQ==
-X-Received: by 2002:a50:ad55:: with SMTP id z21mr4665294edc.74.1549384613001; 
- Tue, 05 Feb 2019 08:36:53 -0800 (PST)
-Received: from phenom.ffwll.local ([2a02:168:569e:0:3106:d637:d723:e855])
- by smtp.gmail.com with ESMTPSA id e35sm5213751eda.13.2019.02.05.08.36.51
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 05 Feb 2019 08:36:51 -0800 (PST)
-Date: Tue, 5 Feb 2019 17:36:49 +0100
-From: Daniel Vetter <daniel@ffwll.ch>
-To: Thierry Reding <thierry.reding@gmail.com>
-Subject: Re: [PATCH RESEND v2 08/12] dt-bindings: add binding for generic eDP
- panel
-Message-ID: <20190205163649.GG3271@phenom.ffwll.local>
-References: <20190203185501.8958-9-anarsoul@gmail.com>
- <20190204074350.GC16448@ulmo>
- <CA+E=qVecudACOEXt74Kf=UA_F-uuHgEqHzKpYAq1ocMx3Sx+eQ@mail.gmail.com>
- <20190204082353.GE19087@ulmo>
- <20190204094012.GP3271@phenom.ffwll.local>
- <20190204112218.GB10412@ulmo>
- <20190204155909.GU3271@phenom.ffwll.local>
- <20190204162258.GB25476@ulmo>
- <20190205085737.GY3271@phenom.ffwll.local>
- <20190205102419.GA591@ulmo>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=HBle8rJYyyt01ATizJJrNAmYdunnvDGlqA15wX+Mvo0=;
+ b=iVsmbFiVazZ9O5+/PZkEiwixAvTFRMPd6rgIFijuXR6mulnKYtpv0QhVqlnKkLQ8NP
+ W29Uvq/+NzXHlxTiKwJ3ptvhqjKxeCjA6bb9/2Gt9gWJkLR6/7owxPn5EjIXtWAUBRoW
+ mAUxl5JoCyrTrrVzkfrtr3J6l2jq4skdJWw8SLClxKmoOGfCrVaSZYStFGNfFZDhgQoG
+ zn17UJo116XrGhJDs7PFCMGR08966aDKBGpcXcd9M+dLhkPmGhrD1kng0hzz60wWxxA9
+ x9ef65I1BtlOKLnhBcjB3oIvT0Pt6qqwqAnFiK1VnhE8gL6HWFTrMxT0BCS3i7zwBPpB
+ SVcA==
+X-Gm-Message-State: AHQUAuaU3OTzlrzz53d8uazbe/nfghJfjRjRQKA1evP2bQQshLpC5eOb
+ dwyCH+K1axKX30TwFGKnlw==
+X-Google-Smtp-Source: AHgI3IaE9wj865XsCg1zKNXJlTzg3XklIHlEQvlgM4uI9+q2fh5fiLbj7fCyFd7gWXw+knGd/3ZPvw==
+X-Received: by 2002:aca:5053:: with SMTP id e80mr160510oib.334.1549384653183; 
+ Tue, 05 Feb 2019 08:37:33 -0800 (PST)
+Received: from xps15.herring.priv (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.googlemail.com with ESMTPSA id r9sm9312678otq.81.2019.02.05.08.37.32
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 05 Feb 2019 08:37:32 -0800 (PST)
+From: Rob Herring <robh@kernel.org>
+To: Will Deacon <will.deacon@arm.com>, Robin Murphy <robin.murphy@arm.com>,
+ Joerg Roedel <joro@8bytes.org>
+Subject: [PATCH] iommu: Allow io-pgtable to be used outside of drivers/iommu/
+Date: Tue,  5 Feb 2019 10:37:31 -0600
+Message-Id: <20190205163731.17864-1-robh@kernel.org>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190205102419.GA591@ulmo>
-X-Operating-System: Linux phenom 4.19.0-1-amd64 
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_083655_755633_0BB963A6 
-X-CRM114-Status: GOOD (  51.95  )
+X-CRM114-CacheID: sfid-20190205_083735_895566_B8C65162 
+X-CRM114-Status: GOOD (  14.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -104,181 +82,253 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Archit Taneja <architt@codeaurora.org>, Andrzej Hajda <a.hajda@samsung.com>,
- David Airlie <airlied@linux.ie>, linux-sunxi <linux-sunxi@googlegroups.com>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Sean Paul <seanpaul@chromium.org>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Daniel Vetter <daniel@ffwll.ch>,
- arm-linux <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
+Cc: linux-arm-msm@vger.kernel.org, iommu@lists.linux-foundation.org,
+ Rob Clark <robdclark@gmail.com>, linux-mediatek@lists.infradead.org,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 05, 2019 at 11:24:19AM +0100, Thierry Reding wrote:
-> On Tue, Feb 05, 2019 at 09:57:37AM +0100, Daniel Vetter wrote:
-> > On Mon, Feb 04, 2019 at 05:22:58PM +0100, Thierry Reding wrote:
-> > > On Mon, Feb 04, 2019 at 04:59:09PM +0100, Daniel Vetter wrote:
-> > > > On Mon, Feb 04, 2019 at 12:22:18PM +0100, Thierry Reding wrote:
-> > > > > On Mon, Feb 04, 2019 at 10:40:12AM +0100, Daniel Vetter wrote:
-> > > > > > On Mon, Feb 04, 2019 at 09:23:59AM +0100, Thierry Reding wrote:
-> > > > > > > On Mon, Feb 04, 2019 at 12:13:55AM -0800, Vasily Khoruzhick wrote:
-> > > > > > > > On Sun, Feb 3, 2019 at 11:43 PM Thierry Reding <thierry.reding@gmail.com> wrote:
-> > > > > > > > >
-> > > > > > > > > On Sun, Feb 03, 2019 at 10:54:57AM -0800, Vasily Khoruzhick wrote:
-> > > > > > > > > > eDP panels usually have EDID EEPROM, so there's no need to define panel
-> > > > > > > > > > width/height or any modes/timings in dts. But this panel still may have
-> > > > > > > > > > regulator and/or backlight.
-> > > > > > > > > >
-> > > > > > > > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > > > > > > > > > ---
-> > > > > > > > > >  .../devicetree/bindings/display/panel/panel-edp.txt        | 7 +++++++
-> > > > > > > > > >  1 file changed, 7 insertions(+)
-> > > > > > > > > >  create mode 100644 Documentation/devicetree/bindings/display/panel/panel-edp.txt
-> > > > > > > > >
-> > > > > > > > > Please don't try to make panels look more generic than they really are.
-> > > > > > > > > You're going to have to provide a compatible string for your device that
-> > > > > > > > > is more specific than "panel-edp". You claim that you don't need any
-> > > > > > > > > extra information that is panel specific, but you don't know that now.
-> > > > > > > > > We have in the past thought that we didn't need things like prepare
-> > > > > > > > > delay, but then we ran into situations where we did need them.
-> > > > > > > > >
-> > > > > > > > > Just do what everybody else does. Provide a specific compatible string
-> > > > > > > > > and match on that in the panel-simple driver. Even if you can read all
-> > > > > > > > > the video timings from an EDID EEPROM, you can still provide a mode in
-> > > > > > > > > the panel descriptor to serve as a fallback if for example the EEPROM
-> > > > > > > > > is faulty on some device.
-> > > > > > > > 
-> > > > > > > > Pinebook used several 768p panels that have slightly different timings
-> > > > > > > > and recent batch uses 1080p panel.
-> > > > > > > > 
-> > > > > > > > What panel descriptor should I use as fallback?
-> > > > > > > 
-> > > > > > > You don't use panel descriptors as fallback. The simple-panel driver
-> > > > > > > will bind to a panel device and use the corresponding descriptor. If
-> > > > > > > your device tree contains the correct information, the descriptor is
-> > > > > > > correct for the panel you have.
-> > > > > > > 
-> > > > > > > In other words you need to ensure that you have the correct panel in
-> > > > > > > device tree for the board that you're using. This is exactly the same
-> > > > > > > thing as for other devices.
-> > > > > > > 
-> > > > > > > One way to to this is to have separate device trees for each variant
-> > > > > > > of the board that you want to support. Another variant may be to have
-> > > > > > > a common device tree and then have some early firmware update the DTB
-> > > > > > > with the correct panel information.
-> > > > > > 
-> > > > > > This would defeat the point of edp, which is to standardize the mess of
-> > > > > > panels (at least somewhat) and avoid having to change the DT/ACPI
-> > > > > > tables/firmware for every board you ship. Also, we do have DP quirking
-> > > > > > infrastructure already (using the OUI), I think if there's something that
-> > > > > > doesn't work then we should quirk it there.
-> > > > > 
-> > > > > The problem is that while the attempt may have been to standardize, it
-> > > > > failed. It doesn't take into account any of the details such as timing
-> > > > > between things like powering up the display and enabling the backlight
-> > > > > or similar. I don't know how you'd want to "quirk" those kinds of
-> > > > > requirements because they are highly panel specific.
-> > > > 
-> > > > Hm right, we get these from some firmware tables (and mix them with the
-> > > > spec one, since some of the firmware values are nonsense). I don't even
-> > > > know whether we can read the timings over dp aux somehow (you can power up
-> > > > the panel with some pessimistic values to figure those out, and you only
-> > > > need dp aux to work, which is much simpler than the entire panel).
-> > > > 
-> > > > > > What does make sense though imo is if we try not to stuff the edp panel
-> > > > > > into panel-simple, because it's anything like a simple dumb panel. There's
-> > > > > > also some integration awkwardness since with this panel you need to do dp
-> > > > > > aux/i2c transactions to get at the information (edid alone isn't good
-> > > > > > enough for edp), and I'm not sure how exactly that's supposed to be
-> > > > > > instantiated. Maybe a special function to instantiate an edp panel, which
-> > > > > > takes both a DT node and the dp_aux controller would be much better,
-> > > > > > instead of trying to auto-match against a DT compatible string and load a
-> > > > > > panel driver which is almost all fake.
-> > > > > > 
-> > > > > > Or we teach dp_aux to register itself and somehow teach panel-edp how it
-> > > > > > can get hold of the dp_aux channel it needs.
-> > > > > 
-> > > > > We already do that. drm_dp_aux registers as an I2C adapter that can be
-> > > > > used to read EDID EEPROMs using I2C-over-AUX transactions. We already
-> > > > > use that on some platforms.
-> > > > > 
-> > > > > Also note that simple-panel already supports getting video timings from
-> > > > > EDID. If a DDC link is present in DT, the driver will load the modes
-> > > > > from EDID and use them.
-> > > > 
-> > > > Could we extend this to dp aux somehow? For edp you need the dp aux (which
-> > > > then gives you the ddc link automatically).
-> > > 
-> > > I suppose we could do that. We could introduce a new property that would
-> > > allow the panel driver to get at the struct drm_dp_aux that can access
-> > > the panel. I'm not sure how much that would buy us. I suppose the driver
-> > > could go and use that drm_dp_aux to do I2C-over-AUX and ignore any
-> > > ddc-bus property in device tree. A drm_dp_aux object could also be used
-> > > to access DPCD if that's helpful.
-> > > 
-> > > The driver proposed here doesn't need access to DPCD, so I'm not sure
-> > > that would immediately help.
-> > 
-> > You definitely need dp aux to drive edp. That's where a lot of the really
-> > important stuff is stored, and it sounds like on non-broken panels even
-> > the timings (we've never implemented that on i915 somehow).
-> 
-> I'm not sure I understand what you're saying here. I haven't worked with
-> eDP panels in a while, but my recollection is that you can use DP AUX to
-> read video timings over EDID. We provide support for that by exporting a
-> DP AUX controller as I2C adapter (i.e. register with the I2C subsystem)
-> and then that I2C adapter can be used to read the EDID. I wasn't aware
-> that eDP panels additionally stored the video timings somewhere else.
+Move io-pgtable.h to include/linux/ and export alloc_io_pgtable_ops
+and free_io_pgtable_ops. This enables drivers outside drivers/iommu/ to
+use the ARM page table library. Specifically, some ARM Mali GPUs use the
+ARM page table formats.
 
-I didn't know either, but understood Vasily's comment that this is
-possible. Haven't dug around in the specs though.
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Rob Clark <robdclark@gmail.com>
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: iommu@lists.linux-foundation.org
+Cc: linux-mediatek@lists.infradead.org
+Cc: linux-arm-msm@vger.kernel.org
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
+This will be needed for an in-progress Mali GPU DRM driver. It's using 
+the page table lib, but is not a full IOMMU driver.
 
-> What I meant above was that aside from the I2C-over-AUX for reading the
-> EDID, this driver doesn't do anything else with DP AUX in order to turn
-> the panel on. Looking at the eDP support we have on Tegra, there's a
-> DPCD register (DP_SET_POWER) that needs to be written in order to take
-> the sink device (i.e. panel) out of the power saving state. We do that
-> as part of the connector implementation rather than within the panel
-> driver. There are also additional registers such as DP_LINK_BW_SET that
-> need to be programmed. I think this is also relevant to regular DP and
-> detailed in the specification.
-> 
-> Given all the above, I'm beginning to think that Rob's right in that
-> perhaps we shouldn't be treating eDP panels as panels, but rather to
-> make them look more like DP monitors and make all this code part of the
-> connector implementation. I think pretty much the only differences to
-> regular DP are that we might require some lower-level resources that a
-> DP monitor would usually have built-in (reset or power GPIOs, power
-> supplies, backlight, ...).
-> 
-> I'm not sure if that's enough for eDP panels, though. For example the
-> AUO B133HTN01 panel, used by the exynos5800-peach-pi, seems to be an eDP
-> panel. But the driver also specifies a couple of additional delays which
-> suggests that either it violates the eDP specification or that the eDP
-> specification doesn't define any power sequencing delays that would've
-> been needed. Or perhaps these delays are specified somewhere and the
-> driver just doesn't use them?
+It's going to be a few cycles I'd guess before the DRM driver is 
+anywhere close to merging. So I can carry this if preferred, but release 
+early, release often.
 
-I honestly don't know, but gut feeling also goes towards making edp
-something else than a dumb panel. There's a lot of stuff you need to do
-that overlaps with normal DP sinks, plus there's a lot of stuff (but not
-everything, or at least it needs some quirking sometimes) that you're
-supposed to autodiscover. But I'm not sure what's the best solution really
-is, since for i915 all the quirking we need is in some i915-specific
-tables (and I'm not even sure how much of that quirking is really
-necessary, and how much just convenience for us because the fw already did
-the hard work of poking the information out of the panel).
--Daniel
+Rob
+
+ drivers/iommu/arm-smmu-v3.c                   | 3 +--
+ drivers/iommu/arm-smmu.c                      | 2 +-
+ drivers/iommu/io-pgtable-arm-v7s.c            | 3 +--
+ drivers/iommu/io-pgtable-arm.c                | 3 +--
+ drivers/iommu/io-pgtable.c                    | 5 +++--
+ drivers/iommu/ipmmu-vmsa.c                    | 3 +--
+ drivers/iommu/msm_iommu.c                     | 2 +-
+ drivers/iommu/mtk_iommu.h                     | 3 +--
+ drivers/iommu/qcom_iommu.c                    | 2 +-
+ {drivers/iommu => include/linux}/io-pgtable.h | 0
+ 10 files changed, 11 insertions(+), 15 deletions(-)
+ rename {drivers/iommu => include/linux}/io-pgtable.h (100%)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 0d284029dc73..d3880010c6cf 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -18,6 +18,7 @@
+ #include <linux/dma-iommu.h>
+ #include <linux/err.h>
+ #include <linux/interrupt.h>
++#include <linux/io-pgtable.h>
+ #include <linux/iommu.h>
+ #include <linux/iopoll.h>
+ #include <linux/init.h>
+@@ -32,8 +33,6 @@
+ 
+ #include <linux/amba/bus.h>
+ 
+-#include "io-pgtable.h"
+-
+ /* MMIO registers */
+ #define ARM_SMMU_IDR0			0x0
+ #define IDR0_ST_LVL			GENMASK(28, 27)
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index af18a7e7f917..045d93884164 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -39,6 +39,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/io-64-nonatomic-hi-lo.h>
++#include <linux/io-pgtable.h>
+ #include <linux/iommu.h>
+ #include <linux/iopoll.h>
+ #include <linux/init.h>
+@@ -56,7 +57,6 @@
+ #include <linux/amba/bus.h>
+ #include <linux/fsl/mc.h>
+ 
+-#include "io-pgtable.h"
+ #include "arm-smmu-regs.h"
+ 
+ #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index cec29bf45c9b..75a8273d1ae9 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -35,6 +35,7 @@
+ #include <linux/atomic.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/gfp.h>
++#include <linux/io-pgtable.h>
+ #include <linux/iommu.h>
+ #include <linux/kernel.h>
+ #include <linux/kmemleak.h>
+@@ -45,8 +46,6 @@
+ 
+ #include <asm/barrier.h>
+ 
+-#include "io-pgtable.h"
+-
+ /* Struct accessors */
+ #define io_pgtable_to_data(x)						\
+ 	container_of((x), struct arm_v7s_io_pgtable, iop)
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 237cacd4a62b..d3700ec15cbd 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -22,6 +22,7 @@
+ 
+ #include <linux/atomic.h>
+ #include <linux/bitops.h>
++#include <linux/io-pgtable.h>
+ #include <linux/iommu.h>
+ #include <linux/kernel.h>
+ #include <linux/sizes.h>
+@@ -31,8 +32,6 @@
+ 
+ #include <asm/barrier.h>
+ 
+-#include "io-pgtable.h"
+-
+ #define ARM_LPAE_MAX_ADDR_BITS		52
+ #define ARM_LPAE_S2_MAX_CONCAT_PAGES	16
+ #define ARM_LPAE_MAX_LEVELS		4
+diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
+index 127558d83667..93f2880be6c6 100644
+--- a/drivers/iommu/io-pgtable.c
++++ b/drivers/iommu/io-pgtable.c
+@@ -19,11 +19,10 @@
+  */
+ 
+ #include <linux/bug.h>
++#include <linux/io-pgtable.h>
+ #include <linux/kernel.h>
+ #include <linux/types.h>
+ 
+-#include "io-pgtable.h"
+-
+ static const struct io_pgtable_init_fns *
+ io_pgtable_init_table[IO_PGTABLE_NUM_FMTS] = {
+ #ifdef CONFIG_IOMMU_IO_PGTABLE_LPAE
+@@ -61,6 +60,7 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
+ 
+ 	return &iop->ops;
+ }
++EXPORT_SYMBOL_GPL(alloc_io_pgtable_ops);
+ 
+ /*
+  * It is the IOMMU driver's responsibility to ensure that the page table
+@@ -77,3 +77,4 @@ void free_io_pgtable_ops(struct io_pgtable_ops *ops)
+ 	io_pgtable_tlb_flush_all(iop);
+ 	io_pgtable_init_table[iop->fmt]->free(iop);
+ }
++EXPORT_SYMBOL_GPL(free_io_pgtable_ops);
+diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
+index 7a4529c61c19..9a380c10655e 100644
+--- a/drivers/iommu/ipmmu-vmsa.c
++++ b/drivers/iommu/ipmmu-vmsa.c
+@@ -15,6 +15,7 @@
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
++#include <linux/io-pgtable.h>
+ #include <linux/iommu.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -35,8 +36,6 @@
+ #define arm_iommu_detach_device(...)	do {} while (0)
+ #endif
+ 
+-#include "io-pgtable.h"
+-
+ #define IPMMU_CTX_MAX 8
+ 
+ struct ipmmu_features {
+diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
+index fc4270733f11..ef7d1f995d6b 100644
+--- a/drivers/iommu/msm_iommu.c
++++ b/drivers/iommu/msm_iommu.c
+@@ -23,6 +23,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/errno.h>
+ #include <linux/io.h>
++#include <linux/io-pgtable.h>
+ #include <linux/interrupt.h>
+ #include <linux/list.h>
+ #include <linux/spinlock.h>
+@@ -37,7 +38,6 @@
+ 
+ #include "msm_iommu_hw-8xxx.h"
+ #include "msm_iommu.h"
+-#include "io-pgtable.h"
+ 
+ #define MRC(reg, processor, op1, crn, crm, op2)				\
+ __asm__ __volatile__ (							\
+diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
+index 778498b8633f..62c2c3e8c5df 100644
+--- a/drivers/iommu/mtk_iommu.h
++++ b/drivers/iommu/mtk_iommu.h
+@@ -19,13 +19,12 @@
+ #include <linux/component.h>
+ #include <linux/device.h>
+ #include <linux/io.h>
++#include <linux/io-pgtable.h>
+ #include <linux/iommu.h>
+ #include <linux/list.h>
+ #include <linux/spinlock.h>
+ #include <soc/mediatek/smi.h>
+ 
+-#include "io-pgtable.h"
+-
+ struct mtk_iommu_suspend_reg {
+ 	u32				standard_axi_mode;
+ 	u32				dcm_dis;
+diff --git a/drivers/iommu/qcom_iommu.c b/drivers/iommu/qcom_iommu.c
+index d8595f0a987d..8cdd3f059513 100644
+--- a/drivers/iommu/qcom_iommu.c
++++ b/drivers/iommu/qcom_iommu.c
+@@ -26,6 +26,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/io-64-nonatomic-hi-lo.h>
++#include <linux/io-pgtable.h>
+ #include <linux/iommu.h>
+ #include <linux/iopoll.h>
+ #include <linux/kconfig.h>
+@@ -42,7 +43,6 @@
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+ 
+-#include "io-pgtable.h"
+ #include "arm-smmu-regs.h"
+ 
+ #define SMMU_INTR_SEL_NS     0x2000
+diff --git a/drivers/iommu/io-pgtable.h b/include/linux/io-pgtable.h
+similarity index 100%
+rename from drivers/iommu/io-pgtable.h
+rename to include/linux/io-pgtable.h
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+2.19.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
