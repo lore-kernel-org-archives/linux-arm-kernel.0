@@ -2,113 +2,90 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D7F6C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:18:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BB479C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:20:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 20E0C2080D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:18:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 87D0F2176F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:20:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hN1MWa3t";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=impinj.com header.i=@impinj.com header.b="cbdGrco8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 20E0C2080D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=impinj.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r7XwFIbr";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="Mf/qPalz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87D0F2176F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lechnology.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZFaA/B3ChkROLlEQNBblW3zFdQQVV/Afys3kX5vZ0T8=; b=hN1MWa3tr+5mT7
-	7338xTj0M46qnxyBRHUYvIf+rCOLlhAfkB7liiWuyvsRSW1WpiKvXEHoM8Qq0ZkjazKsGJQQhAm6/
-	qZaX6gLNtXm0dvSOyYfnb79Xetux5sNyJfWipkE8MH7Uy1jeaw5yHyDozmVkfUsFm3jYaNrBmudXo
-	LJjGrHbGOG3PkLZInYSRECjo0zKk0dyJNx/fh+wleeZeNw07DdFCTL95hwy9Dzeaslno8GpYBOYyv
-	l7Q44xRvmMn3ufQeswNVfCzBfjnL0TlKyPvOmVNmx1zcykWhq4QKUWTd1OytTkUk2g1xNsmPMiOwV
-	Y3NeQW5UPuCO/DOG0sHw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=ybciA3JtDcqypqwVAoC1uZykyuQLcxYHVODqR+SfJ+s=; b=r7XwFIbr56ErQpQPTMk7Jy/FK
+	782AWy46rRGU9VEsb/pGub+srUR2R0ng2FJ4FT0ANfmO3MAGSQT/o/+JfwTljDE/9XHM800rLqgjk
+	NTOzBlkkYLWeZY19LzfbjXP7DaWqKJsMkTFoQ94UKCdMhKNWm+Mbswc2W92a+8M86hZOEkypKa/aj
+	jo//XwexchUG1iGyW/qyYl8Fkt9YJBOLk4H9QnV9mhgyzQoB03AvZv9/VdVHb2S7q338b/Sg+emhD
+	r7QnAQKYp4wR+0hxjz8Utu3hECledpYwCcGFHR2BBcKgD6QNEEk4XUMvHKg0FFkZdl9cDg9HWdGO1
+	bC4UX9P6A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqoRr-0005C3-LL; Tue, 05 Feb 2019 00:18:47 +0000
-Received: from mail-dm3nam05on0701.outbound.protection.outlook.com
- ([2a01:111:f400:fe51::701]
- helo=NAM05-DM3-obe.outbound.protection.outlook.com)
+	id 1gqoTT-0006xh-Q4; Tue, 05 Feb 2019 00:20:27 +0000
+Received: from vern.gendns.com ([98.142.107.122])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqoR1-0004P6-S2
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 00:18:11 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=impinj.com;
- s=selector1;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=Q7RiZACcNA+wyuttLTr7HU4ezOYEzdjsUyq1kCjCgzc=;
- b=cbdGrco8gY55eSnVmEnAVl/6avBj18RkKr7Y2ZMOunZdwYNWVC+WnlRUZwc2DPCylYcJFZUZezsZKFpBDnTpLeiGcRCYnPosCKuy0CT9X4p9e9nftInlZkplKi2J0aAtWfJrGemPbfBCYwdKiYr7q7RKS3lOOFwoAFQjsXmft4o=
-Received: from MWHPR0601MB3708.namprd06.prod.outlook.com (10.167.236.38) by
- MWHPR0601MB3722.namprd06.prod.outlook.com (10.167.236.139) with Microsoft
- SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1580.16; Tue, 5 Feb 2019 00:17:41 +0000
-Received: from MWHPR0601MB3708.namprd06.prod.outlook.com
- ([fe80::ac0c:a03e:77c7:fa85]) by MWHPR0601MB3708.namprd06.prod.outlook.com
- ([fe80::ac0c:a03e:77c7:fa85%5]) with mapi id 15.20.1580.019; Tue, 5 Feb 2019
- 00:17:41 +0000
-From: Trent Piepho <tpiepho@impinj.com>
-To: "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>
-Subject: [PATCH v2 3/3] PCI: imx: Add workaround for e10728, IMX7d PCIe PLL
- failure
-Thread-Topic: [PATCH v2 3/3] PCI: imx: Add workaround for e10728, IMX7d PCIe
- PLL failure
-Thread-Index: AQHUvOg1I9SIwv2NIEC65G+x/YIYYw==
-Date: Tue, 5 Feb 2019 00:17:41 +0000
-Message-ID: <20190205001721.18639-4-tpiepho@impinj.com>
-References: <20190205001721.18639-1-tpiepho@impinj.com>
-In-Reply-To: <20190205001721.18639-1-tpiepho@impinj.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: BYAPR07CA0078.namprd07.prod.outlook.com
- (2603:10b6:a03:12b::19) To MWHPR0601MB3708.namprd06.prod.outlook.com
- (2603:10b6:301:7c::38)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=tpiepho@impinj.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-mailer: git-send-email 2.14.4
-x-originating-ip: [216.207.205.253]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; MWHPR0601MB3722;
- 6:rScQydgHaMNq65zSLTOco5AsfA8mpCe1qbCPSkWbLyU9PPKIIUIgzFshDvf4OKIxH8cGyq3awXlZUBRnV3MzdOE7KzMxUWKAgpHAISdH7lobipEjjbTwoPStxAjLvH6l7yGFnhzaDCUOcEpC3cHmukZPs2jEbg532vcgTmW3c7OMhwZK9hciMq5BLOw+ehVa9jWwlq6KUvksnUlFForVu8jxGYxrR1dbON91ZV/hy47rIxO/9RV05p9GwXdD5E23fgsgY9Ys6ySg5vt5jqDr9mp5pRRdg7fffnmlkKTPEDCyDuKN8V1QVAd+yFRfaT1lKlDeadxFTMbUKErumnDvCdqoHd4k31bMGbO66FrezWPiQSrUdu53HK7dvzj4AkrnQvAZCx5jaION9c8BIms9HdkJlXs8LSShp2NGj6OXc6XXdB3a7Now4o/vbvHG9M8yeXglieiYDI5pF30N+XrzKg==;
- 5:s8gdbLbt8ScHhRq+JQlF6sdCmP5lBICYUSO+eUO20iy8LX0NoluIAUUiKIBi/77R1MUE7V4ETsd6hmKwYxg/tc+fD/p0rBmw8zNLkQGFDBJAN0dqd9M/jfB8yhnJZTGDeb2oWKYchjidzGGbhAex/tE2nB7k4ZeCaz2hdQ5MVyxImoQvbdHZBQLqH9klrGuz5qr0V+3un9//18MAU/VsqQ==;
- 7:9YK0uW2JOzBIKhSF6r5+QZoFLVCj85gSWwShCx8U9RqzJPgmPzowc7cHSzXDZ7qPW7u0KQq/61M5FyZ+tCQInQcuPSIjtOGmQugp6jNmKTikVoyG6D9MjDdFXa/iYyCVHtCeFT274Bh0yMyGY+dE/w==
-x-ms-office365-filtering-correlation-id: 42d04db9-692d-422d-f194-08d68aff578d
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
- SRVR:MWHPR0601MB3722; 
-x-ms-traffictypediagnostic: MWHPR0601MB3722:
-x-microsoft-antispam-prvs: <MWHPR0601MB37226C47B7B646257A615FA3D36E0@MWHPR0601MB3722.namprd06.prod.outlook.com>
-x-forefront-prvs: 0939529DE2
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10019020)(376002)(346002)(136003)(396003)(39850400004)(366004)(199004)(189003)(2616005)(476003)(105586002)(25786009)(305945005)(7736002)(2906002)(6116002)(107886003)(3846002)(11346002)(66066001)(486006)(86362001)(4326008)(97736004)(186003)(2351001)(446003)(1076003)(71190400001)(71200400001)(256004)(6486002)(102836004)(6436002)(26005)(50226002)(386003)(6506007)(53936002)(14454004)(6916009)(5640700003)(316002)(8936002)(478600001)(6512007)(76176011)(2501003)(99286004)(81166006)(81156014)(68736007)(14444005)(52116002)(54906003)(36756003)(106356001)(8676002);
- DIR:OUT; SFP:1102; SCL:1; SRVR:MWHPR0601MB3722;
- H:MWHPR0601MB3708.namprd06.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: impinj.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: dZs41GfsuRSAtrtSxR7f+qgOVBlVbxSigREn5qHa7ms12i7H+4LCn0lzhEfm6F6g0xpKVyK0+oWgB0GjnVg5Zqj8KFHaVw4yXM9SQSxig+0M1cU6PKYH87heSYbiH5ZO+Q4hpcVCeRsgsxRmO8clJotPeRgoQhCg4OANEM11YP+S6M+VSOoXLw0VM8Wj7OlfgWol/Z7ICR/lahhcAi9IMY1QImM6ZXOkMfHO6WdAop99sLWoOey1UqrPsm1ELXlIFPl/vrjkKuKQSMld1vtdKtcntbWD2Aazmn/beWBa+FNrkIYFuNFSfZcaI8xII4iMK0jBbe+bJvk7i5qkObeoBFKIobIOXUTtfFhEM1xSLgwuagXM6pcfC+zNhSaNfAYJzMubTEGiWF3GeZcrfuFiBdqRXsbY3NSovQeXVt0yocg=
+ id 1gqoTP-0006xE-5v
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 00:20:24 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=lechnology.com; s=default; h=Content-Transfer-Encoding:Content-Type:
+ In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=bQJwCPwRuCTQSo9mQctEi0X/I+I2GRQgR7Nl0ve1TRQ=; b=Mf/qPalzFR0iRDZ4WE82VKaevq
+ 1U4HaHJchPIbDh160tc5hsaTgbnQdfrWz+Lvon5YE5yW5yBX7lTiZ8I5C5E76ots/QSqepUxVEUIS
+ cg2ea0ncln3otDvDObACOunyUJ+Efya1It0BDx7KVkPY+v6dSWCxU13xh1l588CgN8KtIrY44nL3R
+ LM86vMENm66cnSupFV47tSz+doJjgqskTYCuObr91BRYeAsi0YJSeSiiB9K26H+yxwhaT3qO+rK1F
+ BEGGl1tt6Sv16bZ9k0SXCz+mWNxPJekWMJDQnOuDHPaRP7EtLcJxpNnuPk396XQfNk2uDCicF7Tde
+ A+BVnG/g==;
+Received: from 108-198-5-147.lightspeed.okcbok.sbcglobal.net
+ ([108.198.5.147]:60228 helo=[192.168.0.134])
+ by vern.gendns.com with esmtpsa (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128)
+ (Exim 4.91) (envelope-from <david@lechnology.com>)
+ id 1gqoPt-0006vT-2h; Mon, 04 Feb 2019 19:16:45 -0500
+Subject: Re: [PATCH 05/35] ARM: davinci: drop irq defines from
+ default_priorites
+To: Bartosz Golaszewski <brgl@bgdev.pl>, Sekhar Nori <nsekhar@ti.com>,
+ Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>
+References: <20190131133928.17985-1-brgl@bgdev.pl>
+ <20190131133928.17985-6-brgl@bgdev.pl>
+From: David Lechner <david@lechnology.com>
+Message-ID: <28694e1b-415a-d53f-f2e5-ba2a407fa88c@lechnology.com>
+Date: Mon, 4 Feb 2019 18:20:18 -0600
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-OriginatorOrg: impinj.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 42d04db9-692d-422d-f194-08d68aff578d
-X-MS-Exchange-CrossTenant-originalarrivaltime: 05 Feb 2019 00:17:40.5774 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 6de70f0f-7357-4529-a415-d8cbb7e93e5e
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR0601MB3722
+In-Reply-To: <20190131133928.17985-6-brgl@bgdev.pl>
+Content-Language: en-US
+X-AntiAbuse: This header was added to track abuse,
+ please include it with any abuse report
+X-AntiAbuse: Primary Hostname - vern.gendns.com
+X-AntiAbuse: Original Domain - lists.infradead.org
+X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
+X-AntiAbuse: Sender Address Domain - lechnology.com
+X-Get-Message-Sender-Via: vern.gendns.com: authenticated_id:
+ davidmain+lechnology.com/only user confirmed/virtual account not confirmed
+X-Authenticated-Sender: vern.gendns.com: davidmain@lechnology.com
+X-Source: 
+X-Source-Args: 
+X-Source-Dir: 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_161756_484055_0D041498 
-X-CRM114-Status: GOOD (  13.13  )
+X-CRM114-CacheID: sfid-20190204_162023_383704_A17039DB 
+X-CRM114-Status: GOOD (  15.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -120,140 +97,153 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Richard Zhu <hongxing.zhu@nxp.com>, Lucas Stach <l.stach@pengutronix.de>,
- Shawn Guo <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- Trent Piepho <tpiepho@impinj.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This implements the workound described in the NXP IMX7d erratum e10728.
+On 1/31/19 7:38 AM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> In order to select SPARSE_IRQ we need to make the interrupt numbers
+> dynamic (at least at build-time for the top-level controller). The
+> interrupt numbers are used as array indexes for irq priorities.
+> 
+> Drop the defines and just initialize the arrays in a linear manner.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>   arch/arm/mach-davinci/da830.c  | 107 ++++--------------------------
+>   arch/arm/mach-davinci/da850.c  | 118 +++++----------------------------
+>   arch/arm/mach-davinci/dm355.c  |  74 +++------------------
+>   arch/arm/mach-davinci/dm365.c  |  76 +++------------------
+>   arch/arm/mach-davinci/dm644x.c |  76 +++------------------
+>   arch/arm/mach-davinci/dm646x.c |  76 +++------------------
+>   6 files changed, 69 insertions(+), 458 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+> index 9e18b245266b..f1e7b6c644e5 100644
+> --- a/arch/arm/mach-davinci/da830.c
+> +++ b/arch/arm/mach-davinci/da830.c
+> @@ -624,98 +624,19 @@ const short da830_eqep1_pins[] __initconst = {
+>   };
+>   
+>   /* FIQ are pri 0-1; otherwise 2-7, with 7 lowest priority */
+> -static u8 da830_default_priorities[DA830_N_CP_INTC_IRQ] = {
+> -	[IRQ_DA8XX_COMMTX]		= 7,
+> -	[IRQ_DA8XX_COMMRX]		= 7,
+> -	[IRQ_DA8XX_NINT]		= 7,
+> -	[IRQ_DA8XX_EVTOUT0]		= 7,
+> -	[IRQ_DA8XX_EVTOUT1]		= 7,
+> -	[IRQ_DA8XX_EVTOUT2]		= 7,
+> -	[IRQ_DA8XX_EVTOUT3]		= 7,
+> -	[IRQ_DA8XX_EVTOUT4]		= 7,
+> -	[IRQ_DA8XX_EVTOUT5]		= 7,
+> -	[IRQ_DA8XX_EVTOUT6]		= 7,
+> -	[IRQ_DA8XX_EVTOUT7]		= 7,
+> -	[IRQ_DA8XX_CCINT0]		= 7,
+> -	[IRQ_DA8XX_CCERRINT]		= 7,
+> -	[IRQ_DA8XX_TCERRINT0]		= 7,
+> -	[IRQ_DA8XX_AEMIFINT]		= 7,
+> -	[IRQ_DA8XX_I2CINT0]		= 7,
+> -	[IRQ_DA8XX_MMCSDINT0]		= 7,
+> -	[IRQ_DA8XX_MMCSDINT1]		= 7,
+> -	[IRQ_DA8XX_ALLINT0]		= 7,
+> -	[IRQ_DA8XX_RTC]			= 7,
+> -	[IRQ_DA8XX_SPINT0]		= 7,
+> -	[IRQ_DA8XX_TINT12_0]		= 7,
+> -	[IRQ_DA8XX_TINT34_0]		= 7,
+> -	[IRQ_DA8XX_TINT12_1]		= 7,
+> -	[IRQ_DA8XX_TINT34_1]		= 7,
+> -	[IRQ_DA8XX_UARTINT0]		= 7,
+> -	[IRQ_DA8XX_KEYMGRINT]		= 7,
+> -	[IRQ_DA830_MPUERR]		= 7,
+> -	[IRQ_DA8XX_CHIPINT0]		= 7,
+> -	[IRQ_DA8XX_CHIPINT1]		= 7,
+> -	[IRQ_DA8XX_CHIPINT2]		= 7,
+> -	[IRQ_DA8XX_CHIPINT3]		= 7,
+> -	[IRQ_DA8XX_TCERRINT1]		= 7,
+> -	[IRQ_DA8XX_C0_RX_THRESH_PULSE]	= 7,
+> -	[IRQ_DA8XX_C0_RX_PULSE]		= 7,
+> -	[IRQ_DA8XX_C0_TX_PULSE]		= 7,
+> -	[IRQ_DA8XX_C0_MISC_PULSE]	= 7,
+> -	[IRQ_DA8XX_C1_RX_THRESH_PULSE]	= 7,
+> -	[IRQ_DA8XX_C1_RX_PULSE]		= 7,
+> -	[IRQ_DA8XX_C1_TX_PULSE]		= 7,
+> -	[IRQ_DA8XX_C1_MISC_PULSE]	= 7,
+> -	[IRQ_DA8XX_MEMERR]		= 7,
+> -	[IRQ_DA8XX_GPIO0]		= 7,
+> -	[IRQ_DA8XX_GPIO1]		= 7,
+> -	[IRQ_DA8XX_GPIO2]		= 7,
+> -	[IRQ_DA8XX_GPIO3]		= 7,
+> -	[IRQ_DA8XX_GPIO4]		= 7,
+> -	[IRQ_DA8XX_GPIO5]		= 7,
+> -	[IRQ_DA8XX_GPIO6]		= 7,
+> -	[IRQ_DA8XX_GPIO7]		= 7,
+> -	[IRQ_DA8XX_GPIO8]		= 7,
+> -	[IRQ_DA8XX_I2CINT1]		= 7,
+> -	[IRQ_DA8XX_LCDINT]		= 7,
+> -	[IRQ_DA8XX_UARTINT1]		= 7,
+> -	[IRQ_DA8XX_MCASPINT]		= 7,
+> -	[IRQ_DA8XX_ALLINT1]		= 7,
+> -	[IRQ_DA8XX_SPINT1]		= 7,
+> -	[IRQ_DA8XX_UHPI_INT1]		= 7,
+> -	[IRQ_DA8XX_USB_INT]		= 7,
+> -	[IRQ_DA8XX_IRQN]		= 7,
+> -	[IRQ_DA8XX_RWAKEUP]		= 7,
+> -	[IRQ_DA8XX_UARTINT2]		= 7,
+> -	[IRQ_DA8XX_DFTSSINT]		= 7,
+> -	[IRQ_DA8XX_EHRPWM0]		= 7,
+> -	[IRQ_DA8XX_EHRPWM0TZ]		= 7,
+> -	[IRQ_DA8XX_EHRPWM1]		= 7,
+> -	[IRQ_DA8XX_EHRPWM1TZ]		= 7,
+> -	[IRQ_DA830_EHRPWM2]		= 7,
+> -	[IRQ_DA830_EHRPWM2TZ]		= 7,
+> -	[IRQ_DA8XX_ECAP0]		= 7,
+> -	[IRQ_DA8XX_ECAP1]		= 7,
+> -	[IRQ_DA8XX_ECAP2]		= 7,
+> -	[IRQ_DA830_EQEP0]		= 7,
+> -	[IRQ_DA830_EQEP1]		= 7,
+> -	[IRQ_DA830_T12CMPINT0_0]	= 7,
+> -	[IRQ_DA830_T12CMPINT1_0]	= 7,
+> -	[IRQ_DA830_T12CMPINT2_0]	= 7,
+> -	[IRQ_DA830_T12CMPINT3_0]	= 7,
+> -	[IRQ_DA830_T12CMPINT4_0]	= 7,
+> -	[IRQ_DA830_T12CMPINT5_0]	= 7,
+> -	[IRQ_DA830_T12CMPINT6_0]	= 7,
+> -	[IRQ_DA830_T12CMPINT7_0]	= 7,
+> -	[IRQ_DA830_T12CMPINT0_1]	= 7,
+> -	[IRQ_DA830_T12CMPINT1_1]	= 7,
+> -	[IRQ_DA830_T12CMPINT2_1]	= 7,
+> -	[IRQ_DA830_T12CMPINT3_1]	= 7,
+> -	[IRQ_DA830_T12CMPINT4_1]	= 7,
+> -	[IRQ_DA830_T12CMPINT5_1]	= 7,
+> -	[IRQ_DA830_T12CMPINT6_1]	= 7,
+> -	[IRQ_DA830_T12CMPINT7_1]	= 7,
+> -	[IRQ_DA8XX_ARMCLKSTOPREQ]	= 7,
+> +static u8 da830_cp_intc_prios[] = {
+> +	7, 7, 7, 7, 7, 7, 7, 7,
+> +	7, 7, 7, 7, 7, 7, 7, 7,
+> +	7, 7, 7, 7, 7, 7, 7, 7,
+> +	7, 7, 7, 7, 7, 7, 7, 7,
+> +	7, 7, 7, 7, 7, 7, 7, 7,
+> +	7, 7, 7, 7, 7, 7, 7, 7,
+> +	7, 7, 7, 7, 7, 7, 7, 7,
+> +	7, 7, 7, 7, 7, 7, 7, 7,
+> +	7, 7, 7, 7, 7, 7, 7, 7,
+> +	7, 7, 7, 7, 7, 7, 7, 7,
+> +	7, 7, 7, 7, 7, 7, 7, 7,
+> +	7, 7, 7, 7, 7, 7, 7, 7,
+>   };
+>  
 
-Initial VCO oscillation may fail under corner conditions such as cold
-temperature.  It causes PCIe PLL to fail to lock in the initialization
-phase, which results in the PCIe link failing to come up.
-
-The workaround is to disable Duty-cycle Corrector (DCC) calibration
-after G_RST.
-
-To do this it is necessary to gain access to the undocumented and
-currently unused PCIe PHY register bank.  A new device tree node of type
-"fsl,imx7d-pcie-phy" is created for the PHY block and the existing PCIe
-device uses a phandle named "fsl,imx7d-pcie-phy" to point to it.
-
-Signed-off-by: Trent Piepho <tpiepho@impinj.com>
----
- drivers/pci/controller/dwc/pci-imx6.c | 57 +++++++++++++++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
-
-diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-index 80f843030e36..06dd6aa927d4 100644
---- a/drivers/pci/controller/dwc/pci-imx6.c
-+++ b/drivers/pci/controller/dwc/pci-imx6.c
-@@ -18,6 +18,7 @@
- #include <linux/module.h>
- #include <linux/of_gpio.h>
- #include <linux/of_device.h>
-+#include <linux/of_address.h>
- #include <linux/pci.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
-@@ -61,6 +62,7 @@ struct imx6_pcie {
- 	u32			tx_swing_low;
- 	int			link_gen;
- 	struct regulator	*vpcie;
-+	void __iomem		*phy_base;
- 
- 	/* power domain for pcie */
- 	struct device		*pd_pcie;
-@@ -117,6 +119,23 @@ struct imx6_pcie {
- #define PCIE_PHY_RX_ASIC_OUT 0x100D
- #define PCIE_PHY_RX_ASIC_OUT_VALID	(1 << 0)
- 
-+/* iMX7 PCIe PHY registers */
-+#define PCIE_PHY_CMN_REG4		0x14
-+/* These are probably the bits that *aren't* DCC_FB_EN */
-+#define PCIE_PHY_CMN_REG4_DCC_FB_EN	0x29
-+
-+#define PCIE_PHY_CMN_REG15	        0x54
-+#define PCIE_PHY_CMN_REG15_DLY_4	BIT(2)
-+#define PCIE_PHY_CMN_REG15_PLL_PD	BIT(5)
-+#define PCIE_PHY_CMN_REG15_OVRD_PLL_PD	BIT(7)
-+
-+#define PCIE_PHY_CMN_REG24		0x90
-+#define PCIE_PHY_CMN_REG24_RX_EQ	BIT(6)
-+#define PCIE_PHY_CMN_REG24_RX_EQ_SEL	BIT(3)
-+
-+#define PCIE_PHY_CMN_REG26		0x98
-+#define PCIE_PHY_CMN_REG26_ATT_MODE	0xBC
-+
- #define PHY_RX_OVRD_IN_LO 0x1005
- #define PHY_RX_OVRD_IN_LO_RX_DATA_EN (1 << 5)
- #define PHY_RX_OVRD_IN_LO_RX_PLL_EN (1 << 3)
-@@ -490,6 +509,26 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
- 	switch (imx6_pcie->variant) {
- 	case IMX7D:
- 		reset_control_deassert(imx6_pcie->pciephy_reset);
-+
-+		/* Workaround for ERR010728, failure of PCI-e PLL VCO to
-+		 * oscillate, especially when cold.  This turns off "Duty-cycle
-+		 * Corrector" and other mysterious undocumented things.
-+		 */
-+		if (likely(imx6_pcie->phy_base)) {
-+			/* De-assert DCC_FB_EN */
-+			writel(PCIE_PHY_CMN_REG4_DCC_FB_EN,
-+			       imx6_pcie->phy_base + PCIE_PHY_CMN_REG4);
-+			/* Assert RX_EQS and RX_EQS_SEL */
-+			writel(PCIE_PHY_CMN_REG24_RX_EQ_SEL
-+				| PCIE_PHY_CMN_REG24_RX_EQ,
-+			       imx6_pcie->phy_base + PCIE_PHY_CMN_REG24);
-+			/* Assert ATT_MODE */
-+			writel(PCIE_PHY_CMN_REG26_ATT_MODE,
-+			       imx6_pcie->phy_base + PCIE_PHY_CMN_REG26);
-+		} else {
-+			dev_warn(dev, "DT lacks imx7d-pcie-phy, unable to apply ERR010728 workaround\n");
-+		}
-+
- 		imx7d_pcie_wait_for_phy_pll_lock(imx6_pcie);
- 		break;
- 	case IMX6SX:
-@@ -919,6 +958,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct dw_pcie *pci;
- 	struct imx6_pcie *imx6_pcie;
-+	struct device_node *np;
- 	struct resource *dbi_base;
- 	struct device_node *node = dev->of_node;
- 	int ret;
-@@ -939,6 +979,23 @@ static int imx6_pcie_probe(struct platform_device *pdev)
- 	imx6_pcie->variant =
- 		(enum imx6_pcie_variants)of_device_get_match_data(dev);
- 
-+	/* Find the PHY if one is defined, only imx7d uses it */
-+	np = of_parse_phandle(node, "fsl,imx7d-pcie-phy", 0);
-+	if (np) {
-+		struct resource res;
-+
-+		ret = of_address_to_resource(np, 0, &res);
-+		if (ret) {
-+			dev_err(dev, "Unable to map PCIe PHY\n");
-+			return ret;
-+		}
-+		imx6_pcie->phy_base = devm_ioremap_resource(dev, &res);
-+		if (IS_ERR(imx6_pcie->phy_base)) {
-+			dev_err(dev, "Unable to map PCIe PHY\n");
-+			return PTR_ERR(imx6_pcie->phy_base);
-+		}
-+	}
-+
- 	dbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pci->dbi_base = devm_ioremap_resource(dev, dbi_base);
- 	if (IS_ERR(pci->dbi_base))
--- 
-2.14.4
+Technically, any holes in the array that are being deleted
+here have a default priority of 15 assigned in the cp_intc
+driver instead of 7. I don't think this is a problem, but it
+might be worth mentioning in the commit message. Same goes
+for DA850.
 
 
 _______________________________________________
