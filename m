@@ -2,23 +2,22 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 66732C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 04:55:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 74979C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 05:01:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2D6D320821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 04:55:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 420CA2081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 05:01:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fDmPSFPX";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="GtUrEgaZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D6D320821
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ch9+u2Uz";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ay1JqYOB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 420CA2081B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,64 +25,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Sy1b0jALDyYqADe+/AC8pfIp/aZ5nNUuNO+54LNEMF8=; b=fDmPSFPX0L/d0k
-	m3HNS+Z7VxCkKww3LmE/1Myh7PZ+oADHElX5CYZBqI3XE0Ltd5qxYCMU+fBAUTqTVMh5srriIWFIj
-	VswD1b9U0r5UoiUECKWwq4/othRjyH3FKwi2ibtvC2jb9G9a8i+WJjwjVD4mg1kZrl6Ty2ShQzuuL
-	Lr9G5H7r5DyV7w/xW6CkyDpN32Qzcfw+OV1Zcl8MP8M1Yahn7X2Dd/XGsMRDxNyA0VZ6yRqSHemsD
-	SzxgMRExjc/bFUzwgiLfaBxlgYjoUc5vi+ZRKnzhJzkVKoe0p4hONS+BBnnJU2KeZGDucIzzzHTf7
-	7QP5HDLKABmbrpv8OZYw==;
+	List-Owner; bh=txHxalRmi/NbgWgipREVu6oZ3baAyxwndCk323Ystvg=; b=Ch9+u2Uzv7U9oE
+	KMwCAuFdwRMnMMKlu5cuxjoCmJIcgVdBvMt9LagwyLebQigIMooiTWHYTVAJ+qH6JxT6iDvPkfbsi
+	Ngf2m/1g4KHNcLUfKEvAj0jEzRd3IVxQjPHF3Khq7D9mZpkjKsWS3YAOlmzbubCsKVOpLqzUv/LMQ
+	KGDHR8MQuvezLxYp8DRCl2tCDRvsr2ymy/ovPmmAeIJH9d7kSv5srs+y7dWBsJE3g22L/sG0k1/ud
+	IB8x067WS7NsYcv0VlJ1fbkOImkMiYRV1W4zTNtfRLhITpQNYvaGZ9PwjlwuDJkAEfDWBNziOjBVu
+	LHAss1cr0zJt3NHE7ygQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqslW-0000uS-B9; Tue, 05 Feb 2019 04:55:22 +0000
-Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
+	id 1gqsrQ-0002YJ-IM; Tue, 05 Feb 2019 05:01:28 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqslT-0000u2-MY
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 04:55:21 +0000
-Received: by mail-pf1-x443.google.com with SMTP id z9so970414pfi.2
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 20:55:17 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:content-transfer-encoding:in-reply-to
- :user-agent; bh=Pj29ZP53jXH3k34XhVa5Kv7d7T0KHRmwkYPC25H6maI=;
- b=GtUrEgaZgCXKg6irY0VrzPG+p4ZCyRvQ2NjMRs+NabyR9G6/hUNxjQUlfzI5Mukl6J
- Dzn27FCI4MaunKw8W5WZA2bWzEdXIJJcT/6L66necL5Ypb38D4KxjPBocy6GXPHp2y7g
- ZFEICyBaxiCeq03Iw4xawYbDDUCzIIuoK3msM=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:content-transfer-encoding
- :in-reply-to:user-agent;
- bh=Pj29ZP53jXH3k34XhVa5Kv7d7T0KHRmwkYPC25H6maI=;
- b=JvaU1xIqEs+Ou4Rc4ojawGP2tuU3b0eDbM623fSlCvAdLHj3M7znymlnTSZ6LSpPCf
- rJN8zAsFqps9ZS7aC+nrAk6YjWBFKncdtKPhnEhu0GTMS+emvjMQG7GP7lS1ZUZz0w5l
- eL8JY4i1kdU+lmNutu61J80wHx6UG9kCndFXg9Oyk6dFIoxd/Ttbv85oGKNOfmiHjBPG
- RDtGbBg+nI3nMXEuHtMcwmFWsAOmqhrSt2S0+TBaT02i1/OeiZB8Nnd/9gs6+Y3IlkpE
- CeruH3FbLVvXUBXvmR3UHOcW98NQ6k0Wy9QjpUPrVNKUFLFQ00IXpK7329HsQfajUtdv
- vBVw==
-X-Gm-Message-State: AHQUAuak8XoMBJ+qCBQWei3utDdEXE9nsP1eRp6y3P76Gmub1u47ZVM8
- yD+nKSkGsCaukq60L1eWIa0sI05yk8k=
-X-Google-Smtp-Source: AHgI3IYW1/4douBppUhRF/OoyBCckP25XlC7Is6qmjf7KrqFcvc+4c59iKTrvM+amQbB/u9gHh37ug==
-X-Received: by 2002:a62:444b:: with SMTP id r72mr3132836pfa.184.1549342517262; 
- Mon, 04 Feb 2019 20:55:17 -0800 (PST)
-Received: from localhost ([122.172.102.63])
- by smtp.gmail.com with ESMTPSA id 184sm2211166pfe.106.2019.02.04.20.55.15
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 04 Feb 2019 20:55:15 -0800 (PST)
-Date: Tue, 5 Feb 2019 10:25:13 +0530
-From: Viresh Kumar <viresh.kumar@linaro.org>
-To: Quentin Perret <quentin.perret@arm.com>
-Subject: Re: [PATCH v4 0/5] Register an Energy Model for Arm reference
- platforms
-Message-ID: <20190205045513.p4ljxgsnvmk3fzgw@vireshk-i7>
-References: <20190204110952.16025-1-quentin.perret@arm.com>
+ id 1gqsrN-0002Xn-EF
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 05:01:26 +0000
+Received: from localhost (unknown [171.61.84.175])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 120E72081B;
+ Tue,  5 Feb 2019 05:01:23 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549342884;
+ bh=2q/nWreDmf4PHQGRP8s50OMKY7xs6uZYZGwOVEnWQMk=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=ay1JqYOB7/m2yMyXXi9AOLbK7QPHvmY6NHOFbzfnYxTVpRNJq/o++liD8gs3o9Diu
+ EAFBc6VtUmJIxQZsL4xCx0lLhCEjqAWZCVicMx1RbAkwzaMWTzejNDAMYRNot3obTU
+ Cc4xOjZAKHQY+MjWt00CbbsSbW1NtRpp/j8+35u8=
+Date: Tue, 5 Feb 2019 10:31:16 +0530
+From: Vinod Koul <vkoul@kernel.org>
+To: John Stultz <john.stultz@linaro.org>
+Subject: Re: [PATCH 0/8 v5] k3dma patches to add support for hi3660/HiKey960
+Message-ID: <20190205050116.GV4296@vkoul-mobl>
+References: <1548361463-28372-1-git-send-email-john.stultz@linaro.org>
+ <20190204090154.GM4296@vkoul-mobl>
+ <CALAqxLVo8aukbc61YX0r3ABDWYJ_cisSb2NxN1qNyWJ_tfYCyw@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190204110952.16025-1-quentin.perret@arm.com>
-User-Agent: NeoMutt/20180323-120-3dd1ac
+In-Reply-To: <CALAqxLVo8aukbc61YX0r3ABDWYJ_cisSb2NxN1qNyWJ_tfYCyw@mail.gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_205519_774260_AFBB4183 
-X-CRM114-Status: GOOD (  15.33  )
+X-CRM114-CacheID: sfid-20190204_210125_497610_9F89A68A 
+X-CRM114-Status: GOOD (  16.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,49 +76,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: nm@ti.com, linux-pm@vger.kernel.org, sboyd@kernel.org, rjw@rjwysocki.net,
- linux-kernel@vger.kernel.org, mka@chromium.org, sudeep.holla@arm.com,
- dietmar.eggemann@arm.com, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, Guodong Xu <guodong.xu@linaro.org>,
+ Ryan Grachek <ryan@edited.us>, Zhuangluan Su <suzhuangluan@hisilicon.com>,
+ Tanglei Han <hantanglei@huawei.com>, lkml <linux-kernel@vger.kernel.org>,
+ Wei Xu <xuwei5@hisilicon.com>, Rob Herring <robh+dt@kernel.org>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ "open list:DMA GENERIC OFFLOAD ENGINE SUBSYSTEM" <dmaengine@vger.kernel.org>,
+ Dan Williams <dan.j.williams@intel.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 04-02-19, 11:09, Quentin Perret wrote:
-> The Energy Model (EM) framework feeds interested subsystems (the
-> scheduler/EAS as of now) with power costs provided by drivers. Yet, no
-> driver is actually doing that upstream yet. This series updates a set of
-> CPUFreq drivers in order to register power costs in the EM framework for
-> some of the Arm reference platforms for EAS: Hikey960, Juno and TC2.
-> =
+On 04-02-19, 11:15, John Stultz wrote:
+> On Mon, Feb 4, 2019 at 1:03 AM Vinod Koul <vkoul@kernel.org> wrote:
+> >
+> > On 24-01-19, 12:24, John Stultz wrote:
+> > > This patch series is based on recent work by Tanglei Han, and
+> > > adds support for hi3660 SoCs as found on the HiKey960 board,
+> > > along with a few patches I've been carrying.
+> >
+> > Applied and fixed the minor style issues in patch 5, and retagged 3 thru
+> > 5 to dmaengine: xxx, thanks
+> 
+> My apologies for the style mistake. Your help is very much appreciated
+> here! Thanks so much again!
 
-> The series is split as follows:
->  - Patch 01 introduces in PM_OPP a helper function which estimates the
->    CPU power using the P=3DCV=B2f equation also used by IPA. It should be
->    noted that this introduces duplicate code with IPA, which will
->    eventually be fixed by migrating IPA to using PM_EM. The ideal plan
->    would be to do so later, in a separate patch series. I would indeed
->    prefer to keep the thermal and CPUFreq discussion separate at this
->    stage, if deemed acceptable.
->  - Patches 02-04 make use of that PM_OPP helper function from the
->    following CPUFreq drivers: cpufreq-dt, scpi-cpufreq and
->    arm_big_little.
->  - Patch 05 modifies the SCMI cpufreq driver to pass the power costs
->    obtained from firmware to PM_EM. This patch is independent from the
->    rest of the series.
-> =
+No issues it was a minor one so didnt warrant a respin!
+> 
+> Just to clarify, are you planning on taking the reviewed binding
+> documents (patches 1&2) via your tree?
 
-> =
+yes sorry I should have clarified since this is multi-subsystem series.
+I have applied 1 thru 5 that includes DT binding. I do that typically
+for dmaengine driver patches with Rob's ack.
 
-> Changes since v3 (20190201093101.31869-1-quentin.perret@arm.com)
->  - Moved the OPP count inside dev_pm_opp_of_register_em() (Matthias,
->    Sudeep)
-
-Applied. Thanks.
-
--- =
-
-viresh
+Thanks
+-- 
+~Vinod
 
 _______________________________________________
 linux-arm-kernel mailing list
