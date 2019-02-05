@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 59982C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:05:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B639C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:06:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 292B12176F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:05:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3DA482175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:06:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gHZyu0Zf";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mobiveil.co.in header.i=@mobiveil.co.in header.b="SRE815C4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 292B12176F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J6UbwbfM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mobiveil.co.in header.i=@mobiveil.co.in header.b="q0302VE6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3DA482175B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mobiveil.co.in
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,58 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Qn8BnzqG5EISGzieHdXPxFp1V4fQ80SA3mmnQUYk60A=; b=gHZyu0Zf1IBV+r
-	uCMq/n7I0koUmvgC7LrFFBJXmt39KfHe89isQBL/W7VmAeRNI73HM/PHScma181r0Q6fPVAQtpjf6
-	XlDSWPkJnA0g57OFr/wVGEQ5BL0rFagrwQi0EmyH5Tb+e5ypKyhKyqVtaLhrwon6pcFpVKBgcUv7Q
-	rHJCRD3WyqbD+oVW61AmRUBCFnef2rpuO3Womb5iVndCaSnzWXc3iDBCExQVmfEcTZI9sDHAiPYW7
-	/pO2YhiuXSf/xxdZdfLa6uugkLMDqhNf61wMWLk/VThPo7lBWdpHzGhBPxft8LqmyD0aj1T0/JK6E
-	c2aQqI0vMB8CQXje0/8g==;
+	List-Owner; bh=JzSEAwv/yvVeZWQEEEDs0gFibCgQuT7cPcfSxDhKM0M=; b=J6UbwbfM4bfMyw
+	T61GgKXVHVpi9TaC7dEXVztrbwrc3kbz95M+U8+PIaDq2J7pr5vVSwp4c7gIIgmkgTw2zbYihVvOQ
+	t14iHB4uPS9okK5p/4/nofUriPy6e0FXRHDE1OjKvUsH45VLXfqUTGXkQ6AiX16yfP2HiZGZAKdIJ
+	iQjluXwakL+znzFmcte4AMEtTNt5MoxcyBHGrwsClwYajdUb3r+dTwNEnCjHMbCbY5FymG2VGLyLB
+	9gLreLN47RvQMODVB1D+XvyeLvlADahcPZgcJlXgNf3qLM7oTWlvtJp4wreIIlMi+GihZlbDxClAn
+	Xm0lGqaHGmNMx5t2YSYQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqtrT-0000AL-5B; Tue, 05 Feb 2019 06:05:35 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gqtrp-0000Wv-D2; Tue, 05 Feb 2019 06:05:57 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqtrP-00009u-ML
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 06:05:33 +0000
-Received: by mail-wm1-x341.google.com with SMTP id y139so2209708wmc.5
+ id 1gqtrk-0000St-Ip
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 06:05:55 +0000
+Received: by mail-wm1-x343.google.com with SMTP id m1so2237819wml.2
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 22:05:31 -0800 (PST)
+ Mon, 04 Feb 2019 22:05:52 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=mobiveil.co.in; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=R58VXnmcQsUtQ66r5EJzM8NXDWdDZjbuPCSxVpk2C04=;
- b=SRE815C4N3sktm3vi9fx669wnGcjRJT9I7x1DlNmRwortUl/zUl0f6xdrnjuamG0lJ
- V+w/NRC2xDQ838y/irmlvhp1kG+5Fpiy2d2IKKMNXjoxY37/f2f1gwm+JAc4dDGdSKBo
- K1p5gkLFxZ73jk7SP0Mv349nWkqfkRcDOdamk=
+ :cc; bh=jcZjY5XDE/E9FNQRkXQrr6M7zvi/tvQDKDvX/q8jeBg=;
+ b=q0302VE6ZZ4eNwzx+A/WjcR8zgl6JfM1E9Cb7sWFs3EnBG8DlBam36U/zaUIomk+Rn
+ PB/UJi6qNDOJeNoxyP5YBBm6F/SKwfXjCV6humG+s32dhAo5O4Sl7rjWXrfNAFmkdcZS
+ ah15QIs+ac7BXFU+SI+Ree7g0rLUefx4a1/00=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=R58VXnmcQsUtQ66r5EJzM8NXDWdDZjbuPCSxVpk2C04=;
- b=d4/lV5We5SroSpvunzAsMYDVFVGOeLYLqibppT0JU7gkb3rTna3nIfq4h6wyId8MmF
- aUx/2lKjwdS8NOAodnOCAywKPXbfuGLEW+mVVv2xO0tpQmeC18J5c0wRTwt2QcrToY84
- qU5D5cv0bnfVS04ZFMcRq8ghdYhoj5Vwfkk+7m+vzf0ZoabagtGHgLLbGEwWW+nirCfL
- dAMGcb+ff7fIEOEydVH3zv+udmNNZ5/EqVqnmbxR4YWkro3b+XXpoAfnhhTi4hijo1z5
- getMl98Yq+u1zAADCu500w1u7bxoaJTxlnC8ikf8nETpfbirLYrZZXUMTd2t4dyedECp
- GSQQ==
-X-Gm-Message-State: AHQUAubn2mwT0hIhmhjfNQ54MBX64fWvfXECPq5Rl9OqmaxRcnHVE9VC
- IgpMuISKzz8xeKD1HESvSYD457ENbjvrFyCFg+Y5bQ==
-X-Google-Smtp-Source: AHgI3IYdRky9neI+cisyum0AuGIDv/vJG5HiERzlGTNDOxIyK8MM4wPBtU8pcm7t4qEqVmdBSe+Hu5fzkT9sVsunRew=
-X-Received: by 2002:a1c:9d57:: with SMTP id g84mr2253821wme.143.1549346729826; 
- Mon, 04 Feb 2019 22:05:29 -0800 (PST)
+ bh=jcZjY5XDE/E9FNQRkXQrr6M7zvi/tvQDKDvX/q8jeBg=;
+ b=ibsZ/iaobC/dACoXKO/Uqbdjd9vlJ/3gFR3LyhS+NAaFRd+nlYEDPNs28jBxmQE4dl
+ qy6AJ3jusXv+bhzZleHXQMB82NGiHtqPeGA+zNaiMgJbvei7Ap5x0YaScEpZWmW6G5Lp
+ j4dqbPg3MdclcP/sBKlrDUPy9+2jgXWZZuye8Tlah3kmk52LYkCHF+gKCA5gcV7Yqfj3
+ rMG2QdoC9zR7ORQBYjS4bFVCK/pzwHKoMg2TEEeyQ4vyPS0wGLRQ8Xh84f4Cjsazlnpq
+ 6XWyFreo13eGNwBZIfbgQyG/PVZw5D8sf4eC7iLcvoFFj/MZj+SozJjfVDC6LMGw/JEa
+ UPRg==
+X-Gm-Message-State: AHQUAuZdgdp8Pvrg6PGHj2fhWf9nyTpf9LA6B+Pe7IJELF8HHYuGt3it
+ H13hLusMpeELZ6Vb0o/PvRt2343b+1w7zuUulvsA3g==
+X-Google-Smtp-Source: AHgI3IZJKwW71eEFV/3N1NOzT6DuLNVD97wOcuHi4aYiIwiKY7zBlO5L43hFAXGP2PhSDNVMebdU2WxBXYVABu5rJ6Y=
+X-Received: by 2002:a1c:9e4a:: with SMTP id h71mr2241827wme.82.1549346750647; 
+ Mon, 04 Feb 2019 22:05:50 -0800 (PST)
 MIME-Version: 1.0
 References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
- <20190129080926.36773-8-Zhiqiang.Hou@nxp.com>
-In-Reply-To: <20190129080926.36773-8-Zhiqiang.Hou@nxp.com>
+ <20190129080926.36773-9-Zhiqiang.Hou@nxp.com>
+In-Reply-To: <20190129080926.36773-9-Zhiqiang.Hou@nxp.com>
 From: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-Date: Tue, 5 Feb 2019 11:38:03 +0530
-Message-ID: <CAFZiPx3soEXCKixiix=L+Bvy2-V2rqvxdHEeYDgdnnra+AMq4g@mail.gmail.com>
-Subject: Re: [PATCHv3 07/27] PCI: mobiveil: use WIN_NUM_0 explicitly for CFG
- outbound window
+Date: Tue, 5 Feb 2019 11:38:24 +0530
+Message-ID: <CAFZiPx0jgFROcecsa6Q3+HjDY-WL0Msp9DvJTRQp9fP79BGmnQ@mail.gmail.com>
+Subject: Re: [PATCHv3 08/27] PCI: mobiveil: use the 1st inbound window for MEM
+ inbound transactions
 To: "Z.q. Hou" <zhiqiang.hou@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_220531_734528_94E10C77 
-X-CRM114-Status: GOOD (  13.54  )
+X-CRM114-CacheID: sfid-20190204_220552_619473_003A74DD 
+X-CRM114-Status: GOOD (  14.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,9 +113,8 @@ On Tue, Jan 29, 2019 at 1:39 PM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
 >
 > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 >
-> As the .map_bus() use the WIN_NUM_0 for CFG transactions,
-> it's better passing WIN_NUM_0 explicitly when initialize
-> the CFG outbound window.
+> The inbound windows have different register set with outbound windows.
+> This patch change the MEM inbound window to the first one.
 >
 > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > Reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
@@ -122,25 +122,22 @@ On Tue, Jan 29, 2019 at 1:39 PM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
 > V3:
 >  - No change
 >
->  drivers/pci/controller/pcie-mobiveil.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
+>  drivers/pci/controller/pcie-mobiveil.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
 > diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-> index b2cc9c097fc9..df71c11b4810 100644
+> index df71c11b4810..e88afc792a5c 100644
 > --- a/drivers/pci/controller/pcie-mobiveil.c
 > +++ b/drivers/pci/controller/pcie-mobiveil.c
-> @@ -612,9 +612,8 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
->          */
->
->         /* config outbound translation window */
-> -       program_ob_windows(pcie, pcie->ob_wins_configured,
-> -                          pcie->ob_io_res->start, 0, CFG_WINDOW_TYPE,
-> -                          resource_size(pcie->ob_io_res));
-> +       program_ob_windows(pcie, WIN_NUM_0, pcie->ob_io_res->start, 0,
-> +                          CFG_WINDOW_TYPE, resource_size(pcie->ob_io_res));
+> @@ -616,7 +616,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+>                            CFG_WINDOW_TYPE, resource_size(pcie->ob_io_res));
 >
 >         /* memory inbound translation window */
->         program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
+> -       program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
+> +       program_ib_windows(pcie, WIN_NUM_0, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
+>
+>         /* Get the I/O and memory ranges from DT */
+>         resource_list_for_each_entry(win, &pcie->resources) {
 > --
 > 2.17.1
 >
