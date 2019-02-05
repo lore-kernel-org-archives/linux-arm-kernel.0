@@ -2,21 +2,21 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C1D10C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 01:18:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CA7F4C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 02:13:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8F5E9206DD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 01:18:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9304A2083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 02:13:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fO5ZwJeq";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="iqRzfOQ1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F5E9206DD
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TtZic5QO";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="M/6uOPVP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9304A2083B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lechnology.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,51 +25,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=UW3Q6vH+LuayrUJxTwogelTIiDJrd+TdsGGGUq5wL6M=; b=fO5ZwJeqU3Ar7RPN5rBBAJwQg
-	W4Exl/HU9KwoUgp3dsu4469av0eo6PcRrsgvzV8hXScL48WyEA5qC0gaNdlAvT/Cr28bkabA2chBI
-	QUhBWpcHgbAUI92re5oIZJr4HwXUtfbPFQ6r524gNKv/P8m55CXyu9r4MrPHuR0kaO3ctCU3xaq6R
-	6edBdHTBVVpbUpIMDUN7pYUdmDq8Pzku9XMqLLbrHNaGyELqY+4aMS9yjo+Oiz6Eqcnxw2pfCBxl0
-	FkDaMNQxBQqgauPu831WYSXvpb5JFiCOfsrYOTj0hkiv73vfoWh1xn0iob8Ml0y6KRpA4XsoRknwa
-	jhgG++16g==;
+	 bh=WBU6kRS0oQH+9LHCvt6TKW1x+EwlSDmEHRMmno1qAtg=; b=TtZic5QOpE1/ZgWMhiaBc+O7P
+	O8JmmR12qXClLgvzogk0GPp5+duRC5OWNQ0pDPGizKt1/8og5eL1bkiBCV9FYTw+RIkBLUMXvbrjf
+	A3CN7hH/b9xL0nx7fMAPUgyq759GcgrW9+L3hYjlG8Nz/iNLA1GcJtshU9zYCvLKhsddKI+aAV00R
+	6KQhfxaJkIFZle5Rpju0H/KexQhhBg5xk9wApP4T+QrT+kudI1zgYod4R+BjtnjTCllEhW66R2rtb
+	9LFY0jXqEnPAz55aioPA8K3cfO1xqo/6+NqHHGwkX4ZC79sQ7GY6+hfKeggeGJEoFi2F2r6F6RH6Q
+	pbHf9Ky7g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqpNT-0001vY-7D; Tue, 05 Feb 2019 01:18:19 +0000
+	id 1gqqEe-00016L-6O; Tue, 05 Feb 2019 02:13:16 +0000
 Received: from vern.gendns.com ([98.142.107.122])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqpNQ-0001vC-PG
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 01:18:18 +0000
+ id 1gqqEa-00015q-8d
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 02:13:14 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=lechnology.com; s=default; h=Content-Transfer-Encoding:Content-Type:
  In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
  :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=3LmSdDP8ewwWIpdIRpCF/dZcat8JTdo1nV6JDm1go2o=; b=iqRzfOQ1cYIbjaYHYExridkvfa
- A0kjdgTYmnI+YmSHaTCvlE9C/d9eXuWuKYCyDtFpDj8inzgoZyA4IRf0l1zpncDTMQ6E4tvRGsnpr
- BsND3nLEmPkIqsKlYUJVSZ93k3LV2y3H9moLjaA7I09B9Cb8yxBdDEfDSws69Vm+kDifL28L4EwkL
- NLMbg+PQkhsXHIoqTjsMhWldqucrVd32rZcGBR7UgfP92oQcKh1XVRHy2sWGkrdEKGH9TazAgjOrL
- XNuH/rE3CyInHriwtUGKbKN2INWZCWuP+tnaLjeHZqBOhV8cg3OuxgVEktrN8copccUJI3xB25VbI
- 5RJi1pfg==;
+ bh=e4fUkZiXb6zKNgsDmv7byzMNO9zw3lfhcyU0Cd2PmXU=; b=M/6uOPVPdNutkkFd40qDLSnT7Q
+ ubD50SRmx6xLARWq8wlas7jkhLHPhZXgAyufU+AuOJcLLvUSDtnzeZrdHp17kpkkc8CjsRbGdW7RF
+ +c1FGV6n88hLw4u2OCrmg2mOPne4aeJlX8BCsw7vF3TYZKpZNHeX5OlkPDjHgRQx/ZyE1sYr0NsRl
+ bjA7RPz7qTK9OauvdQqAHj0rIwF1FdjjWmXP2J7JfUbO8oFY3Udi0szIRVvS5Vmmo54h5pKdu7glL
+ JgUdURtGJCK8OZBqvlRv6qJ3te12141Yg3qIy3ISZF0cyFBWd59NcNw2Fy95HiOwO2wo08eFipq3b
+ qRBQ+B5w==;
 Received: from 108-198-5-147.lightspeed.okcbok.sbcglobal.net
- ([108.198.5.147]:33180 helo=[192.168.0.134])
+ ([108.198.5.147]:34120 helo=[192.168.0.134])
  by vern.gendns.com with esmtpsa (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128)
  (Exim 4.91) (envelope-from <david@lechnology.com>)
- id 1gqpJv-0007Kx-0A; Mon, 04 Feb 2019 20:14:39 -0500
-Subject: Re: [PATCH v2 01/12] ARM: dts: da850: fix interrupt numbers for
- clocksource
+ id 1gqqB4-0003De-0r; Mon, 04 Feb 2019 21:09:34 -0500
+Subject: Re: [PATCH v2 02/12] clocksource: davinci-timer: new driver
 To: Bartosz Golaszewski <brgl@bgdev.pl>, Sekhar Nori <nsekhar@ti.com>,
  Kevin Hilman <khilman@kernel.org>, Daniel Lezcano
  <daniel.lezcano@linaro.org>, Rob Herring <robh+dt@kernel.org>,
  Mark Rutland <mark.rutland@arm.com>, Thomas Gleixner <tglx@linutronix.de>
 References: <20190204171757.32073-1-brgl@bgdev.pl>
- <20190204171757.32073-2-brgl@bgdev.pl>
+ <20190204171757.32073-3-brgl@bgdev.pl>
 From: David Lechner <david@lechnology.com>
-Message-ID: <ce4c305e-7d76-6028-07e4-4922f3c700bf@lechnology.com>
-Date: Mon, 4 Feb 2019 19:18:12 -0600
+Message-ID: <b9291955-ec2d-a83b-00e3-457e8fb54874@lechnology.com>
+Date: Mon, 4 Feb 2019 20:13:07 -0600
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <20190204171757.32073-2-brgl@bgdev.pl>
+In-Reply-To: <20190204171757.32073-3-brgl@bgdev.pl>
 Content-Language: en-US
 X-AntiAbuse: This header was added to track abuse,
  please include it with any abuse report
@@ -84,8 +83,8 @@ X-Source:
 X-Source-Args: 
 X-Source-Dir: 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_171816_978263_5F36AA4D 
-X-CRM114-Status: GOOD (  10.58  )
+X-CRM114-CacheID: sfid-20190204_181312_468556_E71C1368 
+X-CRM114-Status: GOOD (  24.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,8 +96,8 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, stable@vger.kernel.org,
+Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org,
  Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Content-Transfer-Encoding: 7bit
 Content-Type: text/plain; charset="us-ascii"; Format="flowed"
@@ -108,19 +107,223 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 On 2/4/19 11:17 AM, Bartosz Golaszewski wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> The timer interrupts specified in commit 3652e2741f42 ("ARM: dts:
-> da850: Add clocks") are wrong but since the current timer code
-> hard-codes them, the bug was never spotted.
+> Currently the clocksource and clockevent support for davinci platforms
+> lives in mach-davinci. It hard-codes many things, used global variables,
+> implements functionalities unused by any platform and has code fragments
+> scattered across many (often unrelated) files.
 > 
-> This patch must go into stable since, once we introduce a proper
-> clocksource driver, devices with buggy device tree will stop booting.
+> Implement a new, modern and simplified timer driver and put it into
+> drivers/clocksource. We still need to support legacy board files so
+> export a config structure and a function that allows machine code to
+> register the timer.
 > 
-> Fixes: 3652e2741f42 ("ARM: dts: da850: Add clocks")
-> Cc: stable@vger.kernel.org
+> We don't bother freeing resources on errors in davinci_timer_register()
+> as the system won't boot without a timer anyway.
+> 
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
 
-Reviewed-by: David Lechner <david@lechnology.com>
+...
+
+> diff --git a/drivers/clocksource/timer-davinci.c b/drivers/clocksource/timer-davinci.c
+> new file mode 100644
+> index 000000000000..a6d2d3f6526e
+> --- /dev/null
+> +++ b/drivers/clocksource/timer-davinci.c
+> @@ -0,0 +1,431 @@
+> +// SPDX-License-Identifier: GPL-2.0
+
+GPL-2.0-only ?
+
+> +//
+> +// TI DaVinci clocksource driver
+> +//
+> +// Copyright (C) 2019 Texas Instruments
+> +// Author: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> +// (with some parts adopted from code by Kevin Hilman <khilman@baylibre.com>)
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/clocksource.h>
+> +#include <linux/err.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/sched_clock.h>
+> +
+> +#include <clocksource/timer-davinci.h>
+> +
+> +#define DAVINCI_TIMER_REG_TIM12			0x10
+> +#define DAVINCI_TIMER_REG_TIM34			0x14
+> +#define DAVINCI_TIMER_REG_PRD12			0x18
+> +#define DAVINCI_TIMER_REG_PRD34			0x1c
+> +#define DAVINCI_TIMER_REG_TCR			0x20
+> +#define DAVINCI_TIMER_REG_TGCR			0x24
+> +
+> +#define DAVINCI_TIMER_TIMMODE_MASK		GENMASK(3, 2)
+> +#define DAVINCI_TIMER_RESET_MASK		GENMASK(1, 0)
+> +#define DAVINCI_TIMER_TIMMODE_32BIT_UNCHAINED	BIT(2)
+> +#define DAVINCI_TIMER_UNRESET			GENMASK(1, 0)
+> +
+> +/* Shift depends on timer. */
+> +#define DAVINCI_TIMER_ENAMODE_MASK		GENMASK(1, 0)
+
+
+> +#define DAVINCI_TIMER_ENAMODE_DISABLED		0x00
+> +#define DAVINCI_TIMER_ENAMODE_ONESHOT		BIT(0)
+> +#define DAVINCI_TIMER_ENAMODE_PERIODIC		BIT(1)
+
+Are these 3 values essentially an enum of exclusive values?
+If so, the the BIT() macro doesn't seem right here. If they
+are flags, then BIT() is OK, but DAVINCI_TIMER_ENAMODE_DISABLED
+could be omitted.
+
+> +
+> +#define DAVINCI_TIMER_ENAMODE_SHIFT_TIM12	6
+> +#define DAVINCI_TIMER_ENAMODE_SHIFT_TIM34	22
+> +
+> +#define DAVINCI_TIMER_MIN_DELTA			0x01
+> +#define DAVINCI_TIMER_MAX_DELTA			0xfffffffe
+> +
+> +#define DAVINCI_TIMER_CLKSRC_BITS		32
+> +
+> +#define DAVINCI_TIMER_TGCR_DEFAULT \
+> +		(DAVINCI_TIMER_TIMMODE_32BIT_UNCHAINED | DAVINCI_TIMER_UNRESET)
+> +
+> +enum {
+> +	DAVINCI_TIMER_MODE_DISABLED = 0,
+> +	DAVINCI_TIMER_MODE_ONESHOT,
+> +	DAVINCI_TIMER_MODE_PERIODIC,
+> +};
+> +
+> +struct davinci_timer_data;
+> +
+> +typedef void (*davinci_timer_set_period_func)(struct davinci_timer_data *,
+> +					      unsigned int period);
+> +
+> +struct davinci_timer_regs {
+> +	unsigned int tim_off;> +	unsigned int prd_off;
+
+It is not obvious to me what the abbreviations tim and prd
+mean. Add comments or change the names?
+
+> +	unsigned int enamode_shift;
+> +};
+> +
+
+...
+
+> +static void davinci_timer_update(struct davinci_timer_data *timer,
+> +				 unsigned int reg, unsigned int mask,
+> +				 unsigned int val)
+> +{
+> +	unsigned int new, orig = davinci_timer_read(timer, reg);
+
+Slightly more readable with function not in variable declaration?
+
+> +
+> +	new = orig & ~mask;
+> +	new |= val & mask;
+> +
+> +	davinci_timer_write(timer, reg, new);
+> +}
+
+...
+
+> +int __init davinci_timer_register(struct clk *clk,
+> +				  const struct davinci_timer_cfg *timer_cfg)
+> +{
+> +	struct davinci_timer_clocksource *clocksource;
+> +	struct davinci_timer_clockevent *clockevent;
+> +	void __iomem *base;
+> +	int rv;
+> +
+> +	rv = clk_prepare_enable(clk);
+> +	if (rv) {
+> +		pr_err("%s: Unable to prepare and enable the timer clock\n",
+
+use pr_fmt marco to simplify? e.g. at the top of the file...
+
+#define pr_fmt(fmt)    "%s: " fmt "\n", __func__
+
+Then just
+
+		pr_err("Unable to prepare and enable the timer clock");
+
+
+> +		       __func__);
+> +		return rv;
+> +	}
+
+...
+
+> diff --git a/include/clocksource/timer-davinci.h b/include/clocksource/timer-davinci.h
+> new file mode 100644
+> index 000000000000..ef1de78a1820
+> --- /dev/null
+> +++ b/include/clocksource/timer-davinci.h
+> @@ -0,0 +1,44 @@
+> +/* SPDX-License-Identifier: GPL-2.0+ */
+
+Seems odd to have the header GPL-2.0+ when the c file GPL-2.0-only
+
+> +/*
+> + * TI DaVinci clocksource driver
+> + *
+> + * Copyright (C) 2019 Texas Instruments
+> + * Author: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> + */
+> +
+> +#ifndef __TIMER_DAVINCI_H__
+> +#define __TIMER_DAVINCI_H__
+> +
+> +#include <linux/clk.h>
+> +#include <linux/ioport.h>
+> +
+> +enum {
+> +	DAVINCI_TIMER_CLOCKEVENT_IRQ = 0,
+
+Isn't = 0 implied, so can be omitted?
+
+> +	DAVINCI_TIMER_CLOCKSOURCE_IRQ,
+> +	DAVINCI_TIMER_NUM_IRQS,
+> +};
+> +
+> +/**
+> + * struct davinci_timer_cfg - davinci clocksource driver configuration struct
+> + * @reg:        register range resource
+> + * @irq:        clockevent and clocksource interrupt resources
+> + * @cmp_off:    if set - it specifies the compare register used for clockevent
+> + *
+> + * Note: if the compare register is specified, the driver will use the bottom
+> + * clock half for both clocksource and clockevent and the compare register
+> + * to generate event irqs. The user must supply the correct compare register
+> + * interrupt number.
+
+I'm a little confused by this comment. I think I get it, but it took me a while.
+
+If cmp_off is 0, we don't use the compare register and therefore
+DAVINCI_TIMER_CLOCKEVENT_IRQ and DAVINCI_TIMER_CLOCKSOURCE_IRQ should
+be TINT12 and TINT34 (or vice versa?). If cmp_off is non-zero, then
+it should be one of the 8 (more or less depending on the SoC) and
+DAVINCI_TIMER_CLOCKEVENT_IRQ should be something like T12CMPINT0.
+
+> + *
+> + * This is only used by da830 the DSP of which uses the top half. The timer
+> + * driver still configures the top half to run in free-run mode.
+> + */
+> +struct davinci_timer_cfg {
+> +	struct resource reg;
+> +	struct resource irq[DAVINCI_TIMER_NUM_IRQS];
+> +	unsigned int cmp_off;
+> +};
+> +
+> +int __init davinci_timer_register(struct clk *clk,
+> +				  const struct davinci_timer_cfg *data);
+> +
+> +#endif /* __TIMER_DAVINCI_H__ */
+> 
 
 
 _______________________________________________
