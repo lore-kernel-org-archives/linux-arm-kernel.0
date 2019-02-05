@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB7B1C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 19:53:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 44808C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 19:54:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8E5CF2080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 19:53:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 16F472080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 19:54:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tzQw/f80";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="uG+yx4mO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8E5CF2080F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GIXc+uK1";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="SHqISbjy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16F472080F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,59 +26,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UhHLjMMHgqT7oa9a5hVgNWMx/Qe5UrkMXKKa0PFL7KA=; b=tzQw/f80DwIAFu
-	bqrliyYaSfRoR7Js/YcaRWxjjEYUm9//yjc3aAGIW4kfWh+JL50PX+2/qgfz44NB1N8akM7UehY17
-	VLpKBqW/UHj+kCyHh9SZApjXSJGtvBhujqfuvwUz1pWuvYEEORSieizKU7X8ruTOqDi/Z4eLD0ino
-	b5hmyayreOazSAhoJ4gj4mVQfvhvtIN+EPox8tE9PoqSMjIYLXIs/acZfrpBhDxbuhc5kdKTxp7uc
-	aAUygTCr2+z8MBXGL2yudM+8lyt8EIdyvwRy9scSA0rLwK+H6dGgtHG7AwNGRPIlg0zR3Ue2chQ9l
-	GnnBFCs+uzR+/WXmC/Iw==;
+	List-Owner; bh=NIWa82s/0jLB2YRaaZSMftD0Yp7yJl0y3fkRRlLyOKI=; b=GIXc+uK1t+NtBa
+	GrVHGL/b6iB471NtwNUM+H4OjyC+AusdXFM3/TN+IuGOp3S59/+mxSGkmWzELmBJkbOmJDY26KiAI
+	TcQhcg2x8gVZMNwro2CwrNDrvqNCUI0E8J6di9JuSPo2PCD+xMLXoU005phehRc3yU8heMCoTzWtP
+	q4RzC3G1OQL8OHNLD33ENTecim+VZ4A8f5K8nxhW0aynndDi1Eu2vk46j78OQanfM132g2Pz+pt63
+	cLmFpm1TqFUYAz5nn4SK8RH6ZsdG5Q5ab6tR/jI4tPYqvXzsdTa4r6hHfuKEctXqG4kdnW/jJS5ws
+	MZUl1Gj38bFw6RLz4xVA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr6mu-0003PR-JQ; Tue, 05 Feb 2019 19:53:44 +0000
-Received: from mail-ot1-x32b.google.com ([2607:f8b0:4864:20::32b])
+	id 1gr6nE-0003hO-F5; Tue, 05 Feb 2019 19:54:04 +0000
+Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr6mh-0003MO-9P; Tue, 05 Feb 2019 19:53:39 +0000
-Received: by mail-ot1-x32b.google.com with SMTP id s13so7911264otq.4;
- Tue, 05 Feb 2019 11:53:30 -0800 (PST)
+ id 1gr6n7-0003cJ-Tb; Tue, 05 Feb 2019 19:54:01 +0000
+Received: by mail-ot1-x341.google.com with SMTP id s13so7913611otq.4;
+ Tue, 05 Feb 2019 11:53:57 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=6TpxB9wKUuQIyEkbFds5s9cGUD6kRMrQQ03ech8ZRS4=;
- b=uG+yx4mOqq/obmuL24Ni9s8gQmGRIzfid4PGdOezKVWQwrXCX6SGNSfxdUntNlNjRz
- T2cFoYIouCJkrv6siUv/0pMvs7xKZltbAK9kvM7WLkyizf0zh/jIPI5RN6dR3fHwMYHe
- Lzl/w/YGw6Gf7Raz99/WxMG+7Cr6mkTOBhV1TMViRIhB5DwW9fdE+cITNzChqxoAWRz/
- elfR98JZkm0w6YZHQXaqy40cfiR9dMJQ3HyTT76lfFb55aSCKr9PAexASp7bThsUGJss
- ali2b9qLu6jk6EJM11jByPYaWIbEjZbfma/nJgrvr/0jP6at0rezvcDPWnc5jOwjhjUH
- MBdQ==
+ :cc; bh=dAazEzP0AmczIR8hnl6k673OVHEao5Qycj49uG7Q4W4=;
+ b=SHqISbjyLvYyJyF1pUWvNbVYPPWCPS+UnJ8GM3X72AAOHfuGkx9aKB0p8H49zPJLZI
+ W1i7QoHLJdYNa3CJg3WQfOz2759P9mShR93p/dCRwE7WugcQuJUn7ju7JVRxVt/u1kSM
+ gw7PIbPfAbjbyR4xvmlhEawJMojn3HR6COLy1IiJxZOz5tvY+2U454bPjFUeVFCKMkbG
+ Fp/WYKb0u4YJfFzJkbxBXbm5bRBtX81Zg5E3dKxB0tevBPmvIkK74QZO7imXL6xrXaMu
+ S7hBOZ/GJfAtLJPf1UA1YInQSPflTWkYiTLhV90E9W1nWSjMX4totIWkrQ3pwwW1O6DT
+ mxKw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=6TpxB9wKUuQIyEkbFds5s9cGUD6kRMrQQ03ech8ZRS4=;
- b=D3+9vo6EdJvrmvX1AZfuJv3WGYWjz3E9kATZ1NxXuVgtAJo6ZwnSsMgeSN3tCJ9AnM
- p9puc7o/PDUxO6KdnjmKrJlP3G7zKDGy1t6/IUO4g6nfRCjvLYfD3M7kUakg6xdKqeuL
- MgrMMLnGJpnjphYlqerTYyJCZbfeslFBTIirSWmMH02/FlhqAHJyh1rVdOOg6a1WDfsX
- MDy0kwk5FlRXVT/NtI19VT4ySgA8XiEX5c/Xh46SdP/9/W2fApULUsE9VMHFf5VIa12G
- TpYpPRFDP/md0pK892XOPqCjqZnJC3cJtCPsRwe7999QNaFmivRyZLGKHAZb5HojkI0t
- sNLA==
-X-Gm-Message-State: AHQUAubEERma7GwT9IZB0iYzSR0/tfRHoxercvYWsxx8U2RWl7y/UW+Z
- wJmh2fyQ5d159paevqVxfYB6bQVLY5S2YG88cNQ=
-X-Google-Smtp-Source: AHgI3IZ/ODV+mHbgredq/e6Nhz2PMd21xUcJKyJ6t49Du1p+useF/5WNGET6SKNURzuwgOs0F5e6BgTkIKn+0viU6XQ=
-X-Received: by 2002:aca:3fc6:: with SMTP id m189mr3566788oia.142.1549396410208; 
- Tue, 05 Feb 2019 11:53:30 -0800 (PST)
+ bh=dAazEzP0AmczIR8hnl6k673OVHEao5Qycj49uG7Q4W4=;
+ b=hAYOL8Rvdmefx25nS2ppbQynhgepvgHa7kk/xWz+tvIQtrDg2JmYw2JTiA9Ni90o7w
+ 3p4d+aS9mUzaQV29lBwgidyfP5RmrdOFOzWuXfcOieTLJBAdaBTBZBzc/pWHsyxvIFpy
+ +t1KO1FT8BibCeWR41K8CTonTlmXaIl/hlRiUjq7c0W7y9heRyFqdkdSMastQu+p30Rk
+ cQ1JTz0SRCEfJYJJD+aJLyxtQscjJGaoLBsjRcoPiw0BWUyZr2NUKHfIy8/4jU7+wYyY
+ O1HhEZ4lt1R9zy/JX8eSsTDdbB8cKYxzQoMxRXVtDwSvS1b618Dzhi7zRaKNHXqTd6V6
+ e6sA==
+X-Gm-Message-State: AHQUAuZOzUpMH0F4T6IeCjCV2VC6rPEWkKd6XoLphrUxL0mxhXk7FvGr
+ n3PTwFZ6H8oEAEH+5fcGVYNQbr3hvkgyCpvIdWo=
+X-Google-Smtp-Source: AHgI3IbOs/NvbnBIEyAt1I3ymLP5OW3XBJtK9nMv8oS04YsfoAdHyaOoJGIVlmEq4XufBUaToL4HDR3Py6m/jKHBjUg=
+X-Received: by 2002:aca:915:: with SMTP id 21mr3517231oij.163.1549396437046;
+ Tue, 05 Feb 2019 11:53:57 -0800 (PST)
 MIME-Version: 1.0
-References: <20190123151209.2080-1-linux.amoon@gmail.com>
- <CAFBinCC1xjqogcLm94gu+iLS_b_zB8eNEXL+4bYhog==zN0S+A@mail.gmail.com>
- <CANAwSgT3tVss-hQ0jYzTaSvkfVkSQZtiRFhdq1KmUSL4idZmLw@mail.gmail.com>
- <CAFBinCDj0jA9dT72J8RvfJtyL3bBKTy+PaRsHXukvTuKitaXqg@mail.gmail.com>
-In-Reply-To: <CAFBinCDj0jA9dT72J8RvfJtyL3bBKTy+PaRsHXukvTuKitaXqg@mail.gmail.com>
+References: <20190129102521.4141-1-linux.amoon@gmail.com>
+ <20190129102521.4141-2-linux.amoon@gmail.com>
+ <CAFBinCDj=Y9HWEhJYMjo9FviAosxpHW5d61CceZ7HPV4ObZ79Q@mail.gmail.com>
+ <CANAwSgSnR-DWffg3vKStuXQXahLf8ONssxr4+byL=PSr5JR=xA@mail.gmail.com>
+ <CAFBinCBjF5iOkUjhxSGXpQa7Nc1=bWAzA=XjrfXRYxSPZO15nQ@mail.gmail.com>
+In-Reply-To: <CAFBinCBjF5iOkUjhxSGXpQa7Nc1=bWAzA=XjrfXRYxSPZO15nQ@mail.gmail.com>
 From: Anand Moon <linux.amoon@gmail.com>
-Date: Wed, 6 Feb 2019 01:23:18 +0530
-Message-ID: <CANAwSgT1eej_U+CAB=Dp+TyYYdYw9WfCKg5FuLAZEx6t3VoDxQ@mail.gmail.com>
-Subject: Re: [RFCv1 0/3] Odroid c1+ usb fixs
+Date: Wed, 6 Feb 2019 01:23:45 +0530
+Message-ID: <CANAwSgT_q6zDVC8UVz+hrzA5Hn34eT_k-ZGB2LTO3dauT45T7g@mail.gmail.com>
+Subject: Re: [PATCHv3 1/2] ARM64: dts: meson-gxbb-odroidc2: Fix usb phy reset
+ warning
 To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_115331_401016_6BA58A56 
-X-CRM114-Status: GOOD (  17.99  )
+X-CRM114-CacheID: sfid-20190205_115358_506761_BBFEEF3E 
+X-CRM114-Status: GOOD (  21.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,108 +93,70 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: devicetree <devicetree@vger.kernel.org>,
- Kevin Hilman <khilman@baylibre.com>, Kishon Vijay Abraham I <kishon@ti.com>,
- Rob Herring <robh+dt@kernel.org>, linux-amlogic@lists.infradead.org,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+ Neil Armstrong <narmstrong@baylibre.com>, Kevin Hilman <khilman@baylibre.com>,
+ Linux Kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ linux-amlogic@lists.infradead.org,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Martin,
+hi Martin,
 
-On Tue, 5 Feb 2019 at 02:08, Martin Blumenstingl
+On Tue, 5 Feb 2019 at 02:19, Martin Blumenstingl
 <martin.blumenstingl@googlemail.com> wrote:
 >
 > Hi Anand,
 >
 > On Mon, Feb 4, 2019 at 9:04 PM Anand Moon <linux.amoon@gmail.com> wrote:
 > [...]
-> > I dont have multi-meter to check this out on old and new kernel.
-> > As per my observation Amlogic 3.10 (32 bit) and 3.14 (64 bit)
-> > both use some state machine the tune the usb port.
+> > > > @@ -36,6 +43,8 @@
+> > > >                 regulator-min-microvolt = <5000000>;
+> > > >                 regulator-max-microvolt = <5000000>;
+> > > >
+> > > > +               vin-supply = <&p5v0>;
+> > > did you find out why this patch fixes the USB_OTG_PWR regulator?
+> > > based on just reading the patch I can't find an explanation myself
+> > >
 > >
-> > It's not clear that this will work with upstream kernel.
-> do you have a filename / line number in Amlogic's kernel regarding
-> this state machine and / or tuning logic?
->
-> > I just checked with board booted with usb device connected we are observing
-> > the bus and is getting power up and hot plugging of usb device is working fine.
+> > As per the device tree binding we need this setting to enable power input source
+> > [0] Documentation/devicetree/bindings/regulator/fixed-regulator.txt
 > >
-> > $ lsusb -v|egrep "^Bus|MaxPower"
-> > Couldn't open device, some information will be missing
-> > Bus 002 Device 003: ID 1b71:0056 Fushicai
-> >     MaxPower              500mA
-> > Couldn't open device, some information will be missing
-> > Bus 002 Device 004: ID 152d:0578 JMicron Technology Corp. / JMicron
-> > USA Technology Corp. JMS567 SATA 6Gb/s bridge
-> >     MaxPower               30mA
-> > Couldn't open device, some information will be missing
-> > Couldn't open device, some information will be missing
-> > Bus 002 Device 002: ID 05e3:0610 Genesys Logic, Inc. 4-port hub
-> >     MaxPower              100mA
-> > Bus 002 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-> > Couldn't open device, some information will be missing
-> >     MaxPower                0mA
-> > Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-> >     MaxPower                0mA
-> for me it stops at the Genesys Logic, Inc. 4-port hub (I see the root
-> hub, the 4-port hub and then nothing more) using the mainline kernel
-> (with or without your patches)
+> > *I have observed few more place where this setting is missing*
+> OK, I understand that we should describe the hierarchy of the regulators
 >
-> I'm not sure what to do with this information though.
-> currently we have no reliable way to tell if GPIOAO_5 is only for the
-> OTG port (usb0) or also for the host-only port (usb1).
+> > > have you tested without this patch to rule out that you hit some bug
+> > > in the regulator framework back when you wrote the patch?
+> > > (I don't have an Odroid-C2 so I can't test this myself).
+> > >
+> >
+> > Yes I have tested this patch.Some device like usb camera and usb hard drive
+> > when connected to usb port will generate warning message.
+> > which shows us that not enough power is being set to the port.
+> I don't understand why adding "p5v0" as parent of "usb_otg_pwr"
+> changes the output of "usb_otg_pwr":
+> - "p5v0" is a fixed regulator which cannot be controlled at all (apart
+> from removing power from it)
+> - "usb_otg_pwr" does not have any current limits set inside the .dts
+> - "usb_otg_pwr" has the same fixed voltage as the new "p5v0" regulator
+>
+> what are your steps-to-reproduce for your original issue ("reset
+> high-speed USB device number 3 using dwc2")?
 >
 
-In order to enable usb debug verbose output we need to compile the
-kernel with following option.
+I have tried to reproduce this but some how I cannot get the logs
+I might have enable some more debug options to reproduce but currently
+it's lost.
+because of over flashing of the operating system on sdcards.
 
-CONFIG_DYNAMIC_DEBUG=y
-CONFIG_USB_DWC2_DEBUG=y
-CONFIG_USB_DWC2_VERBOSE=y
+But definitely this fix the power issue needed to get usb-storage
+device to work on Odroid c1/c2 boards.
 
-to get more in sight into usb initialization and low level hand shake.
------------------------------
-[    1.796436] dwc2 c90c0000.usb: mapped PA c90c0000 to VA (ptrval)
-[    1.796481] dwc2 c90c0000.usb: c90c0000.usb supply vusb_d not
-found, using dummy regulator
-[    1.799183] dwc2 c90c0000.usb: Linked as a consumer to regulator.0
-[    1.805320] dwc2 c90c0000.usb: c90c0000.usb supply vusb_a not
-found, using dummy regulator
-[    1.813600] dwc2 c90c0000.usb: registering common handler for irq26
-[    1.814794] dwc2 c90c0000.usb: Core Release: 3.10a (snpsid=4f54310a)
-[    1.814803] dwc2 c90c0000.usb: Forcing mode to host
-[    1.883383] dwc2 c90c0000.usb: dwc2_check_params: Invalid parameter lpm=1
-[    1.884534] dwc2 c90c0000.usb: dwc2_check_params: Invalid parameter
-lpm_clock_gating=1
-[    1.892435] dwc2 c90c0000.usb: dwc2_check_params: Invalid parameter besl=1
-[    1.899318] dwc2 c90c0000.usb: dwc2_check_params: Invalid parameter
-hird_threshold_en=1
-[    1.907300] dwc2 c90c0000.usb: DWC OTG HCD INIT
-[    1.907306] dwc2 c90c0000.usb: hcfg=00000200
-[    1.907319] dwc2 c90c0000.usb: dwc2_core_init((ptrval))
-[    1.907324] dwc2 c90c0000.usb: HS UTMI+ PHY selected
-[    1.907330] dwc2 c90c0000.usb: Internal DMA Mode
-[    1.907337] dwc2 c90c0000.usb: Host Mode
-[    1.907599] dwc2 c90c0000.usb: DWC OTG Controller
-[    1.911994] dwc2 c90c0000.usb: new USB bus registered, assigned bus number 1
-[    1.919060] dwc2 c90c0000.usb: irq 26, io mem 0xc90c0000
-[    1.924323] dwc2 c90c0000.usb: DWC OTG HCD START
-[    1.924335] dwc2 c90c0000.usb: dwc2_core_host_init((ptrval))
-[    1.924342] dwc2 c90c0000.usb: Initializing HCFG.FSLSPClkSel to 00000000
-[    1.924349] dwc2 c90c0000.usb: initial grxfsiz=00000800
-[    1.924354] dwc2 c90c0000.usb: new grxfsiz=00000200
-[    1.924360] dwc2 c90c0000.usb: initial gnptxfsiz=08000800
-[    1.924365] dwc2 c90c0000.usb: new gnptxfsiz=01f40200
-[    1.924370] dwc2 c90c0000.usb: initial hptxfsiz=08000000
-[    1.924375] dwc2 c90c0000.usb: new hptxfsiz=01f403f4
-[    1.924389] dwc2 c90c0000.usb: dwc2_core_host_init: Halt channel 0
-[    1.924396] dwc2 c90c0000.usb: dwc2_core_host_init: Halt channel 1
-[    1.924401] dwc2 c90c0000.usb: dwc2_core_host_init: Halt channel 2
-[    1.924406] dwc2 c90c0000.usb: dwc2_core_host_init: Halt channel 3
-[    1.924412] dwc2 c90c0000.usb: dwc2_core_host_init: Halt channel 4
-[    1.924417] dwc2 c90c0000.usb: dwc2_core_host_init: Halt channel 5
+>
+> Regards
+> Martin
 
 Best Regards
 
