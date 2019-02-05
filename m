@@ -2,59 +2,72 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 371BEC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:19:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DD6DBC282CC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:24:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 04D71206DD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:19:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A98C02073D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:24:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ClYu84oF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 04D71206DD
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kWQsTWT5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A98C02073D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LjGMRW+hRa1GcIJUwoiepNAj+TLjyzcGelGT8DPxuO4=; b=ClYu84oFvCAqro
-	mh4ml062CyDCCYz3Eymd8h/PEXXHcDsNDrZJpWyzF1sCZDNu2QlMh3PNBkURECI7s+6BnzHjhpBFU
-	Zh+Vz5+XzdBy59zv77yQhQyPvZW5/5DYrsrb+4+kU//F0+nj2iE7OikqAEMKZ3ObgMcs3vtvsFjyb
-	IJ8IAB6oF6FlH3iqDT3XhT9CCZO25Xy9JDIa4SL596lRxhawGvNZevvEMR6gCxoU79bMyngQDmtr3
-	jFiwAzh1CSEpk8BrL1ZuIZKaR/Pi3H/PFCEmm9wb244nGVNcpXr/dz16/r05AQG110jTUbT/D+iB5
-	xUwIbmJUB4Y6sX/s8iGw==;
+	List-Owner; bh=sD+r9y9TYPIvv+mL9bETy8RIaLNj5ObqI2Y3iPNrlcA=; b=kWQsTWT5t+dj8f
+	J2CkO8ZTLzHYn7YCddTU/OstdetCaXeZH4Dk+i/o7imwvQRbVSOhvQaICLNQjWPigPRbdoqSaZkQ9
+	4OWf3UEJZXIYASXY1XmzLToaTOruTLlC84dl44cPfQeqKVXO7onVxL25VP2yPlqP7AiK5jSTaxHjM
+	TTQbmXIP4ltn/U+5YYKsp3qyrunV/D8iMzKNVM3o+0GPOtFXmYO4b9EJAkDmNrzWtddQYDM6S/t5m
+	rUL7a62NlMBPBhgXRZVCyAyZTa44y0o5PHFf2H246vdomSrK9U0VAudGz+fWwiNUoLh9RvobPfwbP
+	osqCsRevt2FyBSPorxDA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr0d8-0003xb-4A; Tue, 05 Feb 2019 13:19:14 +0000
-Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
+	id 1gr0iZ-0005nI-UY; Tue, 05 Feb 2019 13:24:51 +0000
+Received: from mail-vs1-f66.google.com ([209.85.217.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr0d2-0003mH-6n
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 13:19:12 +0000
-Received: by newverein.lst.de (Postfix, from userid 2005)
- id CE54468D93; Tue,  5 Feb 2019 14:19:02 +0100 (CET)
-Date: Tue, 5 Feb 2019 14:19:02 +0100
-From: Torsten Duwe <duwe@lst.de>
-To: Vasily Khoruzhick <anarsoul@gmail.com>
-Subject: Re: [PATCH RESEND v2 05/12] drm/bridge: Add Analogix anx6345 support
-Message-ID: <20190205131902.GA7432@lst.de>
-References: <20181018073327.64942-1-icenowy@aosc.io>
- <20190204122250.GB7660@lst.de>
- <CA+E=qVfHMqo_ZWPTgvr+5G2J29Yy-TU4aceVD0oHLeyaOxVogA@mail.gmail.com>
+ id 1gr0iW-0005my-CT
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 13:24:49 +0000
+Received: by mail-vs1-f66.google.com with SMTP id b74so2094026vsd.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 05 Feb 2019 05:24:46 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=mH2jC//BX4csPlxzLWPxIbl/VLPdX2MNzc/nlQzQz8Q=;
+ b=M5nfh9DHgf3yhYoKHrZAv5kud0hdFAXYitYONLqNEzgcIGdxh4jTwBmdEKSLKvAs9G
+ 0UwM78rRrRyrLO9+Z3iUiMk9/D7oqzAbRKJ/bcSeMy1fC7s4xBN/BCm7ajNh29++vSup
+ /u+SSqIff07TrZ8EHljPa413fRtDjbhEvDD16n/kRFSrD9G+pqydVkQWtw29hg0wsv5u
+ pktItQtTuDmlx/iRXNfh5iuwO7OYfzWpNQ1DmuJibfbPYMb0dLHfDQ+jHVoFqjJSARrT
+ K9sQk48FaKYIpGJe0O3dgTbbMUK1LPMxgcgguOCfoNvrvkp6eLTo99Q2rvVbCbmzfv9F
+ NNUA==
+X-Gm-Message-State: AHQUAuY3Vtzt2BJInsqFBCUKdzYQUf/NDGlpJQCWgpFpW7784owwG4uz
+ I/PZmTb7XNZ/P+X5z+RxZ1OklBuCUM9EUJ+yxIk=
+X-Google-Smtp-Source: AHgI3IZGiOTTw8sZiDzZNxEUVJfcek13r1NV7ffeSdfvgl9Jp03HBQFnX+NKK7wxVbto9ZhTYk3nwT3JsD0+hzp5ILU=
+X-Received: by 2002:a67:d119:: with SMTP id u25mr1891966vsi.63.1549373086077; 
+ Tue, 05 Feb 2019 05:24:46 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190203185501.8958-6-anarsoul@gmail.com>
-User-Agent: Mutt/1.5.17 (2007-11-01)
+References: <1548846984-2044-1-git-send-email-vincent.guittot@linaro.org>
+ <CAPDyKFpyg7oGoDZA+=SG7R3yL874Geeqs5LWrsAf50csxsE05A@mail.gmail.com>
+In-Reply-To: <CAPDyKFpyg7oGoDZA+=SG7R3yL874Geeqs5LWrsAf50csxsE05A@mail.gmail.com>
+From: Geert Uytterhoeven <geert@linux-m68k.org>
+Date: Tue, 5 Feb 2019 14:24:33 +0100
+Message-ID: <CAMuHMdWdbRpA_M4V1kigab6U8rSDgGYXtidiSU4MVdj5xarK8g@mail.gmail.com>
+Subject: Re: [PATCH v2 ] PM-runtime: fix deadlock with ktime
+To: Ulf Hansson <ulf.hansson@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_051909_203141_D1C627B4 
-X-CRM114-Status: UNSURE (   9.75  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190205_052448_428122_7624A71E 
+X-CRM114-Status: GOOD (  12.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,72 +79,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Archit Taneja <architt@codeaurora.org>, David Airlie <airlied@linux.ie>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Andrzej Hajda <a.hajda@samsung.com>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Thierry Reding <thierry.reding@gmail.com>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Daniel Vetter <daniel@ffwll.ch>, Maxime Ripard <maxime.ripard@bootlin.com>,
- Sean Paul <seanpaul@chromium.org>,
- arm-linux <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
+Cc: Vincent Guittot <vincent.guittot@linaro.org>,
+ Linux PM <linux-pm@vger.kernel.org>, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Biju Das <biju.das@bp.renesas.com>,
+ Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ linux-omap <linux-omap@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-First thing that struck me is that the chip's reset is actually low active
+Hi Ulf,
 
-   reset-gpios = <&pio 3 24 GPIO_ACTIVE_LOW>; /* PD24 */
-                                        ^^^^
-(please correct this in patches 11 and 12)
+On Wed, Jan 30, 2019 at 1:15 PM Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On Wed, 30 Jan 2019 at 12:16, Vincent Guittot
+> <vincent.guittot@linaro.org> wrote:
+> >
+> > A deadlock has been seen when swicthing clocksources which use PM runtime.
+> > The call path is:
+> > change_clocksource
+> >     ...
+> >     write_seqcount_begin
+> >     ...
+> >     timekeeping_update
+> >         ...
+> >         sh_cmt_clocksource_enable
+> >             ...
+> >             rpm_resume
+>
+> Hmm, isn't this already a problem in genpd then?
+>
+> In genpd's ->runtime_resume() callback (genpd_runtime_resume()) we
+> call ktime_get() to measure the latency of running the callback.
+>
+> Or, perhaps irq_safe_dev_in_no_sleep_domain() returns true for the
+> genpd + device in question, which means the ktime thingy is skipped.
+>
+> Geert?
 
-Consequently, you're using inverted values here in the driver:
+Correct. After adding
 
-> +static void anx6345_poweron(struct anx6345 *anx6345)
-> +{
-[...]
-> +	gpiod_set_value_cansleep(pdata->gpiod_reset, 0);
+    dev_info(dev, "%s: pm_runtime_is_irq_safe = %d,
+genpd_is_irq_safe(%s) = %d => %s\n", __func__,
+pm_runtime_is_irq_safe(dev), genpd->name, genpd_is_irq_safe(genpd),
+ret ? "true" : "false");
 
-0 = reset on, ok.
+I see on R-Car M2-W:
 
-> +	usleep_range(1000, 2000);
-> +
-> +	gpiod_set_value_cansleep(pdata->gpiod_reset, 1);
+    sh_cmt ffca0000.timer: irq_safe_dev_in_no_sleep_domain:
+pm_runtime_is_irq_safe = 1, genpd_is_irq_safe(always-on) = 0 => true
 
-1 = reset off, also fine.
+For all other devices, the result is false.
 
-> +
-> +	/* Power on registers module */
-> +	anx6345_set_bits(anx6345->map[I2C_IDX_TXCOM], SP_POWERDOWN_CTRL_REG,
-> +			 SP_HDCP_PD | SP_AUDIO_PD | SP_VIDEO_PD | SP_LINK_PD);
-> +	anx6345_clear_bits(anx6345->map[I2C_IDX_TXCOM], SP_POWERDOWN_CTRL_REG,
-> +			   SP_REGISTER_PD | SP_TOTAL_PD);
-> +
-> +	anx6345->powered = true;
-> +}
-> +
-> +static void anx6345_poweroff(struct anx6345 *anx6345)
-> +{
-> +	struct anx6345_platform_data *pdata = &anx6345->pdata;
-> +	int err;
-> +
-> +	if (WARN_ON(!anx6345->powered))
-> +		return;
-> +
-> +	gpiod_set_value_cansleep(pdata->gpiod_reset, 1);
-> +	usleep_range(1000, 2000);
+Gr{oetje,eeting}s,
 
-This one got me a bit confused. Assert or deassert reset (again) before
-poweroff?
+                        Geert
 
-Please stick to the logical value of the reset line.
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
 
-	Torsten
-
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
 
 _______________________________________________
 linux-arm-kernel mailing list
