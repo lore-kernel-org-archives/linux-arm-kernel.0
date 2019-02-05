@@ -2,75 +2,87 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4FF98C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:37:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A1B7CC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:48:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1E53720818
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:37:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6B9A22080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:48:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Jo7BU26a"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E53720818
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DzROHslw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B9A22080F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=CtlKFykwlg6O2Oty0k4BoZ8jTMFccRBctt+wgNeR3zQ=; b=Jo7BU26aayfcZ1
-	GWBCIEdPnqjyShsjQ2S/ITgz1hwPQiv82/RHjwbHaHRWQdx93YxEgR/jDveJv9ARgP1xnhrZzknDR
-	m3ol9iJeG4BBFDlNyLE0WR0ufWBqi34afYEj8EnINzqnUZgVumy0IxCUy7XAzb/HrSttUzMob6hhx
-	bQS24qTkqLXJYP4K7w2Me9NysoSfESKRYjALYI2qQ+SrcD6gwfdbht0paYYDHO8uAAGLaCcPajwsR
-	NgglykwpbWaVkq/ZjBXb+GuEBCHkbztSCK+PBKnuJNTo9Wq74xR68yTOxAQC8bT9FzD/ni1U5f8So
-	LCPv4LB56CZzC5Bcw8Pw==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=24ruR5I9xSX4iSVjwpATZxKfx0yGJPgsxvYyq72Cxs0=; b=DzROHslwRPn145
+	Lv+c544y3FTYQBqw6r2Y1auPqjYYbBzwsg+9fYDEC9f3cqKFFSRzXy5CYXDIVC8JcPjNoSnUoe8cp
+	vrU0KCjza1/GQG549JEgtxlFD0fGRTvdZ7bwCh7qcQiuUaP5TnTMMcVFVaQcUhrIXS0GmPzcqoJfz
+	/1Megn/ZZzy3kdLtURE/gQ3q/fnBN4UL9rCJa8t2SxuzV33UVJthSaxPcVt3PkhQ5jdbXnpm3vBZs
+	tKcxN1XW9HVaaFfLYaCxdwqUVTxxNfPMBx+M5ky01Ma2qWEFHjsIbW0MhYpxRdzGYdpvq1Zg55mvn
+	w8Ao8UloQgIzZqApPa8A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr3j9-00007Y-OJ; Tue, 05 Feb 2019 16:37:39 +0000
-Received: from mail-ot1-f65.google.com ([209.85.210.65])
+	id 1gr3tq-0003ZC-8V; Tue, 05 Feb 2019 16:48:42 +0000
+Received: from mail-ed1-f67.google.com ([209.85.208.67])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr3j5-000078-Rp; Tue, 05 Feb 2019 16:37:37 +0000
-Received: by mail-ot1-f65.google.com with SMTP id k98so6773107otk.3;
- Tue, 05 Feb 2019 08:37:34 -0800 (PST)
+ id 1gr3tm-0003Ys-6a
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 16:48:40 +0000
+Received: by mail-ed1-f67.google.com with SMTP id o10so3381468edt.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 05 Feb 2019 08:48:37 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=HBle8rJYyyt01ATizJJrNAmYdunnvDGlqA15wX+Mvo0=;
- b=iVsmbFiVazZ9O5+/PZkEiwixAvTFRMPd6rgIFijuXR6mulnKYtpv0QhVqlnKkLQ8NP
- W29Uvq/+NzXHlxTiKwJ3ptvhqjKxeCjA6bb9/2Gt9gWJkLR6/7owxPn5EjIXtWAUBRoW
- mAUxl5JoCyrTrrVzkfrtr3J6l2jq4skdJWw8SLClxKmoOGfCrVaSZYStFGNfFZDhgQoG
- zn17UJo116XrGhJDs7PFCMGR08966aDKBGpcXcd9M+dLhkPmGhrD1kng0hzz60wWxxA9
- x9ef65I1BtlOKLnhBcjB3oIvT0Pt6qqwqAnFiK1VnhE8gL6HWFTrMxT0BCS3i7zwBPpB
- SVcA==
-X-Gm-Message-State: AHQUAuaU3OTzlrzz53d8uazbe/nfghJfjRjRQKA1evP2bQQshLpC5eOb
- dwyCH+K1axKX30TwFGKnlw==
-X-Google-Smtp-Source: AHgI3IaE9wj865XsCg1zKNXJlTzg3XklIHlEQvlgM4uI9+q2fh5fiLbj7fCyFd7gWXw+knGd/3ZPvw==
-X-Received: by 2002:aca:5053:: with SMTP id e80mr160510oib.334.1549384653183; 
- Tue, 05 Feb 2019 08:37:33 -0800 (PST)
-Received: from xps15.herring.priv (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.googlemail.com with ESMTPSA id r9sm9312678otq.81.2019.02.05.08.37.32
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=DjdOsJcV5AkbRiOCkbN5HDGNBdWxBwEz3rrOfCwE3Rw=;
+ b=q+DvZUE7UMnVqZm2i/CSO706KYi3AC5vEK8UV+ePe6IBrBIB/AfmcnY9Zt9Z2LH1QX
+ bEHJ+zhceFX5MLCPUvr/x0LpBYkmLXAiLSPu5ZKkkxD688LzIWTQkaYO/uv2MsWEuuAr
+ RaKs91MRnzKD8lUGVWeJQfwoaFDXwGw5DQ6Kk84cFghMGXe5EkAb2pY88A77xBROpRqo
+ S6Vp/3aoF8mQKgYezof6PaL/1W0tAksWQ6CZLjqvjE0Pca5nBQXE36iFmhjuEujAQeyo
+ Tio9mMUHIzsFqM9v55+yB26IkljUvP9gNH8FU/OL1tMhYniR+0D+34h/Jo1hFCChJdft
+ Rk6Q==
+X-Gm-Message-State: AHQUAuYQRvHsypu8wA+rIi8xEVw5nbJIPMooD1v09cXYQB4S9C2s2o0T
+ ao+hQQhY8vSKSjCUa4FADzfGhAGfjak=
+X-Google-Smtp-Source: AHgI3IbbXLdx+efIy27LNpMqnqLNxFmVR3qpzuJIiF30hvlr9xWAYTVKpqxXO/dnabg6YVM6TbZfvg==
+X-Received: by 2002:a17:906:24da:: with SMTP id
+ f26mr4311182ejb.136.1549385315643; 
+ Tue, 05 Feb 2019 08:48:35 -0800 (PST)
+Received: from mail-wm1-f44.google.com (mail-wm1-f44.google.com.
+ [209.85.128.44])
+ by smtp.gmail.com with ESMTPSA id f34sm499994eda.22.2019.02.05.08.48.34
+ for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 05 Feb 2019 08:37:32 -0800 (PST)
-From: Rob Herring <robh@kernel.org>
-To: Will Deacon <will.deacon@arm.com>, Robin Murphy <robin.murphy@arm.com>,
- Joerg Roedel <joro@8bytes.org>
-Subject: [PATCH] iommu: Allow io-pgtable to be used outside of drivers/iommu/
-Date: Tue,  5 Feb 2019 10:37:31 -0600
-Message-Id: <20190205163731.17864-1-robh@kernel.org>
-X-Mailer: git-send-email 2.19.1
+ Tue, 05 Feb 2019 08:48:35 -0800 (PST)
+Received: by mail-wm1-f44.google.com with SMTP id g67so4426183wmd.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 05 Feb 2019 08:48:34 -0800 (PST)
+X-Received: by 2002:a1c:c008:: with SMTP id q8mr4060725wmf.99.1549385314525;
+ Tue, 05 Feb 2019 08:48:34 -0800 (PST)
 MIME-Version: 1.0
+References: <cover.f7a136448029ab87c498d68164670712639748e7.1548236066.git-series.maxime.ripard@bootlin.com>
+ <624512bb9665e0b15244c2bdf230bcfada3a3b98.1548236066.git-series.maxime.ripard@bootlin.com>
+ <CAGb2v6702pRt-=SrOLqfxO5CBQT+bxFgQ6fugA=4SP_vWdqcBw@mail.gmail.com>
+In-Reply-To: <CAGb2v6702pRt-=SrOLqfxO5CBQT+bxFgQ6fugA=4SP_vWdqcBw@mail.gmail.com>
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Wed, 6 Feb 2019 00:48:21 +0800
+X-Gmail-Original-Message-ID: <CAGb2v66h67zmGB9jZ4QxUN1mU-pZy4kPRzvSxu1ECOi4SqETUA@mail.gmail.com>
+Message-ID: <CAGb2v66h67zmGB9jZ4QxUN1mU-pZy4kPRzvSxu1ECOi4SqETUA@mail.gmail.com>
+Subject: Re: [PATCH 2/4] drm/sun4i: dsi: Change the start delay calculation
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_083735_895566_B8C65162 
-X-CRM114-Status: GOOD (  14.56  )
+X-CRM114-CacheID: sfid-20190205_084838_254506_6B095F99 
+X-CRM114-Status: GOOD (  29.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,253 +94,126 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-msm@vger.kernel.org, iommu@lists.linux-foundation.org,
- Rob Clark <robdclark@gmail.com>, linux-mediatek@lists.infradead.org,
- Matthias Brugger <matthias.bgg@gmail.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: bbrezillon@kernel.org,
+ Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Sean Paul <seanpaul@chromium.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Jagan Teki <jagan@openedev.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Move io-pgtable.h to include/linux/ and export alloc_io_pgtable_ops
-and free_io_pgtable_ops. This enables drivers outside drivers/iommu/ to
-use the ARM page table library. Specifically, some ARM Mali GPUs use the
-ARM page table formats.
+On Wed, Jan 30, 2019 at 11:23 AM Chen-Yu Tsai <wens@csie.org> wrote:
+>
+> On Wed, Jan 23, 2019 at 11:54 PM Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> >
+> > The current calculation for the video start delay in the current DSI driver
+> > is that it is the total vertical size, minus the backporch and sync length,
+> > plus 1.
+> >
+> > However, the Allwinner code has it as the active vertical size, plus the
+> > back porch and the sync length. This doesn't make any difference on the
+> > only panel it has been tested with so far, since in that particular case
+> > the front porch is equal to the sum of the back porch and sync length.
+> >
+> > This is not the case for all panels, obviously, so we need to fix it. Since
+> > the Allwinner code has a bunch of extra code to deal with out of bounds
+> > values, so let's add them as well.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 7 ++++++-
+> >  1 file changed, 6 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > index 380fc527a707..e3e4ba90c059 100644
+> > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > @@ -357,7 +357,12 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
+> >  static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
+> >                                            struct drm_display_mode *mode)
+> >  {
+> > -       return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
+>
+> According to the diagram in include/drm/drm_modes.h ,
+> This is active region plus back porch plus 1, as
+>
+>     sync_end - display = length of front porch and sync
+>
+> > +       u16 delay = (mode->vsync_end + 1) % mode->vtotal;
+>
+> And this actually means
+>
+>     (length of active region and front porch and sync pulse plus 1) %
+> total length
+>
+> So I don't really understand what's happening here. And the modulus
+> is unexplained.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: Rob Clark <robdclark@gmail.com>
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: iommu@lists.linux-foundation.org
-Cc: linux-mediatek@lists.infradead.org
-Cc: linux-arm-msm@vger.kernel.org
-Signed-off-by: Rob Herring <robh@kernel.org>
----
-This will be needed for an in-progress Mali GPU DRM driver. It's using 
-the page table lib, but is not a full IOMMU driver.
+Attempting to make sense of this. Allwinner's A64 BSP the following
+which uses their definitions for y, vbp, vt:
 
-It's going to be a few cycles I'd guess before the DRM driver is 
-anywhere close to merging. So I can carry this if preferred, but release 
-early, release often.
+    s32 start_delay = panel->lcd_vt - panel->lcd_y -10;
+    u32 vfp = panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
+    u32 dsi_start_delay;
 
-Rob
+    /* put start_delay to tcon. set ready sync early to dramfreq, so
+set start_delay 1 */
+    start_delay = 1;
 
- drivers/iommu/arm-smmu-v3.c                   | 3 +--
- drivers/iommu/arm-smmu.c                      | 2 +-
- drivers/iommu/io-pgtable-arm-v7s.c            | 3 +--
- drivers/iommu/io-pgtable-arm.c                | 3 +--
- drivers/iommu/io-pgtable.c                    | 5 +++--
- drivers/iommu/ipmmu-vmsa.c                    | 3 +--
- drivers/iommu/msm_iommu.c                     | 2 +-
- drivers/iommu/mtk_iommu.h                     | 3 +--
- drivers/iommu/qcom_iommu.c                    | 2 +-
- {drivers/iommu => include/linux}/io-pgtable.h | 0
- 10 files changed, 11 insertions(+), 15 deletions(-)
- rename {drivers/iommu => include/linux}/io-pgtable.h (100%)
+    dsi_start_delay = panel->lcd_vt - vfp + start_delay;
+    if (dsi_start_delay > panel->lcd_vt)
+           dsi_start_delay -= panel->lcd_vt;
+    if (dsi_start_delay==0)
+           dsi_start_delay = 1;
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 0d284029dc73..d3880010c6cf 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -18,6 +18,7 @@
- #include <linux/dma-iommu.h>
- #include <linux/err.h>
- #include <linux/interrupt.h>
-+#include <linux/io-pgtable.h>
- #include <linux/iommu.h>
- #include <linux/iopoll.h>
- #include <linux/init.h>
-@@ -32,8 +33,6 @@
- 
- #include <linux/amba/bus.h>
- 
--#include "io-pgtable.h"
--
- /* MMIO registers */
- #define ARM_SMMU_IDR0			0x0
- #define IDR0_ST_LVL			GENMASK(28, 27)
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index af18a7e7f917..045d93884164 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -39,6 +39,7 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/io-64-nonatomic-hi-lo.h>
-+#include <linux/io-pgtable.h>
- #include <linux/iommu.h>
- #include <linux/iopoll.h>
- #include <linux/init.h>
-@@ -56,7 +57,6 @@
- #include <linux/amba/bus.h>
- #include <linux/fsl/mc.h>
- 
--#include "io-pgtable.h"
- #include "arm-smmu-regs.h"
- 
- #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index cec29bf45c9b..75a8273d1ae9 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -35,6 +35,7 @@
- #include <linux/atomic.h>
- #include <linux/dma-mapping.h>
- #include <linux/gfp.h>
-+#include <linux/io-pgtable.h>
- #include <linux/iommu.h>
- #include <linux/kernel.h>
- #include <linux/kmemleak.h>
-@@ -45,8 +46,6 @@
- 
- #include <asm/barrier.h>
- 
--#include "io-pgtable.h"
--
- /* Struct accessors */
- #define io_pgtable_to_data(x)						\
- 	container_of((x), struct arm_v7s_io_pgtable, iop)
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 237cacd4a62b..d3700ec15cbd 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -22,6 +22,7 @@
- 
- #include <linux/atomic.h>
- #include <linux/bitops.h>
-+#include <linux/io-pgtable.h>
- #include <linux/iommu.h>
- #include <linux/kernel.h>
- #include <linux/sizes.h>
-@@ -31,8 +32,6 @@
- 
- #include <asm/barrier.h>
- 
--#include "io-pgtable.h"
--
- #define ARM_LPAE_MAX_ADDR_BITS		52
- #define ARM_LPAE_S2_MAX_CONCAT_PAGES	16
- #define ARM_LPAE_MAX_LEVELS		4
-diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
-index 127558d83667..93f2880be6c6 100644
---- a/drivers/iommu/io-pgtable.c
-+++ b/drivers/iommu/io-pgtable.c
-@@ -19,11 +19,10 @@
-  */
- 
- #include <linux/bug.h>
-+#include <linux/io-pgtable.h>
- #include <linux/kernel.h>
- #include <linux/types.h>
- 
--#include "io-pgtable.h"
--
- static const struct io_pgtable_init_fns *
- io_pgtable_init_table[IO_PGTABLE_NUM_FMTS] = {
- #ifdef CONFIG_IOMMU_IO_PGTABLE_LPAE
-@@ -61,6 +60,7 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
- 
- 	return &iop->ops;
- }
-+EXPORT_SYMBOL_GPL(alloc_io_pgtable_ops);
- 
- /*
-  * It is the IOMMU driver's responsibility to ensure that the page table
-@@ -77,3 +77,4 @@ void free_io_pgtable_ops(struct io_pgtable_ops *ops)
- 	io_pgtable_tlb_flush_all(iop);
- 	io_pgtable_init_table[iop->fmt]->free(iop);
- }
-+EXPORT_SYMBOL_GPL(free_io_pgtable_ops);
-diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-index 7a4529c61c19..9a380c10655e 100644
---- a/drivers/iommu/ipmmu-vmsa.c
-+++ b/drivers/iommu/ipmmu-vmsa.c
-@@ -15,6 +15,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
-+#include <linux/io-pgtable.h>
- #include <linux/iommu.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-@@ -35,8 +36,6 @@
- #define arm_iommu_detach_device(...)	do {} while (0)
- #endif
- 
--#include "io-pgtable.h"
--
- #define IPMMU_CTX_MAX 8
- 
- struct ipmmu_features {
-diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
-index fc4270733f11..ef7d1f995d6b 100644
---- a/drivers/iommu/msm_iommu.c
-+++ b/drivers/iommu/msm_iommu.c
-@@ -23,6 +23,7 @@
- #include <linux/platform_device.h>
- #include <linux/errno.h>
- #include <linux/io.h>
-+#include <linux/io-pgtable.h>
- #include <linux/interrupt.h>
- #include <linux/list.h>
- #include <linux/spinlock.h>
-@@ -37,7 +38,6 @@
- 
- #include "msm_iommu_hw-8xxx.h"
- #include "msm_iommu.h"
--#include "io-pgtable.h"
- 
- #define MRC(reg, processor, op1, crn, crm, op2)				\
- __asm__ __volatile__ (							\
-diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
-index 778498b8633f..62c2c3e8c5df 100644
---- a/drivers/iommu/mtk_iommu.h
-+++ b/drivers/iommu/mtk_iommu.h
-@@ -19,13 +19,12 @@
- #include <linux/component.h>
- #include <linux/device.h>
- #include <linux/io.h>
-+#include <linux/io-pgtable.h>
- #include <linux/iommu.h>
- #include <linux/list.h>
- #include <linux/spinlock.h>
- #include <soc/mediatek/smi.h>
- 
--#include "io-pgtable.h"
--
- struct mtk_iommu_suspend_reg {
- 	u32				standard_axi_mode;
- 	u32				dcm_dis;
-diff --git a/drivers/iommu/qcom_iommu.c b/drivers/iommu/qcom_iommu.c
-index d8595f0a987d..8cdd3f059513 100644
---- a/drivers/iommu/qcom_iommu.c
-+++ b/drivers/iommu/qcom_iommu.c
-@@ -26,6 +26,7 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/io-64-nonatomic-hi-lo.h>
-+#include <linux/io-pgtable.h>
- #include <linux/iommu.h>
- #include <linux/iopoll.h>
- #include <linux/kconfig.h>
-@@ -42,7 +43,6 @@
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- 
--#include "io-pgtable.h"
- #include "arm-smmu-regs.h"
- 
- #define SMMU_INTR_SEL_NS     0x2000
-diff --git a/drivers/iommu/io-pgtable.h b/include/linux/io-pgtable.h
-similarity index 100%
-rename from drivers/iommu/io-pgtable.h
-rename to include/linux/io-pgtable.h
--- 
-2.19.1
+This can be converted to
 
+    dsi_start_delay = max(1, (mode->vtotal - (mode->vtotal -
+mode->vdisplay - (mode->vtotal - mode->vsync_start)) + 1) %
+mode->vtotal)
+
+and simplified to
+
+    dsi_start_delay = max(1, (mode->vtotal + mode->vdisplay -
+mode->vsync_start) + 1) % mode->vtotal)
+
+and reordered to the following
+
+    dsi_start_delay = max(1, (mode->vtotal - (mode->vsync_start -
+mode->vdisplay) + 1) % mode->vtotal)
+
+which means total length minus front porch, or length of active
+portion plus back porch plus sync.
+Based on your commit message, the last derivation is what you want.
+
+ChenYu
+
+> > +
+> > +       if (!delay)
+> > +               delay = 1;
+>
+> Same comment as Paul.
+>
+> ChenYu
+>
+> > +
+> > +       return delay;
+> >  }
+> >
+> >  static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
+> > --
+> > git-series 0.9.1
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel@lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 _______________________________________________
 linux-arm-kernel mailing list
