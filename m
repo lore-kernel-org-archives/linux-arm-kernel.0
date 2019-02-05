@@ -7,53 +7,117 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3E2A5C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 15:43:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2DAD7C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 15:44:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 092D0217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 15:43:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ED4B020663
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 15:44:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oe/ktz0d"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 092D0217F9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o8k5OFEq";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="eqwr/DhM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ED4B020663
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YP1cYSuxpSwpAcFc3teb89bRswecrUtIjIkQ/e+uT5g=; b=oe/ktz0dBaAbPD
-	YDQq9wtD9CJBt+NrqdYeBLW3h8j6a7F3Y7lLM43YcaSY7hbhAcQhsspshac4jvXYLFdI7BjliucJI
-	yStJLY7kU2XdeDdylR0J9YH3louPtrsFiToLZW+PM7Sh1UyaPEetvZ9K1KAejgDVJ/H2yTmUtcPwg
-	n3ihaJE1jOry2Ixyco0r4NgZTPEuBU/oj5uCHns7f1SYKdBn153yi/82hG2r7yGtbByeLhyece31f
-	UNYjMweHOqffyzh2CvwzsuxAEA4VtUnpHOYCMvfhFo7bwyxu2rGjW4E2ZB7uhKUayr/n2w7JrJEoR
-	xkMDtcGKSZChQNZzTLCg==;
+	List-Owner; bh=6TOEZW1hE9Q1OwKJreea71/KLkixvFXNVIiAHSSrt4Q=; b=o8k5OFEq5ZKGlr
+	9bg3TaNZQLUHyd2HopBVZl0WCNl+YRpLbEkOz3ppbVod7cnSq2bKLDGJ2k+p/cNDYPnRpu1KCk36q
+	PxE0IpfVSnBLc+x1fCdFs5FKdC0L0lJKLy9ioabKbt9iJU8QIDiX4HtRlZQyedf94rWQCiTaYDyWR
+	AgNAQb7MVFPABJme9hEoKiSihiuEsGCKoVl2AkW1TWlWvZDrEgyDlhbaq9s1X6Ou1vFgKqQbn5+Ce
+	q6WOGqSEz9x/Ag5tyZccWu7vtNB8o7CgJUbSkY/Drf6iFaUKmWNq1R25z3/eYzOl3ICDOPHH+GyyI
+	ljWo+L+NRFikfxYftt9w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr2ss-0004CG-9G; Tue, 05 Feb 2019 15:43:38 +0000
-Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
+	id 1gr2tG-0004dV-JP; Tue, 05 Feb 2019 15:44:02 +0000
+Received: from esa1.microchip.iphmx.com ([68.232.147.91])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr2rp-0003Ak-O9
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 15:42:40 +0000
-Received: by wens.csie.org (Postfix, from userid 1000)
- id 76C635FD5E; Tue,  5 Feb 2019 23:42:26 +0800 (CST)
-From: Chen-Yu Tsai <wens@csie.org>
-To: Ulf Hansson <ulf.hansson@linaro.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH v2 3/3] arm64: dts: allwinner: h5: libretech-all-h3-cc: Mark
- eMMC HS-DDR 3.3V capable
-Date: Tue,  5 Feb 2019 23:42:25 +0800
-Message-Id: <20190205154225.14264-4-wens@csie.org>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190205154225.14264-1-wens@csie.org>
-References: <20190205154225.14264-1-wens@csie.org>
+ id 1gr2sf-0003xa-N6; Tue, 05 Feb 2019 15:43:59 +0000
+X-IronPort-AV: E=Sophos;i="5.56,564,1539673200"; d="scan'208";a="27303250"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa1.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 05 Feb 2019 08:43:18 -0700
+Received: from NAM01-BY2-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.108) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Tue, 5 Feb 2019 08:43:17 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=dulE2vno0UHBP+wCzC4qklSLqhWS5TN+6xXukCzmqqo=;
+ b=eqwr/DhMMMskrBPzrypQDC+DwmO2ZUyFqEnqzgSCOst81+oqGdtNxZEppzfD7JIl4IHQQWyjDxJNDMPV0RrS9cCZbetuZVTH3/BOC3mSJ63RZqU0AOa5F4XKQvCfahEfVuLLqy9DGeA2FMcYZQoTtx5VMEXE7Uvt+LjFjGC923A=
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.98.146) by
+ BN6PR11MB1409.namprd11.prod.outlook.com (10.173.31.19) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1601.17; Tue, 5 Feb 2019 15:43:14 +0000
+Received: from BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::847:4296:13b9:fc9f]) by BN6PR11MB1842.namprd11.prod.outlook.com
+ ([fe80::847:4296:13b9:fc9f%8]) with mapi id 15.20.1580.019; Tue, 5 Feb 2019
+ 15:43:14 +0000
+From: <Tudor.Ambarus@microchip.com>
+To: <broonie@kernel.org>, <robh+dt@kernel.org>, <mark.rutland@arm.com>,
+ <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
+ <Ludovic.Desroches@microchip.com>, <bbrezillon@kernel.org>,
+ <Cyrille.Pitchen@microchip.com>, <bugalski.piotr@gmail.com>
+Subject: [PATCH v5 02/13] spi: atmel-quadspi: order header files inclusion
+ alphabetically
+Thread-Topic: [PATCH v5 02/13] spi: atmel-quadspi: order header files
+ inclusion alphabetically
+Thread-Index: AQHUvWmB+tbUF1mBbUiW0q2k4YJFKw==
+Date: Tue, 5 Feb 2019 15:43:14 +0000
+Message-ID: <20190205154257.29529-3-tudor.ambarus@microchip.com>
+References: <20190205154257.29529-1-tudor.ambarus@microchip.com>
+In-Reply-To: <20190205154257.29529-1-tudor.ambarus@microchip.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: AM5P190CA0017.EURP190.PROD.OUTLOOK.COM
+ (2603:10a6:206:14::30) To BN6PR11MB1842.namprd11.prod.outlook.com
+ (2603:10b6:404:101::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Tudor.Ambarus@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 2.9.5
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; BN6PR11MB1409;
+ 6:owhDfCB6AkTiCnuOvEhXWvAO/v9s5tqTPZ795hLYs3vD3WO/9XfyiKax3HvX050AuE7z+cHhD3MFHbzPx4/wUy8I7XXdnuwXuF7Q9KwqYBTvFuYw0dtj6gHkRqAE5wPEhgzRaJ1BcROGoZfIKhShs2ieHTML4wpuCFiwgqpeLG0Dub7BoUQrNB+GiSjWCq2HDrj9P6pWW4l+Xdx9LmDv1COzR5aas8yEGIfCWmAX9MxGeoimAU8d2SUarGfVHjCThVuwrCB2GNsl7FAWkuix7Qjch4EfDfF5g8kZNoFu7w8G34USiLh3oS+MSuOjPBil1qOXpdzyt0mybFY1pm5gKmNMzNHK5W67GlA3zvZaHK6N3we/C9Uvroh8YimMWNz0xPtuNIu0fM72kJm+sNHpyEK0VfAct9Zc9IRPkiUV2fF8p8XfN6nBD3KSHY5K583dYNGx5CsgRFjeE8yfHVrNHA==;
+ 5:Zm8s0EJKv4P+PbwYeh4Xgr1wx9D/vb2GE+AsoNGsNJVyiypnMFObW4LR9yWaMGHym5yxxZBWn/62X8JD1+96qp2Q8JCGAX+B+zksKdLSe+F58uy+zeuUhvR4TLpID/Ix9V+eGa4iVwr89sK3AitMk1PbAsGAZHWJZLwvs8A9dA9Kj2yEc/jjvWrANiuTAw6l0VPBl8alh3/T8oXCXGoYvA==;
+ 7:5HgbkkkdP4JtLdB9ilJJlZf3CGsgLbo93vXifxXeYiVw7Y32C2OX5OQD/OTXC8BLaUlXyFm1yh0tpyxVuzIp26pWbT5uJpLrzYRA6d0oCId1kXy0O9kDhpCRramqVTNVmTdyVMhd+V18MvE7TNO5xA==
+x-ms-office365-filtering-correlation-id: 8058fc9e-f900-4114-15d4-08d68b80a38f
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:BN6PR11MB1409; 
+x-ms-traffictypediagnostic: BN6PR11MB1409:
+x-microsoft-antispam-prvs: <BN6PR11MB1409B9EDFDE799BF026F214BF06E0@BN6PR11MB1409.namprd11.prod.outlook.com>
+x-forefront-prvs: 0939529DE2
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(376002)(346002)(366004)(136003)(39860400002)(189003)(199004)(97736004)(105586002)(106356001)(2501003)(26005)(6506007)(386003)(186003)(71190400001)(71200400001)(11346002)(446003)(4326008)(25786009)(316002)(2616005)(2906002)(102836004)(476003)(7416002)(110136005)(54906003)(86362001)(486006)(256004)(6436002)(99286004)(72206003)(478600001)(7736002)(68736007)(36756003)(14454004)(76176011)(52116002)(4744005)(50226002)(3846002)(53936002)(81156014)(6116002)(66066001)(6486002)(8676002)(305945005)(81166006)(6512007)(8936002)(1076003)(107886003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1409;
+ H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: /tTXG7NThu61xVHad4w6mBRAvrlu8TcNRQl2CNtTJ3EinULPG/lHHT8Y5bRh2DabzHXcyimtcpO3MuKbkLkO1Lr9qOdSJ5J3ml45YdVDVlAwxcSkvIymZ4TCieZn2ZCNXfh7o/d+TGBn49QLR68yUGuOPBWvUDgz9XWVGECmKgRTG4UI+EpC6qmfon6H613Lc+FAiX8LYvgXP17v2Ob21ymN5rEayP0qpt89Ay/T+QsiNhNmkwHaM8AqPTJn5LwiqPQTOq6Z9XBtEoUE9S+TWqDiySrwIiXikHTSW21oKg7LF5Gvtn1DWSu44r77Ja+/rU+8Sh4SXHu8qFxxLIlKhBWksi28UL+wY/FrBqltHw6FaVvNuKV0GzoUFTwb8en2t15jw/g2MgxkvwYeO9Lz0FrGbmosmpAIgIAkr7e+MIs=
 MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 8058fc9e-f900-4114-15d4-08d68b80a38f
+X-MS-Exchange-CrossTenant-originalarrivaltime: 05 Feb 2019 15:43:10.9410 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1409
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_074234_192120_F4E880DA 
-X-CRM114-Status: UNSURE (   8.02  )
+X-CRM114-CacheID: sfid-20190205_074326_515459_C062A340 
+X-CRM114-Status: UNSURE (   7.25  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -66,37 +130,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Chris Blake <chrisrblake93@gmail.com>,
- linux-mmc@vger.kernel.org, linux-sunxi@googlegroups.com,
- linux-kernel@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, Tudor.Ambarus@microchip.com,
+ linux-kernel@vger.kernel.org, linux-spi@vger.kernel.org,
+ linux-mtd@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Libre Computer ALL-H3-CC H5 is one of the few boards that can have
-its eMMC run at HS-DDR speed mode. Mark it as such.
+From: Tudor Ambarus <tudor.ambarus@microchip.com>
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Cosmetic change, no functional change.
+
+Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+Reviewed-by: Boris Brezillon <bbrezillon@kernel.org>
 ---
- .../boot/dts/allwinner/sun50i-h5-libretech-all-h3-cc.dts      | 4 ++++
- 1 file changed, 4 insertions(+)
+v5: no change
+v4: no change
+v3: no change
+v2: collect R-b
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-libretech-all-h3-cc.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-libretech-all-h3-cc.dts
-index 95e113ce8699..d68bdfea2271 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-libretech-all-h3-cc.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-libretech-all-h3-cc.dts
-@@ -12,3 +12,7 @@
- 	model = "Libre Computer Board ALL-H3-CC H5";
- 	compatible = "libretech,all-h3-cc-h5", "allwinner,sun50i-h5";
- };
-+
-+&mmc2 {
-+	mmc-ddr-3_3v;
-+};
+ drivers/spi/atmel-quadspi.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/spi/atmel-quadspi.c b/drivers/spi/atmel-quadspi.c
+index d6864d29f294..7d83ce8747e8 100644
+--- a/drivers/spi/atmel-quadspi.c
++++ b/drivers/spi/atmel-quadspi.c
+@@ -22,16 +22,15 @@
+  * This driver is based on drivers/mtd/spi-nor/fsl-quadspi.c from Freescale.
+  */
+ 
+-#include <linux/kernel.h>
+ #include <linux/clk.h>
+-#include <linux/module.h>
+-#include <linux/platform_device.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/interrupt.h>
+-#include <linux/of.h>
+-
+ #include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
+ #include <linux/spi/spi-mem.h>
+ 
+ /* QSPI register offsets */
 -- 
-2.20.1
+2.9.5
 
 
 _______________________________________________
