@@ -2,70 +2,62 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9C928C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:18:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E86FEC3E8A4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:38:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 657BB20821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:18:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B7C0F2081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:38:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n3bFT+yA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 657BB20821
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TvyN28GH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B7C0F2081B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=renesas.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=K08pe06Oej+T/kkp70NKq5g7Ec6spjkr4Gi7ikqVbbA=; b=n3bFT+yASukX5Q
-	AJsSOla95EsLItbrvTf8Nm+ukNy3Gg1DlgwZzAe2GAuSyXbQG9eOAoCnnKHJOZm1DnpA5SOVFrNtk
-	uMvimm+UZHT22Awu7baOb8fGqmeik3wF+7sbU4urb/Ib0kdlrklSN/vP6GFMoR0LzHBwNlBt7U+WD
-	BnnW5pl6gCrOi2O93LRZ4FlDjsRUeESlH/Lp6GBz5BVsKxz5i5fTcED+GYCdwPBP/hZKExUIwOSiu
-	oPzlg8QHR0V6e9Enh/VjZodNPh9w+sxVJ8WtmvTjaV1RmHlUQd8IRyy1yhINkUuazudAh3io5XkbM
-	VLEnYavjHsXb1YJd+R4A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:To:From:Message-ID
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=SPc2IjCi1/jBedsPyUqINCyRDAWIdFF/DXB/Os0GywM=; b=TvyN28GHR3Ia7D
+	VBEcx4YTa3ZEegtzvgksCbyxIcEFraUxvljP3rZcRx7kDpTd/yKH/ddUTPVWnVyb0a0oGseNi506i
+	KZbZm5FLZeH2/PwEuKhPjIPVf4HIrGDFCVLEPrkC/ZL4sr8e4+obOb+EV17UIJb6O+zBcnj+ELcBI
+	rb8U0F9+Jw5VC3as20Rw+bycTHsa410zsxscDxXJ5kxijge3K1nALi7BmNljU8zA9qu0cL/zVUOfu
+	+5WjJPcjj37mgofvU+SkrGjQlC4F+9PE2iXZrUphJBgkyrfKeVo48XV8YOXEIUqn6YnNCHE5at70N
+	2Q0XVZo151pGRfuKEiPg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqu3R-00058G-Fz; Tue, 05 Feb 2019 06:17:57 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqu3O-00057h-1j
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 06:17:55 +0000
-Received: from pty.hi.pengutronix.de ([2001:67c:670:100:1d::c5])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gqu3H-0006mR-45; Tue, 05 Feb 2019 07:17:47 +0100
-Received: from ukl by pty.hi.pengutronix.de with local (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gqu3G-0001rY-B9; Tue, 05 Feb 2019 07:17:46 +0100
-Date: Tue, 5 Feb 2019 07:17:46 +0100
-From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-To: Shawn Guo <shawnguo@kernel.org>
-Subject: Re: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Enable SIOX bus
-Message-ID: <20190205061746.2feq4h3sflpk3qoa@pengutronix.de>
-References: <20190111164936.7152-1-u.kleine-koenig@pengutronix.de>
- <20190111164936.7152-2-u.kleine-koenig@pengutronix.de>
- <20190114014034.GF15371@dragon>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190114014034.GF15371@dragon>
-User-Agent: NeoMutt/20170113 (1.7.2)
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c5
-X-SA-Exim-Mail-From: ukl@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+	id 1gquNT-0002OS-6b; Tue, 05 Feb 2019 06:38:39 +0000
+Received: from relmlor2.renesas.com ([210.160.252.172]
+ helo=relmlie6.idc.renesas.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gquNP-0002NU-TJ
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 06:38:38 +0000
+Date: 05 Feb 2019 15:38:29 +0900
+X-IronPort-AV: E=Sophos;i="5.56,562,1539615600"; 
+   d="scan'208";a="6868068"
+Received: from unknown (HELO relmlir5.idc.renesas.com) ([10.200.68.151])
+ by relmlie6.idc.renesas.com with ESMTP; 05 Feb 2019 15:38:29 +0900
+Received: from morimoto-PC.renesas.com (unknown [10.166.18.140])
+ by relmlir5.idc.renesas.com (Postfix) with ESMTP id B337D400EC47;
+ Tue,  5 Feb 2019 15:38:29 +0900 (JST)
+Message-ID: <878syukax3.wl-kuninori.morimoto.gx@renesas.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+To: Yong Deng <yong.deng@magewell.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>
+Subject: compile error at sun6i_video
+User-Agent: Wanderlust/2.15.9 Emacs/24.5 Mule/6.0
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_221754_244855_F9BAC266 
-X-CRM114-Status: GOOD (  11.09  )
+X-CRM114-CacheID: sfid-20190204_223836_055618_00144312 
+X-CRM114-Status: UNSURE (   4.23  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,42 +69,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>, Gavin Schenk <g.schenk@eckelmann.de>,
- NXP Linux Team <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello Shawn,
 
-On Mon, Jan 14, 2019 at 09:40:35AM +0800, Shawn Guo wrote:
-> On Fri, Jan 11, 2019 at 05:49:36PM +0100, Uwe Kleine-K=F6nig wrote:
-> > Now that there is a board making use of this bus is available
-> > enable the siox code to increase compile coverage.
-> > =
+Hi MultiMedia ML
 
-> > Signed-off-by: Uwe Kleine-K=F6nig <u.kleine-koenig@pengutronix.de>
-> =
+I got below compile error at SH.
 
-> Applied, thanks.
+  ...
+  CC      drivers/tty/tty_io.o
+/opt/RB02197/home/morimoto/save/WORK/linux/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c: In function 'sun6i_video_start_streaming':
+/opt/RB02197/home/morimoto/save/WORK/linux/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c:141:29: error: passing argument 1 of 'media_pipeline_start' from incompatible pointer type [-Werror=incompatible-pointer-types]
+  ret = media_pipeline_start(&video->vdev.entity, &video->vdev.pipe);
+                             ^~~~~~~~~~~~~~~~~~~
+In file included from /opt/RB02197/home/morimoto/save/WORK/linux/include/media/media-device.h:26,
+                 from /opt/RB02197/home/morimoto/save/WORK/linux/include/media/v4l2-device.h:24,
+                 from /opt/RB02197/home/morimoto/save/WORK/linux/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c:10:
+/opt/RB02197/home/morimoto/save/WORK/linux/include/media/media-entity.h:1030:84: note: expected 'struct media_pad *' but argument is of type 'struct media_entity *'
+ __must_check int media_pipeline_start(struct media_pad *pad,
+                                                                                    ^  
+/opt/RB02197/home/morimoto/save/WORK/linux/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c:205:22: error: passing argument 1 of 'media_pipeline_stop' from incompatible pointer type [-Werror=incompatible-pointer-types]
+  media_pipeline_stop(&video->vdev.entity);
+                      ^~~~~~~~~~~~~~~~~~~
+In file included from /opt/RB02197/home/morimoto/save/WORK/linux/include/media/media-device.h:26,
+                 from /opt/RB02197/home/morimoto/save/WORK/linux/include/media/v4l2-device.h:24,
+                 from /opt/RB02197/home/morimoto/save/WORK/linux/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c:10:
+/opt/RB02197/home/morimoto/save/WORK/linux/include/media/media-entity.h:1055:44: note: expected 'struct media_pad *' but argument is of type 'struct media_entity *'
+ void media_pipeline_stop(struct media_pad *pad);
+                          ~~~~~~~~~~~~~~~~~~^~~
+/opt/RB02197/home/morimoto/save/WORK/linux/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c: In function 'sun6i_video_stop_streaming':
+/opt/RB02197/home/morimoto/save/WORK/linux/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c:229:22: error: passing argument 1 of 'media_pipeline_stop' from incompatible pointer type [-Werror=incompatible-pointer-types]
+  media_pipeline_stop(&video->vdev.entity);
+                      ^~~~~~~~~~~~~~~~~~~
+In file included from /opt/RB02197/home/morimoto/save/WORK/linux/include/media/media-device.h:26,
+                 from /opt/RB02197/home/morimoto/save/WORK/linux/include/media/v4l2-device.h:24,
+                 from /opt/RB02197/home/morimoto/save/WORK/linux/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c:10:
+/opt/RB02197/home/morimoto/save/WORK/linux/include/media/media-entity.h:1055:44: note: expected 'struct media_pad *' but argument is of type 'struct media_entity *'
+ void media_pipeline_stop(struct media_pad *pad);
+                          ~~~~~~~~~~~~~~~~~~^~~
 
-As you dropped patch 1 the commit log of this patch is wrong. There is
-no board that makes use of siox without the first patch. If you consider
-it important enough to care, we can reword to:
-
-	To increase compile coverage enable SIOX bus which is used on a
-	not-yet-mainlined i.MX6 machine.
 
 Best regards
-Uwe
-
--- =
-
-Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+---
+Kuninori Morimoto
 
 _______________________________________________
 linux-arm-kernel mailing list
