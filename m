@@ -2,85 +2,66 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A3292C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 09:40:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BB004C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 09:44:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7361D20844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 09:40:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8BEC82080D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 09:44:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ob/YoGpe";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="EPrLLSJF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7361D20844
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sLl6Q4Ql"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8BEC82080D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=h4vIw/I+/rR9ALeUqdOFF7PHDZ/CiP4RoyvRbJt4f3I=; b=ob/YoGpeMZeDDs
-	3X59FIhfKrQgcOF+uTOEC5ZJRZhQr1J0cV4a81B4tBiOOU3NaYhkbptfoDb/eaSaGhGTizTcOK4QC
-	E63/Bs8qUuQFhtiZJsP+MwRsC6ZYZCs3JaeQcaaQbrgdcTk+vyUIDDE7Lghm/Z+kR8HfGBx7WQAta
-	iW+MZw+GPL12r3ydUcqtPSpSHQxI1R98TBLTIA+PQsSVxdOzBvdDmwDbJT6h2UayJAgAL4sy7+BMF
-	b6+aIPzhca/z7Yzun009XcazNYBKMyptv2HWnSITmsgZSHQXX/qxpfZRAjgH/eynoUcZgQf91Q/Ab
-	JPoCsMpPJSs1WRtEA5rA==;
+	List-Owner; bh=+r+oun4wsKuVPg/FFmaQm3b84idxHERCf/OkhxAtrcI=; b=sLl6Q4QlBYFlzX
+	qZl/O9Vsc/6qV2OFmv7KSk421euvMjZ0rVmla+bGhoUXgE4zkpizDzlljJ757nmwcqWwNj2u33yjG
+	SFISYDaJR0vQR8MmoqHo5SYAwtT4gg3dbsBYEYHHizI1nW89+kgshpucJbxSpRcGSXQIaZAoK/5yS
+	lEh81+vgeUOHBYA57UQbYgHmn2Y8j9Xbzl9u58CeSlFBzlcdjoKW9LmlOQ5TZbQ5YiSF/dN7Yjc9y
+	g5uJx8aaTm32DyWE5KfrA+AWSho/g2VTrvP9OTbd4Z3oRmzjEhqs/0c4CLUGH/y0GgKvprsRfbp6P
+	/UdqZAYBu4U4EmM3dwCA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqxDQ-0005R6-LE; Tue, 05 Feb 2019 09:40:28 +0000
-Received: from mail-vk1-xa41.google.com ([2607:f8b0:4864:20::a41])
+	id 1gqxGu-00062j-Jc; Tue, 05 Feb 2019 09:44:04 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqxDN-0005Qh-Ev
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 09:40:27 +0000
-Received: by mail-vk1-xa41.google.com with SMTP id 197so640599vkf.4
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 05 Feb 2019 01:40:24 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=PUbbD68Dm2rbFTrJ1ZJ+R3uLQKALFkdWbqo3heo6Xzw=;
- b=EPrLLSJFKOg7JaGRhtkSyBHeo/acfa3gyel5KjAsGlerXfXz8OVU5IcTzCm3+I2duc
- yPrw1wQavGMpdwR68etgw71JOoYoWzpUqcUcva41/0dBOhDML4NBJOqWNVCCOsqwphFQ
- src8rmWtvKZGoBsMZBfpMjZlr6ZGMSBue5lhw=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=PUbbD68Dm2rbFTrJ1ZJ+R3uLQKALFkdWbqo3heo6Xzw=;
- b=IBiBvmJJdp1Tu0SQWrkS2nNmtmJIX5CvGz4ZfaMB1kQsBzda08pPWTHdmqwjyhhuR/
- h1w0PPXaS9W7LqPtAx0eQ9msyBeeSpgU/6TMQf4Fm1LrVbQqQAQ/8esi8Z1KYoRnLrwG
- wbcTgo5MQ+WZgFXWYq4kdoJQZIEo9ktyBXWU9h1nnYaZoPpTiYASQN9KqlFvNBWRHZiJ
- q4nMZWa99Y/3tlEh7cauuGt21ObW2GgDUW8KYJA2GtIifmzDNqlMnzCtSp6k2hcnnrb6
- zqJO1wgmbI1iJW+2LF2lOiS4MUz+uxS+5Q6dvsoSytrWYRjhf6vQ6/y19iyFy2C4Ze4X
- +0Fg==
-X-Gm-Message-State: AHQUAuYMC2kay+wsAqEYXdc1BtKKL9+Ibxafq2LgrD201ZQoGK74efTq
- OvQX0S9Y+pfXA3RHigJfOThn6HbZLNuvsFZC3TDm+A==
-X-Google-Smtp-Source: AHgI3IbHO3PSU3qDgTSJnVVoEKJNT5+Pu8j1uNBG0k2Z2IBxFOUzci+lNCtTgLYnqoGJfKipauibUz+/JooOouyYfrI=
-X-Received: by 2002:a1f:1408:: with SMTP id 8mr361031vku.36.1549359623932;
- Tue, 05 Feb 2019 01:40:23 -0800 (PST)
-MIME-Version: 1.0
-References: <1545930550-9906-1-git-send-email-aisheng.dong@nxp.com>
- <CAPDyKFrP8HOum_4S0-4Bx+sYbTNSyctv3rQDB78zozeNWOuv=A@mail.gmail.com>
- <AM0PR04MB42117D773477A408462D19D180B00@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <CAPDyKFq4eji_FVKrRJ2k=c1iKuVP_3aERspy6vpXQzeFdBYt9w@mail.gmail.com>
- <AM0PR04MB421124AE755C01CEEC0CF31D808C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <CAPDyKFodySv0A9ESDWwpJU=FQeyZ3FpOG0BMVBPxfgxd3oLWDw@mail.gmail.com>
- <AM0PR04MB4211C13768DD0D9543B6A59F808E0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-In-Reply-To: <AM0PR04MB4211C13768DD0D9543B6A59F808E0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Tue, 5 Feb 2019 10:39:47 +0100
-Message-ID: <CAPDyKFrnUK1_=0okEPTxCjACbOpYuOF9h3oK6pBTXrR9OYje+A@mail.gmail.com>
-Subject: Re: [RFC PATCH 1/1] PM / Domains: Add multi PM domains support for
- attach_dev
-To: Aisheng Dong <aisheng.dong@nxp.com>
+ id 1gqxGr-00062H-KI
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 09:44:03 +0000
+Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <l.stach@pengutronix.de>)
+ id 1gqxGn-00029G-EA; Tue, 05 Feb 2019 10:43:57 +0100
+Message-ID: <1549359836.2544.33.camel@pengutronix.de>
+Subject: Re: [PATCH v2 1/3] dt-bindings: imx6q-pcie: Add description of
+ imx7d pcie phy
+From: Lucas Stach <l.stach@pengutronix.de>
+To: Trent Piepho <tpiepho@impinj.com>, "linux-pci@vger.kernel.org"
+ <linux-pci@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>
+Date: Tue, 05 Feb 2019 10:43:56 +0100
+In-Reply-To: <20190205001721.18639-2-tpiepho@impinj.com>
+References: <20190205001721.18639-1-tpiepho@impinj.com>
+ <20190205001721.18639-2-tpiepho@impinj.com>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
+X-SA-Exim-Mail-From: l.stach@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_014025_508720_83D43FE6 
-X-CRM114-Status: GOOD (  23.59  )
+X-CRM114-CacheID: sfid-20190205_014401_822335_0DF033F9 
+X-CRM114-Status: GOOD (  14.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,92 +73,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "dongas86@gmail.com" <dongas86@gmail.com>,
- "linux-pm@vger.kernel.org" <linux-pm@vger.kernel.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- "khilman@kernel.org" <khilman@kernel.org>,
- "rjw@rjwysocki.net" <rjw@rjwysocki.net>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Richard Zhu <hongxing.zhu@nxp.com>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>, Shawn Guo <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ devicetree@vger.kernel.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-[...]
-
-> > > Then attach_dev() can parse the correct "resource id" (e.g.
-> > > IMX_SC_R_SDHC_1) from device tree And store it in per-device struct
-> > generic_pm_domain_data for later start()/stop() using.
-> >
-> > I see, thanks for clarifying.
-> >
-> > Seem like, we have two options to make this work.
-> >
-> > 1. Let genpd pre-store the index in a the per device generic_pm_domain_data
-> > while doing the attach and before calling the
-> > ->attach_dev() callback. This would make sense, if we consider this to
-> > be a common thing.
-> >
-> > 2. Provide the index as an additional new in-parameter to the
-> > ->attach_dev() callback. This requires a tree wide change as it means
-> > we need to update existing code using the ->attach_dev() callback.
-> >
-> > I would probably try 1) first to see how the code would look like and then fall
-> > back to 2). What do you think?
-> >
->
-> Yes, I agree with you.
-> This patch is exactly doing 1.
->
-> For your former suggestion:
-> " Just assign virt_dev->of_node = of_node_get(dev->of_node), somewhere in
-> genpd_dev_pm_attach_by_id() and before calling __genpd_dev_pm_attach().
-> Doing that, would mean the genpd provider's ->attach_dev() callback,
-> don't have to distinguish between virtual and non-virtual devices"
->
-> As this can only solve passing the real device node issue and we still need
-> pre-store the index in a the per device generic_pm_domain_data and then
-> distinguish if it's multi power domain virtual devices in attach_dev(), so
-> I'm not sure if it's still quite necessary to do that way by assigning
-> "virt_dev->of_node = of_node_get(dev->of_node) before attach".
-> Probably after fully switch to option 2, then we can do it to fully drop the using
-> of per device generic_pm_domain_data to make it transparent to attach_dev()
-> users.
->
-> So now the options may be:
-> 1. Pre-store both device node and domain index in generic_pm_domain_data before
->   Calling attach_dev(). This is exactly this patch does.
-> 2. Pre-store only domain index in generic_pm_domain_data. For device node, assigning
->   "virt_dev->of_node = of_node_get(dev->of_node) before attach.
-> 3. Change attach_dev() to passing domain index and assigning
->   "virt_dev->of_node = of_node_get(dev->of_node) before attach.
->
-> Can you please tell what's your prefer?
-
-Apologize for the delay, just realized that you were expecting a reply from me.
-
-To me is sounds like option 2) is the most feasible. Perhaps it's even
-a good idea to store the domain index in the struct
-generic_pm_domain_data, as it allows it then to be used at any point
-later in time, this not only from the ->attach_dev() callback as
-option 3) would mean.
-
-So according to my understandings, then your genpd backend driver's
-->attach_dev() callback, would use dev_gpd_data() to find out the
-domain index for the device in question. Is that sufficient, or is
-there anything else that is needed?
-
-[...]
-
-Kind regards
-Uffe
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+QW0gRGllbnN0YWcsIGRlbiAwNS4wMi4yMDE5LCAwMDoxNyArMDAwMCBzY2hyaWViIFRyZW50IFBp
+ZXBobzoKPiBUaGVyZSBpcyBhIHNlcGFyYXRlIFBIWSBkZXZpY2Ugd2l0aCBpdHMgb3duIHJlZ2lz
+dGVycyBvbiBpbXg3ZC7CoMKgSXQncwo+IGN1cnJlbnRseSB1bnVzZWQsIGJ1dCBhIFBDSWUgZXJy
+YXR1bSBvbiBpbXg3ZCB3aWxsIHJlcXVpcmUgaXQgZm9yIHRoZQo+IHdvcmthcm91bmQuCj4gCj4g
+U2lnbmVkLW9mZi1ieTogVHJlbnQgUGllcGhvIDx0cGllcGhvQGltcGluai5jb20+CgpJJ20gZ2Vu
+ZXJhbGx5IGZpbmUgd2l0aCB0aGlzLCBidXQgcmVhbGx5IHdhbnQgdG8gc2VlIGFuIEFjayBmcm9t
+IHRoZSBEVApmb2xrcyAoQ0MnZWQpIG9uIHRoaXMuCgpBY2tlZC1ieTogTHVjYXMgU3RhY2ggPGwu
+c3RhY2hAcGVuZ3V0cm9uaXguZGU+CgpSZWdhcmRzLApMdWNhcwoKPiAtLS0KPiDCoERvY3VtZW50
+YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9wY2kvZnNsLGlteDZxLXBjaWUudHh0IHwgMTEgKysr
+KysrKysrKysKPiDCoDEgZmlsZSBjaGFuZ2VkLCAxMSBpbnNlcnRpb25zKCspCj4gCj4gZGlmZiAt
+LWdpdCBhL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9wY2kvZnNsLGlteDZxLXBj
+aWUudHh0IGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL3BjaS9mc2wsaW14NnEt
+cGNpZS50eHQKPiBpbmRleCBkNTE0YzFmMjM2NWYuLmY0OTMzYzg5NTFiYyAxMDA2NDQKPiAtLS0g
+YS9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvcGNpL2ZzbCxpbXg2cS1wY2llLnR4
+dAo+ICsrKyBiL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9wY2kvZnNsLGlteDZx
+LXBjaWUudHh0Cj4gQEAgLTUzLDYgKzUzLDcgQEAgQWRkaXRpb25hbCByZXF1aXJlZCBwcm9wZXJ0
+aWVzIGZvciBpbXg3ZC1wY2llOgo+ID4gwqAJwqDCoMKgwqDCoMKgwqAtICJwY2llcGh5Igo+ID4g
+wqAJwqDCoMKgwqDCoMKgwqAtICJhcHBzIgo+ID4gwqAJwqDCoMKgwqDCoMKgwqAtICJ0dXJub2Zm
+Igo+ICstIGZzbCxpbXg3ZC1wY2llLXBoeTogQSBwaGFuZGxlIHRvIGFuIGZzbCxpbXg3ZC1wY2ll
+LXBoeSBub2RlLgo+IMKgCj4gwqBFeGFtcGxlOgo+IMKgCj4gQEAgLTc5LDMgKzgwLDEzIEBAIEV4
+YW1wbGU6Cj4gPiDCoAkJY2xvY2tzID0gPCZjbGtzIDE0ND4sIDwmY2xrcyAyMDY+LCA8JmNsa3Mg
+MTg5PjsKPiA+IMKgCQljbG9jay1uYW1lcyA9ICJwY2llIiwgInBjaWVfYnVzIiwgInBjaWVfcGh5
+IjsKPiA+IMKgCX07Cj4gKwo+ICsqIEZyZWVzY2FsZSBpLk1YN2QgUENJZSBQSFkKPiArCj4gK1Ro
+aXMgaXMgdGhlIFBIWSBhc3NvY2lhdGVkIHdpdGggdGhlIElNWDdkIFBDSWUgY29udHJvbGxlci7C
+oMKgSXQncyB1c2VkIGJ5IHRoZQo+ICtQQ0ktZSBjb250cm9sbGVyIHZpYSB0aGUgZnNsLGlteDdk
+LXBjaWUtcGh5IHBoYW5kbGUuCj4gKwo+ICtSZXF1aXJlZCBwcm9wZXJ0aWVzOgo+ICstIGNvbXBh
+dGlibGU6Cj4gPiArCS0gImZzbCxpbXg3ZC1wY2llLXBoeSIKPiArLSByZWc6IGJhc2UgYWRkcmVz
+cyBhbmQgbGVuZ3RoIG9mIHRoZSBQQ0llIFBIWSBjb250cm9sbGVyCgpfX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcg
+bGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmlu
+ZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
