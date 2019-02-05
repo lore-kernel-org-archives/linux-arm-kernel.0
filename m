@@ -5,18 +5,18 @@ X-Spam-Level:
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A6D4C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:45:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D481DC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:51:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5300F2080D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:45:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9FFA520811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:51:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LWO4bjKD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5300F2080D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uZoc7tVW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9FFA520811
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,48 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=nw7K0yOlQR63nrd72owu8zYt9kznpZp+uSA6ZV8vG1U=; b=LWO4bjKDaTRlGM
-	E+2DGcAFitJ+4heXcwKLrXTr9nO6jHheMM5ehoDb9lY7ObecGPAe1XA24Ji4k62NPGlfypEwYaYRt
-	HUO3QP3nERZOFfQdkRUcISU9TY2HhSdYlXN3gf/400vaFm4Osp5hdxNKuPOTtbwpC69PoXu4N9MxG
-	vfpTWsak/U3oUXYgtvyl0a6FHUSjvQE9B9LRGSUO+mIk6ATpYehTqN3pvPBtoYcVEWLGj73hXLXCI
-	l5/6C+4FfIqVPhHFuoDQXv42XsOB/1LPgsYdmV/GNg0hxwwocprBb3dtYs+/MuRi03AT+ROwVMR8k
-	q+DXsp74gmekatdswUaQ==;
+	List-Owner; bh=GYliZzDp0PEwmw1EnvYiUp/8cZAcRb8GQkHGxD2U150=; b=uZoc7tVW1AxmVE
+	NB6Ywf1MAAsLQvZX3oJmXxviRcmGpNIsUzC/RZ2tzPbEdhmRt4f1oBYzY3wIWNUjsY7MbGHZfE8mC
+	V7xFicSFiQ9puego4mxxKboNfEbNZeoB2XLtlak1vUOy04aroUrzqc7lJQtoOh+4uL3hk4LaHQdHp
+	CraE2yoouOxsVZBRseh78eqa9EHEMpUNWLekhw9HPJN+pj+LbsfZObkvR2kdU4Q6BmgKFiB5MCtN5
+	wnJeakkcva3zBqtVCY9VwSNx0rqumdnPSIib46Rb8kEacSF5WiPqERlRhdRLjRyiKhtIEHuAMZrUK
+	cCD7348T/FkTc+7pOrQw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gquTs-00061C-4G; Tue, 05 Feb 2019 06:45:16 +0000
+	id 1gquaI-00009R-6X; Tue, 05 Feb 2019 06:51:54 +0000
 Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gquSn-0004Me-5z; Tue, 05 Feb 2019 06:44:16 +0000
-X-UUID: 23b656b935944fde93bc79fb425192cd-20190204
-X-UUID: 23b656b935944fde93bc79fb425192cd-20190204
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
+ id 1gquSv-0004Me-0S; Tue, 05 Feb 2019 06:44:27 +0000
+X-UUID: fc5603203fc5496689033a52944a77fb-20190204
+X-UUID: fc5603203fc5496689033a52944a77fb-20190204
+Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
  (envelope-from <frederic.chen@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 773099852; Mon, 04 Feb 2019 22:43:37 -0800
-Received: from MTKMBS01N1.mediatek.inc (172.21.101.68) by
- MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 4 Feb 2019 22:43:35 -0800
+ with ESMTP id 2006039163; Mon, 04 Feb 2019 22:43:23 -0800
+Received: from mtkmbs03n1.mediatek.inc (172.21.101.181) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 4 Feb 2019 22:43:22 -0800
 Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs01n1.mediatek.inc (172.21.101.68) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 5 Feb 2019 14:43:21 +0800
+ mtkmbs03n1.mediatek.inc (172.21.101.181) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 5 Feb 2019 14:43:20 +0800
 Received: from mtkslt306.mediatek.inc (10.21.14.136) by mtkcas09.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
- Frontend Transport; Tue, 5 Feb 2019 14:43:21 +0800
+ Frontend Transport; Tue, 5 Feb 2019 14:43:20 +0800
 From: Frederic Chen <frederic.chen@mediatek.com>
 To: <hans.verkuil@cisco.com>, <laurent.pinchart+renesas@ideasonboard.com>,
  <tfiga@chromium.org>, <matthias.bgg@gmail.com>, <mchehab@kernel.org>
-Subject: [RFC PATCH V0 4/7] [media] dt-bindings: mt8183: Added camera ISP Pass
- 1 dt-bindings
-Date: Tue, 5 Feb 2019 14:42:43 +0800
-Message-ID: <1549348966-14451-5-git-send-email-frederic.chen@mediatek.com>
+Subject: [RFC PATCH V0 3/7] [media] dt-bindings: mt8183: Added CAM-SMEM
+ dt-bindings
+Date: Tue, 5 Feb 2019 14:42:42 +0800
+Message-ID: <1549348966-14451-4-git-send-email-frederic.chen@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1549348966-14451-1-git-send-email-frederic.chen@mediatek.com>
 References: <1549348966-14451-1-git-send-email-frederic.chen@mediatek.com>
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_224409_672224_13E5CD4C 
-X-CRM114-Status: UNSURE (   9.55  )
+X-CRM114-CacheID: sfid-20190204_224417_536703_DA84F070 
+X-CRM114-Status: UNSURE (   9.72  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -92,82 +92,54 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Jungo Lin <jungo.lin@mediatek.com>
 
-This patch adds DT binding document for the Pass 1 (P1) unit in
-Mediatek's camera ISP system. The Pass 1 unit grabs the sensor data
-out from the sensor interface, applies ISP effects and writes the
-image data to DRAM.
+This patch adds the DT binding documentation for the shared memory
+between Pass 1 unit of the camera ISP system and the co-processor
+in Mediatek SoCs.
 
 Signed-off-by: Jungo Lin <jungo.lin@mediatek.com>
 Signed-off-by: Frederic Chen <frederic.chen@mediatek.com>
 ---
- .../bindings/media/mediatek,mt8183-camisp.txt      | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/mediatek,mt8183-camisp.txt
+ .../bindings/media/mediatek,cam_smem.txt           | 32 ++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/mediatek,cam_smem.txt
 
-diff --git a/Documentation/devicetree/bindings/media/mediatek,mt8183-camisp.txt b/Documentation/devicetree/bindings/media/mediatek,mt8183-camisp.txt
+diff --git a/Documentation/devicetree/bindings/media/mediatek,cam_smem.txt b/Documentation/devicetree/bindings/media/mediatek,cam_smem.txt
 new file mode 100644
-index 0000000..ba16b4e
+index 0000000..d0d9c17
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/media/mediatek,mt8183-camisp.txt
-@@ -0,0 +1,59 @@
-+* Mediatek Image Signal Processor Pass 1 (ISP P1)
++++ b/Documentation/devicetree/bindings/media/mediatek,cam_smem.txt
+@@ -0,0 +1,32 @@
++Mediatek Camera ISP Pass 1 Shared Memory Device
 +
-+The Pass 1 unit of Mediatek's camera ISP system grabs the sensor data out
-+from the sensor interface, applies ISP effects and writes the image data
-+to DRAM. Furthermore, Pass 1 unit has the ability to output two different
-+resolutions frames at the same time to increase the performance of the
-+camera application.
++Mediatek Camera ISP Pass 1 Shared Memory Device is used to manage shared
++memory among CPU, Camera ISP Pass 1 hardware and coprocessor. The Camera
++ISP Pass 1 is a hardware unit for processing image signal from the image
++sensor. Camera ISP Pass 1 is responsible for RAW processing and 3A tuning.
++
++It is associated with a reserved memory region
++(Please see Documentation\devicetree\bindings\reserved-memory\mediatek,
++reserve-memory-cam_smem.txt) and and provides the context to
++allocate memory with dma addresses.
 +
 +Required properties:
-+- compatible: "mediatek,mt8183-camisp" for MT8183
-+- reg: Must contain an entry for each entry in reg-names.
-+- interrupts: interrupt number to the cpu.
++- compatible: Should be "mediatek,cam_smem"
++
 +- iommus: should point to the respective IOMMU block with master port
 +  as argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
 +  for details.
-+- power-domains : a phandle to the power domain of this local arbiter.
-+- mediatek,smi : a phandle to the smi_common node.
-+- clocks: device clocks, see
-+  Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
-+- clock-names: must be "CAMSYS_CAM_CGPDN" and "CAMSYS_CAMTG_CGPDN".
++
 +- mediatek,larb: must contain the local arbiters in the current SOCs, see
 +  Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
 +  for details.
-+- mediatek,vpu : the node of video processor unit
-+- smem_device : the shared memory device managing the shared memory between
-+  Pass 1 unit and the video processor unit
 +
 +Example:
-+	camisp: camisp@1a000000 {
-+		compatible = "mediatek,mt8183-camisp", "syscon";
-+		reg = <0 0x1a000000 0 0x1000>,
-+		      <0 0x1a003000 0 0x1000>,
-+		      <0 0x1a004000 0 0x2000>,
-+		      <0 0x1a006000 0 0x2000>;
-+		reg-names = "camisp",
-+		            "cam1",
-+		            "cam2",
-+		            "cam3";
-+		interrupts = <GIC_SPI 253 IRQ_TYPE_LEVEL_LOW>,
-+				<GIC_SPI 254 IRQ_TYPE_LEVEL_LOW>,
-+				<GIC_SPI 255 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-names = "cam1",
-+		            "cam2",
-+		            "cam3";
++	cam_smem: cam_smem {
++		compatible = "mediatek,cam_smem";
++		mediatek,larb = <&larb3>,
++				<&larb6>;
 +		iommus = <&iommu M4U_PORT_CAM_LSCI0>,
 +				<&iommu M4U_PORT_CAM_LSCI1>,
 +				<&iommu M4U_PORT_CAM_BPCI>;
-+		#clock-cells = <1>;
-+		power-domains = <&scpsys MT8183_POWER_DOMAIN_CAM>;
-+		/* Camera CCF */
-+		clocks = <&camsys CLK_CAM_CAM>,
-+				<&camsys CLK_CAM_CAMTG>;
-+		clock-names = "CAMSYS_CAM_CGPDN",
-+				"CAMSYS_CAMTG_CGPDN";
-+		mediatek,larb = <&larb3>,
-+				<&larb6>;
-+		mediatek,vpu = <&vpu>;
-+		smem_device = <&cam_smem>;
 +	};
 -- 
 1.9.1
