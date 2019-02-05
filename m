@@ -2,73 +2,75 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 977F5C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:41:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CC522C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:41:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5D9EC2083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:41:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 819F22083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:41:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e2RTP/cy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D9EC2083B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r6PAb0t1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 819F22083B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=ZO88oPt7sgt4/cGho4L4/YgmKEoOS3eG8jAsCwetd/U=; b=e2RTP/cyNFz4/z
-	X31XlaJfp9U3tLUtlULRdPVmBFqZyy3uGK9Sm3bronj+baIOdg06QBi5hEDWUOSEFmhGTiOjVX7FU
-	KL/7Y3CNsTCIoMvtqUx4xOW/gTJXUz7hkTwlv2AIjpuoI6GwCbSe7M4x2Hv+S3+osPIQcsjT7EruD
-	ViFl6DoHTsLaoZQVl47hn6fI3aDBtncRJmdUzXcid+43GnRuYli/aj1HqLzCnkTs2mMiCzzWQ+K5/
-	NUxFIAiW01vt5kROKwfuhiZYrL8atLT2XxfLBimzfhh+Rqi54jfHPpsewj0jYppdj3JHpDzSxAt2R
-	2mraU+iGHFuuNJdPjRAw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=mq/WIWA9C2JZlBgrM9W8XAKW3ojDnVraVLkVAlMsisk=; b=r6PAb0t1+qoAAY
+	aV/n9CcQsO/6DIHwFIuApzYlyvUsHmHkwn/qgEVjEqi0OTwOXxb7RfzVquPsKvfDvqv0nC5eOMFpR
+	g/ir59Tma072WlisGo6Z3ClU6fgAEd+y+LERcMOYa47Xo/9H/EC/rg8O2BP0LgA0HdkYrR+N7Wjej
+	H46/e+mNmpDzXcr8wgUtaf8P1e1zp9Hhimd/xdZvCquGDxqYl3OsQVcrqITNHLTCWF+E/pGw5YmaL
+	5MXtLRGPjpb4X2KD742kKmn8gcf/2Na/3pDtEUa9956IcVt5oZmRWQwWNlBMCZjhakQMasimL4G8E
+	c4MU6c9kWlw3h23z3auw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr02T-0002Yx-7T; Tue, 05 Feb 2019 12:41:21 +0000
+	id 1gr02k-0002pj-0g; Tue, 05 Feb 2019 12:41:38 +0000
 Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr01z-00026n-DN
+ id 1gr01z-00026t-No
  for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 12:40:54 +0000
-Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
+Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
  by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x15CaEJP002718; Tue, 5 Feb 2019 13:40:41 +0100
+ x15CZncn027439; Tue, 5 Feb 2019 13:40:44 +0100
 Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2qd1v06pqm-1
+ by mx07-00178001.pphosted.com with ESMTP id 2qdjdnkkn7-1
  (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Tue, 05 Feb 2019 13:40:41 +0100
+ Tue, 05 Feb 2019 13:40:44 +0100
 Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id C627231;
- Tue,  5 Feb 2019 12:40:40 +0000 (GMT)
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id DA21D31;
+ Tue,  5 Feb 2019 12:40:43 +0000 (GMT)
 Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 74D3529AC;
- Tue,  5 Feb 2019 12:40:40 +0000 (GMT)
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id A9CF229AF;
+ Tue,  5 Feb 2019 12:40:43 +0000 (GMT)
 Received: from localhost (10.75.127.44) by SFHDAG5NODE3.st.com (10.75.127.15)
  with Microsoft SMTP Server (TLS) id 15.0.1347.2;
- Tue, 5 Feb 2019 13:40:40 +0100
+ Tue, 5 Feb 2019 13:40:43 +0100
 From: Fabrice Gasnier <fabrice.gasnier@st.com>
 To: <jic23@kernel.org>, <thierry.reding@gmail.com>, <robh+dt@kernel.org>
-Subject: [PATCH 0/4] Add PM support to STM32 LP Timer drivers
-Date: Tue, 5 Feb 2019 13:40:25 +0100
-Message-ID: <1549370429-19116-1-git-send-email-fabrice.gasnier@st.com>
+Subject: [PATCH 4/4] iio: counter: stm32-lptimer: Add power management support
+Date: Tue, 5 Feb 2019 13:40:29 +0100
+Message-ID: <1549370429-19116-5-git-send-email-fabrice.gasnier@st.com>
 X-Mailer: git-send-email 1.9.1
+In-Reply-To: <1549370429-19116-1-git-send-email-fabrice.gasnier@st.com>
+References: <1549370429-19116-1-git-send-email-fabrice.gasnier@st.com>
 MIME-Version: 1.0
 X-Originating-IP: [10.75.127.44]
-X-ClientProxiedBy: SFHDAG5NODE3.st.com (10.75.127.15) To SFHDAG5NODE3.st.com
+X-ClientProxiedBy: SFHDAG3NODE3.st.com (10.75.127.9) To SFHDAG5NODE3.st.com
  (10.75.127.15)
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-02-05_05:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_044051_781780_A2DA6C58 
-X-CRM114-Status: UNSURE (   8.26  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190205_044052_065001_3CA55AE7 
+X-CRM114-Status: GOOD (  14.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,24 +92,116 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch series adds power management support for STM32 LP Timer
-drivers:
-- PWM driver
-- IIO counter driver
-- Document the pinctrl states for sleep mode
+Add suspend/resume PM sleep ops. When going to low power, disable
+active counter. Only active counter should be resumed: don't touch
+disabled counter, as it may be used by other LPTimer MFD child driver.
 
-Fabrice Gasnier (4):
-  dt-bindings: pwm-stm32-lp: document pinctrl sleep state
-  pwm: stm32-lp: Add power management support
-  dt-bindings: iio: stm32-lptimer-counter: document pinctrl sleep state
-  iio: counter: stm32-lptimer: Add power management support
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ drivers/iio/counter/stm32-lptimer-cnt.c | 55 +++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
- .../bindings/iio/counter/stm32-lptimer-cnt.txt     |  8 ++--
- .../devicetree/bindings/pwm/pwm-stm32-lp.txt       |  9 ++--
- drivers/iio/counter/stm32-lptimer-cnt.c            | 55 ++++++++++++++++++++++
- drivers/pwm/pwm-stm32-lp.c                         | 38 +++++++++++++++
- 4 files changed, 104 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/iio/counter/stm32-lptimer-cnt.c b/drivers/iio/counter/stm32-lptimer-cnt.c
+index 42fb8ba..2a49cce 100644
+--- a/drivers/iio/counter/stm32-lptimer-cnt.c
++++ b/drivers/iio/counter/stm32-lptimer-cnt.c
+@@ -14,6 +14,7 @@
+ #include <linux/iio/iio.h>
+ #include <linux/mfd/stm32-lptimer.h>
+ #include <linux/module.h>
++#include <linux/pinctrl/consumer.h>
+ #include <linux/platform_device.h>
+ 
+ struct stm32_lptim_cnt {
+@@ -23,6 +24,7 @@ struct stm32_lptim_cnt {
+ 	u32 preset;
+ 	u32 polarity;
+ 	u32 quadrature_mode;
++	bool enabled;
+ };
+ 
+ static int stm32_lptim_is_enabled(struct stm32_lptim_cnt *priv)
+@@ -50,6 +52,7 @@ static int stm32_lptim_set_enable_state(struct stm32_lptim_cnt *priv,
+ 
+ 	if (!enable) {
+ 		clk_disable(priv->clk);
++		priv->enabled = false;
+ 		return 0;
+ 	}
+ 
+@@ -79,6 +82,7 @@ static int stm32_lptim_set_enable_state(struct stm32_lptim_cnt *priv,
+ 		regmap_write(priv->regmap, STM32_LPTIM_CR, 0);
+ 		return ret;
+ 	}
++	priv->enabled = true;
+ 
+ 	/* Start LP timer in continuous mode */
+ 	return regmap_update_bits(priv->regmap, STM32_LPTIM_CR,
+@@ -361,6 +365,56 @@ static int stm32_lptim_cnt_probe(struct platform_device *pdev)
+ 	return devm_iio_device_register(&pdev->dev, indio_dev);
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int stm32_lptim_cnt_suspend(struct device *dev)
++{
++	struct stm32_lptim_cnt *priv = dev_get_drvdata(dev);
++	int ret;
++
++	/* Only take care of enabled counter: don't disturb other MFD child */
++	if (priv->enabled) {
++		ret = stm32_lptim_setup(priv, 0);
++		if (ret)
++			return ret;
++
++		ret = stm32_lptim_set_enable_state(priv, 0);
++		if (ret)
++			return ret;
++
++		/* Force enable state for later resume */
++		priv->enabled = true;
++	}
++
++	return pinctrl_pm_select_sleep_state(dev);
++}
++
++static int stm32_lptim_cnt_resume(struct device *dev)
++{
++	struct stm32_lptim_cnt *priv = dev_get_drvdata(dev);
++	int ret;
++
++	ret = pinctrl_pm_select_default_state(dev);
++	if (ret)
++		return ret;
++
++	if (priv->enabled) {
++		priv->enabled = false;
++		ret = stm32_lptim_setup(priv, 1);
++		if (ret)
++			return ret;
++
++		ret = stm32_lptim_set_enable_state(priv, 1);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(stm32_lptim_cnt_pm_ops, stm32_lptim_cnt_suspend,
++			 stm32_lptim_cnt_resume);
++
+ static const struct of_device_id stm32_lptim_cnt_of_match[] = {
+ 	{ .compatible = "st,stm32-lptimer-counter", },
+ 	{},
+@@ -372,6 +426,7 @@ static int stm32_lptim_cnt_probe(struct platform_device *pdev)
+ 	.driver = {
+ 		.name = "stm32-lptimer-counter",
+ 		.of_match_table = stm32_lptim_cnt_of_match,
++		.pm = &stm32_lptim_cnt_pm_ops,
+ 	},
+ };
+ module_platform_driver(stm32_lptim_cnt_driver);
 -- 
 1.9.1
 
