@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F916C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:04:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D40EEC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:05:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D47582145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:04:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7C8E82083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:05:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K+vhaG0O";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mobiveil.co.in header.i=@mobiveil.co.in header.b="a0lt9vja"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D47582145D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fmzhHojf";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mobiveil.co.in header.i=@mobiveil.co.in header.b="PuZH3LDR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7C8E82083B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mobiveil.co.in
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,58 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ssc3nxV0tGJE3ID4pOZ0RecXY3HQ5/virPcS55aAw98=; b=K+vhaG0OsgNHj3
-	sxQfVWbt8vfbd4Bc1/DfDhUbBrx7sbzMVDebZ6OyxFKlkTkXIGujL1tKWmXpIgq7FGHYfdGC3ved2
-	cpkjGXVev8V0pvkIup5SMiiiaoDVQO8Fit0B6ryo8RLQX8EP2SRRVzTT8XDZlkP6qPK6FHBMfADU5
-	2gxEvLIb2uAuxK3uCUxD4pfS3SDGHFbhGemHnAWojwGT+joJbELxdQdsUnevRUM/ZRhhxQDss1dwU
-	KeE/a9P99nAc9HZz0VVnT1So4xi2joQHzGt5Hi4cRlNsVmWem55/EvH8MWv8KlwVSv3pmhheYduS5
-	gi/yWmVEjl6k4xAT3vaA==;
+	List-Owner; bh=VCQQ7B368r6zt9I3Ic/iePBEhpoqfXTA5vy6DnaXvHg=; b=fmzhHojfGHecdb
+	tDAowQcdl4r9vaTvUXnmVtB/wSDMzZ573tlfC0BFA9elHNVQFgAWMq8loPjACzOQHMeQiHGyg8qV+
+	n03rMLYoK8y05Wtu2ldiGN0WuQ3W2dajW2hmWjP+FKP1EyjQ/5p8560w0Oq3+5jVIZ2AgJpHmYp8z
+	sMyYjGmyZstTAbsMvAi4q0OlAmvIt0w4lIFoxuzdIhRLoUa+VhDhq1HrG8szHi+DFpWbwU+OKSRcE
+	CAT6PbYNyQlgu5AhTrI+G1tS1SwQrR1gSQWq9aWB7qLO/ioeTVSCq2Hjmj0qycnayQqEVgvNIPa9M
+	SdDRgYDIgDh+GbA+Tnfg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqtqN-0006ki-8A; Tue, 05 Feb 2019 06:04:27 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1gqtqp-00071p-Na; Tue, 05 Feb 2019 06:04:55 +0000
+Received: from mail-wm1-x331.google.com ([2a00:1450:4864:20::331])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqtqJ-0006kH-Ua
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 06:04:25 +0000
-Received: by mail-wr1-x442.google.com with SMTP id t27so2274596wra.6
+ id 1gqtqm-00071Q-Qm
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 06:04:54 +0000
+Received: by mail-wm1-x331.google.com with SMTP id d15so2232356wmb.3
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 22:04:23 -0800 (PST)
+ Mon, 04 Feb 2019 22:04:52 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=mobiveil.co.in; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=E8Nz/JOD+e1xoqAI4YK+0goMEU7txF8Kn0+PiGymNa8=;
- b=a0lt9vjaYGvo5ZjCMKI4qBCmuxJB3MEqbdXjeKZbh+T2f2nZ72O8/RHqWxV7l6HJYZ
- UCE2tm6/FROvTqIC+Nj4Xtk13boNIRpa4eHoE2/95EH9a+MyYFmfR2YIAwrsfxbWN3ol
- k0v2t9jjDyZw3M4IrxpaQEeGGibrzRh/SKAfI=
+ :cc; bh=3aQtR76X4VtJOe5HikigbKlmMNbkcyXJpnJePsqpATQ=;
+ b=PuZH3LDRHXppM67bMX3nu+bUj3v5Xdm4kGzc3NjlmHaE5N4KR78ROx2/Ki4QA1i84K
+ NDeWLjYlBuLu2VrSQXSQkYUMnO/DZFqh/Q/E+4CZCtSRTdasmo7B2tM8DrLl6qzcJRjM
+ LIfV49RB3P5yCq5775EuUYxz6sh3EUkT1rbSE=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=E8Nz/JOD+e1xoqAI4YK+0goMEU7txF8Kn0+PiGymNa8=;
- b=eekK55mKRUIffcalYqwEAa5CbWRgFJUINtoeC+ezld2XQIpmrrOvj8vPoueGySgq+/
- PfAxILVzjyUptaAFkvY0UTqwTdI05FIKk9smNvEBrd87XbkEcW9bXBhibNMqE+3nBXSe
- ldgKPaemrQpyfHmKHUAB8qso+dPKauIAEoDjnnOCyQA4Y6sEH/ixP3MQOa68uSdYVn8U
- zst/CgWpsktXAIsR1PkGF0jvYQGChvMjLA0sZeX943KdmuF9TGb38yI8Jhg4JAw4s5bB
- VpEks+WLIPZ5Pmu3hFzfVjP1pvfoRHj/mKIZw+3xADMvh4/2yeMPWs55vY0596eAxAga
- sd6Q==
-X-Gm-Message-State: AHQUAuZorP1yQkVuhF1qLxKGnToaAeEjmdLaMx70D8rMpsKLwHtCbWrJ
- 9rkgg6roxCLhBSyb36w62zj8bmXZeeMs3tJrbeC2BA==
-X-Google-Smtp-Source: AHgI3IZABnEpCunPrjrSCncSfkYCrTT1Vrxws6KuAXMByp9HYmZCCEG2EFEppAWPTIq00CvmKwpJrXSlEI29F2o99Mw=
-X-Received: by 2002:adf:fd81:: with SMTP id d1mr2123021wrr.105.1549346662212; 
- Mon, 04 Feb 2019 22:04:22 -0800 (PST)
+ bh=3aQtR76X4VtJOe5HikigbKlmMNbkcyXJpnJePsqpATQ=;
+ b=p/Ng192WiMKeY1dMisGf6HJNRwqnaZKxoUrqDk7sn7kyZ1PsNG1vKtmJlChIiO6gKz
+ xNkkdzf6er/YNS6/kaSaRI3PCUEzxEwogmBNGgmjBeRPWngXOphLG7NlSpkKEUnQXPkP
+ oNsHdkp3BUuEnwxeeQjUqX4QjZk817zOjG9NVHCz0urwYMcTtuuOwhUy8OFLORXnh9Qw
+ E90IA9Vz0kfGkewHPEYXl5cD/z8c+nfBFxQ6PDyY1wqjYekbGnIFZlA2vq2r0vhilur9
+ 8xve1XJ/E03wAnVj13Ziwn0S5kpRIRqMcEsYVxnpzsWl6zfth+NEOB7U2bfVmZ+umJIx
+ w/Tw==
+X-Gm-Message-State: AHQUAubqxJEbp/cDqKUoE6XoTarRvZuWGr8XI3XiMl5sI9qJkUDnI3ns
+ sQu3xiA+6m2Lbhkc0hAxgOq+Vg36QbKt1AZTi5ZIYA==
+X-Google-Smtp-Source: AHgI3IaUIENwON4vGBErykNufFGyL0jwh+Mj0IuiqAvWyNwrw1Szt8ore/d9WT1qSCmzWYRd0/UO91ZvfY245DOe5Rc=
+X-Received: by 2002:a7b:c5d1:: with SMTP id n17mr2145787wmk.152.1549346690855; 
+ Mon, 04 Feb 2019 22:04:50 -0800 (PST)
 MIME-Version: 1.0
 References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
- <20190129080926.36773-6-Zhiqiang.Hou@nxp.com>
-In-Reply-To: <20190129080926.36773-6-Zhiqiang.Hou@nxp.com>
+ <20190129080926.36773-7-Zhiqiang.Hou@nxp.com>
+In-Reply-To: <20190129080926.36773-7-Zhiqiang.Hou@nxp.com>
 From: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-Date: Tue, 5 Feb 2019 11:36:56 +0530
-Message-ID: <CAFZiPx1eiMYgpaT4q219hcfOGqBB1XkZvX5xjAM5mApiMSVMxw@mail.gmail.com>
-Subject: Re: [PATCHv3 05/27] PCI: mobiveil: correct PCI base address in MEM/IO
- outbound windows
+Date: Tue, 5 Feb 2019 11:37:24 +0530
+Message-ID: <CAFZiPx3yW89pXsB+Qo5nSQX-C998CYPVr7HWDrJotrV+6q9DBQ@mail.gmail.com>
+Subject: Re: [PATCHv3 06/27] PCI: mobiveil: replace the resource list
+ iteration function
 To: "Z.q. Hou" <zhiqiang.hou@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_220423_986015_BF057392 
-X-CRM114-Status: GOOD (  13.86  )
+X-CRM114-CacheID: sfid-20190204_220452_860935_1E39B76D 
+X-CRM114-Status: GOOD (  15.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -113,36 +113,41 @@ On Tue, Jan 29, 2019 at 1:39 PM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
 >
 > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 >
-> It should get PCI base address from the DT node property 'ranges'
-> to setup MEM/IO outbound windows instead of always zero.
+> As it won't delete any node in this iteration, replaced
+> the function resource_list_for_each_entry_safe() with
+> the resource_list_for_each_entry().
 >
-> Fixes: 9af6bcb11e12 ("PCI: mobiveil: Add Mobiveil PCIe Host Bridge
-> IP driver")
 > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > Reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 > ---
 > V3:
 >  - No change
 >
->  drivers/pci/controller/pcie-mobiveil.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+>  drivers/pci/controller/pcie-mobiveil.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
 > diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-> index a0dd337c6214..8ff873023b5f 100644
+> index 8ff873023b5f..b2cc9c097fc9 100644
 > --- a/drivers/pci/controller/pcie-mobiveil.c
 > +++ b/drivers/pci/controller/pcie-mobiveil.c
-> @@ -630,8 +630,9 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+> @@ -569,7 +569,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+>  {
+>         u32 value, pab_ctrl, type;
+>         int err;
+> -       struct resource_entry *win, *tmp;
+> +       struct resource_entry *win;
 >
->                 /* configure outbound translation window */
->                 program_ob_windows(pcie, pcie->ob_wins_configured,
-> -                                  win->res->start, 0, type,
-> -                                  resource_size(win->res));
-> +                                  win->res->start,
-> +                                  win->res->start - win->offset,
-> +                                  type, resource_size(win->res));
->         }
+>         err = mobiveil_bringup_link(pcie);
+>         if (err) {
+> @@ -620,7 +620,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+>         program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
 >
->         /* setup MSI hardware registers */
+>         /* Get the I/O and memory ranges from DT */
+> -       resource_list_for_each_entry_safe(win, tmp, &pcie->resources) {
+> +       resource_list_for_each_entry(win, &pcie->resources) {
+>                 if (resource_type(win->res) == IORESOURCE_MEM)
+>                         type = MEM_WINDOW_TYPE;
+>                 else if (resource_type(win->res) == IORESOURCE_IO)
 > --
 > 2.17.1
 >
