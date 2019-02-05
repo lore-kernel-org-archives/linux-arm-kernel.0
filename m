@@ -2,138 +2,92 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UPPERCASE_50_75,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 708FEC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 18:10:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 08DECC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 18:18:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 44AF02083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 18:10:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C38CA2175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 18:18:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kebeHOsf";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="A1mZCwm3";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="SwWchiYC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 44AF02083B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BhhgI6LQ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="gwsK/w1J"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C38CA2175B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fBQfsxGldgGJyzRXL4cNNmnrVwFeDJprSZUH0wZ7HLI=; b=kebeHOsfSYAjOQ
-	1LV32Aoq04peB59DisTWNdIjOwFlNr5Xyz2tBHQMyPXgptBFIRUgy7C5QNMhHROoEw0UiEXiC9OQF
-	aygi6zWc6vZnHn4ibEaDwdJO8+spt2m//ZYWf07elEK+tQcotIkr2pFYhKZvhMqI2sCgfGChWwxSP
-	aWJFYNpGpoJxn/2cm3pFThhenFzAvOql+L6FX/P95S5NCgVR5kbSznavDfJHrXoFVA/9dOBks0d2W
-	ZV0tJmw05fWNrzBtVp7+fGDx3P6k2KCsi+PPMfCUwR/YmB1b4vA8bqdiU0drsHYwEGB3MBidD+MQP
-	Pe87Qo7sY9tCb3SxQrgA==;
+	List-Owner; bh=47IlkK5xIsNdqTlV9nPeP5qjN419acT9PoKGFN/FUGs=; b=BhhgI6LQuxzE0a
+	+B+QV2RRH0CRBuZxe4RXUt3nhb6E2/IzmTW1sX8ln39WL5gKgEh0edml8Xp2L60gS+x/SixH48w05
+	0PcYjwLsjW0/lW8yx+1AvDjLx+OdscZ6pS2WzV/0HXVGfBL+e+Py0Fr5j6nYN3uLSR0kIg1OjcqGH
+	aG16LB6XQ6ZmQiU5MhGCrzKYgYyIWSOFzj+Ic+WMEJOOYRqObAMSUZ6JXN4CcI1wbLkcWkQDxetC+
+	cKMUyqc95TfPOqwwXyHtjF14Md5XuPDruWsxexkIQmf9QRtKo4Wmo7vdcfIicWXK3SIjaMP0bNnYC
+	poD+Arp5MSHFxvFusKIQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr5BG-000638-Bi; Tue, 05 Feb 2019 18:10:46 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gr5IK-0008Lz-QV; Tue, 05 Feb 2019 18:18:04 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr5BD-00062x-Rw; Tue, 05 Feb 2019 18:10:44 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=MIME-Version:Content-Transfer-Encoding:
- Content-Type:In-Reply-To:References:Message-ID:Date:Subject:CC:To:From:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=v4Od9gnCxi3jip042FHAM7tJUXHXYe07DTLwP8ZuCzQ=; b=A1mZCwm3FfiRc8PT+sI4zHPApt
- jp+FpRyv3rUOvSE5xpk4w/bxbD7GjIyBAV2+HQNA/EFXh30AOUw3lBJrQFIkGqidv0wX3bPiB2OQ0
- YLMdDY8e+rw+DG1bfDOSR43xnv5CfT1xerqvkCUcm9UUewh787iTj0RaHbtjFqJ5hhg/mIxNR80Zf
- QPQ13BTyxPFOx94t5kgosDkzKvNnQVAPg9mUdk78V687UeSoAahSjP8sSIpYRe7QgsRBx91yL/U/x
- DPtFonZSnMKnzu4jkqkfdmPjC+4neYuph6YXELyPBj0Ui/U6jbqrOGAomi566Nvbm8LrR8n2w6YjD
- iGlhseLw==;
-Received: from esa3.microchip.iphmx.com ([68.232.153.233])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr4ba-0005M1-4t; Tue, 05 Feb 2019 17:33:56 +0000
-X-IronPort-AV: E=Sophos;i="5.56,564,1539673200"; d="scan'208";a="26340151"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa3.microchip.iphmx.com with ESMTP/TLS/AES128-SHA;
- 05 Feb 2019 10:33:42 -0700
-Received: from NAM05-BY2-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.37) with Microsoft SMTP Server (TLS) id
- 14.3.352.0; Tue, 5 Feb 2019 10:33:41 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=v4Od9gnCxi3jip042FHAM7tJUXHXYe07DTLwP8ZuCzQ=;
- b=SwWchiYCwclmbctT7lOP4cMpQE6CAw82ckaeUG/XHELP5plUWG71Jz5E9BEfEG8l6p7y3fSW63GyzhhiUFV9GlzKqwxrlT7s3EgKUc2G9PjXi/+XkVorogVYG5vCguUGDL16W1vU1a8EpbVaYw7oKMqYXo70h7SaJ/Q3Y7RErJ4=
-Received: from BN6PR11MB1842.namprd11.prod.outlook.com (10.175.98.146) by
- BN6PR11MB1539.namprd11.prod.outlook.com (10.172.23.143) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1580.17; Tue, 5 Feb 2019 17:33:38 +0000
-Received: from BN6PR11MB1842.namprd11.prod.outlook.com
- ([fe80::847:4296:13b9:fc9f]) by BN6PR11MB1842.namprd11.prod.outlook.com
- ([fe80::847:4296:13b9:fc9f%8]) with mapi id 15.20.1580.019; Tue, 5 Feb 2019
- 17:33:38 +0000
-From: <Tudor.Ambarus@microchip.com>
-To: <broonie@kernel.org>, <robh+dt@kernel.org>, <mark.rutland@arm.com>,
- <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
- <Ludovic.Desroches@microchip.com>, <bbrezillon@kernel.org>,
- <Cyrille.Pitchen@microchip.com>, <bugalski.piotr@gmail.com>
-Subject: [PATCH v6 13/13] spi: atmel-quadspi: add support for sam9x60 qspi
- controller
-Thread-Topic: [PATCH v6 13/13] spi: atmel-quadspi: add support for sam9x60
- qspi controller
-Thread-Index: AQHUvXjtLv08A027eU25+F42pnge9g==
-Date: Tue, 5 Feb 2019 17:33:38 +0000
-Message-ID: <20190205173254.16388-14-tudor.ambarus@microchip.com>
-References: <20190205173254.16388-1-tudor.ambarus@microchip.com>
-In-Reply-To: <20190205173254.16388-1-tudor.ambarus@microchip.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: VI1PR07CA0128.eurprd07.prod.outlook.com
- (2603:10a6:802:16::15) To BN6PR11MB1842.namprd11.prod.outlook.com
- (2603:10b6:404:101::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Tudor.Ambarus@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-mailer: git-send-email 2.9.5
-x-originating-ip: [94.177.32.154]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; BN6PR11MB1539;
- 6:vG0lVldju4QaQIJVcKqoP7uRjyrrJ0Xu0qm6Hx3nlTPgXr10NN04D16qaTsr4QRnF11jU7baZUe9r2XLdk0eGEQ1CimlAAbm0PCBvkwNSvJZW78lVVjRDYP2iGI5xa0/pSxGhHff+U51FiV98AXxphhvz+0Y8LD3M2dax36PNnUH9VgtfihbYC45sUd2bXaFS5PveasguhMX3pLkJ1i4wi4YnNKtNxLq1wNx8tjvmSqRqxUQ4fVApEMIxuj9SGJpwyInYUpoREwnsUTgvi++ckLkVfggYQjiZ25Z/v82f9VAr5X+fo80zkhaa+TN34qgp3+hQ7amZX4uASM+EmUYonk7opPPDd7dOMtr0LoS7cDOazMSU1FQOjhlLIdtdHwE7F5CFXWTIwufHHUSfEtuVpHlA+Slau1P9TsHj16MdJKKqHSq1th7rtZI9hckjp0cFiTDWcgtkv4cFkbaV9Hefg==;
- 5:YMKn9vWFmXLJvwAuALZ69qLHqD65siS5uZ/oGzkFTUIIsxk3kEZLt5UmBXPOc1GOcmn3eag20MYW3Gug4oAHJ1wLdh9dxJb4jMynmCQsiDGvI/QOJ/exOBY0jBKmZ0QKdx7FXIlZPd1fGfh+l8/AoDudrST1rrcyLIGC2sGVRX8vVEWP5z+V4u//XML/iX/tDfkQUFgpbwrFDUJ6Snn1qw==;
- 7:STSx4VhM2uS4rsbWAKqg7LijuMZxJM7cykpZ4IKc2K2b+IDfV4/NxMJs0mBC5U1OXdKaRv9gxWcEsXDQHZMx77T7XYo25aQ3B3pCbqrxQueFY2f5SidJS5wrRMe4SdO7AjXXON3ATZKZ/NCIzKDDZw==
-x-ms-office365-filtering-correlation-id: 81ee7cbb-f835-44ad-974b-08d68b90103a
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
- SRVR:BN6PR11MB1539; 
-x-ms-traffictypediagnostic: BN6PR11MB1539:
-x-microsoft-antispam-prvs: <BN6PR11MB1539D70EC6ACEC9873CCD057F06E0@BN6PR11MB1539.namprd11.prod.outlook.com>
-x-forefront-prvs: 0939529DE2
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(396003)(376002)(346002)(366004)(136003)(39860400002)(199004)(189003)(386003)(6506007)(7736002)(4326008)(71200400001)(71190400001)(99286004)(72206003)(2906002)(110136005)(14454004)(316002)(305945005)(76176011)(8936002)(8676002)(52116002)(7416002)(3846002)(478600001)(6116002)(54906003)(2501003)(50226002)(1076003)(36756003)(106356001)(53936002)(105586002)(30864003)(25786009)(81156014)(6486002)(68736007)(81166006)(256004)(86362001)(102836004)(26005)(486006)(6512007)(11346002)(14444005)(66066001)(476003)(97736004)(107886003)(6436002)(186003)(2616005)(446003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR11MB1539;
- H:BN6PR11MB1842.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: UUm5iApy4yz/Vf8S45O9AXol2Xq9wdFBeexd2dJatlP8yOYv08tzb652fGkxeC73XRh3h0nyjsiYx+KSPqGdGNeY0gccFDplQIVK/DGUb0UPZrZoVP/Or+wtgXo6ucFsEzNsZGdUC+Eobx7+trr2YnXBejGZ0sNS53mIDUgTUu/SlFb86g3oDZt55kuyxTZ238auJtAAEvyecYM3zyip27DwbJrtUcbNey9jFUYTP9grf1jJA2fxjDboPJIqTgaj6c3jhMXFlapojQ6/heSqLV4K1Kcg7f+fEXnSDcSxeeD2Rtr2mFQMYD1maZmowZ4pX5x+4WBP+dLhcbp8RiwvaxtXxm5IgX8ZhBzfrkTrrPNtXKL8hj9FFKMtu2MO6cWQXVfnY9nVn6KBZFm4iCAvqsI1P508s4pCZc/klxEn7cg=
+ id 1gr5IF-0008LX-Tk
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 18:18:02 +0000
+Received: by mail-pl1-x644.google.com with SMTP id p4so1836052plq.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 05 Feb 2019 10:17:58 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=kco+xcGu73PTRICKyl+pGPTy6nGRb5ArTXJ7AjDUODc=;
+ b=gwsK/w1JTyp8tA6Zuoxappn/Y9YhRa1lDmP5HTH78703zRBkX9QufN1euySV52JG0r
+ UOUHopAABtXV3Pb/xZrD220mMizKDFvnDuH08A7CIkncL5d43PEouHMsI/VrI6mclRyx
+ Cy/tAQ4w8h6X/1EhS4v7GCc/OyvlrZr7hR6QeyLIQ6b6K5Pzvdor9F+HDyh2uNjReCoT
+ ZSo/RZMovhBMwb/ddXJbPDuVp4EicDEcRpEGJ2Y4ykoZDZZhgLizZOYU6Vmwt97kuheh
+ mMRyPQ77LAoPX75cyp92JngSwXAUcG91I9slekpJOUpfn/nhO5bPyHmejsuittHd3uUm
+ hiFg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=kco+xcGu73PTRICKyl+pGPTy6nGRb5ArTXJ7AjDUODc=;
+ b=eGk4h/nfh2xYjFx9DeurT89Uul6eXGq8VYNHJx3YuCTRu1/+XgKr483uBpGLMyOCZV
+ Xp4O1bP0A7NG8QQFx9OgRvffTkVVlJJGC28tIa24zJKlCrMB0x4d1xYy8dTNusNf9dSq
+ oEW4OgTU2qgxtm8bZlKvtp8014fdlVrp/aGAorpEXInsbJECGzv2wBGcz3toQCgPTt9j
+ oZQVp/4La/gXLPv86SdbfAdnJkBLGf7SwE17YHvwsOFqdIdvwaQORSm3oGxVFAH3dv9c
+ EOLbE+EmIX0u7uiPPSn3O/XUmzJursF0jVVcGoeN3tqYGuA+3W7Z/sgxTeoAiFkNmZQr
+ GCcg==
+X-Gm-Message-State: AHQUAuaVAlymzU/4is2vnVa09yQtks576uREEd8SJqTPPxsrmd4S4y3f
+ Z9VzkaSPIbrnQ7XQcb9QGsAn6g==
+X-Google-Smtp-Source: AHgI3IZTs4aUTDqlGYVA5msVCjInZP7HQSY2A2RvCjlDv6aOYskvsxQLSpy+Tkcq9mXZnNVI0ZLgwA==
+X-Received: by 2002:a17:902:6683:: with SMTP id
+ e3mr6159932plk.93.1549390677646; 
+ Tue, 05 Feb 2019 10:17:57 -0800 (PST)
+Received: from builder (104-188-17-28.lightspeed.sndgca.sbcglobal.net.
+ [104.188.17.28])
+ by smtp.gmail.com with ESMTPSA id g70sm8218546pfg.98.2019.02.05.10.17.56
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 05 Feb 2019 10:17:56 -0800 (PST)
+Date: Tue, 5 Feb 2019 10:17:52 -0800
+From: Bjorn Andersson <bjorn.andersson@linaro.org>
+To: Brian Masney <masneyb@onstation.org>
+Subject: Re: [PATCH] ARM: hammerhead_defconfig: new defconfig for LG Nexus 5
+ phone
+Message-ID: <20190205181752.GB23363@builder>
+References: <20190124161621.24185-1-masneyb@onstation.org>
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 81ee7cbb-f835-44ad-974b-08d68b90103a
-X-MS-Exchange-CrossTenant-originalarrivaltime: 05 Feb 2019 17:33:36.1651 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR11MB1539
-X-OriginatorOrg: microchip.com
+Content-Disposition: inline
+In-Reply-To: <20190124161621.24185-1-masneyb@onstation.org>
+User-Agent: Mutt/1.10.0 (2018-05-17)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_123354_627669_536FD3F7 
-X-CRM114-Status: GOOD (  27.01  )
+X-CRM114-CacheID: sfid-20190205_101759_968114_B64AFA5E 
+X-CRM114-Status: GOOD (  17.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -145,384 +99,312 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Tudor.Ambarus@microchip.com,
- linux-kernel@vger.kernel.org, linux-spi@vger.kernel.org,
- linux-mtd@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-arm-msm@vger.kernel.org, linux@armlinux.org.uk,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Tudor Ambarus <tudor.ambarus@microchip.com>
+On Thu 24 Jan 08:16 PST 2019, Brian Masney wrote:
 
-The sam9x60 qspi controller uses 2 clocks, one for the peripheral register
-access, the other for the qspi core and phy. Both are mandatory. It uses
-different transfer type bits in IFR register. It has dedicated registers
-to specify a read or a write instruction: Read Instruction Code Register
-(RICR) and Write Instruction Code Register (WICR). ICR/RICR/WICR have
-identical fields.
+> Introduce hammerhead_defconfig for the LG Nexus 5 phone. Includes
+> options for USG OTG, WiFi, charger, serial console, gyroscope,
+> accelerometer, magnetometer, temperature, and pressure sensors.
+> 
+> The necessary options for the display are also included, however the
+> necessary device tree changes, plus a minor driver change have not been
+> submitted upstream yet.
+> 
 
-Tested with sst26vf064b jedec,spi-nor flash. Backward compatibility test
-done on sama5d2 qspi controller and mx25l25635e jedec,spi-nor flash.
+Please update qcom_defconfig (and if you can run multi_v7_defconfig)
+instead of introducing additional defconfigs; and keep things that
+aren't necessary during boot the kernel as kernel modules.
 
-Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
----
-v6: add a caps instance to the sama5d2 entry instead of allowing caps
-    to be NULL
-v5:
-- use WICR for sam9x60
-- remove ops hooks and introduce caps->has_ricr
-- get rid of the cfg struct
-- group IO accesses together in atmel_qspi_set_cfg()
-v4:
-- drop local variables that kept aq->regs and &pdev->dev, the compiler
-  should be smart enough to store them in a register
-- add comment saying QSPI_IFR_APBTFRTYP_READ is defined in sam9x60
-- s/sama5d2_qspi_modes/atmel_qspi_modes, modes are the same both
-  controllers
-- fix kernel doc header
-- move comment in function body
-v3:
-- reorganize the code and change ops functions pointers to avoid code
-  duplication. From the IP perspective, the transfer type bits are
-  different, and what registers are written: ricr/wicr instead of icr.
-- treat just regular spi transfers. Mem transfers will be added together
-  with dirmap support.
-v2:
-- rework clock handling
-- reorder setting of register values in set_cfg() calls -> move functions
-  that can fail in the upper part of the function body.
+Regards,
+Bjorn
 
- drivers/spi/atmel-quadspi.c | 163 ++++++++++++++++++++++++++++++++++----------
- 1 file changed, 128 insertions(+), 35 deletions(-)
-
-diff --git a/drivers/spi/atmel-quadspi.c b/drivers/spi/atmel-quadspi.c
-index 336501d962e5..fffc21cd5f79 100644
---- a/drivers/spi/atmel-quadspi.c
-+++ b/drivers/spi/atmel-quadspi.c
-@@ -19,6 +19,7 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/spi/spi-mem.h>
- 
-@@ -35,7 +36,9 @@
- 
- #define QSPI_IAR     0x0030  /* Instruction Address Register */
- #define QSPI_ICR     0x0034  /* Instruction Code Register */
-+#define QSPI_WICR    0x0034  /* Write Instruction Code Register */
- #define QSPI_IFR     0x0038  /* Instruction Frame Register */
-+#define QSPI_RICR    0x003C  /* Read Instruction Code Register */
- 
- #define QSPI_SMR     0x0040  /* Scrambling Mode Register */
- #define QSPI_SKR     0x0044  /* Scrambling Key Register */
-@@ -88,7 +91,7 @@
- #define QSPI_SCR_DLYBS_MASK             GENMASK(23, 16)
- #define QSPI_SCR_DLYBS(n)               (((n) << 16) & QSPI_SCR_DLYBS_MASK)
- 
--/* Bitfields in QSPI_ICR (Instruction Code Register) */
-+/* Bitfields in QSPI_ICR (Read/Write Instruction Code Register) */
- #define QSPI_ICR_INST_MASK              GENMASK(7, 0)
- #define QSPI_ICR_INST(inst)             (((inst) << 0) & QSPI_ICR_INST_MASK)
- #define QSPI_ICR_OPT_MASK               GENMASK(23, 16)
-@@ -118,6 +121,7 @@
- #define QSPI_IFR_CRM                    BIT(14)
- #define QSPI_IFR_NBDUM_MASK             GENMASK(20, 16)
- #define QSPI_IFR_NBDUM(n)               (((n) << 16) & QSPI_IFR_NBDUM_MASK)
-+#define QSPI_IFR_APBTFRTYP_READ		BIT(24)	/* Defined in SAM9X60 */
- 
- /* Bitfields in QSPI_SMR (Scrambling Mode Register) */
- #define QSPI_SMR_SCREN                  BIT(0)
-@@ -133,12 +137,18 @@
- #define QSPI_WPSR_WPVSRC_MASK           GENMASK(15, 8)
- #define QSPI_WPSR_WPVSRC(src)           (((src) << 8) & QSPI_WPSR_WPVSRC)
- 
-+struct atmel_qspi_caps {
-+	bool has_qspick;
-+	bool has_ricr;
-+};
- 
- struct atmel_qspi {
- 	void __iomem		*regs;
- 	void __iomem		*mem;
- 	struct clk		*pclk;
-+	struct clk		*qspick;
- 	struct platform_device	*pdev;
-+	const struct atmel_qspi_caps *caps;
- 	u32			pending;
- 	u32			mr;
- 	struct completion	cmd_completion;
-@@ -151,7 +161,7 @@ struct atmel_qspi_mode {
- 	u32 config;
- };
- 
--static const struct atmel_qspi_mode sama5d2_qspi_modes[] = {
-+static const struct atmel_qspi_mode atmel_qspi_modes[] = {
- 	{ 1, 1, 1, QSPI_IFR_WIDTH_SINGLE_BIT_SPI },
- 	{ 1, 1, 2, QSPI_IFR_WIDTH_DUAL_OUTPUT },
- 	{ 1, 1, 4, QSPI_IFR_WIDTH_QUAD_OUTPUT },
-@@ -180,8 +190,8 @@ static int atmel_qspi_find_mode(const struct spi_mem_op *op)
- {
- 	u32 i;
- 
--	for (i = 0; i < ARRAY_SIZE(sama5d2_qspi_modes); i++)
--		if (atmel_qspi_is_compatible(op, &sama5d2_qspi_modes[i]))
-+	for (i = 0; i < ARRAY_SIZE(atmel_qspi_modes); i++)
-+		if (atmel_qspi_is_compatible(op, &atmel_qspi_modes[i]))
- 			return i;
- 
- 	return -ENOTSUPP;
-@@ -201,36 +211,37 @@ static bool atmel_qspi_supports_op(struct spi_mem *mem,
- 	return true;
- }
- 
--static int atmel_qspi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
-+static int atmel_qspi_set_cfg(struct atmel_qspi *aq,
-+			      const struct spi_mem_op *op, u32 *offset)
- {
--	struct atmel_qspi *aq = spi_controller_get_devdata(mem->spi->master);
--	int mode;
-+	u32 iar, icr, ifr;
- 	u32 dummy_cycles = 0;
--	u32 iar, icr, ifr, sr;
--	int err = 0;
-+	int mode;
- 
- 	iar = 0;
- 	icr = QSPI_ICR_INST(op->cmd.opcode);
- 	ifr = QSPI_IFR_INSTEN;
- 
--	/*
--	 * If the QSPI controller is set in regular SPI mode, set it in
--	 * Serial Memory Mode (SMM).
--	 */
--	if (aq->mr != QSPI_MR_SMM) {
--		writel_relaxed(QSPI_MR_SMM, aq->regs + QSPI_MR);
--		aq->mr = QSPI_MR_SMM;
--	}
--
- 	mode = atmel_qspi_find_mode(op);
- 	if (mode < 0)
- 		return mode;
--
--	ifr |= sama5d2_qspi_modes[mode].config;
-+	ifr |= atmel_qspi_modes[mode].config;
- 
- 	if (op->dummy.buswidth && op->dummy.nbytes)
- 		dummy_cycles = op->dummy.nbytes * 8 / op->dummy.buswidth;
- 
-+	/*
-+	 * The controller allows 24 and 32-bit addressing while NAND-flash
-+	 * requires 16-bit long. Handling 8-bit long addresses is done using
-+	 * the option field. For the 16-bit addresses, the workaround depends
-+	 * of the number of requested dummy bits. If there are 8 or more dummy
-+	 * cycles, the address is shifted and sent with the first dummy byte.
-+	 * Otherwise opcode is disabled and the first byte of the address
-+	 * contains the command opcode (works only if the opcode and address
-+	 * use the same buswidth). The limitation is when the 16-bit address is
-+	 * used without enough dummy cycles and the opcode is using a different
-+	 * buswidth than the address.
-+	 */
- 	if (op->addr.buswidth) {
- 		switch (op->addr.nbytes) {
- 		case 0:
-@@ -264,6 +275,9 @@ static int atmel_qspi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
- 		}
- 	}
- 
-+	/* offset of the data access in the QSPI memory space */
-+	*offset = iar;
-+
- 	/* Set number of dummy cycles */
- 	if (dummy_cycles)
- 		ifr |= QSPI_IFR_NBDUM(dummy_cycles);
-@@ -272,16 +286,51 @@ static int atmel_qspi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
- 	if (op->data.nbytes)
- 		ifr |= QSPI_IFR_DATAEN;
- 
--	if (op->data.dir == SPI_MEM_DATA_OUT)
--		ifr |= QSPI_IFR_SAMA5D2_WRITE_TRSFR;
-+	/*
-+	 * If the QSPI controller is set in regular SPI mode, set it in
-+	 * Serial Memory Mode (SMM).
-+	 */
-+	if (aq->mr != QSPI_MR_SMM) {
-+		writel_relaxed(QSPI_MR_SMM, aq->regs + QSPI_MR);
-+		aq->mr = QSPI_MR_SMM;
-+	}
- 
- 	/* Clear pending interrupts */
- 	(void)readl_relaxed(aq->regs + QSPI_SR);
- 
--	/* Set QSPI Instruction Frame registers */
--	writel_relaxed(iar, aq->regs + QSPI_IAR);
--	writel_relaxed(icr, aq->regs + QSPI_ICR);
--	writel_relaxed(ifr, aq->regs + QSPI_IFR);
-+	if (aq->caps->has_ricr) {
-+		if (!op->addr.nbytes && op->data.dir == SPI_MEM_DATA_IN)
-+			ifr |= QSPI_IFR_APBTFRTYP_READ;
-+
-+		/* Set QSPI Instruction Frame registers */
-+		writel_relaxed(iar, aq->regs + QSPI_IAR);
-+		if (op->data.dir == SPI_MEM_DATA_IN)
-+			writel_relaxed(icr, aq->regs + QSPI_RICR);
-+		else
-+			writel_relaxed(icr, aq->regs + QSPI_WICR);
-+		writel_relaxed(ifr, aq->regs + QSPI_IFR);
-+	} else {
-+		if (op->data.dir == SPI_MEM_DATA_OUT)
-+			ifr |= QSPI_IFR_SAMA5D2_WRITE_TRSFR;
-+
-+		/* Set QSPI Instruction Frame registers */
-+		writel_relaxed(iar, aq->regs + QSPI_IAR);
-+		writel_relaxed(icr, aq->regs + QSPI_ICR);
-+		writel_relaxed(ifr, aq->regs + QSPI_IFR);
-+	}
-+
-+	return 0;
-+}
-+
-+static int atmel_qspi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
-+{
-+	struct atmel_qspi *aq = spi_controller_get_devdata(mem->spi->master);
-+	u32 sr, offset;
-+	int err;
-+
-+	err = atmel_qspi_set_cfg(aq, op, &offset);
-+	if (err)
-+		return err;
- 
- 	/* Skip to the final steps if there is no data */
- 	if (op->data.nbytes) {
-@@ -290,11 +339,11 @@ static int atmel_qspi_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
- 
- 		/* Send/Receive data */
- 		if (op->data.dir == SPI_MEM_DATA_IN)
--			_memcpy_fromio(op->data.buf.in,
--				aq->mem + iar, op->data.nbytes);
-+			_memcpy_fromio(op->data.buf.in, aq->mem + offset,
-+				       op->data.nbytes);
- 		else
--			_memcpy_toio(aq->mem + iar,
--				op->data.buf.out, op->data.nbytes);
-+			_memcpy_toio(aq->mem + offset, op->data.buf.out,
-+				     op->data.nbytes);
- 
- 		/* Release the chip-select */
- 		writel_relaxed(QSPI_CR_LASTXFER, aq->regs + QSPI_CR);
-@@ -450,28 +499,55 @@ static int atmel_qspi_probe(struct platform_device *pdev)
- 		goto exit;
- 	}
- 
-+	aq->caps = of_device_get_match_data(&pdev->dev);
-+	if (!aq->caps) {
-+		dev_err(&pdev->dev, "Could not retrieve QSPI caps\n");
-+		err = -EINVAL;
-+		goto exit;
-+	}
-+
-+	if (aq->caps->has_qspick) {
-+		/* Get the QSPI system clock */
-+		aq->qspick = devm_clk_get(&pdev->dev, "qspick");
-+		if (IS_ERR(aq->qspick)) {
-+			dev_err(&pdev->dev, "missing system clock\n");
-+			err = PTR_ERR(aq->qspick);
-+			goto disable_pclk;
-+		}
-+
-+		/* Enable the QSPI system clock */
-+		err = clk_prepare_enable(aq->qspick);
-+		if (err) {
-+			dev_err(&pdev->dev,
-+				"failed to enable the QSPI system clock\n");
-+			goto disable_pclk;
-+		}
-+	}
-+
- 	/* Request the IRQ */
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
- 		dev_err(&pdev->dev, "missing IRQ\n");
- 		err = irq;
--		goto disable_pclk;
-+		goto disable_qspick;
- 	}
- 	err = devm_request_irq(&pdev->dev, irq, atmel_qspi_interrupt,
- 			       0, dev_name(&pdev->dev), aq);
- 	if (err)
--		goto disable_pclk;
-+		goto disable_qspick;
- 
- 	err = atmel_qspi_init(aq);
- 	if (err)
--		goto disable_pclk;
-+		goto disable_qspick;
- 
- 	err = spi_register_controller(ctrl);
- 	if (err)
--		goto disable_pclk;
-+		goto disable_qspick;
- 
- 	return 0;
- 
-+disable_qspick:
-+	clk_disable_unprepare(aq->qspick);
- disable_pclk:
- 	clk_disable_unprepare(aq->pclk);
- exit:
-@@ -487,6 +563,7 @@ static int atmel_qspi_remove(struct platform_device *pdev)
- 
- 	spi_unregister_controller(ctrl);
- 	writel_relaxed(QSPI_CR_QSPIDIS, aq->regs + QSPI_CR);
-+	clk_disable_unprepare(aq->qspick);
- 	clk_disable_unprepare(aq->pclk);
- 	return 0;
- }
-@@ -495,6 +572,7 @@ static int __maybe_unused atmel_qspi_suspend(struct device *dev)
- {
- 	struct atmel_qspi *aq = dev_get_drvdata(dev);
- 
-+	clk_disable_unprepare(aq->qspick);
- 	clk_disable_unprepare(aq->pclk);
- 
- 	return 0;
-@@ -505,6 +583,7 @@ static int __maybe_unused atmel_qspi_resume(struct device *dev)
- 	struct atmel_qspi *aq = dev_get_drvdata(dev);
- 
- 	clk_prepare_enable(aq->pclk);
-+	clk_prepare_enable(aq->qspick);
- 
- 	return atmel_qspi_init(aq);
- }
-@@ -512,8 +591,22 @@ static int __maybe_unused atmel_qspi_resume(struct device *dev)
- static SIMPLE_DEV_PM_OPS(atmel_qspi_pm_ops, atmel_qspi_suspend,
- 			 atmel_qspi_resume);
- 
-+static const struct atmel_qspi_caps atmel_sama5d2_qspi_caps = {};
-+
-+static const struct atmel_qspi_caps atmel_sam9x60_qspi_caps = {
-+	.has_qspick = true,
-+	.has_ricr = true,
-+};
-+
- static const struct of_device_id atmel_qspi_dt_ids[] = {
--	{ .compatible = "atmel,sama5d2-qspi" },
-+	{
-+		.compatible = "atmel,sama5d2-qspi",
-+		.data = &atmel_sama5d2_qspi_caps,
-+	},
-+	{
-+		.compatible = "microchip,sam9x60-qspi",
-+		.data = &atmel_sam9x60_qspi_caps,
-+	},
- 	{ /* sentinel */ }
- };
- 
--- 
-2.9.5
-
+> Signed-off-by: Brian Masney <masneyb@onstation.org>
+> ---
+> See https://masneyb.github.io/nexus-5-upstream/ for more details about
+> the work that I've done so far porting the upstream kernel to this phone.
+> 
+>  arch/arm/configs/hammerhead_defconfig | 263 ++++++++++++++++++++++++++
+>  1 file changed, 263 insertions(+)
+>  create mode 100644 arch/arm/configs/hammerhead_defconfig
+> 
+> diff --git a/arch/arm/configs/hammerhead_defconfig b/arch/arm/configs/hammerhead_defconfig
+> new file mode 100644
+> index 000000000000..46681e1e8aba
+> --- /dev/null
+> +++ b/arch/arm/configs/hammerhead_defconfig
+> @@ -0,0 +1,263 @@
+> +# CONFIG_SWAP is not set
+> +CONFIG_SYSVIPC=y
+> +CONFIG_POSIX_MQUEUE=y
+> +CONFIG_GENERIC_IRQ_DEBUGFS=y
+> +CONFIG_NO_HZ_IDLE=y
+> +CONFIG_HIGH_RES_TIMERS=y
+> +CONFIG_TASKSTATS=y
+> +CONFIG_TASK_DELAY_ACCT=y
+> +CONFIG_IKCONFIG=y
+> +CONFIG_IKCONFIG_PROC=y
+> +CONFIG_CGROUPS=y
+> +CONFIG_MEMCG=y
+> +CONFIG_BLK_CGROUP=y
+> +CONFIG_DEBUG_BLK_CGROUP=y
+> +CONFIG_CGROUP_SCHED=y
+> +CONFIG_CFS_BANDWIDTH=y
+> +CONFIG_CGROUP_PIDS=y
+> +CONFIG_CGROUP_FREEZER=y
+> +CONFIG_CPUSETS=y
+> +CONFIG_CGROUP_DEVICE=y
+> +CONFIG_CGROUP_CPUACCT=y
+> +CONFIG_CGROUP_DEBUG=y
+> +CONFIG_NAMESPACES=y
+> +CONFIG_USER_NS=y
+> +CONFIG_BLK_DEV_INITRD=y
+> +# CONFIG_RD_BZIP2 is not set
+> +# CONFIG_RD_LZMA is not set
+> +# CONFIG_RD_XZ is not set
+> +# CONFIG_RD_LZO is not set
+> +# CONFIG_RD_LZ4 is not set
+> +CONFIG_SYSCTL_SYSCALL=y
+> +CONFIG_EMBEDDED=y
+> +CONFIG_ARCH_QCOM=y
+> +CONFIG_ARCH_MSM8974=y
+> +CONFIG_SMP=y
+> +# CONFIG_SMP_ON_UP is not set
+> +CONFIG_SCHED_MC=y
+> +CONFIG_HIGHMEM=y
+> +# CONFIG_ARM_MODULE_PLTS is not set
+> +CONFIG_SECCOMP=y
+> +CONFIG_ARM_APPENDED_DTB=y
+> +CONFIG_CPU_FREQ=y
+> +CONFIG_CPUFREQ_DT=y
+> +CONFIG_VFP=y
+> +CONFIG_NEON=y
+> +CONFIG_KERNEL_MODE_NEON=y
+> +CONFIG_MODULES=y
+> +CONFIG_CMA=y
+> +CONFIG_CMA_DEBUG=y
+> +CONFIG_NET=y
+> +CONFIG_PACKET=y
+> +CONFIG_UNIX=y
+> +CONFIG_NET_KEY=y
+> +CONFIG_INET=y
+> +# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+> +# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+> +# CONFIG_INET_XFRM_MODE_BEET is not set
+> +# CONFIG_INET_DIAG is not set
+> +# CONFIG_IPV6 is not set
+> +CONFIG_NETFILTER=y
+> +CONFIG_BRIDGE_NETFILTER=y
+> +CONFIG_NF_CONNTRACK=y
+> +CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+> +CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
+> +CONFIG_IP_NF_IPTABLES=y
+> +CONFIG_IP_NF_FILTER=y
+> +CONFIG_IP_NF_NAT=y
+> +CONFIG_IP_NF_TARGET_MASQUERADE=y
+> +CONFIG_BRIDGE=y
+> +CONFIG_QRTR=y
+> +CONFIG_QRTR_SMD=y
+> +CONFIG_BT=m
+> +CONFIG_BT_HCIUART=m
+> +CONFIG_BT_HCIUART_BCM=y
+> +CONFIG_CFG80211=y
+> +CONFIG_CFG80211_WEXT=y
+> +CONFIG_MAC80211=y
+> +CONFIG_RFKILL=y
+> +CONFIG_DEVTMPFS=y
+> +CONFIG_DMA_CMA=y
+> +CONFIG_CMA_SIZE_MBYTES=256
+> +CONFIG_BLK_DEV_RAM=y
+> +CONFIG_BLK_DEV_RAM_COUNT=2
+> +CONFIG_SCSI=y
+> +CONFIG_BLK_DEV_SD=y
+> +CONFIG_MD=y
+> +CONFIG_BLK_DEV_DM=y
+> +CONFIG_DM_CRYPT=y
+> +CONFIG_DM_THIN_PROVISIONING=y
+> +CONFIG_NETDEVICES=y
+> +CONFIG_MACVLAN=y
+> +CONFIG_IPVLAN=y
+> +CONFIG_VXLAN=y
+> +CONFIG_VETH=y
+> +# CONFIG_ETHERNET is not set
+> +CONFIG_USB_USBNET=y
+> +CONFIG_USB_NET_RNDIS_HOST=y
+> +# CONFIG_WLAN_VENDOR_ADMTEK is not set
+> +CONFIG_WCN36XX=m
+> +# CONFIG_WLAN_VENDOR_ATMEL is not set
+> +CONFIG_BRCMFMAC=m
+> +# CONFIG_WLAN_VENDOR_CISCO is not set
+> +# CONFIG_WLAN_VENDOR_INTEL is not set
+> +# CONFIG_WLAN_VENDOR_INTERSIL is not set
+> +# CONFIG_WLAN_VENDOR_MARVELL is not set
+> +# CONFIG_WLAN_VENDOR_MEDIATEK is not set
+> +# CONFIG_WLAN_VENDOR_RALINK is not set
+> +# CONFIG_WLAN_VENDOR_REALTEK is not set
+> +# CONFIG_WLAN_VENDOR_RSI is not set
+> +# CONFIG_WLAN_VENDOR_ST is not set
+> +# CONFIG_WLAN_VENDOR_TI is not set
+> +# CONFIG_WLAN_VENDOR_ZYDAS is not set
+> +# CONFIG_WLAN_VENDOR_QUANTENNA is not set
+> +CONFIG_INPUT_EVDEV=y
+> +# CONFIG_KEYBOARD_ATKBD is not set
+> +CONFIG_KEYBOARD_GPIO=y
+> +# CONFIG_INPUT_MOUSE is not set
+> +CONFIG_INPUT_TOUCHSCREEN=y
+> +CONFIG_INPUT_MISC=y
+> +CONFIG_INPUT_PM8941_PWRKEY=y
+> +CONFIG_INPUT_UINPUT=y
+> +CONFIG_RMI4_CORE=y
+> +CONFIG_RMI4_I2C=y
+> +CONFIG_RMI4_F12=y
+> +CONFIG_SERIO_LIBPS2=y
+> +CONFIG_SERIAL_MSM=y
+> +CONFIG_SERIAL_MSM_CONSOLE=y
+> +CONFIG_SERIAL_DEV_BUS=y
+> +CONFIG_HW_RANDOM=y
+> +# CONFIG_I2C_COMPAT is not set
+> +CONFIG_I2C_CHARDEV=y
+> +CONFIG_I2C_MUX=y
+> +CONFIG_I2C_QUP=y
+> +CONFIG_SPI=y
+> +CONFIG_SPI_QUP=y
+> +CONFIG_SPI_SPIDEV=y
+> +CONFIG_SPMI=y
+> +CONFIG_PINCTRL_MSM8X74=y
+> +CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
+> +CONFIG_GPIOLIB=y
+> +CONFIG_GPIO_SYSFS=y
+> +CONFIG_POWER_RESET=y
+> +CONFIG_POWER_RESET_MSM=y
+> +CONFIG_POWER_SUPPLY=y
+> +CONFIG_CHARGER_QCOM_SMBB=y
+> +CONFIG_CHARGER_BQ24190=y
+> +CONFIG_THERMAL=y
+> +CONFIG_QCOM_TSENS=y
+> +CONFIG_QCOM_SPMI_TEMP_ALARM=y
+> +CONFIG_MFD_SPMI_PMIC=y
+> +CONFIG_REGULATOR_DEBUG=y
+> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
+> +CONFIG_REGULATOR_GPIO=y
+> +CONFIG_REGULATOR_QCOM_SMD_RPM=y
+> +CONFIG_REGULATOR_QCOM_SPMI=y
+> +CONFIG_REGULATOR_VCTRL=y
+> +CONFIG_MEDIA_SUPPORT=y
+> +CONFIG_MEDIA_CAMERA_SUPPORT=y
+> +CONFIG_MEDIA_CONTROLLER=y
+> +CONFIG_VIDEO_V4L2_SUBDEV_API=y
+> +CONFIG_V4L_PLATFORM_DRIVERS=y
+> +CONFIG_V4L_MEM2MEM_DRIVERS=y
+> +# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+> +CONFIG_VIDEO_MT9T112=y
+> +CONFIG_DRM=y
+> +# CONFIG_DRM_MSM_DSI_14NM_PHY is not set
+> +# CONFIG_DRM_MSM_DSI_10NM_PHY is not set
+> +CONFIG_DRM_PANEL_SIMPLE=y
+> +CONFIG_DRM_ANALOGIX_ANX78XX=y
+> +CONFIG_BACKLIGHT_LCD_SUPPORT=y
+> +# CONFIG_LCD_CLASS_DEVICE is not set
+> +CONFIG_BACKLIGHT_CLASS_DEVICE=y
+> +# CONFIG_BACKLIGHT_GENERIC is not set
+> +CONFIG_BACKLIGHT_PM8941_WLED=y
+> +CONFIG_BACKLIGHT_LM3630A=y
+> +CONFIG_FRAMEBUFFER_CONSOLE=y
+> +CONFIG_SOUND=y
+> +CONFIG_SND=y
+> +# CONFIG_SND_SUPPORT_OLD_API is not set
+> +# CONFIG_SND_DRIVERS is not set
+> +# CONFIG_SND_ARM is not set
+> +# CONFIG_SND_SPI is not set
+> +# CONFIG_SND_USB is not set
+> +CONFIG_SND_SOC=y
+> +CONFIG_SND_SOC_QCOM=y
+> +CONFIG_SND_SOC_PCM1789_I2C=y
+> +CONFIG_SND_SOC_TDA7419=y
+> +CONFIG_HID_A4TECH=y
+> +CONFIG_USB=y
+> +CONFIG_USB_OTG=y
+> +CONFIG_USB_EHCI_HCD=y
+> +CONFIG_USB_STORAGE=y
+> +CONFIG_USB_DWC3=y
+> +CONFIG_USB_CHIPIDEA=y
+> +CONFIG_USB_CHIPIDEA_UDC=y
+> +CONFIG_USB_CHIPIDEA_HOST=y
+> +CONFIG_USB_GADGET=y
+> +CONFIG_U_SERIAL_CONSOLE=y
+> +CONFIG_USB_CONFIGFS=y
+> +CONFIG_USB_CONFIGFS_SERIAL=y
+> +CONFIG_USB_CONFIGFS_ECM=y
+> +CONFIG_USB_CONFIGFS_ECM_SUBSET=y
+> +CONFIG_USB_CONFIGFS_RNDIS=y
+> +CONFIG_USB_CONFIGFS_F_FS=y
+> +CONFIG_USB_ETH=y
+> +CONFIG_MMC=y
+> +CONFIG_MMC_ARMMMCI=y
+> +CONFIG_MMC_SDHCI=y
+> +CONFIG_MMC_SDHCI_PLTFM=y
+> +CONFIG_MMC_SDHCI_MSM=y
+> +CONFIG_NEW_LEDS=y
+> +CONFIG_LEDS_CLASS=y
+> +CONFIG_RTC_CLASS=y
+> +CONFIG_RTC_DRV_PM8XXX=y
+> +CONFIG_DMADEVICES=y
+> +CONFIG_QCOM_BAM_DMA=y
+> +CONFIG_COMMON_CLK_QCOM=y
+> +CONFIG_QCOM_CLK_SMD_RPM=y
+> +CONFIG_MSM_MMCC_8974=y
+> +CONFIG_SPMI_PMIC_CLKDIV=y
+> +CONFIG_HWSPINLOCK=y
+> +CONFIG_HWSPINLOCK_QCOM=y
+> +CONFIG_MAILBOX=y
+> +CONFIG_QCOM_APCS_IPC=y
+> +CONFIG_IOMMU_IO_PGTABLE_ARMV7S=y
+> +CONFIG_QCOM_IOMMU=y
+> +CONFIG_REMOTEPROC=y
+> +CONFIG_QCOM_SYSMON=y
+> +CONFIG_RPMSG_CHAR=y
+> +CONFIG_RPMSG_QCOM_GLINK_RPM=y
+> +CONFIG_RPMSG_QCOM_GLINK_SMEM=y
+> +CONFIG_RPMSG_QCOM_SMD=y
+> +CONFIG_QCOM_PM=y
+> +CONFIG_QCOM_RMTFS_MEM=y
+> +CONFIG_QCOM_SMEM=y
+> +CONFIG_QCOM_SMD_RPM=y
+> +CONFIG_QCOM_SMP2P=y
+> +CONFIG_QCOM_SMSM=y
+> +CONFIG_EXTCON_QCOM_SPMI_MISC=y
+> +CONFIG_IIO=y
+> +CONFIG_QCOM_SPMI_IADC=y
+> +CONFIG_QCOM_SPMI_VADC=y
+> +CONFIG_INV_MPU6050_I2C=y
+> +CONFIG_TSL2772=y
+> +CONFIG_AK8975=y
+> +CONFIG_BMP280=y
+> +CONFIG_PWM=y
+> +CONFIG_PHY_QCOM_USB_HS=y
+> +CONFIG_DAX=y
+> +CONFIG_QCOM_QFPROM=y
+> +CONFIG_SLIMBUS=y
+> +CONFIG_SLIM_QCOM_CTRL=y
+> +CONFIG_EXT4_FS=y
+> +CONFIG_OVERLAY_FS=y
+> +# CONFIG_MISC_FILESYSTEMS is not set
+> +CONFIG_CRYPTO_AUTHENC=y
+> +CONFIG_CRYPTO_ECHAINIV=y
+> +CONFIG_CRYPTO_DEV_VIRTIO=y
+> +CONFIG_PRINTK_TIME=y
+> +CONFIG_DEBUG_FS=y
+> +CONFIG_MAGIC_SYSRQ=y
+> +# CONFIG_FTRACE is not set
+> +# CONFIG_RUNTIME_TESTING_MENU is not set
+> -- 
+> 2.17.2
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
