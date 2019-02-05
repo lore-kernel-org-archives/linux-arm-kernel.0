@@ -2,85 +2,84 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.9 required=3.0 tests=DATE_IN_PAST_96_XX,
-	DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5FA21C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:01:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B8F01C282CC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:11:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 271932080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:01:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 87B1A2080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 16:11:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gySUdquE";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="WSV81ETS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 271932080F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ow0J2UlJ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="I2T7xdo0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87B1A2080F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=a6M/xNycioX79R9wyPD4KMdTAIBYDQEpfUgaym1vOLc=; b=gySUdquE1ywTn7
-	NPVRSOZ74fy6ynELKmAaScPqpzr0W3s57UC3fTXIy2RcNcAhZdbf/rSBgaICuTcTVrakWygF/Bx52
-	pG5aOYltHTBWjP4X3nh5w1MhsnOQyOcpK/Zg4t6wU4/4tatBoIikhgVi3iyo4617NDP7P+cZS7yB+
-	dWC6BMuf1g9cVcS9KI9FyXHRuqqNhmk5trhQ7e5r38vdNIzVxc4QZv82HyfugSXUqyVrKXsyqE7mI
-	RejNgeQpiD3oG2LugsYfYrgyjPQVKM9Ek9M6k1hGbXii6tRdGOgxOZzKOcfnxx9vlG+GsVF6H74L5
-	ccpQgcWRYK/cuRinxt/g==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=KKZdh9yLSuZ2eVjGxOyFEtm52ZcUDtFtncsFidvw9M4=; b=ow0J2UlJNGX+la
+	v5k6jo55l1Pn2h+2I6oOLvRMmKysx087MDdrijxxFiwkUsDBOLGZbDVHz07Doj0FHidbDgsK/RpDy
+	Tt4OlbKM/Q0YSm5J+1wODsal3h436Mqbq8vmRPFIT3KdCQmM4kGAtpAuSX7YcmTmZDUDZNOuYV/QS
+	U+wmVaCXzbLGyCd9o2Lq4iHjTpxnttZKa7BP4+33X2NfA/sfHG42zWVDHIKQFN06NT03dRgwB6SV+
+	sJt3yKYzdSPRkgUVbX1XAFkSd8XIvXEhTMam+e3qAWm0+7diGewWrIH2WRcvzy+R1dhGKpvDaRbL4
+	OVVmlDeyAItZbB77xanw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr3AO-0001Pd-62; Tue, 05 Feb 2019 16:01:44 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
+	id 1gr3Jb-0004tR-Fb; Tue, 05 Feb 2019 16:11:15 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr38Y-0006m9-ON
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 16:00:58 +0000
-Received: by mail-wm1-x343.google.com with SMTP id z5so4197461wmf.0
+ id 1gr3JY-0004t1-7I
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 16:11:13 +0000
+Received: by mail-it1-x141.google.com with SMTP id p197so9546404itp.0
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 05 Feb 2019 07:59:49 -0800 (PST)
+ Tue, 05 Feb 2019 08:11:11 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:mime-version;
- bh=obC/o0x/Of+oiYvDNo+3FmUgPGJAQl+NE5x85eXAQHI=;
- b=WSV81ETS+kogLHB4BvEl6z/BdttOBfQ9jLyogcbwsk8O19p2eJ0F87NbLRjxhPSY5m
- jru04119WHfN5Ojw0FqEIYDTbm883PI2wFjbPV4qVeN6TE1SfV707mJos0aAAXrdVjGd
- UVZ5O98son0kInTPtFBdl31QBQT018TiJbDlPq7hHUXTPeGDswp1xUuOQQZ8kCCNFzvM
- 0jLnZk08zYrCG96BfpERA2AJPeweqEfm5iBeW6P6cOHy5hGmAzVKwOA3hR5EeQ1MzCL6
- DacGQGFQCsj1er9+HxPHY6gwsKFFNujj76py9cyjFI5vhpJzinV5mzWrxZX+qJW771AT
- AZ5g==
+ d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=PDyxZQez69poaTeCS0qHlzzySskONvPAxl2nUBIaDiw=;
+ b=I2T7xdo0NGWBOsDrCPMtF3kcpZzrI+Gp/0XelKJQAke5My9IXWsYa881sq41rS6ar5
+ I5QI0nLPhSls1sICAjTUmdC0kjQt7zXT8rKKwbjiWF+PLGiAGK/fv1rrlEtNG3J5fUfL
+ mcuP1ZU2bJZM/p2Hil5IVrftiksw/hNmqHCv+qsI7FXqeJ7w2nvDI7PvKsdQg2lUM4su
+ KWj7xj4iMU0Zp7QB21DfLjTmq5l/NziDnBa549EL1Zg4Mc9IeWkVlUE1eYuk90WayYI8
+ T6dB1Q45y4svkC1G8myc5bdr++RwTyjiT67Uzurn9HXMyM+HCXtMRRE3rbHQlKwAaL33
+ 2K/w==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version;
- bh=obC/o0x/Of+oiYvDNo+3FmUgPGJAQl+NE5x85eXAQHI=;
- b=NRxrutLlnuDvD4EbsumYHqKxV6yel5E8jrgucDMIobsItE7zmE+t1WKIGVjww4WnRB
- CgjBo/v3uM9LFaaS0nR5R4SUK8F49m7UhpFkjmAAoMQ2bKWpk5Q28O0vRN3qn1tHbi/U
- bTB5Bcp0mh6U1mJzHtgNdakSxM7JXzHN0mUBz1XuetVRvOEO1d5iKL3qEYQ26fVaoPTy
- 8Jvay5vs6lLmCWFu5BE26nZXsL/pj2jnYR1jW7oz0XxkIpDIhWmBAWAAswg9GGN+6bY0
- mXjMlDdJwe/WNEnpijhcjnFjK2OTmGZm4yQqXtDFNkBMEEKKShUK+9hUXSzNRBAIvViJ
- EuTA==
-X-Gm-Message-State: AHQUAubn+FKRMQcKU/XSUHn/LgfYfrxpZzK2DAPYkULgIVK9Q7sIX0aH
- 4fT07TeG9SPB2nJh30RIlbYxAg==
-X-Google-Smtp-Source: AHgI3IYSrGj7kHlF8uGsZVxlBXMYAo+pXQSmbx+a+mIkXGS/XNkMYdNI1G7+AD7n1YIQ7vnG8Tm7QQ==
-X-Received: by 2002:a1c:d082:: with SMTP id h124mr4071012wmg.21.1549382388516; 
- Tue, 05 Feb 2019 07:59:48 -0800 (PST)
-Received: from localhost ([2620:10d:c092:180::1:a0f9])
- by smtp.gmail.com with ESMTPSA id s66sm11635832wmf.34.2019.02.05.07.59.47
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 05 Feb 2019 07:59:47 -0800 (PST)
-From: Julien Masson <jmasson@baylibre.com>
-To: Kevin Hilman <khilman@baylibre.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [PATCH 1/2] tty: serial: meson_uart: Add support for kernel debugger
-Date: Fri, 1 Feb 2019 08:36:59 +0100
-Message-ID: <864l9i1b0t.fsf@baylibre.com>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=PDyxZQez69poaTeCS0qHlzzySskONvPAxl2nUBIaDiw=;
+ b=QwbhjRgAgGPXsrJzAto5nqciOEUxgH10QbTg2uJMMKqHT2UlO5ib+nQzltrv/xF2uL
+ ig8Q+eC1h7fgKp1vGJBP1jlnTJHLA0l9abmb0ttZJdga+oL+T3viYAcH6vv3UA3NfvRO
+ bJIBdtN3/R7y34HsztHoSqdfF2EG0Rp6+3uof6MAGIK7tS7dMS/8bJrdgaE+Q1fWPNAU
+ AVyyd/wHH24kcV6D4v7olgsC0xcZ16Y6/eVwEllCDCVruh8nbaCeMnBljXBwc/TGlI8B
+ OP9gcEei52g5rI+JO0O21mixxlY6U2QFUYfNMY9eAU5oZYAqTtN1egeZwvXUsP78ZTuq
+ hzuA==
+X-Gm-Message-State: AHQUAuavZ5+BdZdUUAgBtYxe0gQjUqa8cxl/LcdRxoKQcgbyUqWynXRn
+ kR7lK2edz3omWF8h2+ggT7+fqfXzja799XdSEipckw==
+X-Google-Smtp-Source: AHgI3Ib8VcJBaKIDYqLflL+TBgTZ+UzWErLpmepkjsFM4MeivJf9N8w9cvtD4ABW8Z2p76z3fScOxgV3RzpnAu4O/+8=
+X-Received: by 2002:a5e:dd0c:: with SMTP id t12mr574765iop.258.1549383071140; 
+ Tue, 05 Feb 2019 08:11:11 -0800 (PST)
 MIME-Version: 1.0
+References: <20190131133928.17985-1-brgl@bgdev.pl>
+ <edfcdc52-3ff0-ec58-94f7-4816d2b2b3f4@lechnology.com>
+In-Reply-To: <edfcdc52-3ff0-ec58-94f7-4816d2b2b3f4@lechnology.com>
+From: Bartosz Golaszewski <brgl@bgdev.pl>
+Date: Tue, 5 Feb 2019 17:11:00 +0100
+Message-ID: <CAMRc=MfPAg_j-DfaQCaTd2GmBDctv7L0eSzTET+fcj+WArejdg@mail.gmail.com>
+Subject: Re: [PATCH 00/35] ARM: davinci: modernize the irq support
+To: David Lechner <david@lechnology.com>, Sekhar Nori <nsekhar@ti.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_075951_293160_1B061D8D 
-X-CRM114-Status: GOOD (  11.69  )
+X-CRM114-CacheID: sfid-20190205_081112_318586_B88551AA 
+X-CRM114-Status: GOOD (  13.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,92 +91,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, linux-kernel@vger.kernel.org,
- linux-serial@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Jiri Slaby <jslaby@suse.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Jason Cooper <jason@lakedaemon.net>, Kevin Hilman <khilman@kernel.org>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Thomas Gleixner <tglx@linutronix.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The kgdb invokes the poll_put_char and poll_get_char when communicating
-with the host. This patch implement the serial polling hooks for the
-meson_uart to be used for KGDB debugging over serial line.
-
-Signed-off-by: Julien Masson <jmasson@baylibre.com>
----
- drivers/tty/serial/meson_uart.c | 46 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
-
-diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
-index 8a84259..49b20da 100644
---- a/drivers/tty/serial/meson_uart.c
-+++ b/drivers/tty/serial/meson_uart.c
-@@ -426,6 +426,48 @@ static void meson_uart_config_port(struct uart_port *port, int flags)
- 	}
- }
- 
-+#ifdef CONFIG_CONSOLE_POLL
-+/*
-+ * Console polling routines for writing and reading from the uart while
-+ * in an interrupt or debug context (i.e. kgdb).
-+ */
-+
-+static int meson_uart_poll_get_char(struct uart_port *port)
-+{
-+	u32 c;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&port->lock, flags);
-+
-+	if (readl(port->membase + AML_UART_STATUS) & AML_UART_RX_EMPTY)
-+		c = NO_POLL_CHAR;
-+	else
-+		c = readl(port->membase + AML_UART_RFIFO);
-+
-+	spin_unlock_irqrestore(&port->lock, flags);
-+
-+	return c;
-+}
-+
-+static void meson_uart_poll_put_char(struct uart_port *port, unsigned char c)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&port->lock, flags);
-+
-+	while (!(readl(port->membase + AML_UART_STATUS) & AML_UART_TX_EMPTY))
-+		cpu_relax();
-+
-+	writel(c, port->membase + AML_UART_WFIFO);
-+
-+	while (!(readl(port->membase + AML_UART_STATUS) & AML_UART_TX_EMPTY))
-+		cpu_relax();
-+
-+	spin_unlock_irqrestore(&port->lock, flags);
-+}
-+
-+#endif /* CONFIG_CONSOLE_POLL */
-+
- static const struct uart_ops meson_uart_ops = {
- 	.set_mctrl      = meson_uart_set_mctrl,
- 	.get_mctrl      = meson_uart_get_mctrl,
-@@ -441,6 +483,10 @@ static const struct uart_ops meson_uart_ops = {
- 	.request_port	= meson_uart_request_port,
- 	.release_port	= meson_uart_release_port,
- 	.verify_port	= meson_uart_verify_port,
-+#ifdef CONFIG_CONSOLE_POLL
-+	.poll_get_char	= meson_uart_poll_get_char,
-+	.poll_put_char	= meson_uart_poll_put_char,
-+#endif
- };
- 
- #ifdef CONFIG_SERIAL_MESON_CONSOLE
--- 
-2.7.4
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+cG9uLiwgNCBsdXQgMjAxOSBvIDIyOjQ5IERhdmlkIExlY2huZXIgPGRhdmlkQGxlY2hub2xvZ3ku
+Y29tPiBuYXBpc2HFgihhKToKPgo+IE9uIDEvMzEvMTkgNzozOCBBTSwgQmFydG9zeiBHb2xhc3pl
+d3NraSB3cm90ZToKPiA+IEZyb206IEJhcnRvc3ogR29sYXN6ZXdza2kgPGJnb2xhc3pld3NraUBi
+YXlsaWJyZS5jb20+Cj4gPgo+ID4gVGhpcyBzZXJpZXMgcG9ydHMgdGhlIGRhdmluY2kgcGxhdGZv
+cm0gdG8gdXNpbmcgU1BBUlNFX0lSUSwgY2xlYW5zIHVwCj4gPiB0aGUgaXJxY2hpcCBkcml2ZXJz
+IGFuZCBtb3ZlcyB0aGVtIG92ZXIgdG8gZHJpdmVycy9pcnFjaGlwLgo+ID4KPgo+IFRoaXMgaGFz
+IGJlZW4gb24gbXkgdG9kbyBsaXN0IGZvciB5ZWFycywgYnV0IEkndmUgbmV2ZXIgaGFkIGVub3Vn
+aAo+IHRpbWUgdG8gZmlndXJlIGl0IG91dC4gTmljZSB0byBzZWUgaXQgZmluYWxseSBnZXR0aW5n
+IGRvbmUhCj4KPiBTZXJpZXMgdGVzdGVkIG9uIExFR08gTUlORFNUT1JNUyBFVjMgKGRhODUwLWxp
+a2UpLiBJIGNhbiBub3cgdXNlCj4gSUlPIHRyaWdnZXJzIHdpdGhvdXQgaGF2aW5nIHRvIHBhdGNo
+IHRoZSBrZXJuZWwgdG8gYWRkIGV4dHJhCj4gaW50ZXJydXB0cy4KPgo+IFRlc3RlZC1ieTogRGF2
+aWQgTGVjaG5lciA8ZGF2aWRAbGVjaG5vbG9neS5jb20+Cj4KPgoKV293IHRoYW5rcyBmb3IgdGFr
+aW5nIHRoZSB0aW1lIHRvIHJldmlldyBpdCEKCkknbGwgYWRkcmVzcyBjZXJ0YWluIHJlbWFya3Mg
+LSBmb3IgdGhvc2UgdW5hZGRyZXNzZWQgLSBJJ2xsIGZpeCB0aGVtIGluIHYyLgoKU2VraGFyOiBh
+cmUgeW91IGZpbmUgd2l0aCBzZW5kaW5nIGJvdGggdGhlIGNsb2Nrc291cmNlIGFuZCBpbnRlcnJ1
+cHQKc2VyaWVzIHRvZ2V0aGVyIG5leHQgdGltZSB3aXRoIGFkZGl0aW9uYWwgcGF0Y2hlcyBvbiB0
+b3AgbWFraW5nCmRhdmluY2kgcGFydCBvZiBtdWx0aV92NV9kZWZjb25maWc/CgpCZXN0IHJlZ2Fy
+ZHMsCkJhcnRvc3ogR29sYXN6ZXdza2kKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1r
+ZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWls
+bWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
