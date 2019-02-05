@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 414C5C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:44:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D082AC282CC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:45:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0EEBB2145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:44:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7F7C32080D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 06:45:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VtZqHPKQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0EEBB2145D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oMTZlJmf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7F7C32080D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,48 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ACCp9FIbLAYNHFVRh1ICjZWW1HuHhpIDSLTQwDFXWhE=; b=VtZqHPKQQZIRUo
-	NpMZSH6QV5LzNmKmSOmEX3wHXCS7BZFoY+Ucu3NlMW8t9Brzzq7r7v6VA5tpniXxZVNx0sCQLW3EB
-	Mz5B06S6mROH2Gu1xFj/wzZba3ruY7blK7gkflI2bfubFJE7/zWCZBfKnrPmsnIvPOHU/14UQJfGm
-	mS14ggeGTCee8PrhHrokNNIWLab+DClaB1MeYCRwScew2H8wGFWxcnn08o2t112F6OrHhPgGMzmWu
-	ziFmLkCgfE1gEDeg5aeF41PNNsGy/2Ni2j+eX+RootRym7TAD6u9U3jg1j0ceQ8j1UehUx3obk2Hp
-	2Fq93dvaWHLeZrIQ0ivQ==;
+	List-Owner; bh=9gX5Jb4/9riPhRUqvSc/tSYBrnRDlbRDaikXyFnFTUE=; b=oMTZlJmfe2LE2/
+	stBPJpUQVPYYjE37aEFGlxFGcf3R195LzHx/iVAmACOYV9ABs2LnPkD1F3JurmYc5rGa1C4RhB2EJ
+	WHaL5b1Q9us58TQb5we1YiuApTk9JIrsiMQkzuExoweDBKoQ9ydtYmBWgoz9UK9YTeddCqRtAi5cg
+	KpjDOmDjO7wRQWPFZBJibhVJmAocPd+jxeExayN9o8UvSXo32H7jFAP+UAT2PyTlZy7fVxD5MZNbE
+	3S4TaFwn4b06ThyOlM92BhDKPN+P30s6RR84ywv3FW0xSDvtz7O1YERIiw7/YkoxGU1uXSfXSWEgp
+	mG6joSUeq12PTHUYRyLA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gquTF-0004y9-FM; Tue, 05 Feb 2019 06:44:37 +0000
+	id 1gquTa-0005H0-BV; Tue, 05 Feb 2019 06:44:58 +0000
 Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gquSa-0004NW-UU; Tue, 05 Feb 2019 06:44:10 +0000
-X-UUID: 848c944b6839477db6f2c805c38602e9-20190204
-X-UUID: 848c944b6839477db6f2c805c38602e9-20190204
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
+ id 1gquSo-0004NW-2e; Tue, 05 Feb 2019 06:44:17 +0000
+X-UUID: fb7f7977d87545d89713f59791ce3263-20190204
+X-UUID: fb7f7977d87545d89713f59791ce3263-20190204
+Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
  (envelope-from <frederic.chen@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1627860560; Mon, 04 Feb 2019 22:43:37 -0800
-Received: from MTKMBS01N1.mediatek.inc (172.21.101.68) by
- MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 4 Feb 2019 22:43:36 -0800
+ with ESMTP id 374182805; Mon, 04 Feb 2019 22:43:35 -0800
+Received: from MTKMBS01N2.mediatek.inc (172.21.101.79) by
+ MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 4 Feb 2019 22:43:34 -0800
 Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs01n1.mediatek.inc (172.21.101.68) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 5 Feb 2019 14:43:23 +0800
+ mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 5 Feb 2019 14:43:22 +0800
 Received: from mtkslt306.mediatek.inc (10.21.14.136) by mtkcas09.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
- Frontend Transport; Tue, 5 Feb 2019 14:43:23 +0800
+ Frontend Transport; Tue, 5 Feb 2019 14:43:22 +0800
 From: Frederic Chen <frederic.chen@mediatek.com>
 To: <hans.verkuil@cisco.com>, <laurent.pinchart+renesas@ideasonboard.com>,
  <tfiga@chromium.org>, <matthias.bgg@gmail.com>, <mchehab@kernel.org>
-Subject: [RFC PATCH V0 6/7] media: platform: Add Mediatek ISP Pass 1 driver
- KConfig
-Date: Tue, 5 Feb 2019 14:42:45 +0800
-Message-ID: <1549348966-14451-7-git-send-email-frederic.chen@mediatek.com>
+Subject: [RFC PATCH V0 5/7] dts: arm64: mt8183: Add ISP Pass 1 nodes
+Date: Tue, 5 Feb 2019 14:42:44 +0800
+Message-ID: <1549348966-14451-6-git-send-email-frederic.chen@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1549348966-14451-1-git-send-email-frederic.chen@mediatek.com>
 References: <1549348966-14451-1-git-send-email-frederic.chen@mediatek.com>
 MIME-Version: 1.0
+X-TM-SNTS-SMTP: 48D05ECA1E0ABAA1E13C76477FB115FB55BF55EE5553BBE37F37429512DC82C62000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_224357_186012_46D9D0EB 
-X-CRM114-Status: UNSURE (   9.27  )
+X-CRM114-CacheID: sfid-20190204_224410_529295_BE3CAE3C 
+X-CRM114-Status: UNSURE (   7.39  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -90,59 +90,68 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds KConfig for Pass 1 (P1) unit driver of Mediatek's
-camera ISP system. ISP P1 unit is embedded in Mediatek SOCs. It
-provides RAW processing which includes optical black correction,
-defect pixel correction, W/IR imbalance correction and lens
-shading correction.
+From: Jungo Lin <jungo.lin@mediatek.com>
 
+Add nodes for Pass 1 unit of Mediatek's camera ISP system.
+Pass 1 unit embedded in Mediatek SOCs, works with the
+co-processor to process image signal from the image sensor
+and output RAW data.
+
+Signed-off-by: Jungo Lin <jungo.lin@mediatek.com>
 Signed-off-by: Frederic Chen <frederic.chen@mediatek.com>
 ---
- drivers/media/platform/Kconfig         |  2 ++
- drivers/media/platform/mtk-isp/Kconfig | 21 +++++++++++++++++++++
- 2 files changed, 23 insertions(+)
- create mode 100644 drivers/media/platform/mtk-isp/Kconfig
+ arch/arm64/boot/dts/mediatek/mt8183.dtsi | 40 ++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-index a505e9f..ef08d48 100644
---- a/drivers/media/platform/Kconfig
-+++ b/drivers/media/platform/Kconfig
-@@ -32,6 +32,8 @@ source "drivers/media/platform/davinci/Kconfig"
+diff --git a/arch/arm64/boot/dts/mediatek/mt8183.dtsi b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
+index 3b85a6c..780d2c5 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8183.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
+@@ -419,4 +419,44 @@
+ 		#clock-cells = <1>;
+ 	};
  
- source "drivers/media/platform/omap/Kconfig"
- 
-+source "drivers/media/platform/mtk-isp/Kconfig"
++	cam_smem: cam_smem {
++		compatible = "mediatek,cam_smem";
++		mediatek,larb = <&larb3>,
++				<&larb6>;
++		iommus = <&iommu M4U_PORT_CAM_LSCI0>,
++				<&iommu M4U_PORT_CAM_LSCI1>,
++				<&iommu M4U_PORT_CAM_BPCI>;
++	};
 +
- config VIDEO_ASPEED
- 	tristate "Aspeed AST2400 and AST2500 Video Engine driver"
- 	depends on VIDEO_V4L2
-diff --git a/drivers/media/platform/mtk-isp/Kconfig b/drivers/media/platform/mtk-isp/Kconfig
-new file mode 100644
-index 0000000..999eb24
---- /dev/null
-+++ b/drivers/media/platform/mtk-isp/Kconfig
-@@ -0,0 +1,21 @@
-+config VIDEO_MEDIATEK_ISP_PASS1_SUPPORT
-+	bool "Mediatek pass 1 image processing function"
-+
-+	select DMA_SHARED_BUFFER
-+	select VIDEO_V4L2_SUBDEV_API
-+	select VIDEOBUF2_DMA_CONTIG
-+	select VIDEOBUF2_CORE
-+	select VIDEOBUF2_V4L2
-+	select VIDEOBUF2_MEMOPS
-+	select VIDEOBUF2_VMALLOC
-+	select MEDIA_CONTROLLER
-+
-+	default n
-+	help
-+		Pass 1 driver controls 3A (autofocus, exposure,
-+		and white balance) with tuning feature and output
-+		the first capture image buffer in Mediatek's camera system.
-+
-+		Choose y if you want to use Mediatek SoCs to create image
-+		vcapture application such as video recording and still image
-+		capture.
++	camisp: camisp@1a000000 {
++		compatible = "mediatek,mt8183-camisp", "syscon";
++		reg = <0 0x1a000000 0 0x1000>,
++			<0 0x1a003000 0 0x1000>,
++			<0 0x1a004000 0 0x2000>,
++			<0 0x1a006000 0 0x2000>;
++		reg-names = "camisp",
++					"cam1",
++					"cam2",
++					"cam3";
++		interrupts = <GIC_SPI 253 IRQ_TYPE_LEVEL_LOW>,
++				<GIC_SPI 254 IRQ_TYPE_LEVEL_LOW>,
++				<GIC_SPI 255 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-names = "cam1",
++					"cam2",
++					"cam3";
++		iommus = <&iommu M4U_PORT_CAM_LSCI0>,
++				<&iommu M4U_PORT_CAM_LSCI1>,
++				<&iommu M4U_PORT_CAM_BPCI>;
++		#clock-cells = <1>;
++		power-domains = <&scpsys MT8183_POWER_DOMAIN_CAM>;
++		/* Camera CCF */
++		clocks = <&camsys CLK_CAM_CAM>,
++				<&camsys CLK_CAM_CAMTG>;
++		clock-names = "CAMSYS_CAM_CGPDN",
++				"CAMSYS_CAMTG_CGPDN";
++		mediatek,larb = <&larb3>,
++				<&larb6>;
++		mediatek,vpu = <&vpu>;
++		smem_device = <&cam_smem>;
++	};
+ };
 -- 
 1.9.1
 
