@@ -2,57 +2,67 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A14FC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:09:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 163C3C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:21:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 50D2A2080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:09:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D5FD220821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:21:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="momBo09z"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 50D2A2080F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=the-dreams.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CWaLXzjt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D5FD220821
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=uldiBeFHbsZMjUx7rgOroaQxik1KsV7B8a2nR/p//wc=; b=momBo09zmB/eoGZ9s3HOiv5Fj
-	HLEHspFdFg9+JRUZVbeOEa66NqfqmbwfOlZZKITLzSk38gq29EeSHM74ZY6l48sO2KCu1sciq1aFC
-	zEvopwKfomTLfJ8Zzmy7ylvb+FRKI5k4SVRpzpHINvmACzvRD38merp5T0k479LdUeoAH8G4j+j2J
-	CNzBxBomhVZZex44EWM8GiqbaqT7Ap/5p07Jw2xkIE7Xjy7Z1eOX63eB0lfHjM3Oyl5NGlEDhczz9
-	bJuZgEePSbjRRP7vFT6VNbcbjmUrgA9GUcrI6J3Fy0nsU5d/1LNgyCYw1gkeMP630w20PMjh12IlW
-	arbSpXoEw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=g8eyhDInj4ewlHKcq90i3zWOIRr15htJLcEdKDrwapI=; b=CWaLXzjtqfxMcu
+	uSjEkllMkvWyxX48AV64L3EImYo2hhUJ+rDt4yvzcbtu9H0VVqrkwI1FCfEq5Q+MJR0nkjG2Aw+o9
+	4Ep0Lcjg4YDxLbMttjoReKZ/WvnVb4UQXe4i14ZoNWW6dUyR0cecuw+95Y0fY7qc7rJcdgKLxGwEy
+	YyXY9Wa5aHPAHnQbc0EVB195FsJD3290yQKqcYpJVUtBZ0YL4SyVwDTWKgg4FfN3TBbJa2VMC+fZ4
+	ncQYilb3yx8WeoQEm5lACnztQYplqWwpkidJ5GpR6bvmtQhcGqzr/0T3OA0M+n+2eN/NfmGuUlXR1
+	Tc9rpFH+AKYmfRBpkhsg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqzXR-000614-Vm; Tue, 05 Feb 2019 12:09:17 +0000
-Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
+	id 1gqziu-0002AH-G7; Tue, 05 Feb 2019 12:21:08 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqzXN-00060O-J3; Tue, 05 Feb 2019 12:09:15 +0000
-Received: from localhost (unknown [46.183.103.8])
- by pokefinder.org (Postfix) with ESMTPSA id BB9252C0509;
- Tue,  5 Feb 2019 13:09:08 +0100 (CET)
-Date: Tue, 5 Feb 2019 13:09:06 +0100
-From: Wolfram Sang <wsa@the-dreams.de>
-To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Subject: Re: [PATCH v2] i2c: bcm2835: Clear current buffer pointers and
- counts after a transfer
-Message-ID: <20190205120905.GB1045@kunai>
-References: <20181227154225.5492-1-paul.kocialkowski@bootlin.com>
+ id 1gqzir-00029v-51
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 12:21:06 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 876DF80D;
+ Tue,  5 Feb 2019 04:21:03 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 689463F675;
+ Tue,  5 Feb 2019 04:21:02 -0800 (PST)
+Subject: Re: [PATCH v2 1/5] KVM: arm/arm64: rename
+ kvm_pmu_{enable/disable}_counter functions
+To: Andrew Murray <andrew.murray@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Marc Zyngier <marc.zyngier@arm.com>
+References: <1549299218-44714-1-git-send-email-andrew.murray@arm.com>
+ <1549299218-44714-2-git-send-email-andrew.murray@arm.com>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <73b4e485-bc5f-d89f-6b01-fd0bc9a22989@arm.com>
+Date: Tue, 5 Feb 2019 12:21:00 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181227154225.5492-1-paul.kocialkowski@bootlin.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <1549299218-44714-2-git-send-email-andrew.murray@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_040913_776239_308B1E78 
-X-CRM114-Status: GOOD (  15.39  )
+X-CRM114-CacheID: sfid-20190205_042105_206673_96AAD043 
+X-CRM114-Status: GOOD (  19.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,90 +74,129 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stefan Wahren <stefan.wahren@i2se.com>,
- Florian Fainelli <f.fainelli@gmail.com>, Scott Branden <sbranden@broadcom.com>,
- Eben Upton <eben@raspberrypi.org>, Maxime Ripard <maxime.ripard@bootlin.com>,
- Ray Jui <rjui@broadcom.com>, linux-kernel@vger.kernel.org,
- Eric Anholt <eric@anholt.net>, bcm-kernel-feedback-list@broadcom.com,
- linux-i2c@vger.kernel.org, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- linux-arm-kernel@lists.infradead.org, linux-rpi-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============8920057819728643935=="
+Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
+ suzuki.poulose@arm.com
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 
---===============8920057819728643935==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="tjCHc7DPkfUGtrlw"
-Content-Disposition: inline
+
+On 04/02/2019 16:53, Andrew Murray wrote:
+> The kvm_pmu_{enable/disable}_counter functions can enabled/disable
+> multiple counters at once as they operate on a bitmask. Let's
+> make this clearer by renaming the function.
+>> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 
 
---tjCHc7DPkfUGtrlw
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 
-On Thu, Dec 27, 2018 at 04:42:25PM +0100, Paul Kocialkowski wrote:
-> The driver's interrupt handler checks whether a message is currently
-> being handled with the curr_msg pointer. When it is NULL, the interrupt
-> is considered to be unexpected. Similarly, the i2c_start_transfer
-> routine checks for the remaining number of messages to handle in
-> num_msgs.
->=20
-> However, these values are never cleared and always keep the message and
-> number relevant to the latest transfer (which might be done already and
-> the underlying message memory might have been freed).
->=20
-> When an unexpected interrupt hits with the DONE bit set, the isr will
-> then try to access the flags field of the curr_msg structure, leading
-> to a fatal page fault.
->=20
-> The msg_buf and msg_buf_remaining fields are also never cleared at the
-> end of the transfer, which can lead to similar pitfalls.
->=20
-> Fix these issues by introducing a cleanup function and always calling
-> it after a transfer is finished.
->=20
-> Fixes: e2474541032d ("i2c: bcm2835: Fix hang for writing messages larger =
-than 16 bytes")
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> ---
+>  arch/arm64/kvm/sys_regs.c |  4 ++--
+>  include/kvm/arm_pmu.h     |  8 ++++----
+>  virt/kvm/arm/pmu.c        | 12 ++++++------
+>  3 files changed, 12 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index e3e3722..4a6fbac 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -857,11 +857,11 @@ static bool access_pmcnten(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+>  		if (r->Op2 & 0x1) {
+>  			/* accessing PMCNTENSET_EL0 */
+>  			__vcpu_sys_reg(vcpu, PMCNTENSET_EL0) |= val;
+> -			kvm_pmu_enable_counter(vcpu, val);
+> +			kvm_pmu_enable_counter_mask(vcpu, val);
+>  		} else {
+>  			/* accessing PMCNTENCLR_EL0 */
+>  			__vcpu_sys_reg(vcpu, PMCNTENSET_EL0) &= ~val;
+> -			kvm_pmu_disable_counter(vcpu, val);
+> +			kvm_pmu_disable_counter_mask(vcpu, val);
+>  		}
+>  	} else {
+>  		p->regval = __vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & mask;
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> index f87fe20..b73f31b 100644
+> --- a/include/kvm/arm_pmu.h
+> +++ b/include/kvm/arm_pmu.h
+> @@ -46,8 +46,8 @@ void kvm_pmu_set_counter_value(struct kvm_vcpu *vcpu, u64 select_idx, u64 val);
+>  u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu);
+>  void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
+>  void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu);
+> -void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val);
+> -void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val);
+> +void kvm_pmu_disable_counter_mask(struct kvm_vcpu *vcpu, u64 val);
+> +void kvm_pmu_enable_counter_mask(struct kvm_vcpu *vcpu, u64 val);
+>  void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu);
+>  void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu);
+>  bool kvm_pmu_should_notify_user(struct kvm_vcpu *vcpu);
+> @@ -83,8 +83,8 @@ static inline u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+>  }
+>  static inline void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
+>  static inline void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu) {}
+> -static inline void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+> -static inline void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val) {}
+> +static inline void kvm_pmu_disable_counter_mask(struct kvm_vcpu *vcpu, u64 val) {}
+> +static inline void kvm_pmu_enable_counter_mask(struct kvm_vcpu *vcpu, u64 val) {}
+>  static inline void kvm_pmu_flush_hwstate(struct kvm_vcpu *vcpu) {}
+>  static inline void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
+>  static inline bool kvm_pmu_should_notify_user(struct kvm_vcpu *vcpu)
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 1c5b76c..c5a722a 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -135,13 +135,13 @@ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+>  }
+>  
+>  /**
+> - * kvm_pmu_enable_counter - enable selected PMU counter
+> + * kvm_pmu_enable_counter_mask - enable selected PMU counters
+>   * @vcpu: The vcpu pointer
+>   * @val: the value guest writes to PMCNTENSET register
+>   *
+>   * Call perf_event_enable to start counting the perf event
+>   */
+> -void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val)
+> +void kvm_pmu_enable_counter_mask(struct kvm_vcpu *vcpu, u64 val)
+>  {
+>  	int i;
+>  	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> @@ -164,13 +164,13 @@ void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 val)
+>  }
+>  
+>  /**
+> - * kvm_pmu_disable_counter - disable selected PMU counter
+> + * kvm_pmu_disable_counter_mask - disable selected PMU counters
+>   * @vcpu: The vcpu pointer
+>   * @val: the value guest writes to PMCNTENCLR register
+>   *
+>   * Call perf_event_disable to stop counting the perf event
+>   */
+> -void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 val)
+> +void kvm_pmu_disable_counter_mask(struct kvm_vcpu *vcpu, u64 val)
+>  {
+>  	int i;
+>  	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> @@ -347,10 +347,10 @@ void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val)
+>  
+>  	mask = kvm_pmu_valid_counter_mask(vcpu);
+>  	if (val & ARMV8_PMU_PMCR_E) {
+> -		kvm_pmu_enable_counter(vcpu,
+> +		kvm_pmu_enable_counter_mask(vcpu,
+>  		       __vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & mask);
+>  	} else {
+> -		kvm_pmu_disable_counter(vcpu, mask);
+> +		kvm_pmu_disable_counter_mask(vcpu, mask);
+>  	}
+>  
+>  	if (val & ARMV8_PMU_PMCR_C)
+> 
 
-Stefan, Florian, any comment about this patch?
-
-
---tjCHc7DPkfUGtrlw
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCgAdFiEEOZGx6rniZ1Gk92RdFA3kzBSgKbYFAlxZfOEACgkQFA3kzBSg
-KbYpQw/+I5EVIhwbmysIh+L9Au4/Gm2PS/klKGFRPiiV5gJZWeYg6Pnb7exKsPet
-Jht6B6C5nDf2c8UcGc4Sj3vdJMeu3hln3j8Xv/mQQo5bUYU2VYsf5+wTwrh8NFbH
-CUBP32dXvZMyDl5wI4dDXwyiOOtJYwMr76SXaeQuxsNZITBPMqI8sl3TYbCeaT2x
-/UoYyCD4GTBed3lRUknOqmtr07bbnsohBS3IFVKZMCiSSCoTAHNe9q3XptYVEdlp
-0KyaaKrlEa4XvrZmolJMlgcHMoQMSptmARj6ZTl664WmwD90TrjsHoyPKAtFPn/B
-bP+XzwsAJqhasN/CrUrebDxd1vzMSGtj0kShlQABvZRXN7DK4vdmLfKrOYcCZ5ra
-bWigpqGuGOnyQOJCWfPh4o0EpHQt8Fqu06cKZLQDIGz7x7n7rqp5PRFJzxhGK3Go
-gY7ESo/VZ0rXGawuYFWVpGw3r/TAWNNIR39v1vmN7+lr7mfnKjvnZnwOS7+HwcBN
-CehQ9lS/pM2jvZZfs8mWbWx3wnmZ1tfWooacHBi9FRksTylHLoiOaPONfUXB4l5z
-exhP7ryt4iN/HS/wAVUYcTVzpIlDsDyf0kwsfXwRg+rj9ykl6DKC72nnK1bg/lEh
-HPuolBp1p71U5oY3AgfDSwtuEL1CR6IU/+vI6fnWTgRMJqbyxNY=
-=fC0y
------END PGP SIGNATURE-----
-
---tjCHc7DPkfUGtrlw--
-
-
---===============8920057819728643935==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============8920057819728643935==--
-
