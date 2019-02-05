@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 61EFDC282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 10:26:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 26CD1C282CC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 10:26:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3138E2145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 10:26:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CF02C2083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 10:26:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Pdy3k6EG";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="RSbmwGTB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3138E2145D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bbpVm5ny";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="ekRvCqVm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF02C2083B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XbpuvRwFFHu2RwoAVsKA/qu8IjG5/pjEeQ93EdByIKA=; b=Pdy3k6EGyC3mS7
-	agYANh41KSJFEvne26uG5VqKvXwuKqbSsapRhPahsy8sJ8usbOMva+/r+nH/1Imhckxuf/z0maAvh
-	9mErx0m4HId4m0Yz4S7AWPWqKabJvJSAeMF3L8YIiQ1dUVBDvBHfxJ/78CBxVAVSdfvB5yjhFAizo
-	XcEWQYs4WaNgbGWEso9ihyVhIPSUSuVzGoxox5HFzFIUWkVdOruByaCjgumeXzhGyHoqb/ljI86Iq
-	RejbRyjJuW5QmdViYIMiZcxzNjpXW8RrGTdT+TURJg1JvjEo/hITH7y1dtreLVW9vyaDDyqA9JHNn
-	S/Dz6fcS8dAxHCeYBisQ==;
+	List-Owner; bh=7j6ZVcEq9AQ6ZV8Tb1FW9cGq5AvXNvyiYaB9P+YsT0Q=; b=bbpVm5nyJhXHHx
+	AjZVTHKXqUrFBGIBsur0Y1EJJL+fGbpRNd9jDWT69tWwzJ4iGuVlBGnH810tVut444Ltp9YWXWPcn
+	m5Sfr55LuKCZSXJIo6wue3VUfFP89VphIsi/3rfBxpB6YUds01CdzIR84LYQARnyJNwB4HcYEz9Hh
+	yDUq3KZIztu8u0RCkmQgqpOd0cBGr200C8P981u0KAZNVToC0sh/rLoL4/73Li+U98WjmD9qjvbpV
+	ROcliuD+vUDdWyarerV/eKidYLtC45NJEaOimS/fmpuIbpaaSNjBsPIqhafd3r/NlFKpsAZ3vJgsC
+	/P/HdNS0nzqtSeReQJdg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqxvc-0007Yp-IF; Tue, 05 Feb 2019 10:26:08 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gqxvr-0007ud-FI; Tue, 05 Feb 2019 10:26:23 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqxvN-0007Kf-H7
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 10:25:54 +0000
-Received: by mail-wm1-x342.google.com with SMTP id y185so12169675wmd.1
+ id 1gqxvO-0007Kr-Fm
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 10:25:55 +0000
+Received: by mail-wm1-x344.google.com with SMTP id a62so2969753wmh.4
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 05 Feb 2019 02:25:53 -0800 (PST)
+ Tue, 05 Feb 2019 02:25:54 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=3EpyubzHmpBYIwWB1kg4OB1nrghXCzVSBiVe35BMGlw=;
- b=RSbmwGTBNDzgAS9Lt5lvqih71f9/sSFeCPyK4eSrPS/tAUmSE0BmxWJCL8iRsztWa2
- N7Ey0QqNAJhyEeCLmi75nu9eEOqEjoEG5FevLevCJl1b2OVPUxoPEM2eyBrIrDbN1H0W
- 0Ru8fiaYlFq9ExKOYyTigL4V73NED9/XzLSrl/vUT6d9szov+BqWikXT6kP8sXQ5SCIX
- ZcXaTp3S3O745Pm/38VvFntkDoOAqG7WnAGlYE1EqszR0ArSnWRZcadksSZTJ7SMCpmz
- 7WyIHZiKwtdqx/e/Ndmjz8UcCWYJbQ8H/jwC2TmZMVMz9rDQU+ZgWTENIh2McrH0dvvK
- 6UMg==
+ bh=K28XEDucrkZ5vgvjZiASy101nZ1AxRRv73xLLYx8KTo=;
+ b=ekRvCqVm+xtU74RrKwAd41IXAQxFSUFWlIaLg+6J5y6MeIV8O0g8TlaAW2Eov0XQQm
+ y/HjVMN0gITr/hb4ExYPvvq1spFo7qSblVl89fVAdjiaXYZOHZ2biaQ2mCmHDlUCJMKO
+ ziNuBragCMqI+Ly6/ni8rdUm3AUkiSm2YaHwJGzSrzyaoI1yqR1mAalt0oQH36iIXWz1
+ 5t4awRrARZsiUJLbULx47sKoVI+hwQMwH0+C+BtKRaLfhP8auKY0BWqv9Y8UgKlcnSGT
+ hgAwAzx4ES6MbvLyHyYJuYlXIHWEuqfWdOvWUuzE+ZFVFUiYX/U58UGXWV5pjxwNZk1r
+ 5Bow==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=3EpyubzHmpBYIwWB1kg4OB1nrghXCzVSBiVe35BMGlw=;
- b=E0c6lJLaYcv4gqL2HQT8X+KujhWdpZwP0x/PSXdd5XAxroZLxjFkiQvLuZ+UuVzce3
- o33sk3sXsmv5mU+Z4dcrS2O8p0OwivIJzOr5xjKe4wU3nbvy8LJlMIcJ/Mk1Ub/pJwxB
- SdYshcu337IQLKbsuCGx5vUjHns88UjW7/4RFOqyjTFUI4qEbTEvXJZFPPGlXj6iGsV6
- s6S+Iq7wzBEKqR3FV6qGT+5qNje0plDRu8OFopnjKQVhJ7H6VokGfA21IGB8H+plzvAF
- e3iE0lp1r1C2r4KZTefJ27udX0eYXH3iTlCW5Oev1mREYR61EH6DbNVX9ZUyLh9K9Xml
- G74w==
-X-Gm-Message-State: AHQUAuY0oLTt+gDKht4Kw1RAhaREiWGy6jjyJfZyCJUgH7Mo5lw6gq0g
- lkgn7MoRTrJriiQHD7tC5thIEw==
-X-Google-Smtp-Source: AHgI3IavTgvkr8R3vGnWMQgauROLW65WfKaGxIbsFxWdWDcT0vKa4XoS0uCH6ylybl6tTZuKkciMew==
-X-Received: by 2002:a1c:a851:: with SMTP id r78mr3118795wme.120.1549362351739; 
- Tue, 05 Feb 2019 02:25:51 -0800 (PST)
+ bh=K28XEDucrkZ5vgvjZiASy101nZ1AxRRv73xLLYx8KTo=;
+ b=C61eoXHTgrIQ5goVKnD3SLYvwbVlyfjNXUiGZZosghkLXY0dNWlXmk95y+73NTRgR5
+ IGsj/fADgFCdmVA506QJGl0fXwupIq2InAsZrMu+d/4mN0zz9kZKWRq3+lW0iadpAigY
+ hcT27L+ZPLX47CR3Z6wXd9mwaiAJyyWMTFws0yUkKgEMw81O42A6U3fmpGoA1NlRxgA7
+ DrTlcgUbHV0IT9OUTrRtNCziqNiWcFnV1WJ2EXiSMQ6c+jb3Jf9r5+vA1T7GuhG7jJD/
+ GU72luU7BpuyCmWocPVkv+TDChFkHwNxtUY/XQdPweSJ9GsE3pw6wfHFraVLZ7qLeOBm
+ TkRw==
+X-Gm-Message-State: AHQUAuZNPoBYr67obPPLzDBQuK3q+O+Ux5jvYnqrWaJZ1wvML+Nts41d
+ NNnFYGZYDNbN2H95jEH717LpCw==
+X-Google-Smtp-Source: AHgI3Ib4vgR76sqHah7iOtB1dwjhpJLu9RRaSYtef1Gl8/yjMFKLzYEFWOGmumqju+OJB5OeNt9X9A==
+X-Received: by 2002:a7b:c5d1:: with SMTP id n17mr3113741wmk.152.1549362352910; 
+ Tue, 05 Feb 2019 02:25:52 -0800 (PST)
 Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id r11sm5132396wrx.75.2019.02.05.02.25.50
+ by smtp.gmail.com with ESMTPSA id r11sm5132396wrx.75.2019.02.05.02.25.51
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 05 Feb 2019 02:25:51 -0800 (PST)
+ Tue, 05 Feb 2019 02:25:52 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Alan Stern <stern@rowland.harvard.edu>,
  Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [PATCH 1/8] usb: ohci-da8xx: add a new line after local variables
-Date: Tue,  5 Feb 2019 11:25:39 +0100
-Message-Id: <20190205102546.29457-2-brgl@bgdev.pl>
+Subject: [PATCH 2/8] usb: ohci-da8xx: add a helper pointer to &pdev->dev
+Date: Tue,  5 Feb 2019 11:25:40 +0100
+Message-Id: <20190205102546.29457-3-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190205102546.29457-1-brgl@bgdev.pl>
 References: <20190205102546.29457-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_022553_563434_E0E60910 
-X-CRM114-Status: GOOD (  11.08  )
+X-CRM114-CacheID: sfid-20190205_022554_527701_6FB0F857 
+X-CRM114-Status: GOOD (  12.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,25 +108,76 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-This improves the coding style.
+This improves readability by removing all the &pdev->dev dereferencing.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/usb/host/ohci-da8xx.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/usb/host/ohci-da8xx.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
-index a55cbba40a5a..c492c7e6f746 100644
+index c492c7e6f746..e8ede0b5e3f0 100644
 --- a/drivers/usb/host/ohci-da8xx.c
 +++ b/drivers/usb/host/ohci-da8xx.c
-@@ -405,6 +405,7 @@ static int ohci_da8xx_probe(struct platform_device *pdev)
+@@ -402,35 +402,35 @@ MODULE_DEVICE_TABLE(of, da8xx_ohci_ids);
+ static int ohci_da8xx_probe(struct platform_device *pdev)
+ {
+ 	struct da8xx_ohci_hcd *da8xx_ohci;
++	struct device *dev = &pdev->dev;
  	struct usb_hcd	*hcd;
  	struct resource *mem;
  	int error, irq;
-+
- 	hcd = usb_create_hcd(&ohci_da8xx_hc_driver, &pdev->dev,
- 				dev_name(&pdev->dev));
+ 
+-	hcd = usb_create_hcd(&ohci_da8xx_hc_driver, &pdev->dev,
+-				dev_name(&pdev->dev));
++	hcd = usb_create_hcd(&ohci_da8xx_hc_driver, dev, dev_name(dev));
  	if (!hcd)
+ 		return -ENOMEM;
+ 
+ 	da8xx_ohci = to_da8xx_ohci(hcd);
+ 	da8xx_ohci->hcd = hcd;
+ 
+-	da8xx_ohci->usb11_clk = devm_clk_get(&pdev->dev, NULL);
++	da8xx_ohci->usb11_clk = devm_clk_get(dev, NULL);
+ 	if (IS_ERR(da8xx_ohci->usb11_clk)) {
+ 		error = PTR_ERR(da8xx_ohci->usb11_clk);
+ 		if (error != -EPROBE_DEFER)
+-			dev_err(&pdev->dev, "Failed to get clock.\n");
++			dev_err(dev, "Failed to get clock.\n");
+ 		goto err;
+ 	}
+ 
+-	da8xx_ohci->usb11_phy = devm_phy_get(&pdev->dev, "usb-phy");
++	da8xx_ohci->usb11_phy = devm_phy_get(dev, "usb-phy");
+ 	if (IS_ERR(da8xx_ohci->usb11_phy)) {
+ 		error = PTR_ERR(da8xx_ohci->usb11_phy);
+ 		if (error != -EPROBE_DEFER)
+-			dev_err(&pdev->dev, "Failed to get phy.\n");
++			dev_err(dev, "Failed to get phy.\n");
+ 		goto err;
+ 	}
+ 
+-	da8xx_ohci->vbus_reg = devm_regulator_get_optional(&pdev->dev, "vbus");
++	da8xx_ohci->vbus_reg = devm_regulator_get_optional(dev, "vbus");
+ 	if (IS_ERR(da8xx_ohci->vbus_reg)) {
+ 		error = PTR_ERR(da8xx_ohci->vbus_reg);
+ 		if (error == -ENODEV) {
+@@ -438,13 +438,13 @@ static int ohci_da8xx_probe(struct platform_device *pdev)
+ 		} else if (error == -EPROBE_DEFER) {
+ 			goto err;
+ 		} else {
+-			dev_err(&pdev->dev, "Failed to get regulator\n");
++			dev_err(dev, "Failed to get regulator\n");
+ 			goto err;
+ 		}
+ 	}
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	hcd->regs = devm_ioremap_resource(&pdev->dev, mem);
++	hcd->regs = devm_ioremap_resource(dev, mem);
+ 	if (IS_ERR(hcd->regs)) {
+ 		error = PTR_ERR(hcd->regs);
+ 		goto err;
 -- 
 2.20.1
 
