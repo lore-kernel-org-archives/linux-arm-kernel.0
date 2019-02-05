@@ -2,21 +2,23 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D1F48C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 18:38:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D756AC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 19:01:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A2B1D204EC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 18:38:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B09842175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 19:01:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZiEFBOoX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A2B1D204EC
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LOq0p4DO";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="hSHrv0jl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B09842175B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,63 +26,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jN367jQGh/Keqrf2+quVCzuC1MLfdxykqvnK/IM38Zw=; b=ZiEFBOoXY0gu6I
-	bmmW+lymSzST5h94vKmTRLlw6gS/4PYFPTlyq28wrwQv33FHTXm1miLY9QIBXMvFyGXT0ji8lknvo
-	WFQO2mWpd9pFSBqY7TDHuTRHbDljqUspwk10ExiD6w1bp2s5i+N4+SPXJmu0o0ikDm+KYX7LdVd7w
-	JUUtF2kbCpmc+3E1A7fNxGAoqiaXmV5g3Fb3kqjc+Eyy3RENtOw65Ta0Gh1rR5ed9O2FXd8sYeZGI
-	lkfNNXfjyojBIL/Rau3TTnlZzliivA9VFel5NxAPv0FA+Eq5f8+SauuJBH2spwZxchvAGYX1GDaMW
-	CFodOMD1xQA0LjsPs0jg==;
+	List-Owner; bh=hGxrFLnQrGYot+SZNIF23aCtqz0FB3Z2ORwZoSkuh3A=; b=LOq0p4DOs88by7
+	fGXsEA/tFZ7v6xqNruwBX1QgeU6Sn0TDxNKbEIMl5EcfEdofCwulk/QUP2BhpShsuEvbTU9R/dmii
+	R6HG9Bay+U2W3RDtpcZJdtILAmGyeWifXWLkjk2RTR2BNu88qBBwn/PxcsRKTCj5isTUdhTnBPD3l
+	q0iJlUNVj6Ww24QqB/TwIgy4UT3DcSNf+4/91jljN11KbSdr5eTdyh/ct54tgDSAcEZCHru15rxZR
+	0LfgqmGg8Qd2Psj+38FEaAcxwY7D16BuZNuV0BDtFtIGRIxH/XelHgcNn7+eFdk7hN6PCZ5HW7vTR
+	kS1GAbY2UQ4wMm22rL0A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr5cV-0006jr-L1; Tue, 05 Feb 2019 18:38:55 +0000
-Received: from mail-ot1-f67.google.com ([209.85.210.67])
+	id 1gr5xu-0006R5-DG; Tue, 05 Feb 2019 19:01:02 +0000
+Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr5cR-0006hx-Ti
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 18:38:53 +0000
-Received: by mail-ot1-f67.google.com with SMTP id n8so7474401otl.6
+ id 1gr5xp-0006Po-Nb
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 19:00:59 +0000
+Received: by mail-lj1-x241.google.com with SMTP id v14-v6so1057546ljv.1
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 05 Feb 2019 10:38:51 -0800 (PST)
+ Tue, 05 Feb 2019 11:00:56 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=9Ii1zkpJMnUP4gV1GDZFzp7asIhaprUu1dNgN/0w9hY=;
+ b=hSHrv0jlbQxfkkR+ZTsf1C/QyvKqgbBkz8drQzZnTF4AfCoIAOdm+GoZEdFd7SbypM
+ UG+fk99FditjoHSwikN2qKergCEb9HWHc3mPT9FnG/XOz9/Q2bNj/EF50x3bfhZVireC
+ x5r/K/1MCZF4QEoACZ3qffJDyQRy9EWJy3u4SfUK1L+c4KXy/XnmaFKyxEOsH/xnks+k
+ d46vCCE+JX57og7oEX7wxOUycSJ6L4p6yX0TzlnBRiLq0PVRqF+rRE0S+EMOm+/WmZRs
+ xlM9PSUcBuX/4EnEn6nm6GEGaqJSmO/N7cR6jQbmuEfB0JYj68InlsY4e11q8r2ejCLK
+ I+TQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=I8DZRoiHjOcr9h/WP2dul90nc9EKRai7plYma+vlHc4=;
- b=tZd2kNLqr5DPWyEQ6sUj0pqpfMgE7owIh5Nr77wUhPnNl93fWA9SeTZ9N0SfNwjV9v
- 9TJ9cPTgE9AV6kJzExO+/0/1BeARxbgiPOi0VSJ9jx0LtKrJGE6XC6JW8xfKYAGIO7ZR
- v5K4xUTyhlFmIN2SKJ6rIIIcxoO8vjWehhvUTVclOjOvYXPECB9e1yul44yOOdfCzCH+
- fNmmbMvrZUr1I3bEatJTUoIe8TDZsRMEjGLOQUlY3OORo9n7hAG1EXEq2BzBpRUb4o2h
- bn/SO9v33d+QBAZVuluR1ZW8RHiRooUHyemVVQyVC1k5k7th86RiX1urI5hY/RnUJTnW
- ElQA==
-X-Gm-Message-State: AHQUAuYO3o2TDarrxt9aiYXj9VqzEhl3Y3T+iGXWavPP4s3xVe65Z6Ci
- 2PSCw0GJ0jdD4K6ONKX0VcVeHwXvi1w=
-X-Google-Smtp-Source: AHgI3IYfMozGzGOkPrQjsMxKU02KLewxI8MPcv99h0bqZFvkbMKswzk4geXswu0+t+unPj5yDJqrtA==
-X-Received: by 2002:a9d:6552:: with SMTP id q18mr3479308otl.128.1549391930794; 
- Tue, 05 Feb 2019 10:38:50 -0800 (PST)
-Received: from mail-ot1-f46.google.com (mail-ot1-f46.google.com.
- [209.85.210.46])
- by smtp.gmail.com with ESMTPSA id d3sm8601464otb.79.2019.02.05.10.38.50
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 05 Feb 2019 10:38:50 -0800 (PST)
-Received: by mail-ot1-f46.google.com with SMTP id e12so7486187otl.5
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 05 Feb 2019 10:38:50 -0800 (PST)
-X-Received: by 2002:a9d:1405:: with SMTP id h5mr3192991oth.331.1549391929938; 
- Tue, 05 Feb 2019 10:38:49 -0800 (PST)
+ bh=9Ii1zkpJMnUP4gV1GDZFzp7asIhaprUu1dNgN/0w9hY=;
+ b=oC/U0MS50x20R/K099kMuU835ZTqrLBMpngTBnTIBNVh03YXH/NPfDr8b7kPV/m1Vq
+ pv3xRX/+TACSGLWeQGym5ofU/Hdm5MZG0KSGTHQWFS8AzBUo4W0iv+WDoPSdY0dTFk3+
+ Any7u1sKfbjmfehaLZ+e1M/hkb2aWkgZ2LuAgYA4KabrUYinq/8JlU8vXOR6X2cZC7mU
+ utXtMP6kSpbUmlSmCbOK3891HUJNCmwReXeXF0wrE39Bz2Js4OIj3M8EDxl//lNQwd21
+ 8vDjucNqKFC0O2jP6XVt/wEOQiRijEvz1o4K8hNpqGyU0vcAplFpvqB/0IiBAOWYgosH
+ BBbQ==
+X-Gm-Message-State: AHQUAua5TWe1D/9TE/49SgD+lg952q9CxJg30V+xs+ERXf95Afg+v1FK
+ TCmET8e5asTeNOtCaYNYU3Ibo7wKHL6eNNVgOvwDew==
+X-Google-Smtp-Source: AHgI3Ib+ob7GlrP05cPcePXjRO1T3vArIJCAAT72qlUnxxqX8WgwX6UmHhNISqA0qOSCs44u6iSUSN3VzHK4WoKuKR0=
+X-Received: by 2002:a2e:8087:: with SMTP id
+ i7-v6mr3802701ljg.179.1549393255057; 
+ Tue, 05 Feb 2019 11:00:55 -0800 (PST)
 MIME-Version: 1.0
-References: <20190204141641.18272-1-pankaj.bansal@nxp.com>
- <20190204.085056.439064547458115258.davem@davemloft.net>
- <VI1PR0401MB2496085A7A23DF5CE86A4657F16E0@VI1PR0401MB2496.eurprd04.prod.outlook.com>
-In-Reply-To: <VI1PR0401MB2496085A7A23DF5CE86A4657F16E0@VI1PR0401MB2496.eurprd04.prod.outlook.com>
-From: Li Yang <leoyang.li@nxp.com>
-Date: Tue, 5 Feb 2019 12:38:38 -0600
-X-Gmail-Original-Message-ID: <CADRPPNR3-skaahtUJ=8vUPYSHj69QXf22Na7OtxFePCh8uoX9Q@mail.gmail.com>
-Message-ID: <CADRPPNR3-skaahtUJ=8vUPYSHj69QXf22Na7OtxFePCh8uoX9Q@mail.gmail.com>
-Subject: Re: [PATCH v2] arm64: dts: lx2160aqds: Add mdio mux nodes
-To: Pankaj Bansal <pankaj.bansal@nxp.com>
+References: <20181029094245.7886-1-manivannan.sadhasivam@linaro.org>
+ <20181029094245.7886-8-manivannan.sadhasivam@linaro.org>
+ <20181221023554.GB3233@Mani-XPS-13-9360>
+In-Reply-To: <20181221023554.GB3233@Mani-XPS-13-9360>
+From: Nicolas Dechesne <nicolas.dechesne@linaro.org>
+Date: Tue, 5 Feb 2019 20:00:43 +0100
+Message-ID: <CAP71WjzWiCg-NXDnh58N-5O7kvNj+DDndSK04DeoPxFE2L8W0g@mail.gmail.com>
+Subject: Re: [PATCH v3 7/7] arm64: dts: qcom: apq8016-sbc: Standardize LED
+ labels
+To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_103851_960121_0E5B09FF 
-X-CRM114-Status: GOOD (  18.10  )
+X-CRM114-CacheID: sfid-20190205_110057_805469_A3BD0183 
+X-CRM114-Status: GOOD (  14.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,58 +93,113 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "andrew@lunn.ch" <andrew@lunn.ch>,
- "f.fainelli@gmail.com" <f.fainelli@gmail.com>,
- "netdev@vger.kernel.org" <netdev@vger.kernel.org>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- David Miller <davem@davemloft.net>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, Daniel Thompson <daniel.thompson@linaro.org>,
+ linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ Linus Walleij <linus.walleij@linaro.org>, lkml <linux-kernel@vger.kernel.org>,
+ Amit Kucheria <amit.kucheria@linaro.org>, linux-rockchip@lists.infradead.org,
+ Koen Kooi <koen.kooi@linaro.org>, linux-leds@vger.kernel.org,
+ Andy Gross <andy.gross@linaro.org>, linux-soc@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 5, 2019 at 6:26 AM Pankaj Bansal <pankaj.bansal@nxp.com> wrote:
->
-> Hi Shawn/Leo,
->
-> If you have no more comments, can you please merge this path in your branch?
-> in same branch in which you have accepted LX2160AQDS board patches.
+Hey Mani,
 
-It can be merged through the ARM SoC tree.  But there are still
-comments remain to be addressed.
+thanks for sending this out, it should have been just like that in the
+first place ;)
+
+On Fri, Dec 21, 2018 at 3:36 AM Manivannan Sadhasivam
+<manivannan.sadhasivam@linaro.org> wrote:
+>
+> On Mon, Oct 29, 2018 at 03:12:45PM +0530, Manivannan Sadhasivam wrote:
+> > For all 96Boards, the following standard is used for onboard LEDs.
+> >
+> > green:user1  default-trigger: heartbeat
+> > green:user2  default-trigger: mmc0/disk-activity(onboard-storage)
+> > green:user3  default-trigger: mmc1 (SD-card)
+> > green:user4  default-trigger: none, panic-indicator
+> > yellow:wlan  default-trigger: phy0tx
+> > blue:bt      default-trigger: hci0-power
+> >
+> > So lets adopt the same for APQ8016 SBC (Dragonboard410c), which is
+> > one of the 96Boards CE platform.
+> >
+>
+> Hello,
+>
+> Any update on this patch?
+
+Reviewed-by: Nicolas Dechesne <nicolas.dechesne@linaro.org>
 
 >
 > Regards,
-> Pankaj Bansal
+> Mani
 >
-> > -----Original Message-----
-> > From: David Miller [mailto:davem@davemloft.net]
-> > Sent: Monday, 4 February, 2019 10:21 PM
-> > To: Pankaj Bansal <pankaj.bansal@nxp.com>
-> > Cc: shawnguo@kernel.org; Leo Li <leoyang.li@nxp.com>; andrew@lunn.ch;
-> > f.fainelli@gmail.com; netdev@vger.kernel.org; linux-arm-
-> > kernel@lists.infradead.org
-> > Subject: Re: [PATCH v2] arm64: dts: lx2160aqds: Add mdio mux nodes
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > Acked-by: Amit Kucheria <amit.kucheria@linaro.org>
+> > ---
+> >  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 12 ++++++------
+> >  1 file changed, 6 insertions(+), 6 deletions(-)
 > >
-> > From: Pankaj Bansal <pankaj.bansal@nxp.com>
-> > Date: Mon, 4 Feb 2019 08:51:57 +0000
+> > diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> > index 46feedf7c989..35f95154316b 100644
+> > --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> > +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
+> > @@ -300,28 +300,28 @@
+> >                       compatible = "gpio-leds";
 > >
-> > > The two external MDIO buses used to communicate with phy devices that
-> > > are external to SOC are muxed in LX2160AQDS board.
-> > >
-> > > These buses can be routed to any one of the eight IO slots on
-> > > LX2160AQDS board depending on value in fpga register 0x54.
-> > >
-> > > Additionally the external MDIO1 is used to communicate to the onboard
-> > > RGMII phy devices.
-> > >
-> > > The mdio1 is controlled by bits 4-7 of fpga register and mdio2 is
-> > > controlled by bits 0-3 of fpga register.
-> > >
-> > > Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
+> >                       led@1 {
+> > -                             label = "apq8016-sbc:green:user1";
+> > +                             label = "green:user1";
+> >                               gpios = <&msmgpio 21 GPIO_ACTIVE_HIGH>;
+> >                               linux,default-trigger = "heartbeat";
+> >                               default-state = "off";
+> >                       };
 > >
-> > Am I applying this to my networking tree or are the ARM folks taking this?
+> >                       led@2 {
+> > -                             label = "apq8016-sbc:green:user2";
+> > +                             label = "green:user2";
+> >                               gpios = <&msmgpio 120 GPIO_ACTIVE_HIGH>;
+> >                               linux,default-trigger = "mmc0";
+> >                               default-state = "off";
+> >                       };
+> >
+> >                       led@3 {
+> > -                             label = "apq8016-sbc:green:user3";
+> > +                             label = "green:user3";
+> >                               gpios = <&pm8916_gpios 1 GPIO_ACTIVE_HIGH>;
+> >                               linux,default-trigger = "mmc1";
+> >                               default-state = "off";
+> >                       };
+> >
+> >                       led@4 {
+> > -                             label = "apq8016-sbc:green:user4";
+> > +                             label = "green:user4";
+> >                               gpios = <&pm8916_gpios 2 GPIO_ACTIVE_HIGH>;
+> >                               linux,default-trigger = "none";
+> >                               panic-indicator;
+> > @@ -329,14 +329,14 @@
+> >                       };
+> >
+> >                       led@5 {
+> > -                             label = "apq8016-sbc:yellow:wlan";
+> > +                             label = "yellow:wlan";
+> >                               gpios = <&pm8916_mpps 2 GPIO_ACTIVE_HIGH>;
+> >                               linux,default-trigger = "phy0tx";
+> >                               default-state = "off";
+> >                       };
+> >
+> >                       led@6 {
+> > -                             label = "apq8016-sbc:blue:bt";
+> > +                             label = "blue:bt";
+> >                               gpios = <&pm8916_mpps 3 GPIO_ACTIVE_HIGH>;
+> >                               linux,default-trigger = "bluetooth-power";
+> >                               default-state = "off";
+> > --
+> > 2.17.1
+> >
 
 _______________________________________________
 linux-arm-kernel mailing list
