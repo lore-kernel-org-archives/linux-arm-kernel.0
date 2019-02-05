@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 61C1DC282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 05:36:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1E8B6C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 05:45:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2D9F320821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 05:36:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CEC222081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 05:45:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iRzPz7as";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mobiveil.co.in header.i=@mobiveil.co.in header.b="NXhmC3Es"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D9F320821
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bjcS2Z/W";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mobiveil.co.in header.i=@mobiveil.co.in header.b="WiLCfNpM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CEC222081B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mobiveil.co.in
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,57 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OkJKkhXlPTQI2mTASfN07Cc4jZidSSrVfL7a2WoL1Qs=; b=iRzPz7asICCXWJ
-	MHihzd9sDL5NIE/HQTymfl19zf9tmNwwQbg67wc0vxre8ihId6TrUypDYNG551D5j/he9ibc6PXyf
-	uj5TEjxYTLKKT3FvXrv6dPtb9wuzFuF6PmR39FTAa+TA/PYOk2TxZ1+coj0Y5iLSM7/lYngKDyjjk
-	kxcvFiVKhvmyquj7rX0oW+Q4LDWPbC6fe1NJPULpgZBmnJFTQ/3UNpbIiUxYQnCczYCK5qf2A/Kyk
-	x/7nqgUTKY8Y0rP1SW8MutreT77iVu9yTv5XgzOVq35IFitmPx2+qK7+S9ZYWpguKHNuODIBr/DNu
-	dXiFXc2m8iOOjv96G2+g==;
+	List-Owner; bh=/NGEsuV6v3L49SdjaeHlKwNXMtqaqM6TloObB1oQLoM=; b=bjcS2Z/WzS6xvC
+	yNospDHS2pJsDATYSRNG5U2gQy5if5WaMu6CSBndvWYZZmFQYhJ9AB4q7KgvHGQk8qAiybiYp5CJq
+	H4g9oEiNqL4Iv1RNnktcfKTkf1ESjdEiewi9VtZW1k9xVF6LjluoQJUgLWkHAGNqV82Hh8kvX0FlH
+	SbYB3kyDv9WfaRWSxJD+JpPAkPKjp9NPsdvKmOKjpaUGPNoXsoP59VjHrYjX2msUkTeqMn0ffI5id
+	voAcjU55IMCMW8B3ddFPkdkW/sdOwLHqpZ12vpenNITH8xa7rKylDTsXO5USRdN82QCox4No0U07a
+	R+/7dU2ATDnHHkp7fMxQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqtPg-0005uX-CR; Tue, 05 Feb 2019 05:36:52 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gqtYC-0000mT-Lh; Tue, 05 Feb 2019 05:45:40 +0000
+Received: from mail-wm1-x334.google.com ([2a00:1450:4864:20::334])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqtPc-0005uE-Ph
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 05:36:50 +0000
-Received: by mail-wr1-x441.google.com with SMTP id z15so189681wrn.1
+ id 1gqtY8-0000m9-84
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 05:45:38 +0000
+Received: by mail-wm1-x334.google.com with SMTP id p6so2266305wmc.1
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 04 Feb 2019 21:36:46 -0800 (PST)
+ Mon, 04 Feb 2019 21:45:35 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=mobiveil.co.in; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=7HSMuYKY3HO0FTlrONFulrp9mKtDf2RQdf5tGI4dsfA=;
- b=NXhmC3Es/Ns3XYhEytV8lbB1OFUfVVx2dbMKXi24djPZTpbAsd7RtbFv7IT3Cc4BdJ
- X/cNSAPU8o6ioV3BFGLJRyzRpnX5QqrmHMSamyWlq0+z3HzxneyX6B6lWk4U+p2SUsGI
- 2Z42D/Rd5x93knovDa8KI/Kp65q/6nNpCtznc=
+ :cc; bh=3l0X3pe6yezB3pJ3enRZXXcm21vvQJcXaZALR1ftuJ8=;
+ b=WiLCfNpMyfmd+rc7TwLISYKagm4kI6lH9sEWfk4b8Ht6vTD6duyxx8iPU1/hpNYSEV
+ UrluYlCQyT6woBX+t03q/iZ7eej4p/qJMMcbW20su3PUiijeBiC0jrNTJKW9pwmjiXg6
+ kSMybNTWTTJDU4XG0U611G02P5u0lAFFxvaBU=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=7HSMuYKY3HO0FTlrONFulrp9mKtDf2RQdf5tGI4dsfA=;
- b=iAKsnYE9KUcwyHXDb6a/ACuiNhzCIdDi0aS9K/x2KzApn2XiYeh/x9oDu7bnf4SrMF
- DGHsHkEcOZOyDGtPz/JTubK9cHhyGTJ48elN7e7v2sOi5ClEed7OfWEwLivWjAUK1neq
- i/ZYJbm5+/TXB8y53ISmEelxP/ifnbymWtklAUOoDmEAVaV7URKyXtjjjWo2IutUd8dG
- nkS6E8NaUNxd8uW6IXM/nNraahAEzi4Qni9yKqikE3gfmpJzc0sNfNjmEPSmvwHZUtjO
- 2b1kKwQqbnK5wal9uvE7rHCWBA3jqD9C6g5X96QV1jSev4THlEyraUUJx8txb3zru5zq
- v89Q==
-X-Gm-Message-State: AHQUAubZ1Zh4P1L+c+WKvuZQKQMeavUJvg7O+ZQ/9jNuYm5AQWroizGy
- QYC7hTwFORM7fliTNHwhQ9JSR60wLLZgMEq5/LaeXg==
-X-Google-Smtp-Source: AHgI3IalbvQcWbUCehJrsCBTuh7nt9NYiTBIO2IMdXNAeygrG1KNP07TA4GPkQkXnastF513jpqzARfzLAtovn6/vb0=
-X-Received: by 2002:adf:b201:: with SMTP id u1mr1978755wra.165.1549345005132; 
- Mon, 04 Feb 2019 21:36:45 -0800 (PST)
+ bh=3l0X3pe6yezB3pJ3enRZXXcm21vvQJcXaZALR1ftuJ8=;
+ b=F54XAjJMLTZbPGJuS7eTJa43fZ0j4KA5DPVBhwRf4KJeHHfQVkDaLvEvFEgGNKRwI9
+ yMdE2WYMquB6OIahwo/GyohODPuTE0Z+zSgyO45bh4ap7Fx5s2oVET935j6uqalBkFzX
+ K+/AhlPf3nEob6DWk5MJ40HcQb8IxPq6E2iEVr13dTv7ILnk3SQ5BY067X3OFNSTV2o1
+ kqKEnSiZfvpeuqL4w9fKYfa4T+xBg1Bt2BgKA1GvJezpbbyw+2hqzIl1eraI6J6gYwgH
+ er+T8pHxeJ9UJGKqIkKDYpqTdzMusGL8xCL6ch0T9Kph4l5W1LCyghxfRHrTtIa/TT6n
+ PfCQ==
+X-Gm-Message-State: AHQUAuZAsqW24m0c8Bs1FnIvW55ujz9t+9DvEQ8MapBiTCaK+u1dqgML
+ QS2nbflyU0HHI97ZwuK+g/C8VDLR359fxxWD9hhCVQ==
+X-Google-Smtp-Source: AHgI3IZidrKuvqUQKHCu8iX1Pv9ZkeZH9NCgbObX0LDBN5XC60nBTXXEqGsLOibBkg2P69vcsZ0cpSP73ZIP1oEXsiI=
+X-Received: by 2002:a1c:2e43:: with SMTP id u64mr2143461wmu.52.1549345534112; 
+ Mon, 04 Feb 2019 21:45:34 -0800 (PST)
 MIME-Version: 1.0
 References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
- <20190129080926.36773-2-Zhiqiang.Hou@nxp.com>
-In-Reply-To: <20190129080926.36773-2-Zhiqiang.Hou@nxp.com>
+ <20190129080926.36773-3-Zhiqiang.Hou@nxp.com>
+In-Reply-To: <20190129080926.36773-3-Zhiqiang.Hou@nxp.com>
 From: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-Date: Tue, 5 Feb 2019 11:09:19 +0530
-Message-ID: <CAFZiPx0wA5=juO0PnuMKY_mJSPD12W09Vy+buW_EyQAKzZkjKw@mail.gmail.com>
-Subject: Re: [PATCHv3 01/27] PCI: mobiveil: uniform the register accessors
+Date: Tue, 5 Feb 2019 11:18:07 +0530
+Message-ID: <CAFZiPx0Uebtst2oVy31LJmsBAf8Y-AW6zM9_etvh3gp4QES8kw@mail.gmail.com>
+Subject: Re: [PATCHv3 02/27] PCI: mobiveil: format the code without function
+ change
 To: "Z.q. Hou" <zhiqiang.hou@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_213648_902220_EE49C2CB 
-X-CRM114-Status: GOOD (  23.49  )
+X-CRM114-CacheID: sfid-20190204_214536_304962_2FB32C93 
+X-CRM114-Status: GOOD (  23.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,21 +107,13 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Reviewed-by: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-
-
+Zhiqiang,
 
 On Tue, Jan 29, 2019 at 1:38 PM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
 >
 > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 >
-> It's confused that R/W some registers by csr_readl()/csr_writel(),
-> while others by read_paged_register()/write_paged_register().
-> Actually the low 3KB of 4KB PCIe configure space can be accessed
-> directly and high 1KB is paging area. So this patch uniformed the
-> register accessors to csr_readl() and csr_writel() by comparing
-> the register offset with page access boundary 3KB in the accessor
-> internal.
+> Just format the code without functionality change.
 >
 > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > Reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
@@ -128,246 +121,597 @@ On Tue, Jan 29, 2019 at 1:38 PM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
 > V3:
 >  - No change
 >
->  drivers/pci/controller/pcie-mobiveil.c | 179 +++++++++++++++++--------
->  1 file changed, 124 insertions(+), 55 deletions(-)
+>  drivers/pci/controller/pcie-mobiveil.c | 261 +++++++++++++------------
+>  1 file changed, 137 insertions(+), 124 deletions(-)
 >
 > diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-> index 77052a0712d0..d55c7e780c6e 100644
+> index d55c7e780c6e..b87471f08a40 100644
 > --- a/drivers/pci/controller/pcie-mobiveil.c
 > +++ b/drivers/pci/controller/pcie-mobiveil.c
-> @@ -47,7 +47,6 @@
->  #define  PAGE_SEL_SHIFT        13
->  #define  PAGE_SEL_MASK         0x3f
->  #define  PAGE_LO_MASK          0x3ff
-> -#define  PAGE_SEL_EN           0xc00
->  #define  PAGE_SEL_OFFSET_SHIFT 10
+> @@ -31,38 +31,40 @@
+>   * translation tables are grouped into windows, each window registers are
+>   * grouped into blocks of 4 or 16 registers each
+>   */
+> -#define PAB_REG_BLOCK_SIZE     16
+> -#define PAB_EXT_REG_BLOCK_SIZE 4
+> +#define PAB_REG_BLOCK_SIZE             16
+> +#define PAB_EXT_REG_BLOCK_SIZE         4
 >
->  #define PAB_AXI_PIO_CTRL       0x0840
-> @@ -117,6 +116,12 @@
->  #define LINK_WAIT_MIN  90000
->  #define LINK_WAIT_MAX  100000
+> -#define PAB_REG_ADDR(offset, win) (offset + (win * PAB_REG_BLOCK_SIZE))
+> -#define PAB_EXT_REG_ADDR(offset, win) (offset + (win * PAB_EXT_REG_BLOCK_SIZE))
+> +#define PAB_REG_ADDR(offset, win)      \
+> +       (offset + (win * PAB_REG_BLOCK_SIZE))
+> +#define PAB_EXT_REG_ADDR(offset, win)  \
+> +       (offset + (win * PAB_EXT_REG_BLOCK_SIZE))
 >
-> +#define PAGED_ADDR_BNDRY                       0xc00
-> +#define OFFSET_TO_PAGE_ADDR(off)               \
-> +       ((off & PAGE_LO_MASK) | PAGED_ADDR_BNDRY)
-> +#define OFFSET_TO_PAGE_IDX(off)                        \
-> +       ((off >> PAGE_SEL_OFFSET_SHIFT) & PAGE_SEL_MASK)
-> +
+> -#define LTSSM_STATUS           0x0404
+> -#define  LTSSM_STATUS_L0_MASK  0x3f
+> -#define  LTSSM_STATUS_L0       0x2d
+> +#define LTSSM_STATUS                   0x0404
+> +#define  LTSSM_STATUS_L0_MASK          0x3f
+> +#define  LTSSM_STATUS_L0               0x2d
+>
+> -#define PAB_CTRL               0x0808
+> -#define  AMBA_PIO_ENABLE_SHIFT 0
+> -#define  PEX_PIO_ENABLE_SHIFT  1
+> -#define  PAGE_SEL_SHIFT        13
+> -#define  PAGE_SEL_MASK         0x3f
+> -#define  PAGE_LO_MASK          0x3ff
+> -#define  PAGE_SEL_OFFSET_SHIFT 10
+> +#define PAB_CTRL                       0x0808
+> +#define  AMBA_PIO_ENABLE_SHIFT         0
+> +#define  PEX_PIO_ENABLE_SHIFT          1
+> +#define  PAGE_SEL_SHIFT                        13
+above line seems to have an extra tab which makes it not aligned with
+lines above.
+
+> +#define  PAGE_SEL_MASK                 0x3f
+> +#define  PAGE_LO_MASK                  0x3ff
+> +#define  PAGE_SEL_OFFSET_SHIFT         10
+>
+> -#define PAB_AXI_PIO_CTRL       0x0840
+> -#define  APIO_EN_MASK          0xf
+> +#define PAB_AXI_PIO_CTRL               0x0840
+> +#define  APIO_EN_MASK                  0xf
+>
+> -#define PAB_PEX_PIO_CTRL       0x08c0
+> -#define  PIO_ENABLE_SHIFT      0
+> +#define PAB_PEX_PIO_CTRL               0x08c0
+> +#define  PIO_ENABLE_SHIFT              0
+>
+>  #define PAB_INTP_AMBA_MISC_ENB         0x0b0c
+> -#define PAB_INTP_AMBA_MISC_STAT        0x0b1c
+> +#define PAB_INTP_AMBA_MISC_STAT                0x0b1c
+>  #define  PAB_INTP_INTX_MASK            0x01e0
+>  #define  PAB_INTP_MSI_MASK             0x8
+>
+> -#define PAB_AXI_AMAP_CTRL(win) PAB_REG_ADDR(0x0ba0, win)
+> -#define  WIN_ENABLE_SHIFT      0
+> -#define  WIN_TYPE_SHIFT        1
+> +#define PAB_AXI_AMAP_CTRL(win)         PAB_REG_ADDR(0x0ba0, win)
+> +#define  WIN_ENABLE_SHIFT              0
+> +#define  WIN_TYPE_SHIFT                        1
+please check the extra tab above
+>
+>  #define PAB_EXT_AXI_AMAP_SIZE(win)     PAB_EXT_REG_ADDR(0xbaf0, win)
+>
+> @@ -70,16 +72,16 @@
+>  #define  AXI_WINDOW_ALIGN_MASK         3
+>
+>  #define PAB_AXI_AMAP_PEX_WIN_L(win)    PAB_REG_ADDR(0x0ba8, win)
+> -#define  PAB_BUS_SHIFT         24
+> -#define  PAB_DEVICE_SHIFT      19
+> -#define  PAB_FUNCTION_SHIFT    16
+> +#define  PAB_BUS_SHIFT                 24
+> +#define  PAB_DEVICE_SHIFT              19
+> +#define  PAB_FUNCTION_SHIFT            16
+>
+>  #define PAB_AXI_AMAP_PEX_WIN_H(win)    PAB_REG_ADDR(0x0bac, win)
+>  #define PAB_INTP_AXI_PIO_CLASS         0x474
+>
+> -#define PAB_PEX_AMAP_CTRL(win) PAB_REG_ADDR(0x4ba0, win)
+> -#define  AMAP_CTRL_EN_SHIFT    0
+> -#define  AMAP_CTRL_TYPE_SHIFT  1
+> +#define PAB_PEX_AMAP_CTRL(win)         PAB_REG_ADDR(0x4ba0, win)
+> +#define  AMAP_CTRL_EN_SHIFT            0
+> +#define  AMAP_CTRL_TYPE_SHIFT          1
+>
+>  #define PAB_EXT_PEX_AMAP_SIZEN(win)    PAB_EXT_REG_ADDR(0xbef0, win)
+>  #define PAB_PEX_AMAP_AXI_WIN(win)      PAB_REG_ADDR(0x4ba4, win)
+> @@ -87,39 +89,39 @@
+>  #define PAB_PEX_AMAP_PEX_WIN_H(win)    PAB_REG_ADDR(0x4bac, win)
+>
+>  /* starting offset of INTX bits in status register */
+> -#define PAB_INTX_START 5
+> +#define PAB_INTX_START                 5
+>
+>  /* supported number of MSI interrupts */
+> -#define PCI_NUM_MSI    16
+> +#define PCI_NUM_MSI                    16
+>
+>  /* MSI registers */
+> -#define MSI_BASE_LO_OFFSET     0x04
+> -#define MSI_BASE_HI_OFFSET     0x08
+> -#define MSI_SIZE_OFFSET        0x0c
+> -#define MSI_ENABLE_OFFSET      0x14
+> -#define MSI_STATUS_OFFSET      0x18
+> -#define MSI_DATA_OFFSET        0x20
+> -#define MSI_ADDR_L_OFFSET      0x24
+> -#define MSI_ADDR_H_OFFSET      0x28
+> +#define MSI_BASE_LO_OFFSET             0x04
+> +#define MSI_BASE_HI_OFFSET             0x08
+> +#define MSI_SIZE_OFFSET                        0x0c
+> +#define MSI_ENABLE_OFFSET              0x14
+> +#define MSI_STATUS_OFFSET              0x18
+> +#define MSI_DATA_OFFSET                        0x20
+> +#define MSI_ADDR_L_OFFSET              0x24
+> +#define MSI_ADDR_H_OFFSET              0x28
+size and data offset macros have extra tabs?
+>
+>  /* outbound and inbound window definitions */
+> -#define WIN_NUM_0              0
+> -#define WIN_NUM_1              1
+> -#define CFG_WINDOW_TYPE        0
+> -#define IO_WINDOW_TYPE         1
+> -#define MEM_WINDOW_TYPE        2
+> -#define IB_WIN_SIZE            ((u64)256 * 1024 * 1024 * 1024)
+> -#define MAX_PIO_WINDOWS        8
+> +#define WIN_NUM_0                      0
+> +#define WIN_NUM_1                      1
+> +#define CFG_WINDOW_TYPE                        0
+> +#define IO_WINDOW_TYPE                 1
+> +#define MEM_WINDOW_TYPE                        2
+> +#define IB_WIN_SIZE                    ((u64)256 * 1024 * 1024 * 1024)
+> +#define MAX_PIO_WINDOWS                        8
+>
+>  /* Parameters for the waiting for link up routine */
+> -#define LINK_WAIT_MAX_RETRIES  10
+> -#define LINK_WAIT_MIN  90000
+> -#define LINK_WAIT_MAX  100000
+> +#define LINK_WAIT_MAX_RETRIES          10
+> +#define LINK_WAIT_MIN                  90000
+> +#define LINK_WAIT_MAX                  100000
+>
+> -#define PAGED_ADDR_BNDRY                       0xc00
+> -#define OFFSET_TO_PAGE_ADDR(off)               \
+> +#define PAGED_ADDR_BNDRY               0xc00
+> +#define OFFSET_TO_PAGE_ADDR(off)       \
+>         ((off & PAGE_LO_MASK) | PAGED_ADDR_BNDRY)
+> -#define OFFSET_TO_PAGE_IDX(off)                        \
+> +#define OFFSET_TO_PAGE_IDX(off)                \
+>         ((off >> PAGE_SEL_OFFSET_SHIFT) & PAGE_SEL_MASK)
+>
 >  struct mobiveil_msi {                  /* MSI information */
->         struct mutex lock;              /* protect bitmap variable */
->         struct irq_domain *msi_domain;
-> @@ -145,15 +150,119 @@ struct mobiveil_pcie {
->         struct mobiveil_msi msi;
->  };
->
-> -static inline void csr_writel(struct mobiveil_pcie *pcie, const u32 value,
-> -               const u32 reg)
-> +/*
-> + * mobiveil_pcie_sel_page - routine to access paged register
-> + *
-> + * Registers whose address greater than PAGED_ADDR_BNDRY (0xc00) are paged,
-> + * for this scheme to work extracted higher 6 bits of the offset will be
-> + * written to pg_sel field of PAB_CTRL register and rest of the lower 10
-> + * bits enabled with PAGED_ADDR_BNDRY are used as offset of the register.
-> + */
-> +static void mobiveil_pcie_sel_page(struct mobiveil_pcie *pcie, u8 pg_idx)
+> @@ -297,14 +299,14 @@ static void __iomem *mobiveil_pcie_map_bus(struct pci_bus *bus,
+>                                         unsigned int devfn, int where)
 >  {
-> -       writel_relaxed(value, pcie->csr_axi_slave_base + reg);
-> +       u32 val;
+>         struct mobiveil_pcie *pcie = bus->sysdata;
+> +       u32 value;
+>
+>         if (!mobiveil_pcie_valid_device(bus, devfn))
+>                 return NULL;
+>
+> -       if (bus->number == pcie->root_bus_nr) {
+> -               /* RC config access */
+> +       /* RC config access */
+> +       if (bus->number == pcie->root_bus_nr)
+>                 return pcie->csr_axi_slave_base + where;
+> -       }
+>
+>         /*
+>          * EP config access (in Config/APIO space)
+> @@ -312,10 +314,12 @@ static void __iomem *mobiveil_pcie_map_bus(struct pci_bus *bus,
+>          * (BDF) in PAB_AXI_AMAP_PEX_WIN_L0 Register.
+>          * Relies on pci_lock serialization
+>          */
+> -       csr_writel(pcie, bus->number << PAB_BUS_SHIFT |
+> -                       PCI_SLOT(devfn) << PAB_DEVICE_SHIFT |
+> -                       PCI_FUNC(devfn) << PAB_FUNCTION_SHIFT,
+> -                       PAB_AXI_AMAP_PEX_WIN_L(WIN_NUM_0));
+> +       value = bus->number << PAB_BUS_SHIFT |
+> +               PCI_SLOT(devfn) << PAB_DEVICE_SHIFT |
+> +               PCI_FUNC(devfn) << PAB_FUNCTION_SHIFT;
 > +
-> +       val = readl(pcie->csr_axi_slave_base + PAB_CTRL);
-> +       val &= ~(PAGE_SEL_MASK << PAGE_SEL_SHIFT);
-> +       val |= (pg_idx & PAGE_SEL_MASK) << PAGE_SEL_SHIFT;
+> +       csr_writel(pcie, value, PAB_AXI_AMAP_PEX_WIN_L(WIN_NUM_0));
 > +
-> +       writel(val, pcie->csr_axi_slave_base + PAB_CTRL);
+>         return pcie->config_axi_slave_base + where;
 >  }
 >
-> -static inline u32 csr_readl(struct mobiveil_pcie *pcie, const u32 reg)
-> +static void *mobiveil_pcie_comp_addr(struct mobiveil_pcie *pcie, u32 off)
->  {
-> -       return readl_relaxed(pcie->csr_axi_slave_base + reg);
-> +       if (off < PAGED_ADDR_BNDRY) {
-> +               /* For directly accessed registers, clear the pg_sel field */
-> +               mobiveil_pcie_sel_page(pcie, 0);
-> +               return pcie->csr_axi_slave_base + off;
-> +       }
-> +
-> +       mobiveil_pcie_sel_page(pcie, OFFSET_TO_PAGE_IDX(off));
-> +       return pcie->csr_axi_slave_base + OFFSET_TO_PAGE_ADDR(off);
-> +}
-> +
-> +static int mobiveil_pcie_read(void __iomem *addr, int size, u32 *val)
-> +{
-> +       if ((uintptr_t)addr & (size - 1)) {
-> +               *val = 0;
-> +               return PCIBIOS_BAD_REGISTER_NUMBER;
-> +       }
-> +
-> +       switch (size) {
-> +       case 4:
-> +               *val = readl(addr);
-> +               break;
-> +       case 2:
-> +               *val = readw(addr);
-> +               break;
-> +       case 1:
-> +               *val = readb(addr);
-> +               break;
-> +       default:
-> +               *val = 0;
-> +               return PCIBIOS_BAD_REGISTER_NUMBER;
-> +       }
-> +
-> +       return PCIBIOS_SUCCESSFUL;
-> +}
-> +
-> +static int mobiveil_pcie_write(void __iomem *addr, int size, u32 val)
-> +{
-> +       if ((uintptr_t)addr & (size - 1))
-> +               return PCIBIOS_BAD_REGISTER_NUMBER;
-> +
-> +       switch (size) {
-> +       case 4:
-> +               writel(val, addr);
-> +               break;
-> +       case 2:
-> +               writew(val, addr);
-> +               break;
-> +       case 1:
-> +               writeb(val, addr);
-> +               break;
-> +       default:
-> +               return PCIBIOS_BAD_REGISTER_NUMBER;
-> +       }
-> +
-> +       return PCIBIOS_SUCCESSFUL;
-> +}
-> +
-> +static u32 csr_read(struct mobiveil_pcie *pcie, u32 off, size_t size)
-> +{
-> +       void *addr;
-> +       u32 val;
-> +       int ret;
-> +
-> +       addr = mobiveil_pcie_comp_addr(pcie, off);
-> +
-> +       ret = mobiveil_pcie_read(addr, size, &val);
-> +       if (ret)
-> +               dev_err(&pcie->pdev->dev, "read CSR address failed\n");
-> +
-> +       return val;
-> +}
-> +
-> +static void csr_write(struct mobiveil_pcie *pcie, u32 val, u32 off, size_t size)
-> +{
-> +       void *addr;
-> +       int ret;
-> +
-> +       addr = mobiveil_pcie_comp_addr(pcie, off);
-> +
-> +       ret = mobiveil_pcie_write(addr, size, val);
-> +       if (ret)
-> +               dev_err(&pcie->pdev->dev, "write CSR address failed\n");
-> +}
-> +
-> +static u32 csr_readl(struct mobiveil_pcie *pcie, u32 off)
-> +{
-> +       return csr_read(pcie, off, 0x4);
-> +}
-> +
-> +static void csr_writel(struct mobiveil_pcie *pcie, u32 val, u32 off)
-> +{
-> +       csr_write(pcie, val, off, 0x4);
+> @@ -350,22 +354,22 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
+>
+>         /* Handle INTx */
+>         if (intr_status & PAB_INTP_INTX_MASK) {
+> -               shifted_status = csr_readl(pcie, PAB_INTP_AMBA_MISC_STAT) >>
+> -                       PAB_INTX_START;
+> +               shifted_status = csr_readl(pcie, PAB_INTP_AMBA_MISC_STAT);
+> +               shifted_status >>= PAB_INTX_START;
+>                 do {
+>                         for_each_set_bit(bit, &shifted_status, PCI_NUM_INTX) {
+>                                 virq = irq_find_mapping(pcie->intx_domain,
+> -                                               bit + 1);
+> +                                                       bit + 1);
+>                                 if (virq)
+>                                         generic_handle_irq(virq);
+>                                 else
+> -                                       dev_err_ratelimited(dev,
+> -                                               "unexpected IRQ, INT%d\n", bit);
+> +                                       dev_err_ratelimited(dev, "unexpected IRQ, INT%d\n",
+> +                                                           bit);
+>
+>                                 /* clear interrupt */
+>                                 csr_writel(pcie,
+> -                                       shifted_status << PAB_INTX_START,
+> -                                       PAB_INTP_AMBA_MISC_STAT);
+> +                                          shifted_status << PAB_INTX_START,
+> +                                          PAB_INTP_AMBA_MISC_STAT);
+>                         }
+>                 } while ((shifted_status >> PAB_INTX_START) != 0);
+>         }
+> @@ -375,8 +379,7 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
+>
+>         /* handle MSI interrupts */
+>         while (msi_status & 1) {
+> -               msi_data = readl_relaxed(pcie->apb_csr_base
+> -                               + MSI_DATA_OFFSET);
+> +               msi_data = readl_relaxed(pcie->apb_csr_base + MSI_DATA_OFFSET);
+>
+>                 /*
+>                  * MSI_STATUS_OFFSET register gets updated to zero
+> @@ -385,18 +388,18 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
+>                  * two dummy reads.
+>                  */
+>                 msi_addr_lo = readl_relaxed(pcie->apb_csr_base +
+> -                               MSI_ADDR_L_OFFSET);
+> +                                           MSI_ADDR_L_OFFSET);
+>                 msi_addr_hi = readl_relaxed(pcie->apb_csr_base +
+> -                               MSI_ADDR_H_OFFSET);
+> +                                           MSI_ADDR_H_OFFSET);
+>                 dev_dbg(dev, "MSI registers, data: %08x, addr: %08x:%08x\n",
+> -                               msi_data, msi_addr_hi, msi_addr_lo);
+> +                       msi_data, msi_addr_hi, msi_addr_lo);
+>
+>                 virq = irq_find_mapping(msi->dev_domain, msi_data);
+>                 if (virq)
+>                         generic_handle_irq(virq);
+>
+>                 msi_status = readl_relaxed(pcie->apb_csr_base +
+> -                               MSI_STATUS_OFFSET);
+> +                                          MSI_STATUS_OFFSET);
+>         }
+>
+>         /* Clear the interrupt status */
+> @@ -413,7 +416,7 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
+>
+>         /* map config resource */
+>         res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+> -                       "config_axi_slave");
+> +                                          "config_axi_slave");
+>         pcie->config_axi_slave_base = devm_pci_remap_cfg_resource(dev, res);
+>         if (IS_ERR(pcie->config_axi_slave_base))
+>                 return PTR_ERR(pcie->config_axi_slave_base);
+> @@ -421,7 +424,7 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
+>
+>         /* map csr resource */
+>         res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+> -                       "csr_axi_slave");
+> +                                          "csr_axi_slave");
+>         pcie->csr_axi_slave_base = devm_pci_remap_cfg_resource(dev, res);
+>         if (IS_ERR(pcie->csr_axi_slave_base))
+>                 return PTR_ERR(pcie->csr_axi_slave_base);
+> @@ -452,7 +455,7 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
 >  }
 >
->  static bool mobiveil_pcie_link_up(struct mobiveil_pcie *pcie)
-> @@ -342,45 +451,6 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
+>  static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
+> -               int pci_addr, u32 type, u64 size)
+> +                              int pci_addr, u32 type, u64 size)
+>  {
+>         int pio_ctrl_val;
+>         int amap_ctrl_dw;
+> @@ -465,19 +468,20 @@ static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
+>         }
+>
+>         pio_ctrl_val = csr_readl(pcie, PAB_PEX_PIO_CTRL);
+> -       csr_writel(pcie,
+> -               pio_ctrl_val | (1 << PIO_ENABLE_SHIFT), PAB_PEX_PIO_CTRL);
+> -       amap_ctrl_dw = csr_readl(pcie, PAB_PEX_AMAP_CTRL(win_num));
+> -       amap_ctrl_dw = (amap_ctrl_dw | (type << AMAP_CTRL_TYPE_SHIFT));
+> -       amap_ctrl_dw = (amap_ctrl_dw | (1 << AMAP_CTRL_EN_SHIFT));
+> +       pio_ctrl_val |= 1 << PIO_ENABLE_SHIFT;
+> +       csr_writel(pcie, pio_ctrl_val, PAB_PEX_PIO_CTRL);
+>
+> -       csr_writel(pcie, amap_ctrl_dw | lower_32_bits(size64),
+> -                  PAB_PEX_AMAP_CTRL(win_num));
+> +       amap_ctrl_dw = csr_readl(pcie, PAB_PEX_AMAP_CTRL(win_num));
+> +       amap_ctrl_dw |= (type << AMAP_CTRL_TYPE_SHIFT) |
+> +                       (1 << AMAP_CTRL_EN_SHIFT) |
+> +                       lower_32_bits(size64);
+> +       csr_writel(pcie, amap_ctrl_dw, PAB_PEX_AMAP_CTRL(win_num));
+>
+>         csr_writel(pcie, upper_32_bits(size64),
+>                    PAB_EXT_PEX_AMAP_SIZEN(win_num));
+>
+>         csr_writel(pcie, pci_addr, PAB_PEX_AMAP_AXI_WIN(win_num));
+> +
+>         csr_writel(pcie, pci_addr, PAB_PEX_AMAP_PEX_WIN_L(win_num));
+>         csr_writel(pcie, 0, PAB_PEX_AMAP_PEX_WIN_H(win_num));
+>  }
+> @@ -486,7 +490,8 @@ static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
+>   * routine to program the outbound windows
+>   */
+>  static void program_ob_windows(struct mobiveil_pcie *pcie, int win_num,
+> -               u64 cpu_addr, u64 pci_addr, u32 config_io_bit, u64 size)
+> +                              u64 cpu_addr, u64 pci_addr,
+> +                              u32 config_io_bit, u64 size)
+>  {
+>
+>         u32 value, type;
+> @@ -505,7 +510,7 @@ static void program_ob_windows(struct mobiveil_pcie *pcie, int win_num,
+>         type = config_io_bit;
+>         value = csr_readl(pcie, PAB_AXI_AMAP_CTRL(win_num));
+>         csr_writel(pcie, 1 << WIN_ENABLE_SHIFT | type << WIN_TYPE_SHIFT |
+> -                       lower_32_bits(size64), PAB_AXI_AMAP_CTRL(win_num));
+> +                  lower_32_bits(size64), PAB_AXI_AMAP_CTRL(win_num));
+>
+>         csr_writel(pcie, upper_32_bits(size64), PAB_EXT_AXI_AMAP_SIZE(win_num));
+>
+> @@ -515,14 +520,14 @@ static void program_ob_windows(struct mobiveil_pcie *pcie, int win_num,
+>          */
+>         value = csr_readl(pcie, PAB_AXI_AMAP_AXI_WIN(win_num));
+>         csr_writel(pcie, cpu_addr & (~AXI_WINDOW_ALIGN_MASK),
+> -                       PAB_AXI_AMAP_AXI_WIN(win_num));
+> +                  PAB_AXI_AMAP_AXI_WIN(win_num));
+>
+>         value = csr_readl(pcie, PAB_AXI_AMAP_PEX_WIN_H(win_num));
+>
+>         csr_writel(pcie, lower_32_bits(pci_addr),
+> -                       PAB_AXI_AMAP_PEX_WIN_L(win_num));
+> +                  PAB_AXI_AMAP_PEX_WIN_L(win_num));
+>         csr_writel(pcie, upper_32_bits(pci_addr),
+> -                       PAB_AXI_AMAP_PEX_WIN_H(win_num));
+> +                  PAB_AXI_AMAP_PEX_WIN_H(win_num));
+>
+>         pcie->ob_wins_configured++;
+>  }
+> @@ -538,7 +543,9 @@ static int mobiveil_bringup_link(struct mobiveil_pcie *pcie)
+>
+>                 usleep_range(LINK_WAIT_MIN, LINK_WAIT_MAX);
+>         }
+> +
+>         dev_err(&pcie->pdev->dev, "link never came up\n");
+> +
+>         return -ETIMEDOUT;
+>  }
+>
+> @@ -551,16 +558,16 @@ static void mobiveil_pcie_enable_msi(struct mobiveil_pcie *pcie)
+>         msi->msi_pages_phys = (phys_addr_t)msg_addr;
+>
+>         writel_relaxed(lower_32_bits(msg_addr),
+> -               pcie->apb_csr_base + MSI_BASE_LO_OFFSET);
+> +                      pcie->apb_csr_base + MSI_BASE_LO_OFFSET);
+>         writel_relaxed(upper_32_bits(msg_addr),
+> -               pcie->apb_csr_base + MSI_BASE_HI_OFFSET);
+> +                      pcie->apb_csr_base + MSI_BASE_HI_OFFSET);
+>         writel_relaxed(4096, pcie->apb_csr_base + MSI_SIZE_OFFSET);
+>         writel_relaxed(1, pcie->apb_csr_base + MSI_ENABLE_OFFSET);
+>  }
+>
+>  static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+>  {
+> -       u32 value, pab_ctrl, type = 0;
+> +       u32 value, pab_ctrl, type;
+>         int err;
+>         struct resource_entry *win, *tmp;
+>
+> @@ -575,26 +582,27 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+>          * Space
+>          */
+>         value = csr_readl(pcie, PCI_COMMAND);
+> -       csr_writel(pcie, value | PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
+> -               PCI_COMMAND_MASTER, PCI_COMMAND);
+> +       value |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER;
+> +       csr_writel(pcie, value, PCI_COMMAND);
+>
+>         /*
+>          * program PIO Enable Bit to 1 (and PEX PIO Enable to 1) in PAB_CTRL
+>          * register
+>          */
+>         pab_ctrl = csr_readl(pcie, PAB_CTRL);
+> -       csr_writel(pcie, pab_ctrl | (1 << AMBA_PIO_ENABLE_SHIFT) |
+> -               (1 << PEX_PIO_ENABLE_SHIFT), PAB_CTRL);
+> +       pab_ctrl |= (1 << AMBA_PIO_ENABLE_SHIFT) | (1 << PEX_PIO_ENABLE_SHIFT);
+> +       csr_writel(pcie, pab_ctrl, PAB_CTRL);
+>
+>         csr_writel(pcie, (PAB_INTP_INTX_MASK | PAB_INTP_MSI_MASK),
+> -               PAB_INTP_AMBA_MISC_ENB);
+> +                  PAB_INTP_AMBA_MISC_ENB);
+>
+>         /*
+>          * program PIO Enable Bit to 1 and Config Window Enable Bit to 1 in
+>          * PAB_AXI_PIO_CTRL Register
+>          */
+>         value = csr_readl(pcie, PAB_AXI_PIO_CTRL);
+> -       csr_writel(pcie, value | APIO_EN_MASK, PAB_AXI_PIO_CTRL);
+> +       value |= APIO_EN_MASK;
+> +       csr_writel(pcie, value, PAB_AXI_PIO_CTRL);
+>
+>         /*
+>          * we'll program one outbound window for config reads and
+> @@ -605,25 +613,25 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+>
+>         /* config outbound translation window */
+>         program_ob_windows(pcie, pcie->ob_wins_configured,
+> -                       pcie->ob_io_res->start, 0, CFG_WINDOW_TYPE,
+> -                       resource_size(pcie->ob_io_res));
+> +                          pcie->ob_io_res->start, 0, CFG_WINDOW_TYPE,
+> +                          resource_size(pcie->ob_io_res));
+>
+>         /* memory inbound translation window */
+>         program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
+>
+>         /* Get the I/O and memory ranges from DT */
+>         resource_list_for_each_entry_safe(win, tmp, &pcie->resources) {
+> -               type = 0;
+>                 if (resource_type(win->res) == IORESOURCE_MEM)
+>                         type = MEM_WINDOW_TYPE;
+> -               if (resource_type(win->res) == IORESOURCE_IO)
+> +               else if (resource_type(win->res) == IORESOURCE_IO)
+>                         type = IO_WINDOW_TYPE;
+> -               if (type) {
+> -                       /* configure outbound translation window */
+> -                       program_ob_windows(pcie, pcie->ob_wins_configured,
+> -                               win->res->start, 0, type,
+> -                               resource_size(win->res));
+> -               }
+> +               else
+> +                       continue;
+> +
+> +               /* configure outbound translation window */
+> +               program_ob_windows(pcie, pcie->ob_wins_configured,
+> +                                  win->res->start, 0, type,
+> +                                  resource_size(win->res));
+>         }
+>
+>         /* setup MSI hardware registers */
+> @@ -643,7 +651,8 @@ static void mobiveil_mask_intx_irq(struct irq_data *data)
+>         mask = 1 << ((data->hwirq + PAB_INTX_START) - 1);
+>         raw_spin_lock_irqsave(&pcie->intx_mask_lock, flags);
+>         shifted_val = csr_readl(pcie, PAB_INTP_AMBA_MISC_ENB);
+> -       csr_writel(pcie, (shifted_val & (~mask)), PAB_INTP_AMBA_MISC_ENB);
+> +       shifted_val &= ~mask;
+> +       csr_writel(pcie, shifted_val, PAB_INTP_AMBA_MISC_ENB);
+>         raw_spin_unlock_irqrestore(&pcie->intx_mask_lock, flags);
+>  }
+>
+> @@ -658,7 +667,8 @@ static void mobiveil_unmask_intx_irq(struct irq_data *data)
+>         mask = 1 << ((data->hwirq + PAB_INTX_START) - 1);
+>         raw_spin_lock_irqsave(&pcie->intx_mask_lock, flags);
+>         shifted_val = csr_readl(pcie, PAB_INTP_AMBA_MISC_ENB);
+> -       csr_writel(pcie, (shifted_val | mask), PAB_INTP_AMBA_MISC_ENB);
+> +       shifted_val |= mask;
+> +       csr_writel(pcie, shifted_val, PAB_INTP_AMBA_MISC_ENB);
+>         raw_spin_unlock_irqrestore(&pcie->intx_mask_lock, flags);
+>  }
+>
+> @@ -672,10 +682,11 @@ static struct irq_chip intx_irq_chip = {
+>
+>  /* routine to setup the INTx related data */
+>  static int mobiveil_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+> -               irq_hw_number_t hwirq)
+> +                                 irq_hw_number_t hwirq)
+>  {
+>         irq_set_chip_and_handler(irq, &intx_irq_chip, handle_level_irq);
+>         irq_set_chip_data(irq, domain->host_data);
+> +
 >         return 0;
 >  }
 >
-> -/*
-> - * select_paged_register - routine to access paged register of root complex
-> - *
-> - * registers of RC are paged, for this scheme to work
-> - * extracted higher 6 bits of the offset will be written to pg_sel
-> - * field of PAB_CTRL register and rest of the lower 10 bits enabled with
-> - * PAGE_SEL_EN are used as offset of the register.
-> - */
-> -static void select_paged_register(struct mobiveil_pcie *pcie, u32 offset)
-> -{
-> -       int pab_ctrl_dw, pg_sel;
-> -
-> -       /* clear pg_sel field */
-> -       pab_ctrl_dw = csr_readl(pcie, PAB_CTRL);
-> -       pab_ctrl_dw = (pab_ctrl_dw & ~(PAGE_SEL_MASK << PAGE_SEL_SHIFT));
-> -
-> -       /* set pg_sel field */
-> -       pg_sel = (offset >> PAGE_SEL_OFFSET_SHIFT) & PAGE_SEL_MASK;
-> -       pab_ctrl_dw |= ((pg_sel << PAGE_SEL_SHIFT));
-> -       csr_writel(pcie, pab_ctrl_dw, PAB_CTRL);
-> -}
-> -
-> -static void write_paged_register(struct mobiveil_pcie *pcie,
-> -               u32 val, u32 offset)
-> -{
-> -       u32 off = (offset & PAGE_LO_MASK) | PAGE_SEL_EN;
-> -
-> -       select_paged_register(pcie, offset);
-> -       csr_writel(pcie, val, off);
-> -}
-> -
-> -static u32 read_paged_register(struct mobiveil_pcie *pcie, u32 offset)
-> -{
-> -       u32 off = (offset & PAGE_LO_MASK) | PAGE_SEL_EN;
-> -
-> -       select_paged_register(pcie, offset);
-> -       return csr_readl(pcie, off);
-> -}
-> -
->  static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
->                 int pci_addr, u32 type, u64 size)
->  {
-> @@ -397,19 +467,19 @@ static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
->         pio_ctrl_val = csr_readl(pcie, PAB_PEX_PIO_CTRL);
->         csr_writel(pcie,
->                 pio_ctrl_val | (1 << PIO_ENABLE_SHIFT), PAB_PEX_PIO_CTRL);
-> -       amap_ctrl_dw = read_paged_register(pcie, PAB_PEX_AMAP_CTRL(win_num));
-> +       amap_ctrl_dw = csr_readl(pcie, PAB_PEX_AMAP_CTRL(win_num));
->         amap_ctrl_dw = (amap_ctrl_dw | (type << AMAP_CTRL_TYPE_SHIFT));
->         amap_ctrl_dw = (amap_ctrl_dw | (1 << AMAP_CTRL_EN_SHIFT));
+> @@ -692,7 +703,7 @@ static struct irq_chip mobiveil_msi_irq_chip = {
 >
-> -       write_paged_register(pcie, amap_ctrl_dw | lower_32_bits(size64),
-> -                               PAB_PEX_AMAP_CTRL(win_num));
-> +       csr_writel(pcie, amap_ctrl_dw | lower_32_bits(size64),
-> +                  PAB_PEX_AMAP_CTRL(win_num));
+>  static struct msi_domain_info mobiveil_msi_domain_info = {
+>         .flags  = (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+> -               MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
+> +                  MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
+>         .chip   = &mobiveil_msi_irq_chip,
+>  };
 >
-> -       write_paged_register(pcie, upper_32_bits(size64),
-> -                               PAB_EXT_PEX_AMAP_SIZEN(win_num));
-> +       csr_writel(pcie, upper_32_bits(size64),
-> +                  PAB_EXT_PEX_AMAP_SIZEN(win_num));
->
-> -       write_paged_register(pcie, pci_addr, PAB_PEX_AMAP_AXI_WIN(win_num));
-> -       write_paged_register(pcie, pci_addr, PAB_PEX_AMAP_PEX_WIN_L(win_num));
-> -       write_paged_register(pcie, 0, PAB_PEX_AMAP_PEX_WIN_H(win_num));
-> +       csr_writel(pcie, pci_addr, PAB_PEX_AMAP_AXI_WIN(win_num));
-> +       csr_writel(pcie, pci_addr, PAB_PEX_AMAP_PEX_WIN_L(win_num));
-> +       csr_writel(pcie, 0, PAB_PEX_AMAP_PEX_WIN_H(win_num));
+> @@ -710,7 +721,7 @@ static void mobiveil_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 >  }
 >
->  /*
-> @@ -437,8 +507,7 @@ static void program_ob_windows(struct mobiveil_pcie *pcie, int win_num,
->         csr_writel(pcie, 1 << WIN_ENABLE_SHIFT | type << WIN_TYPE_SHIFT |
->                         lower_32_bits(size64), PAB_AXI_AMAP_CTRL(win_num));
+>  static int mobiveil_msi_set_affinity(struct irq_data *irq_data,
+> -               const struct cpumask *mask, bool force)
+> +                                    const struct cpumask *mask, bool force)
+>  {
+>         return -EINVAL;
+>  }
+> @@ -722,7 +733,8 @@ static struct irq_chip mobiveil_msi_bottom_irq_chip = {
+>  };
 >
-> -       write_paged_register(pcie, upper_32_bits(size64),
-> -                               PAB_EXT_AXI_AMAP_SIZE(win_num));
-> +       csr_writel(pcie, upper_32_bits(size64), PAB_EXT_AXI_AMAP_SIZE(win_num));
+>  static int mobiveil_irq_msi_domain_alloc(struct irq_domain *domain,
+> -               unsigned int virq, unsigned int nr_irqs, void *args)
+> +                                        unsigned int virq,
+> +                                        unsigned int nr_irqs, void *args)
+>  {
+>         struct mobiveil_pcie *pcie = domain->host_data;
+>         struct mobiveil_msi *msi = &pcie->msi;
+> @@ -742,13 +754,13 @@ static int mobiveil_irq_msi_domain_alloc(struct irq_domain *domain,
+>         mutex_unlock(&msi->lock);
 >
->         /*
->          * program AXI window base with appropriate value in
+>         irq_domain_set_info(domain, virq, bit, &mobiveil_msi_bottom_irq_chip,
+> -                               domain->host_data, handle_level_irq,
+> -                               NULL, NULL);
+> +                           domain->host_data, handle_level_irq, NULL, NULL);
+>         return 0;
+>  }
+>
+>  static void mobiveil_irq_msi_domain_free(struct irq_domain *domain,
+> -               unsigned int virq, unsigned int nr_irqs)
+> +                                        unsigned int virq,
+> +                                        unsigned int nr_irqs)
+>  {
+>         struct irq_data *d = irq_domain_get_irq_data(domain, virq);
+>         struct mobiveil_pcie *pcie = irq_data_get_irq_chip_data(d);
+> @@ -756,12 +768,11 @@ static void mobiveil_irq_msi_domain_free(struct irq_domain *domain,
+>
+>         mutex_lock(&msi->lock);
+>
+> -       if (!test_bit(d->hwirq, msi->msi_irq_in_use)) {
+> +       if (!test_bit(d->hwirq, msi->msi_irq_in_use))
+>                 dev_err(&pcie->pdev->dev, "trying to free unused MSI#%lu\n",
+>                         d->hwirq);
+> -       } else {
+> +       else
+>                 __clear_bit(d->hwirq, msi->msi_irq_in_use);
+> -       }
+>
+>         mutex_unlock(&msi->lock);
+>  }
+> @@ -785,12 +796,14 @@ static int mobiveil_allocate_msi_domains(struct mobiveil_pcie *pcie)
+>         }
+>
+>         msi->msi_domain = pci_msi_create_irq_domain(fwnode,
+> -                               &mobiveil_msi_domain_info, msi->dev_domain);
+> +                                                   &mobiveil_msi_domain_info,
+> +                                                   msi->dev_domain);
+>         if (!msi->msi_domain) {
+>                 dev_err(dev, "failed to create MSI domain\n");
+>                 irq_domain_remove(msi->dev_domain);
+>                 return -ENOMEM;
+>         }
+> +
+>         return 0;
+>  }
+>
+> @@ -801,8 +814,8 @@ static int mobiveil_pcie_init_irq_domain(struct mobiveil_pcie *pcie)
+>         int ret;
+>
+>         /* setup INTx */
+> -       pcie->intx_domain = irq_domain_add_linear(node,
+> -                               PCI_NUM_INTX, &intx_domain_ops, pcie);
+> +       pcie->intx_domain = irq_domain_add_linear(node, PCI_NUM_INTX,
+> +                                                 &intx_domain_ops, pcie);
+>
+>         if (!pcie->intx_domain) {
+>                 dev_err(dev, "Failed to get a INTx IRQ domain\n");
+> @@ -917,10 +930,10 @@ MODULE_DEVICE_TABLE(of, mobiveil_pcie_of_match);
+>  static struct platform_driver mobiveil_pcie_driver = {
+>         .probe = mobiveil_pcie_probe,
+>         .driver = {
+> -                       .name = "mobiveil-pcie",
+> -                       .of_match_table = mobiveil_pcie_of_match,
+> -                       .suppress_bind_attrs = true,
+> -               },
+> +               .name = "mobiveil-pcie",
+> +               .of_match_table = mobiveil_pcie_of_match,
+> +               .suppress_bind_attrs = true,
+> +       },
+>  };
+>
+>  builtin_platform_driver(mobiveil_pcie_driver);
 > --
 > 2.17.1
 >
+
+Thanks.
 
 _______________________________________________
 linux-arm-kernel mailing list
