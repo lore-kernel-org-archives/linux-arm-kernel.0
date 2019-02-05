@@ -2,94 +2,97 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D079C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 23:01:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6AC69C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 23:12:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AC73A20844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 23:01:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 355CE217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 23:12:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K5mX3RV5";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="cPOBDOgb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AC73A20844
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y/Swyekk";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="KTW3o8sV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 355CE217F9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=BBu8yoi8eMU57Xnqqdpi1zMaTQVNcNzaTXmWnZr6oHQ=; b=K5mX3RV5vwedRyOAmg1cUNOkA
-	x18dbv1Wl6bsvJeHADxO5VmxVjiFfhPUU19BjSey+GUM92N4ZRNQvTVmVyn1oodQ+TqTdrv3Fl2/V
-	2g/fOE9zu0XVd6xynz+6RgA6BgZMZm52ObUoLmPuTB/NPucIcAyPdCWY1fLl94707PFQEmELe3MU7
-	iGCAQdwtg2wxgAFvTBsB84jtyc6O4CeDj2Wpg2yRI997Uw77QPAh+cR2n19Ba9wYcsD9Am9/Fhvw7
-	XmwhUG9I8vvbJ4+fheMwDCQ48ZAma86ct4jo6feE+4gPS/5puF0p3/6zUAkd3wB2Nb0TlUMih5ObF
-	zc2/1wCTQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=VtDolyn/6KOS+rZYyagPtOpl9UvfQ/kBw6cwAIJCdBM=; b=Y/SwyekkeYgQlA
+	dd6/3ws8+p3y8v7UacnR7dHVTjD3nJkGjomqe9EUMB+fOqapL/BtsCIsbBgTw446EyI/jkqrrKz1u
+	MOOLK7+LqxmCJCmnC+CUrEC7VhkgBUaar10yVG6q8W9HRO1cMCwbBZsxRStQmbdY+fbA8IE8bb4Tq
+	iwsdZxUACyJNI4gkSsk0cBNCoB9QY+JcUAo+8801a0e/kylXeduymxY9xZsoq9Ft8N2A0ucdskdRR
+	16ulagIK2sAFp/IbkukuPxRpcJ4gnoYcu3QDmop8xCmGSDCMwMa1I/oezUvmv7V5aHZE8F4Kkcy8X
+	zye0q7UBVlxdx10AiDCw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr9if-0006hB-Fx; Tue, 05 Feb 2019 23:01:33 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gr9sx-0002PC-FM; Tue, 05 Feb 2019 23:12:11 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr9ib-0006gh-Qm
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 23:01:31 +0000
-Received: by mail-wr1-x443.google.com with SMTP id p4so5543116wrt.7
+ id 1gr9ss-0002Li-RS
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 23:12:09 +0000
+Received: by mail-lj1-x244.google.com with SMTP id k19-v6so4381301lji.11
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 05 Feb 2019 15:01:29 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=Lbr4P5N5o7NXW6Y0WDoZCkSdtEf+zUXi/Dt0g0HVwEk=;
- b=cPOBDOgbYe188N5UmKY/+OQ/eR5dHi0XE5mDL02qq/ueypt/ezwDwujhqnqf9xtMyG
- KcuMy229gC3o3pkNLHjYIoxS3D2GQtATi8talwHMDk3U+are/C8YKUHKA/3w+lzwWDjs
- eRn/4sRt2zJP+y4NYXJp6Vs4h3aCZQ/HvJfhQjrTBTUA5telAO+xsyROdpM8QuzjkQ0h
- egzaSCpKsSSBN0owQJy0YEUlCKL77TEbyAADkwC7gPkeiOeCV6dQPa001MhzAePfiCKx
- YAX3/P6hBI56FZYubnf5SVy9KBzOLqj+dXX2TUU7UCCNuS/BhQHsJeAmzwMlhUGbIEE7
- ZNbQ==
+ Tue, 05 Feb 2019 15:12:05 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=RNt8Ge50ARCKMvNQX1Z6filfr1fCr4s7dBo5HZRXsUo=;
+ b=KTW3o8sV+2G90oB5KjmJuPMMh5jHJjR4P41hNQdiOkKObz/0+fHeZCO7Ev/T/hr2SS
+ TegEaOF5DHEgJoI2QM9lwdwsyuPHTpdOUONJoDFs4m0pc/8DohksSTrURh97KhnoYz8j
+ y60swwxMLFgrRqwVz6LJdFAbdLQxbnxVf+1jg=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=Lbr4P5N5o7NXW6Y0WDoZCkSdtEf+zUXi/Dt0g0HVwEk=;
- b=GMdGmh80ozcyU5Pn73vICpFSvyiCUsyXScEZUPwVRQSvA5EFZh4o+3MdBS+2gjJTp9
- 8Z/oWvWpBzU/m0pvRLYUg8kfUtD6Iap6M5Hj/VMQDkKGQ5EIWZ1byRIGl8Qm4tpNvrmD
- RJJuc5fHRnRNc2K1RtmEPknNC+9CvSf5VDOzRO0afh9uiEHkbckpWPbyh9aP09c72Kl3
- KVmUZ5p2nMloCMUHEwrCbjGWoZc8nYl6M3FJp5V4bjaYSnBZAZSO5tPuRn9JoNI34wMm
- 9ofqIWtnU6RIsh8gnXQ2O3ZieVJvW22OjfjbOxYe6DLy/9eRbJIOBYksCU3T0lQkdkE4
- Wr7A==
-X-Gm-Message-State: AHQUAubXyi6U+LneJAnJkU0x+IvPmWZP2ziD5VLVQQFOW3bN1lxm9UR4
- 3IGa4EqejJlMsjF69/68E9s=
-X-Google-Smtp-Source: AHgI3IZuANDZ1lOKD1rcDJrMEPSg2uqCjG5bdhnOx4B/DRLJhvJmxVIcDDsgVsc4gpgsmLTSObdpSQ==
-X-Received: by 2002:a5d:4cd0:: with SMTP id c16mr5685677wrt.221.1549407687956; 
- Tue, 05 Feb 2019 15:01:27 -0800 (PST)
-Received: from localhost
- (p200300E41F128C00021F3CFFFE37B91B.dip0.t-ipconnect.de.
- [2003:e4:1f12:8c00:21f:3cff:fe37:b91b])
- by smtp.gmail.com with ESMTPSA id q9sm14202519wrv.26.2019.02.05.15.01.27
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 05 Feb 2019 15:01:27 -0800 (PST)
-Date: Wed, 6 Feb 2019 00:01:26 +0100
-From: Thierry Reding <thierry.reding@gmail.com>
-To: Uwe =?utf-8?Q?Kleine-K=C3=B6nig?= <u.kleine-koenig@pengutronix.de>
-Subject: Re: [PATCH v8 1/6] pwm: extend PWM framework with PWM modes
-Message-ID: <20190205230125.GE1372@mithrandir>
-References: <1546522081-23659-1-git-send-email-claudiu.beznea@microchip.com>
- <1546522081-23659-2-git-send-email-claudiu.beznea@microchip.com>
- <20190105210522.ho2o2a4gc7r7ijeq@pengutronix.de>
- <67e881c5-0ea7-3d2f-5910-534729097d11@microchip.com>
- <20190107221040.uos5qlnkjmcayv73@pengutronix.de>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=RNt8Ge50ARCKMvNQX1Z6filfr1fCr4s7dBo5HZRXsUo=;
+ b=YBNb+8zjMjnBj4a5DB7+J89XyV8PVZI01lmAHhOTNHdk9Sb2Dtk1bToGNlNJaNnPB4
+ PIIAa0ixTL20FdE9Ja4Xn6dlC4EiU/vF5NYPuAxQ2CHSPLmmSp+Bir8dGENzGRo3k1SN
+ yU1MpfnMJ2Fr0WyPBHJmoY0WQYQf2KZC1HnX16hkWMpCKcXfBdsyW2m6RbzzzlsKNRRW
+ oCLoVdZcOapx/XgPUscFt6KUvA1zxwM9QnGNsodadxWCpTfrOyRWKZRKxT3QM0mxcZOT
+ 0mQs5V4+Nd9BioDrAB842wMFuMmALyLDHcY9JILEW+CuwV7C+bYTNo8ggmnP57wW3Abj
+ 9lPw==
+X-Gm-Message-State: AHQUAuZ6PZR509Mlup7Uhf/gd69erTFxmNOA423DK+6aAovaZIOg6WpQ
+ eqVqrjYQ8SNVhSPqaAarSV6h7z+7HzM=
+X-Google-Smtp-Source: AHgI3IYn1w5d3+z/pRnmyUHCgSuf5wggShwQlhTT3+VAZiKtelDmmFWbHb4ecy4+DYDmTVnJ5n9AiQ==
+X-Received: by 2002:a2e:89d7:: with SMTP id c23-v6mr4556738ljk.0.1549408324397; 
+ Tue, 05 Feb 2019 15:12:04 -0800 (PST)
+Received: from mail-lj1-f177.google.com (mail-lj1-f177.google.com.
+ [209.85.208.177])
+ by smtp.gmail.com with ESMTPSA id u14sm2202887lfl.20.2019.02.05.15.12.04
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 05 Feb 2019 15:12:04 -0800 (PST)
+Received: by mail-lj1-f177.google.com with SMTP id l15-v6so4401726lja.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 05 Feb 2019 15:12:04 -0800 (PST)
+X-Received: by 2002:a2e:7011:: with SMTP id
+ l17-v6mr4301457ljc.147.1549408323353; 
+ Tue, 05 Feb 2019 15:12:03 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190107221040.uos5qlnkjmcayv73@pengutronix.de>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+References: <1546314952-15990-1-git-send-email-yong.wu@mediatek.com>
+ <1546314952-15990-7-git-send-email-yong.wu@mediatek.com>
+ <CAE=gft5bga+pM_7syKMnnma78xYN0HT4LaPPEftJ9DNqFf=zWw@mail.gmail.com>
+ <1548917937.3292.15.camel@mhfsdcap03>
+ <CAE=gft6ai_ff5e2=XL=pU5AxwOYeSb05PUkfEt9Bn7Ek+fZRyg@mail.gmail.com>
+ <1549014148.12663.27.camel@mhfsdcap03>
+In-Reply-To: <1549014148.12663.27.camel@mhfsdcap03>
+From: Evan Green <evgreen@chromium.org>
+Date: Tue, 5 Feb 2019 15:11:26 -0800
+X-Gmail-Original-Message-ID: <CAE=gft4YBvbq5fSuu-RzY9jF8ea8eLKHgOrZ46wPcgdSAWKkVQ@mail.gmail.com>
+Message-ID: <CAE=gft4YBvbq5fSuu-RzY9jF8ea8eLKHgOrZ46wPcgdSAWKkVQ@mail.gmail.com>
+Subject: Re: [PATCH v6 06/20] iommu/io-pgtable-arm-v7s: Extend MediaTek 4GB
+ Mode
+To: Yong Wu <yong.wu@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_150129_878092_9DA04E15 
-X-CRM114-Status: GOOD (  35.41  )
+X-CRM114-CacheID: sfid-20190205_151206_903427_2CE2D043 
+X-CRM114-Status: GOOD (  50.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,199 +104,396 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pwm@vger.kernel.org, alexandre.belloni@bootlin.com, corbet@lwn.net,
- linux-doc@vger.kernel.org, linux-kernel@vger.kernel.org,
- Ludovic.Desroches@microchip.com, Claudiu.Beznea@microchip.com,
+Cc: youlin.pei@mediatek.com,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, Nicolas Boichat <drinkcat@chromium.org>,
+ Arnd Bergmann <arnd@arndb.de>, srv_heupstream@mediatek.com,
+ Joerg Roedel <joro@8bytes.org>, Will Deacon <will.deacon@arm.com>,
+ LKML <linux-kernel@vger.kernel.org>, Tomasz Figa <tfiga@google.com>,
+ iommu@lists.linux-foundation.org, Rob Herring <robh+dt@kernel.org>,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ yingjoe.chen@mediatek.com, Robin Murphy <robin.murphy@arm.com>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============8410872350832758032=="
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Fri, Feb 1, 2019 at 1:42 AM Yong Wu <yong.wu@mediatek.com> wrote:
+>
+> On Thu, 2019-01-31 at 11:23 -0800, Evan Green wrote:
+> > On Wed, Jan 30, 2019 at 10:59 PM Yong Wu <yong.wu@mediatek.com> wrote:
+> > >
+> > > On Wed, 2019-01-30 at 10:28 -0800, Evan Green wrote:
+> > > > On Mon, Dec 31, 2018 at 7:57 PM Yong Wu <yong.wu@mediatek.com> wrote:
+> > > > >
+> > > > > MediaTek extend the arm v7s descriptor to support the dram over 4GB.
+> > > > >
+> > > > > In the mt2712 and mt8173, it's called "4GB mode", the physical address
+> > > > > is from 0x4000_0000 to 0x1_3fff_ffff, but from EMI point of view, it
+> > > > > is remapped to high address from 0x1_0000_0000 to 0x1_ffff_ffff, the
+> > > > > bit32 is always enabled. thus, in the M4U, we always enable the bit9
+> > > > > for all PTEs which means to enable bit32 of physical address.
+> > > >
+> > > > I got a little lost here. I get that you're trying to explain why you
+> > > > always used to set bit32 of the physical address. But I don't totally
+> > > > get the part about physical addresses being from 0x4000_0000 -
+> > > > 0x1_3fff_ffff, but also from 0x1_0000_0000-0x1_ffff_ffff. Are you
+> > > > saying that the physical addresses from the iommu's perspective were
+> > > > always >0x1_0000_0000?
+> > >
+> > > Yes. From the IOMMU's perspective, the Physical address is from
+> > > 0x1_0000_0000 to 0x1_ffff_ffff.
+> > >
+> > > > But then from whose perspective is it 0x4000_0000? ...
+> > >
+> > > I guess from SW point view. it is from 0x4000_0000 to 0x1_3fff_ffff.
+> > >
+> > > If 4GB mode is enabled, the memory property in dts like this:
+> > >
+> > >         memory@40000000 {
+> > >                 device_type = "memory";
+> > >                 reg = <0 0x40000000 0x00000001 0x00000000>;
+> > >         };
+> > >
+> > > > oh, or you're saying there was some sort of remapping
+> > > > facility that moved the physical addresses around?
+> > > >
+> > > > >
+> > > > > but in mt8183, M4U support the dram from 0x4000_0000 to 0x3_ffff_ffff
+> > > > > which isn't remaped. We extend the PTEs: the bit9 represent bit32 of
+> > > > > PA and the bit4 represent bit33 of PA. Meanwhile the iova still is
+> > > > > 32bits.
+> > > > >
+> > > > > In order to unify code, in the "4GB mode", we add the bit32 for the
+> > > > > physical address manually in our driver.
+> > > > >
+> > > > > Correspondingly, Adding bit32 and bit33 for the PA in the iova_to_phys
+> > > > > has to been moved into v7s.
+> > > > >
+> > > > > Regarding whether the pagetable address could be over 4GB, the mt8183
+> > > > > support it while the previous mt8173 don't. thus keep it as is.
+> > > > >
+> > > > > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> > > > > Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> > > > > ---
+> > > > >  drivers/iommu/io-pgtable-arm-v7s.c | 31 ++++++++++++++++++++++++-------
+> > > > >  drivers/iommu/io-pgtable.h         |  7 +++----
+> > > > >  drivers/iommu/mtk_iommu.c          | 14 ++++++++------
+> > > > >  drivers/iommu/mtk_iommu.h          |  1 +
+> > > > >  4 files changed, 36 insertions(+), 17 deletions(-)
+> > > > >
+> > > > > diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+> > > > > index 11d8505..8803a35 100644
+> > > > > --- a/drivers/iommu/io-pgtable-arm-v7s.c
+> > > > > +++ b/drivers/iommu/io-pgtable-arm-v7s.c
+> > > > > @@ -124,7 +124,9 @@
+> > > > >  #define ARM_V7S_TEX_MASK               0x7
+> > > > >  #define ARM_V7S_ATTR_TEX(val)          (((val) & ARM_V7S_TEX_MASK) << ARM_V7S_TEX_SHIFT)
+> > > > >
+> > > > > -#define ARM_V7S_ATTR_MTK_4GB           BIT(9) /* MTK extend it for 4GB mode */
+> > > > > +/* MediaTek extend the two bits below for over 4GB mode */
+> > > > > +#define ARM_V7S_ATTR_MTK_PA_BIT32      BIT(9)
+> > > > > +#define ARM_V7S_ATTR_MTK_PA_BIT33      BIT(4)
+> > > >
+> > > > If other vendors start doing stuff like this we'll need a more generic
+> > > > way to handle this... but I guess until we see a pattern this is okay.
+> > > >
+> > > > >
+> > > > >  /* *well, except for TEX on level 2 large pages, of course :( */
+> > > > >  #define ARM_V7S_CONT_PAGE_TEX_SHIFT    6
+> > > > > @@ -183,13 +185,22 @@ static dma_addr_t __arm_v7s_dma_addr(void *pages)
+> > > > >  static arm_v7s_iopte paddr_to_iopte(phys_addr_t paddr, int lvl,
+> > > > >                                     struct io_pgtable_cfg *cfg)
+> > > > >  {
+> > > > > -       return paddr & ARM_V7S_LVL_MASK(lvl);
+> > > > > +       arm_v7s_iopte pte = paddr & ARM_V7S_LVL_MASK(lvl);
+> > > > > +
+> > > > > +       if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB) {
+> > > > > +               if (paddr & BIT_ULL(32))
+> > > > > +                       pte |= ARM_V7S_ATTR_MTK_PA_BIT32;
+> > > > > +               if (paddr & BIT_ULL(33))
+> > > > > +                       pte |= ARM_V7S_ATTR_MTK_PA_BIT33;
+> > > > > +       }
+> > > > > +       return pte;
+> > > > >  }
+> > > > >
+> > > > >  static phys_addr_t iopte_to_paddr(arm_v7s_iopte pte, int lvl,
+> > > > >                                   struct io_pgtable_cfg *cfg)
+> > > > >  {
+> > > > >         arm_v7s_iopte mask;
+> > > > > +       phys_addr_t paddr;
+> > > > >
+> > > > >         if (ARM_V7S_PTE_IS_TABLE(pte, lvl))
+> > > > >                 mask = ARM_V7S_TABLE_MASK;
+> > > > > @@ -198,7 +209,14 @@ static phys_addr_t iopte_to_paddr(arm_v7s_iopte pte, int lvl,
+> > > > >         else
+> > > > >                 mask = ARM_V7S_LVL_MASK(lvl);
+> > > > >
+> > > > > -       return pte & mask;
+> > > > > +       paddr = pte & mask;
+> > > > > +       if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB) {
+> > > > > +               if (pte & ARM_V7S_ATTR_MTK_PA_BIT32)
+> > > > > +                       paddr |= BIT_ULL(32);
+> > > > > +               if (pte & ARM_V7S_ATTR_MTK_PA_BIT33)
+> > > > > +                       paddr |= BIT_ULL(33);
+> > > > > +       }
+> > > > > +       return paddr;
+> > > > >  }
+> > > > >
+> > > > >  static arm_v7s_iopte *iopte_deref(arm_v7s_iopte pte, int lvl,
+> > > > > @@ -315,9 +333,6 @@ static arm_v7s_iopte arm_v7s_prot_to_pte(int prot, int lvl,
+> > > > >         if (lvl == 1 && (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS))
+> > > > >                 pte |= ARM_V7S_ATTR_NS_SECTION;
+> > > > >
+> > > > > -       if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB)
+> > > > > -               pte |= ARM_V7S_ATTR_MTK_4GB;
+> > > > > -
+> > > >
+> > > > So despite getting lost in the details, I guess the reason it's okay
+> > > > that this goes from unconditional to conditional on bit32 is that
+> > > > before, with the older chips, all physical addresses were above 4GB,
+> > > > so we'll always see PA's above 4GB?
+> > > >
+> > > > >         return pte;
+> > > > >  }
+> > > > >
+> > > > > @@ -504,7 +519,9 @@ static int arm_v7s_map(struct io_pgtable_ops *ops, unsigned long iova,
+> > > > >         if (!(prot & (IOMMU_READ | IOMMU_WRITE)))
+> > > > >                 return 0;
+> > > > >
+> > > > > -       if (WARN_ON(upper_32_bits(iova) || upper_32_bits(paddr)))
+> > > > > +       if (WARN_ON(upper_32_bits(iova)) ||
+> > > > > +           WARN_ON(upper_32_bits(paddr) &&
+> > > > > +                   !(iop->cfg.quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB)))
+> > > > >                 return -ERANGE;
+> > > > >
+> > > > >         ret = __arm_v7s_map(data, iova, paddr, size, prot, 1, data->pgd);
+> > > > > diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+> > > > > index 47d5ae5..69db115 100644
+> > > > > --- a/drivers/iommu/io-pgtable.h
+> > > > > +++ b/drivers/iommu/io-pgtable.h
+> > > > > @@ -62,10 +62,9 @@ struct io_pgtable_cfg {
+> > > > >          *      (unmapped) entries but the hardware might do so anyway, perform
+> > > > >          *      TLB maintenance when mapping as well as when unmapping.
+> > > > >          *
+> > > > > -        * IO_PGTABLE_QUIRK_ARM_MTK_4GB: (ARM v7s format) Set bit 9 in all
+> > > > > -        *      PTEs, for Mediatek IOMMUs which treat it as a 33rd address bit
+> > > > > -        *      when the SoC is in "4GB mode" and they can only access the high
+> > > > > -        *      remap of DRAM (0x1_00000000 to 0x1_ffffffff).
+> > > > > +        * IO_PGTABLE_QUIRK_ARM_MTK_4GB: (ARM v7s format) MediaTek IOMMUs extend
+> > > > > +        *      to support up to 34 bits PA where the bit32 and bit33 are
+> > > > > +        *      encoded in the bit9 and bit4 of the PTE respectively.
+> > > > >          *
+> > > > >          * IO_PGTABLE_QUIRK_NO_DMA: Guarantees that the tables will only ever
+> > > > >          *      be accessed by a fully cache-coherent IOMMU or CPU (e.g. for a
+> > > > > diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+> > > > > index 189d1b5..ae1aa5a 100644
+> > > > > --- a/drivers/iommu/mtk_iommu.c
+> > > > > +++ b/drivers/iommu/mtk_iommu.c
+> > > > > @@ -367,12 +367,16 @@ static int mtk_iommu_map(struct iommu_domain *domain, unsigned long iova,
+> > > > >                          phys_addr_t paddr, size_t size, int prot)
+> > > > >  {
+> > > > >         struct mtk_iommu_domain *dom = to_mtk_domain(domain);
+> > > > > +       struct mtk_iommu_data *data = mtk_iommu_get_m4u_data();
+> > > > >         unsigned long flags;
+> > > > >         int ret;
+> > > > >
+> > > > > +       /* The "4GB mode" M4U physically can not use the lower remap of Dram. */
+> > > > > +       if (data->plat_data->has_4gb_mode && data->enable_4GB)
+> > > > > +               paddr |= BIT_ULL(32);
+> > > > > +
+> > > >
+> > > > Ok here's where I get lost. How is this okay? Is the same physical RAM
+> > > > accessible at multiple locations in the physical address space? Won't
+> > > > this map an iova to a different pa than the one requested?
+> > >
+> > > In 4GB mode, HW will remap 0x4000_0000-0x1_3fff_ffff to 0x1_0000_0000-
+> > > 0x1_ffff_ffff. M4U help multimedia HW access dram, thus from M4U point
+> > > of view, the dram always is 0x1_0000_0000 to 0x1_ffff_ffff.
+> > >
+> > > The detailed mapping relationship is like this:
+> > >
+> > > 0x4000_0000  -0xffff_ffff   map to 0x1_4000_0000 - 0x1_ffff_ffff.
+> > > 0x1_0000_0000-0x1_3fff_ffff map to 0x1_0000_0000 - 0x1_3fff_ffff.
+> > >
+> > > Thus, we can only add bit32 for the PA in the 4GB mode.
+> >
+> > Ok, I think I get it now. This thread really helped:
+> > https://patchwork.kernel.org/patch/8402211/
+> >
+> > So from what I understand basically the same DRAM exists in two places:
+> > 0000_0000 - ffff_ffff, and is also available in
+> > 1_0000_0000 - 1_ffff_ffff
+> >
+> > ...except that the peripherals are located in 0000_0000 - 3ffff_ffff,
+> > so that first GB of RAM is not visible at the lower address. I'm
+> > gathering this was in fact the motivation for 4GB mode. The important
+> > part is that address 4000_0000 == 1_4000_0000.
+> >
+> > Then there was also some quirk of the IOMMU where it refused to access
+> > addresses below 4GB. But those same addresses are accessible by ORing
+> > in bit 32, so you just always do that and you're good to go.
+> >
+> > Ok so now I can use that to understand this refactoring:
+> > * You used to always return an address above 4GB in
+> > mtk_iommu_iova_to_phys. I don't fully get how that worked, since it
+> > seems like you'd start returning PAs to the rest of the system that
+> > were outside of the range 4000_0000 - 1_3fff_ffff, but okay, you're no
+>
+> I'm not sure I follow this. From the SW point view, the dram is
+> 0x4000_0000 - 0x1_3fff_ffff. there is no memory outside it.
+>
+> But there is really a issue in the mtk_iommu_iova_to_phys in the
+> 4gb_mode.
 
---===============8410872350832758032==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="Rgf3q3z9SdmXC6oT"
-Content-Disposition: inline
+I guess I'm still struggling to understand what the "remapping" means.
+From what you've described, it seems like it means that the physical
+addresses seen by the CPU and IOMMU are different. I can picture two
+possibilities:
 
+First variant:
+CPU PA == IOMMU PA
+0x4000_0000 == 0x1_4000_0000
+0x8000_0000 == 0x1_8000_0000
+0xC000_0000 == 0x1_C000_0000
+0x1_0000_0000 == 0x1_0000_0000
 
---Rgf3q3z9SdmXC6oT
-Content-Type: text/plain; charset=utf-8
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+Or, maybe second variant:
+CPU PA == IOMMU PA
+0x4000_0000 == 0x1_0000_0000
+0x8000_0000 == 0x1_4000_0000
+0xC000_0000 == 0x1_8000_0000
+0x1_0000_0000 == 0x1_C000_0000
 
-On Mon, Jan 07, 2019 at 11:10:40PM +0100, Uwe Kleine-K=C3=B6nig wrote:
-> Hello Claudiu,
->=20
-> On Mon, Jan 07, 2019 at 09:30:55AM +0000, Claudiu.Beznea@microchip.com wr=
-ote:
-> > On 05.01.2019 23:05, Uwe Kleine-K=C3=B6nig wrote:
-> > > On Thu, Jan 03, 2019 at 01:29:44PM +0000, Claudiu.Beznea@microchip.co=
-m wrote:
-> > >> From: Claudiu Beznea <claudiu.beznea@microchip.com>
-> > >>
-> > >> Add basic PWM modes: normal and complementary. These modes should
-> > >> differentiate the single output PWM channels from two outputs PWM
-> > >> channels. These modes could be set as follow:
-> > >> 1. PWM channels with one output per channel:
-> > >> - normal mode
-> > >> 2. PWM channels with two outputs per channel:
-> > >> - normal mode
-> > >> - complementary mode
-> > >> Since users could use a PWM channel with two output as one output PWM
-> > >> channel, the PWM normal mode is allowed to be set for PWM channels w=
-ith
-> > >> two outputs; in fact PWM normal mode should be supported by all PWMs.
-> > >=20
-> > > I still think that my suggestion that I sent in reply to your v5 using
-> > > .alt_duty_cycle and .alt_offset is the better one as it is more gener=
-ic.
-> >=20
-> > I like it better my way, I explained myself why.
->=20
-> I couldn't really follow your argument though. You seemed to acknowledge
-> that using .alt_duty_cycle and .alt_offset is more generic. Then you
-> wrote that the push-pull mode is hardware generated on Atmel with some
-> implementation details. IMHO these implementation details shouldn't be
-> part of the PWM API and atmel's .apply should look as follows:
->=20
-> 	if (state->alt_duty_cycle =3D=3D 0) {
->=20
-> 		... configure for normal mode ...
->=20
-> 	} else if (state->duty_cycle =3D=3D state->alt_duty_cycle &&
-> 	           state->alt_offset =3D=3D state->period / 2) {
->=20
-> 		... configure for push pull mode ...
->=20
-> 	} else if (state->duty_cycle + state->alt_duty_cycle =3D=3D state->perio=
-d &&
-> 		   state->alt_offset =3D=3D state->duty_cycle) {
->=20
-> 		... configure for complementary mode ...
->=20
-> 	} else {
-> 		return -EINVAL;
-> 	}
->=20
-> If it turns out to be a common pattern, we can add helper functions =C3=
-=A0 la
-> pwm_is_complementary_mode(state) and
-> pwm_set_complementary_mode(state, period, duty_cycle). This allows to
-> have a generic way to describe a wide range of wave forms in a uniform
-> way in the API (which is good) and each driver implements the parts of
-> this range that it can support.
+My only point in trying to understand this about 4GB mode is that I'm
+trying to figure out if the equation CPU PA | 0x1_0000_0000 == IOMMU
+PA holds. In the first variant above, that equation works. But in the
+second equation, I'd expect to see a +/- 0x4000_0000, as simply ORing
+in 0x1_0000_0000 would get you the wrong PA as seen by the IOMMU.
 
-I think this is going to be the rule rather than the exception, so I'd
-expect we'll see these helpers used in pretty much all drivers that
-support more than just the normal mode.
+>
+> Currently in the 4gb mode, I always add BIT32 for all the memory, then
+> the PA returned by the mtk_iommu_iova_to_phys(in v7s) always
+> is from 0x1_0000_0000 to 0x1_ffff_ffff. But the SW still expect the PA
+> is from 0x4000_0000 - 0x1_3fff_ffff. Thus, I guess I will add a new
+> patch like this:
+>
+> @@ -418,6 +418,7 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct
+> iommu_domain *domain,
+>                                           dma_addr_t iova)
+>  {
+>         struct mtk_iommu_domain *dom = to_mtk_domain(domain);
+> +       struct mtk_iommu_data *data = mtk_iommu_get_m4u_data();
+>         unsigned long flags;
+>         phys_addr_t pa;
+>
+> @@ -425,6 +426,11 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct
+> iommu_domain *domain,
+>         pa = dom->iop->iova_to_phys(dom->iop, iova);
+>         spin_unlock_irqrestore(&dom->pgtlock, flags);
+>
+> +       /* Discard bit32 if pa is 0x1_4000_0000 -0x1_ffff_ffff in 4GB mode. */
+> +       if (data->plat_data->has_4gb_mode && data->enable_4GB &&
+> +           pa >= 0x140000000)
+> +               paddr &= ~BIT_ULL(32);
+> +
 
-But I really don't see the point in having consumers jump through hoops
-to set one of the standard modes just to have the driver jump through
-more hoops to determine which mode was meant.
+Right. I had noticed this in my previous reply about the old code, but
+forgot about the place where we just jam in that BIT32 in the new code
+for enable_4GB, which would lead to returning PAs to the rest of the
+system outside of the valid range of 0x4000_0000 - 0x1_3fff_ffff. Good
+catch.
 
-There are only so many modes and I have never seen hardware that
-actually implements the kind of fine-grained control that would be
-possible with your proposal.
+The hardcoded PA is horribly ugly, I'm trying to think of a better way
+to do this. I've got nothing at the moment...
 
-The goal of an API is to abstract, but .alt_duty_cycle and .alt_offset
-would be an inversion of API abstraction. That is, we'd be requiring the
-drivers to abstract the inputs of the API, which is the wrong way
-around.
+I guess this also lends another point towards #1 of my two variants
+being the correct picture of things.
 
-> > > I don't repeat what I wrote there assuming you still remember or are
-> > > willing to look it up at
-> > > e.g. https://www.spinics.net/lists/linux-pwm/msg08174.html (in the 2n=
-d half
-> > > of my mail).
-> >=20
-> > Yes, I remember it.
->=20
-> I expected that, my words were more directed to Thierry than you.
-> =20
-> > > Also I think that if the capabilities function is the way forward add=
-ing
-> > > support to detect availability of polarity inversion should be
-> > > considered.=20
-> >=20
-> > Yep, why not. But it should be done in a different patch. It is not rel=
-ated
-> > to this series.
->=20
-> Yes, given that polarity already exists, this would be a good
-> opportunity to introduce the capability function for that and only
-> afterwards add the new use case with modes. (But having said this, read
-> further as I think that this capability function is a bad idea.)
+>         return pa;
+>  }
+>
+>
+> > longer doing that there, so I won't worry about it.
+> > * Now, if you're in the 4GB mode, you just slam the bit in the PTE in
+> > mtk_iommu_map, which seems like the right thing to do.
+> > * The general functions in io-pgtable-arm-v7s.c now carefully reflect
+> > bits 32 & 33 in the PTE, since the new IOMMUs don't have the weird
+> > restriction of staying above 4GB, and there's not this weird 4GB
+> > aliasing mode going on (which I think would be a clearer name for this
+> > feature: has_4gb_alias).
+>
+> A more beautiful name. But our internal and all the CODA call this "4GB
+> mode"..thus I'd like to keep it....
 
-I don't think we need to require this. The series is already big enough
-as it is and has been in the works for long enough. There's no harm in
-integrating polarity support into the capability function later on.
+Sigh.
 
-> > > This would also be an opportunity to split the introduction
-> > > of the capabilities function and the introduction of complementary mo=
-de.
-> > > (But my personal preference would be to just let .apply fail when an
-> > > unsupported configuration is requested.)
-> >=20
-> > .apply fails when something wrong is requested.
->=20
-> If my controller doesn't support a second output is it "wrong" to
-> request complementary mode? I'd say yes. So you have to catch that in
-> .apply anyhow and there is little benefit to be able to ask the
-> controller if it supports it beforehand.
->=20
-> I don't have a provable statistic at hand, but my feeling is that quite
-> some users of the i2c frame work get it wrong to first check the
-> capabilities and only then try to use them. This is at least error prone
-> and harder to use than the apply function returning an error code.
-> And on the driver side the upside is to have all stuff related to which
-> wave form can be generated and which cannot is a single place. (Just
-> consider "inverted complementary mode". Theoretically this should work
-> if your controller supports complementary mode and inverted mode. If you
-> now have a driver for a controller that can do both, but not at the same
-> time, the separation gets ugly. OK, this is a constructed example, but
-> in my experience something like that happens earlier or later.)
+>
+> >
+> > >
+> > > >
+> > > > Also, you could have rolled the has_4gb_mode check into whether or not
+> > > > you set enable_4GB. Then you're doing the check for has_4gb_mode once,
+> > > > rather than on every map call.
+> > >
+> > > "has_4gb_mode" means this SoC support 4GB mode.
+> > > "enable_4GB" means whether the current dram size is 4GB.
+> >
+> > Right. But your use of the variable as well as it's name suggest that
+> > it really means "is 4GB aliasing mode on", not "does the system have
+> > >=4GB of RAM". You could reduce the map function to one conditional if
+> > you treated the variable that way. Then the only things that would
+> > need to change would be:
+> > * Add an extra conditional in probe that would only set enable_4GB if
+> > has_4gb_mode is set.
+>
+> I guess I still don't get this. the enable_4GB and has_4gb_mode are not
+> the same. Take mt8173 as a example when its dram size is 2G. it
+> has_4gb_mode, but we can not enable_4GB at that time.(if dram size is
+> 2G, the HW will not remap the PA address, we can not add BIT32 at that
+> time.)
 
-I think capabilities are useful in order to be able to implement
-fallbacks in consumer drivers. Sure the same thing could be implemented
-by trying to apply one state first and then downgrade and retry on
-failure and so on, but sometimes it's more convenient to know what's
-possible and determine what's the correct solution upfront.
+Right. So enable_4GB would be false there, since your code in probe
+would look like:
+data->enable_4GB = !!(max_pfn > (BIT_ULL(32) >> PAGE_SHIFT));
+if (!data->plat_data->has_4gb_mode)
+    data->enable_4GB = false;
 
-Thierry
+Then mtk_iommu_map would only have:
+if (data->enable_4GB)
+        paddr |= BIT_ULL(32);
 
---Rgf3q3z9SdmXC6oT
-Content-Type: application/pgp-signature; name="signature.asc"
+Said differently: right now every place enable_4GB is read, there is
+(or could be with no change in behavior) a check just before it for
+has_4gb_mode, so roll that check into enable_4GB.
 
------BEGIN PGP SIGNATURE-----
+Anyway, this isn't a huge deal, it just seemed nice to save the extra
+conditional in the map function, which I imagine might be a hot
+function.
 
-iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlxaFcEACgkQ3SOs138+
-s6FVjQ//UF5fY+9gMw0xhv0ZqYGHCM53pUyeDPu6Yr6I0O15w9OC2Fu+/aeCxKH+
-GzfE6ULNqmbi6BYLm+LXXLzRhXQzWaHCpThEnyVlexcqRy+Smb3UL0k5o6qveW49
-HvR/L/hQpfu/I3OH2rWGuH26aenSg96F2V7+elRelVUxpMDVWF7mid1UNtoZVcBt
-7HJ73Rkh8e8hNgYNCOKe7nSobxysM370jOmpwFU0XWeqBeS6WA6tNVG4TB6tyjHm
-VTLZ9Fb7MiQJQwJ7GCV5VeJsXt4wm1SEW3f0C/sJ9suz7yd9G19FhxQDWndAuzel
-PIYdk0NvIe6SNmrBoGupHGixKu3HOwMFv2QOaOBNzOqQ8hnAcTAqanOTAedbrj/O
-wfZ1liV5nAgxikmOFIKm2SiHqSj11SLSPsZrsiEEdNo5f6yJs5zj/fXzgG9o9mrE
-fCaW/LE+Vqfh8EW84KK2AQnbEmZhxPF0mPwNuKPD0xlbBbYy6skxGllfpjlVil6E
-saHJt57E9KoNyCo1Iq88F1ZOFfIhV02se8W/zAuzSuKhY9fsXXGyNEsXorIq9WIH
-z2ZTvGyuceFPQ+L2UIYPdaAZCG/gxO1gOob6MjKI9/tRzApnqca+egU/pAEhzxGs
-xqbJahbKMPFzOguMGCn0hyQ/X41vNNa5Vyk4NDhei7ei0RCKXoA=
-=1eNS
------END PGP SIGNATURE-----
+>
+> > * in mtk_iommu_domain_finalize, you could just always set the MTK
+> > quirk, since if you have <4GB of RAM, those bits will never get set in
+> > the PTEs anyway.
+>
+> oh. Yes. this looks right.
+>
+> > * I suspect mtk_iommu_hw_init would continue to work as-is, since
+> > everything that has vld_pa_rng also has has_4gb_mode.
+>
+> mt8173 has 4gb_mode but it doesn't has vld_pa_rng.
 
---Rgf3q3z9SdmXC6oT--
+Right, so that conditional would continue to stay false, as it should.
+Put differently, that conditional in mtk_iommu_hw_init() could be
+replaced with no functional difference by:
 
+if ((data->has_4gb_mode && data->enable_4GB) && data->plat_data->vld_pa_rng)
 
---===============8410872350832758032==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+since everything that has vld_pa_rng also has has_4gb_mode.
+-Evan
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============8410872350832758032==--
-
