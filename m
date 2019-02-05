@@ -2,68 +2,64 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C3D18C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 19:59:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D50AC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 20:47:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 91D242083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 19:59:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2E3002083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 20:47:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rilP/ghy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="VGdnhpla"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 91D242083B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lWuIpTn/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="qu3tDq6+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E3002083B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=KwMglpvJXzCsnTWIHfohmCoxEMufZ0p3VX611CcLXgA=; b=ril
-	P/ghysMaHdW0OFn3eCAxvvv99F9KnmtwuYfuVGkskZpmtekD4sJ1zWWHGdLzIXfZ9IooQ+FNFqltU
-	lPHmQYsPKPry04aTSKl7cixzIVUoTBd17n6umgZPgle1p/U4SN1YVLsJd9sggZ2YaLBViTjw4Xe9w
-	h8BJDPJTV06MjzrMfYKS9lL+qom6OD0OQLvs+90SO2iObOnXvErd0LbP6SK/eLGR4VViXmkZfaU7v
-	0/EJRTO9iOc0rPvBGlqaqqWFSpRPnJ11ugBRkfaz2WxoH9IBfXuHwLUumcpyoMrhvymjo2KjMzDTE
-	55UDU9q82hQzy99P+CE3cKgpBcHVQQg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:To:From:
+	Subject:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=BYf+Cgoo6PmRGVNfhi4QOGISioHK8Rq9Jc7Ufw7w8fA=; b=lWuIpTn/BJDE01
+	dKIyXxCO04BXgQJJTKfUAsfWxFJRsMTtwbw3v4nWUxNOP16mqd8FiztbwPn42dLCu4lzzlEj2A5g2
+	Og/fwMAP+xKIp3dSAvnNX+l5jtdQLst55h2wSQFKHn/FQ6deJq+YU8qYMmgJFuY0ASOYVsy+ireZL
+	bIm6bSMFYNJpz5jR1Qk4KfC3iZrUmPJadgZKt3gVIB50aeCNeiKZ+10L3gg4MopYMnNIqIxAUABtt
+	mw8UIXHuGDcozeJaAhBfYM1JOdTRPv4G1KOguZJqLObX6CquJzOKcsqgCZ4jMKczRd4OlFA0xxbh3
+	Gg+mzQDLHIROYxeB9i4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr6sQ-00065b-EK; Tue, 05 Feb 2019 19:59:26 +0000
+	id 1gr7ct-0005mU-66; Tue, 05 Feb 2019 20:47:27 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr6sN-000650-8j
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 19:59:24 +0000
-Received: from localhost.localdomain (unknown [194.230.155.153])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ id 1gr7cq-0005mA-En
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 20:47:25 +0000
+Received: from localhost (unknown [69.71.4.100])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 546012083B;
- Tue,  5 Feb 2019 19:59:20 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 6BBDE2083B;
+ Tue,  5 Feb 2019 20:47:23 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549396762;
- bh=Lmc2QzvU6mlVrbu9yAFloJg089oDSJS72xZtA5Ecs9U=;
- h=From:To:Cc:Subject:Date:From;
- b=VGdnhplap5z5ZwIRXClS50FCFf/blPWIqOmbeypB2YRKVeAP25CDSvKgi81uuSmy/
- HNauCpsYg+yYp+w2M39XWSgaf4o9/NLJ/EtcRYuRZN9Luph2KAf6gKgZKFuiyCErQ2
- CX2HsO2EWqd2TKOWrzWi88W1Zbi8NNKPKZ0E9m0s=
-From: Krzysztof Kozlowski <krzk@kernel.org>
-To: Tomasz Figa <tomasz.figa@gmail.com>, Krzysztof Kozlowski <krzk@kernel.org>,
- Sylwester Nawrocki <s.nawrocki@samsung.com>,
- Linus Walleij <linus.walleij@linaro.org>, Kukjin Kim <kgene@kernel.org>,
- linux-arm-kernel@lists.infradead.org, linux-samsung-soc@vger.kernel.org,
- linux-gpio@vger.kernel.org, linux-kernel@vger.kernel.org
-Subject: [PATCH v3] pinctrl: samsung: Remove legacy API for handling external
- wakeup interrupts mask
-Date: Tue,  5 Feb 2019 20:59:09 +0100
-Message-Id: <20190205195909.3565-1-krzk@kernel.org>
-X-Mailer: git-send-email 2.17.1
+ s=default; t=1549399643;
+ bh=VTpmfTKGtHgWiwqIWajrR7SPRxKH4ZGo6w3sS37zYAk=;
+ h=Subject:From:To:Cc:Date:From;
+ b=qu3tDq6+1EnQfvBIKgcxeOjs8949shMKJyWorrOVpDNIqT+z078CbjZ4X4XJeZf/4
+ oqdwzget1KBG2FRk6P+JEwDmhxP8z7ytWgctPTF8kiI65RTuoxMpCLETTJEVxjcbVm
+ 9qm1x/wiCv2uHvzERX2C8pUlSBcVirPNIElsGK88=
+Subject: [PATCH] net: Don't default Cavium PTP driver to 'y'
+From: Bjorn Helgaas <helgaas@kernel.org>
+To: "David S. Miller" <davem@davemloft.net>
+Date: Tue, 05 Feb 2019 14:47:21 -0600
+Message-ID: <154939964148.34496.18016063453530224332.stgit@bhelgaas-glaptop.roam.corp.google.com>
+User-Agent: StGit/0.18
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_115923_321792_D4E8FCC7 
-X-CRM114-Status: GOOD (  10.79  )
+X-CRM114-CacheID: sfid-20190205_124724_515685_CE3B0A36 
+X-CRM114-Status: GOOD (  10.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,68 +71,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sylwester Nawrocki <snawrocki@kernel.org>
-MIME-Version: 1.0
+Cc: Aleksey Makarov <aleksey.makarov@cavium.com>, netdev@vger.kernel.org,
+ Radoslaw Biernacki <rad@semihalf.com>, linux-kernel@vger.kernel.org,
+ Philippe Ombredanne <pombredanne@nexb.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Remove the legacy, ugly API of exposing the static value of external
-wakeup interrupts mask, because all arch-machine users where converted
-to use generic implementation from pinctrl driver.
+From: Bjorn Helgaas <bhelgaas@google.com>
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Sylwester Nawrocki <snawrocki@kernel.org>
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+8c56df372bc1 ("net: add support for Cavium PTP coprocessor") added the
+Cavium PTP coprocessor driver and enabled it by default.  Remove the
+"default y" because the driver only applies to Cavium ThunderX processors.
 
+Fixes: 8c56df372bc1 ("net: add support for Cavium PTP coprocessor")
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
+ drivers/net/ethernet/cavium/Kconfig |    1 -
+ 1 file changed, 1 deletion(-)
 
-Dear Linus,
-
-Could you apply this directly? It is an old cleanup patch, waiting for
-dependencies to get into mainline (v5.0-rc1).
-
-Changes since v3:
-1. Rebased on latest linux-next.
----
- drivers/pinctrl/samsung/pinctrl-exynos.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index f49ea3d92aa1..ebc27b06718c 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -325,13 +325,6 @@ int exynos_eint_gpio_init(struct samsung_pinctrl_drv_data *d)
- 	return ret;
- }
- 
--static u32 exynos_eint_wake_mask = 0xffffffff;
--
--u32 exynos_get_eint_wake_mask(void)
--{
--	return exynos_eint_wake_mask;
--}
--
- static int exynos_wkup_irq_set_wake(struct irq_data *irqd, unsigned int on)
- {
- 	struct irq_chip *chip = irq_data_get_irq_chip(irqd);
-@@ -342,10 +335,9 @@ static int exynos_wkup_irq_set_wake(struct irq_data *irqd, unsigned int on)
- 	pr_info("wake %s for irq %d\n", on ? "enabled" : "disabled", irqd->irq);
- 
- 	if (!on)
--		exynos_eint_wake_mask |= bit;
-+		our_chip->eint_wake_mask_value |= bit;
- 	else
--		exynos_eint_wake_mask &= ~bit;
--	our_chip->eint_wake_mask_value = exynos_eint_wake_mask;
-+		our_chip->eint_wake_mask_value &= ~bit;
- 
- 	return 0;
- }
--- 
-2.17.1
+diff --git a/drivers/net/ethernet/cavium/Kconfig b/drivers/net/ethernet/cavium/Kconfig
+index 5f03199a3acf..05f4a3b21e29 100644
+--- a/drivers/net/ethernet/cavium/Kconfig
++++ b/drivers/net/ethernet/cavium/Kconfig
+@@ -54,7 +54,6 @@ config CAVIUM_PTP
+ 	tristate "Cavium PTP coprocessor as PTP clock"
+ 	depends on 64BIT && PCI
+ 	imply PTP_1588_CLOCK
+-	default y
+ 	---help---
+ 	  This driver adds support for the Precision Time Protocol Clocks and
+ 	  Timestamping coprocessor (PTP) found on Cavium processors.
 
 
 _______________________________________________
