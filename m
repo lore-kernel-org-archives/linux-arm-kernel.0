@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EF3B7C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 10:27:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C3BAC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 10:27:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B2F902080A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 10:27:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DE5FE2080A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 10:27:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jDMg4idd";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="iWoQrZmy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B2F902080A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LpKHk3J8";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="1acO/Tza"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DE5FE2080A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,68 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OOQy8GU3fE16Mml24ZId+ZhDIf8cF7e141LeuugeMr4=; b=jDMg4iddOvrYdz
-	HHvxUhi6+Cdtum0NUQS3f0Yxz1m5JamzP6IJHZHNdUraYOPNCE+Vrzxp/C07qirYh1bi7vx6LPIvg
-	vEolC8qdiO/q9Rn5KPzxMeyfEjcEWcV2cjxkt8N9787qO3AciMfnfLo61z3AjtWulGK7/4rKObPJl
-	DlEVW3N8aCcRJ7IzQ+sGNnlx/AgLsdX4sQWycF2R2ilkU+qe/ch59FxE1uESudkV01OLPHf71YEZR
-	/+8Gskr3rjzztZ6yCQkq3rsJIJyixziEcY/NeMEjGK7LAwsqFYV3zEWFxlsL3W2JyE9JmbrcXDe6o
-	u1aPdkNaSJdjTEKzPrUQ==;
+	List-Owner; bh=eSX9sSCR6Bvdl+8rYs7Yg68vjAjgASUsNoDO0S4LL6s=; b=LpKHk3J8cFGxq2
+	PMJ6xaJJDr1wu8SsyS0rXTWNWmZfWArj+qKqg0jvdsmG9LMhsi5mgXrCCymzYWLkmREtopWqtO9IF
+	UDOlAOc4icmax7u4wBl1I8ekYgG8Px6aZM1zTYQW0Vn+vuA73w0M2/Co1mt+LaTmix/+Tyi6820oS
+	Mxw5enhjrZ+wx1NBpUUOUi90wVDdBIaToi+PEbgDYjrD0oe+HRZIj6b4ZhYKKBxUy4oIlW1feilk+
+	vlY0TTdfpGVHfz6qIDGFUPNjech2q+58qIgRhN0F4cbdwqubOmjPkF+I+8oiNvf2uUxJrCtWEUhu3
+	oDJE2KJSZh9XEaii7OXA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqxwZ-0000Ds-Hb; Tue, 05 Feb 2019 10:27:07 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gqxwn-0000RI-2Y; Tue, 05 Feb 2019 10:27:21 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqxvV-0007Qo-9f
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 10:26:08 +0000
-Received: by mail-wm1-x341.google.com with SMTP id b11so2990246wmj.1
+ id 1gqxvW-0007PY-Ef
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 10:26:10 +0000
+Received: by mail-wr1-x441.google.com with SMTP id x10so2960309wrs.8
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 05 Feb 2019 02:26:01 -0800 (PST)
+ Tue, 05 Feb 2019 02:26:00 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=YI7lGj6dJe+1jKSiIdUHdLpV0CJALW0y9vtqdcoWmhk=;
- b=iWoQrZmyEXVVLnvOIwM5PQVAvKBfwG5luEZW9f/zDaI2O4VZYwnJCOCGzKO1drdajw
- Jdlx8uDUelkhDw43lxxSIyJGcXjRLaiQDOH9BVqwz0RpcCMstHnysgTHdOqNqVw7AKIR
- AYv0VaP/sxhn1yM5VsVReX1iSJUPvHn5MqhZW0KyemDeSCMwk+S15yELF9t7Tt7yK3Jr
- WQUqzNXLO8AeVqz5eIKSAmPVxMtgP/Wb+mK4pL+g/BSJcq27apRzQkMo1J1ikntkZjzO
- 2iD3KHv2uD8Tx3sY+stWfw78sW5kiMD14wUO1UtIlMU1qjIiHrUzGkrACEJoH+1RkFOt
- 5+pg==
+ bh=bcVd+xaXefW/PkS3D+eVHZxbCvxtmtyCV/GOjJgMVBA=;
+ b=1acO/TzaTS03s9bceKurSqbS0vnd6Wsw05XIWMfb6Q2TUUfpvFDveRnfJ2Kzk4em+l
+ OjQL9v8R1DrfVaeDQKUkF8JOrVbqpzOgHmFXnRmTr92FWfHKpJddgbQc7TQmC4ztVaS5
+ tPZtuw7wux1ULY4TvoZEMToU38yEeWQi9Twg+kDMuTrCEdw6plCxpJX2C0ihtxWe2TC6
+ ey5twDj3VC8lUzf9lCYzwyIdbiMb3NrQ6rd5Od4Kic4x+LZIisPDbAi9+PTCNgdbFcCQ
+ zQ0kEbnp3QIochiozQP6p8/PQ1IU5+yylC87Xie+1IvcLeEG7kztOVefqgvRU2moGjaG
+ 0ruQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=YI7lGj6dJe+1jKSiIdUHdLpV0CJALW0y9vtqdcoWmhk=;
- b=NJg+puAKWNJiTdoqjJN8ZrVVKwbCZktzqLBW0a/zUT6SYjxBP2nMWpjn/thTTS+jok
- mrBOH0CrjNJQUIPzJtwrcQJ7H8UTYmg06h6BpGh+fi4ZsAQ0/S4/04gVQovKMh1lHNxQ
- e+ItbK0qcbM8gwP7KHmWYHNMNMlBhFezoa9QBbPkBW6xFxLOOTdQ/wpaGThGNj98qOao
- xKKUE36OyGCb+843H8+bksomGDwqh5cNpf2jbxp9n1iEql2RIyl9xoRzo7F4M6liFZuH
- H0TLKgFRDabnBKKZAqCVLUGxRlQQM8iRUvC+jYZbNLl2EfTWj9xwKsaGtqrPzBTQaHY8
- XNDA==
-X-Gm-Message-State: AHQUAuYCP2tt0AuM2z+coiF2342b+s+Q0zcLw96cBfoLCf/WNdRH1QQF
- ig+LICsu+vYYBbEtq4rBpq+XfQ==
-X-Google-Smtp-Source: AHgI3IZ4nPR1E+2u8hkBsTrLXyxyY8xsYuSmFe0pJpeHIc2QhG7pGS242qb/Zai3zg/pyR/6JexZLQ==
-X-Received: by 2002:a1c:ab87:: with SMTP id u129mr3137760wme.104.1549362359927; 
- Tue, 05 Feb 2019 02:25:59 -0800 (PST)
+ bh=bcVd+xaXefW/PkS3D+eVHZxbCvxtmtyCV/GOjJgMVBA=;
+ b=lPqhMm0SjBKXHJ4Vtr2HdH/ZUsdtyc1THdoQzkhv7LD5M11xZubxOL9qPXJBOJyNxA
+ 8deMavKh/FqNKOqCLJIqZGYivDCwjdWqUYYqWe0E7nPqV9k9k9qn6kbA1ixDmKJuYyT9
+ mli7xLHk1vLe75XWtWQAVK+LPUNIsjiDX0zZ42aJs4miHplkQsgDigPyo/EQKwvxNx9l
+ C6LwNdMWEfL8ckoN/0RdVPJNDJrQaK7zl20H+nLFpQHbaf6gy+bz7K4x56Mll3NArlJE
+ c+4DyV/tQu7jKU3WEC7MFeZyMr428EK8EwLOOhHKP7edIGAem+As6vYmr/EIrNHxc0sJ
+ aFTg==
+X-Gm-Message-State: AHQUAuZr++WEXq3yC14n8RbIvj7Au8MwUyGsCfHTapen/nK6PH/W9k8D
+ etiTsv4BM24uIIU7gc+YsjMVRQ==
+X-Google-Smtp-Source: AHgI3IaJHGNe/jeXwZM5GgTrUi1I/64CzT56Inrtp+00XAI6g8YCac9ynWVLI2Q0xYU6hZq2/Weg2A==
+X-Received: by 2002:adf:dd06:: with SMTP id a6mr3225217wrm.2.1549362358789;
+ Tue, 05 Feb 2019 02:25:58 -0800 (PST)
 Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id r11sm5132396wrx.75.2019.02.05.02.25.58
+ by smtp.gmail.com with ESMTPSA id r11sm5132396wrx.75.2019.02.05.02.25.57
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 05 Feb 2019 02:25:59 -0800 (PST)
+ Tue, 05 Feb 2019 02:25:58 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Alan Stern <stern@rowland.harvard.edu>,
  Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [PATCH 8/8] usb: ohci-da8xx: remove unused callbacks from platform
- data
-Date: Tue,  5 Feb 2019 11:25:46 +0100
-Message-Id: <20190205102546.29457-9-brgl@bgdev.pl>
+Subject: [PATCH 7/8] ARM: davinci: da830-evm: remove legacy usb helpers
+Date: Tue,  5 Feb 2019 11:25:45 +0100
+Message-Id: <20190205102546.29457-8-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190205102546.29457-1-brgl@bgdev.pl>
 References: <20190205102546.29457-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_022601_856431_21A7E3B6 
-X-CRM114-Status: GOOD (  11.58  )
+X-CRM114-CacheID: sfid-20190205_022603_033428_FEC4C0EB 
+X-CRM114-Status: GOOD (  13.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,40 +108,111 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-There are no more users of these callbacks.
+The logic implemented by these routines now lives in the da8xx-ohci
+driver. Remove dead code.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- include/linux/platform_data/usb-davinci.h | 14 --------------
- 1 file changed, 14 deletions(-)
+ arch/arm/mach-davinci/board-da830-evm.c | 67 -------------------------
+ 1 file changed, 67 deletions(-)
 
-diff --git a/include/linux/platform_data/usb-davinci.h b/include/linux/platform_data/usb-davinci.h
-index 0926e99f2e8f..879f5c78b91a 100644
---- a/include/linux/platform_data/usb-davinci.h
-+++ b/include/linux/platform_data/usb-davinci.h
-@@ -11,22 +11,8 @@
- #ifndef __ASM_ARCH_USB_H
- #define __ASM_ARCH_USB_H
- 
--struct	da8xx_ohci_root_hub;
--
--typedef void (*da8xx_ocic_handler_t)(struct da8xx_ohci_root_hub *hub,
--				     unsigned port);
--
- /* Passed as the platform data to the OHCI driver */
- struct	da8xx_ohci_root_hub {
--	/* Switch the port power on/off */
--	int	(*set_power)(unsigned port, int on);
--	/* Read the port power status */
--	int	(*get_power)(unsigned port);
--	/* Read the port over-current indicator */
--	int	(*get_oci)(unsigned port);
--	/* Over-current indicator change notification (pass NULL to disable) */
--	int	(*ocic_notify)(da8xx_ocic_handler_t handler);
--
- 	/* Time from power on to power good (in 2 ms units) */
- 	u8	potpgt;
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index 0712a37153a8..8d30f68773a0 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -52,8 +52,6 @@ static const short da830_evm_usb11_pins[] = {
+ 	-1
  };
+ 
+-static da8xx_ocic_handler_t da830_evm_usb_ocic_handler;
+-
+ static struct gpiod_lookup_table da830_evm_usb_gpio_lookup = {
+ 	.dev_id		= "ohci-da8xx",
+ 	.table = {
+@@ -62,60 +60,11 @@ static struct gpiod_lookup_table da830_evm_usb_gpio_lookup = {
+ 	},
+ };
+ 
+-static int da830_evm_usb_set_power(unsigned port, int on)
+-{
+-	gpio_set_value(ON_BD_USB_DRV, on);
+-	return 0;
+-}
+-
+-static int da830_evm_usb_get_power(unsigned port)
+-{
+-	return gpio_get_value(ON_BD_USB_DRV);
+-}
+-
+-static int da830_evm_usb_get_oci(unsigned port)
+-{
+-	return !gpio_get_value(ON_BD_USB_OVC);
+-}
+-
+-static irqreturn_t da830_evm_usb_ocic_irq(int, void *);
+-
+-static int da830_evm_usb_ocic_notify(da8xx_ocic_handler_t handler)
+-{
+-	int irq 	= gpio_to_irq(ON_BD_USB_OVC);
+-	int error	= 0;
+-
+-	if (handler != NULL) {
+-		da830_evm_usb_ocic_handler = handler;
+-
+-		error = request_irq(irq, da830_evm_usb_ocic_irq,
+-				    IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+-				    "OHCI over-current indicator", NULL);
+-		if (error)
+-			pr_err("%s: could not request IRQ to watch over-current indicator changes\n",
+-			       __func__);
+-	} else
+-		free_irq(irq, NULL);
+-
+-	return error;
+-}
+-
+ static struct da8xx_ohci_root_hub da830_evm_usb11_pdata = {
+-	.set_power	= da830_evm_usb_set_power,
+-	.get_power	= da830_evm_usb_get_power,
+-	.get_oci	= da830_evm_usb_get_oci,
+-	.ocic_notify	= da830_evm_usb_ocic_notify,
+-
+ 	/* TPS2065 switch @ 5V */
+ 	.potpgt		= (3 + 1) / 2,	/* 3 ms max */
+ };
+ 
+-static irqreturn_t da830_evm_usb_ocic_irq(int irq, void *dev_id)
+-{
+-	da830_evm_usb_ocic_handler(&da830_evm_usb11_pdata, 1);
+-	return IRQ_HANDLED;
+-}
+-
+ static __init void da830_evm_usb_init(void)
+ {
+ 	int ret;
+@@ -150,22 +99,6 @@ static __init void da830_evm_usb_init(void)
+ 		return;
+ 	}
+ 
+-	ret = gpio_request(ON_BD_USB_DRV, "ON_BD_USB_DRV");
+-	if (ret) {
+-		pr_err("%s: failed to request GPIO for USB 1.1 port power control: %d\n",
+-		       __func__, ret);
+-		return;
+-	}
+-	gpio_direction_output(ON_BD_USB_DRV, 0);
+-
+-	ret = gpio_request(ON_BD_USB_OVC, "ON_BD_USB_OVC");
+-	if (ret) {
+-		pr_err("%s: failed to request GPIO for USB 1.1 port over-current indicator: %d\n",
+-		       __func__, ret);
+-		return;
+-	}
+-	gpio_direction_input(ON_BD_USB_OVC);
+-
+ 	gpiod_add_lookup_table(&da830_evm_usb_gpio_lookup);
+ 
+ 	ret = da8xx_register_usb11(&da830_evm_usb11_pdata);
 -- 
 2.20.1
 
