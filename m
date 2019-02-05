@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3B221C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:44:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8A41AC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:48:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 097982083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:44:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 587312083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:48:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ckoWHn0T";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="UaoO4VDt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 097982083B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PJarPmIQ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="Nf7w4lz1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 587312083B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lechnology.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,50 +25,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=NHeY+kRWovZdWVccRDLoQ3fHC+bYaGDJoVLvtA3U1A4=; b=ckoWHn0TJsFIBC6BjBa+EwA3D
-	OSxOVeEejk0tf+dfut5CXQmE5Efq1yZ5qc7dwQCZ68IzN8GtAHXiYL+dHyCtNXFvElANmabiWtpGv
-	VZvouHxOyz6H1RuV4UfSoOQk7IcFahFWdH6WZRS4qnLfF9J4ifjD/5RRRU3O5XKJoJZppp3lyNwCL
-	2Z/X2nhOaDBVX9bbDRDE16XH/GiU37dFiMckU2yGIyT817r0HdACeuF3mZdNcoP7+F5gjHKludiq/
-	0p8HWnCN34vvzlMCaibnTQ7+IZnb3K5rX6NH1hyD/wznaJMagGkbwhI0sObD08IxXpEFwEDd1C+9D
-	nqZruTr2Q==;
+	 bh=qTlXDg2e3ifi+S7aMbCj98SWvttHar6Dx0e9d3zQq6A=; b=PJarPmIQvoL5N19I/9+N0rjM6
+	5Q9oyzSzdDmpfu4yKOA2Np0jtEBi8JByXbmS4QP0lKg6QtyNsuw0E98lW2pZNKd/d3MDNtvFZOBO4
+	7ausGmWCL7S5rvuSNk2SEeiRM6vTR1paUYilUVdXsJLvFrpo8zD2MY/kp+AkNmEk63TCTZvGlghZ8
+	YgnrFJRPGpcGJYCY+d0KZppiuIoJLb254k7eLwKCdLBUqwh2QiZ26JF8IRNfIfzAsjp0wERklmwP9
+	2QEwv4KFLln396cQ6DnanOzdOVI5taWBJrnBCTxy7yWHoFNKDvtxB6o3VVP+UYbZ1nWs680FQ9GQg
+	EBQL8WkCw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqoqg-0006px-7X; Tue, 05 Feb 2019 00:44:26 +0000
+	id 1gqoue-0008Ti-3U; Tue, 05 Feb 2019 00:48:32 +0000
 Received: from vern.gendns.com ([98.142.107.122])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqoqc-0006pe-J5
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 00:44:24 +0000
+ id 1gqoua-0008TO-BV
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 00:48:29 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=lechnology.com; s=default; h=Content-Transfer-Encoding:Content-Type:
  In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
  :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=o9HNgvBMmdTYUAhtpk+by5uqtEJVfHekLpP5tCkjqGc=; b=UaoO4VDtOu9qruiYRxIcNMQRbc
- i/myMoxO5vCOeMCeFK4pw6OrWoUI4Vfj1/c2Ao5NMVI7KsS4XCXD3iYLp9r2Y3F9yCm60KaVc+vve
- tK6hLvqcXIlIMqA924zjBabClVlIx5uWSHO4/QPF/c75uiaKB7RVTniM05F07NKdUITdrVPmw/et4
- UH5fKwpQADz35DckhYF4eyv6E7T2Ww4SjM2ZabMeQLRC9EgMi5Ytd+8hF/j1VGBt78GLLbnlQHj5s
- EzsmhziKQdDcXnfNq5vFrlaU0zs7b4uo9GtUkQUZgG4IP8I3vvq2vXzVig+wB1oS9fxe7rNBdkWzv
- Dn/YCtNg==;
+ bh=TM2Zh1XozD5ydN2IL/NMl5G45A6ku0yVGdHl8QWr+C4=; b=Nf7w4lz1NsBQM26ZSvjQ3vW6W9
+ UGf4z9JtK/+wDpYm6CS0UnOpYOXnUtqDbb2CdOrZGZQCrAiZeS8OqO/SpcA+5QkdhEEzXG6U33TMl
+ RXzDG0L49G1qdg4jW8Td1VohSSPdnzsbh4p+1ZLGtH/i/mhxGKF2BFWWlMzFNoiL3PqBAVqGJVX8s
+ 5PukbnQgV45rOn4GPiGDnRSWUs+VhXfJqV6D9qvo7iM+70xnuEDycBlzEQVKKJffE6AtI7y1kHY+d
+ BOxvcoNDs8vfaId1UsIqrRTRu9C/HcfN1+/s0YZZ+UphmaGmQOIfHQZGbcokHW+vjXjq3KM2FoM8i
+ Pv5W+xXw==;
 Received: from 108-198-5-147.lightspeed.okcbok.sbcglobal.net
- ([108.198.5.147]:60796 helo=[192.168.0.134])
+ ([108.198.5.147]:60902 helo=[192.168.0.134])
  by vern.gendns.com with esmtpsa (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128)
  (Exim 4.91) (envelope-from <david@lechnology.com>)
- id 1gqon7-0005zT-Jo; Mon, 04 Feb 2019 19:40:45 -0500
-Subject: Re: [PATCH 31/35] irqchip: davinci-cp-intc: move the driver to
- drivers/irqchip
+ id 1gqor4-00071V-Ru; Mon, 04 Feb 2019 19:44:50 -0500
+Subject: Re: [PATCH 32/35] ARM: davinci: remove intc related fields from
+ davinci_soc_info
 To: Bartosz Golaszewski <brgl@bgdev.pl>, Sekhar Nori <nsekhar@ti.com>,
  Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
  Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>
 References: <20190131133928.17985-1-brgl@bgdev.pl>
- <20190131133928.17985-32-brgl@bgdev.pl>
+ <20190131133928.17985-33-brgl@bgdev.pl>
 From: David Lechner <david@lechnology.com>
-Message-ID: <513399b3-e8dc-293a-065f-050c3cfbb09f@lechnology.com>
-Date: Mon, 4 Feb 2019 18:44:18 -0600
+Message-ID: <8aff0959-d114-eaba-5be5-76419d61039f@lechnology.com>
+Date: Mon, 4 Feb 2019 18:48:24 -0600
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <20190131133928.17985-32-brgl@bgdev.pl>
+In-Reply-To: <20190131133928.17985-33-brgl@bgdev.pl>
 Content-Language: en-US
 X-AntiAbuse: This header was added to track abuse,
  please include it with any abuse report
@@ -83,8 +83,8 @@ X-Source:
 X-Source-Args: 
 X-Source-Dir: 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_164422_708173_BFCFF94D 
-X-CRM114-Status: UNSURE (   8.88  )
+X-CRM114-CacheID: sfid-20190204_164828_473660_3698A1B4 
+X-CRM114-Status: UNSURE (   6.39  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -107,31 +107,13 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 On 1/31/19 7:39 AM, Bartosz Golaszewski wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> The cp-intc driver has now been cleaned up. Move it to drivers/irqchip
-> where it belongs.
+> These are no longer used. Remove them.
 > 
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
 
 Reviewed-by: David Lechner <david@lechnology.com>
 
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -134,6 +134,11 @@ config DAVINCI_AINTC
->   	select GENERIC_IRQ_CHIP
->   	select IRQ_DOMAIN
->   
-> +config DAVINCI_CP_INTC
-> +	bool
-> +	select GENERIC_IRQ_CHIP
-> +	select IRQ_DOMAIN
-
-A little help section would be nice.
-
-> +
->   config DW_APB_ICTL
->   	bool
->   	select GENERIC_IRQ_CHIP
 
 
 _______________________________________________
