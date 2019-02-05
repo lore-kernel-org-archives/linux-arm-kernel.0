@@ -2,72 +2,60 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DD6DBC282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:24:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 328B2C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:31:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A98C02073D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:24:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DE03E2175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:31:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kWQsTWT5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A98C02073D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kkXY2j3T"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DE03E2175B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sD+r9y9TYPIvv+mL9bETy8RIaLNj5ObqI2Y3iPNrlcA=; b=kWQsTWT5t+dj8f
-	J2CkO8ZTLzHYn7YCddTU/OstdetCaXeZH4Dk+i/o7imwvQRbVSOhvQaICLNQjWPigPRbdoqSaZkQ9
-	4OWf3UEJZXIYASXY1XmzLToaTOruTLlC84dl44cPfQeqKVXO7onVxL25VP2yPlqP7AiK5jSTaxHjM
-	TTQbmXIP4ltn/U+5YYKsp3qyrunV/D8iMzKNVM3o+0GPOtFXmYO4b9EJAkDmNrzWtddQYDM6S/t5m
-	rUL7a62NlMBPBhgXRZVCyAyZTa44y0o5PHFf2H246vdomSrK9U0VAudGz+fWwiNUoLh9RvobPfwbP
-	osqCsRevt2FyBSPorxDA==;
+	List-Owner; bh=xCNPZtzHDsFdah7dYslLrU1sOq2UxcT1GbNQECSX+CM=; b=kkXY2j3T16O7Ln
+	FuV/JBtIhA76ix/eTCho14zP3/0hYCJq75xniOGORcyCHDXRBCxyfe7+96DRyPYA30TCiuqc4Z34B
+	3uG62zxuaGkH1lIJP8RVs93yuKkKqCSADGJ7k3Xw/h71WbtXkik7fVP98hb6OhxNPbWoHv3pKpNpG
+	sOjD7ffEwEmvAn9to3HvxJ+mFrtRG2J/ARBRQCJE1OgZBUwZgbcABDgnOb+A+1scgPNMPPphvhSBq
+	lQkuSnSRQ0GVeFOUMdIJCTOJFYIedyV1od45PZAF9IUEu17RsU3CVxq3k7RrIKZ8pQX7GzNBOXafR
+	9uo0x2xlIRcm2RA0cFuw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr0iZ-0005nI-UY; Tue, 05 Feb 2019 13:24:51 +0000
-Received: from mail-vs1-f66.google.com ([209.85.217.66])
+	id 1gr0or-0000mb-M7; Tue, 05 Feb 2019 13:31:21 +0000
+Received: from relay5-d.mail.gandi.net ([217.70.183.197])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr0iW-0005my-CT
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 13:24:49 +0000
-Received: by mail-vs1-f66.google.com with SMTP id b74so2094026vsd.9
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 05 Feb 2019 05:24:46 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=mH2jC//BX4csPlxzLWPxIbl/VLPdX2MNzc/nlQzQz8Q=;
- b=M5nfh9DHgf3yhYoKHrZAv5kud0hdFAXYitYONLqNEzgcIGdxh4jTwBmdEKSLKvAs9G
- 0UwM78rRrRyrLO9+Z3iUiMk9/D7oqzAbRKJ/bcSeMy1fC7s4xBN/BCm7ajNh29++vSup
- /u+SSqIff07TrZ8EHljPa413fRtDjbhEvDD16n/kRFSrD9G+pqydVkQWtw29hg0wsv5u
- pktItQtTuDmlx/iRXNfh5iuwO7OYfzWpNQ1DmuJibfbPYMb0dLHfDQ+jHVoFqjJSARrT
- K9sQk48FaKYIpGJe0O3dgTbbMUK1LPMxgcgguOCfoNvrvkp6eLTo99Q2rvVbCbmzfv9F
- NNUA==
-X-Gm-Message-State: AHQUAuY3Vtzt2BJInsqFBCUKdzYQUf/NDGlpJQCWgpFpW7784owwG4uz
- I/PZmTb7XNZ/P+X5z+RxZ1OklBuCUM9EUJ+yxIk=
-X-Google-Smtp-Source: AHgI3IZGiOTTw8sZiDzZNxEUVJfcek13r1NV7ffeSdfvgl9Jp03HBQFnX+NKK7wxVbto9ZhTYk3nwT3JsD0+hzp5ILU=
-X-Received: by 2002:a67:d119:: with SMTP id u25mr1891966vsi.63.1549373086077; 
- Tue, 05 Feb 2019 05:24:46 -0800 (PST)
+ id 1gr0on-0000ll-Eg; Tue, 05 Feb 2019 13:31:19 +0000
+X-Originating-IP: 90.88.22.177
+Received: from xps13 (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
+ [90.88.22.177]) (Authenticated sender: miquel.raynal@bootlin.com)
+ by relay5-d.mail.gandi.net (Postfix) with ESMTPSA id 8DD0D1C0016;
+ Tue,  5 Feb 2019 13:31:07 +0000 (UTC)
+Date: Tue, 5 Feb 2019 14:31:06 +0100
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: wen yang <yellowriver2010@hotmail.com>
+Subject: Re: [PATCH] mtd: rawnand: mtk: fix object reference leaks in
+ mtk_ecc_get
+Message-ID: <20190205143106.751554e0@xps13>
+In-Reply-To: <HK0PR02MB36345BDC344D1A6FE77B4576B26E0@HK0PR02MB3634.apcprd02.prod.outlook.com>
+References: <HK0PR02MB36345BDC344D1A6FE77B4576B26E0@HK0PR02MB3634.apcprd02.prod.outlook.com>
+Organization: Bootlin
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-References: <1548846984-2044-1-git-send-email-vincent.guittot@linaro.org>
- <CAPDyKFpyg7oGoDZA+=SG7R3yL874Geeqs5LWrsAf50csxsE05A@mail.gmail.com>
-In-Reply-To: <CAPDyKFpyg7oGoDZA+=SG7R3yL874Geeqs5LWrsAf50csxsE05A@mail.gmail.com>
-From: Geert Uytterhoeven <geert@linux-m68k.org>
-Date: Tue, 5 Feb 2019 14:24:33 +0100
-Message-ID: <CAMuHMdWdbRpA_M4V1kigab6U8rSDgGYXtidiSU4MVdj5xarK8g@mail.gmail.com>
-Subject: Re: [PATCH v2 ] PM-runtime: fix deadlock with ktime
-To: Ulf Hansson <ulf.hansson@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_052448_428122_7624A71E 
-X-CRM114-Status: GOOD (  12.68  )
+X-CRM114-CacheID: sfid-20190205_053117_640277_7628E1D9 
+X-CRM114-Status: GOOD (  19.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,72 +67,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Vincent Guittot <vincent.guittot@linaro.org>,
- Linux PM <linux-pm@vger.kernel.org>, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Biju Das <biju.das@bp.renesas.com>,
- Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
- linux-omap <linux-omap@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "bbrezillon@kernel.org" <bbrezillon@kernel.org>,
+ "richard@nod.at" <richard@nod.at>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "marek.vasut@gmail.com" <marek.vasut@gmail.com>,
+ "ludovic.desroches@microchip.com" <ludovic.desroches@microchip.com>,
+ "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ "matthias.bgg@gmail.com" <matthias.bgg@gmail.com>,
+ "linux-mediatek@lists.infradead.org" <linux-mediatek@lists.infradead.org>,
+ "xiaolei.li@mediatek.com" <xiaolei.li@mediatek.com>,
+ "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
+ "dwmw2@infradead.org" <dwmw2@infradead.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Ulf,
-
-On Wed, Jan 30, 2019 at 1:15 PM Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On Wed, 30 Jan 2019 at 12:16, Vincent Guittot
-> <vincent.guittot@linaro.org> wrote:
-> >
-> > A deadlock has been seen when swicthing clocksources which use PM runtime.
-> > The call path is:
-> > change_clocksource
-> >     ...
-> >     write_seqcount_begin
-> >     ...
-> >     timekeeping_update
-> >         ...
-> >         sh_cmt_clocksource_enable
-> >             ...
-> >             rpm_resume
->
-> Hmm, isn't this already a problem in genpd then?
->
-> In genpd's ->runtime_resume() callback (genpd_runtime_resume()) we
-> call ktime_get() to measure the latency of running the callback.
->
-> Or, perhaps irq_safe_dev_in_no_sleep_domain() returns true for the
-> genpd + device in question, which means the ktime thingy is skipped.
->
-> Geert?
-
-Correct. After adding
-
-    dev_info(dev, "%s: pm_runtime_is_irq_safe = %d,
-genpd_is_irq_safe(%s) = %d => %s\n", __func__,
-pm_runtime_is_irq_safe(dev), genpd->name, genpd_is_irq_safe(genpd),
-ret ? "true" : "false");
-
-I see on R-Car M2-W:
-
-    sh_cmt ffca0000.timer: irq_safe_dev_in_no_sleep_domain:
-pm_runtime_is_irq_safe = 1, genpd_is_irq_safe(always-on) = 0 => true
-
-For all other devices, the result is false.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgd2VuLAoKd2VuIHlhbmcgPHllbGxvd3JpdmVyMjAxMEBob3RtYWlsLmNvbT4gd3JvdGUgb24g
+VHVlLCA1IEZlYiAyMDE5CjEwOjA1OjQ2ICswMDAwOgoKPiBvZl9maW5kX2RldmljZV9ieV9ub2Rl
+KCkgdGFrZXMgYSByZWZlcmVuY2UgdG8gdGhlIHN0cnVjdCBkZXZpY2UKPiB3aGVuIGl0IGZpbmRz
+IGEgbWF0Y2ggdmlhIGdldF9kZXZpY2UsIHRoZXJlIGlzIG5vIG5lZWQgdG8gY2FsbAo+IGdldF9k
+ZXZpY2UoKSB0d2ljZS4KPiBXZSBhbHNvIHNob3VsZCBtYWtlIHN1cmUgdG8gZHJvcCB0aGUgcmVm
+ZXJlbmNlIHRvIHRoZSBkZXZpY2UKPiB0YWtlbiBieSBvZl9maW5kX2RldmljZV9ieV9ub2RlKCkg
+b24gZHJpdmVyIHVuYmluZC4KPiAKPiBGaXhlczogMWQ2YjFlNDY0OTUwICgibXRkOiBtZWRpYXRl
+azogZHJpdmVyIGZvciBNVEsgU21hcnQgRGV2aWNlIikKPiBTaWduZWQtb2ZmLWJ5OiBXZW4gWWFu
+ZyA8eWVsbG93cml2ZXIyMDEwQGhvdG1haWwuY29tPgo+IFN1Z2dlc3RlZC1ieTogQm9yaXMgQnJl
+emlsbG9uIDxiYnJlemlsbG9uQGtlcm5lbC5vcmc+Cj4gQ2M6IFhpYW9sZWkgTGkgPHhpYW9sZWku
+bGlAbWVkaWF0ZWsuY29tPgo+IENjOiBCb3JpcyBCcmV6aWxsb24gPGJicmV6aWxsb25Aa2VybmVs
+Lm9yZz4KPiBDYzogTWlxdWVsIFJheW5hbCA8bWlxdWVsLnJheW5hbEBib290bGluLmNvbT4KPiBD
+YzogUmljaGFyZCBXZWluYmVyZ2VyIDxyaWNoYXJkQG5vZC5hdD4KPiBDYzogRGF2aWQgV29vZGhv
+dXNlIDxkd213MkBpbmZyYWRlYWQub3JnPgo+IENjOiBCcmlhbiBOb3JyaXMgPGNvbXB1dGVyc2Zv
+cnBlYWNlQGdtYWlsLmNvbT4KPiBDYzogTWFyZWsgVmFzdXQgPG1hcmVrLnZhc3V0QGdtYWlsLmNv
+bT4KPiBDYzogTWF0dGhpYXMgQnJ1Z2dlciA8bWF0dGhpYXMuYmdnQGdtYWlsLmNvbT4KPiBDYzog
+bGludXgtbXRkQGxpc3RzLmluZnJhZGVhZC5vcmcKPiBDYzogbGludXgtYXJtLWtlcm5lbEBsaXN0
+cy5pbmZyYWRlYWQub3JnCj4gQ2M6IGxpbnV4LW1lZGlhdGVrQGxpc3RzLmluZnJhZGVhZC5vcmcK
+PiBDYzogbGludXgta2VybmVsQHZnZXIua2VybmVsLm9yZwo+IC0tLQo+ICBkcml2ZXJzL210ZC9u
+YW5kL3Jhdy9tdGtfZWNjLmMgfCAxMiArKysrKysrKysrLS0KPiAgMSBmaWxlIGNoYW5nZWQsIDEw
+IGluc2VydGlvbnMoKyksIDIgZGVsZXRpb25zKC0pCj4gCj4gZGlmZiAtLWdpdCBhL2RyaXZlcnMv
+bXRkL25hbmQvcmF3L210a19lY2MuYyBiL2RyaXZlcnMvbXRkL25hbmQvcmF3L210a19lY2MuYwo+
+IGluZGV4IDY0MzJiZDcuLjI1YmRjMTUgMTAwNjQ0Cj4gLS0tIGEvZHJpdmVycy9tdGQvbmFuZC9y
+YXcvbXRrX2VjYy5jCj4gKysrIGIvZHJpdmVycy9tdGQvbmFuZC9yYXcvbXRrX2VjYy5jCj4gQEAg
+LTI2NSwxNyArMjY1LDI1IEBAIHN0YXRpYyBzdHJ1Y3QgbXRrX2VjYyAqbXRrX2VjY19nZXQoc3Ry
+dWN0IGRldmljZV9ub2RlICpucCkKPiAgewo+ICAJc3RydWN0IHBsYXRmb3JtX2RldmljZSAqcGRl
+djsKPiAgCXN0cnVjdCBtdGtfZWNjICplY2M7Cj4gKwlpbnQgcmV0Owo+ICAKPiAgCXBkZXYgPSBv
+Zl9maW5kX2RldmljZV9ieV9ub2RlKG5wKTsKPiAtCWlmICghcGRldiB8fCAhcGxhdGZvcm1fZ2V0
+X2RydmRhdGEocGRldikpCj4gKwlpZiAoIXBkZXYpCj4gIAkJcmV0dXJuIEVSUl9QVFIoLUVQUk9C
+RV9ERUZFUik7Cj4gKwlpZiAoIXBsYXRmb3JtX2dldF9kcnZkYXRhKHBkZXYpKSB7Cj4gKwkJcmV0
+ID0gLUVQUk9CRV9ERUZFUjsKPiArCQlnb3RvIGVycl9wdXRfZGV2aWNlOwo+ICsJfQo+ICAKPiAt
+CWdldF9kZXZpY2UoJnBkZXYtPmRldik7Cj4gIAllY2MgPSBwbGF0Zm9ybV9nZXRfZHJ2ZGF0YShw
+ZGV2KTsKPiAgCWNsa19wcmVwYXJlX2VuYWJsZShlY2MtPmNsayk7Cj4gIAltdGtfZWNjX2h3X2lu
+aXQoZWNjKTsKPiAgCj4gIAlyZXR1cm4gZWNjOwo+ICsKPiArZXJyX3B1dF9kZXZpY2U6Cj4gKwlw
+dXRfZGV2aWNlKCZwZGV2LT5kZXYpOwo+ICsJcmV0dXJuIEVSUl9QVFIocmV0KTsKClNhbWUgYXMg
+YmVmb3JlLCBJIGRvbid0IHRoaW5rIGEgbGFiZWwgaXMgdXNlZnVsIGluIHRoaXMgc2l0dWF0aW9u
+LgoKClRoYW5rcywKTWlxdcOobAoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5l
+bEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4v
+bGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
