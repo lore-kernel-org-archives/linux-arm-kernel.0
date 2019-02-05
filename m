@@ -2,21 +2,21 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 33EF6C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:30:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EB927C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:35:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0237C20823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:30:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B788820823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 00:35:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N2KWTzJ4";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="wTyHpEPt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0237C20823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ofrenI0B";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="CdS1DmCi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B788820823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lechnology.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,50 +25,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=g0Z9EPsSCrph3wy8wuIBybaZ39hzpsVB6exidmS3Qn8=; b=N2KWTzJ4go1QesVBtNCFPUiwp
-	L1ThA//dZI7czztFUUCgSJDFavXtHPwCvS7odi2R2bPOwo52pYNa/elLRo7BfyZ06AZe1Y2730lFT
-	YwX935YCsCtsQ8lWEb65R0P2ZjN7EE3NkaYrDXFdWuQJHDXDlME96efsAUle2KNb+7hoKr5/0tNVy
-	VW9L6K362ax56PqCJ7WXsTZR2Nx7qeo8JKflxCGEudxwhyW8g6TDOI5qSkKf0o/oHQeHUtdjd9PX9
-	X3o4cprWJpg4IHc4GqyTy9kbKPTfIbteY3XuuC2k5p8KhCDuhRbzEtQyCjSMfaiz3UnTXnkKdo0rD
-	21dbHZZpw==;
+	 bh=tUsYIYUKs3rSl/FPZZwduz8w10SO3aMhDHHiMHZfqJk=; b=ofrenI0BkS706BO5m5tY3cmIb
+	rvSkBpvg/XnSOza/+wl+1u47Sz7H/IWBCwcESNWO+w8N5yjD/QoK1uYsdbZcrYg51Xa+VXZYM233D
+	+gOQkfC3nem3cT+m4u6fLv3ISegiAbXZOryMXZ2mSC+NrZybtgtMZimvEA857+VEKmX9lUw1tij4J
+	u5+G3/dVqE9Wa1/JdyZPCO9G9xXL7FcggKlFCqJbcJp2dJgVKDAJ5kITeQ+OBE1TXxUfXh/ytX+xE
+	p0DH3GDSSiVnIzl/uA4nMX50ExDooEQSPVSJYeiEKEFCSKADQk6+wWnoALsB0NUnC9Vd3CKZkx9di
+	RivzmikWA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqocl-0000nW-38; Tue, 05 Feb 2019 00:30:03 +0000
+	id 1gqoiM-00042M-PO; Tue, 05 Feb 2019 00:35:50 +0000
 Received: from vern.gendns.com ([98.142.107.122])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqoch-0000mF-6u
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 00:30:00 +0000
+ id 1gqoiJ-000423-FI
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 00:35:49 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=lechnology.com; s=default; h=Content-Transfer-Encoding:Content-Type:
  In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
  :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=9143fEFiv9Z6gdD0b+ulyN7PkSp1bjjjNTkDc5sshjc=; b=wTyHpEPtSoR1YmGsslTM6Puq+3
- 8bDGvH+jWFz2wSoFsrPKd2vkuLKuHPx3IM6BwZ/6o1MLOJk09ARjFZPTQnVafgMQXAwi8fVY4XCPH
- jCHKmVmIldUnuSQ2Tt9agB+/VuXlTR9VfpLmm0pC2yNU7/wi54tLCQNrDUE3PzNcm9uczr67BIlqS
- uHLtPBccOY5W7lLkOTZLWZHFR3wEJ7G1UniD0Sm2EMdYLolf/RLzpL7RCeENkRnwnb4Kz8yI+4vWg
- MrA78Q98LLeFNYMZa4bdlN8bTIqzBVt15jCmkrKhRmTFjw8pKWQ3OERo50FaeMmK0+v1QLuYZky9C
- 1UpAc4OQ==;
+ bh=zKSJ0jyVZjjqzc7GBEjuxXuEvTyouXi90e4Hbbr1TYQ=; b=CdS1DmCi0EtjXrnc9ltsRx16l9
+ 36FlTR668K9qhzFp3kMtwbtW7oGxHl98vEafmhGAKCcx+TS+OPLDzbEdSYtDdXgjvZkYcY7cKvXbQ
+ bEvDjLxJHtJwIgcO4FXAFx9dvXyYdvdtR4bGUBf/WssovgZT/EMQAkllZs1Dm70GuM0MnfJRfHTt/
+ RZkmw0ir+gQ/Fy9MegopzNv5EXcEaGGVDO5pDQYYUX1mxLTdqfum9nO3HiWZXbhFEr9nT8ub/8IJn
+ P1dHWP+zF3NPd8Uf9yNvRfRmVAtv5gGXLcGjSBgyP6kMNQtJkLt4rivNjIZOEn9vvRurc7JBAMYjk
+ 6/Vm0PLQ==;
 Received: from 108-198-5-147.lightspeed.okcbok.sbcglobal.net
- ([108.198.5.147]:60374 helo=[192.168.0.134])
+ ([108.198.5.147]:60600 helo=[192.168.0.134])
  by vern.gendns.com with esmtpsa (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128)
  (Exim 4.91) (envelope-from <david@lechnology.com>)
- id 1gqoZB-0001WB-RM; Mon, 04 Feb 2019 19:26:21 -0500
-Subject: Re: [PATCH 25/35] ARM: davinci: cp-intc: use the new-style config
- structure
+ id 1gqoen-0003FR-Hd; Mon, 04 Feb 2019 19:32:09 -0500
+Subject: Re: [PATCH 26/35] ARM: davinci: cp-intc: improve coding style
 To: Bartosz Golaszewski <brgl@bgdev.pl>, Sekhar Nori <nsekhar@ti.com>,
  Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
  Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>
 References: <20190131133928.17985-1-brgl@bgdev.pl>
- <20190131133928.17985-26-brgl@bgdev.pl>
+ <20190131133928.17985-27-brgl@bgdev.pl>
 From: David Lechner <david@lechnology.com>
-Message-ID: <55b5797c-ee0b-c2d8-9eb9-0d681da08018@lechnology.com>
-Date: Mon, 4 Feb 2019 18:29:55 -0600
+Message-ID: <8202be1d-d5c6-8702-da3c-7c80e80fa209@lechnology.com>
+Date: Mon, 4 Feb 2019 18:35:43 -0600
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <20190131133928.17985-26-brgl@bgdev.pl>
+In-Reply-To: <20190131133928.17985-27-brgl@bgdev.pl>
 Content-Language: en-US
 X-AntiAbuse: This header was added to track abuse,
  please include it with any abuse report
@@ -83,8 +82,8 @@ X-Source:
 X-Source-Args: 
 X-Source-Dir: 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190204_162959_330635_25F5866A 
-X-CRM114-Status: GOOD (  11.75  )
+X-CRM114-CacheID: sfid-20190204_163547_672198_A98D4B49 
+X-CRM114-Status: GOOD (  14.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,29 +105,52 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 On 1/31/19 7:39 AM, Bartosz Golaszewski wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> Modify the cp-intc driver to take all its configuration from the new
-> config structure. Stop referencing davinci_soc_info in any way.
-> Move the declaration for davinci_cp_intc_init() to
-> irq-davinci-cp-intc.h and make it take the new config structure as
-> parameter. Convert all users to the new version.
-> 
-> Also: since the two da8xx SoCs default all irq priorities to 7, just
-> drop the priority configuration at all and hardcode the channels to 7.
+> Drop tabs from variable initialization. Arrange variables in reverse
+> christmas-tree order.
 
-As mentioned in a comment on a different patch, this isn't strictly
-true (although in practice, it probably is).
+I'm not sure this description is correct.
 
-This patch deletes a code path with the comment "Default everything
-to channel 15 if priority not specified.", so it is possible (although
-unlikely) that this patch could change a priority of some IRQ that is
-being used.
 
-> 
-> It will simplify the driver code and make our lives easier when it
-> comes to device-tree support.
+> Add a newline before a return.
 > 
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
+>   arch/arm/mach-davinci/cp_intc.c | 13 +++++++------
+>   1 file changed, 7 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
+> index 2ce0b7653c88..4cd515b507f4 100644
+> --- a/arch/arm/mach-davinci/cp_intc.c
+> +++ b/arch/arm/mach-davinci/cp_intc.c
+> @@ -76,12 +76,12 @@ static void cp_intc_unmask_irq(struct irq_data *d)
+>   static int davinci_cp_intc_set_irq_type(struct irq_data *d,
+>   					unsigned int flow_type)
+>   {
+> -	unsigned reg		= BIT_WORD(d->hwirq);
+> -	unsigned mask		= BIT_MASK(d->hwirq);
+> -	unsigned polarity	= davinci_cp_intc_read(
+> -					DAVINCI_CP_INTC_SYS_POLARITY(reg));
+> -	unsigned type		= davinci_cp_intc_read(
+> -					DAVINCI_CP_INTC_SYS_TYPE(reg));
+> +	unsigned int reg, mask, polarity, type;
+> +
+> +	reg = BIT_WORD(d->hwirq);
+> +	mask = BIT_MASK(d->hwirq);
+> +	polarity = davinci_cp_intc_read(DAVINCI_CP_INTC_SYS_POLARITY(reg));
+> +	type = davinci_cp_intc_read(DAVINCI_CP_INTC_SYS_TYPE(reg));
+>   
+>   	switch (flow_type) {
+>   	case IRQ_TYPE_EDGE_RISING:
+> @@ -137,6 +137,7 @@ static int davinci_cp_intc_host_map(struct irq_domain *h, unsigned int virq,
+>   	irq_set_chip(virq, &davinci_cp_intc_irq_chip);
+>   	irq_set_probe(virq);
+>   	irq_set_handler(virq, handle_edge_irq);
+> +
+>   	return 0;
+>   }
+>   
+> 
+
 
 _______________________________________________
 linux-arm-kernel mailing list
