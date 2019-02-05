@@ -2,82 +2,65 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 86231C282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:25:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2B24EC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:27:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 59C8D20821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:25:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ECA422081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:27:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NVBfGqlu";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="YeB5LT/w"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59C8D20821
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GrxOiRgY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ECA422081B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=A3WUN0YHIAhHls+RtZY1yzwWOToRFhLf5mbFS7eRdZo=; b=NVBfGqlu5bQR/n
-	biQ4z1wMCAY88hgoqc2Ubc50OCzEMqh1DLjnQvcs59Pw3ziLIeEWd+s/CsjyTNKWd8HFFTadRfLeT
-	kLHgEKYyiAJlxdRaOUnsBsJLTFiec6G1N17tGFEKUBs7T/UzX7xSv7PRYNAaOfpEWYlEB4VE+Q6mO
-	tVH+7AIYKQEZg7D3Gqqs2Ur5AuiasGr66I+P57kJtVUd2CsoW+sfjXKMywWfNRZ5E7QmwgG8BQLxq
-	+EPKv0c1IDoNI0ngkyROpW65eaJfYyeCoqClPWyALeNNXlaSqS3BXgVFnBQmjFi49xc9cH7SpTP1z
-	lZCHbbAQjGPkT0TbQlxg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=nUoOV6HSvmAXRQ3Pn7e1nP1edMTicf7kmMkPq9elZPY=; b=GrxOiRgYo34tqE
+	cMLcFPSHVUEn0ywVYYV4r9n9uezY0iuLhBMZgIXqWvMKMs/Gv20Dx+AsvUU9Dqk5C4vNRSl9KOWeJ
+	U61BQbnTFPsexVhu90FX/cwdpi195nE0sg1GYUaRJDjLcd9v3rUtu986UJdeMCxhQtCrDZ7+shlfh
+	8KzlysSFjzD3V4doe5MIOIp3ncoAEO9mry5NOCIO+SehOspUyLXTu8txp1mAYxNjVnq1ShIsTKANq
+	6v3ILcNWx/yeZgf/gam4rbgwCjwB01BBDnZm702vhww7u9VBxkiI5l9UMZl9hSzrnh3iF3VzAtoHN
+	e025FBzg5Ykjtjtnx+ew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqznJ-0004LP-JA; Tue, 05 Feb 2019 12:25:41 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqznG-0004K6-6L
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 12:25:39 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x15CPTaI107944;
- Tue, 5 Feb 2019 06:25:29 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549369529;
- bh=efT/wS2Ar0wFibVSmT54IkPNM629ZRziLUkTgWBrBoQ=;
- h=Subject:To:References:CC:From:Date:In-Reply-To;
- b=YeB5LT/w5XvSdhKry3lGFHtxW1Enk+/67hscGUzl6KQ886FQZWbXo8CHz76wragDa
- PvMAkBVWJO6k/j0iZfvwu2i3JmAbK7kKqFAtL6dN9tz2n4MEUtW9soYfmLvAA3iW1w
- aYSq+/QNPcH0zdBjHkBop4Sxs/ZL+I9WC1dJYvRI=
-Received: from DLEE100.ent.ti.com (dlee100.ent.ti.com [157.170.170.30])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x15CPTH3033530
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 5 Feb 2019 06:25:29 -0600
-Received: from DLEE113.ent.ti.com (157.170.170.24) by DLEE100.ent.ti.com
- (157.170.170.30) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 5
- Feb 2019 06:25:28 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE113.ent.ti.com
- (157.170.170.24) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 5 Feb 2019 06:25:28 -0600
-Received: from [192.168.2.6] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x15CPQ1k023206;
- Tue, 5 Feb 2019 06:25:27 -0600
-Subject: Re: [PATCH] arm64: dts: ti: k3-am65: Add MSMC RAM node
-To: <t-kristo@ti.com>
-References: <1547199855-16374-1-git-send-email-rogerq@ti.com>
-From: Roger Quadros <rogerq@ti.com>
-Message-ID: <5C5980B6.4010502@ti.com>
-Date: Tue, 5 Feb 2019 14:25:26 +0200
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:38.0) Gecko/20100101
- Thunderbird/38.6.0
+	id 1gqzok-0004dc-Mg; Tue, 05 Feb 2019 12:27:10 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gqzoh-0004dF-H4
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 12:27:09 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D438480D;
+ Tue,  5 Feb 2019 04:27:06 -0800 (PST)
+Received: from localhost (unknown [10.37.6.16])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 58DE33F675;
+ Tue,  5 Feb 2019 04:27:06 -0800 (PST)
+Date: Tue, 5 Feb 2019 12:27:04 +0000
+From: Andrew Murray <andrew.murray@arm.com>
+To: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH v2 3/5] KVM: arm/arm64: re-create event when setting
+ counter value
+Message-ID: <20190205122704.GB33475@e119886-lin.cambridge.arm.com>
+References: <1549299218-44714-1-git-send-email-andrew.murray@arm.com>
+ <1549299218-44714-4-git-send-email-andrew.murray@arm.com>
+ <00ead646-aec6-deff-2dc3-7cb0e253a57c@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <1547199855-16374-1-git-send-email-rogerq@ti.com>
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+Content-Disposition: inline
+In-Reply-To: <00ead646-aec6-deff-2dc3-7cb0e253a57c@arm.com>
+User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_042538_306147_93D449EA 
-X-CRM114-Status: GOOD (  18.34  )
+X-CRM114-CacheID: sfid-20190205_042707_578714_A1F76FCE 
+X-CRM114-Status: GOOD (  27.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,79 +72,128 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>, devicetree@vger.kernel.org,
- Lokesh Vutla <lokeshvutla@ti.com>, linux-kernel@vger.kernel.org,
- "Andrew F . Davis" <afd@ti.com>, robh+dt@kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Marc Zyngier <marc.zyngier@arm.com>, suzuki.poulose@arm.com,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Tero,
-
-On 11/01/19 11:44, Roger Quadros wrote:
-> The AM65 SoC has 2MB MSMC RAM. Add this as a mmio-sram
-> node so drivers can use it via genpool API.
+On Tue, Feb 05, 2019 at 12:21:25PM +0000, Julien Thierry wrote:
+> Hi Andrew,
 > 
-> Following areas are marked reserved:
-> - Lower 128KB for ATF
-> - 64KB@0xf0000 for SYSFW
-> - Upper 1MB for cache
+> On 04/02/2019 16:53, Andrew Murray wrote:
+> > The perf event sample_period is currently set based upon the current
+> > counter value, when PMXEVTYPER is written to and the perf event is created.
+> > However the user may choose to write the type before the counter value in
+> > which case sample_period will be set incorrectly. Let's instead decouple
+> > event creation from PMXEVTYPER and (re)create the event in either
+> > suitation.
+> > 
+> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > ---
+> >  virt/kvm/arm/pmu.c | 40 +++++++++++++++++++++++++++++++---------
+> >  1 file changed, 31 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> > index 6e7c179..95d74ec 100644
+> > --- a/virt/kvm/arm/pmu.c
+> > +++ b/virt/kvm/arm/pmu.c
+> > @@ -24,6 +24,7 @@
+> >  #include <kvm/arm_pmu.h>
+> >  #include <kvm/arm_vgic.h>
+> >  
+> > +static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 select_idx);
+> >  /**
+> >   * kvm_pmu_get_counter_value - get PMU counter value
+> >   * @vcpu: The vcpu pointer
+> > @@ -62,6 +63,9 @@ void kvm_pmu_set_counter_value(struct kvm_vcpu *vcpu, u64 select_idx, u64 val)
+> >  	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
+> >  	      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx;
+> >  	__vcpu_sys_reg(vcpu, reg) += (s64)val - kvm_pmu_get_counter_value(vcpu, select_idx);
+> > +
+> > +	/* Recreate the perf event to reflect the updated sample_period */
+> > +	kvm_pmu_create_perf_event(vcpu, select_idx);
+> >  }
+> >  
+> >  /**
+> > @@ -378,23 +382,22 @@ static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
+> >  }
+> >  
+> >  /**
+> > - * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
+> > + * kvm_pmu_create_perf_event - create a perf event for a counter
+> >   * @vcpu: The vcpu pointer
+> > - * @data: The data guest writes to PMXEVTYPER_EL0
+> > + * @data: Type of event as per PMXEVTYPER_EL0 format
+> >   * @select_idx: The number of selected counter
+> > - *
+> > - * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
+> > - * event with given hardware event number. Here we call perf_event API to
+> > - * emulate this action and create a kernel perf event for it.
+> >   */
+> > -void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+> > -				    u64 select_idx)
+> > +static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 select_idx)
+> >  {
+> >  	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> >  	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+> >  	struct perf_event *event;
+> >  	struct perf_event_attr attr;
+> > -	u64 eventsel, counter;
+> > +	u64 eventsel, counter, reg, data;
+> > +
+> > +	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
+> > +	      ? PMCCFILTR_EL0 : PMEVTYPER0_EL0 + select_idx;
+> > +	data = __vcpu_sys_reg(vcpu, reg);
+> >  
+> >  	kvm_pmu_stop_counter(vcpu, pmc);
+> >  	eventsel = data & ARMV8_PMU_EVTYPE_EVENT;
+> > @@ -431,6 +434,25 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+> >  	pmc->perf_event = event;
+> >  }
+> >  
+> > +/**
+> > + * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
+> > + * @vcpu: The vcpu pointer
+> > + * @data: The data guest writes to PMXEVTYPER_EL0
+> > + * @select_idx: The number of selected counter
+> > + *
+> > + * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
+> > + * event with given hardware event number. Here we call perf_event API to
+> > + * emulate this action and create a kernel perf event for it.
+> > + */
+> > +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
+> > +				    u64 select_idx)
+> > +{
+> > +	u64 event_type = data & ARMV8_PMU_EVTYPE_MASK;
+> > +> +	__vcpu_sys_reg(vcpu, PMEVTYPER0_EL0 + select_idx) = event_type;
 > 
-> The reserved locations are subject to change at runtime by
-> the bootloader.
+> I think there has been a wrong split. In the next patch you add the
+> check for the cycle counter but I believe it should be already present here.
 > 
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Lokesh Vutla <lokeshvutla@ti.com>
-> Cc: Andrew F. Davis <afd@ti.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-
-Is this patch good to pick for -next?
-
-cheers,
--roger
-
-> ---
->  arch/arm64/boot/dts/ti/k3-am65-main.dtsi | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+> With that fixed:
 > 
-> diff --git a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-> index 272cf8f..5a18150 100644
-> --- a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-> +++ b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-> @@ -6,6 +6,26 @@
->   */
->  
->  &cbass_main {
-> +	msmc_ram: sram@70000000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x0 0x70000000 0x0 0x200000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0x0 0x0 0x70000000 0x200000>;
-> +
-> +		atf-sram@0 {
-> +			reg = <0x0 0x20000>;
-> +		};
-> +
-> +		sysfw-sram@f0000 {
-> +			reg = <0xf0000 0x10000>;
-> +		};
-> +
-> +		l3cache-sram@100000 {
-> +			reg = <0x100000 0x100000>;
-> +		};
-> +	};
-> +
->  	gic500: interrupt-controller@1800000 {
->  		compatible = "arm,gic-v3";
->  		#address-cells = <2>;
-> 
+> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 
--- 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Thanks for spotting this and for the review.
+
+Thanks,
+
+Andrew Murray
+
+> 
+> > +	kvm_pmu_create_perf_event(vcpu, select_idx);
+> > +}
+> > +
+> >  bool kvm_arm_support_pmu_v3(void)
+> >  {
+> >  	/*
+> > 
+> 
+> -- 
+> Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
