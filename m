@@ -2,91 +2,109 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C648C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 10:11:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7F75BC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 10:14:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 38AC220844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 10:11:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 48AFE2175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 10:14:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bF7cX4Ty";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="XGf3et6z"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 38AC220844
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t916vwdj";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="v/+j3rwg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 48AFE2175B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Mg8ZjKeLOXnI5dS/JVtXGuX50RLXovQlrlOGz9mT9bA=; b=bF7cX4Tyo2sRUD
-	hLlo28F3UOn97FFcRcP7koIgW/LOLfX6O3EKmF9xAhVP97zJM2Jo2PolmsHqmEQQmXoLH1ogC2m9Z
-	RxIPr31+CHHDulfDzky7k3y+DhTiNsSOGgvK3/vo8yJjQNYg23n9bV8UvG4TjK4zwMRhC0R16jdr0
-	l09bDp1PdUpYIeJFNuAlq42N3K464uUYETJjQlCO1dYlI2fpjvlQuGCY+T1Z3UXXl74FkCFfn04n/
-	Kqn6U1w1LpPJkez/xrY9LwZuLiPjq+9sfZTfXS9ZFgT/Ly/Hlc97AJCuvkTfldjz15Lk5mmBpSqbL
-	wRGuAeHu+uA+i/QmG0vg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:Message-ID:Date
+	:Subject:To:From:Reply-To:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=ogNScQWZPJZxN0faiPfZC0fNUQ8xaXoGq4gWuNtGxAo=; b=t916vwdjSXjlQ7
+	YPQnv0WwkQYauaLDUKDOdhVnxVTyJ+HGd2vU5Km95s7ygXuMkXxrY/SAYwBT6YnN5mE/j6Mu2WLWv
+	uU5O5M1zo3keJANEV8d7mPx8eHHpNAO3n/kOsHKwtZv+OD0rzbaPTNO0efKgVREsCFmUBRf0uG6F9
+	s8+WF7f8BeWPju41Rs/cOiG5x/ro2est9nd973n0+IbgcuyONy67wj8GSYrFWtY88YUdwmRkwzizB
+	7hZjxxx20NcvSX2be94+Qxx9VzUmEWHQBLOl5bBPvlrpN67eoJZCyIzszIKHGR7DNfujdAmQQGEXo
+	8iy4KZm4jkR6ogCC1Ygg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqxgs-0000ST-Pm; Tue, 05 Feb 2019 10:10:54 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gqxkf-00012D-13; Tue, 05 Feb 2019 10:14:49 +0000
+Received: from mail-eopbgr140040.outbound.protection.outlook.com
+ ([40.107.14.40] helo=EUR01-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqxgo-0000SA-NO
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 10:10:52 +0000
-Received: by mail-wm1-x344.google.com with SMTP id f188so2917941wmf.5
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 05 Feb 2019 02:10:49 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=fXd6DbXSx8O30DE77NsjshJqWksv0B74q6S2C+obTY4=;
- b=XGf3et6zvH1XRd8xzd/9CgQF+y/UQkLvR9OqCbbfHOspCFUE5zwOaGIp6rhCDfee6k
- QVvaLbm/5XV8DQSOInVQ2mr1qK8/AMPOcXcgW98RZbgenEwtEhopHcfNF5iGk5VGZIf+
- hdIiRtZTy/hGJoiPZhkCzK33Aarfiv/zxv06WaPZlGlQcqryiv3kGrx0HjbjIEbdAc1V
- oxdAw4xTliVCH868SoRfS1+wFUp+ENGuTMbJ+QAF/6w6Rs5xX7yn0aqPZUbiLnhBRzAI
- rvVV5J/dzz2BUK8ZhoF5RuBxhe5MNz9j+hrNn/TunVisPVzodyGSjijY6IuFKvfJkxCg
- 2FYA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=fXd6DbXSx8O30DE77NsjshJqWksv0B74q6S2C+obTY4=;
- b=a91abocGyTMKZclSCgbYoCv6bnGdC5FH0msaGn9Lb7C1svrofvX2uNYwBVpmwVRvV8
- 91Tq1kZAFmvWLGJtXtgu9NJiG0EWZjw7ZPRBKDhVul49sOvLSUD2Y/aAOS+GlsJ88nIo
- k/MpTXS+DH64xRHBpIknNdR8EiH947eqNFsx4PkOsoktxo8242MrQxR+a+bEGtfWkBxF
- 6y/cfj2sHFIpIhCXm5gKc6wfa8DU9uAsZJR5Y9m9agDldKQJ/ZR/soI1yrICm8umOQ0D
- aoPMj+hE/XL63OBVQ+nUdchm1CKoyonVx1HPdyRbnxN/v37Dot6vZ+UmWoHrE2DyEz16
- WzdQ==
-X-Gm-Message-State: AHQUAuZs3ETWMPDK88xkiZsmWlKHM+WZ4nurudg61bFA1DGk96Z9VNg1
- 2E8dZ+rwgYhckE1O4ifF+Og=
-X-Google-Smtp-Source: AHgI3IZT/s15wuBzS8Luay+LFzBvf01xJRRWD3Xk961FXSknAExQY0BIe6UKJ/jEYq86mQ3h2e2Zjg==
-X-Received: by 2002:a7b:c24c:: with SMTP id b12mr2810014wmj.29.1549361448578; 
- Tue, 05 Feb 2019 02:10:48 -0800 (PST)
-Received: from Red ([2a01:cb1d:147:7200:2e56:dcff:fed2:c6d6])
- by smtp.googlemail.com with ESMTPSA id c18sm11868785wre.32.2019.02.05.02.10.47
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 05 Feb 2019 02:10:47 -0800 (PST)
-Date: Tue, 5 Feb 2019 11:10:45 +0100
-From: Corentin Labbe <clabbe.montjoie@gmail.com>
-To: Robin Murphy <robin.murphy@arm.com>
-Subject: Re: [PATCH 1/5] perf/arm-cci: Fix CPU hotplug race avoidance
-Message-ID: <20190205101045.GB27918@Red>
-References: <cover.1549299188.git.robin.murphy@arm.com>
- <606ff8c3f7f35ccdcb4b52a49f692fb20e27359c.1549299188.git.robin.murphy@arm.com>
+ id 1gqxkb-0000zW-1z
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 10:14:46 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=aH50gOLcom9OSQehZJpibvFWh4GYxhU1Iti8qPrl+zg=;
+ b=v/+j3rwg2hH4Y9GUiAkiRm4kQxGWVYV0m66JmCYeSqd15fs6/dIlD9GSxeqaRHAuYT7yoULGScogi0at5n+e3hT7+qFaalSnGdhqSe9PqlgLwAKX7hJA3Ku3KL+2Xl5npgs54WuyRrzpANAgRzGCU2mJA9GhCGzlTY2fRnv9XbA=
+Received: from VI1PR0401MB2496.eurprd04.prod.outlook.com (10.168.65.10) by
+ VI1PR0401MB2030.eurprd04.prod.outlook.com (10.166.141.22) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1601.17; Tue, 5 Feb 2019 10:14:39 +0000
+Received: from VI1PR0401MB2496.eurprd04.prod.outlook.com
+ ([fe80::208f:755e:b057:2cfe]) by VI1PR0401MB2496.eurprd04.prod.outlook.com
+ ([fe80::208f:755e:b057:2cfe%8]) with mapi id 15.20.1580.019; Tue, 5 Feb 2019
+ 10:14:39 +0000
+From: Pankaj Bansal <pankaj.bansal@nxp.com>
+To: Leo Li <leoyang.li@nxp.com>, Rob Herring <robh+dt@kernel.org>, Mark
+ Rutland <mark.rutland@arm.com>
+Subject: [PATCH v4 0/2] add qixis driver
+Thread-Topic: [PATCH v4 0/2] add qixis driver
+Thread-Index: AQHUvTuasEwNjg2eckWnM8rIkKU7jQ==
+Date: Tue, 5 Feb 2019 10:14:39 +0000
+Message-ID: <20190205153924.7204-1-pankaj.bansal@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: BMXPR01CA0019.INDPRD01.PROD.OUTLOOK.COM
+ (2603:1096:b00:d::29) To VI1PR0401MB2496.eurprd04.prod.outlook.com
+ (2603:10a6:800:56::10)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=pankaj.bansal@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 2.17.1
+x-originating-ip: [92.120.1.69]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR0401MB2030;
+ 6:9L9CElNPsNVa5U/uFOj2F3SPSN66UfOyiEAzx4iIkEwASo9nlGeywQtUp9zVGT3UYsB2fxTljfOLqNuVszJTCULuYLO8oq5hNgQPGxDc80P68qZNv08KkV2NvmN7fXxRfM/xEP+btxBuyw4ZEz0Wd+RVvh4TDnWGsohKDvTnw32sj+bzsoKKEK5alWeZaarrhl0EYWyVp7q9u5um2C5Y6u5Nzyp5DcVg9Xhj/t+pOfm8JLGznLafWZOc6DHUMyApTrBtsJTILuKgOPD/jQxU5CjBuLbQmBtVb2KPdo2zPMRtg5iXMkSEkzcA55wlLWhMC38ogQh1dBOsx0lOhEed1CJo1LZAjtv1kjM5ie9dMrURxdbEsxlQkEIhzWLH1tw/Mxdr+t3kF9RIsMxNGmckTbauImb3Sg1M0qUAyi79l3u37CKdegIr/gP3XT/FFnElVZknI/qr7GHj25eD1mWeoA==;
+ 5:swFhlZ+9bmpw0LE2AbyYNoYveZkxkneiwZSjqh5XcHacXQgk6gHNyd1vyE9b46QxTAdQ7637yiktOsP0/CwTf/11acDnvLj0At2VqWJvnNORwbuHJDolCBQB14pgO8U50RXv4pixnL28zK0BpMCMtPzKFV98q3t+xRRuG2qat8BnLtpzMbCpDZJM2enAu5xzawr50rlC6e/IDTSOE9KeEw==;
+ 7:NY40+LZ/lS7pTARxQhHob6Oft3Gb4Of0Wn1bLd2GoS6LijN7iqV6KYTt9tOghSH5G6GlQvWFplDhp9UIHCM9fcvUZlRbsRv4HqB5MO0K29A/pqZrkTxINt0/DkMfBjhIqUIuHw4fVihx1qTTqckGbQ==
+x-ms-office365-filtering-correlation-id: 0e573c03-a6d1-4240-2b5a-08d68b52bc92
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR0401MB2030; 
+x-ms-traffictypediagnostic: VI1PR0401MB2030:
+x-microsoft-antispam-prvs: <VI1PR0401MB20305522A0B4E70F3936F315F16E0@VI1PR0401MB2030.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0939529DE2
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39860400002)(396003)(376002)(366004)(136003)(346002)(199004)(189003)(25786009)(8676002)(2906002)(26005)(14454004)(102836004)(386003)(6506007)(99286004)(6436002)(6486002)(6512007)(4326008)(8936002)(71190400001)(81166006)(81156014)(71200400001)(256004)(6306002)(105586002)(36756003)(106356001)(52116002)(486006)(6116002)(3846002)(44832011)(7736002)(110136005)(476003)(2616005)(966005)(68736007)(316002)(86362001)(53936002)(186003)(1076003)(50226002)(305945005)(478600001)(97736004)(54906003)(66066001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0401MB2030;
+ H:VI1PR0401MB2496.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: HPeNI84WXTTpUsGRACzywTWJnAGTm65bxzb4zILBH7Tp1XoAryHZ6VYuSNvQVzDzTazRzSGeiUfEZ6IysRmt816nnX7w5Ls13xaqomBpnJeAu5HB6D0aE/syrAy85FlcRPod0yvbMSBgUvjCpSjrtTIjqU1FqsAjotDMxDlb7NgVLrRfkphU0m+w8FGT6VDKNvuI2owJHjq0Fb1mxqxPnJIvJ58cbwCL/fR9imIaaW/IQoFD8+BwsMuaBlUq1nFxJ6lVBXr9Wgm1t4g8Gyp2Ev/Sk5f6d+1loanj2O9g6+rAoBlYbHttJI02GPLAfUAJDvRz9upMflad0PmEI191x+M7Y7Q2NzIGHJqcUt4O0lmt3qOwgeKCi+y3qXX9H3NVPhXIJVJrPzPlu1pqjfiB2DQOG2jz+aCy0/BhTsobOyM=
+Content-ID: <7F4E9F77F385CF47BE8D769A11A9B993@eurprd04.prod.outlook.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <606ff8c3f7f35ccdcb4b52a49f692fb20e27359c.1549299188.git.robin.murphy@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 0e573c03-a6d1-4240-2b5a-08d68b52bc92
+X-MS-Exchange-CrossTenant-originalarrivaltime: 05 Feb 2019 10:14:37.1656 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0401MB2030
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_021050_786259_202C6EB7 
-X-CRM114-Status: GOOD (  23.04  )
+X-CRM114-CacheID: sfid-20190205_021445_102474_201350C6 
+X-CRM114-Status: GOOD (  10.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,108 +116,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, suzuki.poulose@arm.com, peterz@infradead.org,
- bigeasy@linutronix.de, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- tglx@linutronix.de, "Li, Meng" <Meng.Li@windriver.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: "open list : OPEN FIRMWARE AND
+ FLATTENED DEVICE TREE BINDINGS" <devicetree@vger.kernel.org>,
+ Pankaj Bansal <pankaj.bansal@nxp.com>,
+ "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
+ Varun Sethi <V.Sethi@nxp.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 04, 2019 at 05:09:04PM +0000, Robin Murphy wrote:
-> The arm-cci probe logic faces a cyclic dependency wherein it has to pick
-> a valid CPU to associate with before registering the PMU device, has to
-> have the PMU state initialised before handling hotplug events in case it
-> must be migrated, but has to have the hotplug notifier registered before
-> the chosen CPU may go offline lest things get out of sync. The present
-> code has tried to solve the races by using get_cpu() to pick the current
-> CPU and prevent it from disappearing while the other two registrations
-> are performed, but that results in taking mutexes with preemption
-> disabled, which makes certain configurations very unhappy:
-> 
-> [ 1.983337] BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:2004
-> [ 1.983340] in_atomic(): 1, irqs_disabled(): 0, pid: 1, name: swapper/0
-> [ 1.983342] Preemption disabled at:
-> [ 1.983353] [<ffffff80089801f4>] cci_pmu_probe+0x1dc/0x488
-> [ 1.983360] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.18.20-rt8-yocto-preempt-rt #1
-> [ 1.983362] Hardware name: ZynqMP ZCU102 Rev1.0 (DT)
-> [ 1.983364] Call trace:
-> [ 1.983369] dump_backtrace+0x0/0x158
-> [ 1.983372] show_stack+0x24/0x30
-> [ 1.983378] dump_stack+0x80/0xa4
-> [ 1.983383] ___might_sleep+0x138/0x160
-> [ 1.983386] __might_sleep+0x58/0x90
-> [ 1.983391] __rt_mutex_lock_state+0x30/0xc0
-> [ 1.983395] _mutex_lock+0x24/0x30
-> [ 1.983400] perf_pmu_register+0x2c/0x388
-> [ 1.983404] cci_pmu_probe+0x2bc/0x488
-> [ 1.983409] platform_drv_probe+0x58/0xa8
-> 
-> However, we don't actually mind being preempted or migrated at this
-> point; all that really matters is that whichever CPU we pick does not
-> get offlined before we're done. Thus, do the robust thing and instead
-> take the lock to inhibit CPU hotplug for the duration. This also
-> revealed an additional race in assigning the global pointer too late
-> relative to the hotplug notifier, so that gets fixed in the process.
-> 
-> Reported-by: "Li, Meng" <Meng.Li@windriver.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/perf/arm-cci.c | 22 ++++++++++++----------
->  1 file changed, 12 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
-> index 1bfeb160c5b1..f6d9df07ec9b 100644
-> --- a/drivers/perf/arm-cci.c
-> +++ b/drivers/perf/arm-cci.c
-> @@ -1692,21 +1692,23 @@ static int cci_pmu_probe(struct platform_device *pdev)
->  	raw_spin_lock_init(&cci_pmu->hw_events.pmu_lock);
->  	mutex_init(&cci_pmu->reserve_mutex);
->  	atomic_set(&cci_pmu->active_events, 0);
-> -	cci_pmu->cpu = get_cpu();
-> +
-> +	cpus_read_lock();
-> +	cci_pmu->cpu = smp_processor_id();
->  
->  	ret = cci_pmu_init(cci_pmu, pdev);
-> -	if (ret) {
-> -		put_cpu();
-> -		return ret;
-> -	}
-> +	if (ret)
-> +		goto out;
->  
-> -	cpuhp_setup_state_nocalls(CPUHP_AP_PERF_ARM_CCI_ONLINE,
-> -				  "perf/arm/cci:online", NULL,
-> -				  cci_pmu_offline_cpu);
-> -	put_cpu();
->  	g_cci_pmu = cci_pmu;
-> +	cpuhp_setup_state_nocalls_cpuslocked(CPUHP_AP_PERF_ARM_CCI_ONLINE,
-> +					     "perf/arm/cci:online", NULL,
-> +					     cci_pmu_offline_cpu);
-> +
->  	pr_info("ARM %s PMU driver probed", cci_pmu->model->name);
-> -	return 0;
-> +out:
-> +	cpus_read_unlock();
-> +	return ret;
->  }
->  
->  static int cci_pmu_remove(struct platform_device *pdev)
-> -- 
-> 2.20.1.dirty
+FPGA on LX2160AQDS/LX2160ARDB connected on I2C bus, so add qixis driver which is basically an i2c client driver to control FPGA.
 
-Hello
+Also added platform driver for MMIO based FPGA, like the one available on LS2088ARDB/LS2088AQDS.
 
-Thanks, this patch fix my issue that I has reported here:
-https://lkml.org/lkml/2017/12/29/139
-https://lkml.org/lkml/2018/11/12/1901
+This driver is essential to control MDIO mux multiplexing.
 
-Tested-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-Tested-on: sun8i-a83t-bananapi-m3
+This driver is dependent on below patches:
+https://www.mail-archive.com/netdev@vger.kernel.org/msg281274.html
 
-Regards
+Cc: Varun Sethi <V.Sethi@nxp.com>
+
+---
+Notes:
+	V3:
+	- https://patchwork.kernel.org/cover/10795195/
+	V2:
+	- https://patchwork.kernel.org/cover/10788341/
+	V1:
+	- https://patchwork.kernel.org/cover/10627297/
+
+Pankaj Bansal (2):
+  dt-bindings: soc: fsl: Document Qixis FPGA usage
+  drivers: soc: fsl: add qixis driver
+
+ .../bindings/soc/fsl/qixis_ctrl.txt           |  53 +++++
+ drivers/soc/fsl/Kconfig                       |  11 +
+ drivers/soc/fsl/Makefile                      |   1 +
+ drivers/soc/fsl/qixis_ctrl.c                  | 222 ++++++++++++++++++
+ 4 files changed, 287 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/fsl/qixis_ctrl.txt
+ create mode 100644 drivers/soc/fsl/qixis_ctrl.c
+
+-- 
+2.17.1
 
 _______________________________________________
 linux-arm-kernel mailing list
