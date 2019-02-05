@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 88166C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:34:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7ED64C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:35:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5673F2083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:34:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4D3DA2083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:35:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Epwuovcj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5673F2083B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tckyUjXU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4D3DA2083B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=n+YFpM5FN3yZCpaHf9VPpk+DFS86vAaFDRQMUxFel54=; b=EpwuovcjK/X5Sz
-	hnTCorSpGBrXhd2CG4I2axiuinE0IzHDhi25r8eXs1c8ss+JpI6moiTukaOMah73IBRtsSyzX3b5U
-	nSWnmHAYLaaqDqmZ1fVrEveaHdavlZRxoEmDbIIrXAbagMFuiiGupIJJb8VQT4jn9SJ1fj2tcwc5f
-	Zx+Tl2K6ipoYKngUkM6vKNt01yRg7Jxg9wmRyBBaSLbsHHDJzLLLyBxwHRLjb1YXMTcPjz7hVQSqt
-	kLUWG3Za/T/4wDKQZ3M0Zr+ioPhr2bdTT373oZQc4W1aZC513IYvVs4F1eePlYMh/JOCCpHLg4vLa
-	i558z1hTgawR1MIxQApA==;
+	List-Owner; bh=sDpCkcjK91RXtFf4+wPDL7xv5a2deOqI31980BeLOCc=; b=tckyUjXU6KV6GI
+	SQqrMaI3STFZmwHkP5nEFx3eGDAs8QPeVNt4dB3MEEiAXmT6l/8ZlhXQPsd60QvGdJMS75erBGJIq
+	QLpgjyWQLAGagzd63VL2PfOZFoywLeCATeI/jugiEhnmg8tH0lnG58YKdJjP/7U7aIGNr2Job8Uls
+	GtMEtXGsm/dLRN7WceIXhltQ5KmZu5zadCAR6ClbIqzjUXGTSlox6OON3YeK4aj68rU5ZjI1Ltx9B
+	LUno50hMq4Lc4DbvIH2a38OXHiMf0E0gtErQCUc9zqltMxSPGkixFPiLBsZ9IUsVXJART2NFwkhhy
+	HWF5DblKXjTbK+C6BqjQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gqzvM-00079x-Tv; Tue, 05 Feb 2019 12:34:00 +0000
-Received: from esa6.microchip.iphmx.com ([216.71.154.253])
+	id 1gqzwm-0000Kj-JX; Tue, 05 Feb 2019 12:35:28 +0000
+Received: from esa3.microchip.iphmx.com ([68.232.153.233])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gqzvJ-00078R-0Z
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 12:33:59 +0000
-X-IronPort-AV: E=Sophos;i="5.56,563,1539673200"; d="scan'208";a="23454194"
+ id 1gqzwj-0000KM-Ld
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 12:35:27 +0000
+X-IronPort-AV: E=Sophos;i="5.56,563,1539673200"; d="scan'208";a="26329076"
 Received: from smtpout.microchip.com (HELO email.microchip.com)
  ([198.175.253.82])
- by esa6.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 05 Feb 2019 05:33:55 -0700
+ by esa3.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 05 Feb 2019 05:35:23 -0700
 Received: from localhost (10.10.76.4) by chn-sv-exch05.mchp-main.com
  (10.10.76.106) with Microsoft SMTP Server id 14.3.352.0; Tue, 5 Feb 2019
- 05:33:55 -0700
-Date: Tue, 5 Feb 2019 13:33:41 +0100
+ 05:35:23 -0700
+Date: Tue, 5 Feb 2019 13:35:10 +0100
 From: Ludovic Desroches <ludovic.desroches@microchip.com>
 To: Nicolas Ferre <nicolas.ferre@microchip.com>
-Subject: Re: [PATCH 2/3] dmaengine: at_xdmac: enhance channel errors handling
- in tasklet
-Message-ID: <20190205123341.blmbxuuqjswrekfm@M43218.corp.atmel.com>
+Subject: Re: [PATCH 3/3] dmaengine: at_xdmac: only monitor overflow errors
+ for peripheral xfer
+Message-ID: <20190205123509.tgvqbdik5lhrb5qb@M43218.corp.atmel.com>
 Mail-Followup-To: Nicolas Ferre <nicolas.ferre@microchip.com>,
  linux-arm-kernel@lists.infradead.org, dmaengine@vger.kernel.org,
  Vinod Koul <vkoul@kernel.org>,
  Alexandre Belloni <alexandre.belloni@bootlin.com>,
  linux-kernel@vger.kernel.org
 References: <324b91c71a148a7694d28d9b8b4364095d9b0ebe.1549364323.git.nicolas.ferre@microchip.com>
- <ad6c3c705fbef7ba4a1b762b39b0b8e04c10b632.1549364323.git.nicolas.ferre@microchip.com>
+ <4af293348e03a30746d8c0e5eead2f480b2f13f9.1549364323.git.nicolas.ferre@microchip.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <ad6c3c705fbef7ba4a1b762b39b0b8e04c10b632.1549364323.git.nicolas.ferre@microchip.com>
+In-Reply-To: <4af293348e03a30746d8c0e5eead2f480b2f13f9.1549364323.git.nicolas.ferre@microchip.com>
 User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_043357_096512_5C09E564 
-X-CRM114-Status: GOOD (  16.67  )
+X-CRM114-CacheID: sfid-20190205_043525_822060_5453F17E 
+X-CRM114-Status: GOOD (  17.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,78 +85,54 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 05, 2019 at 12:03:42PM +0100, Nicolas Ferre wrote:
-> Complement the identification of errors with stoping the channel and
-> dumping the descriptor that led to the error case.
+On Tue, Feb 05, 2019 at 12:03:43PM +0100, Nicolas Ferre wrote:
+> The overflow error flag (ROI: Request Overflow Error) is only relevant
+> for the case when the channel handles a peripheral synchronized transfer.
+> Not in the case of memory to memory transfer where there is no hardware
+> request signal.
+> 
+> Remove the use of this interrupt source in such a case. It's based on
+> the first descriptor which holds the configuration for the whole
+> linked list transfer.
 > 
 > Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
 > ---
->  drivers/dma/at_xdmac.c | 43 ++++++++++++++++++++++++++++++++++++------
->  1 file changed, 37 insertions(+), 6 deletions(-)
+>  drivers/dma/at_xdmac.c | 13 ++++++++++++-
+>  1 file changed, 12 insertions(+), 1 deletion(-)
 > 
 > diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-> index 37a269420435..ec7a29d8e448 100644
+> index ec7a29d8e448..b558a23ffbc2 100644
 > --- a/drivers/dma/at_xdmac.c
 > +++ b/drivers/dma/at_xdmac.c
-> @@ -1575,6 +1575,41 @@ static void at_xdmac_handle_cyclic(struct at_xdmac_chan *atchan)
->  		dmaengine_desc_get_callback_invoke(txd, NULL);
->  }
+> @@ -308,6 +308,11 @@ static inline int at_xdmac_csize(u32 maxburst)
+>  	return csize;
+>  };
 >  
-> +static void at_xdmac_handle_error(struct at_xdmac_chan *atchan)
+> +static inline bool at_xdmac_chan_is_peripheral_xfer(u32 cfg)
 > +{
-> +	struct at_xdmac		*atxdmac = to_at_xdmac(atchan->chan.device);
-> +	struct at_xdmac_desc	*bad_desc;
-> +
-> +	/*
-> +	 * The descriptor currently at the head of the active list is
-> +	 * broked. Since we don't have any way to report errors, we'll
-> +	 * just have to scream loudly and try to carry on.
-> +	 */
-> +	if (atchan->irq_status & AT_XDMAC_CIS_RBEIS)
-> +		dev_err(chan2dev(&atchan->chan), "read bus error!!!");
-> +	if (atchan->irq_status & AT_XDMAC_CIS_WBEIS)
-> +		dev_err(chan2dev(&atchan->chan), "write bus error!!!");
-> +	if (atchan->irq_status & AT_XDMAC_CIS_ROIS)
-> +		dev_err(chan2dev(&atchan->chan), "request overflow error!!!");
-> +
-> +	spin_lock_bh(&atchan->lock);
-> +	/* Channel must be disabled first as it's not done automatically */
-> +	at_xdmac_write(atxdmac, AT_XDMAC_GD, atchan->mask);
-> +	while (at_xdmac_read(atxdmac, AT_XDMAC_GS) & atchan->mask)
-> +		cpu_relax();
-> +	bad_desc = list_first_entry(&atchan->xfers_list,
-> +				    struct at_xdmac_desc,
-> +				    xfer_node);
-> +	spin_unlock_bh(&atchan->lock);
-> +	/* Print bad descriptor's details if needed */
-> +	dev_dbg(chan2dev(&atchan->chan),
-> +		 "%s: lld: mbr_sa=%pad, mbr_da=%pad, mbr_ubc=0x%08x\n",
-> +		 __func__, &bad_desc->lld.mbr_sa, &bad_desc->lld.mbr_da,
-> +		 bad_desc->lld.mbr_ubc);
-> +
-> +	/* Then continue with usual descriptor management */
+> +	return cfg & AT_XDMAC_CC_TYPE_PER_TRAN;
 > +}
 > +
->  static void at_xdmac_tasklet(unsigned long data)
+>  static inline u8 at_xdmac_get_dwidth(u32 cfg)
 >  {
->  	struct at_xdmac_chan	*atchan = (struct at_xdmac_chan *)data;
-> @@ -1594,12 +1629,8 @@ static void at_xdmac_tasklet(unsigned long data)
->  		   || (atchan->irq_status & error_mask)) {
->  		struct dma_async_tx_descriptor  *txd;
+>  	return (cfg & AT_XDMAC_CC_DWIDTH_MASK) >> AT_XDMAC_CC_DWIDTH_OFFSET;
+> @@ -389,7 +394,13 @@ static void at_xdmac_start_xfer(struct at_xdmac_chan *atchan,
+>  		 at_xdmac_chan_read(atchan, AT_XDMAC_CUBC));
 >  
-> -		if (atchan->irq_status & AT_XDMAC_CIS_RBEIS)
-> -			dev_err(chan2dev(&atchan->chan), "read bus error!!!");
-> -		if (atchan->irq_status & AT_XDMAC_CIS_WBEIS)
-> -			dev_err(chan2dev(&atchan->chan), "write bus error!!!");
-> -		if (atchan->irq_status & AT_XDMAC_CIS_ROIS)
-> -			dev_err(chan2dev(&atchan->chan), "request overflow error!!!");
-> +		if (atchan->irq_status & error_mask)
-> +			at_xdmac_handle_error(atchan);
->  
->  		spin_lock(&atchan->lock);
->  		desc = list_first_entry(&atchan->xfers_list,
+>  	at_xdmac_chan_write(atchan, AT_XDMAC_CID, 0xffffffff);
+> -	reg = AT_XDMAC_CIE_RBEIE | AT_XDMAC_CIE_WBEIE | AT_XDMAC_CIE_ROIE;
+> +	reg = AT_XDMAC_CIE_RBEIE | AT_XDMAC_CIE_WBEIE;
+> +	/*
+> +	 * Request Overflow Error is only for peripheral synchronized transfers
+> +	 */
+> +	if (at_xdmac_chan_is_peripheral_xfer(first->lld.mbr_cfg))
+> +		reg |= AT_XDMAC_CIE_ROIE;
+> +
+>  	/*
+>  	 * There is no end of list when doing cyclic dma, we need to get
+>  	 * an interrupt after each periods.
 > -- 
 > 2.17.1
 > 
