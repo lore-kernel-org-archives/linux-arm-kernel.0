@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CC522C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:41:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2D620C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:41:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 819F22083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:41:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F28A62083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:41:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r6PAb0t1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 819F22083B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DDj1xWJS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F28A62083B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,52 +25,52 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mq/WIWA9C2JZlBgrM9W8XAKW3ojDnVraVLkVAlMsisk=; b=r6PAb0t1+qoAAY
-	aV/n9CcQsO/6DIHwFIuApzYlyvUsHmHkwn/qgEVjEqi0OTwOXxb7RfzVquPsKvfDvqv0nC5eOMFpR
-	g/ir59Tma072WlisGo6Z3ClU6fgAEd+y+LERcMOYa47Xo/9H/EC/rg8O2BP0LgA0HdkYrR+N7Wjej
-	H46/e+mNmpDzXcr8wgUtaf8P1e1zp9Hhimd/xdZvCquGDxqYl3OsQVcrqITNHLTCWF+E/pGw5YmaL
-	5MXtLRGPjpb4X2KD742kKmn8gcf/2Na/3pDtEUa9956IcVt5oZmRWQwWNlBMCZjhakQMasimL4G8E
-	c4MU6c9kWlw3h23z3auw==;
+	List-Owner; bh=l9id4V3ovmMJgDqf381wpUJespoZsxxD6J8jOWkiaAI=; b=DDj1xWJSt6rLAR
+	UQhfnUKmVYeJbUDtZ64jQNx6c3RUsoFCtJ68NpRCsoHteqxCWZ2QF+p5tL1opLYmy2V+5ZW/IQhjV
+	mqOnTfQsx4zTtt9olKs+vaZ/lo8JI6zfprB0r/QAnKp3LnhKXV6pFGL8fT+FtahKx4/nNao18wUou
+	c0/69gxwtGAi4r3kl1pJ3n3LAx3BDixxLK0U5Ou64ljmvSQA+b136vlJ6kMyaOdIFrjdd88cVtZZf
+	Z6rm8IIvvNuXdNMhhVsbjCedxbaQN6oc9P2k75EOXcLXeO7aEPS/U6Mv3ydyCD5jiT+2lZlDwkH8K
+	tR+v+mGvJWqqv089lHbw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr02k-0002pj-0g; Tue, 05 Feb 2019 12:41:38 +0000
+	id 1gr02y-00034o-Dk; Tue, 05 Feb 2019 12:41:52 +0000
 Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr01z-00026t-No
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 12:40:54 +0000
-Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
+ id 1gr01z-00026p-D6
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 12:40:55 +0000
+Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
  by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x15CZncn027439; Tue, 5 Feb 2019 13:40:44 +0100
+ x15CaEJQ002718; Tue, 5 Feb 2019 13:40:42 +0100
 Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2qdjdnkkn7-1
+ by mx07-00178001.pphosted.com with ESMTP id 2qd1v06pqn-1
  (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Tue, 05 Feb 2019 13:40:44 +0100
+ Tue, 05 Feb 2019 13:40:42 +0100
 Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id DA21D31;
- Tue,  5 Feb 2019 12:40:43 +0000 (GMT)
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 43A8A31;
+ Tue,  5 Feb 2019 12:40:42 +0000 (GMT)
 Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id A9CF229AF;
- Tue,  5 Feb 2019 12:40:43 +0000 (GMT)
-Received: from localhost (10.75.127.44) by SFHDAG5NODE3.st.com (10.75.127.15)
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 20A8829AC;
+ Tue,  5 Feb 2019 12:40:42 +0000 (GMT)
+Received: from localhost (10.75.127.47) by SFHDAG5NODE3.st.com (10.75.127.15)
  with Microsoft SMTP Server (TLS) id 15.0.1347.2;
- Tue, 5 Feb 2019 13:40:43 +0100
+ Tue, 5 Feb 2019 13:40:41 +0100
 From: Fabrice Gasnier <fabrice.gasnier@st.com>
 To: <jic23@kernel.org>, <thierry.reding@gmail.com>, <robh+dt@kernel.org>
-Subject: [PATCH 4/4] iio: counter: stm32-lptimer: Add power management support
-Date: Tue, 5 Feb 2019 13:40:29 +0100
-Message-ID: <1549370429-19116-5-git-send-email-fabrice.gasnier@st.com>
+Subject: [PATCH 2/4] pwm: stm32-lp: Add power management support
+Date: Tue, 5 Feb 2019 13:40:27 +0100
+Message-ID: <1549370429-19116-3-git-send-email-fabrice.gasnier@st.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1549370429-19116-1-git-send-email-fabrice.gasnier@st.com>
 References: <1549370429-19116-1-git-send-email-fabrice.gasnier@st.com>
 MIME-Version: 1.0
-X-Originating-IP: [10.75.127.44]
-X-ClientProxiedBy: SFHDAG3NODE3.st.com (10.75.127.9) To SFHDAG5NODE3.st.com
+X-Originating-IP: [10.75.127.47]
+X-ClientProxiedBy: SFHDAG4NODE2.st.com (10.75.127.11) To SFHDAG5NODE3.st.com
  (10.75.127.15)
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-02-05_05:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_044052_065001_3CA55AE7 
-X-CRM114-Status: GOOD (  14.39  )
+X-CRM114-CacheID: sfid-20190205_044051_782206_0A01F18E 
+X-CRM114-Status: GOOD (  13.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,115 +93,87 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 Add suspend/resume PM sleep ops. When going to low power, disable
-active counter. Only active counter should be resumed: don't touch
-disabled counter, as it may be used by other LPTimer MFD child driver.
+active PWM channel. Active PWM channel is resumed, by calling
+pwm_apply_state(). This is inspired by Thierry's comment in [1].
+Don't touch inactive channels, as it may be used by other LPTimer MFD
+child driver.
+[1]https://lkml.org/lkml/2017/12/5/175
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- drivers/iio/counter/stm32-lptimer-cnt.c | 55 +++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+ drivers/pwm/pwm-stm32-lp.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/drivers/iio/counter/stm32-lptimer-cnt.c b/drivers/iio/counter/stm32-lptimer-cnt.c
-index 42fb8ba..2a49cce 100644
---- a/drivers/iio/counter/stm32-lptimer-cnt.c
-+++ b/drivers/iio/counter/stm32-lptimer-cnt.c
-@@ -14,6 +14,7 @@
- #include <linux/iio/iio.h>
+diff --git a/drivers/pwm/pwm-stm32-lp.c b/drivers/pwm/pwm-stm32-lp.c
+index 0059b24c..0c40d48 100644
+--- a/drivers/pwm/pwm-stm32-lp.c
++++ b/drivers/pwm/pwm-stm32-lp.c
+@@ -13,6 +13,7 @@
  #include <linux/mfd/stm32-lptimer.h>
  #include <linux/module.h>
+ #include <linux/of.h>
 +#include <linux/pinctrl/consumer.h>
  #include <linux/platform_device.h>
+ #include <linux/pwm.h>
  
- struct stm32_lptim_cnt {
-@@ -23,6 +24,7 @@ struct stm32_lptim_cnt {
- 	u32 preset;
- 	u32 polarity;
- 	u32 quadrature_mode;
-+	bool enabled;
+@@ -20,6 +21,8 @@ struct stm32_pwm_lp {
+ 	struct pwm_chip chip;
+ 	struct clk *clk;
+ 	struct regmap *regmap;
++	struct pwm_state suspend;
++	bool suspended;
  };
  
- static int stm32_lptim_is_enabled(struct stm32_lptim_cnt *priv)
-@@ -50,6 +52,7 @@ static int stm32_lptim_set_enable_state(struct stm32_lptim_cnt *priv,
- 
- 	if (!enable) {
- 		clk_disable(priv->clk);
-+		priv->enabled = false;
- 		return 0;
- 	}
- 
-@@ -79,6 +82,7 @@ static int stm32_lptim_set_enable_state(struct stm32_lptim_cnt *priv,
- 		regmap_write(priv->regmap, STM32_LPTIM_CR, 0);
- 		return ret;
- 	}
-+	priv->enabled = true;
- 
- 	/* Start LP timer in continuous mode */
- 	return regmap_update_bits(priv->regmap, STM32_LPTIM_CR,
-@@ -361,6 +365,56 @@ static int stm32_lptim_cnt_probe(struct platform_device *pdev)
- 	return devm_iio_device_register(&pdev->dev, indio_dev);
+ static inline struct stm32_pwm_lp *to_stm32_pwm_lp(struct pwm_chip *chip)
+@@ -223,6 +226,40 @@ static int stm32_pwm_lp_remove(struct platform_device *pdev)
+ 	return pwmchip_remove(&priv->chip);
  }
  
 +#ifdef CONFIG_PM_SLEEP
-+static int stm32_lptim_cnt_suspend(struct device *dev)
++static int stm32_pwm_lp_suspend(struct device *dev)
 +{
-+	struct stm32_lptim_cnt *priv = dev_get_drvdata(dev);
-+	int ret;
++	struct stm32_pwm_lp *priv = dev_get_drvdata(dev);
 +
-+	/* Only take care of enabled counter: don't disturb other MFD child */
-+	if (priv->enabled) {
-+		ret = stm32_lptim_setup(priv, 0);
-+		if (ret)
-+			return ret;
++	pwm_get_state(&priv->chip.pwms[0], &priv->suspend);
++	priv->suspended = priv->suspend.enabled;
 +
-+		ret = stm32_lptim_set_enable_state(priv, 0);
-+		if (ret)
-+			return ret;
-+
-+		/* Force enable state for later resume */
-+		priv->enabled = true;
-+	}
++	/* safe to call pwm_disable() for already disabled pwm */
++	pwm_disable(&priv->chip.pwms[0]);
 +
 +	return pinctrl_pm_select_sleep_state(dev);
 +}
 +
-+static int stm32_lptim_cnt_resume(struct device *dev)
++static int stm32_pwm_lp_resume(struct device *dev)
 +{
-+	struct stm32_lptim_cnt *priv = dev_get_drvdata(dev);
++	struct stm32_pwm_lp *priv = dev_get_drvdata(dev);
 +	int ret;
 +
 +	ret = pinctrl_pm_select_default_state(dev);
 +	if (ret)
 +		return ret;
 +
-+	if (priv->enabled) {
-+		priv->enabled = false;
-+		ret = stm32_lptim_setup(priv, 1);
-+		if (ret)
-+			return ret;
++	/* Only restore suspended pwm, not to disrupt other MFD child */
++	if (!priv->suspended)
++		return 0;
 +
-+		ret = stm32_lptim_set_enable_state(priv, 1);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
++	return pwm_apply_state(&priv->chip.pwms[0], &priv->suspend);
 +}
 +#endif
 +
-+static SIMPLE_DEV_PM_OPS(stm32_lptim_cnt_pm_ops, stm32_lptim_cnt_suspend,
-+			 stm32_lptim_cnt_resume);
++static SIMPLE_DEV_PM_OPS(stm32_pwm_lp_pm_ops, stm32_pwm_lp_suspend,
++			 stm32_pwm_lp_resume);
 +
- static const struct of_device_id stm32_lptim_cnt_of_match[] = {
- 	{ .compatible = "st,stm32-lptimer-counter", },
+ static const struct of_device_id stm32_pwm_lp_of_match[] = {
+ 	{ .compatible = "st,stm32-pwm-lp", },
  	{},
-@@ -372,6 +426,7 @@ static int stm32_lptim_cnt_probe(struct platform_device *pdev)
- 	.driver = {
- 		.name = "stm32-lptimer-counter",
- 		.of_match_table = stm32_lptim_cnt_of_match,
-+		.pm = &stm32_lptim_cnt_pm_ops,
+@@ -235,6 +272,7 @@ static int stm32_pwm_lp_remove(struct platform_device *pdev)
+ 	.driver	= {
+ 		.name = "stm32-pwm-lp",
+ 		.of_match_table = of_match_ptr(stm32_pwm_lp_of_match),
++		.pm = &stm32_pwm_lp_pm_ops,
  	},
  };
- module_platform_driver(stm32_lptim_cnt_driver);
+ module_platform_driver(stm32_pwm_lp_driver);
 -- 
 1.9.1
 
