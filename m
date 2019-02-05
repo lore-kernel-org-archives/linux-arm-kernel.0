@@ -2,79 +2,82 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A4782C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:45:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 24A4CC282DD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:45:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 742ED2080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:45:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DB54220844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:45:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VtTbzBi0";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="o0vczFf4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 742ED2080F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pFhmZyZ+";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="s7scjYWm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB54220844
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=w1X1n50U+qEuV+Bk7YyHfOgoKtCrQTSdkbvMBMt2uM0=; b=VtTbzBi0F6k9Eb
-	Lec5jI1UClBgJ+WMbQz4cYziuQ+1yL0eY18rANr/oh0sSnQt0fq7ALVqc+bPfkSKpBRtHdaYeNTCL
-	NNv2K2NHBcP+0N2S1Mke+6ZPnBTfmessPGSd3p5vQJwLNw/KPD2P7hkosyvVPPrYo0jfv1AgCJin1
-	TmPm5vYi0o+TQnXH8mPslZP5lXmpLaOg8H4ZanHsIS3X9I/vc/RcHF1bm2kycduD1YGsfqR/36a6R
-	7DjsC6s5gCxlCVbLQRBIZDkme6PuEZcplaqo6WJue7NYh9r1hamTPEcGpyMOlesTUp8f/SH5DUnmK
-	ggBLNsQxnYEAo1wDVOXQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=PoaacmSi6bTSwJDFBlrucrqlznGhbIKz4u/dORj+axQ=; b=pFhmZyZ+Po65qD
+	mCznq6rrXZxDVsOuXLvFJsSnlmAAQOeMq616DsyP63lj6LGHWn0VCCS+6ilFE6R8d+SUKkxisJjts
+	vCKPcD/a4hh2T73APjZYfqiIS2vkZ7TJ14vo9OJK71UZypS5fzwRKZDBKwYv5xKwh6d/q4Vg3WvVu
+	hVAx68dw09UExo9K/h29skf79lWKGvLVrJKW75+fD+DYpD/+3ESjc++4tbG1MxfELQQecD6E3cyXt
+	B0gO5mb6ByYRz42Pen8Ocumy9zsMXMqbYxildEAkATZeKCwJTo9B+8iYpkQoFJRLqFdom7HMiR2cj
+	b0DdyAKjNBpeamMXdonA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr06U-0005BH-Tm; Tue, 05 Feb 2019 12:45:30 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
+	id 1gr06e-0005L8-JW; Tue, 05 Feb 2019 12:45:40 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr06R-0005Ag-Pk
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 12:45:29 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x15CjQPM121588;
- Tue, 5 Feb 2019 06:45:27 -0600
+ id 1gr06U-0005Az-8z
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 12:45:31 +0000
+Received: from lelv0266.itg.ti.com ([10.180.67.225])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x15CjTlu002594;
+ Tue, 5 Feb 2019 06:45:29 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549370727;
- bh=tegAcGr5jNT+pzfG2jbu6Xo+DepOFefepzxKS98iz7Y=;
- h=From:To:CC:Subject:Date;
- b=o0vczFf4jzs1XPZ8YtDQIxrJDuPzNUpKlqi3ID8P4cTK7DsZDLPK8gRpjRlBHKlJs
- ppwjF2rv6JzD69WG/OQTa9eM0XMxQuD2j/9EROxs9K7I82AY4VHssCU+bLTn+iyAF2
- WsyzXMtzz7V6oXd/BB1M3PVFr8ovjciCbUzsEGdY=
-Received: from DFLE113.ent.ti.com (dfle113.ent.ti.com [10.64.6.34])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x15CjQW5053425
+ s=ti-com-17Q1; t=1549370729;
+ bh=FewW4TCQN3mY2m7ZNXLiiW6MuxAyqXYQ1d+6hP29D54=;
+ h=From:To:CC:Subject:Date:In-Reply-To:References;
+ b=s7scjYWmAVDLvwYXuEKTJOxh4Wqqwl/v5SoOYsgl9yC4h5Qs1d22MtPpeiWxLBgBo
+ 7gElNs8g7Z31cBu/lwfa/ayhgTfG9r846YM5XyQYyZ7Ym49igd4NzBHipv4HzqZfIc
+ Jzr5viYLUAZA7Mp2eRDtpECWKWOMuKRJa5Cg4hZE=
+Received: from DFLE102.ent.ti.com (dfle102.ent.ti.com [10.64.6.23])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x15CjTj9076060
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 5 Feb 2019 06:45:26 -0600
-Received: from DFLE101.ent.ti.com (10.64.6.22) by DFLE113.ent.ti.com
- (10.64.6.34) with Microsoft SMTP Server (version=TLS1_2,
+ Tue, 5 Feb 2019 06:45:29 -0600
+Received: from DFLE103.ent.ti.com (10.64.6.24) by DFLE102.ent.ti.com
+ (10.64.6.23) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 5
- Feb 2019 06:45:26 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE101.ent.ti.com
- (10.64.6.22) with Microsoft SMTP Server (version=TLS1_0,
+ Feb 2019 06:45:29 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE103.ent.ti.com
+ (10.64.6.24) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 5 Feb 2019 06:45:26 -0600
+ Tue, 5 Feb 2019 06:45:28 -0600
 Received: from localhost.localdomain (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x15CjOVM012216;
- Tue, 5 Feb 2019 06:45:24 -0600
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x15CjOVN012216;
+ Tue, 5 Feb 2019 06:45:26 -0600
 From: Roger Quadros <rogerq@ti.com>
 To: <t-kristo@ti.com>
-Subject: [PATCH v2 0/3] arm64: ti: k3-am654: USB support
-Date: Tue, 5 Feb 2019 14:45:19 +0200
-Message-ID: <1549370722-414-1-git-send-email-rogerq@ti.com>
+Subject: [PATCH v2 1/3] arm64: dts: ti: am654: Add Main System Control Module
+ node
+Date: Tue, 5 Feb 2019 14:45:20 +0200
+Message-ID: <1549370722-414-2-git-send-email-rogerq@ti.com>
 X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1549370722-414-1-git-send-email-rogerq@ti.com>
+References: <1549370722-414-1-git-send-email-rogerq@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_044527_917087_3D73761E 
-X-CRM114-Status: GOOD (  12.10  )
+X-CRM114-CacheID: sfid-20190205_044530_352336_09B1DD9A 
+X-CRM114-Status: GOOD (  14.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,55 +90,41 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: nm@ti.com, devicetree@vger.kernel.org, vigneshr@ti.com, nsekhar@ti.com,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Roger Quadros <rogerq@ti.com>
+ linux-kernel@vger.kernel.org, Jyri Sarha <jsarha@ti.com>,
+ linux-arm-kernel@lists.infradead.org, Roger Quadros <rogerq@ti.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+From: Jyri Sarha <jsarha@ti.com>
 
-The AM654 SoC supports 2 DWC3 USB controller instances. The
-AM654 base board supports the 2nd (USB1) instance in high-speed.
+Main System control module support is added to the device tree to allow
+driver to access to their control module registers.
 
-This series enables support for USB1 instance on the AM654-base-board.
+Signed-off-by: Jyri Sarha <jsarha@ti.com>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm64/boot/dts/ti/k3-am65-main.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-The series depends on [1] and [2]. Both are in the -next branch of their
-respective maintainer trees.
-
-To test you can apply on top of linux-next. As usb/next was just pushed
-today, it might have not reached linux-next yet. If so please pull that from [3].
-
-If using arm64 defconfig, you need to enable
-	CONFIG_USB_DWC3_KEYSTONE=y
-	CONFIG_OMAP_USB2=y
-and the necessary USB drivers that you want to test. e.g. USB network adapter.
-
-[1] AM654 USB2 PHY support https://lkml.org/lkml/2018/12/5/908
-[2] AM654 DWC3 support https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg1896101.html
-[3] usb-next https://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git/log/?h=next
-
-Changelog:
-v2
-- usb & phy nodes are not kept disabled in k3-am65-main.dtsi.
-  Unused ones are disabled in board dts instead.
-
-cheers,
--roger
-
-
-Jyri Sarha (1):
-  arm64: dts: ti: am654: Add Main System Control Module node
-
-Roger Quadros (2):
-  arm64: dts: ti: k3-am6: add USB support
-  arm64: dts: ti: k3-am654-base-board: enable USB1
-
- arch/arm64/boot/dts/ti/k3-am65-main.dtsi       | 84 ++++++++++++++++++++++++++
- arch/arm64/boot/dts/ti/k3-am654-base-board.dts | 28 +++++++++
- 2 files changed, 112 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+index 9338315..7b0acf2 100644
+--- a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
++++ b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+@@ -205,4 +205,12 @@
+ 		ti,trm-icp = <0x8>;
+ 		dma-coherent;
+ 	};
++
++	scm_conf: scm_conf@100000 {
++		compatible = "syscon", "simple-mfd";
++		reg = <0 0x00100000 0 0x1c000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0x0 0x0 0x00100000 0x1c000>;
++	};
+ };
 -- 
 Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
 Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
