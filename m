@@ -2,83 +2,79 @@ Return-Path: <SRS0=y9BX=QM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7423CC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:42:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A4782C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:45:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 42F552080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:42:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 742ED2080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 12:45:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JvcryS49";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="XYOm5N7K"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 42F552080F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VtTbzBi0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="o0vczFf4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 742ED2080F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9g3lqtgpb1WAXjgcde/1ECFzU5mO9eJBcfRjcXFYsBk=; b=JvcryS49nvAZKf
-	V8WYLMuaeluzXrLUdJcuJEBCkhRNYWtz1pk2TQ8I63qenQqF9e2GlArWGMU7DRC32w3+wCnrojxAH
-	BRNHlaSJnKrMlHByPe5YInQzR4mmyHuul+paUXKKDRNyt/nF26YuH4D73Mcaj5Iv72gZo5BVgip4N
-	4IyvNkTN3gks2tKzmVPPFL+uq+cT8/+ZCVGpEO5ReAv7v4xr0lJgq9rBh6QaZ2bhkeCHBQd/nZR7M
-	xyA8yv74PJVJyF1QQwEGUGhWhH9Ck0ABQe4gbwqEWs2ZhliDbI2DvapMcbZVgyxKUCVR5zxyTVSJ9
-	A+ztXTS4GH1iZGFPsPPg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=w1X1n50U+qEuV+Bk7YyHfOgoKtCrQTSdkbvMBMt2uM0=; b=VtTbzBi0F6k9Eb
+	Lec5jI1UClBgJ+WMbQz4cYziuQ+1yL0eY18rANr/oh0sSnQt0fq7ALVqc+bPfkSKpBRtHdaYeNTCL
+	NNv2K2NHBcP+0N2S1Mke+6ZPnBTfmessPGSd3p5vQJwLNw/KPD2P7hkosyvVPPrYo0jfv1AgCJin1
+	TmPm5vYi0o+TQnXH8mPslZP5lXmpLaOg8H4ZanHsIS3X9I/vc/RcHF1bm2kycduD1YGsfqR/36a6R
+	7DjsC6s5gCxlCVbLQRBIZDkme6PuEZcplaqo6WJue7NYh9r1hamTPEcGpyMOlesTUp8f/SH5DUnmK
+	ggBLNsQxnYEAo1wDVOXQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr03T-0003Sv-6l; Tue, 05 Feb 2019 12:42:23 +0000
-Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
+	id 1gr06U-0005BH-Tm; Tue, 05 Feb 2019 12:45:30 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr02y-00033c-Qm
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 12:42:20 +0000
-Received: by mail-lj1-x244.google.com with SMTP id q2-v6so2716931lji.10
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 05 Feb 2019 04:41:51 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=PujTR3VNMLT5EVX/UqxbH2pEhEzBe1DF8UOx19PW8us=;
- b=XYOm5N7K+2gM6vgrKEvLrT+uS7LoA2euPbUNA9k2cE256s3MZjXdg1Ld1UjO+/+G+G
- lPIfJUQIUuOtcQ3XwImF3DgqtPhkiP14v8jZMSybH0JbI6no9y36Vgt/44hHdoxLwPh4
- B1dzeDKmR5QbFRXkdolp9O1bEJhyOPK9isk2VETBOoDRHThgyOYKL2bIhrGOArQGwQ8m
- gnUr300JQ6d6mre4/wPJAnGM810QiqKXoKWWMVb7fj7ypVH7hGR95RD7SNiubV3Cl2tH
- ty1alUY+g3MX3sQ7tth4ZA9boSzIXozzsxCy25Kliww8Tth1Ew8/2FIVPqgbC/9iECGI
- n3hQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=PujTR3VNMLT5EVX/UqxbH2pEhEzBe1DF8UOx19PW8us=;
- b=sdOshlS/v+Da0eoDiO8GgcTHraE5gtCYd6g7DWSFnnw9GqNX1q7epzRgGCjfbXr78w
- 2HgMyj6/NG6GsawDEiNCc9309jSUfepEfil35Xh6rPxN8KCfb3lRjV2TLxPXtcDY//E8
- pJTfesL2dm2znCTzdVLirpOl0HpWKS8o/nvGuGSy2NF3iarD/viwOyae4Op5x7RVpwpH
- tVZ6xxLlCYEQlw2mqBCzXrSywgZZCE9/tU46j48+YehrbmX2amOENG0gJw5IJPYJPQgy
- inUj3+b/UUiZvTNdXyARoWSN3895DcBmZx0akVHVh4FY9WorLE1X5EtZpPTFxSI6BkTC
- JvZA==
-X-Gm-Message-State: AHQUAuY8yoGkO+md1pQkaoRDOltIMUrD/diXcxZH4Ht7OFzxMZ7yLKgw
- vGUasygdbzfawF0775NsgkfgMkHG0fpMeO7g5aUHFQ==
-X-Google-Smtp-Source: AHgI3IZ5PbuTNMeGMxbQSI9dcS7UkvwYFjc7/+WprXGB6n0865mBoKl2ukg6NtRertzthtF9PQNG5xYzIXGf9G+w7aw=
-X-Received: by 2002:a2e:131a:: with SMTP id
- 26-v6mr2744142ljt.107.1549370510090; 
- Tue, 05 Feb 2019 04:41:50 -0800 (PST)
+ id 1gr06R-0005Ag-Pk
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 12:45:29 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x15CjQPM121588;
+ Tue, 5 Feb 2019 06:45:27 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1549370727;
+ bh=tegAcGr5jNT+pzfG2jbu6Xo+DepOFefepzxKS98iz7Y=;
+ h=From:To:CC:Subject:Date;
+ b=o0vczFf4jzs1XPZ8YtDQIxrJDuPzNUpKlqi3ID8P4cTK7DsZDLPK8gRpjRlBHKlJs
+ ppwjF2rv6JzD69WG/OQTa9eM0XMxQuD2j/9EROxs9K7I82AY4VHssCU+bLTn+iyAF2
+ WsyzXMtzz7V6oXd/BB1M3PVFr8ovjciCbUzsEGdY=
+Received: from DFLE113.ent.ti.com (dfle113.ent.ti.com [10.64.6.34])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x15CjQW5053425
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Tue, 5 Feb 2019 06:45:26 -0600
+Received: from DFLE101.ent.ti.com (10.64.6.22) by DFLE113.ent.ti.com
+ (10.64.6.34) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 5
+ Feb 2019 06:45:26 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE101.ent.ti.com
+ (10.64.6.22) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Tue, 5 Feb 2019 06:45:26 -0600
+Received: from localhost.localdomain (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x15CjOVM012216;
+ Tue, 5 Feb 2019 06:45:24 -0600
+From: Roger Quadros <rogerq@ti.com>
+To: <t-kristo@ti.com>
+Subject: [PATCH v2 0/3] arm64: ti: k3-am654: USB support
+Date: Tue, 5 Feb 2019 14:45:19 +0200
+Message-ID: <1549370722-414-1-git-send-email-rogerq@ti.com>
+X-Mailer: git-send-email 2.7.4
 MIME-Version: 1.0
-References: <20190205094937.18645-1-brgl@bgdev.pl>
-In-Reply-To: <20190205094937.18645-1-brgl@bgdev.pl>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Tue, 5 Feb 2019 13:41:37 +0100
-Message-ID: <CACRpkdb+fBGEv9xvvkC=YFMA5BeNNYCXKHFkRy=a_PS5QCCG6w@mail.gmail.com>
-Subject: Re: [PATCH] ARM: davinci: da850-evm: use GPIO hogs instead of the
- legacy API
-To: Bartosz Golaszewski <brgl@bgdev.pl>
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_044153_599720_8A58F0E7 
-X-CRM114-Status: GOOD (  10.09  )
+X-CRM114-CacheID: sfid-20190205_044527_917087_3D73761E 
+X-CRM114-Status: GOOD (  12.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,30 +86,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- Sekhar Nori <nsekhar@ti.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Kevin Hilman <khilman@kernel.org>
+Cc: nm@ti.com, devicetree@vger.kernel.org, vigneshr@ti.com, nsekhar@ti.com,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Roger Quadros <rogerq@ti.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 5, 2019 at 10:49 AM Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->
-> In order to drop the hard-coded GPIO base values from the davinci GPIO
-> driver's platform data, we first need to get rid of all calls to the
-> legacy GPIO functions. Convert the mdio configuration to hogging the
-> relevant GPIO line in the da850-evm board file.
->
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Hi,
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+The AM654 SoC supports 2 DWC3 USB controller instances. The
+AM654 base board supports the 2nd (USB1) instance in high-speed.
 
-Yours,
-Linus Walleij
+This series enables support for USB1 instance on the AM654-base-board.
+
+The series depends on [1] and [2]. Both are in the -next branch of their
+respective maintainer trees.
+
+To test you can apply on top of linux-next. As usb/next was just pushed
+today, it might have not reached linux-next yet. If so please pull that from [3].
+
+If using arm64 defconfig, you need to enable
+	CONFIG_USB_DWC3_KEYSTONE=y
+	CONFIG_OMAP_USB2=y
+and the necessary USB drivers that you want to test. e.g. USB network adapter.
+
+[1] AM654 USB2 PHY support https://lkml.org/lkml/2018/12/5/908
+[2] AM654 DWC3 support https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg1896101.html
+[3] usb-next https://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git/log/?h=next
+
+Changelog:
+v2
+- usb & phy nodes are not kept disabled in k3-am65-main.dtsi.
+  Unused ones are disabled in board dts instead.
+
+cheers,
+-roger
+
+
+Jyri Sarha (1):
+  arm64: dts: ti: am654: Add Main System Control Module node
+
+Roger Quadros (2):
+  arm64: dts: ti: k3-am6: add USB support
+  arm64: dts: ti: k3-am654-base-board: enable USB1
+
+ arch/arm64/boot/dts/ti/k3-am65-main.dtsi       | 84 ++++++++++++++++++++++++++
+ arch/arm64/boot/dts/ti/k3-am654-base-board.dts | 28 +++++++++
+ 2 files changed, 112 insertions(+)
+
+-- 
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+
 
 _______________________________________________
 linux-arm-kernel mailing list
