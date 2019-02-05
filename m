@@ -3,84 +3,82 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 85623C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:32:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 550ABC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:40:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 51F4920844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:32:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 20C0420844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  5 Feb 2019 13:40:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cK6HEbh3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 51F4920844
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jp.fujitsu.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cV2+ccEG";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="z0W/wiQn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 20C0420844
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=D0wjmc5FPyJI4wlR9S+0CFyURsAmHZgDdgqWb3pJ6ZY=; b=cK6HEbh3FfrUzr
-	iil5oUjOnB9i2l7OokUc9pY1QiThgSNszMHGOlQ0CXQS+kD7lmjvCS6GVmWAJJ5fB7DRTVnkIf1tx
-	393bqFi/LEYhWNkz8kpp1cu6LVZxggIhWOq0qdOvvbJ+jtRskr4KFtf8cdIOJ+aopUuMYXS+4be/3
-	+DuurcU4VM+VKBH4kpghbf/HK+82P6TtOSqrXXIAKJu1GYSsbDDNvVvGybKDG1STZfuK9pKqDH2yQ
-	517s/CZ9Gwc4fCDLUsy7xpsCUlDeD7cbBOG+I5RA00Oor6Q0PDSZfB6Jns/qZlj/ORG8uow3v4qjL
-	gGtG7PoIxzTqA3278gfA==;
+	List-Owner; bh=I5v5v0p6HICtPCO2arhzKG6pkj+9QzRwNELlbalJ9ps=; b=cV2+ccEGSg0RPZ
+	yOBfhGXfwxZG6zfIGSwHoapFdo0J5LUuHaR/uh26LXeVOPocS4PmyHEotyNDNPA5GIukjssv5Er38
+	SCgFXTCitJdaJqLZtERng5aG0AjPWtrBkVmFDPKEHYQi75+FQTwqyBZ3mtsGgSJFqQTj42lfkMHK3
+	1JEnCl4xLV1zBBTZkEU0d/SED0Zf6EAFu91csCVTlKI/fw2J0dwfxYC0Su11Y0QZYdVN2K+QFI55h
+	444kZ7d6ErMuNT4xdfK6Ojqwa9plxHedtg4fdDToJhocQWDriI0lLDOHgMvY2ifVSGFzZdKR4A2OZ
+	FgUyweCBjr/qOuEFQOwQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gr0po-0001Kl-3U; Tue, 05 Feb 2019 13:32:20 +0000
-Received: from mgwkm04.jp.fujitsu.com ([202.219.69.171])
+	id 1gr0xw-0004if-PG; Tue, 05 Feb 2019 13:40:44 +0000
+Received: from mail-vs1-xe42.google.com ([2607:f8b0:4864:20::e42])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gr0pk-0001KK-0O
- for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 13:32:17 +0000
-Received: from kw-mxoi2.gw.nic.fujitsu.com (unknown [192.168.231.133]) by
- mgwkm04.jp.fujitsu.com with smtp
- id 26ad_8d80_b59e6077_922a_4a08_bbf0_d8584c36daa0;
- Tue, 05 Feb 2019 22:32:09 +0900
-Received: from g01jpfmpwkw03.exch.g01.fujitsu.local
- (g01jpfmpwkw03.exch.g01.fujitsu.local [10.0.193.57])
- by kw-mxoi2.gw.nic.fujitsu.com (Postfix) with ESMTP id 25DEEAC00ED
+ id 1gr0xt-0004iG-GE
+ for linux-arm-kernel@lists.infradead.org; Tue, 05 Feb 2019 13:40:42 +0000
+Received: by mail-vs1-xe42.google.com with SMTP id z3so2140845vsf.7
  for <linux-arm-kernel@lists.infradead.org>;
- Tue,  5 Feb 2019 22:32:09 +0900 (JST)
-Received: from G01JPEXCHKW13.g01.fujitsu.local
- (G01JPEXCHKW13.g01.fujitsu.local [10.0.194.52])
- by g01jpfmpwkw03.exch.g01.fujitsu.local (Postfix) with ESMTP id CE1C2BD66E1;
- Tue,  5 Feb 2019 22:32:07 +0900 (JST)
-Received: from G01JPEXMBKW03.g01.fujitsu.local ([10.0.194.67]) by
- g01jpexchkw13 ([10.0.194.52]) with mapi id 14.03.0415.000; Tue, 5 Feb 2019
- 22:32:06 +0900
-From: "Zhang, Lei" <zhang.lei@jp.fujitsu.com>
-To: 'Will Deacon' <will.deacon@arm.com>
-Subject: RE: [PATCH v3 0/1] arm64: Add workaround for Fujitsu A64FX erratum
- 010001
-Thread-Topic: [PATCH v3 0/1] arm64: Add workaround for Fujitsu A64FX erratum
- 010001
-Thread-Index: AQHUuKy5V4yTFdOO5Emj9g0aGwlQl6XKckPA//+9wQCABwJDsA==
-Date: Tue, 5 Feb 2019 13:32:07 +0000
-Message-ID: <8898674D84E3B24BA3A2D289B872026A6A30C3CB@G01JPEXMBKW03>
-References: <8898674D84E3B24BA3A2D289B872026A6A2C04E6@G01JPEXMBKW03>
- <cb7544e2-bd85-df4c-1f48-0afeedefc962@arm.com>
- <8898674D84E3B24BA3A2D289B872026A6A3090AC@G01JPEXMBKW03>
- <20190201105144.GA27140@fuggles.cambridge.arm.com>
-In-Reply-To: <20190201105144.GA27140@fuggles.cambridge.arm.com>
-Accept-Language: ja-JP, en-US
-Content-Language: ja-JP
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-securitypolicycheck: OK by SHieldMailChecker v2.2.3
-x-shieldmailcheckerpolicyversion: FJ-ISEC-20140219
-x-originating-ip: [10.18.70.198]
+ Tue, 05 Feb 2019 05:40:40 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=hGz+KaIHU6kdZjr70CxUzqvL/Y3JaHXrvpE3EZ2OZfE=;
+ b=z0W/wiQn7JYbpAZ1ol9zt74MyT0lCGqciOPnKnapYHSRPgPTaEviiqgcQ9K1b2wh8i
+ yPZ6PBrJDufXLkOGem2jmlKPtpWVxIzf1uDzjPvacUf1hdtQttxrmYJbCd3PsU+jgzsP
+ /v9+mWIvCCW0dXF8zXGP8fBTWUpy9lhOLqvMYHJTByxbSYRFYyiVoWBXFhgJQJwWHozm
+ 56qIIc3lJvN0RS56QJuXMFYFYKv7MK7k940KjaYavrVhrCM2YZdtnm8hB+YXfcFQ+8FI
+ pKoDyJ61mVVH5zD06oYLTuwtyADsD5UHJ2Z4GHNeoL1Os741Fq1WTl1wJOeBqx7P7ZvU
+ PHsA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=hGz+KaIHU6kdZjr70CxUzqvL/Y3JaHXrvpE3EZ2OZfE=;
+ b=MJRgJQhzwNhyJtosOjc4xr0j6jVLYcs9K0LEMIqVoOGLzqPStbGpUut9UbL5hzmuN1
+ j9CHb3F54zFFnaFFdRphx/OFbtKU8l+nQeC+ZAKJ+kCM5zYpdeo1GfQU/h+nyZ71ETrl
+ cRR3Gn03wAlXlhDbyXvSxKXiOKnkr+sBccbptxLLoM4B9v68m6NmwKKwEtNgTkEB3LWQ
+ HdfmNl86pqb8p4PgFT1Srue8EAiumIKTbzPMUlL9O1gXoDMOW8QQPJvUDkKIfkRXFUap
+ 0U3KJ/NIRJLBnahR1tU8VKTRxtVRYncxYRPcaubZxNu73ujbvfbiZlkFFkLDOQ8jvMQn
+ +NvQ==
+X-Gm-Message-State: AHQUAubj6D8qT0XuxvV5OBJm4Z6EoONQykEC0lCidwbaMRlIv6BNKvJM
+ CfeOBfao74uAcAxSJ7hfKtESQw+yghfDtV0PY6LMhg==
+X-Google-Smtp-Source: AHgI3IYVw/nkWXn4pDQ6QdiimktaGEI7Lc7rL5L+LWqatJUnmPRDh65+YENGhUU2l+fUF4WoXLWXU9Tun+zS5f6jloY=
+X-Received: by 2002:a67:b245:: with SMTP id s5mr2002390vsh.200.1549374040188; 
+ Tue, 05 Feb 2019 05:40:40 -0800 (PST)
 MIME-Version: 1.0
-X-SecurityPolicyCheck-GC: OK by FENCE-Mail
-X-TM-AS-MML: disable
+References: <1548846984-2044-1-git-send-email-vincent.guittot@linaro.org>
+ <CAPDyKFpyg7oGoDZA+=SG7R3yL874Geeqs5LWrsAf50csxsE05A@mail.gmail.com>
+ <CAMuHMdWdbRpA_M4V1kigab6U8rSDgGYXtidiSU4MVdj5xarK8g@mail.gmail.com>
+In-Reply-To: <CAMuHMdWdbRpA_M4V1kigab6U8rSDgGYXtidiSU4MVdj5xarK8g@mail.gmail.com>
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Tue, 5 Feb 2019 14:40:04 +0100
+Message-ID: <CAPDyKFqSofB2TfQXqhngQhaSKRZr-k-z2CXpQ2oWvnCn3JeFHQ@mail.gmail.com>
+Subject: Re: [PATCH v2 ] PM-runtime: fix deadlock with ktime
+To: Geert Uytterhoeven <geert@linux-m68k.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_053216_287719_645F7332 
-X-CRM114-Status: UNSURE (   8.49  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190205_054041_564823_DE358517 
+X-CRM114-Status: GOOD (  14.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,42 +90,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: 'Mark Rutland' <mark.rutland@arm.com>,
- 'Catalin Marinas' <catalin.marinas@arm.com>,
- 'James Morse' <james.morse@arm.com>,
- "'linux-kernel@vger.kernel.org'" <linux-kernel@vger.kernel.org>,
- "'linux-arm-kernel@lists.infradead.org'"
- <linux-arm-kernel@lists.infradead.org>
+Cc: Vincent Guittot <vincent.guittot@linaro.org>,
+ Linux PM <linux-pm@vger.kernel.org>, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Biju Das <biju.das@bp.renesas.com>,
+ Linux-Renesas <linux-renesas-soc@vger.kernel.org>,
+ linux-omap <linux-omap@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Will,
+On Tue, 5 Feb 2019 at 14:24, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>
+> Hi Ulf,
+>
+> On Wed, Jan 30, 2019 at 1:15 PM Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> > On Wed, 30 Jan 2019 at 12:16, Vincent Guittot
+> > <vincent.guittot@linaro.org> wrote:
+> > >
+> > > A deadlock has been seen when swicthing clocksources which use PM runtime.
+> > > The call path is:
+> > > change_clocksource
+> > >     ...
+> > >     write_seqcount_begin
+> > >     ...
+> > >     timekeeping_update
+> > >         ...
+> > >         sh_cmt_clocksource_enable
+> > >             ...
+> > >             rpm_resume
+> >
+> > Hmm, isn't this already a problem in genpd then?
+> >
+> > In genpd's ->runtime_resume() callback (genpd_runtime_resume()) we
+> > call ktime_get() to measure the latency of running the callback.
+> >
+> > Or, perhaps irq_safe_dev_in_no_sleep_domain() returns true for the
+> > genpd + device in question, which means the ktime thingy is skipped.
+> >
+> > Geert?
+>
+> Correct. After adding
+>
+>     dev_info(dev, "%s: pm_runtime_is_irq_safe = %d,
+> genpd_is_irq_safe(%s) = %d => %s\n", __func__,
+> pm_runtime_is_irq_safe(dev), genpd->name, genpd_is_irq_safe(genpd),
+> ret ? "true" : "false");
+>
+> I see on R-Car M2-W:
+>
+>     sh_cmt ffca0000.timer: irq_safe_dev_in_no_sleep_domain:
+> pm_runtime_is_irq_safe = 1, genpd_is_irq_safe(always-on) = 0 => true
+>
+> For all other devices, the result is false.
 
-> -----Original Message-----
-> From: linux-arm-kernel
-> [mailto:linux-arm-kernel-bounces@lists.infradead.org] On Behalf Of
-> Will Deacon
-> Sent: Friday, February 01, 2019 7:52 PM
-> To: Zhang, Lei 
-> Cc: 'Mark Rutland'; 'Catalin Marinas'; 'James Morse';
-> 'linux-kernel@vger.kernel.org';
-> 'linux-arm-kernel@lists.infradead.org'
-> Subject: Re: [PATCH v3 0/1] arm64: Add workaround for Fujitsu A64FX
-> erratum 010001
+Thanks for confirming! I guess we have been lucky so far.
 
-> So I guess we should boot with NFD1 clear, and then set it only when we
-> realise we're not on an A64FX?
+Anyway, if runtime PM core converts to use ktime_get_mono_fast_ns(),
+we should probably consider to convert genpd to this as well. Don't
+you think?
 
-In my patch, I do similar things at __cpu_setup which we 
-set NFD1=1 on all processors except A64FX.
-
-Do you mean we would better to change the place where we 
-set/clear NFD1?
-
-Thanks,
-Zhang Lei
+Kind regards
+Uffe
 
 _______________________________________________
 linux-arm-kernel mailing list
