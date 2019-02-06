@@ -2,89 +2,122 @@ Return-Path: <SRS0=SkGj=QN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 02728C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 00:53:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6DAA9C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 01:47:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C38ED2184E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 00:53:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2F22F2184E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 01:47:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BLj4gfAi";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="m8WU5ZJ1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C38ED2184E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ArK2GXxY";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=ucr.edu header.i=@ucr.edu header.b="ssAyL97J"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F22F2184E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ucr.edu
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/wM9p03SgbnTM5n1JPcfOofKpkg+0W/33QZUNY+htTs=; b=BLj4gfAi0WflZE
-	zDN27cOohAzYUygfuMtTmAlNMIHzUMep4OwpMgUwSwqZY/qD7WFVv7PZeUMNH0DZkt5M4qvkGb8iE
-	FyZv0i3NLad5q6RTQfNCuE0YEngHMaj6NXZG9eSED6DGwS/jobTF/JrAng7eJGw6MIlD6C6Af0iZh
-	P76uZq9+X4W1QkwFlFJz5oHonMISOD1AUyu/lVrzG1Dc6TDXTJZFgs8KAYu2SxfugpdCGm0o6UfS6
-	S15PsqIwq636IPZ3IGS5I6u1GJwMNd3VjjRjoLGXwgGh+LAodMzNpsGC2J63Zhl0d3r9lN5eaupIx
-	C8AL3R0sCNx6uy1OALqg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=i5vxWMmI5ZlabfCbs3XcdC2SsDgn36y+0NnF0QFo7Pg=; b=ArK
+	2GXxY71hONdFu0E2b//echuMejHqCVyzzinsKhieA3af72O5p4wx7sO4SmCg2Y8kavkkHF5TjXWkM
+	lx8fVdVfLfpCci6i/4WANkmb6gn5DGVlkz6hJ5ubLKNLjZYHHP9H8Jg+CEYAXlOqyeebgkx8/ou16
+	CpOKkmXAB9Jdt5bTme7u17D3JBsgGVgRWAlNmB75DhTOe0Lo1l6/T8aD8RUJji0GqVXlsntBvqd9G
+	CchUGjodMIniQytzjf+U1HJfL42pmpClZi/hEOt9o8eUbttNz6GjRhKwY4MmUxd1k6IuznNjUymbr
+	I4VIEY8x+Svueh2thfQwx+nkirT7nHw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grBSl-000417-Nq; Wed, 06 Feb 2019 00:53:15 +0000
-Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+	id 1grCJg-0005Yy-Fv; Wed, 06 Feb 2019 01:47:56 +0000
+Received: from mx6.ucr.edu ([138.23.62.71])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grBSi-00040O-69; Wed, 06 Feb 2019 00:53:14 +0000
-Received: by mail-pg1-x542.google.com with SMTP id m1so2171894pgq.8;
- Tue, 05 Feb 2019 16:53:11 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=xprkqdRaqmi3kWJXLytQa/TDOOKc9AS87ujUPnh+CAI=;
- b=m8WU5ZJ15QT7KzG6rOqXVjWyj6UZ40aggF6HiwmBg5qIjHAPkN0fl2VjZEGNdhFMMg
- GEmx+vM6M9jlXMqpvpbJDckj6lFBIcWw6UnTmaxVYycLnEXRXMybgirtJNlSoQTk4Ca1
- hgAeNdN4w8Xz/xp3SfqhX4J/7ZNSAlURlWYT0AP4fsE8N7dcoznOMCsKJdUp2bGRaKJp
- u7B5dJUdyMspQ5BSnT6HKdAlVDbYCscemQ+48aQgve9j885xYrLvJ2Pj1L6lywcDRHhZ
- nkh4pu0/h4cohftu0v6bEXT6V3DTIcXsJa9AMmL1FkYZDGhP2mXNWlRnhSRKjcK+8oE2
- 084g==
+ id 1grCJd-0005YE-1k
+ for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 01:47:54 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple;
+ d=ucr.edu; i=@ucr.edu; q=dns/txt; s=selector3;
+ t=1549417672; x=1580953672;
+ h=from:to:cc:subject:date:message-id;
+ bh=MkIFH725olQXVn1J0td1c/AMRtWp8ZUI3+26TG4Oq/o=;
+ b=ssAyL97JJ7w//K2c6xugz8hfNXCkQKgqM/BDg8PwavvfSZ9p8SMa07NC
+ kJnT4GcaVRa0xnFo+j2KI9DeikdJQ79MtXaqwoE8nJY+YmSqh19hPGb2I
+ 4qDSYiHE0JIV5oAYsFZRlcoJMl95da0b90i7uHYK/h/8OAti8FiZM8XIK
+ pVWunjnCDi3LWl0rzw0qzhZ+1NpfnToF5TR7ewF7AlOum6gmEIz3FwXOi
+ nVWcuENnTd6asoiLrR788MssgflB5DM0gLFwalE2YyVcOEOnXEdTw66ZV
+ NhNxzDUXZ+G0HmxPegxCIuWNRZ9VbOt53tiAnNQVC7NS/BN60ZFagABvP Q==;
+IronPort-PHdr: =?us-ascii?q?9a23=3AK0cK7x8r9eaK6P9uRHKM819IXTAuvvDOBiVQ1KB4?=
+ =?us-ascii?q?2uIcTK2v8tzYMVDF4r011RmVBdWds6oMotGVmpioYXYH75eFvSJKW713fDhBt/?=
+ =?us-ascii?q?8rmRc9CtWOE0zxIa2iRSU7GMNfSA0tpCnjYgBaF8nkelLdvGC54yIMFRXjLwp1?=
+ =?us-ascii?q?Ifn+FpLPg8it2O2+557ebx9UiDahfLh/MAi4oQLNu8cMnIBsMLwxyhzHontJf+?=
+ =?us-ascii?q?RZ22ZlLk+Nkhj/+8m94odt/zxftPw9+cFAV776f7kjQrxDEDsmKWE169b1uhTF?=
+ =?us-ascii?q?UACC+2ETUmQSkhpPHgjF8BT3VYr/vyfmquZw3jSRMNboRr4oRzut86ZrSAfpiC?=
+ =?us-ascii?q?gZMT457HrXgdF0gK5CvR6tuwBzz4vSbYGQNfp+ZbjdfdIcRWpOQ81fSTVPCZ6y?=
+ =?us-ascii?q?b4sOEeUBOftXpJT5q1YAsReyAA+hD/7txDBVnH/7xa003fo8Hw/I3wIuGMkDvG?=
+ =?us-ascii?q?jIoNjvKKsfS/y5wLXOwD7eb/1WwzD96I3Qfx8joPGNXLJwcdfWyUIyEA7EjlSR?=
+ =?us-ascii?q?qYz/MDOUyugBr2aW4vF9Ve2zkW4rsR9+rSWyxso1jITCm4Ebykjc+Cln3Io4Ic?=
+ =?us-ascii?q?e0RU17bNK+Dpdcqi6XO5FrTs4mQWxkoDs2x7wCtJKhYiQHxpQqywTBZ/GGaYSF?=
+ =?us-ascii?q?4B3uWeCMKjlinn1lYqiwhxOq/Eilze3zS9e73U5RripAjtnMrncN1wHP6sSfSv?=
+ =?us-ascii?q?ty4EOh2TGX2gDW8O5EIEQ0mbPDK54l37I8j5QTvVnHEyL0gkn2g6iWdkIr+uis?=
+ =?us-ascii?q?9evreKnpppiZN4NsiwH+NLohmtCnDOgmLgQDW3KX9Oe82bH540H1XbpHgucrnq?=
+ =?us-ascii?q?Tdsp3WPcEbqbS4Aw9R3IYj8RG/DzK+3dUYnHgHLEhKeBObg4T1NVzDO+34Auul?=
+ =?us-ascii?q?g1i2jjhk2u3GMqX7AprRNnjDjKvhfbFl5k5YyQozy81f5p1NBr4bOvLzX1b9tN?=
+ =?us-ascii?q?/GAR8jNQy73eLnBc551oMfQmKPHrSZPLnTsV+O6OIvOfODa5ILtznnNvcp/fnu?=
+ =?us-ascii?q?jWU2mQxVU7Ou2M4maWK4A/Mud1SLYXPt2o9aOXoBpEwzQPG82w7KaiJae3vnB/?=
+ =?us-ascii?q?F03To8Eo/zSNibSw=3D=3D?=
+X-IronPort-Anti-Spam-Filtered: true
+X-IronPort-Anti-Spam-Result: =?us-ascii?q?A2A1AAAaPFpcgMXWVdFlHAEBAQQBAQcEA?=
+ =?us-ascii?q?QGBUQcBAQsBgztKD4wdX4sWUgaKZRhthVmCc4UPgXsBCgEBLIRAgxQiNAkNAQM?=
+ =?us-ascii?q?BAQIBAQIBEwEBCQ0JCBsMMYI6KYJfNlKBFQEFATVbgkcBgXQNBaEPPIwXM4hkA?=
+ =?us-ascii?q?QeBSwkBCIdwhEGBD4EHg26IU4JDAoEsAQEBiESHRFiQbgEGAgGBZYFDjwslgWy?=
+ =?us-ascii?q?BSoZ+OIdaAS2bOQIEAgQFAgUPIYElgg5NJYFsCoFEglKOLB4zgQeNcwE?=
+X-IPAS-Result: =?us-ascii?q?A2A1AAAaPFpcgMXWVdFlHAEBAQQBAQcEAQGBUQcBAQsBgzt?=
+ =?us-ascii?q?KD4wdX4sWUgaKZRhthVmCc4UPgXsBCgEBLIRAgxQiNAkNAQMBAQIBAQIBEwEBC?=
+ =?us-ascii?q?Q0JCBsMMYI6KYJfNlKBFQEFATVbgkcBgXQNBaEPPIwXM4hkAQeBSwkBCIdwhEG?=
+ =?us-ascii?q?BD4EHg26IU4JDAoEsAQEBiESHRFiQbgEGAgGBZYFDjwslgWyBSoZ+OIdaAS2bO?=
+ =?us-ascii?q?QIEAgQFAgUPIYElgg5NJYFsCoFEglKOLB4zgQeNcwE?=
+X-IronPort-AV: E=Sophos;i="5.58,337,1544515200"; d="scan'208";a="26763083"
+Received: from mail-pl1-f197.google.com ([209.85.214.197])
+ by smtpmx6.ucr.edu with ESMTP/TLS/AES128-GCM-SHA256; 05 Feb 2019 17:47:44 -0800
+Received: by mail-pl1-f197.google.com with SMTP id q20so3779804pls.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 05 Feb 2019 17:47:45 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=xprkqdRaqmi3kWJXLytQa/TDOOKc9AS87ujUPnh+CAI=;
- b=BoldC/vspp5pIUeeYPoaMqVGFgQzW00Vyf2CAVuKLOvWlt6J1ZvL9IW+/8qBm+2XIx
- 1qnID1XlFHYKObvI2teLWsh+F9fJfR53fe494UbDRJ6FFnA7tl1pTj+dG512rGJjjv/p
- z9cGVef3N6Lte6XekDG6rJM2Yg3ayu7k9wpKPMjxoD6XQ8giDKvoUGVAGChaPgk5TLBO
- uwY1v3nFcZgrNnp/n8luGQR0sf8tlRHfglKWszvCFij9uGTF5ZvpTkLp8Y3U+H4+v1AD
- t/V7c/BpSKm15FXweKbDNgLi45JauN2c29+2aD+/KX3QQ0fsdRCAC2a+NrKVpMAooQ2I
- cBXQ==
-X-Gm-Message-State: AHQUAuayYRU89PYoMCTycn0VuCHGJVUv0LhZSuVVYLG1pno+OkbpSmTf
- tPima3mA6DEPPuB37GU7vlTeCWe/thE=
-X-Google-Smtp-Source: AHgI3IagaiB28kfXas58FRjrIQFbuolGAX2QgdVqNIsNoOlc/wAaPYCTAY4bgSWKHjatSY0GnELYug==
-X-Received: by 2002:a63:da18:: with SMTP id c24mr7097580pgh.318.1549414391360; 
- Tue, 05 Feb 2019 16:53:11 -0800 (PST)
-Received: from localhost.localdomain ([2601:644:8201:32e0:7256:81ff:febd:926d])
- by smtp.gmail.com with ESMTPSA id y72sm123455pfa.98.2019.02.05.16.53.09
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=v2+oUWDnQz4pz+6QK9pnqRnNQZm/eHZVWJ/uZZFNW/A=;
+ b=mPHcWUUeBDNZlGT3swA4U3I/0qEod5JKYFbTpWWh7TEaLt3WOxe0dsQuLOCRumW5z0
+ KHgtZAok12WWGJa73CrBgen+3muVvz/+GKYqqL5aBn8VwApbKMQE0WyTo2zdPDn9TO2v
+ vc5zZz1QN41PHCRnOhkEIl7ypUSdzUmzhAipLgjekOfY2VkAZ/B9XDYal8iKcn4wByPk
+ tR4jRULtg6XLSVhHoVQ4T/yj0F9KYUPliFK81uwTouQU51Jw5d91VwmkApW2ij1et5Vr
+ /Y6tUq/KnsTe07SSOJaj0k+5xXeyTZB6+SHA6b18rXuB4f2oK2JdPpCEykKv3cl6T9Ei
+ VqLA==
+X-Gm-Message-State: AHQUAuayD5muRjJOamtc7q2XRaRdyqh/qAvkckxdGJBVYzLWBu4ASTA/
+ Z6TyrTGZ74DaRpH84rXhldfDm7TrtQpjhb+vgj6PsZZ35L3f8pkCdiTmLvEvrNm+Rip6MMfj8ql
+ 3v1QwGz/7PNtxbuo3LBbROK6+EfMZSWlBJbLj
+X-Received: by 2002:a62:4d81:: with SMTP id a123mr8219315pfb.122.1549417663965; 
+ Tue, 05 Feb 2019 17:47:43 -0800 (PST)
+X-Google-Smtp-Source: AHgI3IZ/Dj8XlceW1pvJi4tE1ublOmi4prcBrw/600wizMg1uz17vyyzMG0/5Rf2549oAiXQIVi4mQ==
+X-Received: by 2002:a62:4d81:: with SMTP id a123mr8219285pfb.122.1549417663512; 
+ Tue, 05 Feb 2019 17:47:43 -0800 (PST)
+Received: from Yizhuo.cs.ucr.edu (yizhuo.cs.ucr.edu. [169.235.26.74])
+ by smtp.googlemail.com with ESMTPSA id z13sm8736089pgf.84.2019.02.05.17.47.42
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 05 Feb 2019 16:53:10 -0800 (PST)
-Date: Tue, 5 Feb 2019 16:53:03 -0800
-From: Eduardo Valentin <edubezval@gmail.com>
-To: michael.kao@mediatek.com
-Subject: Re: [PATCH 4/7] thermal: mediatek: add thermal controller offset
-Message-ID: <20190206005300.GD19687@localhost.localdomain>
-References: <1549006693-11659-1-git-send-email-michael.kao@mediatek.com>
- <1549006693-11659-5-git-send-email-michael.kao@mediatek.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1549006693-11659-5-git-send-email-michael.kao@mediatek.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+ Tue, 05 Feb 2019 17:47:42 -0800 (PST)
+From: Yizhuo <yzhai003@ucr.edu>
+To: 
+Subject: [PATCH] phy: Variable "caldone" in function rockchip_emmc_phy_power()
+ could be uninitialized
+Date: Tue,  5 Feb 2019 17:47:33 -0800
+Message-Id: <20190206014733.21094-1-yzhai003@ucr.edu>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_165312_254312_D3189077 
-X-CRM114-Status: GOOD (  24.97  )
+X-CRM114-CacheID: sfid-20190205_174753_121759_31481843 
+X-CRM114-Status: GOOD (  15.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,303 +129,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: =Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- srv_heupstream@mediatek.com, linux-pm@vger.kernel.org,
- =Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
- =Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
- =Matthias Brugger <matthias.bgg@gmail.com>, =Zhang Rui <rui.zhang@intel.com>,
+Cc: csong@cs.ucr.edu, Heiko Stuebner <heiko@sntech.de>, zhiyunq@cs.ucr.edu,
+ linux-kernel@vger.kernel.org, Kishon Vijay Abraham I <kishon@ti.com>,
+ Yizhuo <yzhai003@ucr.edu>, linux-rockchip@lists.infradead.org,
  linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 01, 2019 at 03:38:10PM +0800, michael.kao@mediatek.com wrote:
-> From: Michael Kao <michael.kao@mediatek.com>
-> 
-> One thermal controller can read four sensors at most,
-> so we need to add controller_offset for the project with
-> more than four sensors to reuse the same register settings.
-> 
-> Signed-off-by: Michael Kao <michael.kao@mediatek.com>
-> ---
->  drivers/thermal/mtk_thermal.c | 79 +++++++++++++++++++++++++++++--------------
->  1 file changed, 54 insertions(+), 25 deletions(-)
-> 
-> diff --git a/drivers/thermal/mtk_thermal.c b/drivers/thermal/mtk_thermal.c
-> index 45c6587..e5cf3f4 100644
-> --- a/drivers/thermal/mtk_thermal.c
-> +++ b/drivers/thermal/mtk_thermal.c
-> @@ -105,6 +105,9 @@
->  /* The number of sensing points per bank */
->  #define MT8173_NUM_SENSORS_PER_ZONE	4
->  
-> +/* The number of controller in the MT8173 */
-> +#define MT8173_NUM_CONTROLLER		1
-> +
->  /* The calibration coefficient of sensor  */
->  #define MT8173_CALIBRATION	165
->  
-> @@ -150,6 +153,9 @@ enum {
->  /* The number of sensing points per bank */
->  #define MT2701_NUM_SENSORS_PER_ZONE	3
->  
-> +/* The number of controller in the MT2701 */
-> +#define MT2701_NUM_CONTROLLER		1
-> +
->  /* The calibration coefficient of sensor  */
->  #define MT2701_CALIBRATION	165
->  
-> @@ -168,6 +174,9 @@ enum {
->  /* The number of sensing points per bank */
->  #define MT2712_NUM_SENSORS_PER_ZONE	4
->  
-> +/* The number of controller in the MT2712 */
-> +#define MT2712_NUM_CONTROLLER		1
-> +
->  /* The calibration coefficient of sensor  */
->  #define MT2712_CALIBRATION	165
->  
-> @@ -176,6 +185,7 @@ enum {
->  #define MT7622_NUM_ZONES		1
->  #define MT7622_NUM_SENSORS_PER_ZONE	1
->  #define MT7622_TS1	0
-> +#define MT7622_NUM_CONTROLLER		1
->  
->  /* The calibration coefficient of sensor  */
->  #define MT7622_CALIBRATION	165
-> @@ -201,6 +211,8 @@ struct mtk_thermal_data {
->  	const int *msr;
->  	const int *adcpnp;
->  	const int cali_val;
-> +	const int num_controller;
-> +	const int *controller_offset;
->  	struct thermal_bank_cfg bank_data[];
->  };
->  
-> @@ -240,6 +252,7 @@ struct mtk_thermal {
->  };
->  
->  static const int mt8173_mux_values[MT8173_NUM_SENSORS] = { 0, 1, 2, 3, 16 };
-> +static const int mt8173_tc_offset[MT8173_NUM_CONTROLLER] = { 0x0, };
->  
->  static const int mt8173_vts_index[MT8173_NUM_SENSORS] = {
->  	VTS1, VTS2, VTS3, VTS4, VTSABB
-> @@ -259,6 +272,7 @@ struct mtk_thermal {
->  };
->  
->  static const int mt2701_mux_values[MT2701_NUM_SENSORS] = { 0, 1, 16 };
-> +static const int mt2701_tc_offset[MT2701_NUM_CONTROLLER] = { 0x0, };
->  
->  static const int mt2701_vts_index[MT2701_NUM_SENSORS] = {
->  	VTS1, VTS2, VTS3
-> @@ -278,6 +292,7 @@ struct mtk_thermal {
->  };
->  
->  static const int mt2712_mux_values[MT2712_NUM_SENSORS] = { 0, 1, 2, 3 };
-> +static const int mt2712_tc_offset[MT2712_NUM_CONTROLLER] = { 0x0, };
->  
->  static const int mt2712_vts_index[MT2712_NUM_SENSORS] = {
->  	VTS1, VTS2, VTS3, VTS4
-> @@ -289,6 +304,7 @@ struct mtk_thermal {
->  static const int mt7622_adcpnp[MT7622_NUM_SENSORS_PER_ZONE] = { TEMP_ADCPNP0, };
->  static const int mt7622_mux_values[MT7622_NUM_SENSORS] = { 0, };
->  static const int mt7622_vts_index[MT7622_NUM_SENSORS] = { VTS1 };
-> +static const int mt7622_tc_offset[MT7622_NUM_CONTROLLER] = { 0x0, };
->  
->  /**
->   * The MT8173 thermal controller has four banks. Each bank can read up to
-> @@ -309,6 +325,8 @@ struct mtk_thermal {
->  	.num_sensors = MT8173_NUM_SENSORS,
->  	.vts_index = mt8173_vts_index,
->  	.cali_val = MT8173_CALIBRATION,
-> +	.num_controller = MT8173_NUM_CONTROLLER,
-> +	.controller_offset = mt8173_tc_offset,
->  	.bank_data = {
->  		{
->  			.num_sensors = 2,
-> @@ -345,6 +363,8 @@ struct mtk_thermal {
->  	.num_sensors = MT2701_NUM_SENSORS,
->  	.vts_index = mt2701_vts_index,
->  	.cali_val = MT2701_CALIBRATION,
-> +	.num_controller = MT2701_NUM_CONTROLLER,
-> +	.controller_offset = mt2701_tc_offset,
->  	.bank_data = {
->  		{
->  			.num_sensors = 3,
-> @@ -372,6 +392,8 @@ struct mtk_thermal {
->  	.num_sensors = MT2712_NUM_SENSORS,
->  	.vts_index = mt2712_vts_index,
->  	.cali_val = MT2712_CALIBRATION,
-> +	.num_controller = MT2712_NUM_CONTROLLER,
-> +	.controller_offset = mt2712_tc_offset,
->  	.bank_data = {
->  		{
->  			.num_sensors = 4,
-> @@ -393,6 +415,8 @@ struct mtk_thermal {
->  	.num_sensors = MT7622_NUM_SENSORS,
->  	.vts_index = mt7622_vts_index,
->  	.cali_val = MT7622_CALIBRATION,
-> +	.num_controller = MT7622_NUM_CONTROLLER,
-> +	.controller_offset = mt7622_tc_offset,
->  	.bank_data = {
->  		{
->  			.num_sensors = 1,
-> @@ -523,19 +547,23 @@ static int mtk_read_temp(void *data, int *temperature)
->  };
->  
->  static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
-> -				  u32 apmixed_phys_base, u32 auxadc_phys_base)
-> +				  u32 apmixed_phys_base, u32 auxadc_phys_base,
-> +				  int ctrl_id)
->  {
->  	struct mtk_thermal_bank *bank = &mt->banks[num];
->  	const struct mtk_thermal_data *conf = mt->conf;
->  	int i;
->  
-> +	int offset = mt->conf->controller_offset[ctrl_id];
-> +	void *controller_base = mt->thermal_base + offset;
+In function rockchip_emmc_phy_power(), local variable "caldone"
+could be uninitialized if function regmap_read() returns -EINVAL.
+However, it will be used directly in the later context, which
+is potentially unsafe.
 
-This void * has to be at least __iomem, right?
+Signed-off-by: Yizhuo <yzhai003@ucr.edu>
+---
+ drivers/phy/rockchip/phy-rockchip-emmc.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-See the report of kbuild bot, fix it and send it back.
+diff --git a/drivers/phy/rockchip/phy-rockchip-emmc.c b/drivers/phy/rockchip/phy-rockchip-emmc.c
+index f1b24f18e9b2..ca921ae08309 100644
+--- a/drivers/phy/rockchip/phy-rockchip-emmc.c
++++ b/drivers/phy/rockchip/phy-rockchip-emmc.c
+@@ -85,11 +85,12 @@ struct rockchip_emmc_phy {
+ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+ {
+ 	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
+-	unsigned int caldone;
++	unsigned int caldone = 0;
+ 	unsigned int dllrdy;
+ 	unsigned int freqsel = PHYCTRL_FREQSEL_200M;
+ 	unsigned long rate;
+ 	unsigned long timeout;
++	int err;
+ 
+ 	/*
+ 	 * Keep phyctrl_pdb and phyctrl_endll low to allow
+@@ -164,9 +165,14 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+ 	 * wait 5us for calpad busy trimming
+ 	 */
+ 	udelay(5);
+-	regmap_read(rk_phy->reg_base,
++	err = regmap_read(rk_phy->reg_base,
+ 		    rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
+ 		    &caldone);
++	if (err) {
++		pr_err("Failed to read status.\n");
++		return err;
++	}
++
+ 	caldone = (caldone >> PHYCTRL_CALDONE_SHIFT) & PHYCTRL_CALDONE_MASK;
+ 	if (caldone != PHYCTRL_CALDONE_DONE) {
+ 		pr_err("rockchip_emmc_phy_power: caldone timeout.\n");
+-- 
+2.17.1
 
-> +
->  	bank->id = num;
->  	bank->mt = mt;
->  
->  	mtk_thermal_get_bank(bank);
->  
->  	/* bus clock 66M counting unit is 12 * 15.15ns * 256 = 46.540us */
-> -	writel(TEMP_MONCTL1_PERIOD_UNIT(12), mt->thermal_base + TEMP_MONCTL1);
-> +	writel(TEMP_MONCTL1_PERIOD_UNIT(12), controller_base + TEMP_MONCTL1);
->  
->  	/*
->  	 * filt interval is 1 * 46.540us = 46.54us,
-> @@ -543,21 +571,21 @@ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
->  	 */
->  	writel(TEMP_MONCTL2_FILTER_INTERVAL(1) |
->  			TEMP_MONCTL2_SENSOR_INTERVAL(429),
-> -			mt->thermal_base + TEMP_MONCTL2);
-> +			controller_base + TEMP_MONCTL2);
->  
->  	/* poll is set to 10u */
->  	writel(TEMP_AHBPOLL_ADC_POLL_INTERVAL(768),
-> -	       mt->thermal_base + TEMP_AHBPOLL);
-> +	       controller_base + TEMP_AHBPOLL);
->  
->  	/* temperature sampling control, 1 sample */
-> -	writel(0x0, mt->thermal_base + TEMP_MSRCTL0);
-> +	writel(0x0, controller_base + TEMP_MSRCTL0);
->  
->  	/* exceed this polling time, IRQ would be inserted */
-> -	writel(0xffffffff, mt->thermal_base + TEMP_AHBTO);
-> +	writel(0xffffffff, controller_base + TEMP_AHBTO);
->  
->  	/* number of interrupts per event, 1 is enough */
-> -	writel(0x0, mt->thermal_base + TEMP_MONIDET0);
-> -	writel(0x0, mt->thermal_base + TEMP_MONIDET1);
-> +	writel(0x0, controller_base + TEMP_MONIDET0);
-> +	writel(0x0, controller_base + TEMP_MONIDET1);
->  
->  	/*
->  	 * The MT8173 thermal controller does not have its own ADC. Instead it
-> @@ -572,44 +600,44 @@ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
->  	 * this value will be stored to TEMP_PNPMUXADDR (TEMP_SPARE0)
->  	 * automatically by hw
->  	 */
-> -	writel(BIT(conf->auxadc_channel), mt->thermal_base + TEMP_ADCMUX);
-> +	writel(BIT(conf->auxadc_channel), controller_base + TEMP_ADCMUX);
->  
->  	/* AHB address for auxadc mux selection */
->  	writel(auxadc_phys_base + AUXADC_CON1_CLR_V,
-> -	       mt->thermal_base + TEMP_ADCMUXADDR);
-> +	       controller_base + TEMP_ADCMUXADDR);
->  
->  	/* AHB address for pnp sensor mux selection */
->  	writel(apmixed_phys_base + APMIXED_SYS_TS_CON1,
-> -	       mt->thermal_base + TEMP_PNPMUXADDR);
-> +	       controller_base + TEMP_PNPMUXADDR);
->  
->  	/* AHB value for auxadc enable */
-> -	writel(BIT(conf->auxadc_channel), mt->thermal_base + TEMP_ADCEN);
-> +	writel(BIT(conf->auxadc_channel), controller_base + TEMP_ADCEN);
->  
->  	/* AHB address for auxadc enable (channel 0 immediate mode selected) */
->  	writel(auxadc_phys_base + AUXADC_CON1_SET_V,
-> -	       mt->thermal_base + TEMP_ADCENADDR);
-> +	       controller_base + TEMP_ADCENADDR);
->  
->  	/* AHB address for auxadc valid bit */
->  	writel(auxadc_phys_base + AUXADC_DATA(conf->auxadc_channel),
-> -	       mt->thermal_base + TEMP_ADCVALIDADDR);
-> +	       controller_base + TEMP_ADCVALIDADDR);
->  
->  	/* AHB address for auxadc voltage output */
->  	writel(auxadc_phys_base + AUXADC_DATA(conf->auxadc_channel),
-> -	       mt->thermal_base + TEMP_ADCVOLTADDR);
-> +	       controller_base + TEMP_ADCVOLTADDR);
->  
->  	/* read valid & voltage are at the same register */
-> -	writel(0x0, mt->thermal_base + TEMP_RDCTRL);
-> +	writel(0x0, controller_base + TEMP_RDCTRL);
->  
->  	/* indicate where the valid bit is */
->  	writel(TEMP_ADCVALIDMASK_VALID_HIGH | TEMP_ADCVALIDMASK_VALID_POS(12),
-> -	       mt->thermal_base + TEMP_ADCVALIDMASK);
-> +	       controller_base + TEMP_ADCVALIDMASK);
->  
->  	/* no shift */
-> -	writel(0x0, mt->thermal_base + TEMP_ADCVOLTAGESHIFT);
-> +	writel(0x0, controller_base + TEMP_ADCVOLTAGESHIFT);
->  
->  	/* enable auxadc mux write transaction */
->  	writel(TEMP_ADCWRITECTRL_ADC_MUX_WRITE,
-> -	       mt->thermal_base + TEMP_ADCWRITECTRL);
-> +		controller_base + TEMP_ADCWRITECTRL);
->  
->  	for (i = 0; i < conf->bank_data[num].num_sensors; i++)
->  		writel(conf->sensor_mux_values[conf->bank_data[num].sensors[i]],
-> @@ -617,11 +645,11 @@ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
->  		       conf->adcpnp[conf->bank_data[num].sensors[i]]);
->  
->  	writel((1 << conf->bank_data[num].num_sensors) - 1,
-> -	       mt->thermal_base + TEMP_MONCTL0);
-> +	       controller_base + TEMP_MONCTL0);
->  
->  	writel(TEMP_ADCWRITECTRL_ADC_PNP_WRITE |
->  	       TEMP_ADCWRITECTRL_ADC_MUX_WRITE,
-> -	       mt->thermal_base + TEMP_ADCWRITECTRL);
-> +	       controller_base + TEMP_ADCWRITECTRL);
->  
->  	mtk_thermal_put_bank(bank);
->  }
-> @@ -737,7 +765,7 @@ static int mtk_thermal_get_calibration_data(struct device *dev,
->  
->  static int mtk_thermal_probe(struct platform_device *pdev)
->  {
-> -	int ret, i;
-> +	int ret, i, ctrl_id;
->  	struct device_node *auxadc, *apmixedsys, *np = pdev->dev.of_node;
->  	struct mtk_thermal *mt;
->  	struct resource *res;
-> @@ -817,9 +845,10 @@ static int mtk_thermal_probe(struct platform_device *pdev)
->  		goto err_disable_clk_auxadc;
->  	}
->  
-> -	for (i = 0; i < mt->conf->num_banks; i++)
-> -		mtk_thermal_init_bank(mt, i, apmixed_phys_base,
-> -				      auxadc_phys_base);
-> +	for (ctrl_id = 0; ctrl_id < mt->conf->num_controller ; ctrl_id++)
-> +		for (i = 0; i < mt->conf->num_banks; i++)
-> +			mtk_thermal_init_bank(mt, i, apmixed_phys_base,
-> +					      auxadc_phys_base, ctrl_id);
->  
->  	platform_set_drvdata(pdev, mt);
->  
-> -- 
-> 1.9.1
-> 
 
 _______________________________________________
 linux-arm-kernel mailing list
