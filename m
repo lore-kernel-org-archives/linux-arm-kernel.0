@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A3BBC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 02:18:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 42F95C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 03:13:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 64258218A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 02:18:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 10EFD217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 03:13:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CGZISCw8";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=ucr.edu header.i=@ucr.edu header.b="d3k2FBGk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 64258218A3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XtQ6li7z";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=ucr.edu header.i=@ucr.edu header.b="XBQTjLOR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 10EFD217F9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ucr.edu
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,98 +26,101 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
 	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=hnnKJhECtdGuPFLAyYPT0qlPhRdAhTCC/EVaeQ7QJIg=; b=CGZ
-	ISCw8DaH42It9j6b6C1D1UBCOJJJkvVNYPI0OMos/g2xvO45qqXx9X15Khm7SBUpsY/bK85E4oSbx
-	eyFpdn3C9b7hEImpEdWNLfo2V7iepXa1oHa+XadkRNwqNBex/hEWIpVTSfnv0sBEkLuSwj8h7qWSo
-	6wC4Jv6RbpiQT18UpcMJCcW/YaTIPli13o53s+ret78Cdjet4PQiWsAMueBgYbtXlgJ/ckNMMeU5p
-	UJqrrq7SfCpOatZwJQZUxGrILx3SGEbyxDmMcQG+xirVtwTVY7+T/fRswxoRjWyAmshMpDFiH30bd
-	Bf7DuRRwKEY2deAAAs+KElNtKGMn1tw==;
+	References:List-Owner; bh=dNn+UGj5KPWw8OR3jxMFYlDnLN/Tcr+d8UFzZsO4ShY=; b=XtQ
+	6li7zJHC4KqNT3h9mc0JAVqyeU8TGcF2C/UTy/xRHZabLbJbg9/9eFLn3fNeb1vbPLmQWGWB+CNHi
+	OHhbflOcL52PCgrgprVXaiwD5HoFIHVm4JEPtWW+2r681nO/MAVEtIgr+K/GfDIJVjj4o0788owW/
+	B6pfeF+bM9F1Df2dyz5XbxfPVSufq9TjZIpmCHLQdQavgX1TiDFKmBk3IF9v5LXBL5bFRGkRmyZqg
+	+MhPjQR55/HMLFqDXF7M7WNfdS1xZq5k1XJKb0pf6+exrNhSziQe7QfbEKdcZZC8lkOeKF5dyGyjb
+	WM0sjqb24/7ocAVyHcayO1Oj5nM/D+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grCnD-0005yC-22; Wed, 06 Feb 2019 02:18:27 +0000
+	id 1grDeE-0005I7-Uj; Wed, 06 Feb 2019 03:13:14 +0000
 Received: from mx5.ucr.edu ([138.23.62.67])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grCnA-0005xo-3l
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 02:18:25 +0000
+ id 1grDeB-0005Hn-7l
+ for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 03:13:12 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple;
  d=ucr.edu; i=@ucr.edu; q=dns/txt; s=selector3;
- t=1549419504; x=1580955504;
+ t=1549422791; x=1580958791;
  h=from:to:cc:subject:date:message-id;
- bh=D0JGImJ9qrSJZ/loF6Jscsoui2BmjSV1/GLZh7cocuo=;
- b=d3k2FBGkmPiAOIIzNYggWLY7gKQOVzmLY4cc2yfeT1/eBFcTs6WrNze6
- BOMSeK3c4OmeeOre3Bs30AaxUnhwUp8xzXV533StXTtHzwMjuleWMjXX9
- kHpS3Qm1dxs9hqC6ZOAVlol4zGasdRbv2PPKLylfH6GdcJthZaFdn0+Gi
- BnqOTMERQ+XOUs6/N1L7SERF7h/QSMsXccoeHkgEcb1637DgtXrQRQK67
- oVzIe5g2gwEIHl2VxzOb1g3jFKWD4TfP/7WWiduiw1QPO6hH8Im4aDXQo
- Eg/+WVm822P6urOpwMgghdEOZBFc+DmgVSX0OpNFwr4owMELzs6bf7T20 Q==;
-IronPort-PHdr: =?us-ascii?q?9a23=3AmWQ7yxXlaZrjdo6Dg2nhejHk+XPV8LGtZVwlr6E/?=
- =?us-ascii?q?grcLSJyIuqrYYx2Pt8tkgFKBZ4jH8fUM07OQ7/iwHzRYqb+681k6OKRWUBEEjc?=
- =?us-ascii?q?hE1ycBO+WiTXPBEfjxciYhF95DXlI2t1uyMExSBdqsLwaK+i764jEdAAjwOhRo?=
- =?us-ascii?q?LerpBIHSk9631+ev8JHPfglEnjWwba9xIRmssQndqtQdjJd/JKo21hbHuGZDdf?=
- =?us-ascii?q?5MxWNvK1KTnhL86dm18ZV+7SleuO8v+tBZX6nicKs2UbJXDDI9M2Ao/8LrrgXM?=
- =?us-ascii?q?TRGO5nQHTGoblAdDDhXf4xH7WpfxtTb6tvZ41SKHM8D6Uaw4VDK/5KpwVhTmlD?=
- =?us-ascii?q?kIOCI48GHPi8x/kqRboA66pxdix4LYeZyZOOZicq/Ye94aQGtBXt1KVyxABIO8?=
- =?us-ascii?q?YJYEAfQYM+1FoYn9pkUBrR+jCgKxAO/ixCNEinrw0KYn0eouDBvG0RQgEdwQrX?=
- =?us-ascii?q?raotb7OqAJXOyp0KXF1ynPYulK1Tvh7oXDbxAvoeuLXbJ1acfey0gvFgLFjlWN?=
- =?us-ascii?q?rozuIjSY1+QMsmib9eVgVP6jh3Ippgxqvzig2t0shpPXiY0I11DJ7CN0y5s2K9?=
- =?us-ascii?q?2gUEN3f8KoHZ9KuyyZN4Z6WN0uT3x0tCog17ELvZ22cDAXxJkmwxPTceKLfoaI?=
- =?us-ascii?q?7x75SuqcIC10iXBqdb+5mh2861KvyvfmWcmxyFtKqy1FncTSuX0VzBzT79SHSu?=
- =?us-ascii?q?N6/ke8xTaDzwDT5f9AIUAzjafbLoQuwr80lpYKqUTDEDL6lFz4jKOLckgp+fKk?=
- =?us-ascii?q?6+vgYrXhqZ+cM5F7hhviPaQpn8yzGeU4Mg4QUGiH4emwyqHv8EnjTLhJjvA6iL?=
- =?us-ascii?q?fVvI3GKcgBu6K0BwxY3p4m6xmlDjem1NoYnWMALFJAYB+Gj4noO1HUL/D5Efuz?=
- =?us-ascii?q?n1qhnSx2x//aJL3tGIvCIWXekLv5Z7Zy91ZcyBYvzdBY/59UDrABIPTuWk7+rd?=
- =?us-ascii?q?DXFAU5Mwmtz+bkFtp9zIUeVnyLAqKCNKPSsESI5v40I+WWZY8Vvjj9K+I/6PHz?=
- =?us-ascii?q?k3A2g0IScbOu3ZsNZ3DrVtp8JEDMUHv+gsoGWTMbrAo3TbSy03WfWiQVanqvCf?=
- =?us-ascii?q?FvrgonAZ6rWN+QDrumh6aMiWLkRpA=3D?=
+ bh=RoHy0oCGXIhna6y33HCrI+i2WKeLdKhVB5imxc0MR+A=;
+ b=XBQTjLORAdWfi0poKH34xLYivvQODrXADSqORj8gFkFj0rrw55SXKIAt
+ oNZctBIJHofLmoyoLA9etOlLi3l11gUf3aa3ifLuEOvxKOmcQppjQupPj
+ f+iBSExCXt8LloQqGt+vkNRUfPG44LYtHflJ8Js2crFdtqM3lj3PL2DcP
+ 6Y7AvUwjQZM93YPE2hKo8z7yo+R2X1cLZJiFLomnpPPL6Nsjz9RDV7RVM
+ n/7oT5h/0mGe7G5xKvTmhePaoPq0usRxeGmi8nW1HLC72fFkzstfpTCeJ
+ 2wWNoL41QkJ1B23f2jgHaSG+DLWSoMTwaCxMo8CRT+rhhFBXkkzeqxu6e A==;
+IronPort-PHdr: =?us-ascii?q?9a23=3An4sQFhZNiJ6JbkihYAkSaLL/LSx+4OfEezUN459i?=
+ =?us-ascii?q?sYplN5qZoMWybnLW6fgltlLVR4KTs6sC17KG9fi4EUU7or+5+EgYd5JNUxJXwe?=
+ =?us-ascii?q?43pCcHRPC/NEvgMfTxZDY7FskRHHVs/nW8LFQHUJ2mPw6arXK99yMdFQviPgRp?=
+ =?us-ascii?q?OOv1BpTSj8Oq3Oyu5pHfeQpFiCa+bL9oMBm6sRjau9ULj4dlNqs/0AbCrGFSe+?=
+ =?us-ascii?q?RRy2NoJFaTkAj568yt4pNt8Dletuw4+cJYXqr0Y6o3TbpDDDQ7KG81/9HktQPC?=
+ =?us-ascii?q?TQSU+HQRVHgdnwdSDAjE6BH6WYrxsjf/u+Fg1iSWIdH6QLYpUjm58axlVAHnhz?=
+ =?us-ascii?q?sGNz4h8WHYlMpwjL5AoBm8oxBz2pPYbJ2JOPZ7eK7deNIaRXFaXsZQUSxBDZ63?=
+ =?us-ascii?q?YZUWAeEcM+ZYrpfyp18TohCjAQWhCv/jxjpOi3Tr36M1zv4hHBnG0gI+AtwAvn?=
+ =?us-ascii?q?faotLuOasOTey41rXEwC/fY/9K3zr29YjGcgomofGJRb9/c8vRyEgvFwPYiVWb?=
+ =?us-ascii?q?tIvoPjOU1+QNqWeb7vZsWf6hhmM8tgF+viKvyt0yhYbUm4IY01bJ/jh6zoYtPd?=
+ =?us-ascii?q?C0VlJ3bNq+HJZTtyyWLZV6Tt4+T21ypSo3zr4LtYamcCULzJkr3QDTZvKHfoSS?=
+ =?us-ascii?q?/B7uVfydLDV3iX9jZbmxnQy98VK6xe35TsS01VFKoTdbndTUrXAN0gDT6tCASv?=
+ =?us-ascii?q?tg4ketwTaP2B7X6uFDOU00kLDUK58lwrIpjpoTv1nPEjb4mEnriKKbdV8o+uev?=
+ =?us-ascii?q?6+TgbbXmooGTO5VohQH5N6Qigs2/AeImPQgSR2WX5/iw2bn58UD6QLhGlOM6nr?=
+ =?us-ascii?q?TFvJzAOMgWoq20DxdQ0ok56ha/Czmm0M4fnXkCNF9EeBOGj4jzNFHPPPz0Efmy?=
+ =?us-ascii?q?jk+xkDh33fDKJKPuDYjQLnTbirfuYa5961JAyAo01d1f45NUCrccIPP8Q0P+rs?=
+ =?us-ascii?q?bYDhogPwy33ennEtN92Z0aWW+UBq+ZMbjSsUOT5u41IumMYoEVuCznJPc4+fHh?=
+ =?us-ascii?q?l2I2lUUafamz0ptEIF6iGfEzEkSLYWfryoMQA2cDv1JmF8T3g0fEXDJOMSXhF5?=
+ =?us-ascii?q?kg7y02Xdr1RbzIQZqg1fnehCo=3D?=
 X-IronPort-Anti-Spam-Filtered: true
-X-IronPort-Anti-Spam-Result: =?us-ascii?q?A2BsAABeQ1pcf8bSVdFlHAEBAQQBAQcEA?=
- =?us-ascii?q?QGBUwUBAQsBgztKD4x8ixZPAQEBBoplGG2FWIJzhQ+BewEKAQEshECDFCI2Bw0?=
- =?us-ascii?q?BAwEBAgEBAgETAQEJCwsIGwwxgjopgl82UlY/AQUBNVuCRwGBdA0FoQw8jBczi?=
- =?us-ascii?q?GMBB4FLCQEIh3CEQYEPgQeDboR/g1SCQwKBLAEBAZAIkUgBBgIBgWWBQ48MJYM?=
- =?us-ascii?q?2hwCIFAEtmz0CBAIEBQIFDyGBLAaCAU0lgWwKgUSCUo4sHjOBB4smgk0B?=
-X-IPAS-Result: =?us-ascii?q?A2BsAABeQ1pcf8bSVdFlHAEBAQQBAQcEAQGBUwUBAQsBgzt?=
- =?us-ascii?q?KD4x8ixZPAQEBBoplGG2FWIJzhQ+BewEKAQEshECDFCI2Bw0BAwEBAgEBAgETA?=
- =?us-ascii?q?QEJCwsIGwwxgjopgl82UlY/AQUBNVuCRwGBdA0FoQw8jBcziGMBB4FLCQEIh3C?=
- =?us-ascii?q?EQYEPgQeDboR/g1SCQwKBLAEBAZAIkUgBBgIBgWWBQ48MJYM2hwCIFAEtmz0CB?=
- =?us-ascii?q?AIEBQIFDyGBLAaCAU0lgWwKgUSCUo4sHjOBB4smgk0B?=
-X-IronPort-AV: E=Sophos;i="5.58,338,1544515200"; d="scan'208";a="26847862"
+X-IronPort-Anti-Spam-Result: =?us-ascii?q?A2BMAACCUFpcf8bSVdFlHAEBAQQBAQcEA?=
+ =?us-ascii?q?QGBUgYBAQsBgztKD4x8ixZPAQEBBoplGG2FWIJzhQ+BewEKAQEshECDFCI1CA0?=
+ =?us-ascii?q?BAwEBAgEBAgETAQEJCwsIGwwxgjopgl82UoEVAQUBNVuCRwGBdA0FoQY8jBczi?=
+ =?us-ascii?q?GUBB4FLCQEIh3CEQYEPgQeDbohTgkMCgSwBAQGQCJFIAQYCAYFlgUOPDCWDNoc?=
+ =?us-ascii?q?AiBQBLZs9AgQCBAUCBQ8hgSYBggxNJYFsCoFEglKOLB4zgQeNcwE?=
+X-IPAS-Result: =?us-ascii?q?A2BMAACCUFpcf8bSVdFlHAEBAQQBAQcEAQGBUgYBAQsBgzt?=
+ =?us-ascii?q?KD4x8ixZPAQEBBoplGG2FWIJzhQ+BewEKAQEshECDFCI1CA0BAwEBAgEBAgETA?=
+ =?us-ascii?q?QEJCwsIGwwxgjopgl82UoEVAQUBNVuCRwGBdA0FoQY8jBcziGUBB4FLCQEIh3C?=
+ =?us-ascii?q?EQYEPgQeDbohTgkMCgSwBAQGQCJFIAQYCAYFlgUOPDCWDNocAiBQBLZs9AgQCB?=
+ =?us-ascii?q?AUCBQ8hgSYBggxNJYFsCoFEglKOLB4zgQeNcwE?=
+X-IronPort-AV: E=Sophos;i="5.58,338,1544515200"; d="scan'208";a="26854468"
 Received: from mail-pf1-f198.google.com ([209.85.210.198])
- by smtpmx5.ucr.edu with ESMTP/TLS/AES128-GCM-SHA256; 05 Feb 2019 18:18:23 -0800
-Received: by mail-pf1-f198.google.com with SMTP id f69so4126153pff.5
+ by smtpmx5.ucr.edu with ESMTP/TLS/AES128-GCM-SHA256; 05 Feb 2019 19:13:09 -0800
+Received: by mail-pf1-f198.google.com with SMTP id o7so4170041pfi.23
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 05 Feb 2019 18:18:23 -0800 (PST)
+ Tue, 05 Feb 2019 19:13:09 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=vKCJp8IORvIsHrDyUZajuZHeMiJCJviDrMcOZ6kuFfg=;
- b=JrUtPW69dTpumegmatVb2SzwUCw7SE9Fyco9dfP41m34IxYavLRk2wMxdhtqHYajot
- Lm4IZgM0Hakul9LaOb2TOE7tBo49X9oJ4aoEzfmPpA2EjsJE3/Z3Axs5Kcci+1IAa8Nm
- CIpg25AzRV529W1XjAMB0oTVyKDQR8Hki3zsuNs+ZTVZDoEM0J/8sBAWSxe4wSi8QqhY
- 7lCRXn+oXfee67L5YqaFfVhUgLAVo4f08F/h48f4FkFCvX3l4hS/QtETzdZniZe6I0+E
- Zn/kk877illvVONhNhuUuXVwpW63DJCtvITPhHLfP1pnMQoWcrqrfumUlPwA9Bk/DU+8
- aWtQ==
-X-Gm-Message-State: AHQUAuaKowWNLm2lxWmTLBvYKnIGx+l2+z1HiIwuq6k5/73TqISJ3AUO
- L9aVsjOb83TtGBH+wJEPxlG4bpdFsnZv5ohlddPgHp+Kupc6A/8x9PJKOCzVwaI/Jio83SqjusQ
- Dwl9gyR4lRkz2KFF76+DqyYWntIuDV4D52dET
-X-Received: by 2002:a62:2f06:: with SMTP id v6mr8215638pfv.216.1549419502693; 
- Tue, 05 Feb 2019 18:18:22 -0800 (PST)
-X-Google-Smtp-Source: AHgI3IZX1CcpPLb8Db6nC9eW9nN5ZiP7BmEjOoo6MOm0zKDcy9yHAdu7iX0RDp7j7avOaFBbWl3AZw==
-X-Received: by 2002:a62:2f06:: with SMTP id v6mr8215626pfv.216.1549419502430; 
- Tue, 05 Feb 2019 18:18:22 -0800 (PST)
+ bh=YYDz1uajXM2BD9Gmd2pvUl+dFDUhIgT0Qevcatq2bns=;
+ b=FTYDg/CQuzra7ceyKsgwDd7htZNTJxSVEhCrXDvgvQDtUjT56AtgKrx5+LrEtvrrF8
+ KF0eo8+BECtW8iPfAQuWy/nNTabwcJZJOrOuncQ/SD5nWb772etHjU9o9VM3L0pf74PO
+ nsCFp+wol20gxVEyYcxsyZztgBDTp4DQh3U3lwvWrIbKENiICHXlagjIdL74jPXiSZlQ
+ H9xXyaX3ntLWRsfuP7y7e7GFfvUOVmoy7LiSvxdLQ1GMYF6RNFru/otueKARnhdxlzzC
+ alZlyEfOqveeJklbO/votMfuWQjIRXTt4qXLT+XwaAoHJifHotdGvPjDlyx5EIgjm6Yi
+ 350g==
+X-Gm-Message-State: AHQUAuaLBANfyxAByQ0ofyLMKtEA+6EGt21UxBfk1Ve5D1NdJvbYTU0G
+ kf82a5AiF1/HCyOa9fcWjWxh9PQFjoWPMRC6yrO3gG6hlaFU1Kmws5AjWnOfAdDKxFANvlzIMeY
+ xSsTR4SCc+Hy4YilPaoNOT2DyoxKB9rT5BI4B
+X-Received: by 2002:a17:902:145:: with SMTP id
+ 63mr8461158plb.256.1549422789164; 
+ Tue, 05 Feb 2019 19:13:09 -0800 (PST)
+X-Google-Smtp-Source: AHgI3IaeCRQc9opHP2/SPoEliLwcrh3aaO85I7bM3TBhacFo7U2dv422YbEPqOxKBlckPLSaLHN+mg==
+X-Received: by 2002:a17:902:145:: with SMTP id
+ 63mr8461132plb.256.1549422788787; 
+ Tue, 05 Feb 2019 19:13:08 -0800 (PST)
 Received: from Yizhuo.cs.ucr.edu (yizhuo.cs.ucr.edu. [169.235.26.74])
- by smtp.googlemail.com with ESMTPSA id a13sm4893878pgq.65.2019.02.05.18.18.21
+ by smtp.googlemail.com with ESMTPSA id
+ q187sm12357838pfq.128.2019.02.05.19.13.07
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 05 Feb 2019 18:18:21 -0800 (PST)
+ Tue, 05 Feb 2019 19:13:07 -0800 (PST)
 From: Yizhuo <yzhai003@ucr.edu>
 To: 
-Subject: [PATCH] phy: rockchip-typec: Variable "val" of function
- rockchip_usb3_phy_power_on() could be uninitialized
-Date: Tue,  5 Feb 2019 18:18:10 -0800
-Message-Id: <20190206021810.21596-1-yzhai003@ucr.edu>
+Subject: [PATCH] phy: Variable "val" in function miphy_osc_is_ready() could be
+ uninitialized
+Date: Tue,  5 Feb 2019 19:12:57 -0800
+Message-Id: <20190206031257.22494-1-yzhai003@ucr.edu>
 X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_181824_182917_52396C0F 
-X-CRM114-Status: GOOD (  13.94  )
+X-CRM114-CacheID: sfid-20190205_191311_306182_D7418D51 
+X-CRM114-Status: GOOD (  13.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -129,9 +132,9 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: csong@cs.ucr.edu, Heiko Stuebner <heiko@sntech.de>, zhiyunq@cs.ucr.edu,
- linux-kernel@vger.kernel.org, Kishon Vijay Abraham I <kishon@ti.com>,
- Yizhuo <yzhai003@ucr.edu>, linux-rockchip@lists.infradead.org,
+Cc: csong@cs.ucr.edu, Yizhuo <yzhai003@ucr.edu>, linux-kernel@vger.kernel.org,
+ Patrice Chotard <patrice.chotard@st.com>,
+ Kishon Vijay Abraham I <kishon@ti.com>, zhuyunq@cs.ucr.edu,
  linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -139,32 +142,42 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-In function rockchip_usb3_phy_power_on(), local variable
-"val" could be uninitialized if function regmap_read()
-returns -EINVAL. However, this value is directly used in
-later context. This is potentially unsafe.
+In function miphy_osc_is_ready(), local variable "val"
+could be uninitalized. if function regmap_read() returns
+-EINVAL. However, this value is used in if statement.
+This is potentially unsafe.
 
 Signed-off-by: Yizhuo <yzhai003@ucr.edu>
 ---
- drivers/phy/rockchip/phy-rockchip-typec.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/phy/st/phy-miphy28lp.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c b/drivers/phy/rockchip/phy-rockchip-typec.c
-index a958c9bced01..b1e24418cb2d 100644
---- a/drivers/phy/rockchip/phy-rockchip-typec.c
-+++ b/drivers/phy/rockchip/phy-rockchip-typec.c
-@@ -716,7 +716,10 @@ static int rockchip_usb3_phy_power_on(struct phy *phy)
+diff --git a/drivers/phy/st/phy-miphy28lp.c b/drivers/phy/st/phy-miphy28lp.c
+index 213e2e15339c..40c7c0a611a0 100644
+--- a/drivers/phy/st/phy-miphy28lp.c
++++ b/drivers/phy/st/phy-miphy28lp.c
+@@ -835,7 +835,8 @@ static int miphy_osc_is_ready(struct miphy28lp_phy *miphy_phy)
+ {
+ 	struct miphy28lp_dev *miphy_dev = miphy_phy->phydev;
+ 	unsigned long finish = jiffies + 5 * HZ;
+-	u32 val;
++	u32 val = 0;
++	int ret;
  
- 	/* wait TCPHY for pipe ready */
- 	for (timeout = 0; timeout < 100; timeout++) {
--		regmap_read(tcphy->grf_regs, reg->offset, &val);
-+		ret = regmap_read(tcphy->grf_regs, reg->offset, &val);
+ 	if (!miphy_phy->osc_rdy)
+ 		return 0;
+@@ -844,8 +845,10 @@ static int miphy_osc_is_ready(struct miphy28lp_phy *miphy_phy)
+ 		return -EINVAL;
+ 
+ 	do {
+-		regmap_read(miphy_dev->regmap,
++		ret = regmap_read(miphy_dev->regmap,
+ 				miphy_phy->syscfg_reg[SYSCFG_STATUS], &val);
 +		if (ret)
-+			goto unlock_ret;
-+
- 		if (!(val & BIT(reg->enable_bit))) {
- 			tcphy->mode |= new_mode & (MODE_DFP_USB | MODE_UFP_USB);
- 			goto unlock_ret;
++			return ret;
+ 
+ 		if ((val & MIPHY_OSC_RDY) != MIPHY_OSC_RDY)
+ 			cpu_relax();
 -- 
 2.17.1
 
