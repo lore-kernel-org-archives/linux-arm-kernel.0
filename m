@@ -2,89 +2,91 @@ Return-Path: <SRS0=SkGj=QN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4EEA3C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 14:33:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BABF0C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 14:37:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1EEFB217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 14:33:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 74EBF217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 14:37:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uTGLNK65"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1EEFB217F9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b6B1Mmv7";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="TzokPaG7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 74EBF217F9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=d3mqvE4EQkXCM4KIXEQ22vA4CCXQzyS1SKTkWdlknhE=; b=uTGLNK65CBryAv
-	r+4xxdO347FkZHG+gdZHjzjkpnZy8DtUaNti9ouwC7ugFJKHX41YQ7CWRsv1IrkazAHkbGu5WTyKS
-	x4fEW+7ULdomMuittPbM3vc+h06DfegSALk+Z2NtgnNAIXnTqfNh3uiNhr1IvipNR2LVUoDvi9ylt
-	3UwGW2nWpEIZ3vmDjKO5rjdcGxHIsRlzjna3CAxhZ95e97AnCBMq6KR3PgXdTp6/dz1oSX3OF8C+Q
-	Nx85aVDALzcAB/zRyjkqsSoXmiJwUT5lpDB3tR6e0x8Plkz0BMlFxvDwegKk/vz255nrwI+I7Yu5s
-	bd6r589ye31kZ3F3oSkQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=fmG2v3AQfh0AJZI8I7hkt1E1Xh3J7jY55knZJ7Ab6l8=; b=b6B1Mmv75vuVgO
+	Ik0XtpIvYgljuH+JG6Nvnct5KlKhnW+rnIWDFY7qFk7dMj3K7KMxJQ/JDhm0SGKSOEs9cZyDq17R9
+	e58Chq/eJ7tNjNfZQbiyLC0TRj1Ox456dqofjgRHw9lLajCvCspmbjj+mQ90RgKPINUAty5Ug2zus
+	3phWPdViK57mtMRmJtv5s2mGszKBt/6Gb/yMTAC24EHAY3xgQhL+Zqk4LjE3zGedernoL5shgBX1Z
+	TxWY/FVgs1ExKuAtv1lKsB0wRQOH7Q8DVR/iYXAmlwCt44VCshi4KTezgNCvVlqlwiHOUeBycEZhc
+	w0LpdymYxtwvl/2x50DQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grOGN-00053Q-Oz; Wed, 06 Feb 2019 14:33:19 +0000
-Received: from mail-ed1-f67.google.com ([209.85.208.67])
+	id 1grOKh-0006uk-C2; Wed, 06 Feb 2019 14:37:47 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grOGK-000531-Tu
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 14:33:18 +0000
-Received: by mail-ed1-f67.google.com with SMTP id b3so6095754ede.1
+ id 1grOKd-0006u6-GP
+ for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 14:37:45 +0000
+Received: by mail-wr1-x443.google.com with SMTP id z3so7834569wrv.3
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 06 Feb 2019 06:33:16 -0800 (PST)
+ Wed, 06 Feb 2019 06:37:43 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=lypDSreTF0NpbYbE6e4ptHTBd1wuQq7wAXpNTueGgy0=;
+ b=TzokPaG7f1uOuTh3LAqqLUqrOXwTzfAWdGFYOGbpGn0//iR+Bn4+sYOe9QMEOzlMbF
+ H7WYszyCZwKjzEL2kaWySutrMCAcfHLdEMHOi567/E8o1ccSUibnzRPYLoKX4HlMf2FL
+ ssBPTANl1P60p94240Ef2ZnlYKfNhQFlJ1LHBgle1B76vyaZdpFUQJSrs8mpT1Fcc9MW
+ uZICSkTVhOIybtj9NvTWINl7LDI5pXgGrnJpdvK1jq/f9BI2ytr5kv2AojsgCROAtvRS
+ z6G89atJgQDRQfEg+hG/y65+KafF2L1naDzXQKvtXD18t2tDXynmOC/NT1a7l4OKprMn
+ Nd6g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=nN6InIre/0Ut06P7m83xMDQv6DT19lGhu9I5wCEhGnc=;
- b=mJ3tIXxs442nS0NteTd0QVQUl/LiO1gVoISGr2XW3gJZJ7LH0LQ5MV6vJijzb3X1Iq
- Xf1cFFAM53D2qwSFsMBeFp6V0pb6VkrwIa6ExiVDPHvoag7KgCZsYOFjOLw9Kzs4CQPf
- bHpu53bXPyDS0Ri8V3cYbyUdgr3f3mb6wbEon5M929DG2xY6bzIv9d+ee/2ohi4yUcoP
- q0E66qnYVYspNKit25GOHyEW5SsauTRIsh5JLeAVEGbKVnS6CmNIcuNyKSAZfpRCMHOG
- 9y3LehhWhcuxVX524hL0x4jR3DfhlNGsLzhvPccSIw04GxdGh73CT6NtYnf72+rnYz/K
- sKqg==
-X-Gm-Message-State: AHQUAuYAy0B6JrglVnfhBDbgdQRQ40KSPDxdgFlrrt0vnvuA7dELGMwY
- E1gesEiowRnMFOEUdF0aW9n0zKJ2Ci8=
-X-Google-Smtp-Source: AHgI3IYqJHTHN7noANg0fssfJ+5s4+Mw+/UT0OsJ6N5lRvWjF1iEj3EPlwSGexprxaG3R3haRsJuwQ==
-X-Received: by 2002:a17:906:7f95:: with SMTP id
- f21mr7750529ejr.131.1549463594565; 
- Wed, 06 Feb 2019 06:33:14 -0800 (PST)
-Received: from mail-wm1-f43.google.com (mail-wm1-f43.google.com.
- [209.85.128.43])
- by smtp.gmail.com with ESMTPSA id x58sm5972298edm.10.2019.02.06.06.33.13
- for <linux-arm-kernel@lists.infradead.org>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=lypDSreTF0NpbYbE6e4ptHTBd1wuQq7wAXpNTueGgy0=;
+ b=mfRQx4Ymagu/khY+juwUFpDL9OSfdzkfNL3w/fFpGXa7ctv+dY0TSo6TlqLYKXztKi
+ WTFTLxNY79l7vqWTmUONjQlzFOdIQyoUFOJZQWxTiXvp9u7VyEIONwUQ3AGJFG4YKOvI
+ 1D6cwyIHdccVQDbBKg4cR3cf6gsF5QBRcdenYOiabwZ17CrMKTHtOKcg9OTcLg22dwQL
+ ZhHsF5CwpVqHLTePfKbRa9eKL5q8M7k+F+Lob/G03Qrk5MrltsKAJkUEUZvlojj3HPLG
+ 8rwB38YYpA9DnzJbkCEQgggkgqpR/GXWbxC8j/yVA7cBieRUsTy29hMY1e2Mi+fjFxZ6
+ fYpQ==
+X-Gm-Message-State: AHQUAuanh0gwe3sAnffOk0qohD2l6QSoDfy28nZw7TwxDZSF0UpkKDYt
+ V4j5I195tXIBpZZ5wpZzOw+i+Q==
+X-Google-Smtp-Source: AHgI3IZdEmZIqL0iexVDY+SvKxpVoibW7uQlS+CR4Dz9u6Zlq1ezMemrh/hq9VZL4Tk2n5sqnDZnfQ==
+X-Received: by 2002:a5d:6988:: with SMTP id g8mr7855825wru.33.1549463861875;
+ Wed, 06 Feb 2019 06:37:41 -0800 (PST)
+Received: from localhost.localdomain ([2a00:23c4:f7a1:ce00:5105:4b7b:c922:7c6])
+ by smtp.gmail.com with ESMTPSA id q8sm23249382wrr.9.2019.02.06.06.37.40
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 06 Feb 2019 06:33:14 -0800 (PST)
-Received: by mail-wm1-f43.google.com with SMTP id y8so2956262wmi.4
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 06 Feb 2019 06:33:13 -0800 (PST)
-X-Received: by 2002:a1c:494:: with SMTP id 142mr3422692wme.111.1549463593169; 
- Wed, 06 Feb 2019 06:33:13 -0800 (PST)
+ Wed, 06 Feb 2019 06:37:41 -0800 (PST)
+From: Carlo Caione <ccaione@baylibre.com>
+To: catalin.marinas@arm.com, will.deacon@arm.com,
+ linux-arm-kernel@lists.infradead.org, shawnguo@kernel.org,
+ kernel@pengutronix.de, fabio.estevam@nxp.com, abel.vesa@nxp.com,
+ l.stach@pengutronix.de
+Subject: [PATCH] arm64: defconfig: Add IMX2+ watchdog
+Date: Wed,  6 Feb 2019 14:37:37 +0000
+Message-Id: <20190206143737.25368-1-ccaione@baylibre.com>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-References: <cover.f7a136448029ab87c498d68164670712639748e7.1548236066.git-series.maxime.ripard@bootlin.com>
- <624512bb9665e0b15244c2bdf230bcfada3a3b98.1548236066.git-series.maxime.ripard@bootlin.com>
- <CAGb2v6702pRt-=SrOLqfxO5CBQT+bxFgQ6fugA=4SP_vWdqcBw@mail.gmail.com>
- <CAGb2v66h67zmGB9jZ4QxUN1mU-pZy4kPRzvSxu1ECOi4SqETUA@mail.gmail.com>
- <20190206141230.k3sngyad2k5rdmrx@flea>
-In-Reply-To: <20190206141230.k3sngyad2k5rdmrx@flea>
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Wed, 6 Feb 2019 22:32:57 +0800
-X-Gmail-Original-Message-ID: <CAGb2v66XtKTir-NJ8Auyos9dq1McyW0fG47y=zrmUfTPVN_8VA@mail.gmail.com>
-Message-ID: <CAGb2v66XtKTir-NJ8Auyos9dq1McyW0fG47y=zrmUfTPVN_8VA@mail.gmail.com>
-Subject: Re: [PATCH 2/4] drm/sun4i: dsi: Change the start delay calculation
-To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_063316_960629_BCB9E411 
-X-CRM114-Status: GOOD (  36.88  )
+X-CRM114-CacheID: sfid-20190206_063743_679359_716A1273 
+X-CRM114-Status: UNSURE (   9.64  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,145 +98,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: bbrezillon@kernel.org,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Sean Paul <seanpaul@chromium.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Jagan Teki <jagan@openedev.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Carlo Caione <ccaione@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 6, 2019 at 10:12 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> Hi Chen-Yu,
->
-> On Wed, Feb 06, 2019 at 12:48:21AM +0800, Chen-Yu Tsai wrote:
-> > On Wed, Jan 30, 2019 at 11:23 AM Chen-Yu Tsai <wens@csie.org> wrote:
-> > >
-> > > On Wed, Jan 23, 2019 at 11:54 PM Maxime Ripard
-> > > <maxime.ripard@bootlin.com> wrote:
-> > > >
-> > > > The current calculation for the video start delay in the current DSI driver
-> > > > is that it is the total vertical size, minus the backporch and sync length,
-> > > > plus 1.
-> > > >
-> > > > However, the Allwinner code has it as the active vertical size, plus the
-> > > > back porch and the sync length. This doesn't make any difference on the
-> > > > only panel it has been tested with so far, since in that particular case
-> > > > the front porch is equal to the sum of the back porch and sync length.
-> > > >
-> > > > This is not the case for all panels, obviously, so we need to fix it. Since
-> > > > the Allwinner code has a bunch of extra code to deal with out of bounds
-> > > > values, so let's add them as well.
-> > > >
-> > > > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > > > ---
-> > > >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 7 ++++++-
-> > > >  1 file changed, 6 insertions(+), 1 deletion(-)
-> > > >
-> > > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > index 380fc527a707..e3e4ba90c059 100644
-> > > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > @@ -357,7 +357,12 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
-> > > >  static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
-> > > >                                            struct drm_display_mode *mode)
-> > > >  {
-> > > > -       return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
-> > >
-> > > According to the diagram in include/drm/drm_modes.h ,
-> > > This is active region plus back porch plus 1, as
-> > >
-> > >     sync_end - display = length of front porch and sync
-> > >
-> > > > +       u16 delay = (mode->vsync_end + 1) % mode->vtotal;
-> > >
-> > > And this actually means
-> > >
-> > >     (length of active region and front porch and sync pulse plus 1) %
-> > > total length
-> > >
-> > > So I don't really understand what's happening here. And the modulus
-> > > is unexplained.
-> >
-> > Attempting to make sense of this.
->
-> Sorry for dragging you into this
->
-> > Allwinner's A64 BSP the following which uses their definitions for
-> > y, vbp, vt:
-> >
-> >     s32 start_delay = panel->lcd_vt - panel->lcd_y -10;
-> >     u32 vfp = panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
-> >     u32 dsi_start_delay;
-> >
-> >     /* put start_delay to tcon. set ready sync early to dramfreq, so
-> > set start_delay 1 */
-> >     start_delay = 1;
-> >
-> >     dsi_start_delay = panel->lcd_vt - vfp + start_delay;
-> >     if (dsi_start_delay > panel->lcd_vt)
-> >            dsi_start_delay -= panel->lcd_vt;
-> >     if (dsi_start_delay==0)
-> >            dsi_start_delay = 1;
-> >
-> > This can be converted to
-> >
-> >     dsi_start_delay = max(1, (mode->vtotal - (mode->vtotal -
-> > mode->vdisplay - (mode->vtotal - mode->vsync_start)) + 1) %
-> > mode->vtotal)
-> >
-> > and simplified to
-> >
-> >     dsi_start_delay = max(1, (mode->vtotal + mode->vdisplay -
-> > mode->vsync_start) + 1) % mode->vtotal)
-> >
-> > and reordered to the following
-> >
-> >     dsi_start_delay = max(1, (mode->vtotal - (mode->vsync_start -
-> > mode->vdisplay) + 1) % mode->vtotal)
->
-> Where did you find that Allwinner's back porch is including the sync
-> length?
+It's needed to properly reboot the i.MX8MQ EVK board.
 
-I believe that was the case with the TCON? And since Allwinner's code
-take the values from the FEX files directly for both TCON and DSI,
-it should be the same.
+Signed-off-by: Carlo Caione <ccaione@baylibre.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-There's also some dead code in the BSP that alludes to it, such as the
-function tcon1_cfg_ex() in drivers/video/de/lowlevel_sun50iw1/de_lcd.c
-from the A64 BSP.
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 788773d16c7c..1c26d8bfd927 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -423,6 +423,7 @@ CONFIG_UNIPHIER_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_ARM_SP805_WATCHDOG=y
+ CONFIG_S3C2410_WATCHDOG=y
++CONFIG_IMX2_WDT=y
+ CONFIG_MESON_GXBB_WATCHDOG=m
+ CONFIG_MESON_WATCHDOG=m
+ CONFIG_RENESAS_WDT=y
+-- 
+2.19.1
 
-> If we treat the bp as vtotal - vsync_end as we should (and yet I often
-> fail to), then we end up with (leaving out the modulo for now):
->
-> dsi_start_delay = max(1, mode->vtotal - (mode->vtotal - mode->vdisplay -
->                                          (mode->vtotal - mode->vsync_end)) + 1)
->
-> which equals (if we remove the first mode->vtotal - mode->vtotal)
->
-> dsi_start_delay = max(1, mode->vdisplay + (mode->vtotal - mode->vsync_end) + 1)
->
-> Otherwise,
->
-> Then yeah, I end up with the same results than you, and on the Rondo
-> display I have, the start delay difference is of one between the
-> formula in this patch and the one you came up with, so I think we're
-> good.
->
-> The BPI-M2M display timings would need to be adjusted as well, since
-> the timings were created from the FEX file and the BP was assumed to
-> be only the BP. We don't have the datasheet for this one though, so
-> it's difficult to check.
-
-Let's just see if it still behaves correctly.
-
-ChenYu
 
 _______________________________________________
 linux-arm-kernel mailing list
