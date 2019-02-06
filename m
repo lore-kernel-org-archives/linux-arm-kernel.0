@@ -2,128 +2,186 @@ Return-Path: <SRS0=SkGj=QN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8FA5BC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 13:46:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EA3CEC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 13:55:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 18D702175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 13:46:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A9E682186A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 13:55:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HpOZRgFz";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="HyHHAZUl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 18D702175B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mpf9O8cw";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ThC0646D"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A9E682186A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Cc:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wRxUdUK7wLgv+c0FKQX+pzjqRlI6XbemhAbr7l6OiCg=; b=HpOZRgFzUghQTJ
-	HbFmTDVj0g4ngFpaLlCgekSCbaWrCYcgxCxOrZZkN1+8ZJ50JtpPp+mnEREZB/dNEBGSnOFz/5Cyz
-	gaSpsMwzqlA7mjX660P2Ap0eZtlTE5HhFQ7+SCQc1PHuUN7txZOg/jWx1ZvR+6ERvg0eE+L6jdZHt
-	adNkQhizCwTBlLwQ9i1Swqfsb+LZO2GpYFveFEpi1MOmC8Z1tz30p8Bp+BCLfP9MdJXdIxLjDTaiP
-	gfQ0GkAj8mX0+qyIFhBkIN1R3CFYDmcaybukWta8M3l1MHCiZNn0sglCT/wSqwD4kG3EkQDBZ1+FT
-	HVC0s7fWW7clHfgcvwFA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Wj5n6oPKomI1rLSIXz7gQRCS6hMoEMLy7ZBtrYsdIow=; b=Mpf9O8cwpQxYeO
+	YcoBc7DGTCiDpLN3wL2MH29FyzbflNUM/6A1ADUZnyZAr0XtwXrIfqvLCr0EdidixMgUkCpbKy9rj
+	mg+ZN3aTGWgcuK8RMqZI66rN2QH4hJudX2KNbzS1t/8KhVJs432xivsERKmpurzCVxYLUOYn5wOiS
+	L2cCM5fkxMMG4QlNf83o1N4VIMpjFvOzAHPoOIfYHjXVFFaR7VMGcakGn+PCrOvXXldO293E3x5rj
+	EFpLlXcTrFPEukAwoBgD0/lIpLpdHmNvs38cA7WM+QST6T1OXSOdI8fLUoV48mmbtzpTKzVWX5iEM
+	IMoi2AyqCAxLyDUkf1dA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grNWn-0001rb-Ao; Wed, 06 Feb 2019 13:46:13 +0000
-Received: from esa5.microchip.iphmx.com ([216.71.150.166])
+	id 1grNfW-0005HR-89; Wed, 06 Feb 2019 13:55:14 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grNWj-0001fu-C1
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 13:46:11 +0000
-X-IronPort-AV: E=Sophos;i="5.56,564,1539673200"; d="scan'208";a="24289027"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa5.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 06 Feb 2019 06:46:05 -0700
-Received: from NAM01-BN3-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.108) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Wed, 6 Feb 2019 06:46:04 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=WxttacHnw5X/Qf2S6wJ69U3uxwPkIq8GDEQYTDMB/H0=;
- b=HyHHAZUlTOUhcMY4SWWejFACwpZTI7mPLir53IfI7zUEHqTRxHcsGGwf8d83ffh1G9Jx5On4LJWkGMtT1adxzgYAri4jrsJ3pEB7oyEI5PBQBzP/tvDkGsATsJrMbSZNxt0hcgxSWC0uBmh9JA1LJ+fcl+0SrGg7MQ2ImXkDQeY=
-Received: from MWHPR11MB1920.namprd11.prod.outlook.com (10.175.54.19) by
- MWHPR11MB1982.namprd11.prod.outlook.com (10.175.54.145) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1580.17; Wed, 6 Feb 2019 13:46:01 +0000
-Received: from MWHPR11MB1920.namprd11.prod.outlook.com
- ([fe80::d917:8496:9d53:1f55]) by MWHPR11MB1920.namprd11.prod.outlook.com
- ([fe80::d917:8496:9d53:1f55%9]) with mapi id 15.20.1580.016; Wed, 6 Feb 2019
- 13:46:01 +0000
-From: <Claudiu.Beznea@microchip.com>
-To: <linus.walleij@linaro.org>, <robh+dt@kernel.org>, <mark.rutland@arm.com>, 
- <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
- <linux-gpio@vger.kernel.org>, <devicetree@vger.kernel.org>,
- <linux-arm-kernel@lists.infradead.org>, <linux-kernel@vger.kernel.org>
-Subject: Re: [PATCH v2 1/7] pinctrl: at91: add option to use drive strength
- bits
-Thread-Topic: [PATCH v2 1/7] pinctrl: at91: add option to use drive strength
- bits
-Thread-Index: AQHUuYCLA9fU9IUpL0SQqk5ieOzKJqXSdJAAgAAaDACAAAqQAIAAOF6A
-Date: Wed, 6 Feb 2019 13:46:01 +0000
-Message-ID: <8880dfa2-4bbd-d3c8-b692-180555636926@microchip.com>
-References: <1548951466-26297-1-git-send-email-claudiu.beznea@microchip.com>
- <1548951466-26297-2-git-send-email-claudiu.beznea@microchip.com>
- <20190206081304.cv344rjzvz7wzih5@M43218.corp.atmel.com>
- <f0022bfc-6deb-de77-857c-c70d41f4fc78@microchip.com>
- <20190206102406.r45rb5bfjk2j45dr@M43218.corp.atmel.com>
-In-Reply-To: <20190206102406.r45rb5bfjk2j45dr@M43218.corp.atmel.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: VI1PR07CA0224.eurprd07.prod.outlook.com
- (2603:10a6:802:58::27) To MWHPR11MB1920.namprd11.prod.outlook.com
- (2603:10b6:300:110::19)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Claudiu.Beznea@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-tagtoolbar-keys: D20190206154551761
-x-originating-ip: [94.177.32.154]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; MWHPR11MB1982;
- 6:Hq6JoyCEzUcPu13eAnIKYhwRYFrnZXUyHMXALKw31NcqZSHsxSHjDm1MI8KWOdE8f1wju1ERdHY9bQ7Aj10eMNhP0alqk+XlT4QRRlF9+wW6RVNp+oqObGLpCPGZuh90q9PxuUoI48Pwi7+X0/DzYFkYa8mxGBJhpvLUjj/IX1csJSzICdR4W/kGwBbWySqWzCCyL7CV1QvXPsp0QXlSd/6v1CrUx6DT4dXIwkGeWkGWqfVa0tll8vYNKrZoea0wOviaI+LoFGzX/ZlVBY2jvjJggbuX6pBjl5jsLhF+NYKq0RhzgUNR2fQxKUfXtRmxTB42TKasros/rnz7s6xczRResiWMOM0y6rhbYZulKgVI1/Rx5RO9jdCz7lKYQNKXptcNL/tRGbHyT2Jg98/6+s95AgBzwxY7SsUATUoTE50NEble8+EFRHF8HRBQxbege15NH1LQYh5v2I8geRm/Rw==;
- 5:GHgB/8GkBTW2067i/pWEkeoHUb8aVupeBigDAHknlTMVV5g75YrK8M6gn54YbFpxPnCBqJucKlMp8deYC9LN/Y52w1PtzamCNmaHTUF7TirEH941zVyF3wCwLkbupsDvCcj7/Tv3TdanQLrYPD6IyQXWyc3VPH0GKyS5jQhQ/v/oxih7c3PdKVn8hAAtjLQ0+yG041ZyNw/DQZt9ls5fzw==;
- 7:kKlfewkKq5hdhVJmLe6slDFKI3bHu+Ju1xqK3GO0lW/KRJoiQa8Km7Kz4bYBs7A5xltbNCgg6QrOb61D8ZGUoHqtkzfXayIgXyjVrAR+y+Y4PKj/SWKRaOvL+rSoJnr+JTakCI8DlpfUl5VCQfmX7A==
-x-ms-office365-filtering-correlation-id: ade7bc4c-e357-4d4c-4f32-08d68c396e36
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
- SRVR:MWHPR11MB1982; 
-x-ms-traffictypediagnostic: MWHPR11MB1982:
-x-microsoft-antispam-prvs: <MWHPR11MB1982735AED30D6AAB0A27D54876F0@MWHPR11MB1982.namprd11.prod.outlook.com>
-x-forefront-prvs: 0940A19703
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(979002)(39860400002)(366004)(346002)(376002)(136003)(396003)(189003)(199004)(72206003)(36756003)(486006)(6436002)(6306002)(6512007)(256004)(76176011)(53936002)(31696002)(52116002)(86362001)(2201001)(11346002)(305945005)(105586002)(6246003)(26005)(6506007)(6116002)(229853002)(106356001)(446003)(476003)(6486002)(53546011)(186003)(386003)(31686004)(2616005)(102836004)(66066001)(7736002)(316002)(2501003)(110136005)(2906002)(8676002)(71200400001)(71190400001)(478600001)(68736007)(8936002)(3846002)(81166006)(81156014)(966005)(93886005)(99286004)(97736004)(14454004)(25786009)(969003)(989001)(999001)(1009001)(1019001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1982;
- H:MWHPR11MB1920.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: 0igF9Gho+VVLJZ6VTbv9XWyYMd9a+eEM0s0RVL5D+IMa5kHC6kwYGbIj13Jwi/OsFQKZFrEc3WEI8+f3bzJfp8yk6WiZ/g4TSd2CFmqSKt/xc8L33/sQmf+VUDwTF0aYGsYJA+cXzjRnzj+bG+6ap/iiWrD5PYyjEeAtE9SjmuHqREK4lnQl7pMiU9gPYOXhhohnkrmj7Ek4oUhnowZKCc9tshpxbB3cD3ajT3Fjj0a8t8kvgsYCweqXGkpsZCSaFWskxmKpo/4QLf1rty7+raC+g0m85MXyiu51Dyx0MyacRs9y2pbt0KvS/SSLBYud0OVHz7HaRUVDYbbU9NdvlowHOPwKDF1S8K9oNUFlRgMiqrxsZ9Asv+39fbCdlEgQHUwpzdoWWwZj3WUq3k//UwFbW1hzGxAzEmfvXkREwIc=
-Content-ID: <85B05BE69312EF4B81D66117CB99F4F1@namprd11.prod.outlook.com>
+ id 1grNfP-0004Uz-3A; Wed, 06 Feb 2019 13:55:08 +0000
+Received: by mail-wr1-x444.google.com with SMTP id v13so7647861wrw.5;
+ Wed, 06 Feb 2019 05:55:06 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=2ODU6Fgcz2o22/4AOYV9AK24KMjMNxLy/pQQcBz0NKQ=;
+ b=ThC0646D+NrttN2VhKXbGxLEgAEAFWI6kLJl0/VvJjKz8UbLJlm1y99CTqY9e40VQn
+ vnuDngl5nLwxtVNsybzChyGaTF8Dy8e9VR+ylqpb4KjuXAZ7WRXVIvgNZz5qF7tsbC18
+ Kg9rcF/VXzZX+8qdfiS78Bv2h9Gh7644ebawH4yZO8fei8axLSSFqLcEj1arkbU/+mgS
+ O+u0+I8R3taAz770CkLMdNktZ2Ivitb6JLcPRYssESpckZInuS/64G7L9ex/FHLKgN81
+ xZIgEenZrL6L9joqdo+XC3+9tT5cCPFQJ+AXQrMNQPgZOtgIeNh94sFTINWd7mUaW2kq
+ iy2Q==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=2ODU6Fgcz2o22/4AOYV9AK24KMjMNxLy/pQQcBz0NKQ=;
+ b=o9dJJ2ji4L18wjIrXx7aJkzb/qTdymrOT4TAjhA5J73h6RXdE8oMnOMIVZozlNbV5b
+ ox0zbMq1jCnKMNCSUiry3kIzMxOuhYrQyBZ8EINsXXwy7e6HxyM1KDb/Xbn5k2FfIZYE
+ qGArgGMrunyZtvx3GNfr6VDNJdf18g6b8tlDOui4suMVDTFgmZrTmYEOPkAT3T84s9+3
+ 1uxl9+Zql9qosRVPGTMAwMRO1K2I6MEvRJ5mHJGuB98ole8+opaOj3KdG0LeVCddKnF/
+ 8bCXBxOeE2hoWYWvWiza9E5m4wxOt388q653mmg11Rq9jYUOqNPj4tSinnYz8CPx+h+R
+ gbWA==
+X-Gm-Message-State: AHQUAuYEFJlb4916+lEcGCrI/QqLx5n7tg8xHvxXq3anSkhslxEGmm85
+ C5Izl80ufdnfgsT9uFcu5g8YdMIeQws=
+X-Google-Smtp-Source: AHgI3IYk3m0Vmiy/hd9p2FV4uMsjbG94imFtDM4/AD4PO4KfaxVBFrc3XGBh0nmUteCQARVRHAKD+w==
+X-Received: by 2002:a5d:620d:: with SMTP id y13mr2155405wru.119.1549461304566; 
+ Wed, 06 Feb 2019 05:55:04 -0800 (PST)
+Received: from ziggy.stardust ([212.187.182.163])
+ by smtp.gmail.com with ESMTPSA id a12sm36332940wro.18.2019.02.06.05.55.03
+ (version=TLS1_3 cipher=AEAD-AES128-GCM-SHA256 bits=128/128);
+ Wed, 06 Feb 2019 05:55:03 -0800 (PST)
+Subject: Re: [PATCH v5 6/9] cpufreq: mediatek: Use auto-registration of
+ thermal cooling device
+To: Amit Kucheria <amit.kucheria@linaro.org>, linux-kernel@vger.kernel.org
+References: <cover.1548737236.git.amit.kucheria@linaro.org>
+ <36eb429112e84263bdbd26d8ea3027f71eeb862e.1548737236.git.amit.kucheria@linaro.org>
+From: Matthias Brugger <matthias.bgg@gmail.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
+ 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
+ jrHWeQEI2ucSKsNa8FllDmG/fQ==
+Message-ID: <b745a0be-c3ca-00d3-50c3-8ec560548da7@gmail.com>
+Date: Wed, 6 Feb 2019 14:55:03 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.3
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: ade7bc4c-e357-4d4c-4f32-08d68c396e36
-X-MS-Exchange-CrossTenant-originalarrivaltime: 06 Feb 2019 13:45:57.4782 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1982
-X-OriginatorOrg: microchip.com
+In-Reply-To: <36eb429112e84263bdbd26d8ea3027f71eeb862e.1548737236.git.amit.kucheria@linaro.org>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_054609_563350_CAD2489E 
-X-CRM114-Status: GOOD (  17.54  )
+X-CRM114-CacheID: sfid-20190206_055507_433150_71178BB3 
+X-CRM114-Status: GOOD (  18.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -135,6 +193,11 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: Sean Wang <sean.wang@mediatek.com>, linux-pm@vger.kernel.org,
+ Viresh Kumar <viresh.kumar@linaro.org>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>, linux-mediatek@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
@@ -142,140 +205,82 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 
 
-On 06.02.2019 12:24, Ludovic Desroches wrote:
-> On Wed, Feb 06, 2019 at 09:46:28AM +0000, Claudiu.Beznea@microchip.com wrote:
->>
->>
->> On 06.02.2019 10:13, Ludovic Desroches wrote:
->>> On Thu, Jan 31, 2019 at 05:18:04PM +0100, Claudiu Beznea - M18063 wrote:
->>>> From: Claudiu Beznea <claudiu.beznea@microchip.com>
->>>>
->>>> SAM9X60 uses high and low drive strengths. To implement this, in
->>>> at91_pinctrl_mux_ops::set_drivestrength and
->>>> at91_pinctrl_mux_ops::get_drivestrength we need bit numbers of
->>>> drive strengths (1 for low, 2 for high), thus change the code to
->>>> allow the usage of drive strength bit numbers.
->>>>
->>>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->>>> ---
->>>>  drivers/pinctrl/pinctrl-at91.c | 32 ++++++++++++++++++++------------
->>>>  1 file changed, 20 insertions(+), 12 deletions(-)
->>>>
->>>> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
->>>> index 3d49bbbcdbc7..31f06dafca2e 100644
->>>> --- a/drivers/pinctrl/pinctrl-at91.c
->>>> +++ b/drivers/pinctrl/pinctrl-at91.c
->>>> @@ -72,10 +72,15 @@ static int gpio_banks;
->>>>   * DRIVE_STRENGTH_DEFAULT is just a placeholder to avoid changing the drive
->>>>   * strength when there is no dt config for it.
->>>>   */
->>>> -#define DRIVE_STRENGTH_DEFAULT		(0 << DRIVE_STRENGTH_SHIFT)
->>>> -#define DRIVE_STRENGTH_LOW          (1 << DRIVE_STRENGTH_SHIFT)
->>>> -#define DRIVE_STRENGTH_MED          (2 << DRIVE_STRENGTH_SHIFT)
->>>> -#define DRIVE_STRENGTH_HI           (3 << DRIVE_STRENGTH_SHIFT)
->>>> +enum drive_strength_bit {
->>>> +	DRIVE_STRENGTH_BIT_DEF,
->>>> +	DRIVE_STRENGTH_BIT_LOW,
->>>> +	DRIVE_STRENGTH_BIT_MED,
->>>> +	DRIVE_STRENGTH_BIT_HI,
->>>> +};
->>>> +
->>>> +#define DRIVE_STRENGTH_BIT_MSK(name)	(DRIVE_STRENGTH_BIT_##name << \
->>>> +					 DRIVE_STRENGTH_SHIFT)
->>>>  
->>>>  /**
->>>>   * struct at91_pmx_func - describes AT91 pinmux functions
->>>> @@ -551,7 +556,7 @@ static unsigned at91_mux_sama5d3_get_drivestrength(void __iomem *pio,
->>>>  	/* SAMA5 strength is 1:1 with our defines,
->>>>  	 * except 0 is equivalent to low per datasheet */
->>>>  	if (!tmp)
->>>> -		tmp = DRIVE_STRENGTH_LOW;
->>>> +		tmp = DRIVE_STRENGTH_BIT_MSK(LOW);
->>>>  
->>>>  	return tmp;
->>>>  }
->>>> @@ -564,7 +569,7 @@ static unsigned at91_mux_sam9x5_get_drivestrength(void __iomem *pio,
->>>>  
->>>>  	/* strength is inverse in SAM9x5s hardware with the pinctrl defines
->>>>  	 * hardware: 0 = hi, 1 = med, 2 = low, 3 = rsvd */
->>>> -	tmp = DRIVE_STRENGTH_HI - tmp;
->>>> +	tmp = DRIVE_STRENGTH_BIT_MSK(HI) - tmp;
->>>>  
->>>>  	return tmp;
->>>>  }
->>>> @@ -600,7 +605,7 @@ static void at91_mux_sam9x5_set_drivestrength(void __iomem *pio, unsigned pin,
->>>>  
->>>>  	/* strength is inverse on SAM9x5s with our defines
->>>>  	 * 0 = hi, 1 = med, 2 = low, 3 = rsvd */
->>>> -	setting = DRIVE_STRENGTH_HI - setting;
->>>> +	setting = DRIVE_STRENGTH_BIT_MSK(HI) - setting;
->>>>  
->>>>  	set_drive_strength(pio + at91sam9x5_get_drive_register(pin), pin,
->>>>  				setting);
->>>> @@ -959,11 +964,11 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
->>>>  	}					\
->>>>  } while (0)
->>>>  
->>>> -#define DBG_SHOW_FLAG_MASKED(mask,flag) do {	\
->>>> +#define DBG_SHOW_FLAG_MASKED(mask,flag,name) do {	\
->>>
->>> checkpatch error: space required
->>
->> I'm aware of that but I added it in the way it was previously (were the
->> checkpatch error was still present). Please let me know if you want me to
->> send a new version fixing this.
+On 29/01/2019 05:55, Amit Kucheria wrote:
+> Use the CPUFREQ_IS_COOLING_DEV flag to allow cpufreq core to
+> automatically register as a thermal cooling device.
 > 
-> I think it's the opportunity to fix it. If you can resend a new version
-> including my ack.
+> This allows removal of boiler plate code from the driver.
+> 
+> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Sure!
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-Thanks,
-Claudiu
+> ---
+>  drivers/cpufreq/mediatek-cpufreq.c | 14 ++------------
+>  1 file changed, 2 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/mediatek-cpufreq.c b/drivers/cpufreq/mediatek-cpufreq.c
+> index eb8920d39818..4229fcc31310 100644
+> --- a/drivers/cpufreq/mediatek-cpufreq.c
+> +++ b/drivers/cpufreq/mediatek-cpufreq.c
+> @@ -14,7 +14,6 @@
+>  
+>  #include <linux/clk.h>
+>  #include <linux/cpu.h>
+> -#include <linux/cpu_cooling.h>
+>  #include <linux/cpufreq.h>
+>  #include <linux/cpumask.h>
+>  #include <linux/module.h>
+> @@ -48,7 +47,6 @@ struct mtk_cpu_dvfs_info {
+>  	struct regulator *sram_reg;
+>  	struct clk *cpu_clk;
+>  	struct clk *inter_clk;
+> -	struct thermal_cooling_device *cdev;
+>  	struct list_head list_head;
+>  	int intermediate_voltage;
+>  	bool need_voltage_tracking;
+> @@ -307,13 +305,6 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
+>  
+>  #define DYNAMIC_POWER "dynamic-power-coefficient"
+>  
+> -static void mtk_cpufreq_ready(struct cpufreq_policy *policy)
+> -{
+> -	struct mtk_cpu_dvfs_info *info = policy->driver_data;
+> -
+> -	info->cdev = of_cpufreq_cooling_register(policy);
+> -}
+> -
+>  static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
+>  {
+>  	struct device *cpu_dev;
+> @@ -472,7 +463,6 @@ static int mtk_cpufreq_exit(struct cpufreq_policy *policy)
+>  {
+>  	struct mtk_cpu_dvfs_info *info = policy->driver_data;
+>  
+> -	cpufreq_cooling_unregister(info->cdev);
+>  	dev_pm_opp_free_cpufreq_table(info->cpu_dev, &policy->freq_table);
+>  
+>  	return 0;
+> @@ -480,13 +470,13 @@ static int mtk_cpufreq_exit(struct cpufreq_policy *policy)
+>  
+>  static struct cpufreq_driver mtk_cpufreq_driver = {
+>  	.flags = CPUFREQ_STICKY | CPUFREQ_NEED_INITIAL_FREQ_CHECK |
+> -		 CPUFREQ_HAVE_GOVERNOR_PER_POLICY,
+> +		 CPUFREQ_HAVE_GOVERNOR_PER_POLICY |
+> +		 CPUFREQ_IS_COOLING_DEV,
+>  	.verify = cpufreq_generic_frequency_table_verify,
+>  	.target_index = mtk_cpufreq_set_target,
+>  	.get = cpufreq_generic_get,
+>  	.init = mtk_cpufreq_init,
+>  	.exit = mtk_cpufreq_exit,
+> -	.ready = mtk_cpufreq_ready,
+>  	.name = "mtk-cpufreq",
+>  	.attr = cpufreq_generic_attr,
+>  };
+> 
 
-> 
-> Regards
-> 
-> Ludovic
-> 
->>
->> Thank you,
->> Claudiu Beznea
->>
->>>
->>>>  	if ((config & mask) == flag) {		\
->>>>  		if (num_conf)			\
->>>>  			seq_puts(s, "|");	\
->>>> -		seq_puts(s, #flag);		\
->>>> +		seq_puts(s, #name);		\
->>>>  		num_conf++;			\
->>>>  	}					\
->>>>  } while (0)
->>>> @@ -981,9 +986,12 @@ static void at91_pinconf_dbg_show(struct pinctrl_dev *pctldev,
->>>>  	DBG_SHOW_FLAG(PULL_DOWN);
->>>>  	DBG_SHOW_FLAG(DIS_SCHMIT);
->>>>  	DBG_SHOW_FLAG(DEGLITCH);
->>>> -	DBG_SHOW_FLAG_MASKED(DRIVE_STRENGTH, DRIVE_STRENGTH_LOW);
->>>> -	DBG_SHOW_FLAG_MASKED(DRIVE_STRENGTH, DRIVE_STRENGTH_MED);
->>>> -	DBG_SHOW_FLAG_MASKED(DRIVE_STRENGTH, DRIVE_STRENGTH_HI);
->>>> +	DBG_SHOW_FLAG_MASKED(DRIVE_STRENGTH, DRIVE_STRENGTH_BIT_MSK(LOW),
->>>> +			     DRIVE_STRENGTH_LOW);
->>>> +	DBG_SHOW_FLAG_MASKED(DRIVE_STRENGTH, DRIVE_STRENGTH_BIT_MSK(MED),
->>>> +			     DRIVE_STRENGTH_MED);
->>>> +	DBG_SHOW_FLAG_MASKED(DRIVE_STRENGTH, DRIVE_STRENGTH_BIT_MSK(HI),
->>>> +			     DRIVE_STRENGTH_HI);
->>>>  	DBG_SHOW_FLAG(DEBOUNCE);
->>>>  	if (config & DEBOUNCE) {
->>>>  		val = config >> DEBOUNCE_VAL_SHIFT;
->>>> -- 
->>>> 2.7.4
->>>>
->>>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel@lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
