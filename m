@@ -2,146 +2,61 @@ Return-Path: <SRS0=SkGj=QN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 11C5FC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 19:41:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 70D7AC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 19:42:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D1E092080D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 19:41:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3F2422080D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 19:42:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="igvmPxAJ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="hXdIP7ze"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D1E092080D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AakKHveZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F2422080D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NEStJga/xLblbJEd/phQ5HeD5VZmLye8pMe4/LnFz/s=; b=igvmPxAJd3o327
-	hhU6YxBwaTqN6yT0JlqET1GFo72fXARz4BLqXzTDeV4VgisCf2cixcsjIdTduyOIdrBolBaQz1Ukv
-	AiUJx06wETUpQsFcW85rr+d6N1izA/wPhFaXGCTNDS21U3LYerNqsOYYJsYVh6CMyFQG73p64l599
-	7Zff9HYq28bd8i6rcHJ2KS4QaeH2uBX4RkFnPYJySe7Q1g4z0T5v0wweolRij5z3KEJ5L3pp47+tx
-	ZFsyE85O0O7jBWM5OSWb/UHAtvRE56xK6N8rmdMn+35kIvfZQVPHMMC/T3H0STNEHLpvgS3Szd+AM
-	fIwgJVNR053vzAcW/YTA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=2tZ10/CEORR7DTqYhL2qNcdUhqQRPFZh9+x5A+NZR1A=; b=AakKHveZ22jRky
+	6By0WhkmBqWsA9utfEZXwp92QGcZSeryLkf5KeQTUgpx2awRBIcoy5kceRw6Uf/cnrU4fvtdg88Wa
+	/P3/3jk0INZ3yYXCNRThv4QhL2HXQMjt4YF3xTvBRnm5DBVC+ITAPo8n8oiNjQbdOfH0x/wldCGY+
+	IOKPNUpnFME5abv25PjHFhnflqBpsAELcZbX9ATSGB3iQlgtlUfRibQ8ENTIBu0klIbf12Ofex9dT
+	EMZIC6GcGUSBGkt0MH3c4JYCS8Pg5iH1VkpIOCSQBi7Ph5q+LCL3olbxcoxx3NLILlqZMQrnenPnI
+	QbXsPyT8DuEuMp9LVn4A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grT4T-00034e-De; Wed, 06 Feb 2019 19:41:21 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1grT5B-0003Tu-6T; Wed, 06 Feb 2019 19:42:05 +0000
+Received: from relay3-d.mail.gandi.net ([217.70.183.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grT4O-00033x-Mz
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 19:41:18 +0000
-Received: by mail-wm1-x341.google.com with SMTP id y185so2613965wmd.1
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 06 Feb 2019 11:41:16 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:openpgp:autocrypt:organization
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=g0SOurmC/1hWbZf3RZ1yC2YreX5i3l8fOWg+TNn51ec=;
- b=hXdIP7zevKZeWBzz3ovYsZWIBdRegy4rL2qvQiPcHj2V8xMubq0cJS6EPD8mF6KEHo
- JSKZeaTf9+1eopGEjEKN6xfhAZHErNQftS3CYOgYWkKr07Sy/B+Lv2e7tt8fuLWC+bd9
- iQtEwkM50gjKcMhkqAAMvpsbt0jiIsvkXR7mYew+IgR4xK3R+3a4jM3Nmp0dNNh5ALV5
- ZO8JUePCLLutzpAZC9jBnYUz7BwsGBB5Hv9CPNo+rU3YJM4YJZH9VRlybkFz5g3ko2rl
- GpQZwaDh6gTpqOZPDcf3vIOEoK6LHUghFNaOtSTt+wQJhZEZ7M60ua+9rmV6FsSuApow
- pmHQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :organization:message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=g0SOurmC/1hWbZf3RZ1yC2YreX5i3l8fOWg+TNn51ec=;
- b=TAGv/YKiT2TGzYvtoNE8SMeVqK45scEN57Q9t9aClBrVs/KSdeLWXvfizFqT87iqwf
- cvI1rYCNlmOUp4Im2akv49L3+BeekuyeQtZBBu/potLaAHC310EjpygBjumoVKp9RNFM
- JzPJmllGahDUur8ec4JeFMKsh4QjSaPqvwucLr2usuRKHunHhk/mpxQ9eT6NJui8H/pd
- zPyujs5ZjJe/dfElJe/1/3wZvVXFnNuaNCK/g63t+Qq2QCk8etlG9Zv7VZsB7Bg40KWe
- t5HzYYj2SzlIupYZHYZvriIOFVuXNQ8p0gfmMjceL9uhLErvKxqvHuwf+BroZIgNnaFo
- bT/g==
-X-Gm-Message-State: AHQUAuaD2VAmVHq+dp7xu6G1p3BEeHnjgxdVOLNEXK9aGF6tzk7kwMl1
- y6QM3B3kqGFm4fJP+Cdzga5npQ==
-X-Google-Smtp-Source: AHgI3IbjhHgL+IcQBXfpM0N+GBFZjy0aFHdVdvdM1NoE5c+Qs73KhTZXrl8Fc2MVpp5ufVYIzrOV9Q==
-X-Received: by 2002:a1c:a00f:: with SMTP id j15mr1104229wme.84.1549482074771; 
- Wed, 06 Feb 2019 11:41:14 -0800 (PST)
-Received: from [192.168.1.62] (176-150-251-154.abo.bbox.fr. [176.150.251.154])
- by smtp.gmail.com with ESMTPSA id
- a12sm29037322wrm.45.2019.02.06.11.41.13
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 06 Feb 2019 11:41:14 -0800 (PST)
-Subject: Re: [PATCH 2/2] clk: meson: Add G12A AO Clock + Reset Controller
-To: Stephen Boyd <sboyd@kernel.org>, jbrunet@baylibre.com
-References: <20190204091331.9298-1-narmstrong@baylibre.com>
- <20190204091331.9298-3-narmstrong@baylibre.com>
- <154940510132.169292.12584338453129084603@swboyd.mtv.corp.google.com>
-From: Neil Armstrong <narmstrong@baylibre.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
- 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
- ZaTUOEkgIor5losDrePdPgE=
-Organization: Baylibre
-Message-ID: <c93fb858-27e1-47b5-a7da-849d02fd7a38@baylibre.com>
-Date: Wed, 6 Feb 2019 20:41:13 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1grT57-0003SW-7K
+ for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 19:42:03 +0000
+X-Originating-IP: 90.89.68.76
+Received: from localhost (lfbn-1-10718-76.w90-89.abo.wanadoo.fr [90.89.68.76])
+ (Authenticated sender: maxime.ripard@bootlin.com)
+ by relay3-d.mail.gandi.net (Postfix) with ESMTPSA id E103860009;
+ Wed,  6 Feb 2019 19:41:51 +0000 (UTC)
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh+dt@kernel.org>,
+ Frank Rowand <frowand.list@gmail.com>, Chen-Yu Tsai <wens@csie.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>
+Subject: [PATCH v2 1/7] dt-bindings: interconnect: Add a dma interconnect name
+Date: Wed,  6 Feb 2019 20:41:18 +0100
+Message-Id: <43eeca13733faefe62f9facc25b8e88f7e593f61.1549482066.git-series.maxime.ripard@bootlin.com>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <cover.ddd928eab0069d426b711e69940918eaf85625ce.1549482066.git-series.maxime.ripard@bootlin.com>
+References: <cover.ddd928eab0069d426b711e69940918eaf85625ce.1549482066.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
-In-Reply-To: <154940510132.169292.12584338453129084603@swboyd.mtv.corp.google.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_114116_756940_3F34872B 
-X-CRM114-Status: GOOD (  12.66  )
+X-CRM114-CacheID: sfid-20190206_114201_411193_283B2FE8 
+X-CRM114-Status: GOOD (  10.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -153,51 +68,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Cc: devicetree@vger.kernel.org, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Arnd Bergmann <arnd@arndb.de>, dri-devel@lists.freedesktop.org,
+ Georgi Djakov <georgi.djakov@linaro.org>,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Yong Deng <yong.deng@magewell.com>, Robin Murphy <robin.murphy@arm.com>,
+ Dave Martin <dave.martin@arm.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+The current DT bindings assume that the DMA will be performed by the
+devices through their parent DT node, and rely on that assumption for the
+address translation using dma-ranges.
 
-On 05/02/2019 23:18, Stephen Boyd wrote:
-> Quoting Neil Armstrong (2019-02-04 01:13:30)
->> + * Register offsets from the data sheet must be multiplied by 4.
->> + */
->> +#define AO_RTI_STATUS_REG3     0x0C
->> +#define AO_RTI_PWR_CNTL_REG0   0x10
->> +#define AO_RTI_GEN_CNTL_REG0   0x40
->> +#define AO_CLK_GATE0           0x4c
->> +#define AO_CLK_GATE0_SP                0x50
->> +#define AO_OSCIN_CNTL          0x58
->> +#define AO_CEC_CLK_CNTL_REG0   0x74
->> +#define AO_CEC_CLK_CNTL_REG1   0x78
->> +#define AO_SAR_CLK             0x90
->> +#define AO_RTC_ALT_CLK_CNTL0   0x94
->> +#define AO_RTC_ALT_CLK_CNTL1   0x98
->> +
->> +#define AXG_AO_GATE(_name, _reg, _bit)                                 \
->> +static struct clk_regmap g12a_aoclk_##_name = {                                \
->> +       .data = &(struct clk_regmap_gate_data) {                        \
->> +               .offset = (_reg),                                       \
->> +               .bit_idx = (_bit),                                      \
->> +       },                                                              \
->> +       .hw.init = &(struct clk_init_data) {                            \
->> +               .name =  "g12a_ao_" #_name,                             \
->> +               .ops = &clk_regmap_gate_ops,                            \
->> +               .parent_names = (const char *[]){ IN_PREFIX "mpeg-clk" }, \
->> +               .num_parents = 1,                                       \
->> +               .flags = CLK_IGNORE_UNUSED,                             \
-> 
-> Can you please add a comment explaining why CLK_IGNORE_UNUSED is here?
-> It will help future readers know what's going on with this special flag.
-> 
+However, some SoCs have devices that will perform DMA through another bus,
+with separate address translation rules. We therefore need to express that
+relationship, through the special interconnect name "dma".
 
-Sure, I'll add it.
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ Documentation/devicetree/bindings/interconnect/interconnect.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Neil
+diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+index 5a3c575b387a..e69fc2d992c3 100644
+--- a/Documentation/devicetree/bindings/interconnect/interconnect.txt
++++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+@@ -51,6 +51,9 @@ interconnect-names : List of interconnect path name strings sorted in the same
+ 		     interconnect-names to match interconnect paths with interconnect
+ 		     specifier pairs.
+ 
++                     Reserved interconnect names:
++                         * dma: Path from the device to the main memory of the system
++
+ Example:
+ 
+ 	sdhci@7864000 {
+-- 
+git-series 0.9.1
 
 _______________________________________________
 linux-arm-kernel mailing list
