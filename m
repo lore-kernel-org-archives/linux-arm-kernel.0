@@ -2,86 +2,87 @@ Return-Path: <SRS0=SkGj=QN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 880ECC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 11:18:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 64525C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 11:28:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 555572080D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 11:18:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 317FC217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 11:28:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tl2ollon";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="bM1+Hdhr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 555572080D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FznMHOko";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="JKvmMgI+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 317FC217F9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=P86JUSAxD2D+APtd1v3RchN7yrEfe0vUxQZzBKkm2rU=; b=tl2ollonJfnIo8
-	8rBo0TedrV8cBlCPbMzmZQmAki97rh3oqEvVtPd0XSqVDiYpRDx7ePeNQO3yAflmAVUv+iIEvjhs3
-	RspY6GMetlvJweF+8xCyc+2HSmmqFD8Qyiu7eGk/Ali+IJTT9Ou+oa5s4D+xixpLFknRd/G8LIhXR
-	aDgbuGQKro7cFdf4gZGpmgDbcmgnnk82jT8wgWcZ1oqjvlX/9iLKULwiX8jKMYjKRdhGJY2SVuvDq
-	WDao3lQHIS3LiIybfiRmZXj71xiNj6CoLVbxPHCGDenkLiINiiMcQ+4j8hX0E32VePAlHHiIX22PX
-	WOfPcIvzhf8QixmWWZ5w==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=MBg4NL9YBRpQHJ2F60IykhPXEWnli6WGVXRaeghc0uQ=; b=FznMHOkozyUQMo
+	RVjwwL5lXIE4qjZyBHTivHvYB4I7sWvPacvx42RvURW1UYjC5b6vbpy95cCgaS1V7IcUo9FVLOPpt
+	Reqy4EH67iOYyWz5Ea3085bzatOD43WBaUt9DDflA9fjEXUAIs4Dv1EiAkGrJZJa51b7bp3fBwG5s
+	IxsY+wdJ0B4UJg2BYH9HESeTmuGzPFhuv1wH2WWTDD3162a/9Dfo7EWh+X0I3lN7CjIRZtPH3JzxT
+	WXmk4cG0eECHSTO0L5dvD/8H+rFih/vO/Wau/yglNQQJRVbgCvkcXJQ74F5kWoNFi28PNb773/Vjy
+	4vAEk6PG+52gEDrIWojA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grLE3-0001CE-3Y; Wed, 06 Feb 2019 11:18:43 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+	id 1grLNo-0004Yw-Df; Wed, 06 Feb 2019 11:28:48 +0000
+Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grLDz-0001Bj-Nk
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 11:18:41 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x16BIQF9105556;
- Wed, 6 Feb 2019 05:18:26 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549451906;
- bh=6KLtT6t2MhwFlIQe4mzX9zJaY6RcA71GnYnsQ6Rnvgc=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=bM1+HdhrNKm315kjSkS7qVxOWu7Gqw+Q8IIn2g+dKU1ZLXTQUJZYtEDL1AdNwHjfL
- J7B3IsCu3slnWom0/CLtCw4E+hwK9YiwST6xx9nJQytH62AR05K0crY9PAETQy2lZz
- 7x+J9HwC3fw85lwEbBwvZ2FXI6QzwUjFan8RC0FU=
-Received: from DFLE111.ent.ti.com (dfle111.ent.ti.com [10.64.6.32])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x16BIQng024728
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Wed, 6 Feb 2019 05:18:26 -0600
-Received: from DFLE104.ent.ti.com (10.64.6.25) by DFLE111.ent.ti.com
- (10.64.6.32) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 6
- Feb 2019 05:18:25 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE104.ent.ti.com
- (10.64.6.25) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Wed, 6 Feb 2019 05:18:25 -0600
-Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x16BIHdF022104;
- Wed, 6 Feb 2019 05:18:19 -0600
-Subject: Re: [PATCH v5 0/7] Add Armada 3700 COMPHY support
-To: Miquel Raynal <miquel.raynal@bootlin.com>, Gregory Clement
- <gregory.clement@bootlin.com>, Jason Cooper <jason@lakedaemon.net>, Andrew
- Lunn <andrew@lunn.ch>, Sebastian Hesselbarth
- <sebastian.hesselbarth@gmail.com>
-References: <20190108163124.6409-1-miquel.raynal@bootlin.com>
- <20190206095743.5eed3584@xps13>
-From: Kishon Vijay Abraham I <kishon@ti.com>
-Message-ID: <300b86e7-1d00-da92-2203-a7cfeb2d7aa8@ti.com>
-Date: Wed, 6 Feb 2019 16:47:39 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1grLNl-0004XE-1x; Wed, 06 Feb 2019 11:28:46 +0000
+Received: by mail-ot1-x344.google.com with SMTP id 32so11181022ota.12;
+ Wed, 06 Feb 2019 03:28:43 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=googlemail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=q6uxksyd4B7vRqtlr+5W33DQQzfWzcoKK5+Un05MXvs=;
+ b=JKvmMgI+O1towSFvmv+w7YwuBdOXO83XUBp6QYktR92TUzh8aIowl6PndOc+O5C4j8
+ 7X6ycgstGT/8U3ovsoEee9vcNkHpj7FIl1m1mydaP9USlGjBXSb3dX4B1fsS+wOYah1a
+ fGOBlcxau8uFofrQhWjqovEAcKpR/9Rn3ACNmwIux9Ntnqt0VjoJ0p6gENEyO5GB65d/
+ rO55pqUdPubYOr3+XH6EhOGgV5IakJ5JGI1xfQpddy7ldNEEP6IK2jmtwygN85rNBr46
+ +P0aX0oWOe+3Tawz2xGAiJUpZahJ763qLccUXcWMmVJNj6hwI0XOOkpq/BJb4t/MGzbj
+ hgMA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=q6uxksyd4B7vRqtlr+5W33DQQzfWzcoKK5+Un05MXvs=;
+ b=EhhKxY5kFsJaMUoRb+2+be1Joj2NB7rDaW9zApNI7iXoOytBYPFdoRvUpnXsmWDOj8
+ mlE/LDPjHrk16RilxNdMp6dBW5FQTn8OfMbkeNDoshtEPWl5KELQZiystDXqO1zQux0w
+ TObsnN24FsnoWvRnBxzGVV+MdX6T2fdrR5I6SKy78S/ZdpRS5YdR2IaMbk1oFPeJp6t2
+ FvH3HsN/jhd3RsP682+nFvWXjkncOFXneiahQnSWlmm3Zyps6k6yLAZlFtXYx/5Swci9
+ Y8S4n3DpNXiRvx2fhPH8zEx5lb+OoS/MXQdqsWLY2TcHwt9/7ojWGKVRcNbt4E+O10/M
+ Ds+g==
+X-Gm-Message-State: AHQUAuYnzX6dl4B8QJ9tlrGxv0i32hpjVqmSLEF4NrgQWbtlvPz4Q0Ap
+ p2iTyoRFh5l/Iem8XdrpOrmp2yDlNc15cL/UibQ=
+X-Google-Smtp-Source: AHgI3IZnKAjfMiHnkbT1AerxK1Z3q8GXLb3dcvennBaAEK4TzTIhYlxFXLgzTkIO0igglWD4KIBL9R61Ep+UKiYnEgI=
+X-Received: by 2002:a9d:715d:: with SMTP id y29mr5428844otj.148.1549452522210; 
+ Wed, 06 Feb 2019 03:28:42 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190206095743.5eed3584@xps13>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+References: <20190123151209.2080-1-linux.amoon@gmail.com>
+ <20190123151209.2080-3-linux.amoon@gmail.com>
+ <CAFBinCAdf0rtt-7tON_LRNH_cpvGJXX3LX8g-i4xsC3wahZSVA@mail.gmail.com>
+ <CANAwSgQ4=Vn6RM4Kpd20UWkQNW81=mfg-qB0G73dsRem3qwjcA@mail.gmail.com>
+ <CAFBinCB=3kmuFb_xXzhW+m8dTasVrCHQp2wti+=5UjrAHk5TTg@mail.gmail.com>
+ <CANAwSgQnMkXECkCVjFKwNKB+2JoiPtVPQbateppmtgfPYCutZg@mail.gmail.com>
+In-Reply-To: <CANAwSgQnMkXECkCVjFKwNKB+2JoiPtVPQbateppmtgfPYCutZg@mail.gmail.com>
+From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Date: Wed, 6 Feb 2019 12:28:31 +0100
+Message-ID: <CAFBinCCFoBkbf-HvEoMk7mTYTBV27nJ9TF1X-DrLuHR9qDVDSA@mail.gmail.com>
+Subject: Re: [RFCv1 2/3] ARM: dts: meson8b: odroidc1: fix USB power supplies
+ for phy
+To: Anand Moon <linux.amoon@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_031839_876679_08E58695 
-X-CRM114-Status: GOOD (  28.37  )
+X-CRM114-CacheID: sfid-20190206_032845_119173_D79290FC 
+X-CRM114-Status: GOOD (  13.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,74 +94,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Antoine Tenart <antoine.tenart@bootlin.com>,
- Grzegorz Jaszczyk <jaz@semihalf.com>, linux-kernel@vger.kernel.org,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>, Rob Herring <robh+dt@kernel.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Marcin Wojtas <mw@semihalf.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: devicetree <devicetree@vger.kernel.org>,
+ Neil Armstrong <narmstrong@baylibre.com>, Kevin Hilman <khilman@baylibre.com>,
+ Kishon Vijay Abraham I <kishon@ti.com>, Rob Herring <robh+dt@kernel.org>,
+ linux-amlogic@lists.infradead.org,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Jerome Brunet <jbrunet@baylibre.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGksCgpPbiAwNi8wMi8xOSAyOjI3IFBNLCBNaXF1ZWwgUmF5bmFsIHdyb3RlOgo+IEhpIEtpc2hv
-biwKPiAKPiBNaXF1ZWwgUmF5bmFsIDxtaXF1ZWwucmF5bmFsQGJvb3RsaW4uY29tPiB3cm90ZSBv
-biBUdWUsICA4IEphbiAyMDE5Cj4gMTc6MzE6MTcgKzAxMDA6Cj4gCj4+IEhlbGxvLAo+Pgo+PiBU
-aGlzIHNlcmllcyBhZGRzIGEgbmV3IGRyaXZlciB0byBzdXBwb3J0IEFybWFkYSAzNzAwIENPTVBI
-WSBJUC4KPj4gVGhlIHNlcmllcyBoYXMgYmVlbiB0ZXN0ZWQgb24gYW4gRVNQUkVTU09iaW4gd2l0
-aCBTQVRBLCBQQ0llCj4+IGFuZCBVU0IzIGhvc3QuIEZvciB0aGlzIHB1cnBvc2UsIHBhdGNoIDEg
-ZW51bWVyYXRlcyB0aGUgU0FUQSBQSFkKPj4gbW9kZS4gVGhlIFNHTUlJIFBIWSBtb2RlIHRoYXQg
-aXMgc3VwcG9ydGVkIGJ5IHRoZSBJUCBoYXMgYmVlbiB3cml0dGVuCj4+ICh1c2VzIFNNQyBjYWxs
-cyBhbnl3YXkpIGJ1dCBjb3VsZCBub3QgYmUgdGVzdGVkIG9uIHRoaXMgcGxhdGZvcm0uCj4+Cj4+
-IFRocmVlIHNlcmllcyB3aWxsIGZvbGxvdyB0byBhZGQgUEhZIHN1cHBvcnQgKG9yIGF0IGxlYXN0
-IGEgUEhZIG5vZGVzCj4+IGluIHRoZSBBMzcwMC9FU1BSRVNTT2JpbiBkZXZpY2UgdHJlZXMpIHRv
-IHRoZSBNVkVCVSBBSENJIGRyaXZlciwgdGhlCj4+IEFhcmR2YXJrIFBDSSBjb250cm9sbGVyIGRy
-aXZlciBhbmQgdGhlIE1WRUJVIHhIQ0kgZHJpdmVyLiBBbGwgdGhpcyBpcwo+PiBuZWVkZWQgaW4g
-b3JkZXIgdG8gYWNoaWV2ZSBzdXNwZW5kIHRvIFJBTSBvbiB0aGlzIHBsYXRmb3JtLgo+Pgo+PiBU
-aGFua3MsCj4+IE1pcXXDqGwKPj4KPiAKPiBBbnkgaW5wdXRzIG9uIHRoaXMgc2VyaWVzPyBJdCBp
-cyBpbXBvcnRhbnQgZm9yIG1lIGJlY2F1c2UgaXQgaW1wYWN0cwo+IFNBVEEsIFBDSWUgYW5kIFVT
-QiBjaGFuZ2VzIEkgcGxhbiB0byBnZXQgbWVyZ2UuCgptZXJnZWQgbm93LCB0aGFua3MuCgotS2lz
-aG9uCj4gCj4gVGhhbmtzLAo+IE1pcXXDqGwKPiAKPj4KPj4gQ2hhbmdlcyBzaW5jZSB2NDoKPj4g
-PT09PT09PT09PT09PT09PT0KPj4gKiBGaXhlZCBlcnJvciBpbiB0aGUgZHJpdmVyIHByb2JlIHdo
-ZXJlIFBIWV9JTlRFUkZBQ0VfTU9ERV9OQSB3YXMKPj4gICBhc3NpZ25lZCB0byBsYW5lLT5tb2Rl
-IGluc3RlYWQgb2YgbGFuZS0+c3VibW9kZS4KPj4gKiBDb21waWxlLWluIHRoZSBkcml2ZXIgYnkg
-ZGVmYXVsdCAoZGVwZW5kcyBvbiBBUkNIX01WRUJVKS4KPj4gKiBBZGQgZGVwZW5kZW5jeSBvbiBI
-QVZFX0FSTV9TTUNDIGluIEtjb25maWcuCj4+Cj4+IENoYW5nZXMgc2luY2UgdjM6Cj4+ID09PT09
-PT09PT09PT09PT09Cj4+ICogQWRkZWQgUm9iJ3MgUmV2aWV3ZWQtYnkgdGFnIG9uIGJpbmRpbmdz
-Lgo+PiAqIFJlYmFzZWQgb24gdG9wIG9mIHBoeSAtbmV4dCBhcyBvZiB0aGUgMTJ0aCBvZiBEZWNl
-bWJlciwgMjAxOC4KPj4gKiBBZGFwdGVkIHRoZSBkcml2ZXIgdG8gc3VwcG9ydCBTR01JSS8xMDAw
-QkFTRVggYW5kCj4+ICAgSFNfU0dNSUkvMjUwMEJBU0VYLgo+Pgo+PiBDaGFuZ2VzIHNpbmNlIHYy
-Ogo+PiA9PT09PT09PT09PT09PT09PQo+PiAqIFJlbW92ZSByZWR1bmRhbnQgY2hlY2sgb24gbGFu
-ZS0+cG9ydC9hcmdzLT5hcmdbMF0gYXQgdGhlIGVuZCBvZiB0aGUKPj4gICAtPnhsYXRlKCkgY2Fs
-bGJhY2suIERvIGl0IG9uIGJvdGggYXJtYWRhLWNwMTEwIGFuZCBhcm1hZGEtYTM3MDAgIAo+PiAg
-IENPTVBIWSBkcml2ZXJzLgo+PiAqIFB1dCBteSBTb0IgYXMgYXV0aG9yIG9mIHRoZSBwYXRjaCBm
-aXJzdCB3aGVuIGEgcGF0Y2ggaXMgY28tZGV2ZWxvcGVkLgo+Pgo+PiBDaGFuZ2VzIHNpbmNlIHYx
-Ogo+PiA9PT09PT09PT09PT09PT09PQo+PiAqIEZpeCB3cm9uZyBjaGVjayBpbiAtPnhsYXRlKCku
-Cj4+ICogQXBwbHkgdGhlIHNhbWUgZml4IHRvIHRoZSBjcDExMCBjb21waHkgZHJpdmVyIGZyb20g
-d2hpY2ggdGhlIGEzNzAwCj4+ICAgZHJpdmVyIGlzIGJhc2VkLgo+PiAqIEFkZGVkIGNyZWRpdCB0
-byBHcmVnb3J6IEphc3pjenlrIGZvciBoaXMgd29yay4KPj4gKiBBZGRlZCBTdWdnZXN0ZWQtYnkg
-dGFnIHRvIHRoZSBwYXRjaCBhZGRpbmcgdGhlIENPTVBIWSBEVCBub2RlLgo+Pgo+Pgo+PiBHcnpl
-Z29yeiBKYXN6Y3p5ayAoMSk6Cj4+ICAgcGh5OiBlbnVtZXJhdGUgU0FUQSBQSFkgbW9kZQo+Pgo+
-PiBNaXF1ZWwgUmF5bmFsICg2KToKPj4gICBwaHk6IG12ZWJ1LWNwMTEwLWNvbXBoeTogZml4IHBv
-cnQgY2hlY2sgaW4gLT54bGF0ZSgpCj4+ICAgcGh5OiBhZGQgQTM3MDAgQ09NUEhZIHN1cHBvcnQK
-Pj4gICBkdC1iaW5kaW5nczogcGh5OiBtdmVidS1jb21waHk6IGV4dGVuZCB0aGUgZmlsZSB0byBk
-ZXNjcmliZSBhMzcwMAo+PiAgICAgYmluZGluZ3MKPj4gICBNQUlOVEFJTkVSUzogcGh5OiBhZGQg
-ZW50cnkgZm9yIEFybWFkYSAzNzAwIENPTVBIWSBkcml2ZXIKPj4gICBBUk02NDogZHRzOiBtYXJ2
-ZWxsOiBhcm1hZGEtMzd4eDogZml4IFNBVEEgbm9kZSBzY29wZQo+PiAgIEFSTTY0OiBkdHM6IG1h
-cnZlbGw6IGFybWFkYS0zN3h4OiBkZWNsYXJlIHRoZSBDT01QSFkgbm9kZQo+Pgo+PiAgLi4uL2Jp
-bmRpbmdzL3BoeS9waHktbXZlYnUtY29tcGh5LnR4dCAgICAgICAgIHwgIDY1ICsrKy0KPj4gIE1B
-SU5UQUlORVJTICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB8ICAgNiArCj4+ICBh
-cmNoL2FybTY0L2Jvb3QvZHRzL21hcnZlbGwvYXJtYWRhLTM3eHguZHRzaSAgfCAgMzEgKy0KPj4g
-IGRyaXZlcnMvcGh5L21hcnZlbGwvS2NvbmZpZyAgICAgICAgICAgICAgICAgICB8ICAxMiArCj4+
-ICBkcml2ZXJzL3BoeS9tYXJ2ZWxsL01ha2VmaWxlICAgICAgICAgICAgICAgICAgfCAgIDEgKwo+
-PiAgZHJpdmVycy9waHkvbWFydmVsbC9waHktbXZlYnUtYTM3MDAtY29tcGh5LmMgIHwgMzE4ICsr
-KysrKysrKysrKysrKysrKwo+PiAgZHJpdmVycy9waHkvbWFydmVsbC9waHktbXZlYnUtY3AxMTAt
-Y29tcGh5LmMgIHwgICAyIC0KPj4gIGluY2x1ZGUvbGludXgvcGh5L3BoeS5oICAgICAgICAgICAg
-ICAgICAgICAgICB8ICAgMSArCj4+ICA4IGZpbGVzIGNoYW5nZWQsIDQyMSBpbnNlcnRpb25zKCsp
-LCAxNSBkZWxldGlvbnMoLSkKPj4gIGNyZWF0ZSBtb2RlIDEwMDY0NCBkcml2ZXJzL3BoeS9tYXJ2
-ZWxsL3BoeS1tdmVidS1hMzcwMC1jb21waHkuYwo+PgoKX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGlu
-dXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQu
-b3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+Hi Anand,
+
+On Tue, Feb 5, 2019 at 8:53 PM Anand Moon <linux.amoon@gmail.com> wrote:
+[...]
+> > my interpretationfor the Amlogic SoCs is:
+> > - vusb_a and vusb_d are generated internally, not sure if there's an
+> > external fixed regulator
+> > - there is no phy-supply (the PHY itself is powered by clock-gating
+> > using the CLKID_USB clock)
+> > - usb0 VBUS is controlled by GPIOAO_5
+> >
+>
+> But as per the device tree binding
+>
+> [0] https://elixir.bootlin.com/linux/v5.0-rc5/source/Documentation/devicetree/bindings/phy/meson8b-usb2-phy.txt
+> [1] https://elixir.bootlin.com/linux/v5.0-rc5/source/Documentation/devicetree/bindings/phy/phy-bindings.txt
+>
+> its uses phy-supply to enable power to usb phy which seem to be correct option.
+phy-bindings.txt states that "phy-supply" is a "Phandle to a regulator
+that provides power to the PHY".
+I have written the example in meson8b-usb2-phy.txt and I think it's
+wrong (back when I wrote it I didn't know about the "vbus-supply"
+property on the controller and I didn't know about the VBUS
+constraints).
+
+I believe that the phy-supply property is intended for PHYs which need
+an external power supply (for example because they are not embedded
+into a SoC or if the SoC has separate voltage inputs for the PHY).
+I'm not aware of any PHY supply voltage on the Amlogic SoCs (I believe
+this is done internally within the SoC). instead they use clock gating
+to power down the PHY.
+
+as far as I understand the VBUS signal it depends on the USB mode:
+- host provides VBUS
+- peripheral devices are powered using this voltage
+- with OTG VBUS needs to be turned on or off depending on the current
+mode (host or peripheral)
+with the "phy-supply" property there's no way to manage the regulator
+depending on the USB mode (host or peripheral), it will always be
+"on".
+
+
+Regards
+Martin
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
