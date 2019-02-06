@@ -3,20 +3,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5072FC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 19:05:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B3ABFC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 19:05:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1C8872083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 19:05:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 845652075C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 19:05:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QGDB7XBd";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="tPCSLZLD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1C8872083B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NCcoeRLt";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="p15U12WO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 845652075C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,31 +25,31 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:From:References:Message-ID:Subject
 	:In-Reply-To:To:MIME-Version:Reply-To:Cc:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6z4UzP/V0xqB1os+shHFeicg+YESLUgcA++it1xTMoI=; b=QGDB7XBdWrIniI
-	EEFLR/RpOrdd20evcJMnch9fAYJat6eRsZgJ/t3Iuud+KaNwKqLjeRYx3orediOXz8TSFcm7I709I
-	rNEh3+qqK476LG3S4rOjT1pi/kNVrS2Yr20oiDbiGoKejHEBg48BoVgwZKXcHJGY8x+QxA7A2EGIA
-	KKYlM+6q8Z6CcAkiq+d67mlWKW5WjEz14U6/n6XNPgz3YnlcTtv5LvN6Njd2+1pbUFX14LdOSwaP5
-	1m3onL5VR2Ai4rRu0fui6KIr7/C52jb6gPIseEgE5+HZQgO8mEFPgRuKa1AnVzhMvmsoCfwYnt2de
-	CSivw/w1mQEL1wvNZHBg==;
+	List-Owner; bh=tYIW0JqhtfjJZpTbWldtRhFKJb8v07CB6zP1plWgtnc=; b=NCcoeRLtpH22ul
+	qC91E9dsVuJ8f8M+tSRBAtr/sKVy+XX/RrvKoAQWtQgaEV+eVEGsZxoPyfuVj53SBfbDWw/DsWIpM
+	nAEYrx4Af4KTC9rk2NlzsjC6U7Muz5gmnZeQ4+Qv2RYbS9NIjxd+bmGf1RgMHXM0a/NUmXxhqX4pX
+	v6KkzVvcHHfwj586tyh9cv7XtjyXya1RlCUcVDA3i0BPZvEAOW81ZlzTg7vLSORlML/aqa2c3rOiV
+	gVaJCXsgrz4CuJgFbTRIq6gOTg3CDWxdSA1b7tDVo1XnaNxqZfI3JCiRsTLHVZBC+alegcEmQD5yd
+	3ziI3aROJFzCHSRCkQQw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grSVR-000634-Qe; Wed, 06 Feb 2019 19:05:09 +0000
+	id 1grSVe-0006NU-HU; Wed, 06 Feb 2019 19:05:22 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grSVO-0005e5-PW
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 19:05:08 +0000
+ id 1grSVR-000642-JG
+ for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 19:05:11 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 3EB082075C;
- Wed,  6 Feb 2019 19:05:06 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 2F1FD2186A;
+ Wed,  6 Feb 2019 19:05:09 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549479906;
- bh=m7KBaT19iUslXWD8IuHyFFBiuEOdD0k7a3zUi0DgJBI=;
+ s=default; t=1549479909;
+ bh=ZemIRr87mympofqI890c43n5tJ0wMqXKtody80aXefg=;
  h=To:In-Reply-To:Subject:References:From:Date:From;
- b=tPCSLZLDjnsXRQCO56S443kaMNmrhZRfAI/nnVAnRvuimHR+lzgY0J3AwGret3Ua2
- 1vkGKO9SGCT2DiGLwt/XaXK6HIAfI9SQPEkDD9zYcbn0pt3QfBrBrFKeFffzvsNENp
- abG1KGsvGx39D6afGvolOm8fhYdxVdPqJBFNTXlA=
+ b=p15U12WOtgy22aGvOYLQNlxQ1xH4+RObL7wE3aBFhY9SdtCScEF/MDzdIMgNL6r2k
+ YR7qvpEMPXuF+lxD1qiz4siHucR73AtS/fp7bGNU0fAoK1aarI5EqMv9/abYwsCHLn
+ uqZHE92esHGjN7ookCADXONeM8Wi79i50ad0+naA=
 MIME-Version: 1.0
 To: akshu.agrawal@amd.com, andrew.smirnov@gmail.com, b.zolnierkie@samsung.com,
  corbet@lwn.net, cw00.choi@samsung.com, djkurtz@chromium.org, krzk@kernel.org,
@@ -59,17 +59,18 @@ To: akshu.agrawal@amd.com, andrew.smirnov@gmail.com, b.zolnierkie@samsung.com,
  mazziesaccount@gmail.com, mturquette@baylibre.com, pavel@ucw.cz,
  pombredanne@nexb.com, rafael.j.wysocki@intel.com, sjhuang@iluvatar.ai,
  sre@kernel.org, vkoul@kernel.org
-In-Reply-To: <eee936f2d49c17bf13f3fa355de5045e71f6cde3.1544177090.git.matti.vaittinen@fi.rohmeurope.com>
+In-Reply-To: <05409aafa108c77b2b878ed9663717c4b4a183ca.1544177090.git.matti.vaittinen@fi.rohmeurope.com>
 User-Agent: alot/0.8
-Subject: Re: [PATCH v7 1/3] clkdev: add managed clkdev lookup registration
-Message-ID: <154947990546.115909.11802583613858729722@swboyd.mtv.corp.google.com>
+Subject: Re: [PATCH v7 2/3] clk: clk-max77686: Clean clkdev lookup leak and
+ use devm
+Message-ID: <154947990848.115909.478174902516192562@swboyd.mtv.corp.google.com>
 References: <cover.1544177090.git.matti.vaittinen@fi.rohmeurope.com>
- <eee936f2d49c17bf13f3fa355de5045e71f6cde3.1544177090.git.matti.vaittinen@fi.rohmeurope.com>
+ <05409aafa108c77b2b878ed9663717c4b4a183ca.1544177090.git.matti.vaittinen@fi.rohmeurope.com>
 From: Stephen Boyd <sboyd@kernel.org>
-Date: Wed, 06 Feb 2019 11:05:05 -0800
+Date: Wed, 06 Feb 2019 11:05:08 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_110506_900147_9D0AFB68 
-X-CRM114-Status: UNSURE (   5.83  )
+X-CRM114-CacheID: sfid-20190206_110509_813039_C8EA1DC7 
+X-CRM114-Status: UNSURE (   5.50  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -87,13 +88,14 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Matti Vaittinen (2018-12-07 03:09:39)
-> Clkdev registration lacks of managed registration functions and it
-> seems few drivers do not drop clkdev lookups at exit. Add
-> devm_clk_hw_register_clkdev and devm_clk_release_clkdev to ease lookup
-> releasing at exit.
+Quoting Matti Vaittinen (2018-12-07 03:10:15)
+> clk-max77686 never clean clkdev lookup at remove. This can cause
+> oops if clk-max77686 is removed and inserted again. Fix leak by
+> using new devm clkdev lookup registration. Simplify also error
+> path by using new devm_of_clk_add_hw_provider.
 > 
 > Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 > ---
 
 Applied to clk-next
