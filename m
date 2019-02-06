@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B2E76C282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 19:43:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 21716C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 19:52:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8221D2080D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 19:43:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BAE3E217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 19:52:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AH8xbW5P"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8221D2080D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XWC4MOn1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BAE3E217F9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uhZF6/5MiGNH72PdMCL5qbndDVoHCTswrd3r13Se7aU=; b=AH8xbW5PZ/0vFw
-	evTFpslG//Dcp3RjgTWZXXrDC98H6jb5fLZ40Zh8aBF/EzySh1MJv5yCrAwm64ZskCNmiJ6OIPbsC
-	o6nKJWCyNlfmh3ULBkWuoFoAcXeoYZ2o0wau3i3M0/ddu12etZIZBbegT/ThvsHC6IkFHsGhbfOv7
-	H3HB3Fbb1rfxuzhRbDlSaZBgf3hHEww3uaZ409TscjZzlIRKjbgmnPA/HGg4P0mbpIwxE16RzISq1
-	Ij/0f2w2F4xVikEnM97aX1mfPAKm1a094PUoyvJfOl50GZzIjFn6nq7lZZp/WIGZnehNueIGOx5wx
-	QJhbijW1mOLTPu3WtX9Q==;
+	List-Owner; bh=KA3VCViDzy1ggG8CwIQ4kqoxRJVg7eHrJWBFJ4bukhQ=; b=XWC4MOn1lwEXB8
+	DPtODxdbbTY0Cc3rwyuV35MdhxyWnlgY1T+ZqF9HYYEmpAp5MrhluOVyWe83EBR8QFs3aTW0qFePt
+	OfmDa1c5nUwtWxfI/M7h6nPTiXWHzdzcDedUZg0NXhLmQLKeDsngntpDBUzkhU6XHlE3iFYvhDPKh
+	hq+uFnyJMapy6tjNowCSBseWaf2clBH3zHuI853lor/RI47+c+RnWfDc0IeCLJ0PvBmGJ9NjFz/sJ
+	EYDi33ULm5U5qWwbJYU1XvP2mjcKV46kHKi63n7wYc0laZfbFE4MyJnCDDW+ZGqgSYe4euk2apUpM
+	uqZavjow10Dm36buIAWA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grT6U-0004nd-5U; Wed, 06 Feb 2019 19:43:26 +0000
+	id 1grTEu-00005X-IC; Wed, 06 Feb 2019 19:52:08 +0000
 Received: from relay11.mail.gandi.net ([217.70.178.231])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grT5G-0003Wo-26
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 19:42:19 +0000
+ id 1grT5I-0003a7-7s
+ for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 19:42:24 +0000
 Received: from localhost (lfbn-1-10718-76.w90-89.abo.wanadoo.fr [90.89.68.76])
  (Authenticated sender: maxime.ripard@bootlin.com)
- by relay11.mail.gandi.net (Postfix) with ESMTPSA id D5CA7100008;
- Wed,  6 Feb 2019 19:42:02 +0000 (UTC)
+ by relay11.mail.gandi.net (Postfix) with ESMTPSA id 9E14C10000B;
+ Wed,  6 Feb 2019 19:42:08 +0000 (UTC)
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh+dt@kernel.org>,
  Frank Rowand <frowand.list@gmail.com>, Chen-Yu Tsai <wens@csie.org>,
  Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH v2 6/7] clk: sunxi-ng: sun5i: Export the MBUS clock
-Date: Wed,  6 Feb 2019 20:41:23 +0100
-Message-Id: <631521f362904022dd3a1b7a7d3d90c572773e49.1549482066.git-series.maxime.ripard@bootlin.com>
+Subject: [PATCH v2 3/7] of: address: Add parent pointer to the
+ __of_translate_address args
+Date: Wed,  6 Feb 2019 20:41:20 +0100
+Message-Id: <9c1de6009a7e09252c01df8d8b906409ec602e16.1549482066.git-series.maxime.ripard@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <cover.ddd928eab0069d426b711e69940918eaf85625ce.1549482066.git-series.maxime.ripard@bootlin.com>
 References: <cover.ddd928eab0069d426b711e69940918eaf85625ce.1549482066.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_114210_618321_232EACC0 
-X-CRM114-Status: GOOD (  11.51  )
+X-CRM114-CacheID: sfid-20190206_114212_905026_E06D5FB1 
+X-CRM114-Status: GOOD (  17.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,8 +69,8 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: devicetree@vger.kernel.org, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Arnd Bergmann <arnd@arndb.de>, Rob Herring <robh@kernel.org>,
- dri-devel@lists.freedesktop.org, Georgi Djakov <georgi.djakov@linaro.org>,
+ Arnd Bergmann <arnd@arndb.de>, dri-devel@lists.freedesktop.org,
+ Georgi Djakov <georgi.djakov@linaro.org>,
  Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
  Yong Deng <yong.deng@magewell.com>, Robin Murphy <robin.murphy@arm.com>,
  Dave Martin <dave.martin@arm.com>, linux-arm-kernel@lists.infradead.org
@@ -78,44 +79,84 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The MBUS clock is used by the MBUS controller, so let's export it so that
-we can use it in our DT node.
+The __of_translate_address function is used to translate the device tree
+addresses to physical addresses using the various ranges property to create
+the offset.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+However, it's shared between the CPU addresses (based on the ranges
+property) and the DMA addresses (based on dma-ranges). Since we're going to
+add support for a DMA parent node that is not the DT parent node, we need
+to change the logic a bit to have an optional parent node that we should
+use.
+
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/clk/sunxi-ng/ccu-sun5i.h      | 4 ----
- include/dt-bindings/clock/sun5i-ccu.h | 2 +-
- 2 files changed, 1 insertion(+), 5 deletions(-)
+ drivers/of/address.c | 21 ++++++++++++---------
+ 1 file changed, 12 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.h b/drivers/clk/sunxi-ng/ccu-sun5i.h
-index 93a275fbd9a9..b66abd4fd0bf 100644
---- a/drivers/clk/sunxi-ng/ccu-sun5i.h
-+++ b/drivers/clk/sunxi-ng/ccu-sun5i.h
-@@ -60,10 +60,6 @@
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 2270373b30ab..4c5dc21c71ca 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -569,10 +569,10 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
+  * relative to that node.
+  */
+ static u64 __of_translate_address(struct device_node *dev,
++				  struct device_node *parent,
+ 				  const __be32 *in_addr, const char *rprop,
+ 				  struct device_node **host)
+ {
+-	struct device_node *parent = NULL;
+ 	struct of_bus *bus, *pbus;
+ 	__be32 addr[OF_MAX_ADDR_CELLS];
+ 	int na, ns, pna, pns;
+@@ -583,11 +583,14 @@ static u64 __of_translate_address(struct device_node *dev,
+ 	/* Increase refcount at current level */
+ 	of_node_get(dev);
  
- /* The rest of the module clocks are exported */
+-	*host = NULL;
+-	/* Get parent & match bus type */
+-	parent = of_get_parent(dev);
+-	if (parent == NULL)
+-		goto bail;
++	if (!parent) {
++		*host = NULL;
++		/* Get parent & match bus type */
++		parent = of_get_parent(dev);
++		if (parent == NULL)
++			goto bail;
++	}
++
+ 	bus = of_match_bus(parent);
  
--#define CLK_MBUS		99
--
--/* And finally the IEP clock */
--
- #define CLK_NUMBER		(CLK_IEP + 1)
+ 	/* Count address cells & copy address locally */
+@@ -665,7 +668,7 @@ u64 of_translate_address(struct device_node *dev, const __be32 *in_addr)
+ 	struct device_node *host;
+ 	u64 ret;
  
- #endif /* _CCU_SUN5I_H_ */
-diff --git a/include/dt-bindings/clock/sun5i-ccu.h b/include/dt-bindings/clock/sun5i-ccu.h
-index 81f34d477aeb..2e6b9ddcc24e 100644
---- a/include/dt-bindings/clock/sun5i-ccu.h
-+++ b/include/dt-bindings/clock/sun5i-ccu.h
-@@ -100,7 +100,7 @@
- #define CLK_AVS			96
- #define CLK_HDMI		97
- #define CLK_GPU			98
--
-+#define CLK_MBUS		99
- #define CLK_IEP			100
+-	ret = __of_translate_address(dev, in_addr, "ranges", &host);
++	ret = __of_translate_address(dev, NULL, in_addr, "ranges", &host);
+ 	if (host) {
+ 		of_node_put(host);
+ 		return OF_BAD_ADDR;
+@@ -680,7 +683,7 @@ u64 of_translate_dma_address(struct device_node *dev, const __be32 *in_addr)
+ 	struct device_node *host;
+ 	u64 ret;
  
- #endif /* _DT_BINDINGS_CLK_SUN5I_H_ */
+-	ret = __of_translate_address(dev, in_addr, "dma-ranges", &host);
++	ret = __of_translate_address(dev, NULL, in_addr, "dma-ranges", &host);
+ 
+ 	if (host) {
+ 		of_node_put(host);
+@@ -736,7 +739,7 @@ static u64 of_translate_ioport(struct device_node *dev, const __be32 *in_addr,
+ 	unsigned long port;
+ 	struct device_node *host;
+ 
+-	taddr = __of_translate_address(dev, in_addr, "ranges", &host);
++	taddr = __of_translate_address(dev, NULL, in_addr, "ranges", &host);
+ 	if (host) {
+ 		/* host-specific port access */
+ 		port = logic_pio_trans_hwaddr(&host->fwnode, taddr, size);
 -- 
 git-series 0.9.1
 
