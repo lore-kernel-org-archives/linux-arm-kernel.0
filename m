@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BD9BC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 03:34:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AA5A8C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 03:35:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4C7ED218A4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 03:34:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 73214218A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 03:35:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JbEv1/mM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C7ED218A4
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jmWb4lq7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 73214218A3
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,34 +25,34 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1G5SHjGZTfn2tbOXl1bXPShLB9Ntt9v2m1DoLYAQTU0=; b=JbEv1/mMimbGyf
-	f7blTcTCjilb3L2wNeOnQLsKBB00BYF204brZGSJ/wSPyv+rW1uPvaNcAq1zcrka/2uzD2LvxyIcW
-	7YL662KcQ6XeaERqNFYS6YcoQo5Sme9Ra/uuVR0zKJBCgEH/misQn/w4uItPHbeJmKvgO8vGBw83S
-	hbIpnZRFAr4QA548+avTipB5ciC0LTYouoyvAI3pBS2IFLygJKySQDEyVfkMYh2MvicpUdxLla+YW
-	NQZzhhe7NcsCUj9KXPcpVlSlKlwRlOZHYGN3XH9qCxfu2SQT9IdediomOAyQqtX/L4MxT3NGTKbJq
-	Jc2QQSnWy29YCx8MNVvA==;
+	List-Owner; bh=qjnIZFE6pkVY26WqahqXytnWBKaDQeCefWMFVUiPB8I=; b=jmWb4lq7LyR9T2
+	Man2E4YESKElkSoEQhXlJ/JDzH0EHTcRPi0GvbQ1TNrtmpp/E5hbmodwSklnv2yVlmXV4HHN7x73Q
+	S4tYfuQA7r913ujY/E8PH5ZfKaC5MjPX/yZOCLPbUh5KIHgjguRYbQtFCzMSx+w3U+pfuJkLT1wsc
+	J05O+YtDwib5AT0uC4KVAs9xN7cUFkLZm0vHnFohbiK55ic4Ba5eHMZjlThEcSxQk4SX/rADlnkEn
+	lIP26pJAvA2HrGLomv7RNWuLBayS3x0urNT7YiB4VRXFOdBC5iyz7MPKI2lqmSbv1ZrccrIAOm6+L
+	XZ+FfIcE3vwSjbJeWcAA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grDyw-0004T9-Ep; Wed, 06 Feb 2019 03:34:38 +0000
+	id 1grDzQ-000586-Qm; Wed, 06 Feb 2019 03:35:08 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grDxD-0002p6-4I
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 03:32:53 +0000
+ id 1grDxC-0002p0-U5
+ for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 03:32:54 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id D22B45FDB8; Wed,  6 Feb 2019 11:32:43 +0800 (CST)
+ id C058F5FD53; Wed,  6 Feb 2019 11:32:43 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Linus Walleij <linus.walleij@linaro.org>
-Subject: [PATCH 7/9] ARM: dts: sun9i: Add A80 GMAC RGMII pinmux setting
-Date: Wed,  6 Feb 2019 11:32:37 +0800
-Message-Id: <20190206033239.3619-8-wens@csie.org>
+Subject: [PATCH 5/9] ARM: dts: sun9i: Add GMAC clock node
+Date: Wed,  6 Feb 2019 11:32:35 +0800
+Message-Id: <20190206033239.3619-6-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190206033239.3619-1-wens@csie.org>
 References: <20190206033239.3619-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190205_193251_611987_72AAA246 
-X-CRM114-Status: UNSURE (   8.92  )
+X-CRM114-CacheID: sfid-20190205_193251_115726_EEA93D77 
+X-CRM114-Status: UNSURE (   9.87  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -73,38 +73,59 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The GMAC (gigabit ethernet controller) supports RGMII to connect to
-the ethernet PHY, for gigabit network speeds.
+The A80 has the same DWMAC hardware as on earlier Allwinner SoCs. The
+accompanying GMAC clock register has been moved into the "System
+Control" area.
+
+Add a clock node for it.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun9i-a80.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/sun9i-a80.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index f0c7acf2d0a4..6fb292e0b662 100644
+index d9532fb1ef65..724ca3b850c8 100644
 --- a/arch/arm/boot/dts/sun9i-a80.dtsi
 +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -1000,6 +1000,19 @@
- 			#size-cells = <0>;
- 			#gpio-cells = <3>;
+@@ -183,6 +183,37 @@
+ 			clock-output-names = "osc32k";
+ 		};
  
-+			gmac_rgmii_pins: gmac-rgmii-pins {
-+				allwinner,pins = "PA0", "PA1", "PA2", "PA3",
-+						 "PA4", "PA5", "PA7", "PA8",
-+						 "PA9", "PA10", "PA12", "PA13",
-+						 "PA15", "PA16", "PA17";
-+				allwinner,function = "gmac";
-+				/*
-+				 * data lines in RGMII mode use DDR mode
-+				 * and need a higher signal drive strength
-+				 */
-+				drive-strength = <40>;
-+			};
++		/*
++		 * The following two are dummy clocks, placeholders
++		 * used in the gmac_tx clock. The gmac driver will
++		 * choose one parent depending on the PHY interface
++		 * mode, using clk_set_rate auto-reparenting.
++		 *
++		 * The actual TX clock rate is not controlled by the
++		 * gmac_tx clock.
++		 */
++		mii_phy_tx_clk: mii_phy_tx_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <25000000>;
++			clock-output-names = "mii_phy_tx";
++		};
 +
- 			i2c3_pins: i2c3-pins {
- 				pins = "PG10", "PG11";
- 				function = "i2c3";
++		gmac_int_tx_clk: gmac_int_tx_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <125000000>;
++			clock-output-names = "gmac_int_tx";
++		};
++
++		gmac_tx_clk: clk@800030 {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun7i-a20-gmac-clk";
++			reg = <0x00800030 0x4>;
++			clocks = <&mii_phy_tx_clk>, <&gmac_int_tx_clk>;
++			clock-output-names = "gmac_tx";
++		};
++
+ 		cpus_clk: clk@8001410 {
+ 			compatible = "allwinner,sun9i-a80-cpus-clk";
+ 			reg = <0x08001410 0x4>;
 -- 
 2.20.1
 
