@@ -2,84 +2,93 @@ Return-Path: <SRS0=SkGj=QN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 08EEDC282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 12:51:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 481BFC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 12:56:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CE74320B1F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 12:51:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 179DD20B1F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 12:56:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t5xzxKYr";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="vUQBd2gR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CE74320B1F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nDQzbMFV";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="lntAZsQ5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 179DD20B1F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=eM+uIdqAzpFsW0ICkaQCVYTR+9FF871uM9UQ0FCQvRg=; b=t5xzxKYrAqGfLT
-	7Zd9gURJStQ9x2ylRl58F3hAKEjZaxQWyQcho+ZFz3flX/4xDGAlTkLCNiW52ti2o9jgwdtMT0AZf
-	AyYzsHqSMd36jV5y8Vg05XSMeEQjqxWQalD21MO2oRgzUjZMdZU0HU8hs15ZuY8ZZUWmIeNoo9i4l
-	HFdCYd6DLxXcM81txcqZTaMl6OmGLu6nn6csVvsvn+7yqEaYsPJlyRzR+BPkQppXQjzemSNCDyUXi
-	5nXULV5m2c50O5jWy9sMRIkdcz1IE6A7dz4gEuCqnaHWGXidNKkrMAyRM+VmLfTOpBAbKBwONqqGV
-	st9cd1Mf00KRhd8lK/Hg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=dDXsdZpsZnQ9pLyTHWE5ITTBzSyYvDP2RxjZn+Hy9eU=; b=nDQzbMFVxhUlFXfU9up2YqMoi
+	pmX+To3Akcl8oBhkiSriTKhXqoM/ZvF7XXD66HBQa1xP/0Tk1K7Cid78qawDE4FnHyK8WBAFEt6wF
+	Ie5NhYobsoCdIv9k5HuJkJ/4tKLPbkdOE4ikkoYoaJlOiOYkfjfInQ7tOYITb43gTE3Pxs/8khm13
+	UJltem7QcUsPii4fDAy6GvOXY5ZrGGz0FBzRfhLmoMz6EOIHmq425t5SI1xFHQgwHwvczriZhtWGi
+	TRdsqUIjbPyEJ1VQnZyQhIsdsWXuNJ/Yu3mNjRm4+ZTC+EprvITQB0h6xO4xtVeHpuPEeU8cb8SMp
+	7gK0+dJyg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grMfa-0005wU-Uo; Wed, 06 Feb 2019 12:51:14 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
+	id 1grMk4-0007ki-Ui; Wed, 06 Feb 2019 12:55:52 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grMfW-0005w9-U4
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 12:51:12 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x16CoxY6108766;
- Wed, 6 Feb 2019 06:50:59 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549457459;
- bh=XQ7nlxslfcwTd9Bi0BBFQvK4BIP9P7P7NhyBC1rpSck=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=vUQBd2gROk0KS7Qa1I8LXECHmTjYxleSg9M7qJKc0lMFvkxCWcWJhQh1VUcgjOk69
- H7yM1/0fQpBjH31BWmet98H6LJYqsRc8nm7iB26SDDl3e2ce8GNRKzVQKBzEZ9EUGR
- M7Cqd5SQB6/E7sXbrdwoRVis6dllfoNTO8LmxL6w=
-Received: from DFLE108.ent.ti.com (dfle108.ent.ti.com [10.64.6.29])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x16Cox8H081347
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Wed, 6 Feb 2019 06:50:59 -0600
-Received: from DFLE100.ent.ti.com (10.64.6.21) by DFLE108.ent.ti.com
- (10.64.6.29) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 6
- Feb 2019 06:50:59 -0600
-Received: from dflp33.itg.ti.com (10.64.6.16) by DFLE100.ent.ti.com
- (10.64.6.21) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Wed, 6 Feb 2019 06:50:59 -0600
-Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x16Cos1N026235;
- Wed, 6 Feb 2019 06:50:55 -0600
-Subject: Re: [PATCH 00/24] Add support for PCIe RC and EP mode in TI's AM654
- SoC
-To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-References: <20190114132424.6445-1-kishon@ti.com>
- <20190204164054.GA21488@e107981-ln.cambridge.arm.com>
-From: Kishon Vijay Abraham I <kishon@ti.com>
-Message-ID: <a9a7fe72-9b23-7ebb-d0d0-82cac62b6884@ti.com>
-Date: Wed, 6 Feb 2019 18:20:21 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1grMk1-0007k3-6C
+ for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 12:55:50 +0000
+Received: by mail-wm1-x342.google.com with SMTP id y8so2570820wmi.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 06 Feb 2019 04:55:48 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=vZx4P1PdN5ThifFFMSL4i/6yprDS3Sosy76ja/tPiC4=;
+ b=lntAZsQ554Dc/9FxC8DLHuhk8yjb+JoBOq7uDUHpL9DO/Cm7+C1WuV8gd1nBygc2cb
+ ztLxtq1Kr2+gBoG32cKFAGZbuayqEbixe/Shg0a4hOJ8EVxftSMRKXymmsLZYa2pOcfl
+ Flm+ZfOijDwrNImUCP+evCCgNycZIKSZENkKOgrYNMDUxhSI+Ma35+CeoXY+KtldbvuD
+ 2IE/Yx8XyiNIx0J9Xx1Y6iB7vdukV6WkX8tLscCIV8+kLgrYtYdCfhvYwxCtAhagM8OO
+ bSvE7hcH5rydNQXWpzrCoFj0rF3JVCfLOxDddSOeHGouxgQ7k3WhzWq2KugE56qqya2V
+ xgzw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=vZx4P1PdN5ThifFFMSL4i/6yprDS3Sosy76ja/tPiC4=;
+ b=Ifpvn/njaQB+SW5VL9a2r0bSUy3KvLdI0cg1UiA2GrxaTeC+l/GjvvixXme7belO65
+ ezsNkSED9GZtDGTTfSUu03HWf+WhERhbYmseGtDLV8fNSx0cFsCmWvlha14TeAWWE/SQ
+ q32sjkpC8CR4OHM9KPfHOFm8vFTNwqBXz/zr2wHDhCWESG2X4tN78xDXnc/mWEKIpHxE
+ 3u82JQPSo6bfm2HIx37PL31ChF3Bpp/STQnkzvNJVNyXknmezEvQiEJtn2bQk/4Jq+0l
+ vm775JuWZrojBOVOWI6MuYCgUyJp5bN7dzexRuz0P+4s7uXvMof+Ds468iFTUYKxmKpr
+ FKcw==
+X-Gm-Message-State: AHQUAuZfFDAK5cX/Eds55SxVp1XOza4twdF/YXSbXiBO0SZrYRcZoKvL
+ Z0etAfTfMDaii7HGQMvRsNk=
+X-Google-Smtp-Source: AHgI3IaxAf/66h4v+3Hy77NV2TeD9AAxmHFY4/C6jY1hCmC7jUU+KLRSioELd5peUtR3keUyTDlOyg==
+X-Received: by 2002:a1c:e911:: with SMTP id q17mr3359006wmc.31.1549457747564; 
+ Wed, 06 Feb 2019 04:55:47 -0800 (PST)
+Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
+ by smtp.gmail.com with ESMTPSA id c129sm15089075wma.48.2019.02.06.04.55.46
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 06 Feb 2019 04:55:46 -0800 (PST)
+Date: Wed, 6 Feb 2019 13:55:45 +0100
+From: Thierry Reding <thierry.reding@gmail.com>
+To: Uwe =?utf-8?Q?Kleine-K=C3=B6nig?= <u.kleine-koenig@pengutronix.de>
+Subject: Re: [PATCH 2/4] pwm: stm32-lp: Add power management support
+Message-ID: <20190206125545.GI21676@ulmo>
+References: <1549370429-19116-1-git-send-email-fabrice.gasnier@st.com>
+ <1549370429-19116-3-git-send-email-fabrice.gasnier@st.com>
+ <20190205204732.zrbhgyxnvjbwfyw4@pengutronix.de>
+ <20190205222522.GB1372@mithrandir>
+ <6584a59b-657d-adc9-fab2-eb1a9baba05d@st.com>
+ <20190206085405.pdiwd3c6wjog5hl7@pengutronix.de>
 MIME-Version: 1.0
-In-Reply-To: <20190204164054.GA21488@e107981-ln.cambridge.arm.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+In-Reply-To: <20190206085405.pdiwd3c6wjog5hl7@pengutronix.de>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_045111_045808_BDE3FB9B 
-X-CRM114-Status: GOOD (  27.46  )
+X-CRM114-CacheID: sfid-20190206_045549_253145_3942E0F7 
+X-CRM114-Status: GOOD (  14.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,124 +100,91 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Jesper Nilsson <jesper.nilsson@axis.com>, Arnd Bergmann <arnd@arndb.de>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>, linux-pci@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@axis.com,
- Rob Herring <robh+dt@kernel.org>, Murali Karicheri <m-karicheri2@ti.com>,
- Jingoo Han <jingoohan1@gmail.com>, Bjorn Helgaas <bhelgaas@google.com>,
- linux-omap@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, alexandre.torgue@st.com,
+ linux-pwm@vger.kernel.org, linux-iio@vger.kernel.org,
+ Tomasz Duszynski <tduszyns@gmail.com>, linux-kernel@vger.kernel.org,
+ vilhelm.gray@gmail.com, robh+dt@kernel.org,
+ linux-arm-kernel@lists.infradead.org, mcoquelin.stm32@gmail.com,
+ Fabrice Gasnier <fabrice.gasnier@st.com>,
+ linux-stm32@st-md-mailman.stormreply.com, jic23@kernel.org
+Content-Type: multipart/mixed; boundary="===============6135796782279063468=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Lorenzo,
 
-On 04/02/19 10:10 PM, Lorenzo Pieralisi wrote:
-> On Mon, Jan 14, 2019 at 06:54:00PM +0530, Kishon Vijay Abraham I wrote:
->> Add PCIe RC support for TI's AM654 SoC. The PCIe controller in AM654
->> uses Synopsys core revision 4.90a and uses the same TI wrapper as used
->> in keystone2 with certain modification. Hence AM654 will use the same
->> pci wrapper driver pci-keystone.c
->>
->> This series was initially part of [1]. This series only includes patches
->> that has to be merged via Lorenzo's tree. The PHY patches and dt patches
->> will be sent separately.
->>
->> This series is created over my keystone MSI cleanup series [2] and EPC
->> features series [3].
-> 
-> Hi Kishon,
-> 
-> so I would suggest we merge those series first, starting from the MSI
-> clean-up.
-> 
-> I will mark this series as awaiting upstream, it is on my radar but
-> we have to get the two others done first.
+--===============6135796782279063468==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="Li7ckgedzMh1NgdW"
+Content-Disposition: inline
 
-Sure. I have one outstanding comment to be fixed on my legacy interrupt cleanup
-patch in the MSI cleanup series. I'll resend the series without the legacy
-interrupt cleanup patch so that we can get most of the patches for 5.1. I'll
-come back to it later.
 
-I'm not sure how many tested EPC features cleanup. However I've got ACK from
-Shawn Lin for the v2 of EPC features cleanup series and Layerscape EP series
-was created on top of EPC features cleanup series.
+--Li7ckgedzMh1NgdW
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-Thanks
-Kishon
+On Wed, Feb 06, 2019 at 09:54:05AM +0100, Uwe Kleine-K=C3=B6nig wrote:
+> On Wed, Feb 06, 2019 at 09:42:48AM +0100, Fabrice Gasnier wrote:
+> > If you agree with the current approach, I can send a V2 with Tomasz's
+> > suggestion to remove the ifdefs and use __maybe_unused instead.
+>=20
+> I think the suspend callback should have something like:
+>=20
+> 	if (is_still_enabled) {
+> 		/*
+> 		 * The consumer didn't stop us, so refuse to suspend.
+> 		 */
+> 		dev_err(dev, "The consumer didn't stop us, so refuse to suspend.\n");
+> 		return -EBUSY;
+> 	}
+>=20
+> This way there are no bad surprises if the pwm is suspended before its
+> consumer and it's obvious what is missing.
 
-> 
-> Thanks,
-> Lorenzo
-> 
->> This series:
->> *) Cleanup pci-keystone driver so that both RC mode and EP mode of
->>    AM654 can be supported
->> *) Modify epc-core to support allocation of aligned buffers required for
->>    AM654
->> *) Fix ATU unroll identification
->> *) Add support for both host mode and device mode in AM654    
->>
->> [1] -> https://lore.kernel.org/patchwork/cover/989487/
->> [2] -> https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg1883081.html
->> [3] -> https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg1899011.html
->>
->> Kishon Vijay Abraham I (24):
->>   PCI: keystone: Add start_link/stop_link dw_pcie_ops
->>   PCI: keystone: Cleanup error_irq configuration
->>   dt-bindings: PCI: keystone: Add "reg-names" binding information
->>   PCI: keystone: Perform host initialization in a single function
->>   PCI: keystone: Use platform_get_resource_byname to get memory
->>     resources
->>   PCI: keystone: Move initializations to appropriate places
->>   dt-bindings: PCI: Add dt-binding to configure PCIe mode
->>   PCI: keystone: Explicitly set the PCIe mode
->>   dt-bindings: PCI: Document "atu" reg-names
->>   PCI: dwc: Enable iATU unroll for endpoint too
->>   PCI: dwc: Fix ATU identification for designware version >= 4.80
->>   PCI: keystone: Prevent ARM32 specific code to be compiled for ARM64
->>   dt-bindings: PCI: Add PCI RC dt binding documentation for AM654
->>   PCI: keystone: Add support for PCIe RC in AM654x Platforms
->>   PCI: keystone: Invoke phy_reset API before enabling PHY
->>   PCI: endpoint: Add support to allocate aligned buffers to be mapped in
->>     BARs
->>   PCI: dwc: Add const qualifier to struct dw_pcie_ep_ops
->>   PCI: dwc: Fix dw_pcie_ep_find_capability to return correct capability
->>     offset
->>   PCI: dwc: Add callbacks for accessing dbi2 address space
->>   PCI: keystone: Add support for PCIe EP in AM654x Platforms
->>   PCI: designware-ep: Configure RESBAR to advertise the smallest size
->>   PCI: designware-ep: Use aligned ATU window for raising MSI interrupts
->>   misc: pci_endpoint_test: Add support to test PCI EP in AM654x
->>   misc: pci_endpoint_test: Fix test_reg_bar to be updated in
->>     pci_endpoint_test
->>
->>  .../bindings/pci/designware-pcie.txt          |   7 +-
->>  .../devicetree/bindings/pci/pci-keystone.txt  |  14 +-
->>  drivers/misc/pci_endpoint_test.c              |  17 +
->>  drivers/pci/controller/dwc/Kconfig            |  25 +-
->>  drivers/pci/controller/dwc/pci-dra7xx.c       |   2 +-
->>  drivers/pci/controller/dwc/pci-keystone.c     | 505 ++++++++++++++----
->>  drivers/pci/controller/dwc/pcie-artpec6.c     |   2 +-
->>  .../pci/controller/dwc/pcie-designware-ep.c   |  55 +-
->>  .../pci/controller/dwc/pcie-designware-host.c |  19 -
->>  .../pci/controller/dwc/pcie-designware-plat.c |   2 +-
->>  drivers/pci/controller/dwc/pcie-designware.c  |  52 ++
->>  drivers/pci/controller/dwc/pcie-designware.h  |  15 +-
->>  drivers/pci/endpoint/functions/pci-epf-test.c |   5 +-
->>  drivers/pci/endpoint/pci-epf-core.c           |  10 +-
->>  include/linux/pci-epc.h                       |   2 +
->>  include/linux/pci-epf.h                       |   3 +-
->>  16 files changed, 587 insertions(+), 148 deletions(-)
->>
->> -- 
->> 2.17.1
->>
+Something that just occurred to me: perhaps as part of pwm_get() we
+should track where we were being requested from so that we could give
+hints in situations like this as to where the consumer is that forgot
+to suspend the PWM.
+
+I suppose we already have pwm_device.label to help with this, but
+perhaps we could improve things if we stored __builtin_return_address
+during pwm_get() to help users pinpoint where they need to look.
+
+Thierry
+
+--Li7ckgedzMh1NgdW
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlxa2VEACgkQ3SOs138+
+s6EMtQ/+NuYEI6bg9mbWLyhJ3zRbtXrmiV+D2Rr3AvfBXKYks4TF9pGSJFk3f/L+
+GLjT4DXZqqCHlnZkHRkvUe/FVjwkSvusTwcQE6TPYZ9ikPG1pXoaA8mFAR9NS4Yf
+E0RWwnoMkIpnvF82peQf1zb1ZIlaSwidvFYTA3XYXjdRXzjipix2qkYy55K9FBU7
+X9z6uJlAk7UgoTNXKmt+C6VPLTKdQ0TGcN7j/mVIv9cBeYaRzqrUicTqDqMU+Qw1
+2kZDJwaXqD4wB0ai8631f2sdruSlIREg8+M4HydMZxiwuqZ0zuX2I3Gm2ihdUQ3P
+fFkslyeUouUJ0IWGtZMY1Y5HexCKD3iN837g7Iugpo4rvr2ububpfiCuG1o7v/W4
+n3jO7/K0SmjBO+iMiaFgmoaJeEIvg+F+64n54F5ZNdnk1+dVWwJJhHFTtpsGq1c8
+bK+MNRdVlwGRug61fIXKQSKPqkr+Flx6xYv+y0AZZ/fGV5Lujx4vJgydUdnfKrqV
+OWivKy6KysxAMbgmyyxfDkx06GPlSPk/g7iJ37I5SeHwuie9HWi7M1iycPYIdo+x
+hlYJOJOfhXQ+WxaBQ8u6xGW7a4SBJbOKdup60mkVftOJT7yl0ydHtWdOyXpJ92xX
+RxWJVBo7WifuGP/40vv6Kz9XFYXBvlCOO1xvvbkismhJjAqVFHo=
+=Re92
+-----END PGP SIGNATURE-----
+
+--Li7ckgedzMh1NgdW--
+
+
+--===============6135796782279063468==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============6135796782279063468==--
+
