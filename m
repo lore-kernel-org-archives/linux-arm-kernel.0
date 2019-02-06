@@ -2,100 +2,66 @@ Return-Path: <SRS0=SkGj=QN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C1BEC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 18:38:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C5A3C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 18:50:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5CD77206DD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 18:38:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CDB592186A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 18:50:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kblozeae";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="H1XRxbRw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5CD77206DD
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="StlFwIE2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="toQnCDZ1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CDB592186A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:Reply-To:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Content-ID:Content-Description:
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LS7UrBIw59bhvSIOEnNnljxwCDQZdNFbQBhcm3QWUco=; b=kblozeaeC2R8m0
-	jPSPk52DM3sSoEUfT5xUSNmEoCjwyXF6kJcFV8DXPZIwhnwk8EcVXsA4uOk5p/Ti5z/b207M5VrWN
-	JbsrHVXei99m2nBKUwIv+bllhbI0Vw8pwzQQ1vKmXXKKPd5Nhd7XUiivwvAQR0jdSBiosx3WCjSvg
-	SPMHKdJD0wLtZvw6VWa2z8FC3aM1QaGGvBlHBKoCmg7Fp+88TN7Khpo90TmIEmKebeK0euDlOlD50
-	jlADKltb+ZV8x+aE2s2456pzep7U2n39HkGp3fS+JZiULeNB01oFdaY1V1T50FmK0iPF98/m4afUS
-	Kbx6Rz+h5zVE78RxvSgQ==;
+	List-Owner; bh=gN9dp8iFqXoF93u8hsCrTGLaHArkj+OIw7THt3ZOOb8=; b=StlFwIE2l59Gm1
+	qQvHJIWpCC82p/evHv2+8zOQ1x/oOS3lyf570dz5Tcy5JeZVQEtAVcXf8JtY3LGnroW1+hdIm6xd2
+	JnFTi9iecf/QnmHardG9+jgEPfv3gVtmSvIxmBUJx1omNmj//P2dMLpKWsAy+TdzH0sMBIONY2k9y
+	a27IbvRoIjYoknMVKxvnxJXrcVsTTcWOB5csbC4isz32PMQIJAfz9DaSwj6n8MYnD+x71QsLy25YP
+	W3O7L0M+y4lsVE1adQA4DtbUr+T0CeVEsqEitHsi8xSN5MUl8zCKcLVoy4uwF0YksDuuLgSBtzMVf
+	TKQlQWrJPsuz3Ggct/dw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grS5u-0007N2-P9; Wed, 06 Feb 2019 18:38:46 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1grSH1-0004dt-D5; Wed, 06 Feb 2019 18:50:15 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grS5r-0007Md-Gt
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 18:38:45 +0000
-Received: by mail-wr1-x443.google.com with SMTP id r2so8707112wrv.10
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 06 Feb 2019 10:38:42 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=reply-to:subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-transfer-encoding:content-language;
- bh=MbFwoMgUhiXyNtpcCvwACbIJvZ6c0BECx7NE8js6t78=;
- b=H1XRxbRwgKVCQ9Ljq7xEvqlKpI9UNcQiipOfDNSMhGASAcMrPpX4Rhm1Uc4kbpT5nw
- VzjWXdaPNmf+BLQukVHJ6+qlL/K3fv292cTnwDAebRxC7HSdrwt50bPhnZN2YRlquMTV
- vzU9tGj44JzCdu1G16BNdAYawMGb1oaw1PIj4K+OyJADV3iDYbxfV3fbyW0Zk2jByITh
- ZRVoQ9O+tArQeKIHy0OR2q4VcdwUfW6rR9Ib9klteFLMduJTWlwpkm0ViogBaHVYjxzT
- vCDwYFNCCM9WsrvNbfZSxdOCqKgg3jpN8xPC1J2mPVu5a/2IrvrkqpqDAZWlSFL88DLS
- PtVA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:reply-to:subject:to:cc:references:from
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-transfer-encoding:content-language;
- bh=MbFwoMgUhiXyNtpcCvwACbIJvZ6c0BECx7NE8js6t78=;
- b=YTONBYayHoZ3u0YZW7/dxIXslkDhfoSCAIL3QRhK9BiIj8OCPSM/p29aNxEz2lCy/U
- pB0/4v4fNY1Nq/tTG4rfUSB51ZMCXkrXYHHvCfipd2JoPTZSYGiXpgqrCPRG4EM5+muj
- Pt/G+BbFOalG/Ang4ItWioTpOMIyzWQXYPvaHF0LD1g2fYJYnnjPl1uFWW2LhiN4De5b
- 7o35SjOOJKCsdnZNO10qACe5HhDDn+BYLo6mqHDFF5EdE1bvHfCv12Br1QVGTyKZNClB
- 4aC4bCsbknOHrcpIWWDlotwco0Jux7RlRwrikmff0SMshncYUk92zS9RWck+wgTilgnA
- JiHA==
-X-Gm-Message-State: AHQUAuayyuOOyCOyk3pH39jpQ6sD3qd5p2kw5ZzkRjBh5fw4xt5CgSq9
- iMJm+UeASIihtf0k+7JSOYY=
-X-Google-Smtp-Source: AHgI3IbiyIjOuNw8QTjdk18aVp2glLugGCAMBpzpPvstKZLHP58L23nP4fiH/iuwPY5Xk4B5ckpFuQ==
-X-Received: by 2002:adf:f9cb:: with SMTP id w11mr8863806wrr.201.1549478321369; 
- Wed, 06 Feb 2019 10:38:41 -0800 (PST)
-Received: from ?IPv6:2a02:908:1252:fb60:be8a:bd56:1f94:86e7?
- ([2a02:908:1252:fb60:be8a:bd56:1f94:86e7])
- by smtp.gmail.com with ESMTPSA id t12sm9151887wra.63.2019.02.06.10.38.39
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 06 Feb 2019 10:38:40 -0800 (PST)
-Subject: Re: [PATCH] drm: enable uncached DMA optimization for ARM and arm64
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- "Koenig, Christian" <christian.koenig@amd.com>
-References: <20190124120658.30288-1-ard.biesheuvel@linaro.org>
- <3cca35a9-c71c-a100-b29d-31ba0d1d10b1@amd.com>
- <CAKv+Gu9OG3O4+4F2nioaQ-3U-1kwRBr5KVj-1gD1ZEsUx_Ud5A@mail.gmail.com>
- <CADnq5_PETD6umm9Df7OZ9BdaV5MZutmhN+HTAnVkcRLg5=TNWw@mail.gmail.com>
- <CAKv+Gu-Yk1iEe+cF30ee7R+hcrke9XH9MdTeERA2P-0s2QpaLw@mail.gmail.com>
- <961e758d-b0a0-8f6c-a8fa-c3047e058706@gmail.com>
- <CAKv+Gu_faPAf+0NBTNM03EUH4-_0vWbPfDQneshps5vbaU4R_Q@mail.gmail.com>
- <CAKv+Gu-4=1r8X8BUvRjcTwgxj=sZpZLyY3ABBZyzh-RsSm1eXg@mail.gmail.com>
-From: =?UTF-8?Q?Christian_K=c3=b6nig?= <ckoenig.leichtzumerken@gmail.com>
-Message-ID: <f6bdd647-722b-8145-92d4-3f6c52f8a74c@gmail.com>
-Date: Wed, 6 Feb 2019 19:38:34 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1grSGw-0004It-Uo
+ for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 18:50:13 +0000
+Received: from quaco.ghostprotocols.net (unknown [179.97.41.93])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 2B276218FE;
+ Wed,  6 Feb 2019 18:50:04 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549479010;
+ bh=+fdLtBa/jTcz5Smb3xVqKFDQXHQ3oH4hwydtbSFEpJU=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=toQnCDZ1Bh3NhTYaJp2d996JlKBJIzKzaPZuciv6Pfv/w2zp2Mu5bfe9tpXJDtYwT
+ L1puKvQ5z0qDgMSO+U4mxWFh6+LYT4SVA4Z92JobY3+mTZPGkWhrcSkfrKQaDcRfjo
+ eycm4HfOuR4gwsDrJRn1lr7cYoaQ0bWUletSn/XM=
+From: Arnaldo Carvalho de Melo <acme@kernel.org>
+To: Ingo Molnar <mingo@kernel.org>
+Subject: [PATCH 20/53] perf/aux: Make perf_event accessible to setup_aux()
+Date: Wed,  6 Feb 2019 15:48:30 -0300
+Message-Id: <20190206184903.24054-21-acme@kernel.org>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190206184903.24054-1-acme@kernel.org>
+References: <20190206184903.24054-1-acme@kernel.org>
 MIME-Version: 1.0
-In-Reply-To: <CAKv+Gu-4=1r8X8BUvRjcTwgxj=sZpZLyY3ABBZyzh-RsSm1eXg@mail.gmail.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_103843_555129_45A31DFB 
-X-CRM114-Status: GOOD (  16.88  )
+X-CRM114-CacheID: sfid-20190206_105011_053758_D734C456 
+X-CRM114-Status: GOOD (  15.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,86 +73,194 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Reply-To: christian.koenig@amd.com
-Cc: "Daenzer, Michel" <Michel.Daenzer@amd.com>,
- Carsten Haitzler <Carsten.Haitzler@arm.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Michael Ellerman <mpe@ellerman.id.au>, Will Deacon <will.deacon@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Christoph Hellwig <hch@infradead.org>, David Airlie <airlied@linux.ie>, "Huang,
- Ray" <Ray.Huang@amd.com>, amd-gfx list <amd-gfx@lists.freedesktop.org>, "Zhang,
- Jerry" <Jerry.Zhang@amd.com>, Alex Deucher <alexdeucher@gmail.com>,
- Robin Murphy <robin.murphy@arm.com>, Sean Paul <sean@poorly.run>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "Deucher, Alexander" <Alexander.Deucher@amd.com>
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: Mark Rutland <mark.rutland@arm.com>, Clark Williams <williams@redhat.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>,
+ Alexei Starovoitov <ast@kernel.org>, Adrian Hunter <adrian.hunter@intel.com>,
+ "H . Peter Anvin" <hpa@zytor.com>, Jiri Olsa <jolsa@redhat.com>,
+ linux-s390@vger.kernel.org,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ Suzuki Poulouse <suzuki.poulose@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Arnaldo Carvalho de Melo <acme@redhat.com>, Namhyung Kim <namhyung@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
+ Mathieu Poirier <mathieu.poirier@linaro.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-kernel@vger.kernel.org,
+ linux-perf-users@vger.kernel.org, Peter Zijlstra <peterz@infradead.org>,
+ Jiri Olsa <jolsa@kernel.org>, Martin Schwidefsky <schwidefsky@de.ibm.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-QW0gMDYuMDIuMTkgdW0gMTg6MjMgc2NocmllYiBBcmQgQmllc2hldXZlbDoKPiBPbiBGcmksIDI1
-IEphbiAyMDE5IGF0IDExOjM1LCBBcmQgQmllc2hldXZlbCA8YXJkLmJpZXNoZXV2ZWxAbGluYXJv
-Lm9yZz4gd3JvdGU6Cj4+IE9uIEZyaSwgMjUgSmFuIDIwMTkgYXQgMTI6MzAsIENocmlzdGlhbiBL
-w7ZuaWcKPj4gPGNrb2VuaWcubGVpY2h0enVtZXJrZW5AZ21haWwuY29tPiB3cm90ZToKPj4+IEFt
-IDI1LjAxLjE5IHVtIDA5OjQzIHNjaHJpZWIgQXJkIEJpZXNoZXV2ZWw6Cj4+Pj4gT24gVGh1LCAy
-NCBKYW4gMjAxOSBhdCAxNTowMSwgQWxleCBEZXVjaGVyIDxhbGV4ZGV1Y2hlckBnbWFpbC5jb20+
-IHdyb3RlOgo+Pj4+PiBPbiBUaHUsIEphbiAyNCwgMjAxOSBhdCA5OjAwIEFNIEFyZCBCaWVzaGV1
-dmVsCj4+Pj4+IDxhcmQuYmllc2hldXZlbEBsaW5hcm8ub3JnPiB3cm90ZToKPj4+Pj4+IE9uIFRo
-dSwgMjQgSmFuIDIwMTkgYXQgMTM6MzEsIEtvZW5pZywgQ2hyaXN0aWFuCj4+Pj4+PiA8Q2hyaXN0
-aWFuLktvZW5pZ0BhbWQuY29tPiB3cm90ZToKPj4+Pj4+PiBBbSAyNC4wMS4xOSB1bSAxMzowNiBz
-Y2hyaWViIEFyZCBCaWVzaGV1dmVsOgo+Pj4+Pj4+PiBUaGUgRFJNIGRyaXZlciBzdGFjayBpcyBk
-ZXNpZ25lZCB0byB3b3JrIHdpdGggY2FjaGUgY29oZXJlbnQgZGV2aWNlcwo+Pj4+Pj4+PiBvbmx5
-LCBidXQgcGVybWl0cyBhbiBvcHRpbWl6YXRpb24gdG8gYmUgZW5hYmxlZCBpbiBzb21lIGNhc2Vz
-LCB3aGVyZQo+Pj4+Pj4+PiBmb3Igc29tZSBidWZmZXJzLCBib3RoIHRoZSBDUFUgYW5kIHRoZSBH
-UFUgdXNlIHVuY2FjaGVkIG1hcHBpbmdzLAo+Pj4+Pj4+PiByZW1vdmluZyB0aGUgbmVlZCBmb3Ig
-RE1BIHNub29waW5nIGFuZCBhbGxvY2F0aW9uIGluIHRoZSBDUFUgY2FjaGVzLgo+Pj4+Pj4+Pgo+
-Pj4+Pj4+PiBUaGUgdXNlIG9mIHVuY2FjaGVkIEdQVSBtYXBwaW5ncyByZWxpZXMgb24gdGhlIGNv
-cnJlY3QgaW1wbGVtZW50YXRpb24KPj4+Pj4+Pj4gb2YgdGhlIFBDSWUgTm9Tbm9vcCBUTFAgYXR0
-cmlidXRlIGJ5IHRoZSBwbGF0Zm9ybSwgb3RoZXJ3aXNlIHRoZSBHUFUKPj4+Pj4+Pj4gd2lsbCB1
-c2UgY2FjaGVkIG1hcHBpbmdzIG5vbmV0aGVsZXNzLiBPbiB4ODYgcGxhdGZvcm1zLCB0aGlzIGRv
-ZXMgbm90Cj4+Pj4+Pj4+IHNlZW0gdG8gbWF0dGVyLCBhcyB1bmNhY2hlZCBDUFUgbWFwcGluZ3Mg
-d2lsbCBzbm9vcCB0aGUgY2FjaGVzIGluIGFueQo+Pj4+Pj4+PiBjYXNlLiBIb3dldmVyLCBvbiBB
-Uk0gYW5kIGFybTY0LCBlbmFibGluZyB0aGlzIG9wdGltaXphdGlvbiBvbiBhCj4+Pj4+Pj4+IHBs
-YXRmb3JtIHdoZXJlIE5vU25vb3AgaXMgaWdub3JlZCByZXN1bHRzIGluIGxvc3Mgb2YgY29oZXJl
-bmN5LCB3aGljaAo+Pj4+Pj4+PiBicmVha3MgY29ycmVjdCBvcGVyYXRpb24gb2YgdGhlIGRldmlj
-ZS4gU2luY2Ugd2UgaGF2ZSBubyB3YXkgb2YKPj4+Pj4+Pj4gZGV0ZWN0aW5nIHdoZXRoZXIgTm9T
-bm9vcCB3b3JrcyBvciBub3QsIGp1c3QgZGlzYWJsZSB0aGlzCj4+Pj4+Pj4+IG9wdGltaXphdGlv
-biBlbnRpcmVseSBmb3IgQVJNIGFuZCBhcm02NC4KPj4+Pj4+Pj4KPj4+Pj4+Pj4gQ2M6IENocmlz
-dGlhbiBLb2VuaWcgPGNocmlzdGlhbi5rb2VuaWdAYW1kLmNvbT4KPj4+Pj4+Pj4gQ2M6IEFsZXgg
-RGV1Y2hlciA8YWxleGFuZGVyLmRldWNoZXJAYW1kLmNvbT4KPj4+Pj4+Pj4gQ2M6IERhdmlkIFpo
-b3UgPERhdmlkMS5aaG91QGFtZC5jb20+Cj4+Pj4+Pj4+IENjOiBIdWFuZyBSdWkgPHJheS5odWFu
-Z0BhbWQuY29tPgo+Pj4+Pj4+PiBDYzogSnVud2VpIFpoYW5nIDxKZXJyeS5aaGFuZ0BhbWQuY29t
-Pgo+Pj4+Pj4+PiBDYzogTWljaGVsIERhZW56ZXIgPG1pY2hlbC5kYWVuemVyQGFtZC5jb20+Cj4+
-Pj4+Pj4+IENjOiBEYXZpZCBBaXJsaWUgPGFpcmxpZWRAbGludXguaWU+Cj4+Pj4+Pj4+IENjOiBE
-YW5pZWwgVmV0dGVyIDxkYW5pZWxAZmZ3bGwuY2g+Cj4+Pj4+Pj4+IENjOiBNYWFydGVuIExhbmto
-b3JzdCA8bWFhcnRlbi5sYW5raG9yc3RAbGludXguaW50ZWwuY29tPgo+Pj4+Pj4+PiBDYzogTWF4
-aW1lIFJpcGFyZCA8bWF4aW1lLnJpcGFyZEBib290bGluLmNvbT4KPj4+Pj4+Pj4gQ2M6IFNlYW4g
-UGF1bCA8c2VhbkBwb29ybHkucnVuPgo+Pj4+Pj4+PiBDYzogTWljaGFlbCBFbGxlcm1hbiA8bXBl
-QGVsbGVybWFuLmlkLmF1Pgo+Pj4+Pj4+PiBDYzogQmVuamFtaW4gSGVycmVuc2NobWlkdCA8YmVu
-aEBrZXJuZWwuY3Jhc2hpbmcub3JnPgo+Pj4+Pj4+PiBDYzogV2lsbCBEZWFjb24gPHdpbGwuZGVh
-Y29uQGFybS5jb20+Cj4+Pj4+Pj4+IENjOiBDaHJpc3RvcGggSGVsbHdpZyA8aGNoQGluZnJhZGVh
-ZC5vcmc+Cj4+Pj4+Pj4+IENjOiBSb2JpbiBNdXJwaHkgPHJvYmluLm11cnBoeUBhcm0uY29tPgo+
-Pj4+Pj4+PiBDYzogYW1kLWdmeCBsaXN0IDxhbWQtZ2Z4QGxpc3RzLmZyZWVkZXNrdG9wLm9yZz4K
-Pj4+Pj4+Pj4gQ2M6IGRyaS1kZXZlbCA8ZHJpLWRldmVsQGxpc3RzLmZyZWVkZXNrdG9wLm9yZz4K
-Pj4+Pj4+Pj4gUmVwb3J0ZWQtYnk6IENhcnN0ZW4gSGFpdHpsZXIgPENhcnN0ZW4uSGFpdHpsZXJA
-YXJtLmNvbT4KPj4+Pj4+Pj4gU2lnbmVkLW9mZi1ieTogQXJkIEJpZXNoZXV2ZWwgPGFyZC5iaWVz
-aGV1dmVsQGxpbmFyby5vcmc+Cj4+Pj4+Pj4gVGhlIHN1YmplY3QgbGluZSBzaG91bGQgcHJvYmFi
-bHkgcmVhZCAiZGlzYWJsZSB1bmNhY2hlZC4uLiIuCj4+Pj4+Pj4KPj4+Pj4+IFVnaCwgb2YgY291
-cnNlIC4uLgo+Pj4+Pj4KPj4+Pj4+PiBXaXRoIHRoYXQgZml4ZWQgdGhlIHBhdGNoIGlzIFJldmll
-d2VkLWJ5OiBDaHJpc3RpYW4gS8O2bmlnCj4+Pj4+Pj4gPGNocmlzdGlhbi5rb2VuaWdAYW1kLmNv
-bT4uCj4+Pj4+Pj4KPj4+Pj4gU2FtZToKPj4+Pj4gUmV2aWV3ZWQtYnk6IEFsZXggRGV1Y2hlciA8
-YWxleGFuZGVyLmRldWNoZXJAYW1kLmNvbT4KPj4+Pj4KPj4+PiBUaGFua3MgYWxsCj4+Pj4KPj4+
-PiBTaG91bGQgSSByZXNlbmQgdGhlIHBhdGNoIHdpdGggdGhlIHN1YmplY3QgY29ycmVjdGVkPwo+
-Pj4gSSB3aWxsIHVwZGF0ZSB0aGUgc3ViamVjdCBsaW5lIGFuZCBwdXNoIGl0IHVwc3RyZWFtIHRo
-cm91Z2gKPj4+IGRybS1taXNjLW5leHQgaWYgbm9ib2R5IG9iamVjdHMuCj4+Pgo+PiBXb25kZXJm
-dWwsIHRoYW5rcy4KPiBIaSBDaHJpc3RpYW4sCj4KPiBBcmUgeW91IHN0aWxsIHBsYW5uaW5nIHRv
-IG1lcmdlIHRoaXMgZm9yIHY1LjE/CgpNeSBiYWQsIG9ubHkgcHVzaGVkIHRoaXMgdG8gb3VyIGlu
-dGVybmFsIGJyYW5jaCwgYnV0IGZvcmdvdCBvdXQgCmRybS1taXNjLW5leHQuCgpGaXhlZCBub3cs
-IHRoYW5rcyBmb3IgdGhlIHJlbWluZGVyLgoKQ2hyaXN0aWFuLgoKPgo+IFRoYW5rcywKPiBBcmQu
-Cj4gX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KPiBhbWQt
-Z2Z4IG1haWxpbmcgbGlzdAo+IGFtZC1nZnhAbGlzdHMuZnJlZWRlc2t0b3Aub3JnCj4gaHR0cHM6
-Ly9saXN0cy5mcmVlZGVza3RvcC5vcmcvbWFpbG1hbi9saXN0aW5mby9hbWQtZ2Z4CgoKX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5l
-bCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6
-Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
+
+When pmu::setup_aux() is called the coresight PMU needs to know which
+sink to use for the session by looking up the information in the
+event's attr::config2 field.
+
+As such simply replace the cpu information by the complete perf_event
+structure and change all affected customers.
+
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reviewed-by: Suzuki Poulouse <suzuki.poulose@arm.com>
+Acked-by: Peter Zijlstra <peterz@infradead.org>
+Cc: Adrian Hunter <adrian.hunter@intel.com>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: Alexei Starovoitov <ast@kernel.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: linux-s390@vger.kernel.org
+Link: http://lkml.kernel.org/r/20190131184714.20388-2-mathieu.poirier@linaro.org
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+---
+ arch/s390/kernel/perf_cpum_sf.c                  | 6 +++---
+ arch/x86/events/intel/bts.c                      | 4 +++-
+ arch/x86/events/intel/pt.c                       | 5 +++--
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 6 +++---
+ drivers/perf/arm_spe_pmu.c                       | 6 +++---
+ include/linux/perf_event.h                       | 2 +-
+ kernel/events/ring_buffer.c                      | 2 +-
+ 7 files changed, 17 insertions(+), 14 deletions(-)
+
+diff --git a/arch/s390/kernel/perf_cpum_sf.c b/arch/s390/kernel/perf_cpum_sf.c
+index bfabeb1889cc..1266194afb02 100644
+--- a/arch/s390/kernel/perf_cpum_sf.c
++++ b/arch/s390/kernel/perf_cpum_sf.c
+@@ -1600,7 +1600,7 @@ static void aux_sdb_init(unsigned long sdb)
+ 
+ /*
+  * aux_buffer_setup() - Setup AUX buffer for diagnostic mode sampling
+- * @cpu:	On which to allocate, -1 means current
++ * @event:	Event the buffer is setup for, event->cpu == -1 means current
+  * @pages:	Array of pointers to buffer pages passed from perf core
+  * @nr_pages:	Total pages
+  * @snapshot:	Flag for snapshot mode
+@@ -1612,8 +1612,8 @@ static void aux_sdb_init(unsigned long sdb)
+  *
+  * Return the private AUX buffer structure if success or NULL if fails.
+  */
+-static void *aux_buffer_setup(int cpu, void **pages, int nr_pages,
+-			      bool snapshot)
++static void *aux_buffer_setup(struct perf_event *event, void **pages,
++			      int nr_pages, bool snapshot)
+ {
+ 	struct sf_buffer *sfb;
+ 	struct aux_buffer *aux;
+diff --git a/arch/x86/events/intel/bts.c b/arch/x86/events/intel/bts.c
+index a01ef1b0f883..7cdd7b13bbda 100644
+--- a/arch/x86/events/intel/bts.c
++++ b/arch/x86/events/intel/bts.c
+@@ -77,10 +77,12 @@ static size_t buf_size(struct page *page)
+ }
+ 
+ static void *
+-bts_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool overwrite)
++bts_buffer_setup_aux(struct perf_event *event, void **pages,
++		     int nr_pages, bool overwrite)
+ {
+ 	struct bts_buffer *buf;
+ 	struct page *page;
++	int cpu = event->cpu;
+ 	int node = (cpu == -1) ? cpu : cpu_to_node(cpu);
+ 	unsigned long offset;
+ 	size_t size = nr_pages << PAGE_SHIFT;
+diff --git a/arch/x86/events/intel/pt.c b/arch/x86/events/intel/pt.c
+index 9494ca68fd9d..c0e86ff21f81 100644
+--- a/arch/x86/events/intel/pt.c
++++ b/arch/x86/events/intel/pt.c
+@@ -1114,10 +1114,11 @@ static int pt_buffer_init_topa(struct pt_buffer *buf, unsigned long nr_pages,
+  * Return:	Our private PT buffer structure.
+  */
+ static void *
+-pt_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool snapshot)
++pt_buffer_setup_aux(struct perf_event *event, void **pages,
++		    int nr_pages, bool snapshot)
+ {
+ 	struct pt_buffer *buf;
+-	int node, ret;
++	int node, ret, cpu = event->cpu;
+ 
+ 	if (!nr_pages)
+ 		return NULL;
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index abe8249b893b..f21eb28b6782 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -177,15 +177,15 @@ static void etm_free_aux(void *data)
+ 	schedule_work(&event_data->work);
+ }
+ 
+-static void *etm_setup_aux(int event_cpu, void **pages,
++static void *etm_setup_aux(struct perf_event *event, void **pages,
+ 			   int nr_pages, bool overwrite)
+ {
+-	int cpu;
++	int cpu = event->cpu;
+ 	cpumask_t *mask;
+ 	struct coresight_device *sink;
+ 	struct etm_event_data *event_data = NULL;
+ 
+-	event_data = alloc_event_data(event_cpu);
++	event_data = alloc_event_data(cpu);
+ 	if (!event_data)
+ 		return NULL;
+ 	INIT_WORK(&event_data->work, free_event_data);
+diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
+index 8e46a9dad2fa..7cb766dafe85 100644
+--- a/drivers/perf/arm_spe_pmu.c
++++ b/drivers/perf/arm_spe_pmu.c
+@@ -824,10 +824,10 @@ static void arm_spe_pmu_read(struct perf_event *event)
+ {
+ }
+ 
+-static void *arm_spe_pmu_setup_aux(int cpu, void **pages, int nr_pages,
+-				   bool snapshot)
++static void *arm_spe_pmu_setup_aux(struct perf_event *event, void **pages,
++				   int nr_pages, bool snapshot)
+ {
+-	int i;
++	int i, cpu = event->cpu;
+ 	struct page **pglist;
+ 	struct arm_spe_pmu_buf *buf;
+ 
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index 6cb5d483ab34..d9c3610e0e25 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -410,7 +410,7 @@ struct pmu {
+ 	/*
+ 	 * Set up pmu-private data structures for an AUX area
+ 	 */
+-	void *(*setup_aux)		(int cpu, void **pages,
++	void *(*setup_aux)		(struct perf_event *event, void **pages,
+ 					 int nr_pages, bool overwrite);
+ 					/* optional */
+ 
+diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
+index 805f0423ee0b..70ae2422cbaf 100644
+--- a/kernel/events/ring_buffer.c
++++ b/kernel/events/ring_buffer.c
+@@ -657,7 +657,7 @@ int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
+ 			goto out;
+ 	}
+ 
+-	rb->aux_priv = event->pmu->setup_aux(event->cpu, rb->aux_pages, nr_pages,
++	rb->aux_priv = event->pmu->setup_aux(event, rb->aux_pages, nr_pages,
+ 					     overwrite);
+ 	if (!rb->aux_priv)
+ 		goto out;
+-- 
+2.20.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
