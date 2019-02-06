@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8787AC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 18:54:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 73DC2C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 18:54:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3C6EE2070B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 18:54:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3EDBE2070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 18:54:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mHSXXSK5";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="qEZ9c/YO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C6EE2070B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y0SJJml7";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="xMjN/M/Z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3EDBE2070B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,44 +26,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cXRmlR7inaGniB+zezH+SxeKpuWzvZkxXHLNWkx68nk=; b=mHSXXSK5D2Lhwx
-	2GYX73Ml4o/NI8DheGg53amPoM0TuBA7b4IJFP8mTlaiXCmBlRyQ9LE8iOIo5I45I/YPiHHErplIE
-	Y93ShslyIzSZXBaC9jmZto+ugwwQ06yF9NUrbxM753+bFRMpfH/c+FdRZDTdQ+Aap6H+V50I7hikJ
-	V/SC34uzhmr7kYIaVHBTMMCreFSR7hfnqCiRQki9PiwFxsCywTrHCG0ozDHhUtrp6YjoOr6yH8aF1
-	L3PozffVqHEYKmcYHiE4KN7cs6HrITA6ZFsllzuPaIdZjTB0tr+PygNDipYMXbygjrJ5nWKsEvCZM
-	/G/PhYIKaQGc7gDqch0Q==;
+	List-Owner; bh=DlVxYyipGytvWTouLWsxCiLc9BATom6MsV3einRuYUQ=; b=Y0SJJml7hg7U04
+	31LNBBdMihQxja46JYYJwdT4aQQcHlBRglYGwyt/thfcVinOpc9Fd1jimqk8erD9Vj/pJ3cFbJAaU
+	f6IaEn4SFWVR+hg1Jt5EaIYiu5bb7MX8EIVk0bKQ09Gantoj26WsYMqbxoiTx0E25/4cl19uryrx+
+	mZ07XUdpY4JdcPQp4fpockyhNrvUqe1mPZexS5emcvSx1XxciH5MI83eVSDK6dEYzg+/iXo/UxTgi
+	1fQj7Pgbdn/RGCtGDs4PjH/s6eGmsy65TLMoE/vfU0sV+BoHBzn3TtaTRzfU/k1zMEwOHk4D/6YXk
+	tg+zr9+Tgy6/lfHKPKfQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grSL9-00008g-TO; Wed, 06 Feb 2019 18:54:31 +0000
+	id 1grSLQ-0000NV-Pn; Wed, 06 Feb 2019 18:54:48 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grSIB-0005lv-BL
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 18:52:11 +0000
+ id 1grSIJ-0005tE-6F
+ for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 18:52:16 +0000
 Received: from quaco.ghostprotocols.net (unknown [179.97.41.93])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 983A2218D9;
- Wed,  6 Feb 2019 18:51:23 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 27AE9218D3;
+ Wed,  6 Feb 2019 18:51:30 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549479086;
- bh=XhtmITiRFeYN57RPQnAu2Cbh3Wk96kMmWOimwywIUQA=;
+ s=default; t=1549479094;
+ bh=FrhbT8ZEuVVCA4GiTJFBZd/f6RG8vpkTrlWvNIMJPnc=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=qEZ9c/YOOgb+s4ktXIoxQVSYdzVVUg8n0+fI3g74z004Hu+odAvoGBRPZmVOh13hv
- 81tTQZ5O19GaBmnIhx5lVCG+MRkGPqbRuZLCFY8Ea5le70PQ1m1fMfaC9NkPJhhPZw
- 93hWKwpX1u3esxBaBAwf1sWHutjRxxkg0HctM+Cw=
+ b=xMjN/M/Z/WGvpzYX40IsMdxu/hW8OZM2w/Udw/KW22KpV9LLIhtKxVHxb+70+Cw5R
+ F69Ksa3dbxvGKpCYQW7aJy8sNr0Q663ZAiVv2ffs2r5TzBRUJV9FIsF+qrvtDHnEpo
+ U2qyZR3joNvaAV7S4vSHRmziEbekJq2iIFingPYU=
 From: Arnaldo Carvalho de Melo <acme@kernel.org>
 To: Ingo Molnar <mingo@kernel.org>
-Subject: [PATCH 40/53] perf cs-etm: Change tuple from traceID-CPU# to
- traceID-metadata
-Date: Wed,  6 Feb 2019 15:48:50 -0300
-Message-Id: <20190206184903.24054-41-acme@kernel.org>
+Subject: [PATCH 42/53] perf cs-etm: Set sample flags for exception packet
+Date: Wed,  6 Feb 2019 15:48:52 -0300
+Message-Id: <20190206184903.24054-43-acme@kernel.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190206184903.24054-1-acme@kernel.org>
 References: <20190206184903.24054-1-acme@kernel.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_105128_144450_BA1C4ECC 
-X-CRM114-Status: GOOD (  17.10  )
+X-CRM114-CacheID: sfid-20190206_105136_530486_6CF3DD59 
+X-CRM114-Status: GOOD (  19.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,80 +92,54 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Leo Yan <leo.yan@linaro.org>
 
-If packet processing wants to know the packet is bound with which ETM
-version, it needs to access metadata to decide that based on metadata
-magic number; but we cannot simply to use CPU logic ID number as index
-to access metadata sequential array, especially when system have
-hotplugged off CPUs, the metadata array are only allocated for online
-CPUs but not offline CPUs, so the CPU logic number doesn't match with
-its index in the array.
+The exception taken and returning are typical flow for instruction jump
+but it needs to be handled with exception packets. This patch is to set
+sample flags for exception packet.
 
-This patch is to change tuple from traceID-CPU# to traceID-metadata,
-thus it can use the tuple to retrieve metadata pointer according to
-traceID.
+Since the exception packet contains the exception number, according to
+the exception number this patch makes decision for belonging to which
+exception types.
 
-For safe accessing metadata fields, this patch provides helper function
-cs_etm__get_cpu() which is used to return CPU number according to
-traceID; cs_etm_decoder__buffer_packet() is the first consumer for this
-helper function.
+The decoder have defined different exception number for ETMv3 and ETMv4
+separately, hence this patch needs firstly decide the ETM version by
+using the metadata magic number, and this patch adds helper function
+cs_etm__get_magic() for easily getting magic number.
+
+Based on different ETM version, the exception packet contains the
+exception number, according to the exception number this patch makes
+decision for the exception belonging to which exception types.
+
+In this patch, it introduces helper function cs_etm__is_svc_instr(); for
+ETMv4 CS_ETMV4_EXC_CALL covers SVC, SMC and HVC cases in the single
+exception number, thus need to use cs_etm__is_svc_instr() to decide an
+exception taken for system call.
 
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reviewed-by: Robert Walker <robert.walker@arm.com>
 Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 Cc: Jiri Olsa <jolsa@redhat.com>
 Cc: Mike Leach <mike.leach@linaro.org>
 Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Robert Walker <robert.walker@arm.com>
 Cc: Suzuki K Poulouse <suzuki.poulose@arm.com>
 Cc: coresight ml <coresight@lists.linaro.org>
 Cc: linux-arm-kernel@lists.infradead.org
-Link: http://lkml.kernel.org/r/20190129122842.32041-6-leo.yan@linaro.org
+Link: http://lkml.kernel.org/r/20190129122842.32041-8-leo.yan@linaro.org
 Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
 ---
- .../perf/util/cs-etm-decoder/cs-etm-decoder.c |  8 +++---
- tools/perf/util/cs-etm.c                      | 26 ++++++++++++++-----
- tools/perf/util/cs-etm.h                      |  9 ++++++-
- 3 files changed, 31 insertions(+), 12 deletions(-)
+ tools/perf/util/cs-etm.c | 215 +++++++++++++++++++++++++++++++++++++++
+ tools/perf/util/cs-etm.h |  44 ++++++++
+ 2 files changed, 259 insertions(+)
 
-diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-index 294efa76c9e3..cdd38ffd10d2 100644
---- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-+++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-@@ -305,14 +305,12 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
- 			      enum cs_etm_sample_type sample_type)
- {
- 	u32 et = 0;
--	struct int_node *inode = NULL;
-+	int cpu;
- 
- 	if (decoder->packet_count >= MAX_BUFFER - 1)
- 		return OCSD_RESP_FATAL_SYS_ERR;
- 
--	/* Search the RB tree for the cpu associated with this traceID */
--	inode = intlist__find(traceid_list, trace_chan_id);
--	if (!inode)
-+	if (cs_etm__get_cpu(trace_chan_id, &cpu) < 0)
- 		return OCSD_RESP_FATAL_SYS_ERR;
- 
- 	et = decoder->tail;
-@@ -322,7 +320,7 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
- 
- 	decoder->packet_buffer[et].sample_type = sample_type;
- 	decoder->packet_buffer[et].isa = CS_ETM_ISA_UNKNOWN;
--	decoder->packet_buffer[et].cpu = *((int *)inode->priv);
-+	decoder->packet_buffer[et].cpu = cpu;
- 	decoder->packet_buffer[et].start_addr = CS_ETM_INVAL_ADDR;
- 	decoder->packet_buffer[et].end_addr = CS_ETM_INVAL_ADDR;
- 	decoder->packet_buffer[et].instr_count = 0;
 diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 1aa29633ce77..a5497a761db7 100644
+index a5497a761db7..a714b31656ea 100644
 --- a/tools/perf/util/cs-etm.c
 +++ b/tools/perf/util/cs-etm.c
 @@ -97,6 +97,20 @@ static u32 cs_etm__get_v7_protocol_version(u32 etmidr)
  	return CS_ETM_PROTO_ETMV3;
  }
  
-+int cs_etm__get_cpu(u8 trace_chan_id, int *cpu)
++static int cs_etm__get_magic(u8 trace_chan_id, u64 *magic)
 +{
 +	struct int_node *inode;
 +	u64 *metadata;
@@ -175,80 +149,287 @@ index 1aa29633ce77..a5497a761db7 100644
 +		return -EINVAL;
 +
 +	metadata = inode->priv;
-+	*cpu = (int)metadata[CS_ETM_CPU];
++	*magic = metadata[CS_ETM_MAGIC];
 +	return 0;
 +}
 +
- static void cs_etm__packet_dump(const char *pkt_string)
+ int cs_etm__get_cpu(u8 trace_chan_id, int *cpu)
  {
- 	const char *color = PERF_COLOR_BLUE;
-@@ -252,7 +266,7 @@ static void cs_etm__free(struct perf_session *session)
- 	cs_etm__free_events(session);
- 	session->auxtrace = NULL;
+ 	struct int_node *inode;
+@@ -1122,10 +1136,174 @@ static int cs_etm__end_block(struct cs_etm_queue *etmq)
+ 	return 0;
+ }
  
--	/* First remove all traceID/CPU# nodes for the RB tree */
-+	/* First remove all traceID/metadata nodes for the RB tree */
- 	intlist__for_each_entry_safe(inode, tmp, traceid_list)
- 		intlist__remove(traceid_list, inode);
- 	/* Then the RB tree itself */
-@@ -1519,9 +1533,9 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
- 				    0xffffffff);
++static bool cs_etm__is_svc_instr(struct cs_etm_queue *etmq,
++				 struct cs_etm_packet *packet,
++				 u64 end_addr)
++{
++	u16 instr16;
++	u32 instr32;
++	u64 addr;
++
++	switch (packet->isa) {
++	case CS_ETM_ISA_T32:
++		/*
++		 * The SVC of T32 is defined in ARM DDI 0487D.a, F5.1.247:
++		 *
++		 *  b'15         b'8
++		 * +-----------------+--------+
++		 * | 1 1 0 1 1 1 1 1 |  imm8  |
++		 * +-----------------+--------+
++		 *
++		 * According to the specifiction, it only defines SVC for T32
++		 * with 16 bits instruction and has no definition for 32bits;
++		 * so below only read 2 bytes as instruction size for T32.
++		 */
++		addr = end_addr - 2;
++		cs_etm__mem_access(etmq, addr, sizeof(instr16), (u8 *)&instr16);
++		if ((instr16 & 0xFF00) == 0xDF00)
++			return true;
++
++		break;
++	case CS_ETM_ISA_A32:
++		/*
++		 * The SVC of A32 is defined in ARM DDI 0487D.a, F5.1.247:
++		 *
++		 *  b'31 b'28 b'27 b'24
++		 * +---------+---------+-------------------------+
++		 * |  !1111  | 1 1 1 1 |        imm24            |
++		 * +---------+---------+-------------------------+
++		 */
++		addr = end_addr - 4;
++		cs_etm__mem_access(etmq, addr, sizeof(instr32), (u8 *)&instr32);
++		if ((instr32 & 0x0F000000) == 0x0F000000 &&
++		    (instr32 & 0xF0000000) != 0xF0000000)
++			return true;
++
++		break;
++	case CS_ETM_ISA_A64:
++		/*
++		 * The SVC of A64 is defined in ARM DDI 0487D.a, C6.2.294:
++		 *
++		 *  b'31               b'21           b'4     b'0
++		 * +-----------------------+---------+-----------+
++		 * | 1 1 0 1 0 1 0 0 0 0 0 |  imm16  | 0 0 0 0 1 |
++		 * +-----------------------+---------+-----------+
++		 */
++		addr = end_addr - 4;
++		cs_etm__mem_access(etmq, addr, sizeof(instr32), (u8 *)&instr32);
++		if ((instr32 & 0xFFE0001F) == 0xd4000001)
++			return true;
++
++		break;
++	case CS_ETM_ISA_UNKNOWN:
++	default:
++		break;
++	}
++
++	return false;
++}
++
++static bool cs_etm__is_syscall(struct cs_etm_queue *etmq, u64 magic)
++{
++	struct cs_etm_packet *packet = etmq->packet;
++	struct cs_etm_packet *prev_packet = etmq->prev_packet;
++
++	if (magic == __perf_cs_etmv3_magic)
++		if (packet->exception_number == CS_ETMV3_EXC_SVC)
++			return true;
++
++	/*
++	 * ETMv4 exception type CS_ETMV4_EXC_CALL covers SVC, SMC and
++	 * HVC cases; need to check if it's SVC instruction based on
++	 * packet address.
++	 */
++	if (magic == __perf_cs_etmv4_magic) {
++		if (packet->exception_number == CS_ETMV4_EXC_CALL &&
++		    cs_etm__is_svc_instr(etmq, prev_packet,
++					 prev_packet->end_addr))
++			return true;
++	}
++
++	return false;
++}
++
++static bool cs_etm__is_async_exception(struct cs_etm_queue *etmq, u64 magic)
++{
++	struct cs_etm_packet *packet = etmq->packet;
++
++	if (magic == __perf_cs_etmv3_magic)
++		if (packet->exception_number == CS_ETMV3_EXC_DEBUG_HALT ||
++		    packet->exception_number == CS_ETMV3_EXC_ASYNC_DATA_ABORT ||
++		    packet->exception_number == CS_ETMV3_EXC_PE_RESET ||
++		    packet->exception_number == CS_ETMV3_EXC_IRQ ||
++		    packet->exception_number == CS_ETMV3_EXC_FIQ)
++			return true;
++
++	if (magic == __perf_cs_etmv4_magic)
++		if (packet->exception_number == CS_ETMV4_EXC_RESET ||
++		    packet->exception_number == CS_ETMV4_EXC_DEBUG_HALT ||
++		    packet->exception_number == CS_ETMV4_EXC_SYSTEM_ERROR ||
++		    packet->exception_number == CS_ETMV4_EXC_INST_DEBUG ||
++		    packet->exception_number == CS_ETMV4_EXC_DATA_DEBUG ||
++		    packet->exception_number == CS_ETMV4_EXC_IRQ ||
++		    packet->exception_number == CS_ETMV4_EXC_FIQ)
++			return true;
++
++	return false;
++}
++
++static bool cs_etm__is_sync_exception(struct cs_etm_queue *etmq, u64 magic)
++{
++	struct cs_etm_packet *packet = etmq->packet;
++	struct cs_etm_packet *prev_packet = etmq->prev_packet;
++
++	if (magic == __perf_cs_etmv3_magic)
++		if (packet->exception_number == CS_ETMV3_EXC_SMC ||
++		    packet->exception_number == CS_ETMV3_EXC_HYP ||
++		    packet->exception_number == CS_ETMV3_EXC_JAZELLE_THUMBEE ||
++		    packet->exception_number == CS_ETMV3_EXC_UNDEFINED_INSTR ||
++		    packet->exception_number == CS_ETMV3_EXC_PREFETCH_ABORT ||
++		    packet->exception_number == CS_ETMV3_EXC_DATA_FAULT ||
++		    packet->exception_number == CS_ETMV3_EXC_GENERIC)
++			return true;
++
++	if (magic == __perf_cs_etmv4_magic) {
++		if (packet->exception_number == CS_ETMV4_EXC_TRAP ||
++		    packet->exception_number == CS_ETMV4_EXC_ALIGNMENT ||
++		    packet->exception_number == CS_ETMV4_EXC_INST_FAULT ||
++		    packet->exception_number == CS_ETMV4_EXC_DATA_FAULT)
++			return true;
++
++		/*
++		 * For CS_ETMV4_EXC_CALL, except SVC other instructions
++		 * (SMC, HVC) are taken as sync exceptions.
++		 */
++		if (packet->exception_number == CS_ETMV4_EXC_CALL &&
++		    !cs_etm__is_svc_instr(etmq, prev_packet,
++					  prev_packet->end_addr))
++			return true;
++
++		/*
++		 * ETMv4 has 5 bits for exception number; if the numbers
++		 * are in the range ( CS_ETMV4_EXC_FIQ, CS_ETMV4_EXC_END ]
++		 * they are implementation defined exceptions.
++		 *
++		 * For this case, simply take it as sync exception.
++		 */
++		if (packet->exception_number > CS_ETMV4_EXC_FIQ &&
++		    packet->exception_number <= CS_ETMV4_EXC_END)
++			return true;
++	}
++
++	return false;
++}
++
+ static int cs_etm__set_sample_flags(struct cs_etm_queue *etmq)
+ {
+ 	struct cs_etm_packet *packet = etmq->packet;
+ 	struct cs_etm_packet *prev_packet = etmq->prev_packet;
++	u64 magic;
++	int ret;
  
- 	/*
--	 * Create an RB tree for traceID-CPU# tuple. Since the conversion has
--	 * to be made for each packet that gets decoded, optimizing access in
--	 * anything other than a sequential array is worth doing.
-+	 * Create an RB tree for traceID-metadata tuple.  Since the conversion
-+	 * has to be made for each packet that gets decoded, optimizing access
-+	 * in anything other than a sequential array is worth doing.
- 	 */
- 	traceid_list = intlist__new(NULL);
- 	if (!traceid_list) {
-@@ -1587,8 +1601,8 @@ int cs_etm__process_auxtrace_info(union perf_event *event,
- 			err = -EINVAL;
- 			goto err_free_metadata;
- 		}
--		/* All good, associate the traceID with the CPU# */
--		inode->priv = &metadata[j][CS_ETM_CPU];
-+		/* All good, associate the traceID with the metadata pointer */
-+		inode->priv = metadata[j];
- 	}
- 
- 	/*
+ 	switch (packet->sample_type) {
+ 	case CS_ETM_RANGE:
+@@ -1206,6 +1384,43 @@ static int cs_etm__set_sample_flags(struct cs_etm_queue *etmq)
+ 					      PERF_IP_FLAG_TRACE_END;
+ 		break;
+ 	case CS_ETM_EXCEPTION:
++		ret = cs_etm__get_magic(packet->trace_chan_id, &magic);
++		if (ret)
++			return ret;
++
++		/* The exception is for system call. */
++		if (cs_etm__is_syscall(etmq, magic))
++			packet->flags = PERF_IP_FLAG_BRANCH |
++					PERF_IP_FLAG_CALL |
++					PERF_IP_FLAG_SYSCALLRET;
++		/*
++		 * The exceptions are triggered by external signals from bus,
++		 * interrupt controller, debug module, PE reset or halt.
++		 */
++		else if (cs_etm__is_async_exception(etmq, magic))
++			packet->flags = PERF_IP_FLAG_BRANCH |
++					PERF_IP_FLAG_CALL |
++					PERF_IP_FLAG_ASYNC |
++					PERF_IP_FLAG_INTERRUPT;
++		/*
++		 * Otherwise, exception is caused by trap, instruction &
++		 * data fault, or alignment errors.
++		 */
++		else if (cs_etm__is_sync_exception(etmq, magic))
++			packet->flags = PERF_IP_FLAG_BRANCH |
++					PERF_IP_FLAG_CALL |
++					PERF_IP_FLAG_INTERRUPT;
++
++		/*
++		 * When the exception packet is inserted, since exception
++		 * packet is not used standalone for generating samples
++		 * and it's affiliation to the previous instruction range
++		 * packet; so set previous range packet flags to tell perf
++		 * it is an exception taken branch.
++		 */
++		if (prev_packet->sample_type == CS_ETM_RANGE)
++			prev_packet->flags = packet->flags;
++		break;
+ 	case CS_ETM_EXCEPTION_RET:
+ 	case CS_ETM_EMPTY:
+ 	default:
 diff --git a/tools/perf/util/cs-etm.h b/tools/perf/util/cs-etm.h
-index 37f8d48179ca..fb5fc6538b7f 100644
+index fb5fc6538b7f..d76126e0e3d0 100644
 --- a/tools/perf/util/cs-etm.h
 +++ b/tools/perf/util/cs-etm.h
-@@ -53,7 +53,7 @@ enum {
+@@ -53,6 +53,50 @@ enum {
  	CS_ETMV4_PRIV_MAX,
  };
  
--/* RB tree for quick conversion between traceID and CPUs */
-+/* RB tree for quick conversion between traceID and metadata pointers */
++/*
++ * ETMv3 exception encoding number:
++ * See Embedded Trace Macrocell spcification (ARM IHI 0014Q)
++ * table 7-12 Encoding of Exception[3:0] for non-ARMv7-M processors.
++ */
++enum {
++	CS_ETMV3_EXC_NONE = 0,
++	CS_ETMV3_EXC_DEBUG_HALT = 1,
++	CS_ETMV3_EXC_SMC = 2,
++	CS_ETMV3_EXC_HYP = 3,
++	CS_ETMV3_EXC_ASYNC_DATA_ABORT = 4,
++	CS_ETMV3_EXC_JAZELLE_THUMBEE = 5,
++	CS_ETMV3_EXC_PE_RESET = 8,
++	CS_ETMV3_EXC_UNDEFINED_INSTR = 9,
++	CS_ETMV3_EXC_SVC = 10,
++	CS_ETMV3_EXC_PREFETCH_ABORT = 11,
++	CS_ETMV3_EXC_DATA_FAULT = 12,
++	CS_ETMV3_EXC_GENERIC = 13,
++	CS_ETMV3_EXC_IRQ = 14,
++	CS_ETMV3_EXC_FIQ = 15,
++};
++
++/*
++ * ETMv4 exception encoding number:
++ * See ARM Embedded Trace Macrocell Architecture Specification (ARM IHI 0064D)
++ * table 6-12 Possible values for the TYPE field in an Exception instruction
++ * trace packet, for ARMv7-A/R and ARMv8-A/R PEs.
++ */
++enum {
++	CS_ETMV4_EXC_RESET = 0,
++	CS_ETMV4_EXC_DEBUG_HALT = 1,
++	CS_ETMV4_EXC_CALL = 2,
++	CS_ETMV4_EXC_TRAP = 3,
++	CS_ETMV4_EXC_SYSTEM_ERROR = 4,
++	CS_ETMV4_EXC_INST_DEBUG = 6,
++	CS_ETMV4_EXC_DATA_DEBUG = 7,
++	CS_ETMV4_EXC_ALIGNMENT = 10,
++	CS_ETMV4_EXC_INST_FAULT = 11,
++	CS_ETMV4_EXC_DATA_FAULT = 12,
++	CS_ETMV4_EXC_IRQ = 14,
++	CS_ETMV4_EXC_FIQ = 15,
++	CS_ETMV4_EXC_END = 31,
++};
++
+ /* RB tree for quick conversion between traceID and metadata pointers */
  struct intlist *traceid_list;
  
- #define KiB(x) ((x) * 1024)
-@@ -69,6 +69,7 @@ static const u64 __perf_cs_etmv4_magic   = 0x4040404040404040ULL;
- #ifdef HAVE_CSTRACE_SUPPORT
- int cs_etm__process_auxtrace_info(union perf_event *event,
- 				  struct perf_session *session);
-+int cs_etm__get_cpu(u8 trace_chan_id, int *cpu);
- #else
- static inline int
- cs_etm__process_auxtrace_info(union perf_event *event __maybe_unused,
-@@ -76,6 +77,12 @@ cs_etm__process_auxtrace_info(union perf_event *event __maybe_unused,
- {
- 	return -1;
- }
-+
-+static inline int cs_etm__get_cpu(u8 trace_chan_id __maybe_unused,
-+				  int *cpu __maybe_unused)
-+{
-+	return -1;
-+}
- #endif
- 
- #endif
 -- 
 2.20.1
 
