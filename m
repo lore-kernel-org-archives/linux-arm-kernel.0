@@ -2,83 +2,59 @@ Return-Path: <SRS0=SkGj=QN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9F970C282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 14:55:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 61068C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 15:05:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6E4DB2073F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 14:55:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2ECCA2175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 15:05:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m/0Bnakf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E4DB2073F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mYK+feoo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2ECCA2175B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NbNNIWqffUBaFL24StzlStayVrDmIaVBqhInA7JBU6o=; b=m/0Bnakf7nHq2/
-	Nqcu4Qnia16FTrpKjn/PQWd9Hdm3k75sh01h5/NlcU0y4Y1mlsYebqn/5VZBYfkuSCGnJ54J8LTvi
-	0srUxWZaUC1P2UoOHY/ZX1NBoZkAwvVUV3XvjFjK5RNTYJiYCiGpFLa1Xm3e5N4+fgFa9Wv99U5p9
-	skUvrpU4AmBWfajMvbVjgLl1X6waaiB9eeCWqAGkfZQQ8EaAV67xuJfOnDFvDuQQEvVe7c2PmlIpW
-	CjoMmafT5qU594SLssIuU+chTfsY3KK/7sUPIuW3+856+ENC0vF3tqQb8DW55KTAkUR0LRYqReI7V
-	/0ZgpcKKGWeWgrKxxPZg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=tV72YSYYEFsQzr/+/qQNlrEOsFM0zUU0+ZR3lCrZo5k=; b=mYK+feooWqGXtw
+	+1bW/OqL0sZtrkOc0isKROu30q0Zy/QpUeReEgSbkB4I9ouAjYTABUUTe2GqdK1vQ2fsRl/LSxIdG
+	tcMbMGO5bDmRQk1AHlkz9MuC6BBGo0G1OylBupbNiU0YE3VbjglcHoVEfWOUoYiiyGin/pdO3Iv+g
+	beOyLGMJhUSpKa1izZVxLEc3QSyji41FC1zclg7WwW7d2NMk9MNDm9YJqEke8rzZSaPO7E+W5s6E6
+	agVfN57NfBV7pRcf18h7FzxyYMXKnI02R4oA7Q7pBRcCi8QPPv5zJNPQ7apZ7rRnKiDKCwyNO4w4R
+	R1wNjGZ8hpV4wJgKlR+Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grObY-0005H3-Eq; Wed, 06 Feb 2019 14:55:12 +0000
-Received: from mx07-00178001.pphosted.com ([62.209.51.94])
+	id 1grOld-0000CK-OO; Wed, 06 Feb 2019 15:05:37 +0000
+Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grObU-00041h-67
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 14:55:10 +0000
-Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
- by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x16EpNMb001272; Wed, 6 Feb 2019 15:54:53 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2qfv9j9k5a-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Wed, 06 Feb 2019 15:54:53 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 786D034;
- Wed,  6 Feb 2019 14:54:52 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 488F52C3C;
- Wed,  6 Feb 2019 14:54:52 +0000 (GMT)
-Received: from [10.48.0.167] (10.75.127.45) by SFHDAG5NODE3.st.com
- (10.75.127.15) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Wed, 6 Feb
- 2019 15:54:51 +0100
-Subject: Re: [PATCH 2/4] pwm: stm32-lp: Add power management support
-To: Thierry Reding <thierry.reding@gmail.com>,
- =?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?= <u.kleine-koenig@pengutronix.de>
-References: <1549370429-19116-1-git-send-email-fabrice.gasnier@st.com>
- <1549370429-19116-3-git-send-email-fabrice.gasnier@st.com>
- <20190205204732.zrbhgyxnvjbwfyw4@pengutronix.de>
- <20190205222522.GB1372@mithrandir>
- <6584a59b-657d-adc9-fab2-eb1a9baba05d@st.com>
- <20190206085405.pdiwd3c6wjog5hl7@pengutronix.de>
- <20190206125545.GI21676@ulmo>
-From: Fabrice Gasnier <fabrice.gasnier@st.com>
-Message-ID: <ddb93754-2734-e4c2-a209-517984c6d814@st.com>
-Date: Wed, 6 Feb 2019 15:54:50 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1grOlZ-0000BL-FD
+ for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 15:05:35 +0000
+Received: by newverein.lst.de (Postfix, from userid 2005)
+ id B3CA168D93; Wed,  6 Feb 2019 16:05:24 +0100 (CET)
+Date: Wed, 6 Feb 2019 16:05:24 +0100
+From: Torsten Duwe <duwe@lst.de>
+To: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH v7 2/3] arm64: implement ftrace with regs
+Message-ID: <20190206150524.GA28892@lst.de>
+References: <20190118163736.6A99268CEB@newverein.lst.de>
+ <20190118163908.E338E68D93@newverein.lst.de>
+ <e206e229-7813-2d37-d5c6-7a9785e311c9@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <20190206125545.GI21676@ulmo>
-Content-Language: en-US
-X-Originating-IP: [10.75.127.45]
-X-ClientProxiedBy: SFHDAG7NODE3.st.com (10.75.127.21) To SFHDAG5NODE3.st.com
- (10.75.127.15)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-02-06_09:, , signatures=0
+Content-Disposition: inline
+In-Reply-To: <e206e229-7813-2d37-d5c6-7a9785e311c9@arm.com>
+User-Agent: Mutt/1.5.17 (2007-11-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_065508_524971_588E1D86 
-X-CRM114-Status: GOOD (  16.69  )
+X-CRM114-CacheID: sfid-20190206_070533_661816_B47EC62C 
+X-CRM114-Status: GOOD (  20.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,47 +66,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, alexandre.torgue@st.com,
- linux-pwm@vger.kernel.org, linux-iio@vger.kernel.org,
- Tomasz Duszynski <tduszyns@gmail.com>, linux-kernel@vger.kernel.org,
- vilhelm.gray@gmail.com, robh+dt@kernel.org,
- linux-arm-kernel@lists.infradead.org, mcoquelin.stm32@gmail.com,
- linux-stm32@st-md-mailman.stormreply.com, jic23@kernel.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, Arnd Bergmann <arnd@arndb.de>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Steven Rostedt <rostedt@goodmis.org>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>, Ingo Molnar <mingo@redhat.com>,
+ Josh Poimboeuf <jpoimboe@redhat.com>,
+ Amit Daniel Kachhap <amit.kachhap@arm.com>, live-patching@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMi82LzE5IDE6NTUgUE0sIFRoaWVycnkgUmVkaW5nIHdyb3RlOgo+IE9uIFdlZCwgRmViIDA2
-LCAyMDE5IGF0IDA5OjU0OjA1QU0gKzAxMDAsIFV3ZSBLbGVpbmUtS8O2bmlnIHdyb3RlOgo+PiBP
-biBXZWQsIEZlYiAwNiwgMjAxOSBhdCAwOTo0Mjo0OEFNICswMTAwLCBGYWJyaWNlIEdhc25pZXIg
-d3JvdGU6Cj4+PiBJZiB5b3UgYWdyZWUgd2l0aCB0aGUgY3VycmVudCBhcHByb2FjaCwgSSBjYW4g
-c2VuZCBhIFYyIHdpdGggVG9tYXN6J3MKPj4+IHN1Z2dlc3Rpb24gdG8gcmVtb3ZlIHRoZSBpZmRl
-ZnMgYW5kIHVzZSBfX21heWJlX3VudXNlZCBpbnN0ZWFkLgo+Pgo+PiBJIHRoaW5rIHRoZSBzdXNw
-ZW5kIGNhbGxiYWNrIHNob3VsZCBoYXZlIHNvbWV0aGluZyBsaWtlOgo+Pgo+PiAJaWYgKGlzX3N0
-aWxsX2VuYWJsZWQpIHsKPj4gCQkvKgo+PiAJCSAqIFRoZSBjb25zdW1lciBkaWRuJ3Qgc3RvcCB1
-cywgc28gcmVmdXNlIHRvIHN1c3BlbmQuCj4+IAkJICovCj4+IAkJZGV2X2VycihkZXYsICJUaGUg
-Y29uc3VtZXIgZGlkbid0IHN0b3AgdXMsIHNvIHJlZnVzZSB0byBzdXNwZW5kLlxuIik7Cj4+IAkJ
-cmV0dXJuIC1FQlVTWTsKPj4gCX0KPj4KPj4gVGhpcyB3YXkgdGhlcmUgYXJlIG5vIGJhZCBzdXJw
-cmlzZXMgaWYgdGhlIHB3bSBpcyBzdXNwZW5kZWQgYmVmb3JlIGl0cwo+PiBjb25zdW1lciBhbmQg
-aXQncyBvYnZpb3VzIHdoYXQgaXMgbWlzc2luZy4KClRoaWVycnksIFV3ZSwKCldoZW4gdGhlIHB3
-bSBpcyBzdXNwZW5kZWQgYmVmb3JlIGl0cyBjb25zdW1lciwgdGhlIGJhZCBzdXJwcmlzZSBpcyB0
-aGUKc3VzcGVuZCByZXF1ZXN0IHdpbGwgZmFpbC4uLiBJJ20gbm90IHN1cmUgYSBuZXcgYXR0ZW1w
-dCBtYXkgYmUgYmV0dGVyLgpTbywgaXQgbG9va3MgbGlrZSB0aGUgb25seSB3YXkgdG8gaGF2ZSB0
-aGlzIGNsZWFuIGlzIGJ5IGltcGxlbWVudGluZyB0aGUKZGV2aWNlIGxpbmsgZS5nLiB2aWEgcHdt
-X2dldCgpID8KCj4gCj4gU29tZXRoaW5nIHRoYXQganVzdCBvY2N1cnJlZCB0byBtZTogcGVyaGFw
-cyBhcyBwYXJ0IG9mIHB3bV9nZXQoKSB3ZQo+IHNob3VsZCB0cmFjayB3aGVyZSB3ZSB3ZXJlIGJl
-aW5nIHJlcXVlc3RlZCBmcm9tIHNvIHRoYXQgd2UgY291bGQgZ2l2ZQo+IGhpbnRzIGluIHNpdHVh
-dGlvbnMgbGlrZSB0aGlzIGFzIHRvIHdoZXJlIHRoZSBjb25zdW1lciBpcyB0aGF0IGZvcmdvdAo+
-IHRvIHN1c3BlbmQgdGhlIFBXTS4KClRoZSBjdXJyZW50IGFwcHJvYWNoIGhhbmRsZXMgdGhlIHNp
-dHVhdGlvbiB3aGVyZSB0aGUgY29uc3VtZXIgZm9yZ290IHRvCnN1c3BlbmQgdGhlIFBXTS4uLiBJ
-IGNhbiBhZGQgc29tZSB3YXJuaW5nIGFib3V0IHRoYXQgaW4gdGhlIHN1c3BlbmQKcm91dGluZSwg
-aW5jbCB0aGUgbGFiZWwuCgpXaGF0IGRvIHlvdSB0aGluaz8gV2hhdCdzIHRoZSBiZXN0IGFwcHJv
-YWNoID8KClBsZWFzZSBhZHZpc2UsCkJSLApGYWJyaWNlCj4gCj4gSSBzdXBwb3NlIHdlIGFscmVh
-ZHkgaGF2ZSBwd21fZGV2aWNlLmxhYmVsIHRvIGhlbHAgd2l0aCB0aGlzLCBidXQKPiBwZXJoYXBz
-IHdlIGNvdWxkIGltcHJvdmUgdGhpbmdzIGlmIHdlIHN0b3JlZCBfX2J1aWx0aW5fcmV0dXJuX2Fk
-ZHJlc3MKPiBkdXJpbmcgcHdtX2dldCgpIHRvIGhlbHAgdXNlcnMgcGlucG9pbnQgd2hlcmUgdGhl
-eSBuZWVkIHRvIGxvb2suCj4gCj4gVGhpZXJyeQo+IAoKX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGlu
-dXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQu
-b3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+On Wed, Feb 06, 2019 at 08:59:44AM +0000, Julien Thierry wrote:
+> Hi Torsten,
+> 
+> On 18/01/2019 16:39, Torsten Duwe wrote:
+> 
+> > --- a/arch/arm64/kernel/ftrace.c
+> > +++ b/arch/arm64/kernel/ftrace.c
+> > @@ -133,17 +163,45 @@ int ftrace_make_call(struct dyn_ftrace *
+> >  	return ftrace_modify_code(pc, old, new, true);
+> >  }
+> >  
+> > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> > +int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
+> > +			unsigned long addr)
+> > +{
+> > +	unsigned long pc = rec->ip + REC_IP_BRANCH_OFFSET;
+> > +	u32 old, new;
+> > +
+> > +	old = aarch64_insn_gen_branch_imm(pc, old_addr, true);
+> > +	new = aarch64_insn_gen_branch_imm(pc, addr, true);
+> > +
+> > +	return ftrace_modify_code(pc, old, new, true);
+> > +}
+> > +#endif
+> > +
+> >  /*
+> >   * Turn off the call to ftrace_caller() in instrumented function
+> >   */
+> >  int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
+> >  		    unsigned long addr)
+> >  {
+> > -	unsigned long pc = rec->ip;
+> > +	unsigned long pc = rec->ip + REC_IP_BRANCH_OFFSET;
+> 
+> Sorry to come back on this patch again, but I was looking at the ftrace
+> code a bit, and I see that when processing the ftrace call locations,
+> ftrace calls ftrace_call_adjust() on every ip registered as mcount
+> caller (or in our case patchable entries). This ftrace_call_adjust() is
+> arch specific, so I was thinking we could place the offset in here once
+> and for all so we don't have to worry about it in the future.
+
+Now that you mention it - yes indeed that's the correct facility to fix
+the deviating address, as Steve has also confirmed. I had totally forgotten
+about this hook.
+
+> Also, I'm unsure whether it would be safe, but we could patch the "mov
+> x9, lr" there as well. In theory, this would be called at init time
+> (before secondary CPUs are brought up) and when loading a module (so I'd
+> expect no-one is executing that code *yet*.
+> 
+> If this is possible, I think it would make things a bit cleaner.
+
+This is in fact very tempting, but it will introduce a nasty side effect
+to ftrace_call_adjust. Is there any obvious documentation that specifies
+guarantees about ftrace_call_adjust being called exactly once for each site?
+
+	Torsten
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
