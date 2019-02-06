@@ -2,62 +2,70 @@ Return-Path: <SRS0=SkGj=QN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DA43BC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 09:25:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 54B98C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 09:31:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A11662175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 09:25:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 21F6C218A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 09:31:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cL5iJSSW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A11662175B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mRLeNlpv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 21F6C218A3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
-	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8NeELK//llgbceiu5PggYaFRQeVoXYys3sFuaUGhTFg=; b=cL5iJSSWM0Egu1
-	guPV4WfyCP9dME1hvXwsKUJSZ+bu0UJioONSOLtmox/izQBloSkjfIXjcIW68t+6ikRatdwRdWKEd
-	5uspUvFHuTKr5iF4P+xoy6qiHTP0YX92RZKr0rRX122QPL8bH7T8R1wMSS70663BMLC+B51Nk8DhV
-	v1NZYNHqTb8760IcwJ3DsRu50H/8xU7dT2I8FAdYCX3a3NHi5/c7AZ0kiiQDm/C9CwYdu50bWK3ma
-	KQfem4R85l/UPgqUjqkBBIkwFJNptybVcpASf0mW8tLGlhUqq8KF5sjsFZxIzW4XV6lyxGzQwez37
-	V7XKELrWVw3/4tQf45gg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=cxbsxnpakII4zNXwBWA/ntH+GQ/cl0kSpcSxjgbEgJk=; b=mRLeNlpvhUQqk+
+	oXTOQmNGe0ulAqB1iJdNtUVdsWQ3vbwLQt9baKHgCU2VJFq9GaTNZp0/7QHQpL3jJMm9u5/+tGftb
+	8bn+oprVOljmDmWStnBfcLJVMf+uRgFLODxHrfKtjrlmaN2YoW4xyKLQd7ZkeslQgo14s8tyRZc17
+	hrauTzS2/lHzev4qkpGLMj8Eay7F2e46iJQ6i05sko2pFvQR246ubjb+kqUDv1tb5DMUvp9mJkjUE
+	pJzKItfrf4Lv01xlfucpdcYq+uNe12eBt2pDKccUeIw6Wpdjnd7iqeIuTul1rRKZI35HYR6HxlzV+
+	CZbQZyuIEmElPLev7SkA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grJSp-0006Sa-DA; Wed, 06 Feb 2019 09:25:51 +0000
-Received: from relay4-d.mail.gandi.net ([217.70.183.196])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grJSi-0006SB-As
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 09:25:49 +0000
-X-Originating-IP: 109.213.13.254
-Received: from localhost (alyon-652-1-30-254.w109-213.abo.wanadoo.fr
- [109.213.13.254]) (Authenticated sender: gregory.clement@bootlin.com)
- by relay4-d.mail.gandi.net (Postfix) with ESMTPSA id 4FEDCE0005;
- Wed,  6 Feb 2019 09:25:38 +0000 (UTC)
-From: Gregory CLEMENT <gregory.clement@bootlin.com>
-To: Miquel Raynal <miquel.raynal@bootlin.com>,
- Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
- Zhang Rui <rui.zhang@intel.com>, Eduardo Valentin <edubezval@gmail.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>
-Subject: Re: [PATCH v4 0/6] Add hw overheat IRQ support to Marvell thermal
- driver
-In-Reply-To: <20181212093645.14752-1-miquel.raynal@bootlin.com>
-References: <20181212093645.14752-1-miquel.raynal@bootlin.com>
-Date: Wed, 06 Feb 2019 10:25:37 +0100
-Message-ID: <87bm3p8e0e.fsf@FE-laptop>
+	id 1grJXy-0008Tb-Cd; Wed, 06 Feb 2019 09:31:10 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1grJXu-0008TF-TJ
+ for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 09:31:08 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C0DF1A78;
+ Wed,  6 Feb 2019 01:31:05 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E24503F719;
+ Wed,  6 Feb 2019 01:31:02 -0800 (PST)
+Subject: Re: [PATCH v7 2/3] arm64: implement ftrace with regs
+From: Julien Thierry <julien.thierry@arm.com>
+To: Torsten Duwe <duwe@lst.de>, Mark Rutland <mark.rutland@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Catalin Marinas
+ <catalin.marinas@arm.com>, Steven Rostedt <rostedt@goodmis.org>,
+ Josh Poimboeuf <jpoimboe@redhat.com>, Ingo Molnar <mingo@redhat.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, Arnd Bergmann <arnd@arndb.de>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>,
+ Amit Daniel Kachhap <amit.kachhap@arm.com>
+References: <20190118163736.6A99268CEB@newverein.lst.de>
+ <20190118163908.E338E68D93@newverein.lst.de>
+ <e206e229-7813-2d37-d5c6-7a9785e311c9@arm.com>
+Message-ID: <22289b8e-bfdf-37cb-0234-2233a528ef61@arm.com>
+Date: Wed, 6 Feb 2019 09:30:58 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <e206e229-7813-2d37-d5c6-7a9785e311c9@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_012547_278528_5EC1463E 
-X-CRM114-Status: GOOD (  24.07  )
+X-CRM114-CacheID: sfid-20190206_013106_959002_C8BF5593 
+X-CRM114-Status: GOOD (  24.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,77 +77,99 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- linux-pm@vger.kernel.org, Antoine Tenart <antoine.tenart@bootlin.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- Russell King <linux@armlinux.org.uk>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>, Marc Zyngier <marc.zyngier@arm.com>,
- David Sniatkiwicz <davidsn@marvell.com>, Rob Herring <robh+dt@kernel.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>,
+Cc: live-patching@vger.kernel.org, linux-kernel@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgTWlxdWVsLAogCiBPbiBtZXIuLCBkw6ljLiAxMiAyMDE4LCBNaXF1ZWwgUmF5bmFsIDxtaXF1
-ZWwucmF5bmFsQGJvb3RsaW4uY29tPiB3cm90ZToKCj4gSGVsbG8sCj4KPiBUaGlzIGlzIHRoZSBs
-YXN0IGJhdGNoIG9mIHBhdGNoZXMgYWJvdXQgdGhlIHRoZXJtYWwgZHJpdmVyIHRoYXQgd2FzCj4g
-c3VzcGVuZGVkLCB3YWl0aW5nIGZvciB0aGUgSUNVL1NFSSBzZXJpZXMgdG8gYmUgbWVyZ2VkLiBO
-b3cgdGhhdAo+IGV2ZXJ5dGhpbmcgaXMgcmVhZHkgaW4gbWFpbmxpbmUsIGxldCdzIGFkZCBoYXJk
-d2FyZSBvdmVyaGVhdCBpbnRlcnJ1cHQKPiBzdXBwb3J0IHRvIHRoaXMgZHJpdmVyLgo+Cj4gQmlu
-ZGluZ3MgYW5kIERUIGFyZSB1cGRhdGVkIGFjY29yZGluZ2x5LiBUaGUgaW50ZXJydXB0IHdpbGwg
-b25seSBiZQo+IHRyaWdnZXJlZCBpZiB0aGUgcGxhdGZvcm0gZ29lcyBhYm92ZSB+MTAywrBDICh0
-aHJlc2hvbGQgc2V0IHRvIDEwMMKwQywKPiBoeXN0ZXJlc2lzIHRvID4gMsKwQykuIFRoZSBpbnRl
-cnJ1cHQgcHJvcGVydHkgaXMgb2YgY291cnNlIG5vdAo+IG1hbmRhdG9yeS4KPgo+IEluIHRoZSBt
-ZWFuIHRpbWUsIEkgYWRkIG15c2VsZiB0byB0aGUgTUFJTlRBSU5FUlMgZmlsZSB0byByZWNlaXZl
-IGFuZAo+IHJldmlldyBwb3NzaWJsZSBmaXhlcy9uZXcgZmVhdHVyZXMuCj4KPiBUaGFua3MsCj4g
-TWlxdcOobAo+Cj4gQ2hhbmdlcyBzaW5jZSB2MzoKPiA9PT09PT09PT09PT09PT09PQo+ICogQWRk
-ZWQgUm9iJ3MgUmV2aWV3ZWQtYnkgb24gY3AxMTAgYmluZGluZ3MuCj4gKiBBZGRyZXNzZWQgUm9i
-IGNvbW1lbnQgb24gYXA4MDYgYmluZGluZ3MgYnkgcmVtb3ZpbmcgdGhlIHJlZmVyZW5jZSB0bwo+
-ICAgdGhlIGludGVycnVwdCBwYXJlbnQuCj4KPiBDaGFuZ2VzIHNpbmNlIHYyOgo+ID09PT09PT09
-PT09PT09PT09Cj4gKiBSZW1vdmUgdXNlbGVzcyBnb3RvIHN0YXRlbWVudC4KPiAqIE1vdmUgdGhl
-IGh5c3RlcmVzaXMgYXJyYXkgb3V0IG9mIHRoZSBmdW5jdGlvbiB1c2luZyBpdCBhbmQgZGVjbGFy
-ZQo+ICAgdGhlIGFycmF5IHN0YXRpY2FsbHkgaW5zdGVhZCB0aGF0IGRvaW5nIHNvIG9uIHRoZSBz
-dGFjay4KPiAqIFJlbW92ZSB1bm5lY2Vzc2FyeSBjYXN0Lgo+ICogT24gZXJyb3IsIGF2b2lkIHJl
-dHVybmluZyBhIHZhbHVlIG5vdCBjb21wYXRpYmxlIHdpdGggaXJxcmV0dXJuX3QgaW4KPiAgIHRo
-ZSBJUlEgaGFuZGxlciAoYW5kIHdoZW4gZG9pbmcgc28sIHJlLWVuYWJsZSBpbnRlcnJ1cHRzCj4g
-ICBmaXJzdCkuIFRoaXMgaXMgc2ltcGx5IGhhbmRsZWQgd2l0aCBhIGdvdG8gc3RhdGVtZW50Lgo+
-ICogMCBpcyBub3QgYSB2YWxpZCBpbnRlcnJ1cHQsIHRha2UgdGhpcyBpbnRvIGFjY291bnQgZHVy
-aW5nIHZhcmlhYmxlcwo+ICAgdmFsaWRhdGlvbi4KPgo+IENoYW5nZXMgKm5vdCogYWRkcmVzc2Vk
-IHNpbmNlIHYyOgo+ID09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09Cj4gKiBPdmVyaGVh
-dCBpbnRlcnJ1cHQgY29uZmlndXJhdGlvbiBoYXMgY2VydGFpbiBsaW1pdGF0aW9ucyBvbiB3aGlj
-aAo+ICAgTWFyYyBhc2tlZCBxdWVzdGlvbnMuIEkgZG9uJ3Qga25vdyBpZi93aGF0IEkgbmVlZCB0
-byBjaGFuZ2Ugc28KPiAgIGtlZXBpbmcgaXQgbGlrZSB0aGlzIGZvciB0aGlzIHZlcnNpb24uCj4g
-KiBFZHVhcmRvIHBvaW50ZWQgdGhhdCBvbmNlIGEgY3JpdGljYWwgbGV2ZWwgaGFzIGJlZW4gcmVh
-Y2hlZCwgdGhlcmUKPiAgIGlzIG5vIHdheSBiYWNrLCB0aGUgc3lzdGVtIHdpbGwgc2h1dGRvd24u
-IEkgZGVzaWduZWQgdGhlIGhhbmRsZXIgdG8KPiAgIHJlY292ZXIgZnJvbSB0aGF0IGFuZCB0byBl
-bmFibGUgdGhlIElSUSBhZ2FpbiBpZiBuZWVkZWQsIGJ1dCBtYXliZQo+ICAgdGhpcyBpcyB1c2Vs
-ZXNzIGFuZCBzaG91bGQgYmUgcmVtb3ZlZC4gV2hpbGUgd2FpdGluZyBmb3IgaGlzIGFuc3dlciwK
-PiAgIEkgYW0gc2VuZGluZyBhbm90aGVyIHZlcnNpb24gYW5kIHdpbGwgY29ycmVjdCBpbiBhIHY0
-IGlmIG5lZWRlZC4KPgo+IENoYW5nZXMgc2luY2UgdjE6Cj4gPT09PT09PT09PT09PT09PT0KPiAq
-IFVzZSBhIHRocmVhZGVkIElSUSBoYW5kbGVyIHRvIGF2b2lkIGEgcG90ZW50aWFsIGxvY2sgZGVw
-ZW5jeSB3aGVuCj4gICBub3RpZnlpbmcgdGhlIGNvcmUgb2YgYW4gb3ZlcmhlYXQgc2l0dWF0aW9u
-Lgo+Cj4KPiBNaXF1ZWwgUmF5bmFsICg2KToKPiAgIHRoZXJtYWw6IGFybWFkYTogYWRkIG92ZXJo
-ZWF0IGludGVycnVwdCBzdXBwb3J0Cj4gICBNQUlOVEFJTkVSUzogdGhlcm1hbDogYWRkIGVudHJ5
-IGZvciBNYXJ2ZWxsIE1WRUJVIHRoZXJtYWwgZHJpdmVyCj4gICBkdC1iaW5kaW5nczogYXA4MDY6
-IGRvY3VtZW50IHRoZSB0aGVybWFsIGludGVycnVwdCBjYXBhYmlsaXRpZXMKPiAgIGR0LWJpbmRp
-bmdzOiBjcDExMDogZG9jdW1lbnQgdGhlIHRoZXJtYWwgaW50ZXJydXB0IGNhcGFiaWxpdGllcwoK
-Cj4gICBhcm02NDogZHRzOiBtYXJ2ZWxsOiBhZGQgaW50ZXJydXB0IHN1cHBvcnQgdG8gYXA4MDYg
-dGhlcm1hbCBub2RlCj4gICBhcm02NDogZHRzOiBtYXJ2ZWxsOiBhZGQgaW50ZXJydXB0IHN1cHBv
-cnQgdG8gY3AxMTAgdGhlcm1hbCBub2RlCkJvdGggcGF0Y2hlcyBhcHBsaWVkIHRvIG12ZWJ1L2R0
-NjQKClRoYW5rcywKCkdyZWdvcnkKCgo+Cj4gIC4uLi9hcm0vbWFydmVsbC9hcDgwNi1zeXN0ZW0t
-Y29udHJvbGxlci50eHQgICB8ICAgNyArCj4gIC4uLi9hcm0vbWFydmVsbC9jcDExMC1zeXN0ZW0t
-Y29udHJvbGxlci50eHQgICB8ICAgOSArCj4gIE1BSU5UQUlORVJTICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgICB8ICAgNSArCj4gIGFyY2gvYXJtNjQvYm9vdC9kdHMvbWFydmVsbC9h
-cm1hZGEtYXA4MDYuZHRzaSB8ICAxOCArLQo+ICBhcmNoL2FybTY0L2Jvb3QvZHRzL21hcnZlbGwv
-YXJtYWRhLWNwMTEwLmR0c2kgfCAgMTUgKy0KPiAgZHJpdmVycy90aGVybWFsL2FybWFkYV90aGVy
-bWFsLmMgICAgICAgICAgICAgIHwgMjcwICsrKysrKysrKysrKysrKysrLQo+ICA2IGZpbGVzIGNo
-YW5nZWQsIDMxNyBpbnNlcnRpb25zKCspLCA3IGRlbGV0aW9ucygtKQo+Cj4gLS0gCj4gMi4xOS4x
-Cj4KCi0tIApHcmVnb3J5IENsZW1lbnQsIEJvb3RsaW4KRW1iZWRkZWQgTGludXggYW5kIEtlcm5l
-bCBlbmdpbmVlcmluZwpodHRwOi8vYm9vdGxpbi5jb20KCl9fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0Cmxp
-bnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFk
-Lm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+
+
+On 06/02/2019 08:59, Julien Thierry wrote:
+> Hi Torsten,
+> 
+> On 18/01/2019 16:39, Torsten Duwe wrote:
+>> Once gcc8 adds 2 NOPs at the beginning of each function, replace the
+>> first NOP thus generated with a quick LR saver (move it to scratch reg
+>> x9), so the 2nd replacement insn, the call to ftrace, does not clobber
+>> the value. Ftrace will then generate the standard stack frames.
+>>
+>> Note that patchable-function-entry in GCC disables IPA-RA, which means
+>> ABI register calling conventions are obeyed *and* scratch registers
+>> such as x9 are available.
+>>
+>> Introduce and handle an ftrace_regs_trampoline for module PLTs, right
+>> after ftrace_trampoline, and double the size of this special section.
+>>
+>> Signed-off-by: Torsten Duwe <duwe@suse.de>
+>>
+>> ---
+>>
+>> Mark, if you see your ftrace entry macro code being represented correctly
+>> here, please add your sign-off, As I've initially copied it from your mail.
+>>
+>> ---
+>>  arch/arm64/include/asm/ftrace.h  |   17 ++++-
+>>  arch/arm64/include/asm/module.h  |    3 
+>>  arch/arm64/kernel/entry-ftrace.S |  125 +++++++++++++++++++++++++++++++++++++--
+>>  arch/arm64/kernel/ftrace.c       |  114 ++++++++++++++++++++++++++---------
+>>  arch/arm64/kernel/module-plts.c  |    3 
+>>  arch/arm64/kernel/module.c       |    2 
+>>  6 files changed, 227 insertions(+), 37 deletions(-)
+> 
+> [...]
+> 
+>> --- a/arch/arm64/kernel/ftrace.c
+>> +++ b/arch/arm64/kernel/ftrace.c
+>> @@ -133,17 +163,45 @@ int ftrace_make_call(struct dyn_ftrace *
+>>  	return ftrace_modify_code(pc, old, new, true);
+>>  }
+>>  
+>> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+>> +int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
+>> +			unsigned long addr)
+>> +{
+>> +	unsigned long pc = rec->ip + REC_IP_BRANCH_OFFSET;
+>> +	u32 old, new;
+>> +
+>> +	old = aarch64_insn_gen_branch_imm(pc, old_addr, true);
+>> +	new = aarch64_insn_gen_branch_imm(pc, addr, true);
+>> +
+>> +	return ftrace_modify_code(pc, old, new, true);
+>> +}
+>> +#endif
+>> +
+>>  /*
+>>   * Turn off the call to ftrace_caller() in instrumented function
+>>   */
+>>  int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
+>>  		    unsigned long addr)
+>>  {
+>> -	unsigned long pc = rec->ip;
+>> +	unsigned long pc = rec->ip + REC_IP_BRANCH_OFFSET;
+> 
+> Sorry to come back on this patch again, but I was looking at the ftrace
+> code a bit, and I see that when processing the ftrace call locations,
+> ftrace calls ftrace_call_adjust() on every ip registered as mcount
+> caller (or in our case patchable entries). This ftrace_call_adjust() is
+> arch specific, so I was thinking we could place the offset in here once
+> and for all so we don't have to worry about it in the future.
+> 
+> Also, I'm unsure whether it would be safe, but we could patch the "mov
+> x9, lr" there as well. In theory, this would be called at init time
+> (before secondary CPUs are brought up) and when loading a module (so I'd
+> expect no-one is executing that code *yet*.
+> 
+
+And if the above works, we could also define CC_HAVE_NOP_MCOUNT (when we
+have the patchable entry) and then we just not have to worry about the
+initial ftrace_make_nop() with MCOUNT_ADDR.
+
+-- 
+Julien Thierry
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
