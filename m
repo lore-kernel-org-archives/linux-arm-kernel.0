@@ -2,67 +2,67 @@ Return-Path: <SRS0=SkGj=QN=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D7996C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 09:12:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 713CAC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 09:16:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A6C97207E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 09:12:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 403C72175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed,  6 Feb 2019 09:16:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oP6AR/MR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6C97207E0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SHqESZU1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 403C72175B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oMBdqMYI+m91OTnuW66wWl0wNWlW81oqDQ6CbocXUvo=; b=oP6AR/MRPl+DWh
-	Dwv08QzUT9eQRDnDBzCrgydM1NkQ5PzM0ZLzDE/r89Bun0SAg26GNi+BLH0n0FCGHFfXSxwqaX4jl
-	WQRynyybvAtB2WJ26C8UnXvJJhBZ/myvKXuJTAjk5cL+WjICTQoHNHoFcgXhptc39C0MwaEjYDc3C
-	vtoMTh15ZqaIZxyaYo50WQCtxlZk+/Hw0Kd9y52y4n/dEtoDe7mCUFgb7EAh0e81xpxjlm2ECwUx6
-	v1LbT+DHLy6XrKwWd5nccW3QttsdHHpgvJtxO+VPWJLnSdWIIxYXznU2tMPp521V2bbrPq7LTyJyf
-	b436N7gLX+pzJ2uDCpOg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=ekAzrwlzzguQ+U+EHOFDoyW4qF0N3DNHkPlspFPxAJw=; b=SHqESZU1buMbc3FpZ0UirBmj4
+	IFSd+ZJw7ajuYzriysPvYglSDWnmO1H1juWL3jSsM0oEYHolnmbp9wErjntzYYSeD1ThFYsD0DzG1
+	wkWCvk5VDfe9rhd0tZ5CRIXGDKHMNbGE5bRMcPwv12lr4F7yqp6mlYyI5B6RlMi1hqM6epJhz+2SZ
+	Thcre/JRsYm8RT1a4I2NZXXRYwbIT3H775+U4QWMbCd6UKFLmFbk6vQZNAM81exxJk8sedLTGYXJD
+	aaqreUnwx1DBGNVCa1Qd6bY8jsDDVG9iGDUxnAAR3LH0zcc/nBw0J96yJr3DycJy7CuS+lpWjNWM4
+	akmbYjdAw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grJFt-0000fz-HO; Wed, 06 Feb 2019 09:12:29 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
+	id 1grJJi-0002dt-9l; Wed, 06 Feb 2019 09:16:26 +0000
+Received: from relay5-d.mail.gandi.net ([217.70.183.197])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grJFp-0000fY-Ml
- for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 09:12:27 +0000
-Received: from smtp.corp.redhat.com (int-mx04.intmail.prod.int.phx2.redhat.com
- [10.5.11.14])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
- (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id B1C89C058CA8;
- Wed,  6 Feb 2019 09:12:23 +0000 (UTC)
-Received: from gondolin (dhcp-192-187.str.redhat.com [10.33.192.187])
- by smtp.corp.redhat.com (Postfix) with ESMTP id 2CE5C18E2A;
- Wed,  6 Feb 2019 09:12:14 +0000 (UTC)
-Date: Wed, 6 Feb 2019 10:12:11 +0100
-From: Cornelia Huck <cohuck@redhat.com>
-To: Sean Christopherson <sean.j.christopherson@intel.com>
-Subject: Re: [PATCH v2 01/27] KVM: Call kvm_arch_memslots_updated() before
- updating memslots
-Message-ID: <20190206101211.253cfbd9.cohuck@redhat.com>
-In-Reply-To: <20190205205443.1059-2-sean.j.christopherson@intel.com>
-References: <20190205205443.1059-1-sean.j.christopherson@intel.com>
- <20190205205443.1059-2-sean.j.christopherson@intel.com>
-Organization: Red Hat GmbH
+ id 1grJJf-0002dP-AH
+ for linux-arm-kernel@lists.infradead.org; Wed, 06 Feb 2019 09:16:25 +0000
+X-Originating-IP: 90.88.22.177
+Received: from localhost (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
+ [90.88.22.177]) (Authenticated sender: maxime.ripard@bootlin.com)
+ by relay5-d.mail.gandi.net (Postfix) with ESMTPSA id 0479C1C0010;
+ Wed,  6 Feb 2019 09:16:08 +0000 (UTC)
+Date: Wed, 6 Feb 2019 10:16:08 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Vasily Khoruzhick <anarsoul@gmail.com>
+Subject: Re: [linux-sunxi] Re: [PATCH RESEND v2 06/12] drm/sun4i: rgb: Add 1%
+ tolerance to dclk frequency check when bridge is connected
+Message-ID: <20190206091608.yvws7iyjuhw3xsdk@flea>
+References: <20190203185501.8958-1-anarsoul@gmail.com>
+ <20190203185501.8958-7-anarsoul@gmail.com>
+ <20190204142036.vd42nvyjnjr5yeoi@flea>
+ <CA+E=qVfTfJ9E29gz83tdVGx5_KGWSQVJOAxKTzC+-n7=gdj0cA@mail.gmail.com>
+ <0F6CBEA4-6DB6-40F1-A2FD-65101AF64F1F@aosc.io>
+ <CA+E=qVd7yh=JNZSvrfY4Diu+VJWFK6yLUJ5MavBcZ8Cftn6f-Q@mail.gmail.com>
+ <20190205154156.o3aa4cy6uxenkwol@flea>
+ <CA+E=qVePKnQLwObfu=ya7-GcUiUkjyFg2p-rmg=FiJJUhQBvxw@mail.gmail.com>
 MIME-Version: 1.0
-X-Scanned-By: MIMEDefang 2.79 on 10.5.11.14
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.32]); Wed, 06 Feb 2019 09:12:24 +0000 (UTC)
+In-Reply-To: <CA+E=qVePKnQLwObfu=ya7-GcUiUkjyFg2p-rmg=FiJJUhQBvxw@mail.gmail.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_011225_759750_15FA9EA5 
-X-CRM114-Status: GOOD (  15.43  )
+X-CRM114-CacheID: sfid-20190206_011623_503620_1289F6F5 
+X-CRM114-Status: GOOD (  17.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,60 +74,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-s390@vger.kernel.org, Janosch Frank <frankja@linux.ibm.com>,
- kvm@vger.kernel.org, Radim =?UTF-8?B?S3LEjW3DocWZ?= <rkrcmar@redhat.com>,
- Marc Zyngier <marc.zyngier@arm.com>, James Hogan <jhogan@kernel.org>,
- David Hildenbrand <david@redhat.com>,
- Christoffer Dall <christoffer.dall@arm.com>, kvm-ppc@vger.kernel.org,
- linux-mips@vger.kernel.org, Paul Mackerras <paulus@ozlabs.org>,
- Christian Borntraeger <borntraeger@de.ibm.com>,
- Xiao Guangrong <guangrong.xiao@gmail.com>, Paolo Bonzini <pbonzini@redhat.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Archit Taneja <architt@codeaurora.org>, David Airlie <airlied@linux.ie>,
+ Chen-Yu Tsai <wens@csie.org>, dri-devel <dri-devel@lists.freedesktop.org>,
+ Andrzej Hajda <a.hajda@samsung.com>,
+ linux-sunxi <linux-sunxi@googlegroups.com>, Rob Herring <robh+dt@kernel.org>,
+ Thierry Reding <thierry.reding@gmail.com>,
+ Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
+ Daniel Vetter <daniel@ffwll.ch>, Sean Paul <seanpaul@chromium.org>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>,
+ Icenowy Zheng <icenowy@aosc.io>
+Content-Type: multipart/mixed; boundary="===============5793425596158131481=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue,  5 Feb 2019 12:54:17 -0800
-Sean Christopherson <sean.j.christopherson@intel.com> wrote:
 
-> kvm_arch_memslots_updated() is at this point in time an x86-specific
-> hook for handling MMIO generation wraparound.  x86 stashes 19 bits of
-> the memslots generation number in its MMIO sptes in order to avoid
-> full page fault walks for repeat faults on emulated MMIO addresses.
-> Because only 19 bits are used, wrapping the MMIO generation number is
-> possible, if unlikely.  kvm_arch_memslots_updated() alerts x86 that
-> the generation has changed so that it can invalidate all MMIO sptes in
-> case the effective MMIO generation has wrapped so as to avoid using a
-> stale spte, e.g. a (very) old spte that was created with generation==0.
-> 
-> Given that the purpose of kvm_arch_memslots_updated() is to prevent
-> consuming stale entries, it needs to be called before the new generation
-> is propagated to memslots.  Invalidating the MMIO sptes after updating
-> memslots means that there is a window where a vCPU could dereference
-> the new memslots generation, e.g. 0, and incorrectly reuse an old MMIO
-> spte that was created with (pre-wrap) generation==0.
-> 
-> Fixes: e59dbe09f8e6 ("KVM: Introduce kvm_arch_memslots_updated()")
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Sean Christopherson <sean.j.christopherson@intel.com>
-> ---
->  arch/mips/include/asm/kvm_host.h    | 2 +-
->  arch/powerpc/include/asm/kvm_host.h | 2 +-
->  arch/s390/include/asm/kvm_host.h    | 2 +-
->  arch/x86/include/asm/kvm_host.h     | 2 +-
->  arch/x86/kvm/mmu.c                  | 4 ++--
->  arch/x86/kvm/x86.c                  | 4 ++--
->  include/linux/kvm_host.h            | 2 +-
->  virt/kvm/arm/mmu.c                  | 2 +-
->  virt/kvm/kvm_main.c                 | 7 +++++--
->  9 files changed, 15 insertions(+), 12 deletions(-)
+--===============5793425596158131481==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="6mbqqqmv7k77dcll"
+Content-Disposition: inline
 
-Not an x86 person, but I think that makes sense.
 
-Reviewed-by: Cornelia Huck <cohuck@redhat.com>
+--6mbqqqmv7k77dcll
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Tue, Feb 05, 2019 at 09:49:17AM -0800, Vasily Khoruzhick wrote:
+> On Tue, Feb 5, 2019 at 7:42 AM Maxime Ripard <maxime.ripard@bootlin.com> =
+wrote:
+> >
+> > On Mon, Feb 04, 2019 at 10:50:17AM -0800, Vasily Khoruzhick wrote:
+> > > On Mon, Feb 4, 2019 at 8:29 AM Icenowy Zheng <icenowy@aosc.io> wrote:
+> > > > >> IIRC, from the previous discussion, HDMI had a tolerancy require=
+ment
+> > > > >> in the standard. Do you know if there's such a thing for eDP? Th=
+at
+> > > > >> would solve the issue for all the eDP displays at once.
+> > > > >
+> > > > >I don't have access to eDP standard - vesa.org says it's available=
+ to
+> > > > >members only.
+> > > >
+> > > > Try out to grab an old version?
+> > > >
+> > > > I remember 1.0 is open.
+> > >
+> > > I can't find anything regarding dot clock tolerance in DisplayPort
+> > > specification.
+> >
+> > I guess since the DP is a VESA spec, it's probably .5%, just like on
+> > the EDID (well, CVT).
+>=20
+> Unfortunately that's not enough for Pinebook. It needs 1% for 768p
+> panel.
+
+And that mode is stored in the EDID as a standard (or established)
+timing, or a detailed timing?
+
+If the latter, then it should also provide the tolerancies as part of
+the panel timing description.
+
+If the former, then what would be the advertised pixel clock and the
+one we can compute? Maybe we have a bug somewhere.
+
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--6mbqqqmv7k77dcll
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXFql0gAKCRDj7w1vZxhR
+xWGpAP9D/c/QkTM7RkEmYqX278PgTsD6DZQS9V3WGIvI9bLJXgEAm3+HDc3qJQPA
+0HQwnjxRf6y79VXPkZBpd2H0cw1tdQY=
+=vBLL
+-----END PGP SIGNATURE-----
+
+--6mbqqqmv7k77dcll--
+
+
+--===============5793425596158131481==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============5793425596158131481==--
+
