@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2B967C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:36:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8518AC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:44:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E6008206DD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:36:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4B57321904
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:44:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tuwiEvQM";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="aJL0qX9X"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6008206DD
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V+8P90kn";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="NX93lTAr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B57321904
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,63 +25,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=e7wDOdsXrkaBY3uhlmnJFIKbXefWTvRglZbczX7Q+rk=; b=tuwiEvQM/Emqps
-	GFsJHNC0tXI/7SuiKw+MIKPWWlrebwYRsfVZRZIFPNQ7chYPKYlYkCcOhO7RMaOg9l+eMFP52013Q
-	yfC7gJld0/FHncwQ9CkpcB+X5sMOLGf5X951OlTdG6NMuvjO4mXbJVYmH/v+dSjnAK6G3DfOlXPuQ
-	GxTjvqIG2ok8CJB/rUz0yiyEs9UaisMyfoEbf0/CVjZnqr0G4Ob2sxz1nf8UAiBWNOHNGj/LZMu2v
-	AqY2jMWJCyg2+wz3ITMz08a+Ej9LkpDieOJf80oiNMOvznGu/kXQJtnCfHCKew0H9zlhr7wDYtJc/
-	sVZ8lLEAHeHv8T8tL4Gg==;
+	List-Owner; bh=4uUnfpD/J9wjOJATOcVAEk58f8d27zWpXp8yHR46klw=; b=V+8P90knF39q1s
+	fbJzSaTF+2N5MG6p3g4gwYH1Rs6u5BtY/UEgzMPXl39FCou7A1FmbIvbuBW8hBc4YHPVEwBRxMMsU
+	W8eUmEQn4LfaxhniGu08rp2faEyfjnkVO7cVyqDLZXlxc4xbR1ctx7ZBXeAhzjRPrTL5j96zhzmem
+	Sl+MY6u9+qfSV5fi2MgFwj5zTEHaBOAPHRuo3eakPdbHfjBDsRZF+U4Edm7qwVkFwhI62cEIor1qV
+	/HspUdul9LZEd/n7hNCXoqvAOQRq+lfNm9biQkoIi4yVgWIrc5vFP7HMbdq17RwIjvJtuxDcEBIGj
+	wwaiOBQ67P6tCkMBUceg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grjqW-0004mk-9s; Thu, 07 Feb 2019 13:36:04 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
+	id 1grjyJ-0007Un-Ke; Thu, 07 Feb 2019 13:44:07 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grjqR-0004mM-L0
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 13:36:01 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x17DZhwD126071;
- Thu, 7 Feb 2019 07:35:43 -0600
+ id 1grjyG-0007Nn-O1
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 13:44:06 +0000
+Received: from lelv0266.itg.ti.com ([10.180.67.225])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x17Dhn6m007453;
+ Thu, 7 Feb 2019 07:43:49 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549546543;
- bh=HVZABGzY+/mzH9sbu3mK4ofM7dbrE9QG/dVMSoGapvo=;
+ s=ti-com-17Q1; t=1549547029;
+ bh=h31aGMGZ/O3IAV76pMQeoWa/s2tCobM0/mcmHNc2kw0=;
  h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=aJL0qX9Xy74z+4daMeSxe8uhUShCfm62C/gmdjnPIzdrCjhEBGypvqBwID6g0wTMy
- l/U8TxfXBtrznXg5fBTtgN7s9a6NYEQ2VlOET/yRcQr6xirSyvBXzHjieYCYbyrYxs
- kHSbtA9FgJuxQWOWSKVa+V/EAFX5fYaCdvQbCYng=
-Received: from DFLE112.ent.ti.com (dfle112.ent.ti.com [10.64.6.33])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x17DZhPW012287
+ b=NX93lTArgqXNl07AnU31uorIgPEs7IJ+EnAzpnYo5caI/2llG22WsO7tZT7oh5WoA
+ t1CYvldGSE/J7KSlTkjooBq2Cq32/TA3ybK37mvc0fXXwI+TNXX5C3nFYA5yIV9aRG
+ 2lSK3lsbVNgaT4Jz7IOce8R26ExIupI/XkoZhaRo=
+Received: from DFLE114.ent.ti.com (dfle114.ent.ti.com [10.64.6.35])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x17DhnLT024603
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 7 Feb 2019 07:35:43 -0600
-Received: from DFLE101.ent.ti.com (10.64.6.22) by DFLE112.ent.ti.com
- (10.64.6.33) with Microsoft SMTP Server (version=TLS1_2,
+ Thu, 7 Feb 2019 07:43:49 -0600
+Received: from DFLE113.ent.ti.com (10.64.6.34) by DFLE114.ent.ti.com
+ (10.64.6.35) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 7
- Feb 2019 07:35:43 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DFLE101.ent.ti.com
- (10.64.6.22) with Microsoft SMTP Server (version=TLS1_0,
+ Feb 2019 07:43:49 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE113.ent.ti.com
+ (10.64.6.34) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 7 Feb 2019 07:35:43 -0600
+ Thu, 7 Feb 2019 07:43:49 -0600
 Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x17DZeRc003242;
- Thu, 7 Feb 2019 07:35:41 -0600
-Subject: Re: [PATCH 22/35] ARM: davinci: cp-intc: add the new config
- structures for da8xx SoCs
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x17Dhk8s002633;
+ Thu, 7 Feb 2019 07:43:47 -0600
+Subject: Re: [PATCH 23/35] ARM: davinci: cp-intc: use a common prefix for all
+ symbols
 To: Bartosz Golaszewski <brgl@bgdev.pl>, Kevin Hilman <khilman@kernel.org>,
  Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
  Marc Zyngier <marc.zyngier@arm.com>
 References: <20190131133928.17985-1-brgl@bgdev.pl>
- <20190131133928.17985-23-brgl@bgdev.pl>
+ <20190131133928.17985-24-brgl@bgdev.pl>
 From: Sekhar Nori <nsekhar@ti.com>
-Message-ID: <fc43b6de-c53f-e2ae-9c8f-6f479dd21126@ti.com>
-Date: Thu, 7 Feb 2019 19:05:39 +0530
+Message-ID: <d81883ee-1b87-7c55-e595-7c7c7551b824@ti.com>
+Date: Thu, 7 Feb 2019 19:13:45 +0530
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <20190131133928.17985-23-brgl@bgdev.pl>
+In-Reply-To: <20190131133928.17985-24-brgl@bgdev.pl>
 Content-Language: en-US
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_053559_724711_39490276 
-X-CRM114-Status: GOOD (  13.19  )
+X-CRM114-CacheID: sfid-20190207_054404_845016_350D4044 
+X-CRM114-Status: GOOD (  15.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,17 +103,25 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 On 31/01/19 7:09 PM, Bartosz Golaszewski wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> Add the new-style config structures for dm* SoCs. They will be used
-
-da* SoCs.
-
-> once we make the cp-intc driver stop using davinci_soc_info.
+> In preparation for moving the driver to drivers/irqchip do some
+> cleanup: use a common prefix for all symbols.
 > 
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
->  arch/arm/mach-davinci/da830.c | 10 ++++++++++
->  arch/arm/mach-davinci/da850.c | 10 ++++++++++
->  2 files changed, 20 insertions(+)
+>  arch/arm/mach-davinci/cp_intc.c             | 143 ++++++++++----------
+>  arch/arm/mach-davinci/da830.c               |   2 +-
+>  arch/arm/mach-davinci/da850.c               |   2 +-
+>  arch/arm/mach-davinci/include/mach/common.h |   2 +-
+>  4 files changed, 77 insertions(+), 72 deletions(-)
+
+>  /* Enable interrupt */
+>  static void cp_intc_unmask_irq(struct irq_data *d)
+>  {
+> -	cp_intc_write(d->hwirq, CP_INTC_SYS_ENABLE_IDX_SET);
+> +	davinci_cp_intc_write(d->hwirq, DAVINCI_CP_INTC_SYS_ENABLE_IDX_SET);
+>  }
+
+For consistency, can you please add davinci_ prefix to this function too?
 
 Thanks,
 Sekhar
