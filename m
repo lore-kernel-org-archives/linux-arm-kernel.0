@@ -2,121 +2,85 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 140C0C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 05:53:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B1A55C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 05:54:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D584A21902
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 05:53:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 80E452147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 05:54:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F9Rjudy1";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=ucr.edu header.i=@ucr.edu header.b="ke9wHLrk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D584A21902
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ucr.edu
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="okbYcYRy";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="I93jGVOL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 80E452147C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jVVE5VmS34fh3qoXnL7og7Nlm4exV738KoLqLk/pgXA=; b=F9Rjudy1QC+2oW
-	1b3Nj8aw0wLoCqyCoc2rN4DnU7IzMWaKYx4Wd497N19wlIZtekDMytZijZ/t7Ib+rXFskUB1yorG1
-	qGHCiuDsUhAC6kubUytyOSM9bGbre50qObocy5XpIohJXXvjGMCw5UWoWVBJpL+8UmGLGGyMSaS6x
-	aBFwTZByqMJ4JJWjjhyvEmgQ/csL4eqo5wJf4gLguB+MaIHFyzzHf76+y43Ls2qXsyK2R6+RNsb4I
-	kRj5J+IG+61FLzpPkTIWI9zgZ0Vw4x54MX02MEpJz0FyKAamtlbj9cN50jdZYQDEcSDNr1cqGOZub
-	DV9PzqCLHLU71kzAwfsQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=1o82b5Gukpcd6M9ImlezpbRJuDj45z1gKMl3sasNkyQ=; b=okb
+	YcYRy9OgKyz0VYsaWoKapBV5Mxp7pEqVRWppNXy9QZveC+PNqcKqcW8n6Yspw93ZFAynaq2jaWROW
+	PoLFXQB1uIMxM7rPX8LQ9KfQCJKqJOFMqRIslK20vMttm6EWTmawT3LjV77eBRb4BGqq6OUC8AkNH
+	T0Zr2KdfiVQNJoiycAa6VdXNLKwud1VqoqVvxTGmNQ/e+XO13B+HrnciHm4ZiE0va8pS9SoIuKgnj
+	p5u1tloeOcTxf21s5V91nH227AgYrC1J51oSwyFMzYtuGUkih/Lh7SotbVB6nhLnVcT7SRfQrFUF7
+	d28g2tnWw2HwyKVUEFqj4H6VilLtVVw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grccv-0003NT-Ve; Thu, 07 Feb 2019 05:53:33 +0000
-Received: from mx5.ucr.edu ([138.23.62.67])
+	id 1grcdX-0003g3-Q0; Thu, 07 Feb 2019 05:54:11 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grccs-0003N7-H2
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 05:53:31 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple;
- d=ucr.edu; i=@ucr.edu; q=dns/txt; s=selector3;
- t=1549518810; x=1581054810;
- h=mime-version:references:in-reply-to:from:date:message-id:
- subject:to:cc; bh=VcVhiERyGKHily5ypTgS5H29A4FBtKsk1pDYCwypsi4=;
- b=ke9wHLrkLTtCzbi6WoqGYtfykbuvg2wajTjzJuGR/PiGE1iLh4LN1Dx2
- gXqzQZsZOpK4YPOcUynNTWPwfONIwhZXWykUfB3JEuM7CgnkjC/901Fb+
- Ed4znq/UHlQCFlVmoywZj0Z5j6fzrkonwhp1o0E7o2hJ/jC3BK5DlLoD2
- akSR66luoQgQiIj561kTBf2Y7hzoEahtTVa1CnXYUm1FLOkLQtB8aaj2s
- ad2lqEi97U8vabvugz+gn6vNVIkOrncOBNzeS1j1Q1avfLpYJqwNpFKMQ
- MjXRAMGOHy5wMwAmYwYe8SMi6wYJ72M/aWoUc+eqP1BEQKpoMo2fA3j70 g==;
-IronPort-PHdr: =?us-ascii?q?9a23=3A8VFfYBNLBHQxhGDd4fgl6mtUPXoX/o7sNwtQ0KIM?=
- =?us-ascii?q?zox0LfT7rarrMEGX3/hxlliBBdydt6oUzbKO+4nbGkU4qa6bt34DdJEeHzQksu?=
- =?us-ascii?q?4x2zIaPcieFEfgJ+TrZSFpVO5LVVti4m3peRMNQJW2aFLduGC94iAPERvjKwV1?=
- =?us-ascii?q?Ov71GonPhMiryuy+4ZLebxlLiTanfb9+MAi9oBnMuMURnYZsMLs6xAHTontPde?=
- =?us-ascii?q?RWxGdoKkyWkh3h+Mq+/4Nt/jpJtf45+MFOTav1f6IjTbxFFzsmKHw65NfqtRbY?=
- =?us-ascii?q?UwSC4GYXX3gMnRpJBwjF6wz6Xov0vyDnuOdxxDWWMMvrRr0vRz+s87lkRwPpiC?=
- =?us-ascii?q?cfNj427mfXitBrjKlGpB6tvgFzz5LIbI2QMvd1Y6HTcs4ARWdZUclRWS5ODIOy?=
- =?us-ascii?q?YYUMEuQPI/pXopLhp1cStxayGRWgCP/txzJOm3T43bc60+MkEQze3gMgHtMPsH?=
- =?us-ascii?q?TJrNXyKawdUuC1w7PJzT7eaP5X2Tb86IjSfRAgvf2AQbx9fNHMyUYzDQPJlEuf?=
- =?us-ascii?q?ppH4Pz6M0OkGrmuV7/J4WO6xl2Iqrxt9rzuvy8s2l4XEh4AYxkrG+Clnxos+OM?=
- =?us-ascii?q?e2R1RhYdG+FZtdrySaN4xrTcw8W2xooyM6yqEeuZ68YSgK1Iwrxx7BZPyDdIiF?=
- =?us-ascii?q?+hfjW/yQITd8nX5lfLy/iwur/UiuyODwSNO40FlNripCndnMsm4C2wbP5ciAT/?=
- =?us-ascii?q?tx5kah2TCR2ADP8uxIP1w4mK7BJ5MiwrM8jIcfvEXBEyPsmkj6kreadkA+9eip?=
- =?us-ascii?q?7+TnbK/mppiZN4JsigD/M6Qulda+AegkLgQDUXOW+fmg273550H2XqhFjuAunq?=
- =?us-ascii?q?nDrJ/aPdgbprK+AwJN1oYj6hC/Dyqp0dgBh3YHNldFdAuEj4f3IVHOJu73DfOk?=
- =?us-ascii?q?jlSokTdr3OzGPqb7DpXMKHjDnq3hcqxg5EFC0gU80MpT55VOCrEOc7rPXRrdvc?=
- =?us-ascii?q?LZAlccMgiwzvyvXNl0yI4bcW6GHKKcNKTcrRmO6/55cMeWY4pAiTfvK+Uir8zu?=
- =?us-ascii?q?hH5xzU4PfaCohcNMQG2zBLJrL1jPMimkucsIDWpf5ll2d+ftklDXFGcLP3s=3D?=
-X-IronPort-Anti-Spam-Filtered: true
-X-IronPort-Anti-Spam-Result: =?us-ascii?q?A2AfAACMx1tcgEinVdFkHQEBBQEHBQGBU?=
- =?us-ascii?q?gcBCwGDOjMnhAOUCIINkwKFD4F7AQyEbAKDGiI1CA0BAwEBAgEBAgETAQEJDQk?=
- =?us-ascii?q?IJzGCOikBgmYBAQEEIwRSEAsLAwYBAwICHwcCAiISAQUBHAYTCIUeBaB5PIsbf?=
- =?us-ascii?q?DOIWQEHgUsSeYs4ghaEI4gKglcCgSwBAQGKUIU7kU8BBgIBgWWQYBmBbIkCh2E?=
- =?us-ascii?q?tm2MPIYEnA4IJMxolfwZngU6CUo4sITCOegEB?=
-X-IPAS-Result: =?us-ascii?q?A2AfAACMx1tcgEinVdFkHQEBBQEHBQGBUgcBCwGDOjMnhAO?=
- =?us-ascii?q?UCIINkwKFD4F7AQyEbAKDGiI1CA0BAwEBAgEBAgETAQEJDQkIJzGCOikBgmYBA?=
- =?us-ascii?q?QEEIwRSEAsLAwYBAwICHwcCAiISAQUBHAYTCIUeBaB5PIsbfDOIWQEHgUsSeYs?=
- =?us-ascii?q?4ghaEI4gKglcCgSwBAQGKUIU7kU8BBgIBgWWQYBmBbIkCh2Etm2MPIYEnA4IJM?=
- =?us-ascii?q?xolfwZngU6CUo4sITCOegEB?=
-X-IronPort-AV: E=Sophos;i="5.58,342,1544515200"; d="scan'208";a="27242915"
-Received: from mail-lf1-f72.google.com ([209.85.167.72])
- by smtpmx5.ucr.edu with ESMTP/TLS/AES128-GCM-SHA256; 06 Feb 2019 21:53:28 -0800
-Received: by mail-lf1-f72.google.com with SMTP id m10so1368117lfk.6
+ id 1grcdU-0003f3-I8
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 05:54:10 +0000
+Received: by mail-pl1-x643.google.com with SMTP id k15so4297869pls.8
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 06 Feb 2019 21:53:28 -0800 (PST)
+ Wed, 06 Feb 2019 21:54:08 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=swvbNBv+LvJQkqr26tX9fTzwidgI0RC66IvI6f27eJ4=;
+ b=I93jGVOLhr1IScjguAw11x4BSytMhirVNDJLqV4trKpyxqSXZqWzeMsaEownUtXxfC
+ zx5uS++CWxWaUdXT7mf/NILyhPcR7PkNT8xPPiFltsy9h0yLmKbN+ALNa/rdDEJhKTTZ
+ /H3KdoOnupPf7H8gx2HlhHwIyZKJGBNV3PPY6gIWhdqf1iNLI6PWZXwO89tcIan09rhM
+ 459mvTqWEpcsQiCDtfVEo8/8uGdUrIuLhjeze9P6/B1zlp4PconxO/4kyWndGgcf9UdI
+ FQ6eJPG6hGobXHDtwF0VEIYiYvhG/dCGp6EfytQzp1AWoSPv0Tm71ygvglVV/uhl83c0
+ H4PQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=OuxZLL8UNbVQzWmaxCNdMvTP4WXTa93NPRnjzawF7/s=;
- b=RxwHPoSVLgyphul0ZYptisl7Xd0QWCF+sv/lzo3N9kCSQm2UPR6gRMX2RLZZpbO4Ii
- Y1HcSfTO6Buf0ViOKR3E0cbKJbQquAj+iKgKDgxtxavCHXfdBQl4Y0BBJwmBJpF0lJYi
- YDB8C9eCuSbs3TlkuYqJ+4dOs6qVv6oEEqQTFWOyUKl74m+AgPI+RTJzjCLgEFVWGYyA
- DhjS2fe8NnEFbFGy2q47AHGLz5RcdvGjn7R6nEDleXT7vlWLLxFTzPj02MEMZ1yb5L7+
- jOJfea97AbxyZekbEalJDEnr/ss2b8ulYuGdBwf/uPs83wsXAPaDmmX/WgUpnNXAB97t
- ZIJA==
-X-Gm-Message-State: AHQUAuY2E4sJxfWbR32V9L3sJW4cXit11GHxRTsR+LihC8r9X0VqwXCp
- KCtwyPqyBuPy3zEXA6IjOW/WLXSa2SDrVW12pnqfH7vPBiDjbQ6aGuZ6u6aoRF4Nc82Mr9A/p+j
- KND9evvCP5sQkxEK2gG17MmwOc6hw02dCTyxiM9uk7Lgk4lCRJ3Hv
-X-Received: by 2002:ac2:5230:: with SMTP id i16mr9363075lfl.54.1549518807246; 
- Wed, 06 Feb 2019 21:53:27 -0800 (PST)
-X-Google-Smtp-Source: AHgI3IadxvbDND8MVfG27lQv3DRXo1BjCd90b9Zx/Nd0gufYIjmXU1K/Fcm5NdhEj+YyxeekYEbWramdvbOF7CR0gnQ=
-X-Received: by 2002:ac2:5230:: with SMTP id i16mr9363057lfl.54.1549518806961; 
- Wed, 06 Feb 2019 21:53:26 -0800 (PST)
-MIME-Version: 1.0
-References: <20190205221559.17545-1-yzhai003@ucr.edu>
- <20190206.201736.1146228626076916564.davem@davemloft.net>
- <CABvMjLQ6MYtGYeLxwceZsvcyn4oScgMo+BGQMHw7SkZ1uxFmHQ@mail.gmail.com>
-In-Reply-To: <CABvMjLQ6MYtGYeLxwceZsvcyn4oScgMo+BGQMHw7SkZ1uxFmHQ@mail.gmail.com>
-From: Yizhuo Zhai <yzhai003@ucr.edu>
-Date: Wed, 6 Feb 2019 21:53:16 -0800
-Message-ID: <CABvMjLTymaszPdX5afOHFfFBS1AueVzRVra5_QUr144GahH5gQ@mail.gmail.com>
-Subject: Re: [PATCH] net: stmmac: Variable "val" in function
- sun8i_dwmac_set_syscon() could be uninitialized
-To: David Miller <davem@davemloft.net>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=swvbNBv+LvJQkqr26tX9fTzwidgI0RC66IvI6f27eJ4=;
+ b=RgP/mxHhyUP6e8hPsUJyxOyEj22c9aRA9Xz472nq7wxSZi3dcs9+wKWnGPx+rwY1TF
+ +tLGvC+UHLvIWzfOTP809XeumvLQ8W9hZpfYh1ke33nnYVQCxCG9dQqGFWKHbhP5VfLX
+ SdWHWr4xPhtVRB502Ixk3dOwmqSnS9ZQ+xIgb9OliA2/jULHg0YKLqarzspaElqVptiI
+ 397/hgBCiYHcfyHr+WlAIq3iu7QSiu87tWpxrzuJFdfhJSoEaV8xi4kPqW1lqPnf3Dyh
+ c2r67oKfQE4GAJsT3GXOvHJP8PCsx8qgaN/IvipltX7ga0Q7ebnVBAK78v1h4UgvOCkA
+ KZaw==
+X-Gm-Message-State: AHQUAuamODV21Wq9p4omCWsBH+FfycSrSuQLfWwiNK4BQjbr0Zd199Ob
+ uyHGQY+fTeSZxGo+rkSW0KeMtT3WBQ==
+X-Google-Smtp-Source: AHgI3IZYXmH6xWwIA/mxI4AW/NlCyIWiNufAJdcB8RxL7hLJmRWiEdS8r3/hHfsqYvtU06qrNWTFaw==
+X-Received: by 2002:a17:902:449:: with SMTP id
+ 67mr6093465ple.310.1549518847371; 
+ Wed, 06 Feb 2019 21:54:07 -0800 (PST)
+Received: from localhost.localdomain ([2405:204:730d:914e:a8b4:2532:ae24:7d86])
+ by smtp.gmail.com with ESMTPSA id l19sm19256807pfi.71.2019.02.06.21.54.01
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 06 Feb 2019 21:54:06 -0800 (PST)
+From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+To: heiko@sntech.de
+Subject: [PATCH] arm64: dts: rockchip: Add on-board WiFi/BT support for
+ Rock960 boards
+Date: Thu,  7 Feb 2019 11:23:49 +0530
+Message-Id: <20190207055349.27919-1-manivannan.sadhasivam@linaro.org>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_215330_609060_34C78DCE 
-X-CRM114-Status: GOOD (  13.35  )
+X-CRM114-CacheID: sfid-20190206_215408_606072_02B92F52 
+X-CRM114-Status: GOOD (  14.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -128,64 +92,175 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Chengyu Song <csong@cs.ucr.edu>, Alexandre Torgue <alexandre.torgue@st.com>,
- netdev@vger.kernel.org, Zhiyun Qian <zhiyunq@cs.ucr.edu>,
- linux-kernel@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
- Giuseppe Cavallaro <peppe.cavallaro@st.com>,
- Maxime Ripard <maxime.ripard@free-electrons.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: tom@vamrs.com, mani@kernel.org, linux-kernel@vger.kernel.org, dev@vamrs.com,
+ linux-rockchip@lists.infradead.org, pbrobinson@gmail.com,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ ezequiel@collabora.com, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Thanks, but why initialization matters here? Is performance the main concern?
+Add on-board WiFi/BT support for Rock960 boards such as Rock960 based
+on AP6356S and Ficus based on AP6354 wireless modules.
 
+Firmwares for the respective boards are available here:
 
-On Wed, Feb 6, 2019 at 9:52 PM Yizhuo Zhai <yzhai003@ucr.edu> wrote:
->
-> Thanks, but why initialization matters here? Is performance the main concern?
->
-> On Wed, Feb 6, 2019 at 8:17 PM David Miller <davem@davemloft.net> wrote:
->>
->> From: Yizhuo <yzhai003@ucr.edu>
->> Date: Tue,  5 Feb 2019 14:15:59 -0800
->>
->> > @@ -639,9 +639,14 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
->> >       struct sunxi_priv_data *gmac = priv->plat->bsp_priv;
->> >       struct device_node *node = priv->device->of_node;
->> >       int ret;
->> > -     u32 reg, val;
->> > +     u32 reg, val = 0;
->> > +
->> > +     ret = regmap_read(gmac->regmap, SYSCON_EMAC_REG, &val);
->> > +     if (ret) {
->> > +             dev_err(priv->device, "Fail to read SYSCON_EMAC_REG.\n");
->> > +             return ret;
->> > +     }
->>
->> I agree with the other reviewer that since you check 'ret' the initialization of
->> 'val' is no longer needed.
->
->
->
-> --
-> Kind Regards,
->
-> Yizhuo Zhai
->
-> Computer Science, Graduate Student
-> University of California, Riverside
+http://people.linaro.org/~manivannan.sadhasivam/rock960_wifi/
+http://people.linaro.org/~manivannan.sadhasivam/ficus_wifi/
 
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ .../boot/dts/rockchip/rk3399-rock960.dtsi     | 96 ++++++++++++++++++-
+ 1 file changed, 95 insertions(+), 1 deletion(-)
 
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+index 56abbb08c133..1b2f7cd82244 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+@@ -9,6 +9,15 @@
+ #include "rk3399-opp.dtsi"
+ 
+ / {
++	sdio_pwrseq: sdio-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		clocks = <&rk808 1>;
++		clock-names = "ext_clock";
++		pinctrl-names = "default";
++		pinctrl-0 = <&wifi_enable_h>;
++		reset-gpios = <&gpio0 RK_PB2 GPIO_ACTIVE_LOW>;
++	};
++
+ 	vcc1v8_s0: vcc1v8-s0 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vcc1v8_s0";
+@@ -362,6 +371,20 @@
+ };
+ 
+ &pinctrl {
++	bt {
++		bt_enable_h: bt-enable-h {
++			rockchip,pins = <0 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++
++		bt_host_wake_l: bt-host-wake-l {
++			rockchip,pins = <0 RK_PA4 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++
++		bt_wake_l: bt-wake-l {
++			rockchip,pins = <2 RK_PD3 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
+ 	sdmmc {
+ 		sdmmc_bus1: sdmmc-bus1 {
+ 			rockchip,pins =
+@@ -387,6 +410,26 @@
+ 		};
+ 	};
+ 
++	sdio0 {
++		sdio0_bus4: sdio0-bus4 {
++			rockchip,pins =
++				<2 20 RK_FUNC_1 &pcfg_pull_up_20ma>,
++				<2 21 RK_FUNC_1 &pcfg_pull_up_20ma>,
++				<2 22 RK_FUNC_1 &pcfg_pull_up_20ma>,
++				<2 23 RK_FUNC_1 &pcfg_pull_up_20ma>;
++		};
++
++		sdio0_cmd: sdio0-cmd {
++			rockchip,pins =
++				<2 24 RK_FUNC_1 &pcfg_pull_up_20ma>;
++		};
++
++		sdio0_clk: sdio0-clk {
++			rockchip,pins =
++				<2 25 RK_FUNC_1 &pcfg_pull_none_20ma>;
++		};
++	};
++
+ 	pmic {
+ 		pmic_int_l: pmic-int-l {
+ 			rockchip,pins =
+@@ -403,6 +446,19 @@
+ 				<1 14 RK_FUNC_GPIO &pcfg_pull_down>;
+ 		};
+ 	};
++
++	sdio-pwrseq {
++		wifi_enable_h: wifi-enable-h {
++			rockchip,pins =
++				<0 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	wifi {
++		wifi_host_wake_l: wifi-host-wake-l {
++			rockchip,pins = <0 RK_PA3 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
+ };
+ 
+ &pwm2 {
+@@ -413,6 +469,33 @@
+ 	status = "okay";
+ };
+ 
++&sdio0 {
++	clock-frequency = <50000000>;
++	bus-width = <4>;
++	cap-sdio-irq;
++	cap-sd-highspeed;
++	no-emmc;
++	keep-power-in-suspend;
++	mmc-pwrseq = <&sdio_pwrseq>;
++	non-removable;
++	num-slots = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
++	sd-uhs-sdr104;
++
++	status = "okay";
++
++	brcmf: wifi@1 {
++		compatible = "brcm,bcm4329-fmac";
++		reg = <1>;
++		interrupt-parent = <&gpio0>;
++		interrupts = <RK_PA3 GPIO_ACTIVE_HIGH>;
++		interrupt-names = "host-wake";
++		pinctrl-names = "default";
++		pinctrl-0 = <&wifi_host_wake_l>;
++	};
++};
++
+ &sdhci {
+ 	bus-width = <8>;
+ 	mmc-hs400-1_8v;
+@@ -439,8 +522,19 @@
+ 
+ &uart0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_xfer &uart0_cts>;
++	pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
+ 	status = "okay";
++
++	bluetooth {
++		compatible = "brcm,bcm43438-bt";
++		clocks = <&rk808 1>;
++		clock-names = "ext_clock";
++		device-wakeup-gpios = <&gpio2 RK_PD3 GPIO_ACTIVE_HIGH>;
++		host-wakeup-gpios = <&gpio0 RK_PA4 GPIO_ACTIVE_HIGH>;
++		shutdown-gpios = <&gpio0 RK_PB1 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&bt_host_wake_l &bt_wake_l &bt_enable_h>;
++	};
+ };
+ 
+ &uart2 {
 -- 
-Kind Regards,
+2.17.1
 
-Yizhuo Zhai
-
-Computer Science, Graduate Student
-University of California, Riverside
 
 _______________________________________________
 linux-arm-kernel mailing list
