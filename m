@@ -2,22 +2,23 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 661A8C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:24:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E3E8C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:28:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1E4512190A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:24:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6260F21872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:28:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ouNI3UaL";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="mYCdFYT6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E4512190A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cQaKNC+D";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="kQubtED5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6260F21872
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,61 +26,166 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CFs5yxjTTobrnpE39o0Wy4puY6vzUdtRK2loa5dYgRo=; b=ouNI3UaLu5uXBF
-	SzazTzBwzl8BvN+aig/zG37uA0xAXC5TYl/TXUd9dMnxL29MC2PphPNL+LotJsYR1ItPswxlwtuIc
-	LgupjJF4PmYlFDt/AcIuh6BZaIMvIhaPIvUD2idCsMcODl0y57ofcJdJA6BLWUNVHLysrwI61w0uB
-	XVUHMMu51fXhp57HKuZxJy7Ky1K91SY1yZTLHSWueMwA3mWF5jcNZPz1aZe1EkyJzv/CI9em3YLgk
-	jwwJ2xp5DVIHs3WmDQy+Nnn6F4ksDgMcCXG7tP8fCBlBp2bp6PzvMHZTjhT1MH9YL9GfWZhFUSs3n
-	QnCal1swlmk2h6pie3NQ==;
+	List-Owner; bh=nwcHVhOe5WRlv8Llt6nZPEd+bUgx1cOtLcfqm5QI1nU=; b=cQaKNC+DGslvoV
+	MUr6GlnKYeiqEGZmlViLOmLKlnFuOy5uGLEsoI2o0j7HtK71RNORMGziQNq9PAFPaBuJoByq968qS
+	2dhhElogiWbcode3W983nNISH8RRprssR+EsrOvoPFFhgjcXug3wL5U5ZaRLGf1FnQtluHj9KYkBL
+	4hKPLxVB8bZU+pyIhh5vfdr52adU8bAwco90y2clKn8RmgtDqbbefGn0uAV3MaRdbb2a9hw9wyilc
+	B8mZbrtuYo36L3qoyZ1qwJCTfX5y3q5eNOQ2oPJNhhy04zAhYmSfjk+ARcqVE/KPypqeRM1xo1wP+
+	Wr9FhXJtdajJfG5deZDw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grlXW-0001kr-KX; Thu, 07 Feb 2019 15:24:34 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+	id 1grlbT-0003TV-60; Thu, 07 Feb 2019 15:28:39 +0000
+Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grlXT-0001kX-R8
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 15:24:33 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x17FOFnn036811;
- Thu, 7 Feb 2019 09:24:15 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549553055;
- bh=VxHe9q3vwv6tCQ2mheOwbxRx0o6X/EcDJo/tFyBHw3w=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=mYCdFYT6TXnKHRPj3KhiF+O7kU1wMljtsGGjU9dcWCzqeobjyZRsV9To3NXEyugqN
- ynTZWgdvp/L0XQlB31PwK6lya+n9H65EiLkKa+blcVdi27A3uIkgfmmyHAHyvLH8xC
- FJ86864WtYx1rlbE/Kf0p04bvafFaJm9KpVd9bcU=
-Received: from DFLE114.ent.ti.com (dfle114.ent.ti.com [10.64.6.35])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x17FOFn5066269
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 7 Feb 2019 09:24:15 -0600
-Received: from DFLE112.ent.ti.com (10.64.6.33) by DFLE114.ent.ti.com
- (10.64.6.35) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 7
- Feb 2019 09:24:15 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE112.ent.ti.com
- (10.64.6.33) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 7 Feb 2019 09:24:15 -0600
-Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x17FOCrb032767;
- Thu, 7 Feb 2019 09:24:13 -0600
-Subject: Re: [PATCH 00/35] ARM: davinci: modernize the irq support
-To: Bartosz Golaszewski <brgl@bgdev.pl>, Kevin Hilman <khilman@kernel.org>,
- Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
- Marc Zyngier <marc.zyngier@arm.com>
-References: <20190131133928.17985-1-brgl@bgdev.pl>
-From: Sekhar Nori <nsekhar@ti.com>
-Message-ID: <db144bdb-40dc-cd57-dd42-7eeacd3caabe@ti.com>
-Date: Thu, 7 Feb 2019 20:54:12 +0530
+ id 1grlbP-0003T6-Q4; Thu, 07 Feb 2019 15:28:37 +0000
+Received: by mail-pl1-x641.google.com with SMTP id k15so76381pls.8;
+ Thu, 07 Feb 2019 07:28:35 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=edIZOYpvDwlWIlZcuQddKu9opi5g4UwQeHPRb8NgKGc=;
+ b=kQubtED5QnUc56DtlIApJmR8wUn5vL5hpafmMXkPRH3uQZ7IQkfrbUptMLWF/ro1PC
+ 5EwPvG3BcCnPJKOMZVWPNrV3r9qb5gHiICRFhOPeag18Jx0nHZSYPACSJI4UHNyKJK2B
+ qo/imXnAyDmSLaV7Aoz41f0xRaK3docxHBaIg2lfUGIrz3YdJ0emL+JsYVUfJR+QUzhU
+ s3+iQ22YJeDvM5us2MoAit4ObzMgCx0tOKfSn14A1owe3/+sIR9iCfnjnmgFH9TXDSXC
+ mM1+c00G3M2jr/JXcwWXnJSwQHQUwB94EWjxusZ21P3LV50V6fFIcaZzYmGDjbQFuaRC
+ TJzw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=edIZOYpvDwlWIlZcuQddKu9opi5g4UwQeHPRb8NgKGc=;
+ b=rKXGdAmSAgx+YDmdc4xWfgeI/06h/aeAdQDZZza5qID/F/G/fFflC2ZMz8jE/Yfx+w
+ TbraU5rAGFDAykHCk15jNXvFpyyqM09vJCyr5F10zix8ry0ZIbJwiQEArB1kW11ujLBx
+ Kd2G4DXDLo7e3d2gP3lgySt/6Y0NR4Qtzz+DM7Tik+WQk1wDpVcGF2n+M5pPIdy8NbKt
+ me49pCF+VSL9LRzNGnLguDSSZnG1QUkFABH1Ij72Tezl3nPqHIIkMqO7Gl2wICDw+wEv
+ wbjCEbIEM9yuZoeaCQYVbkQeOABtsh8lHc/SmSMkEuiy/sVRDEEKjO19dv5UsC+aBWQD
+ OkfA==
+X-Gm-Message-State: AHQUAubXWDge5phWdmDP/HdKJJMRtk3jcWrvmYk1ewOQ9PQRjyV4KJUY
+ 5kjx+84WAanwFdn0jwhm5iw=
+X-Google-Smtp-Source: AHgI3IadOavmTJaEOod4c6gBFYdSX8YOnhPBhMtEQbM1lJBVCKKH2jBPwzlRLGSluQr9GveecqDI7g==
+X-Received: by 2002:a17:902:9887:: with SMTP id
+ s7mr16621032plp.199.1549553314673; 
+ Thu, 07 Feb 2019 07:28:34 -0800 (PST)
+Received: from ziggy.stardust ([62.31.71.171])
+ by smtp.gmail.com with ESMTPSA id i8sm5642056pgo.19.2019.02.07.07.28.29
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 07 Feb 2019 07:28:33 -0800 (PST)
+Subject: Re: [PATCH v6 5/6] dt-bindings: pinctrl: mt8183: add binding document
+To: Erin Lo <erin.lo@mediatek.com>, Rob Herring <robh+dt@kernel.org>,
+ Mark Rutland <mark.rutland@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
+ Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Stephen Boyd <sboyd@codeaurora.org>
+References: <1548317240-44682-1-git-send-email-erin.lo@mediatek.com>
+ <1548317240-44682-6-git-send-email-erin.lo@mediatek.com>
+From: Matthias Brugger <matthias.bgg@gmail.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
+ 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
+ jrHWeQEI2ucSKsNa8FllDmG/fQ==
+Message-ID: <d76bb2e8-5285-15ce-b850-6cf3065e0777@gmail.com>
+Date: Thu, 7 Feb 2019 16:28:27 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ Thunderbird/60.3.3
 MIME-Version: 1.0
-In-Reply-To: <20190131133928.17985-1-brgl@bgdev.pl>
+In-Reply-To: <1548317240-44682-6-git-send-email-erin.lo@mediatek.com>
 Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_072432_014953_FBDC3477 
-X-CRM114-Status: GOOD (  18.97  )
+X-CRM114-CacheID: sfid-20190207_072835_869213_D380924C 
+X-CRM114-Status: GOOD (  27.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,45 +197,163 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, srv_heupstream <srv_heupstream@mediatek.com>,
+ Zhiyong Tao <zhiyong.tao@mediatek.com>, mars.cheng@mediatek.com,
+ linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
+ linux-serial@vger.kernel.org, yingjoe.chen@mediatek.com,
+ eddie.huang@mediatek.com, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Bartosz,
 
-On 31/01/19 7:08 PM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> This series ports the davinci platform to using SPARSE_IRQ, cleans up
-> the irqchip drivers and moves them over to drivers/irqchip.
-> 
-> The series can be logically split into four parts. The first (1-8) aims
-> at introducing support for SPARSE_IRQ. It contains a couple changes
-> required for that functionality and the final patch actually selecting
-> it.
-> 
-> Second part (9-18) makes the aintc driver suitable for drivers/irqchip
-> and eventually moves it over there.
-> 
-> Part 3 (19-31) does the same for the cp-intc driver.
-> 
-> Last part (32-35) aims at removing mach/irqs.h as it's no longer needed
-> with SPARSE_IRQ selected.
-> 
-> The series has been tested on da850-lcdk (for cp-intc) and
-> dm365-evm (for aintc).
 
-Looks good to me overall, apart from some comments on individual
-patches. I boot tested on all 6 DaVinci SoCs. Also did a basic iperf
-test on DA850 to check that performance remains same as before.
+On 24/01/2019 09:07, Erin Lo wrote:
+> From: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> 
+> The commit adds mt8183 compatible node in binding document.
+> 
+> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> ---
 
-Nice work!
+I'm missing Linus Walleij on the recipient list.
+Pleas make sure to add all persons from the get_maintainers script.
+IMHO it's a bit unfortunate that we got the driver merged, but no binding
+description. Please try to send driver + binding documentation together, that
+makes things easier to discuss.
 
 Thanks,
-Sekhar
+Matthias
+
+>  .../devicetree/bindings/pinctrl/pinctrl-mt8183.txt | 115 +++++++++++++++++++++
+>  1 file changed, 115 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
+> new file mode 100644
+> index 0000000..364e673
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
+> @@ -0,0 +1,115 @@
+> +* Mediatek MT8183 Pin Controller
+> +
+> +The Mediatek's Pin controller is used to control SoC pins.
+> +
+> +Required properties:
+> +- compatible: value should be one of the following.
+> +	"mediatek,mt8183-pinctrl", compatible with mt8183 pinctrl.
+> +- gpio-controller : Marks the device node as a gpio controller.
+> +- #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
+> +  binding is used, the amount of cells must be specified as 2. See the below
+> +  mentioned gpio binding representation for description of particular cells.
+> +- gpio-ranges : gpio valid number range.
+> +- reg: physicall address base for gpio base registers. There are nine
+> +  physicall address base in mt8183. They are 0x10005000, 0x11F20000,
+> +  0x11E80000, 0x11E70000, 0x11E90000, 0x11D30000, 0x11D20000, 0x11C50000,
+> +  0x11F30000.
+> +
+> +	Eg: <&pio 6 0>
+> +	<[phandle of the gpio controller node]
+> +	[line number within the gpio controller]
+> +	[flags]>
+> +
+> +	Values for gpio specifier:
+> +	- Line number: is a value between 0 to 202.
+> +	- Flags:  bit field of flags, as defined in <dt-bindings/gpio/gpio.h>.
+> +            Only the following flags are supported:
+> +            0 - GPIO_ACTIVE_HIGH
+> +            1 - GPIO_ACTIVE_LOW
+> +
+> +Optional properties:
+> +- reg-names: gpio base register names. There are nine gpio base register
+> +  names in mt8183. They are "iocfg0", "iocfg1", "iocfg2", "iocfg3", "iocfg4",
+> +  "iocfg5", "iocfg6", "iocfg7", "iocfg8".
+> +- interrupt-controller: Marks the device node as an interrupt controller
+> +- #interrupt-cells: Should be two.
+> +- interrupts : The interrupt outputs from the controller.
+> +
+> +Please refer to pinctrl-bindings.txt in this directory for details of the
+> +common pinctrl bindings used by client devices.
+> +
+> +Subnode format
+> +A pinctrl node should contain at least one subnodes representing the
+> +pinctrl groups available on the machine. Each subnode will list the
+> +pins it needs, and how they should be configured, with regard to muxer
+> +configuration, pullups, drive strength, input enable/disable and input schmitt.
+> +
+> +    node {
+> +	pinmux = <PIN_NUMBER_PINMUX>;
+> +	GENERIC_PINCONFIG;
+> +    };
+> +
+> +Required properties:
+> +- pinmux: integer array, represents gpio pin number and mux setting.
+> +    Supported pin number and mux varies for different SoCs, and are defined
+> +    as macros in boot/dts/<soc>-pinfunc.h directly.
+> +
+> +Optional properties:
+> +- GENERIC_PINCONFIG: is the generic pinconfig options to use, bias-disable,
+> +    bias-pull-down, bias-pull-up, input-enable, input-disable, output-low, output-high,
+> +    input-schmitt-enable, input-schmitt-disable and drive-strength are valid.
+> +
+> +    Some special pins have extra pull up strength, there are R0 and R1 pull-up
+> +    resistors available, but for user, it's only need to set R1R0 as 00, 01, 10 or 11.
+> +    So when config mediatek,pull-up-adv or mediatek,pull-down-adv,
+> +    it support arguments for those special pins.
+> +
+> +    When config drive-strength, it can support some arguments, such as
+> +    MTK_DRIVE_4mA, MTK_DRIVE_6mA, etc. See dt-bindings/pinctrl/mt65xx.h.
+> +
+> +Examples:
+> +
+> +#include "mt8183-pinfunc.h"
+> +
+> +...
+> +{
+> +	pio: pinctrl@10005000 {
+> +		compatible = "mediatek,mt8183-pinctrl";
+> +		reg = <0 0x10005000 0 0x1000>,
+> +		      <0 0x11F20000 0 0x1000>,
+> +		      <0 0x11E80000 0 0x1000>,
+> +		      <0 0x11E70000 0 0x1000>,
+> +		      <0 0x11E90000 0 0x1000>,
+> +		      <0 0x11D30000 0 0x1000>,
+> +		      <0 0x11D20000 0 0x1000>,
+> +		      <0 0x11C50000 0 0x1000>,
+> +		      <0 0x11F30000 0 0x1000>;
+> +		reg-names = "iocfg0", "iocfg1", "iocfg2",
+> +			    "iocfg3", "iocfg4", "iocfg5",
+> +			    "iocfg6", "iocfg7", "iocfg8";
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +		gpio-ranges = <&pio 0 0 192>;
+> +		interrupt-controller;
+> +		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-parent = <&gic>;
+> +		#interrupt-cells = <2>;
+> +
+> +		i2c0_pins_a: i2c0 {
+> +			pins1 {
+> +				pinmux = <PINMUX_GPIO48__FUNC_SCL5>,
+> +					 <PINMUX_GPIO49__FUNC_SDA5>;
+> +				mediatek,pull-up-adv = <11>;
+> +			};
+> +		};
+> +
+> +		i2c1_pins_a: i2c1 {
+> +			pins {
+> +				pinmux = <PINMUX_GPIO50__FUNC_SCL3>,
+> +					 <PINMUX_GPIO51__FUNC_SDA3>;
+> +				mediatek,pull-down-adv = <10>;
+> +			};
+> +		};
+> +		...
+> +	};
+> +};
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
