@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B4E5C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 03:54:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2924BC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 03:58:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4884E2175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 03:54:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E551620811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 03:58:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qQa+qNND";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="MimCXGW0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4884E2175B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l8L8sb2C";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="CBqA5Wrr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E551620811
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,63 +25,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
 	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VEf6Yv0uCeLfu+OrXEb29nNVDJ5jO0Ky7WH+MHUrG5o=; b=qQa+qNNDCVK9s/
-	7mt4qfB+03b+9SQaVrlAufxAnK8TtZh0MxUIbbbmlPamagBSYuIr6fQed6GeUJ9J3rKW7HGAs3QCA
-	57dFxHwfe/BTB5QjCBpJ59CrOLnyKwxGslw1D3ba2oQvXpjsCA9sTMzXKjXu4OznAOM5Cl3XPiaxr
-	ha82lkq35NHqXptuSROIsMMvTRRK1X16zGoZB9dpYxgb5qp+8iDU81MQjUuXitnmXYGvWSCL6h4Lt
-	jzlJA3IwVlqhHRktWx19q28Rm0DTwFzwOD39Oenj29ywToyNSH+DzLUOvtJHjBFfOIGF2EFzrmVNl
-	ceCSTiHBVwEKP9eC9yiA==;
+	List-Owner; bh=R+E+kflinN+zlTgSN8zHqv56fqkwg3yKEBfKsP71XkA=; b=l8L8sb2CjyziM/
+	T2pzTW7Dg1bYp0iOPzXsT4VJD3pW/II+9zo0WCUzJZLU2jotMsBFWUtaPw6pXewzU8Jl2nnZlSwOq
+	2PSqkTnYXhcmheN8lx5AjvhGT7OHFSj2Y/ZPms/EdnS7lF794SKJhU7X8BbBCzFM99VP4KPR+37m3
+	/y0JxLKK0UN1r4/56qHP4b4KZTzoWrGltNhcxmK7fty2N6u+bzE3iRNEus96okMV11PLveN9TTczw
+	YKPy9xJ25n+npDZlfeNBN70BFRa+Rf/0tLncmGgdYNOV9QLK5QUzpbtft0NydgbasaKDfy4oX4cwp
+	CX0+vytrjjJB5qm/qBxw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gralf-0003NX-IE; Thu, 07 Feb 2019 03:54:27 +0000
-Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+	id 1grapG-00059f-Aq; Thu, 07 Feb 2019 03:58:10 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grala-0003MF-K3
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 03:54:24 +0000
-Received: by mail-pg1-x542.google.com with SMTP id g189so3918979pgc.5
+ id 1grapC-00058x-QC
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 03:58:08 +0000
+Received: by mail-pf1-x444.google.com with SMTP id j3so2028624pfi.12
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 06 Feb 2019 19:54:22 -0800 (PST)
+ Wed, 06 Feb 2019 19:58:06 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:in-reply-to:references:date:message-id
- :mime-version; bh=dzXRzhNeAJaEDDw2bDa7ru6nYvSSdEcmyz9Bav3YOBU=;
- b=MimCXGW0Zu7FeWTSBR9d1/YF9E7VPhv36ttKdTrQaqDHEbHFsoysktz5aHAAUGMXYJ
- /2/oDvpnfjxcMKyQKw14aSa6rKxUbQedk2Wjk/J4PARs2y5LdKQM0yYN7T9lah6SaCqc
- Y6/EqGrAmZPBka4qczbSkvPOOXVK2vc28xDSBMQn+5Klx/p+fPtXsmOj6pMLN/RtgdLu
- 4utt1CO3kzBRchYjNnnbd8LSe2et8Ye+jbM5KnsWbxxet6I4NkZqr9/Uax1YjoQCtNrM
- ZNsfXL7W4m5lqeknrJP/oXvjZym6zfla0cgjpvKR/4Oa0m6rSvRXmuL/0Y74tsr65l7F
- ErMg==
+ :mime-version:content-transfer-encoding;
+ bh=4vE9BU00uVWm07pHSl9XmaBqTKJTzMk4dRaKirmkAwg=;
+ b=CBqA5Wrr5nQY0/io8LQVu2pwnh/AIGUtm3+pmy7XdGF2oStq4rizz1j9etGI1NO1Zn
+ XURTlghKfEjPqbAnIqd0hKGTfRW+xUZkz8k7qrY4KtEDxMTb+Vr3LcTu4TESmgHD4WO7
+ B8A5knEHG7wGmXGSBYchv80nJEPyX3aEen/9nb6AZRzBm0Ji3t42niAONu1H8MPo3BN5
+ nDh4lD+hhOLwCwzBctqmNUOv2Dh8JtJQq2XlHKZsWOw96fIeHxlJ1BDSCcBN8YPigmAr
+ BzpHDevJ1BPrAKUfbZjxz2j7n2AR8cBC2mbfKPXw4Yoei3/ahP60xJvYpJvwyiBtcgcC
+ irlQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
- :message-id:mime-version;
- bh=dzXRzhNeAJaEDDw2bDa7ru6nYvSSdEcmyz9Bav3YOBU=;
- b=uWOoyMIwQOHdAOKxOafTsOCxrMJ6QpfnEaITRpNXR1jxaKPsU1Eviouy3xC4h9ALhB
- lGQPydjUu0RwVRpd9jOpUbqVgS4fRQOR9I0rR+EW9Yc3tVK62EASddqCIvSXV/gxU8Al
- AmnrKyu7TJkwA2zF5Fbmm0SB+JNI339jXX9laLjuM9bAjkGh/D4rXTGUc2AkiOZK6vOA
- TmrtTYpVOCadx8ptyQBE6LIRW5TNBBTBrtOFJO7UaWAjM2Vgg4cpRoWdVdUk+StSNl8S
- Magz9fggIIhXy6sZyTHswoKt4rHF+0uE5Z/bJNc7MnJ5/YxUxiCWsUQtls/ylnHuki02
- VfQg==
-X-Gm-Message-State: AHQUAuZJ1DYCoX/E73+07HE7JqDZBk3Hw2mfJ1msT8HVFy6aOEmCtnkP
- UMpaU4ST4cwatJh9YL8U6Wrhxg==
-X-Google-Smtp-Source: AHgI3IZlRGwVgh2CPfMev7H+GxPlpUtK2D9w1DvuR8UVW0yabk9i1txXo7EmDTCJQLHIK4+xYu4BSg==
-X-Received: by 2002:a65:60c5:: with SMTP id r5mr8369118pgv.427.1549511662023; 
- Wed, 06 Feb 2019 19:54:22 -0800 (PST)
+ :message-id:mime-version:content-transfer-encoding;
+ bh=4vE9BU00uVWm07pHSl9XmaBqTKJTzMk4dRaKirmkAwg=;
+ b=cuBfMB3P4LMkK+v+eZKg47JILe6KGvpn9ErvO5nBcJpohRCuifw3jgDkNNtkont+Zr
+ O0uW8NlQkMcQB5riSONVeTO7WRy/RP+ixFyWwNuVE8bsBet1Ncz/I2KceOgL/sbHeWsT
+ 7Qv1cO1aJVKdhfK+7OG8t4Nijwkqi74rAir1P/++kTHejcVXIywJyZlSLJuzDdicUo7U
+ yd44dD6hCc3uk4k3VUeZtwFMRPo8kjJRM+bJ5RgHLny633VAQpR/SNxIv6XFD1/udOpI
+ WAv23eQMGV0dRbEfhTuATabvscLyx+OM4WnR1SHrNbgq8sfHziqZoZ26+BfIttIC68sr
+ yqig==
+X-Gm-Message-State: AHQUAub1VGIVsRhHNn5uhTAG9UfKB7Hmr76vkQKZukg8n3KcW+4Daugd
+ Xph9BqOlVkkjmR2QWzWpr5CIgQ==
+X-Google-Smtp-Source: AHgI3IaFp5sgEjJOCrn46BYjHmUjilzFj3AdOVe9WGP1fBe+lpzmN8tIosQ11mVSNyJcFcSb5SlsPQ==
+X-Received: by 2002:a65:4784:: with SMTP id e4mr3129018pgs.12.1549511886237;
+ Wed, 06 Feb 2019 19:58:06 -0800 (PST)
 Received: from localhost ([2601:602:9200:a1a5:1818:ce94:f47:7c12])
- by smtp.googlemail.com with ESMTPSA id l70sm10201707pgd.20.2019.02.06.19.54.21
+ by smtp.googlemail.com with ESMTPSA id d3sm9706256pgl.64.2019.02.06.19.58.05
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 06 Feb 2019 19:54:21 -0800 (PST)
+ Wed, 06 Feb 2019 19:58:05 -0800 (PST)
 From: Kevin Hilman <khilman@baylibre.com>
-To: Jerome Brunet <jbrunet@baylibre.com>
-Subject: Re: [PATCH 0/2] ARM: meson: do not select COMMON_CLK_AMLOGIC
-In-Reply-To: <20190128182252.32589-1-jbrunet@baylibre.com>
-References: <20190128182252.32589-1-jbrunet@baylibre.com>
-Date: Wed, 06 Feb 2019 19:54:19 -0800
-Message-ID: <7himxwgsno.fsf@baylibre.com>
+To: Neil Armstrong <narmstrong@baylibre.com>,
+ Jerome Brunet <jbrunet@baylibre.com>, Stephen Boyd <sboyd@kernel.org>,
+ Michael Turquette <mturquette@baylibre.com>
+Subject: Re: [PATCH v6 0/4] clk: meson-g12a: Add EE clock controller driver
+In-Reply-To: <5C55CDCE.9030502@baylibre.com>
+References: <20190201145345.6795-1-jbrunet@baylibre.com>
+ <5C55CDCE.9030502@baylibre.com>
+Date: Wed, 06 Feb 2019 19:58:04 -0800
+Message-ID: <7hbm3ogshf.fsf@baylibre.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_195422_659989_7451C085 
-X-CRM114-Status: UNSURE (   8.92  )
+X-CRM114-CacheID: sfid-20190206_195806_853016_9D06CA13 
+X-CRM114-Status: UNSURE (   9.12  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -94,30 +98,24 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, Jerome Brunet <jbrunet@baylibre.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-amlogic@lists.infradead.org, Jian Hu <jian.hu@amlogic.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-clk@vger.kernel.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
-
-> The patchset remove the selection of CONFIG_COMMON_CLK_AMLOGIC.
-> This CONFIG symbol:
-> * Is already selected by controller driver which requires it.
-> * Is being removed by this changeset [0]
->
-> Whether or not series [0] is merged, selecting CONFIG_COMMON_CLK_AMLOGIC
-> is not necessary and it is safe to remove it.
->
-> [0]: https://lkml.kernel.org/r/20190128180430.28689-1-jbrunet@baylibre.com
-
-Queued for v5.1 (branch: v5.1/soc)
-
-Kevin
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+TmVpbCBBcm1zdHJvbmcgPG5hcm1zdHJvbmdAYmF5bGlicmUuY29tPiB3cml0ZXM6Cgo+IExlIDAx
+LzAyLzIwMTkgMTU6NTMsIEplcm9tZSBCcnVuZXQgYSDDqWNyaXQgOgo+PiBUaGlzIHB1cnBvc2Ug
+b2YgdGhpcyBwYXRjaHNldCBpcyB0byB0aGUgbWFpbiBjbG9jayBjb250cm9sbGVyIG9mIHRoZQo+
+PiBnMTJhIFNvQyBmYW1pbHkKPj4gCj4+IFRoaXMgcGF0Y2hzZXQgZGVwZW5kcyBvbiB0aGUgcmVj
+ZW50IHJld29yayB0aGUgbWVzb24gY2xvY2sgZGlyZWN0b3J5IFs3XS4KClsuLi5dCgo+IFJldmll
+d2VkLWJ5OiBOZWlsIEFybXN0cm9uZyA8bmFybXN0cm9uZ0BiYXlsaWJyZS5jb20+Cj4KPiBJJ20g
+YXBwbHlpbmcgdGhlc2UgdG8gbmV4dC9kcml2ZXJzIGZvciBMaW51eCA1LjEtcmMxLCBpcyBpdCBu
+ZWNlc3NhcnkgdG8KPiBoYXZlIGEgdGFnIGZvciB0aGUgaGVhZGVycyA/CgpPbmx5IGlmIHdlIGhh
+dmUgc29tZSB1c2VycyB0aGF0IHdlIHdhbnQgdG8gbWVyZ2UgaW4gdGhlIHY1LjEgY3ljbGUKKHdo
+aWNoIEkgaGF2ZW4ndCBzZWVuIHlldC4pCgpLZXZpbgoKX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGlu
+dXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQu
+b3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
