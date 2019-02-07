@@ -2,68 +2,57 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2236CC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:48:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 47A05C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:50:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E62B82075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:48:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0EFC920823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:50:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fS17lgmz";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="xIP+ozZ6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E62B82075C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E5AqIEgw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0EFC920823
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=JCSfXFfx/HmMLZRvtg3fLC7VqeT9B5i4TBZ9SG7HpHw=; b=fS17lgmzth5H6/
-	8V05BDzlxr3HkaHaRn7RDzPP/SAhOusTJ2r55b/z9oRDXGo4bLatnnu8ptyMgkKCHiSwzIftrev8q
-	E936nptZeFmPp9HKqE/8hcdWjefW3WEQW+A0MsDQCMOltG1YZRHU3hBUzI/BwQEV2BpBYQpGS3ZJ1
-	u5gWjaJ+MwjEDnNH88jU9SwlVotgLsEkab3OR6AcSLLEylbT2CrzoQAtaQHQmHvs915+JIQ0guZmU
-	3kSEupPeJ0pvEPJHrJkPPO7Pnils28UqUiAm+lC3A2vgxvVj1VJAy3hmMtdc/agQK1+4m2fW8/LhD
-	gCOoZwMut1RiLOW7BKbA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=b32iTfk0znl466ohup4zS0xut30qMWFlkS3MwwYfv+c=; b=E5AqIEgwWd8Ama
+	XOTauockEU92juPnk132Ixn2Aw3dvZjLhvrOGtVSC7mP1ZKA0OzK5qHPWAJ6J6uagZdWeEyeCaBEW
+	CsLkoRFS6zq17wbTh9JPIugDT5tl0zjxVHGEkdD94ZR8mr9O5pdEdww0B3g+n1dMe2HqYuWGZw9vt
+	qmRjwGdkDb9MrOXSB2q586WATGye5IfyNpwE/2gB5lqpyXz27/EMUt+iRpAcAOMYIakdpdG75+C6d
+	Z6ac9b/6TZqrFk2/D26e5F8argo/SIjePoIz8LWEhjaQbXIWKyrfZw5ILu9RaB5aE0toigs7c3yFF
+	8CsRnmOo8MG8P36GcEQg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grgIK-0004Vj-SW; Thu, 07 Feb 2019 09:48:32 +0000
-Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
+	id 1grgJm-00054y-TF; Thu, 07 Feb 2019 09:50:02 +0000
+Received: from relay11.mail.gandi.net ([217.70.178.231])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grgGq-0002zz-Dh
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:47:08 +0000
-Received: from zyt.lan (unknown [IPv6:2a02:169:34b6:0:5054:ff:fe4f:85bd])
- by mail.kmu-office.ch (Postfix) with ESMTPSA id DF5135C1E18;
- Thu,  7 Feb 2019 10:46:55 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
- t=1549532815;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:
- content-transfer-encoding:content-transfer-encoding:
- in-reply-to:in-reply-to:references:references;
- bh=zwc604StUvjs3fmtSGOl0ACcuHgsxayF/Y8S2m4nlzM=;
- b=xIP+ozZ6WLEdZ13wl0cNRnBtQJSh2M2VLcrbmtpUGYEhjHxPG2mOqeOKnDqBEXOTVM+Fco
- tJzxVGtu0kB30V2d63EvUWbhHpfkTefwwueJkZhQ5v1D3tQ3JcudqH9zEPjgPZTE8SXh7c
- PrXYAhPdDK4O2xf53Rqab6LC3GyRk8c=
-From: Stefan Agner <stefan@agner.ch>
-To: linux@armlinux.org.uk
-Subject: [PATCH 2/5] ARM: use unified assembler in headers
-Date: Thu,  7 Feb 2019 10:48:26 +0100
-Message-Id: <b670feebd5e0bbc4c93d3f31f45bd0243b32425f.1549532513.git.stefan@agner.ch>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <cover.1549532513.git.stefan@agner.ch>
-References: <cover.1549532513.git.stefan@agner.ch>
+ id 1grgJi-00053S-OT
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:50:00 +0000
+Received: from mc-bl-xps13.lan
+ (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr [90.88.22.177])
+ (Authenticated sender: maxime.chevallier@bootlin.com)
+ by relay11.mail.gandi.net (Postfix) with ESMTPSA id 8FBB610000B;
+ Thu,  7 Feb 2019 09:49:52 +0000 (UTC)
+From: Maxime Chevallier <maxime.chevallier@bootlin.com>
+To: davem@davemloft.net
+Subject: [PATCH net-next v2 00/10] net: phy: Add support for 2.5GBASET PHYs
+Date: Thu,  7 Feb 2019 10:49:29 +0100
+Message-Id: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_014700_868432_7677A70C 
-X-CRM114-Status: GOOD (  11.70  )
+X-CRM114-CacheID: sfid-20190207_014958_944037_7D22FFF7 
+X-CRM114-Status: GOOD (  13.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,145 +64,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: nicolas.pitre@linaro.org, mark.rutland@arm.com, arnd@arndb.de,
- ard.biesheuvel@linaro.org, will.deacon@arm.com, julien.thierry@arm.com,
- ndesaulniers@google.com, linux-kernel@vger.kernel.org,
- Stefan Agner <stefan@agner.ch>, thierry.reding@gmail.com,
- natechancellor@gmail.com, linux-arm-kernel@lists.infradead.org
+Cc: Andrew Lunn <andrew@lunn.ch>, Florian Fainelli <f.fainelli@gmail.com>,
+ mw@semihalf.com, Antoine Tenart <antoine.tenart@bootlin.com>,
+ netdev@vger.kernel.org, gregory.clement@bootlin.com,
+ linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>, nadavh@marvell.com,
+ thomas.petazzoni@bootlin.com, miquel.raynal@bootlin.com,
+ Russell King <linux@armlinux.org.uk>, stefanc@marvell.com,
+ linux-arm-kernel@lists.infradead.org, Heiner Kallweit <hkallweit1@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use unified assembler syntax (UAL) in headers. Divided syntax is
-considered depricated. This will also allow to build the kernel
-using LLVM's integrated assembler.
+Hello everyone,
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/include/asm/assembler.h | 8 ++++----
- arch/arm/include/asm/vfpmacros.h | 8 ++++----
- arch/arm/lib/bitops.h            | 8 ++++----
- 3 files changed, 12 insertions(+), 12 deletions(-)
+This is the second iteration of the series introducing support for
+2.5GBASET and 5GBASET to the network PHY infrastructure.
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 28a48e0d4cca..60465b55683c 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -376,7 +376,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	.macro	usraccoff, instr, reg, ptr, inc, off, cond, abort, t=TUSER()
- 9999:
- 	.if	\inc == 1
--	\instr\cond\()b\()\t\().w \reg, [\ptr, #\off]
-+	\instr\()b\cond\()\t\().w \reg, [\ptr, #\off]
- 	.elseif	\inc == 4
- 	\instr\cond\()\t\().w \reg, [\ptr, #\off]
- 	.else
-@@ -417,7 +417,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	.rept	\rept
- 9999:
- 	.if	\inc == 1
--	\instr\cond\()b\()\t \reg, [\ptr], #\inc
-+	\instr\()b\cond\()\t \reg, [\ptr], #\inc
- 	.elseif	\inc == 4
- 	\instr\cond\()\t \reg, [\ptr], #\inc
- 	.else
-@@ -460,7 +460,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	.macro check_uaccess, addr:req, size:req, limit:req, tmp:req, bad:req
- #ifndef CONFIG_CPU_USE_DOMAINS
- 	adds	\tmp, \addr, #\size - 1
--	sbcccs	\tmp, \tmp, \limit
-+	sbcscc	\tmp, \tmp, \limit
- 	bcs	\bad
- #ifdef CONFIG_CPU_SPECTRE
- 	movcs	\addr, #0
-@@ -474,7 +474,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	sub	\tmp, \limit, #1
- 	subs	\tmp, \tmp, \addr	@ tmp = limit - 1 - addr
- 	addhs	\tmp, \tmp, #1		@ if (tmp >= 0) {
--	subhss	\tmp, \tmp, \size	@ tmp = limit - (addr + size) }
-+	subshs	\tmp, \tmp, \size	@ tmp = limit - (addr + size) }
- 	movlo	\addr, #0		@ if (tmp < 0) addr = NULL
- 	csdb
- #endif
-diff --git a/arch/arm/include/asm/vfpmacros.h b/arch/arm/include/asm/vfpmacros.h
-index ef5dfedacd8d..628c336e8e3b 100644
---- a/arch/arm/include/asm/vfpmacros.h
-+++ b/arch/arm/include/asm/vfpmacros.h
-@@ -29,13 +29,13 @@
- 	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
- 	ldr	\tmp, [\tmp, #0]
- 	tst	\tmp, #HWCAP_VFPD32
--	ldcnel	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
-+	ldclne	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
- 	addeq	\base, \base, #32*4		    @ step over unused register space
- #else
- 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
- 	and	\tmp, \tmp, #MVFR0_A_SIMD_MASK	    @ A_SIMD field
- 	cmp	\tmp, #2			    @ 32 x 64bit registers?
--	ldceql	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
-+	ldcleq	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
- 	addne	\base, \base, #32*4		    @ step over unused register space
- #endif
- #endif
-@@ -53,13 +53,13 @@
- 	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
- 	ldr	\tmp, [\tmp, #0]
- 	tst	\tmp, #HWCAP_VFPD32
--	stcnel	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
-+	stclne	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
- 	addeq	\base, \base, #32*4		    @ step over unused register space
- #else
- 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
- 	and	\tmp, \tmp, #MVFR0_A_SIMD_MASK	    @ A_SIMD field
- 	cmp	\tmp, #2			    @ 32 x 64bit registers?
--	stceql	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
-+	stcleq	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
- 	addne	\base, \base, #32*4		    @ step over unused register space
- #endif
- #endif
-diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
-index 93cddab73072..95bd35991288 100644
---- a/arch/arm/lib/bitops.h
-+++ b/arch/arm/lib/bitops.h
-@@ -7,7 +7,7 @@
- ENTRY(	\name		)
- UNWIND(	.fnstart	)
- 	ands	ip, r1, #3
--	strneb	r1, [ip]		@ assert word-aligned
-+	strbne	r1, [ip]		@ assert word-aligned
- 	mov	r2, #1
- 	and	r3, r0, #31		@ Get bit offset
- 	mov	r0, r0, lsr #5
-@@ -32,7 +32,7 @@ ENDPROC(\name		)
- ENTRY(	\name		)
- UNWIND(	.fnstart	)
- 	ands	ip, r1, #3
--	strneb	r1, [ip]		@ assert word-aligned
-+	strbne	r1, [ip]		@ assert word-aligned
- 	mov	r2, #1
- 	and	r3, r0, #31		@ Get bit offset
- 	mov	r0, r0, lsr #5
-@@ -62,7 +62,7 @@ ENDPROC(\name		)
- ENTRY(	\name		)
- UNWIND(	.fnstart	)
- 	ands	ip, r1, #3
--	strneb	r1, [ip]		@ assert word-aligned
-+	strbne	r1, [ip]		@ assert word-aligned
- 	and	r2, r0, #31
- 	mov	r0, r0, lsr #5
- 	mov	r3, #1
-@@ -89,7 +89,7 @@ ENDPROC(\name		)
- ENTRY(	\name		)
- UNWIND(	.fnstart	)
- 	ands	ip, r1, #3
--	strneb	r1, [ip]		@ assert word-aligned
-+	strbne	r1, [ip]		@ assert word-aligned
- 	and	r3, r0, #31
- 	mov	r0, r0, lsr #5
- 	save_and_disable_irqs ip
+These 2 modes are described in the 802.3bz specifications, and allow to
+use 2.5G and 5G speeds on cat5e/cat6 cables.
+
+The required infrastructure code is added for 2.5GBASET and 5GBASET, but
+only 2.5GBASET support is added to the Marvell10G driver. The reason is
+because the 5GBASER interface mode used to communicate with the MAC
+isn't implemented yet, and therefore this can't be tested.
+
+This series has seen some rework since last time, see the full details
+in the patches changelog. The main highlights are :
+
+ - Patch 1 moves the Pause ans Asym_Pause parameters update after
+   calling config_init. This allows us to change the phydev->supported
+   modes in config_init, while still forcing some quirks taken from
+   phydrv->features, to disable unsupported Pause modes. This was
+   proposed by Andrew.
+
+ - Patch 2 generalizes the way we mask-out modes we don't want to use
+   when forcing the link speed through DT or ethtool, by walking through
+   the PHY settings table, as proposed by Russell.
+
+ - Patch 4 implements automatic setting of TM, FIBRE and Backplane bits
+   from the list of supported linkmodes.
+
+ - In Patch 5, we only read abilities from the PMA. Pause parameters
+   aren't built from the genphy_c45_pma_read_abilities, as it was done
+   in the previous iteration of the patch. We also amke use of
+   linkmode_mod_bit to make sure we mask-out unsupported modes.
+
+ - In Patch 8, we manually check for the PMA device id to see if we have
+   to use a quirk when reading the 2.5G/5G Extended Abilities
+
+Maxime Chevallier (10):
+  net: phy: Update PHY linkmodes after config_init
+  net: phy: Mask-out non-compatible modes when setting the max-speed
+  net: phy: Move of_set_phy_eee_broken to phy-core.c
+  net: phy: Automatically fill the generic TP, FIBRE and Backplane modes
+  net: phy: Extract genphy_c45_pma_read_abilities from marvell10g
+  net: phy: Add generic support for 2.5GBaseT and 5GBaseT
+  net: phy: marvell10g: Add support for 2.5GBASET
+  net: phy: marvell10g: Force reading of 2.5/5G
+  net: mvpp2: Add 2.5GBaseT support
+  net: phy: marvell10g: add support for the 88x2110 PHY
+
+ .../net/ethernet/marvell/mvpp2/mvpp2_main.c   |   1 +
+ drivers/net/phy/marvell10g.c                  | 142 +++++------
+ drivers/net/phy/phy-c45.c                     | 111 ++++++++
+ drivers/net/phy/phy-core.c                    |  72 ++++++
+ drivers/net/phy/phy_device.c                  | 237 +++++++++---------
+ include/linux/linkmode.h                      |   6 +
+ include/linux/marvell_phy.h                   |   2 +
+ include/linux/phy.h                           |   3 +
+ include/uapi/linux/mdio.h                     |  16 ++
+ 9 files changed, 405 insertions(+), 185 deletions(-)
+
 -- 
-2.20.1
+2.19.2
 
 
 _______________________________________________
