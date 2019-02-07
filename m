@@ -2,189 +2,64 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B16ADC282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:35:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A8A5C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:44:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 770852077B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:35:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2751321872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:44:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nPI8bSKK";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="cf+jEUQk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 770852077B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PxRH7+Ls"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2751321872
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LiVtZ7KHvu9YTbfie0WFhNnGqarJxyt41iwOYH1Gip4=; b=nPI8bSKKvwtKJK
-	STjI+mb7lRdK32uSGWYMKnXoZSvdZd50nwC/juLMMBgSRu3B37q+4rYypok7Qd2t9k02uHoHjfS/p
-	/kzp8wJf0tXzk11+zShZEy5Rs1Hb+vyyTuxwUqKOwbTWGNuQS3b+DUi8UnwhsdxmG7KbSsykFFvqO
-	g7e2NH+oE383MlRU2LZ+Fcr+CVuPJGiMaFkdzd3Q222jtsBvJEYNmhiSKDt7Bo8bmQoBAywMyEEMw
-	tdJkY60I3LCePQsHxmQx8wVFyNM+rILhszzxOUmtoFe7Ih9Eo3KqK0zRQGtC/P1GZSxzyxJX4TQEg
-	2ImHYYfUCikX0rVYt8Sg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=AXq/xorTZiwk9WU6AYMrlrdUjzS7cMvE/R9HSpIVKzU=; b=PxRH7+LstcBEOt
+	auF+J5+GNTuUrfw943nxhJclzr1lzSbErh3qGjrG1wNFaOQRHrc7f0hpNfj9lcOidkuDUTaVEfEzG
+	DQP+hforJyh2nM2DPlTUlUC1EpzE4C786S+xM4m9gPvgSgIW9SuKrWQq9MUF5Xc1lX8C0gwzFN36/
+	Nu2BT6D7+9CB5bEv9mHa/759ZDiH4RTW+M0mMmqOa/anohoNyyjxP4JyYbA1qF3+bWLBxpRE43Fvu
+	k932TFaaeHSn1LGijCi9x6aXz5unSCHQiKDcpIErzKhSZhN0uWoylE7xvDzAiEvWyMylZgeVFzxsa
+	ipf00X0+qo47Sm3dcsQw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grlhv-0007NY-GJ; Thu, 07 Feb 2019 15:35:19 +0000
-Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grlhr-0007Kp-Eh; Thu, 07 Feb 2019 15:35:16 +0000
-Received: by mail-ed1-x542.google.com with SMTP id p15so198589edy.8;
- Thu, 07 Feb 2019 07:35:14 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=nnpgIQ4oyHO2t0agnXL7bNZ9F9HlWsuN78DYk1N54Ps=;
- b=cf+jEUQkPvfJCa7BcxGz02yU47TojqqwS1wpi2jr3SSovBHVoB/cvYFEukq3YWkPqc
- ++XFzyN81rM2ljGBGsq16fH97zC2fyU0qqSAPACXQ766OY2Oa/2ad3X97lP0O+7UvRrg
- lKAI3m7DvUZpbOwyOVfYnRqpGctFoi11iLVAobwBKEO5N0FgmDxpuGx+DcBybPPtr87d
- SmIQ+zPNay+ILtqsm3KCTIhbNj97t95GPHExndYke+sX5HB2RAoL8VM1OQ3bN2shETnI
- CvuxKjNi49tZENm7LM7Sa6fIUvI9BtkKpVantHY/kh/dcVtXQIpM4mnxV4IwHtydkpHX
- m09Q==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=nnpgIQ4oyHO2t0agnXL7bNZ9F9HlWsuN78DYk1N54Ps=;
- b=f+vkWv+hc9G2YX5mL6tcf9RuKDwkxHxvsizbCXMOOVHeRqprd2h0lTZimiQqNP2xf6
- i6JvwjlPSNJ63mYcyrScoIy3Baay0QZfzjRkk2eNB7hrfYkClmFBCpQEp471fz25xwSa
- lXo8MI7H2qG9sLmFidpt0IXgp3dVDjMpJC0GPostkjp3PIhDEOLUErchMHM/IudJRzNZ
- dOQJUgpGwo+vW4VqzUUse6lOnJaFsh9TvcfWCCEsxw6jF0VAJZTg+BW6NBmdVo+aGS4W
- fgDQuyMKo6OoMZQJpXtsDeC4c6VRgzOj0jUB+vOj67Fj+T1Yrv1jZO6AQ8DRxqfB0tN+
- bHYQ==
-X-Gm-Message-State: AHQUAuYHpY1KWuTwvBFLf34etw2o0eAt88nm8yITJOmfjP5lA2QIUCeT
- WbdZl8xxxQ1n5kgWhtk6kLs=
-X-Google-Smtp-Source: AHgI3IaseZUwnzfKO0qKnmW8WEAb8kuGA/qjQ4Ck1ozy4nT188QG7a19OoAFQ6ZJ8OPfh2BGERNlVw==
-X-Received: by 2002:a17:906:3ed0:: with SMTP id
- d16mr1961262ejj.138.1549553713496; 
- Thu, 07 Feb 2019 07:35:13 -0800 (PST)
-Received: from ziggy.stardust ([62.31.71.171])
- by smtp.gmail.com with ESMTPSA id p30sm6935194eda.68.2019.02.07.07.35.12
- (version=TLS1_3 cipher=AEAD-AES128-GCM-SHA256 bits=128/128);
- Thu, 07 Feb 2019 07:35:12 -0800 (PST)
-Subject: Re: [PATCH v4 09/12] dt-bindings: soc: fix typo of MT8173 power
- dt-bindings
-To: Weiyi Lu <weiyi.lu@mediatek.com>, Nicolas Boichat
- <drinkcat@chromium.org>, Stephen Boyd <sboyd@codeaurora.org>,
- Rob Herring <robh@kernel.org>
-References: <20190201083016.25856-1-weiyi.lu@mediatek.com>
- <20190201083016.25856-11-weiyi.lu@mediatek.com>
-From: Matthias Brugger <matthias.bgg@gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
- 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
- jrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <a8315d4b-3209-baca-ea39-10626a60f0e8@gmail.com>
-Date: Thu, 7 Feb 2019 16:35:11 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.3
+	id 1grlqm-0001Xn-WE; Thu, 07 Feb 2019 15:44:29 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1grlqj-0001X4-8q
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 15:44:26 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EE2EBA78;
+ Thu,  7 Feb 2019 07:44:23 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 714323F719;
+ Thu,  7 Feb 2019 07:44:22 -0800 (PST)
+Date: Thu, 7 Feb 2019 15:44:19 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Kishon Vijay Abraham I <kishon@ti.com>
+Subject: Re: [PATCH v2 3/9] PCI: keystone: Add separate functions for
+ configuring MSI and legacy interrupt
+Message-ID: <20190207154419.GB21111@e107981-ln.cambridge.arm.com>
+References: <20190207110924.30716-1-kishon@ti.com>
+ <20190207110924.30716-4-kishon@ti.com>
 MIME-Version: 1.0
-In-Reply-To: <20190201083016.25856-11-weiyi.lu@mediatek.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20190207110924.30716-4-kishon@ti.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_073515_522989_8F8B2529 
-X-CRM114-Status: GOOD (  14.94  )
+X-CRM114-CacheID: sfid-20190207_074425_326531_FB20EDC0 
+X-CRM114-Status: GOOD (  25.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -196,49 +71,299 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: James Liao <jamesjj.liao@mediatek.com>, srv_heupstream@mediatek.com,
- linux-kernel@vger.kernel.org, stable@vger.kernel.org,
- Fan Chen <fan.chen@mediatek.com>, linux-mediatek@lists.infradead.org,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: Jingoo Han <jingoohan1@gmail.com>, linux-kernel@vger.kernel.org,
+ Murali Karicheri <m-karicheri2@ti.com>, linux-pci@vger.kernel.org,
+ Bjorn Helgaas <bhelgaas@google.com>,
+ Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 01/02/2019 09:30, Weiyi Lu wrote:
-> fix incorrect IC name that will affect the MT8183 power dt-bindings
+On Thu, Feb 07, 2019 at 04:39:18PM +0530, Kishon Vijay Abraham I wrote:
+> ks_pcie_get_irq_controller_info() was used to configure both MSI and
+> legacy interrupt. This will prevent MSI or legacy interrupt specific
+> intializations. Add separate functions to configure MSI and legacy
+> interrupts.
 > 
-> Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
-
-pushed to v5.0-next/soc
-
-Thanks
-
->  include/dt-bindings/power/mt8173-power.h | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  drivers/pci/controller/dwc/pci-keystone.c | 188 +++++++++++-----------
+>  1 file changed, 96 insertions(+), 92 deletions(-)
 > 
-> diff --git a/include/dt-bindings/power/mt8173-power.h b/include/dt-bindings/power/mt8173-power.h
-> index 15d531aa6e78..ef4a7f944848 100644
-> --- a/include/dt-bindings/power/mt8173-power.h
-> +++ b/include/dt-bindings/power/mt8173-power.h
-> @@ -1,6 +1,6 @@
->  /* SPDX-License-Identifier: GPL-2.0 */
-> -#ifndef _DT_BINDINGS_POWER_MT8183_POWER_H
-> -#define _DT_BINDINGS_POWER_MT8183_POWER_H
-> +#ifndef _DT_BINDINGS_POWER_MT8173_POWER_H
-> +#define _DT_BINDINGS_POWER_MT8173_POWER_H
+> diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
+> index 4cf9849d5a1d..b1d01751c1af 100644
+> --- a/drivers/pci/controller/dwc/pci-keystone.c
+> +++ b/drivers/pci/controller/dwc/pci-keystone.c
+> @@ -87,11 +87,8 @@ struct keystone_pcie {
+>  	struct dw_pcie		*pci;
+>  	/* PCI Device ID */
+>  	u32			device_id;
+> -	int			num_legacy_host_irqs;
+> -	int			legacy_host_irqs[PCI_NUM_INTX];
+>  	struct			device_node *legacy_intc_np;
 >  
->  #define MT8173_POWER_DOMAIN_VDEC	0
->  #define MT8173_POWER_DOMAIN_VENC	1
-> @@ -13,4 +13,4 @@
->  #define MT8173_POWER_DOMAIN_MFG_2D	8
->  #define MT8173_POWER_DOMAIN_MFG		9
+> -	int			num_msi_host_irqs;
+>  	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
+>  	int			num_lanes;
+>  	u32			num_viewport;
+> @@ -201,14 +198,6 @@ static int ks_pcie_msi_host_init(struct pcie_port *pp)
+>  	return dw_pcie_allocate_domains(pp);
+>  }
 >  
-> -#endif /* _DT_BINDINGS_POWER_MT8183_POWER_H */
-> +#endif /* _DT_BINDINGS_POWER_MT8173_POWER_H */
+> -static void ks_pcie_enable_legacy_irqs(struct keystone_pcie *ks_pcie)
+> -{
+> -	int i;
+> -
+> -	for (i = 0; i < PCI_NUM_INTX; i++)
+> -		ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET(i), 0x1);
+> -}
+> -
+>  static void ks_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie,
+>  				      int offset)
+>  {
+> @@ -490,17 +479,6 @@ static int __init ks_pcie_dw_host_init(struct keystone_pcie *ks_pcie)
+>  
+>  	ks_pcie->app = *res;
+>  
+> -	/* Create legacy IRQ domain */
+> -	ks_pcie->legacy_irq_domain =
+> -			irq_domain_add_linear(ks_pcie->legacy_intc_np,
+> -					      PCI_NUM_INTX,
+> -					      &ks_pcie_legacy_irq_domain_ops,
+> -					      NULL);
+> -	if (!ks_pcie->legacy_irq_domain) {
+> -		dev_err(dev, "Failed to add irq domain for legacy irqs\n");
+> -		return -EINVAL;
+> -	}
+> -
+>  	return dw_pcie_host_init(pp);
+>  }
+>  
+> @@ -624,85 +602,117 @@ static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
+>  	chained_irq_exit(chip, desc);
+>  }
+>  
+> -static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+> -					   char *controller, int *num_irqs)
+> +static int ks_pcie_config_msi_irq(struct keystone_pcie *ks_pcie)
+>  {
+> -	int temp, max_host_irqs, legacy = 1, *host_irqs;
+>  	struct device *dev = ks_pcie->pci->dev;
+> -	struct device_node *np_pcie = dev->of_node, **np_temp;
+> -
+> -	if (!strcmp(controller, "msi-interrupt-controller"))
+> -		legacy = 0;
+> -
+> -	if (legacy) {
+> -		np_temp = &ks_pcie->legacy_intc_np;
+> -		max_host_irqs = PCI_NUM_INTX;
+> -		host_irqs = &ks_pcie->legacy_host_irqs[0];
+> -	} else {
+> -		np_temp = &ks_pcie->msi_intc_np;
+> -		max_host_irqs = MAX_MSI_HOST_IRQS;
+> -		host_irqs =  &ks_pcie->msi_host_irqs[0];
+> -	}
+> +	struct device_node *np = ks_pcie->np;
+> +	struct device_node *intc_np;
+> +	int irq_count;
+> +	int irq;
+> +	int ret;
+> +	int i;
+
+Nit: all int can be in one line.
+
+> -	/* interrupt controller is in a child node */
+> -	*np_temp = of_get_child_by_name(np_pcie, controller);
+> -	if (!(*np_temp)) {
+> -		dev_err(dev, "Node for %s is absent\n", controller);
+> -		return -EINVAL;
+> -	}
+> +	if (!IS_ENABLED(CONFIG_PCI_MSI))
+> +		return 0;
+>  
+> -	temp = of_irq_count(*np_temp);
+> -	if (!temp) {
+> -		dev_err(dev, "No IRQ entries in %s\n", controller);
+> -		of_node_put(*np_temp);
+> +	intc_np = of_get_child_by_name(np, "msi-interrupt-controller");
+> +	if (!intc_np) {
+> +		dev_WARN(dev, "msi-interrupt-controller node is absent\n");
+
+I do not think you can justify a backtrace for this error path, so
+convert it to a dev_warn() please.
+
+>  		return -EINVAL;
+>  	}
+>  
+> -	if (temp > max_host_irqs)
+> -		dev_warn(dev, "Too many %s interrupts defined %u\n",
+> -			(legacy ? "legacy" : "MSI"), temp);
+> +	irq_count = of_irq_count(intc_np);
+> +	if (!irq_count) {
+> +		dev_err(dev, "No IRQ entries in msi-interrupt-controller\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+>  
+> -	/*
+> -	 * support upto max_host_irqs. In dt from index 0 to 3 (legacy) or 0 to
+> -	 * 7 (MSI)
+> -	 */
+> -	for (temp = 0; temp < max_host_irqs; temp++) {
+> -		host_irqs[temp] = irq_of_parse_and_map(*np_temp, temp);
+> -		if (!host_irqs[temp])
+> -			break;
+> +	if (irq_count > MAX_MSI_HOST_IRQS) {
+> +		dev_warn(dev, "Too many MSI interrupt lines defined %u\n",
+> +			 irq_count);
+> +		irq_count = MAX_MSI_HOST_IRQS;
+>  	}
+>  
+> -	of_node_put(*np_temp);
+> +	for (i = 0; i < irq_count; i++) {
+> +		irq = irq_of_parse_and_map(intc_np, i);
+> +		if (!irq) {
+> +			ret = -EINVAL;
+> +			goto err;
+> +		}
+> +		ks_pcie->msi_host_irqs[i] = irq;
+>  
+> -	if (temp) {
+> -		*num_irqs = temp;
+> -		return 0;
+> +		irq_set_chained_handler_and_data(irq, ks_pcie_msi_irq_handler,
+> +						 ks_pcie);
+>  	}
+>  
+> -	return -EINVAL;
+> +	of_node_put(intc_np);
+> +	return 0;
+> +
+> +err:
+> +	of_node_put(intc_np);
+> +	return ret;
+>  }
+>  
+> -static void ks_pcie_setup_interrupts(struct keystone_pcie *ks_pcie)
+> +static int ks_pcie_config_legacy_irq(struct keystone_pcie *ks_pcie)
+>  {
+> +	struct device *dev = ks_pcie->pci->dev;
+> +	struct irq_domain *legacy_irq_domain;
+> +	struct device_node *np = ks_pcie->np;
+> +	struct device_node *intc_np;
+> +	int irq_count;
+> +	int irq;
+> +	int ret;
+>  	int i;
+>  
+> -	/* Legacy IRQ */
+> -	for (i = 0; i < ks_pcie->num_legacy_host_irqs; i++) {
+> -		irq_set_chained_handler_and_data(ks_pcie->legacy_host_irqs[i],
+> +	intc_np = of_get_child_by_name(np, "legacy-interrupt-controller");
+> +	if (!intc_np) {
+> +		dev_WARN(dev, "legacy-interrupt-controller node is absent\n");
+
+Likewise.
+
+Lorenzo
+
+> +		return -EINVAL;
+> +	}
+> +
+> +	irq_count = of_irq_count(intc_np);
+> +	if (!irq_count) {
+> +		dev_err(dev, "No IRQ entries in legacy-interrupt-controller\n");
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +
+> +	for (i = 0; i < irq_count; i++) {
+> +		irq = irq_of_parse_and_map(intc_np, i);
+> +		if (!irq) {
+> +			ret = -EINVAL;
+> +			goto err;
+> +		}
+> +		irq_set_chained_handler_and_data(irq,
+>  						 ks_pcie_legacy_irq_handler,
+>  						 ks_pcie);
+>  	}
+> -	ks_pcie_enable_legacy_irqs(ks_pcie);
+> -
+> -	/* MSI IRQ */
+> -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> -		for (i = 0; i < ks_pcie->num_msi_host_irqs; i++) {
+> -			irq_set_chained_handler_and_data(ks_pcie->msi_host_irqs[i],
+> -							 ks_pcie_msi_irq_handler,
+> -							 ks_pcie);
+> -		}
+> +
+> +	legacy_irq_domain =
+> +		irq_domain_add_linear(intc_np, PCI_NUM_INTX,
+> +				      &ks_pcie_legacy_irq_domain_ops, NULL);
+> +	if (!legacy_irq_domain) {
+> +		dev_err(dev, "Failed to add irq domain for legacy irqs\n");
+> +		ret = -EINVAL;
+> +		goto err;
+>  	}
+> +	ks_pcie->legacy_irq_domain = legacy_irq_domain;
+> +
+> +	for (i = 0; i < PCI_NUM_INTX; i++)
+> +		ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET(i), INTx_EN);
+> +
+> +	of_node_put(intc_np);
+> +
+> +	return 0;
+> +
+> +err:
+> +	of_node_put(intc_np);
+> +	return ret;
+> +}
+>  
+> +static void ks_pcie_setup_interrupts(struct keystone_pcie *ks_pcie)
+> +{
+>  	if (ks_pcie->error_irq > 0)
+>  		ks_pcie_enable_error_irq(ks_pcie);
+>  }
+> @@ -756,6 +766,14 @@ static int __init ks_pcie_host_init(struct pcie_port *pp)
+>  	struct keystone_pcie *ks_pcie = to_keystone_pcie(pci);
+>  	int ret;
+>  
+> +	ret = ks_pcie_config_legacy_irq(ks_pcie);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = ks_pcie_config_msi_irq(ks_pcie);
+> +	if (ret)
+> +		return ret;
+> +
+>  	dw_pcie_setup_rc(pp);
+>  
+>  	ks_pcie_establish_link(ks_pcie);
+> @@ -805,20 +823,6 @@ static int __init ks_pcie_add_pcie_port(struct keystone_pcie *ks_pcie,
+>  	struct device *dev = &pdev->dev;
+>  	int ret;
+>  
+> -	ret = ks_pcie_get_irq_controller_info(ks_pcie,
+> -					"legacy-interrupt-controller",
+> -					&ks_pcie->num_legacy_host_irqs);
+> -	if (ret)
+> -		return ret;
+> -
+> -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> -		ret = ks_pcie_get_irq_controller_info(ks_pcie,
+> -						"msi-interrupt-controller",
+> -						&ks_pcie->num_msi_host_irqs);
+> -		if (ret)
+> -			return ret;
+> -	}
+> -
+>  	/*
+>  	 * Index 0 is the platform interrupt for error interrupt
+>  	 * from RC.  This is optional.
+> -- 
+> 2.17.1
 > 
 
 _______________________________________________
