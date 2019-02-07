@@ -2,105 +2,90 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 94074C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 16:05:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C964BC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 16:10:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5FE612175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 16:05:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 935E52175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 16:10:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D7skzohm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5FE612175B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MLGdDEVI";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="kYmcCNnk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 935E52175B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-Id:In-Reply-To:MIME-Version:
-	References:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:
+	In-Reply-To:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0ljFJyHGIHaZdBs1IaR2bREhhWd0CIDpPlMoQj1Bvf0=; b=D7skzohmPUTblv
-	m9OnSbXcmKPlwaB7V0uEZwAEMLN9Ra51Uh56aMMk9dTF92aaEm/XRI0mypjH7hFbatkJbF9xTkjhF
-	+wYj8LckyyJLOhggHqZ1HafVyTJL17vW2sLUrEzEz+3adgzHwjhKWZrqBz/UgCnmE/ucG2B/cPkWQ
-	5gFzRO3DdJo/l8ErxBQRJIS4X5c54F/8T0ojkLfv8TasgNg7yLVbxvp2ww6Kld3efSSPjEkrBN8lM
-	HpkP8Z2+WrL9cKyfK/rX+5KFa/uXv4ZBolbxx7Qs5Gj/MAblXBkeyNMCuyOfcJt3ik4LjHbmAeWB1
-	PLXAxMvwfQqrw+uOdvSg==;
+	List-Owner; bh=WDvvdgwwzEjyLjCZ3PGvxnps0Dranr3T2i1p1JCPbMU=; b=MLGdDEVIxasVUz
+	KvJXLHeNGPsswtVSVV7FCA4BgqZ3ZwzLko9azLNnMAFQ9M5XGbWpETlyjNbHI8FC1xUCkhSSmJC/s
+	8oH4Hu1ZC0Zp5+KwNsuR3XE7KOVzuGdNh2F5jjCvPuH/UeXPwIfjc6OYxbsOKg5qJXbBwQp3aN96T
+	O7HBbGtdT68XfNpL2LpcG6xL3bBzErkliT1s+FaQsvFSU9WM/OqKZtDpiJcbF9MeismYaO2l1/Wuo
+	6A4Rjr5+3qVR+kDHUiiCkb3lKLfje5clzNQR+gsW2ifGiNb4s9kprA7Uss0wb0a4kfwKHLbngrxam
+	93bZpFBE0ma8Q9AdfTbg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grmBO-0003yL-VA; Thu, 07 Feb 2019 16:05:46 +0000
-Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
- helo=mx0a-001b2d01.pphosted.com)
+	id 1grmFx-0005kg-S6; Thu, 07 Feb 2019 16:10:29 +0000
+Received: from mail-qk1-x744.google.com ([2607:f8b0:4864:20::744])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grmBH-0003x9-Q2
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 16:05:41 +0000
-Received: from pps.filterd (m0098417.ppops.net [127.0.0.1])
- by mx0a-001b2d01.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x17G5Rkx088442
- for <linux-arm-kernel@lists.infradead.org>; Thu, 7 Feb 2019 11:05:38 -0500
-Received: from e06smtp07.uk.ibm.com (e06smtp07.uk.ibm.com [195.75.94.103])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2qgppfcga7-1
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Thu, 07 Feb 2019 11:05:28 -0500
-Received: from localhost
- by e06smtp07.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
- Violators will be prosecuted
- for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Thu, 7 Feb 2019 16:05:04 -0000
-Received: from b06cxnps4075.portsmouth.uk.ibm.com (9.149.109.197)
- by e06smtp07.uk.ibm.com (192.168.101.137) with IBM ESMTP SMTP Gateway:
- Authorized Use Only! Violators will be prosecuted; 
- (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Thu, 7 Feb 2019 16:04:56 -0000
-Received: from d06av25.portsmouth.uk.ibm.com (d06av25.portsmouth.uk.ibm.com
- [9.149.105.61])
- by b06cxnps4075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- x17G4tNl8913356
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 7 Feb 2019 16:04:55 GMT
-Received: from d06av25.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id E367211C058;
- Thu,  7 Feb 2019 16:04:54 +0000 (GMT)
-Received: from d06av25.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 79A8F11C052;
- Thu,  7 Feb 2019 16:04:52 +0000 (GMT)
-Received: from rapoport-lnx (unknown [9.148.8.84])
- by d06av25.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Thu,  7 Feb 2019 16:04:52 +0000 (GMT)
-Date: Thu, 7 Feb 2019 18:04:50 +0200
-From: Mike Rapoport <rppt@linux.ibm.com>
-To: Souptick Joarder <jrdr.linux@gmail.com>
-Subject: Re: [PATCHv2 1/9] mm: Introduce new vm_insert_range and
- vm_insert_range_buggy API
-References: <20190131030812.GA2174@jordon-HP-15-Notebook-PC>
- <20190131083842.GE28876@rapoport-lnx>
- <CAFqt6za9xA_8OKiaaHXcO9go+RtPdjLY5Bz_fgQL+DZbermNhA@mail.gmail.com>
- <20190207155700.GA8040@rapoport-lnx>
- <CAFqt6zbE0JD09ibp3jZ0rr5xp52SEK+Pi6pGMQwSp_=d0edy7g@mail.gmail.com>
+ id 1grmFq-0005jE-1M
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 16:10:28 +0000
+Received: by mail-qk1-x744.google.com with SMTP id u188so229310qkh.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 07 Feb 2019 08:10:20 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:in-reply-to:message-id:references
+ :user-agent:mime-version;
+ bh=nLKu2Ce48SbsIOliZjWYYBEGchd5P2cptNKDEpsxe7A=;
+ b=kYmcCNnkuY2iAEyigKxDmit5+sQ0ZmcHHX2MwM9w1yNdosCIQBv/a1itlAepYXa13L
+ 6CBHHD+WcFY4s6gwO/5j+dC9Mwqr8mXOCHnwAD4+/I7AQv06md31uLmxfDzRDzVn+XH9
+ 9o0uFd3wx/1Oume2taJpqiAY2jAZmMI7kZwz95mYRrVWQoPUGsEAdZKeOjvBStVgNcwH
+ oXJy9vy2oICkAivcxtgacsxAhOsl3n7+OUADosxdaS4h3sj56EqXRpPvZ1VndcVcaXUv
+ rFrnHQ4gnnaCSnAjVn2d1PJphptAJQ5SajZUPlO8hOf/9y7n2H2EQfbGm+ekP8tmGQWs
+ pAdw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:in-reply-to:message-id
+ :references:user-agent:mime-version;
+ bh=nLKu2Ce48SbsIOliZjWYYBEGchd5P2cptNKDEpsxe7A=;
+ b=fTldOzgEEcwZomhOnu/VLhkikpnN8XsWwvrKGq17nftBG6fJBecLLwgUT4+7qGMH8s
+ pcI9nR3vmJqUEft3dHO8sHMtXG1Hlqr7116WbydsDGTuXcQMj8tFub0KvvM5exwMIMCT
+ FcsFjxB7I5lICKR2CYfGUdaqIRawV6G4tAl7s6Xc+IM+hn1vqnLDQIK5YTfw/Udn4QqW
+ jL41QMLxz1CnCA5dCPusaoiNLJ8z4+1AYbKKZrEIO482FDEKME6dgDg1Xn7CRMP9s4Qi
+ EfqfZCzyT1ZNCll5Fao6o7ge2Q1B+bhcA1ml5dBZAlVCwdjT2eWvO/KmtUrfh2pko2rD
+ eWjA==
+X-Gm-Message-State: AHQUAuaP/69m9J6M5xQtuYeCoWBNQOW0K32HFchsuBWzReItvuXec3n7
+ OEhSE/omWZEfILoeJEuo1mvATQ==
+X-Google-Smtp-Source: AHgI3Ib8wHs2EOKVBWXcyiIIYAhB852YPrAyjvKSHZs1Vt2ESLuqCOGBW1yI+jCL2rTXi3mN81wLyA==
+X-Received: by 2002:a37:e406:: with SMTP id y6mr11995955qkf.216.1549555819238; 
+ Thu, 07 Feb 2019 08:10:19 -0800 (PST)
+Received: from xanadu.home (modemcable228.104-82-70.mc.videotron.ca.
+ [70.82.104.228])
+ by smtp.gmail.com with ESMTPSA id a185sm24550182qkb.1.2019.02.07.08.10.17
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 07 Feb 2019 08:10:17 -0800 (PST)
+Date: Thu, 7 Feb 2019 11:10:16 -0500 (EST)
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
+To: Stefan Agner <stefan@agner.ch>
+Subject: Re: [PATCH 2/5] ARM: use unified assembler in headers
+In-Reply-To: <b670feebd5e0bbc4c93d3f31f45bd0243b32425f.1549532513.git.stefan@agner.ch>
+Message-ID: <nycvar.YSQ.7.76.1902071055380.2213@knanqh.ubzr>
+References: <cover.1549532513.git.stefan@agner.ch>
+ <b670feebd5e0bbc4c93d3f31f45bd0243b32425f.1549532513.git.stefan@agner.ch>
+User-Agent: Alpine 2.21 (LFD 202 2017-01-01)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAFqt6zbE0JD09ibp3jZ0rr5xp52SEK+Pi6pGMQwSp_=d0edy7g@mail.gmail.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
-X-TM-AS-GCONF: 00
-x-cbid: 19020716-0028-0000-0000-00000345D191
-X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 19020716-0029-0000-0000-00002403E2F7
-Message-Id: <20190207160450.GB8040@rapoport-lnx>
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-02-07_11:, , signatures=0
-X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
- priorityscore=1501
- malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
- clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=959 adultscore=0 classifier=spam adjust=0 reason=mlx
- scancount=1 engine=8.0.1-1810050000 definitions=main-1902070122
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_080539_969483_F5FD5475 
-X-CRM114-Status: GOOD (  28.71  )
+X-CRM114-CacheID: sfid-20190207_081022_081822_3E26E9F8 
+X-CRM114-Status: GOOD (  14.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,118 +97,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, Heiko Stuebner <heiko@sntech.de>,
- Peter Zijlstra <peterz@infradead.org>, dri-devel@lists.freedesktop.org,
- linux-kernel@vger.kernel.org, Linux-MM <linux-mm@kvack.org>,
- linux1394-devel@lists.sourceforge.net,
- Marek Szyprowski <m.szyprowski@samsung.com>,
- Stephen Rothwell <sfr@canb.auug.org.au>, oleksandr_andrushchenko@epam.com,
- joro@8bytes.org, Russell King - ARM Linux <linux@armlinux.org.uk>,
- Matthew Wilcox <willy@infradead.org>, airlied@linux.ie,
- linux-arm-kernel@lists.infradead.org, linux-rockchip@lists.infradead.org,
- treding@nvidia.com, linux-media@vger.kernel.org,
- Kees Cook <keescook@chromium.org>, pawel@osciak.com,
- Rik van Riel <riel@surriel.com>, iommu@lists.linux-foundation.org,
- rppt@linux.vnet.ibm.com, Boris Ostrovsky <boris.ostrovsky@oracle.com>,
- mchehab@kernel.org, iamjoonsoo.kim@lge.com, vbabka@suse.cz,
- Juergen Gross <jgross@suse.com>, hjc@rock-chips.com, xen-devel@lists.xen.org,
- Kyungmin Park <kyungmin.park@samsung.com>, stefanr@s5r6.in-berlin.de,
- Andrew Morton <akpm@linux-foundation.org>, robin.murphy@arm.com,
- "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
+Cc: mark.rutland@arm.com, arnd@arndb.de, ard.biesheuvel@linaro.org,
+ will.deacon@arm.com, julien.thierry@arm.com, ndesaulniers@google.com,
+ linux@armlinux.org.uk, linux-kernel@vger.kernel.org, thierry.reding@gmail.com,
+ natechancellor@gmail.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 07, 2019 at 09:37:08PM +0530, Souptick Joarder wrote:
-> On Thu, Feb 7, 2019 at 9:27 PM Mike Rapoport <rppt@linux.ibm.com> wrote:
-> >
-> > Hi Souptick,
-> >
-> > On Thu, Feb 07, 2019 at 09:19:47PM +0530, Souptick Joarder wrote:
-> > > Hi Mike,
-> > >
-> > > Just thought to take opinion for documentation before placing it in v3.
-> > > Does it looks fine ?
-> >
-> > Overall looks good to me. Several minor points below.
+On Thu, 7 Feb 2019, Stefan Agner wrote:
+
+> Use unified assembler syntax (UAL) in headers. Divided syntax is
+> considered depricated. This will also allow to build the kernel
+> using LLVM's integrated assembler.
 > 
-> Thanks Mike. Noted.
-> Shall I consider it as *Reviewed-by:* with below changes ?
- 
-Yeah, sure.
-
-> >
-> > > +/**
-> > > + * __vm_insert_range - insert range of kernel pages into user vma
-> > > + * @vma: user vma to map to
-> > > + * @pages: pointer to array of source kernel pages
-> > > + * @num: number of pages in page array
-> > > + * @offset: user's requested vm_pgoff
-> > > + *
-> > > + * This allow drivers to insert range of kernel pages into a user vma.
-> >
-> >           allows
-> > > + *
-> > > + * Return: 0 on success and error code otherwise.
-> > > + */
-> > > +static int __vm_insert_range(struct vm_area_struct *vma, struct page **pages,
-> > > +                               unsigned long num, unsigned long offset)
-> > >
-> > >
-> > > +/**
-> > > + * vm_insert_range - insert range of kernel pages starts with non zero offset
-> > > + * @vma: user vma to map to
-> > > + * @pages: pointer to array of source kernel pages
-> > > + * @num: number of pages in page array
-> > > + *
-> > > + * Maps an object consisting of `num' `pages', catering for the user's
-> >                                    @num pages
-> > > + * requested vm_pgoff
-> > > + *
-> > > + * If we fail to insert any page into the vma, the function will return
-> > > + * immediately leaving any previously inserted pages present.  Callers
-> > > + * from the mmap handler may immediately return the error as their caller
-> > > + * will destroy the vma, removing any successfully inserted pages. Other
-> > > + * callers should make their own arrangements for calling unmap_region().
-> > > + *
-> > > + * Context: Process context. Called by mmap handlers.
-> > > + * Return: 0 on success and error code otherwise.
-> > > + */
-> > > +int vm_insert_range(struct vm_area_struct *vma, struct page **pages,
-> > > +                               unsigned long num)
-> > >
-> > >
-> > > +/**
-> > > + * vm_insert_range_buggy - insert range of kernel pages starts with zero offset
-> > > + * @vma: user vma to map to
-> > > + * @pages: pointer to array of source kernel pages
-> > > + * @num: number of pages in page array
-> > > + *
-> > > + * Similar to vm_insert_range(), except that it explicitly sets @vm_pgoff to
-> >
-> >                                                                   the offset
-> >
-> > > + * 0. This function is intended for the drivers that did not consider
-> > > + * @vm_pgoff.
-> > > + *
-> > > + * Context: Process context. Called by mmap handlers.
-> > > + * Return: 0 on success and error code otherwise.
-> > > + */
-> > > +int vm_insert_range_buggy(struct vm_area_struct *vma, struct page **pages,
-> > > +                               unsigned long num)
-> > >
-> >
-> > --
-> > Sincerely yours,
-> > Mike.
-> >
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/include/asm/assembler.h | 8 ++++----
+>  arch/arm/include/asm/vfpmacros.h | 8 ++++----
+>  arch/arm/lib/bitops.h            | 8 ++++----
+>  3 files changed, 12 insertions(+), 12 deletions(-)
 > 
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index 28a48e0d4cca..60465b55683c 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -376,7 +376,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+>  	.macro	usraccoff, instr, reg, ptr, inc, off, cond, abort, t=TUSER()
+>  9999:
+>  	.if	\inc == 1
+> -	\instr\cond\()b\()\t\().w \reg, [\ptr, #\off]
+> +	\instr\()b\cond\()\t\().w \reg, [\ptr, #\off]
 
--- 
-Sincerely yours,
-Mike.
+Similar comment here: you added a \() between \instr and b as needed, 
+but the one between \cond and \t (which was already redundant before) 
+may go.
 
+
+Nicolas
 
 _______________________________________________
 linux-arm-kernel mailing list
