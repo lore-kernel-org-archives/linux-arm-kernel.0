@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BEC64C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:21:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 94774C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:22:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 89D462175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:21:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 560C921908
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:22:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="vERT9Lb8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89D462175B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WZI8XNhB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 560C921908
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,41 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wrat9lBv0LZhOyLONyXFxmrQpL1YyPOa1alVRFNNbrY=; b=vERT9Lb8TK6uQk
-	0lBJVVyKQdBlT5q168fLpaVVBqj+wuw6PiLs0TqitKS0oG0nOzBwsHAOaV0yeesJBnU7/e1qPSm3j
-	JZrB0aqXkbJEf6pS7bJmRzBZJ4f/LpC9viibV+K8yTkGyE1QWSczwQVUXxm1yO0l5b7FH9A6sDaO8
-	l3ifAOFRe1JQwU4Nal4cRW22Vb/A6i1tJyC5MxFRIVmj7vzUqRJl96b8hRL8yRPW8erXwEMXcWpF0
-	kjajTGsh6aymQ/gZTQysAn2VO0yTmLTF4hpwF3L+k6bFpGuGEqYykMldxp6v1czMoJMFbbo0gjDKa
-	TY5J9ZFdceYqZz3hD39Q==;
+	List-Owner; bh=9DHN/wzadzZ5TLgSFuElrE0Hgs7AmJ3MkbR+m3SzOTE=; b=WZI8XNhBCAPtBB
+	W1vQ1eYSKUehvAu6CxFwFl45oQGTZombURSMQpNV3ABLKI7tyBs/ROkcSMorrGBlQVp94QaPx4p9e
+	bs1mZ0DGqW/Hge+X8ExGSY9uFKTpceIq59CCJpccrip1N12hrXc2V9sIggM+3KX9J4UobAjczQE1K
+	Brukg0C0dYqROLKyU8/jRRQDuevjjpyYhQ0Tub1C6V9blkIZ0fVMwQY5eOrmsTIBLPFlCADH2xXwk
+	ymeOnb8ai3DFYpt/+sHbFurqpUFRsIJtlnLU7rl/OTUzD27QG4ZaF+FseGIYPS17Z2m+pWikF5own
+	/SpAKAK2vt+zkvQhHrhg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grjcn-0005un-VW; Thu, 07 Feb 2019 13:21:53 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1grjdC-0006FV-8J; Thu, 07 Feb 2019 13:22:18 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grjaI-0002LE-Q1
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 13:19:37 +0000
+ id 1grja8-00027x-Cr
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 13:19:14 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 219D3A78;
- Thu,  7 Feb 2019 05:19:18 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3024EA78;
+ Thu,  7 Feb 2019 05:19:08 -0800 (PST)
 Received: from filthy-habits.cambridge.arm.com
  (filthy-habits.cambridge.arm.com [10.1.196.62])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DEDBA3F675;
- Thu,  7 Feb 2019 05:19:15 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EE8A63F675;
+ Thu,  7 Feb 2019 05:19:05 -0800 (PST)
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Paolo Bonzini <pbonzini@redhat.com>,
  =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
-Subject: [PATCH 08/11] KVM: arm/arm64: vgic: Always initialize the group of
- private IRQs
-Date: Thu,  7 Feb 2019 13:18:40 +0000
-Message-Id: <20190207131843.157210-9-marc.zyngier@arm.com>
+Subject: [PATCH 04/11] arm64: KVM: Don't generate UNDEF when LORegion feature
+ is present
+Date: Thu,  7 Feb 2019 13:18:36 +0000
+Message-Id: <20190207131843.157210-5-marc.zyngier@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190207131843.157210-1-marc.zyngier@arm.com>
 References: <20190207131843.157210-1-marc.zyngier@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_051919_793239_D5FADBC3 
-X-CRM114-Status: GOOD (  16.20  )
+X-CRM114-CacheID: sfid-20190207_051909_117851_DE683814 
+X-CRM114-Status: GOOD (  14.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,79 +82,96 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@arm.com>
+We currently hide the LORegion feature, and generate an UNDEF
+if the guest dares using the corresponding registers. This is
+a bit extreme, as ARMv8.1 guarantees the feature to be present.
 
-We currently initialize the group of private IRQs during
-kvm_vgic_vcpu_init, and the value of the group depends on the GIC model
-we are emulating.  However, CPUs created before creating (and
-initializing) the VGIC might end up with the wrong group if the VGIC
-is created as GICv3 later.
+The guest should check the feature register before doing anything,
+but we could also give the guest some slack (read "allow the
+guest to be a bit stupid").
 
-Since we have no enforced ordering of creating the VGIC and creating
-VCPUs, we can end up with part the VCPUs being properly intialized and
-the remaining incorrectly initialized.  That also means that we have no
-single place to do the per-cpu data structure initialization which
-depends on knowing the emulated GIC model (which is only the group
-field).
+So instead of unconditionnaly deliver an exception, let's
+only do it when the host doesn't support LORegion at all (or
+when the feature has been sanitized out), and treat the registers
+as RAZ/WI otherwise (with the exception of LORID_EL1 being RO).
 
-This patch removes the incorrect comment from kvm_vgic_vcpu_init and
-initializes the group of all previously created VCPUs's private
-interrupts in vgic_init in addition to the existing initialization in
-kvm_vgic_vcpu_init.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+Fixes: cc33c4e20185 ("arm64/kvm: Prohibit guest LOR accesses")
+Suggested-by: Richard Henderson <richard.henderson@linaro.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-init.c | 22 ++++++++++++++--------
- 1 file changed, 14 insertions(+), 8 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 42 +++++++++++++++++++++++++--------------
+ 1 file changed, 27 insertions(+), 15 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index dfbfcb1fe933..3bdb31eaed64 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -231,13 +231,6 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
- 			irq->config = VGIC_CONFIG_LEVEL;
- 		}
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index e3e37228ae4e..86096774abcd 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -314,12 +314,29 @@ static bool trap_raz_wi(struct kvm_vcpu *vcpu,
+ 		return read_zero(vcpu, p);
+ }
  
--		/*
--		 * GICv3 can only be created via the KVM_DEVICE_CREATE API and
--		 * so we always know the emulation type at this point as it's
--		 * either explicitly configured as GICv3, or explicitly
--		 * configured as GICv2, or not configured yet which also
--		 * implies GICv2.
--		 */
- 		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
- 			irq->group = 1;
- 		else
-@@ -281,7 +274,7 @@ int vgic_init(struct kvm *kvm)
+-static bool trap_undef(struct kvm_vcpu *vcpu,
+-		       struct sys_reg_params *p,
+-		       const struct sys_reg_desc *r)
++/*
++ * ARMv8.1 mandates at least a trivial LORegion implementation, where all the
++ * RW registers are RES0 (which we can implement as RAZ/WI). On an ARMv8.0
++ * system, these registers should UNDEF. LORID_EL1 being a RO register, we
++ * treat it separately.
++ */
++static bool trap_loregion(struct kvm_vcpu *vcpu,
++			  struct sys_reg_params *p,
++			  const struct sys_reg_desc *r)
  {
- 	struct vgic_dist *dist = &kvm->arch.vgic;
- 	struct kvm_vcpu *vcpu;
--	int ret = 0, i;
-+	int ret = 0, i, idx;
- 
- 	if (vgic_initialized(kvm))
- 		return 0;
-@@ -298,6 +291,19 @@ int vgic_init(struct kvm *kvm)
- 	if (ret)
- 		goto out;
- 
-+	/* Initialize groups on CPUs created before the VGIC type was known */
-+	kvm_for_each_vcpu(idx, vcpu, kvm) {
-+		struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+-	kvm_inject_undefined(vcpu);
+-	return false;
++	u64 val = read_sanitised_ftr_reg(SYS_ID_AA64MMFR1_EL1);
++	u32 sr = sys_reg((u32)r->Op0, (u32)r->Op1,
++			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
 +
-+		for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
-+			struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
-+			if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-+				irq->group = 1;
-+			else
-+				irq->group = 0;
-+		}
++	if (!(val & (0xfUL << ID_AA64MMFR1_LOR_SHIFT))) {
++		kvm_inject_undefined(vcpu);
++		return false;
 +	}
 +
- 	if (vgic_has_its(kvm)) {
- 		ret = vgic_v4_init(kvm);
- 		if (ret)
++	if (p->is_write && sr == SYS_LORID_EL1)
++		return write_to_read_only(vcpu, p, r);
++
++	return trap_raz_wi(vcpu, p, r);
+ }
+ 
+ static bool trap_oslsr_el1(struct kvm_vcpu *vcpu,
+@@ -1048,11 +1065,6 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
+ 		if (val & ptrauth_mask)
+ 			kvm_debug("ptrauth unsupported for guests, suppressing\n");
+ 		val &= ~ptrauth_mask;
+-	} else if (id == SYS_ID_AA64MMFR1_EL1) {
+-		if (val & (0xfUL << ID_AA64MMFR1_LOR_SHIFT))
+-			kvm_debug("LORegions unsupported for guests, suppressing\n");
+-
+-		val &= ~(0xfUL << ID_AA64MMFR1_LOR_SHIFT);
+ 	}
+ 
+ 	return val;
+@@ -1338,11 +1350,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	{ SYS_DESC(SYS_MAIR_EL1), access_vm_reg, reset_unknown, MAIR_EL1 },
+ 	{ SYS_DESC(SYS_AMAIR_EL1), access_vm_reg, reset_amair_el1, AMAIR_EL1 },
+ 
+-	{ SYS_DESC(SYS_LORSA_EL1), trap_undef },
+-	{ SYS_DESC(SYS_LOREA_EL1), trap_undef },
+-	{ SYS_DESC(SYS_LORN_EL1), trap_undef },
+-	{ SYS_DESC(SYS_LORC_EL1), trap_undef },
+-	{ SYS_DESC(SYS_LORID_EL1), trap_undef },
++	{ SYS_DESC(SYS_LORSA_EL1), trap_loregion },
++	{ SYS_DESC(SYS_LOREA_EL1), trap_loregion },
++	{ SYS_DESC(SYS_LORN_EL1), trap_loregion },
++	{ SYS_DESC(SYS_LORC_EL1), trap_loregion },
++	{ SYS_DESC(SYS_LORID_EL1), trap_loregion },
+ 
+ 	{ SYS_DESC(SYS_VBAR_EL1), NULL, reset_val, VBAR_EL1, 0 },
+ 	{ SYS_DESC(SYS_DISR_EL1), NULL, reset_val, DISR_EL1, 0 },
 -- 
 2.20.1
 
