@@ -2,83 +2,147 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,
-	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C4F10C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 12:58:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DD700C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:07:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8471F2083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 12:58:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A33F62190A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:07:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AzQTVskb";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="SJqJXjIB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8471F2083B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V/3Qltoi";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="KL1wv0AE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A33F62190A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=63yIcNN46ejIdKeSpb2HgOhw45pwb3Bg3vXG4CGEak8=; b=AzQTVskbNFQrII
-	Yh2JEhiAhYGWmGddG5Ht6c10gKuXYZAKO0NUw5KYQLYVYxyVy5eJaNx9qg/kBd0ZDKdYKSk02iqED
-	oG57Sqps7SzAbvYTDsyojS780N61o9ppju8zXyxGiIkRmmXqWUIpYpSwTA4NRDcyJ6F4Bvsqgr/bo
-	ohmL3oCtZqe4x4KKOJX2P4PCg09ZgVJBso3pJlmButAoBrUGbWxFttUtCU9HWMPW3GUAS2362YOtW
-	oygR6mLhLKn1EdsnSN3kKqw7Tm0n1PLU+cC/peLvW2+qed2VbxODy0MsF8oOfDDMQQ7cwcJYcwSlL
-	j+cc/DG71/kNrUwDwxQA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=/MxnUrl/o30s5AdfCgRS8s5zxBFwf6CslL3NG2wZa7c=; b=V/3Qltoi9dptCD
+	F38DYiVSeQOrk9XAmDe6i7WEu/04T5j0k41bo8MBylXsTs6E7aOXj2cfR2w9G/M6EZZiXRJhyQG06
+	LreFxsIwVnsbJmCozvDTmUdfodwFnxHec6xeMzMuae8gNdOaOxsyxOtv/wJhm3/othQDNs6P+mVO7
+	O09dfr0WBjawS92LDTiLSJyN4fVEUqxcVZAWi1Ja8F8UTjA+DE0T+jBJZHi/IbntVDRUrXd6Uqv7p
+	E9LcL20eyPLwF1D0wr0ZeQHGNkInN2htuP+OYJIWHr6NYNIpsz9wjuZdzwsHkYS10Yu0tLxy32UCp
+	t2vrS6cLzg6J6CIoPB5Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grjGU-0000Wo-M0; Thu, 07 Feb 2019 12:58:50 +0000
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
+	id 1grjOO-0004Bm-Lb; Thu, 07 Feb 2019 13:07:00 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grjGQ-0000W6-VX
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 12:58:48 +0000
-Received: by mail-pg1-x541.google.com with SMTP id n2so4462425pgm.3
+ id 1grjOK-00047z-8v
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 13:06:58 +0000
+Received: by mail-wr1-x443.google.com with SMTP id r2so11417542wrv.10
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 07 Feb 2019 04:58:44 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=rRWwt4URCRXcwIZxbYDkHZAEZxjPcHH4qziRDx6ay7I=;
- b=SJqJXjIBwzbuiMMx3cdyzQxG2h+pkW8Nqnxt/dW6chSPurhZN+GxpGd2H01aKvryWX
- /7o/c649L3gMxZ/4X+1jK0bprBzSouam0GMBRDQ5skeMM+Tr26A57RLVPiS8+HibBdv5
- DUlwUrgLG1VjrxiPhxli+/qDqdDDvZh9jLQWVY8ZYzhenoJl1LWIeXbPaHv6X13u1MZr
- bMiLBO+p3eQDTjD/M48KQtxZkNpZttRLLWcZ5YZJTWT410noBnrxDJUlIhpdPz+kv+Vp
- R1/uGQ3E/9kAdTtvo29gBWLFW9Ljte4ORSfdyYVq11iUJhJy70WQw3hfEMeq1iMlwOEu
- SsYw==
+ Thu, 07 Feb 2019 05:06:55 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=subject:to:cc:references:from:openpgp:autocrypt:organization
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=B0zTQ15P7Bd5RQCXJirxvYKNT1qa1KsdthP0kLsLFfU=;
+ b=KL1wv0AEWpRmMUD5Xd95fBxqeV2dRemRPVfW9DInvu3SN0PPrEUnozFwFUVrmnAKBN
+ BUd5g+s6Lb8aqGY2SE4TSG/nXeP7GlSWnq0WofHlrJEE4u16R2+DKYlCc+KQ/qstvmfM
+ vSfAeERqJW2y1s+1J76cUZHSC43DjruvYvTX5Z4XiQWvIjn/pMOsj2hEdsn3Vtc5IC7K
+ 5n8gYsqIbS/7mKkat+2FikWPDO5ZfeWfAxBmx+pu0R/Hx4m7dHel3T6dEEaleayh4CBh
+ ekoKYwAbmXHHmvE1rOPZn3dpuourlmhsnspnXEbiWul0sJKg3IfLl77v+idgpt3IUmSS
+ p+Ag==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=rRWwt4URCRXcwIZxbYDkHZAEZxjPcHH4qziRDx6ay7I=;
- b=DOw9nrR/hiPYMIdP2cVyGIQdXWkZ2AhoxjZlPD9pFSDvpUXbtCwyIzOkE7/Fb+hD3F
- O347FqBAq/DDUaLps/yYkQC3nyqzi68l57zmo5qVYbmBrSHjAhePHtubkfibZULLOgCO
- ObdTuK3VUal8waduCPwlA91n9Un5SdLPPuS8aR74lZ/T7AKYnZ+Ykgl4rVsoCbsueq8D
- 2JuzEQJzjZfWcIR7JU1UVT5QkM643a7uWtEDAdZY4C9dNovSMniqoYbE4/bXs3WU+rpi
- rrCAbmz0pweHn6+VDV8cOhOMBia3+HEgxEJBdRB3/VKYL5hcwVD/wUZq74gg3uoXh3ZJ
- AhqQ==
-X-Gm-Message-State: AHQUAub+P0nIjxQUL8Y6jGOeP8ihHBSoFGp7zu0o0e24tR8NOK67/nhy
- S+CwzhaIz645nRI5VuYnap+v35m3RrXHjHzCJ4C6zA==
-X-Google-Smtp-Source: AHgI3IYq/RozyymCMYCqwKU17RYvcd7MFhkheCrs+eM9ALWLG/mli/pClahJ31igwZ5DN5iPyTD95MOutF5xsXHzPSU=
-X-Received: by 2002:a62:5c1:: with SMTP id 184mr15885896pff.165.1549544323426; 
- Thu, 07 Feb 2019 04:58:43 -0800 (PST)
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :organization:message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=B0zTQ15P7Bd5RQCXJirxvYKNT1qa1KsdthP0kLsLFfU=;
+ b=S2EY/rm37Dl0VDMUHiT11kxVrTnV1920uF2FE6C5YSLy021AXkP9YrqaHSTE587S4S
+ gjOqOOSoErWENthFE0aRBHk15xAaRi7lspOgzgDHj+mbmyVB82OGHLQlS0zmz0pBxfwn
+ uLFnrqFksRjsSd5yciKggZ+N3kayTAJV5wNSIFQkinZMPY06VIZtLvcljuWc6pAZhphx
+ whb1lp/PJZ44irr/JpE75BP5TXyRWJ9CAqrONdS/dRnRzsjjZoHBAOQiNBvH/Sm9h72h
+ rD4nHoLEJpaJq47RfdKpP3CVfl4fbt4aswj+9sgg1LL7uxCoCFQERhTxognD0NTQ8XKh
+ IzVw==
+X-Gm-Message-State: AHQUAua2ciSxbaKaYlKa/nAJ3/Ry5GYVYAd+jxaif7SUXzxe7N0lO5OJ
+ uh85q8nDM7FNPf4N8o8GwignzQ==
+X-Google-Smtp-Source: AHgI3IaufuwsNvZXH9XiQDfcMmdyBB19pR9BS5jASdh80Ae6HQlFKSyDnO+F6SlOyFNizslbF65K9Q==
+X-Received: by 2002:a5d:5111:: with SMTP id s17mr11892324wrt.43.1549544813980; 
+ Thu, 07 Feb 2019 05:06:53 -0800 (PST)
+Received: from [10.1.2.12] (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
+ [90.63.244.31])
+ by smtp.gmail.com with ESMTPSA id t5sm15537453wmg.43.2019.02.07.05.06.52
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 07 Feb 2019 05:06:53 -0800 (PST)
+Subject: Re: [PATCH v6 0/4] clk: meson-g12a: Add EE clock controller driver
+To: Kevin Hilman <khilman@baylibre.com>, Jerome Brunet
+ <jbrunet@baylibre.com>, Stephen Boyd <sboyd@kernel.org>,
+ Michael Turquette <mturquette@baylibre.com>
+References: <20190201145345.6795-1-jbrunet@baylibre.com>
+ <5C55CDCE.9030502@baylibre.com> <7hbm3ogshf.fsf@baylibre.com>
+From: Neil Armstrong <narmstrong@baylibre.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
+ 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
+ ZaTUOEkgIor5losDrePdPgE=
+Organization: Baylibre
+Message-ID: <00f67ab3-93a9-9663-586f-e50e69a20902@baylibre.com>
+Date: Thu, 7 Feb 2019 14:06:52 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <b1d210ae-3fc9-c77a-4010-40fb74a61727@lca.pw>
-In-Reply-To: <b1d210ae-3fc9-c77a-4010-40fb74a61727@lca.pw>
-From: Andrey Konovalov <andreyknvl@google.com>
-Date: Thu, 7 Feb 2019 13:58:32 +0100
-Message-ID: <CAAeHK+yzHbLbFe7mtruEG-br9V-LZRC-n6dkq5+mmvLux0gSbg@mail.gmail.com>
-Subject: Re: CONFIG_KASAN_SW_TAGS=y NULL pointer dereference at
- freelist_dereference()
-To: Qian Cai <cai@lca.pw>
+In-Reply-To: <7hbm3ogshf.fsf@baylibre.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_045847_042118_70160A59 
-X-CRM114-Status: GOOD (  19.37  )
+X-CRM114-CacheID: sfid-20190207_050656_336976_AD5488ED 
+X-CRM114-Status: GOOD (  12.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,97 +154,26 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kasan-dev <kasan-dev@googlegroups.com>, Linux-MM <linux-mm@kvack.org>,
- Alexander Potapenko <glider@google.com>, Dmitry Vyukov <dvyukov@google.com>,
- Andrey Ryabinin <aryabinin@virtuozzo.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-amlogic@lists.infradead.org, Jian Hu <jian.hu@amlogic.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-clk@vger.kernel.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 7, 2019 at 5:04 AM Qian Cai <cai@lca.pw> wrote:
->
-> The kernel was compiled by clang-7.0.1 on a ThunderX2 server, and it fails to
-> boot. CONFIG_KASAN_GENERIC=y works fine.
-
-Hi Qian,
-
-Could you share the kernel commit id and .config that you use?
-
-Thanks!
-
->
-> deactivate_slab+0x84/0x6ac:
-> freelist_dereference at mm/slub.c:262
-> (inlined by) get_freepointer at mm/slub.c:268
-> (inlined by) deactivate_slab at mm/slub.c:2056
->
-> /* Returns the freelist pointer recorded at location ptr_addr. */
-> static inline void *freelist_dereference(const struct kmem_cache *s,
->                                          void *ptr_addr)
-> {
->         return freelist_ptr(s, (void *)*(unsigned long *)(ptr_addr),
->                             (unsigned long)ptr_addr);
-> }
->
-> [    0.000000] Memory: 3259968K/100594752K available (15548K kernel code, 12360K
-> rwdata, 4096K rodata, 25536K init, 27244K bss, 7444672K reserved, 0K cma-reserved)
-> [    0.000000] Unable to handle kernel NULL pointer dereference at virtual
-> address 0000000000000078
-> [    0.000000] Mem abort info:
-> [    0.000000]   ESR = 0x96000005
-> [    0.000000]   Exception class = DABT (current EL), IL = 32 bits
-> [    0.000000]   SET = 0, FnV = 0
-> [    0.000000]   EA = 0, S1PTW = 0
-> [    0.000000] Data abort info:
-> [    0.000000]   ISV = 0, ISS = 0x00000005
-> [    0.000000]   CM = 0, WnR = 0
-> [    0.000000] [0000000000000078] user address but active_mm is swapper
-> [    0.000000] Internal error: Oops: 96000005 [#1] SMP
-> [    0.000000] Modules linked in:
-> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 5.0.0-rc5+ #6
-> [    0.000000] pstate: 60000089 (nZCv daIf -PAN -UAO)
-> [    0.000000] pc : deactivate_slab+0x84/0x6ac
-> [    0.000000] lr : deactivate_slab+0x1cc/0x6ac
-> [    0.000000] sp : ffff100012cf7be0
-> [    0.000000] x29: ffff100012cf7cc0 x28: ffff1000114e4f00
-> [    0.000000] x27: ffff1000114e4f20 x26: ffff1000114e4f08
-> [    0.000000] x25: ffff1000114e5078 x24: fb00000000000000
-> [    0.000000] x23: ffff7fe002080008 x22: ffff808abb5b72d0
-> [    0.000000] x21: ffff7fe002080020 x20: ffff7fe002080028
-> [    0.000000] x19: ffff7fe002080000 x18: ffff1000148a5538
-> [    0.000000] x17: 000000000000001b x16: 0000000000000000
-> [    0.000000] x15: 007ffffffc000201 x14: 04ff80082000fa80
-> [    0.000000] x13: 0000000080660002 x12: 0000000080660003
-> [    0.000000] x11: 4582a03bdc147ab9 x10: ffff100012d31c90
-> [    0.000000] x9 : fb00000000000078 x8 : ffff100012d31c80
-> [    0.000000] x7 : cccccccccccccccc x6 : ffff1000105d8db8
-> [    0.000000] x5 : 0000000000000000 x4 : 0000000000000000
-> [    0.000000] x3 : ffff808abb5b72d0 x2 : 04ff800820000580
-> [    0.000000] x1 : ffff7fe002080000 x0 : ffff1000114e4f00
-> [    0.000000] Process swapper (pid: 0, stack limit = 0x(____ptrval____))
-> [    0.000000] Call trace:
-> [    0.000000]  deactivate_slab+0x84/0x6ac
-> [    0.000000]  ___slab_alloc+0x648/0x6fc
-> [    0.000000]  kmem_cache_alloc_node+0x408/0x538
-> [    0.000000]  __kmem_cache_create+0x20c/0x6a8
-> [    0.000000]  create_boot_cache+0x68/0xac
-> [    0.000000]  kmem_cache_init+0xb0/0x19c
-> [    0.000000]  start_kernel+0x4b4/0xac4
-> [    0.000000] Code: 14000057 b9400369 f940032b 8b090309 (f940012a)
-> [    0.000000] ---[ end trace 54ad7e55e4749a96 ]---
-> [    0.000000] Kernel panic - not syncing: Fatal exception
-> [    0.000000] ---[ end Kernel panic - not syncing: Fatal exception ]---
->
-> --
-> You received this message because you are subscribed to the Google Groups "kasan-dev" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to kasan-dev+unsubscribe@googlegroups.com.
-> To post to this group, send email to kasan-dev@googlegroups.com.
-> To view this discussion on the web visit https://groups.google.com/d/msgid/kasan-dev/b1d210ae-3fc9-c77a-4010-40fb74a61727%40lca.pw.
-> For more options, visit https://groups.google.com/d/optout.
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMDcvMDIvMjAxOSAwNDo1OCwgS2V2aW4gSGlsbWFuIHdyb3RlOgo+IE5laWwgQXJtc3Ryb25n
+IDxuYXJtc3Ryb25nQGJheWxpYnJlLmNvbT4gd3JpdGVzOgo+IAo+PiBMZSAwMS8wMi8yMDE5IDE1
+OjUzLCBKZXJvbWUgQnJ1bmV0IGEgw6ljcml0IDoKPj4+IFRoaXMgcHVycG9zZSBvZiB0aGlzIHBh
+dGNoc2V0IGlzIHRvIHRoZSBtYWluIGNsb2NrIGNvbnRyb2xsZXIgb2YgdGhlCj4+PiBnMTJhIFNv
+QyBmYW1pbHkKPj4+Cj4+PiBUaGlzIHBhdGNoc2V0IGRlcGVuZHMgb24gdGhlIHJlY2VudCByZXdv
+cmsgdGhlIG1lc29uIGNsb2NrIGRpcmVjdG9yeSBbN10uCj4gCj4gWy4uLl0KPiAKPj4gUmV2aWV3
+ZWQtYnk6IE5laWwgQXJtc3Ryb25nIDxuYXJtc3Ryb25nQGJheWxpYnJlLmNvbT4KPj4KPj4gSSdt
+IGFwcGx5aW5nIHRoZXNlIHRvIG5leHQvZHJpdmVycyBmb3IgTGludXggNS4xLXJjMSwgaXMgaXQg
+bmVjZXNzYXJ5IHRvCj4+IGhhdmUgYSB0YWcgZm9yIHRoZSBoZWFkZXJzID8KPiAKPiBPbmx5IGlm
+IHdlIGhhdmUgc29tZSB1c2VycyB0aGF0IHdlIHdhbnQgdG8gbWVyZ2UgaW4gdGhlIHY1LjEgY3lj
+bGUKPiAod2hpY2ggSSBoYXZlbid0IHNlZW4geWV0LikKClNhbWUsIHdlIHdpbGwgd2FpdCBmb3Ig
+bmV4dCBjeWNsZSB0aGVuLgoKTmVpbAoKPiAKPiBLZXZpbgo+IAoKCl9fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBs
+aXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5m
+cmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
