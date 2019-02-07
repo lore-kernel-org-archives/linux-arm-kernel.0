@@ -2,89 +2,87 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 888DAC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 08:52:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6DA3AC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:00:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5811821900
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 08:52:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3AA75218B0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:00:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="suBJ1E9K";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="uroXagWr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5811821900
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tMEfcmro";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="E2SZTPx/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3AA75218B0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0m0D9iy6FF+w6NEE9GAhgi/6PvACMKMNUSY8ycRibOM=; b=suBJ1E9KHQRVft
-	/Exw7BTaSU18uazr94VAm4h3iGNHOQj2RK2eLLxL3Eq03+9Fu+Yjk6MfgBNXs0dHy8DAqLhjbYGL9
-	JYXoNsN840keGUG5yUfLOuj5cCoM384YHItp5UtRvh9qlttwAfBbkI1C7sdpFNaoXlAYmUNaRbOZ5
-	AL+B4PtSzfGkq7RLUwIDynnz1Fa/a4bex5CzmazFOak6o9dyz9ef2R5xGufKINd7PVOe4PHOtsqlR
-	Ymi7tC4YAOii0yu6kBvHvKvUVquG2skaqj5XKUpC9iC9DrU+xQuSI//7sqSHh1KhH7Nb31PtTmMA0
-	XYaQ7gMJv1l+rfaqSO8g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=G7HvlWnWXgCLgqwSUYLkA3wubh7tEvo+FyVcEbvp8sU=; b=tMEfcmrozxjJNtzKeIPNIO6H/
+	wFT9FbGZCd0lgDytp1P7dosjVJ//BPGdQyV4UIekoP3B5Kfmgg2EK7+0nazy57Maie1v30XlcxYKB
+	JNcccsQGH76A2zrxiaRSFvClpKThn4agIy1u5a+HUFX1oQlxdFsRjwcwJA5x+zcN6VUmEuSUAl2WC
+	liV3gOvrBWrXi8js3pv1gPeQRRJnaYgVPkCuX24Y3jrN+mm9RERbM8GMF9GEMnalfrnfxyaRzkb/9
+	fbKK4CNqRAa0RmdufmochWy9VMOWy9T+UCJAVIWT2hxaqbd2LJV3OICiTqn6mvAYcckkAo5WDBc41
+	9AWRPtoIg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grfPo-00030K-T1; Thu, 07 Feb 2019 08:52:12 +0000
-Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+	id 1grfXi-0006pz-Ai; Thu, 07 Feb 2019 09:00:22 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grfBJ-0004Uu-CV
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 08:37:19 +0000
-Received: by mail-lf1-x143.google.com with SMTP id i26so7563173lfc.0
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 07 Feb 2019 00:37:13 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=iFmmPc4bLcix+iB9KqTphgdxH8DV4tik6E4A8m4R3H0=;
- b=uroXagWr86WjI8Shk2Jp039YtWevKo6eApzyVWflRr/LXszlvkNXbqA9tB2EwddMCf
- A+zqQZKgZrGwgy0g/DGI5PcAn0/elugjjwZeY00Z7FFhrsEXao54O5OLoWnp2xdTEUOy
- +0buO4oxMHKaumzK1h7YezKtd1hPiEzpXX7VJ2Buy+qHBJr46F/1cV3tYagFSCWUhEpz
- bapSAwfEYom6LIJBxJ0KdQ+GEZ7WypN5nC1PuyWm3/S7F8waEnOrzedp3T+LLL7Zxtd+
- zbTRAYPB4D8hSTweqVcfeljV3+IJDPxatIWbny2j+IvOVi42yR04mIhZbV7A81xRxZT5
- TP7g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=iFmmPc4bLcix+iB9KqTphgdxH8DV4tik6E4A8m4R3H0=;
- b=H9y8Lg0B5uMfXrKi30J3FDGaisuByw43ibe1A2z7+GBgJQI0QxSe596fVauphjNBRJ
- 6Q1Ozt7nw7eVkBu6nH5TnC5cwA8pabpmxjcF3lEVd2O8wy53VL8X5Ms29jnM6r1y0wrF
- ntb6Gd4yepxDc0YTan6b7ophWlWudHPGiREjqQcFieu7+4Ytj7w6z6EzmVk/Lp8tsCuY
- 94Fq1pkh1rVgFc73GVzIOO266YkQc3RMIaCNHOHXMSllRC2fp2oADT1I27EC0HF14H8b
- VwA4ax0TXEpO+h2YZBLBy3NlrEqXRfUWqocwi7Cc5VjfDsioHxlWkDLc6hXy9x6EK9es
- 9RgQ==
-X-Gm-Message-State: AHQUAuZXE7j7ok9wD02Hyj/8emIleLywJsm54PvmZJKUvyVjf6RHbckI
- QY7I36BEWXj5qE+A6YxAYwn+w5A+DN8=
-X-Google-Smtp-Source: AHgI3IZttqHyLnXd1kj+f15bntC6W+lqoOXhui6U3bRddUUGQPs5L8gHyeHkrdKyBzZTRQ42PJN6Zg==
-X-Received: by 2002:a19:9c81:: with SMTP id f123mr9201499lfe.96.1549528631265; 
- Thu, 07 Feb 2019 00:37:11 -0800 (PST)
-Received: from genomnajs.ideon.se ([85.235.10.227])
- by smtp.gmail.com with ESMTPSA id l72sm470910lfg.75.2019.02.07.00.37.10
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 07 Feb 2019 00:37:10 -0800 (PST)
-From: Linus Walleij <linus.walleij@linaro.org>
-To: dri-devel@lists.freedesktop.org, Daniel Vetter <daniel@ffwll.ch>,
- David Airlie <airlied@linux.ie>
-Subject: [PATCH 4/4] ARM: dts: Ux500: Add MCDE and Samsung display
-Date: Thu,  7 Feb 2019 09:36:47 +0100
-Message-Id: <20190207083647.20615-5-linus.walleij@linaro.org>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190207083647.20615-1-linus.walleij@linaro.org>
-References: <20190207083647.20615-1-linus.walleij@linaro.org>
+ id 1grfXa-0006de-AV
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:00:19 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x17909N7064509;
+ Thu, 7 Feb 2019 03:00:09 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1549530009;
+ bh=kbe4CEQgtDkF7N6OJLnSI5lU9ue/nEXutdaEd7XiHWk=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=E2SZTPx/o+cU5q0LVcj9Bc4IBDI3VNDUYTxD75JLRR3AHsvTjNt/KestehB3Ye3Q2
+ tAq2tj9sAsfpPXDYhEBj7qjzN1Kk/kTs2TArVFjfBo2JFA5nUV05AEYy7UZETXg1mZ
+ LreKiwPMwHEAKgfMPpV+hm8yHYBysTSM4kEVxTtM=
+Received: from DLEE105.ent.ti.com (dlee105.ent.ti.com [157.170.170.35])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x17909el106679
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Thu, 7 Feb 2019 03:00:09 -0600
+Received: from DLEE104.ent.ti.com (157.170.170.34) by DLEE105.ent.ti.com
+ (157.170.170.35) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 7
+ Feb 2019 03:00:07 -0600
+Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE104.ent.ti.com
+ (157.170.170.34) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Thu, 7 Feb 2019 03:00:07 -0600
+Received: from [127.0.0.1] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x17902FY003375;
+ Thu, 7 Feb 2019 03:00:03 -0600
+Subject: Re: [PATCH 1/3] dt-bindings: clock: ti,sci-clk: Add support for
+ parsing clock info from DT
+To: Stephen Boyd <sboyd@kernel.org>, Rob Herring <robh@kernel.org>
+References: <1546954223-9738-1-git-send-email-t-kristo@ti.com>
+ <1546954223-9738-2-git-send-email-t-kristo@ti.com>
+ <20190121210449.GB7851@bogus> <7ce7bd25-b5c4-f99d-fda6-0f21376f2204@ti.com>
+ <ab8707fb-e632-5be9-9fdb-4b1fb3cb26ba@ti.com>
+ <154947523891.74891.8214442349263473281@swboyd.mtv.corp.google.com>
+From: Tero Kristo <t-kristo@ti.com>
+Message-ID: <2a22b7f4-8ac4-184e-6c69-f324488614ee@ti.com>
+Date: Thu, 7 Feb 2019 10:59:59 +0200
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
+In-Reply-To: <154947523891.74891.8214442349263473281@swboyd.mtv.corp.google.com>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_003713_906968_38DFFFF2 
-X-CRM114-Status: GOOD (  15.04  )
+X-CRM114-CacheID: sfid-20190207_010014_464580_A66C5B3B 
+X-CRM114-Status: GOOD (  23.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,153 +94,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linus Walleij <linus.walleij@linaro.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: devicetree@vger.kernel.org, mturquette@baylibre.com,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ ssantosh@kernel.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This adds and updates the device tree nodes for the MCDE
-display controller and connects the Samsung display to
-the TVK1281618 user interface board (UIB) so we get
-nicely working graphics on this reference design.
+On 06/02/2019 19:47, Stephen Boyd wrote:
+> Quoting Tero Kristo (2019-02-05 00:25:40)
+>> On 22/01/2019 09:33, Tero Kristo wrote:
+>>> On 21/01/2019 23:04, Rob Herring wrote:
+>>>> At first, I thought this was an either/or thing. Use firmware or use DT,
+>>>> but it is really only get the clocks used in the DT from firmware.
+>>>>
+>>>> Why wouldn't you just always do that? I can think of 3 cases:
+>>>> reparenting, debug and overlays. This breaks reparenting and overlays,
+>>>> right? Debug could be handled with some userspace trigger to get all the
+>>>> clocks.
+>>>
+>>> Re-parenting this does not break, as the scan still checks every
+>>> possible parent of a clock scanned. Overlays are broken for sure, as we
+>>> don't know which overlays we would be applying, and what clocks would be
+>>> in them. Debug is kind of broken as we only scan a small portion of the
+>>> clocks.
+>>>
+>>>>
+>>>> Why scan any of the clocks up front? Why not just create the clocks on
+>>>> demand? If an unknown clock id is requested, then create the clock and
+>>>> query the firmware at that point. That would avoid the DT scan too.
+>>>> Maybe there's some issues in the clk framework preventing that, but
+>>>> that's not really a DT problem.
+>>>
+>>> The very initial version I did a couple of years back, did scan the
+>>> clocks based on need, and registered them dynamically. Stephen shot down
+>>> this based on the assessment that there might be locking issues with the
+>>> common clock framework with this approach leading into potential
+>>> deadlock situations.
+> 
+> It's an interesting idea to limit the scope of clks that are registered
+> to only the leaf and whatever up to the root of the tree is involved in
+> the working set of the kernel.
+> 
+>>
+>> So Rob, what is the final call on this binding? Ack/NAK? If NAK, shall I
+>> implement a kernel cmdline param to select the parsing method or what is
+>> preferred? Doing it build time with a simple Kconfig seems too limiting.
+>>
+> 
+> Is the problem a performance problem where probing the firmware for all
+> the clks is costly and time intensive?
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-dbx5x0.dtsi          | 36 +++++++++++++++++++---
- arch/arm/boot/dts/ste-href-stuib.dtsi      | 25 +++++++++++++++
- arch/arm/boot/dts/ste-href-tvk1281618.dtsi | 25 +++++++++++++++
- 3 files changed, 81 insertions(+), 5 deletions(-)
+Yes this is pretty expensive, as there can be quite a large amount of 
+clocks on a SoC, and each clock must be probed separately.
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index e6ed7c0354a2..a33b36a8c879 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -1197,12 +1197,11 @@
- 		};
- 
- 		mcde@a0350000 {
--			compatible = "stericsson,mcde";
--			reg = <0xa0350000 0x1000>, /* MCDE */
--			      <0xa0351000 0x1000>, /* DSI link 1 */
--			      <0xa0352000 0x1000>, /* DSI link 2 */
--			      <0xa0353000 0x1000>; /* DSI link 3 */
-+			compatible = "ste,mcde";
-+			reg = <0xa0350000 0x1000>;
- 			interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
-+			epod-supply = <&db8500_b2r2_mcde_reg>;
-+			vana-supply = <&ab8500_ldo_ana_reg>;
- 			clocks = <&prcmu_clk PRCMU_MCDECLK>, /* Main MCDE clock */
- 				 <&prcmu_clk PRCMU_LCDCLK>, /* LCD clock */
- 				 <&prcmu_clk PRCMU_PLLDSI>, /* HDMI clock */
-@@ -1211,6 +1210,33 @@
- 				 <&prcmu_clk PRCMU_DSI0ESCCLK>, /* TVout clock 0 */
- 				 <&prcmu_clk PRCMU_DSI1ESCCLK>, /* TVout clock 1 */
- 				 <&prcmu_clk PRCMU_DSI2ESCCLK>; /* TVout clock 2 */
-+			clock-names = "mcde", "lcd", "hdmi", "dsi0", "dsi1", "dsi0es", "dsi1es", "dsi2es";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			status = "disabled";
-+
-+			dsi0: dsi@a0351000 {
-+				compatible = "ste,mcde-dsi";
-+				reg = <0xa0351000 0x1000>;
-+				vana-supply = <&ab8500_ldo_ana_reg>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			dsi1: dsi@a0352000 {
-+				compatible = "ste,mcde-dsi";
-+				reg = <0xa0352000 0x1000>;
-+				vana-supply = <&ab8500_ldo_ana_reg>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			dsi2: dsi@a0353000 {
-+				compatible = "ste,mcde-dsi";
-+				reg = <0xa0353000 0x1000>;
-+				vana-supply = <&ab8500_ldo_ana_reg>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
- 		};
- 
- 		cryp@a03cb000 {
-diff --git a/arch/arm/boot/dts/ste-href-stuib.dtsi b/arch/arm/boot/dts/ste-href-stuib.dtsi
-index 35e944d8b5c4..714c2fb758d4 100644
---- a/arch/arm/boot/dts/ste-href-stuib.dtsi
-+++ b/arch/arm/boot/dts/ste-href-stuib.dtsi
-@@ -190,5 +190,30 @@
- 				};
- 			};
- 		};
-+
-+		mcde@a0350000 {
-+			status = "okay";
-+
-+			dsi@a0351000 {
-+				port {
-+					dsi0_out: endpoint {
-+						remote-endpoint = <&panel_in>;
-+					};
-+				};
-+
-+				panel: display {
-+					compatible = "samsung,s6d16d0";
-+					reg = <0>;
-+					vdd1-supply = <&ab8500_ldo_aux1_reg>;
-+					reset-gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
-+
-+					port {
-+						panel_in: endpoint {
-+							remote-endpoint = <&dsi0_out>;
-+						};
-+					};
-+				};
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-index 0e7d77d719d7..84bb1e79168b 100644
---- a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-+++ b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-@@ -274,5 +274,30 @@
- 				};
- 			};
- 		};
-+
-+		mcde@a0350000 {
-+			status = "okay";
-+
-+			dsi@a0351000 {
-+				port {
-+					dsi0_out: endpoint {
-+						remote-endpoint = <&panel_in>;
-+					};
-+				};
-+
-+				panel: display {
-+					compatible = "samsung,s6d16d0";
-+					reg = <0>;
-+					vdd1-supply = <&ab8500_ldo_aux1_reg>;
-+					reset-gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
-+
-+					port {
-+						panel_in: endpoint {
-+							remote-endpoint = <&dsi0_out>;
-+						};
-+					};
-+				};
-+			};
-+		};
- 	};
- };
--- 
-2.20.1
+> So instead of doing that we're
+> describing some of the details in DT? Why can't we describe the clk tree
+> in C code with some data structure that indicates parent child linkages?
+> This is how every other SoC is doing this so far.
 
+We can obviously do that also, however it is "neat" that we can probe 
+the available clocks from the device, and don't need to hardcode 
+anything kernel side... and neither maintain the clock data. If we want 
+to go the hardcoded way, I can create tools to autogenerate the kernel 
+side clock data from the clock dump of a running system though, and use 
+the built-in clock data if it is available, retaining the existing probe 
+method basically for new devices.
+
+-Tero
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
 
 _______________________________________________
 linux-arm-kernel mailing list
