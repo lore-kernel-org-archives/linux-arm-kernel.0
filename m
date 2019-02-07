@@ -2,189 +2,90 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 95344C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:08:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 30F56C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:10:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5FB3721904
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:08:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ED3332190A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:10:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mr3wWqP6";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="jReqGrfe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5FB3721904
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KvsRvV7w";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="UAdPGrQj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ED3332190A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hBC+jjsP3BrFz/WK5nQldjd5uukS3N8a1lPaW95Nd/U=; b=mr3wWqP6qQEZyX
-	49Vgu0oH41+1cS6nr7Hkku/tlcOlP27sPLUh75jp7CHKvX3Y68QVuKga2hLImkW4V5DJlsuwlIa+Z
-	wb5RP2rsx6FweooJ+oY7RFZu1RZTokPKRoHWQ+ho+SW5tg0RdtmIBQI4nW+q0r66u7zxRlR27ROj9
-	zqBAfajPxCd8QTiueSoC7o0kbdTtY9wFuZQRkl8/aVERGIbxrNmD4dfWC+gaJr35OA28OCKGxTNiX
-	MJ22oWIjw59REkhNyTEqR/zfeCGYy34H1MJQc58BYIsBgk7TyP8eJ2O64Ec6hJaGMb4Wzmt0gWk7R
-	RTMshSriD9nT+A5WJHFA==;
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ZhGeL2AvLz3hbphnisPxdYmNxi4134rSbu/ID7nmOD4=; b=KvsRvV7wGpOoQ9
+	fqRRO0xMSo/DIZ3FWWqlEtW6YucWjhEDu/D9IdywFk+ogG9GTjjtctF8owtikFJRHpBQ7mJ+1pghW
+	pIbfcaL+hbV+s+I+xkQ1I34J3+TdOHfKv1HJSBqCHvUvY9xSeUWse/OtmAYKmD7wFpISjkpP83Km0
+	b0lFTaXCEZWYJjt3kil4XBwrkwySkT2hbNSGNkXTqTHx9/qfVhHewQDlwEPMZB60EPGUtl5T7uOz/
+	xTmvpDE6gFgM9aayqnfe7zEOkNk/tovo2fUq5peS/yjH//4N/XLHFktx8WQuoGhqB2iuXB3S4hctH
+	MCIhDJVxpvBpS0H+2o8w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grlHt-0001On-4s; Thu, 07 Feb 2019 15:08:25 +0000
-Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+	id 1grlJm-0003Oq-Ak; Thu, 07 Feb 2019 15:10:22 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grlHp-0001OB-Ti; Thu, 07 Feb 2019 15:08:23 +0000
-Received: by mail-pf1-x444.google.com with SMTP id f132so54891pfa.6;
- Thu, 07 Feb 2019 07:08:19 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=dfU0pKg1NTJucRMIlSxa2N0XLCtOEs1yT5bK0KcghM8=;
- b=jReqGrfeeg785CCKzcU2lrpeLHNUuStHo4LQyFXMHeHKrxHe+Ngh/UIw0tL7TAiPxP
- SRB2zEoVmQlD5uOlBzFH3Hqy56aVUE2AcrWV+Hnt/Z7X4sWCfORNDh9ssaDsI+AQH6kj
- PkheZfDSXAwn0c2Z0M/suofEzkR8KDlfCdMe8X1fMFELMvvEc56yhfliLnOT3X82+RBJ
- Ccm2DGGEm6Cif1qZoYF1gYe6zLlszEUQCJdCdVmlt2cRy7woZCg/UVvnpV+W6vvDVv64
- uidzUh64UbIMbaazNY1JFjGqYrWjM4mm9pd9HKUuJ+nDBudzJ6j60TGSMgK6r33Tnxff
- L5TA==
+ id 1grlJh-0003Nd-EH
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 15:10:20 +0000
+Received: by mail-wr1-x443.google.com with SMTP id v13so200894wrw.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 07 Feb 2019 07:10:17 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=message-id:subject:from:to:cc:date:in-reply-to:references
+ :user-agent:mime-version:content-transfer-encoding;
+ bh=h5y4FDODq872pLT04GyZ8UAR5pFINUnNPPRuvtTI9MA=;
+ b=UAdPGrQj/s2L6OGgGR700XCgw2OTQBDJ99f36Gke7+JFlUhBX5xakn2DMYKwlJvnTR
+ KFUvWjJEgYwHrcGjUZVHvDdhVC38ZdlrQnhQNjyqYicS4/eXCU7DKsXUI6S50tc5bWlx
+ ANMRuMXqxBACmrpvcuqsFNU/ZMNMByOKhhUohHw03RycsDfHW1XzwNbbpxrfBGaxtfXq
+ eKbSlfPOKa8HVeNuFGdvg2XF2Fps6HJBglWncWEJ0aAb+7kHcLc01B2dgEy0Q9nD5Dm2
+ sF0xqbUoMnfSVcoAdmIlgmUBU28zXwg+IjvG1CsKL90MkpUn/6oZRkszSI9FA3xmuqYM
+ XDqQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=dfU0pKg1NTJucRMIlSxa2N0XLCtOEs1yT5bK0KcghM8=;
- b=ZjeA1+bhPlZRxv6R+pHXKXgjgZX+bRdVH/of4RKpGiGhg1gBpnqeNm0kdJuauci1ez
- d7m42QV7KnSC9XQ7foInykTwjB93IJVKoQwppofQHzJ+WZKMeDmu5YwALvkRLe5WVT9L
- ikdpyWqfUn7OVJgwZKnwAUTU/xDHrMBA3A6/8jR2JJc4GT3+lvOa0yx4QQz5aRG1YP+w
- /ygk/HREa6iJzi76fA5Qe3yazRK2Vf1ruKFrI7URUayTKstK9ZPv4yEMd6shdnsgBxtu
- tnL0/jeZbP86QvqYlwkvykwv4hxvlWE5jin9FUdIeX9uYuQ5W2yAx/Do1EjsfWe9qufj
- 89gQ==
-X-Gm-Message-State: AHQUAuaK/2O3pqHolScXzyj0RicTEv2aFluu6gLHBc1mjt+l2alQFXXz
- v+K0NNs9KE9HvlZNrnZJxjE=
-X-Google-Smtp-Source: AHgI3Ia1/W1S9Ao6TO/5es/lCyRm4v0rlcd+DX/1/vFbsSCydpoK2BoVVsqrKtbsulKQ8k8cgnKaNg==
-X-Received: by 2002:a63:451a:: with SMTP id s26mr15482085pga.150.1549552098516; 
- Thu, 07 Feb 2019 07:08:18 -0800 (PST)
-Received: from ziggy.stardust ([62.31.71.171])
- by smtp.gmail.com with ESMTPSA id q127sm7358176pgq.39.2019.02.07.07.08.12
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 07 Feb 2019 07:08:16 -0800 (PST)
-Subject: Re: [PATCH v6 6/6] arm64: dts: Add Mediatek SoC MT8183 and evaluation
- board dts and Makefile
-To: Erin Lo <erin.lo@mediatek.com>, Rob Herring <robh@kernel.org>
-References: <1548317240-44682-1-git-send-email-erin.lo@mediatek.com>
- <1548317240-44682-7-git-send-email-erin.lo@mediatek.com>
- <20190130162204.GA1521@bogus> <1548902050.23230.4.camel@mtksdaap41>
- <CAL_JsqL1vQCgbb2yLL2E4KTDZve1vus5bDX75HGiOu14X26q7w@mail.gmail.com>
- <1548992018.11367.8.camel@mtksdaap41> <1548997866.26127.4.camel@mtksdaap41>
-From: Matthias Brugger <matthias.bgg@gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
- 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
- jrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <c872f03c-714a-d99f-d555-e897f80d67be@gmail.com>
-Date: Thu, 7 Feb 2019 16:08:09 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.3
-MIME-Version: 1.0
-In-Reply-To: <1548997866.26127.4.camel@mtksdaap41>
-Content-Language: en-US
+ h=x-gm-message-state:message-id:subject:from:to:cc:date:in-reply-to
+ :references:user-agent:mime-version:content-transfer-encoding;
+ bh=h5y4FDODq872pLT04GyZ8UAR5pFINUnNPPRuvtTI9MA=;
+ b=ZCJQfIBTWcTAeDawzFJILJA5vYO8NKdCCEmz9plPDhczKjNH9QLNwfGGUTp5lNbTw1
+ s9ZZoR1UIwOrB8sw6eT19CQMqzKrEbjxgVUAvRapWfGOd6aKZVXcA57ojxHoEeLSO5V1
+ qLzsjKrYAhdB+en/D3wwcQbgwGcXAQ8iAk3hB7bG+q7fnzfXBkpwczUBkNK+dfHrk8r9
+ 9HGOsGx6+ppqXE0KMRYSdiyPYNXTlwpJGTMb7P/GCQHVdxw0CagktmBwBZdprfyq5ztG
+ nBuKEqLMktcXFZWfPza9gOjwOFYgvZXgZPKDA3FaF90QEVAgPAdpyFKLeM0bRRvHoOPz
+ OO8Q==
+X-Gm-Message-State: AHQUAuYBP1ZhUwSHQvp0YNB4LhYjBYTglTp0jmlqxLYeofdZKWnfVmUK
+ epANXXuXo7hX5Rq3u8etkeWpgg==
+X-Google-Smtp-Source: AHgI3IY4Hde8uCVrST3qqGUSTIECToaeQzPsgPSz1Sg4cXrjB7VguBuyvXTKgeH2AXnnpIZ0CAn7Hg==
+X-Received: by 2002:adf:a58a:: with SMTP id g10mr12625907wrc.3.1549552215547; 
+ Thu, 07 Feb 2019 07:10:15 -0800 (PST)
+Received: from boomer.baylibre.com ([2a04:cec0:1103:b081:462c:a008:349b:2f3a])
+ by smtp.gmail.com with ESMTPSA id
+ f134sm20032540wme.31.2019.02.07.07.10.13
+ (version=TLS1_3 cipher=AEAD-AES256-GCM-SHA384 bits=256/256);
+ Thu, 07 Feb 2019 07:10:14 -0800 (PST)
+Message-ID: <2f03298e4d1ca0aa08d683d6db14bc194607b974.camel@baylibre.com>
+Subject: Re: [PATCH 1/2] dt-bindings: clk: add G12A AO Clock and Reset Bindings
+From: Jerome Brunet <jbrunet@baylibre.com>
+To: Neil Armstrong <narmstrong@baylibre.com>, devicetree@vger.kernel.org
+Date: Thu, 07 Feb 2019 16:10:12 +0100
+In-Reply-To: <20190204091331.9298-2-narmstrong@baylibre.com>
+References: <20190204091331.9298-1-narmstrong@baylibre.com>
+ <20190204091331.9298-2-narmstrong@baylibre.com>
+User-Agent: Evolution 3.30.4 (3.30.4-1.fc29) 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_070821_965129_275D0302 
-X-CRM114-Status: GOOD (  18.85  )
+X-CRM114-CacheID: sfid-20190207_071017_533176_C38936CA 
+X-CRM114-Status: GOOD (  17.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -196,136 +97,122 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Ben Ho <Ben.Ho@mediatek.com>,
- Mars Cheng <mars.cheng@mediatek.com>, Mengqi Zhang <Mengqi.Zhang@mediatek.com>,
- linux-clk <linux-clk@vger.kernel.org>,
- Hsin-Hsiung Wang <hsin-hsiung.wang@mediatek.com>,
- Weiyi Lu <weiyi.lu@mediatek.com>, Seiya Wang <seiya.wang@mediatek.com>,
- "open list:SERIAL DRIVERS" <linux-serial@vger.kernel.org>,
- Yingjoe Chen <yingjoe.chen@mediatek.com>, devicetree@vger.kernel.org,
- Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>,
- "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
- Thomas Gleixner <tglx@linutronix.de>, Eddie Huang <eddie.huang@mediatek.com>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>,
- srv_heupstream <srv_heupstream@mediatek.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Stephen Boyd <sboyd@codeaurora.org>, linux-kernel@vger.kernel.org,
- Zhiyong Tao <Zhiyong.Tao@mediatek.com>
+Cc: linux-amlogic@lists.infradead.org, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 01/02/2019 06:11, Erin Lo wrote:
-> Add back more people since mail server issue
+On Mon, 2019-02-04 at 10:13 +0100, Neil Armstrong wrote:
+> Add bindings for the Amlogic G12A AO Clock and Reset controllers.
 > 
-> On Fri, 2019-02-01 at 11:33 +0800, Erin Lo wrote:
->> On Thu, 2019-01-31 at 15:10 -0600, Rob Herring wrote:
->>> On Wed, Jan 30, 2019 at 8:34 PM Erin Lo <erin.lo@mediatek.com> wrote:
->>>>
->>>> On Wed, 2019-01-30 at 10:22 -0600, Rob Herring wrote:
->>>>> On Thu, Jan 24, 2019 at 04:07:20PM +0800, Erin Lo wrote:
->>>>>> From: Ben Ho <Ben.Ho@mediatek.com>
->>>>>>
->>>>>> Add basic chip support for Mediatek 8183, include
->>>>>> pinctrl file, uart node with correct uart clocks, pwrap device
->>>>>>
->>>>>> Add clock controller nodes, include topckgen, infracfg,
->>>>>> apmixedsys and subsystem.
->>>>>>
->>>>>> Signed-off-by: Ben Ho <Ben.Ho@mediatek.com>
->>>>>> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
->>>>>> Signed-off-by: Seiya Wang <seiya.wang@mediatek.com>
->>>>>> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
->>>>>> Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
->>>>>> Signed-off-by: Mengqi Zhang <Mengqi.Zhang@mediatek.com>
->>>>>> Signed-off-by: Hsin-Hsiung Wang <hsin-hsiung.wang@mediatek.com>
->>>>>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
->>>>>> ---
->>>>>
->>>>>
->>>>>> +   sysirq: intpol-controller@c530a80 {
->>>>>
->>>>> interrupt-controller@...
->>>>
->>>> I will modify it in next version.
->>>>>
->>>>>
->>>>> Place all the MMIO peripherals under one or more simple-bus nodes.
->>>>>
->>>>> Rob
->>>>>
->>>>
->>>> Do you mean need to add simple-bus like this?
->>>
->>> Yes.
->>
->> We remove soc because Matthias suggested it in former MTK SoC maybe in
->> 2015 year.
->>
->> We will add it back by your comment.
->>
->> Thank you. 
->>
->> Best Regards,
->> Erin
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  .../bindings/clock/amlogic,gxbb-aoclkc.txt    |  1 +
+>  include/dt-bindings/clock/g12a-aoclkc.h       | 43 +++++++++++++++++++
+>  include/dt-bindings/reset/g12a-aoclkc.h       | 18 ++++++++
+>  3 files changed, 62 insertions(+)
+>  create mode 100644 include/dt-bindings/clock/g12a-aoclkc.h
+>  create mode 100644 include/dt-bindings/reset/g12a-aoclkc.h
 > 
-> Hi, Matthias,
-> Do you have any comment here?
+> diff --git a/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt 
+> b/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
+> index 79511d7bb321..c41f0be5d438 100644
+> --- a/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
+> +++ b/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
+> @@ -10,6 +10,7 @@ Required Properties:
+>  	- GXL (S905X, S905D) : "amlogic,meson-gxl-aoclkc"
+>  	- GXM (S912) : "amlogic,meson-gxm-aoclkc"
+>  	- AXG (A113D, A113X) : "amlogic,meson-axg-aoclkc"
+> +	- G12A (S905X2, S905D2, S905Y2) : "amlogic,meson-g12a-aoclkc"
+>  	followed by the common "amlogic,meson-gx-aoclkc"
+>  - clocks: list of clock phandle, one for each entry clock-names.
+>  - clock-names: should contain the following:
+> diff --git a/include/dt-bindings/clock/g12a-aoclkc.h b/include/dt-
+> bindings/clock/g12a-aoclkc.h
+> new file mode 100644
+> index 000000000000..997aca16c94f
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/g12a-aoclkc.h
+> @@ -0,0 +1,43 @@
+> +/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
+> +/*
+> + * Copyright (c) 2016 BayLibre, SAS
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + *
+> + * Copyright (c) 2018 Amlogic, inc.
+> + * Author: Qiufang Dai <qiufang.dai@amlogic.com>
+> + */
+> +
+> +#ifndef DT_BINDINGS_CLOCK_AMLOGIC_MESON_G12A_AOCLK
+> +#define DT_BINDINGS_CLOCK_AMLOGIC_MESON_G12A_AOCLK
+> +
+> +#define CLKID_AO_AHB		0
+> +#define CLKID_AO_IR_IN		1
+> +#define CLKID_AO_I2C_M0		2
+> +#define CLKID_AO_I2C_S0		3
+> +#define CLKID_AO_UART		4
+> +#define CLKID_AO_PROD_I2C	5
+> +#define CLKID_AO_UART2		6
+> +#define CLKID_AO_IR_OUT		7
+> +#define CLKID_AO_SAR_ADC	8
+> +#define CLKID_AO_MAILBOX	9
+> +#define CLKID_AO_M3		10
+> +#define CLKID_AO_AHB_SRAM	11
+> +#define CLKID_AO_RTI		12
+> +#define CLKID_AO_M4_FCLK	13
+> +#define CLKID_AO_M4_HCLK	14
+> +#define CLKID_AO_CLK81		15
+> +#define CLKID_AO_SAR_ADC_SEL	16
+> +#define CLKID_AO_SAR_ADC_DIV	17
 
-Although I wasn't able to find it in the documentation my understanding is, that
-all devices on-chip should be under soc "bus".
+Do we need to export the internal part of these composite clock ?
+I know the other AO controller do it but it would be nice to avoid it, like
+for the EE controllers ... unless there is good reason of course.
 
-I'm sorry if I created confusion with comments in the past.
+Same for the others below.
 
-Regards,
-Matthias
+> +#define CLKID_AO_SAR_ADC_CLK	18
+> +#define CLKID_AO_CTS_OSCIN	19
+> +#define CLKID_AO_32K_PRE	20
+> +#define CLKID_AO_32K_DIV	21
+> +#define CLKID_AO_32K_SEL	22
+> +#define CLKID_AO_32K		23
+> +#define CLKID_AO_CEC_PRE	24
+> +#define CLKID_AO_CEC_DIV	25
+> +#define CLKID_AO_CEC_SEL	26
+> +#define CLKID_AO_CEC		27
+> +#define CLKID_AO_CTS_RTC_OSCIN	28
+> +
+> +#endif
+> diff --git a/include/dt-bindings/reset/g12a-aoclkc.h b/include/dt-
+> bindings/reset/g12a-aoclkc.h
+> new file mode 100644
+> index 000000000000..bd2e2337135c
+> --- /dev/null
+> +++ b/include/dt-bindings/reset/g12a-aoclkc.h
+> @@ -0,0 +1,18 @@
+> +/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
+> +/*
+> + * Copyright (c) 2016 BayLibre, SAS
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + */
+> +
+> +#ifndef DT_BINDINGS_RESET_AMLOGIC_MESON_G12A_AOCLK
+> +#define DT_BINDINGS_RESET_AMLOGIC_MESON_G12A_AOCLK
+> +
+> +#define RESET_AO_IR_IN		0
+> +#define RESET_AO_UART		1
+> +#define RESET_AO_I2C_M		2
+> +#define RESET_AO_I2C_S		3
+> +#define RESET_AO_SAR_ADC	4
+> +#define RESET_AO_UART2		5
+> +#define RESET_AO_IR_OUT		6
+> +
+> +#endif
 
-> Thanks
-> 
-> Best Regards,
-> Erin
->>>
->>>>
->>>> +   soc: soc {
->>>> +                #address-cells = <0x1>;
->>>> +                #size-cells = <0x1>;
->>>> +                ranges = <0 0 0 0xffffffff>;
->>>> +                compatible = "simple-bus";
->>>>
->>>>                 soc_data: soc_data@08000000 {
->>>>                         compatible = "mediatek,mt8183-efuse",
->>>>                                      "mediatek,efuse";
->>>>                         reg = <0 0x08000000 0 0x0010>;
->>>>                         #address-cells = <1>;
->>>>                         #size-cells = <1>;
->>>>                         status = "disabled";
->>>>                 };
->>>>
->>>>                 gic: interrupt-controller@0c000000 {
->>>>                         compatible = "arm,gic-v3";
->>>>                         #interrupt-cells = <4>;
->>>>
->>>> Best Regards,
->>>> Erin
->>>>
->>>>> _______________________________________________
->>>>> Linux-mediatek mailing list
->>>>> Linux-mediatek@lists.infradead.org
->>>>> http://lists.infradead.org/mailman/listinfo/linux-mediatek
->>>>
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel@lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
-> 
+
 
 _______________________________________________
 linux-arm-kernel mailing list
