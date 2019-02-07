@@ -2,21 +2,22 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_NEOMUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D4E50C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 23:37:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 94DCAC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 23:48:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9E43321721
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 23:37:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 656FA2173B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 23:48:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LISMwCtT";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="AeBFBGHM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E43321721
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qqUsRjJ+";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="Wa403v3v"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 656FA2173B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,59 +26,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=l57Tw/ad137qoTsbSBGIMW+89KNmoJMJ7jE7QgRiLGE=; b=LISMwCtTTqenUA
-	H+e9q3NUnN0D4gommmre/2Kv0vTEVaV4DsJYlbEohNYLD8qXRNEp16c9DzV1WczdIWiwDf8VM2UxR
-	45gKn55I42e0ZnzGhbtnOmnZlNuZQR7jbzm7H2QvH9K/jAG54cZXovf9HNPYP6ic1PVBJORVVZXhl
-	hFUzhAq1ldynOViZnH0/xjS+t04CVqYBSOqc1GTvlc7ta9/DRqzCLU9M3muEdwWJzePodJJhz2/ze
-	/RE6Q0RQj2++qxHKzzGUJuvkNx4Ftd/TxOMu2o8GCrIiJo3IyUDs4VksKRWD1uOeXiovE0kkEYyL7
-	jt7sUSmnuHpPY6hdN6pQ==;
+	List-Owner; bh=BzAvfOMMYcXPfd1n2JumlyhkXIz453lAJiQccahSaf8=; b=qqUsRjJ+awBeKk
+	iw0eYOqDIZHRhf9mhY79cJXB+QZsDaFG11aohwo++s7fv7PBbyS8hmu3uzGYdhNsNEERYpkgf7Oui
+	y9L0PanEKtDCwqcBwB5EjR2Vrq6zsZjsNnq0YESbAMUZtIjlxtqQg2ikAPf1mKHJFMoFBTfwsE4IZ
+	0s8O+JVStqJId6pLyNURPJsylFBTFv4tD4H+ddl8687nC8buPfpDmo0QGT913cz0LoYpqMcMK7+Cz
+	Mt1FuPg38h/hDzJ3Q2VukPHIOIxQzrk7UcWpyWEXfAayxte6iBrdPW3zx9IbCrJzgjdmsSnrNTiS7
+	nIfzEKLfH9Br6LI0sxaA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grtES-0004Kc-40; Thu, 07 Feb 2019 23:37:24 +0000
+	id 1grtPO-00009r-2F; Thu, 07 Feb 2019 23:48:42 +0000
 Received: from pandora.armlinux.org.uk
  ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grtEO-0003uR-C2
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 23:37:23 +0000
+ id 1grtPJ-00008K-K2
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 23:48:40 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
  MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
  Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
  Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
  List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=Ju5+vYpJoZF1xS6C9OLI61WX5FiyHVFYeX6XMvTY2ns=; b=AeBFBGHMda5J9s/ynjOI/Qv9+
- FbNAmhatmnFz1lYq0j6b09eAWld2lZ/tHy6PrJXmngfBf9uTOX7XzYM291YSQCNUFyU8aEWWWGHFb
- 3XJrgBaaahv8gl6W1ke1LBN50WR1H3qYPkFxJr1GJIfxQRp2NisqaxNAZBsds+JM9Jt1A=;
+ bh=gjPeUEpl3IC8+f3m0OUBhJxI8Sy93l2m2nEMVlydeXk=; b=Wa403v3v2SN2evhNn6D3hojc4
+ UXfBsGSVFcvxNAGIjTscdV7OPeelgKhq/CZjiTMeHT0zHAJ45LawgdQHUQyROjym3WXRP90JCnKfA
+ 4xFnzyHsvrk2hSiAte3zW5o/ljoM/ptffZ9V1mwI12bUs2+k2nCVKujnR0w3gcHUOLfHI=;
 Received: from shell.armlinux.org.uk
- ([2002:4e20:1eda:1:5054:ff:fe00:4ec]:36614)
+ ([2002:4e20:1eda:1:5054:ff:fe00:4ec]:36618)
  by pandora.armlinux.org.uk with esmtpsa
  (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.90_1)
  (envelope-from <linux@armlinux.org.uk>)
- id 1grtEA-0004dD-Kf; Thu, 07 Feb 2019 23:37:06 +0000
+ id 1grtPA-0004hN-CD; Thu, 07 Feb 2019 23:48:28 +0000
 Received: from linux by shell.armlinux.org.uk with local (Exim 4.89)
  (envelope-from <linux@shell.armlinux.org.uk>)
- id 1grtE4-0006YS-OC; Thu, 07 Feb 2019 23:37:00 +0000
-Date: Thu, 7 Feb 2019 23:37:00 +0000
+ id 1grtP6-0006Zb-RH; Thu, 07 Feb 2019 23:48:24 +0000
+Date: Thu, 7 Feb 2019 23:48:24 +0000
 From: Russell King - ARM Linux admin <linux@armlinux.org.uk>
 To: Maxime Chevallier <maxime.chevallier@bootlin.com>
-Subject: Re: [PATCH net-next 5/7] net: phy: marvell10g: Force reading of
- 2.5/5G PMA extended abilities
-Message-ID: <20190207233700.ftw4cyilc2tzzqmb@shell.armlinux.org.uk>
-References: <20190118152352.26417-1-maxime.chevallier@bootlin.com>
- <20190118152352.26417-6-maxime.chevallier@bootlin.com>
- <20190120190809.GB19714@lunn.ch>
- <20190121113531.7a8b5b51@bootlin.com>
- <20190121105206.mxxxosytk5qiysc2@e5254000004ec.dyn.armlinux.org.uk>
- <20190121132945.6e6dee23@bootlin.com>
- <20190121130030.i5kkjb55gwttobvq@e5254000004ec.dyn.armlinux.org.uk>
- <20190128152621.2aec96c1@bootlin.com>
+Subject: Re: [PATCH net-next v2 07/10] net: phy: marvell10g: Add support for
+ 2.5GBASET
+Message-ID: <20190207234824.dhynfaglfxllxhei@shell.armlinux.org.uk>
+References: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
+ <20190207094939.27369-8-maxime.chevallier@bootlin.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190128152621.2aec96c1@bootlin.com>
+In-Reply-To: <20190207094939.27369-8-maxime.chevallier@bootlin.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_153721_265331_C270FDC2 
-X-CRM114-Status: GOOD (  22.24  )
+X-CRM114-CacheID: sfid-20190207_154837_767020_9B60699A 
+X-CRM114-Status: GOOD (  25.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,73 +95,135 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 28, 2019 at 03:26:21PM +0100, Maxime Chevallier wrote:
-> Hello Russell,
+On Thu, Feb 07, 2019 at 10:49:36AM +0100, Maxime Chevallier wrote:
+> The Marvell Alaska family of PHYs supports 2.5GBaseT and 5GBaseT modes,
+> as defined in the 802.3bz specification.
 > 
-> On Mon, 21 Jan 2019 13:00:30 +0000
-> Russell King - ARM Linux admin <linux@armlinux.org.uk> wrote:
+> When the link partner requests a 2.5GBASET link, the PHY will
+> reconfigure it's MII interface to 2500BASEX.
 > 
-> >On Mon, Jan 21, 2019 at 01:29:45PM +0100, Maxime Chevallier wrote:
-> >> Hello Russell,
-> >> 
-> >> On Mon, 21 Jan 2019 10:52:06 +0000
-> >> Russell King - ARM Linux admin <linux@armlinux.org.uk> wrote:  
-> >> >It's entirely possible that the 3310 switches to different hardware
-> >> >blocks for 2.5G and 5G speeds, and reading _just_ the 1.4 register
-> >> >is not sufficient.  
-> >> 
-> >> I agree with you but in that particular case, I think we are reading
-> >> from the correct device. The datasheet itself says that we should be
-> >> reading 1.4 and 1.11 as we expect, with 2.5G/5G support being set (these
-> >> registers are read-only, and the datasheet's values aren't what we
-> >> actually read).  
-> >
-> >No, you missed what I was saying.
-> >
-> >The 88x3310 is a hybrid device.  It contains multiple instances of
-> >each individual device at different offsets in each MMD address space.
+> At 5G, the PHY will reconfigure it's interface to 5GBASE-R, but this
+> mode isn't supported by any MAC for now.
 > 
-> Ah I see, I indeed thought you refered to the MMDs. 
-> 
-> [...]
-> 
-> >The exception seems to be the PMA/PMD MMD which I've only discovered
-> >a single instance.
-> 
-> Yes there only seems to be one. There are some other registers in the
-> 1.0xCxxx range, but those who are documented don't help a lot with
-> determing wether or not these modes are supported.
-> 
-> I wonder if these values are correctly reported in newer PHY firmware
-> revisions.
-> 
-> I've checked other PCS instances, but it seems the one at 3.0x0xxx is
-> the one used in 2.5/5GBASET.
+> This was tested with :
+>  - The 88X3310, which is on the MacchiatoBin
 
-In the following, I use "subdevice N" to mean instance "N + 1".  So
-the instance at address 0 is the main device and the following instance
-is subdevice 1.
+Hi Maxime,
 
-Looking at the PCS, none of them have the 2.5G/5G bits set in the 3310
-which is rather interesting, except the one at 3.0 has the EEE bits
-set in 3.21.  You are quite correct that the first instance is used
-for 2.5G copper, but PCS subdevice 2 also changes as a result of
-switching down to 2.5G (its transmit fault status clears.)
+Looking deeper at this, I think we actually need an additional patch at
+the beginning of your series.
 
-It looks like PhyXS subdevice 3 is used (which is a SGMII/1000base-X
-MAC facing PHY), is switched to fixed speed mode.  It doesn't have
-what looks like a sensible advertisement either, so my guess is that
-this will need the MAC side to be configured _not_ to expect the
-in-band control word in this mode.  In other words, it may be SGMII
-or 1000base-X upclocked to 2.5G speeds - which it is doesn't matter
-because the difference is in the control word which looks like it's
-omitted, or if it isn't, doesn't contain useful information.
+The default AN advertisement in 7.32 is 0x1181 - which includes the
+2.5G and 5G modes.  We need to clear these bits, so that when the 10G
+mode disabled via ethtool, we do not switch to 2.5G or 5G speed (both
+of which are not currently reported as supported.)  Such a patch needs
+backporting to stable kernels.
 
-Note that mvpp2 is slightly buggy in this area, and I have a patch
-set that fixes it up - patches can be found in my "mvpp2" branch,
-which I'm waiting for my problem reporter to report back after his
-testing.  If you use this patch set, as long as you don't use
-in-band mode, it should be fine.
+>  - The 88E2010, an Alaska PHY that has no fiber interfaces, and is
+>    limited to 5G maximum speed.
+> 
+> Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+> ---
+> V1 -> V2: Use a #define for the 88X3310 PHY ID, since it's reused in
+> 	  various places in the code. Rebased on Heiner Kallweit's patch
+> 	  introducing the phy_modify_mmd accessor.
+> 
+>  drivers/net/phy/marvell10g.c | 30 ++++++++++++++++++++++--------
+>  include/linux/marvell_phy.h  |  1 +
+>  2 files changed, 23 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/net/phy/marvell10g.c b/drivers/net/phy/marvell10g.c
+> index 07df87b81369..581b4b6e31e9 100644
+> --- a/drivers/net/phy/marvell10g.c
+> +++ b/drivers/net/phy/marvell10g.c
+> @@ -238,6 +238,7 @@ static int mv3310_config_init(struct phy_device *phydev)
+>  
+>  	/* Check that the PHY interface type is compatible */
+>  	if (phydev->interface != PHY_INTERFACE_MODE_SGMII &&
+> +	    phydev->interface != PHY_INTERFACE_MODE_2500BASEX &&
+>  	    phydev->interface != PHY_INTERFACE_MODE_XAUI &&
+>  	    phydev->interface != PHY_INTERFACE_MODE_RXAUI &&
+>  	    phydev->interface != PHY_INTERFACE_MODE_10GKR)
+> @@ -307,8 +308,18 @@ static int mv3310_config_aneg(struct phy_device *phydev)
+>  	else
+>  		reg = 0;
+>  
+> +	if (linkmode_test_bit(ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
+> +			      phydev->advertising))
+> +		reg |= MDIO_AN_10GBT_CTRL_ADV2_5G;
+> +	if (linkmode_test_bit(ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
+> +			      phydev->advertising))
+> +		reg |= MDIO_AN_10GBT_CTRL_ADV5G;
+> +
+>  	ret = phy_modify_mmd(phydev, MDIO_MMD_AN, MDIO_AN_10GBT_CTRL,
+> -			     MDIO_AN_10GBT_CTRL_ADV10G, reg);
+> +			     MDIO_AN_10GBT_CTRL_ADV10G |
+> +			     MDIO_AN_10GBT_CTRL_ADV5G |
+> +			     MDIO_AN_10GBT_CTRL_ADV2_5G, reg);
+> +
+>  	if (ret < 0)
+>  		return ret;
+>  	if (ret > 0)
+> @@ -337,17 +348,20 @@ static int mv3310_aneg_done(struct phy_device *phydev)
+>  static void mv3310_update_interface(struct phy_device *phydev)
+>  {
+>  	if ((phydev->interface == PHY_INTERFACE_MODE_SGMII ||
+> +	     phydev->interface == PHY_INTERFACE_MODE_2500BASEX ||
+>  	     phydev->interface == PHY_INTERFACE_MODE_10GKR) && phydev->link) {
+>  		/* The PHY automatically switches its serdes interface (and
+> -		 * active PHYXS instance) between Cisco SGMII and 10GBase-KR
+> -		 * modes according to the speed.  Florian suggests setting
+> -		 * phydev->interface to communicate this to the MAC. Only do
+> -		 * this if we are already in either SGMII or 10GBase-KR mode.
+> +		 * active PHYXS instance) between Cisco SGMII, 10GBase-KR and
+> +		 * 2500BaseX modes according to the speed.  Florian suggests
+> +		 * setting phydev->interface to communicate this to the MAC.
+> +		 * Only do this if we are already in one of the above modes.
+>  		 */
+>  		if (phydev->speed == SPEED_10000)
+>  			phydev->interface = PHY_INTERFACE_MODE_10GKR;
+> +		else if (phydev->speed == SPEED_2500)
+> +			phydev->interface = PHY_INTERFACE_MODE_2500BASEX;
+>  		else if (phydev->speed >= SPEED_10 &&
+> -			 phydev->speed < SPEED_10000)
+> +			 phydev->speed < SPEED_2500)
+>  			phydev->interface = PHY_INTERFACE_MODE_SGMII;
+>  	}
+>  }
+> @@ -450,7 +464,7 @@ static int mv3310_read_status(struct phy_device *phydev)
+>  
+>  static struct phy_driver mv3310_drivers[] = {
+>  	{
+> -		.phy_id		= 0x002b09aa,
+> +		.phy_id		= MARVELL_PHY_ID_88X3310,
+>  		.phy_id_mask	= MARVELL_PHY_ID_MASK,
+>  		.name		= "mv88x3310",
+>  		.features	= PHY_10GBIT_FEATURES,
+> @@ -468,7 +482,7 @@ static struct phy_driver mv3310_drivers[] = {
+>  module_phy_driver(mv3310_drivers);
+>  
+>  static struct mdio_device_id __maybe_unused mv3310_tbl[] = {
+> -	{ 0x002b09aa, MARVELL_PHY_ID_MASK },
+> +	{ MARVELL_PHY_ID_88X3310, MARVELL_PHY_ID_MASK },
+>  	{ },
+>  };
+>  MODULE_DEVICE_TABLE(mdio, mv3310_tbl);
+> diff --git a/include/linux/marvell_phy.h b/include/linux/marvell_phy.h
+> index 1eb6f244588d..5851d68d828a 100644
+> --- a/include/linux/marvell_phy.h
+> +++ b/include/linux/marvell_phy.h
+> @@ -20,6 +20,7 @@
+>  #define MARVELL_PHY_ID_88E1540		0x01410eb0
+>  #define MARVELL_PHY_ID_88E1545		0x01410ea0
+>  #define MARVELL_PHY_ID_88E3016		0x01410e60
+> +#define MARVELL_PHY_ID_88X3310		0x002b09aa
+>  
+>  /* The MV88e6390 Ethernet switch contains embedded PHYs. These PHYs do
+>   * not have a model ID. So the switch driver traps reads to the ID2
+> -- 
+> 2.19.2
+> 
+> 
 
 -- 
 RMK's Patch system: https://www.armlinux.org.uk/developer/patches/
