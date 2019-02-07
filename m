@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B9F80C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:51:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 13503C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:51:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6D42920823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:51:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CFE7320823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:51:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tyBLy/ED"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D42920823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UYbzsNAj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CFE7320823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Rw14qLP9h1VO9OjMFam3yYrzQpl2ekehaleV7dpmbSM=; b=tyBLy/EDOGknzj
-	l7seAnDeH1OeLDocKHJ7vtx9UWAiNrnOJfEXtYSP7t3IfR4bTgZSCnTiqVp/hdaIuvqWTTNQ8g0Tq
-	n/BG8ee66gu6ShknUgXTw52FVPgjjw/heyaCEP9Gf6p69tNCZyHg9MctApoZY4r1h0WKs62Ics9oo
-	GLpomvMUAadEI3VKVzU6gGGV9/exPhYZjiNuTw4gF7eXTSskYgZ4EfwkvyPI1B3KxkjovSfHfxrFV
-	vb3xtI2pZGSgE5GTLeeKNtc4aeO3Xlbbflzsw06DxPTUyxyr+acebxE1Ku+zkhammk1FaXB126Gox
-	BvXqPbK9XoTDC4OlQO2A==;
+	List-Owner; bh=9zq5+tjvDFGaglrDBdpkGowOhJfUeOyLhRR1zpgipB4=; b=UYbzsNAjNs9ZdV
+	rAk6mT20KFlONI9+IUuOCIkzsZK1rPXJWhp1tJDTNHaF9MRQmjrZRM/f/xGUhqq1GcO4xV9pDDcNH
+	kaCmHfMvIOpE73F16fTAKB+zTd+OgJDbJroShdQ0CwrAY9tBxkbr3edNE3HUDTqiIasz2XzUH+ymp
+	nWKozfQbz8/Dnym7rEFZdb6FYacw25hAmopH6avuK4F04N1516s4wcbhD0evcyl2q9yakboWqL9Zq
+	cbCyni3/okAZdIfJacWR65Wp5qQoGFLSeZbQCAPSMBS0cFUFZdtFrj92TeLK3VMpW3WCZHflU9HSW
+	l4hhtQO1FHbo4yhZt2ow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grgLG-0007sb-Gi; Thu, 07 Feb 2019 09:51:34 +0000
+	id 1grgLV-00085u-B3; Thu, 07 Feb 2019 09:51:49 +0000
 Received: from relay11.mail.gandi.net ([217.70.178.231])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grgJx-0005fc-Mz
+ id 1grgK0-0005sJ-Fl
  for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:50:22 +0000
 Received: from mc-bl-xps13.lan
  (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr [90.88.22.177])
  (Authenticated sender: maxime.chevallier@bootlin.com)
- by relay11.mail.gandi.net (Postfix) with ESMTPSA id 92561100020;
- Thu,  7 Feb 2019 09:50:08 +0000 (UTC)
+ by relay11.mail.gandi.net (Postfix) with ESMTPSA id 48852100014;
+ Thu,  7 Feb 2019 09:50:12 +0000 (UTC)
 From: Maxime Chevallier <maxime.chevallier@bootlin.com>
 To: davem@davemloft.net
-Subject: [PATCH net-next v2 05/10] net: phy: Extract
- genphy_c45_pma_read_abilities from marvell10g
-Date: Thu,  7 Feb 2019 10:49:34 +0100
-Message-Id: <20190207094939.27369-6-maxime.chevallier@bootlin.com>
+Subject: [PATCH net-next v2 06/10] net: phy: Add generic support for 2.5GBaseT
+ and 5GBaseT
+Date: Thu,  7 Feb 2019 10:49:35 +0100
+Message-Id: <20190207094939.27369-7-maxime.chevallier@bootlin.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
 References: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_015014_733170_887C2BC4 
-X-CRM114-Status: GOOD (  16.35  )
+X-CRM114-CacheID: sfid-20190207_015017_572012_29E7FB25 
+X-CRM114-Status: GOOD (  12.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,231 +80,176 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Marvell 10G PHY driver has a generic way of initializing the supported
-link modes by reading the PHY's C45 PMA abilities. This can be made
-generic, since these registers are part of the 802.3 specifications.
+The 802.3bz specification, based on previous by the NBASET alliance,
+defines the 2.5GBaseT and 5GBaseT link modes for ethernet traffic on
+cat5e, cat6 and cat7 cables.
 
-This commit extracts the config_init link_mode initialization code from
-marvell10g and uses it to introduce the genphy_c45_pma_read_abilities
-function.
+These mode integrate with the already defined C45 MDIO PMA/PMD registers
+set that added 10G support, by defining some previously reserved bits,
+and adding a new register (2.5G/5G Extended abilities).
 
-Only PMA modes are read, it's still up to the caller to set the Pause
-parameters.
+This commit adds the required definitions in include/uapi/linux/mdio.h
+to support these modes, and detect when a link-partner advertises them.
+
+It also adds support for these mode in the generic C45 PHY
+infrastructure.
 
 Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
 ---
-V1 -> V2: The Pause parameters setting stays in marvell10g. Make use of
-	  linkmode_mod_bit. Renamed the function from
-	  genphy_c45_read_abilities to genphy_c45_pma_read_abilities, as
-	  advised by Andrew.
+V1 -> V2: Merged in code for reading 2.5G/5G abilities.
 
- drivers/net/phy/marvell10g.c | 78 ++++--------------------------------
- drivers/net/phy/phy-c45.c    | 74 ++++++++++++++++++++++++++++++++++
- include/linux/phy.h          |  1 +
- 3 files changed, 83 insertions(+), 70 deletions(-)
+ drivers/net/phy/phy-c45.c    | 37 ++++++++++++++++++++++++++++++++++++
+ drivers/net/phy/phy_device.c |  2 ++
+ include/uapi/linux/mdio.h    | 16 ++++++++++++++++
+ 3 files changed, 55 insertions(+)
 
-diff --git a/drivers/net/phy/marvell10g.c b/drivers/net/phy/marvell10g.c
-index 296a537cdfcb..07df87b81369 100644
---- a/drivers/net/phy/marvell10g.c
-+++ b/drivers/net/phy/marvell10g.c
-@@ -234,8 +234,7 @@ static int mv3310_resume(struct phy_device *phydev)
- 
- static int mv3310_config_init(struct phy_device *phydev)
- {
--	__ETHTOOL_DECLARE_LINK_MODE_MASK(supported) = { 0, };
--	int val;
-+	int ret, val;
- 
- 	/* Check that the PHY interface type is compatible */
- 	if (phydev->interface != PHY_INTERFACE_MODE_SGMII &&
-@@ -244,8 +243,8 @@ static int mv3310_config_init(struct phy_device *phydev)
- 	    phydev->interface != PHY_INTERFACE_MODE_10GKR)
- 		return -ENODEV;
- 
--	__set_bit(ETHTOOL_LINK_MODE_Pause_BIT, supported);
--	__set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, supported);
-+	__set_bit(ETHTOOL_LINK_MODE_Pause_BIT, phydev->supported);
-+	__set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, phydev->supported);
- 
- 	if (phydev->c45_ids.devices_in_package & MDIO_DEVS_AN) {
- 		val = phy_read_mmd(phydev, MDIO_MMD_AN, MDIO_STAT1);
-@@ -253,74 +252,13 @@ static int mv3310_config_init(struct phy_device *phydev)
- 			return val;
- 
- 		if (val & MDIO_AN_STAT1_ABLE)
--			__set_bit(ETHTOOL_LINK_MODE_Autoneg_BIT, supported);
-+			__set_bit(ETHTOOL_LINK_MODE_Autoneg_BIT,
-+				  phydev->supported);
- 	}
- 
--	val = phy_read_mmd(phydev, MDIO_MMD_PMAPMD, MDIO_STAT2);
--	if (val < 0)
--		return val;
--
--	/* Ethtool does not support the WAN mode bits */
--	if (val & (MDIO_PMA_STAT2_10GBSR | MDIO_PMA_STAT2_10GBLR |
--		   MDIO_PMA_STAT2_10GBER | MDIO_PMA_STAT2_10GBLX4 |
--		   MDIO_PMA_STAT2_10GBSW | MDIO_PMA_STAT2_10GBLW |
--		   MDIO_PMA_STAT2_10GBEW))
--		__set_bit(ETHTOOL_LINK_MODE_FIBRE_BIT, supported);
--	if (val & MDIO_PMA_STAT2_10GBSR)
--		__set_bit(ETHTOOL_LINK_MODE_10000baseSR_Full_BIT, supported);
--	if (val & MDIO_PMA_STAT2_10GBLR)
--		__set_bit(ETHTOOL_LINK_MODE_10000baseLR_Full_BIT, supported);
--	if (val & MDIO_PMA_STAT2_10GBER)
--		__set_bit(ETHTOOL_LINK_MODE_10000baseER_Full_BIT, supported);
--
--	if (val & MDIO_PMA_STAT2_EXTABLE) {
--		val = phy_read_mmd(phydev, MDIO_MMD_PMAPMD, MDIO_PMA_EXTABLE);
--		if (val < 0)
--			return val;
--
--		if (val & (MDIO_PMA_EXTABLE_10GBT | MDIO_PMA_EXTABLE_1000BT |
--			   MDIO_PMA_EXTABLE_100BTX | MDIO_PMA_EXTABLE_10BT))
--			__set_bit(ETHTOOL_LINK_MODE_TP_BIT, supported);
--		if (val & MDIO_PMA_EXTABLE_10GBLRM)
--			__set_bit(ETHTOOL_LINK_MODE_FIBRE_BIT, supported);
--		if (val & (MDIO_PMA_EXTABLE_10GBKX4 | MDIO_PMA_EXTABLE_10GBKR |
--			   MDIO_PMA_EXTABLE_1000BKX))
--			__set_bit(ETHTOOL_LINK_MODE_Backplane_BIT, supported);
--		if (val & MDIO_PMA_EXTABLE_10GBLRM)
--			__set_bit(ETHTOOL_LINK_MODE_10000baseLRM_Full_BIT,
--				  supported);
--		if (val & MDIO_PMA_EXTABLE_10GBT)
--			__set_bit(ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
--				  supported);
--		if (val & MDIO_PMA_EXTABLE_10GBKX4)
--			__set_bit(ETHTOOL_LINK_MODE_10000baseKX4_Full_BIT,
--				  supported);
--		if (val & MDIO_PMA_EXTABLE_10GBKR)
--			__set_bit(ETHTOOL_LINK_MODE_10000baseKR_Full_BIT,
--				  supported);
--		if (val & MDIO_PMA_EXTABLE_1000BT)
--			__set_bit(ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
--				  supported);
--		if (val & MDIO_PMA_EXTABLE_1000BKX)
--			__set_bit(ETHTOOL_LINK_MODE_1000baseKX_Full_BIT,
--				  supported);
--		if (val & MDIO_PMA_EXTABLE_100BTX) {
--			__set_bit(ETHTOOL_LINK_MODE_100baseT_Full_BIT,
--				  supported);
--			__set_bit(ETHTOOL_LINK_MODE_100baseT_Half_BIT,
--				  supported);
--		}
--		if (val & MDIO_PMA_EXTABLE_10BT) {
--			__set_bit(ETHTOOL_LINK_MODE_10baseT_Full_BIT,
--				  supported);
--			__set_bit(ETHTOOL_LINK_MODE_10baseT_Half_BIT,
--				  supported);
--		}
--	}
--
--	linkmode_copy(phydev->supported, supported);
--	linkmode_and(phydev->advertising, phydev->advertising,
--		     phydev->supported);
-+	ret = genphy_c45_pma_read_abilities(phydev);
-+	if (ret)
-+		return ret;
- 
- 	return 0;
- }
 diff --git a/drivers/net/phy/phy-c45.c b/drivers/net/phy/phy-c45.c
-index c92d0fb7ec4f..32e72b170ea9 100644
+index 32e72b170ea9..92897cb26557 100644
 --- a/drivers/net/phy/phy-c45.c
 +++ b/drivers/net/phy/phy-c45.c
-@@ -256,6 +256,80 @@ int genphy_c45_read_mdix(struct phy_device *phydev)
- }
- EXPORT_SYMBOL_GPL(genphy_c45_read_mdix);
+@@ -47,6 +47,16 @@ int genphy_c45_pma_setup_forced(struct phy_device *phydev)
+ 		/* Assume 1000base-T */
+ 		ctrl2 |= MDIO_PMA_CTRL2_1000BT;
+ 		break;
++	case SPEED_2500:
++		ctrl1 |= MDIO_CTRL1_SPEED2_5G;
++		/* Assume 2.5Gbase-T */
++		ctrl2 |= MDIO_PMA_CTRL2_2_5GBT;
++		break;
++	case SPEED_5000:
++		ctrl1 |= MDIO_CTRL1_SPEED5G;
++		/* Assume 5Gbase-T */
++		ctrl2 |= MDIO_PMA_CTRL2_5GBT;
++		break;
+ 	case SPEED_10000:
+ 		ctrl1 |= MDIO_CTRL1_SPEED10G;
+ 		/* Assume 10Gbase-T */
+@@ -179,6 +189,12 @@ int genphy_c45_read_lpa(struct phy_device *phydev)
+ 	if (val < 0)
+ 		return val;
  
-+/**
-+ * genphy_c45_pma_read_abilities - read supported link modes from PMA
-+ * @phydev: target phy_device struct
-+ *
-+ * Read the supported link modes from the PMA Status 2 (1.8) register. If bit
-+ * 1.8.9 is set, the list of supported modes is build using the values in the
-+ * PMA Extended Abilities (1.11) register, indicating 1000BASET an 10G related
-+ * modes. If bit 1.11.14 is set, then the list is also extended with the modes
-+ * in the 2.5G/5G PMA Extended register (1.21), indicating if 2.5GBASET and
-+ * 5GBASET are supported.
-+ */
-+int genphy_c45_pma_read_abilities(struct phy_device *phydev)
-+{
-+	int val;
++	if (val & MDIO_AN_10GBT_STAT_LP2_5G)
++		linkmode_set_bit(ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
++				 phydev->lp_advertising);
++	if (val & MDIO_AN_10GBT_STAT_LP5G)
++		linkmode_set_bit(ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
++				 phydev->lp_advertising);
+ 	if (val & MDIO_AN_10GBT_STAT_LP10G)
+ 		linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
+ 				 phydev->lp_advertising);
+@@ -209,6 +225,12 @@ int genphy_c45_read_pma(struct phy_device *phydev)
+ 	case MDIO_PMA_CTRL1_SPEED1000:
+ 		phydev->speed = SPEED_1000;
+ 		break;
++	case MDIO_CTRL1_SPEED2_5G:
++		phydev->speed = SPEED_2500;
++		break;
++	case MDIO_CTRL1_SPEED5G:
++		phydev->speed = SPEED_5000;
++		break;
+ 	case MDIO_CTRL1_SPEED10G:
+ 		phydev->speed = SPEED_10000;
+ 		break;
+@@ -324,6 +346,21 @@ int genphy_c45_pma_read_abilities(struct phy_device *phydev)
+ 		linkmode_mod_bit(ETHTOOL_LINK_MODE_10baseT_Half_BIT,
+ 				 phydev->supported,
+ 				 val & MDIO_PMA_EXTABLE_10BT);
 +
-+	val = phy_read_mmd(phydev, MDIO_MMD_PMAPMD, MDIO_STAT2);
-+	if (val < 0)
-+		return val;
++		if (val & MDIO_PMA_EXTABLE_NBT) {
++			val = phy_read_mmd(phydev, MDIO_MMD_PMAPMD,
++					   MDIO_PMA_NG_EXTABLE);
++			if (val < 0)
++				return val;
 +
-+	linkmode_mod_bit(ETHTOOL_LINK_MODE_10000baseSR_Full_BIT,
-+			 phydev->supported,
-+			 val & MDIO_PMA_STAT2_10GBSR);
++			linkmode_mod_bit(ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
++					 phydev->supported,
++					 val & MDIO_PMA_NG_EXTABLE_2_5GBT);
 +
-+	linkmode_mod_bit(ETHTOOL_LINK_MODE_10000baseLR_Full_BIT,
-+			 phydev->supported,
-+			 val & MDIO_PMA_STAT2_10GBLR);
-+
-+	linkmode_mod_bit(ETHTOOL_LINK_MODE_10000baseER_Full_BIT,
-+			 phydev->supported,
-+			 val & MDIO_PMA_STAT2_10GBER);
-+
-+	if (val & MDIO_PMA_STAT2_EXTABLE) {
-+		val = phy_read_mmd(phydev, MDIO_MMD_PMAPMD, MDIO_PMA_EXTABLE);
-+		if (val < 0)
-+			return val;
-+
-+		linkmode_mod_bit(ETHTOOL_LINK_MODE_10000baseLRM_Full_BIT,
-+				 phydev->supported,
-+				 val & MDIO_PMA_EXTABLE_10GBLRM);
-+		linkmode_mod_bit(ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
-+				 phydev->supported,
-+				 val & MDIO_PMA_EXTABLE_10GBT);
-+		linkmode_mod_bit(ETHTOOL_LINK_MODE_10000baseKX4_Full_BIT,
-+				 phydev->supported,
-+				 val & MDIO_PMA_EXTABLE_10GBKX4);
-+		linkmode_mod_bit(ETHTOOL_LINK_MODE_10000baseKR_Full_BIT,
-+				 phydev->supported,
-+				 val & MDIO_PMA_EXTABLE_10GBKR);
-+		linkmode_mod_bit(ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
-+				 phydev->supported,
-+				 val & MDIO_PMA_EXTABLE_1000BT);
-+		linkmode_mod_bit(ETHTOOL_LINK_MODE_1000baseKX_Full_BIT,
-+				 phydev->supported,
-+				 val & MDIO_PMA_EXTABLE_1000BKX);
-+
-+		linkmode_mod_bit(ETHTOOL_LINK_MODE_100baseT_Full_BIT,
-+				 phydev->supported,
-+				 val & MDIO_PMA_EXTABLE_100BTX);
-+		linkmode_mod_bit(ETHTOOL_LINK_MODE_100baseT_Half_BIT,
-+				 phydev->supported,
-+				 val & MDIO_PMA_EXTABLE_100BTX);
-+
-+		linkmode_mod_bit(ETHTOOL_LINK_MODE_10baseT_Full_BIT,
-+				 phydev->supported,
-+				 val & MDIO_PMA_EXTABLE_10BT);
-+		linkmode_mod_bit(ETHTOOL_LINK_MODE_10baseT_Half_BIT,
-+				 phydev->supported,
-+				 val & MDIO_PMA_EXTABLE_10BT);
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(genphy_c45_pma_read_abilities);
-+
- /* The gen10g_* functions are the old Clause 45 stub */
++			linkmode_mod_bit(ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
++					 phydev->supported,
++					 val & MDIO_PMA_NG_EXTABLE_5GBT);
++		}
+ 	}
  
- int gen10g_config_aneg(struct phy_device *phydev)
-diff --git a/include/linux/phy.h b/include/linux/phy.h
-index 017118061ecf..863d0e00db89 100644
---- a/include/linux/phy.h
-+++ b/include/linux/phy.h
-@@ -1102,6 +1102,7 @@ int genphy_c45_read_pma(struct phy_device *phydev);
- int genphy_c45_pma_setup_forced(struct phy_device *phydev);
- int genphy_c45_an_disable_aneg(struct phy_device *phydev);
- int genphy_c45_read_mdix(struct phy_device *phydev);
-+int genphy_c45_pma_read_abilities(struct phy_device *phydev);
+ 	return 0;
+diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
+index 942cfa7548c4..13ac4bdb9b69 100644
+--- a/drivers/net/phy/phy_device.c
++++ b/drivers/net/phy/phy_device.c
+@@ -1085,6 +1085,8 @@ static void phy_update_linkmodes(struct phy_device *phydev)
+ 		ETHTOOL_LINK_MODE_100baseT_Full_BIT,
+ 		ETHTOOL_LINK_MODE_1000baseT_Half_BIT,
+ 		ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
++		ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
++		ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
+ 		ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
+ 	};
  
- /* The gen10g_* functions are the old Clause 45 stub */
- int gen10g_config_aneg(struct phy_device *phydev);
+diff --git a/include/uapi/linux/mdio.h b/include/uapi/linux/mdio.h
+index d435b00d64ad..546509898867 100644
+--- a/include/uapi/linux/mdio.h
++++ b/include/uapi/linux/mdio.h
+@@ -45,6 +45,7 @@
+ #define MDIO_AN_ADVERTISE	16	/* AN advertising (base page) */
+ #define MDIO_AN_LPA		19	/* AN LP abilities (base page) */
+ #define MDIO_PCS_EEE_ABLE	20	/* EEE Capability register */
++#define MDIO_PMA_NG_EXTABLE	21	/* 2.5G/5G PMA/PMD extended ability */
+ #define MDIO_PCS_EEE_WK_ERR	22	/* EEE wake error counter */
+ #define MDIO_PHYXS_LNSTAT	24	/* PHY XGXS lane state */
+ #define MDIO_AN_EEE_ADV		60	/* EEE advertisement */
+@@ -92,6 +93,10 @@
+ #define MDIO_CTRL1_SPEED10G		(MDIO_CTRL1_SPEEDSELEXT | 0x00)
+ /* 10PASS-TS/2BASE-TL */
+ #define MDIO_CTRL1_SPEED10P2B		(MDIO_CTRL1_SPEEDSELEXT | 0x04)
++/* 2.5 Gb/s */
++#define MDIO_CTRL1_SPEED2_5G		(MDIO_CTRL1_SPEEDSELEXT | 0x18)
++/* 5 Gb/s */
++#define MDIO_CTRL1_SPEED5G		(MDIO_CTRL1_SPEEDSELEXT | 0x1c)
+ 
+ /* Status register 1. */
+ #define MDIO_STAT1_LPOWERABLE		0x0002	/* Low-power ability */
+@@ -142,6 +147,8 @@
+ #define MDIO_PMA_CTRL2_1000BKX		0x000d	/* 1000BASE-KX type */
+ #define MDIO_PMA_CTRL2_100BTX		0x000e	/* 100BASE-TX type */
+ #define MDIO_PMA_CTRL2_10BT		0x000f	/* 10BASE-T type */
++#define MDIO_PMA_CTRL2_2_5GBT		0x0030  /* 2.5GBaseT type */
++#define MDIO_PMA_CTRL2_5GBT		0x0031  /* 5GBaseT type */
+ #define MDIO_PCS_CTRL2_TYPE		0x0003	/* PCS type selection */
+ #define MDIO_PCS_CTRL2_10GBR		0x0000	/* 10GBASE-R type */
+ #define MDIO_PCS_CTRL2_10GBX		0x0001	/* 10GBASE-X type */
+@@ -195,6 +202,7 @@
+ #define MDIO_PMA_EXTABLE_1000BKX	0x0040	/* 1000BASE-KX ability */
+ #define MDIO_PMA_EXTABLE_100BTX		0x0080	/* 100BASE-TX ability */
+ #define MDIO_PMA_EXTABLE_10BT		0x0100	/* 10BASE-T ability */
++#define MDIO_PMA_EXTABLE_NBT		0x4000  /* 2.5/5GBASE-T ability */
+ 
+ /* PHY XGXS lane state register. */
+ #define MDIO_PHYXS_LNSTAT_SYNC0		0x0001
+@@ -231,9 +239,13 @@
+ #define MDIO_PCS_10GBRT_STAT2_BER	0x3f00
+ 
+ /* AN 10GBASE-T control register. */
++#define MDIO_AN_10GBT_CTRL_ADV2_5G	0x0080	/* Advertise 2.5GBASE-T */
++#define MDIO_AN_10GBT_CTRL_ADV5G	0x0100	/* Advertise 5GBASE-T */
+ #define MDIO_AN_10GBT_CTRL_ADV10G	0x1000	/* Advertise 10GBASE-T */
+ 
+ /* AN 10GBASE-T status register. */
++#define MDIO_AN_10GBT_STAT_LP2_5G	0x0020  /* LP is 2.5GBT capable */
++#define MDIO_AN_10GBT_STAT_LP5G		0x0040  /* LP is 5GBT capable */
+ #define MDIO_AN_10GBT_STAT_LPTRR	0x0200	/* LP training reset req. */
+ #define MDIO_AN_10GBT_STAT_LPLTABLE	0x0400	/* LP loop timing ability */
+ #define MDIO_AN_10GBT_STAT_LP10G	0x0800	/* LP is 10GBT capable */
+@@ -262,6 +274,10 @@
+ #define MDIO_EEE_10GKX4		0x0020	/* 10G KX4 EEE cap */
+ #define MDIO_EEE_10GKR		0x0040	/* 10G KR EEE cap */
+ 
++/* 2.5G/5G Extended abilities register. */
++#define MDIO_PMA_NG_EXTABLE_2_5GBT	0x0001	/* 2.5GBASET ability */
++#define MDIO_PMA_NG_EXTABLE_5GBT	0x0002	/* 5GBASET ability */
++
+ /* LASI RX_ALARM control/status registers. */
+ #define MDIO_PMA_LASI_RX_PHYXSLFLT	0x0001	/* PHY XS RX local fault */
+ #define MDIO_PMA_LASI_RX_PCSLFLT	0x0008	/* PCS RX local fault */
 -- 
 2.19.2
 
