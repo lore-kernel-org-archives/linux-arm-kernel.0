@@ -2,91 +2,93 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4BA11C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 04:05:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 02336C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 04:08:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1097E2084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 04:05:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B9C252084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 04:08:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F0SLW5TA";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lca.pw header.i=@lca.pw header.b="nK9wO4n9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1097E2084D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lca.pw
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rELUJxJJ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="kCsh2wOs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B9C252084D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Date:Message-ID:To:Subject
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=EekoUelVJZDc7uE/dejPEhnejTIDQXUofzWHoKiqpus=; b=F0SLW5TAz56a+k
-	RHeUZ3LsunqpIm+UBlytW8SSBwWaB/BodysdbsfslpicKKUQDKgISLitA01PSjy5+/eWy/aNsAcnm
-	z4LGchrziqDEsuGlwPoMImYLRv6DkdS0JkuwXvIlsG0HWjkOMEITdl7fmrMUtaHBSHD9Pepxdfp9q
-	EExjsejqQhBFOAC9UQdBgK+BYvvfBu7tRWfHbn2nSIN63ilpmIbnUQ6ToDMbMvYUNp5QVf0jAOmlt
-	km9SKnXmTpVKPVj1w3csWQhQgzgyV4Wp+GyEGn71YHmkTIg03ySj5SqbFuKSP7XaiIBDeFcOagJGb
-	9wU7JJpfdezPBfGWjAXg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=42REiBqF/orP9qBtUwvj27TOgN2WM+g8BhaYL+pCOLo=; b=rELUJxJJZvwkqA
+	jfQ26ssX7t6VmsQUOIxSBKWs8iTgU7vuzbeG6YP9Kc1SWJ2rQ97pNumJRfGCi/pDQa1op9Ie2M/2P
+	16J1SgUMiP3oy1f0GTGop3Xly0B0rh5hcc4+4NJ7GMIKczMSfw19DGHNnrphKcF5aBRZI15IHrCVG
+	nU3+m+6+0BUqijc1+0r+tYG+tgBs8zXh1+yyFOrJp1RwQVvsAZ/nv9X6gXJDSfmbstYz5ebHoD2Ub
+	uVYpm3FJv4nADPRNdkEo2jDznfdXf1qMQ0n1rFzAe8IvjUZIfSG06QgKoOI3gIRFqdp+lr7v5XYZ2
+	+gtwNJDcGwyQ980HrMlQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gravq-0006tm-Kd; Thu, 07 Feb 2019 04:04:58 +0000
-Received: from mail-qk1-x743.google.com ([2607:f8b0:4864:20::743])
+	id 1grayx-00007m-Uj; Thu, 07 Feb 2019 04:08:11 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gravm-0006tL-JW
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 04:04:56 +0000
-Received: by mail-qk1-x743.google.com with SMTP id m17so5721866qki.5
+ id 1grayu-000076-Q9
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 04:08:10 +0000
+Received: by mail-pl1-x644.google.com with SMTP id gn14so4169739plb.10
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 06 Feb 2019 20:04:51 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=lca.pw; s=google;
- h=from:subject:to:cc:message-id:date:user-agent:mime-version
- :content-language:content-transfer-encoding;
- bh=uqDFmLu9eRIl2FkZ8iL2rbGAF9xtpoxPtooDYLXchCs=;
- b=nK9wO4n9hul5JU8GgFYVhCNibSqu8CPms8VeFjFWNeQqvNTmfXf9JESFrxG59YupEe
- K0l2jH2cTExPDh0+4gWTP4L9ZJqpzeKA06RLmYDiRvkzM0/Hd3KP7yRyIlnjWNEUdEse
- OY55oZgBQFn0if+EfbRQ0p8GVLZgGgN2TBsHGdwexzvxz+vIjXgxP0lYdb4bBeCKUwKS
- oDtnCNWlHM1S+M+KAsYzoiVlbVPa8i4DV6zkrlv2RsnCeQE/58LpyOvgh4cnst6jgNA9
- UdQ8iljhl8Rs30CbX3TseIxW7A3782V/YrLusStdCKXKNtER4ao0fyFq767lpmG5wVcg
- NmGA==
+ Wed, 06 Feb 2019 20:08:08 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=Oe6CHy5kVVxLnzuV/JO6wOHCV2blRstih5wPBxrJ8o0=;
+ b=kCsh2wOs8jp8h+ZOJhfvTVfG07C8yWJrNOBx3ZTwwptp6bmL8VoxgOkovzTJEKu6k/
+ /8wjVei/dMPiXtEzT8DddaQUKWAhP/jMgaPfIeeTLvdJ73XXJkuNIqjOMlUl0uiu6L+O
+ R0TM7RmSD5XzDb9YPpRMm0PDJ0PGv3ksbOeoopBG5dzzAZduzm48O8s+cBdUK2i3fxO1
+ L84HQUWc4CExz77UH4M+TtjWJdQuftp6zdNGMNeph0lELyGruDwLifDL0KmTTwcEgzjE
+ PmaowDpLpp/v2L6GVEEZPTE+fGDhXo0sd4p75RlVAi8whyGYjMxEKTlsrRsAokNkyb8n
+ cPCw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:subject:to:cc:message-id:date:user-agent
- :mime-version:content-language:content-transfer-encoding;
- bh=uqDFmLu9eRIl2FkZ8iL2rbGAF9xtpoxPtooDYLXchCs=;
- b=YDDsaigRij0xi0CSFlEa/Dg4A7IIQ1bTiG70y55GCB7letOi9AAtXrvw88VgMVhCSf
- V3vaJrK3jGLH96KGx4+ui49dnrwEH2tGI794i1pn+aRhomo6YXXKdorclD2uNmwknweo
- 7sAF41mzdQFtsi/UVvZOZSPc7zqaY3zZOdOUqepdwdCkp4eHGHJ+bl+gi3g2+Py0W/fY
- baF5t8IlA5/q1MVq44NG/OA570GM8JacPDPFwckOrR964Ojr/hNW3whK1fhlhiCQI/3o
- QO74uAnFlmQWimQFlPK80s4NWW9ko0PuvqaQoHLseiNrMShom43I1/3396AdCRNn9YII
- fbkw==
-X-Gm-Message-State: AHQUAuZkSISElzfSEpWA2NlA+c3y+qp7BWR+l2bW7SZBl+MiHsHUEnjn
- W+kzqFFGQCE8eyXkIzRlTErRsw==
-X-Google-Smtp-Source: AHgI3IaCyqeuRDN8q9M2toLl+/2h6YXJ0F4f/uX5cv8rQLS/UtG939rlqX0VEtLEXDfeNC0vYo4x1Q==
-X-Received: by 2002:a37:498a:: with SMTP id w132mr10349837qka.92.1549512290900; 
- Wed, 06 Feb 2019 20:04:50 -0800 (PST)
-Received: from ovpn-120-150.rdu2.redhat.com
- (pool-71-184-117-43.bstnma.fios.verizon.net. [71.184.117.43])
- by smtp.gmail.com with ESMTPSA id b6sm14515948qtq.29.2019.02.06.20.04.50
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=Oe6CHy5kVVxLnzuV/JO6wOHCV2blRstih5wPBxrJ8o0=;
+ b=HOQdy/2AfLtjNjTQweb6VycYoweGV/M2hl//w1j+AxgQ+X9dmX3e0ZpVAzhlU7cnEU
+ 8QYWtowWLIdhk8Phehu6UgRQoTnyIFWkmTnUroiI+ayj3gUcR7jJR6xUUvz2sMC/zHq/
+ 24ZLvznbjwf98WqHePqynbKiWI4ctQmP4UI7F0NIQn+n8KdPT9LCFq5qbH5HVl89S4v8
+ 98VDwFbdaMd23L84a/vps31PYLAhBrtIPYJQV57Rqh/0hknWwy5zafWfoYZM1A5euTyh
+ 73WYsEsP0Pn8W1OlpNtXdL8YH2kA4AAEfxJ3JF0K+gev/6DbTxk9bHz5FGADut8w6YbS
+ CVBg==
+X-Gm-Message-State: AHQUAuapd+5BRkFLhFaNWTze0+bPJymLJ/uDOSmM1MHGuHQgGcsZSFC8
+ wtWo+2MjrgTBUAlVYZsNYnhw4Q==
+X-Google-Smtp-Source: AHgI3IYBrG4YfPCSVfMNpwUv4aEIummWC8IQbiiR9AFRu4hbiwXG3SfHj8Iv4v/j5MwpXnpOr4xZxQ==
+X-Received: by 2002:a17:902:9a04:: with SMTP id
+ v4mr14668526plp.34.1549512487925; 
+ Wed, 06 Feb 2019 20:08:07 -0800 (PST)
+Received: from localhost ([122.172.102.63])
+ by smtp.gmail.com with ESMTPSA id 125sm10293184pfg.39.2019.02.06.20.08.06
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 06 Feb 2019 20:04:50 -0800 (PST)
-From: Qian Cai <cai@lca.pw>
-Subject: CONFIG_KASAN_SW_TAGS=y NULL pointer dereference at
- freelist_dereference()
-To: Andrey Ryabinin <aryabinin@virtuozzo.com>,
- Alexander Potapenko <glider@google.com>, Dmitry Vyukov <dvyukov@google.com>
-Message-ID: <b1d210ae-3fc9-c77a-4010-40fb74a61727@lca.pw>
-Date: Wed, 6 Feb 2019 23:04:49 -0500
-User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:60.0)
- Gecko/20100101 Thunderbird/60.3.3
+ Wed, 06 Feb 2019 20:08:07 -0800 (PST)
+Date: Thu, 7 Feb 2019 09:38:05 +0530
+From: Viresh Kumar <viresh.kumar@linaro.org>
+To: Matthias Kaehlcke <mka@chromium.org>
+Subject: Re: [PATCH 2/2] cpufreq: mediatek: Register an Energy Model
+Message-ID: <20190207040805.og4t2s5ycuy6hqab@vireshk-i7>
+References: <20190205175225.25923-1-mka@chromium.org>
+ <20190205175225.25923-2-mka@chromium.org>
+ <20190206101316.fr7z4ffr4ck4l4aj@queper01-lin>
+ <20190206181659.GI117604@google.com>
 MIME-Version: 1.0
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20190206181659.GI117604@google.com>
+User-Agent: NeoMutt/20180323-120-3dd1ac
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_200454_689308_E9C2F172 
-X-CRM114-Status: UNSURE (   9.62  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190206_200808_880367_9F442F05 
+X-CRM114-Status: GOOD (  11.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,77 +100,32 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linux-MM <linux-mm@kvack.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>, kasan-dev@googlegroups.com
+Cc: Taniya Das <tdas@codeaurora.org>, Nicolas Boichat <drinkcat@chromium.org>,
+ linux-pm@vger.kernel.org, "Rafael J . Wysocki" <rjw@rjwysocki.net>,
+ linux-kernel@vger.kernel.org, Douglas Anderson <dianders@chromium.org>,
+ Quentin Perret <quentin.perret@arm.com>, CK Hu <ck.hu@mediatek.com>,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ Eddie Huang <eddie.huang@mediatek.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The kernel was compiled by clang-7.0.1 on a ThunderX2 server, and it fails to
-boot. CONFIG_KASAN_GENERIC=y works fine.
+On 06-02-19, 10:16, Matthias Kaehlcke wrote:
+> You are prefectly right, I missed the obvious and didn't get my hands
+> on hardware yet for testing.
+> 
+> So much for screwing up a one-liner ... I'll send a fix.
+> 
+> I thought Viresh already applied the patch, however in opp/linux-next
+> I currently only see the other one of this series for qcom-hw, so it
+> seems sending a new version rather than a fix-up patch is the way to
+> go.
 
-deactivate_slab+0x84/0x6ac:
-freelist_dereference at mm/slub.c:262
-(inlined by) get_freepointer at mm/slub.c:268
-(inlined by) deactivate_slab at mm/slub.c:2056
+Yeah, I dropped it after Quentin reported the issue.
 
-/* Returns the freelist pointer recorded at location ptr_addr. */
-static inline void *freelist_dereference(const struct kmem_cache *s,
-                                         void *ptr_addr)
-{
-        return freelist_ptr(s, (void *)*(unsigned long *)(ptr_addr),
-                            (unsigned long)ptr_addr);
-}
-
-[    0.000000] Memory: 3259968K/100594752K available (15548K kernel code, 12360K
-rwdata, 4096K rodata, 25536K init, 27244K bss, 7444672K reserved, 0K cma-reserved)
-[    0.000000] Unable to handle kernel NULL pointer dereference at virtual
-address 0000000000000078
-[    0.000000] Mem abort info:
-[    0.000000]   ESR = 0x96000005
-[    0.000000]   Exception class = DABT (current EL), IL = 32 bits
-[    0.000000]   SET = 0, FnV = 0
-[    0.000000]   EA = 0, S1PTW = 0
-[    0.000000] Data abort info:
-[    0.000000]   ISV = 0, ISS = 0x00000005
-[    0.000000]   CM = 0, WnR = 0
-[    0.000000] [0000000000000078] user address but active_mm is swapper
-[    0.000000] Internal error: Oops: 96000005 [#1] SMP
-[    0.000000] Modules linked in:
-[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 5.0.0-rc5+ #6
-[    0.000000] pstate: 60000089 (nZCv daIf -PAN -UAO)
-[    0.000000] pc : deactivate_slab+0x84/0x6ac
-[    0.000000] lr : deactivate_slab+0x1cc/0x6ac
-[    0.000000] sp : ffff100012cf7be0
-[    0.000000] x29: ffff100012cf7cc0 x28: ffff1000114e4f00
-[    0.000000] x27: ffff1000114e4f20 x26: ffff1000114e4f08
-[    0.000000] x25: ffff1000114e5078 x24: fb00000000000000
-[    0.000000] x23: ffff7fe002080008 x22: ffff808abb5b72d0
-[    0.000000] x21: ffff7fe002080020 x20: ffff7fe002080028
-[    0.000000] x19: ffff7fe002080000 x18: ffff1000148a5538
-[    0.000000] x17: 000000000000001b x16: 0000000000000000
-[    0.000000] x15: 007ffffffc000201 x14: 04ff80082000fa80
-[    0.000000] x13: 0000000080660002 x12: 0000000080660003
-[    0.000000] x11: 4582a03bdc147ab9 x10: ffff100012d31c90
-[    0.000000] x9 : fb00000000000078 x8 : ffff100012d31c80
-[    0.000000] x7 : cccccccccccccccc x6 : ffff1000105d8db8
-[    0.000000] x5 : 0000000000000000 x4 : 0000000000000000
-[    0.000000] x3 : ffff808abb5b72d0 x2 : 04ff800820000580
-[    0.000000] x1 : ffff7fe002080000 x0 : ffff1000114e4f00
-[    0.000000] Process swapper (pid: 0, stack limit = 0x(____ptrval____))
-[    0.000000] Call trace:
-[    0.000000]  deactivate_slab+0x84/0x6ac
-[    0.000000]  ___slab_alloc+0x648/0x6fc
-[    0.000000]  kmem_cache_alloc_node+0x408/0x538
-[    0.000000]  __kmem_cache_create+0x20c/0x6a8
-[    0.000000]  create_boot_cache+0x68/0xac
-[    0.000000]  kmem_cache_init+0xb0/0x19c
-[    0.000000]  start_kernel+0x4b4/0xac4
-[    0.000000] Code: 14000057 b9400369 f940032b 8b090309 (f940012a)
-[    0.000000] ---[ end trace 54ad7e55e4749a96 ]---
-[    0.000000] Kernel panic - not syncing: Fatal exception
-[    0.000000] ---[ end Kernel panic - not syncing: Fatal exception ]---
+-- 
+viresh
 
 _______________________________________________
 linux-arm-kernel mailing list
