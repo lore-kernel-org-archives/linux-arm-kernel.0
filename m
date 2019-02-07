@@ -2,64 +2,64 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A9E9CC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 10:34:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B4052C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 10:35:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7AF5F2147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 10:34:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8599F2147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 10:35:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t8XfgFwW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7AF5F2147C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NbhzBK+W"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8599F2147C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=syywzYobrPKCCp7y7iZYm+7971kZc/TfWzXXHDF2p5g=; b=t8XfgFwWiK04ga
-	+ZConpI1Wj+86zONUyFtbc6GeCQA/sYhgXD9d5dvGZpt0W8/ivUXy7TKdmGP9Mqn64OD/HBi3+rXN
-	/WBVUX5g+nNz8MfivvJihB4c7FQHSCIUSfhaXU1cntJPVnrynHjsk3SIAo3hr/Py7qcG/Ai4EBlVz
-	woDe5ucMcWcPAXemFbA5AAvbjQAxtRYviLLikyVzAoBJrdltatwmCfqfrKDxjcSd8kP5GYnpXTSes
-	uejKr0lhBFN8YQvVZd2e8BbPvtmWfaYAYM7FfQUpv8/PwjLDWmKSysv6+yo8zRMU7cSWWKTG//jgt
-	ErHVfzY2KOV1Uqwrb6/A==;
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=9YJSTkGDyjsdv30Mf7fJqGN7fnvM/a2qV1EC+tUlJKE=; b=NbhzBK+Wqu0cMO
+	gKfKaCWFqsRTDn0n9jqzAHHvJv9rIkMt7nf3PcF4S6bENkto6JSO0fEnw3TlUgjuv6xXhLcanQz5j
+	jycBkJpaYB0rvvvAZOwOCONA0cJNlNp0ev5K+Uu9lpBIikrsewxpKr7uwMFF2aIasySDQbceuXflK
+	JXKBRMjOcvcvV5dqIUJXFp9iA2FKjz91RQEjJZQv98ZdA/xMCkPBgxnBsaQgyyMVnTkB6UGZEkIYF
+	rK/0cFxB9T6PJFwxDbOoWA2WrD+EDeonH2Do1t/Lw6z67AazjDxo6N39UZFJbH/3BbuZeIvmYKOyB
+	tXeExzMDbCwx1Iq+ILsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grh0N-0004FV-Rw; Thu, 07 Feb 2019 10:34:03 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grh0I-00048k-2z
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 10:34:01 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7B87280D;
- Thu,  7 Feb 2019 02:33:55 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id F10CC3F675;
- Thu,  7 Feb 2019 02:33:52 -0800 (PST)
-Subject: Re: [PATCH v7 2/3] arm64: implement ftrace with regs
-To: Torsten Duwe <duwe@lst.de>
-References: <20190118163736.6A99268CEB@newverein.lst.de>
- <20190118163908.E338E68D93@newverein.lst.de>
- <e206e229-7813-2d37-d5c6-7a9785e311c9@arm.com>
- <20190206150524.GA28892@lst.de>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <198550d8-78d4-6e30-0179-b5e07dd140f8@arm.com>
-Date: Thu, 7 Feb 2019 10:33:50 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <20190206150524.GA28892@lst.de>
-Content-Language: en-US
+	id 1grh2A-0005ub-Fh; Thu, 07 Feb 2019 10:35:54 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1grh25-0005sl-RG
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 10:35:51 +0000
+Received: from lupine.hi.pengutronix.de
+ ([2001:67c:670:100:3ad5:47ff:feaf:1a17] helo=lupine)
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <p.zabel@pengutronix.de>)
+ id 1grh22-0007Wm-9V; Thu, 07 Feb 2019 11:35:46 +0100
+Message-ID: <1549535746.4557.3.camel@pengutronix.de>
+Subject: Re: [PATCH v3] dt-bindings: reset: meson: add g12a bindings
+From: Philipp Zabel <p.zabel@pengutronix.de>
+To: Jerome Brunet <jbrunet@baylibre.com>, Kevin Hilman <khilman@baylibre.com>
+Date: Thu, 07 Feb 2019 11:35:46 +0100
+In-Reply-To: <20190201125003.25022-1-jbrunet@baylibre.com>
+References: <20190201125003.25022-1-jbrunet@baylibre.com>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:3ad5:47ff:feaf:1a17
+X-SA-Exim-Mail-From: p.zabel@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_023358_738363_71A921E4 
-X-CRM114-Status: GOOD (  25.19  )
+X-CRM114-CacheID: sfid-20190207_023550_059204_0AF48772 
+X-CRM114-Status: GOOD (  17.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,91 +71,188 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Arnd Bergmann <arnd@arndb.de>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Steven Rostedt <rostedt@goodmis.org>,
- AKASHI Takahiro <takahiro.akashi@linaro.org>, Ingo Molnar <mingo@redhat.com>,
- Josh Poimboeuf <jpoimboe@redhat.com>,
- Amit Daniel Kachhap <amit.kachhap@arm.com>, live-patching@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, Neil Armstrong <narmstrong@baylibre.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-amlogic@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Jerome,
 
+is there any public documentation for the G12A reset controller?
 
-On 06/02/2019 15:05, Torsten Duwe wrote:
-> On Wed, Feb 06, 2019 at 08:59:44AM +0000, Julien Thierry wrote:
->> Hi Torsten,
->>
->> On 18/01/2019 16:39, Torsten Duwe wrote:
->>
->>> --- a/arch/arm64/kernel/ftrace.c
->>> +++ b/arch/arm64/kernel/ftrace.c
->>> @@ -133,17 +163,45 @@ int ftrace_make_call(struct dyn_ftrace *
->>>  	return ftrace_modify_code(pc, old, new, true);
->>>  }
->>>  
->>> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
->>> +int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
->>> +			unsigned long addr)
->>> +{
->>> +	unsigned long pc = rec->ip + REC_IP_BRANCH_OFFSET;
->>> +	u32 old, new;
->>> +
->>> +	old = aarch64_insn_gen_branch_imm(pc, old_addr, true);
->>> +	new = aarch64_insn_gen_branch_imm(pc, addr, true);
->>> +
->>> +	return ftrace_modify_code(pc, old, new, true);
->>> +}
->>> +#endif
->>> +
->>>  /*
->>>   * Turn off the call to ftrace_caller() in instrumented function
->>>   */
->>>  int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
->>>  		    unsigned long addr)
->>>  {
->>> -	unsigned long pc = rec->ip;
->>> +	unsigned long pc = rec->ip + REC_IP_BRANCH_OFFSET;
->>
->> Sorry to come back on this patch again, but I was looking at the ftrace
->> code a bit, and I see that when processing the ftrace call locations,
->> ftrace calls ftrace_call_adjust() on every ip registered as mcount
->> caller (or in our case patchable entries). This ftrace_call_adjust() is
->> arch specific, so I was thinking we could place the offset in here once
->> and for all so we don't have to worry about it in the future.
+On Fri, 2019-02-01 at 13:50 +0100, Jerome Brunet wrote:
+> Add device tree bindings for the reset controller of g12a SoC family.
 > 
-> Now that you mention it - yes indeed that's the correct facility to fix
-> the deviating address, as Steve has also confirmed. I had totally forgotten
-> about this hook.
+> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
 > 
->> Also, I'm unsure whether it would be safe, but we could patch the "mov
->> x9, lr" there as well. In theory, this would be called at init time
->> (before secondary CPUs are brought up) and when loading a module (so I'd
->> expect no-one is executing that code *yet*.
->>
->> If this is possible, I think it would make things a bit cleaner.
+> Changes since v2 [0]:
+> * Dropped useless g12a compatible
+
+What if in the future somebody notices that a g12a specific workaround
+needs to be added to the driver? I agree that we don't have to list all
+compatibles in the driver, but unless you are certain that the reset
+controller is identical to the one from another SoC, it would be better
+to have a SoC specific compatible in the device tree, even if the driver
+only matches to a more generic compatible. For example:
+
+	compatible = "amlogic,meson-g12a-reset", "amlogic,meson8b-reset";
+
+if the reset controller behaves identical to the one in meson8b.
+
+> [0]: https://lkml.kernel.org/r/20190128181316.30814-1-jbrunet@baylibre.com
 > 
-> This is in fact very tempting, but it will introduce a nasty side effect
-> to ftrace_call_adjust. Is there any obvious documentation that specifies
-> guarantees about ftrace_call_adjust being called exactly once for each site?
+>  .../reset/amlogic,meson-g12a-reset.h          | 134 ++++++++++++++++++
+>  1 file changed, 134 insertions(+)
+>  create mode 100644 include/dt-bindings/reset/amlogic,meson-g12a-reset.h
 > 
+> diff --git a/include/dt-bindings/reset/amlogic,meson-g12a-reset.h b/include/dt-bindings/reset/amlogic,meson-g12a-reset.h
+> new file mode 100644
+> index 000000000000..8063e8314eef
+> --- /dev/null
+> +++ b/include/dt-bindings/reset/amlogic,meson-g12a-reset.h
+> @@ -0,0 +1,134 @@
+> +/* SPDX-License-Identifier: GPL-2.0+ OR BSD-3-Clause */
+> +/*
+> + * Copyright (c) 2019 BayLibre, SAS.
+> + * Author: Jerome Brunet <jbrunet@baylibre.com>
+> + *
+> + */
+> +
+> +#ifndef _DT_BINDINGS_AMLOGIC_MESON_G12A_RESET_H
+> +#define _DT_BINDINGS_AMLOGIC_MESON_G12A_RESET_H
+> +
+> +/*	RESET0					*/
+> +#define RESET_HIU			0
+> +/*					1	*/
+> +#define RESET_DOS			2
+> +/*					3-4	*/
+> +#define RESET_VIU			5
+> +#define RESET_AFIFO			6
+> +#define RESET_VID_PLL_DIV		7
+> +/*					8-9	*/
+> +#define RESET_VENC			10
+> +#define RESET_ASSIST			11
+> +#define RESET_PCIE_CTRL_A		12
+> +#define RESET_VCBUS			13
+> +#define RESET_PCIE_PHY			14
+> +#define RESET_PCIE_APB			15
+> +#define RESET_GIC			16
+> +#define RESET_CAPB3_DECODE		17
+> +/*					18	*/
+> +#define RESET_HDMITX_CAPB3		19
+> +#define RESET_DVALIN_CAPB3		20
+> +#define RESET_DOS_CAPB3			21
+> +/*					22	*/
+> +#define RESET_CBUS_CAPB3		23
+> +#define RESET_AHB_CNTL			24
+> +#define RESET_AHB_DATA			25
+> +#define RESET_VCBUS_CLK81		26
+> +/*					27-31	*/
+> +/*	RESET1					*/
+> +/*					32	*/
+> +#define RESET_DEMUX			33
+> +#define RESET_USB			34
+> +#define RESET_DDR			35
+> +/*					36	*/
+> +#define RESET_BT656			37
+> +#define RESET_AHB_SRAM			38
+> +/*					39	*/
+> +#define RESET_PARSER			40
+> +/*					41	*/
+> +#define RESET_ISA			42
+> +#define RESET_ETHERNET			43
+> +#define RESET_SD_EMMC_A			44
+> +#define RESET_SD_EMMC_B			45
+> +#define RESET_SD_EMMC_C			46
+> +/*					47-60 */
+> +#define RESET_AUDIO_CODEC		61
+> +/*					62-63	*/
+> +/*	RESET2					*/
+> +/*					64	*/
+> +#define RESET_AUDIO			65
+> +#define RESET_HDMITX_PHY		66
+> +/*					67	*/
+> +#define RESET_MIPI_DSI_HOST		68
+> +#define RESET_ALOCKER			69
+> +#define RESET_GE2D			70
+> +#define RESET_PARSER_REG		71
+> +#define RESET_PARSER_FETCH		72
+> +#define RESET_CTL			73
+> +#define RESET_PARSER_TOP		74
+> +/*					75-77	*/
+> +#define RESET_DVALIN			78
+> +#define RESET_HDMITX			79
+> +/*					80-95	*/
+> +/*	RESET3					*/
+> +/*					96-95	*/
+> +#define RESET_DEMUX_TOP			105
+> +#define RESET_DEMUX_DES_PL		106
+> +#define RESET_DEMUX_S2P_0		107
+> +#define RESET_DEMUX_S2P_1		108
+> +#define RESET_DEMUX_0			109
+> +#define RESET_DEMUX_1			110
+> +#define RESET_DEMUX_2			111
+> +/*					112-127	*/
+> +/*	RESET4					*/
+> +/*					128-129	*/
+> +#define RESET_MIPI_DSI_PHY		130
+> +/*					131-132	*/
+> +#define RESET_RDMA			133
+> +#define RESET_VENCI			134
+> +#define RESET_VENCP			135
+> +/*					136	*/
+> +#define RESET_VDAC			137
+> +/*					138-139 */
+> +#define RESET_VDI6			140
+> +#define RESET_VENCL			141
+> +#define RESET_I2C_M1			142
+> +#define RESET_I2C_M2			143
+> +/*					144-159	*/
+> +/*	RESET5					*/
+> +/*					160-191	*/
+> +/*	RESET6					*/
+> +#define RESET_GEN			192
+> +#define RESET_SPICC0			193
+> +#define RESET_SC			194
+> +#define RESET_SANA_3			195
+> +#define RESET_I2C_M0			196
+> +#define RESET_TS_PLL			197
+> +#define RESET_SPICC1			198
+> +#define RESET_STREAM			199
+> +#define RESET_TS_CPU			200
+> +#define RESET_UART0			201
+> +#define RESET_UART1_2			202
+> +#define RESET_ASYNC0			203
+> +#define RESET_ASYNC1			204
+> +#define RESET_SPIFC0			205
+> +#define RESET_I2C_M3			206
+> +/*					207-223	*/
+> +/*	RESET7					*/
+> +#define RESET_USB_DDR_0			224
+> +#define RESET_USB_DDR_1			225
+> +#define RESET_USB_DDR_2			226
+> +#define RESET_USB_DDR_3			227
+> +#define RESET_TS_GPU			228
+> +#define RESET_DEVICE_MMC_ARB		229
+> +#define RESET_DVALIN_DMC_PIPL		230
+> +#define RESET_VID_LOCK			231
+> +#define RESET_NIC_DMC_PIPL		232
+> +#define RESET_DMC_VPU_PIPL		233
+> +#define RESET_GE2D_DMC_PIPL		234
+> +#define RESET_HCODEC_DMC_PIPL		235
+> +#define RESET_WAVE420_DMC_PIPL		236
+> +#define RESET_HEVCF_DMC_PIPL		237
+> +/*					238-255	*/
+> +
+> +#endif
 
-I don't see really much documentation on that function. As far as I can
-tell it is only called once for each site (and if it didn't, we'd always
-be placing the same instruction, but I agree it wouldn't be nice). It
-could depend on how far you can expand the notion of "adjusting" :) .
-
-Steven, do you have an opinion on whether it would be acceptable to
-modify function entry code in ftrace_call_adjust() ?
-
-Thanks,
-
--- 
-Julien Thierry
+regards
+Philipp
 
 _______________________________________________
 linux-arm-kernel mailing list
