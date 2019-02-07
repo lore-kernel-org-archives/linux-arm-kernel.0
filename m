@@ -2,82 +2,64 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1A548C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 19:37:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 03F97C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 19:37:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C47812175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 19:37:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C101321872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 19:37:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="becNpHdW";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="FCp5w0cT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C47812175B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JCAeufeB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C101321872
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=glider.be
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=dT9nHvYCYGdihHp9qgiK1uA1fOljN/uL/jrQ+UU5Aro=; b=becNpHdW5nhpYxdDPjhwqTIJGe
-	gudQjKG6KrsVy5ZT44HA2jHeClAcAx/x2ovRMrdtfBN7IKcc2u6rhg+lcZL+fLFGLTKILTwVw/Uck
-	UyxtRYlv6aaW10tIGY42SRSrLbgLs3wIaAuWx3KJWtRGjT/i+QkiGmrfb8BgBG6yfkm2wlAJyYWaB
-	kOxpqzs52t86VDuheEBxwuunwoRl8FXTR4z0PMju+Rlw7tzHp99rUpJh1KaYJPXPtvwq0QYVzbe0y
-	Chso9sd+ILs8u9t+B9lGXqp1YfR+Qlrcj6lKMHcBoh0DfSAUXMfUnVjWqvTgzyDODVVfjo0GcDucR
-	XArPMJrg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=1PJhjOPQFAZW0ZlbT4+isyQawB/w5qRgOlAWttqcCgk=; b=JCAeufeBmke3Qu
+	154WjdniC/z1J+fk94uotu6JA3oepdIOB0YcZginCfh1XRn5FsqoXNd3Hj+RWLPu0DJl0UU1CpH8b
+	+pq6nX/rY00ZkgWQK4Mj1LlfuaXz24sX+j9rsSfFI9uv76XVqZzA4BxHmS51nr96nm76Adz5djZ+i
+	vPRrPHM6YipWiPmNZ6nG8YJ/oxYvfkxbgNjvhTra473hGx//ItTdbX4QGk0FuYGQBlL4KVz6LVA5E
+	o7ydxZPeayM/cyeI+phukDj9lKSOLWxjQvZNB7Y3GGmjRpEiPvlt77BfzpVOQ8xAZzJ9G9qIGfv2Q
+	MW/QpXOIycdQywkfTh/w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grpUA-0007zP-NL; Thu, 07 Feb 2019 19:37:22 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1grpUN-000895-AO; Thu, 07 Feb 2019 19:37:35 +0000
+Received: from andre.telenet-ops.be ([2a02:1800:120:4::f00:15])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grpIx-0002ep-O9
- for linux-arm-kernel@bombadil.infradead.org; Thu, 07 Feb 2019 19:25:48 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=References:In-Reply-To:Message-Id:Date:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=se01WzHagutFFKrIL7FhtPtRHoOV8J9OFVM5LZ6uizo=; b=FCp5w0cTDK7ow/3kDBViJRKxI
- 4ty+CxQuMfdfiJfIO+ranx+gIp6YmGes3alBpchUp5t3EJkagPpwQXNCmlqle0Zuc1B35r8PrK1BV
- AE67cysAyTF7uvAARHcGhxal2yieiV/6sUjJDlz84KrgBlbk9Qdye3Mv7MLBV9ILlvHlloqJw1Gmw
- UptXYl55Fv6xd5K/ZcEOHqAtV7GnBn8nrFM1evH2jJWjiLo2RTe4s1WmjDHoQLxRiy2GWBtPHag6a
- dVDiZ8DS0v6B2hRtaZFwdTlR9A3Tx9ArSRuPGxo90AEg+z3QwRuJRm+qf0SFbekG/u6W0KEfDbmG1
- 8peeHmUfA==;
-Received: from mx1.redhat.com ([209.132.183.28])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grp3P-0004dZ-ME
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 19:09:46 +0000
-Received: from smtp.corp.redhat.com (int-mx02.intmail.prod.int.phx2.redhat.com
- [10.5.11.12])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
- (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 23BC97F3EA;
- Thu,  7 Feb 2019 19:09:42 +0000 (UTC)
-Received: from llong.com (dhcp-17-35.bos.redhat.com [10.18.17.35])
- by smtp.corp.redhat.com (Postfix) with ESMTP id 3E97E1693B;
- Thu,  7 Feb 2019 19:09:36 +0000 (UTC)
-From: Waiman Long <longman@redhat.com>
-To: Peter Zijlstra <peterz@infradead.org>, Ingo Molnar <mingo@redhat.com>,
- Will Deacon <will.deacon@arm.com>, Thomas Gleixner <tglx@linutronix.de>
-Subject: [PATCH-tip 11/22] locking/rwsem: Implement a new locking scheme
-Date: Thu,  7 Feb 2019 14:07:15 -0500
-Message-Id: <1549566446-27967-12-git-send-email-longman@redhat.com>
-In-Reply-To: <1549566446-27967-1-git-send-email-longman@redhat.com>
-References: <1549566446-27967-1-git-send-email-longman@redhat.com>
-X-Scanned-By: MIMEDefang 2.79 on 10.5.11.12
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.25]); Thu, 07 Feb 2019 19:09:42 +0000 (UTC)
+ id 1grpU8-0007wi-Ia
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 19:37:33 +0000
+Received: from ramsan ([84.194.111.163]) by andre.telenet-ops.be with bizsmtp
+ id ZvdB1z0043XaVaC01vdBiQ; Thu, 07 Feb 2019 20:37:13 +0100
+Received: from rox.of.borg ([192.168.97.57]) by ramsan with esmtp (Exim 4.90_1)
+ (envelope-from <geert@linux-m68k.org>)
+ id 1grpTz-0001g3-4Q; Thu, 07 Feb 2019 20:37:11 +0100
+Received: from geert by rox.of.borg with local (Exim 4.90_1)
+ (envelope-from <geert@linux-m68k.org>)
+ id 1grpTz-0004lC-1h; Thu, 07 Feb 2019 20:37:11 +0100
+From: Geert Uytterhoeven <geert+renesas@glider.be>
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Robin Murphy <robin.murphy@arm.com>, Christoph Hellwig <hch@lst.de>,
+ Marek Szyprowski <m.szyprowski@samsung.com>,
+ Joerg Roedel <joro@8bytes.org>, "Rafael J . Wysocki" <rafael@kernel.org>
+Subject: [PATCH/RFC] driver core: Postpone DMA tear-down until after devres
+ release
+Date: Thu,  7 Feb 2019 20:36:53 +0100
+Message-Id: <20190207193653.18221-1-geert+renesas@glider.be>
+X-Mailer: git-send-email 2.17.1
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_190944_000615_1632C6BB 
-X-CRM114-Status: GOOD (  45.18  )
+X-CRM114-CacheID: sfid-20190207_113720_777711_B96531D6 
+X-CRM114-Status: GOOD (  16.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,541 +71,159 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, linux-xtensa@linux-xtensa.org,
- Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
- Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
- linux-sh@vger.kernel.org, linux-hexagon@vger.kernel.org, x86@kernel.org,
- "H. Peter Anvin" <hpa@zytor.com>, linux-kernel@vger.kernel.org,
- Linus Torvalds <torvalds@linux-foundation.org>, Borislav Petkov <bp@alien8.de>,
- linux-alpha@vger.kernel.org, sparclinux@vger.kernel.org,
- Waiman Long <longman@redhat.com>, Andrew Morton <akpm@linux-foundation.org>,
- linuxppc-dev@lists.ozlabs.org, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-renesas-soc@vger.kernel.org, iommu@lists.linux-foundation.org,
+ Geert Uytterhoeven <geert+renesas@glider.be>, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The current way of using various reader, writer and waiting biases
-in the rwsem code are confusing and hard to understand. I have to
-reread the rwsem count guide in the rwsem-xadd.c file from time to
-time to remind myself how this whole thing works. It also makes the
-rwsem code harder to be optimized.
-
-To make rwsem more sane, a new locking scheme similar to the one in
-qrwlock is now being used.  The count is now a 32-bit atomic value
-in all architectures. The current bit definitions are:
-
-  Bit  0   - writer locked bit
-  Bit  1   - waiters present bit
-  Bits 2-7 - reserved for future extension
-  Bits 8-X - reader count (24/56 bits)
-
-Now the cmpxchg instruction is used to acquire the write lock. The
-read lock is still acquired with xadd instruction, so there is no
-change here.  This scheme will allow up to 16M active readers which
-should be more than enough. We can always use some more reserved bits
-if necessary.
-
-With that change, we can deterministically know if a rwsem has been
-write-locked. Looking at the count alone, however, one cannot determine
-for certain if a rwsem is owned by readers or not as the readers that
-set the reader count bits may be in the process of backing out. So we
-still need the reader-owned bit in the owner field to be sure.
-
-With a locking microbenchmark running on 5.0 based kernel, the total
-locking rates (in kops/s) of the benchmark on a 4-socket 56-core
-x86-64 system before and after the patch were as follows:
-
-                  Before Patch      After Patch
-   # of Threads  wlock    rlock    wlock    rlock
-   ------------  -----    -----    -----    -----
-        1        28,773   30,164   29,063   29,967
-        2         7,435   15,167    6,746   13,198
-        4         7,181   14,438    6,515   12,763
-        8         6,918   13,796    6,747   13,419
-       16         6,554   16,030    6,653   15,534
-
-The locking rates of the benchmark on a Power9 system were as follows:
-
-                  Before Patch      After Patch
-   # of Threads  wlock    rlock    wlock    rlock
-   ------------  -----    -----    -----    -----
-        1        11,527   12,378   11,527   12,195
-        2         6,318   15,116    7,690   15,065
-        4         3,957   16,812    4,495   16,884
-        8         3,617   16,496    3,993   16,588
-
-The locking rates of the benchmark on a 2-socket ARM64 system were
-as follows:
-
-                  Before Patch      After Patch
-   # of Threads  wlock    rlock    wlock    rlock
-   ------------  -----    -----    -----    -----
-        1        23,703   23,208   23,923   23,167
-        2         6,206   11,996    6,756   13,268
-        4         6,098   12,343    6,928   15,064
-        8         6,007   13,152    7,117   15,335
-
-For x86, the locking rate dropped somewhat at low contention level with
-the patch.  At high contention level, however, the performance recovered.
-For both Power9 and ARM64, the patch caused no performance drop. In fact,
-it improved a little bit after the patch.
-
-Signed-off-by: Waiman Long <longman@redhat.com>
----
- kernel/locking/rwsem-xadd.c | 145 +++++++++++++++-----------------------------
- kernel/locking/rwsem-xadd.h |  85 +++++++++++++-------------
- 2 files changed, 89 insertions(+), 141 deletions(-)
-
-diff --git a/kernel/locking/rwsem-xadd.c b/kernel/locking/rwsem-xadd.c
-index fff231a..18a414e 100644
---- a/kernel/locking/rwsem-xadd.c
-+++ b/kernel/locking/rwsem-xadd.c
-@@ -9,6 +9,8 @@
-  *
-  * Optimistic spinning by Tim Chen <tim.c.chen@intel.com>
-  * and Davidlohr Bueso <davidlohr@hp.com>. Based on mutexes.
-+ *
-+ * Rwsem count bit fields re-definition by Waiman Long <longman@redhat.com>.
-  */
- #include <linux/rwsem.h>
- #include <linux/init.h>
-@@ -23,52 +25,20 @@
- #include "lock_events.h"
- 
- /*
-- * Guide to the rw_semaphore's count field for common values.
-- * (32-bit case illustrated, similar for 64-bit)
-- *
-- * 0x0000000X	(1) X readers active or attempting lock, no writer waiting
-- *		    X = #active_readers + #readers attempting to lock
-- *		    (X*ACTIVE_BIAS)
-- *
-- * 0x00000000	rwsem is unlocked, and no one is waiting for the lock or
-- *		attempting to read lock or write lock.
-- *
-- * 0xffff000X	(1) X readers active or attempting lock, with waiters for lock
-- *		    X = #active readers + # readers attempting lock
-- *		    (X*ACTIVE_BIAS + WAITING_BIAS)
-- *		(2) 1 writer attempting lock, no waiters for lock
-- *		    X-1 = #active readers + #readers attempting lock
-- *		    ((X-1)*ACTIVE_BIAS + ACTIVE_WRITE_BIAS)
-- *		(3) 1 writer active, no waiters for lock
-- *		    X-1 = #active readers + #readers attempting lock
-- *		    ((X-1)*ACTIVE_BIAS + ACTIVE_WRITE_BIAS)
-- *
-- * 0xffff0001	(1) 1 reader active or attempting lock, waiters for lock
-- *		    (WAITING_BIAS + ACTIVE_BIAS)
-- *		(2) 1 writer active or attempting lock, no waiters for lock
-- *		    (ACTIVE_WRITE_BIAS)
-+ * Guide to the rw_semaphore's count field.
-  *
-- * 0xffff0000	(1) There are writers or readers queued but none active
-- *		    or in the process of attempting lock.
-- *		    (WAITING_BIAS)
-- *		Note: writer can attempt to steal lock for this count by adding
-- *		ACTIVE_WRITE_BIAS in cmpxchg and checking the old count
-+ * When the RWSEM_WRITER_LOCKED bit in count is set, the lock is owned
-+ * by a writer.
-  *
-- * 0xfffe0001	(1) 1 writer active, or attempting lock. Waiters on queue.
-- *		    (ACTIVE_WRITE_BIAS + WAITING_BIAS)
-- *
-- * Note: Readers attempt to lock by adding ACTIVE_BIAS in down_read and checking
-- *	 the count becomes more than 0 for successful lock acquisition,
-- *	 i.e. the case where there are only readers or nobody has lock.
-- *	 (1st and 2nd case above).
-- *
-- *	 Writers attempt to lock by adding ACTIVE_WRITE_BIAS in down_write and
-- *	 checking the count becomes ACTIVE_WRITE_BIAS for successful lock
-- *	 acquisition (i.e. nobody else has lock or attempts lock).  If
-- *	 unsuccessful, in rwsem_down_write_failed, we'll check to see if there
-- *	 are only waiters but none active (5th case above), and attempt to
-- *	 steal the lock.
-+ * The lock is owned by readers when
-+ * (1) the RWSEM_WRITER_LOCKED isn't set in count,
-+ * (2) some of the reader bits are set in count, and
-+ * (3) the owner field has RWSEM_READ_OWNED bit set.
-  *
-+ * Having some reader bits set is not enough to guarantee a readers owned
-+ * lock as the readers may be in the process of backing out from the count
-+ * and a writer has just released the lock. So another writer may steal
-+ * the lock immediately after that.
-  */
- 
- /*
-@@ -114,9 +84,8 @@ enum rwsem_wake_type {
- 
- /*
-  * handle the lock release when processes blocked on it that can now run
-- * - if we come here from up_xxxx(), then:
-- *   - the 'active part' of count (&0x0000ffff) reached 0 (but may have changed)
-- *   - the 'waiting part' of count (&0xffff0000) is -ve (and will still be so)
-+ * - if we come here from up_xxxx(), then the RWSEM_FLAG_WAITERS bit must
-+ *   have been set.
-  * - there must be someone on the queue
-  * - the wait_lock must be held by the caller
-  * - tasks are marked for wakeup, the caller must later invoke wake_up_q()
-@@ -160,22 +129,11 @@ static void __rwsem_mark_wake(struct rw_semaphore *sem,
- 	 * so we can bail out early if a writer stole the lock.
- 	 */
- 	if (wake_type != RWSEM_WAKE_READ_OWNED) {
--		adjustment = RWSEM_ACTIVE_READ_BIAS;
-- try_reader_grant:
-+		adjustment = RWSEM_READER_BIAS;
- 		oldcount = atomic_long_fetch_add(adjustment, &sem->count);
--		if (unlikely(oldcount < RWSEM_WAITING_BIAS)) {
--			/*
--			 * If the count is still less than RWSEM_WAITING_BIAS
--			 * after removing the adjustment, it is assumed that
--			 * a writer has stolen the lock. We have to undo our
--			 * reader grant.
--			 */
--			if (atomic_long_add_return(-adjustment, &sem->count) <
--			    RWSEM_WAITING_BIAS)
--				return;
--
--			/* Last active locker left. Retry waking readers. */
--			goto try_reader_grant;
-+		if (unlikely(oldcount & RWSEM_WRITER_MASK)) {
-+			atomic_long_sub(adjustment, &sem->count);
-+			return;
- 		}
- 		/*
- 		 * Set it to reader-owned to give spinners an early
-@@ -215,11 +173,11 @@ static void __rwsem_mark_wake(struct rw_semaphore *sem,
- 		wake_q_add_safe(wake_q, tsk);
- 	}
- 
--	adjustment = woken * RWSEM_ACTIVE_READ_BIAS - adjustment;
-+	adjustment = woken * RWSEM_READER_BIAS - adjustment;
- 	lockevent_cond_inc(rwsem_wake_reader, woken);
- 	if (list_empty(&sem->wait_list)) {
- 		/* hit end of list above */
--		adjustment -= RWSEM_WAITING_BIAS;
-+		adjustment -= RWSEM_FLAG_WAITERS;
- 	}
- 
- 	if (adjustment)
-@@ -233,22 +191,15 @@ static void __rwsem_mark_wake(struct rw_semaphore *sem,
-  */
- static inline bool rwsem_try_write_lock(long count, struct rw_semaphore *sem)
- {
--	/*
--	 * Avoid trying to acquire write lock if count isn't RWSEM_WAITING_BIAS.
--	 */
--	if (count != RWSEM_WAITING_BIAS)
-+	long new;
-+
-+	if (RWSEM_COUNT_LOCKED(count))
- 		return false;
- 
--	/*
--	 * Acquire the lock by trying to set it to ACTIVE_WRITE_BIAS. If there
--	 * are other tasks on the wait list, we need to add on WAITING_BIAS.
--	 */
--	count = list_is_singular(&sem->wait_list) ?
--			RWSEM_ACTIVE_WRITE_BIAS :
--			RWSEM_ACTIVE_WRITE_BIAS + RWSEM_WAITING_BIAS;
-+	new = count + RWSEM_WRITER_LOCKED -
-+	     (list_is_singular(&sem->wait_list) ? RWSEM_FLAG_WAITERS : 0);
- 
--	if (atomic_long_cmpxchg_acquire(&sem->count, RWSEM_WAITING_BIAS, count)
--							== RWSEM_WAITING_BIAS) {
-+	if (atomic_long_cmpxchg_acquire(&sem->count, count, new) == count) {
- 		rwsem_set_owner(sem);
- 		return true;
- 	}
-@@ -265,11 +216,11 @@ static inline bool rwsem_try_write_lock_unqueued(struct rw_semaphore *sem)
- 	long old, count = atomic_long_read(&sem->count);
- 
- 	while (true) {
--		if (!(count == 0 || count == RWSEM_WAITING_BIAS))
-+		if (RWSEM_COUNT_LOCKED(count))
- 			return false;
- 
- 		old = atomic_long_cmpxchg_acquire(&sem->count, count,
--				      count + RWSEM_ACTIVE_WRITE_BIAS);
-+				count + RWSEM_WRITER_LOCKED);
- 		if (old == count) {
- 			rwsem_set_owner(sem);
- 			lockevent_inc(rwsem_opt_wlock);
-@@ -428,7 +379,7 @@ static inline bool rwsem_has_spinner(struct rw_semaphore *sem)
- static inline struct rw_semaphore __sched *
- __rwsem_down_read_failed_common(struct rw_semaphore *sem, int state)
- {
--	long count, adjustment = -RWSEM_ACTIVE_READ_BIAS;
-+	long count, adjustment = -RWSEM_READER_BIAS;
- 	struct rwsem_waiter waiter;
- 	DEFINE_WAKE_Q(wake_q);
- 
-@@ -440,16 +391,16 @@ static inline bool rwsem_has_spinner(struct rw_semaphore *sem)
- 		/*
- 		 * In case the wait queue is empty and the lock isn't owned
- 		 * by a writer, this reader can exit the slowpath and return
--		 * immediately as its RWSEM_ACTIVE_READ_BIAS has already
--		 * been set in the count.
-+		 * immediately as its RWSEM_READER_BIAS has already been
-+		 * set in the count.
- 		 */
--		if (atomic_long_read(&sem->count) >= 0) {
-+		if (!(atomic_long_read(&sem->count) & RWSEM_WRITER_MASK)) {
- 			raw_spin_unlock_irq(&sem->wait_lock);
- 			rwsem_set_reader_owned(sem);
- 			lockevent_inc(rwsem_rlock_fast);
- 			return sem;
- 		}
--		adjustment += RWSEM_WAITING_BIAS;
-+		adjustment += RWSEM_FLAG_WAITERS;
- 	}
- 	list_add_tail(&waiter.list, &sem->wait_list);
- 
-@@ -462,9 +413,8 @@ static inline bool rwsem_has_spinner(struct rw_semaphore *sem)
- 	 * If there are no writers and we are first in the queue,
- 	 * wake our own waiter to join the existing active readers !
- 	 */
--	if (count == RWSEM_WAITING_BIAS ||
--	    (count > RWSEM_WAITING_BIAS &&
--	     adjustment != -RWSEM_ACTIVE_READ_BIAS))
-+	if (!RWSEM_COUNT_LOCKED(count) ||
-+	   (!(count & RWSEM_WRITER_MASK) && (adjustment & RWSEM_FLAG_WAITERS)))
- 		__rwsem_mark_wake(sem, RWSEM_WAKE_ANY, &wake_q);
- 
- 	raw_spin_unlock_irq(&sem->wait_lock);
-@@ -492,7 +442,7 @@ static inline bool rwsem_has_spinner(struct rw_semaphore *sem)
- out_nolock:
- 	list_del(&waiter.list);
- 	if (list_empty(&sem->wait_list))
--		atomic_long_add(-RWSEM_WAITING_BIAS, &sem->count);
-+		atomic_long_add(-RWSEM_FLAG_WAITERS, &sem->count);
- 	raw_spin_unlock_irq(&sem->wait_lock);
- 	__set_current_state(TASK_RUNNING);
- 	lockevent_inc(rwsem_rlock_fail);
-@@ -525,9 +475,6 @@ static inline bool rwsem_has_spinner(struct rw_semaphore *sem)
- 	struct rw_semaphore *ret = sem;
- 	DEFINE_WAKE_Q(wake_q);
- 
--	/* undo write bias from down_write operation, stop active locking */
--	count = atomic_long_sub_return(RWSEM_ACTIVE_WRITE_BIAS, &sem->count);
--
- 	/* do optimistic spinning and steal lock if possible */
- 	if (rwsem_optimistic_spin(sem))
- 		return sem;
-@@ -553,10 +500,12 @@ static inline bool rwsem_has_spinner(struct rw_semaphore *sem)
- 
- 		/*
- 		 * If there were already threads queued before us and there are
--		 * no active writers, the lock must be read owned; so we try to
--		 * wake any read locks that were queued ahead of us.
-+		 * no active writers and some readers, the lock must be read
-+		 * owned; so we try to  any read locks that were queued ahead
-+		 * of us.
- 		 */
--		if (count > RWSEM_WAITING_BIAS) {
-+		if (!(count & RWSEM_WRITER_MASK) &&
-+		     (count & RWSEM_READER_MASK)) {
- 			__rwsem_mark_wake(sem, RWSEM_WAKE_READERS, &wake_q);
- 			/*
- 			 * The wakeup is normally called _after_ the wait_lock
-@@ -573,8 +522,9 @@ static inline bool rwsem_has_spinner(struct rw_semaphore *sem)
- 			wake_q_init(&wake_q);
- 		}
- 
--	} else
--		count = atomic_long_add_return(RWSEM_WAITING_BIAS, &sem->count);
-+	} else {
-+		count = atomic_long_add_return(RWSEM_FLAG_WAITERS, &sem->count);
-+	}
- 
- 	/* wait until we successfully acquire the lock */
- 	set_current_state(state);
-@@ -591,7 +541,8 @@ static inline bool rwsem_has_spinner(struct rw_semaphore *sem)
- 			schedule();
- 			lockevent_inc(rwsem_sleep_writer);
- 			set_current_state(state);
--		} while ((count = atomic_long_read(&sem->count)) & RWSEM_ACTIVE_MASK);
-+			count = atomic_long_read(&sem->count);
-+		} while (RWSEM_COUNT_LOCKED(count));
- 
- 		raw_spin_lock_irq(&sem->wait_lock);
- 	}
-@@ -607,7 +558,7 @@ static inline bool rwsem_has_spinner(struct rw_semaphore *sem)
- 	raw_spin_lock_irq(&sem->wait_lock);
- 	list_del(&waiter.list);
- 	if (list_empty(&sem->wait_list))
--		atomic_long_add(-RWSEM_WAITING_BIAS, &sem->count);
-+		atomic_long_add(-RWSEM_FLAG_WAITERS, &sem->count);
- 	else
- 		__rwsem_mark_wake(sem, RWSEM_WAKE_ANY, &wake_q);
- 	raw_spin_unlock_irq(&sem->wait_lock);
-diff --git a/kernel/locking/rwsem-xadd.h b/kernel/locking/rwsem-xadd.h
-index 6d2478c..1febd17 100644
---- a/kernel/locking/rwsem-xadd.h
-+++ b/kernel/locking/rwsem-xadd.h
-@@ -37,24 +37,26 @@
- #endif
- 
- /*
-- * R/W semaphores originally for PPC using the stuff in lib/rwsem.c.
-- * Adapted largely from include/asm-i386/rwsem.h
-- * by Paul Mackerras <paulus@samba.org>.
-- */
--
--/*
-- * the semaphore definition
-+ * The definition of the atomic counter in the semaphore:
-+ *
-+ * Bit  0   - writer locked bit
-+ * Bit  1   - waiters present bit
-+ * Bits 2-7 - reserved
-+ * Bits 8-X - 24-bit (32-bit) or 56-bit reader count
-+ *
-+ * atomic_long_fetch_add() is used to obtain reader lock, whereas
-+ * atomic_long_cmpxchg() will be used to obtain writer lock.
-  */
--#ifdef CONFIG_64BIT
--# define RWSEM_ACTIVE_MASK		0xffffffffL
--#else
--# define RWSEM_ACTIVE_MASK		0x0000ffffL
--#endif
-+#define RWSEM_WRITER_LOCKED	(1UL << 0)
-+#define RWSEM_FLAG_WAITERS	(1UL << 1)
-+#define RWSEM_READER_SHIFT	8
-+#define RWSEM_READER_BIAS	(1UL << RWSEM_READER_SHIFT)
-+#define RWSEM_READER_MASK	(~(RWSEM_READER_BIAS - 1))
-+#define RWSEM_WRITER_MASK	RWSEM_WRITER_LOCKED
-+#define RWSEM_LOCK_MASK		(RWSEM_WRITER_MASK|RWSEM_READER_MASK)
-+#define RWSEM_READ_FAILED_MASK	(RWSEM_WRITER_MASK|RWSEM_FLAG_WAITERS)
- 
--#define RWSEM_ACTIVE_BIAS		0x00000001L
--#define RWSEM_WAITING_BIAS		(-RWSEM_ACTIVE_MASK-1)
--#define RWSEM_ACTIVE_READ_BIAS		RWSEM_ACTIVE_BIAS
--#define RWSEM_ACTIVE_WRITE_BIAS		(RWSEM_WAITING_BIAS + RWSEM_ACTIVE_BIAS)
-+#define RWSEM_COUNT_LOCKED(c)	((c) & RWSEM_LOCK_MASK)
- 
- #ifdef CONFIG_RWSEM_SPIN_ON_OWNER
- /*
-@@ -169,7 +171,8 @@ static inline void rwsem_clear_reader_owned(struct rw_semaphore *sem)
-  */
- static inline void __down_read(struct rw_semaphore *sem)
- {
--	if (unlikely(atomic_long_inc_return_acquire(&sem->count) <= 0)) {
-+	if (unlikely(atomic_long_fetch_add_acquire(RWSEM_READER_BIAS,
-+			&sem->count) & RWSEM_READ_FAILED_MASK)) {
- 		rwsem_down_read_failed(sem);
- 		DEBUG_RWSEMS_WARN_ON(!((unsigned long)sem->owner &
- 					RWSEM_READER_OWNED), sem);
-@@ -180,7 +183,8 @@ static inline void __down_read(struct rw_semaphore *sem)
- 
- static inline int __down_read_killable(struct rw_semaphore *sem)
- {
--	if (unlikely(atomic_long_inc_return_acquire(&sem->count) <= 0)) {
-+	if (unlikely(atomic_long_fetch_add_acquire(RWSEM_READER_BIAS,
-+			&sem->count) & RWSEM_READ_FAILED_MASK)) {
- 		if (IS_ERR(rwsem_down_read_failed_killable(sem)))
- 			return -EINTR;
- 		DEBUG_RWSEMS_WARN_ON(!((unsigned long)sem->owner &
-@@ -195,9 +199,10 @@ static inline int __down_read_trylock(struct rw_semaphore *sem)
- {
- 	long tmp;
- 
--	while ((tmp = atomic_long_read(&sem->count)) >= 0) {
-+	while (!((tmp = atomic_long_read(&sem->count)) &
-+			RWSEM_READ_FAILED_MASK)) {
- 		if (tmp == atomic_long_cmpxchg_acquire(&sem->count, tmp,
--				   tmp + RWSEM_ACTIVE_READ_BIAS)) {
-+				   tmp + RWSEM_READER_BIAS)) {
- 			rwsem_set_reader_owned(sem);
- 			return 1;
- 		}
-@@ -210,22 +215,16 @@ static inline int __down_read_trylock(struct rw_semaphore *sem)
-  */
- static inline void __down_write(struct rw_semaphore *sem)
- {
--	long tmp;
--
--	tmp = atomic_long_add_return_acquire(RWSEM_ACTIVE_WRITE_BIAS,
--					     &sem->count);
--	if (unlikely(tmp != RWSEM_ACTIVE_WRITE_BIAS))
-+	if (unlikely(atomic_long_cmpxchg_acquire(&sem->count, 0,
-+						 RWSEM_WRITER_LOCKED)))
- 		rwsem_down_write_failed(sem);
- 	rwsem_set_owner(sem);
- }
- 
- static inline int __down_write_killable(struct rw_semaphore *sem)
- {
--	long tmp;
--
--	tmp = atomic_long_add_return_acquire(RWSEM_ACTIVE_WRITE_BIAS,
--					     &sem->count);
--	if (unlikely(tmp != RWSEM_ACTIVE_WRITE_BIAS))
-+	if (unlikely(atomic_long_cmpxchg_acquire(&sem->count, 0,
-+						 RWSEM_WRITER_LOCKED)))
- 		if (IS_ERR(rwsem_down_write_failed_killable(sem)))
- 			return -EINTR;
- 	rwsem_set_owner(sem);
-@@ -234,15 +233,11 @@ static inline int __down_write_killable(struct rw_semaphore *sem)
- 
- static inline int __down_write_trylock(struct rw_semaphore *sem)
- {
--	long tmp;
--
--	tmp = atomic_long_cmpxchg_acquire(&sem->count, RWSEM_UNLOCKED_VALUE,
--		      RWSEM_ACTIVE_WRITE_BIAS);
--	if (tmp == RWSEM_UNLOCKED_VALUE) {
-+	bool taken = !atomic_long_cmpxchg_acquire(&sem->count, 0,
-+						  RWSEM_WRITER_LOCKED);
-+	if (taken)
- 		rwsem_set_owner(sem);
--		return true;
--	}
--	return false;
-+	return taken;
- }
- 
- /*
-@@ -255,8 +250,9 @@ static inline void __up_read(struct rw_semaphore *sem)
- 	DEBUG_RWSEMS_WARN_ON(!((unsigned long)sem->owner & RWSEM_READER_OWNED),
- 				sem);
- 	rwsem_clear_reader_owned(sem);
--	tmp = atomic_long_dec_return_release(&sem->count);
--	if (unlikely(tmp < -1 && (tmp & RWSEM_ACTIVE_MASK) == 0))
-+	tmp = atomic_long_add_return_release(-RWSEM_READER_BIAS, &sem->count);
-+	if (unlikely((tmp & (RWSEM_LOCK_MASK|RWSEM_FLAG_WAITERS))
-+			== RWSEM_FLAG_WAITERS))
- 		rwsem_wake(sem);
- }
- 
-@@ -267,8 +263,8 @@ static inline void __up_write(struct rw_semaphore *sem)
- {
- 	DEBUG_RWSEMS_WARN_ON(sem->owner != current, sem);
- 	rwsem_clear_owner(sem);
--	if (unlikely(atomic_long_sub_return_release(RWSEM_ACTIVE_WRITE_BIAS,
--						    &sem->count) < 0))
-+	if (unlikely(atomic_long_fetch_add_release(-RWSEM_WRITER_LOCKED,
-+			&sem->count) & RWSEM_FLAG_WAITERS))
- 		rwsem_wake(sem);
- }
- 
-@@ -287,8 +283,9 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
- 	 * write side. As such, rely on RELEASE semantics.
- 	 */
- 	DEBUG_RWSEMS_WARN_ON(sem->owner != current, sem);
--	tmp = atomic_long_add_return_release(-RWSEM_WAITING_BIAS, &sem->count);
-+	tmp = atomic_long_fetch_add_release(
-+		-RWSEM_WRITER_LOCKED+RWSEM_READER_BIAS, &sem->count);
- 	rwsem_set_reader_owned(sem);
--	if (tmp < 0)
-+	if (tmp & RWSEM_FLAG_WAITERS)
- 		rwsem_downgrade_wake(sem);
- }
--- 
-1.8.3.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+V2hlbiB1bmJpbmRpbmcgdGhlIChJT01NVS1lbmFibGVkKSBSLUNhciBTQVRBIGRldmljZSBvbiBT
+YWx2YXRvci1YUwooUi1DYXIgSDMgRVMyLjApLCBpbiBwcmVwYXJhdGlvbiBvZiByZWJpbmRpbmcg
+YWdhaW5zdCB2ZmlvLXBsYXRmb3JtIGZvcgpkZXZpY2UgcGFzcy10aHJvdWdoIGZvciB2aXJ0dWFs
+aXphdGlvbjoKCsKgIMKgIGVjaG8gZWUzMDAwMDAuc2F0YSA+IC9zeXMvYnVzL3BsYXRmb3JtL2Ry
+aXZlcnMvc2F0YV9yY2FyL3VuYmluZAoKdGhlIGtlcm5lbCBjcmFzaGVzIHdpdGg6CgrCoCDCoCBV
+bmFibGUgdG8gaGFuZGxlIGtlcm5lbCBwYWdpbmcgcmVxdWVzdCBhdCB2aXJ0dWFsIGFkZHJlc3Mg
+ZmZmZmZmYmYwMjlmZmZmYwrCoCDCoCBNZW0gYWJvcnQgaW5mbzoKwqAgwqAgwqAgRVNSID0gMHg5
+NjAwMDAwNgrCoCDCoCDCoCBFeGNlcHRpb24gY2xhc3MgPSBEQUJUIChjdXJyZW50IEVMKSwgSUwg
+PSAzMiBiaXRzCsKgIMKgIMKgIFNFVCA9IDAsIEZuViA9IDAKwqAgwqAgwqAgRUEgPSAwLCBTMVBU
+VyA9IDAKwqAgwqAgRGF0YSBhYm9ydCBpbmZvOgrCoCDCoCDCoCBJU1YgPSAwLCBJU1MgPSAweDAw
+MDAwMDA2CsKgIMKgIMKgIENNID0gMCwgV25SID0gMArCoCDCoCBzd2FwcGVyIHBndGFibGU6IDRr
+IHBhZ2VzLCAzOS1iaXQgVkFzLCBwZ2RwID0gMDAwMDAwMDA3ZThjNTg2YwrCoCDCoCBbZmZmZmZm
+YmYwMjlmZmZmY10gcGdkPTAwMDAwMDA3M2JmYzYwMDMsIHB1ZD0wMDAwMDAwNzNiZmM2MDAzLCBw
+bWQ9MDAwMDAwMDAwMDAwMDAwMArCoCDCoCBJbnRlcm5hbCBlcnJvcjogT29wczogOTYwMDAwMDYg
+WyMxXSBTTVAKwqAgwqAgTW9kdWxlcyBsaW5rZWQgaW46CsKgIMKgIENQVTogMCBQSUQ6IDEwOTgg
+Q29tbTogYmFzaCBOb3QgdGFpbnRlZCA1LjAuMC1yYzUtc2FsdmF0b3IteC0wMDQ1Mi1nMzc1OTZm
+ODg0ZjQzMThlZiAjMjg3CsKgIMKgIEhhcmR3YXJlIG5hbWU6IFJlbmVzYXMgU2FsdmF0b3ItWCAy
+bmQgdmVyc2lvbiBib2FyZCBiYXNlZCBvbiByOGE3Nzk1IEVTMi4wKyAoRFQpCsKgIMKgIHBzdGF0
+ZTogNjA0MDAwMDUgKG5aQ3YgZGFpZiArUEFOIC1VQU8pCsKgIMKgIHBjIDogX19mcmVlX3BhZ2Vz
+KzB4OC8weDU4CsKgIMKgIGxyIDogX19kbWFfZGlyZWN0X2ZyZWVfcGFnZXMrMHg1MC8weDVjCsKg
+IMKgIHNwIDogZmZmZmZmODAxMjY4YmFhMArCoCDCoCB4Mjk6IGZmZmZmZjgwMTI2OGJhYTAgeDI4
+OiAwMDAwMDAwMDAwMDAwMDAwCsKgIMKgIHgyNzogZmZmZmZmYzZmOWM2MGJmMCB4MjY6IGZmZmZm
+ZmM2ZjljNjBiZjAKwqAgwqAgeDI1OiBmZmZmZmZjNmY5YzYwODEwIHgyNDogMDAwMDAwMDAwMDAw
+MDAwMArCoCDCoCB4MjM6IDAwMDAwMDAwZmZmZmYwMDAgeDIyOiBmZmZmZmY4MDEyMTQ1MDAwCsKg
+IMKgIHgyMTogMDAwMDAwMDAwMDAwMDgwMCB4MjA6IGZmZmZmZmJmMDI5ZmZmYzgKwqAgwqAgeDE5
+OiAwMDAwMDAwMDAwMDAwMDAwIHgxODogZmZmZmZmYzZmODZjNDJjOArCoCDCoCB4MTc6IDAwMDAw
+MDAwMDAwMDAwMDAgeDE2OiAwMDAwMDAwMDAwMDAwMDcwCsKgIMKgIHgxNTogMDAwMDAwMDAwMDAw
+MDAwMyB4MTQ6IDAwMDAwMDAwMDAwMDAwMDAKwqAgwqAgeDEzOiBmZmZmZmY4MDExMDNkN2Y4IHgx
+MjogMDAwMDAwMDAwMDAwMDAyOArCoCDCoCB4MTE6IGZmZmZmZjgwMTExMTc2MDQgeDEwOiAwMDAw
+MDAwMDAwMDA5YWQ4CsKgIMKgIHg5IDogZmZmZmZmODAxMTAxMjZkMCB4OCA6IGZmZmZmZmM2Zjc1
+NjMwMDAKwqAgwqAgeDcgOiA2YjZiNmI2YjZiNmI2YjZiIHg2IDogMDAwMDAwMDAwMDAwMDAxOArC
+oCDCoCB4NSA6IGZmZmZmZjgwMTFjZjNjYzggeDQgOiAwMDAwMDAwMDAwMDA0MDAwCsKgIMKgIHgz
+IDogMDAwMDAwMDAwMDA4MDAwMCB4MiA6IDAwMDAwMDAwMDAwMDAwMDEKwqAgwqAgeDEgOiAwMDAw
+MDAwMDAwMDAwMDAwIHgwIDogZmZmZmZmYmYwMjlmZmZjOArCoCDCoCBQcm9jZXNzIGJhc2ggKHBp
+ZDogMTA5OCwgc3RhY2sgbGltaXQgPSAweDAwMDAwMDAwYzM4ZTNlMzIpCsKgIMKgIENhbGwgdHJh
+Y2U6CsKgIMKgIMKgX19mcmVlX3BhZ2VzKzB4OC8weDU4CsKgIMKgIMKgX19kbWFfZGlyZWN0X2Zy
+ZWVfcGFnZXMrMHg1MC8weDVjCsKgIMKgIMKgYXJjaF9kbWFfZnJlZSsweDFjLzB4OTgKwqAgwqAg
+wqBkbWFfZGlyZWN0X2ZyZWUrMHgxNC8weDI0CsKgIMKgIMKgZG1hX2ZyZWVfYXR0cnMrMHg5Yy8w
+eGRjCsKgIMKgIMKgZG1hbV9yZWxlYXNlKzB4MTgvMHgyMArCoCDCoCDCoHJlbGVhc2Vfbm9kZXMr
+MHgyNWMvMHgyOGMKwqAgwqAgwqBkZXZyZXNfcmVsZWFzZV9hbGwrMHg0OC8weDRjCsKgIMKgIMKg
+ZGV2aWNlX3JlbGVhc2VfZHJpdmVyX2ludGVybmFsKzB4MTg0LzB4MWYwCsKgIMKgIMKgZGV2aWNl
+X3JlbGVhc2VfZHJpdmVyKzB4MTQvMHgxYwrCoCDCoCDCoHVuYmluZF9zdG9yZSsweDcwLzB4YjgK
+wqAgwqAgwqBkcnZfYXR0cl9zdG9yZSsweDI0LzB4MzQKwqAgwqAgwqBzeXNmc19rZl93cml0ZSsw
+eDRjLzB4NjQKwqAgwqAgwqBrZXJuZnNfZm9wX3dyaXRlKzB4MTU0LzB4MWM0CsKgIMKgIMKgX192
+ZnNfd3JpdGUrMHgzNC8weDE2NArCoCDCoCDCoHZmc193cml0ZSsweGI0LzB4MTZjCsKgIMKgIMKg
+a3N5c193cml0ZSsweDVjLzB4YmMKwqAgwqAgwqBfX2FybTY0X3N5c193cml0ZSsweDE0LzB4MWMK
+wqAgwqAgwqBlbDBfc3ZjX2NvbW1vbisweDk4LzB4MTE0CsKgIMKgIMKgZWwwX3N2Y19oYW5kbGVy
+KzB4MWMvMHgyNArCoCDCoCDCoGVsMF9zdmMrMHg4LzB4YwrCoCDCoCBDb2RlOiBkNTFiNDIzNCAx
+N2ZmZmZmYSBhOWJmN2JmZCA5MTAwMDNmZCAoYjk0MDM0MDQpCsKgIMKgIC0tLVsgZW5kIHRyYWNl
+IDhjNTY0Y2RkM2ExYTg0MGYgXS0tLQoKV2hpbGUgSSd2ZSBiaXNlY3RlZCB0aGlzIHRvIGNvbW1p
+dCBlOGU2ODNhZTlhNzM2NDA3ICgiaW9tbXUvb2Y6IEZpeApwcm9iZS1kZWZlcnJhbCIpLCBhbmQg
+cmV2ZXJ0aW5nIHRoYXQgY29tbWl0IG9uIHBvc3QtdjUuMC1yYzQga2VybmVscwpkb2VzIGZpeCB0
+aGUgcHJvYmxlbSwgdGhpcyB0dXJuZWQgb3V0IHRvIGJlIGEgcmVkIGhlcnJpbmcuCgpPbiBhcm02
+NCwgYXJjaF90ZWFyZG93bl9kbWFfb3BzKCkgcmVzZXRzIGRldi0+ZG1hX29wcyB0byBOVUxMLgpI
+ZW5jZSBpZiBhIGRyaXZlciBoYXMgdXNlZCBhIG1hbmFnZWQgRE1BIGFsbG9jYXRpb24gQVBJLCB0
+aGUgYWxsb2NhdGVkCkRNQSBtZW1vcnkgd2lsbCBiZSBmcmVlZCB1c2luZyB0aGUgZGlyZWN0IERN
+QSBvcHMsIHdoaWxlIGl0IG1heSBoYXZlCmJlZW4gYWxsb2NhdGVkIHVzaW5nIGEgY3VzdG9tIERN
+QSBvcHMgKGlvbW11X2RtYV9vcHMgaW4gdGhpcyBjYXNlKS4KCkZpeCB0aGlzIGJ5IHJldmVyc2lu
+ZyB0aGUgb3JkZXIgb2YgdGhlIGNhbGxzIHRvIGRldnJlc19yZWxlYXNlX2FsbCgpIGFuZAphcmNo
+X3RlYXJkb3duX2RtYV9vcHMoKS4KClNpZ25lZC1vZmYtYnk6IEdlZXJ0IFV5dHRlcmhvZXZlbiA8
+Z2VlcnQrcmVuZXNhc0BnbGlkZXIuYmU+Ci0tLQpRdWVzdGlvbjoKSXMgdGhpcyBzYWZlIG9uIGFy
+bTMyLCB3aGljaCBjYWxscyBhcm1fdGVhcmRvd25faW9tbXVfZG1hX29wcygpIGluc3RlYWQKb2Yg
+cmVzZXR0aW5nIGRldi0+ZG1hX29wcz8KCi0tLQpBZGRpbmcgc29tZSBkZWJ1ZyBjb2RlLCBhbmQg
+Y29tcGFyaW5nIGJlZm9yZS9hZnRlciBjb21taXQKZThlNjgzYWU5YTczNjQwNzoKCiAgICAgc2F0
+YV9yY2FyIGVlMzAwMDAwLnNhdGE6IG9mX2lvbW11X2NvbmZpZ3VyZToyMjc6IGVyciA9IC01MTcK
+ICAgIC1zYXRhX3JjYXIgZWUzMDAwMDAuc2F0YTogb2ZfaW9tbXVfY29uZmlndXJlOjIzMDogY2Fs
+bGluZyBpb21tdV9wcm9iZV9kZXZpY2UoKQogICAgLXNhdGFfcmNhciBlZTMwMDAwMC5zYXRhOiBp
+b21tdV9wcm9iZV9kZXZpY2U6MTIyOiBDYWxsaW5nIGlwbW11X2FkZF9kZXZpY2UKICAgIC1zYXRh
+X3JjYXIgZWUzMDAwMDAuc2F0YTogaXBtbXVfYWRkX2RldmljZTo4OTMKICAgIC1zYXRhX3JjYXIg
+ZWUzMDAwMDAuc2F0YTogb2ZfaW9tbXVfY29uZmlndXJlOjIzMjogaW9tbXVfcHJvYmVfZGV2aWNl
+KCkgcmV0dXJuZWQgLTE5CiAgICAtc2F0YV9yY2FyIGVlMzAwMDAwLnNhdGE6IGRtYV9hbGxvY19h
+dHRyczoyNTc6IHNpemUgMjA0OCwgb3BzID0gICAgICAgICAgIChudWxsKQogICAgLXNhdGFfcmNh
+ciBlZTMwMDAwMC5zYXRhOiBfX2RtYV9kaXJlY3RfYWxsb2NfcGFnZXM6MTA0OiBzaXplIDQwOTYK
+ICAgIC1zYXRhX3JjYXIgZWUzMDAwMDAuc2F0YTogX19kbWFfZGlyZWN0X2FsbG9jX3BhZ2VzOjEx
+NTogdHJ5aW5nIGRtYV9hbGxvY19mcm9tX2NvbnRpZ3VvdXMoKQogICAgLXNhdGFfcmNhciBlZTMw
+MDAwMC5zYXRhOiBkbWFfYWxsb2NfZnJvbV9jb250aWd1b3VzOjIwMjogY21hX2FsbG9jKDEpIHJl
+dHVybmVkIHBhZ2UgZmZmZmZmYmYwMGQyMGUwMAogICAgLXNhdGFfcmNhciBlZTMwMDAwMC5zYXRh
+OiBkbWFfYWxsb2NfYXR0cnM6MjcxOiBhbGxvY2F0ZWQgdXNpbmcgZG1hX2RpcmVjdF9hbGxvYygp
+CiAgICAtc2F0YV9yY2FyIGVlMzAwMDAwLnNhdGE6IGRtYW1fYWxsb2NfYXR0cnM6OTg6IHNpemUg
+MjA0OCB2YWRkciBmZmZmZmY4MDExZTk1MDAwIGRtYV9oYW5kbGUgMHgweDAwMDAwMDAwN2MwNDAw
+MDAgYXR0cnMgMHgwCiAgICAtc2NzaSBob3N0MDogc2F0YV9yY2FyCiAgICAtYXRhMTogU0FUQSBt
+YXggVURNQS8xMzMgaXJxIDE3MgogICAgLWF0YTE6IFNBVEEgbGluayB1cCAxLjUgR2JwcyAoU1N0
+YXR1cyAxMTMgU0NvbnRyb2wgMzAwKQoKRE1BIG1lbW9yeSB1c2VkIHRvIGJlIGFsbG9jYXRlZCBm
+cm9tIENNQSwgZG1hX21hcF9vcHMgPSBOVUxMLgpUaGUgU0FUQSBkcml2ZXIgd2FzIHByb2JlZCBh
+bmQgaW5pdGlhbGl6ZWQuCgogICAgK3NhdGFfcmNhciBlZTMwMDAwMC5zYXRhOiBvZl9pb21tdV9j
+b25maWd1cmU6MjM0OiBza2lwcGluZyBpb21tdV9wcm9iZV9kZXZpY2UoKQoKU0FUQSBkcml2ZXIg
+aW5pdGlhbGl6YXRpb24gaXMgbm93IGRlZmVycmVkLgpMYXRlciwgaXQgaXMgcmV0cmllZDoKCiAg
+ICArc2F0YV9yY2FyIGVlMzAwMDAwLnNhdGE6IG9mX2lvbW11X2NvbmZpZ3VyZToyMjc6IGVyciA9
+IDAKICAgICtzYXRhX3JjYXIgZWUzMDAwMDAuc2F0YTogb2ZfaW9tbXVfY29uZmlndXJlOjIzMDog
+Y2FsbGluZyBpb21tdV9wcm9iZV9kZXZpY2UoKQogICAgK3NhdGFfcmNhciBlZTMwMDAwMC5zYXRh
+OiBpb21tdV9wcm9iZV9kZXZpY2U6MTIyOiBDYWxsaW5nIGlwbW11X2FkZF9kZXZpY2UKICAgICtz
+YXRhX3JjYXIgZWUzMDAwMDAuc2F0YTogaXBtbXVfYWRkX2RldmljZTo4OTMKICAgICtzYXRhX3Jj
+YXIgZWUzMDAwMDAuc2F0YTogVXNpbmcgSVBNTVUgY29udGV4dCAxCiAgICAraW9tbXU6IEFkZGlu
+ZyBkZXZpY2UgZWUzMDAwMDAuc2F0YSB0byBncm91cCAwCiAgICArc2F0YV9yY2FyIGVlMzAwMDAw
+LnNhdGE6IGlwbW11X2FkZF9kZXZpY2U6OTA4OiBTdWNjZXNzCiAgICArc2F0YV9yY2FyIGVlMzAw
+MDAwLnNhdGE6IG9mX2lvbW11X2NvbmZpZ3VyZToyMzI6IGlvbW11X3Byb2JlX2RldmljZSgpIHJl
+dHVybmVkIDAKICAgICtzYXRhX3JjYXIgZWUzMDAwMDAuc2F0YTogZG1hX2FsbG9jX2F0dHJzOjI1
+Nzogc2l6ZSAyMDQ4LCBvcHMgPSBpb21tdV9kbWFfb3BzCiAgICArc2F0YV9yY2FyIGVlMzAwMDAw
+LnNhdGE6IGRtYV9hbGxvY19hdHRyczoyNzQ6IGFsbG9jYXRlZCB1c2luZyBfX2lvbW11X2FsbG9j
+X2F0dHJzKCkKICAgICtzYXRhX3JjYXIgZWUzMDAwMDAuc2F0YTogZG1hbV9hbGxvY19hdHRyczo5
+ODogc2l6ZSAyMDQ4IHZhZGRyIGZmZmZmZjgwMTIxMzUwMDAgZG1hX2hhbmRsZSAweDB4MDAwMDAw
+MDBmZmZmZjAwMCBhdHRycyAweDAKICAgICtzY3NpIGhvc3QwOiBzYXRhX3JjYXIKICAgICthdGEx
+OiBTQVRBIG1heCBVRE1BLzEzMyBpcnEgMTcyCiAgICArYXRhMTogU0FUQSBsaW5rIHVwIDEuNSBH
+YnBzIChTU3RhdHVzIDExMyBTQ29udHJvbCAzMDApCgpETUEgbWVtb3J5IGlzIG5vdyBhbGxvY2F0
+ZWQgdXNpbmcgX19pb21tdV9hbGxvY19hdHRycygpLCBhcyBkbWFfbWFwX29wcwo9IGlvbW11X2Rt
+YV9vcHMuCgpVbmJpbmQ6CgogICAgLXNhdGFfcmNhciBlZTMwMDAwMC5zYXRhOiBkbWFtX3JlbGVh
+c2U6MzI6IHNpemUgMjA0OCB2YWRkciBmZmZmZmY4MDExZTk1MDAwIGRtYV9oYW5kbGUgMHgweDAw
+MDAwMDAwN2MwNDAwMDAgYXR0cnMgMHgwCiAgICArc2F0YV9yY2FyIGVlMzAwMDAwLnNhdGE6IGRt
+YW1fcmVsZWFzZTozMjogc2l6ZSAyMDQ4IHZhZGRyIGZmZmZmZjgwMTIxMzUwMDAgZG1hX2hhbmRs
+ZSAweDB4MDAwMDAwMDBmZmZmZjAwMCBhdHRycyAweDAKICAgICBzYXRhX3JjYXIgZWUzMDAwMDAu
+c2F0YTogZG1hX2ZyZWVfYXR0cnM6Mjg5OiBzaXplIDIwNDgsIG9wcyA9ICAgICAgICAgICAobnVs
+bCkKCmRtYV9tYXBfb3BzID0gTlVMTCwgYm90aCBiZWZvcmUvYWZ0ZXIhCgogICAgIHNhdGFfcmNh
+ciBlZTMwMDAwMC5zYXRhOiBkbWFfZnJlZV9hdHRyczozMDg6IGNhbGxpbmcgZG1hX2RpcmVjdF9m
+cmVlKCkKICAgIC1zYXRhX3JjYXIgZWUzMDAwMDAuc2F0YTogX19kbWFfZGlyZWN0X2ZyZWVfcGFn
+ZXM6MTg5OiBzaXplIDIwNDggcGFnZSBmZmZmZmZiZjAwZDIwZTAwCiAgICAtc2F0YV9yY2FyIGVl
+MzAwMDAwLnNhdGE6IGRtYV9yZWxlYXNlX2Zyb21fY29udGlndW91czoyMjM6IGNtYV9yZWxlYXNl
+KDEpIGZyZWVkCiAgICAtc2F0YV9yY2FyIGVlMzAwMDAwLnNhdGE6IF9fZG1hX2RpcmVjdF9mcmVl
+X3BhZ2VzOjE5NDogc2tpcHBpbmcgX19mcmVlX3BhZ2VzKCkKCkRNQSBtZW1vcnkgd2FzIGNvcnJl
+Y3RseSBmcmVlZCB1c2luZyBDTUEuCgogICAgK3NhdGFfcmNhciBlZTMwMDAwMC5zYXRhOiBfX2Rt
+YV9kaXJlY3RfZnJlZV9wYWdlczoxODk6IHNpemUgMjA0OCBwYWdlIGZmZmZmZmJmMDI5ZmZmYzgK
+ICAgICtzYXRhX3JjYXIgZWUzMDAwMDAuc2F0YTogZG1hX3JlbGVhc2VfZnJvbV9jb250aWd1b3Vz
+OjIyNTogY21hX3JlbGVhc2UoMSkgZmFpbGVkLCBjbWEgYXJlYSBmZmZmZmY4MDExY2Y1NTMwCiAg
+ICArc2F0YV9yY2FyIGVlMzAwMDAwLnNhdGE6IF9fZG1hX2RpcmVjdF9mcmVlX3BhZ2VzOjE5MTog
+Y2FsbGluZyBfX2ZyZWVfcGFnZXMoKQogICAgK1VuYWJsZSB0byBoYW5kbGUga2VybmVsIHBhZ2lu
+ZyByZXF1ZXN0IGF0IHZpcnR1YWwgYWRkcmVzcyBmZmZmZmZiZjAyOWZmZmZjCgpNZW1vcnkgaXMg
+aW5jb3JyZWN0bHkgZnJlZWQgdXNpbmcgdGhlIGRpcmVjdCBvcHMsIGFzIGRtYV9tYXBfb3BzID0g
+TlVMTC4KT29wcy4uLgoKQWZ0ZXIgcmV2ZXJzaW5nIHRoZSBvcmRlciBvZiB0aGUgY2FsbHMgdG8g
+YXJjaF90ZWFyZG93bl9kbWFfb3BzKCkgYW5kCmRldnJlc19yZWxlYXNlX2FsbCgpLCBkbWFfbWFw
+X29wcyBpcyBzdGlsbCB2YWxpZCwgYW5kIHRoZSBETUEgbWVtb3J5IGlzCm5vdyByZWxlYXNlZCB1
+c2luZyBfX2lvbW11X2ZyZWVfYXR0cnMoKToKCiAgICArc2F0YV9yY2FyIGVlMzAwMDAwLnNhdGE6
+IGRtYW1fcmVsZWFzZTozMjogc2l6ZSAyMDQ4IHZhZGRyIGZmZmZmZjgwMTIxNDUwMDAgZG1hX2hh
+bmRsZSAweDB4MDAwMDAwMDBmZmZmZjAwMCBhdHRycyAweDAKICAgICtzYXRhX3JjYXIgZWUzMDAw
+MDAuc2F0YTogZG1hX2ZyZWVfYXR0cnM6Mjg5OiBzaXplIDIwNDgsIG9wcyA9IGlvbW11X2RtYV9v
+cHMKICAgICtzYXRhX3JjYXIgZWUzMDAwMDAuc2F0YTogZG1hX2ZyZWVfYXR0cnM6MzExOiBjYWxs
+aW5nIF9faW9tbXVfZnJlZV9hdHRycygpCi0tLQogZHJpdmVycy9iYXNlL2RkLmMgfCAyICstCiAx
+IGZpbGUgY2hhbmdlZCwgMSBpbnNlcnRpb24oKyksIDEgZGVsZXRpb24oLSkKCmRpZmYgLS1naXQg
+YS9kcml2ZXJzL2Jhc2UvZGQuYyBiL2RyaXZlcnMvYmFzZS9kZC5jCmluZGV4IDhhYzEwYWYxN2Mw
+MDQzYTMuLmQ2MjQ4N2QwMjQ1NTk2MjAgMTAwNjQ0Ci0tLSBhL2RyaXZlcnMvYmFzZS9kZC5jCisr
+KyBiL2RyaXZlcnMvYmFzZS9kZC5jCkBAIC05NjgsOSArOTY4LDkgQEAgc3RhdGljIHZvaWQgX19k
+ZXZpY2VfcmVsZWFzZV9kcml2ZXIoc3RydWN0IGRldmljZSAqZGV2LCBzdHJ1Y3QgZGV2aWNlICpw
+YXJlbnQpCiAJCQlkcnYtPnJlbW92ZShkZXYpOwogCiAJCWRldmljZV9saW5rc19kcml2ZXJfY2xl
+YW51cChkZXYpOwotCQlhcmNoX3RlYXJkb3duX2RtYV9vcHMoZGV2KTsKIAogCQlkZXZyZXNfcmVs
+ZWFzZV9hbGwoZGV2KTsKKwkJYXJjaF90ZWFyZG93bl9kbWFfb3BzKGRldik7CiAJCWRldi0+ZHJp
+dmVyID0gTlVMTDsKIAkJZGV2X3NldF9kcnZkYXRhKGRldiwgTlVMTCk7CiAJCWlmIChkZXYtPnBt
+X2RvbWFpbiAmJiBkZXYtPnBtX2RvbWFpbi0+ZGlzbWlzcykKLS0gCjIuMTcuMQoKCl9fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwg
+bWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8v
+bGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
