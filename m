@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EC989C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 08:16:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 46C25C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 08:16:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BB6AE2175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 08:16:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 161472175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 08:16:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TnkEYGu5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB6AE2175B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z8m3H0U1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 161472175B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=nwYMHu8SnxgyvhilcpNJwuiwmwt4L/pL1dT1eeyGP0k=; b=TnkEYGu5PwUz4O
-	qOP0OQhjMXVPJphdAgtvkqdn3CTIaq6PHF43q8mWAqXEJ/eJ+HEF+Gge8vpaFN1mhBWc8Gy/nYdnC
-	MaVlbiVVio8JTe94k/rQ7rMngPiX8c7r3yhEO7yG3xe1Q2CDRIC+/O+OlXoGLS1GPS3I/ojksZzPX
-	NfwB+PrHJN5pQ+1deZAQ+UZ0s/9x+dNadTlVKZ9SWSuN5jZNDtP2zRTH9jUUwInFYmu1xv99E1d/c
-	zU7LJMyqJdqCzY7igj7oymRtggcKb82N3rbGDyKXqg6y7vM48LT8htsY+Ny4AfxCyKIU/Apsj2e5+
-	wC8TlLb5v22nf5msohAg==;
+	List-Owner; bh=2/9sQhsXsyVqbg1rmoZVGtM4NL9AAwRnRqp7SL8onSg=; b=Z8m3H0U1M/gD2g
+	xZvb9gIONLLInn2JTszSbXuxPyGOMgpnQtqhoOLGzYWUk9viOUwlJxgdVR+0Uyw+hHP48bmkJ3+si
+	Q9qS9iiNzkGwuta+tp52+naIDCjRatMOH5JAZvKN1rMnatwtn9+zTYntWp7RNpSux3aum7IECBthj
+	gY1oJ4ouh8Qcn2wrlKVCz3eVTeQxAxTPm/JkkHSt9F2RO9D47NfD6j5b7J0LLAOojQckYeUg99EhO
+	9DlFw20sifay6baNC4EBwe8N1QkUNttGhmYLPwkyWEzQdQ6ot/xgCh9cvfPZgzhO/RyFqieW5HZp2
+	LRUlR+N4Jcsi9ERca1Qg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1greqv-0005gP-Co; Thu, 07 Feb 2019 08:16:09 +0000
-Received: from relay3-d.mail.gandi.net ([217.70.183.195])
+	id 1grerA-0005v6-Rs; Thu, 07 Feb 2019 08:16:24 +0000
+Received: from relay1-d.mail.gandi.net ([217.70.183.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1greqq-0005fA-Ne
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 08:16:07 +0000
+ id 1grer1-0005kT-Sg
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 08:16:21 +0000
 X-Originating-IP: 90.88.22.177
 Received: from aptenodytes (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
  [90.88.22.177]) (Authenticated sender: paul.kocialkowski@bootlin.com)
- by relay3-d.mail.gandi.net (Postfix) with ESMTPSA id 20AE86000D;
- Thu,  7 Feb 2019 08:15:50 +0000 (UTC)
-Message-ID: <8856006f5cf615b7d278d4ead16a5fbc6e95d334.camel@bootlin.com>
-Subject: Re: [PATCH v5 4/9] sun6i: dsi: Convert to generic phy handling
+ by relay1-d.mail.gandi.net (Postfix) with ESMTPSA id B158324000E;
+ Thu,  7 Feb 2019 08:16:04 +0000 (UTC)
+Message-ID: <3777fc72cefa0a110b1a642bdb8b20df456c7726.camel@bootlin.com>
+Subject: Re: [PATCH v4 4/9] sun6i: dsi: Convert to generic phy handling
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 To: Maxime Ripard <maxime.ripard@bootlin.com>, Kishon Vijay Abraham I
  <kishon@ti.com>
-Date: Thu, 07 Feb 2019 09:15:49 +0100
-In-Reply-To: <dc6450e2978b6dafcc464595ad06204d22d2658f.1548085432.git-series.maxime.ripard@bootlin.com>
-References: <cover.fbf0776c70c0cfb7b7fd88ce6a96b4597d620cac.1548085432.git-series.maxime.ripard@bootlin.com>
- <dc6450e2978b6dafcc464595ad06204d22d2658f.1548085432.git-series.maxime.ripard@bootlin.com>
+Date: Thu, 07 Feb 2019 09:16:03 +0100
+In-Reply-To: <0c3493b4e9eaf7b4fbe7960d1239a71fc3563eee.1547026369.git-series.maxime.ripard@bootlin.com>
+References: <cover.5d91ef683e3f432342f536e0f2fe239dbcebcb3e.1547026369.git-series.maxime.ripard@bootlin.com>
+ <0c3493b4e9eaf7b4fbe7960d1239a71fc3563eee.1547026369.git-series.maxime.ripard@bootlin.com>
 Organization: Bootlin
 User-Agent: Evolution 3.30.5 
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_001605_081330_29840F39 
-X-CRM114-Status: GOOD (  22.37  )
+X-CRM114-CacheID: sfid-20190207_001616_321613_6A6BF7DA 
+X-CRM114-Status: GOOD (  22.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,7 +71,7 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Rafal Ciepiela <rafalc@cadence.com>, linux-kernel@vger.kernel.org,
  dri-devel@lists.freedesktop.org, Krzysztof Witos <kwitos@cadence.com>,
- Chen-Yu Tsai <wens@csie.org>, Sean Paul <seanpaul@chromium.org>,
+ Chen-Yu Tsai <wens@csie.org>,
  Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
  Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
  linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
@@ -82,7 +82,7 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 Hi,
 
-On Mon, 2019-01-21 at 16:45 +0100, Maxime Ripard wrote:
+On Wed, 2019-01-09 at 10:33 +0100, Maxime Ripard wrote:
 > Now that we have everything in place in the PHY framework to deal in a
 > generic way with MIPI D-PHY phys, let's convert our PHY driver and its
 > associated DSI driver to that new API.
