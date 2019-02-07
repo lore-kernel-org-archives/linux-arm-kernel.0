@@ -2,21 +2,21 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 58606C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:19:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C594EC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:20:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 199912175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:19:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 945A82175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:20:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ubbMYk7z"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 199912175B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z7D0lbM5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 945A82175B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,41 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+h5mBEH03xygcTxupLAs/p63dCxHzTnzsTwgrF6CfW8=; b=ubbMYk7zQ8+/2k
-	+SknpVqtW/8VnUHGkXtTZOAbHrZoLHQELsALuMYr1DUU3h45swlBhVqeemKclc6r7m2AWVQ0sBY8p
-	glThFYGWQRQi5ZvJRCph1xx37CtmdHVywSLAxmnnZVa7ePNDn+huHJJuoKXN+nnlPPAuUfAy+KQ45
-	CXeDoT+TUWOufMsx6eWb3PAxt8/wLtB75rFDwgy1R0J9uEtJbbhHVPswoLDOv9P1T85fsEW7y+QLg
-	7F8AgaUshjt2lOxJf3a7SqiUtt/GdQRoGjoaPOSCdpSUScniAJ/N4Lf+PaJ/Gn0fFxDrnizhnPfVH
-	sWNm35EwmCIMo7Ki/i0Q==;
+	List-Owner; bh=QNaDTEiXx+baHw/mUypkeIvPYSZ3Q28s14vursGrrBE=; b=Z7D0lbM5Qya02c
+	v68sgzhZwTr69EpRzapR15cgwLN1VvwQfvFZ+1UDVqYYb7xDNubUPnN+jb/NVHvp+TCveIVPbPdIp
+	0LEAeit4pfrxl1C8L+SsovwIs+H0Q9X54JDezranzF9vQ2bChJltzkwDAjs+2HKBleRdUc0gJOqzJ
+	sPbbjkBo4ZspOEcOjg+DNx25l5/S3BBp6Q7B9lgV8wgPAz8HRlyUtXyCRcl7NWutf8jtvDBTT2AXp
+	Z1nYJ8OKR2/UaUzxey7jCOL7jhPr4Pkayr6YT/F9uMd57z4xLrNYxuPHl1q33Y+lIaBpjRhqKOFIB
+	5j1GyJTkLgkpQMGGCBIw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grjaZ-0002dG-K9; Thu, 07 Feb 2019 13:19:35 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1grjar-0002vI-Fh; Thu, 07 Feb 2019 13:19:53 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grja3-00022k-BZ
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 13:19:06 +0000
+ id 1grja6-000256-0Z
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 13:19:16 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3B4F7A78;
- Thu,  7 Feb 2019 05:19:03 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AF45B1596;
+ Thu,  7 Feb 2019 05:19:05 -0800 (PST)
 Received: from filthy-habits.cambridge.arm.com
  (filthy-habits.cambridge.arm.com [10.1.196.62])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 03F623F675;
- Thu,  7 Feb 2019 05:19:00 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 797C13F675;
+ Thu,  7 Feb 2019 05:19:03 -0800 (PST)
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Paolo Bonzini <pbonzini@redhat.com>,
  =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
-Subject: [PATCH 02/11] KVM: arm/arm64: vgic: Make vgic_dist->lpi_list_lock a
+Subject: [PATCH 03/11] KVM: arm/arm64: vgic: Make vgic_cpu->ap_list_lock a
  raw_spinlock
-Date: Thu,  7 Feb 2019 13:18:34 +0000
-Message-Id: <20190207131843.157210-3-marc.zyngier@arm.com>
+Date: Thu,  7 Feb 2019 13:18:35 +0000
+Message-Id: <20190207131843.157210-4-marc.zyngier@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190207131843.157210-1-marc.zyngier@arm.com>
 References: <20190207131843.157210-1-marc.zyngier@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_051903_614875_5F91AF81 
-X-CRM114-Status: GOOD (  14.71  )
+X-CRM114-CacheID: sfid-20190207_051906_602678_6E720ED5 
+X-CRM114-Status: GOOD (  14.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,7 +84,7 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Julien Thierry <julien.thierry@arm.com>
 
-vgic_dist->lpi_list_lock must always be taken with interrupts disabled as
+vgic_cpu->ap_list_lock must always be taken with interrupts disabled as
 it is used in interrupt context.
 
 For configurations such as PREEMPT_RT_FULL, this means that it should
@@ -98,116 +97,162 @@ Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
  include/kvm/arm_vgic.h        |  2 +-
  virt/kvm/arm/vgic/vgic-init.c |  2 +-
- virt/kvm/arm/vgic/vgic-its.c  |  8 ++++----
- virt/kvm/arm/vgic/vgic.c      | 10 +++++-----
- 4 files changed, 11 insertions(+), 11 deletions(-)
+ virt/kvm/arm/vgic/vgic.c      | 37 ++++++++++++++++++-----------------
+ 3 files changed, 21 insertions(+), 20 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index b5426052152e..32954e115796 100644
+index 32954e115796..c36c86f1ec9a 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -256,7 +256,7 @@ struct vgic_dist {
- 	u64			propbaser;
+@@ -307,7 +307,7 @@ struct vgic_cpu {
+ 	unsigned int used_lrs;
+ 	struct vgic_irq private_irqs[VGIC_NR_PRIVATE_IRQS];
  
- 	/* Protects the lpi_list and the count value below. */
--	spinlock_t		lpi_list_lock;
-+	raw_spinlock_t		lpi_list_lock;
- 	struct list_head	lpi_list_head;
- 	int			lpi_list_count;
+-	spinlock_t ap_list_lock;	/* Protects the ap_list */
++	raw_spinlock_t ap_list_lock;	/* Protects the ap_list */
  
+ 	/*
+ 	 * List of IRQs that this VCPU should consider because they are either
 diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 1128e97406cf..330c1ada7326 100644
+index 330c1ada7326..dfbfcb1fe933 100644
 --- a/virt/kvm/arm/vgic/vgic-init.c
 +++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -64,7 +64,7 @@ void kvm_vgic_early_init(struct kvm *kvm)
- 	struct vgic_dist *dist = &kvm->arch.vgic;
+@@ -206,7 +206,7 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 	vgic_cpu->sgi_iodev.base_addr = VGIC_ADDR_UNDEF;
  
- 	INIT_LIST_HEAD(&dist->lpi_list_head);
--	spin_lock_init(&dist->lpi_list_lock);
-+	raw_spin_lock_init(&dist->lpi_list_lock);
- }
- 
- /* CREATION */
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 911ba61505ee..ab3f47745d9c 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -73,7 +73,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
- 	irq->target_vcpu = vcpu;
- 	irq->group = 1;
- 
--	spin_lock_irqsave(&dist->lpi_list_lock, flags);
-+	raw_spin_lock_irqsave(&dist->lpi_list_lock, flags);
+ 	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+-	spin_lock_init(&vgic_cpu->ap_list_lock);
++	raw_spin_lock_init(&vgic_cpu->ap_list_lock);
  
  	/*
- 	 * There could be a race with another vgic_add_lpi(), so we need to
-@@ -101,7 +101,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
- 	dist->lpi_list_count++;
- 
- out_unlock:
--	spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-+	raw_spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
- 
- 	/*
- 	 * We "cache" the configuration table entries in our struct vgic_irq's.
-@@ -332,7 +332,7 @@ int vgic_copy_lpi_list(struct kvm *kvm, struct kvm_vcpu *vcpu, u32 **intid_ptr)
- 	if (!intids)
- 		return -ENOMEM;
- 
--	spin_lock_irqsave(&dist->lpi_list_lock, flags);
-+	raw_spin_lock_irqsave(&dist->lpi_list_lock, flags);
- 	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
- 		if (i == irq_count)
- 			break;
-@@ -341,7 +341,7 @@ int vgic_copy_lpi_list(struct kvm *kvm, struct kvm_vcpu *vcpu, u32 **intid_ptr)
- 			continue;
- 		intids[i++] = irq->intid;
- 	}
--	spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-+	raw_spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
- 
- 	*intid_ptr = intids;
- 	return i;
+ 	 * Enable and configure all SGIs to be edge-triggered and
 diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index bc36f2e68f5a..ea54a1923c4f 100644
+index ea54a1923c4f..abd9c7352677 100644
 --- a/virt/kvm/arm/vgic/vgic.c
 +++ b/virt/kvm/arm/vgic/vgic.c
-@@ -72,7 +72,7 @@ static struct vgic_irq *vgic_get_lpi(struct kvm *kvm, u32 intid)
- 	struct vgic_irq *irq = NULL;
- 	unsigned long flags;
+@@ -54,11 +54,11 @@ struct vgic_global kvm_vgic_global_state __ro_after_init = {
+  * When taking more than one ap_list_lock at the same time, always take the
+  * lowest numbered VCPU's ap_list_lock first, so:
+  *   vcpuX->vcpu_id < vcpuY->vcpu_id:
+- *     spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
+- *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
++ *     raw_spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
++ *     raw_spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
+  *
+  * Since the VGIC must support injecting virtual interrupts from ISRs, we have
+- * to use the spin_lock_irqsave/spin_unlock_irqrestore versions of outer
++ * to use the raw_spin_lock_irqsave/raw_spin_unlock_irqrestore versions of outer
+  * spinlocks for any lock that may be taken while injecting an interrupt.
+  */
  
--	spin_lock_irqsave(&dist->lpi_list_lock, flags);
-+	raw_spin_lock_irqsave(&dist->lpi_list_lock, flags);
+@@ -351,7 +351,7 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq,
  
- 	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
- 		if (irq->intid != intid)
-@@ -88,7 +88,7 @@ static struct vgic_irq *vgic_get_lpi(struct kvm *kvm, u32 intid)
- 	irq = NULL;
+ 	/* someone can do stuff here, which we re-check below */
  
- out_unlock:
--	spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-+	raw_spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
+-	spin_lock_irqsave(&vcpu->arch.vgic_cpu.ap_list_lock, flags);
++	raw_spin_lock_irqsave(&vcpu->arch.vgic_cpu.ap_list_lock, flags);
+ 	raw_spin_lock(&irq->irq_lock);
  
- 	return irq;
+ 	/*
+@@ -368,7 +368,8 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq,
+ 
+ 	if (unlikely(irq->vcpu || vcpu != vgic_target_oracle(irq))) {
+ 		raw_spin_unlock(&irq->irq_lock);
+-		spin_unlock_irqrestore(&vcpu->arch.vgic_cpu.ap_list_lock, flags);
++		raw_spin_unlock_irqrestore(&vcpu->arch.vgic_cpu.ap_list_lock,
++					   flags);
+ 
+ 		raw_spin_lock_irqsave(&irq->irq_lock, flags);
+ 		goto retry;
+@@ -383,7 +384,7 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq,
+ 	irq->vcpu = vcpu;
+ 
+ 	raw_spin_unlock(&irq->irq_lock);
+-	spin_unlock_irqrestore(&vcpu->arch.vgic_cpu.ap_list_lock, flags);
++	raw_spin_unlock_irqrestore(&vcpu->arch.vgic_cpu.ap_list_lock, flags);
+ 
+ 	kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
+ 	kvm_vcpu_kick(vcpu);
+@@ -597,7 +598,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+ 	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
+ 
+ retry:
+-	spin_lock(&vgic_cpu->ap_list_lock);
++	raw_spin_lock(&vgic_cpu->ap_list_lock);
+ 
+ 	list_for_each_entry_safe(irq, tmp, &vgic_cpu->ap_list_head, ap_list) {
+ 		struct kvm_vcpu *target_vcpu, *vcpuA, *vcpuB;
+@@ -638,7 +639,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+ 		/* This interrupt looks like it has to be migrated. */
+ 
+ 		raw_spin_unlock(&irq->irq_lock);
+-		spin_unlock(&vgic_cpu->ap_list_lock);
++		raw_spin_unlock(&vgic_cpu->ap_list_lock);
+ 
+ 		/*
+ 		 * Ensure locking order by always locking the smallest
+@@ -652,9 +653,9 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+ 			vcpuB = vcpu;
+ 		}
+ 
+-		spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+-		spin_lock_nested(&vcpuB->arch.vgic_cpu.ap_list_lock,
+-				 SINGLE_DEPTH_NESTING);
++		raw_spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
++		raw_spin_lock_nested(&vcpuB->arch.vgic_cpu.ap_list_lock,
++				      SINGLE_DEPTH_NESTING);
+ 		raw_spin_lock(&irq->irq_lock);
+ 
+ 		/*
+@@ -676,8 +677,8 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+ 		}
+ 
+ 		raw_spin_unlock(&irq->irq_lock);
+-		spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
+-		spin_unlock(&vcpuA->arch.vgic_cpu.ap_list_lock);
++		raw_spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
++		raw_spin_unlock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+ 
+ 		if (target_vcpu_needs_kick) {
+ 			kvm_make_request(KVM_REQ_IRQ_PENDING, target_vcpu);
+@@ -687,7 +688,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+ 		goto retry;
+ 	}
+ 
+-	spin_unlock(&vgic_cpu->ap_list_lock);
++	raw_spin_unlock(&vgic_cpu->ap_list_lock);
  }
-@@ -138,15 +138,15 @@ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
- 	if (irq->intid < VGIC_MIN_LPI)
- 		return;
  
--	spin_lock_irqsave(&dist->lpi_list_lock, flags);
-+	raw_spin_lock_irqsave(&dist->lpi_list_lock, flags);
- 	if (!kref_put(&irq->refcount, vgic_irq_release)) {
--		spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-+		raw_spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
- 		return;
- 	};
+ static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
+@@ -872,9 +873,9 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
  
- 	list_del(&irq->lpi_list);
- 	dist->lpi_list_count--;
--	spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-+	raw_spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
+ 	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
  
- 	kfree(irq);
+-	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
++	raw_spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
+ 	vgic_flush_lr_state(vcpu);
+-	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
++	raw_spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+ 
+ 	if (can_access_vgic_from_kernel())
+ 		vgic_restore_state(vcpu);
+@@ -918,7 +919,7 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+ 
+ 	vgic_get_vmcr(vcpu, &vmcr);
+ 
+-	spin_lock_irqsave(&vgic_cpu->ap_list_lock, flags);
++	raw_spin_lock_irqsave(&vgic_cpu->ap_list_lock, flags);
+ 
+ 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+ 		raw_spin_lock(&irq->irq_lock);
+@@ -931,7 +932,7 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+ 			break;
+ 	}
+ 
+-	spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
++	raw_spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
+ 
+ 	return pending;
  }
 -- 
 2.20.1
