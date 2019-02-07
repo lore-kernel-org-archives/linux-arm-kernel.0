@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 24697C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:48:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2236CC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:48:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DB34421872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:48:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E62B82075C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:48:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lfsUcVxR";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="aEEl25PQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB34421872
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fS17lgmz";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="xIP+ozZ6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E62B82075C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,21 +26,21 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QROpFFE5LtJc6kOw/PCMzLil7q7++Tm0hpda3UDxl98=; b=lfsUcVxRVmM514
-	xmm6/PheutjaKKdq9+p3xBfzoInzCSTIIqBdUcsqOH9czuirN0UtiD2VhmjcahZ88NU0JAyQH5CLm
-	L9tU1p9ilg1Uqh25rg4B6ogyHcLli+Encqlpp3tM+HSTaYP6WX1cZaOos0JL40HAVmL8HX0SKhktq
-	eHc2l/sUFg2mQ6e2nU0uzKrKHRp/Zu0JnxVHKKX3VcU9znnkHx2VVKRrACnq7GmSOhXIcnQvsckA/
-	l+qUiy6J8gCz+czZ57OtBrXXORY5U7JVqlGGnE6t+KZFT38F5kqI2gra8ldV7h7p4DXskW89bB6Rz
-	G0TIPX+5sePOoXtgT+0Q==;
+	List-Owner; bh=JCSfXFfx/HmMLZRvtg3fLC7VqeT9B5i4TBZ9SG7HpHw=; b=fS17lgmzth5H6/
+	8V05BDzlxr3HkaHaRn7RDzPP/SAhOusTJ2r55b/z9oRDXGo4bLatnnu8ptyMgkKCHiSwzIftrev8q
+	E936nptZeFmPp9HKqE/8hcdWjefW3WEQW+A0MsDQCMOltG1YZRHU3hBUzI/BwQEV2BpBYQpGS3ZJ1
+	u5gWjaJ+MwjEDnNH88jU9SwlVotgLsEkab3OR6AcSLLEylbT2CrzoQAtaQHQmHvs915+JIQ0guZmU
+	3kSEupPeJ0pvEPJHrJkPPO7Pnils28UqUiAm+lC3A2vgxvVj1VJAy3hmMtdc/agQK1+4m2fW8/LhD
+	gCOoZwMut1RiLOW7BKbA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grgI4-0004CY-0h; Thu, 07 Feb 2019 09:48:16 +0000
+	id 1grgIK-0004Vj-SW; Thu, 07 Feb 2019 09:48:32 +0000
 Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grgGq-0002zy-EL
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:47:07 +0000
+ id 1grgGq-0002zz-Dh
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:47:08 +0000
 Received: from zyt.lan (unknown [IPv6:2a02:169:34b6:0:5054:ff:fe4f:85bd])
- by mail.kmu-office.ch (Postfix) with ESMTPSA id C6A155C1C93;
+ by mail.kmu-office.ch (Postfix) with ESMTPSA id DF5135C1E18;
  Thu,  7 Feb 2019 10:46:55 +0100 (CET)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
  t=1549532815;
@@ -48,22 +48,22 @@ DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
  to:to:cc:cc:mime-version:mime-version:content-type:
  content-transfer-encoding:content-transfer-encoding:
  in-reply-to:in-reply-to:references:references;
- bh=tCLBmaTR71ESXFFla8753iRBL+0oC+zULExKyNHdSxI=;
- b=aEEl25PQ38cbkLrxoHe/LFhNjA/ohffZIGLODN5N5yBAic0iXwhdJuup+I/atXq96dXFoz
- XBHJYEPySgOqO61Zr/yJhT0S2IVRe72rUaWqUXZi2rN63bXbcrbwe+miyUuWdGqUnC7OIQ
- +pdO3d20sgVMYtSjAS0ldUZwS+5DX1A=
+ bh=zwc604StUvjs3fmtSGOl0ACcuHgsxayF/Y8S2m4nlzM=;
+ b=xIP+ozZ6WLEdZ13wl0cNRnBtQJSh2M2VLcrbmtpUGYEhjHxPG2mOqeOKnDqBEXOTVM+Fco
+ tJzxVGtu0kB30V2d63EvUWbhHpfkTefwwueJkZhQ5v1D3tQ3JcudqH9zEPjgPZTE8SXh7c
+ PrXYAhPdDK4O2xf53Rqab6LC3GyRk8c=
 From: Stefan Agner <stefan@agner.ch>
 To: linux@armlinux.org.uk
-Subject: [PATCH 1/5] ARM: use unified assembler in macros
-Date: Thu,  7 Feb 2019 10:48:25 +0100
-Message-Id: <5b710816f634307d6a67ffcf7e4b538818dcb2a3.1549532513.git.stefan@agner.ch>
+Subject: [PATCH 2/5] ARM: use unified assembler in headers
+Date: Thu,  7 Feb 2019 10:48:26 +0100
+Message-Id: <b670feebd5e0bbc4c93d3f31f45bd0243b32425f.1549532513.git.stefan@agner.ch>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <cover.1549532513.git.stefan@agner.ch>
 References: <cover.1549532513.git.stefan@agner.ch>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_014700_701026_14387439 
-X-CRM114-Status: GOOD (  12.00  )
+X-CRM114-CacheID: sfid-20190207_014700_868432_7677A70C 
+X-CRM114-Status: GOOD (  11.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,65 +85,133 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use unified assembler syntax (UAL) in macros. Divided syntax is
+Use unified assembler syntax (UAL) in headers. Divided syntax is
 considered depricated. This will also allow to build the kernel
 using LLVM's integrated assembler.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/lib/copy_from_user.S | 2 +-
- arch/arm/lib/copy_to_user.S   | 2 +-
- arch/arm/lib/memcpy.S         | 4 ++--
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/assembler.h | 8 ++++----
+ arch/arm/include/asm/vfpmacros.h | 8 ++++----
+ arch/arm/lib/bitops.h            | 8 ++++----
+ 3 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
-index 0d4c189c7f4f..712ca399f559 100644
---- a/arch/arm/lib/copy_from_user.S
-+++ b/arch/arm/lib/copy_from_user.S
-@@ -91,7 +91,7 @@
- 	.endm
- 
- 	.macro str1b ptr reg cond=al abort
--	str\cond\()b \reg, [\ptr], #1
-+	strb\cond\() \reg, [\ptr], #1
- 	.endm
- 
- 	.macro enter reg1 reg2
-diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
-index 97a6ff4b7e3c..2e402b815e13 100644
---- a/arch/arm/lib/copy_to_user.S
-+++ b/arch/arm/lib/copy_to_user.S
-@@ -49,7 +49,7 @@
- 	.endm
- 
- 	.macro ldr1b ptr reg cond=al abort
--	ldr\cond\()b \reg, [\ptr], #1
-+	ldrb\cond\() \reg, [\ptr], #1
- 	.endm
- 
- #ifdef CONFIG_CPU_USE_DOMAINS
-diff --git a/arch/arm/lib/memcpy.S b/arch/arm/lib/memcpy.S
-index 64111bd4440b..1c9e625148ca 100644
---- a/arch/arm/lib/memcpy.S
-+++ b/arch/arm/lib/memcpy.S
-@@ -30,7 +30,7 @@
- 	.endm
- 
- 	.macro ldr1b ptr reg cond=al abort
--	ldr\cond\()b \reg, [\ptr], #1
-+	ldrb\cond\() \reg, [\ptr], #1
- 	.endm
- 
- 	.macro str1w ptr reg abort
-@@ -42,7 +42,7 @@
- 	.endm
- 
- 	.macro str1b ptr reg cond=al abort
--	str\cond\()b \reg, [\ptr], #1
-+	strb\cond\() \reg, [\ptr], #1
- 	.endm
- 
- 	.macro enter reg1 reg2
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 28a48e0d4cca..60465b55683c 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -376,7 +376,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+ 	.macro	usraccoff, instr, reg, ptr, inc, off, cond, abort, t=TUSER()
+ 9999:
+ 	.if	\inc == 1
+-	\instr\cond\()b\()\t\().w \reg, [\ptr, #\off]
++	\instr\()b\cond\()\t\().w \reg, [\ptr, #\off]
+ 	.elseif	\inc == 4
+ 	\instr\cond\()\t\().w \reg, [\ptr, #\off]
+ 	.else
+@@ -417,7 +417,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+ 	.rept	\rept
+ 9999:
+ 	.if	\inc == 1
+-	\instr\cond\()b\()\t \reg, [\ptr], #\inc
++	\instr\()b\cond\()\t \reg, [\ptr], #\inc
+ 	.elseif	\inc == 4
+ 	\instr\cond\()\t \reg, [\ptr], #\inc
+ 	.else
+@@ -460,7 +460,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+ 	.macro check_uaccess, addr:req, size:req, limit:req, tmp:req, bad:req
+ #ifndef CONFIG_CPU_USE_DOMAINS
+ 	adds	\tmp, \addr, #\size - 1
+-	sbcccs	\tmp, \tmp, \limit
++	sbcscc	\tmp, \tmp, \limit
+ 	bcs	\bad
+ #ifdef CONFIG_CPU_SPECTRE
+ 	movcs	\addr, #0
+@@ -474,7 +474,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+ 	sub	\tmp, \limit, #1
+ 	subs	\tmp, \tmp, \addr	@ tmp = limit - 1 - addr
+ 	addhs	\tmp, \tmp, #1		@ if (tmp >= 0) {
+-	subhss	\tmp, \tmp, \size	@ tmp = limit - (addr + size) }
++	subshs	\tmp, \tmp, \size	@ tmp = limit - (addr + size) }
+ 	movlo	\addr, #0		@ if (tmp < 0) addr = NULL
+ 	csdb
+ #endif
+diff --git a/arch/arm/include/asm/vfpmacros.h b/arch/arm/include/asm/vfpmacros.h
+index ef5dfedacd8d..628c336e8e3b 100644
+--- a/arch/arm/include/asm/vfpmacros.h
++++ b/arch/arm/include/asm/vfpmacros.h
+@@ -29,13 +29,13 @@
+ 	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
+ 	ldr	\tmp, [\tmp, #0]
+ 	tst	\tmp, #HWCAP_VFPD32
+-	ldcnel	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
++	ldclne	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
+ 	addeq	\base, \base, #32*4		    @ step over unused register space
+ #else
+ 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
+ 	and	\tmp, \tmp, #MVFR0_A_SIMD_MASK	    @ A_SIMD field
+ 	cmp	\tmp, #2			    @ 32 x 64bit registers?
+-	ldceql	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
++	ldcleq	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
+ 	addne	\base, \base, #32*4		    @ step over unused register space
+ #endif
+ #endif
+@@ -53,13 +53,13 @@
+ 	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
+ 	ldr	\tmp, [\tmp, #0]
+ 	tst	\tmp, #HWCAP_VFPD32
+-	stcnel	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
++	stclne	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
+ 	addeq	\base, \base, #32*4		    @ step over unused register space
+ #else
+ 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
+ 	and	\tmp, \tmp, #MVFR0_A_SIMD_MASK	    @ A_SIMD field
+ 	cmp	\tmp, #2			    @ 32 x 64bit registers?
+-	stceql	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
++	stcleq	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
+ 	addne	\base, \base, #32*4		    @ step over unused register space
+ #endif
+ #endif
+diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
+index 93cddab73072..95bd35991288 100644
+--- a/arch/arm/lib/bitops.h
++++ b/arch/arm/lib/bitops.h
+@@ -7,7 +7,7 @@
+ ENTRY(	\name		)
+ UNWIND(	.fnstart	)
+ 	ands	ip, r1, #3
+-	strneb	r1, [ip]		@ assert word-aligned
++	strbne	r1, [ip]		@ assert word-aligned
+ 	mov	r2, #1
+ 	and	r3, r0, #31		@ Get bit offset
+ 	mov	r0, r0, lsr #5
+@@ -32,7 +32,7 @@ ENDPROC(\name		)
+ ENTRY(	\name		)
+ UNWIND(	.fnstart	)
+ 	ands	ip, r1, #3
+-	strneb	r1, [ip]		@ assert word-aligned
++	strbne	r1, [ip]		@ assert word-aligned
+ 	mov	r2, #1
+ 	and	r3, r0, #31		@ Get bit offset
+ 	mov	r0, r0, lsr #5
+@@ -62,7 +62,7 @@ ENDPROC(\name		)
+ ENTRY(	\name		)
+ UNWIND(	.fnstart	)
+ 	ands	ip, r1, #3
+-	strneb	r1, [ip]		@ assert word-aligned
++	strbne	r1, [ip]		@ assert word-aligned
+ 	and	r2, r0, #31
+ 	mov	r0, r0, lsr #5
+ 	mov	r3, #1
+@@ -89,7 +89,7 @@ ENDPROC(\name		)
+ ENTRY(	\name		)
+ UNWIND(	.fnstart	)
+ 	ands	ip, r1, #3
+-	strneb	r1, [ip]		@ assert word-aligned
++	strbne	r1, [ip]		@ assert word-aligned
+ 	and	r3, r0, #31
+ 	mov	r0, r0, lsr #5
+ 	save_and_disable_irqs ip
 -- 
 2.20.1
 
