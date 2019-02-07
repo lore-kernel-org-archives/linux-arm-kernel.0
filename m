@@ -2,85 +2,122 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7BC1DC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 17:30:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CE06EC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 17:47:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4D6D9218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 17:30:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9E9502083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 17:47:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K6ZUbaLX";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="E/G1eVpc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4D6D9218D3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DhzVKWzA";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=ucr.edu header.i=@ucr.edu header.b="b0xOLyxi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E9502083B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ucr.edu
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=1o34QlQKasSdrENqgVPHlhOrqQr69e0vUxI2ndcSy8k=; b=K6ZUbaLXTWEJJ2
-	/04/8/P46N6gxFM10RhF3TZBtogxvbQ0RaHPlK0BJ3sJBfsTbfyQyBSvV57eRup+RcgZdq4k0uRFK
-	E3XY95mRn+4OxELeEd24W2rdygvLW158ddlyqNQzMjedse4HaR4FUpPweH6c8H5YLpOZYvads3kxX
-	iHk6/apF8WLuH+JeegqbT9zUUQ8Ueeu/NNjzWW/PRFy+EoXBzLFLFPsvhrrN98r/Th2TQrDMy8c96
-	R0z9Yj3qma+fvSkDfJ3N8PLnunHOJ2Q4Q84wk+qwELKshl9pjeviZBLs1RhbURtvitsKuhvl5BIgu
-	jn9DYZRRei4UoQpPJMcQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=1ZwYPZ0ZAEbT2zjRpzUrAXEfA6IFDrmcS0Pc8WtM0BM=; b=Dhz
+	VKWzAvTUgscVV3/rJtnDdVC2jD2ntiXXTq3g6aOe+uVtEYEAV9TdA4LPBF86+RanQZDF//KlRc+Zg
+	/UTXc1uNF/Y2p6Qtgy7Ywe1pzhM4YtvuKX6HTBbpp3S76IHzp745VSbntzU8Js3DZwjSB7tJdxhVj
+	vjgUGvqXlyxrlynS0B259503Fpv5lTa3ht3W9qwvjtzq2LAHfiCAUtxqnM8WpRqRlYM3HUEx4zdAY
+	mU+VbOqHlb74fTxElQqIUC/ih41uYqzkKxGlfEHUeqQ9E7+gO5AIvt/8t8/TL9rM6xL995ntKyGo7
+	YR/boxVW5mZR1xRaCezJ2c6f09CeQAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grnVE-0003x4-RI; Thu, 07 Feb 2019 17:30:20 +0000
-Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
+	id 1grnlN-0000cs-Ls; Thu, 07 Feb 2019 17:47:01 +0000
+Received: from mx2.ucr.edu ([138.23.62.3])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grnVA-0003w7-QX
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 17:30:19 +0000
-Received: by mail-ed1-x542.google.com with SMTP id f9so522429eds.10
+ id 1grnlK-0000cS-Is
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 17:46:59 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple;
+ d=ucr.edu; i=@ucr.edu; q=dns/txt; s=selector3;
+ t=1549561618; x=1581097618;
+ h=from:to:cc:subject:date:message-id;
+ bh=wImntgiBJtk3wwGZmT6fv88DkNLi+LVBqQWMeTeg6K4=;
+ b=b0xOLyxiyPaU5dQlptMt18G4gaJCNAJuJX7nAh+d7O4hl7ns6mSfTycA
+ 2xFunT90+4pZ5kDLodatwZhbZQ3qFa/v2UYqsYK9gT+5tyHGXnsI3ytsj
+ ZlNxxEbUX2BQs4dNrdggITqn4Dsy1l6UdhqiWez0xxjFM3yWL/0Nc/42V
+ /tFQCMkUASV+FnOpm/qrHItC2CBBzkBwJo6ionkurVsgssSJtV4CtoaA+
+ +pGE0a7votzJPh62MKhe2TKDka3tAPtPRrYYdM3yjH75gJTCYh5l7z9mY
+ aV6p/Mx/qZVwbZ35pENcVOWleQTeA0yqxZp2kETfsFY0z/JrdYPwDwOU/ Q==;
+IronPort-PHdr: =?us-ascii?q?9a23=3A3LcOEBAGF60XZWPDj3E6UyQJP3N1i/DPJgcQr6Af?=
+ =?us-ascii?q?oPdwSPvyr8bcNUDSrc9gkEXOFd2Cra4c26yO6+jJYi8p2d65qncMcZhBBVcuqP?=
+ =?us-ascii?q?49uEgeOvODElDxN/XwbiY3T4xoXV5h+GynYwAOQJ6tL1LdrWev4jEMBx7xKRR6?=
+ =?us-ascii?q?JvjvGo7Vks+7y/2+94fcbglUhzexe69+IAmrpgjNq8cahpdvJLwswRXTuHtIfO?=
+ =?us-ascii?q?pWxWJsJV2Nmhv3+9m98p1+/SlOovwt78FPX7n0cKQ+VrxYES8pM3sp683xtBnM?=
+ =?us-ascii?q?VhWA630BWWgLiBVIAgzF7BbnXpfttybxq+Rw1DWGMcDwULs5Qiqp4bt1RxD0iS?=
+ =?us-ascii?q?cHLz85/3/Risxsl6JQvRatqwViz4LIfI2ZMfxzfqbcfdMBXmpBX8BRVyNcCY2i?=
+ =?us-ascii?q?doUEEuQBPedGoIn5ulQFsB+yCAewCO/qzDJDm3340rAg0+k5EQ/IwhEuEdwNvn?=
+ =?us-ascii?q?rTt9j5KLseXPqpwKTS0TnPc/Vb0ir95ojSdRAhpOmBUrBxccvQyUkvCgTFhUiX?=
+ =?us-ascii?q?pI3lPjKV1v4Cs2mH4+Z8W++ikHMnpB1rojS12Mgjl5TJi5sTx1vZ9it52J44Kc?=
+ =?us-ascii?q?OkREN/e9KpE5tduzuEO4drQs4uWXxktSI+x7EepJK2fSwHxI45yxPRa/GLaZaE?=
+ =?us-ascii?q?7xP5WOuTLjp1gm9udqiliBao60egz/XxVsyz0FlXsCVIisLMtnUR1xzL7ciHV+?=
+ =?us-ascii?q?d98l+h2TmR0wDT7flJIUUumqraL54t26YwlpUOvUjaEC/6hUH7gauMekUr/eio?=
+ =?us-ascii?q?7OvnYrH4qZOGK4B0jQT+Prwvmsy5H+s4LhADU3aH9em4zrHu/k30TK9UgvErkq?=
+ =?us-ascii?q?TVqo3WKMAfq6KhBg9ayIcj6xKxDze819QYmGEKLVJEeRKHlYfpOk3CLOz2APqk?=
+ =?us-ascii?q?nlSjjC1ry+rYMbL8H5XBNmLDn6v5fbZh905czxI+zdRe55JSF7EAL+v/VVXrtN?=
+ =?us-ascii?q?zdFxM5MBK7w/zhCNpj0oMTQmaPAq6CMKPOql+E/OMvI++CZI8PojnyNuYq6OTz?=
+ =?us-ascii?q?gnMjnl8dZ6apjtM5cne9S8VnMUWEZjK4k8UBGGZS5lEWUefwzlCOTGgAND6JQ6?=
+ =?us-ascii?q?sg62RjW8qdBoDZS9Xo3+SM?=
+X-IronPort-Anti-Spam-Filtered: true
+X-IronPort-Anti-Spam-Result: =?us-ascii?q?A2B1AgCnblxcgMfXVdFkHAEBAQQBAQcEA?=
+ =?us-ascii?q?QGBZYM8Sg+MfIsQUgaKfm2FWYJzhwoBCgEBLIRAgyoiSgEDAQECAQMBEwEBCQ0?=
+ =?us-ascii?q?JCCcxgjopgl82UoEVAQUBNVuCSQGBdA2hWDyMFzOIWQEHgUsJAQiHcIRBgQ+BB?=
+ =?us-ascii?q?4NuhH+DVIJDAoEsAQEBilCFPJFUAQYCAYFlgUOPESWBbYFKhwE4h2QBLZtPAgQ?=
+ =?us-ascii?q?CBAUCBQ8hgzNNJYFsCoFEglKOLB4zgQeLJoJNAQ?=
+X-IPAS-Result: =?us-ascii?q?A2B1AgCnblxcgMfXVdFkHAEBAQQBAQcEAQGBZYM8Sg+MfIs?=
+ =?us-ascii?q?QUgaKfm2FWYJzhwoBCgEBLIRAgyoiSgEDAQECAQMBEwEBCQ0JCCcxgjopgl82U?=
+ =?us-ascii?q?oEVAQUBNVuCSQGBdA2hWDyMFzOIWQEHgUsJAQiHcIRBgQ+BB4NuhH+DVIJDAoE?=
+ =?us-ascii?q?sAQEBilCFPJFUAQYCAYFlgUOPESWBbYFKhwE4h2QBLZtPAgQCBAUCBQ8hgzNNJ?=
+ =?us-ascii?q?YFsCoFEglKOLB4zgQeLJoJNAQ?=
+X-IronPort-AV: E=Sophos;i="5.58,345,1544515200"; d="scan'208";a="1055034903"
+Received: from mail-pg1-f199.google.com ([209.85.215.199])
+ by smtp2.ucr.edu with ESMTP/TLS/AES128-GCM-SHA256; 07 Feb 2019 09:46:38 -0800
+Received: by mail-pg1-f199.google.com with SMTP id o187so418277pgo.2
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 07 Feb 2019 09:30:16 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:mime-version;
- bh=goV4oeui+QjZXGASbWEnmi9tnJ5aRRm3TV6+qGVkZCw=;
- b=E/G1eVpclGbPqa6wEwR+w2v8D7LjGwl1tAIfNRowttC7eNOQpkPu667FDpDXYrNELx
- 5QCX2dVTrTZAu3VHSS9v+/14Q4WKrnAktZHQnCYhQ9zBaPPPCYy9otw/JYxe/dwQq2n1
- pbNLeVX7sgvao51xy6MK8X5Jz3EWf1YxW0Nju7yEqa7N0LhU7Ji2ExddPoPXbJtKiaIS
- C3q7393v1NxEk8BRT/i5rsTfe5VLQs5ZGYMBdVXZNCf3FMGV0d2HfSXa5yoMzVsLCtsN
- fjs2CJXo59KZTAgbsHExzLwyNorAH2U6mcTEhqaxjIWdMbJ4Q+1IISoBjmkkhzDbX3zZ
- yPEw==
+ Thu, 07 Feb 2019 09:46:38 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version;
- bh=goV4oeui+QjZXGASbWEnmi9tnJ5aRRm3TV6+qGVkZCw=;
- b=SQEwtlWSrJZE9mn5a5qcuPEsjzKj6rqbwMmN7rWC/WyUt3SOZvKdcdqMyaHzd3Nsyn
- og7INIuigcp/MnWMfJe+6PqW0eBci/F53EMWRxgXRPkDBzcJPOCthejocRFcyO4C/VjB
- cvUcJK28JQSvpJf3Fb1sn3E0NDBc6Tcsjo67a/PtuDrSekUq6CC8eqH/DYPXPW5SjVpG
- terRDTO1f+aOB18xEy4/goWR7iFEUpH3kytsvRs1QW/LIULPggFtAlCTxz1/DdWGfORp
- LTG3OptoUBgRSoIZh1JuqMdQZfYYTFFKIq1hn0FtEv5NdkY6Lm7WnS94+36X1xoYTGUl
- CBpA==
-X-Gm-Message-State: AHQUAub8mB/nXUaGLIU3PI5FNN/xjo3mMLP2xbq5wCC1LReuBS18bf4Y
- /JuCQx9soetnrVan1XiJ+8ucMQ==
-X-Google-Smtp-Source: AHgI3Ia1KW0iSGh1qbZtY6aDlkL1lwFh8uSLrKbWxO0couClL/4F1IkZWaqSpRyPGLODpi3nwn7HSg==
-X-Received: by 2002:a17:906:12cf:: with SMTP id
- l15mr7724322ejb.31.1549560614919; 
- Thu, 07 Feb 2019 09:30:14 -0800 (PST)
-Received: from localhost ([2620:10d:c092:180::1:a0f9])
- by smtp.gmail.com with ESMTPSA id w27sm4275214eje.76.2019.02.07.09.30.13
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=2tzpVyPYpfdzliPB1oyDkazyBfCrViS9BIM/UOQo4PI=;
+ b=eNtWzdzMVkq0CVorvoR2G8ROjzJrsZ3TwF100rfSsI10/UxBRTdYNqL4FSaviDbGOU
+ sMA0qiP66NS6hsk8lG/fNYgtEe1ha2eGjMz9+AEMm8TqdRmUYLfEzrFqGsYpQ1jnBncm
+ rEnPS3PHuNBjeyDQXM2odds6cGrzGJOyGKWOybhzzadC9UiKeEOL/V1xFNV8r9NKK3ak
+ 3TANRdoZ9CWU6EWiN4MP9ku4lv4qNx5ok65hm2q8jgU0Ej7osIaw6CxSz0CViMlY2ThP
+ CT9dBzB/3dJPVBjJLNkahVDp6urdaH8xGVtC6hjlhG2wXva7Ihgk38zfIxdSwHLnzhkD
+ F6ig==
+X-Gm-Message-State: AHQUAubM0FshVo6gJnp/i08aBfLCmfh+kwlsfueccAdQf2VZWjXKE99S
+ KEvmlhwJ6ckIAsFbz6ihD1nRPx8YPy8GCECVcIHNoN5aObsIaeIYxa4HsCDUbBl3DH+7SgTe//l
+ MRVvRV8TO2qYsCgHcrvvsEEuQDDj/7ChJFb2y
+X-Received: by 2002:a63:da14:: with SMTP id c20mr15338850pgh.233.1549561597765; 
+ Thu, 07 Feb 2019 09:46:37 -0800 (PST)
+X-Google-Smtp-Source: AHgI3IayrGVGwQ3ZjOg/wOj9tm31uHR4CdpsjffL6HoAIgRqtFTZ12maLg7c1SCwb6lANot4erlZ3A==
+X-Received: by 2002:a63:da14:: with SMTP id c20mr15338773pgh.233.1549561597020; 
+ Thu, 07 Feb 2019 09:46:37 -0800 (PST)
+Received: from Yizhuo.cs.ucr.edu (yizhuo.cs.ucr.edu. [169.235.26.74])
+ by smtp.googlemail.com with ESMTPSA id m67sm14007791pfm.73.2019.02.07.09.46.35
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 07 Feb 2019 09:30:13 -0800 (PST)
-From: Julien Masson <jmasson@baylibre.com>
-To: Kevin Hilman <khilman@baylibre.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [PATCH v2] tty: serial: meson_uart: Add support for kernel debugger
-Date: Thu,  7 Feb 2019 18:11:29 +0100
-Message-ID: <86k1ibv74r.fsf@baylibre.com>
-MIME-Version: 1.0
+ Thu, 07 Feb 2019 09:46:36 -0800 (PST)
+From: Yizhuo <yzhai003@ucr.edu>
+To: 
+Subject: [PATCH] net: stmmac: Variable "val" in function
+ sun8i_dwmac_set_syscon() could be uninitialized
+Date: Thu,  7 Feb 2019 09:46:23 -0800
+Message-Id: <20190207174623.16712-1-yzhai003@ucr.edu>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_093016_873982_92B35608 
-X-CRM114-Status: GOOD (  14.87  )
+X-CRM114-CacheID: sfid-20190207_094658_662581_640AA607 
+X-CRM114-Status: GOOD (  13.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,130 +129,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Julien Masson <jmasson@baylibre.com>, linux-kernel@vger.kernel.org,
- linux-serial@vger.kernel.org, Jiri Slaby <jslaby@suse.com>,
- linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: csong@cs.ucr.edu, Alexandre Torgue <alexandre.torgue@st.com>,
+ netdev@vger.kernel.org, zhiyunq@cs.ucr.edu, linux-kernel@vger.kernel.org,
+ Yizhuo <yzhai003@ucr.edu>, Chen-Yu Tsai <wens@csie.org>,
+ Giuseppe Cavallaro <peppe.cavallaro@st.com>,
+ Maxime Ripard <maxime.ripard@free-electrons.com>,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The kgdb invokes the poll_put_char and poll_get_char when communicating
-with the host. This patch implement the serial polling hooks for the
-meson_uart to be used for KGDB debugging over serial line.
+In function sun8i_dwmac_set_syscon(), local variable "val" could
+be uninitialized if function regmap_read() returns -EINVAL.
+However, it will be used directly in the if statement, which
+is potentially unsafe.
 
-Signed-off-by: Julien Masson <jmasson@baylibre.com>
+Signed-off-by: Yizhuo <yzhai003@ucr.edu>
 ---
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Changes since v1 [0]:
-* Use readl_poll_timeout_atomic instead of looping with read + cpu_relax
-  -> read every 5 usecs during 1 msec
-* add some comments
-
-[0]: https://lore.kernel.org/lkml/1549015162-17418-1-git-send-email-jmasson@baylibre.com
-
- drivers/tty/serial/meson_uart.c | 65 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
-
-diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
-index 8a84259..bcff572 100644
---- a/drivers/tty/serial/meson_uart.c
-+++ b/drivers/tty/serial/meson_uart.c
-@@ -14,6 +14,7 @@
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/iopoll.h>
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/of.h>
-@@ -75,6 +76,8 @@
- #define AML_UART_PORT_NUM		6
- #define AML_UART_DEV_NAME		"ttyAML"
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+index 39c2122a4f26..50cfd6d83052 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+@@ -641,7 +641,12 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
+ 	int ret;
+ 	u32 reg, val;
  
-+#define AML_UART_POLL_USEC		5
-+#define AML_UART_TIMEOUT_USEC		1000
- 
- static struct uart_driver meson_uart_driver;
- 
-@@ -426,6 +429,64 @@ static void meson_uart_config_port(struct uart_port *port, int flags)
- 	}
- }
- 
-+#ifdef CONFIG_CONSOLE_POLL
-+/*
-+ * Console polling routines for writing and reading from the uart while
-+ * in an interrupt or debug context (i.e. kgdb).
-+ */
-+
-+static int meson_uart_poll_get_char(struct uart_port *port)
-+{
-+	u32 c;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&port->lock, flags);
-+
-+	if (readl(port->membase + AML_UART_STATUS) & AML_UART_RX_EMPTY)
-+		c = NO_POLL_CHAR;
-+	else
-+		c = readl(port->membase + AML_UART_RFIFO);
-+
-+	spin_unlock_irqrestore(&port->lock, flags);
-+
-+	return c;
-+}
-+
-+static void meson_uart_poll_put_char(struct uart_port *port, unsigned char c)
-+{
-+	unsigned long flags;
-+	u32 reg;
-+	int ret;
-+
-+	spin_lock_irqsave(&port->lock, flags);
-+
-+	/* Wait until FIFO is empty or timeout */
-+	ret = readl_poll_timeout_atomic(port->membase + AML_UART_STATUS, reg,
-+					reg & AML_UART_TX_EMPTY,
-+					AML_UART_POLL_USEC,
-+					AML_UART_TIMEOUT_USEC);
-+	if (ret == -ETIMEDOUT) {
-+		dev_err(port->dev, "Timeout waiting for UART TX EMPTY\n");
-+		goto out;
+-	regmap_read(gmac->regmap, SYSCON_EMAC_REG, &val);
++	ret = regmap_read(gmac->regmap, SYSCON_EMAC_REG, &val);
++	if (ret) {
++		dev_err(priv->device, "Fail to read SYSCON_EMAC_REG.\n");
++		return ret;
 +	}
 +
-+	/* Write the character */
-+	writel(c, port->membase + AML_UART_WFIFO);
-+
-+	/* Wait until FIFO is empty or timeout */
-+	ret = readl_poll_timeout_atomic(port->membase + AML_UART_STATUS, reg,
-+					reg & AML_UART_TX_EMPTY,
-+					AML_UART_POLL_USEC,
-+					AML_UART_TIMEOUT_USEC);
-+	if (ret == -ETIMEDOUT)
-+		dev_err(port->dev, "Timeout waiting for UART TX EMPTY\n");
-+
-+out:
-+	spin_unlock_irqrestore(&port->lock, flags);
-+}
-+
-+#endif /* CONFIG_CONSOLE_POLL */
-+
- static const struct uart_ops meson_uart_ops = {
- 	.set_mctrl      = meson_uart_set_mctrl,
- 	.get_mctrl      = meson_uart_get_mctrl,
-@@ -441,6 +502,10 @@ static const struct uart_ops meson_uart_ops = {
- 	.request_port	= meson_uart_request_port,
- 	.release_port	= meson_uart_release_port,
- 	.verify_port	= meson_uart_verify_port,
-+#ifdef CONFIG_CONSOLE_POLL
-+	.poll_get_char	= meson_uart_poll_get_char,
-+	.poll_put_char	= meson_uart_poll_put_char,
-+#endif
- };
- 
- #ifdef CONFIG_SERIAL_MESON_CONSOLE
+ 	reg = gmac->variant->default_syscon_value;
+ 	if (reg != val)
+ 		dev_warn(priv->device,
 -- 
-2.7.4
+2.17.1
 
 
 _______________________________________________
