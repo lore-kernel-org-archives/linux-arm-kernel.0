@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 13503C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:51:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9BD43C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:52:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CFE7320823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:51:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1DDCF20823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:52:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UYbzsNAj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CFE7320823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d6n2OPkZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1DDCF20823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9zq5+tjvDFGaglrDBdpkGowOhJfUeOyLhRR1zpgipB4=; b=UYbzsNAjNs9ZdV
-	rAk6mT20KFlONI9+IUuOCIkzsZK1rPXJWhp1tJDTNHaF9MRQmjrZRM/f/xGUhqq1GcO4xV9pDDcNH
-	kaCmHfMvIOpE73F16fTAKB+zTd+OgJDbJroShdQ0CwrAY9tBxkbr3edNE3HUDTqiIasz2XzUH+ymp
-	nWKozfQbz8/Dnym7rEFZdb6FYacw25hAmopH6avuK4F04N1516s4wcbhD0evcyl2q9yakboWqL9Zq
-	cbCyni3/okAZdIfJacWR65Wp5qQoGFLSeZbQCAPSMBS0cFUFZdtFrj92TeLK3VMpW3WCZHflU9HSW
-	l4hhtQO1FHbo4yhZt2ow==;
+	List-Owner; bh=a6MJTzUzLdLG4dm5PjFMjePsokZviwdyMekCl2AjzJw=; b=d6n2OPkZFWWGpU
+	nWR8K0RpAbMxNrR8ZBZ6HJntAc77dCllZ4qi4fXKzhfsZPRHMcTbrYdrC9AE8h8RDSf8n1QauFgAV
+	33Cd/kJm2NPVD660+I7GVJdvSp5yh6P5BRoC/mp0nftYotU/l1c0FHG2Cpu2OcVdSLaTnSw/8+bMS
+	Kt8Wb9GWSFlo+HkkcvFirvJMuq7AF4oFzOoSd1lWUIx4Xi5oAViCOOhdQyEDc3D1G7uVWQlVeyEc4
+	V5dN/ONF/YVg1ul8HDrEE9ikjlHmo/1NhCJJiAArxbGzYHisIe9oQrHeZ3muaxddkRQvMwFc9IZ/m
+	8WMOH/d3wwW9qjkl86Yw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grgLV-00085u-B3; Thu, 07 Feb 2019 09:51:49 +0000
+	id 1grgM6-0000Gk-K7; Thu, 07 Feb 2019 09:52:26 +0000
 Received: from relay11.mail.gandi.net ([217.70.178.231])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grgK0-0005sJ-Fl
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:50:22 +0000
+ id 1grgK3-00063U-9G
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:50:27 +0000
 Received: from mc-bl-xps13.lan
  (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr [90.88.22.177])
  (Authenticated sender: maxime.chevallier@bootlin.com)
- by relay11.mail.gandi.net (Postfix) with ESMTPSA id 48852100014;
- Thu,  7 Feb 2019 09:50:12 +0000 (UTC)
+ by relay11.mail.gandi.net (Postfix) with ESMTPSA id 197DD10001F;
+ Thu,  7 Feb 2019 09:50:14 +0000 (UTC)
 From: Maxime Chevallier <maxime.chevallier@bootlin.com>
 To: davem@davemloft.net
-Subject: [PATCH net-next v2 06/10] net: phy: Add generic support for 2.5GBaseT
- and 5GBaseT
-Date: Thu,  7 Feb 2019 10:49:35 +0100
-Message-Id: <20190207094939.27369-7-maxime.chevallier@bootlin.com>
+Subject: [PATCH net-next v2 07/10] net: phy: marvell10g: Add support for
+ 2.5GBASET
+Date: Thu,  7 Feb 2019 10:49:36 +0100
+Message-Id: <20190207094939.27369-8-maxime.chevallier@bootlin.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
 References: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_015017_572012_29E7FB25 
-X-CRM114-Status: GOOD (  12.37  )
+X-CRM114-CacheID: sfid-20190207_015020_090679_256184C0 
+X-CRM114-Status: GOOD (  16.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,176 +80,118 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The 802.3bz specification, based on previous by the NBASET alliance,
-defines the 2.5GBaseT and 5GBaseT link modes for ethernet traffic on
-cat5e, cat6 and cat7 cables.
+The Marvell Alaska family of PHYs supports 2.5GBaseT and 5GBaseT modes,
+as defined in the 802.3bz specification.
 
-These mode integrate with the already defined C45 MDIO PMA/PMD registers
-set that added 10G support, by defining some previously reserved bits,
-and adding a new register (2.5G/5G Extended abilities).
+When the link partner requests a 2.5GBASET link, the PHY will
+reconfigure it's MII interface to 2500BASEX.
 
-This commit adds the required definitions in include/uapi/linux/mdio.h
-to support these modes, and detect when a link-partner advertises them.
+At 5G, the PHY will reconfigure it's interface to 5GBASE-R, but this
+mode isn't supported by any MAC for now.
 
-It also adds support for these mode in the generic C45 PHY
-infrastructure.
+This was tested with :
+ - The 88X3310, which is on the MacchiatoBin
+ - The 88E2010, an Alaska PHY that has no fiber interfaces, and is
+   limited to 5G maximum speed.
 
 Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
 ---
-V1 -> V2: Merged in code for reading 2.5G/5G abilities.
+V1 -> V2: Use a #define for the 88X3310 PHY ID, since it's reused in
+	  various places in the code. Rebased on Heiner Kallweit's patch
+	  introducing the phy_modify_mmd accessor.
 
- drivers/net/phy/phy-c45.c    | 37 ++++++++++++++++++++++++++++++++++++
- drivers/net/phy/phy_device.c |  2 ++
- include/uapi/linux/mdio.h    | 16 ++++++++++++++++
- 3 files changed, 55 insertions(+)
+ drivers/net/phy/marvell10g.c | 30 ++++++++++++++++++++++--------
+ include/linux/marvell_phy.h  |  1 +
+ 2 files changed, 23 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/net/phy/phy-c45.c b/drivers/net/phy/phy-c45.c
-index 32e72b170ea9..92897cb26557 100644
---- a/drivers/net/phy/phy-c45.c
-+++ b/drivers/net/phy/phy-c45.c
-@@ -47,6 +47,16 @@ int genphy_c45_pma_setup_forced(struct phy_device *phydev)
- 		/* Assume 1000base-T */
- 		ctrl2 |= MDIO_PMA_CTRL2_1000BT;
- 		break;
-+	case SPEED_2500:
-+		ctrl1 |= MDIO_CTRL1_SPEED2_5G;
-+		/* Assume 2.5Gbase-T */
-+		ctrl2 |= MDIO_PMA_CTRL2_2_5GBT;
-+		break;
-+	case SPEED_5000:
-+		ctrl1 |= MDIO_CTRL1_SPEED5G;
-+		/* Assume 5Gbase-T */
-+		ctrl2 |= MDIO_PMA_CTRL2_5GBT;
-+		break;
- 	case SPEED_10000:
- 		ctrl1 |= MDIO_CTRL1_SPEED10G;
- 		/* Assume 10Gbase-T */
-@@ -179,6 +189,12 @@ int genphy_c45_read_lpa(struct phy_device *phydev)
- 	if (val < 0)
- 		return val;
+diff --git a/drivers/net/phy/marvell10g.c b/drivers/net/phy/marvell10g.c
+index 07df87b81369..581b4b6e31e9 100644
+--- a/drivers/net/phy/marvell10g.c
++++ b/drivers/net/phy/marvell10g.c
+@@ -238,6 +238,7 @@ static int mv3310_config_init(struct phy_device *phydev)
  
-+	if (val & MDIO_AN_10GBT_STAT_LP2_5G)
-+		linkmode_set_bit(ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
-+				 phydev->lp_advertising);
-+	if (val & MDIO_AN_10GBT_STAT_LP5G)
-+		linkmode_set_bit(ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
-+				 phydev->lp_advertising);
- 	if (val & MDIO_AN_10GBT_STAT_LP10G)
- 		linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
- 				 phydev->lp_advertising);
-@@ -209,6 +225,12 @@ int genphy_c45_read_pma(struct phy_device *phydev)
- 	case MDIO_PMA_CTRL1_SPEED1000:
- 		phydev->speed = SPEED_1000;
- 		break;
-+	case MDIO_CTRL1_SPEED2_5G:
-+		phydev->speed = SPEED_2500;
-+		break;
-+	case MDIO_CTRL1_SPEED5G:
-+		phydev->speed = SPEED_5000;
-+		break;
- 	case MDIO_CTRL1_SPEED10G:
- 		phydev->speed = SPEED_10000;
- 		break;
-@@ -324,6 +346,21 @@ int genphy_c45_pma_read_abilities(struct phy_device *phydev)
- 		linkmode_mod_bit(ETHTOOL_LINK_MODE_10baseT_Half_BIT,
- 				 phydev->supported,
- 				 val & MDIO_PMA_EXTABLE_10BT);
+ 	/* Check that the PHY interface type is compatible */
+ 	if (phydev->interface != PHY_INTERFACE_MODE_SGMII &&
++	    phydev->interface != PHY_INTERFACE_MODE_2500BASEX &&
+ 	    phydev->interface != PHY_INTERFACE_MODE_XAUI &&
+ 	    phydev->interface != PHY_INTERFACE_MODE_RXAUI &&
+ 	    phydev->interface != PHY_INTERFACE_MODE_10GKR)
+@@ -307,8 +308,18 @@ static int mv3310_config_aneg(struct phy_device *phydev)
+ 	else
+ 		reg = 0;
+ 
++	if (linkmode_test_bit(ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
++			      phydev->advertising))
++		reg |= MDIO_AN_10GBT_CTRL_ADV2_5G;
++	if (linkmode_test_bit(ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
++			      phydev->advertising))
++		reg |= MDIO_AN_10GBT_CTRL_ADV5G;
 +
-+		if (val & MDIO_PMA_EXTABLE_NBT) {
-+			val = phy_read_mmd(phydev, MDIO_MMD_PMAPMD,
-+					   MDIO_PMA_NG_EXTABLE);
-+			if (val < 0)
-+				return val;
+ 	ret = phy_modify_mmd(phydev, MDIO_MMD_AN, MDIO_AN_10GBT_CTRL,
+-			     MDIO_AN_10GBT_CTRL_ADV10G, reg);
++			     MDIO_AN_10GBT_CTRL_ADV10G |
++			     MDIO_AN_10GBT_CTRL_ADV5G |
++			     MDIO_AN_10GBT_CTRL_ADV2_5G, reg);
 +
-+			linkmode_mod_bit(ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
-+					 phydev->supported,
-+					 val & MDIO_PMA_NG_EXTABLE_2_5GBT);
-+
-+			linkmode_mod_bit(ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
-+					 phydev->supported,
-+					 val & MDIO_PMA_NG_EXTABLE_5GBT);
-+		}
+ 	if (ret < 0)
+ 		return ret;
+ 	if (ret > 0)
+@@ -337,17 +348,20 @@ static int mv3310_aneg_done(struct phy_device *phydev)
+ static void mv3310_update_interface(struct phy_device *phydev)
+ {
+ 	if ((phydev->interface == PHY_INTERFACE_MODE_SGMII ||
++	     phydev->interface == PHY_INTERFACE_MODE_2500BASEX ||
+ 	     phydev->interface == PHY_INTERFACE_MODE_10GKR) && phydev->link) {
+ 		/* The PHY automatically switches its serdes interface (and
+-		 * active PHYXS instance) between Cisco SGMII and 10GBase-KR
+-		 * modes according to the speed.  Florian suggests setting
+-		 * phydev->interface to communicate this to the MAC. Only do
+-		 * this if we are already in either SGMII or 10GBase-KR mode.
++		 * active PHYXS instance) between Cisco SGMII, 10GBase-KR and
++		 * 2500BaseX modes according to the speed.  Florian suggests
++		 * setting phydev->interface to communicate this to the MAC.
++		 * Only do this if we are already in one of the above modes.
+ 		 */
+ 		if (phydev->speed == SPEED_10000)
+ 			phydev->interface = PHY_INTERFACE_MODE_10GKR;
++		else if (phydev->speed == SPEED_2500)
++			phydev->interface = PHY_INTERFACE_MODE_2500BASEX;
+ 		else if (phydev->speed >= SPEED_10 &&
+-			 phydev->speed < SPEED_10000)
++			 phydev->speed < SPEED_2500)
+ 			phydev->interface = PHY_INTERFACE_MODE_SGMII;
  	}
+ }
+@@ -450,7 +464,7 @@ static int mv3310_read_status(struct phy_device *phydev)
  
- 	return 0;
-diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
-index 942cfa7548c4..13ac4bdb9b69 100644
---- a/drivers/net/phy/phy_device.c
-+++ b/drivers/net/phy/phy_device.c
-@@ -1085,6 +1085,8 @@ static void phy_update_linkmodes(struct phy_device *phydev)
- 		ETHTOOL_LINK_MODE_100baseT_Full_BIT,
- 		ETHTOOL_LINK_MODE_1000baseT_Half_BIT,
- 		ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
-+		ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
-+		ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
- 		ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
- 	};
+ static struct phy_driver mv3310_drivers[] = {
+ 	{
+-		.phy_id		= 0x002b09aa,
++		.phy_id		= MARVELL_PHY_ID_88X3310,
+ 		.phy_id_mask	= MARVELL_PHY_ID_MASK,
+ 		.name		= "mv88x3310",
+ 		.features	= PHY_10GBIT_FEATURES,
+@@ -468,7 +482,7 @@ static struct phy_driver mv3310_drivers[] = {
+ module_phy_driver(mv3310_drivers);
  
-diff --git a/include/uapi/linux/mdio.h b/include/uapi/linux/mdio.h
-index d435b00d64ad..546509898867 100644
---- a/include/uapi/linux/mdio.h
-+++ b/include/uapi/linux/mdio.h
-@@ -45,6 +45,7 @@
- #define MDIO_AN_ADVERTISE	16	/* AN advertising (base page) */
- #define MDIO_AN_LPA		19	/* AN LP abilities (base page) */
- #define MDIO_PCS_EEE_ABLE	20	/* EEE Capability register */
-+#define MDIO_PMA_NG_EXTABLE	21	/* 2.5G/5G PMA/PMD extended ability */
- #define MDIO_PCS_EEE_WK_ERR	22	/* EEE wake error counter */
- #define MDIO_PHYXS_LNSTAT	24	/* PHY XGXS lane state */
- #define MDIO_AN_EEE_ADV		60	/* EEE advertisement */
-@@ -92,6 +93,10 @@
- #define MDIO_CTRL1_SPEED10G		(MDIO_CTRL1_SPEEDSELEXT | 0x00)
- /* 10PASS-TS/2BASE-TL */
- #define MDIO_CTRL1_SPEED10P2B		(MDIO_CTRL1_SPEEDSELEXT | 0x04)
-+/* 2.5 Gb/s */
-+#define MDIO_CTRL1_SPEED2_5G		(MDIO_CTRL1_SPEEDSELEXT | 0x18)
-+/* 5 Gb/s */
-+#define MDIO_CTRL1_SPEED5G		(MDIO_CTRL1_SPEEDSELEXT | 0x1c)
+ static struct mdio_device_id __maybe_unused mv3310_tbl[] = {
+-	{ 0x002b09aa, MARVELL_PHY_ID_MASK },
++	{ MARVELL_PHY_ID_88X3310, MARVELL_PHY_ID_MASK },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(mdio, mv3310_tbl);
+diff --git a/include/linux/marvell_phy.h b/include/linux/marvell_phy.h
+index 1eb6f244588d..5851d68d828a 100644
+--- a/include/linux/marvell_phy.h
++++ b/include/linux/marvell_phy.h
+@@ -20,6 +20,7 @@
+ #define MARVELL_PHY_ID_88E1540		0x01410eb0
+ #define MARVELL_PHY_ID_88E1545		0x01410ea0
+ #define MARVELL_PHY_ID_88E3016		0x01410e60
++#define MARVELL_PHY_ID_88X3310		0x002b09aa
  
- /* Status register 1. */
- #define MDIO_STAT1_LPOWERABLE		0x0002	/* Low-power ability */
-@@ -142,6 +147,8 @@
- #define MDIO_PMA_CTRL2_1000BKX		0x000d	/* 1000BASE-KX type */
- #define MDIO_PMA_CTRL2_100BTX		0x000e	/* 100BASE-TX type */
- #define MDIO_PMA_CTRL2_10BT		0x000f	/* 10BASE-T type */
-+#define MDIO_PMA_CTRL2_2_5GBT		0x0030  /* 2.5GBaseT type */
-+#define MDIO_PMA_CTRL2_5GBT		0x0031  /* 5GBaseT type */
- #define MDIO_PCS_CTRL2_TYPE		0x0003	/* PCS type selection */
- #define MDIO_PCS_CTRL2_10GBR		0x0000	/* 10GBASE-R type */
- #define MDIO_PCS_CTRL2_10GBX		0x0001	/* 10GBASE-X type */
-@@ -195,6 +202,7 @@
- #define MDIO_PMA_EXTABLE_1000BKX	0x0040	/* 1000BASE-KX ability */
- #define MDIO_PMA_EXTABLE_100BTX		0x0080	/* 100BASE-TX ability */
- #define MDIO_PMA_EXTABLE_10BT		0x0100	/* 10BASE-T ability */
-+#define MDIO_PMA_EXTABLE_NBT		0x4000  /* 2.5/5GBASE-T ability */
- 
- /* PHY XGXS lane state register. */
- #define MDIO_PHYXS_LNSTAT_SYNC0		0x0001
-@@ -231,9 +239,13 @@
- #define MDIO_PCS_10GBRT_STAT2_BER	0x3f00
- 
- /* AN 10GBASE-T control register. */
-+#define MDIO_AN_10GBT_CTRL_ADV2_5G	0x0080	/* Advertise 2.5GBASE-T */
-+#define MDIO_AN_10GBT_CTRL_ADV5G	0x0100	/* Advertise 5GBASE-T */
- #define MDIO_AN_10GBT_CTRL_ADV10G	0x1000	/* Advertise 10GBASE-T */
- 
- /* AN 10GBASE-T status register. */
-+#define MDIO_AN_10GBT_STAT_LP2_5G	0x0020  /* LP is 2.5GBT capable */
-+#define MDIO_AN_10GBT_STAT_LP5G		0x0040  /* LP is 5GBT capable */
- #define MDIO_AN_10GBT_STAT_LPTRR	0x0200	/* LP training reset req. */
- #define MDIO_AN_10GBT_STAT_LPLTABLE	0x0400	/* LP loop timing ability */
- #define MDIO_AN_10GBT_STAT_LP10G	0x0800	/* LP is 10GBT capable */
-@@ -262,6 +274,10 @@
- #define MDIO_EEE_10GKX4		0x0020	/* 10G KX4 EEE cap */
- #define MDIO_EEE_10GKR		0x0040	/* 10G KR EEE cap */
- 
-+/* 2.5G/5G Extended abilities register. */
-+#define MDIO_PMA_NG_EXTABLE_2_5GBT	0x0001	/* 2.5GBASET ability */
-+#define MDIO_PMA_NG_EXTABLE_5GBT	0x0002	/* 5GBASET ability */
-+
- /* LASI RX_ALARM control/status registers. */
- #define MDIO_PMA_LASI_RX_PHYXSLFLT	0x0001	/* PHY XS RX local fault */
- #define MDIO_PMA_LASI_RX_PCSLFLT	0x0008	/* PCS RX local fault */
+ /* The MV88e6390 Ethernet switch contains embedded PHYs. These PHYs do
+  * not have a model ID. So the switch driver traps reads to the ID2
 -- 
 2.19.2
 
