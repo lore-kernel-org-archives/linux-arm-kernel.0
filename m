@@ -2,114 +2,71 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 71226C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 19:43:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 33B19C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 19:45:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 36BDB2147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 19:43:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EF5E721872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 19:45:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kXv0pDlu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 36BDB2147C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kz++8QFG";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="GD6MNJTH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF5E721872
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wOZCqpchx9TC3QTuBgdfYFLrFxRqWoyQGW19kZ29I5c=; b=kXv0pDludKLsZA
-	65j4xlcbWjN+YHlVBCHzEjXQbYJO2lZRhiGENm9VBx/wXlN6CIlpjFRxgrwYYlXSI1hb1nDfd5ZnZ
-	/DcC1GzjIhUuiGrBimZBCCES6B2769XSKbYHpDBoD3f2VdDpM6aCpF1N8jRGpyWGmoEdicOCZIqEW
-	7oKAC9pTRGXyitvs26qsiI8RZ5qDFV20i6a9TqxjW1PmbEudPRyhzf+CFpQ2p5DfGVd1mpsKrzjYM
-	qoxBRLG0v7jizaUm3e/dCZeqbXHypHwg+dbj7wKmAPEX7OKAioywz0MzvEv/b9apKBhrjxM5v2g7P
-	vSlzs7jEjamnTFbVwOqg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=qJ4R4vKR5Gh3TUQ3aR+hUsBRzfAA3J2RckeljmJSAzU=; b=kz++8QFGUz+34b
+	LQLDKTGHCj1zjdmo5ad3IsZ1VnNeLXoiol0j4xUrEHL1zPS0a0WlBEmpX7QNLebFlM4zyntiwJQRJ
+	fsmNTjJGkfLracSEyFf5wMWh7EaKv4vKgRKU5HXGEWIQJefQwkq9vpVj1V5hBi/D+Nhr/HfSmHSBo
+	hclevqIlWDC72LTt3ac/nWXrWJWf/mgkh4kDptvK++SwHXC7q7FVAGiU8YIVMWaYAZApekr2I5iv4
+	pGysHU+EdUCZw6F3a/AOibRnRruX02uSAOK9At65OurqOaKw+d8ezC80oPOEBJUCpSE1Ip8pwXv53
+	zMsSyR9KwSRtNvBUThjA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grpZv-0001Z6-Ah; Thu, 07 Feb 2019 19:43:19 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
+	id 1grpcR-00039k-VM; Thu, 07 Feb 2019 19:45:55 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grpZs-0001Xs-54
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 19:43:17 +0000
-Received: from smtp.corp.redhat.com (int-mx08.intmail.prod.int.phx2.redhat.com
- [10.5.11.23])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
- (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 1B8D589AC4;
- Thu,  7 Feb 2019 19:43:15 +0000 (UTC)
-Received: from llong.remote.csb (dhcp-17-35.bos.redhat.com [10.18.17.35])
- by smtp.corp.redhat.com (Postfix) with ESMTP id B9D604501;
- Thu,  7 Feb 2019 19:43:10 +0000 (UTC)
-Subject: Re: [PATCH-tip 04/22] locking/rwsem: Remove arch specific rwsem files
-To: Peter Zijlstra <peterz@infradead.org>
+ id 1grpcP-00039e-U0
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 07 Feb 2019 19:45:53 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=d2Auinqj+iinWuACUh1zWQLvdx+uvY34M1d8kVvscRo=; b=GD6MNJTH7ahxODIJwjMRtXdnR
+ RGD+hw9J+ZDL8sz/xbv/d7Zqgil1ESzAyfO7J6vTAR0eOBQbKA+2n1dr0BkrZrWBaHsHiinLNErB3
+ g+h3oZHOrxMVq84OJ9xWE4MvvJNsJ7gMZziSCkHMHlorLYek/Ay+0h+X4Ff02okQAYSM9Q9kbsEYG
+ sP6vzRH/Aw3OMOnEjV905Mx2248RvsaFgDw5pfYmQN1OH4MoKxYYnGwKbb1rQt3d/GT/GYTWx5Omh
+ KzbHIoABiKb148eXjHvwxsrvCmrg26erty1ERFcwZ5kSKWjGzDj0O5Sh8u0FqWgxN6v7ekPCAzKqa
+ wmJhspFPg==;
+Received: from j217100.upc-j.chello.nl ([24.132.217.100]
+ helo=hirez.programming.kicks-ass.net)
+ by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1grpcH-00070v-BQ; Thu, 07 Feb 2019 19:45:45 +0000
+Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
+ id 01FBD2029E062; Thu,  7 Feb 2019 20:45:42 +0100 (CET)
+Date: Thu, 7 Feb 2019 20:45:42 +0100
+From: Peter Zijlstra <peterz@infradead.org>
+To: Waiman Long <longman@redhat.com>
+Subject: Re: [PATCH-tip 15/22] locking/rwsem: Merge owner into count on x86-64
+Message-ID: <20190207194542.GG32511@hirez.programming.kicks-ass.net>
 References: <1549566446-27967-1-git-send-email-longman@redhat.com>
- <1549566446-27967-5-git-send-email-longman@redhat.com>
- <20190207193656.GF32511@hirez.programming.kicks-ass.net>
-From: Waiman Long <longman@redhat.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=longman@redhat.com; prefer-encrypt=mutual; keydata=
- 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
- weim8xU=
-Organization: Red Hat
-Message-ID: <71019c4b-7e3d-de59-5f49-1f147ecc3458@redhat.com>
-Date: Thu, 7 Feb 2019 14:43:10 -0500
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
+ <1549566446-27967-16-git-send-email-longman@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <20190207193656.GF32511@hirez.programming.kicks-ass.net>
-Content-Language: en-US
-X-Scanned-By: MIMEDefang 2.84 on 10.5.11.23
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.26]); Thu, 07 Feb 2019 19:43:15 +0000 (UTC)
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_114316_237699_F099C4B1 
-X-CRM114-Status: GOOD (  16.95  )
+Content-Disposition: inline
+In-Reply-To: <1549566446-27967-16-git-send-email-longman@redhat.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -137,48 +94,30 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 02/07/2019 02:36 PM, Peter Zijlstra wrote:
-> On Thu, Feb 07, 2019 at 02:07:08PM -0500, Waiman Long wrote:
->
->> +static inline int __down_read_trylock(struct rw_semaphore *sem)
->> +{
->> +	long tmp;
->> +
->> +	while ((tmp = atomic_long_read(&sem->count)) >= 0) {
->> +		if (tmp == atomic_long_cmpxchg_acquire(&sem->count, tmp,
->> +				   tmp + RWSEM_ACTIVE_READ_BIAS)) {
->> +			return 1;
->> +		}
->> +	}
-> Nah, you're supposed to write that like:
->
-> 	for (;;) {
-> 		val = atomic_long_cond_read_relaxed(&sem->count, VAL < 0);
-> 		if (atomic_long_try_cmpxchg_acquire(&sem->count, &val,
-> 						    val + RWSEM_ACTIVE_READ_BIAS))
-> 			break;
-> 	}
->
+On Thu, Feb 07, 2019 at 02:07:19PM -0500, Waiman Long wrote:
+> On 32-bit architectures, there aren't enough bits to hold both.
+> 64-bit architectures, however, can have enough bits to do that. For
+> x86-64, the physical address can use up to 52 bits. That is 4PB of
+> memory. That leaves 12 bits available for other use. The task structure
+> pointer is also aligned to the L1 cache size. That means another 6 bits
+> (64 bytes cacheline) will be available. Reserving 2 bits for status
+> flags, we will have 16 bits for the reader count.  That can supports
+> up to (64k-1) readers.
 
-Ah, you are right. I just took it directly from the current generic
-asm.h file and didn't pay much attention to it. I will fix that in the
-next iteration.
+*groan*...
 
->> +	return 0;
->> +}
->
-> Anyway, yuck, you're keeping all that BIAS nonsense :/ I was so hoping
-> for a rwsem implementation without that impenetrable crap.
+So take qrwlock's idea for a queue, then make the count value (similar
+to the new mutex); that is have a bit0 be a r/w bit, when w bits 6-N are
+owner, when r they are reader-count. bit1 can be a pending bit, bit2 a
+handoff bit etc..
 
-Well, I am going to take out all the BIAS handling in a later patch.
-This one is just for removing the architecture specific files.
+That should fit and work on 32bit and 64bit without issue.
 
-I can't change the rwsem count encoding before I take out all the arch
-specific files.
+I have a half-arsed rwsem-atomic.c somewhere that does just that. I just
+never got around to doing all the optimistic spin and steal crap that
+makes our current rwsem fly.
 
-Cheers,
-Longman
-
+And that nicely gets rid of that mind bending BIAS crud.
 
 _______________________________________________
 linux-arm-kernel mailing list
