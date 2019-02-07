@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CC38AC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:21:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BEC64C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:21:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5E7D421908
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:21:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 89D462175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:21:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kFswWJA2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5E7D421908
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="vERT9Lb8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89D462175B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uA8RNYp349WWx0tnIfKqPkEEx5CHRjBWHxd3boJG078=; b=kFswWJA2nuTcZ6
-	lKbd/I2c18UW0FHZMtTnLrpZt7NJqVlWwfTlUpU6hpC1gopBzcixi8mv8LO0dnaZnKx8uIvXXVQYk
-	VWabiPEMfFF04j4DndyT49r+h7X6x/FM+4FUOIDZXdSJW8aPpSsFIIiOjn1wrSlSo7xloRNsol9EW
-	7h1XOzeOobByrz3xIJSbGUfB4aXKjnBAee+fFtLcV/kzfrRiJYrMLJKXGSXh8dPCviTmmgYSGABZ+
-	RsoPZqAGTWMRIkqQNzl40v/nUQ60QZI2QDfxkcZRsc3WsPBVHna1nzYSZYrgXv0WSBphlMCqIj68u
-	SbcRun5hW1Ce4d2cQhLA==;
+	List-Owner; bh=wrat9lBv0LZhOyLONyXFxmrQpL1YyPOa1alVRFNNbrY=; b=vERT9Lb8TK6uQk
+	0lBJVVyKQdBlT5q168fLpaVVBqj+wuw6PiLs0TqitKS0oG0nOzBwsHAOaV0yeesJBnU7/e1qPSm3j
+	JZrB0aqXkbJEf6pS7bJmRzBZJ4f/LpC9viibV+K8yTkGyE1QWSczwQVUXxm1yO0l5b7FH9A6sDaO8
+	l3ifAOFRe1JQwU4Nal4cRW22Vb/A6i1tJyC5MxFRIVmj7vzUqRJl96b8hRL8yRPW8erXwEMXcWpF0
+	kjajTGsh6aymQ/gZTQysAn2VO0yTmLTF4hpwF3L+k6bFpGuGEqYykMldxp6v1czMoJMFbbo0gjDKa
+	TY5J9ZFdceYqZz3hD39Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grjcW-0005et-UZ; Thu, 07 Feb 2019 13:21:36 +0000
+	id 1grjcn-0005un-VW; Thu, 07 Feb 2019 13:21:53 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grjaQ-0002UN-Dz
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 13:20:02 +0000
+ id 1grjaI-0002LE-Q1
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 13:19:37 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 91A9E1684;
- Thu,  7 Feb 2019 05:19:25 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 219D3A78;
+ Thu,  7 Feb 2019 05:19:18 -0800 (PST)
 Received: from filthy-habits.cambridge.arm.com
  (filthy-habits.cambridge.arm.com [10.1.196.62])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5AF083F762;
- Thu,  7 Feb 2019 05:19:23 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DEDBA3F675;
+ Thu,  7 Feb 2019 05:19:15 -0800 (PST)
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Paolo Bonzini <pbonzini@redhat.com>,
  =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
-Subject: [PATCH 11/11] KVM: arm64: Forbid kprobing of the VHE world-switch code
-Date: Thu,  7 Feb 2019 13:18:43 +0000
-Message-Id: <20190207131843.157210-12-marc.zyngier@arm.com>
+Subject: [PATCH 08/11] KVM: arm/arm64: vgic: Always initialize the group of
+ private IRQs
+Date: Thu,  7 Feb 2019 13:18:40 +0000
+Message-Id: <20190207131843.157210-9-marc.zyngier@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190207131843.157210-1-marc.zyngier@arm.com>
 References: <20190207131843.157210-1-marc.zyngier@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_051927_114332_5A949622 
-X-CRM114-Status: GOOD (  14.51  )
+X-CRM114-CacheID: sfid-20190207_051919_793239_D5FADBC3 
+X-CRM114-Status: GOOD (  16.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,158 +83,79 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+From: Christoffer Dall <christoffer.dall@arm.com>
 
-On systems with VHE the kernel and KVM's world-switch code run at the
-same exception level. Code that is only used on a VHE system does not
-need to be annotated as __hyp_text as it can reside anywhere in the
-kernel text.
+We currently initialize the group of private IRQs during
+kvm_vgic_vcpu_init, and the value of the group depends on the GIC model
+we are emulating.  However, CPUs created before creating (and
+initializing) the VGIC might end up with the wrong group if the VGIC
+is created as GICv3 later.
 
-__hyp_text was also used to prevent kprobes from patching breakpoint
-instructions into this region, as this code runs at a different
-exception level. While this is no longer true with VHE, KVM still
-switches VBAR_EL1, meaning a kprobe's breakpoint executed in the
-world-switch code will cause a hyp-panic.
+Since we have no enforced ordering of creating the VGIC and creating
+VCPUs, we can end up with part the VCPUs being properly intialized and
+the remaining incorrectly initialized.  That also means that we have no
+single place to do the per-cpu data structure initialization which
+depends on knowing the emulated GIC model (which is only the group
+field).
 
-echo "p:weasel sysreg_save_guest_state_vhe" > /sys/kernel/debug/tracing/kprobe_events
-echo 1 > /sys/kernel/debug/tracing/events/kprobes/weasel/enable
-lkvm run -k /boot/Image --console serial -p "console=ttyS0 earlycon=uart,mmio,0x3f8"
+This patch removes the incorrect comment from kvm_vgic_vcpu_init and
+initializes the group of all previously created VCPUs's private
+interrupts in vgic_init in addition to the existing initialization in
+kvm_vgic_vcpu_init.
 
-  # lkvm run -k /boot/Image -m 384 -c 3 --name guest-1474
-  Info: Placing fdt at 0x8fe00000 - 0x8fffffff
-  Info: virtio-mmio.devices=0x200@0x10000:36
-
-  Info: virtio-mmio.devices=0x200@0x10200:37
-
-  Info: virtio-mmio.devices=0x200@0x10400:38
-
-[  614.178186] Kernel panic - not syncing: HYP panic:
-[  614.178186] PS:404003c9 PC:ffff0000100d70e0 ESR:f2000004
-[  614.178186] FAR:0000000080080000 HPFAR:0000000000800800 PAR:1d00007edbadc0de
-[  614.178186] VCPU:00000000f8de32f1
-[  614.178383] CPU: 2 PID: 1482 Comm: kvm-vcpu-0 Not tainted 5.0.0-rc2 #10799
-[  614.178446] Call trace:
-[  614.178480]  dump_backtrace+0x0/0x148
-[  614.178567]  show_stack+0x24/0x30
-[  614.178658]  dump_stack+0x90/0xb4
-[  614.178710]  panic+0x13c/0x2d8
-[  614.178793]  hyp_panic+0xac/0xd8
-[  614.178880]  kvm_vcpu_run_vhe+0x9c/0xe0
-[  614.178958]  kvm_arch_vcpu_ioctl_run+0x454/0x798
-[  614.179038]  kvm_vcpu_ioctl+0x360/0x898
-[  614.179087]  do_vfs_ioctl+0xc4/0x858
-[  614.179174]  ksys_ioctl+0x84/0xb8
-[  614.179261]  __arm64_sys_ioctl+0x28/0x38
-[  614.179348]  el0_svc_common+0x94/0x108
-[  614.179401]  el0_svc_handler+0x38/0x78
-[  614.179487]  el0_svc+0x8/0xc
-[  614.179558] SMP: stopping secondary CPUs
-[  614.179661] Kernel Offset: disabled
-[  614.179695] CPU features: 0x003,2a80aa38
-[  614.179758] Memory Limit: none
-[  614.179858] ---[ end Kernel panic - not syncing: HYP panic:
-[  614.179858] PS:404003c9 PC:ffff0000100d70e0 ESR:f2000004
-[  614.179858] FAR:0000000080080000 HPFAR:0000000000800800 PAR:1d00007edbadc0de
-[  614.179858] VCPU:00000000f8de32f1 ]---
-
-Annotate the VHE world-switch functions that aren't marked
-__hyp_text using NOKPROBE_SYMBOL().
-
-Signed-off-by: James Morse <james.morse@arm.com>
-Fixes: 3f5c90b890ac ("KVM: arm64: Introduce VHE-specific kvm_vcpu_run")
-Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/switch.c    | 5 +++++
- arch/arm64/kvm/hyp/sysreg-sr.c | 5 +++++
- 2 files changed, 10 insertions(+)
+ virt/kvm/arm/vgic/vgic-init.c | 22 ++++++++++++++--------
+ 1 file changed, 14 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index b0b1478094b4..421ebf6f7086 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -23,6 +23,7 @@
- #include <kvm/arm_psci.h>
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index dfbfcb1fe933..3bdb31eaed64 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -231,13 +231,6 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 			irq->config = VGIC_CONFIG_LEVEL;
+ 		}
  
- #include <asm/cpufeature.h>
-+#include <asm/kprobes.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_host.h>
-@@ -107,6 +108,7 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
- 
- 	write_sysreg(kvm_get_hyp_vector(), vbar_el1);
- }
-+NOKPROBE_SYMBOL(activate_traps_vhe);
- 
- static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+-		/*
+-		 * GICv3 can only be created via the KVM_DEVICE_CREATE API and
+-		 * so we always know the emulation type at this point as it's
+-		 * either explicitly configured as GICv3, or explicitly
+-		 * configured as GICv2, or not configured yet which also
+-		 * implies GICv2.
+-		 */
+ 		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+ 			irq->group = 1;
+ 		else
+@@ -281,7 +274,7 @@ int vgic_init(struct kvm *kvm)
  {
-@@ -154,6 +156,7 @@ static void deactivate_traps_vhe(void)
- 	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
- 	write_sysreg(vectors, vbar_el1);
- }
-+NOKPROBE_SYMBOL(deactivate_traps_vhe);
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	struct kvm_vcpu *vcpu;
+-	int ret = 0, i;
++	int ret = 0, i, idx;
  
- static void __hyp_text __deactivate_traps_nvhe(void)
- {
-@@ -513,6 +516,7 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+ 	if (vgic_initialized(kvm))
+ 		return 0;
+@@ -298,6 +291,19 @@ int vgic_init(struct kvm *kvm)
+ 	if (ret)
+ 		goto out;
  
- 	return exit_code;
- }
-+NOKPROBE_SYMBOL(kvm_vcpu_run_vhe);
- 
- /* Switch to the guest for legacy non-VHE systems */
- int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
-@@ -620,6 +624,7 @@ static void __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
- 	      read_sysreg_el2(esr),   read_sysreg_el2(far),
- 	      read_sysreg(hpfar_el2), par, vcpu);
- }
-+NOKPROBE_SYMBOL(__hyp_call_panic_vhe);
- 
- void __hyp_text __noreturn hyp_panic(struct kvm_cpu_context *host_ctxt)
- {
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 68d6f7c3b237..b426e2cf973c 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -18,6 +18,7 @@
- #include <linux/compiler.h>
- #include <linux/kvm_host.h>
- 
-+#include <asm/kprobes.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
-@@ -98,12 +99,14 @@ void sysreg_save_host_state_vhe(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_save_common_state(ctxt);
- }
-+NOKPROBE_SYMBOL(sysreg_save_host_state_vhe);
- 
- void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_save_common_state(ctxt);
- 	__sysreg_save_el2_return_state(ctxt);
- }
-+NOKPROBE_SYMBOL(sysreg_save_guest_state_vhe);
- 
- static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
- {
-@@ -188,12 +191,14 @@ void sysreg_restore_host_state_vhe(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_restore_common_state(ctxt);
- }
-+NOKPROBE_SYMBOL(sysreg_restore_host_state_vhe);
- 
- void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_restore_common_state(ctxt);
- 	__sysreg_restore_el2_return_state(ctxt);
- }
-+NOKPROBE_SYMBOL(sysreg_restore_guest_state_vhe);
- 
- void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
- {
++	/* Initialize groups on CPUs created before the VGIC type was known */
++	kvm_for_each_vcpu(idx, vcpu, kvm) {
++		struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++
++		for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
++			struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
++			if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
++				irq->group = 1;
++			else
++				irq->group = 0;
++		}
++	}
++
+ 	if (vgic_has_its(kvm)) {
+ 		ret = vgic_v4_init(kvm);
+ 		if (ret)
 -- 
 2.20.1
 
