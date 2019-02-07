@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D5B18C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:50:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BE1BBC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:50:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A5B6420823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:50:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8503E20823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:50:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Nl9XHziD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A5B6420823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AvB1knVt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8503E20823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uXas6zjox66y8EG6R5/ZXnwum0FWmubvVj+gGoEG0ew=; b=Nl9XHziDBi0Abd
-	wJpsGVholZGdGGW9oqfxCB7sQCJwrf4VrIzaDbA2BSEGE8SGrPH/zCs611X6m+fe09dlsGlwYhGzq
-	OtihesIR66o14oNdXvUtCDvht/LrQcjf6pO9nSrZnDmvhOqxKgn+bSsy1iZEZnM9YH2t+Nr2TVXi0
-	7pQ2USHc4f4+xMNXWnISKHnF8d35PQkFhDNP4ebk1o2Tslf7x+I0mwOpI10E4U0WBMVuUgpZLMJOU
-	xkfu6oFEHZu0gYE4yb3J3GmRr6D/T2dzc9bKhMA2gZFZku78miisakBX+KgCLv/5vZVswA18SrurQ
-	zMM5ICZ3pF1qG5TMGbrQ==;
+	List-Owner; bh=9+AUdcyISzKBaoIGCUYx+ApkcPWYlexXfrz9qNuj8cE=; b=AvB1knVt8hjfa0
+	63iSHaC/3PqC0CtWmGEwFjxJZ48h6b/FuKod59xsB1KzbO9OxdySEXLCBscCQ+lKwX3zf+KCOl3pc
+	INRlmOjG2fC/Nc8+aWSilE9tRHi2+etFd/Ye93SoRvSjB+cUBC2evpN2AQ/yHdd/XpTZdbDM6915n
+	vqQsVr4Qgcon0WML30as584eOZ5G1Uho18LrLkn6BLBoYCb4Mbw9x5TbazY1MP3jpJ6AYvytdQqtr
+	GeVFN8SrBNkYbH+gl0hUN86jSvCsCcooOz4krYYBmwlEY5G8XgkTHXJLEXJrDx08+NlLHd+fxJWi8
+	R69Z/4Ok40yCc2tXV+3Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grgK8-0006SP-Mq; Thu, 07 Feb 2019 09:50:24 +0000
+	id 1grgKP-0006v6-4R; Thu, 07 Feb 2019 09:50:41 +0000
 Received: from relay11.mail.gandi.net ([217.70.178.231])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grgJl-00053p-7Q
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:50:03 +0000
+ id 1grgJo-000561-1I
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:50:09 +0000
 Received: from mc-bl-xps13.lan
  (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr [90.88.22.177])
  (Authenticated sender: maxime.chevallier@bootlin.com)
- by relay11.mail.gandi.net (Postfix) with ESMTPSA id DD84510001C;
- Thu,  7 Feb 2019 09:49:56 +0000 (UTC)
+ by relay11.mail.gandi.net (Postfix) with ESMTPSA id E9A4E100004;
+ Thu,  7 Feb 2019 09:49:59 +0000 (UTC)
 From: Maxime Chevallier <maxime.chevallier@bootlin.com>
 To: davem@davemloft.net
-Subject: [PATCH net-next v2 01/10] net: phy: Update PHY linkmodes after
- config_init
-Date: Thu,  7 Feb 2019 10:49:30 +0100
-Message-Id: <20190207094939.27369-2-maxime.chevallier@bootlin.com>
+Subject: [PATCH net-next v2 02/10] net: phy: Mask-out non-compatible modes
+ when setting the max-speed
+Date: Thu,  7 Feb 2019 10:49:31 +0100
+Message-Id: <20190207094939.27369-3-maxime.chevallier@bootlin.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
 References: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_015001_594023_C3402016 
-X-CRM114-Status: GOOD (  16.50  )
+X-CRM114-CacheID: sfid-20190207_015004_533617_36808A63 
+X-CRM114-Status: GOOD (  13.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,130 +80,164 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-We want to be able to update a PHY's supported list in the config_init
-callback, so move the Pause parameters settings from phydrv->features
-after calling config_init to make sure these  parameters aren't
-overwritten.
+When setting a PHY's max speed using either the max-speed DT property
+or ethtool, we should mask-out all non-compatible modes according to the
+settings table, instead of just the 10/100BASET modes.
 
 Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+Suggested-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/net/phy/phy_device.c | 89 +++++++++++++++++++++++-------------
- 1 file changed, 58 insertions(+), 31 deletions(-)
+ drivers/net/phy/phy-core.c   | 45 ++++++++++++++++++++++++++++++
+ drivers/net/phy/phy_device.c | 53 ------------------------------------
+ include/linux/phy.h          |  1 +
+ 3 files changed, 46 insertions(+), 53 deletions(-)
 
-diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
-index 891e0178b97f..18a10565efd4 100644
---- a/drivers/net/phy/phy_device.c
-+++ b/drivers/net/phy/phy_device.c
-@@ -1059,6 +1059,59 @@ static int phy_poll_reset(struct phy_device *phydev)
- 	return 0;
+diff --git a/drivers/net/phy/phy-core.c b/drivers/net/phy/phy-core.c
+index 7d6aad287f84..8e54fe396553 100644
+--- a/drivers/net/phy/phy-core.c
++++ b/drivers/net/phy/phy-core.c
+@@ -4,6 +4,7 @@
+  */
+ #include <linux/export.h>
+ #include <linux/phy.h>
++#include <linux/of.h>
+ 
+ const char *phy_speed_to_str(int speed)
+ {
+@@ -338,6 +339,50 @@ size_t phy_speeds(unsigned int *speeds, size_t size,
+ 	return count;
  }
  
-+/**
-+ * phy_update_linkmodes - Update and sanitize linkmodes and pause parameters
-+ * @phydev: The PHY device whose parameters we want to update.
-+ *
-+ * Description: The list of supported and advertised linkmodes is not
-+ * straightforward to maintain, since PHYs and MACs are subject to quirks and
-+ * erratas. This function re-builds the list of the supported pause parameters
-+ * by taking into account the parameters expressed in the driver's features
-+ * list.
-+ */
-+static void phy_update_linkmodes(struct phy_device *phydev)
++static int __set_phy_supported(struct phy_device *phydev, u32 max_speed)
 +{
-+	struct device_driver *drv = phydev->mdio.dev.driver;
-+	struct phy_driver *phydrv = to_phy_driver(drv);
++	const struct phy_setting *p;
++	int i;
 +
-+	mutex_lock(&phydev->lock);
-+
-+	/* The Pause Frame bits indicate that the PHY can support passing
-+	 * pause frames. During autonegotiation, the PHYs will determine if
-+	 * they should allow pause frames to pass.  The MAC driver should then
-+	 * use that result to determine whether to enable flow control via
-+	 * pause frames.
-+	 *
-+	 * Normally, PHY drivers should not set the Pause bits, and instead
-+	 * allow phylib to do that.  However, there may be some situations
-+	 * (e.g. hardware erratum) where the driver wants to set only one
-+	 * of these bits.
-+	 */
-+	if (test_bit(ETHTOOL_LINK_MODE_Pause_BIT, phydrv->features) ||
-+	    test_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, phydrv->features)) {
-+		linkmode_clear_bit(ETHTOOL_LINK_MODE_Pause_BIT,
-+				   phydev->supported);
-+		linkmode_clear_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
-+				   phydev->supported);
-+		if (test_bit(ETHTOOL_LINK_MODE_Pause_BIT, phydrv->features))
-+			linkmode_set_bit(ETHTOOL_LINK_MODE_Pause_BIT,
-+					 phydev->supported);
-+		if (test_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
-+			     phydrv->features))
-+			linkmode_set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
-+					 phydev->supported);
-+	} else {
-+		linkmode_set_bit(ETHTOOL_LINK_MODE_Pause_BIT,
-+				 phydev->supported);
-+		linkmode_set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
-+				 phydev->supported);
++	for (i = 0, p = settings; i < ARRAY_SIZE(settings); i++, p++) {
++		if (p->speed > max_speed)
++			linkmode_clear_bit(p->bit, phydev->supported);
++		else
++			break;
 +	}
++
++	return 0;
++}
++
++int phy_set_max_speed(struct phy_device *phydev, u32 max_speed)
++{
++	int err;
++
++	err = __set_phy_supported(phydev, max_speed);
++	if (err)
++		return err;
 +
 +	linkmode_copy(phydev->advertising, phydev->supported);
 +
-+	mutex_unlock(&phydev->lock);
++	return 0;
++}
++EXPORT_SYMBOL(phy_set_max_speed);
++
++void of_set_phy_supported(struct phy_device *phydev)
++{
++	struct device_node *node = phydev->mdio.dev.of_node;
++	u32 max_speed;
++
++	if (!IS_ENABLED(CONFIG_OF_MDIO))
++		return;
++
++	if (!node)
++		return;
++
++	if (!of_property_read_u32(node, "max-speed", &max_speed))
++		__set_phy_supported(phydev, max_speed);
 +}
 +
- int phy_init_hw(struct phy_device *phydev)
- {
- 	int ret = 0;
-@@ -1082,6 +1135,11 @@ int phy_init_hw(struct phy_device *phydev)
- 	if (phydev->drv->config_init)
- 		ret = phydev->drv->config_init(phydev);
- 
-+	/* Update and sanitize the supported and advertised linkmodes, since
-+	 * they might have been changed in config_init
-+	 */
-+	phy_update_linkmodes(phydev);
-+
- 	return ret;
+ /**
+  * phy_resolve_aneg_linkmode - resolve the advertisements into phy settings
+  * @phydev: The phy_device struct
+diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
+index 18a10565efd4..a4ab16992806 100644
+--- a/drivers/net/phy/phy_device.c
++++ b/drivers/net/phy/phy_device.c
+@@ -2023,44 +2023,6 @@ int genphy_loopback(struct phy_device *phydev, bool enable)
  }
- EXPORT_SYMBOL(phy_init_hw);
-@@ -2221,37 +2279,6 @@ static int phy_probe(struct device *dev)
- 	 */
- 	of_set_phy_eee_broken(phydev);
+ EXPORT_SYMBOL(genphy_loopback);
  
--	/* The Pause Frame bits indicate that the PHY can support passing
--	 * pause frames. During autonegotiation, the PHYs will determine if
--	 * they should allow pause frames to pass.  The MAC driver should then
--	 * use that result to determine whether to enable flow control via
--	 * pause frames.
--	 *
--	 * Normally, PHY drivers should not set the Pause bits, and instead
--	 * allow phylib to do that.  However, there may be some situations
--	 * (e.g. hardware erratum) where the driver wants to set only one
--	 * of these bits.
--	 */
--	if (test_bit(ETHTOOL_LINK_MODE_Pause_BIT, phydrv->features) ||
--	    test_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, phydrv->features)) {
--		linkmode_clear_bit(ETHTOOL_LINK_MODE_Pause_BIT,
+-static int __set_phy_supported(struct phy_device *phydev, u32 max_speed)
+-{
+-	switch (max_speed) {
+-	case SPEED_10:
+-		linkmode_clear_bit(ETHTOOL_LINK_MODE_100baseT_Half_BIT,
 -				   phydev->supported);
--		linkmode_clear_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
+-		linkmode_clear_bit(ETHTOOL_LINK_MODE_100baseT_Full_BIT,
 -				   phydev->supported);
--		if (test_bit(ETHTOOL_LINK_MODE_Pause_BIT, phydrv->features))
--			linkmode_set_bit(ETHTOOL_LINK_MODE_Pause_BIT,
--					 phydev->supported);
--		if (test_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
--			     phydrv->features))
--			linkmode_set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
--					 phydev->supported);
--	} else {
--		linkmode_set_bit(ETHTOOL_LINK_MODE_Pause_BIT,
--				 phydev->supported);
--		linkmode_set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
--				 phydev->supported);
+-		/* fall through */
+-	case SPEED_100:
+-		linkmode_clear_bit(ETHTOOL_LINK_MODE_1000baseT_Half_BIT,
+-				   phydev->supported);
+-		linkmode_clear_bit(ETHTOOL_LINK_MODE_1000baseT_Full_BIT,
+-				   phydev->supported);
+-		break;
+-	case SPEED_1000:
+-		break;
+-	default:
+-		return -ENOTSUPP;
 -	}
 -
- 	/* Set the state to READY by default */
- 	phydev->state = PHY_READY;
+-	return 0;
+-}
+-
+-int phy_set_max_speed(struct phy_device *phydev, u32 max_speed)
+-{
+-	int err;
+-
+-	err = __set_phy_supported(phydev, max_speed);
+-	if (err)
+-		return err;
+-
+-	linkmode_copy(phydev->advertising, phydev->supported);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL(phy_set_max_speed);
+-
+ /**
+  * phy_remove_link_mode - Remove a supported link mode
+  * @phydev: phy_device structure to remove link mode from
+@@ -2191,21 +2153,6 @@ bool phy_validate_pause(struct phy_device *phydev,
+ }
+ EXPORT_SYMBOL(phy_validate_pause);
  
+-static void of_set_phy_supported(struct phy_device *phydev)
+-{
+-	struct device_node *node = phydev->mdio.dev.of_node;
+-	u32 max_speed;
+-
+-	if (!IS_ENABLED(CONFIG_OF_MDIO))
+-		return;
+-
+-	if (!node)
+-		return;
+-
+-	if (!of_property_read_u32(node, "max-speed", &max_speed))
+-		__set_phy_supported(phydev, max_speed);
+-}
+-
+ static void of_set_phy_eee_broken(struct phy_device *phydev)
+ {
+ 	struct device_node *node = phydev->mdio.dev.of_node;
+diff --git a/include/linux/phy.h b/include/linux/phy.h
+index 237dd035858a..cfdd3de38410 100644
+--- a/include/linux/phy.h
++++ b/include/linux/phy.h
+@@ -667,6 +667,7 @@ phy_lookup_setting(int speed, int duplex, const unsigned long *mask,
+ 		   bool exact);
+ size_t phy_speeds(unsigned int *speeds, size_t size,
+ 		  unsigned long *mask);
++void of_set_phy_supported(struct phy_device *phydev);
+ 
+ static inline bool __phy_is_started(struct phy_device *phydev)
+ {
 -- 
 2.19.2
 
