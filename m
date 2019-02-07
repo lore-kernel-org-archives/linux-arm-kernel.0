@@ -2,21 +2,21 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ED894C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 06:47:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8643CC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 06:47:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AF1872175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 06:47:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 545E42175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 06:47:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GGVa7y12"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF1872175B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a6aKCNOW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 545E42175B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +25,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BcAEauGEJ9RwJy9ehqZzCYI+d4vODyOifp3JJNN7l9I=; b=GGVa7y12x/xksV
-	VRKimrbVJXETyCkfk5yfd+oCcveXHRsZ+ooTr2bINKIjjXt2KQyud69dQEYsZX92Ne4HJ8Pcjs9pQ
-	N48Qjd6VcHNuUtjn/sXYMWcOXRfC00fXsd/l0z9QPDuPGUYpMc4Kp6MPx1XcI/khW7Cz8tZy7uA2F
-	dizeqZwXk7XGDP0Z/fA2tSlBIYXJopuKnvlMJ885W090T32ORBL5vcPrIkzTKat1ED4kD2bTl4MAJ
-	dEGkFsvRlv5ihQ0dfZsbLXwl5TiesLG6HPmu4uwsk2/HIMkqQ2og2fJoOof1HRx4D4yN9kYBSx2HK
-	rmN8og7L8yQMvQtHHweQ==;
+	List-Owner; bh=YHgj3zDjWiOszfHaxOFigjBMdrJugPVOkHzYnTbkuQc=; b=a6aKCNOW/JcrUi
+	7XqpR+1lUfZgeuOkNqv4bAVWTIHgzkbtpHRGn5aMFzXwGmyj5Ri8gJY0tr0dQyQRrFXjqAhWvSJNO
+	CA3NHLB19qJ3+a55X48qPUMxA2KH+/wfYP1I7MjWvpCEquGToiy/68JIVrmGZu/tNXMYK7MQAkxNP
+	g2j3xFx4z5RTjZE6Tqg3/OlU406WGDnMv+rQ6yeSh35N8ndOiXaIrQZi7MpO/uw93QrYE9uJYD52n
+	Y7AFVKSIYAyCnfQxKWPiJObih45JybIb6svGcj7Cehhj7lz81VtXbFjmqrdV44iFdXPXbVAVrFUjb
+	5T9wkd8UmpPU9ln7o3zQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grdSp-0007Bi-2K; Thu, 07 Feb 2019 06:47:11 +0000
+	id 1grdT8-0007XK-QD; Thu, 07 Feb 2019 06:47:30 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grdRU-0005uY-Eo
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 06:45:49 +0000
+ id 1grdRU-0005uX-KG
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 06:45:50 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id C97AD5FDC1; Thu,  7 Feb 2019 14:45:39 +0800 (CST)
+ id BEAC25FDBD; Thu,  7 Feb 2019 14:45:39 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Lee Jones <lee.jones@linaro.org>, Sebastian Reichel <sre@kernel.org>
-Subject: [RFT PATCH 7/9] mfd: axp20x: add USB power supply mfd cell to AXP813
-Date: Thu,  7 Feb 2019 14:45:33 +0800
-Message-Id: <20190207064535.9226-8-wens@csie.org>
+Subject: [RFT PATCH 6/9] power: supply: axp20x_usb_power: add support for
+ AXP813
+Date: Thu,  7 Feb 2019 14:45:32 +0800
+Message-Id: <20190207064535.9226-7-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190207064535.9226-1-wens@csie.org>
 References: <20190207064535.9226-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_224548_618286_3B668404 
-X-CRM114-Status: UNSURE (   8.67  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190206_224549_030253_E3083CB9 
+X-CRM114-Status: GOOD (  12.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,45 +77,134 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Quentin Schulz <quentin.schulz@bootlin.com>
 
-The AXP813 has a VBUS power input. Now that the axp20x_usb_power driver
-supports this variant, we can add an mfd cell for it to use it.
+This adds support for AXP813 PMIC. It is almost the same as AXP22X but
+has a different current limit.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@bootlin.com>
-[wens@csie.org: add commit message]
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/mfd/axp20x.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/power/supply/axp20x_usb_power.c | 66 ++++++++++++++++++++++++-
+ 1 file changed, 65 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 3c97f2c0fdfe..17b115845993 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -198,6 +198,12 @@ static const struct resource axp22x_usb_power_supply_resources[] = {
- 	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
- };
+diff --git a/drivers/power/supply/axp20x_usb_power.c b/drivers/power/supply/axp20x_usb_power.c
+index 90d06027bf98..d39c450b14c6 100644
+--- a/drivers/power/supply/axp20x_usb_power.c
++++ b/drivers/power/supply/axp20x_usb_power.c
+@@ -42,6 +42,11 @@
+ #define AXP20X_VBUS_CLIMIT_100mA	2
+ #define AXP20X_VBUS_CLIMIT_NONE		3
  
-+/* AXP803 and AXP813/AXP818 share the same interrupts */
-+static struct resource axp803_usb_power_supply_resources[] = {
-+	DEFINE_RES_IRQ_NAMED(AXP803_IRQ_VBUS_PLUGIN, "VBUS_PLUGIN"),
-+	DEFINE_RES_IRQ_NAMED(AXP803_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
-+};
++#define AXP813_VBUS_CLIMIT_900mA	0
++#define AXP813_VBUS_CLIMIT_1500mA	1
++#define AXP813_VBUS_CLIMIT_2000mA	2
++#define AXP813_VBUS_CLIMIT_2500mA	3
 +
- static const struct resource axp22x_pek_resources[] = {
- 	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_PEK_RIS_EDGE, "PEK_DBR"),
- 	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_PEK_FAL_EDGE, "PEK_DBF"),
-@@ -793,6 +799,11 @@ static const struct mfd_cell axp813_cells[] = {
- 		.of_compatible	= "x-powers,axp813-ac-power-supply",
- 		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
- 		.resources	= axp20x_ac_power_supply_resources,
-+	}, {
-+		.name		= "axp20x-usb-power-supply",
-+		.num_resources	= ARRAY_SIZE(axp803_usb_power_supply_resources),
-+		.resources	= axp803_usb_power_supply_resources,
-+		.of_compatible	= "x-powers,axp813-usb-power-supply",
- 	},
- };
+ #define AXP20X_ADC_EN1_VBUS_CURR	BIT(2)
+ #define AXP20X_ADC_EN1_VBUS_VOLT	BIT(3)
  
+@@ -131,6 +136,31 @@ static int axp20x_get_current_max(struct axp20x_usb_power *power, int *val)
+ 	return 0;
+ }
+ 
++static int axp813_get_current_max(struct axp20x_usb_power *power, int *val)
++{
++	unsigned int v;
++	int ret = regmap_read(power->regmap, AXP20X_VBUS_IPSOUT_MGMT, &v);
++
++	if (ret)
++		return ret;
++
++	switch (v & AXP20X_VBUS_CLIMIT_MASK) {
++	case AXP813_VBUS_CLIMIT_900mA:
++		*val = 900000;
++		break;
++	case AXP813_VBUS_CLIMIT_1500mA:
++		*val = 1500000;
++		break;
++	case AXP813_VBUS_CLIMIT_2000mA:
++		*val = 2000000;
++		break;
++	case AXP813_VBUS_CLIMIT_2500mA:
++		*val = 2500000;
++		break;
++	}
++	return 0;
++}
++
+ static int axp20x_usb_power_get_property(struct power_supply *psy,
+ 	enum power_supply_property psp, union power_supply_propval *val)
+ {
+@@ -169,6 +199,8 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
+ 		val->intval = ret * 1700; /* 1 step = 1.7 mV */
+ 		return 0;
+ 	case POWER_SUPPLY_PROP_CURRENT_MAX:
++		if (power->axp20x_id == AXP813_ID)
++			return axp813_get_current_max(power, &val->intval);
+ 		return axp20x_get_current_max(power, &val->intval);
+ 	case POWER_SUPPLY_PROP_CURRENT_NOW:
+ 		if (IS_ENABLED(CONFIG_AXP20X_ADC)) {
+@@ -260,6 +292,31 @@ static int axp20x_usb_power_set_voltage_min(struct axp20x_usb_power *power,
+ 	return -EINVAL;
+ }
+ 
++static int axp813_usb_power_set_current_max(struct axp20x_usb_power *power,
++					    int intval)
++{
++	int val;
++
++	switch (intval) {
++	case 900000:
++		return regmap_update_bits(power->regmap,
++					  AXP20X_VBUS_IPSOUT_MGMT,
++					  AXP20X_VBUS_CLIMIT_MASK,
++					  AXP813_VBUS_CLIMIT_900mA);
++	case 1500000:
++	case 2000000:
++	case 2500000:
++		val = (intval - 1000000) / 500000;
++		return regmap_update_bits(power->regmap,
++					  AXP20X_VBUS_IPSOUT_MGMT,
++					  AXP20X_VBUS_CLIMIT_MASK, val);
++	default:
++		return -EINVAL;
++	}
++
++	return -EINVAL;
++}
++
+ static int axp20x_usb_power_set_current_max(struct axp20x_usb_power *power,
+ 					    int intval)
+ {
+@@ -299,6 +356,9 @@ static int axp20x_usb_power_set_property(struct power_supply *psy,
+ 		return axp20x_usb_power_set_voltage_min(power, val->intval);
+ 
+ 	case POWER_SUPPLY_PROP_CURRENT_MAX:
++		if (power->axp20x_id == AXP813_ID)
++			return axp813_usb_power_set_current_max(power,
++								val->intval);
+ 		return axp20x_usb_power_set_current_max(power, val->intval);
+ 
+ 	default:
+@@ -434,7 +494,8 @@ static int axp20x_usb_power_probe(struct platform_device *pdev)
+ 		usb_power_desc = &axp20x_usb_power_desc;
+ 		irq_names = axp20x_irq_names;
+ 	} else if (power->axp20x_id == AXP221_ID ||
+-		   power->axp20x_id == AXP223_ID) {
++		   power->axp20x_id == AXP223_ID ||
++		   power->axp20x_id == AXP813_ID) {
+ 		usb_power_desc = &axp22x_usb_power_desc;
+ 		irq_names = axp22x_irq_names;
+ 	} else {
+@@ -493,6 +554,9 @@ static const struct of_device_id axp20x_usb_power_match[] = {
+ 	}, {
+ 		.compatible = "x-powers,axp223-usb-power-supply",
+ 		.data = (void *)AXP223_ID,
++	}, {
++		.compatible = "x-powers,axp813-usb-power-supply",
++		.data = (void *)AXP813_ID,
+ 	}, { /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, axp20x_usb_power_match);
 -- 
 2.20.1
 
