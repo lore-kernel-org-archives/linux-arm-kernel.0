@@ -5,59 +5,59 @@ X-Spam-Level:
 X-Spam-Status: No, score=-7.8 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
 	FORGED_HOTMAIL_RCVD2,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1FA10C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 03:51:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7879AC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 03:53:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E26982175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 03:51:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 39B0D2175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 03:53:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mdi0Ubar";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=hotmail.com header.i=@hotmail.com header.b="fy5pdXLA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E26982175B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NnpIAWAF";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=hotmail.com header.i=@hotmail.com header.b="AD3WO2Yw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 39B0D2175B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=hotmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=B2kvMYcPL4aVvnCJbq/69577kh3q3wN+MBk88M5uWaU=; b=mdi0UbarLA7lb+
-	nlylLT847gCdC2TLgjBTnveEcC+Y+tXQjmIBwULCd64m642NSssR28iQEDhf7mXG+yoy4cCAMS1os
-	67G0WoCujcKHOucgA5vXiFxFdSYXGbq53leNTm0MjB8OAnRibDIml38EcrIxsw4wVrO3wE79o1CS0
-	D4iVzXJmGtLfdubVp/E2bYnd+sCX61JAAmVl91d3DSvzmcYdV0oXJufzOwYW3UXOzFfhZfo8lh9dG
-	XdRyUpZfyB4KSoZ4v9gNz1pXh4CI/EYA8Drm1Q4wlh9oh7SjXBOGwM3WyY+6DzyyPkUMKJQgEWyKj
-	yGGlplYpgc42d9d3nlfg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=2kyG3032u5dNZ/P6PBKJWEqA4Tyr9GvYdJqMJrrxPrc=; b=NnpIAWAFl/12Dr
+	4EWm4rk+1fvtDwF2lo6VV1dfHIuVwqT9b7MI6B171U47w+8+ZimkSYpw5BezbnuX5dFoNLEVeHIOb
+	AZ7TcilAqvBXFkOYkgw/cOdfK1VfmMMuYn1o3rAVwjBpN/T8czDvquoLS1o7SI55BkXaiCzMmupzO
+	hj087sfgooF5LcYmx+EHAL8JFrm8JYCz86g72n7VEEMA1aPYc4GFmw+MLAkd4C8ivrjUyDQEraHNp
+	tf1r8rB+5ThY1HAcpuZzvDksegQbE3Ai/iv9h5c8ghZyUqFzBQCNvPWMHHSY4+ICMS+WlCMr+eFHb
+	cqtP5ItEpbKTbg6FUvSA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1graic-0001qo-D4; Thu, 07 Feb 2019 03:51:18 +0000
-Received: from mail-oln040092253057.outbound.protection.outlook.com
- ([40.92.253.57] helo=APC01-SG2-obe.outbound.protection.outlook.com)
+	id 1grakB-0002NM-Gw; Thu, 07 Feb 2019 03:52:55 +0000
+Received: from mail-oln040092253048.outbound.protection.outlook.com
+ ([40.92.253.48] helo=APC01-SG2-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1graiO-0001gh-25; Thu, 07 Feb 2019 03:51:06 +0000
+ id 1grajy-0002D3-7E; Thu, 07 Feb 2019 03:52:43 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=hotmail.com;
  s=selector1;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=kAgNr3AnAs8uRDokOWBe82bcTepke1seB00KqldPKKA=;
- b=fy5pdXLAHxdleMeOyBBbZZNiSftVkkKvj9wUPrMz59URiBZLcy2QNQIIuWzRnco+b+sg2MFOHuU61bRb6K+IYSuH/Z5anReMrAW5F0TNGDsFnq3Aj61LdiWXYFV0Lp3uXV2qWVKnoml9LNT1jxI/f/0H4eIyj6G3Sg2kFqpiiVTMvQ0Ttqh8N8GNRfndZH1V4Nlwc6nuXgaVhVMhL6AjZBMNC+B9DMQ83KuMrKo7nZmczY+hBXQCQWSUBPEeslPhUZgZ/DfbbxZJWh82+8DYgi5xzlWrHJc0yIx8uHqI9RpQ7vGGfQv47xrfqBHoTt6hcWa//wrc6FPoE3LwYSO8LQ==
+ bh=8/mOpTOHc6sHxOe1fGdHPZBgJK5+YVUC2BBnz++s3pU=;
+ b=AD3WO2YwVKeXR/FTKVnjKaX8cqgvZ+jhc+1ykZWRPj8WPcVIKSbpslSutXUvxk9m8YwHXEOm48P9/Jaf9nj/fSMMOYFQ2LOnyLANUh586108EYTjnXk1Z28MAY3VsLwoAtp73TUQ4/UsyWTqoz+fQIGcCvWyYzwLA94fNCRDRSCL37wuFu5gGYigHWuHSasTLoOdnwlWaqx1j2zGk7xLxvyAT7V4XxV2wGVUYTRfxrmjZf7laVby6GnbdoVR+aG6qq2XS2M2kcdETWzeaq6Fzdp9KVTVaFVvLnvCd8DnelBR3Dp0NO1YJNXU5NJuDT/xd8cAFX2f0Dv4BhkNK3nSzw==
 Received: from PU1APC01FT039.eop-APC01.prod.protection.outlook.com
- (10.152.252.58) by PU1APC01HT082.eop-APC01.prod.protection.outlook.com
- (10.152.253.54) with Microsoft SMTP Server (version=TLS1_2,
+ (10.152.252.56) by PU1APC01HT091.eop-APC01.prod.protection.outlook.com
+ (10.152.253.15) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1580.10; Thu, 7 Feb
- 2019 03:50:55 +0000
+ 2019 03:52:31 +0000
 Received: from HK0PR02MB3634.apcprd02.prod.outlook.com (10.152.252.59) by
  PU1APC01FT039.mail.protection.outlook.com (10.152.253.127) with Microsoft
  SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
- 15.20.1580.10 via Frontend Transport; Thu, 7 Feb 2019 03:50:55 +0000
+ 15.20.1580.10 via Frontend Transport; Thu, 7 Feb 2019 03:52:31 +0000
 Received: from HK0PR02MB3634.apcprd02.prod.outlook.com
  ([fe80::d582:b3ef:f46a:4735]) by HK0PR02MB3634.apcprd02.prod.outlook.com
  ([fe80::d582:b3ef:f46a:4735%3]) with mapi id 15.20.1580.019; Thu, 7 Feb 2019
- 03:50:55 +0000
+ 03:52:31 +0000
 From: Wen Yang <yellowriver2010@hotmail.com>
 To: "tudor.ambarus@microchip.com" <tudor.ambarus@microchip.com>,
  "bbrezillon@kernel.org" <bbrezillon@kernel.org>, "miquel.raynal@bootlin.com"
@@ -65,12 +65,15 @@ To: "tudor.ambarus@microchip.com" <tudor.ambarus@microchip.com>,
  "dwmw2@infradead.org" <dwmw2@infradead.org>, "computersforpeace@gmail.com"
  <computersforpeace@gmail.com>, "marek.vasut@gmail.com"
  <marek.vasut@gmail.com>
-Subject: [PATCH v4 1/3] mtd: rawnand: atmel: fix possible object reference leak
-Thread-Topic: [PATCH v4 1/3] mtd: rawnand: atmel: fix possible object
+Subject: [PATCH v3 2/3] mtd: rawnand: jz4780: fix possible object reference
+ leak
+Thread-Topic: [PATCH v3 2/3] mtd: rawnand: jz4780: fix possible object
  reference leak
-Thread-Index: AQHUvphUN4OyaheCt0SC9MTXo7xEhQ==
-Date: Thu, 7 Feb 2019 03:50:55 +0000
-Message-ID: <HK0PR02MB363495256F9ADB049C795D7DB2680@HK0PR02MB3634.apcprd02.prod.outlook.com>
+Thread-Index: AQHUvpiNjvvHcFETJk6ZDu2Hv+MqPA==
+Date: Thu, 7 Feb 2019 03:52:31 +0000
+Message-ID: <HK0PR02MB36344D1C4321EA844316EEAEB2680@HK0PR02MB3634.apcprd02.prod.outlook.com>
+References: <1549511278-7735-1-git-send-email-yellowriver2010@hotmail.com>
+In-Reply-To: <1549511278-7735-1-git-send-email-yellowriver2010@hotmail.com>
 Accept-Language: zh-CN, en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -78,40 +81,40 @@ X-MS-TNEF-Correlator:
 x-clientproxiedby: HK2PR06CA0022.apcprd06.prod.outlook.com
  (2603:1096:202:2e::34) To HK0PR02MB3634.apcprd02.prod.outlook.com
  (2603:1096:203:97::14)
-x-incomingtopheadermarker: OriginalChecksum:8826EEFA6AF9565CAF1D57CE604C76ACFD2D8FE52A6A1AB0DD05DFC585994469;
- UpperCasedChecksum:94F998B745EE8A0E68ACC7CB33DCEA9773B0C0E9CE2B4FE987919EDD16B8248E;
- SizeAsReceived:9203; Count:63
+x-incomingtopheadermarker: OriginalChecksum:F9A676279358872DB67E4E458995487A20655766AEB1C76E011F39E01D00334C;
+ UpperCasedChecksum:6258203BFB8D8173B62AB72CF640D597FBCE1DD319622E0DD3E5159221D3790C;
+ SizeAsReceived:9417; Count:65
 x-ms-exchange-messagesentrepresentingtype: 1
 x-mailer: git-send-email 2.7.4
-x-tmn: [NV9FuxyvFimDwnD1dmuLKDgSPmrwv1/s]
-x-microsoft-original-message-id: <1549511278-7735-1-git-send-email-yellowriver2010@hotmail.com>
+x-tmn: [U81r9HGwCICxmTqhgLDqB6GsSrr/D06q]
+x-microsoft-original-message-id: <1549511278-7735-2-git-send-email-yellowriver2010@hotmail.com>
 x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; PU1APC01HT082;
- 6:sFweAFoDw4SR4ATGTCxsJ9W+a031SmdiB867ZPggPHNQc/+4t/SsFvxCXODtILVlY87mlZmlh9nnLOuNkVXs/ePPu+8IU3/2MlpTLD079AUxwechc1A89yJMY9+0EISyiQqtjTTcXw2YxCjlirkKu11Ku90lPx2sIDTk/D92bAoTYACYbMjXgJo8cW0zew4/fY8pIeKNIUmFQp6svFoI83hxbVyICRYuz4v+dwP362gbcVpBsyArWQWexsXEE83H5Q8TrbHXwErFUOqcGI9wfF/FWzEmykrOOS3f06E38dH7IGkRPBz3ZdcrLVG4Py6rm+/61wUSU4buk+1H69blb+VlMeSbDzZ8bINp551Co0L1Jnfom8sSnJR4T0B9kX2v6GOnsM2IG51fuuWGTr6LYYrPceGo8bf2HO72UHpMt20yGm/EhWKQGnXuEG27myuj5EoDWTfEMmanAX0Y+3fqxQ==;
- 5:TQb7PRFtIv38rMKhRgRMLMhW+f0ZF0jg/cKjK5xtn7kp1KiMWKaUsCt7NTbe+ZK42FMDDcIz9i/teTXWk4u55V+8/m/1HB78JQFvUuiLzxS20uQQC9ui18PfU4/b853FLDwh/MKWhg36rC+pkvrDqo1q62067lLnSY+qLFBG683+8FAaj6f6h3x2mi9evBTa9lcN6+A0xDxhYoH4EpLJqg==;
- 7:Qri1tEI5iSoennWbgRlWj7g2cYj07HJVHaAcU7PLo76n5O2TSk9mlf5vfAQF/wsUNtjhL537QnzzjOADqm9acm/neg18cjQI0yau9i6pGV066k2iahNd2lbwSH3DK8dxirJ1iWZ012Ggpv+oD42PqQ==
-x-incomingheadercount: 63
+x-microsoft-exchange-diagnostics: 1; PU1APC01HT091;
+ 6:hRs2tKhL3NyexlRYxcy3BO+qvquHn108ilOxNMvRiJPHN9wW0rng+UBcR0vs1wkVM9Qtzgzcg51GABcaZRqjDvj9MueHvKh9WTQxlbhDkfWFkadTPRuJhJAiCq07212iYTzdSxE361zFYcaIYY7To5vKpxhU0G/WGO3D7NLTvHjZtQTPGsZGbAPzplKDF9dOnaZKfF3cKkMA+4wHj1c4JxsqwdRne1OAvzPMxdAXmfXhypPCCWaCFD8x0MXbWTLYvLHK84mX8mMEYP1bU2CTfV1D7oj1kzNacnxn4aBsyoPoI8FfGsPYFewJiWQFR1eOgAxuIlgBDPNkhUOoRP+3Cn4Pxn61d1IUblLl8CDbDtcqMRKv6LN1mG0o4W0kfJfZYbAJOwXYIlAVGUvLlJyIZ3CF8kImW9BGfPQIVjjozwwsQloa5LC774RZz0DZ3jLORiIRGorHyArBRQ0lzZ/qhA==;
+ 5:GK0+Jp/4UnWk0XtEswbFnFznFrqkimuiSYtTEACZ8iQXwXKy55MviUFxbDKdoZkydlN1N3Td8oyDRzzk26SbjfFNbhAHZbOg6AfgvHV/1DLZDBEOgKJQ12KF0sztSu0HuOPJuqA4RV7wofV2PE9bhF6Vi9xa/2LcpXwpLK7SNw6jnup2IIXc3WU5FZ5BVZYqH1HlG6aB/nRyBemZnT3Zug==;
+ 7:LeERfQ5EmQIMC6960I9p6eaUWENGD5y1vsxANk3El6mWQQ5cA061Q6Hamume16YRRCnr3pPNq7XI/8g5BcoPpDLdtfdT4tI3YkJxVNiKhWD/uJJDy4EuT+Y5f2l8ASCkZdSYeUEY9je8Xid5z5nWHQ==
+x-incomingheadercount: 65
 x-eopattributedmessage: 0
-x-ms-exchange-slblob-mailprops: b0omxY8GwpZtOL5FmEVprcShgOktBSYZhzsJHgWxUBcWJl4g7fgyqM1ZBbvIR+f1cl6ROY8qPfw56IbqyOAW8HP7szP30yfdunHgaI/NQlwfBsqCle3Lwy4ptXLVuXpAsKlcpQCMZGpKG0g7K+dIYzI2i+o6Ef3rEp+YUPxpRNlQT36RL+KKZS7g2WjyrSBnW3Q+CfC3rcMU8Ho+R3bvho1+mTEpUf2Kkups5F6HU81wvhVyIrf7HIwQkEakuFgSKNiH5RgVzbPSfjqRDEc3bji8Wh+zzPi4BVS7M44ek41eqtlSvPMrpa5SidUrYqTlm3Lxy/o1ySZJsrShm7swXlZyzhp2XcWOfNv+wLhU9t/a2w2vRUm1z56Ql0uhGo9x8OGZioHgJiGvzS0GANMflCsSTzs14EJ35etZ/oeoBExzemSKdhObJM4IdHz2no4iP65J4qkxIvISF660vOxIm4ym6S63WglXneBa+Fv7Wzhjo4bOulTBuUkMV1QCbQTbsjUf/iNEJ31C/HPKeZXsucdng/rtB5dP7+wRMFUSQQBaCZkZympZwRikmtSRXN7Rl4w8xhYYprfGH6oFb5Szz3qdRytVXYLa40lAwjY6yi9nhlOHn/UjeyPw/efKFhGWhibgDhNGt2dpy1FEOAOpE0DRrMxJNZozfVFFXNGZNVgnDKC5AEh/2zoSBkK2MwXPF92EPJvQTdiBfHVtAt++LzkJLgp5/lXHrakfE4qwDePSFz/ej5YzLWKuSufXWoe+
+x-ms-exchange-slblob-mailprops: DJLbvgWm8MaxudWSkncYhwGFHEpKdsaEIlO+NWFgau/NQHKRwArcYav8ugiRk5+INxYCpzExpjANsNGx29yiBejfL14I+RBjgUGQg+lnOj/gmRVPcDky1bh2R58FLhO2PSMrEz9xFqESn6wgW6x+lXojVrxy1+/6RuBx9sbWq3tXnwoikTAbOgT4jAgg1wLwlJxq1on3FvD/Z68zaM3DgmavELoAxKtt+q8sCMpAkDn9Ed95dGL7QHzx0RqMaeyxSMD1yvoFYGceCqIbGv5VNmbogJMbHWBQTHPoy+3lIGy0vpEjHjN8V5w5pzMrhAoPH1CNcXLt15SIkkmxPrf8XVkvNwIIyS+NiZVcW88hUWNGhA/T8dXikyALRtk/5qEfn2LXdaQin/m9ehMp4I+iRW83R+QiM/veNPK2JoBYzo7x7DyJmnb+km/zVipWBMd1N5Vc1izfRVu3KNgfnNkQNXZMs8KtpwQomSYKogiZwRm7+0SFAxAGZdpW5giRDgr5bKG8WqFa6IIZa4g3Tb9CvzsZbsM/cZBqMSTY8fSEBh+cXYg64fGrxwam9td5DNTnGLmoJ4ygDskTQv5mNfszAJcMt2GqSv3Y2+JmlaDPwlSZ9D9ivNrbZoHke/L7cOPvamqKvXD+0Oaeoqy2zSgyD73Neq+5duUsLPkvhhny/9cTu+dT5lUNBUsym6glA+tqX42T04mbKe8ywAZsArsP6g==
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(201702061078)(5061506573)(5061507331)(1603103135)(2017031320274)(201702181274)(2017031323274)(2017031324274)(2017031322404)(1601125500)(1603101475)(1701031045);
- SRVR:PU1APC01HT082; 
-x-ms-traffictypediagnostic: PU1APC01HT082:
+ SRVR:PU1APC01HT091; 
+x-ms-traffictypediagnostic: PU1APC01HT091:
 x-exchange-antispam-report-cfa-test: BCL:0; PCL:0; RULEID:(4566010)(82015058);
- SRVR:PU1APC01HT082; BCL:0; PCL:0; RULEID:; SRVR:PU1APC01HT082; 
-x-microsoft-antispam-message-info: bcWvzUBmtXNf/F647lGi0um9EhWAfD7U9oivkwD9BHx7MfTeKa6BHYvPf8pssC8Y
+ SRVR:PU1APC01HT091; BCL:0; PCL:0; RULEID:; SRVR:PU1APC01HT091; 
+x-microsoft-antispam-message-info: VPjsln6DS9atbrjxzyDGOXwDF4dlFO6dz0JVUtfNo2TyINn61KuCR5BCQbrXJ3sz
 MIME-Version: 1.0
 X-OriginatorOrg: hotmail.com
 X-MS-Exchange-CrossTenant-RMS-PersistedConsumerOrg: 9a4e3081-9524-43cf-bfc3-dcaef82d5da1
-X-MS-Exchange-CrossTenant-Network-Message-Id: 47ba58a3-1b46-4594-c631-08d68caf7604
+X-MS-Exchange-CrossTenant-Network-Message-Id: 29d24773-4b6d-44a3-6025-08d68cafaf7b
 X-MS-Exchange-CrossTenant-rms-persistedconsumerorg: 9a4e3081-9524-43cf-bfc3-dcaef82d5da1
-X-MS-Exchange-CrossTenant-originalarrivaltime: 07 Feb 2019 03:50:47.3891 (UTC)
+X-MS-Exchange-CrossTenant-originalarrivaltime: 07 Feb 2019 03:51:32.7772 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Internet
 X-MS-Exchange-CrossTenant-id: 84df9e7f-e9f6-40af-b435-aaaaaaaaaaaa
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: PU1APC01HT082
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: PU1APC01HT091
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_195104_194333_B1817A0F 
-X-CRM114-Status: GOOD (  15.29  )
+X-CRM114-CacheID: sfid-20190206_195242_264873_733E7DB7 
+X-CRM114-Status: GOOD (  14.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -127,6 +130,7 @@ Cc: "alexandre.belloni@bootlin.com" <alexandre.belloni@bootlin.com>,
  Wen Yang <yellowriver2010@hotmail.com>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
  "ludovic.desroches@microchip.com" <ludovic.desroches@microchip.com>,
+ Harvey Hunt <harveyhuntnexus@gmail.com>,
  "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
@@ -140,76 +144,49 @@ get_device() twice.
 We also should make sure to drop the reference to the device
 taken by of_find_device_by_node() on driver unbind.
 
-Fixes: f88fc122cc34 ("mtd: nand: Cleanup/rework the atmel_nand driver")
+Fixes: ae02ab00aa3c ("mtd: nand: jz4780: driver for NAND devices on JZ4780 SoCs")
 Signed-off-by: Wen Yang <yellowriver2010@hotmail.com>
-Suggested-by: Boris Brezillon <bbrezillon@kernel.org>
-Reviewed-by: Boris Brezillon <bbrezillon@kernel.org>
-Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Suggested-by: Miquel Raynal <miquel.raynal@bootlin.com>
 Acked-by: Miquel Raynal <miquel.raynal@bootlin.com>
-Cc: Tudor Ambarus <tudor.ambarus@microchip.com>
+Cc: Harvey Hunt <harveyhuntnexus@gmail.com>
 Cc: Boris Brezillon <bbrezillon@kernel.org>
 Cc: Miquel Raynal <miquel.raynal@bootlin.com>
 Cc: Richard Weinberger <richard@nod.at>
 Cc: David Woodhouse <dwmw2@infradead.org>
 Cc: Brian Norris <computersforpeace@gmail.com>
 Cc: Marek Vasut <marek.vasut@gmail.com>
-Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-Cc: Ludovic Desroches <ludovic.desroches@microchip.com>
 Cc: linux-mtd@lists.infradead.org
-Cc: linux-arm-kernel@lists.infradead.org
 Cc: linux-kernel@vger.kernel.org
 ---
-v4->v3: Avoid two times of calling grtform_get_drvdata()
-v3->v2: Change the commit message.
-v2->v1: Add missing Fixes tag
+v3->v2: Avoid two times of calling grtform_get_drvdata()
+v2->v1: Since there is the only one user, let's remove the err_put_device label.
 
- drivers/mtd/nand/raw/atmel/pmecc.c | 21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+ drivers/mtd/nand/raw/jz4780_bch.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/atmel/pmecc.c b/drivers/mtd/nand/raw/atmel/pmecc.c
-index 555a74e..9d39978 100644
---- a/drivers/mtd/nand/raw/atmel/pmecc.c
-+++ b/drivers/mtd/nand/raw/atmel/pmecc.c
-@@ -876,23 +876,32 @@ static struct atmel_pmecc *atmel_pmecc_get_by_node(struct device *userdev,
- {
- 	struct platform_device *pdev;
- 	struct atmel_pmecc *pmecc, **ptr;
-+	int ret;
+diff --git a/drivers/mtd/nand/raw/jz4780_bch.c b/drivers/mtd/nand/raw/jz4780_bch.c
+index 7201827..7aab851 100644
+--- a/drivers/mtd/nand/raw/jz4780_bch.c
++++ b/drivers/mtd/nand/raw/jz4780_bch.c
+@@ -281,12 +281,14 @@ static struct jz4780_bch *jz4780_bch_get(struct device_node *np)
+ 	struct jz4780_bch *bch;
  
  	pdev = of_find_device_by_node(np);
 -	if (!pdev || !platform_get_drvdata(pdev))
 +	if (!pdev)
  		return ERR_PTR(-EPROBE_DEFER);
-+	pmecc = platform_get_drvdata(pdev);
-+	if (!pmecc) {
-+		ret = -EPROBE_DEFER;
-+		goto err_put_device;
-+	}
- 
- 	ptr = devres_alloc(devm_atmel_pmecc_put, sizeof(*ptr), GFP_KERNEL);
--	if (!ptr)
--		return ERR_PTR(-ENOMEM);
 -
 -	get_device(&pdev->dev);
--	pmecc = platform_get_drvdata(pdev);
-+	if (!ptr) {
-+		ret = -ENOMEM;
-+		goto err_put_device;
+-
+ 	bch = platform_get_drvdata(pdev);
++	if (!bch) {
++		put_device(&pdev->dev);
++		return ERR_PTR(-EPROBE_DEFER);
 +	}
- 
- 	*ptr = pmecc;
- 
- 	devres_add(userdev, ptr);
- 
- 	return pmecc;
 +
-+err_put_device:
-+	put_device(&pdev->dev);
-+	return ERR_PTR(ret);
- }
+ 	clk_prepare_enable(bch->clk);
  
- static const int atmel_pmecc_strengths[] = { 2, 4, 8, 12, 24, 32 };
+ 	return bch;
 -- 
 2.7.4
 
