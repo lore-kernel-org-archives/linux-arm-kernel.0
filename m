@@ -2,21 +2,21 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8643CC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 06:47:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3A7ACC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 06:47:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 545E42175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 06:47:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0A5B52175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 06:47:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a6aKCNOW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 545E42175B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bVuPQSMN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0A5B52175B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YHgj3zDjWiOszfHaxOFigjBMdrJugPVOkHzYnTbkuQc=; b=a6aKCNOW/JcrUi
-	7XqpR+1lUfZgeuOkNqv4bAVWTIHgzkbtpHRGn5aMFzXwGmyj5Ri8gJY0tr0dQyQRrFXjqAhWvSJNO
-	CA3NHLB19qJ3+a55X48qPUMxA2KH+/wfYP1I7MjWvpCEquGToiy/68JIVrmGZu/tNXMYK7MQAkxNP
-	g2j3xFx4z5RTjZE6Tqg3/OlU406WGDnMv+rQ6yeSh35N8ndOiXaIrQZi7MpO/uw93QrYE9uJYD52n
-	Y7AFVKSIYAyCnfQxKWPiJObih45JybIb6svGcj7Cehhj7lz81VtXbFjmqrdV44iFdXPXbVAVrFUjb
-	5T9wkd8UmpPU9ln7o3zQ==;
+	List-Owner; bh=AWqv3MAX/rCEE7YYEIHg/yq4r/gBoWNpuZEUY8eYZ+k=; b=bVuPQSMNFpOXfU
+	iglxK3kZ076hfqGb2/lj9QumTCJfLgDft78W9sMuWCjHuyA0dr0k4ukvKotOu4P1ZsRqFsbUrmTyT
+	oWTm7ckyhxAXGgj0BoJDnurZ4BmFB61wsKsMzRAYbHyPmjr9nDidZnnaVLDv8l3gViB/TleFtCNK9
+	8O1Ua9SDAj4mfrhmyRoFgUFsJcjfpWy+pfguZmPTyUbEB6NB8n2sGK+cHg/vTiWyUwJ0SXi1H5air
+	y7+M+MIbYR1828E5s0p/hNVpTCVrOOa8a6GSjbuOf6UqiGU5Z7Xrj9RmwUEeqe1kjhdTca3oEqQi3
+	BTBO0bN0YFmO5U/I1tOg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grdT8-0007XK-QD; Thu, 07 Feb 2019 06:47:30 +0000
+	id 1grdTQ-0007p4-JQ; Thu, 07 Feb 2019 06:47:48 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grdRU-0005uX-KG
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 06:45:50 +0000
+ id 1grdRV-0005vD-SI
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 06:45:52 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id BEAC25FDBD; Thu,  7 Feb 2019 14:45:39 +0800 (CST)
+ id DE81B5FE33; Thu,  7 Feb 2019 14:45:39 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Lee Jones <lee.jones@linaro.org>, Sebastian Reichel <sre@kernel.org>
-Subject: [RFT PATCH 6/9] power: supply: axp20x_usb_power: add support for
- AXP813
-Date: Thu,  7 Feb 2019 14:45:32 +0800
-Message-Id: <20190207064535.9226-7-wens@csie.org>
+Subject: [RFT PATCH 9/9] ARM: dts: sun8i: a83t: Enable USB OTG controller on
+ some boards
+Date: Thu,  7 Feb 2019 14:45:35 +0800
+Message-Id: <20190207064535.9226-10-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190207064535.9226-1-wens@csie.org>
 References: <20190207064535.9226-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_224549_030253_E3083CB9 
-X-CRM114-Status: GOOD (  12.98  )
+X-CRM114-CacheID: sfid-20190206_224550_267692_83EE3145 
+X-CRM114-Status: UNSURE (   9.68  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,144 +68,75 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: devicetree@vger.kernel.org, Quentin Schulz <quentin.schulz@bootlin.com>,
- linux-pm@vger.kernel.org, linux-kernel@vger.kernel.org,
- Hans de Goede <hdegoede@redhat.com>, linux-sunxi@googlegroups.com,
+ linux-pm@vger.kernel.org, linux-sunxi@googlegroups.com,
+ linux-kernel@vger.kernel.org, Hans de Goede <hdegoede@redhat.com>,
  Chen-Yu Tsai <wens@csie.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Quentin Schulz <quentin.schulz@bootlin.com>
+The Bananapi M3 and Cubietruck Plus both have USB OTG ports wired to the
+SoC and PMIC in the same way, with the N_VBUSEN pin on the PMIC
+controlling VBUS output, the PMIC's VBUS input for sensing VBUS, and
+PH11 on the SoC for sensing the ID pin.
 
-This adds support for AXP813 PMIC. It is almost the same as AXP22X but
-has a different current limit.
+Enable OTG on both boards.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@bootlin.com>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/power/supply/axp20x_usb_power.c | 66 ++++++++++++++++++++++++-
- 1 file changed, 65 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts     | 12 ++++++++++++
+ arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts | 12 ++++++++++++
+ 2 files changed, 24 insertions(+)
 
-diff --git a/drivers/power/supply/axp20x_usb_power.c b/drivers/power/supply/axp20x_usb_power.c
-index 90d06027bf98..d39c450b14c6 100644
---- a/drivers/power/supply/axp20x_usb_power.c
-+++ b/drivers/power/supply/axp20x_usb_power.c
-@@ -42,6 +42,11 @@
- #define AXP20X_VBUS_CLIMIT_100mA	2
- #define AXP20X_VBUS_CLIMIT_NONE		3
- 
-+#define AXP813_VBUS_CLIMIT_900mA	0
-+#define AXP813_VBUS_CLIMIT_1500mA	1
-+#define AXP813_VBUS_CLIMIT_2000mA	2
-+#define AXP813_VBUS_CLIMIT_2500mA	3
-+
- #define AXP20X_ADC_EN1_VBUS_CURR	BIT(2)
- #define AXP20X_ADC_EN1_VBUS_VOLT	BIT(3)
- 
-@@ -131,6 +136,31 @@ static int axp20x_get_current_max(struct axp20x_usb_power *power, int *val)
- 	return 0;
- }
- 
-+static int axp813_get_current_max(struct axp20x_usb_power *power, int *val)
-+{
-+	unsigned int v;
-+	int ret = regmap_read(power->regmap, AXP20X_VBUS_IPSOUT_MGMT, &v);
-+
-+	if (ret)
-+		return ret;
-+
-+	switch (v & AXP20X_VBUS_CLIMIT_MASK) {
-+	case AXP813_VBUS_CLIMIT_900mA:
-+		*val = 900000;
-+		break;
-+	case AXP813_VBUS_CLIMIT_1500mA:
-+		*val = 1500000;
-+		break;
-+	case AXP813_VBUS_CLIMIT_2000mA:
-+		*val = 2000000;
-+		break;
-+	case AXP813_VBUS_CLIMIT_2500mA:
-+		*val = 2500000;
-+		break;
-+	}
-+	return 0;
-+}
-+
- static int axp20x_usb_power_get_property(struct power_supply *psy,
- 	enum power_supply_property psp, union power_supply_propval *val)
- {
-@@ -169,6 +199,8 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
- 		val->intval = ret * 1700; /* 1 step = 1.7 mV */
- 		return 0;
- 	case POWER_SUPPLY_PROP_CURRENT_MAX:
-+		if (power->axp20x_id == AXP813_ID)
-+			return axp813_get_current_max(power, &val->intval);
- 		return axp20x_get_current_max(power, &val->intval);
- 	case POWER_SUPPLY_PROP_CURRENT_NOW:
- 		if (IS_ENABLED(CONFIG_AXP20X_ADC)) {
-@@ -260,6 +292,31 @@ static int axp20x_usb_power_set_voltage_min(struct axp20x_usb_power *power,
- 	return -EINVAL;
- }
- 
-+static int axp813_usb_power_set_current_max(struct axp20x_usb_power *power,
-+					    int intval)
-+{
-+	int val;
-+
-+	switch (intval) {
-+	case 900000:
-+		return regmap_update_bits(power->regmap,
-+					  AXP20X_VBUS_IPSOUT_MGMT,
-+					  AXP20X_VBUS_CLIMIT_MASK,
-+					  AXP813_VBUS_CLIMIT_900mA);
-+	case 1500000:
-+	case 2000000:
-+	case 2500000:
-+		val = (intval - 1000000) / 500000;
-+		return regmap_update_bits(power->regmap,
-+					  AXP20X_VBUS_IPSOUT_MGMT,
-+					  AXP20X_VBUS_CLIMIT_MASK, val);
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return -EINVAL;
-+}
-+
- static int axp20x_usb_power_set_current_max(struct axp20x_usb_power *power,
- 					    int intval)
- {
-@@ -299,6 +356,9 @@ static int axp20x_usb_power_set_property(struct power_supply *psy,
- 		return axp20x_usb_power_set_voltage_min(power, val->intval);
- 
- 	case POWER_SUPPLY_PROP_CURRENT_MAX:
-+		if (power->axp20x_id == AXP813_ID)
-+			return axp813_usb_power_set_current_max(power,
-+								val->intval);
- 		return axp20x_usb_power_set_current_max(power, val->intval);
- 
- 	default:
-@@ -434,7 +494,8 @@ static int axp20x_usb_power_probe(struct platform_device *pdev)
- 		usb_power_desc = &axp20x_usb_power_desc;
- 		irq_names = axp20x_irq_names;
- 	} else if (power->axp20x_id == AXP221_ID ||
--		   power->axp20x_id == AXP223_ID) {
-+		   power->axp20x_id == AXP223_ID ||
-+		   power->axp20x_id == AXP813_ID) {
- 		usb_power_desc = &axp22x_usb_power_desc;
- 		irq_names = axp22x_irq_names;
- 	} else {
-@@ -493,6 +554,9 @@ static const struct of_device_id axp20x_usb_power_match[] = {
- 	}, {
- 		.compatible = "x-powers,axp223-usb-power-supply",
- 		.data = (void *)AXP223_ID,
-+	}, {
-+		.compatible = "x-powers,axp813-usb-power-supply",
-+		.data = (void *)AXP813_ID,
- 	}, { /* sentinel */ }
+diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+index 838be7b3715f..9d34eabba121 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+@@ -389,7 +389,19 @@
+ 	};
  };
- MODULE_DEVICE_TABLE(of, axp20x_usb_power_match);
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
++&usb_power_supply {
++	status = "okay";
++};
++
+ &usbphy {
++	usb0_id_det-gpios = <&pio 7 11 GPIO_ACTIVE_HIGH>; /* PH11 */
++	usb0_vbus_power-supply = <&usb_power_supply>;
++	usb0_vbus-supply = <&reg_drivevbus>;
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+index fcbec3d7ccd7..ea299d3d84d0 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+@@ -420,7 +420,19 @@
+ 	};
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
++&usb_power_supply {
++	status = "okay";
++};
++
+ &usbphy {
++	usb0_id_det-gpios = <&pio 7 11 GPIO_ACTIVE_HIGH>; /* PH11 */
++	usb0_vbus_power-supply = <&usb_power_supply>;
++	usb0_vbus-supply = <&reg_drivevbus>;
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	usb2_vbus-supply = <&reg_usb2_vbus>;
+ 	status = "okay";
 -- 
 2.20.1
 
