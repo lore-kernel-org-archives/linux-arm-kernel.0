@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E3F3BC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:52:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D7FE5C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:52:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B1B8920823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:52:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 885D720823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:52:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WBc2DaYq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1B8920823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DOr7U54Z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 885D720823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yDMYn3/Aqg7MNX7r9UwCdKRUs40sUFHCVN4g2Y/9JpE=; b=WBc2DaYqQB+D/D
-	y6ol6zxJ4YkmcKc0fe16BS1/OPuAfQ2Sq09t1YMBVKdsZ3R8mG6danNjE1XDlGKHdd9QlIN/4unYV
-	b4Kd7Nb0+p4cHlX91fzlUgB/xDexHlGtttdB/EPbQgL687+yTBu9pV3OOiAXsdSMtOic8iboyK21L
-	TuWTj/yeKQ1o66UbAQXHPKehacF+cTQcD8RsBeOhHGT5bDuE2O4LqoSps/tAxwWe0ejCNUqqj7tLJ
-	RZXdI6YQoWV5a3bmU9RepFXWO/fPwhrnLhJopelwtaCJtrpe+w+wuWG4AD7t4k/QREPKj1ov+smM5
-	2DJ0FiERe5oqJho5aZAA==;
+	List-Owner; bh=LZ9J/+Z+YDZCzlOo60nogHfTNE4870s5X2YOCPiKjTc=; b=DOr7U54ZsVuBiS
+	mbCB7FhK9hILzMBoO4nZEccLuXURywPQ4/8aqCi/DskVDYxcSM9HqxuqMkj66Nb114WZK7mu117cd
+	+07mZPvoC70rPQQU6rA+HY6KvhIRZqJ55uPL+6R2bOguX31IdssyovLGnAWsXCh6RiVGDzWgTLZNU
+	NUr+d3s2KxuWNEp+smmGkVFhqvAeiOnLRi/U7Y5oIcyvne22SAYXpuWHL6yVkahZAFiiTFpsVRWxl
+	r/VWbblFtl7/PxJyUCazMfb9GrrCfCNAlrGXW6XNeedg6wNU+jL3IIUh90u/jKRgI7/Cz2XJjhryq
+	YB4u8pFRVVh1NJpbt+Rg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grgMM-0000XQ-2E; Thu, 07 Feb 2019 09:52:42 +0000
+	id 1grgMb-0000mX-SE; Thu, 07 Feb 2019 09:52:57 +0000
 Received: from relay11.mail.gandi.net ([217.70.178.231])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grgK5-0006FI-U6
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:50:31 +0000
+ id 1grgKB-0006eS-FM
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:50:35 +0000
 Received: from mc-bl-xps13.lan
  (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr [90.88.22.177])
  (Authenticated sender: maxime.chevallier@bootlin.com)
- by relay11.mail.gandi.net (Postfix) with ESMTPSA id E4A13100022;
- Thu,  7 Feb 2019 09:50:17 +0000 (UTC)
+ by relay11.mail.gandi.net (Postfix) with ESMTPSA id 2F9D8100014;
+ Thu,  7 Feb 2019 09:50:23 +0000 (UTC)
 From: Maxime Chevallier <maxime.chevallier@bootlin.com>
 To: davem@davemloft.net
-Subject: [PATCH net-next v2 08/10] net: phy: marvell10g: Force reading of
- 2.5/5G
-Date: Thu,  7 Feb 2019 10:49:37 +0100
-Message-Id: <20190207094939.27369-9-maxime.chevallier@bootlin.com>
+Subject: [PATCH net-next v2 10/10] net: phy: marvell10g: add support for the
+ 88x2110 PHY
+Date: Thu,  7 Feb 2019 10:49:39 +0100
+Message-Id: <20190207094939.27369-11-maxime.chevallier@bootlin.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
 References: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_015022_214134_4BFD34DE 
-X-CRM114-Status: GOOD (  13.42  )
+X-CRM114-CacheID: sfid-20190207_015028_037262_6A45FDFF 
+X-CRM114-Status: GOOD (  12.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,77 +80,69 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-As per 802.3bz, if bit 14 of (1.11) "PMA Extended Abilities" indicates
-whether or not we should read register (1.21) "2.52/5G PMA Extended
-Abilities", which contains information on the support of 2.5GBASET and
-5GBASET.
+This patch adds support for the 88x2110 PHY, which is similar to the
+already supported 88x3310 PHY without the SFP interface.
 
-After testing on several variants of PHYS of this family, it appears
-that bit 14 in (1.11) isn't always set when it should be.
+It supports 10/100/1000BASET along with 2.5GBASET, 5GBASET and 10GBASET,
+with the same interface modes that are used by the 3310.
 
-PHYs 88X3310 (on MacchiatoBin) and 88E2010 do support 2.5G and 5GBASET,
-but don't have 1.11.14 set. Their register 1.21 is filled with the
-correct values, indicating 2.5G and 5G support.
-
-PHYs 88E2110 do have their 1.11.14 bit set, as it should.
+This PHY don't have the same issue as the 88x3310 regarding 2.5/5G
+abilities, and correctly follows the 802.3bz standard to list the
+supported abilities.
 
 Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+Suggested-by: Antoine Tenart <antoine.tenart@bootlin.com>
 ---
-V1 -> V2: Use the PMA device id to identify which devices need this
-	  quirk, based on Andrew's idea.
+V1 -> V2: Use a #define for the PHY ID, since we also do that for the
+	  3310. Removed the mv2110_config_init implementation since we
+	  now manually check for the PMA device id when using the quirk.
 
- drivers/net/phy/marvell10g.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/net/phy/marvell10g.c | 13 +++++++++++++
+ include/linux/marvell_phy.h  |  1 +
+ 2 files changed, 14 insertions(+)
 
 diff --git a/drivers/net/phy/marvell10g.c b/drivers/net/phy/marvell10g.c
-index 581b4b6e31e9..2593db608af7 100644
+index 2593db608af7..fa4847662c81 100644
 --- a/drivers/net/phy/marvell10g.c
 +++ b/drivers/net/phy/marvell10g.c
-@@ -232,6 +232,23 @@ static int mv3310_resume(struct phy_device *phydev)
- 	return mv3310_hwmon_config(phydev, true);
- }
+@@ -508,12 +508,25 @@ static struct phy_driver mv3310_drivers[] = {
+ 		.aneg_done	= mv3310_aneg_done,
+ 		.read_status	= mv3310_read_status,
+ 	},
++	{
++		.phy_id		= MARVELL_PHY_ID_88E2110,
++		.phy_id_mask	= MARVELL_PHY_ID_MASK,
++		.name		= "mv88x2110",
++		.features	= PHY_10GBIT_FEATURES,
++		.probe		= mv3310_probe,
++		.soft_reset	= gen10g_no_soft_reset,
++		.config_init	= mv3310_config_init,
++		.config_aneg	= mv3310_config_aneg,
++		.aneg_done	= mv3310_aneg_done,
++		.read_status	= mv3310_read_status,
++	},
+ };
  
-+/* Some PHYs in the Alaska family such as the 88X3310 and the 88E2010
-+ * don't set bit 14 in PMA Extended Abilities (1.11), although they do
-+ * support 2.5GBASET and 5GBASET. For these models, we can still read their
-+ * 2.5G/5G extended abilities register (1.21). We detect these models based on
-+ * the PMA device identifier, with a mask matching models known to have this
-+ * issue
-+ */
-+static bool mv3310_has_pma_ngbaset_quirk(struct phy_device *phydev)
-+{
-+	if (!(phydev->c45_ids.devices_in_package & MDIO_DEVS_PMAPMD))
-+		return false;
-+
-+	/* Only some revisions of the 88X3310 family PMA seem to be impacted */
-+	return (phydev->c45_ids.device_ids[MDIO_MMD_PMAPMD] & 0xfffffffe) ==
-+	       (MARVELL_PHY_ID_88X3310 & 0xfffffffe);
-+}
-+
- static int mv3310_config_init(struct phy_device *phydev)
- {
- 	int ret, val;
-@@ -261,6 +278,20 @@ static int mv3310_config_init(struct phy_device *phydev)
- 	if (ret)
- 		return ret;
+ module_phy_driver(mv3310_drivers);
  
-+	if (mv3310_has_pma_ngbaset_quirk(phydev)) {
-+		val = phy_read_mmd(phydev, MDIO_MMD_PMAPMD,
-+				   MDIO_PMA_NG_EXTABLE);
-+		if (val < 0)
-+			return val;
-+
-+		if (val & MDIO_PMA_NG_EXTABLE_2_5GBT)
-+			__set_bit(ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
-+				  phydev->supported);
-+		if (val & MDIO_PMA_NG_EXTABLE_5GBT)
-+			__set_bit(ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
-+				  phydev->supported);
-+	}
-+
- 	return 0;
- }
+ static struct mdio_device_id __maybe_unused mv3310_tbl[] = {
+ 	{ MARVELL_PHY_ID_88X3310, MARVELL_PHY_ID_MASK },
++	{ MARVELL_PHY_ID_88E2110, MARVELL_PHY_ID_MASK },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(mdio, mv3310_tbl);
+diff --git a/include/linux/marvell_phy.h b/include/linux/marvell_phy.h
+index 5851d68d828a..8596a861940e 100644
+--- a/include/linux/marvell_phy.h
++++ b/include/linux/marvell_phy.h
+@@ -21,6 +21,7 @@
+ #define MARVELL_PHY_ID_88E1545		0x01410ea0
+ #define MARVELL_PHY_ID_88E3016		0x01410e60
+ #define MARVELL_PHY_ID_88X3310		0x002b09aa
++#define MARVELL_PHY_ID_88E2110		0x002b09b8
  
+ /* The MV88e6390 Ethernet switch contains embedded PHYs. These PHYs do
+  * not have a model ID. So the switch driver traps reads to the ID2
 -- 
 2.19.2
 
