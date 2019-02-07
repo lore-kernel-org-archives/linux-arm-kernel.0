@@ -2,72 +2,86 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 000A2C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 12:17:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 02A6DC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 12:22:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B5C662175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 12:17:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C6CA021904
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 12:22:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e8Cw98AC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="Dqw/Q0Hl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B5C662175B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VyqjWhBv";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="SET6Beng"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C6CA021904
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
-	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	References:List-Owner; bh=NNrSsIBI1D73rJvcPW3xyiHYY7hnDuXR6+prH8sKY9Q=; b=e8C
-	w98ACY2prwWbXsEBGHtmSueLvFXdLlzRcoyicYGVBFljvwHtrvibOWEd8Wpw+AOrhn8JNCWa3fktl
-	35tlIC5Y2DxkGk4Hhw5u3P1XeOexnz1Js/lmaPwNwFoJcZWYtRFAHlILhqL0jIuZNoWMntmFYQVJ7
-	5ZMo5zdfNqj+mFWMVwAS1SlTC6PoNC2ofRlrtC3jLVqQ8NTebhav5KqUHR7AONNPQzx8CnTydLYvi
-	5hRvd+zeG2LuHRWGFo7K7FVY2xagi563rPXj2QYUeiRc2yGudRSqbQsUomcLG3upD3/jPZmkGKQPQ
-	jyhLhK+kq1tTT4HYBXGyfDF/sd+dzOg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=7/wOujUSRGNzHC4tcWoPmgu23+zIQIBdyImZIB0phMo=; b=VyqjWhBvu9IQzS
+	X7vciLcaoV3eTa2iar/NQY41uyO+C4Y3B8U/KFU5EaMrHQ6c/A7aEYGOS8Wafq8I8vSAIaN7U6B4J
+	UBcCkY/p6f/NHTkYXuv+rs+pLmRWtwflodnx0IDGBA7QTU86V62oLMI7eEU/V1TAN/ktVNEmAEqIw
+	rjbWU7s7k07v/mfkd1t9Oty5LFiHVPSnTI93nghfXOrJnBnlbSB9Ea5sM0XlR40jOjT4g8jL9xqxs
+	SfHTh38ZvySXl53YKz92bgTMy1BcTKvoLeaDuTYAJ3dUteUfHBDBKVLpuWcsJvmPodubOT+APULrD
+	BoIVQnzVHWuUxnfgI4sw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gricO-0002QF-95; Thu, 07 Feb 2019 12:17:24 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+	id 1grigv-00043O-EW; Thu, 07 Feb 2019 12:22:05 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gribE-0001Hk-KU
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 12:16:23 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
- List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
- List-Archive; bh=yFkwKMvykrDydXmI294G9wD/aqb9Rwvefm4MYvh9e0o=; b=Dqw/Q0HlQwLr
- pOOzDspNJIdUR3sZ3HrHkhtzZNiHK+4Kex3fLl5zjYnkYruUfgwqF4azmJY7zMJ/krfbl4vLy/Uyf
- TygQ8RZH7AvVEBUM7FXxrzol9mnNkdG07vSII6hkY8tP7GsYkDtqtV/kfl72lmpWmawOJpLpKEfQg
- xyxTE=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1grib5-0004vM-H5; Thu, 07 Feb 2019 12:16:03 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id 1BB971127EF9; Thu,  7 Feb 2019 12:16:03 +0000 (GMT)
-From: Mark Brown <broonie@kernel.org>
-To: Danny Milosavljevic <dannym@scratchpost.org>
-Subject: Applied "ASoC: sun4i-codec: Add MIC2 Pre-Amplifier,
- Mic2 input" to the asoc tree
-In-Reply-To: <20190130103945.26692-2-dannym@scratchpost.org>
-X-Patchwork-Hint: ignore
-Message-Id: <20190207121603.1BB971127EF9@debutante.sirena.org.uk>
-Date: Thu,  7 Feb 2019 12:16:03 +0000 (GMT)
-X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
+ id 1grigr-000434-CC
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 12:22:02 +0000
+Received: from lelv0266.itg.ti.com ([10.180.67.225])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x17CLhtl115848;
+ Thu, 7 Feb 2019 06:21:43 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1549542103;
+ bh=dCTLPZKdBwcNKIjpTTCnTDXhgBzRhnn4VA2HiHM1NZk=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=SET6BengYn9qOMCljixmToS9/L2bWaHzAn91LaRrK66nJL8aHWMyGdZEol2Vk1gJb
+ Cj7LlKJn2uDF+G1Oe22/T6mhILtHTsvLUlLudARXYSFfclwFUTXVv1ejaPck5Q5HQi
+ XdtpxlQQlQ2TcTB0yTtYWzDht4yif3prfgo5H4MU=
+Received: from DFLE114.ent.ti.com (dfle114.ent.ti.com [10.64.6.35])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x17CLhGt069850
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Thu, 7 Feb 2019 06:21:43 -0600
+Received: from DFLE103.ent.ti.com (10.64.6.24) by DFLE114.ent.ti.com
+ (10.64.6.35) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 7
+ Feb 2019 06:21:43 -0600
+Received: from dflp33.itg.ti.com (10.64.6.16) by DFLE103.ent.ti.com
+ (10.64.6.24) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Thu, 7 Feb 2019 06:21:43 -0600
+Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x17CLeAg003399;
+ Thu, 7 Feb 2019 06:21:41 -0600
+Subject: Re: [PATCH 16/35] ARM: davinci: aintc: move timer-specific
+ irq_set_handler() out of irq.c
+To: Bartosz Golaszewski <brgl@bgdev.pl>, Kevin Hilman <khilman@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
+ Marc Zyngier <marc.zyngier@arm.com>
+References: <20190131133928.17985-1-brgl@bgdev.pl>
+ <20190131133928.17985-17-brgl@bgdev.pl>
+From: Sekhar Nori <nsekhar@ti.com>
+Message-ID: <9f6e023c-71cc-197a-d651-83a3b1662d85@ti.com>
+Date: Thu, 7 Feb 2019 17:51:39 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
+MIME-Version: 1.0
+In-Reply-To: <20190131133928.17985-17-brgl@bgdev.pl>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_041613_380639_FF200A23 
-X-CRM114-Status: GOOD (  12.97  )
+X-CRM114-CacheID: sfid-20190207_042201_479556_B3988A22 
+X-CRM114-Status: GOOD (  17.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,115 +93,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: alsa-devel@alsa-project.org, Maxime Ripard <maxime.ripard@bootlin.com>,
- linux-kernel@vger.kernel.org, Takashi Iwai <tiwai@suse.com>,
- Liam Girdwood <lgirdwood@gmail.com>, Chen-Yu Tsai <wens@csie.org>,
- Mark Brown <broonie@kernel.org>, Jaroslav Kysela <perex@perex.cz>,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The patch
+On 31/01/19 7:09 PM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> I've been unable to figure out exactly why, but it seems that the
+> IRQ_TINT1_TINT34 interrupt for timer 1 needs to be handled as a
+> level irq, not edge like all others.
 
-   ASoC: sun4i-codec: Add MIC2 Pre-Amplifier, Mic2 input
+Not sure of the history myself. This has been this way since beginning
+of DaVinci support in kernel.
 
-has been applied to the asoc tree at
+> 
+> This timer is used by the dsp on dm64* boards only.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+This would be T1_TOP in code, which is actually marked as unused. T1_BOT
+is the one used for DSPs.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+> 
+> Let's move the handler setup out of the aintc driver where it's lived
+> since the beginning and into the dm64* SoC-specific files where it
+> belongs.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/mach-davinci/dm644x.c | 4 ++++
+>  arch/arm/mach-davinci/dm646x.c | 4 ++++
+>  arch/arm/mach-davinci/irq.c    | 1 -
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+I think this should be done for DM355 too?
 
 Thanks,
-Mark
-
-From 63bd84890fc41f280809a9bce7326529d044e2f9 Mon Sep 17 00:00:00 2001
-From: Danny Milosavljevic <dannym@scratchpost.org>
-Date: Wed, 30 Jan 2019 11:39:37 +0100
-Subject: [PATCH] ASoC: sun4i-codec: Add MIC2 Pre-Amplifier, Mic2 input
-
-Add MIC2 Pre-Amplifier, Mic2 input for Allwinner A10 and Allwinner A20.
-
-Previously, there only the Mic1 input and MIC1 Pre-Amplifier was exposed.
-This exposes the Mic2 input and MIC2 Pre-Amplifier.
-
-Signed-off-by: Danny Milosavljevic <dannym@scratchpost.org>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/sunxi/sun4i-codec.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 9a3cb7704810..7b965bc50042 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -64,6 +64,7 @@
- #define SUN4I_CODEC_DAC_ACTL_DACAENR			(31)
- #define SUN4I_CODEC_DAC_ACTL_DACAENL			(30)
- #define SUN4I_CODEC_DAC_ACTL_MIXEN			(29)
-+#define SUN4I_CODEC_DAC_ACTL_MICG			(20)
- #define SUN4I_CODEC_DAC_ACTL_LDACLMIXS			(15)
- #define SUN4I_CODEC_DAC_ACTL_RDACRMIXS			(14)
- #define SUN4I_CODEC_DAC_ACTL_LDACRMIXS			(13)
-@@ -673,6 +674,8 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
- 			SUN4I_CODEC_DAC_ACTL_PA_MUTE, 1, 0);
- 
- static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
-+static DECLARE_TLV_DB_SCALE(sun4i_codec_micin_loopback_gain_scale, -450, 150,
-+			    0);
- 
- static const struct snd_kcontrol_new sun4i_codec_controls[] = {
- 	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
-@@ -741,6 +744,8 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
- 	/* Mic Pre-Amplifiers */
- 	SND_SOC_DAPM_PGA("MIC1 Pre-Amplifier", SUN4I_CODEC_ADC_ACTL,
- 			 SUN4I_CODEC_ADC_ACTL_PREG1EN, 0, NULL, 0),
-+	SND_SOC_DAPM_PGA("MIC2 Pre-Amplifier", SUN4I_CODEC_ADC_ACTL,
-+			 SUN4I_CODEC_ADC_ACTL_PREG2EN, 0, NULL, 0),
- 
- 	/* Power Amplifier */
- 	SND_SOC_DAPM_MIXER("Power Amplifier", SUN4I_CODEC_ADC_ACTL,
-@@ -751,6 +756,7 @@ static const struct snd_soc_dapm_widget sun4i_codec_codec_dapm_widgets[] = {
- 			    &sun4i_codec_pa_mute),
- 
- 	SND_SOC_DAPM_INPUT("Mic1"),
-+	SND_SOC_DAPM_INPUT("Mic2"),
- 
- 	SND_SOC_DAPM_OUTPUT("HP Right"),
- 	SND_SOC_DAPM_OUTPUT("HP Left"),
-@@ -790,6 +796,12 @@ static const struct snd_soc_dapm_route sun4i_codec_codec_dapm_routes[] = {
- 	{ "Right ADC", NULL, "MIC1 Pre-Amplifier" },
- 	{ "MIC1 Pre-Amplifier", NULL, "Mic1"},
- 	{ "Mic1", NULL, "VMIC" },
-+
-+	/* Mic2 Routes */
-+	{ "Left ADC", NULL, "MIC2 Pre-Amplifier" },
-+	{ "Right ADC", NULL, "MIC2 Pre-Amplifier" },
-+	{ "MIC2 Pre-Amplifier", NULL, "Mic2"},
-+	{ "Mic2", NULL, "VMIC" },
- };
- 
- static const struct snd_soc_component_driver sun4i_codec_codec = {
--- 
-2.20.1
-
+Sekhar
 
 _______________________________________________
 linux-arm-kernel mailing list
