@@ -2,84 +2,69 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B318EC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 21:22:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DFC7AC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 21:26:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 787A821721
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 21:22:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A9FE321721
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 21:26:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VBxiB3v7";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="FwtxgGl0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 787A821721
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l/r0EfHM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="GHkGrjqK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A9FE321721
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2+o8K4Y7mveLs7vwTOJ6/zSW/U3kXPaGHX1QvLCagfw=; b=VBxiB3v77iapCX
-	SZFrbkkiPZmq5TqstacUQT2/BbD9c5XMEU93CSb3zwWybDVeuNQpWISzN86Onj4lW79JARTWEk3iq
-	CA9ET6hrX6qlRu/2BP4Lboe6OBsYbJqRLC2E8UyvP1yuVwzG1BSs1UkyP4HS6kNWLChkyDgcnf98k
-	RzGDKTVw/TnMPTYRd8w+P0b0SMWZbAnWmtYsjadBrTIZtydt5CnAJZLU2ag08R4qoVfQLKKSBsuYs
-	jkCmTNz6cpL5eWCSD4+lvWEriCJft3GKD6dBCnpKBw7V4SDEVsPrKmvllPP1rtXdr8sMj4upScEG0
-	bBQ2WSPcJz2E9ek7i9DA==;
+	List-Owner; bh=tMjc+dLwX55PZsarfQ70C0/l3PgQYhanEwyeVHr88tk=; b=l/r0EfHMIc0jmb
+	j/jY7LBGRH6J44nmouUdiqa5D+3KRxWVTMNrxKqxLgIx7lcTgmxVHRFCPNVIRXDl8oRddf1MyNVRt
+	iDTGWsUXfP7k2H4mUHbXRGLoG9IvV+WQ7i8QMAchfr15PeqrZj/5Qa7LoGN58eGu5eWe5K0Yj47Sp
+	QJB4IiX/GjRw+o9lA6t0x3IdzrrffuU4sBsEoiI80y7S/sg8DBtUQGCWey6WZoAi4pfc0M5Oc5S5P
+	uoU58058RIjRx7Wv78W6IIMyK8JimYvEjNCaYrjjuv3SYXQY+48OYejnrKWtkkqizVYHYMHOrpov2
+	W7AeJUC6HuwPc0cKBr9w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grr84-0003Nl-By; Thu, 07 Feb 2019 21:22:40 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
+	id 1grrBp-00048o-DQ; Thu, 07 Feb 2019 21:26:33 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grr80-0003DQ-SM
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 21:22:38 +0000
-Received: by mail-wm1-x343.google.com with SMTP id h22so5327241wmb.0
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 07 Feb 2019 13:22:36 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=ZsHTNSJE/lKlDQS3n1W69xmTT6S2j6VecvSVZDrzC3I=;
- b=FwtxgGl0UjVOeLNcPo67MLwfL80S8JGKV8HgdwW8XHnL/xkNEL+VAf26R9tum5qEQF
- XcgaDrLWNi9yHRxrwWJ0oEObWcDhcO8nY9tu5sgtthFuMvi1gx/z6C3HsQfJh3EI8qdd
- M9S8eXTHPdMJgWJAYk4pgEA1TRW1/v38p5elLcrVUpqfzW0RAFH9dTqx0S1WN4E5bQdH
- FNR27scsTuIFE61bmca8UotJJiVsQXVSX1GO6TRtQCols83/ZCl0I+l6FrLn6objuDrY
- VQ8qt+VcNFGDB3dBpZA40PgI7QuqLEVBwHCy7GgbFN3hHIny/Uy11J5WAwVNnzLtGCte
- jklQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=ZsHTNSJE/lKlDQS3n1W69xmTT6S2j6VecvSVZDrzC3I=;
- b=BgDnivRbpfoJ1wh9+Z4/x1ubG4wDejhQgv+mpieuYUVHr+M9jDBJ9k3Td+dADU2ktc
- wZkJudaTLrAEClsP3LxllkFACh1zEKx5vHuipo8gPwxxneC5zN334hS3RRxTRqCq+9jj
- 4P6YePh8TwnzURHC5TV7FwcWV7b4gpF6X4+DcZUbpH1JHUYW6URHtm2tJ5gDnatglS/c
- XeOx7lmzpqKLRx3RTbgV1Ro5dFITXUsiGchDNCwHJXz0jJ5hvB/ShViikRjr7BkfQIOy
- YMrIrVeKjWMV4n8a50uJZ+I6B9j7i+2jkgsZz/pEatjzQikiTYSr2WbY+1B5fNG1F87r
- gEaw==
-X-Gm-Message-State: AHQUAubq5ehRNdPz5eJCLLlTryrrPAN1MIh6h82NTrruyz7cV/PPvXxn
- 1yTiuY6oatBinxqjXFSh+sUV4hHXppYIeSpxAG4=
-X-Google-Smtp-Source: AHgI3Ib3H9iLE7uj5xKcChBKx8AaIe6sqt//BqWFTM9rYSOMVQpTT00qo6os+xAai6MpP7IfNdlQBSSJwUtGmyDiMWI=
-X-Received: by 2002:a1c:760c:: with SMTP id r12mr8291706wmc.127.1549574554687; 
- Thu, 07 Feb 2019 13:22:34 -0800 (PST)
+ id 1grrBh-0003vs-4t
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 21:26:29 +0000
+Received: from localhost (unknown [69.71.4.100])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 4CAEB21721;
+ Thu,  7 Feb 2019 21:26:24 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549574784;
+ bh=U/2YnB/WK1IGdD93d7XtsgRlaRFoLinSnoRbkTaKUxA=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=GHkGrjqKtSA40ScLOGuB8aZBK++BRUVe28Fd5//1saVqHsdDTcR/gSPxOaNZYqOmp
+ bJ6101B6yOD1YOmCBPqLv4NR4xJibaApxEppLEMXnGsSNvj2DfEGeIZRUMIZjugmQc
+ Xc4YvswIATVC3TrQQZIwM8NvdxS1thDMbieTVH3M=
+Date: Thu, 7 Feb 2019 15:26:22 -0600
+From: Bjorn Helgaas <helgaas@kernel.org>
+To: Kishon Vijay Abraham I <kishon@ti.com>
+Subject: Re: [PATCH v2 8/9] PCI: dwc: Remove Keystone specific dw_pcie_host_ops
+Message-ID: <20190207212622.GO7268@google.com>
+References: <20190207110924.30716-1-kishon@ti.com>
+ <20190207110924.30716-9-kishon@ti.com>
 MIME-Version: 1.0
-References: <20190131204333.31846-1-andrew.smirnov@gmail.com>
- <20190131204333.31846-5-andrew.smirnov@gmail.com>
- <1549549676.2544.79.camel@pengutronix.de>
-In-Reply-To: <1549549676.2544.79.camel@pengutronix.de>
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
-Date: Thu, 7 Feb 2019 13:22:23 -0800
-Message-ID: <CAHQ1cqGOtGb1mt7BCm_DaKoJn=6=atauipgt6Dg2-doSEoj_tg@mail.gmail.com>
-Subject: Re: [RFC 4/5] arm64: dts: Add nodes for PCIe IP blocks
-To: Lucas Stach <l.stach@pengutronix.de>
+Content-Disposition: inline
+In-Reply-To: <20190207110924.30716-9-kishon@ti.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_132236_915546_01A2B7BF 
-X-CRM114-Status: GOOD (  19.45  )
+X-CRM114-CacheID: sfid-20190207_132625_238094_A54D538B 
+X-CRM114-Status: GOOD (  18.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,98 +76,142 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- Leonard Crestez <leonard.crestez@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- Chris Healy <cphealy@gmail.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Jingoo Han <jingoohan1@gmail.com>, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Murali Karicheri <m-karicheri2@ti.com>,
+ Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 7, 2019 at 6:27 AM Lucas Stach <l.stach@pengutronix.de> wrote:
->
-> Am Donnerstag, den 31.01.2019, 12:43 -0800 schrieb Andrey Smirnov:
-> > Add nodes for two PCIe controllers found on i.MX8MQ.
-> >
-> > > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> > > Cc: Shawn Guo <shawnguo@kernel.org>
-> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > > Cc: Chris Healy <cphealy@gmail.com>
-> > > Cc: Lucas Stach <l.stach@pengutronix.de>
-> > > Cc: Leonard Crestez <leonard.crestez@nxp.com>
-> > > Cc: "A.s. Dong" <aisheng.dong@nxp.com>
-> > > Cc: Richard Zhu <hongxing.zhu@nxp.com>
-> > Cc: linux-imx@nxp.com
-> > Cc: linux-arm-kernel@lists.infradead.org
-> > Cc: linux-kernel@vger.kernel.org
-> > ---
-> >  arch/arm64/boot/dts/freescale/imx8mq.dtsi | 68 +++++++++++++++++++++++
-> >  1 file changed, 68 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-> > index 89babc531380..d20e5c7e21a3 100644
-> > --- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-> > +++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-> > @@ -6,6 +6,7 @@
-> >
-> >  #include <dt-bindings/clock/imx8mq-clock.h>
-> >  #include <dt-bindings/power/imx8mq-power.h>
-> > +#include <dt-bindings/reset/imx8mq-reset.h>
-> >  #include <dt-bindings/gpio/gpio.h>
-> >  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> >  #include "imx8mq-pinfunc.h"
-> > @@ -539,6 +540,73 @@
-> >                       };
-> >
-> >       };
-> >
-> > +             pcie0: pcie@33800000 {
-> > +                     compatible = "fsl,imx8mq-pcie";
-> > +                     reg = <0x33800000 0x400000>,
-> > +                           <0x1ff00000 0x80000>;
-> > +                     reg-names = "dbi", "config";
-> > +                     #address-cells = <3>;
-> > +                     #size-cells = <2>;
-> > +                     device_type = "pci";
-> > +                     bus-range = <0x00 0xff>;
-> > +                     ranges = <0x81000000 0 0x00000000 0x1ff80000 0 0x00010000 /* downstream I/O 64KB */
-> > +                               0x82000000 0 0x18000000 0x18000000 0 0x07f00000>; /* non-prefetchable memory */
-> > +                     num-lanes = <1>;
-> > +                     interrupts = <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-> > +                                  <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>; /* eDMA */
->
-> I don't think this IRQ is documented in any binding yet.
->
+On Thu, Feb 07, 2019 at 04:39:23PM +0530, Kishon Vijay Abraham I wrote:
+> Now that Keystone started using it's own msi_irq_chip, remove
+> Keystone specific callback function defined in dw_pcie_host_ops.
 
-A leftover from vendor tree. Will drop in v2.
+s/it's/its/
+s/callback function/callback functions/
 
-> > +                     interrupt-names = "msi";
-> > +                     #interrupt-cells = <1>;
-> > +                     interrupt-map-mask = <0 0 0 0x7>;
-> > +                     interrupt-map = <0 0 0 1 &gic GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
-> > +                                     <0 0 0 2 &gic GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
-> > +                                     <0 0 0 3 &gic GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-> > +                                     <0 0 0 4 &gic GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
-> > +                     clocks = <&clk IMX8MQ_CLK_PCIE1_ROOT>,
-> > +                              <&clk IMX8MQ_CLK_PCIE1_AUX>,
->
-> This is not the PCIe bus clock. The bus clock is whatever drives the
-> ref clock of the external bus. So on the i.MX8M-EVK this would be the
-> fixed clock generated by U1302.
->
-> The right thing to properly describe the HW is to extend the PCIe
-> driver to look for the aux clock on i.MX8M, just like we do with the
-> axi_inbound_clk on i.MX6SX.
->
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Acked-by: Gustavo Pimentel <gustavo.pimentel@synopsys.com>
+> ---
+>  .../pci/controller/dwc/pcie-designware-host.c | 45 ++++++-------------
+>  drivers/pci/controller/dwc/pcie-designware.h  |  5 ---
+>  2 files changed, 14 insertions(+), 36 deletions(-)
+> 
+> diff --git a/drivers/pci/controller/dwc/pcie-designware-host.c b/drivers/pci/controller/dwc/pcie-designware-host.c
+> index 042de09b0451..9492b05e8ff0 100644
+> --- a/drivers/pci/controller/dwc/pcie-designware-host.c
+> +++ b/drivers/pci/controller/dwc/pcie-designware-host.c
+> @@ -126,18 +126,12 @@ static void dw_pci_setup_msi_msg(struct irq_data *data, struct msi_msg *msg)
+>  	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+>  	u64 msi_target;
+>  
+> -	if (pp->ops->get_msi_addr)
+> -		msi_target = pp->ops->get_msi_addr(pp);
+> -	else
+> -		msi_target = (u64)pp->msi_data;
+> +	msi_target = (u64)pp->msi_data;
+>  
+>  	msg->address_lo = lower_32_bits(msi_target);
+>  	msg->address_hi = upper_32_bits(msi_target);
+>  
+> -	if (pp->ops->get_msi_data)
+> -		msg->data = pp->ops->get_msi_data(pp, data->hwirq);
+> -	else
+> -		msg->data = data->hwirq;
+> +	msg->data = data->hwirq;
+>  
+>  	dev_dbg(pci->dev, "msi#%d address_hi %#x address_lo %#x\n",
+>  		(int)data->hwirq, msg->address_hi, msg->address_lo);
+> @@ -157,17 +151,13 @@ static void dw_pci_bottom_mask(struct irq_data *data)
+>  
+>  	raw_spin_lock_irqsave(&pp->lock, flags);
+>  
+> -	if (pp->ops->msi_clear_irq) {
+> -		pp->ops->msi_clear_irq(pp, data->hwirq);
+> -	} else {
+> -		ctrl = data->hwirq / MAX_MSI_IRQS_PER_CTRL;
+> -		res = ctrl * MSI_REG_CTRL_BLOCK_SIZE;
+> -		bit = data->hwirq % MAX_MSI_IRQS_PER_CTRL;
+> +	ctrl = data->hwirq / MAX_MSI_IRQS_PER_CTRL;
+> +	res = ctrl * MSI_REG_CTRL_BLOCK_SIZE;
+> +	bit = data->hwirq % MAX_MSI_IRQS_PER_CTRL;
+>  
+> -		pp->irq_status[ctrl] &= ~(1 << bit);
+> -		dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_MASK + res, 4,
+> -				    ~pp->irq_status[ctrl]);
+> -	}
+> +	pp->irq_status[ctrl] &= ~(1 << bit);
+> +	dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_MASK + res, 4,
+> +			    ~pp->irq_status[ctrl]);
+>  
+>  	raw_spin_unlock_irqrestore(&pp->lock, flags);
+>  }
+> @@ -180,17 +170,13 @@ static void dw_pci_bottom_unmask(struct irq_data *data)
+>  
+>  	raw_spin_lock_irqsave(&pp->lock, flags);
+>  
+> -	if (pp->ops->msi_set_irq) {
+> -		pp->ops->msi_set_irq(pp, data->hwirq);
+> -	} else {
+> -		ctrl = data->hwirq / MAX_MSI_IRQS_PER_CTRL;
+> -		res = ctrl * MSI_REG_CTRL_BLOCK_SIZE;
+> -		bit = data->hwirq % MAX_MSI_IRQS_PER_CTRL;
+> +	ctrl = data->hwirq / MAX_MSI_IRQS_PER_CTRL;
+> +	res = ctrl * MSI_REG_CTRL_BLOCK_SIZE;
+> +	bit = data->hwirq % MAX_MSI_IRQS_PER_CTRL;
+>  
+> -		pp->irq_status[ctrl] |= 1 << bit;
+> -		dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_MASK + res, 4,
+> -				    ~pp->irq_status[ctrl]);
+> -	}
+> +	pp->irq_status[ctrl] |= 1 << bit;
+> +	dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_MASK + res, 4,
+> +			    ~pp->irq_status[ctrl]);
+>  
+>  	raw_spin_unlock_irqrestore(&pp->lock, flags);
+>  }
+> @@ -209,9 +195,6 @@ static void dw_pci_bottom_ack(struct irq_data *d)
+>  
+>  	dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_STATUS + res, 4, 1 << bit);
+>  
+> -	if (pp->ops->msi_irq_ack)
+> -		pp->ops->msi_irq_ack(d->hwirq, pp);
+> -
+>  	raw_spin_unlock_irqrestore(&pp->lock, flags);
+>  }
+>  
+> diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
+> index 95e0c3c93f48..ea4b215b605d 100644
+> --- a/drivers/pci/controller/dwc/pcie-designware.h
+> +++ b/drivers/pci/controller/dwc/pcie-designware.h
+> @@ -142,14 +142,9 @@ struct dw_pcie_host_ops {
+>  	int (*wr_other_conf)(struct pcie_port *pp, struct pci_bus *bus,
+>  			     unsigned int devfn, int where, int size, u32 val);
+>  	int (*host_init)(struct pcie_port *pp);
+> -	void (*msi_set_irq)(struct pcie_port *pp, int irq);
+> -	void (*msi_clear_irq)(struct pcie_port *pp, int irq);
+> -	phys_addr_t (*get_msi_addr)(struct pcie_port *pp);
+> -	u32 (*get_msi_data)(struct pcie_port *pp, int pos);
 
-OK, will update it in v2 and send a corresponding patch to PCI tree
-once everything is agreed upon.
+I don't see the whole series on linux-pci (I only see patches 2, 6, 8, 9),
+but I expected to somewhere see the removal of assignments to these
+pointers.  It would be easier to review if the removal of assignments and
+the removal of the function pointers from the structure were in the same
+patch, but maybe that's not really feasible.
 
-Thanks,
-Andrey Smirnov
+>  	void (*scan_bus)(struct pcie_port *pp);
+>  	void (*set_num_vectors)(struct pcie_port *pp);
+>  	int (*msi_host_init)(struct pcie_port *pp);
+> -	void (*msi_irq_ack)(int irq, struct pcie_port *pp);
+>  };
+>  
+>  struct pcie_port {
+> -- 
+> 2.17.1
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
