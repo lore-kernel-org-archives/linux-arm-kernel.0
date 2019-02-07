@@ -2,147 +2,60 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0A918C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:10:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E421FC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:19:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B7D6121904
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:10:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A024821908
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:19:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eoxbjjww";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="TliMbP9X"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B7D6121904
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SIN7lRhM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A024821908
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8dRA0jK5s9+mptYNXfE3u9XR/v0Fid2xA75IAS52STI=; b=eoxbjjww8JoIQC
-	/ZSrJsWnpECja5Vvl8L2U+ArdwNlaFdgqSKnWLczlUm+uBWPlmPg7O62XgoUBPFrG4RKBOIXRMWsv
-	ui+aoq22l4JYQjdI+TqxmaaZ+nHpVMVBXGE2g/YFieVvOb+dRoU5vNCxCNi4YdH5No1oLaymjKP92
-	mInhSaRILE+lqTh6ZD67RA+UpruDeCdZD5Un+gEeA/+kxSYsFs2gVumNOOCR2tRlC+XwlThJB8xVy
-	cBfywNC1s04CBmNJAUtpKafUz+W8ZwzaIECZqOd1J3jbPVpS39DqJYmTu+Q+Hh0ZuOC6PnTwS72cf
-	DCr7J9Xqw/ofBxlhlyFA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=9c4BI10m/FDUezyqwIIQueKHRUWe5pp2NXfWCS+t3ZQ=; b=SIN7lRhMw2tf+t
+	zmbpm/ZKdWSijtYSlAH8S1bMQel5VrdN1vqeMG9fcMRpzDwalBet065X4hGDSVNzggEhAMygJUzrJ
+	gDPKSfXs1UiRRHgqLkpotNqZA8xf1e+dUlLIK2CrCFG1z2iGgDnURCcru9uy0FHpo26tY4Q1OMnFj
+	743KZ+Hdce752aVnAPzNo+jlCmLlXA7AuaQj9GnP4ty/WiCmuLYfJqP0f1oG4zDFwloIGVOZa1cWP
+	kGJ9unONM/0ISfRV5I2baVFNlsOS05OEbocW0lMWlmQNdlrnKiWtOQ/kK/lRJC3bBQpqxzQEVHUfT
+	QR+V+ca223qKWllx+FBw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grjRp-00068x-BZ; Thu, 07 Feb 2019 13:10:33 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grjRf-00065x-NY
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 13:10:31 +0000
-Received: by mail-wr1-x443.google.com with SMTP id q15so11425718wro.12
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 07 Feb 2019 05:10:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:openpgp:autocrypt:organization
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=PCPgj02ZmQU9UuSynuMjSlcHkBId7QqRwKFh7cQxKVM=;
- b=TliMbP9XmFHOntwZVRS/xWA99nwGIyqoZfL3NQAyBz/2CCYcJAdeEsvG/moquDvdsW
- 2YsGTiu21ElJFM4GkdAdvjjDDaTrNIHjMn0Qs4nCga5zbQhohYkHiqNupr1FVVhYGr4m
- aGW//gdnjo7k4eFtaSS9zKQgipPdCZCS53RAoEr8dlQHo6yh1FcKSffL5SKjsP7cmY+L
- peB6zodOlRnh8AKgrQ/A2ahNo4S1CwzNipXA3d42mg4Xu93QGgvLVTfbofu67BlI50Ii
- UXdVw28uYzJlfNZACp5w2/yRFq/hXu5uWgiDL9c0hr3QyTGx/946683U7QVrYKYhXBpG
- 6FWg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :organization:message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=PCPgj02ZmQU9UuSynuMjSlcHkBId7QqRwKFh7cQxKVM=;
- b=jPdy0PAPl5OdYkQyBWE5a4Pjvd8v9nOAxSMWbCPUibQUor4jS/vQAgzhCdyyx1L9DC
- yoPt90izl6QveGlOk7CSNRuSU0s4SLYcCFKgKmDqmMVlbQyrO7Hm9vsKxEPsbtfV9YNC
- jDFwT3HfUe+6wd+7sGfQmh3bLhO3HmmNoyqPOfJOB1O+h4Ccj5wbon2RcDARWT19ir1x
- oD+eWSsJqnCtcyAF9szMNGjhEB5VtbeRJggQxVSqqxFmVyxTeiHn3zpSXsn4mxNBtbvl
- EDDvYckJlF0/xpLV9F3Hww5NDprSd+NE9pBYLNoIDl+7Fwqsg0rV1wPdZOYLOHFIyqZw
- j1YA==
-X-Gm-Message-State: AHQUAuYJ5Z8UqSCt0ws5HfKBmAqkrwTKKN8nyrBUgSpc0N8mf1yLiFo8
- /AznOAi2SIcPLcX87eWs2aIHfDCaPNV5IA==
-X-Google-Smtp-Source: AHgI3Ia1kNytFuYGPx3NdUCDpQ80zSQ5jlgt7mb4NAcQKfnfm2In6DgXJpZq/lzZDguQJot1/JVJog==
-X-Received: by 2002:adf:c589:: with SMTP id m9mr12529108wrg.145.1549545021045; 
- Thu, 07 Feb 2019 05:10:21 -0800 (PST)
-Received: from [10.1.2.12] (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
- [90.63.244.31])
- by smtp.gmail.com with ESMTPSA id n11sm18505925wrw.60.2019.02.07.05.10.20
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 07 Feb 2019 05:10:20 -0800 (PST)
-Subject: Re: [PATCH v3] dt-bindings: reset: meson: add g12a bindings
-To: Philipp Zabel <p.zabel@pengutronix.de>,
- Jerome Brunet <jbrunet@baylibre.com>, Kevin Hilman <khilman@baylibre.com>
-References: <20190201125003.25022-1-jbrunet@baylibre.com>
- <1549535746.4557.3.camel@pengutronix.de>
-From: Neil Armstrong <narmstrong@baylibre.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
- 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
- ZaTUOEkgIor5losDrePdPgE=
-Organization: Baylibre
-Message-ID: <6bdabea0-9870-66d1-a737-9695067ba8e6@baylibre.com>
-Date: Thu, 7 Feb 2019 14:10:19 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1grja3-00022j-Nb; Thu, 07 Feb 2019 13:19:03 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1grjZz-00021j-Rt
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 13:19:01 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id F2CEFA78;
+ Thu,  7 Feb 2019 05:18:57 -0800 (PST)
+Received: from filthy-habits.cambridge.arm.com
+ (filthy-habits.cambridge.arm.com [10.1.196.62])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B88723F675;
+ Thu,  7 Feb 2019 05:18:55 -0800 (PST)
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Paolo Bonzini <pbonzini@redhat.com>,
+ =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
+Subject: [GIT PULL] KVM/ARM updates for 5.0-rc6
+Date: Thu,  7 Feb 2019 13:18:32 +0000
+Message-Id: <20190207131843.157210-1-marc.zyngier@arm.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-In-Reply-To: <1549535746.4557.3.camel@pengutronix.de>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_051025_036201_3CEEC663 
-X-CRM114-Status: GOOD (  24.57  )
+X-CRM114-CacheID: sfid-20190207_051859_913839_72AB7E80 
+X-CRM114-Status: GOOD (  11.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -154,201 +67,96 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-amlogic@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
+ kvm@vger.kernel.org, Julien Thierry <julien.thierry@arm.com>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Richard Henderson <richard.henderson@linaro.org>,
+ Christoffer Dall <christoffer.dall@arm.com>, James Morse <james.morse@arm.com>,
+ Masami Hiramatsu <mhiramat@kernel.org>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Philipp,
+Paolo, Radim,
 
-On 07/02/2019 11:35, Philipp Zabel wrote:
-> Hi Jerome,
-> 
-> is there any public documentation for the G12A reset controller?
-> 
-> On Fri, 2019-02-01 at 13:50 +0100, Jerome Brunet wrote:
->> Add device tree bindings for the reset controller of g12a SoC family.
->>
->> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
->> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
->> ---
->>
->> Changes since v2 [0]:
->> * Dropped useless g12a compatible
-> 
-> What if in the future somebody notices that a g12a specific workaround
-> needs to be added to the driver? I agree that we don't have to list all
-> compatibles in the driver, but unless you are certain that the reset
-> controller is identical to the one from another SoC, it would be better
-> to have a SoC specific compatible in the device tree, even if the driver
-> only matches to a more generic compatible. For example:
-> 
-> 	compatible = "amlogic,meson-g12a-reset", "amlogic,meson8b-reset";
-> 
-> if the reset controller behaves identical to the one in meson8b.
+This is hopefully the last drop of KVM/ARM patches for 5.0. We have
+fixes to the vcpu reset code, a fix for a corner case of the VGIC
+init, better LORegion handling compliance, more configurations where
+we allow PUD mappings, a set of kprobe exclusions, and the required
+fixes to be able to run KVM with PREEMPT_RT.
 
-The controller is the exact same as Meson8, GXBB, and AXG.
+Please pull,
 
-We had doubts since the previous datasheets were not clear, but for G12A we
-are sure it's 100% same to at least GXBB and AXG, thus using the same
-compatible as AXG since they share most of same architecture.
+	M.
 
-Neil
+The following changes since commit 49a57857aeea06ca831043acbb0fa5e0f50602fd:
 
-> 
->> [0]: https://lkml.kernel.org/r/20190128181316.30814-1-jbrunet@baylibre.com
->>
->>  .../reset/amlogic,meson-g12a-reset.h          | 134 ++++++++++++++++++
->>  1 file changed, 134 insertions(+)
->>  create mode 100644 include/dt-bindings/reset/amlogic,meson-g12a-reset.h
->>
->> diff --git a/include/dt-bindings/reset/amlogic,meson-g12a-reset.h b/include/dt-bindings/reset/amlogic,meson-g12a-reset.h
->> new file mode 100644
->> index 000000000000..8063e8314eef
->> --- /dev/null
->> +++ b/include/dt-bindings/reset/amlogic,meson-g12a-reset.h
->> @@ -0,0 +1,134 @@
->> +/* SPDX-License-Identifier: GPL-2.0+ OR BSD-3-Clause */
->> +/*
->> + * Copyright (c) 2019 BayLibre, SAS.
->> + * Author: Jerome Brunet <jbrunet@baylibre.com>
->> + *
->> + */
->> +
->> +#ifndef _DT_BINDINGS_AMLOGIC_MESON_G12A_RESET_H
->> +#define _DT_BINDINGS_AMLOGIC_MESON_G12A_RESET_H
->> +
->> +/*	RESET0					*/
->> +#define RESET_HIU			0
->> +/*					1	*/
->> +#define RESET_DOS			2
->> +/*					3-4	*/
->> +#define RESET_VIU			5
->> +#define RESET_AFIFO			6
->> +#define RESET_VID_PLL_DIV		7
->> +/*					8-9	*/
->> +#define RESET_VENC			10
->> +#define RESET_ASSIST			11
->> +#define RESET_PCIE_CTRL_A		12
->> +#define RESET_VCBUS			13
->> +#define RESET_PCIE_PHY			14
->> +#define RESET_PCIE_APB			15
->> +#define RESET_GIC			16
->> +#define RESET_CAPB3_DECODE		17
->> +/*					18	*/
->> +#define RESET_HDMITX_CAPB3		19
->> +#define RESET_DVALIN_CAPB3		20
->> +#define RESET_DOS_CAPB3			21
->> +/*					22	*/
->> +#define RESET_CBUS_CAPB3		23
->> +#define RESET_AHB_CNTL			24
->> +#define RESET_AHB_DATA			25
->> +#define RESET_VCBUS_CLK81		26
->> +/*					27-31	*/
->> +/*	RESET1					*/
->> +/*					32	*/
->> +#define RESET_DEMUX			33
->> +#define RESET_USB			34
->> +#define RESET_DDR			35
->> +/*					36	*/
->> +#define RESET_BT656			37
->> +#define RESET_AHB_SRAM			38
->> +/*					39	*/
->> +#define RESET_PARSER			40
->> +/*					41	*/
->> +#define RESET_ISA			42
->> +#define RESET_ETHERNET			43
->> +#define RESET_SD_EMMC_A			44
->> +#define RESET_SD_EMMC_B			45
->> +#define RESET_SD_EMMC_C			46
->> +/*					47-60 */
->> +#define RESET_AUDIO_CODEC		61
->> +/*					62-63	*/
->> +/*	RESET2					*/
->> +/*					64	*/
->> +#define RESET_AUDIO			65
->> +#define RESET_HDMITX_PHY		66
->> +/*					67	*/
->> +#define RESET_MIPI_DSI_HOST		68
->> +#define RESET_ALOCKER			69
->> +#define RESET_GE2D			70
->> +#define RESET_PARSER_REG		71
->> +#define RESET_PARSER_FETCH		72
->> +#define RESET_CTL			73
->> +#define RESET_PARSER_TOP		74
->> +/*					75-77	*/
->> +#define RESET_DVALIN			78
->> +#define RESET_HDMITX			79
->> +/*					80-95	*/
->> +/*	RESET3					*/
->> +/*					96-95	*/
->> +#define RESET_DEMUX_TOP			105
->> +#define RESET_DEMUX_DES_PL		106
->> +#define RESET_DEMUX_S2P_0		107
->> +#define RESET_DEMUX_S2P_1		108
->> +#define RESET_DEMUX_0			109
->> +#define RESET_DEMUX_1			110
->> +#define RESET_DEMUX_2			111
->> +/*					112-127	*/
->> +/*	RESET4					*/
->> +/*					128-129	*/
->> +#define RESET_MIPI_DSI_PHY		130
->> +/*					131-132	*/
->> +#define RESET_RDMA			133
->> +#define RESET_VENCI			134
->> +#define RESET_VENCP			135
->> +/*					136	*/
->> +#define RESET_VDAC			137
->> +/*					138-139 */
->> +#define RESET_VDI6			140
->> +#define RESET_VENCL			141
->> +#define RESET_I2C_M1			142
->> +#define RESET_I2C_M2			143
->> +/*					144-159	*/
->> +/*	RESET5					*/
->> +/*					160-191	*/
->> +/*	RESET6					*/
->> +#define RESET_GEN			192
->> +#define RESET_SPICC0			193
->> +#define RESET_SC			194
->> +#define RESET_SANA_3			195
->> +#define RESET_I2C_M0			196
->> +#define RESET_TS_PLL			197
->> +#define RESET_SPICC1			198
->> +#define RESET_STREAM			199
->> +#define RESET_TS_CPU			200
->> +#define RESET_UART0			201
->> +#define RESET_UART1_2			202
->> +#define RESET_ASYNC0			203
->> +#define RESET_ASYNC1			204
->> +#define RESET_SPIFC0			205
->> +#define RESET_I2C_M3			206
->> +/*					207-223	*/
->> +/*	RESET7					*/
->> +#define RESET_USB_DDR_0			224
->> +#define RESET_USB_DDR_1			225
->> +#define RESET_USB_DDR_2			226
->> +#define RESET_USB_DDR_3			227
->> +#define RESET_TS_GPU			228
->> +#define RESET_DEVICE_MMC_ARB		229
->> +#define RESET_DVALIN_DMC_PIPL		230
->> +#define RESET_VID_LOCK			231
->> +#define RESET_NIC_DMC_PIPL		232
->> +#define RESET_DMC_VPU_PIPL		233
->> +#define RESET_GE2D_DMC_PIPL		234
->> +#define RESET_HCODEC_DMC_PIPL		235
->> +#define RESET_WAVE420_DMC_PIPL		236
->> +#define RESET_HEVCF_DMC_PIPL		237
->> +/*					238-255	*/
->> +
->> +#endif
-> 
-> regards
-> Philipp
-> 
+  Linux 5.0-rc3 (2019-01-21 13:14:44 +1300)
 
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-for-5.0
+
+for you to fetch changes up to 7d82602909ed9c73b34ad26f05d10db4850a4f8c:
+
+  KVM: arm64: Forbid kprobing of the VHE world-switch code (2019-02-07 11:44:47 +0000)
+
+----------------------------------------------------------------
+KVM/ARM fixes for 5.0:
+
+- Fix the way we reset vcpus, plugging the race that could happen on VHE
+- Fix potentially inconsistent group setting for private interrupts
+- Don't generate UNDEF when LORegion feature is present
+- Relax the restriction on using stage2 PUD huge mapping
+- Turn some spinlocks into raw_spinlocks to help RT compliance
+
+----------------------------------------------------------------
+Christoffer Dall (2):
+      KVM: arm/arm64: Reset the VCPU without preemption and vcpu state loaded
+      KVM: arm/arm64: vgic: Always initialize the group of private IRQs
+
+James Morse (1):
+      KVM: arm64: Forbid kprobing of the VHE world-switch code
+
+Julien Thierry (3):
+      KVM: arm/arm64: vgic: Make vgic_irq->irq_lock a raw_spinlock
+      KVM: arm/arm64: vgic: Make vgic_dist->lpi_list_lock a raw_spinlock
+      KVM: arm/arm64: vgic: Make vgic_cpu->ap_list_lock a raw_spinlock
+
+Marc Zyngier (4):
+      arm64: KVM: Don't generate UNDEF when LORegion feature is present
+      arm/arm64: KVM: Allow a VCPU to fully reset itself
+      arm/arm64: KVM: Don't panic on failure to properly reset system registers
+      arm: KVM: Add missing kvm_stage2_has_pmd() helper
+
+Suzuki K Poulose (1):
+      KVM: arm64: Relax the restriction on using stage2 PUD huge mapping
+
+ arch/arm/include/asm/kvm_host.h       |  10 +++
+ arch/arm/include/asm/stage2_pgtable.h |   5 ++
+ arch/arm/kvm/coproc.c                 |   4 +-
+ arch/arm/kvm/reset.c                  |  24 +++++++
+ arch/arm64/include/asm/kvm_host.h     |  11 ++++
+ arch/arm64/kvm/hyp/switch.c           |   5 ++
+ arch/arm64/kvm/hyp/sysreg-sr.c        |   5 ++
+ arch/arm64/kvm/reset.c                |  50 +++++++++++++-
+ arch/arm64/kvm/sys_regs.c             |  50 ++++++++------
+ include/kvm/arm_vgic.h                |   6 +-
+ virt/kvm/arm/arm.c                    |  10 +++
+ virt/kvm/arm/mmu.c                    |   9 ++-
+ virt/kvm/arm/psci.c                   |  36 +++++------
+ virt/kvm/arm/vgic/vgic-debug.c        |   4 +-
+ virt/kvm/arm/vgic/vgic-init.c         |  30 +++++----
+ virt/kvm/arm/vgic/vgic-its.c          |  22 +++----
+ virt/kvm/arm/vgic/vgic-mmio-v2.c      |  14 ++--
+ virt/kvm/arm/vgic/vgic-mmio-v3.c      |  12 ++--
+ virt/kvm/arm/vgic/vgic-mmio.c         |  34 +++++-----
+ virt/kvm/arm/vgic/vgic-v2.c           |   4 +-
+ virt/kvm/arm/vgic/vgic-v3.c           |   8 +--
+ virt/kvm/arm/vgic/vgic.c              | 118 +++++++++++++++++-----------------
+ 22 files changed, 303 insertions(+), 168 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
