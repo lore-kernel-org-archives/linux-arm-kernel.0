@@ -2,64 +2,83 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A8A5C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:44:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16BEFC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:45:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2751321872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:44:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D516121872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 15:45:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PxRH7+Ls"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2751321872
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ieGYQPuu";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="qG761ZJ4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D516121872
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AXq/xorTZiwk9WU6AYMrlrdUjzS7cMvE/R9HSpIVKzU=; b=PxRH7+LstcBEOt
-	auF+J5+GNTuUrfw943nxhJclzr1lzSbErh3qGjrG1wNFaOQRHrc7f0hpNfj9lcOidkuDUTaVEfEzG
-	DQP+hforJyh2nM2DPlTUlUC1EpzE4C786S+xM4m9gPvgSgIW9SuKrWQq9MUF5Xc1lX8C0gwzFN36/
-	Nu2BT6D7+9CB5bEv9mHa/759ZDiH4RTW+M0mMmqOa/anohoNyyjxP4JyYbA1qF3+bWLBxpRE43Fvu
-	k932TFaaeHSn1LGijCi9x6aXz5unSCHQiKDcpIErzKhSZhN0uWoylE7xvDzAiEvWyMylZgeVFzxsa
-	ipf00X0+qo47Sm3dcsQw==;
+	List-Owner; bh=u4MNMdKHg0Cu9Q5rzE0ijxEtwoGbNzzjPsrcUvKjhFI=; b=ieGYQPuuSlN/HP
+	7pzPyjG4pN6AHj1AHFGCdUTT+N9An95zk8PL4EjTB63sEtw/3WWwIe+t3DJb18I1mkhtKxVZ04UIK
+	qDuVyvXt1Q+VqRa49wqiNqJ2+5BhH+xFizCsrs+nLehM9kWEntyodvy2uMjDfZuxZISqSmXS/Bd+8
+	nDZ+dpm6PpMJhl3FGIBA+rf8kGGBj9kT3sXna8CXMStwkSBov0uvSp1esoXRHe15zqbr3UGbw6NlF
+	tpLnV9wJph+v9kCv3boPAZ8agFXVq4zd3QCFRN5T9scWCwWTGcExxIsUBkGeaO7QmnHtLXQLr/oi/
+	UQiEuw66YiyhtwOezDFg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grlqm-0001Xn-WE; Thu, 07 Feb 2019 15:44:29 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grlqj-0001X4-8q
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 15:44:26 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EE2EBA78;
- Thu,  7 Feb 2019 07:44:23 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 714323F719;
- Thu,  7 Feb 2019 07:44:22 -0800 (PST)
-Date: Thu, 7 Feb 2019 15:44:19 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Kishon Vijay Abraham I <kishon@ti.com>
-Subject: Re: [PATCH v2 3/9] PCI: keystone: Add separate functions for
- configuring MSI and legacy interrupt
-Message-ID: <20190207154419.GB21111@e107981-ln.cambridge.arm.com>
-References: <20190207110924.30716-1-kishon@ti.com>
- <20190207110924.30716-4-kishon@ti.com>
+	id 1grls2-0003Bs-I3; Thu, 07 Feb 2019 15:45:46 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1grlry-0003BG-6a; Thu, 07 Feb 2019 15:45:43 +0000
+Received: by mail-lj1-x244.google.com with SMTP id f24-v6so299408ljk.0;
+ Thu, 07 Feb 2019 07:45:41 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=O/NDPUvmhc7liFnvbt6y13+UwzEpiHVHRuajdML0aZE=;
+ b=qG761ZJ4JAzXfWf4k44vzqwTzwJdjw7HrMLbfG1ZctjDfX4AmZwvEAEci1Mvk5c/tO
+ dx/AsCRD999RsyRjScsXZk1cF4SvMrbo0EHBqG7M6gagDU7RrepOTMBVJ0QvngXVdC4C
+ asPeFulrVbB8TB5K9XbHruy7p7DuLl3xyaXwCBIkFFIM2WU2xP4PAwKMeW2CXk5RxCri
+ 9Q9SywOgwTjHgmlgb2mxpeDd/JAHJUPSg6p33yqmJ3WJLcrV8ldWK3NpbE644OabC0iA
+ ySWILr/9OUhjnh56kYlr/R8o0akqI1Znp4lFuZzvqDKPr6QJDmScR9H7v4viyNnc/uUb
+ jyhQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=O/NDPUvmhc7liFnvbt6y13+UwzEpiHVHRuajdML0aZE=;
+ b=IXDvBHlwJZWM603EAtIDkXwpEPbZBTP2F5Z2SNDOWuP/FVYMnRoYNLyeR4lDwjrMf8
+ Av581q5ZUR4VuzgkRcFKxesmZ3oZWDb2BRhX18mI7/TAEnZrzz0vDc9nvg4GUiLT99u+
+ NKmiplH14iwTuoo41D62fHsNQTXFHzAy8QocSZncXfz6/RlHQ8948Rbh/6Q6G1m0SMDf
+ 05/YvsPNCwC8j8LbRGS1xfqfmAIiRLa9W2ZdNR2tP+EuB/TXH5sN9c4LzLGkJFZMgAhM
+ oM2ZHRmEGd0vrUpXrthPA3W6xo3KDErRYnv4w+zyOZP0O0sT6Xrkoz+dpvx72085u8vS
+ gMkg==
+X-Gm-Message-State: AHQUAuYWEZckhJKX5cDII05jmh3yGzUmxDBFqWQ42+mpu87tF0ILp1n0
+ plKxAhYMY7M2RvqZK10jKnOl9BZrU5xeAvMyw/g=
+X-Google-Smtp-Source: AHgI3IbzB32ZxLY4eEONdPREgOSNHlby90vBWlr2L1uBsnqPtn/YWeju73oKE8ZL1X/0hLqt52nRIBXKfBEWtUoKRwY=
+X-Received: by 2002:a2e:884b:: with SMTP id
+ z11-v6mr3704699ljj.68.1549554339336; 
+ Thu, 07 Feb 2019 07:45:39 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190207110924.30716-4-kishon@ti.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+References: <20190131030812.GA2174@jordon-HP-15-Notebook-PC>
+ <20190131083842.GE28876@rapoport-lnx>
+In-Reply-To: <20190131083842.GE28876@rapoport-lnx>
+From: Souptick Joarder <jrdr.linux@gmail.com>
+Date: Thu, 7 Feb 2019 21:19:47 +0530
+Message-ID: <CAFqt6za9xA_8OKiaaHXcO9go+RtPdjLY5Bz_fgQL+DZbermNhA@mail.gmail.com>
+Subject: Re: [PATCHv2 1/9] mm: Introduce new vm_insert_range and
+ vm_insert_range_buggy API
+To: Mike Rapoport <rppt@linux.ibm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_074425_326531_FB20EDC0 
-X-CRM114-Status: GOOD (  25.36  )
+X-CRM114-CacheID: sfid-20190207_074542_246512_2228ADB6 
+X-CRM114-Status: GOOD (  30.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,300 +90,222 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jingoo Han <jingoohan1@gmail.com>, linux-kernel@vger.kernel.org,
- Murali Karicheri <m-karicheri2@ti.com>, linux-pci@vger.kernel.org,
- Bjorn Helgaas <bhelgaas@google.com>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Michal Hocko <mhocko@suse.com>, Heiko Stuebner <heiko@sntech.de>,
+ Peter Zijlstra <peterz@infradead.org>, dri-devel@lists.freedesktop.org,
+ linux-kernel@vger.kernel.org, Linux-MM <linux-mm@kvack.org>,
+ linux1394-devel@lists.sourceforge.net,
+ Marek Szyprowski <m.szyprowski@samsung.com>,
+ Stephen Rothwell <sfr@canb.auug.org.au>, oleksandr_andrushchenko@epam.com,
+ joro@8bytes.org, Russell King - ARM Linux <linux@armlinux.org.uk>,
+ Matthew Wilcox <willy@infradead.org>, airlied@linux.ie,
+ linux-arm-kernel@lists.infradead.org, linux-rockchip@lists.infradead.org,
+ treding@nvidia.com, linux-media@vger.kernel.org,
+ Kees Cook <keescook@chromium.org>, pawel@osciak.com,
+ Rik van Riel <riel@surriel.com>, iommu@lists.linux-foundation.org,
+ rppt@linux.vnet.ibm.com, Boris Ostrovsky <boris.ostrovsky@oracle.com>,
+ mchehab@kernel.org, iamjoonsoo.kim@lge.com, vbabka@suse.cz,
+ Juergen Gross <jgross@suse.com>, hjc@rock-chips.com, xen-devel@lists.xen.org,
+ Kyungmin Park <kyungmin.park@samsung.com>, stefanr@s5r6.in-berlin.de,
+ Andrew Morton <akpm@linux-foundation.org>, robin.murphy@arm.com,
+ "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 07, 2019 at 04:39:18PM +0530, Kishon Vijay Abraham I wrote:
-> ks_pcie_get_irq_controller_info() was used to configure both MSI and
-> legacy interrupt. This will prevent MSI or legacy interrupt specific
-> intializations. Add separate functions to configure MSI and legacy
-> interrupts.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/pci/controller/dwc/pci-keystone.c | 188 +++++++++++-----------
->  1 file changed, 96 insertions(+), 92 deletions(-)
-> 
-> diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-> index 4cf9849d5a1d..b1d01751c1af 100644
-> --- a/drivers/pci/controller/dwc/pci-keystone.c
-> +++ b/drivers/pci/controller/dwc/pci-keystone.c
-> @@ -87,11 +87,8 @@ struct keystone_pcie {
->  	struct dw_pcie		*pci;
->  	/* PCI Device ID */
->  	u32			device_id;
-> -	int			num_legacy_host_irqs;
-> -	int			legacy_host_irqs[PCI_NUM_INTX];
->  	struct			device_node *legacy_intc_np;
->  
-> -	int			num_msi_host_irqs;
->  	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
->  	int			num_lanes;
->  	u32			num_viewport;
-> @@ -201,14 +198,6 @@ static int ks_pcie_msi_host_init(struct pcie_port *pp)
->  	return dw_pcie_allocate_domains(pp);
->  }
->  
-> -static void ks_pcie_enable_legacy_irqs(struct keystone_pcie *ks_pcie)
-> -{
-> -	int i;
-> -
-> -	for (i = 0; i < PCI_NUM_INTX; i++)
-> -		ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET(i), 0x1);
-> -}
-> -
->  static void ks_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie,
->  				      int offset)
->  {
-> @@ -490,17 +479,6 @@ static int __init ks_pcie_dw_host_init(struct keystone_pcie *ks_pcie)
->  
->  	ks_pcie->app = *res;
->  
-> -	/* Create legacy IRQ domain */
-> -	ks_pcie->legacy_irq_domain =
-> -			irq_domain_add_linear(ks_pcie->legacy_intc_np,
-> -					      PCI_NUM_INTX,
-> -					      &ks_pcie_legacy_irq_domain_ops,
-> -					      NULL);
-> -	if (!ks_pcie->legacy_irq_domain) {
-> -		dev_err(dev, "Failed to add irq domain for legacy irqs\n");
-> -		return -EINVAL;
-> -	}
-> -
->  	return dw_pcie_host_init(pp);
->  }
->  
-> @@ -624,85 +602,117 @@ static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
->  	chained_irq_exit(chip, desc);
->  }
->  
-> -static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
-> -					   char *controller, int *num_irqs)
-> +static int ks_pcie_config_msi_irq(struct keystone_pcie *ks_pcie)
->  {
-> -	int temp, max_host_irqs, legacy = 1, *host_irqs;
->  	struct device *dev = ks_pcie->pci->dev;
-> -	struct device_node *np_pcie = dev->of_node, **np_temp;
-> -
-> -	if (!strcmp(controller, "msi-interrupt-controller"))
-> -		legacy = 0;
-> -
-> -	if (legacy) {
-> -		np_temp = &ks_pcie->legacy_intc_np;
-> -		max_host_irqs = PCI_NUM_INTX;
-> -		host_irqs = &ks_pcie->legacy_host_irqs[0];
-> -	} else {
-> -		np_temp = &ks_pcie->msi_intc_np;
-> -		max_host_irqs = MAX_MSI_HOST_IRQS;
-> -		host_irqs =  &ks_pcie->msi_host_irqs[0];
-> -	}
-> +	struct device_node *np = ks_pcie->np;
-> +	struct device_node *intc_np;
-> +	int irq_count;
-> +	int irq;
-> +	int ret;
-> +	int i;
+Hi Mike,
 
-Nit: all int can be in one line.
+On Thu, Jan 31, 2019 at 2:09 PM Mike Rapoport <rppt@linux.ibm.com> wrote:
+>
+> On Thu, Jan 31, 2019 at 08:38:12AM +0530, Souptick Joarder wrote:
+> > Previouly drivers have their own way of mapping range of
+> > kernel pages/memory into user vma and this was done by
+> > invoking vm_insert_page() within a loop.
+> >
+> > As this pattern is common across different drivers, it can
+> > be generalized by creating new functions and use it across
+> > the drivers.
+> >
+> > vm_insert_range() is the API which could be used to mapped
+> > kernel memory/pages in drivers which has considered vm_pgoff
+> >
+> > vm_insert_range_buggy() is the API which could be used to map
+> > range of kernel memory/pages in drivers which has not considered
+> > vm_pgoff. vm_pgoff is passed default as 0 for those drivers.
+> >
+> > We _could_ then at a later "fix" these drivers which are using
+> > vm_insert_range_buggy() to behave according to the normal vm_pgoff
+> > offsetting simply by removing the _buggy suffix on the function
+> > name and if that causes regressions, it gives us an easy way to revert.
+> >
+> > Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> > Suggested-by: Russell King <linux@armlinux.org.uk>
+> > Suggested-by: Matthew Wilcox <willy@infradead.org>
+> > ---
+> >  include/linux/mm.h |  4 +++
+> >  mm/memory.c        | 81 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+> >  mm/nommu.c         | 14 ++++++++++
+> >  3 files changed, 99 insertions(+)
+> >
+> > diff --git a/include/linux/mm.h b/include/linux/mm.h
+> > index 80bb640..25752b0 100644
+> > --- a/include/linux/mm.h
+> > +++ b/include/linux/mm.h
+> > @@ -2565,6 +2565,10 @@ unsigned long change_prot_numa(struct vm_area_struct *vma,
+> >  int remap_pfn_range(struct vm_area_struct *, unsigned long addr,
+> >                       unsigned long pfn, unsigned long size, pgprot_t);
+> >  int vm_insert_page(struct vm_area_struct *, unsigned long addr, struct page *);
+> > +int vm_insert_range(struct vm_area_struct *vma, struct page **pages,
+> > +                             unsigned long num);
+> > +int vm_insert_range_buggy(struct vm_area_struct *vma, struct page **pages,
+> > +                             unsigned long num);
+> >  vm_fault_t vmf_insert_pfn(struct vm_area_struct *vma, unsigned long addr,
+> >                       unsigned long pfn);
+> >  vm_fault_t vmf_insert_pfn_prot(struct vm_area_struct *vma, unsigned long addr,
+> > diff --git a/mm/memory.c b/mm/memory.c
+> > index e11ca9d..0a4bf57 100644
+> > --- a/mm/memory.c
+> > +++ b/mm/memory.c
+> > @@ -1520,6 +1520,87 @@ int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
+> >  }
+> >  EXPORT_SYMBOL(vm_insert_page);
+> >
+> > +/**
+> > + * __vm_insert_range - insert range of kernel pages into user vma
+> > + * @vma: user vma to map to
+> > + * @pages: pointer to array of source kernel pages
+> > + * @num: number of pages in page array
+> > + * @offset: user's requested vm_pgoff
+> > + *
+> > + * This allows drivers to insert range of kernel pages they've allocated
+> > + * into a user vma.
+> > + *
+> > + * If we fail to insert any page into the vma, the function will return
+> > + * immediately leaving any previously inserted pages present.  Callers
+> > + * from the mmap handler may immediately return the error as their caller
+> > + * will destroy the vma, removing any successfully inserted pages. Other
+> > + * callers should make their own arrangements for calling unmap_region().
+> > + *
+> > + * Context: Process context.
+> > + * Return: 0 on success and error code otherwise.
+> > + */
+> > +static int __vm_insert_range(struct vm_area_struct *vma, struct page **pages,
+> > +                             unsigned long num, unsigned long offset)
+> > +{
+> > +     unsigned long count = vma_pages(vma);
+> > +     unsigned long uaddr = vma->vm_start;
+> > +     int ret, i;
+> > +
+> > +     /* Fail if the user requested offset is beyond the end of the object */
+> > +     if (offset > num)
+> > +             return -ENXIO;
+> > +
+> > +     /* Fail if the user requested size exceeds available object size */
+> > +     if (count > num - offset)
+> > +             return -ENXIO;
+> > +
+> > +     for (i = 0; i < count; i++) {
+> > +             ret = vm_insert_page(vma, uaddr, pages[offset + i]);
+> > +             if (ret < 0)
+> > +                     return ret;
+> > +             uaddr += PAGE_SIZE;
+> > +     }
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +/**
+> > + * vm_insert_range - insert range of kernel pages starts with non zero offset
+> > + * @vma: user vma to map to
+> > + * @pages: pointer to array of source kernel pages
+> > + * @num: number of pages in page array
+> > + *
+> > + * Maps an object consisting of `num' `pages', catering for the user's
+> > + * requested vm_pgoff
+> > + *
+>
+> The elaborate description you've added to __vm_insert_range() is better put
+> here, as this is the "public" function.
+>
+> > + * Context: Process context. Called by mmap handlers.
+> > + * Return: 0 on success and error code otherwise.
+> > + */
+> > +int vm_insert_range(struct vm_area_struct *vma, struct page **pages,
+> > +                             unsigned long num)
+> > +{
+> > +     return __vm_insert_range(vma, pages, num, vma->vm_pgoff);
+> > +}
+> > +EXPORT_SYMBOL(vm_insert_range);
+> > +
+> > +/**
+> > + * vm_insert_range_buggy - insert range of kernel pages starts with zero offset
+> > + * @vma: user vma to map to
+> > + * @pages: pointer to array of source kernel pages
+> > + * @num: number of pages in page array
+> > + *
+> > + * Maps a set of pages, always starting at page[0]
+>
+> Here I'd add something like:
+>
+> Similar to vm_insert_range(), except that it explicitly sets @vm_pgoff to
+> 0. This function is intended for the drivers that did not consider
+> @vm_pgoff.
 
-> -	/* interrupt controller is in a child node */
-> -	*np_temp = of_get_child_by_name(np_pcie, controller);
-> -	if (!(*np_temp)) {
-> -		dev_err(dev, "Node for %s is absent\n", controller);
-> -		return -EINVAL;
-> -	}
-> +	if (!IS_ENABLED(CONFIG_PCI_MSI))
-> +		return 0;
->  
-> -	temp = of_irq_count(*np_temp);
-> -	if (!temp) {
-> -		dev_err(dev, "No IRQ entries in %s\n", controller);
-> -		of_node_put(*np_temp);
-> +	intc_np = of_get_child_by_name(np, "msi-interrupt-controller");
-> +	if (!intc_np) {
-> +		dev_WARN(dev, "msi-interrupt-controller node is absent\n");
+Just thought to take opinion for documentation before placing it in v3.
+Does it looks fine ?
 
-I do not think you can justify a backtrace for this error path, so
-convert it to a dev_warn() please.
++/**
++ * __vm_insert_range - insert range of kernel pages into user vma
++ * @vma: user vma to map to
++ * @pages: pointer to array of source kernel pages
++ * @num: number of pages in page array
++ * @offset: user's requested vm_pgoff
++ *
++ * This allow drivers to insert range of kernel pages into a user vma.
++ *
++ * Return: 0 on success and error code otherwise.
++ */
++static int __vm_insert_range(struct vm_area_struct *vma, struct page **pages,
++                               unsigned long num, unsigned long offset)
 
->  		return -EINVAL;
->  	}
->  
-> -	if (temp > max_host_irqs)
-> -		dev_warn(dev, "Too many %s interrupts defined %u\n",
-> -			(legacy ? "legacy" : "MSI"), temp);
-> +	irq_count = of_irq_count(intc_np);
-> +	if (!irq_count) {
-> +		dev_err(dev, "No IRQ entries in msi-interrupt-controller\n");
-> +		ret = -EINVAL;
-> +		goto err;
-> +	}
->  
-> -	/*
-> -	 * support upto max_host_irqs. In dt from index 0 to 3 (legacy) or 0 to
-> -	 * 7 (MSI)
-> -	 */
-> -	for (temp = 0; temp < max_host_irqs; temp++) {
-> -		host_irqs[temp] = irq_of_parse_and_map(*np_temp, temp);
-> -		if (!host_irqs[temp])
-> -			break;
-> +	if (irq_count > MAX_MSI_HOST_IRQS) {
-> +		dev_warn(dev, "Too many MSI interrupt lines defined %u\n",
-> +			 irq_count);
-> +		irq_count = MAX_MSI_HOST_IRQS;
->  	}
->  
-> -	of_node_put(*np_temp);
-> +	for (i = 0; i < irq_count; i++) {
-> +		irq = irq_of_parse_and_map(intc_np, i);
-> +		if (!irq) {
-> +			ret = -EINVAL;
-> +			goto err;
-> +		}
-> +		ks_pcie->msi_host_irqs[i] = irq;
->  
-> -	if (temp) {
-> -		*num_irqs = temp;
-> -		return 0;
-> +		irq_set_chained_handler_and_data(irq, ks_pcie_msi_irq_handler,
-> +						 ks_pcie);
->  	}
->  
-> -	return -EINVAL;
-> +	of_node_put(intc_np);
-> +	return 0;
-> +
-> +err:
-> +	of_node_put(intc_np);
-> +	return ret;
->  }
->  
-> -static void ks_pcie_setup_interrupts(struct keystone_pcie *ks_pcie)
-> +static int ks_pcie_config_legacy_irq(struct keystone_pcie *ks_pcie)
->  {
-> +	struct device *dev = ks_pcie->pci->dev;
-> +	struct irq_domain *legacy_irq_domain;
-> +	struct device_node *np = ks_pcie->np;
-> +	struct device_node *intc_np;
-> +	int irq_count;
-> +	int irq;
-> +	int ret;
->  	int i;
->  
-> -	/* Legacy IRQ */
-> -	for (i = 0; i < ks_pcie->num_legacy_host_irqs; i++) {
-> -		irq_set_chained_handler_and_data(ks_pcie->legacy_host_irqs[i],
-> +	intc_np = of_get_child_by_name(np, "legacy-interrupt-controller");
-> +	if (!intc_np) {
-> +		dev_WARN(dev, "legacy-interrupt-controller node is absent\n");
 
-Likewise.
++/**
++ * vm_insert_range - insert range of kernel pages starts with non zero offset
++ * @vma: user vma to map to
++ * @pages: pointer to array of source kernel pages
++ * @num: number of pages in page array
++ *
++ * Maps an object consisting of `num' `pages', catering for the user's
++ * requested vm_pgoff
++ *
++ * If we fail to insert any page into the vma, the function will return
++ * immediately leaving any previously inserted pages present.  Callers
++ * from the mmap handler may immediately return the error as their caller
++ * will destroy the vma, removing any successfully inserted pages. Other
++ * callers should make their own arrangements for calling unmap_region().
++ *
++ * Context: Process context. Called by mmap handlers.
++ * Return: 0 on success and error code otherwise.
++ */
++int vm_insert_range(struct vm_area_struct *vma, struct page **pages,
++                               unsigned long num)
 
-Lorenzo
 
-> +		return -EINVAL;
-> +	}
-> +
-> +	irq_count = of_irq_count(intc_np);
-> +	if (!irq_count) {
-> +		dev_err(dev, "No IRQ entries in legacy-interrupt-controller\n");
-> +		ret = -EINVAL;
-> +		goto err;
-> +	}
-> +
-> +	for (i = 0; i < irq_count; i++) {
-> +		irq = irq_of_parse_and_map(intc_np, i);
-> +		if (!irq) {
-> +			ret = -EINVAL;
-> +			goto err;
-> +		}
-> +		irq_set_chained_handler_and_data(irq,
->  						 ks_pcie_legacy_irq_handler,
->  						 ks_pcie);
->  	}
-> -	ks_pcie_enable_legacy_irqs(ks_pcie);
-> -
-> -	/* MSI IRQ */
-> -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> -		for (i = 0; i < ks_pcie->num_msi_host_irqs; i++) {
-> -			irq_set_chained_handler_and_data(ks_pcie->msi_host_irqs[i],
-> -							 ks_pcie_msi_irq_handler,
-> -							 ks_pcie);
-> -		}
-> +
-> +	legacy_irq_domain =
-> +		irq_domain_add_linear(intc_np, PCI_NUM_INTX,
-> +				      &ks_pcie_legacy_irq_domain_ops, NULL);
-> +	if (!legacy_irq_domain) {
-> +		dev_err(dev, "Failed to add irq domain for legacy irqs\n");
-> +		ret = -EINVAL;
-> +		goto err;
->  	}
-> +	ks_pcie->legacy_irq_domain = legacy_irq_domain;
-> +
-> +	for (i = 0; i < PCI_NUM_INTX; i++)
-> +		ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET(i), INTx_EN);
-> +
-> +	of_node_put(intc_np);
-> +
-> +	return 0;
-> +
-> +err:
-> +	of_node_put(intc_np);
-> +	return ret;
-> +}
->  
-> +static void ks_pcie_setup_interrupts(struct keystone_pcie *ks_pcie)
-> +{
->  	if (ks_pcie->error_irq > 0)
->  		ks_pcie_enable_error_irq(ks_pcie);
->  }
-> @@ -756,6 +766,14 @@ static int __init ks_pcie_host_init(struct pcie_port *pp)
->  	struct keystone_pcie *ks_pcie = to_keystone_pcie(pci);
->  	int ret;
->  
-> +	ret = ks_pcie_config_legacy_irq(ks_pcie);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = ks_pcie_config_msi_irq(ks_pcie);
-> +	if (ret)
-> +		return ret;
-> +
->  	dw_pcie_setup_rc(pp);
->  
->  	ks_pcie_establish_link(ks_pcie);
-> @@ -805,20 +823,6 @@ static int __init ks_pcie_add_pcie_port(struct keystone_pcie *ks_pcie,
->  	struct device *dev = &pdev->dev;
->  	int ret;
->  
-> -	ret = ks_pcie_get_irq_controller_info(ks_pcie,
-> -					"legacy-interrupt-controller",
-> -					&ks_pcie->num_legacy_host_irqs);
-> -	if (ret)
-> -		return ret;
-> -
-> -	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> -		ret = ks_pcie_get_irq_controller_info(ks_pcie,
-> -						"msi-interrupt-controller",
-> -						&ks_pcie->num_msi_host_irqs);
-> -		if (ret)
-> -			return ret;
-> -	}
-> -
->  	/*
->  	 * Index 0 is the platform interrupt for error interrupt
->  	 * from RC.  This is optional.
-> -- 
-> 2.17.1
-> 
++/**
++ * vm_insert_range_buggy - insert range of kernel pages starts with zero offset
++ * @vma: user vma to map to
++ * @pages: pointer to array of source kernel pages
++ * @num: number of pages in page array
++ *
++ * Similar to vm_insert_range(), except that it explicitly sets @vm_pgoff to
++ * 0. This function is intended for the drivers that did not consider
++ * @vm_pgoff.
++ *
++ * Context: Process context. Called by mmap handlers.
++ * Return: 0 on success and error code otherwise.
++ */
++int vm_insert_range_buggy(struct vm_area_struct *vma, struct page **pages,
++                               unsigned long num)
 
 _______________________________________________
 linux-arm-kernel mailing list
