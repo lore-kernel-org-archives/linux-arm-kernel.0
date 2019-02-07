@@ -2,65 +2,78 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C4313C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 16:15:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9397CC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 16:18:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8CE5820863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 16:15:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4DC8220863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 16:18:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="X522K4re"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8CE5820863
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Alz4t58r";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="RHXTpNdv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4DC8220863
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=poyXk5Q8YVd248t8EE0RdpeMxfr1Ya2cfgdzDR7lff8=; b=X522K4re9UueK3
-	NL6cU0ZLLIf7hypIURuGHt2+Ff3A5/F7JiI2mqQs0TVWFCJ1lOe27j0dzmmsZRuH1Lk12Llmjq8X3
-	5g1hKHzlauPCSqUtugMP5zx5cp0pTOSE6/WpPZ4sVGuOcVBS3VOBE52KwukSU8IxETR9vL0sR3oa8
-	7kaohz95Zn3DA+cAvbGYez8xKDp3X0x1QTMGkcoG2kIKeJdn6hkM6/03AQKzPCjWJizHkrOFu2xvK
-	JhVO4J4DU68EgArgyaSkJ+3Qa3tW8qOYLVB7TuhpzZKcMt++AXw/s8D4vOmIuOsmoh05gZsv3Hg42
-	d5Z4sPdF6MMW4EZld/jw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=BvGj+AIiilYxadF8QzIcku8F2BTIGHtkkaFrp2Tetf4=; b=Alz4t58rr5QqFK
+	xTH9SVihdlNMZBghz0QRnXuUy24P8pawc6fyanEIYC/6kOeBXVW8rqHkWAecgGQy2HCJVtJguSAfb
+	z7aN2nwhSz+lm3beZeQuRV9sMmLf3PtO4fjH3T6+qaPH7dpjgKGhLSI/u457HR5AIHUR7MP1jrdYb
+	F87/86jfMmzvLupNOp4LwpsjYssQvI1iib3p47rLJfL3o5VsnrKXMnY8PhAJpwTfiabj0CpXMBRRw
+	HODU3AGqY/6N/QfLf5FpwRCxhiV8b9P5zIT67hP+Zn90oz2/uaDOhSFav9Wp5OMqbgcj68tSEzvmV
+	LlSW9CWt3aWrxuLEKWzQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grmKW-00083e-Nf; Thu, 07 Feb 2019 16:15:12 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grmKT-0007pz-FN
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 16:15:11 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 77532A78;
- Thu,  7 Feb 2019 08:15:07 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id F15133F675;
- Thu,  7 Feb 2019 08:15:05 -0800 (PST)
-Date: Thu, 7 Feb 2019 16:15:02 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Kishon Vijay Abraham I <kishon@ti.com>
-Subject: Re: [PATCH v2 2/9] PCI: keystone: Modify legacy_irq_handler to check
- the IRQ_STATUS of INTA/B/C/D
-Message-ID: <20190207161502.GC21111@e107981-ln.cambridge.arm.com>
-References: <20190207110924.30716-1-kishon@ti.com>
- <20190207110924.30716-3-kishon@ti.com>
+	id 1grmO5-0000Bx-8v; Thu, 07 Feb 2019 16:18:53 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1grmO1-0000BM-8n
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 16:18:50 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:Content-Type:MIME-Version:
+ Message-ID:Subject:Cc:To:From:Date:Reply-To:Content-Transfer-Encoding:
+ Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:
+ Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=BD5pXxcqZXBSRGEDMyg0/sbCznTi4usgrz6g7xp0wdE=; b=RHXTpNdvpiGCGsrXFkfIfYcSJ
+ nuLTywQEbzhR+8baoDmVhky6g4Mhx9GwqnH8MrGl7rvbEgEvSlR22sQcJ931mSAjUkC0x4f5owaTT
+ yzssij+H0Xil5neNh0XGqH19GyqbWUGTkYLwXnYFJSFSGsjDgMlKcZcCww4uBJ2FxDTLE=;
+Received: from shell.armlinux.org.uk
+ ([2002:4e20:1eda:1:5054:ff:fe00:4ec]:36602)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1grmNi-0002Rq-64; Thu, 07 Feb 2019 16:18:30 +0000
+Received: from linux by shell.armlinux.org.uk with local (Exim 4.89)
+ (envelope-from <linux@shell.armlinux.org.uk>)
+ id 1grmNd-0006JB-RP; Thu, 07 Feb 2019 16:18:25 +0000
+Date: Thu, 7 Feb 2019 16:18:25 +0000
+From: Russell King - ARM Linux admin <linux@armlinux.org.uk>
+To: Andrew Lunn <andrew@lunn.ch>,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ Jason Cooper <jason@lakedaemon.net>,
+ Kishon Vijay Abraham I <kishon@ti.com>,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Subject: [PATCH net-next v2 0/6] Add comphy support for Armada 38x
+Message-ID: <20190207161825.ueinmyf6ygjiqzzy@shell.armlinux.org.uk>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190207110924.30716-3-kishon@ti.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_081509_528327_51CC6110 
-X-CRM114-Status: GOOD (  26.33  )
+X-CRM114-CacheID: sfid-20190207_081849_314222_2941915D 
+X-CRM114-Status: GOOD (  12.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,112 +85,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jingoo Han <jingoohan1@gmail.com>, linux-kernel@vger.kernel.org,
- Murali Karicheri <m-karicheri2@ti.com>, linux-pci@vger.kernel.org,
- Bjorn Helgaas <bhelgaas@google.com>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ netdev@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ "David S. Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 07, 2019 at 04:39:17PM +0530, Kishon Vijay Abraham I wrote:
-> The legacy interrupt handler directly checks the IRQ_STATUS register
-> corresponding to a interrupt line inorder to invoke generic_handle_irq.
-> 
-> While this is okay for K2G platform which has separate interrupt line for
-> each of the 4 legacy interrupts, AM654 which uses the same PCIe wrapper
-> has a single interrupt line for all the legacy interrupts. So for AM654
-> the interrupt handler won't be able to directly check the IRQ_STATUS
-> register corresponding to the interrupt line.
-> 
-> Also the legacy interrupt handler uses 'virq' obtained from
-> irq_of_parse_and_map to find the correct interrupt line which raised the
-> interrupt. There is no guarantee that virq assigned for contiguous hardware
-> irq will be contiguous and the interrupt handler might end up checking
-> the wrong IRQ_STATUS register.
-> 
-> In order to overcome the above issues, read the IRQ_STATUS register of
-> all the 4 legacy interrupts to determine which interrupt was raised.
-> 
-> Link: https://lkml.kernel.org/r/bb081d21-7c03-0357-4294-7e92d95d838c@arm.com
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/pci/controller/dwc/pci-keystone.c | 22 ++++++++++++----------
->  1 file changed, 12 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-> index 5286a480f76b..4cf9849d5a1d 100644
-> --- a/drivers/pci/controller/dwc/pci-keystone.c
-> +++ b/drivers/pci/controller/dwc/pci-keystone.c
-> @@ -214,16 +214,11 @@ static void ks_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie,
->  {
->  	struct dw_pcie *pci = ks_pcie->pci;
->  	struct device *dev = pci->dev;
-> -	u32 pending;
->  	int virq;
->  
-> -	pending = ks_pcie_app_readl(ks_pcie, IRQ_STATUS(offset));
-> -
-> -	if (BIT(0) & pending) {
-> -		virq = irq_linear_revmap(ks_pcie->legacy_irq_domain, offset);
-> -		dev_dbg(dev, ": irq: irq_offset %d, virq %d\n", offset, virq);
-> -		generic_handle_irq(virq);
-> -	}
-> +	virq = irq_linear_revmap(ks_pcie->legacy_irq_domain, offset);
-> +	dev_dbg(dev, ": irq: irq_offset %d, virq %d\n", offset, virq);
-> +	generic_handle_irq(virq);
->  
->  	/* EOI the INTx interrupt */
->  	ks_pcie_app_writel(ks_pcie, IRQ_EOI, offset);
-> @@ -607,8 +602,9 @@ static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
->  	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
->  	struct dw_pcie *pci = ks_pcie->pci;
->  	struct device *dev = pci->dev;
-> -	u32 irq_offset = irq - ks_pcie->legacy_host_irqs[0];
->  	struct irq_chip *chip = irq_desc_get_chip(desc);
-> +	unsigned int irq_no;
-> +	u32 reg;
->  
->  	dev_dbg(dev, ": Handling legacy irq %d\n", irq);
->  
-> @@ -618,7 +614,13 @@ static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
->  	 * ack operation.
->  	 */
->  	chained_irq_enter(chip, desc);
-> -	ks_pcie_handle_legacy_irq(ks_pcie, irq_offset);
-> +	for (irq_no = 0; irq_no < PCI_NUM_INTX; irq_no++) {
+Hi,
 
-I understand the aim of this code but now on platforms where there
-is a 1:1 relationship between Linux IRQ and INTX this loop has
-steps carried out for nothing.
+This series adds support for the comphy for Armada 38x, which allows
+these SoCs to use 2500BASE-X mode with appropriate SFP modules.
 
-If I understand the code correctly what this code does is force
-looping over INTX status regs regardless of what linux IRQ number was
-actually active.
+Tested on SolidRun Clearfog after updating for the 5.0 merge window
+changes.
 
-You could do something faster by creating a matrix LinuxIRQ x INTx to
-detect what INTx status register should actually be checked.
+ .../bindings/net/marvell-armada-370-neta.txt       |   2 +-
+ .../bindings/phy/phy-armada38x-comphy.txt          |  40 ++++
+ arch/arm/boot/dts/armada-388-clearfog.dtsi         |   2 +
+ arch/arm/boot/dts/armada-38x.dtsi                  |  37 ++++
+ drivers/net/ethernet/marvell/mvneta.c              |  45 +++-
+ drivers/phy/marvell/Kconfig                        |  10 +
+ drivers/phy/marvell/Makefile                       |   1 +
+ drivers/phy/marvell/phy-armada38x-comphy.c         | 237 +++++++++++++++++++++
+ 8 files changed, 369 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-armada38x-comphy.txt
+ create mode 100644 drivers/phy/marvell/phy-armada38x-comphy.c
 
-This seems overkill to me but it is not that complicated to implement
-and may clarify the code (and avoid reading up to three registers for
-nothing on the IRQ code path, which can make things faster too).
-
-Lorenzo
-
-> +		reg = ks_pcie_app_readl(ks_pcie, IRQ_STATUS(irq_no));
-> +		if (!(reg & INTx_EN))
-> +			continue;
-> +		ks_pcie_handle_legacy_irq(ks_pcie, irq_no);
-> +	}
-> +
->  	chained_irq_exit(chip, desc);
->  }
->  
-> -- 
-> 2.17.1
-> 
+-- 
+RMK's Patch system: https://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
