@@ -2,23 +2,23 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,
+	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DCB9CC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 20:29:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 01176C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 20:52:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A78C420857
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 20:29:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C13022146E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 20:52:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Exk6LDbY";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="DuNqhcyw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A78C420857
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GlYvKJ95";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="Nu8aan8q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C13022146E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,59 +26,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Qjg/DretZjOiJJmPrY6OhFRvN9E27L6glG4+9mipnSU=; b=Exk6LDbYqFh53w
-	9V9Y36evHGibTZ29T3oPJzPuUuLRr24YQHg50ssNsh8iRL33Zt30P+dqMeOXpVntt4AHs/N31UMCl
-	O+FlQK/BdPGC4ZwPGA9ErFVolxd98D8oXIhT9+fOKkgc0oKxnKueZ7oCrctZW1pLAQTYVLFKlHeaq
-	Jst/nmUFzHCrNyDbTRjEAqhcXjFDLzVN4dDGhRZGe6vfaTJaI2x/UBAtKtPfZ71SB6rCUoXi3JCqL
-	JMqn+YZUS2fRYANFg9OwQ+WQxO8ZyDK9NDIg17hwVDnXRe9IahkiM/mk2bWaQ2iagDEUcAbeJvf5g
-	axUaIVUmuz256ejr2kUA==;
+	List-Owner; bh=hvdEk1NRKgCCDygfifr/aPJy6lBDixO5LArLXVQXVoc=; b=GlYvKJ95ymp1pg
+	YeKwr3qY9z+j8DF38YEyr90UmbixtUKtJDYsftRKFLEDpJHeAh8c11O9WyBI4C7R4d3G77V7rtpIe
+	176FNIxZoMKSA+c8q+l5fJfhlPw5vfKYKQ0oGsA37mY4foGkXYfTGFd3VPSb7bba7+yYBlz4wWjA1
+	hm1HVReCJKETkob6pMCvrQydAMQR5WTgh0YtXLbfm9bNRNxKdsvzjvKY9f28UbAbaBosW7gIyqy7W
+	ur8WP5noYuc1f3enDLm59EgZZDEihiZTSXOxPOL4gkcWvBm+0cE4Gg0uxhns2YvgxwmEfCttJ2UIc
+	1+lslWFKrcnXpi2yu67Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grqIK-0007Qv-3D; Thu, 07 Feb 2019 20:29:12 +0000
-Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+	id 1grqeq-0007Rf-9j; Thu, 07 Feb 2019 20:52:28 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grqIF-0007QW-L3
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 20:29:09 +0000
-Received: by mail-it1-x141.google.com with SMTP id r6so3279066itk.0
+ id 1grqem-0007Qy-G6
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 20:52:25 +0000
+Received: by mail-pl1-x644.google.com with SMTP id f90so278224plb.10
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 07 Feb 2019 12:29:07 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ Thu, 07 Feb 2019 12:52:20 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=XQMPFtgiD9kRlMP0xZT8Ht2uYetxaIQrdf6+lFc9OpY=;
- b=DuNqhcywKP09C6NkoUbMBjCCJTWJVY06rTcY5nHiNAAZXOZXE00E0eUwJpcVQmsjGc
- IDh+VcS8g7OpsodKnX2ftUO5X3G9uo6qdL+SGcqn37ijRqmkYb5HCc5DI1buktEry9sS
- glyXZQTDQ8ajIZEzN4p2LJeVpfkBHk0Jx4ca3M6Oryl4uLqxh4VqpQBv76h5q9DVo8vN
- Us6ID3Rpjgv1VKu1qxezX4ppdACsfyndpzI4GF5VzJewcZJCk/IWMKNzOp9ad9O8Qat9
- K6iiITDOQq0Cs4wcPhbkTy90f9Y5I+eGGSOInrX6yN/HaTkU6tBg7DBfG3xwmM2bEHB4
- Ztxg==
+ :cc; bh=pKTL/VUO2v+cmiF0gtxjbJiV47KA6awqYyKIrFSUDqc=;
+ b=Nu8aan8qIfY42IqTNRslSjIE3HNHTa1HXz5Ii/eUGTQiwta1KIwOchyhIa+ylL6AFf
+ px2rYcK4Dit+DWHb0PjEgSD3SFiFoL+kAR6DMc9thZq85MMCAeJz8NRyaV+HGufOlXLu
+ xRwZqCMghe9/MRtydm3N4jfKK5hxTpp4+curaxffw+YfsRqTMx73ADEvsFM8Z2kULRZN
+ Ad4IfzQicG9qXthFT9ssPDfi84hoLP7kbW6K2Y4qS/pFD6H8K0zrvCR+ES051wSom0Ti
+ LuiijfqPy1pbOL6GhPs5HCtmq7OvEJGFeKRFKgiZ50xs7zBzjg8nEgTd8aoK/3dZ4MUW
+ +3Sw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=XQMPFtgiD9kRlMP0xZT8Ht2uYetxaIQrdf6+lFc9OpY=;
- b=KBJYyIxhE2y2wObycNVCgOGK7u8jMg6+E+ozxBV78gvnt1pi6rIxLxZIRblX57+A/T
- r2gV6Hzs4KzbqHIfxzEzQMPeEXx+LHsbWoqXX9YHfVScpbPc39PiSeWIIdRnGhJV57r5
- n6ncmmNpD9Xwui2gLWt95LEVv7Kc+tDwEI/T+kugS4la6d1JbyJr7NGeNtaOxMgCI4l2
- 3zZ6R2JIcLCvzHvr9CpYS0iQmqaIHk7b1Iv0pPEx4OzARWUS6Ny3mD9pReojkIgOM3K0
- jbFZAfM4kY8K3cfUn64ROU13RYbiHKqyCn+R1Jp/5BvmnpL2nUcXLF3u7G2WRN8ClKyK
- GLkg==
-X-Gm-Message-State: AHQUAuZJ8yXgxp7LUsvLIP/PEQG0JAtcBd0xHQlbsHX2rvZm5aspljF2
- EEawYcnb0y7q8edcnf9Ui2Klr1gqsnDeqsUphEuv9g==
-X-Google-Smtp-Source: AHgI3IaIb8+ndBXJmvKkRFflVgcEw4+PcfWvXoVOH/BWSeqJXrWzIlFBFARebrSRCDL+K5TWFY9+1TlbfBjvsSSc0qE=
-X-Received: by 2002:a24:db02:: with SMTP id c2mr6818644itg.137.1549571346926; 
- Thu, 07 Feb 2019 12:29:06 -0800 (PST)
+ bh=pKTL/VUO2v+cmiF0gtxjbJiV47KA6awqYyKIrFSUDqc=;
+ b=Bhb9nls5vTVMJsYYZ6fH7DOM8HeGJHxRHpBzi5U0pR7O8oWePm4rVMWGh1YGIulOBe
+ kuJtHf1faudJFztiDjYJ3ctsHCOVAwJeVfwx4JAB+6YcGoJ77lF3M9z7iPi7PUn8/Z4e
+ SFkePD8UmPcQfxE+33gfFmJ5nUsDkH7W+bGUU+oo15OjHejKEJCKa05xoJln4/S5rj4p
+ d/yo7GlbPjXOEZNrc3atGwbcnjY1ogIa6T9RA/v3haK52cwJHqDkWgVTr1PaX/t7cLZS
+ d/VHfBhffxnhMjj687iS2ZZr/ynQVaLJNWt7y7bakMHj3cJXdeUl+M+1AFoprjpf/7dn
+ dM+g==
+X-Gm-Message-State: AHQUAuZRMbGdKabxYmHZO3UABz+SgqB1UaAHKR9O4ycR/JMewWuo1Y+V
+ 7Q5DSOISXZrooLNYx5++cBO3/DUb14gRwAGQGXLTVQ==
+X-Google-Smtp-Source: AHgI3IZKwz8iogrrII4x6WBjKdp9oBL6psLrJYaoA3GW7KKugenPXAsega03xFSIOdTn5h1oq1iBrNlnM1L4cMSPj5A=
+X-Received: by 2002:a17:902:4464:: with SMTP id
+ k91mr18808462pld.13.1549572740234; 
+ Thu, 07 Feb 2019 12:52:20 -0800 (PST)
 MIME-Version: 1.0
-References: <cover.1548981329.git.saiprakash.ranjan@codeaurora.org>
- <53cf9d9d3b14f503a6c842754f3c55413f5a3392.1548981329.git.saiprakash.ranjan@codeaurora.org>
-In-Reply-To: <53cf9d9d3b14f503a6c842754f3c55413f5a3392.1548981329.git.saiprakash.ranjan@codeaurora.org>
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
-Date: Thu, 7 Feb 2019 13:28:56 -0700
-Message-ID: <CANLsYky9ujRyftg3WoeSWK37=3_k5hw9x=DV34P_YrUXCLApXw@mail.gmail.com>
-Subject: Re: [PATCHv7 6/6] coresight: cpu-debug: Add support for Qualcomm Kryo
-To: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+References: <cover.1549532513.git.stefan@agner.ch>
+ <c44f25a2d9e2f64fe41d910b09868c0f6ec3a3c9.1549532513.git.stefan@agner.ch>
+In-Reply-To: <c44f25a2d9e2f64fe41d910b09868c0f6ec3a3c9.1549532513.git.stefan@agner.ch>
+From: Nick Desaulniers <ndesaulniers@google.com>
+Date: Thu, 7 Feb 2019 12:52:09 -0800
+Message-ID: <CAKwvOd=j_xA-dTm098un2qRnzir-9FZNv3K=5vpNT7prgMpvbQ@mail.gmail.com>
+Subject: Re: [PATCH 5/5] ARM: warn if divided syntax assembler is used
+To: Stefan Agner <stefan@agner.ch>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_122907_704633_40F125CC 
-X-CRM114-Status: GOOD (  20.46  )
+X-CRM114-CacheID: sfid-20190207_125224_556196_80252C98 
+X-CRM114-Status: GOOD (  15.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,118 +91,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Jeffrey Hugo <jhugo@codeaurora.org>,
- Rajendra Nayak <rnayak@codeaurora.org>, Tingwei Zhang <tingwei@codeaurora.org>,
- Suzuki K Poulose <suzuki.poulose@arm.com>,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Marc Gonzalez <marc.w.gonzalez@free.fr>, Doug Anderson <dianders@chromium.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- David Brown <david.brown@linaro.org>, devicetree@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, Sibi Sankar <sibis@codeaurora.org>,
- Vivek Gautam <vivek.gautam@codeaurora.org>, Leo Yan <leo.yan@linaro.org>,
- Andy Gross <andy.gross@linaro.org>, Stephen Boyd <sboyd@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Mike Leach <mike.leach@linaro.org>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>,
+ Mark Rutland <mark.rutland@arm.com>, Arnd Bergmann <arnd@arndb.de>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, julien.thierry@arm.com,
+ Will Deacon <will.deacon@arm.com>, Russell King <linux@armlinux.org.uk>,
+ LKML <linux-kernel@vger.kernel.org>, Thierry Reding <thierry.reding@gmail.com>,
+ Nathan Chancellor <natechancellor@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 31 Jan 2019 at 17:55, Sai Prakash Ranjan
-<saiprakash.ranjan@codeaurora.org> wrote:
+On Thu, Feb 7, 2019 at 1:46 AM Stefan Agner <stefan@agner.ch> wrote:
 >
-> Add support for coresight CPU debug module on Qualcomm
-> Kryo CPUs. This patch adds the UCI entries for Kryo CPUs
-> found on MSM8996 which shares the same PIDs as ETMs.
+> Remove the -mno-warn-deprecated assembler flag to make sure the GNU
+> assembler warns in case non-unified syntax is used.
 >
-> Without this, below error is observed on MSM8996:
->
-> [    5.429867] OF: graph: no port node found in /soc/debug@3810000
-> [    5.429938] coresight-etm4x: probe of 3810000.debug failed with error -22
-> [    5.435415] coresight-cpu-debug 3810000.debug: Coresight debug-CPU0 initialized
-> [    5.446474] OF: graph: no port node found in /soc/debug@3910000
-> [    5.448927] coresight-etm4x: probe of 3910000.debug failed with error -22
-> [    5.454681] coresight-cpu-debug 3910000.debug: Coresight debug-CPU1 initialized
-> [    5.487765] OF: graph: no port node found in /soc/debug@3a10000
-> [    5.488007] coresight-etm4x: probe of 3a10000.debug failed with error -22
-> [    5.493024] coresight-cpu-debug 3a10000.debug: Coresight debug-CPU2 initialized
-> [    5.501802] OF: graph: no port node found in /soc/debug@3b10000
-> [    5.512901] coresight-etm4x: probe of 3b10000.debug failed with error -22
-> [    5.513192] coresight-cpu-debug 3b10000.debug: Coresight debug-CPU3 initialized
->
-> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
->
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+
+Good idea, thanks for unifying the syntax.
+
 > ---
-> For testing, all dependent patches are in below tree:
->  * https://github.com/saiprakash-ranjan/linux/tree/coresight-next
+>  arch/arm/Makefile | 3 ---
+>  1 file changed, 3 deletions(-)
 >
-> This patch depends on UCI support by Mike Leach in below link:
->  * https://lore.kernel.org/lkml/20190130234051.2294-1-mike.leach@linaro.org/
-> ---
->  .../hwtracing/coresight/coresight-cpu-debug.c | 33 +++++++++----------
->  1 file changed, 16 insertions(+), 17 deletions(-)
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index a0d08a3c9d33..811498e16673 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -112,9 +112,6 @@ ifeq ($(CONFIG_ARM_UNWIND),y)
+>  CFLAGS_ABI     +=-funwind-tables
+>  endif
 >
-> diff --git a/drivers/hwtracing/coresight/coresight-cpu-debug.c b/drivers/hwtracing/coresight/coresight-cpu-debug.c
-> index e8819d750938..50ebf5b7fa4f 100644
-> --- a/drivers/hwtracing/coresight/coresight-cpu-debug.c
-> +++ b/drivers/hwtracing/coresight/coresight-cpu-debug.c
-> @@ -655,24 +655,23 @@ static int debug_remove(struct amba_device *adev)
->         return 0;
->  }
->
-> +static const struct amba_cs_uci_id uci_id_debug[] = {
-> +       {
-> +               /*  CPU Debug UCI data */
-> +               .devarch        = 0x47706a15,
-> +               .devarch_mask   = 0xfff0ffff,
-> +               .devtype        = 0x00000015,
-> +       }
-> +};
-> +
+> -# Accept old syntax despite ".syntax unified"
+> -AFLAGS_NOWARN  :=$(call as-option,-Wa$(comma)-mno-warn-deprecated,-Wa$(comma)-W)
+> -
 
-Thank you for adding that.
+Shouldn't you also remove the references to the now gone AFLAGS_NOWARN
+on lines 120 AND 127?
 
->  static const struct amba_id debug_ids[] = {
-> -       {       /* Debug for Cortex-A53 */
-> -               .id     = 0x000bbd03,
-> -               .mask   = 0x000fffff,
-> -       },
-> -       {       /* Debug for Cortex-A57 */
-> -               .id     = 0x000bbd07,
-> -               .mask   = 0x000fffff,
-> -       },
-> -       {       /* Debug for Cortex-A72 */
-> -               .id     = 0x000bbd08,
-> -               .mask   = 0x000fffff,
-> -       },
-> -       {       /* Debug for Cortex-A73 */
-> -               .id     = 0x000bbd09,
-> -               .mask   = 0x000fffff,
-> -       },
-> -       { 0, 0 },
-> +       CS_AMBA_ID(0x000bbd03),                         /* Cortex-A53 */
-> +       CS_AMBA_ID(0x000bbd07),                         /* Cortex-A57 */
-> +       CS_AMBA_ID(0x000bbd08),                         /* Cortex-A72 */
-> +       CS_AMBA_ID(0x000bbd09),                         /* Cortex-A73 */
-> +       CS_AMBA_UCI_ID(0x000f0205, uci_id_debug),       /* Qualcomm Kryo */
-> +       CS_AMBA_UCI_ID(0x000f0211, uci_id_debug),       /* Qualcomm Kryo */
-> +       {},
-
-I have reviewed your work and things look good to me.  Once again
-there isn't much I can do with it right now.  Please re-submit when
-Mike's set has been merged.
-
-Mathieu
-
->  };
->
->  static struct amba_driver debug_driver = {
+>  ifeq ($(CONFIG_THUMB2_KERNEL),y)
+>  AFLAGS_AUTOIT  :=$(call as-option,-Wa$(comma)-mimplicit-it=always,-Wa$(comma)-mauto-it)
+>  CFLAGS_ISA     :=-mthumb $(AFLAGS_AUTOIT) $(AFLAGS_NOWARN)
 > --
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-> of Code Aurora Forum, hosted by The Linux Foundation
+> 2.20.1
 >
+
+
+-- 
+Thanks,
+~Nick Desaulniers
 
 _______________________________________________
 linux-arm-kernel mailing list
