@@ -2,57 +2,60 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 47A05C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:50:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D5B18C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:50:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0EFC920823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:50:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A5B6420823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:50:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E5AqIEgw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0EFC920823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Nl9XHziD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A5B6420823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=b32iTfk0znl466ohup4zS0xut30qMWFlkS3MwwYfv+c=; b=E5AqIEgwWd8Ama
-	XOTauockEU92juPnk132Ixn2Aw3dvZjLhvrOGtVSC7mP1ZKA0OzK5qHPWAJ6J6uagZdWeEyeCaBEW
-	CsLkoRFS6zq17wbTh9JPIugDT5tl0zjxVHGEkdD94ZR8mr9O5pdEdww0B3g+n1dMe2HqYuWGZw9vt
-	qmRjwGdkDb9MrOXSB2q586WATGye5IfyNpwE/2gB5lqpyXz27/EMUt+iRpAcAOMYIakdpdG75+C6d
-	Z6ac9b/6TZqrFk2/D26e5F8argo/SIjePoIz8LWEhjaQbXIWKyrfZw5ILu9RaB5aE0toigs7c3yFF
-	8CsRnmOo8MG8P36GcEQg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=uXas6zjox66y8EG6R5/ZXnwum0FWmubvVj+gGoEG0ew=; b=Nl9XHziDBi0Abd
+	wJpsGVholZGdGGW9oqfxCB7sQCJwrf4VrIzaDbA2BSEGE8SGrPH/zCs611X6m+fe09dlsGlwYhGzq
+	OtihesIR66o14oNdXvUtCDvht/LrQcjf6pO9nSrZnDmvhOqxKgn+bSsy1iZEZnM9YH2t+Nr2TVXi0
+	7pQ2USHc4f4+xMNXWnISKHnF8d35PQkFhDNP4ebk1o2Tslf7x+I0mwOpI10E4U0WBMVuUgpZLMJOU
+	xkfu6oFEHZu0gYE4yb3J3GmRr6D/T2dzc9bKhMA2gZFZku78miisakBX+KgCLv/5vZVswA18SrurQ
+	zMM5ICZ3pF1qG5TMGbrQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grgJm-00054y-TF; Thu, 07 Feb 2019 09:50:02 +0000
+	id 1grgK8-0006SP-Mq; Thu, 07 Feb 2019 09:50:24 +0000
 Received: from relay11.mail.gandi.net ([217.70.178.231])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grgJi-00053S-OT
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:50:00 +0000
+ id 1grgJl-00053p-7Q
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:50:03 +0000
 Received: from mc-bl-xps13.lan
  (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr [90.88.22.177])
  (Authenticated sender: maxime.chevallier@bootlin.com)
- by relay11.mail.gandi.net (Postfix) with ESMTPSA id 8FBB610000B;
- Thu,  7 Feb 2019 09:49:52 +0000 (UTC)
+ by relay11.mail.gandi.net (Postfix) with ESMTPSA id DD84510001C;
+ Thu,  7 Feb 2019 09:49:56 +0000 (UTC)
 From: Maxime Chevallier <maxime.chevallier@bootlin.com>
 To: davem@davemloft.net
-Subject: [PATCH net-next v2 00/10] net: phy: Add support for 2.5GBASET PHYs
-Date: Thu,  7 Feb 2019 10:49:29 +0100
-Message-Id: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
+Subject: [PATCH net-next v2 01/10] net: phy: Update PHY linkmodes after
+ config_init
+Date: Thu,  7 Feb 2019 10:49:30 +0100
+Message-Id: <20190207094939.27369-2-maxime.chevallier@bootlin.com>
 X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
+References: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_014958_944037_7D22FFF7 
-X-CRM114-Status: GOOD (  13.23  )
+X-CRM114-CacheID: sfid-20190207_015001_594023_C3402016 
+X-CRM114-Status: GOOD (  16.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,66 +80,130 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello everyone,
+We want to be able to update a PHY's supported list in the config_init
+callback, so move the Pause parameters settings from phydrv->features
+after calling config_init to make sure these  parameters aren't
+overwritten.
 
-This is the second iteration of the series introducing support for
-2.5GBASET and 5GBASET to the network PHY infrastructure.
+Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+---
+ drivers/net/phy/phy_device.c | 89 +++++++++++++++++++++++-------------
+ 1 file changed, 58 insertions(+), 31 deletions(-)
 
-These 2 modes are described in the 802.3bz specifications, and allow to
-use 2.5G and 5G speeds on cat5e/cat6 cables.
-
-The required infrastructure code is added for 2.5GBASET and 5GBASET, but
-only 2.5GBASET support is added to the Marvell10G driver. The reason is
-because the 5GBASER interface mode used to communicate with the MAC
-isn't implemented yet, and therefore this can't be tested.
-
-This series has seen some rework since last time, see the full details
-in the patches changelog. The main highlights are :
-
- - Patch 1 moves the Pause ans Asym_Pause parameters update after
-   calling config_init. This allows us to change the phydev->supported
-   modes in config_init, while still forcing some quirks taken from
-   phydrv->features, to disable unsupported Pause modes. This was
-   proposed by Andrew.
-
- - Patch 2 generalizes the way we mask-out modes we don't want to use
-   when forcing the link speed through DT or ethtool, by walking through
-   the PHY settings table, as proposed by Russell.
-
- - Patch 4 implements automatic setting of TM, FIBRE and Backplane bits
-   from the list of supported linkmodes.
-
- - In Patch 5, we only read abilities from the PMA. Pause parameters
-   aren't built from the genphy_c45_pma_read_abilities, as it was done
-   in the previous iteration of the patch. We also amke use of
-   linkmode_mod_bit to make sure we mask-out unsupported modes.
-
- - In Patch 8, we manually check for the PMA device id to see if we have
-   to use a quirk when reading the 2.5G/5G Extended Abilities
-
-Maxime Chevallier (10):
-  net: phy: Update PHY linkmodes after config_init
-  net: phy: Mask-out non-compatible modes when setting the max-speed
-  net: phy: Move of_set_phy_eee_broken to phy-core.c
-  net: phy: Automatically fill the generic TP, FIBRE and Backplane modes
-  net: phy: Extract genphy_c45_pma_read_abilities from marvell10g
-  net: phy: Add generic support for 2.5GBaseT and 5GBaseT
-  net: phy: marvell10g: Add support for 2.5GBASET
-  net: phy: marvell10g: Force reading of 2.5/5G
-  net: mvpp2: Add 2.5GBaseT support
-  net: phy: marvell10g: add support for the 88x2110 PHY
-
- .../net/ethernet/marvell/mvpp2/mvpp2_main.c   |   1 +
- drivers/net/phy/marvell10g.c                  | 142 +++++------
- drivers/net/phy/phy-c45.c                     | 111 ++++++++
- drivers/net/phy/phy-core.c                    |  72 ++++++
- drivers/net/phy/phy_device.c                  | 237 +++++++++---------
- include/linux/linkmode.h                      |   6 +
- include/linux/marvell_phy.h                   |   2 +
- include/linux/phy.h                           |   3 +
- include/uapi/linux/mdio.h                     |  16 ++
- 9 files changed, 405 insertions(+), 185 deletions(-)
-
+diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
+index 891e0178b97f..18a10565efd4 100644
+--- a/drivers/net/phy/phy_device.c
++++ b/drivers/net/phy/phy_device.c
+@@ -1059,6 +1059,59 @@ static int phy_poll_reset(struct phy_device *phydev)
+ 	return 0;
+ }
+ 
++/**
++ * phy_update_linkmodes - Update and sanitize linkmodes and pause parameters
++ * @phydev: The PHY device whose parameters we want to update.
++ *
++ * Description: The list of supported and advertised linkmodes is not
++ * straightforward to maintain, since PHYs and MACs are subject to quirks and
++ * erratas. This function re-builds the list of the supported pause parameters
++ * by taking into account the parameters expressed in the driver's features
++ * list.
++ */
++static void phy_update_linkmodes(struct phy_device *phydev)
++{
++	struct device_driver *drv = phydev->mdio.dev.driver;
++	struct phy_driver *phydrv = to_phy_driver(drv);
++
++	mutex_lock(&phydev->lock);
++
++	/* The Pause Frame bits indicate that the PHY can support passing
++	 * pause frames. During autonegotiation, the PHYs will determine if
++	 * they should allow pause frames to pass.  The MAC driver should then
++	 * use that result to determine whether to enable flow control via
++	 * pause frames.
++	 *
++	 * Normally, PHY drivers should not set the Pause bits, and instead
++	 * allow phylib to do that.  However, there may be some situations
++	 * (e.g. hardware erratum) where the driver wants to set only one
++	 * of these bits.
++	 */
++	if (test_bit(ETHTOOL_LINK_MODE_Pause_BIT, phydrv->features) ||
++	    test_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, phydrv->features)) {
++		linkmode_clear_bit(ETHTOOL_LINK_MODE_Pause_BIT,
++				   phydev->supported);
++		linkmode_clear_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
++				   phydev->supported);
++		if (test_bit(ETHTOOL_LINK_MODE_Pause_BIT, phydrv->features))
++			linkmode_set_bit(ETHTOOL_LINK_MODE_Pause_BIT,
++					 phydev->supported);
++		if (test_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
++			     phydrv->features))
++			linkmode_set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
++					 phydev->supported);
++	} else {
++		linkmode_set_bit(ETHTOOL_LINK_MODE_Pause_BIT,
++				 phydev->supported);
++		linkmode_set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
++				 phydev->supported);
++	}
++
++	linkmode_copy(phydev->advertising, phydev->supported);
++
++	mutex_unlock(&phydev->lock);
++}
++
+ int phy_init_hw(struct phy_device *phydev)
+ {
+ 	int ret = 0;
+@@ -1082,6 +1135,11 @@ int phy_init_hw(struct phy_device *phydev)
+ 	if (phydev->drv->config_init)
+ 		ret = phydev->drv->config_init(phydev);
+ 
++	/* Update and sanitize the supported and advertised linkmodes, since
++	 * they might have been changed in config_init
++	 */
++	phy_update_linkmodes(phydev);
++
+ 	return ret;
+ }
+ EXPORT_SYMBOL(phy_init_hw);
+@@ -2221,37 +2279,6 @@ static int phy_probe(struct device *dev)
+ 	 */
+ 	of_set_phy_eee_broken(phydev);
+ 
+-	/* The Pause Frame bits indicate that the PHY can support passing
+-	 * pause frames. During autonegotiation, the PHYs will determine if
+-	 * they should allow pause frames to pass.  The MAC driver should then
+-	 * use that result to determine whether to enable flow control via
+-	 * pause frames.
+-	 *
+-	 * Normally, PHY drivers should not set the Pause bits, and instead
+-	 * allow phylib to do that.  However, there may be some situations
+-	 * (e.g. hardware erratum) where the driver wants to set only one
+-	 * of these bits.
+-	 */
+-	if (test_bit(ETHTOOL_LINK_MODE_Pause_BIT, phydrv->features) ||
+-	    test_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT, phydrv->features)) {
+-		linkmode_clear_bit(ETHTOOL_LINK_MODE_Pause_BIT,
+-				   phydev->supported);
+-		linkmode_clear_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
+-				   phydev->supported);
+-		if (test_bit(ETHTOOL_LINK_MODE_Pause_BIT, phydrv->features))
+-			linkmode_set_bit(ETHTOOL_LINK_MODE_Pause_BIT,
+-					 phydev->supported);
+-		if (test_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
+-			     phydrv->features))
+-			linkmode_set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
+-					 phydev->supported);
+-	} else {
+-		linkmode_set_bit(ETHTOOL_LINK_MODE_Pause_BIT,
+-				 phydev->supported);
+-		linkmode_set_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
+-				 phydev->supported);
+-	}
+-
+ 	/* Set the state to READY by default */
+ 	phydev->state = PHY_READY;
+ 
 -- 
 2.19.2
 
