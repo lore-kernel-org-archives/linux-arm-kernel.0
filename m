@@ -2,63 +2,94 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 94774C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:22:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 61EB4C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:23:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 560C921908
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:22:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2E6EA2175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 13:23:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WZI8XNhB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 560C921908
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YnwjcJ7V";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="rZ7L82Qy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E6EA2175B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9DHN/wzadzZ5TLgSFuElrE0Hgs7AmJ3MkbR+m3SzOTE=; b=WZI8XNhBCAPtBB
-	W1vQ1eYSKUehvAu6CxFwFl45oQGTZombURSMQpNV3ABLKI7tyBs/ROkcSMorrGBlQVp94QaPx4p9e
-	bs1mZ0DGqW/Hge+X8ExGSY9uFKTpceIq59CCJpccrip1N12hrXc2V9sIggM+3KX9J4UobAjczQE1K
-	Brukg0C0dYqROLKyU8/jRRQDuevjjpyYhQ0Tub1C6V9blkIZ0fVMwQY5eOrmsTIBLPFlCADH2xXwk
-	ymeOnb8ai3DFYpt/+sHbFurqpUFRsIJtlnLU7rl/OTUzD27QG4ZaF+FseGIYPS17Z2m+pWikF5own
-	/SpAKAK2vt+zkvQhHrhg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=kTpfzi0gGUlcFeLlBFQwSzqSMznllx2LHuneD0gNieQ=; b=YnwjcJ7V4L+3El
+	fIy6wv+6fCR19+vmzCDCUOQzC2zSg8ofQ3GiiVxE2/7/nqe4Dqef2kubn4NIitpcUL22uZyiiLkhg
+	2XiSFo4jBwvbnDNuFbmfTsfEma7JlwwCXwITdc0L6TY7H1i0YUsGkeima4cuDm1bcHhHHw9uCw3OH
+	YgwHH+aksy0ALphktDOjCpR3NB6brMsug0bpU7uXH7CUwHjJ+HVl0xi/9zxnbUoVn3FaA1fggOy2d
+	8h0XcnZ1fr7gO/1frrqQa3rn9oi+3D7ERznu229QjDpa9wa/7hWXZyAX9a9JR2HmL5sKJDcXkGZkm
+	frmkcWxNFYZFpn2kvLgA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grjdC-0006FV-8J; Thu, 07 Feb 2019 13:22:18 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grja8-00027x-Cr
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 13:19:14 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3024EA78;
- Thu,  7 Feb 2019 05:19:08 -0800 (PST)
-Received: from filthy-habits.cambridge.arm.com
- (filthy-habits.cambridge.arm.com [10.1.196.62])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EE8A63F675;
- Thu,  7 Feb 2019 05:19:05 -0800 (PST)
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: Paolo Bonzini <pbonzini@redhat.com>,
- =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
-Subject: [PATCH 04/11] arm64: KVM: Don't generate UNDEF when LORegion feature
- is present
-Date: Thu,  7 Feb 2019 13:18:36 +0000
-Message-Id: <20190207131843.157210-5-marc.zyngier@arm.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190207131843.157210-1-marc.zyngier@arm.com>
-References: <20190207131843.157210-1-marc.zyngier@arm.com>
+	id 1grjeL-0006WK-PT; Thu, 07 Feb 2019 13:23:29 +0000
+Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1grjeI-0006Vu-Bw
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 13:23:28 +0000
+Received: by mail-lf1-x144.google.com with SMTP id j15so8145426lfh.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 07 Feb 2019 05:23:23 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=nT9U+IqbKKF9Dj69MLkbsXUxdciHE9Xh1cNqb70PjPA=;
+ b=rZ7L82QyToJSwQ96j5EsvjzrLWLxxENblM3mmYGZtPk+BI+7G0lFa9yWYiD+M8waiF
+ 2FUur5querkohBNBBIoABrVtjTT/2PMH/+XTokzwzPiNKpmN+nPrwdrvb9zXQptfvXjI
+ TqPuZYAidxUsPF4G3vWunRjUlXJyBnq9gStiFwHnXqkMZuWQ9QKLTi65iWB8EG7QRU3+
+ 8YQoHlxFMZ0TkJLCGr9PdBzM3l7MO+xMFKCgE3gGKsjgwYPVScN3YLDRg+kZJJzW+AFS
+ iQRo+0Eb320yZ1yNCsYecWUKwNYKkJqC8ZECXVQvktRSfenneY3e1ZMjdEdWUxc6FTpe
+ 164g==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=nT9U+IqbKKF9Dj69MLkbsXUxdciHE9Xh1cNqb70PjPA=;
+ b=lNwc3+e4ItHFoSS2qx8lHAJeOeCuRrc5hwczJ4uTtA/FnxGW1ng8gSvtZFu3bfKh23
+ 2fAgJ0Tb4dvFk4hEuBuRqchW3vNKAIYsc0urv/MhmPWLZHtvIPUVVfFNJU8jU67k1x6b
+ cuBygDLCCC2k40ofWJpwUjBqCCCRN7AtgkeDTRrGosTd2tORmrM4bYUGlI5ahWcSKA0V
+ gdpFzKA38NMVfNwblsv1joEakIWrYCi/BYN1hvyN52z5U0E0WaQqA3/X5NNVJpA0+eX1
+ OWcwW5+C3rID3pVxkx1bk38CeQ3y5kQbf4wOJG46QqOoR+omhQVUJvPQ0GqdNTDJjC5q
+ 338g==
+X-Gm-Message-State: AHQUAuZ2hfAT2OzQSc7gPOHto8rAInKmstSi01GNaM+xUqgg5nVUJbDX
+ +q1vxBRVF1XUchjdaQigmGA=
+X-Google-Smtp-Source: AHgI3IZsHveu/BEZYmxWRXyXYsB32b9LjLdIkUZSickZWtWcnStqoD1r79M/iE58mM7kyoym7H/wDA==
+X-Received: by 2002:a19:4d90:: with SMTP id a138mr9882489lfb.120.1549545802252; 
+ Thu, 07 Feb 2019 05:23:22 -0800 (PST)
+Received: from [192.168.2.145] (ppp91-79-175-49.pppoe.mtu-net.ru.
+ [91.79.175.49]) by smtp.googlemail.com with ESMTPSA id
+ d19-v6sm4281016ljc.37.2019.02.07.05.23.21
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 07 Feb 2019 05:23:21 -0800 (PST)
+Subject: Re: [PATCH 5/5] clk: tegra: add tegra20 automotive init
+To: Kejia Hu <kejia.hu@codethink.co.uk>, linux-tegra@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+References: <20190207125408.8776-1-kejia.hu@codethink.co.uk>
+ <20190207125408.8776-6-kejia.hu@codethink.co.uk>
+From: Dmitry Osipenko <digetx@gmail.com>
+Message-ID: <7f300cd5-2b97-17fb-da06-b212a8fae647@gmail.com>
+Date: Thu, 7 Feb 2019 16:23:19 +0300
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
+In-Reply-To: <20190207125408.8776-6-kejia.hu@codethink.co.uk>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_051909_117851_DE683814 
-X-CRM114-Status: GOOD (  14.04  )
+X-CRM114-CacheID: sfid-20190207_052326_429850_1A25D637 
+X-CRM114-Status: GOOD (  22.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,113 +101,121 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
- kvm@vger.kernel.org, Julien Thierry <julien.thierry@arm.com>,
- Suzuki K Poulose <suzuki.poulose@arm.com>,
- Richard Henderson <richard.henderson@linaro.org>,
- Christoffer Dall <christoffer.dall@arm.com>, James Morse <james.morse@arm.com>,
- Masami Hiramatsu <mhiramat@kernel.org>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Thomas Preston <thomas.preston@codethink.co.uk>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-We currently hide the LORegion feature, and generate an UNDEF
-if the guest dares using the corresponding registers. This is
-a bit extreme, as ARMv8.1 guarantees the feature to be present.
-
-The guest should check the feature register before doing anything,
-but we could also give the guest some slack (read "allow the
-guest to be a bit stupid").
-
-So instead of unconditionnaly deliver an exception, let's
-only do it when the host doesn't support LORegion at all (or
-when the feature has been sanitized out), and treat the registers
-as RAZ/WI otherwise (with the exception of LORID_EL1 being RO).
-
-Fixes: cc33c4e20185 ("arm64/kvm: Prohibit guest LOR accesses")
-Suggested-by: Richard Henderson <richard.henderson@linaro.org>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
----
- arch/arm64/kvm/sys_regs.c | 42 +++++++++++++++++++++++++--------------
- 1 file changed, 27 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index e3e37228ae4e..86096774abcd 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -314,12 +314,29 @@ static bool trap_raz_wi(struct kvm_vcpu *vcpu,
- 		return read_zero(vcpu, p);
- }
- 
--static bool trap_undef(struct kvm_vcpu *vcpu,
--		       struct sys_reg_params *p,
--		       const struct sys_reg_desc *r)
-+/*
-+ * ARMv8.1 mandates at least a trivial LORegion implementation, where all the
-+ * RW registers are RES0 (which we can implement as RAZ/WI). On an ARMv8.0
-+ * system, these registers should UNDEF. LORID_EL1 being a RO register, we
-+ * treat it separately.
-+ */
-+static bool trap_loregion(struct kvm_vcpu *vcpu,
-+			  struct sys_reg_params *p,
-+			  const struct sys_reg_desc *r)
- {
--	kvm_inject_undefined(vcpu);
--	return false;
-+	u64 val = read_sanitised_ftr_reg(SYS_ID_AA64MMFR1_EL1);
-+	u32 sr = sys_reg((u32)r->Op0, (u32)r->Op1,
-+			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
-+
-+	if (!(val & (0xfUL << ID_AA64MMFR1_LOR_SHIFT))) {
-+		kvm_inject_undefined(vcpu);
-+		return false;
-+	}
-+
-+	if (p->is_write && sr == SYS_LORID_EL1)
-+		return write_to_read_only(vcpu, p, r);
-+
-+	return trap_raz_wi(vcpu, p, r);
- }
- 
- static bool trap_oslsr_el1(struct kvm_vcpu *vcpu,
-@@ -1048,11 +1065,6 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
- 		if (val & ptrauth_mask)
- 			kvm_debug("ptrauth unsupported for guests, suppressing\n");
- 		val &= ~ptrauth_mask;
--	} else if (id == SYS_ID_AA64MMFR1_EL1) {
--		if (val & (0xfUL << ID_AA64MMFR1_LOR_SHIFT))
--			kvm_debug("LORegions unsupported for guests, suppressing\n");
--
--		val &= ~(0xfUL << ID_AA64MMFR1_LOR_SHIFT);
- 	}
- 
- 	return val;
-@@ -1338,11 +1350,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ SYS_DESC(SYS_MAIR_EL1), access_vm_reg, reset_unknown, MAIR_EL1 },
- 	{ SYS_DESC(SYS_AMAIR_EL1), access_vm_reg, reset_amair_el1, AMAIR_EL1 },
- 
--	{ SYS_DESC(SYS_LORSA_EL1), trap_undef },
--	{ SYS_DESC(SYS_LOREA_EL1), trap_undef },
--	{ SYS_DESC(SYS_LORN_EL1), trap_undef },
--	{ SYS_DESC(SYS_LORC_EL1), trap_undef },
--	{ SYS_DESC(SYS_LORID_EL1), trap_undef },
-+	{ SYS_DESC(SYS_LORSA_EL1), trap_loregion },
-+	{ SYS_DESC(SYS_LOREA_EL1), trap_loregion },
-+	{ SYS_DESC(SYS_LORN_EL1), trap_loregion },
-+	{ SYS_DESC(SYS_LORC_EL1), trap_loregion },
-+	{ SYS_DESC(SYS_LORID_EL1), trap_loregion },
- 
- 	{ SYS_DESC(SYS_VBAR_EL1), NULL, reset_val, VBAR_EL1, 0 },
- 	{ SYS_DESC(SYS_DISR_EL1), NULL, reset_val, DISR_EL1, 0 },
--- 
-2.20.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+MDcuMDIuMjAxOSAxNTo1NCwgS2VqaWEgSHUg0L/QuNGI0LXRgjoKPiBGcm9tOiBUaG9tYXMgUHJl
+c3RvbiA8dGhvbWFzLnByZXN0b25AY29kZXRoaW5rLmNvLnVrPgo+IAo+IEFkZCBpbnRpYWxpc2F0
+aW9uIGZvciB0aGUgdGVncmEyMCBhdXRvbW90aXZlIHBhcnRzCj4gd2hpY2ggaGF2ZSBkaWZmZXJl
+bnQgaW5pdGlhbGlzYXRpb24gcmVxdWlyZW1lbnRzIHRoYW4KPiB0aGUgdGVncmEyMC4gVGhlc2Ug
+aGF2ZSBiZWVuIGNvcGllZCBmcm9tIHRoZSAyLjYgQlNQCj4gc3VwcGxpZWQgYnkgbnZpZGlhIGZv
+ciB0aGVzZSBwYXJ0cy4KPiAKPiBTaWduZWQtb2ZmLWJ5OiBUaG9tYXMgUHJlc3RvbiA8dGhvbWFz
+LnByZXN0b25AY29kZXRoaW5rLmNvLnVrPgo+IFNpZ25lZC1vZmYtYnk6IEtlamlhIEh1IDxrZWpp
+YS5odUBjb2RldGhpbmsuY28udWs+Cj4gLS0tCj4gIGRyaXZlcnMvY2xrL3RlZ3JhL2Nsay10ZWdy
+YTIwLmMgfCA3OCArKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKystLQo+ICAx
+IGZpbGUgY2hhbmdlZCwgNzYgaW5zZXJ0aW9ucygrKSwgMiBkZWxldGlvbnMoLSkKPiAKPiBkaWZm
+IC0tZ2l0IGEvZHJpdmVycy9jbGsvdGVncmEvY2xrLXRlZ3JhMjAuYyBiL2RyaXZlcnMvY2xrL3Rl
+Z3JhL2Nsay10ZWdyYTIwLmMKPiBpbmRleCBjNzFiNjExNjJhMzIuLjFiOGM3ZDQwZmQ1NSAxMDA2
+NDQKPiAtLS0gYS9kcml2ZXJzL2Nsay90ZWdyYS9jbGstdGVncmEyMC5jCj4gKysrIGIvZHJpdmVy
+cy9jbGsvdGVncmEvY2xrLXRlZ3JhMjAuYwo+IEBAIC0yMiw2ICsyMiw3IEBACj4gICNpbmNsdWRl
+IDxsaW51eC9jbGsvdGVncmEuaD4KPiAgI2luY2x1ZGUgPGxpbnV4L2RlbGF5Lmg+Cj4gICNpbmNs
+dWRlIDxkdC1iaW5kaW5ncy9jbG9jay90ZWdyYTIwLWNhci5oPgo+ICsjaW5jbHVkZSA8c29jL3Rl
+Z3JhL2NvbW1vbi5oPgo+ICAKPiAgI2luY2x1ZGUgImNsay5oIgo+ICAjaW5jbHVkZSAiY2xrLWlk
+LmgiCj4gQEAgLTUzNCw3ICs1MzUsNyBAQCBzdGF0aWMgc3RydWN0IHRlZ3JhX2NsayB0ZWdyYTIw
+X2Nsa3NbdGVncmFfY2xrX21heF0gX19pbml0ZGF0YSA9IHsKPiAgCVt0ZWdyYV9jbGtfc2RtbWM0
+XSA9IHsgLmR0X2lkID0gVEVHUkEyMF9DTEtfU0RNTUM0LCAucHJlc2VudCA9IHRydWUgfSwKPiAg
+CVt0ZWdyYV9jbGtfbGFdID0geyAuZHRfaWQgPSBURUdSQTIwX0NMS19MQSwgLnByZXNlbnQgPSB0
+cnVlIH0sCj4gIAlbdGVncmFfY2xrX2NzaXRlXSA9IHsgLmR0X2lkID0gVEVHUkEyMF9DTEtfQ1NJ
+VEUsIC5wcmVzZW50ID0gdHJ1ZSB9LAo+IC0JW3RlZ3JhX2Nsa192ZmlyXSA9IHsgLmR0X2lkID0g
+VEVHUkEyMF9DTEtfVkZJUiwgLnByZXNlbnQgPSB0cnVlIH0sCj4gKwlbdGVncmFfY2xrX3ZmaXJd
+ID0geyAuZHRfaWQgPSBURUdSQTIwX0NMS19WRklSLCAucHJlc2VudCA9IGZhbHNlIH0sCj4gIAlb
+dGVncmFfY2xrX21pcGldID0geyAuZHRfaWQgPSBURUdSQTIwX0NMS19NSVBJLCAucHJlc2VudCA9
+IHRydWUgfSwKPiAgCVt0ZWdyYV9jbGtfbm9yXSA9IHsgLmR0X2lkID0gVEVHUkEyMF9DTEtfTk9S
+LCAucHJlc2VudCA9IHRydWUgfSwKPiAgCVt0ZWdyYV9jbGtfcnRjXSA9IHsgLmR0X2lkID0gVEVH
+UkEyMF9DTEtfUlRDLCAucHJlc2VudCA9IHRydWUgfSwKPiBAQCAtMTA5MSw5ICsxMDkyLDgyIEBA
+IHN0YXRpYyBzdHJ1Y3QgdGVncmFfY2xrX2luaXRfdGFibGUgaW5pdF90YWJsZVtdIF9faW5pdGRh
+dGEgPSB7Cj4gIAl7IFRFR1JBMjBfQ0xLX0NMS19NQVgsIFRFR1JBMjBfQ0xLX0NMS19NQVgsIDAs
+IDAgfSwKPiAgfTsKPiAgCj4gKy8qIFRlZ3JhMjAgYXV0b21vdGl2ZSBwYXJ0IGluaXRpYWxpc2F0
+aW9uIHRhYmxlLgo+ICsgKgo+ICsgKiBUaGVzZSB2YWx1ZXMgaGF2ZSBiZWVuIGRlcml2ZWQgZnJv
+bSB0aGUgTnZpZGlhIHN1cHBsaWVkIEJTUCBmb3IgdGhlaXIKPiArICogYXV0b21vdGl2ZSBwYXJ0
+cy4KPiArICovCj4gKwo+ICtzdGF0aWMgc3RydWN0IHRlZ3JhX2Nsa19pbml0X3RhYmxlIGluaXRf
+dGFibGVfdDIwYVtdIF9faW5pdGRhdGEgPSB7Cj4gKwl7VEVHUkEyMF9DTEtfUExMX1AsIFRFR1JB
+MjBfQ0xLX0NMS19NQVgsIDIxNjAwMDAwMCwgMX0sCj4gKwl7VEVHUkEyMF9DTEtfUExMX1BfT1VU
+MSwgVEVHUkEyMF9DTEtfQ0xLX01BWCwgMjg4MDAwMDAsIDF9LAo+ICsJe1RFR1JBMjBfQ0xLX1BM
+TF9QX09VVDIsIFRFR1JBMjBfQ0xLX0NMS19NQVgsIDQ4MDAwMDAwLCAxfSwKPiArCXtURUdSQTIw
+X0NMS19QTExfUF9PVVQzLCBURUdSQTIwX0NMS19DTEtfTUFYLCA3MjAwMDAwMCwgMX0sCj4gKwl7
+VEVHUkEyMF9DTEtfUExMX1BfT1VUNCwgVEVHUkEyMF9DTEtfQ0xLX01BWCwgMjQwMDAwMDAwLCAx
+fSwKPiArCXtURUdSQTIwX0NMS19QTExfTSwgVEVHUkEyMF9DTEtfQ0xLX01BWCwgNjY2MDAwMDAw
+LCAxIH0sCj4gKwl7VEVHUkEyMF9DTEtfUExMX01fT1VUMSwgVEVHUkEyMF9DTEtfQ0xLX01BWCwg
+MjY2NDAwMDAwLCAxIH0sCj4gKwl7VEVHUkEyMF9DTEtfUExMX0MsIFRFR1JBMjBfQ0xLX0NMS19N
+QVgsIDYwMDAwMDAwMCwgMX0sCj4gKwl7VEVHUkEyMF9DTEtfUExMX0NfT1VUMSwgVEVHUkEyMF9D
+TEtfQ0xLX01BWCwgMjQwMDAwMDAwLCAxfSwKPiArCXtURUdSQTIwX0NMS19TQ0xLLCBURUdSQTIw
+X0NMS19QTExfQ19PVVQxLCAwLCAxfSwKPiArCXtURUdSQTIwX0NMS19IQ0xLLCBURUdSQTIwX0NM
+S19DTEtfTUFYLCAwLCAxfSwKPiArCXtURUdSQTIwX0NMS19QQ0xLLCBURUdSQTIwX0NMS19DTEtf
+TUFYLCAxMjAwMDAwMDAsIDF9LAo+ICsJe1RFR1JBMjBfQ0xLX0NTSVRFLCBURUdSQTIwX0NMS19D
+TEtfTUFYLCAwLCAxfSwKPiArCXtURUdSQTIwX0NMS19FTUMsIFRFR1JBMjBfQ0xLX0NMS19NQVgs
+IDAsIDF9LAo+ICsJe1RFR1JBMjBfQ0xLX1BMTF9ELCBURUdSQTIwX0NMS19DTEtfTUFYLCA1OTQw
+MDAwMDAsIDF9LAo+ICsJe1RFR1JBMjBfQ0xLX1BMTF9EX09VVDAsIFRFR1JBMjBfQ0xLX0NMS19N
+QVgsIDU5NDAwMDAwMC8yLCAxfSwKPiArCXtURUdSQTIwX0NMS19DQ0xLLCBURUdSQTIwX0NMS19D
+TEtfTUFYLCAwLCAxfSwKPiArCXtURUdSQTIwX0NMS19VQVJUQSwgVEVHUkEyMF9DTEtfUExMX1As
+IDAsIDB9LAo+ICsJe1RFR1JBMjBfQ0xLX1VBUlRCLCBURUdSQTIwX0NMS19QTExfUCwgMjE2MDAw
+MDAwLCAxfSwKPiArCXtURUdSQTIwX0NMS19VQVJUQywgVEVHUkEyMF9DTEtfUExMX1AsIDAsIDB9
+LAo+ICsJe1RFR1JBMjBfQ0xLX1VBUlRELCBURUdSQTIwX0NMS19QTExfUCwgMCwgMH0sCj4gKwl7
+VEVHUkEyMF9DTEtfVUFSVEUsIFRFR1JBMjBfQ0xLX1BMTF9QLCAwLCAwfSwKPiArCXtURUdSQTIw
+X0NMS19QTExfQSwgVEVHUkEyMF9DTEtfQ0xLX01BWCwgNTY0NDgwMDAsIDF9LAo+ICsJe1RFR1JB
+MjBfQ0xLX1BMTF9BX09VVDAsIFRFR1JBMjBfQ0xLX0NMS19NQVgsIDExMjg5NjAwLCAxfSwKPiAr
+CXtURUdSQTIwX0NMS19CTElOSywgVEVHUkEyMF9DTEtfQ0xLX01BWCwgMzI3NjgsIDB9LAo+ICsJ
+e1RFR1JBMjBfQ0xLX0kyUzEsIFRFR1JBMjBfQ0xLX1BMTF9BX09VVDAsIDExMjg5NjAwLCAwfSwK
+PiArCXtURUdSQTIwX0NMS19JMlMyLCBURUdSQTIwX0NMS19QTExfQV9PVVQwLCAxMTI4OTYwMCwg
+MH0sCj4gKwl7VEVHUkEyMF9DTEtfU0RNTUMxLCBURUdSQTIwX0NMS19QTExfUCwgNDgwMDAwMDAs
+IDB9LAo+ICsJe1RFR1JBMjBfQ0xLX1NETU1DMywgVEVHUkEyMF9DTEtfUExMX1AsIDQ4MDAwMDAw
+LCAwfSwKPiArCXtURUdSQTIwX0NMS19TRE1NQzQsIFRFR1JBMjBfQ0xLX1BMTF9QLCA0ODAwMDAw
+MCwgMH0sCj4gKwl7VEVHUkEyMF9DTEtfU1BJLCBURUdSQTIwX0NMS19QTExfUCwgMjAwMDAwMDAs
+IDB9LAo+ICsJe1RFR1JBMjBfQ0xLX05PUiwgVEVHUkEyMF9DTEtfUExMX1AsIDg2NTAwMDAwLCAw
+fSwKPiArCXtURUdSQTIwX0NMS19TQkMxLCBURUdSQTIwX0NMS19QTExfQywgMTIwMDAwMDAsIDB9
+LAo+ICsJe1RFR1JBMjBfQ0xLX1NCQzIsIFRFR1JBMjBfQ0xLX1BMTF9DLCAxMjAwMDAwMCwgMH0s
+Cj4gKwl7VEVHUkEyMF9DTEtfU0JDMywgVEVHUkEyMF9DTEtfUExMX0MsIDEyMDAwMDAwLCAwfSwK
+PiArCXtURUdSQTIwX0NMS19TQkM0LCBURUdSQTIwX0NMS19QTExfQywgMTIwMDAwMDAsIDB9LAo+
+ICsJe1RFR1JBMjBfQ0xLX0hPU1QxWCwgVEVHUkEyMF9DTEtfUExMX00sIDI2NjQwMDAwMCwgMX0s
+Cj4gKwl7VEVHUkEyMF9DTEtfQ1NVUywgVEVHUkEyMF9DTEtfQ0xLX01BWCwgMTIwMDAwMDAsIDF9
+LAo+ICsJe1RFR1JBMjBfQ0xLX0RJU1AxLCBURUdSQTIwX0NMS19QTExfRF9PVVQwLCAyOTcwMDAw
+MDAsIDEsIH0sICAgIC8qIGRpc3AxIGZyb20gcGxsX2QgKG5vIGRpdikgKi8KPiArCXtURUdSQTIw
+X0NMS19HUjJELCBURUdSQTIwX0NMS19DTEtfTUFYLCAzMDAwMDAwMDAsIDF9LAo+ICsJe1RFR1JB
+MjBfQ0xLX0dSM0QsIFRFR1JBMjBfQ0xLX0NMS19NQVgsIDMwMDAwMDAwMCwgMX0sCj4gKwl7VEVH
+UkEyMF9DTEtfVkksIFRFR1JBMjBfQ0xLX1BMTF9NLCAxMTEwMDAwMDAsIDEgfSwKPiArCXtURUdS
+QTIwX0NMS19WSV9TRU5TT1IsIFRFR1JBMjBfQ0xLX1BMTF9NLCAxMTEwMDAwMDAsIDEgfSwKPiAr
+CXtURUdSQTIwX0NMS19JMkMxLCBURUdSQTIwX0NMS19QTExfUCwgMzAwMDAwMCwgMCB9LAo+ICsJ
+e1RFR1JBMjBfQ0xLX0kyQzIsIFRFR1JBMjBfQ0xLX1BMTF9QLCAzMDAwMDAwLCAwIH0sCj4gKwl7
+VEVHUkEyMF9DTEtfSTJDMywgVEVHUkEyMF9DTEtfUExMX1AsIDMwMDAwMDAsIDAgfSwKPiArCXtU
+RUdSQTIwX0NMS19EVkMsIFRFR1JBMjBfQ0xLX1BMTF9QLCAzMDAwMDAwLCAwIH0sCj4gKwl7VEVH
+UkEyMF9DTEtfUFdNLCBURUdSQTIwX0NMS19DTEtfMzJLLCAzMjc2OCwgMCB9LAo+ICsJe1RFR1JB
+MjBfQ0xLX0VQUCwgVEVHUkEyMF9DTEtfUExMX00sIDI2NjQwMDAwMCwgMSB9LAo+ICsJe1RFR1JB
+MjBfQ0xLX01QRSwgVEVHUkEyMF9DTEtfUExMX0MsIDMwMDAwMDAwMCwgMX0sCj4gKwl7VEVHUkEy
+MF9DTEtfTkRGTEFTSCwgVEVHUkEyMF9DTEtfUExMX1AsIDg2NTAwMDAwLCAxIH0sCj4gKwl7VEVH
+UkEyMF9DTEtfVkRFLCBURUdSQTIwX0NMS19QTExfQywgMzAwMDAwMDAwLCAwIH0sCj4gKwl7VEVH
+UkEyMF9DTEtfU1BESUZfSU4sIFRFR1JBMjBfQ0xLX1BMTF9NLCAyMjIwMDAwMCwgMCB9LAo+ICsJ
+e1RFR1JBMjBfQ0xLX1NQRElGX09VVCwgVEVHUkEyMF9DTEtfUExMX0FfT1VUMCwgNTY0NDgwMCwg
+MCB9LAo+ICsJe1RFR1JBMjBfQ0xLX1BMTF9FLCBURUdSQTIwX0NMS19DTEtfTUFYLCAxMjAwMDAw
+MDAwLCAwIH0sCj4gKwl7VEVHUkEyMF9DTEtfQ0xLX01BWCwgVEVHUkEyMF9DTEtfQ0xLX01BWCwg
+MCwgMH0sIC8qIFRoaXMgTVVTVCBiZSB0aGUgbGFzdCBlbnRyeSAqLwo+ICt9Owo+ICsKPiArCj4g
+IHN0YXRpYyB2b2lkIF9faW5pdCB0ZWdyYTIwX2Nsb2NrX2FwcGx5X2luaXRfdGFibGUodm9pZCkK
+PiAgewo+IC0JdGVncmFfaW5pdF9mcm9tX3RhYmxlKGluaXRfdGFibGUsIGNsa3MsIFRFR1JBMjBf
+Q0xLX0NMS19NQVgpOwo+ICsJc3RydWN0IHRlZ3JhX2Nsa19pbml0X3RhYmxlICp0YWJsZSA9IGlu
+aXRfdGFibGU7Cj4gKwo+ICsJaWYgKHNvY19pc190ZWdyYV9hdXRvKCkpIHsKPiArCQlwcl9pbmZv
+KCJJbml0aWFsaXNlIFRlZ3JhIEF1dG9tb3RpdmUgY2xvY2tzXG4iKTsKPiArCQl0YWJsZSA9IGlu
+aXRfdGFibGVfdDIwYTsKPiArCX0KPiArCj4gKwl0ZWdyYV9pbml0X2Zyb21fdGFibGUodGFibGUs
+IGNsa3MsIFRFR1JBMjBfQ0xLX0NMS19NQVgpOwo+ICB9Cj4gIAo+ICAvKgo+IAoKSGksIAoKUXVp
+Y2sgY29tbWVudC4uIHRoaXMgYWxsIGxvb2tzIHZlcnkgZ2VuZXJpYyBhbmQgbXVjaCBtb3JlIGJv
+YXJkLXNwZWNpZmljIHRoYW4gYXV0b21vdGl2ZS4gTm93YWRheXMgZGV2aWNlLXRyZWUgaGFzIHN1
+cHBvcnQgZm9yIHNwZWNpZnlpbmcgY2xvY2sgcGFyZW50cyBhbmQgcmF0ZXMgcGVyIGJvYXJkIERU
+LCBzZWUgIkFzc2lnbmVkIGNsb2NrIHBhcmVudHMgYW5kIHJhdGVzIiBvZiBbMF0uIEhlbmNlIGl0
+IGxvb2tzIGxpa2UgdGhlcmUgaXMgbm8gcmVhbCBuZWVkIHRvIGhhcmRjb2RlIHRob3NlIHZhbHVl
+cyBpbiB0aGUgZHJpdmVyLiBQbGVhc2UgdGFrZSBhIGxvb2sgYXQgdGhlIGFzc2lnbmVkLWNsb2Nr
+cy4KClswXSBodHRwczovL3d3dy5rZXJuZWwub3JnL2RvYy9Eb2N1bWVudGF0aW9uL2RldmljZXRy
+ZWUvYmluZGluZ3MvY2xvY2svY2xvY2stYmluZGluZ3MudHh0CgpfX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlz
+dApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJh
+ZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
