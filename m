@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 933C1C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 03:08:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 95298C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 03:24:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6095E217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 03:08:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4B263218FE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 03:24:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CxjrctAC";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="K4LnwqpL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6095E217F9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J93vSyQC";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="BFNfuLOP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B263218FE
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,65 +25,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
 	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wvmywUCN3E/+dK784WQ2JP4wbpRa/+xbFxL4LrQnPvY=; b=CxjrctACzG0seI
-	lFt48nAxkVbhxK8q0dRQnPUCLlsmsMd5Y58uXqW2p8W4/2LhBzC6rylCMa61U/F88ahGAcMl0E2YD
-	HPkxAyqXoD54z6ZXApQ7c4l+k8fdSmkt9Yu6ulVYXJLpgaNrR3BstBOyqQUtUaBQsZjwUiZSKaJxr
-	Cl6aM0DvF09lBXcx0F9EjoYzYfYQ//fj/Iy00msyZ82MuBeiwui8y3EsSxmT3QT++tklKr+uuvi8L
-	FfmscH5wb26/Wu2Xu17DGiEMAT0M4MCjuqFA6sLA7hb2j8+MtQ88cyqvYvxwcN1g82J/jxmPC1HQX
-	qnyu0O92y+y6Ii4CORGw==;
+	List-Owner; bh=qyyOr3kkgFyuZMVF+zIijwf4JJqE8vYXrTbhAwIBI20=; b=J93vSyQCZZ4Zy3
+	s7YnQyHXZLzUjykA8wtx0GmJv3ZQxDH/Y4sYyZGj7r2sJXrU2el/x19oS3c8F/vIUqSQ6djKnbgOO
+	JvZs/Xg/od+2KfqJ3P+8M2Yzfv/kKkfR9RNnB6TTQqTdLeZhKnFJgFOcWAbthB71dMMSr1yoZEUaO
+	bPN6uvmYH5nXQb5Daom/owLb7TxbFe4bXp4FfwmVNkTWFTI0KNKB8jVHzLvNh1EgCtAL8svG/ctmO
+	4DsipNd1cQyM18AiSQphFA8b7pQUDqoIk4VokuucbK3fQL4r8AHNb+WZQRZZfD9TsGFm9qgWwXeIX
+	bq92yNtEl1sSbZZzKTqA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gra3H-0003Z5-Cd; Thu, 07 Feb 2019 03:08:35 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
+	id 1graIC-0008IA-Mp; Thu, 07 Feb 2019 03:24:00 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gra3E-0003YU-Nj
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 03:08:33 +0000
-Received: by mail-pf1-x441.google.com with SMTP id w73so4104872pfk.10
+ id 1graI8-0008Gq-K4
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 03:23:57 +0000
+Received: by mail-pl1-x644.google.com with SMTP id a14so4126437plm.12
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 06 Feb 2019 19:08:32 -0800 (PST)
+ Wed, 06 Feb 2019 19:23:55 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:in-reply-to:references:date:message-id
- :mime-version; bh=bjV0pff0+Yorv72/l3DDEcnxgGGPgV5xTdNHYgPwYFE=;
- b=K4LnwqpL6tzwKU4ZPpvlqSm1yFcsKqzT2cDka9owHlzN2RqWzelCEYr3m3paVrufpg
- F4a81ac7cUy6Bk1fJJJ7uZQO2EdEV0BoMEtbhcI6HMq5s0UWw5XRLxtWaG5+9y/mIFUv
- k8kOsBDxa4kklUgf9EZRSQPWL1aHNgapHz79+dSmgn2/3s8ZoxUadWhbW7lgOtleaq/f
- OqJBEY4D0u2WA+rGjP3VTMxmfZbb4wugWu6acBXvUwuWhFrUFsx+z5QosEvH9MbqP7PG
- 41gNNaZxvFk7tHMf/Kt2EaKA0k4TyMVMs6KEtnm2WtUZn5Mvevwz8hJ9snrN/IYT7KbZ
- UFJg==
+ :mime-version; bh=wgMLZtwbxS9Z4PMvknmxQ2RRO/mBgmvoLu3T0GddWLs=;
+ b=BFNfuLOPpEVH0BDElhJ2FAyxVIWfcgPnbEtcK7Oomy7/5m0TiqFnBIU0mfaVIDjLi6
+ SSqVW9ycop/cD8I0KsRZnRYuNZvnN4st5HheWG92DRCttgmmFR18OrVj6F1wtl/Hi247
+ n9hAH5KNcaXZeaYuvyWammk3sBh7VoHy+2SnhX6sc4HCXASXeaIdNJx8wLznnuwzmuUH
+ d8+/xuPBk1rDDF67aSwkzM9hiG4Kk7hrAdnbMDL6cYRe6B0KZt+hBM5o74YuBiMBup0c
+ bqxWkMU9CKyrSWgMomYtUeaPlHaQ4zoF3N+6hNEXmnsg27Gl1y518ZNu0bbe+yAMhwPv
+ N9tw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
  :message-id:mime-version;
- bh=bjV0pff0+Yorv72/l3DDEcnxgGGPgV5xTdNHYgPwYFE=;
- b=mXunx4X1uDY9/c8aPXV9Ts4fYwNvoBOKk9tC6uF9OGaZhYk4/DrUiEym32j7zcG1Ut
- vVKjbUgtBvur2JQnWmPyCae5f21SA30N7yo0FFJWHELI7YfOYA4SBF7M08HJfLa64SQD
- E4db73jgqsx/UfwTUHTKSW6aifLZQwoQPY+9wL0bA6/DeVnZiwVMNzlQ4mm9UYb23lwK
- YqZ5hsmpxwry4K/+kbdaGhRDGjGCIm3LRxlyQ/3ox/eCsLLWbhL2BwXzl4tsO+/BwnTu
- NDSY5o9tOPtRKlsDRrz9CwPOFi1WiMN0ocUYwJ2dq5TtrTlGY/e5MxflBVQqUkhu9IhM
- hj0w==
-X-Gm-Message-State: AHQUAuZj+9y2QP8sBdbxS6xMynKYcG9UBsEwaZn/1fr/BmA1wEq8FQZt
- L+KLEvFtO68pw4TpLLO5jAwBGA==
-X-Google-Smtp-Source: AHgI3IagxwSg3I87aQnZ4KoOTdbI3Nt3Ewl+l409hzNH/tn8WUnTA+wOxbRVBd3r3RZLtGbv/J9dOA==
-X-Received: by 2002:a62:1e87:: with SMTP id
- e129mr13798221pfe.221.1549508911915; 
- Wed, 06 Feb 2019 19:08:31 -0800 (PST)
+ bh=wgMLZtwbxS9Z4PMvknmxQ2RRO/mBgmvoLu3T0GddWLs=;
+ b=uPM3xyJWQSRAtrqo7rfmqEBRWMcc8m1gfTrVR6/H8iSoqXIagB8fA1B7TlsarKETrA
+ adYU+YkcEygxXKOpPrOZZVTq3kGjTU2ZJoPphdSoCSPipQJ5+uxhSpOfryjgPkWh0iHW
+ Jivc6sqMvf6YdRR8yd4i4Gnc8R9kspTm/stOHOktCnyuCA2rxryQiTkpSFNqtfPkpWQp
+ 8Y58CDX4v8NXD2PW2TMiWsFfTujfqHEd85fgcvcIYIN0O3+FGu5ouNLvI7KHypcu7+8i
+ foHoIQ8BJrKkERQ28m0Busi4Qrm9Ul4eb0SC6uDvSOIDVOLpiWUNbYY7chToz632gXy0
+ 7gBA==
+X-Gm-Message-State: AHQUAub0R3cs4tjQ66H0dIsHyhV5qsz/q38Icd5bckT0ULI21vak0OxG
+ eA0dfgXSvOySDH6LYL5MhtOKvg==
+X-Google-Smtp-Source: AHgI3IbSz0/OUlXHq1X8d1l7V6vht4CARVIl0WrRPaAxws7Kyb00C5LYas8twBs6xF7WOObcMFlvZg==
+X-Received: by 2002:a17:902:24d:: with SMTP id
+ 71mr13857459plc.225.1549509834989; 
+ Wed, 06 Feb 2019 19:23:54 -0800 (PST)
 Received: from localhost ([2601:602:9200:a1a5:1818:ce94:f47:7c12])
- by smtp.googlemail.com with ESMTPSA id a10sm9303427pfi.138.2019.02.06.19.08.30
+ by smtp.googlemail.com with ESMTPSA id
+ i72sm11363785pfe.181.2019.02.06.19.23.54
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 06 Feb 2019 19:08:31 -0800 (PST)
+ Wed, 06 Feb 2019 19:23:54 -0800 (PST)
 From: Kevin Hilman <khilman@baylibre.com>
-To: Jerome Brunet <jbrunet@baylibre.com>,
- Philipp Zabel <p.zabel@pengutronix.de>
-Subject: Re: [PATCH v3] dt-bindings: reset: meson: add g12a bindings
-In-Reply-To: <20190201125003.25022-1-jbrunet@baylibre.com>
-References: <20190201125003.25022-1-jbrunet@baylibre.com>
-Date: Wed, 06 Feb 2019 19:08:30 -0800
-Message-ID: <7h8sysi9ch.fsf@baylibre.com>
+To: Jerome Brunet <jbrunet@baylibre.com>
+Subject: Re: [PATCH v2] arm64: dts: meson: fix g12a buses
+In-Reply-To: <20190201133732.32169-1-jbrunet@baylibre.com>
+References: <20190201133732.32169-1-jbrunet@baylibre.com>
+Date: Wed, 06 Feb 2019 19:23:31 -0800
+Message-ID: <7h5ztwi8ng.fsf@baylibre.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_190832_791714_1D99818A 
-X-CRM114-Status: UNSURE (   6.97  )
+X-CRM114-CacheID: sfid-20190206_192356_656642_E9B3E863 
+X-CRM114-Status: UNSURE (   7.15  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -96,7 +96,7 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Neil Armstrong <narmstrong@baylibre.com>,
+Cc: devicetree@vger.kernel.org, Jianxin Pan <jianxin.pan@amlogic.com>,
  linux-kernel@vger.kernel.org, linux-amlogic@lists.infradead.org,
  linux-arm-kernel@lists.infradead.org, Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
@@ -106,12 +106,16 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 Jerome Brunet <jbrunet@baylibre.com> writes:
 
-> Add device tree bindings for the reset controller of g12a SoC family.
+> Fix apb, cbus, hiu and periph regions which are not aligned
+> with the documentation and the information provided by Amlogic
 >
-> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+> Fixes: 9c8c52f7cb4f ("arm64: dts: meson-g12a: add initial g12a s905d2 SoC DT support")
+> Cc: Jianxin Pan <jianxin.pan@amlogic.com>
 > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 
-Acked-by: Kevin Hilman <khilman@baylibre.com>
+Queued for v5.1 (branch: v5.1/dt64)
+
+Kevin
 
 _______________________________________________
 linux-arm-kernel mailing list
