@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6AB91C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:48:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 24697C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:48:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3B6CB2075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:48:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DB34421872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 09:48:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SjUuU7Ky";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="YyC8He12"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B6CB2075C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lfsUcVxR";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="aEEl25PQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB34421872
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,44 +26,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=k7KIjJP8Evw43WsQHIWeS4FraXqaURiNVAWwoc+zb0k=; b=SjUuU7KySmxJBL
-	muz6Sgrg20UT4PFVwhPuYG7vfCPFZw+mCsfXF54w5BcolkmdvYURvGuNbZXUjM0JQpBgk0JmNWVTL
-	CO87uHPxrphwrOEQ49E32OXCqyB7WP3nrew1s9G1Y47E5XTGztfBJDVc6n6CtwBjoKvMqSOBwRIVy
-	m64JTgAMEKEcOG2bMiPMvBgfubK7ZbYS5PSQ71J7yCtG9OGtog/ZBmCtIk+RXIBTiBfRE2hS6A1IR
-	bQzr2Kz8UmnjC3kbNPPp8vXG3wlKhKX+t7GcC8RK/VTA/tGUyLL7efYv7lUULYTOBtA0srl3MI4vF
-	NpJTwN/Y4C0e1Mca+tnA==;
+	List-Owner; bh=QROpFFE5LtJc6kOw/PCMzLil7q7++Tm0hpda3UDxl98=; b=lfsUcVxRVmM514
+	xmm6/PheutjaKKdq9+p3xBfzoInzCSTIIqBdUcsqOH9czuirN0UtiD2VhmjcahZ88NU0JAyQH5CLm
+	L9tU1p9ilg1Uqh25rg4B6ogyHcLli+Encqlpp3tM+HSTaYP6WX1cZaOos0JL40HAVmL8HX0SKhktq
+	eHc2l/sUFg2mQ6e2nU0uzKrKHRp/Zu0JnxVHKKX3VcU9znnkHx2VVKRrACnq7GmSOhXIcnQvsckA/
+	l+qUiy6J8gCz+czZ57OtBrXXORY5U7JVqlGGnE6t+KZFT38F5kqI2gra8ldV7h7p4DXskW89bB6Rz
+	G0TIPX+5sePOoXtgT+0Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grgHm-0003t8-Uu; Thu, 07 Feb 2019 09:47:59 +0000
+	id 1grgI4-0004CY-0h; Thu, 07 Feb 2019 09:48:16 +0000
 Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grgGt-00031n-HR
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:47:06 +0000
+ id 1grgGq-0002zy-EL
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 09:47:07 +0000
 Received: from zyt.lan (unknown [IPv6:2a02:169:34b6:0:5054:ff:fe4f:85bd])
- by mail.kmu-office.ch (Postfix) with ESMTPSA id 304D75C2080;
- Thu,  7 Feb 2019 10:46:56 +0100 (CET)
+ by mail.kmu-office.ch (Postfix) with ESMTPSA id C6A155C1C93;
+ Thu,  7 Feb 2019 10:46:55 +0100 (CET)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
- t=1549532816;
+ t=1549532815;
  h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
  to:to:cc:cc:mime-version:mime-version:content-type:
  content-transfer-encoding:content-transfer-encoding:
  in-reply-to:in-reply-to:references:references;
- bh=9wFJ9ATYCTctc0PTg1OV7FRoxmu9QOfiUozfNp6Jfco=;
- b=YyC8He12CM9ZDutLSSGt6M3lwoEfZIkOACzHR8YHo+j/ji3YRYFYMLJ7leVBVj5tdG04/3
- Os+ZtnAJe44KCBeBxTXx3o+0KbgQg6iZpmUUN9XBhNONGZBT7SG7RvjAyjG/S3uoCiEYnQ
- xQWB2xyluPh/O/XymOvmYdYk9HkJa4E=
+ bh=tCLBmaTR71ESXFFla8753iRBL+0oC+zULExKyNHdSxI=;
+ b=aEEl25PQ38cbkLrxoHe/LFhNjA/ohffZIGLODN5N5yBAic0iXwhdJuup+I/atXq96dXFoz
+ XBHJYEPySgOqO61Zr/yJhT0S2IVRe72rUaWqUXZi2rN63bXbcrbwe+miyUuWdGqUnC7OIQ
+ +pdO3d20sgVMYtSjAS0ldUZwS+5DX1A=
 From: Stefan Agner <stefan@agner.ch>
 To: linux@armlinux.org.uk
-Subject: [PATCH 5/5] ARM: warn if divided syntax assembler is used
-Date: Thu,  7 Feb 2019 10:48:29 +0100
-Message-Id: <c44f25a2d9e2f64fe41d910b09868c0f6ec3a3c9.1549532513.git.stefan@agner.ch>
+Subject: [PATCH 1/5] ARM: use unified assembler in macros
+Date: Thu,  7 Feb 2019 10:48:25 +0100
+Message-Id: <5b710816f634307d6a67ffcf7e4b538818dcb2a3.1549532513.git.stefan@agner.ch>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <cover.1549532513.git.stefan@agner.ch>
 References: <cover.1549532513.git.stefan@agner.ch>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_014703_982030_3D430621 
-X-CRM114-Status: GOOD (  10.00  )
+X-CRM114-CacheID: sfid-20190207_014700_701026_14387439 
+X-CRM114-Status: GOOD (  12.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,28 +85,65 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Remove the -mno-warn-deprecated assembler flag to make sure the GNU
-assembler warns in case non-unified syntax is used.
+Use unified assembler syntax (UAL) in macros. Divided syntax is
+considered depricated. This will also allow to build the kernel
+using LLVM's integrated assembler.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/Makefile | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/lib/copy_from_user.S | 2 +-
+ arch/arm/lib/copy_to_user.S   | 2 +-
+ arch/arm/lib/memcpy.S         | 4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index a0d08a3c9d33..811498e16673 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -112,9 +112,6 @@ ifeq ($(CONFIG_ARM_UNWIND),y)
- CFLAGS_ABI	+=-funwind-tables
- endif
+diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
+index 0d4c189c7f4f..712ca399f559 100644
+--- a/arch/arm/lib/copy_from_user.S
++++ b/arch/arm/lib/copy_from_user.S
+@@ -91,7 +91,7 @@
+ 	.endm
  
--# Accept old syntax despite ".syntax unified"
--AFLAGS_NOWARN	:=$(call as-option,-Wa$(comma)-mno-warn-deprecated,-Wa$(comma)-W)
--
- ifeq ($(CONFIG_THUMB2_KERNEL),y)
- AFLAGS_AUTOIT	:=$(call as-option,-Wa$(comma)-mimplicit-it=always,-Wa$(comma)-mauto-it)
- CFLAGS_ISA	:=-mthumb $(AFLAGS_AUTOIT) $(AFLAGS_NOWARN)
+ 	.macro str1b ptr reg cond=al abort
+-	str\cond\()b \reg, [\ptr], #1
++	strb\cond\() \reg, [\ptr], #1
+ 	.endm
+ 
+ 	.macro enter reg1 reg2
+diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
+index 97a6ff4b7e3c..2e402b815e13 100644
+--- a/arch/arm/lib/copy_to_user.S
++++ b/arch/arm/lib/copy_to_user.S
+@@ -49,7 +49,7 @@
+ 	.endm
+ 
+ 	.macro ldr1b ptr reg cond=al abort
+-	ldr\cond\()b \reg, [\ptr], #1
++	ldrb\cond\() \reg, [\ptr], #1
+ 	.endm
+ 
+ #ifdef CONFIG_CPU_USE_DOMAINS
+diff --git a/arch/arm/lib/memcpy.S b/arch/arm/lib/memcpy.S
+index 64111bd4440b..1c9e625148ca 100644
+--- a/arch/arm/lib/memcpy.S
++++ b/arch/arm/lib/memcpy.S
+@@ -30,7 +30,7 @@
+ 	.endm
+ 
+ 	.macro ldr1b ptr reg cond=al abort
+-	ldr\cond\()b \reg, [\ptr], #1
++	ldrb\cond\() \reg, [\ptr], #1
+ 	.endm
+ 
+ 	.macro str1w ptr reg abort
+@@ -42,7 +42,7 @@
+ 	.endm
+ 
+ 	.macro str1b ptr reg cond=al abort
+-	str\cond\()b \reg, [\ptr], #1
++	strb\cond\() \reg, [\ptr], #1
+ 	.endm
+ 
+ 	.macro enter reg1 reg2
 -- 
 2.20.1
 
