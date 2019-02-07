@@ -2,22 +2,22 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3BB96C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 19:48:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DD344C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 19:48:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D69C62147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 19:48:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A721A2147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 19:48:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tfBn6xyT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D69C62147C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KNvoV89e";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="f14eLpKt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A721A2147C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,38 +25,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6w5SVSxij0AkSh7C0ic5fWNmNobNHGShPW4I6CoYhX4=; b=tfBn6xyTy0RoFt
-	SY0+IWDHFNl4V0FRS+TqN7KncUmmAFCcVzVPzra/oUn3+h164DieQqnuEHytLC4j6XvdonGsUNArB
-	0y/vf8Gck5kuimuHHLiNqIEUsP3jNkMW6CYnMBQyyXxW50Qc1R0/iY2/GtLyHLW0Axxhodue7s59x
-	e6gh/X2t5MlPM5s20s/FzZN/hUxS+jbVHfz4Xrsmji4V6sEbJtg4pUIzFYWE1fwguxd0Mf1dvFSc4
-	35XqxO4k5RnsMJPYwRuHTkf2V5xt2sXARlcxVrv42hk4B42yZ3fISANM5E0Gzr6bs38fBXDVM1b6B
-	U9aP9UC+d9Dm8Y0uJFxA==;
+	List-Owner; bh=hxCBBz1pEfTZnhZNsSDIwt/XCw9svY9pwm3PKqyFTNc=; b=KNvoV89ezzn8j1
+	xLsp7vEqws10o5lRcHUZJoqY8F0eof5sV3GgexcqkOoYJRVIEfnSIwjw0pWmy551zDJi5YVGvOHG4
+	TiTr6XKDgoCl7fzljP9QkqfzxzByX11FKtpqr4qtXKmqgriQy8pV4s0OxbQ9ZQz5m0awJw7cUlqds
+	DhFuw7GgyTrKi3Av85QePriRwREFeFpoJIjNESKItOTP6Vg1A1SpNFET7hEyv6EQop2e14xH2i6Ae
+	1i8Oc8c3TDAuQPG0oGNBY8Kmjf53QLGEOsttTkFXGs9zIGYST+nYoKTDJiRH7itr/kvRk7PFBQyyC
+	DaKUGzQazp/kOf39VCcQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grpeP-0004xB-8W; Thu, 07 Feb 2019 19:47:57 +0000
-Received: from relay7-d.mail.gandi.net ([217.70.183.200])
+	id 1grpf0-0005Jh-N0; Thu, 07 Feb 2019 19:48:34 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grpch-0003Or-U7
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 19:46:18 +0000
-X-Originating-IP: 86.202.231.219
-Received: from localhost (lfbn-lyo-1-149-219.w86-202.abo.wanadoo.fr
- [86.202.231.219])
- (Authenticated sender: alexandre.belloni@bootlin.com)
- by relay7-d.mail.gandi.net (Postfix) with ESMTPSA id 39B3320006;
- Thu,  7 Feb 2019 19:46:01 +0000 (UTC)
-Date: Thu, 7 Feb 2019 20:46:01 +0100
-From: Alexandre Belloni <alexandre.belloni@bootlin.com>
-To: Anson Huang <anson.huang@nxp.com>
-Subject: Re: [PATCH] rtc: imx-sc: add rtc set time support
-Message-ID: <20190207194601.GG4719@piout.net>
-References: <1548127476-7958-1-git-send-email-Anson.Huang@nxp.com>
+ id 1grpey-0005J8-H3
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 07 Feb 2019 19:48:32 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=1CcmVVwzqXHvGyue8+fGzj5x9f2QCCBdzMmFKuWYvvI=; b=f14eLpKtzKaxMtx4VihGne5Yv
+ 3uhI+pBxOe/zRqrgJUKcIEm2hz91td1S43Na3Y59E83kGj7N3Yzgkjvn0IJS7aqXnkf4MDwmT4ZI+
+ WMD3LjZaKNTa3Rn9yYaoGdDB1k91hT/asZAoIAU4uh/Wa/MOYJJPpJ7UT1+NElwtMDe1nTPq8Q1nz
+ QS+dSRwJjJYFfVDxKHR/kxi62mnUxBlgXGFrG/pCvpeO17dMiPrdJ8TAKIzG2SURuhksc7gEJlaNe
+ Bv0bVqtu482N3/gyYF7VsFKBJ2mT7S0bgfMYfznX2oafvgTylrSNqrBQJ8S1QJtrQ8E5xeYMvAjTu
+ T81w7uqYA==;
+Received: from j217100.upc-j.chello.nl ([24.132.217.100]
+ helo=hirez.programming.kicks-ass.net)
+ by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1grpew-00075D-3U; Thu, 07 Feb 2019 19:48:30 +0000
+Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
+ id DD0EB2029E062; Thu,  7 Feb 2019 20:48:28 +0100 (CET)
+Date: Thu, 7 Feb 2019 20:48:28 +0100
+From: Peter Zijlstra <peterz@infradead.org>
+To: Waiman Long <longman@redhat.com>
+Subject: Re: [PATCH-tip 04/22] locking/rwsem: Remove arch specific rwsem files
+Message-ID: <20190207194828.GC32534@hirez.programming.kicks-ass.net>
+References: <1549566446-27967-1-git-send-email-longman@redhat.com>
+ <1549566446-27967-5-git-send-email-longman@redhat.com>
+ <20190207193656.GF32511@hirez.programming.kicks-ass.net>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1548127476-7958-1-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <20190207193656.GF32511@hirez.programming.kicks-ass.net>
 User-Agent: Mutt/1.10.1 (2018-07-13)
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_114612_605300_A3FA01F9 
-X-CRM114-Status: GOOD (  10.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,37 +79,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-rtc@vger.kernel.org" <linux-rtc@vger.kernel.org>,
- "a.zummo@towertech.it" <a.zummo@towertech.it>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: linux-arch@vger.kernel.org, linux-xtensa@linux-xtensa.org,
+ Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
+ Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
+ linux-sh@vger.kernel.org, linux-hexagon@vger.kernel.org, x86@kernel.org,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ Linus Torvalds <torvalds@linux-foundation.org>, Ingo Molnar <mingo@redhat.com>,
+ Borislav Petkov <bp@alien8.de>, "H. Peter Anvin" <hpa@zytor.com>,
+ linux-alpha@vger.kernel.org, sparclinux@vger.kernel.org,
+ Thomas Gleixner <tglx@linutronix.de>, linuxppc-dev@lists.ozlabs.org,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 22/01/2019 03:29:24+0000, Anson Huang wrote:
-> This patch adds i.MX system controller RTC set time support, the
-> RTC set time is implemented via SIP(silicon provider) runtime
-> service call and ARM-Trusted-Firmware will communicate with system
-> controller via MU(message unit) IPC to set RTC time.
+On Thu, Feb 07, 2019 at 08:36:56PM +0100, Peter Zijlstra wrote:
+> On Thu, Feb 07, 2019 at 02:07:08PM -0500, Waiman Long wrote:
 > 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
->  drivers/rtc/rtc-imx-sc.c | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+> > +static inline int __down_read_trylock(struct rw_semaphore *sem)
+> > +{
+> > +	long tmp;
+> > +
+> > +	while ((tmp = atomic_long_read(&sem->count)) >= 0) {
+> > +		if (tmp == atomic_long_cmpxchg_acquire(&sem->count, tmp,
+> > +				   tmp + RWSEM_ACTIVE_READ_BIAS)) {
+> > +			return 1;
+> > +		}
+> > +	}
 > 
-Applied, thanks.
+> Nah, you're supposed to write that like:
+> 
+> 	for (;;) {
+> 		val = atomic_long_cond_read_relaxed(&sem->count, VAL < 0);
+> 		if (atomic_long_try_cmpxchg_acquire(&sem->count, &val,
+> 						    val + RWSEM_ACTIVE_READ_BIAS))
+> 			break;
+> 	}
 
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+N/m that's not in fact the same...
+
+> > +	return 0;
+> > +}
+> 
+> 
+> Anyway, yuck, you're keeping all that BIAS nonsense :/ I was so hoping
+> for a rwsem implementation without that impenetrable crap.
 
 _______________________________________________
 linux-arm-kernel mailing list
