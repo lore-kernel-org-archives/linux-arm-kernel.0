@@ -2,59 +2,56 @@ Return-Path: <SRS0=LcWp=QO=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BA35AC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 06:46:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7FD4CC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 06:47:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8576D2175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 06:46:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2EE042175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 06:47:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k7mct3VU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8576D2175B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EQQglBqM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2EE042175B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SU8whBPmm4nHV/bf8sGh0TLSJn7U7OPsnVJHfTGvT4s=; b=k7mct3VU+XZe65
-	cjJ0zKRQftLf9JK8qpCv1NwD7CNAtmqewv/7G4SP8hjLDf7Gd4Gn1Ux2vIVoqOlLAf5CV6wLjrGL9
-	/FzRywtfJ5ryGkPip1VBE6IBmvH0Kw7RxOKUvP5UQTGEfc6RIxPLfumslTBDbGySuF3Qv+Ywhb7fl
-	S6LrWMSAVjQlpXuQmuUzS3z3DXiuWCE59W5S0FcaA99Dd2hLXlDi8gKzcfrvsq4BXRGntySF9G3Lu
-	A1sdEgiEgsBBY/2iIbUfJf/Pu6mhr3vMmIsMR64EaY0ilXax/F/KkZkNvbD1tC1dLQTz/Ry4jTz0m
-	NrnQSymDRhhKOlZh9myA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=HGw+tDxU4UeYfoNAEE8hfqBVM4HbnU9hv6UUBzFJk0c=; b=EQQglBqM5YzYoK
+	IFX81vvuZJVfuCSmOIsrAC5nL9LHV6FmJthhalKmF9CNsRhdYz/dfNaawuAasNskgTyH/UdzWWvXI
+	oC4SKUjIARHDhd92BtqTwfdy3nPrs4XIJ2IiNll8cT++JHXgBDSqeNdLQaqFgsHA2JtykOEHBmspN
+	Pr5Q2rjRfYXCagmKXumwu4M5AQ9VWF/Jih384GLtuc0M05pU6UC0qmRFd0Bgu/f441LutuFgC1hOY
+	+4c3+9moIPeUrRdmxyeD++IulEweu1P8paHpVs257zxyOGVtC0xR5V6/spSw+Gg2ko0PqqlPmHYJl
+	nlO8fxSPZHRwVxv0f8+Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grdSI-0006hs-Dm; Thu, 07 Feb 2019 06:46:38 +0000
+	id 1grdSa-0006yX-1D; Thu, 07 Feb 2019 06:46:56 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grdRS-0005tB-4A
- for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 06:45:48 +0000
+ id 1grdRS-0005tA-2e
+ for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 06:45:49 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id AC7B05FD5F; Thu,  7 Feb 2019 14:45:39 +0800 (CST)
+ id 96D3D5FA80; Thu,  7 Feb 2019 14:45:39 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Lee Jones <lee.jones@linaro.org>, Sebastian Reichel <sre@kernel.org>
-Subject: [RFT PATCH 4/9] power: supply: axp20x_usb_power: use polling to
- detect vbus status change
-Date: Thu,  7 Feb 2019 14:45:30 +0800
-Message-Id: <20190207064535.9226-5-wens@csie.org>
+Subject: [RFT PATCH 0/9] ARM: sun8i: a83t: Enable USB OTG
+Date: Thu,  7 Feb 2019 14:45:26 +0800
+Message-Id: <20190207064535.9226-1-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190207064535.9226-1-wens@csie.org>
-References: <20190207064535.9226-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190206_224546_450481_A238C04B 
-X-CRM114-Status: GOOD (  15.69  )
+X-CRM114-CacheID: sfid-20190206_224546_400994_38312F66 
+X-CRM114-Status: GOOD (  16.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,136 +72,101 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On AXP221 and later AXP PMICs that have the N_VBUSEN pin, when this pin
-is high, either due to the PMIC driving it high or as an input, the VBUS
-detection related interrupt mechanisms are disabled.
+Hi everyone,
 
-Previously this was worked around in the phy-sun4i-usb driver, which
-needed to sense VBUS changes and report them to the musb driver in a
-timely matter. However this workaround was only for the A31 and A33 type
-USB PHYs. To support newer platforms we would have to enable it for
-almost all the post-A31 SoCs.
+This series enables USB OTG on the A83T boards. The AXP813/AXP818 PMICs
+used with the A83T have the same behavior as the AXP221 and AXP223,
+where if the N_VBUSEN pin is driven high, the VBUS sensing interrupts
+stop working. In the past Hans made a polling workaround in the USB PHY
+driver. In this series polling is added to the power supply driver.
 
-However, since this is actually the result of the PMIC's behavior, the
-workaround would be better if done in the PMIC driver, in this case the
-VBUS power supply driver.
+The power supply driver work was started by Quentin, and shared with me
+when I expressed interest in getting USB OTG to work some time ago.
+Neither of us got around to finishing it, until now that is.
 
-Add the same workqueue-based polling to the VBUS power supply driver.
-The polling interval is chosen to be the debounce interval from the USB
-PHY driver, as this short interval is needed in some cases, but the
-power supply driver would not know when.
+Patch 1 adds a new compatible string for the AXP813 VBUS power supply
+part.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/power/supply/axp20x_usb_power.c | 53 +++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+Patch 2 is a bit of cleanup work for the driver.
 
-diff --git a/drivers/power/supply/axp20x_usb_power.c b/drivers/power/supply/axp20x_usb_power.c
-index e2f353906bb1..ac061bcdc056 100644
---- a/drivers/power/supply/axp20x_usb_power.c
-+++ b/drivers/power/supply/axp20x_usb_power.c
-@@ -24,6 +24,7 @@
- #include <linux/regmap.h>
- #include <linux/slab.h>
- #include <linux/iio/consumer.h>
-+#include <linux/workqueue.h>
- 
- #define DRVNAME "axp20x-usb-power-supply"
- 
-@@ -46,6 +47,12 @@
- 
- #define AXP20X_VBUS_MON_VBUS_VALID	BIT(3)
- 
-+/*
-+ * Note do not raise the debounce time, we must report Vusb high within
-+ * 100ms otherwise we get Vbus errors in musb.
-+ */
-+#define DEBOUNCE_TIME			msecs_to_jiffies(50)
-+
- struct axp20x_usb_power {
- 	struct device_node *np;
- 	struct regmap *regmap;
-@@ -53,6 +60,8 @@ struct axp20x_usb_power {
- 	enum axp20x_variants axp20x_id;
- 	struct iio_channel *vbus_v;
- 	struct iio_channel *vbus_i;
-+	struct delayed_work vbus_detect;
-+	unsigned int old_status;
- };
- 
- static irqreturn_t axp20x_usb_power_irq(int irq, void *devid)
-@@ -64,6 +73,35 @@ static irqreturn_t axp20x_usb_power_irq(int irq, void *devid)
- 	return IRQ_HANDLED;
- }
- 
-+static void axp20x_usb_power_poll_vbus(struct work_struct *work)
-+{
-+	struct axp20x_usb_power *power =
-+		container_of(work, struct axp20x_usb_power, vbus_detect.work);
-+	unsigned int val;
-+	int ret;
-+
-+	ret = regmap_read(power->regmap, AXP20X_PWR_INPUT_STATUS, &val);
-+	if (ret)
-+		goto out;
-+
-+	val &= (AXP20X_PWR_STATUS_VBUS_PRESENT | AXP20X_PWR_STATUS_VBUS_USED);
-+	if (val != power->old_status)
-+		power_supply_changed(power->supply);
-+
-+	power->old_status = val;
-+
-+out:
-+	mod_delayed_work(system_wq, &power->vbus_detect, DEBOUNCE_TIME);
-+}
-+
-+static bool axp20x_usb_vbus_needs_polling(struct axp20x_usb_power *power)
-+{
-+	if (power->axp20x_id >= AXP221_ID)
-+		return true;
-+
-+	return false;
-+}
-+
- static int axp20x_usb_power_get_property(struct power_supply *psy,
- 	enum power_supply_property psp, union power_supply_propval *val)
- {
-@@ -362,6 +400,7 @@ static int axp20x_usb_power_probe(struct platform_device *pdev)
- 	if (!power)
- 		return -ENOMEM;
- 
-+	platform_set_drvdata(pdev, power);
- 	power->axp20x_id = (enum axp20x_variants)of_device_get_match_data(
- 								&pdev->dev);
- 
-@@ -420,6 +459,19 @@ static int axp20x_usb_power_probe(struct platform_device *pdev)
- 				 irq_names[i], ret);
- 	}
- 
-+	INIT_DELAYED_WORK(&power->vbus_detect, axp20x_usb_power_poll_vbus);
-+	if (axp20x_usb_vbus_needs_polling(power))
-+		queue_delayed_work(system_wq, &power->vbus_detect, 0);
-+
-+	return 0;
-+}
-+
-+static int axp20x_usb_power_remove(struct platform_device *pdev)
-+{
-+	struct axp20x_usb_power *power = platform_get_drvdata(pdev);
-+
-+	cancel_delayed_work_sync(&power->vbus_detect);
-+
- 	return 0;
- }
- 
-@@ -439,6 +491,7 @@ MODULE_DEVICE_TABLE(of, axp20x_usb_power_match);
- 
- static struct platform_driver axp20x_usb_power_driver = {
- 	.probe = axp20x_usb_power_probe,
-+	.remove = axp20x_usb_power_remove,
- 	.driver = {
- 		.name = DRVNAME,
- 		.of_match_table = axp20x_usb_power_match,
+Patch 3 allows disabling VBUS input current limiting on the AXP20x /
+AXP22x PMICs. While not strictly related to this series, I found it
+easier to just send everything together. This patch depends on the
+previous one.
+
+Patch 4 adds the VBUS status polling feature. This is enabled on AXP221
+and all later PMICs.
+
+Patch 5 factors out code to read out the configured input current limit
+for the AXP20x and AXP22x PMICs. As the AXP813 uses different values,
+factoring out the code based on model will make the main function more
+readable.
+
+Patch 6 adds support for the AXP813 VBUS power supply. checkpatch.pl
+reports a few warnings for this patch:
+
+    WARNING: Possible switch case/default not preceded by break or
+    fallthrough comment
+    #100: FILE: drivers/power/supply/axp20x_usb_power.c:306:
+    +       case 1500000:
+
+    WARNING: Possible switch case/default not preceded by break or
+    fallthrough comment
+    #101: FILE: drivers/power/supply/axp20x_usb_power.c:307:
+    +       case 2000000:
+
+    WARNING: Possible switch case/default not preceded by break or
+    fallthrough comment
+    #102: FILE: drivers/power/supply/axp20x_usb_power.c:308:
+    +       case 2500000:
+
+However they seem to be a false positive. The preceding line of the
+reported lines is a return statement, which is definitely not a
+fallthrough.
+
+Patch 7 adds an mfd cell for the newly supported VBUS power supply.
+
+Patch 8 adds a device node for the VBUS power supply to the common
+axp81x dtsi file.
+
+Patch 9 enables USB OTG on the Cubietruck Plus and Bananapi M3.
+
+Please have a look, and also test it on boards you have, and don't
+limit it to just the A83T ones. As mentioned above, the polling feature
+affects all boards that have an AXP221 or newer PMIC.
+
+I haven't removed the polling workaround from the USB PHY driver yet.
+That would be the next step after this series is merged, and preferrably
+a release has passed.
+
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (5):
+  dt-bindings: power: supply: axp20x_usb_power: add axp813 compatible
+  power: supply: axp20x_usb_power: Fix typo in VBUS current limit macros
+  power: supply: axp20x_usb_power: allow disabling input current
+    limiting
+  power: supply: axp20x_usb_power: use polling to detect vbus status
+    change
+  ARM: dts: sun8i: a83t: Enable USB OTG controller on some boards
+
+Quentin Schulz (4):
+  power: supply: axp20x_usb_power: add function to get max current
+  power: supply: axp20x_usb_power: add support for AXP813
+  mfd: axp20x: add USB power supply mfd cell to AXP813
+  ARM: dtsi: axp81x: add USB power supply node
+
+ .../power/supply/axp20x_usb_power.txt         |   1 +
+ arch/arm/boot/dts/axp81x.dtsi                 |   4 +
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts  |  12 ++
+ .../boot/dts/sun8i-a83t-cubietruck-plus.dts   |  12 ++
+ drivers/mfd/axp20x.c                          |  11 ++
+ drivers/power/supply/axp20x_usb_power.c       | 184 +++++++++++++++---
+ 6 files changed, 197 insertions(+), 27 deletions(-)
+
 -- 
 2.20.1
 
