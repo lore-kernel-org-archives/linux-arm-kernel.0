@@ -4,64 +4,65 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E4C2CC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 18:12:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5F00DC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 18:12:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ACD1C2086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 18:12:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0941B218D3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu,  7 Feb 2019 18:12:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IRZZ0uZg";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="qKOQFcMU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ACD1C2086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oYACM2Y0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Idzx1qex"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0941B218D3
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=jfdje91Zt0yOX/8xCN2c+X45wRb38BU99EgD9dcuSvA=; b=IRZZ0uZgpQpt26
-	8dMmaPEYAvQHompODALRAYtWhmeERRO1BrEX3PNOEWMqIeHokqX0yEC8z3w3UAN1FVNyXdFF5VGF4
-	3UEmzJYVXtYTg8FzAB5eTAP9o26tmpuQQq5FvPndZhgdldTjh9S/j+N6f8/CW175OHXx1P9SSJvPj
-	d/TL7JXESag/PShtmaUmhAi+KUgvK3Ji7XxnAFQj2OAQQVXapGD4CA+IaRLHJkMJPh1qoEWpqMBuC
-	30FmWCvGYe7dL6lQq5hqc/dZ2RVfDhfGxxDaSwIcnGHUzy9AvZJF1B0SxTv+h+5K0GEGjwE7FCnxf
-	4lqN4QmK5nw2oXvTah2A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ScLIXSPFC9rmRkoK6v8clOhc65zEZb7gpiaqsVqCnus=; b=oYACM2Y0Gam6wQ
+	AlVqrS3tXapchd9kZqPpkisKDvml3/R9grJ7VGvxm7L+ygMCW8/eHBz7UomacnM6ON2T195k1chWd
+	CJlnMJeXe8aJtpCGHFQ2eR1hNhc0pI0itGX8rTYrqihXbsXdgv3gfIV5AQT9axqZxaj13HaqIEk6/
+	TSjm3LT7Nd8R+o+kxG2TqVhwQZ6shv5LniOdQKS/t5ihJd7iTAeKQayQhE9E+FyFCq4qOsh94t91d
+	YJTMu/+r6qaO2sWmzf1ji5S76+tEvZVAlHRMToyltDzyhxzmuq+SSypixg3oNrlWkB3kJtXQNO3nf
+	6p4tYQ5cZTgeWQvUFn0A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1groA2-0000Gg-V4; Thu, 07 Feb 2019 18:12:30 +0000
+	id 1groAC-0000Pi-LF; Thu, 07 Feb 2019 18:12:40 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1groA0-0000FS-2G
+ id 1groA0-0000FT-2F
  for linux-arm-kernel@lists.infradead.org; Thu, 07 Feb 2019 18:12:29 +0000
 Received: from localhost.localdomain (cpe-70-114-128-244.austin.res.rr.com
  [70.114.128.244])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id E8E082086C;
- Thu,  7 Feb 2019 18:12:24 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 8343F21872;
+ Thu,  7 Feb 2019 18:12:25 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
  s=default; t=1549563145;
- bh=nuywoxFAYOyuxnSl2xu8hX3CcvgH2LN3BQymPCN5LV4=;
- h=From:To:Cc:Subject:Date:From;
- b=qKOQFcMUjAo4FF+DnSs3c5EhkqHFf7Zu2Ovbp5lqDy54CXvtbnlKlPpePH4BytXph
- To7R3c9LrMa13FTQusbQfvr9TjovdpoHVndnrk4Eg+mgOjpIYyaI23giHhXjxXS8Of
- GPFUB4flwQgp6NZw982Rhp6SeaBF6PaTqOdjDVns=
+ bh=Omqvw7Xwqd3GlXVuDr4mh/1jicStjF2LCtmtV6EKOEQ=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=Idzx1qexN26C/yIt7/yhlaUK5Pgl6ZYm1SUQYX68X7Z/4J8xVWZp8ApVSc8v97Att
+ t3BI/1crRlSA42eheLL7DGvoX5EnY9jrtsUxx1XX3oNjEe0FgfzkISQY7vEB3HhHvt
+ jyfSIXSXLTbo/FH9uLzKrp/kK3HBLIAHA7stEYgM=
 From: Dinh Nguyen <dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 1/2] ARM: dts: socfpga: enable MMC highspeed support
-Date: Thu,  7 Feb 2019 12:12:12 -0600
-Message-Id: <20190207181213.26153-1-dinguyen@kernel.org>
+Subject: [PATCH 2/2] arm64: dts: stratix10: enable MMC highspeed support
+Date: Thu,  7 Feb 2019 12:12:13 -0600
+Message-Id: <20190207181213.26153-2-dinguyen@kernel.org>
 X-Mailer: git-send-email 2.20.0
+In-Reply-To: <20190207181213.26153-1-dinguyen@kernel.org>
+References: <20190207181213.26153-1-dinguyen@kernel.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_101228_171117_1B19F525 
-X-CRM114-Status: UNSURE (   9.87  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190207_101228_130995_1350FE0F 
+X-CRM114-Status: GOOD (  10.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,14 +84,14 @@ Add 'cap-mmc-highspeed' property to enable high-speed support for MMC cards.
 
 Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
 ---
- arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts | 1 +
+ arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts b/arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts
-index df2bab1624d4..64dc0799f3d7 100644
---- a/arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts
-+++ b/arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts
-@@ -9,6 +9,7 @@
+diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+index 2e3863ee12b3..c26f11a2089a 100644
+--- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
++++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+@@ -107,6 +107,7 @@
  &mmc {
  	status = "okay";
  	cap-sd-highspeed;
