@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5753CC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:23:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 248FEC4151A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:24:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 245492080A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:23:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EA69120855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:24:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bSA2t78V"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 245492080A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MYWiMgO6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA69120855
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OcmonagoHrNu5GAK9dSs2KDzlwhb0/bkaPtfE405C/Y=; b=bSA2t78Vdx6sDj
-	3rGpQhfMbY1mevNpgsxdLVFlt3RjJBF76Dc3Zkk1hZ71h+FU0/SYsN/mqfvO0/0YBC3L2beFSy3rJ
-	QE3i4wXqXKKXFvFbzYqQZ7TJIPQp4D6SNe35BN2aH4pR6QLYxGnUczYX5oji4QkEd6mSmNqZjsUBf
-	rjq8JaPBJZSBOHvuCSXY/fbJVY7sajOWyc1LyKisicuU6ZNJ/iGSvBfVALb24foteQ1DkfZWRJ9QL
-	NdyvFgmNVoLk4fZSfqKMPsUsTKJyTgBcszqzT5BZLpaQrUy65+Xl8NLgLyCkqBNYDb7PQUTsO+ICK
-	SZXCPZNvVXfQm6k3UetA==;
+	List-Owner; bh=co1L0VZq/Zu7eSzcJr5xjkVlxCsut0W45RRe30W14AM=; b=MYWiMgO6xAOkdZ
+	7/6dW3FLh6Yh+Yjkl4iAobutRWO3m5yQnuMXEHvoYyosz6aTWDlRpNv9GLR75TnTrza1o3RzR0ANO
+	kRUA0DukvSw1QCxOkxcx/FHddABaVNX7H05yHCojGWh3vXvHep5HOJxDgd+1PNqskWdDuLoXKg2Xa
+	vFxlpHHT9MLnkahkhDfepLR63tySajS00pwLiMv0tnXrAARnh1CQEaHMQ9SaewTnTKcxjqH+7+9HL
+	iBFADShfIav1ykFa6TJuoc8sNFuLfc/+d74x6pNaaSQFBc+vDqWN8kSxj/wVKSyOquDoj6iYslEt7
+	fnQIFuGVTYyZo844EJew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs80O-0000w2-AF; Fri, 08 Feb 2019 15:23:52 +0000
+	id 1gs80Z-00016k-Vc; Fri, 08 Feb 2019 15:24:04 +0000
 Received: from relay2-d.mail.gandi.net ([217.70.183.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs80H-0000rx-LF
+ id 1gs80G-0000pU-GU
  for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 15:23:50 +0000
 X-Originating-IP: 109.213.164.40
 Received: from localhost (alyon-652-1-53-40.w109-213.abo.wanadoo.fr
  [109.213.164.40])
  (Authenticated sender: alexandre.belloni@bootlin.com)
- by relay2-d.mail.gandi.net (Postfix) with ESMTPSA id 275A140010;
- Fri,  8 Feb 2019 15:23:42 +0000 (UTC)
-Date: Fri, 8 Feb 2019 16:23:42 +0100
+ by relay2-d.mail.gandi.net (Postfix) with ESMTPSA id 8D00A40015;
+ Fri,  8 Feb 2019 15:23:32 +0000 (UTC)
+Date: Fri, 8 Feb 2019 16:23:31 +0100
 From: Alexandre Belloni <alexandre.belloni@bootlin.com>
 To: Nicolas Ferre <nicolas.ferre@microchip.com>
-Subject: Re: [PATCH v2 2/3] dt-bindings: arm: atmel: add new sam9x60 reset
- controller binding
-Message-ID: <20190208152342.GB23062@piout.net>
+Subject: Re: [PATCH v2 1/3] dt-bindings: arm: atmel: add missing samx7 to
+ reset controller
+Message-ID: <20190208152331.GA23062@piout.net>
 References: <20190206181221.27914-1-nicolas.ferre@microchip.com>
- <20190206181221.27914-2-nicolas.ferre@microchip.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190206181221.27914-2-nicolas.ferre@microchip.com>
+In-Reply-To: <20190206181221.27914-1-nicolas.ferre@microchip.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_072345_846689_EC99CF35 
-X-CRM114-Status: GOOD (  14.46  )
+X-CRM114-CacheID: sfid-20190208_072344_887854_84529C5F 
+X-CRM114-Status: GOOD (  13.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,8 +77,9 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 06/02/2019 19:12:20+0100, Nicolas Ferre wrote:
-> Update the Reset Controller's binding to add new SoC compatibility string.
+On 06/02/2019 19:12:19+0100, Nicolas Ferre wrote:
+> Add this missing compatibility string to the Reset Controller
+> compatible string chip list.
 > 
 > Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 > Reviewed-by: Rob Herring <robh@kernel.org>
@@ -88,18 +88,19 @@ Acked-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 > ---
 > v2: split series and collect tag
 > 
->  Documentation/devicetree/bindings/arm/atmel-sysregs.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  Documentation/devicetree/bindings/arm/atmel-sysregs.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
 > diff --git a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
-> index dd7864f2bb2b..dfc91bc02b97 100644
+> index df444073d376..dd7864f2bb2b 100644
 > --- a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
 > +++ b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
-> @@ -22,6 +22,7 @@ Its subnodes can be:
+> @@ -21,7 +21,7 @@ Its subnodes can be:
+>  
 >  RSTC Reset Controller required properties:
 >  - compatible: Should be "atmel,<chip>-rstc".
->    <chip> can be "at91sam9260", "at91sam9g45", "sama5d3" or "samx7"
-> +  it also can be "microchip,sam9x60-rstc"
+> -  <chip> can be "at91sam9260" or "at91sam9g45" or "sama5d3"
+> +  <chip> can be "at91sam9260", "at91sam9g45", "sama5d3" or "samx7"
 >  - reg: Should contain registers location and length
 >  - clocks: phandle to input clock.
 >  
