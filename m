@@ -2,23 +2,23 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-8.2 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	MENTIONS_GIT_HOSTING,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 67832C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 19:59:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 912A2C282CC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 20:00:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3122921841
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 19:59:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 596EA217D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 20:00:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pqHc1Uwy";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="JOYGtL7k"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3122921841
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ELBcYtaI";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="oottIKcD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 596EA217D8
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,55 +27,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Date:Message-ID:Subject:
 	From:To:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=FYIy2BVKoYMd//tgtZm9PFz5XAvT8ri5vxknsjOjHJ4=; b=pqHc1Uwy0somD9
-	x/hpTQkU3G5PS3txlvDGqdArj8mooIaoFeGZbRdcLXxL6ebWfExG/htON6t1Og68bPHmSKbMKaAGU
-	9dXua3GZpTEDwAngD2rfvnBSchGLCZGeFYfx66gc8btY4LJIo9WrjUq+Ka1HQaFfasZtMG05gjdGX
-	Jr//0UcXxTGm612QXuq6AuWA21D7MS74iohFaQssV0XPLI2k4QV2LdOieT5sqd/hiLs0dKMjvwAdn
-	SNHTBBmwEMnT9e/CwQ/iiT8L3CcOSD8Dj36mCHer6W71Krf/KV5IZb2nUjVR6/eXOoHdlodmcbydY
-	lMc7/TR4WVdIqeDFdKbg==;
+	List-Owner; bh=JavhM+Ap4Db0G+0l6XVybFOKjELn+lHRI63lo119gLg=; b=ELBcYtaISXdtv6
+	+k4hq+ogUo9BZP8naEuC+C0EaeWdEH3A2eEv7kGKDVN8E4xrWaZMjr21XgXuxsCF2UrgWw5SDkFuU
+	a1VJC+YC765M95mobJ6mPtUL5OSmGY7lkw7wUcBfaZ2+3oqYWjVV/MZbbUb+kX5T2dVLWpzD8TkY8
+	NmlCqOKAiBB/KFHSCCEBKE2iO/gae1k7R1B5OygodgbYBwPGjmKUkZQF8d/vbdag4iPdP6tY0/Xnk
+	Ui1jN6XhVEISfS54fUxanljXifRTMxo73XvI6PGkLb3Z/VbydnK3NQSeOtxQqlm0fDk6A1VVa+a1l
+	xwOVwXVhG2NttTkwHC4w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsCJQ-0000CG-VH; Fri, 08 Feb 2019 19:59:48 +0000
+	id 1gsCK6-000238-1F; Fri, 08 Feb 2019 20:00:30 +0000
 Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsCJN-0000BS-15; Fri, 08 Feb 2019 19:59:46 +0000
-Received: by mail-pl1-x642.google.com with SMTP id p8so2204490plo.2;
- Fri, 08 Feb 2019 11:59:44 -0800 (PST)
+ id 1gsCJc-0000QS-Dz; Fri, 08 Feb 2019 20:00:03 +0000
+Received: by mail-pl1-x642.google.com with SMTP id a14so2173916plm.12;
+ Fri, 08 Feb 2019 12:00:00 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=to:cc:from:subject:openpgp:autocrypt:message-id:date:user-agent
  :mime-version:content-language:content-transfer-encoding;
- bh=efhnySkQ/X7MOmQwuFrscaJg/BwtK5pFHyrhJEqrcp4=;
- b=JOYGtL7k+Yjfc+sPeENLV/N8UrUDM6rPnOttCRYqbSzeE9US/PqE1QsIdMgjWwMt+0
- scCcs6jxTq7Fk/g+aDViNipcP6Jgf6oq/g0Rdu8gqbGQBb6V7m9t+EjBW+M44i4w05J6
- xI9Jr6Oe3qAPBcqAEQAob9iz04t3JbBsRsxtTeJqG6R3kmA1IvMq5yFt/hE2HbtICTX9
- Epwv7xAIyrUkDpI+1Z+ZZSjGUFoomLEsqtg3rMCvTxlrMFFyMo+oI4I5u5ua6h0O9L0j
- JjJXkbXE2a0D+f03dFK97aYNlha+fT3VBs9Gb+i8VItj4BNISVgFbuxgI9nTsaxsGWgU
- cUvw==
+ bh=aUbES86ilz22BnfXzbo6xhwFv+S4zs8/cYLNw8xmVXg=;
+ b=oottIKcD9fcbreUSMXDsWR0UIgB4g6uvlkyDTfFX25Zm93qQRTF34UUr22u2HUELQk
+ fK5ibzYGlt5Wv/0DdaBdd4VAd4A7kJYN/Y0ywDxVatoctBShx/aliPm1m/6lOvwY/jRh
+ jN50j8/Oy5tkE/h1ITbHg8KNi+l61pdW1t0w7NMbqu7DCusxb225W0CPzJGQqUHKu752
+ ixwjMJpm5um/GI1+B7RdGndMQO0Qx/bo3GPnXqug9DSIk6tzPQQHVq8hFlnSuq7ytjL8
+ bGzvnlZ6qrga5er36vU7rkxoDflypNS8cudTuaUzX2q00fffTsNP+GWk1TxrQRGvN0Dq
+ qnqw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:to:cc:from:subject:openpgp:autocrypt:message-id
  :date:user-agent:mime-version:content-language
  :content-transfer-encoding;
- bh=efhnySkQ/X7MOmQwuFrscaJg/BwtK5pFHyrhJEqrcp4=;
- b=F2lOl1utP8i4G0UlKBKDrqv+GGJt+Yv/gXU90jMdiX9BaOZW1LvQXE3rOwu12f75YW
- TzcFGIoki0noDYQtSWN/yvZc8PoC51Xet72swQSVyWWioVKYMtvjv2DHz614UTfrFSCJ
- U4Cgypahnobi7Fr1O/+HXos+dowdaIyTBmrfQOopaRY9sp+4CBqGA8+5UbTh52ZC8cSA
- atMkBCupRssxu2lCMWevhs8knipV4wcvIiowDn4rQEa1DjUCnkosaQg8uFHaUSNA31a2
- 0CV4s83omCvd6dm8CnHl92YQt/m9RZDl725jVVVTZJcj6xChYw9aJW8MXrqpCJr9jnYH
- 0WAA==
-X-Gm-Message-State: AHQUAuZ5CJyvL53ka0VMdh4GYga07PO/Zg1xwMul7S50APa2L6wml9TK
- qigg4DB/0CgKga2K00mSVno=
-X-Google-Smtp-Source: AHgI3IbesxdhdHsVivsOUvv7DH84gvsowZRqTbYk+vGIjhrUIwtpS+Iho9tOnqOAo2Ju7Kf5K0tDyw==
-X-Received: by 2002:a17:902:6949:: with SMTP id
- k9mr24568803plt.85.1549655984175; 
- Fri, 08 Feb 2019 11:59:44 -0800 (PST)
+ bh=aUbES86ilz22BnfXzbo6xhwFv+S4zs8/cYLNw8xmVXg=;
+ b=cOOLXkabgqYUb/lGoVYJrd1Bi/XzR9TpwmRpQ2aQ4GsZ7LFhDljoThA9ZFO6sysA7U
+ RL9siPHmplVGoYzeTugDjF1qMw7LXg/MPFK58KiBXDEByyqKmsm++dhzmau7eSovQRag
+ FwKj4eLSv7tCDaOBD2xX8lo8EqlmnbNbI1PMZRks3pBIarLD5esTorKaszo/5KEtmo+J
+ GOj8MmfmZ7ZogJzSTKeTt58v9m8qG7rgokHf0GT4ALFQzy6b9q1BteQXvbgZv5fzSHwA
+ a257nMVgpogCC46uRConFRU9uwEbehto5f57/BoxdLmIMUYnczu1sl6Q5LiQX+9jDOkR
+ t8RA==
+X-Gm-Message-State: AHQUAual1ssL5jjRxGbPhl9ZFtAK7InBrqMoVDWIYoepxUpbRoP02KU2
+ NDTZ8BEv+7I6j7FDAcMTjlESvc9Rils=
+X-Google-Smtp-Source: AHgI3IbpWarawB/YedhFVGMzowyGESjCDjeSpBBpBw/JnfnpkAv7ZPvZ9+5k1E3jD4v6tGJr2WL7Ow==
+X-Received: by 2002:a17:902:b609:: with SMTP id
+ b9mr24529323pls.57.1549655999917; 
+ Fri, 08 Feb 2019 11:59:59 -0800 (PST)
 Received: from ziggy.stardust ([2a00:23c5:318d:1d00:295e:b5f9:da4c:df23])
- by smtp.gmail.com with ESMTPSA id w10sm3023731pgr.42.2019.02.08.11.59.41
+ by smtp.gmail.com with ESMTPSA id w10sm3261043pge.8.2019.02.08.11.59.58
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 08 Feb 2019 11:59:43 -0800 (PST)
+ Fri, 08 Feb 2019 11:59:59 -0800 (PST)
 To: arm-soc <arm@kernel.org>
 From: Matthias Brugger <matthias.bgg@gmail.com>
-Subject: [GIT PULL] Mediatek DT 32 bit updates for v5.1
+Subject: [GIT PULL] Mediatek SoC updates for v5.1
 Openpgp: preference=signencrypt
 Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  mQINBFP1zgUBEAC21D6hk7//0kOmsUrE3eZ55kjc9DmFPKIz6l4NggqwQjBNRHIMh04BbCMY
@@ -170,15 +170,15 @@ Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  pac005PuhxCWkKTJz3gCmznnoat4GCnL5gy/m0Qk45l4PFqwWXVLo9AQg2Kp3mlIFZ6fsEKI
  AN5hxlbNvNb9V2Zo5bFZjPWPFTxOteM0omUAS+QopwU0yPLLGJVf2iCmItHcUXI+r2JwH1CJ
  jrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <40e8af4e-e86d-af97-d9bf-0932c97a2829@gmail.com>
-Date: Fri, 8 Feb 2019 20:59:39 +0100
+Message-ID: <7c3dc195-68eb-e78d-3f7d-806546608d2c@gmail.com>
+Date: Fri, 8 Feb 2019 20:59:56 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.3
 MIME-Version: 1.0
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_115945_100191_027F7DFB 
-X-CRM114-Status: GOOD (  13.77  )
+X-CRM114-CacheID: sfid-20190208_120000_765856_13102BE7 
+X-CRM114-Status: GOOD (  14.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -190,9 +190,9 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>, Ryder Lee <ryder.lee@mediatek.com>,
+Cc: Ryder Lee <ryder.lee@mediatek.com>,
  "moderated list:ARM/Mediatek SoC support"
- <linux-mediatek@lists.infradead.org>,
+ <linux-mediatek@lists.infradead.org>, Weiyi Lu <weiyi.lu@mediatek.com>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -202,12 +202,13 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 Hi Arnd,
 Hi Olof,
 
-Please find below changes for 32 bit device tree for v5.1.
+Please find below changes for v5.1 SoC support
 
 Please merge :)
 Matthias
 
 ---
+
 The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 
   Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
@@ -215,28 +216,30 @@ The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 are available in the Git repository at:
 
   ssh://git@gitolite.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-tags/v5.0-next-dts32
+tags/v5.0-next-soc
 
-for you to fetch changes up to 60b71a239bbd286232a547349815d6330f10db7c:
+for you to fetch changes up to a43379dddf1ba14b6a9d50d95175117bbdf52ed2:
 
-  dt-bindings: interrupt-controller: update bindings for MT7623 (2019-02-08
-13:18:04 +0100)
-
-----------------------------------------------------------------
-mt7623:
-add cooling mask to all CPUs
-add compatible to sysirq binding
+  arm: mediatek: add MT7629 smp bring up code (2019-02-07 17:59:16 +0100)
 
 ----------------------------------------------------------------
-Ryder Lee (1):
-      dt-bindings: interrupt-controller: update bindings for MT7623
+mt8173: minor typo in scpsys header file
+mt7629: add smp bringup code
+mt7623a: delete unused smp bringup code
 
-Viresh Kumar (1):
-      ARM: dts: mt7623: Add all CPUs in cooling maps
+----------------------------------------------------------------
+Ryder Lee (2):
+      Revert "ARM: mediatek: add MT7623a smp bringup code"
+      arm: mediatek: add MT7629 smp bring up code
 
- .../bindings/interrupt-controller/mediatek,sysirq.txt     |  1 +
- arch/arm/boot/dts/mt7623.dtsi                             | 15 ++++++++++++---
- 2 files changed, 13 insertions(+), 3 deletions(-)
+Weiyi Lu (1):
+      dt-bindings: soc: fix typo of MT8173 power dt-bindings
+
+ arch/arm/mach-mediatek/Kconfig           | 4 ++++
+ arch/arm/mach-mediatek/mediatek.c        | 3 +--
+ arch/arm/mach-mediatek/platsmp.c         | 2 +-
+ include/dt-bindings/power/mt8173-power.h | 6 +++---
+ 4 files changed, 9 insertions(+), 6 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
