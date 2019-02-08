@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 14D85C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:56:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D2C8C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:56:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D610E20823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:56:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2D42520823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:56:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B/UpE5rB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D610E20823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VVv54Yjj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D42520823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dzYNCaWmcl4VbH49PraETWbpSHkzmBtsrOKV7jtE/pk=; b=B/UpE5rBbC246q
-	L0m6MGmLuyGiwlOqBdFL/Y5JMxiPk7XFIzK0Dq/YxpFr/qRqb98Vtj1zAm9Ps1NCXHXUvWRYSetIU
-	bZNBb4Pd3Lnwm71cJSn4t7iwSEKTx/4YTIYMeWzoAgGQqbTOKI6sKTN9Cq8AvmruNfJbar7hw/SPp
-	VpJnS+vEDI8xwMxQcB2TxNDAHn/lbwkP17hZwXNEvikbcM2Q9VdHqZAjmonYzw7aNmtDYx8q+yy3b
-	FwmvFtZ/M2fPNh0b42YMb9ZvX+WPsrzc05NnIaOVM2bC7b2rinuuWjo4Vg/5gUNiQPFFUzISJ7NrT
-	dUzg9k8LmTxWRBE5+MiA==;
+	List-Owner; bh=Q0dv3s4htZxtvXJPYmRtXyMyHN6O/sSS0hXoQ+tAUiE=; b=VVv54YjjFfV80A
+	JQNkBgi4CDOC39yNdnzn4S0hKFLQMF48CVNWKq2QjsLm0FvaE0FEkBwjePJYpdDylQjcPoNLQ+Js8
+	CeGhN6jw0PVSeLZ9mB/4xXHM2Nu7bj8z8HwbI5kwJB06Kq+B/HcUOmpNrG1I1FXCorO8vWwxZz/eR
+	J6JjCieTbVuJM4UgS6pmV8YeElrbZBhOMYwsRO3X0SyYSTuAQ9/gvRlPltElZzRp5rzBxEkT1KwlH
+	iM/YqZ4mInsmvioKz7gpqUA+YRakJ2H3CMAEhxoCUNxGRie8dLV9cQ/DGrXY6jkSqT2psDXyIMn6C
+	Js9z3Y4jT6U/o8I+/lxw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs2t7-0006pB-DH; Fri, 08 Feb 2019 09:56:01 +0000
-Received: from relay12.mail.gandi.net ([217.70.178.232])
+	id 1gs2tN-000737-NS; Fri, 08 Feb 2019 09:56:17 +0000
+Received: from relay6-d.mail.gandi.net ([217.70.183.198])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs2qt-0003Q0-LX
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:53:53 +0000
+ id 1gs2qx-0003Tc-Fv
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:53:54 +0000
+X-Originating-IP: 90.88.22.177
 Received: from localhost (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
  [90.88.22.177]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay12.mail.gandi.net (Postfix) with ESMTPSA id D145220000A;
- Fri,  8 Feb 2019 09:53:40 +0000 (UTC)
+ by relay6-d.mail.gandi.net (Postfix) with ESMTPSA id E309EC0006;
+ Fri,  8 Feb 2019 09:53:37 +0000 (UTC)
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
  Sean Paul <seanpaul@chromium.org>,
  Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH v2 5/9] drm/sun4i: dsi: Fix front vs back porch calculation
-Date: Fri,  8 Feb 2019 10:53:18 +0100
-Message-Id: <90c2375b8a853cae0dcc135cedb47edbc26168d8.1549619502.git-series.maxime.ripard@bootlin.com>
+Subject: [PATCH v2 4/9] drm/sun4i: dsi: Enforce boundaries on the start delay
+Date: Fri,  8 Feb 2019 10:53:17 +0100
+Message-Id: <c9889cf5f7a3d101ef380905900b45a182596f56.1549619502.git-series.maxime.ripard@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <cover.23dbbc9b943ff8f36253ac7c617e2eda142b1b69.1549619502.git-series.maxime.ripard@bootlin.com>
 References: <cover.23dbbc9b943ff8f36253ac7c617e2eda142b1b69.1549619502.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_015344_422605_8331FD35 
-X-CRM114-Status: GOOD (  10.91  )
+X-CRM114-CacheID: sfid-20190208_015348_518544_7E78E4D7 
+X-CRM114-Status: GOOD (  12.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,47 +77,35 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Since I always confuse the back and front porches, a few miscalculation
-slipped through. Fix them.
+The Allwinner BSP makes sure that we don't end up with a null start delay
+or with a delay larger than vtotal.
+
+The former condition is likely to happen now with the reworked start delay,
+so make sure we enforce the same boundaries.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 506f2e8cf454..2518a0d7567c 100644
+index 9471fa695ec7..506f2e8cf454 100644
 --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -477,7 +477,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
- 	 */
- #define HBP_PACKET_OVERHEAD	6
- 	hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
--		  (mode->hsync_start - mode->hdisplay) * Bpp - HBP_PACKET_OVERHEAD);
-+		  (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
+@@ -358,8 +358,12 @@ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
+ 					   struct drm_display_mode *mode)
+ {
+ 	u16 start = clamp(mode->vtotal - mode->vdisplay - 10, 8, 100);
++	u16 delay = mode->vtotal - (mode->vsync_end - mode->vdisplay) + start;
  
- 	/*
- 	 * The frontporch is set using a blanking packet (4 bytes +
-@@ -485,7 +485,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
- 	 */
- #define HFP_PACKET_OVERHEAD	6
- 	hfp = max((unsigned int)HFP_PACKET_OVERHEAD,
--		  (mode->htotal - mode->hsync_end) * Bpp - HFP_PACKET_OVERHEAD);
-+		  (mode->hsync_start - mode->hdisplay) * Bpp - HFP_PACKET_OVERHEAD);
+-	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + start;
++	if (delay > mode->vtotal)
++		delay = delay % mode->vtotal;
++
++	return max_t(u16, delay, 1);
+ }
  
- 	/*
- 	 * hblk seems to be the line + porches length.
-@@ -531,8 +531,8 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
- 	regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE0_REG,
- 		     SUN6I_DSI_BASIC_SIZE0_VSA(mode->vsync_end -
- 					       mode->vsync_start) |
--		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vsync_start -
--					       mode->vdisplay));
-+		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vtotal -
-+					       mode->vsync_end));
- 
- 	regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE1_REG,
- 		     SUN6I_DSI_BASIC_SIZE1_VACT(mode->vdisplay) |
+ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
 -- 
 git-series 0.9.1
 
