@@ -2,86 +2,82 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D6588C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:24:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4AF72C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:27:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A3A8F20869
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:24:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 18B4E20869
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:27:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t4nx125p";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="P+lAusm9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A3A8F20869
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rgB9Hxec";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="yEGzBWdz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 18B4E20869
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=u3E5z9gCnEs+ihKhF2R3YYCEMUZ4iYuKU183WO7LlTQ=; b=t4nx125poCUH1+
-	pRLEgBMhr5Z4zs1jk5HvWWrwFtM9fBMF2zHu2Zs91tFJxUpqhLN7xN+/OTLwTLXFP/2uLlxgvx/iO
-	Z+aKYqoGH4aKny4B+q2dPY+wBLT/b8519NCCsbnTT29XMVrce9Xu6FvqLabilDkVAvyoOZUtRP0NX
-	tZDI+0r8LUtRQ86Gf64+Zfye6YxeqtPvQCr4I8QwvFbjb7s4uhxduURyYIHETtb2606+K4D8Fr8DK
-	H7g65XKGE1m5pdzN/si3EpwFxF4JZuJTxogbTPkAj+6Ciyi9DeFxRzUlApGBG4sPBft1vI9Sm28SC
-	1BKywCPHLmKFqSmNe7nA==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=mGzINCRvwoDNPzFfWq4ENTmr6HyVywaxyuiw20niJgY=; b=rgB9HxecNSdd8A
+	qYlUzRmT4vAP4Dwb94nyJ5cElJNtWlbs81u1hcw7fXW+92Lb9mfekLb9P/alQ9oDWHX9KidFMaKHp
+	8Y037cVPUWViBg8c7Iljid/3lIIL1rdF/FKVTwL0sv+lD3nnVx0JD0ReEeMA7ub71MASFHCtlD2PR
+	VQWrBLOpcEKYBRS6RW+bx4F68mBKZkYbIa6iDoHCrFURYM7oUW3gPrD6y0rUJ4Nv90sDiH04QtEDy
+	kVJhV2Pu7CEuXdPw3IVErJ759THO0ldHSx0ziF6V9sLccWAAusQJnlBhkfJiv25He7bY82AjC6C61
+	zd4VnKfNfnZzbg5rooxQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs68x-0003EO-Hp; Fri, 08 Feb 2019 13:24:35 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
+	id 1gs6BI-0004td-3i; Fri, 08 Feb 2019 13:27:00 +0000
+Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs68r-0003A1-8d
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 13:24:33 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x18DOH69020334;
- Fri, 8 Feb 2019 07:24:17 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549632257;
- bh=KN27eVrW9tG745rWB5gGx4GSDgsoCpJZfglRGskOQBI=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=P+lAusm9BLTzDk8nbFCw328u49Da5fae4BHImqSTMOGwKmWiqOwAevya63TqXCdE1
- QhItZkjpyZcJCF/dLp3Mpvn2kpa42i/OleBnbAEChph/Qsn8uVENU3SZRfx/f88l+7
- /Y2S6z0Ecs8RvGzMUj8I5tT1K8Yi5zOW7QJLEjEM=
-Received: from DLEE102.ent.ti.com (dlee102.ent.ti.com [157.170.170.32])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x18DOHGM056066
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 8 Feb 2019 07:24:17 -0600
-Received: from DLEE106.ent.ti.com (157.170.170.36) by DLEE102.ent.ti.com
- (157.170.170.32) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 8
- Feb 2019 07:24:17 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE106.ent.ti.com
- (157.170.170.36) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 8 Feb 2019 07:24:17 -0600
-Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x18DODlT007996;
- Fri, 8 Feb 2019 07:24:14 -0600
-Subject: Re: [PATCH v2 02/12] clocksource: davinci-timer: new driver
-To: Bartosz Golaszewski <brgl@bgdev.pl>, Kevin Hilman <khilman@kernel.org>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Thomas Gleixner <tglx@linutronix.de>
-References: <20190204171757.32073-1-brgl@bgdev.pl>
- <20190204171757.32073-3-brgl@bgdev.pl>
-From: Sekhar Nori <nsekhar@ti.com>
-Message-ID: <7243573a-884d-cce2-380b-1be73636fafb@ti.com>
-Date: Fri, 8 Feb 2019 18:54:12 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gs6BE-0004sf-F7
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 13:26:58 +0000
+Received: by mail-lf1-x144.google.com with SMTP id f5so2480013lfc.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 08 Feb 2019 05:26:56 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=DIexPMS3LbQgGRNP20KqPQNl68AB6eSBUP7lDlRt/50=;
+ b=yEGzBWdzg3RZToByoSknLziCHxI1H6EfS3c1ekuSErrD1npxoZmBQ/kITyryYvM93G
+ rov8t4tMB6k9BJxqdSn9HD6oxO1eOewfmxypTCWcbeEHzNByMZ7RM4YTL+4uI1IFH/PW
+ QWcEkDDlaS9Tlqe5pWuKUaSnytaOxaLCvog43fIGNTu75u0L01RSjjtVw7/gDgQueDES
+ pL8Nre1kh5B/d/xU8z9UAeLg/n+TaTJaSLvVKeA6ePYaaBdxNsqRhA5dyhlcXIIKnFhb
+ RSLirpYtwsILUGBOHH5mGf5ByWd7FpXylIXaUBXAk5NeDGK1h9AGDNZpvgGqmnuviU7w
+ Eqig==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=DIexPMS3LbQgGRNP20KqPQNl68AB6eSBUP7lDlRt/50=;
+ b=oUADNShmvDJ2RgNoNm6vho50frwg2eCrlCm3M+EQ4X4qaL6C/YYYQEbyOyPJNMu+Hy
+ d8VbZzMsGpgoacEu4bA1YRTNBk1aiWUL6GMVSi9ARRriTGzqYvjW8SjLdIIQtlEUcR2B
+ DCYulWZrh+TY19ylYMPBYVoeHP139ac55Zh0AFYldJVKxZmG1hhi8TXHECQ1JvPT9k8/
+ U7SHuoyRPAuHZpTpJc5TQ8XLTnBJIAciofMboKLddy2LtIol/uI18rPQcnNej2qICXF+
+ 7lg4kdHru22qLrwojs7HGAHIyETtMYeEBA+jnnMXmdgv5M0Af7UzxHYyAJwrYdur3+6/
+ 1b5w==
+X-Gm-Message-State: AHQUAuZBXbaOU3qeMwPy1VjfALdwvCSfDnAaGA64Glu59/HP9IeVV/os
+ wv8MXX3MfCCsKeN/rywU77pB8SjwkOwoihI1jcoIfw==
+X-Google-Smtp-Source: AHgI3IblgVBhhjLNrJQFB7I2tfVY43YBQ4nDDDFpbHY2NmUmC1OiAaGcKtTZ5MoUl/CLDtCLoCU2yijGbAGBRlHxwDY=
+X-Received: by 2002:a19:c502:: with SMTP id w2mr13187354lfe.168.1549632414248; 
+ Fri, 08 Feb 2019 05:26:54 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190204171757.32073-3-brgl@bgdev.pl>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+References: <1549628897-32345-1-git-send-email-sugaya.taichi@socionext.com>
+In-Reply-To: <1549628897-32345-1-git-send-email-sugaya.taichi@socionext.com>
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Fri, 8 Feb 2019 14:26:42 +0100
+Message-ID: <CACRpkdZCpyJDL+zy-NftXJNah2u6t75cVCDmh_L0+ZyXv7J2LA@mail.gmail.com>
+Subject: Re: [PATCH v2 12/15] pinctrl: milbeaut: Add Milbeaut M10V pinctrl
+To: Sugaya Taichi <sugaya.taichi@socionext.com>, 
+ Masahiro Yamada <yamada.masahiro@socionext.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_052429_491783_470A894C 
-X-CRM114-Status: GOOD (  19.44  )
+X-CRM114-CacheID: sfid-20190208_052656_602119_8DD16C88 
+X-CRM114-Status: GOOD (  33.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,95 +89,331 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Jassi Brar <jaswinder.singh@linaro.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
+ Takao Orito <orito.takao@socionext.com>,
+ Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Brian Masney <masneyb@onstation.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 04/02/19 10:47 PM, Bartosz Golaszewski wrote:
+Hi Sugaya,
 
-> +static unsigned int davinci_timer_read(struct davinci_timer_data *timer,
-> +				       unsigned int reg)
+thank you for the patch!
+
+Since Masahiro has previously added the Uniphier pin control driver
+I would like him to provide a review of this patch, if possible. I also
+want to make sure that the hardware is different enough from the
+existing Uniphier pin control so that it really needs a new
+driver, else I suppose it should be refactored to be part of
+the pinctrl/uniphier drivers (we can of course rename it
+pinctrl/socionext if only naming is an issue).
+
+On Fri, Feb 8, 2019 at 1:27 PM Sugaya Taichi
+<sugaya.taichi@socionext.com> wrote:
+
+> Add Milbeaut M10V pinctrl.
+> The M10V has the pins that can be used GPIOs or take multiple other
+> functions.
+>
+> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
+
+This file seems to be mostly authored by Jassi Brar as he is
+listed as author in the top of the source code.
+
+Please at least add Signed-off-by: Jassi Brar <jassi.brar@linaro.org>
+above your signed-off-by to reflect the delivery path.
+
+Also usually author is set to indicate the person who wrote
+the majority of the code so consider:
+git commit --amend --author="Jassi Brar <jassi.brar@linaro.org>"
+if Jassi wrote the majority of the code.
+Since I will ask you to change a bunch of stuff in the driver
+I don't know who the majority author will be in the end.
+
+When you send out the patches this will reflect in a
+From: ... line at the top of the patch.
+
+I'm not overly sensitive about credits but this seems like
+a simple thing to fix.
+
+> +config PINCTRL_MILBEAUT
+> +       bool
+> +       select PINMUX
+> +       select PINCONF
+> +       select GENERIC_PINCONF
+> +       select OF_GPIO
+> +       select REGMAP_MMIO
+> +       select GPIOLIB_IRQCHIP
+
+Nice reuse of the frameworks! But this driver doesn't
+really use GPIOLIB_IRQCHIP, at least not as it looks now.
+
+> +#include <linux/gpio.h>
+
+Please use only <linux/gpio/driver.h> on new code.
+It should be just as fine.
+
+> +#include <linux/pinctrl/machine.h>
+
+This include should not be needed.
+
+> +struct pin_irq_map {
+> +       int pin; /* offset of pin in the managed range */
+> +       int irq; /* virq of the pin as fpint */
+> +       int type;
+> +       char irqname[8];
+> +};
+
+If pins are mapped 1-to-1 to IRQs from another irqchip,
+we are dealing with a hierarchical interrupt controller.
+But I guess I learn more as I read the code.
+
+> +static void _set_mux(struct m10v_pinctrl *pctl, unsigned int pin, bool gpio)
+
+I don't like __underscore_prefix on functions since they
+are semantically ambiguous. Try to find the perfect name that
+reflects what the function is really doing. m10v_pmx_commit_mux_setting()
+if nothing else.
+
+I do not understand the "gpio" argument for this function so please
+explain it:
+
+> +       if (gpio)
+> +               val &= ~BIT(offset);
+> +       else
+> +               val |= BIT(offset);
+
+So this bit is set if "gpio" is true, and that comes from here:
+
+> +static int m10v_pmx_set_mux(struct pinctrl_dev *pctldev,
+> +                            unsigned int function,
+> +                            unsigned int group)
 > +{
-> +	return __raw_readl(timer->base + reg);
+> +       struct m10v_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
+> +       u32 pin = pctl->gpins[group][0]; /* each group has exactly 1 pin */
+> +
+> +       _set_mux(pctl, pin, !function);
+
+So if no special function is passed to the .set_mux() callback,
+we assume that the pin is used for GPIO. Write this in a comment
+if I understand it correctly, so it gets easy to read the code.
+
+> +static int _set_direction(struct m10v_pinctrl *pctl,
+> +                       unsigned int pin, bool input)
+
+Same issue with __underscore.
+m10v_set_direction_commit()?
+
+> +static int
+> +m10v_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
+> +                       struct pinctrl_gpio_range *range,
+> +                       unsigned int pin, bool input)
+> +{
+> +       struct m10v_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
+> +
+> +       return _set_direction(pctl, pin, input);
 > +}
 > +
-> +static void davinci_timer_write(struct davinci_timer_data *timer,
-> +				unsigned int reg, unsigned int val)
+> +static int
+> +m10v_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
+> +                           struct pinctrl_gpio_range *range,
+> +                           unsigned int pin)
 > +{
-> +	__raw_writel(val, timer->base + reg);
+> +       struct m10v_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
+> +
+> +       _set_mux(pctl, pin, true);
+> +       return 0;
 > +}
 
-Since its a new driver, please use readl_relaxed() and writel_relaxed().
+This is a good solution.
 
-> +static void davinci_timer_init(void __iomem *base)
+> +static const struct pinmux_ops m10v_pmx_ops = {
+> +       .get_functions_count    = m10v_pmx_get_funcs_cnt,
+> +       .get_function_name      = m10v_pmx_get_func_name,
+> +       .get_function_groups    = m10v_pmx_get_func_groups,
+> +       .set_mux                = m10v_pmx_set_mux,
+> +       .gpio_set_direction     = m10v_pmx_gpio_set_direction,
+> +       .gpio_request_enable    = m10v_pmx_gpio_request_enable,
+> +};
+
+If GPIO and other functions cannot be used at the same time,
+then consider setting .strict = true, in struct pinmux_ops.
+(Else skip it, maybe add a comment that GPIO lines can be
+used orthogonal to functions.)
+
+> +static int m10v_gpio_get(struct gpio_chip *gc, unsigned int group)
 > +{
-> +	/* Set clock to internal mode and disable it. */
-> +	__raw_writel(0x0, base + DAVINCI_TIMER_REG_TCR);
-> +	/*
-> +	 * Reset both 32-bit timers, set no prescaler for timer 34, set the
-> +	 * timer to dual 32-bit unchained mode, unreset both 32-bit timers.
-> +	 */
-> +	__raw_writel(DAVINCI_TIMER_TGCR_DEFAULT, base + DAVINCI_TIMER_REG_TGCR);
-> +	/* Init both counters to zero. */
-> +	__raw_writel(0x0, base + DAVINCI_TIMER_REG_TIM12);
-> +	__raw_writel(0x0, base + DAVINCI_TIMER_REG_TIM34);
+> +       struct m10v_pinctrl *pctl =
+> +               container_of(gc, struct m10v_pinctrl, gc);
 
-here too.
+Please set the gpio chip data to struct m10v_pinctrl * and use:
 
+struct m10v_pinctrl *pctl = gpiochip_get_data(gc);
+
+in all these functions.
+
+> +static void (*gpio_set)(struct gpio_chip *, unsigned int, int);
+
+Why is this forward-declaration here in the middle of the code?
+It seems unnecessary, at least it warrants a comment.
+
+> +static int m10v_gpio_to_irq(struct gpio_chip *gc, unsigned int offset)
+> +{
+> +       struct m10v_pinctrl *pctl =
+> +               container_of(gc, struct m10v_pinctrl, gc);
+> +
+> +       return irq_linear_revmap(pctl->irqdom, offset);
 > +}
-> +
-> +int __init davinci_timer_register(struct clk *clk,
-> +				  const struct davinci_timer_cfg *timer_cfg)
+
+Something is fishy here because when you use GPIOLIB_IRQCHIP
+.to_irq() should be handled by the gpiolib core.
+
+However if you rewrite this driver to use hierarchical irqdomain,
+you still have to provide a .to_irq() function.
+
+> +static struct lock_class_key gpio_lock_class;
+> +static struct lock_class_key gpio_request_class;
+
+These forward declarations should not be here, they should
+be coming from <linux/gpio/driver.h>
+
+> +static int pin_to_extint(struct m10v_pinctrl *pctl, int pin)
 > +{
-
-[...]
-
-> +	clocksource = kzalloc(sizeof(*clocksource), GFP_KERNEL);
-> +	if (!clocksource) {
-> +		pr_err("%s: Error allocating memory for clocksource data\n",
-> +		       __func__);
-> +		return -ENOMEM;
-> +	}
+> +       int extint;
 > +
-> +	clocksource->dev.name = "tim34";
-> +	clocksource->dev.rating = 300;
-> +	clocksource->dev.read = davinci_timer_clksrc_read;
-> +	clocksource->dev.mask = CLOCKSOURCE_MASK(DAVINCI_TIMER_CLKSRC_BITS);
-> +	clocksource->dev.flags = CLOCK_SOURCE_IS_CONTINUOUS;
-> +	clocksource->timer.set_period = davinci_timer_set_period_std;
-> +	clocksource->timer.mode = DAVINCI_TIMER_MODE_PERIODIC;
-> +	clocksource->timer.base = base;
+> +       for (extint = 0; extint < pctl->extints; extint++)
+> +               if (pctl->fpint[extint].pin == pin)
+> +                       break;
 > +
-> +	if (timer_cfg->cmp_off)
-> +		clocksource->timer.regs = &davinci_timer_tim12_regs;
-> +	else
-> +		clocksource->timer.regs = &davinci_timer_tim34_regs;
+> +       if (extint == pctl->extints)
+> +               return -1;
+> +
+> +       return extint;
+> +}
 
-We should set clocksource->dev.name based on cmp_off too, otherwise it
-will be confusing to have a device called "tim34" using tim12 registers.
+This looks like it should be a hierarchical irqchip.
 
-> +/**
-> + * struct davinci_timer_cfg - davinci clocksource driver configuration struct
-> + * @reg:        register range resource
-> + * @irq:        clockevent and clocksource interrupt resources
-> + * @cmp_off:    if set - it specifies the compare register used for clockevent
-> + *
-> + * Note: if the compare register is specified, the driver will use the bottom
-> + * clock half for both clocksource and clockevent and the compare register
-> + * to generate event irqs. The user must supply the correct compare register
-> + * interrupt number.
-> + *
-> + * This is only used by da830 the DSP of which uses the top half. The timer
-> + * driver still configures the top half to run in free-run mode.
+I am working on generic mappings of parent<->child IRQ
+offsets for gpiolib but don't know when it will be there.
 
-This note helps. Thanks!
+> +static void update_trigger(struct m10v_pinctrl *pctl, int extint)
 
-Regards,
-Sekhar
+Normally this is .set_type() on the irqchip.
+
+> +{
+> +       int type = pctl->fpint[extint].type;
+
+But since you are not using hierarchical irqchip, this stuff
+appears here instead, which becomes a kind of workaround.
+So use hierarchical irqchip instead.
+
+> +static irqreturn_t m10v_gpio_irq_handler(int irq, void *data)
+> +{
+> +       struct m10v_pinctrl *pctl = data;
+> +       int i, pin;
+> +       u32 val;
+> +
+> +       for (i = 0; i < pctl->extints; i++)
+> +               if (pctl->fpint[i].irq == irq)
+> +                       break;
+> +       if (i == pctl->extints) {
+> +               pr_err("%s:%d IRQ(%d)!\n", __func__, __LINE__, irq);
+> +               return IRQ_NONE;
+> +       }
+> +
+> +       if (!pctl->exiu)
+> +               return IRQ_NONE;
+> +
+> +       val = readl_relaxed(pctl->exiu + EIREQSTA);
+> +       if (!(val & BIT(i))) {
+> +               pr_err("%s:%d i=%d EIREQSTA=0x%x IRQ(%d)!\n",
+> +                               __func__, __LINE__, i, val, irq);
+> +               return IRQ_NONE;
+> +       }
+> +
+> +       pin = pctl->fpint[i].pin;
+> +       generic_handle_irq(irq_linear_revmap(pctl->irqdom, pin));
+> +
+> +       return IRQ_HANDLED;
+> +}
+
+This becomes a complex workaround for not having hierarchical
+irqchip.
+
+> +static int m10v_pinctrl_probe(struct platform_device *pdev)
+> +{
+> +       struct device_node *np = pdev->dev.of_node;
+> +       struct pinctrl_dev *pctl_dev;
+> +       struct pin_irq_map fpint[32];
+> +       struct m10v_pinctrl *pctl;
+> +       struct pinctrl_desc *pd;
+> +       struct gpio_chip *gc;
+> +       struct resource *res;
+> +       int idx, i, ret, extints, tpins;
+> +
+> +       extints = of_irq_count(np);
+
+So this means that you have all the IRQs from the parent interrupt
+controller defined in the device tree.
+
+This has been done in some drivers but they are bad example.
+
+Instead use hierarchical irqchip, and do the mappings from parent
+to child offset directly in the driver.
+
+Hierarchial irqdomains are not very old, so I am sorry if the kernel
+contains a number of bad examples.
+
+Examples:
+drivers/irqchip/irq-meson-gpio.c
+drivers/pinctrl/stm32/pinctrl-stm32.c
+https://marc.info/?l=linux-arm-kernel&m=154923023907623&w=2
+https://marc.info/?l=linux-arm-kernel&m=154923038707686&w=2
+
+You can also look at Brian Masney's series where he's converting
+some of Qualcomms drivers to use hierarchical interrupts.
+
+> +       pctl = devm_kzalloc(&pdev->dev, sizeof(*pctl) +
+> +                               sizeof(struct pin_irq_map) * extints,
+> +                               GFP_KERNEL);
+
+This should use struct_size() these days, but this will not be needed
+when you switch to hierarchical irqdomain.
+
+> +       for (idx = 0, i = 0; i < pctl->extints; i++) {
+> +               int j = 0, irq = platform_get_irq(pdev, i);
+
+And this code goes away as well. Instead the mapping from
+child to parent irq offset happens in statically assigned data.
+If that varies between implementations of this pin controller,
+you should use unique compatible strings to discern them.
+
+> +       gc->base = -1;
+> +       gc->ngpio = tpins;
+> +       gc->label = dev_name(&pdev->dev);
+> +       gc->owner = THIS_MODULE;
+> +       gc->of_node = np;
+> +       gc->direction_input = m10v_gpio_direction_input;
+> +       gc->direction_output = m10v_gpio_direction_output;
+> +       gc->get = m10v_gpio_get;
+> +       gc->set = gpio_set;
+> +       gc->to_irq = m10v_gpio_to_irq;
+> +       gc->request = gpiochip_generic_request;
+> +       gc->free = gpiochip_generic_free;
+> +       ret = gpiochip_add(gc);
+
+Please use devm_gpiochip_add_data() and pass the pin controller struct
+as data.
+
+Yours,
+Linus Walleij
 
 _______________________________________________
 linux-arm-kernel mailing list
