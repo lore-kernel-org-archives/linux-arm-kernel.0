@@ -2,89 +2,71 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AA3E2C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:10:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B59DC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:11:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7BC4920844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:10:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6DBCE2177B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:11:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SUofMK0y";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="qp5Lk+Fd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7BC4920844
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ic8HqdwE";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="QZ+KcbJV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6DBCE2177B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8ehsOaexBvc4Kcrhaf10jE88Nz3w0F2XKZaLIe55iU4=; b=SUofMK0yG0aOop
-	dndtz1REe1K4k0rpfpb8u1ZRYNfiuGg/X17zGuME7vCOjK0FvYMODJuWk8+8Wj5BSCmoOXUrqFwxT
-	dDjb2HsGRYs/ZFNMu7Wn0pXD15L9uRf+xk5ow5jdZnKJ/2qXCamyIJt+z+v6/aeAw3EhQwTNY+oXF
-	hYvAFkDtgParH2Iizrp/58X4B1ktiYU/VDbL3se/JCmy4a4+MbDhpumKhixDVLEeyozJEaDzjjQGF
-	jwKOfVb6IU3c1qty9UGxWPYOH1jvY+FGTopN+suJ4YvNIODLglGaFWL1nDRdV+0Q3Q6oQ8H4uCVan
-	eKJVt/yMXqLM58dKHV3w==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
+	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	References:List-Owner; bh=cP3IMiVTLhSbhgddDc4BTvz04iHFDHDVKgIxsJtE9jc=; b=Ic8
+	HqdwE+0fXIsB6pnccawsXtDoo5jrt5+EWpvXyY/q2nerZ7iYp9x2Mb2QfhROuugjAGBwg30xOxvoL
+	Xq5HuOtCfqVQKvr9Yw1Ii4v2vAoKZu70g227/bjIFbtqCOE+RkEv4ixpVtZOJpJhKc2zEyqmU1lRO
+	N0TwsovD5l4Ph3PgsCL5lvaQGnFiL/eb39FUYXlqRISo+b2lOGIqAV8iNOIabzYaykMM92LkWtMWE
+	llEr7QbALkmUUrMQuy6WAnLMD/P+8XQjIRUsl4KsPyYhYRidGn159P9zBMDRQ/tW0JsVXcrhq3qEp
+	DuyiLSfG4362ngKNJ0KK17ghwWKThBw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs5vZ-0006no-Tn; Fri, 08 Feb 2019 13:10:45 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+	id 1gs5w8-0007B7-Fg; Fri, 08 Feb 2019 13:11:20 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs5vW-0006nI-0V
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 13:10:43 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x18D9CMd023141;
- Fri, 8 Feb 2019 07:09:12 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549631352;
- bh=O8g8S2kcSDX2YUP4kXKQs1K4athPkpJdPZuH4Q8eASE=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=qp5Lk+FdDR5Ta3QPuiOMnWGc/Zswe0e9RwkT3y1CFx1V1vaNwAKefghnurpCI/Bmg
- PXhWymeQxe40wqM+4o6SjSAL0Ky0pEKVmllHBCWCKJmWhZ2HGS7Kqgf5qWcoPut8vB
- kJYTVU/YnIuSSItfUQ6B1Q2rswRQPKUgL4b7qnTc=
-Received: from DLEE107.ent.ti.com (dlee107.ent.ti.com [157.170.170.37])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x18D9CWM040537
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 8 Feb 2019 07:09:12 -0600
-Received: from DLEE103.ent.ti.com (157.170.170.33) by DLEE107.ent.ti.com
- (157.170.170.37) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 8
- Feb 2019 07:09:11 -0600
-Received: from dflp33.itg.ti.com (10.64.6.16) by DLEE103.ent.ti.com
- (157.170.170.33) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 8 Feb 2019 07:09:11 -0600
-Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x18D97tR005676;
- Fri, 8 Feb 2019 07:09:08 -0600
-Subject: Re: [PATCH v2 01/12] ARM: dts: da850: fix interrupt numbers for
- clocksource
-To: David Lechner <david@lechnology.com>, Bartosz Golaszewski <brgl@bgdev.pl>, 
- Kevin Hilman <khilman@kernel.org>, Daniel Lezcano
- <daniel.lezcano@linaro.org>, Rob Herring <robh+dt@kernel.org>, Mark Rutland
- <mark.rutland@arm.com>, Thomas Gleixner <tglx@linutronix.de>
-References: <20190204171757.32073-1-brgl@bgdev.pl>
- <20190204171757.32073-2-brgl@bgdev.pl>
- <ce4c305e-7d76-6028-07e4-4922f3c700bf@lechnology.com>
-From: Sekhar Nori <nsekhar@ti.com>
-Message-ID: <4325c375-0519-7775-e4a9-8bd70aa59f94@ti.com>
-Date: Fri, 8 Feb 2019 18:39:07 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <ce4c305e-7d76-6028-07e4-4922f3c700bf@lechnology.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+ id 1gs5w3-00079f-VK
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 13:11:17 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
+ List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
+ List-Archive; bh=EiIrpbKtRrtKbnRnQEu849eNL9UnFqfXEdpzWHPHkeE=; b=QZ+KcbJVLWs0
+ GPDo4HxQSsuugnbjNmb0Wy4wZihTNDNlrVTSQePDHK/P8soNadsQSUIxCV7bZQOV6TjL8N9qo7UxA
+ VmtLVq8CTg61d+XySZv2zBvHeHrEEH9hJN1qe27jqwOs9ssrfPP8mlRG6Qik9L6oOETJYekv4QBxT
+ yfkSc=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=debutante.sirena.org.uk)
+ by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1gs5vv-0001JQ-Us; Fri, 08 Feb 2019 13:11:08 +0000
+Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
+ id 813F71127F30; Fri,  8 Feb 2019 13:11:07 +0000 (GMT)
+From: Mark Brown <broonie@kernel.org>
+To: Olivier Moysan <olivier.moysan@st.com>
+Subject: Applied "SoC: stm32: i2s: manage clock power" to the asoc tree
+In-Reply-To: <1549622994-13810-3-git-send-email-olivier.moysan@st.com>
+X-Patchwork-Hint: ignore
+Message-Id: <20190208131107.813F71127F30@debutante.sirena.org.uk>
+Date: Fri,  8 Feb 2019 13:11:07 +0000 (GMT)
+X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_051042_143930_A54C961D 
-X-CRM114-Status: GOOD (  14.62  )
+X-CRM114-CacheID: sfid-20190208_051116_149648_8B2BD802 
+X-CRM114-Status: GOOD (  16.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,38 +78,150 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, stable@vger.kernel.org,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Cc: alsa-devel@alsa-project.org, olivier.moysan@st.com, alexandre.torgue@st.com,
+ linux-kernel@vger.kernel.org, arnaud.pouliquen@st.com, tiwai@suse.com,
+ lgirdwood@gmail.com, broonie@kernel.org, mcoquelin.stm32@gmail.com,
+ perex@perex.cz, linux-stm32@st-md-mailman.stormreply.com,
+ linux-arm-kernel@lists.infradead.org, benjamin.gaignard@st.com
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 05/02/19 6:48 AM, David Lechner wrote:
-> On 2/4/19 11:17 AM, Bartosz Golaszewski wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> The timer interrupts specified in commit 3652e2741f42 ("ARM: dts:
->> da850: Add clocks") are wrong but since the current timer code
->> hard-codes them, the bug was never spotted.
->>
->> This patch must go into stable since, once we introduce a proper
->> clocksource driver, devices with buggy device tree will stop booting.
->>
->> Fixes: 3652e2741f42 ("ARM: dts: da850: Add clocks")
->> Cc: stable@vger.kernel.org
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
-> 
-> Reviewed-by: David Lechner <david@lechnology.com>
+The patch
 
-This patch is already in ARM SoC. Should be soon in Linus's tree too.
+   SoC: stm32: i2s: manage clock power
 
-https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/commit/?h=fixes&id=e3966a766865da7ced1dece663697861dd5cf103
+has been applied to the asoc tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
-Sekhar
+Mark
+
+From 6a68eeee0f03ab371bec7a719795f69b05be183f Mon Sep 17 00:00:00 2001
+From: Olivier Moysan <olivier.moysan@st.com>
+Date: Fri, 8 Feb 2019 11:49:54 +0100
+Subject: [PATCH] SoC: stm32: i2s: manage clock power
+
+Kernel clock management:
+Enable/disable I2S kernel clock on audio stream startup/shutdown.
+
+Peripheral clock management:
+Manage I2S peripheral clock power through regmap services.
+
+Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/stm/stm32_i2s.c | 44 +++++++++++++--------------------------
+ 1 file changed, 15 insertions(+), 29 deletions(-)
+
+diff --git a/sound/soc/stm/stm32_i2s.c b/sound/soc/stm/stm32_i2s.c
+index dbe23a709d24..a25919d32187 100644
+--- a/sound/soc/stm/stm32_i2s.c
++++ b/sound/soc/stm/stm32_i2s.c
+@@ -545,9 +545,16 @@ static int stm32_i2s_startup(struct snd_pcm_substream *substream,
+ 			     struct snd_soc_dai *cpu_dai)
+ {
+ 	struct stm32_i2s_data *i2s = snd_soc_dai_get_drvdata(cpu_dai);
++	int ret;
+ 
+ 	i2s->substream = substream;
+ 
++	ret = clk_prepare_enable(i2s->i2sclk);
++	if (ret < 0) {
++		dev_err(cpu_dai->dev, "Failed to enable clock: %d\n", ret);
++		return ret;
++	}
++
+ 	spin_lock(&i2s->lock_fd);
+ 	i2s->refcount++;
+ 	spin_unlock(&i2s->lock_fd);
+@@ -674,6 +681,8 @@ static void stm32_i2s_shutdown(struct snd_pcm_substream *substream,
+ 
+ 	regmap_update_bits(i2s->regmap, STM32_I2S_CGFR_REG,
+ 			   I2S_CGFR_MCKOE, (unsigned int)~I2S_CGFR_MCKOE);
++
++	clk_disable_unprepare(i2s->i2sclk);
+ }
+ 
+ static int stm32_i2s_dai_probe(struct snd_soc_dai *cpu_dai)
+@@ -874,49 +883,26 @@ static int stm32_i2s_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
+-	i2s->regmap = devm_regmap_init_mmio(&pdev->dev, i2s->base,
+-					    i2s->regmap_conf);
++	i2s->regmap = devm_regmap_init_mmio_clk(&pdev->dev, "pclk",
++						i2s->base, i2s->regmap_conf);
+ 	if (IS_ERR(i2s->regmap)) {
+ 		dev_err(&pdev->dev, "regmap init failed\n");
+ 		return PTR_ERR(i2s->regmap);
+ 	}
+ 
+-	ret = clk_prepare_enable(i2s->pclk);
+-	if (ret) {
+-		dev_err(&pdev->dev, "Enable pclk failed: %d\n", ret);
+-		return ret;
+-	}
+-
+-	ret = clk_prepare_enable(i2s->i2sclk);
+-	if (ret) {
+-		dev_err(&pdev->dev, "Enable i2sclk failed: %d\n", ret);
+-		goto err_pclk_disable;
+-	}
+-
+ 	ret = devm_snd_soc_register_component(&pdev->dev, &stm32_i2s_component,
+ 					      i2s->dai_drv, 1);
+ 	if (ret)
+-		goto err_clocks_disable;
++		return ret;
+ 
+ 	ret = devm_snd_dmaengine_pcm_register(&pdev->dev,
+ 					      &stm32_i2s_pcm_config, 0);
+ 	if (ret)
+-		goto err_clocks_disable;
++		return ret;
+ 
+ 	/* Set SPI/I2S in i2s mode */
+-	ret = regmap_update_bits(i2s->regmap, STM32_I2S_CGFR_REG,
+-				 I2S_CGFR_I2SMOD, I2S_CGFR_I2SMOD);
+-	if (ret)
+-		goto err_clocks_disable;
+-
+-	return ret;
+-
+-err_clocks_disable:
+-	clk_disable_unprepare(i2s->i2sclk);
+-err_pclk_disable:
+-	clk_disable_unprepare(i2s->pclk);
+-
+-	return ret;
++	return regmap_update_bits(i2s->regmap, STM32_I2S_CGFR_REG,
++				  I2S_CGFR_I2SMOD, I2S_CGFR_I2SMOD);
+ }
+ 
+ static int stm32_i2s_remove(struct platform_device *pdev)
+-- 
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
