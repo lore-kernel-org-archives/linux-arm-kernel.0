@@ -7,18 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6DD23C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:52:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C316CC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:52:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3DA292146E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:52:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 975FC20863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:52:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rsyn6b3K";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="Lb1VSkmg";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="yI2trusg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3DA292146E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tktVKs+D";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="PCwknzLr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 975FC20863
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,85 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ev7UY7Xa3TUY7yBYpJr8w2M7bKydBJhKzKPB2S87xl4=; b=Rsyn6b3KtDGg+6
-	xsXI/+3WrWHej5RjGPXex3FyuDuDzL0zaCUq2e/ITA4M06sJ/gQbgbyHJhDeNLunJcqLVJ9ABRJ6B
-	TU+2Wo3ham+K2oHjrV5ghi6FKdvBVPD2eSvGwGo4OCjYUYQ4qTSJdE1TL9PIe3k98VDZ6htp956FE
-	X/UKB4UVQD5IvSnBuTCCZ9mqUSkNvqqHcALJZMXzgFsf9aTHbYoN9juR9CN8AOGh1U7FQHENcZV/E
-	yuzB3jbb13+gsrjdgUzBeQtAgP5ow00gEumWFpanFnxSbkIAqTfMEnctdJVE3hmCd124LkRsQ+ats
-	ry53c5VBwAXk6K9O5eaw==;
+	List-Owner; bh=xHSUWerZhI4JQ/AT5KgemtXfaNUuiUCuXPHNmNTK7r8=; b=tktVKs+DeeNWLX
+	0bY99fcuyJA68QEE8APxmWZWDCr1+wykixGOslhxyknFkbRhnpxFdV/oqGtnr66Y+o4DrPu7YTfWm
+	sWw1K6rtUIKEciwnuZFqNHt/3oK3AgRqQX2G6im23aPmc1s+/UHa1/7/hO8s1cuBEB2dFeivrTpn1
+	je54mnh99YjVfltws8qtKw3AbfXh9wnHnMHdFsc6wUgGimom+tg6Z9P8qiivJ7fSiCnr0oUgrXcOc
+	AxUggd4nKMOcuaeQg7Ch15PHIFB+MbY4K4q7qMwo8xyZ/gcu9hflfLFSxAXxtDASKqgGjB2HwGaxl
+	olPxUAe+fiabCRHIgDbg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsAKK-0005VH-4u; Fri, 08 Feb 2019 17:52:36 +0000
-Received: from merlin.infradead.org ([205.233.59.134])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsA3r-0007RH-Qb
- for linux-arm-kernel@bombadil.infradead.org; Fri, 08 Feb 2019 17:35:35 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=yRSCRg5rDKszKeNaGzOxkxAIRW2gEt2oxrvbVDGGZhU=; b=Lb1VSkmg67UZZrMnffDeEQqWw9
- 9VQAxi/G5YvCBpn/CDK+9CV92hpxmfEDTozoA2SAGpjDPwBQVgRjHLeamNnR3dZ7A4/+yk5nlCeLF
- cihjGw8f0c+Y/y+Zua4OQuA36jNvsJHRw5tyoawAeGCrXcd8STKY69eop0wLCmVUw0hySR0plwTjQ
- hRicLITJbGgB7nRI9In38nnGnhiDIDULYD/Xtg20YRpD4fcE8sKGM1qHh+qoFeCXun47sLsrBaBKl
- oZrNKEUVgKEKRSE+GdOg4EDeED8zF98UsKY8yvfYk2/hfAplMuN0ILjOC1RVYon13mEYXvp2eEin1
- 8wCmt+KQ==;
+	id 1gsAKH-0005Su-6p; Fri, 08 Feb 2019 17:52:33 +0000
 Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsA3p-0005qf-I9
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 17:35:34 +0000
-Received: by mail-wm1-x341.google.com with SMTP id d15so4361767wmb.3
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gsA3X-00072G-Rh
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 17:35:22 +0000
+Received: by mail-wm1-x341.google.com with SMTP id h22so7334040wmb.0
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 08 Feb 2019 09:35:33 -0800 (PST)
+ Fri, 08 Feb 2019 09:35:15 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=yRSCRg5rDKszKeNaGzOxkxAIRW2gEt2oxrvbVDGGZhU=;
- b=yI2trusg39CqSSY1w5JVHaY8GJ2lA76s7TIlaufRNc+1O5UkB4tm3/3kJ1ebzOUJcl
- x7B+uRTt5tCoXT6wqScf+AU2LiyjQ5vAsWaotGEC8u3Tj+0DNlTsh4/JhvC1l/oSqsJc
- MGcNS2NcN9/axrZsnJuKojz5WwGdcqcWuFvSx0GGkgsvX7HTSNWAjFOnfpM41bervt1l
- RFa9Orv8b51MUA9XTFaey6S+GJRlQtUA7V6dyhsWaLT+TCTfS/1LOO7MjhWMaN4Cbopf
- MgCf/G6QxDyKHIuLos8WPItjzhV13bPCczU/M5m5EeTbwyc3TO+6XI6jueecJl8m6S8f
- wPqg==
+ bh=3iFNXNJpMgxpSvLUlNs5UzXd58xkcnpCTcNMUIsP+iw=;
+ b=PCwknzLrGE9EkAPzmVpHGom+Jc8LHmbEsx4Cq4MW/tXIpep5Tg0bDaMM7rPs9h+j2y
+ kxhpyTJdg4+4ePwJv1rGxJFH5wLXc7ezkJuX4/tWZGyKihkikjxcXps2Lq5EOpFBB1If
+ kkUD8xZEHUoxkLWwT8b8wKfM9dYJ673DqKQtGcGBbZXq8Y168lwxukjgP2Ba6vOWNp+5
+ zOHUN9YKctkBJd9NWB11Vk3oqTtVJmEp0r8uDU3bcBbRErt3c7BIz45Ac3rqrkeQ84ld
+ iDfJZUt6ZroVaPotuW50ctqZ2ki7OGCNhMrNPGHPV5deLUkfSl2HNciMzIH3VLubMTA8
+ 645Q==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=yRSCRg5rDKszKeNaGzOxkxAIRW2gEt2oxrvbVDGGZhU=;
- b=UnuNfYT9RbQZhRjy8ZpZ/x/z8tmuTOZtCSZ7e69Y5Oyc5HfBODgEcv4wN7yh2ERjFt
- GjnRlmJbNhH5k4LXHXbNuocuInMUlqGk4lJi7qdBwKJxFfY41wk9bBYpJa3p1WbJSqv1
- R+j62gIHvdaT6do07TSgG1FDOUCK68XAc/BsqqvGfiFOjxSCwSJ62sJoAv1IL/O3bagQ
- d4jgi/zmgSKBWU7kXn0mwwP5QpUuTjxE/l4J/Hdpz0ICWj6LDjrO7I4rvtnKgxUzjWje
- ALqVmTRlh4LZXeThwO5HieP1FMu+e6cAOu8BJuKGlCSBhw86r2OI1PYDx2ydrxC9UGpn
- WsYw==
-X-Gm-Message-State: AHQUAuZ13amJeF77uovP0ugQY98btdzP4dvJxoICep1ICnDIDFg4Xpxv
- xpz4HTA+GpHOS8oUzLzxFDb++Q==
-X-Google-Smtp-Source: AHgI3Ibae8GrffpMyzyML+a18ZhuluLag5gpbKjmTe+Iy3mLyhDZ1k1djQPSqMi4BX+CLHfZt3TvcQ==
-X-Received: by 2002:a1c:dc86:: with SMTP id t128mr13151890wmg.42.1549647331524; 
- Fri, 08 Feb 2019 09:35:31 -0800 (PST)
+ bh=3iFNXNJpMgxpSvLUlNs5UzXd58xkcnpCTcNMUIsP+iw=;
+ b=DVF4vsb9Dwpc06n1ezgFPy9q/dBYLETicqZ1W2+/45nmOaNs6QKs1ola31r2APNftN
+ DxjI0G2fTqiGrDvENCtlL48QcCQeHepDoxzGw3BU51Gne0sO6t6u+E0yntlxgbQ4dPzS
+ 01q7yUegUJv1pUYLKf7S5iOs0+OhV+ve7l/pf29wFJkCpJ8jQea0UH9BStOdWOkAN4Kz
+ 10FhNgverHTy/OWYmRjhlRaFZGMv74dbKjCTffs5mDoc4wBDPljbrTlKgxfSGr/caZ2Q
+ i592GpBOpi3KJz7apbQWTVAxUt3envWGL2udM1xQQ/kvD/8Ut9NHpeg4/6SZqNv3PlHl
+ hNAA==
+X-Gm-Message-State: AHQUAuYVylWMWsqByDIH4z+amE5ibsC8QnUfFzk6xxqkY+nc16xtMbcM
+ vDDd9ysWo5qGt+iO67++cGr35Q==
+X-Google-Smtp-Source: AHgI3IaPVfW4ADR2MHJbxzRaNDN4otCcg/Z4V3FgMmW0ZYeHIiakaQ8iCqUFz2QmYgcW6mKWfmuw0A==
+X-Received: by 2002:adf:e54a:: with SMTP id z10mr17015431wrm.238.1549647314378; 
+ Fri, 08 Feb 2019 09:35:14 -0800 (PST)
 Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id p17sm354714wrv.59.2019.02.08.09.35.30
+ by smtp.gmail.com with ESMTPSA id p17sm354714wrv.59.2019.02.08.09.35.13
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 08 Feb 2019 09:35:30 -0800 (PST)
+ Fri, 08 Feb 2019 09:35:13 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Daniel Lezcano <daniel.lezcano@linaro.org>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Thomas Gleixner <tglx@linutronix.de>, David Lechner <david@lechnology.com>
-Subject: [PATCH v2 21/33] ARM: davinci: cp-intc: add a wrapper around
- cp_intc_init()
-Date: Fri,  8 Feb 2019 18:34:46 +0100
-Message-Id: <20190208173458.4801-22-brgl@bgdev.pl>
+Subject: [PATCH v2 07/33] ARM: davinci: select SPARSE_IRQ
+Date: Fri,  8 Feb 2019 18:34:32 +0100
+Message-Id: <20190208173458.4801-8-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190208173458.4801-1-brgl@bgdev.pl>
 References: <20190208173458.4801-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_123533_634757_4AD1182B 
-X-CRM114-Status: GOOD (  16.06  )
+X-CRM114-CacheID: sfid-20190208_093516_218320_8BDE4E99 
+X-CRM114-Status: GOOD (  14.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -127,125 +109,122 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We're going to extend the cp_intc_init() function with a config
-structure so we can drop the intc-related fields from davinci_soc_info.
+Everything is in place now for SPARSE_IRQ. Select it and set
+DAVINCI_INTC_START to NR_IRQS.
 
-Once we do it, we won't be able to use this routine directly as the
-init_irq callback. Wrap the calls in additional helpers that don't
-take parameters and can be assigned to init_irq.
+We now need to include mach/irqs.h in a couple places as it is no
+longer indirectly included after selecting SPARSE_IRQ.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Reviewed-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/mach-davinci/board-da830-evm.c     | 2 +-
- arch/arm/mach-davinci/board-da850-evm.c     | 2 +-
- arch/arm/mach-davinci/board-mityomapl138.c  | 2 +-
- arch/arm/mach-davinci/board-omapl138-hawk.c | 2 +-
- arch/arm/mach-davinci/da830.c               | 5 +++++
- arch/arm/mach-davinci/da850.c               | 5 +++++
- arch/arm/mach-davinci/include/mach/da8xx.h  | 2 ++
- 7 files changed, 16 insertions(+), 4 deletions(-)
+ arch/arm/Kconfig                            | 1 +
+ arch/arm/mach-davinci/board-da830-evm.c     | 1 +
+ arch/arm/mach-davinci/board-da850-evm.c     | 1 +
+ arch/arm/mach-davinci/board-dm644x-evm.c    | 1 +
+ arch/arm/mach-davinci/devices-da8xx.c       | 1 +
+ arch/arm/mach-davinci/include/mach/common.h | 4 +++-
+ arch/arm/mach-davinci/include/mach/irqs.h   | 1 -
+ arch/arm/mach-davinci/irq.c                 | 1 +
+ 8 files changed, 9 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f7770fdcad68..1037f49e050f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -595,6 +595,7 @@ config ARCH_DAVINCI
+ 	select PM_GENERIC_DOMAINS if PM
+ 	select PM_GENERIC_DOMAINS_OF if PM && OF
+ 	select RESET_CONTROLLER
++	select SPARSE_IRQ
+ 	select USE_OF
+ 	select ZONE_DMA
+ 	help
 diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index f81c92b9cf07..1ae7dcb8f59d 100644
+index c4da635ee4ce..41f5a51fee9a 100644
 --- a/arch/arm/mach-davinci/board-da830-evm.c
 +++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -694,7 +694,7 @@ static void __init da830_evm_map_io(void)
- MACHINE_START(DAVINCI_DA830_EVM, "DaVinci DA830/OMAP-L137/AM17x EVM")
- 	.atag_offset	= 0x100,
- 	.map_io		= da830_evm_map_io,
--	.init_irq	= cp_intc_init,
-+	.init_irq	= da830_init_irq,
- 	.init_time	= da830_init_time,
- 	.init_machine	= da830_evm_init,
- 	.init_late	= davinci_init_late,
+@@ -36,6 +36,7 @@
+ #include <asm/mach/arch.h>
+ 
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include "cp_intc.h"
+ #include <mach/mux.h>
+ #include <mach/da8xx.h>
 diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 1cc49e7bf128..8022ca8ac4ef 100644
+index 44bca048dfd0..317f48560534 100644
 --- a/arch/arm/mach-davinci/board-da850-evm.c
 +++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -1522,7 +1522,7 @@ static void __init da850_evm_map_io(void)
- MACHINE_START(DAVINCI_DA850_EVM, "DaVinci DA850/OMAP-L138/AM18x EVM")
- 	.atag_offset	= 0x100,
- 	.map_io		= da850_evm_map_io,
--	.init_irq	= cp_intc_init,
-+	.init_irq	= da850_init_irq,
- 	.init_time	= da850_init_time,
- 	.init_machine	= da850_evm_init,
- 	.init_late	= davinci_init_late,
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index eb6a9465f229..815f155eb349 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -623,7 +623,7 @@ static void __init mityomapl138_map_io(void)
- MACHINE_START(MITYOMAPL138, "MityDSP-L138/MityARM-1808")
- 	.atag_offset	= 0x100,
- 	.map_io		= mityomapl138_map_io,
--	.init_irq	= cp_intc_init,
-+	.init_irq	= da850_init_irq,
- 	.init_time	= da850_init_time,
- 	.init_machine	= mityomapl138_init,
- 	.init_late	= davinci_init_late,
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index 7f852722ff08..673d890c2e3e 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -461,7 +461,7 @@ static void __init omapl138_hawk_map_io(void)
- MACHINE_START(OMAPL138_HAWKBOARD, "AM18x/OMAP-L138 Hawkboard")
- 	.atag_offset	= 0x100,
- 	.map_io		= omapl138_hawk_map_io,
--	.init_irq	= cp_intc_init,
-+	.init_irq	= da850_init_irq,
- 	.init_time	= da850_init_time,
- 	.init_machine	= omapl138_hawk_init,
- 	.init_late	= davinci_init_late,
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index ca903c9105e4..5cfd30c57429 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -821,6 +821,11 @@ void __init da830_init(void)
- 	WARN(!da8xx_syscfg0_base, "Unable to map syscfg0 module");
- }
+@@ -46,6 +46,7 @@
+ #include "cp_intc.h"
+ #include <mach/da8xx.h>
+ #include <mach/mux.h>
++#include <mach/irqs.h>
+ #include "sram.h"
  
-+void __init da830_init_irq(void)
-+{
-+	cp_intc_init();
-+}
+ #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index b80c4ee76217..16ffed2525e6 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -36,6 +36,7 @@
+ #include <asm/mach/arch.h>
+ 
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include <linux/platform_data/i2c-davinci.h>
+ #include <mach/serial.h>
+ #include <mach/mux.h>
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index 298165095d31..3104a3eb2ddf 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -25,6 +25,7 @@
+ #include <mach/cputype.h>
+ #include <mach/da8xx.h>
+ #include <mach/time.h>
++#include <mach/irqs.h>
+ 
+ #include "asp.h"
+ #include "cpuidle.h"
+diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
+index d840023eaaac..1ceed0345988 100644
+--- a/arch/arm/mach-davinci/include/mach/common.h
++++ b/arch/arm/mach-davinci/include/mach/common.h
+@@ -17,7 +17,9 @@
+ #include <linux/types.h>
+ #include <linux/reboot.h>
+ 
+-#define DAVINCI_INTC_START		0
++#include <asm/irq.h>
 +
- void __init da830_init_time(void)
- {
- 	void __iomem *pll;
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 486d53481636..6df6994c0f26 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -759,6 +759,11 @@ void __init da850_init(void)
- 	WARN(!da8xx_syscfg1_base, "Unable to map syscfg1 module");
- }
++#define DAVINCI_INTC_START		NR_IRQS
+ #define DAVINCI_INTC_IRQ(_irqnum)	(DAVINCI_INTC_START + (_irqnum))
  
-+void __init da850_init_irq(void)
-+{
-+	cp_intc_init();
-+}
-+
- void __init da850_init_time(void)
- {
- 	void __iomem *pll0;
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index ab4a57f433f4..1618b30661a9 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -88,10 +88,12 @@ extern unsigned int da850_max_speed;
- #define DA8XX_ARM_RAM_BASE	0xffff0000
+ void davinci_timer_init(struct clk *clk);
+diff --git a/arch/arm/mach-davinci/include/mach/irqs.h b/arch/arm/mach-davinci/include/mach/irqs.h
+index 03c446635301..8f9fc7a56ce8 100644
+--- a/arch/arm/mach-davinci/include/mach/irqs.h
++++ b/arch/arm/mach-davinci/include/mach/irqs.h
+@@ -401,6 +401,5 @@
+ /* da850 currently has the most gpio pins (144) */
+ #define DAVINCI_N_GPIO			144
+ /* da850 currently has the most irqs so use DA850_N_CP_INTC_IRQ */
+-#define NR_IRQS				(DA850_N_CP_INTC_IRQ + DAVINCI_N_GPIO)
  
- void da830_init(void);
-+void da830_init_irq(void);
- void da830_init_time(void);
- void da830_register_clocks(void);
- 
- void da850_init(void);
-+void da850_init_irq(void);
- void da850_init_time(void);
- void da850_register_clocks(void);
+ #endif /* __ASM_ARCH_IRQS_H */
+diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
+index de31be42a394..16ac28833eb4 100644
+--- a/arch/arm/mach-davinci/irq.c
++++ b/arch/arm/mach-davinci/irq.c
+@@ -28,6 +28,7 @@
+ #include <mach/hardware.h>
+ #include <mach/cputype.h>
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include <asm/mach/irq.h>
+ #include <asm/exception.h>
  
 -- 
 2.20.1
