@@ -2,82 +2,96 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 23BD2C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:50:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2DFD4C282E1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:52:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E1B7220857
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:50:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EF6852086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:52:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aBAYPLbY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mobiveil.co.in header.i=@mobiveil.co.in header.b="0k9WPPCK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1B7220857
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mobiveil.co.in
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ChR2N1Ul";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=cogentembedded-com.20150623.gappssmtp.com header.i=@cogentembedded-com.20150623.gappssmtp.com header.b="pUXtqEko"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF6852086C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=cogentembedded.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8VRHj+0aQPqQ72kUmgMGIL+VeAGFrx4HVDLyYVrsFj0=; b=aBAYPLbYGDsbOG
-	/ExQXYzjvpIuFJay9GFOM2tVtZzdBFoAwcICDU/sBIwJRE0qQHCA3HwrTtXhknumyr3J5Y65WKI5h
-	atit1BJgVORQhXQdxGua7MDd31sr55QVJTq82CLMV0QQybxgSg2unOy+Ow7BecqU7iZ7Q13Nk/5Ww
-	Qdfs6FCJIy37EHMsZEV79Hf+KcP7jILBm1xQAZs4cuy+MbBmTfcopjwqSVKolhqjD4IzndnbsGzzG
-	3ugIdxCK0fgJNcB+I7wuREWn0pMKZPy0pFeMlV34J0330y4m5B4mTEnPQv7ysD0d8H29EAlys5Qqe
-	Ec3IszqlGhO0wlBDL4vw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=NHIuuFARhZTMgOqJvQp/eggThO0NDR5uvzjdITR1IwU=; b=ChR2N1UlW2UWRR
+	tax6WwLsJOfa1mEsI4S8A3EViAQNGYSk+ikV6fgXM7da17h36OIRD4wgVqPUhsQej+i3FWFABBFy5
+	0SEe+z95sFhyGy1MPBRDSjECF23ZoqY5MawYHphoYzUrYyh05p7IWQLcL+EZCia4G4F+q26rkN2b1
+	l1C+6Oc5G0rsPj1tTW9VPuJbC0ooanyOCnHh9wc/zbntWCMoXsNn4JrODq3j8P+kSOHzhr6LWaMv+
+	821bxIAVVnPklQRw+UcOMNi016li0i7oMmSAQhVXByakIKi7uwX3Ryt3A4WWedpZJtX5J8fpEqx/1
+	qF8i3hgTwg3zLUUE5YuQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs5cC-0007cw-NO; Fri, 08 Feb 2019 12:50:44 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gs5e7-00080p-GE; Fri, 08 Feb 2019 12:52:43 +0000
+Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs5c8-0007cZ-PY
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:50:42 +0000
-Received: by mail-wr1-x441.google.com with SMTP id a16so3498582wrv.0
+ id 1gs5e3-00080T-Sm
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:52:41 +0000
+Received: by mail-lf1-x144.google.com with SMTP id e27so2434519lfj.8
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 08 Feb 2019 04:50:40 -0800 (PST)
+ Fri, 08 Feb 2019 04:52:38 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=mobiveil.co.in; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=qnHdX7TnXOEiHXHYVasMmzva4CaTpXguv8jLldqZ/zM=;
- b=0k9WPPCKKItYXzndcogdzxnVoO9cQlpjEn2qq4gxRc/FV272WdMDa/HugcL9upD7P6
- t8xXnl6q1RTUo5498d+qetP/xj0gz+rlcUWUhDBPM2JNl47QC+KxFSUeH4b9wHJX+A4E
- dK7tUg9ny3O1jwPkgEAHETOzII/BJLVdDNXV4=
+ d=cogentembedded-com.20150623.gappssmtp.com; s=20150623;
+ h=subject:to:cc:references:from:organization:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=Sstv+FariMaDhiPskpASC+lRTN6ZSuuUp6yHfV2vVeo=;
+ b=pUXtqEkoPQZauIcsHjpB761HPyBOV3Iq5ePVbpOkaV8s6katFMt0diQdY5IVrOvjHx
+ x0daotQvK6kMcXax4UNQrLOOe3ZRSRic6X4DrmdJRJbf7NBOXkEleXJRLAs8IEilrVqb
+ B31puiKCR6nJCYaMHlu9Kg8GxOZpxwRB1gsJ2k+DjN5jbRr6VFPWlBCkTWrtISsySFmu
+ ri+KyZ8VuxLtoRbLrAvg55AJ575XLTJeTa1HYhZgyZZwyM98NC12xc2mY45LpatU0uuA
+ aRbQw+6q0aW8WIwEAzAFCzsygj6jH2uKjq5P7Rw9bdrkrTVAtLtEscDWEe//I03hNZ/l
+ 7ajw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=qnHdX7TnXOEiHXHYVasMmzva4CaTpXguv8jLldqZ/zM=;
- b=kBHDWdSgul5FNtrNcfcrHajdCm/BQSh7qvRlIIj/aLWrzYLVxRUDMY7DrGgFQff0d3
- Xx88Jphy/4Iu6vbu7UFXlxbON1VIJyk/RSna7CgQU+d7bNrYd33CyVIYXxRuax+bZrn6
- 5NVh4nnCI+n2Ypqb8U+axNz2v5JV8ZJ2SgUB01YqAjnh2/ute+/S/S725x0LPH2TfLro
- Vzi576qMf392f4kZUSV9dVtQXwGuFAhZRVYb6SYu6dqSpGcxjquKfKX8toD3T5pPGM0T
- tqks/7gNk2GBujT2sr839rEuHqgM7VYOeXKZGTb9RpI2akhO9krOVUmQvRSx1NLaLbKx
- /j5Q==
-X-Gm-Message-State: AHQUAuYY3DwuId4U2r7UKpPSGiv8CG6bTb66665s8T1E3bndWv6Gd6bw
- xqap0onIeXeYXqUGYrZGxuWP8Flfx1il6PP6ScTCtQ==
-X-Google-Smtp-Source: AHgI3IYkO1gBaw8j2seTdh1YGRiQzYKKQql6G6YxqXpzAf/hB9zHkLibVQpTzUvEP9Z7w1HZvDqzA1aD42q9jVaM4Ms=
-X-Received: by 2002:adf:fd81:: with SMTP id d1mr16559738wrr.105.1549630239150; 
- Fri, 08 Feb 2019 04:50:39 -0800 (PST)
+ h=x-gm-message-state:subject:to:cc:references:from:organization
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=Sstv+FariMaDhiPskpASC+lRTN6ZSuuUp6yHfV2vVeo=;
+ b=n2yxsWzlKqB1+LQh75IDYxi/gtT0w1tQbyH0Q33WVJxykgsuobdjHDuef84RR6NN6/
+ 1ns5ha+qSW9o/03XlpCYs1E2LMWzMSBe1C936d28UsLLJ4vIdAwxVIjAqe/jOOcd2bus
+ 787Jz+CVb6dwH6z4DcE36wtmiwCP1rZRSmRKjJYoAlpRQbWyGxRgQleNfcwockq0+SIX
+ h3zf1/Ez6j256LeBettoUIq6X2aPTWLXlTpB0NfA4sXhry5kNrILF6SXCc6iFfjl5pUS
+ HIm+etKPRl1LAFVYoVRzhknxDdcvloSXxs/KcmnglYweASn/BI3uppFY4pzVDke7cETK
+ vjmg==
+X-Gm-Message-State: AHQUAuYjjftC7IW8lM00rs7Xv5l/0fcXUTswDcyuBCO8rbOuK0KJ3eyx
+ y/ckjxr39fcEP9oPg1Xe5uccZw==
+X-Google-Smtp-Source: AHgI3IYIX8QubbdZUqL0dfyxcVIoZ9Oo1GAT+HJwmp5FzO6CzomrM/ENEturuFWDVc+CALZ5MhfA/A==
+X-Received: by 2002:ac2:5224:: with SMTP id i4mr6988894lfl.145.1549630356984; 
+ Fri, 08 Feb 2019 04:52:36 -0800 (PST)
+Received: from wasted.cogentembedded.com ([31.173.84.132])
+ by smtp.gmail.com with ESMTPSA id p77-v6sm405827lja.0.2019.02.08.04.52.35
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 08 Feb 2019 04:52:35 -0800 (PST)
+Subject: Re: [PATCH 08/12] arm64: dts: renesas: r8a774c0: Add OPPs table for
+ cpu devices
+To: Simon Horman <horms+renesas@verge.net.au>,
+ linux-renesas-soc@vger.kernel.org
+References: <cover.1549623801.git.horms+renesas@verge.net.au>
+ <231d8908a66fa98f09553d31ad8cd5f382b29959.1549623801.git.horms+renesas@verge.net.au>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Organization: Cogent Embedded
+Message-ID: <7d60ebf5-c245-f48d-47db-ce63f4f3690b@cogentembedded.com>
+Date: Fri, 8 Feb 2019 15:52:34 +0300
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.2.1
 MIME-Version: 1.0
-References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
- <20190129080926.36773-26-Zhiqiang.Hou@nxp.com>
-In-Reply-To: <20190129080926.36773-26-Zhiqiang.Hou@nxp.com>
-From: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-Date: Fri, 8 Feb 2019 18:23:18 +0530
-Message-ID: <CAFZiPx24PEE6LnUaY5MiQ_QDLbwkF-BvWe8s9ycUDVH-dN2_xg@mail.gmail.com>
-Subject: Re: [PATCHv3 25/27] PCI: mobiveil: ls_pcie_g4: add Workaround for
- A-011451
-To: "Z.q. Hou" <zhiqiang.hou@nxp.com>
+In-Reply-To: <231d8908a66fa98f09553d31ad8cd5f382b29959.1549623801.git.horms+renesas@verge.net.au>
+Content-Language: en-MW
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_045040_825571_A46376A5 
-X-CRM114-Status: GOOD (  18.76  )
+X-CRM114-CacheID: sfid-20190208_045240_345176_B5D78E38 
+X-CRM114-Status: GOOD (  16.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,109 +103,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "lorenzo.pieralisi@arm.com" <lorenzo.pieralisi@arm.com>,
- Xiaowei Bao <xiaowei.bao@nxp.com>,
- "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
- "will.deacon@arm.com" <will.deacon@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Leo Li <leoyang.li@nxp.com>, "M.h. Lian" <minghuan.lian@nxp.com>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, Mingkai Hu <mingkai.hu@nxp.com>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- "bhelgaas@google.com" <bhelgaas@google.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Fabrizio Castro <fabrizio.castro@bp.renesas.com>,
+ Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-ZQ,
+Hello!
 
-On Tue, Jan 29, 2019 at 1:41 PM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
->
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
->
-> When LX2 PCIe controller is sending multiple split completions and
-> ACK latency expires indicating that ACK should be send at priority.
-> But because of large number of split completions and FC update DLLP,
-> the controller does not give priority to ACK transmission. This
-> results into ACK latency timer timeout error at the link partner and
-> the pending TLPs are replayed by the link partner again.
->
-> Workaround:
-> 1. Reduce the ACK latency timeout value to a very small value.
-> 2. Restrict the number of completions from the LX2 PCIe controller
->    to 1, by changing the Max Read Request Size (MRRS) of link partner
->    to the same value as Max Packet size (MPS).
->
-> This patch implemented part 1, the part 2 can be set by kernel parameter
-> 'pci=pcie_bus_perf'
->
-> This ERRATA is only for LX2160A Rev1.0, and it will be fixed
-> in Rev2.0.
->
-> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> ---
-> V3:
->  - Integrated without change from http://patchwork.ozlabs.org/patch/1006796/
->
->  .../pci/controller/mobiveil/pci-layerscape-gen4.c | 15 +++++++++++++++
->  drivers/pci/controller/mobiveil/pcie-mobiveil.h   |  4 ++++
->  2 files changed, 19 insertions(+)
->
-> diff --git a/drivers/pci/controller/mobiveil/pci-layerscape-gen4.c b/drivers/pci/controller/mobiveil/pci-layerscape-gen4.c
-> index d2c5dbbd5e3c..20ce146788ca 100644
-> --- a/drivers/pci/controller/mobiveil/pci-layerscape-gen4.c
-> +++ b/drivers/pci/controller/mobiveil/pci-layerscape-gen4.c
-> @@ -82,12 +82,27 @@ static bool ls_pcie_g4_is_bridge(struct ls_pcie_g4 *pcie)
->         return header_type == PCI_HEADER_TYPE_BRIDGE;
->  }
->
-> +static void workaround_A011451(struct ls_pcie_g4 *pcie)
-> +{
-> +       struct mobiveil_pcie *mv_pci = pcie->pci;
-> +       u32 val;
-> +
-> +       /* Set ACK latency timeout */
-> +       val = csr_readl(mv_pci, GPEX_ACK_REPLAY_TO);
-> +       val &= ~(ACK_LAT_TO_VAL_MASK << ACK_LAT_TO_VAL_SHIFT);
-> +       val |= (4 << ACK_LAT_TO_VAL_SHIFT);
-> +       csr_writel(mv_pci, val, GPEX_ACK_REPLAY_TO);
-> +}
-> +
->  static int ls_pcie_g4_host_init(struct mobiveil_pcie *pci)
->  {
->         struct ls_pcie_g4 *pcie = to_ls_pcie_g4(pci);
->
->         pcie->rev = csr_readb(pci, PCI_REVISION_ID);
->
-> +       if (pcie->rev == REV_1_0)
-> +               workaround_A011451(pcie);
-> +
->         return 0;
->  }
->
-> diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil.h b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-> index ab43de5e4b2b..f0e2e4ae09b5 100644
-> --- a/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-> +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-> @@ -85,6 +85,10 @@
->  #define PAB_AXI_AMAP_PEX_WIN_H(win)    PAB_REG_ADDR(0x0bac, win)
->  #define PAB_INTP_AXI_PIO_CLASS         0x474
->
-> +#define GPEX_ACK_REPLAY_TO             0x438
-> +#define  ACK_LAT_TO_VAL_MASK           0x1fff
-> +#define  ACK_LAT_TO_VAL_SHIFT          0
-> +
->  #define PAB_PEX_AMAP_CTRL(win)         PAB_REG_ADDR(0x4ba0, win)
->  #define  AMAP_CTRL_EN_SHIFT            0
->  #define  AMAP_CTRL_TYPE_SHIFT          1
-> --
-> 2.17.1
->
-again, can we avoid errata number on patch title and have a brief title instead?
+On 02/08/2019 02:13 PM, Simon Horman wrote:
+
+> From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> 
+> This patch defines OOP tables for all CPUs, similarly to
+> what done by Takeshi Kihara and Yoshihiro Kaneko for the
+> R8A77990.
+> 
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+[...]
+> @@ -55,6 +76,8 @@
+>  			power-domains = <&sysc R8A774C0_PD_CA53_CPU0>;
+>  			next-level-cache = <&L2_CA53>;
+>  			enable-method = "psci";
+> +			clocks =<&cpg CPG_CORE R8A774C0_CLK_Z2>;
+
+   Need space after =...
+
+> +			operating-points-v2 = <&cluster1_opp>;
+>  		};
+>  
+>  		a53_1: cpu@1 {
+> @@ -64,6 +87,8 @@
+>  			power-domains = <&sysc R8A774C0_PD_CA53_CPU1>;
+>  			next-level-cache = <&L2_CA53>;
+>  			enable-method = "psci";
+> +			clocks =<&cpg CPG_CORE R8A774C0_CLK_Z2>;
+
+
+   Here as well...
+
+> +			operating-points-v2 = <&cluster1_opp>;
+>  		};
+>  
+>  		L2_CA53: cache-controller-0 {
+
+MBR, Sergei
 
 _______________________________________________
 linux-arm-kernel mailing list
