@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 35B28C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:33:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 46D72C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:34:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E357520844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:33:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 17C9A20844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:34:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GyQ8txQM";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="hJ/gBzIB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E357520844
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pA/g0NiE";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="GmBaQFmc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 17C9A20844
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,59 +25,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2i767iDS1AtyrFrwetfX6BCO9u4eUGzrGS+Zl3yX0Ak=; b=GyQ8txQMnt1Rad
-	YUiqn7lWCuNCWlw89mxT7Ziax/qRAA1Noa5mVhTexMaABHlxkTSOizieTbzYktWvsWuZ2acA6Yqyu
-	xZW40IVPA1LZ+q4nCtb0O7mVfyqcfXB606RsZLasE0f4LSXrIZ5SmDASx/pirBSMSwGK6nyQEt3hx
-	dnQmdkg3LlfNsU+o/agKuU4RklzcRcMZrdonxrOJU140V9Hv6tAI7gR0n3zJKIXQor260360df88M
-	gL70lqr5SOIJjuoS9SKK81zxHUIZVg/Gqf673z8bYBMmblyHjk9C2lEVlBu90iGfkpJNpHgXn2NRQ
-	56molBXV9+DgeFfYg1zQ==;
+	List-Owner; bh=S2JTWQ9W3865eW3NwC1rVxDNQAJmiE1sjO3DZm/NdFY=; b=pA/g0NiE2hR6rk
+	FhcfJiLDuDFt2eaIPvlc8Ue8U93t7PpFD1UjO8dfP4paR5aLYKCyWCW1QzTL8e5I1UCDMHdjTnCeF
+	KzxltxBywAocog8FhPoFd1EW8Mxf16enS/ntzgcT3zDDp4H7ufKO6F3OvW9Ya8S4byyFSWZYEW31W
+	ECdrZQJIkZXA2ElU5lJbIPL3q/qELtm9aAUPLj0o8VZrs7HBNCpkeMDflMxMVXeQrfWBAO3QPjuut
+	g4kROVzkI930r/mM6hBDctz2L1Lu0dF3GUZniLEUlHCdnTAy9I29V8wcUzloM9PAZvD8xCJt/+PnT
+	uyyvD28ESM3gPCNg7NRg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs6H6-00073e-VS; Fri, 08 Feb 2019 13:33:00 +0000
-Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+	id 1gs6IH-0007Mz-7t; Fri, 08 Feb 2019 13:34:13 +0000
+Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs6H3-00073M-Hq
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 13:32:58 +0000
-Received: by mail-lf1-x143.google.com with SMTP id j15so2541475lfh.5
+ id 1gs6ID-0007MM-AZ
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 13:34:10 +0000
+Received: by mail-lj1-x241.google.com with SMTP id v14-v6so3048819ljv.1
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 08 Feb 2019 05:32:57 -0800 (PST)
+ Fri, 08 Feb 2019 05:34:08 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=zOKN2RtkqD3NhMxXTntaG9/up/T7KSnJjjnbyy1R1eQ=;
- b=hJ/gBzIBCLQhm2rPw3nICW4FI+YX9FDpAGBDmZblsvklPtVgQkqbeK+W9uXIsO6m1Y
- fOoPPn/tB5+fCM1fYzT2+zm1VK69ijYIk0FBrMzQy7MGGNwSU8yTQgDA6lccGuPnB3h5
- Y4MEDVCpU+vdENq/lAbTxaXZwU5i2Ah8cfcwkW61MouNQOkDNpBSr+Z7+laM+HSOl9HH
- yj0iDQ0qQM6Cbw4q2qFnRO27zhYYZ6zh707rHEVmeDSYWHUglGnd24Y0SYtNmu6I5A+o
- rDr/mfWB+NRWnaijrBNLaJYGaRaAkfbvRKzwODHfWUnak9R3hP9oIEuoMOQ4hiU+3xZ2
- X25g==
+ :cc; bh=hT1KpY7uPwpUpPExJQn6LeYhsQy0SUPQZ6+Yia9oUwg=;
+ b=GmBaQFmcXEalcDOu4gHMRZ21n9xIEPIl9HxZcel8s5jmjPclNDRkM4jbYPMfZILZtA
+ nnxOjLNCSOby5vRyTXetSzD+ojNuR5vMkDE5hklsCSQEZjk1KqK37G3a9KW3TyFd0EFD
+ cJw13Q7Y3Gc/vFmTKlggFs7nAamUXu/VL7bWdsU+LNL9ftKHQPvJy2xsAgt+IzTghvqo
+ QrkcLZlbnh5G48Gei1pRR1wIbb5ulGE6Jg1f7cakCHFkfgSlH5bwD2ZdfSW60yGlbsm+
+ VuVSFBk2Hxa/JfLRxgLLHUF416rLsAmAENaR/ZEaeywVqL+I1Oms7MWluxOZdcz96CAJ
+ DlTA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=zOKN2RtkqD3NhMxXTntaG9/up/T7KSnJjjnbyy1R1eQ=;
- b=mMMEwplpBuqvu+hAdAMJ+r0q9Oe3kWOJmphLc7DRFOUcbm5yW+VtMmCZaw8B+w3YUd
- Bz4+JEKaFfYY1+4marHjtsZ7QRowNf8ZCY+awIx6hrpEGZPe382HrxCEAQJd2eC6szj7
- larGS8KwTUkP3BTve+3mw5p6jWUtwdJftUfEnE6+gsyK5IDA6yczYLLMdAWXTqnN5ATV
- Qj+YJofkoWV5PeJQOGyDcXqXwOZ0Fw01rCAWfKdjGJe/+BYciHlbMiC2C29YyX6POHgL
- GPKmDzyToEqTIgx8VpJOvC+iiSdWhnlEgGBGr2cCGm+osC3sT4hdhNsdCoAJ5HbRDHpl
- WzRg==
-X-Gm-Message-State: AHQUAua1gG092AOIAiRznkKJmwJ6IzM/5UE++4JP+NobjXgUk5pHZVHp
- h7+KY7OxanwyLOtQur7q9JIzLftxp/IJBIe6zbHaPg==
-X-Google-Smtp-Source: AHgI3Iaun5UChBVpgraPMeJiOXrr7LLPt7LegZUyY1EAUG1cB5RCgqZ5w6gktc+8ahXVjI1Rp1m/H6r2Vgq39tr+324=
-X-Received: by 2002:a19:c502:: with SMTP id w2mr13201900lfe.168.1549632775616; 
- Fri, 08 Feb 2019 05:32:55 -0800 (PST)
+ bh=hT1KpY7uPwpUpPExJQn6LeYhsQy0SUPQZ6+Yia9oUwg=;
+ b=Enh5jIIv4geIEWHKwYBop25nnHDOBwWPDYlE16pLyyt7DOUKMX5gXFX2suhRlAwzjd
+ 0kBsYx5X3tME41EydpbqKwZ3nHaoAm6MTGy/1/z2S9jkwMO/4qRpqpVqQeMuBsfZosI6
+ uMmr5EQPT/aSsh068Dwg6pDSIBoneFNS9n443jTwuZXMUc1/cHTS/AlTM19/kSschZcC
+ 3V8HPfQffPYIOK29brz9MjYnoKIwyF5RZYEM1RzmFYUQDI/9eOi+Vfc3CMzktMFjTWx/
+ OGzfcWCPkbRll3E5qz6E+l3h3XghWpGQbvzDJYhLklL45cp9of+4Kd/aDvTjSUSlhF6g
+ 1Q1w==
+X-Gm-Message-State: AHQUAubods+wDvcWx+zvo/sJTPFP4tXLHRYxzDiwanr/KIxBxF90ZmRP
+ iChvnLeV28jir29aSSiKAapDDncT40Lvm8NrDAW57A==
+X-Google-Smtp-Source: AHgI3Iaa0doTUcfElIHZkbhRRkiTXKSNmm7NJ0pPtA0V5s51LJ2KkNa6Zn53Exc4EUrJT0jR4A1Sy1mIw09I8Xbj+Os=
+X-Received: by 2002:a2e:6109:: with SMTP id
+ v9-v6mr13293584ljb.126.1549632847307; 
+ Fri, 08 Feb 2019 05:34:07 -0800 (PST)
 MIME-Version: 1.0
-References: <1549629187-3177-1-git-send-email-sugaya.taichi@socionext.com>
-In-Reply-To: <1549629187-3177-1-git-send-email-sugaya.taichi@socionext.com>
+References: <20190205102546.29457-1-brgl@bgdev.pl>
+ <20190205102546.29457-4-brgl@bgdev.pl>
+In-Reply-To: <20190205102546.29457-4-brgl@bgdev.pl>
 From: Linus Walleij <linus.walleij@linaro.org>
-Date: Fri, 8 Feb 2019 14:32:44 +0100
-Message-ID: <CACRpkdYgTWffL3RcW7Xs7ve=9HhYyndth7RDX7sedeXytCZC1g@mail.gmail.com>
-Subject: Re: [PATCH v2 11/15] dt-bindings: pinctrl: milbeaut: Add Milbeaut
- M10V pinctrl description
-To: Sugaya Taichi <sugaya.taichi@socionext.com>
+Date: Fri, 8 Feb 2019 14:33:55 +0100
+Message-ID: <CACRpkdakUOgnkNb1FVfycoq4u50wVo8Aj_57EUBs5QkvrYN7wg@mail.gmail.com>
+Subject: Re: [PATCH 3/8] ARM: davinci: omapl138-hawk: use gpio lookup entries
+ for usb gpios
+To: Bartosz Golaszewski <brgl@bgdev.pl>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_053257_590203_27DDDAE9 
-X-CRM114-Status: UNSURE (   9.89  )
+X-CRM114-CacheID: sfid-20190208_053409_364968_59C62167 
+X-CRM114-Status: UNSURE (   8.58  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -90,54 +92,27 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Shinji Kanematsu <kanematsu.shinji@socionext.com>,
- Marc Zyngier <marc.zyngier@arm.com>,
+Cc: Kevin Hilman <khilman@kernel.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
+ Sekhar Nori <nsekhar@ti.com>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Takao Orito <orito.takao@socionext.com>,
- Jassi Brar <jaswinder.singh@linaro.org>,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
+ Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Alan Stern <stern@rowland.harvard.edu>,
  Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Sugaya,
+On Tue, Feb 5, 2019 at 11:25 AM Bartosz Golaszewski <brgl@bgdev.pl> wrote:
 
-thanks for your patch!
-
-On Fri, Feb 8, 2019 at 1:32 PM Sugaya Taichi
-<sugaya.taichi@socionext.com> wrote:
-
-> Add DT bindings document for Milbeaut M10V pinctrl.
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 >
-> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
+> Add lookup entries for the vbus and overcurrent gpios for omapl138-hawk.
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-(...)
-> +- interrupts: three interrupts specifer.
-> +- interrupt-names: corresponds "interrupts" factor.
-(...)
-> +               interrupts = <0 54 4>, <0 55 4>, <0 56 4>, <0 57 4>,
-> +                               <0 58 4>, <0 59 4>, <0 60 4>, <0 61 4>,
-> +                               <0 62 4>, <0 63 4>, <0 64 4>, <0 65 4>,
-> +                               <0 66 4>, <0 67 4>, <0 68 4>, <0 69 4>;
-> +               interrupt-names = "pin-48", "pin-49", "pin-50", "pin-51",
-> +                               "pin-52", "pin-53", "pin-54", "pin-55",
-> +                               "pin-56", "pin-57", "pin-58", "pin-59",
-> +                               "pin-60", "pin-61", "pin-62", "pin-63";
-
-As mentioned in the review of the driver, don't do this.
-
-This is a hierarchical interrupt controller, so these
-GIC-offset-to-GPIO-interrupt-offests should be hardcoded in
-the driver.
-
-If these interrupt offsets differ between difference instances of
-this pin controller, they should have different compatible strings.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
