@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AABFAC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:10:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5525BC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:11:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 704A520863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:10:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E27D620863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:11:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZsmiPRZi";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dOZY/rJq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 704A520863
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KZdWo7K6";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="WOJd9G22"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E27D620863
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,64 +27,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DxbmZEk7GrC4SizG4kwt2+0Pt1eIdAXyOKEwW48aaMQ=; b=ZsmiPRZib2o9Nn
-	2R2w1Rsh/9VmYjyG8Po2Thhb8Nwye3QV6E0b7qZe7OiZtjefdX3qX0VOPnK+yaNZeTIKLxyhFn8V+
-	slikMCsR1uFVada34ds/8xe7TbwLVlU6Rf2zpnCgmV8p9iCvZKEuWuiAYzjni/mUJpZ3j2ocZ45qs
-	w2769zmZOFnoSz37UsseYV6WqwH9WVL6sIC/EoUsDaFuyMitGrcvRCCH3r0KcCBCqgBDbtGB7ZUvt
-	EulOZtD0LI22OBTtegu/Ufn6rz7NUF0zeYBcMJng9XtZWGsxGTcpPrbS6kL+tUkjwRskwbzlhoLbg
-	lI3+rQbor3+w7vKKteyA==;
+	List-Owner; bh=RKYhSI11IROnNWkF8GAl0DAK6x7aNPznFgtXGT3PYMw=; b=KZdWo7K6wPU5tQ
+	B85DmFLLNNSu1kL3SQHwmWfxyAla8Z2fxJzazCZiKG/i1nppTMeiVrOwk1n9zrM4vGTL9lXrRahPE
+	7x+XsKftVX7MdV5nYa2il8fhzXdFaaS3Uof+UmyBtnAaolaQ9JKN2EpzDpTdzgjS/to2jlBjb7gst
+	RbdRCLqk4ZaDA2b79+1NeNtLYxoP/5MxcoqU8ojR3sZA5WmMXHL9FGcPZXBxC1L/6cwf34814nESL
+	7X37ucueRDvcKqVub+iMWHh1oViuzTm56a1qjVBK3ZF12GQphuj7HsVl3tHUtHRxlnU0Md6ZuFmxe
+	Y9+6ceRCTz5/L6v0LnVQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs7nj-0002Xs-O7; Fri, 08 Feb 2019 15:10:47 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gs7nx-0002lV-1R; Fri, 08 Feb 2019 15:11:01 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs7mj-0000G0-B1
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 15:09:50 +0000
-Received: by mail-wr1-x441.google.com with SMTP id t27so3922478wra.6
+ id 1gs7mk-0000HY-Q0
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 15:09:52 +0000
+Received: by mail-wm1-x343.google.com with SMTP id r17so3731413wmh.5
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 08 Feb 2019 07:09:44 -0800 (PST)
+ Fri, 08 Feb 2019 07:09:46 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=bA0D3UY78ZZHsBmfU5/+kJTV1brI8irF15ILBsCLyMY=;
- b=dOZY/rJqoDUOXhPdriAEzEyrgUQkkjPxPAsU/EnGSlEofNN+3eB3ot9H+zhJT9sdLg
- BlihbFbMuLydyDG3QjtLqk9P4wMTPnQ57NRrISCbq1iea9+jwLM61XkT/B4qLg36JaBc
- qPIRZKTX8zbOiwytWc9mQTF3aggEmduWA0kDMdKq0qxfqfOAW6X3D/qDonEK6JX66iWZ
- 09pEytMqObB2BK43P5pNo8f+nt9MpZ02LsmL42vVnMH6W/5ypoyskCT12DLuPMZtYHG2
- xsi8FXPbSiQ9ObD4+Zupo/JW/5AOwFpha8ziWcXcsqcpbU+EfH8/vhU9A6fMUPAAQ1qZ
- G0jQ==
+ bh=STRawEDZ3aDbsHGnZgRbdYm2rLIbMG3DM92Sz7unDrg=;
+ b=WOJd9G22Hhl6heWu4H3Vi+EW6iE78dTg7B8QN73iSe2lZpeW5qCBgZ3b2LXzjroG+0
+ B/6j4O/7jhomie678ZO66h7D5iyg2/GrL+7caECtKpvCSijNu+ec2GzjYE2KYfxn24FC
+ x6voyoyBbYc3YnjRnaen0ljxudz3HUhtNsIfFUIgkpPgYvxpOYbV/sNcta9LNFdfICYM
+ Qyw438exFWx2UdWrQKqYRfAk2Ww4OQ3iJLOJx2VDvH4QABogmkgfmaIBZHz23SkME0Fu
+ u1+tP3bqLWVQSWi5hddTxHI6pvwRzCjho/DgUCqiOTwMssC35XzclrWuuCZrClvvOjG/
+ +Zjw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=bA0D3UY78ZZHsBmfU5/+kJTV1brI8irF15ILBsCLyMY=;
- b=j6zu4Y9ZuOI8eHDXY31gbfWMo4Jk6kkeUBzTv3GYHNRqq/5u55/rqakw1MECB/RyUB
- E4DbBPdmI/xpGtU0keEos4U4o4SRvNjdw4jbR27q7+udr2buc8UHXEi1guyK2QbEbDZ8
- UOb7eWz3BXKFeSkE2PYrkBeCVULQJpZdhO1N/I2p6OnC8+HFgCj/d6kVPkML7QjhA3A2
- IHEWFe+DPgrQRzMndavqrb0g816fgw2Xp6jB7qHF5r2uoT+xGBf9dsZSB3+zqVQkM1/t
- rdjt/8vzUNI3oNbz3LOx5LppSw1DAA+HWPVk2U7LdtJajpoobDHEB3O75QF4TAVjIm2z
- 7tMw==
-X-Gm-Message-State: AHQUAuZn/GPUns5TLBFh4UMwVo2rKt/NGNsxXr4MI9B3tqsO0J8MEaI3
- W4DOOJ6vBMLXs8MPwQm0lWI=
-X-Google-Smtp-Source: AHgI3IZwB3gXPsYsWqKB0VGFcxE3dWFNBOiVMgDS1V8d7SXN1pSU5X9QehY0JSJj3IDq7sfceRPeiQ==
-X-Received: by 2002:a5d:4e08:: with SMTP id p8mr17822967wrt.235.1549638583555; 
- Fri, 08 Feb 2019 07:09:43 -0800 (PST)
+ bh=STRawEDZ3aDbsHGnZgRbdYm2rLIbMG3DM92Sz7unDrg=;
+ b=Va/YzJ0pm0Ni3nlO8cOp/UpLd8lU5BSF+Qri2TgYiKQNm/ucNmLJ8kUYiSfqYReeoj
+ jR8o3weZ3ZOLo9OeoyUhKpySVaRAfQVUvzK7RDq8zVzoxjGbGRDvzeblffrXf3i2Q8gZ
+ /loiGptg7Yl8yKWel0aZ4iw97PLp3NPdwDm9DynyYoCVuv6t/JHsEPnrry5TMEfr7ee/
+ DNpYKbgEFEsX582qXhyRBEHFMkCDtP5p3654RHh9QmM6demc2tRHHk07d6/ICCS9HQNm
+ aBPuN0+YbOTnpE341xNrK5MUHYfMOP5PjaNhLXH64HRA1g/5W04vv1Pz8iSf2sT9Gyg1
+ nR5Q==
+X-Gm-Message-State: AHQUAubd1Ws/bKToIIBuucEVk5phoX4+7zuOMLbUPcHHN56ywFeEDb/X
+ ij/NCTX/u90oaECwmiJEdAo=
+X-Google-Smtp-Source: AHgI3IZMyN+vMwbkuyRxHGcHx7Vl9SEPlsIZPGGwSFTT5Syb9UbdRTECGCmgrlgqh47gXwPFBItneQ==
+X-Received: by 2002:a1c:b10a:: with SMTP id a10mr11625013wmf.148.1549638584992; 
+ Fri, 08 Feb 2019 07:09:44 -0800 (PST)
 Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
- by smtp.gmail.com with ESMTPSA id r12sm2042028wrq.3.2019.02.08.07.09.42
+ by smtp.gmail.com with ESMTPSA id k3sm2186281wrm.7.2019.02.08.07.09.44
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 08 Feb 2019 07:09:42 -0800 (PST)
+ Fri, 08 Feb 2019 07:09:44 -0800 (PST)
 From: Thierry Reding <thierry.reding@gmail.com>
 To: arm@kernel.org
-Subject: [GIT PULL 4/9] soc/tegra: Changes for v5.1-rc1
-Date: Fri,  8 Feb 2019 16:09:30 +0100
-Message-Id: <20190208150935.32108-5-thierry.reding@gmail.com>
+Subject: [GIT PULL 5/9] firmware: tegra: Changes for v5.1-rc1
+Date: Fri,  8 Feb 2019 16:09:31 +0100
+Message-Id: <20190208150935.32108-6-thierry.reding@gmail.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190208150935.32108-1-thierry.reding@gmail.com>
 References: <20190208150935.32108-1-thierry.reding@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_070945_649926_F9BA4FC5 
-X-CRM114-Status: GOOD (  12.92  )
+X-CRM114-CacheID: sfid-20190208_070947_357592_0E19691F 
+X-CRM114-Status: GOOD (  13.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -111,48 +111,41 @@ The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-5.1-soc
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-5.1-firmware
 
-for you to fetch changes up to e247deae1a55089cb04cc25c91faeba083d0c39c:
+for you to fetch changes up to fe45ab552955ee93b492cbf86603eb02b3c77a66:
 
-  soc/tegra: pmc: Support systems where PMC is marked secure (2019-01-25 16:18:24 +0100)
+  firmware/tegra: Enable Tegra186 BPMP support on Tegra194 (2019-02-07 18:52:39 +0100)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-soc/tegra: Changes for v5.1-rc1
+firmware: tegra: Changes for v5.1-rc1
 
-This contains a couple of miscellaneous fixes for minor issues and a
-largish rework of the PMC driver to make it work on systems where the
-PMC has been locked down and can only be accessed from secure firmware.
+These changes add support for BPMP on Tegra210.
 
 ----------------------------------------------------------------
-Jon Hunter (1):
-      soc/tegra: pmc: Make tegra_powergate_is_powered() a local function
+Thierry Reding (3):
+      firmware: tegra: bpmp-tegra186: Remove unused includes
+      firmware: tegra: Conditionally support SoC generations
+      firmware/tegra: Enable Tegra186 BPMP support on Tegra194
 
-Joseph Lo (1):
-      soc/tegra: fuse: Fix typo in tegra210_init_speedo_data
+Timo Alho (3):
+      firmware: tegra: Reword messaging terminology
+      firmware: tegra: Refactor BPMP driver
+      firmware: tegra: add bpmp driver for Tegra210
 
-Mikko Perttunen (1):
-      soc/tegra: pmc: Support systems where PMC is marked secure
-
-Thierry Reding (6):
-      soc/tegra: pmc: Use TEGRA186_ prefix for GPIO names
-      soc/tegra: pmc: Sort includes alphabetically
-      soc/tegra: pmc: Add missing kerneldoc
-      soc/tegra: pmc: Pass struct tegra_pmc * where possible
-      soc/tegra: pmc: Make alignment consistent
-      soc/tegra: pmc: Explicitly initialize all fields
-
-Timo Alho (1):
-      soc/tegra: fuse: Fix illegal free of IO base address
-
- drivers/soc/tegra/fuse/fuse-tegra.c      |  12 +-
- drivers/soc/tegra/fuse/speedo-tegra210.c |   2 +-
- drivers/soc/tegra/pmc.c                  | 424 +++++++++++++++++++++----------
- include/soc/tegra/pmc.h                  |   6 -
- 4 files changed, 298 insertions(+), 146 deletions(-)
+ drivers/firmware/tegra/Makefile        |   3 +
+ drivers/firmware/tegra/bpmp-private.h  |  34 +++
+ drivers/firmware/tegra/bpmp-tegra186.c | 305 ++++++++++++++++++++++++++
+ drivers/firmware/tegra/bpmp-tegra210.c | 243 +++++++++++++++++++++
+ drivers/firmware/tegra/bpmp.c          | 376 +++++++++++++--------------------
+ include/soc/tegra/bpmp.h               |  13 +-
+ 6 files changed, 742 insertions(+), 232 deletions(-)
+ create mode 100644 drivers/firmware/tegra/bpmp-private.h
+ create mode 100644 drivers/firmware/tegra/bpmp-tegra186.c
+ create mode 100644 drivers/firmware/tegra/bpmp-tegra210.c
 
 _______________________________________________
 linux-arm-kernel mailing list
