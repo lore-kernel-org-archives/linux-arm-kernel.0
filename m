@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 70749C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:12:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 74091C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:13:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3F5F0217D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:12:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3A5E6218D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:13:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="caujfHTy";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="vyDdC/7x"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F5F0217D8
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D/Dv1FDT";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="gndZI216"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3A5E6218D9
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,59 +25,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yyj8ZPnpYR6mlNtBLMpZ24oiNh1mih7gwcjduLd/0JU=; b=caujfHTyxuKeof
-	xka8/AMOBR1n7UnR3P3dXRE+PhKMwIC8FlM8pbIZJBwXpX0+YzIK+KDlP7vLUT+hLA3UT8VuwTn7o
-	nY6Idj8fIwQ0kDWF+bkt7mKz1O+MeZ60xq8JBRZHDJ9eBOXTUlL00A3dYkwb4Fq4bCTQkHKiFA7hT
-	oZ0B9HRZrBOVs4/Ic6bucNVmu1o6tHoe9/r1I/i/sziJDQfikcXOMG2z9IcInzE5TDbAZVd9El1R4
-	/qkIlt5YUZmJSwOsH5m8AblnuB1PbDEbpQeYyzTPeTfdMYUL2eAEEfTEFhbw+9Euj6PadY1WzlrMd
-	yjmzh81gmGVY9vkWl2IQ==;
+	List-Owner; bh=g1vcZZiLVYrYHhw0GjF0GI9Hawrbak+TGIooEDIxIQA=; b=D/Dv1FDTF4EpYA
+	STvjPsvIWo/18nEG/8oegdhqKTRBp8Q+vhN3A2rYSs/YF+Y6o9VkK67270viinA2maPogzOwC9avY
+	W9ExJS6/AOSejNZawapDg8X/j7654fCoHfCK4a8SsJpKag47vQcCT4fF7VcnAjN55V19QDGIi/sBz
+	6Sruf7cHuTo3YpNLYgRT0TTD9GO3ohNwTQY2FqVxNyjgpXMSiJeVx7PL8DB5DhHyHCKAAPzTWeQZq
+	sJnLqxiKVaGD1pN0ACcH0sfK7UOGjh8nWUpthcwCdyE6hv9Q32TJZL52rRxaTN2Wm/Casxl4kAtn0
+	/SgPJgH8v2a00WJvd12g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs51Z-0000PA-54; Fri, 08 Feb 2019 12:12:53 +0000
-Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
+	id 1gs52Q-0000nu-5r; Fri, 08 Feb 2019 12:13:46 +0000
+Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs51U-0000LW-IA
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:12:50 +0000
-Received: by mail-lf1-x141.google.com with SMTP id j1so2341718lfb.10
+ id 1gs52N-0000na-BH
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:13:44 +0000
+Received: by mail-lj1-x243.google.com with SMTP id v15-v6so2745015ljh.13
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 08 Feb 2019 04:12:47 -0800 (PST)
+ Fri, 08 Feb 2019 04:13:43 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=qfhTtiMDaKURe0aPAjfU33h8QzgqP7sz0JOiIA836Pw=;
- b=vyDdC/7xXJqvvnbBU7ak1cq1nz0n8/Q1I5s5wGAZocOYjLtLvrsNKvYjJFGXBQyxU0
- aJJrfX6CBpZOO4nazDg7VY1tZxuIAIbjtwRglDyyxUhb00kyy0gYmNkhmD9JosENrkDH
- tomUBXhTjZfe7/k6L+YbAIJFHTErk2Y+nFG5cchDHFbGCqq77HSHJOSKd8KA5o0CGrK5
- 1NG/ObB63ofAM6xN1bUqhzBdsKX7bUw49DkaG9YRij4THu9n/i2BnmzFCUxfCqZJeO+M
- Gq7gOXn6MmBC0vB2tcrak3dqtW0olI6TgJLQqtH9XJZX/b02x76uR7Nrsq7tE8tGIJnF
- vP4w==
+ :cc; bh=N/IG/9wqZtS39xJlRa38m4WHs+osHMphVTDahg9SM1Q=;
+ b=gndZI216swTQB1tPggVX67N6F2mI/Up4SCE4LAeQaDebDrYZYrH5H2O0PFr0CZ5xYt
+ schdq3tDTdwE7uooFmzOJLBtgFPkAkhnwwgbxejnOf/+eIf0CHJemwEzR2D7rrYs/t5f
+ kOOoFrMX6m3JxdmCcrWXwDm/oMSzL+EodG0fPGQQVgCBoEJ4sJiZHa8vrJq8N+ocL5xw
+ Fvu8NUBnVaXJn9JGgsjPagFctS6aYDQ3phqTeyIMOw8a08oqW0X9TL+xCxP8wKEmUWxb
+ IwNVZh4rQ3a2gTenB1KP1CBQ29/7wPFCBjSDJ8Ya337r5Z/OoMOKKbdZsXPxa4uepFeu
+ ksQA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=qfhTtiMDaKURe0aPAjfU33h8QzgqP7sz0JOiIA836Pw=;
- b=KW3n46prExl8O3FXaS6s2DYSitFdUnGQX1wAdDcgL6Opk1LIQnMZhOo/Bo4ei7P4sT
- bPsZiAe+ta0/nEQJHcNGWCcFSNL/xOYw43bix/wm+tFaJqlUSnaEgAUdf/V/SqyPxRQG
- jvW/6Ttuf6qd6Ui81oLDeARb1lWgEPxlhGlzcaIvMe2RVoSDF7irdklG63XG+zt2nTHc
- OLwEMemUzzkqcsuVkUuiWJaTmLRB19HTiI9W4CjkB2B77sW4LtO20PP0PpvkJWwM77lI
- NTyM+xJO2JiJ6eNKjUEjUdZdCgYGkT1CTgiBWS4PmUqojeE1nnMK9J6ngBvrSVEB/XjB
- SMAg==
-X-Gm-Message-State: AHQUAuZ0O7eQNXjjIxBn1FXMIuh40wIsngpKuwII/A7RvhII0cFnG1hB
- 5oZefeLohb61Co+ufbv5zvKrl0T/SeGD2Ds2sXbuBQ==
-X-Google-Smtp-Source: AHgI3IbSSUzbwgsSx/Yrrhvag6JYXDQtoOD1qLU4Mot44kqyFzhUd3DBrUJrFxv4cj1ArBsmXqBA7DI6QxfgvY6/oPk=
-X-Received: by 2002:ac2:4343:: with SMTP id o3mr12129920lfl.129.1549627966313; 
- Fri, 08 Feb 2019 04:12:46 -0800 (PST)
+ bh=N/IG/9wqZtS39xJlRa38m4WHs+osHMphVTDahg9SM1Q=;
+ b=hXpDcwoRsWoH/Zx5zvf9CNfxmoPHZIG6Iry36NlazDLJbfGldPr158tBUb6Fz6xwkW
+ nx5bvWfLISfwk4Z6ajvRi736fDQDwodQI2gYKxPvY1Lsg2zi3mlT3FkXQt9fdcwUM5uw
+ MTLbVosL354hlSy8gIwwPJwL85EFBP5/awajyJ1WufMyeDjPZJ8nJbnEW3RjVxa6JbCq
+ YT2Eydzz6hppHCt6MQT5KJqmj+wGGJtUJoDo2hf16OOhc5vX7m1eeSBDH1VYZiXTYSDM
+ m1up7hckBKa5hE66yE/sIpKLtmBI4Fopqn/cs3VwDncO6IRb7hIqbgn5ngaqOjgvtc1D
+ bTjw==
+X-Gm-Message-State: AHQUAuYNZ4IKbqQFfyApSLnfQMM9VG1HDnWA2JEctcEfgHOxwl5bYN4I
+ IfaTiiZfigjhtebM51MnKm18qfJCRNS0Zy6Gbz5hX6ky
+X-Google-Smtp-Source: AHgI3IYFIomAvrNEWylbG1EzyVuDW1x1Vw6Ue041+V5n023evRXuZwNVy1DTe6K3W+BVhhv8TcgNrppxUyVBHVHQVU4=
+X-Received: by 2002:a2e:6503:: with SMTP id
+ z3-v6mr13505023ljb.153.1549628021704; 
+ Fri, 08 Feb 2019 04:13:41 -0800 (PST)
 MIME-Version: 1.0
 References: <1549198954-4711-1-git-send-email-stefan.wahren@i2se.com>
- <1549198954-4711-2-git-send-email-stefan.wahren@i2se.com>
-In-Reply-To: <1549198954-4711-2-git-send-email-stefan.wahren@i2se.com>
+ <1549198954-4711-3-git-send-email-stefan.wahren@i2se.com>
+In-Reply-To: <1549198954-4711-3-git-send-email-stefan.wahren@i2se.com>
 From: Linus Walleij <linus.walleij@linaro.org>
-Date: Fri, 8 Feb 2019 13:12:34 +0100
-Message-ID: <CACRpkdZSURNfxgYGMU2tC7rKMzMEQQZcEV=MVJMpPLg54hzKow@mail.gmail.com>
-Subject: Re: [PATCH V3 1/2] pinctrl: bcm2835: declare pin config as generic
+Date: Fri, 8 Feb 2019 13:13:30 +0100
+Message-ID: <CACRpkdZzywMnP49pyUgobr8YmiyoV6g3Jiq1ft+NEQFnR3gbEA@mail.gmail.com>
+Subject: Re: [PATCH V3 2/2] pinctrl: bcm2835: Direct GPIO config changes to
+ generic pinctrl
 To: Stefan Wahren <stefan.wahren@i2se.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_041248_608899_F644AEB5 
-X-CRM114-Status: UNSURE (   9.48  )
+X-CRM114-CacheID: sfid-20190208_041343_380337_BFF180AF 
+X-CRM114-Status: UNSURE (   9.35  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -101,9 +103,9 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 On Sun, Feb 3, 2019 at 2:03 PM Stefan Wahren <stefan.wahren@i2se.com> wrote:
 
-> Since commit 0de704955ee44 ("pinctrl: bcm2835: Add support for
-> generic pinctrl binding") this driver is capable to use the generic
-> interface. So declare this accordingly.
+> In order to support GPIO config changes direct these to the generic pinctrl.
+> This also requires an adjust of the return code for unsupported parameter
+> otherwise gpiod_configure_flags wont work as expected.
 >
 > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 
