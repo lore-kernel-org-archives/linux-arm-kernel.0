@@ -2,66 +2,60 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ACFC3C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 16:51:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 18C3BC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 16:55:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 69DA52084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 16:51:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DA17B20863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 16:55:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o+zT/8ZR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 69DA52084D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F84XNazl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA17B20863
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:Date:To:From:Subject:
-	Message-ID:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=lWugk7weEWrnKuJKrqpix5mT1iDrPmXoOPWKlPj8k/w=; b=o+zT/8ZRgEaivD
-	P+Qi9qnTJ2uXphLmd+Ru+b98yeuncdowAEa3wqXFghpf4T2kUZm8CrvLMekoms5AXGfzDR0uxNs8m
-	r23JWEuhuYZEk0q4B6XduMndXwRZ5RBEqGCjc/X2Lb6xMdWy5DOu3M/rZ1BrwUy3mU3YS9dQ/35Vd
-	ylF5oKkgQ19qCxdGroof7TN3zXzbKjM7j93OTjbRkKDeyd8faWZPR70DYdMgIwmlttjnp+r54Pqp4
-	m2mnyKGN2YJzigFk82jZ+944PC57Oh7y89gOOU3dvPCQkG4H7ctJ3IG6s+TmtIQ90nLnt2GYxapvI
-	BZBWidXF0T524pHu6XeA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=8MTZDXgJ6uC5yADLuLvPqYIMyh5IhhCHjpc6UJ+Fyv4=; b=F84
+	XNazlf9sJem5d2emnwplkTwvJsoixjmg0CDdSyG6eWeDV7n38XOWVYzeWyD9GQkfCGRG+eq2xdOYT
+	rA8jaqUzVs9HQg6er5H8emKQFcZwQkbFWEhF+eCGN7IeTy3mXenA6rMs3VvO4k7VHliLKpmluQGUI
+	Y+bjehnyMXGyvI2J9mdxfqIqZOFJyZNAbiggJ+OicAd33of10887wrQkComqG6yb8dlXOfph4LF2z
+	heCft+SdbZD1ZL65MJxPOSFnsyGxOa5VwTL8HULJcu3kX5kJ2HEstYDU7oE5CS5Lf7UAhtGEMTzAT
+	4dXZWJVGFCkAdc0pRcLiwJhGF84AF7A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs9Ms-0004XI-Aj; Fri, 08 Feb 2019 16:51:10 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs9Mo-0004WT-NE
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 16:51:08 +0000
-Received: from lupine.hi.pengutronix.de
- ([2001:67c:670:100:3ad5:47ff:feaf:1a17] helo=lupine)
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <p.zabel@pengutronix.de>)
- id 1gs9Mm-0006xQ-J0; Fri, 08 Feb 2019 17:51:04 +0100
-Received: from pza by lupine with local (Exim 4.89)
- (envelope-from <p.zabel@pengutronix.de>)
- id 1gs9Mm-00079A-8y; Fri, 08 Feb 2019 17:51:04 +0100
-Message-ID: <1549644664.24981.1.camel@pengutronix.de>
-Subject: Reset controller changes for v5.1
-From: Philipp Zabel <p.zabel@pengutronix.de>
-To: arm@kernel.org
-Date: Fri, 08 Feb 2019 17:51:04 +0100
-X-Mailer: Evolution 3.22.6-1+deb9u1 
-Mime-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:3ad5:47ff:feaf:1a17
-X-SA-Exim-Mail-From: p.zabel@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+	id 1gs9R1-0006As-I0; Fri, 08 Feb 2019 16:55:27 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gs9Qx-00069s-C2
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 16:55:25 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 412611596;
+ Fri,  8 Feb 2019 08:55:20 -0800 (PST)
+Received: from e108454-lin.cambridge.arm.com (e108454-lin.cambridge.arm.com
+ [10.1.196.50])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7386B3F719;
+ Fri,  8 Feb 2019 08:55:18 -0800 (PST)
+From: Julien Grall <julien.grall@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [RFC PATCH] arm64/fpsimd: Don't disable softirq when touching
+ FPSIMD/SVE state
+Date: Fri,  8 Feb 2019 16:55:13 +0000
+Message-Id: <20190208165513.8435-1-julien.grall@arm.com>
+X-Mailer: git-send-email 2.11.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_085106_932666_D2935B82 
-X-CRM114-Status: GOOD (  13.91  )
+X-CRM114-CacheID: sfid-20190208_085523_445757_DAD5C371 
+X-CRM114-Status: GOOD (  25.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,78 +67,317 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kernel@pengutronix.de, linux-arm-kernel@lists.infradead.org
+Cc: linux-rt-users@vger.kernel.org, ard.biesheuvel@linaro.org,
+ catalin.marinas@arm.com, bigeasy@linutronix.de, will.deacon@arm.com,
+ linux-kernel@vger.kernel.org, Julien Grall <julien.grall@arm.com>,
+ Dave.Martin@arm.com
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Dear arm-soc maintainers,
+When the kernel is compiled with CONFIG_KERNEL_MODE_NEON, some part of
+the kernel may be able to use FPSIMD/SVE. This is for instance the case
+for crypto code.
 
-The following changes since commit 1c7fc5cbc33980acd13d668f1c8f0313d6ae9fd8:
+Any use of FPSIMD/SVE in the kernel are clearly marked by using the
+function kernel_neon_{begin, end}. Furthermore, this can only be used
+when may_use_simd() returns true.
 
-  Linux 5.0-rc2 (2019-01-14 10:41:12 +1200)
+The current implementation of may_use_simd() allows softirq to use
+FPSIMD/SVE unless it is currently in used (i.e kernel_neon_busy is true).
+When in used, softirqs usually fallback to a software method.
 
-are available in the git repository at:
+At the moment, as a softirq may use FPSIMD/SVE, softirqs are disabled
+when touching the FPSIMD/SVE context. This has the drawback to disable
+all softirqs even if they are not using FPSIMD/SVE.
 
-  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-5.1
+As a softirq should not rely on been able to use simd at a given time,
+there are limited reason to keep softirq disabled when touching the
+FPSIMD/SVE context. Instead, we can only disable preemption and tell
+the NEON unit is currently in use.
 
-for you to fetch changes up to dbfc54534dfcaee004d54137d9b34d000f847e41:
+This patch introduces two new helpers kernel_neon_{disable, enable} to
+mark the area using FPSIMD/SVE context and use them in replacement of
+local_bh_{disable, enable}. The functions kernel_neon_{begin, end} are
+also re-implemented to use the new helpers.
 
-  dt-bindings: reset: meson: add g12a bindings (2019-02-08 17:31:33 +0100)
+Signed-off-by: Julien Grall <julien.grall@arm.com>
 
-----------------------------------------------------------------
-Reset controller changes for v5.1
+---
 
-This adds the include/linux/reset directory to MAINTAINERS for reset
-specific headers and adds headers for sunxi and socfpga in there to
-get rid of a few extern function declarations.
-There is a new reset driver for the Broadcom STB reset controller and
-the i.MX7 system reset controller driver is extended to support i.MX8MQ
-as well. Finally, there is a new header with reset id constants for
-the Meson G12A SoC, which has a reset controller identical to Meson AXG
-and thus can reuse its driver and DT bindings.
+I have been exploring this solution as an alternative approach to the RT
+patch "arm64: fpsimd: use preemp_disable in addition to local_bh_disable()".
 
-----------------------------------------------------------------
-Andrey Smirnov (3):
-      dt-bindings: reset: imx7: Document usage on i.MX8MQ SoCs
-      reset: imx7: Add plubming to support multiple IP variants
-      reset: imx7: Add support for i.MX8MQ IP block variant
+So far, the patch has only been lightly tested.
 
-Florian Fainelli (2):
-      dt-bindings: reset: Add document for Broadcom STB reset controller
-      reset: Add Broadcom STB SW_INIT reset controller driver
+For RT-linux, it might be possible to use migrate_{enable, disable}. I
+am quite new with RT and have some trouble to understand the semantics
+of migrate_{enable, disable}. So far, I am still unsure if it is possible
+to run another userspace task on the same CPU while getting preempted
+when the migration is disabled.
+---
+ arch/arm64/include/asm/simd.h |  4 +--
+ arch/arm64/kernel/fpsimd.c    | 76 +++++++++++++++++++++++++------------------
+ 2 files changed, 46 insertions(+), 34 deletions(-)
 
-Jerome Brunet (1):
-      dt-bindings: reset: meson: add g12a bindings
+diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
+index 6495cc51246f..94c0dac508aa 100644
+--- a/arch/arm64/include/asm/simd.h
++++ b/arch/arm64/include/asm/simd.h
+@@ -15,10 +15,10 @@
+ #include <linux/preempt.h>
+ #include <linux/types.h>
+ 
+-#ifdef CONFIG_KERNEL_MODE_NEON
+-
+ DECLARE_PER_CPU(bool, kernel_neon_busy);
+ 
++#ifdef CONFIG_KERNEL_MODE_NEON
++
+ /*
+  * may_use_simd - whether it is allowable at this time to issue SIMD
+  *                instructions or access the SIMD register file
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 5ebe73b69961..b7e5dac26190 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -90,7 +90,8 @@
+  * To prevent this from racing with the manipulation of the task's FPSIMD state
+  * from task context and thereby corrupting the state, it is necessary to
+  * protect any manipulation of a task's fpsimd_state or TIF_FOREIGN_FPSTATE
+- * flag with local_bh_disable() unless softirqs are already masked.
++ * flag with kernel_neon_{disable, enable}. This will still allow softirqs to
++ * run but prevent them to use FPSIMD.
+  *
+  * For a certain task, the sequence may look something like this:
+  * - the task gets scheduled in; if both the task's fpsimd_cpu field
+@@ -142,6 +143,9 @@ extern void __percpu *efi_sve_state;
+ 
+ #endif /* ! CONFIG_ARM64_SVE */
+ 
++static void kernel_neon_disable(void);
++static void kernel_neon_enable(void);
++
+ /*
+  * Call __sve_free() directly only if you know task can't be scheduled
+  * or preempted.
+@@ -213,11 +217,11 @@ static void sve_free(struct task_struct *task)
+  * thread_struct is known to be up to date, when preparing to enter
+  * userspace.
+  *
+- * Softirqs (and preemption) must be disabled.
++ * Preemption must be disabled.
+  */
+ static void task_fpsimd_load(void)
+ {
+-	WARN_ON(!in_softirq() && !irqs_disabled());
++	WARN_ON(!preempt_count() && !irqs_disabled());
+ 
+ 	if (system_supports_sve() && test_thread_flag(TIF_SVE))
+ 		sve_load_state(sve_pffr(&current->thread),
+@@ -238,7 +242,7 @@ void fpsimd_save(void)
+ 	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
+ 	/* set by fpsimd_bind_task_to_cpu() or fpsimd_bind_state_to_cpu() */
+ 
+-	WARN_ON(!in_softirq() && !irqs_disabled());
++	WARN_ON(!preempt_count() && !irqs_disabled());
+ 
+ 	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
+ 		if (system_supports_sve() && test_thread_flag(TIF_SVE)) {
+@@ -360,7 +364,7 @@ static int __init sve_sysctl_init(void) { return 0; }
+  * task->thread.sve_state.
+  *
+  * Task can be a non-runnable task, or current.  In the latter case,
+- * softirqs (and preemption) must be disabled.
++ * preemption must be disabled.
+  * task->thread.sve_state must point to at least sve_state_size(task)
+  * bytes of allocated kernel memory.
+  * task->thread.uw.fpsimd_state must be up to date before calling this
+@@ -387,7 +391,7 @@ static void fpsimd_to_sve(struct task_struct *task)
+  * task->thread.uw.fpsimd_state.
+  *
+  * Task can be a non-runnable task, or current.  In the latter case,
+- * softirqs (and preemption) must be disabled.
++ * preemption must be disabled.
+  * task->thread.sve_state must point to at least sve_state_size(task)
+  * bytes of allocated kernel memory.
+  * task->thread.sve_state must be up to date before calling this function.
+@@ -547,7 +551,7 @@ int sve_set_vector_length(struct task_struct *task,
+ 	 * non-SVE thread.
+ 	 */
+ 	if (task == current) {
+-		local_bh_disable();
++		kernel_neon_disable();
+ 
+ 		fpsimd_save();
+ 		set_thread_flag(TIF_FOREIGN_FPSTATE);
+@@ -558,7 +562,7 @@ int sve_set_vector_length(struct task_struct *task,
+ 		sve_to_fpsimd(task);
+ 
+ 	if (task == current)
+-		local_bh_enable();
++		kernel_neon_enable();
+ 
+ 	/*
+ 	 * Force reallocation of task SVE state to the correct size
+@@ -813,7 +817,7 @@ asmlinkage void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+ 
+ 	sve_alloc(current);
+ 
+-	local_bh_disable();
++	kernel_neon_disable();
+ 
+ 	fpsimd_save();
+ 	fpsimd_to_sve(current);
+@@ -825,7 +829,7 @@ asmlinkage void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+ 	if (test_and_set_thread_flag(TIF_SVE))
+ 		WARN_ON(1); /* SVE access shouldn't have trapped */
+ 
+-	local_bh_enable();
++	kernel_neon_enable();
+ }
+ 
+ /*
+@@ -892,7 +896,7 @@ void fpsimd_flush_thread(void)
+ 	if (!system_supports_fpsimd())
+ 		return;
+ 
+-	local_bh_disable();
++	kernel_neon_disable();
+ 
+ 	memset(&current->thread.uw.fpsimd_state, 0,
+ 	       sizeof(current->thread.uw.fpsimd_state));
+@@ -935,7 +939,7 @@ void fpsimd_flush_thread(void)
+ 
+ 	set_thread_flag(TIF_FOREIGN_FPSTATE);
+ 
+-	local_bh_enable();
++	kernel_neon_enable();
+ }
+ 
+ /*
+@@ -947,9 +951,9 @@ void fpsimd_preserve_current_state(void)
+ 	if (!system_supports_fpsimd())
+ 		return;
+ 
+-	local_bh_disable();
++	kernel_neon_disable();
+ 	fpsimd_save();
+-	local_bh_enable();
++	kernel_neon_enable();
+ }
+ 
+ /*
+@@ -1007,14 +1011,14 @@ void fpsimd_restore_current_state(void)
+ 	if (!system_supports_fpsimd())
+ 		return;
+ 
+-	local_bh_disable();
++	kernel_neon_disable();
+ 
+ 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+ 		task_fpsimd_load();
+ 		fpsimd_bind_task_to_cpu();
+ 	}
+ 
+-	local_bh_enable();
++	kernel_neon_enable();
+ }
+ 
+ /*
+@@ -1027,7 +1031,7 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
+ 	if (!system_supports_fpsimd())
+ 		return;
+ 
+-	local_bh_disable();
++	kernel_neon_disable();
+ 
+ 	current->thread.uw.fpsimd_state = *state;
+ 	if (system_supports_sve() && test_thread_flag(TIF_SVE))
+@@ -1038,7 +1042,7 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
+ 
+ 	clear_thread_flag(TIF_FOREIGN_FPSTATE);
+ 
+-	local_bh_enable();
++	kernel_neon_enable();
+ }
+ 
+ /*
+@@ -1055,11 +1059,28 @@ void fpsimd_flush_cpu_state(void)
+ 	set_thread_flag(TIF_FOREIGN_FPSTATE);
+ }
+ 
+-#ifdef CONFIG_KERNEL_MODE_NEON
+-
+ DEFINE_PER_CPU(bool, kernel_neon_busy);
+ EXPORT_PER_CPU_SYMBOL(kernel_neon_busy);
+ 
++static void kernel_neon_disable(void)
++{
++	preempt_disable();
++	WARN_ON(__this_cpu_read(kernel_neon_busy));
++	__this_cpu_write(kernel_neon_busy, true);
++}
++
++static void kernel_neon_enable(void)
++{
++	bool busy;
++
++	busy = __this_cpu_xchg(kernel_neon_busy, false);
++	WARN_ON(!busy); /* No matching kernel_neon_disable()? */
++
++	preempt_enable();
++}
++
++#ifdef CONFIG_KERNEL_MODE_NEON
++
+ /*
+  * Kernel-side NEON support functions
+  */
+@@ -1084,9 +1105,7 @@ void kernel_neon_begin(void)
+ 
+ 	BUG_ON(!may_use_simd());
+ 
+-	local_bh_disable();
+-
+-	__this_cpu_write(kernel_neon_busy, true);
++	kernel_neon_disable();
+ 
+ 	/* Save unsaved fpsimd state, if any: */
+ 	fpsimd_save();
+@@ -1094,9 +1113,7 @@ void kernel_neon_begin(void)
+ 	/* Invalidate any task state remaining in the fpsimd regs: */
+ 	fpsimd_flush_cpu_state();
+ 
+-	preempt_disable();
+-
+-	local_bh_enable();
++	kernel_neon_enable();
+ }
+ EXPORT_SYMBOL(kernel_neon_begin);
+ 
+@@ -1111,15 +1128,10 @@ EXPORT_SYMBOL(kernel_neon_begin);
+  */
+ void kernel_neon_end(void)
+ {
+-	bool busy;
+-
+ 	if (!system_supports_fpsimd())
+ 		return;
+ 
+-	busy = __this_cpu_xchg(kernel_neon_busy, false);
+-	WARN_ON(!busy);	/* No matching kernel_neon_begin()? */
+-
+-	preempt_enable();
++	kernel_neon_enable();
+ }
+ EXPORT_SYMBOL(kernel_neon_end);
+ 
+-- 
+2.11.0
 
-Philipp Zabel (3):
-      MAINTAINERS: use include/linux/reset for reset controller related headers
-      reset: sunxi: declare sun6i_reset_init in a header file
-      reset: socfpga: declare socfpga_reset_init in a header file
-
- .../bindings/reset/brcm,brcmstb-reset.txt          |  27 ++++
- .../devicetree/bindings/reset/fsl,imx7-src.txt     |   7 +-
- MAINTAINERS                                        |   1 +
- arch/arm/mach-socfpga/socfpga.c                    |   3 +-
- arch/arm/mach-sunxi/sunxi.c                        |   2 +-
- drivers/reset/Kconfig                              |  12 +-
- drivers/reset/Makefile                             |   1 +
- drivers/reset/reset-brcmstb.c                      | 132 ++++++++++++++++
- drivers/reset/reset-imx7.c                         | 172 +++++++++++++++++++--
- drivers/reset/reset-socfpga.c                      |   2 +-
- drivers/reset/reset-sunxi.c                        |   1 +
- .../dt-bindings/reset/amlogic,meson-g12a-reset.h   | 134 ++++++++++++++++
- include/dt-bindings/reset/imx8mq-reset.h           |  64 ++++++++
- include/linux/reset/socfpga.h                      |   7 +
- include/linux/reset/sunxi.h                        |   7 +
- 15 files changed, 550 insertions(+), 22 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/reset/brcm,brcmstb-reset.txt
- create mode 100644 drivers/reset/reset-brcmstb.c
- create mode 100644 include/dt-bindings/reset/amlogic,meson-g12a-reset.h
- create mode 100644 include/dt-bindings/reset/imx8mq-reset.h
- create mode 100644 include/linux/reset/socfpga.h
- create mode 100644 include/linux/reset/sunxi.h
 
 _______________________________________________
 linux-arm-kernel mailing list
