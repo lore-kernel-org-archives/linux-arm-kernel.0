@@ -3,86 +3,80 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7F610C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:06:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AB914C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:08:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4DE8C2177B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:06:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 79E642177B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:08:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bGmx+PpB";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="BcOXtT/l"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4DE8C2177B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kKXeh7Ft";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="OpE43GoU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 79E642177B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VZP0U4Xa1T9oxaHAoHV9inFGXJsCiBJIiI3BA02JL0w=; b=bGmx+PpBF4bJnk
-	PGpR0sSRKrzEWM7rJH0QDYwB0hNpF540gmVZmsfqje0vRMPxO4HsXZ7sp9ZsIzkKZxF7tfvuzNI6v
-	Z/jD7ritukIuXkZYvREsR5iWZIOLsFX7WHDYJq0emlQzKocZPfUvb+1msSPhepaMu5Shzhm7Tagz5
-	983RAWJWwGfyv0HU6C2t0wb757rtP+H9TiJ1cs4tjlhAv13uvDu/x/zlBmtARGkwrO9hldimb1/6f
-	JMIOTjmkX6/R1q6MRC832KXjSwFhtv2FWZ/fcPivmfQCXkVkUyuy0DItnvtOnjXndQ8o8Hg0/JMfz
-	iuV1TlNFyWs5oWAAQSkg==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=aD7B4L+44Bd6DV3vNZa7XbWMOcCZyJi7PEwu7fgmktM=; b=kKXeh7FtqXYkFE
+	JNcadAaMLzoNdI3ZXl6Lmgum9LZTcd6e61CavOG3N1YM9EZFaaK8LZAgo3K0FjbMPs+UNVIIEKPmS
+	5Zz1dTL5enINdCib7xsTGUl1/7uJY9QNdmLMPf/3g8RBvYopXIs29l/uly4w+hWSG5K7Yr/QB5KNb
+	EyZ7rhl2c/JZyV3q0dC+vNyLXx5UOoobLakLHA3/SsU+sjyXMrbZrwzuo+ZeqWMAozLmnVc+pjKSi
+	Ik7SF7UGVFkErN7r/OxhXVxOXkbDla1iNZ5yGMk2xG/b1Oe3CBG7Ti18IXhbKS5HTTLyA/JVruU2C
+	hZqO4a398WSA+briPQAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs4ve-00062W-M0; Fri, 08 Feb 2019 12:06:46 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+	id 1gs4x3-0006KD-Bc; Fri, 08 Feb 2019 12:08:13 +0000
+Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs4vb-000626-MM
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:06:45 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x18C6RL3006116;
- Fri, 8 Feb 2019 06:06:27 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549627587;
- bh=+6PdHybLXwE86y3Kmmp8q9Ip6Uq/cX/z4kIbfexJbUs=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=BcOXtT/lM0cCGLkeVBAjjtq/4aBJzS5lREPlTAUs1DyupXertKey7uX3eY98ozyXz
- k0LLhFezq05FXr4Q/RjKOYdyEQMqr0CaV9i7mhWYdnRrohx1Iv0lOU+GFmjvBV1kXe
- l9xEmORJzM2ATB8uqEu8b6VHETEoif7/uWFQvbMs=
-Received: from DFLE104.ent.ti.com (dfle104.ent.ti.com [10.64.6.25])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x18C6RkP024989
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 8 Feb 2019 06:06:27 -0600
-Received: from DFLE104.ent.ti.com (10.64.6.25) by DFLE104.ent.ti.com
- (10.64.6.25) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 8
- Feb 2019 06:06:26 -0600
-Received: from dflp33.itg.ti.com (10.64.6.16) by DFLE104.ent.ti.com
- (10.64.6.25) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 8 Feb 2019 06:06:26 -0600
-Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x18C6Ngg002104;
- Fri, 8 Feb 2019 06:06:24 -0600
-Subject: Re: [PATCH v2 05/12] ARM: davinci: da850: switch to using the
- clocksource driver
-To: Bartosz Golaszewski <brgl@bgdev.pl>, Kevin Hilman <khilman@kernel.org>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Thomas Gleixner <tglx@linutronix.de>
-References: <20190204171757.32073-1-brgl@bgdev.pl>
- <20190204171757.32073-6-brgl@bgdev.pl>
-From: Sekhar Nori <nsekhar@ti.com>
-Message-ID: <9d423e18-8c85-731b-388a-1843067db242@ti.com>
-Date: Fri, 8 Feb 2019 17:36:22 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gs4x0-0006Jl-La
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:08:12 +0000
+Received: by mail-lf1-x142.google.com with SMTP id m11so2348487lfc.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 08 Feb 2019 04:08:09 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=/MZVCPmiFoZOeY6Zi2sALAnt/UkJv5RFzHY10fRT4mI=;
+ b=OpE43GoUJYMqV2jgCBvlmhI2KoIScG4kI9bUBTnc01KvDFy+ZgiH8UtfjavtxkYzR6
+ mXcvxjONbF+enJ24VKebl2DbbZo5wA3dRBK/oWxpJMm7kvAsgzBNPLOL3JdGUv892MBg
+ u7so9XNQ9ZMpwps4OAbefgxVnZOCOD0r4XuL0e8r6nfY7H6EyA2ViNOlikmgane+Hx9O
+ pzkiucyCRnYfc9yxzMknbPy6OeQhVby2j7SNmhyxT+LW0sL9262lxa96gGON0+9ZBMa0
+ kL4kk5rxHc66RTtSQsbi9mObG4Am2NTjM+Jt4qhm3scPA35mLx62/frTl8X5fvV/MtSK
+ YmuQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=/MZVCPmiFoZOeY6Zi2sALAnt/UkJv5RFzHY10fRT4mI=;
+ b=ave0GcyxcaDy22gUhuzxD1omg2XVHLJCEv9WuITaLqoPyaGXNAXvZlt7Z2REq/9ga/
+ A6cKR3gi9HyVW2yPq4f1CESgUbA3Qc2xOaqo07gf0no5dOnZYPuOaMvEh80nhvYtYrps
+ scbzOkJsPUjAZNLxCm6DsgrNZdBzuXf2Jl6m1S+GD0bda09sLYUsMUUEtkjNZ76O1npV
+ okltYZBPPzUpXJxXJpfrbmWuKNZlz9AWMa4ESbcFCUPqSsMU0ZtSIAwl+A1Zbg1nEjGW
+ OTy/7mQuVIsr0xYNRckuhBpbEoGEcPpQJlLbEn4tiVKTIpacy3PQwUlNij927LLMq1UE
+ EyAQ==
+X-Gm-Message-State: AHQUAubnPmgsqglGwEcuZEho7Lsd3f8QolEVqu/3En2giOUJLeKHZd43
+ t+1C+muf/RuUyoccBK1BZgRZ/9e+ekH78gI+eVpYgg==
+X-Google-Smtp-Source: AHgI3IaPPJmXbMUXRxatMm83Ibuspywjjx9pmn4aBEeEXTgtFqQqNYb4fqm7fvevB4/5Kcs/FH9N86RwxeERxtmbpIQ=
+X-Received: by 2002:a19:7dc2:: with SMTP id y185mr13882950lfc.27.1549627687819; 
+ Fri, 08 Feb 2019 04:08:07 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190204171757.32073-6-brgl@bgdev.pl>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+References: <1549531468-1676-1-git-send-email-claudiu.beznea@microchip.com>
+In-Reply-To: <1549531468-1676-1-git-send-email-claudiu.beznea@microchip.com>
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Fri, 8 Feb 2019 13:07:56 +0100
+Message-ID: <CACRpkdasSzX8gxW1dDjkeTyT6RAYFhrwSPGdwmrKEaabEFgG4Q@mail.gmail.com>
+Subject: Re: [PATCH v3 0/7] add support for SAM9X60 pin controller
+To: Claudiu.Beznea@microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_040643_812860_1159BB55 
-X-CRM114-Status: GOOD (  12.37  )
+X-CRM114-CacheID: sfid-20190208_040810_776159_898034DC 
+X-CRM114-Status: GOOD (  10.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,26 +88,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
+ Ludovic Desroches <Ludovic.Desroches@microchip.com>,
+ Rob Herring <robh+dt@kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 04/02/19 10:47 PM, Bartosz Golaszewski wrote:
-> +static const struct davinci_timer_cfg da850_timer_cfg = {
-> +	.reg = {
-> +		.start		= DA8XX_TIMER64P0_BASE,
-> +		.end		= DA8XX_TIMER64P0_BASE + SZ_4K,
+On Thu, Feb 7, 2019 at 10:24 AM <Claudiu.Beznea@microchip.com> wrote:
 
-SZ_4K - 1
+> From: Claudiu Beznea <claudiu.beznea@microchip.com>
+>
+> This series adds drive strenght and slew rate support for SAMX60's pin
+> controller. For drive strenght we could have 2 values: low, high.
+> For slew rate we could have 2 values: enable, disabled.
+>
+> Besides this I took the chance and adapt the documentation for at91 pinctrl
+> driver.
+>
+> Changes in v3:
+> - fix checkpatch.pl warning on DBG_SHOW_FLAG_MASKED() macro in patch 1/7
+> - add Ack-by tag
 
-This should have prevented watchdog timer from getting registered.
+All 7 patches applied for kernel v5.1.
 
-Thanks,
-Sekhar
+Yours,
+Linus Walleij
 
 _______________________________________________
 linux-arm-kernel mailing list
