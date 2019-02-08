@@ -2,67 +2,58 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 290FCC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 16:34:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 30F44C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 16:40:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA5152086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 16:34:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F3E8020823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 16:40:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M/cWljEF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA5152086C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bUYoII+I"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F3E8020823
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=8bytes.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CQqoALpPiv7zAXMiaZQTSTZlJpFKJia2av7HnS4eWoA=; b=M/cWljEFZH8VSL
-	nEXH0XWTqHsjtDat0umX9wSDauP0GmvF5jovvYgisFeYCo3pTgbUZm3xU9w5eBOEZ7NyzlosBoAG4
-	ZBletBbLhS10Q+3kmWYz0qOYW2luocJRzw+qVkCHYtM1M9KMpTWkUMar0rHhfY4dDXHeZm/gnYQTg
-	UEtJUfRY7T7MwuVTYhhDJUtOLBR7PwMdXeR1BpSr8o40K3SCrPxcIrY7t6zqk5OPgmKNWFQmYQAfp
-	4UOxU4TyOjw+232ruReRmL5PYQGEhFkSnOSsXWt0XHnEu7uXctpozrBEtaVz1qU8JmwJzgbSz3/Y/
-	a/ZBEnGxwzIiWb6nbFGA==;
+	List-Owner; bh=XDI+Y5HotGMaOs/HtJu7GETwK3if690s02n0xB1KiL8=; b=bUYoII+IXsWz7y
+	sWnNc/Zi4xrxWsVWLommpyvWMjGshP21UmkPwF5tcDtn/crJNRCx2iArZ5Yusim3XBkREr+DeY57h
+	KUhvWot/gSX6NFNQT/5nCb+KvZfAb+Fn4C/yyXCIWkbtXQH4shBHLoLOEjMATPjwyi5P5FCPvq+od
+	icXgL/7pmV8qvFCW93pHLcnPFYEJEM4PVzrXT0UqCCh8GjTnQY9CvhQSZ1lV+Pv1Zuic2YhXmyY8K
+	r+q1Il7m84yA+700k2YQ77ZpSjDzNi2sawUTxJTLYGsHFVM2TJMs8ykP6leToe1bxJ378nkfmamTj
+	FcSOE0H4ekhFX/Q/1oAQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs96E-0005Wv-VX; Fri, 08 Feb 2019 16:33:58 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gs9CX-0000DU-91; Fri, 08 Feb 2019 16:40:29 +0000
+Received: from 8bytes.org ([2a01:238:4383:600:38bc:a715:4b6d:a889]
+ helo=theia.8bytes.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs96A-0005PY-Jj
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 16:33:56 +0000
-Received: from lupine.hi.pengutronix.de
- ([2001:67c:670:100:3ad5:47ff:feaf:1a17] helo=lupine)
- by metis.ext.pengutronix.de with esmtp (Exim 4.89)
- (envelope-from <p.zabel@pengutronix.de>)
- id 1gs965-00054l-6U; Fri, 08 Feb 2019 17:33:49 +0100
-Message-ID: <1549643628.3305.12.camel@pengutronix.de>
-Subject: Re: [PATCH v3] dt-bindings: reset: meson: add g12a bindings
-From: Philipp Zabel <p.zabel@pengutronix.de>
-To: Neil Armstrong <narmstrong@baylibre.com>, Jerome Brunet
- <jbrunet@baylibre.com>, Kevin Hilman <khilman@baylibre.com>
-Date: Fri, 08 Feb 2019 17:33:48 +0100
-In-Reply-To: <6bdabea0-9870-66d1-a737-9695067ba8e6@baylibre.com>
-References: <20190201125003.25022-1-jbrunet@baylibre.com>
- <1549535746.4557.3.camel@pengutronix.de>
- <6bdabea0-9870-66d1-a737-9695067ba8e6@baylibre.com>
-X-Mailer: Evolution 3.22.6-1+deb9u1 
-Mime-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:3ad5:47ff:feaf:1a17
-X-SA-Exim-Mail-From: p.zabel@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+ id 1gs9CT-0000BS-M2
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 16:40:27 +0000
+Received: by theia.8bytes.org (Postfix, from userid 1000)
+ id B359316F; Fri,  8 Feb 2019 17:40:19 +0100 (CET)
+Date: Fri, 8 Feb 2019 17:40:19 +0100
+From: Joerg Roedel <joro@8bytes.org>
+To: Geert Uytterhoeven <geert+renesas@glider.be>
+Subject: Re: [PATCH/RFC] driver core: Postpone DMA tear-down until after
+ devres release
+Message-ID: <20190208164019.GY32526@8bytes.org>
+References: <20190207193653.18221-1-geert+renesas@glider.be>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190207193653.18221-1-geert+renesas@glider.be>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_083354_829052_DF0084B8 
-X-CRM114-Status: UNSURE (   8.74  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190208_084026_069242_16ACACEA 
+X-CRM114-Status: GOOD (  10.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,25 +65,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-amlogic@lists.infradead.org
+Cc: "Rafael J . Wysocki" <rafael@kernel.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-kernel@vger.kernel.org,
+ linux-renesas-soc@vger.kernel.org, iommu@lists.linux-foundation.org,
+ Robin Murphy <robin.murphy@arm.com>, Christoph Hellwig <hch@lst.de>,
+ linux-arm-kernel@lists.infradead.org,
+ Marek Szyprowski <m.szyprowski@samsung.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 2019-02-07 at 14:10 +0100, Neil Armstrong wrote:
-[...]
-> The controller is the exact same as Meson8, GXBB, and AXG.
-> 
-> We had doubts since the previous datasheets were not clear, but for G12A we
-> are sure it's 100% same to at least GXBB and AXG, thus using the same
-> compatible as AXG since they share most of same architecture.
+Hi Geert,
 
-Ok, thank you. I've applied the patch to the reset/next branch.
+On Thu, Feb 07, 2019 at 08:36:53PM +0100, Geert Uytterhoeven wrote:
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index 8ac10af17c0043a3..d62487d024559620 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -968,9 +968,9 @@ static void __device_release_driver(struct device *dev, struct device *parent)
+>  			drv->remove(dev);
+>  
+>  		device_links_driver_cleanup(dev);
+> -		arch_teardown_dma_ops(dev);
+>  
+>  		devres_release_all(dev);
+> +		arch_teardown_dma_ops(dev);
+>  		dev->driver = NULL;
+>  		dev_set_drvdata(dev, NULL);
+>  		if (dev->pm_domain && dev->pm_domain->dismiss)
 
-regards
-Philipp
+Thanks for the fix! Should it also be tagged for stable and get a Fixes
+tag? I know it only triggers with a fix in v5.0-rc, but still...
+
+Regards,
+
+	Joerg
+
 
 _______________________________________________
 linux-arm-kernel mailing list
