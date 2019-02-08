@@ -2,85 +2,57 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C2F1C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:00:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BF680C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:06:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E0A6821916
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:00:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8FBB02147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:06:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dZb1Glzb";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="XmxtA2G8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E0A6821916
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DX3ziB/4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8FBB02147C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=J/mv/NmI8T/w3V3DyRQ2IRznRXeIxhYu2tm0JzZEtUI=; b=dZb1GlzbTTsM4q
-	lqMreLS41p8jH4IcLBaQp98kRxTTFQS8ol8nkZF0xGUyGO7RaFWb0exS/F7tTABxDN9GmJ51K6Cvu
-	iDThwIO6D8yJk5qKRYH5ewo917gsP5mNfhe0WvZA70WYSntgBB8XF566TZudaWW71s69wf+vYSgle
-	haqGGswyjtw3mmGJvcoZjxq5vjVlxS8phq7qI4UBL87WDF8tSUmWjT+sZjqQpZGeJUQ/eBWTvE/n0
-	nF3IDl6dco5PDFugVdyaZHpYdyO3PuSebrX/k1V1JjHHW4EMw0HOwrXRtMIhsxs+hQkWHzSQ1jHTO
-	j48eK3XVdXl9PqWmMkRg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=5EP7txYXLoJWPB+tOUe8pXx6XsnLsT93HLJTl9K8LAI=; b=DX3ziB/4e+UCDy
+	RAwdt74IaWMvY2IHv6S+74SlKwxADtel9HurnHxaBsZoEUbHWpOHtTN2ZmwjR36w9NMez1MOgFOb7
+	RfPRVXkE3uTDMRO48a7TeEhl42RJeWw/qAQ/0Ol8Age+zhFsmgCYCcFvkLY84c4r4epedS0nD5xdL
+	b2EzHXhlfVBYyEvEO94cqycp6H+X8XkaRYO5e4SOpW45ri6aw1LkSjjugdBHutmGUE91RC+4QtvVe
+	WSgyR2G1Y/PmBf6YC9htiHvt46/TyW0KM8VWOZ2UM7dlmZxyShHw5mbxrMHo3E7pBIOd/Q0aLIoJj
+	JQcBMhWTjUd6CuP+r5kw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs213-0003oF-RY; Fri, 08 Feb 2019 09:00:09 +0000
-Received: from lelv0142.ext.ti.com ([198.47.23.249])
+	id 1gs26f-0006Fw-AB; Fri, 08 Feb 2019 09:05:57 +0000
+Received: from relay10.mail.gandi.net ([217.70.178.230])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs20z-00030r-OS
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:00:08 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x188xlm3020331;
- Fri, 8 Feb 2019 02:59:47 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549616387;
- bh=JAWoQZj8VTQbstjNpUCEMX9WOMSN1nX/HpEhdRFugUc=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=XmxtA2G8N5r8Mz4zK1bzBsTxLjBdYUXR2MfNjU+KGDUsAc3/quYQLGmeDQaMCOX8U
- Py+H8VT42mbyiT53+w77HaP8/usaH+W1PtzKaCEWLMUsmpMenBOaygxqQPRe/wW6it
- rj9insuXxELin5ZjQVa5GT0ey9edny3XcVpx2wnI=
-Received: from DLEE103.ent.ti.com (dlee103.ent.ti.com [157.170.170.33])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x188xl2F064238
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 8 Feb 2019 02:59:47 -0600
-Received: from DLEE100.ent.ti.com (157.170.170.30) by DLEE103.ent.ti.com
- (157.170.170.33) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 8
- Feb 2019 02:59:46 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE100.ent.ti.com
- (157.170.170.30) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 8 Feb 2019 02:59:46 -0600
-Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x188xhso017135;
- Fri, 8 Feb 2019 02:59:44 -0600
-Subject: Re: [PATCH 02/35] ARM: davinci: select GENERIC_IRQ_MULTI_HANDLER
-To: Bartosz Golaszewski <brgl@bgdev.pl>
-References: <20190131133928.17985-1-brgl@bgdev.pl>
- <20190131133928.17985-3-brgl@bgdev.pl>
- <eb09a892-d965-3ee2-dfe7-2dcbbcb03791@ti.com>
- <CAMRc=Me9gqfN6WuWPZ61M2pNC+ZrhxAX_=BzAr4_zxnfdL4G7Q@mail.gmail.com>
-From: Sekhar Nori <nsekhar@ti.com>
-Message-ID: <7f5206ea-ad18-86c2-f9f0-3fccaf4932e9@ti.com>
-Date: Fri, 8 Feb 2019 14:29:43 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gs26c-0006FE-0s
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:05:55 +0000
+Received: from localhost (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
+ [90.88.22.177]) (Authenticated sender: maxime.ripard@bootlin.com)
+ by relay10.mail.gandi.net (Postfix) with ESMTPSA id 6B8EF240011;
+ Fri,  8 Feb 2019 09:05:42 +0000 (UTC)
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Daniel Vetter <daniel.vetter@intel.com>,
+	David Airlie <airlied@linux.ie>
+Subject: [PATCH] drm/sun4i: dsi: Fix unitialized variable warning
+Date: Fri,  8 Feb 2019 10:05:40 +0100
+Message-Id: <20190208090540.19626-1-maxime.ripard@bootlin.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-In-Reply-To: <CAMRc=Me9gqfN6WuWPZ61M2pNC+ZrhxAX_=BzAr4_zxnfdL4G7Q@mail.gmail.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_010005_908321_7E926FBA 
-X-CRM114-Status: GOOD (  15.31  )
+X-CRM114-CacheID: sfid-20190208_010554_213656_9F604FB9 
+X-CRM114-Status: GOOD (  10.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,45 +64,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jason Cooper <jason@lakedaemon.net>, Kevin Hilman <khilman@kernel.org>,
- Marc Zyngier <marc.zyngier@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- Thomas Gleixner <tglx@linutronix.de>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
+ Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
+ dri-devel@lists.freedesktop.org, Chen-Yu Tsai <wens@csie.org>,
+ Sean Paul <seanpaul@chromium.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 07/02/19 9:19 PM, Bartosz Golaszewski wrote:
+Since the DPHY rework, one error path doesn't set the return error code
+before jumping to its error label, which in turns make gcc (rightfully)
+complain about the variable holding the error code being uninitialized.
 
->>> +static asmlinkage void __exception_irq_entry
->>> +cp_intc_handle_irq(struct pt_regs *regs)
->>> +{
->>> +     int irqnr = cp_intc_read(CP_INTC_PRIO_IDX);
->>> +
->>> +     irqnr &= 0xff;
->>> +
->>> +     handle_domain_irq(cp_intc_domain, irqnr, regs);
->>
->> This leaves out spurious interrupt handling present in existing assembly
->> code. Can you add it back. May be use omap_intc_handle_irq() as an
->> example for handling spurious IRQs.
->>
-> 
-> Hi Sekhar,
-> 
-> I started looking at this one and noticed that the manual says
-> PRI_INDX field in the GPIR register is in bits 0-9 (mask 0x3ff) while
-> the assembly logically ANDs it with 0xff. I guess it's because there
-> can be no more interrupts than 255 but I'd at least explain it in a
-> comment. Or should we use the proper mask? What do you think?
+Fix this.
 
-I think using mask 0x3ff to match TRM is fine.
+Fixes: bb3b6fcb6849 ("sun6i: dsi: Convert to generic phy handling")
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-Sekhar
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+index 9b7bef696957..318994cd1b85 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+@@ -1025,6 +1025,7 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
+ 	dsi->dphy = devm_phy_get(dev, "dphy");
+ 	if (IS_ERR(dsi->dphy)) {
+ 		dev_err(dev, "Couldn't get the MIPI D-PHY\n");
++		ret = PTR_ERR(dsi->dphy);
+ 		goto err_unprotect_clk;
+ 	}
+ 
+-- 
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
