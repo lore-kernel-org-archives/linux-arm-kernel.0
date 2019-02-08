@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A0A3DC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:49:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 23BD2C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:50:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6E5452086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:49:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E1B7220857
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:50:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZycAQBKf";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mobiveil.co.in header.i=@mobiveil.co.in header.b="eh/Bg0jU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E5452086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aBAYPLbY";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mobiveil.co.in header.i=@mobiveil.co.in header.b="0k9WPPCK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1B7220857
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mobiveil.co.in
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,58 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=nrEzzMt7aRbWTwwUfsazA27PHyo0aPFQjX3Lr68I+z4=; b=ZycAQBKfcCuXee
-	niABNdPtJqUd8E0Jv1HF1qnoyoK9yPy47Dk3udScfItht/przHK6YbAD4TYSjHZUPVTtgOhzdhr8P
-	wh8zyHVLKUkLztd8ILWx1Y12cfX6n9riGN0N5E3fBbk2VrUrH11rp8cN4hu6bm/TgykNTxoApvQgH
-	C3jYU/ikrri3MdEmzTws5vjWKJdiKIBw918P6McY8M+va9z6Mj8b62EZc7LJXSVjzLKmcA2wFrNkP
-	jzNy063fSaf2ORjZ8qBYtowHtlcCNDP2LlXLCiq1yKxDjd1TowQTYSHKuByZnkgoJdE1fMQPqnfWV
-	ohxwjBtQ9mcUPbCtIvrg==;
+	List-Owner; bh=8VRHj+0aQPqQ72kUmgMGIL+VeAGFrx4HVDLyYVrsFj0=; b=aBAYPLbYGDsbOG
+	/ExQXYzjvpIuFJay9GFOM2tVtZzdBFoAwcICDU/sBIwJRE0qQHCA3HwrTtXhknumyr3J5Y65WKI5h
+	atit1BJgVORQhXQdxGua7MDd31sr55QVJTq82CLMV0QQybxgSg2unOy+Ow7BecqU7iZ7Q13Nk/5Ww
+	Qdfs6FCJIy37EHMsZEV79Hf+KcP7jILBm1xQAZs4cuy+MbBmTfcopjwqSVKolhqjD4IzndnbsGzzG
+	3ugIdxCK0fgJNcB+I7wuREWn0pMKZPy0pFeMlV34J0330y4m5B4mTEnPQv7ysD0d8H29EAlys5Qqe
+	Ec3IszqlGhO0wlBDL4vw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs5bK-00067Q-SW; Fri, 08 Feb 2019 12:49:50 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gs5cC-0007cw-NO; Fri, 08 Feb 2019 12:50:44 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs5bH-00066n-Fb
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:49:49 +0000
-Received: by mail-wm1-x342.google.com with SMTP id z5so3308878wmf.0
+ id 1gs5c8-0007cZ-PY
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:50:42 +0000
+Received: by mail-wr1-x441.google.com with SMTP id a16so3498582wrv.0
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 08 Feb 2019 04:49:47 -0800 (PST)
+ Fri, 08 Feb 2019 04:50:40 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=mobiveil.co.in; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=xPcDhdgRfeCUFb0NzA1yOiOvgeXq4mBndVeTfOEslgQ=;
- b=eh/Bg0jU9RaDR1LBeR3Gh1Q56m8LdqeMCjFymtwr+4RLIQKymhUKmPy7h8cE2dnt6I
- MY2BcxyhOc37PCKHC09QEvo6SDg9KssZE/fXVFmu9gRRmyMIwtzLjj6dvRIoXbuJj/lf
- F8RLPay1V2SCqepLMtout4X3rx5JR/99Q+y4A=
+ :cc; bh=qnHdX7TnXOEiHXHYVasMmzva4CaTpXguv8jLldqZ/zM=;
+ b=0k9WPPCKKItYXzndcogdzxnVoO9cQlpjEn2qq4gxRc/FV272WdMDa/HugcL9upD7P6
+ t8xXnl6q1RTUo5498d+qetP/xj0gz+rlcUWUhDBPM2JNl47QC+KxFSUeH4b9wHJX+A4E
+ dK7tUg9ny3O1jwPkgEAHETOzII/BJLVdDNXV4=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=xPcDhdgRfeCUFb0NzA1yOiOvgeXq4mBndVeTfOEslgQ=;
- b=M3gOw2lXzevlVLme8r0IZRH6TxDyF8FyUxRN2Er8Az5XoG7mtdAHN+POjxSPgfIk3R
- YElsLK9LGaUzkOpSstdqJld10VqVsGJYv62Rwuj2SfUUkREdOIR/RdS/WURYSjaPNuSb
- W00CBrIQ3W21O0iirey++6aFTL1yx2VyB3kC2Zh8bIwT/m5SefcfKkbzocaD+Eorj2Mx
- 5BI1bIjV3njJpGcLyE5rmMZPH9JhhHsD5IyGI3KbHziCeU6LzOvuM6jpJr72ymhYUHOG
- BHrivdM6nV21kdKAHZ9nnE3m4XtNCWLxehGadaESm7dWTFxzIG/L00Vx4AtdupPOGKMf
- 5VXA==
-X-Gm-Message-State: AHQUAuYH3FKtCWJS3Y7MhMtTz6Hc0xvwXp7Ucj2gXS2HNKkM4CZfu1H/
- sBEafikHLI6G+xfSBe6LTwglRz0sD+hfOpvvbdEw/w==
-X-Google-Smtp-Source: AHgI3IY+i3iPNRf0lkCuV77xZsU23QrAtPoJon2X4xtGpT07Tf9p//8oHrYpsx85i6UZ8C+QSMmSG3ErzybDAESBhrE=
-X-Received: by 2002:a1c:9e4a:: with SMTP id h71mr11858445wme.82.1549630185604; 
- Fri, 08 Feb 2019 04:49:45 -0800 (PST)
+ bh=qnHdX7TnXOEiHXHYVasMmzva4CaTpXguv8jLldqZ/zM=;
+ b=kBHDWdSgul5FNtrNcfcrHajdCm/BQSh7qvRlIIj/aLWrzYLVxRUDMY7DrGgFQff0d3
+ Xx88Jphy/4Iu6vbu7UFXlxbON1VIJyk/RSna7CgQU+d7bNrYd33CyVIYXxRuax+bZrn6
+ 5NVh4nnCI+n2Ypqb8U+axNz2v5JV8ZJ2SgUB01YqAjnh2/ute+/S/S725x0LPH2TfLro
+ Vzi576qMf392f4kZUSV9dVtQXwGuFAhZRVYb6SYu6dqSpGcxjquKfKX8toD3T5pPGM0T
+ tqks/7gNk2GBujT2sr839rEuHqgM7VYOeXKZGTb9RpI2akhO9krOVUmQvRSx1NLaLbKx
+ /j5Q==
+X-Gm-Message-State: AHQUAuYY3DwuId4U2r7UKpPSGiv8CG6bTb66665s8T1E3bndWv6Gd6bw
+ xqap0onIeXeYXqUGYrZGxuWP8Flfx1il6PP6ScTCtQ==
+X-Google-Smtp-Source: AHgI3IYkO1gBaw8j2seTdh1YGRiQzYKKQql6G6YxqXpzAf/hB9zHkLibVQpTzUvEP9Z7w1HZvDqzA1aD42q9jVaM4Ms=
+X-Received: by 2002:adf:fd81:: with SMTP id d1mr16559738wrr.105.1549630239150; 
+ Fri, 08 Feb 2019 04:50:39 -0800 (PST)
 MIME-Version: 1.0
 References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
- <20190129080926.36773-25-Zhiqiang.Hou@nxp.com>
-In-Reply-To: <20190129080926.36773-25-Zhiqiang.Hou@nxp.com>
+ <20190129080926.36773-26-Zhiqiang.Hou@nxp.com>
+In-Reply-To: <20190129080926.36773-26-Zhiqiang.Hou@nxp.com>
 From: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-Date: Fri, 8 Feb 2019 18:22:24 +0530
-Message-ID: <CAFZiPx0Qv6LN6mi4Z9fta2X=Rh85uk7bYGPHmncy=XYgBQOnAw@mail.gmail.com>
-Subject: Re: [PATCHv3 24/27] PCI: mobiveil: ls_pcie_g4: add Workaround for
- A-011577
+Date: Fri, 8 Feb 2019 18:23:18 +0530
+Message-ID: <CAFZiPx24PEE6LnUaY5MiQ_QDLbwkF-BvWe8s9ycUDVH-dN2_xg@mail.gmail.com>
+Subject: Re: [PATCHv3 25/27] PCI: mobiveil: ls_pcie_g4: add Workaround for
+ A-011451
 To: "Z.q. Hou" <zhiqiang.hou@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_044947_524099_949C00BB 
-X-CRM114-Status: GOOD (  19.82  )
+X-CRM114-CacheID: sfid-20190208_045040_825571_A46376A5 
+X-CRM114-Status: GOOD (  18.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,12 +113,21 @@ On Tue, Jan 29, 2019 at 1:41 PM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
 >
 > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 >
-> PCIe configuration access to non-existent function triggered
-> SERROR interrupt exception.
+> When LX2 PCIe controller is sending multiple split completions and
+> ACK latency expires indicating that ACK should be send at priority.
+> But because of large number of split completions and FC update DLLP,
+> the controller does not give priority to ACK transmission. This
+> results into ACK latency timer timeout error at the link partner and
+> the pending TLPs are replayed by the link partner again.
 >
 > Workaround:
-> Disable error reporting on AXI bus during the Vendor ID read
-> transactions in enumeration.
+> 1. Reduce the ACK latency timeout value to a very small value.
+> 2. Restrict the number of completions from the LX2 PCIe controller
+>    to 1, by changing the Max Read Request Size (MRRS) of link partner
+>    to the same value as Max Packet size (MPS).
+>
+> This patch implemented part 1, the part 2 can be set by kernel parameter
+> 'pci=pcie_bus_perf'
 >
 > This ERRATA is only for LX2160A Rev1.0, and it will be fixed
 > in Rev2.0.
@@ -125,153 +135,63 @@ On Tue, Jan 29, 2019 at 1:41 PM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
 > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > ---
 > V3:
->  - Integrated without change from http://patchwork.ozlabs.org/patch/1006790/
+>  - Integrated without change from http://patchwork.ozlabs.org/patch/1006796/
 >
->  .../controller/mobiveil/pci-layerscape-gen4.c | 37 +++++++++++++++++++
->  .../controller/mobiveil/pcie-mobiveil-host.c  | 17 ++++++++-
->  .../pci/controller/mobiveil/pcie-mobiveil.h   |  3 ++
->  3 files changed, 56 insertions(+), 1 deletion(-)
+>  .../pci/controller/mobiveil/pci-layerscape-gen4.c | 15 +++++++++++++++
+>  drivers/pci/controller/mobiveil/pcie-mobiveil.h   |  4 ++++
+>  2 files changed, 19 insertions(+)
 >
 > diff --git a/drivers/pci/controller/mobiveil/pci-layerscape-gen4.c b/drivers/pci/controller/mobiveil/pci-layerscape-gen4.c
-> index 174cbcac4059..d2c5dbbd5e3c 100644
+> index d2c5dbbd5e3c..20ce146788ca 100644
 > --- a/drivers/pci/controller/mobiveil/pci-layerscape-gen4.c
 > +++ b/drivers/pci/controller/mobiveil/pci-layerscape-gen4.c
-> @@ -22,8 +22,13 @@
->
->  #include "pcie-mobiveil.h"
->
-> +#define REV_1_0                                (0x10)
-> +
->  /* LUT and PF control registers */
->  #define PCIE_LUT_OFF                   (0x80000)
-> +#define PCIE_LUT_GCR                   (0x28)
-> +#define PCIE_LUT_GCR_RRE               (0)
-> +
->  #define PCIE_PF_OFF                    (0xc0000)
->  #define PCIE_PF_INT_STAT               (0x18)
->  #define PF_INT_STAT_PABRST             (31)
-> @@ -41,6 +46,7 @@ struct ls_pcie_g4 {
->         struct mobiveil_pcie *pci;
->         struct delayed_work dwork;
->         int irq;
-> +       u8 rev;
->  };
->
->  static inline u32 ls_pcie_g4_lut_readl(struct ls_pcie_g4 *pcie, u32 off)
-> @@ -76,6 +82,15 @@ static bool ls_pcie_g4_is_bridge(struct ls_pcie_g4 *pcie)
+> @@ -82,12 +82,27 @@ static bool ls_pcie_g4_is_bridge(struct ls_pcie_g4 *pcie)
 >         return header_type == PCI_HEADER_TYPE_BRIDGE;
 >  }
 >
-> +static int ls_pcie_g4_host_init(struct mobiveil_pcie *pci)
+> +static void workaround_A011451(struct ls_pcie_g4 *pcie)
 > +{
-> +       struct ls_pcie_g4 *pcie = to_ls_pcie_g4(pci);
+> +       struct mobiveil_pcie *mv_pci = pcie->pci;
+> +       u32 val;
 > +
-> +       pcie->rev = csr_readb(pci, PCI_REVISION_ID);
-> +
-> +       return 0;
+> +       /* Set ACK latency timeout */
+> +       val = csr_readl(mv_pci, GPEX_ACK_REPLAY_TO);
+> +       val &= ~(ACK_LAT_TO_VAL_MASK << ACK_LAT_TO_VAL_SHIFT);
+> +       val |= (4 << ACK_LAT_TO_VAL_SHIFT);
+> +       csr_writel(mv_pci, val, GPEX_ACK_REPLAY_TO);
 > +}
 > +
->  static int ls_pcie_g4_link_up(struct mobiveil_pcie *pci)
+>  static int ls_pcie_g4_host_init(struct mobiveil_pcie *pci)
 >  {
 >         struct ls_pcie_g4 *pcie = to_ls_pcie_g4(pci);
-> @@ -188,12 +203,34 @@ static void ls_pcie_g4_reset(struct work_struct *work)
->         ls_pcie_g4_reinit_hw(pcie);
->  }
 >
-> +static int ls_pcie_g4_read_other_conf(struct pci_bus *bus, unsigned int devfn,
-> +                                  int where, int size, u32 *val)
-> +{
-> +       struct mobiveil_pcie *pci = bus->sysdata;
-> +       struct ls_pcie_g4 *pcie = to_ls_pcie_g4(pci);
-> +       int ret;
-> +
-> +       if (pcie->rev == REV_1_0 && where == PCI_VENDOR_ID)
-> +               ls_pcie_g4_lut_writel(pcie, PCIE_LUT_GCR,
-> +                                     0 << PCIE_LUT_GCR_RRE);
-> +
-> +       ret = pci_generic_config_read(bus, devfn, where, size, val);
-> +
-> +       if (pcie->rev == REV_1_0 && where == PCI_VENDOR_ID)
-> +               ls_pcie_g4_lut_writel(pcie, PCIE_LUT_GCR,
-> +                                     1 << PCIE_LUT_GCR_RRE);
-> +
-> +       return ret;
-> +}
-> +
->  static struct mobiveil_rp_ops ls_pcie_g4_rp_ops = {
->         .interrupt_init = ls_pcie_g4_interrupt_init,
-> +       .read_other_conf = ls_pcie_g4_read_other_conf,
->  };
+>         pcie->rev = csr_readb(pci, PCI_REVISION_ID);
 >
->  static const struct mobiveil_pab_ops ls_pcie_g4_pab_ops = {
->         .link_up = ls_pcie_g4_link_up,
-> +       .host_init = ls_pcie_g4_host_init,
->  };
->
->  static int __init ls_pcie_g4_probe(struct platform_device *pdev)
-> diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> index e8d0c4989013..5f51bc2dd6d7 100644
-> --- a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> @@ -79,9 +79,20 @@ static void __iomem *mobiveil_pcie_map_bus(struct pci_bus *bus,
->         return pcie->rp.config_axi_slave_base + where;
->  }
->
-> +static int mobiveil_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
-> +                                    int where, int size, u32 *val)
-> +{
-> +       struct mobiveil_pcie *pcie = bus->sysdata;
-> +       struct root_port *rp = &pcie->rp;
-> +
-> +       if (bus->number > rp->root_bus_nr && rp->ops->read_other_conf)
-> +               return rp->ops->read_other_conf(bus, devfn, where, size, val);
-> +
-> +       return pci_generic_config_read(bus, devfn, where, size, val);
-> +}
->  static struct pci_ops mobiveil_pcie_ops = {
->         .map_bus = mobiveil_pcie_map_bus,
-> -       .read = pci_generic_config_read,
-> +       .read = mobiveil_pcie_config_read,
->         .write = pci_generic_config_write,
->  };
->
-> @@ -309,6 +320,10 @@ int mobiveil_host_init(struct mobiveil_pcie *pcie, bool reinit)
->         value |= (PCI_CLASS_BRIDGE_PCI << 16);
->         csr_writel(pcie, value, PAB_INTP_AXI_PIO_CLASS);
->
-> +       /* Platform specific host init */
-> +       if (pcie->ops->host_init)
-> +               return pcie->ops->host_init(pcie);
+> +       if (pcie->rev == REV_1_0)
+> +               workaround_A011451(pcie);
 > +
 >         return 0;
 >  }
 >
 > diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil.h b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-> index 0ccd6cee5f8f..ab43de5e4b2b 100644
+> index ab43de5e4b2b..f0e2e4ae09b5 100644
 > --- a/drivers/pci/controller/mobiveil/pcie-mobiveil.h
 > +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-> @@ -145,6 +145,8 @@ struct mobiveil_msi {                       /* MSI information */
+> @@ -85,6 +85,10 @@
+>  #define PAB_AXI_AMAP_PEX_WIN_H(win)    PAB_REG_ADDR(0x0bac, win)
+>  #define PAB_INTP_AXI_PIO_CLASS         0x474
 >
->  struct mobiveil_rp_ops {
->         int (*interrupt_init)(struct mobiveil_pcie *pcie);
-> +       int (*read_other_conf)(struct pci_bus *bus, unsigned int devfn,
-> +                              int where, int size, u32 *val);
->  };
->
->  struct root_port {
-> @@ -160,6 +162,7 @@ struct root_port {
->
->  struct mobiveil_pab_ops {
->         int (*link_up)(struct mobiveil_pcie *pcie);
-> +       int (*host_init)(struct mobiveil_pcie *pcie);
->  };
->
->  struct mobiveil_pcie {
+> +#define GPEX_ACK_REPLAY_TO             0x438
+> +#define  ACK_LAT_TO_VAL_MASK           0x1fff
+> +#define  ACK_LAT_TO_VAL_SHIFT          0
+> +
+>  #define PAB_PEX_AMAP_CTRL(win)         PAB_REG_ADDR(0x4ba0, win)
+>  #define  AMAP_CTRL_EN_SHIFT            0
+>  #define  AMAP_CTRL_TYPE_SHIFT          1
 > --
 > 2.17.1
 >
-can we have an english brief than having a internal cryptic
-number:A-011577, on the patch title?
+again, can we avoid errata number on patch title and have a brief title instead?
 
 _______________________________________________
 linux-arm-kernel mailing list
