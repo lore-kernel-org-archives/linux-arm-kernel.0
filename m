@@ -2,70 +2,63 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B6B50C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 14:13:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 83935C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 14:14:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 855902146E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 14:13:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4ECA12146E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 14:14:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W2j2aQX1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Do8jFUfY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 855902146E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V8DE7Gf9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4ECA12146E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7oix8p6H42+PHkAT6yVHNtQvY3yqxhDokTO8VVIrOs8=; b=W2j2aQX1IdWqlg
-	UKDBK6DNGIjedaWaI1o6nWBfbtrEYr8BFypMRI4M3bsz4sD8Xdc0gvy+G4okr8FguLa3cM11lHUft
-	fhrPnFrbDuSgitQUNLZ6sPct3SYFAzmLUlY+1B56VkDZfT+RKnVvsl0JNTkDpSoCUS7fAJHl4bWKg
-	8hQc9UmGmyGrobe0zQxq7kJUUYeWbQ6dsx7U8SGDLVbzdFSQaOHuyYbDC4swYtG7aD/1rL4QwjPrx
-	fV0Gu2vgzMG4gZaKvZ+0CLfgN7mSsec35jJ1bmBDai5BcMWZFB+QyVzDLFr0GpLA+6kOce0YBgDqj
-	WSWU8BwZfwvN46I82KFQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=kGhBm1KREtGNFAt4r+S9/GCSomLiARMG07j9bRrwtv0=; b=V8DE7Gf9wmKrEz
+	6I9ilqIn2nUsqHDpBPRX+X85PB+omrjOwhsCv8tiooebfmf55gbCaasHiVlGzOKYN6fCPp+HiwxIY
+	7YG1qCcm4j2elJdIwOONjoVZYz97Usb9e/c2EtNpwtDLDn5tl4KqigL/vLZeuRDRL/f7bZjCsS7BP
+	WnTX0aMySAT8cUGKyPe/LgCvmcfV+h7uz1KKPvy3sJWUZ2nDdnLC/vXzkUjLeLQ/TLkdmHigTGZPE
+	DxNvpp87i+95EvIpObWM/Tdr4P67lApJVckd3TsCKeDn24VLgMXQSASC5HNLc93ODJiksZ1qET98e
+	vkjNTxM5vMNpHpDQjMSw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs6u9-0007Gj-FR; Fri, 08 Feb 2019 14:13:21 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs6u5-0007GO-U0
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 14:13:19 +0000
-Received: from localhost (173-25-63-173.client.mchsi.com [173.25.63.173])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 6390020844;
- Fri,  8 Feb 2019 14:13:17 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549635197;
- bh=dXIofY2YeXA/ZJaKecf3mgmXm6vF+WyXOcPwQr3jdmg=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=Do8jFUfYqrHu/SScyMLw6FCUJwCseAmkAHYohHRggGQpqg8yGdk17bXeM4zkxVMTT
- dMa3NFlLl/esqCBuZAQBNusVO8EkdPomcDkwGz59+VSp9q+Fu8xR0MaQcQPlqUTFOA
- bcVLnjqpzqsBKq/PjIo/GNKANrGasBMb1/EZ7h3Q=
-Date: Fri, 8 Feb 2019 08:13:15 -0600
-From: Bjorn Helgaas <helgaas@kernel.org>
-To: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-Subject: Re: [PATCHv3 17/27] PCI: mobiveil: fix the checking of valid device
-Message-ID: <20190208141315.GU7268@google.com>
-References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
- <20190129080926.36773-18-Zhiqiang.Hou@nxp.com>
- <CAFZiPx0faPHN1mqPV28XTZfOxA2GgDPuc=RVdXEiGGNAUe=Fxw@mail.gmail.com>
+	id 1gs6up-0007nd-FB; Fri, 08 Feb 2019 14:14:03 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gs6ul-0007nC-Tu
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 14:14:01 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 92D82A78;
+ Fri,  8 Feb 2019 06:13:57 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 3706A3F557;
+ Fri,  8 Feb 2019 06:13:55 -0800 (PST)
+Subject: Re: [PATCH v8 00/26] APEI in_nmi() rework and SDEI wire-up
+To: "Rafael J. Wysocki" <rjw@rjwysocki.net>, Borislav Petkov <bp@alien8.de>
+References: <20190129184902.102850-1-james.morse@arm.com>
+ <15200237.N8Ro7ITLGE@aspire.rjw.lan>
+From: James Morse <james.morse@arm.com>
+Message-ID: <a8b9983d-5eef-2f30-441f-73ce50da7bca@arm.com>
+Date: Fri, 8 Feb 2019 14:13:53 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAFZiPx0faPHN1mqPV28XTZfOxA2GgDPuc=RVdXEiGGNAUe=Fxw@mail.gmail.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <15200237.N8Ro7ITLGE@aspire.rjw.lan>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_061317_996386_04DBE6FF 
-X-CRM114-Status: GOOD (  21.71  )
+X-CRM114-CacheID: sfid-20190208_061359_972026_B1DB8B30 
+X-CRM114-Status: GOOD (  23.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,88 +70,119 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "lorenzo.pieralisi@arm.com" <lorenzo.pieralisi@arm.com>,
- Xiaowei Bao <xiaowei.bao@nxp.com>,
- "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
- "Z.q. Hou" <zhiqiang.hou@nxp.com>, "will.deacon@arm.com" <will.deacon@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Leo Li <leoyang.li@nxp.com>, "M.h. Lian" <minghuan.lian@nxp.com>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>, Mingkai Hu <mingkai.hu@nxp.com>
+Cc: Tony Luck <tony.luck@intel.com>, linux-mm@kvack.org,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Xie XiuQi <xiexiuqi@huawei.com>, Will Deacon <will.deacon@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Dongjiu Geng <gengdongjiu@huawei.com>, linux-acpi@vger.kernel.org,
+ Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org, Len Brown <lenb@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-[+cc Thomas]
+Hi Rafael,
 
-On Fri, Feb 08, 2019 at 06:11:15PM +0530, Subrahmanya Lingappa wrote:
-> On Tue, Jan 29, 2019 at 1:40 PM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
-> >
-> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> >
-> > Avoid to issue CFG transactions to link partner when the PCIe
-> > link is not up. And allow CFG transactions to all functions of
-> > Endpoint implemented multiple functions.
-> >
-> > Fixes: 9af6bcb11e12 ("PCI: mobiveil: Add Mobiveil PCIe Host
-> > Bridge IP driver")
-> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> > Reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-> > ---
-> > V3:
-> >  - No change
-> >
-> >  drivers/pci/controller/mobiveil/pcie-mobiveil-host.c | 6 +++++-
-> >  1 file changed, 5 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> > index dc5324d94466..1ae82e790562 100644
-> > --- a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> > +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> > @@ -29,6 +29,10 @@ static bool mobiveil_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
-> >  {
-> >         struct mobiveil_pcie *pcie = bus->sysdata;
-> >
-> > +       /* If there is no link, then there is no device */
-> > +       if (bus->number > pcie->rp.root_bus_nr && !mobiveil_pcie_link_up(pcie))
-> > +               return false;
-> > +
-> >         /* Only one device down on each root port */
-> >         if ((bus->number == pcie->rp.root_bus_nr) && (devfn > 0))
-> >                 return false;
-> > @@ -37,7 +41,7 @@ static bool mobiveil_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
-> >          * Do not read more than one device on the bus directly
-> >          * attached to RC
-> >          */
-> > -       if ((bus->primary == pcie->rp.root_bus_nr) && (devfn > 0))
-> > +       if ((bus->primary == pcie->rp.root_bus_nr) && (PCI_SLOT(devfn) > 0))
+On 08/02/2019 11:40, Rafael J. Wysocki wrote:
+> On Tuesday, January 29, 2019 7:48:36 PM CET James Morse wrote:
+>> This series aims to wire-up arm64's fancy new software-NMI notifications
+>> for firmware-first RAS. These need to use the estatus-queue, which is
+>> also needed for notifications via emulated-SError. All of these
+>> things take the 'in_nmi()' path through ghes_copy_tofrom_phys(), and
+>> so will deadlock if they can interact, which they might.
 
-> here change "primary" to "number", as it's a bug in the original driver too.
+>> Known issues:
+>>  * ghes_copy_tofrom_phys() already takes a lock in NMI context, this
+>>    series moves that around, and makes sure we never try to take the
+>>    same lock from different NMIlike notifications. Since the switch to
+>>    queued spinlocks it looks like the kernel can only be 4 context's
+>>    deep in spinlock, which arm64 could exceed as it doesn't have a
+>>    single architected NMI. This would be fixed by dropping back to
+>>    test-and-set when the nesting gets too deep:
+>>  lore.kernel.org/r/1548215351-18896-1-git-send-email-longman@redhat.com
+>>
+>> * Taking an NMI from a KVM guest on arm64 with VHE leaves HCR_EL2.TGE
+>>   clear, meaning AT and TLBI point at the guest, and PAN/UAO are squiffy.
+>>   Only TLBI matters for APEI, and this is fixed by Julien's patch:
+>>  http://lore.kernel.org/r/1548084825-8803-2-git-send-email-julien.thierry@arm.com
+>>
+>> * Linux ignores the physical address mask, meaning it doesn't call
+>>   memory_failure() on all the affected pages if firmware or hypervisor
+>>   believe in a different page size. Easy to hit on arm64, (easy to fix too,
+>>   it just conflicts with this series)
 
-This looks like it should be split into two patches: (1) checking for
-link up, and (2) checking root_bus_nr.
 
-And if you mean "bus->primary == pcie->rp.root_bus_nr" is a bug in
-pci-aardvark.c, too, it is imperative to fix that bug also (with a
-separate patch).
+>> James Morse (26):
+>>   ACPI / APEI: Don't wait to serialise with oops messages when
+>>     panic()ing
+>>   ACPI / APEI: Remove silent flag from ghes_read_estatus()
+>>   ACPI / APEI: Switch estatus pool to use vmalloc memory
+>>   ACPI / APEI: Make hest.c manage the estatus memory pool
+>>   ACPI / APEI: Make estatus pool allocation a static size
+>>   ACPI / APEI: Don't store CPER records physical address in struct ghes
+>>   ACPI / APEI: Remove spurious GHES_TO_CLEAR check
+>>   ACPI / APEI: Don't update struct ghes' flags in read/clear estatus
+>>   ACPI / APEI: Generalise the estatus queue's notify code
+>>   ACPI / APEI: Don't allow ghes_ack_error() to mask earlier errors
+>>   ACPI / APEI: Move NOTIFY_SEA between the estatus-queue and NOTIFY_NMI
+>>   ACPI / APEI: Switch NOTIFY_SEA to use the estatus queue
+>>   KVM: arm/arm64: Add kvm_ras.h to collect kvm specific RAS plumbing
+>>   arm64: KVM/mm: Move SEA handling behind a single 'claim' interface
+>>   ACPI / APEI: Move locking to the notification helper
+>>   ACPI / APEI: Let the notification helper specify the fixmap slot
+>>   ACPI / APEI: Pass ghes and estatus separately to avoid a later copy
+>>   ACPI / APEI: Make GHES estatus header validation more user friendly
+>>   ACPI / APEI: Split ghes_read_estatus() to allow a peek at the CPER
+>>     length
+>>   ACPI / APEI: Only use queued estatus entry during
+>>     in_nmi_queue_one_entry()
+>>   ACPI / APEI: Use separate fixmap pages for arm64 NMI-like
+>>     notifications
+>>   mm/memory-failure: Add memory_failure_queue_kick()
+>>   ACPI / APEI: Kick the memory_failure() queue for synchronous errors
+>>   arm64: acpi: Make apei_claim_sea() synchronise with APEI's irq work
+>>   firmware: arm_sdei: Add ACPI GHES registration helper
+>>   ACPI / APEI: Add support for the SDEI GHES Notification type
 
-> >                 return false;
-> >
-> >         return true;
-> > --
-> > 2.17.1
-> >
+
+> I can apply patches in this series up to and including patch [21/26].
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Do you want me to do that?
+
+9-12, 17-19, 21 are missing any review/ack tags, so I wouldn't ask, but as
+you're offering, yes please!
+
+
+> Patch [22/26] requires an ACK from mm people.
+> 
+> Patch [23/26] has a problem that randconfig can generate a configuration
+> in which memory_failure_queue_kick() is not present, so it is necessary
+> to add a CONFIG_MEMORY_FAILURE dependency somewhere for things to
+> work (or define an empty stub for that function in case the symbol is
+> not set).
+
+Damn-it! Thanks, I was just trying to work that report out...
+
+
+> If patches [24-26/26] don't depend on the previous two, I can try to
+> apply them either, so please let me know.
+
+22-24 depend on each other. Merging 24 without the other two is no-improvement,
+so I'd like them to be kept together.
+
+25-26 don't depend on 22-24, but came later so that they weren't affected by the
+same race.
+(note to self: describe that in the cover letter next time.)
+
+
+If I apply the tag's and Boris' changes and post a tested v9 as 1-21, 25-26, is
+that easier, or does it cause extra work?
+
+
+Thanks,
+
+James
 
 _______________________________________________
 linux-arm-kernel mailing list
