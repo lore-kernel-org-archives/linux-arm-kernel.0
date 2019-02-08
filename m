@@ -2,107 +2,118 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DC589C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:42:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B7470C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:54:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AA25A2177B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:42:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 839E9206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:54:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VQ3B2k9u"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AA25A2177B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="krRrZvwu";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="FgnxrpOt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 839E9206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LUDJ2441i4QgcjZRI6qn12eQgYqBGzGCK3SuszW3R8g=; b=VQ3B2k9uskYt5C
-	MKRTeOP7j1gdtyJtuIcXevkVFlsRZw5us+c77pY4MO4H/IaLiwznPNVgN8bSK5cqU650JF4ujj/Tt
-	Fa/QvvPsIE+3WSnlYddR8P5yt2L+Zn7OPe3pDDkvetlHIdla4XFjVWnexUGhDDWlyYdz7MI0wzH7v
-	OzGsTK93QRPUjXq74m5IkIbhp5LvvhSVMHjOtHIvlznO2mVcKc3RguCqRVjT1zMMuRfdQkeG3GmyI
-	eOaZrL/PCWNrY97tVpCZDxIJSpkq2I0KFaCVf1fDhS32+k0Bd4LKpI9W2MGXoyVWpItOtzcUheKw2
-	Z4FuQcPJbtxFGAruSOMQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Ts4s80l/Gt7pWibahZtx85MPffocI61Z0voqPY6fpOc=; b=krRrZvwu9aM7xN
+	LEJCR8F7iKagQfNBK9sAGSnZZiokdqS33606uG64KO1masqbCUU2uBv1/EGedRjsd0gU+wOZ9Ar3B
+	opDSdyzgQ6snUj2AmTfyA4pky8ZCCohsotAAL1m/XxfidEAsZeOYH7Kr74B+tkEK5gRnK8DgoiXV0
+	yEAFsiBMIp2Cn8wgzVkdgdH7DVOhQrlofe3/JV9h1pGJstSONRaG+CvCsLrZNpL2W7aURAaQAGlra
+	Qu/hCuo9LidAVESF5cHYy3dP1zc1vRsENQrEsam/590sI8quj+n9tiDz2NVNhfbOXtWSP0g1ZwrTX
+	DWJSky9uw9Hafw0PiG7w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs8Io-0001e5-Lk; Fri, 08 Feb 2019 15:42:54 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs8Im-0001dY-86
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 15:42:53 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8342DA78;
- Fri,  8 Feb 2019 07:42:50 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 2A6443F675; Fri,  8 Feb 2019 07:42:49 -0800 (PST)
-Subject: Re: [PATCH 0/3] KVM: arm/arm64: trivial header path sanitization
-To: Masahiro Yamada <yamada.masahiro@socionext.com>,
- Christoffer Dall <christoffer.dall@arm.com>
-References: <1548403050-6585-1-git-send-email-yamada.masahiro@socionext.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <01ede89d-9cb4-8e3c-420b-d862755c630c@arm.com>
-Date: Fri, 8 Feb 2019 15:42:47 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <1548403050-6585-1-git-send-email-yamada.masahiro@socionext.com>
+	id 1gs8TY-0005CJ-Ia; Fri, 08 Feb 2019 15:54:00 +0000
+Received: from esa4.microchip.iphmx.com ([68.232.154.123])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gs8TV-0005BS-No
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 15:53:59 +0000
+X-IronPort-AV: E=Sophos;i="5.58,348,1544511600"; d="scan'208";a="26002642"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa4.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 08 Feb 2019 08:53:50 -0700
+Received: from NAM05-DM3-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.105) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Fri, 8 Feb 2019 08:53:49 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=ZfUX/BKxKKp+KuUcrHEUdLhz45z2XCFya2ivk0Mtmfg=;
+ b=FgnxrpOt1KG11OUJSoXOwspGPSBLJVdFRFdsUEe7fJNe6ETC8FtMVjJjXE8yhA/V5NygK58ZJzr1UfVv+bw0lGjGUcBpO6xKHg1wJaDf8ZFGz8uixlJPokO2Us6rDFOmcyXXGqqHVq+lmB4OYD0wpJ3ivW9dNppKviRZwI4qq+0=
+Received: from MWHPR11MB1662.namprd11.prod.outlook.com (10.172.55.15) by
+ MWHPR11MB1247.namprd11.prod.outlook.com (10.169.236.144) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1601.17; Fri, 8 Feb 2019 15:53:47 +0000
+Received: from MWHPR11MB1662.namprd11.prod.outlook.com
+ ([fe80::b92e:f982:af32:2887]) by MWHPR11MB1662.namprd11.prod.outlook.com
+ ([fe80::b92e:f982:af32:2887%5]) with mapi id 15.20.1580.019; Fri, 8 Feb 2019
+ 15:53:47 +0000
+From: <Nicolas.Ferre@microchip.com>
+To: <alexandre.belloni@bootlin.com>, <sboyd@kernel.org>
+Subject: Re: [PATCH] clk: at91: fix masterck name
+Thread-Topic: [PATCH] clk: at91: fix masterck name
+Thread-Index: AQHUv7x/dAWxQXybc0i6K8XkGPakkqXWDXGA
+Date: Fri, 8 Feb 2019 15:53:47 +0000
+Message-ID: <db6b542f-add1-af4c-e3f1-ce293042f375@microchip.com>
+References: <20190208144059.29861-1-alexandre.belloni@bootlin.com>
+In-Reply-To: <20190208144059.29861-1-alexandre.belloni@bootlin.com>
+Accept-Language: en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: LO2P265CA0442.GBRP265.PROD.OUTLOOK.COM
+ (2603:10a6:600:e::22) To MWHPR11MB1662.namprd11.prod.outlook.com
+ (2603:10b6:301:e::15)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Nicolas.Ferre@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [195.6.168.232]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; MWHPR11MB1247;
+ 6:NQXazG1vRiUS8YmPueohkpGlcyuLBrF/AqrpSPKeFO5XC/KSTgeHcPmnFvPBcouoAgpbzZXew7Oppzsev+dLnC4DflHodc5rOMLydO2QY5X6KG0svSHagLhRG5oClhz5vmJ/7q9HEDJf56d814bBLzrLoqsmEWDQ3jkCQAm+QVfk9xp9JkUENKfYNc4QMwRLlwjf3ZO8iAXEUd7jk295WyRBBIP4MoFB7ALZ/PtQl7AnnhLJcl2tblQzhlCq23OOf+F+TjpIJ+7tq/nEiaoLjl0PcE9RxsRNticNOk0yZVOMzegPbgn1Qdn23Ngj/Ld6v/ChLwyeUMtdyVMBYzwUPvMBmK8CLceUgw3bdsTKlbI2pcYVzWM/zckbbujkrXOOLeRdnaOCMbMjOoQy55EfULse26NmY9mjjLQ+nVrwzYAkNNz464m90VrBCv1LFgT/vaMZx3tH7I40312rzSD0zQ==;
+ 5:rmb0Nr1GDydrPp9pJ4qlTi7ngPatBnpGA31WYrn3djKJ3o+JTEGbBY6Fl3pMTvB+XwiLGH5yuyTsNeclgLAPMCkN6ed+GbzWv1SjArQQsUVtSDDE5dkoYZcvGZGxXk5Ow90w6BREKW2i7swiCS2kFXBOjrYGJJ5BSvjJUYJx7bdbd9CHBErFUVwYG/KnU1xzmZfAGacpE7XoY48aIa5I4g==;
+ 7:7APSFt6P+3smqd4AScxcPpO5s+NQOSWPeqdTYhr3xDc9uIngk5dRvpG0cNNQZN14sd/nEa9utn8OjWossEanvShbrAk2TOExDjKn3NARKAvntySF/E29COx3xXgYmTsPsAsT8bQ1k/iQrPgTXHD3Tg==
+x-ms-office365-filtering-correlation-id: 605c7a5e-3450-48c2-a63d-08d68ddd9c2f
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:MWHPR11MB1247; 
+x-ms-traffictypediagnostic: MWHPR11MB1247:
+x-microsoft-antispam-prvs: <MWHPR11MB1247F6F244B925ED29DA8E18E0690@MWHPR11MB1247.namprd11.prod.outlook.com>
+x-forefront-prvs: 094213BFEA
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(366004)(39860400002)(376002)(346002)(136003)(189003)(199004)(97736004)(106356001)(476003)(105586002)(486006)(53936002)(6512007)(6246003)(26005)(2616005)(86362001)(6486002)(4326008)(6436002)(11346002)(446003)(31686004)(14454004)(31696002)(25786009)(36756003)(14444005)(53546011)(66066001)(99286004)(229853002)(71200400001)(71190400001)(54906003)(316002)(102836004)(72206003)(76176011)(3846002)(110136005)(52116002)(6506007)(6116002)(256004)(8936002)(305945005)(478600001)(8676002)(81156014)(81166006)(186003)(68736007)(2906002)(7736002)(386003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1247;
+ H:MWHPR11MB1662.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 8NK2O1V2Hgax9CVlvZUIqN6HvvN923ZRz3cPit8N7qpi0X58kbDD1t2YIp8Xlhoybdq8qTqVVAcN/SQc1n8SbYnLBR93r2tkS0U5gSf8avTu2utVW5B/Rg99ee3mgo2Q9hRGVrsaAeUxD69iNL5wYGtbwwx6qdMNP0gIhIaYqvTT78K36B4da5w3K6e8jCdQ/TAildo6Q76Gc/dV/xmmevJ7NyM2hg1cxJFM7WG9KvjzxqobUY4RN4U/wKj+0R7EFEK24ARxgQleCowakNJphLUndxr/Yk27ZmZI82PDzfjp/9QR4BlHEbVYnUzx1ML8g7nEKD4WoDVs0wzL2c2RON0PjWaS5ENxBOqdVLJAkq2FpalPUetpaSORfVRGOPs3UCEPQVTzes/7CBirvoaRPZluoYzPV6A1G2PO1ye35xk=
+Content-ID: <2E1277669F1FE342A03D64FA37C336CB@namprd11.prod.outlook.com>
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 605c7a5e-3450-48c2-a63d-08d68ddd9c2f
+X-MS-Exchange-CrossTenant-originalarrivaltime: 08 Feb 2019 15:53:45.0607 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1247
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_074252_295843_4CEE5C3C 
-X-CRM114-Status: GOOD (  13.65  )
+X-CRM114-CacheID: sfid-20190208_075357_813360_D15A4B51 
+X-CRM114-Status: GOOD (  14.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -114,47 +125,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Russell King <linux@armlinux.org.uk>,
- linux-kernel@vger.kernel.org, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, mturquette@baylibre.com,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 25/01/2019 07:57, Masahiro Yamada wrote:
-> My main motivation is to get rid of crappy header search path manipulation
-> from Kbuild core.
+On 08/02/2019 at 15:40, Alexandre Belloni wrote:
+> The master clock is actually named masterck earlier in the driver. Having
+> "mck" in the parent list means that it can never be selected.
 > 
-> Before that, I want to finish as many cleanup works as possible.
+> Fixes: 1eabdc2f9dd8 ("clk: at91: add at91sam9x5 PMCs driver")
+> Fixes: a2038077de9a ("clk: at91: add sama5d2 PMC driver")
+> Fixes: 084b696bb509 ("clk: at91: add sama5d4 pmc driver")
 > 
-> If you are interested in the big picture of this work,
-> the full patch set is available at:
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+> ---
+>   drivers/clk/at91/at91sam9x5.c | 2 +-
+>   drivers/clk/at91/sama5d2.c    | 4 ++--
+>   drivers/clk/at91/sama5d4.c    | 2 +-
+>   3 files changed, 4 insertions(+), 4 deletions(-)
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-kbuild.git build-test
-> 
-> 
-> 
-> Masahiro Yamada (3):
->   KVM: arm/arm64: fix TRACE_INCLUDE_PATH
->   KVM: arm/arm64: remove -I. header search paths
->   KVM: arm/arm64: prefix header search paths with $(srctree)/
-> 
->  arch/arm/kvm/Makefile   | 5 ++---
->  arch/arm64/kvm/Makefile | 4 +---
->  virt/kvm/arm/trace.h    | 2 +-
->  3 files changed, 4 insertions(+), 7 deletions(-)
+> diff --git a/drivers/clk/at91/at91sam9x5.c b/drivers/clk/at91/at91sam9x5.c
+> index 2fe225a697df..d55a151cb7f5 100644
+> --- a/drivers/clk/at91/at91sam9x5.c
+> +++ b/drivers/clk/at91/at91sam9x5.c
+> @@ -210,7 +210,7 @@ static void __init at91sam9x5_pmc_setup(struct device_node *np,
+>   	parent_names[1] = "mainck";
+>   	parent_names[2] = "plladivck";
+>   	parent_names[3] = "utmick";
+> -	parent_names[4] = "mck";
+> +	parent_names[4] = "masterck";
+>   	for (i = 0; i < 2; i++) {
+>   		char name[6];
+>   
+> diff --git a/drivers/clk/at91/sama5d2.c b/drivers/clk/at91/sama5d2.c
+> index d69ad96fe988..cd0ef7274fdb 100644
+> --- a/drivers/clk/at91/sama5d2.c
+> +++ b/drivers/clk/at91/sama5d2.c
+> @@ -240,7 +240,7 @@ static void __init sama5d2_pmc_setup(struct device_node *np)
+>   	parent_names[1] = "mainck";
+>   	parent_names[2] = "plladivck";
+>   	parent_names[3] = "utmick";
+> -	parent_names[4] = "mck";
+> +	parent_names[4] = "masterck";
+>   	for (i = 0; i < 3; i++) {
+>   		char name[6];
+>   
+> @@ -291,7 +291,7 @@ static void __init sama5d2_pmc_setup(struct device_node *np)
+>   	parent_names[1] = "mainck";
+>   	parent_names[2] = "plladivck";
+>   	parent_names[3] = "utmick";
+> -	parent_names[4] = "mck";
+> +	parent_names[4] = "masterck";
+>   	parent_names[5] = "audiopll_pmcck";
+>   	for (i = 0; i < ARRAY_SIZE(sama5d2_gck); i++) {
+>   		hw = at91_clk_register_generated(regmap, &pmc_pcr_lock,
+> diff --git a/drivers/clk/at91/sama5d4.c b/drivers/clk/at91/sama5d4.c
+> index e358be7f6c8d..b645a9d59cdb 100644
+> --- a/drivers/clk/at91/sama5d4.c
+> +++ b/drivers/clk/at91/sama5d4.c
+> @@ -207,7 +207,7 @@ static void __init sama5d4_pmc_setup(struct device_node *np)
+>   	parent_names[1] = "mainck";
+>   	parent_names[2] = "plladivck";
+>   	parent_names[3] = "utmick";
+> -	parent_names[4] = "mck";
+> +	parent_names[4] = "masterck";
+>   	for (i = 0; i < 3; i++) {
+>   		char name[6];
+>   
 > 
 
-I've applied these 3 patches to kvmarm/queue.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
-
+Nicolas Ferre
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
