@@ -2,64 +2,67 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,UNWANTED_LANGUAGE_BODY,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 90007C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:18:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F967C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:18:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6073520863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:18:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D098820863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:18:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gZYRuLKn";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="JAJjBftu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6073520863
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MN0JogQ1";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="qxwqO3QC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D098820863
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=Q6PNwYChK6KX7X+XurB2g8CCrk3DFEw2ON90pz1/diU=; b=gZY
-	RuLKn6dkSOFG2zJ7FMJYrqWMGm3SKjVmBhXDl/JCuF98ELbVubi7T1EHNcgt+Y8uVKTYUvzo1SNTE
-	M6OupIuVQqyYCKY65rDK20bS180UxFjQI5hAZE3RlAZPlRbkx1DzLivWyi4ioqh/DsCG6nl0tBm4O
-	hkGR8tqM8YHs+wg0oe0dCz0YuF+5g+5Hm4gC9GLyiSx3r7l79DL2oPg/5KTWSmAGAqgHMZtivMnOe
-	VnMjErJw2cP0u+jRP10Z2JB/l7KsmzZ9pGrB/yUHxE1MlBNHKdbNERRtMDVzNAOYuiSPGvvjFGefA
-	AApyKU3a6MVC+61mdJL1R//VTXNwQ4Q==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=FS+Ds2PNL2WIk0luBJwDeWcDxOAn8LI5x7omZgqBsic=; b=MN0JogQ1cX8fZXyjcCh5Dq5/Sl
+	KwYuTzXZnBdkz/CpUutYa9Ena4IUy8gLYb7AGhhleNjT0ZqdVLcLt/LeRxDI8e3t1WRLVcD0OwJK3
+	RoFx869h9aAQ9ejatF8rgAO8AZq2iw1Ekj5V7nDtLTsoAY8PlH94dpsGb/8ijaHFa1vCM+e8qdPYM
+	KK8nySxIJgGzWcRIj9czgCecip7aBCx+do+0piDIvRRlvJhCs/s57FRLtIP2vIOj0MNwHSBYoNuKB
+	Y+LpuGhCnw6lWvu1Gg90pNcW03qOFSVjIEHwXcvVuvBPPouHKfo5waaI6PSU1DUgN7/Sx0xEULq/T
+	4zYUxGfg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs4Ax-00051u-Cg; Fri, 08 Feb 2019 11:18:31 +0000
+	id 1gs4BJ-0005IZ-Fa; Fri, 08 Feb 2019 11:18:53 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs4Ae-00084G-N7
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 11:18:28 +0000
+ id 1gs4Au-00084G-Oo
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 11:18:49 +0000
 Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id E2B0925BEE7;
- Fri,  8 Feb 2019 22:13:48 +1100 (AEDT)
+ by kirsty.vergenet.net (Postfix) with ESMTPA id E79A525BF01;
+ Fri,  8 Feb 2019 22:13:49 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1549624429; bh=aWZA4Fk6i1vrJDTx2cEwafCACYgBrCJ8vjTGeLftXzU=;
- h=From:To:Cc:Subject:Date:From;
- b=JAJjBftul55RjxOUux2VU4vtS88izR3aZWPpJPfWgOQcf4mbB9s7HmTpXtRXQpwQQ
- f6Ngl02jx5j1Rz3SjQIDLGpWmBc75tpkg2wC6Cnbfh+nmNce3Gja+MGrq16eOut+hI
- UjiFJ9AvQfn0ySp5HG1OwRB5Wnf99/sYaVw20c3k=
+ t=1549624430; bh=ftdiyIFmsH9rL18fTj55GmMBsd3dKTOHp1CQ93j4dzY=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=qxwqO3QCgQncehCOLxyKnbeVVwok8hwCp3Zs2j6kRoOmQcmnSA3fYbuGh0MFG007y
+ whuGh/ASeO9tTngtoTGEP7kj2bzWYvwQuA6uKw/KuBLblnNf/3AxdcMEczoNym8yHj
+ 1RJwtPHLyAqWbzJ4AgQrI1rkTrMtLHH3PpTYSjBU=
 Received: by reginn.horms.nl (Postfix, from userid 7100)
- id 3D0589401DB; Fri,  8 Feb 2019 12:13:47 +0100 (CET)
+ id 414A89402EE; Fri,  8 Feb 2019 12:13:48 +0100 (CET)
 From: Simon Horman <horms+renesas@verge.net.au>
-To: arm@kernel.org
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v5.1
-Date: Fri,  8 Feb 2019 12:13:35 +0100
-Message-Id: <cover.1549621233.git.horms+renesas@verge.net.au>
+To: linux-renesas-soc@vger.kernel.org
+Subject: [PATCH 1/5] ARM: shmobile: Enable NXP pcf85363 rtc in
+ shmobile_defconfig
+Date: Fri,  8 Feb 2019 12:13:43 +0100
+Message-Id: <71e3039dd7c377118608321d6c1f2ecb35da4c17.1549621233.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
+In-Reply-To: <cover.1549621233.git.horms+renesas@verge.net.au>
+References: <cover.1549621233.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_031813_116638_11F8AFC6 
-X-CRM114-Status: UNSURE (   9.95  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190208_031829_170855_3EBD3403 
+X-CRM114-Status: GOOD (  10.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,56 +74,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, Kevin Hilman <khilman@kernel.org>,
- Magnus Damm <magnus.damm@gmail.com>, linux-renesas-soc@vger.kernel.org,
- Olof Johansson <olof@lixom.net>, Simon Horman <horms+renesas@verge.net.au>,
- linux-arm-kernel@lists.infradead.org
+Cc: Simon Horman <horms+renesas@verge.net.au>,
+ Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org,
+ Biju Das <biju.das@bp.renesas.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Biju Das <biju.das@bp.renesas.com>
 
-Please consider these Renesas ARM based SoC defconfig updates for v5.1.
+The iWave RZ/G1C SBC supports RTC (NXP pcf85263). To increase hardware
+support enable the driver in the shmobile_defconfig multiplatform
+configuration.
 
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 9e5a5ade6cab..fdac4e4ca04d 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -177,6 +177,7 @@ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_RS5C372=y
++CONFIG_RTC_DRV_PCF85363=y
+ CONFIG_RTC_DRV_BQ32K=y
+ CONFIG_RTC_DRV_S35390A=y
+ CONFIG_RTC_DRV_RX8581=y
+-- 
+2.11.0
 
-  Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-defconfig-for-v5.1
-
-for you to fetch changes up to 03ff9677930064a495fcce269a0f6f1db5dd9dd9:
-
-  ARM: multi_v7_defconfig: Enable support for RZ/A2 (2019-01-25 11:03:04 +0100)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Defconfig Updates for v5.1
-
-shmobile and multi_v7 defconfig
-* Enable support for recently upstreamed RZ/A2 (r7s9210) SoC
-* Enable NXP pcf85363 RTC which is used on RZ/G1C (r8a77470) based iWave SBC
-
-shmobile defconfig
-* Refresh for changes present in v5.0-rc1
-
-----------------------------------------------------------------
-Biju Das (2):
-      ARM: shmobile: Enable NXP pcf85363 rtc in shmobile_defconfig
-      ARM: multi_v7_defconfig: Enable NXP pcf85363 rtc
-
-Geert Uytterhoeven (3):
-      ARM: shmobile: defconfig: Refresh for v5.0-rc1
-      ARM: shmobile: defconfig: Enable support for RZ/A2
-      ARM: multi_v7_defconfig: Enable support for RZ/A2
-
- arch/arm/configs/multi_v7_defconfig |  3 +++
- arch/arm/configs/shmobile_defconfig | 48 ++++++++++++++++++-------------------
- 2 files changed, 27 insertions(+), 24 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
