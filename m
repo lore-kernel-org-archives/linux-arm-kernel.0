@@ -2,90 +2,89 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B92F8C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 00:37:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2D13BC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 00:49:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 82A1D21916
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 00:37:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EE3F921907
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 00:49:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Cwr3e2Ub";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Y6Ub6F4y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 82A1D21916
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YHO+BPdV";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="EELu/fbl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE3F921907
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=r/WiVKqWrvXKCIarATK3ZT7iIioVdlxnbvJCoLBR3kQ=; b=Cwr3e2UbGvasky
-	SkspeAb7t0M2b12rbaWSUq0O4k3Xgo1UsoKZ6koQBcRyph/zrq0/5CXScK5Cg2kEzhDgH55/lTSTj
-	OSSPssGyUaYSUpKNYnPcpN5tikuYd/5i0MaqhcYKNxlELJIHnDtgdID2wJ6S5IbpXfjAh44QLvzJ0
-	X5DKL5B9vVENP0PQeRUbkW9FDm+W0ozcabpknas9n4NB8pZLsDoNgV0IP+1CxkH51cHfEPjm5Npp2
-	1VzK9fnGIRvkSB9wURJGlXS92t4rM4iJj/GdQiQj/oUGRharMaf7el8hT1IZf2WViKECCOpLhHwTF
-	PHFtvr1rLQ+5wvhRVmIA==;
+	List-Owner; bh=zFd59/Sv2piepRbz58FaJn1q3add7PVXRQVV2AKYke0=; b=YHO+BPdVgKjxF0
+	2peorzvjGRPjP3CwEClcet+17DPPHvF9HdPk9Zfh/5anGU7Qyul6V8IWkSinu+J26uCT5j1s+VcNn
+	G4e1GeGMYuKvjrETweb1mFg2fpqV8E9IEvUoZ1EzkZRENk9x7N3pnNcbyY7XCFWEDC9BExyj909e+
+	u5uvMTUmc5/gvMDvL6lUFzwWEDO615aylBC3CiY0lXfKtb4WNVSU5gZnrV6O49i7411evFDZCfLAX
+	IQZd2Ll0mTxRdwDNVUQYKOANH2sMJV5L5KrqfaOLSvawOp1WjjUU9RlhzrjGb7V9097MAG05DrpFT
+	6paqMxz2POsFD6LEHYBA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gruAW-00046g-5V; Fri, 08 Feb 2019 00:37:24 +0000
-Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+	id 1gruMZ-0007IX-ME; Fri, 08 Feb 2019 00:49:51 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gru3M-0007mG-Rk
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 00:30:02 +0000
-Received: by mail-pf1-x444.google.com with SMTP id j3so798151pfi.12
+ id 1gruMW-0007Hh-67
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 00:49:49 +0000
+Received: by mail-pl1-x644.google.com with SMTP id s1so831501plp.9
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 07 Feb 2019 16:30:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=c324b380hphqzikJSwYwP+iMI2K9W7f9e6HIiTYzB7k=;
- b=Y6Ub6F4ydFHhhs7fQk8IjFmLX17QPsmXIhljs3ttclwAAhAFQsFDD/d6UMXpXsJPCy
- dAh37W5bDhiIFaYTAz/2vjI3qRxono16pVaIsLmCuxZg0DKMmA6K7kPM717tq/pBgQo8
- V9hnUhl/7xR7tptVuJ1GkCnNJQVH1fAWzu1pwj6y3/DLV/uOu52wa9IqquGEMU/rmT+O
- DJBTEG7pGkvtbOxWsq7kCOHP7ZeXJ9c4d5GBela9ftO4TEyMsPeNSf2tcHhwVZVLTqch
- RLIbzu8VtWTGBBcPxOab6V/sQsfU5bfnAN47f4ANk7PIGTGHMXKBFiBnusj4FvuPlReJ
- goJA==
+ Thu, 07 Feb 2019 16:49:47 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:in-reply-to:references:date:message-id
+ :mime-version; bh=igWMC6rHby596QWZ2CVQNpZ2BdkN0gx1s+3p6FSiN/Y=;
+ b=EELu/fblR9WxJjmRDSQOmP5+TvvSI/KEuuzURzyttry409Ld/t+K6SVQFxL6x7T51e
+ deyFxzJLjnk5UPsDmdqTh4Cck9z1X+WYAr/2ciKHpIanp+9TNijgeFp+Z7GwnEtEMQqv
+ UYbWrYy2h72neWsbErVwRZKjxLeXRtTo4zQ0zlCDOvCdKHMububezs0iEsWDDXfH9uqP
+ KdZhAtwcjLXa+6Ajm5cnlrMYGFpvuFY99nMGKkYC9PlIOuV1VebnEfv+jqg3B2I4re2N
+ C1pb1BeutJ0/49r6GDrXerBE1jAaDpahnUzjZ8HcFsL/McHfbCJ3krEkNubJ2zHqnZWp
+ PnEQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=c324b380hphqzikJSwYwP+iMI2K9W7f9e6HIiTYzB7k=;
- b=jQs5D1nE2NMsJRf6HlYpduSblrqKWCmZ9jb2ohQIEGeWh2+1ttiQ/SX4PO079bWTfy
- bs/ECrY/iL8vbkGUdlPHLeOGQDzY/Nx+ymchIdMo00PlCyZ4owBS+YPjcv9+cHN5xCnV
- JG8p8EGtasnI0H6jhK+7Kfrju/2rrKm15pMsGYwzyATGRVhBJ7b7TA97imcwgv2hZcIG
- 3q1NT3cR88HMD1s8SDKUIOEGKrmrTQB1xpxiYKiKzpacpt1aMI8cO6Pr6t3f48aJiqFB
- aZOiqkVeOaceW1MPk+iBdD5CtEoXnsR3VW3bYL4n84JB4gaJlPfGRxffzRj0ESCA04tN
- tHOg==
-X-Gm-Message-State: AHQUAubg6r8r3mTvpYaho3za/cwRhF+y+c9OCFPEvxT4HwVVKbOFUYW6
- 1P2+I8dsyugqjTT+V2lToEo=
-X-Google-Smtp-Source: AHgI3Iatvplw1t39WpZ1FuDx8dLwVFh25jfkRAbg/cnaQUJj6AX/lmjxWW3/02r+d9pW3T/WZUgJyw==
-X-Received: by 2002:a62:2f06:: with SMTP id v6mr19345960pfv.216.1549585800149; 
- Thu, 07 Feb 2019 16:30:00 -0800 (PST)
-Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
- [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id p81sm380835pfa.107.2019.02.07.16.29.58
+ h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
+ :message-id:mime-version;
+ bh=igWMC6rHby596QWZ2CVQNpZ2BdkN0gx1s+3p6FSiN/Y=;
+ b=oNdMZluTL0jF6QD4f14hhz5HJFFyrHODBR88pjc2zzo3gvrzL1ICBUVscUsUn3EkNI
+ DM+ASZs95KKyxGvv49rE6lq4nczg3MLSh66iKA3OpkdVDqfnTKzPEQnGnjNZmyWmSlL/
+ eTdVUpJV4Q0QDlJNbj5bOvILuZZrB7HgyFZeuC/p8+1a+UwW+eMihahUCva8PypdWtkg
+ 2vYFISzfL6YXmGe4HduYTMRh8Jqbgw0t+06GB6XgpeJHW26Qge3z+Aa5NDYhI1OYa0Pj
+ MWkZpN3qHQ+s8tRpKlDRGIQ2OjdDRdqxaEvlA4+k5ZFlrDM/yL0l3DNBVWpdBrILg9Tb
+ 83lA==
+X-Gm-Message-State: AHQUAubrE3U4hdeL8cgka+Uqh9q30ju5e24nnJFFawNeqWOdtEJoOatu
+ TmIqxXqi6unu+GZDI1yIwWfULA==
+X-Google-Smtp-Source: AHgI3IZuTXzpdYL1QTkcFFChP8DF7vS3FKUitDqgwBCMhR/ypCOd9QZQ/ryUz2TAXKqN1pJAOQhlhA==
+X-Received: by 2002:a17:902:8f98:: with SMTP id
+ z24mr19263866plo.40.1549586986699; 
+ Thu, 07 Feb 2019 16:49:46 -0800 (PST)
+Received: from localhost ([2601:602:9200:a1a5:1818:ce94:f47:7c12])
+ by smtp.googlemail.com with ESMTPSA id n72sm44884pfg.13.2019.02.07.16.49.45
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 07 Feb 2019 16:29:59 -0800 (PST)
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
-To: Lucas Stach <l.stach@pengutronix.de>
-Subject: [RFC v2 3/5] arm64: dts: imx8mq: Combine PCIE power domains
-Date: Thu,  7 Feb 2019 16:29:39 -0800
-Message-Id: <20190208002941.30343-4-andrew.smirnov@gmail.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190208002941.30343-1-andrew.smirnov@gmail.com>
-References: <20190208002941.30343-1-andrew.smirnov@gmail.com>
+ Thu, 07 Feb 2019 16:49:45 -0800 (PST)
+From: Kevin Hilman <khilman@baylibre.com>
+To: Jerome Brunet <jbrunet@baylibre.com>
+Subject: Re: [PATCH 1/2] arm64: dts: meson: g12a: fix clk_msr node
+In-Reply-To: <20190207132603.694-2-jbrunet@baylibre.com>
+References: <20190207132603.694-1-jbrunet@baylibre.com>
+ <20190207132603.694-2-jbrunet@baylibre.com>
+Date: Thu, 07 Feb 2019 16:49:44 -0800
+Message-ID: <7hwombf6jb.fsf@baylibre.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_163000_894120_9467953F 
-X-CRM114-Status: GOOD (  13.27  )
+X-CRM114-CacheID: sfid-20190207_164948_228778_529D97AD 
+X-CRM114-Status: UNSURE (   7.67  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,74 +96,24 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
- Andrey Smirnov <andrew.smirnov@gmail.com>, linux-kernel@vger.kernel.org,
- linux-imx@nxp.com, Fabio Estevam <fabio.estevam@nxp.com>,
- Leonard Crestez <leonard.crestez@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- Chris Healy <cphealy@gmail.com>, linux-arm-kernel@lists.infradead.org
+Cc: linux-amlogic@lists.infradead.org, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Jerome Brunet <jbrunet@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-According to NXP's FAE feedback and a comment in ATF firmware, PCIE1
-and PCIE2 power domains can't really be used independently. Due to
-shared reset line both power domains have to be turned on at the same
-time. Account for that quirk by combining PCIE power domains into a
-single 'pgc_pcie' power domain.
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Chris Healy <cphealy@gmail.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Leonard Crestez <leonard.crestez@nxp.com>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>
-Cc: Richard Zhu <hongxing.zhu@nxp.com>
-Cc: linux-imx@nxp.com
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: linux-kernel@vger.kernel.org
----
- arch/arm64/boot/dts/freescale/imx8mq.dtsi | 21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+> The clk-msr node should be in cbus.
+>
+> Fixes: eeca2cf15e05 ("arm64: dts: meson: g12a: add clk measure support")
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-index 50436bd393ed..89babc531380 100644
---- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-@@ -273,9 +273,28 @@
- 						reg = <IMX8M_POWER_DOMAIN_MIPI>;
- 					};
- 
--					pgc_pcie1: power-domain@1 {
-+					/*
-+					 * As per comment in ATF source code:
-+					 *
-+					 * PCIE1 and PCIE2 share the
-+					 * same reset signal, if we
-+					 * power down PCIE2, PCIE1
-+					 * will be held in reset too.
-+					 *
-+					 * So instead of creating two
-+					 * separate power domains for
-+					 * PCIE1 and PCIE2. We create
-+					 * a link between 1 and 10 and
-+					 * use what was supposed to be
-+					 * domain 1 as a shared PCIE
-+					 * power domain powering both
-+					 * PCIE1 and PCIE2 at the same
-+					 * time
-+					 */
-+					pgc_pcie: power-domain@1 {
- 						#power-domain-cells = <0>;
- 						reg = <IMX8M_POWER_DOMAIN_PCIE1>;
-+						power-domains = <&pgc_pcie2>;
- 					};
- 
- 					pgc_otg1: power-domain@2 {
--- 
-2.20.1
+This one I squashed with the original (in branch v5.1/dt64)
 
+Kevin
 
 _______________________________________________
 linux-arm-kernel mailing list
