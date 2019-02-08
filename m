@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D5845C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:38:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D86E9C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:39:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A8A2B2177B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:38:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 938C02077B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:39:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MCySTl2b";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mobiveil.co.in header.i=@mobiveil.co.in header.b="OVoNxJ6L"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A8A2B2177B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TtWoydq/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mobiveil.co.in header.i=@mobiveil.co.in header.b="fHYpdPCu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 938C02077B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mobiveil.co.in
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,57 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Yka6w7HW8eADiwpN33wIFyFz7RGBF4Lpm2uw7HAlU4w=; b=MCySTl2b9nOYZ1
-	AcRME/lrvCj8qRbGsO50/eIhGBPyWLUZk4I6FBphS4nbs2VUeZhTE0Dj/xFTUyFBHRBZnYxCBjUGv
-	T6hu3vE/KetcqN//NBgz+lLcLXyXc5IB0VbS3/TvllgKcbxPP5vb8MNQCSD9pX9p0Ws3aDgE+XOd9
-	ZrJZEDy0BxGGJTZF1Zm6WhiczgA1S6QamfwgsAicZflvW3JuXhXWLAKiaXsIqavS9X2DFZSvm3rsI
-	jcy1F4NwsnliM8sTykyQcRQWMXfq45WqqohziAuPI6NSuBwyw7zDUqhz6urALe3W/wXxCw9miTVHx
-	SdJzkXxqjmPCQ3BS5Aag==;
+	List-Owner; bh=xLxQWnOvonE3eYEiJuvULuQiXxP5/rJB1Glhbo7TXx4=; b=TtWoydq/SMl92K
+	InGChyaQelKzOPfJtxu2jurutX9appdUDOm2+cDJzslytQtLIejebcnxQEjEFzWGu3tYCH0r4wUjp
+	l9tgSlty3WIbAvA6UwrhL8b7NcP1rtbn5aCDj4eYkTsxMJcl09enNGTqvWI+HANcsOLJCz2WM5Z+O
+	tWPayStqJjbkjrXlO1n3pefNt42QmUmpoiW+ormGQ1HZRw5BmP6wH4H3msokjX3saHsgcRVigZv8q
+	CyizRslAMsSqPau+MmacG+hbeu9a81zHdr+6jBvveZoKfy1E2Kx+yIHVBV30K2X47Uc2h1lnWKPw+
+	j+f/sTN1bJhc23Zh0M6g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs5QY-0007wK-94; Fri, 08 Feb 2019 12:38:42 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gs5R3-0008CW-59; Fri, 08 Feb 2019 12:39:13 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs5QU-0007vs-UI
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:38:40 +0000
-Received: by mail-wr1-x441.google.com with SMTP id z3so3433535wrv.3
+ id 1gs5R0-0008C4-Kh
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:39:11 +0000
+Received: by mail-wm1-x341.google.com with SMTP id h22so6710437wmb.0
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 08 Feb 2019 04:38:37 -0800 (PST)
+ Fri, 08 Feb 2019 04:39:10 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=mobiveil.co.in; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=za3n79uTXhuAg89Odl5K7zA3/4teHlFt8f/2UCul1pI=;
- b=OVoNxJ6L+4h0zmcRL0/+4rPL4qAp+s8E3C9mBgNG/yVgl7yp+6sLCgN44Re9Gu9Wik
- f5q3MpCGafDHKYYqZ/Yl9KI4QDOZQ+NY+A1WSs8brIvZ5W/8k1hH5FE+Ltz5vD5IW5Y0
- t+A80vouwIa00ZgMDXFMn6bwZrkAi9VYz/t4k=
+ :cc; bh=SOmmoEnVav+euIt9Iv/uAN2WfRPzXaYHTM5sqnc8FUg=;
+ b=fHYpdPCuqrHZZ8RtFUO8NNmfzDp8Hp+hyisTU7ORlGPs+J7aGd7wnv9Vj0aASwU2ZP
+ CA9u2vEdVZvsq0UwbBucKmlcDIP72/hSmegsjMGX9ybOb55p9E5+961tIdC2hK+p8DqI
+ AmuvcI1cWY17NJvHINuU3Pl5Q6XYPARf6imrw=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=za3n79uTXhuAg89Odl5K7zA3/4teHlFt8f/2UCul1pI=;
- b=CpEyW043oqtnp8w3ppkA5S7yGip2/uz4eINAuI1+4rUw5U3Pky96LhKgzY1NIPTV/A
- B79H+hY8Eru/EBJM+8MGfCQbjlyrabQlOBWiNVtAWCNSmoi54dHQf1qyf8huiMW8akvr
- bKla2To4KHO737kqOcj5xHos2gxz0lP1Z2F6iANULjsw7C9hhAeOJJFtB+XS2xy0ue4A
- GZ+MEUdv48i7shGEFsYHC6tLxRdomkyY+IEg9aKgqz5iN/MwwXiejXqZifUhJANOk+uV
- Kos0Uj7sGN7HgTUtL3xgc88SkTHxzy89Qvccur3EA/QYzZoEKfFCRxIvdG3lDCPIpRRk
- ww+Q==
-X-Gm-Message-State: AHQUAuZDnak1ecxF7+m7W5Gkr/drE8TnjzKm3XUmy6UgRfaIgY5wS3Tk
- DWPpkqv61Pu5HFyrgy8aKnDcNr8xpOvxoYjRTcwtJA==
-X-Google-Smtp-Source: AHgI3Iatp5BtTgrEbIDAPsLDPC8Il8bwT1QG2XB42RwPY79StgZWtwjcGnSo0DQr+93S2X94tfqQdYfUBTw6ZWcFbfU=
-X-Received: by 2002:a5d:468e:: with SMTP id u14mr14295242wrq.253.1549629516223; 
- Fri, 08 Feb 2019 04:38:36 -0800 (PST)
+ bh=SOmmoEnVav+euIt9Iv/uAN2WfRPzXaYHTM5sqnc8FUg=;
+ b=gSO4Don4yRjKtraRVqg9qYWTNJIkXDyOAk+DDmZ8I0VXnHjRswn38eOtWnJyJBaWbQ
+ V70zzeC4hwC0QDrvJOH7OxxS5oQrAjLLOAK2NOTUvKhVVz/PLPPvQPIb7iJZ5gsnEMI+
+ l98BqmmSbwELQQpgIHGjm9Hwob1jjiEy5U8BFbbxgUdDd0AZ+5JkYZk6XtjJojcV2B7+
+ rCZuXbMZNMBm/WP2KoRSKKizD8n25ps2BSq1RvytUGEWolkbMqzhihcGwqwSEZ/yw9tD
+ ZyrvB9AOIFm1SN4sb/gG88eP9k+ORA6txCiZu2cV3ca6oe0JsML1N7wqo/kpNS3QFIrh
+ 9djA==
+X-Gm-Message-State: AHQUAuZlEQ4RQc0JYe2vjimr+CFLHvS4btoxrJM9ypOSOsdryrz8gynZ
+ Db2PQ7YmENBc+hN8fAevmM96V3jSFeG1Jn7PA6PjTA==
+X-Google-Smtp-Source: AHgI3IbFjpJWc8rNSFfqShcxmeGZCZTlTw3MsHSYS4+CSbBi8WavbbLbYYm+HrwAPPxI2i47LEa7EBpfVljyxDI0qas=
+X-Received: by 2002:a7b:c458:: with SMTP id l24mr12191490wmi.143.1549629548841; 
+ Fri, 08 Feb 2019 04:39:08 -0800 (PST)
 MIME-Version: 1.0
 References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
- <20190129080926.36773-18-Zhiqiang.Hou@nxp.com>
-In-Reply-To: <20190129080926.36773-18-Zhiqiang.Hou@nxp.com>
+ <20190129080926.36773-19-Zhiqiang.Hou@nxp.com>
+In-Reply-To: <20190129080926.36773-19-Zhiqiang.Hou@nxp.com>
 From: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-Date: Fri, 8 Feb 2019 18:11:15 +0530
-Message-ID: <CAFZiPx0faPHN1mqPV28XTZfOxA2GgDPuc=RVdXEiGGNAUe=Fxw@mail.gmail.com>
-Subject: Re: [PATCHv3 17/27] PCI: mobiveil: fix the checking of valid device
+Date: Fri, 8 Feb 2019 18:11:48 +0530
+Message-ID: <CAFZiPx0v9nw=k=Cq3dhy_NB4iR7P0FmvZ=9hgKv27xbgxaCFNA@mail.gmail.com>
+Subject: Re: [PATCHv3 18/27] PCI: mobiveil: continue to initialize the host
+ upon no PCIe link
 To: "Z.q. Hou" <zhiqiang.hou@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_043839_008497_D9643C8B 
-X-CRM114-Status: GOOD (  17.71  )
+X-CRM114-CacheID: sfid-20190208_043910_676025_DB672143 
+X-CRM114-Status: GOOD (  15.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,56 +107,53 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-ZQ,
-
 On Tue, Jan 29, 2019 at 1:40 PM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
 >
 > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 >
-> Avoid to issue CFG transactions to link partner when the PCIe
-> link is not up. And allow CFG transactions to all functions of
-> Endpoint implemented multiple functions.
+> Sometimes there is not a PCIe Endpoint in the PCIe slot, so do
+> not exit when the PCIe link is not up. And degrade the print
+> level of link up info.
 >
-> Fixes: 9af6bcb11e12 ("PCI: mobiveil: Add Mobiveil PCIe Host
-> Bridge IP driver")
 > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > Reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 > ---
 > V3:
 >  - No change
 >
->  drivers/pci/controller/mobiveil/pcie-mobiveil-host.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+>  drivers/pci/controller/mobiveil/pcie-mobiveil-host.c | 1 -
+>  drivers/pci/controller/mobiveil/pcie-mobiveil.c      | 2 +-
+>  2 files changed, 1 insertion(+), 2 deletions(-)
 >
 > diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> index dc5324d94466..1ae82e790562 100644
+> index 1ae82e790562..d1765d572f44 100644
 > --- a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
 > +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> @@ -29,6 +29,10 @@ static bool mobiveil_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
->  {
->         struct mobiveil_pcie *pcie = bus->sysdata;
+> @@ -596,7 +596,6 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
+>         ret = mobiveil_bringup_link(pcie);
+>         if (ret) {
+>                 dev_info(dev, "link bring-up failed\n");
+> -               goto error;
+>         }
 >
-> +       /* If there is no link, then there is no device */
-> +       if (bus->number > pcie->rp.root_bus_nr && !mobiveil_pcie_link_up(pcie))
-> +               return false;
-> +
->         /* Only one device down on each root port */
->         if ((bus->number == pcie->rp.root_bus_nr) && (devfn > 0))
->                 return false;
-> @@ -37,7 +41,7 @@ static bool mobiveil_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
->          * Do not read more than one device on the bus directly
->          * attached to RC
->          */
-> -       if ((bus->primary == pcie->rp.root_bus_nr) && (devfn > 0))
-> +       if ((bus->primary == pcie->rp.root_bus_nr) && (PCI_SLOT(devfn) > 0))
-here change "primary" to "number", as it's a bug in the original driver too.
-
->                 return false;
+>         /* setup the kernel resources for the newly added PCIe root bus */
+> diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil.c b/drivers/pci/controller/mobiveil/pcie-mobiveil.c
+> index ee678a60825d..370658d6546d 100644
+> --- a/drivers/pci/controller/mobiveil/pcie-mobiveil.c
+> +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil.c
+> @@ -222,7 +222,7 @@ int mobiveil_bringup_link(struct mobiveil_pcie *pcie)
+>                 usleep_range(LINK_WAIT_MIN, LINK_WAIT_MAX);
+>         }
 >
->         return true;
+> -       dev_err(&pcie->pdev->dev, "link never came up\n");
+> +       dev_info(&pcie->pdev->dev, "link never came up\n");
+>
+>         return -ETIMEDOUT;
+>  }
 > --
 > 2.17.1
 >
+Reviewed-by: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
 
 _______________________________________________
 linux-arm-kernel mailing list
