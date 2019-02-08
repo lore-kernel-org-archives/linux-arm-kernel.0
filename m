@@ -2,93 +2,86 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 88D7BC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:43:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A17CC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:50:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4E99320863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:43:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2862720863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:50:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M3g61GI9";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="15aH7i8i"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E99320863
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m4R4pwgH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2862720863
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=embeddedor.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Tmliy8vCeq4ZbyVaM6UASxqVYnkI3u1vC/juMBOgAdQ=; b=M3g61GI9cPjLMA
-	lCurIqzSXcviessWrY6+dcjXEtnfA0s7eLFGMVrl6IZrKj2bfqwINfqemcNEGAivRobKPSE+lB5PV
-	529v9Xug05JgJLwOnopGs/1DmMyGP8v68msl9KzrdqUSmliI8qdHdrAbFJdN9Xb6eB9WUeoueOfu9
-	SwqkqA5pBf+GGekYwVC8FQVU1hRiOE+MTsdJrLZMjuOYR6/2WCJf1opM6QbXJruCcbvVnQdudnXJs
-	M1am6cIjxT7JZlvNuRkcIb5VrUqapQYST6uwK2MkX1nw9+w9l/SuZ/Tx1p5Hzq7nKevpAvloupd99
-	qDWvfZjISaSuy0EtlKlQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=u1+7kxYi9hAU0z1tnjyC8PVPHEwd2uqJasN/UAdsLXw=; b=m4R4pwgHnbERJw
+	+0CfJPrx27eqF3Tp/RvwrqyCMpXvL9dNHL/YlWi7wth6P6dOms5j9xukv3dQFeLhoTlSs5OVXjWIK
+	RSaT52uViJrVtEwP6N7VavksOw8iHOe3JUtCwTsaaK6pYeJ3n8vRoQm7jZtEDS/CCn5G43s4x6/i5
+	BAk7WbwvQVdJGa6SRleYRXqi3JMyhqiyXcr0ulxqfLIXNVqwzBCPMTfhb3Y/qssTnOZ/IJMSXjqbY
+	6BgO1BS0aQEuBrEWeaYVJdljVb/WwrpNeS5xT8rlkJZYmXfVkz4S2XGbebno6ASTw3sjk/2/wsi6R
+	TiCWUlYncrIesvoA396g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsABB-0007AZ-Hr; Fri, 08 Feb 2019 17:43:09 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
+	id 1gsAHz-0002gD-Mr; Fri, 08 Feb 2019 17:50:11 +0000
+Received: from gateway36.websitewelcome.com ([192.185.186.5])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsA42-0007k9-To
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 17:36:12 +0000
-Received: by mail-wm1-x343.google.com with SMTP id z5so4366811wmf.0
+ id 1gsAHQ-0001kE-AI
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 17:49:48 +0000
+Received: from cm16.websitewelcome.com (cm16.websitewelcome.com [100.42.49.19])
+ by gateway36.websitewelcome.com (Postfix) with ESMTP id CFD1E400CB0D7
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 08 Feb 2019 09:35:46 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=/0z1of7/QDsVE2JoIw+5LkRJ/UT4aPISepSTadwOIBI=;
- b=15aH7i8iwBEW+q46W6sOef/sv6KROYdNZL7QXmEi3t/DCR1T8N/hEvcFWCIWbsPxNo
- Ep9qjwPVNz3aRZIsUGntxXJZ6VunP26HDfLv485TQMrcs87fu6lVySAKuqh5HNZ+3Qao
- TQDfaSkSrEkYLBvFGdMNzV4KZzQO4KDzQzDMiyl8VihgbjIeDYPlNk1fO8lzL4e9/dld
- PKNks9fQKKkrTkFQvY1vh/XkSPvaIP0MiHD6I8lcyL0wQjQDBsYwk/6l6FVDBmHRPj58
- 8SVFLo/GynAfe8jLTZnQ+656L04iMCyMUw4HwQcUdTLXJ108ULq6NxSLk8djg3/V2EAs
- yKNw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=/0z1of7/QDsVE2JoIw+5LkRJ/UT4aPISepSTadwOIBI=;
- b=PyQroRNAvvk7d69SG3jjH4vCbXQh7cKLTJZCmB7kz9lrygn4qm3bgy7oXgYDxhIUej
- m4KcM/PwCR2Kgy0OoNzCasw7VRVev8KVXAl1N0vP5wSy/B+NwG8Mg1NpgZSgs9rwRVR5
- IfL3558+3ODss4vLSOXDdpgTvPYKGcsfWtVLLfPriwhM9Hz8lW75RYnWwfmyc1erKLUI
- xU7U67yIwT1wIq6xNmhNcsBCp/PMddSqgWMtrSGrIeWjt0KvEEsTC8ZFJEwKhfFGouZO
- iV6kVOM5WiYBltwM/dLP0qs+7hURTeo7uqawQ8mJbEXfHTDhLC8zKe/JOD/UsCq+WcGI
- J/0A==
-X-Gm-Message-State: AHQUAuYOokUjLcK8iiQJNPpK0USHH0G9is9Y1WEUMeVZJGmC194XSaVp
- Cijnxf2hWUulYiOYQNvlOkairQ==
-X-Google-Smtp-Source: AHgI3IbOcfxvZttRhCQpyzjbt1hsWLnRoJpC6u+xos2NkkLzXf3XTr1dWazw60lk/jYY5NpXC/09ug==
-X-Received: by 2002:a1c:7a16:: with SMTP id v22mr11562524wmc.131.1549647345519; 
- Fri, 08 Feb 2019 09:35:45 -0800 (PST)
-Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id p17sm354714wrv.59.2019.02.08.09.35.44
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 08 Feb 2019 09:35:44 -0800 (PST)
-From: Bartosz Golaszewski <brgl@bgdev.pl>
-To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Thomas Gleixner <tglx@linutronix.de>, David Lechner <david@lechnology.com>
-Subject: [PATCH v2 33/33] ARM: davinci: remove intc related fields from
- davinci_soc_info
-Date: Fri,  8 Feb 2019 18:34:58 +0100
-Message-Id: <20190208173458.4801-34-brgl@bgdev.pl>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190208173458.4801-1-brgl@bgdev.pl>
-References: <20190208173458.4801-1-brgl@bgdev.pl>
+ Fri,  8 Feb 2019 11:03:27 -0600 (CST)
+Received: from gator4166.hostgator.com ([108.167.133.22]) by cmsmtp with SMTP
+ id sAHNgyo854FKpsAHNgKHoq; Fri, 08 Feb 2019 11:49:33 -0600
+X-Authority-Reason: nr=8
+Received: from [189.250.49.191] (port=57452 helo=embeddedor)
+ by gator4166.hostgator.com with esmtpa (Exim 4.91)
+ (envelope-from <gustavo@embeddedor.com>)
+ id 1gsAHM-003yuk-E5; Fri, 08 Feb 2019 11:49:33 -0600
+Date: Fri, 8 Feb 2019 11:49:30 -0600
+From: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+To: Boris Brezillon <bbrezillon@kernel.org>,
+ Miquel Raynal <miquel.raynal@bootlin.com>,
+ Richard Weinberger <richard@nod.at>, David Woodhouse <dwmw2@infradead.org>,
+ Brian Norris <computersforpeace@gmail.com>,
+ Marek Vasut <marek.vasut@gmail.com>, Wan ZongShun <mcuos.com@gmail.com>
+Subject: [PATCH v3] mtd: rawnand: Mark expected switch fall-throughs
+Message-ID: <20190208174930.GA12962@embeddedor>
 MIME-Version: 1.0
+Content-Disposition: inline
+User-Agent: Mutt/1.9.4 (2018-02-28)
+X-AntiAbuse: This header was added to track abuse,
+ please include it with any abuse report
+X-AntiAbuse: Primary Hostname - gator4166.hostgator.com
+X-AntiAbuse: Original Domain - lists.infradead.org
+X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
+X-AntiAbuse: Sender Address Domain - embeddedor.com
+X-BWhitelist: no
+X-Source-IP: 189.250.49.191
+X-Source-L: No
+X-Exim-ID: 1gsAHM-003yuk-E5
+X-Source: 
+X-Source-Args: 
+X-Source-Dir: 
+X-Source-Sender: (embeddedor) [189.250.49.191]:57452
+X-Source-Auth: gustavo@embeddedor.com
+X-Email-Count: 22
+X-Source-Cap: Z3V6aWRpbmU7Z3V6aWRpbmU7Z2F0b3I0MTY2Lmhvc3RnYXRvci5jb20=
+X-Local-Domain: yes
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_093548_591164_8EE16C8D 
-X-CRM114-Status: GOOD (  12.98  )
+X-CRM114-CacheID: sfid-20190208_094937_483838_D3621E76 
+X-CRM114-Status: GOOD (  11.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,347 +93,134 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Kees Cook <keescook@chromium.org>, linux-mtd@lists.infradead.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-
-The fields related to the two davinci interrupt controllers are no
-longer used. Remove them.
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/da830.c               |  98 ------------------
- arch/arm/mach-davinci/da850.c               | 108 --------------------
- arch/arm/mach-davinci/dm355.c               |   3 -
- arch/arm/mach-davinci/dm365.c               |   3 -
- arch/arm/mach-davinci/dm644x.c              |   3 -
- arch/arm/mach-davinci/dm646x.c              |   3 -
- arch/arm/mach-davinci/include/mach/common.h |   3 -
- 7 files changed, 221 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index 7ce0b5f1200d..63511f638ce4 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -624,101 +624,6 @@ const short da830_eqep1_pins[] __initconst = {
- 	-1
- };
- 
--/* FIQ are pri 0-1; otherwise 2-7, with 7 lowest priority */
--static u8 da830_default_priorities[DA830_N_CP_INTC_IRQ] = {
--	[IRQ_DA8XX_COMMTX]		= 7,
--	[IRQ_DA8XX_COMMRX]		= 7,
--	[IRQ_DA8XX_NINT]		= 7,
--	[IRQ_DA8XX_EVTOUT0]		= 7,
--	[IRQ_DA8XX_EVTOUT1]		= 7,
--	[IRQ_DA8XX_EVTOUT2]		= 7,
--	[IRQ_DA8XX_EVTOUT3]		= 7,
--	[IRQ_DA8XX_EVTOUT4]		= 7,
--	[IRQ_DA8XX_EVTOUT5]		= 7,
--	[IRQ_DA8XX_EVTOUT6]		= 7,
--	[IRQ_DA8XX_EVTOUT7]		= 7,
--	[IRQ_DA8XX_CCINT0]		= 7,
--	[IRQ_DA8XX_CCERRINT]		= 7,
--	[IRQ_DA8XX_TCERRINT0]		= 7,
--	[IRQ_DA8XX_AEMIFINT]		= 7,
--	[IRQ_DA8XX_I2CINT0]		= 7,
--	[IRQ_DA8XX_MMCSDINT0]		= 7,
--	[IRQ_DA8XX_MMCSDINT1]		= 7,
--	[IRQ_DA8XX_ALLINT0]		= 7,
--	[IRQ_DA8XX_RTC]			= 7,
--	[IRQ_DA8XX_SPINT0]		= 7,
--	[IRQ_DA8XX_TINT12_0]		= 7,
--	[IRQ_DA8XX_TINT34_0]		= 7,
--	[IRQ_DA8XX_TINT12_1]		= 7,
--	[IRQ_DA8XX_TINT34_1]		= 7,
--	[IRQ_DA8XX_UARTINT0]		= 7,
--	[IRQ_DA8XX_KEYMGRINT]		= 7,
--	[IRQ_DA830_MPUERR]		= 7,
--	[IRQ_DA8XX_CHIPINT0]		= 7,
--	[IRQ_DA8XX_CHIPINT1]		= 7,
--	[IRQ_DA8XX_CHIPINT2]		= 7,
--	[IRQ_DA8XX_CHIPINT3]		= 7,
--	[IRQ_DA8XX_TCERRINT1]		= 7,
--	[IRQ_DA8XX_C0_RX_THRESH_PULSE]	= 7,
--	[IRQ_DA8XX_C0_RX_PULSE]		= 7,
--	[IRQ_DA8XX_C0_TX_PULSE]		= 7,
--	[IRQ_DA8XX_C0_MISC_PULSE]	= 7,
--	[IRQ_DA8XX_C1_RX_THRESH_PULSE]	= 7,
--	[IRQ_DA8XX_C1_RX_PULSE]		= 7,
--	[IRQ_DA8XX_C1_TX_PULSE]		= 7,
--	[IRQ_DA8XX_C1_MISC_PULSE]	= 7,
--	[IRQ_DA8XX_MEMERR]		= 7,
--	[IRQ_DA8XX_GPIO0]		= 7,
--	[IRQ_DA8XX_GPIO1]		= 7,
--	[IRQ_DA8XX_GPIO2]		= 7,
--	[IRQ_DA8XX_GPIO3]		= 7,
--	[IRQ_DA8XX_GPIO4]		= 7,
--	[IRQ_DA8XX_GPIO5]		= 7,
--	[IRQ_DA8XX_GPIO6]		= 7,
--	[IRQ_DA8XX_GPIO7]		= 7,
--	[IRQ_DA8XX_GPIO8]		= 7,
--	[IRQ_DA8XX_I2CINT1]		= 7,
--	[IRQ_DA8XX_LCDINT]		= 7,
--	[IRQ_DA8XX_UARTINT1]		= 7,
--	[IRQ_DA8XX_MCASPINT]		= 7,
--	[IRQ_DA8XX_ALLINT1]		= 7,
--	[IRQ_DA8XX_SPINT1]		= 7,
--	[IRQ_DA8XX_UHPI_INT1]		= 7,
--	[IRQ_DA8XX_USB_INT]		= 7,
--	[IRQ_DA8XX_IRQN]		= 7,
--	[IRQ_DA8XX_RWAKEUP]		= 7,
--	[IRQ_DA8XX_UARTINT2]		= 7,
--	[IRQ_DA8XX_DFTSSINT]		= 7,
--	[IRQ_DA8XX_EHRPWM0]		= 7,
--	[IRQ_DA8XX_EHRPWM0TZ]		= 7,
--	[IRQ_DA8XX_EHRPWM1]		= 7,
--	[IRQ_DA8XX_EHRPWM1TZ]		= 7,
--	[IRQ_DA830_EHRPWM2]		= 7,
--	[IRQ_DA830_EHRPWM2TZ]		= 7,
--	[IRQ_DA8XX_ECAP0]		= 7,
--	[IRQ_DA8XX_ECAP1]		= 7,
--	[IRQ_DA8XX_ECAP2]		= 7,
--	[IRQ_DA830_EQEP0]		= 7,
--	[IRQ_DA830_EQEP1]		= 7,
--	[IRQ_DA830_T12CMPINT0_0]	= 7,
--	[IRQ_DA830_T12CMPINT1_0]	= 7,
--	[IRQ_DA830_T12CMPINT2_0]	= 7,
--	[IRQ_DA830_T12CMPINT3_0]	= 7,
--	[IRQ_DA830_T12CMPINT4_0]	= 7,
--	[IRQ_DA830_T12CMPINT5_0]	= 7,
--	[IRQ_DA830_T12CMPINT6_0]	= 7,
--	[IRQ_DA830_T12CMPINT7_0]	= 7,
--	[IRQ_DA830_T12CMPINT0_1]	= 7,
--	[IRQ_DA830_T12CMPINT1_1]	= 7,
--	[IRQ_DA830_T12CMPINT2_1]	= 7,
--	[IRQ_DA830_T12CMPINT3_1]	= 7,
--	[IRQ_DA830_T12CMPINT4_1]	= 7,
--	[IRQ_DA830_T12CMPINT5_1]	= 7,
--	[IRQ_DA830_T12CMPINT6_1]	= 7,
--	[IRQ_DA830_T12CMPINT7_1]	= 7,
--	[IRQ_DA8XX_ARMCLKSTOPREQ]	= 7,
--};
--
- static struct map_desc da830_io_desc[] = {
- 	{
- 		.virtual	= IO_VIRT,
-@@ -807,9 +712,6 @@ static const struct davinci_soc_info davinci_soc_info_da830 = {
- 	.pinmux_base		= DA8XX_SYSCFG0_BASE + 0x120,
- 	.pinmux_pins		= da830_pins,
- 	.pinmux_pins_num	= ARRAY_SIZE(da830_pins),
--	.intc_base		= DA8XX_CP_INTC_BASE,
--	.intc_irq_prios		= da830_default_priorities,
--	.intc_irq_num		= DA830_N_CP_INTC_IRQ,
- 	.timer_info		= &da830_timer_info,
- 	.emac_pdata		= &da8xx_emac_pdata,
- };
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 62a00fa94696..8a50956a9181 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -299,111 +299,6 @@ const short da850_vpif_display_pins[] __initconst = {
- 	-1
- };
- 
--/* FIQ are pri 0-1; otherwise 2-7, with 7 lowest priority */
--static u8 da850_default_priorities[DA850_N_CP_INTC_IRQ] = {
--	[IRQ_DA8XX_COMMTX]		= 7,
--	[IRQ_DA8XX_COMMRX]		= 7,
--	[IRQ_DA8XX_NINT]		= 7,
--	[IRQ_DA8XX_EVTOUT0]		= 7,
--	[IRQ_DA8XX_EVTOUT1]		= 7,
--	[IRQ_DA8XX_EVTOUT2]		= 7,
--	[IRQ_DA8XX_EVTOUT3]		= 7,
--	[IRQ_DA8XX_EVTOUT4]		= 7,
--	[IRQ_DA8XX_EVTOUT5]		= 7,
--	[IRQ_DA8XX_EVTOUT6]		= 7,
--	[IRQ_DA8XX_EVTOUT7]		= 7,
--	[IRQ_DA8XX_CCINT0]		= 7,
--	[IRQ_DA8XX_CCERRINT]		= 7,
--	[IRQ_DA8XX_TCERRINT0]		= 7,
--	[IRQ_DA8XX_AEMIFINT]		= 7,
--	[IRQ_DA8XX_I2CINT0]		= 7,
--	[IRQ_DA8XX_MMCSDINT0]		= 7,
--	[IRQ_DA8XX_MMCSDINT1]		= 7,
--	[IRQ_DA8XX_ALLINT0]		= 7,
--	[IRQ_DA8XX_RTC]			= 7,
--	[IRQ_DA8XX_SPINT0]		= 7,
--	[IRQ_DA8XX_TINT12_0]		= 7,
--	[IRQ_DA8XX_TINT34_0]		= 7,
--	[IRQ_DA8XX_TINT12_1]		= 7,
--	[IRQ_DA8XX_TINT34_1]		= 7,
--	[IRQ_DA8XX_UARTINT0]		= 7,
--	[IRQ_DA8XX_KEYMGRINT]		= 7,
--	[IRQ_DA850_MPUADDRERR0]		= 7,
--	[IRQ_DA8XX_CHIPINT0]		= 7,
--	[IRQ_DA8XX_CHIPINT1]		= 7,
--	[IRQ_DA8XX_CHIPINT2]		= 7,
--	[IRQ_DA8XX_CHIPINT3]		= 7,
--	[IRQ_DA8XX_TCERRINT1]		= 7,
--	[IRQ_DA8XX_C0_RX_THRESH_PULSE]	= 7,
--	[IRQ_DA8XX_C0_RX_PULSE]		= 7,
--	[IRQ_DA8XX_C0_TX_PULSE]		= 7,
--	[IRQ_DA8XX_C0_MISC_PULSE]	= 7,
--	[IRQ_DA8XX_C1_RX_THRESH_PULSE]	= 7,
--	[IRQ_DA8XX_C1_RX_PULSE]		= 7,
--	[IRQ_DA8XX_C1_TX_PULSE]		= 7,
--	[IRQ_DA8XX_C1_MISC_PULSE]	= 7,
--	[IRQ_DA8XX_MEMERR]		= 7,
--	[IRQ_DA8XX_GPIO0]		= 7,
--	[IRQ_DA8XX_GPIO1]		= 7,
--	[IRQ_DA8XX_GPIO2]		= 7,
--	[IRQ_DA8XX_GPIO3]		= 7,
--	[IRQ_DA8XX_GPIO4]		= 7,
--	[IRQ_DA8XX_GPIO5]		= 7,
--	[IRQ_DA8XX_GPIO6]		= 7,
--	[IRQ_DA8XX_GPIO7]		= 7,
--	[IRQ_DA8XX_GPIO8]		= 7,
--	[IRQ_DA8XX_I2CINT1]		= 7,
--	[IRQ_DA8XX_LCDINT]		= 7,
--	[IRQ_DA8XX_UARTINT1]		= 7,
--	[IRQ_DA8XX_MCASPINT]		= 7,
--	[IRQ_DA8XX_ALLINT1]		= 7,
--	[IRQ_DA8XX_SPINT1]		= 7,
--	[IRQ_DA8XX_UHPI_INT1]		= 7,
--	[IRQ_DA8XX_USB_INT]		= 7,
--	[IRQ_DA8XX_IRQN]		= 7,
--	[IRQ_DA8XX_RWAKEUP]		= 7,
--	[IRQ_DA8XX_UARTINT2]		= 7,
--	[IRQ_DA8XX_DFTSSINT]		= 7,
--	[IRQ_DA8XX_EHRPWM0]		= 7,
--	[IRQ_DA8XX_EHRPWM0TZ]		= 7,
--	[IRQ_DA8XX_EHRPWM1]		= 7,
--	[IRQ_DA8XX_EHRPWM1TZ]		= 7,
--	[IRQ_DA850_SATAINT]		= 7,
--	[IRQ_DA850_TINTALL_2]		= 7,
--	[IRQ_DA8XX_ECAP0]		= 7,
--	[IRQ_DA8XX_ECAP1]		= 7,
--	[IRQ_DA8XX_ECAP2]		= 7,
--	[IRQ_DA850_MMCSDINT0_1]		= 7,
--	[IRQ_DA850_MMCSDINT1_1]		= 7,
--	[IRQ_DA850_T12CMPINT0_2]	= 7,
--	[IRQ_DA850_T12CMPINT1_2]	= 7,
--	[IRQ_DA850_T12CMPINT2_2]	= 7,
--	[IRQ_DA850_T12CMPINT3_2]	= 7,
--	[IRQ_DA850_T12CMPINT4_2]	= 7,
--	[IRQ_DA850_T12CMPINT5_2]	= 7,
--	[IRQ_DA850_T12CMPINT6_2]	= 7,
--	[IRQ_DA850_T12CMPINT7_2]	= 7,
--	[IRQ_DA850_T12CMPINT0_3]	= 7,
--	[IRQ_DA850_T12CMPINT1_3]	= 7,
--	[IRQ_DA850_T12CMPINT2_3]	= 7,
--	[IRQ_DA850_T12CMPINT3_3]	= 7,
--	[IRQ_DA850_T12CMPINT4_3]	= 7,
--	[IRQ_DA850_T12CMPINT5_3]	= 7,
--	[IRQ_DA850_T12CMPINT6_3]	= 7,
--	[IRQ_DA850_T12CMPINT7_3]	= 7,
--	[IRQ_DA850_RPIINT]		= 7,
--	[IRQ_DA850_VPIFINT]		= 7,
--	[IRQ_DA850_CCINT1]		= 7,
--	[IRQ_DA850_CCERRINT1]		= 7,
--	[IRQ_DA850_TCERRINT2]		= 7,
--	[IRQ_DA850_TINTALL_3]		= 7,
--	[IRQ_DA850_MCBSP0RINT]		= 7,
--	[IRQ_DA850_MCBSP0XINT]		= 7,
--	[IRQ_DA850_MCBSP1RINT]		= 7,
--	[IRQ_DA850_MCBSP1XINT]		= 7,
--	[IRQ_DA8XX_ARMCLKSTOPREQ]	= 7,
--};
--
- static struct map_desc da850_io_desc[] = {
- 	{
- 		.virtual	= IO_VIRT,
-@@ -739,9 +634,6 @@ static const struct davinci_soc_info davinci_soc_info_da850 = {
- 	.pinmux_base		= DA8XX_SYSCFG0_BASE + 0x120,
- 	.pinmux_pins		= da850_pins,
- 	.pinmux_pins_num	= ARRAY_SIZE(da850_pins),
--	.intc_base		= DA8XX_CP_INTC_BASE,
--	.intc_irq_prios		= da850_default_priorities,
--	.intc_irq_num		= DA850_N_CP_INTC_IRQ,
- 	.timer_info		= &da850_timer_info,
- 	.emac_pdata		= &da8xx_emac_pdata,
- 	.sram_dma		= DA8XX_SHARED_RAM_BASE,
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index a732f2ea1d9a..2352bcd359b4 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -706,9 +706,6 @@ static const struct davinci_soc_info davinci_soc_info_dm355 = {
- 	.pinmux_base		= DAVINCI_SYSTEM_MODULE_BASE,
- 	.pinmux_pins		= dm355_pins,
- 	.pinmux_pins_num	= ARRAY_SIZE(dm355_pins),
--	.intc_base		= DAVINCI_ARM_INTC_BASE,
--	.intc_irq_prios		= dm355_default_priorities,
--	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
- 	.timer_info		= &dm355_timer_info,
- 	.sram_dma		= 0x00010000,
- 	.sram_len		= SZ_32K,
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 79afde34cfbb..b86cab92a8de 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -723,9 +723,6 @@ static const struct davinci_soc_info davinci_soc_info_dm365 = {
- 	.pinmux_base		= DAVINCI_SYSTEM_MODULE_BASE,
- 	.pinmux_pins		= dm365_pins,
- 	.pinmux_pins_num	= ARRAY_SIZE(dm365_pins),
--	.intc_base		= DAVINCI_ARM_INTC_BASE,
--	.intc_irq_prios		= dm365_default_priorities,
--	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
- 	.timer_info		= &dm365_timer_info,
- 	.emac_pdata		= &dm365_emac_pdata,
- 	.sram_dma		= 0x00010000,
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 007d979d2d64..51b67bca634e 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -647,9 +647,6 @@ static const struct davinci_soc_info davinci_soc_info_dm644x = {
- 	.pinmux_base		= DAVINCI_SYSTEM_MODULE_BASE,
- 	.pinmux_pins		= dm644x_pins,
- 	.pinmux_pins_num	= ARRAY_SIZE(dm644x_pins),
--	.intc_base		= DAVINCI_ARM_INTC_BASE,
--	.intc_irq_prios 	= dm644x_default_priorities,
--	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
- 	.timer_info		= &dm644x_timer_info,
- 	.emac_pdata		= &dm644x_emac_pdata,
- 	.sram_dma		= 0x00008000,
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index a643d78ad644..9638b327f638 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -587,9 +587,6 @@ static const struct davinci_soc_info davinci_soc_info_dm646x = {
- 	.pinmux_base		= DAVINCI_SYSTEM_MODULE_BASE,
- 	.pinmux_pins		= dm646x_pins,
- 	.pinmux_pins_num	= ARRAY_SIZE(dm646x_pins),
--	.intc_base		= DAVINCI_ARM_INTC_BASE,
--	.intc_irq_prios		= dm646x_default_priorities,
--	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
- 	.timer_info		= &dm646x_timer_info,
- 	.emac_pdata		= &dm646x_emac_pdata,
- 	.sram_dma		= 0x10010000,
-diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
-index 14e0e1c40611..9526e5da0d33 100644
---- a/arch/arm/mach-davinci/include/mach/common.h
-+++ b/arch/arm/mach-davinci/include/mach/common.h
-@@ -58,9 +58,6 @@ struct davinci_soc_info {
- 	u32				pinmux_base;
- 	const struct mux_config		*pinmux_pins;
- 	unsigned long			pinmux_pins_num;
--	u32				intc_base;
--	u8				*intc_irq_prios;
--	unsigned long			intc_irq_num;
- 	struct davinci_timer_info	*timer_info;
- 	int				gpio_type;
- 	u32				gpio_base;
--- 
-2.20.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SW4gcHJlcGFyYXRpb24gdG8gZW5hYmxpbmcgLVdpbXBsaWNpdC1mYWxsdGhyb3VnaCwgbWFyayBz
+d2l0Y2gKY2FzZXMgd2hlcmUgd2UgYXJlIGV4cGVjdGluZyB0byBmYWxsIHRocm91Z2guCgpUaGlz
+IHBhdGNoIGZpeGVzIHRoZSBmb2xsb3dpbmcgd2FybmluZzoKCmRyaXZlcnMvbXRkL25hbmQvcmF3
+L2Rpc2tvbmNoaXAuYzogSW4gZnVuY3Rpb24g4oCYZG9jX3Byb2Jl4oCZOgouL2luY2x1ZGUvbGlu
+dXgvcHJpbnRrLmg6MzAzOjI6IHdhcm5pbmc6IHRoaXMgc3RhdGVtZW50IG1heSBmYWxsIHRocm91
+Z2ggWy1XaW1wbGljaXQtZmFsbHRocm91Z2g9XQogIHByaW50ayhLRVJOX0VSUiBwcl9mbXQoZm10
+KSwgIyNfX1ZBX0FSR1NfXykKICBefn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+
+fn5+fn5+CmRyaXZlcnMvbXRkL25hbmQvcmF3L2Rpc2tvbmNoaXAuYzoxNDc5OjQ6IG5vdGU6IGlu
+IGV4cGFuc2lvbiBvZiBtYWNybyDigJhwcl9lcnLigJkKICAgIHByX2VycigiRGlza09uQ2hpcCBN
+aWxsZW5uaXVtIFBsdXMgMzJNQiBpcyBub3Qgc3VwcG9ydGVkLCBpZ25vcmluZy5cbiIpOwogICAg
+Xn5+fn5+CmRyaXZlcnMvbXRkL25hbmQvcmF3L2Rpc2tvbmNoaXAuYzoxNDgwOjM6IG5vdGU6IGhl
+cmUKICAgZGVmYXVsdDoKICAgXn5+fn5+fgpkcml2ZXJzL210ZC9uYW5kL3Jhdy9uYW5kc2ltLmM6
+IEluIGZ1bmN0aW9uIOKAmG5zX2luaXRfbW9kdWxl4oCZOgpkcml2ZXJzL210ZC9uYW5kL3Jhdy9u
+YW5kc2ltLmM6MjI1NDoyMjogd2FybmluZzogdGhpcyBzdGF0ZW1lbnQgbWF5IGZhbGwgdGhyb3Vn
+aCBbLVdpbXBsaWNpdC1mYWxsdGhyb3VnaD1dCiAgICBjaGlwLT5iYnRfb3B0aW9ucyB8PSBOQU5E
+X0JCVF9OT19PT0I7CmRyaXZlcnMvbXRkL25hbmQvcmF3L25hbmRzaW0uYzoyMjU1OjI6IG5vdGU6
+IGhlcmUKICBjYXNlIDE6CiAgXn5+fgpkcml2ZXJzL210ZC9uYW5kL3Jhdy9udWM5MDBfbmFuZC5j
+OiBJbiBmdW5jdGlvbiDigJhudWM5MDBfbmFuZF9jb21tYW5kX2xw4oCZOgouL2FyY2gveDg2L2lu
+Y2x1ZGUvYXNtL2lvLmg6OTE6MjI6IHdhcm5pbmc6IHRoaXMgc3RhdGVtZW50IG1heSBmYWxsIHRo
+cm91Z2ggWy1XaW1wbGljaXQtZmFsbHRocm91Z2g9XQogI2RlZmluZSBfX3Jhd193cml0ZWwgX193
+cml0ZWwKZHJpdmVycy9tdGQvbmFuZC9yYXcvbnVjOTAwX25hbmQuYzo1MjoyOiBub3RlOiBpbiBl
+eHBhbnNpb24gb2YgbWFjcm8g4oCYX19yYXdfd3JpdGVs4oCZCiAgX19yYXdfd3JpdGVsKCh2YWwp
+LCAoZGV2KS0+cmVnICsgUkVHX1NNQ01EKQogIF5+fn5+fn5+fn5+fgpkcml2ZXJzL210ZC9uYW5k
+L3Jhdy9udWM5MDBfbmFuZC5jOjE5NjozOiBub3RlOiBpbiBleHBhbnNpb24gb2YgbWFjcm8g4oCY
+d3JpdGVfY21kX3JlZ+KAmQogICB3cml0ZV9jbWRfcmVnKG5hbmQsIE5BTkRfQ01EX1JFQURTVEFS
+VCk7CiAgIF5+fn5+fn5+fn5+fn4KZHJpdmVycy9tdGQvbmFuZC9yYXcvbnVjOTAwX25hbmQuYzox
+OTc6Mjogbm90ZTogaGVyZQogIGRlZmF1bHQ6CiAgXn5+fn5+fgpkcml2ZXJzL210ZC9uYW5kL3Jh
+dy9vbWFwX2VsbS5jOiBJbiBmdW5jdGlvbiDigJhlbG1fY29udGV4dF9yZXN0b3Jl4oCZOgpkcml2
+ZXJzL210ZC9uYW5kL3Jhdy9vbWFwX2VsbS5jOjUxMjo0OiB3YXJuaW5nOiB0aGlzIHN0YXRlbWVu
+dCBtYXkgZmFsbCB0aHJvdWdoIFstV2ltcGxpY2l0LWZhbGx0aHJvdWdoPV0KICAgIGVsbV93cml0
+ZV9yZWcoaW5mbywgRUxNX1NZTkRST01FX0ZSQUdNRU5UXzQgKyBvZmZzZXQsCiAgICBefn5+fn5+
+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fgogICAgICByZWdz
+LT5lbG1fc3luZHJvbWVfZnJhZ21lbnRfNFtpXSk7CiAgICAgIH5+fn5+fn5+fn5+fn5+fn5+fn5+
+fn5+fn5+fn5+fn5+fgpkcml2ZXJzL210ZC9uYW5kL3Jhdy9vbWFwX2VsbS5jOjUxNDozOiBub3Rl
+OiBoZXJlCiAgIGNhc2UgQkNIOF9FQ0M6CiAgIF5+fn4KZHJpdmVycy9tdGQvbmFuZC9yYXcvb21h
+cF9lbG0uYzo1MTc6NDogd2FybmluZzogdGhpcyBzdGF0ZW1lbnQgbWF5IGZhbGwgdGhyb3VnaCBb
+LVdpbXBsaWNpdC1mYWxsdGhyb3VnaD1dCiAgICBlbG1fd3JpdGVfcmVnKGluZm8sIEVMTV9TWU5E
+Uk9NRV9GUkFHTUVOVF8yICsgb2Zmc2V0LAogICAgXn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+
+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn4KICAgICAgcmVncy0+ZWxtX3N5bmRyb21lX2ZyYWdt
+ZW50XzJbaV0pOwogICAgICB+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn4KZHJpdmVy
+cy9tdGQvbmFuZC9yYXcvb21hcF9lbG0uYzo1MTk6Mzogbm90ZTogaGVyZQogICBjYXNlIEJDSDRf
+RUNDOgogICBefn5+CmRyaXZlcnMvbXRkL25hbmQvcmF3L29tYXBfZWxtLmM6IEluIGZ1bmN0aW9u
+IOKAmGVsbV9jb250ZXh0X3NhdmXigJk6CmRyaXZlcnMvbXRkL25hbmQvcmF3L29tYXBfZWxtLmM6
+NDY2OjM3OiB3YXJuaW5nOiB0aGlzIHN0YXRlbWVudCBtYXkgZmFsbCB0aHJvdWdoIFstV2ltcGxp
+Y2l0LWZhbGx0aHJvdWdoPV0KICAgIHJlZ3MtPmVsbV9zeW5kcm9tZV9mcmFnbWVudF80W2ldID0g
+ZWxtX3JlYWRfcmVnKGluZm8sCiAgICB+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5e
+fn5+fn5+fn5+fn5+fn5+fn5+fgogICAgICBFTE1fU1lORFJPTUVfRlJBR01FTlRfNCArIG9mZnNl
+dCk7CiAgICAgIH5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fgpkcml2ZXJzL210ZC9u
+YW5kL3Jhdy9vbWFwX2VsbS5jOjQ2ODozOiBub3RlOiBoZXJlCiAgIGNhc2UgQkNIOF9FQ0M6CiAg
+IF5+fn4KZHJpdmVycy9tdGQvbmFuZC9yYXcvb21hcF9lbG0uYzo0NzE6Mzc6IHdhcm5pbmc6IHRo
+aXMgc3RhdGVtZW50IG1heSBmYWxsIHRocm91Z2ggWy1XaW1wbGljaXQtZmFsbHRocm91Z2g9XQog
+ICAgcmVncy0+ZWxtX3N5bmRyb21lX2ZyYWdtZW50XzJbaV0gPSBlbG1fcmVhZF9yZWcoaW5mbywK
+ICAgIH5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fl5+fn5+fn5+fn5+fn5+fn5+fn5+
+CiAgICAgIEVMTV9TWU5EUk9NRV9GUkFHTUVOVF8yICsgb2Zmc2V0KTsKICAgICAgfn5+fn5+fn5+
+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+CmRyaXZlcnMvbXRkL25hbmQvcmF3L29tYXBfZWxtLmM6
+NDczOjM6IG5vdGU6IGhlcmUKICAgY2FzZSBCQ0g0X0VDQzoKICAgXn5+fgoKV2FybmluZyBsZXZl
+bCAzIHdhcyB1c2VkOiAtV2ltcGxpY2l0LWZhbGx0aHJvdWdoPTMKClRoaXMgcGF0Y2ggaXMgcGFy
+dCBvZiB0aGUgb25nb2luZyBlZmZvcnRzIHRvIGVuYWJsaW5nCi1XaW1wbGljaXQtZmFsbHRocm91
+Z2guCgpTaWduZWQtb2ZmLWJ5OiBHdXN0YXZvIEEuIFIuIFNpbHZhIDxndXN0YXZvQGVtYmVkZGVk
+b3IuY29tPgotLS0KQ2hhbmdlcyBpbiB2MzoKIC0gTGVhdmUgb3V0IG9mIHRoaXMgcGF0Y2ggdGhl
+IGZvbGxvd2luZyBmaWxlczoKCWRyaXZlcnMvbXRkL25hbmQvb25lbmFuZC9vbmVuYW5kX2Jhc2Uu
+YwoJZHJpdmVycy9tdGQvbmFuZC9yYXcvbmFuZF9iYXNlLmMKCWRyaXZlcnMvbXRkL25hbmQvcmF3
+L25hbmRfbGVnYWN5LmMKCQogICBUaGUgZmlyc3Qgb25lIG5lZWRzIHRvIGJlIHJld29ya2VkLCBh
+bmQgdGhlIGxhc3QKICAgdHdvIGhhdmUgYWxyZWFkeSBiZWVuIGFkZHJlc3NlZC4KCkNoYW5nZXMg
+aW4gdjI6CiAtIEFkZCBleHRyYSAvKiBmYWxsIHRocm91Z2ggKi8gY29tbWVudCBpbiBuYW5kc2lt
+LmMgZmlsZS4KCiBkcml2ZXJzL210ZC9uYW5kL3Jhdy9kaXNrb25jaGlwLmMgIHwgMSArCiBkcml2
+ZXJzL210ZC9uYW5kL3Jhdy9uYW5kc2ltLmMgICAgIHwgNiArKysrLS0KIGRyaXZlcnMvbXRkL25h
+bmQvcmF3L251YzkwMF9uYW5kLmMgfCAzICsrLQogZHJpdmVycy9tdGQvbmFuZC9yYXcvb21hcF9l
+bG0uYyAgICB8IDQgKysrKwogNCBmaWxlcyBjaGFuZ2VkLCAxMSBpbnNlcnRpb25zKCspLCAzIGRl
+bGV0aW9ucygtKQoKZGlmZiAtLWdpdCBhL2RyaXZlcnMvbXRkL25hbmQvcmF3L2Rpc2tvbmNoaXAu
+YyBiL2RyaXZlcnMvbXRkL25hbmQvcmF3L2Rpc2tvbmNoaXAuYwppbmRleCA1M2Y1N2UwZjAwN2Uu
+LmVhZDU0YzkwZjJkMSAxMDA2NDQKLS0tIGEvZHJpdmVycy9tdGQvbmFuZC9yYXcvZGlza29uY2hp
+cC5jCisrKyBiL2RyaXZlcnMvbXRkL25hbmQvcmF3L2Rpc2tvbmNoaXAuYwpAQCAtMTQ3Nyw2ICsx
+NDc3LDcgQEAgc3RhdGljIGludCBfX2luaXQgZG9jX3Byb2JlKHVuc2lnbmVkIGxvbmcgcGh5c2Fk
+cikKIAkJCWJyZWFrOwogCQljYXNlIERPQ19DaGlwSURfRG9jTWlsUGx1czMyOgogCQkJcHJfZXJy
+KCJEaXNrT25DaGlwIE1pbGxlbm5pdW0gUGx1cyAzMk1CIGlzIG5vdCBzdXBwb3J0ZWQsIGlnbm9y
+aW5nLlxuIik7CisJCQkvKiBmYWxsIHRocm91Z2ggKi8KIAkJZGVmYXVsdDoKIAkJCXJldCA9IC1F
+Tk9ERVY7CiAJCQlnb3RvIG5vdGZvdW5kOwpkaWZmIC0tZ2l0IGEvZHJpdmVycy9tdGQvbmFuZC9y
+YXcvbmFuZHNpbS5jIGIvZHJpdmVycy9tdGQvbmFuZC9yYXcvbmFuZHNpbS5jCmluZGV4IDkzM2Qx
+YTYyOWM1MS4uZWRmNWZkM2Q1ZjA3IDEwMDY0NAotLS0gYS9kcml2ZXJzL210ZC9uYW5kL3Jhdy9u
+YW5kc2ltLmMKKysrIGIvZHJpdmVycy9tdGQvbmFuZC9yYXcvbmFuZHNpbS5jCkBAIC0yMjUxLDkg
+KzIyNTEsMTEgQEAgc3RhdGljIGludCBfX2luaXQgbnNfaW5pdF9tb2R1bGUodm9pZCkKIAogCXN3
+aXRjaCAoYmJ0KSB7CiAJY2FzZSAyOgotCQkgY2hpcC0+YmJ0X29wdGlvbnMgfD0gTkFORF9CQlRf
+Tk9fT09COworCQljaGlwLT5iYnRfb3B0aW9ucyB8PSBOQU5EX0JCVF9OT19PT0I7CisJCS8qIGZh
+bGwgdGhyb3VnaCAqLwogCWNhc2UgMToKLQkJIGNoaXAtPmJidF9vcHRpb25zIHw9IE5BTkRfQkJU
+X1VTRV9GTEFTSDsKKwkJY2hpcC0+YmJ0X29wdGlvbnMgfD0gTkFORF9CQlRfVVNFX0ZMQVNIOwor
+CQkvKiBmYWxsIHRocm91Z2ggKi8KIAljYXNlIDA6CiAJCWJyZWFrOwogCWRlZmF1bHQ6CmRpZmYg
+LS1naXQgYS9kcml2ZXJzL210ZC9uYW5kL3Jhdy9udWM5MDBfbmFuZC5jIGIvZHJpdmVycy9tdGQv
+bmFuZC9yYXcvbnVjOTAwX25hbmQuYwppbmRleCAzOGIxOTk0ZTdlZDMuLjU2ZmE4NDAyOTQ4MiAx
+MDA2NDQKLS0tIGEvZHJpdmVycy9tdGQvbmFuZC9yYXcvbnVjOTAwX25hbmQuYworKysgYi9kcml2
+ZXJzL210ZC9uYW5kL3Jhdy9udWM5MDBfbmFuZC5jCkBAIC0xOTIsOCArMTkyLDkgQEAgc3RhdGlj
+IHZvaWQgbnVjOTAwX25hbmRfY29tbWFuZF9scChzdHJ1Y3QgbmFuZF9jaGlwICpjaGlwLAogCQly
+ZXR1cm47CiAKIAljYXNlIE5BTkRfQ01EX1JFQUQwOgotCiAJCXdyaXRlX2NtZF9yZWcobmFuZCwg
+TkFORF9DTURfUkVBRFNUQVJUKTsKKwkJLyogZmFsbCB0aHJvdWdoICovCisKIAlkZWZhdWx0Ogog
+CiAJCWlmICghY2hpcC0+bGVnYWN5LmRldl9yZWFkeSkgewpkaWZmIC0tZ2l0IGEvZHJpdmVycy9t
+dGQvbmFuZC9yYXcvb21hcF9lbG0uYyBiL2RyaXZlcnMvbXRkL25hbmQvcmF3L29tYXBfZWxtLmMK
+aW5kZXggYTNmMzJmOTM5Y2MxLi45NGM2NDAxZWYzMmYgMTAwNjQ0Ci0tLSBhL2RyaXZlcnMvbXRk
+L25hbmQvcmF3L29tYXBfZWxtLmMKKysrIGIvZHJpdmVycy9tdGQvbmFuZC9yYXcvb21hcF9lbG0u
+YwpAQCAtNDY1LDExICs0NjUsMTMgQEAgc3RhdGljIGludCBlbG1fY29udGV4dF9zYXZlKHN0cnVj
+dCBlbG1faW5mbyAqaW5mbykKIAkJCQkJRUxNX1NZTkRST01FX0ZSQUdNRU5UXzUgKyBvZmZzZXQp
+OwogCQkJcmVncy0+ZWxtX3N5bmRyb21lX2ZyYWdtZW50XzRbaV0gPSBlbG1fcmVhZF9yZWcoaW5m
+bywKIAkJCQkJRUxNX1NZTkRST01FX0ZSQUdNRU5UXzQgKyBvZmZzZXQpOworCQkJLyogZmFsbCB0
+aHJvdWdoICovCiAJCWNhc2UgQkNIOF9FQ0M6CiAJCQlyZWdzLT5lbG1fc3luZHJvbWVfZnJhZ21l
+bnRfM1tpXSA9IGVsbV9yZWFkX3JlZyhpbmZvLAogCQkJCQlFTE1fU1lORFJPTUVfRlJBR01FTlRf
+MyArIG9mZnNldCk7CiAJCQlyZWdzLT5lbG1fc3luZHJvbWVfZnJhZ21lbnRfMltpXSA9IGVsbV9y
+ZWFkX3JlZyhpbmZvLAogCQkJCQlFTE1fU1lORFJPTUVfRlJBR01FTlRfMiArIG9mZnNldCk7CisJ
+CQkvKiBmYWxsIHRocm91Z2ggKi8KIAkJY2FzZSBCQ0g0X0VDQzoKIAkJCXJlZ3MtPmVsbV9zeW5k
+cm9tZV9mcmFnbWVudF8xW2ldID0gZWxtX3JlYWRfcmVnKGluZm8sCiAJCQkJCUVMTV9TWU5EUk9N
+RV9GUkFHTUVOVF8xICsgb2Zmc2V0KTsKQEAgLTUxMSwxMSArNTEzLDEzIEBAIHN0YXRpYyBpbnQg
+ZWxtX2NvbnRleHRfcmVzdG9yZShzdHJ1Y3QgZWxtX2luZm8gKmluZm8pCiAJCQkJCXJlZ3MtPmVs
+bV9zeW5kcm9tZV9mcmFnbWVudF81W2ldKTsKIAkJCWVsbV93cml0ZV9yZWcoaW5mbywgRUxNX1NZ
+TkRST01FX0ZSQUdNRU5UXzQgKyBvZmZzZXQsCiAJCQkJCXJlZ3MtPmVsbV9zeW5kcm9tZV9mcmFn
+bWVudF80W2ldKTsKKwkJCS8qIGZhbGwgdGhyb3VnaCAqLwogCQljYXNlIEJDSDhfRUNDOgogCQkJ
+ZWxtX3dyaXRlX3JlZyhpbmZvLCBFTE1fU1lORFJPTUVfRlJBR01FTlRfMyArIG9mZnNldCwKIAkJ
+CQkJcmVncy0+ZWxtX3N5bmRyb21lX2ZyYWdtZW50XzNbaV0pOwogCQkJZWxtX3dyaXRlX3JlZyhp
+bmZvLCBFTE1fU1lORFJPTUVfRlJBR01FTlRfMiArIG9mZnNldCwKIAkJCQkJcmVncy0+ZWxtX3N5
+bmRyb21lX2ZyYWdtZW50XzJbaV0pOworCQkJLyogZmFsbCB0aHJvdWdoICovCiAJCWNhc2UgQkNI
+NF9FQ0M6CiAJCQllbG1fd3JpdGVfcmVnKGluZm8sIEVMTV9TWU5EUk9NRV9GUkFHTUVOVF8xICsg
+b2Zmc2V0LAogCQkJCQlyZWdzLT5lbG1fc3luZHJvbWVfZnJhZ21lbnRfMVtpXSk7Ci0tIAoyLjIw
+LjEKCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51
+eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVh
+ZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1h
+cm0ta2VybmVsCg==
