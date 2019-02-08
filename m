@@ -2,87 +2,83 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1EB6DC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 05:13:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 876EFC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 05:14:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DDC4321916
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 05:13:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5306721920
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 05:14:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fMr+5mNZ";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="ABPU29/E";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="ABPU29/E"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DDC4321916
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rdpvFGTH";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="rdXaV2Kj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5306721920
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=wX3y7nZXuS7/rD9FYgdJarxVXHi/2MJGoClDu2A9ExQ=; b=fMr+5mNZi72lffAn+OST/tTTX
-	xngbdXLLD+DleeNg7fWWtYrkQTz9HJJgO+uEcihQTUbuJvaMDYJkT8vhC5jBLDuFy+rYpoC1nGsv3
-	J3hHskb+NAdhdjIPyNJ/IVaA/YgUHWX+pPLZHyxVnvel8dnHkBe4qaGr04P1vMbZNk8YigohIzplr
-	k5jmdIn4xa4Ss0Y7OXo2dz8uGXYS3nEPHNDYDdoS0UMVelvmuUtXZEsY6b/AIZvWy3Gcn5oKAsNF9
-	pnL/vYC3HsCdK9DZwp5uq6V9/8YM8D/46XdHgfBk6esQqKEbfXrA2iLq8D586nGFuhrOjvbTwMlTM
-	z+A9MPixQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=7SNzg54tGUYREC3fhLvkugi5GVBMr/DPycawDMPgD14=; b=rdpvFGTHGP8Fsw
+	zeOSanwtzTMzRXPYK1AmgNR/tanq+PxUcu2E/VkYvmn6OllGL6Imq3uDIBbmzEsPiyZ5CqjJQgQXZ
+	4xdQAI6EBytyp4RxRyZ6pF9VYZSdB4gcXejk7q46v2KDiynRrhrXQ+ldsmvQAiwrbDrRIYpeVrjAX
+	VRgCJPmTVarv4qcK4gVDGbTSH1b1sc6kRsX/f/f1+sNbZ0PG6xS0orBxYvaWVSzpvTPLxu4Qcbk34
+	lWSd2Rxt4CObocQFHb7RaVp+Eqc2MrRbHTeGZw73iBOXYmxVZhHWs3hfownSEYsA1gfrBU6KBH6SI
+	hrPZ0BQ/Xm1HvY3dtsjg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gryU4-0000A3-7C; Fri, 08 Feb 2019 05:13:52 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1gryUb-0000SE-7q; Fri, 08 Feb 2019 05:14:25 +0000
+Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gryU1-00009L-7C
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 05:13:50 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id CA4F960860; Fri,  8 Feb 2019 05:13:44 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1549602824;
- bh=Epxg5oMx7p948rTTtVmM7t1VQNKZYq/qvGPZ3nQFngg=;
- h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=ABPU29/EKhMnBUJ6mC7vcDB/24Umg1D9FGQPfGz9AdPl0AnYCSKHBmsLMp4m8HPVp
- n3Wobc83C/IJS2jccVpFFLl7Cfdn7OpT91EGzftM/sSHS3OGqMGVZW7+r9h+ERonxd
- NCTGbnljOtBmOO02VdAAotW/NNq8VB/ue0Ge34I8=
-Received: from [192.168.43.47] (unknown [106.206.90.11])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: saiprakash.ranjan@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 9BF7560791;
- Fri,  8 Feb 2019 05:13:36 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1549602824;
- bh=Epxg5oMx7p948rTTtVmM7t1VQNKZYq/qvGPZ3nQFngg=;
- h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
- b=ABPU29/EKhMnBUJ6mC7vcDB/24Umg1D9FGQPfGz9AdPl0AnYCSKHBmsLMp4m8HPVp
- n3Wobc83C/IJS2jccVpFFLl7Cfdn7OpT91EGzftM/sSHS3OGqMGVZW7+r9h+ERonxd
- NCTGbnljOtBmOO02VdAAotW/NNq8VB/ue0Ge34I8=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 9BF7560791
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org; spf=none
- smtp.mailfrom=saiprakash.ranjan@codeaurora.org
-Subject: Re: [PATCHv7 5/6] coresight: etm4x: Add ETM PIDs for SDM845 and
- MSM8996
-To: Mathieu Poirier <mathieu.poirier@linaro.org>
-References: <cover.1548981329.git.saiprakash.ranjan@codeaurora.org>
- <c050252dc8eb3fea03119cd5efc422ed6e48834e.1548981329.git.saiprakash.ranjan@codeaurora.org>
- <CANLsYkwoqOhtENkhhSY5Tv23-vgUst4oakWrmQsB97=gDTVQLA@mail.gmail.com>
-From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-Message-ID: <cdef693d-1e8b-304d-cd62-d2fad3256580@codeaurora.org>
-Date: Fri, 8 Feb 2019 10:43:33 +0530
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+ id 1gryUX-0000Ru-Ha
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 05:14:23 +0000
+Received: from lelv0266.itg.ti.com ([10.180.67.225])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x185EGqU002615;
+ Thu, 7 Feb 2019 23:14:16 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1549602856;
+ bh=uv/vDbobEA/423bYmegRzWeDlsmKJhcSL5IECCFS2Jo=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=rdXaV2Kj9NG4HuETzh3rEo35DD6ctJP1JwLlFL6SP7sO3eWVO5FbXk6waxN8HvP1r
+ 44JZOMfP7wMtRudJZZ1x/zMc4B9cqPboUVpglaEtEW2Kae2MigP/VGtApOsmfRvPR7
+ TcycPqK1eF6RIzuxNkd0AfsZZbhHGwiks+54+KnU=
+Received: from DFLE109.ent.ti.com (dfle109.ent.ti.com [10.64.6.30])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x185EGri027207
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Thu, 7 Feb 2019 23:14:16 -0600
+Received: from DFLE105.ent.ti.com (10.64.6.26) by DFLE109.ent.ti.com
+ (10.64.6.30) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 7
+ Feb 2019 23:14:15 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE105.ent.ti.com
+ (10.64.6.26) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Thu, 7 Feb 2019 23:14:15 -0600
+Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x185ECjw002829;
+ Thu, 7 Feb 2019 23:14:13 -0600
+Subject: Re: [PATCH v2 8/9] PCI: dwc: Remove Keystone specific dw_pcie_host_ops
+To: Bjorn Helgaas <helgaas@kernel.org>
+References: <20190207110924.30716-1-kishon@ti.com>
+ <20190207110924.30716-9-kishon@ti.com> <20190207212622.GO7268@google.com>
+From: Kishon Vijay Abraham I <kishon@ti.com>
+Message-ID: <2b839b2f-d792-069b-b45f-4a455335f016@ti.com>
+Date: Fri, 8 Feb 2019 10:43:40 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <CANLsYkwoqOhtENkhhSY5Tv23-vgUst4oakWrmQsB97=gDTVQLA@mail.gmail.com>
+In-Reply-To: <20190207212622.GO7268@google.com>
 Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_211349_281517_D54D8789 
-X-CRM114-Status: GOOD (  13.18  )
+X-CRM114-CacheID: sfid-20190207_211421_665408_95D19A02 
+X-CRM114-Status: GOOD (  24.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,40 +90,146 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Jeffrey Hugo <jhugo@codeaurora.org>,
- Rajendra Nayak <rnayak@codeaurora.org>, Tingwei Zhang <tingwei@codeaurora.org>,
- Suzuki K Poulose <suzuki.poulose@arm.com>,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Marc Gonzalez <marc.w.gonzalez@free.fr>, Doug Anderson <dianders@chromium.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- David Brown <david.brown@linaro.org>, devicetree@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, Sibi Sankar <sibis@codeaurora.org>,
- Vivek Gautam <vivek.gautam@codeaurora.org>, Leo Yan <leo.yan@linaro.org>,
- Andy Gross <andy.gross@linaro.org>, Stephen Boyd <sboyd@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Mike Leach <mike.leach@linaro.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Jingoo Han <jingoohan1@gmail.com>, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Murali Karicheri <m-karicheri2@ti.com>,
+ Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2/8/2019 1:56 AM, Mathieu Poirier wrote:
-> On Thu, 31 Jan 2019 at 17:54, Sai Prakash Ranjan
-> <saiprakash.ranjan@codeaurora.org> wrote:
+Hi,
+
+On 08/02/19 2:56 AM, Bjorn Helgaas wrote:
+> On Thu, Feb 07, 2019 at 04:39:23PM +0530, Kishon Vijay Abraham I wrote:
+>> Now that Keystone started using it's own msi_irq_chip, remove
+>> Keystone specific callback function defined in dw_pcie_host_ops.
+> 
+> s/it's/its/
+> s/callback function/callback functions/
+
+okay.
+> 
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> Acked-by: Gustavo Pimentel <gustavo.pimentel@synopsys.com>
+>> ---
+>>  .../pci/controller/dwc/pcie-designware-host.c | 45 ++++++-------------
+>>  drivers/pci/controller/dwc/pcie-designware.h  |  5 ---
+>>  2 files changed, 14 insertions(+), 36 deletions(-)
 >>
+>> diff --git a/drivers/pci/controller/dwc/pcie-designware-host.c b/drivers/pci/controller/dwc/pcie-designware-host.c
+>> index 042de09b0451..9492b05e8ff0 100644
+>> --- a/drivers/pci/controller/dwc/pcie-designware-host.c
+>> +++ b/drivers/pci/controller/dwc/pcie-designware-host.c
+>> @@ -126,18 +126,12 @@ static void dw_pci_setup_msi_msg(struct irq_data *data, struct msi_msg *msg)
+>>  	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+>>  	u64 msi_target;
+>>  
+>> -	if (pp->ops->get_msi_addr)
+>> -		msi_target = pp->ops->get_msi_addr(pp);
+>> -	else
+>> -		msi_target = (u64)pp->msi_data;
+>> +	msi_target = (u64)pp->msi_data;
+>>  
+>>  	msg->address_lo = lower_32_bits(msi_target);
+>>  	msg->address_hi = upper_32_bits(msi_target);
+>>  
+>> -	if (pp->ops->get_msi_data)
+>> -		msg->data = pp->ops->get_msi_data(pp, data->hwirq);
+>> -	else
+>> -		msg->data = data->hwirq;
+>> +	msg->data = data->hwirq;
+>>  
+>>  	dev_dbg(pci->dev, "msi#%d address_hi %#x address_lo %#x\n",
+>>  		(int)data->hwirq, msg->address_hi, msg->address_lo);
+>> @@ -157,17 +151,13 @@ static void dw_pci_bottom_mask(struct irq_data *data)
+>>  
+>>  	raw_spin_lock_irqsave(&pp->lock, flags);
+>>  
+>> -	if (pp->ops->msi_clear_irq) {
+>> -		pp->ops->msi_clear_irq(pp, data->hwirq);
+>> -	} else {
+>> -		ctrl = data->hwirq / MAX_MSI_IRQS_PER_CTRL;
+>> -		res = ctrl * MSI_REG_CTRL_BLOCK_SIZE;
+>> -		bit = data->hwirq % MAX_MSI_IRQS_PER_CTRL;
+>> +	ctrl = data->hwirq / MAX_MSI_IRQS_PER_CTRL;
+>> +	res = ctrl * MSI_REG_CTRL_BLOCK_SIZE;
+>> +	bit = data->hwirq % MAX_MSI_IRQS_PER_CTRL;
+>>  
+>> -		pp->irq_status[ctrl] &= ~(1 << bit);
+>> -		dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_MASK + res, 4,
+>> -				    ~pp->irq_status[ctrl]);
+>> -	}
+>> +	pp->irq_status[ctrl] &= ~(1 << bit);
+>> +	dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_MASK + res, 4,
+>> +			    ~pp->irq_status[ctrl]);
+>>  
+>>  	raw_spin_unlock_irqrestore(&pp->lock, flags);
+>>  }
+>> @@ -180,17 +170,13 @@ static void dw_pci_bottom_unmask(struct irq_data *data)
+>>  
+>>  	raw_spin_lock_irqsave(&pp->lock, flags);
+>>  
+>> -	if (pp->ops->msi_set_irq) {
+>> -		pp->ops->msi_set_irq(pp, data->hwirq);
+>> -	} else {
+>> -		ctrl = data->hwirq / MAX_MSI_IRQS_PER_CTRL;
+>> -		res = ctrl * MSI_REG_CTRL_BLOCK_SIZE;
+>> -		bit = data->hwirq % MAX_MSI_IRQS_PER_CTRL;
+>> +	ctrl = data->hwirq / MAX_MSI_IRQS_PER_CTRL;
+>> +	res = ctrl * MSI_REG_CTRL_BLOCK_SIZE;
+>> +	bit = data->hwirq % MAX_MSI_IRQS_PER_CTRL;
+>>  
+>> -		pp->irq_status[ctrl] |= 1 << bit;
+>> -		dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_MASK + res, 4,
+>> -				    ~pp->irq_status[ctrl]);
+>> -	}
+>> +	pp->irq_status[ctrl] |= 1 << bit;
+>> +	dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_MASK + res, 4,
+>> +			    ~pp->irq_status[ctrl]);
+>>  
+>>  	raw_spin_unlock_irqrestore(&pp->lock, flags);
+>>  }
+>> @@ -209,9 +195,6 @@ static void dw_pci_bottom_ack(struct irq_data *d)
+>>  
+>>  	dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_STATUS + res, 4, 1 << bit);
+>>  
+>> -	if (pp->ops->msi_irq_ack)
+>> -		pp->ops->msi_irq_ack(d->hwirq, pp);
+>> -
+>>  	raw_spin_unlock_irqrestore(&pp->lock, flags);
+>>  }
+>>  
+>> diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
+>> index 95e0c3c93f48..ea4b215b605d 100644
+>> --- a/drivers/pci/controller/dwc/pcie-designware.h
+>> +++ b/drivers/pci/controller/dwc/pcie-designware.h
+>> @@ -142,14 +142,9 @@ struct dw_pcie_host_ops {
+>>  	int (*wr_other_conf)(struct pcie_port *pp, struct pci_bus *bus,
+>>  			     unsigned int devfn, int where, int size, u32 val);
+>>  	int (*host_init)(struct pcie_port *pp);
+>> -	void (*msi_set_irq)(struct pcie_port *pp, int irq);
+>> -	void (*msi_clear_irq)(struct pcie_port *pp, int irq);
+>> -	phys_addr_t (*get_msi_addr)(struct pcie_port *pp);
+>> -	u32 (*get_msi_data)(struct pcie_port *pp, int pos);
 > 
-> I am good with this patch but there isn't much I can do with it until
-> Mike's patchset has been merged.  Please submit again when that has
-> been done.
-> 
+> I don't see the whole series on linux-pci (I only see patches 2, 6, 8, 9),
 
-Sure, thanks.
+I do see all the patches here
+https://patchwork.kernel.org/project/linux-pci/list/. Maybe it arrived little late?
+> but I expected to somewhere see the removal of assignments to these
+> pointers.  It would be easier to review if the removal of assignments and
+> the removal of the function pointers from the structure were in the same
+> patch, but maybe that's not really feasible.
 
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+The removal of the assignments are in 7th patch of the series (PCI: keystone:
+Use Keystone specific msi_irq_chip). It's feasible but just wanted to keep the
+keystone changes and DesignWare changes in separate patches.
+
+Thanks
+Kishon
 
 _______________________________________________
 linux-arm-kernel mailing list
