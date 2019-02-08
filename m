@@ -2,67 +2,66 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 00C68C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:33:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 65081C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:37:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BDF3621916
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:33:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 331452080F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:37:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i3J90+Ma"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BDF3621916
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JBSnYbhC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 331452080F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EkigNwLAlWiqdUzZYPUq/R/q1drYRUcDoi8SuNSCYxY=; b=i3J90+MaSWqEuC
-	s9EUY3CBr269Pmb39ZG1rw6ZHOJEz+0Hm5C+c20pVVP15bJ+e2xY5YjCd8K/iOKBNR6B5lTidARXt
-	7e8VB2f5VyL83c17PMXGLnw8feolJM69h6wLCXzF7haqNUkYkuL5CEKd8EXVDhiPxxQpQj71JyqGA
-	YAq+aIZh+/4g5Em0J4vhOz21yx92EG2LoLtmQC18CiDTUZnfrpwqu8HwsFcHbg9NgLjXsUbAr9XTp
-	Rmeu4VbytZaMq0JNjEH92EJaRxNmZNzExQmHhK9q5YC3E+0t+PPXSBoCaFb38MSBNjCGvkd+X9XcO
-	EoB3VlqtNQ3PKbjwlghw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Z69Awe9cTtaW2bT7RpbSP0uAWnV2KD/pibARjgEMezo=; b=JBSnYbhCqdsvGJ
+	24RuBXFRoRuz7rJSlpgL83JYpv/ufQRTSFEwIMaKtfosx6vTrKhnWekbSGYX3Md7QZ/t+j7trzKQq
+	kO6Tf0tRBDuzG7TFFFxy4nxfhe+OtWBbwbJD+68ihWo6ciRcKdcm2tAV/MTrJKTQ5hUa1mtpIRCUk
+	QJND5mg4ZGhtSjekSIgc1O67bVtD/x1x8mi4lXkgTXickzMiJ9zbiK1A+YRUp8yqqz2hFUbH2GwrC
+	G/5T66TwGsA+gidqlH44V2w5/aF8w8EVDlIzzLNz+ateC4v4sNluEycHEKTG3zIbzsk+lQOQsbpHm
+	7/38VPGGDP1KBrU128Ag==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs2XB-0000dz-I9; Fri, 08 Feb 2019 09:33:21 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs2X7-0000dR-ET
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:33:19 +0000
-Received: from dude.hi.pengutronix.de ([2001:67c:670:100:1d::7])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gs2X2-0007Ty-UG; Fri, 08 Feb 2019 10:33:12 +0100
-Received: from ukl by dude.hi.pengutronix.de with local (Exim 4.92-RC5)
- (envelope-from <ukl@pengutronix.de>)
- id 1gs2X2-0004Vi-IW; Fri, 08 Feb 2019 10:33:12 +0100
-From: =?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?= <u.kleine-koenig@pengutronix.de>
-To: Shawn Guo <shawnguo@kernel.org>
-Subject: [PATCH v2] ARM: dts: Add devicetree for Eckelmann CI4x10
-Date: Fri,  8 Feb 2019 10:33:06 +0100
-Message-Id: <20190208093306.14316-1-u.kleine-koenig@pengutronix.de>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190205081825.rcoi2wx2bvxsyfjz@pengutronix.de>
-References: <20190205081825.rcoi2wx2bvxsyfjz@pengutronix.de>
+	id 1gs2ah-0002Vq-MT; Fri, 08 Feb 2019 09:36:59 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gs2ae-0002VV-4b
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:36:57 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DA8FFA78;
+ Fri,  8 Feb 2019 01:36:54 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A34823F557;
+ Fri,  8 Feb 2019 01:36:50 -0800 (PST)
+From: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH v10 12/25] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
+ masking
+To: Nathan Chancellor <natechancellor@gmail.com>
+References: <1548946743-38979-1-git-send-email-julien.thierry@arm.com>
+ <1548946743-38979-13-git-send-email-julien.thierry@arm.com>
+ <20190208043543.GA5040@archlinux-ryzen>
+Message-ID: <a5c2aacd-f607-c73e-d636-9cfc73c1fde0@arm.com>
+Date: Fri, 8 Feb 2019 09:36:48 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::7
-X-SA-Exim-Mail-From: ukl@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+In-Reply-To: <20190208043543.GA5040@archlinux-ryzen>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_013317_820379_9ADAC31A 
-X-CRM114-Status: GOOD (  17.66  )
+X-CRM114-CacheID: sfid-20190208_013656_197923_48C60AAC 
+X-CRM114-Status: GOOD (  21.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,204 +73,180 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>, Gavin Schenk <g.schenk@eckelmann.de>,
- NXP Linux Team <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
+Cc: mark.rutland@arm.com, Nick Desaulniers <ndesaulniers@google.com>,
+ daniel.thompson@linaro.org, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ marc.zyngier@arm.com, catalin.marinas@arm.com, will.deacon@arm.com,
+ linux-kernel@vger.kernel.org, christoffer.dall@arm.com, james.morse@arm.com,
+ Oleg Nesterov <oleg@redhat.com>, joel@joelfernandes.org,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-VGhpcyBpcyBvbmUgb2YgdHdvIGJvYXJkcyB0aGF0IG1ha2UgdXNlIG9mIHRoZSByZWNlbnRseSBp
-bnRyb2R1Y2VkIFNJT1gKYnVzLiBBcGFydCBmcm9tIHRoZSBkZXZpY2VzIGRlc2NyaWJlZCBpbiB0
-aGUgZHRzIGl0IGZlYXR1cmVzIGEgZGlzcGxheQp3aXRoIHRvdWNoIHRoYXQgSSBkaWRuJ3QgaW5j
-bHVkZSBoZXJlIGJlY2F1c2UgaXQgbmVlZHMgc29tZSBub24tbWFpbmxpbmUKY2hhbmdlIHRvIG9w
-ZXJhdGUgY29ycmVjdGx5LgoKU2lnbmVkLW9mZi1ieTogVXdlIEtsZWluZS1Lw7ZuaWcgPHUua2xl
-aW5lLWtvZW5pZ0BwZW5ndXRyb25peC5kZT4KLS0tCkhlbGxvLAoKdGhpcyBhZGRyZXNzZXMgYWxs
-IGJ1dCB0aGUgdHdvIGlzc3VlZCByYWlzZWQgYnkgU2hhd24gdGhhdCBJIGRpZG4ndAp1bmRlcnN0
-YW5kLiBJIHVzZSB0aGlzIHBhdGNoIGFzIGEgcmVtaW5kZXIgdGhhdCBteSBxdWVzdGlvbnMgcmVn
-YXJkaW5nCnRoZXNlIGFyZSBzdGlsbCBvcGVuLiA6LSkKCkJlc3QgcmVnYXJkcwpVd2UKCiBhcmNo
-L2FybS9ib290L2R0cy9NYWtlZmlsZSAgICAgICAgICAgICAgICAgICAgfCAgIDEgKwogYXJjaC9h
-cm0vYm9vdC9kdHMvaW14NmRsLWVja2VsbWFubi1jaTR4MTAuZHRzIHwgMzgxICsrKysrKysrKysr
-KysrKysrKwogMiBmaWxlcyBjaGFuZ2VkLCAzODIgaW5zZXJ0aW9ucygrKQogY3JlYXRlIG1vZGUg
-MTAwNjQ0IGFyY2gvYXJtL2Jvb3QvZHRzL2lteDZkbC1lY2tlbG1hbm4tY2k0eDEwLmR0cwoKZGlm
-ZiAtLWdpdCBhL2FyY2gvYXJtL2Jvb3QvZHRzL01ha2VmaWxlIGIvYXJjaC9hcm0vYm9vdC9kdHMv
-TWFrZWZpbGUKaW5kZXggYmQ0MDE0OGExNWIyLi5iNjBkNzU5ZTM5YzAgMTAwNjQ0Ci0tLSBhL2Fy
-Y2gvYXJtL2Jvb3QvZHRzL01ha2VmaWxlCisrKyBiL2FyY2gvYXJtL2Jvb3QvZHRzL01ha2VmaWxl
-CkBAIC0zOTcsNiArMzk3LDcgQEAgZHRiLSQoQ09ORklHX1NPQ19JTVg2USkgKz0gXAogCWlteDZk
-bC1jdWJveC1pLWVtbWMtc29tLXYxNS5kdGIgXAogCWlteDZkbC1jdWJveC1pLXNvbS12MTUuZHRi
-IFwKIAlpbXg2ZGwtZGZpLWZzNzAwLW02MC5kdGIgXAorCWlteDZkbC1lY2tlbG1hbm4tY2k0eDEw
-LmR0YiBcCiAJaW14NmRsLWVtY29uLWF2YXJpLmR0YiBcCiAJaW14NmRsLWd3NTF4eC5kdGIgXAog
-CWlteDZkbC1ndzUyeHguZHRiIFwKZGlmZiAtLWdpdCBhL2FyY2gvYXJtL2Jvb3QvZHRzL2lteDZk
-bC1lY2tlbG1hbm4tY2k0eDEwLmR0cyBiL2FyY2gvYXJtL2Jvb3QvZHRzL2lteDZkbC1lY2tlbG1h
-bm4tY2k0eDEwLmR0cwpuZXcgZmlsZSBtb2RlIDEwMDY0NAppbmRleCAwMDAwMDAwMDAwMDAuLjVi
-ODVlMGNjZTIxMAotLS0gL2Rldi9udWxsCisrKyBiL2FyY2gvYXJtL2Jvb3QvZHRzL2lteDZkbC1l
-Y2tlbG1hbm4tY2k0eDEwLmR0cwpAQCAtMCwwICsxLDM4MSBAQAorLy8gU1BEWC1MaWNlbnNlLUlk
-ZW50aWZpZXI6IEdQTC0yLjAKKy8qCisgKiBDb3B5cmlnaHQgKEMpIDIwMTYgRWNrZWxtYW5uIEFH
-LgorICogQ29weXJpZ2h0IChDKSAyMDEzIEZyZWVzY2FsZSBTZW1pY29uZHVjdG9yLCBJbmMuCisg
-Ki8KKworL2R0cy12MS87CisKKyNpbmNsdWRlIDxkdC1iaW5kaW5ncy9ncGlvL2dwaW8uaD4KKwor
-I2luY2x1ZGUgImlteDZkbC5kdHNpIgorCisvIHsKKwltb2RlbCA9ICJFY2tlbG1hbm4gQ0kgNFgx
-MCBCb2FyZCI7CisJY29tcGF0aWJsZSA9ICJlY2tlbG1hbm4saW14NmRsLWNpNHgxMCIsICJmc2ws
-aW14NmRsIjsKKworCWNob3NlbiB7CisJCXN0ZG91dC1wYXRoID0gJnVhcnQzOworCX07CisKKwlt
-ZW1vcnkgeworCQlkZXZpY2VfdHlwZSA9ICJtZW1vcnkiOworCQlyZWcgPSA8MHgxMDAwMDAwMCAw
-eDQwMDAwMDAwPjsKKwl9OworCisJcm1paV9jbGs6IGNsb2NrLXJtaWkgeworCQkvKiBUaGlzIGNs
-b2NrIGlzIHByb3ZpZGVkIGJ5IHRoZSBwaHkgKEtTWjgwOTFSTkIpICovCisJCWNvbXBhdGlibGUg
-PSAiZml4ZWQtY2xvY2siOworCQkjY2xvY2stY2VsbHMgPSA8MD47CisJCWNsb2NrLWZyZXF1ZW5j
-eSA9IDw1MDAwMDAwMD47CisJfTsKKworCXJlZ191c2JfaDFfdmJ1czogcmVndWxhdG9yLXVzYi1o
-MS12YnVzIHsKKwkJcGluY3RybC1uYW1lcyA9ICJkZWZhdWx0IjsKKwkJcGluY3RybC0wID0gPCZw
-aW5jdHJsX3JlZ191c2JfaDFfdmJ1cz47CisJCWNvbXBhdGlibGUgPSAicmVndWxhdG9yLWZpeGVk
-IjsKKwkJcmVndWxhdG9yLW5hbWUgPSAidXNiX2gxX3ZidXMiOworCQlyZWd1bGF0b3ItbWluLW1p
-Y3Jvdm9sdCA9IDw1MDAwMDAwPjsKKwkJcmVndWxhdG9yLW1heC1taWNyb3ZvbHQgPSA8NTAwMDAw
-MD47CisJCWdwaW8gPSA8JmdwaW8zIDMxIDA+OworCQllbmFibGUtYWN0aXZlLWhpZ2g7CisJfTsK
-KworCXNpb3ggeworCQljb21wYXRpYmxlID0gImVja2VsbWFubixzaW94LWdwaW8iOworCQlwaW5j
-dHJsLW5hbWVzID0gImRlZmF1bHQiOworCQlwaW5jdHJsLTAgPSA8JnBpbmN0cmxfc2lveD47CisJ
-CWRpbi1ncGlvcyA9IDwmZ3BpbzYgMTEgMD47CisJCWRvdXQtZ3Bpb3MgPSA8JmdwaW82IDggMD47
-CisJCWRjbGstZ3Bpb3MgPSA8JmdwaW82IDkgMD47CisJCWRsZC1ncGlvcyA9IDwmZ3BpbzYgMTAg
-MD47CisJfTsKK307CisKKyZjYW4xIHsKKwlwaW5jdHJsLW5hbWVzID0gImRlZmF1bHQiOworCXBp
-bmN0cmwtMCA9IDwmcGluY3RybF9mbGV4Y2FuMT47CisJc3RhdHVzID0gIm9rYXkiOworfTsKKwor
-JmNhbjIgeworCXBpbmN0cmwtbmFtZXMgPSAiZGVmYXVsdCI7CisJcGluY3RybC0wID0gPCZwaW5j
-dHJsX2ZsZXhjYW4yPjsKKwlzdGF0dXMgPSAib2theSI7Cit9OworCismZWNzcGkyIHsKKwlwaW5j
-dHJsLW5hbWVzID0gImRlZmF1bHQiOworCXBpbmN0cmwtMCA9IDwmcGluY3RybF9lY3NwaTI+Owor
-CWNzLWdwaW9zID0gPCZncGlvNSAxMiBHUElPX0FDVElWRV9ISUdIPjsKKwlzdGF0dXMgPSAib2th
-eSI7CisKKwltcmFtOiBmbGFzaEAwIHsKKwkJY29tcGF0aWJsZSA9ICJldmVyc3BpbixtcjI1aDI1
-NiI7CisJCXJlZyA9IDwwPjsKKwkJc3BpLW1heC1mcmVxdWVuY3kgPSA8MTUwMDAwMDA+OworCX07
-Cit9OworCismZWNzcGkxIHsKKwlwaW5jdHJsLW5hbWVzID0gImRlZmF1bHQiOworCXBpbmN0cmwt
-MCA9IDwmcGluY3RybF9lY3NwaTE+OworCWNzLWdwaW9zID0gPCZncGlvNSAyNSBHUElPX0FDVElW
-RV9ISUdIPjsKKwlzdGF0dXMgPSAib2theSI7CisKKwl0cG1AMCB7CisJCWNvbXBhdGlibGUgPSAi
-aW5maW5lb24sc2xiOTY3MCIsICJ0Y2csdHBtX3Rpcy1zcGkiOworCQlyZWcgPSA8MD47CisJCXNw
-aS1tYXgtZnJlcXVlbmN5ID0gPDEwMDAwMDAwPjsKKwl9OworfTsKKworJmdwaW8yIHsKKwlncGlv
-LWxpbmUtbmFtZXMgPSAiYnV6emVyIiwgIiIsICIiLCAiIiwgIiIsICIiLCAiIiwgIiIsCisJCQkg
-ICIiLCAiIiwgIiIsICIiLCAiIiwgIiIsICIiLCAiIiwKKwkJCSAgIiIsICIiLCAiIiwgIiIsICIi
-LCAiIiwgIiIsICIiLAorCQkJICAiIiwgIiIsICIiLCAiIiwgIiIsICIiLCAiIiwgIiI7Cit9Owor
-CismZ3BpbzQgeworCWdwaW8tbGluZS1uYW1lcyA9ICIiLCAiIiwgIiIsICIiLCAiIiwgIiIsICIi
-LCAiaW4yIiwKKwkJCSAgInByaW8yIiwgInByaW8xIiwgImF1eCIsICIiLCAiIiwgIiIsICIiLCAi
-IiwKKwkJCSAgIiIsICIiLCAiIiwgIiIsICIiLCAiIiwgIiIsICIiLAorCQkJICAiIiwgIiIsICIi
-LCAiIiwgIiIsICIiLCAiIiwgIiI7Cit9OworCismZ3BpbzYgeworCWdwaW8tbGluZS1uYW1lcyA9
-ICIiLCAiIiwgIiIsICIiLCAiIiwgIiIsICIiLCAiIiwKKwkJCSAgIiIsICIiLCAiIiwgIiIsICIi
-LCAiIiwgIiIsICJpbjEiLAorCQkJICAiIiwgIiIsICIiLCAiIiwgIiIsICIiLCAiIiwgIiIsCisJ
-CQkgICIiLCAiIiwgIiIsICIiLCAiIiwgIiIsICIiLCAiIjsKK307CisKKyZpMmMxIHsKKwlwaW5j
-dHJsLW5hbWVzID0gImRlZmF1bHQiOworCXBpbmN0cmwtMCA9IDwmcGluY3RybF9pMmMxPjsKKwlz
-dGF0dXMgPSAib2theSI7CisKKwl0ZW1wZXJhdHVyZS1zZW5zb3JANDkgeworCQljb21wYXRpYmxl
-ID0gImFkLGFkNzQxNCI7CisJCXJlZyA9IDwweDQ5PjsKKwl9OworCisJcnRjQDUxIHsKKwkJY29t
-cGF0aWJsZSA9ICJueHAscGNmMjEyNyI7CisJCXJlZyA9IDwweDUxPjsKKwl9OworfTsKKworJmlv
-bXV4YyB7CisJcGluY3RybC1uYW1lcyA9ICJkZWZhdWx0IjsKKwlwaW5jdHJsLTAgPSA8JnBpbmN0
-cmxfaG9nPjsKKworCXBpbmN0cmxfaG9nOiBob2cgeworCQlmc2wscGlucyA9IDwKKwkJCU1YNlFE
-TF9QQURfTkFOREZfRDBfX0dQSU8yX0lPMDAJCTB4MDAwMDAwMTggLyogYnV6emVyICovCisJCQlN
-WDZRRExfUEFEX0tFWV9DT0wxX19HUElPNF9JTzA4CQkweDAwMDAwMDE4IC8qIE9VVF8xICovCisJ
-CQlNWDZRRExfUEFEX0tFWV9ST1cxX19HUElPNF9JTzA5CQkweDAwMDAwMDE4IC8qIE9VVF8yICov
-CisJCQlNWDZRRExfUEFEX0tFWV9DT0wyX19HUElPNF9JTzEwCQkweDAwMDAwMDE4IC8qIE9VVF8z
-ICovCisJCQlNWDZRRExfUEFEX05BTkRGX0NTMl9fR1BJTzZfSU8xNQkweDAwMDAwMDAwIC8qIElu
-MSAqLworCQkJTVg2UURMX1BBRF9LRVlfUk9XMF9fR1BJTzRfSU8wNwkJMHgwMDAwMDAwMCAvKiBJ
-bjIgKi8KKwkJCU1YNlFETF9QQURfR1BJT185X19HUElPMV9JTzA5CQkweDAwMDAwMDE4IC8qIHVu
-dXNlZCB3YXRjaGRvZyBwaW4gKi8KKwkJCU1YNlFETF9QQURfU0QxX0RBVDJfX0dQSU8xX0lPMTkJ
-CTB4MDAwMDAwMTggLyogdW51c2VkIHdhdGNoZG9nIHBpbiAqLworCisJCT47CisJfTsKKworCXBp
-bmN0cmxfZWNzcGkxOiBlY3NwaTFncnAgeworCQlmc2wscGlucyA9IDwKKwkJCU1YNlFETF9QQURf
-Q1NJMF9EQVQ0X19FQ1NQSTFfU0NMSyAJMHgwMDAxMDBhMAorCQkJTVg2UURMX1BBRF9DU0kwX0RB
-VDVfX0VDU1BJMV9NT1NJCTB4MDAwMTAwYTAKKwkJCU1YNlFETF9QQURfQ1NJMF9EQVQ2X19FQ1NQ
-STFfTUlTTwkweDAwMDEwMGEwCisJCQlNWDZRRExfUEFEX0NTSTBfREFUN19fR1BJTzVfSU8yNQkw
-eDAwMDEwMGEwCisJCT47CisJfTsKKworCXBpbmN0cmxfZWNzcGkyOiBlY3NwaTJncnAgeworCQlm
-c2wscGlucyA9IDwKKwkJCU1YNlFETF9QQURfRElTUDBfREFUMTlfX0VDU1BJMl9TQ0xLCTB4MDAw
-MTAwYjEKKwkJCU1YNlFETF9QQURfRUlNX0NTMV9fRUNTUEkyX01PU0kJCTB4MDAwMTAwYjEKKwkJ
-CU1YNlFETF9QQURfRUlNX09FX19FQ1NQSTJfTUlTTwkJMHgwMDAxMDBiMQorCQkJTVg2UURMX1BB
-RF9ESVNQMF9EQVQxOF9fR1BJTzVfSU8xMgkweDAwMDEwMGIxCisJCT47CisJfTsKKworCXBpbmN0
-cmxfZW5ldDogZW5ldGdycCB7CisJCWZzbCxwaW5zID0gPAorCQkJTVg2UURMX1BBRF9HUElPXzE2
-X19FTkVUX1JFRl9DTEsJMHg0MDAxYjBhOAorCQkJTVg2UURMX1BBRF9FTkVUX01ESU9fX0VORVRf
-TURJTwkJMHgwMDAxYjA5OAorCQkJTVg2UURMX1BBRF9FTkVUX01EQ19fRU5FVF9NREMJCTB4MDAw
-MWIwOTgKKwkJCU1YNlFETF9QQURfRU5FVF9UWEQwX19FTkVUX1RYX0RBVEEwCTB4MDAwMWIwOTgK
-KwkJCU1YNlFETF9QQURfRU5FVF9UWEQxX19FTkVUX1RYX0RBVEExCTB4MDAwMWIwOTgKKwkJCU1Y
-NlFETF9QQURfRU5FVF9UWF9FTl9fRU5FVF9UWF9FTgkweDAwMDFiMDk4CisJCQlNWDZRRExfUEFE
-X0VORVRfUlhfRVJfX0VORVRfUlhfRVIJMHgwMDAxYjBiMAorCQkJTVg2UURMX1BBRF9FTkVUX1JY
-RDBfX0VORVRfUlhfREFUQTAJMHgwMDAxYjBiMAorCQkJTVg2UURMX1BBRF9FTkVUX1JYRDFfX0VO
-RVRfUlhfREFUQTEJMHgwMDAxYjBiMAorCQkJTVg2UURMX1BBRF9FTkVUX0NSU19EVl9fRU5FVF9S
-WF9FTgkweDAwMDFiMGIwCisJCQlNWDZRRExfUEFEX1NEMV9DTURfX0dQSU8xX0lPMTgJCTB4MDAw
-MDAwMTgKKwkJPjsKKwl9OworCisJcGluY3RybF9mbGV4Y2FuMTogZmxleGNhbjFncnAgeworCQlm
-c2wscGlucyA9IDwKKwkJCU1YNlFETF9QQURfR1BJT183X19GTEVYQ0FOMV9UWAkJMHgwMDAxYjAy
-MAorCQkJTVg2UURMX1BBRF9HUElPXzhfX0ZMRVhDQU4xX1JYCQkweDAwMDFiMGIwCisJCT47CisJ
-fTsKKworCXBpbmN0cmxfZmxleGNhbjI6IGZsZXhjYW4yZ3JwIHsKKwkJZnNsLHBpbnMgPSA8CisJ
-CQlNWDZRRExfUEFEX0tFWV9DT0w0X19GTEVYQ0FOMl9UWAkweDAwMDFiMDIwCisJCQlNWDZRRExf
-UEFEX0tFWV9ST1c0X19GTEVYQ0FOMl9SWAkweDAwMDFiMGIwCisJCT47CisJfTsKKworCXBpbmN0
-cmxfaTJjMTogaTJjMWdycCB7CisJCWZzbCxwaW5zID0gPAorCQkJLyogd2l0aG91dCBTSU9OIGky
-YyBkb2Vzbid0IGRldGVjdCBidXMgYnVzeSAqLworCQkJTVg2UURMX1BBRF9DU0kwX0RBVDlfX0ky
-QzFfU0NMCQkweDQwMDFiODIwCisJCQlNWDZRRExfUEFEX0NTSTBfREFUOF9fSTJDMV9TREEJCTB4
-NDAwMWI4MjAKKwkJPjsKKwl9OworCisJcGluY3RybF9wY2llOiBwY2llZ3JwIHsKKwkJZnNsLHBp
-bnMgPSA8CisJCQlNWDZRRExfUEFEX1NEMV9DTEtfX0dQSU8xX0lPMjAJCTB4MDAwMDAwMTgKKwkJ
-PjsKKwl9OworCisJcGluY3RybF9yZWdfdXNiX2gxX3ZidXM6IHJlZ191c2JfaDFfdmJ1c2dycCB7
-CisJCWZzbCxwaW5zID0gPAorCQkJTVg2UURMX1BBRF9FSU1fRDMxX19HUElPM19JTzMxCQkweDAw
-MDFiMGIwCisJCT47CisJfTsKKworCXBpbmN0cmxfc2lveDogc2lveGdycCB7CisJCWZzbCxwaW5z
-ID0gPAorCQkJTVg2UURMX1BBRF9OQU5ERl9DUzBfX0dQSU82X0lPMTEJMHgwMDAxYjAxMAkvKiBE
-SU4gKi8KKwkJCU1YNlFETF9QQURfTkFOREZfQUxFX19HUElPNl9JTzA4CTB4MDAwMWIwMTAJLyog
-RE9VVCAqLworCQkJTVg2UURMX1BBRF9OQU5ERl9XUF9CX19HUElPNl9JTzA5CTB4MDAwMWIwMTAJ
-LyogRENMSyAqLworCQkJTVg2UURMX1BBRF9OQU5ERl9SQjBfX0dQSU82X0lPMTAJMHgwMDAxYjAx
-MAkvKiBETEQgKi8KKwkJPjsKKwl9OworCisJcGluY3RybF91YXJ0MV9kdGU6IHVhcnQxZ3JwIHsK
-KwkJZnNsLHBpbnMgPSA8CisJCQlNWDZRRExfUEFEX0NTSTBfREFUMTFfX1VBUlQxX1RYX0RBVEEJ
-MHgwMDAxYjAxMAorCQkJTVg2UURMX1BBRF9DU0kwX0RBVDEwX19VQVJUMV9SWF9EQVRBCTB4MDAw
-MWIwMTAKKwkJCU1YNlFETF9QQURfRUlNX0QxOV9fVUFSVDFfUlRTX0IgCTB4MDAwMWIwMTAKKwkJ
-CU1YNlFETF9QQURfRUlNX0QyMF9fVUFSVDFfQ1RTX0IgCTB4MDAwMWIwMTAKKwkJCU1YNlFETF9Q
-QURfRUlNX0QyM19fR1BJTzNfSU8yMwkJMHgwMDAxYjAxMAkvKiBEQ0QgKi8KKwkJCU1YNlFETF9Q
-QURfRUlNX0QyNF9fR1BJTzNfSU8yNAkJMHgwMDAxYjAxMAkvKiBEVFIgKi8KKwkJCU1YNlFETF9Q
-QURfRUlNX0QyNV9fR1BJTzNfSU8yNQkJMHgwMDAxYjAxMAkvKiBEU1IgKi8KKwkJPjsKKwl9Owor
-CisJcGluY3RybF91YXJ0Ml9kdGU6IHVhcnQyZ3JwIHsKKwkJZnNsLHBpbnMgPSA8CisJCQlNWDZR
-RExfUEFEX0VJTV9EMjdfX1VBUlQyX1RYX0RBVEEJMHgwMDAxYjAxMAorCQkJTVg2UURMX1BBRF9F
-SU1fRDI2X19VQVJUMl9SWF9EQVRBCTB4MDAwMWIwMTAKKwkJCU1YNlFETF9QQURfRUlNX0QyOF9f
-VUFSVDJfUlRTX0IgCTB4MDAwMWIwMTAKKwkJCU1YNlFETF9QQURfRUlNX0QyOV9fVUFSVDJfQ1RT
-X0IgCTB4MDAwMWIwMTAKKwkJCU1YNlFETF9QQURfTkFOREZfRDFfX0dQSU8yX0lPMDEJCTB4MDAw
-MWIwMTAJLyogRENEICovCisJCQlNWDZRRExfUEFEX0dQSU9fMThfX0dQSU83X0lPMTMJCTB4MDAw
-MWIwMTAJLyogRFRSICovCisJCQlNWDZRRExfUEFEX05BTkRGX0NTM19fR1BJTzZfSU8xNgkweDAw
-MDFiMDEwCS8qIERTUiAqLworCQk+OworCX07CisKKwlwaW5jdHJsX3VhcnQzX2RjZTogdWFydDNn
-cnAgeworCQlmc2wscGlucyA9IDwKKwkJCU1YNlFETF9QQURfU0Q0X0NMS19fVUFSVDNfUlhfREFU
-QQkweDAwMDFiMDEwCisJCQlNWDZRRExfUEFEX1NENF9DTURfX1VBUlQzX1RYX0RBVEEJMHgwMDAx
-YjAxMAorCQk+OworCX07CisKKwlwaW5jdHJsX3VhcnQ0X2RjZTogdWFydDRncnAgeworCQlmc2ws
-cGlucyA9IDwKKwkJCU1YNlFETF9QQURfQ1NJMF9EQVQxM19fVUFSVDRfUlhfREFUQQkweDAwMDFi
-MDEwCisJCQlNWDZRRExfUEFEX0NTSTBfREFUMTJfX1VBUlQ0X1RYX0RBVEEJMHgwMDAxYjAxMAor
-CQkJTVg2UURMX1BBRF9DU0kwX0RBVDE3X19HUElPNl9JTzAzCTB4MDAwMWIwMTAKKwkJPjsKKwl9
-OworCisJcGluY3RybF91YXJ0NV9kY2U6IHVhcnQ1Z3JwIHsKKwkJZnNsLHBpbnMgPSA8CisJCQlN
-WDZRRExfUEFEX0NTSTBfREFUMTVfX1VBUlQ1X1JYX0RBVEEJMHgwMDAxYjAxMAorCQkJTVg2UURM
-X1BBRF9DU0kwX0RBVDE0X19VQVJUNV9UWF9EQVRBCTB4MDAwMWIwMTAKKwkJCU1YNlFETF9QQURf
-Q1NJMF9EQVQxOV9fR1BJTzZfSU8wNQkweDAwMDFiMDEwCS8qIFJUUyAqLworCQk+OworCX07CisK
-KwlwaW5jdHJsX3VzYmgxOiB1c2JoMWdycCB7CisJCWZzbCxwaW5zID0gPAorCQkJTVg2UURMX1BB
-RF9FSU1fRDMwX19VU0JfSDFfT0MJCTB4ODAwMDAwMDAKKwkJPjsKKwl9OworCisJcGluY3RybF91
-c2RoYzM6IHVzZGhjM2dycCB7CisJCWZzbCxwaW5zID0gPAorCQkJTVg2UURMX1BBRF9TRDNfQ01E
-X19TRDNfQ01ECQkweDAwMDE3MDU5CisJCQlNWDZRRExfUEFEX1NEM19DTEtfX1NEM19DTEsJCTB4
-MDAwMTAwNTkKKwkJCU1YNlFETF9QQURfU0QzX0RBVDBfX1NEM19EQVRBMAkJMHgwMDAxNzA1OQor
-CQkJTVg2UURMX1BBRF9TRDNfREFUMV9fU0QzX0RBVEExCQkweDAwMDE3MDU5CisJCQlNWDZRRExf
-UEFEX1NEM19EQVQyX19TRDNfREFUQTIJCTB4MDAwMTcwNTkKKwkJCU1YNlFETF9QQURfU0QzX0RB
-VDNfX1NEM19EQVRBMwkJMHgwMDAxNzA1OQorCQkJTVg2UURMX1BBRF9TRDNfREFUNF9fU0QzX0RB
-VEE0CQkweDAwMDE3MDU5CisJCQlNWDZRRExfUEFEX1NEM19EQVQ1X19TRDNfREFUQTUJCTB4MDAw
-MTcwNTkKKwkJCU1YNlFETF9QQURfU0QzX0RBVDZfX1NEM19EQVRBNgkJMHgwMDAxNzA1OQorCQkJ
-TVg2UURMX1BBRF9TRDNfREFUN19fU0QzX0RBVEE3CQkweDAwMDE3MDU5CisJCT47CisJfTsKK307
-CisKKyZmZWMgeworCXBpbmN0cmwtbmFtZXMgPSAiZGVmYXVsdCI7CisJcGluY3RybC0wID0gPCZw
-aW5jdHJsX2VuZXQ+OworCXBoeS1tb2RlID0gInJtaWkiOworCXBoeS1yZXNldC1ncGlvcyA9IDwm
-Z3BpbzEgMTggR1BJT19BQ1RJVkVfTE9XPjsKKwlwaHktaGFuZGxlID0gPCZwaHk+OworCWNsb2Nr
-cyA9IDwmY2xrcyBJTVg2UURMX0NMS19FTkVUPiwgPCZjbGtzIElNWDZRRExfQ0xLX0VORVQ+LCA8
-JnJtaWlfY2xrPjsKKwlzdGF0dXMgPSAib2theSI7CisKKwltZGlvIHsKKwkJI2FkZHJlc3MtY2Vs
-bHMgPSA8MT47CisJCSNzaXplLWNlbGxzID0gPDA+OworCisJCXBoeTogZXRoZXJuZXQtcGh5QDEg
-eworCQkJY29tcGF0aWJsZSA9ICJldGhlcm5ldC1waHktaWVlZTgwMi4zLWMyMiI7CisJCQlyZWcg
-PSA8MT47CisJCX07CisJfTsKK307CisKKyZwY2llIHsKKwlwaW5jdHJsLW5hbWVzID0gImRlZmF1
-bHQiOworCXBpbmN0cmwtMCA9IDwmcGluY3RybF9wY2llPjsKKwlyZXNldC1ncGlvID0gPCZncGlv
-MSAyMCBHUElPX0FDVElWRV9ISUdIPjsKKwlzdGF0dXMgPSAib2theSI7Cit9OworCismdWFydDEg
-eworCXBpbmN0cmwtbmFtZXMgPSAiZGVmYXVsdCI7CisJcGluY3RybC0wID0gPCZwaW5jdHJsX3Vh
-cnQxX2R0ZT47CisJdWFydC1oYXMtcnRzY3RzOworCWZzbCxkdGUtbW9kZTsKKwlkY2QtZ3Bpb3Mg
-PSA8JmdwaW8zIDIzIEdQSU9fQUNUSVZFX0xPVz47CisJZHRyLWdwaW9zID0gPCZncGlvMyAyNCBH
-UElPX0FDVElWRV9MT1c+OworCWRzci1ncGlvcyA9IDwmZ3BpbzMgMjUgR1BJT19BQ1RJVkVfTE9X
-PjsKKwlzdGF0dXMgPSAib2theSI7Cit9OworCismdWFydDIgeworCXBpbmN0cmwtbmFtZXMgPSAi
-ZGVmYXVsdCI7CisJcGluY3RybC0wID0gPCZwaW5jdHJsX3VhcnQyX2R0ZT47CisJdWFydC1oYXMt
-cnRzY3RzOworCWZzbCxkdGUtbW9kZTsKKwlkY2QtZ3Bpb3MgPSA8JmdwaW8yIDEgR1BJT19BQ1RJ
-VkVfTE9XPjsKKwlkdHItZ3Bpb3MgPSA8JmdwaW83IDEzIEdQSU9fQUNUSVZFX0xPVz47CisJZHNy
-LWdwaW9zID0gPCZncGlvNiAxNiBHUElPX0FDVElWRV9MT1c+OworCXN0YXR1cyA9ICJva2F5IjsK
-K307CisKKyZ1YXJ0MyB7CisJcGluY3RybC1uYW1lcyA9ICJkZWZhdWx0IjsKKwlwaW5jdHJsLTAg
-PSA8JnBpbmN0cmxfdWFydDNfZGNlPjsKKwlzdGF0dXMgPSAib2theSI7Cit9OworCismdWFydDQg
-eworCXBpbmN0cmwtbmFtZXMgPSAiZGVmYXVsdCI7CisJcGluY3RybC0wID0gPCZwaW5jdHJsX3Vh
-cnQ0X2RjZT47CisJcnRzLWdwaW9zID0gPCZncGlvNiAzIEdQSU9fQUNUSVZFX0hJR0g+OworCXN0
-YXR1cyA9ICJva2F5IjsKK307CisKKyZ1YXJ0NSB7CisJcGluY3RybC1uYW1lcyA9ICJkZWZhdWx0
-IjsKKwlwaW5jdHJsLTAgPSA8JnBpbmN0cmxfdWFydDVfZGNlPjsKKwlzdGF0dXMgPSAib2theSI7
-CisJcnRzLWdwaW9zID0gPCZncGlvNiA1IEdQSU9fQUNUSVZFX0hJR0g+OworfTsKKworJnVzYmgx
-IHsKKwlwaW5jdHJsLW5hbWVzID0gImRlZmF1bHQiOworCXBpbmN0cmwtMCA9IDwmcGluY3RybF91
-c2JoMT47CisJdmJ1cy1zdXBwbHkgPSA8JnJlZ191c2JfaDFfdmJ1cz47CisJc3RhdHVzID0gIm9r
-YXkiOworfTsKKworJnVzYm90ZyB7CisJc3RhdHVzID0gIm9rYXkiOworCWRyX21vZGUgPSAicGVy
-aXBoZXJhbCI7Cit9OworCismdXNkaGMzIHsKKwlwaW5jdHJsLW5hbWVzID0gImRlZmF1bHQiOwor
-CXBpbmN0cmwtMCA9IDwmcGluY3RybF91c2RoYzM+OworCWJ1cy13aWR0aCA9IDw4PjsKKwlub24t
-cmVtb3ZhYmxlOworCXN0YXR1cyA9ICJva2F5IjsKK307Ci0tIAoyLjIwLjEKCgpfX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1h
-aWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xp
-c3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+Hi Nathan,
+
+On 08/02/2019 04:35, Nathan Chancellor wrote:
+> On Thu, Jan 31, 2019 at 02:58:50PM +0000, Julien Thierry wrote:
+
+[...]
+
+> 
+> Hi Julien,
+> 
+> This patch introduced a slew of Clang warnings:
+> 
+> In file included from arch/arm64/kernel/signal.c:21:
+> In file included from include/linux/compat.h:10:
+> In file included from include/linux/time.h:6:
+> In file included from include/linux/seqlock.h:36:
+> In file included from include/linux/spinlock.h:54:
+> In file included from include/linux/irqflags.h:16:
+> arch/arm64/include/asm/irqflags.h:50:10: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+>                 : "r" (GIC_PRIO_IRQON)
+>                        ^
+> arch/arm64/include/asm/ptrace.h:39:25: note: expanded from macro 'GIC_PRIO_IRQON'
+> #define GIC_PRIO_IRQON          0xf0
+>                                 ^
+> arch/arm64/include/asm/irqflags.h:46:44: note: use constraint modifier "w"
+>                 "msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0\n"
+>                                                          ^~
+>                                                          %w0
+
+I'm not sure I get the relevance of this kind of warnings from Clang.
+Had it been an output operand I could understand the concern of having a
+variable too small to store the register value. But here it's an input
+operand being place in a wider register...
+
+> arch/arm64/include/asm/alternative.h:286:29: note: expanded from macro 'ALTERNATIVE'
+>         _ALTERNATIVE_CFG(oldinstr, newinstr, __VA_ARGS__, 1)
+>                                    ^
+> arch/arm64/include/asm/alternative.h:88:30: note: expanded from macro '_ALTERNATIVE_CFG'
+>         __ALTERNATIVE_CFG(oldinstr, newinstr, feature, IS_ENABLED(cfg), 0)
+>                                     ^
+> arch/arm64/include/asm/alternative.h:76:2: note: expanded from macro '__ALTERNATIVE_CFG'
+>         newinstr "\n"                                                   \
+>         ^
+> In file included from arch/arm64/kernel/signal.c:21:
+> In file included from include/linux/compat.h:10:
+> In file included from include/linux/time.h:6:
+> In file included from include/linux/seqlock.h:36:
+> In file included from include/linux/spinlock.h:54:
+> In file included from include/linux/irqflags.h:16:
+> arch/arm64/include/asm/irqflags.h:61:10: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+>                 : "r" (GIC_PRIO_IRQOFF)
+>                        ^
+> arch/arm64/include/asm/ptrace.h:40:26: note: expanded from macro 'GIC_PRIO_IRQOFF'
+> #define GIC_PRIO_IRQOFF         (GIC_PRIO_IRQON & ~0x80)
+>                                 ^
+> arch/arm64/include/asm/irqflags.h:58:45: note: use constraint modifier "w"
+>                 "msr_s  " __stringify(SYS_ICC_PMR_EL1) ", %0",
+>                                                           ^
+> arch/arm64/include/asm/irqflags.h:94:10: warning: value size does not match register size specified by the constraint and modifier [-Wasm-operand-widths]
+>                 : "r" (GIC_PRIO_IRQOFF)
+>                        ^
+> arch/arm64/include/asm/ptrace.h:40:26: note: expanded from macro 'GIC_PRIO_IRQOFF'
+> #define GIC_PRIO_IRQOFF         (GIC_PRIO_IRQON & ~0x80)
+>                                 ^
+> arch/arm64/include/asm/irqflags.h:91:18: note: use constraint modifier "w"
+>                         "csel   %0, %0, %2, eq",
+>                                         ^~
+>                                         %w2
+> arch/arm64/include/asm/alternative.h:286:29: note: expanded from macro 'ALTERNATIVE'
+>         _ALTERNATIVE_CFG(oldinstr, newinstr, __VA_ARGS__, 1)
+>                                    ^
+> arch/arm64/include/asm/alternative.h:88:30: note: expanded from macro '_ALTERNATIVE_CFG'
+>         __ALTERNATIVE_CFG(oldinstr, newinstr, feature, IS_ENABLED(cfg), 0)
+>                                     ^
+> arch/arm64/include/asm/alternative.h:76:2: note: expanded from macro '__ALTERNATIVE_CFG'
+>         newinstr "\n"                                                   \
+>         ^
+> 3 warnings generated.
+> 
+> 
+> I am not sure if they should be fixed with Clang's suggestion of a
+> constraint modifier or a cast like commit 1b57ec8c7527 ("arm64: io:
+> Ensure value passed to __iormb() is held in a 64-bit register"), hence
+> this message.
+> 
+
+Clang's suggestion would not work as MSR instructions do not operate on
+32-bit general purpose registers. Seeing that PMR is a 32-bit register,
+I'd avoid adding UL for the GIC_PRIO_IRQ* constants.
+
+So I'd recommend just casting the the asm inline operands to unsigned
+long. This should only affect the 3 locations
+arch/arm64/include/asm/irqflags.h.
+
+Does the following patch work for you?
+
+Thanks,
+
+-- 
+Julien Thierry
+
+
+-->
+
+From e839dec632bbf440efe8314751138ba46324078c Mon Sep 17 00:00:00 2001
+From: Julien Thierry <julien.thierry@arm.com>
+Date: Fri, 8 Feb 2019 09:21:58 +0000
+Subject: [PATCH] arm64: irqflags: Fix clang build warnings
+
+Clang complains when passing asm operands that are smaller than the
+registers they are mapped to:
+
+arch/arm64/include/asm/irqflags.h:50:10: warning: value size does not
+	match register size specified by the constraint and modifier
+	[-Wasm-operand-widths]
+                : "r" (GIC_PRIO_IRQON)
+
+Fix it by casting the affected input operands to a type of the correct
+size.
+
+Reported-by: Nathan Chancellor <natechancellor@gmail.com>
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+---
+ arch/arm64/include/asm/irqflags.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+index d4597b2..43d8366 100644
+--- a/arch/arm64/include/asm/irqflags.h
++++ b/arch/arm64/include/asm/irqflags.h
+@@ -47,7 +47,7 @@ static inline void arch_local_irq_enable(void)
+ 		"dsb	sy",
+ 		ARM64_HAS_IRQ_PRIO_MASKING)
+ 		:
+-		: "r" (GIC_PRIO_IRQON)
++		: "r" ((unsigned long) GIC_PRIO_IRQON)
+ 		: "memory");
+ }
+ 
+@@ -58,7 +58,7 @@ static inline void arch_local_irq_disable(void)
+ 		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ", %0",
+ 		ARM64_HAS_IRQ_PRIO_MASKING)
+ 		:
+-		: "r" (GIC_PRIO_IRQOFF)
++		: "r" ((unsigned long) GIC_PRIO_IRQOFF)
+ 		: "memory");
+ }
+ 
+@@ -91,7 +91,7 @@ static inline unsigned long arch_local_save_flags(void)
+ 			"csel	%0, %0, %2, eq",
+ 			ARM64_HAS_IRQ_PRIO_MASKING)
+ 		: "=&r" (flags), "+r" (daif_bits)
+-		: "r" (GIC_PRIO_IRQOFF)
++		: "r" ((unsigned long) GIC_PRIO_IRQOFF)
+ 		: "memory");
+ 
+ 	return flags;
+-- 
+1.9.1
+
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
