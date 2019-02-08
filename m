@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B55AC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:24:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E01B2C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:24:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 289FF20863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:24:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8A87720863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:24:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UfL1UMsX";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="JShbsJUo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 289FF20863
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SJn5JJyZ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="GaV1qr7+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8A87720863
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,41 +27,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=HHBM0hxg/FYX7X5ipQr3UQ16Do9LTyNU2hjOOcAqOE4=; b=UfL1UMsX5Iewn7u3R4d/diZxnF
-	2a00ewPIeG38jutqwLtXADhDmgrSiWfaXt3dB3s0vgB7NeNpHYGO+A4c6slN7InsvsVS194s2tkJ1
-	4/TBsXCCv/0ZQWyAlKhO7bxUGmYgs51VLlT/JHheGVUP7BR7tLVYQNZSEUX4LdFuNEJX0uPsIyHpb
-	Yxhsgu3zfZz8EogOZzx3NC0r1DUtaqfD5Qv5mSL/ubiUOWdzALt+tMvArWuBaCWXbkHT4XxOE7o3F
-	KchtvEb8QdlKm8t6RD6PWqApe2knoae4qLP8luXVXizCC/Hl1r6gcka23N4BE1xoOcFJpgti9HFNe
-	LiCiMtfQ==;
+	bh=L2RLlw10+2eYTjmEzVua3wGwljg1cswV2iME0+P3wus=; b=SJn5JJyZJmkDhXtmKhNPfUpJ/f
+	N0b1TxIPOSFFMJLUVCNN87FCtCLgOkWgXXPcIjVGiqV9+08zSVKzwkOA4kEpSeJvwZdP4kFM0JY4V
+	ese/hOsXuMMo9bb7GHpqstobOEICbxVnMh5tdQwqYlPdN2iLE+S48Vg0DuAuZgAVJ8mwDeE4yFP1a
+	uL5dzHoj8YOUpsPDLwxDEE5tlQu1ESYLwu4Q3s2pYgtwl2C6ZEJmGDF2f3fOQyDGaZWO79qqhJ4sR
+	5BY4VfcmBQMefSS6eDlSJRVdVtZiWm+JKCTRGGheN6LjlN8Q0GvjypNCrhwG5aIAQhF6b1ajuMi3Q
+	d8/qoiqg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs4GF-0002XM-Jc; Fri, 08 Feb 2019 11:23:59 +0000
+	id 1gs4Gc-00038I-Ql; Fri, 08 Feb 2019 11:24:22 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs4Fp-0005IB-Or
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 11:23:53 +0000
+ id 1gs4GA-0002SP-OB
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 11:24:19 +0000
 Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 7DDA425BF17;
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 8919C25BF18;
  Fri,  8 Feb 2019 22:14:19 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1549624459; bh=sLuZy0QzFzPVBjcncmY9BFc44cxWx8KnghUYUKtF36w=;
+ t=1549624459; bh=j7pP+VBqzyrrCvznaj39wn226oDz22U7SQqAl1N+kqQ=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=JShbsJUo7GRwfcIMHTIMdjQUUgIpFQsGlEqMKiWzSWjezFg8jwIacP2MYhfp/ueIS
- kSCfmWRExb5j95ZAFHtBwj7scRpzSY2dtprrY1yWOGUUhRBQgFCriavmYtwrt9jtg/
- dNtb65Xwhn4CJQwqhimI+TNVCZSFX65RG4NF+yjI=
+ b=GaV1qr7+6AfEG1VNDdUYDs4P2hmDA+wjV687cxvb+X6biyDYXCRlgwDqvy/PH89lO
+ rcrzFl+0ok9GVneDbjrGVbYHGQbB8daQK0TSJnv8oXUA0IYd9EpYb1zBkR8jGTTtz3
+ T93xafCvUd2zfNrAhr8SID9qg1kHbIq2L7hjAjQw=
 Received: by reginn.horms.nl (Postfix, from userid 7100)
- id EE1C1940A31; Fri,  8 Feb 2019 12:14:15 +0100 (CET)
+ id 0F41C940A91; Fri,  8 Feb 2019 12:14:16 +0100 (CET)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 10/12] ARM: dts: r7s9210-rza2mevb: Add support for RZ/A2M EVB
-Date: Fri,  8 Feb 2019 12:14:11 +0100
-Message-Id: <3a62c2d2581497de89abbb2d7e0d2ade9b39433e.1549623128.git.horms+renesas@verge.net.au>
+Subject: [PATCH 11/12] ARM: dts: r8a7744: Add DU support
+Date: Fri,  8 Feb 2019 12:14:12 +0100
+Message-Id: <5f152018d340d90c185ced8ef6230b7044ea5540.1549623128.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1549623128.git.horms+renesas@verge.net.au>
 References: <cover.1549623128.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_032334_166567_80666F5F 
-X-CRM114-Status: GOOD (  13.73  )
+X-CRM114-CacheID: sfid-20190208_032355_468883_7E532DE4 
+X-CRM114-Status: GOOD (  10.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,127 +74,55 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Simon Horman <horms+renesas@verge.net.au>,
- Chris Brandt <chris.brandt@renesas.com>, Magnus Damm <magnus.damm@gmail.com>,
- linux-arm-kernel@lists.infradead.org
+ Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org,
+ Biju Das <biju.das@bp.renesas.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+From: Biju Das <biju.das@bp.renesas.com>
 
-Add support for Renesas RZ/A2M evaluation board.
+Add du node to r8a7744 SoC DT. Boards that want to enable the DU
+need to specify the output topology.
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-Reviewed-by: Ulrich Hecht <uli+renesas@fpond.eu>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/Makefile             |  1 +
- arch/arm/boot/dts/r7s9210-rza2mevb.dts | 82 ++++++++++++++++++++++++++++++++++
- 2 files changed, 83 insertions(+)
- create mode 100644 arch/arm/boot/dts/r7s9210-rza2mevb.dts
+ arch/arm/boot/dts/r8a7744.dtsi | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index bd40148a15b2..3a3a931b431e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -843,6 +843,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
- 	r7s72100-genmai.dtb \
- 	r7s72100-gr-peach.dtb \
- 	r7s72100-rskrza1.dtb \
-+	r7s9210-rza2mevb.dtb \
- 	r8a73a4-ape6evm.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	r8a7743-iwg20d-q7.dtb \
-diff --git a/arch/arm/boot/dts/r7s9210-rza2mevb.dts b/arch/arm/boot/dts/r7s9210-rza2mevb.dts
-new file mode 100644
-index 000000000000..991e09de1219
---- /dev/null
-+++ b/arch/arm/boot/dts/r7s9210-rza2mevb.dts
-@@ -0,0 +1,82 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Device Tree Source for the RZA2MEVB board
-+ *
-+ * Copyright (C) 2018 Renesas Electronics
-+ *
-+ */
-+
-+/dts-v1/;
-+#include "r7s9210.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/r7s9210-pinctrl.h>
-+
-+/ {
-+	model = "RZA2MEVB";
-+	compatible = "renesas,rza2mevb", "renesas,r7s9210";
-+
-+	aliases {
-+		serial0 = &scif4;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory@40000000 {
-+		device_type = "memory";
-+		reg = <0x40000000 0x00800000>;	 /* HyperRAM */
-+	};
-+
-+	lbsc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		red {
-+			gpios = <&pinctrl RZA2_PIN(PORT6, 0) GPIO_ACTIVE_HIGH>;
-+		};
-+		green {
-+			gpios = <&pinctrl RZA2_PIN(PORTC, 1) GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+/* EXTAL */
-+&extal_clk {
-+	clock-frequency = <24000000>;	/* 24MHz */
-+};
-+
-+/* RTC_X1 */
-+&rtc_x1_clk {
-+	clock-frequency = <32768>;
-+};
-+
-+&pinctrl {
-+	/* Serial Console */
-+	scif4_pins: serial4 {
-+		pinmux = <RZA2_PINMUX(PORT9, 0, 4)>,	/* TxD4 */
-+			 <RZA2_PINMUX(PORT9, 1, 4)>;	/* RxD4 */
-+	};
-+};
-+
-+/* High resolution System tick timers */
-+&ostm0 {
-+	status = "okay";
-+};
-+
-+&ostm1 {
-+	status = "okay";
-+};
-+
-+/* Serial Console */
-+&scif4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&scif4_pins>;
-+
-+	status = "okay";
-+};
+diff --git a/arch/arm/boot/dts/r8a7744.dtsi b/arch/arm/boot/dts/r8a7744.dtsi
+index 8d25a0a0594a..83804aa042c6 100644
+--- a/arch/arm/boot/dts/r8a7744.dtsi
++++ b/arch/arm/boot/dts/r8a7744.dtsi
+@@ -1645,8 +1645,14 @@
+ 		};
+ 
+ 		du: display@feb00000 {
+-			reg = <0 0xfeb00000 0 0x40000>,
+-			      <0 0xfeb90000 0 0x1c>;
++			compatible = "renesas,du-r8a7744";
++			reg = <0 0xfeb00000 0 0x40000>;
++			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 268 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 724>,
++				 <&cpg CPG_MOD 723>;
++			clock-names = "du.0", "du.1";
++			status = "disabled";
+ 
+ 			ports {
+ 				#address-cells = <1>;
+@@ -1663,7 +1669,6 @@
+ 					};
+ 				};
+ 			};
+-			/* placeholder */
+ 		};
+ 
+ 		prr: chipid@ff000044 {
 -- 
 2.11.0
 
