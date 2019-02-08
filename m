@@ -2,114 +2,57 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8A284C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 20:31:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DA7D7C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 21:18:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 59720218D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 20:31:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AAC282073F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 21:18:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XRS7N7M4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59720218D9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DetKpFJu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AAC282073F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xp0o1Ek9ctrWKFN+9CxgMP0+im14S9RUjSzv8qFeFAY=; b=XRS7N7M44mk1/3
-	HWbPaDZJ4JhoqJCJMwiWleNHojyUCs5BUAl2eENn2TB2CcdTFjMZtQw8IYTVIL3BaYrh68cyoZCdr
-	TUPMVBorluCgFkFbdrjiUVTa80Lkqpyu/ENu2iUQPchDndL16NLki+jTbtMLBSG1E0VKVVlU7WGqq
-	OlBNhy5aJ/omaigGhaqM05Uc9WmzoX0FT6uAzPNNoeGq56BBSiOaR0Pt/TcCxM6a/YTWRuzdY8YkL
-	ESwpGKI3sRCb6GR1M/xLW7Nh5KYURn1ZXhQXq5eOgssewWm68nKp2ouh3pndJl8QmIIV45fKLc98A
-	L3/3COUjYHF8u3eW9I/g==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=CZc77kv9JdG8Pj+sgO5XdrhmohaMWfGY9lk0iUS/adw=; b=DetKpFJuFv9C1L
+	+5Kyql+KUt25zuUiUveZQLjmKKAoCKW/Vrp00zTSB/pkp1//+mZdvnIFAyyY3/G5SYImJ7zbBc4BO
+	A47IzyAQPGDq9NXUxTQDZwtvQWYz0aV9XndCClJhCILNQUMTZpKiH5Ja3ZzpwC3M5irmLh21pDznJ
+	TKfAcXCtkI+b0VXqbhyGOp2vXYF+XOwZD3ulILJksonUZh9zt4D6c9rCI39gBZAtoKP6y6QS1c6By
+	Q0vBJCftL1uG2QwGzIHVFVVMNPaeVnL2vV6y/qH5sX047oWcrh84uYL1/ZSV83BbDxGrmILPVWegn
+	s0qoWEIHpdNOaXYzbi4Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsCo6-0007C9-CJ; Fri, 08 Feb 2019 20:31:30 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
+	id 1gsDXu-0004hK-HN; Fri, 08 Feb 2019 21:18:50 +0000
+Received: from relay9-d.mail.gandi.net ([217.70.183.199])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsCo1-0007Ax-LC
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 20:31:27 +0000
-Received: from smtp.corp.redhat.com (int-mx01.intmail.prod.int.phx2.redhat.com
- [10.5.11.11])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
- (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 7A118637EC;
- Fri,  8 Feb 2019 20:31:21 +0000 (UTC)
-Received: from llong.remote.csb (dhcp-17-35.bos.redhat.com [10.18.17.35])
- by smtp.corp.redhat.com (Postfix) with ESMTP id E87FC60474;
- Fri,  8 Feb 2019 20:31:18 +0000 (UTC)
-Subject: Re: [PATCH-tip 00/22] locking/rwsem: Rework rwsem-xadd & enable new
- rwsem features
-To: Linus Torvalds <torvalds@linux-foundation.org>
-References: <1549566446-27967-1-git-send-email-longman@redhat.com>
- <CAHk-=wjfyrFBjifzmgMVrkrvEePEPaBTDq7D=f2i5kD2E=SqRQ@mail.gmail.com>
-From: Waiman Long <longman@redhat.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=longman@redhat.com; prefer-encrypt=mutual; keydata=
- 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
- weim8xU=
-Organization: Red Hat
-Message-ID: <d7476dfb-1653-747b-b865-5597ba5fc1c1@redhat.com>
-Date: Fri, 8 Feb 2019 15:31:18 -0500
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
+ id 1gsDXr-0004gd-6u
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 21:18:49 +0000
+X-Originating-IP: 87.231.134.186
+Received: from localhost (87-231-134-186.rev.numericable.fr [87.231.134.186])
+ (Authenticated sender: gregory.clement@bootlin.com)
+ by relay9-d.mail.gandi.net (Postfix) with ESMTPSA id 2FD73FF805;
+ Fri,  8 Feb 2019 21:18:38 +0000 (UTC)
+From: Gregory CLEMENT <gregory.clement@bootlin.com>
+To: Arnd Bergmann <arnd@arndb.de>, Olof Johansson <olof@lixom.net>,
+ <arm@kernel.org>
+Subject: [GIT PULL] ARM: mvebu: dt64 for v5.1 (#1)
+Date: Fri, 08 Feb 2019 22:18:38 +0100
+Message-ID: <87mun6568h.fsf@FE-laptop>
 MIME-Version: 1.0
-In-Reply-To: <CAHk-=wjfyrFBjifzmgMVrkrvEePEPaBTDq7D=f2i5kD2E=SqRQ@mail.gmail.com>
-Content-Language: en-US
-X-Scanned-By: MIMEDefang 2.79 on 10.5.11.11
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.28]); Fri, 08 Feb 2019 20:31:23 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_123125_733660_0D622C66 
-X-CRM114-Status: GOOD (  25.05  )
+X-CRM114-CacheID: sfid-20190208_131847_403926_8B78A1FB 
+X-CRM114-Status: GOOD (  12.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,99 +64,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch <linux-arch@vger.kernel.org>, linux-xtensa@linux-xtensa.org,
- Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
- Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
- Linux-sh list <linux-sh@vger.kernel.org>,
- Peter Zijlstra <peterz@infradead.org>, linux-hexagon@vger.kernel.org,
- the arch/x86 maintainers <x86@kernel.org>, Will Deacon <will.deacon@arm.com>,
- Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
- Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
- "H. Peter Anvin" <hpa@zytor.com>, linux-alpha@vger.kernel.org,
- sparclinux@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
- linuxppc-dev@lists.ozlabs.org, Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 02/08/2019 02:50 PM, Linus Torvalds wrote:
-> On Thu, Feb 7, 2019 at 11:08 AM Waiman Long <longman@redhat.com> wrote:
->> This patchset revamps the current rwsem-xadd implementation to make
->> it saner and easier to work with. This patchset removes all the
->> architecture specific assembly code and uses generic C code for all
->> architectures. This eases maintenance and enables us to enhance the
->> code more easily.
->>
->> This patchset also implements the following 3 new features:
->>
->>  1) Waiter lock handoff
->>  2) Reader optimistic spinning
->>  3) Store write-lock owner in the atomic count (x86-64 only)
-> The patches are kind of hard to read, with most of them just doing
-> prep-work that doesn't necessarily matter to the big picture.
->
-> What I'd really like to see is
->
->  (a) an overview of the new locking logic
+Hi,
 
-The new locking logic is similar to qrwlock (see patch 11). Cmpxchg is
-used to acquire the write lock, while xadd is still used for read lock.
-Some of the bits in the count are also reserved for special purpose like
-has waiter or lock handoff. Patch 15 tries to compress the write-lock
-owner task pointer and put it into the count field for x86-64 at the
-expense of less bits available for reader count. I have sent out an
-additional patch this morning to make sure that the reader count won't
-overflow.
+Here is the first pull request for dt64 for mvebu for v5.1.
 
-In term of performance, there isn't much change with respect to
-read-lock performance. For write-lock, I saw a slight drop in some
-cases, but nothing significant. The merging of owner task pointer into
-the count field does impose a slightly bigger drop than I would have
-liked which I am going to look into a bit more.
+Gregory
 
->
->  (b) what's the new fastpath case
+The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 
-The only change in the fastpath is the use of cmpxchg for writer lock.
+  Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
 
->
->  (c) some performance numbers
+are available in the Git repository at:
 
-There are performance data at patches 11, 12, 15, 19, 20, 21. There was
-performance data for patch 4 as well for eliminating the arch specific
-file. Apparently, I might have deleted it accidentally. Anyway, no
-noticeable performance difference was observed when switching to use
-generic C code for x86, ppc and ARM64.
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-5.1-1
 
-The major gain in performance is due to reader optimistic spinning
-patches. The microbenchmark that I used shown an order of magnitude of
-performance improvement for mixed reader-writer workloads. Of course, we
-will see less performance gain with real world benchmarks.
+for you to fetch changes up to bd3d25b0734284dcf603173d54232c538eb6e385:
 
-I am planning to run more performance test and post the data sometimes
-next week. Davidlohr is also going to run some of his rwsem performance
-test on this patchset.
+  arm64: dts: marvell: armada-37xx: link USB hosts with their PHYs (2019-02-08 21:58:59 +0100)
 
->
-> to explain the changes from a "this is the point of the whole
-> exercise" standpoint.
->
-> And yes, I realize that the lock handoff and optimistic spinning is a
-> big deal, since I've seen the same regression numbers that presumably
-> caused this effort to be resurrected. So it's not that I don't find
-> this intriguing and worthwhile, it's literally that I'd like a summary
-> not so much of the individual patches, but of the new model.
->
-> Please?
+----------------------------------------------------------------
+mvebu dt64 for 5.1 (part 1)
 
-Maybe I should break this patchset into a few smaller ones to make it
-easier to review. Any suggestion is welcome.
+ - Interrupt support to Armada 7K/8K thermal nodes
+ - Armada 37xx related patches allowing to enable suspend to RAM
+   (USB2, USB3, PCIe, SATA, DSA)
+ - uDPU board support (Armada-3720 based):single-port FTTdp
+    distribution point unit
+ - Fixes for EspressoBin Ethernet support when using U-Boot mainline
+ - cleanup for partitions under flashes nodes
 
-Cheers,
-Longman
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      arm64: dts: marvell: Remove unnecessary #address-cells/#size-cells under flashes
 
+Miquel Raynal (12):
+      arm64: dts: marvell: add interrupt support to ap806 thermal node
+      arm64: dts: marvell: add interrupt support to cp110 thermal node
+      arm64: dts: marvell: armada-37xx: fix SATA node scope
+      arm64: dts: marvell: armada-37xx: declare SATA clock
+      arm64: dts: marvell: armada-37xx: fix USB2 memory region
+      arm64: dts: marvell: armada-37xx: declare USB2 UTMI PHYs
+      arm64: dts: marvell: armada-37xx: declare PCIe reset pin
+      arm64: dts: marvell: armada-3720-espressobin: declare PCIe warm reset pin
+      arm64: dts: marvell: armada-37xx: declare the COMPHY node
+      arm64: dts: marvell: armada-3720-espressobin: declare PCIe PHY
+      arm64: dts: marvell: armada-3720-espressobin: declare SATA PHY property
+      arm64: dts: marvell: armada-37xx: link USB hosts with their PHYs
+
+Remi Pommarel (2):
+      arm64: dts: armada-3720-espressobin: Configure RGMII and SMI pins
+      arm64: dts: armada-3720-espressobin: Set mv88e6341 cpu port as RGMII-ID
+
+Vladimir Vid (1):
+      arm64: dts: marvell: Add device tree for uDPU board
+
+ arch/arm64/boot/dts/marvell/Makefile               |   1 +
+ .../boot/dts/marvell/armada-3720-espressobin.dts   |  12 ++
+ arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts   | 162 +++++++++++++++++++++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  80 +++++++++-
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts     |   4 -
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts     |   4 -
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |  18 ++-
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi      |  15 +-
+ 8 files changed, 280 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-3720-uDPU.dts
 
 _______________________________________________
 linux-arm-kernel mailing list
