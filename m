@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
 	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 71685C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 10:42:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BB194C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 10:45:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 42F482080A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 10:42:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 878D721919
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 10:45:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qier7OFR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 42F482080A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NputrGPj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 878D721919
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,35 +25,35 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	MIME-Version:Message-ID:Subject:To:From:Date:Reply-To:
 	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=5zNq40OJuM9gCU8Cu7nbQXtQOHzmjswo9MoIl2h62mM=; b=qie
-	r7OFRdCjv+LJjdzpmLk/hu0P5WF7PcnwBB763Bb1kP0By22E+qxj1vgt0pvAD6Rmejksh8KmxML09
-	kuZUdKx6viFkxP3iBbIyLhWNjWXUuNN3u9I7n7D6BVz9NwPjK7FATirzro28Btt7o8upfr5ypZtw4
-	wmMpxPdI5+xJIAiNH+geb8OYbembaumtO9/4Sxd+Qd5oy45Bo76eaa5IAN9XzkQYzen4FWcSjBwQA
-	+C+Xw/ou32QNOMgJVEAxSH++geOO3VtMMwAMSG4FpWqPsxWw7GUzo7ARhbVaV0GSabUUaIhuVGcP4
-	aRwYeOyxWZYq0BUgHcabJZtaHjoQwAg==;
+	References:List-Owner; bh=zCZaW/qFM+cdVYxykwAEL5f/i8iYQdpID8FYljEmv2Q=; b=Npu
+	trGPjGIY5090Oka09UhekQJWjLpnYY3iNxqyLFfiCK4uCaE7KbKLqpUvXAmCqsfsklv7YJCWI/mPz
+	MdHry5jr+lCoTevuLIOyOKK+sjxXb93AtoToehOZyzlZI6wZrf1SuS9S/+ZeaSWJD9weEBUdNVtQM
+	z9WSQvJmdtdp+PQwWHg3c1zog1awc8NkIElMyFoM7GZegyXJpY5uoOxaJrXqGGxuRNVRh4o5TTV9O
+	D3xFYUw9LjWlBqcUubUlXEQNDZM+lLJTNuZa6q4EwP7KFO9ldeSFiLEwkXR1RMo9a+xsQ06Gmh9uP
+	y6t2D5+oFf84IXNWtHXkQBeznsDYoCA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs3cE-0003PH-9w; Fri, 08 Feb 2019 10:42:38 +0000
-Received: from relay5-d.mail.gandi.net ([217.70.183.197])
+	id 1gs3ex-00050z-CJ; Fri, 08 Feb 2019 10:45:27 +0000
+Received: from relay4-d.mail.gandi.net ([217.70.183.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs3cA-0003OY-3K
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 10:42:35 +0000
+ id 1gs3et-0004zt-K8
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 10:45:25 +0000
 X-Originating-IP: 90.88.22.177
 Received: from localhost (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
  [90.88.22.177]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay5-d.mail.gandi.net (Postfix) with ESMTPSA id 459C51C0005;
- Fri,  8 Feb 2019 10:42:31 +0000 (UTC)
-Date: Fri, 8 Feb 2019 11:42:30 +0100
+ by relay4-d.mail.gandi.net (Postfix) with ESMTPSA id 743F4E0007;
+ Fri,  8 Feb 2019 10:45:20 +0000 (UTC)
+Date: Fri, 8 Feb 2019 11:45:19 +0100
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Mike Turquette <mturquette@baylibre.com>,
  Stephen Boyd <sboyd@codeaurora.org>
-Subject: [GIT PULL] Allwinner clock changes for 5.1
-Message-ID: <20190208104230.zn4sn7z4idge4gmh@flea>
+Subject: [GIT PULL] Allwinner clock fixes for 5.0
+Message-ID: <20190208104519.2ix2ujxrpmhqrwlf@flea>
 MIME-Version: 1.0
 User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_024234_287320_007484CC 
-X-CRM114-Status: GOOD (  11.43  )
+X-CRM114-CacheID: sfid-20190208_024523_817585_11111FDA 
+X-CRM114-Status: GOOD (  10.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,25 +67,25 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
  linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============5077705278435195936=="
+Content-Type: multipart/mixed; boundary="===============8901965451058031588=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 
---===============5077705278435195936==
+--===============8901965451058031588==
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="dv2ngskktc2vmjjw"
+	protocol="application/pgp-signature"; boundary="julhqle2jly444cf"
 Content-Disposition: inline
 
 
---dv2ngskktc2vmjjw
+--julhqle2jly444cf
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
 Hi Mike, Stephen,
 
-Please pull the following PR for the next merge window.
+Please pull the following PR for the current release.
 
 Thanks!
 Maxime
@@ -97,45 +97,48 @@ The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 are available in the Git repository at:
 
   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunx=
-i-clk-for-5.1
+i-clk-fixes-for-5.0
 
-for you to fetch changes up to 108a459ef4cd17a28711d81092044e597b5c7618:
+for you to fetch changes up to ee0b27a3a4da0b0ed2318aa092f8856896e9450b:
 
-  clk: sunxi-ng: sun8i-a23: Enable PLL-MIPI LDOs when ungating it (2019-01-=
-25 10:43:44 +0100)
-
-----------------------------------------------------------------
-Allwinner clock changes for 5.1
-
-Just a single non-urgent fix for the PLL-MIPI on the A23
+  clk: sunxi: A31: Fix wrong AHB gate number (2019-01-28 09:26:32 +0100)
 
 ----------------------------------------------------------------
-Chen-Yu Tsai (1):
-      clk: sunxi-ng: sun8i-a23: Enable PLL-MIPI LDOs when ungating it
+Allwinner clock fixes for 5.0
 
- drivers/clk/sunxi-ng/ccu-sun8i-a23.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Two fixes for clock indices, one for the A31 and one for the V3s.
+
+----------------------------------------------------------------
+Andre Przywara (1):
+      clk: sunxi: A31: Fix wrong AHB gate number
+
+Paul Kocialkowski (1):
+      clk: sunxi-ng: v3s: Fix TCON reset de-assert bit
+
+ drivers/clk/sunxi-ng/ccu-sun6i-a31.c | 4 ++--
+ drivers/clk/sunxi-ng/ccu-sun8i-v3s.c | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
 --=20
 Maxime Ripard, Bootlin
 Embedded Linux and Kernel engineering
 https://bootlin.com
 
---dv2ngskktc2vmjjw
+--julhqle2jly444cf
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXF1dFgAKCRDj7w1vZxhR
-xfpbAP9DdAXaWLQCLTfkMGp2dHyai/7FuujXYlvI8WCFP4/5IwD/cb7o3/NhPuAA
-93XNfMxt7iz5IlvxMy7ZTFrpEVd3nwM=
-=AYcw
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXF1dvwAKCRDj7w1vZxhR
+xf16AQDglGUIK+zcZuYFIH4hLeUtnt+Y2wI/DWWnAtbFWQzsawD/Uct9NbHVu2w1
+ck+Snf71+i6WKJHw4lkADHSOoCxOGw4=
+=68jY
 -----END PGP SIGNATURE-----
 
---dv2ngskktc2vmjjw--
+--julhqle2jly444cf--
 
 
---===============5077705278435195936==
+--===============8901965451058031588==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -146,5 +149,5 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---===============5077705278435195936==--
+--===============8901965451058031588==--
 
