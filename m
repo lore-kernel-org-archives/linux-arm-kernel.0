@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 64DB0C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 16:10:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5E6ABC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 16:10:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 35A9520855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 16:10:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1129220855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 16:10:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XXQTpMpx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35A9520855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TzlT4oEX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1129220855
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rpo3YaY6fmmQgm16OfKduCQIwM/93NZTNozZ+Ysp5bc=; b=XXQTpMpxtXC+4J
-	6H/EeOwMZG0/ysBvRlQqgf/XMER7dD0Nv5wINKtDyxUTnS0vywFsENC37qwGyOzc66EVZ1P2BrvE0
-	efK3FPmU98Hh2YWv2DMq7p0MBYrQpviVGMuSW59IErz+CeYVVGsb9HOSXGkm9TzJq9pK9sbDMlMlf
-	oJ42+CTqjFT8kgij5W0bknR9YRpr8f1oCqe7QSJnHLa0ddQHL5EUzxTqEgfdc4PAK1zYmBfyUdRp/
-	l/HdPJ9UQTQ3cf6ATwLsshSTLJdt2eZWxMVf747x0W/eCNtRIg34LYpBbe54ZYTwQSc6rCND+BGZN
-	2Az89erfpt2t9cBd8M9g==;
+	List-Owner; bh=Q8DD5K6bD1BQq4UraqtuE+RrapzDXEuh6XLhimibB94=; b=TzlT4oEXWu3WFN
+	MuBznHzSIJTrX6fUfqSKA/Totc4Pm5va521On6NITttpIHKDjKNPIYprU8M1CkcJQaBextYGjPM6M
+	LOzf52AowSQsxe/ua/YM0MyCfA4SFhwCxYI1RsweZrLNJVyEr2QHJrkWjAa/JZD/LO+k/eGGIRRB2
+	VPDS0ngMRCsILMKgtAjCsquGuLKKP/9pcb7MCOXaUWN8/KOhRGidrsiAvijaRIqSKsnRtLJEy08Kr
+	piJ291JXfnXJ/Zr3GsSzkGge4VgD1G39YZx34pLKS0Okk9A5RmjsrTBduBV3PkrZ88aajzDrqQYRP
+	5Lp2YINM8rIrDUpY1JPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs8jK-0004BP-Kz; Fri, 08 Feb 2019 16:10:18 +0000
-Received: from relay9-d.mail.gandi.net ([217.70.183.199])
+	id 1gs8jh-0004bB-7k; Fri, 08 Feb 2019 16:10:41 +0000
+Received: from relay10.mail.gandi.net ([217.70.178.230])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs8jC-0003SJ-Vd
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 16:10:12 +0000
-X-Originating-IP: 109.213.164.40
+ id 1gs8jD-0003nj-5s
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 16:10:13 +0000
 Received: from localhost (alyon-652-1-53-40.w109-213.abo.wanadoo.fr
  [109.213.164.40]) (Authenticated sender: gregory.clement@bootlin.com)
- by relay9-d.mail.gandi.net (Postfix) with ESMTPSA id C747CFF803;
- Fri,  8 Feb 2019 16:10:04 +0000 (UTC)
+ by relay10.mail.gandi.net (Postfix) with ESMTPSA id DDE9124001C;
+ Fri,  8 Feb 2019 16:10:00 +0000 (UTC)
 From: Gregory CLEMENT <gregory.clement@bootlin.com>
 To: Jonathan Cameron <jic23@kernel.org>, Hartmut Knaack <knaack.h@gmx.de>,
  Lars-Peter Clausen <lars@metafoo.de>,
  Peter Meerwald-Stadler <pmeerw@pmeerw.net>
-Subject: [PATCH 4/5] iio:adc:lpc32xx Cleanup headers
-Date: Fri,  8 Feb 2019 17:09:43 +0100
-Message-Id: <20190208160944.13281-5-gregory.clement@bootlin.com>
+Subject: [PATCH 2/5] dt-bindings: iio: adc: lpc32xx-adc: Document vref-supply
+Date: Fri,  8 Feb 2019 17:09:41 +0100
+Message-Id: <20190208160944.13281-3-gregory.clement@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190208160944.13281-1-gregory.clement@bootlin.com>
 References: <20190208160944.13281-1-gregory.clement@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_081011_162933_FF155148 
-X-CRM114-Status: UNSURE (   7.81  )
+X-CRM114-CacheID: sfid-20190208_081011_483912_49191B4A 
+X-CRM114-Status: UNSURE (   8.82  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -77,43 +76,35 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-A few headers was useless: remove them, and also sort them in alphabetic
-order.
+As most of the other ADC the lpc32xx one use a vref-supply property:
+document it.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- drivers/iio/adc/lpc32xx_adc.c | 15 ++++-----------
- 1 file changed, 4 insertions(+), 11 deletions(-)
+ Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/iio/adc/lpc32xx_adc.c b/drivers/iio/adc/lpc32xx_adc.c
-index e361c1532a75..f391c1e10136 100644
---- a/drivers/iio/adc/lpc32xx_adc.c
-+++ b/drivers/iio/adc/lpc32xx_adc.c
-@@ -7,20 +7,13 @@
-  *  Copyright (C) 2011, 2012 Roland Stigge <stigge@antcom.de>
-  */
+diff --git a/Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt b/Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt
+index b3629d3a9adf..3a1bc669bd51 100644
+--- a/Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt
+@@ -6,6 +6,10 @@ Required properties:
+   region.
+ - interrupts: The ADC interrupt
  
--#include <linux/module.h>
--#include <linux/platform_device.h>
--#include <linux/interrupt.h>
--#include <linux/device.h>
--#include <linux/kernel.h>
--#include <linux/slab.h>
--#include <linux/io.h>
- #include <linux/clk.h>
--#include <linux/err.h>
- #include <linux/completion.h>
--#include <linux/of.h>
--
- #include <linux/iio/iio.h>
--#include <linux/iio/sysfs.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
++Optional:
++ - vref-supply: The regulator supply ADC reference voltage, optional
++   for legacy reason, but highly encouraging to us in new device tree
++
+ Example:
  
- /*
-  * LPC32XX registers definitions
+ 	adc@40048000 {
+@@ -13,4 +17,5 @@ Example:
+ 		reg = <0x40048000 0x1000>;
+ 		interrupt-parent = <&mic>;
+ 		interrupts = <39 0>;
++		vref-supply = <&vcc>;
+ 	};
 -- 
 2.20.1
 
