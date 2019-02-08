@@ -2,88 +2,90 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 51DC6C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 00:30:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2712C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 00:30:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1AA6E2080D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 00:30:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5F8E32080D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 00:30:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pDlyDecM";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="djkzee7I"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1AA6E2080D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N8++mj21";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="r+TQ4Gn6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F8E32080D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=iE67vG9its2ckug+kDWNeLji4RjUqnjzfybTk9a5eG4=; b=pDlyDecMozLiFP
-	Eit7uOsGNKS4CE7j5RSIZ3dGs0daE38ERSsnP7wwZ9dmvAmrAu2gH+t4xhNE5CztKiMyff2OWokF3
-	463PqhEjffROWoZa+obKPeorgvo1gOJ+HKGuNH0bSKoM1izS6+dTpi8joIegzqU3MNUdydIpep7AM
-	474NIqIJumB8Gzh/pj5qv58+A9lAZQFZnJxsRMsQ+aDZfKDrEHeC5JKzYf7cPJNW4Hh6/wRrBlkAT
-	9KzLhXEdBO1+xYjZv8AeSYnIOrwRiW4YYOkyhvQ9JuimBqLGvlERBRpxxPFDZr1N5bda8hiQKEaQX
-	huI/skpuAqg6T+HLmyIQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=RC+2M7qZYJb+ESts/+itxLc4HbOfhgjSVZPkJAfhgYQ=; b=N8++mj213GFlrj
+	imNTdjm4DjKGy0Ht/GxP2gJ9ORK9WjmXPx/TUBGZ+M7usbZPPGBC1XQO0i/WDFGHmK0p7LNjSHcXV
+	34LtbdKSOSVUWqJyc9td9bnHkEomeJAhICT6XZmnCcr/i5IRB0AlPCY1+RvcT7hTtG7I1TO80+WY0
+	Z7tkxC/u2hBToe56DKIwnNT+jnZ/N0q35XrLwtPEc8CCEBV+xH2rSnjwnFGplOQPGAp6b0jEdZwP+
+	QZErfn6reW9UHQUDdxHjUAbRa0PqvikAsmGpvLoljhgs1fuwIdDd9mKzAkmDBozgQvN/h8oy2eYfR
+	Ts/Xli2WB9d6qrULtqAA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gru3O-0007nJ-Vg; Fri, 08 Feb 2019 00:30:02 +0000
-Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+	id 1gru3f-0000HW-5m; Fri, 08 Feb 2019 00:30:19 +0000
+Received: from mail-pg1-x529.google.com ([2607:f8b0:4864:20::529])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gru3K-0007kx-8N
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 00:29:59 +0000
-Received: by mail-pg1-x542.google.com with SMTP id s198so772428pgs.2
+ id 1gru3L-0007l9-0W
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 00:30:00 +0000
+Received: by mail-pg1-x529.google.com with SMTP id s198so772449pgs.2
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 07 Feb 2019 16:29:56 -0800 (PST)
+ Thu, 07 Feb 2019 16:29:57 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=VvKYzIXrc6EWu7dGE6oPMlu2MVBMRNsjV1h+Z0dn2TU=;
- b=djkzee7IYtTa1/ecxtM3tKYtPMEEUm0M5c8WlKmB13/9CUivkYqps2+OROfExObpxl
- ceuuktpwobG/1itfQj5UbzrvJR3Ed96kZvE5uYXeIpwKgLjgSWthoA28uvL7D5d29IUL
- ZXPBEoxwuaEkvMwDr43gXuY0MqDajxpvmopTdKT5o/Nna0QTFOuuj/Zf/1FwDI2DNX3j
- f79Nzq0fhd2RbhLwgatg9N1NttgmDswWQRsG5WK7E/rd3gtPMQgZ6DA6sY841TKbvHVK
- MuoZwlyqdZh1ASGm+u7R4AnwWlJVJ3kEZvncdRYbrd6A/D3NeogK3QWDKON2Rc7XPTBd
- YcEg==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=uW/mc9bOKLDqIolIzjRAHEjOwO1/pc5BGZ9n7AiIB/k=;
+ b=r+TQ4Gn6CBB2kcCKMo8Uqga7g3wHGv3ojbmKsPWXFoSlpMQMixy5Aye+pNvlgY2ixZ
+ 1Vvqtpi5QchsXZU+KpRVl+bJMXxXr47+/UN6epDiAFD+S0ywrNzDamDSzohAPxqyCODn
+ aMbjHxfBmyffwakfdSVW+ii0T1j0ka0EPa1HKDdg3ZEnc9EmKKtTAiLhwI8doovx6DD8
+ CifsIN4HoRLTMKxtNhJCVWYpMYWd2NMElgxLpdFE6U0e1Ruh+iCU6yiHk4Qkjsh9KFxq
+ s0PQbnuzajNC3nRrmpy4KX1aDeeeXmFLu6UeOLB/WnYX3Wca7VwVTblo5rJUBQG3ebVB
+ WWIw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=VvKYzIXrc6EWu7dGE6oPMlu2MVBMRNsjV1h+Z0dn2TU=;
- b=raBIosGvrF9jUf4no8MWalC1R9IDM5mA6QcMmkFaPdo7MmAwb1m7j3bZNooQiCu5qB
- B6FOIwK+NGRbigKtVW59YMeX/NeszIeiEa+UhBGbjsygQlBzrcaaeaZf+XyrtFGltM/N
- F6HcOFQRB6nPIWVcWTPcx4rvRtor7o2jpvJOQcG9kq2R90S7/6qtX9o1WoyDDvA75VIu
- +5OExbPOU05jZSIFfNNUSUpX6iVK/kz6ehwwguhm+Gz+9RL7ogQx4xzPMkWwvGza0iAv
- O/GZxA9sV8KtmXCbv/xPv4AKZYM93nNbVWFvRMNfG5vTVe89/7b67qUWUclsGD9+9SsJ
- ZNlQ==
-X-Gm-Message-State: AHQUAuYEoQytfWTYcwVNkKt83R6a8QzSexiCQJBx/vz2MQZK7beWi+v4
- cCrQSM/SBrEe3qn9iie+rf8=
-X-Google-Smtp-Source: AHgI3IYOt7O8HUcXtRzHPrk9cV4X3PXvHzlomx/ok846UDy9gvtwtHtcQTrtfvEfBpk2YxgwLgRXsg==
-X-Received: by 2002:aa7:8503:: with SMTP id v3mr6244163pfn.255.1549585795808; 
- Thu, 07 Feb 2019 16:29:55 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=uW/mc9bOKLDqIolIzjRAHEjOwO1/pc5BGZ9n7AiIB/k=;
+ b=LlFmWCnswiNmWeez8jVaq5cVZVmWqC/FKyGbATzCywSbDh38Tog8lezomIJY2vQnFt
+ eYBRzcrD4duGclDvDEZ6tgsaSBxMNTCL9yWV4w3H74pgCKyb4+Bo+dR6aUZLysh298SN
+ erRXCkiEhZMR2GKtZdzsJ8nxzj8GjCX0UA+syc6Q2EXaYZEu7jmAXEn/5+Ucew0Sm8mN
+ jOc9xnFQnHBuwosJWV4NDhG1Qr1hSY019J85EUJzf2/siRaVjfpTKIEabfEHx9jXXGFl
+ vhV2OC1UFrkLUS2j1DtwGCzkF53DBP0+VTROREAsdOH8TLe+Jr+LwPREGgf6kohoWF64
+ 9hEQ==
+X-Gm-Message-State: AHQUAuZXn7M1JNbHdzmrhi9nyaqBRZ2CVWU/dn0EjHgvRK9KvJmDgWdM
+ u6vY0Ex7DRtPBcikZKFjYoM=
+X-Google-Smtp-Source: AHgI3IauG3AAMgvMTpqW5IOS494fZrzA6KIlc5MiaatGOwVfHh/ws3S4MsGmyV6yJIFvjR7PaMIFAA==
+X-Received: by 2002:a63:ef50:: with SMTP id c16mr8662258pgk.3.1549585797269;
+ Thu, 07 Feb 2019 16:29:57 -0800 (PST)
 Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
  [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id p81sm380835pfa.107.2019.02.07.16.29.54
+ by smtp.gmail.com with ESMTPSA id p81sm380835pfa.107.2019.02.07.16.29.55
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 07 Feb 2019 16:29:54 -0800 (PST)
+ Thu, 07 Feb 2019 16:29:56 -0800 (PST)
 From: Andrey Smirnov <andrew.smirnov@gmail.com>
 To: Lucas Stach <l.stach@pengutronix.de>
-Subject: [RFC v2 0/5] PCIE support for i.MX8MQ (DT changes)
-Date: Thu,  7 Feb 2019 16:29:36 -0800
-Message-Id: <20190208002941.30343-1-andrew.smirnov@gmail.com>
+Subject: [RFC v2 1/5] arm64: dts: imx8mq: Mark iomuxc_gpr as i.MX6Q compatible
+Date: Thu,  7 Feb 2019 16:29:37 -0800
+Message-Id: <20190208002941.30343-2-andrew.smirnov@gmail.com>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190208002941.30343-1-andrew.smirnov@gmail.com>
+References: <20190208002941.30343-1-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_162958_325464_EB0A9502 
-X-CRM114-Status: GOOD (  10.23  )
+X-CRM114-CacheID: sfid-20190207_162959_048264_757FCA43 
+X-CRM114-Status: GOOD (  12.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,43 +107,37 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Everyone:
+Mark iomuxc_gpr as compatible with "fsl,imx6q-iomuxc-gpr" in order for
+to allow i.MX6 PCIe driver to use it.
 
-This series contains all of the i.MX Device Tree changes I made to
-enable support of PCIe on i.MX8MQ EVK. Marked as RFC since "arm64:
-dts: imx8mq-evk: Enable PCIE0 interface" contains proposed AUX clock
-binding that is not part of the PCI tree yet (to be submitted once we
-agree on this RFC).
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Chris Healy <cphealy@gmail.com>
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Leonard Crestez <leonard.crestez@nxp.com>
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>
+Cc: Richard Zhu <hongxing.zhu@nxp.com>
+Cc: linux-imx@nxp.com
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: linux-kernel@vger.kernel.org
+---
+ arch/arm64/boot/dts/freescale/imx8mq.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-NOTE: Immutable brach containing imx8mq-reset.h used in "arm64: dts:
-Add nodes for PCIe IP blocks" is availible in [reset-imx8mq]
-
-Feedback is welcome!
-
-Changes since [v1]:
-
-    - Dropped unsupported IRQ from PCIe nodes (a leftover from vendor tree)
-
-    - Added "pcie_aux" clock and moved clock configuration to board
-      file since "pcie_bus" clock is now board specific
-
-Thanks,
-Andrey Smirnov
-
-[reset-imx8mq] git://git.pengutronix.de/pza/linux reset/imx8mq
-[v1] https://lore.kernel.org/lkml/20190131204333.31846-1-andrew.smirnov@gmail.com/
-
-Andrey Smirnov (5):
-  arm64: dts: imx8mq: Mark iomuxc_gpr as i.MX6Q compatible
-  arm64: dts: imx8mq: Add a node for SRC IP block
-  arm64: dts: imx8mq: Combine PCIE power domains
-  arm64: dts: imx8mq: Add nodes for PCIe IP blocks
-  arm64: dts: imx8mq-evk: Enable PCIE0 interface
-
- arch/arm64/boot/dts/freescale/imx8mq-evk.dts | 34 ++++++++
- arch/arm64/boot/dts/freescale/imx8mq.dtsi    | 87 +++++++++++++++++++-
- 2 files changed, 119 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+index 892063a7c26c..f6c37bf9cbce 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
++++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+@@ -230,7 +230,7 @@
+ 			};
+ 
+ 			iomuxc_gpr: syscon@30340000 {
+-				compatible = "fsl,imx8mq-iomuxc-gpr", "syscon";
++				compatible = "fsl,imx8mq-iomuxc-gpr", "fsl,imx6q-iomuxc-gpr", "syscon";
+ 				reg = <0x30340000 0x10000>;
+ 			};
+ 
 -- 
 2.20.1
 
