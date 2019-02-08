@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4423CC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:54:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5E246C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:54:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 146E7218D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:54:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2DCB320823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:54:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OjrUbGz1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 146E7218D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fcMGfSlL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2DCB320823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BfHNjkZdOPIM2CBbO8FN3iVRYh+p2fMjfjC0LQUhw/U=; b=OjrUbGz1zdLnnC
-	HPL1JmGa/xGMi5aYV4WD2UU9GDottIpQe/JmCPrR++jcy9o/jO0qT6AkBOqXEnQT5SoZe2gJFBcKk
-	owQ7P2XCz/jkrTU44pwBK3dk4kBOZJt2KDWEuDj6afuk3lbg8zYxDsLpRPEaY0JG6VDRPWUKyWvOF
-	HExcrbVugLLvUoHu8Szaix1VY+mKHLnPjTyKr0qznpVPMAPYBCijQ2Yamsp8V7kpni5mANOtLzjOY
-	hg294m9wTs45ltHbI9Knx6klWZuiCsGWq/xRVsUnONTrfc+GCFnQDbdwD8NtHzTSE+Vgmjs5lIQA9
-	BBb6nyu/LgI7JgMzrF0g==;
+	List-Owner; bh=Y0xeEioZfQBbNKZ21bD3/dxJxZgYegCJDerp8HtmSyM=; b=fcMGfSlLI9zkkn
+	joNStpUkubo2lPp97/I8wCXDwFgY+KWBnuBB7/1UmFkYTNq307GW73jzfNqjBw3pi3Xu9bGIG/DKl
+	v91yY7yL16meYHHXHGWuzFsOrlU0wnvl51McPGPebAk9pXQ1bVoZFrdf1qG7UO63K+Pj0lTIglqp3
+	s7j5xiWiAFurh6F869bSjCijQvwRoSMnqvhTXj9sHKvS+kL//igr3X8i3BNGqO+jm9z8qS8OhTfcW
+	zJMGInacxZzfTpBuPx6/0r3Gt2BOE5psUbFzmpTVA6S2smVfiiRo/GQeuiRrivcYf0rTy6VxBe372
+	bJI1Sn9cYDcktXvXfcGA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs2rL-0003tX-Rh; Fri, 08 Feb 2019 09:54:11 +0000
-Received: from relay1-d.mail.gandi.net ([217.70.183.193])
+	id 1gs2ra-0004A6-Iq; Fri, 08 Feb 2019 09:54:26 +0000
+Received: from relay12.mail.gandi.net ([217.70.178.232])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs2qo-0003LM-Rc
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:53:44 +0000
-X-Originating-IP: 90.88.22.177
+ id 1gs2qs-0003Oc-Nj
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:53:51 +0000
 Received: from localhost (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
  [90.88.22.177]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay1-d.mail.gandi.net (Postfix) with ESMTPSA id 6317C240008;
- Fri,  8 Feb 2019 09:53:33 +0000 (UTC)
+ by relay12.mail.gandi.net (Postfix) with ESMTPSA id C4530200007;
+ Fri,  8 Feb 2019 09:53:35 +0000 (UTC)
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
  Sean Paul <seanpaul@chromium.org>,
  Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH v2 2/9] drm/sun4i: dsi: Restrict DSI tcon clock divider
-Date: Fri,  8 Feb 2019 10:53:15 +0100
-Message-Id: <074e88ae472f5e0492e26939c74b44fb4125ffbd.1549619502.git-series.maxime.ripard@bootlin.com>
+Subject: [PATCH v2 3/9] drm/sun4i: dsi: Change the start delay calculation
+Date: Fri,  8 Feb 2019 10:53:16 +0100
+Message-Id: <6e5f72e68f47ca0223877464bf12f0c3f3978de8.1549619502.git-series.maxime.ripard@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <cover.23dbbc9b943ff8f36253ac7c617e2eda142b1b69.1549619502.git-series.maxime.ripard@bootlin.com>
 References: <cover.23dbbc9b943ff8f36253ac7c617e2eda142b1b69.1549619502.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_015339_398153_244A8E6C 
-X-CRM114-Status: GOOD (  12.40  )
+X-CRM114-CacheID: sfid-20190208_015343_806383_409A1C26 
+X-CRM114-Status: GOOD (  13.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,51 +76,39 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The current code allows the TCON clock divider to have a range between 4
-and 127 when feeding the DSI controller.
+The current calculation for the video start delay in the current DSI driver
+is that it is the total vertical size, minus the front porch and sync length,
+plus 1. This equals to the active vertical size plus the back porch plus 1.
 
-The only display supported so far had a display clock rate that ended up
-using a divider of 4, but testing with other displays show that only 4
-seems to be functional.
+That 1 is coming in the Allwinner BSP from an variable that is set to 1.
+However, if we look at the Allwinner BSP more closely, and especially in
+the "legacy" code for the display (in drivers/video/sunxi/legacy/), we can
+see that this variable is actually computed from the porches and the sync
+minus 10, clamped between 8 and 100.
 
-This also aligns with what Allwinner is doing in their BSP, so let's just
-hardcode that we want a divider of 4 when using the DSI output.
+This fixes the start delay symptom we've seen on some panels (vblank
+timeouts with vertical white stripes at the bottom of the panel).
 
-Reviewed-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c     | 4 ++--
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h | 2 ++
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 0420f5c978b9..bee73ead732a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -341,8 +341,8 @@ static void sun4i_tcon0_mode_set_cpu(struct sun4i_tcon *tcon,
- 	u32 block_space, start_delay;
- 	u32 tcon_div;
- 
--	tcon->dclk_min_div = 4;
--	tcon->dclk_max_div = 127;
-+	tcon->dclk_min_div = SUN6I_DSI_TCON_DIV;
-+	tcon->dclk_max_div = SUN6I_DSI_TCON_DIV;
- 
- 	sun4i_tcon0_mode_set_common(tcon, mode);
- 
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
-index dbbc5b3ecbda..6d4a3c0fd9b5 100644
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
-+++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
-@@ -13,6 +13,8 @@
- #include <drm/drm_encoder.h>
- #include <drm/drm_mipi_dsi.h>
- 
-+#define SUN6I_DSI_TCON_DIV	4
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+index 380fc527a707..9471fa695ec7 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+@@ -357,7 +357,9 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
+ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
+ 					   struct drm_display_mode *mode)
+ {
+-	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
++	u16 start = clamp(mode->vtotal - mode->vdisplay - 10, 8, 100);
 +
- struct sun6i_dphy {
- 	struct clk		*bus_clk;
- 	struct clk		*mod_clk;
++	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + start;
+ }
+ 
+ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
 -- 
 git-series 0.9.1
 
