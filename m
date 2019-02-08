@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 968F9C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:20:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D98C4C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:21:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6701A20863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:20:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A96DE20863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:21:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lLYog6BP";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="NI8UQtq+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6701A20863
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DrGLe+yZ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="V2noUOT2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A96DE20863
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,41 +27,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=2QoT3p1AyNMkbWUgyd4pJT/QKkCjPOmJWo+N7gwGfFc=; b=lLYog6BPj0GNaqaPBPr92jGUSU
-	Kg2B5963lTwUsgsWhTxM6YSsWlGVU6Rvdie/KwI18OqxDaQpui2CNNDCbZ/U9jSAPLqK8RG8RAcDO
-	QTWrqJDe/TVe71S6ys4k6AGkTRdOozb0OON96XZd+pVNZYiIkE5uT0YJEIJFVTIIFoofZ7c9HtEVD
-	kj7stY8SPYeYPzu8ot6CPfOA3LXkW8rnojNHxun8Wq1BQtBgdmHT7Ts/3ombQas4z8UcZEWNTvq2n
-	B30jr+tDLM3IdxQasuz3aHXWWOAOe9pxKmKC8Jp4Q90V651YvyLJq5BoHc2H1DHOZ6XeIRJp58BU2
-	3PkGnJAQ==;
+	bh=fRgbHjSeMrpEhgHqsnOlKfqxv8geV0qSlOCKFHH3dOk=; b=DrGLe+yZn+un9a7C2KxfOIHs8P
+	IMsJiv2Vu+xvHgabeWecw1fArmLI/o3XVn+rQW/hQ7FClp3FvCQsRr7CJeAPDq2GUKs2/+br21D4t
+	u6lWx0LbvdxnM3TedJDmaNJ9cdspRcG6f31j04/MViHFRbw4Zp97+vngchkg1PMd0ptXQbYGNQ+Yt
+	3LiLWCCCJoxrlfsb8EQaA47RYxJbdqgeBAnT1Q3AiMWT6Ca8TzogQFFsWCOY++OE5zLsUljXalrgR
+	uS0+HVt8MQDCKmbwk2Zc0lNQvQLOU8dA9B/Yz7m8wqqKN9TwzyesOi5vUF6dyED2spVcLBuFHzIZ4
+	N8qHQegw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs4D4-0008C6-Sw; Fri, 08 Feb 2019 11:20:42 +0000
+	id 1gs4DP-0008Ue-Fe; Fri, 08 Feb 2019 11:21:03 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs4CM-0005IB-42
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 11:20:33 +0000
+ id 1gs4Cv-0005IB-V8
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 11:21:00 +0000
 Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id 0DEFE25BEF0;
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 1B96F25BEF2;
  Fri,  8 Feb 2019 22:14:17 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1549624457; bh=XBgYxl9ekAggW8AFJqjyLiKAmMpMA0hfZtpsw2aEPls=;
+ t=1549624457; bh=RzzmvDEoY1isB5lMRIxbI0N4DsQa1Ph89rxIb9dUdpk=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=NI8UQtq+C+q4fuHBKXMzDlW3j11wD86iHlTO/GMfNW19/N4RtS1OhuMoIUzwSNZek
- wGh7vZhdaXPJRoeU1+zlTqpNiE6cYrwbsO6Wq/8CsDihD27JY/OtSmmSFE6l/MFGQp
- amtofEELqEQsMkD1qOC3Nml4dgiLFx2CydWKxfc4=
+ b=V2noUOT25Pk/Icl0r37/3C0oMw3SEYoZBITxk8gMismqzy3KK5uCkasG4zr5SopuS
+ jCFFfpAl+2AMJyWdNeug9I8vjsFpGBWtGqV8AvTQQmTBZMAbhO9vXZuiR4MvsaqSAI
+ sXlO1veNfrhV5rwPfcNiAlnKurGend+rhyqoFnxY=
 Received: by reginn.horms.nl (Postfix, from userid 7100)
- id 5B9FB9402EE; Fri,  8 Feb 2019 12:14:15 +0100 (CET)
+ id 67F76940171; Fri,  8 Feb 2019 12:14:15 +0100 (CET)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 01/12] ARM: dts: stout: Convert to new LVDS DT bindings
-Date: Fri,  8 Feb 2019 12:14:02 +0100
-Message-Id: <7aa69a47ecedb5368d862d0d8a2d6537b48e5501.1549623128.git.horms+renesas@verge.net.au>
+Subject: [PATCH 02/12] ARM: dts: iwg23s-sbc: Enable RTC
+Date: Fri,  8 Feb 2019 12:14:03 +0100
+Message-Id: <55327bff832c9903a9133cdad56783b54bd8596a.1549623128.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1549623128.git.horms+renesas@verge.net.au>
 References: <cover.1549623128.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_031958_774480_753D7294 
-X-CRM114-Status: GOOD (  10.62  )
+X-CRM114-CacheID: sfid-20190208_032034_773033_5001AE5F 
+X-CRM114-Status: UNSURE (   9.00  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,69 +75,60 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Simon Horman <horms+renesas@verge.net.au>,
- Magnus Damm <magnus.damm@gmail.com>,
- Geert Uytterhoeven <geert+renesas@glider.be>,
- linux-arm-kernel@lists.infradead.org
+ Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org,
+ Biju Das <biju.das@bp.renesas.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Biju Das <biju.das@bp.renesas.com>
 
-As of commit 6d2ca85279becdff ("dt-bindings: display: renesas: Deprecate
-LVDS support in the DU bindings"), the internal LVDS encoder has DT
-bindings separate from the DU.  The Lager device tree was ported over to
-the new model, but the Stout device tree was forgotten.
+Enable NXP pcf85263 real time clock for the iWave SBC based on RZ/G1C.
 
-Fixes: 15a1ff30d8f9bd83 ("ARM: dts: r8a7790: Convert to new LVDS DT bindings")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Tested-by: Marek Vasut <marek.vasut@gmail.com>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-stout.dts | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790-stout.dts b/arch/arm/boot/dts/r8a7790-stout.dts
-index 629da4cee1b9..7a7d3b84d1a6 100644
---- a/arch/arm/boot/dts/r8a7790-stout.dts
-+++ b/arch/arm/boot/dts/r8a7790-stout.dts
-@@ -94,9 +94,8 @@
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
+index 40b7f98d6013..77d18242ef59 100644
+--- a/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
++++ b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
+@@ -84,12 +84,30 @@
+ 	clock-frequency = <20000000>;
+ };
  
- 	clocks = <&cpg CPG_MOD 724>, <&cpg CPG_MOD 723>, <&cpg CPG_MOD 722>,
--		 <&cpg CPG_MOD 726>, <&cpg CPG_MOD 725>,
- 		 <&osc1_clk>;
--	clock-names = "du.0", "du.1", "du.2", "lvds.0", "lvds.1", "dclkin.0";
-+	clock-names = "du.0", "du.1", "du.2", "dclkin.0";
- 
- 	ports {
- 		port@0 {
-@@ -104,11 +103,21 @@
- 				remote-endpoint = <&adv7511_in>;
- 			};
- 		};
++&i2c3 {
++	pinctrl-0 = <&i2c3_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++	clock-frequency = <400000>;
++
++	rtc@51 {
++		compatible = "nxp,pcf85263";
++		reg = <0x51>;
 +	};
 +};
 +
-+&lvds0 {
-+	ports {
- 		port@1 {
- 			lvds_connector0: endpoint {
- 			};
- 		};
--		port@2 {
+ &pfc {
+ 	avb_pins: avb {
+ 		groups = "avb_mdio", "avb_gmii_tx_rx";
+ 		function = "avb";
+ 	};
+ 
++	i2c3_pins: i2c3 {
++		groups = "i2c3_c";
++		function = "i2c3";
 +	};
-+};
 +
-+&lvds1 {
-+	ports {
-+		port@1 {
- 			lvds_connector1: endpoint {
- 			};
- 		};
+ 	mmc_pins_uhs: mmc_uhs {
+ 		groups = "mmc_data8", "mmc_ctrl";
+ 		function = "mmc";
 -- 
 2.11.0
 
