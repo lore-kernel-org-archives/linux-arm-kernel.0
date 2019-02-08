@@ -2,108 +2,107 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 59F97C282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:27:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DC589C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:42:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 27B072146E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:27:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AA25A2177B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:42:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZNuvj3Mw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=renesasgroup.onmicrosoft.com header.i=@renesasgroup.onmicrosoft.com header.b="iuv3GjWo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 27B072146E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bp.renesas.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VQ3B2k9u"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AA25A2177B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2hUJHMmoQZ8FoB7qw8BELeo0F2Z/X8SCGZhOhuBKbSo=; b=ZNuvj3MwORhPFD
-	hEhq+6opRxmwpgcg2Xjz0bImE7TT8gjFTtv8UEhrBXbYFgFzkqBJV9ufVGER2mZnL2ZJAkN2IkvjH
-	KvatVNNAHHYhs0ZXS0G+nGAQgDsMnf32XMz6oFw4hFps3rQYCWMVJd1JIJevz7V67PbvWifkiFD+v
-	RyQC+/xYzRYGLRlWstgljZi31B0Ji0mwp2ym4wy8eDDHwtnYTcPr7hwEteeH8Bnu8takRiy2fKgXi
-	9WZBlduC9v9IsbPeftYMrNrPwc6XxXTDb1eGSzrNKLn+wNalpUELhn2zqwga7qfBReoowAMxHKEr8
-	ChV9R0lS9zPGrteu5pqg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=LUDJ2441i4QgcjZRI6qn12eQgYqBGzGCK3SuszW3R8g=; b=VQ3B2k9uskYt5C
+	MKRTeOP7j1gdtyJtuIcXevkVFlsRZw5us+c77pY4MO4H/IaLiwznPNVgN8bSK5cqU650JF4ujj/Tt
+	Fa/QvvPsIE+3WSnlYddR8P5yt2L+Zn7OPe3pDDkvetlHIdla4XFjVWnexUGhDDWlyYdz7MI0wzH7v
+	OzGsTK93QRPUjXq74m5IkIbhp5LvvhSVMHjOtHIvlznO2mVcKc3RguCqRVjT1zMMuRfdQkeG3GmyI
+	eOaZrL/PCWNrY97tVpCZDxIJSpkq2I0KFaCVf1fDhS32+k0Bd4LKpI9W2MGXoyVWpItOtzcUheKw2
+	Z4FuQcPJbtxFGAruSOMQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs83O-0003pS-GQ; Fri, 08 Feb 2019 15:26:58 +0000
-Received: from mail-eopbgr1410125.outbound.protection.outlook.com
- ([40.107.141.125] helo=JPN01-OS2-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs83K-0003oZ-PP
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 15:26:57 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=renesasgroup.onmicrosoft.com; s=selector1-bp-renesas-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=F10PqaUW9EyNWKLsy/pVHU5bzaqQlP2i9nIATVSBEuk=;
- b=iuv3GjWoh2K4IQIOFO+w/YQ+8NbuaGpQ9c21R2FF0MciO2Zr34j5tLHBQ6wbnYm/EIx8qzjLs1N/sflaCSPlDr2Z0s7Z/mNUanKvzsgsHbSp95wjnjvy5YUS0sL3DHtX9UTzYzL7EzOl2c6EZ4m1Dq1YObo9tNcshwucXEZ0Uro=
-Received: from TY1PR01MB1770.jpnprd01.prod.outlook.com (52.133.163.147) by
- TY1PR01MB1641.jpnprd01.prod.outlook.com (52.133.162.151) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.17; Fri, 8 Feb 2019 15:26:50 +0000
-Received: from TY1PR01MB1770.jpnprd01.prod.outlook.com
- ([fe80::9c4b:5b3e:212f:354e]) by TY1PR01MB1770.jpnprd01.prod.outlook.com
- ([fe80::9c4b:5b3e:212f:354e%3]) with mapi id 15.20.1601.016; Fri, 8 Feb 2019
- 15:26:50 +0000
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-To: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>, Simon Horman
- <horms+renesas@verge.net.au>
-Subject: RE: [PATCH 08/12] arm64: dts: renesas: r8a774c0: Add OPPs table for
- cpu devices
-Thread-Topic: [PATCH 08/12] arm64: dts: renesas: r8a774c0: Add OPPs table for
- cpu devices
-Thread-Index: AQHUv59UWIs1mWv1SE6wnM13RZEGXaXV2xMAgAAqdKA=
-Date: Fri, 8 Feb 2019 15:26:49 +0000
-Message-ID: <TY1PR01MB1770FAE6E7C26615134B8E0AC0690@TY1PR01MB1770.jpnprd01.prod.outlook.com>
-References: <cover.1549623801.git.horms+renesas@verge.net.au>
- <231d8908a66fa98f09553d31ad8cd5f382b29959.1549623801.git.horms+renesas@verge.net.au>
- <7d60ebf5-c245-f48d-47db-ce63f4f3690b@cogentembedded.com>
-In-Reply-To: <7d60ebf5-c245-f48d-47db-ce63f4f3690b@cogentembedded.com>
-Accept-Language: en-GB, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=fabrizio.castro@bp.renesas.com; 
-x-originating-ip: [193.141.220.21]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; TY1PR01MB1641;
- 20:Pvb5gFIm1XuSH5eVyYwc4Z6atwSxYwzUjYnH0RFMIEqJj+GXehFxj61QlqoypRp3HXSwoFVQ6PmB8JQeVPTjzaZxPBja2bTcI1B4C93YaVI15E7ZxzO/L6bavX0ynyUCFlASs1yHkWHuDPfPs1sUGmY85RixE4ZsSArkTC7pPj0=
-x-ms-office365-filtering-correlation-id: 2dc76061-923f-434d-d42c-08d68dd9d8ac
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:TY1PR01MB1641; 
-x-ms-traffictypediagnostic: TY1PR01MB1641:
-x-microsoft-antispam-prvs: <TY1PR01MB1641330E6DF856C066022B30C0690@TY1PR01MB1641.jpnprd01.prod.outlook.com>
-x-forefront-prvs: 094213BFEA
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10019020)(376002)(39860400002)(366004)(396003)(136003)(346002)(13464003)(199004)(189003)(25786009)(6116002)(3846002)(4326008)(7736002)(6506007)(99286004)(53546011)(53936002)(66066001)(6246003)(33656002)(54906003)(110136005)(316002)(74316002)(305945005)(14454004)(478600001)(106356001)(105586002)(8676002)(81156014)(81166006)(8936002)(97736004)(55016002)(68736007)(2906002)(256004)(71200400001)(76176011)(71190400001)(186003)(229853002)(6436002)(26005)(102836004)(486006)(476003)(86362001)(9686003)(7696005)(44832011)(446003)(11346002);
- DIR:OUT; SFP:1102; SCL:1; SRVR:TY1PR01MB1641;
- H:TY1PR01MB1770.jpnprd01.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:0; MX:1; 
-received-spf: None (protection.outlook.com: bp.renesas.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: HeVvPlyJlaY8ZcFhHiuP1W+4sAPJ3lpNmEhNvJPUz65DOyovu2MQDzoLt53S2z3Np13hQzDlxGZeVTu4eLaHyE252zIMVMtqSehNNKIW6kus93FKPJkoN7UeSVfaZIhooMn8b/Bs12/MDOa/84tU1K95nPZmzAPYnaCcdaL2GZpSkZenh4mrAPkoIMpr3DaYvNAsTo1BHsPBdmlAg0LPt6HHRsK/JLnymjvjeYqslJPamzWLPyoMzjFlAdGlx6j1XSJTwkdY1BUK+h5ZIE5EAxrsU4P7juqjZueSR4xBDeXdnQvc50rMiTQJuzvv0v/08WTatbUz3DbLItVtPB8sye23OyZzp78GE+zk2g/GZf5I9WD8Rdq2JhdQ5Rw9WAyyzlUJOJJkMJu0tZiR7KTTTE3oizNY6Z2QV+SNj9Vr/04=
+	id 1gs8Io-0001e5-Lk; Fri, 08 Feb 2019 15:42:54 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gs8Im-0001dY-86
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 15:42:53 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8342DA78;
+ Fri,  8 Feb 2019 07:42:50 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 2A6443F675; Fri,  8 Feb 2019 07:42:49 -0800 (PST)
+Subject: Re: [PATCH 0/3] KVM: arm/arm64: trivial header path sanitization
+To: Masahiro Yamada <yamada.masahiro@socionext.com>,
+ Christoffer Dall <christoffer.dall@arm.com>
+References: <1548403050-6585-1-git-send-email-yamada.masahiro@socionext.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <01ede89d-9cb4-8e3c-420b-d862755c630c@arm.com>
+Date: Fri, 8 Feb 2019 15:42:47 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-OriginatorOrg: bp.renesas.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 2dc76061-923f-434d-d42c-08d68dd9d8ac
-X-MS-Exchange-CrossTenant-originalarrivaltime: 08 Feb 2019 15:26:49.9326 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 53d82571-da19-47e4-9cb4-625a166a4a2a
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: TY1PR01MB1641
+In-Reply-To: <1548403050-6585-1-git-send-email-yamada.masahiro@socionext.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_072654_873884_06B91684 
-X-CRM114-Status: GOOD (  18.28  )
+X-CRM114-CacheID: sfid-20190208_074252_295843_4CEE5C3C 
+X-CRM114-Status: GOOD (  13.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -115,75 +114,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-renesas-soc@vger.kernel.org" <linux-renesas-soc@vger.kernel.org>,
- Magnus Damm <magnus.damm@gmail.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Russell King <linux@armlinux.org.uk>,
+ linux-kernel@vger.kernel.org, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello Sergei,
+On 25/01/2019 07:57, Masahiro Yamada wrote:
+> My main motivation is to get rid of crappy header search path manipulation
+> from Kbuild core.
+> 
+> Before that, I want to finish as many cleanup works as possible.
+> 
+> If you are interested in the big picture of this work,
+> the full patch set is available at:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-kbuild.git build-test
+> 
+> 
+> 
+> Masahiro Yamada (3):
+>   KVM: arm/arm64: fix TRACE_INCLUDE_PATH
+>   KVM: arm/arm64: remove -I. header search paths
+>   KVM: arm/arm64: prefix header search paths with $(srctree)/
+> 
+>  arch/arm/kvm/Makefile   | 5 ++---
+>  arch/arm64/kvm/Makefile | 4 +---
+>  virt/kvm/arm/trace.h    | 2 +-
+>  3 files changed, 4 insertions(+), 7 deletions(-)
+> 
 
-Thank you for your feedback!
-
-> -----Original Message-----
-> From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Sent: 08 February 2019 12:53
-> To: Simon Horman <horms+renesas@verge.net.au>; linux-renesas-soc@vger.kernel.org
-> Cc: linux-arm-kernel@lists.infradead.org; Magnus Damm <magnus.damm@gmail.com>; Fabrizio Castro
-> <fabrizio.castro@bp.renesas.com>
-> Subject: Re: [PATCH 08/12] arm64: dts: renesas: r8a774c0: Add OPPs table for cpu devices
->
-> Hello!
->
-> On 02/08/2019 02:13 PM, Simon Horman wrote:
->
-> > From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> >
-> > This patch defines OOP tables for all CPUs, similarly to
-> > what done by Takeshi Kihara and Yoshihiro Kaneko for the
-> > R8A77990.
-> >
-> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> [...]
-> > @@ -55,6 +76,8 @@
-> >  power-domains = <&sysc R8A774C0_PD_CA53_CPU0>;
-> >  next-level-cache = <&L2_CA53>;
-> >  enable-method = "psci";
-> > +clocks =<&cpg CPG_CORE R8A774C0_CLK_Z2>;
->
->    Need space after =...
-
-Doh! Simon, do you want me to send another version to fix both spacing issues?
+I've applied these 3 patches to kvmarm/queue.
 
 Thanks,
-Fab
 
->
-> > +operating-points-v2 = <&cluster1_opp>;
-> >  };
-> >
-> >  a53_1: cpu@1 {
-> > @@ -64,6 +87,8 @@
-> >  power-domains = <&sysc R8A774C0_PD_CA53_CPU1>;
-> >  next-level-cache = <&L2_CA53>;
-> >  enable-method = "psci";
-> > +clocks =<&cpg CPG_CORE R8A774C0_CLK_Z2>;
->
->
->    Here as well...
->
-> > +operating-points-v2 = <&cluster1_opp>;
-> >  };
-> >
-> >  L2_CA53: cache-controller-0 {
->
-> MBR, Sergei
+	M.
+-- 
+Jazz is not dead. It just smells funny...
 
-
-Renesas Electronics Europe GmbH,Geschaeftsfuehrer/President : Michael Hannawald, Sitz der Gesellschaft/Registered office: Duesseldorf, Arcadiastrasse 10, 40472 Duesseldorf, Germany,Handelsregister/Commercial Register: Duesseldorf, HRB 3708 USt-IDNr./Tax identification no.: DE 119353406 WEEE-Reg.-Nr./WEEE reg. no.: DE 14978647
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
