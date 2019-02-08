@@ -2,71 +2,86 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 48ADEC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:11:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 84089C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:24:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BA945218D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:11:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 51A4E218AC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:24:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vj6iERP2";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="ZwgOA7x8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BA945218D9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IDNAPP+A";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="GUvfApuw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 51A4E218AC
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
-	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	References:List-Owner; bh=zKpPU6bpvf1VFd8nKvuWy/iVTwBXogwjF9KFQb0jr7A=; b=Vj6
-	iERP2ViBMW68lTbvAxKZvPqzPfQE5NtZgIAFpXMhx6YRkYA5khWp/aY13evSgN46Q7inmUrpXLj97
-	5bPtVmyIFKX188kNY2n+vu9nqwV4lGVFAqS0dEgM/7EhRTnJjFBrC488xH6u3jbGWvGg+Jd7/SSjg
-	3lKdSa7YGSDdQyiRMF9Zv5KtJhSVGrbvc3V7ChdXc1+6Yxhmol+sMDYBXAAxBKiJaSkaz6BG+Tv9P
-	tWsf4Q6Ffy2zSOogr1Fviu6+fxriv0Tg1kwtYN8Et7fSUOez0yE6SUKmw2s4Uh4wAaFH3YZ9waon4
-	QVpRIerITuhJfiFplVLiIIGJv58EG+Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=fcKfMDXLRmVqlyasro5QgyAxTZkzUDrm9GLZJmou15o=; b=IDNAPP+AlFehr4mUKb6SJC+Bs
+	vIzKnPg9TTa91Hq2OPBFd/1ej/owtbNnQ+zQuK6D0nnAhZlow5ol4GeJR3douAdHvH3/MBMrNlzJC
+	Gqdb8/fk5lkqRnH7XSAcHS6Us5YyPut+WwK4iGyYwmljW+vHqmBNyzZoOpNo/fsC/fatDOrZHQXcd
+	XwflcICBZtuOna6vkkYfzBm1u2MPHeaf4N7a7VOEd/i8sIeCAGHgbbqZQaSalmod2hgkD/90VTpv2
+	iCnkZsUMG5v+Tm1NJlK5oZalDcwQIrubxF6jAqhq1dqPkvH4nlOnsnTOqqJ/MT9UeJ9ntrnRw2gAI
+	Z4EApvikQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs5wH-0007KR-Rd; Fri, 08 Feb 2019 13:11:29 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+	id 1gs68Z-0002tt-Cb; Fri, 08 Feb 2019 13:24:11 +0000
+Received: from hqemgate16.nvidia.com ([216.228.121.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs5w4-00079y-0C
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 13:11:18 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
- List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
- List-Archive; bh=N8W8lNmfEUubZPPFAMJm7WEhQfRSk6ig/FBf9LTr2no=; b=ZwgOA7x8yfeT
- RUdpe+zxP5iearuwqtsDCJ4nCVrB4qO5CU56NzEQq2RNrTJKTQ5ridybPTa17J7XfV+OuADcz6lSn
- gHujc3bDWTpOlS5OqVZ8Prmhg8GTPEbDJC8fyT0hXEqpgbFiGHtBxRXVd46gZ+K8npBTqscvz5RHi
- eyZnI=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gs5vy-0001JX-0D; Fri, 08 Feb 2019 13:11:10 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id 9EBC41127F30; Fri,  8 Feb 2019 13:11:09 +0000 (GMT)
-From: Mark Brown <broonie@kernel.org>
-To: Olivier Moysan <olivier.moysan@st.com>
-Subject: Applied "ASoC: stm32: i2s: add power management" to the asoc tree
-In-Reply-To: <1549622994-13810-2-git-send-email-olivier.moysan@st.com>
-X-Patchwork-Hint: ignore
-Message-Id: <20190208131109.9EBC41127F30@debutante.sirena.org.uk>
-Date: Fri,  8 Feb 2019 13:11:09 +0000 (GMT)
-X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
+ id 1gs68U-0002tB-C3
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 13:24:08 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c5d82e10000>; Fri, 08 Feb 2019 05:23:45 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Fri, 08 Feb 2019 05:24:03 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Fri, 08 Feb 2019 05:24:03 -0800
+Received: from [10.19.108.132] (172.20.13.39) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 8 Feb
+ 2019 13:24:01 +0000
+Subject: Re: [PATCH V6 2/7] clocksource: tegra: add Tegra210 timer support
+To: Thierry Reding <thierry.reding@gmail.com>, Jonathan Hunter
+ <jonathanh@nvidia.com>, Daniel Lezcano <daniel.lezcano@linaro.org>, Thomas
+ Gleixner <tglx@linutronix.de>
+References: <20190201161654.18315-1-josephl@nvidia.com>
+ <20190201161654.18315-3-josephl@nvidia.com>
+From: Joseph Lo <josephl@nvidia.com>
+Message-ID: <30d2a97c-c08f-f67c-706a-16288cf63dc8@nvidia.com>
+Date: Fri, 8 Feb 2019 21:23:59 +0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
+MIME-Version: 1.0
+In-Reply-To: <20190201161654.18315-3-josephl@nvidia.com>
+X-Originating-IP: [172.20.13.39]
+X-ClientProxiedBy: HQMAIL106.nvidia.com (172.18.146.12) To
+ HQMAIL101.nvidia.com (172.20.187.10)
+Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1549632225; bh=KORBOLog4Y6nGh14WuilCHO9BegSxMv6lr9UapOZcRk=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=GUvfApuwKLt5Hs7ynmPK8svJN3gUgxhKIyNY8l/oqaoJwy0WEXqHsHo32TFX4a3Pd
+ 7MirifSZbh1KoVGinF5m6d+GI3c+8cyKK1D187j78LZw8wu65LHhtwCNr0KjADa2pW
+ 4Xwwf++TUhbu+vEZQD/v6mXmCnwUVSXZZJheS2hhee41zQdoDNBhvYayyfKkJHcoRm
+ OLo4oBmWwsd5vgt/zkpJcPtFDmW4HKczQoXJH2YdijNcv6HFvXx+JlQ54qu8BJLHvj
+ TekqfM6uJwf8MRTUF99j9u+g3SnMEIfCuv+bixp7weVccoX3gxOpXOaEDOWqDKsWLx
+ 2oYWEN1VRmJqw==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_051116_208357_7B7C9767 
-X-CRM114-Status: GOOD (  15.26  )
+X-CRM114-CacheID: sfid-20190208_052406_446472_9CE4CDAB 
+X-CRM114-Status: GOOD (  29.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,131 +93,551 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: alsa-devel@alsa-project.org, olivier.moysan@st.com, alexandre.torgue@st.com,
- linux-kernel@vger.kernel.org, arnaud.pouliquen@st.com, tiwai@suse.com,
- lgirdwood@gmail.com, broonie@kernel.org, mcoquelin.stm32@gmail.com,
- perex@perex.cz, linux-stm32@st-md-mailman.stormreply.com,
- linux-arm-kernel@lists.infradead.org, benjamin.gaignard@st.com
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
+Cc: linux-tegra@vger.kernel.org, Thierry Reding <treding@nvidia.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The patch
+Hi Daniel & Thomas,
 
-   ASoC: stm32: i2s: add power management
-
-has been applied to the asoc tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+Do we have the chance to get this patch merged for K5.1?
 
 Thanks,
-Mark
+Joseph
 
-From 307cce4a0017f94c6266050487c117660d66104e Mon Sep 17 00:00:00 2001
-From: Olivier Moysan <olivier.moysan@st.com>
-Date: Fri, 8 Feb 2019 11:49:53 +0100
-Subject: [PATCH] ASoC: stm32: i2s: add power management
-
-Add suspend and resume sleep callbacks,
-to support system low power modes.
-
-Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/stm/stm32_i2s.c | 33 ++++++++++++++++++++++++++++++---
- 1 file changed, 30 insertions(+), 3 deletions(-)
-
-diff --git a/sound/soc/stm/stm32_i2s.c b/sound/soc/stm/stm32_i2s.c
-index 6d0bf78d114d..dbe23a709d24 100644
---- a/sound/soc/stm/stm32_i2s.c
-+++ b/sound/soc/stm/stm32_i2s.c
-@@ -186,8 +186,9 @@ enum i2s_datlen {
- #define STM32_I2S_IS_SLAVE(x)		((x)->ms_flg == I2S_MS_SLAVE)
- 
- /**
-+ * struct stm32_i2s_data - private data of I2S
-  * @regmap_conf: I2S register map configuration pointer
-- * @egmap: I2S register map pointer
-+ * @regmap: I2S register map pointer
-  * @pdev: device data pointer
-  * @dai_drv: DAI driver pointer
-  * @dma_data_tx: dma configuration data for tx channel
-@@ -596,8 +597,8 @@ static int stm32_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
- 			return ret;
- 		}
- 
--		ret = regmap_update_bits(i2s->regmap, STM32_I2S_CR1_REG,
--					 I2S_CR1_CSTART, I2S_CR1_CSTART);
-+		ret = regmap_write_bits(i2s->regmap, STM32_I2S_CR1_REG,
-+					I2S_CR1_CSTART, I2S_CR1_CSTART);
- 		if (ret < 0) {
- 			dev_err(cpu_dai->dev, "Error %d starting I2S\n", ret);
- 			return ret;
-@@ -703,6 +704,7 @@ static const struct regmap_config stm32_h7_i2s_regmap_conf = {
- 	.volatile_reg = stm32_i2s_volatile_reg,
- 	.writeable_reg = stm32_i2s_writeable_reg,
- 	.fast_io = true,
-+	.cache_type = REGCACHE_FLAT,
- };
- 
- static const struct snd_soc_dai_ops stm32_i2s_pcm_dai_ops = {
-@@ -929,10 +931,35 @@ static int stm32_i2s_remove(struct platform_device *pdev)
- 
- MODULE_DEVICE_TABLE(of, stm32_i2s_ids);
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int stm32_i2s_suspend(struct device *dev)
-+{
-+	struct stm32_i2s_data *i2s = dev_get_drvdata(dev);
-+
-+	regcache_cache_only(i2s->regmap, true);
-+	regcache_mark_dirty(i2s->regmap);
-+
-+	return 0;
-+}
-+
-+static int stm32_i2s_resume(struct device *dev)
-+{
-+	struct stm32_i2s_data *i2s = dev_get_drvdata(dev);
-+
-+	regcache_cache_only(i2s->regmap, false);
-+	return regcache_sync(i2s->regmap);
-+}
-+#endif /* CONFIG_PM_SLEEP */
-+
-+static const struct dev_pm_ops stm32_i2s_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(stm32_i2s_suspend, stm32_i2s_resume)
-+};
-+
- static struct platform_driver stm32_i2s_driver = {
- 	.driver = {
- 		.name = "st,stm32-i2s",
- 		.of_match_table = stm32_i2s_ids,
-+		.pm = &stm32_i2s_pm_ops,
- 	},
- 	.probe = stm32_i2s_probe,
- 	.remove = stm32_i2s_remove,
--- 
-2.20.1
-
+On 2/2/19 12:16 AM, Joseph Lo wrote:
+> Add support for the Tegra210 timer that runs at oscillator clock
+> (TMR10-TMR13). We need these timers to work as clock event device and to
+> replace the ARMv8 architected timer due to it can't survive across the
+> power cycle of the CPU core or CPUPORESET signal. So it can't be a wake-up
+> source when CPU suspends in power down state.
+> 
+> Also convert the original driver to use timer-of API.
+> 
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: linux-kernel@vger.kernel.org
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> Acked-by: Thierry Reding <treding@nvidia.com>
+> Acked-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+> v6:
+>   * refine the timer defines
+>   * add ack tag from Jon.
+> v5:
+>   * add ack tag from Thierry
+> v4:
+>   * merge timer-tegra210.c in previous version into timer-tegra20.c
+> v3:
+>   * use timer-of API
+> v2:
+>   * add error clean-up code
+> ---
+>   drivers/clocksource/Kconfig         |   2 +-
+>   drivers/clocksource/timer-tegra20.c | 371 ++++++++++++++++++++--------
+>   include/linux/cpuhotplug.h          |   1 +
+>   3 files changed, 270 insertions(+), 104 deletions(-)
+> 
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index a9e26f6a81a1..6af78534a285 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -131,7 +131,7 @@ config SUN5I_HSTIMER
+>   config TEGRA_TIMER
+>   	bool "Tegra timer driver" if COMPILE_TEST
+>   	select CLKSRC_MMIO
+> -	depends on ARM
+> +	select TIMER_OF
+>   	help
+>   	  Enables support for the Tegra driver.
+>   
+> diff --git a/drivers/clocksource/timer-tegra20.c b/drivers/clocksource/timer-tegra20.c
+> index 4293943f4e2b..f66edd63d7f4 100644
+> --- a/drivers/clocksource/timer-tegra20.c
+> +++ b/drivers/clocksource/timer-tegra20.c
+> @@ -15,21 +15,24 @@
+>    *
+>    */
+>   
+> -#include <linux/init.h>
+> +#include <linux/clk.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/cpu.h>
+> +#include <linux/cpumask.h>
+> +#include <linux/delay.h>
+>   #include <linux/err.h>
+> -#include <linux/time.h>
+>   #include <linux/interrupt.h>
+> -#include <linux/irq.h>
+> -#include <linux/clockchips.h>
+> -#include <linux/clocksource.h>
+> -#include <linux/clk.h>
+> -#include <linux/io.h>
+>   #include <linux/of_address.h>
+>   #include <linux/of_irq.h>
+> -#include <linux/sched_clock.h>
+> -#include <linux/delay.h>
+> +#include <linux/percpu.h>
+> +#include <linux/syscore_ops.h>
+> +#include <linux/time.h>
+> +
+> +#include "timer-of.h"
+>   
+> +#ifdef CONFIG_ARM
+>   #include <asm/mach/time.h>
+> +#endif
+>   
+>   #define RTC_SECONDS            0x08
+>   #define RTC_SHADOW_SECONDS     0x0c
+> @@ -39,74 +42,145 @@
+>   #define TIMERUS_USEC_CFG 0x14
+>   #define TIMERUS_CNTR_FREEZE 0x4c
+>   
+> -#define TIMER1_BASE 0x0
+> -#define TIMER2_BASE 0x8
+> -#define TIMER3_BASE 0x50
+> -#define TIMER4_BASE 0x58
+> -
+> -#define TIMER_PTV 0x0
+> -#define TIMER_PCR 0x4
+> -
+> +#define TIMER_PTV		0x0
+> +#define TIMER_PTV_EN		BIT(31)
+> +#define TIMER_PTV_PER		BIT(30)
+> +#define TIMER_PCR		0x4
+> +#define TIMER_PCR_INTR_CLR	BIT(30)
+> +
+> +#ifdef CONFIG_ARM
+> +#define TIMER_CPU0		0x50 /* TIMER3 */
+> +#else
+> +#define TIMER_CPU0		0x90 /* TIMER10 */
+> +#define TIMER10_IRQ_IDX		10
+> +#define IRQ_IDX_FOR_CPU(cpu)	(TIMER10_IRQ_IDX + cpu)
+> +#endif
+> +#define TIMER_BASE_FOR_CPU(cpu) (TIMER_CPU0 + (cpu) * 8)
+> +
+> +static u32 usec_config;
+>   static void __iomem *timer_reg_base;
+> +#ifdef CONFIG_ARM
+>   static void __iomem *rtc_base;
+> -
+>   static struct timespec64 persistent_ts;
+>   static u64 persistent_ms, last_persistent_ms;
+> -
+>   static struct delay_timer tegra_delay_timer;
+> -
+> -#define timer_writel(value, reg) \
+> -	writel_relaxed(value, timer_reg_base + (reg))
+> -#define timer_readl(reg) \
+> -	readl_relaxed(timer_reg_base + (reg))
+> +#endif
+>   
+>   static int tegra_timer_set_next_event(unsigned long cycles,
+>   					 struct clock_event_device *evt)
+>   {
+> -	u32 reg;
+> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
+>   
+> -	reg = 0x80000000 | ((cycles > 1) ? (cycles-1) : 0);
+> -	timer_writel(reg, TIMER3_BASE + TIMER_PTV);
+> +	writel(TIMER_PTV_EN |
+> +	       ((cycles > 1) ? (cycles - 1) : 0), /* n+1 scheme */
+> +	       reg_base + TIMER_PTV);
+>   
+>   	return 0;
+>   }
+>   
+> -static inline void timer_shutdown(struct clock_event_device *evt)
+> +static int tegra_timer_shutdown(struct clock_event_device *evt)
+>   {
+> -	timer_writel(0, TIMER3_BASE + TIMER_PTV);
+> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
+> +
+> +	writel(0, reg_base + TIMER_PTV);
+> +
+> +	return 0;
+>   }
+>   
+> -static int tegra_timer_shutdown(struct clock_event_device *evt)
+> +static int tegra_timer_set_periodic(struct clock_event_device *evt)
+>   {
+> -	timer_shutdown(evt);
+> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
+> +
+> +	writel(TIMER_PTV_EN | TIMER_PTV_PER |
+> +	       ((timer_of_rate(to_timer_of(evt)) / HZ) - 1),
+> +	       reg_base + TIMER_PTV);
+> +
+>   	return 0;
+>   }
+>   
+> -static int tegra_timer_set_periodic(struct clock_event_device *evt)
+> +static irqreturn_t tegra_timer_isr(int irq, void *dev_id)
+>   {
+> -	u32 reg = 0xC0000000 | ((1000000 / HZ) - 1);
+> +	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
+> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
+> +
+> +	writel(TIMER_PCR_INTR_CLR, reg_base + TIMER_PCR);
+> +	evt->event_handler(evt);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +#ifdef CONFIG_ARM64
+> +static DEFINE_PER_CPU(struct timer_of, tegra_to) = {
+> +	.flags = TIMER_OF_CLOCK | TIMER_OF_BASE,
+> +
+> +	.clkevt = {
+> +		.name = "tegra_timer",
+> +		.rating = 460,
+> +		.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> +		.set_next_event = tegra_timer_set_next_event,
+> +		.set_state_shutdown = tegra_timer_shutdown,
+> +		.set_state_periodic = tegra_timer_set_periodic,
+> +		.set_state_oneshot = tegra_timer_shutdown,
+> +		.tick_resume = tegra_timer_shutdown,
+> +	},
+> +};
+> +
+> +static int tegra_timer_setup(unsigned int cpu)
+> +{
+> +	struct timer_of *to = per_cpu_ptr(&tegra_to, cpu);
+> +
+> +	irq_force_affinity(to->clkevt.irq, cpumask_of(cpu));
+> +	enable_irq(to->clkevt.irq);
+> +
+> +	clockevents_config_and_register(&to->clkevt, timer_of_rate(to),
+> +					1, /* min */
+> +					0x1fffffff); /* 29 bits */
+>   
+> -	timer_shutdown(evt);
+> -	timer_writel(reg, TIMER3_BASE + TIMER_PTV);
+>   	return 0;
+>   }
+>   
+> -static struct clock_event_device tegra_clockevent = {
+> -	.name			= "timer0",
+> -	.rating			= 300,
+> -	.features		= CLOCK_EVT_FEAT_ONESHOT |
+> -				  CLOCK_EVT_FEAT_PERIODIC |
+> -				  CLOCK_EVT_FEAT_DYNIRQ,
+> -	.set_next_event		= tegra_timer_set_next_event,
+> -	.set_state_shutdown	= tegra_timer_shutdown,
+> -	.set_state_periodic	= tegra_timer_set_periodic,
+> -	.set_state_oneshot	= tegra_timer_shutdown,
+> -	.tick_resume		= tegra_timer_shutdown,
+> +static int tegra_timer_stop(unsigned int cpu)
+> +{
+> +	struct timer_of *to = per_cpu_ptr(&tegra_to, cpu);
+> +
+> +	to->clkevt.set_state_shutdown(&to->clkevt);
+> +	disable_irq_nosync(to->clkevt.irq);
+> +
+> +	return 0;
+> +}
+> +#else /* CONFIG_ARM */
+> +static struct timer_of tegra_to = {
+> +	.flags = TIMER_OF_CLOCK | TIMER_OF_BASE | TIMER_OF_IRQ,
+> +
+> +	.clkevt = {
+> +		.name = "tegra_timer",
+> +		.rating	= 300,
+> +		.features = CLOCK_EVT_FEAT_ONESHOT |
+> +			    CLOCK_EVT_FEAT_PERIODIC |
+> +			    CLOCK_EVT_FEAT_DYNIRQ,
+> +		.set_next_event	= tegra_timer_set_next_event,
+> +		.set_state_shutdown = tegra_timer_shutdown,
+> +		.set_state_periodic = tegra_timer_set_periodic,
+> +		.set_state_oneshot = tegra_timer_shutdown,
+> +		.tick_resume = tegra_timer_shutdown,
+> +		.cpumask = cpu_possible_mask,
+> +	},
+> +
+> +	.of_irq = {
+> +		.index = 2,
+> +		.flags = IRQF_TIMER | IRQF_TRIGGER_HIGH,
+> +		.handler = tegra_timer_isr,
+> +	},
+>   };
+>   
+>   static u64 notrace tegra_read_sched_clock(void)
+>   {
+> -	return timer_readl(TIMERUS_CNTR_1US);
+> +	return readl(timer_reg_base + TIMERUS_CNTR_1US);
+> +}
+> +
+> +static unsigned long tegra_delay_timer_read_counter_long(void)
+> +{
+> +	return readl(timer_reg_base + TIMERUS_CNTR_1US);
+>   }
+>   
+>   /*
+> @@ -143,98 +217,188 @@ static void tegra_read_persistent_clock64(struct timespec64 *ts)
+>   	timespec64_add_ns(&persistent_ts, delta * NSEC_PER_MSEC);
+>   	*ts = persistent_ts;
+>   }
+> +#endif
+>   
+> -static unsigned long tegra_delay_timer_read_counter_long(void)
+> +static int tegra_timer_suspend(void)
+>   {
+> -	return readl(timer_reg_base + TIMERUS_CNTR_1US);
+> +#ifdef CONFIG_ARM64
+> +	int cpu;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		struct timer_of *to = per_cpu_ptr(&tegra_to, cpu);
+> +		void __iomem *reg_base = timer_of_base(to);
+> +
+> +		writel(TIMER_PCR_INTR_CLR, reg_base + TIMER_PCR);
+> +	}
+> +#else
+> +	void __iomem *reg_base = timer_of_base(&tegra_to);
+> +
+> +	writel(TIMER_PCR_INTR_CLR, reg_base + TIMER_PCR);
+> +#endif
+> +
+> +	return 0;
+>   }
+>   
+> -static irqreturn_t tegra_timer_interrupt(int irq, void *dev_id)
+> +static void tegra_timer_resume(void)
+>   {
+> -	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
+> -	timer_writel(1<<30, TIMER3_BASE + TIMER_PCR);
+> -	evt->event_handler(evt);
+> -	return IRQ_HANDLED;
+> +	writel(usec_config, timer_reg_base + TIMERUS_USEC_CFG);
+>   }
+>   
+> -static struct irqaction tegra_timer_irq = {
+> -	.name		= "timer0",
+> -	.flags		= IRQF_TIMER | IRQF_TRIGGER_HIGH,
+> -	.handler	= tegra_timer_interrupt,
+> -	.dev_id		= &tegra_clockevent,
+> +static struct syscore_ops tegra_timer_syscore_ops = {
+> +	.suspend = tegra_timer_suspend,
+> +	.resume = tegra_timer_resume,
+>   };
+>   
+> -static int __init tegra20_init_timer(struct device_node *np)
+> +static int tegra_timer_init(struct device_node *np, struct timer_of *to)
+>   {
+> -	struct clk *clk;
+> -	unsigned long rate;
+> -	int ret;
+> +	int ret = 0;
+>   
+> -	timer_reg_base = of_iomap(np, 0);
+> -	if (!timer_reg_base) {
+> -		pr_err("Can't map timer registers\n");
+> -		return -ENXIO;
+> -	}
+> +	ret = timer_of_init(np, to);
+> +	if (ret < 0)
+> +		goto out;
+>   
+> -	tegra_timer_irq.irq = irq_of_parse_and_map(np, 2);
+> -	if (tegra_timer_irq.irq <= 0) {
+> -		pr_err("Failed to map timer IRQ\n");
+> -		return -EINVAL;
+> -	}
+> +	timer_reg_base = timer_of_base(to);
+>   
+> -	clk = of_clk_get(np, 0);
+> -	if (IS_ERR(clk)) {
+> -		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
+> -		rate = 12000000;
+> -	} else {
+> -		clk_prepare_enable(clk);
+> -		rate = clk_get_rate(clk);
+> -	}
+> -
+> -	switch (rate) {
+> +	/*
+> +	 * Configure microsecond timers to have 1MHz clock
+> +	 * Config register is 0xqqww, where qq is "dividend", ww is "divisor"
+> +	 * Uses n+1 scheme
+> +	 */
+> +	switch (timer_of_rate(to)) {
+>   	case 12000000:
+> -		timer_writel(0x000b, TIMERUS_USEC_CFG);
+> +		usec_config = 0x000b; /* (11+1)/(0+1) */
+> +		break;
+> +	case 12800000:
+> +		usec_config = 0x043f; /* (63+1)/(4+1) */
+>   		break;
+>   	case 13000000:
+> -		timer_writel(0x000c, TIMERUS_USEC_CFG);
+> +		usec_config = 0x000c; /* (12+1)/(0+1) */
+> +		break;
+> +	case 16800000:
+> +		usec_config = 0x0453; /* (83+1)/(4+1) */
+>   		break;
+>   	case 19200000:
+> -		timer_writel(0x045f, TIMERUS_USEC_CFG);
+> +		usec_config = 0x045f; /* (95+1)/(4+1) */
+>   		break;
+>   	case 26000000:
+> -		timer_writel(0x0019, TIMERUS_USEC_CFG);
+> +		usec_config = 0x0019; /* (25+1)/(0+1) */
+> +		break;
+> +	case 38400000:
+> +		usec_config = 0x04bf; /* (191+1)/(4+1) */
+> +		break;
+> +	case 48000000:
+> +		usec_config = 0x002f; /* (47+1)/(0+1) */
+>   		break;
+>   	default:
+> -		WARN(1, "Unknown clock rate");
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +
+> +	writel(usec_config, timer_of_base(to) + TIMERUS_USEC_CFG);
+> +
+> +	register_syscore_ops(&tegra_timer_syscore_ops);
+> +out:
+> +	return ret;
+> +}
+> +
+> +#ifdef CONFIG_ARM64
+> +static int __init tegra210_timer_init(struct device_node *np)
+> +{
+> +	int cpu, ret = 0;
+> +	struct timer_of *to;
+> +
+> +	to = this_cpu_ptr(&tegra_to);
+> +	ret = tegra_timer_init(np, to);
+> +	if (ret < 0)
+> +		goto out;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		struct timer_of *cpu_to;
+> +
+> +		cpu_to = per_cpu_ptr(&tegra_to, cpu);
+> +		cpu_to->of_base.base = timer_reg_base + TIMER_BASE_FOR_CPU(cpu);
+> +		cpu_to->of_clk.rate = timer_of_rate(to);
+> +		cpu_to->clkevt.cpumask = cpumask_of(cpu);
+> +
+> +		cpu_to->clkevt.irq =
+> +			irq_of_parse_and_map(np, IRQ_IDX_FOR_CPU(cpu));
+> +		if (!cpu_to->clkevt.irq) {
+> +			pr_err("%s: can't map IRQ for CPU%d\n",
+> +			       __func__, cpu);
+> +			ret = -EINVAL;
+> +			goto out;
+> +		}
+> +
+> +		irq_set_status_flags(cpu_to->clkevt.irq, IRQ_NOAUTOEN);
+> +		ret = request_irq(cpu_to->clkevt.irq, tegra_timer_isr,
+> +				  IRQF_TIMER | IRQF_NOBALANCING,
+> +				  cpu_to->clkevt.name, &cpu_to->clkevt);
+> +		if (ret) {
+> +			pr_err("%s: cannot setup irq %d for CPU%d\n",
+> +				__func__, cpu_to->clkevt.irq, cpu);
+> +			ret = -EINVAL;
+> +			goto out_irq;
+> +		}
+> +	}
+> +
+> +	cpuhp_setup_state(CPUHP_AP_TEGRA_TIMER_STARTING,
+> +			  "AP_TEGRA_TIMER_STARTING", tegra_timer_setup,
+> +			  tegra_timer_stop);
+> +
+> +	return ret;
+> +
+> +out_irq:
+> +	for_each_possible_cpu(cpu) {
+> +		struct timer_of *cpu_to;
+> +
+> +		cpu_to = per_cpu_ptr(&tegra_to, cpu);
+> +		if (cpu_to->clkevt.irq) {
+> +			free_irq(cpu_to->clkevt.irq, &cpu_to->clkevt);
+> +			irq_dispose_mapping(cpu_to->clkevt.irq);
+> +		}
+>   	}
+> +out:
+> +	timer_of_cleanup(to);
+> +	return ret;
+> +}
+> +TIMER_OF_DECLARE(tegra210_timer, "nvidia,tegra210-timer", tegra210_timer_init);
+> +#else /* CONFIG_ARM */
+> +static int __init tegra20_init_timer(struct device_node *np)
+> +{
+> +	int ret = 0;
+> +
+> +	ret = tegra_timer_init(np, &tegra_to);
+> +	if (ret < 0)
+> +		goto out;
+>   
+> -	sched_clock_register(tegra_read_sched_clock, 32, 1000000);
+> +	tegra_to.of_base.base = timer_reg_base + TIMER_BASE_FOR_CPU(0);
+> +	tegra_to.of_clk.rate = 1000000; /* microsecond timer */
+>   
+> +	sched_clock_register(tegra_read_sched_clock, 32,
+> +			     timer_of_rate(&tegra_to));
+>   	ret = clocksource_mmio_init(timer_reg_base + TIMERUS_CNTR_1US,
+> -				    "timer_us", 1000000, 300, 32,
+> -				    clocksource_mmio_readl_up);
+> +				    "timer_us", timer_of_rate(&tegra_to),
+> +				    300, 32, clocksource_mmio_readl_up);
+>   	if (ret) {
+>   		pr_err("Failed to register clocksource\n");
+> -		return ret;
+> +		goto out;
+>   	}
+>   
+>   	tegra_delay_timer.read_current_timer =
+>   			tegra_delay_timer_read_counter_long;
+> -	tegra_delay_timer.freq = 1000000;
+> +	tegra_delay_timer.freq = timer_of_rate(&tegra_to);
+>   	register_current_timer_delay(&tegra_delay_timer);
+>   
+> -	ret = setup_irq(tegra_timer_irq.irq, &tegra_timer_irq);
+> -	if (ret) {
+> -		pr_err("Failed to register timer IRQ: %d\n", ret);
+> -		return ret;
+> -	}
+> +	clockevents_config_and_register(&tegra_to.clkevt,
+> +					timer_of_rate(&tegra_to),
+> +					0x1,
+> +					0x1fffffff);
+>   
+> -	tegra_clockevent.cpumask = cpu_possible_mask;
+> -	tegra_clockevent.irq = tegra_timer_irq.irq;
+> -	clockevents_config_and_register(&tegra_clockevent, 1000000,
+> -					0x1, 0x1fffffff);
+> +	return ret;
+> +out:
+> +	timer_of_cleanup(&tegra_to);
+>   
+> -	return 0;
+> +	return ret;
+>   }
+>   TIMER_OF_DECLARE(tegra20_timer, "nvidia,tegra20-timer", tegra20_init_timer);
+>   
+> @@ -261,3 +425,4 @@ static int __init tegra20_init_rtc(struct device_node *np)
+>   	return register_persistent_clock(tegra_read_persistent_clock64);
+>   }
+>   TIMER_OF_DECLARE(tegra20_rtc, "nvidia,tegra20-rtc", tegra20_init_rtc);
+> +#endif
+> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+> index fd586d0301e7..e78281d07b70 100644
+> --- a/include/linux/cpuhotplug.h
+> +++ b/include/linux/cpuhotplug.h
+> @@ -121,6 +121,7 @@ enum cpuhp_state {
+>   	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
+>   	CPUHP_AP_ARM_TWD_STARTING,
+>   	CPUHP_AP_QCOM_TIMER_STARTING,
+> +	CPUHP_AP_TEGRA_TIMER_STARTING,
+>   	CPUHP_AP_ARMADA_TIMER_STARTING,
+>   	CPUHP_AP_MARCO_TIMER_STARTING,
+>   	CPUHP_AP_MIPS_GIC_TIMER_STARTING,
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
