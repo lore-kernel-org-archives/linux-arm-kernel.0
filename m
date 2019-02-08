@@ -2,23 +2,23 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.2 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 912A2C282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 20:00:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B823C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 20:00:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 596EA217D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 20:00:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5522D217D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 20:00:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ELBcYtaI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="oottIKcD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 596EA217D8
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uU9CHkIP";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="EUHBGlUw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5522D217D8
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,55 +27,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Date:Message-ID:Subject:
 	From:To:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=JavhM+Ap4Db0G+0l6XVybFOKjELn+lHRI63lo119gLg=; b=ELBcYtaISXdtv6
-	+k4hq+ogUo9BZP8naEuC+C0EaeWdEH3A2eEv7kGKDVN8E4xrWaZMjr21XgXuxsCF2UrgWw5SDkFuU
-	a1VJC+YC765M95mobJ6mPtUL5OSmGY7lkw7wUcBfaZ2+3oqYWjVV/MZbbUb+kX5T2dVLWpzD8TkY8
-	NmlCqOKAiBB/KFHSCCEBKE2iO/gae1k7R1B5OygodgbYBwPGjmKUkZQF8d/vbdag4iPdP6tY0/Xnk
-	Ui1jN6XhVEISfS54fUxanljXifRTMxo73XvI6PGkLb3Z/VbydnK3NQSeOtxQqlm0fDk6A1VVa+a1l
-	xwOVwXVhG2NttTkwHC4w==;
+	List-Owner; bh=h56Cfsnn4GDcp0sE4XfmFF4Jg8b/RQP6K1wxMZ3qWeA=; b=uU9CHkIP5A/BYG
+	6FjoePXLZJbb6ce/nFjwE/55y9cq8BESW0grEA+35ODu4VXT/4o2WdMxHLHGX3bE//odPIkG8xV/m
+	gZr1C+7p8iqeSwGRh5wNIK297V8SHLJbhQdtnMWTME+IoHZ28j/Fhgy29qU0yaeudSuUuEXmxrm4V
+	Yw0FXdfvdmy2wjQjI/qHRdFTbpDIxovUGIukn2JRoUSKx7Fi6FI3T/K8wtanAaPi+Q9GUErY5C89Y
+	rBhVd33R7KzDUgk0NiTWjCA2hzClNE+POv7ZWf4R/WABewS3U4ciXw0BfxU4n3fCpsPAk7ob90cB0
+	ZxON16igJjVLnFXBPWAw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsCK6-000238-1F; Fri, 08 Feb 2019 20:00:30 +0000
-Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
+	id 1gsCKO-0002ND-Rq; Fri, 08 Feb 2019 20:00:48 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsCJc-0000QS-Dz; Fri, 08 Feb 2019 20:00:03 +0000
-Received: by mail-pl1-x642.google.com with SMTP id a14so2173916plm.12;
- Fri, 08 Feb 2019 12:00:00 -0800 (PST)
+ id 1gsCJp-00015K-FO; Fri, 08 Feb 2019 20:00:45 +0000
+Received: by mail-pl1-x643.google.com with SMTP id p4so2179785plq.11;
+ Fri, 08 Feb 2019 12:00:13 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=to:cc:from:subject:openpgp:autocrypt:message-id:date:user-agent
  :mime-version:content-language:content-transfer-encoding;
- bh=aUbES86ilz22BnfXzbo6xhwFv+S4zs8/cYLNw8xmVXg=;
- b=oottIKcD9fcbreUSMXDsWR0UIgB4g6uvlkyDTfFX25Zm93qQRTF34UUr22u2HUELQk
- fK5ibzYGlt5Wv/0DdaBdd4VAd4A7kJYN/Y0ywDxVatoctBShx/aliPm1m/6lOvwY/jRh
- jN50j8/Oy5tkE/h1ITbHg8KNi+l61pdW1t0w7NMbqu7DCusxb225W0CPzJGQqUHKu752
- ixwjMJpm5um/GI1+B7RdGndMQO0Qx/bo3GPnXqug9DSIk6tzPQQHVq8hFlnSuq7ytjL8
- bGzvnlZ6qrga5er36vU7rkxoDflypNS8cudTuaUzX2q00fffTsNP+GWk1TxrQRGvN0Dq
- qnqw==
+ bh=M+Z5htjDs/d1DQZ4RwWTcn+PwKhNHsGD93qA5bYgvMU=;
+ b=EUHBGlUwc5m9pgEw03m9mbqUQc3a3awLGA0VUzQ9cvyuPdLbof+ayGdFt/TmnHjQDk
+ J+3qfTJ9UL7NZB9fpaEH/m/wABOi/ww2fAht5fbv/DWFXVzXt5lHaTlragdNFnBLfhLp
+ mwi3DoQOLVdmrTMfJqjwkRToDaAu7NPrj3Gd0Q/TXy8ON2eUIcoqmasbZIrcgqOdzlIm
+ AsagSXwYY5pvIP3wNu8Anj0ieNWWI+2ko3KmZJpqRpVsdrH8EJbnFNNQDvyGcFgozdx5
+ sf0gKAaSu+PZx4d5IDTn39BuCmw+DhGdYtPYgOhZujOg28NmEjkcK5/Zb4cd73USoinX
+ MGcw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:to:cc:from:subject:openpgp:autocrypt:message-id
  :date:user-agent:mime-version:content-language
  :content-transfer-encoding;
- bh=aUbES86ilz22BnfXzbo6xhwFv+S4zs8/cYLNw8xmVXg=;
- b=cOOLXkabgqYUb/lGoVYJrd1Bi/XzR9TpwmRpQ2aQ4GsZ7LFhDljoThA9ZFO6sysA7U
- RL9siPHmplVGoYzeTugDjF1qMw7LXg/MPFK58KiBXDEByyqKmsm++dhzmau7eSovQRag
- FwKj4eLSv7tCDaOBD2xX8lo8EqlmnbNbI1PMZRks3pBIarLD5esTorKaszo/5KEtmo+J
- GOj8MmfmZ7ZogJzSTKeTt58v9m8qG7rgokHf0GT4ALFQzy6b9q1BteQXvbgZv5fzSHwA
- a257nMVgpogCC46uRConFRU9uwEbehto5f57/BoxdLmIMUYnczu1sl6Q5LiQX+9jDOkR
- t8RA==
-X-Gm-Message-State: AHQUAual1ssL5jjRxGbPhl9ZFtAK7InBrqMoVDWIYoepxUpbRoP02KU2
- NDTZ8BEv+7I6j7FDAcMTjlESvc9Rils=
-X-Google-Smtp-Source: AHgI3IbpWarawB/YedhFVGMzowyGESjCDjeSpBBpBw/JnfnpkAv7ZPvZ9+5k1E3jD4v6tGJr2WL7Ow==
-X-Received: by 2002:a17:902:b609:: with SMTP id
- b9mr24529323pls.57.1549655999917; 
- Fri, 08 Feb 2019 11:59:59 -0800 (PST)
+ bh=M+Z5htjDs/d1DQZ4RwWTcn+PwKhNHsGD93qA5bYgvMU=;
+ b=qwh0u4m+hJhQlBzXqlGhJat3TfCLSrShpk0tC3XEnh51F34I2/qcebm21OiGs06Rjc
+ py+pxRgLx709m1wrFMbKSjqNjPLvEMU097a6lz88YR9jBU8SywmyMktr63tRN465Jb00
+ j/NRP90mR668xm4mwfae/sXA8YEgoALU0+SfjrZv7i/fypL+PE+D2hB6YV+2UCKxAKEU
+ jolef/CQN5NvA4QoAA0UzO5k9rdHO1zcKQs8ZrqQTcX8SNZmSUkZ/l306ipqpUO7KjR/
+ 6afscPE+iHeHUWMIgh3Scr8YwbKZxMBMccCrATvb4AS4uHUfxEifO/u8qD69Ew+dCiz8
+ Kppw==
+X-Gm-Message-State: AHQUAubMYM7lJQEIj62qSARA0pRYvX+9dRVmTSD1LBnG8p/EKwjiIOUE
+ uutwUxSwddoHQCF/tlfufVI=
+X-Google-Smtp-Source: AHgI3IYGpwlNj/I9j7dkSNvscSsRC2at6oYwGwcV/VqwQU0NF3L7Db+B/ngsYgspqx2jdfACLv1xbA==
+X-Received: by 2002:a17:902:8602:: with SMTP id
+ f2mr12028263plo.263.1549656012870; 
+ Fri, 08 Feb 2019 12:00:12 -0800 (PST)
 Received: from ziggy.stardust ([2a00:23c5:318d:1d00:295e:b5f9:da4c:df23])
- by smtp.gmail.com with ESMTPSA id w10sm3261043pge.8.2019.02.08.11.59.58
+ by smtp.gmail.com with ESMTPSA id 15sm5197854pfs.113.2019.02.08.12.00.09
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 08 Feb 2019 11:59:59 -0800 (PST)
+ Fri, 08 Feb 2019 12:00:12 -0800 (PST)
 To: arm-soc <arm@kernel.org>
 From: Matthias Brugger <matthias.bgg@gmail.com>
-Subject: [GIT PULL] Mediatek SoC updates for v5.1
+Subject: [GIT PULL] Mediatek DT 64 bit updates for v5.1
 Openpgp: preference=signencrypt
 Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  mQINBFP1zgUBEAC21D6hk7//0kOmsUrE3eZ55kjc9DmFPKIz6l4NggqwQjBNRHIMh04BbCMY
@@ -170,15 +170,15 @@ Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  pac005PuhxCWkKTJz3gCmznnoat4GCnL5gy/m0Qk45l4PFqwWXVLo9AQg2Kp3mlIFZ6fsEKI
  AN5hxlbNvNb9V2Zo5bFZjPWPFTxOteM0omUAS+QopwU0yPLLGJVf2iCmItHcUXI+r2JwH1CJ
  jrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <7c3dc195-68eb-e78d-3f7d-806546608d2c@gmail.com>
-Date: Fri, 8 Feb 2019 20:59:56 +0100
+Message-ID: <d55e396b-0cbc-62a2-7bfd-c988cda086ff@gmail.com>
+Date: Fri, 8 Feb 2019 21:00:07 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.3
 MIME-Version: 1.0
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_120000_765856_13102BE7 
-X-CRM114-Status: GOOD (  14.48  )
+X-CRM114-CacheID: sfid-20190208_120014_255129_6615719A 
+X-CRM114-Status: GOOD (  16.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -190,9 +190,13 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ryder Lee <ryder.lee@mediatek.com>,
- "moderated list:ARM/Mediatek SoC support"
- <linux-mediatek@lists.infradead.org>, Weiyi Lu <weiyi.lu@mediatek.com>,
+Cc: Matthias Brugger <mbrugger@suse.com>,
+ Viresh Kumar <viresh.kumar@linaro.org>, Erin Lo <erin.lo@mediatek.com>,
+ honghui.zhang@mediatek.com, YT Shen <yt.shen@mediatek.com>,
+ Ryder Lee <ryder.lee@mediatek.com>,
+ "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ Chunfeng Yun <chunfeng.yun@mediatek.com>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -202,13 +206,12 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 Hi Arnd,
 Hi Olof,
 
-Please find below changes for v5.1 SoC support
+Please find below changes for 64 bit device tree for v5.1.
 
 Please merge :)
 Matthias
 
 ---
-
 The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 
   Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
@@ -216,30 +219,80 @@ The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 are available in the Git repository at:
 
   ssh://git@gitolite.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-tags/v5.0-next-soc
+tags/v5.0-next-dts64
 
-for you to fetch changes up to a43379dddf1ba14b6a9d50d95175117bbdf52ed2:
+for you to fetch changes up to 858a6c310f7761314164e3a49c05f25330595d92:
 
-  arm: mediatek: add MT7629 smp bring up code (2019-02-07 17:59:16 +0100)
-
-----------------------------------------------------------------
-mt8173: minor typo in scpsys header file
-mt7629: add smp bringup code
-mt7623a: delete unused smp bringup code
+  dt-bindings: arm: mediatek: add support for MT7622 BPI-R64 and MT7629 RFB
+(2019-02-07 17:51:51 +0100)
 
 ----------------------------------------------------------------
+mt2712:
+Add device nodes for usb3, iommu, smi, i2c, spi, pwm,
+mmc, NAND flash and PCIe
+
+mt6797:
+add pinctrl node
+enable uart pins on x20 board
+enable uart pins on EVB
+
+mt7622:
+Add all CPUs to the cooling maps
+
+mt7623a:
+Remove unused binding description
+
+mt7629:
+Add binding description for the SoC and the BananaPi
+based on this chip
+
+mt8173:
+Add all CPUs to the cooling maps
+
+mt8183:
+Add binding description for the SoC
+
+----------------------------------------------------------------
+Chunfeng Yun (1):
+      arm64: dts: Add USB3 related nodes for MT2712
+
+Erin Lo (1):
+      dt-bindings: arm: Add bindings for Mediatek MT8183 SoC Platform
+
+Honghui Zhang (1):
+      arm64: dts: add pcie nodes for MT2712
+
+Manivannan Sadhasivam (2):
+      arm64: dts: mediatek: mt6797: Add pinctrl support
+      arm64: dts: mediatek: x20: Add pinmux support for UART1
+
+Matthias Brugger (1):
+      arm64: dts: Add uart for mt6797 EVB
+
 Ryder Lee (2):
-      Revert "ARM: mediatek: add MT7623a smp bringup code"
-      arm: mediatek: add MT7629 smp bring up code
+      dt-bindings: arm: mediatek: remove unused "mediatek, mt7623a"
+      dt-bindings: arm: mediatek: add support for MT7622 BPI-R64 and MT7629 RFB
 
-Weiyi Lu (1):
-      dt-bindings: soc: fix typo of MT8173 power dt-bindings
+Viresh Kumar (1):
+      ARM64: dts: mediatek: Add all CPUs in cooling maps
 
- arch/arm/mach-mediatek/Kconfig           | 4 ++++
- arch/arm/mach-mediatek/mediatek.c        | 3 +--
- arch/arm/mach-mediatek/platsmp.c         | 2 +-
- include/dt-bindings/power/mt8173-power.h | 6 +++---
- 4 files changed, 9 insertions(+), 6 deletions(-)
+YT Shen (6):
+      arm64: dts: add iommu/smi nodes for MT2712
+      arm64: dts: add i2c nodes for MT2712
+      arm64: dts: add spi nodes for MT2712
+      arm64: dts: add pwm nodes for MT2712
+      arm64: dts: add mmc nodes for MT2712
+      arm64: dts: add nand nodes for MT2712
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |  14 +-
+ arch/arm64/boot/dts/mediatek/mt2712-evb.dts        |  98 ++++
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi          | 555 +++++++++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt6797-evb.dts        |   2 +
+ arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts    |   2 +
+ arch/arm64/boot/dts/mediatek/mt6797.dtsi           |  28 ++
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi           |   9 +-
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   6 +-
+ 8 files changed, 707 insertions(+), 7 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
