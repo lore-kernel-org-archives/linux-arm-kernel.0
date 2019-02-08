@@ -2,81 +2,110 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C9A6FC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:51:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C02DC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:51:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9B34C20863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:51:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3FD2220863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:51:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NlB/HFNd";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="BI1SV2XT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9B34C20863
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u8ZrRzl0";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="EPME40rB";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="o6PhnZun"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3FD2220863
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xvCskUs+yz9toGcKToSJU1h9LLrWlQVKjTzGEwnqx6w=; b=NlB/HFNdklxS2d
-	LO/10PzF99OnH9lSBviVwtjOlgkid2vdwiTFaLaKOhKy99qeRE7bLYW+KOwgKeWQJekgcvZgt/KPv
-	OTdle9YQd+8GUbc4cAq3wDo6sjXtlTfAd8A6l4zsDgczX9mvj9T0bk9vWSXiTsKCZPnVi5ToI8exp
-	9Y2h137Y2D181qununJNKjHpZrR9rSDHH3K+WeiUGRp/v5/gsEGXfHTYp/EUXgpJJlUvc5ZOrb3zi
-	abI7t8OpE6oQvyfQxxI6U/olfmpWgagmLogjS/tWVFHpC3fHbgIZbKPgbPl3e6uSuhy5MAA4u30xX
-	MPItnsdBTPUuu/7nzzEw==;
+	List-Owner; bh=Z3TXJyyJ0MDIV3EbX8MIQKmHLCWIVI28NbNeoo+gbiM=; b=u8ZrRzl0aRDPhh
+	WLX74NN9mGkLa1rLw4kXOSbCfW+pfrHP8Ziyesd3rk+4INsgO7ko//+FOU5fKx1lhuApJ0q46tv+q
+	pxuvyxLOCKZ8g7IHXvKKgVEk8GeJmGH1p+IF/n2CJTqg9iyzGTf2kltQNS+YfG33V1Cow1u4IWLss
+	mwGRdYHNkAaYCZ2ljUpzqHYbEdEtOAFL01XLGSngACxrtpveteXtYzo72yHpjogLtGHERz2cElGta
+	wvoeW/EpjYw+kXErRbKMxJFtnD5H9wGTBZBTQ+PmSKYeGpEVBaU9rjq9JggB2Sffxjx0yvBoCDRfn
+	rqgUToBw8fdJumsw/2Cg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsAJE-0004Tv-Jc; Fri, 08 Feb 2019 17:51:28 +0000
+	id 1gsAJX-0004ma-C6; Fri, 08 Feb 2019 17:51:47 +0000
 Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsAJA-0003oI-3g
- for linux-arm-kernel@bombadil.infradead.org; Fri, 08 Feb 2019 17:51:24 +0000
+ id 1gsAJB-0003t2-4s
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 08 Feb 2019 17:51:25 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=l91mJS3jGbF9gq6jv1RIvNd6hpeL7oMfGoeS3HqJt+4=; b=BI1SV2XTux5f9PCEN1UXgGeGn
- WxkDhVaPhdaWyTHzFgw8oeBtt9ePJXdsLAyj54d/B0xfVODmMw+ZcnhMnCBxg93bSWZWc9S56tVm9
- XEGNP9JfV7CizAE8NorFLJxaDaWKZnCDDfoKKJQeKqq2A8yOFbWuPr77TJXUMCNpTJSpV67/bpCHN
- ieQbOHxH/5rwekUE4P/dLX96zxcKjrye7bneCmy6DUU5ydXuDnWNN/I4FyhcwgkEP12JK5ZlVjsvi
- zPLV+Tz+m5BcOawh+Eiv/iJGnrh1tkYPfN7oe0eK/B7GYopmkAvZoDqEnXHtfflsXBwjB3XnDGE26
- UAWCXx9tg==;
-Received: from foss.arm.com ([217.140.101.70])
- by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsA41-0006dt-No
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 17:35:49 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3FA781596;
- Fri,  8 Feb 2019 09:35:44 -0800 (PST)
-Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 2C80E3F719;
- Fri,  8 Feb 2019 09:35:42 -0800 (PST)
-Date: Fri, 8 Feb 2019 17:35:39 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Thomas Gleixner <tglx@linutronix.de>
-Subject: Re: [PATCH v2 06/28] kernel: Define gettimeofday vdso common code
-Message-ID: <20190208173539.GD24375@fuggles.cambridge.arm.com>
-References: <20181129170530.37789-1-vincenzo.frascino@arm.com>
- <20181129170530.37789-7-vincenzo.frascino@arm.com>
- <alpine.DEB.2.21.1811292230430.1657@nanos.tec.linutronix.de>
- <20181207175321.GA11430@edgewater-inn.cambridge.arm.com>
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=E2oKCm2aHyIkLmsWfLt1xuMZ3si46gMPXE7rlXDV4Gg=; b=EPME40rBtIlnFy9mIZrqNvbzLt
+ rpbZmsQ3Reh8Vp/cns0+FK2ploxU1KLgjwS32xZ7Gnw7dXkDqEkDa2CmvchPLAjYZfzbMdYizohIM
+ rHHBZzEKBy5yTTdOyFo/c6I3tV+LsXanb8qTzdIuWLvydVphABBQIiCXP+VE1UwPAvsTUCa/+hcpi
+ sEK3Jabb/s3oyhoDIwGHWuOWOsFMtVy1nJpyf9EhmgbokpKX+W1YwPPg+/B6yr3XJjE3XFIDmKSbT
+ PNOI4TDnT5gEjVS7l5jxzTI+y0GyXLFE5RaqTnY0LGoe9JAJFbPPkr5TtRetqNXdWnQb+xdoNStlC
+ Yy03ZqzA==;
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gsA41-0006dx-EX
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 17:35:47 +0000
+Received: by mail-wm1-x341.google.com with SMTP id q21so4293986wmc.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 08 Feb 2019 09:35:45 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=E2oKCm2aHyIkLmsWfLt1xuMZ3si46gMPXE7rlXDV4Gg=;
+ b=o6PhnZungxBl1FHWb+8WwNsDkJDXfkICZjZtgPmXQm/Zn9kgKjsopyBPsSJcPQXCBq
+ 6l1skgJzlRFtC9/6b/P47gLlxrnsH/csAYVW6DIZvRqmmAtlL5RhgXiKMdSG0HvxDQ3J
+ W9FBPhHEtmkSEPrFX0T/fy0DRtIc5MBG1iRNq7EUA0OkAiGkJcYDo96n2hHeo6gWCXed
+ YU87zAssNGzamz2NhKgPGaULwsfTGJGvbBZXP5Oe47j6sqeKdWBt/19y/y5rAWVddIlO
+ n1d95uPyfKLIEoN+U45If9HSqUPsNpjJYwc272tReyug5Itohv2gFJ6n/hmC/O4a+Mtl
+ xNyg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=E2oKCm2aHyIkLmsWfLt1xuMZ3si46gMPXE7rlXDV4Gg=;
+ b=okEXDX499ru+FB78oM92GJk9AdQYRQ36rCS1lMMhWKRco8xW3tLYxkKaoMXm9Sjim9
+ 1aFSAmFo/YgGUcTnVKstHo6vVkh7JIAOVWY2uoqIcth56dzQDUROtw9Tj85j4/l7oM1q
+ oyfO/qzLQPUAlkHKJOsIQalTdUCHKcDPzO1CWWfwm4vtSbXSK2syVuqMynEM6LBoabuk
+ ncJuOu0qzMYfpYklfQh+imtDUHX82ahJQFwDyGpmLnFCQF+h1zztMV7mCOUe7wOOfFRZ
+ lldV3gT9CFOlrRQrNetXObdArzmTYwAZZaTSvNjFqxxies+rIlUdB4sBGwVzx3nrpOvf
+ uB1g==
+X-Gm-Message-State: AHQUAubSa4NnsHvEwOplrp+rFZT4ABxzpAV2D+nFPSdRadsWMSjjcNeG
+ c3guu35hIJkT9H5UdebIRfYW0Q==
+X-Google-Smtp-Source: AHgI3IatjZg4b0SSZmF0nwmCk5wLo+FpN6T0UdaHP7JlJFCzz077RBt1+NSq82ChDezEKwDZuI785A==
+X-Received: by 2002:a1c:f00a:: with SMTP id a10mr2802502wmb.148.1549647344390; 
+ Fri, 08 Feb 2019 09:35:44 -0800 (PST)
+Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
+ by smtp.gmail.com with ESMTPSA id p17sm354714wrv.59.2019.02.08.09.35.43
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 08 Feb 2019 09:35:43 -0800 (PST)
+From: Bartosz Golaszewski <brgl@bgdev.pl>
+To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Thomas Gleixner <tglx@linutronix.de>, David Lechner <david@lechnology.com>
+Subject: [PATCH v2 32/33] irqchip: davinci-cp-intc: move the driver to
+ drivers/irqchip
+Date: Fri,  8 Feb 2019 18:34:57 +0100
+Message-Id: <20190208173458.4801-33-brgl@bgdev.pl>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190208173458.4801-1-brgl@bgdev.pl>
+References: <20190208173458.4801-1-brgl@bgdev.pl>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181207175321.GA11430@edgewater-inn.cambridge.arm.com>
-User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_173546_101417_4E49ECE3 
-X-CRM114-Status: GOOD (  30.27  )
+X-CRM114-CacheID: sfid-20190208_173545_543040_B27CF125 
+X-CRM114-Status: GOOD (  14.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,158 +117,109 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
- Mark Salyzyn <salyzyn@android.com>, Paul Burton <paul.burton@mips.com>,
- Vincenzo Frascino <vincenzo.frascino@arm.com>,
- Peter Collingbourne <pcc@google.com>, linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org,
+ Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Thomas,
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-On Fri, Dec 07, 2018 at 05:53:21PM +0000, Will Deacon wrote:
-> On Thu, Nov 29, 2018 at 11:11:52PM +0100, Thomas Gleixner wrote:
-> > On Thu, 29 Nov 2018, Vincenzo Frascino wrote:
-> > > +static __always_inline notrace int __do_realtime_or_tai(
-> > > +		const struct vdso_data *vd,
-> > > +		struct __vdso_timespec *ts,
-> > > +		bool is_tai)
-> > > +{
-> > > +	u32 seq, cs_mono_mult, cs_shift;
-> > > +	u64 ns, sec;
-> > > +	u64 cycle_last, cs_mono_mask;
-> > > +
-> > > +	if (vd->use_syscall)
-> > > +		return -1;
-> > > +repeat:
-> > > +	seq = vdso_read_begin(vd);
-> > > +	cycle_last = vd->cs_cycle_last;
-> > > +	cs_mono_mult = vd->cs_mono_mult;
-> > > +	cs_shift = vd->cs_shift;
-> > > +	cs_mono_mask = vd->cs_mono_mask;
-> > > +
-> > > +	if (is_tai)
-> > > +		sec = vd->tai_sec;
-> > > +	else
-> > > +		sec = vd->xtime_clock_sec;
-> > > +	ns = vd->xtime_clock_nsec;
-> > > +
-> > > +	if (unlikely(vdso_read_retry(vd, seq)))
-> > > +		goto repeat;
-> > > +
-> > > +	ns += get_clock_shifted_nsec(cycle_last, cs_mono_mult, cs_mono_mask);
-> > 
-> > This is broken. You cannot read the counter outside the seq count protected
-> > region. Please tell the ARM64 folks that their VDSO asm maze is broken.
-> 
-> We'll fix the maze, but could you explain a bit about the brokenness,
-> please? The write side in update_vsyscall() is only touching the data page,
-> so I think we've got those fields covered correctly with the seqlock. We'd
-> only have to worry about protecting the counter if it could be written
-> somehow.
-> 
-> Is your concern to do with migrating between systems, where the new system
-> has a counter with a different offset? If so, what does the program flow
-> look like when migrating in? I guess somehow we ensure that update_vsyscall()
-> is invoked before userspace can resume.
-> 
-> Anyway, moving the counter read into the protected region is a little fiddly
-> because the memory barriers we have in there won't give us the ordering we
-> need. We'll instead need to do something nasty, like create a dependency
-> from the counter read to the read of the seqlock:
-> 
-> Maybe the untested crufty hack below, although this will be a nightmare to
-> implement in C.
+The cp-intc driver has now been cleaned up. Move it to drivers/irqchip
+where it belongs.
 
-We discussed this in person this week, but you couldn't recall the details
-off the top of your head so I'm replying here. Please could you clarify what
-your concern was with the existing code, and whether or not I've got the
-wrong end of the stick?
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Reviewed-by: David Lechner <david@lechnology.com>
+---
+ arch/arm/mach-davinci/Kconfig                             | 8 ++------
+ arch/arm/mach-davinci/Makefile                            | 2 --
+ drivers/irqchip/Kconfig                                   | 5 +++++
+ drivers/irqchip/Makefile                                  | 1 +
+ .../cp_intc.c => drivers/irqchip/irq-davinci-cp-intc.c    | 0
+ 5 files changed, 8 insertions(+), 8 deletions(-)
+ rename arch/arm/mach-davinci/cp_intc.c => drivers/irqchip/irq-davinci-cp-intc.c (100%)
 
-Cheers,
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index 71a4d875dd39..5a59cebc7d0a 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -1,10 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0
+ if ARCH_DAVINCI
+ 
+-config CP_INTC
+-	bool
+-	select IRQ_DOMAIN
+-
+ config ARCH_DAVINCI_DMx
+ 	bool
+ 
+@@ -33,13 +29,13 @@ config ARCH_DAVINCI_DA830
+ 	select ARCH_DAVINCI_DA8XX
+ 	# needed on silicon revs 1.0, 1.1:
+ 	select CPU_DCACHE_WRITETHROUGH if !CPU_DCACHE_DISABLE
+-	select CP_INTC
++	select DAVINCI_CP_INTC
+ 
+ config ARCH_DAVINCI_DA850
+ 	bool "DA850/OMAP-L138/AM18x based system"
+ 	depends on !ARCH_DAVINCI_DMx || (AUTO_ZRELADDR && ARM_PATCH_PHYS_VIRT)
+ 	select ARCH_DAVINCI_DA8XX
+-	select CP_INTC
++	select DAVINCI_CP_INTC
+ 
+ config ARCH_DAVINCI_DA8XX
+ 	bool
+diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
+index 983865a99616..f76a8482784f 100644
+--- a/arch/arm/mach-davinci/Makefile
++++ b/arch/arm/mach-davinci/Makefile
+@@ -18,8 +18,6 @@ obj-$(CONFIG_ARCH_DAVINCI_DM365)	+= dm365.o devices.o
+ obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= da830.o devices-da8xx.o usb-da8xx.o
+ obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= da850.o devices-da8xx.o usb-da8xx.o
+ 
+-obj-$(CONFIG_CP_INTC)			+= cp_intc.o
+-
+ # Board specific
+ obj-$(CONFIG_MACH_DA8XX_DT)		+= da8xx-dt.o pdata-quirks.o
+ obj-$(CONFIG_MACH_DAVINCI_EVM)  	+= board-dm644x-evm.o
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index ea0eb82bf1d2..48fc5024c073 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -134,6 +134,11 @@ config DAVINCI_AINTC
+ 	select GENERIC_IRQ_CHIP
+ 	select IRQ_DOMAIN
+ 
++config DAVINCI_CP_INTC
++	bool
++	select GENERIC_IRQ_CHIP
++	select IRQ_DOMAIN
++
+ config DW_APB_ICTL
+ 	bool
+ 	select GENERIC_IRQ_CHIP
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 623e0ec5f9d0..e6cd0c98eff2 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -7,6 +7,7 @@ obj-$(CONFIG_ATH79)			+= irq-ath79-misc.o
+ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
+ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
+ obj-$(CONFIG_DAVINCI_AINTC)		+= irq-davinci-aintc.o
++obj-$(CONFIG_DAVINCI_CP_INTC)		+= irq-davinci-cp-intc.o
+ obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
+ obj-$(CONFIG_FARADAY_FTINTC010)		+= irq-ftintc010.o
+ obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
+diff --git a/arch/arm/mach-davinci/cp_intc.c b/drivers/irqchip/irq-davinci-cp-intc.c
+similarity index 100%
+rename from arch/arm/mach-davinci/cp_intc.c
+rename to drivers/irqchip/irq-davinci-cp-intc.c
+-- 
+2.20.1
 
-Will
-
-> --->8
-> 
-> diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
-> index c39872a7b03c..2d1dfecae76b 100644
-> --- a/arch/arm64/kernel/vdso/gettimeofday.S
-> +++ b/arch/arm64/kernel/vdso/gettimeofday.S
-> @@ -73,6 +73,8 @@ x_tmp		.req	x8
->  	movn	x_tmp, #0xff00, lsl #48
->  	and	\res, x_tmp, \res
->  	mul	\res, \res, \mult
-> +	and	x_tmp, x_tmp, xzr
-> +	add	vdso_data, vdso_data, x_tmp
->  	.endm
->  
->  	/*
-> @@ -147,12 +149,12 @@ ENTRY(__kernel_gettimeofday)
->  	/* w11 = cs_mono_mult, w12 = cs_shift */
->  	ldp	w11, w12, [vdso_data, #VDSO_CS_MONO_MULT]
->  	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
-> -	seqcnt_check fail=1b
->  
->  	get_nsec_per_sec res=x9
->  	lsl	x9, x9, x12
->  
->  	get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
-> +	seqcnt_check fail=1b
->  	get_ts_realtime res_sec=x10, res_nsec=x11, \
->  		clock_nsec=x15, xtime_sec=x13, xtime_nsec=x14, nsec_to_sec=x9
->  
-> @@ -211,13 +213,13 @@ realtime:
->  	/* w11 = cs_mono_mult, w12 = cs_shift */
->  	ldp	w11, w12, [vdso_data, #VDSO_CS_MONO_MULT]
->  	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
-> -	seqcnt_check fail=realtime
->  
->  	/* All computations are done with left-shifted nsecs. */
->  	get_nsec_per_sec res=x9
->  	lsl	x9, x9, x12
->  
->  	get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
-> +	seqcnt_check fail=realtime
->  	get_ts_realtime res_sec=x10, res_nsec=x11, \
->  		clock_nsec=x15, xtime_sec=x13, xtime_nsec=x14, nsec_to_sec=x9
->  	clock_gettime_return, shift=1
-> @@ -231,7 +233,6 @@ monotonic:
->  	ldp	w11, w12, [vdso_data, #VDSO_CS_MONO_MULT]
->  	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
->  	ldp	x3, x4, [vdso_data, #VDSO_WTM_CLK_SEC]
-> -	seqcnt_check fail=monotonic
->  
->  	/* All computations are done with left-shifted nsecs. */
->  	lsl	x4, x4, x12
-> @@ -239,6 +240,7 @@ monotonic:
->  	lsl	x9, x9, x12
->  
->  	get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
-> +	seqcnt_check fail=monotonic
->  	get_ts_realtime res_sec=x10, res_nsec=x11, \
->  		clock_nsec=x15, xtime_sec=x13, xtime_nsec=x14, nsec_to_sec=x9
->  
-> @@ -253,13 +255,13 @@ monotonic_raw:
->  	/* w11 = cs_raw_mult, w12 = cs_shift */
->  	ldp	w12, w11, [vdso_data, #VDSO_CS_SHIFT]
->  	ldp	x13, x14, [vdso_data, #VDSO_RAW_TIME_SEC]
-> -	seqcnt_check fail=monotonic_raw
->  
->  	/* All computations are done with left-shifted nsecs. */
->  	get_nsec_per_sec res=x9
->  	lsl	x9, x9, x12
->  
->  	get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
-> +	seqcnt_check fail=monotonic_raw
->  	get_ts_clock_raw res_sec=x10, res_nsec=x11, \
->  		clock_nsec=x15, nsec_to_sec=x9
->  
 
 _______________________________________________
 linux-arm-kernel mailing list
