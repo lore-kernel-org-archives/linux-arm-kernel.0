@@ -2,67 +2,85 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 06FE5C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:15:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A054EC282CC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:23:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CBF4E21917
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:15:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 710E3218D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:23:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gRq31Rmi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CBF4E21917
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tv1CsWVc";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="fYpwcxzA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 710E3218D9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YS7y1xn/agJyrAuUWrAkWjefWLigcCLW7A+54RJXrAA=; b=gRq31Rmi7279qE
-	0u+kdGKQcfA78dLYlA66+rq26ubjOrTBt+XreX5QYp4S/AJZeRrPr1mrHw8zRwZK+zONeh3S23NqM
-	rc8/ITd2SdtATZYXYPApssW6kk/+AAH5hyN2HqypjTJjqklgWwZjORPZRfpqG6ncOttvDgbSdCvO2
-	zDr4qTD9WKTBf58twJON8r7Y4zsZTFt6cgqZTGf4wHcYX0MXea+0fSHELntdPxcg469BtCsVfEL2Y
-	fcfi/LqkhrJwuGgIW8X71KWVJ8HCnur/vkRkA7XSPdqIwcbYN8xlrK8DPpFO4fsAqkbdirwoFZ9SV
-	6OXHu6usqrTABH5Ipd0w==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=yFjB2UGHLXe6m8DzvIr4Ir5tCFROR+y5FJ/Y13645h4=; b=tv1CsWVcOPZ7Kj
+	s+RfNNHjDapxpZtYgqfk2/0v78ChGc1OfEF6R9+Bn7RDIIvA9djBFothykyLU5Sj2sVOky7zmtlhp
+	lHl/AM+68+3s9Aa+G+z2tcE7Ci4CxJcJfR6Gvk3ZbrHJjhfFJbokHXK0TujZp5lqFKqg4OMwO5JPN
+	jDwAfOcNELvoXOMxGhitfA4Tq4nAL2VnFuAHHVX/+KAR1UODg6SXvtjfso3+ydyObBcbjRPNl5D9C
+	OXYEW6Rtgrm801kQtGqVTaJNoydNGLrpf87znfRxX3D5jPkxCzc8NeXbbmwTnzU+NoLwttHSWTSit
+	ripSvtT0rzTFR04EC/QQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs2Fs-0001gB-1p; Fri, 08 Feb 2019 09:15:28 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs2Fp-0001fk-BZ
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:15:26 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id F3C8380D;
- Fri,  8 Feb 2019 01:15:22 -0800 (PST)
-Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9D01E3F557;
- Fri,  8 Feb 2019 01:15:21 -0800 (PST)
-Date: Fri, 8 Feb 2019 09:15:19 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Masami Hiramatsu <mhiramat@kernel.org>
-Subject: Re: [PATCH v2 4/4] arm64: kprobes: Use
- arch_populate_kprobe_blacklist()
-Message-ID: <20190208091519.GB6972@fuggles.cambridge.arm.com>
-References: <154753341900.31541.8135985235882849464.stgit@devbox>
- <154753353370.31541.14485875717131836689.stgit@devbox>
- <7f840cc8-4e62-e1d7-9035-4361204fc134@arm.com>
- <20190121222558.1ef0abc89a704597d6c3de7f@kernel.org>
+	id 1gs2NY-0004O3-6w; Fri, 08 Feb 2019 09:23:24 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gs2NV-0004Ni-BJ
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:23:22 +0000
+Received: from fllv0034.itg.ti.com ([10.64.40.246])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x189N3VO082505;
+ Fri, 8 Feb 2019 03:23:03 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1549617783;
+ bh=X/lGZNH3s/0L7uZkitokagWbtF0cFHSOQuQygwXIy+A=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=fYpwcxzAAXZKbtIbasmTIVsTU20vKtEMdixvw3lCzuwaLVLBBvl/OqBoOx37VtIHG
+ hAELPoY8qHrx3HbcfEWdpiAWBKFT0nFzBp0Ncu0qXvL/3IVoSsjlLyK6DQ0kY8+jrk
+ FnoPzskjYGt67nkYUkyrcsLeuhWqVn2PYvFwxo2Y=
+Received: from DFLE112.ent.ti.com (dfle112.ent.ti.com [10.64.6.33])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x189N2gV099195
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Fri, 8 Feb 2019 03:23:03 -0600
+Received: from DFLE114.ent.ti.com (10.64.6.35) by DFLE112.ent.ti.com
+ (10.64.6.33) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 8
+ Feb 2019 03:23:02 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE114.ent.ti.com
+ (10.64.6.35) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Fri, 8 Feb 2019 03:23:02 -0600
+Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x189Mwil016204;
+ Fri, 8 Feb 2019 03:22:58 -0600
+Subject: Re: [PATCH net-next v2 0/6] Add comphy support for Armada 38x
+To: Thomas Petazzoni <thomas.petazzoni@bootlin.com>, David Miller
+ <davem@davemloft.net>
+References: <20190207161825.ueinmyf6ygjiqzzy@shell.armlinux.org.uk>
+ <20190207.181049.1229639710283404215.davem@davemloft.net>
+ <20190208085821.7556a18d@windsurf>
+From: Kishon Vijay Abraham I <kishon@ti.com>
+Message-ID: <295924f0-1007-4b39-189b-1b21e4bf1b86@ti.com>
+Date: Fri, 8 Feb 2019 14:52:26 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190121222558.1ef0abc89a704597d6c3de7f@kernel.org>
-User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
+In-Reply-To: <20190208085821.7556a18d@windsurf>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_011525_401027_B105F766 
-X-CRM114-Status: GOOD (  20.04  )
+X-CRM114-CacheID: sfid-20190208_012321_467652_8ABD160D 
+X-CRM114-Status: GOOD (  19.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,82 +92,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Pratyush Anand <panand@redhat.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, James Morse <james.morse@arm.com>,
- "David A . Long" <dave.long@linaro.org>, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, andrew@lunn.ch, jason@lakedaemon.net,
+ devicetree@vger.kernel.org, netdev@vger.kernel.org,
+ gregory.clement@bootlin.com, linux@armlinux.org.uk, robh+dt@kernel.org,
+ linux-arm-kernel@lists.infradead.org, sebastian.hesselbarth@gmail.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Masami,
+Hi,
 
-On Mon, Jan 21, 2019 at 10:25:58PM +0900, Masami Hiramatsu wrote:
-> On Mon, 21 Jan 2019 12:20:07 +0000
-> James Morse <james.morse@arm.com> wrote:
-> > On 15/01/2019 06:25, Masami Hiramatsu wrote:
-> > > Use arch_populate_kprobe_blacklist() instead of
-> > > arch_within_kprobe_blacklist() so that we can see the full
-> > > blacklisted symbols under the debugfs.
-> > > diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-> > > index b9e9758b6534..6c066c34c8a4 100644
-> > > --- a/arch/arm64/kernel/probes/kprobes.c
-> > > +++ b/arch/arm64/kernel/probes/kprobes.c
-> > > @@ -465,26 +465,30 @@ kprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr)
-> > >  	return DBG_HOOK_HANDLED;
-> > >  }
-> > >  
-> > > -bool arch_within_kprobe_blacklist(unsigned long addr)
-> > > +int __init arch_populate_kprobe_blacklist(void)
-> > >  {
-> > > -	if ((addr >= (unsigned long)__kprobes_text_start &&
-> > > -	    addr < (unsigned long)__kprobes_text_end) ||
-> > > -	    (addr >= (unsigned long)__entry_text_start &&
-> > > -	    addr < (unsigned long)__entry_text_end) ||
-> > > -	    (addr >= (unsigned long)__idmap_text_start &&
-> > > -	    addr < (unsigned long)__idmap_text_end) ||
-> > 
-> > > -	    in_exception_text(addr))
-> > 
-> > You added this one in the previous patch, but it disappears here.
+On 08/02/19 1:28 PM, Thomas Petazzoni wrote:
+> Hello David,
 > 
-> Yes, it is easy to explain how we transcribe from 
-> arch_within_kprobe_blacklist() to arch_populate_kprobe_blacklist().
+> On Thu, 07 Feb 2019 18:10:49 -0800 (PST)
+> David Miller <davem@davemloft.net> wrote:
 > 
-> > 
-> > 
-> > > -		return true;
-> > > -
-> > > -	if (!is_kernel_in_hyp_mode()) {
-> > > -		if ((addr >= (unsigned long)__hyp_text_start &&
-> > > -		    addr < (unsigned long)__hyp_text_end) ||
-> > > -		    (addr >= (unsigned long)__hyp_idmap_text_start &&
-> > > -		    addr < (unsigned long)__hyp_idmap_text_end))
-> > > -			return true;
-> > > -	}
-> > > -
-> > > -	return false;
-> > > +	int ret;
-> > 
-> > 
-> > > +	ret = kprobe_add_area_blacklist((unsigned long)__kprobes_text_start,
-> > > +					(unsigned long)__kprobes_text_end);
-> > > +	if (ret)
-> > > +		return ret;
-> > 
-> > Now that we have arch_populate_kprobe_blacklist(), does the arch-code need to
-> > blacklist the kprobes section itself?
+>> From: Russell King - ARM Linux admin <linux@armlinux.org.uk>
+>> Date: Thu, 7 Feb 2019 16:18:25 +0000
+>>
+>>> This series adds support for the comphy for Armada 38x, which allows
+>>> these SoCs to use 2500BASE-X mode with appropriate SFP modules.
+>>>
+>>> Tested on SolidRun Clearfog after updating for the 5.0 merge window
+>>> changes.  
+>>
+>> Series applied, thanks Russell.
 > 
-> Ah, good catch! No, we don't need it here. Sorry I worked on older patch.
-> I'll update it.
+> This series contained:
+> 
+>  - Device Tree bindings that had not been ACKed by the DT bindings
+>    maintainers, one of which should have been merged through the
+>    drivers/phy maintainer tree.
+> 
+>  - A brand new drivers/phy driver that had not been ACKed by the
+>    drivers/phy maintainer.
 
-Did you send a new version of this series? I can't seem to spot it in my
-inbox.
+The PHY driver looks good to me. But I think it might still be better to take
+it via PHY tree since there are other Marvell drivers that are getting merged
+and will result in conflicts in Kconfig and Makefile.
 
-Cheers,
-
-Will
+Thanks
+Kishon
 
 _______________________________________________
 linux-arm-kernel mailing list
