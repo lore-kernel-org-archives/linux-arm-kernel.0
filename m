@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 46D72C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:34:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 88A8AC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:34:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 17C9A20844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:34:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4F51320844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:34:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pA/g0NiE";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="GmBaQFmc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 17C9A20844
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FIM+bir+";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="D9yia882"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F51320844
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,61 +25,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=S2JTWQ9W3865eW3NwC1rVxDNQAJmiE1sjO3DZm/NdFY=; b=pA/g0NiE2hR6rk
-	FhcfJiLDuDFt2eaIPvlc8Ue8U93t7PpFD1UjO8dfP4paR5aLYKCyWCW1QzTL8e5I1UCDMHdjTnCeF
-	KzxltxBywAocog8FhPoFd1EW8Mxf16enS/ntzgcT3zDDp4H7ufKO6F3OvW9Ya8S4byyFSWZYEW31W
-	ECdrZQJIkZXA2ElU5lJbIPL3q/qELtm9aAUPLj0o8VZrs7HBNCpkeMDflMxMVXeQrfWBAO3QPjuut
-	g4kROVzkI930r/mM6hBDctz2L1Lu0dF3GUZniLEUlHCdnTAy9I29V8wcUzloM9PAZvD8xCJt/+PnT
-	uyyvD28ESM3gPCNg7NRg==;
+	List-Owner; bh=zAvRbVakLJm3GUWim9NRIrxx3Fp96IogZZLJZXxXlHs=; b=FIM+bir+am73Fo
+	nMoYNcGOyq9dYffuDAjSnRfVz8jwlE5mR3Ac6fzZlTBaAIcb4cRgrAg+hjGuTA1vnr4CBMCEmoTZv
+	rWvQY95FXNljJUT8qlJ4S+ydvLRbjqRt/pGTywBsqqgnhulPMWSBqom4c9ENO85CV24CZOG7faUyG
+	Sq4KpOkOOZpKKTvmryZO116FMeCZyIJI0VfXdVCQcZC2qL6lfKBus+FCaA7IiGMKGNDFy8d3jiNam
+	WuMX4qx64faDQtINC2ioOZ6U26nOhSTW51xbYkoJJ7vBN3IkjzWEBIiKU6wS3XORmgVBJregPtsUK
+	kspmwdhOdT3Knr2Yhg1Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs6IH-0007Mz-7t; Fri, 08 Feb 2019 13:34:13 +0000
-Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
+	id 1gs6Io-0007sH-4v; Fri, 08 Feb 2019 13:34:46 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs6ID-0007MM-AZ
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 13:34:10 +0000
-Received: by mail-lj1-x241.google.com with SMTP id v14-v6so3048819ljv.1
+ id 1gs6Ii-0007qY-06
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 13:34:44 +0000
+Received: by mail-lf1-x143.google.com with SMTP id e27so2531097lfj.8
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 08 Feb 2019 05:34:08 -0800 (PST)
+ Fri, 08 Feb 2019 05:34:39 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=hT1KpY7uPwpUpPExJQn6LeYhsQy0SUPQZ6+Yia9oUwg=;
- b=GmBaQFmcXEalcDOu4gHMRZ21n9xIEPIl9HxZcel8s5jmjPclNDRkM4jbYPMfZILZtA
- nnxOjLNCSOby5vRyTXetSzD+ojNuR5vMkDE5hklsCSQEZjk1KqK37G3a9KW3TyFd0EFD
- cJw13Q7Y3Gc/vFmTKlggFs7nAamUXu/VL7bWdsU+LNL9ftKHQPvJy2xsAgt+IzTghvqo
- QrkcLZlbnh5G48Gei1pRR1wIbb5ulGE6Jg1f7cakCHFkfgSlH5bwD2ZdfSW60yGlbsm+
- VuVSFBk2Hxa/JfLRxgLLHUF416rLsAmAENaR/ZEaeywVqL+I1Oms7MWluxOZdcz96CAJ
- DlTA==
+ :cc; bh=oVpF5CM4kmNqgD308Zd6OdbapiCMvc6nkYIh9QkfA1s=;
+ b=D9yia882uReR1uWCds/eKVRffZcoVsnKUe8GFGv2OzDHs/BOzfBM+r/tfAJzXf1FN1
+ 97JBsaEa0RukmUx88UoHh9/awRA58L8slnXn83cRAaINkG/M6W2aMDeXVqBUSZRsFFtR
+ +awEG3ilmGdjKl4UqTyAGVTQzs+/0z7rl2OVlev9AjjPWzWAUc3E98wPlDqTsz4vZ37h
+ XCtjP3TPbtJd5XZnvpKJnXYyU+j2Lgmp4nY95EnZY8AZN210MBRd9rEIuPHaRq2KACCp
+ 1z3dpsXgmX4vBLcfrKvlGSdioduePRFg2F/Yh0e+bvOnwIAcWSOb78yVRgjxT2FDtGAq
+ OiNQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=hT1KpY7uPwpUpPExJQn6LeYhsQy0SUPQZ6+Yia9oUwg=;
- b=Enh5jIIv4geIEWHKwYBop25nnHDOBwWPDYlE16pLyyt7DOUKMX5gXFX2suhRlAwzjd
- 0kBsYx5X3tME41EydpbqKwZ3nHaoAm6MTGy/1/z2S9jkwMO/4qRpqpVqQeMuBsfZosI6
- uMmr5EQPT/aSsh068Dwg6pDSIBoneFNS9n443jTwuZXMUc1/cHTS/AlTM19/kSschZcC
- 3V8HPfQffPYIOK29brz9MjYnoKIwyF5RZYEM1RzmFYUQDI/9eOi+Vfc3CMzktMFjTWx/
- OGzfcWCPkbRll3E5qz6E+l3h3XghWpGQbvzDJYhLklL45cp9of+4Kd/aDvTjSUSlhF6g
- 1Q1w==
-X-Gm-Message-State: AHQUAubods+wDvcWx+zvo/sJTPFP4tXLHRYxzDiwanr/KIxBxF90ZmRP
- iChvnLeV28jir29aSSiKAapDDncT40Lvm8NrDAW57A==
-X-Google-Smtp-Source: AHgI3Iaa0doTUcfElIHZkbhRRkiTXKSNmm7NJ0pPtA0V5s51LJ2KkNa6Zn53Exc4EUrJT0jR4A1Sy1mIw09I8Xbj+Os=
-X-Received: by 2002:a2e:6109:: with SMTP id
- v9-v6mr13293584ljb.126.1549632847307; 
- Fri, 08 Feb 2019 05:34:07 -0800 (PST)
+ bh=oVpF5CM4kmNqgD308Zd6OdbapiCMvc6nkYIh9QkfA1s=;
+ b=ZsO8zeeHkomroiUBnjtR2+u7d+5PaSh18wgFAGvjhqiULDyqMWh1X2TPN6mbRlrUpj
+ X0oOmz49NrcmykA0ZvVg3cvPzAF0Cxwdo9L//pGUZywC6MLOC68Ai/dYqVOH68pG+0Fg
+ aYnkXq72WI1bmmZdSaCFnVP9J3Rmv9dHLxL8QGS7Q78jQd83E7mosaqNyIDhmkFFeF3B
+ gnx+LNoFiH12rsmYghwY/AyaUat1gxSlFW3HwSdyvthKGTXmTk0iiUJl74SvDtu15C4X
+ Mbw3aVzafuGXUuCzum4W4Hj5qXxQEh/u9WhtEYbVyPGFmRullugB+JFL670jvcgoEQ2a
+ //IA==
+X-Gm-Message-State: AHQUAuYFvVGq/w6gHJ4TcD8gHzDrhClGLmd9FfAun5wDClZHsh10IbdT
+ 4/7fdYRhXCypIUaLApvTV4HHFc64TD836dmUzepcGg==
+X-Google-Smtp-Source: AHgI3IZ99r3YTVCn5AyIyH5vFejioN4md+OJ7ebUTpZ8i/e5O9XdbeRnYkYn8YKjHtXkHi0C2wW0lJm1I3oyLgvv1Ls=
+X-Received: by 2002:a19:c502:: with SMTP id w2mr13206138lfe.168.1549632878369; 
+ Fri, 08 Feb 2019 05:34:38 -0800 (PST)
 MIME-Version: 1.0
 References: <20190205102546.29457-1-brgl@bgdev.pl>
- <20190205102546.29457-4-brgl@bgdev.pl>
-In-Reply-To: <20190205102546.29457-4-brgl@bgdev.pl>
+ <20190205102546.29457-5-brgl@bgdev.pl>
+In-Reply-To: <20190205102546.29457-5-brgl@bgdev.pl>
 From: Linus Walleij <linus.walleij@linaro.org>
-Date: Fri, 8 Feb 2019 14:33:55 +0100
-Message-ID: <CACRpkdakUOgnkNb1FVfycoq4u50wVo8Aj_57EUBs5QkvrYN7wg@mail.gmail.com>
-Subject: Re: [PATCH 3/8] ARM: davinci: omapl138-hawk: use gpio lookup entries
- for usb gpios
+Date: Fri, 8 Feb 2019 14:34:27 +0100
+Message-ID: <CACRpkda9M+MWxQnfkSbAXxdXjR0Ko41+rh+GbmNzJJTLn8Ptaw@mail.gmail.com>
+Subject: Re: [PATCH 4/8] ARM: davinci: da830-evm: use gpio lookup entries for
+ usb gpios
 To: Bartosz Golaszewski <brgl@bgdev.pl>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_053409_364968_59C62167 
-X-CRM114-Status: UNSURE (   8.58  )
+X-CRM114-CacheID: sfid-20190208_053440_146983_92D620C4 
+X-CRM114-Status: UNSURE (   8.56  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -108,7 +107,7 @@ On Tue, Feb 5, 2019 at 11:25 AM Bartosz Golaszewski <brgl@bgdev.pl> wrote:
 
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 >
-> Add lookup entries for the vbus and overcurrent gpios for omapl138-hawk.
+> Add lookup entries for vbus and overcurrent gpios for da830-evm.
 >
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
