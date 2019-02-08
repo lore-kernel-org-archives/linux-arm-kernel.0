@@ -2,21 +2,20 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B70CC282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 20:17:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E5793C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 20:19:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3CF652177B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 20:17:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B433F2177B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 20:19:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F9C+/ZSu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3CF652177B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t6hJngtb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B433F2177B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +24,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
 	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=5tLP0FxPaNg/nA1pSSg8uwsEiPz/gSolPjHM3Oo4dQg=; b=F9C+/ZSusdK09sPv2Zd6q+hh3
-	4wD3K6oxONEzXFt+tjrAsWgSe0mVl8aWOcHgM3Qeo5SGvDTfd4WkB1bLCwf0sVZAu6pHzOEWi102M
-	MLGg6UCAc4+J6xtbUetb+gG0/ofMB+8OGWdHht/IahUEjbm0954dhi/zUsNf9f9e4zLswSzC+KB00
-	mvwaAjSfj5EzP3CSXFnr8cw7m3BanyK8+VYFUgqrl/AJRNrtzJBpNtj90G7xmm3Tb0bCAtUWiI1iW
-	CzgetiJzxqZoDzwbEhpk8SNl8WXwJc0QpA6kHOzOkS4/ZPO9xrFsNkPcfityQ1JRQaQMcc7mnG0Jd
-	SSmbH4ILw==;
+	 bh=qJgvWFVRHJXFhtkIuGJPrQKZTxsXDu0bfU9f8HhBDqM=; b=t6hJngtb4ATFXTznJHGH6KDIp
+	F2OK2ujre8wWBeiPTByyAVGPUntmskjo1oA7Gr7kNYCDMOPhNzYFpZ5BVjHkZIGPESfvwJWY7vi8Z
+	3rCY/dFX6VYWFv3SgWhj1z7UxOsFSsSF+5dNUn/2F67xfqaNYtHSHKDI4NOp1kuT4zR+2/B9S0TMq
+	dg1mcIeKVwRrB2eYDFE53Y7tlIUD51rhhiJj9r+abGXzeU81Mhne/VW5eS4VNo2AstUvVdnbtSj6P
+	Xel5+5rB7t1ky8bwLVq4WzIWwqJdJulmTF0mqLWDgT17wT4Wl+aCNS+Wg9h8xJFvGRFPe8mEKhPtY
+	QZezKOAdQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsCaZ-0001zg-MH; Fri, 08 Feb 2019 20:17:31 +0000
-Received: from relay9-d.mail.gandi.net ([217.70.183.199])
+	id 1gsCcO-0002Jx-CE; Fri, 08 Feb 2019 20:19:24 +0000
+Received: from relay4-d.mail.gandi.net ([217.70.183.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsCaV-0001z7-QE
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 20:17:30 +0000
+ id 1gsCcK-0002JC-Ob
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 20:19:22 +0000
 X-Originating-IP: 90.89.68.76
 Received: from localhost (lfbn-1-10718-76.w90-89.abo.wanadoo.fr [90.89.68.76])
  (Authenticated sender: maxime.ripard@bootlin.com)
- by relay9-d.mail.gandi.net (Postfix) with ESMTPSA id A5A93FF805;
- Fri,  8 Feb 2019 20:17:12 +0000 (UTC)
-Date: Fri, 8 Feb 2019 21:17:11 +0100
+ by relay4-d.mail.gandi.net (Postfix) with ESMTPSA id 6C32CE0003;
+ Fri,  8 Feb 2019 20:19:08 +0000 (UTC)
+Date: Fri, 8 Feb 2019 21:19:08 +0100
 From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Harald Geyer <harald@ccbib.org>
-Subject: Re: [PATCHv3] arm64: dts: allwinner: a64: teres-i: enable backlight
-Message-ID: <20190208201711.fqqvhqd7gbqnoefp@flea>
-References: <20190208141629.14323-1-harald@ccbib.org>
+To: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+Subject: Re: [PATCH v2 3/5] media: sunxi: Add A10 CSI driver
+Message-ID: <20190208201908.t5easf5uurvax7re@flea>
+References: <cover.ba7411f0c7155d0292b38d3dec698e26b5cc813b.1548687041.git-series.maxime.ripard@bootlin.com>
+ <c1a7d46f8504decb58ff224b0b5f2f0733282cc6.1548687041.git-series.maxime.ripard@bootlin.com>
+ <CAAEAJfAxWBvj6E1fJ8fy=F2xDXLHwRq7-2BT3tQqbPvbZxseyg@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20190208141629.14323-1-harald@ccbib.org>
+In-Reply-To: <CAAEAJfAxWBvj6E1fJ8fy=F2xDXLHwRq7-2BT3tQqbPvbZxseyg@mail.gmail.com>
 User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_121728_150269_9B9E8685 
-X-CRM114-Status: GOOD (  24.44  )
+X-CRM114-CacheID: sfid-20190208_121920_948766_BDF9F3C3 
+X-CRM114-Status: GOOD (  12.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,88 +68,63 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Chen-Yu Tsai <wens@csie.org>, Rob Herring <robh+dt@kernel.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============8062259145461660037=="
+ Sakari Ailus <sakari.ailus@linux.intel.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Andrzej Hajda <a.hajda@samsung.com>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Hans Verkuil <hans.verkuil@cisco.com>,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ Frank Rowand <frowand.list@gmail.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ linux-media <linux-media@vger.kernel.org>
+Content-Type: multipart/mixed; boundary="===============7889586809882883263=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 
---===============8062259145461660037==
+--===============7889586809882883263==
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="n3ufijtwuazhhq7b"
+	protocol="application/pgp-signature"; boundary="hsnrvmpmpg5r7wb2"
 Content-Disposition: inline
 
 
---n3ufijtwuazhhq7b
+--hsnrvmpmpg5r7wb2
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-Hi Harald,
+Hi Ezequiel,
 
-On Fri, Feb 08, 2019 at 02:16:29PM +0000, Harald Geyer wrote:
-> Enable pwm and add a pretty standard backlight node.
+On Wed, Feb 06, 2019 at 07:59:43PM -0300, Ezequiel Garcia wrote:
+> > +       csi->isp_clk =3D devm_clk_get(&pdev->dev, "isp");
+> > +       if (IS_ERR(csi->isp_clk)) {
+> > +               dev_err(&pdev->dev, "Couldn't get our ISP clock\n");
+> > +               return PTR_ERR(csi->isp_clk);
+> > +       }
+> > +
+> > +       csi->mod_clk =3D devm_clk_get(&pdev->dev, "mod");
+> > +       if (IS_ERR(csi->mod_clk)) {
+> > +               dev_err(&pdev->dev, "Couldn't get our mod clock\n");
+> > +               return PTR_ERR(csi->mod_clk);
+> > +       }
+> > +
+> > +       csi->ram_clk =3D devm_clk_get(&pdev->dev, "ram");
+> > +       if (IS_ERR(csi->ram_clk)) {
+> > +               dev_err(&pdev->dev, "Couldn't get our ram clock\n");
+> > +               return PTR_ERR(csi->ram_clk);
+> > +       }
+> > +
 >=20
-> The regulator is always on, but we include it anyway, because it is
-> required by the binding document.
->=20
-> Signed-off-by: Harald Geyer <harald@ccbib.org>
-> ---
-> The backlight node got dropped from the initial submission of the
-> teres-i DT, because PWM support wasn't available in time, and I
-> kind of forgot to resubmit once PWM was in. Sorry about that.
->=20
-> While testing this patch I noticed, that sometimes on boot the
-> brightness is set to max_brightness instead of the default specified
-> in DT. I couldn't reproduce it reliably, but it seems to be related
-> to changing the pwm period. I guess the logic trying to detect
-> the brightness set by the boot loader gets confused in some corner
-> case if the pwm periods don't match. However unbinding and rebinding
-> the device to the driver always made it go to the proper default
-> brightness, so the problem is clearly not in the DT.
->=20
-> If the theory above is true, then it implies that the version of
-> u-boot running on my laptop doesn't completely overwrite all pwm
-> parameters. As this might be specific to my installation, I didn't
-> mention the issue in the commit message.
->=20
-> Changes since v2:
->  * Drop all the other stuff that got merged a year ago.
->  * Rebased on current sunxi/for-next branch
->  * Add power-supply property (just to conform to the binding)
->  * Use slightly different brightness-levels
->=20
-> Actually I tried omitting brightness-levels completely, as it is now
-> optional. However automatic calculation gives unreasonable results
-> (depending on the exact value of pwm period). A report has been sent
-> to the author of the code.
->=20
->=20
->  .../arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
->=20
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts b/arch/=
-arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-> index 7b7b14ba58e6..2a78932d5d3b 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-> @@ -21,6 +21,15 @@
->  		serial0 =3D &uart0;
->  	};
-> =20
-> +	backlight: backlight {
-> +		compatible =3D "pwm-backlight";
-> +		pwms =3D <&pwm 0 50000 0>;
-> +		power-supply =3D <&reg_dcdc1>;
-> +		brightness-levels =3D <0 5 10 15 20 30 40 55 70 85 100>;
+> Minor comment: perhaps you can take advantage
+> of the clock bulk API and simplify the clock management.
 
-The backlight perceived brightness should increase lineary with each
-step, which means that if you have ten steps, each step should
-increase the perceived brightness by 10%. The eye being what it is, a
-exponential sequence is usually a much better approximation.
+Our clocks have usually very different usages for each IP (the RAM
+controls the DMA side of the IP, the mod one controls the "logic" part
+of it, the bus one the register, etc.) so they needed to be handled
+quite differently. I'd rather stick with the current API.
 
-It looks good otherwise, thanks!
+Thanks!
 Maxime
 
 --=20
@@ -156,21 +132,21 @@ Maxime Ripard, Bootlin
 Embedded Linux and Kernel engineering
 https://bootlin.com
 
---n3ufijtwuazhhq7b
+--hsnrvmpmpg5r7wb2
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXF3jxwAKCRDj7w1vZxhR
-xd9PAQDfIXB78qZpCvPrEnHhSPEk/+05+/hn9JH47upZR3ZpOAEAsOgI4hEfo5dU
-/cNQ7sqdeDyZNY1GCGUFfIRDYRQx5AI=
-=raX6
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXF3kPAAKCRDj7w1vZxhR
+xX7rAQDZ8SvZeMCDfXgbukEy4JMwmoZozb1nisAxIhaBIKTsAQD6A3Cj6WVtN5dP
+uR0AiYb1Sg3joHZ9DfaysXHNhYUXvA8=
+=uUw3
 -----END PGP SIGNATURE-----
 
---n3ufijtwuazhhq7b--
+--hsnrvmpmpg5r7wb2--
 
 
---===============8062259145461660037==
+--===============7889586809882883263==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -181,5 +157,5 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---===============8062259145461660037==--
+--===============7889586809882883263==--
 
