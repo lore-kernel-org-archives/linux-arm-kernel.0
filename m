@@ -2,22 +2,23 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2DFD4C282E1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:52:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AA3E2C282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:10:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EF6852086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:52:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7BC4920844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 13:10:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ChR2N1Ul";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=cogentembedded-com.20150623.gappssmtp.com header.i=@cogentembedded-com.20150623.gappssmtp.com header.b="pUXtqEko"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF6852086C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=cogentembedded.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SUofMK0y";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="qp5Lk+Fd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7BC4920844
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,73 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NHIuuFARhZTMgOqJvQp/eggThO0NDR5uvzjdITR1IwU=; b=ChR2N1UlW2UWRR
-	tax6WwLsJOfa1mEsI4S8A3EViAQNGYSk+ikV6fgXM7da17h36OIRD4wgVqPUhsQej+i3FWFABBFy5
-	0SEe+z95sFhyGy1MPBRDSjECF23ZoqY5MawYHphoYzUrYyh05p7IWQLcL+EZCia4G4F+q26rkN2b1
-	l1C+6Oc5G0rsPj1tTW9VPuJbC0ooanyOCnHh9wc/zbntWCMoXsNn4JrODq3j8P+kSOHzhr6LWaMv+
-	821bxIAVVnPklQRw+UcOMNi016li0i7oMmSAQhVXByakIKi7uwX3Ryt3A4WWedpZJtX5J8fpEqx/1
-	qF8i3hgTwg3zLUUE5YuQ==;
+	List-Owner; bh=8ehsOaexBvc4Kcrhaf10jE88Nz3w0F2XKZaLIe55iU4=; b=SUofMK0yG0aOop
+	dndtz1REe1K4k0rpfpb8u1ZRYNfiuGg/X17zGuME7vCOjK0FvYMODJuWk8+8Wj5BSCmoOXUrqFwxT
+	dDjb2HsGRYs/ZFNMu7Wn0pXD15L9uRf+xk5ow5jdZnKJ/2qXCamyIJt+z+v6/aeAw3EhQwTNY+oXF
+	hYvAFkDtgParH2Iizrp/58X4B1ktiYU/VDbL3se/JCmy4a4+MbDhpumKhixDVLEeyozJEaDzjjQGF
+	jwKOfVb6IU3c1qty9UGxWPYOH1jvY+FGTopN+suJ4YvNIODLglGaFWL1nDRdV+0Q3Q6oQ8H4uCVan
+	eKJVt/yMXqLM58dKHV3w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs5e7-00080p-GE; Fri, 08 Feb 2019 12:52:43 +0000
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+	id 1gs5vZ-0006no-Tn; Fri, 08 Feb 2019 13:10:45 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs5e3-00080T-Sm
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:52:41 +0000
-Received: by mail-lf1-x144.google.com with SMTP id e27so2434519lfj.8
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 08 Feb 2019 04:52:38 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=cogentembedded-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:organization:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=Sstv+FariMaDhiPskpASC+lRTN6ZSuuUp6yHfV2vVeo=;
- b=pUXtqEkoPQZauIcsHjpB761HPyBOV3Iq5ePVbpOkaV8s6katFMt0diQdY5IVrOvjHx
- x0daotQvK6kMcXax4UNQrLOOe3ZRSRic6X4DrmdJRJbf7NBOXkEleXJRLAs8IEilrVqb
- B31puiKCR6nJCYaMHlu9Kg8GxOZpxwRB1gsJ2k+DjN5jbRr6VFPWlBCkTWrtISsySFmu
- ri+KyZ8VuxLtoRbLrAvg55AJ575XLTJeTa1HYhZgyZZwyM98NC12xc2mY45LpatU0uuA
- aRbQw+6q0aW8WIwEAzAFCzsygj6jH2uKjq5P7Rw9bdrkrTVAtLtEscDWEe//I03hNZ/l
- 7ajw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:organization
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=Sstv+FariMaDhiPskpASC+lRTN6ZSuuUp6yHfV2vVeo=;
- b=n2yxsWzlKqB1+LQh75IDYxi/gtT0w1tQbyH0Q33WVJxykgsuobdjHDuef84RR6NN6/
- 1ns5ha+qSW9o/03XlpCYs1E2LMWzMSBe1C936d28UsLLJ4vIdAwxVIjAqe/jOOcd2bus
- 787Jz+CVb6dwH6z4DcE36wtmiwCP1rZRSmRKjJYoAlpRQbWyGxRgQleNfcwockq0+SIX
- h3zf1/Ez6j256LeBettoUIq6X2aPTWLXlTpB0NfA4sXhry5kNrILF6SXCc6iFfjl5pUS
- HIm+etKPRl1LAFVYoVRzhknxDdcvloSXxs/KcmnglYweASn/BI3uppFY4pzVDke7cETK
- vjmg==
-X-Gm-Message-State: AHQUAuYjjftC7IW8lM00rs7Xv5l/0fcXUTswDcyuBCO8rbOuK0KJ3eyx
- y/ckjxr39fcEP9oPg1Xe5uccZw==
-X-Google-Smtp-Source: AHgI3IYIX8QubbdZUqL0dfyxcVIoZ9Oo1GAT+HJwmp5FzO6CzomrM/ENEturuFWDVc+CALZ5MhfA/A==
-X-Received: by 2002:ac2:5224:: with SMTP id i4mr6988894lfl.145.1549630356984; 
- Fri, 08 Feb 2019 04:52:36 -0800 (PST)
-Received: from wasted.cogentembedded.com ([31.173.84.132])
- by smtp.gmail.com with ESMTPSA id p77-v6sm405827lja.0.2019.02.08.04.52.35
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 08 Feb 2019 04:52:35 -0800 (PST)
-Subject: Re: [PATCH 08/12] arm64: dts: renesas: r8a774c0: Add OPPs table for
- cpu devices
-To: Simon Horman <horms+renesas@verge.net.au>,
- linux-renesas-soc@vger.kernel.org
-References: <cover.1549623801.git.horms+renesas@verge.net.au>
- <231d8908a66fa98f09553d31ad8cd5f382b29959.1549623801.git.horms+renesas@verge.net.au>
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Organization: Cogent Embedded
-Message-ID: <7d60ebf5-c245-f48d-47db-ce63f4f3690b@cogentembedded.com>
-Date: Fri, 8 Feb 2019 15:52:34 +0300
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.2.1
+ id 1gs5vW-0006nI-0V
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 13:10:43 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x18D9CMd023141;
+ Fri, 8 Feb 2019 07:09:12 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1549631352;
+ bh=O8g8S2kcSDX2YUP4kXKQs1K4athPkpJdPZuH4Q8eASE=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=qp5Lk+FdDR5Ta3QPuiOMnWGc/Zswe0e9RwkT3y1CFx1V1vaNwAKefghnurpCI/Bmg
+ PXhWymeQxe40wqM+4o6SjSAL0Ky0pEKVmllHBCWCKJmWhZ2HGS7Kqgf5qWcoPut8vB
+ kJYTVU/YnIuSSItfUQ6B1Q2rswRQPKUgL4b7qnTc=
+Received: from DLEE107.ent.ti.com (dlee107.ent.ti.com [157.170.170.37])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x18D9CWM040537
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Fri, 8 Feb 2019 07:09:12 -0600
+Received: from DLEE103.ent.ti.com (157.170.170.33) by DLEE107.ent.ti.com
+ (157.170.170.37) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 8
+ Feb 2019 07:09:11 -0600
+Received: from dflp33.itg.ti.com (10.64.6.16) by DLEE103.ent.ti.com
+ (157.170.170.33) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Fri, 8 Feb 2019 07:09:11 -0600
+Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x18D97tR005676;
+ Fri, 8 Feb 2019 07:09:08 -0600
+Subject: Re: [PATCH v2 01/12] ARM: dts: da850: fix interrupt numbers for
+ clocksource
+To: David Lechner <david@lechnology.com>, Bartosz Golaszewski <brgl@bgdev.pl>, 
+ Kevin Hilman <khilman@kernel.org>, Daniel Lezcano
+ <daniel.lezcano@linaro.org>, Rob Herring <robh+dt@kernel.org>, Mark Rutland
+ <mark.rutland@arm.com>, Thomas Gleixner <tglx@linutronix.de>
+References: <20190204171757.32073-1-brgl@bgdev.pl>
+ <20190204171757.32073-2-brgl@bgdev.pl>
+ <ce4c305e-7d76-6028-07e4-4922f3c700bf@lechnology.com>
+From: Sekhar Nori <nsekhar@ti.com>
+Message-ID: <4325c375-0519-7775-e4a9-8bd70aa59f94@ti.com>
+Date: Fri, 8 Feb 2019 18:39:07 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <231d8908a66fa98f09553d31ad8cd5f382b29959.1549623801.git.horms+renesas@verge.net.au>
-Content-Language: en-MW
+In-Reply-To: <ce4c305e-7d76-6028-07e4-4922f3c700bf@lechnology.com>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_045240_345176_B5D78E38 
-X-CRM114-Status: GOOD (  16.24  )
+X-CRM114-CacheID: sfid-20190208_051042_143930_A54C961D 
+X-CRM114-Status: GOOD (  14.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,53 +96,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fabrizio Castro <fabrizio.castro@bp.renesas.com>,
- Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org
+Cc: linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, stable@vger.kernel.org,
+ Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello!
-
-On 02/08/2019 02:13 PM, Simon Horman wrote:
-
-> From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+On 05/02/19 6:48 AM, David Lechner wrote:
+> On 2/4/19 11:17 AM, Bartosz Golaszewski wrote:
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> The timer interrupts specified in commit 3652e2741f42 ("ARM: dts:
+>> da850: Add clocks") are wrong but since the current timer code
+>> hard-codes them, the bug was never spotted.
+>>
+>> This patch must go into stable since, once we introduce a proper
+>> clocksource driver, devices with buggy device tree will stop booting.
+>>
+>> Fixes: 3652e2741f42 ("ARM: dts: da850: Add clocks")
+>> Cc: stable@vger.kernel.org
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
 > 
-> This patch defines OOP tables for all CPUs, similarly to
-> what done by Takeshi Kihara and Yoshihiro Kaneko for the
-> R8A77990.
-> 
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-[...]
-> @@ -55,6 +76,8 @@
->  			power-domains = <&sysc R8A774C0_PD_CA53_CPU0>;
->  			next-level-cache = <&L2_CA53>;
->  			enable-method = "psci";
-> +			clocks =<&cpg CPG_CORE R8A774C0_CLK_Z2>;
+> Reviewed-by: David Lechner <david@lechnology.com>
 
-   Need space after =...
+This patch is already in ARM SoC. Should be soon in Linus's tree too.
 
-> +			operating-points-v2 = <&cluster1_opp>;
->  		};
->  
->  		a53_1: cpu@1 {
-> @@ -64,6 +87,8 @@
->  			power-domains = <&sysc R8A774C0_PD_CA53_CPU1>;
->  			next-level-cache = <&L2_CA53>;
->  			enable-method = "psci";
-> +			clocks =<&cpg CPG_CORE R8A774C0_CLK_Z2>;
+https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/commit/?h=fixes&id=e3966a766865da7ced1dece663697861dd5cf103
 
-
-   Here as well...
-
-> +			operating-points-v2 = <&cluster1_opp>;
->  		};
->  
->  		L2_CA53: cache-controller-0 {
-
-MBR, Sergei
+Thanks,
+Sekhar
 
 _______________________________________________
 linux-arm-kernel mailing list
