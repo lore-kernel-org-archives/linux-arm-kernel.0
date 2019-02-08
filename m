@@ -2,84 +2,67 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 24E5CC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:45:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B9C3C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:54:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA066217D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:45:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4B46F218DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 11:54:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fGpn7He1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="uOhA3WNM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA066217D8
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MaqaL9SS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B46F218DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sigxcpu.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zswY+vJAO0Tua98TAf72jZzAPZNTD2XlpwLg4T6y/rc=; b=fGpn7He1VbA8Sy
-	MZ9TTGr5Yb2qGQj9uSXyMnsDOSUSn0VD1f4kIWe9/Bg/vr1c00T27xCRseDp2qEbQJiqCws2yHqwM
-	Yv5HPDZSUq4OMR/lBPfdRJsg5cbw5t9G+YP4WXVsT9IsFBMVOLAIHfSFEzCK5rONwdrvKTGm6kg+1
-	heWOpBU90UJUzlxyMBMO4JV8uUuagpTD5NOqPcr6Bc13H0evGNOhf51aPjUFtmZS/z4OGWDlUuLkE
-	ytQ990xsufqMIN+ZzyaDlTJNT3Sr2mA26h5A6rwmE8IPvWptQQmdNb2lZWwjOcKqvWDDa7v8rZlcY
-	hIFEO12DQVRURDKlPKwg==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Cc:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=4TSECCsu9Hg47uWnqoAZJlrw0y1ZEjox9YZLiaXVNuo=; b=MaqaL9SSQbWR13
+	SoMqFWNCKwEiadq8sNMzxFK0MHWi4I28zmJwz4ChEcijRIkOp7CnQc3gEEvaaCjF8URCCtHvhTCaC
+	8uDJhx8V05+lb9N9BQdAmiEcdXp4AYBgzCtevu5HRUFIVrXiqktccc37QfMc0VOwwbgOF8oyh8I7K
+	LnvB0wZf9o+DaGQ4ox2O7lhWCZEI7ueoZVoowqRhqfpjdMbaNx6YOq9sIWpHDthSm5Y7tXv5vews1
+	bKG4bP03lTNYVcGxYpuvFAqVvubLhdGSG5RXxhnnbMg+y3Doh+mpxub4JD8wiNY6ZBJcyK762Q+Dr
+	7gBtzsx6PnANuGBy5d9A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs4ak-0005kr-NT; Fri, 08 Feb 2019 11:45:10 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
+	id 1gs4jq-0000Mg-38; Fri, 08 Feb 2019 11:54:34 +0000
+Received: from honk.sigxcpu.org ([24.134.29.49])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs4ag-00055z-DV
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 11:45:08 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x18Bhs5b122569;
- Fri, 8 Feb 2019 05:43:54 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549626234;
- bh=LzHUrENdQtad7aZ9C8w4CNHKlWbfppzru+yr3K9GrhE=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=uOhA3WNMe86QOdtyAO3XEx52LK63fyqApmmHeXPr+/eMbjQCBBR9D5H6q50H13YeU
- 0miZqOAo1yKISS1AMRdQdhNR71gm+7KYkBa7ohBPPJCPFbyfUPu6H+wNTJaF1GQgCe
- Poce4eAVF7ZnlkSb83W/CB/lhuNGoAkDfAJ9bLpM=
-Received: from DFLE105.ent.ti.com (dfle105.ent.ti.com [10.64.6.26])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x18BhsdP081422
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 8 Feb 2019 05:43:54 -0600
-Received: from DFLE102.ent.ti.com (10.64.6.23) by DFLE105.ent.ti.com
- (10.64.6.26) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 8
- Feb 2019 05:43:53 -0600
-Received: from dflp33.itg.ti.com (10.64.6.16) by DFLE102.ent.ti.com
- (10.64.6.23) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 8 Feb 2019 05:43:53 -0600
-Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x18Bhnvx007023;
- Fri, 8 Feb 2019 05:43:51 -0600
-Subject: Re: [PATCH 00/35] ARM: davinci: modernize the irq support
-To: Bartosz Golaszewski <brgl@bgdev.pl>, David Lechner <david@lechnology.com>
-References: <20190131133928.17985-1-brgl@bgdev.pl>
- <edfcdc52-3ff0-ec58-94f7-4816d2b2b3f4@lechnology.com>
- <CAMRc=MfPAg_j-DfaQCaTd2GmBDctv7L0eSzTET+fcj+WArejdg@mail.gmail.com>
-From: Sekhar Nori <nsekhar@ti.com>
-Message-ID: <b70bbda8-b448-d9d1-e3fa-57dbfa6c2fbb@ti.com>
-Date: Fri, 8 Feb 2019 17:13:48 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gs4jn-0000Lg-FE
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 11:54:33 +0000
+Received: from localhost (localhost [127.0.0.1])
+ by honk.sigxcpu.org (Postfix) with ESMTP id 420E5FB06;
+ Fri,  8 Feb 2019 12:54:29 +0100 (CET)
+X-Virus-Scanned: Debian amavisd-new at honk.sigxcpu.org
+Received: from honk.sigxcpu.org ([127.0.0.1])
+ by localhost (honk.sigxcpu.org [127.0.0.1]) (amavisd-new, port 10024)
+ with ESMTP id 5a3au22ECbLC; Fri,  8 Feb 2019 12:54:28 +0100 (CET)
+Received: by bogon.sigxcpu.org (Postfix, from userid 1000)
+ id 88C77402F3; Fri,  8 Feb 2019 12:54:27 +0100 (CET)
+From: =?UTF-8?q?Guido=20G=C3=BCnther?= <agx@sigxcpu.org>
+To: Maxime Ripard <maxime.ripard@bootlin.com>, dri-devel@lists.freedesktop.org,
+ linux-arm-kernel@lists.infradead.org,
+ Robert Chiras <robert.chiras@nxp.com>, Sam Ravnborg <sam@ravnborg.org>,
+ Fabio Estevam <festevam@gmail.com>
+Subject: [PATCH v3 1/3] dt-bindings: Add vendor prefix for Mixel Inc
+Date: Fri,  8 Feb 2019 12:54:25 +0100
+Message-Id: <790562475ac47c7f80d41a9d7ed754e20409c87a.1549626136.git.agx@sigxcpu.org>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <cover.1549626136.git.agx@sigxcpu.org>
+References: <cover.1549626136.git.agx@sigxcpu.org>
 MIME-Version: 1.0
-In-Reply-To: <CAMRc=MfPAg_j-DfaQCaTd2GmBDctv7L0eSzTET+fcj+WArejdg@mail.gmail.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_034506_561122_FCFFB55F 
-X-CRM114-Status: GOOD (  18.69  )
+X-CRM114-CacheID: sfid-20190208_035431_667833_0AB65BCF 
+X-CRM114-Status: UNSURE (   8.16  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,37 +74,26 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jason Cooper <jason@lakedaemon.net>, Kevin Hilman <khilman@kernel.org>,
- Marc Zyngier <marc.zyngier@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- Thomas Gleixner <tglx@linutronix.de>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="utf-8"
 Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMDUvMDIvMTkgOTo0MSBQTSwgQmFydG9zeiBHb2xhc3pld3NraSB3cm90ZToKPiBwb24uLCA0
-IGx1dCAyMDE5IG8gMjI6NDkgRGF2aWQgTGVjaG5lciA8ZGF2aWRAbGVjaG5vbG9neS5jb20+IG5h
-cGlzYcWCKGEpOgo+Pgo+PiBPbiAxLzMxLzE5IDc6MzggQU0sIEJhcnRvc3ogR29sYXN6ZXdza2kg
-d3JvdGU6Cj4+PiBGcm9tOiBCYXJ0b3N6IEdvbGFzemV3c2tpIDxiZ29sYXN6ZXdza2lAYmF5bGli
-cmUuY29tPgo+Pj4KPj4+IFRoaXMgc2VyaWVzIHBvcnRzIHRoZSBkYXZpbmNpIHBsYXRmb3JtIHRv
-IHVzaW5nIFNQQVJTRV9JUlEsIGNsZWFucyB1cAo+Pj4gdGhlIGlycWNoaXAgZHJpdmVycyBhbmQg
-bW92ZXMgdGhlbSBvdmVyIHRvIGRyaXZlcnMvaXJxY2hpcC4KPj4+Cj4+Cj4+IFRoaXMgaGFzIGJl
-ZW4gb24gbXkgdG9kbyBsaXN0IGZvciB5ZWFycywgYnV0IEkndmUgbmV2ZXIgaGFkIGVub3VnaAo+
-PiB0aW1lIHRvIGZpZ3VyZSBpdCBvdXQuIE5pY2UgdG8gc2VlIGl0IGZpbmFsbHkgZ2V0dGluZyBk
-b25lIQo+Pgo+PiBTZXJpZXMgdGVzdGVkIG9uIExFR08gTUlORFNUT1JNUyBFVjMgKGRhODUwLWxp
-a2UpLiBJIGNhbiBub3cgdXNlCj4+IElJTyB0cmlnZ2VycyB3aXRob3V0IGhhdmluZyB0byBwYXRj
-aCB0aGUga2VybmVsIHRvIGFkZCBleHRyYQo+PiBpbnRlcnJ1cHRzLgo+Pgo+PiBUZXN0ZWQtYnk6
-IERhdmlkIExlY2huZXIgPGRhdmlkQGxlY2hub2xvZ3kuY29tPgo+Pgo+Pgo+IAo+IFdvdyB0aGFu
-a3MgZm9yIHRha2luZyB0aGUgdGltZSB0byByZXZpZXcgaXQhCj4gCj4gSSdsbCBhZGRyZXNzIGNl
-cnRhaW4gcmVtYXJrcyAtIGZvciB0aG9zZSB1bmFkZHJlc3NlZCAtIEknbGwgZml4IHRoZW0gaW4g
-djIuCj4gCj4gU2VraGFyOiBhcmUgeW91IGZpbmUgd2l0aCBzZW5kaW5nIGJvdGggdGhlIGNsb2Nr
-c291cmNlIGFuZCBpbnRlcnJ1cHQKPiBzZXJpZXMgdG9nZXRoZXIgbmV4dCB0aW1lIHdpdGggYWRk
-aXRpb25hbCBwYXRjaGVzIG9uIHRvcCBtYWtpbmcKPiBkYXZpbmNpIHBhcnQgb2YgbXVsdGlfdjVf
-ZGVmY29uZmlnPwoKSSB0aGluayBpdHMgYmV0dGVyIHRvIGtlZXAgdGhlbSBzZXBhcmF0ZS4gWW91
-IGNhbiBiYXNlIGJvdGggb24gbGF0ZXN0Cm1haW5saW5lLgoKVGhhbmtzLApTZWtoYXIKCl9fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJu
-ZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRw
-Oi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+QWRkIHZlbmRvciBwcmVmaXggIm1peGVsIiBmb3IgTWl4ZWwgSW5jLiBXaWxsIGJlIHVzZWQgZm9y
+IGEgTUlQSSBEU0kKUEhZIGRyaXZlci4KClNpZ25lZC1vZmYtYnk6IEd1aWRvIEfDvG50aGVyIDxh
+Z3hAc2lneGNwdS5vcmc+Ci0tLQogRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL3Zl
+bmRvci1wcmVmaXhlcy50eHQgfCAxICsKIDEgZmlsZSBjaGFuZ2VkLCAxIGluc2VydGlvbigrKQoK
+ZGlmZiAtLWdpdCBhL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy92ZW5kb3ItcHJl
+Zml4ZXMudHh0IGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL3ZlbmRvci1wcmVm
+aXhlcy50eHQKaW5kZXggODhkY2RjMDRjOGM5Li5hNzRjMTA1NzZmYjkgMTAwNjQ0Ci0tLSBhL0Rv
+Y3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy92ZW5kb3ItcHJlZml4ZXMudHh0CisrKyBi
+L0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy92ZW5kb3ItcHJlZml4ZXMudHh0CkBA
+IC0yNDcsNiArMjQ3LDcgQEAgbWlrcm9lCQlNaWtyb0VsZWt0cm9uaWthIGQuby5vLgogbWluaXgJ
+TUlOSVggVGVjaG5vbG9neSBMdGQuCiBtaXJhbWVtcwlNaXJhTUVNUyBTZW5zaW5nIFRlY2hub2xv
+Z3kgQ28uLCBMdGQuCiBtaXRzdWJpc2hpCU1pdHN1YmlzaGkgRWxlY3RyaWMgQ29ycG9yYXRpb24K
+K21peGVsCU1peGVsLCBJbmMuCiBtb3NhaXh0ZWNoCU1vc2FpeCBUZWNobm9sb2dpZXMsIEluYy4K
+IG1vdG9yb2xhCU1vdG9yb2xhLCBJbmMuCiBtb3hhCU1veGEgSW5jLgotLSAKMi4yMC4xCgoKX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtl
+cm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0
+dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5l
+bAo=
