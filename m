@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E8EBFC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:25:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B2F3C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:26:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B768520663
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:25:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CC04420663
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:26:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AGh19gh1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B768520663
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="grNhIr7B"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC04420663
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,43 +25,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
 	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=Luc6uQHEt6bkq0R9sqY6MstndKi6+dS106qVZLuwM14=; b=AGh
-	19gh1t5TiCyF3x1TWCikyAGMcI2Kk9udsynO811qZTkJD3m2TvMhTrUMYfnu27a0LWpppeFtsHUt/
-	BW+OJrqkIw95g4vHEVZmVctwREmtPzcBB+0Wzdc6Bx1W6+c7TwaOxHNisGw5BRI7j5qluQ+BIzWsP
-	Jp3DzfgPEhXtNfTvLNi+OA0jfWdCM73KO81+eDM2ldAd6MZaXkyuYAiU0O9vVFy5BZ3u5EhhwZKxi
-	5EOtl27lW43RD9XQlA3ZfnrNBgVCZ+91WJli8MRkV3BNIHwVNLJ3U6pQPghbDgDAGDQbGvDjxU+Z8
-	xnomhNsz05MGbhtgUbOzFlA4GdOn7Zg==;
+	References:List-Owner; bh=JmpBC372cmOs8qnQ8QbzwjwouonfWl2UzrWmCwFouCI=; b=grN
+	hIr7BJUQlKWTd/tqsv9Swy4ie3FyvqFWwPR2qPFL5iMsf+rBeEqkJZIO1EYffTSrQN7z19jmxTOyC
+	deREXDEjVP6BvkUwr8ckV7qmh10aFaOuPYXqImOU/OqC/Fb6V8UIeXEsHW9w1vWx6c6mCz+YAxwQK
+	3PA/bZFZTyyasz0ks5iYIUFMqxK9H4Ah9xhPyOyPbDWdI3T2uf2gsdz9t40GX/fCuCgb5m6/Rz5kZ
+	vtNQPkHteoXci4E+oCRAVn959WXk+CMuIZstIaYXYqLiTsyd/ylRNcABU4xHx7rikLs47NL3t57Ao
+	4nNtZsy1jMw8mewKIBYkonKueiexo0w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs5ED-0007WL-2a; Fri, 08 Feb 2019 12:25:57 +0000
+	id 1gs5Ei-0007zs-W9; Fri, 08 Feb 2019 12:26:29 +0000
 Received: from mx.socionext.com ([202.248.49.38])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs5Ds-0007A4-Cq
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:25:53 +0000
+ id 1gs5EQ-0007oP-KQ
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:26:26 +0000
 Received: from unknown (HELO iyokan-ex.css.socionext.com) ([172.31.9.54])
- by mx.socionext.com with ESMTP; 08 Feb 2019 21:25:35 +0900
-Received: from mail.mfilter.local (m-filter-1 [10.213.24.61])
- by iyokan-ex.css.socionext.com (Postfix) with ESMTP id 6FBE160062;
- Fri,  8 Feb 2019 21:25:35 +0900 (JST)
+ by mx.socionext.com with ESMTP; 08 Feb 2019 21:26:09 +0900
+Received: from mail.mfilter.local (m-filter-2 [10.213.24.62])
+ by iyokan-ex.css.socionext.com (Postfix) with ESMTP id E2E6760062;
+ Fri,  8 Feb 2019 21:26:09 +0900 (JST)
 Received: from 172.31.9.51 (172.31.9.51) by m-FILTER with ESMTP;
- Fri, 8 Feb 2019 21:25:35 +0900
+ Fri, 8 Feb 2019 21:26:09 +0900
 Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
- by kinkan.css.socionext.com (Postfix) with ESMTP id 498921A04E1;
- Fri,  8 Feb 2019 21:25:35 +0900 (JST)
+ by kinkan.css.socionext.com (Postfix) with ESMTP id A4D711A04E1;
+ Fri,  8 Feb 2019 21:26:09 +0900 (JST)
 Received: from M20VSDK.e01.socionext.com (unknown [10.213.118.34])
- by yuzu.css.socionext.com (Postfix) with ESMTP id 2E5511202F1;
- Fri,  8 Feb 2019 21:25:35 +0900 (JST)
+ by yuzu.css.socionext.com (Postfix) with ESMTP id 922AF1202F1;
+ Fri,  8 Feb 2019 21:26:09 +0900 (JST)
 From: Sugaya Taichi <sugaya.taichi@socionext.com>
-To: linux-arm-kernel@lists.infradead.org,
-	linux-kernel@vger.kernel.org
-Subject: [PATCH v2 04/15] ARM: milbeaut: Add basic support for Milbeaut m10v
- SoC
-Date: Fri,  8 Feb 2019 21:26:18 +0900
-Message-Id: <1549628778-30785-1-git-send-email-sugaya.taichi@socionext.com>
+To: linux-kernel@vger.kernel.org,
+	linux-arm-kernel@lists.infradead.org
+Subject: [PATCH v2 06/15] clocksource/drivers/timer-milbeaut: Introduce timer
+ for Milbeaut SoCs
+Date: Fri,  8 Feb 2019 21:26:52 +0900
+Message-Id: <1549628812-31235-1-git-send-email-sugaya.taichi@socionext.com>
 X-Mailer: git-send-email 1.9.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_042537_438747_26EC418E 
-X-CRM114-Status: GOOD (  19.05  )
+X-CRM114-CacheID: sfid-20190208_042611_522244_7F0912D2 
+X-CRM114-Status: GOOD (  18.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,8 +76,9 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
 Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>,
  Masami Hiramatsu <masami.hiramatsu@linaro.org>,
  Sugaya Taichi <sugaya.taichi@socionext.com>,
- Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
- Takao Orito <orito.takao@socionext.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Jassi Brar <jaswinder.singh@linaro.org>,
+ Takao Orito <orito.takao@socionext.com>, Thomas Gleixner <tglx@linutronix.de>,
  Kazuhiro Kasai <kasai.kazuhiro@socionext.com>
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -85,231 +86,216 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This adds the basic M10V SoC support under arch/arm.
-Since all cores are activated in the custom bootloader before booting
-linux, it is necessary to wait for the secondary-cores using cpu-enable-
-method and special sram.
+Add timer driver for Milbeaut SoCs series.
+
+The timer has two 32-bit width down counters, one of which is configured
+as a clockevent device and the other is configured as a clock source.
 
 Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
 ---
- arch/arm/Kconfig                 |   2 +
- arch/arm/Makefile                |   1 +
- arch/arm/mach-milbeaut/Kconfig   |  20 ++++++
- arch/arm/mach-milbeaut/Makefile  |   1 +
- arch/arm/mach-milbeaut/platsmp.c | 144 +++++++++++++++++++++++++++++++++++++++
- 5 files changed, 168 insertions(+)
- create mode 100644 arch/arm/mach-milbeaut/Kconfig
- create mode 100644 arch/arm/mach-milbeaut/Makefile
- create mode 100644 arch/arm/mach-milbeaut/platsmp.c
+ drivers/clocksource/Kconfig          |   9 ++
+ drivers/clocksource/Makefile         |   1 +
+ drivers/clocksource/timer-milbeaut.c | 161 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 171 insertions(+)
+ create mode 100644 drivers/clocksource/timer-milbeaut.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 664e918..c8cb752 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -750,6 +750,8 @@ source "arch/arm/mach-mediatek/Kconfig"
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index a9e26f6..9101b8f 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -634,4 +634,13 @@ config GX6605S_TIMER
+ 	help
+ 	  This option enables support for gx6605s SOC's timer.
  
- source "arch/arm/mach-meson/Kconfig"
- 
-+source "arch/arm/mach-milbeaut/Kconfig"
-+
- source "arch/arm/mach-mmp/Kconfig"
- 
- source "arch/arm/mach-moxart/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 9db3c58..00000e9 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -190,6 +190,7 @@ machine-$(CONFIG_ARCH_MV78XX0)		+= mv78xx0
- machine-$(CONFIG_ARCH_MVEBU)		+= mvebu
- machine-$(CONFIG_ARCH_MXC)		+= imx
- machine-$(CONFIG_ARCH_MEDIATEK)		+= mediatek
-+machine-$(CONFIG_ARCH_MILBEAUT)		+= milbeaut
- machine-$(CONFIG_ARCH_MXS)		+= mxs
- machine-$(CONFIG_ARCH_NETX)		+= netx
- machine-$(CONFIG_ARCH_NOMADIK)		+= nomadik
-diff --git a/arch/arm/mach-milbeaut/Kconfig b/arch/arm/mach-milbeaut/Kconfig
-new file mode 100644
-index 0000000..6a576fd
---- /dev/null
-+++ b/arch/arm/mach-milbeaut/Kconfig
-@@ -0,0 +1,20 @@
-+# SPDX-License-Identifier: GPL-2.0
-+menuconfig ARCH_MILBEAUT
-+	bool "Socionext Milbeaut SoCs"
-+	depends on ARCH_MULTI_V7
-+	select ARM_GIC
++config MILBEAUT_TIMER
++	bool "Milbeaut timer driver" if COMPILE_TEST
++	depends on OF
++	depends on ARM
++	select TIMER_OF
++	select CLKSRC_MMIO
 +	help
-+	  This enables support for Socionext Milbeaut SoCs
++	  Enables the support for Milbeaut timer driver.
 +
-+if ARCH_MILBEAUT
-+
-+config ARCH_MILBEAUT_M10V
-+	bool "Milbeaut SC2000/M10V platform"
-+	select ARM_ARCH_TIMER
-+	select MILBEAUT_TIMER
-+	select PINCTRL
-+	select PINCTRL_MILBEAUT
-+	help
-+	  Support for Socionext's MILBEAUT M10V based systems
-+
-+endif
-diff --git a/arch/arm/mach-milbeaut/Makefile b/arch/arm/mach-milbeaut/Makefile
+ endmenu
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index cdd210f..6f2543b 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -55,6 +55,7 @@ obj-$(CONFIG_CLKSRC_TI_32K)	+= timer-ti-32k.o
+ obj-$(CONFIG_CLKSRC_NPS)	+= timer-nps.o
+ obj-$(CONFIG_OXNAS_RPS_TIMER)	+= timer-oxnas-rps.o
+ obj-$(CONFIG_OWL_TIMER)		+= timer-owl.o
++obj-$(CONFIG_MILBEAUT_TIMER)	+= timer-milbeaut.o
+ obj-$(CONFIG_SPRD_TIMER)	+= timer-sprd.o
+ obj-$(CONFIG_NPCM7XX_TIMER)	+= timer-npcm7xx.o
+ obj-$(CONFIG_RDA_TIMER)		+= timer-rda.o
+diff --git a/drivers/clocksource/timer-milbeaut.c b/drivers/clocksource/timer-milbeaut.c
 new file mode 100644
-index 0000000..ce5ea06
+index 0000000..f2019a8
 --- /dev/null
-+++ b/arch/arm/mach-milbeaut/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_SMP) += platsmp.o
-diff --git a/arch/arm/mach-milbeaut/platsmp.c b/arch/arm/mach-milbeaut/platsmp.c
-new file mode 100644
-index 0000000..bdcd98e
---- /dev/null
-+++ b/arch/arm/mach-milbeaut/platsmp.c
-@@ -0,0 +1,144 @@
++++ b/drivers/clocksource/timer-milbeaut.c
+@@ -0,0 +1,161 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * Copyright:	(C) 2018 Socionext Inc.
-+ * Copyright:	(C) 2015 Linaro Ltd.
++ * Copyright (C) 2018 Socionext Inc.
 + */
 +
-+#include <linux/cpu_pm.h>
-+#include <linux/irqchip/arm-gic.h>
-+#include <linux/of_address.h>
-+#include <linux/suspend.h>
++#include <linux/clk.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/irqreturn.h>
++#include <linux/sched_clock.h>
++#include "timer-of.h"
 +
-+#include <asm/cacheflush.h>
-+#include <asm/cp15.h>
-+#include <asm/idmap.h>
-+#include <asm/smp_plat.h>
-+#include <asm/suspend.h>
++#define MLB_TMR_TMCSR_OFS	0x0
++#define MLB_TMR_TMR_OFS		0x4
++#define MLB_TMR_TMRLR1_OFS	0x8
++#define MLB_TMR_TMRLR2_OFS	0xc
++#define MLB_TMR_REGSZPCH	0x10
 +
-+#define M10V_MAX_CPU	4
-+#define KERNEL_UNBOOT_FLAG	0x12345678
++#define MLB_TMR_TMCSR_OUTL	BIT(5)
++#define MLB_TMR_TMCSR_RELD	BIT(4)
++#define MLB_TMR_TMCSR_INTE	BIT(3)
++#define MLB_TMR_TMCSR_UF	BIT(2)
++#define MLB_TMR_TMCSR_CNTE	BIT(1)
++#define MLB_TMR_TMCSR_TRG	BIT(0)
 +
-+static void __iomem *m10v_smp_base;
++#define MLB_TMR_TMCSR_CSL_DIV2	0
++#define MLB_TMR_DIV_CNT		2
 +
-+static int m10v_boot_secondary(unsigned int l_cpu, struct task_struct *idle)
++#define MLB_TMR_SRC_CH  (1)
++#define MLB_TMR_EVT_CH  (0)
++
++#define MLB_TMR_SRC_CH_OFS	(MLB_TMR_REGSZPCH * MLB_TMR_SRC_CH)
++#define MLB_TMR_EVT_CH_OFS	(MLB_TMR_REGSZPCH * MLB_TMR_EVT_CH)
++
++#define MLB_TMR_SRC_TMCSR_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMCSR_OFS)
++#define MLB_TMR_SRC_TMR_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMR_OFS)
++#define MLB_TMR_SRC_TMRLR1_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMRLR1_OFS)
++#define MLB_TMR_SRC_TMRLR2_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMRLR2_OFS)
++
++#define MLB_TMR_EVT_TMCSR_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMCSR_OFS)
++#define MLB_TMR_EVT_TMR_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMR_OFS)
++#define MLB_TMR_EVT_TMRLR1_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMRLR1_OFS)
++#define MLB_TMR_EVT_TMRLR2_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMRLR2_OFS)
++
++#define MLB_TIMER_RATING	500
++
++static irqreturn_t mlb_timer_interrupt(int irq, void *dev_id)
 +{
-+	unsigned int mpidr, cpu, cluster;
++	struct clock_event_device *clk = dev_id;
++	struct timer_of *to = to_timer_of(clk);
++	u32 val;
 +
-+	if (!m10v_smp_base)
-+		return -ENXIO;
++	val = readl_relaxed(timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
++	val &= ~MLB_TMR_TMCSR_UF;
++	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
 +
-+	mpidr = cpu_logical_map(l_cpu);
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++	clk->event_handler(clk);
 +
-+	if (cpu >= M10V_MAX_CPU)
-+		return -EINVAL;
++	return IRQ_HANDLED;
++}
 +
-+	pr_info("%s: cpu %u l_cpu %u cluster %u\n",
-+			__func__, cpu, l_cpu, cluster);
++static int mlb_set_state_periodic(struct clock_event_device *clk)
++{
++	struct timer_of *to = to_timer_of(clk);
++	u32 val = MLB_TMR_TMCSR_CSL_DIV2;
 +
-+	writel(__pa_symbol(secondary_startup), m10v_smp_base + cpu * 4);
-+	arch_send_wakeup_ipi_mask(cpumask_of(l_cpu));
++	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
 +
++	writel_relaxed(to->of_clk.period, timer_of_base(to) +
++				MLB_TMR_EVT_TMRLR1_OFS);
++	val |= MLB_TMR_TMCSR_RELD | MLB_TMR_TMCSR_CNTE |
++		MLB_TMR_TMCSR_TRG | MLB_TMR_TMCSR_INTE;
++	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
 +	return 0;
 +}
 +
-+static void m10v_smp_init(unsigned int max_cpus)
++static int mlb_set_state_oneshot(struct clock_event_device *clk)
 +{
-+	unsigned int mpidr, cpu, cluster;
-+	struct device_node *np;
++	struct timer_of *to = to_timer_of(clk);
++	u32 val = MLB_TMR_TMCSR_CSL_DIV2;
 +
-+	np = of_find_compatible_node(NULL, NULL, "socionext,milbeaut-smp-sram");
-+	if (!np)
-+		return;
-+
-+	m10v_smp_base = of_iomap(np, 0);
-+	if (!m10v_smp_base)
-+		return;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+	pr_info("MCPM boot on cpu_%u cluster_%u\n", cpu, cluster);
-+
-+	for (cpu = 0; cpu < M10V_MAX_CPU; cpu++)
-+		writel(KERNEL_UNBOOT_FLAG, m10v_smp_base + cpu * 4);
++	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
++	return 0;
 +}
 +
-+static void m10v_cpu_die(unsigned int l_cpu)
++static int mlb_clkevt_next_event(unsigned long event,
++				   struct clock_event_device *clk)
 +{
-+	gic_cpu_if_down(0);
-+	v7_exit_coherency_flush(louis);
-+	wfi();
++	struct timer_of *to = to_timer_of(clk);
++
++	writel_relaxed(event, timer_of_base(to) + MLB_TMR_EVT_TMRLR1_OFS);
++	writel_relaxed(MLB_TMR_TMCSR_CSL_DIV2 |
++			MLB_TMR_TMCSR_CNTE | MLB_TMR_TMCSR_INTE |
++			MLB_TMR_TMCSR_TRG, timer_of_base(to) +
++			MLB_TMR_EVT_TMCSR_OFS);
++	return 0;
 +}
 +
-+static int m10v_cpu_kill(unsigned int l_cpu)
++static int mlb_config_clock_source(struct timer_of *to)
 +{
-+	unsigned int mpidr, cpu;
-+
-+	mpidr = cpu_logical_map(l_cpu);
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+
-+	writel(KERNEL_UNBOOT_FLAG, m10v_smp_base + cpu * 4);
-+
-+	return 1;
++	writel_relaxed(0, timer_of_base(to) + MLB_TMR_SRC_TMCSR_OFS);
++	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMR_OFS);
++	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMRLR1_OFS);
++	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMRLR2_OFS);
++	writel_relaxed(BIT(4) | BIT(1) | BIT(0), timer_of_base(to) +
++		MLB_TMR_SRC_TMCSR_OFS);
++	return 0;
 +}
 +
-+static struct smp_operations m10v_smp_ops __initdata = {
-+	.smp_prepare_cpus	= m10v_smp_init,
-+	.smp_boot_secondary	= m10v_boot_secondary,
-+	.cpu_die		= m10v_cpu_die,
-+	.cpu_kill		= m10v_cpu_kill,
++static int mlb_config_clock_event(struct timer_of *to)
++{
++	writel_relaxed(0, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
++	return 0;
++}
++
++static struct timer_of to = {
++	.flags = TIMER_OF_IRQ | TIMER_OF_BASE | TIMER_OF_CLOCK,
++
++	.clkevt = {
++		.name = "mlb-clkevt",
++		.rating = MLB_TIMER_RATING,
++		.cpumask = cpu_possible_mask,
++		.features = CLOCK_EVT_FEAT_DYNIRQ | CLOCK_EVT_FEAT_ONESHOT,
++		.set_state_oneshot = mlb_set_state_oneshot,
++		.set_state_periodic = mlb_set_state_periodic,
++		.set_next_event = mlb_clkevt_next_event,
++	},
++
++	.of_irq = {
++		.flags = IRQF_TIMER | IRQF_IRQPOLL,
++		.handler = mlb_timer_interrupt,
++	},
 +};
-+CPU_METHOD_OF_DECLARE(m10v_smp, "socionext,milbeaut-m10v-smp", &m10v_smp_ops);
 +
-+static int m10v_pm_valid(suspend_state_t state)
++static u64 notrace mlb_timer_sched_read(void)
 +{
-+	return (state == PM_SUSPEND_STANDBY) || (state == PM_SUSPEND_MEM);
++	return ~readl_relaxed(timer_of_base(&to) + MLB_TMR_SRC_TMR_OFS);
 +}
 +
-+typedef void (*phys_reset_t)(unsigned long);
-+static phys_reset_t phys_reset;
-+
-+static int m10v_die(unsigned long arg)
++static int __init mlb_timer_init(struct device_node *node)
 +{
-+	setup_mm_for_reboot();
-+	asm("wfi");
-+	/* Boot just like a secondary */
-+	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
-+	phys_reset(virt_to_phys(cpu_resume));
++	int ret;
++	unsigned long rate;
 +
++	ret = timer_of_init(node, &to);
++	if (ret)
++		return ret;
++
++	rate = timer_of_rate(&to) / MLB_TMR_DIV_CNT;
++	mlb_config_clock_source(&to);
++	clocksource_mmio_init(timer_of_base(&to) + MLB_TMR_SRC_TMR_OFS,
++		node->name, rate, MLB_TIMER_RATING, 32,
++		clocksource_mmio_readl_down);
++	sched_clock_register(mlb_timer_sched_read, 32, rate);
++	mlb_config_clock_event(&to);
++	clockevents_config_and_register(&to.clkevt, timer_of_rate(&to), 15,
++		0xffffffff);
 +	return 0;
 +}
-+
-+static int m10v_pm_enter(suspend_state_t state)
-+{
-+	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+		pr_err("STANDBY\n");
-+		asm("wfi");
-+		break;
-+	case PM_SUSPEND_MEM:
-+		pr_err("SUSPEND\n");
-+		cpu_pm_enter();
-+		cpu_suspend(0, m10v_die);
-+		cpu_pm_exit();
-+		break;
-+	}
-+	return 0;
-+}
-+
-+static const struct platform_suspend_ops m10v_pm_ops = {
-+	.valid		= m10v_pm_valid,
-+	.enter		= m10v_pm_enter,
-+};
-+
-+struct clk *m10v_clclk_register(struct device *cpu_dev);
-+
-+static int __init m10v_pm_init(void)
-+{
-+	suspend_set_ops(&m10v_pm_ops);
-+
-+	return 0;
-+}
-+late_initcall(m10v_pm_init);
++TIMER_OF_DECLARE(mlb_peritimer, "socionext,milbeaut-timer",
++		mlb_timer_init);
 -- 
 1.9.1
 
