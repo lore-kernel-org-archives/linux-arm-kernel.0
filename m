@@ -2,87 +2,66 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 65507C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:23:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 28916C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:24:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 27AF8206BA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:23:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DAB4420663
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:24:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BuhRZxpw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="ja351Mn5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 27AF8206BA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PcjH28yF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DAB4420663
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=glfiwPCjIbrmjiJZJ+B2pzEcuDRaxqHW/63p72YWqUg=; b=BuhRZxpwlj1pK2
-	8V5UDM8vVM0Su4iZdZnXZRHfn8BpPtZ9pmSIyLWomC0pekyzxqKMDC1i1ayouLyiKDrSbdxC1kEZi
-	CvCyrMK7O6YjjflzkUEOCD6bF3OMZfNSHWV2RzZl75hy6r7E4NURoz3kP8yHvJFPt7lRMMkh04Wkk
-	j89O8qOcIOEPmErGApJRq2UTdS2OuHMhDiUNO0yziV7rZjX+///P3J1bICiVmXnSlmIzH+B732BPL
-	yH2GJGUm2wMOuPGDEQ7BCIInFljqYc6VXDfHEKzv/7oisz24Kmdbg9pQ4vyVTxmXoD5gEsjFg/ysf
-	ziNZnwRek4l0n12/g36g==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=mHWboVfviunJDdBvIDoITZZi/7T+CaxxgvK1atj5Msc=; b=Pcj
+	H28yFpK7piwI3JSwT/kVbxGOBO6dMr9bD5uFEvFiU16p9WxpXc7Of3aBhGjS6a9sQL46TN5HIIqdZ
+	fzWgrm8CKwjRUYQox1JMuDNb3s8yS3qbYY0T/cDtfm/HvvNMrjpoktF98XRqcQTV7pYG36JqOG0kT
+	VQYsdAfa9mUI78lrvs4KHBfYUAN5Tf7eJPU3iF/1fZ7MU5XlhSmOWoejMmHPPg5LZ9i0JCfEguwiL
+	YqrtGIo/JFMTGfKXDGo1vQyPSkMRDbruiyRokJWzf2Qii5XdY+ctSITYjwYTOBSXGDzqKUJixgucJ
+	euzQ0hjzoCWIreDCzXLKn5TdqrvEQsg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs5C0-0004sV-HP; Fri, 08 Feb 2019 12:23:40 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs5Bx-0004sC-5j
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:23:38 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x18CNMhU010472;
- Fri, 8 Feb 2019 06:23:22 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549628602;
- bh=DeXZhaSQjZZUPxQ+qUmMaQmbF57M5RmlrLzF5SQzmH8=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=ja351Mn5s7pdiMoQ1eNqj2KSjzW6UT8D5NVgWYQtEHgI6W6zlj6xPE60cIV3BKtmJ
- mWO2rFZygaYm7MzdbIVt+3KVbKp492xCGx1UilzfECsFREnNvNh67v5UNLG3zy6PVY
- iBMaEEq8IS9DGT4BijjMKqzx/zEtgbQOIxIS7f8g=
-Received: from DFLE113.ent.ti.com (dfle113.ent.ti.com [10.64.6.34])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x18CNMfK130647
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 8 Feb 2019 06:23:22 -0600
-Received: from DFLE103.ent.ti.com (10.64.6.24) by DFLE113.ent.ti.com
- (10.64.6.34) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 8
- Feb 2019 06:23:21 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DFLE103.ent.ti.com
- (10.64.6.24) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 8 Feb 2019 06:23:21 -0600
-Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x18CNIDa013320;
- Fri, 8 Feb 2019 06:23:19 -0600
-Subject: Re: [PATCH v2 06/12] ARM: davinci: da830: switch to using the
- clocksource driver
-To: Bartosz Golaszewski <brgl@bgdev.pl>, Kevin Hilman <khilman@kernel.org>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Thomas Gleixner <tglx@linutronix.de>
-References: <20190204171757.32073-1-brgl@bgdev.pl>
- <20190204171757.32073-7-brgl@bgdev.pl>
-From: Sekhar Nori <nsekhar@ti.com>
-Message-ID: <3e80e485-10f0-1bf6-72eb-69d69a571cb6@ti.com>
-Date: Fri, 8 Feb 2019 17:53:17 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <20190204171757.32073-7-brgl@bgdev.pl>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+	id 1gs5D3-0005Fb-R1; Fri, 08 Feb 2019 12:24:45 +0000
+Received: from mx.socionext.com ([202.248.49.38])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gs5Cz-0005Ek-Tb
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:24:44 +0000
+Received: from unknown (HELO iyokan-ex.css.socionext.com) ([172.31.9.54])
+ by mx.socionext.com with ESMTP; 08 Feb 2019 21:24:37 +0900
+Received: from mail.mfilter.local (m-filter-1 [10.213.24.61])
+ by iyokan-ex.css.socionext.com (Postfix) with ESMTP id C769060062;
+ Fri,  8 Feb 2019 21:24:37 +0900 (JST)
+Received: from 172.31.9.53 (172.31.9.53) by m-FILTER with ESMTP;
+ Fri, 8 Feb 2019 21:24:37 +0900
+Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
+ by iyokan.css.socionext.com (Postfix) with ESMTP id 839744036D;
+ Fri,  8 Feb 2019 21:24:37 +0900 (JST)
+Received: from M20VSDK.e01.socionext.com (unknown [10.213.118.34])
+ by yuzu.css.socionext.com (Postfix) with ESMTP id 3BE7D1202F1;
+ Fri,  8 Feb 2019 21:24:37 +0900 (JST)
+From: Sugaya Taichi <sugaya.taichi@socionext.com>
+To: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-clk@vger.kernel.org,
+ linux-gpio@vger.kernel.org, linux-serial@vger.kernel.org
+Subject: [PATCH v2 00/15] Add basic support for Socionext Milbeaut M10V SoC
+Date: Fri,  8 Feb 2019 21:24:47 +0900
+Message-Id: <1549628687-29628-1-git-send-email-sugaya.taichi@socionext.com>
+X-Mailer: git-send-email 1.9.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_042337_251677_6C9F5F09 
-X-CRM114-Status: GOOD (  12.47  )
+X-CRM114-CacheID: sfid-20190208_042442_272007_E61866E1 
+X-CRM114-Status: GOOD (  18.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,26 +73,140 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Shinji Kanematsu <kanematsu.shinji@socionext.com>,
+ Sugaya Taichi <sugaya.taichi@socionext.com>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Takao Orito <orito.takao@socionext.com>, Stephen Boyd <sboyd@kernel.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Russell King <linux@armlinux.org.uk>,
+ Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
+ Jassi Brar <jaswinder.singh@linaro.org>, Rob Herring <robh+dt@kernel.org>,
+ Jiri Slaby <jslaby@suse.com>, Thomas Gleixner <tglx@linutronix.de>,
+ Linus Walleij <linus.walleij@linaro.org>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 04/02/19 10:47 PM, Bartosz Golaszewski wrote:
-> -/*
-> - * T0_BOT: Timer 0, bottom		: Used for clock_event & clocksource
-> - * T0_TOP: Timer 0, top			: Used by DSP
-> - * T1_BOT, T1_TOP: Timer 1, bottom & top: Used for watchdog timer
+Hi,
 
-Aren't we changing this usage model for DA830 now, leaving no clock for
-use by DSP? It seems to me that after these patches clockevent is always
-T0_BOT and clocksource is always T0_TOP.
+Here is the series of patches the initial support for SC2000(M10V) of
+Milbeaut SoCs. "M10V" is the internal name of SC2000, so commonly used in
+source code.
 
-Thanks,
-Sekhar
+SC2000 is a SoC of the Milbeaut series. equipped with a DSP optimized for
+computer vision. It also features advanced functionalities such as 360-degree,
+real-time spherical stitching with multi cameras, image stabilization for
+without mechanical gimbals, and rolling shutter correction. More detail is
+below:
+https://www.socionext.com/en/products/assp/milbeaut/SC2000.html
+
+Specifications for developers are below:
+ - Quad-core 32bit Cortex-A7 on ARMv7-A architecture
+ - NEON support
+ - DSP
+ - GPU
+ - MAX 3GB DDR3
+ - Cortex-M0 for power control
+ - NAND Flash Interface
+ - SD UHS-I
+ - SD UHS-II
+ - SDIO
+ - USB2.0 HOST / Device
+ - USB3.0 HOST / Device
+ - PCI express Gen2
+ - Ethernet Engine
+ - I2C
+ - UART
+ - SPI
+ - PWM
+
+Support is quite minimal for now, since it only includes timer, clock,
+pictrl and serial controller drivers, so we can only boot to userspace
+through initramfs. Support for the other peripherals  will come eventually.
+
+Changes since v1:
+* Change file names.
+* Change #define names.
+* Refine cpu-enable-method and bindigs.
+* Add documentation for Milbeaut SoCs.
+* Add more infomation for timer driver.
+* Add sched_clock to timer driver.
+* Refine whole of clk driver.
+* Add earlycon instead of earlyprintk.
+* Refine Device Tree.
+
+Sugaya Taichi (15):
+  dt-bindings: sram: milbeaut: Add binding for Milbeaut smp-sram
+  dt-bindings: arm: Add SMP enable-method for Milbeaut
+  dt-bindings: Add documentation for Milbeaut SoCs
+  ARM: milbeaut: Add basic support for Milbeaut m10v SoC
+  dt-bindings: timer: Add Milbeaut M10V timer description
+  clocksource/drivers/timer-milbeaut: Introduce timer for Milbeaut SoCs
+  ndings: clock: milbeaut: add Milbeaut clock description
+  clock: milbeaut: Add Milbeaut M10V clock controller
+  dt-bindings: serial: Add Milbeaut serial driver description
+  serial: Add Milbeaut serial control
+  dt-bindings: pinctrl: milbeaut: Add Milbeaut M10V pinctrl description
+  pinctrl: milbeaut: Add Milbeaut M10V pinctrl
+  ARM: dts: milbeaut: Add device tree set for the Milbeaut M10V board
+  ARM: configs: Add Milbeaut M10V defconfig
+  MAINTAINERS: Add entry to MAINTAINERS for Milbeaut
+
+ Documentation/devicetree/bindings/arm/cpus.yaml    |   1 +
+ Documentation/devicetree/bindings/arm/milbeaut.txt |   6 +
+ .../devicetree/bindings/clock/milbeaut-clock.txt   |  49 ++
+ .../pinctrl/socionext,milbeaut-pinctrl.txt         |  35 +
+ .../devicetree/bindings/serial/milbeaut-uart.txt   |  21 +
+ .../devicetree/bindings/sram/milbeaut-smp-sram.txt |  24 +
+ .../bindings/timer/socionext,milbeaut-timer.txt    |  17 +
+ MAINTAINERS                                        |   9 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/milbeaut-m10v-evb.dts            |  32 +
+ arch/arm/boot/dts/milbeaut-m10v.dtsi               | 131 ++++
+ arch/arm/configs/milbeaut_m10v_defconfig           | 366 ++++++++++
+ arch/arm/mach-milbeaut/Kconfig                     |  20 +
+ arch/arm/mach-milbeaut/Makefile                    |   1 +
+ arch/arm/mach-milbeaut/platsmp.c                   | 144 ++++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-milbeaut.c                         | 626 +++++++++++++++++
+ drivers/clocksource/Kconfig                        |   9 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/timer-milbeaut.c               | 161 +++++
+ drivers/pinctrl/Kconfig                            |   9 +
+ drivers/pinctrl/Makefile                           |   1 +
+ drivers/pinctrl/pinctrl-milbeaut.c                 | 759 +++++++++++++++++++++
+ drivers/tty/serial/Kconfig                         |  25 +
+ drivers/tty/serial/Makefile                        |   1 +
+ drivers/tty/serial/milbeaut_usio.c                 | 621 +++++++++++++++++
+ include/uapi/linux/serial_core.h                   |   3 +
+ 29 files changed, 3077 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/milbeaut.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/milbeaut-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/socionext,milbeaut-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/milbeaut-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/sram/milbeaut-smp-sram.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/socionext,milbeaut-timer.txt
+ create mode 100644 arch/arm/boot/dts/milbeaut-m10v-evb.dts
+ create mode 100644 arch/arm/boot/dts/milbeaut-m10v.dtsi
+ create mode 100644 arch/arm/configs/milbeaut_m10v_defconfig
+ create mode 100644 arch/arm/mach-milbeaut/Kconfig
+ create mode 100644 arch/arm/mach-milbeaut/Makefile
+ create mode 100644 arch/arm/mach-milbeaut/platsmp.c
+ create mode 100644 drivers/clk/clk-milbeaut.c
+ create mode 100644 drivers/clocksource/timer-milbeaut.c
+ create mode 100644 drivers/pinctrl/pinctrl-milbeaut.c
+ create mode 100644 drivers/tty/serial/milbeaut_usio.c
+
+-- 
+1.9.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
