@@ -2,63 +2,63 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B763C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 02:11:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 93F1BC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 02:25:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5B4F82147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 02:11:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5E63121907
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 02:25:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XY4MKxIL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B4F82147C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davemloft.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iJsEGUEq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5E63121907
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	From:Subject:To:Message-Id:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QEjQ5dmt9pBdGrfhnDC2JYvYRR6ePqPumF7PJ1DAbMQ=; b=XY4MKxILbB7r49
-	OVmCqKfH1NAZwk4eA88Izl3aoOKflM64cyXyyt8Inegwdbfm39DQioLju69EYGrICvl5k5JJgBzz+
-	KVa5WEigw4aKczeH9GPUk/5TsNfwWqZwILhBm7y4VvdQ+1jTQMc6rJUam62wbBm/53sJgNpM35u5j
-	FFg33raDmZJFTXH5qUGur78lOx/nE9tshHYVj8J4+bV+mDIHHAarRa5+fzmVV61eEv+EKUIkEcmnO
-	EmmXKCAww2T7CGwnBwGSxnsx+ub5Ju+3ZMM9irss7uStT8k/3fr4EGexAywNXvGGDbkfnCRiY7RUI
-	v8tpnKTOt7NjnYqTFizA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=o/+7V4FvBYXjMi9NRQOsG4pVr8JWOk5w4ZSS+8nqCX8=; b=iJs
+	EGUEqx7R7AvmlJLkKbcNIvDgEAKqGGXCiZuC7EzQJ7gRhpTykhdQ1uBrWRxmgmr35q9y1+xHi4re+
+	1tyXNp1XTdMA3bVJPYhu+OjancCtTTLFwts5Jm3bCMf9Ez4nsXufjh7GE87OKzeo7/i8UysHvi/hd
+	T7KojLFZkg3CH7xsVK215dgjh9eazUIHoy5PTYz5sgXwJyfDaBkazEWE53taz8TB9u8bmTt7x0303
+	+nhj/bnkXNTa0QqkrbmvKPom8h+AgHbYVzK11jBo46hGrjQ23e0kGYeXPMqaQuAm6b7KgnM9EgmiG
+	Lh5pJYSswW15FGKqfFQroEr3SJJHaVQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1grvd3-0008R9-W6; Fri, 08 Feb 2019 02:10:57 +0000
-Received: from shards.monkeyblade.net ([2620:137:e000::1:9])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1grvd1-0008Qi-Bh
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 02:10:56 +0000
-Received: from localhost (unknown [IPv6:2601:601:9f80:35cd::bf5])
- (using TLSv1 with cipher AES256-SHA (256/256 bits))
- (Client did not present a certificate)
- (Authenticated sender: davem-davemloft)
- by shards.monkeyblade.net (Postfix) with ESMTPSA id 9BC38108B872F;
- Thu,  7 Feb 2019 18:10:49 -0800 (PST)
-Date: Thu, 07 Feb 2019 18:10:49 -0800 (PST)
-Message-Id: <20190207.181049.1229639710283404215.davem@davemloft.net>
-To: linux@armlinux.org.uk
-Subject: Re: [PATCH net-next v2 0/6] Add comphy support for Armada 38x
-From: David Miller <davem@davemloft.net>
-In-Reply-To: <20190207161825.ueinmyf6ygjiqzzy@shell.armlinux.org.uk>
-References: <20190207161825.ueinmyf6ygjiqzzy@shell.armlinux.org.uk>
-X-Mailer: Mew version 6.8 on Emacs 26.1
-Mime-Version: 1.0
-X-Greylist: Sender succeeded SMTP AUTH, not delayed by milter-greylist-4.5.12
- (shards.monkeyblade.net [149.20.54.216]);
- Thu, 07 Feb 2019 18:10:50 -0800 (PST)
+	id 1grvrQ-0004dU-Ac; Fri, 08 Feb 2019 02:25:48 +0000
+Received: from mx.socionext.com ([202.248.49.38])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1grvrM-0004cL-TX
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 02:25:46 +0000
+Received: from unknown (HELO kinkan-ex.css.socionext.com) ([172.31.9.52])
+ by mx.socionext.com with ESMTP; 08 Feb 2019 11:25:40 +0900
+Received: from mail.mfilter.local (m-filter-1 [10.213.24.61])
+ by kinkan-ex.css.socionext.com (Postfix) with ESMTP id E9A0C180C05;
+ Fri,  8 Feb 2019 11:25:40 +0900 (JST)
+Received: from 172.31.9.51 (172.31.9.51) by m-FILTER with ESMTP;
+ Fri, 8 Feb 2019 11:25:40 +0900
+Received: from plum.e01.socionext.com (unknown [10.213.132.32])
+ by kinkan.css.socionext.com (Postfix) with ESMTP id 7F30B1A04E1;
+ Fri,  8 Feb 2019 11:25:40 +0900 (JST)
+From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+To: Michael Turquette <mturquette@baylibre.com>,
+ Stephen Boyd <sboyd@kernel.org>,
+ Masahiro Yamada <yamada.masahiro@socionext.com>
+Subject: [PATCH] clk: uniphier: Fix update register for CPU-gear
+Date: Fri,  8 Feb 2019 11:25:23 +0900
+Message-Id: <1549592723-18494-1-git-send-email-hayashi.kunihiko@socionext.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190207_181055_403868_FEE88805 
-X-CRM114-Status: UNSURE (   8.58  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190207_182545_074797_D10304DA 
+X-CRM114-Status: GOOD (  14.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,26 +70,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, andrew@lunn.ch, jason@lakedaemon.net,
- devicetree@vger.kernel.org, netdev@vger.kernel.org,
- gregory.clement@bootlin.com, kishon@ti.com, robh+dt@kernel.org,
- thomas.petazzoni@bootlin.com, linux-arm-kernel@lists.infradead.org,
- sebastian.hesselbarth@gmail.com
+Cc: linux-stable@vger.kernel.org,
+ Kunihiko Hayashi <hayashi.kunihiko@socionext.com>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>, linux-kernel@vger.kernel.org,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Russell King - ARM Linux admin <linux@armlinux.org.uk>
-Date: Thu, 7 Feb 2019 16:18:25 +0000
+Need to set the update bit in UNIPHIER_CLK_CPUGEAR_UPD to update
+the CPU-gear value.
 
-> This series adds support for the comphy for Armada 38x, which allows
-> these SoCs to use 2500BASE-X mode with appropriate SFP modules.
-> 
-> Tested on SolidRun Clearfog after updating for the 5.0 merge window
-> changes.
+Fixes: d08f1f0d596c ("clk: uniphier: add CPU-gear change (cpufreq) support")
+Cc: linux-stable@vger.kernel.org
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+---
+ drivers/clk/uniphier/clk-uniphier-cpugear.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Series applied, thanks Russell.
+diff --git a/drivers/clk/uniphier/clk-uniphier-cpugear.c b/drivers/clk/uniphier/clk-uniphier-cpugear.c
+index ec11f55..5d2d42b 100644
+--- a/drivers/clk/uniphier/clk-uniphier-cpugear.c
++++ b/drivers/clk/uniphier/clk-uniphier-cpugear.c
+@@ -47,7 +47,7 @@ static int uniphier_clk_cpugear_set_parent(struct clk_hw *hw, u8 index)
+ 		return ret;
+ 
+ 	ret = regmap_write_bits(gear->regmap,
+-				gear->regbase + UNIPHIER_CLK_CPUGEAR_SET,
++				gear->regbase + UNIPHIER_CLK_CPUGEAR_UPD,
+ 				UNIPHIER_CLK_CPUGEAR_UPD_BIT,
+ 				UNIPHIER_CLK_CPUGEAR_UPD_BIT);
+ 	if (ret)
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
