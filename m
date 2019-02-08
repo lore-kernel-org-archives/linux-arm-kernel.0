@@ -2,86 +2,81 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6EBE2C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:38:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D5845C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:38:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3E7062177B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:38:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A8A2B2177B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 12:38:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MIISN4qx";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="a3XOjLvU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3E7062177B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MCySTl2b";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=mobiveil.co.in header.i=@mobiveil.co.in header.b="OVoNxJ6L"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A8A2B2177B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mobiveil.co.in
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iMQ0yGyn93oa5i5KkxxzI6qPntfnoPVtDiBrCet3mhs=; b=MIISN4qxIeIuYF
-	Gs8/r3G4GAJTNnUh5f2tz7coF6cm8hsPR8OuvNQH4UOTVKG8xm0PGCCvXtBt9kKWo7c+Zctw0Vt9c
-	cRxEpRcFCEV14Ol7UiuF8tIDTrDnxme3yesARXJjrjD8WfuG6NTrKt/LHZ4/g89YpWlMW/Vo7TLyQ
-	9GpfeNQepk9VnkNc8+sAOKcdhOrZEuyuMu4PFxM0KCPy107wI6BhChzVJH2U7IeKNs3QA76aVWQwP
-	S/bXlK5I7I2vKb81I+DLDAjTudWTNy16IR1HzskcJEzIg1OMtArPtSCSQqMh6zrQ30rs6Bd5RdY/I
-	j81hDyUr+GBjEKLwwYiw==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Yka6w7HW8eADiwpN33wIFyFz7RGBF4Lpm2uw7HAlU4w=; b=MCySTl2b9nOYZ1
+	AcRME/lrvCj8qRbGsO50/eIhGBPyWLUZk4I6FBphS4nbs2VUeZhTE0Dj/xFTUyFBHRBZnYxCBjUGv
+	T6hu3vE/KetcqN//NBgz+lLcLXyXc5IB0VbS3/TvllgKcbxPP5vb8MNQCSD9pX9p0Ws3aDgE+XOd9
+	ZrJZEDy0BxGGJTZF1Zm6WhiczgA1S6QamfwgsAicZflvW3JuXhXWLAKiaXsIqavS9X2DFZSvm3rsI
+	jcy1F4NwsnliM8sTykyQcRQWMXfq45WqqohziAuPI6NSuBwyw7zDUqhz6urALe3W/wXxCw9miTVHx
+	SdJzkXxqjmPCQ3BS5Aag==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs5Pr-0007ak-NK; Fri, 08 Feb 2019 12:37:59 +0000
-Received: from lelv0142.ext.ti.com ([198.47.23.249])
+	id 1gs5QY-0007wK-94; Fri, 08 Feb 2019 12:38:42 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs5Po-0007aP-1v
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:37:58 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x18CbeXh083437;
- Fri, 8 Feb 2019 06:37:40 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549629460;
- bh=J5H1/KGfmAvzG6oKJoJn4IseVaJm3ElBp7a+t8K9gsE=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=a3XOjLvUjHcNWSxpXvzmhVOupotH+rhFYbK6Z9klTrooPXtgJWDSq7HZZP/tiMp/0
- XhNJ2CW1oFQ1iG6N68wJu3/vCrGZxl/bAgPGfBHfiymQ711npsmLmqT0mV12VEKcSZ
- U364Nh2HSJd0LrMGqbJnLdZyKLHAgTWfnZK97Fwg=
-Received: from DLEE105.ent.ti.com (dlee105.ent.ti.com [157.170.170.35])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x18CbeKR055428
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 8 Feb 2019 06:37:40 -0600
-Received: from DLEE110.ent.ti.com (157.170.170.21) by DLEE105.ent.ti.com
- (157.170.170.35) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 8
- Feb 2019 06:37:39 -0600
-Received: from dflp33.itg.ti.com (10.64.6.16) by DLEE110.ent.ti.com
- (157.170.170.21) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 8 Feb 2019 06:37:39 -0600
-Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x18Cbaf0004092;
- Fri, 8 Feb 2019 06:37:36 -0600
-Subject: Re: [PATCH v2 05/12] ARM: davinci: da850: switch to using the
- clocksource driver
-To: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-References: <20190204171757.32073-1-brgl@bgdev.pl>
- <20190204171757.32073-6-brgl@bgdev.pl>
- <9d423e18-8c85-731b-388a-1843067db242@ti.com>
- <CAMpxmJW0qMi0BmiK2SOwdagw2-t8+1g20XJR418mWb8f1dwxtQ@mail.gmail.com>
-From: Sekhar Nori <nsekhar@ti.com>
-Message-ID: <acd3f8ca-8ed7-f86a-9bdf-24e4e6e9a6a4@ti.com>
-Date: Fri, 8 Feb 2019 18:07:35 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gs5QU-0007vs-UI
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 12:38:40 +0000
+Received: by mail-wr1-x441.google.com with SMTP id z3so3433535wrv.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 08 Feb 2019 04:38:37 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=mobiveil.co.in; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=za3n79uTXhuAg89Odl5K7zA3/4teHlFt8f/2UCul1pI=;
+ b=OVoNxJ6L+4h0zmcRL0/+4rPL4qAp+s8E3C9mBgNG/yVgl7yp+6sLCgN44Re9Gu9Wik
+ f5q3MpCGafDHKYYqZ/Yl9KI4QDOZQ+NY+A1WSs8brIvZ5W/8k1hH5FE+Ltz5vD5IW5Y0
+ t+A80vouwIa00ZgMDXFMn6bwZrkAi9VYz/t4k=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=za3n79uTXhuAg89Odl5K7zA3/4teHlFt8f/2UCul1pI=;
+ b=CpEyW043oqtnp8w3ppkA5S7yGip2/uz4eINAuI1+4rUw5U3Pky96LhKgzY1NIPTV/A
+ B79H+hY8Eru/EBJM+8MGfCQbjlyrabQlOBWiNVtAWCNSmoi54dHQf1qyf8huiMW8akvr
+ bKla2To4KHO737kqOcj5xHos2gxz0lP1Z2F6iANULjsw7C9hhAeOJJFtB+XS2xy0ue4A
+ GZ+MEUdv48i7shGEFsYHC6tLxRdomkyY+IEg9aKgqz5iN/MwwXiejXqZifUhJANOk+uV
+ Kos0Uj7sGN7HgTUtL3xgc88SkTHxzy89Qvccur3EA/QYzZoEKfFCRxIvdG3lDCPIpRRk
+ ww+Q==
+X-Gm-Message-State: AHQUAuZDnak1ecxF7+m7W5Gkr/drE8TnjzKm3XUmy6UgRfaIgY5wS3Tk
+ DWPpkqv61Pu5HFyrgy8aKnDcNr8xpOvxoYjRTcwtJA==
+X-Google-Smtp-Source: AHgI3Iatp5BtTgrEbIDAPsLDPC8Il8bwT1QG2XB42RwPY79StgZWtwjcGnSo0DQr+93S2X94tfqQdYfUBTw6ZWcFbfU=
+X-Received: by 2002:a5d:468e:: with SMTP id u14mr14295242wrq.253.1549629516223; 
+ Fri, 08 Feb 2019 04:38:36 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <CAMpxmJW0qMi0BmiK2SOwdagw2-t8+1g20XJR418mWb8f1dwxtQ@mail.gmail.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+References: <20190129080926.36773-1-Zhiqiang.Hou@nxp.com>
+ <20190129080926.36773-18-Zhiqiang.Hou@nxp.com>
+In-Reply-To: <20190129080926.36773-18-Zhiqiang.Hou@nxp.com>
+From: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
+Date: Fri, 8 Feb 2019 18:11:15 +0530
+Message-ID: <CAFZiPx0faPHN1mqPV28XTZfOxA2GgDPuc=RVdXEiGGNAUe=Fxw@mail.gmail.com>
+Subject: Re: [PATCHv3 17/27] PCI: mobiveil: fix the checking of valid device
+To: "Z.q. Hou" <zhiqiang.hou@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_043756_417028_7467589A 
-X-CRM114-Status: GOOD (  14.74  )
+X-CRM114-CacheID: sfid-20190208_043839_008497_D9643C8B 
+X-CRM114-Status: GOOD (  17.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,32 +88,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- linux-devicetree <devicetree@vger.kernel.org>,
- Kevin Hilman <khilman@kernel.org>, Bartosz Golaszewski <brgl@bgdev.pl>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- LKML <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
- Thomas Gleixner <tglx@linutronix.de>,
- arm-soc <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "lorenzo.pieralisi@arm.com" <lorenzo.pieralisi@arm.com>,
+ Xiaowei Bao <xiaowei.bao@nxp.com>,
+ "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
+ "will.deacon@arm.com" <will.deacon@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Leo Li <leoyang.li@nxp.com>, "M.h. Lian" <minghuan.lian@nxp.com>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, Mingkai Hu <mingkai.hu@nxp.com>,
+ "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
+ "bhelgaas@google.com" <bhelgaas@google.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMDgvMDIvMTkgNjowNCBQTSwgQmFydG9zeiBHb2xhc3pld3NraSB3cm90ZToKPiBwdC4sIDgg
-bHV0IDIwMTkgbyAxMzowNiBTZWtoYXIgTm9yaSA8bnNla2hhckB0aS5jb20+IG5hcGlzYcWCKGEp
-Ogo+Pgo+PiBPbiAwNC8wMi8xOSAxMDo0NyBQTSwgQmFydG9zeiBHb2xhc3pld3NraSB3cm90ZToK
-Pj4+ICtzdGF0aWMgY29uc3Qgc3RydWN0IGRhdmluY2lfdGltZXJfY2ZnIGRhODUwX3RpbWVyX2Nm
-ZyA9IHsKPj4+ICsgICAgIC5yZWcgPSB7Cj4+PiArICAgICAgICAgICAgIC5zdGFydCAgICAgICAg
-ICA9IERBOFhYX1RJTUVSNjRQMF9CQVNFLAo+Pj4gKyAgICAgICAgICAgICAuZW5kICAgICAgICAg
-ICAgPSBEQThYWF9USU1FUjY0UDBfQkFTRSArIFNaXzRLLAo+Pgo+PiBTWl80SyAtIDEKPj4KPj4g
-VGhpcyBzaG91bGQgaGF2ZSBwcmV2ZW50ZWQgd2F0Y2hkb2cgdGltZXIgZnJvbSBnZXR0aW5nIHJl
-Z2lzdGVyZWQuCj4+Cj4+IFRoYW5rcywKPj4gU2VraGFyCj4gCj4gTXkgY2xvY2tzb3VyY2UgZHJp
-dmVyIGRvZXNuJ3QgY2FsbCByZXF1ZXN0X3JlZ2lvbigpIHNvIGEgc3Vic2VxdWVudAo+IGRldm1f
-aW9yZW1hcF9yZXNvdXJjZSgpIGluIHRoZSB3YXRjaGRvZyBkcml2ZXIgd291bGQgc3RpbGwgc3Vj
-Y2VlZC4gSQo+IG5vdyBmaXhlZCBib3RoIHRoZSBtaXNzaW5nIGNhbGwgYW5kIHRoZSB2YWx1ZSBo
-ZXJlLgoKQWgsIGdvdCBpdC4gUGVyaGFwcyBhIGNhbGwgdG8gcmVxdWVzdF9yZWdpb24oKSBzaG91
-bGQgYmUgYWRkZWQgdG8gY2F0Y2gKaXNzdWVzPwoKVGhhbmtzLApTZWtoYXIKCl9fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFp
-bGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlz
-dHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+ZQ,
+
+On Tue, Jan 29, 2019 at 1:40 PM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
+>
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+>
+> Avoid to issue CFG transactions to link partner when the PCIe
+> link is not up. And allow CFG transactions to all functions of
+> Endpoint implemented multiple functions.
+>
+> Fixes: 9af6bcb11e12 ("PCI: mobiveil: Add Mobiveil PCIe Host
+> Bridge IP driver")
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> Reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+> ---
+> V3:
+>  - No change
+>
+>  drivers/pci/controller/mobiveil/pcie-mobiveil-host.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+> index dc5324d94466..1ae82e790562 100644
+> --- a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+> +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+> @@ -29,6 +29,10 @@ static bool mobiveil_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
+>  {
+>         struct mobiveil_pcie *pcie = bus->sysdata;
+>
+> +       /* If there is no link, then there is no device */
+> +       if (bus->number > pcie->rp.root_bus_nr && !mobiveil_pcie_link_up(pcie))
+> +               return false;
+> +
+>         /* Only one device down on each root port */
+>         if ((bus->number == pcie->rp.root_bus_nr) && (devfn > 0))
+>                 return false;
+> @@ -37,7 +41,7 @@ static bool mobiveil_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
+>          * Do not read more than one device on the bus directly
+>          * attached to RC
+>          */
+> -       if ((bus->primary == pcie->rp.root_bus_nr) && (devfn > 0))
+> +       if ((bus->primary == pcie->rp.root_bus_nr) && (PCI_SLOT(devfn) > 0))
+here change "primary" to "number", as it's a bug in the original driver too.
+
+>                 return false;
+>
+>         return true;
+> --
+> 2.17.1
+>
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
