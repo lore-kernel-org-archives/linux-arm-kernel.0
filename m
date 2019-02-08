@@ -2,58 +2,86 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ADAA4C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:08:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 48C6BC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:09:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7EC9520863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:08:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0F437217D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 15:09:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="icFMqfg/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7EC9520863
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bAmfSvkf";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="BPhGCQrI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0F437217D8
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:From:Date:
-	Message-Id:Subject:To:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=Rw0bjC7ohnFm+Po79sysfAeHz3oZEA7LGVFkrVKWBFA=; b=icF
-	Mqfg/dSSA6xqJBj+90IqJs5mBnKnOAZ7/JeUYkOzHfMRBleywbNJXoV0MH6UjPHGvOdtZwZuz6kU9
-	jbflhmcTwttVYUojbMsgNv1X9U6DALZ8Q+f1gGpCp0ndbaAysa2sAb5vVghj6apI84x5MC4d1o0Km
-	yu0xxmINIOUUKXwVdTTnp+v0UBkX3XJyTD6wTYRIsNoKhJdX90l8sT4z++IdsApumrcHGW/cqwSrI
-	OYZdAsLlr0xXI5buqfpP6IrHcEjZn1v2NocjBt9mIMHLatoo2CBgCTG88uyT4qM558r3h837n2FJr
-	czMnIsPr3iPGF0OHuf6k23PbQRt81eg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=kLfNAdzT+ttOudw5M2eA5KeuXQQHLmu6s+Ch/qq4VQk=; b=bAmfSvkfNix05K
+	5c+nnwBcKOTNAFb073HsEcOGM/LiraRXSajOyErBLfwYBOJs2UlYzqYAKKVY5BN8KXgrOV+/+K9vQ
+	U0P2eh5sXGnXUFMOj3esLJYQMSrOmtCNoaMCyeYn3hXEIPRmu0hV7NygfoFmbLYCJsKuLTzptdNF0
+	DUTMHswofmE6PMWd8c5fIslIRfz4iGBe4K00yTKiJzcaSVWyaePPp0zzZTAVrcavUUQZYj/OZYP/M
+	gQRZJ2olY3ViZvFY5bTYw2xE81LQ4wBAfnhnq/vCsXc2qj4+YhM7uLsx0uRceRvNkyNMfv1i/zW3r
+	m9ZlH5rdrdaaREmhelXA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs7lc-0008ND-NY; Fri, 08 Feb 2019 15:08:36 +0000
-Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
+	id 1gs7mh-0000FY-Tm; Fri, 08 Feb 2019 15:09:43 +0000
+Received: from mail-wr1-x434.google.com ([2a00:1450:4864:20::434])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs7lZ-0008M9-NF
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 15:08:35 +0000
-Received: by newverein.lst.de (Postfix, from userid 2005)
- id 44EBC68DD2; Fri,  8 Feb 2019 16:08:26 +0100 (CET)
-To: Mark Rutland <mark.rutland@arm.com>, Will Deacon <will.deacon@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Julien Thierry <julien.thierry@arm.com>,
- Steven Rostedt <rostedt@goodmis.org>, Josh Poimboeuf <jpoimboe@redhat.com>,
- Ingo Molnar <mingo@redhat.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Arnd Bergmann <arnd@arndb.de>,
- AKASHI Takahiro <takahiro.akashi@linaro.org>,
- Amit Daniel Kachhap <amit.kachhap@arm.com>
-Subject: [PATCH v8 0/5] arm64: ftrace with regs
-Message-Id: <20190208150826.44EBC68DD2@newverein.lst.de>
-Date: Fri,  8 Feb 2019 16:08:26 +0100 (CET)
-From: duwe@lst.de (Torsten Duwe)
+ id 1gs7me-0000Ed-0V
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 15:09:41 +0000
+Received: by mail-wr1-x434.google.com with SMTP id z18so3972005wrh.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 08 Feb 2019 07:09:39 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=8woiUdpmT/unzGKCTcasnjTUWRtbm57wdygkC9ImG5s=;
+ b=BPhGCQrIO3vUe20ejaDfPm50j4zSih8OzMv6ZRaUPxrhCTSNnT16A9ac+OEftV8ZI1
+ TUqf5MeABZsgSx3LOFjGko8TALlbhjLqUo5X6RwVbenbpezeq2e4JIyb5LtXE0Ua1H3m
+ JUgj21P+JdjX1yo4Jel7wmyh19tz8fLOANBEsRdu3CsTOokqijUXlYV4iE0/67IundFd
+ DfwL2IKaqu39S3SSG1i8/nu0KYZQ6eL9MoqEP+vR9cJkmgoVmfLwx+Lxvjtd0OWVY9LB
+ xTu878VkHRa9SLXHLDjpMM2RuEv553YxaJwOrB62woeuFzMZbMtfNK5Ug42KjM8bi8Pq
+ 1wtQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=8woiUdpmT/unzGKCTcasnjTUWRtbm57wdygkC9ImG5s=;
+ b=dLXmmZBOEol36XAv20Oz7Y7ZYDd9bqo9GPPa6i6fVPWxND2YQitzFsw8hC5pt3j38w
+ E0mJI+em+tJzUNq6plF1ihjkcHAjUHGOQm356z8ytbpLSiOSicM/MWHuWpEgJANFLsD5
+ tm/d72UFVSRjCT5XJbm48W58u3GZnPnhii65++/FdhISGdsE4dmIE19uFm/1i0UjbgiP
+ /DJutV3dddlUkc507q8LMOENN6yKKd63SYCcEB5BCzICwozFkBZegQeRXRZ0/ZkRHmse
+ Judp5A+QKPcU8nDMkNstZp1WQJLPt7q86+zf+3L6ghLyAWOppl1jhlK4ejH3z1//prrw
+ bBYQ==
+X-Gm-Message-State: AHQUAuadXZuFP/jDzkf48N9G3HWRGe50vbCCJ//R0tbJgh+9L7DKSPwp
+ FHVK3Zp4ObakuyEoNrZm5Do=
+X-Google-Smtp-Source: AHgI3IamY8GTA37ci2x+zGifULVUyi1FwOFGoIFwMUaJ9atltH2SOCTR4dzh9+dMi6+W4WikBfIFXg==
+X-Received: by 2002:adf:e342:: with SMTP id n2mr16341497wrj.60.1549638577576; 
+ Fri, 08 Feb 2019 07:09:37 -0800 (PST)
+Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
+ by smtp.gmail.com with ESMTPSA id d16sm1852621wru.52.2019.02.08.07.09.36
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 08 Feb 2019 07:09:36 -0800 (PST)
+From: Thierry Reding <thierry.reding@gmail.com>
+To: arm@kernel.org
+Subject: [GIT PULL 0/9] Tegra changes for v5.1-rc1
+Date: Fri,  8 Feb 2019 16:09:26 +0100
+Message-Id: <20190208150935.32108-1-thierry.reding@gmail.com>
+X-Mailer: git-send-email 2.19.1
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_070833_900129_CCBC6C99 
-X-CRM114-Status: UNSURE (   7.68  )
+X-CRM114-CacheID: sfid-20190208_070940_054235_1184CFC3 
+X-CRM114-Status: UNSURE (   8.43  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -66,70 +94,30 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: live-patching@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: linux-tegra@vger.kernel.org, Thierry Reding <thierry.reding@gmail.com>,
+ linux-arm-kernel@lists.infradead.org, Jon Hunter <jonathanh@nvidia.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Patch series v8, as discussed.
-The whole series applies cleanly on 5.0-rc5
+Hi ARM SoC maintainers,
 
----
- arch/arm64/Kconfig                    |    4 +
- arch/arm64/Makefile                   |   10 ++
- arch/arm64/include/asm/ftrace.h       |   16 ++++
- arch/arm64/include/asm/module.h       |    3 
- arch/arm64/kernel/Makefile            |   12 +--
- arch/arm64/kernel/entry-ftrace.S      |  125 ++++++++++++++++++++++++++++++++--
- arch/arm64/kernel/ftrace.c            |  117 ++++++++++++++++++++++++-------
- arch/arm64/kernel/module-plts.c       |    3 
- arch/arm64/kernel/module.c            |    2 
- arch/arm64/lib/Makefile               |    4 -
- drivers/firmware/efi/libstub/Makefile |   12 +--
- include/asm-generic/vmlinux.lds.h     |    2 
- include/linux/compiler_types.h        |    4 +
- kernel/module.c                       |   14 +++
- mm/kasan/Makefile                     |    8 +-
- 15 files changed, 281 insertions(+), 55 deletions(-)
----
-changes since v7:
+Slightly unusual for this release is that I've included two branches
+that traditionally don't go through ARM SoC (clk and cpufreq). However
+these are added here because they were part of a larger series to add
+CPU frequency scaling support on Tegra210 and because the respective
+maintainers agreed that it was a good idea to take these through ARM
+SoC.
 
-* -pg -> $(CC_FLAGS_FTRACE) cleanup now split according to subtree
-  maintainership.
+The dependencies between the branches are purely runtime dependencies,
+so I haven't marked them as dependencies. They can be applied in any
+order. This also means that if you'd rather not pull the requests for
+clk and cpufreq, just let me know and I'll send them out to the
+corresponding maintainers.
 
-* REC_IP_BRANCH_OFFSET is gone, the functionality went into
-  ftrace_call_adjust(), where it belongs.
-
-* MOV_X9_X30 macro is gone (why did we argue about its name anyway?);
-  it is only used once now in the initial ftrace_make_nop new helper
-  function ftrace_setup_lr_saver(), suggested by Julien.
-
-* call site processing was missing for modules. Fixed.
-
-changes since v6:
-
-* change the stack layout once more; I hope I have it the "standard" way now.
-  And yes, it looks simpler and cleaner; thanks, Mark, for nagging.
-
-* split out the independent Kconfig and Makefile changes
-
-* fixed style issues
-
-* s/fp/x29/g
-
-* MCOUNT_ADDR is now merely a 64-bit magic, as this is totally sufficient.
-
-* QUICK_LR_SAVE renamed back to MOV_X9_X30.
-
-* place MOV_X9_X30 insns on bootup, and only flip b <-> nop at runtime
-
-* graph tracer "ifdeffery" reshuffle
-
-	Torsten
-  
+Thanks,
+Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
