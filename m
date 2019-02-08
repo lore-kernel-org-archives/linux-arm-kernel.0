@@ -2,65 +2,106 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 33ED7C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:55:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1B130C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 18:11:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 06A4420863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 17:55:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E1DD821B25
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 18:11:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dOlUFFpL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 06A4420863
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GmpJFlYJ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="qWCuRQU7";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="MkTQf5pY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1DD821B25
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=BYNMJHaU/dx6oUXBKKXQpiZeXbCrMoIM311G8tIIP8Q=; b=dOlUFFpLnP+JqUl6GpIGfVnq8
-	WXlKbIy+CWleSZk2IFi/zgZZx7vFpDEYe+Xi/vVLBfIPqBPl4E4pBneNyukkZyzfiv9yBqxJcFufo
-	5XUX2TPvyXoctJQZtd16F599d3blh40uGRJ1dnrtbsPbb+I1E4G21kfuBlmEuk5Eke9QX5L8RYHZx
-	C4iKsxpLCzkLAkslpIzlSkyoSt/MGgqD8pc7QMKJNUZrXCGOvtGo9f3ZLez+OxJuwf1ktKLGv9vy9
-	sbBsDD+kjQPzy+0woN0i83EOvgzvJxLFT4xbwpHd819/DV9RyDJM93UZvnce5dD76DjJdlZDW0/KO
-	zJ3G+r8QA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=to5oim8Zj5/VBddl02YbSjd5vXZx3cj+HIT3aI/wzPg=; b=GmpJFlYJp3bCpp
+	frKwaySxzrYJGnf9cdpeCfTPR9SsgSCDdr+HxiH1Xmcd+Z1j9+taS48fHpZaDrYTZtlMDUjkjgP8x
+	Pry/ua09LMtmtOrybGxKv2xcHBbHuudYUhmhxhKe7cF2CLKPj2v8tO7cYU50j91yqc7WByi4lsU0M
+	SL7453/hVxwZ70NAXCzTXjKqxw1/ucgY5B0NhuHeF/OwlBY++1GvMP7i8EFB0ue8ByJBGh/4s1ClB
+	BfGhbg/S89hp46iX5lxYBGDPk6ACrBNZEAl5ld6d+ngFIiG9jvmOfPgFp+saXKTHOtS6bb6UQkLlX
+	m6/DQ8oL2c/Z36F0QULg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsANH-0007zI-DW; Fri, 08 Feb 2019 17:55:39 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsANE-0007yu-5S
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 17:55:37 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 352B680D;
- Fri,  8 Feb 2019 09:55:35 -0800 (PST)
-Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 896003F719;
- Fri,  8 Feb 2019 09:55:33 -0800 (PST)
-Subject: Re: [PATCH/RFC] driver core: Postpone DMA tear-down until after
- devres release
-To: Joerg Roedel <joro@8bytes.org>,
- Geert Uytterhoeven <geert+renesas@glider.be>
-References: <20190207193653.18221-1-geert+renesas@glider.be>
- <20190208164019.GY32526@8bytes.org>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <fa781547-7fa8-cb1a-50bd-d18351c02afd@arm.com>
-Date: Fri, 8 Feb 2019 17:55:31 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gsAbt-0005OO-Cu; Fri, 08 Feb 2019 18:10:45 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gsAbr-0005OI-QJ
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 08 Feb 2019 18:10:43 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Content-Type:MIME-Version:Message-ID:
+ Date:References:In-Reply-To:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=8qlp/xAnLxAOjV4wYTNej8P4AqA27Ps7vMX0JSJoLng=; b=qWCuRQU7GEl0nlKEp/ZTttCjT
+ DlNRe65QY6+YrB6woJgeAgRI+bkdpqi9Tqh9aTtpQS6a2WwPOJq+wu//MbUZCeEqCBonuiT2S1mAG
+ 0eLPhVuOtRNl7lcM6gBhUTgTmIS5RZhSGo8+UFcd/MjlOALDOkTdjqt3L0GLZ260RD6n9OxurIXBG
+ Xbi6NRq4ELTud8jIahp1poyfUbf9EYExuHod4Q+vs9P9fv1qOmp6m8yD2A+r77S1SyzYBLdIODljA
+ JB6UnVzGFbHthERSdQ0qbxn47QfvCaRXyRuN0DXxQl0mdZMzmJqFdy1rMJq3NqKNWkhdaS2230GHD
+ o4FjHREhg==;
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gsAB4-0006BY-0a
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 17:43:03 +0000
+Received: by mail-pf1-x444.google.com with SMTP id u6so1978210pfh.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 08 Feb 2019 09:43:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:in-reply-to:references:date:message-id
+ :mime-version; bh=8qlp/xAnLxAOjV4wYTNej8P4AqA27Ps7vMX0JSJoLng=;
+ b=MkTQf5pY+FM2kNGLWUDj92xIebBxnlOjXVjgquZYYNsfaX3ahhiBc48k/QjE0oorjR
+ +Qhx/V3+sTFwZwhEjrpwvGCPIcWnFVo+/SdNOB5wlUUURsfdSDPoW4SGHvQHGuuqTX34
+ xYEGFFk2wSYsTdF6uwwHx9OAsZFo04c7O5nd6pdQUlO0FxXM7K9nFYOWhlWO8PtlrVDr
+ +nM0lyIWIHYEza751xg34Ud2fGbssXO9Yh9p9PAr4xw2PEDa1FQRJ8sSGhAm2zyencT2
+ QLEy8IjGtzFrobWfD3EVdGCUtEJCFejSjCzjG29Ulkv+6uNSp8Z91vjaA3lr6TNrN3Px
+ olDw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
+ :message-id:mime-version;
+ bh=8qlp/xAnLxAOjV4wYTNej8P4AqA27Ps7vMX0JSJoLng=;
+ b=Mb8unSmAE8ehGAoAl2E4bRkGXL4x8+lSFG45z/rm2Qy3P8BnS9e/UJtQdaTDHGurty
+ /WoRawTnwtC1ILgMa/rdc9Nr2qj95SqNsTz62IVRcZjgjtjTAm2e1reFXSUkco5CK0mY
+ 7BHdEzaMFX2s6aDR6ZJvv5wNC5D5V69z+GwRVlIgRnJQ5ju+wKAQMc/koaxZVshVFloQ
+ TXYQsBS/nGrz6J6gRaU7Ftm6co84GDpLPlkP44iNicAYajzHgAt/VU+PfbQkMUq1a4zD
+ PBV8EGYxrfHFAxG0Qe6/ZSjc3zdBadOuayDAWrj/LpnDv2wS5jw2d1slkZR5rGHapbTz
+ 2LgA==
+X-Gm-Message-State: AHQUAuaHoOca5yg6vnxh82uCk9dNX2BCWf02bULwSfsazxfMaypDbEHR
+ HyCau2sTaxuglsu+Q22oe1SoGg==
+X-Google-Smtp-Source: AHgI3IbEMM+ggW03aYshu3UHusVMXPCZA+pNgaJy2Yeg2QaRHGd5A6XRwRSkf3NZE4Uho3P5QdJsxA==
+X-Received: by 2002:a62:ca48:: with SMTP id n69mr17099411pfg.162.1549647778039; 
+ Fri, 08 Feb 2019 09:42:58 -0800 (PST)
+Received: from localhost ([2601:602:9200:a1a5:551b:c3ab:6b62:8b9f])
+ by smtp.googlemail.com with ESMTPSA id b26sm3844333pfe.91.2019.02.08.09.42.57
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 08 Feb 2019 09:42:57 -0800 (PST)
+From: Kevin Hilman <khilman@baylibre.com>
+To: Jerome Brunet <jbrunet@baylibre.com>
+Subject: Re: [PATCH 2/2] arm64: dts: meson: g12a: add peripheral clock
+ controller
+In-Reply-To: <20190208101405.25699-3-jbrunet@baylibre.com>
+References: <20190208101405.25699-1-jbrunet@baylibre.com>
+ <20190208101405.25699-3-jbrunet@baylibre.com>
+Date: Fri, 08 Feb 2019 09:42:56 -0800
+Message-ID: <7hh8defa73.fsf@baylibre.com>
 MIME-Version: 1.0
-In-Reply-To: <20190208164019.GY32526@8bytes.org>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_095536_211925_174101C9 
-X-CRM114-Status: GOOD (  21.44  )
+X-CRM114-CacheID: sfid-20190208_124302_063226_14F08D8E 
+X-CRM114-Status: UNSURE (   7.06  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,104 +113,23 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "Rafael J . Wysocki" <rafael@kernel.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-kernel@vger.kernel.org,
- linux-renesas-soc@vger.kernel.org, iommu@lists.linux-foundation.org,
- Christoph Hellwig <hch@lst.de>, linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: devicetree@vger.kernel.org, Neil Armstrong <narmstrong@baylibre.com>,
+ linux-kernel@vger.kernel.org, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org, Jerome Brunet <jbrunet@baylibre.com>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 08/02/2019 16:40, Joerg Roedel wrote:
-> Hi Geert,
-> 
-> On Thu, Feb 07, 2019 at 08:36:53PM +0100, Geert Uytterhoeven wrote:
->> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
->> index 8ac10af17c0043a3..d62487d024559620 100644
->> --- a/drivers/base/dd.c
->> +++ b/drivers/base/dd.c
->> @@ -968,9 +968,9 @@ static void __device_release_driver(struct device *dev, struct device *parent)
->>   			drv->remove(dev);
->>   
->>   		device_links_driver_cleanup(dev);
->> -		arch_teardown_dma_ops(dev);
->>   
->>   		devres_release_all(dev);
->> +		arch_teardown_dma_ops(dev);
->>   		dev->driver = NULL;
->>   		dev_set_drvdata(dev, NULL);
->>   		if (dev->pm_domain && dev->pm_domain->dismiss)
-> 
-> Thanks for the fix! Should it also be tagged for stable and get a Fixes
-> tag? I know it only triggers with a fix in v5.0-rc, but still...
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-I think so:
+> Add the peripheral clock controller to the g12a SoC DT
+>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 
-Fixes: 09515ef5ddad ("of/acpi: Configure dma operations at probe time 
-for platform/amba/pci bus devices")
+Queued for v5.1 (branch: v5.1/dt64)
 
-There aren't many drivers using dmam_alloc_*(), let alone which would 
-also find themselves behind an IOMMU on an Arm system, but it turns out 
-I actually have another one which can reproduce the BUG() with 5.0-rc.
-
-I've tried a 4.12 kernel with a bit of instrumentation[1] and sure 
-enough the devres-managed buffer is freed with the wrong ops[2] even 
-then. How it manages not to blow up more catastrophically I have no 
-idea... I guess at best it just leaks the buffers and IOMMU mappings, 
-and at worst quietly frees random other pages instead.
-
-Robin.
-
---------------
-[1]
-
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index 4f3eecedca2d..f4dbaa5598e3 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -491,6 +491,7 @@ static inline void *dma_alloc_attrs(struct device 
-*dev, size_t size,
-  		return NULL;
-
-  	cpu_addr = ops->alloc(dev, size, dma_handle, flag, attrs);
-+	dev_info(dev, "alloc %lx %lx\n", (unsigned long)cpu_addr, (unsigned 
-long)ops);
-  	debug_dma_alloc_coherent(dev, size, *dma_handle, cpu_addr);
-  	return cpu_addr;
-  }
-@@ -512,6 +513,7 @@ static inline void dma_free_attrs(struct device 
-*dev, size_t size,
-
-  	debug_dma_free_coherent(dev, size, cpu_addr, dma_handle);
-  	ops->free(dev, size, cpu_addr, dma_handle, attrs);
-+	dev_info(dev, "free %lx %lx\n", (unsigned long)cpu_addr, (unsigned 
-long)ops);
-  }
-
-  static inline void *dma_alloc_coherent(struct device *dev, size_t size,
-
--------------
-[2]
-
-/ # echo '0000:03:00.0' > /sys/bus/pci/drivers/sata_sil24/bind
-[  107.417252] sata_sil24 0000:03:00.0: alloc ffff00000a6f9000 
-ffff0000089b8090
-[  107.424397] sata_sil24 0000:03:00.0: alloc ffff00000a719000 
-ffff0000089b8090
-[  107.432216] scsi host0: sata_sil24
-[  107.436134] scsi host1: sata_sil24
-[  107.439853] ata7: SATA max UDMA/100 host m128@0x50084000 port 
-0x50080000 irq 51
-[  107.447228] ata8: SATA max UDMA/100 host m128@0x50084000 port 
-0x50082000 irq 51
-/ # echo '0000:03:00.0' > /sys/bus/pci/drivers/sata_sil24/unbind
-...
-[  112.048654] sata_sil24 0000:03:00.0: free ffff00000a719000 
-ffff0000089b8120
-[  112.055579] sata_sil24 0000:03:00.0: free ffff00000a6f9000 
-ffff0000089b8120
+Kevin
 
 _______________________________________________
 linux-arm-kernel mailing list
