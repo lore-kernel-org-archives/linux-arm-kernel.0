@@ -2,96 +2,93 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 49362C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 19:54:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 977CFC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 19:59:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1512321841
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 19:54:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 63BFC21841
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 19:59:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UYdBppvI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ZaIGnWKw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1512321841
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P8qlNAd3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linux-foundation.org header.i=@linux-foundation.org header.b="OyX0wzEF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 63BFC21841
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-foundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NhQAkxdVHeXdLATFvuXsxeRiedLbOXECCIT7RIL53yA=; b=UYdBppvI4dNC4O
-	sMnJ8kvDAn5EdjtjqoSkfgaVq/OYblusSHVZy0FcqP07t2wq2JtQpXAFrrG014+QDdRuBkMF1SZYw
-	Y3cpYkgZjMCiNaxurCI/J4OUveVa3SYAKY9va18wJ48Opvyr3MZinQdnES3JuVXwHkKy0Z76fFx85
-	8tvRO1bfn93zjl5llz4+BhSKEMXGw1AkoWMA2VMTIpgPdOWP/ZyVWqRI38f1BvuiwKnmcFO/F942F
-	hU8TvpllypRfleErAgbs+Ii6LS83mZMcIEUpAAFBcXBWam82sh2zv5FZpwUKjw4+IZGb9m364gnXg
-	MzckhAE2QifjgEupbm0Q==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=zCDFOkXWAG2+RfjxzEWpSg4gA62nIh6xv4q93j1V638=; b=P8qlNAd3mba6WJ
+	4dxvO5dEnUElNAlO2Y8qbRXnvcLCc6F8C5GZNWPOeoEHrtFJGAxG2weTlSvYjU7P+hkw0hLOLzqk7
+	1EFFT6zvhM5HDqwcWEQplCzV8W72Gvsi444ab8XYo51Jf1iE68cHuueCfPnv7SwhhNDzpLH/Qhrnm
+	rTIyp4vPc5552CeLwYrVs7rffohyHUJw5MW6N3wjL471TGHEBLI0EIShHccieb63CSU67wZI55JKO
+	aQv8fANatd1HhjT9aPKlcR+fxYXUmZx4FQ0fiwOpWuU45u5p4TRBY4oqSjdperxPg+IhDkG0maP5V
+	MU/BumKPyWoj+h2ulpnw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsCE9-0006LP-0w; Fri, 08 Feb 2019 19:54:21 +0000
-Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
+	id 1gsCIj-0008N9-J0; Fri, 08 Feb 2019 19:59:05 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsCE5-0006Kz-Mw
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 19:54:19 +0000
-Received: by mail-pf1-x443.google.com with SMTP id y126so2173723pfb.4
+ id 1gsCIg-0008Ma-LB
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 19:59:04 +0000
+Received: by mail-lj1-x244.google.com with SMTP id g11-v6so4052510ljk.3
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 08 Feb 2019 11:54:17 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=ZW/JrFWuX55nLZipr01Egyz6wooJxiWCzUtC/iAGv+s=;
- b=ZaIGnWKw45nXiBEfG2vBbFDP4ZIpFxQ5HemNl0EK1R9FxACcgh7zLc9Ue8O1meg6d4
- gtx6O5iZsPZVamfPgUL3RTD22tw4UUdMG/XcOzUumsrE0RkebQansSEBd60eakVzngi/
- SLQvvV+yJWEJw1ubUG7MpUUYDQE4fQboArrsoWdZ/WV1HTXDwfFOHlCc5vmhTx8mAcPH
- VtYsAGd8GVRm93bXACf8J5WmDfO6gmauJR1bnSV4gu3hL/XTaDA/2HVIaQCw1eW09Zf5
- 72ICxoX8Ls59f1V3spt2zH0111Rb+bP/ROGKOzM+xTpCgsgWmyto37v7NgvuJhttgEbL
- 4BNA==
+ Fri, 08 Feb 2019 11:59:01 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linux-foundation.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=qOYQNrLIv4ghYg9cJs/kFayOVviMNWKea8x1M/btUwQ=;
+ b=OyX0wzEFwz/6B3oUovySoSdj87UyroJwU08G3xNJoOnjsbu6Dq0hCgkf1L42WN6nW1
+ jwoJPZp5H1TptNE7ujv4YSzeQ1S9iqAxD7F1/8fIrL0nE3FasZpSYcLqdNGwta+XmVQT
+ r5DkKnmqomQZhOV3nS7bhb+cUUVEYNQaa28wc=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=ZW/JrFWuX55nLZipr01Egyz6wooJxiWCzUtC/iAGv+s=;
- b=a0U8LVXlmBJYGG0KQrphT0O3v7C64nY0mrgpZHUfiOSdf6Mpbeh488l0aDnoZGOWu9
- qlo5LLnINfkUgm/oDusa3XREw/5bs1wy3oh9VaQ4Mw5JRJ5FeuJNV/6oxGu406k7Zzf2
- EnjCQoCQSlrUvYVkScU0SqWLIEl3biNKsC7PJs4YlBq+6Z3eScYvXPSHpvor4W06ATts
- RWHYyAfGhJjJ2x2tGr2Wn9OBAFKPxYBg8sT29V4nO9Aq+WCM7pNxCrZavvciTQGBxZRy
- gyF6QahLjY9tHdjtmgi6G0YgK2GSXue3v15FXysgysFz96zIYmiEMnFMdDTXJ39/6GhJ
- VdKg==
-X-Gm-Message-State: AHQUAuZpIIvDzckPxlDMnTSn4xUmYSDT9jc4J5t9IUK0mp5SRwM9Dc3f
- vNwX5iVOqxalj3jXKIEi34A=
-X-Google-Smtp-Source: AHgI3IZRi5kRXNdq819Ty846yarEgn7Ju96oX1bfuqTkknGqcqYfL7+NsybiNNacVMEfTjJZXBDDzg==
-X-Received: by 2002:a63:184a:: with SMTP id 10mr21478044pgy.81.1549655656806; 
- Fri, 08 Feb 2019 11:54:16 -0800 (PST)
-Received: from [192.168.2.145] (ppp91-79-175-49.pppoe.mtu-net.ru.
- [91.79.175.49])
- by smtp.googlemail.com with ESMTPSA id u6sm3194106pgr.79.2019.02.08.11.54.12
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=qOYQNrLIv4ghYg9cJs/kFayOVviMNWKea8x1M/btUwQ=;
+ b=fzu/8ZcBTKAF+WjR0xPq/oOW+RzwlR+1ff1PBU5XNOaRhgAYX1WaRVSSLwL+7oaJdu
+ WucyXuhSP42d+/MvKaWbAs1+5Sb2/cDxe1uaAd9KJ76bFrJNb4WGkML1PLE2/WuiQmwN
+ +hV1iIG+pmn34kbINbV+0RR3WuCH5bVwB0/HVjXMr57cd8XPJp7qhA4P4UYQzosXD8Dt
+ 7hR8yf9A7uUl2nB3tf3XLonMZ6kR4WHeURdh3FiP/11AEpJLBMkSPmlslBahS9TvEBTX
+ rFctj+URO2TmDoShd+a2rDnmCanDwmxHPUSRevWq9EZNuqQ5d/EEy9dp/kSS0inU7t4H
+ /KLQ==
+X-Gm-Message-State: AHQUAuawDdTFSm6maVKuN5t0EAcal5cqm+vjHAXpg78Qb5FP9OfdGnmE
+ wOsPxoRPcvwsQlAF08tRjima7t8GV5d3NQ==
+X-Google-Smtp-Source: AHgI3IYg10nBlshEwM324p10dR1U6x3jByVZYaNMT7+uiRiu0HxFqiYa9QH7QNYYCbwoRdPIhNKRmw==
+X-Received: by 2002:a2e:91d1:: with SMTP id
+ u17-v6mr14879369ljg.160.1549655940024; 
+ Fri, 08 Feb 2019 11:59:00 -0800 (PST)
+Received: from mail-lf1-f54.google.com (mail-lf1-f54.google.com.
+ [209.85.167.54])
+ by smtp.gmail.com with ESMTPSA id a127sm594712lfe.73.2019.02.08.11.58.59
+ for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 08 Feb 2019 11:54:16 -0800 (PST)
-Subject: Re: [PATCH 5/5] clk: tegra: add tegra20 automotive init
-To: Kejia Hu <kejia.hu@codethink.co.uk>, linux-tegra@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-References: <20190207125408.8776-1-kejia.hu@codethink.co.uk>
- <20190207125408.8776-6-kejia.hu@codethink.co.uk>
- <7f300cd5-2b97-17fb-da06-b212a8fae647@gmail.com>
- <1549620609.19850.1.camel@codethink.co.uk>
-From: Dmitry Osipenko <digetx@gmail.com>
-Message-ID: <13a80190-bf33-ebf4-3076-843ca1e8ecdb@gmail.com>
-Date: Fri, 8 Feb 2019 22:54:09 +0300
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+ Fri, 08 Feb 2019 11:58:59 -0800 (PST)
+Received: by mail-lf1-f54.google.com with SMTP id l10so3424953lfh.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 08 Feb 2019 11:58:59 -0800 (PST)
+X-Received: by 2002:ac2:4191:: with SMTP id z17mr14335535lfh.117.1549655456495; 
+ Fri, 08 Feb 2019 11:50:56 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <1549620609.19850.1.camel@codethink.co.uk>
-Content-Language: en-US
+References: <1549566446-27967-1-git-send-email-longman@redhat.com>
+In-Reply-To: <1549566446-27967-1-git-send-email-longman@redhat.com>
+From: Linus Torvalds <torvalds@linux-foundation.org>
+Date: Fri, 8 Feb 2019 11:50:40 -0800
+X-Gmail-Original-Message-ID: <CAHk-=wjfyrFBjifzmgMVrkrvEePEPaBTDq7D=f2i5kD2E=SqRQ@mail.gmail.com>
+Message-ID: <CAHk-=wjfyrFBjifzmgMVrkrvEePEPaBTDq7D=f2i5kD2E=SqRQ@mail.gmail.com>
+Subject: Re: [PATCH-tip 00/22] locking/rwsem: Rework rwsem-xadd & enable new
+ rwsem features
+To: Waiman Long <longman@redhat.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_115417_745326_AD1ADA4B 
-X-CRM114-Status: GOOD (  18.75  )
+X-CRM114-CacheID: sfid-20190208_115902_694106_EE1D49D5 
+X-CRM114-Status: GOOD (  13.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,40 +100,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Peter De Schrijver <pdeschrijver@nvidia.com>,
- Thomas Preston <thomas.preston@codethink.co.uk>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-arch <linux-arch@vger.kernel.org>, linux-xtensa@linux-xtensa.org,
+ Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
+ Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
+ Linux-sh list <linux-sh@vger.kernel.org>,
+ Peter Zijlstra <peterz@infradead.org>, linux-hexagon@vger.kernel.org,
+ the arch/x86 maintainers <x86@kernel.org>, Will Deacon <will.deacon@arm.com>,
+ Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ "H. Peter Anvin" <hpa@zytor.com>, linux-alpha@vger.kernel.org,
+ sparclinux@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
+ linuxppc-dev@lists.ozlabs.org, Andrew Morton <akpm@linux-foundation.org>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-MDguMDIuMjAxOSAxMzoxMCwgS2VqaWEgSHUg0L/QuNGI0LXRgjoKPiBPbiBUaHUsIDIwMTktMDIt
-MDcgYXQgMTY6MjMgKzAzMDAsIERtaXRyeSBPc2lwZW5rbyB3cm90ZToKPj4gdGhpcyBhbGwgbG9v
-a3MgdmVyeSBnZW5lcmljIGFuZCBtdWNoIG1vcmUgYm9hcmQtc3BlY2lmaWMgdGhhbiBhdXRvbW90
-aXZlCj4gCj4gSGksCj4gCj4gVGhhbmtzIGZvciB5b3VyIHJlcGx5Lgo+IAo+IFdlIGdvdCB0aGUg
-Y2xvY2sgZGF0YSBmcm9tIG52aWRpYSBwZGsgZm9yIHRoZSBhdXRvbW90aXZlIHdoaWNoIGRpZG4n
-dAo+IHNldCB0aGUgY2xvY2tzIHVwIGluIHRoZSBzYW1lIHdheSBhcyBjb21tZXJjaWFsIHBhcnRz
-LCBhbmQgd2Ugd2VyZSB0b2xkCj4gdGhhdCB0aGVyZSBhcmUgY2VydGFpbiBjbG9jayByZXN0cmlj
-dGlvbnMgZm9yIHRoZSBhdXRvbW90aXZlIHBhcnRzIHRoYXQKPiB0aGUgY29tbWVyY2lhbCBvbmVz
-IGRvIG5vdCBoYXZlLgo+IAo+IEFwcGx5aW5nIGRpZmZlcmVudCBjbG9jayBjb25maWdzIGZvciBl
-YWNoIG5vZGVzIGRvZXNuJ3Qgc2VlbXMgdG8gYmUgYQo+IGdvb2Qgd2F5LCBhcyB0aGV5IHdpbGwg
-YmUgdG9vIHNjYXR0ZXJlZCBpbiB0aGUgZGV2aWNlIHRyZWUuIFdlIHByb3Bvc2VkCj4gdG8gYWRk
-IGEgbmV3IHJvb3Qgbm9kZSBmb3IgdGhlIGNsb2NrIG9yaWdpbmFsbHlbMV0sIGFuZCBmdXJ0aGVy
-Cj4gZGlzY3Vzc2lvbiBzdWdnZXN0ZWQgdXMgdG8gZGlzdGluZ3Vpc2ggdGhlIHZhcmlhdGlvbiBi
-eSByZWFkaW5nIHRoZSBTS1UKPiBpbmZvLCB0aHVzIGNhbWUgdGhpcyBwYXRjaC4gV2UgY2FuIGRp
-c2N1c3MgZnVydGhlciB0aG91Z2guCj4gCj4gUmVnYXJkcwo+IAo+IFsxXSBodHRwczovL3d3dy5z
-cGluaWNzLm5ldC9saXN0cy9hcm0ta2VybmVsL21zZzY2NTM0NC5odG1sCj4gCgpJIGRvbid0IHNl
-ZSBhbnkgcHJvYmxlbXMgd2l0aCBzcGVjaWZ5aW5nIGNsb2NrIGNvbmZpZ3MgZm9yIGVhY2ggbm9k
-ZSBpbiB0aGUgZGV2aWNlIHRyZWUuIEl0IGFsc28gbG9va3MgdG8gbWUgdGhhdCB0aGUgY2xvY2sg
-Y29uZmlncyB5b3UncmUgc3VnZ2VzdGluZyBpbiB0aGlzIHNlcmllcyBhcmUgb25seSByZWxldmFu
-dCBmb3IgYSBvbmUgc3BlY2lmaWMgYm9hcmQgKG9yIG1heWJlIGZhbWlseSkuIFlvdSBjb3VsZCBt
-b3ZlIG91dCB0aGUgYXNzaWduZWQtY2xvY2sgY29uZmlncyBpbnRvIGEgc2VwYXJhdGUgRFRTSSBm
-aWxlIHRoYXQgd2lsbCBiZSBzaGFyZWQgYnkgYWxsIG9mICJhdXRvbW90aXZlIiBib2FyZHMuCgpN
-YXliZSBpdCB3aWxsIG1ha2Ugc2Vuc2UgdG8gaGF2ZSBhIGN1c3RvbSBpbml0LXRhYmxlIHRvIGF2
-b2lkIHNvbWUgb2YgdGhlIGZhdGFsIGNsb2NrIGNvbmZpZ3VyYXRpb25zIGR1cmluZyBvZiBlYXJs
-eSBib290IG9mIHRoZSBrZXJuZWwuIEJ1dCBtYXliZSBpbiB0aGlzIGNhc2Ugd2UgY291bGQganVz
-dCBsaW1pdCB0aG9zZSB2aXRhbCBjbG9ja3MgdG8gYSBzYW5lci1jb21tb24gdmFsdWU/ICAKCl9f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1r
-ZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpo
-dHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJu
-ZWwK
+On Thu, Feb 7, 2019 at 11:08 AM Waiman Long <longman@redhat.com> wrote:
+>
+> This patchset revamps the current rwsem-xadd implementation to make
+> it saner and easier to work with. This patchset removes all the
+> architecture specific assembly code and uses generic C code for all
+> architectures. This eases maintenance and enables us to enhance the
+> code more easily.
+>
+> This patchset also implements the following 3 new features:
+>
+>  1) Waiter lock handoff
+>  2) Reader optimistic spinning
+>  3) Store write-lock owner in the atomic count (x86-64 only)
+
+The patches are kind of hard to read, with most of them just doing
+prep-work that doesn't necessarily matter to the big picture.
+
+What I'd really like to see is
+
+ (a) an overview of the new locking logic
+
+ (b) what's the new fastpath case
+
+ (c) some performance numbers
+
+to explain the changes from a "this is the point of the whole
+exercise" standpoint.
+
+And yes, I realize that the lock handoff and optimistic spinning is a
+big deal, since I've seen the same regression numbers that presumably
+caused this effort to be resurrected. So it's not that I don't find
+this intriguing and worthwhile, it's literally that I'd like a summary
+not so much of the individual patches, but of the new model.
+
+Please?
+
+             Linus
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
