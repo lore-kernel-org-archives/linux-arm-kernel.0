@@ -2,58 +2,61 @@ Return-Path: <SRS0=fpAU=QP=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F769C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:54:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4423CC282CB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:54:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CC7A220823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:54:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 146E7218D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:54:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TteDR6gc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC7A220823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OjrUbGz1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 146E7218D9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=+bfdCnWNbIDHIhSgwSUy1CWsNZpqmMXmHH8RlqpdSvk=; b=TteDR6gcQ0eVtz
-	mqoSD7TmOeLhC7DIkdCmQ6hhgvX+LLi5FWwj2lOmZHULxxQrrMn5VuJWulOuSUVH84AODJwJwD2GD
-	UOSKqLpdMJkGXJ1yF/jbY+Ql8f5V0vFkQNPwlPv2m8xt49+bjeztQ22mP3khZy2GAdSE1UMIPciJ8
-	dfsUz1iweD9SbSh33CmcimIu4VnB6YKnFSNv6r6UcjjwM/bp0RlCF0gXCDie54tYMQwZtkHdLbJ4Z
-	/3iFG6iFSzjHgadc4exHQ5iburWh8sllK/YIRjsNwF+CNKW6cToQqX7VFY3e5MwpkU99o8nng5AQi
-	W095W0JcYguQTSLv4YIQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=BfHNjkZdOPIM2CBbO8FN3iVRYh+p2fMjfjC0LQUhw/U=; b=OjrUbGz1zdLnnC
+	HPL1JmGa/xGMi5aYV4WD2UU9GDottIpQe/JmCPrR++jcy9o/jO0qT6AkBOqXEnQT5SoZe2gJFBcKk
+	owQ7P2XCz/jkrTU44pwBK3dk4kBOZJt2KDWEuDj6afuk3lbg8zYxDsLpRPEaY0JG6VDRPWUKyWvOF
+	HExcrbVugLLvUoHu8Szaix1VY+mKHLnPjTyKr0qznpVPMAPYBCijQ2Yamsp8V7kpni5mANOtLzjOY
+	hg294m9wTs45ltHbI9Knx6klWZuiCsGWq/xRVsUnONTrfc+GCFnQDbdwD8NtHzTSE+Vgmjs5lIQA9
+	BBb6nyu/LgI7JgMzrF0g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs2r7-0003gP-S2; Fri, 08 Feb 2019 09:53:57 +0000
+	id 1gs2rL-0003tX-Rh; Fri, 08 Feb 2019 09:54:11 +0000
 Received: from relay1-d.mail.gandi.net ([217.70.183.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs2qn-0003LC-Ip
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:53:39 +0000
+ id 1gs2qo-0003LM-Rc
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:53:44 +0000
 X-Originating-IP: 90.88.22.177
 Received: from localhost (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
  [90.88.22.177]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay1-d.mail.gandi.net (Postfix) with ESMTPSA id B810124001A;
- Fri,  8 Feb 2019 09:53:24 +0000 (UTC)
+ by relay1-d.mail.gandi.net (Postfix) with ESMTPSA id 6317C240008;
+ Fri,  8 Feb 2019 09:53:33 +0000 (UTC)
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
  Sean Paul <seanpaul@chromium.org>,
  Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH v2 0/9] drm/sun4i: dsi: Add burst mode support
-Date: Fri,  8 Feb 2019 10:53:13 +0100
-Message-Id: <cover.23dbbc9b943ff8f36253ac7c617e2eda142b1b69.1549619502.git-series.maxime.ripard@bootlin.com>
+Subject: [PATCH v2 2/9] drm/sun4i: dsi: Restrict DSI tcon clock divider
+Date: Fri,  8 Feb 2019 10:53:15 +0100
+Message-Id: <074e88ae472f5e0492e26939c74b44fb4125ffbd.1549619502.git-series.maxime.ripard@bootlin.com>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <cover.23dbbc9b943ff8f36253ac7c617e2eda142b1b69.1549619502.git-series.maxime.ripard@bootlin.com>
+References: <cover.23dbbc9b943ff8f36253ac7c617e2eda142b1b69.1549619502.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_015337_766821_F8A57CFF 
-X-CRM114-Status: GOOD (  13.06  )
+X-CRM114-CacheID: sfid-20190208_015339_398153_244A8E6C 
+X-CRM114-Status: GOOD (  12.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,52 +77,51 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+The current code allows the TCON clock divider to have a range between 4
+and 127 when feeding the DSI controller.
 
-Here is a series implementing the burst mode support for DSI.
+The only display supported so far had a display clock rate that ended up
+using a divider of 4, but testing with other displays show that only 4
+seems to be functional.
 
-It's been tested on an A33 board with the panel supported on the last
-patch, which should remove all quirks due to a different SoC from the
-equation.
+This also aligns with what Allwinner is doing in their BSP, so let's just
+hardcode that we want a divider of 4 when using the DSI output.
 
-Let me know what you think,
-Maxime
+Reviewed-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c     | 4 ++--
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h | 2 ++
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-Changes from v2:
-  - Change the start delay calculation according to the legacy driver in
-    Allwinner's BSP
-  - Fixed the edge calculation to add the same parentheses around the
-    factors
-  - Added a bunch of fixes to timings
-  - Added a patch to make hblk computation more accurate, and added a
-    comment
-  - Renamed the panel to Ronbo and fixed a bunch of things
-  - Added the Reviewed-By
-
-Konstantin Sudakov (2):
-  drm/sun4i: dsi: Add burst support
-  drm/panel: Add Ronbo RB070D30 panel
-
-Maxime Ripard (7):
-  fixup! ARM: dts: sun8i-a33: bridgemate: Enable display support
-  drm/sun4i: dsi: Restrict DSI tcon clock divider
-  drm/sun4i: dsi: Change the start delay calculation
-  drm/sun4i: dsi: Enforce boundaries on the start delay
-  drm/sun4i: dsi: Fix front vs back porch calculation
-  drm/sun4i: dsi: Fix DRQ calculation
-  drm/sun4i: dsi: Rework a bit the hblk calculation
-
- arch/arm/boot/dts/sun8i-a33-bridgemate-bm3.dts |   2 +-
- drivers/gpu/drm/panel/Kconfig                  |   9 +-
- drivers/gpu/drm/panel/Makefile                 |   1 +-
- drivers/gpu/drm/panel/panel-ronbo-rb070d30.c   | 262 ++++++++++++++++++-
- drivers/gpu/drm/sun4i/sun4i_tcon.c             |   4 +-
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c         | 183 ++++++++++---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h         |   2 +-
- 7 files changed, 420 insertions(+), 43 deletions(-)
- create mode 100644 drivers/gpu/drm/panel/panel-ronbo-rb070d30.c
-
-base-commit: f6028e7e48b0f3865b0837d400ca783d3d200b62
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 0420f5c978b9..bee73ead732a 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -341,8 +341,8 @@ static void sun4i_tcon0_mode_set_cpu(struct sun4i_tcon *tcon,
+ 	u32 block_space, start_delay;
+ 	u32 tcon_div;
+ 
+-	tcon->dclk_min_div = 4;
+-	tcon->dclk_max_div = 127;
++	tcon->dclk_min_div = SUN6I_DSI_TCON_DIV;
++	tcon->dclk_max_div = SUN6I_DSI_TCON_DIV;
+ 
+ 	sun4i_tcon0_mode_set_common(tcon, mode);
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+index dbbc5b3ecbda..6d4a3c0fd9b5 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+@@ -13,6 +13,8 @@
+ #include <drm/drm_encoder.h>
+ #include <drm/drm_mipi_dsi.h>
+ 
++#define SUN6I_DSI_TCON_DIV	4
++
+ struct sun6i_dphy {
+ 	struct clk		*bus_clk;
+ 	struct clk		*mod_clk;
 -- 
 git-series 0.9.1
 
