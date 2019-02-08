@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0E39DC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:55:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1E4B7C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:55:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A99F720823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:55:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CFAF620823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri,  8 Feb 2019 09:55:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YRoGkAyG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A99F720823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MntcKKkc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CFAF620823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FM2KA7RM8IOLjqXw6AtUy0ibyEv26F+C7TBgPK+Wg7U=; b=YRoGkAyGcsgSST
-	OzAi8w4j2ONBpbRmXhqmyID9wBeTfscNQetUOkf0z9XLHlVKhnZPplNlii8TZclkt8cWbZ1i8+2H5
-	uBcZoucPTTqIWrYQfvFIXEX7fNKhZg5q26MsiTzmXmsjyYbz/yQjzNcHcSX5xvCouUO3ltSCSAJ2C
-	o1zkoVLHS+k1rmekbWJtWeM17fxHCbdyu26aLRMPZN4YczgAEWPDt4Bo42DX9HEh6AxBiJakRPA1H
-	e0qEr12HxnH0w2FS16riAjXgdE7++99i+/RdzTTwHTiv7GvNJ7Ks42fzRkIaeJHycwzZhreLUdmHB
-	jQ/xvgyZttvodEB5Uyww==;
+	List-Owner; bh=hpJCZ9EA/UPZOHxdpsDU4XifrJKzufSzSYvDdt789W0=; b=MntcKKkc81i5p9
+	pXqCX8yfeRF5I8WUy4MPCoiEiUxGg+mzkjPxbKPoxF/3mpmM3dX2qLTnJpiHTxw3yXtlFPJqkseRx
+	E6zr76bmbZD8L/2i88pLRXOkMNjvNSR6aKYPHqngCb9X+g7E8M7bI7AiP5Je7yQTf7eLVkrhiXPDV
+	+lF9NN2TkB9LMpIB+I4/oRRRXYtQppyn2QXN+coZBzB+7oYjWK53FVenbMQjSJ4eD/h0Ks/3Vvyxh
+	4NSRNsHS35G8jNlvGpCFMtR/qSmoMKtyWCtpXyliC/iOJZK2YoclCpyIcF1gTESfuSi+WLoEhqNBp
+	iUQb3ygd4SgZrYr4CmQw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gs2sW-0005xh-FC; Fri, 08 Feb 2019 09:55:24 +0000
+	id 1gs2so-0006Yu-Nk; Fri, 08 Feb 2019 09:55:42 +0000
 Received: from relay12.mail.gandi.net ([217.70.178.232])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gs2r0-0003Zk-UM
- for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:53:59 +0000
+ id 1gs2qz-0003Wu-1o
+ for linux-arm-kernel@lists.infradead.org; Fri, 08 Feb 2019 09:54:00 +0000
 Received: from localhost (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
  [90.88.22.177]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay12.mail.gandi.net (Postfix) with ESMTPSA id E028B200004;
- Fri,  8 Feb 2019 09:53:47 +0000 (UTC)
+ by relay12.mail.gandi.net (Postfix) with ESMTPSA id D48B8200017;
+ Fri,  8 Feb 2019 09:53:45 +0000 (UTC)
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
  Sean Paul <seanpaul@chromium.org>,
  Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH v2 9/9] drm/panel: Add Ronbo RB070D30 panel
-Date: Fri,  8 Feb 2019 10:53:22 +0100
-Message-Id: <3eff6d6164845eee5636d7451b0fe08b09d1cf07.1549619502.git-series.maxime.ripard@bootlin.com>
+Subject: [PATCH v2 8/9] drm/sun4i: dsi: Add burst support
+Date: Fri,  8 Feb 2019 10:53:21 +0100
+Message-Id: <1dcabf2b38d3f0d3387b1cf02575e3d14e3ecd4e.1549619502.git-series.maxime.ripard@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <cover.23dbbc9b943ff8f36253ac7c617e2eda142b1b69.1549619502.git-series.maxime.ripard@bootlin.com>
 References: <cover.23dbbc9b943ff8f36253ac7c617e2eda142b1b69.1549619502.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_015351_897292_29CC4590 
-X-CRM114-Status: GOOD (  18.52  )
+X-CRM114-CacheID: sfid-20190208_015350_178787_1BA718CD 
+X-CRM114-Status: GOOD (  17.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,318 +79,258 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Konstantin Sudakov <k.sudakov@integrasources.com>
 
-The Ronbo RB070D30 panel is a MIPI-DSI panel based on a Fitipower EK79007
-controller and a 1024x600 panel.
+The current driver doesn't support the DSI burst operation mode.
+
+Let's add the needed quirks to make it work.
 
 Signed-off-by: Konstantin Sudakov <k.sudakov@integrasources.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/gpu/drm/panel/Kconfig                |   9 +-
- drivers/gpu/drm/panel/Makefile               |   1 +-
- drivers/gpu/drm/panel/panel-ronbo-rb070d30.c | 262 ++++++++++++++++++++-
- 3 files changed, 272 insertions(+)
- create mode 100644 drivers/gpu/drm/panel/panel-ronbo-rb070d30.c
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 171 ++++++++++++++++++++------
+ 1 file changed, 132 insertions(+), 39 deletions(-)
 
-diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
-index 3f3537719beb..870dcdbf2601 100644
---- a/drivers/gpu/drm/panel/Kconfig
-+++ b/drivers/gpu/drm/panel/Kconfig
-@@ -138,6 +138,15 @@ config DRM_PANEL_RAYDIUM_RM68200
- 	  Say Y here if you want to enable support for Raydium RM68200
- 	  720x1280 DSI video mode panel.
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+index e0288e7dc64e..4cb715dc9100 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+@@ -23,7 +23,9 @@
+ #include <drm/drm_mipi_dsi.h>
+ #include <drm/drm_panel.h>
  
-+config DRM_PANEL_RONBO_RB070D30
-+	tristate "Ronbo Electronics RB070D30 panel"
-+	depends on OF
-+	depends on DRM_MIPI_DSI
-+	depends on BACKLIGHT_CLASS_DEVICE
-+	help
-+	  Say Y here if you want to enable support for Ronbo Electronics
-+	  RB070D30 1024x600 DSI panel.
++#include "sun4i_crtc.h"
+ #include "sun4i_drv.h"
++#include "sun4i_tcon.h"
+ #include "sun6i_mipi_dsi.h"
+ 
+ #include <video/mipi_display.h>
+@@ -32,6 +34,8 @@
+ #define SUN6I_DSI_CTL_EN			BIT(0)
+ 
+ #define SUN6I_DSI_BASIC_CTL_REG		0x00c
++#define SUN6I_DSI_BASIC_CTL_TRAIL_INV(n)		(((n) & 0xf) << 4)
++#define SUN6I_DSI_BASIC_CTL_TRAIL_FILL		BIT(3)
+ #define SUN6I_DSI_BASIC_CTL_HBP_DIS		BIT(2)
+ #define SUN6I_DSI_BASIC_CTL_HSA_HSE_DIS		BIT(1)
+ #define SUN6I_DSI_BASIC_CTL_VIDEO_BURST		BIT(0)
+@@ -152,6 +156,8 @@
+ 
+ #define SUN6I_DSI_CMD_TX_REG(n)		(0x300 + (n) * 0x04)
+ 
++#define SUN6I_DSI_SYNC_POINT		40
 +
- config DRM_PANEL_SAMSUNG_S6D16D0
- 	tristate "Samsung S6D16D0 DSI video mode panel"
- 	depends on OF
-diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
-index 4396658a7996..4a103d346809 100644
---- a/drivers/gpu/drm/panel/Makefile
-+++ b/drivers/gpu/drm/panel/Makefile
-@@ -12,6 +12,7 @@ obj-$(CONFIG_DRM_PANEL_ORISETECH_OTM8009A) += panel-orisetech-otm8009a.o
- obj-$(CONFIG_DRM_PANEL_PANASONIC_VVX10F034N00) += panel-panasonic-vvx10f034n00.o
- obj-$(CONFIG_DRM_PANEL_RASPBERRYPI_TOUCHSCREEN) += panel-raspberrypi-touchscreen.o
- obj-$(CONFIG_DRM_PANEL_RAYDIUM_RM68200) += panel-raydium-rm68200.o
-+obj-$(CONFIG_DRM_PANEL_RONBO_RB070D30) += panel-ronbo-rb070d30.o
- obj-$(CONFIG_DRM_PANEL_SAMSUNG_LD9040) += panel-samsung-ld9040.o
- obj-$(CONFIG_DRM_PANEL_SAMSUNG_S6D16D0) += panel-samsung-s6d16d0.o
- obj-$(CONFIG_DRM_PANEL_SAMSUNG_S6E3HA2) += panel-samsung-s6e3ha2.o
-diff --git a/drivers/gpu/drm/panel/panel-ronbo-rb070d30.c b/drivers/gpu/drm/panel/panel-ronbo-rb070d30.c
-new file mode 100644
-index 000000000000..0fd67bc49927
---- /dev/null
-+++ b/drivers/gpu/drm/panel/panel-ronbo-rb070d30.c
-@@ -0,0 +1,262 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2018-2019, Bridge Systems BV
-+ * Copyright (C) 2018-2019, Bootlin
-+ * Copyright (C) 2017, Free Electrons
-+ *
-+ * This file based on panel-ilitek-ili9881c.c
-+ */
-+
-+#include <linux/backlight.h>
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/errno.h>
-+#include <linux/fb.h>
-+#include <linux/kernel.h>
-+#include <linux/media-bus-format.h>
-+#include <linux/module.h>
-+
-+#include <linux/gpio/consumer.h>
-+#include <linux/regulator/consumer.h>
-+
-+#include <drm/drm_mipi_dsi.h>
-+#include <drm/drm_modes.h>
-+#include <drm/drm_panel.h>
-+#include <drm/drm_print.h>
-+
-+#include <video/mipi_display.h>
-+#include <video/of_display_timing.h>
-+#include <video/videomode.h>
-+
-+struct rb070d30_panel {
-+	struct drm_panel panel;
-+	struct mipi_dsi_device *dsi;
-+	struct backlight_device *backlight;
-+	struct regulator *supply;
-+
-+	struct {
-+		struct gpio_desc *power;
-+		struct gpio_desc *reset;
-+		struct gpio_desc *updn;
-+		struct gpio_desc *shlr;
-+	} gpios;
-+};
-+
-+static inline struct rb070d30_panel *panel_to_rb070d30_panel(struct drm_panel *panel)
+ enum sun6i_dsi_start_inst {
+ 	DSI_START_LPRX,
+ 	DSI_START_LPTX,
+@@ -366,13 +372,70 @@ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
+ 	return max_t(u16, delay, 1);
+ }
+ 
++static u16 sun6i_dsi_get_line_num(struct sun6i_dsi *dsi,
++				  struct drm_display_mode *mode)
 +{
-+	return container_of(panel, struct rb070d30_panel, panel);
++	struct mipi_dsi_device *device = dsi->device;
++	unsigned Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
++
++	return mode->htotal * Bpp / device->lanes;
 +}
 +
-+static int rb070d30_panel_prepare(struct drm_panel *panel)
++static u16 sun6i_dsi_get_drq_edge0(struct sun6i_dsi *dsi,
++				   struct drm_display_mode *mode,
++				   u16 line_num, u16 edge1)
 +{
-+	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
-+	int ret;
++	u16 edge0 = edge1;
 +
-+	ret = regulator_enable(ctx->supply);
-+	if (ret < 0) {
-+		DRM_DEV_ERROR(&ctx->dsi->dev, "Failed to enable supply: %d\n", ret);
-+		return ret;
-+	}
++	edge0 += (mode->hdisplay + 40) * SUN6I_DSI_TCON_DIV / 8;
 +
-+	/* Reset */
-+	msleep(20);
-+	gpiod_set_value(ctx->gpios.power, 1);
-+	msleep(20);
-+	gpiod_set_value(ctx->gpios.reset, 1);
-+	msleep(20);
-+	return 0;
-+}
-+
-+static int rb070d30_panel_unprepare(struct drm_panel *panel)
-+{
-+	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
-+
-+	gpiod_set_value(ctx->gpios.reset, 0);
-+	gpiod_set_value(ctx->gpios.power, 0);
-+	regulator_disable(ctx->supply);
-+
-+	return 0;
-+}
-+
-+static int rb070d30_panel_enable(struct drm_panel *panel)
-+{
-+	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
-+	int ret;
-+
-+	ret = mipi_dsi_dcs_exit_sleep_mode(ctx->dsi);
-+	if (ret)
-+		return ret;
-+
-+	ret = backlight_enable(ctx->backlight);
-+	if (ret)
-+		goto out;
-+
-+	return 0;
-+
-+out:
-+	mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
-+	return ret;
-+}
-+
-+static int rb070d30_panel_disable(struct drm_panel *panel)
-+{
-+	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
-+
-+	backlight_disable(ctx->backlight);
-+	return mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
-+}
-+
-+/* Default timings */
-+static const struct drm_display_mode default_mode = {
-+	.clock		= 51206,
-+	.hdisplay	= 1024,
-+	.hsync_start	= 1024 + 160,
-+	.hsync_end	= 1024 + 160 + 80,
-+	.htotal		= 1024 + 160 + 80 + 80,
-+	.vdisplay	= 600,
-+	.vsync_start	= 600 + 12,
-+	.vsync_end	= 600 + 12 + 10,
-+	.vtotal		= 600 + 12 + 10 + 13,
-+	.vrefresh	= 60,
-+
-+	.width_mm	= 154,
-+	.height_mm	= 85,
-+};
-+
-+static int rb070d30_panel_get_modes(struct drm_panel *panel)
-+{
-+	struct drm_connector *connector = panel->connector;
-+	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
-+	struct drm_display_mode *mode;
-+	static const u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
-+
-+	mode = drm_mode_duplicate(panel->drm, &default_mode);
-+	if (!mode) {
-+		DRM_DEV_ERROR(&ctx->dsi->dev,
-+			      "Failed to add mode " DRM_MODE_FMT "\n",
-+			      DRM_MODE_ARG(mode));
-+		return -EINVAL;
-+	}
-+
-+	drm_mode_set_name(mode);
-+
-+	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
-+	drm_mode_probed_add(connector, mode);
-+
-+	panel->connector->display_info.bpc = 8;
-+	panel->connector->display_info.width_mm = mode->width_mm;
-+	panel->connector->display_info.height_mm = mode->height_mm;
-+	drm_display_info_set_bus_formats(&connector->display_info,
-+					 &bus_format, 1);
++	if (edge0 > line_num)
++		return edge0 - line_num;
 +
 +	return 1;
 +}
 +
-+static const struct drm_panel_funcs rb070d30_panel_funcs = {
-+	.get_modes	= rb070d30_panel_get_modes,
-+	.prepare	= rb070d30_panel_prepare,
-+	.enable		= rb070d30_panel_enable,
-+	.disable	= rb070d30_panel_disable,
-+	.unprepare	= rb070d30_panel_unprepare,
-+};
-+
-+static int rb070d30_panel_dsi_probe(struct mipi_dsi_device *dsi)
++static u16 sun6i_dsi_get_drq_edge1(struct sun6i_dsi *dsi,
++				   struct drm_display_mode *mode,
++				   u16 line_num)
 +{
-+	struct rb070d30_panel *ctx;
-+	int ret;
++	struct mipi_dsi_device *device = dsi->device;
++	unsigned Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
++	unsigned hbp = mode->htotal - mode->hsync_end;
++	u16 edge1;
 +
-+	ctx = devm_kzalloc(&dsi->dev, sizeof(*ctx), GFP_KERNEL);
-+	if (!ctx)
-+		return -ENOMEM;
++	edge1 = SUN6I_DSI_SYNC_POINT;
++	edge1 += (mode->hdisplay + hbp + 20) * Bpp / device->lanes;
 +
-+	ctx->supply = devm_regulator_get(&dsi->dev, "vcc-lcd");
-+	if (IS_ERR(ctx->supply))
-+		return PTR_ERR(ctx->supply);
++	if (edge1 > line_num)
++		return line_num;
 +
-+	mipi_dsi_set_drvdata(dsi, ctx);
-+	ctx->dsi = dsi;
-+
-+	drm_panel_init(&ctx->panel);
-+	ctx->panel.dev = &dsi->dev;
-+	ctx->panel.funcs = &rb070d30_panel_funcs;
-+
-+	ctx->gpios.reset = devm_gpiod_get(&dsi->dev, "reset", GPIOD_OUT_LOW);
-+	if (IS_ERR(ctx->gpios.reset)) {
-+		DRM_DEV_ERROR(&dsi->dev, "Couldn't get our reset GPIO\n");
-+		return PTR_ERR(ctx->gpios.reset);
-+	}
-+
-+	ctx->gpios.power = devm_gpiod_get(&dsi->dev, "power", GPIOD_OUT_LOW);
-+	if (IS_ERR(ctx->gpios.power)) {
-+		DRM_DEV_ERROR(&dsi->dev, "Couldn't get our power GPIO\n");
-+		return PTR_ERR(ctx->gpios.power);
-+	}
-+
-+	/*
-+	 * We don't change the state of that GPIO later on but we need
-+	 * to force it into a low state.
-+	 */
-+	ctx->gpios.updn = devm_gpiod_get(&dsi->dev, "updn", GPIOD_OUT_LOW);
-+	if (IS_ERR(ctx->gpios.updn)) {
-+		DRM_DEV_ERROR(&dsi->dev, "Couldn't get our updn GPIO\n");
-+		return PTR_ERR(ctx->gpios.updn);
-+	}
-+
-+	/*
-+	 * We don't change the state of that GPIO later on but we need
-+	 * to force it into a low state.
-+	 */
-+	ctx->gpios.shlr = devm_gpiod_get(&dsi->dev, "shlr", GPIOD_OUT_LOW);
-+	if (IS_ERR(ctx->gpios.shlr)) {
-+		DRM_DEV_ERROR(&dsi->dev, "Couldn't get our shlr GPIO\n");
-+		return PTR_ERR(ctx->gpios.shlr);
-+	}
-+
-+	ctx->backlight = devm_of_find_backlight(&dsi->dev);
-+	if (IS_ERR(ctx->backlight)) {
-+		DRM_DEV_ERROR(&dsi->dev, "Couldn't get our backlight\n");
-+		return PTR_ERR(ctx->backlight);
-+	}
-+
-+	ret = drm_panel_add(&ctx->panel);
-+	if (ret < 0)
-+		return ret;
-+
-+	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST | MIPI_DSI_MODE_LPM;
-+	dsi->format = MIPI_DSI_FMT_RGB888;
-+	dsi->lanes = 4;
-+
-+	return mipi_dsi_attach(dsi);
++	return edge1;
 +}
 +
-+static int rb070d30_panel_dsi_remove(struct mipi_dsi_device *dsi)
-+{
-+	struct rb070d30_panel *ctx = mipi_dsi_get_drvdata(dsi);
+ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
+ 				  struct drm_display_mode *mode)
+ {
+ 	struct mipi_dsi_device *device = dsi->device;
+ 	u32 val = 0;
+ 
+-	if ((mode->hsync_start - mode->hdisplay) > 20) {
++	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) {
++		u16 line_num = sun6i_dsi_get_line_num(dsi, mode);
++		u16 edge0, edge1;
 +
-+	mipi_dsi_detach(dsi);
-+	drm_panel_remove(&ctx->panel);
++		edge1 = sun6i_dsi_get_drq_edge1(dsi, mode, line_num);
++		edge0 = sun6i_dsi_get_drq_edge0(dsi, mode, line_num, edge1);
 +
-+	return 0;
-+}
++		regmap_write(dsi->regs, SUN6I_DSI_BURST_DRQ_REG,
++			     SUN6I_DSI_BURST_DRQ_EDGE0(edge0) |
++			     SUN6I_DSI_BURST_DRQ_EDGE1(edge1));
 +
-+static const struct of_device_id rb070d30_panel_of_match[] = {
-+	{ .compatible = "ronbo,rb070d30" },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, rb070d30_panel_of_match);
++		regmap_write(dsi->regs, SUN6I_DSI_BURST_LINE_REG,
++			     SUN6I_DSI_BURST_LINE_NUM(line_num) |
++			     SUN6I_DSI_BURST_LINE_SYNC_POINT(SUN6I_DSI_SYNC_POINT));
 +
-+static struct mipi_dsi_driver rb070d30_panel_driver = {
-+	.probe = rb070d30_panel_dsi_probe,
-+	.remove = rb070d30_panel_dsi_remove,
-+	.driver = {
-+		.name = "panel-ronbo-rb070d30",
-+		.of_match_table	= rb070d30_panel_of_match,
-+	},
-+};
-+module_mipi_dsi_driver(rb070d30_panel_driver);
++		val = SUN6I_DSI_TCON_DRQ_ENABLE_MODE;
++	} else if ((mode->hsync_start - mode->hdisplay) > 20) {
+ 		/* Maaaaaagic */
+ 		u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
+ 
+@@ -389,8 +452,19 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
+ static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
+ 				      struct drm_display_mode *mode)
+ {
++	struct mipi_dsi_device *device = dsi->device;
+ 	u16 delay = 50 - 1;
+ 
++	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) {
++		delay = (mode->htotal - mode->hdisplay) * 150;
++		delay /= (mode->clock / 1000) * 8;
++		delay -= 50;
++	}
 +
-+MODULE_AUTHOR("Boris Brezillon <boris.brezillon@bootlin.com>");
-+MODULE_AUTHOR("Konstantin Sudakov <k.sudakov@integrasources.com>");
-+MODULE_DESCRIPTION("Ronbo RB070D30 Panel Driver");
-+MODULE_LICENSE("GPL");
++	regmap_write(dsi->regs, SUN6I_DSI_INST_LOOP_SEL_REG,
++			 2 << (4 * DSI_INST_ID_LP11) |
++			 3 << (4 * DSI_INST_ID_DLY));
++
+ 	regmap_write(dsi->regs, SUN6I_DSI_INST_LOOP_NUM_REG(0),
+ 		     SUN6I_DSI_INST_LOOP_NUM_N0(50 - 1) |
+ 		     SUN6I_DSI_INST_LOOP_NUM_N1(delay));
+@@ -457,52 +531,71 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+ 	struct mipi_dsi_device *device = dsi->device;
+ 	unsigned int Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
+ 	u16 hbp, hfp, hsa, hblk, vblk;
++	u32 basic_ctl = 0;
+ 	size_t bytes;
+ 	u8 *buffer;
+ 
+ 	/* Do all timing calculations up front to allocate buffer space */
+ 
+-	/*
+-	 * A sync period is composed of a blanking packet (4 bytes +
+-	 * payload + 2 bytes) and a sync event packet (4 bytes). Its
+-	 * minimal size is therefore 10 bytes
+-	 */
++	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) {
++		hsa = 0;
++		hbp = 0;
++		hfp = 0;
++		hblk = mode->hdisplay * Bpp;
++		vblk = 0;
++		basic_ctl = SUN6I_DSI_BASIC_CTL_VIDEO_BURST |
++			    SUN6I_DSI_BASIC_CTL_HSA_HSE_DIS |
++			    SUN6I_DSI_BASIC_CTL_HBP_DIS;
++
++		if (device->lanes == 4)
++			basic_ctl |= SUN6I_DSI_BASIC_CTL_TRAIL_FILL |
++				     SUN6I_DSI_BASIC_CTL_TRAIL_INV(0xc);
++	} else {
++		/*
++		 * A sync period is composed of a blanking packet (4
++		 * bytes + payload + 2 bytes) and a sync event packet
++		 * (4 bytes). Its minimal size is therefore 10 bytes
++		 */
+ #define HSA_PACKET_OVERHEAD	10
+-	hsa = max((unsigned int)HSA_PACKET_OVERHEAD,
+-		  (mode->hsync_end - mode->hsync_start) * Bpp - HSA_PACKET_OVERHEAD);
+-
+-	/*
+-	 * The backporch is set using a blanking packet (4 bytes +
+-	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
+-	 */
++		hsa = max((unsigned int)HSA_PACKET_OVERHEAD,
++			  (mode->hsync_end - mode->hsync_start) * Bpp - HSA_PACKET_OVERHEAD);
++
++		/*
++		 * The backporch is set using a blanking packet (4
++		 * bytes + payload + 2 bytes). Its minimal size is
++		 * therefore 6 bytes
++		 */
+ #define HBP_PACKET_OVERHEAD	6
+-	hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
+-		  (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
+-
+-	/*
+-	 * The frontporch is set using a blanking packet (4 bytes +
+-	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
+-	 */
++		hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
++			  (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
++
++		/*
++		 * The frontporch is set using a blanking packet (4
++		 * bytes + payload + 2 bytes). Its minimal size is
++		 * therefore 6 bytes
++		 */
+ #define HFP_PACKET_OVERHEAD	6
+-	hfp = max((unsigned int)HFP_PACKET_OVERHEAD,
+-		  (mode->hsync_start - mode->hdisplay) * Bpp - HFP_PACKET_OVERHEAD);
+-
+-	/*
+-	 * The blanking is set using a sync event (4 bytes) and a
+-	 * blanking packet (4 bytes + payload + 2 bytes). Its minimal
+-	 * size is therefore 10 bytes.
+-	 */
++		hfp = max((unsigned int)HFP_PACKET_OVERHEAD,
++			  (mode->hsync_start - mode->hdisplay) * Bpp - HFP_PACKET_OVERHEAD);
++
++		/*
++		 * The blanking is set using a sync event (4 bytes)
++		 * and a blanking packet (4 bytes + payload + 2
++		 * bytes). Its minimal size is therefore 10 bytes.
++		 */
+ #define HBLK_PACKET_OVERHEAD	10
+-	hblk = max((unsigned int)HBLK_PACKET_OVERHEAD,
+-		   (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp - HBLK_PACKET_OVERHEAD);
+-
+-	/*
+-	 * And I'm not entirely sure what vblk is about. The driver in
+-	 * Allwinner BSP is using a rather convoluted calculation
+-	 * there only for 4 lanes. However, using 0 (the !4 lanes
+-	 * case) even with a 4 lanes screen seems to work...
+-	 */
+-	vblk = 0;
++		hblk = max((unsigned int)HBLK_PACKET_OVERHEAD,
++			   (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp -
++			   HBLK_PACKET_OVERHEAD);
++
++		/*
++		 * And I'm not entirely sure what vblk is about. The driver in
++		 * Allwinner BSP is using a rather convoluted calculation
++		 * there only for 4 lanes. However, using 0 (the !4 lanes
++		 * case) even with a 4 lanes screen seems to work...
++		 */
++		vblk = 0;
++	}
+ 
+ 	/* How many bytes do we need to send all payloads? */
+ 	bytes = max_t(size_t, max(max(hfp, hblk), max(hsa, hbp)), vblk);
+@@ -510,7 +603,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+ 	if (WARN_ON(!buffer))
+ 		return;
+ 
+-	regmap_write(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, 0);
++	regmap_write(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, basic_ctl);
+ 
+ 	regmap_write(dsi->regs, SUN6I_DSI_SYNC_HSS_REG,
+ 		     sun6i_dsi_build_sync_pkt(MIPI_DSI_H_SYNC_START,
 -- 
 git-series 0.9.1
 
