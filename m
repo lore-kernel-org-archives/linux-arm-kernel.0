@@ -2,69 +2,86 @@ Return-Path: <SRS0=BTYN=QQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9CD3BC282CB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 17:28:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 880E6C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 17:54:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 63E3121939
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 17:28:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5697C214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 17:54:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fcV8bKXa";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="io6gJ4n5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 63E3121939
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cLby9uDL";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dXQZzrMA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5697C214DA
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:
-	Subject:To:From:Date:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FIo6x6pFcKapB45Xy0/H/OvweuHa7EiBGehYV1Huhig=; b=fcV8bKXaw6itjq
-	q/Cm0QDz2jWae98A0s8aVJb3rPZl7TgGpnrH1Kf99MEz6GsP+kVcasNKJYJpd4k+7M/qJCGCuDOR4
-	h/JFni0nLI/lKRY6aSpRj+3z1m3BidGLfJMHugbpTy/YtZpRxdfbdfzx53Ulr3GWLP2eGCWRJHLsb
-	IOP0Vo/vBulys4ZVPygqjyqxIk69OqN2mKC3y1tX5lXF8VaA3HiReg+v6pgSctvhKiJDlmjP2OtKP
-	TY2+YxesMjj285Za7V0mnTxikSx1SdIhgIWfhyD1noC9YDA0SKsC6iCtXTlLOEeS885gSJjkObuYq
-	D/Uak/U5dH5FYEqgPtlw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=fjfwCp+VrI7YdeNCzlUczr4X9wjWCrvYMSWwTLv/UmA=; b=cLby9uDLkE+iC3
+	K49drhh5RHHTotDIYuwYzumDC8XA/YZO65qRfys7e3S7+F1Rvw9ABtXfl5h2BF2IYCHouRXmKL9Un
+	63s4Se2t3+zt49hYFrChEKBQiTuoHIjmDLDdhZfkv/8bJ/O8BJmZXMnAy19fINMMYoucYc/kZroyz
+	RvGRoR7Qh4i/nZQRnw3oHnAuI0stdsYriFG71X8cLtneuGy2zRPwur5dGVB6urMnRKV3lnNpgMIk+
+	chkkgMcw+l7KYEnFeymNv/P88YOCpgBlne3wOODxDOPTIHelebJHiQvgJLaT9ZnWMpgSw8oqgQnms
+	x6N2jwrp2aIjIw+Uxz5w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsWQh-0005JR-CS; Sat, 09 Feb 2019 17:28:39 +0000
-Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
+	id 1gsWpt-0004da-22; Sat, 09 Feb 2019 17:54:41 +0000
+Received: from mail-pg1-x529.google.com ([2607:f8b0:4864:20::529])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsWQd-0005Id-1b
- for linux-arm-kernel@lists.infradead.org; Sat, 09 Feb 2019 17:28:37 +0000
-Received: from webmail.kmu-office.ch (unknown [IPv6:2a02:418:6a02::a3])
- by mail.kmu-office.ch (Postfix) with ESMTPSA id 7CA545C1E69;
- Sat,  9 Feb 2019 18:28:25 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
- t=1549733305;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:content-transfer-encoding:
- in-reply-to:in-reply-to:references:references;
- bh=PW8zfQNBUwSdLd/R0RaFY9UOCwcevFz+HFnUPe87atQ=;
- b=io6gJ4n5U+HR4miJoeDVnMdccujW0ZscC2xbNXYvqtM5sASYiREoFppsdE8b2TgHYiBJyX
- TA0pGw87laYtP1Zyh2emQy5+3qDotXzn9DE3uo3j1ynkdr+MK4ajakqC3gmbrwTLdCmaWt
- U3bKBJ2px0PF10y8WxckJ5McF5oWvJY=
+ id 1gsWpp-0004cr-G9; Sat, 09 Feb 2019 17:54:39 +0000
+Received: by mail-pg1-x529.google.com with SMTP id z10so2980954pgp.7;
+ Sat, 09 Feb 2019 09:54:36 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=Q3Om9mSM/dRlTYIp7O4bWjIHDDjEt7Q+X6ja7q7RFHo=;
+ b=dXQZzrMA8nnogMdhtttJf9xHtFWlz94HpvQgjSjjD2Wsz9MNsE9O85h2wl16ulX50o
+ cte11T6Z0QJJ+ktm8diYlXTn3947q0Rjzm8s1L67SLkT5PUMVahCRvjlj1kKHBb/0e8c
+ 3T6wQoBEpZrmN7+hxT1/TX8x5Xru668i4ikxdBtyuaxoXBHIkqF7yDsSlDfllNjtD11/
+ IFl6gMLI3k11x/y82DfdI5e7hqkLUNDAVPjxpukBGX/VJB5IWZd1cXvy8GiEDSgojmuY
+ yNo3Px6YVOSWzUh1vS86fvmfLqrLQZdA10OX86GyuFVLpZRHP2Mby2C7rcUI6RXn2vn4
+ zSiA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=Q3Om9mSM/dRlTYIp7O4bWjIHDDjEt7Q+X6ja7q7RFHo=;
+ b=m85FdAUK3h5w0ODlHI2v1lGHMAyBSJ7zrrjngQZgfUtzbbT7ZYIDA5OsUayLsge/WT
+ VLgxvQz6dk3Oto9gT9AaxTZMzPEKlqduobV1UrhBf0ma8pJR+Ylxynd4OcuJu1dJuloC
+ 0xuaK6l5AKNpl2VQCde8GNGPvVy6Bq7X7q8ClJTY6dh1B7kAzGFzWb0FydQWbeS8kwax
+ +gUL69ZPo1td/1aRehsCTUpV39gnbxUZzGzbGhVS1ntwonLMo5mLx0vm6O2jsVx72Smm
+ pDaBPTo7TiC8EFi9kWS05mSgATvmSAcVnIo+gdBJXze8OktAEx43iKc6eM1/2eHG0YHQ
+ lu0Q==
+X-Gm-Message-State: AHQUAuZYR1AUspY5Om5Sm+21sVKnTEwX0pLGHLf6KyOVHCIvk3l9hvcU
+ RLmzsUqi7gD/MY07dh2Bj3o=
+X-Google-Smtp-Source: AHgI3IYo9ZVTxNHxiWKKocF7wicWuUHvsl9abFMFGFPZhy1G1ez8T9B7VeW9fbHkb6kfI/bb2k6fNQ==
+X-Received: by 2002:a63:2706:: with SMTP id n6mr10307040pgn.352.1549734875550; 
+ Sat, 09 Feb 2019 09:54:35 -0800 (PST)
+Received: from localhost.localdomain ([103.51.74.181])
+ by smtp.gmail.com with ESMTPSA id e9sm26359780pfh.42.2019.02.09.09.54.32
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Sat, 09 Feb 2019 09:54:34 -0800 (PST)
+From: Anand Moon <linux.amoon@gmail.com>
+To: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-amlogic@lists.infradead.org
+Subject: [PATCHv2 0/1] PATCHv2 Odroid c1+ usb fixes
+Date: Sat,  9 Feb 2019 17:54:27 +0000
+Message-Id: <20190209175428.1199-1-linux.amoon@gmail.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-Date: Sat, 09 Feb 2019 18:28:25 +0100
-From: Stefan Agner <stefan@agner.ch>
-To: linux@armlinux.org.uk
-Subject: Re: [PATCH 4/5] ARM: use unified assembler in c files
-In-Reply-To: <fed4850fb5d8a8ca874affa05d8d116d53e25b88.1549532513.git.stefan@agner.ch>
-References: <cover.1549532513.git.stefan@agner.ch>
- <fed4850fb5d8a8ca874affa05d8d116d53e25b88.1549532513.git.stefan@agner.ch>
-Message-ID: <db0e6b8f034f832c7e52fe3dd47073ad@agner.ch>
-X-Sender: stefan@agner.ch
-User-Agent: Roundcube Webmail/1.3.7
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190209_092835_384825_CAF40404 
-X-CRM114-Status: GOOD (  14.09  )
+X-CRM114-CacheID: sfid-20190209_095437_556148_3FCDFCFC 
+X-CRM114-Status: UNSURE (   7.81  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,89 +93,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: nicolas.pitre@linaro.org, mark.rutland@arm.com, arnd@arndb.de,
- ard.biesheuvel@linaro.org, will.deacon@arm.com, julien.thierry@arm.com,
- ndesaulniers@google.com, linux-kernel@vger.kernel.org,
- thierry.reding@gmail.com, natechancellor@gmail.com,
- linux-arm-kernel@lists.infradead.org
+Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Kevin Hilman <khilman@baylibre.com>, Rob Herring <robh+dt@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Thanks for the reviews so far.
+From my side this changes fix the usb power issue on usb1 ports
+This is follow up on my previous patches.
 
-During some more testing I stumbled upon another issue:
+Changes from prevoius patch drop the initialization of usb0 otg port.
 
-On 07.02.2019 10:48, Stefan Agner wrote:
-> Use unified assembler syntax (UAL) in inline assembler. Divided
-> syntax is considered depricated. This will also allow to build
-> the kernel using LLVM's integrated assembler.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  arch/arm/mm/copypage-v4mc.c | 2 +-
->  arch/arm/mm/copypage-v4wb.c | 2 +-
->  arch/arm/mm/copypage-v4wt.c | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mm/copypage-v4mc.c b/arch/arm/mm/copypage-v4mc.c
-> index b03202cddddb..b19c7ad1a6de 100644
-> --- a/arch/arm/mm/copypage-v4mc.c
-> +++ b/arch/arm/mm/copypage-v4mc.c
-> @@ -56,7 +56,7 @@ static void mc_copy_user_page(void *from, void *to)
->  	ldmia	%0!, {r2, r3, ip, lr}		@ 4\n\
->  	subs	%2, %2, #1			@ 1\n\
->  	stmia	%1!, {r2, r3, ip, lr}		@ 4\n\
-> -	ldmneia	%0!, {r2, r3, ip, lr}		@ 4\n\
-> +	ldmiane	%0!, {r2, r3, ip, lr}		@ 4\n\
->  	bne	1b				@ "
->  	: "+&r" (from), "+&r" (to), "=&r" (tmp)
->  	: "2" (PAGE_SIZE / 64)
-> diff --git a/arch/arm/mm/copypage-v4wb.c b/arch/arm/mm/copypage-v4wb.c
-> index cd3e165afeed..6e3c9b69dd25 100644
-> --- a/arch/arm/mm/copypage-v4wb.c
-> +++ b/arch/arm/mm/copypage-v4wb.c
-> @@ -38,7 +38,7 @@ static void v4wb_copy_user_page(void *kto, const void *kfrom)
->  	ldmia	%1!, {r3, r4, ip, lr}		@ 4\n\
->  	subs	%2, %2, #1			@ 1\n\
->  	stmia	%0!, {r3, r4, ip, lr}		@ 4\n\
-> -	ldmneia	%1!, {r3, r4, ip, lr}		@ 4\n\
-> +	ldmiane	%1!, {r3, r4, ip, lr}		@ 4\n\
->  	bne	1b				@ 1\n\
->  	mcr	p15, 0, %1, c7, c10, 4		@ 1   drain WB"
->  	: "+&r" (kto), "+&r" (kfrom), "=&r" (tmp)
-> diff --git a/arch/arm/mm/copypage-v4wt.c b/arch/arm/mm/copypage-v4wt.c
-> index 8614572e1296..4a40fa1cbc2a 100644
-> --- a/arch/arm/mm/copypage-v4wt.c
-> +++ b/arch/arm/mm/copypage-v4wt.c
-> @@ -34,7 +34,7 @@ static void v4wt_copy_user_page(void *kto, const void *kfrom)
->  	ldmia	%1!, {r3, r4, ip, lr}		@ 4\n\
->  	subs	%2, %2, #1			@ 1\n\
->  	stmia	%0!, {r3, r4, ip, lr}		@ 4\n\
-> -	ldmneia	%1!, {r3, r4, ip, lr}		@ 4\n\
-> +	ldmiane	%1!, {r3, r4, ip, lr}		@ 4\n\
->  	bne	1b				@ 1\n\
->  	mcr	p15, 0, %2, c7, c7, 0		@ flush ID cache"
->  	: "+&r" (kto), "+&r" (kfrom), "=&r" (tmp)
+RFC 
+[0] https://patchwork.kernel.org/patch/10777359/
+[1] https://patchwork.kernel.org/patch/10777369/
 
-When compiling with gcc, this leads to:
+Patch v0
+[0] https://lore.kernel.org/patchwork/patch/1031616/
+[1] https://lore.kernel.org/patchwork/patch/1031617/
 
-/tmp/ccrvA1wy.s: Assembler messages:
-/tmp/ccrvA1wy.s:180: Error: bad instruction `ldmiane r0!,{r3,r4,ip,lr}'
-make[1]: *** [scripts/Makefile.build:277: arch/arm/mm/copypage-v4wb.o]
-Error 1
-make: *** [Makefile:1042: arch/arm/mm] Error 2
+As per Martin's suggestion and input I have tried to fix below issue.
 
-Unfortunately, the gcc option -masm-syntax-unified which allows unified
-syntax in inline assembly is broken (see also
-https://lkml.org/lkml/2019/1/7/1320).
+Fixed the phy power issue on the usb port.
 
-So this requires to sprinkle those inline assembly with ".syntax
-unified" strings, similar to how I've done it in uaccess.h.
+# cat /sys/kernel/debug/regulator/regulator_summary
+ regulator                      use open bypass  opmode voltage current     min     max
+---------------------------------------------------------------------------------------
+ regulator-dummy                  4    3      0 unknown     0mV     0mA     0mV     0mV
+    c90c0000.usb                  1                                 0mA     0mV     0mV
+    c90c0000.usb                  1                                 0mA     0mV     0mV
+    VCCK                          1    1      0 unknown   860mV     0mA   860mV  1140mV
+       cpu0                       0                                 0mA   860mV   860mV
+ P5V0                             3    4      0 unknown  5000mV     0mA  5000mV  5000mV
+    VCC1V8                        1    1      0 unknown  1800mV     0mA  1800mV  1800mV
+       c1108680.adc               1                                 0mA     0mV     0mV
+    VCC3V3                        1    2      0 unknown  3300mV     0mA  3300mV  3300mV
+       VDD_RTC                    0    0      0 unknown   900mV     0mA   900mV   900mV
+       TFLASH_VDD                 1    1      0 unknown  3300mV     0mA  3300mV  3300mV
+          c1108c20.mmc:slot@1     1                                 0mA  3300mV  3400mV
+    DDR_VDDC                      0    0      0 unknown  1500mV     0mA  1500mV  1500mV
+    USB_VBUS                      2    1      0 unknown  5000mV     0mA  5000mV  5000mV
+       phy-c1108820.phy.0         2                                 0mA     0mV     0mV
+ TF_IO                            0    1      0 unknown  3300mV     0mA  1800mV  3300mV
 
---
-Stefan
+# lsusb -t
+/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
+    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
+        |__ Port 1: Dev 3, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+        |__ Port 2: Dev 4, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+        |__ Port 3: Dev 5, If 0, Class=Video, Driver=uvcvideo, 480M
+        |__ Port 3: Dev 5, If 1, Class=Video, Driver=uvcvideo, 480M
+        |__ Port 3: Dev 5, If 2, Class=Audio, Driver=snd-usb-audio, 480M
+        |__ Port 3: Dev 5, If 3, Class=Audio, Driver=snd-usb-audio, 480M
+        |__ Port 4: Dev 6, If 0, Class=Mass Storage, Driver=usb-storage, 480M
+
+ 
+Now hotpluing of usb device is working on odroid c1+ boards.
+TODO: need to initialize the otg usb port to accept usb device.
+
+Any input are welcome 
+
+Best Regards
+-Anand
+
+Anand Moon (1):
+  ARM: dts: meson8b: odroidc1: fix USB power supplies for phy
+
+ arch/arm/boot/dts/meson8b-odroidc1.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+-- 
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
