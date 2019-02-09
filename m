@@ -2,69 +2,69 @@ Return-Path: <SRS0=BTYN=QQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F31EC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 18:07:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9AFB3C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 18:17:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C452920811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 18:07:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 603462084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 18:17:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SPL7bvPE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C452920811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mleia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QaOuiSWG";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ideasonboard.com header.i=@ideasonboard.com header.b="nBD183x5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 603462084D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ideasonboard.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6gJ6rMgjnyX4TOEmvoGVItzVFkRn8nf9mQFY2nqiwe4=; b=SPL7bvPE4Lacsj
-	eHjkY+71rl3Qf2jZmoKVXnpy4a2FgwK82hEVOt/rCW4PPcf9M97eaW8t5UNdLG9+y5zBAWXT8t5KI
-	GyR/75xsBaCL5/pZkcdStC5rmS+nLOGoIpU8PQiz8qNTCSgcz2fczSETqDDN1JJmHsOqETavYwGRl
-	joIybhczFPdBNtEMelunj5BGoQEl/uaB8cf6xG2JcscB2YxV7BpoQXQ1L7hlwK6HB0q94FA4ZtwTC
-	MKqRtJQOyB2/Jyg1PWfipwG88tQGOV0k5v+06yIeMYDbd0X2/6T8kBbmvEkwI42KTvMFhU9sruL8O
-	+tZAO49Y9VMS0Y9Av1rw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=VZie3t4fwZwS501H5udhGAGSdZWxDIET34TcRCp83F0=; b=QaOuiSWGdeCUlE
+	mvgu4Yxsir5G40vdh8/0wwZf/sWQYjVwgs3XlrxxzLR4BegfzXz9/jEYU8++cGh4q49Zo5+F/YR+B
+	RbmjLHudiLy/M3CmRBBz1+IldIZoICP6gIEd0dpHf529X7WWX9x4VDVCOHbCoYb/miUsn5kTpkr4J
+	lLj/H3bFeqqOHUIChklSqmvmpxbzLwX/saVhvJFqzAPyq0ZiaIlAH9aMdIKhknZ8eFyJcjAl8X++X
+	JGnTIR3GJWrjFmdfpAYyPmEkiN88NgRPbfb6l/bB/NUqEp9i3xpZ73SFvzFcTMNwjtRUbC7p1yKjp
+	pbCssK6rL6/ia8DWR5Iw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsX2X-0001hI-4p; Sat, 09 Feb 2019 18:07:45 +0000
-Received: from mleia.com ([178.79.152.223] helo=mail.mleia.com)
+	id 1gsXBv-0005Nr-AB; Sat, 09 Feb 2019 18:17:27 +0000
+Received: from perceval.ideasonboard.com ([213.167.242.64])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsX2T-0001gk-Gf
- for linux-arm-kernel@lists.infradead.org; Sat, 09 Feb 2019 18:07:43 +0000
-Received: from mail.mleia.com (localhost [127.0.0.1])
- by mail.mleia.com (Postfix) with ESMTP id 6B54E44F65F;
- Sat,  9 Feb 2019 18:07:38 +0000 (GMT)
-Subject: Re: [PATCH 2/5] dt-bindings: iio: adc: lpc32xx-adc: Document
- vref-supply
-To: Gregory CLEMENT <gregory.clement@bootlin.com>,
- Jonathan Cameron <jic23@kernel.org>, Hartmut Knaack <knaack.h@gmx.de>,
- Lars-Peter Clausen <lars@metafoo.de>,
- Peter Meerwald-Stadler <pmeerw@pmeerw.net>
-References: <20190208160944.13281-1-gregory.clement@bootlin.com>
- <20190208160944.13281-3-gregory.clement@bootlin.com>
-From: Vladimir Zapolskiy <vz@mleia.com>
-Message-ID: <8bc7bfcf-ad04-0615-1735-c2bbf20b7861@mleia.com>
-Date: Sat, 9 Feb 2019 20:07:36 +0200
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.6.0
+ id 1gsXBr-0005Mh-GP; Sat, 09 Feb 2019 18:17:25 +0000
+Received: from pendragon.ideasonboard.com (85-76-143-97-nat.elisa-mobile.fi
+ [85.76.143.97])
+ by perceval.ideasonboard.com (Postfix) with ESMTPSA id F1A932E2;
+ Sat,  9 Feb 2019 19:17:09 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=ideasonboard.com;
+ s=mail; t=1549736230;
+ bh=t0GNSj2MkvQASbyGDRPGjxV1mW30FaJBbB9de/RdDjI=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=nBD183x5muW9TFd3D1A39fuZOygaD7IpVt4UdTyGzrXARx643CfWM0fw8nfTsn1I4
+ gtY6fc8oPxJSXYhMbReIT9j59NyRBjcAM6DBeLwlC+qcuUIIdf7CfTXMYpaOc9oi9f
+ Fs38M5ej4XXvZAtgRsZqPXPB3sFGiYyoEJYHzECg=
+Date: Sat, 9 Feb 2019 20:17:05 +0200
+From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+To: Sakari Ailus <sakari.ailus@iki.fi>
+Subject: Re: [RFC PATCH V0 1/7] [media] dt-bindings: mt8183: Add binding for
+ DIP shared memory
+Message-ID: <20190209181705.GB4505@pendragon.ideasonboard.com>
+References: <1549020091-42064-1-git-send-email-frederic.chen@mediatek.com>
+ <1549020091-42064-2-git-send-email-frederic.chen@mediatek.com>
+ <20190209155907.rbgwbdablndcesid@valkosipuli.retiisi.org.uk>
 MIME-Version: 1.0
-In-Reply-To: <20190208160944.13281-3-gregory.clement@bootlin.com>
-Content-Language: en-US
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-49551924 
-X-CRM114-CacheID: sfid-20190209_180738_461534_4EA673EF 
-X-CRM114-Status: GOOD (  18.95  )
-/bin/ln: failed to access
- 'reaver_cache/texts/20190209_180738_461534_4EA673EF': No such file or
- directory
+Content-Disposition: inline
+In-Reply-To: <20190209155907.rbgwbdablndcesid@valkosipuli.retiisi.org.uk>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190209_180738_461534_4EA673EF 
-X-CRM114-Status: GOOD (  19.14  )
+X-CRM114-CacheID: sfid-20190209_101723_848833_EDD26E3D 
+X-CRM114-Status: GOOD (  19.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,70 +76,98 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-arm-kernel@lists.infradead.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Cc: Sean.Cheng@mediatek.com, Frederic Chen <frederic.chen@mediatek.com>,
+ Rynn.Wu@mediatek.com, christie.yu@mediatek.com, srv_heupstream@mediatek.com,
+ holmes.chiou@mediatek.com, Jerry-ch.Chen@mediatek.com, tfiga@chromium.org,
+ jungo.lin@mediatek.com, sj.huang@mediatek.com,
+ laurent.pinchart+renesas@ideasonboard.com, hans.verkuil@cisco.com,
+ matthias.bgg@gmail.com, linux-mediatek@lists.infradead.org, mchehab@kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Gregory,
-
-On 02/08/2019 06:09 PM, Gregory CLEMENT wrote:
-> As most of the other ADC the lpc32xx one use a vref-supply property:
-> document it.
+On Sat, Feb 09, 2019 at 05:59:07PM +0200, Sakari Ailus wrote:
+> Hi Frederic,
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> ---
->  Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt | 5 +++++
->  1 file changed, 5 insertions(+)
+> Could you cc the devicetree list, please?
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt b/Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt
-> index b3629d3a9adf..3a1bc669bd51 100644
-> --- a/Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt
-> +++ b/Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt
-> @@ -6,6 +6,10 @@ Required properties:
->    region.
->  - interrupts: The ADC interrupt
->  
-> +Optional:
-> + - vref-supply: The regulator supply ADC reference voltage, optional
-> +   for legacy reason, but highly encouraging to us in new device tree
-> +
-
-here vref-supply voltage is 3.3v only, I think that might be a reason why
-the property is omitted.
-
-My concern is that the documentation shall not contain sections with
-description of properties found in the past for 'legacy reasons', if you
-like to support the backward compatibility in the driver, please update
-the documentation to the expected state and add a stub to care about
-legacy DTBs in the driver only.
-
-FWIW I personally don't mind about breaking the backward compatibility
-for NXP LPC32xx, it might be a concern when CONFIG_ARM_ATAG_DTB_COMPAT=y
-is removed from the lpc32xx_defconfig though.
-
->  Example:
->  
->  	adc@40048000 {
-> @@ -13,4 +17,5 @@ Example:
->  		reg = <0x40048000 0x1000>;
->  		interrupt-parent = <&mic>;
->  		interrupts = <39 0>;
-> +		vref-supply = <&vcc>;
->  	};
+> On Fri, Feb 01, 2019 at 07:21:25PM +0800, Frederic Chen wrote:
+> > This patch adds the binding for describing the shared memory
+> > used to exchange configuration and tuning data between the
+> > co-processor and Digital Image Processing (DIP) unit of the
+> > camera ISP system on Mediatek SoCs.
+> > 
+> > Signed-off-by: Frederic Chen <frederic.chen@mediatek.com>
+> > ---
+> >  .../mediatek,reserve-memory-dip_smem.txt           | 45 ++++++++++++++++++++++
+> >  1 file changed, 45 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/reserved-memory/mediatek,reserve-memory-dip_smem.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/reserved-memory/mediatek,reserve-memory-dip_smem.txt b/Documentation/devicetree/bindings/reserved-memory/mediatek,reserve-memory-dip_smem.txt
+> > new file mode 100644
+> > index 0000000..0ded478
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/reserved-memory/mediatek,reserve-memory-dip_smem.txt
+> > @@ -0,0 +1,45 @@
+> > +Mediatek DIP Shared Memory binding
+> > +
+> > +This binding describes the shared memory, which serves the purpose of
+> > +describing the shared memory region used to exchange data between Digital
+> > +Image Processing (DIP) and co-processor in Mediatek SoCs.
+> > +
+> > +The co-processor doesn't have the iommu so we need to use the physical
+> > +address to access the shared buffer in the firmware.
+> > +
+> > +The Digital Image Processing (DIP) can access memory through mt8183 IOMMU so
+> > +it can use dma address to access the memory region.
+> > +(See iommu/mediatek,iommu.txt for the detailed description of Mediatek IOMMU)
 > 
+> What kind of purpose is the memory used for? Buffers containing video data,
+> or something else? Could the buffer objects be mapped on the devices
+> based on the need instead?
 
-I kindly ask you to include me to To: list, if you send another changes for
-NXP LPC32xx platform.
+And could CMA be used when physically contiguous memory is needed ?
 
-Thank you.
+> > +
+> > +
+> > +Required properties:
+> > +
+> > +- compatible: must be "mediatek,reserve-memory-dip_smem"
+> > +
+> > +- reg: required for static allocation (see reserved-memory.txt for
+> > +  the detailed usage)
+> > +
+> > +- alloc-range: required for dynamic allocation. The range must
+> > +  between 0x00000400 and 0x100000000 due to the co-processer's
+> > +  addressing limitation
+> > +
+> > +- size: required for dynamic allocation. The unit is bytes.
+> > +  If you want to enable the full feature of Digital Processing Unit,
+> > +  you need 20 MB at least.
+> > +
+> > +
+> > +Example:
+> > +
+> > +The following example shows the DIP shared memory setup for MT8183.
+> > +
+> > +	reserved-memory {
+> > +		#address-cells = <2>;
+> > +		#size-cells = <2>;
+> > +		ranges;
+> > +		reserve-memory-isp_smem {
+> > +			compatible = "mediatek,reserve-memory-dip_smem";
+> > +			size = <0 0x1400000>;
+> > +			alignment = <0 0x1000>;
+> > +			alloc-ranges = <0 0x40000000 0 0x50000000>;
+> > +		};
+> > +	};
 
---
-Best wishes,
-Vladimir
+-- 
+Regards,
+
+Laurent Pinchart
 
 _______________________________________________
 linux-arm-kernel mailing list
