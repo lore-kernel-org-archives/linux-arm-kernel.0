@@ -4,97 +4,87 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 23FEAC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 19:17:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 53C47C282CC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 21:14:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E3CCB217D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 19:17:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 21C3F2083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 21:14:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cAPsHBk/";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=cogentembedded-com.20150623.gappssmtp.com header.i=@cogentembedded-com.20150623.gappssmtp.com header.b="HNjYi04q"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E3CCB217D8
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=cogentembedded.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="snIaxxd0";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="kbzM1SZB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 21C3F2083B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lechnology.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HXeduQE58IF1kyWHrYJyhN0pKB90oXiUsh07AZVYZdU=; b=cAPsHBk/Pj4kPe
-	vo1VWVnZIxmQYZw4GuWVjNy+9JJxG7zo5A72IDCq5gBlV6OZg+lTwzzxPl277+uSr2EKycubZ0G/P
-	xnuPLIJGMHRFOCWnKCUOe6KIQ5gsHITh28HE/I83ZBCT7hQ+WSJ9+GNsrJp0qfaPY5EpE5+UJ2zTN
-	Vop2bTnWMOtElRpwYYy1AjSfNY5qfAgB2O/KD9c3Mtjf3JUknGJpa3PUrbX/O6YZleCTh9WKBSgXj
-	Ze8rAEs/FuYhurpVUzEgWi6znNPAIKBTa5qdiG61uGNHabeUBtHoR/I/hyUou9lPhJ/tV4N+W/z67
-	ti+BJMwHd1iEJW6AgUqQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=znrfs3bbYqWzkMdCvZpAOBnQQCD7HwvlRYpwz32WgGo=; b=snIaxxd0mYdqsK2rIC6yhVe6l
+	46H0RygDEq0fvlFXz7JcklCqjfZ8/PXfrbtrsLbwfWoOTvmDvxq65Kucergj2TZiwyJ816cv7U7S4
+	llKjlKNjUcKKjQHBAQr1Ejt4f6IKTjwVnihDGsf/dgb77d9PY6+eRak/ySoS4ylb3Jy5gyVCOP2tR
+	HzbcbMQVDHJXeegGAToTQXFveFM9Hmwag2AslMI63XPxXijCFHUgdr+1z7U5/wb+++aNrwDtyVmH+
+	n0qVxQDb8bczmIpaWy3vyPq/NPJHZEXpDKJNqyaNeQh2KRZTMU6y/EbCiLlGAeIagUhZkMYsSf5tE
+	zvxjaGohA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsY7w-0001KK-M8; Sat, 09 Feb 2019 19:17:24 +0000
-Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+	id 1gsZxC-00043i-4Y; Sat, 09 Feb 2019 21:14:26 +0000
+Received: from vern.gendns.com ([98.142.107.122])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsY7t-0001JT-FO
- for linux-arm-kernel@lists.infradead.org; Sat, 09 Feb 2019 19:17:23 +0000
-Received: by mail-lf1-x143.google.com with SMTP id n23so4944656lfl.4
- for <linux-arm-kernel@lists.infradead.org>;
- Sat, 09 Feb 2019 11:17:18 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=cogentembedded-com.20150623.gappssmtp.com; s=20150623;
- h=subject:from:to:cc:references:organization:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=OgD5Wl5TJQIQJG3EWlvjDgLdlSUmVzFVqDCAbkP63GA=;
- b=HNjYi04qTzmurepLAa2ni4S6rJEcJtkpsspGQZZCMcIah2slGQHPlvV/wFcLFy17pA
- otsjiR4bkMUm/ADOvCkeGLxtsq3uSyLZ1CQMrT0hfWG8yp+P3BwB3zDEuYkALDetJcub
- 0ZqGrgNOucras23Q9QX5I7AIBfYmL6ClqycCSrD5Sl5VXjk5Fxz8DlBDlwD+phQblLmz
- KgzwoNeySXWr7XAjzBBF3IvGVHm4kaTcvDv5SY7paJ7G0Fh85fTxBmvrPZ0l3I9VPBYc
- lyKpRszf4sKWdjAzg6lIUldh5AHAspSO3/RAmaxksO96XF+zdvXnv6IFGjqlBaGuz6hV
- wmrg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:from:to:cc:references:organization
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=OgD5Wl5TJQIQJG3EWlvjDgLdlSUmVzFVqDCAbkP63GA=;
- b=FEsf94L1/SmV9EpJjAxfcT7BB0nu61aFVx3ux9EY+1PyTNIvuwSObaH+yJQPcads4g
- uY7+UJox8cugkk735ROMCl3v4zmb9TKnAODsHZsjCe8ipbDEZGxcOZqRF8gZzIin6dFD
- hTSBV+7ZjPaa6tv2nTKyGVUaKZkmQSkXrDJ4/CIKQIWgSb8ycypj+XOQ9RgTkzxgx2v/
- Fc15efMj9qv7A8vaTtBaJCDgvGzlaQyo4XPsuHiQ7SZY0/+KMo7DJ65ImELJ2i7npl3K
- sM20CkhcC6lIoD9lNZXGE8IP1Q1rAoh9UhOpDwxgldZCM03rWlwg6irf+pm6O5JtUO4D
- P4/w==
-X-Gm-Message-State: AHQUAuajwsLLomQsHKRBUDB52zp4aX+mPB2vyVaDqkfrbpTajwZxOup3
- sfkkvLRXb6vY/QYN6l2u2Flr1w==
-X-Google-Smtp-Source: AHgI3IY9GG9sRnYRWqmMww+kWy7wrRfd4J9ctTC3DR5NsYWujFelyL6p274R1ImsAT1jM3W15m79rw==
-X-Received: by 2002:a19:da1a:: with SMTP id r26mr9523835lfg.2.1549739836443;
- Sat, 09 Feb 2019 11:17:16 -0800 (PST)
-Received: from wasted.cogentembedded.com ([31.173.84.183])
- by smtp.gmail.com with ESMTPSA id e132sm1246793lfg.22.2019.02.09.11.17.15
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 09 Feb 2019 11:17:15 -0800 (PST)
-Subject: Re: [PATCH][next] can: at91_can: mark expected switch fall-throughs
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-To: "Gustavo A. R. Silva" <gustavo@embeddedor.com>,
- Wolfgang Grandegger <wg@grandegger.com>,
- Marc Kleine-Budde <mkl@pengutronix.de>, "David S. Miller"
- <davem@davemloft.net>, Nicolas Ferre <nicolas.ferre@microchip.com>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Ludovic Desroches <ludovic.desroches@microchip.com>
-References: <20190208184444.GA28484@embeddedor>
- <8402d6f6-dff1-eb99-3bd1-051b4f6f24f0@cogentembedded.com>
-Organization: Cogent Embedded
-Message-ID: <1db2edde-5e21-6eab-d643-ae257ecb311b@cogentembedded.com>
-Date: Sat, 9 Feb 2019 22:17:14 +0300
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.2.1
+ id 1gsZx8-0003sF-N7
+ for linux-arm-kernel@lists.infradead.org; Sat, 09 Feb 2019 21:14:24 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=lechnology.com; s=default; h=Content-Transfer-Encoding:Content-Type:
+ In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=tI6HtZ+cou49J3I+feGLu6QXsuZ0+P4Rp4ag5PuTizc=; b=kbzM1SZB6JTJ4SIrpchZkS0mAR
+ onR1a3xSr3vbcAf5fswa0PNBk4Q9jE2iUwGPgR3/ZRZrJTB2Ih470w4PPsSkMCvBI/nB7fMkBrX8G
+ M8fvDXYkTiBk2vAA9UIzAxyseg/NzfVCru8hMYPO6gwqeiasNUmDHjsQMTUQgm7sdBHWav0wG1+n7
+ ARTNay87RiqeMzRvUF2rVi8CTQuHSdZ8EPHXGbnVA1QD37riSurxus3loXiiDVFZMZ7rzp4u8+orW
+ n/rEuq9zvKfsEgnPEr9OCXiCjLO4IZSIz7d/E5QKll+z/Jh/Hb2NdwnT2KAdbAB7tm97cB9ZPamcu
+ c0BGTu0w==;
+Received: from [38.123.241.2] (port=60095 helo=gerda-5.local)
+ by vern.gendns.com with esmtpsa (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128)
+ (Exim 4.91) (envelope-from <david@lechnology.com>)
+ id 1gsZsd-0000CR-DF; Sat, 09 Feb 2019 16:09:43 -0500
+Subject: Re: [PATCH v2 03/33] ARM: davinci: select GENERIC_IRQ_MULTI_HANDLER
+To: Bartosz Golaszewski <brgl@bgdev.pl>, Sekhar Nori <nsekhar@ti.com>,
+ Kevin Hilman <khilman@kernel.org>, Daniel Lezcano
+ <daniel.lezcano@linaro.org>, Rob Herring <robh+dt@kernel.org>,
+ Mark Rutland <mark.rutland@arm.com>, Thomas Gleixner <tglx@linutronix.de>
+References: <20190208173458.4801-1-brgl@bgdev.pl>
+ <20190208173458.4801-4-brgl@bgdev.pl>
+From: David Lechner <david@lechnology.com>
+Message-ID: <c9dbec4e-8738-e2bf-9011-1cc1ac5f44dd@lechnology.com>
+Date: Sat, 9 Feb 2019 15:13:04 -0600
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:60.0)
+ Gecko/20100101 Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <8402d6f6-dff1-eb99-3bd1-051b4f6f24f0@cogentembedded.com>
-Content-Language: en-MW
+In-Reply-To: <20190208173458.4801-4-brgl@bgdev.pl>
+Content-Language: en-US
+X-AntiAbuse: This header was added to track abuse,
+ please include it with any abuse report
+X-AntiAbuse: Primary Hostname - vern.gendns.com
+X-AntiAbuse: Original Domain - lists.infradead.org
+X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
+X-AntiAbuse: Sender Address Domain - lechnology.com
+X-Get-Message-Sender-Via: vern.gendns.com: authenticated_id:
+ davidmain+lechnology.com/only user confirmed/virtual account not confirmed
+X-Authenticated-Sender: vern.gendns.com: davidmain@lechnology.com
+X-Source: 
+X-Source-Args: 
+X-Source-Dir: 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190209_111721_520013_84B8E8BD 
-X-CRM114-Status: GOOD (  16.69  )
+X-CRM114-CacheID: sfid-20190209_131422_842640_A6BB5AB2 
+X-CRM114-Status: GOOD (  11.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,66 +96,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: netdev@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-can@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org,
+ Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 02/08/2019 09:55 PM, Sergei Shtylyov wrote:
 
->> In preparation to enabling -Wimplicit-fallthrough, mark switch
->> cases where we are expecting to fall through.
->>
->> Notice that, in this particular case, the /* fall through */
->> comments are placed at the bottom of the case statement, which
->> is what GCC is expecting to find.
->>
->> Warning level 3 was used: -Wimplicit-fallthrough=3
->>
->> This patch is part of the ongoing efforts to enabling
->> -Wimplicit-fallthrough.
->>
->> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
->> ---
->>  drivers/net/can/at91_can.c | 6 ++++--
->>  1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
->> index d98c69045b17..1718c20f9c99 100644
->> --- a/drivers/net/can/at91_can.c
->> +++ b/drivers/net/can/at91_can.c
->> @@ -902,7 +902,8 @@ static void at91_irq_err_state(struct net_device *dev,
->>  				CAN_ERR_CRTL_TX_WARNING :
->>  				CAN_ERR_CRTL_RX_WARNING;
->>  		}
->> -	case CAN_STATE_ERROR_WARNING:	/* fallthrough */
->> +		/* fall through */
-> 
->    Why do we need this comment at all? Just remove it, that's all.
-> 
->> +	case CAN_STATE_ERROR_WARNING:
->>  		/*
->>  		 * from: ERROR_ACTIVE, ERROR_WARNING
->>  		 * to  : ERROR_PASSIVE, BUS_OFF
->> @@ -951,7 +952,8 @@ static void at91_irq_err_state(struct net_device *dev,
->>  		netdev_dbg(dev, "Error Active\n");
->>  		cf->can_id |= CAN_ERR_PROT;
->>  		cf->data[2] = CAN_ERR_PROT_ACTIVE;
->> -	case CAN_STATE_ERROR_WARNING:	/* fallthrough */
->> +		/* fall through */
-> 
->    Again, we don;t need it here.
-> 
->> +	case CAN_STATE_ERROR_WARNING:
->>  		reg_idr = AT91_IRQ_ERRA | AT91_IRQ_WARN | AT91_IRQ_BOFF;
->>  		reg_ier = AT91_IRQ_ERRP;
->>  		break;
 
-   Ignore me, I misread the code...
+On 2/8/19 11:34 AM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> In order to support SPARSE_IRQ we first need to make davinci use the
+> generic irq handler for ARM. Translate the legacy assembly to C and
+> put the irq handlers into their respective drivers (aintc and cp-intc).
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
 
-MBR, Sergei
+Reviewed-by: David Lechner <david@lechnology.com>
+
+
+> diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
+> index 07d8ef8037e4..3ce821a06e52 100644
+> --- a/arch/arm/mach-davinci/irq.c
+> +++ b/arch/arm/mach-davinci/irq.c
+> @@ -29,11 +29,13 @@
+>   #include <mach/cputype.h>
+>   #include <mach/common.h>
+>   #include <asm/mach/irq.h>
+> +#include <asm/exception.h>
+
+Alphabetical order?
 
 _______________________________________________
 linux-arm-kernel mailing list
