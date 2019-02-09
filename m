@@ -3,20 +3,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5FBD9C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 16:47:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A7282C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 17:06:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2B44921929
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 16:47:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 74DC521934
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 17:06:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h6eitoZG";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="B9FUTGyP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2B44921929
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a4ouoIWI";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="nGO/7dhj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 74DC521934
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zg3sleHQsP29pNtTOu93aOLon0j4+2ohEG2AekYZHSE=; b=h6eitoZGgRoa5Y
-	WRTVcckhnD/FVnwhRgIy1O090/e/1ACm71pf2rQWqUWb7uf+0IuqZ1Vx8aZAwKYlYr/cErvjNoQrh
-	VyQbCCEoKex4NAdpEFzYACl3Ayb0cCBjtqAg8AnpNftZpbmZBpKSwFCoWitP4b7pfPT7318AmLbfh
-	9mZvzKnTrJlGui1SoZHkMjmof781tSxdkWLV6E1mG29h8XEMGzpXh+IVLSCfqqMBhCAbioOJ5WxX9
-	G/aUFHDcArOhL8cVPgf6eagBh+akSMH/r8iNlLKC391kGxHbaMiT7th26qLEQKiLyRTeY1j1cSTrH
-	5+OXDpcn5d1x0FWY4tZw==;
+	List-Owner; bh=onhfFyncmrKvdyfbSS06ho491Xek3Zt+q8vSo2Sj5+M=; b=a4ouoIWI3cAs0r
+	87vu0rv30QEPqtPPfe4jpIKFrbcx6Z32I/RnFnuqHCtRaWEBfa+hbJSsRGqIDVWFPzU1qU/tEau5b
+	5LCuk++KulWWW6+rvq8jhMA0bA5avrOlF5oFyTXXQdrEFlR+qAL9c3MJgqUIdLyOovEL2GQkdlC8Z
+	yJjatuGFfS1l9xQVB7ixcBYGPZuULy8Uom53Q1moPCiJ/JkePJRZBXAHngSzZI/YbZ7XH/zrOHCDw
+	6ETwwLkUIehC9C/d7KnVwCXRVWtLAC7dhet1OuDm6S1gjhItPp8XlQe2OcrmJgs6BAPWEoRPvJKrS
+	I541VpwQHEnvBrLaQmjQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsVma-0007oO-Hx; Sat, 09 Feb 2019 16:47:12 +0000
+	id 1gsW4m-0005l9-Lo; Sat, 09 Feb 2019 17:06:00 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsVmY-0007o2-54
- for linux-arm-kernel@lists.infradead.org; Sat, 09 Feb 2019 16:47:11 +0000
+ id 1gsW4j-0005kd-9d
+ for linux-arm-kernel@lists.infradead.org; Sat, 09 Feb 2019 17:05:58 +0000
 Received: from archlinux (cpc91196-cmbg18-2-0-cust659.5-4.cable.virginm.net
  [81.96.234.148])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 7F35D218D2;
- Sat,  9 Feb 2019 16:47:06 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id DFAF72192C;
+ Sat,  9 Feb 2019 17:05:54 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549730828;
- bh=iubSI39owbR/5OxgRxZL+pMKjJpk2EgAx+sbCmO8haI=;
+ s=default; t=1549731956;
+ bh=WNXxYNEpp45e0JzheuLTWXnISOYxdjszVdvBG49Rfk0=;
  h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=B9FUTGyPg6O451fRsNeG4ZwKX9Hnrpvj0eh+G8aQ4YUu4jmD86Uq4bkjnilur/d1Y
- OuI2+ne2rFbXt0fdfWyYoT/QEdtMa63xGzRSkaCeq5mQKbRffeUD3p3wZvgytnhQjn
- S6rx6jRxmjauifsP05eBGjEZAkz6CUJW7xHlDH04=
-Date: Sat, 9 Feb 2019 16:47:02 +0000
+ b=nGO/7dhjdoaTSV4mElFoglDF5tMSfuMtaWi3+J0wJ5I37hAOA6J+/XSmsaPYBeiVp
+ GnUOncuAMr7RUh3nRq8n9WeyDhmjUoc+t5qd5pTiwS02/Zfm9soAtVQWD21nhJmWv1
+ gcrMZoL26SAzHZesAorNVjeRWITattl1NGqjwRyE=
+Date: Sat, 9 Feb 2019 17:05:51 +0000
 From: Jonathan Cameron <jic23@kernel.org>
-To: Krzysztof Kozlowski <krzk@kernel.org>
-Subject: Re: [PATCH]  iio: adc: exynos-adc: Fix NULL pointer exception on
- unbind
-Message-ID: <20190209164702.697de406@archlinux>
-In-Reply-To: <20190208233927.5392-1-krzk@kernel.org>
-References: <20190208233927.5392-1-krzk@kernel.org>
+To: Gregory CLEMENT <gregory.clement@bootlin.com>
+Subject: Re: [PATCH 1/5] dt-bindings: iio: adc: move lpc32xx-adc out of staging
+Message-ID: <20190209170551.38a8e3de@archlinux>
+In-Reply-To: <20190208160944.13281-2-gregory.clement@bootlin.com>
+References: <20190208160944.13281-1-gregory.clement@bootlin.com>
+ <20190208160944.13281-2-gregory.clement@bootlin.com>
 X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190209_084710_211776_10651F60 
-X-CRM114-Status: GOOD (  18.51  )
+X-CRM114-CacheID: sfid-20190209_090557_354911_9F6EC81A 
+X-CRM114-Status: GOOD (  11.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,67 +75,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Lars-Peter Clausen <lars@metafoo.de>, linux-iio@vger.kernel.org,
- Jonathan Bakker <xc-racer2@live.ca>, linux-kernel@vger.kernel.org,
- stable@vger.kernel.org, linux-samsung-soc@vger.kernel.org,
- Kukjin Kim <kgene@kernel.org>, Peter Meerwald-Stadler <pmeerw@pmeerw.net>,
- Hartmut Knaack <knaack.h@gmx.de>, linux-arm-kernel@lists.infradead.org,
- =?UTF-8?B?UGF3ZcWC?= Chmiel <pawel.mikolaj.chmiel@gmail.com>
+Cc: devicetree@vger.kernel.org, Lars-Peter Clausen <lars@metafoo.de>,
+ Peter Meerwald-Stadler <pmeerw@pmeerw.net>, linux-iio@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Hartmut Knaack <knaack.h@gmx.de>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat,  9 Feb 2019 00:39:27 +0100
-Krzysztof Kozlowski <krzk@kernel.org> wrote:
+On Fri,  8 Feb 2019 17:09:40 +0100
+Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
 
-> Fix NULL pointer exception on device unbind when device tree does not
-> contain "has-touchscreen" property.  In such case the input device is
-> not registered so it should not be unregistered.
+> The drivers has been moved out since
+> 0097e20e7771 ("staging:iio:adc:lpc32xx Move out of staging.") in v4.10,
+> so let's align the binding documentation.
 > 
->     $ echo "12d10000.adc" > /sys/bus/platform/drivers/exynos-adc/unbind
-> 
->     Unable to handle kernel NULL pointer dereference at virtual address 00000474
->     ...
->     (input_unregister_device) from [<c0772060>] (exynos_adc_remove+0x20/0x80)
->     (exynos_adc_remove) from [<c0587d5c>] (platform_drv_remove+0x20/0x40)
->     (platform_drv_remove) from [<c05860f0>] (device_release_driver_internal+0xdc/0x1ac)
->     (device_release_driver_internal) from [<c0583ecc>] (unbind_store+0x60/0xd4)
->     (unbind_store) from [<c031b89c>] (kernfs_fop_write+0x100/0x1e0)
->     (kernfs_fop_write) from [<c029709c>] (__vfs_write+0x2c/0x17c)
->     (__vfs_write) from [<c0297374>] (vfs_write+0xa4/0x184)
->     (vfs_write) from [<c0297594>] (ksys_write+0x4c/0xac)
->     (ksys_write) from [<c0101000>] (ret_fast_syscall+0x0/0x28)
-> 
-> Fixes: 2bb8ad9b44c5 ("iio: exynos-adc: add experimental touchscreen support")
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-Given we have had this one for a little while and are late in the
-cycle I'm going to queue it up for the coming merge window.
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+Oops. My fault.
 
-Applied to the togreg branch of iio.git and pushed out as testing
-for the autobuilders to play with it.
+You forgot the iio list on these so +cc
+
+Applied to the togreg branch of iio.git and pushed out as testing for the
+autobuilders to play with it.
 
 Thanks,
 
 Jonathan
+
 > ---
->  drivers/iio/adc/exynos_adc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  .../devicetree/bindings/{staging => }/iio/adc/lpc32xx-adc.txt     | 0
+>  1 file changed, 0 insertions(+), 0 deletions(-)
+>  rename Documentation/devicetree/bindings/{staging => }/iio/adc/lpc32xx-adc.txt (100%)
 > 
-> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
-> index fa2d2b5767f3..41da522fc673 100644
-> --- a/drivers/iio/adc/exynos_adc.c
-> +++ b/drivers/iio/adc/exynos_adc.c
-> @@ -929,7 +929,7 @@ static int exynos_adc_remove(struct platform_device *pdev)
->  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
->  	struct exynos_adc *info = iio_priv(indio_dev);
->  
-> -	if (IS_REACHABLE(CONFIG_INPUT)) {
-> +	if (IS_REACHABLE(CONFIG_INPUT) && info->input) {
->  		free_irq(info->tsirq, info);
->  		input_unregister_device(info->input);
->  	}
+> diff --git a/Documentation/devicetree/bindings/staging/iio/adc/lpc32xx-adc.txt b/Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt
+> similarity index 100%
+> rename from Documentation/devicetree/bindings/staging/iio/adc/lpc32xx-adc.txt
+> rename to Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt
 
 
 _______________________________________________
