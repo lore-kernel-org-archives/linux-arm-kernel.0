@@ -2,59 +2,69 @@ Return-Path: <SRS0=BTYN=QQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 16043C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 18:03:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F31EC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 18:07:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D487E20811
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 18:03:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C452920811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 18:07:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lkipM4dL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D487E20811
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=the-dreams.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SPL7bvPE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C452920811
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mleia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=aJNy23vdVsQlt0MAuz91LU9ndkexz8wN58/CSrgyJnM=; b=lkipM4dLGoWtfunRyy8pVOse5
-	gqaXznioL4u/tMSGftBfjfJQNYR4lbe8coymcZC/Z6NQVqm7VSgCdz0d3LYFd3xzdYa4fKuJgvvWw
-	rRDFN9C06Sa2EfYoQkfn9I/ueIUotKYI7pAMDL1oLunhr2Hv0c+YJo5SnBz5a/CXacomBDQiWlpgy
-	/ZUmw+Y6gd7ByTjHQWntWEhOyTRdmhIsZ17FnDVYDY5lzF44aoN8NET3el1wcsRFFSIuexkxB08W4
-	5F2lDD5abvKVWie6MEbK519PUNwVVQ58G+MU3RofJgWRw7BjwXRlsgzl5VLeGcr+UYlPxLU2dVL3O
-	P49zIjcUQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=6gJ6rMgjnyX4TOEmvoGVItzVFkRn8nf9mQFY2nqiwe4=; b=SPL7bvPE4Lacsj
+	eHjkY+71rl3Qf2jZmoKVXnpy4a2FgwK82hEVOt/rCW4PPcf9M97eaW8t5UNdLG9+y5zBAWXT8t5KI
+	GyR/75xsBaCL5/pZkcdStC5rmS+nLOGoIpU8PQiz8qNTCSgcz2fczSETqDDN1JJmHsOqETavYwGRl
+	joIybhczFPdBNtEMelunj5BGoQEl/uaB8cf6xG2JcscB2YxV7BpoQXQ1L7hlwK6HB0q94FA4ZtwTC
+	MKqRtJQOyB2/Jyg1PWfipwG88tQGOV0k5v+06yIeMYDbd0X2/6T8kBbmvEkwI42KTvMFhU9sruL8O
+	+tZAO49Y9VMS0Y9Av1rw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsWye-0008VP-K6; Sat, 09 Feb 2019 18:03:44 +0000
-Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsWya-0008V5-DA
- for linux-arm-kernel@lists.infradead.org; Sat, 09 Feb 2019 18:03:42 +0000
-Received: from localhost (p5486C39D.dip0.t-ipconnect.de [84.134.195.157])
- by pokefinder.org (Postfix) with ESMTPSA id CB6832C7BF4;
- Sat,  9 Feb 2019 19:03:38 +0100 (CET)
-Date: Sat, 9 Feb 2019 19:03:35 +0100
-From: Wolfram Sang <wsa@the-dreams.de>
-To: Russell King - ARM Linux <linux@armlinux.org.uk>
-Subject: Re: [RFC PATCH 4/4] i2c: core: introduce master_xfer_irqless callback
-Message-ID: <20190209180335.hmdlqf45kw64mbvn@ninjato>
-References: <20180920161423.13990-1-wsa+renesas@sang-engineering.com>
- <20180920161423.13990-5-wsa+renesas@sang-engineering.com>
- <20181018104446.GM6920@n2100.armlinux.org.uk>
+	id 1gsX2X-0001hI-4p; Sat, 09 Feb 2019 18:07:45 +0000
+Received: from mleia.com ([178.79.152.223] helo=mail.mleia.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gsX2T-0001gk-Gf
+ for linux-arm-kernel@lists.infradead.org; Sat, 09 Feb 2019 18:07:43 +0000
+Received: from mail.mleia.com (localhost [127.0.0.1])
+ by mail.mleia.com (Postfix) with ESMTP id 6B54E44F65F;
+ Sat,  9 Feb 2019 18:07:38 +0000 (GMT)
+Subject: Re: [PATCH 2/5] dt-bindings: iio: adc: lpc32xx-adc: Document
+ vref-supply
+To: Gregory CLEMENT <gregory.clement@bootlin.com>,
+ Jonathan Cameron <jic23@kernel.org>, Hartmut Knaack <knaack.h@gmx.de>,
+ Lars-Peter Clausen <lars@metafoo.de>,
+ Peter Meerwald-Stadler <pmeerw@pmeerw.net>
+References: <20190208160944.13281-1-gregory.clement@bootlin.com>
+ <20190208160944.13281-3-gregory.clement@bootlin.com>
+From: Vladimir Zapolskiy <vz@mleia.com>
+Message-ID: <8bc7bfcf-ad04-0615-1735-c2bbf20b7861@mleia.com>
+Date: Sat, 9 Feb 2019 20:07:36 +0200
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.6.0
 MIME-Version: 1.0
-In-Reply-To: <20181018104446.GM6920@n2100.armlinux.org.uk>
-User-Agent: NeoMutt/20170113 (1.7.2)
+In-Reply-To: <20190208160944.13281-3-gregory.clement@bootlin.com>
+Content-Language: en-US
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-49551924 
+X-CRM114-CacheID: sfid-20190209_180738_461534_4EA673EF 
+X-CRM114-Status: GOOD (  18.95  )
+/bin/ln: failed to access
+ 'reaver_cache/texts/20190209_180738_461534_4EA673EF': No such file or
+ directory
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190209_100340_746316_7BE96BB0 
-X-CRM114-Status: GOOD (  36.38  )
+X-CRM114-CacheID: sfid-20190209_180738_461534_4EA673EF 
+X-CRM114-Status: GOOD (  19.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,214 +76,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-renesas-soc@vger.kernel.org,
- Andy Shevchenko <andriy.shevchenko@linux.intel.com>,
- Keerthy <j-keerthy@ti.com>, Tero Kristo <t-kristo@ti.com>,
- Wolfram Sang <wsa+renesas@sang-engineering.com>, linux-omap@vger.kernel.org,
- Grygorii Strashko <grygorii.strashko@ti.com>, linux-i2c@vger.kernel.org,
- Stefan Lengfeld <contact@stefanchrist.eu>, preid@electromag.com.au,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============2324045989677792949=="
+Cc: devicetree@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ linux-arm-kernel@lists.infradead.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Gregory,
 
---===============2324045989677792949==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="l6zl2xstp3grxwt4"
-Content-Disposition: inline
+On 02/08/2019 06:09 PM, Gregory CLEMENT wrote:
+> As most of the other ADC the lpc32xx one use a vref-supply property:
+> document it.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> ---
+>  Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt b/Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt
+> index b3629d3a9adf..3a1bc669bd51 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/lpc32xx-adc.txt
+> @@ -6,6 +6,10 @@ Required properties:
+>    region.
+>  - interrupts: The ADC interrupt
+>  
+> +Optional:
+> + - vref-supply: The regulator supply ADC reference voltage, optional
+> +   for legacy reason, but highly encouraging to us in new device tree
+> +
 
+here vref-supply voltage is 3.3v only, I think that might be a reason why
+the property is omitted.
 
---l6zl2xstp3grxwt4
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+My concern is that the documentation shall not contain sections with
+description of properties found in the past for 'legacy reasons', if you
+like to support the backward compatibility in the driver, please update
+the documentation to the expected state and add a stub to care about
+legacy DTBs in the driver only.
 
-Hi Russell,
+FWIW I personally don't mind about breaking the backward compatibility
+for NXP LPC32xx, it might be a concern when CONFIG_ARM_ATAG_DTB_COMPAT=y
+is removed from the lpc32xx_defconfig though.
 
-I know this has been quite a while. I didn't have further time for this
-topic back then. But now I am going to revive and rework it. Still,
-thank you for your input.
+>  Example:
+>  
+>  	adc@40048000 {
+> @@ -13,4 +17,5 @@ Example:
+>  		reg = <0x40048000 0x1000>;
+>  		interrupt-parent = <&mic>;
+>  		interrupts = <39 0>;
+> +		vref-supply = <&vcc>;
+>  	};
+> 
 
-On Thu, Oct 18, 2018 at 11:44:46AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Sep 20, 2018 at 06:14:23PM +0200, Wolfram Sang wrote:
-> > We had the request to access devices very late when interrupts are not
-> > available anymore multiple times now. Mostly to prepare shutdown or
-> > reboot. Allow adapters to specify a specific callback for this case.
-> > Note that we fall back to the generic master_xfer callback if this new
-> > irqless one is not present. This is intentional to preserve the previous
-> > behaviour and avoid regressions. Because there are drivers not using
-> > interrupts or because it might have worked "accidently" before.
->=20
-> It's not really about "irqless", it's about being in atomic context.
-> irqless makes it sound like you may sleep, but the reality is sleeping
-> is also out (the scheduler needs IRQs to do it's job.)
->=20
-> So, it may be tempting to use things like msleep() in "irqless" but
-> that's not permissable.  So surely "atomic" would be a better name for
-> this?
+I kindly ask you to include me to To: list, if you send another changes for
+NXP LPC32xx platform.
 
-Full ack. It should be 'master_xfer_atomic'.
+Thank you.
 
-> Also, how does this get around the issue which I pointed out with (eg)
-> an oops occuring, which leads to a panic followed by an attempt to
-> reboot if the I2C bus in question is already mid-transaction?  Won't
-> we deadlock?
-
-Interesting question with multiple aspects:
-
-- The above setting will cause problems but this is orthogonal to this
-  patch. It works by modifying __i2c_transfer() but all the locking logic
-  is one layer above in i2c_transfer(). So, there shouldn't be a
-  difference.
-
-- We won't deadlock, because I2C core will use trylock in this case.
-  However, even reporting -EAGAIN won't be helpful because the
-  interrupted transfer is likely to never finish without irqs. So,
-  retrying won't help and we are still stuck.
-
-- Brainstorming: we could decide that if in_atomic() and
-  master_xfer_atomic() present and the I2C client is allowed to do
-  ATOMIC_IO (and maybe more checks), to ignore the locking and force
-  this command on the bus. Also requiring master_xfer_atomic() to reset
-  the IP core properly, etc. Probably also enforcing i2c_recover_bus()
-  to ensure a free bus. This is probably the best we could do, but
-  still no guarantees here. Some I2C devices just lock up when
-  interrupted at the wrong time.
-
-Relying on I2C for poweroff/reboot is a somewhat fragile design to begin
-with. I will re-start this series with something simple, but keep the
-above scenario in mind. Then, we can see how much we can do, hopefully.
-
-And I got the idea for a panic-fault-injector which sounds interesting.
-I will try that!
-
-Kind regards,
-
-   Wolfram
-
->=20
-> >=20
-> > Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> > ---
-> >  drivers/i2c/i2c-core-base.c |  6 +++++-
-> >  include/linux/i2c.h         | 10 +++++++---
-> >  2 files changed, 12 insertions(+), 4 deletions(-)
-> >=20
-> > diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
-> > index 904b4d2ebefa..f827446c3089 100644
-> > --- a/drivers/i2c/i2c-core-base.c
-> > +++ b/drivers/i2c/i2c-core-base.c
-> > @@ -1887,7 +1887,11 @@ int __i2c_transfer(struct i2c_adapter *adap, str=
-uct i2c_msg *msgs, int num)
-> >  	/* Retry automatically on arbitration loss */
-> >  	orig_jiffies =3D jiffies;
-> >  	for (ret =3D 0, try =3D 0; try <=3D adap->retries; try++) {
-> > -		ret =3D adap->algo->master_xfer(adap, msgs, num);
-> > +		if ((in_atomic() || irqs_disabled()) && adap->algo->master_xfer_irql=
-ess)
-> > +			ret =3D adap->algo->master_xfer_irqless(adap, msgs, num);
-> > +		else
-> > +			ret =3D adap->algo->master_xfer(adap, msgs, num);
-> > +
-> >  		if (ret !=3D -EAGAIN)
-> >  			break;
-> >  		if (time_after(jiffies, orig_jiffies + adap->timeout))
-> > diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> > index 65b4eaed1d96..11e615123bd0 100644
-> > --- a/include/linux/i2c.h
-> > +++ b/include/linux/i2c.h
-> > @@ -498,6 +498,8 @@ i2c_register_board_info(int busnum, struct i2c_boar=
-d_info const *info,
-> >   * @master_xfer: Issue a set of i2c transactions to the given I2C adap=
-ter
-> >   *   defined by the msgs array, with num messages available to transfe=
-r via
-> >   *   the adapter specified by adap.
-> > + * @master_xfer_irqless: same as master_xfer. Yet, not using any inter=
-rupts
-> > + *   so e.g. PMICs can be accessed very late before shutdown
-> >   * @smbus_xfer: Issue smbus transactions to the given I2C adapter. If =
-this
-> >   *   is not present, then the bus layer will try and convert the SMBus=
- calls
-> >   *   into I2C transfers instead.
-> > @@ -511,9 +513,9 @@ i2c_register_board_info(int busnum, struct i2c_boar=
-d_info const *info,
-> >   * be addressed using the same bus algorithms - i.e. bit-banging or th=
-e PCF8584
-> >   * to name two of the most common.
-> >   *
-> > - * The return codes from the @master_xfer field should indicate the ty=
-pe of
-> > - * error code that occurred during the transfer, as documented in the =
-kernel
-> > - * Documentation file Documentation/i2c/fault-codes.
-> > + * The return codes from the @master_xfer{_irqless} field should indic=
-ate the
-> > + * type of error code that occurred during the transfer, as documented=
- in the
-> > + * Kernel Documentation file Documentation/i2c/fault-codes.
-> >   */
-> >  struct i2c_algorithm {
-> >  	/* If an adapter algorithm can't do I2C-level access, set master_xfer
-> > @@ -524,6 +526,8 @@ struct i2c_algorithm {
-> >  	   processed, or a negative value on error */
-> >  	int (*master_xfer)(struct i2c_adapter *adap, struct i2c_msg *msgs,
-> >  			   int num);
-> > +	int (*master_xfer_irqless)(struct i2c_adapter *adap,
-> > +				   struct i2c_msg *msgs, int num);
-> >  	int (*smbus_xfer) (struct i2c_adapter *adap, u16 addr,
-> >  			   unsigned short flags, char read_write,
-> >  			   u8 command, int size, union i2c_smbus_data *data);
-> > --=20
-> > 2.18.0
-> >=20
-> >=20
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel@lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->=20
-> --=20
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbp=
-s up
-> According to speedtest.net: 11.9Mbps down 500kbps up
-
---l6zl2xstp3grxwt4
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEOZGx6rniZ1Gk92RdFA3kzBSgKbYFAlxfFfIACgkQFA3kzBSg
-KbYtYQ/6AkePVz4PczsGrZ9xlTQE4SWBGUnbLsK54HPXSsYxW8TsfHaorH5p8iNb
-MpjF3SdT5oXmmLgEmp96RP1alCR61O+TLDhxzxGkZTtdTpnGxacZ7lhop0u2Rtq/
-+q1R3jrDbeOCsMzdS2m3sl2M6uba5B1ovKJzei8IX87LtkSxvSvu0tujB+L4jkwS
-UoZMbYYKwpDbDmO9R8QmF9wGI/eR5sxl5CnVFcqepJZbazIXIbqs9Exskp/NCH9o
-9LydDonsYO39mz3kW2EoCGXS/1JvFta/X6Wdom0mdxs3ZUOvZO+DH6GmmtS/LaOp
-L5f2ASfc9ZSWwaZN9kkDp6aSrZW35KIr67q62TwldCyMEYfGHPy7ezrEi/Di3S2m
-EFGzfdVwtZJiX6ZuZafan59nMcRu4EfB63w+cJETmWRC/1IOZER6BK9e9E5JQ8G9
-WLNM0Cq8ar0YoBZLi6dEvlidN6zv8Ppn8duKXW2FWb7UVbm5KnBpqv14D4fSwbjY
-X8xwBX16yaNthwjopHKg6hIHrcq2QVnq9Pl/z7YYG5ZyqUxBTb8D5VKl8Ou4heni
-1J8FiWB8vwkJ1EeFtEIJE2XjoBjHYMd33F9J3Y7OTzSxaZ5g6SsALZxn5Bd+41O4
-OotNnd5svC4ZWmzrJDoGVg4Z60XsxmK8Nik0VmL7B4sjR5xlGEM=
-=lfwN
------END PGP SIGNATURE-----
-
---l6zl2xstp3grxwt4--
-
-
---===============2324045989677792949==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+--
+Best wishes,
+Vladimir
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============2324045989677792949==--
-
