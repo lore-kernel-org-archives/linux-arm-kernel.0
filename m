@@ -2,114 +2,94 @@ Return-Path: <SRS0=BTYN=QQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FORGED_HOTMAIL_RCVD2,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A1216C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 10:41:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 81FCDC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 13:22:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 57F59218D2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 10:41:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4E70D21916
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 13:22:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UZzxz1MR";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=hotmail.com header.i=@hotmail.com header.b="PBvBW16C"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57F59218D2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=hotmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R1KcMqhu";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="MEXukQHF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E70D21916
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=XKsKCyMuhZ2hPL1Jzi3GbxEP7lTW8OMpdYZS8Vo/Vuk=; b=UZzxz1MR5+ky3y
-	kg4TVW0q3hqRB0U2sSCYM+g9+IK5Fu6ajnpmXqUYbWMavAyWDMSuG97q8Amyc7A9arict5HvA2Vvr
-	9JGeAiApGwWQH9iR36GGaQ2iyskQm6pX0v6BTlwl/SBHnKTXowKxxPE930Ueuq3GAItsn0m8NyTrY
-	33Zdu+xxn9f20BuwjdYD6BHn9WQYLX2HEltPKjI6LnpcajxHY3c36lXDhUQCKo3eWelURxUQftm0c
-	6990IKvs2HPPcOw+DLBim8vXRC0wr4SLO9tYSzwlTHpW0soMl9zO7+0q3y23Hh5bG8E9lePRWKYg0
-	s9rc3KLj8Zf/eJV2GA2A==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=nxkwya72Z7FBxPPdA8AFEHbY7i9BHtpKpmvjSWn/5CI=; b=R1KcMqhuMwt6bL
+	BjYZfCwgZM6cvgKtJmcZ7zNAcQnUbIu+sDJQm9VjG7BbCGXIkmJ0BdzWpPr3Dm51xi03dPr5GHyKQ
+	V11k8pTcKH/VHwesLl/Aw4eaHUpLR0UYXLdXmKry+pO1ewtcuJRqidruS8tE4/7IsjgOD/ITHW3qu
+	IOTEeOX41engY45lhv6sLDVNSZDvvHoSnOj8aWVihWBHiaSjmZkN/6ZqhNrw1wDOBeun1pYtJamH6
+	acaW/dhlY+OE+4XHDh0ML1YgHOgERFxGZcvkEHlqSBD8r/9NV2tFG4ybKcH/fJry3skPXHepaZoyJ
+	n7x7nrBmqmH+/CidOSOw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsQ4b-00023y-B6; Sat, 09 Feb 2019 10:41:25 +0000
-Received: from mail-oln040092254064.outbound.protection.outlook.com
- ([40.92.254.64] helo=APC01-PU1-obe.outbound.protection.outlook.com)
+	id 1gsSai-0007us-FW; Sat, 09 Feb 2019 13:22:44 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsQ4U-00023P-Mf
- for linux-arm-kernel@lists.infradead.org; Sat, 09 Feb 2019 10:41:23 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=hotmail.com;
- s=selector1;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=DiEOs/xkP9wLeqqFPeWG3V6VPzylxuJ0ZRqDlDQbStg=;
- b=PBvBW16CsfvfXR65r+VMMU0KjAjXxxj1SSuZ3g/24i5CeqvGlSxx7B4yVpcFinVMklnIpttAuxJO3su3MZKEapdb08mR+ksmWhyVhEEcM583jfgdP6njT536awvAycdGtbAwmWXHdYP/gGJ61C2g0O2vU9ggwROM4UeAspfb44j2xlgMvv2OA8HAzQPOITiGfccgvQBheVCOQ+qXB37+r9Ld8lIg+nZ44fQTIrDpbiMX596ZqeOPM3e3/oQ0kMsIcvYSX9ixNG9lHNW8ooUr/ZEtlj9E4mklaUEo4H5Uh/LNbfzgNsBPZKM20GLuj2W9ggKGH5lpgw5XA6DLSTXePQ==
-Received: from HK2APC01FT050.eop-APC01.prod.protection.outlook.com
- (10.152.248.52) by HK2APC01HT080.eop-APC01.prod.protection.outlook.com
- (10.152.248.199) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1580.10; Sat, 9 Feb
- 2019 10:41:09 +0000
-Received: from HK0PR02MB3634.apcprd02.prod.outlook.com (10.152.248.52) by
- HK2APC01FT050.mail.protection.outlook.com (10.152.249.87) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
- 15.20.1580.10 via Frontend Transport; Sat, 9 Feb 2019 10:41:09 +0000
-Received: from HK0PR02MB3634.apcprd02.prod.outlook.com
- ([fe80::d582:b3ef:f46a:4735]) by HK0PR02MB3634.apcprd02.prod.outlook.com
- ([fe80::d582:b3ef:f46a:4735%3]) with mapi id 15.20.1601.016; Sat, 9 Feb 2019
- 10:41:09 +0000
-From: Wen Yang <yellowriver2010@hotmail.com>
-To: Olivier Moysan <olivier.moysan@st.com>, Arnaud Pouliquen
- <arnaud.pouliquen@st.com>, Liam Girdwood <lgirdwood@gmail.com>, Mark Brown
- <broonie@kernel.org>, Jaroslav Kysela <perex@perex.cz>, Takashi Iwai
- <tiwai@suse.com>, Maxime Coquelin <mcoquelin.stm32@gmail.com>, "Alexandre
- Torgue" <alexandre.torgue@st.com>
-Subject: [PATCH] ASoC: stm32: sai: add missing put_device()
-Thread-Topic: [PATCH] ASoC: stm32: sai: add missing put_device()
-Thread-Index: AQHUwGP3BFaM6L9X70mSmjxl1QacOQ==
-Date: Sat, 9 Feb 2019 10:41:09 +0000
-Message-ID: <HK0PR02MB36348FCAF73000463738C017B26A0@HK0PR02MB3634.apcprd02.prod.outlook.com>
-Accept-Language: zh-CN, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: HK2PR0302CA0012.apcprd03.prod.outlook.com
- (2603:1096:202::22) To HK0PR02MB3634.apcprd02.prod.outlook.com
- (2603:1096:203:97::14)
-x-incomingtopheadermarker: OriginalChecksum:7B37FA94378D0AB4EAA93A1D8F65916BBF078320F215C370CFFCE78BC9CF5621;
- UpperCasedChecksum:537F9B0B33B2C120E5E6AC5CF5CEB1E179ECD997FDCBF133CC284247FFFF0D86;
- SizeAsReceived:9005; Count:63
-x-ms-exchange-messagesentrepresentingtype: 1
-x-mailer: git-send-email 2.7.4
-x-tmn: [oJzL2gpxU+WXTi74rbET6FFeNLLSIPKF]
-x-microsoft-original-message-id: <1549708811-22685-1-git-send-email-yellowriver2010@hotmail.com>
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; HK2APC01HT080;
- 6:GECrVGQpANjV1fA5LpRha1Uz0nRaI1SH1zAvfdBf89GFCqb9SXhFcR0lAsNZYSvBRbLr0e0UCZNsn1LAqbfdHYKjSrX9GmzsCxVJSp08wKGoTdXnH0U6DiicsT98HB/TH4XGDb1QwFEPfcAcf/BZ8XBiaY09/FbIkBOWTzmPHpLNo6g+UmDiTgTuIB2FXIwLzqCMCydIdXJN++IaBK2CT+N7Ur0RPnL3vACZGhGfWu/HDcjPGC7Ve+wCTp9HH1jycW7ZSwWgcHyJDD6V9t6jB0h/MrCNuSFsgpq4fOFJm/24QkaALXtJgKooZkQfp1wRlYepmTAq4xMFNR4QJhFuPw9droXAfxLoXVrMgvSr7AdoO5mFj4k3O4kdl8mxpM+vLQUPFXY9vnmdlcTW6YrDWLIV6u9BS+2TFomblNMjcTV6JSWgR1B5tbBqe3a2FSPAJavGdh6qCcZPLfgSL8n/kQ==;
- 5:Ze+Bn4HKo7tPrQMkI39/4nrIKXh/cMjoOVHKUJi5xUS8fKEKd+/MJS4BAwp1TjkRt0UReGzU+Vp/jb1KPqhwCo8jWQlttK4u2Z8pzeX1Ka/++z4aaT9W92BZvPVqUZEZXKU5oNKbZKtzwxuruZLxazOzfxbs2V+z/DraYh2y9PpuyL5qp6DMJXf3XR9R+G7x2hIWJyd1r66JliCXieMEag==;
- 7:UhFJIOOj7WbVfIweOgJYoB+PV2iApbdbsXg9MWDu0n+/MP64jaxUbQtPAKQhZVKR7zigwDemQ1vmU7iijmvtAnaa2bkI4CEFhlkGMwI+HHLJfBjg7ojH9DPRfnKMESKk72P9McqrU++LDjp6fNCD+g==
-x-incomingheadercount: 63
-x-eopattributedmessage: 0
-x-ms-exchange-slblob-mailprops: mBRmoEB1kyLZIPUDhDw0Z3bfE4/ohWtWI5WwGr5xEb/HkaZu6TNx2TJ5nc54MnG3SZWjtv+cU4m9fBnWuCtknltkMpAULMhIX8jL4O5PwmDh95IIVvn5zwPgcRPuzPw7HfDTy4z15+zAt60AhtEZHHEMKGweidkrQRuxOi6ieLqoa5nVcHcGXH/gvuO8kGJmIKaiOJvVFXcWFB4GoMBloMKVgcmPiLo5S+1NANIeV4jchyP61fIgpbdRsbCxWDr6FlR2EvVviecebSx+mufW4tKBQAq/vzRUxMER/I6J0cOADQ5AMthh0gnBvPUfeA66cSLuv15if0jye36VeYFcGm0BIgFGxpP317wfPpsFSIFt9DKs8z+IN4YRhvdtIJpPjnCABL8beUKU0Je7qtFJ/Sw411Maw/EyoPiwxLXsnYGAIXYRftxXcxFD/PGOIUV8ScITdT58LQU0oPq9VUja34wzfg8rnsYi1QP8cYJl7S8yw4rT9SeOwBmJwZ8zaXDHUEq0KJQk2LhrQfvmF3mvuGw8/iRU5/NC4EFXZuyHjrjTn2DeZCVpwJH+Nich9MDfk9mO7JrCJaTWwElE2jjmdV+RZB7jAz7WJfz+9xVu5rXpj6AxFU5wl+wH2ThTAKM3Rhd4RTmPyMkuL6XWSgkF3UaeqrpUSMESUA0s+uovpeqX4rQsgjzxUxxFbPiPlBbiZWAjqIetzHvSu1uktH7s/wS47XDtULanCpMbAla18lB4JZZ+wJE3XR4Iqz2EYsNbKAG+C2wKUjM=
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(201702061078)(5061506573)(5061507331)(1603103135)(2017031320274)(201702181274)(2017031323274)(2017031324274)(2017031322404)(1601125500)(1603101475)(1701031045);
- SRVR:HK2APC01HT080; 
-x-ms-traffictypediagnostic: HK2APC01HT080:
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0; RULEID:(4566010)(82015058);
- SRVR:HK2APC01HT080; BCL:0; PCL:0; RULEID:; SRVR:HK2APC01HT080; 
-x-microsoft-antispam-message-info: uordCzEDKtK9EgWveYZPXlgDl97sVKKL9KikLE+4TfvuoxcK2LWBFXJvYgY+mv7u
+ id 1gsSae-0007uW-Hw
+ for linux-arm-kernel@lists.infradead.org; Sat, 09 Feb 2019 13:22:42 +0000
+Received: by mail-wm1-x342.google.com with SMTP id a62so8387969wmh.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 09 Feb 2019 05:22:39 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=YKhgG+hRVMP2SdK2Q9vdp473wxfGQlE8YElcW8qOQBE=;
+ b=MEXukQHFYReCWYuAccv4GN1zP8yVR3mXAvFkKDFNJR7ZfsnIacCfisAfiR5V8dsg0D
+ vjfMrEN4CSGabYd6NvQPz/6kmfiJ5AizAsZ11dX9tarA5EKfLEFtHXgfmCrLWl5L9tBy
+ +sQ0/cPsbzr0p3IMZcfMOoge3oZG4iruHXNMLLZtXAikQVWeKOXv6TqiJL4ycTwDnMdK
+ 6udSjyqodfflhVapJwgcbvx9l+KC88rBMHKNnLOTlgfdQj2ZjQXVCJtmRvGaVz+X9ei4
+ Sh1DeCNXOwVkt/yVGcvo3XI0DNd6K8wBb+TW1uq+Z/0a6b11myOI9HYzPJf9BQ7HBOCY
+ N9hA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=YKhgG+hRVMP2SdK2Q9vdp473wxfGQlE8YElcW8qOQBE=;
+ b=HN6GNmf4ERQ8Pu4TDCGL4gvXAEO3wSrSIKE45c4O7EvIUC0staVRT8/2f3VehZmubj
+ C/uhYLVs+UArhNuDQO8DeEMW3adIhDGgr/cDEuHkKaZ2rL0pLgT+Iy/hJwygGAlpZC6u
+ wYC67kVkrNNkYnn9ZzagVL7erO7Z24K10NHCqX/yaA5ZuCQzPyMxjzZuromEVZ7WacnJ
+ k/7orgtTEU6lxnicFCaCfRSGiROS35vratY/SQZ1uEcv6/d+aKCmT+jK+AwKZP6nsWFQ
+ xrwF+7AFk/FpM6/IxsKLkZYsDD7DvyZfuvwrwztkbHArEEoKsegjvHCpgvlIhs3vc1U4
+ rqyQ==
+X-Gm-Message-State: AHQUAub/ynRFMpWIG1PaKV2ev+Oby1vi4kKgCnj67l2v6LZoivJHHpgQ
+ EyNoiqnW7dK4W1LbCma2KN0=
+X-Google-Smtp-Source: AHgI3IYC54iQfAxHvnr2IAMXerJE5+VCzC+iCR7vXpR3aRnzwfErywSJmbDhchW4WRnTSchyY4CJlg==
+X-Received: by 2002:adf:fd0a:: with SMTP id e10mr21571198wrr.190.1549718557952; 
+ Sat, 09 Feb 2019 05:22:37 -0800 (PST)
+Received: from ?IPv6:2003:ea:8bf1:e200:aca4:3d:8205:4c97?
+ (p200300EA8BF1E200ACA4003D82054C97.dip0.t-ipconnect.de.
+ [2003:ea:8bf1:e200:aca4:3d:8205:4c97])
+ by smtp.googlemail.com with ESMTPSA id s3sm4624771wmj.23.2019.02.09.05.22.35
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Sat, 09 Feb 2019 05:22:36 -0800 (PST)
+Subject: Re: [PATCH net-next v2 00/10] net: phy: Add support for 2.5GBASET PHYs
+To: Maxime Chevallier <maxime.chevallier@bootlin.com>, davem@davemloft.net,
+ Andrew Lunn <andrew@lunn.ch>
+References: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
+From: Heiner Kallweit <hkallweit1@gmail.com>
+Message-ID: <81c340ea-54b0-1abf-94af-b8dc4ee83e3a@gmail.com>
+Date: Sat, 9 Feb 2019 14:22:31 +0100
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-X-OriginatorOrg: hotmail.com
-X-MS-Exchange-CrossTenant-RMS-PersistedConsumerOrg: 9a4e3081-9524-43cf-bfc3-dcaef82d5da1
-X-MS-Exchange-CrossTenant-Network-Message-Id: 297a944a-657e-4730-5c43-08d68e7b1a38
-X-MS-Exchange-CrossTenant-rms-persistedconsumerorg: 9a4e3081-9524-43cf-bfc3-dcaef82d5da1
-X-MS-Exchange-CrossTenant-originalarrivaltime: 09 Feb 2019 10:41:08.3491 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Internet
-X-MS-Exchange-CrossTenant-id: 84df9e7f-e9f6-40af-b435-aaaaaaaaaaaa
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: HK2APC01HT080
+In-Reply-To: <20190207094939.27369-1-maxime.chevallier@bootlin.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190209_024121_863922_69E9BF0C 
-X-CRM114-Status: GOOD (  11.23  )
+X-CRM114-CacheID: sfid-20190209_052240_630365_D57B3239 
+X-CRM114-Status: GOOD (  25.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,58 +101,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Wen Yang <yellowriver2010@hotmail.com>,
- "alsa-devel@alsa-project.org" <alsa-devel@alsa-project.org>,
- "linux-stm32@st-md-mailman.stormreply.com"
- <linux-stm32@st-md-mailman.stormreply.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+Cc: Florian Fainelli <f.fainelli@gmail.com>,
+ Antoine Tenart <antoine.tenart@bootlin.com>, netdev@vger.kernel.org,
+ gregory.clement@bootlin.com, linux-kernel@vger.kernel.org,
+ Russell King <linux@armlinux.org.uk>, nadavh@marvell.com,
+ thomas.petazzoni@bootlin.com, miquel.raynal@bootlin.com, stefanc@marvell.com,
+ mw@semihalf.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The of_find_device_by_node() takes a reference to the underlying device
-structure, we should release that reference.
+On 07.02.2019 10:49, Maxime Chevallier wrote:
+> Hello everyone,
+> 
+> This is the second iteration of the series introducing support for
+> 2.5GBASET and 5GBASET to the network PHY infrastructure.
+> 
+> These 2 modes are described in the 802.3bz specifications, and allow to
+> use 2.5G and 5G speeds on cat5e/cat6 cables.
+> 
+> The required infrastructure code is added for 2.5GBASET and 5GBASET, but
+> only 2.5GBASET support is added to the Marvell10G driver. The reason is
+> because the 5GBASER interface mode used to communicate with the MAC
+> isn't implemented yet, and therefore this can't be tested.
+> 
+> This series has seen some rework since last time, see the full details
+> in the patches changelog. The main highlights are :
+> 
+>  - Patch 1 moves the Pause ans Asym_Pause parameters update after
+>    calling config_init. This allows us to change the phydev->supported
+>    modes in config_init, while still forcing some quirks taken from
+>    phydrv->features, to disable unsupported Pause modes. This was
+>    proposed by Andrew.
+> 
+>  - Patch 2 generalizes the way we mask-out modes we don't want to use
+>    when forcing the link speed through DT or ethtool, by walking through
+>    the PHY settings table, as proposed by Russell.
+> 
+>  - Patch 4 implements automatic setting of TM, FIBRE and Backplane bits
+>    from the list of supported linkmodes.
+> 
+>  - In Patch 5, we only read abilities from the PMA. Pause parameters
+>    aren't built from the genphy_c45_pma_read_abilities, as it was done
+>    in the previous iteration of the patch. We also amke use of
+>    linkmode_mod_bit to make sure we mask-out unsupported modes.
+> 
+>  - In Patch 8, we manually check for the PMA device id to see if we have
+>    to use a quirk when reading the 2.5G/5G Extended Abilities
+> 
+> Maxime Chevallier (10):
+>   net: phy: Update PHY linkmodes after config_init
+>   net: phy: Mask-out non-compatible modes when setting the max-speed
+>   net: phy: Move of_set_phy_eee_broken to phy-core.c
+>   net: phy: Automatically fill the generic TP, FIBRE and Backplane modes
+>   net: phy: Extract genphy_c45_pma_read_abilities from marvell10g
+>   net: phy: Add generic support for 2.5GBaseT and 5GBaseT
+>   net: phy: marvell10g: Add support for 2.5GBASET
+>   net: phy: marvell10g: Force reading of 2.5/5G
+>   net: mvpp2: Add 2.5GBaseT support
+>   net: phy: marvell10g: add support for the 88x2110 PHY
+> 
+>  .../net/ethernet/marvell/mvpp2/mvpp2_main.c   |   1 +
+>  drivers/net/phy/marvell10g.c                  | 142 +++++------
+>  drivers/net/phy/phy-c45.c                     | 111 ++++++++
+>  drivers/net/phy/phy-core.c                    |  72 ++++++
+>  drivers/net/phy/phy_device.c                  | 237 +++++++++---------
+>  include/linux/linkmode.h                      |   6 +
+>  include/linux/marvell_phy.h                   |   2 +
+>  include/linux/phy.h                           |   3 +
+>  include/uapi/linux/mdio.h                     |  16 ++
+>  9 files changed, 405 insertions(+), 185 deletions(-)
+> 
+Hi Maxime,
 
-Fixes: 7dd0d835582f ("ASoC: stm32: sai: simplify sync modes management")
-Signed-off-by: Wen Yang <yellowriver2010@hotmail.com>
----
- sound/soc/stm/stm32_sai.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+Andrew and me are working on Aquantia PHY support and he handed over
+to me a patch series which includes parts of the first version of your
+series. Having said that I'm especially interested in your patches
+5 and 6. Because your series is somewhat bigger and there are a few
+review comments, preparing the next round may take time.
 
-diff --git a/sound/soc/stm/stm32_sai.c b/sound/soc/stm/stm32_sai.c
-index bcb35ca..14c9591 100644
---- a/sound/soc/stm/stm32_sai.c
-+++ b/sound/soc/stm/stm32_sai.c
-@@ -112,16 +112,21 @@ static int stm32_sai_set_sync(struct stm32_sai_data *sai_client,
- 	if (!sai_provider) {
- 		dev_err(&sai_client->pdev->dev,
- 			"SAI sync provider data not found\n");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto out_put_dev;
- 	}
- 
- 	/* Configure sync client */
- 	ret = stm32_sai_sync_conf_client(sai_client, synci);
- 	if (ret < 0)
--		return ret;
-+		goto out_put_dev;
- 
- 	/* Configure sync provider */
--	return stm32_sai_sync_conf_provider(sai_provider, synco);
-+	ret = stm32_sai_sync_conf_provider(sai_provider, synco);
-+
-+out_put_dev:
-+	put_device(&pdev->dev);
-+	return ret;
- }
- 
- static int stm32_sai_probe(struct platform_device *pdev)
--- 
-2.7.4
+I'd propose that you extract generic patches being submission-ready
+and split the patch series into two. I think the following patches
+would be candidates for the first series: 2, 3, 5, 6
+(provided they have no dependency on the other patches)
+Based on that both of us can go on with our work.
 
+Andrew, what do you think?
+
+Heiner
 
 _______________________________________________
 linux-arm-kernel mailing list
