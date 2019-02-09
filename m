@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C154AC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 15:59:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DF0AEC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 16:00:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9145D218D2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 15:59:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B039121919
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 16:00:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Nbwz09dF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9145D218D2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PblRL/o8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B039121919
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=iki.fi
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,42 +25,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/Iv/deiusu7DF7SeScLbezTt+b3wY8r/5YuBTH8l2vc=; b=Nbwz09dFACQ7y4
-	6ofu+IGSRAG82BcPY3eWMs8/bE3SiucPNDcJBz2uJFwaGrFCdX7o4a12BelDfj6YkAyofeDIBP1wU
-	hsCTPqO673u5HcNXbAuaVOb2JMBloZxgEI0N8At8s1OgMkyLGuJ3ECAAvjO378WQ/cNPNfhgcRcSk
-	5nN3oB+AwXItu7qxUa86d3e2pgr493oDOpUFWBSBi4ZEPAgOOidFxmw13SDJJ2gslJk/k0Q0lLS60
-	561kYX5QX77kd30p/fheskA5MJLKQ3JqtcBYCxOwU3TTUvStkZNr03yf3KPfu9Iz5Qxp1zQgYWrr1
-	5p6SNd9rUia5MBxhrBDg==;
+	List-Owner; bh=Z/1tEvZd2w2pXMsC5sx+7Jfv+ZDgJctExXmQ7U6u6eo=; b=PblRL/o8nodMtd
+	QCbJUcokrOTEBAtxdRQbmiHITC/uNp8bJbmxc+Leu4TpKCfLVgP6JDFwKBeCIu1lppqa/MBwWW2Zd
+	lVv6w2pd6fKhuqhtiNRybpCkONy8HBVsc7G5slVbORVvtj+WW36javq101n3QWzP7FNkZyDLJBbX5
+	ddYFa5qbpKpZ5KyHd9RwiDDJ5ghbFELV0Hu4oJV//Yu9MMFfcfVqZcfH6KVmh8OMQRP8NmZ4dkHf/
+	ct3RUuaxHHJUTfIyEDRsIWve6bOQWDUB1O/osROPfj+CE6/XARR0K0PY3yUzdDM8kyE/0Q/3WzLfM
+	VJSSHKGGd4zCnAyUo8Ig==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsV2d-0007iM-2p; Sat, 09 Feb 2019 15:59:43 +0000
+	id 1gsV3D-0000s4-2t; Sat, 09 Feb 2019 16:00:19 +0000
 Received: from hillosipuli.retiisi.org.uk ([2001:1bc8:1a6:d3d5::81:2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsV2X-0007do-Pv; Sat, 09 Feb 2019 15:59:41 +0000
+ id 1gsV2n-0007uN-Sk; Sat, 09 Feb 2019 15:59:58 +0000
 Received: from valkosipuli.localdomain (valkosipuli.retiisi.org.uk
  [IPv6:2001:1bc8:1a6:d3d5::80:2])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by hillosipuli.retiisi.org.uk (Postfix) with ESMTPS id E160F634C7B;
- Sat,  9 Feb 2019 17:59:07 +0200 (EET)
+ by hillosipuli.retiisi.org.uk (Postfix) with ESMTPS id 9BD08634C7D;
+ Sat,  9 Feb 2019 17:59:35 +0200 (EET)
 Received: from sailus by valkosipuli.localdomain with local (Exim 4.89)
  (envelope-from <sakari.ailus@retiisi.org.uk>)
- id 1gsV23-0000wr-Hp; Sat, 09 Feb 2019 17:59:07 +0200
-Date: Sat, 9 Feb 2019 17:59:07 +0200
+ id 1gsV2V-0000wx-Dm; Sat, 09 Feb 2019 17:59:35 +0200
+Date: Sat, 9 Feb 2019 17:59:35 +0200
 From: Sakari Ailus <sakari.ailus@iki.fi>
 To: Frederic Chen <frederic.chen@mediatek.com>
-Subject: Re: [RFC PATCH V0 1/7] [media] dt-bindings: mt8183: Add binding for
- DIP shared memory
-Message-ID: <20190209155907.rbgwbdablndcesid@valkosipuli.retiisi.org.uk>
+Subject: Re: [RFC PATCH V0 3/7] [media] dt-bindings: mt8183: Added DIP-SMEM
+ dt-bindings
+Message-ID: <20190209155935.afrrtf3twjmj23sm@valkosipuli.retiisi.org.uk>
 References: <1549020091-42064-1-git-send-email-frederic.chen@mediatek.com>
- <1549020091-42064-2-git-send-email-frederic.chen@mediatek.com>
+ <1549020091-42064-4-git-send-email-frederic.chen@mediatek.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1549020091-42064-2-git-send-email-frederic.chen@mediatek.com>
+In-Reply-To: <1549020091-42064-4-git-send-email-frederic.chen@mediatek.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190209_075938_220215_B21A88C0 
-X-CRM114-Status: GOOD (  19.56  )
+X-CRM114-CacheID: sfid-20190209_075954_609196_755D5511 
+X-CRM114-Status: GOOD (  18.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,75 +86,67 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 Hi Frederic,
 
-Could you cc the devicetree list, please?
+Thanks for the patchset.
 
-On Fri, Feb 01, 2019 at 07:21:25PM +0800, Frederic Chen wrote:
-> This patch adds the binding for describing the shared memory
-> used to exchange configuration and tuning data between the
-> co-processor and Digital Image Processing (DIP) unit of the
-> camera ISP system on Mediatek SoCs.
+Could you also cc the devicetree list, please?
+
+On Fri, Feb 01, 2019 at 07:21:27PM +0800, Frederic Chen wrote:
+> This patch adds the DT binding documentation for the shared memory
+> between DIP (Digital Image Processing) unit of the camera ISP system
+> and the co-processor in Mediatek SoCs.
 > 
 > Signed-off-by: Frederic Chen <frederic.chen@mediatek.com>
 > ---
->  .../mediatek,reserve-memory-dip_smem.txt           | 45 ++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reserved-memory/mediatek,reserve-memory-dip_smem.txt
+>  .../bindings/media/mediatek,dip_smem.txt           | 29 ++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/mediatek,dip_smem.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/reserved-memory/mediatek,reserve-memory-dip_smem.txt b/Documentation/devicetree/bindings/reserved-memory/mediatek,reserve-memory-dip_smem.txt
+> diff --git a/Documentation/devicetree/bindings/media/mediatek,dip_smem.txt b/Documentation/devicetree/bindings/media/mediatek,dip_smem.txt
 > new file mode 100644
-> index 0000000..0ded478
+> index 0000000..5533721
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reserved-memory/mediatek,reserve-memory-dip_smem.txt
-> @@ -0,0 +1,45 @@
-> +Mediatek DIP Shared Memory binding
+> +++ b/Documentation/devicetree/bindings/media/mediatek,dip_smem.txt
+> @@ -0,0 +1,29 @@
+> +Mediatek ISP Shared Memory Device
 > +
-> +This binding describes the shared memory, which serves the purpose of
-> +describing the shared memory region used to exchange data between Digital
-> +Image Processing (DIP) and co-processor in Mediatek SoCs.
-> +
-> +The co-processor doesn't have the iommu so we need to use the physical
-> +address to access the shared buffer in the firmware.
-> +
-> +The Digital Image Processing (DIP) can access memory through mt8183 IOMMU so
-> +it can use dma address to access the memory region.
-> +(See iommu/mediatek,iommu.txt for the detailed description of Mediatek IOMMU)
+> +Mediatek ISP Shared Memory Device is used to manage shared memory
+> +among CPU, ISP IPs and coprocessor. It is associated with a reserved
+> +memory region (Please see Documentation\devicetree\bindings\
+> +reserved-memory\mediatek,reserve-memory-isp_smem.txt) and
 
-What kind of purpose is the memory used for? Buffers containing video data,
-or something else? Could the buffer objects be mapped on the devices
-based on the need instead?
+s/\\/\//g;
 
-> +
+> +and provide the context to allocate memory with dma addresses.
 > +
 > +Required properties:
+> +- compatible: Should be "mediatek,isp_smem"
+
+s/Should/Shall/
+
 > +
-> +- compatible: must be "mediatek,reserve-memory-dip_smem"
+> +- iommus: should point to the respective IOMMU block with master port
+
+s/should/shall/
+
+> +  as argument. Please set the ports which may be accessed
+> +  through the common path. You can see
+> +  Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+> +  for the detail.
 > +
-> +- reg: required for static allocation (see reserved-memory.txt for
-> +  the detailed usage)
-> +
-> +- alloc-range: required for dynamic allocation. The range must
-> +  between 0x00000400 and 0x100000000 due to the co-processer's
-> +  addressing limitation
-> +
-> +- size: required for dynamic allocation. The unit is bytes.
-> +  If you want to enable the full feature of Digital Processing Unit,
-> +  you need 20 MB at least.
-> +
+> +- mediatek,larb: must contain the local arbiters in the current Socs.
+
+Perhaps "SoCs"?
+
+> +  Please set the larb of camsys for Pass 1 and imgsys for DIP, or both
+> +  if you are using all the camera function. You can see
+> +  Documentation/devicetree/bindings/memory-controllers/
+> +  mediatek,smi-larb.txt for the detail.
 > +
 > +Example:
-> +
-> +The following example shows the DIP shared memory setup for MT8183.
-> +
-> +	reserved-memory {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +		reserve-memory-isp_smem {
-> +			compatible = "mediatek,reserve-memory-dip_smem";
-> +			size = <0 0x1400000>;
-> +			alignment = <0 0x1000>;
-> +			alloc-ranges = <0 0x40000000 0 0x50000000>;
-> +		};
+> +	isp_smem: isp_smem {
+> +		compatible = "mediatek,isp_smem";
+> +		mediatek,larb = <&larb5>;
+> +		iommus = <&iommu M4U_PORT_CAM_IMGI>;
 > +	};
 
 -- 
