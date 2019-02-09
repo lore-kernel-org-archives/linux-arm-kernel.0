@@ -2,68 +2,65 @@ Return-Path: <SRS0=BTYN=QQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EEBD3C282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 23:09:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CB4E4C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 23:10:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AB7E521929
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 23:09:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9A7C4218D2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 23:10:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OAu4zMTU";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="Qfhq26PO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB7E521929
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fDd+uVBz";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="boy6UUUD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9A7C4218D2
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gI/M+/HwNo0ZO13NS51/dQOvDNcD8mMt6npFMgSFAt0=; b=OAu4zMTUWk+88M
-	PNSmeCMUJU25IjvQzrTkc/fhRPoe8pwfWo2CUmStYxdThhWslbWRZ9j/P2Hc1fPbtzFUDdjo9W7/s
-	F4sHyG9GfbbYgGbpPcq/J/TO8zuduE6DNBj13bFDcReI2Iku0rvXsc3Bo9fY5PEYz7PIzC8tSgAMu
-	KvbYFUCBUds4XJ8SXWQKEnAuTGudGG58haSx/WqpsTORklu8bHRYnddYfzqhyM+9kwZXt8Mpn8vh3
-	LHjWdy6gmwqAaN6qdvq0xHQEVchaE1iKRKO5Q533vVGx4NpVoN9Q185agPfm56QAFhZYy+CzT5uAS
-	n70YfaWxs7UZfQu5KN+A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=62sIkbsttgjNu7APjvOOIgN/054rA/PNogDfD1FwrkI=; b=fDd+uVBz9On7CO
+	ef5/j+dNAoxQ8aFSFmawaxkekaIHIJZvrATeCsoHRVVoAdij53/JeLpEEOVLtMbpJp3T1SwYmt4lM
+	tM1sfBbDKY8rSjnsEOjagF2U+qyAfaJ7DcbF3/R63BY0unjorpc+6VI8wkFd+jzafha5bKYAXQ4O1
+	eByQ8h+/9ptubFnL5yXTAuWXOoCXVXBzBBVqcyyKhXfVdpxVGVrAorX9TzzE6jkB0E9nqhqULeUqs
+	oTV22tAHWPZ5eqbym3LGLPllnC80N6E6vZtAbeKD0Zchy6Gu2exd9B/KOCV8BWn/6GKkkrA/bwNBq
+	VuiiJIfoKop0OyeWP0qQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsbkZ-00058R-O5; Sat, 09 Feb 2019 23:09:31 +0000
+	id 1gsbks-0005S2-MK; Sat, 09 Feb 2019 23:09:50 +0000
 Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsbkK-0004tO-8m
- for linux-arm-kernel@lists.infradead.org; Sat, 09 Feb 2019 23:09:18 +0000
+ id 1gsbkK-0004tM-8k
+ for linux-arm-kernel@lists.infradead.org; Sat, 09 Feb 2019 23:09:19 +0000
 Received: from zyt.lan (unknown [IPv6:2a02:169:34b6::564])
- by mail.kmu-office.ch (Postfix) with ESMTPSA id AF0715C253C;
+ by mail.kmu-office.ch (Postfix) with ESMTPSA id 8CB2F5C210A;
  Sun, 10 Feb 2019 00:09:14 +0100 (CET)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
  t=1549753754;
  h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
  to:to:cc:cc:mime-version:mime-version:content-type:
- content-transfer-encoding:content-transfer-encoding:
- in-reply-to:in-reply-to:references:references;
- bh=bZIgtMFv0wRhQi5yztbI7/tU+V/Gp0KyNMz1SKbWLyE=;
- b=Qfhq26POREf6tO9daoXE2W1NV3qqk4Nlu6941Gm4j4Qf/10KKBqsKw9QSI0VIx7e3sqYYF
- WbILmBSuFKLWYSe6fl290cDQNGixll0rRDOW2LFSrIIswwF5mAAxKUSMzEvFEGP7XJVZ0E
- s8Ns1oFT2xVF7sjkSYGVOC3WOSyW0JI=
+ content-transfer-encoding:content-transfer-encoding:in-reply-to:
+ references; bh=yelkleMCJXLHP5LlESFJtU0Z18t/+Mx5P7qCJU7puu8=;
+ b=boy6UUUDaweYefxBP4z+oAdgfxYxs8AXx7bmhFEwkY5EBzvu+4MtumDximF4Nk1y85uiOs
+ rHjjcWZvW19PLjWqk8ZI4JdqHueJSpGqgzBs+NTmktnmECFIJf6jgRp9fsf/SitCisKVr8
+ 1o2S/ckZMqNlSgYzS3GGZD7P0BMJhd8=
 From: Stefan Agner <stefan@agner.ch>
 To: linux@armlinux.org.uk
-Subject: [PATCH v2 2/5] ARM: use unified assembler in headers
-Date: Sun, 10 Feb 2019 00:08:59 +0100
-Message-Id: <ec66f5e3424ba4a29dc61c00519c54e6abbf2609.1549753425.git.stefan@agner.ch>
+Subject: [PATCH v2 0/5] ARM: convert to unified syntax
+Date: Sun, 10 Feb 2019 00:08:57 +0100
+Message-Id: <cover.1549753425.git.stefan@agner.ch>
 X-Mailer: git-send-email 2.20.1
-In-Reply-To: <cover.1549753425.git.stefan@agner.ch>
-References: <cover.1549753425.git.stefan@agner.ch>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190209_150916_662190_2805CC15 
-X-CRM114-Status: GOOD (  12.01  )
+X-CRM114-CacheID: sfid-20190209_150916_667481_6FF95511 
+X-CRM114-Status: GOOD (  12.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,143 +82,83 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use unified assembler syntax (UAL) in headers. Divided syntax is
-considered deprecated. This will also allow to build the kernel
-using LLVM's integrated assembler.
+This patchset converts all assembly code to unified assembler
+language (UAL) compatible assembly code. From what I can tell,
+this mainly boils down to using conditional infixes instead of
+postfixes.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-Changes in v2:
-- Remove excessive null tokens
-- Move t token before conditional token
+Most of the conversion has been done using the following regular
+expression:
+  find ./arch/arm/ -name "*.[hSc]" -exec sed -i -r \
+    "s/^((\s*[._a-zA-Z0-9]*[\:\(])?\s*)([a-z]{3})(eq|ne|cs|hs|cc|lo|mi|pl|vs|vc|hi|ls|ge|lt|gt|le|al)([a-z]{1,2})(\s)/\1\3\5\4\6/"
+\
+    {} \;
 
- arch/arm/include/asm/assembler.h | 12 ++++++------
- arch/arm/include/asm/vfpmacros.h |  8 ++++----
- arch/arm/lib/bitops.h            |  8 ++++----
- 3 files changed, 14 insertions(+), 14 deletions(-)
+The expression resulted in some false positives and missed some
+instances where infix conditionals have been used. With this
+changes applied, I compiled several kernel configurations
+successfully and without a warning.
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 28a48e0d4cca..b59921a560da 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -376,9 +376,9 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	.macro	usraccoff, instr, reg, ptr, inc, off, cond, abort, t=TUSER()
- 9999:
- 	.if	\inc == 1
--	\instr\cond\()b\()\t\().w \reg, [\ptr, #\off]
-+	\instr\()b\t\cond\().w \reg, [\ptr, #\off]
- 	.elseif	\inc == 4
--	\instr\cond\()\t\().w \reg, [\ptr, #\off]
-+	\instr\t\cond\().w \reg, [\ptr, #\off]
- 	.else
- 	.error	"Unsupported inc macro argument"
- 	.endif
-@@ -417,9 +417,9 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	.rept	\rept
- 9999:
- 	.if	\inc == 1
--	\instr\cond\()b\()\t \reg, [\ptr], #\inc
-+	\instr\()b\t\cond \reg, [\ptr], #\inc
- 	.elseif	\inc == 4
--	\instr\cond\()\t \reg, [\ptr], #\inc
-+	\instr\t\cond \reg, [\ptr], #\inc
- 	.else
- 	.error	"Unsupported inc macro argument"
- 	.endif
-@@ -460,7 +460,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	.macro check_uaccess, addr:req, size:req, limit:req, tmp:req, bad:req
- #ifndef CONFIG_CPU_USE_DOMAINS
- 	adds	\tmp, \addr, #\size - 1
--	sbcccs	\tmp, \tmp, \limit
-+	sbcscc	\tmp, \tmp, \limit
- 	bcs	\bad
- #ifdef CONFIG_CPU_SPECTRE
- 	movcs	\addr, #0
-@@ -474,7 +474,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- 	sub	\tmp, \limit, #1
- 	subs	\tmp, \tmp, \addr	@ tmp = limit - 1 - addr
- 	addhs	\tmp, \tmp, #1		@ if (tmp >= 0) {
--	subhss	\tmp, \tmp, \size	@ tmp = limit - (addr + size) }
-+	subshs	\tmp, \tmp, \size	@ tmp = limit - (addr + size) }
- 	movlo	\addr, #0		@ if (tmp < 0) addr = NULL
- 	csdb
- #endif
-diff --git a/arch/arm/include/asm/vfpmacros.h b/arch/arm/include/asm/vfpmacros.h
-index ef5dfedacd8d..628c336e8e3b 100644
---- a/arch/arm/include/asm/vfpmacros.h
-+++ b/arch/arm/include/asm/vfpmacros.h
-@@ -29,13 +29,13 @@
- 	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
- 	ldr	\tmp, [\tmp, #0]
- 	tst	\tmp, #HWCAP_VFPD32
--	ldcnel	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
-+	ldclne	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
- 	addeq	\base, \base, #32*4		    @ step over unused register space
- #else
- 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
- 	and	\tmp, \tmp, #MVFR0_A_SIMD_MASK	    @ A_SIMD field
- 	cmp	\tmp, #2			    @ 32 x 64bit registers?
--	ldceql	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
-+	ldcleq	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
- 	addne	\base, \base, #32*4		    @ step over unused register space
- #endif
- #endif
-@@ -53,13 +53,13 @@
- 	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
- 	ldr	\tmp, [\tmp, #0]
- 	tst	\tmp, #HWCAP_VFPD32
--	stcnel	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
-+	stclne	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
- 	addeq	\base, \base, #32*4		    @ step over unused register space
- #else
- 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
- 	and	\tmp, \tmp, #MVFR0_A_SIMD_MASK	    @ A_SIMD field
- 	cmp	\tmp, #2			    @ 32 x 64bit registers?
--	stceql	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
-+	stcleq	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
- 	addne	\base, \base, #32*4		    @ step over unused register space
- #endif
- #endif
-diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
-index 93cddab73072..95bd35991288 100644
---- a/arch/arm/lib/bitops.h
-+++ b/arch/arm/lib/bitops.h
-@@ -7,7 +7,7 @@
- ENTRY(	\name		)
- UNWIND(	.fnstart	)
- 	ands	ip, r1, #3
--	strneb	r1, [ip]		@ assert word-aligned
-+	strbne	r1, [ip]		@ assert word-aligned
- 	mov	r2, #1
- 	and	r3, r0, #31		@ Get bit offset
- 	mov	r0, r0, lsr #5
-@@ -32,7 +32,7 @@ ENDPROC(\name		)
- ENTRY(	\name		)
- UNWIND(	.fnstart	)
- 	ands	ip, r1, #3
--	strneb	r1, [ip]		@ assert word-aligned
-+	strbne	r1, [ip]		@ assert word-aligned
- 	mov	r2, #1
- 	and	r3, r0, #31		@ Get bit offset
- 	mov	r0, r0, lsr #5
-@@ -62,7 +62,7 @@ ENDPROC(\name		)
- ENTRY(	\name		)
- UNWIND(	.fnstart	)
- 	ands	ip, r1, #3
--	strneb	r1, [ip]		@ assert word-aligned
-+	strbne	r1, [ip]		@ assert word-aligned
- 	and	r2, r0, #31
- 	mov	r0, r0, lsr #5
- 	mov	r3, #1
-@@ -89,7 +89,7 @@ ENDPROC(\name		)
- ENTRY(	\name		)
- UNWIND(	.fnstart	)
- 	ands	ip, r1, #3
--	strneb	r1, [ip]		@ assert word-aligned
-+	strbne	r1, [ip]		@ assert word-aligned
- 	and	r3, r0, #31
- 	mov	r0, r0, lsr #5
- 	save_and_disable_irqs ip
+The file arch/arm/probes/kprobes/test-arm.c is still using some
+divided syntax assembler.
+
+This does not allow to use LLVM's integrated assembler just yet,
+there is still some assembler which the integrated assembler does
+not like (yet). But it is a big step towards that direction.
+
+--
+Stefan
+
+Stefan Agner (5):
+  ARM: use unified assembler in macros
+  ARM: use unified assembler in headers
+  ARM: use unified assembler in assembly files
+  ARM: use unified assembler in c files
+  ARM: warn if divided syntax assembler is used
+
+ arch/arm/Makefile                             |  7 +---
+ arch/arm/boot/bootp/init.S                    |  2 +-
+ arch/arm/boot/compressed/ll_char_wr.S         |  4 +-
+ arch/arm/include/asm/assembler.h              | 12 +++---
+ .../include/asm/hardware/entry-macro-iomd.S   | 10 ++---
+ arch/arm/include/asm/vfpmacros.h              |  8 ++--
+ arch/arm/include/debug/tegra.S                |  2 +-
+ arch/arm/kernel/debug.S                       |  2 +-
+ arch/arm/kernel/entry-armv.S                  | 12 +++---
+ arch/arm/kernel/entry-common.S                |  2 +-
+ arch/arm/kernel/entry-header.S                |  8 ++--
+ arch/arm/lib/bitops.h                         |  8 ++--
+ arch/arm/lib/clear_user.S                     |  2 +-
+ arch/arm/lib/copy_from_user.S                 |  2 +-
+ arch/arm/lib/copy_page.S                      |  4 +-
+ arch/arm/lib/copy_template.S                  |  4 +-
+ arch/arm/lib/copy_to_user.S                   |  2 +-
+ arch/arm/lib/csumpartial.S                    | 20 ++++-----
+ arch/arm/lib/csumpartialcopygeneric.S         |  4 +-
+ arch/arm/lib/csumpartialcopyuser.S            |  2 +-
+ arch/arm/lib/div64.S                          |  4 +-
+ arch/arm/lib/floppydma.S                      | 10 ++---
+ arch/arm/lib/io-readsb.S                      | 20 ++++-----
+ arch/arm/lib/io-readsl.S                      |  2 +-
+ arch/arm/lib/io-readsw-armv3.S                |  6 +--
+ arch/arm/lib/io-readsw-armv4.S                | 12 +++---
+ arch/arm/lib/io-writesb.S                     | 20 ++++-----
+ arch/arm/lib/io-writesl.S                     |  2 +-
+ arch/arm/lib/io-writesw-armv3.S               |  2 +-
+ arch/arm/lib/io-writesw-armv4.S               |  6 +--
+ arch/arm/lib/lib1funcs.S                      |  4 +-
+ arch/arm/lib/memcpy.S                         |  4 +-
+ arch/arm/lib/memmove.S                        | 24 +++++------
+ arch/arm/lib/memset.S                         | 42 +++++++++----------
+ .../mach-ks8695/include/mach/entry-macro.S    |  2 +-
+ arch/arm/mach-tegra/reset-handler.S           |  2 +-
+ arch/arm/mm/cache-v6.S                        |  8 ++--
+ arch/arm/mm/copypage-v4mc.c                   |  3 +-
+ arch/arm/mm/copypage-v4wb.c                   |  3 +-
+ arch/arm/mm/copypage-v4wt.c                   |  3 +-
+ arch/arm/mm/proc-v7m.S                        |  4 +-
+ 41 files changed, 150 insertions(+), 150 deletions(-)
+
 -- 
 2.20.1
 
