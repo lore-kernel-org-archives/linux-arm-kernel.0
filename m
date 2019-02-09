@@ -2,22 +2,23 @@ Return-Path: <SRS0=BTYN=QQ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E99C2C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 00:04:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7CEE6C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 00:04:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B458721908
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 00:04:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3C4CC2177B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  9 Feb 2019 00:04:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K7kmJ+wz";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linux-foundation.org header.i=@linux-foundation.org header.b="LbLALWqm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B458721908
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-foundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mH/N+kct";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="iERiP2gI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C4CC2177B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,71 +26,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0sC4pTla/3nrxve3pxX2A06LaCmQYbJOGe39maYoi1M=; b=K7kmJ+wzsGenSh
-	/MH+0OzCDyhyX8+y9v9T3Jyji0ERZ5Ngf1uNQaYqh4lc4aHk7qTtKLaNrMUN3NLIoUH3csVZj83Wl
-	ZOQngO68tK8f2jzm8jxgFb5I9MlAnX55RFxVQMSRNyE7tOr6l6VPrHrhrXer+A1SeixrJYA5p+TWE
-	3PBHduOVjvkI0BDQqhq8K8DZxbF188uBM26VGJGI9evM1wQ3QQ9X5L4c+dX/C4e8QfzPEuLpFz9kg
-	i5807Z5CJnJ9+ngySePQ2iXCK3zHDGCnwFg+uMk/r+DNYSHygQxi5dTITCRoF5z4ZK4YQZRSvZiYr
-	i5UZ7f3D41keBX2ztczQ==;
+	List-Owner; bh=1RYZXUZat23C8gPqa/H/S1j405Jcc8U8bgEj6oBguaI=; b=mH/N+kctVUpl+0
+	FW/0A+qj64w8QWkJoUPnSaFA1WKbqJ30PbT1p4/Cn3S+HvMZsKusvEMr15R/eAwaQt7tiewyZB6Te
+	n9hzarUmvEH7UGEDdzZRCYi+rC8oWUFSw28ZTENwFnPnJ8s+5Ywe2nvbFkZLII2wDkZaIx7BqUCqd
+	Ni97JA+k797R9emy7ZjNvzjktddukWZvCGlyj9lQjCo6F6aF9b8eE0KqIaqNzwPmT4Wz+7ifL1l88
+	f/DI/nXiPQqbmSsYKMgaNm1OfxKCAvaHY0gghNTHiBhY0ogYEVAfRNUTds/lhjWWWvlVyzMShhErQ
+	aOm7ab5kZeiyOLZuNRlA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsG7u-00053i-DW; Sat, 09 Feb 2019 00:04:10 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gsG8V-0005QI-4o; Sat, 09 Feb 2019 00:04:47 +0000
+Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsG7q-000531-LB
- for linux-arm-kernel@lists.infradead.org; Sat, 09 Feb 2019 00:04:08 +0000
-Received: by mail-lf1-x142.google.com with SMTP id e27so3809852lfj.8
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 08 Feb 2019 16:04:05 -0800 (PST)
+ id 1gsG8Q-0005P6-2j; Sat, 09 Feb 2019 00:04:43 +0000
+Received: by mail-ot1-x341.google.com with SMTP id w25so8754592otm.13;
+ Fri, 08 Feb 2019 16:04:41 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linux-foundation.org; s=google;
+ d=googlemail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=esUN0eAUy4YWkP+bozuSr/XyV8kG31d8rYJRedvgykU=;
- b=LbLALWqmuur3vFRa25JFyrgBoAdC34KiufM5BZY6FVjl/WYfmGblutfsjwJLgcnL2s
- 7WfLx0BMAxPDJUxhk3YWwQvooGaab1y8eWCVbR4BtrKqYJ8QmykyrhzkiPDRsWkCWKX2
- tpgX9WKhMrvACLp3JH8Bq642be3K34aaxe+NA=
+ :cc; bh=BRbSVSMAAjLz79nFPURIfjFzOJxrbDjbmCLm4dxSPuo=;
+ b=iERiP2gIYG+8Y+P6PHCJpoPfXd+Km12rUAOxPepG583EWT2hGOb2CbnlTXEuMoys0u
+ PaifffNYcOFSN55Awz2Sl76hdxWJD6jdcOoVX/UaO+rL5imfcSHJZkbQxuq+0EVtQtBH
+ 8Y4FZoh5mOUc+IYzhbfWaDSQJCGGnxF+tT7cSfkoWC0eYZdMuG5rMgfn0rYqvL5JA9nu
+ mnjo1tNhOub11vfz+P6YO+Fxzfb5/6wcBVyhsZYsCQ5G9BdplaAr3A8HcsI2drpXmW0c
+ RaUNOiRIMN/QMYmCyxMVvTOp2h7XVbaQcNtf8RIoPED1kmyJs4KwzbpXH5AdWur2kVAM
+ MT4A==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=esUN0eAUy4YWkP+bozuSr/XyV8kG31d8rYJRedvgykU=;
- b=CDTuC12ddrDB8zH/WcYzgAQU3KJ2sxHWIoz7mWttgDWMf7emwAyQqW1/7rrkvocpj4
- KMOohEvPksqs+mWwvnFjC1CUKLjnazWfZhd6izRlwQt9neJTRrjNMXn23DJlfdJMJjYu
- zaFm1xS8CKP1fZ3iHU53A9fmFUWYs+AvbsprFnk8J4owrI80SkEwm6GMkAub5VNkTtjr
- rEWNlZIqJbuqPffSAO64Z5dZIO9m5emNE2DH9wIqE+4JqdmS/ZoLcXQQyv2zGKmEE4CC
- /6gYUyCpw289+vsEctYYGj0dlBLTRlZ7n+5N22SQm/aicc7kvU+iRm+tQjJ3ATSCZIgK
- TUBA==
-X-Gm-Message-State: AHQUAuYisOMDkB7XAOHkKCnnGaLkOboMr1uJzdOD3cEuXg1nncZsSX0P
- bG3v8P7SsMsS+IODBxpqPNMRdaK3T24=
-X-Google-Smtp-Source: AHgI3IZ5HZXZJFanKJRiiRjuYXpy0YRP0rVnTPS/JcJke4ot8hU9I5jujZqYXy3ovFYoURTCs8FoVA==
-X-Received: by 2002:a19:9c54:: with SMTP id f81mr15517748lfe.135.1549670643258; 
- Fri, 08 Feb 2019 16:04:03 -0800 (PST)
-Received: from mail-lf1-f47.google.com (mail-lf1-f47.google.com.
- [209.85.167.47])
- by smtp.gmail.com with ESMTPSA id q1sm137841lfk.15.2019.02.08.16.04.00
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 08 Feb 2019 16:04:01 -0800 (PST)
-Received: by mail-lf1-f47.google.com with SMTP id e27so3809776lfj.8
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 08 Feb 2019 16:04:00 -0800 (PST)
-X-Received: by 2002:ac2:4191:: with SMTP id z17mr14867539lfh.117.1549670639775; 
- Fri, 08 Feb 2019 16:03:59 -0800 (PST)
+ bh=BRbSVSMAAjLz79nFPURIfjFzOJxrbDjbmCLm4dxSPuo=;
+ b=lVlXejpGm8VxMHwUjGQ+QA6W8laikUM+ofi4p32PWX+iyqGbmAR5pM7M4ER+NJwqpx
+ gT8d13yemw8y+9o7ZvIYin2KfzEpl4jcuNlwayMm6OeLQSavPVoK/DvoRsvFhJpUKNqo
+ wF5xwqZ8KYdVZ5MX1XqRSsbpV9uh6+Cq5KKpxfv2XdMZB29Kr0JD4y4oeEWkEjGzA1HM
+ c1/nheh48Z/4NCb0IaPeWaXkIwKjJ8EW1AaNdJnI3WL9R6YdQpfWJSEoU2+s5Hl9c3/w
+ hnG1p0B9V+MOkCW7owb/haRiXJNrxnIEUxiEjV2VBlvBS10adDi8CqyRFVeCMo2vzyec
+ 3RLg==
+X-Gm-Message-State: AHQUAubKchDWzUV1CB518gsCxGIfCKyNh+4AMWknvw6PHrmOKbfFnM9X
+ Klmw3VfrF74ta4ZBv5iQLWo0Rj6FdLDv2y8+e24=
+X-Google-Smtp-Source: AHgI3IZJ/+56P9Q2b5cGshNPs+AYBn1bpODpXSRsY7iNg9HWaqcyr035L88biBurKAaCB6SDdpOz/ysfQFNk6S3sQWg=
+X-Received: by 2002:a05:6830:2010:: with SMTP id
+ e16mr14993174otp.86.1549670680878; 
+ Fri, 08 Feb 2019 16:04:40 -0800 (PST)
 MIME-Version: 1.0
-References: <1549566446-27967-1-git-send-email-longman@redhat.com>
- <CAHk-=wjfyrFBjifzmgMVrkrvEePEPaBTDq7D=f2i5kD2E=SqRQ@mail.gmail.com>
- <d7476dfb-1653-747b-b865-5597ba5fc1c1@redhat.com>
-In-Reply-To: <d7476dfb-1653-747b-b865-5597ba5fc1c1@redhat.com>
-From: Linus Torvalds <torvalds@linux-foundation.org>
-Date: Fri, 8 Feb 2019 16:03:43 -0800
-X-Gmail-Original-Message-ID: <CAHk-=whzAGRJQE43NHaC8sCECLr-QnpHYst+TJq-qhfp9eK-Qw@mail.gmail.com>
-Message-ID: <CAHk-=whzAGRJQE43NHaC8sCECLr-QnpHYst+TJq-qhfp9eK-Qw@mail.gmail.com>
-Subject: Re: [PATCH-tip 00/22] locking/rwsem: Rework rwsem-xadd & enable new
- rwsem features
-To: Waiman Long <longman@redhat.com>
+References: <20190208144226.15102-1-khilman@baylibre.com>
+In-Reply-To: <20190208144226.15102-1-khilman@baylibre.com>
+From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Date: Sat, 9 Feb 2019 01:04:29 +0100
+Message-ID: <CAFBinCBwjsoo5Q9D=tyUpCa4f=XZc_EX7UMwYyy4v4Pkr=6_6A@mail.gmail.com>
+Subject: Re: [PATCH v3 1/2] dt-bindings: arm: amlogic: add amediatech x96-max
+ bindings
+To: Kevin Hilman <khilman@baylibre.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190208_160406_703932_C6A7A36C 
-X-CRM114-Status: GOOD (  12.04  )
+X-CRM114-CacheID: sfid-20190208_160442_618921_299984AF 
+X-CRM114-Status: UNSURE (   7.50  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,51 +91,25 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch <linux-arch@vger.kernel.org>, linux-xtensa@linux-xtensa.org,
- Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
- Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
- Linux-sh list <linux-sh@vger.kernel.org>,
- Peter Zijlstra <peterz@infradead.org>, linux-hexagon@vger.kernel.org,
- the arch/x86 maintainers <x86@kernel.org>, Will Deacon <will.deacon@arm.com>,
- Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
- Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
- "H. Peter Anvin" <hpa@zytor.com>, linux-alpha@vger.kernel.org,
- sparclinux@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
- linuxppc-dev@lists.ozlabs.org, Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 8, 2019 at 12:31 PM Waiman Long <longman@redhat.com> wrote:
+On Fri, Feb 8, 2019 at 3:42 PM Kevin Hilman <khilman@baylibre.com> wrote:
 >
-> >  (b) what's the new fastpath case
+> Add new vendor for amediatech, and initial board: x96-max
 >
-> The only change in the fastpath is the use of cmpxchg for writer lock.
-
-.. since a big deal here was about using the generic atomic accessor
-functions, I really was looking forward to seeing the *actual* fast
-path code generation.
-
-In other words, right now I have very little visibility in how it
-actually affects the code. Looking at the patches themselves doesn't
-make it obvious. I was hoping for the overview to really explain the
-whole "before and after" situation, and it didn't. Not at the high
-level, and not at a low level. And no performance numbers in the
-overview either.
-
-And yes, I see the numbers in the patches, but what I really hoped for
-was some real load numbers. In particular, I would have loved to see
-numbers from th ekernel test robot "will-it-scale.per_thread_ops"
-case, which is the one that had a 65% regression due to the lack of
-reader spinning.
-
-So I was kind of hoping to hear whether that regression is basically
-entirely gone with this patch series, or if we still have a regression
-due to the extra downgrade, or what?
-
-                 Linus
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+> v3: fixed the SoC name
+>
+>  Documentation/devicetree/bindings/arm/amlogic.txt     | 1 +
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+assuming Rob is fine with having vendor-prefixes.txt and <other
+binding doc> in one patch:
+Reviewed-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
 _______________________________________________
 linux-arm-kernel mailing list
