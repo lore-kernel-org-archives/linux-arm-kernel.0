@@ -2,92 +2,92 @@ Return-Path: <SRS0=5+Aw=QR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 75E17C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 10 Feb 2019 22:22:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5337DC282CC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 10 Feb 2019 22:26:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3C79F2084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 10 Feb 2019 22:22:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1FF8B20844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 10 Feb 2019 22:26:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZLPHnuGt";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="lJjNQ1VF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C79F2084D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pik0GySg";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="jjJ/LUqg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1FF8B20844
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Content-Type:To:
-	Subject:Message-ID:Date:From:In-Reply-To:References:MIME-Version:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=M98Qqpnt8ZUxquYaobOYdJGngYK9ONujzgVBTOk5Iyg=; b=ZLPHnuGt2Pst8Q650ImtEG5AI
-	fDq+OZ+k3NovktGkscPn13qgUYURbTpuCtY/udYfuq3EFjPr3uJ3hoAqvozF8JXHyGb+uNm/r7mTI
-	THGAOGzL0R8xFKaBeZx71PHNNQN8SXUip+0kA+isnVCQ3dv8JRENL22r0regrvdIL6JB/LOznHduT
-	cjz0FC0Q1wzjqmquf2ucEtY13a1wcrbgAT4errnDEBoygofdSHQDkax0HNPkeo/9IVNZ9L2AR9DMN
-	+LAOuA9AufpRQ2fwNJL01c8KVXQ09aKOjw8WtXV/nqeWXAdMfDQ3Qr7JOJQVrA/Qftz3wBUeFEO+9
-	D61M58CIQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=nLrTqeqsqHwGqbaznx2/WTWKYBoJe9EJwwvZHisRmqI=; b=pik0GySgTBJZJs
+	za1yvZtKOTXx8I4zJpA8csL5v2QgMKajF1SH8SOGbtJsfJEyeXOVn6CRKjhioObZ5Kn/Ltb/cbAZ6
+	dk4E095nhDSp6806lOEl+lCBkrFIXq1M/YhYJZp0hozCqb+kJayv4C/Yw0UU2KLvL3+HirIw+1tWd
+	ih4XOMp9Wk52SVwMUhUChq7PJy7WN1t/9P4Rj4w8gtpuqe5u1mb6TElTYAs3LpEIiAhiXjMNRbrNh
+	WyjOMH9r7odJ51JkPc//5ATcVx3Whx/SMnOFALcgsfDp5To9VtArU4s07RFKprU+NQyrTXOrKmzKJ
+	bhT6EdPhveeRSY2I6gwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsxU4-0007Q2-7Z; Sun, 10 Feb 2019 22:21:56 +0000
-Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
+	id 1gsxYY-0000tY-Ea; Sun, 10 Feb 2019 22:26:34 +0000
+Received: from mail-wm1-x32b.google.com ([2a00:1450:4864:20::32b])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsxTy-0007Ov-Q0; Sun, 10 Feb 2019 22:21:52 +0000
-Received: by mail-ot1-x344.google.com with SMTP id 32so14435444ota.12;
- Sun, 10 Feb 2019 14:21:47 -0800 (PST)
+ id 1gsxYT-0000rU-ST; Sun, 10 Feb 2019 22:26:31 +0000
+Received: by mail-wm1-x32b.google.com with SMTP id p6so13317765wmc.1;
+ Sun, 10 Feb 2019 14:26:29 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=googlemail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=AdoNSob177L31r3KUHrqyxvfDROGvKI6dmmHVkyG6PU=;
- b=lJjNQ1VFmtCgWvEQj/lCcLa2FWeXQlU9sc12GR03KUiA19YLK1cNkEe4Gzpf2vYSko
- P2Go5oGQTxdISMFwlk5XJ6Kf2sF7fSQlnpDniYzg1/1fPq/GoNi6cTvAUmJxQZU92+ft
- c7xZ0jDmg/tTZ9KhSQ6KEkGT13liKAL2Ifllv5CSYul/5y8bIDIP01lUlF+B6GdnOUzR
- TU0cRH1rqI/rwUy7q0bqlsawLrZ5P96B8Eg3Ak4nV0Hlu4PEqVRxZN2b1mo5kzUXdZwJ
- Avyv8Znqoc1VPpZ8/XBuqsqIniEtTUnbv0xo8Vpea40h6RgfvIqWC25imoYWXmtBuBwY
- hN7w==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=mfga5LPr/J3+vtuLs6sE/4iTgznBPBA3E+j5LobqNYM=;
+ b=jjJ/LUqgiivo4ybNNx8VXJ8xpv6uAvDtXSJzrKyfkTKApoia4xS0nG7OI7T0mvIuU4
+ +HJH7CobjoW6z9FeJLiMP3fmfyPTG+j13M0Hd5184Tc6j6Sa0El4JhZZT7GQ7buWUada
+ oteoPBKBReaD+TNTa/bDV2xcwRX9VXKPdvHu6oNWf59yDCVhd0dIK3kTLb/TMalC3sDM
+ AcETk7TCmZuN6ZQoLfZLh7QnZ56OSCpTBFpKC44+IbfDvbmrqRarIHwGMdkQAVEFBnP3
+ Ep4CriSqdmwX0fUz2F95mXKZ4nilUEtWOuxfCEOayUPhUyZ5+6OA3er059Ab+y1Plr4y
+ y7mw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=AdoNSob177L31r3KUHrqyxvfDROGvKI6dmmHVkyG6PU=;
- b=sqAwzmrCZEukIq1k5dcGCUgRDmdNOcj/n+SmFBQbq+K87yQnA/9EK54fuhIsnuyXnY
- gEbSPPYFonciN7HiWsrAvMoSFyFjzv9pV/KARq6uV4AivDoZWZihHXsEhsOCr4zzXCa3
- 6ZmQyYe+eSIPzqtBH5LibiEHDzx7lom66nExybfOjbwQO2FLcMpsEzmCu4AdmlO+PBXe
- U0mZpL3ei/fQ/ZaINYEX4b2Gaya/soYyYRcSS64DvZG1VhGTW9/wL2gT4kG56jx6+t1E
- UKBtxgW56rpVATqhxFiYAIjXY3QvCA9oA8HL1L7DP51SIfC/iJXznWQqfaP2P7DrI16d
- S7Eg==
-X-Gm-Message-State: AHQUAubkb19bitYDvwbj6G/XWDngZsYGoRhyjECSWrzs3jSyKfsi5Y0L
- TH83IMOLZX3Vqw/JX2ANQafwS0iW6I++5v90bDM=
-X-Google-Smtp-Source: AHgI3IYqImZcEVjHaDdTwo9jf08MmMfx3OmNGuIhpms8Pi5HvYZuyIdWIHNMj2MLy6nKkLDwmpSXxgo7BaICKx7h4EU=
-X-Received: by 2002:a9d:491e:: with SMTP id e30mr25719918otf.131.1549837307094; 
- Sun, 10 Feb 2019 14:21:47 -0800 (PST)
-MIME-Version: 1.0
-References: <20190123151209.2080-1-linux.amoon@gmail.com>
- <20190123151209.2080-3-linux.amoon@gmail.com>
- <CAFBinCAdf0rtt-7tON_LRNH_cpvGJXX3LX8g-i4xsC3wahZSVA@mail.gmail.com>
- <CANAwSgQ4=Vn6RM4Kpd20UWkQNW81=mfg-qB0G73dsRem3qwjcA@mail.gmail.com>
- <CAFBinCB=3kmuFb_xXzhW+m8dTasVrCHQp2wti+=5UjrAHk5TTg@mail.gmail.com>
- <CANAwSgQnMkXECkCVjFKwNKB+2JoiPtVPQbateppmtgfPYCutZg@mail.gmail.com>
- <CAFBinCCFoBkbf-HvEoMk7mTYTBV27nJ9TF1X-DrLuHR9qDVDSA@mail.gmail.com>
- <CANAwSgRtBWzKiFLUV6twxv+TnvjLdHXv=U8+ppQ7=9uBBLEH+Q@mail.gmail.com>
- <CAFBinCD_Pddu+pBEKwMS6467J5nxKF4T5-LxVo06nFvyUSLpew@mail.gmail.com>
- <CANAwSgSQRwF+_VR1jJFg=Q9wSdanEH0GmnFaeegt=hRMXiHX3Q@mail.gmail.com>
-In-Reply-To: <CANAwSgSQRwF+_VR1jJFg=Q9wSdanEH0GmnFaeegt=hRMXiHX3Q@mail.gmail.com>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=mfga5LPr/J3+vtuLs6sE/4iTgznBPBA3E+j5LobqNYM=;
+ b=YSzV30K2jD5oeJFmWL4I/zlOiNbD8ffBVLXSsYuw2b6Urp6ka2RBrzLx0t5QtG33zQ
+ rAG4RTFteWt4K22MiAeF2/zyUtLOk8lex0TbQ1/s2Q8BzJx7fsllEbThCj424yj8unwi
+ 8fHYbxcAwkigykg61TpmKNP2Ti/0myilam/434mlc0g47ojXJawFFpMFHTCOoOxJpKli
+ jDrkx1zSy8Xpf74Czqi9+NE9XiDVq+WHDrBKuixcueYR/tloHnBlRA3RAumLGTr+a0pO
+ CV6utcVXwv34AEM80OByHyhUuXUKHeTvMGfjUqQ5S96AWO7/o0VjWggRpjCh84TfZpnJ
+ mFJA==
+X-Gm-Message-State: AHQUAuaetzGFXTd7pI2BU9RyPRlJDQrM6X0j4o5GoH0ill+T4CVED2Og
+ m3YxLSUync0DUjt0EFpFjSzd9shq
+X-Google-Smtp-Source: AHgI3IaXjoT47lxbtsg47YPQ5DqyvjDltZAZSAX75NeQ0BzFEG8dXRQHyoZhkNt/5q7WwIQFRaAOzg==
+X-Received: by 2002:a5d:43cd:: with SMTP id v13mr25276183wrr.194.1549837587435; 
+ Sun, 10 Feb 2019 14:26:27 -0800 (PST)
+Received: from blackbox.darklights.net
+ (p200300DCD70B4600C064670D88EA61CD.dip0.t-ipconnect.de.
+ [2003:dc:d70b:4600:c064:670d:88ea:61cd])
+ by smtp.googlemail.com with ESMTPSA id b14sm15523330wrx.36.2019.02.10.14.26.26
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Sun, 10 Feb 2019 14:26:26 -0800 (PST)
 From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Date: Sun, 10 Feb 2019 23:21:36 +0100
-Message-ID: <CAFBinCBwDg21t+HT6w7CcUgH_aDuwh-UgoPs7GuZo9rABvPDig@mail.gmail.com>
-Subject: Re: [RFCv1 2/3] ARM: dts: meson8b: odroidc1: fix USB power supplies
- for phy
-To: Anand Moon <linux.amoon@gmail.com>
-Content-Type: multipart/mixed; boundary="0000000000002656590581919e73"
+To: linux-amlogic@lists.infradead.org, narmstrong@baylibre.com,
+ robh+dt@kernel.org, devicetree@vger.kernel.org
+Subject: [RESEND PATCH v2 1/2] dt-bindings: clock: meson8b: add APB clock
+ definition
+Date: Sun, 10 Feb 2019 23:26:02 +0100
+Message-Id: <20190210222603.6404-2-martin.blumenstingl@googlemail.com>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190210222603.6404-1-martin.blumenstingl@googlemail.com>
+References: <20190210222603.6404-1-martin.blumenstingl@googlemail.com>
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190210_142150_868987_A83C863E 
-X-CRM114-Status: GOOD (  24.12  )
+X-CRM114-CacheID: sfid-20190210_142629_928485_5F2C29AA 
+X-CRM114-Status: GOOD (  11.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,162 +99,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree <devicetree@vger.kernel.org>,
- Neil Armstrong <narmstrong@baylibre.com>, Kevin Hilman <khilman@baylibre.com>,
- Kishon Vijay Abraham I <kishon@ti.com>, Rob Herring <robh+dt@kernel.org>,
- linux-amlogic@lists.infradead.org,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Jerome Brunet <jbrunet@baylibre.com>
+Cc: mark.rutland@arm.com, sboyd@kernel.org, mturquette@baylibre.com,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ jbrunet@baylibre.com
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
---0000000000002656590581919e73
-Content-Type: text/plain; charset="UTF-8"
+Commit 8e1dd17c8b0e3f ("dt-bindings: clock: meson8b: export the CPU
+post dividers") added a clock with the name "ABP". The actual name of
+this clock is "APB".
 
-Hi Anand,
+Add a new #define with the same ID but the correct name. The old #define
+will be dropped in a follow-up patch because each commit in the tree
+must compile on it's own (the old #define is still used by the clock
+controller driver).
 
-On Sat, Feb 9, 2019 at 6:55 PM Anand Moon <linux.amoon@gmail.com> wrote:
-[...]
-> > > But this dose not work setting the usb1_phy to use vbus-supply.
-> > >
-> > >  &usb1_phy {
-> > >         status = "okay";
-> > > +       vbus-supply = <&usb_vbus>;
-> > >  };
-> > >
-> > > I am attaching a small patch for testing.
-> > > [0] usbvbus.patch
-> > indeed, this is not working for me either.
-> > I checked my old notes at [0] -> it works for me when setting
-> > "vbus-supply" at the usb controller (not the PHY).
-> >
-> > with the following snippet:
-> >   &usb1 {
-> >     status = "okay";
-> >     vbus-supply = <&usb_vbus>;
-> >   };
-> > I get:
-> > # cat /sys/kernel/debug/regulator/regulator_summary | grep -i usb
-> >    c90c0000.usb                  1                                 0mA
-> >     0mV     0mV
-> >    c90c0000.usb                  1                                 0mA
-> >     0mV     0mV
-> >    USB_VBUS                      1    1      0 unknown  5000mV     0mA
-> >  5000mV  5000mV
-> >       c90c0000.usb               1                                 0mA
-> >     0mV     0mV
-> >
-> > can you please try this on your board as well?
-> >
-> > > Here is the summary of the above patch.
-> > >
-> > > 1. hot-plugins of usb device is not working.
-> > > 2. only cold/warm boot let the device come up.
-> > > 3. not power is supplied to the usb ports.
-> > > 4. no power module is registered with the regulator summary.
-> > with "vbus-supply" moved to the usb1 node I get the following result:
-> > 1. same: hot-plugins of usb device is not working
-> > 2. different: a reboot doesn't make devices come up
-> > 3. same: no power is supplied to the USB ports (in my case this causes
-> > #2, but it's not clear why there's no power...)
-> > 4. different: the regulator is registered with the USB controller in debugfs
-> >
-> Here the the logs after I applied the above changes
->
-> [1] https://pastebin.com/rVa8gxNG
-can you please provide the .dts patch for this log?
-I can see the following message in your log:
-[    1.977367] USB_VBUS: disabling
+Fixes: 8e1dd17c8b0e3f ("dt-bindings: clock: meson8b: export the CPU post dividers")
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ include/dt-bindings/clock/meson8b-clkc.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-I have tried it with the attached patch, then I get:
-# dmesg | grep VBUS
-#
-# cat /sys/kernel/debug/regulator/regulator_summary
-regulator                      use open bypass  opmode voltage current
-    min     max
----------------------------------------------------------------------------------------
-regulator-dummy                  4    3      0 unknown     0mV     0mA
-    0mV     0mV
-   c90c0000.usb                  1                                 0mA
-    0mV     0mV
-   c90c0000.usb                  1                                 0mA
-    0mV     0mV
-   VCCK                          1    1      0 unknown   860mV     0mA
-  860mV  1140mV
-      cpu0                       0                                 0mA
-  860mV   860mV
-P5V0                             3    4      0 unknown  5000mV     0mA
- 5000mV  5000mV
-   VCC1V8                        2    2      0 unknown  1800mV     0mA
- 1800mV  1800mV
-      c1108680.adc               1                                 0mA
-    0mV     0mV
-      c1108e00.mmc               1                                 0mA
- 1800mV  1950mV
-   VCC3V3                        2    3      0 unknown  3300mV     0mA
- 3300mV  3300mV
-      c1108e00.mmc               1                                 0mA
- 3300mV  3400mV
-      VDD_RTC                    0    0      0 unknown   900mV     0mA
-  900mV   900mV
-      TFLASH_VDD                 1    1      0 unknown  3300mV     0mA
- 3300mV  3300mV
-         c1108c20.mmc:slot@1     1                                 0mA
- 3300mV  3400mV
-   DDR_VDDC                      0    0      0 unknown  1500mV     0mA
- 1500mV  1500mV
-   USB_VBUS                      1    1      0 unknown  5000mV     0mA
- 5000mV  5000mV
-      c90c0000.usb               1                                 0mA
-    0mV     0mV
-TF_IO                            0    1      0 unknown  3300mV     0mA
- 1800mV  3300mV
-   c1108c20.mmc:slot@1           0                                 0mA
-    0mV     0mV
+diff --git a/include/dt-bindings/clock/meson8b-clkc.h b/include/dt-bindings/clock/meson8b-clkc.h
+index 5fe2923382d0..8067077a62ca 100644
+--- a/include/dt-bindings/clock/meson8b-clkc.h
++++ b/include/dt-bindings/clock/meson8b-clkc.h
+@@ -104,6 +104,7 @@
+ #define CLKID_MPLL2		95
+ #define CLKID_NAND_CLK		112
+ #define CLKID_ABP		124
++#define CLKID_APB		124
+ #define CLKID_PERIPH		126
+ #define CLKID_AXI		128
+ #define CLKID_L2_DRAM		130
+-- 
+2.20.1
 
-(my kernel build includes two more changes on top of Kevin's v5.1/dt
-branch which add two new regulators: it enables the RTC and the SDHC
-MMC controller, but these are not related to USB at all)
-
-USB ist still not working for me, but I believe my problem is
-different to yours.
-
-
-Regards
-
-Martin
-
---0000000000002656590581919e73
-Content-Type: application/x-patch; name="vbus-supply.patch"
-Content-Disposition: attachment; filename="vbus-supply.patch"
-Content-Transfer-Encoding: base64
-Content-ID: <f_jrzgyt8b0>
-X-Attachment-Id: f_jrzgyt8b0
-
-ZGlmZiAtLWdpdCBhL2FyY2gvYXJtL2Jvb3QvZHRzL21lc29uOGItb2Ryb2lkYzEuZHRzIGIvYXJj
-aC9hcm0vYm9vdC9kdHMvbWVzb244Yi1vZHJvaWRjMS5kdHMKaW5kZXggMGYwYTQ2ZGRmM2ZmLi40
-NGI5ZTZjYmUyZWQgMTAwNjQ0Ci0tLSBhL2FyY2gvYXJtL2Jvb3QvZHRzL21lc29uOGItb2Ryb2lk
-YzEuZHRzCisrKyBiL2FyY2gvYXJtL2Jvb3QvZHRzL21lc29uOGItb2Ryb2lkYzEuZHRzCkBAIC0x
-MTgsNiArMTE4LDIyIEBACiAJCQkgIDE4MDAwMDAgMT47CiAJfTsKIAorCXVzYl92YnVzOiByZWd1
-bGF0b3ItdXNiLXZidXMgeworCQljb21wYXRpYmxlID0gInJlZ3VsYXRvci1maXhlZCI7CisKKwkJ
-cmVndWxhdG9yLW5hbWUgPSAiVVNCX1ZCVVMiOworCQlyZWd1bGF0b3ItbWluLW1pY3Jvdm9sdCA9
-IDw1MDAwMDAwPjsKKwkJcmVndWxhdG9yLW1heC1taWNyb3ZvbHQgPSA8NTAwMDAwMD47CisKKwkJ
-dmluLXN1cHBseSA9IDwmcDV2MD47CisKKwkJLyoKKwkJICogc2lnbmFsIG5hbWUgZnJvbSBzY2hl
-bWF0aWNzOiBQV1JFTgorCQkgKi8KKwkJZ3BpbyA9IDwmZ3Bpb19hbyBHUElPQU9fNSBHUElPX0FD
-VElWRV9ISUdIPjsKKwkJZW5hYmxlLWFjdGl2ZS1oaWdoOworCX07CisKIAl2Y2NfMXY4OiByZWd1
-bGF0b3ItdmNjLTF2OCB7CiAJCS8qCiAJCSAqIFJJQ0hURUsgUlQ5MTc5IGNvbmZpZ3VyZWQgZm9y
-IGEgZml4ZWQgb3V0cHV0IHZvbHRhZ2Ugb2YKQEAgLTI5OSw0ICszMTUsNSBAQAogCiAmdXNiMSB7
-CiAJc3RhdHVzID0gIm9rYXkiOworCXZidXMtc3VwcGx5ID0gPCZ1c2JfdmJ1cz47CiB9Owo=
---0000000000002656590581919e73
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---0000000000002656590581919e73--
-
