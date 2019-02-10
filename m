@@ -2,77 +2,71 @@ Return-Path: <SRS0=5+Aw=QR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 81F7EC282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 10 Feb 2019 21:32:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 05237C282CC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 10 Feb 2019 21:33:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 436202146F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 10 Feb 2019 21:32:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C6F512146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 10 Feb 2019 21:33:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QdisWwVR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 436202146F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=gmx.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iydC3VAx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C6F512146F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=wyDQf3TyiccpWEuYHdN25glESPPiZ5J/3GqaR1aW4R4=; b=QdisWwVRaS7mZaRmLpK9uXknI
-	um7vExV0jmJwDhJCbj594PPdTlqfTHrGTY4m6d8UKl5FaiJDCgdCtqxG5+94RQnSvVePGc5St6ZAe
-	ESSJMphevgLyXBNuZ+B6erf5rJXeGqM+MqjRCAxPvPpx8y9wEpDwpFRrtdORj7qVw9m3nnqpUv+Gm
-	D5tXgn3yfHJH/R9N8skyXs3QJy+c2S6/1oPuggKSNYIVK/f0z7TeZxa8RJ1idECAQFhGTItLxxLcB
-	taHQSwhJeRcXY10fRjVT7gy9U8PY22Zcumo542ff5uKQDShEs9Rt7Ur+VxJ/UBukzbx3h0hD6u2zj
-	L9/HzyZ+Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=VR4tVGZsBFtAGHNue/mN88vNmRgra2A0g3+DDQidSTI=; b=iydC3VAx/XgWmK
+	ybRY4cdXzCoQfqFW8sP07hxWDWREh85hhXejmzkae0pzHL1NN3YIMDxJuigq/KXVLYhMiOmoe0lUZ
+	QllX/wxjcAn6N52+NrBCrzeNqcNADdjm+Dk+I1XMSo4ZD+brg+5+06xRrGXvtgCeGVwiRbTkchBJm
+	ynWeWOQINxPq+zzMJl3YyqGnx030clEiTL7du17KKYvuXe6D4utKH4Ro/Ido37oi1T1P8ajtgCaLJ
+	zRgqXXmtS+2+O+C/ZXs1z/fuPomrZZS8VnpO+bkXq4sGRTj3GppZMZbKIjDCnaRQml7g400dcneVU
+	dei3UbJlCXQftcEJHqvA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gswiM-0000Lu-LN; Sun, 10 Feb 2019 21:32:38 +0000
-Received: from mout.gmx.net ([212.227.17.21])
+	id 1gswjG-0000k9-V8; Sun, 10 Feb 2019 21:33:34 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gswiJ-0000LW-5i
- for linux-arm-kernel@lists.infradead.org; Sun, 10 Feb 2019 21:32:36 +0000
-Received: from longitude ([109.90.232.48]) by mail.gmx.com (mrgmx101
- [212.227.17.168]) with ESMTPSA (Nemesis) id 0LnkiR-1haVrt3pap-00huCc; Sun, 10
- Feb 2019 22:32:23 +0100
-Date: Sun, 10 Feb 2019 22:32:21 +0100
-From: Jonathan =?utf-8?Q?Neusch=C3=A4fer?= <j.neuschaefer@gmx.net>
-To: Jonathan =?utf-8?Q?Neusch=C3=A4fer?= <j.neuschaefer@gmx.net>
-Subject: Re: sdhci-esdhc-imx/v5.0-rc5: i.MX50 system hangs when "per" clock
- is disabled
-Message-ID: <20190210213221.GC2061@latitude>
-References: <20190207225211.GA17552@latitude>
+ id 1gswjD-0000jb-49
+ for linux-arm-kernel@lists.infradead.org; Sun, 10 Feb 2019 21:33:33 +0000
+Received: from pty.hi.pengutronix.de ([2001:67c:670:100:1d::c5])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gswj4-0006G4-VQ; Sun, 10 Feb 2019 22:33:22 +0100
+Received: from ukl by pty.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gswj2-0007GC-4B; Sun, 10 Feb 2019 22:33:20 +0100
+Date: Sun, 10 Feb 2019 22:33:20 +0100
+From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
+To: Jonathan Cameron <jic23@kernel.org>
+Subject: Re: [PATCH 4/4] iio: counter: stm32-lptimer: Add power management
+ support
+Message-ID: <20190210213320.fs5kzezyzwd6akpx@pengutronix.de>
+References: <1549370429-19116-1-git-send-email-fabrice.gasnier@st.com>
+ <1549370429-19116-5-git-send-email-fabrice.gasnier@st.com>
+ <20190209162133.65e6fd93@archlinux>
 MIME-Version: 1.0
-In-Reply-To: <20190207225211.GA17552@latitude>
-User-Agent: Mutt/1.10.1 (2018-07-13)
-X-Provags-ID: V03:K1:XAXp9iHbCJQ7mYPC77Hpt85Bjyy367hPYeA+Kn1H0ZN+F868zxh
- 7uhalFxjTqpXyBtZIZx/HDtdiWWjh930KrB6USs7vHY3XyijCCVwERMpoBv69iLgj0JhZc1
- qwJGeWaIiMJJ7CCYi4S5DsKZdJz2cKrA/Wl8OxFL4UnMehI05w6aFffPNQExdO/jgk7XQ/A
- XiPCbiqvRuZdWJ+u0TfFg==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:mb9FXcvWVqI=:ABlsysEuGfRSqVP/X8VtVM
- 2svwLi4pIlwOOSy9/uurp1HqoLl1cphCG31W/cUHh0eGfo6VkR21wFWOqNhA4eYOmiAGNZ+Mo
- 4kLiJDwr1r+xr7bBK4tKT4UyLFp/ppEPVnVLqYvt99+5wGT2iQ5Akk90kxj2JefZD0TlWZ68a
- w2yKmA0IPnd9VToSRW8FN/sgSlNHSijiZuh5Mdh0W1gI/Ldgkf+mhc4+5Nr6I83s3gClTAP36
- R4mZPYjBDvasMJKFM7b6BWf2n6rA9FT94ayfTldGCmyGNUtwruksa/PXVvW4XUr7j9q046/Uu
- Ju6gUTdaB7/qFn9j1BIQo1zaB8bgdoZhz46uKSvl3xjPHvf6Ekk+demJWMojSj5JQb0Pi55/Y
- /cnAhmucZ/5ZngSL5VkiDiH3r53MSepKSnbQRvqG2bXWVga+Kr5Y6muE5DwDf9rm5y3UM3+uj
- P10pGqLXZTtLXwY5nAqEW7CyCcCNyuplNavnFc3ikMWBeBKo3/tcL7ymn+DinlQV5TIqzip6W
- TEfJ2yXChtNchZkGMwRyJtJTB5qaXG0pCSDoDLcqIE7LLBttbTqt6uI3CfJa3tFhNhooZR5ZT
- qaKBvLoY4LV5qEFYdvdIUcAn+TuNdBkX7+qnwxYJA3EvAyHP0l4PPn2tChmq9cNLy7ytU88zF
- eKVOpZuXHs2VYF1PkypNEsRMF9m2dKKntdBBKzb63afTH1PiZ+OcUFdSfT3SQUPxrUFf/2qRn
- YqoNs9l0lwPCrCwbOFkHvDdynedObf3q4WFaR4zDsaHVjBvkLhCYolmhkjwhmiPE0ya2L6CC5
- YPsgPR37Gp2pjIkF0oi+Y6SpAnC6Q3Rziv7ZNAtdbDsKYk9Q8BZ5cLswxAwiBrgCEzFV51+0Y
- VyUawdkAyuggmTZCYpqLz08GS3Hb5cJRczR+fmZ2tIyMg4ti8ECfiUQ0YMA9TT
+Content-Disposition: inline
+In-Reply-To: <20190209162133.65e6fd93@archlinux>
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c5
+X-SA-Exim-Mail-From: ukl@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190210_133235_511453_65BA24BD 
-X-CRM114-Status: UNSURE (   9.68  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190210_133331_324337_04D080BD 
+X-CRM114-Status: GOOD (  10.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,84 +78,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>, Stephen Boyd <sboyd@kernel.org>,
- Sascha Hauer <s.hauer@pengutronix.de>, linux-mmc@vger.kernel.org,
- linux-kernel@vger.kernel.org, Adrian Hunter <adrian.hunter@intel.com>,
- Michael Turquette <mturquette@baylibre.com>,
- NXP Linux Team <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============7184002623262560004=="
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, alexandre.torgue@st.com,
+ linux-pwm@vger.kernel.org, linux-iio@vger.kernel.org,
+ linux-kernel@vger.kernel.org, robh+dt@kernel.org, vilhelm.gray@gmail.com,
+ thierry.reding@gmail.com, mcoquelin.stm32@gmail.com,
+ Fabrice Gasnier <fabrice.gasnier@st.com>,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Sat, Feb 09, 2019 at 04:21:33PM +0000, Jonathan Cameron wrote:
+> On Tue, 5 Feb 2019 13:40:29 +0100
+> Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+> =
 
---===============7184002623262560004==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="/e2eDi0V/xtL+Mc8"
-Content-Disposition: inline
+> > Add suspend/resume PM sleep ops. When going to low power, disable
+> > active counter. Only active counter should be resumed: don't touch
+> > disabled counter, as it may be used by other LPTimer MFD child driver.
+> > =
 
+> > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> I think this looks fine.  I'm not totally sure if patches 3,4 are
+> separable from 1,2 though so please let me know whether I should take
+> these now, or let all 4 go in together via some path?
 
---/e2eDi0V/xtL+Mc8
-Content-Type: text/plain; charset=utf-8
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+I'd say these are orthogonal, so if you are happy with patches 3 and 4
+you can take them without bothering for patches 1 and 2.
 
-On Thu, Feb 07, 2019 at 11:52:11PM +0100, Jonathan Neusch=C3=A4fer wrote:
-> However, as soon as the mmc driver (sdhci-esdhc-imx.c) disables clk_per
-> in sdhci_esdhc_runtime_suspend[2], the whole system locks up in some way.
+Best regards
+Uwe
 
-I've traced clk prepare/unprepare/enable/disable calls and got this
-right before it hangs:
+-- =
 
-[    1.280981] sdhci_esdhc_runtime_suspend: unprepare clk_per
-[    1.283356] clk_core_unprepare esdhc1_per_gate
-[    1.285191] clk_core_unprepare esdhc_a_podf
-[    1.286881] clk_core_unprepare esdhc_a_pred
-[    1.288568] clk_core_unprepare esdhc_a_sel
-[    1.290220] clk_core_unprepare pll2_sw
-
-I suspect that there is a dependency on pll2_sw that is not represented
-in the imx5 clock driver. I'm comparing it to the Reference Manual now.
-
-
-Thanks,
-Jonathan Neusch=C3=A4fer
-
---/e2eDi0V/xtL+Mc8
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCgAdFiEEvHAHGBBjQPVy+qvDCDBEmo7zX9sFAlxgmF0ACgkQCDBEmo7z
-X9sINBAApuuzxXq9D6VZLxr0ABlrqGVUN9QMdqizhS4PcNi97B4Ax5J1dDGCXaJN
-U1J1GwA9WQgC3/khCiP04XAc1qp6/2KkobDFl/IjBNPZRcBS/qeBemePKhAWH9Jh
-ICqYCbKZCkxpcLD8zFpY4XtzC16fdk5CTeXEJLjb83JcWY+p8KBkLGCl0SQyJuJ5
-pHS79Cgw1RhGYS4zF3a8AO8o4Llccl1PdshUlXNOZ4rFS3Ep68A03cBoWI+PWuhU
-auF0HmYufLhajjeaDFaMv9uzBSM5vylxIsEtKJzxLChgOP5sAwIMGFxyo1sDAab5
-A6GovivJ/jtQpK/mVSoHqazyt1226c0LXV2Sg6erImmCUkAzcHPAzRPeRJqqCt0Y
-IUaLY7jWPQSUMmh+XjMuGUuDuJbuTetb/1TJBK94aAzndMn12fojEDRtOgtvpW3d
-KaZKj2tk/250uC6q+GvQClF7iZEadl7bmu/QQfEpfMU61qH7IOmw7wrGFueQLelu
-HDX+GRpoe0qsYdYtFOmsYYj5ocyLRgF/F8ycEyK9Ea+WOr76JS2+ycDkSit8uxcl
-JiAHh3xMGQz7Mt0sTMdChfg5ee6ruxanfB/SzSeurpBmg4fmdCJmt7JYZbwC3NBI
-CfjjX/RM10JpwYk4YVxxekG/ZOP+jO9JDIgHWZTIFkHt6oat234=
-=Ejgh
------END PGP SIGNATURE-----
-
---/e2eDi0V/xtL+Mc8--
-
-
---===============7184002623262560004==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============7184002623262560004==--
-
