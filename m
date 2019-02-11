@@ -2,22 +2,23 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,FSL_HELO_FAKE,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B9E3C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 06:56:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 48405C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 07:12:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3A56720838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 06:56:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1775320836
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 07:12:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DrZBX0mS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3A56720838
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ravnborg.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V0LFd8xi";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="iLc0oI6v"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1775320836
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,45 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Q2u30C7U3Re1+O9IZtFmDKs/3X2KgeAB6Qkmbk5OUq8=; b=DrZBX0mSM5o2o/
-	9Gpd60qVfrinHHq7YM/KLtjg632HkybUzicUgDASOsnMyDG/KXUlm91mI9ZRfM3UwRMjjjw05lieQ
-	jTYNL2SGAw4EgwdvHs827NSmXMp5h0iG2id3h+bbASvwBS44/fpDYQQoUnmXqygKTqMkGhTkxsW9w
-	47WFdsDQedDPORnAqlR6b/v0LY6gugl3N5hqYHBfsDJqalV3F5UlMtMBhxDCjQNGhXegvibj8Tf2l
-	8Kd8xyJ7sw698zUTM8z4MkMgbEpJyM2WO+8acMHZTnQIwPJq3B/7oV981vh91hoZDwzH0iHud/PGO
-	pdQx7CjbRbo9fD1F7Fyw==;
+	List-Owner; bh=RimGaA0mpU8nLIJwlqtC5s5AGC7ZrUR4bFTZAyICjZA=; b=V0LFd8xi1ezqRu
+	3LMGNFgq2Wj/Tlz1WqZ3LSBN0nDJlLSd1bD0CpIP6Qq2MGEUKGow2rHXIdRZV+K0+FE7I1OGuSqHZ
+	VEJ14OC5AK1rJFYwJvDTOsSssI3gYRFNottdP97Wn9fO7S2XiQjuX+rohEnBX3UIQP2pu4CbGCczm
+	sbMsn9WMqZlVwoMbfp0K01rtICRFv4Fa3wrCfttiIQeyhD5xqUfUBXSxkv4gN6TYr+jXHnvQnBjBO
+	p23nzmwwjDt2O+tJu4vDOL46UH3zL8wKphASaV/QkO9aIn2VQ1fOiWOJInla+RQPwkmjmHVNVX8Ph
+	yLpIkLQHL+0sMUzWMOog==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt5Vg-0001lQ-S9; Mon, 11 Feb 2019 06:56:08 +0000
-Received: from asavdk3.altibox.net ([109.247.116.14])
+	id 1gt5lB-0007LW-Ag; Mon, 11 Feb 2019 07:12:09 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt5Vc-0001jN-KE
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 06:56:07 +0000
-Received: from ravnborg.org (unknown [158.248.194.18])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by asavdk3.altibox.net (Postfix) with ESMTPS id 8EC1620030;
- Mon, 11 Feb 2019 07:55:53 +0100 (CET)
-Date: Mon, 11 Feb 2019 07:55:52 +0100
-From: Sam Ravnborg <sam@ravnborg.org>
-To: "Hean-Loong, Ong" <hean.loong.ong@intel.com>
-Subject: Re: [PATCHv12 3/3] ARM:drm ivip Intel FPGA Video and Image
- Processing Suite
-Message-ID: <20190211065552.GA7010@ravnborg.org>
-References: <20190211060926.3433-1-hean.loong.ong@intel.com>
- <20190211060926.3433-4-hean.loong.ong@intel.com>
+ id 1gt5l7-0007Jh-54
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 07:12:06 +0000
+Received: by mail-wm1-x342.google.com with SMTP id h22so13573573wmb.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 10 Feb 2019 23:12:04 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=sender:date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=BK4Sm1vYAP/cUQnaGA8IV1A1wXMg4Z4Mq4IDBe+5Fz0=;
+ b=iLc0oI6v6Cc382OU0fdlNtw/4hwzwv60nfBQ5KbKbVaS4A61E93cSWC8jo2x/WEl1a
+ /7iNgiNDbixuFiTPVQxi8pc+/7fGx7pcuID+pMESwbpBB58ja3pRwNYGtoteTRn6cyHX
+ VckXzbs5q4+RkIKdXXafDtC0IPMQNYgZCtrdvLgHeBBkHD9tEw/VRJq1p441jPtIqSIQ
+ IJ/q1mwZcAvFB2yG85C6ntvl+UYgPG+r8dkD4WtUr93nSoN1GOE9cAmp6aCYRXO1Q3Ue
+ sMgUko0pVzP2JoCJuinZBMQqE+COBfHkCMgJfh+JRAGW8JHu+EFVr4Ml2wOSRNsdda4K
+ M0yw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
+ :references:mime-version:content-disposition:in-reply-to:user-agent;
+ bh=BK4Sm1vYAP/cUQnaGA8IV1A1wXMg4Z4Mq4IDBe+5Fz0=;
+ b=jmmbSvY5KaCC5FrJZqN9YSBLzNlyFxkBqvyGhoEFuaiMS1+d698nniwuZkBmFL8F1R
+ O21Ww2SPzv2qCRWwUdN0lLhrXZadpIWdGZgici/JLvZ+dy8UsUnESTilDv0iPytiMXh2
+ ZUKqxqunU/znUGJknK0FKzTtrk7Y2tmmi/LYcybqldNvVbHbx4oTdOf+5TnzVNte03S+
+ 5M8rSVRtnYWMeFYtMxd8MxFjF/slC3AeTaSbbKhWrqJrDibN3YtQHc7JbAQoTDXCCF8V
+ 19rGHj8bvqwP9ajXdH4kYDIREWajPGVKpxpiY3Ae0WkCYFPB7LzFxLN0xWeS2qCUnA5C
+ c9CQ==
+X-Gm-Message-State: AHQUAubI9IwKpWQRg1at1//9ZvqWZdr8FcQ399Gnn7H8qA9TFfOScruM
+ 4sLWpE8V1Q7vkSmuPKySzxQ=
+X-Google-Smtp-Source: AHgI3IYKyZH/baZMa5ziJeeQ06x4xxi+rhZ/xrB3f4ycB4qyp+lAO8FS4iZNzqjB6VFbBo/ZmJWgew==
+X-Received: by 2002:adf:e34b:: with SMTP id n11mr24796464wrj.91.1549869123278; 
+ Sun, 10 Feb 2019 23:12:03 -0800 (PST)
+Received: from gmail.com (2E8B0CD5.catv.pool.telekom.hu. [46.139.12.213])
+ by smtp.gmail.com with ESMTPSA id a184sm9956832wmh.37.2019.02.10.23.12.01
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Sun, 10 Feb 2019 23:12:02 -0800 (PST)
+Date: Mon, 11 Feb 2019 08:11:59 +0100
+From: Ingo Molnar <mingo@kernel.org>
+To: Waiman Long <longman@redhat.com>
+Subject: Re: [PATCH] locking/rwsem: Remove arch specific rwsem files
+Message-ID: <20190211071159.GA55579@gmail.com>
+References: <1549850450-10171-1-git-send-email-longman@redhat.com>
+ <a610aeb2-b1cb-0d57-8078-97d1051481f9@redhat.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190211060926.3433-4-hean.loong.ong@intel.com>
-User-Agent: Mutt/1.5.21 (2010-09-15)
-X-CMAE-Score: 0
-X-CMAE-Analysis: v=2.3 cv=dqr19Wo4 c=1 sm=1 tr=0
- a=UWs3HLbX/2nnQ3s7vZ42gw==:117 a=UWs3HLbX/2nnQ3s7vZ42gw==:17
- a=kj9zAlcOel0A:10 a=yBYpec10AAAA:8 a=fjobobjgAAAA:8 a=QyXUC8HyAAAA:8
- a=jbnKnBcKNtAAbXgpOMQA:9 a=aegFic2g-LuQCSZJ:21 a=er5hxFpQ-oadSlK4:21
- a=CjuIK1q_8ugA:10 a=zbxmTX4fiVD2UiCe4Dha:22 a=PlEKnuvBpV2Z9KzPMKMm:22
+In-Reply-To: <a610aeb2-b1cb-0d57-8078-97d1051481f9@redhat.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190210_225605_025782_664D3B5E 
-X-CRM114-Status: GOOD (  21.70  )
+X-CRM114-CacheID: sfid-20190210_231205_190915_205BF52F 
+X-CRM114-Status: GOOD (  23.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,219 +97,83 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org,
- Rienk de Jong <rienk.dejong@quest-innovations.com>,
- yves.vandervennet@intel.com, chin.liang.see@intel.com,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- Dinh Nguyen <dinguyen@kernel.org>,
- Noralf =?iso-8859-1?Q?Tr=F8nnes?= <noralf@tronnes.org>,
- dri-devel@lists.freedesktop.org, Daniel Vetter <daniel.vetter@intel.com>,
- linux-arm-kernel@lists.infradead.org, Ong@freedesktop.org
+Cc: linux-ia64@vger.kernel.org, linux-sh@vger.kernel.org,
+ Peter Zijlstra <peterz@infradead.org>, Will Deacon <will.deacon@arm.com>,
+ "H. Peter Anvin" <hpa@zytor.com>, sparclinux@vger.kernel.org,
+ linux-arch@vger.kernel.org, Davidlohr Bueso <dave@stgolabs.net>,
+ linux-hexagon@vger.kernel.org, x86@kernel.org, Ingo Molnar <mingo@redhat.com>,
+ linux-xtensa@linux-xtensa.org, Arnd Bergmann <arnd@arndb.de>,
+ linuxppc-dev@lists.ozlabs.org, Borislav Petkov <bp@alien8.de>,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
+ Linus Torvalds <torvalds@linux-foundation.org>, linux-kernel@vger.kernel.org,
+ linux-alpha@vger.kernel.org, Andrew Morton <akpm@linux-foundation.org>,
+ Tim Chen <tim.c.chen@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Hean-Loong, Ong
 
-Patch looks good to me, but there is a few trivial
-things I spotted while browsing the code.
-See below.
+* Waiman Long <longman@redhat.com> wrote:
 
-	Sam
+> On 02/10/2019 09:00 PM, Waiman Long wrote:
+> > As the generic rwsem-xadd code is using the appropriate acquire and
+> > release versions of the atomic operations, the arch specific rwsem.h
+> > files will not be that much faster than the generic code as long as the
+> > atomic functions are properly implemented. So we can remove those arch
+> > specific rwsem.h and stop building asm/rwsem.h to reduce maintenance
+> > effort.
+> >
+> > Currently, only x86, alpha and ia64 have implemented architecture
+> > specific fast paths. I don't have access to alpha and ia64 systems for
+> > testing, but they are legacy systems that are not likely to be updated
+> > to the latest kernel anyway.
+> >
+> > By using a rwsem microbenchmark, the total locking rates on a 4-socket
+> > 56-core 112-thread x86-64 system before and after the patch were as
+> > follows (mixed means equal # of read and write locks):
+> >
+> >                       Before Patch              After Patch
+> >    # of Threads  wlock   rlock   mixed     wlock   rlock   mixed
+> >    ------------  -----   -----   -----     -----   -----   -----
+> >         1        27,373  29,409  28,170    28,773  30,164  29,276
+> >         2         7,697  14,922   1,703     7,435  15,167   1,729
+> >         4         6,987  14,285   1,490     7,181  14,438   1,330
+> >         8         6,650  13,652     761     6,918  13,796     718
+> >        16         6,434  15,729     713     6,554  16,030     625
+> >        32         5,590  15,312     552     6,124  15,344     471
+> >        64         5,980  15,478      61     5,668  15,509      58
+> >
+> > There were some run-to-run variations for the multi-thread tests. For
+> > x86-64, using the generic C code fast path seems to be a liitle bit
+> > faster than the assembly version especially for read-lock and when lock
+> > contention is low.  Looking at the assembly version of the fast paths,
+> > there are assembly to/from C code wrappers that save and restore all
+> > the callee-clobbered registers (7 registers on x86-64). The assembly
+> > generated from the generic C code doesn't need to do that. That may
+> > explain the slight performance gain here.
+> >
+> > The generic asm rwsem.h can also be merged into kernel/locking/rwsem.h
+> > as no other code other than those under kernel/locking needs to access
+> > the internal rwsem macros and functions.
+> >
+> > Signed-off-by: Waiman Long <longman@redhat.com>
+> 
+> I have decided to break the rwsem patchset that I sent out on last
+> Thursday into 3 parts. This patch is part 0 as it touches a number of
+> arch specific files and so have the widest distribution. I would like to
+> get it merged first. Part 1 will be patches 1-10 (except 4) of my
+> original rwsem patchset. This part moves things around, adds more
+> debugging capability and lays the ground work for the next part. Part 2
+> will contains the remaining patches which are the real beef of the whole
+> patchset.
 
-> +++ b/drivers/gpu/drm/ivip/Makefile
-> @@ -0,0 +1,7 @@
-> +#
-> +# Makefile for the drm device driver.  This driver provides support for the
-> +# Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
-> +
-> +obj-$(CONFIG_DRM_IVIP) += ivip.o
-> +ivip-objs := intel_vip_of.o intel_vip_core.o \
-> +	intel_vip_conn.o
+Sounds good to me - I've merged this patch, will push it out after 
+testing.
 
-You could use:
-ivip-y := intel_vip_of.o intel_vip_core.o
-ivip-y += intel_vip_conn.o
+Thanks,
 
-
-Using "ivip-y" is the recommend syntax today.
-And using "+=" you get rid of the ugly "\" to continue a line.
-(Some people prefer "\" in makefiles, but there are not needed)
-
-> +++ b/drivers/gpu/drm/ivip/intel_vip_core.c
-> @@ -0,0 +1,189 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (C) 2019 Intel Corporation.
-> + *
-> + * intel_vip_core.c -- Intel Video and Image Processing(VIP)
-> + * Frame Buffer II driver
-> + *
-> + * This driver supports the Intel VIP Frame Reader component.
-> + * More info on the hardware can be found in the Intel Video
-> + * and Image Processing Suite User Guide at this address
-> + * http://www.altera.com/literature/ug/ug_vip.pdf.
-> + *
-> + * Authors:
-> + * Walter Goossens <waltergoossens@home.nl>
-> + * Thomas Chou <thomas@wytron.com.tw>
-> + * Chris Rauer <crauer@altera.com>
-> + * Ong, Hean-Loong <hean.loong.ong@intel.com>
-> + *
-> + */
-> +
-> +#include <drm/drmP.h>
-Please do not use drmP.h in new drivers, we try to get rid of this file.
-
-> +#include <drm/drm_atomic.h>
-> +#include <drm/drm_atomic_helper.h>
-> +#include <drm/drm_crtc_helper.h>
-> +#include <drm/drm_fb_helper.h>
-> +#include <drm/drm_fb_cma_helper.h>
-> +#include <drm/drm_gem_cma_helper.h>
-> +#include <drm/drm_plane_helper.h>
-> +#include <drm/drm_simple_kms_helper.h>
-> +#include <drm/drm_gem_framebuffer_helper.h>
-Sort the list of include files.
-(Looks like this was properly done before, and only one file is out of palce)
-
-
-> +static void intelvipfb_enable(struct drm_simple_display_pipe *pipe,
-> +	       struct drm_crtc_state *crtc_state, struct drm_plane_state *
-> +	       plane_state)
-Fix indent. The parameters on second line and following should be aligned
-below the opening paranthesis.
-Use tab(s) + spaces to align properly.
-
-> +void intelvipfb_display_pipe_update(struct drm_simple_display_pipe *pipe,
-> +				 struct drm_plane_state *old_state)
-Align parameter
-
-> +}
-> +EXPORT_SYMBOL(intelvipfb_display_pipe_update);
-> +
-> +static struct drm_simple_display_pipe_funcs fbpriv_funcs = {
-> +	.prepare_fb = drm_gem_fb_simple_display_pipe_prepare_fb,
-> +	.update = intelvipfb_display_pipe_update,
-> +	.enable = intelvipfb_enable,
-> +	.disable = intelvipfb_disable,
-> +};
-> +
-> +
-> +int intelvipfb_probe(struct device *dev)
-> +{
-> +	int retval;
-> +	struct drm_device *drm;
-> +	struct intelvipfb_priv *fbpriv = dev_get_drvdata(dev);
-> +
-> +	struct drm_connector *connector;
-> +	u32 formats[] = {DRM_FORMAT_XRGB8888};
-> +
-> +	drm = fbpriv->drm;
-> +
-> +	drm->dev_private = fbpriv;
-
-It would be simpler to just pass fbpriv as a parameter.
-There is only one user of intelvipfb_probe() so no need
-to avoid it.
-
-Also it would be more logical to set drm = fbpriv->drm; where memory are allocated.
-
-> +
-> +	intelvipfb_setup_mode_config(drm);
-> +
-> +	connector = intelvipfb_conn_setup(drm);
-> +	if (!connector) {
-> +		dev_err(drm->dev, "Connector setup failed\n");
-> +		goto err_mode_config;
-> +	}
-> +
-> +	retval = drm_simple_display_pipe_init(drm,
-> +			&fbpriv->pipe,
-> +			&fbpriv_funcs,
-> +			formats,
-> +			ARRAY_SIZE(formats),
-> +			NULL, connector);
-Consider indent, where subsequent parameters are aligned right after the
-opening '('.
-
-> +
-> +	if (retval < 0) {
-> +		dev_err(drm->dev, "Cannot setup simple display pipe\n");
-> +		goto err_mode_config;
-> +	}
-> +
-> +	drm_mode_config_reset(drm);
-> +
-> +	drm_dev_register(drm, 0);
-> +
-> +	drm_fbdev_generic_setup(drm, 32);
-> +
-> +	dev_info(drm->dev, "ivip: Successfully created fb\n");
-> +
-> +	return retval;
-> +
-> +err_mode_config:
-> +
-> +	drm_mode_config_cleanup(drm);
-> +	return -ENODEV;
-> +}
-> +
-
-> diff --git a/drivers/gpu/drm/ivip/intel_vip_of.c b/drivers/gpu/drm/ivip/intel_vip_of.c
-> new file mode 100644
-> index 0000000..c899e30
-> --- /dev/null
-> +++ b/drivers/gpu/drm/ivip/intel_vip_of.c
-> @@ -0,0 +1,181 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (C) 2019 Intel Corporation.
-> + *
-> + * intel_vip_of.c -- Intel Video and Image Processing(VIP)
-> + * Frame Buffer II driver
-
-The need for this file confuses me.
-It does not include only "of" related stuff, but also generic device driver stuff.
-
-Maybe merge with intel_vip_core.c?
-And rename that file to intel_vip_drv.c?
-
-> + *
-> + * This driver supports the Intel VIP Frame Reader component.
-> + * More info on the hardware can be found in the Intel Video
-> + * and Image Processing Suite User Guide at this address
-> + * http://www.altera.com/literature/ug/ug_vip.pdf.
-> + *
-> + * Authors:
-> + * Ong, Hean-Loong <hean.loong.ong@intel.com>
-> + *
-> + */
-> +#include <drm/drmP.h>
-Drop use of drmP.h
-
-> +static int intelvipfb_of_probe(struct platform_device *pdev)
-> +{
-> +	int retval;
-> +	struct resource *reg_res;
-> +	struct intelvipfb_priv *fbpriv;
-> +	struct device *dev = &pdev->dev;
-> +	struct drm_device *drm;
-> +
-> +	fbpriv = devm_kzalloc(dev, sizeof(*fbpriv), GFP_KERNEL);
-> +	if (!fbpriv)
-> +		return -ENOMEM;
-> +
-> +	/*setup DRM */
-Space before "setup"
-
-> +
-> +static const struct of_device_id intelvipfb_of_match[] = {
-> +	{ .compatible = "altr,vip-frame-buffer-2.0" },
-> +	{},
-Maybe add "/* sentinel */" comment?
-
+	Ingo
 
 _______________________________________________
 linux-arm-kernel mailing list
