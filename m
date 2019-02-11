@@ -2,105 +2,89 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,
+	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	MAILING_LIST_MULTI,SPF_PASS autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 58834C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 20:14:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B8D37C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 20:33:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 15F86217FA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 20:14:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8816A218D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 20:33:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b8I2hJsA";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=impinj.com header.i=@impinj.com header.b="pjQpaM7s"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 15F86217FA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=impinj.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CSpN/IPz";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="BmQVHGsb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8816A218D8
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9SK+vjabbTIr9bsFSstcVsUcuCDWuk3l3s9hRtbIlh4=; b=b8I2hJsAwxva5F
-	bcl3N3Z/9p+P4avkO8XlXft2VsOpCS52mJL2Bs416fB0+3hj98wA71H+lKs+7UifLMODmmxNplohH
-	WQ5C02NfCOn9VMUtwj0IcZyKjmWCv6zm6w3ax5yuV48C4mqsQfbewycQ7r6n+iKHSWwrnCDTyVcdF
-	vA8SL8Nlv8HuOSRsEOnK92EejsvsX3GJfy0hJ6zGUCrZ4MCn5kJk7byLSZgYqNg/x7ax/BmLXtApt
-	nClWEgVV5QT7YyUmc94oLdBD29KQnBZQPQwEsGvXTlrd9A3yamkHKUabCwK2XaxbIU4tLHr0f1kEy
-	MaHiyRjb/uJHzauOEpfg==;
+	List-Owner; bh=mrbeuqgArWznoKzTIHxKJgEU3BGrL8FMphk2irx0Gxc=; b=CSpN/IPznPTfOQ
+	aRkCdgsZotb6BeznX17svGE0cVyLJQGXvLjKQ5Nav4rZI7nsrFA6wRnnFofQDYRz0f88zphZA8vAZ
+	3hlzOkTxhsRdWOYtO/ZiOgXDrsliTeBbUdpSNE4wI23KVS/llkYV46vKHy/un6JbPl2sNzX3lmV9j
+	OEaY+2EzRg1ew7BUR2wekGBIF2OfYCPnrOtRzrzd4exFsgLaYC5uixzHxYs9wA5ZIseHvXu4ukOSz
+	9Hu/+7UsLib7zSbk5x/Ff+4TIm7Hu8gltSFCZPFrPMj7YpERQA8IsA6QsxoTCOLdoSnlU5ckJdodh
+	2GI04HhOkAT5xXsN2b9Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtHyD-0004n1-6A; Mon, 11 Feb 2019 20:14:25 +0000
-Received: from mail-eopbgr710096.outbound.protection.outlook.com
- ([40.107.71.96] helo=NAM05-BY2-obe.outbound.protection.outlook.com)
+	id 1gtIGR-0003iI-2O; Mon, 11 Feb 2019 20:33:15 +0000
+Received: from mail-vk1-xa43.google.com ([2607:f8b0:4864:20::a43])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtHy9-0004mK-4s
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 20:14:22 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=impinj.com;
- s=selector1;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=OAEEoVkWHdQgY1VQuIsvnL88i3Nn/XcgMpUgUU8uMqE=;
- b=pjQpaM7sCB6GhG8byMTg57Ek4ZZN5vIbn3HB2L4YgazzJKQHUo8YfcTCATPUD+gPk3xJxfTeQ+6/9/oa9MwN2HvKii2OC1dKsq9XvOxts7zcXx77TstrWC468MoYQKnqAKfjrqiEXm1sQ7ryYrzLcAyyKBu/fjrhIKOmaiasRKM=
-Received: from MWHPR0601MB3708.namprd06.prod.outlook.com (10.167.236.38) by
- MWHPR0601MB3771.namprd06.prod.outlook.com (10.167.236.152) with Microsoft
- SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.19; Mon, 11 Feb 2019 20:14:17 +0000
-Received: from MWHPR0601MB3708.namprd06.prod.outlook.com
- ([fe80::ac0c:a03e:77c7:fa85]) by MWHPR0601MB3708.namprd06.prod.outlook.com
- ([fe80::ac0c:a03e:77c7:fa85%5]) with mapi id 15.20.1601.023; Mon, 11 Feb 2019
- 20:14:17 +0000
-From: Trent Piepho <tpiepho@impinj.com>
-To: "shawnguo@kernel.org" <shawnguo@kernel.org>
-Subject: Re: [PATCH 2/2] ARM: dts: imx7: add DMA properties for ECSPI
-Thread-Topic: [PATCH 2/2] ARM: dts: imx7: add DMA properties for ECSPI
-Thread-Index: AQHUvyD/DkP33gVxsUSHwHJ5QzA1bqXU0h6AgAUATgCAATwLAA==
-Date: Mon, 11 Feb 2019 20:14:16 +0000
-Message-ID: <1549916056.3075.102.camel@impinj.com>
-References: <20190107132226.16216-1-stefan@agner.ch>
- <20190107132226.16216-2-stefan@agner.ch>
- <1549573243.3075.72.camel@impinj.com> <20190211012305.GA21496@dragon>
-In-Reply-To: <20190211012305.GA21496@dragon>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=tpiepho@impinj.com; 
-x-originating-ip: [216.207.205.253]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 235fccf4-02a4-4a0c-f4ca-08d6905d7fed
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
- SRVR:MWHPR0601MB3771; 
-x-ms-traffictypediagnostic: MWHPR0601MB3771:
-x-microsoft-exchange-diagnostics: 1; MWHPR0601MB3771;
- 20:HeoXgP7yPyS4GOoOaDPtZLulNiq/NIr8wPrt1FyE1pmrYd4oFuxSqFpcgi0CzeAVdt53jeqtKh2gLpV4mlRbehwJxvnAqxVmQgW8VEwsbhv3fhFEwYr/5DKrxHTGbsgsSSQ7BfsKydMr8V1Abab+wR0aUn8uclYjQ1RnqWeGRrg=
-x-microsoft-antispam-prvs: <MWHPR0601MB3771D144FDAEB46D47295D92D3640@MWHPR0601MB3771.namprd06.prod.outlook.com>
-x-forefront-prvs: 0945B0CC72
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10019020)(396003)(366004)(136003)(39850400004)(346002)(376002)(189003)(199004)(316002)(6246003)(102836004)(53936002)(66066001)(6486002)(229853002)(86362001)(7416002)(6116002)(2351001)(25786009)(26005)(6506007)(97736004)(7736002)(5640700003)(305945005)(3846002)(103116003)(106356001)(105586002)(6436002)(6512007)(4326008)(11346002)(446003)(2501003)(14454004)(8676002)(2906002)(2616005)(476003)(99286004)(6916009)(256004)(1730700003)(71200400001)(81156014)(36756003)(54906003)(68736007)(486006)(8936002)(478600001)(76176011)(186003)(93886005)(81166006)(71190400001);
- DIR:OUT; SFP:1102; SCL:1; SRVR:MWHPR0601MB3771;
- H:MWHPR0601MB3708.namprd06.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: impinj.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: MQnxeZU/m+YrtG81ZoffGKfGXEJ7pXRtyB4sdcaM+lDDYHiXRY1M4/vRkHVOqSecYBo/WMv1yXGh/0/cZhyblbeRkL/gCqdPJo5vxpo8gEszJUI9JxsEHUBi2dsawesvTOXyPsMdtnDGKRDOjWd0qTeOXLmnX3cUeAxd6vxxwXSfIBU5h5/recEIv2YY/QhyvvHU1XCH0jG6Syl0tdVEVOyYEkuVpieAbFqe88kcfffU33PlkECTTLTMTxG1O4o+X7woVnqll0uEAt16iAYbfTj05ycjDK4nO/HnNt7G/q5rzdlD+9SEOsdVkiQFMp2lZmSoh4bCKLkWa3TLv4Sck9n/1IzFTSSiHNKPGbXUcDDmQBGbv8jbZkcC9PRZukc5FP/nhrRBPZ0udi4gQgNR0c49Tgp30bD6szkaeswDP0M=
-Content-ID: <C8C20BCD9316084191ED9ADADA43B63E@namprd06.prod.outlook.com>
+ id 1gtIGN-0003hW-RB
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 20:33:13 +0000
+Received: by mail-vk1-xa43.google.com with SMTP id v70so61674vkv.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 11 Feb 2019 12:33:08 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=r6VRajPoqaThCJT0Dvdiha6ogbe9QcNkbuaAo7A6Lms=;
+ b=BmQVHGsbVwhoYZdBSedRkqIv6og7RMSliRadT3+x3j6C1gbIKUuwcxXzqv5jKmWvjo
+ KdPJxVpmNCDYVgKTbZX5dzd/F00C4iJjDGN6QzwEks6s+CaJpSauJ9LlIoNCdIKimi6c
+ JGhlLjiLL1uqvF8XnV5O7YMCfE0Cjq5ccbC9r8DysKVu1r5mFlDQX1dL97frVsvPHyu0
+ 9mrkSPWrFbpeP0Eqh9roRzPndd+Sq7oG4Q2uFQvXNygHhtEZpexHI0RTL5IyfFXeJLib
+ sht/JwBIBWaNTiZTNYltal2S7DIierzLBZLEKpRhAH9hiD5e/iEv2Qz7CxmUv+6ZtP7X
+ /Qfg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=r6VRajPoqaThCJT0Dvdiha6ogbe9QcNkbuaAo7A6Lms=;
+ b=LQlLkJD+8sZ/H+z9uuIgtjImEujqD2KsGY8lm2p/mcjMwdiCoLdeE3vHlF/rt1ySdH
+ O+B51XDLvCTBKowfmriTbarEyRtYvCFBWBmOlyhsdjxmlEoUxreUjq67togXsBMxzfFi
+ ND3iEWZfuByJlusW09nl/hqQAmqwVbMiFJ6g1JdZyeiUs4k68ELD7iC91pHQeDZjXkit
+ 8mKtdM3UluHTu5rUKac4//giW+EhY3C36qnhyT4AfhIMbHNIyXJfOog7K5h36mYQUkxh
+ kGFLb5BRVl6ll4Hl+iQK7gz6L8e2Oqy53biLbMKNaUl1YVOmC9OtLbD0TXnvM9KY60xZ
+ QL5w==
+X-Gm-Message-State: AHQUAubI2Yef4RMnF0ABpV8M53/qJpSHV5xsRxOY2NZ/fSWkEdMTC6jI
+ zH4Eq/O08HPG3tvxN9IofRk+F/i9Toq7lgbXBwBcrQ==
+X-Google-Smtp-Source: AHgI3IYRoxxh5UANRY+c7YFpbiuZIVnkRpZEjVgGacZzLPAQLpz/3AFD8Mhp7mukXr/ijhZ1DgvcmKgyBVxi4v5h/0s=
+X-Received: by 2002:a1f:9042:: with SMTP id s63mr29880vkd.17.1549917187324;
+ Mon, 11 Feb 2019 12:33:07 -0800 (PST)
 MIME-Version: 1.0
-X-OriginatorOrg: impinj.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 235fccf4-02a4-4a0c-f4ca-08d6905d7fed
-X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Feb 2019 20:14:17.0422 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 6de70f0f-7357-4529-a415-d8cbb7e93e5e
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR0601MB3771
+References: <cover.1544445454.git.andreyknvl@google.com>
+ <20181210143044.12714-1-vincenzo.frascino@arm.com>
+ <CAAeHK+xPZ-Z9YUAq=3+hbjj4uyJk32qVaxZkhcSAHYC4mHAkvQ@mail.gmail.com>
+ <20181212150230.GH65138@arrakis.emea.arm.com>
+ <CAAeHK+zxYJDJ7DJuDAOuOMgGvckFwMAoVUTDJzb6MX3WsXhRTQ@mail.gmail.com>
+ <20181218175938.GD20197@arrakis.emea.arm.com>
+ <20181219125249.GB22067@e103592.cambridge.arm.com>
+ <9bbacb1b-6237-f0bb-9bec-b4cf8d42bfc5@arm.com>
+In-Reply-To: <9bbacb1b-6237-f0bb-9bec-b4cf8d42bfc5@arm.com>
+From: Evgenii Stepanov <eugenis@google.com>
+Date: Mon, 11 Feb 2019 12:32:55 -0800
+Message-ID: <CAFKCwrhH5R3e5ntX0t-gxcE6zzbCNm06pzeFfYEN2K13c5WLTg@mail.gmail.com>
+Subject: Re: [RFC][PATCH 0/3] arm64 relaxed ABI
+To: Kevin Brodsky <kevin.brodsky@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_121421_237018_23E5438D 
-X-CRM114-Status: GOOD (  16.30  )
+X-CRM114-CacheID: sfid-20190211_123311_905962_59AA1812 
+X-CRM114-Status: GOOD (  53.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,55 +96,249 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "stefan@agner.ch" <stefan@agner.ch>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
- "linux-imx@nxp.com" <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "fabio.estevam@nxp.com" <fabio.estevam@nxp.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Kate Stewart <kstewart@linuxfoundation.org>,
+ "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Kostya Serebryany <kcc@google.com>,
+ "open list:KERNEL SELFTEST FRAMEWORK" <linux-kselftest@vger.kernel.org>,
+ Chintan Pandya <cpandya@codeaurora.org>,
+ Vincenzo Frascino <vincenzo.frascino@arm.com>, Shuah Khan <shuah@kernel.org>,
+ Ingo Molnar <mingo@kernel.org>, linux-arch <linux-arch@vger.kernel.org>,
+ Jacob Bramley <Jacob.Bramley@arm.com>, Dmitry Vyukov <dvyukov@google.com>,
+ Dave Martin <Dave.Martin@arm.com>, Kees Cook <keescook@chromium.org>,
+ Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
+ Andrey Konovalov <andreyknvl@google.com>,
+ Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
+ Alexander Viro <viro@zeniv.linux.org.uk>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Linux Memory Management List <linux-mm@kvack.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ LKML <linux-kernel@vger.kernel.org>,
+ Luc Van Oostenryck <luc.vanoostenryck@gmail.com>,
+ Lee Smith <Lee.Smith@arm.com>, Andrew Morton <akpm@linux-foundation.org>,
+ Robin Murphy <robin.murphy@arm.com>,
+ "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 2019-02-11 at 09:23 +0800, Shawn Guo wrote:
-> On Thu, Feb 07, 2019 at 09:00:44PM +0000, Trent Piepho wrote:
-> > On Mon, 2019-01-07 at 14:22 +0100, Stefan Agner wrote:
-> > > Allow to use DMA for SPI by adding the appropriate DMA properites
-> > > to the ecspi nodes.
-> > > 
-> > > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> > > 
-> > There's an interesting thing that happens when DMA is used.  The SPI
-> > clock changes.  Instead of cycling continuously for the entire
-> > transfer, it instead clocks out 8 bits, then pauses for 4 bit times,
-> > then the next byte, etc.  So it's a net of about 50% slower.  The pause
-> > between bytes scales with spi frequency to always be about 4 bits.
-> > 
-> > I think DMA on imx not be ready for prime time yet.
-> 
-> I dropped both patches from my tree.
-> 
+On Mon, Feb 11, 2019 at 9:28 AM Kevin Brodsky <kevin.brodsky@arm.com> wrote:
+>
+> On 19/12/2018 12:52, Dave Martin wrote:
+> > On Tue, Dec 18, 2018 at 05:59:38PM +0000, Catalin Marinas wrote:
+> >> On Tue, Dec 18, 2018 at 04:03:38PM +0100, Andrey Konovalov wrote:
+> >>> On Wed, Dec 12, 2018 at 4:02 PM Catalin Marinas<catalin.marinas@arm.com>  wrote:
+> >>>> The summary of our internal discussions (mostly between kernel
+> >>>> developers) is that we can't properly describe a user ABI that covers
+> >>>> future syscalls or syscall extensions while not all syscalls accept
+> >>>> tagged pointers. So we tweaked the requirements slightly to only allow
+> >>>> tagged pointers back into the kernel *if* the originating address is
+> >>>> from an anonymous mmap() or below sbrk(0). This should cover some of the
+> >>>> ioctls or getsockopt(TCP_ZEROCOPY_RECEIVE) where the user passes a
+> >>>> pointer to a buffer obtained via mmap() on the device operations.
+> >>>>
+> >>>> (sorry for not being clear on what Vincenzo's proposal implies)
+> >>> OK, I see. So I need to make the following changes to my patchset AFAIU.
+> >>>
+> >>> 1. Make sure that we only allow tagged user addresses that originate
+> >>> from an anonymous mmap() or below sbrk(0). How exactly should this
+> >>> check be performed?
+> >> I don't think we should perform such checks. That's rather stating that
+> >> the kernel only guarantees that the tagged pointers work if they
+> >> originated from these memory ranges.
+> > I concur.
+> >
+> > Really, the kernel should do the expected thing with all "non-weird"
+> > memory.
+> >
+> > In lieu of a proper definition of "non-weird", I think we should have
+> > some lists of things that are explicitly included, and also excluded:
+> >
+> > OK:
+> >       kernel-allocated process stack
+> >       brk area
+> >       MAP_ANONYMOUS | MAP_PRIVATE
+> >       MAP_PRIVATE mappings of /dev/zero
+> >
+> > Not OK:
+> >       MAP_SHARED
+> >       mmaps of non-memory-like devices
+> >       mmaps of anything that is not a regular file
+> >       the VDSO
+> >       ...
+> >
+> > In general, userspace can tag memory that it "owns", and we do not assume
+> > a transfer of ownership except in the "OK" list above.  Otherwise, it's
+> > the kernel's memory, or the owner is simply not well defined.
+>
+> Agreed on the general idea: a process should be able to pass tagged pointers at the
+> syscall interface, as long as they point to memory privately owned by the process. I
+> think it would be possible to simplify the definition of "non-weird" memory by using
+> only this "OK" list:
+> - mmap() done by the process itself, where either:
+>    * flags = MAP_PRIVATE | MAP_ANONYMOUS
+>    * flags = MAP_PRIVATE and fd refers to a regular file or a well-defined list of
+> device files (like /dev/zero)
+> - brk() done by the process itself
+> - Any memory mapped by the kernel in the new process's address space during execve(),
+> with the same restrictions as above ([vdso]/[vvar] are therefore excluded)
+>
+> > I would also like to see advice for userspace developers, particularly
+> > things like (strawman, please challenge!):
+>
+> To some extent, one could call me a userspace developer, so I'll try to help :)
+>
+> >   * Userspace should set tags at the point of allocation only.
+>
+> Yes, tags are only supposed to be set at the point of either allocation or
+> deallocation/reallocation. However, allocators can in principle be nested, so an
+> allocator could  take a region allocated by malloc() as input and subdivide it
+> (changing tags in the process). That said, this suballocator must not free() that
+> region until all the suballocations themselves have been freed (thereby restoring the
+> tags initially set by malloc()).
+>
+> >   * If you don't know how an object was allocated, you cannot modify the
+> >     tag, period.
+>
+> Agreed, allocators that tag memory can only operate on memory with a well-defined
+> provenance (for instance anonymous mmap() or malloc()).
+>
+> >   * A single C object should be accessed using a single, fixed pointer tag
+> >     throughout its entire lifetime.
+>
+> Agreed. Allocators themselves may need to be excluded though, depending on how they
+> represent their managed memory.
+>
+> >   * Tags can be changed only when there are no outstanding pointers to
+> >     the affected object or region that may be used to access the object
+> >     or region (i.e., if the object were allocated from the C heap and
+> >     is it safe to realloc() it, then it is safe to change the tag; for
+> >     other types of allocation, analogous arguments can be applied).
+>
+> Tags can only be changed at the point of deallocation/reallocation. Pointers to the
+> object become invalid and cannot be used after it has been deallocated; memory
+> tagging allows to catch such invalid usage.
+>
+> >   * When the kernel dereferences a pointer on userspace's behalf, it
+> >     shall behave equivalently to userspace dereferencing the same pointer,
+> >     including use of the same tag (where passed by userspace).
+> >
+> >   * Where the pointer tag affects pointer dereference behaviour (i.e.,
+> >     with hardware memory colouring) the kernel makes no guarantee to
+> >     honour pointer tags correctly for every location a buffer based on a
+> >     pointer passed by userspace to the kernel.
+> >
+> >     (This means for example that for a read(fd, buf, size), we can check
+> >     the tag for a single arbitrary location in *(char (*)[size])buf
+> >     before passing the buffer to get_user_pages().  Hopefully this could
+> >     be done in get_user_pages() itself rather than hunting call sites.
+> >     For userspace, it means that you're on your own if you ask the
+> >     kernel to operate on a buffer than spans multiple, independently-
+> >     allocated objects, or a deliberately striped single object.)
+>
+> I think both points are reasonable. It is very valuable for the kernel to access
+> userspace memory using the user-provided tag, because it enables kernel accesses to
+> be checked in the same way as user accesses, allowing to detect bugs that are
+> potentially hard to find. For instance, if a pointer to an object is passed to the
+> kernel after it has been deallocated, this is invalid and should be detected.
+> However, you are absolutely right that the kernel cannot *guarantee* that such a
+> check is carried out for the entire memory range (or in fact at all); it should be a
+> best-effort approach.
 
-I've had more time to test.
+It would also be valuable to narrow down the set of "relaxed" (i.e.
+not tag-checking) syscalls as reasonably possible. We would want to
+provide tag-checking userspace wrappers for any important calls that
+are not checked in the kernel. Is it correct to assume that anything
+that goes through copy_from_user  / copy_to_user is checked?
 
-Without DMA, I can reload my FPGA hundreds of times and get days of
-uptime using linux-next.
+>
+> >   * The kernel shall not extend the lifetime of user pointers in ways
+> >     that are not clear from the specification of the syscall or
+> >     interface to which the pointer is passed (and in any case shall not
+> >     extend pointer lifetimes without good reason).
+> >
+> >     So no clever transparent caching between syscalls, unless it _really_
+> >     is transparent in the presence of tags.
+>
+> Do you have any particular case in mind? If such caching is really valuable, it is
+> always possible to access the object while ignoring the tag. For sure, the
+> user-provided tag can only be used during the syscall handling itself, not
+> asynchronously later on, unless otherwise specified.
 
-With DMA, loading is unreliable.  The higher the SPI speed, the less
-reliable it is.  Unfortunately, it's hard to duplicate the problem with
-a small amount of data, and with a large amount of data I can't examine
-it in depth enough to determine if the problem is related to SPI bus
-timing or IMX sDMA sending the wrong bytes to the spi controller.
+For aio* operations it would be nice if the tag was checked at the
+time of the actual userspace read/write, either instead of or in
+addition to at the time of the system call.
 
-Using DMA with SPI causes kernel panics.  Not always immediately, but
-after using DMA it's a smaller of minutes before something crashes. 
-The backtraces are all over the place and don't usually point back into
-SPI.  It does seem like they usually hit something has allocated or is
-allocating DMA memory.
+>
+> >   * For purposes other than dereference, the kernel shall accept any
+> >     legitimately tagged pointer (according to the above rules) as
+> >     identifying the associated memory location.
+> >
+> >     So, mprotect(some_page_aligned_object, ...); is valid irrespective
+> >     of where page_aligned_object() came from.  There is no implicit
+> >     derefence by the kernel here, hence no tag check.
+> >
+> >     The kernel does not guarantee to work correctly if the wrong tag
+> >     is used, but there is not always a well-defined "right" tag, so
+> >     we can't really guarantee to check it.  So a pointer derived by
+> >     any reasonable means by userspace has to be treated as equally
+> >     valid.
+>
+> This is a disputed point :) In my opinion, this is the the most reasonable approach.
+
+Yes, it would be nice if the kernel explicitly promised, ex.
+mprotect() over a range of differently tagged pages to be allowed
+(i.e. address tag should be unchecked).
+
+
+>
+> Cheers,
+> Kevin
+>
+> > We would need to get some cross-arch buy-in for this, otherwise core
+> > maintainers might just refuse to maintain the necessary guarantees.
+> >
+> >
+> >>> 2. Allow tagged addressed passed to memory syscalls (as long as (1) is
+> >>> satisfied). Do I understand correctly that this means that I need to
+> >>> locate all find_vma() callers outside of mm/ and fix them up as well?
+> >> Yes (unless anyone as a better idea or objections to this approach).
+> > Also, watch out for code that pokes about inside struct vma directly.
+> >
+> > I'm wondering, could we define an explicit type, say,
+> >
+> >       struct user_vaddr {
+> >               unsigned long addr;
+> >       };
+> >
+> > to replace the unsigned longs in struct vma the mm API?  This would
+> > turn ad-hoc (unsigned long) casts into build breaks.  We could have
+> > an explicit conversion functions, say,
+> >
+> >       struct user_vaddr __user_vaddr_unsafe(void __user *);
+> >       void __user *__user_ptr_unsafe(struct user_vaddr);
+> >
+> > that we robotically insert in all the relevant places to mark
+> > unaudited code.
+> >
+> > This allows us to keep the kernel buildable, while flagging things
+> > that will need review.  We would also need to warn the mm folks to
+> > reject any new code using these unsafe conversions.
+> >
+> > Of course, it would be a non-trivial effort...
+> >
+> >> BTW, I'll be off until the new year, so won't be able to follow up.
+> > Cheers
+> > ---Dave
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel@lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
