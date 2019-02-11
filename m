@@ -2,92 +2,105 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AA446C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:29:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BE598C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:29:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 79B3520818
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:29:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8043221A49
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:29:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nPKCLtOx";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="alHZkdmy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 79B3520818
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Odkl2kc1";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="o4DD2IWc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8043221A49
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=93pCb8fcPhz5n7aslB5nxBBWs6qEevfD5WbV+M9i/sI=; b=nPKCLtOxSH7xv2
-	YEoUsiNaM5KvclVk+KNPFVdTSmu+LdhVqmHtgCvrenXa/AWGu3mv1GFOard6gn09POty6FXM19LaW
-	1Lu/9yhhoqw+WNrLz0Aqhzsxbih4u1KRH9VcD+V24xDqTVpJwuzIR5uxN0J3DOWGmga3FVTysSiGH
-	Vb/aAb1hXogaWyxk0muwqsqrwIOnBJp+sX/hujf1hftuifmB8rBBxoVhYtqDSlmySD10ugJ9rJxfx
-	yUhB7QkJ2RWJ6xJFsHd4HQlgbrvsX2VxlqYsw3cYAcYkgG/ojkG8In89ou/hGgU6sQEAo1u2K9Tmj
-	meiadXXiVjkHRZTbs4eg==;
+	List-Owner; bh=aFXdP48lQp3fgl4MHCo62A9kMoE2u6Ybc70XRWiei3k=; b=Odkl2kc1WjK8nX
+	qFHOb0bHl7qyte1nWJbyRArEbBfRfzHFe/iUPM/XYNcHB0eS/Lhmbn2KtuYC4fb9Ar1eqEvGQTuWA
+	rpkO0rgDGFrS0pWWwyCXw2aJi0h+MXiobIc54MfBv7m2DbBJoGSJqVaXIhualRJ2ymFjZLgl3UbYg
+	fEzFab8/JIOvd5bc4+K/x5MJREsLwWNyc0EhzpeljKRqbxhsK68C7k/DIsI2nZ+jKaxtssO9H0/+g
+	173Vcwa9wYN4twX9gJA2YUWAgYM7AESoAooJ3ec2rDzrFXdQzBUCpiPI8ku9uhu4LenF6HBHNGqKD
+	kZDxoI5wiJHhD6ABKtBA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtAiM-0001qE-No; Mon, 11 Feb 2019 12:29:34 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gtAie-00024p-6O; Mon, 11 Feb 2019 12:29:52 +0000
+Received: from mail-eopbgr50053.outbound.protection.outlook.com ([40.107.5.53]
+ helo=EUR03-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtAfW-0007Xz-5q
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 12:27:00 +0000
-Received: by mail-wr1-x441.google.com with SMTP id i12so131775wrw.0
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 04:26:38 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=EZWE16C9ZjEItVcQFpDaRLfJ9IzuvKc+mM7HSbjjb18=;
- b=alHZkdmynZLa+/RsnJEdVcofBrWWORgv1FH1Z5Vor7vD1j+a88QtZodptUBhzFTSet
- xcFd3X1lke+y3A9aHN6kattLmvTq4zRhSyPTWKtOwibPHlibUsWVpS8CE0UfPlXB5fHk
- hdx/NueX7JHPx67Ir1G61ZY2e7nDazoW2XetrSBjRIZZgHnH2Z8/v59ox6x8/IfhywJH
- G1swjdmDTY68O8AB2APigq9urroJ4mbD2ITDCnucVdsjaTAR3nDqczvOkd1W8mI0dQfv
- sPxzn8ZWTyVw1yEvbdTvldU2HYS2yFhlLYiQp/PosDKE8sdrQleSGNkiE8uUT2/t1BPg
- yFcQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=EZWE16C9ZjEItVcQFpDaRLfJ9IzuvKc+mM7HSbjjb18=;
- b=BAouNkNEi7StuIh6iguHznHFEBUBagv/RU4v+Cp+05iL11GF1DM5xaPSzwzRX0+o24
- 8VYVX2EXruPXSjNrmHxucgqgK0AQou5NDYE1GKMiRpa6K6fr78b07XRdFeStFEnAY3bX
- tgw8xcOo7MiUqBBniDINuZvXvtc6IVx8qs1tRpT0nXDHufwQQ3CY2kDxkHdTe6+3nQ9F
- lFbmGeAk5qzDthKTr3bH63dqJgoqkMeIwy8cjjJv33r7H2mhmgbdLyF74NLPth6vXc+c
- hInb4qPqozoMV5c3OBsCWzjOjHpGZSkchTCDE37L4+npWgAHXfKaASx3+X4+BN5PzDF7
- Xszw==
-X-Gm-Message-State: AHQUAuYM5QeRpPerUVmLgvUe5KbCg1QGp4xPXhanolu7NfknfFnPSWvu
- eiFctYYLt7ZWhCulLB72ko9vXw==
-X-Google-Smtp-Source: AHgI3Iag16vunggkrK0k72LNCKQrkekcbITs8U7VPsgsgGm0rn969rE5UyAJgcNjcxx1ennWWuyfYw==
-X-Received: by 2002:a5d:660e:: with SMTP id n14mr26642677wru.19.1549887996769; 
- Mon, 11 Feb 2019 04:26:36 -0800 (PST)
-Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id l20sm19494321wrb.93.2019.02.11.04.26.35
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 11 Feb 2019 04:26:36 -0800 (PST)
-From: Bartosz Golaszewski <brgl@bgdev.pl>
-To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
- Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
- Marc Zyngier <marc.zyngier@arm.com>, David Lechner <david@lechnology.com>
-Subject: [RESEND PATCH v2 19/33] irqchip: davinci-aintc: move the driver to
- drivers/irqchip
-Date: Mon, 11 Feb 2019 13:25:52 +0100
-Message-Id: <20190211122606.8662-20-brgl@bgdev.pl>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190211122606.8662-1-brgl@bgdev.pl>
-References: <20190211122606.8662-1-brgl@bgdev.pl>
+ id 1gtAfU-0007TR-NR
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 12:26:59 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=VejCmhzdMwe7UHPjg65TGKridhcxr8VDBPkQaURJW0A=;
+ b=o4DD2IWcf5b+832xty9lF6/epH+mFWwcno+1uSfinM2rLb99MH6lrtZQz6hzHP8Hj3Rm/NzqEsWZ3Mmzc2b2X5/uy/Quk8K/dptsSqcSt82EucDgC8J6/sF/MWT/HgBPsljP3CPsTmAQZB4qaLnxLukJ18MpIVC7QFPGSY6XtHk=
+Received: from DB7PR04MB4490.eurprd04.prod.outlook.com (52.135.138.16) by
+ DB7PR04MB4873.eurprd04.prod.outlook.com (20.176.234.16) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1601.17; Mon, 11 Feb 2019 12:26:30 +0000
+Received: from DB7PR04MB4490.eurprd04.prod.outlook.com
+ ([fe80::fd45:a391:7591:1aa5]) by DB7PR04MB4490.eurprd04.prod.outlook.com
+ ([fe80::fd45:a391:7591:1aa5%6]) with mapi id 15.20.1601.023; Mon, 11 Feb 2019
+ 12:26:29 +0000
+From: Peng Fan <peng.fan@nxp.com>
+To: Catalin Marinas <catalin.marinas@arm.com>
+Subject: RE: [PATCH] arm64: use memblocks_present
+Thread-Topic: [PATCH] arm64: use memblocks_present
+Thread-Index: AQHUwSMEW3Pz/Bimd06u3YBihOcWUKXahhcAgAABDcA=
+Date: Mon, 11 Feb 2019 12:26:28 +0000
+Message-ID: <DB7PR04MB4490C1F037EB7C82A4EB218D88640@DB7PR04MB4490.eurprd04.prod.outlook.com>
+References: <20190210093738.30923-1-peng.fan@nxp.com>
+ <20190211122032.GC165128@arrakis.emea.arm.com>
+In-Reply-To: <20190211122032.GC165128@arrakis.emea.arm.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=peng.fan@nxp.com; 
+x-originating-ip: [119.31.174.68]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DB7PR04MB4873;
+ 6:5KkH0yWiFphfYnNf6BzJIFYtvGI5aFuM5v0C0f2l5GnqYv9p6FCV8VKqIVyhLasXfRTSOJi3oz9dBkubYPvtZu/mX9QFyk4aw3mQodTaTv+eOhAhT0IvxcY6ep8JF3tC6XcvdgK86aWvsrJnnP23gVezONpufv/LwKtynKJ/n1ochDWgwLB2dkgo/4Z5JImH0ednBaXMSVgAUFbW5Elpz+EfmTKJNBeQ7x2MRrQIis/1+jMWD7QugVqZLqJUVzT4rLD1upgdcVA+iKqvVUNvkCg5c4HAL1Yb+UPUGamlEb6/T1whO3RS9B3KIlwP8jg9t/HuwFH/8bX1t2DEb4jRxNDIt3fm/9hzRmA8iNTQnWwVrLMtU3ZpGoD8sai1HiVkf2qw8kHmMv0t3vCs5c1eD4XMBqszp6HPQA1OpK8GVAAxFdVFcMgfCs/rSSiQ2TeiyjHl3DwKIwOasr6L/OdBzQ==;
+ 5:UttVO7BASdEZjTdh44S1qZawZtJq72jEBtO7aVn5HxCh8L9s+mkl6C9R56RlwWNDJrc2zRiccNQCfr7KfDVksI92AehdWNhR1hjo7NoZm1gcAztgbmWBVwhVjGSTwIGopilkUCrbK7VnjgpUta87cTbM1p9gFjChvXaoR7KXo0N78bBaMerVx2dMdJBieP7UaMcxbUw6wrsMq4/h/2+Lzw==;
+ 7:mFh26dPRKm9FhZaucrBJGb6OlXfUpbpBDiWOu00tyHHyNPSQxTB+jLRA4EtTqSlpxKWZiJG52Wa82A6PWuMV16B/SW3HKs5XEuersR0LIKCnJ/zsdRAVsTbrMaE0WmavVOpOVl0RHyxJ8zNa5e5/4Q==
+x-ms-office365-filtering-correlation-id: 723b3afa-62c7-4006-d449-08d6901c268d
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DB7PR04MB4873; 
+x-ms-traffictypediagnostic: DB7PR04MB4873:
+x-microsoft-antispam-prvs: <DB7PR04MB4873200B3BDE861A96E2484A88640@DB7PR04MB4873.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0945B0CC72
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(346002)(136003)(39860400002)(396003)(366004)(13464003)(189003)(199004)(99286004)(105586002)(26005)(7696005)(66066001)(4326008)(86362001)(97736004)(53546011)(6506007)(25786009)(102836004)(6246003)(71200400001)(53936002)(106356001)(68736007)(76176011)(71190400001)(2906002)(6436002)(316002)(11346002)(229853002)(14454004)(446003)(7416002)(305945005)(256004)(54906003)(486006)(6116002)(33656002)(3846002)(74316002)(44832011)(55016002)(9686003)(8936002)(6916009)(8676002)(81156014)(81166006)(476003)(7736002)(478600001)(186003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB7PR04MB4873;
+ H:DB7PR04MB4490.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: eH67NXaJc91SYXMt+SwE/gS0FCAfC+hLRunznnCCmNkrxdp70JLdltkHEsXlSdg3eWmgtgzDCRcU2MOs4iUo9QLN5ZfY7xwm76RNBuwLiKIXG9eu3rO7EvNF1QOYE4Yr56jQgTFwOsUjYBgXCsuuKejYQFsAQFyFH+JYSDe4UJGdW9bSN1okD8D7bRmcxzrKfYlHGmvCwLzGextVSA+bg1/DFrPnKW17q1NnfE8d1s3eYpVzN4Pl6P2b/VYPQSPDWueJxq6iGf5+QLTFN7DGZOadGrBi7TN0zk7tNDW/XJGdCmyxqrex9MH0A0gW94jI3ZpfGFgIQYgRlvMkXvkyva90kbeGUtKEV0yI0r3gAO85+0w1720MQQlSwaLRqLjUO9Ygp5sRF0fxBRQNXaKI2D02viWU6LHTeb/sOyZ80rk=
 MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 723b3afa-62c7-4006-d449-08d6901c268d
+X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Feb 2019 12:26:29.9506 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB7PR04MB4873
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_042639_603972_7B647493 
-X-CRM114-Status: GOOD (  13.11  )
+X-CRM114-CacheID: sfid-20190211_042637_546479_28EC17CF 
+X-CRM114-Status: GOOD (  11.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,123 +112,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "f.fainelli@gmail.com" <f.fainelli@gmail.com>,
+ "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
+ "logang@deltatee.com" <logang@deltatee.com>,
+ "will.deacon@arm.com" <will.deacon@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "stefan@agner.ch" <stefan@agner.ch>,
+ "rppt@linux.vnet.ibm.com" <rppt@linux.vnet.ibm.com>,
+ "james.morse@arm.com" <james.morse@arm.com>,
+ "hannes@cmpxchg.org" <hannes@cmpxchg.org>,
+ "van.freenix@gmail.com" <van.freenix@gmail.com>,
+ "akpm@linux-foundation.org" <akpm@linux-foundation.org>,
+ "robin.murphy@arm.com" <robin.murphy@arm.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "ghackmann@android.com" <ghackmann@android.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-
-The aintc driver has now been cleaned up. Move it to drivers/irqchip
-where it belongs. There's no device-tree support for any dm* board so
-there's no IRQCHIP_OF_DECLARE() - there's only the exported init
-function called from machine code.
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/Kconfig                         | 11 ++++-------
- arch/arm/mach-davinci/Makefile                        |  1 -
- drivers/irqchip/Kconfig                               |  5 +++++
- drivers/irqchip/Makefile                              |  1 +
- .../irq.c => drivers/irqchip/irq-davinci-aintc.c      |  0
- 5 files changed, 10 insertions(+), 8 deletions(-)
- rename arch/arm/mach-davinci/irq.c => drivers/irqchip/irq-davinci-aintc.c (100%)
-
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index da8a039d65f9..71a4d875dd39 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -1,9 +1,6 @@
- # SPDX-License-Identifier: GPL-2.0
- if ARCH_DAVINCI
- 
--config AINTC
--	bool
--
- config CP_INTC
- 	bool
- 	select IRQ_DOMAIN
-@@ -17,17 +14,17 @@ comment "DaVinci Core Type"
- 
- config ARCH_DAVINCI_DM644x
- 	bool "DaVinci 644x based system"
--	select AINTC
-+	select DAVINCI_AINTC
- 	select ARCH_DAVINCI_DMx
- 
- config ARCH_DAVINCI_DM355
- 	bool "DaVinci 355 based system"
--	select AINTC
-+	select DAVINCI_AINTC
- 	select ARCH_DAVINCI_DMx
- 
- config ARCH_DAVINCI_DM646x
- 	bool "DaVinci 646x based system"
--	select AINTC
-+	select DAVINCI_AINTC
- 	select ARCH_DAVINCI_DMx
- 
- config ARCH_DAVINCI_DA830
-@@ -49,7 +46,7 @@ config ARCH_DAVINCI_DA8XX
- 
- config ARCH_DAVINCI_DM365
- 	bool "DaVinci 365 based system"
--	select AINTC
-+	select DAVINCI_AINTC
- 	select ARCH_DAVINCI_DMx
- 
- comment "DaVinci Board Type"
-diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-index 93d271b4d84b..983865a99616 100644
---- a/arch/arm/mach-davinci/Makefile
-+++ b/arch/arm/mach-davinci/Makefile
-@@ -18,7 +18,6 @@ obj-$(CONFIG_ARCH_DAVINCI_DM365)	+= dm365.o devices.o
- obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= da830.o devices-da8xx.o usb-da8xx.o
- obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= da850.o devices-da8xx.o usb-da8xx.o
- 
--obj-$(CONFIG_AINTC)			+= irq.o
- obj-$(CONFIG_CP_INTC)			+= cp_intc.o
- 
- # Board specific
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 3d1e60779078..ea0eb82bf1d2 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -129,6 +129,11 @@ config BRCMSTB_L2_IRQ
- 	select GENERIC_IRQ_CHIP
- 	select IRQ_DOMAIN
- 
-+config DAVINCI_AINTC
-+	bool
-+	select GENERIC_IRQ_CHIP
-+	select IRQ_DOMAIN
-+
- config DW_APB_ICTL
- 	bool
- 	select GENERIC_IRQ_CHIP
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index c93713d24b86..623e0ec5f9d0 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -6,6 +6,7 @@ obj-$(CONFIG_ATH79)			+= irq-ath79-cpu.o
- obj-$(CONFIG_ATH79)			+= irq-ath79-misc.o
- obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
- obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
-+obj-$(CONFIG_DAVINCI_AINTC)		+= irq-davinci-aintc.o
- obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
- obj-$(CONFIG_FARADAY_FTINTC010)		+= irq-ftintc010.o
- obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
-diff --git a/arch/arm/mach-davinci/irq.c b/drivers/irqchip/irq-davinci-aintc.c
-similarity index 100%
-rename from arch/arm/mach-davinci/irq.c
-rename to drivers/irqchip/irq-davinci-aintc.c
--- 
-2.20.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+DQoNCj4gLS0tLS1PcmlnaW5hbCBNZXNzYWdlLS0tLS0NCj4gRnJvbTogQ2F0YWxpbiBNYXJpbmFz
+IFttYWlsdG86Y2F0YWxpbi5tYXJpbmFzQGFybS5jb21dDQo+IFNlbnQ6IDIwMTnlubQy5pyIMTHm
+l6UgMjA6MjENCj4gVG86IFBlbmcgRmFuIDxwZW5nLmZhbkBueHAuY29tPg0KPiBDYzogd2lsbC5k
+ZWFjb25AYXJtLmNvbTsgYWtwbUBsaW51eC1mb3VuZGF0aW9uLm9yZzsNCj4gcnBwdEBsaW51eC52
+bmV0LmlibS5jb207IGFyZC5iaWVzaGV1dmVsQGxpbmFyby5vcmc7IGYuZmFpbmVsbGlAZ21haWwu
+Y29tOw0KPiByb2Jpbi5tdXJwaHlAYXJtLmNvbTsgamFtZXMubW9yc2VAYXJtLmNvbTsgZ2hhY2tt
+YW5uQGFuZHJvaWQuY29tOw0KPiBzdGVmYW5AYWduZXIuY2g7IGhhbm5lc0BjbXB4Y2hnLm9yZzsg
+bG9nYW5nQGRlbHRhdGVlLmNvbTsNCj4gbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQu
+b3JnOyBsaW51eC1rZXJuZWxAdmdlci5rZXJuZWwub3JnOw0KPiB2YW4uZnJlZW5peEBnbWFpbC5j
+b20NCj4gU3ViamVjdDogUmU6IFtQQVRDSF0gYXJtNjQ6IHVzZSBtZW1ibG9ja3NfcHJlc2VudA0K
+PiANCj4gT24gU3VuLCBGZWIgMTAsIDIwMTkgYXQgMDk6Mjg6NDNBTSArMDAwMCwgUGVuZyBGYW4g
+d3JvdGU6DQo+ID4gYXJtNjRfbWVtb3J5X3ByZXNlbnQgaXMgZG9pbmcgc2FtZSB0aGluZyBhcyBt
+ZW1ibG9ja3NfcHJlc2VudCwgc28NCj4gPiBsZXQncyB1c2UgY29tbW9uIGNvZGUgbWVtYmxvY2tz
+X3ByZXNlbnQgaW5zdGVhZCBvZiBwbGF0Zm9ybSBzcGVjaWZpYw0KPiA+IGFybTY0X21lbW9yeV9w
+cmVzZW50Lg0KPiA+DQo+ID4gU2lnbmVkLW9mZi1ieTogUGVuZyBGYW4gPHBlbmcuZmFuQG54cC5j
+b20+DQo+IA0KPiBJIGFscmVhZHkgbWVyZ2VkIGEgc2ltaWxhciBvbmUgKHNlZSBjb21taXQNCj4g
+YTJjODAxYzUzZDE2ODI4NzFmYmExZTAzN2M5ZDNiMGM5ZmZmZWU4YSBpbiAtbmV4dCkuDQoNCkkg
+c2hvdWxkIGNoZWNrIHlvdXIgdHJlZSBmaXJzdCBiZWZvcmUgc2VuZGluZyBwYXRjaGVzLg0KDQpU
+aGUgYXJtMzIgY29kZSBjb3VsZCBhbHNvIHVzZSBzaW1pbGFyIGxvZ2ljLCBuZWVkIGNoZWNrIGFy
+bSB0cmVlIDopDQoNClRoYW5rcywNClBlbmcuDQoNCj4gDQo+IC0tDQo+IENhdGFsaW4NCl9fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJu
+ZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRw
+Oi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
