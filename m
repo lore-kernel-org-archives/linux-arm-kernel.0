@@ -2,59 +2,163 @@ Return-Path: <SRS0=5+Aw=QR=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-0.5 required=3.0 tests=BAD_ENC_HEADER,
+	DATE_IN_FUTURE_12_24,DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 31A15C4151A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 10 Feb 2019 15:51:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8668C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 10 Feb 2019 16:13:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F34E3217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 10 Feb 2019 15:51:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6F0FD21773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 10 Feb 2019 16:13:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lCCIz/w0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F34E3217D9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cXzFW1O7";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="0bHFkfPV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F0FD21773
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4X6ue8PTpNVmXHv6DT2FOQKFnEw4GlMAJ+1MfhAv5rE=; b=lCCIz/w0+aHMfX
-	ez6KGC/TKdBwJ9JaEbTaEbMbpNQtDMXy7IP3VWRIVqdTC0Y8pi8GqBktax7n1qQXoj91AKTH2Xyw2
-	+0E1mSiX/v3nhLoe6etr4tn36lqZuZoqoYMdWvLgVoafjuPhXRwXW+KEQyWREEz5CIHFACW1mYruf
-	0579tHW/YuSHLE+4O9IB9fbYKAENsq7+wobrUNx+sKZwbqiA56kAOp/1D6q5shj2BTr9m75DqRxu8
-	kWs2vIJwSO2f81anafCwR9FjMlDXH24F6KpE3JQY5beoS1e9NpI9ZumMcaXa72LDh6bKkf6QA4b3V
-	FT2ZLoIBgfCaiHfJjjbA==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=UxrAe6Y9QmKNV92zdJrvNPjAIk0TbgGONQiIfxFn9Ys=; b=cXzFW1O7vab5ei
+	ioN1pIeaTcxpyaXzFwB8ycagUZ6J0rbJXuFB4oQRz2vQQrN3P1CckqiwWuyEuWarUdB82N6b3FZIP
+	iGVff89i1VxfUXj42PIeqYHvtbrGK0YJHNke3njZ5RCY6uCc/QCRoYveRL6zXc85U7Zycbw0+g0Db
+	WKK0CEYQ6D3CwIJ2XOTgU8df/B7hupr/BZrho2PrPGqduQZVObKA3Ero/ZOaqAZGA+I4FT1hiXQ1S
+	HIHAD3I3RvLDFmnqENklVQOrKwElGZntbAnP94QPUpqGHfl9OL/PQCxnUjDW99AWmBl2VdLQ0sH7A
+	SRSZ/zKnTcygR/+/NvZg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gsrNi-0003B7-Ah; Sun, 10 Feb 2019 15:50:58 +0000
-Received: from gloria.sntech.de ([185.11.138.130])
+	id 1gsrjc-00019J-IH; Sun, 10 Feb 2019 16:13:36 +0000
+Received: from mail-eopbgr730044.outbound.protection.outlook.com
+ ([40.107.73.44] helo=NAM05-DM3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gsrNf-0003AE-2h
- for linux-arm-kernel@lists.infradead.org; Sun, 10 Feb 2019 15:50:57 +0000
-Received: from p54b26fa7.dip0.t-ipconnect.de ([84.178.111.167]
- helo=phil.localnet)
- by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
- (Exim 4.89) (envelope-from <heiko@sntech.de>)
- id 1gsrNU-0000MQ-SP; Sun, 10 Feb 2019 16:50:44 +0100
-From: Heiko Stuebner <heiko@sntech.de>
-To: Katsuhiro Suzuki <katsuhiro@katsuster.net>
-Subject: Re: [PATCH v2] clk: fractional-divider: check parent rate only if
- flag is set
-Date: Sun, 10 Feb 2019 16:50:10 +0100
-Message-ID: <1772879.g6DUe2Ua28@phil>
-In-Reply-To: <20190210153806.24201-1-katsuhiro@katsuster.net>
-References: <20190210153806.24201-1-katsuhiro@katsuster.net>
+ id 1gsrjY-00018x-Q0
+ for linux-arm-kernel@lists.infradead.org; Sun, 10 Feb 2019 16:13:34 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=BHsJemVvBAwxWJ/MMWq6+xGaia4yrcScBSUcztm41Es=;
+ b=0bHFkfPV+qbS9y/iAgPeh5CetvUOQFT5nlcCNvJHqIHgaX6jdvYWQJTn7i0WakMn0tXjdsX98uiFTg0c7EO6KFjhFkCVvp9iw436/Ys4XGFBeTyjir+H1mP0EjcRrXWGHjhHHPCp0VJJgR3uJjuRyEpXUvaWl/31QfOiLev53wE=
+Received: from BYAPR02CA0024.namprd02.prod.outlook.com (2603:10b6:a02:ee::37)
+ by BN6PR02MB2643.namprd02.prod.outlook.com (2603:10b6:404:5c::9) with
+ Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1601.17; Sun, 10 Feb
+ 2019 16:13:27 +0000
+Received: from BL2NAM02FT040.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e46::205) by BYAPR02CA0024.outlook.office365.com
+ (2603:10b6:a02:ee::37) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1601.17 via Frontend
+ Transport; Sun, 10 Feb 2019 16:13:26 +0000
+Authentication-Results: spf=pass (sender IP is 149.199.60.83)
+ smtp.mailfrom=xilinx.com; gmail.com; dkim=none (message not signed)
+ header.d=none;gmail.com; dmarc=bestguesspass action=none
+ header.from=xilinx.com;
+Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
+ 149.199.60.83 as permitted sender) receiver=protection.outlook.com;
+ client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
+Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
+ BL2NAM02FT040.mail.protection.outlook.com (10.152.77.193) with Microsoft SMTP
+ Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1580.10
+ via Frontend Transport; Sun, 10 Feb 2019 16:13:26 +0000
+Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
+ by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
+ (envelope-from <nava.manne@xilinx.com>)
+ id 1gsrjR-0003cx-RW; Sun, 10 Feb 2019 08:13:25 -0800
+Received: from [127.0.0.1] (helo=localhost)
+ by xsj-pvapsmtp01 with smtp (Exim 4.63)
+ (envelope-from <nava.manne@xilinx.com>)
+ id 1gsrjM-0001tg-No; Sun, 10 Feb 2019 08:13:20 -0800
+Received: from xsj-pvapsmtp01 (maildrop.xilinx.com [149.199.38.66])
+ by xsj-smtp-dlp2.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x1AGDF85016551; 
+ Sun, 10 Feb 2019 08:13:15 -0800
+Received: from [172.23.37.118] (helo=xhdnavam40.xilinx.com)
+ by xsj-pvapsmtp01 with esmtp (Exim 4.63)
+ (envelope-from <nava.manne@xilinx.com>)
+ id 1gsrjG-0001sW-HX; Sun, 10 Feb 2019 08:13:15 -0800
+From: Nava kishore Manne <nava.manne@xilinx.com>
+To: <atull@kernel.org>, <mdf@kernel.org>, <robh+dt@kernel.org>,
+ <mark.rutland@arm.com>, <michal.simek@xilinx.com>, <rajanv@xilinx.com>,
+ <jollys@xilinx.com>, <nava.manne@xilinx.com>, <linux-fpga@vger.kernel.org>,
+ <devicetree@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>,
+ <linux-kernel@vger.kernel.org>, <chinnikishore369@gmail.com>
+Subject: [PATCH v3 0/3] Add Bitstream configuration support for ZynqMP  
+Date: Mon, 11 Feb 2019 21:43:35 +0530
+Message-ID: <20190211161335.23463-1-nava.manne@xilinx.com>
+X-Mailer: git-send-email 2.18.0
+X-RCIS-Action: ALLOW
+X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
+X-TM-AS-User-Approved-Sender: Yes;Yes
+X-EOPAttributedMessage: 0
+X-MS-Office365-Filtering-HT: Tenant
+X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
+ SFV:NSPM;
+ SFS:(10009020)(376002)(346002)(396003)(136003)(39850400004)(2980300002)(199004)(189003)(186003)(126002)(336012)(77096007)(476003)(2906002)(486006)(26005)(2616005)(426003)(36386004)(47776003)(7696005)(36756003)(51416003)(9786002)(81166006)(6666004)(478600001)(356004)(1076003)(8676002)(8936002)(50226002)(81156014)(4744005)(63266004)(305945005)(316002)(106002)(106466001)(16586007)(110136005)(48376002)(2201001)(50466002)(107986001)(921003)(83996005)(1121003)(2101003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR02MB2643; H:xsj-pvapsmtpgw01; FPR:;
+ SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; A:1; MX:1; 
+X-Microsoft-Exchange-Diagnostics: 1; BL2NAM02FT040;
+ 1:y7bvu/YvAQ0oUm0ygxzGgxduhW5WIHXgORbV8ByNKFmWJfKJqi1IdEkawjKHqaccdOnJ+4xthrIc1QVJ6cQXXKSaDwon6T6DhEWpIib+etiFlUGbjBHix23XNyhwGP0tcPhxrrYYJKy/EBRj/vlb3jyuMBKdtAAq4+jmgvyR1NE=
 MIME-Version: 1.0
+X-MS-PublicTrafficType: Email
+X-MS-Office365-Filtering-Correlation-Id: 003431f5-355b-48b3-e10d-08d68f72b048
+X-Microsoft-Antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4608076)(4709027)(2017052603328)(7153060);
+ SRVR:BN6PR02MB2643; 
+X-Microsoft-Exchange-Diagnostics: 1; BN6PR02MB2643;
+ 3:c3bvP8I+kbBAV29vHMkEMHeiFqwVx4Nmyz/uVbECFyOJq6idu36eed0Wt95gdPYVnt7IrLWiu9TZbXY6J231XXLRh6AIhi88tE+7UrJwOJUVdLt5LQwiRv7hpvyqIi1lRZd8x0jqWt+803EWS2D1v5KjaatAyhAa8nkZgi31XRCdnUI+HI6MM2QvprrWUTryT0rBE3wJl9kKoUf7H8/fkrvESWA+YaH/O5qToZBkcK3w+JdWyzo2Ui5/UaiILS303o7trSPtK0nkD3P8AuEgZNZfD1vZSwO/2+dHjpWsileh4I2HSrhx5BvRupqWfzngz0CdcvCHCXH66o0aep10RZ84XvCEFvkYFDP9KM26mlISqr449ONYaoZeIdeBESG3;
+ 25:wsnwGF0TQ1PsbepsUZ6GcwT/Qtoqm1K6RMSduzmyXcfkt8cep0zUhnYDivu/PmQSvErpJtSH7WMtnN/CaE2jYugaiHPigLxM3v5uk3z4WSBHeZaWED6DGnVxmMBahpXovxbGUnR/5WW/kuvTAM0weYFqCWqxafjq6s+3x6P0OIhrI9UROV5S7vL9bjnvp3KdwHjvsmpQQznpKTyGFX6BQjv8PbyvgUDAwoytPwqcEykUgvaf6SqhULas4XfwHuvcqw78b9/bD5XzwZgmHQ2U8iFZmw0YubrIVJJHo5eG8wv+IDCdzJk5/cce44G/jdbU4wXEqYC+IxPcJ1Je9N5aYg==
+X-MS-TrafficTypeDiagnostic: BN6PR02MB2643:
+X-Microsoft-Exchange-Diagnostics: 1; BN6PR02MB2643;
+ 31:LJP2dPVs8OGOzjYQWLE6277Q4h57aXxQt2oDmkFy+WYS5aK5z3fCtp5FKMq4Q7z1FhgS+k4F+nUWwzVuH/n3hz+zUIoy86F9VqzB2019zPGKHd+7BILKmxfMt2npiZidtv+eF6m3oUaYE+C1kLEER8L4P4a0Tn7CfV2BAA/rhiDwyndktDZcvH+Ba+rgbdX6ABQGOr/BU58fUg3g0wHlOur6Cmd+MJlGkzemmui8q4c=;
+ 20:LjQ+kOaWsJD4MZiRsYXQPvmpybeGxd7e9oRmswPK8Xil4wKTNJHVHYzslcspuNqbWRR5m1qv/7fcrGeXdrNErMid5u5USxjAVBLGGXr+U/Go5HqG3UQRdrQeJj3SiRL1euxX5sr5s0CtXenG5nUeGeAI9i5KzTvKuwg89HKpeG8ou3Cx/gEoKNvN7X6ZwWhEa5xe2x93mdnKFiIT55bJEEzdpyaM5Jh/KQKz43PuxzTa7RKojQrkg7V7PKScOYyJtIIA1B0wdmZs1KgJzPAhTakWzo+lcFhXuVdcbdIhGLfQf8qOrVsK7R5eQ2ITwXY3e1IVhilSbZYTNvwVBHgHTjd7g4qM5wzjG68BxYLZlQ4Qdw7xtoqZS1neB8mC5deVV6wfC0TDE7ecRcMyTxKGP95z8lZqAS2h/imnHrt/lgkVVmIcFIyBVmQa2CJSMC+tV4dJQtJ142fU3mOEAqTELljr61CifkiFhfOgSdpB1tqeLm5wKXjwicwUgr8vtz89
+X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
+X-Microsoft-Antispam-PRVS: <BN6PR02MB2643CA1EC99484042D93B7A8C26B0@BN6PR02MB2643.namprd02.prod.outlook.com>
+X-Microsoft-Exchange-Diagnostics: 1; BN6PR02MB2643;
+ 4:Ue5bKft1IRvNEzA5dJchzmR8NcINjjNtja5/Bg6IqOnm2aM3CQIyYEtT5Zv+ygzXWYi/tTFwg5H1+DEe3M6NQzYRzfubwP8XpgoB0jF17K5/cfuayVGSjIG88gsGSqCNcRAGdofglmDW9HCxbn4J0Lo5H7ROb3TgrrjWNqxX3QQfFt2Nc9tRp0m2aM6s5TN9TODef6bgWt5YqTkZIms4q3MLiV8izgesiV2x1g2DyQoO9s+ZfInGuIw8wW52dQ4Q9lxEDWdU3nIK9iUdT7Dc6df8wpxpxM3QC8BBgab/l+w=
+X-Forefront-PRVS: 09443CAA7E
+X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; BN6PR02MB2643;
+ 23:Xf4XnU8iEDPQ4Wf4mpgTGcxPQXDYy+eBLMmEvfbFQ?=
+ =?us-ascii?Q?8Prp+brBY0aKWek+F5Ar7hBwYXALf6R2FV9kkLYxynfov0GMZyty2lVYN7Qk?=
+ =?us-ascii?Q?oR7ymxpw+syew3llC215In1HLv8qo9Ha8rSm1vQ09GFrhtOQz2nQ/3X+exhv?=
+ =?us-ascii?Q?aJle8rkG6nKuUOtcorWelNBAneuqZuhUVtIx7D5978dtU3eASepnDWKhoO6c?=
+ =?us-ascii?Q?WaHBRyu2NaJ/h1Nz8rwIOBd8VzkV/YVRhGdATEXLB2fAMF8qhvKAZ9kMq+nW?=
+ =?us-ascii?Q?2FPZUMY/lxlzrFmfLuE+jFVeJ/3cJqTXk67aKRDhzr+Afd97rI8cql7mcYH4?=
+ =?us-ascii?Q?UpDk6/v26W5nUq1/NB8JTkCyWFz/qxTij3Q+cH3iMM8fRczOAT4iWOEb7aUM?=
+ =?us-ascii?Q?YdMWjjVT16z1MXlYcU2/+oqjvzVXydgj3k1ER+r1jeDxF2wFzclv2mReOz7j?=
+ =?us-ascii?Q?s8Pkq9dJRbFmavGY1XEEYzAWc1U3qPDDLGs1CX2cqKN0FOnLuuWyNWA7nXuM?=
+ =?us-ascii?Q?66nfHizufiND08xXnFQRgqvxH8X8Vtm+uZsAm2Krh89S1SaB9pi7CE8hUOpF?=
+ =?us-ascii?Q?wqCuuZnYYIzj/qd1BW9e8CKUPH/v09VJVdRJN90TAb9BLB6RBC0XPRz9/at+?=
+ =?us-ascii?Q?Ph4XEYvEHgBlDvjVgEFitDUNpY88eLPYnJoFiEnoMpGc8FL3m0U465b2pps8?=
+ =?us-ascii?Q?LzXEO4JiUjF0ksGUJzCGeBtrzJGx2vm+oa6r9DGJBSpdAJaxbiUCkf/bRQyg?=
+ =?us-ascii?Q?ZORNDINsRTP+5J9DwQFjDcQ6fXUBt8KLI6i1C0o0ymINXJNi7ZIoSkc2TwMW?=
+ =?us-ascii?Q?JOlTW9tpGKdXd1AJFO44iOZ18OssIf8+p6zsLgfuytSCQRVAtBtoabBmERvE?=
+ =?us-ascii?Q?wvhGIZVezfUfBbZCF+vAdBpbYrxzl7KzCtfbTeBKqfTkC0161f4wv/BNh8nY?=
+ =?us-ascii?Q?aMJChrDEAL0pniPxo/in1j26JSDssFieDMUYVitVdtHfoM+g/VFy3XGXmzX5?=
+ =?us-ascii?Q?76GUvZaKIlmXTCrxwrnKRPdwUPokL0ESBudYLVaPxTG9Bji/olK3uNIPjJ+m?=
+ =?us-ascii?Q?hT3iKPfTg2fxgVZmxo7Z4lUzCUV?=
+X-MS-Exchange-SenderADCheck: 1
+X-Microsoft-Antispam-Message-Info: qrbMF5afZBed73lvPQdCOLkSAaxhY/l8HFIUde6tzeh1OAt86MaHHWiOox1txVJsUb3uFurj2wfQ+D3nh1b99nTgWtxTjfH1BpA6IeUwteZivkl3w7V3dBQNKmyEcT3m60EmNYymvEy49xyE1nhyOQWOQjLvLh3seYQqUNJp6tq22E1TwolZNPo33dqLb9KYq8apVJwQ2RsCt+PiFEvM7JiWP7hG37PrlgsuU78sB8afxrHbuh6AUiYgQo+CHqQ2TQSzYDPPAjIZCueFbhi+RAzs047NLw2jYqOhE/FmRe4P5ntETxD4+PsvK8vmZiRFvaV0fWX6P1WL/Mxv6hInj1HrlP5TfjQAoUOoETyZ3U2Jm3nypwRbTYleWcZKo4gyqSedxe/B+CPzk1C5OlUj4hsWN/jEfQfkEGbaDrcFMgI=
+X-Microsoft-Exchange-Diagnostics: 1; BN6PR02MB2643;
+ 6:pN6Ovsb+k0q5IPtccuOdTlAMbbKbtQ4gmukDPzYNKJ6LmmK5CVhBkkTthEBu9qCYVZpszodhkfG/WQyvB3UsdKDvCHOsQA3J98Up+sUvAeFyhc4x6GFXSc5Mhh8IXDKJUin7TGLv9eTwDNgtMcTsbB3DMtgbv7lLAN+Oj+2Bu8r7L4QD3aC04lovn55siX3MZVeg4ame8vM/5fny2R5HXV+jaT3SL58gaf2wyaFMSfzuMEHCw9yLJvEFcUUINhPUI/oM7+pcQ2DZcZUzgGKMR0hvTbgHWiJEulDOSv3oTpVBnK3wC738+e83XbnrdapKHeiNTTYDHHAt3JJwr1cFC9VXs0TB7/KluNj4+xyYEIzNHjKE7YvjBbba1ath4rJ0gGkQNiFB4SzmapViV2CvO8O9vzzwCDmT4cYxQc4KflH8Rm06Av/mHdVxdyzkGrs1I0dZx0Kf0Y7jx+qtMZp3gA==;
+ 5:36lQZPl5jmGe+nKIfA9/ps1xloLz0IBeHyWsk12LHrvwIiRx57xUTGZkwV8sB3TBZ4KL1XbCX4L1PqT39qCEMRQ+pI2NeBMD8VVaxOUmKzfNFzf9BjcBUDlxenkG7pt5R+6rFOD0IJrJ4lH7WjSFyABsMRVNOimeciI8iruxJwGT6iTQVo0D4J4A1ztqFFMyDT5/LTt6+3xjP2TqrNJHqg==;
+ 7:mQWwi9yZGeoBGn63cCJ/WDpceSL6P0nd2Qxuy2wuSDf6ju6/XJ1qOaKb+C9PUWcTgw6BWNpKFm6hYkqYMD1B8llFadu/5phr4QPatItk+sgHvjUeezJPjm/WiqZyX2rO3oHb23I5+R78BJZ/mqEH6A==
+X-OriginatorOrg: xilinx.com
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 10 Feb 2019 16:13:26.4362 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 003431f5-355b-48b3-e10d-08d68f72b048
+X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
+ Helo=[xsj-pvapsmtpgw01]
+X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR02MB2643
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190210_075055_270595_5C640B45 
-X-CRM114-Status: GOOD (  27.01  )
+X-CRM114-CacheID: sfid-20190210_081332_891449_0D7F3A88 
+X-CRM114-Status: UNSURE (   7.59  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,135 +170,28 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stephen Boyd <sboyd@kernel.org>,
- Michael Turquette <mturquette@baylibre.com>, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Am Sonntag, 10. Februar 2019, 16:38:06 CET schrieb Katsuhiro Suzuki:
-> Custom approximation of fractional-divider may not need parent clock
-> rate checking. For example Rockchip SoCs work fine using grand parent
-> clock rate even if target rate is greater than parent.
-> 
-> This patch checks parent clock rate only if CLK_SET_RATE_PARENT flag
-> is set.
-> 
-> For detailed example, clock tree of Rockchip I2S audio hardware.
->   - Clock rate of CPLL is 1.2GHz, GPLL is 491.52MHz.
->   - i2s1_div is integer divider can divide N (N is 1~128).
->     Input clock is CPLL or GPLL. Initial divider value is N = 1.
->     Ex) PLL = CPLL, N = 10, i2s1_div output rate is
->       CPLL / 10 = 1.2GHz / 10 = 120MHz
->   - i2s1_frac is fractional divider can divide input to x/y, x and
->     y are 16bit integer.
-> 
-> CPLL --> | selector | ---> i2s1_div -+--> | selector | --> I2S1 MCLK
-> GPLL --> |          | ,--------------'    |          |
->                       `--> i2s1_frac ---> |          |
-> 
-> Clock mux system try to choose suitable one from i2s1_div and
-> i2s1_frac for master clock (MCLK) of I2S1.
-> 
-> Bad scenario as follows:
->   - Try to set MCLK to 8.192MHz (32kHz audio replay)
->     Candidate setting is
->     - i2s1_div: GPLL / 60 = 8.192MHz
->     i2s1_div candidate is exactly same as target clock rate, so mux
->     choose this clock source. i2s1_div output rate is changed
->     491.52MHz -> 8.192MHz
-> 
->   - After that try to set to 11.2896MHz (44.1kHz audio replay)
->     Candidate settings are
->     - i2s1_div : CPLL / 107 = 11.214945MHz
->     - i2s1_frac: i2s1_div   = 8.192MHz
->       This is because clk_fd_round_rate() thinks target rate
->       (11.2896MHz) is higher than parent rate (i2s1_div = 8.192MHz)
->       and returns parent clock rate.
-> 
-> Above is current upstreamed behavior. Clock mux system choose
-> i2s1_div, but this clock rate is not acceptable for I2S driver, so
-> users cannot replay audio.
-> 
-> Expected behavior is:
->   - Try to set master clock to 11.2896MHz (44.1kHz audio replay)
->     Candidate settings are
->     - i2s1_div : CPLL / 107          = 11.214945MHz
->     - i2s1_frac: i2s1_div * 147/6400 = 11.2896MHz
->                  Change i2s1_div to GPLL / 1 = 491.52MHz at same
->                  time.
-> 
-> If apply this commit, clk_fd_round_rate() calls custom approximate
-> function of Rockchip even if target rate is higher than parent.
-> Custom function changes both grand parent (i2s1_div) and parent
-> (i2s_frac) settings at same time. Clock mux system can choose
-> i2s1_frac and audio works fine.
-> 
-> Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+Nava kishore Manne (3):
+  firmware: xilinx: Add fpga API's
+  dt-bindings: fpga: Add bindings for ZynqMP fpga driver
+  fpga manager: Adding FPGA Manager support for Xilinx zynqmp
 
-While it took me a bit to wrap my head around fractional dividers
-again :-) ... this sounds definitly sensible to do, especially
-as the clock driver should really take into account potentially
-setting the parent rate if possible, so
+ .../bindings/fpga/xlnx,zynqmp-pcap-fpga.txt        |  13 ++
+ drivers/firmware/xilinx/zynqmp.c                   |  46 ++++++
+ drivers/fpga/Kconfig                               |   9 ++
+ drivers/fpga/Makefile                              |   1 +
+ drivers/fpga/zynqmp-fpga.c                         | 165 +++++++++++++++++++++
+ include/linux/firmware/xlnx-zynqmp.h               |  12 ++
+ 6 files changed, 246 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
+ create mode 100644 drivers/fpga/zynqmp-fpga.c
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-
-> ---
->  drivers/clk/clk-fractional-divider.c | 2 +-
->  drivers/clk/clk.c                    | 8 ++++++++
->  include/linux/clk-provider.h         | 1 +
->  3 files changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-fractional-divider.c b/drivers/clk/clk-fractional-divider.c
-> index 545dceec0bbf..fdfe2e423d15 100644
-> --- a/drivers/clk/clk-fractional-divider.c
-> +++ b/drivers/clk/clk-fractional-divider.c
-> @@ -79,7 +79,7 @@ static long clk_fd_round_rate(struct clk_hw *hw, unsigned long rate,
->  	unsigned long m, n;
->  	u64 ret;
->  
-> -	if (!rate || rate >= *parent_rate)
-> +	if (!rate || (!clk_hw_can_set_rate_parent(hw) && rate >= *parent_rate))
->  		return *parent_rate;
->  
->  	if (fd->approximation)
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index d2477a5058ac..070c0cb29ee8 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -518,6 +518,14 @@ void clk_hw_set_rate_range(struct clk_hw *hw, unsigned long min_rate,
->  }
->  EXPORT_SYMBOL_GPL(clk_hw_set_rate_range);
->  
-> +bool clk_hw_can_set_rate_parent(struct clk_hw *hw)
-> +{
-> +	unsigned long flags = clk_hw_get_flags(hw);
-> +
-> +	return flags & CLK_SET_RATE_PARENT;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_hw_can_set_rate_parent);
-> +
->  /*
->   * Helper for finding best parent to provide a given frequency. This can be used
->   * directly as a determine_rate callback (e.g. for a mux), or from a more
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index e443fa9fa859..693a51937ded 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -808,6 +808,7 @@ int clk_mux_determine_rate_flags(struct clk_hw *hw,
->  void clk_hw_reparent(struct clk_hw *hw, struct clk_hw *new_parent);
->  void clk_hw_set_rate_range(struct clk_hw *hw, unsigned long min_rate,
->  			   unsigned long max_rate);
-> +bool clk_hw_can_set_rate_parent(struct clk_hw *hw);
->  
->  static inline void __clk_hw_set_clk(struct clk_hw *dst, struct clk_hw *src)
->  {
-> 
-
-
-
+-- 
+2.7.4
 
 
 _______________________________________________
