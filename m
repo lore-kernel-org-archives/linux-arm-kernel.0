@@ -1,93 +1,92 @@
 Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
-X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Level: *
+X-Spam-Status: No, score=1.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,FSL_HELO_FAKE,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=no autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 43960C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 10:39:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 631ECC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 10:40:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0CB582084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 10:39:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 31BAB20863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 10:40:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FI6IvBcs";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="sKVAHfBS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CB582084D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MTUDTs6x";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="GHcTe/v4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 31BAB20863
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FKKi4gk+lPsT+CsNKnEDRq6DmWNovrIND9zjmPvn7nk=; b=FI6IvBcsT9QUME
-	tLWOOL9OYdbIckaOJdI34QwZVS0z7MISPKdu56x3PvWftC6IwojIuHmrnxx9cxALYVpXwhPXWX1AI
-	jYLCVqlFAgm4Qx22ARl2guXWOY9RXB75m+NuAfNxsnX2jUsyOzftosOdI7Xfk1msCMUAc3bDY00cS
-	XWypyr43fNrNoj7UvdFcoARvvMzifGaAMI7GBTPCSO5AF04eliTXQYinb7+cpYcGrJmVcsOOeZWr0
-	n8KKvc/6lSAcelNoftIz9gw3MG64SK3+HFRUy5eBxTrfVioWnvb6V0dhHYduEix5ZHfWHNgdiKH+a
-	rQ+O03SWo5LArKfPMcUw==;
+	List-Owner; bh=lIXWJnS435O3xu4Ga08U+cTYV9QnGOA6EH5Ezz3t+OQ=; b=MTUDTs6xdSukFI
+	gHAAxIRQoeWMZtO4Qz7CRffVUYkxB8kJIqA5oRGn7vVS4mZQ0O76EiiC/hZDw3V8tsy+LQTb5WJuh
+	89HPs3vpGrw1Ji9jekbzOQtYGw2lNL8fYw+ghR2bVguiIqn13VOeAyNJ12Mf5m8/3OPhSyXOeGDnq
+	WNdzPQEXXKaPro6onEfyD8RorXvN1hVqsfVUiIqfcZQF25lgBCMaGRVK2FN6Tv/3/ya6dYSSKbk5L
+	UJtCx5cyF0gOI1bV6bNoYBO2zB6516r2XW0Z6he3KDH26cvnrEG1n/rfvfZjPZgEI7xxd/RBppJMn
+	Yh2IU0nZF1NhIt46XnjQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt8zv-0000Ew-BX; Mon, 11 Feb 2019 10:39:35 +0000
+	id 1gt90V-0001Pl-1U; Mon, 11 Feb 2019 10:40:11 +0000
 Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt8xh-0006fK-8A
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 10:37:21 +0000
-Received: by mail-wm1-x344.google.com with SMTP id v26so16309169wmh.3
+ id 1gt8zs-0000Dg-I0
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 10:40:08 +0000
+Received: by mail-wm1-x344.google.com with SMTP id f16so16338344wmh.4
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 02:37:17 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=Tt06UGkm6C60fE3GnCLmVsdN1KETvFT9lYr7KKnVtso=;
- b=sKVAHfBSGT6IdWdNE5LktbYFBiksZLEdXjYNRPMNh/GHaXkR3ztP+XBnsm2wyoHB2q
- 3cto1e4KOLLe/rXUPUAGVkHxDVxBs1x6pVtED2SMpSPk7Bv0LogoZQ5B3ea/t96px4ju
- J1GTy/Rgg3e1E7i/Ofwr0h1+9SWIHY0iGCHYshVVwCZ8uuK5U/bTgmA+0gKdRHndXe1H
- i6KFuoM7eNHrEqG4cpZIKGPJEfc2QXQdCigw99YbtgpVpnb+0B4qbad+lO+1QHhA2uw1
- eRTpomgOFVp6bUdXLqYSFc9+BcvOc3nqtJ/rWFQc2jFpDTEYOiCTgt8ZxBsjZOKClXVP
- H0hw==
+ Mon, 11 Feb 2019 02:39:32 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=sender:date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=MSMeJ85hCnV/mBF9GGGV6ArWIiKHCHYp6BfRp6LTcvk=;
+ b=GHcTe/v4HLTE6/ZcIf6lGV4ciNnib00F0miBQKJ/h849hGbvpylts6FbdNzfzkLCoA
+ kEZJZgxvXWR05iwQH6TglhLsW3luSoxuZSoOafur7xRkm+HucfsvvvyhrGCleinsdB7a
+ kOKt6ePQGkkAvZgLGpAqxiZYf0kHWJJX9HQmrFTSGE8lrjQx6tIHXY3u/qip4OWoalqb
+ n/9ukgVhnW2jvZYUZ+dkiFka5KTup8rI2fD7QxHZWg9FtOJS57KdgEu1/QdFsDsQrA7f
+ f0yTITJvlyuX9LZ89piQz+46mR2R0uLfipoujrOoIEPaGnhfgup0ylO/7xEAA2KaP8sa
+ Q7QQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=Tt06UGkm6C60fE3GnCLmVsdN1KETvFT9lYr7KKnVtso=;
- b=FQcbZ7UbF3c/VGPjoEdbDYUjKlgWCoto1lmjxk+DU/uGy4eg3N/WNV7Os5foVPwE1K
- 0gUlEUiPXBcSYlbef0JwtSQISoSlo4G4YoHaeGWb1tV9WMRo4/Cx5+snchwVwVjL0Ky3
- J5QDbbr+1X3or2pu6NcH6STOKRDz+KjTKQWQstl/3rAfQKJMU1IqQxIQtQ8HkQtMz+Qw
- mVjkG/ZsRCO5EcRCQe36DZ7Twy6cviaOnLcbM/l3P7YWHokcJkethkaO5ZJ97nAXYTnj
- iow1Wkde0Y9CWYcFj0E0aJB73D7CvzgRtTjTq/sEetGYKnvCn3YD4g/7qaogYN0ZRBJx
- +7Ug==
-X-Gm-Message-State: AHQUAuYWP0Z3YsGuqlRTaieg+wE5qsLzyK43KNuO8inYybPzvDgr0yuy
- hqY6SOe55hh6ZxWfHSPnBNhakw==
-X-Google-Smtp-Source: AHgI3IZDb7JzDbFuJfzdE5f/zY5bCfx61C1chkHlbE9OBlu3hXjXN3Fp4mm2dOAV7e75keLcB04ftw==
-X-Received: by 2002:a1c:7304:: with SMTP id d4mr6467825wmb.136.1549881435805; 
- Mon, 11 Feb 2019 02:37:15 -0800 (PST)
-Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id i192sm11121275wmg.7.2019.02.11.02.37.14
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 11 Feb 2019 02:37:15 -0800 (PST)
-From: Bartosz Golaszewski <brgl@bgdev.pl>
-To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
- Alan Stern <stern@rowland.harvard.edu>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: [PATCH v2 8/8] usb: ohci-da8xx: remove unused callbacks from platform
- data
-Date: Mon, 11 Feb 2019 11:37:02 +0100
-Message-Id: <20190211103702.4277-9-brgl@bgdev.pl>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190211103702.4277-1-brgl@bgdev.pl>
-References: <20190211103702.4277-1-brgl@bgdev.pl>
+ h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
+ :references:mime-version:content-disposition:in-reply-to:user-agent;
+ bh=MSMeJ85hCnV/mBF9GGGV6ArWIiKHCHYp6BfRp6LTcvk=;
+ b=KuRAYE6iIBZM6QTYSK38t3gTCUMfUnVMxw+qbQvw2NM8kwVpp/RrSR550Q2bBUY24i
+ jUF3jKYBIdX82nC0pGUru29K83sv6DglKZV+sPN/puQf/LEF7E51+VHQMw2UH15u7FDm
+ lFd11u43n77P6JAzg67BHWquiHjkNZS/4+qXJW3v4z6b55GIS+15FTpKQPMoq6xssFhA
+ mcG1Tm+OOMsUbSr0Rcq4gAaHtsTospqtmvpyQoI0zhmQl22ccRHsvsEFBByy6FG7Y7fm
+ 9/U/F7S5dFap4AXlm5AIl0eWSnIJp3qhfUZYKKO+UCYIZbANowcFClMksNySrentJbOW
+ uZcw==
+X-Gm-Message-State: AHQUAuaWhPhe/hH4vPj8Ig5fKH3Pvi/TMLR2xlOxQPRAAIFkVrou5PoU
+ YPZNLQuGqJfsgHrAZ+fCoKc=
+X-Google-Smtp-Source: AHgI3IZf3wahjDIx/L7PG9L3qJubpkc8NKYYmZR89WZekk9Sg8y67JBJz4VnSSQGjYaDrsxP6nvI7w==
+X-Received: by 2002:a5d:4303:: with SMTP id h3mr20556355wrq.273.1549881571132; 
+ Mon, 11 Feb 2019 02:39:31 -0800 (PST)
+Received: from gmail.com (2E8B0CD5.catv.pool.telekom.hu. [46.139.12.213])
+ by smtp.gmail.com with ESMTPSA id r12sm10477719wrt.76.2019.02.11.02.39.29
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 11 Feb 2019 02:39:30 -0800 (PST)
+Date: Mon, 11 Feb 2019 11:39:27 +0100
+From: Ingo Molnar <mingo@kernel.org>
+To: Waiman Long <longman@redhat.com>
+Subject: Re: [PATCH] locking/rwsem: Remove arch specific rwsem files
+Message-ID: <20190211103927.GA118071@gmail.com>
+References: <1549850450-10171-1-git-send-email-longman@redhat.com>
+ <a610aeb2-b1cb-0d57-8078-97d1051481f9@redhat.com>
+ <20190211071159.GA55579@gmail.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190211071159.GA55579@gmail.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_023717_707971_04C6A273 
-X-CRM114-Status: GOOD (  11.78  )
+X-CRM114-CacheID: sfid-20190211_023933_263541_170150F6 
+X-CRM114-Status: UNSURE (   9.37  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,55 +98,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- Linus Walleij <linus.walleij@linaro.org>, linux-usb@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-ia64@vger.kernel.org, linux-sh@vger.kernel.org,
+ Peter Zijlstra <peterz@infradead.org>, Will Deacon <will.deacon@arm.com>,
+ "H. Peter Anvin" <hpa@zytor.com>, sparclinux@vger.kernel.org,
+ linux-arch@vger.kernel.org, Davidlohr Bueso <dave@stgolabs.net>,
+ linux-hexagon@vger.kernel.org, x86@kernel.org, Ingo Molnar <mingo@redhat.com>,
+ linux-xtensa@linux-xtensa.org, Arnd Bergmann <arnd@arndb.de>,
+ linuxppc-dev@lists.ozlabs.org, Borislav Petkov <bp@alien8.de>,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
+ Linus Torvalds <torvalds@linux-foundation.org>, linux-kernel@vger.kernel.org,
+ linux-alpha@vger.kernel.org, Andrew Morton <akpm@linux-foundation.org>,
+ Tim Chen <tim.c.chen@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-There are no more users of the platform_data callbacks in ohci-da8xx.
-Remove them.
+* Ingo Molnar <mingo@kernel.org> wrote:
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
----
- include/linux/platform_data/usb-davinci.h | 14 --------------
- 1 file changed, 14 deletions(-)
+> Sounds good to me - I've merged this patch, will push it out after 
+> testing.
 
-diff --git a/include/linux/platform_data/usb-davinci.h b/include/linux/platform_data/usb-davinci.h
-index 0926e99f2e8f..879f5c78b91a 100644
---- a/include/linux/platform_data/usb-davinci.h
-+++ b/include/linux/platform_data/usb-davinci.h
-@@ -11,22 +11,8 @@
- #ifndef __ASM_ARCH_USB_H
- #define __ASM_ARCH_USB_H
- 
--struct	da8xx_ohci_root_hub;
--
--typedef void (*da8xx_ocic_handler_t)(struct da8xx_ohci_root_hub *hub,
--				     unsigned port);
--
- /* Passed as the platform data to the OHCI driver */
- struct	da8xx_ohci_root_hub {
--	/* Switch the port power on/off */
--	int	(*set_power)(unsigned port, int on);
--	/* Read the port power status */
--	int	(*get_power)(unsigned port);
--	/* Read the port over-current indicator */
--	int	(*get_oci)(unsigned port);
--	/* Over-current indicator change notification (pass NULL to disable) */
--	int	(*ocic_notify)(da8xx_ocic_handler_t handler);
--
- 	/* Time from power on to power good (in 2 ms units) */
- 	u8	potpgt;
- };
--- 
-2.20.1
+Based on Peter's feedback I'm delaying this - performance testing on at 
+least one key ll/sc arch would be nice indeed.
 
+Thanks,
+
+	Ingo
 
 _______________________________________________
 linux-arm-kernel mailing list
