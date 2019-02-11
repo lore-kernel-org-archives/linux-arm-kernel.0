@@ -2,23 +2,22 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4E4E4C282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:08:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D9B83C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:11:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1DD0921B1A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:08:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 93056222B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:11:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oSlYsy4v";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="BvoRPQmf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1DD0921B1A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PbeG+K2H";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="chJGF9Xd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 93056222B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,62 +25,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=d2sC+xXfo7bw1V+JA7Y6srFtkWliWZ9iiTbB3y76os4=; b=oSlYsy4vyqjeM5
-	AS3xuRvKILS/jqVJCuk4dIEQkaJRAxmubn0kjouN04KeAFKlOdmxM+Pci/AQuQ3ZM5pj+Ne1QaUHA
-	w+HJ0Mv3Khr2QjEJ1ekgpGQiteH6m5x5Xn1Our6GZhwXxGQ7ejYlcclaKNi0AXe4EjITNr6ZL6iwK
-	XHVfg3HbLvH5Hs9PDBjltKDDcjtF5ZYYRtO32sKfENdWleZR/mEITj+9HpRvzBKU4j8Kl1PkRqk0K
-	CNM1x5tuDxx6wR/R6Rh2gNf54V4gY70C+8aOMTwzt7evwibGliEI/Z93jnkEQxHcRHVmcA1hn6bJj
-	G+fjEjgmnaXwaiNoseAA==;
+	List-Owner; bh=+nnoQCnFFysgBcB4OE0qHpf8jBcb7zYS14Xx/WBdWaQ=; b=PbeG+K2HuUG3yC
+	+kL+tiNqMiqmXZJAieCYnbRGNCn5fvT4nJW3DGt+oAP24WnIhrW06+ut6ONpqV16nmDr+OtJSBEjI
+	yhyAVKoYK3XtK+elJub9e+mZzkmgyyjh6XduY8OiuJchMmr86qYxv38wQNbk42CHcsUqkHLV694Lb
+	iMWEJphW03mLiw/adAAUM5h4fMyukcCslX00S2pHpx8dmOmNF6+y5d6+U97MgXVe7J6k1js6Eb9C0
+	mI87GQhk+Chsi/ABQu0pJr78h9o/sUteGybDmQgvGoKFZ0FuGIF8yivlTQYjYdG1VX+E66n0zyivL
+	7LMFCWlvA4gDRroO1y0A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtCFr-0008Hi-Lo; Mon, 11 Feb 2019 14:08:15 +0000
-Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+	id 1gtCIV-000255-PM; Mon, 11 Feb 2019 14:10:59 +0000
+Received: from conssluserg-03.nifty.com ([210.131.2.82])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtCFm-0008Ge-9s
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 14:08:12 +0000
-Received: by mail-it1-x141.google.com with SMTP id z20so26413532itc.3
+ id 1gtCIS-00022B-21
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 14:10:58 +0000
+Received: from mail-vs1-f54.google.com (mail-vs1-f54.google.com
+ [209.85.217.54]) (authenticated)
+ by conssluserg-03.nifty.com with ESMTP id x1BEAGet002240
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 11 Feb 2019 23:10:16 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conssluserg-03.nifty.com x1BEAGet002240
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
+ s=dec2015msa; t=1549894217;
+ bh=Ddm3RVPs+99BTjqrALyXAj1R7WQCUvTiXfq5LNFNpd4=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=chJGF9XdmsH8ZCxYlcpQ7Cw/QIl2foerTD5Q1MlSAQWITcJRWAUIUQA/HJr+tyg+G
+ H6X63NWnReRrk5eLO7HeOnRTVL1Nm96pf/JagyUXGHUlrynU5Vw81/tdy27FAjcrK7
+ a3RA4ddRVHqZ1bWpjnqKMhUVyb+CRie3Dky6seX8GkXxiZqYkAiee3GDS3B33DOqci
+ 1yBGx/PjeLGTtZtSaBxETKRKeZpmgOFTDUWa7XUPT2OfRIWYyvJmkVpmVsAr302rMq
+ 50txzTA+sX9tHYgFLpNZD+yTUZoY+MSUdvQ7Mh8zLabantKClQ+314tK5ME7t1D+/b
+ kPXMaA8d092XA==
+X-Nifty-SrcIP: [209.85.217.54]
+Received: by mail-vs1-f54.google.com with SMTP id z18so652104vso.7
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 06:08:10 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=iqkP2QCm/psQNIZdrH0gsPgyyvakV4TbORJxmarwLXQ=;
- b=BvoRPQmfcCldhXT1HPptWPBvyp6OOoKlzKzi+6I8DbaaJeCK85fQmusCKcgfKt5CE6
- NC9v/UrCR2DgNett5a3hty9LgzK3qLVW70fGraC5UJ2lh29dVsNkI+Vakh5W2ylyaI6I
- BH68eUtocGZeELOq0LAnwgprL6s5qrLAzwCkc=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=iqkP2QCm/psQNIZdrH0gsPgyyvakV4TbORJxmarwLXQ=;
- b=EpGmc2HtddoXFg7vk8KgUKDL2CFOiUesjvDfr6IN0PM7GZjbx2p7RBFU/e5IJUIBGD
- A8cBmKrSP4QdXEPtsM3UxacO6U69E907zWbTMYZj5xYmUfYTvIcYj384ykQ2+Xwe7Id/
- Akdm6n8UGRWsOmsIgeH0epzothjgzcfT1QMM6bxlLEhNgfUleCB2Z2R1YIEm76BjAgxp
- qT9P14o+kH4FaOMr1ye9r6gbiaWlfIBdBOG9pLcgRtNkclhSJJQQgVWjxDLDyyyUK8vu
- FrmS75x7a8C2MVQVJ2uew3XHwL3PhDt1z5yaKolfAK5Liu94yl1p3mCY7Zlcs72czWgJ
- 6dKw==
-X-Gm-Message-State: AHQUAuaaVob10SdS0VPDp7ybhaGYMoy3cyzRGsQvmHZyUiHsLZYxM2e9
- 9h04o/4SaWeeaDiUL5qkijRvchjWC5MA7FonmulpyQ==
-X-Google-Smtp-Source: AHgI3IY2/zZTwQOKdReFGOMUZra41eeM5QImdevk+KFU2bEaszJda/yh3mS4+nAHO07lcKYG3UjE8Ga7DIQGqgnJKUs=
-X-Received: by 2002:a24:10cb:: with SMTP id 194mr6336896ity.173.1549894089414; 
- Mon, 11 Feb 2019 06:08:09 -0800 (PST)
+ Mon, 11 Feb 2019 06:10:16 -0800 (PST)
+X-Gm-Message-State: AHQUAuYRq5whQTP0Bu7P/8Qidy5aats/TmzyjcmXqKbnyed8leR/w9To
+ BOwc0hK+kod5Y0YAWhdh3n62mYXNI1cTUKnMXbY=
+X-Google-Smtp-Source: AHgI3IZqdzRTG6E3sfZ1JwMvMHMlytVdk21phNy5hgAKmioNsAos9rOoPGu9X2q51/W7DH91fHNU4WMGOxDALQAloGU=
+X-Received: by 2002:a67:3e97:: with SMTP id a23mr1027719vsi.181.1549894215478; 
+ Mon, 11 Feb 2019 06:10:15 -0800 (PST)
 MIME-Version: 1.0
-References: <20190124195900.22620-1-jagan@amarulasolutions.com>
- <20190124195900.22620-12-jagan@amarulasolutions.com>
- <20190125212433.ni2jg3wvpyjazlxf@flea>
- <CAMty3ZAsH2iZ+JEqTE3D58aXfGuhMSg9YoO56ZhhOeE4c4yQHQ@mail.gmail.com>
- <20190129151348.mh27btttsqcmeban@flea>
- <CAMty3ZAjAoti8Zu80c=OyCA+u-jtQnkidsKSNz_c2OaRswqc3w@mail.gmail.com>
- <20190201143102.rcvrxstc365mezvx@flea>
-In-Reply-To: <20190201143102.rcvrxstc365mezvx@flea>
-From: Jagan Teki <jagan@amarulasolutions.com>
-Date: Mon, 11 Feb 2019 19:37:57 +0530
-Message-ID: <CAMty3ZAgJMy+qOW0eO5U_MDUPw0Zaq7tLDi8zwUxw=B6UiFS9w@mail.gmail.com>
-Subject: Re: [PATCH v6 11/22] clk: sunxi-ng: a64: Add minimum rate for PLL_MIPI
-To: Maxime Ripard <maxime.ripard@bootlin.com>
+References: <1549628897-32345-1-git-send-email-sugaya.taichi@socionext.com>
+ <CACRpkdZCpyJDL+zy-NftXJNah2u6t75cVCDmh_L0+ZyXv7J2LA@mail.gmail.com>
+In-Reply-To: <CACRpkdZCpyJDL+zy-NftXJNah2u6t75cVCDmh_L0+ZyXv7J2LA@mail.gmail.com>
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+Date: Mon, 11 Feb 2019 23:09:39 +0900
+X-Gmail-Original-Message-ID: <CAK7LNAQx1Ee7a5CAhbaxKv8wiiuX_aP4ie7+_BqBSGh-dmchPQ@mail.gmail.com>
+Message-ID: <CAK7LNAQx1Ee7a5CAhbaxKv8wiiuX_aP4ie7+_BqBSGh-dmchPQ@mail.gmail.com>
+Subject: Re: [PATCH v2 12/15] pinctrl: milbeaut: Add Milbeaut M10V pinctrl
+To: Linus Walleij <linus.walleij@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_060810_841641_3EEC7014 
-X-CRM114-Status: GOOD (  35.24  )
+X-CRM114-CacheID: sfid-20190211_061056_340140_5A6CF7B0 
+X-CRM114-Status: GOOD (  11.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,164 +86,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>, David Airlie <airlied@linux.ie>,
- Michael Turquette <mturquette@baylibre.com>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Daniel Vetter <daniel@ffwll.ch>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Jassi Brar <jaswinder.singh@linaro.org>,
+ Sugaya Taichi <sugaya.taichi@socionext.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
+ Takao Orito <orito.takao@socionext.com>,
+ Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Brian Masney <masneyb@onstation.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Maxime,
+Hi Linus,
 
-On Fri, Feb 1, 2019 at 8:01 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+On Fri, Feb 8, 2019 at 10:27 PM Linus Walleij <linus.walleij@linaro.org> wrote:
 >
-> On Tue, Jan 29, 2019 at 11:01:31PM +0530, Jagan Teki wrote:
-> > On Tue, Jan 29, 2019 at 8:43 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > >
-> > > On Mon, Jan 28, 2019 at 03:06:10PM +0530, Jagan Teki wrote:
-> > > > On Sat, Jan 26, 2019 at 2:54 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > > >
-> > > > > On Fri, Jan 25, 2019 at 01:28:49AM +0530, Jagan Teki wrote:
-> > > > > > Minimum PLL used for MIPI is 500MHz, as per manual, but
-> > > > > > lowering the min rate by 300MHz can result proper working
-> > > > > > nkms divider with the help of desired dclock rate from
-> > > > > > panel driver.
-> > > > > >
-> > > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > > > > Acked-by: Stephen Boyd <sboyd@kernel.org>
-> > > > >
-> > > > > Going 200MHz below the minimum doesn't seem really reasonable. What
-> > > > > is the issue that you are trying to fix here?
-> > > > >
-> > > > > It looks like it's picking bad dividers, but if that's the case, this
-> > > > > isn't the proper fix.
-> > > >
-> > > > As I stated in earlier patches, the whole idea is pick the desired
-> > > > dclk divider based dclk rate. So the dotclock, sun4i_dclk_round_rate
-> > > > is unable to get the proper dclk divider at the end, so it eventually
-> > > > picking up wrong divider value and fired vblank timeout.
-> > > >
-> > > > So, we come-up with optimal and working min_rate 300MHz in pll-mipi to
-> > > > get the desired clock something like below.
-> > > > [    2.415773] [drm] No driver support for vblank timestamp query.
-> > > > [    2.424116] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
-> > > > [    2.424172] ideal = 220000000, rounded = 0
-> > > > [    2.424176] ideal = 275000000, rounded = 0
-> > > > [    2.424194] ccu_nkm_round_rate: rate = 330000000
-> > > > [    2.424197] ideal = 330000000, rounded = 330000000
-> > > > [    2.424201] sun4i_dclk_round_rate: div = 6 rate = 55000000
-> > > > [    2.424205] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
-> > > > [    2.424209] ideal = 220000000, rounded = 0
-> > > > [    2.424213] ideal = 275000000, rounded = 0
-> > > > [    2.424230] ccu_nkm_round_rate: rate = 330000000
-> > > > [    2.424233] ideal = 330000000, rounded = 330000000
-> > > > [    2.424236] sun4i_dclk_round_rate: div = 6 rate = 55000000
-> > > > [    2.424253] ccu_nkm_round_rate: rate = 330000000
-> > > > [    2.424270] ccu_nkm_round_rate: rate = 330000000
-> > > > [    2.424278] sun4i_dclk_recalc_rate: val = 1, rate = 330000000
-> > > > [    2.424281] sun4i_dclk_recalc_rate: val = 1, rate = 330000000
-> > > > [    2.424306] ccu_nkm_set_rate: rate = 330000000, parent_rate = 297000000
-> > > > [    2.424309] ccu_nkm_set_rate: _nkm.n = 5
-> > > > [    2.424311] ccu_nkm_set_rate: _nkm.k = 2
-> > > > [    2.424313] ccu_nkm_set_rate: _nkm.m = 9
-> > > > [    2.424661] sun4i_dclk_set_rate div 6
-> > > > [    2.424668] sun4i_dclk_recalc_rate: val = 6, rate = 55000000
-> > > >
-> > > > But look like this wouldn't valid for all other dclock rates, say BPI
-> > > > panel has 30MHz clock that would failed with this logic.
-> > > >
-> > > > On the other side Allwinner BSP calculating dclk divider based on the
-> > > > SoC's. for A33 [1] it is fixed dclk divider of 4 and for A64 is is
-> > > > calculated based on the bpp/lanes.
-> > >
-> > > It looks like the A64 has the same divider of 4:
-> > > https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c#L12
-> > >
-> > > I think you're confusing it with the ratio between the pixel clock and
-> > > the dotclock, called dsi_div:
-> > > https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/disp_al.c#L198
-> >
-> > Ahh.. I thought this initially but as far as DSI clock computation is
-> > concern, the L12 tcon_div is local variable which is used for edge0
-> > computation in burst mode and not for the dsi clock computation. Since
-> > the BSP is unable to get the tcon_div during edge0 computation, they
-> > defined it locally I think.
-> >
-> > You can see the lcd_clk_config() code [2], where we can see DSI clock
-> > computation using dsi_div value.
-> >
-> > Here is dump after the in Line 792 which is after computation[3]
-> > [   10.800737] lcd_clk_config: dsi_div = 6, tcon_div = 4, lcd_div = 1
-> > [   10.800743] lcd_clk_config: lcd_dclk_freq = 55, dclk_rate = 55000000
-> > [   10.800749] lcd_clk_config: lcd_rate = 330000000, pll_rate = 330000000
-> >
-> > The above dump the lcd_rate 330MHz is computed with panel clock, 55MHz
-> > into dsi_div 6. So this can be our actual divider values dclk_min_div,
-> > dclk_max_div in sun4i_dclk_round_rate (from
-> > drivers/gpu/drm/sun4i/sun4i_dotclock.c)
+> Hi Sugaya,
 >
-> I wish it was in your commit log in the first place, instead of having
-> to exchange multiple mails over this.
+> thank you for the patch!
 >
-> However, I don't think that's quite true, and it might be a bug in
-> Allwinner's implementation (or rather something quite confusing).
->
-> You're right that the lcd_rate and pll_rate seem to be generated from
-> the pixel clock, and it indeed looks like the ratio between the pixel
-> clock and the TCON dotclock is defined through the number of bits per
-> lanes.
->
-> However, in this case, dsi_rate is actually the same than lcd_rate,
-> since pll_rate is going to be divided by dsi_div:
-> https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c#L791
->
-> Since lcd_div is 1, it also means that in this case, dsi_rate ==
-> dclk_rate.
->
-> The DSI module clock however, is always set to 148.5 MHz. Indeed, if
-> we look at:
-> https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c#L804
->
-> We can see that the rate in clk_info is used if it's different than
-> 0. This is filled by disp_al_lcd_get_clk_info, which, in the case of a
-> DSI panel, will hardcode it to 148.5 MHz:
-> https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/disp_al.c#L164
->
-> So, the DSI clock is set to this here:
-> https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c#L805
->
-> The TCON *module* clock (the one in the clock controller) has been set
-> to lcd_rate (so the pixel clock times the number of bits per lane) here:
-> https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c#L800
->
-> And the PLL has been set to the same rate here:
-> https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c#L794
->
-> Let's take a step back now: that function we were looking at,
-> lcd_clk_config, is called by lcd_clk_enable, which is in turn called
-> by disp_lcd_enable here:
-> https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c#L1328
->
-> The next function being called is disp_al_lcd_cfg, and that function
-> will hardcode the TCON dotclock divider to 4, here:
-> https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/disp_al.c#L240
->
-> So, in the end, the dotclock divider is always 4, the DSI module clock
-> is set to 148.5 MHz, and the TCON module clock is set to 330MHz. Since
-> the TCON module clock doesn't have a divider, the PLL is set at that
-> same value but this is redundant.
->
-> I'll experiment with this and try to see how it works on the A33.
+> Since Masahiro has previously added the Uniphier pin control driver
+> I would like him to provide a review of this patch, if possible. I also
+> want to make sure that the hardware is different enough from the
+> existing Uniphier pin control so that it really needs a new
+> driver, else I suppose it should be refactored to be part of
+> the pinctrl/uniphier drivers (we can of course rename it
+> pinctrl/socionext if only naming is an issue).
 
-How is it with A33?
+
+Milbeaut and UniPhier are totally different platforms,
+so no code is shareable.
+
+At most, they could share the directory,
+drivers/pinctrl/socionext/, if you like.
+
+I know you prefer grouping by SoC-family
+instead of by vendor-name as you stated in the
+"Moving ARM dts files" discussion.
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
 
 _______________________________________________
 linux-arm-kernel mailing list
