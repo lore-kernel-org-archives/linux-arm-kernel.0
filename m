@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BA09DC282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:03:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9DD0DC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:04:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8A182222B1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:03:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 59F03222A7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:04:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P+f62r4M"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8A182222B1
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xp0f1I8Y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59F03222A7
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GCVXO8Fi8uhstGomuCAZ+jEIv8CtxnLp1jH6ux1oU80=; b=P+f62r4MSZTwEX
-	iu/KOpG8IqnK3fS0C3NlQSw026vs078cOd8bk2mjVZPW/UytPgg6OAhWMtraEKHkW0c3DWId+Qd8r
-	Pvp6cN7YOYgR1IbzowuQmLgOy0QiyyBoIEDPikAyrQWrG9AhhAYyvtBXAtwqQmql7NYdOpMUbgeQk
-	eAXs1aaeilsruPPMCobWtSjt0K6gjOg8o91ezVVJPNyRsBVeFTUBf40wm+14lHDAuS4NbAPYlch/V
-	b42nyguPmVnO70VFWUVmO/rsbs8qoQFUqGgLGdIR8TAAz46SDblgsEBtF+z040ItDBxP7RHF9cbF7
-	Ht5Aw3BijG9mNOCNGmkA==;
+	List-Owner; bh=KA3VCViDzy1ggG8CwIQ4kqoxRJVg7eHrJWBFJ4bukhQ=; b=Xp0f1I8YN9DSQj
+	YdOfnc754nLZnV6giDfoImDvdRyN5p9/vZZ8Z+/R0D6clsO1QPmCedrVeSAFlREz/s7M5VV1kbolo
+	OKgNBEbKExeWpmr7/hRjUU/XJTmj0+VcRhlAr1hYofIZENme9Znu/VaDXyVSvYc6uZj5DMTWp3tve
+	A+w1A4xz41iI3iXX/no2vt1n+x6Pmi2S4fiAKUHOrPj8Yk3xWXr3NT24Q5SRgPHoMGfOpIjaJb4PY
+	uOzBT9IRQo4j3dmXZq3/Sgku4/vYbjcA4kuttk+QbtvJA9Zd3rIjbYYVxoWMwYXPgFIkc8rcqywyO
+	OY8a1u/xErz3HeHA8N0A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtD7U-0000iI-UY; Mon, 11 Feb 2019 15:03:40 +0000
-Received: from relay1-d.mail.gandi.net ([217.70.183.193])
+	id 1gtD7l-000100-S9; Mon, 11 Feb 2019 15:03:57 +0000
+Received: from relay11.mail.gandi.net ([217.70.178.231])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtD76-0000FY-9H
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 15:03:23 +0000
-X-Originating-IP: 185.94.189.187
+ id 1gtD7B-0000Kk-2M
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 15:03:25 +0000
 Received: from localhost (unknown [185.94.189.187])
  (Authenticated sender: maxime.ripard@bootlin.com)
- by relay1-d.mail.gandi.net (Postfix) with ESMTPSA id 8C339240020;
- Mon, 11 Feb 2019 15:03:09 +0000 (UTC)
+ by relay11.mail.gandi.net (Postfix) with ESMTPSA id 26007100003;
+ Mon, 11 Feb 2019 15:03:14 +0000 (UTC)
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh+dt@kernel.org>,
  Frank Rowand <frowand.list@gmail.com>, Chen-Yu Tsai <wens@csie.org>,
  Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH v3 2/7] dt-bindings: bus: Add binding for the Allwinner MBUS
- controller
-Date: Mon, 11 Feb 2019 16:02:50 +0100
-Message-Id: <43f965dae8b0ba8dffd3af478c2836c17feaa18b.1549897336.git-series.maxime.ripard@bootlin.com>
+Subject: [PATCH v3 3/7] of: address: Add parent pointer to the
+ __of_translate_address args
+Date: Mon, 11 Feb 2019 16:02:51 +0100
+Message-Id: <57fa05909120919f33590fed11bd4041467a09f5.1549897336.git-series.maxime.ripard@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <cover.f2e5fbb4d21384168973fa32377a33d627768146.1549897336.git-series.maxime.ripard@bootlin.com>
 References: <cover.f2e5fbb4d21384168973fa32377a33d627768146.1549897336.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_070316_756931_AAB45BB0 
-X-CRM114-Status: GOOD (  12.63  )
+X-CRM114-CacheID: sfid-20190211_070321_653939_BCEA7ED8 
+X-CRM114-Status: GOOD (  17.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,59 +79,84 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The MBUS controller drives the MBUS that other devices in the SoC will
-use to perform DMA. It also has a register interface that allows to
-monitor and control the bandwidth and priorities for masters on that
-bus.
+The __of_translate_address function is used to translate the device tree
+addresses to physical addresses using the various ranges property to create
+the offset.
+
+However, it's shared between the CPU addresses (based on the ranges
+property) and the DMA addresses (based on dma-ranges). Since we're going to
+add support for a DMA parent node that is not the DT parent node, we need
+to change the logic a bit to have an optional parent node that we should
+use.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- Documentation/devicetree/bindings/arm/sunxi/sunxi-mbus.txt | 36 +++++++-
- 1 file changed, 36 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/sunxi/sunxi-mbus.txt
+ drivers/of/address.c | 21 ++++++++++++---------
+ 1 file changed, 12 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/sunxi/sunxi-mbus.txt b/Documentation/devicetree/bindings/arm/sunxi/sunxi-mbus.txt
-new file mode 100644
-index 000000000000..e72b7ac9e359
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/sunxi/sunxi-mbus.txt
-@@ -0,0 +1,36 @@
-+Allwinner Memory Bus (MBUS) controller
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 2270373b30ab..4c5dc21c71ca 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -569,10 +569,10 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
+  * relative to that node.
+  */
+ static u64 __of_translate_address(struct device_node *dev,
++				  struct device_node *parent,
+ 				  const __be32 *in_addr, const char *rprop,
+ 				  struct device_node **host)
+ {
+-	struct device_node *parent = NULL;
+ 	struct of_bus *bus, *pbus;
+ 	__be32 addr[OF_MAX_ADDR_CELLS];
+ 	int na, ns, pna, pns;
+@@ -583,11 +583,14 @@ static u64 __of_translate_address(struct device_node *dev,
+ 	/* Increase refcount at current level */
+ 	of_node_get(dev);
+ 
+-	*host = NULL;
+-	/* Get parent & match bus type */
+-	parent = of_get_parent(dev);
+-	if (parent == NULL)
+-		goto bail;
++	if (!parent) {
++		*host = NULL;
++		/* Get parent & match bus type */
++		parent = of_get_parent(dev);
++		if (parent == NULL)
++			goto bail;
++	}
 +
-+The MBUS controller drives the MBUS that other devices in the SoC will
-+use to perform DMA. It also has a register interface that allows to
-+monitor and control the bandwidth and priorities for masters on that
-+bus.
-+
-+Required properties:
-+ - compatible: Must be one of:
-+	- allwinner,sun5i-a13-mbus
-+ - reg: Offset and length of the register set for the controller
-+ - clocks: phandle to the clock driving the controller
-+ - dma-ranges: see booting-without-of.txt
-+ - #interconnect-cells: Must be one, with the argument being the MBUS
-+   port ID
-+
-+Each device having to perform their DMA through the MBUS must have the
-+interconnects and interconnect-names properties set to the MBUS
-+controller and with "dma" as the interconnect name.
-+
-+Example:
-+
-+mbus: dram-controller@1c01000 {
-+	compatible = "allwinner,sun5i-a13-mbus";
-+	reg = <0x01c01000 0x1000>;
-+	clocks = <&ccu CLK_MBUS>;
-+	dma-ranges = <0x00000000 0x40000000 0x20000000>;
-+	#interconnect-cells = <1>;
-+};
-+
-+fe0: display-frontend@1e00000 {
-+	compatible = "allwinner,sun5i-a13-display-frontend";
-+	...
-+	interconnects = <&mbus 19>;
-+	interconnect-names = "dma";
-+};
+ 	bus = of_match_bus(parent);
+ 
+ 	/* Count address cells & copy address locally */
+@@ -665,7 +668,7 @@ u64 of_translate_address(struct device_node *dev, const __be32 *in_addr)
+ 	struct device_node *host;
+ 	u64 ret;
+ 
+-	ret = __of_translate_address(dev, in_addr, "ranges", &host);
++	ret = __of_translate_address(dev, NULL, in_addr, "ranges", &host);
+ 	if (host) {
+ 		of_node_put(host);
+ 		return OF_BAD_ADDR;
+@@ -680,7 +683,7 @@ u64 of_translate_dma_address(struct device_node *dev, const __be32 *in_addr)
+ 	struct device_node *host;
+ 	u64 ret;
+ 
+-	ret = __of_translate_address(dev, in_addr, "dma-ranges", &host);
++	ret = __of_translate_address(dev, NULL, in_addr, "dma-ranges", &host);
+ 
+ 	if (host) {
+ 		of_node_put(host);
+@@ -736,7 +739,7 @@ static u64 of_translate_ioport(struct device_node *dev, const __be32 *in_addr,
+ 	unsigned long port;
+ 	struct device_node *host;
+ 
+-	taddr = __of_translate_address(dev, in_addr, "ranges", &host);
++	taddr = __of_translate_address(dev, NULL, in_addr, "ranges", &host);
+ 	if (host) {
+ 		/* host-specific port access */
+ 		port = logic_pio_trans_hwaddr(&host->fwnode, taddr, size);
 -- 
 git-series 0.9.1
 
