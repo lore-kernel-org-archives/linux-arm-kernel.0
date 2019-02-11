@@ -2,22 +2,22 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 32E37C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 08:21:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A330DC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 08:23:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 00CB520873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 08:21:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7019B20873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 08:23:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bmc97EP+";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="PUK7X9XZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 00CB520873
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Bvjmuvtm";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="jdAsyQ90"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7019B20873
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,60 +25,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Es6jUY0yWgUDsf1mJmyZxBSBOle68nT2mz9x7K/+3cY=; b=bmc97EP+dyMU8z
-	Ku83mb+huYoV8c2i/cCE7uQi0B8r/kG0zEHwuPBclagLfxO28K5T0zCPq2jIIoZeTzIPUjaurAtLa
-	xtx1aKgA7x2Zugd3LC+RUGKYXGodDi9+C9yq277EKT2MrzBl7MkYP5MAdKcE2vAVfMaYM+9sH7+y+
-	40kbvVA7rt1TiTyTi0L48akx9tB1eti+f4nRd7LyIfC4G6YKDAjxo6NugnxAGRvPcAxzy1Ap4L2nV
-	gHj54A+OXUmEpQH0IY7BEfEfLk+dwpGk/vjolNp6WexU9GhHBJyziSd2mk/ettUcsPp7pp7CMr9zk
-	0/JRKUpRPIgThxMFznaQ==;
+	List-Owner; bh=pLjxCWu5joQdFE4f0h6mksZwJoXwkDgdItGuxNLcRO4=; b=BvjmuvtmhPzY/s
+	S6n0ga37taiWu0wV5CWGCRS95jbqrpzd+9trUvXWeuNRAnEgaF8sUqnzOqQA+6SBVvVYy2BrPMbJ1
+	mYA+tN7C10TpYQLeaV3Do8uIdPt67q59WOa5FaBYZBJBUkTT6lqxW6aAIzR3zo9sBCerDh3fb1yjX
+	4zIk0YVjtDHI2kAyMfoQDbWD8F6le1GdX/3KPGlqIW1YMElVNTjlxG7PGAz+pFP03JIZkV2h+Fm9S
+	w0aV09Ag9n9ZiP3kupJWpOCnOPkT8mke8cS5U2CKuJbRxXPfvuT+GaJxmL+vgouf8fpLVU0I89+4J
+	Da5/K3y3sEZMRrZ1VrBg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt6pw-0002S7-IC; Mon, 11 Feb 2019 08:21:08 +0000
-Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+	id 1gt6rg-0002vn-3A; Mon, 11 Feb 2019 08:22:56 +0000
+Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt6pt-0002RN-VF
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 08:21:07 +0000
-Received: by mail-lf1-x143.google.com with SMTP id g2so1732015lfh.11
+ id 1gt6rc-0002v4-45
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 08:22:54 +0000
+Received: by mail-it1-x142.google.com with SMTP id c9so24106474itj.1
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 00:21:05 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ Mon, 11 Feb 2019 00:22:51 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=KAP+/QkaC/kPvD0d6Vhaj1cPtEZDAtF44P3YSanj1iM=;
- b=PUK7X9XZbvcnAXgdpuFDtpIDrpwjLcA7TAnPUkdEY+UPDT0CUCIU55KqiWttOC0pJM
- zpMRSwU2NSVK+YPmHLhNAbGjE6PSmc2Xq2o3/ULh96lol/yLCuBNig2Gd9ZFupJWxGts
- 6gKaNq1tnlZlPak7R3c5tkMAeFkOO4nZKAAMof08U4Rup6Osp1yoFbukBN9amnyfa15V
- IUpb+ctuU4HL6IRC4pNW4exoYoOuQAK4yKLPdCOUryrUJS3l40yNMbfkzcZtiFgTVvlL
- krCqT38mUthOMHYq84FFCdNKSQdGLFcvzJjNl4y4uVI6qbJ+/fLe5Bk3VTzRawJqZmiS
- jT7w==
+ :cc; bh=fvY2/yBGMwbngNDLa66cM3Z3OvAxuwsm6ud86Xu01mE=;
+ b=jdAsyQ90mli/1X4feqFov2FjxbYBaMp8oZXHDFKZAWdO1k84n+XBqCwxjtSJ8VoJM9
+ lFJCACs/k+wKAao0f9jIyuZozeIDbrBMETX3xuOOUCzseOUdxq3r8S3hsyqwQpGUgtNl
+ ern03whpopTdNC/7JyKsxVGGZJZy2bZm6hI00=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=KAP+/QkaC/kPvD0d6Vhaj1cPtEZDAtF44P3YSanj1iM=;
- b=Zk0ZWDok110bP0Wzq3PRMfUg1phiZOLRx1+bW8hqQt6YeuGvMFTGyiUhOp3JNxokqt
- 7aJx/VN7Q+rfF+mKt8jHLPH0RHXlFREKr4yvGRjMVRuStQjSqlM+Vg5Le6eIaB+z064A
- tuFhRbV+N5YZ7SSpDhIUmlEGChXk55bSQLu3xhR0w+CPKWtPbXGGrVEydt9YjIbjuAK6
- C7U2YslTrFoqxjtf6OG0ncxYrvizz+Ymgbkv6Kd5N4c8RD1YxaobHLqSs4KDeanrzcE5
- Ys4tMnQyQNSpDDlWSSN0Dt3HsTVnbFhW9nHgDNWCaLC0AyREszw+ZP/i72rYPWxIdDsC
- iPkg==
-X-Gm-Message-State: AHQUAuaMJ0HTQZodXTN9/ltO0nkf99VGYjgcJSLt4psvaMdfoCVqzzR2
- tsnzqzPoglZ8UqU2yl/WXkFHh/qsvLpqHPKOEGrKRA==
-X-Google-Smtp-Source: AHgI3IYQC9maKJWT1HSMkW62nOsngFfw9sDT7x5S4Z+L6hgFGU8dAP8Gzu8PjowSP41wpHOEaWRlGwxTBf8gfOgEGoM=
-X-Received: by 2002:ac2:4343:: with SMTP id o3mr19203143lfl.129.1549873264141; 
- Mon, 11 Feb 2019 00:21:04 -0800 (PST)
+ bh=fvY2/yBGMwbngNDLa66cM3Z3OvAxuwsm6ud86Xu01mE=;
+ b=qDRL3/qnw8IJ7ADUDi5o33DHesLNzvkww4TPzMFD0Y8pkPyQ45h5sThvvBTXV5kyIK
+ D/zQNhcFTgI1HkdngBqzdmbdQ+7nSn/rUcUTM3EeCuW2apaRFucHjHyZBl/dScuKzanH
+ sjfsrt+FB2O6bYNaXAY67OJi3GMwNHwbk9wimy+SV+O374PfIEeTy/CZ2/BU1vocxyRO
+ eCq8ljRB8oKrstBtQxE97Cp+zG35tyL3KNf7TrLEpWpJoYplz0La9P94D9/igHNvUUed
+ KBGBWe9r1ZyV6G9MC4qGvN2lmUIqTMBTCKQILmLFM2wZYENWBvbFtizgqgWXoaMfBY+C
+ 4r7A==
+X-Gm-Message-State: AHQUAuYsZblC+OO0g2HX+zRocIsmZ8CZ0906fQ0JRnZYudKt7GKmyVqm
+ JUWG3mOQ2olzF9pCYGqGnsaMi4FsQfQf/heVSEFsxQ==
+X-Google-Smtp-Source: AHgI3IaFcZZL/2rH9QTpGunyScGyRTXN776wXOAZSs3378quUqLuNmzuocgC1Zo1SMOQDR5v96EwagPe0Xwc0kqbyPg=
+X-Received: by 2002:a6b:b790:: with SMTP id
+ h138mr14110911iof.114.1549873370645; 
+ Mon, 11 Feb 2019 00:22:50 -0800 (PST)
 MIME-Version: 1.0
-References: <20190206033239.3619-1-wens@csie.org>
- <20190206033239.3619-2-wens@csie.org>
-In-Reply-To: <20190206033239.3619-2-wens@csie.org>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Mon, 11 Feb 2019 09:20:52 +0100
-Message-ID: <CACRpkdZFwG9-ap3jMe+eGDCgzG9+fKRXVEb4Q=pWasd5GUs9tQ@mail.gmail.com>
-Subject: Re: [PATCH 1/9] pinctrl: sunxi: Support I/O bias voltage setting on
- A80
-To: Chen-Yu Tsai <wens@csie.org>
+References: <20190128085847.7217-1-jagan@amarulasolutions.com>
+In-Reply-To: <20190128085847.7217-1-jagan@amarulasolutions.com>
+From: Jagan Teki <jagan@amarulasolutions.com>
+Date: Mon, 11 Feb 2019 13:52:39 +0530
+Message-ID: <CAMty3ZCdm_RoVxoHy9u2-Xhg4_tf7Mr0Gedcrz-jVhc5ceL0CQ@mail.gmail.com>
+Subject: Re: [PATCH v8 0/5] media/sun6i: Allwinner A64 CSI support
+To: Yong Deng <yong.deng@magewell.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>, 
+ Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>, 
+ Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_002106_006134_6BDFCD32 
-X-CRM114-Status: GOOD (  17.54  )
+X-CRM114-CacheID: sfid-20190211_002252_635272_A0E6255D 
+X-CRM114-Status: GOOD (  11.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,50 +90,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Maxime Ripard <maxime.ripard@bootlin.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
+Cc: devicetree <devicetree@vger.kernel.org>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
  linux-sunxi <linux-sunxi@googlegroups.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-amarula@amarulasolutions.com,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ linux-media <linux-media@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 6, 2019 at 4:32 AM Chen-Yu Tsai <wens@csie.org> wrote:
+Mauro and Maxime,
 
-> The A80 SoC has configuration registers for I/O bias voltage. Incorrect
-> settings would make the affected peripherals inoperable in some cases,
-> such as Ethernet RGMII signals biased at 2.5V with the settings still
-> at 3.3V. However low speed signals such as MDIO on the same group of
-> pins seem to be unaffected.
+On Mon, Jan 28, 2019 at 2:29 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
 >
-> Previously there was no way to know what the actual voltage used was,
-> short of hard-coding a value in the device tree. With the new pin bank
-> regulator supply support in place, the driver can now query the
-> regulator for its voltage, and if it's valid (as opposed to being the
-> dummy regulator), set the bias voltage setting accordingly.
+> Add CSI support for Allwinner A64. Here is previous series[1]
 >
-> Add a quirk to denote the presence of the configuration registers, and
-> a function to set the correct setting based on the voltage read back
-> from the regulator.
+> Changes for v8:
+> - update proper enable and disable sequnce for clk_mod
+> - fix warning for patch "media: sun6i: Add A64 CSI block support"
+> - collect Maxime Acked-by
+> Changes for v7:
+> - Drop quirk change, and add as suggusted by Maxime
+> - Use csi instead csi0 in pinctrl function
+> Changes for v6:
+> - set the mod rate in seett_power instead of probe
+> Changes for v5:
+> - Add mod_rate quirk for better handling clk_set code
+> Changes for v4:
+> - update the compatible string order
+> - add proper commit message
+> - included BPI-M64 patch
+> - skipped amarula-a64 patch
+> Changes for v3:
+> - update dt-bindings for A64
+> - set mod clock via csi driver
+> - remove assign clocks from dtsi
+> - remove i2c-gpio opendrian
+> - fix avdd and dovdd supplies
+> - remove vcc-csi pin group supply
 >
-> This is only done when the regulator is first acquired and enabled.
-> While it would be nice to have a notifier on the regulator so that when
-> the voltage changes, the driver can update the setting, in practice no
-> board currently supports dynamic changing of the I/O voltages.
+> [1] https://patchwork.kernel.org/cover/10779831/
 >
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Jagan Teki (5):
+>   dt-bindings: media: sun6i: Add A64 CSI compatible
+>   media: sun6i: Add A64 CSI block support
+>   arm64: dts: allwinner: a64: Add A64 CSI controller
+>   arm64: dts: allwinner: a64: Add pinmux setting for CSI MCLK on PE1
 
-I merged the v5.0-rc6 into my devel branch and applied this patch on
-top now.
-
-All the DTS file changes should be merged through ARM SoC, and
-they should work fine now.
-
-Yours,
-Linus Walleij
+Any chance to apply this patches? dtsi patch is already been merged
+and all been Acked as well.
 
 _______________________________________________
 linux-arm-kernel mailing list
