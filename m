@@ -2,113 +2,68 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5F128C282CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 02:08:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 91046C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 02:19:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 31902207E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 02:08:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 631AE2084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 02:19:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KWforwqd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 31902207E0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="riTUS+E+";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="wA4hBMNG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 631AE2084D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uMjEX2ZXHzD/sgZW1kRCtQNM/GyEBJsW/5KhE23Skew=; b=KWforwqdjsQQ/3
-	pktiTyjj6MNbMA1Zo1f4goNMqSN20W84fc8hpg9XiiKWnpju6rENYge0DS1XnqQgn4JZEwVl3hsem
-	fPuneBPwJg+zuP2nHPnm/9CIHXJmSVf7XMr/zGeVLqjfRDiUBUGeOsgKNmL/0xJb5G8yo1qo0BYCq
-	DdRpaqt9Lvm5GFik+x4FBAFF/pOh+eMd5aT3jrFPwTdp5dCvofm+V3vrcm9iy7aMC1M5XYdolUaQT
-	3EkQHaBSlyLH87RNPaVCo+Obhs9MZPSGRlO1iYz/w6K+rDHwUq+SNUAwO/Hr6HAquCfSLr+lzT2I4
-	qU8xO/nkfJnGGXeCIr4g==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=vJNj7qPjEf+R9H0q1aieXmgeVo0AznwpF7MVMrI/eeA=; b=riTUS+E+SAtc0v
+	Sf7fghrHhOlmUhqPJZvLyeWsPhsKtQyUKZns1b7e1GJZhWbidrYCBgsv05w35VIg67dke5AdWZnbb
+	cv/CMKRlmvDP02FscMoTPtY6AE02zieiHPkXqrGf5i4j2ht5mGIkYT24N7IhvlwvNx6lhMq5xfKI7
+	J6EewyIJLSwgpjyDOXtWsDXbp0eIvWqC9mjUcWVDes52KW1UJM4uVXENNkft3LTkO/eRvTrvgRBSH
+	KvbCP498sjFd1Pl7hpY/66kiGCe0+1pJ1PZWUacyEi6cVTewbNHeGxSfI3DcuPZRrg4VIuT6ryyHi
+	yTmnBeeCXLGfqsfyGFgw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt11c-0003YW-Ex; Mon, 11 Feb 2019 02:08:48 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
+	id 1gt1C6-0006vZ-Db; Mon, 11 Feb 2019 02:19:38 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt11Z-0003Y9-66
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 02:08:46 +0000
-Received: from smtp.corp.redhat.com (int-mx04.intmail.prod.int.phx2.redhat.com
- [10.5.11.14])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
+ id 1gt1C3-0006vE-F8
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 02:19:36 +0000
+Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
+ (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
  (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 9413A4902D;
- Mon, 11 Feb 2019 02:08:44 +0000 (UTC)
-Received: from llong.remote.csb (ovpn-121-9.rdu2.redhat.com [10.10.121.9])
- by smtp.corp.redhat.com (Postfix) with ESMTP id 344144F685;
- Mon, 11 Feb 2019 02:08:41 +0000 (UTC)
-Subject: Re: [PATCH] locking/rwsem: Remove arch specific rwsem files
-To: Peter Zijlstra <peterz@infradead.org>, Ingo Molnar <mingo@redhat.com>,
- Will Deacon <will.deacon@arm.com>, Thomas Gleixner <tglx@linutronix.de>
-References: <1549850450-10171-1-git-send-email-longman@redhat.com>
-From: Waiman Long <longman@redhat.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=longman@redhat.com; prefer-encrypt=mutual; keydata=
- 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
- weim8xU=
-Organization: Red Hat
-Message-ID: <a610aeb2-b1cb-0d57-8078-97d1051481f9@redhat.com>
-Date: Sun, 10 Feb 2019 21:08:40 -0500
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
+ by mail.kernel.org (Postfix) with ESMTPSA id 2BE472084D;
+ Mon, 11 Feb 2019 02:19:30 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549851575;
+ bh=WBip9+yQal7fzQiqL8/PA7bzT8kCaPqfkOfQz3RPd1s=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=wA4hBMNG0KU/HJfGcK4MwX7WtKoBn1HOfnh9HIwOQpKlrnf2vdEU1dyoWnOMfzfzF
+ GF4amOxyMsMkBw+wVYx5DoOgCURtZF/Fvl9mU3dnUW1u9hWYOMeP6G2H2hUGVNYP8p
+ 55kXWl1220qVbNtRNH5iCHxCDLX9irQoYoAJklgg=
+Date: Mon, 11 Feb 2019 10:19:23 +0800
+From: Shawn Guo <shawnguo@kernel.org>
+To: Abel Vesa <abel.vesa@nxp.com>
+Subject: Re: [PATCH] arm64: dts: imx8mq: Add RTC support
+Message-ID: <20190211021921.GE22487@dragon>
+References: <1548946870-29037-1-git-send-email-abel.vesa@nxp.com>
 MIME-Version: 1.0
-In-Reply-To: <1549850450-10171-1-git-send-email-longman@redhat.com>
-Content-Language: en-US
-X-Scanned-By: MIMEDefang 2.79 on 10.5.11.14
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.38]); Mon, 11 Feb 2019 02:08:44 +0000 (UTC)
+Content-Disposition: inline
+In-Reply-To: <1548946870-29037-1-git-send-email-abel.vesa@nxp.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190210_180845_291114_E4C17A7B 
-X-CRM114-Status: GOOD (  23.17  )
+X-CRM114-CacheID: sfid-20190210_181935_559817_74C2DD33 
+X-CRM114-Status: UNSURE (   9.22  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -120,75 +75,25 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, linux-xtensa@linux-xtensa.org,
- Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
- Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
- linux-sh@vger.kernel.org, linux-hexagon@vger.kernel.org, x86@kernel.org,
- "H. Peter Anvin" <hpa@zytor.com>, linux-kernel@vger.kernel.org,
- Linus Torvalds <torvalds@linux-foundation.org>, Borislav Petkov <bp@alien8.de>,
- linux-alpha@vger.kernel.org, sparclinux@vger.kernel.org,
- Andrew Morton <akpm@linux-foundation.org>, linuxppc-dev@lists.ozlabs.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
+ Baruch Siach <baruch@tkos.co.il>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Abel Vesa <abelvesa@linux.com>, dl-linux-imx <linux-imx@nxp.com>,
+ Sascha Hauer <kernel@pengutronix.de>, Fabio Estevam <fabio.estevam@nxp.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 02/10/2019 09:00 PM, Waiman Long wrote:
-> As the generic rwsem-xadd code is using the appropriate acquire and
-> release versions of the atomic operations, the arch specific rwsem.h
-> files will not be that much faster than the generic code as long as the
-> atomic functions are properly implemented. So we can remove those arch
-> specific rwsem.h and stop building asm/rwsem.h to reduce maintenance
-> effort.
->
-> Currently, only x86, alpha and ia64 have implemented architecture
-> specific fast paths. I don't have access to alpha and ia64 systems for
-> testing, but they are legacy systems that are not likely to be updated
-> to the latest kernel anyway.
->
-> By using a rwsem microbenchmark, the total locking rates on a 4-socket
-> 56-core 112-thread x86-64 system before and after the patch were as
-> follows (mixed means equal # of read and write locks):
->
->                       Before Patch              After Patch
->    # of Threads  wlock   rlock   mixed     wlock   rlock   mixed
->    ------------  -----   -----   -----     -----   -----   -----
->         1        27,373  29,409  28,170    28,773  30,164  29,276
->         2         7,697  14,922   1,703     7,435  15,167   1,729
->         4         6,987  14,285   1,490     7,181  14,438   1,330
->         8         6,650  13,652     761     6,918  13,796     718
->        16         6,434  15,729     713     6,554  16,030     625
->        32         5,590  15,312     552     6,124  15,344     471
->        64         5,980  15,478      61     5,668  15,509      58
->
-> There were some run-to-run variations for the multi-thread tests. For
-> x86-64, using the generic C code fast path seems to be a liitle bit
-> faster than the assembly version especially for read-lock and when lock
-> contention is low.  Looking at the assembly version of the fast paths,
-> there are assembly to/from C code wrappers that save and restore all
-> the callee-clobbered registers (7 registers on x86-64). The assembly
-> generated from the generic C code doesn't need to do that. That may
-> explain the slight performance gain here.
->
-> The generic asm rwsem.h can also be merged into kernel/locking/rwsem.h
-> as no other code other than those under kernel/locking needs to access
-> the internal rwsem macros and functions.
->
-> Signed-off-by: Waiman Long <longman@redhat.com>
+On Thu, Jan 31, 2019 at 03:01:22PM +0000, Abel Vesa wrote:
+> Add RTC support for i.MX8MQ.
+> 
+> Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
 
-I have decided to break the rwsem patchset that I sent out on last
-Thursday into 3 parts. This patch is part 0 as it touches a number of
-arch specific files and so have the widest distribution. I would like to
-get it merged first. Part 1 will be patches 1-10 (except 4) of my
-original rwsem patchset. This part moves things around, adds more
-debugging capability and lays the ground work for the next part. Part 2
-will contains the remaining patches which are the real beef of the whole
-patchset.
-
-Cheers,
-Longman
-
+Applied, thanks.
 
 _______________________________________________
 linux-arm-kernel mailing list
