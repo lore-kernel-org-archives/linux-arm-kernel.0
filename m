@@ -2,87 +2,90 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6519BC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:09:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 214BAC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:09:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3594F20844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:09:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E32CD20844
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:09:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TWR5Vw7R";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="A5EGKxLL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3594F20844
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="THxB/sZu";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=lucaceresoli.net header.i=@lucaceresoli.net header.b="J5ngiVZf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E32CD20844
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lucaceresoli.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=MK+xPrqLCOJXQCiHm+F/efuVOe0Kx6m5PnyNielpL/I=; b=TWR5Vw7RFaHqjy
-	yyJyT/IyEaGSpZ8Sv6ggqTrWXas4iOihZNAf0z9ISWr5mX9aqDQeEKcTZZZxFjX2K2kR4AkLrk5J2
-	l2RM1Spr2Rzgshn0MG+Fx5c342lwQrtvDRaIfL3a5iI9NIsM7KHSMNdvHfcCdwPkNqIanZCArLLJ1
-	3mudh7Vi2r9oys7L3abkvBd2xeYUORYjc7JbXS22HCyCUasmuSQGsdeT35UAr7f7z9XRvpUnR1HtB
-	oxhLfkQMjVYrhQBjnTgudZVBx4xv16C989vgZAIWTO+lwx0rQSwqAxB7EkGf66b2NsfHfitWWOGvj
-	hmW4bG8Z7Ky4ftyHk+ow==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:References:To:Subject:From:Reply-To:Cc:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=sMvB4J/uTYg4z/WedBBipVtvaybMf6iEg4yMwPREHb4=; b=THxB/sZuEBye4mgJqeYHWSNFmE
+	YwUwKhjGJDoZT4nWNfAcUxvTU3NXutievOdgskiKfMmNJZi1NomBTd0sq4rDHZB2BGplkDjkXuVc5
+	OsQJgrmn7taLH01ZRSPJyEON5DZHiWlBY0n4X88O9urZWI0F056wNsc0jd8yGLIFsHZ038HVZ4+eL
+	f3RdRoN6RUsKVcU3kNkEKbAlZSWtAOWbMniSxSUBK1zXcbu44QSBfgQb8uSrCJ9AlD91eKDLPSeiy
+	S72wyMWD7kExqJPOct5eLbokh2U0MpM7aMxM0I3lAakxfIHEOXPPiS+WdZ1V41LWSaeuD19wMkQ2q
+	ENOJzVaA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt9So-0005T7-Cf; Mon, 11 Feb 2019 11:09:26 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gt9T4-0005ig-7k; Mon, 11 Feb 2019 11:09:42 +0000
+Received: from hostingweb31-40.netsons.net ([89.40.174.40])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt9Sk-0005Sm-AC
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 11:09:23 +0000
-Received: by mail-wm1-x341.google.com with SMTP id b11so17072749wmj.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 03:09:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=QxR4ydY2asPONlOFGBW5etgVpUXzE8d1exJ++uN0wXU=;
- b=A5EGKxLL5iykMofqRqHSqdwj18iG04+j1nHO1A0xiC6tEoTT134GF5GKz//7NW8MLL
- 3R6EvIHAFkk/85wXZKr+KLeFrR8cs+W2yPejJleSa7HL+u5/q/QxmfFNVWyjqjSEJu8u
- ivxxWiWvyINTotAyCfjpMVRN2kPaI7J9Cyzhw5e6LoUVS0ExhvJDiTljpzt8zYr2Ih5w
- aorBWFcIY37ugPv8f1dsWVhQNgQt6n+Go7tYRDijzAvPwVTZqZTkf6gzK5T8J4FKKnmI
- QKwUKWJHLTZIcc3/Sbjrw+1QFOJ1Zq1zMlh/KDknwPNx27HlWxK+LkVtSf2XnYXfCzFu
- zSzg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=QxR4ydY2asPONlOFGBW5etgVpUXzE8d1exJ++uN0wXU=;
- b=ZPersrLxLLkWnL2UTS40IU4YYcas90IyP18SNpYKTR8AAHrCp5NfYsckzxSsc2xVsS
- NE+Th+XhxXWjsuXw3+wLsD16Uu8qhArpf4K2a5qMmKHXBQr48ZoK7uLH0aF/lFz8Lwj4
- DQhTC52Z6GfZ0SrvnwWfZOHA8oGwar6YNrKy3sxASLEN8HypgxeyFw5NU9i2OqBRGxjs
- 2A98Tz4NOpbvdh9ru/OHKWeaLfoMA8wxBv4vizuNB9/SPY3g6vgnH1WxSpchFf39A9my
- kcbs5puE+vn+S5pw/HmElcV6NkGIur1BxS2ouajiLyYp2gpaU4b55VURxj6PliAM/m9A
- V1ZQ==
-X-Gm-Message-State: AHQUAuYDSiEH7Tc8xjoGbscTXlSnZn6ofMWUDMbiJTbat9qzGEE+bX8b
- duoUJxZAkbTpX1JIkjGEzl9rIkMu
-X-Google-Smtp-Source: AHgI3IaL6iEgQxU2vX5daEdKUZBJAD/TfVShSwkTr/6wXRI9emFGjA0+bKrjGMjv3YMRuRavh0S4GA==
-X-Received: by 2002:adf:f28d:: with SMTP id k13mr28092250wro.78.1549883360690; 
- Mon, 11 Feb 2019 03:09:20 -0800 (PST)
-Received: from localhost (pD9E51040.dip0.t-ipconnect.de. [217.229.16.64])
- by smtp.gmail.com with ESMTPSA id y145sm9976625wmd.30.2019.02.11.03.09.19
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 11 Feb 2019 03:09:20 -0800 (PST)
-From: Thierry Reding <thierry.reding@gmail.com>
-To: Thierry Reding <thierry.reding@gmail.com>
-Subject: [PATCH v2] ARM: tegra: Restore DT ABI on Tegra124 Chromebooks
-Date: Mon, 11 Feb 2019 12:09:19 +0100
-Message-Id: <20190211110919.10388-1-thierry.reding@gmail.com>
-X-Mailer: git-send-email 2.19.1
+ id 1gt9Sw-0005av-FG
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 11:09:38 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=lucaceresoli.net; s=default; h=Content-Transfer-Encoding:Content-Type:
+ In-Reply-To:MIME-Version:Date:Message-ID:References:To:Subject:From:Sender:
+ Reply-To:Cc:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=PefZbUwJMzQ4ZwMXSOIIqFQDeGpOHkO2Vj/7JrEeLUU=; b=J5ngiVZfK4jGBlXcrYy0/yw3a8
+ 6rze3AtW+z6vDUKlP4uPMOuOf1efbcNdu1pwPgdMvLUi5ZlL08BmJiWLxOeOzEfYNSCJ1ohHXYNF+
+ UeXC5EzBg8VKvqFmAUTUYW0bqN4r0q95eNgnFi2et6M0lfLRWL8Buz8U03k6n1/tRsV4=;
+Received: from [109.168.11.45] (port=59808 helo=[192.168.101.224])
+ by hostingweb31.netsons.net with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.91)
+ (envelope-from <luca@lucaceresoli.net>)
+ id 1gt92f-00GzIe-Hj; Mon, 11 Feb 2019 11:42:25 +0100
+From: Luca Ceresoli <luca@lucaceresoli.net>
+Subject: Re: [PATCH v3 2/2] media: v4l: xilinx: Add Xilinx MIPI CSI-2 Rx
+ Subsystem
+To: Vishal Sagar <vishal.sagar@xilinx.com>, hyun.kwon@xilinx.com,
+ laurent.pinchart@ideasonboard.com, mchehab@kernel.org, robh+dt@kernel.org,
+ mark.rutland@arm.com, michals@xilinx.com, linux-media@vger.kernel.org,
+ devicetree@vger.kernel.org, sakari.ailus@linux.intel.com,
+ hans.verkuil@cisco.com, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org, dineshk@xilinx.com, sandipk@xilinx.com
+References: <1549025766-135037-1-git-send-email-vishal.sagar@xilinx.com>
+ <1549025766-135037-3-git-send-email-vishal.sagar@xilinx.com>
+Message-ID: <3923069f-7c69-c601-0ded-f7629696ef9b@lucaceresoli.net>
+Date: Mon, 11 Feb 2019 11:42:24 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
+In-Reply-To: <1549025766-135037-3-git-send-email-vishal.sagar@xilinx.com>
+Content-Language: en-US
+X-AntiAbuse: This header was added to track abuse,
+ please include it with any abuse report
+X-AntiAbuse: Primary Hostname - hostingweb31.netsons.net
+X-AntiAbuse: Original Domain - lists.infradead.org
+X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
+X-AntiAbuse: Sender Address Domain - lucaceresoli.net
+X-Get-Message-Sender-Via: hostingweb31.netsons.net: authenticated_id:
+ luca+lucaceresoli.net/only user confirmed/virtual account not confirmed
+X-Authenticated-Sender: hostingweb31.netsons.net: luca@lucaceresoli.net
+X-Source: 
+X-Source-Args: 
+X-Source-Dir: 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_030922_376155_D4517F3D 
-X-CRM114-Status: GOOD (  16.89  )
+X-CRM114-CacheID: sfid-20190211_030935_210049_689D2E27 
+X-CRM114-Status: GOOD (  14.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,76 +97,86 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Tristan Bastian <tristan-c.bastian@gmx.de>,
- linux-arm-kernel@lists.infradead.org, Jon Hunter <jonathanh@nvidia.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+Hi Vishal,
 
-Commit 482997699ef0 ("ARM: tegra: Fix unit_address_vs_reg DTC warnings
-for /memory") inadventently broke device tree ABI by adding a unit-
-address to the "/memory" node because the device tree compiler flagged
-the missing unit-address as a warning.
+On 01/02/19 13:56, Vishal Sagar wrote:
+> The Xilinx MIPI CSI-2 Rx Subsystem soft IP is used to capture images
+> from MIPI CSI-2 camera sensors and output AXI4-Stream video data ready
+> for image processing. Please refer to PG232 for details.
 
-Tegra124 Chromebooks (a.k.a. Nyan) use a bootloader that relies on the
-full name of the memory node in device tree being exactly "/memory". It
-can be argued whether this was a good decision or not, and some other
-bootloaders (such as U-Boot) do accept a unit-address in the name of the
-node, but the device tree is an ABI and we can't break existing setups
-just because the device tree compiler considers it bad practice to omit
-the unit-address nowadays.
+For those unused to Xilinx documentation I'd use the full document name
+("MIPI CSI-2 Receiver Subsystem v4.0") or, even better, a stable URL if
+available.
 
-This partially reverts the offending commit and restores device tree ABI
-compatibility.
+> The driver is used to set the number of active lanes, if enabled
+> in hardware. The CSI2 Rx controller filters out all packets except for
+> the packets with data type fixed in hardware. RAW8 packets are always
+> allowed to pass through.
+> 
+> It is also used to setup and handle interrupts and enable the core. It
+> logs all the events in respective counters between streaming on and off.
+> The generic short packets received are notified to application via
+> v4l2_events.
+> 
+> The driver supports only the video format bridge enabled configuration.
+> Some data types like YUV 422 10bpc, RAW16, RAW20 are supported when the
+> CSI v2.0 feature is enabled in design. When the VCX feature is enabled,
+> the maximum number of virtual channels becomes 16 from 4.
+> 
+> Signed-off-by: Vishal Sagar <vishal.sagar@xilinx.com>
 
-Fixes: 482997699ef0 ("ARM: tegra: Fix unit_address_vs_reg DTC warnings for /memory")
-Reported-by: Tristan Bastian <tristan-c.bastian@gmx.de>
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-Changes in v2:
-- remove memory@80000000 node pulled in from tegra124.dtsi
-- add device_type = "memory" property
+...
 
- arch/arm/boot/dts/tegra124-nyan.dtsi | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
+> +/**
+> + * xcsi2rxss_reset - Does a soft reset of the MIPI CSI2 Rx Subsystem
+> + * @core: Core Xilinx CSI2 Rx Subsystem structure pointer
+> + *
+> + * Core takes less than 100 video clock cycles to reset.
+> + * So a larger timeout value is chosen for margin.
+> + *
+> + * Return: 0 - on success OR -ETIME if reset times out
+> + */
+> +static int xcsi2rxss_reset(struct xcsi2rxss_core *core)
+> +{
+> +	u32 timeout = XCSI_TIMEOUT_VAL;
 
-diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
-index d5f11d6d987e..bc85b6a166c7 100644
---- a/arch/arm/boot/dts/tegra124-nyan.dtsi
-+++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
-@@ -13,10 +13,25 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
--	memory@80000000 {
-+	/*
-+	 * Note that recent version of the device tree compiler (starting with
-+	 * version 1.4.2) warn about this node containing a reg property, but
-+	 * missing a unit-address. However, the bootloader on these Chromebook
-+	 * devices relies on the full name of this node to be exactly /memory.
-+	 * Adding the unit-address causes the bootloader to create a /memory
-+	 * node and write the memory bank configuration to that node, which in
-+	 * turn leads the kernel to believe that the device has 2 GiB of
-+	 * memory instead of the amount detected by the bootloader.
-+	 *
-+	 * The name of this node is effectively ABI and must not be changed.
-+	 */
-+	memory {
-+		device_type = "memory";
- 		reg = <0x0 0x80000000 0x0 0x80000000>;
- 	};
- 
-+	/delete-node/ memory@80000000;
-+
- 	host1x@50000000 {
- 		hdmi@54280000 {
- 			status = "okay";
+The comment about the timeout is duplicated here and at the #define
+line. Why not removing the define above and just putting
+
+  u32 timeout = 1000; /* us */
+
+here? It would make the entire timeout logic appear in a unique place.
+
+> +static int xcsi2rxss_start_stream(struct xcsi2rxss_state *state)
+> +{
+> +	struct xcsi2rxss_core *core = &state->core;
+> +	int ret = 0;
+> +
+> +	xcsi2rxss_enable(core);
+> +
+> +	ret = xcsi2rxss_reset(core);
+> +	if (ret < 0) {
+> +		state->streaming = false;
+> +		return ret;
+> +	}
+> +
+> +	xcsi2rxss_intr_enable(core);
+> +	state->streaming = true;
+
+Shouldn't you propagate s_stream to the upstream subdev here calling
+v4l2_subdev_call(..., ..., s_stream, 1)?
+
+> +	return ret;
+> +}
+
+
 -- 
-2.19.1
-
+Luca
 
 _______________________________________________
 linux-arm-kernel mailing list
