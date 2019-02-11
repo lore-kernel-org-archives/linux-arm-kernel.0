@@ -4,18 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 46F94C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:50:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 781ECC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:54:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 09565218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:50:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 43703218D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:54:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nPCW6IAn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 09565218A6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YctGgyz2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43703218D8
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,32 +25,33 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Yf0LIb+Q9vWKmJrQ9K9esnZ+oizkkrcoYhLu39T7oe8=; b=nPCW6IAnQ6YCCT
-	gqRhK5k9alHMnuGuK72NY8wRvp0aP3J7gugmhq6DoTy5ASAq1rSa8H02VKxdRcq/cHvZQ3UlGn4Sf
-	LvwNxrUF8c3v8Bx674C/dSzB3SiRZDmzUVimmg0f+YJ9Ua6Z8OASAQOhfVpTGu3L22Zo31ZhaS45n
-	PUsgPvzPZ/nJgeK3xj/sL6045JGpkCczicDjhiZsVOsuZllIuarlqVe2EnXFhgwG/COXjLGLKGKcT
-	ne0m/QTVZZ16dNlVCcS8FIvjdPn/78OexCyYoDc0RdBzircd3O0CcKbXDO2cY/GrNtUHOTji4MdRl
-	dA9vDLJT+JTNl0TkrYDA==;
+	List-Owner; bh=EG5peyLPcaWjRVdONSFsBFttSPF54Omw94km9BQ2/tM=; b=YctGgyz2uVWPJ5
+	io5pmO9bSESC1KH2/V60BWClz1xQ7QWKfN9QMNX87SUim4zwccU+lPJ7rl21S+wYA4QG6Fo5K4m3j
+	mdbwrVrPk0g106YP66PcWINjxRm1pMYma766PvX4TEcDYHYzos3POr4R/9yNmByeJM+jQuPqr2VXv
+	8g/vZs37arIzDPNHJy4P4QOpi+Th0iXbrYA0kcRjE6HxobhBBOr4xs/DfEaVkNx2xEBBcD/dFy9Hl
+	/ExsY3drgNZ8aqjnh6YZ8J+bLuk4amTziu0KnpFew0dz7PlOm1hwa1ebdsGs0rfRFX8HzcRszqPLz
+	eMsqZUggpkkpp4oE7bxw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtB2l-0001qx-Ff; Mon, 11 Feb 2019 12:50:39 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gtB6c-0003JJ-Mz; Mon, 11 Feb 2019 12:54:38 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtB2h-0001qL-GR
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 12:50:37 +0000
+ id 1gtB6Z-0003Iq-IC
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 12:54:36 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E840E80D;
- Mon, 11 Feb 2019 04:50:32 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 29F6180D;
+ Mon, 11 Feb 2019 04:54:35 -0800 (PST)
 Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
  by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- D87F93F557; Mon, 11 Feb 2019 04:50:30 -0800 (PST)
-Subject: Re: [RESEND PATCH v2 03/33] ARM: davinci: select
- GENERIC_IRQ_MULTI_HANDLER
+ 02B363F557; Mon, 11 Feb 2019 04:54:29 -0800 (PST)
+Subject: Re: [RESEND PATCH v2 13/33] ARM: davinci: aintc: use
+ readl/writel_relaxed()
 To: Bartosz Golaszewski <brgl@bgdev.pl>, Sekhar Nori <nsekhar@ti.com>,
  Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
  Jason Cooper <jason@lakedaemon.net>, David Lechner <david@lechnology.com>
 References: <20190211122606.8662-1-brgl@bgdev.pl>
- <20190211122606.8662-4-brgl@bgdev.pl>
+ <20190211122606.8662-14-brgl@bgdev.pl>
 From: Marc Zyngier <marc.zyngier@arm.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
@@ -95,16 +97,16 @@ Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
  hApihi08gwvP5G9fNGKQyRETePEtEAWt0b7dOqMzYBYGRVr7uS4uT6WP7fzOwAJC4lU7ZYWZ
  yVshCa0IvTtp1085RtT3qhh9mobkcZ+7cQOY+Tx2RGXS9WeOh2jZjdoWUv6CevXNQyOUXMM=
 Organization: ARM Ltd
-Message-ID: <0220fbc8-a73f-0f40-2b62-14bec019ac7c@arm.com>
-Date: Mon, 11 Feb 2019 12:50:21 +0000
+Message-ID: <98530970-e49c-cce1-d2f7-749e18430dad@arm.com>
+Date: Mon, 11 Feb 2019 12:54:27 +0000
 User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <20190211122606.8662-4-brgl@bgdev.pl>
+In-Reply-To: <20190211122606.8662-14-brgl@bgdev.pl>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_045035_558701_CE0F11CD 
-X-CRM114-Status: GOOD (  26.92  )
+X-CRM114-CacheID: sfid-20190211_045435_616150_43A58432 
+X-CRM114-Status: GOOD (  18.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -126,166 +128,39 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 On 11/02/2019 12:25, Bartosz Golaszewski wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> In order to support SPARSE_IRQ we first need to make davinci use the
-> generic irq handler for ARM. Translate the legacy assembly to C and
-> put the irq handlers into their respective drivers (aintc and cp-intc).
+> Raplace all calls to __raw_readl() & __raw_writel() with readl_relaxed()
+> and writel_relaxed() respectively. It's safe to do as there's no
+> endianness conversion being done in the code.
 > 
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
->  arch/arm/Kconfig                              |  1 +
->  arch/arm/mach-davinci/cp_intc.c               | 28 +++++++++++++
->  .../mach-davinci/include/mach/entry-macro.S   | 39 -------------------
->  arch/arm/mach-davinci/irq.c                   | 23 +++++++++++
->  4 files changed, 52 insertions(+), 39 deletions(-)
->  delete mode 100644 arch/arm/mach-davinci/include/mach/entry-macro.S
+>  arch/arm/mach-davinci/irq.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 664e918e2624..f7770fdcad68 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -589,6 +589,7 @@ config ARCH_DAVINCI
->  	select GENERIC_ALLOCATOR
->  	select GENERIC_CLOCKEVENTS
->  	select GENERIC_IRQ_CHIP
-> +	select GENERIC_IRQ_MULTI_HANDLER
->  	select GPIOLIB
->  	select HAVE_IDE
->  	select PM_GENERIC_DOMAINS if PM
-> diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
-> index 67805ca74ff8..4a372add8cf9 100644
-> --- a/arch/arm/mach-davinci/cp_intc.c
-> +++ b/arch/arm/mach-davinci/cp_intc.c
-> @@ -19,9 +19,13 @@
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
->  
-> +#include <asm/exception.h>
->  #include <mach/common.h>
->  #include "cp_intc.h"
->  
-> +#define DAVINCI_CP_INTC_PRI_INDX_MASK		GENMASK(9, 0)
-> +#define DAVINCI_CP_INTC_GPIR_NONE		BIT(31)
-> +
->  static inline unsigned int cp_intc_read(unsigned offset)
->  {
->  	return __raw_readl(davinci_intc_base + offset);
-> @@ -97,6 +101,28 @@ static struct irq_chip cp_intc_irq_chip = {
->  
->  static struct irq_domain *cp_intc_domain;
->  
-> +static asmlinkage void __exception_irq_entry
-> +cp_intc_handle_irq(struct pt_regs *regs)
-> +{
-> +	int gpir, irqnr, none;
-> +
-> +	/*
-> +	 * The interrupt number is in first ten bits. The NONE field set to 1
-> +	 * indicates a spurious irq.
-> +	 */
-> +
-> +	gpir = cp_intc_read(CP_INTC_PRIO_IDX);
-> +	irqnr = gpir & DAVINCI_CP_INTC_PRI_INDX_MASK;
-> +	none = gpir & DAVINCI_CP_INTC_GPIR_NONE;
-> +
-> +	if (unlikely(none)) {
-> +		pr_err_once("%s: spurious irq!\n", __func__);
-> +		return;
-> +	}
-> +
-> +	handle_domain_irq(cp_intc_domain, irqnr, regs);
-> +}
-> +
->  static int cp_intc_host_map(struct irq_domain *h, unsigned int virq,
->  			  irq_hw_number_t hw)
->  {
-> @@ -196,6 +222,8 @@ int __init cp_intc_of_init(struct device_node *node, struct device_node *parent)
->  		return -EINVAL;
->  	}
->  
-> +	set_handle_irq(cp_intc_handle_irq);
-> +
->  	/* Enable global interrupt */
->  	cp_intc_write(1, CP_INTC_GLOBAL_ENABLE);
->  
-> diff --git a/arch/arm/mach-davinci/include/mach/entry-macro.S b/arch/arm/mach-davinci/include/mach/entry-macro.S
-> deleted file mode 100644
-> index cf5f573eb5fd..000000000000
-> --- a/arch/arm/mach-davinci/include/mach/entry-macro.S
-> +++ /dev/null
-> @@ -1,39 +0,0 @@
-> -/*
-> - * Low-level IRQ helper macros for TI DaVinci-based platforms
-> - *
-> - * Author: Kevin Hilman, MontaVista Software, Inc. <source@mvista.com>
-> - *
-> - * 2007 (c) MontaVista Software, Inc. This file is licensed under
-> - * the terms of the GNU General Public License version 2. This program
-> - * is licensed "as is" without any warranty of any kind, whether express
-> - * or implied.
-> - */
-> -#include <mach/irqs.h>
-> -
-> -		.macro  get_irqnr_preamble, base, tmp
-> -		ldr \base, =davinci_intc_base
-> -		ldr \base, [\base]
-> -		.endm
-> -
-> -		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
-> -#if defined(CONFIG_AINTC) && defined(CONFIG_CP_INTC)
-> -		ldr \tmp, =davinci_intc_type
-> -		ldr \tmp, [\tmp]
-> -		cmp \tmp, #DAVINCI_INTC_TYPE_CP_INTC
-> -		beq 1001f
-> -#endif
-> -#if defined(CONFIG_AINTC)
-> -		ldr \tmp, [\base, #0x14]
-> -		movs \tmp, \tmp, lsr #2
-> -		sub \irqnr, \tmp, #1
-> -		b 1002f
-> -#endif
-> -#if defined(CONFIG_CP_INTC)
-> -1001:		ldr \irqnr, [\base, #0x80] /* get irq number */
-> -		mov \tmp, \irqnr, lsr #31
-> -		and \irqnr, \irqnr, #0xff  /* irq is in bits 0-9 */
-> -		and \tmp, \tmp, #0x1
-> -		cmp \tmp, #0x1
-> -#endif
-> -1002:
-> -		.endm
 > diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
-> index 07d8ef8037e4..3ce821a06e52 100644
+> index 148c23728bdb..6a7205a844e1 100644
 > --- a/arch/arm/mach-davinci/irq.c
 > +++ b/arch/arm/mach-davinci/irq.c
-> @@ -29,11 +29,13 @@
->  #include <mach/cputype.h>
->  #include <mach/common.h>
->  #include <asm/mach/irq.h>
-> +#include <asm/exception.h>
+> @@ -36,12 +36,12 @@ static struct irq_domain *davinci_aintc_irq_domain;
 >  
->  #define FIQ_REG0_OFFSET		0x0000
->  #define FIQ_REG1_OFFSET		0x0004
->  #define IRQ_REG0_OFFSET		0x0008
->  #define IRQ_REG1_OFFSET		0x000C
-> +#define IRQ_IRQENTRY_OFFSET	0x0014
->  #define IRQ_ENT_REG0_OFFSET	0x0018
->  #define IRQ_ENT_REG1_OFFSET	0x001C
->  #define IRQ_INCTL_REG_OFFSET	0x0020
-> @@ -48,6 +50,11 @@ static inline void davinci_irq_writel(unsigned long value, int offset)
->  	__raw_writel(value, davinci_intc_base + offset);
+>  static inline void davinci_aintc_writel(unsigned long value, int offset)
+>  {
+> -	__raw_writel(value, davinci_aintc_base + offset);
+> +	writel_relaxed(value, davinci_aintc_base + offset);
 >  }
 >  
-> +static inline unsigned long davinci_irq_readl(int offset)
-> +{
-> +	return __raw_readl(davinci_intc_base + offset);
+>  static inline unsigned long davinci_aintc_readl(int offset)
+>  {
+> -	return __raw_readl(davinci_aintc_base + offset);
+> +	return readl_relaxed(davinci_aintc_base + offset);
+>  }
+>  
+>  static __init void
+> 
 
-I appreciate that you're converting assembly code dating from a while
-back, but if we're going to do this correctly, I don't think we should
-entertain the use of __raw_readl().
-
-Surely the bus has a fixed endianness (and I'd assume it to be LE). Why
-aren't you using readl_relaxed() instead, which will have the exact same
-generated code with an LE kernel, and will do the right thing should you
-run a BE kernel.
+Right. And that's exactly what I'd like to see in patch #3. There is no
+point having a separate patch for this when you can do the right thing
+from the beginning.
 
 Thanks,
 
