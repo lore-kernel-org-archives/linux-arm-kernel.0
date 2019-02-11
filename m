@@ -2,132 +2,71 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3783DC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 07:14:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D720DC282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 07:17:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 034BF20836
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 07:14:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A51BC20836
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 07:17:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gRNb3+22";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="UJTLquNW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 034BF20836
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cL0XYBgc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A51BC20836
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Cc:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dAdP5snNRck9tbKMByQMHeEk6Ns+Wt8TVaRd4tkwYlI=; b=gRNb3+22keukFJ
-	WzGIYOCsFgC0KRv+a0eL7g09MG6cFhgQ3ruibtopKKz2Gig8M7qtCahUInNLUIyozBQDoemymIWhA
-	q89xAVXPSRLVlitYLbymrHI/q5ImU1UstkAtOrCn/FBjqDAdlLcwYmJ1/CyPawG6YY277NgvZtAfz
-	Jpfht1nIy0r5AZIQmXFLLaE5pLD1o3HlR/k0HUkjcaMLxqN2OR4WczEIIyiJmmSabZISPxJ7e6St5
-	Nw8wtpaaWEywusI0VJj9DUvElXL1Ac/aM569LfQ117eS95alFnqT+6KRzzZ02xvFA1JS6YrIfyHFM
-	+g6iIgJRSqgoBCn0eT2g==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=S7P6M3WHI4OjhdIiUuvJNlNI00oQfPno+dHC5AsoUtk=; b=cL0XYBgcqRgOsu
+	/tQRstHKbchd1npsvDPlqrM2nrzo5W0L3lr/PjE77UQPRLS4rS71nxoDCYODwJIq0ye2f2Pn8cs7c
+	do0/TTak/0D3yXYL1Pp4qlYoyxE7koo6NH5MBTjAct6+txT3LLL2DDEFJJk6zlwCrd85x9+4F5s4E
+	/9BoYxG2MiOmsj6zvnBgFSwkpo2/wPT3KwgsIwwr4o+4TKGzaMSj4K2n54GvPCl6sTnPyLSJJC9uL
+	h63kpacU99mBsq0gfTL6r4gFz+l2VooXp8L7x0xsBFIqkXtj+LFpUkmTz+mDWs2qzX9fwkmUxSibJ
+	nvgClretn3HlFyxUgDyQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt5nI-0007qa-T0; Mon, 11 Feb 2019 07:14:20 +0000
-Received: from mailout2.w1.samsung.com ([210.118.77.12])
+	id 1gt5qX-0001IN-0G; Mon, 11 Feb 2019 07:17:41 +0000
+Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt5nE-0007pK-Hy
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 07:14:18 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
- by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190211071406euoutp022ee82cb7c1e57c2afe17bd685433e116~CPd4qnZaT1362113621euoutp02V
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 07:14:06 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
- 20190211071406euoutp022ee82cb7c1e57c2afe17bd685433e116~CPd4qnZaT1362113621euoutp02V
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1549869246;
- bh=RkXi9YezkbID3MO4NwJ2pFWG22B7fNBAMm5Y52Zx9LA=;
- h=Subject:To:From:Date:In-Reply-To:References:From;
- b=UJTLquNWVQtag0Z+ZYkra0wfknJqIerGMxHpAR0OEFEDi6Qyu4MMsvzypbM5ewDFs
- Q1DSib7/fXk8CmZHArtWTNPxWhtBylcuCxu5W41FRyg8p8ctZ9bZkYIavJVLfn9wX7
- +SfosRe55pC6VZ+k+R+OqTlvcQLUgMqEV1+VWmO0=
-Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20190211071405eucas1p1886924ba2a7ba23d19379e3d38ec7c36~CPd4FvxIS0441604416eucas1p1E;
- Mon, 11 Feb 2019 07:14:05 +0000 (GMT)
-Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
- eusmges2new.samsung.com (EUCPMTA) with SMTP id EA.3D.04294.DB0216C5; Mon, 11
- Feb 2019 07:14:05 +0000 (GMT)
-Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
- 20190211071404eucas1p27b5d9aea5772f38bd543102f740d0ac5~CPd3SiJnW0295702957eucas1p2w;
- Mon, 11 Feb 2019 07:14:04 +0000 (GMT)
-Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
- eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
- 20190211071404eusmtrp1fefb66b5dcff8a2f9b9e8fcc9a3875d1~CPd3EFhqf0939009390eusmtrp1k;
- Mon, 11 Feb 2019 07:14:04 +0000 (GMT)
-X-AuditID: cbfec7f4-84fff700000010c6-55-5c6120bd2843
-Received: from eusmtip1.samsung.com ( [203.254.199.221]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id 97.07.04128.CB0216C5; Mon, 11
- Feb 2019 07:14:04 +0000 (GMT)
-Received: from [106.116.147.30] (unknown [106.116.147.30]) by
- eusmtip1.samsung.com (KnoxPortal) with ESMTPA id
- 20190211071404eusmtip1e7e201228c6a767456b91fc3aea30874~CPd2pPUc_1366613666eusmtip1K;
- Mon, 11 Feb 2019 07:14:03 +0000 (GMT)
-Subject: Re: [PATCH 0/2] Subject: [PATCH 0/2] clocksource: exynos_mct: Clear
- timer interrupt when shutting down
-To: Stuart Menefy <stuart.menefy@mathembedded.com>,
- linux-samsung-soc@vger.kernel.org, Daniel Lezcano
- <daniel.lezcano@linaro.org>, Thomas Gleixner <tglx@linutronix.de>, Kukjin
- Kim <kgene@kernel.org>, Krzysztof Kozlowski <krzk@kernel.org>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-From: Marek Szyprowski <m.szyprowski@samsung.com>
-Message-ID: <e22c175a-d88a-81a7-9faa-42bb4fe09a22@samsung.com>
-Date: Mon, 11 Feb 2019 08:14:01 +0100
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+ id 1gt5qT-0001Hp-AD; Mon, 11 Feb 2019 07:17:38 +0000
+X-UUID: 9628415cab294592928a223e83de0690-20190210
+X-UUID: 9628415cab294592928a223e83de0690-20190210
+Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
+ (envelope-from <seiya.wang@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 336559588; Sun, 10 Feb 2019 23:17:35 -0800
+Received: from mtkmbs08n1.mediatek.inc (172.21.101.55) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Sun, 10 Feb 2019 23:17:33 -0800
+Received: from mtkcas07.mediatek.inc (172.21.101.84) by
+ mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 11 Feb 2019 15:17:32 +0800
+Received: from mtksdccf07.mediatek.inc (172.21.84.99) by mtkcas07.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
+ Frontend Transport; Mon, 11 Feb 2019 15:17:32 +0800
+From: Seiya Wang <seiya.wang@mediatek.com>
+To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>, Michael Turquette
+ <mturquette@baylibre.com>, Stephen Boyd <sboyd@kernel.org>
+Subject: [PATCH v1 1/2] arm64: dts: mt8173: correct cpu type of cpu2 and cpu3
+ to cortex-a72
+Date: Mon, 11 Feb 2019 15:15:54 +0800
+Message-ID: <20190211071555.31430-1-seiya.wang@mediatek.com>
+X-Mailer: git-send-email 2.14.1
 MIME-Version: 1.0
-In-Reply-To: <20190210225114.20110-1-stuart.menefy@mathembedded.com>
-Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA01Sa0hTYRju29m5bDg7bsrezKxWBgVpRsKJQhKMRvRDKEnUyNM8XshN3Zw1
- o5IK0yVlqWjDSsVuEqbztoZWzmxNy6XGiFKylCBLM7whqaQ7Vv57bu/3XvgoTFqP+1LJmgxO
- q2FTFIRY2PRytnt76wY2doflh4S5PbGOuTb0HWOczlqSMQ+5cKbPWkYwpc6nAubd+FWCqTcX
- Y/sopbk6j1D2u1oI5Vh3N6msrzqvtH2zCZQTZv8IIlq8N55LSc7ktEGhceKkmVdjRFqNx+nC
- +cPZKEdsRBQF9C54VBBmRGJKSj9A8Ku2Q8iTSQRTJZUETyYQFM23LDoid0VP5XOSN+4jmLlb
- ifPkJwLnw2F8KSWj0+GKsdH9ljf9RAAf6/qIJYOgg8E4anRjCR0KtopJ97NCOgBsVZ1u7EPH
- QlH3C5LPeIHj5rBbF9Hh0Hrrk7sWo9dD82gZxmM5fBi+I1hqBrSZhIW+UpKfNRzKW6aX55bB
- iL1hWfeDrsJ8IV9wEcHlUhPJk3wEjWUWgk/tgXZ7D750J4zeCo+tQbwcBp8rCkj+fJ7wftSL
- H8ITbjSVYLwsgdwcKZ/eAiZ7zb+2bW97MR4rocvsJAvQRtOKNU0rVjOtWM30f4ZyJKxGck6v
- Uydyup0a7lSgjlXr9JrEQFWq2owWv1LXgn3SgqxzJ2yIppDCQzLOxsVKcTZTZ1DbEFCYwlvS
- 7s/GSiXxrCGL06Ye1+pTOJ0NraWECrnkzKrBGCmdyGZwJzkujdP+dQWUyDcb4Y6DDfqjbd7j
- cmvCHBGQMfRMFrIhKtLXOO1QCy6U7WcRoxKdbbCofEJkLkdzSZa+arUzeW4g+tjUbsu94k3Z
- g3POrwm9pYVJ/b8Hojr9VTGK64c8RlQlR74YfDqypZYK7cKbPFdIeV1E5szmc5dy1X5rItu0
- r/F8A34gcjZdIdQlscHbMK2O/QNO9RWhRgMAAA==
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFtrBIsWRmVeSWpSXmKPExsVy+t/xu7p7FBJjDM4skLSY91nWov/xa2aL
- 8+c3sFtsenyN1eLyrjlsFjPO72OyuPKhj81i86apzA4cHptWdbJ53Lm2h83j3blz7B6bl9R7
- HHp5iMnj8ya5ALYoPZui/NKSVIWM/OISW6VoQwsjPUNLCz0jE0s9Q2PzWCsjUyV9O5uU1JzM
- stQifbsEvYzvJ96xFazjqZj8N7iBsY2ri5GTQ0LAROLiogPsILaQwFJGie9vcyHiMhInpzWw
- QtjCEn+udbF1MXIB1bxllJi9/DIzSEJYoFCiu2srC0hCRGAnk0T3/+fMEFXTGSVWvboB1s4m
- YCjR9RaknZODV8BO4tDCLywgNouAqsShJaeAbA4OUYEYiavnGCFKBCVOznwCVsIp4CKxd+59
- sFZmAXWJP/MuMUPY8hLb386BssUlbj2ZzzSBUXAWkvZZSFpmIWmZhaRlASPLKkaR1NLi3PTc
- YiO94sTc4tK8dL3k/NxNjMBY23bs55YdjF3vgg8xCnAwKvHwfkhMiBFiTSwrrsw9xCjBwawk
- wntYLjFGiDclsbIqtSg/vqg0J7X4EKMp0G8TmaVEk/OBaSCvJN7Q1NDcwtLQ3Njc2MxCSZz3
- vEFllJBAemJJanZqakFqEUwfEwenVANjZZremR7ln7HMIibbjNnKtYSYnv+9suXV5KmMb5im
- e5lMPqPMVtl03zFwhZzZ7Fmbkws/P/kt/v1b1NL8E/vLrUSYdy0V6HH1/sRZ1HW+4tdlnjVR
- l5YXL1rhcUbUSs+Qa6Ps3SV8karP/pq6b75RWmr18mnnKRYRS/d3i10nN9xj6TbK2jtPiaU4
- I9FQi7moOBEAWwGdc8sCAAA=
-X-CMS-MailID: 20190211071404eucas1p27b5d9aea5772f38bd543102f740d0ac5
-X-Msg-Generator: CA
-X-RootMTR: 20190210225147epcas3p4cedebfc5692274bc6135ceabbcf2642d
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20190210225147epcas3p4cedebfc5692274bc6135ceabbcf2642d
-References: <CGME20190210225147epcas3p4cedebfc5692274bc6135ceabbcf2642d@epcas3p4.samsung.com>
- <20190210225114.20110-1-stuart.menefy@mathembedded.com>
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190210_231416_731254_AD9BF1B5 
-X-CRM114-Status: GOOD (  16.10  )
+X-CRM114-CacheID: sfid-20190210_231737_360020_BD15D0B5 
+X-CRM114-Status: UNSURE (   9.38  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -139,48 +78,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: devicetree@vger.kernel.org, Seiya Wang <seiya.wang@mediatek.com>,
+ linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Stuart
+The cpu type of cpu2 and cpu3 should be cortex-a72, not cortex-a57.
 
-On 2019-02-10 23:51, Stuart Menefy wrote:
-> When debugging suspend problems on Exynos 5260, I had a large number
-> of debugging prints going to the serial port after interrupts
-> had been disabled but before the timer interrupt was shutdown. This
-> was long enough for a timer tick to occur, but as interrupts were
-> disabled the ISR didn't run, and so the interrupt wasn't cleared.
-> Later when the timer was shutdown the interrupt was left asserted and
-> so the wfi at the heart of the suspend code didn't wait, causing
-> the suspend to fail.
->
-> Currently the code which stops the timer when it is on one-shot mode
-> and the interrupt occurs is in exynos4_mct_tick_clear(), meaning if we
-> called this from the shutdown code exynos4_mct_tick_stop() could be
-> called twice. So first restructure the existing code, so the check for
-> one-shot mode and stopping the timer is moved to the ISR, leaving
-> exynos4_mct_tick_clear() just clearing the interrupt flag.
->
-> Once this has been done simply call exynos4_mct_tick_clear() from
-> set_state_shutdown().
+Signed-off-by: Seiya Wang <seiya.wang@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-This also fixes mysterious suspend failures on Odroid XU3/XU4/HC1 :)
-
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-> Stuart Menefy (2):
->   clocksource: exynos_mct: Move one-shot check from tick clear to ISR
->   clocksource: exynos_mct: Clear timer interrupt when shutdown
->
->  drivers/clocksource/exynos_mct.c | 23 ++++++++++++-----------
->  1 file changed, 12 insertions(+), 11 deletions(-)
->
-Best regards
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 44374c506a1c..99675c51577a 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -178,12 +178,12 @@
+ 
+ 		cpu2: cpu@100 {
+ 			device_type = "cpu";
+-			compatible = "arm,cortex-a57";
++			compatible = "arm,cortex-a72";
+ 			reg = <0x100>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
+ 			#cooling-cells = <2>;
+-			clocks = <&infracfg CLK_INFRA_CA57SEL>,
++			clocks = <&infracfg CLK_INFRA_CA72SEL>,
+ 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+ 			clock-names = "cpu", "intermediate";
+ 			operating-points-v2 = <&cluster1_opp>;
+@@ -191,12 +191,12 @@
+ 
+ 		cpu3: cpu@101 {
+ 			device_type = "cpu";
+-			compatible = "arm,cortex-a57";
++			compatible = "arm,cortex-a72";
+ 			reg = <0x101>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
+ 			#cooling-cells = <2>;
+-			clocks = <&infracfg CLK_INFRA_CA57SEL>,
++			clocks = <&infracfg CLK_INFRA_CA72SEL>,
+ 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
+ 			clock-names = "cpu", "intermediate";
+ 			operating-points-v2 = <&cluster1_opp>;
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.14.1
 
 
 _______________________________________________
