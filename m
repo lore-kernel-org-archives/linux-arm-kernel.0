@@ -2,90 +2,81 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 00762C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 09:24:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2D5A8C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 09:24:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C3D0820863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 09:24:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E84DE20869
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 09:24:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m2mix+Jy";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="CkX4vG0C"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C3D0820863
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M9LzzubZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E84DE20869
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=fjM9HCBqZW27BJI/ZlUmHuzYEaJ5upimOYuLYedthzA=; b=m2mix+Jyq5pxxrswnHGTHZjpww
-	23To47eHI2X8IOLqF3JPUPAd9BkkNtnt6AAJUYO+8DW8Crc5JirwU3AuSYlYkjN+MwGDDGXeoG8og
-	Qf218RzEA9LvLTWzFl76rtneZ9pWXqwNrQhkxdX6Yyiv6wkCpLlG97/C3bXzVsKH+sNCoQkmf3/Ub
-	0XMyqUYU/fbfVLJw87IpA2WPRvNuQbZsKBDRWCRdBDjWBb1jiKBsae4g2QfxUIKLgDi6sTNMm6ZKN
-	0mrwcOJAi3szVhMfdx8xdTAeZxvn+Y3hcYJh2BcncmynxrFSvsQLBXMojHhTsM10BotD7EpVSCSkR
-	WnuF7fSQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=kKbBAkdlgGTCNN7nahoipRT1L//R1N6ERbgipVs9r/w=; b=M9LzzubZCjIgE5
+	c5tCrzo762zv/a95IBeL+0W4L24Ydyj3tj08tZcVblYwqtiopz887ltAjGrxB30+D7d8h3X8Gq9kl
+	VD2M9m0ajA7hL6d1d88Nt4TyBF7bLpy1HpYheP0DY2uDSZb5P7s0EfBpjdg19sgvp/qkO0ENJhhHv
+	Qu6+5Mz9rkhswPSjpiinAYj3osk2vATYdF+NFmfxcScDNWP7Laq5L2g7m4yRINVrNQvt+jBJAl5OK
+	Ud6ZXl+NkRGdm5z7+aFI4Z5nYzNXupBoBe7lGCTZoc1Hw34As2vVaG1+QStCKRVDtCJOg5x1fkp65
+	72bUVeR3o9qxln2s9mcQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt7p6-00015T-0y; Mon, 11 Feb 2019 09:24:20 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gt7pV-0001Tf-LG; Mon, 11 Feb 2019 09:24:45 +0000
+Received: from mail-lj1-f195.google.com ([209.85.208.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt7mp-0007ha-Dk
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 09:22:05 +0000
-Received: by mail-wm1-x341.google.com with SMTP id x7so296361wmj.0
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 01:21:58 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=lIYeZisgInqCOZpWT0d/hZqmxdLdiRL0RmR52VTtRjA=;
- b=CkX4vG0Cf9MIFPB0r0biBCJp7uoat+QwA097brWM6ScCKl4BT3GVi8GEuUEaW19elo
- ndLUpJZ+7IZDWLr1mx4AmIU1LzoEcxn/+b+NUs2tydpQoOc4MTLFyqWJ9QdUn9MVdCgk
- RXUeW5B3O7Um5IrnlJt9so2xIFHljU72hhUvrW2r5WseWu5+wIDqNsT0nFUv+CkJrqU4
- jHnq7gugqCTYnyBIdrOwZvYApZsUWqDKaCuuq2huAXgVS3yGuP3r20yAINq4+8B2WZEX
- K3FFAjYEub/jDQo7UEZ2c1iKdET8pDPxGfw6ZpJKRCTk09Wh8kPHsLSR2q0rBqM6IH7G
- Vf3Q==
+ id 1gt7no-00007g-Pn; Mon, 11 Feb 2019 09:23:08 +0000
+Received: by mail-lj1-f195.google.com with SMTP id a16so4001844ljb.11;
+ Mon, 11 Feb 2019 01:23:00 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=lIYeZisgInqCOZpWT0d/hZqmxdLdiRL0RmR52VTtRjA=;
- b=CeZLBwfyIMB4NiztwdlDlwWiNH8On0krb+eLh2jlwWeK4xjZwWok4V06o4xcFYdDYS
- 4xzGWAPGEQRNHa/oymyFpOC5OpbCiO/DDh9KIU2Cf1GrcxwLTRUYsDArTAY1yLOD5WVn
- +RIcAD73J8Welr7CX91ix/GZ98YNktZkq3CMsCL/wp5EdW2twnHksxBL/bC+jX4l+3gQ
- B85V0brxYwlXkJ4M7Bh9vFVMjtl0tS91cNJSaiTmDHImpRdr8cn3e2GjC/AdaJ0CqnVh
- ciNaqSj67nlr1+hdOeBaYBD4fsseC94RXBoJDtudeJn7lDi1dFpjtz1vtjfQg88a0nVd
- bDdw==
-X-Gm-Message-State: AHQUAubzHiAaLbKD4ZregxhUfBK/IyEpjChWLMpI0+F7T6rOFlAZ5S97
- iRKjUedBb/4kWlqAdWSAaxU=
-X-Google-Smtp-Source: AHgI3IZ3YDqNq/2AQaMYe1kJv8UXjv+MSl9KMteeI+5/4URxr44WhcfQlK15lXqYlYzWYBQFLK1FQQ==
-X-Received: by 2002:adf:de83:: with SMTP id w3mr5951635wrl.56.1549876916755;
- Mon, 11 Feb 2019 01:21:56 -0800 (PST)
-Received: from ThinkPad.gtu.edu.tr ([193.140.134.118])
- by smtp.gmail.com with ESMTPSA id o7sm11388979wmc.44.2019.02.11.01.21.55
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 11 Feb 2019 01:21:56 -0800 (PST)
-From: Mesih Kilinc <mesihkilinc@gmail.com>
-To: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org, linux-clk@vger.kernel.org,
- linux-sunxi@googlegroups.com
-Subject: [PATCH 7/7] ARM: dts: f1c100s: Activate SPI flash on Lichee Pi Nano
-Date: Mon, 11 Feb 2019 12:21:13 +0300
-Message-Id: <02be41b6187d4d1fe09bff24cb93c2400a166803.1549875778.git.mesihkilinc@gmail.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <cover.1549875778.git.mesihkilinc@gmail.com>
-References: <cover.1549875778.git.mesihkilinc@gmail.com>
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=57cf3Lc6S+hV34hW4qWkEqcWBtCzdKYSCNE88tgbwFY=;
+ b=r1qU9DBjxeXAa1TV6CTXu9bVhb//BYHTT9RsnlauYk88B93i0uJnxxfru7DzFBU7K+
+ rHnZkSUY1qCoJ/x4tdTtX5ug45YxuXW6aef890Rm7iv+pmq+CRj4O8AM8G5d3YoMqbCS
+ pvT4WCXWlAdgB1sfaDAs7HeZQbnprZ7oMX4MPoiBIChWc0ZdJOe1aZL+vh0o1QLm6Feq
+ 5rovvdmnxSD3HWed1vAMLMvezWBIZ7U/7mrGYA6ZK+bjAXh5LwHu83xXTjrJsmC9EcPc
+ s+F0ZU30wX9bEutDTP4A+X8EgACALztGiZVwIoqg3rAv35FxxgyxP+wFsHL69bibjFFo
+ PFQg==
+X-Gm-Message-State: AHQUAubWMZJ4LAw634ZwGK0CnmZ89DDsv3Jsjr7mz8NVKk0T6Dc3dG7T
+ xK/VURvHm7UDYGPvvhFAu+U=
+X-Google-Smtp-Source: AHgI3IZD1jEIfdMVWIhhGklrrMIe+2SC7DYFGzpUnfPu5MYxGNfkzXRHYwnnblKbLxcOwTdZ1dZ3RA==
+X-Received: by 2002:a05:651c:c4:: with SMTP id 4mr2988166ljr.45.1549876978579; 
+ Mon, 11 Feb 2019 01:22:58 -0800 (PST)
+Received: from xi.terra (c-74bee655.07-184-6d6c6d4.bbcust.telenor.se.
+ [85.230.190.116])
+ by smtp.gmail.com with ESMTPSA id a21sm1034696lfk.61.2019.02.11.01.22.57
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 11 Feb 2019 01:22:57 -0800 (PST)
+Received: from johan by xi.terra with local (Exim 4.91)
+ (envelope-from <johan@kernel.org>)
+ id 1gt7nf-00058B-Ak; Mon, 11 Feb 2019 10:22:51 +0100
+Date: Mon, 11 Feb 2019 10:22:51 +0100
+From: Johan Hovold <johan@kernel.org>
+To: Rob Herring <robh@kernel.org>
+Subject: Re: [PATCH v3 2/4] dt-bindings: gnss: add mediatek binding
+Message-ID: <20190211092251.GV4686@localhost>
+References: <1548693481-1162-1-git-send-email-lollivier@baylibre.com>
+ <1548693481-1162-3-git-send-email-lollivier@baylibre.com>
+ <20190130155016.GA26536@bogus>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190130155016.GA26536@bogus>
+User-Agent: Mutt/1.11.2 (2019-01-07)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_012200_491398_42273217 
-X-CRM114-Status: GOOD (  12.11  )
+X-CRM114-CacheID: sfid-20190211_012306_764509_43150BEC 
+X-CRM114-Status: GOOD (  20.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,52 +88,92 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mesih Kilinc <mesihkilinc@gmail.com>,
- Linus Walleij <linus.walleij@linaro.org>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>,
- Maxime Ripard <maxime.ripard@free-electrons.com>,
- Icenowy Zheng <icenowy@aosc.io>
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Kevin Hilman <khilman@baylibre.com>, Loys Ollivier <lollivier@baylibre.com>,
+ Johan Hovold <johan@kernel.org>, linux-kernel@vger.kernel.org,
+ linux-mediatek@lists.infradead.org, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Lichee Pi Nano board has a Winbond W25Q128FVSIQ 128Mbit SPI NOR flash
-connected to the SPI0 controller of F1C100s SoC, via the pinmux group at
-PC bank; so it's bootable.
+On Wed, Jan 30, 2019 at 09:50:16AM -0600, Rob Herring wrote:
+> On Mon, Jan 28, 2019 at 05:37:59PM +0100, Loys Ollivier wrote:
+> > Add binding for Mediatek-based GNSS receivers.
+> > 
+> > Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+> > ---
+> > 
+> > v3:
+> > Removed the I2C and SPI interfaces references.
+> > Removed the "mediatek,mt3339" compatible line.
+> > Added the optional propertied (reset, fix)
+> > Added the pin names for the optional properties.
+> > 
+> > v2:
+> > Renamed bindings from Globaltop/gtop to Mediatek/mtk.
+> > Moved current-speed as an optional propertie.
+> > Removed the status line in the example.
+> > Added "mediatek,mt3339" compatible.
+> > 
+> >  .../devicetree/bindings/gnss/mediatek.txt          | 37 ++++++++++++++++++++++
+> >  1 file changed, 37 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/gnss/mediatek.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/gnss/mediatek.txt b/Documentation/devicetree/bindings/gnss/mediatek.txt
+> > new file mode 100644
+> > index 000000000000..00650d81c5c8
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/gnss/mediatek.txt
+> > @@ -0,0 +1,37 @@
+> > +Mediatek-based GNSS Receiver DT binding
+> > +
+> > +Mediatek chipsets are used in GNSS-receiver modules produced by several
+> > +vendors and can use an UART interface.
 
-Enable this SPI flash.
+s/an/a/
 
-Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
----
- arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+> > +
+> > +Please see Documentation/devicetree/bindings/gnss/gnss.txt for generic
+> > +properties.
+> > +
+> > +Required properties:
+> > +
+> > +- compatible	: Must be
+> > +
+> > +			"globaltop,pa6h"
+> > +
+> > +- vcc-supply	: Main voltage regulator (pin name: VCC)
+> > +
+> > +Optional properties:
+> > +
+> > +- gtop,reset-gpios	: GPIO used to reset the device
+> > +  			  (pin name: RESET, NRESET)
+> 
+> reset-gpios is the standard name.
+> 
+> > +- gtop,fix-gpios	: GPIO used to determine device position fix state
+> > +			  (pin name: FIX, 3D_FIX)
 
-diff --git a/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
-index a1154e6..52a29be 100644
---- a/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
-+++ b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
-@@ -24,3 +24,16 @@
- 	pinctrl-0 = <&uart0_pe_pins>;
- 	status = "okay";
- };
-+
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pc_pins>;
-+	status = "okay";
-+	flash@0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "winbond,w25q128", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <50000000>;
-+	};
-+};
--- 
-2.7.4
+I'm thinking we might need a standard name for fix-gpios as well. This
+isn't a feature that is globaltop (or mediatek) specific, and other
+manufacturers provide similar functionality through pins named UI_FIX,
+or even LCKIND (lock indicator).
 
+The pin is typically used to drive an indicator LED AFAIU, but the
+characteristics of the signal varies from device to device (fw to fw),
+for example, pulse when no lock and low otherwise, or pulse when a 2d or
+3d-fix is acquired, etc.
+
+I'm not sure how useful the pulsing would be for software, but someone
+might find a use for it in some form.
+
+Rob, is this something we want to keep in the binding, and if so, how
+about using a generic name such as "gnss-fix-gpios"?
+
+Johan
 
 _______________________________________________
 linux-arm-kernel mailing list
