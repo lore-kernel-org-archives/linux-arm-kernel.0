@@ -2,115 +2,110 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 55FA9C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:05:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B4D36C4151A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:08:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 24C57218D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:05:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 86D6121A80
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:08:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DaZilYxo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="rzg8j7+G"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24C57218D8
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="seWvcde9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 86D6121A80
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=Avu8+6ZgCL7RzsyqIIgYJayWN/KQK1UhPFWb1Yjf1Xs=; b=DaZilYxo/l1XPv
-	TKqA7qES80S27gPNqHCzuAc73x1G/FAHlUbKog+ze7vaohdKTCbAqLFmc+DjA7/cIzFczkZywfQ85
-	tiT2o0RNDJQhNk3eu8yh9VECBi8aMLir5DULfrQ5PQSmujYfO4AS79AtTtTbp1Yr1smSpG7IBtRm+
-	3a5zX6Wa4rID42ZG2s+YhYl9Bj3Z1e7Ucx1GsczZP7UTvKupvPlQ4cpLNvnzpjpymfqr5ZQY0nONF
-	bg1pUMHwdgyPbjvweLtMjNw54sNhbtYYq5NWgOOdkKk566IfB2QPX4Nv0B8pP4QnA3wv+kZ10uXii
-	Gl0w3KZMMq8T9dp7XeIQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=7eP0wQpcxmu/juRpGu7LuPECK73wxaWU/ud8m+YvBSU=; b=seWvcde94sWuUx
+	bNCxlNYWFMIimULQRYzThdUJp8ad3wWeNnYgS2nXQTDDjKsRQYauYGipnrgqm3snpqTMdmkdcOQOH
+	qW+uvK7ZvGe5uZRmubzow2/Tg4GrFn67qpf9oUylNB4Tn/pXx6IVYAJoX1PLBm63AIjgzu45YuorP
+	takw0gwKSSXtUFOodHLkpDdH2flXxFduGqjMhcyN5soB4RsFYnmAjMCb7h+PsfMVCJKQAA89Z9mjr
+	veXCPfKNxW+nNNqufI5DnVhlAlxMeWsLjV3k4e/gYwwnWBaw1aEPF61a7zzrJEeJUJE1q5l7W9+HV
+	q4CEhQKPEMaNIYchKptQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtBGm-0000rq-OJ; Mon, 11 Feb 2019 13:05:08 +0000
-Received: from mail-eopbgr130059.outbound.protection.outlook.com
- ([40.107.13.59] helo=EUR01-HE1-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtBGh-0008Rr-Jh
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 13:05:06 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=MIAApjtE1jh7Kf92D8go1dW5TusT+j72TGarvGRzMrs=;
- b=rzg8j7+GMIroQyfYuDd+bOWNiXfPR7GhoXugAxCGgBG6w8b60a2Q8hpzgEZE7fVXFWp679jqPCednhINoGphjU1NoyzMneyLeuM9h9l93SzSZnuOvRUM1YgqiAKK9+Z0XJucnB7BZ9wp56vatiM/GnOjo/+LhoKoIsk5Lg0kq4I=
-Received: from DB7PR04MB4490.eurprd04.prod.outlook.com (52.135.138.16) by
- DB7PR04MB4489.eurprd04.prod.outlook.com (52.135.138.15) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.19; Mon, 11 Feb 2019 13:04:59 +0000
-Received: from DB7PR04MB4490.eurprd04.prod.outlook.com
- ([fe80::fd45:a391:7591:1aa5]) by DB7PR04MB4490.eurprd04.prod.outlook.com
- ([fe80::fd45:a391:7591:1aa5%6]) with mapi id 15.20.1601.023; Mon, 11 Feb 2019
- 13:04:59 +0000
-From: Peng Fan <peng.fan@nxp.com>
-To: "linux@armlinux.org.uk" <linux@armlinux.org.uk>, "arnd@arndb.de"
- <arnd@arndb.de>, "rppt@linux.vnet.ibm.com" <rppt@linux.vnet.ibm.com>,
- "robh@kernel.org" <robh@kernel.org>, "f.fainelli@gmail.com"
- <f.fainelli@gmail.com>, "akpm@linux-foundation.org"
- <akpm@linux-foundation.org>, "mhocko@suse.com" <mhocko@suse.com>,
- "rostedt@goodmis.org" <rostedt@goodmis.org>, "nicolas.pitre@linaro.org"
- <nicolas.pitre@linaro.org>
-Subject: [PATCH] arm: use memblocks_present
-Thread-Topic: [PATCH] arm: use memblocks_present
-Thread-Index: AQHUwgpk6mha5pabokK36jjcALV7pg==
-Date: Mon, 11 Feb 2019 13:04:59 +0000
-Message-ID: <20190211131602.3294-1-peng.fan@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.16.4
-x-clientproxiedby: HK0PR01CA0027.apcprd01.prod.exchangelabs.com
- (2603:1096:203:3e::15) To DB7PR04MB4490.eurprd04.prod.outlook.com
- (2603:10a6:5:35::16)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=peng.fan@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.71]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB7PR04MB4489;
- 6:j9uPY1758Wtj+WDr7cG+0sl/tXQolnMQQnQXVS+O4MBS5bIxKwqpcDaKpbwzT6JbfU6I26YmAicW5SHSSyPd7S0ASNM3BlaEHrjLpAQ8zMnkSE8L4RXevr8f4AMWOI5TN300grJqEH+PGRdJLfQwfvQk4pm1JUtSW+nRXVDtZN5TsHIwBzb3RYeJ2gZN+Wp5WcEAS9VA4BbFZTg3OD3X1xCRGMM9+B55DWoXgQezZ0mVOQ2urKrgQX//PG7CrIDPZ+Ouop/zd0xwC7M3DfaGyTiVEcproraTg7QNSmkXsjo4wB9fv4N7QONJROmD9E/U2huaugyYLGPtyIXA6YFd3xI4tuAPyooACsNKNeATFr3e9wT4WKyb+SwDnWsjCD9vuPF1hx+qdqyrcp2L0dnP0EHL6LcgN3l9+XWDYCVqKV8ty3RgHpq3RtZYxfNYJQgsdtSR13cPvHa0041TxOVkaw==;
- 5:g6KODoSU5iIAmosKXfaMO8QyT7KaF8OzmhqJRG6lOZe/iJ6NMJAQRsz6WtCshwBNQsMnuKsXvXI5AbR1NdusBz1RpgGFBPmp02nWGZbKLybp0mG1J0IETuom4ss0pPURyEDhcyCouARCklCC7iwHQf9YIE1LN7pSiii29Ea4/+Q8C4CjurGE0rgU4u0XKtAwGXWSyWk6wdjKIFAlK6OX8A==;
- 7:NZdZ1OOnYl5q2ujy3n87FxMV44zRK5xRr2Vn06Tl9UFuKETtQijzLtVi6SGNkRCNdYWuKjzOxSHXYXpJate5Kss822ktJlzCJHLDx0UiqMFO7zQqD/r4QBJhaPhFlztCFqz5FBQBApD9aWprPShYYw==
-x-ms-office365-filtering-correlation-id: c08b2d9a-9fad-4d9d-064e-08d690218693
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB7PR04MB4489; 
-x-ms-traffictypediagnostic: DB7PR04MB4489:
-x-microsoft-antispam-prvs: <DB7PR04MB4489667D35FA921F8704AC8188640@DB7PR04MB4489.eurprd04.prod.outlook.com>
-x-forefront-prvs: 0945B0CC72
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(376002)(396003)(346002)(39860400002)(366004)(199004)(189003)(68736007)(44832011)(97736004)(52116002)(7416002)(305945005)(7736002)(102836004)(50226002)(14454004)(6506007)(106356001)(386003)(486006)(105586002)(8676002)(81166006)(36756003)(2906002)(2501003)(81156014)(71200400001)(71190400001)(256004)(478600001)(476003)(53936002)(66066001)(25786009)(26005)(2616005)(8936002)(1076003)(6436002)(2201001)(86362001)(54906003)(316002)(6486002)(186003)(6512007)(4326008)(110136005)(6116002)(99286004)(3846002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB7PR04MB4489;
- H:DB7PR04MB4490.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: Yx5IINc9jP34ACH5r8PZxajbtD0EfipfNhhJXS7hRK5ii8+2NDJKQy5Oh0dtXQ3542Q4OKjfgpFOZ5nx7gJxskmdoWORbycJiqpT9JNpYguE1WCc6oCx4aLJP0cF7U0d7h1wIbggCVH0uuhV95C4e7IgMi8N6XxuCxMtSJR1ogSrn5H8g+np1GS/qBZIw+H1Jv+N0wB5j5DE2jZUFXFtEoq5qmSZ3PdF8PjuCdVXtC/S48EvinN314P4o6DedX8DDItYfVnBaEzy7/bnewAIVhIcdyvDtzkdV8GHO+oOyBV2HeJiLoPaBcxUlOUYNptC23mDbbHjZJ7d4uqj61GbJEm+sEucGvIhz1SaaKP0C/fu8Ue1NzRetTqgO0USMYxP3OBGqT+FZxpapuDQVkaeZSrF72QtWOdceAqhGAcnCLQ=
+	id 1gtBJk-0001os-LA; Mon, 11 Feb 2019 13:08:12 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtBJd-0001o6-4y
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 13:08:10 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B396E80D;
+ Mon, 11 Feb 2019 05:08:04 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 3C7503F557; Mon, 11 Feb 2019 05:07:59 -0800 (PST)
+Subject: Re: [RESEND PATCH v2 28/33] ARM: davinci: cp-intc: unify error
+ handling
+To: Bartosz Golaszewski <brgl@bgdev.pl>, Sekhar Nori <nsekhar@ti.com>,
+ Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ Jason Cooper <jason@lakedaemon.net>, David Lechner <david@lechnology.com>
+References: <20190211122606.8662-1-brgl@bgdev.pl>
+ <20190211122606.8662-29-brgl@bgdev.pl>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <7b494951-7b37-3ee5-5ece-f486b7a566fe@arm.com>
+Date: Mon, 11 Feb 2019 13:07:56 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: c08b2d9a-9fad-4d9d-064e-08d690218693
-X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Feb 2019 13:04:54.0035 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB7PR04MB4489
+In-Reply-To: <20190211122606.8662-29-brgl@bgdev.pl>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_050503_657298_848844F1 
-X-CRM114-Status: UNSURE (   9.90  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190211_050805_202477_FB42C423 
+X-CRM114-Status: GOOD (  18.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -122,62 +117,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "van.freenix@gmail.com" <van.freenix@gmail.com>,
- Peng Fan <peng.fan@nxp.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-arm_memory_present is doing same thing as memblocks_present, so
-let's use common code memblocks_present instead of platform
-specific arm_memory_present.
+On 11/02/2019 12:26, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> Use WARN_ON() on eny error in cp-intc initialization and drop all
+> custom error messages.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Reviewed-by: David Lechner <david@lechnology.com>
+> ---
+>  arch/arm/mach-davinci/cp_intc.c | 10 +++-------
+>  1 file changed, 3 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
+> index f3787ae4cdbd..c1efb9390655 100644
+> --- a/arch/arm/mach-davinci/cp_intc.c
+> +++ b/arch/arm/mach-davinci/cp_intc.c
+> @@ -200,20 +200,16 @@ davinci_cp_intc_do_init(const struct davinci_cp_intc_config *config,
+>  			DAVINCI_CP_INTC_CHAN_MAP(offset));
+>  
+>  	irq_base = irq_alloc_descs(-1, 0, config->num_irqs, 0);
+> -	if (irq_base < 0) {
+> -		pr_warn("Couldn't allocate IRQ numbers\n");
+> -		irq_base = 0;
+> -	}
+> +	if (WARN_ON(irq_base < 0))
+> +		return irq_base;
+>  
+>  	/* create a legacy host */
+>  	davinci_cp_intc_irq_domain = irq_domain_add_legacy(
+>  					node, config->num_irqs, irq_base, 0,
+>  					&davinci_cp_intc_irq_domain_ops, NULL);
+>  
+> -	if (!davinci_cp_intc_irq_domain) {
+> -		pr_err("cp_intc: failed to allocate irq host!\n");
+> +	if (WARN_ON(!davinci_cp_intc_irq_domain))
+>  		return -EINVAL;
+> -	}
+>  
+>  	set_handle_irq(davinci_cp_intc_handle_irq);
+>  
+> 
 
-Signed-off-by: Peng Fan <peng.fan@nxp.com>
----
- arch/arm/mm/init.c | 17 +----------------
- 1 file changed, 1 insertion(+), 16 deletions(-)
+I'm sorry, but how is turning an explicit message into a long stack
+trace really useful?
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 478ea8b7db87..6c50dd407ba8 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -182,21 +182,6 @@ int pfn_valid(unsigned long pfn)
- EXPORT_SYMBOL(pfn_valid);
- #endif
- 
--#ifndef CONFIG_SPARSEMEM
--static void __init arm_memory_present(void)
--{
--}
--#else
--static void __init arm_memory_present(void)
--{
--	struct memblock_region *reg;
--
--	for_each_memblock(memory, reg)
--		memory_present(0, memblock_region_memory_base_pfn(reg),
--			       memblock_region_memory_end_pfn(reg));
--}
--#endif
--
- static bool arm_memblock_steal_permitted = true;
- 
- phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
-@@ -292,7 +277,7 @@ void __init bootmem_init(void)
- 	 * Sparsemem tries to allocate bootmem in memory_present(),
- 	 * so must be done after the fixed reservations
- 	 */
--	arm_memory_present();
-+	memblocks_present();
- 
- 	/*
- 	 * sparse_init() needs the bootmem allocator up and running.
+	M.
 -- 
-2.16.4
-
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
