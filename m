@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C90AC282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 10:57:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 07D3FC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 10:58:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 59AD920838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 10:57:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CC5FD20873
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 10:58:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qDm2nKYq";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="0U7b+TSC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59AD920838
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Jzy/U4e/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC5FD20873
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,49 +24,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ncSqt2PLo4pdd6rz79XO7avg043G84xdBBaEBPJMQio=; b=qDm2nKYqx9z8YF
-	tIYUUJ9bM4gwp9w5NmH423XCwlcxiRSB3+frUDOe1sU5kVsY6HSFiaR1fgTriv8En/7lOMtjLnZ/c
-	ibg2RiROJDcahPpg9Oa9B+D+5eoX0zerynE8CiKSDu0nwfbCln8TG2TB2h4no47yJ/KJrzb1Dq2tt
-	mXJTF+uAGLrPj2lsHKO4Tznn9Y1tLSxSswQ1rQQ/Z28AeTQ5NsWvz3QJKtveI/uxxSSZzleG6XuNp
-	UTdYAF1IaZ7JmweLCSxa8hlZqTgHOfWEH59MXUanJwmGZNnZ+FQ98n6pZgmTXgZ+AssyQow2KfXVf
-	6317SD9ZMSltkbP81duQ==;
+	List-Owner; bh=cznyOz5Bis7QgCroyQ3/oSEZ9T7zcC2Nyvp89858UL4=; b=Jzy/U4e/vHfId7
+	rXdxHeLGCUeUK8radOC2ZkvVo1TQAA1UNtAGPrR832CiWGNiQ1hfvom0M4jiLs9iKiQJyzSnostZN
+	CcgDHiNDgHtFmAso+YLef0LdpkGUIz9/f+vn4pn964zmGKlr2eo8zIntbc5HvzcJi1LjiqMC+55Mm
+	4d9kNd5FNLS4v8LTEFFOPqYormlKE7xe7sHWzC8BpOTLD+dsaMwY8Y2ZxRe02OFCnLJonTXxHd712
+	dZ+mumTYaM3JjWzwpHYQgvt8aWoiZ3V6yY+9xsc6PpzeHzlH/0Tg3kh2SNa/PhGk3y6kP9Nmld99R
+	qJGJw33rsYPta3926/kg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt9HQ-000075-HU; Mon, 11 Feb 2019 10:57:40 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt9HO-00006b-Sn
- for linux-arm-kernel@bombadil.infradead.org; Mon, 11 Feb 2019 10:57:38 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=H4FKzYfPZLq064fpvMaxRyPbo6mwWdcW0fXgF0VWycY=; b=0U7b+TSCrog3RuwY+5aIN+sYF
- hv/X24vYbiLjaTad2ObIWMdW7Cp2r/5OoaUpAoXctxc/VYvLlvd8Jg876MzN8pgTjMW8CZ3P1r/K0
- V/l2fLFDfV1pgkRUFU9xzkmvMbliuyWhgYyM+5CQxhzMD875i3oOU3bLFnwzd6Z1n69EGanR7kB8K
- jwNrR1x25pUNYuM1WWMfiO/CFWtHodA2Mmztx2gmUubEivvDlwHAS5qsyCdKdk3uPgvtfWI5OmsKO
- 4D+eGwN6yN1S/MmNn/tvUdF/HvrjMc60lzn96bluUcUP+BS/cOvXQ1En41wBhdBg2BY4eZU6c4md3
- EkSdmP65w==;
-Received: from j217100.upc-j.chello.nl ([24.132.217.100]
- helo=hirez.programming.kicks-ass.net)
- by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt9HI-0007Ng-0y; Mon, 11 Feb 2019 10:57:32 +0000
-Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
- id 535FA20D0E3CF; Mon, 11 Feb 2019 11:57:29 +0100 (CET)
-Date: Mon, 11 Feb 2019 11:57:29 +0100
-From: Peter Zijlstra <peterz@infradead.org>
-To: Waiman Long <longman@redhat.com>
-Subject: Re: [PATCH] locking/rwsem: Remove arch specific rwsem files
-Message-ID: <20190211105729.GH32534@hirez.programming.kicks-ass.net>
-References: <1549850450-10171-1-git-send-email-longman@redhat.com>
- <20190211093601.GT32511@hirez.programming.kicks-ass.net>
- <20190211094044.GG32534@hirez.programming.kicks-ass.net>
+	id 1gt9Ho-0000Vh-Qt; Mon, 11 Feb 2019 10:58:04 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gt9Hk-0000Tb-JR
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 10:58:02 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C153EA78;
+ Mon, 11 Feb 2019 02:57:59 -0800 (PST)
+Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 8DC9B3F557;
+ Mon, 11 Feb 2019 02:57:58 -0800 (PST)
+Date: Mon, 11 Feb 2019 10:57:55 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: AngeloGioacchino Del Regno <kholk11@gmail.com>
+Subject: Re: [PATCH] arm64/io: Don't use WZR in writel
+Message-ID: <20190211105755.GB30880@fuggles.cambridge.arm.com>
+References: <68b71c15f32341468a868f6418e4fcb375bc49ba.camel@gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190211094044.GG32534@hirez.programming.kicks-ass.net>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <68b71c15f32341468a868f6418e4fcb375bc49ba.camel@gmail.com>
+User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190211_025800_641703_3297122C 
+X-CRM114-Status: GOOD (  16.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,49 +69,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, linux-xtensa@linux-xtensa.org,
- Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
- Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
- linux-sh@vger.kernel.org, linux-hexagon@vger.kernel.org, x86@kernel.org,
- Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- Linus Torvalds <torvalds@linux-foundation.org>, Ingo Molnar <mingo@redhat.com>,
- Borislav Petkov <bp@alien8.de>, "H. Peter Anvin" <hpa@zytor.com>,
- linux-alpha@vger.kernel.org, sparclinux@vger.kernel.org,
- Thomas Gleixner <tglx@linutronix.de>, linuxppc-dev@lists.ozlabs.org,
- Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Jens Axboe <axboe@kernel.dk>, Catalin Marinas <catalin.marinas@arm.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-arm-msm@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 10:40:44AM +0100, Peter Zijlstra wrote:
-> On Mon, Feb 11, 2019 at 10:36:01AM +0100, Peter Zijlstra wrote:
-> > On Sun, Feb 10, 2019 at 09:00:50PM -0500, Waiman Long wrote:
-> > > +static inline int __down_read_trylock(struct rw_semaphore *sem)
-> > > +{
-> > > +	long tmp;
-> > > +
-> > > +	while ((tmp = atomic_long_read(&sem->count)) >= 0) {
-> > > +		if (tmp == atomic_long_cmpxchg_acquire(&sem->count, tmp,
-> > > +				   tmp + RWSEM_ACTIVE_READ_BIAS)) {
-> > > +			return 1;
-> > 
-> > That really wants to be:
-> > 
-> > 		if (atomic_long_try_cmpxchg_acquire(&sem->count, &tmp,
-> > 						    tmp + RWSEM_ACTIVE_READ_BIAS))
-> > 
-> > > +		}
-> > > +	}
-> > > +	return 0;
-> > > +}
+On Sat, Feb 09, 2019 at 07:34:53PM +0100, AngeloGioacchino Del Regno wrote:
+> From 33fb6d036de273bb71ac1c67d7a91b7a5148e659 Mon Sep 17 00:00:00 2001
+> From: "Angelo G. Del Regno" <kholk11@gmail.com>
+> Date: Sat, 9 Feb 2019 18:56:46 +0100
+> Subject: [PATCH] arm64/io: Don't use WZR in writel
 > 
-> Also, the is the one case where LL/SC can actually do 'better'. Do you
-> have benchmarks for say PowerPC or ARM64 ?
+> This is a partial revert of commit ee5e41b5f21a
+> ("arm64/io: Allow I/O writes to use {W,X}ZR")
+> 
+> When we try to use the zero register directly on some SoCs,
+> their security will make them freeze due to a firmware bug.
+> This behavior is seen with the arm-smmu driver freezing on
+> TLBI and TLBSYNC on MSM8996, MSM8998, SDM630, SDM660.
 
-Ah, I see they already used asm-generic/rwsem.h which has similar code
-to the above.
+Hmm, this sounds very fragile. I hope they're not trapping and emulating
+MMIO accesses and treating the zero register as the stack pointer...
+
+Wouldn't this also be triggerable from userspace by mmap()ing either
+/dev/mem or e.g. a PCI bar via sysfs?
+
+> Allocating a temporary register to store the zero for the
+> write actually solves the issue on these SoCs.
+
+I don't think this catches all MMIO accesses, so I think we need to
+understand more about the actual issue here. For example, is it only the
+SMMU that causes this problem? Also, any workaround should be specific to
+the broken SoCs.
+
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
