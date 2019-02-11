@@ -2,21 +2,21 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB77BC282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:39:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 23343C282CE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:52:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8C228222A7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:39:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E84CF218A4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:52:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sFknz0v4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C228222A7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="khjn2O8j"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E84CF218A4
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
 	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=rwwZplq93zinb/IV0FFOOa1FjyuGsNstMcfxbDm5fhU=; b=sFknz0v4KacmN7h7O5WgExmaZ
-	SwXVFxiWdA1xPMGqfGF3/gCBljjcd+OTKkiMOPPhV+CBy8PFlx5CBwCdTMM0oTFbevEetizwki7d2
-	dKZvceCdSlUvbcXayH/PvxTdSWunxqyKTK8JNUYGev39YXTb3mmQZeRXrH3wXEMevs5ydbwwdtKQZ
-	zZGrVHpjE2nRXWXbamPPPHgkKSZ/iTYW43yoxcOJXlMbz5vKAoTnBnHOOij2yFezOSx1H3CSxbKdU
-	0SRcYPyt7JxBHI3BJLTrr+GbwJ8XTF3k/vme3UfaVe7A7RjivUlwCF8+Hnk5Ca39BnznPEiXUjUmL
-	GbhfIgMzw==;
+	 bh=jtWtIoMYuGIWwgAawqIPcineuMHCLtnSh55CgQIEXww=; b=khjn2O8jPYzKJuw8wWp98yjc3
+	n55XcQuePOZglUCndNfMqK//auIp27BYP4FRxwNmT2RkkujGnpGd9T9+I3OLXx7FdCj6wijsK+2Xd
+	eD33xqol1XgO/Wfg+CR5uqHmVjnqUBwVunrt9z2fgYjB8W7khX17A1z+i2X7bSFno9ZgZWbAvjqyZ
+	HpP5Y36LXOQWnL//SE8QuHgdQnul+yPwl/TI0v2fwXXiJqm9uTswd4kn/6m+Qz/6OiY64XNff50gE
+	2hNtuvCsl9+XUdX3myM2aHBABD315UUHTaxw0MAMymHvUpIhX83n5DS8Yft5WWzythQK31rFSifWL
+	bmvlMRtug==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtDgY-0004TI-B8; Mon, 11 Feb 2019 15:39:54 +0000
-Received: from relay11.mail.gandi.net ([217.70.178.231])
+	id 1gtDsM-0001bQ-UB; Mon, 11 Feb 2019 15:52:06 +0000
+Received: from relay5-d.mail.gandi.net ([217.70.183.197])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtDgU-0004SD-9I
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 15:39:52 +0000
+ id 1gtDsI-0001aa-WD
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 15:52:04 +0000
+X-Originating-IP: 90.88.22.177
 Received: from localhost (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
  [90.88.22.177]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay11.mail.gandi.net (Postfix) with ESMTPSA id A0BD010000D;
- Mon, 11 Feb 2019 15:39:46 +0000 (UTC)
-Date: Mon, 11 Feb 2019 16:39:45 +0100
+ by relay5-d.mail.gandi.net (Postfix) with ESMTPSA id 6DEBE1C000E;
+ Mon, 11 Feb 2019 15:51:53 +0000 (UTC)
+Date: Mon, 11 Feb 2019 16:51:52 +0100
 From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Harald Geyer <harald@ccbib.org>
-Subject: Re: [PATCH RFC] arm64: dts: allwinner: a64: teres-i: Enable audio
-Message-ID: <20190211153945.e34fpwkuk67l7lc6@flea>
-References: <20190211111245.GA18147@lst.de>
- <E1gtBlV-0000Wl-Cv@stardust.g4.wien.funkfeuer.at>
+To: Mesih Kilinc <mesihkilinc@gmail.com>
+Subject: Re: [PATCH 6/7] ARM: dts: suniv: Add pinmux for SPI0 and SPI1 of
+ F1C100s
+Message-ID: <20190211155152.gnocoojqa27fmeay@flea>
+References: <cover.1549875778.git.mesihkilinc@gmail.com>
+ <37f573797e18fc22f8f78d0a62550b6d5e460a8d.1549875778.git.mesihkilinc@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <E1gtBlV-0000Wl-Cv@stardust.g4.wien.funkfeuer.at>
+In-Reply-To: <37f573797e18fc22f8f78d0a62550b6d5e460a8d.1549875778.git.mesihkilinc@gmail.com>
 User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_073950_623877_B9AB0398 
-X-CRM114-Status: GOOD (  26.10  )
+X-CRM114-CacheID: sfid-20190211_075203_184302_899A81FF 
+X-CRM114-Status: GOOD (  16.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,102 +68,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- info@olimex.com, Mark Brown <broonie@kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Chen-Yu Tsai <wens@csie.org>,
- 20190201113743.10058-1-harald@ccbib.org, ibu@radempa.de,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============0635340447579478590=="
+Cc: devicetree@vger.kernel.org, Linus Walleij <linus.walleij@linaro.org>,
+ Chen-Yu Tsai <wens@csie.org>, linux-kernel@vger.kernel.org,
+ linux-sunxi@googlegroups.com, Rob Herring <robh+dt@kernel.org>,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Icenowy Zheng <icenowy@aosc.io>
+Content-Type: multipart/mixed; boundary="===============8937332550879751691=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 
---===============0635340447579478590==
+--===============8937332550879751691==
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="4xdgdd7ok6zr6uwh"
+	protocol="application/pgp-signature"; boundary="zkkgxlj3vb7km2v6"
 Content-Disposition: inline
 
 
---4xdgdd7ok6zr6uwh
+--zkkgxlj3vb7km2v6
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Mon, Feb 11, 2019 at 02:36:53PM +0100, Harald Geyer wrote:
-> > > debug console multiplexing:
-> > > Olimex have a userspace script that controls gpio PL9 during boot,
-> > > to select between HP and serial console. I guess this is not acceptab=
-le
-> > > for mainline.
-> >=20
-> > > The best solution I can see is to switch the HP jack from serial cons=
-ole
-> > > to audio once the audio drivers load. With this people can still capt=
-ure
-> > > the bootlogs but everybody gets audio once the system is up and
-> > > switching back to console output is as simple as unloading the audio
-> > > drivers.
-> >=20
-> > IMO it is really not the audio driver's business to mess with this swit=
-ch.
-> > You could argue as well that the serial driver should get a flag to cla=
-im
-> > the HP jack, which would be similarily unjustified.
+On Mon, Feb 11, 2019 at 12:21:12PM +0300, Mesih Kilinc wrote:
+> PC0~PC4 is pin group for SPI0. PA0~PA4 is pin group for SPI1.
+> Add device tree nodes for this groups.
 >=20
-> Not the audio driver's business, but perheps the audio card's DT node.
-> Which is why I came up with the pinctrl idea.
-
-I know that the nexus7 is quite well supported, and iirc they were
-using a similar trick on their UART. Have you looked at how they were
-doing that?
-
-> > My solution is to confine this choice inside U-Boot:
-> > in sun50i-a64-teres-i-u-boot.dtsi I put
-> >=20
-> > / {
-> >         leds {
-> >                 compatible =3D "gpio-leds";
-> >                 /* Not really a LED, but the least intrusive workaround=
- */
-> >                 audioconsole {
-> >                         label =3D "teres-i:audio:console";
-> >                         gpio =3D <&r_pio 0 9 GPIO_ACTIVE_LOW>; /* PL9 */
-> >                         default-state =3D "on";
-> >                 };
-> >         };
-> > [...]
-> >=20
-> > and place a "gpio set PL9;" somewhere in the bootcmd_* logic. Otherwise=
- there's
-> > a *lot* of chirping on the right ear during boot ;-)
-> > The switch is for early boot debugging, so it's best to have U-Boot ena=
-ble it
-> > when required, and keep it off by default.
+> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
+> ---
+>  arch/arm/boot/dts/suniv-f1c100s.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 >=20
-> I agree that some quirk in u-boot will be required for those who want
-> to boot with headphones plugged in.
->=20
-> But I still think we need a proper description of the HW in the linux DT:
-> * When linux doesn't know about the pin at all, there are no guarantees
->   that it won't accidentally touch the pin during some operations like
->   suspend/resume, etc.
-> * There is the usecase where somebody puts the system console on ttyS1
->   and uses ttyS0 to connect to some other board. (Actually I believe this
->   is a quite likely usecase given Olimex' usual target market.) I'd like
->   to support this.
+> diff --git a/arch/arm/boot/dts/suniv-f1c100s.dtsi b/arch/arm/boot/dts/sun=
+iv-f1c100s.dtsi
+> index 1b332d9..a92a411 100644
+> --- a/arch/arm/boot/dts/suniv-f1c100s.dtsi
+> +++ b/arch/arm/boot/dts/suniv-f1c100s.dtsi
+> @@ -96,6 +96,16 @@
+>  				pins =3D "PE0", "PE1";
+>  				function =3D "uart0";
+>  			};
+> +
+> +			spi0_pc_pins: spi0-pc-pins {
+> +				pins =3D "PC0", "PC1", "PC2", "PC3";
+> +				function =3D "spi0";
+> +			};
+> +
+> +			spi1_pa_pins: spi1-pa-pins {
+> +				pins =3D "PA0", "PA1", "PA2", "PA3";
+> +				function =3D "spi1";
+> +			};
 
-Agreed.
+Are they the only options for the muxing of the SPI pins? if so, you'd
+need to remove the pin bank, and to set the pinctrl-0 and
+pinctrl-names in the DTSI.
 
-> Using something like your leds hack in the linux DT would be fine for
-> me, if the maintainers are willing to accept it.
-
-Not really. The side-effects of that is that any user-space stack is
-free to come by and treat it like an LED as well which would be quite
-horrible as far as audio or UART reliability is concerned :)
-
-We want to model this properly. I guess using a pinctrl driver
-controlled through GPIO (similar to what regulator-gpio is) would be a
-good first step.
+We also move the CS pin out in a separate group to accomodate devices
+that use a GPIO instead.
 
 Maxime
 
@@ -170,21 +132,21 @@ Maxime Ripard, Bootlin
 Embedded Linux and Kernel engineering
 https://bootlin.com
 
---4xdgdd7ok6zr6uwh
+--zkkgxlj3vb7km2v6
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGGXQQAKCRDj7w1vZxhR
-xah0AQDNke3FvZDP3fx1pwTxtI9X0ZAwQ77Kz7ab8ApZ4RRhJwEAlk24JICLapq7
-L0LIPdAvmlqBONizC9kYBEMEFzrZtQ8=
-=ESOE
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGGaGAAKCRDj7w1vZxhR
+xQ7OAP4khQgOjuMy0Pt4C5+nZbUJzc1AUk4H+bPNMiSaCTyTWgEAzvbAUWtcbIUM
+EoODht2ZsP3V/ygf5ZbbXKbOU6Sl3Q4=
+=yQWo
 -----END PGP SIGNATURE-----
 
---4xdgdd7ok6zr6uwh--
+--zkkgxlj3vb7km2v6--
 
 
---===============0635340447579478590==
+--===============8937332550879751691==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -195,5 +157,5 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---===============0635340447579478590==--
+--===============8937332550879751691==--
 
