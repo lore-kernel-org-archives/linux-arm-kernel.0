@@ -2,79 +2,69 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7186BC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 08:48:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 10C03C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 08:50:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 451D620823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 08:48:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CDD4320823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 08:50:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eb9G6+ql";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="kk3/s48C"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 451D620823
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r3+lgoAs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CDD4320823
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MA8OpP9CUooDxT1zfByPvM0tYrgwiKjHhzu3NwLc8UE=; b=eb9G6+qlBDeYPC
-	7G9ETpczaEKTqlICi+GJD7Hb5J/O5jB5LCgH8Vd47WGXt0OADqqBwC0pVqFQn7BMDDryP2NZiPlRV
-	pP8ecZ6+VeUmjoGv4h6W86K8Q/Rl9b4MzaCASXYGOGpmPivk9AJ1jEgzzfarWN0TIBcghM8WsoxL8
-	FjI2UOQnrK/nfBc433eZXqnBemx/4gOgQBCXlKq0Wt1808PgejmeDMJ6FVC4HQE2eESwfo4I1o5dc
-	4ZI6IB2O31tyq5nJdhU56pGPcAaC093dzIWAlXLeafJQcYOET/+Aic9a8sCkuanXHy6YQBz9YrKnv
-	EMthB9bg2fim2qpWdaww==;
+	List-Owner; bh=mezd/JLB4cfow4tqyn6upz5E+2GT31HHIwdr32cws0g=; b=r3+lgoAsV6rjma
+	Ue9XaoMpr3+bumabTPRu8ieKRGf1w4DE+IYj/UzIDOtphMbJsouBFrmVgwel7XvyKxZtyHUhccbeV
+	PDGmnYBT+HG54Ho8H3bBGlT3q5XWIggmvEnrqsDLgiOv3A5e4h7VDX7ucoc6KR4bZpq79/cOaJkB4
+	6nnwi7RxOJJch/LBNDqVLDvxB27gVK3hq8PCn6Sn26VQO3NfNXWgIj5Z+KA74Hh2vXvngnSNT+g+h
+	btrAWMm1ENfOUMnHsjee2EPOcvNAAogvgflke5HU7kNYSWU3ufyxD7By6aak5SXR1K67l4oviD0sM
+	qgQOXq2bZrw+JALRH4EA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt7G6-0003O6-JK; Mon, 11 Feb 2019 08:48:10 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt7G3-0003Nh-D0
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 08:48:08 +0000
-Received: from mail-lj1-f174.google.com (mail-lj1-f174.google.com
- [209.85.208.174])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id C31C721773
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 08:48:06 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549874887;
- bh=USbBreDmij9gGsyvuqdUdGistLyFa43WnOmvhiQ9Q8Q=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=kk3/s48CG7NbiZrJzGE/MNLX8My1+8x8qVaEAV9kYdutCYQjUdarbxekRPv9/pKEc
- Osqf03nsRKWYC1gwn4NTHMN5n5PWrlJdabFG0GUx1AwcXEg4mUEhSO7Ofoco5fPdZB
- l6Bw2SbziuQJaoKfVA92yY4jWnjjwdQa4XIXRJvo=
-Received: by mail-lj1-f174.google.com with SMTP id o1-v6so2171530ljc.10
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 00:48:06 -0800 (PST)
-X-Gm-Message-State: AHQUAuZjngGZWIxfYIIkgQSEqE7KVF8SPSXrC1rqipHtAmo3GiClm/dd
- P1hNfAuyBRLw0i4yDniIAl52NeWvoyyqkk5rSOw=
-X-Google-Smtp-Source: AHgI3Ia1N07rYTM2frCVmNxEX7R2AR2aB9qS4yZTNFU64lu3FRLGxDbSBZLSShiqffpQDWeKCoSXBYP2U2t+PmfyZHc=
-X-Received: by 2002:a2e:3a10:: with SMTP id
- h16-v6mr21125806lja.184.1549874884990; 
- Mon, 11 Feb 2019 00:48:04 -0800 (PST)
-MIME-Version: 1.0
-References: <20190210225114.20110-1-stuart.menefy@mathembedded.com>
- <20190210225114.20110-3-stuart.menefy@mathembedded.com>
-In-Reply-To: <20190210225114.20110-3-stuart.menefy@mathembedded.com>
-From: Krzysztof Kozlowski <krzk@kernel.org>
-Date: Mon, 11 Feb 2019 09:47:53 +0100
-X-Gmail-Original-Message-ID: <CAJKOXPeHMTZn0h8aVU4btg736XyHxpYHBFy1Up7jZgmQa17gtg@mail.gmail.com>
-Message-ID: <CAJKOXPeHMTZn0h8aVU4btg736XyHxpYHBFy1Up7jZgmQa17gtg@mail.gmail.com>
-Subject: Re: [PATCH 2/2] clocksource: exynos_mct: Clear timer interrupt when
- shutdown
-To: Stuart Menefy <stuart.menefy@mathembedded.com>
+	id 1gt7Ii-0005KO-Cw; Mon, 11 Feb 2019 08:50:52 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gt7Ie-0005FW-Ek; Mon, 11 Feb 2019 08:50:50 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B8FD480D;
+ Mon, 11 Feb 2019 00:50:44 -0800 (PST)
+Received: from big-swifty.misterjones.org (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EF2233F575;
+ Mon, 11 Feb 2019 00:50:36 -0800 (PST)
+Date: Mon, 11 Feb 2019 08:50:27 +0000
+Message-ID: <868symu2ss.wl-marc.zyngier@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Seiya Wang <seiya.wang@mediatek.com>
+Subject: Re: [PATCH v6 1/6] irqchip/mtk-sysirq: support 4 interrupt parameters
+ for sysirq
+In-Reply-To: <1549866929.22817.20.camel@mtksdccf07>
+References: <1548317240-44682-1-git-send-email-erin.lo@mediatek.com>
+ <1548317240-44682-2-git-send-email-erin.lo@mediatek.com>
+ <898ca3d9-002b-e28e-fc97-86bc2538e9de@gmail.com>
+ <626b5b46-aac7-1532-386e-2fed85bf4ad9@arm.com>
+ <c0187acf-bd8c-2d41-d84d-d35fc63b2beb@arm.com>
+ <1549866929.22817.20.camel@mtksdccf07>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_004807_456979_5E30F45B 
-X-CRM114-Status: GOOD (  13.97  )
+X-CRM114-CacheID: sfid-20190211_005048_552677_6E9EDDD0 
+X-CRM114-Status: GOOD (  24.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,33 +76,96 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
- Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
- Kukjin Kim <kgene@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Jason Cooper <jason@lakedaemon.net>,
+ srv_heupstream <srv_heupstream@mediatek.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Erin Lo <erin.lo@mediatek.com>, Stephen Boyd <sboyd@codeaurora.org>,
+ linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ linux-mediatek@lists.infradead.org, linux-serial@vger.kernel.org,
+ mars.cheng@mediatek.com, Matthias Brugger <matthias.bgg@gmail.com>,
+ yingjoe.chen@mediatek.com, Thomas Gleixner <tglx@linutronix.de>,
+ eddie.huang@mediatek.com, linux-clk@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sun, 10 Feb 2019 at 23:51, Stuart Menefy
-<stuart.menefy@mathembedded.com> wrote:
->
-> When shutting down the timer, ensure that after we have stopped the
-> timer any pending interrupts are cleared. This fixes a problem when
-> suspending, as interrupts are disabled before the timer is stopped,
-> so the timer interrupt may still be asserted, preventing the system
-> entering a low power state when the wfi is executed.
->
-> Signed-off-by: Stuart Menefy <stuart.menefy@mathembedded.com>
-> ---
->  drivers/clocksource/exynos_mct.c | 1 +
->  1 file changed, 1 insertion(+)
+On Mon, 11 Feb 2019 06:35:29 +0000,
+Seiya Wang <seiya.wang@mediatek.com> wrote:
+> 
+> On Thu, 2019-02-07 at 15:52 +0000, Marc Zyngier wrote:
+> > On 07/02/2019 15:47, Marc Zyngier wrote:
+> > > On 07/02/2019 15:20, Matthias Brugger wrote:
+> > >>
+> > >>
+> > >> On 24/01/2019 09:07, Erin Lo wrote:
+> > >>> From: Seiya Wang <seiya.wang@mediatek.com>
+> > >>>
+> > >>> To support partitioned PPIs, 4 interrupt parameters should be valid
+> > >>> for sysirq.
+> > >>>
+> > >>> Signed-off-by: Seiya Wang <seiya.wang@mediatek.com>
+> > >>> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> > >>> ---
+> > >>>  drivers/irqchip/irq-mtk-sysirq.c | 4 ++--
+> > >>>  1 file changed, 2 insertions(+), 2 deletions(-)
+> > >>>
+> > >>> diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
+> > >>> index 90aaf19..282736a 100644
+> > >>> --- a/drivers/irqchip/irq-mtk-sysirq.c
+> > >>> +++ b/drivers/irqchip/irq-mtk-sysirq.c
+> > >>> @@ -81,7 +81,7 @@ static int mtk_sysirq_domain_translate(struct irq_domain *d,
+> > >>>  				       unsigned int *type)
+> > >>>  {
+> > >>>  	if (is_of_node(fwspec->fwnode)) {
+> > >>> -		if (fwspec->param_count != 3)
+> > >>> +		if (fwspec->param_count != 3 && fwspec->param_count != 4)
+> > >>
+> > >> Where is this 4th parameter used?
+> > > 
+> > > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt#n14
+> > Sorry, I fired Send way too early.
+> > 
+> > What I wanted to add is that it is not clear to me why this change would
+> > be required here, as this driver only supports SPIs. It could be fixed
+> > by just relaxing the binding itself.
+> > 
+> > Thanks,
+> > 
+> > 	M.
+> 
+> Do you mean that we should change #interrupt-cells back to 3 for sysirq
+> and remove the 4th parameters of every spi interrupts in mt8183.dtsi
+> (i.e. 3 parameters for spi, 4 for ppi) such that we can discard this
+> patch?
 
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+It is more subtle than that:
 
-Best regards,
-Krzysztof
+- PPIs must have the affinity parameter in their int-spec (since you
+  need that for the PMU)
+
+- SPIs that are directly routed to the GIC must also have the affinity
+  parameter (although set to zero).
+
+- SPIs that are routed via the sysirq block (or any other) can use the
+  3 parameter variant, as they are not resolved in the context of the
+  GIC, but in that of the sysirq.
+
+But in short, yes. You should be able to drop this patch altogether.
+
+> If yes, we may need some time to verify the change before resending the
+> patch.
+
+That's absolutely fine.
+
+Thanks,
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
 
 _______________________________________________
 linux-arm-kernel mailing list
