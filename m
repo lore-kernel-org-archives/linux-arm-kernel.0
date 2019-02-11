@@ -2,63 +2,134 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EA4A8C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 19:58:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 74CB2C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 20:13:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B445C218AD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 19:58:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3FB092075B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 20:13:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tHfj3wH0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B445C218AD
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PIAptc44";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.com header.i=@fb.com header.b="SEoYiKwf";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=fb.onmicrosoft.com header.i=@fb.onmicrosoft.com header.b="HpdJD7+p"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3FB092075B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=fb.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Tlcod+f/PJn/lJMjkV2twR2uNxI+a3r6gLIfgFBRpzU=; b=tHfj3wH09PIwud
-	rKzLXbbZfbDgrJWSf6RIGga/2lxmn+wMPiAEIycKstg4JnIerb5eDjfL6Y/ojhmIfRbBlWsafVzDg
-	5KgLyzE6gwW4Ynqt28eUfcLL2W86pjzgOhOZT9HhXmGItPRIQC1NjIY1beaWduqcC4yGAe/zCxTZo
-	12DVUCdOwBMEQoq5UIdZdCnN4Aw1GMtEhV0G4KTkUzjQjuDayN1iUvANnmpZefqm0zlPtwUOo5eUk
-	rDo20yEKvFQiI5M6m2Y4DYQdmpIak1gN91RcVid+jm+RCG/mvtWemOiuPD5ca6sFX/u08i95cG8Tm
-	HoCPhofgf9yBkgAGlvlA==;
+	List-Owner; bh=0vc9qPDlh7hJ9/THOTnckM8mpsHval4I0gqsX/0eRD0=; b=PIAptc445BFG2x
+	RjD1/Lg/BPxC78veze4sEmQRfD8Wc5wuPRe5oe8R48D2tjxleXH7uF6ffrSo4c9vuj+USCt2hWhod
+	TPDlay73HzUkIyJbathiYiaSUUIN25N4g4dlsbSpzdHUJBZb3pjcXLPjaN2Dzxnfu+JxBP+vkATIC
+	LffeHBl5c9RmthCdy/0QcKdxOIOBoyMUs83rmkOTWKHWQsVk/aZQNSZ3Mfvix2NRpM3K6T1rwCJri
+	rZNtjL/XM9DFWGuocovgI9RaVJ9doaiMU3hrWLqHEjDj6mg5jHXCk77G3YtB+yIZkQFyTwI9aSjOu
+	ch7pgc4i6RdKV8MG00Jg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtHiK-0005QR-Qy; Mon, 11 Feb 2019 19:58:00 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtHiH-0005HQ-Rr
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 19:57:59 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D0B8580D;
- Mon, 11 Feb 2019 11:57:56 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9C9CA3F557;
- Mon, 11 Feb 2019 11:57:55 -0800 (PST)
-Date: Mon, 11 Feb 2019 19:57:53 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Doug Anderson <dianders@chromium.org>
-Subject: Re: Possible to annotate ARM64 IRQ handling to help gdb?
-Message-ID: <20190211195750.GI3567@e103592.cambridge.arm.com>
-References: <CAD=FV=X+YOf6Pt8bwuh0KCs=H3KTAW3atLLEP_X-5BMqtYMyZQ@mail.gmail.com>
- <20190204123130.GE3567@e103592.cambridge.arm.com>
- <CAD=FV=U_wfuU9zYSeu+JNrMts0Y1mf8Usvb7P_wCzgVNy0AUhQ@mail.gmail.com>
+	id 1gtHxZ-0004W9-DW; Mon, 11 Feb 2019 20:13:45 +0000
+Received: from mx0b-00082601.pphosted.com ([67.231.153.30]
+ helo=mx0a-00082601.pphosted.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtHxV-0004Vd-Mp
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 20:13:43 +0000
+Received: from pps.filterd (m0089730.ppops.net [127.0.0.1])
+ by m0089730.ppops.net (8.16.0.27/8.16.0.27) with SMTP id x1BKBicj004111;
+ Mon, 11 Feb 2019 12:13:32 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.com;
+ h=from : to : cc : subject
+ : date : message-id : references : in-reply-to : content-type : content-id
+ : content-transfer-encoding : mime-version; s=facebook;
+ bh=Qz+71zK4S8O3ulPwvIWUAtdOJf83HKjdiQm2enhhDUM=;
+ b=SEoYiKwf35woYtPnRnfysgUcH5hFRMxNJfEzTxEmNnkXRFqkRNQMYKx8ZyzJIeNI4DE3
+ 9BTV1tEYVzlvwiHJNNveZI3WHfWacWizyBOVlZfv2xn0FimBQ5wdrVnlesBm1Gvlm702
+ N1w+x8S3ZtAnmNgjA/2hvM1o9Xz8jGx1tfQ= 
+Received: from maileast.thefacebook.com ([199.201.65.23])
+ by m0089730.ppops.net with ESMTP id 2qkdqc0hbr-6
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
+ Mon, 11 Feb 2019 12:13:31 -0800
+Received: from frc-hub06.TheFacebook.com (2620:10d:c021:18::176) by
+ frc-hub04.TheFacebook.com (2620:10d:c021:18::174) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
+ 15.1.1531.3; Mon, 11 Feb 2019 12:13:17 -0800
+Received: from NAM01-BN3-obe.outbound.protection.outlook.com (192.168.183.28)
+ by o365-in.thefacebook.com (192.168.177.76) with Microsoft SMTP
+ Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.1.1531.3
+ via Frontend Transport; Mon, 11 Feb 2019 12:13:17 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=fb.onmicrosoft.com;
+ s=selector1-fb-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=Qz+71zK4S8O3ulPwvIWUAtdOJf83HKjdiQm2enhhDUM=;
+ b=HpdJD7+p1YDos6U5g5n6MdDEKcdDjZSA1We+fWtkz3sBJsbqkA4PNfiDfXOcy7uwtkctvin/rzxmtzqqzcvUBZypwWsQm5VvGAbblNiKPm/JcDb2yRUFF1/PSfaJ7/BhzQfOWWd8SIqYmwtpeC85/tcyhV5Jls/7nJ/yOfoT8PQ=
+Received: from CY4PR15MB1269.namprd15.prod.outlook.com (10.172.180.139) by
+ CY4PR15MB1560.namprd15.prod.outlook.com (10.172.162.13) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1601.24; Mon, 11 Feb 2019 20:13:16 +0000
+Received: from CY4PR15MB1269.namprd15.prod.outlook.com
+ ([fe80::b9cb:6dd8:d8bf:45c6]) by CY4PR15MB1269.namprd15.prod.outlook.com
+ ([fe80::b9cb:6dd8:d8bf:45c6%2]) with mapi id 15.20.1601.023; Mon, 11 Feb 2019
+ 20:13:16 +0000
+From: Vijay Khemka <vijaykhemka@fb.com>
+To: Andrew Jeffery <andrew@aj.id.au>, Greg Kroah-Hartman
+ <gregkh@linuxfoundation.org>
+Subject: Re: [PATCH] misc: aspeed-lpc-ctrl: Correct return values
+Thread-Topic: [PATCH] misc: aspeed-lpc-ctrl: Correct return values
+Thread-Index: AQHUs3BeMI31TwUu10WDx7+uo1I7z6W+EyAAgAA2EYCAG+OTgIAAcpsA
+Date: Mon, 11 Feb 2019 20:13:15 +0000
+Message-ID: <F4D4C25B-5E76-4E50-97E7-5A3548BBA1C4@fb.com>
+References: <20190123230634.1815021-1-vijaykhemka@fb.com>
+ <20190124081544.GA1649@kroah.com>
+ <13C13AE8-63A4-4002-9E0D-70276C529448@fb.com>
+ <1549862567.1175306.1655243744.11AFF30D@webmail.messagingengine.com>
+In-Reply-To: <1549862567.1175306.1655243744.11AFF30D@webmail.messagingengine.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [2620:10d:c090:200::6:6ae9]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; CY4PR15MB1560;
+ 20:Wql2j3IidcbXcAwx+D/tNGEN6DTRbV2P2qviYLYjkTbvDUt+68JN028+7C6R8mV46BxFE+GeGJdu++kg6mW8/8t9MQPWe7jLlEpTM7wDG8C5SPyyxJaSCDnkCsQk8fz7Tf35URLU8Ab1Tv5qsDcBbil+Q6eTxLIZYG1C4Qak4bw=
+x-ms-office365-filtering-correlation-id: 8866b2e7-bf5d-4a4f-f8f5-08d6905d5b83
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:CY4PR15MB1560; 
+x-ms-traffictypediagnostic: CY4PR15MB1560:
+x-microsoft-antispam-prvs: <CY4PR15MB1560497164FE02210C3DA9DDDD640@CY4PR15MB1560.namprd15.prod.outlook.com>
+x-forefront-prvs: 0945B0CC72
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(396003)(376002)(366004)(136003)(346002)(39860400002)(189003)(199004)(106356001)(476003)(86362001)(53936002)(6436002)(229853002)(2616005)(102836004)(14444005)(256004)(53546011)(6506007)(68736007)(11346002)(46003)(82746002)(93886005)(446003)(110136005)(4326008)(316002)(486006)(105586002)(81156014)(97736004)(8676002)(6116002)(36756003)(7736002)(14454004)(6486002)(6246003)(81166006)(8936002)(76176011)(33656002)(71200400001)(99286004)(305945005)(2906002)(54906003)(83716004)(71190400001)(186003)(25786009)(6512007)(478600001);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:CY4PR15MB1560;
+ H:CY4PR15MB1269.namprd15.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: fb.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: l4Q3YgebybB1nvVGl8s4ruueHKDi8pOlCiZuhSrgcwL08zVWW9Z7skUZWNKBYlxx7zQU7eQ7U2dYrfosmZXCzO+5SMf8UzzVrUSStnMvIJy2bcjkAQ0DNxBNGiP3OlvsfHAW9TSH3N2zBjzOSP0pNgQJYaZMNhM/9l1/eAOyRSZg/OeGJ6urrxuUgrrX9/AaATUYMQwHD8HFv0D9l4v1qJ/3KMor26LLxEV0bN86sb2q9bvqJb97Z/3GObl9M8FAFHKBfB0hrx9j9ckkXynkE/+BcEpfenTgZsx4MwQQXPkjQIzfMQqwM783uKFFVLcr0soLxQRuPq3gbWEkO5onuGWj6mT1XeC2TfCVkaOXAe2M947VebUcbf0ikggwcD/+jyPyPmR7aUULWIVDjODCg5ok1c7RwJq3aCsuyMOX2uU=
+Content-ID: <63618F2410F7204090F466D259C31D32@namprd15.prod.outlook.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAD=FV=U_wfuU9zYSeu+JNrMts0Y1mf8Usvb7P_wCzgVNy0AUhQ@mail.gmail.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 8866b2e7-bf5d-4a4f-f8f5-08d6905d5b83
+X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Feb 2019 20:13:16.0106 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 8ae927fe-1255-47a7-a2af-5f3a069daaa2
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR15MB1560
+X-OriginatorOrg: fb.com
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-02-11_14:, , signatures=0
+X-Proofpoint-Spam-Reason: safe
+X-FB-Internal: Safe
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_115757_914714_84A864BC 
-X-CRM114-Status: GOOD (  35.13  )
+X-CRM114-CacheID: sfid-20190211_121341_877756_154195F1 
+X-CRM114-Status: GOOD (  19.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,145 +141,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Caroline Tice <cmtice@chromium.org>, kgdb-bugreport@lists.sourceforge.net,
- Will Deacon <will.deacon@arm.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Stephen Boyd <swboyd@chromium.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Arnd Bergmann <arnd@arndb.de>,
+ "linux-aspeed@lists.ozlabs.org" <linux-aspeed@lists.ozlabs.org>,
+ "openbmc @ lists . ozlabs . org" <openbmc@lists.ozlabs.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Joel Stanley <joel@jms.id.au>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 09:27:11AM -0800, Doug Anderson wrote:
-> Hi,
-> 
-> On Mon, Feb 4, 2019 at 4:31 AM Dave Martin <Dave.Martin@arm.com> wrote:
-> >
-> > On Fri, Feb 01, 2019 at 01:38:05PM -0800, Doug Anderson wrote:
-> > > Hi,
-> > >
-> > > I was wondering if anyone out there has given any thought to
-> > > annotating the ARM64 IRQ handling in such a way that we could stack
-> > > crawl past el1_irq() when in gdb.
-> > >
-> > > I spent a bit of time on this a few months ago and documented all my
-> > > findings in:
-> > >
-> > > https://bugs.chromium.org/p/chromium/issues/detail?id=908721
-> > >
-> > > I can copy and paste all the discussion from that bug here, but since
-> > > it's public hopefully folks can read the discussion / investigation
-> > > there.  To put it briefly, though: I can stack crawl past "el1_irq"
-> > > with the normal linux stack crawl (which is what kdb uses) but I can't
-> > > crawl past "el1_irq" in gdb().  After talking to some of our tools
-> > > guys here I'm fairly certain that we could solve this with the right
-> > > CFI directives, but when I poked at it I wasn't able to figure out the
-> > > magic.
-> > >
-> > >
-> > > Anyway, I figured I'd check to see if anyone here happens to know the
-> > > right magic.
-> >
-> > The kernel (appears to) generate a valid frame record for el1_irq:
-> >
-> >    0xffffff8008082b94 <+84>:    mrs     x22, elr_el1
-> >
-> >         [...]
-> >
-> >    0xffffff8008082ba0 <+96>:    stp     x29, x22, [sp, #304]
-> >    0xffffff8008082ba4 <+100>:   add     x29, sp, #0x130
-> >
-> > (I note that 0x130 == 304.  Yay binutils.)
-> 
-> Right, this is how the kernel is able to do the crawl.  It's also why
-> I was able to manually do the crawl in the bug by chaining together
-> frame pointers.
-> 
-> 
-> > From the bug report, I don't see any real investigation into what
-> > precisely causes gdb to choke on this frame.
-> 
-> Right.  I just don't know gdb well enough.  :(  I've had it on my list
-> to dig into it, but I need to find time.  ;-)
-> 
-> 
-> > Do you have evidence that CFI annotations help in this case?  And can
-> > you explain _why_ they help (i.e., precisely how is gdb relying on the
-> > annotations)?
-> 
-> I spent a tiny bit of time playing around with CFI annotations.
-> Mostly it was stumbling around in the dark since I had a hard time
-> finding good arm/arm64 examples and the documentation was a little
-> hard for me to parse.
-
-You could try compiling a few simple C functions with gcc -S
--fexceptions and see what the compiler spits out.
-
-> ...but from my experience with gdb, my guess is that gdb wants more
-> than just the simple frame pointers.  It wants to know where _all_ the
-> registers are stored on the stack and the only way it's going to get
-> that from assembly code (especially assembly code that barfed the
-> registers onto the stack somewhere that's not between FUNC and
-> ENDFUNC) is with some type of annotation.  My guess is that it doesn't
-> fall back to just looking at frame pointer chains.  Specifically as
-> you move up the stack frame in gdb and you type "info reg", the set of
-> registers changes to be those registers that are correct for the stack
-> frame you're on.  Here's a quick example showing how gdb behaves with
-> a random register that was barfed, $x22:
-> 
-> (gdb) frame 3
-> #3  0xffffff800846a088 in __handle_sysrq (key=103,
-> check_mask=<optimized out>) at .../drivers/tty/sysrq.c:620
-> 620                             op_p->handler(key);
-> 
-> (gdb) disass
-> Dump of assembler code for function __handle_sysrq:
->    0xffffff8008469f64 <+0>:     str     x23, [sp, #-64]!
->    0xffffff8008469f68 <+4>:     stp     x22, x21, [sp, #16]
->    0xffffff8008469f6c <+8>:     stp     x20, x19, [sp, #32]
->    0xffffff8008469f70 <+12>:    stp     x29, x30, [sp, #48]
->    0xffffff8008469f74 <+16>:    add     x29, sp, #0x30
-> 
-> (gdb) print /x $x22
-> $13 = 0xffffff8009035000
-> 
-> (gdb) print /x *(void**)($x29 - 0x30 + 16)
-> $14 = 0x8000100
-> 
-> (gdb) up
-> #4  0xffffff800846a0dc in handle_sysrq (key=103) at .../drivers/tty/sysrq.c:649
-> 649                     __handle_sysrq(key, true);
-> 
-> (gdb) print /x $x22
-> $15 = 0x8000100
-
-
-Indeed, but this requires full DWARF or .eh_frame info, which is not
-generally available in the kernel.
-
-Except for code built with -fomit-frame-pointer, you should at least
-be able to see a list of frames though: this doesn't require all the
-registers of ancestor frames to be recovered, just x29 and lr (which is
-what the frame records on the stack contain -- so no other magic info
-is required in order to recover these).
-
-gdb tries various methods to unwind a frame, and ought to fall back to
-this approach if all else fails.  Frame chains that appear to loop
-are a problem though, with no straightforward solution.
-
-My hunch is that gdb sees the frame chain attempt to loop backwards
-after el1_irq and bails out.  Is your task stack at a lower address than
-the IRQ stack?
-
-In the kernel we gave up attempting to fully detect backtrace loops
-because of this issue, but this involves some cruddy heuristics which
-may not be considered acceptable for gdb.  For one thing, our rules are
-specific for the kernel, not general-purpose.
-
-Cheers
----Dave
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+DQoNCu+7v09uIDIvMTAvMTksIDk6MjIgUE0sICJBbmRyZXcgSmVmZmVyeSIgPGFuZHJld0Bhai5p
+ZC5hdT4gd3JvdGU6DQoNCiAgICBPbiBGcmksIDI1IEphbiAyMDE5LCBhdCAwNTo1OSwgVmlqYXkg
+S2hlbWthIHdyb3RlOg0KICAgID4gDQogICAgPiANCiAgICA+IE9uIDEvMjQvMTksIDEyOjE2IEFN
+LCAiR3JlZyBLcm9haC1IYXJ0bWFuIiA8Z3JlZ2toQGxpbnV4Zm91bmRhdGlvbi5vcmc+IHdyb3Rl
+Og0KICAgID4gDQogICAgPiAgICAgT24gV2VkLCBKYW4gMjMsIDIwMTkgYXQgMDM6MDY6MzRQTSAt
+MDgwMCwgVmlqYXkgS2hlbWthIHdyb3RlOg0KICAgID4gICAgID4gQ29ycmVjdGVkIHNvbWUgb2Yg
+cmV0dXJuIHZhbHVlcyB3aXRoIGFwcHJvcHJpYXRlIG1lYW5pbmdzLg0KICAgID4gICAgID4gDQog
+ICAgPiAgICAgPiBTaWduZWQtb2ZmLWJ5OiBWaWpheSBLaGVta2EgPHZpamF5a2hlbWthQGZiLmNv
+bT4NCiAgICA+ICAgICA+IC0tLQ0KICAgID4gICAgID4gIGRyaXZlcnMvbWlzYy9hc3BlZWQtbHBj
+LWN0cmwuYyB8IDE1ICsrKysrKystLS0tLS0tLQ0KICAgID4gICAgID4gIDEgZmlsZSBjaGFuZ2Vk
+LCA3IGluc2VydGlvbnMoKyksIDggZGVsZXRpb25zKC0pDQogICAgPiAgICAgPiANCiAgICA+ICAg
+ICA+IGRpZmYgLS1naXQgYS9kcml2ZXJzL21pc2MvYXNwZWVkLWxwYy1jdHJsLmMgYi9kcml2ZXJz
+L21pc2MvYXNwZWVkLQ0KICAgID4gbHBjLWN0cmwuYw0KICAgID4gICAgID4gaW5kZXggMzMyMjEw
+ZTA2ZTk4Li45N2FlMzQxMTA5ZDUgMTAwNjQ0DQogICAgPiAgICAgPiAtLS0gYS9kcml2ZXJzL21p
+c2MvYXNwZWVkLWxwYy1jdHJsLmMNCiAgICA+ICAgICA+ICsrKyBiL2RyaXZlcnMvbWlzYy9hc3Bl
+ZWQtbHBjLWN0cmwuYw0KICAgID4gICAgID4gQEAgLTY4LDcgKzY4LDYgQEAgc3RhdGljIGxvbmcg
+YXNwZWVkX2xwY19jdHJsX2lvY3RsKHN0cnVjdCBmaWxlIA0KICAgID4gKmZpbGUsIHVuc2lnbmVk
+IGludCBjbWQsDQogICAgPiAgICAgPiAgCQl1bnNpZ25lZCBsb25nIHBhcmFtKQ0KICAgID4gICAg
+ID4gIHsNCiAgICA+ICAgICA+ICAJc3RydWN0IGFzcGVlZF9scGNfY3RybCAqbHBjX2N0cmwgPSBm
+aWxlX2FzcGVlZF9scGNfY3RybChmaWxlKTsNCiAgICA+ICAgICA+IC0Jc3RydWN0IGRldmljZSAq
+ZGV2ID0gZmlsZS0+cHJpdmF0ZV9kYXRhOw0KICAgID4gICAgID4gIAl2b2lkIF9fdXNlciAqcCA9
+ICh2b2lkIF9fdXNlciAqKXBhcmFtOw0KICAgID4gICAgID4gIAlzdHJ1Y3QgYXNwZWVkX2xwY19j
+dHJsX21hcHBpbmcgbWFwOw0KICAgID4gICAgID4gIAl1MzIgYWRkcjsNCiAgICA+ICAgICA+IEBA
+IC05Myw4ICs5Miw4IEBAIHN0YXRpYyBsb25nIGFzcGVlZF9scGNfY3RybF9pb2N0bChzdHJ1Y3Qg
+ZmlsZSANCiAgICA+ICpmaWxlLCB1bnNpZ25lZCBpbnQgY21kLA0KICAgID4gICAgID4gIA0KICAg
+ID4gICAgID4gIAkJLyogSWYgbWVtb3J5LXJlZ2lvbiBpcyBub3QgZGVzY3JpYmVkIGluIGRldmlj
+ZSB0cmVlICovDQogICAgPiAgICAgPiAgCQlpZiAoIWxwY19jdHJsLT5tZW1fc2l6ZSkgew0KICAg
+ID4gICAgID4gLQkJCWRldl9lcnIoZGV2LCAiRGlkbid0IGZpbmQgcmVzZXJ2ZWQgbWVtb3J5XG4i
+KTsNCiAgICA+ICAgICA+IC0JCQlyZXR1cm4gLUVJTlZBTDsNCiAgICA+ICAgICA+ICsJCQlwcl9l
+cnIoImFzcGVlZF9scGNfY3RybDogaW9jdGw6IERpZG4ndCBmaW5kIHJlc2VydmVkIG1lbW9yeVxu
+Iik7DQogICAgPiAgICAgDQogICAgPiAgICAgV2h5IGRpZCB5b3UgY2hhbmdlIGZyb20gZGV2X2Vy
+cigpIHRvIHByX2VycigpPyAgWW91IGp1c3QgbG9zdCBhIGxvdCBvZg0KICAgID4gICAgIGluZm9y
+bWF0aW9uIHRoYXQgdGhlIHVzZXIgcHJldmlvdXNseSB3YXMgZ2V0dGluZyBmcm9tIGRldl9lcnIo
+KSA6KA0KICAgID4gDQogICAgPiBJIGRpZCB0aGlzIGFzIHBlciByZXZpZXcgY29tbWVudCBmcm9t
+IEFuZHJldyBKZWZmZXJ5LCBhcyB3ZSBkb24ndCB3YW50IA0KICAgID4gdG8gcHV0IHRoaXMgZXJy
+b3IgZm9yIGRyaXZlci4gSXQgaGFzIHRvIGJlIGhhbmRsZWQgYnkgdXNlcnNwYWNlLiBCdXQgSSAN
+CiAgICA+IGFtIHN0aWxsIHJlcG9ydGluZyBzb21lIGVycm9yIGhlcmUuDQogICAgDQogICAgU29y
+cnk/IFdoYXQgSSB3YXMgdHJ5aW5nIHRvIHN1Z2dlc3Qgd2FzIHJlbW92aW5nIHRoZSBsb2dnaW5n
+IGFsdG9nZXRoZXIgYW5kDQogICAganVzdCByZXR1cm5pbmcgdGhlIGVycm9yIGNvZGUuIE5vdCBz
+aW1wbHkgY2hhbmdpbmcgaG93IHRoZSBsb2dnaW5nIGlzIGRvbmUuDQpObyBpc3N1ZSwgSSBjYW4g
+cmVtb3ZlIGxvZ2dpbmcsIHdpbGwganVzdCByZXR1cm4gZXJyb3IgY29kZS4gV2lsbCBzZW5kIG5l
+dyBwYXRjaCB3aXRoIHVwZGF0ZS4NCiAgICANCiAgICBBbmRyZXcNCiAgICANCg0KX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBt
+YWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9s
+aXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
