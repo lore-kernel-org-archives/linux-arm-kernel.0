@@ -2,21 +2,22 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 07D3FC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 10:58:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16B8DC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 10:59:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CC5FD20873
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 10:58:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D8D3E20838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 10:59:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Jzy/U4e/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC5FD20873
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N9R9nF0K"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D8D3E20838
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,40 +25,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cznyOz5Bis7QgCroyQ3/oSEZ9T7zcC2Nyvp89858UL4=; b=Jzy/U4e/vHfId7
-	rXdxHeLGCUeUK8radOC2ZkvVo1TQAA1UNtAGPrR832CiWGNiQ1hfvom0M4jiLs9iKiQJyzSnostZN
-	CcgDHiNDgHtFmAso+YLef0LdpkGUIz9/f+vn4pn964zmGKlr2eo8zIntbc5HvzcJi1LjiqMC+55Mm
-	4d9kNd5FNLS4v8LTEFFOPqYormlKE7xe7sHWzC8BpOTLD+dsaMwY8Y2ZxRe02OFCnLJonTXxHd712
-	dZ+mumTYaM3JjWzwpHYQgvt8aWoiZ3V6yY+9xsc6PpzeHzlH/0Tg3kh2SNa/PhGk3y6kP9Nmld99R
-	qJGJw33rsYPta3926/kg==;
+	List-Owner; bh=hoR1+NAfR4dsAl+SeR1X3y1w4qr/jWdEQtfC9fsSdes=; b=N9R9nF0K/V6/0Q
+	+sNUqH5kkZPM2R6aEOGRnniNu6P5uc4tC8//+aUvmEQvRJZzvAnSB+mHDP1IHgm0WtkIXawxk5LkI
+	7yGpKjqHytYHHXUBQMob9qwvuMEF74YzlMMgsaOc9n5u9GEx+OUo23DsQvjuJpzbXMwgKJpc8ZVbe
+	NURY9KAAaraVNtJGq9fPajWz8UePmki0HbcfGlrfeZgthsy0QAusEoD8WAN5gJzfwLXFUxp+KPzg7
+	TyMSQUugP6ZrGoFvAostvnIkGfMb3+cQD5fvQNS2QDiicF4r1RyVvCP2d0liPPKfXb7BKJBFKxXpA
+	k7nSj4oSRuStZepdfkLg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt9Ho-0000Vh-Qt; Mon, 11 Feb 2019 10:58:04 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt9Hk-0000Tb-JR
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 10:58:02 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C153EA78;
- Mon, 11 Feb 2019 02:57:59 -0800 (PST)
-Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 8DC9B3F557;
- Mon, 11 Feb 2019 02:57:58 -0800 (PST)
-Date: Mon, 11 Feb 2019 10:57:55 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: AngeloGioacchino Del Regno <kholk11@gmail.com>
-Subject: Re: [PATCH] arm64/io: Don't use WZR in writel
-Message-ID: <20190211105755.GB30880@fuggles.cambridge.arm.com>
-References: <68b71c15f32341468a868f6418e4fcb375bc49ba.camel@gmail.com>
+	id 1gt9It-0000nU-Ho; Mon, 11 Feb 2019 10:59:11 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gt9Iq-0000n8-P5
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 10:59:10 +0000
+Received: from pty.hi.pengutronix.de ([2001:67c:670:100:1d::c5])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gt9Im-0006Ps-9x; Mon, 11 Feb 2019 11:59:04 +0100
+Received: from ukl by pty.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gt9Il-0008Ir-TV; Mon, 11 Feb 2019 11:59:03 +0100
+Date: Mon, 11 Feb 2019 11:59:03 +0100
+From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
+To: Shawn Guo <shawnguo@kernel.org>
+Subject: Re: [PATCH 1/2] ARM: dts: Add devicetree for Eckelmann CI4x10
+Message-ID: <20190211105903.p7ihdfa2tcgjigpl@pengutronix.de>
+References: <20190111164936.7152-1-u.kleine-koenig@pengutronix.de>
+ <20190114013909.GE15371@dragon>
+ <20190205081825.rcoi2wx2bvxsyfjz@pengutronix.de>
+ <20190211013808.GC21496@dragon>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <68b71c15f32341468a868f6418e4fcb375bc49ba.camel@gmail.com>
-User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
+In-Reply-To: <20190211013808.GC21496@dragon>
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c5
+X-SA-Exim-Mail-From: ukl@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_025800_641703_3297122C 
-X-CRM114-Status: GOOD (  16.34  )
+X-CRM114-CacheID: sfid-20190211_025908_995846_890474CF 
+X-CRM114-Status: UNSURE (   9.17  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,43 +79,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jens Axboe <axboe@kernel.dk>, Catalin Marinas <catalin.marinas@arm.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-arm-msm@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Fabio Estevam <fabio.estevam@nxp.com>, Gavin Schenk <g.schenk@eckelmann.de>,
+ NXP Linux Team <linux-imx@nxp.com>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Feb 09, 2019 at 07:34:53PM +0100, AngeloGioacchino Del Regno wrote:
-> From 33fb6d036de273bb71ac1c67d7a91b7a5148e659 Mon Sep 17 00:00:00 2001
-> From: "Angelo G. Del Regno" <kholk11@gmail.com>
-> Date: Sat, 9 Feb 2019 18:56:46 +0100
-> Subject: [PATCH] arm64/io: Don't use WZR in writel
-> 
-> This is a partial revert of commit ee5e41b5f21a
-> ("arm64/io: Allow I/O writes to use {W,X}ZR")
-> 
-> When we try to use the zero register directly on some SoCs,
-> their security will make them freeze due to a firmware bug.
-> This behavior is seen with the arm-smmu driver freezing on
-> TLBI and TLBSYNC on MSM8996, MSM8998, SDM630, SDM660.
+Hello,
 
-Hmm, this sounds very fragile. I hope they're not trapping and emulating
-MMIO accesses and treating the zero register as the stack pointer...
+On Mon, Feb 11, 2019 at 09:38:10AM +0800, Shawn Guo wrote:
+> > > > +	mram: mr25h256@0 {
+> =
 
-Wouldn't this also be triggerable from userspace by mmap()ing either
-/dev/mem or e.g. a PCI bar via sysfs?
+> Just spot it - please use a generic node name.
 
-> Allocating a temporary register to store the zero for the
-> write actually solves the issue on these SoCs.
+This was already fixed in v2 (as you pointed it out already).
+ =
 
-I don't think this catches all MMIO accesses, so I think we need to
-understand more about the actual issue here. For example, is it only the
-SMMU that causes this problem? Also, any workaround should be specific to
-the broken SoCs.
+Thanks for your feedback.
 
-Will
+Best regards
+Uwe
+
+-- =
+
+Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
 _______________________________________________
 linux-arm-kernel mailing list
