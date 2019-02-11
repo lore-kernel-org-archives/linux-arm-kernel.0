@@ -2,76 +2,85 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,SUBJ_ALL_CAPS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2B844C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 20:45:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7A740C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 20:49:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EF06E218A4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 20:45:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 423FD218AD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 20:49:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RlBv/8EU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF06E218A4
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=gmx.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="crYhf7RR";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="kyfi3dan"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 423FD218AD
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Date:Message-ID:
-	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	References:List-Owner; bh=oW+AuRDG7qBp141XsL8LWGIvOiTDGNZWoCfBTKVw+v0=; b=RlB
-	v/8EUa39f1r1JIay/luxxgnkVJhnvxZr9WFljLVY0i6k9ajDVsk58Hgla4quyXe6Icmdf+FZj95pH
-	oiX/2PctkyJE+Ww7AgQy14m6ipivxMDAFx2dhiZ9DqyMpf3U5URNPAUd+X/J29xf3LO9n29yRhzGL
-	vV2Jr33ZbGI/oyyLKPI0WHpsMtRLbvi4hRnyEN0dofD3ahhonMjrWh/ejT4f3VLWNcHtZ9tDRod0o
-	9YxrbiYh1v8sjatlRJjA/LDVffI1U4s+Nok1x1s+Dafzdwg8XDjF96co4W/Uj3txxYjsWmIXwgjgR
-	n8gfN8FYsln1tJ/99bnPs0AnWahF9Tw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=vRlJ5W8GOQkUDHOliI8xx60NYmqPW5B3Y5c6/p+5ofM=; b=crYhf7RRUEIFfW
+	hNT30mabhMfXzbRB6TbCfD+Dw1GBeFtm4m22E/ZpHosKAJ62pHDds7c6NoUbaWfqVnijqfbxmJzJl
+	OhG/pV2HRC4ZO/Y/8hqqHsl7IsBUPetjuYZJS1gePfqj2Ck7MSz+z6yYUuMGle7ZkH7ME0DdiJI6Z
+	d+ZfAp8J/eFh683E46nW8taF6Sw5FYCStrUcJwQU9NRU1RydwpwnAAe+E4LY3KpYDiveMfV2WwWyM
+	ETDwIr7PQPeL0ZosWgHEBg/pxtp/IXLqdYewiTA35kE2VU9xuLuFo8HI0zBnaVuBkzbz+1ujSkXr/
+	Tn0+KN1ItPaiFApYtHeQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtIRt-0008Dc-KW; Mon, 11 Feb 2019 20:45:05 +0000
-Received: from mout.gmx.net ([212.227.15.18])
+	id 1gtIVk-0001Kf-Qi; Mon, 11 Feb 2019 20:49:04 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtIRp-0007uw-Dd
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 20:45:03 +0000
-Received: from nc.bastianfamily.de ([79.204.83.51]) by mail.gmx.com (mrgmx001
- [212.227.17.190]) with ESMTPSA (Nemesis) id 0LsChr-1h5U5L2zrr-013ueP; Mon, 11
- Feb 2019 21:44:52 +0100
-From: Tristan Bastian <tristan-c.bastian@gmx.de>
-To: Thierry Reding <thierry.reding@gmail.com>, Thierry Reding
- <thierry.reding@gmail.com>
-Subject: Re: [PATCH v2] ARM: tegra: Restore DT ABI on Tegra124 Chromebooks
-In-Reply-To: <20190211110919.10388-1-thierry.reding@gmail.com>
-Message-ID: <20190211204452.Horde.-B4_UgJoWHc85yxQZVtc9wu@_>
-User-Agent: Horde Application Framework 5
-Date: Mon, 11 Feb 2019 20:44:52 +0000
+ id 1gtIVg-0001JT-FQ
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 20:49:02 +0000
+Received: by mail-pg1-x544.google.com with SMTP id d72so109362pga.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 11 Feb 2019 12:49:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:mime-version;
+ bh=iD/2fmc3WOR75xKs3SOI8RznZuRTsGWHd3f6jaHVDts=;
+ b=kyfi3danVhowRODs3bHSnz2xGgr0DF4P4v+EjPqfmcAG6qPV5XUQQj7/ezwvx6sr/M
+ 2KkYAkp33KRAciQUISTrFMCKZ4BHAmLZMUubk/pGjzadyehjxo1BEAcjiI+X/h/TI3HN
+ igBtu0iU4lHzu8uKr+ZEiM+dbG5WjU31hiG5465F0BG3rN67vmov8yWT9hRw4suQxztJ
+ CUiOfz2oUpwVPE8O0ys7inkeaURGwK1WHs8NF8xCHCpFq3nbcjKWs1gQfsKn4TgeMY7T
+ W/1N/MhpoPJhjdHc6bjIy5cdok5de9/9BzYazHu9759G9rm5J7ZR+qjV1McVVpa6aQ+8
+ Lruw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version;
+ bh=iD/2fmc3WOR75xKs3SOI8RznZuRTsGWHd3f6jaHVDts=;
+ b=IaU+aybUhPQjsowQAVNt1lcQpTc5guP9C08ONeh6TJPVhYsXd6dNPNn8qCMbWbz7Io
+ 1b9rTKzDJNMfs14+/yPY/gGWPUYtfH7yLrA19v4Ms4RYcXxSWlRb5P+ldImM56KZwcjv
+ rcdtB0bq8Mg0PIx/xZUOQVEYph850OzV1v9jJ3lInIZYojVAOSMUyuvpYmoQpnFy7hJa
+ /M0/REIxSSW/nlbQl3CVtsFR9U15oyYXxmLFpN2m3PHVtkNWIJMWkdOtoLqvN+B1vcHs
+ UMka52ZAxK3E97XfpO8Zmesqe2MKixCggWS7UMU/+RVohOejeDHy0wIoOd9RaahaHU2q
+ u98Q==
+X-Gm-Message-State: AHQUAuZnOQhzUL+UjXTe/YvVq31A83oCrQLg6d+ME9+t+gv8ZtASxW7F
+ jmoHlUfXPnDf8q8AAtfufXDOIGiYT7Q=
+X-Google-Smtp-Source: AHgI3Ib4lf6z9Qjmrs9M7eL8SvaRqCk8Uf+gA800Vg6jAcWnU5WVJAuxDkgR4V0sfijIpomyMSqfQA==
+X-Received: by 2002:a63:f201:: with SMTP id v1mr140486pgh.232.1549918139610;
+ Mon, 11 Feb 2019 12:48:59 -0800 (PST)
+Received: from localhost ([2601:602:9200:a1a5:1d1:285e:6b85:3bfc])
+ by smtp.googlemail.com with ESMTPSA id 10sm17683708pfq.146.2019.02.11.12.48.58
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 11 Feb 2019 12:48:59 -0800 (PST)
+From: Kevin Hilman <khilman@baylibre.com>
+To: arm@kernel.org
+Subject: [GIT PULL] 
+Date: Mon, 11 Feb 2019 12:48:58 -0800
+Message-ID: <7himxqdpad.fsf@baylibre.com>
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:WK0KdiJULMy4bA1WhngBCBEgtpaIYcL+y7I+XULTWd3NCk8Krzq
- zG4GVHCfNAogjIjNulVI7lpn/1wUtWdWUQ6kdsVTxj8s3HTLi+mlmO5bbzcecFkAIm+E8UE
- H7SEIG+5XP1A6Oo+6mhxbDnZ+pMWpQ5X3KVQk18Bpu7guztGtwKpYKvNPDsbnOjjby/UTak
- 1egc9CQKB/0r9ofsaJeVA==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:oiQI1JcTgSE=:RXoh9mCTZehRG7QcibW6Cf
- UGGl9kHqHt/9O2rXTXvlM92R/BjeAQfgIWkzmUyFFRvqGpWzhVkO1hvo/1uUTwpc6ljwJH/fm
- QpGGQmwCHnP9Gee1gpRhujmnqia49EeHwrM+hBK5FhKOrakIxjI3iTgdCl2yLHySpDzpCEYtD
- fKzN0W7wPsuhZCLWwqIqWcTcGs2Q7nuOTrWkk/TM/z+UOcl2Nfg1hztc49xKkLeGFwGyV6r9N
- jOIHHRpw9iLYlFzNEdnG5dBkuY4g5I9LRFAlEAqrVrUMYElf3EMNz1semkq5bM2AdgtiWbrcV
- 9cz6O9/fdlu69/zSPS6E/GyAq1LPZUisNqipqDlmqzqSriLOCLTJiyE0ByHl/WtipAY5Wg46f
- hLDCWsOYRUKRBRqzKJ/C7s4Q9kg7iR2/SFpKsuLA843ZqczCHz6NtU2gm2FWzfbpVyrJV9sn0
- 2HFWuSBkp0ExN2YvIxiBgS/RHVEWDqaP6sWL34V1m20F3Rc540X9i//iJHlJaeaG1W3YrF4F6
- 3QzDumxWQyxpWbQ3M57cS32aTdsOyf/9K/Uobs9AGwHbRAcOkJLCXr9XcwxSI9N/lKykoT4lI
- n+Opqc7CMgd3X4WRPhe9y/vckXP4itKbeYowmiostXHC2Hzrq5czfI6rkb08R+RGMDsQBCoMs
- E3tqHiC14bZ/l/SFQsO5QV+QMi6nlqS9LSgOTguHVc4c/bfUkUwRi0YNYrcXPx6CY8mf3POJE
- V/RNb8y6qPnxP4FphVowlvXN9Oihclae3SgMhrLz4C0ACUIGW49iwZectA+1Iv25cPMb2oD8m
- 5TImUtTuRQVOqk1dEu4J4w02C+0KPH/fFK+UPsdqG2BXceza9S/h4JMggAfMJaY1Ddd6j28mW
- pZafQRHDJvTUBc/2Ftk1upL99zw8iLIXOmXA0YqNjqXoi/iJ2YL0OuRyUPhDwS0plqwVAJNyk
- Zi4MOgQTa2A==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_124501_771371_54B74306 
-X-CRM114-Status: GOOD (  20.79  )
+X-CRM114-CacheID: sfid-20190211_124900_511985_06F84223 
+X-CRM114-Status: UNSURE (   9.85  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,60 +92,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Jon Hunter <jonathanh@nvidia.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-VGhpZXJyeSBSZWRpbmcg4oCTIE1vbiwgMTEuIEZlYnJ1YXJ5IDIwMTkgMTI6MDkKPiBGcm9tOiBU
-aGllcnJ5IFJlZGluZyA8dHJlZGluZ0BudmlkaWEuY29tPgo+IAo+IENvbW1pdCA0ODI5OTc2OTll
-ZjAgKCJBUk06IHRlZ3JhOiBGaXggdW5pdF9hZGRyZXNzX3ZzX3JlZyBEVEMgd2FybmluZ3MKPiBm
-b3IgL21lbW9yeSIpIGluYWR2ZW50ZW50bHkgYnJva2UgZGV2aWNlIHRyZWUgQUJJIGJ5IGFkZGlu
-ZyBhIHVuaXQtCj4gYWRkcmVzcyB0byB0aGUgIi9tZW1vcnkiIG5vZGUgYmVjYXVzZSB0aGUgZGV2
-aWNlIHRyZWUgY29tcGlsZXIgZmxhZ2dlZAo+IHRoZSBtaXNzaW5nIHVuaXQtYWRkcmVzcyBhcyBh
-IHdhcm5pbmcuCj4gCj4gVGVncmExMjQgQ2hyb21lYm9va3MgKGEuay5hLiBOeWFuKSB1c2UgYSBi
-b290bG9hZGVyIHRoYXQgcmVsaWVzIG9uIHRoZQo+IGZ1bGwgbmFtZSBvZiB0aGUgbWVtb3J5IG5v
-ZGUgaW4gZGV2aWNlIHRyZWUgYmVpbmcgZXhhY3RseSAiL21lbW9yeSIuIEl0Cj4gY2FuIGJlIGFy
-Z3VlZCB3aGV0aGVyIHRoaXMgd2FzIGEgZ29vZCBkZWNpc2lvbiBvciBub3QsIGFuZCBzb21lIG90
-aGVyCj4gYm9vdGxvYWRlcnMgKHN1Y2ggYXMgVS1Cb290KSBkbyBhY2NlcHQgYSB1bml0LWFkZHJl
-c3MgaW4gdGhlIG5hbWUgb2YgdGhlCj4gbm9kZSwgYnV0IHRoZSBkZXZpY2UgdHJlZSBpcyBhbiBB
-QkkgYW5kIHdlIGNhbid0IGJyZWFrIGV4aXN0aW5nIHNldHVwcwo+IGp1c3QgYmVjYXVzZSB0aGUg
-ZGV2aWNlIHRyZWUgY29tcGlsZXIgY29uc2lkZXJzIGl0IGJhZCBwcmFjdGljZSB0byBvbWl0Cj4g
-dGhlIHVuaXQtYWRkcmVzcyBub3dhZGF5cy4KPiAKPiBUaGlzIHBhcnRpYWxseSByZXZlcnRzIHRo
-ZSBvZmZlbmRpbmcgY29tbWl0IGFuZCByZXN0b3JlcyBkZXZpY2UgdHJlZSBBQkkKPiBjb21wYXRp
-YmlsaXR5Lgo+IAo+IEZpeGVzOiA0ODI5OTc2OTllZjAgKCJBUk06IHRlZ3JhOiBGaXggdW5pdF9h
-ZGRyZXNzX3ZzX3JlZyBEVEMgd2FybmluZ3MgZm9yCj4gL21lbW9yeSIpCj4gUmVwb3J0ZWQtYnk6
-IFRyaXN0YW4gQmFzdGlhbiA8dHJpc3Rhbi1jLmJhc3RpYW5AZ214LmRlPgo+IFNpZ25lZC1vZmYt
-Ynk6IFRoaWVycnkgUmVkaW5nIDx0cmVkaW5nQG52aWRpYS5jb20+Cj4gLS0tCj4gQ2hhbmdlcyBp
-biB2MjoKPiAtIHJlbW92ZSBtZW1vcnlAODAwMDAwMDAgbm9kZSBwdWxsZWQgaW4gZnJvbSB0ZWdy
-YTEyNC5kdHNpCj4gLSBhZGQgZGV2aWNlX3R5cGUgPSAibWVtb3J5IiBwcm9wZXJ0eQo+IAo+IGFy
-Y2gvYXJtL2Jvb3QvZHRzL3RlZ3JhMTI0LW55YW4uZHRzaSB8IDE3ICsrKysrKysrKysrKysrKyst
-Cj4gMSBmaWxlIGNoYW5nZWQsIDE2IGluc2VydGlvbnMoKyksIDEgZGVsZXRpb24oLSkKPiAKPiBk
-aWZmIC0tZ2l0IGEvYXJjaC9hcm0vYm9vdC9kdHMvdGVncmExMjQtbnlhbi5kdHNpCj4gYi9hcmNo
-L2FybS9ib290L2R0cy90ZWdyYTEyNC1ueWFuLmR0c2kKPiBpbmRleCBkNWYxMWQ2ZDk4N2UuLmJj
-ODViNmExNjZjNyAxMDA2NDQKPiAtLS0gYS9hcmNoL2FybS9ib290L2R0cy90ZWdyYTEyNC1ueWFu
-LmR0c2kKPiArKysgYi9hcmNoL2FybS9ib290L2R0cy90ZWdyYTEyNC1ueWFuLmR0c2kKPiBAQCAt
-MTMsMTAgKzEzLDI1IEBACj4gc3Rkb3V0LXBhdGggPSAic2VyaWFsMDoxMTUyMDBuOCI7Cj4gfTsK
-PiAKPiAtIG1lbW9yeUA4MDAwMDAwMCB7Cj4gKyAvKgo+ICsgKiBOb3RlIHRoYXQgcmVjZW50IHZl
-cnNpb24gb2YgdGhlIGRldmljZSB0cmVlIGNvbXBpbGVyIChzdGFydGluZyB3aXRoCj4gKyAqIHZl
-cnNpb24gMS40LjIpIHdhcm4gYWJvdXQgdGhpcyBub2RlIGNvbnRhaW5pbmcgYSByZWcgcHJvcGVy
-dHksIGJ1dAo+ICsgKiBtaXNzaW5nIGEgdW5pdC1hZGRyZXNzLiBIb3dldmVyLCB0aGUgYm9vdGxv
-YWRlciBvbiB0aGVzZSBDaHJvbWVib29rCj4gKyAqIGRldmljZXMgcmVsaWVzIG9uIHRoZSBmdWxs
-IG5hbWUgb2YgdGhpcyBub2RlIHRvIGJlIGV4YWN0bHkgL21lbW9yeS4KPiArICogQWRkaW5nIHRo
-ZSB1bml0LWFkZHJlc3MgY2F1c2VzIHRoZSBib290bG9hZGVyIHRvIGNyZWF0ZSBhIC9tZW1vcnkK
-PiArICogbm9kZSBhbmQgd3JpdGUgdGhlIG1lbW9yeSBiYW5rIGNvbmZpZ3VyYXRpb24gdG8gdGhh
-dCBub2RlLCB3aGljaCBpbgo+ICsgKiB0dXJuIGxlYWRzIHRoZSBrZXJuZWwgdG8gYmVsaWV2ZSB0
-aGF0IHRoZSBkZXZpY2UgaGFzIDIgR2lCIG9mCj4gKyAqIG1lbW9yeSBpbnN0ZWFkIG9mIHRoZSBh
-bW91bnQgZGV0ZWN0ZWQgYnkgdGhlIGJvb3Rsb2FkZXIuCj4gKyAqCj4gKyAqIFRoZSBuYW1lIG9m
-IHRoaXMgbm9kZSBpcyBlZmZlY3RpdmVseSBBQkkgYW5kIG11c3Qgbm90IGJlIGNoYW5nZWQuCj4g
-KyAqLwo+ICsgbWVtb3J5IHsKPiArIGRldmljZV90eXBlID0gIm1lbW9yeSI7Cj4gcmVnID0gPDB4
-MCAweDgwMDAwMDAwIDB4MCAweDgwMDAwMDAwPjsKPiB9Owo+IAo+ICsgL2RlbGV0ZS1ub2RlLyBt
-ZW1vcnlAODAwMDAwMDA7Cj4gKwo+IGhvc3QxeEA1MDAwMDAwMCB7Cj4gaGRtaUA1NDI4MDAwMCB7
-Cj4gc3RhdHVzID0gIm9rYXkiOwo+IC0tIAo+IDIuMTkuMQoKVGhhbmtzIFRoaWVycnkKClRyaXN0
-YW4KClRlc3RlZC1ieTogVHJpc3RhbiBCYXN0aWFuIDx0cmlzdGFuLWMuYmFzdGlhbkBnbXguZGU+
-CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1h
-cm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5v
-cmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0t
-a2VybmVsCg==
+The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
+
+  Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
+
+are available in the Git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-soc
+
+for you to fetch changes up to b3077ffcfa24b05c05af3b990d97a392ef88b22e:
+
+  arm64: meson: enable g12a clock controller (2019-02-08 09:30:25 -0800)
+
+----------------------------------------------------------------
+Amlogic SoC Kconfig updates for v5.1:
+- arm64: meson: enable g12a clock controller
+- drop unneeded COMMON_CLK_AMLOGIC
+
+----------------------------------------------------------------
+Jerome Brunet (3):
+      arm64: meson: remove COMMON_CLK_AMLOGIC selection
+      ARM: meson: remove COMMON_CLK_AMLOGIC selection
+      arm64: meson: enable g12a clock controller
+
+ arch/arm/mach-meson/Kconfig  | 1 -
+ arch/arm64/Kconfig.platforms | 5 +++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
