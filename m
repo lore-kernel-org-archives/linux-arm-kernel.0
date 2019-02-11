@@ -2,73 +2,59 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_ADSP_ALL,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 93B3CC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:36:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 35EBFC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:39:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 52DCC20818
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:36:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0494F2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:39:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CSDle/Ml";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="UcWzavtC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 52DCC20818
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=plaes.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YqeRNVUH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0494F2082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Uy9jjAX6LXCGCsFAwsULnF9xXVSaRwbgPZzAqbxDdXs=; b=CSDle/Ml0pwGLm
-	7V9J5LPZ/vRs3UYb/qdWDIGGFmhayinUsFUZJdvVrcbDbnVqMIQMXsZUdNa/tFns46eH3cyClJE2L
-	iZH4nlROGlyxM2nAFm1smjzo90fXQGRUMSoUGFFm1z8pyFLwEwf1NPVx1GWbul8MoyicbKewAFq6R
-	vv9muYx+T6tFJHl426LxjtlfKD8Hf9MO0Ea/26HGqStdW4Ug9pAcHmTN+1+n8mX/qpotX8y7XGbDQ
-	qEvqz0GjwM19ZWVFFQUnrG8083iZTWcS0tRdmKuTdvCKjamJvmi3YiZKUzs/razN0wZvioAteGzIW
-	+czKBbgGflvhvSZSeJdQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=L5zgv4zP5jStt5o9+7obGl1vO7poU/KLCKK7lRHKm6Y=; b=YqeRNVUHgnBLC1
+	9ih+NQm8KrTlMo8yBXET6t21bmd3ROzuZzxT6sM6OS5tlbhhDZXBfP4WhTzXtGBtJf0qKm0YtVyer
+	2u+PhJcPBF+1lCQPS0rT5rQhocnvCRjaXEkpaofkoYVNzoMmKOf5o7jtBl1s7/PH+dETZTkQO9FPo
+	4+xao1AmM5Z64Xpx0bdpcgvwyJPPjYKVjJwyHZlPqzrWkcNToSgH9Na8088tDORq4nC0Hvsl/USn3
+	k5lu1RehkLScWmY43uv+EXH7won/qWzhEBExc9FgGnbTr2gXbnR8/FmsPpJ2B/0KDnGYa/696vsl1
+	Mx1cbSnIIwfZOD1h7hwQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtCgk-0001bt-Lq; Mon, 11 Feb 2019 14:36:02 +0000
-Received: from plaes.org ([188.166.43.21])
+	id 1gtCjx-0002EK-Nt; Mon, 11 Feb 2019 14:39:21 +0000
+Received: from relay9-d.mail.gandi.net ([217.70.183.199])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtCgg-0001aW-Ul
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 14:36:00 +0000
-Received: from plaes.org (localhost [127.0.0.1])
- by plaes.org (Postfix) with ESMTPSA id C02C9412CA;
- Mon, 11 Feb 2019 14:35:53 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=plaes.org; s=mail;
- t=1549895753; bh=8Gi4omit073u81WaoF9zvkqRCS3LXU7oUSEGO5wyFVg=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=UcWzavtCei5KDgJWdYUmJqg3iM+kJGgqI6RL1LfSuXi7HxH8x92/YtcE/TFpRV/vd
- OXTkEpfGw0zTjOOhXn26nTz88366xRfx/duaJqI5JvIA6oDOpPckgIU4P3dDRu3uN4
- l9z2yNsJdbOCz1Hrle7EwdowWHV6rNEPpa+KU1XNhHWubpo5LKKYZhK7ZPpF4LFvEp
- dXlObLMkJjG1EudRgdcaFUugj+GukUBJQ8cYeGpYhXF5b8vf7dhXZtywiCn+KupPB5
- ku36ilStHzdIwhC5RzuoXiDBk0fiXEaiuIYZA3G36e8i53XSBp8x9scneTReEAt+ta
- IP0ydVUHZEYrA==
-Date: Mon, 11 Feb 2019 14:35:52 +0000
-From: Priit Laes <plaes@plaes.org>
-To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: Re: [RFC PATCH] clk: sunxi-ng: sun4i: Use CLK_SET_RATE_PARENT for
- mmc2 clock
-Message-ID: <20190211143552.2uqx6yy53dyv5lbl@plaes.org>
-References: <20190202155209.31617-1-plaes@plaes.org>
- <20190205094529.t7je4ozzu2b4ornc@flea>
- <CAGb2v673ntXn7MTRhU1uecO9q8_i79e+Ovio=tucd6qFf5L84Q@mail.gmail.com>
- <20190206092000.f46nsn4fw2n4crub@flea>
- <20190206100309.dhkm2l73qzkwgjzg@plaes.org>
- <20190206155227.wbkzvsdgykir4wn5@flea>
+ id 1gtCju-0002Cr-1B
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 14:39:20 +0000
+X-Originating-IP: 185.94.189.187
+Received: from localhost (unknown [185.94.189.187])
+ (Authenticated sender: maxime.ripard@bootlin.com)
+ by relay9-d.mail.gandi.net (Postfix) with ESMTPSA id 90400FF811;
+ Mon, 11 Feb 2019 14:39:05 +0000 (UTC)
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: hans.verkuil@cisco.com, acourbot@chromium.org,
+ sakari.ailus@linux.intel.com,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Subject: [PATCH v3 0/2] media: cedrus: Add H264 decoding support
+Date: Mon, 11 Feb 2019 15:39:01 +0100
+Message-Id: <cover.d3bb4d93da91ed5668025354ee1fca656e7d5b8b.1549895062.git-series.maxime.ripard@bootlin.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190206155227.wbkzvsdgykir4wn5@flea>
-User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_063559_133504_F355C676 
-X-CRM114-Status: GOOD (  20.31  )
+X-CRM114-CacheID: sfid-20190211_063918_387364_A2E29426 
+X-CRM114-Status: GOOD (  16.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,74 +66,114 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jernej Skrabec <jernej.skrabec@siol.net>, Stephen Boyd <sboyd@kernel.org>,
- Michael Turquette <mturquette@baylibre.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, Chen-Yu Tsai <wens@csie.org>,
- linux-clk <linux-clk@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: jonas@kwiboo.se, Maxime Ripard <maxime.ripard@bootlin.com>,
+ jenskuske@gmail.com, linux-sunxi@googlegroups.com,
+ linux-kernel@vger.kernel.org, jernej.skrabec@gmail.com, tfiga@chromium.org,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Chen-Yu Tsai <wens@csie.org>, posciak@chromium.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ nicolas.dufresne@collabora.com, ezequiel@collabora.com,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 06, 2019 at 04:52:27PM +0100, Maxime Ripard wrote:
-> Hi,
-> 
-> On Wed, Feb 06, 2019 at 10:03:09AM +0000, Priit Laes wrote:
-> > > > I'm concerned for other users of the PLL-PERIPH clock. AFAIK
-> > > > all of them, except the HRTIMER, expect the clock rate to stay
-> > > > the same and not change underneath them. And SATA expects it to
-> > > > be at 600 MHz, as the datasheet says. And while it may not directly
-> > > > apply to the LIME2, eMMC on newer SoCs / boards run at the slightly
-> > > > reduced rate of 50 MHz just fine.
-> > > > 
-> > > > In the commit in question, clocks without CLK_SET_RATE_PARENT
-> > > > should be using the old code (now in the if conditional block),
-> > > > i.e. the behavior should not have changed.
-> > > > 
-> > > > I don't think this actually "fixes" whatever bug was introduced,
-> > > > but only papers over the issue, and possible introduces further
-> > > > issues for other users.
-> > > 
-> > > You're right, I've overlooked that it was pll-periph being
-> > > affected. I've dropped it for now.
-> > 
-> > Any ideas what could be done. I currently have no time to debug it,
-> > but it affects existing systems.
-> 
-> I can't find what would change with that commit either if the flag
-> isn't set, so looking at the register state before and after that
-> commit would help I guess?
+Hi,
 
-Register dump without the patch:
+Here is a new version of the H264 decoding support in the cedrus
+driver.
 
-$ busybox devmem 0x01c20090
-0x0250030E
+As you might already know, the cedrus driver relies on the Request
+API, and is a reverse engineered driver for the video decoding engine
+found on the Allwinner SoCs.
 
-pll-ddr-base     2 2 0   768000000          0     0  50000
-   pll-ddr-other 1 1 0   768000000          0     0  50000
-      mmc2       3 3 0    51200000          0     0  50000
+This work has been possible thanks to the work done by the people
+behind libvdpau-sunxi found here:
+https://github.com/linux-sunxi/libvdpau-sunxi/
 
-Register dump with patch applied, booted from mmc0 and after mounting emmc:
+I've tested the various ABI using this gdb script:
+http://code.bulix.org/jl4se4-505620?raw
 
-$ busybox devmem 0x01c20090
-0x8140020B
+And this test script:
+http://code.bulix.org/8zle4s-505623?raw
 
-pll-periph-base  3 3 0  1200000000          0     0  50000
-   pll-periph    6 6 0   600000000          0     0  50000
-      mmc2       3 3 0    50000000          0     0  50000
+The application compiled is quite trivial:
+http://code.bulix.org/e34zp8-505624?raw
 
+The output is:
+arm:	builds/arm-test-v4l2-h264-structures
+	SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
+x86:	builds/x86-test-v4l2-h264-structures
+	SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
+x64:	builds/x64-test-v4l2-h264-structures
+	SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
+arm64:	builds/arm64-test-v4l2-h264-structures
+	SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
 
+Let me know if there's any flaw using that test setup, or if you have
+any comments on the patches.
 
-> 
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Bootlin
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+Maxime
 
+Changes from v2:
+  - Simplified _cedrus_write_ref_list as suggested by Jernej
+  - Set whether the frame is used as reference using nal_ref_idc
+  - Respect chroma_format_idc
+  - Fixes for the scaling list and prediction tables
+  - Wrote the documentation for the flags
+  - Added a bunch of defines to the driver bit fields
+  - Reworded the controls and data format descriptions as suggested
+    by Hans
+  - Reworked the controls' structure field size to avoid padding
+  - Removed the long term reference flag
+  - Reintroduced the neighbor info buffer
+  - Removed the ref_pic_list_p0/b0/b1 arrays that are redundant with the
+    one in the DPB
+  - used the timestamps instead of tags
+  - Rebased on 5.0-rc1
 
+Changes from v1:
+  - Rebased on 4.20
+  - Did the documentation for the userspace API
+  - Used the tags instead of buffer IDs
+  - Added a comment to explain why we still needed the swdec trigger
+  - Reworked the MV col buffer in order to have one slot per frame
+  - Removed the unused neighbor info buffer
+  - Made sure to have the same structure offset and alignments across
+    32 bits and 64 bits architecture
+
+Maxime Ripard (1):
+  media: cedrus: Add H264 decoding support
+
+Pawel Osciak (1):
+  media: uapi: Add H264 low-level decoder API compound controls.
+
+ Documentation/media/uapi/v4l/biblio.rst            |   9 +-
+ Documentation/media/uapi/v4l/extended-controls.rst | 530 +++++++++++++-
+ Documentation/media/uapi/v4l/pixfmt-compressed.rst |  20 +-
+ Documentation/media/uapi/v4l/vidioc-queryctrl.rst  |  30 +-
+ Documentation/media/videodev2.h.rst.exceptions     |   5 +-
+ drivers/media/v4l2-core/v4l2-ctrls.c               |  42 +-
+ drivers/media/v4l2-core/v4l2-ioctl.c               |   1 +-
+ drivers/staging/media/sunxi/cedrus/Makefile        |   3 +-
+ drivers/staging/media/sunxi/cedrus/cedrus.c        |  31 +-
+ drivers/staging/media/sunxi/cedrus/cedrus.h        |  38 +-
+ drivers/staging/media/sunxi/cedrus/cedrus_dec.c    |  15 +-
+ drivers/staging/media/sunxi/cedrus/cedrus_h264.c   | 589 ++++++++++++++-
+ drivers/staging/media/sunxi/cedrus/cedrus_hw.c     |   4 +-
+ drivers/staging/media/sunxi/cedrus/cedrus_regs.h   |  91 ++-
+ drivers/staging/media/sunxi/cedrus/cedrus_video.c  |   9 +-
+ include/media/h264-ctrls.h                         | 179 ++++-
+ include/media/v4l2-ctrls.h                         |  13 +-
+ include/uapi/linux/videodev2.h                     |   1 +-
+ 18 files changed, 1607 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus_h264.c
+ create mode 100644 include/media/h264-ctrls.h
+
+base-commit: e7552cc33320523b660dd1891bceb616ced7b47c
+-- 
+git-series 0.9.1
 
 _______________________________________________
 linux-arm-kernel mailing list
