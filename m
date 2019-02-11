@@ -2,64 +2,67 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BC542C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:00:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B658CC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:03:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7DA0B218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:00:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7FECE218A6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:03:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FBw3ft5h"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7DA0B218A6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LavjgZzW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FECE218A6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Cc:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=J4+thkAZqAhMm85Ntss7yFQtgzs2tq3wMyz1xwT0vcY=; b=FBw3ft5h8T4ocU
-	VxqUAwDLKBq9JDrCVNXrJ1dhr08nsNyCzvHPMI+J+YQxQjcaB33zfWqiN3akXTz7sA0DiTDqSriki
-	kOD4sG8dsm7CwTYN8VyUPVn/i3hzRkgFT7xOWagfDufbjkmHjKqh4Bx/hJwMJXQXw/Ba9cDp5PRle
-	+ZVCOdH+jpGk7iXQxTHPiEANyfMz/2gvXfyWvQ3aA3VkIT2bjUcz9Y/lsnxLfgAyR6XOtD1BA51eI
-	vJzzb2elTSaDKZQv1fiEBgGX2Yxy5xRdk+9Gyt+RqMmefu8BL0NWpyGLKwQ0uS96IOEzblsDfyF2X
-	VWFrE8vJvle0J2n1yX7A==;
+	List-Owner; bh=VhPDlSXZFBcVeggqvquEKc6uZI/pu5d1be470haGGsE=; b=LavjgZzWs2MfkD
+	nzdVpClBnem/VQiMZk/NyK1+EGFM4YBEcy5MRe8tehEq5M+OGvIh3aQiBpM1Bez8/5b8RmqedW2Xv
+	owwr/LsBVFTSrY+wrbhFnsPCz3Jow+kr9NICcTHEW/IvF47IpzmzH4IXRk9PPkETp6ANzJDziZavZ
+	qn+r77pnFyrebSqAvdv5DToBfyG/0e1vkofC3c/iJuNxMDvMxekf3dPUYng0S2FaVHaVFWqc/f6Xa
+	Z1hlvRuBcuOAsljxb9U9J5SLC+4JD9d4BdayC1W4HI2rYS5JfqxnbCOrT0b05Twzot8FiwX/XveTM
+	4yBaVyCRH33gP8Hmk4mw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtAFm-0001py-Qi; Mon, 11 Feb 2019 12:00:02 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtAFj-0001pD-NX
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 12:00:00 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 578D480D;
- Mon, 11 Feb 2019 03:59:59 -0800 (PST)
-Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id CDC373F557;
- Mon, 11 Feb 2019 03:59:56 -0800 (PST)
-Date: Mon, 11 Feb 2019 11:59:54 +0000
-From: Mark Rutland <mark.rutland@arm.com>
-To: Torsten Duwe <duwe@lst.de>
-Subject: Re: [PATCH v8 2/5] arm64: replace -pg with CC_FLAGS_FTRACE in efi
- Makefiles
-Message-ID: <20190211115953.GD10501@lakrids.cambridge.arm.com>
-References: <20190208150826.44EBC68DD2@newverein.lst.de>
- <20190208151011.0807668DD3@newverein.lst.de>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190208151011.0807668DD3@newverein.lst.de>
-User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
+	id 1gtAJ7-0003P3-OZ; Mon, 11 Feb 2019 12:03:29 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtAJ5-0003Oc-3N
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 12:03:28 +0000
+Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <l.stach@pengutronix.de>)
+ id 1gtAIw-0005qT-R2; Mon, 11 Feb 2019 13:03:18 +0100
+Message-ID: <1549886597.2546.5.camel@pengutronix.de>
+Subject: Re: [PATCH v2 1/2] arm64: dts: imx8mq: Add on-chip OTP controller node
+From: Lucas Stach <l.stach@pengutronix.de>
+To: Carlo Caione <ccaione@baylibre.com>, robh+dt@kernel.org, 
+ mark.rutland@arm.com, shawnguo@kernel.org, s.hauer@pengutronix.de, 
+ kernel@pengutronix.de, festevam@gmail.com, linux-imx@nxp.com, 
+ devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Date: Mon, 11 Feb 2019 13:03:17 +0100
+In-Reply-To: <20190202150638.13672-2-ccaione@baylibre.com>
+References: <20190202150638.13672-1-ccaione@baylibre.com>
+ <20190202150638.13672-2-ccaione@baylibre.com>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
+X-SA-Exim-Mail-From: l.stach@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_035959_766966_679CCD51 
-X-CRM114-Status: GOOD (  14.18  )
+X-CRM114-CacheID: sfid-20190211_040327_296198_23EA3292 
+X-CRM114-Status: GOOD (  13.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,57 +74,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-efi@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
- Julien Thierry <julien.thierry@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Steven Rostedt <rostedt@goodmis.org>,
- AKASHI Takahiro <takahiro.akashi@linaro.org>, Ingo Molnar <mingo@redhat.com>,
- Josh Poimboeuf <jpoimboe@redhat.com>,
- Amit Daniel Kachhap <amit.kachhap@arm.com>, live-patching@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 08, 2019 at 04:10:11PM +0100, Torsten Duwe wrote:
->   In preparation for arm64 supporting ftrace built on other compiler
->   options, let's have makefiles remove the $(CC_FLAGS_FTRACE)
->   flags, whatever these may be, rather than assuming '-pg'.
->   While at it, fix arm32 as well.
-> 
->   There should be no functional change as a result of this patch.
-> 
-> Signed-off-by: Torsten Duwe <duwe@suse.de>
-
-With the indentation removed from the commit text:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> 
-> ---
->  drivers/firmware/efi/libstub/Makefile |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> --- a/drivers/firmware/efi/libstub/Makefile
-> +++ b/drivers/firmware/efi/libstub/Makefile
-> @@ -16,9 +16,9 @@ cflags-$(CONFIG_X86)		+= -m$(BITS) -D__K
->  
->  # arm64 uses the full KBUILD_CFLAGS so it's necessary to explicitly
->  # disable the stackleak plugin
-> -cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS)) -fpie \
-> -				   $(DISABLE_STACKLEAK_PLUGIN)
-> -cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
-> +cflags-$(CONFIG_ARM64)		:= $(subst $(CC_FLAGS_FTRACE),,$(KBUILD_CFLAGS)) \
-> +				   -fpie $(DISABLE_STACKLEAK_PLUGIN)
-> +cflags-$(CONFIG_ARM)		:= $(subst $(CC_FLAGS_FTRACE),,$(KBUILD_CFLAGS)) \
->  				   -fno-builtin -fpic \
->  				   $(call cc-option,-mno-single-pic-base)
->  
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+QW0gU2Ftc3RhZywgZGVuIDAyLjAyLjIwMTksIDE1OjA2ICswMDAwIHNjaHJpZWIgQ2FybG8gQ2Fp
+b25lOgo+IEFkZCB0aGUgbm9kZSBmb3IgdGhlIE9UUCBjb250cm9sbGVyLiBUaGUgSVAgaXMgdGhl
+IHNhbWUgYXMgb24gdGhlIGlteDdkLgoKVGhpcyBpcyBub3QgdHJ1ZS4gQWNjb3JkaW5nIHRvIHRo
+ZSByZWZlcmVuY2UgbWFudWFsLCB0aGUgT0NPVFAKY29udHJvbGxlciBvbiBpLk1YOE1RIHVzZXMg
+dGhlIG5vbi1iYW5rZWQgd3JpdGUgbW9kZSwgc2FtZSBhcyBpLk1YNi4KVGh1cyBpdCBpcyBpbmNv
+bXBhdGlibGUgdG8gdGhlIGkuTVg3IE9DT1RQLgoKQWxzbyB0aGUgbnVtYmVyIG9mIGZ1c2VzIGlz
+IGRpZmZlcmVudCwgc28gd2UgcmVhbGx5IG5lZWQgc29tZSBkcml2ZXIKc3VwcG9ydCBmb3IgdGhl
+IGlteDhtcSBjb21wYXRpYmxlIGFuZCBjYW4ndCBkZWNsYXJlIHRoZSBjb250cm9sbGVyCmNvbXBh
+dGlibGUgdG8gc29tZSBvbGRlciBpbnN0YW5jZS4KClJlZ2FyZHMsCkx1Y2FzCgo+IFNpZ25lZC1v
+ZmYtYnk6IENhcmxvIENhaW9uZSA8Y2NhaW9uZUBiYXlsaWJyZS5jb20+Cj4gLS0tCj4gwqBhcmNo
+L2FybTY0L2Jvb3QvZHRzL2ZyZWVzY2FsZS9pbXg4bXEuZHRzaSB8IDggKysrKysrKysKPiDCoDEg
+ZmlsZSBjaGFuZ2VkLCA4IGluc2VydGlvbnMoKykKPiAKPiBkaWZmIC0tZ2l0IGEvYXJjaC9hcm02
+NC9ib290L2R0cy9mcmVlc2NhbGUvaW14OG1xLmR0c2kgYi9hcmNoL2FybTY0L2Jvb3QvZHRzL2Zy
+ZWVzY2FsZS9pbXg4bXEuZHRzaQo+IGluZGV4IGMzNGNhYmU5YjM1Ni4uZjM3ZjE3YjcxMTUxIDEw
+MDY0NAo+IC0tLSBhL2FyY2gvYXJtNjQvYm9vdC9kdHMvZnJlZXNjYWxlL2lteDhtcS5kdHNpCj4g
+KysrIGIvYXJjaC9hcm02NC9ib290L2R0cy9mcmVlc2NhbGUvaW14OG1xLmR0c2kKPiBAQCAtMjQx
+LDYgKzI0MSwxNCBAQAo+IMKgCQkJCXJlZyA9IDwweDMwMzQwMDAwIDB4MTAwMDA+Owo+IMKgCQkJ
+fTsKPiDCoAo+ICsJCQlvY290cDogb2NvdHAtY3RybEAzMDM1MDAwMCB7Cj4gKwkJCQljb21wYXRp
+YmxlID0gImZzbCxpbXg4bXEtb2NvdHAiLCAiZnNsLGlteDdkLW9jb3RwIiwgInN5c2NvbiI7Cj4g
+KwkJCQlyZWcgPSA8MHgzMDM1MDAwMCAweDEwMDAwPjsKPiArCQkJCWNsb2NrcyA9IDwmY2xrIElN
+WDhNUV9DTEtfT0NPVFBfUk9PVD47Cj4gKwkJCQkjYWRkcmVzcy1jZWxscyA9IDwxPjsKPiArCQkJ
+CSNzaXplLWNlbGxzID0gPDE+Owo+ICsJCQl9Owo+ICsKPiDCoAkJCWFuYXRvcDogc3lzY29uQDMw
+MzYwMDAwIHsKPiDCoAkJCQljb21wYXRpYmxlID0gImZzbCxpbXg4bXEtYW5hdG9wIiwgInN5c2Nv
+biI7Cj4gwqAJCQkJcmVnID0gPDB4MzAzNjAwMDAgMHgxMDAwMD47CgpfX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcg
+bGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmlu
+ZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
