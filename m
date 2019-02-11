@@ -2,60 +2,65 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,UNPARSEABLE_RELAY autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 35B77C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 19:53:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FC50C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 19:55:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 06F63218A1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 19:53:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6FA64218AD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 19:55:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r9JKnlsh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 06F63218A1
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sbtr2PCs";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="IS1pn/Iq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6FA64218AD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=45AJva4Ul9Oxdq7vOnUtAU1mSSBEETXyrB2ngbO6jMw=; b=r9JKnlshBZ+Nhf
-	mMt0cwsTl3wMZIyulQ5+ggqm/dyYuw+MrCHS0FTO1AgXWXILyasS0g62z5ARsUbx9WaFlwH7vgowZ
-	FkrGfCa1u+OEbpuLLjVLtC96SzIYLBxVZoNEU2ofnfV55Xmk5lrFSg4Fiv8zJDYnX89zKIaINvTJR
-	dWQrRWoo6hpO5gmNUqiy8IwoAE3gvHT28+FO6lWQdISehtzN2zh60r08Za6Uzx7R4CTxIAdr3sT3J
-	03uEMzs/Vzo0Oz5LRiLfOR0wOfqoobFHMdnhrSR1sUxKzvhVkwUf+3WzCJlJUHcHksTIQ2kpDUrQA
-	GasMWgYVQwe0VZIc0Pqw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=pO75Fg9CyJq/xyfafPCFinN7/3pynOrQqMnWIPLSUYk=; b=sbt
+	r2PCsa3L3T3kaVG95V+pU8hAKM0XxuWKGcTCF5prpLH6EdzM/svcQ6DIB4gbwOfiDck16ayQ1vsEp
+	ciUVViLe7m9bCU1Q3UBMlG8RwFLsotGw9GMPtyHB7g0y6LBCpx65wtkXgBRxVTXOXCchcnbAHFeDM
+	3hi5x1pDF6yTFnjuGqJ/9g+XJO++fY0oGV6tiIdNLFCKGeqNYxuTvDDLWpnF/DDDIk4/fQ/sseL9p
+	AHi4t0JVusgr3spCoRZemZUJWntlifbPYEQTEWFyrZ7DZvzHnsr9iRCZvjBKxeEoikE+r8oBP/wGT
+	yPR2hVK5n75MzOs+DKS7B9pW55d8loQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtHe1-0006p1-6W; Mon, 11 Feb 2019 19:53:33 +0000
-Received: from bhuna.collabora.co.uk ([2a00:1098:0:82:1000:25:2eeb:e3e3])
+	id 1gtHfO-00078Q-Fi; Mon, 11 Feb 2019 19:54:58 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtHdx-0006oK-TM
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 19:53:31 +0000
-Received: from [127.0.0.1] (localhost [127.0.0.1])
- (Authenticated sender: ezequiel) with ESMTPSA id 83B9B27EC6B
-Message-ID: <092de35bb41cdf278212297996ff46181458c6f4.camel@collabora.com>
-Subject: Re: [PATCH v3 1/2] media: uapi: Add H264 low-level decoder API
- compound controls.
-From: Ezequiel Garcia <ezequiel@collabora.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>, hans.verkuil@cisco.com, 
- acourbot@chromium.org, sakari.ailus@linux.intel.com, Laurent Pinchart
- <laurent.pinchart@ideasonboard.com>
-Date: Mon, 11 Feb 2019 16:53:16 -0300
-In-Reply-To: <562aefcd53a1a30d034e97f177096d70fb705f2b.1549895062.git-series.maxime.ripard@bootlin.com>
-References: <cover.d3bb4d93da91ed5668025354ee1fca656e7d5b8b.1549895062.git-series.maxime.ripard@bootlin.com>
- <562aefcd53a1a30d034e97f177096d70fb705f2b.1549895062.git-series.maxime.ripard@bootlin.com>
-Organization: Collabora
-User-Agent: Evolution 3.30.5-1 
-MIME-Version: 1.0
+ id 1gtHfK-00077r-TE
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 19:54:56 +0000
+Received: from localhost.localdomain (unknown [194.230.155.153])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 861E1218AD;
+ Mon, 11 Feb 2019 19:54:52 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549914894;
+ bh=jLqyLyXK18ojtHyc76vRWvjOh2yn+6cTad3ij3KYZMY=;
+ h=From:To:Cc:Subject:Date:From;
+ b=IS1pn/IqZo2IWwoajlx3m/h7IeRPNm3EKn7ZbqnYIh5VipE6UcFaD5QMlSjL9DjjY
+ AML27hHIDBkprlRnKFkNLzqmBrg1NCrQ+bl9YR6FE7ga6EZ1w/NdXZUR/MpdtfX70R
+ 2UBkZv/oLsyuu+4nPkfwxJout2D4wmtMXHoobIg8=
+From: Krzysztof Kozlowski <krzk@kernel.org>
+To: Olof Johansson <olof@lixom.net>, Arnd Bergmann <arnd@arndb.de>,
+ arm@kernel.org
+Subject: [GIT PULL] ARM: samsung: mach/soc for v5.1
+Date: Mon, 11 Feb 2019 20:54:48 +0100
+Message-Id: <20190211195448.19983-1-krzk@kernel.org>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_115330_078165_D5B8ABC6 
-X-CRM114-Status: GOOD (  11.39  )
+X-CRM114-CacheID: sfid-20190211_115454_966243_9FCA38B8 
+X-CRM114-Status: GOOD (  11.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,58 +72,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: jonas@kwiboo.se, jenskuske@gmail.com, linux-sunxi@googlegroups.com,
- linux-kernel@vger.kernel.org, jernej.skrabec@gmail.com, tfiga@chromium.org,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Chen-Yu Tsai <wens@csie.org>, posciak@chromium.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Guenter Roeck <groeck@chromium.org>, nicolas.dufresne@collabora.com,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Cc: linux-samsung-soc@vger.kernel.org, Kukjin Kim <kgene@kernel.org>,
+ linux-arm-kernel@lists.infradead.org, Krzysztof Kozlowski <krzk@kernel.org>,
+ linux-kernel@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 2019-02-11 at 15:39 +0100, Maxime Ripard wrote:
-> From: Pawel Osciak <posciak@chromium.org>
-> 
-> Stateless video codecs will require both the H264 metadata and slices in
-> order to be able to decode frames.
-> 
-> This introduces the definitions for a new pixel format for H264 slices that
-> have been parsed, as well as the structures used to pass the metadata from
-> the userspace to the kernel.
-> 
-> Co-Developed-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> Signed-off-by: Pawel Osciak <posciak@chromium.org>
-> Signed-off-by: Guenter Roeck <groeck@chromium.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-[..]
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +/*
-> + * These are the H.264 state controls for use with stateless H.264
-> + * codec drivers.
-> + *
-> + * It turns out that these structs are not stable yet and will undergo
-> + * more changes. So keep them private until they are stable and ready to
-> + * become part of the official public API.
-> + */
-> +
-> +#ifndef _H264_CTRLS_H_
-> +#define _H264_CTRLS_H_
-> +
-> +#define V4L2_CID_MPEG_VIDEO_H264_SPS		(V4L2_CID_MPEG_BASE+383)
-> +#define V4L2_CID_MPEG_VIDEO_H264_PPS		(V4L2_CID_MPEG_BASE+384)
-> +#define V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX	(V4L2_CID_MPEG_BASE+385)
-> +#define V4L2_CID_MPEG_VIDEO_H264_SLICE_PARAMS	(V4L2_CID_MPEG_BASE+386)
-> +#define V4L2_CID_MPEG_VIDEO_H264_DECODE_PARAMS	(V4L2_CID_MPEG_BASE+387)
-> +
 
-Note that these integers (+383, ..) are already in-use.
+The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 
-Since the controls are non-public, perhaps we could use upper integers,
-say +1000 or something?
+  Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
 
+are available in the Git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-5.1
+
+for you to fetch changes up to 4bdf2f3f20a9de9b07f97907820c42f3a49ba63d:
+
+  ARM: exynos: Fix timeout when booting secondary CPUs (2019-02-01 20:07:47 +0100)
+
+----------------------------------------------------------------
+Samsung mach/soc changes for v5.1
+
+Two fixes: one for handling timeout while booting secondary CPU of
+Exynos and second for S3C24xx DVS notifier.
+
+----------------------------------------------------------------
+Gustavo A. R. Silva (1):
+      ARM: s3c24xx: Fix boolean expressions in osiris_dvs_notify
+
+Stuart Menefy (1):
+      ARM: exynos: Fix timeout when booting secondary CPUs
+
+ arch/arm/mach-exynos/platsmp.c          | 4 ++--
+ arch/arm/mach-s3c24xx/mach-osiris-dvs.c | 8 ++++----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
