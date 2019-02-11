@@ -2,63 +2,85 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB3C3C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 16:58:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9DD7CC282CE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 17:02:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5E32621B69
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 16:58:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6EA6E2075C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 17:02:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q5FAdgJg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5E32621B69
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jtsphPyR";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Dycem5Iy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6EA6E2075C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6qt8Ib9keLD40/e1PThtDLjN0EIgXDUm+i+RRpaBfZM=; b=q5FAdgJg3hJ6I6
-	sut2jbSZrIDsPvTvzUDN4zIYLiZ5g9IieU1i0ZtG7joWADKdPestC9XBkMDvIb5QD+ZnkHByHkhBG
-	Yq6pvW7CGJ9mMYDd3850AE6xM2lwM7xCB80EsxIrLNvtFNTspx/2eZ5VLFHuPQaRMFHp0NVQorahm
-	GBTnRA3szUceVqAR8V5NGFk3YjvGA4aQP8Hb+vqAOGBasSj8hE5jA3lCqwaAI2Tz8P8pvP2oYGz6s
-	wmRqNSVhF/h63iILpCU63jpsHAone8wQlZvSCcqn9xWHfceQW9dDISQ4a6G/4wTqEUD/Smmb2G2Fk
-	sZb0fmcbvzY0e7MaPiXA==;
+	List-Owner; bh=QA2N6fHuRRJ/N8vkqteRgx3yJVXBkUY9VwbxsQsW7rs=; b=jtsphPyRiDUvtX
+	i8/xmXB5zAE51X2X278hGIO6iuTJu3PESK9qn3cBzqejVvi4BXNQ0UF+jBBAYlS5dsYsHL81KOpB2
+	sjh3KbTypHfYuIhSoWu3O5BwdZgP3l7s5aGS6HAWawiowpCc1GQ+e2v0hPWeyPczz5PjgfAGyhpyE
+	ZRmMLL7kZafb8fYyfpUTnoONwBpXPe830dCGb0XztKcxJwss/edUCrMyS9UwgZGpr1vlWvECceq1f
+	ViUSyF1kx+XiYCVAWo0mWd9UK1rGbORnE51KO0B7DqbB/u0LBbd8TT2kkqhD4Dm+FRzfJC+k2+FMG
+	btvqbYhtiBAdy92+ICjQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtEuC-00012g-7z; Mon, 11 Feb 2019 16:58:04 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gtEyC-0003YT-Um; Mon, 11 Feb 2019 17:02:12 +0000
+Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtEu9-00011w-AI
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 16:58:03 +0000
-Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
- by metis.ext.pengutronix.de with esmtp (Exim 4.89)
- (envelope-from <l.stach@pengutronix.de>)
- id 1gtEu1-0001Y3-N8; Mon, 11 Feb 2019 17:57:53 +0100
-Message-ID: <1549904273.2546.16.camel@pengutronix.de>
-Subject: Re: [PATCH v2 2/2] pci: imx6: support kernels built in Thumb-2 mode
-From: Lucas Stach <l.stach@pengutronix.de>
-To: Stefan Agner <stefan@agner.ch>, hongxing.zhu@nxp.com
-Date: Mon, 11 Feb 2019 17:57:53 +0100
-In-Reply-To: <20181204132733.14422-2-stefan@agner.ch>
-References: <20181204132733.14422-1-stefan@agner.ch>
- <20181204132733.14422-2-stefan@agner.ch>
-X-Mailer: Evolution 3.22.6-1+deb9u1 
-Mime-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
-X-SA-Exim-Mail-From: l.stach@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+ id 1gtEy9-0003Xt-KN; Mon, 11 Feb 2019 17:02:11 +0000
+Received: by mail-lf1-x141.google.com with SMTP id q11so8346602lfd.3;
+ Mon, 11 Feb 2019 09:02:08 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=UhMN5gACQr1+W4A8Ag5wPDh62RaNjK/ZgHm434PrC78=;
+ b=Dycem5Iy15XhBFQsCdrlyR70cVYi8iEHdjbiM68ElBqd2AuRvAsNQVBPszRVGhzOes
+ 4ghWIEDaZJqjwIvPAoy9X2DP7JqHWi80tnUpOlPWlpZ1uM1s61kbY33b7oQI39GLLDGn
+ E61Ey9sXAEhgkUTxWs3YjJn/cr2UtlFvIsMQptsivCA4qcu2lBVw1mBwHXi14ZhLqfZT
+ llfzt7bn5yuGTsb/KDKH+rY6A+TOjuCAl9E0Djzyw3HMlvO3y65at592q5FsX1KdRYDL
+ KORq40gRwIB8Akjia616vJ//3AM1qSrbGnqfQtj9Zf7Jn60umhLieOoHQwDpAo7mMfoP
+ LsLA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=UhMN5gACQr1+W4A8Ag5wPDh62RaNjK/ZgHm434PrC78=;
+ b=nJXSda7h/zDi22XYYcEVh3cytk16O7n/jDoFFV/On3ojP3qOMWVyUXKzheXWpj43SQ
+ akyg3ZMIl2dIiqAsi2JqWA7jkzhRLXIMTXKCKQsgN8RLaQdSyXcoTTh7T25I0rfahjvA
+ AuBD30sRJ+lRqFWQuwWoYO0RPpJ5s6NmcN79ZJ2qBa5fW6/ThKqWhBh4d6UtZA/peXJ+
+ 2oKqpB4zwPcGQKNY3hRjWThu/jcebN9BR/2XevB+XX7ihgCpP8l3uDor8Ypr5qGHB0uR
+ /LAYqdN5Ftyn4mJ/8SBKEGNVs9NeZCjbaTx0Rl4i+Jrjjj2sZwVa98lnvWZMT3nnJm2g
+ 7aOg==
+X-Gm-Message-State: AHQUAuZ7bZslBxVYJ4yCYg9zAPPEXcRGqirbO80udgL3VBOHVbQMbaEn
+ rFxeDnFhrzv+eFe+z5NAneWA/K5Lx66lBhBRG44=
+X-Google-Smtp-Source: AHgI3IalfbXEC0ubkiPvBEKZp244GmIb+2indUy8ujEZOIJyFGOHcxcPXDTtIiBWV4qDRv6rjSWWM0OTaxXYOKcGqoU=
+X-Received: by 2002:ac2:4318:: with SMTP id l24mr631387lfh.75.1549904525499;
+ Mon, 11 Feb 2019 09:02:05 -0800 (PST)
+MIME-Version: 1.0
+References: <20190131030812.GA2174@jordon-HP-15-Notebook-PC>
+ <20190131083842.GE28876@rapoport-lnx>
+ <CAFqt6za9xA_8OKiaaHXcO9go+RtPdjLY5Bz_fgQL+DZbermNhA@mail.gmail.com>
+ <20190207164739.GX21860@bombadil.infradead.org>
+ <CAFqt6zawBP5Yyy7nfoKz_6ugw8e4MVopvBaeKvaKoXcS-_oSNg@mail.gmail.com>
+In-Reply-To: <CAFqt6zawBP5Yyy7nfoKz_6ugw8e4MVopvBaeKvaKoXcS-_oSNg@mail.gmail.com>
+From: Souptick Joarder <jrdr.linux@gmail.com>
+Date: Mon, 11 Feb 2019 22:36:15 +0530
+Message-ID: <CAFqt6zYGSn1dA8tdiH16Mq0bzkx5DmpUo+2RUZ0nTPm+nvZS7Q@mail.gmail.com>
+Subject: Re: [PATCHv2 1/9] mm: Introduce new vm_insert_range and
+ vm_insert_range_buggy API
+To: Matthew Wilcox <willy@infradead.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_085801_537307_2B00FB2B 
-X-CRM114-Status: GOOD (  18.48  )
+X-CRM114-CacheID: sfid-20190211_090209_704695_A3899EA4 
+X-CRM114-Status: GOOD (  22.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,79 +92,128 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: lorenzo.pieralisi@arm.com, andrew.smirnov@gmail.com, robin.murphy@arm.com,
- linux@armlinux.org.uk, linux-kernel@vger.kernel.org, linux-pci@vger.kernel.org,
- bhelgaas@google.com, leonard.crestez@nxp.com, festevam@gmail.com,
- linux-arm-kernel@lists.infradead.org, tpiepho@impinj.com
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Michal Hocko <mhocko@suse.com>, Heiko Stuebner <heiko@sntech.de>,
+ Peter Zijlstra <peterz@infradead.org>, dri-devel@lists.freedesktop.org,
+ linux-kernel@vger.kernel.org, Linux-MM <linux-mm@kvack.org>,
+ linux1394-devel@lists.sourceforge.net,
+ Marek Szyprowski <m.szyprowski@samsung.com>,
+ Stephen Rothwell <sfr@canb.auug.org.au>, oleksandr_andrushchenko@epam.com,
+ joro@8bytes.org, Russell King - ARM Linux <linux@armlinux.org.uk>,
+ iommu@lists.linux-foundation.org, Mike Rapoport <rppt@linux.ibm.com>,
+ airlied@linux.ie, linux-arm-kernel@lists.infradead.org,
+ linux-rockchip@lists.infradead.org, treding@nvidia.com,
+ linux-media@vger.kernel.org, Kees Cook <keescook@chromium.org>,
+ pawel@osciak.com, Rik van Riel <riel@surriel.com>, rppt@linux.vnet.ibm.com,
+ Boris Ostrovsky <boris.ostrovsky@oracle.com>, mchehab@kernel.org,
+ iamjoonsoo.kim@lge.com, vbabka@suse.cz, Juergen Gross <jgross@suse.com>,
+ hjc@rock-chips.com, xen-devel@lists.xen.org,
+ Kyungmin Park <kyungmin.park@samsung.com>, stefanr@s5r6.in-berlin.de,
+ Andrew Morton <akpm@linux-foundation.org>, robin.murphy@arm.com,
+ "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-QW0gRGllbnN0YWcsIGRlbiAwNC4xMi4yMDE4LCAxNDoyNyArMDEwMCBzY2hyaWViIFN0ZWZhbiBB
-Z25lcjoKPiBBZGQgYSBmYXVsdCBoYW5kbGVyIHdoaWNoIGhhbmRsZXMgaW1tZWRpYXRlIHJlYWRz
-IGluIFRodW1iLTIKPiBtb2RlLiBJbnN0YWxsIHRoZSBhcHByb3ByaWF0ZSBoYW5kbGVyIGRlcGVu
-ZGluZyBvbiB3aGljaCBtb2RlCj4gdGhlIGtlcm5lbCBoYXMgYmVlbiBidWlsdC4gVGhpcyBhdm9p
-ZHMgYW4gIlVuaGFuZGxlZCBmYXVsdDoKPiBleHRlcm5hbCBhYm9ydCBvbiBub24tbGluZWZldGNo
-ICgweDEwMDgpIGF0IDB4ZjBhODAwMDAiCj4gZHVyaW5nIGJvb3Qgb24gYSBkZXZpY2Ugd2l0aCBh
-IFBDSWUgc3dpdGNoIGNvbm5lY3RlZC4KPiAKPiBMaW5rOiBodHRwczovL2xvcmUua2VybmVsLm9y
-Zy9saW51eC1wY2kvMjAxODExMjYxNjE2NDUuODE3Ny0xLXN0ZWZhbkBhZ25lci5jaC8KPiBTaWdu
-ZWQtb2ZmLWJ5OiBTdGVmYW4gQWduZXIgPHN0ZWZhbkBhZ25lci5jaD4KCkFja2VkLWJ5OiBMdWNh
-cyBTdGFjaCA8bC5zdGFjaEBwZW5ndXRyb25peC5kZT4KCj4gLS0tCj4gQ2hhbmdlcyBzaW5jZSB2
-MToKPiAtIEFkZGVkIFRodW1iLTIgMzItYml0IGluc3RydWN0aW9uIHN1cHBvcnQgKHRlc3RlZCBi
-eSBpbnNlcnRpbmcgLncKPiDCoCBpbnN0cnVjdGlvbnMgaW4gYXJjaC9hcm0vaW5jbHVkZS9hc20v
-aW8uaCkKPiAtIEF2b2lkIGRlcmVmZXJlbmNpbmcgaWYgZmF1bHQgaGFwcGVuZWQgaW4gdXNlciBt
-b2RlCj4gCj4gwqBkcml2ZXJzL3BjaS9jb250cm9sbGVyL2R3Yy9wY2ktaW14Ni5jIHwgNTkgKysr
-KysrKysrKysrKysrKysrKysrKysrKystCj4gwqAxIGZpbGUgY2hhbmdlZCwgNTggaW5zZXJ0aW9u
-cygrKSwgMSBkZWxldGlvbigtKQo+IAo+IGRpZmYgLS1naXQgYS9kcml2ZXJzL3BjaS9jb250cm9s
-bGVyL2R3Yy9wY2ktaW14Ni5jIGIvZHJpdmVycy9wY2kvY29udHJvbGxlci9kd2MvcGNpLWlteDYu
-Ywo+IGluZGV4IDU0YTI5ZTQ0MTMwMy4uYTliYmJmMTc2YzRhIDEwMDY0NAo+IC0tLSBhL2RyaXZl
-cnMvcGNpL2NvbnRyb2xsZXIvZHdjL3BjaS1pbXg2LmMKPiArKysgYi9kcml2ZXJzL3BjaS9jb250
-cm9sbGVyL2R3Yy9wY2ktaW14Ni5jCj4gQEAgLTI5LDYgKzI5LDcgQEAKPiDCoCNpbmNsdWRlIDxs
-aW51eC9yZXNldC5oPgo+IMKgI2luY2x1ZGUgPGxpbnV4L3BtX2RvbWFpbi5oPgo+IMKgI2luY2x1
-ZGUgPGxpbnV4L3BtX3J1bnRpbWUuaD4KPiArI2luY2x1ZGUgPGFzbS9vcGNvZGVzLmg+Cj4gwqAK
-PiDCoCNpbmNsdWRlICJwY2llLWRlc2lnbndhcmUuaCIKPiDCoAo+IEBAIC0zMDUsNiArMzA2LDU5
-IEBAIHN0YXRpYyBpbnQgaW14NnFfcGNpZV9hYm9ydF9oYW5kbGVyKHVuc2lnbmVkIGxvbmcgYWRk
-ciwKPiDCoAlyZXR1cm4gMTsKPiDCoH0KPiDCoAo+ICtzdGF0aWMgaW50IGlteDZxX3BjaWVfYWJv
-cnRfaGFuZGxlcl90aHVtYjIodW5zaWduZWQgbG9uZyBhZGRyLAo+ICsJCXVuc2lnbmVkIGludCBm
-c3IsIHN0cnVjdCBwdF9yZWdzICpyZWdzKQo+ICt7Cj4gKwl1bnNpZ25lZCBsb25nIHBjID0gaW5z
-dHJ1Y3Rpb25fcG9pbnRlcihyZWdzKTsKPiArCXVuc2lnbmVkIGxvbmcgaW5zdHI7Cj4gKwo+ICsJ
-aWYgKHVzZXJfbW9kZShyZWdzKSkKPiArCQlyZXR1cm4gMTsKPiArCj4gKwlpbnN0ciA9IF9fbWVt
-X3RvX29wY29kZV90aHVtYjMyKCoodW5zaWduZWQgbG9uZyAqKXBjKTsKPiArCj4gKwlpZiAoX19v
-cGNvZGVfaXNfdGh1bWIzMihpbnN0cikpIHsKPiArCQkvKiBMb2FkIHdvcmQvYnl0ZSBhbmQgaGFs
-ZndvcmQgaW1tZWRpYXRlIG9mZnNldCAqLwo+ICsJCWlmICgoaW5zdHIgJiAweGZmMTAwMDAwVUwp
-ID09IDB4ZjgxMDAwMDBVTCkgewo+ICsJCQlpbnQgcmVnID0gKGluc3RyID4+IDEyKSAmIDB4ZjsK
-PiArCQkJdW5zaWduZWQgbG9uZyB2YWw7Cj4gKwo+ICsJCQlpZiAoKGluc3RyICYgMHgwMDcwMDAw
-MFVMKSA9PSAweDAwMTAwMDAwVUwpCj4gKwkJCQl2YWwgPSAweGZmOwo+ICsJCQllbHNlIGlmICgo
-aW5zdHIgJiAweDAwNzAwMDAwVUwpID09IDB4MDAzMDAwMDBVTCkKPiArCQkJCXZhbCA9IDB4ZmZm
-ZjsKPiArCQkJZWxzZQo+ICsJCQkJdmFsID0gMHhmZmZmZmZmZlVMOwo+ICsKPiArCQkJcmVncy0+
-dXJlZ3NbcmVnXSA9IHZhbDsKPiArCQkJcmVncy0+QVJNX3BjICs9IDQ7Cj4gKwkJCXJldHVybiAw
-Owo+ICsJCX0KPiArCX0gZWxzZSB7Cj4gKwkJaW5zdHIgPSBfX21lbV90b19vcGNvZGVfdGh1bWIx
-NigqKHVuc2lnbmVkIGxvbmcgKilwYyk7Cj4gKwo+ICsJCS8qIExvYWQgd29yZC9ieXRlIGFuZCBo
-YWxmd29yZCBpbW1lZGlhdGUgb2Zmc2V0ICovCj4gKwkJaWYgKCgoaW5zdHIgJiAweGU4MDApID09
-IDB4NjgwMCkgfHwKPiArCQnCoMKgwqDCoCgoaW5zdHIgJiAweGY4MDApID09IDB4ODgwMCkpIHsK
-PiArCQkJaW50IHJlZyA9IGluc3RyICYgMHg3Owo+ICsJCQl1bnNpZ25lZCBsb25nIHZhbDsKPiAr
-Cj4gKwkJCWlmIChpbnN0ciAmIDB4MTAwMCkKPiArCQkJCXZhbCA9IDB4ZmY7Cj4gKwkJCWVsc2Ug
-aWYgKGluc3RyICYgMHg4MDAwKQo+ICsJCQkJdmFsID0gMHhmZmZmOwo+ICsJCQllbHNlCj4gKwkJ
-CQl2YWwgPSAweGZmZmZmZmZmVUw7Cj4gKwo+ICsJCQlyZWdzLT51cmVnc1tyZWddID0gdmFsOwo+
-ICsJCQlyZWdzLT5BUk1fcGMgKz0gMjsKPiArCQkJcmV0dXJuIDA7Cj4gKwkJfQo+ICsJfQo+ICsK
-PiArCXJldHVybiAxOwo+ICt9Cj4gKwo+IMKgc3RhdGljIGludCBpbXg2X3BjaWVfYXR0YWNoX3Bk
-KHN0cnVjdCBkZXZpY2UgKmRldikKPiDCoHsKPiDCoAlzdHJ1Y3QgaW14Nl9wY2llICppbXg2X3Bj
-aWUgPSBkZXZfZ2V0X2RydmRhdGEoZGV2KTsKPiBAQCAtMTA3NSw2ICsxMTI5LDggQEAgc3RhdGlj
-IHN0cnVjdCBwbGF0Zm9ybV9kcml2ZXIgaW14Nl9wY2llX2RyaXZlciA9IHsKPiDCoAo+IMKgc3Rh
-dGljIGludCBfX2luaXQgaW14Nl9wY2llX2luaXQodm9pZCkKPiDCoHsKPiArCWJvb2wgdGh1bWIy
-ID0gSVNfRU5BQkxFRChDT05GSUdfVEhVTUIyX0tFUk5FTCk7Cj4gKwo+IMKgCS8qCj4gwqAJwqAq
-IFNpbmNlIHByb2JlKCkgY2FuIGJlIGRlZmVycmVkIHdlIG5lZWQgdG8gbWFrZSBzdXJlIHRoYXQK
-PiDCoAnCoCogaG9va19mYXVsdF9jb2RlIGlzIG5vdCBjYWxsZWQgYWZ0ZXIgX19pbml0IG1lbW9y
-eSBpcyBmcmVlZAo+IEBAIC0xMDgyLDcgKzExMzgsOCBAQCBzdGF0aWMgaW50IF9faW5pdCBpbXg2
-X3BjaWVfaW5pdCh2b2lkKQo+IMKgCcKgKiB3ZSBjYW4gaW5zdGFsbCB0aGUgaGFuZGxlciBoZXJl
-IHdpdGhvdXQgcmlza2luZyBpdAo+IMKgCcKgKiBhY2Nlc3Npbmcgc29tZSB1bmluaXRpYWxpemVk
-IGRyaXZlciBzdGF0ZS4KPiDCoAnCoCovCj4gLQlob29rX2ZhdWx0X2NvZGUoOCwgaW14NnFfcGNp
-ZV9hYm9ydF9oYW5kbGVyLCBTSUdCVVMsIDAsCj4gKwlob29rX2ZhdWx0X2NvZGUoOCwgdGh1bWIy
-ID8gaW14NnFfcGNpZV9hYm9ydF9oYW5kbGVyX3RodW1iMiA6Cj4gKwkJCWlteDZxX3BjaWVfYWJv
-cnRfaGFuZGxlciwgU0lHQlVTLCAwLAo+IMKgCQkJImV4dGVybmFsIGFib3J0IG9uIG5vbi1saW5l
-ZmV0Y2giKTsKPiDCoAo+IMKgCXJldHVybiBwbGF0Zm9ybV9kcml2ZXJfcmVnaXN0ZXIoJmlteDZf
-cGNpZV9kcml2ZXIpOwoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0
-cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGlu
-Zm8vbGludXgtYXJtLWtlcm5lbAo=
+On Fri, Feb 8, 2019 at 10:52 AM Souptick Joarder <jrdr.linux@gmail.com> wrote:
+>
+> On Thu, Feb 7, 2019 at 10:17 PM Matthew Wilcox <willy@infradead.org> wrote:
+> >
+> > On Thu, Feb 07, 2019 at 09:19:47PM +0530, Souptick Joarder wrote:
+> > > Just thought to take opinion for documentation before placing it in v3.
+> > > Does it looks fine ?
+> > >
+> > > +/**
+> > > + * __vm_insert_range - insert range of kernel pages into user vma
+> > > + * @vma: user vma to map to
+> > > + * @pages: pointer to array of source kernel pages
+> > > + * @num: number of pages in page array
+> > > + * @offset: user's requested vm_pgoff
+> > > + *
+> > > + * This allow drivers to insert range of kernel pages into a user vma.
+> > > + *
+> > > + * Return: 0 on success and error code otherwise.
+> > > + */
+> > > +static int __vm_insert_range(struct vm_area_struct *vma, struct page **pages,
+> > > +                               unsigned long num, unsigned long offset)
+> >
+> > For static functions, I prefer to leave off the second '*', ie make it
+> > formatted like a docbook comment, but not be processed like a docbook
+> > comment.  That avoids cluttering the html with descriptions of internal
+> > functions that people can't actually call.
+> >
+> > > +/**
+> > > + * vm_insert_range - insert range of kernel pages starts with non zero offset
+> > > + * @vma: user vma to map to
+> > > + * @pages: pointer to array of source kernel pages
+> > > + * @num: number of pages in page array
+> > > + *
+> > > + * Maps an object consisting of `num' `pages', catering for the user's
+> >
+> > Rather than using `num', you should use @num.
+> >
+> > > + * requested vm_pgoff
+> > > + *
+> > > + * If we fail to insert any page into the vma, the function will return
+> > > + * immediately leaving any previously inserted pages present.  Callers
+> > > + * from the mmap handler may immediately return the error as their caller
+> > > + * will destroy the vma, removing any successfully inserted pages. Other
+> > > + * callers should make their own arrangements for calling unmap_region().
+> > > + *
+> > > + * Context: Process context. Called by mmap handlers.
+> > > + * Return: 0 on success and error code otherwise.
+> > > + */
+> > > +int vm_insert_range(struct vm_area_struct *vma, struct page **pages,
+> > > +                               unsigned long num)
+> > >
+> > >
+> > > +/**
+> > > + * vm_insert_range_buggy - insert range of kernel pages starts with zero offset
+> > > + * @vma: user vma to map to
+> > > + * @pages: pointer to array of source kernel pages
+> > > + * @num: number of pages in page array
+> > > + *
+> > > + * Similar to vm_insert_range(), except that it explicitly sets @vm_pgoff to
+> >
+> > But vm_pgoff isn't a parameter, so it's misleading to format it as such.
+> >
+> > > + * 0. This function is intended for the drivers that did not consider
+> > > + * @vm_pgoff.
+> > > + *
+> > > + * Context: Process context. Called by mmap handlers.
+> > > + * Return: 0 on success and error code otherwise.
+> > > + */
+> > > +int vm_insert_range_buggy(struct vm_area_struct *vma, struct page **pages,
+> > > +                               unsigned long num)
+> >
+> > I don't think we should call it 'buggy'.  'zero' would make more sense
+> > as a suffix.
+>
+> suffix can be *zero or zero_offset* whichever suits better.
+>
+> >
+> > Given how this interface has evolved, I'm no longer sure than
+> > 'vm_insert_range' makes sense as the name for it.  Is it perhaps
+> > 'vm_map_object' or 'vm_map_pages'?
+> >
+>
+> I prefer vm_map_pages. Considering it, both the interface name can be changed
+> to *vm_insert_range -> vm_map_pages* and *vm_insert_range_buggy ->
+> vm_map_pages_{zero/zero_offset}.
+>
+> As this is only change in interface name and rest of code remain same
+> shall I post it in v3 ( with additional change log mentioned about interface
+> name changed) ?
+>
+> or,
+>
+> It will be a new patch series ( with carry forward all the Reviewed-by
+> / Tested-by on
+> vm_insert_range/ vm_insert_range_buggy ) ?
+
+Any suggestion on this minor query ?
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
