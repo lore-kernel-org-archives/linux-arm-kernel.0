@@ -2,100 +2,114 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C440FC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:30:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 87881C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:33:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8B36D20855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:30:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3470921B1A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:33:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Sue+ebwH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8B36D20855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c4NJmh+k"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3470921B1A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-Id:In-Reply-To:MIME-Version:
-	References:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4hQqDHtJUdd4Ns8u3F9/8T5vBUEVdynynUmhxUSHh48=; b=Sue+ebwHuV6ScN
-	gHMWNRYzymhNs512nU+9yTmDyLjIAHtbcc5zOYB9qAnodIZkM1aOpLSbA6ROMR+pxuebCbKpNFuJq
-	wENDsJbpZCot/nGZDJ8XNtiSKJbBla0qgZZVXEY8LqhN2oC8NGO7xz2sa91dwPdvpTvoF3eRrWqCs
-	QEMo8+KkPr6YE2TKybHKjJ15iQEKn67fRgYNKaOu2YV29+k0PXrCwCvORY818sJ4W2IEJzsPSYXBd
-	jCHLq1qMgMUzudWRe+D2C+U1Y2R3xJbR2wntWL4SUzWv+zHf4dKb3YsrHp6jXpaUyaXv0iGcbayrc
-	TqaftQmV/iWjOfKfEz4w==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=YH6xdsH8DFZ/p0pcCAsaEKSdf1LAAIQhGvr/a0ZhNQU=; b=c4NJmh+kir78Lr
+	gTjhny1pfkucQcFbEeOPB7PHDYwhkEUss+yqrR5RNs/OOFGRZYMpz5IksTc6H6oiwVS3F263VKMhY
+	k2Su7Fc86CKEaTSNVV/CSEfE4RvPZYI0uzZyINKlqzKKGSMSBBlmRgtK//cG3Y/vSgTMe0/ZA8BnN
+	ZBJXysy+9PtmUVP06G5fKms6oq0QL8OM1wJOh1GJIj5qpTM56jkjmS4ocz1VsCYk6pgWbVPC5BUe0
+	RzulK/0FwWfOk1qahX1/VH7tgiZXij6NT+rdYryBiKM/WuNhr95rJIjCjwNspmDAt1nZ6qEqLHAP4
+	5SkGjES8JKtXqAicEQiQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtBfb-0005kO-2h; Mon, 11 Feb 2019 13:30:47 +0000
-Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
+	id 1gtBht-00065P-7x; Mon, 11 Feb 2019 13:33:09 +0000
+Received: from mx1.redhat.com ([209.132.183.28])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtBfX-0005ji-Ey
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 13:30:45 +0000
-Received: from pps.filterd (m0098393.ppops.net [127.0.0.1])
- by mx0a-001b2d01.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1BDOg5a106382
- for <linux-arm-kernel@lists.infradead.org>; Mon, 11 Feb 2019 08:30:39 -0500
-Received: from e06smtp04.uk.ibm.com (e06smtp04.uk.ibm.com [195.75.94.100])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2qk8gmvj6e-1
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Mon, 11 Feb 2019 08:30:39 -0500
-Received: from localhost
- by e06smtp04.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
- Violators will be prosecuted
- for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Mon, 11 Feb 2019 13:30:37 -0000
-Received: from b06cxnps4074.portsmouth.uk.ibm.com (9.149.109.196)
- by e06smtp04.uk.ibm.com (192.168.101.134) with IBM ESMTP SMTP Gateway:
- Authorized Use Only! Violators will be prosecuted; 
- (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Mon, 11 Feb 2019 13:30:31 -0000
-Received: from d06av22.portsmouth.uk.ibm.com (d06av22.portsmouth.uk.ibm.com
- [9.149.105.58])
- by b06cxnps4074.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- x1BDUUt22228690
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 11 Feb 2019 13:30:31 GMT
-Received: from d06av22.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id DB2D64C044;
- Mon, 11 Feb 2019 13:30:30 +0000 (GMT)
-Received: from d06av22.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id A40264C050;
- Mon, 11 Feb 2019 13:30:29 +0000 (GMT)
-Received: from rapoport-lnx (unknown [9.148.205.211])
- by d06av22.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Mon, 11 Feb 2019 13:30:29 +0000 (GMT)
-Date: Mon, 11 Feb 2019 15:30:27 +0200
-From: Mike Rapoport <rppt@linux.ibm.com>
-To: Peng Fan <peng.fan@nxp.com>
-Subject: Re: [PATCH] arm: use memblocks_present
-References: <20190211131602.3294-1-peng.fan@nxp.com>
+ id 1gtBho-00064z-Dq
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 13:33:07 +0000
+Received: from smtp.corp.redhat.com (int-mx03.intmail.prod.int.phx2.redhat.com
+ [10.5.11.13])
+ (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
+ (No client certificate requested)
+ by mx1.redhat.com (Postfix) with ESMTPS id B210659461;
+ Mon, 11 Feb 2019 13:33:02 +0000 (UTC)
+Received: from llong.remote.csb (ovpn-122-44.rdu2.redhat.com [10.10.122.44])
+ by smtp.corp.redhat.com (Postfix) with ESMTP id 3CEDF60A9A;
+ Mon, 11 Feb 2019 13:32:58 +0000 (UTC)
+Subject: Re: [PATCH] locking/rwsem: Remove arch specific rwsem files
+To: Ingo Molnar <mingo@kernel.org>
+References: <1549850450-10171-1-git-send-email-longman@redhat.com>
+ <a610aeb2-b1cb-0d57-8078-97d1051481f9@redhat.com>
+ <20190211071159.GA55579@gmail.com> <20190211103927.GA118071@gmail.com>
+From: Waiman Long <longman@redhat.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=longman@redhat.com; prefer-encrypt=mutual; keydata=
+ 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
+ weim8xU=
+Organization: Red Hat
+Message-ID: <9b03594e-d7b0-e042-374e-9f045dcb692c@redhat.com>
+Date: Mon, 11 Feb 2019 08:32:57 -0500
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190211131602.3294-1-peng.fan@nxp.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
-X-TM-AS-GCONF: 00
-x-cbid: 19021113-0016-0000-0000-000002550B9F
-X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 19021113-0017-0000-0000-000032AF27AC
-Message-Id: <20190211133027.GA11446@rapoport-lnx>
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-02-11_09:, , signatures=0
-X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
- priorityscore=1501
- malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
- clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
- scancount=1 engine=8.0.1-1810050000 definitions=main-1902110105
+In-Reply-To: <20190211103927.GA118071@gmail.com>
+Content-Language: en-US
+X-Scanned-By: MIMEDefang 2.79 on 10.5.11.13
+X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
+ (mx1.redhat.com [10.5.110.39]); Mon, 11 Feb 2019 13:33:03 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_053043_616127_A3D3877A 
-X-CRM114-Status: GOOD (  23.74  )
+X-CRM114-CacheID: sfid-20190211_053304_504076_F96FB4C8 
+X-CRM114-Status: GOOD (  17.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,77 +121,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "nicolas.pitre@linaro.org" <nicolas.pitre@linaro.org>,
- "robh@kernel.org" <robh@kernel.org>,
- "f.fainelli@gmail.com" <f.fainelli@gmail.com>, "arnd@arndb.de" <arnd@arndb.de>,
- "mhocko@suse.com" <mhocko@suse.com>,
- "linux@armlinux.org.uk" <linux@armlinux.org.uk>,
- "rostedt@goodmis.org" <rostedt@goodmis.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "rppt@linux.vnet.ibm.com" <rppt@linux.vnet.ibm.com>,
- "van.freenix@gmail.com" <van.freenix@gmail.com>,
- "akpm@linux-foundation.org" <akpm@linux-foundation.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: linux-ia64@vger.kernel.org, linux-sh@vger.kernel.org,
+ Peter Zijlstra <peterz@infradead.org>, Will Deacon <will.deacon@arm.com>,
+ "H. Peter Anvin" <hpa@zytor.com>, sparclinux@vger.kernel.org,
+ linux-arch@vger.kernel.org, Davidlohr Bueso <dave@stgolabs.net>,
+ linux-hexagon@vger.kernel.org, x86@kernel.org, Ingo Molnar <mingo@redhat.com>,
+ linux-xtensa@linux-xtensa.org, Arnd Bergmann <arnd@arndb.de>,
+ linuxppc-dev@lists.ozlabs.org, Borislav Petkov <bp@alien8.de>,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
+ Linus Torvalds <torvalds@linux-foundation.org>, linux-kernel@vger.kernel.org,
+ linux-alpha@vger.kernel.org, Andrew Morton <akpm@linux-foundation.org>,
+ Tim Chen <tim.c.chen@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 01:04:59PM +0000, Peng Fan wrote:
-> arm_memory_present is doing same thing as memblocks_present, so
-> let's use common code memblocks_present instead of platform
-> specific arm_memory_present.
-> 
-> Signed-off-by: Peng Fan <peng.fan@nxp.com>
+On 02/11/2019 05:39 AM, Ingo Molnar wrote:
+> * Ingo Molnar <mingo@kernel.org> wrote:
+>
+>> Sounds good to me - I've merged this patch, will push it out after 
+>> testing.
+> Based on Peter's feedback I'm delaying this - performance testing on at 
+> least one key ll/sc arch would be nice indeed.
+>
+> Thanks,
+>
+> 	Ingo
 
-Acked-by: Mike Rapoport <rppt@linux.ibm.com>
+Yes, I will twist the generic code to generate better code.
 
-> ---
->  arch/arm/mm/init.c | 17 +----------------
->  1 file changed, 1 insertion(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 478ea8b7db87..6c50dd407ba8 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -182,21 +182,6 @@ int pfn_valid(unsigned long pfn)
->  EXPORT_SYMBOL(pfn_valid);
->  #endif
->  
-> -#ifndef CONFIG_SPARSEMEM
-> -static void __init arm_memory_present(void)
-> -{
-> -}
-> -#else
-> -static void __init arm_memory_present(void)
-> -{
-> -	struct memblock_region *reg;
-> -
-> -	for_each_memblock(memory, reg)
-> -		memory_present(0, memblock_region_memory_base_pfn(reg),
-> -			       memblock_region_memory_end_pfn(reg));
-> -}
-> -#endif
-> -
->  static bool arm_memblock_steal_permitted = true;
->  
->  phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
-> @@ -292,7 +277,7 @@ void __init bootmem_init(void)
->  	 * Sparsemem tries to allocate bootmem in memory_present(),
->  	 * so must be done after the fixed reservations
->  	 */
-> -	arm_memory_present();
-> +	memblocks_present();
->  
->  	/*
->  	 * sparse_init() needs the bootmem allocator up and running.
-> -- 
-> 2.16.4
-> 
+As I said in the commit log, only x86, ia64 and alpha provide assembly
+code to replace the generic C code. The ll/sc archs that I have access
+to (ARM64, ppc) are all using the generic C code anyway. I actually had
+done some performance measurement on both those platforms and didn't see
+any performance difference. I didn't include them as they were using
+generic code before. I will rerun the tests after I twisted the generic
+C code.
 
--- 
-Sincerely yours,
-Mike.
+Thanks,
+Longman
+
 
 
 _______________________________________________
