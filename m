@@ -7,18 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6F4E3C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:33:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 38290C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:33:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3C8CE20818
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:33:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D2EA020818
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:33:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NqC1clle";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="09fk1c0k";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="jNfPuPtP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C8CE20818
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eNrXjlKv";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="v+foSweA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D2EA020818
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,83 +26,69 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/rnoHFlr6A3w9QTlNaKzvOO4x04sVVh+q+E2serXTEM=; b=NqC1clleouV/83
-	cxE9Mj6J1aiW4r/g6jIHBFzjEX5VF229S2Y5Zt018qVV+HFra71pyrNADtLSVVK3JFwu+juzFX0xm
-	jzOo6wCnppRfwgTN4PGgIC8DpX80gVw8QWmrITPv0MXldmD6eMV71BGX9KQd7Btdv9fDMehppYGMz
-	7AFTYCORDz4oUaxhtlKUuij4z1cimlQQzFQ0mwKHAzP2EuZYGxQZ0v0l7AHE+0uWkrD+HJ0Dt61PB
-	FAz0OUneyh7LKG6bWDamz5fczV+BxeBrq0ZPf0ASCZowtXGXD6YXqDuufQdD3O+1bTlWGnL1ysBWO
-	pjR9Aasa+thTi2P+yTkQ==;
+	List-Owner; bh=rLInrmz7GAFNobJkO9UfWAbD2nyD7QghwtYKcwdeYY4=; b=eNrXjlKvVT3+s3
+	E2fvYNdOPL11ffkGSFZhypMP1zz8iTa+q322kc+jV5cYHP4yJomA3MLlD50+eLNfvjjK2cdXNoXzy
+	JK2sH1SeSWaowHCy/vEWDXtSA5qIi/RJdk2JhsiDRkIoZQzX0YqCU2ljXIGPRQLXVPhYxDG7e0U8r
+	sixMSSm1kt2r061mqbyphJGIGz2WCGIUWX/nxtqnwLdJUtGbwdFIUZZzKpS2sR2aHCAG6xCdrsmiv
+	chepMbBmC/YrhJ/g45S9gnSLaRvJrYQf5rgHGix407Kl7zPpISJuOZzNixjtas4TYt0xuFIdEX+QP
+	HKK73/VnXA5G6v9Vg8vg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtAlp-0005yx-HD; Mon, 11 Feb 2019 12:33:09 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gtAm3-0006CN-Ev; Mon, 11 Feb 2019 12:33:23 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtAfj-0007mm-QO
- for linux-arm-kernel@bombadil.infradead.org; Mon, 11 Feb 2019 12:26:51 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=PVpMk4DVv+a2tPz6DDcxjR1CpV2M9ZT7i4uU6Q6sRTU=; b=09fk1c0kUoChzDtu1R7cbRF/NV
- SCG1miI7F0MlByp7AqDhSDUjzhcfrN9JDbW6gJl/IF71s2kBVqTkK53VzCnE0rPObTwzts0KKjDgX
- rkTm9rIg/Fa+r0fp7XLoQWywRCTWOuOWwwTD58OLXnSXa/YXYOafsj5JyqCBTIn945RO/60wdWlCz
- 8F52l5FbRZQ1sETcmyCwjXC3tDgjM4mqgGGcbo4V0RTb/MJMnW+ugfXvLIwGL6+xqFNaWh5OwLavJ
- vJ8GVNHPNyHdJfSa1ISoUDwzy/SRVh0mZsp7j7AqLVdxFzQzK1oTNQ+4tY3vax6jFNbtuptekl8Bz
- I+KwOfdA==;
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtAfh-0008TB-9W
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 12:26:49 +0000
-Received: by mail-wr1-x442.google.com with SMTP id q1so4484737wrp.7
+ id 1gtAfU-0007WQ-UV
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 12:26:54 +0000
+Received: by mail-wr1-x444.google.com with SMTP id i12so131709wrw.0
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 04:26:49 -0800 (PST)
+ Mon, 11 Feb 2019 04:26:36 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=PVpMk4DVv+a2tPz6DDcxjR1CpV2M9ZT7i4uU6Q6sRTU=;
- b=jNfPuPtPZZ1iElfR7lBREEpMmy4JVpCcJWxwmvB2x+kGyLKK3gZmxNavs+ZsWppjZQ
- OzpALHu2GQuRgyu0/XyI4fT1JpktYHsdoPQq7qIkWoHCMMefSKIJaIhtgdw1nwFDuTrD
- Gp+qbAsV+yacD86IiVX7HB+k7EgP0IgRaQbUKJMKdReAG59ja+meEnJqk0p3qm21/QFF
- 6IWgxbUdCbnfJaR4rwSjdJus5nlDkUDxfUmeqinnG1fT0Fma1Ki35HeY+KMD/eM7nXPH
- 3q7xriUwsoDU0x3FdbZjEdQqJjHtTVPYVqDYmie2Ms18u1MeUgnFvsS8X+OI2P4WxJz0
- SjGw==
+ bh=krZKYWoU8pidQJSuC93zX28N7u3H16YP6+0fJKp65YA=;
+ b=v+foSweAwlvLRYK067ZEY421O7c6yQsEQ2J3Zc6Guw8DCLrNAlsM/cL1gjLlP5QlKy
+ nfEBCwyUMiuslK5XPkwn9nIH3bisP6+hVvu9p3Q812crvhpCneAkVDr5JFupnXxpwSAh
+ iWMnD0akRTrSPeWeB0delCZ/+/M6b3bRERwX+wJZHl7f/ogkSX0YPgAtBCFsfnUeKNUG
+ u2Hoolx6LL0CuhrA36b0VVIfLwBQu5Xivv0ZdjENk5u5LHzw6XAGLiPYjwrsqtDZLKOF
+ ye9V42Mbpxa4qK5s/dhEfHrO28cmKk1CGhBDHEwitsaxgH4NoSJ9mD1y6b83jGS98M98
+ 2I9Q==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=PVpMk4DVv+a2tPz6DDcxjR1CpV2M9ZT7i4uU6Q6sRTU=;
- b=q4Zh8o2vb/tnlGHXFOSlaCijfxhY2UaOJIjVuAApft1XmZF8zIus2iHUg3IyjDqBDu
- 9kr1X+MDjxkxwjMgiSUdzv5YzsZjgF7SLbkbkNYG66gL8eLGU3lppeZemGwAOtBTmJAd
- mEH1s/++TQ+DHFefedsN7Oh4/vmzPlbr9645RHQjysCPibRdlf3SftLUjKBlC1F2tyIW
- qTcrg8Tsfn2Jb9P6EvVI/klA4edrEbCLB6T+HI+gk8PFUKkKYnVCJjL8sc1nGNgGY4Yy
- isNa2xUntLqKem4yiHsLRNDr0g/ZOaLuCvTg23+Pj1SWQZJnhYpxZJ7M790hTZmqrShl
- VZSQ==
-X-Gm-Message-State: AHQUAubvRfRCclQAFTDAmFECcESttWA6r1lttFYzMHIsTvLkBg1gD2/p
- 5xgeqahmCpud0wKyP8PjcIFl5g==
-X-Google-Smtp-Source: AHgI3IbqIQIgpmEsKfirMG84alydoChsZyJ/cJAXGK+6oaOJTTy2ywYowbHZxmw+JPEc1CCw9ZCy3A==
-X-Received: by 2002:adf:dbc4:: with SMTP id e4mr29297329wrj.320.1549888007733; 
- Mon, 11 Feb 2019 04:26:47 -0800 (PST)
+ bh=krZKYWoU8pidQJSuC93zX28N7u3H16YP6+0fJKp65YA=;
+ b=Zoipus6UMJF/ODs6ceKFLC8IsJXfSrlc+FpxYmuHbrlfj8fiRhO/QXjUSGLAU8RA03
+ GcNgJFSAdjv6Yr8zLrurTA1TsNmeOk2OwfosoTLo/k/yWl87DFPgLU9crZR4HRL6V7ie
+ 5YJ5bcwoyHZpONZ7YU5rWo2VbL4gRdb5xpC+PZVY6pDz87grPu2nZWw+MWXWsm1Aezyb
+ gFRuroE9ZDB9OVA1IueIbhKJtP5UqbIwIGdZUhq8RTmJIr0f3sidare/Zw9ilG8Vy1wp
+ Mp+K7GVpC29ZbiYAQi54bGgZzk/29DVSX6ZrGhB0OV3Jcn1mudiHPFlkzWN6sIQIpcNj
+ y6Pw==
+X-Gm-Message-State: AHQUAuZYbJ0zfjiQOaj39ic4GCR8qtyrUS1wX/JCBstU2Pn9o7IzE7LV
+ oGn9BSuS3cBO4C6AXLR6YREctw==
+X-Google-Smtp-Source: AHgI3IaAQHSdGcRUIgcdYvZNxlXj6H4KgRs1wEYKfsoBZw6wR8VkvZCUMVhkm1hGJ/OCUOvAlE9fHg==
+X-Received: by 2002:adf:dbc4:: with SMTP id e4mr29296689wrj.320.1549887995641; 
+ Mon, 11 Feb 2019 04:26:35 -0800 (PST)
 Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id l20sm19494321wrb.93.2019.02.11.04.26.46
+ by smtp.gmail.com with ESMTPSA id l20sm19494321wrb.93.2019.02.11.04.26.34
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 11 Feb 2019 04:26:47 -0800 (PST)
+ Mon, 11 Feb 2019 04:26:35 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
  Marc Zyngier <marc.zyngier@arm.com>, David Lechner <david@lechnology.com>
-Subject: [RESEND PATCH v2 28/33] ARM: davinci: cp-intc: unify error handling
-Date: Mon, 11 Feb 2019 13:26:01 +0100
-Message-Id: <20190211122606.8662-29-brgl@bgdev.pl>
+Subject: [RESEND PATCH v2 18/33] ARM: davinci: aintc: remove unnecessary
+ includes
+Date: Mon, 11 Feb 2019 13:25:51 +0100
+Message-Id: <20190211122606.8662-19-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190211122606.8662-1-brgl@bgdev.pl>
 References: <20190211122606.8662-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_072649_379687_6F74EBD3 
-X-CRM114-Status: GOOD (  13.73  )
+X-CRM114-CacheID: sfid-20190211_042637_698592_CE080263 
+X-CRM114-Status: UNSURE (   9.70  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -124,43 +109,29 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Use WARN_ON() on eny error in cp-intc initialization and drop all
-custom error messages.
+These includes are no longer required. Remove them.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Reviewed-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/mach-davinci/cp_intc.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ arch/arm/mach-davinci/irq.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
-index f3787ae4cdbd..c1efb9390655 100644
---- a/arch/arm/mach-davinci/cp_intc.c
-+++ b/arch/arm/mach-davinci/cp_intc.c
-@@ -200,20 +200,16 @@ davinci_cp_intc_do_init(const struct davinci_cp_intc_config *config,
- 			DAVINCI_CP_INTC_CHAN_MAP(offset));
+diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
+index 0f469c59acfb..0768edfc3b66 100644
+--- a/arch/arm/mach-davinci/irq.c
++++ b/arch/arm/mach-davinci/irq.c
+@@ -12,10 +12,6 @@
+ #include <linux/io.h>
+ #include <linux/irqdomain.h>
  
- 	irq_base = irq_alloc_descs(-1, 0, config->num_irqs, 0);
--	if (irq_base < 0) {
--		pr_warn("Couldn't allocate IRQ numbers\n");
--		irq_base = 0;
--	}
-+	if (WARN_ON(irq_base < 0))
-+		return irq_base;
+-#include <mach/hardware.h>
+-#include <mach/cputype.h>
+-#include <mach/common.h>
+-#include <asm/mach/irq.h>
+ #include <asm/exception.h>
  
- 	/* create a legacy host */
- 	davinci_cp_intc_irq_domain = irq_domain_add_legacy(
- 					node, config->num_irqs, irq_base, 0,
- 					&davinci_cp_intc_irq_domain_ops, NULL);
- 
--	if (!davinci_cp_intc_irq_domain) {
--		pr_err("cp_intc: failed to allocate irq host!\n");
-+	if (WARN_ON(!davinci_cp_intc_irq_domain))
- 		return -EINVAL;
--	}
- 
- 	set_handle_irq(davinci_cp_intc_handle_irq);
- 
+ #define DAVINCI_AINTC_FIQ_REG0		0x00
 -- 
 2.20.1
 
