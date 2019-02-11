@@ -4,19 +4,18 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 781ECC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:54:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F1043C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:00:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 43703218D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:54:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BC06E218D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:00:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YctGgyz2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43703218D8
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p4aOvEA8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC06E218D8
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,33 +24,32 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EG5peyLPcaWjRVdONSFsBFttSPF54Omw94km9BQ2/tM=; b=YctGgyz2uVWPJ5
-	io5pmO9bSESC1KH2/V60BWClz1xQ7QWKfN9QMNX87SUim4zwccU+lPJ7rl21S+wYA4QG6Fo5K4m3j
-	mdbwrVrPk0g106YP66PcWINjxRm1pMYma766PvX4TEcDYHYzos3POr4R/9yNmByeJM+jQuPqr2VXv
-	8g/vZs37arIzDPNHJy4P4QOpi+Th0iXbrYA0kcRjE6HxobhBBOr4xs/DfEaVkNx2xEBBcD/dFy9Hl
-	/ExsY3drgNZ8aqjnh6YZ8J+bLuk4amTziu0KnpFew0dz7PlOm1hwa1ebdsGs0rfRFX8HzcRszqPLz
-	eMsqZUggpkkpp4oE7bxw==;
+	List-Owner; bh=aZ9cKD/vkxOFej5Id8mXYYvEKUoBNFCig/cKcerCCr0=; b=p4aOvEA8hkFyds
+	gPnRLsczgNzWvQa61ahxjuQWYkF+By3Zq/2isjWybJ3cxkXyCUoC1mmF6GwxDgXuirc837VKBBylP
+	lJaNgPQrqB3HVBg+XwVY9Pne4NwC5OcHeE3z7ye63NmSzkEEnsCv20pwMwD3aVb46LPX6VXq5C7UQ
+	6QdOMeqzFz185GPuDv7AmkPc6y+f/vR+/YQe+bebEZ6dFWTmjs8SDsLKjAJySLBP/nEWmHwGhy6RD
+	F5g4bDH+iW7h9V1Pwf/J6aoBz/j0wK6horSggEUZgOQn0rc7r/mhs5TYRqOjYJ0oZ8hDqNe25JAKv
+	szCYKrqzC/mm/Kn0LlVQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtB6c-0003JJ-Mz; Mon, 11 Feb 2019 12:54:38 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gtBCb-0006uI-AV; Mon, 11 Feb 2019 13:00:49 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtB6Z-0003Iq-IC
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 12:54:36 +0000
+ id 1gtBCY-0006tu-Fq
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 13:00:47 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 29F6180D;
- Mon, 11 Feb 2019 04:54:35 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9C5AC80D;
+ Mon, 11 Feb 2019 05:00:44 -0800 (PST)
 Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
  by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 02B363F557; Mon, 11 Feb 2019 04:54:29 -0800 (PST)
-Subject: Re: [RESEND PATCH v2 13/33] ARM: davinci: aintc: use
- readl/writel_relaxed()
+ 211E93F557; Mon, 11 Feb 2019 05:00:42 -0800 (PST)
+Subject: Re: [RESEND PATCH v2 17/33] ARM: davinci: aintc: move timer-specific
+ irq_set_handler() out of irq.c
 To: Bartosz Golaszewski <brgl@bgdev.pl>, Sekhar Nori <nsekhar@ti.com>,
  Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
  Jason Cooper <jason@lakedaemon.net>, David Lechner <david@lechnology.com>
 References: <20190211122606.8662-1-brgl@bgdev.pl>
- <20190211122606.8662-14-brgl@bgdev.pl>
+ <20190211122606.8662-18-brgl@bgdev.pl>
 From: Marc Zyngier <marc.zyngier@arm.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
@@ -97,16 +95,16 @@ Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
  hApihi08gwvP5G9fNGKQyRETePEtEAWt0b7dOqMzYBYGRVr7uS4uT6WP7fzOwAJC4lU7ZYWZ
  yVshCa0IvTtp1085RtT3qhh9mobkcZ+7cQOY+Tx2RGXS9WeOh2jZjdoWUv6CevXNQyOUXMM=
 Organization: ARM Ltd
-Message-ID: <98530970-e49c-cce1-d2f7-749e18430dad@arm.com>
-Date: Mon, 11 Feb 2019 12:54:27 +0000
+Message-ID: <67127a57-3d1f-5cf4-efb8-f1a2a49b3a2a@arm.com>
+Date: Mon, 11 Feb 2019 13:00:40 +0000
 User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <20190211122606.8662-14-brgl@bgdev.pl>
+In-Reply-To: <20190211122606.8662-18-brgl@bgdev.pl>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_045435_616150_43A58432 
-X-CRM114-Status: GOOD (  18.38  )
+X-CRM114-CacheID: sfid-20190211_050046_541516_A902BDA6 
+X-CRM114-Status: GOOD (  19.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -128,39 +126,61 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 On 11/02/2019 12:25, Bartosz Golaszewski wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> Raplace all calls to __raw_readl() & __raw_writel() with readl_relaxed()
-> and writel_relaxed() respectively. It's safe to do as there's no
-> endianness conversion being done in the code.
+> I've been unable to figure out exactly why, but it seems that the
+> IRQ_TINT1_TINT34 interrupt for timer 1 needs to be handled as a
+> level irq, not edge like all others.
+
+That's probably because its comparator maintains the interrupt asserted
+as long as its value is less than the counter.
+
+Level-trigger timers are the most common thing on this side of the known
+universe.
+
+> 
+> Let's move the handler setup out of the aintc driver where it's lived
+> since the beginning and into the dm* SoC-specific files where it
+> belongs.
 > 
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
->  arch/arm/mach-davinci/irq.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/mach-davinci/dm355.c  | 8 ++++++++
+>  arch/arm/mach-davinci/dm365.c  | 8 ++++++++
+>  arch/arm/mach-davinci/dm644x.c | 8 ++++++++
+>  arch/arm/mach-davinci/dm646x.c | 8 ++++++++
+>  arch/arm/mach-davinci/irq.c    | 3 ---
+>  5 files changed, 32 insertions(+), 3 deletions(-)
 > 
-> diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
-> index 148c23728bdb..6a7205a844e1 100644
-> --- a/arch/arm/mach-davinci/irq.c
-> +++ b/arch/arm/mach-davinci/irq.c
-> @@ -36,12 +36,12 @@ static struct irq_domain *davinci_aintc_irq_domain;
+> diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+> index c7cd765114af..a732f2ea1d9a 100644
+> --- a/arch/arm/mach-davinci/dm355.c
+> +++ b/arch/arm/mach-davinci/dm355.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/dmaengine.h>
+>  #include <linux/init.h>
+> +#include <linux/irq.h>
+>  #include <linux/irqchip/irq-davinci-aintc.h>
+>  #include <linux/platform_data/edma.h>
+>  #include <linux/platform_data/gpio-davinci.h>
+> @@ -744,6 +745,13 @@ void __init dm355_init_time(void)
+>  	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
+>  	dm355_psc_init(NULL, psc);
 >  
->  static inline void davinci_aintc_writel(unsigned long value, int offset)
->  {
-> -	__raw_writel(value, davinci_aintc_base + offset);
-> +	writel_relaxed(value, davinci_aintc_base + offset);
->  }
->  
->  static inline unsigned long davinci_aintc_readl(int offset)
->  {
-> -	return __raw_readl(davinci_aintc_base + offset);
-> +	return readl_relaxed(davinci_aintc_base + offset);
->  }
->  
->  static __init void
-> 
+> +	/*
+> +	 * Nobody knows why anymore, but this interrupt has been handled as
+> +	 * a level irq from the very beginning of davinci support in mainline
+> +	 * linux.
+> +	 */
+> +	irq_set_handler(DAVINCI_INTC_IRQ(IRQ_TINT1_TINT34), handle_level_irq);
+> +
 
-Right. And that's exactly what I'd like to see in patch #3. There is no
-point having a separate patch for this when you can do the right thing
-from the beginning.
+Now, the real question is: why isn't that set as part of the
+set_irq_type() callback, instead of hardcoding it in the platform?
+
+This is exactly the kind of information that should come as part of the
+DT or from the driver as one of the request_irq() flags.
+
+It would save quite a bit of boilerplate code.
 
 Thanks,
 
