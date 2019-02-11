@@ -2,66 +2,110 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C7611C4151A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:34:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B36E9C282CE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:34:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 93EFC222A7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:34:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7F13C222A5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:34:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ynil+BSO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 93EFC222A7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t6jY93NC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7F13C222A5
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=dN40EFVTPzjzue655WmHNWuCHAgcm2jcPGBk6QjNwoU=; b=Ynil+BSOlMvxEuQqJcHYTjusA
-	IwG4Tiz0qhG8707S9TfMiEBmWJ+h0g38sMtImZDKm6avZGp5lZWwbUVR03vmUKSa2l7UlegYFxydg
-	fe6CkWE/xFM+YCU4lgjuP08m5l65N7/KzjBlGqI5VtoFpNKoPLUg9FMq/gm8J36b0xuXnLE+BEqs1
-	A35at7M5n1lj+sTrXl53+yycLyCoMmWZZhPRF//QLpfk9/FyWdf2T7d1LT+ILmJMbg3SjPL010avZ
-	UpXuS5sHyXcfOcN6FioYxhKlA3tjOG3GCaOg+gRXriph1e8Ijf7eO/Z31ekU6dKg4dmsyJcMHZllW
-	Dr+BAhthQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=+eZVEgZ02LqKpckiRgo8aAWuHwmxcxYGV6yysNsOEbs=; b=t6jY93NCR26sPq
+	ezXfQt5H+C/wjRzaAsl3wLs0hAs9ygueGWirTMlhnN1V/aEn92u02EtZE1bQcT6BYPMANrJ5ah9yo
+	FVafMQSr7TgcbAzCPG6bdhRxS3XSHKXG8CXjLMs233JjJkTvv2j2HFMMIWltP4FEangCoYaNq0BB1
+	O0RLNmFGcwc6YWYdz5X+vtvW34kfBQripXo8EOPBpDnoa1/kcR8DaT20oHwvhBb3HBxyv0ZboBBLO
+	yaqnRUzUlnwi1dq9U3yPXRLcpIxBTICE3gHAUc9cRkCkGuY+uTWFy+m5GOCGc4ka7cRE3/auoKCfE
+	SNpYWYnYe+wB6wNVKHmQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtDb0-00018w-J1; Mon, 11 Feb 2019 15:34:10 +0000
-Received: from relay5-d.mail.gandi.net ([217.70.183.197])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtDaw-00018F-Hb
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 15:34:08 +0000
-X-Originating-IP: 90.88.22.177
-Received: from localhost (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
- [90.88.22.177]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay5-d.mail.gandi.net (Postfix) with ESMTPSA id 973E11C0013;
- Mon, 11 Feb 2019 15:34:02 +0000 (UTC)
-Date: Mon, 11 Feb 2019 16:34:02 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Priit Laes <plaes@plaes.org>
-Subject: Re: [RFC PATCH] clk: sunxi-ng: sun4i: Use CLK_SET_RATE_PARENT for
- mmc2 clock
-Message-ID: <20190211153402.s5qij5idvhbtsw2y@flea>
-References: <20190202155209.31617-1-plaes@plaes.org>
- <20190205094529.t7je4ozzu2b4ornc@flea>
- <CAGb2v673ntXn7MTRhU1uecO9q8_i79e+Ovio=tucd6qFf5L84Q@mail.gmail.com>
- <20190206092000.f46nsn4fw2n4crub@flea>
- <20190206100309.dhkm2l73qzkwgjzg@plaes.org>
- <20190206155227.wbkzvsdgykir4wn5@flea>
- <20190211143552.2uqx6yy53dyv5lbl@plaes.org>
+	id 1gtDbN-0001Qc-NQ; Mon, 11 Feb 2019 15:34:33 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtDbH-0001Oe-8M
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 15:34:30 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 61B8780D;
+ Mon, 11 Feb 2019 07:34:26 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ D97823F589; Mon, 11 Feb 2019 07:34:24 -0800 (PST)
+Subject: Re: [PATCH V3 2/4] dt-bindings: irq: imx-irqsteer: add multi output
+ interrupts support
+To: Aisheng Dong <aisheng.dong@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
+References: <1548921464-28917-1-git-send-email-aisheng.dong@nxp.com>
+ <1548921464-28917-3-git-send-email-aisheng.dong@nxp.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <23f5f2f0-79b8-b9f7-9f46-972966563596@arm.com>
+Date: Mon, 11 Feb 2019 15:34:23 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-In-Reply-To: <20190211143552.2uqx6yy53dyv5lbl@plaes.org>
-User-Agent: NeoMutt/20180716
+In-Reply-To: <1548921464-28917-3-git-send-email-aisheng.dong@nxp.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_073406_892546_E0A69FC7 
-X-CRM114-Status: GOOD (  21.65  )
+X-CRM114-CacheID: sfid-20190211_073427_484651_D78F6DB0 
+X-CRM114-Status: GOOD (  18.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,112 +117,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jernej Skrabec <jernej.skrabec@siol.net>, Stephen Boyd <sboyd@kernel.org>,
- Michael Turquette <mturquette@baylibre.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, Chen-Yu Tsai <wens@csie.org>,
- linux-clk <linux-clk@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: multipart/mixed; boundary="===============1276349127354792614=="
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "tglx@linutronix.de" <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On 31/01/2019 08:03, Aisheng Dong wrote:
+> One irqsteer channel can support up to 8 output interrupts.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: devicetree@vger.kernel.org
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+> ChangeLog:
+> v2->v3:
+>  * fix a typo
+> v1->v2:
+>  * remove one unnecessary note.
+> ---
+>  .../devicetree/bindings/interrupt-controller/fsl,irqsteer.txt        | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/fsl,irqsteer.txt b/Documentation/devicetree/bindings/interrupt-controller/fsl,irqsteer.txt
+> index 6d0a41b..582991c 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/fsl,irqsteer.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,irqsteer.txt
+> @@ -6,8 +6,9 @@ Required properties:
+>  	- "fsl,imx8m-irqsteer"
+>  	- "fsl,imx-irqsteer"
+>  - reg: Physical base address and size of registers.
+> -- interrupts: Should contain the parent interrupt line used to multiplex the
+> -  input interrupts.
+> +- interrupts: Should contain the up to 8 parent interrupt lines used to
+> +  multiplex the input interrupts. They should be specified sequentially
+> +  from output 0 to 7.
+>  - clocks: Should contain one clock for entry in clock-names
+>    see Documentation/devicetree/bindings/clock/clock-bindings.txt
+>  - clock-names:
+> 
 
---===============1276349127354792614==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="wbna365u3tl67kxz"
-Content-Disposition: inline
+I'd like an Ack from a DT person, as this is a change to an existing
+binding.
 
+Thanks,
 
---wbna365u3tl67kxz
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Mon, Feb 11, 2019 at 02:35:52PM +0000, Priit Laes wrote:
-> On Wed, Feb 06, 2019 at 04:52:27PM +0100, Maxime Ripard wrote:
-> > Hi,
-> >=20
-> > On Wed, Feb 06, 2019 at 10:03:09AM +0000, Priit Laes wrote:
-> > > > > I'm concerned for other users of the PLL-PERIPH clock. AFAIK
-> > > > > all of them, except the HRTIMER, expect the clock rate to stay
-> > > > > the same and not change underneath them. And SATA expects it to
-> > > > > be at 600 MHz, as the datasheet says. And while it may not direct=
-ly
-> > > > > apply to the LIME2, eMMC on newer SoCs / boards run at the slight=
-ly
-> > > > > reduced rate of 50 MHz just fine.
-> > > > >=20
-> > > > > In the commit in question, clocks without CLK_SET_RATE_PARENT
-> > > > > should be using the old code (now in the if conditional block),
-> > > > > i.e. the behavior should not have changed.
-> > > > >=20
-> > > > > I don't think this actually "fixes" whatever bug was introduced,
-> > > > > but only papers over the issue, and possible introduces further
-> > > > > issues for other users.
-> > > >=20
-> > > > You're right, I've overlooked that it was pll-periph being
-> > > > affected. I've dropped it for now.
-> > >=20
-> > > Any ideas what could be done. I currently have no time to debug it,
-> > > but it affects existing systems.
-> >=20
-> > I can't find what would change with that commit either if the flag
-> > isn't set, so looking at the register state before and after that
-> > commit would help I guess?
->=20
-> Register dump without the patch:
->=20
-> $ busybox devmem 0x01c20090
-> 0x0250030E
->=20
-> pll-ddr-base     2 2 0   768000000          0     0  50000
->    pll-ddr-other 1 1 0   768000000          0     0  50000
->       mmc2       3 3 0    51200000          0     0  50000
->=20
-> Register dump with patch applied, booted from mmc0 and after mounting emm=
-c:
->=20
-> $ busybox devmem 0x01c20090
-> 0x8140020B
->=20
-> pll-periph-base  3 3 0  1200000000          0     0  50000
->    pll-periph    6 6 0   600000000          0     0  50000
->       mmc2       3 3 0    50000000          0     0  50000
-
-I meant the whole Clock controller, ideally a diff between the two
-states would be great.
-
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---wbna365u3tl67kxz
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGGV6gAKCRDj7w1vZxhR
-xSb0AQD60HG8McEgeqDKFTSbYkbsOD8CLdNxRxAkFYF53Ne4OAD+Ml7PXxYFoTB5
-cofsj/UmY7nxosZX0nApMceCtLp4Kwg=
-=ryVE
------END PGP SIGNATURE-----
-
---wbna365u3tl67kxz--
-
-
---===============1276349127354792614==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+	M.
+-- 
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============1276349127354792614==--
-
