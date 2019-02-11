@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3A68AC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 09:24:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 00762C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 09:24:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0B0F520863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 09:24:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C3D0820863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 09:24:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s/e4wltM";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="QyTJPG/B"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B0F520863
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m2mix+Jy";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="CkX4vG0C"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C3D0820863
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -28,65 +28,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=ypcjKBuT2w48wzEoOtDVcvj6duqIAcSD2dL+PbAqhx4=; b=s/e4wltMtnjrAGh6iZ01ci8ROI
-	8BJYbXuonkf/VWTpskYNagKvFYzUMIU9LZNL5BTYx+MB1At8uP4nVyKSKzGRC4a23P796IE/iyFsi
-	Xr1fFiPNKn/BUWwTF8J+pR+08sKm2a4ze+4K2tPfvuJRDxgM8RMIOBrWplGgu+kMU2gNa7AZDjPOa
-	/f0VJwxqNEXmrrbOFEGhN3VidR4UWNwPkJsonwTFSsDmjoGX/bHysAaXrFuTodpzImrAfWECb3aIh
-	cB9B4njeG7eD0wuocCGwOBNfcIJqO406li80lXu8PL2r8mwe3VTOClrpzTgUTls3DlYYYTP+oB4bz
-	64SgHPCA==;
+	bh=fjM9HCBqZW27BJI/ZlUmHuzYEaJ5upimOYuLYedthzA=; b=m2mix+Jyq5pxxrswnHGTHZjpww
+	23To47eHI2X8IOLqF3JPUPAd9BkkNtnt6AAJUYO+8DW8Crc5JirwU3AuSYlYkjN+MwGDDGXeoG8og
+	Qf218RzEA9LvLTWzFl76rtneZ9pWXqwNrQhkxdX6Yyiv6wkCpLlG97/C3bXzVsKH+sNCoQkmf3/Ub
+	0XMyqUYU/fbfVLJw87IpA2WPRvNuQbZsKBDRWCRdBDjWBb1jiKBsae4g2QfxUIKLgDi6sTNMm6ZKN
+	0mrwcOJAi3szVhMfdx8xdTAeZxvn+Y3hcYJh2BcncmynxrFSvsQLBXMojHhTsM10BotD7EpVSCSkR
+	WnuF7fSQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt7oq-0000qU-2g; Mon, 11 Feb 2019 09:24:04 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gt7p6-00015T-0y; Mon, 11 Feb 2019 09:24:20 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt7mk-0007dp-Ss
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 09:21:59 +0000
-Received: by mail-wm1-x344.google.com with SMTP id x10so10325924wmg.2
+ id 1gt7mp-0007ha-Dk
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 09:22:05 +0000
+Received: by mail-wm1-x341.google.com with SMTP id x7so296361wmj.0
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 01:21:54 -0800 (PST)
+ Mon, 11 Feb 2019 01:21:58 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=fwD0w9cY6pAqgprkGqKHjvaIM0lWzxAak4iqngIDanE=;
- b=QyTJPG/Bx/k2DgyeqFolci5TCnumOLVhB6okYdjDW2ie1kneDcXMMhJEOneqSRvWwP
- DldyUsX+E0iI5swA+sWqYeikX8sAeCbzFUjALZBe8i1S8Ihj9J2Ai8v8eI6q7Be4HNmO
- vHoZtXAUI+90kaxejbRrKJcZMLF7Tj7GyruKxNPN7otIlmWRV5BSwelqHhWUVmEeM4zK
- 47LS+vurw1O4EHF2GLuFPhWxxj3inkzkxLLeicprL7sDXknvKJxbXHMyPub1VWM6Ddwj
- I1zRR/LchiJ7EqGZC0dtdYSjTNXme1B+ProKtjbWTYZnew08nXjt/NldLTTZO8NB+bRc
- W1Tw==
+ bh=lIYeZisgInqCOZpWT0d/hZqmxdLdiRL0RmR52VTtRjA=;
+ b=CkX4vG0Cf9MIFPB0r0biBCJp7uoat+QwA097brWM6ScCKl4BT3GVi8GEuUEaW19elo
+ ndLUpJZ+7IZDWLr1mx4AmIU1LzoEcxn/+b+NUs2tydpQoOc4MTLFyqWJ9QdUn9MVdCgk
+ RXUeW5B3O7Um5IrnlJt9so2xIFHljU72hhUvrW2r5WseWu5+wIDqNsT0nFUv+CkJrqU4
+ jHnq7gugqCTYnyBIdrOwZvYApZsUWqDKaCuuq2huAXgVS3yGuP3r20yAINq4+8B2WZEX
+ K3FFAjYEub/jDQo7UEZ2c1iKdET8pDPxGfw6ZpJKRCTk09Wh8kPHsLSR2q0rBqM6IH7G
+ Vf3Q==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=fwD0w9cY6pAqgprkGqKHjvaIM0lWzxAak4iqngIDanE=;
- b=jhPy2nlA37rvIc6QBnj6c6ffM0+ETz9fMuESWZP3E73gdPfFqYjxuoSaEVixHMbQDo
- Z/n+fjv1HWekQtBphCNo3eZjTqoXOj30DvRxyF7cg2xcyiLW6MZgCS9UczakdG9w5Ioy
- UCQtpzvZm9Eh4b3z7cDUMP2Hz4RpoyGVvXIo4VW4M7zZgV40Dp2MY3qkfJTEWIz/4D0/
- 0xbiqUqEbY3YeJW4HshJMCwEBO8FPIGC1Tsl6xhIY1NJQrsXhNIc55scb8dHFChpFUO6
- YIt3egFjU/sJ2SYCoPce+zc0/qIovxX0KJPfLEfgXCwoUmNhnhRd9keOMSDo6Ssi7oUR
- xTpg==
-X-Gm-Message-State: AHQUAuaeNVap1oT9sLmXjkZNfTZ+gOw4oc9oIcrH2maaaYkCDF00BQj5
- RsCnWDMDtOCaWzVXysjNXPQ=
-X-Google-Smtp-Source: AHgI3IbI8Pp3O5chVjMuKPKEycPJpQtScjVPz5GgOvT4cXuGkW8JSB+BgetdDfEqZniD2hysWJ0lXQ==
-X-Received: by 2002:a05:6000:8a:: with SMTP id
- m10mr25834299wrx.79.1549876913504; 
- Mon, 11 Feb 2019 01:21:53 -0800 (PST)
+ bh=lIYeZisgInqCOZpWT0d/hZqmxdLdiRL0RmR52VTtRjA=;
+ b=CeZLBwfyIMB4NiztwdlDlwWiNH8On0krb+eLh2jlwWeK4xjZwWok4V06o4xcFYdDYS
+ 4xzGWAPGEQRNHa/oymyFpOC5OpbCiO/DDh9KIU2Cf1GrcxwLTRUYsDArTAY1yLOD5WVn
+ +RIcAD73J8Welr7CX91ix/GZ98YNktZkq3CMsCL/wp5EdW2twnHksxBL/bC+jX4l+3gQ
+ B85V0brxYwlXkJ4M7Bh9vFVMjtl0tS91cNJSaiTmDHImpRdr8cn3e2GjC/AdaJ0CqnVh
+ ciNaqSj67nlr1+hdOeBaYBD4fsseC94RXBoJDtudeJn7lDi1dFpjtz1vtjfQg88a0nVd
+ bDdw==
+X-Gm-Message-State: AHQUAubzHiAaLbKD4ZregxhUfBK/IyEpjChWLMpI0+F7T6rOFlAZ5S97
+ iRKjUedBb/4kWlqAdWSAaxU=
+X-Google-Smtp-Source: AHgI3IZ3YDqNq/2AQaMYe1kJv8UXjv+MSl9KMteeI+5/4URxr44WhcfQlK15lXqYlYzWYBQFLK1FQQ==
+X-Received: by 2002:adf:de83:: with SMTP id w3mr5951635wrl.56.1549876916755;
+ Mon, 11 Feb 2019 01:21:56 -0800 (PST)
 Received: from ThinkPad.gtu.edu.tr ([193.140.134.118])
- by smtp.gmail.com with ESMTPSA id o7sm11388979wmc.44.2019.02.11.01.21.51
+ by smtp.gmail.com with ESMTPSA id o7sm11388979wmc.44.2019.02.11.01.21.55
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 11 Feb 2019 01:21:53 -0800 (PST)
+ Mon, 11 Feb 2019 01:21:56 -0800 (PST)
 From: Mesih Kilinc <mesihkilinc@gmail.com>
 To: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org, linux-clk@vger.kernel.org,
  linux-sunxi@googlegroups.com
-Subject: [PATCH 5/7] ARM: dts: suniv: Add SPI device-tree nodes
-Date: Mon, 11 Feb 2019 12:21:11 +0300
-Message-Id: <d1f0bd8af72b0902bc1d44a0df64a844b00fa895.1549875778.git.mesihkilinc@gmail.com>
+Subject: [PATCH 7/7] ARM: dts: f1c100s: Activate SPI flash on Lichee Pi Nano
+Date: Mon, 11 Feb 2019 12:21:13 +0300
+Message-Id: <02be41b6187d4d1fe09bff24cb93c2400a166803.1549875778.git.mesihkilinc@gmail.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <cover.1549875778.git.mesihkilinc@gmail.com>
 References: <cover.1549875778.git.mesihkilinc@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_012155_802738_FF7E2C97 
-X-CRM114-Status: GOOD (  12.48  )
+X-CRM114-CacheID: sfid-20190211_012200_491398_42273217 
+X-CRM114-Status: GOOD (  12.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,52 +108,38 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Allwinner suniv F1C100s has similar SPI controller as sun8i H3.
-F1C100s has no dedicated mod clock, instead it uses AHB bus clock.
+The Lichee Pi Nano board has a Winbond W25Q128FVSIQ 128Mbit SPI NOR flash
+connected to the SPI0 controller of F1C100s SoC, via the pinmux group at
+PC bank; so it's bootable.
 
-Add support for both SPI0 and SPI1.
+Enable this SPI flash.
 
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 ---
- arch/arm/boot/dts/suniv-f1c100s.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/suniv-f1c100s.dtsi b/arch/arm/boot/dts/suniv-f1c100s.dtsi
-index 953228c..1b332d9 100644
---- a/arch/arm/boot/dts/suniv-f1c100s.dtsi
-+++ b/arch/arm/boot/dts/suniv-f1c100s.dtsi
-@@ -143,5 +143,31 @@
- 			resets = <&ccu RST_BUS_UART2>;
- 			status = "disabled";
- 		};
-+
-+		spi0: spi@1c05000 {
-+			compatible = "allwinner,suniv-f1c100s-spi",
-+				     "allwinner,sun8i-h3-spi";
-+			reg = <0x01c05000 0x1000>;
-+			interrupts = <10>;
-+			clocks = <&ccu CLK_BUS_SPI0>, <&ccu CLK_BUS_SPI0>;
-+			clock-names = "ahb", "mod";
-+			resets = <&ccu RST_BUS_SPI0>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		spi1: spi@1c06000 {
-+			compatible = "allwinner,suniv-f1c100s-spi",
-+				     "allwinner,sun8i-h3-spi";
-+			reg = <0x01c06000 0x1000>;
-+			interrupts = <11>;
-+			clocks = <&ccu CLK_BUS_SPI1>, <&ccu CLK_BUS_SPI1>;
-+			clock-names = "ahb", "mod";
-+			resets = <&ccu RST_BUS_SPI1>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
- 	};
+diff --git a/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
+index a1154e6..52a29be 100644
+--- a/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
++++ b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
+@@ -24,3 +24,16 @@
+ 	pinctrl-0 = <&uart0_pe_pins>;
+ 	status = "okay";
  };
++
++&spi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pc_pins>;
++	status = "okay";
++	flash@0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "winbond,w25q128", "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <50000000>;
++	};
++};
 -- 
 2.7.4
 
