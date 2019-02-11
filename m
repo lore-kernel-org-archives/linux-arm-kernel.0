@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AF51CC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:36:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D0D30C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:36:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7FB7B218F0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:36:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8D569218F0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:36:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ep0UTQT1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FB7B218F0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P6ZGuUfm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D569218F0
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mHwNLD5qapU/1/Pfj5lL5vL7sUBU1YupFjCUJBPuVFc=; b=Ep0UTQT1ZR65nB
-	QGmvKA05VPqqRrg8glBaH6ET9oVfJhQlAjxrsjMVwltfmMO8PDe6uUzbnC8yCEoKyUNzRwfRt6bYX
-	ky/tpJ+ZyKCg4HoEBtINzVqeUZngEiXweELDvJHQuKS3OHLDzNjCqSSnUZXkKm5ixW6mL1vzsTHjq
-	6UYyp/ax2MtqjSf0jboaw7zPTD7dqjmLQ3tRJu95pNYAL+z05Jtv6qgyPkKFgTqMs3HHZiQiPYbb/
-	9KQuNraPq6x9qpSqi6Sx4J1s/yW5+WAe5llmt8rcLj8HIWlzIu2SvN8HepZ/4BsQcygTFnRCDteJv
-	NBDER30otu9XnWya5lJg==;
+	List-Owner; bh=Z08i8sPVe9OdbePO97ROmaXMCJT/JCGRtzqLy6DQqhg=; b=P6ZGuUfm6pAAGu
+	h0zaHU7MqV4THoYZgqgIJnJCKPVxY5FwUO344QkWv8V1sQZhsT2+I5KnzxBZgaf+CbpP4PQIryqpz
+	TR4xB6UmNRfzrWVfFbIuMT5Z8EUfJwWZoV82cMq8dFx4Jdzp5cHAW5Fm4U2znXGxs5vBi6Zo23EVe
+	/lzC9yze+Emg/rpbYU8xA2rc0xvpMYl7E63Am+UTudoi5YjZd6U8OaAtAXT8Ol7wa+y7D4cwZZndj
+	3/N18jzyDf4O3q1g9hOQkmFgDSuW8AESoezgTufRS7R2pzwp7lZko9eRaY5N6pnS5Mkbnpmw/CwkT
+	i1BvaM9J9qwS7tcsRcyQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtBkz-0000HD-UO; Mon, 11 Feb 2019 13:36:21 +0000
+	id 1gtBlP-0000ku-7w; Mon, 11 Feb 2019 13:36:47 +0000
 Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtBkf-0008Lw-3f; Mon, 11 Feb 2019 13:36:01 +0000
+ id 1gtBkl-0008Qj-An; Mon, 11 Feb 2019 13:36:07 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: iommu@lists.linux-foundation.org
-Subject: [PATCH 01/12] mfd/sm501: depend on HAS_DMA
-Date: Mon, 11 Feb 2019 14:35:43 +0100
-Message-Id: <20190211133554.30055-2-hch@lst.de>
+Subject: [PATCH 03/12] of: mark early_init_dt_alloc_reserved_memory_arch static
+Date: Mon, 11 Feb 2019 14:35:45 +0100
+Message-Id: <20190211133554.30055-4-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190211133554.30055-1-hch@lst.de>
 References: <20190211133554.30055-1-hch@lst.de>
@@ -69,30 +69,46 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Currently the sm501 mfd driver can be compiled without any dependencies,
-but through the use of dma_declare_coherent it really depends on
-having DMA and iomem support.  Normally we don't explicitly require DMA
-support as we have stubs for it if on UML, but in this case the driver
-selects support for dma_declare_coherent and thus also requires
-memmap support.  Guard this by an explicit dependency.
+This function is only used in of_reserved_mem.c, and never overridden
+despite the __weak marker.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- drivers/mfd/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/of/of_reserved_mem.c    | 2 +-
+ include/linux/of_reserved_mem.h | 7 -------
+ 2 files changed, 1 insertion(+), 8 deletions(-)
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index f461460a2aeb..f15f6489803d 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -1066,6 +1066,7 @@ config MFD_SI476X_CORE
+diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+index 1977ee0adcb1..9f165fc1d1a2 100644
+--- a/drivers/of/of_reserved_mem.c
++++ b/drivers/of/of_reserved_mem.c
+@@ -26,7 +26,7 @@
+ static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
+ static int reserved_mem_count;
  
- config MFD_SM501
- 	tristate "Silicon Motion SM501"
-+	depends on HAS_DMA
- 	 ---help---
- 	  This is the core driver for the Silicon Motion SM501 multimedia
- 	  companion chip. This device is a multifunction device which may
+-int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
++static int __init early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
+ 	phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
+ 	phys_addr_t *res_base)
+ {
+diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
+index 67ab8d271df3..60f541912ccf 100644
+--- a/include/linux/of_reserved_mem.h
++++ b/include/linux/of_reserved_mem.h
+@@ -35,13 +35,6 @@ int of_reserved_mem_device_init_by_idx(struct device *dev,
+ 				       struct device_node *np, int idx);
+ void of_reserved_mem_device_release(struct device *dev);
+ 
+-int early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
+-					     phys_addr_t align,
+-					     phys_addr_t start,
+-					     phys_addr_t end,
+-					     bool nomap,
+-					     phys_addr_t *res_base);
+-
+ void fdt_init_reserved_mem(void);
+ void fdt_reserved_mem_save_node(unsigned long node, const char *uname,
+ 			       phys_addr_t base, phys_addr_t size);
 -- 
 2.20.1
 
