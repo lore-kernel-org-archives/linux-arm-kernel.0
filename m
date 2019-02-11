@@ -4,20 +4,21 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0042EC282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:43:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C8E6C282CE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:44:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C153B2070C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:43:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CF2D32081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:44:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ELuREXQL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C153B2070C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rUv+SQh3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="khXaVXvb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF2D32081B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,38 +26,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hpJCZ9EA/UPZOHxdpsDU4XifrJKzufSzSYvDdt789W0=; b=ELuREXQLEFu1U7
-	QKkFu8RYNgfQ6oUFkxIeYmh8ibqjBXK+cVgqIUW4GeCFYh8HdZ1PzC4JDt/TMd556A0PAJoT9bKy4
-	0AXpQiAY3ydNE2w9K01RRhtgw8Vu63EdeywEelEvNUMyTLmacUS75GkccbRuU74D9OI3kvuKCl/az
-	UoqOBryxCsFOPv/K9rHBbXFhXVtahKpbgkHxUbWJTAWS8fqE71Qyy6P0x2taE1789cmYKpGmlBtdq
-	27IYpDqs3CnLuiz+CHGJwCRVCW4QGlO7peurgbQeLRjkrSInq4CuI//fEhZ/DBFI99NinIuEYZl9s
-	NCOi6x/RhCJcAFkmoIVw==;
+	List-Owner; bh=iibOEXIJy98Acw6iBUe00tZ81vGvaq17Ta7UMZKU19s=; b=rUv+SQh37YGk8p
+	LgLcOvdQWWlwSkmaojg6kHiiw0qR6LVptEHnNSHxipDPC4eb1nLOmOy2oxIaWZwMFs5CR7UI4MifC
+	rbyKcu1D5bQCRJWxSkKyskYZCctLy+jzkOPeR7/+mYs6HPUr9Co2CJC6WMuCtSJ/VwxB+K2jZt+na
+	dtITRpG7iiny1ZW4r9af3jfP5WTXmUNAdFcB8RUcDSMOhodW4zdcBbTX/NuRVwV2CbblTERjaOlq3
+	KgsPj/65s0ReSbHLHDIxSOwHUfzW0p9ZVW71mjvNfIo3MYMyiHEL0VlS7tLIgQcBAbm7ppcNphJsw
+	Foz2143SSs1Sb/X3/nmA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtCoF-0006nu-HW; Mon, 11 Feb 2019 14:43:47 +0000
-Received: from relay7-d.mail.gandi.net ([217.70.183.200])
+	id 1gtCoc-0007A0-K6; Mon, 11 Feb 2019 14:44:10 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtCmJ-0004vN-OP
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 14:42:04 +0000
-X-Originating-IP: 185.94.189.187
-Received: from localhost (unknown [185.94.189.187])
- (Authenticated sender: maxime.ripard@bootlin.com)
- by relay7-d.mail.gandi.net (Postfix) with ESMTPSA id 785FC20003;
- Mon, 11 Feb 2019 14:41:44 +0000 (UTC)
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- Sean Paul <seanpaul@chromium.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH v3 7/8] drm/sun4i: dsi: Add burst support
-Date: Mon, 11 Feb 2019 15:41:28 +0100
-Message-Id: <1dcabf2b38d3f0d3387b1cf02575e3d14e3ecd4e.1549896081.git-series.maxime.ripard@bootlin.com>
+ id 1gtCnq-0006SF-O7
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 14:43:50 +0000
+Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id EEF6A21B18;
+ Mon, 11 Feb 2019 14:43:21 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549896202;
+ bh=ZTMgYY7tYir6iFTl6JGcnUTQeDK3XEGMwgJfM8MSKHk=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=khXaVXvbYyZtW0p8TZre9wAhGS775l1WvGz/Fqlre/HzvJjBIN0y8JsGtcLqkXgS0
+ u3ti2myR0KZSKRoV3tffFZOpoBfsgqyFvz0uqYzVVEMXhrUZdqIwX2xTX51NdO1FdI
+ +rU/m0lhCax4P1giq20IcnEqgdhn4dg6usxKYM2Y=
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+To: linux-kernel@vger.kernel.org
+Subject: [PATCH 4.19 089/313] ARM: dts: aspeed: add missing memory unit-address
+Date: Mon, 11 Feb 2019 15:16:09 +0100
+Message-Id: <20190211141859.802233380@linuxfoundation.org>
 X-Mailer: git-send-email 2.20.1
-In-Reply-To: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
-References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
+In-Reply-To: <20190211141852.749630980@linuxfoundation.org>
+References: <20190211141852.749630980@linuxfoundation.org>
+User-Agent: quilt/0.65
+X-stable: review
+X-Patchwork-Hint: ignore
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_064148_727249_2FF31F36 
-X-CRM114-Status: GOOD (  18.60  )
+X-CRM114-CacheID: sfid-20190211_064323_177691_9A49B7A6 
+X-CRM114-Status: GOOD (  13.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,272 +77,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Konstantin Sudakov <k.sudakov@integrasources.com>, bbrezillon@kernel.org,
- dri-devel@lists.freedesktop.org,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Chen-Yu Tsai <wens@csie.org>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Jagan Teki <jagan@openedev.com>, linux-arm-kernel@lists.infradead.org
+Cc: Sasha Levin <sashal@kernel.org>, devicetree@vger.kernel.org,
+ linux-aspeed@lists.ozlabs.org, Rob Herring <robh@kernel.org>,
+ Andrew Jeffery <andrew@aj.id.au>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, stable@vger.kernel.org,
+ Joel Stanley <joel@jms.id.au>, Olof Johansson <olof@lixom.net>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Konstantin Sudakov <k.sudakov@integrasources.com>
+4.19-stable review patch.  If anyone has any objections, please let me know.
 
-The current driver doesn't support the DSI burst operation mode.
+------------------
 
-Let's add the needed quirks to make it work.
+[ Upstream commit 8ef86955fe59f7912a40d57ae4c6d511f0187b4d ]
 
-Signed-off-by: Konstantin Sudakov <k.sudakov@integrasources.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+The base aspeed-g5.dtsi already defines a '/memory@80000000' node, so
+'/memory' in the board files create a duplicate node. We're probably
+getting lucky that the bootloader fixes up the memory node that the
+kernel ends up using. Add the unit-address so it's merged with the base
+node.
+
+Found with DT json-schema checks.
+
+Cc: Joel Stanley <joel@jms.id.au>
+Cc: Andrew Jeffery <andrew@aj.id.au>
+Cc: devicetree@vger.kernel.org
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: linux-aspeed@lists.ozlabs.org
+Signed-off-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Sasha Levin <sashal@kernel.org>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 171 ++++++++++++++++++++------
- 1 file changed, 132 insertions(+), 39 deletions(-)
+ arch/arm/boot/dts/aspeed-bmc-arm-centriq2400-rep.dts | 2 +-
+ arch/arm/boot/dts/aspeed-bmc-intel-s2600wf.dts       | 2 +-
+ arch/arm/boot/dts/aspeed-bmc-opp-lanyang.dts         | 3 +--
+ arch/arm/boot/dts/aspeed-bmc-portwell-neptune.dts    | 2 +-
+ 4 files changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index e0288e7dc64e..4cb715dc9100 100644
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -23,7 +23,9 @@
- #include <drm/drm_mipi_dsi.h>
- #include <drm/drm_panel.h>
+diff --git a/arch/arm/boot/dts/aspeed-bmc-arm-centriq2400-rep.dts b/arch/arm/boot/dts/aspeed-bmc-arm-centriq2400-rep.dts
+index df1227613d48..c2ece0b91885 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-arm-centriq2400-rep.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-arm-centriq2400-rep.dts
+@@ -13,7 +13,7 @@
+ 		bootargs = "console=ttyS4,115200 earlyprintk";
+ 	};
  
-+#include "sun4i_crtc.h"
- #include "sun4i_drv.h"
-+#include "sun4i_tcon.h"
- #include "sun6i_mipi_dsi.h"
+-	memory {
++	memory@80000000 {
+ 		reg = <0x80000000 0x40000000>;
+ 	};
  
- #include <video/mipi_display.h>
-@@ -32,6 +34,8 @@
- #define SUN6I_DSI_CTL_EN			BIT(0)
+diff --git a/arch/arm/boot/dts/aspeed-bmc-intel-s2600wf.dts b/arch/arm/boot/dts/aspeed-bmc-intel-s2600wf.dts
+index 7a291de02543..22dade6393d0 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-intel-s2600wf.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-intel-s2600wf.dts
+@@ -13,7 +13,7 @@
+ 		bootargs = "earlyprintk";
+ 	};
  
- #define SUN6I_DSI_BASIC_CTL_REG		0x00c
-+#define SUN6I_DSI_BASIC_CTL_TRAIL_INV(n)		(((n) & 0xf) << 4)
-+#define SUN6I_DSI_BASIC_CTL_TRAIL_FILL		BIT(3)
- #define SUN6I_DSI_BASIC_CTL_HBP_DIS		BIT(2)
- #define SUN6I_DSI_BASIC_CTL_HSA_HSE_DIS		BIT(1)
- #define SUN6I_DSI_BASIC_CTL_VIDEO_BURST		BIT(0)
-@@ -152,6 +156,8 @@
+-	memory {
++	memory@80000000 {
+ 		reg = <0x80000000 0x20000000>;
+ 	};
  
- #define SUN6I_DSI_CMD_TX_REG(n)		(0x300 + (n) * 0x04)
+diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-lanyang.dts b/arch/arm/boot/dts/aspeed-bmc-opp-lanyang.dts
+index d598b6391362..024e52a6cd0f 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-opp-lanyang.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-opp-lanyang.dts
+@@ -14,7 +14,7 @@
+ 		bootargs = "console=ttyS4,115200 earlyprintk";
+ 	};
  
-+#define SUN6I_DSI_SYNC_POINT		40
-+
- enum sun6i_dsi_start_inst {
- 	DSI_START_LPRX,
- 	DSI_START_LPTX,
-@@ -366,13 +372,70 @@ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
- 	return max_t(u16, delay, 1);
- }
+-	memory {
++	memory@80000000 {
+ 		reg = <0x80000000 0x40000000>;
+ 	};
  
-+static u16 sun6i_dsi_get_line_num(struct sun6i_dsi *dsi,
-+				  struct drm_display_mode *mode)
-+{
-+	struct mipi_dsi_device *device = dsi->device;
-+	unsigned Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
-+
-+	return mode->htotal * Bpp / device->lanes;
-+}
-+
-+static u16 sun6i_dsi_get_drq_edge0(struct sun6i_dsi *dsi,
-+				   struct drm_display_mode *mode,
-+				   u16 line_num, u16 edge1)
-+{
-+	u16 edge0 = edge1;
-+
-+	edge0 += (mode->hdisplay + 40) * SUN6I_DSI_TCON_DIV / 8;
-+
-+	if (edge0 > line_num)
-+		return edge0 - line_num;
-+
-+	return 1;
-+}
-+
-+static u16 sun6i_dsi_get_drq_edge1(struct sun6i_dsi *dsi,
-+				   struct drm_display_mode *mode,
-+				   u16 line_num)
-+{
-+	struct mipi_dsi_device *device = dsi->device;
-+	unsigned Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
-+	unsigned hbp = mode->htotal - mode->hsync_end;
-+	u16 edge1;
-+
-+	edge1 = SUN6I_DSI_SYNC_POINT;
-+	edge1 += (mode->hdisplay + hbp + 20) * Bpp / device->lanes;
-+
-+	if (edge1 > line_num)
-+		return line_num;
-+
-+	return edge1;
-+}
-+
- static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
- 				  struct drm_display_mode *mode)
- {
- 	struct mipi_dsi_device *device = dsi->device;
- 	u32 val = 0;
- 
--	if ((mode->hsync_start - mode->hdisplay) > 20) {
-+	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) {
-+		u16 line_num = sun6i_dsi_get_line_num(dsi, mode);
-+		u16 edge0, edge1;
-+
-+		edge1 = sun6i_dsi_get_drq_edge1(dsi, mode, line_num);
-+		edge0 = sun6i_dsi_get_drq_edge0(dsi, mode, line_num, edge1);
-+
-+		regmap_write(dsi->regs, SUN6I_DSI_BURST_DRQ_REG,
-+			     SUN6I_DSI_BURST_DRQ_EDGE0(edge0) |
-+			     SUN6I_DSI_BURST_DRQ_EDGE1(edge1));
-+
-+		regmap_write(dsi->regs, SUN6I_DSI_BURST_LINE_REG,
-+			     SUN6I_DSI_BURST_LINE_NUM(line_num) |
-+			     SUN6I_DSI_BURST_LINE_SYNC_POINT(SUN6I_DSI_SYNC_POINT));
-+
-+		val = SUN6I_DSI_TCON_DRQ_ENABLE_MODE;
-+	} else if ((mode->hsync_start - mode->hdisplay) > 20) {
- 		/* Maaaaaagic */
- 		u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
- 
-@@ -389,8 +452,19 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
- static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
- 				      struct drm_display_mode *mode)
- {
-+	struct mipi_dsi_device *device = dsi->device;
- 	u16 delay = 50 - 1;
- 
-+	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) {
-+		delay = (mode->htotal - mode->hdisplay) * 150;
-+		delay /= (mode->clock / 1000) * 8;
-+		delay -= 50;
-+	}
-+
-+	regmap_write(dsi->regs, SUN6I_DSI_INST_LOOP_SEL_REG,
-+			 2 << (4 * DSI_INST_ID_LP11) |
-+			 3 << (4 * DSI_INST_ID_DLY));
-+
- 	regmap_write(dsi->regs, SUN6I_DSI_INST_LOOP_NUM_REG(0),
- 		     SUN6I_DSI_INST_LOOP_NUM_N0(50 - 1) |
- 		     SUN6I_DSI_INST_LOOP_NUM_N1(delay));
-@@ -457,52 +531,71 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
- 	struct mipi_dsi_device *device = dsi->device;
- 	unsigned int Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
- 	u16 hbp, hfp, hsa, hblk, vblk;
-+	u32 basic_ctl = 0;
- 	size_t bytes;
- 	u8 *buffer;
- 
- 	/* Do all timing calculations up front to allocate buffer space */
- 
--	/*
--	 * A sync period is composed of a blanking packet (4 bytes +
--	 * payload + 2 bytes) and a sync event packet (4 bytes). Its
--	 * minimal size is therefore 10 bytes
--	 */
-+	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) {
-+		hsa = 0;
-+		hbp = 0;
-+		hfp = 0;
-+		hblk = mode->hdisplay * Bpp;
-+		vblk = 0;
-+		basic_ctl = SUN6I_DSI_BASIC_CTL_VIDEO_BURST |
-+			    SUN6I_DSI_BASIC_CTL_HSA_HSE_DIS |
-+			    SUN6I_DSI_BASIC_CTL_HBP_DIS;
-+
-+		if (device->lanes == 4)
-+			basic_ctl |= SUN6I_DSI_BASIC_CTL_TRAIL_FILL |
-+				     SUN6I_DSI_BASIC_CTL_TRAIL_INV(0xc);
-+	} else {
-+		/*
-+		 * A sync period is composed of a blanking packet (4
-+		 * bytes + payload + 2 bytes) and a sync event packet
-+		 * (4 bytes). Its minimal size is therefore 10 bytes
-+		 */
- #define HSA_PACKET_OVERHEAD	10
--	hsa = max((unsigned int)HSA_PACKET_OVERHEAD,
--		  (mode->hsync_end - mode->hsync_start) * Bpp - HSA_PACKET_OVERHEAD);
+@@ -322,4 +322,3 @@
+ &adc {
+ 	status = "okay";
+ };
 -
--	/*
--	 * The backporch is set using a blanking packet (4 bytes +
--	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
--	 */
-+		hsa = max((unsigned int)HSA_PACKET_OVERHEAD,
-+			  (mode->hsync_end - mode->hsync_start) * Bpp - HSA_PACKET_OVERHEAD);
-+
-+		/*
-+		 * The backporch is set using a blanking packet (4
-+		 * bytes + payload + 2 bytes). Its minimal size is
-+		 * therefore 6 bytes
-+		 */
- #define HBP_PACKET_OVERHEAD	6
--	hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
--		  (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
--
--	/*
--	 * The frontporch is set using a blanking packet (4 bytes +
--	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
--	 */
-+		hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
-+			  (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
-+
-+		/*
-+		 * The frontporch is set using a blanking packet (4
-+		 * bytes + payload + 2 bytes). Its minimal size is
-+		 * therefore 6 bytes
-+		 */
- #define HFP_PACKET_OVERHEAD	6
--	hfp = max((unsigned int)HFP_PACKET_OVERHEAD,
--		  (mode->hsync_start - mode->hdisplay) * Bpp - HFP_PACKET_OVERHEAD);
--
--	/*
--	 * The blanking is set using a sync event (4 bytes) and a
--	 * blanking packet (4 bytes + payload + 2 bytes). Its minimal
--	 * size is therefore 10 bytes.
--	 */
-+		hfp = max((unsigned int)HFP_PACKET_OVERHEAD,
-+			  (mode->hsync_start - mode->hdisplay) * Bpp - HFP_PACKET_OVERHEAD);
-+
-+		/*
-+		 * The blanking is set using a sync event (4 bytes)
-+		 * and a blanking packet (4 bytes + payload + 2
-+		 * bytes). Its minimal size is therefore 10 bytes.
-+		 */
- #define HBLK_PACKET_OVERHEAD	10
--	hblk = max((unsigned int)HBLK_PACKET_OVERHEAD,
--		   (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp - HBLK_PACKET_OVERHEAD);
--
--	/*
--	 * And I'm not entirely sure what vblk is about. The driver in
--	 * Allwinner BSP is using a rather convoluted calculation
--	 * there only for 4 lanes. However, using 0 (the !4 lanes
--	 * case) even with a 4 lanes screen seems to work...
--	 */
--	vblk = 0;
-+		hblk = max((unsigned int)HBLK_PACKET_OVERHEAD,
-+			   (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp -
-+			   HBLK_PACKET_OVERHEAD);
-+
-+		/*
-+		 * And I'm not entirely sure what vblk is about. The driver in
-+		 * Allwinner BSP is using a rather convoluted calculation
-+		 * there only for 4 lanes. However, using 0 (the !4 lanes
-+		 * case) even with a 4 lanes screen seems to work...
-+		 */
-+		vblk = 0;
-+	}
+diff --git a/arch/arm/boot/dts/aspeed-bmc-portwell-neptune.dts b/arch/arm/boot/dts/aspeed-bmc-portwell-neptune.dts
+index 43ed13963d35..33d704541de6 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-portwell-neptune.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-portwell-neptune.dts
+@@ -17,7 +17,7 @@
+ 		bootargs = "console=ttyS4,115200 earlyprintk";
+ 	};
  
- 	/* How many bytes do we need to send all payloads? */
- 	bytes = max_t(size_t, max(max(hfp, hblk), max(hsa, hbp)), vblk);
-@@ -510,7 +603,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
- 	if (WARN_ON(!buffer))
- 		return;
+-	memory {
++	memory@80000000 {
+ 		reg = <0x80000000 0x20000000>;
+ 	};
  
--	regmap_write(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, 0);
-+	regmap_write(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, basic_ctl);
- 
- 	regmap_write(dsi->regs, SUN6I_DSI_SYNC_HSS_REG,
- 		     sun6i_dsi_build_sync_pkt(MIPI_DSI_H_SYNC_START,
 -- 
-git-series 0.9.1
+2.19.1
+
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
