@@ -2,95 +2,91 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 332D1C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:26:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BF5D1C282CE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:31:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 058F3214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:26:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 87D1B214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:31:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KZbDaTCQ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="u79/+PEH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 058F3214DA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qyRp+3NF";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="CuWdPgao"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87D1B214DA
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5hYcKR0n8Fdh9Ah4FEAvj7/AVR8yia3p6XOtid3taEo=; b=KZbDaTCQKIfYJz
-	0cU2TOPSpWJpA6E14MOrpmyNwos7Yn0JmtVb2BF1Kh5n7i40u+M/KwEla9+uBBiKQzvBVVTmKOQWw
-	a6CaNEoQ6c44Eh1KncV9Mks/aGojXclVx1P4bUYK3nnpBLmkmOd9wlH36XJtH98v87V8dyRSi7Sv3
-	JW4lp9PibP+Bn1vqQc3clB9NOQyojBIYc5cYeuTA7ap9tEfpCsITAMM0g1V2LbArpoeXq+qk4NFDC
-	SPj3MtLaQK9n9YkouxzyPXDIOW1b4EARbxmzbAtjxX6JWkyiy9u0wjmIx63A/0F/uAOLl3cxZThCn
-	iczYwLf+bqWlods8WNZg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=V4zlTrj3P8LjL+GYCKkhw9+9xQjVROkVcA+w/7vbouo=; b=qyRp+3NF2H5KoR
+	Jm5AbDOTaFz44MPlbL5/CWNHkDGIiHwYDX9gLJzaI8YCPCASj31spw4mF1UkHrxVTSBxlhD7I1QBk
+	QxL4//OXahF1F+9axnr35aaBJwQdsqhKXyWJwjbQV7M1DcySuRwcSFBvXT1aQg4zBxqtfGR1q2SLh
+	1oZdvkftv82ILlh31xmbEZeMolQzzR5ogExgkqW8o3ULlskr0QvIRBTrA60tGlAlpOAG4xnLO7vPB
+	/9+yUixRya5wGjGVu17f8bohErzIbTsxgj3PEURYOW9ut6lW9/6ezzaH+gor1l/8u3QuFK4H6fZi6
+	O8yO+tlzkwWFrX90BEbA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt9jf-0004tq-0X; Mon, 11 Feb 2019 11:26:51 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gt9oM-0006sC-On; Mon, 11 Feb 2019 11:31:42 +0000
+Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt9jY-0004m9-4T
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 11:26:49 +0000
-Received: by mail-wm1-x344.google.com with SMTP id f16so16716033wmh.4
+ id 1gt9oI-0006rQ-IB
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 11:31:40 +0000
+Received: by mail-pf1-x442.google.com with SMTP id n22so2379929pfa.3
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 03:26:43 -0800 (PST)
+ Mon, 11 Feb 2019 03:31:37 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=SdxLDzej+W+1L6rlFXDCkuHteBsUA6aEHotwknsM1Pc=;
- b=u79/+PEHiaW/PQYFrNWlF+qtwewBG4Kd+DzV0sS1htWFpjEk79DrLkV2NqipaoRMip
- 63NdEo6PvxHAJgVw3reYEOHFxAtZ1Hvo0DIbVWB1q6VuhE+tz506SUlfYZIUvuWW2dNA
- vek4sTHepeKNj283lkBr1Vi+H4feVHLUH2womu5TgtepCIHN24WHPTVFSXDebeEWv4jS
- wEZgjzkrsDe6CtEUxAP6Fwaj7u5Bb8AumN/80w1WT8EBwgBVF6h/q0yyMsdqOmATAirX
- +23lFiyEJOwx226uh8aUqmo128UZdCqfwwaKTHOv/OgGF6aKsjVk2vs8sVIaW85Qxr6x
- +Qlg==
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=1JEsM2JroaIkgmQdl0RF583/B2IH0sbtfKhWqOtEjUs=;
+ b=CuWdPgao3jxTWpC42B3xsZEZDyFAk2lPD1KD1eLGUXz1wc548X8a22ZQNNAyOUn3qA
+ 30fi/Bu55C3jAfB7dd83OJgWKTQ9y5EDTgtFYgxcMu6PlGKLtu8vT4u477weNfva54dY
+ RfC5ID5AcVPQ2QdQBfY0ADLMQ+cFHlOsbo8qGnsFns07cOQOgYuYwwPsc3Gy8QjCfa1q
+ oGnzM1D7tOKLibD8SLJIemPnHZuwtxJKU9LO+4+blkYA7L8cyN6r5BAX4fDWd08yzfEP
+ CoYT1dyIspgxBp8PRi5jqPuuet9jNvwTgKgOUl+0RaBOrIgDEU9BGnPP03QnZtFEgIqj
+ mNUg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=SdxLDzej+W+1L6rlFXDCkuHteBsUA6aEHotwknsM1Pc=;
- b=omJZhd6WeZ2ZEMOaqIHPydV3RTfUywFUWTFNQFDu5tOwpUGr/RW5huFIFw2QIru5g2
- m2FMjtI9b4ZfVUybkkxWFOKX3E3P74foC92OQotJHdTz+i3p1PsTw9wWeBUW0mQ+lDlE
- U2mJEPuS/UqRszkpw/JUYiz3cpUQMrDhEvcM2FZIeCWzpk9oCJcX5sG/9fkUYsvueolH
- 38kwYS9whosOLxj7sNZkI1rOw84cy6S2uW/7M0P+majafG0VvfQREbrvKZU/I+mL+d+f
- priBtMvhdl06yGjJoVN39X9ypQ4U1kxikidyUHrLqNzFXFybcXdLGbif4zNJ94u1X5WQ
- q0vQ==
-X-Gm-Message-State: AHQUAubCEMK4VvngL9m0QjiR80OwF6rP5NV78tWf9QgMufmXpjNR3ouH
- hbIuJ8DEjBcFOKFndamsTdP97UCdEl0=
-X-Google-Smtp-Source: AHgI3IbCb39JWdzplKnsyzIPAKWeoqNaGjmVSOs1JcJl+4JLnJixri6NybAYNy4LI2p7Dwyydvz6KQ==
-X-Received: by 2002:a1c:27c6:: with SMTP id n189mr8553326wmn.108.1549884402218; 
- Mon, 11 Feb 2019 03:26:42 -0800 (PST)
-Received: from [192.168.0.41] (13.50.92.92.rev.sfr.net. [92.92.50.13])
- by smtp.googlemail.com with ESMTPSA id s3sm11276430wmj.23.2019.02.11.03.26.40
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 11 Feb 2019 03:26:41 -0800 (PST)
-Subject: Re: [PATCH 12/17 v1] clocksource/drivers/ixp4xx: Add OF
- initialization support
-To: Linus Walleij <linus.walleij@linaro.org>,
- linux-arm-kernel@lists.infradead.org, Imre Kaloz <kaloz@openwrt.org>,
- Krzysztof Halasa <khalasa@piap.pl>
-References: <20190203214205.13594-1-linus.walleij@linaro.org>
- <20190203214205.13594-13-linus.walleij@linaro.org>
-From: Daniel Lezcano <daniel.lezcano@linaro.org>
-Message-ID: <4b9f4015-6d49-56a9-df05-12c6393621be@linaro.org>
-Date: Mon, 11 Feb 2019 12:26:40 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=1JEsM2JroaIkgmQdl0RF583/B2IH0sbtfKhWqOtEjUs=;
+ b=rMm/M3qqOimBKECnfSYYhGqymYvDeRS99OWiaoMRr8vsN7QvYrmGNcHx84PGihT7E2
+ /iahPw79eQTZc31P08I0ODhoo8Xey1b620UjqC8tX7rUyXhrpIB1PuUTCWP3SGaZ7R5K
+ 0kheXdt44ndz/M6bJwhdp/kbDvr0GU/Ju4FOEuvu/tAMZRxca8sRR9yFpCGQyw9/nti7
+ tB+lV+5bgpAdkzlHwRLiLUD+/IcjnTEnSl7dNpMrHd6Jco/8Qd5jVrXXBCeyu4/nNmvX
+ I3evn/URHAQgn3wOKr/vE79sKPHqU0T3r0J28t1SQ6WgUa02RVR+8PPq3yIhh8/+dwvV
+ 5VpA==
+X-Gm-Message-State: AHQUAuZzNr3CXfGd5hzNY8LYeTlvTGdGe7VMDNeSWFET7tDVsTo6mDAQ
+ UiWpXXHd2b6c6pNtEGEADs0e
+X-Google-Smtp-Source: AHgI3IZZuo9rgU7o3ot5BBMRbdYb73AQNCudhwnF1oIxRzD93E9ZK/P4t2XDoT8ubAU4REJBl3WKZg==
+X-Received: by 2002:a65:6242:: with SMTP id q2mr33334510pgv.245.1549884697128; 
+ Mon, 11 Feb 2019 03:31:37 -0800 (PST)
+Received: from mani ([103.59.133.81])
+ by smtp.gmail.com with ESMTPSA id e21sm48408047pfh.45.2019.02.11.03.31.33
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 11 Feb 2019 03:31:36 -0800 (PST)
+Date: Mon, 11 Feb 2019 17:01:28 +0530
+From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+To: Peter Robinson <pbrobinson@gmail.com>
+Subject: Re: [PATCH] arm64: dts: rockchip: Add on-board WiFi/BT support for
+ Rock960 boards
+Message-ID: <20190211113128.GA22843@mani>
+References: <20190207055349.27919-1-manivannan.sadhasivam@linaro.org>
+ <CALeDE9MNa+CDJR8bvS05f2UTKrhwMRo8jzdS5o8Ndu7H8V8Ldg@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20190203214205.13594-13-linus.walleij@linaro.org>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <CALeDE9MNa+CDJR8bvS05f2UTKrhwMRo8jzdS5o8Ndu7H8V8Ldg@mail.gmail.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_032644_454144_4F6E5BEA 
-X-CRM114-Status: GOOD (  20.58  )
+X-CRM114-CacheID: sfid-20190211_033138_609760_0EC8013D 
+X-CRM114-Status: GOOD (  22.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,53 +98,232 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Olof Johansson <olof@lixom.net>, Tim Harvey <tharvey@gateworks.com>,
- Thomas Gleixner <tglx@linutronix.de>, Arnd Bergmann <arnd@arndb.de>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: heiko@sntech.de, mani@kernel.org, linux-kernel@vger.kernel.org,
+ dev@vamrs.com, linux-rockchip@lists.infradead.org, ezequiel@collabora.com,
+ linux-arm-kernel@lists.infradead.org, tom@vamrs.com
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMDMvMDIvMjAxOSAyMjo0MiwgTGludXMgV2FsbGVpaiB3cm90ZToKPiBUaGlzIGFkZHMgc3Vw
-cG9ydCBmb3Igc2V0dGluZyB1cCB0aGUgSVhQNHh4IHRpbWVyIGRyaXZlciBmcm9tCj4gZGV2aWNl
-IHRyZWUuCj4gCj4gQ2M6IERhbmllbCBMZXpjYW5vIDxkYW5pZWwubGV6Y2Fub0BsaW5hcm8ub3Jn
-Pgo+IENjOiBUaG9tYXMgR2xlaXhuZXIgPHRnbHhAbGludXRyb25peC5kZT4KPiBTaWduZWQtb2Zm
-LWJ5OiBMaW51cyBXYWxsZWlqIDxsaW51cy53YWxsZWlqQGxpbmFyby5vcmc+Cj4gLS0tCj4gQ2xv
-Y2tzb3VyY2UvdGltZXIgbWFpbnRhaW5lcnM6IEkgYW0gcmVxdWVzdGluZyBhbiBBQ0sgZm9yCj4g
-dGhpcyBvbmNlIHlvdSdyZSBoYXBweSB3aXRoIHRoZSBkcml2ZXIsIGFzIEkgaW50ZW5kIHRvCj4g
-bWVyZ2UgYWxsIG9mIHRoaXMgSVhQNHh4IHJld29yayB0aHJvdWdoIEFSTSBTb0MuCgpBY2tlZC1i
-eTogRGFuaWVsIExlemNhbm8gPGRhbmllbC5sZXpjYW5vQGxpbmFyby5vcmc+Cgo+IC0tLQo+ICBk
-cml2ZXJzL2Nsb2Nrc291cmNlL3RpbWVyLWl4cDR4eC5jIHwgMzUgKysrKysrKysrKysrKysrKysr
-KysrKysrKysrKysrCj4gIDEgZmlsZSBjaGFuZ2VkLCAzNSBpbnNlcnRpb25zKCspCj4gCj4gZGlm
-ZiAtLWdpdCBhL2RyaXZlcnMvY2xvY2tzb3VyY2UvdGltZXItaXhwNHh4LmMgYi9kcml2ZXJzL2Ns
-b2Nrc291cmNlL3RpbWVyLWl4cDR4eC5jCj4gaW5kZXggZmE3OGY4MDc5MmRiLi40MDQ0NDViYzEx
-ZWEgMTAwNjQ0Cj4gLS0tIGEvZHJpdmVycy9jbG9ja3NvdXJjZS90aW1lci1peHA0eHguYwo+ICsr
-KyBiL2RyaXZlcnMvY2xvY2tzb3VyY2UvdGltZXItaXhwNHh4LmMKPiBAQCAtMTYsNiArMTYsOCBA
-QAo+ICAjaW5jbHVkZSA8bGludXgvc2xhYi5oPgo+ICAjaW5jbHVkZSA8bGludXgvYml0b3BzLmg+
-Cj4gICNpbmNsdWRlIDxsaW51eC9kZWxheS5oPgo+ICsjaW5jbHVkZSA8bGludXgvb2ZfYWRkcmVz
-cy5oPgo+ICsjaW5jbHVkZSA8bGludXgvb2ZfaXJxLmg+Cj4gIC8qIEdvZXMgYXdheSB3aXRoIE9G
-IGNvbnZlcnNpb24gKi8KPiAgI2luY2x1ZGUgPGxpbnV4L3BsYXRmb3JtX2RhdGEvdGltZXItaXhw
-NHh4Lmg+Cj4gIAo+IEBAIC0yNDcsMyArMjQ5LDM2IEBAIHZvaWQgX19pbml0IGl4cDR4eF90aW1l
-cl9zZXR1cChyZXNvdXJjZV9zaXplX3QgdGltZXJiYXNlLAo+ICAJaXhwNHh4X3RpbWVyX3JlZ2lz
-dGVyKGJhc2UsIHRpbWVyX2lycSwgdGltZXJfZnJlcSk7Cj4gIH0KPiAgRVhQT1JUX1NZTUJPTF9H
-UEwoaXhwNHh4X3RpbWVyX3NldHVwKTsKPiArCj4gKyNpZmRlZiBDT05GSUdfT0YKPiArc3RhdGlj
-IF9faW5pdCBpbnQgaXhwNHh4X29mX3RpbWVyX2luaXQoc3RydWN0IGRldmljZV9ub2RlICpucCkK
-PiArewo+ICsJdm9pZCBfX2lvbWVtICpiYXNlOwo+ICsJaW50IGlycTsKPiArCWludCByZXQ7Cj4g
-Kwo+ICsJYmFzZSA9IG9mX2lvbWFwKG5wLCAwKTsKPiArCWlmICghYmFzZSkgewo+ICsJCXByX2Ny
-aXQoIklYUDR4eDogY2FuJ3QgcmVtYXAgdGltZXJcbiIpOwo+ICsJCXJldHVybiAtRU5PREVWOwo+
-ICsJfQo+ICsKPiArCWlycSA9IGlycV9vZl9wYXJzZV9hbmRfbWFwKG5wLCAwKTsKPiArCWlmIChp
-cnEgPD0gMCkgewo+ICsJCXByX2VycigiQ2FuJ3QgcGFyc2UgSVJRXG4iKTsKPiArCQlyZXQgPSAt
-RUlOVkFMOwo+ICsJCWdvdG8gb3V0X3VubWFwOwo+ICsJfQo+ICsKPiArCS8qIFRPRE86IGdldCBz
-b21lIGZpeGVkIGNsb2NrcyBpbnRvIHRoZSBkZXZpY2UgdHJlZSAqLwo+ICsJcmV0ID0gaXhwNHh4
-X3RpbWVyX3JlZ2lzdGVyKGJhc2UsIGlycSwgNjY2NjYwMDApOwo+ICsJaWYgKHJldCkKPiArCQln
-b3RvIG91dF91bm1hcDsKPiArCXJldHVybiAwOwo+ICsKPiArb3V0X3VubWFwOgo+ICsJaW91bm1h
-cChiYXNlKTsKPiArCXJldHVybiByZXQ7Cj4gK30KPiArVElNRVJfT0ZfREVDTEFSRShpeHA0eHgs
-ICJpbnRlbCxpeHA0eHgtdGltZXIiLCBpeHA0eHhfb2ZfdGltZXJfaW5pdCk7Cj4gKyNlbmRpZgo+
-IAoKCi0tIAogPGh0dHA6Ly93d3cubGluYXJvLm9yZy8+IExpbmFyby5vcmcg4pSCIE9wZW4gc291
-cmNlIHNvZnR3YXJlIGZvciBBUk0gU29DcwoKRm9sbG93IExpbmFybzogIDxodHRwOi8vd3d3LmZh
-Y2Vib29rLmNvbS9wYWdlcy9MaW5hcm8+IEZhY2Vib29rIHwKPGh0dHA6Ly90d2l0dGVyLmNvbS8j
-IS9saW5hcm9vcmc+IFR3aXR0ZXIgfAo8aHR0cDovL3d3dy5saW5hcm8ub3JnL2xpbmFyby1ibG9n
-Lz4gQmxvZwoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-CmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5m
-cmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xp
-bnV4LWFybS1rZXJuZWwK
+Hi Peter,
+
+On Fri, Feb 08, 2019 at 04:45:01PM +0000, Peter Robinson wrote:
+> Hi Mani,
+> 
+> On Thu, Feb 7, 2019 at 5:54 AM Manivannan Sadhasivam
+> <manivannan.sadhasivam@linaro.org> wrote:
+> >
+> > Add on-board WiFi/BT support for Rock960 boards such as Rock960 based
+> > on AP6356S and Ficus based on AP6354 wireless modules.
+> >
+> > Firmwares for the respective boards are available here:
+> >
+> > http://people.linaro.org/~manivannan.sadhasivam/rock960_wifi/
+> > http://people.linaro.org/~manivannan.sadhasivam/ficus_wifi/
+> >
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> 
+> There's some warnings on building these I noticed in testing this on Fedora:
+> 
+>   DTC     arch/arm64/boot/dts/rockchip/rk3399-ficus.dtb
+> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi:490.3-13: Warning
+> (reg_format): /dwmmc@fe310000/wifi@1:reg: property has invalid length
+> (4 bytes) (#address-cells == 2, #size-cells == 1)
+> arch/arm64/boot/dts/rockchip/rk3399-ficus.dtb: Warning
+> (pci_device_bus_num): Failed prerequisite 'reg_format'
+> arch/arm64/boot/dts/rockchip/rk3399-ficus.dtb: Warning (i2c_bus_reg):
+> Failed prerequisite 'reg_format'
+> arch/arm64/boot/dts/rockchip/rk3399-ficus.dtb: Warning (spi_bus_reg):
+> Failed prerequisite 'reg_format'
+> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi:488.16-496.4: Warning
+> (avoid_default_addr_size): /dwmmc@fe310000/wifi@1: Relying on default
+> #address-cells value
+> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi:488.16-496.4: Warning
+> (avoid_default_addr_size): /dwmmc@fe310000/wifi@1: Relying on default
+> #size-cells value
+> 
+>   DTC     arch/arm64/boot/dts/rockchip/rk3399-rock960.dtb
+> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi:490.3-13: Warning
+> (reg_format): /dwmmc@fe310000/wifi@1:reg: property has invalid length
+> (4 bytes) (#address-cells == 2, #size-cells == 1)
+> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtb: Warning
+> (pci_device_bus_num): Failed prerequisite 'reg_format'
+> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtb: Warning
+> (i2c_bus_reg): Failed prerequisite 'reg_format'
+> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtb: Warning
+> (spi_bus_reg): Failed prerequisite 'reg_format'
+> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi:488.16-496.4: Warning
+> (avoid_default_addr_size): /dwmmc@fe310000/wifi@1: Relying on default
+> #address-cells value
+> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi:488.16-496.4: Warning
+> (avoid_default_addr_size): /dwmmc@fe310000/wifi@1: Relying on default
+> #size-cells value
+> 
+
+Hmm. Since the parent node "sdio0" is missing the address/size cells
+property, the default value has been used by the DTC. I think it would
+make sense to just drop the reg property from "wifi" node instead of
+modifying the parent "sdio0" node.
+
+If no one has any issue over this, I'll send out another revision with the
+reg property removed.
+
+Thanks,
+Mani
+
+> > ---
+> >  .../boot/dts/rockchip/rk3399-rock960.dtsi     | 96 ++++++++++++++++++-
+> >  1 file changed, 95 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+> > index 56abbb08c133..1b2f7cd82244 100644
+> > --- a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+> > +++ b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+> > @@ -9,6 +9,15 @@
+> >  #include "rk3399-opp.dtsi"
+> >
+> >  / {
+> > +       sdio_pwrseq: sdio-pwrseq {
+> > +               compatible = "mmc-pwrseq-simple";
+> > +               clocks = <&rk808 1>;
+> > +               clock-names = "ext_clock";
+> > +               pinctrl-names = "default";
+> > +               pinctrl-0 = <&wifi_enable_h>;
+> > +               reset-gpios = <&gpio0 RK_PB2 GPIO_ACTIVE_LOW>;
+> > +       };
+> > +
+> >         vcc1v8_s0: vcc1v8-s0 {
+> >                 compatible = "regulator-fixed";
+> >                 regulator-name = "vcc1v8_s0";
+> > @@ -362,6 +371,20 @@
+> >  };
+> >
+> >  &pinctrl {
+> > +       bt {
+> > +               bt_enable_h: bt-enable-h {
+> > +                       rockchip,pins = <0 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
+> > +               };
+> > +
+> > +               bt_host_wake_l: bt-host-wake-l {
+> > +                       rockchip,pins = <0 RK_PA4 RK_FUNC_GPIO &pcfg_pull_none>;
+> > +               };
+> > +
+> > +               bt_wake_l: bt-wake-l {
+> > +                       rockchip,pins = <2 RK_PD3 RK_FUNC_GPIO &pcfg_pull_none>;
+> > +               };
+> > +       };
+> > +
+> >         sdmmc {
+> >                 sdmmc_bus1: sdmmc-bus1 {
+> >                         rockchip,pins =
+> > @@ -387,6 +410,26 @@
+> >                 };
+> >         };
+> >
+> > +       sdio0 {
+> > +               sdio0_bus4: sdio0-bus4 {
+> > +                       rockchip,pins =
+> > +                               <2 20 RK_FUNC_1 &pcfg_pull_up_20ma>,
+> > +                               <2 21 RK_FUNC_1 &pcfg_pull_up_20ma>,
+> > +                               <2 22 RK_FUNC_1 &pcfg_pull_up_20ma>,
+> > +                               <2 23 RK_FUNC_1 &pcfg_pull_up_20ma>;
+> > +               };
+> > +
+> > +               sdio0_cmd: sdio0-cmd {
+> > +                       rockchip,pins =
+> > +                               <2 24 RK_FUNC_1 &pcfg_pull_up_20ma>;
+> > +               };
+> > +
+> > +               sdio0_clk: sdio0-clk {
+> > +                       rockchip,pins =
+> > +                               <2 25 RK_FUNC_1 &pcfg_pull_none_20ma>;
+> > +               };
+> > +       };
+> > +
+> >         pmic {
+> >                 pmic_int_l: pmic-int-l {
+> >                         rockchip,pins =
+> > @@ -403,6 +446,19 @@
+> >                                 <1 14 RK_FUNC_GPIO &pcfg_pull_down>;
+> >                 };
+> >         };
+> > +
+> > +       sdio-pwrseq {
+> > +               wifi_enable_h: wifi-enable-h {
+> > +                       rockchip,pins =
+> > +                               <0 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
+> > +               };
+> > +       };
+> > +
+> > +       wifi {
+> > +               wifi_host_wake_l: wifi-host-wake-l {
+> > +                       rockchip,pins = <0 RK_PA3 RK_FUNC_GPIO &pcfg_pull_none>;
+> > +               };
+> > +       };
+> >  };
+> >
+> >  &pwm2 {
+> > @@ -413,6 +469,33 @@
+> >         status = "okay";
+> >  };
+> >
+> > +&sdio0 {
+> > +       clock-frequency = <50000000>;
+> > +       bus-width = <4>;
+> > +       cap-sdio-irq;
+> > +       cap-sd-highspeed;
+> > +       no-emmc;
+> > +       keep-power-in-suspend;
+> > +       mmc-pwrseq = <&sdio_pwrseq>;
+> > +       non-removable;
+> > +       num-slots = <1>;
+> > +       pinctrl-names = "default";
+> > +       pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
+> > +       sd-uhs-sdr104;
+> > +
+> > +       status = "okay";
+> > +
+> > +       brcmf: wifi@1 {
+> > +               compatible = "brcm,bcm4329-fmac";
+> > +               reg = <1>;
+> > +               interrupt-parent = <&gpio0>;
+> > +               interrupts = <RK_PA3 GPIO_ACTIVE_HIGH>;
+> > +               interrupt-names = "host-wake";
+> > +               pinctrl-names = "default";
+> > +               pinctrl-0 = <&wifi_host_wake_l>;
+> > +       };
+> > +};
+> > +
+> >  &sdhci {
+> >         bus-width = <8>;
+> >         mmc-hs400-1_8v;
+> > @@ -439,8 +522,19 @@
+> >
+> >  &uart0 {
+> >         pinctrl-names = "default";
+> > -       pinctrl-0 = <&uart0_xfer &uart0_cts>;
+> > +       pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
+> >         status = "okay";
+> > +
+> > +       bluetooth {
+> > +               compatible = "brcm,bcm43438-bt";
+> > +               clocks = <&rk808 1>;
+> > +               clock-names = "ext_clock";
+> > +               device-wakeup-gpios = <&gpio2 RK_PD3 GPIO_ACTIVE_HIGH>;
+> > +               host-wakeup-gpios = <&gpio0 RK_PA4 GPIO_ACTIVE_HIGH>;
+> > +               shutdown-gpios = <&gpio0 RK_PB1 GPIO_ACTIVE_HIGH>;
+> > +               pinctrl-names = "default";
+> > +               pinctrl-0 = <&bt_host_wake_l &bt_wake_l &bt_enable_h>;
+> > +       };
+> >  };
+> >
+> >  &uart2 {
+> > --
+> > 2.17.1
+> >
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
