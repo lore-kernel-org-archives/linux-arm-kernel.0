@@ -2,75 +2,115 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C799AC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:01:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 55FA9C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:05:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 93B5A218D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:01:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 24C57218D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:05:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ScyJDqfH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 93B5A218D8
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DaZilYxo";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="rzg8j7+G"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24C57218D8
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6XVltgmlfNoe0xwGMwSvcxbcxTABOwYSMOsA+0/V/2w=; b=ScyJDqfHw2PGAv
-	oFAjt1iNGNaIfFzytxO0VUh6YmCBLs04fm11M0AGSQPMNYvRd4H57zpJkXxX1NYtg20zU/b+28VK9
-	upLuDdcgQDjUQ6e7zwl/Bh3LXVlgCP1AJk76hcx+xd9dJZy9/gMMpOrYtid0yoxbY6Jq5yQIDmox8
-	ISO6F+81pyxPowillV2+QwtYWvI9GvdB7ElXMYh7aZwueOfigZtW9jL/0AyVbka1jYgcJoJ2DMpEL
-	OCf1+Obc1lzMtBQJWoxin0pKyWdUbwGwqcJiAcRp7nrL9/azbq73kPMdgmbJVy0ymDhSopAe65yVK
-	PpCFF3YXrzDUBzgYRm0A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=Avu8+6ZgCL7RzsyqIIgYJayWN/KQK1UhPFWb1Yjf1Xs=; b=DaZilYxo/l1XPv
+	TKqA7qES80S27gPNqHCzuAc73x1G/FAHlUbKog+ze7vaohdKTCbAqLFmc+DjA7/cIzFczkZywfQ85
+	tiT2o0RNDJQhNk3eu8yh9VECBi8aMLir5DULfrQ5PQSmujYfO4AS79AtTtTbp1Yr1smSpG7IBtRm+
+	3a5zX6Wa4rID42ZG2s+YhYl9Bj3Z1e7Ucx1GsczZP7UTvKupvPlQ4cpLNvnzpjpymfqr5ZQY0nONF
+	bg1pUMHwdgyPbjvweLtMjNw54sNhbtYYq5NWgOOdkKk566IfB2QPX4Nv0B8pP4QnA3wv+kZ10uXii
+	Gl0w3KZMMq8T9dp7XeIQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtBDV-0007T6-4A; Mon, 11 Feb 2019 13:01:45 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gtBGm-0000rq-OJ; Mon, 11 Feb 2019 13:05:08 +0000
+Received: from mail-eopbgr130059.outbound.protection.outlook.com
+ ([40.107.13.59] helo=EUR01-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtBDO-0007Ry-4H; Mon, 11 Feb 2019 13:01:43 +0000
-X-UUID: 2689bb58830b466d99aaf6e0f97048e1-20190211
-X-UUID: 2689bb58830b466d99aaf6e0f97048e1-20190211
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
- (envelope-from <seiya.wang@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 49111048; Mon, 11 Feb 2019 05:01:30 -0800
-Received: from mtkmbs08n1.mediatek.inc (172.21.101.55) by
- MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 11 Feb 2019 05:01:28 -0800
-Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
- mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 11 Feb 2019 21:01:20 +0800
-Received: from [172.21.84.99] (172.21.84.99) by MTKCAS06.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Mon, 11 Feb 2019 21:01:20 +0800
-Message-ID: <1549890080.22817.24.camel@mtksdccf07>
-Subject: Re: [PATCH v6 1/6] irqchip/mtk-sysirq: support 4 interrupt
- parameters for sysirq
-From: Seiya Wang <seiya.wang@mediatek.com>
-To: Marc Zyngier <marc.zyngier@arm.com>
-Date: Mon, 11 Feb 2019 21:01:20 +0800
-In-Reply-To: <868symu2ss.wl-marc.zyngier@arm.com>
-References: <1548317240-44682-1-git-send-email-erin.lo@mediatek.com>
- <1548317240-44682-2-git-send-email-erin.lo@mediatek.com>
- <898ca3d9-002b-e28e-fc97-86bc2538e9de@gmail.com>
- <626b5b46-aac7-1532-386e-2fed85bf4ad9@arm.com>
- <c0187acf-bd8c-2d41-d84d-d35fc63b2beb@arm.com>
- <1549866929.22817.20.camel@mtksdccf07> <868symu2ss.wl-marc.zyngier@arm.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gtBGh-0008Rr-Jh
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 13:05:06 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=MIAApjtE1jh7Kf92D8go1dW5TusT+j72TGarvGRzMrs=;
+ b=rzg8j7+GMIroQyfYuDd+bOWNiXfPR7GhoXugAxCGgBG6w8b60a2Q8hpzgEZE7fVXFWp679jqPCednhINoGphjU1NoyzMneyLeuM9h9l93SzSZnuOvRUM1YgqiAKK9+Z0XJucnB7BZ9wp56vatiM/GnOjo/+LhoKoIsk5Lg0kq4I=
+Received: from DB7PR04MB4490.eurprd04.prod.outlook.com (52.135.138.16) by
+ DB7PR04MB4489.eurprd04.prod.outlook.com (52.135.138.15) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1601.19; Mon, 11 Feb 2019 13:04:59 +0000
+Received: from DB7PR04MB4490.eurprd04.prod.outlook.com
+ ([fe80::fd45:a391:7591:1aa5]) by DB7PR04MB4490.eurprd04.prod.outlook.com
+ ([fe80::fd45:a391:7591:1aa5%6]) with mapi id 15.20.1601.023; Mon, 11 Feb 2019
+ 13:04:59 +0000
+From: Peng Fan <peng.fan@nxp.com>
+To: "linux@armlinux.org.uk" <linux@armlinux.org.uk>, "arnd@arndb.de"
+ <arnd@arndb.de>, "rppt@linux.vnet.ibm.com" <rppt@linux.vnet.ibm.com>,
+ "robh@kernel.org" <robh@kernel.org>, "f.fainelli@gmail.com"
+ <f.fainelli@gmail.com>, "akpm@linux-foundation.org"
+ <akpm@linux-foundation.org>, "mhocko@suse.com" <mhocko@suse.com>,
+ "rostedt@goodmis.org" <rostedt@goodmis.org>, "nicolas.pitre@linaro.org"
+ <nicolas.pitre@linaro.org>
+Subject: [PATCH] arm: use memblocks_present
+Thread-Topic: [PATCH] arm: use memblocks_present
+Thread-Index: AQHUwgpk6mha5pabokK36jjcALV7pg==
+Date: Mon, 11 Feb 2019 13:04:59 +0000
+Message-ID: <20190211131602.3294-1-peng.fan@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.16.4
+x-clientproxiedby: HK0PR01CA0027.apcprd01.prod.exchangelabs.com
+ (2603:1096:203:3e::15) To DB7PR04MB4490.eurprd04.prod.outlook.com
+ (2603:10a6:5:35::16)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=peng.fan@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.71]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DB7PR04MB4489;
+ 6:j9uPY1758Wtj+WDr7cG+0sl/tXQolnMQQnQXVS+O4MBS5bIxKwqpcDaKpbwzT6JbfU6I26YmAicW5SHSSyPd7S0ASNM3BlaEHrjLpAQ8zMnkSE8L4RXevr8f4AMWOI5TN300grJqEH+PGRdJLfQwfvQk4pm1JUtSW+nRXVDtZN5TsHIwBzb3RYeJ2gZN+Wp5WcEAS9VA4BbFZTg3OD3X1xCRGMM9+B55DWoXgQezZ0mVOQ2urKrgQX//PG7CrIDPZ+Ouop/zd0xwC7M3DfaGyTiVEcproraTg7QNSmkXsjo4wB9fv4N7QONJROmD9E/U2huaugyYLGPtyIXA6YFd3xI4tuAPyooACsNKNeATFr3e9wT4WKyb+SwDnWsjCD9vuPF1hx+qdqyrcp2L0dnP0EHL6LcgN3l9+XWDYCVqKV8ty3RgHpq3RtZYxfNYJQgsdtSR13cPvHa0041TxOVkaw==;
+ 5:g6KODoSU5iIAmosKXfaMO8QyT7KaF8OzmhqJRG6lOZe/iJ6NMJAQRsz6WtCshwBNQsMnuKsXvXI5AbR1NdusBz1RpgGFBPmp02nWGZbKLybp0mG1J0IETuom4ss0pPURyEDhcyCouARCklCC7iwHQf9YIE1LN7pSiii29Ea4/+Q8C4CjurGE0rgU4u0XKtAwGXWSyWk6wdjKIFAlK6OX8A==;
+ 7:NZdZ1OOnYl5q2ujy3n87FxMV44zRK5xRr2Vn06Tl9UFuKETtQijzLtVi6SGNkRCNdYWuKjzOxSHXYXpJate5Kss822ktJlzCJHLDx0UiqMFO7zQqD/r4QBJhaPhFlztCFqz5FBQBApD9aWprPShYYw==
+x-ms-office365-filtering-correlation-id: c08b2d9a-9fad-4d9d-064e-08d690218693
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DB7PR04MB4489; 
+x-ms-traffictypediagnostic: DB7PR04MB4489:
+x-microsoft-antispam-prvs: <DB7PR04MB4489667D35FA921F8704AC8188640@DB7PR04MB4489.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0945B0CC72
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(376002)(396003)(346002)(39860400002)(366004)(199004)(189003)(68736007)(44832011)(97736004)(52116002)(7416002)(305945005)(7736002)(102836004)(50226002)(14454004)(6506007)(106356001)(386003)(486006)(105586002)(8676002)(81166006)(36756003)(2906002)(2501003)(81156014)(71200400001)(71190400001)(256004)(478600001)(476003)(53936002)(66066001)(25786009)(26005)(2616005)(8936002)(1076003)(6436002)(2201001)(86362001)(54906003)(316002)(6486002)(186003)(6512007)(4326008)(110136005)(6116002)(99286004)(3846002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB7PR04MB4489;
+ H:DB7PR04MB4490.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: Yx5IINc9jP34ACH5r8PZxajbtD0EfipfNhhJXS7hRK5ii8+2NDJKQy5Oh0dtXQ3542Q4OKjfgpFOZ5nx7gJxskmdoWORbycJiqpT9JNpYguE1WCc6oCx4aLJP0cF7U0d7h1wIbggCVH0uuhV95C4e7IgMi8N6XxuCxMtSJR1ogSrn5H8g+np1GS/qBZIw+H1Jv+N0wB5j5DE2jZUFXFtEoq5qmSZ3PdF8PjuCdVXtC/S48EvinN314P4o6DedX8DDItYfVnBaEzy7/bnewAIVhIcdyvDtzkdV8GHO+oOyBV2HeJiLoPaBcxUlOUYNptC23mDbbHjZJ7d4uqj61GbJEm+sEucGvIhz1SaaKP0C/fu8Ue1NzRetTqgO0USMYxP3OBGqT+FZxpapuDQVkaeZSrF72QtWOdceAqhGAcnCLQ=
 MIME-Version: 1.0
-X-MTK: N
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: c08b2d9a-9fad-4d9d-064e-08d690218693
+X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Feb 2019 13:04:54.0035 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB7PR04MB4489
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_050138_202300_94C97B01 
-X-CRM114-Status: GOOD (  24.28  )
+X-CRM114-CacheID: sfid-20190211_050503_657298_848844F1 
+X-CRM114-Status: UNSURE (   9.90  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,98 +122,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Jason Cooper <jason@lakedaemon.net>,
- srv_heupstream <srv_heupstream@mediatek.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Erin Lo <erin.lo@mediatek.com>, Stephen Boyd <sboyd@codeaurora.org>,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-mediatek@lists.infradead.org, linux-serial@vger.kernel.org,
- mars.cheng@mediatek.com, Matthias Brugger <matthias.bgg@gmail.com>,
- yingjoe.chen@mediatek.com, Thomas Gleixner <tglx@linutronix.de>,
- eddie.huang@mediatek.com, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: "van.freenix@gmail.com" <van.freenix@gmail.com>,
+ Peng Fan <peng.fan@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 2019-02-11 at 08:50 +0000, Marc Zyngier wrote:
-> On Mon, 11 Feb 2019 06:35:29 +0000,
-> Seiya Wang <seiya.wang@mediatek.com> wrote:
-> > 
-> > On Thu, 2019-02-07 at 15:52 +0000, Marc Zyngier wrote:
-> > > On 07/02/2019 15:47, Marc Zyngier wrote:
-> > > > On 07/02/2019 15:20, Matthias Brugger wrote:
-> > > >>
-> > > >>
-> > > >> On 24/01/2019 09:07, Erin Lo wrote:
-> > > >>> From: Seiya Wang <seiya.wang@mediatek.com>
-> > > >>>
-> > > >>> To support partitioned PPIs, 4 interrupt parameters should be valid
-> > > >>> for sysirq.
-> > > >>>
-> > > >>> Signed-off-by: Seiya Wang <seiya.wang@mediatek.com>
-> > > >>> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> > > >>> ---
-> > > >>>  drivers/irqchip/irq-mtk-sysirq.c | 4 ++--
-> > > >>>  1 file changed, 2 insertions(+), 2 deletions(-)
-> > > >>>
-> > > >>> diff --git a/drivers/irqchip/irq-mtk-sysirq.c b/drivers/irqchip/irq-mtk-sysirq.c
-> > > >>> index 90aaf19..282736a 100644
-> > > >>> --- a/drivers/irqchip/irq-mtk-sysirq.c
-> > > >>> +++ b/drivers/irqchip/irq-mtk-sysirq.c
-> > > >>> @@ -81,7 +81,7 @@ static int mtk_sysirq_domain_translate(struct irq_domain *d,
-> > > >>>  				       unsigned int *type)
-> > > >>>  {
-> > > >>>  	if (is_of_node(fwspec->fwnode)) {
-> > > >>> -		if (fwspec->param_count != 3)
-> > > >>> +		if (fwspec->param_count != 3 && fwspec->param_count != 4)
-> > > >>
-> > > >> Where is this 4th parameter used?
-> > > > 
-> > > > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt#n14
-> > > Sorry, I fired Send way too early.
-> > > 
-> > > What I wanted to add is that it is not clear to me why this change would
-> > > be required here, as this driver only supports SPIs. It could be fixed
-> > > by just relaxing the binding itself.
-> > > 
-> > > Thanks,
-> > > 
-> > > 	M.
-> > 
-> > Do you mean that we should change #interrupt-cells back to 3 for sysirq
-> > and remove the 4th parameters of every spi interrupts in mt8183.dtsi
-> > (i.e. 3 parameters for spi, 4 for ppi) such that we can discard this
-> > patch?
-> 
-> It is more subtle than that:
-> 
-> - PPIs must have the affinity parameter in their int-spec (since you
->   need that for the PMU)
-> 
-> - SPIs that are directly routed to the GIC must also have the affinity
->   parameter (although set to zero).
-> 
-> - SPIs that are routed via the sysirq block (or any other) can use the
->   3 parameter variant, as they are not resolved in the context of the
->   GIC, but in that of the sysirq.
-> 
-> But in short, yes. You should be able to drop this patch altogether.
-> 
-> > If yes, we may need some time to verify the change before resending the
-> > patch.
-> 
-> That's absolutely fine.
-> 
-> Thanks,
-> 
-> 	M.
-> 
-Thanks for the detailed descriptions.
-We will remove this patch and resend again.
+arm_memory_present is doing same thing as memblocks_present, so
+let's use common code memblocks_present instead of platform
+specific arm_memory_present.
 
+Signed-off-by: Peng Fan <peng.fan@nxp.com>
+---
+ arch/arm/mm/init.c | 17 +----------------
+ 1 file changed, 1 insertion(+), 16 deletions(-)
+
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 478ea8b7db87..6c50dd407ba8 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -182,21 +182,6 @@ int pfn_valid(unsigned long pfn)
+ EXPORT_SYMBOL(pfn_valid);
+ #endif
+ 
+-#ifndef CONFIG_SPARSEMEM
+-static void __init arm_memory_present(void)
+-{
+-}
+-#else
+-static void __init arm_memory_present(void)
+-{
+-	struct memblock_region *reg;
+-
+-	for_each_memblock(memory, reg)
+-		memory_present(0, memblock_region_memory_base_pfn(reg),
+-			       memblock_region_memory_end_pfn(reg));
+-}
+-#endif
+-
+ static bool arm_memblock_steal_permitted = true;
+ 
+ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
+@@ -292,7 +277,7 @@ void __init bootmem_init(void)
+ 	 * Sparsemem tries to allocate bootmem in memory_present(),
+ 	 * so must be done after the fixed reservations
+ 	 */
+-	arm_memory_present();
++	memblocks_present();
+ 
+ 	/*
+ 	 * sparse_init() needs the bootmem allocator up and running.
+-- 
+2.16.4
 
 
 _______________________________________________
