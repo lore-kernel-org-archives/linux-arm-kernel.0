@@ -2,61 +2,90 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F3620C282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:26:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CF5B5C282D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:30:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C3E5B2075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:26:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9D7EF214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 14:30:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W8Kxe0pD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C3E5B2075C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o98Lo8ZS";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="jvaxXP1h"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D7EF214DA
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2QvD8da7t1a+Y0lg0r+TH7yJzSu7FwD6Bm1oH9i1LhY=; b=W8Kxe0pDd9JjXY
-	30aJRdI5px3MiYHAVR8NoB9nLU/LYyX5EW7Y9picmKerM1uOhln1Hxmb34xXCZY+16z2rRBaKpqdL
-	G1SiTSSQqZ6G55LYaDqwAleqSVhfrcV6M4olpL9OMFKEzwv5N2Ql2P8xo4RzBMDibOgOXc8T8vtzC
-	Rx5qyPdttyD7cmokwDSGrCMTPM6vvPfJYP5q8/C8DEbXJmFTJxPOZ/hPMbI2imLl+UwnGbODRer75
-	TLyAuJYToQorHheyCLf71R3bB6we/xlEVIBevRyUYmZzErQcWSSOSClaKBBrI2fGTWBT5aeFNB6dz
-	7vUGhF5Az5wICFbBGmMw==;
+	List-Owner; bh=1dvQtGDdr7uLsXFESGckP0wS+RbycI1ZhUOycIwVeCA=; b=o98Lo8ZSbY56km
+	8H5TmqtT3DLEjJzGaKRKx+mzIyq1YVFEv52+/hjEKeB/PPpB8FI5+r/ggf/2Jo2JeRQUB/ZzC6Uxe
+	pBkYwCmyYcshANZKgL919u5lqCYicK/JZ1GhtS9orqrfjpncK/pYyfhRqzWouVJao+4j8fNcFVesO
+	TyXb6tmbbJTN9qLZIElXCNR3i0VzA+B8H48DlMbLmbY+SLgAlNMZwqkH1zJQty4ghKaAsCmB+Scl6
+	NYzshtQkl7Tt+O3oAYrZfpCadY7FyrYe00emHunMrxJpW0zuJ+QxslwTELK72QcvWfIQDBHczikFN
+	nQEe6+wG8q7qBRmokd+Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtCXq-00047z-OO; Mon, 11 Feb 2019 14:26:50 +0000
-Received: from relay1-d.mail.gandi.net ([217.70.183.193])
+	id 1gtCat-0004h8-Ic; Mon, 11 Feb 2019 14:29:59 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtCX0-0003M6-IA
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 14:26:04 +0000
-X-Originating-IP: 90.88.22.177
-Received: from mc-bl-xps13.lan
- (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr [90.88.22.177])
- (Authenticated sender: maxime.chevallier@bootlin.com)
- by relay1-d.mail.gandi.net (Postfix) with ESMTPSA id 974D6240003;
- Mon, 11 Feb 2019 14:25:53 +0000 (UTC)
-From: Maxime Chevallier <maxime.chevallier@bootlin.com>
-To: davem@davemloft.net
-Subject: [PATCH net-next 4/4] net: phy: Add generic support for 2.5GBaseT and
- 5GBaseT
-Date: Mon, 11 Feb 2019 15:25:29 +0100
-Message-Id: <20190211142529.22885-5-maxime.chevallier@bootlin.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20190211142529.22885-1-maxime.chevallier@bootlin.com>
-References: <20190211142529.22885-1-maxime.chevallier@bootlin.com>
-MIME-Version: 1.0
+ id 1gtCap-0004gR-LV
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 14:29:57 +0000
+Received: by mail-wr1-x443.google.com with SMTP id f14so590091wrg.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 11 Feb 2019 06:29:54 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=message-id:subject:from:to:cc:date:in-reply-to:references
+ :user-agent:mime-version:content-transfer-encoding;
+ bh=WNiKGJjUidWR3l0CVZ7Opnq01zwCNqD0tZu9JXLyfwY=;
+ b=jvaxXP1hhM2kEJsZelFy7NY/9CT78XpF68Wh7b9eo7yo/SzJaTFLxguEjLMo9/eIaA
+ 88dTzyrbjEiM44Hqbv+sBkLqdL8VqTgq2vd6MR5orfZ/nWMSZ2h6hP7SC/TMRG0OGzfp
+ BJVBnS87OSwn7Y1IaczK1cmOEDPzm1ZrC6QAt6XfZLtsdOqXhkt8r9TJA/GwBNPLpba+
+ o22ujVAg7cES2GPLZF54TKkTdejnOnDhP2g9OuWy0JpwlanWdynTOPUESLixU5M019HN
+ 6+h6whAGSTzLsCgWLhWI/0cA5MsiqQ7vRV/fYndc0q6rHFdnjAgGp/vivsShP3ovKFUq
+ xW9w==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:message-id:subject:from:to:cc:date:in-reply-to
+ :references:user-agent:mime-version:content-transfer-encoding;
+ bh=WNiKGJjUidWR3l0CVZ7Opnq01zwCNqD0tZu9JXLyfwY=;
+ b=ujV2TkkgG+KGoo12JTcI3HQNuY4KqoTa5lZh/POmyJz16kJRIyF2goyioiizTie90+
+ Anu0qyGvmueyMJMsPnNUqRZPMqKeXz3iOwRpODGxqhkX2W1xc1W753xJe0/L/BP+DADC
+ F6pVMqcvElr/REuUBG1nabaInQUiN3diHQkyEYr77ebT/NCoxRboIcif6fioyI6SqCZX
+ 0YOqXfGrlEWsKlNX2+fARjIGVGTgv0fpxui3N+ypbzh0SJAfoeE5mc5piw8MMztea+1n
+ Xg8b3K5cKPUD0ex1G7A7uhGkkXjV3YXdkc8Ijf21YNfqGuwPWWvXj6wL+roLrKOwntmm
+ n5ww==
+X-Gm-Message-State: AHQUAuYoE11VUf/dcUZkMg1k+4SyrjKopN757OgIl59RlwbrAyBwucOB
+ NV2/kuRSokCW4qiQE/U8pXc=
+X-Google-Smtp-Source: AHgI3IZW1d6ZRxPm47GDke+9ycRLhMM+qJ49ksXvar0oyncr/SOhgMwpul5KfnPHi/tzF3Pn713AfQ==
+X-Received: by 2002:a5d:5101:: with SMTP id s1mr27617369wrt.89.1549895393315; 
+ Mon, 11 Feb 2019 06:29:53 -0800 (PST)
+Received: from [192.168.1.100] ([93.51.16.173])
+ by smtp.gmail.com with ESMTPSA id a144sm18332930wmd.30.2019.02.11.06.29.52
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 11 Feb 2019 06:29:52 -0800 (PST)
+Message-ID: <874c702b8af760aa8fae38d478c79e3ecba00515.camel@gmail.com>
+Subject: Re: [PATCH] arm64/io: Don't use WZR in writel
+From: AngeloGioacchino Del Regno <kholk11@gmail.com>
+To: Marc Zyngier <marc.zyngier@arm.com>, Will Deacon <will.deacon@arm.com>
+Date: Mon, 11 Feb 2019 15:29:51 +0100
+In-Reply-To: <38d8965a-cd41-17cf-1b95-8dd58c079be4@arm.com>
+References: <68b71c15f32341468a868f6418e4fcb375bc49ba.camel@gmail.com>
+ <20190211105755.GB30880@fuggles.cambridge.arm.com>
+ <38d8965a-cd41-17cf-1b95-8dd58c079be4@arm.com>
+User-Agent: Evolution 3.30.2 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_062559_125692_FC7D8B87 
-X-CRM114-Status: GOOD (  12.48  )
+X-CRM114-CacheID: sfid-20190211_062955_726767_FD2D2F41 
+X-CRM114-Status: GOOD (  29.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,175 +97,99 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Florian Fainelli <f.fainelli@gmail.com>,
- mw@semihalf.com, Antoine Tenart <antoine.tenart@bootlin.com>,
- netdev@vger.kernel.org, gregory.clement@bootlin.com,
- linux-kernel@vger.kernel.org,
- Maxime Chevallier <maxime.chevallier@bootlin.com>, nadavh@marvell.com,
- thomas.petazzoni@bootlin.com, miquel.raynal@bootlin.com,
- Russell King <linux@armlinux.org.uk>, stefanc@marvell.com,
- linux-arm-kernel@lists.infradead.org, Heiner Kallweit <hkallweit1@gmail.com>
+Cc: Jens Axboe <axboe@kernel.dk>, Catalin Marinas <catalin.marinas@arm.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-arm-msm@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The 802.3bz specification, based on previous by the NBASET alliance,
-defines the 2.5GBaseT and 5GBaseT link modes for ethernet traffic on
-cat5e, cat6 and cat7 cables.
+Il giorno lun, 11/02/2019 alle 11.52 +0000, Marc Zyngier ha scritto:
+> On 11/02/2019 10:57, Will Deacon wrote:
+> > On Sat, Feb 09, 2019 at 07:34:53PM +0100, AngeloGioacchino Del
+> > Regno wrote:
+> > > From 33fb6d036de273bb71ac1c67d7a91b7a5148e659 Mon Sep 17 00:00:00
+> > > 2001
+> > > From: "Angelo G. Del Regno" <kholk11@gmail.com>
+> > > Date: Sat, 9 Feb 2019 18:56:46 +0100
+> > > Subject: [PATCH] arm64/io: Don't use WZR in writel
+> > > 
+> > > This is a partial revert of commit ee5e41b5f21a
+> > > ("arm64/io: Allow I/O writes to use {W,X}ZR")
+> > > 
+> > > When we try to use the zero register directly on some SoCs,
+> > > their security will make them freeze due to a firmware bug.>>
+> > > This behavior is seen with the arm-smmu driver freezing on
+> > > TLBI and TLBSYNC on MSM8996, MSM8998, SDM630, SDM660.
+> 
+> This looks similar to the issue these SoCs have with GICv3, worked
+> around in 9c8114c20d18.
+> 
 
-These mode integrate with the already defined C45 MDIO PMA/PMD registers
-set that added 10G support, by defining some previously reserved bits,
-and adding a new register (2.5G/5G Extended abilities).
+Well, yes that's a firmware quirk, of course, due to the "security"
+stuff that they have inside...
 
-This commit adds the required definitions in include/uapi/linux/mdio.h
-to support these modes, and detect when a link-partner advertises them.
+> > Hmm, this sounds very fragile. I hope they're not trapping and
+> > emulating
+> > MMIO accesses and treating the zero register as the stack
+> > pointer...
+> 
+> I bet this is the case. The same bug was there in both KVM and Xen.
+> The
+> only difference is that we fixed it back in December 2015 (at least
+> for
+> KVM), while some of these SoCs were announced in 2017, and are still
+> shipping. Great stuff.
 
-It also adds support for these mode in the generic C45 PHY
-infrastructure.
+Totally agree, they must be using it as stack pointer.
+Poor decision.
 
-Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
----
- drivers/net/phy/phy-c45.c | 37 +++++++++++++++++++++++++++++++++++++
- include/uapi/linux/mdio.h | 16 ++++++++++++++++
- 2 files changed, 53 insertions(+)
+> 
+> > Wouldn't this also be triggerable from userspace by mmap()ing
+> > either
+> > /dev/mem or e.g. a PCI bar via sysfs?
+> > 
+> > > Allocating a temporary register to store the zero for the
+> > > write actually solves the issue on these SoCs.
+> > 
+> > I don't think this catches all MMIO accesses, so I think we need to
+> > understand more about the actual issue here. For example, is it
+> > only the
+> > SMMU that causes this problem? Also, any workaround should be
+> > specific to
+> > the broken SoCs.
+> 
+> Also, nothing would prevent a compiler from generating these
+> accesses.
+> 
+> 	M.
+> 
+> Jazz is not dead. It just smells funny...
 
-diff --git a/drivers/net/phy/phy-c45.c b/drivers/net/phy/phy-c45.c
-index 6f028de4dae1..7af5fa81daf6 100644
---- a/drivers/net/phy/phy-c45.c
-+++ b/drivers/net/phy/phy-c45.c
-@@ -47,6 +47,16 @@ int genphy_c45_pma_setup_forced(struct phy_device *phydev)
- 		/* Assume 1000base-T */
- 		ctrl2 |= MDIO_PMA_CTRL2_1000BT;
- 		break;
-+	case SPEED_2500:
-+		ctrl1 |= MDIO_CTRL1_SPEED2_5G;
-+		/* Assume 2.5Gbase-T */
-+		ctrl2 |= MDIO_PMA_CTRL2_2_5GBT;
-+		break;
-+	case SPEED_5000:
-+		ctrl1 |= MDIO_CTRL1_SPEED5G;
-+		/* Assume 5Gbase-T */
-+		ctrl2 |= MDIO_PMA_CTRL2_5GBT;
-+		break;
- 	case SPEED_10000:
- 		ctrl1 |= MDIO_CTRL1_SPEED10G;
- 		/* Assume 10Gbase-T */
-@@ -194,6 +204,12 @@ int genphy_c45_read_lpa(struct phy_device *phydev)
- 	if (val < 0)
- 		return val;
- 
-+	if (val & MDIO_AN_10GBT_STAT_LP2_5G)
-+		linkmode_set_bit(ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
-+				 phydev->lp_advertising);
-+	if (val & MDIO_AN_10GBT_STAT_LP5G)
-+		linkmode_set_bit(ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
-+				 phydev->lp_advertising);
- 	if (val & MDIO_AN_10GBT_STAT_LP10G)
- 		linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
- 				 phydev->lp_advertising);
-@@ -224,6 +240,12 @@ int genphy_c45_read_pma(struct phy_device *phydev)
- 	case MDIO_PMA_CTRL1_SPEED1000:
- 		phydev->speed = SPEED_1000;
- 		break;
-+	case MDIO_CTRL1_SPEED2_5G:
-+		phydev->speed = SPEED_2500;
-+		break;
-+	case MDIO_CTRL1_SPEED5G:
-+		phydev->speed = SPEED_5000;
-+		break;
- 	case MDIO_CTRL1_SPEED10G:
- 		phydev->speed = SPEED_10000;
- 		break;
-@@ -339,6 +361,21 @@ int genphy_c45_pma_read_abilities(struct phy_device *phydev)
- 		linkmode_mod_bit(ETHTOOL_LINK_MODE_10baseT_Half_BIT,
- 				 phydev->supported,
- 				 val & MDIO_PMA_EXTABLE_10BT);
-+
-+		if (val & MDIO_PMA_EXTABLE_NBT) {
-+			val = phy_read_mmd(phydev, MDIO_MMD_PMAPMD,
-+					   MDIO_PMA_NG_EXTABLE);
-+			if (val < 0)
-+				return val;
-+
-+			linkmode_mod_bit(ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
-+					 phydev->supported,
-+					 val & MDIO_PMA_NG_EXTABLE_2_5GBT);
-+
-+			linkmode_mod_bit(ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
-+					 phydev->supported,
-+					 val & MDIO_PMA_NG_EXTABLE_5GBT);
-+		}
- 	}
- 
- 	return 0;
-diff --git a/include/uapi/linux/mdio.h b/include/uapi/linux/mdio.h
-index 0e012b168e4d..0a552061ff1c 100644
---- a/include/uapi/linux/mdio.h
-+++ b/include/uapi/linux/mdio.h
-@@ -45,6 +45,7 @@
- #define MDIO_AN_ADVERTISE	16	/* AN advertising (base page) */
- #define MDIO_AN_LPA		19	/* AN LP abilities (base page) */
- #define MDIO_PCS_EEE_ABLE	20	/* EEE Capability register */
-+#define MDIO_PMA_NG_EXTABLE	21	/* 2.5G/5G PMA/PMD extended ability */
- #define MDIO_PCS_EEE_WK_ERR	22	/* EEE wake error counter */
- #define MDIO_PHYXS_LNSTAT	24	/* PHY XGXS lane state */
- #define MDIO_AN_EEE_ADV		60	/* EEE advertisement */
-@@ -92,6 +93,10 @@
- #define MDIO_CTRL1_SPEED10G		(MDIO_CTRL1_SPEEDSELEXT | 0x00)
- /* 10PASS-TS/2BASE-TL */
- #define MDIO_CTRL1_SPEED10P2B		(MDIO_CTRL1_SPEEDSELEXT | 0x04)
-+/* 2.5 Gb/s */
-+#define MDIO_CTRL1_SPEED2_5G		(MDIO_CTRL1_SPEEDSELEXT | 0x18)
-+/* 5 Gb/s */
-+#define MDIO_CTRL1_SPEED5G		(MDIO_CTRL1_SPEEDSELEXT | 0x1c)
- 
- /* Status register 1. */
- #define MDIO_STAT1_LPOWERABLE		0x0002	/* Low-power ability */
-@@ -145,6 +150,8 @@
- #define MDIO_PMA_CTRL2_1000BKX		0x000d	/* 1000BASE-KX type */
- #define MDIO_PMA_CTRL2_100BTX		0x000e	/* 100BASE-TX type */
- #define MDIO_PMA_CTRL2_10BT		0x000f	/* 10BASE-T type */
-+#define MDIO_PMA_CTRL2_2_5GBT		0x0030  /* 2.5GBaseT type */
-+#define MDIO_PMA_CTRL2_5GBT		0x0031  /* 5GBaseT type */
- #define MDIO_PCS_CTRL2_TYPE		0x0003	/* PCS type selection */
- #define MDIO_PCS_CTRL2_10GBR		0x0000	/* 10GBASE-R type */
- #define MDIO_PCS_CTRL2_10GBX		0x0001	/* 10GBASE-X type */
-@@ -198,6 +205,7 @@
- #define MDIO_PMA_EXTABLE_1000BKX	0x0040	/* 1000BASE-KX ability */
- #define MDIO_PMA_EXTABLE_100BTX		0x0080	/* 100BASE-TX ability */
- #define MDIO_PMA_EXTABLE_10BT		0x0100	/* 10BASE-T ability */
-+#define MDIO_PMA_EXTABLE_NBT		0x4000  /* 2.5/5GBASE-T ability */
- 
- /* PHY XGXS lane state register. */
- #define MDIO_PHYXS_LNSTAT_SYNC0		0x0001
-@@ -234,9 +242,13 @@
- #define MDIO_PCS_10GBRT_STAT2_BER	0x3f00
- 
- /* AN 10GBASE-T control register. */
-+#define MDIO_AN_10GBT_CTRL_ADV2_5G	0x0080	/* Advertise 2.5GBASE-T */
-+#define MDIO_AN_10GBT_CTRL_ADV5G	0x0100	/* Advertise 5GBASE-T */
- #define MDIO_AN_10GBT_CTRL_ADV10G	0x1000	/* Advertise 10GBASE-T */
- 
- /* AN 10GBASE-T status register. */
-+#define MDIO_AN_10GBT_STAT_LP2_5G	0x0020  /* LP is 2.5GBT capable */
-+#define MDIO_AN_10GBT_STAT_LP5G		0x0040  /* LP is 5GBT capable */
- #define MDIO_AN_10GBT_STAT_LPTRR	0x0200	/* LP training reset req. */
- #define MDIO_AN_10GBT_STAT_LPLTABLE	0x0400	/* LP loop timing ability */
- #define MDIO_AN_10GBT_STAT_LP10G	0x0800	/* LP is 10GBT capable */
-@@ -265,6 +277,10 @@
- #define MDIO_EEE_10GKX4		0x0020	/* 10G KX4 EEE cap */
- #define MDIO_EEE_10GKR		0x0040	/* 10G KR EEE cap */
- 
-+/* 2.5G/5G Extended abilities register. */
-+#define MDIO_PMA_NG_EXTABLE_2_5GBT	0x0001	/* 2.5GBASET ability */
-+#define MDIO_PMA_NG_EXTABLE_5GBT	0x0002	/* 5GBASET ability */
-+
- /* LASI RX_ALARM control/status registers. */
- #define MDIO_PMA_LASI_RX_PHYXSLFLT	0x0001	/* PHY XS RX local fault */
- #define MDIO_PMA_LASI_RX_PCSLFLT	0x0008	/* PCS RX local fault */
--- 
-2.19.2
+While I agree that nothing would prevent a compiler from generating
+these accesses, please take in mind that everything worked on
+downstream kernels before this change was introduced (which is first
+seen downstream on msm-4.9).
+So I've discovered it on msm-4.9 while porting the 8996-98, 630-660
+to that and I've had a whole lot of head scratching: the arm-smmu
+code was apparently right, then I've seen that surprise......
+By the way, I can tell you for sure that this bug is not present on
+at least SDM845, since that one worked fine even before this fix,
+and I imagine that also SDM670 and newest may not be affected.
+Also Family-B SoCs are not affected by this bug (MSM8916-36-37-56-76).
+
+Unfortunately, I couldn't think of any other solution on these
+Family-A SoCs, also because I'm not totally sure that the only
+driver that produces this issue is arm-smmu. When I've fixed it
+on the downstream kernel, I've also had some other random freezes
+that weren't related to the SMMU: usually qseecom stuff was also
+acting funny sometimes.
+
+Also, just one more thing: yes this thing is going ARM64-wide and
+- from my findings - it's targeting certain Qualcomm SoCs, but...
+I'm not sure that only QC is affected by that, others may as well
+have the same stupid bug.
 
 
 _______________________________________________
