@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AD676C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:38:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 76386C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:39:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6667F21B24
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:38:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 453B221B24
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:39:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tsDNdKNX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6667F21B24
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AD9Ode56"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 453B221B24
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,25 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=x5FaHTkHCorZm1Bklrl0Scez7Zl0RymHkw3mPGDffqo=; b=tsDNdKNXo614Lb
-	lcfVVM6V2g4T98hWXjIK8ty+Z+Sm/3dHfEKp521q3ItplbX71nNMI6fIYBuQsxVBKfHpik+zPaOgd
-	MNycwusWfnHq5ghRwgbX3XjMHUGPtrfa0/KvJw9hk2nT6jVplA5g+/bKsHZTTWIfQp9yzFSMvmSL6
-	rKzcSBSRyp3tSYXV3HFtoOaTpxlXGUtj4LT+W4J+ZzwIwC3N4qev7wvp91qX/mQIbxpVoqzt1tvlW
-	5TOM6cJ4wdaNp830N56EghyC+pnUz1HJ41BIrc2h9Jk/efTSG0a0VhrlwB/Kp4jSNrttQu+CckHno
-	PtWyW2oXDcjXiubgnqcQ==;
+	List-Owner; bh=F2t3G3ETfgAha31IST/Xj5gvM6w6waKTa+rG06KGzgU=; b=AD9Ode56Lh3O7a
+	WbgvBzAwBgzaGx/v7rPwL9vWMv/IbF5aJPT7ITc5xVCT5CNookXrsGQBD0dlE94Sv36Qptjq4gn1K
+	Ysk/11xedvi5j7ZTtsNYsTpOiXoeQIuzzDx9efbxngm0sUFmkPYbXxOLkLpq7fLyR8sRM6h2tmiXw
+	Em4nOi0j2L9zRya+dfyWWr0LVY3wIn99HDsT7T7hFljr0rTZ8/vcIPB/97n1nrdxKrFTfgPLcIs8d
+	Ppky4hXoxUwpiRl5ECm2JJTmJOHsNmgAC0EkVke+NnfliksO36uEXZGTaU5zFAtKLsBbZ5H1E9aQp
+	ZYteK2S7VDrxyB020S5g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtBnL-0002Te-JS; Mon, 11 Feb 2019 13:38:47 +0000
+	id 1gtBnk-0002u3-N3; Mon, 11 Feb 2019 13:39:12 +0000
 Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtBkz-0000G0-BA; Mon, 11 Feb 2019 13:36:21 +0000
+ id 1gtBl4-0000KP-TN; Mon, 11 Feb 2019 13:36:27 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: iommu@lists.linux-foundation.org
-Subject: [PATCH 08/12] dma-mapping: remove dma_mark_declared_memory_occupied
-Date: Mon, 11 Feb 2019 14:35:50 +0100
-Message-Id: <20190211133554.30055-9-hch@lst.de>
+Subject: [PATCH 10/12] dma-mapping: simplify allocations from per-device
+ coherent memory
+Date: Mon, 11 Feb 2019 14:35:52 +0100
+Message-Id: <20190211133554.30055-11-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190211133554.30055-1-hch@lst.de>
 References: <20190211133554.30055-1-hch@lst.de>
@@ -69,104 +70,289 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This API is not used anywhere, so remove it.
+All users of per-device coherent memory are exclusive, that is if we can't
+allocate from the per-device pool we can't use the system memory either.
+Unfold the current dma_{alloc,free}_from_dev_coherent implementation and
+always use the per-device pool if it exists.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- Documentation/DMA-API.txt   | 17 -----------------
- include/linux/dma-mapping.h |  9 ---------
- kernel/dma/coherent.c       | 23 -----------------------
- 3 files changed, 49 deletions(-)
+ arch/arm/mm/dma-mapping-nommu.c | 12 ++---
+ include/linux/dma-mapping.h     | 14 ++----
+ kernel/dma/coherent.c           | 89 ++++++++-------------------------
+ kernel/dma/internal.h           | 19 +++++++
+ kernel/dma/mapping.c            | 12 +++--
+ 5 files changed, 55 insertions(+), 91 deletions(-)
+ create mode 100644 kernel/dma/internal.h
 
-diff --git a/Documentation/DMA-API.txt b/Documentation/DMA-API.txt
-index 78114ee63057..b9d0cba83877 100644
---- a/Documentation/DMA-API.txt
-+++ b/Documentation/DMA-API.txt
-@@ -605,23 +605,6 @@ unconditionally having removed all the required structures.  It is the
- driver's job to ensure that no parts of this memory region are
- currently in use.
+diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
+index f304b10e23a4..c72f024f1e82 100644
+--- a/arch/arm/mm/dma-mapping-nommu.c
++++ b/arch/arm/mm/dma-mapping-nommu.c
+@@ -70,16 +70,10 @@ static void arm_nommu_dma_free(struct device *dev, size_t size,
+ 			       void *cpu_addr, dma_addr_t dma_addr,
+ 			       unsigned long attrs)
+ {
+-	if (attrs & DMA_ATTR_NON_CONSISTENT) {
++	if (attrs & DMA_ATTR_NON_CONSISTENT)
+ 		dma_direct_free_pages(dev, size, cpu_addr, dma_addr, attrs);
+-	} else {
+-		int ret = dma_release_from_global_coherent(get_order(size),
+-							   cpu_addr);
+-
+-		WARN_ON_ONCE(ret == 0);
+-	}
+-
+-	return;
++	else
++		dma_release_from_global_coherent(size, cpu_addr);
+ }
  
--::
--
--	void *
--	dma_mark_declared_memory_occupied(struct device *dev,
--					  dma_addr_t device_addr, size_t size)
--
--This is used to occupy specific regions of the declared space
--(dma_alloc_coherent() will hand out the first free region it finds).
--
--device_addr is the *device* address of the region requested.
--
--size is the size (and should be a page-sized multiple).
--
--The return value will be either a pointer to the processor virtual
--address of the memory, or an error (via PTR_ERR()) if any part of the
--region is occupied.
--
- Part III - Debug drivers use of the DMA-API
- -------------------------------------------
- 
+ static int arm_nommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
 diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index fde0cfc71824..9df0f4d318c5 100644
+index b12fba725f19..018e37a0870e 100644
 --- a/include/linux/dma-mapping.h
 +++ b/include/linux/dma-mapping.h
-@@ -735,8 +735,6 @@ static inline int dma_get_cache_alignment(void)
- int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
- 				dma_addr_t device_addr, size_t size, int flags);
- void dma_release_declared_memory(struct device *dev);
--void *dma_mark_declared_memory_occupied(struct device *dev,
--					dma_addr_t device_addr, size_t size);
- #else
- static inline int
- dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
-@@ -749,13 +747,6 @@ static inline void
- dma_release_declared_memory(struct device *dev)
- {
- }
+@@ -158,30 +158,24 @@ static inline int is_device_dma_capable(struct device *dev)
+  * These three functions are only for dma allocator.
+  * Don't use them in device drivers.
+  */
+-int dma_alloc_from_dev_coherent(struct device *dev, ssize_t size,
+-				       dma_addr_t *dma_handle, void **ret);
+-int dma_release_from_dev_coherent(struct device *dev, int order, void *vaddr);
 -
--static inline void *
--dma_mark_declared_memory_occupied(struct device *dev,
--				  dma_addr_t device_addr, size_t size)
--{
--	return ERR_PTR(-EBUSY);
--}
- #endif /* CONFIG_DMA_DECLARE_COHERENT */
+ int dma_mmap_from_dev_coherent(struct device *dev, struct vm_area_struct *vma,
+ 			    void *cpu_addr, size_t size, int *ret);
  
- static inline void *dmam_alloc_coherent(struct device *dev, size_t size,
+-void *dma_alloc_from_global_coherent(ssize_t size, dma_addr_t *dma_handle);
+-int dma_release_from_global_coherent(int order, void *vaddr);
++void *dma_alloc_from_global_coherent(size_t size, dma_addr_t *dma_handle);
++void dma_release_from_global_coherent(size_t size, void *vaddr);
+ int dma_mmap_from_global_coherent(struct vm_area_struct *vma, void *cpu_addr,
+ 				  size_t size, int *ret);
+ 
+ #else
+-#define dma_alloc_from_dev_coherent(dev, size, handle, ret) (0)
+-#define dma_release_from_dev_coherent(dev, order, vaddr) (0)
+ #define dma_mmap_from_dev_coherent(dev, vma, vaddr, order, ret) (0)
+ 
+-static inline void *dma_alloc_from_global_coherent(ssize_t size,
++static inline void *dma_alloc_from_global_coherent(size_t size,
+ 						   dma_addr_t *dma_handle)
+ {
+ 	return NULL;
+ }
+ 
+-static inline int dma_release_from_global_coherent(int order, void *vaddr)
++static inline void dma_release_from_global_coherent(size_t size, void *vaddr)
+ {
+ 	return 0;
+ }
 diff --git a/kernel/dma/coherent.c b/kernel/dma/coherent.c
-index 4b76aba574c2..1d12a31af6d7 100644
+index 29fd6590dc1e..d1da1048e470 100644
 --- a/kernel/dma/coherent.c
 +++ b/kernel/dma/coherent.c
-@@ -137,29 +137,6 @@ void dma_release_declared_memory(struct device *dev)
+@@ -8,6 +8,7 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/dma-mapping.h>
++#include "internal.h"
+ 
+ struct dma_coherent_mem {
+ 	void		*virt_base;
+@@ -21,13 +22,6 @@ struct dma_coherent_mem {
+ 
+ static struct dma_coherent_mem *dma_coherent_default_memory __ro_after_init;
+ 
+-static inline struct dma_coherent_mem *dev_get_coherent_memory(struct device *dev)
+-{
+-	if (dev && dev->dma_mem)
+-		return dev->dma_mem;
+-	return NULL;
+-}
+-
+ static inline dma_addr_t dma_get_device_base(struct device *dev,
+ 					     struct dma_coherent_mem * mem)
+ {
+@@ -135,8 +129,8 @@ void dma_release_declared_memory(struct device *dev)
  }
  EXPORT_SYMBOL(dma_release_declared_memory);
  
--void *dma_mark_declared_memory_occupied(struct device *dev,
--					dma_addr_t device_addr, size_t size)
+-static void *__dma_alloc_from_coherent(struct dma_coherent_mem *mem,
+-		ssize_t size, dma_addr_t *dma_handle)
++void *__dma_alloc_from_coherent(struct dma_coherent_mem *mem, size_t size,
++		dma_addr_t *dma_handle)
+ {
+ 	int order = get_order(size);
+ 	unsigned long flags;
+@@ -165,33 +159,7 @@ static void *__dma_alloc_from_coherent(struct dma_coherent_mem *mem,
+ 	return NULL;
+ }
+ 
+-/**
+- * dma_alloc_from_dev_coherent() - allocate memory from device coherent pool
+- * @dev:	device from which we allocate memory
+- * @size:	size of requested memory area
+- * @dma_handle:	This will be filled with the correct dma handle
+- * @ret:	This pointer will be filled with the virtual address
+- *		to allocated area.
+- *
+- * This function should be only called from per-arch dma_alloc_coherent()
+- * to support allocation from per-device coherent memory pools.
+- *
+- * Returns 0 if dma_alloc_coherent should continue with allocating from
+- * generic memory areas, or !0 if dma_alloc_coherent should return @ret.
+- */
+-int dma_alloc_from_dev_coherent(struct device *dev, ssize_t size,
+-		dma_addr_t *dma_handle, void **ret)
 -{
--	struct dma_coherent_mem *mem = dev->dma_mem;
--	unsigned long flags;
--	int pos, err;
--
--	size += device_addr & ~PAGE_MASK;
+-	struct dma_coherent_mem *mem = dev_get_coherent_memory(dev);
 -
 -	if (!mem)
--		return ERR_PTR(-EINVAL);
+-		return 0;
 -
--	spin_lock_irqsave(&mem->spinlock, flags);
--	pos = PFN_DOWN(device_addr - dma_get_device_base(dev, mem));
--	err = bitmap_allocate_region(mem->bitmap, pos, get_order(size));
--	spin_unlock_irqrestore(&mem->spinlock, flags);
--
--	if (err != 0)
--		return ERR_PTR(err);
--	return mem->virt_base + (pos << PAGE_SHIFT);
+-	*ret = __dma_alloc_from_coherent(mem, size, dma_handle);
+-	return 1;
 -}
--EXPORT_SYMBOL(dma_mark_declared_memory_occupied);
 -
- static void *__dma_alloc_from_coherent(struct dma_coherent_mem *mem,
- 		ssize_t size, dma_addr_t *dma_handle)
+-void *dma_alloc_from_global_coherent(ssize_t size, dma_addr_t *dma_handle)
++void *dma_alloc_from_global_coherent(size_t size, dma_addr_t *dma_handle)
  {
+ 	if (!dma_coherent_default_memory)
+ 		return NULL;
+@@ -200,48 +168,33 @@ void *dma_alloc_from_global_coherent(ssize_t size, dma_addr_t *dma_handle)
+ 			dma_handle);
+ }
+ 
+-static int __dma_release_from_coherent(struct dma_coherent_mem *mem,
+-				       int order, void *vaddr)
++static bool dma_in_coherent_range(struct dma_coherent_mem *mem, size_t size,
++		void *vaddr)
+ {
+-	if (mem && vaddr >= mem->virt_base && vaddr <
+-		   (mem->virt_base + (mem->size << PAGE_SHIFT))) {
+-		int page = (vaddr - mem->virt_base) >> PAGE_SHIFT;
+-		unsigned long flags;
+-
+-		spin_lock_irqsave(&mem->spinlock, flags);
+-		bitmap_release_region(mem->bitmap, page, order);
+-		spin_unlock_irqrestore(&mem->spinlock, flags);
+-		return 1;
+-	}
+-	return 0;
++	return vaddr >= mem->virt_base &&
++		vaddr + size <= mem->virt_base + (mem->size << PAGE_SHIFT);
+ }
+ 
+-/**
+- * dma_release_from_dev_coherent() - free memory to device coherent memory pool
+- * @dev:	device from which the memory was allocated
+- * @order:	the order of pages allocated
+- * @vaddr:	virtual address of allocated pages
+- *
+- * This checks whether the memory was allocated from the per-device
+- * coherent memory pool and if so, releases that memory.
+- *
+- * Returns 1 if we correctly released the memory, or 0 if the caller should
+- * proceed with releasing memory from generic pools.
+- */
+-int dma_release_from_dev_coherent(struct device *dev, int order, void *vaddr)
++void __dma_release_from_coherent(struct dma_coherent_mem *mem, size_t size,
++		void *vaddr)
+ {
+-	struct dma_coherent_mem *mem = dev_get_coherent_memory(dev);
++	int page = (vaddr - mem->virt_base) >> PAGE_SHIFT;
++	unsigned long flags;
++
++	if (WARN_ON_ONCE(!dma_in_coherent_range(mem, size, vaddr)))
++		return;
+ 
+-	return __dma_release_from_coherent(mem, order, vaddr);
++	spin_lock_irqsave(&mem->spinlock, flags);
++	bitmap_release_region(mem->bitmap, page, get_order(size));
++	spin_unlock_irqrestore(&mem->spinlock, flags);
+ }
+ 
+-int dma_release_from_global_coherent(int order, void *vaddr)
++void dma_release_from_global_coherent(size_t size, void *vaddr)
+ {
+ 	if (!dma_coherent_default_memory)
+-		return 0;
++		return;
+ 
+-	return __dma_release_from_coherent(dma_coherent_default_memory, order,
+-			vaddr);
++	__dma_release_from_coherent(dma_coherent_default_memory, size, vaddr);
+ }
+ 
+ static int __dma_mmap_from_coherent(struct dma_coherent_mem *mem,
+diff --git a/kernel/dma/internal.h b/kernel/dma/internal.h
+new file mode 100644
+index 000000000000..48a0a71487b1
+--- /dev/null
++++ b/kernel/dma/internal.h
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _DMA_INTERNAL_H
++#define _DMA_INTERNAL_H
++
++static inline struct dma_coherent_mem *dev_get_coherent_memory(struct device *dev)
++{
++#ifdef DMA_DECLARE_COHERENT
++	if (dev && dev->dma_mem)
++		return dev->dma_mem;
++#endif
++	return NULL;
++}
++
++void *__dma_alloc_from_coherent(struct dma_coherent_mem *mem, size_t size,
++		dma_addr_t *dma_handle);
++void __dma_release_from_coherent(struct dma_coherent_mem *mem, size_t size,
++		void *vaddr);
++
++#endif /* _DMA_INTERNAL_H */
+diff --git a/kernel/dma/mapping.c b/kernel/dma/mapping.c
+index a11006b6d8e8..d3c4363b2143 100644
+--- a/kernel/dma/mapping.c
++++ b/kernel/dma/mapping.c
+@@ -14,6 +14,7 @@
+ #include <linux/of_device.h>
+ #include <linux/slab.h>
+ #include <linux/vmalloc.h>
++#include "internal.h"
+ 
+ /*
+  * Managed DMA API
+@@ -248,12 +249,13 @@ void *dma_alloc_attrs(struct device *dev, size_t size, dma_addr_t *dma_handle,
+ 		gfp_t flag, unsigned long attrs)
+ {
+ 	const struct dma_map_ops *ops = get_dma_ops(dev);
++	struct dma_coherent_mem *mem = dev_get_coherent_memory(dev);
+ 	void *cpu_addr;
+ 
+ 	WARN_ON_ONCE(dev && !dev->coherent_dma_mask);
+ 
+-	if (dma_alloc_from_dev_coherent(dev, size, dma_handle, &cpu_addr))
+-		return cpu_addr;
++	if (mem)
++		return __dma_alloc_from_coherent(mem, size, dma_handle);
+ 
+ 	/* let the implementation decide on the zone to allocate from: */
+ 	flag &= ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM);
+@@ -277,9 +279,11 @@ void dma_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+ 		dma_addr_t dma_handle, unsigned long attrs)
+ {
+ 	const struct dma_map_ops *ops = get_dma_ops(dev);
++	struct dma_coherent_mem *mem = dev_get_coherent_memory(dev);
++
++	if (mem)
++		return __dma_release_from_coherent(mem, size, cpu_addr);
+ 
+-	if (dma_release_from_dev_coherent(dev, get_order(size), cpu_addr))
+-		return;
+ 	/*
+ 	 * On non-coherent platforms which implement DMA-coherent buffers via
+ 	 * non-cacheable remaps, ops->free() may call vunmap(). Thus getting
 -- 
 2.20.1
 
