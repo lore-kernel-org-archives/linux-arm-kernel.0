@@ -6,84 +6,59 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 874B0C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 16:42:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 25B55C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 16:56:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5645021B1A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 16:42:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ECD9521B69
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 16:56:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fbxpIZOc";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=synopsys.com header.i=@synopsys.com header.b="dv0+q00f"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5645021B1A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=synopsys.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MZnA8/nn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ECD9521B69
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:Date
-	:Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	List-Owner; bh=1hoJnbRFZkOMlFg28uNEpCg3d73BJWMTcJRBBDPuw2w=; b=fbxpIZOclDa6NR
-	yql7zsOymSrDzjRzjPUdDFSpZiq1bKFR+T2oE25G+KVb/0hsO9fPyymmbx5KEU1B8b3xTNgxtMHy2
-	mIzASO/6YQ7JHZLhC44MOKh3yVg0plj86oUakNg0rpdXCNiSNuz5oraGCiQ1L01IXG+Z/CMfW9IKJ
-	4KWKWInxLoZM+fLkOiU0kAaC7Cw55hrfg9h2R+dsP8JN7WU4rAgACac7DjtBIZrnKUqG8oMo2Zdc+
-	eH0UY5hPNk0VlP3CmdhKh81fEicAVVwbYAlZKMx0Aygexh4DmT1lCzQDoMcL4+eyJvr0AQ5Qu6G9X
-	q+r5WEdmbLbQQuWTypuQ==;
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=puUFodqKT3/vcLpHXrMsWAiEAoyTMJBzPkHpPc55wPk=; b=MZnA8/nno70Jeo
+	IyNP5tk916oFMhGy/KWOx9mRjTQHqBXAOkNMqNce7o0ehDUt2h2Tqotn9bPXteUepfCMziRk7osKe
+	FcneUE03X789XgijcdDUQfRJM4tYrWUQ1+IcM2CywQWNVS+mhSopzzO1lhF7zMDRs49+Bnm5978s7
+	HGziDBefBjt3xUQczsVQofW0fqYqgOICizDXWSl61JdA3WKKJKha+DrmurzqbeNf/EA3oPyZKrgeT
+	NkwBb15I93rb7qihjsMs1eTvjNVTYd68vfT3GKfVd4CG0sCSx5LzoBl3BZP9sOfqAGmc0f20FgfPD
+	jr09+5OU6xmYhhYM9H8w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtEeb-0006yk-4C; Mon, 11 Feb 2019 16:41:57 +0000
-Received: from us01smtprelay-2.synopsys.com ([198.182.60.111]
- helo=smtprelay.synopsys.com)
+	id 1gtEsa-0006nZ-9r; Mon, 11 Feb 2019 16:56:24 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtEeX-0006xx-FK; Mon, 11 Feb 2019 16:41:55 +0000
-Received: from mailhost.synopsys.com (badc-mailhost2.synopsys.com
- [10.192.0.18])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by smtprelay.synopsys.com (Postfix) with ESMTPS id 1BB6010C06E4;
- Mon, 11 Feb 2019 08:41:51 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=synopsys.com; s=mail;
- t=1549903311; bh=fBVZ5ijoAMyIT1n3yfPcdbUEUPLWh1eYHuDbKsa91gs=;
- h=From:To:CC:Subject:Date:References:From;
- b=dv0+q00fCFs4pjqEqjDW022Gj86wwmenhj7sxULppaLz9XTmnE1qwPgO+M5Snnh/5
- 3yAejhcnKuMHGnBULPbnX5bzljCKSP4D603vWHfQexIM/1JWUk5hSbU94MKZDRmI/I
- 59fXoxelopUD8kIBH9nnPjP7ck59qYrprejFu0XXCSEiIM/Yv5eg5ckhefoU6u7zpO
- /jdc9ueytJT0JXdDaOni0f1/lGpIbm3ScBESJXngF58eOBW515ceZnB0NG13BDusPf
- y+j8X5QjGliAATvF9a0v53fn1F1n1Ych188DsPxayjsZkOYknUv8iMQXuzN/u+Y7eb
- ii535rHZSmDpg==
-Received: from US01WEHTC3.internal.synopsys.com
- (us01wehtc3.internal.synopsys.com [10.15.84.232])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-SHA384 (256/256 bits))
- (No client certificate requested)
- by mailhost.synopsys.com (Postfix) with ESMTPS id 3013DA005A;
- Mon, 11 Feb 2019 16:41:49 +0000 (UTC)
-Received: from US01WEMBX2.internal.synopsys.com ([fe80::e4b6:5520:9c0d:250b])
- by US01WEHTC3.internal.synopsys.com ([::1]) with mapi id
- 14.03.0415.000; Mon, 11 Feb 2019 08:41:49 -0800
-From: Vineet Gupta <vineet.gupta1@synopsys.com>
-To: Christoph Hellwig <hch@lst.de>, Russell King <linux@armlinux.org.uk>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>, 
- Paul Burton <paul.burton@mips.com>
-Subject: Re: [PATCH 1/2] dma-mapping: add a kconfig symbol for
- arch_setup_dma_ops availability
-Thread-Topic: [PATCH 1/2] dma-mapping: add a kconfig symbol for
- arch_setup_dma_ops availability
-Thread-Index: AQHUvGGrA+k+qWH4WEmqF3XgiW9roA==
-Date: Mon, 11 Feb 2019 16:41:49 +0000
-Message-ID: <C2D7FE5348E1B147BCA15975FBA230750146433294@US01WEMBX2.internal.synopsys.com>
-References: <20190204081420.15083-1-hch@lst.de>
- <20190204081420.15083-2-hch@lst.de>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [10.144.199.106]
-MIME-Version: 1.0
+ id 1gtEsS-0006he-K2
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 16:56:18 +0000
+Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <l.stach@pengutronix.de>)
+ id 1gtEsI-0001OV-SV; Mon, 11 Feb 2019 17:56:06 +0100
+Message-ID: <1549904165.2546.14.camel@pengutronix.de>
+Subject: Re: [PATCH v2 1/2] pci: imx6: avoid dereferencing program counter
+ from user mode
+From: Lucas Stach <l.stach@pengutronix.de>
+To: Stefan Agner <stefan@agner.ch>, hongxing.zhu@nxp.com
+Date: Mon, 11 Feb 2019 17:56:05 +0100
+In-Reply-To: <20181204132733.14422-1-stefan@agner.ch>
+References: <20181204132733.14422-1-stefan@agner.ch>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
+X-SA-Exim-Mail-From: l.stach@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_084153_519751_5D53D0CA 
-X-CRM114-Status: GOOD (  14.78  )
+X-CRM114-CacheID: sfid-20190211_085616_813189_AD4B2F29 
+X-CRM114-Status: GOOD (  14.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,226 +70,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-mips@vger.kernel.org" <linux-mips@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "iommu@lists.linux-foundation.org" <iommu@lists.linux-foundation.org>,
- "linux-snps-arc@lists.infradead.org" <linux-snps-arc@lists.infradead.org>,
- Eugeniy Paltsev <eugeniy.paltsev@synopsys.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: lorenzo.pieralisi@arm.com, andrew.smirnov@gmail.com, robin.murphy@arm.com,
+ linux@armlinux.org.uk, linux-kernel@vger.kernel.org, linux-pci@vger.kernel.org,
+ bhelgaas@google.com, leonard.crestez@nxp.com, festevam@gmail.com,
+ linux-arm-kernel@lists.infradead.org, tpiepho@impinj.com
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-+CC Eugeniy
-
-As resident ARC DMA expert can you please this a quick spin.
-
--Vineet
-
-On 2/4/19 12:14 AM, Christoph Hellwig wrote:
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  arch/arc/Kconfig                     |  1 +
->  arch/arc/include/asm/Kbuild          |  1 +
->  arch/arc/include/asm/dma-mapping.h   | 13 -------------
->  arch/arm/Kconfig                     |  1 +
->  arch/arm/include/asm/dma-mapping.h   |  4 ----
->  arch/arm64/Kconfig                   |  1 +
->  arch/arm64/include/asm/dma-mapping.h |  4 ----
->  arch/mips/Kconfig                    |  1 +
->  arch/mips/include/asm/dma-mapping.h  | 10 ----------
->  arch/mips/mm/dma-noncoherent.c       |  8 ++++++++
->  include/linux/dma-mapping.h          | 12 ++++++++----
->  kernel/dma/Kconfig                   |  3 +++
->  12 files changed, 24 insertions(+), 35 deletions(-)
->  delete mode 100644 arch/arc/include/asm/dma-mapping.h
->
-> diff --git a/arch/arc/Kconfig b/arch/arc/Kconfig
-> index 376366a7db81..2ab27d88eb1c 100644
-> --- a/arch/arc/Kconfig
-> +++ b/arch/arc/Kconfig
-> @@ -11,6 +11,7 @@ config ARC
->  	select ARC_TIMERS
->  	select ARCH_HAS_DMA_COHERENT_TO_PFN
->  	select ARCH_HAS_PTE_SPECIAL
-> +	select ARCH_HAS_SETUP_DMA_OPS
->  	select ARCH_HAS_SYNC_DMA_FOR_CPU
->  	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
->  	select ARCH_SUPPORTS_ATOMIC_RMW if ARC_HAS_LLSC
-> diff --git a/arch/arc/include/asm/Kbuild b/arch/arc/include/asm/Kbuild
-> index caa270261521..b41f8881ecc8 100644
-> --- a/arch/arc/include/asm/Kbuild
-> +++ b/arch/arc/include/asm/Kbuild
-> @@ -3,6 +3,7 @@ generic-y += bugs.h
->  generic-y += compat.h
->  generic-y += device.h
->  generic-y += div64.h
-> +generic-y += dma-mapping.h
->  generic-y += emergency-restart.h
->  generic-y += extable.h
->  generic-y += ftrace.h
-> diff --git a/arch/arc/include/asm/dma-mapping.h b/arch/arc/include/asm/dma-mapping.h
-> deleted file mode 100644
-> index c946c0a83e76..000000000000
-> --- a/arch/arc/include/asm/dma-mapping.h
-> +++ /dev/null
-> @@ -1,13 +0,0 @@
-> -// SPDX-License-Identifier:  GPL-2.0
-> -// (C) 2018 Synopsys, Inc. (www.synopsys.com)
-> -
-> -#ifndef ASM_ARC_DMA_MAPPING_H
-> -#define ASM_ARC_DMA_MAPPING_H
-> -
-> -#include <asm-generic/dma-mapping.h>
-> -
-> -void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> -			const struct iommu_ops *iommu, bool coherent);
-> -#define arch_setup_dma_ops arch_setup_dma_ops
-> -
-> -#endif
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 664e918e2624..c1cf44f00870 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -12,6 +12,7 @@ config ARM
->  	select ARCH_HAS_MEMBARRIER_SYNC_CORE
->  	select ARCH_HAS_PTE_SPECIAL if ARM_LPAE
->  	select ARCH_HAS_PHYS_TO_DMA
-> +	select ARCH_HAS_SETUP_DMA_OPS
->  	select ARCH_HAS_SET_MEMORY
->  	select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
->  	select ARCH_HAS_STRICT_MODULE_RWX if MMU
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index 31d3b96f0f4b..a224b6e39e58 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -96,10 +96,6 @@ static inline unsigned long dma_max_pfn(struct device *dev)
->  }
->  #define dma_max_pfn(dev) dma_max_pfn(dev)
->  
-> -#define arch_setup_dma_ops arch_setup_dma_ops
-> -extern void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> -			       const struct iommu_ops *iommu, bool coherent);
-> -
->  #ifdef CONFIG_MMU
->  #define arch_teardown_dma_ops arch_teardown_dma_ops
->  extern void arch_teardown_dma_ops(struct device *dev);
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index a4168d366127..63909f318d56 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -22,6 +22,7 @@ config ARM64
->  	select ARCH_HAS_KCOV
->  	select ARCH_HAS_MEMBARRIER_SYNC_CORE
->  	select ARCH_HAS_PTE_SPECIAL
-> +	select ARCH_HAS_SETUP_DMA_OPS
->  	select ARCH_HAS_SET_MEMORY
->  	select ARCH_HAS_STRICT_KERNEL_RWX
->  	select ARCH_HAS_STRICT_MODULE_RWX
-> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> index 95dbf3ef735a..de96507ee2c1 100644
-> --- a/arch/arm64/include/asm/dma-mapping.h
-> +++ b/arch/arm64/include/asm/dma-mapping.h
-> @@ -29,10 +29,6 @@ static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
->  	return NULL;
->  }
->  
-> -void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> -			const struct iommu_ops *iommu, bool coherent);
-> -#define arch_setup_dma_ops	arch_setup_dma_ops
-> -
->  #ifdef CONFIG_IOMMU_DMA
->  void arch_teardown_dma_ops(struct device *dev);
->  #define arch_teardown_dma_ops	arch_teardown_dma_ops
-> diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
-> index 0d14f51d0002..dc5d70f674e0 100644
-> --- a/arch/mips/Kconfig
-> +++ b/arch/mips/Kconfig
-> @@ -1118,6 +1118,7 @@ config DMA_MAYBE_COHERENT
->  
->  config DMA_PERDEV_COHERENT
->  	bool
-> +	select ARCH_HAS_SETUP_DMA_OPS
->  	select DMA_NONCOHERENT
->  
->  config DMA_NONCOHERENT
-> diff --git a/arch/mips/include/asm/dma-mapping.h b/arch/mips/include/asm/dma-mapping.h
-> index 20dfaad3a55d..34de7b17b41b 100644
-> --- a/arch/mips/include/asm/dma-mapping.h
-> +++ b/arch/mips/include/asm/dma-mapping.h
-> @@ -15,14 +15,4 @@ static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
->  #endif
->  }
->  
-> -#define arch_setup_dma_ops arch_setup_dma_ops
-> -static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
-> -				      u64 size, const struct iommu_ops *iommu,
-> -				      bool coherent)
-> -{
-> -#ifdef CONFIG_DMA_PERDEV_COHERENT
-> -	dev->dma_coherent = coherent;
-> -#endif
-> -}
-> -
->  #endif /* _ASM_DMA_MAPPING_H */
-> diff --git a/arch/mips/mm/dma-noncoherent.c b/arch/mips/mm/dma-noncoherent.c
-> index cb38461391cb..0606fc87b294 100644
-> --- a/arch/mips/mm/dma-noncoherent.c
-> +++ b/arch/mips/mm/dma-noncoherent.c
-> @@ -159,3 +159,11 @@ void arch_dma_cache_sync(struct device *dev, void *vaddr, size_t size,
->  
->  	dma_sync_virt(vaddr, size, direction);
->  }
-> +
-> +#ifdef CONFIG_DMA_PERDEV_COHERENT
-> +void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> +		const struct iommu_ops *iommu, bool coherent)
-> +{
-> +	dev->dma_coherent = coherent;
-> +}
-> +#endif
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index b904d55247ab..2b20d60e6158 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -671,11 +671,15 @@ static inline int dma_coerce_mask_and_coherent(struct device *dev, u64 mask)
->  	return dma_set_mask_and_coherent(dev, mask);
->  }
->  
-> -#ifndef arch_setup_dma_ops
-> +#ifdef CONFIG_ARCH_HAS_SETUP_DMA_OPS
-> +void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> +		const struct iommu_ops *iommu, bool coherent);
-> +#else
->  static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
-> -				      u64 size, const struct iommu_ops *iommu,
-> -				      bool coherent) { }
-> -#endif
-> +		u64 size, const struct iommu_ops *iommu, bool coherent)
-> +{
-> +}
-> +#endif /* CONFIG_ARCH_HAS_SETUP_DMA_OPS */
->  
->  #ifndef arch_teardown_dma_ops
->  static inline void arch_teardown_dma_ops(struct device *dev) { }
-> diff --git a/kernel/dma/Kconfig b/kernel/dma/Kconfig
-> index ca88b867e7fe..c44599d128e8 100644
-> --- a/kernel/dma/Kconfig
-> +++ b/kernel/dma/Kconfig
-> @@ -19,6 +19,9 @@ config ARCH_HAS_DMA_COHERENCE_H
->  config HAVE_GENERIC_DMA_COHERENT
->  	bool
->  
-> +config ARCH_HAS_SETUP_DMA_OPS
-> +	bool
-> +
->  config ARCH_HAS_SYNC_DMA_FOR_DEVICE
->  	bool
->  
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+QW0gRGllbnN0YWcsIGRlbiAwNC4xMi4yMDE4LCAxNDoyNyArMDEwMCBzY2hyaWViIFN0ZWZhbiBB
+Z25lcjoKPiBUaGUgY3VzdG9tIGZhdWx0IGhhbmRsZXIgaXMgY3VycmVudGx5IG9ubHkgbWVhbnQg
+dG8gaGFuZGxlIGtlcm5lbAo+IG1vZGUgYnVzIGZhdWx0cy4gRXhpdCBpbiBjYXNlIHRoZSBhYm9y
+dCBoYXBwZW5lZCBpbiB1c2VyIG1vZGUuCj4gCj4gU2lnbmVkLW9mZi1ieTogU3RlZmFuIEFnbmVy
+IDxzdGVmYW5AYWduZXIuY2g+CgpSZXZpZXdlZC1ieTogTHVjYXMgU3RhY2ggPGwuc3RhY2hAcGVu
+Z3V0cm9uaXguZGU+Cgo+IC0tLQo+IMKgZHJpdmVycy9wY2kvY29udHJvbGxlci9kd2MvcGNpLWlt
+eDYuYyB8IDEwICsrKysrKysrLS0KPiDCoDEgZmlsZSBjaGFuZ2VkLCA4IGluc2VydGlvbnMoKyks
+IDIgZGVsZXRpb25zKC0pCj4gCj4gZGlmZiAtLWdpdCBhL2RyaXZlcnMvcGNpL2NvbnRyb2xsZXIv
+ZHdjL3BjaS1pbXg2LmMgYi9kcml2ZXJzL3BjaS9jb250cm9sbGVyL2R3Yy9wY2ktaW14Ni5jCj4g
+aW5kZXggNjlmODYyMzRmN2MwLi41NGEyOWU0NDEzMDMgMTAwNjQ0Cj4gLS0tIGEvZHJpdmVycy9w
+Y2kvY29udHJvbGxlci9kd2MvcGNpLWlteDYuYwo+ICsrKyBiL2RyaXZlcnMvcGNpL2NvbnRyb2xs
+ZXIvZHdjL3BjaS1pbXg2LmMKPiBAQCAtMjcwLDggKzI3MCwxNCBAQCBzdGF0aWMgaW50IGlteDZx
+X3BjaWVfYWJvcnRfaGFuZGxlcih1bnNpZ25lZCBsb25nIGFkZHIsCj4gwqAJCXVuc2lnbmVkIGlu
+dCBmc3IsIHN0cnVjdCBwdF9yZWdzICpyZWdzKQo+IMKgewo+IMKgCXVuc2lnbmVkIGxvbmcgcGMg
+PSBpbnN0cnVjdGlvbl9wb2ludGVyKHJlZ3MpOwo+IC0JdW5zaWduZWQgbG9uZyBpbnN0ciA9ICoo
+dW5zaWduZWQgbG9uZyAqKXBjOwo+IC0JaW50IHJlZyA9IChpbnN0ciA+PiAxMikgJiAxNTsKPiAr
+CXVuc2lnbmVkIGxvbmcgaW5zdHI7Cj4gKwlpbnQgcmVnOwo+ICsKPiArCWlmICh1c2VyX21vZGUo
+cmVncykpCj4gKwkJcmV0dXJuIDE7Cj4gKwo+ICsJaW5zdHIgPSAqKHVuc2lnbmVkIGxvbmcgKilw
+YzsKPiArCXJlZyA9IChpbnN0ciA+PiAxMikgJiAxNTsKPiDCoAo+IMKgCS8qCj4gwqAJwqAqIElm
+IHRoZSBpbnN0cnVjdGlvbiBiZWluZyBleGVjdXRlZCB3YXMgYSByZWFkLAoKX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWls
+aW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0
+cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
