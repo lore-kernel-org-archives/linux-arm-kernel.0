@@ -2,72 +2,63 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,UNPARSEABLE_RELAY autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 56890C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 17:05:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C17DAC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 17:12:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 23847218AD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 17:05:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8E5FF2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 17:12:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ogs2aKEP";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="Y1t9jigP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 23847218AD
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mb8VBMzN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8E5FF2082F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZLwKf7h7zqkbTfEyvmBMOZiwClbevUvDh66/eDcKDLY=; b=Ogs2aKEParxBSW
-	PGZe4Ohmsz+kj44qPLPy0Aw0NBdb/aUTWWeBbkKTpsFYLvcG7vM2t5KLg0Ji0rzKQWFt6+O+/ZmUO
-	dUX8aIXo8s9+JWzAB9F51q/Cg82tj6RmyKtzB8VDzE2yvRCcW1Di87jqXP9pd+fbbIW26bVp+3EwF
-	fBXKL5q80itm1T9OItCEbgqM7nsgSuRV1rDH8mS8WoEzZFC32MKSY4BnN3zkUuzHnBI1f/MiAXDGl
-	tMQGLLx7ErzjEg2F2WX/1rhz5541CHSV+Ug9xQimzMs5Bf99/G1CL0XDgJ1jzYfPqkDGlOAJRsk/n
-	GjfP9+U5Hjk3Bxk8g0Ow==;
+	List-Owner; bh=w5ZbeTjIgqWaOXdFhv7mIJucVIxTRvk/HCPDsxaJmf0=; b=Mb8VBMzNs//+To
+	/DC8tnniSBJUNfaxnm1+I1NjcSXzaESfH8w63OmQbeiCELyTUbviy7abcB4qn5UGOSKht2NEI6zt4
+	6nviNYdbwHIegVOLESD5PiU85lK09zoViN2wl0dig7zkiscGzYGL/0IapgAI2wyhrl7xG44RF/FeK
+	sKDo27DTby8vsnAROovRcXar+YZUjpCOGt3eJO6GYg1gNMwi4s6XHhG8NIWIlKHV0T3H8YONueNR1
+	AIXkaa0t4fxlF4RIKSEOB4pJsNrR4d6BTjG6lzYXlVhMJvUYaWh9slflUkDzF/XRzZABAnLurD+/C
+	5UNaX8jF2cL5NeDjQZ+Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtF0t-0004Gf-JH; Mon, 11 Feb 2019 17:04:59 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gtF8N-0007tL-4D; Mon, 11 Feb 2019 17:12:43 +0000
+Received: from bhuna.collabora.co.uk ([2a00:1098:0:82:1000:25:2eeb:e3e3])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtF0s-0004GS-BJ
- for linux-arm-kernel@bombadil.infradead.org; Mon, 11 Feb 2019 17:04:58 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=NtW9vSG4B9Be8vJJa6zgqc1RANLcAk+oi8MXCzEZ4VU=; b=Y1t9jigPcJQuy+6ZytUPMdcDk
- kcvDhn9nybF03iEbknI0N3tbXAJlxaMQ2f6hJJfcJ6nYjsb0mO6pFvJgvVcvg+WeF8wDpZM3f1X+z
- iWxU6HJcRAJk1vF4EYdkZ7xocFwYoxXdu6WhXvyAJjKjlJkCtRNnv/Ijacgdg8srcrA2e5seoeB5Y
- Es7vmJ4Sxt/Ju+G9LYnA/ldItYVsc0snS1g9tmYGKizi4qgSHMPPXL7DWLlVsDBUmO3t4dxN62tet
- s7fJVp83EP8E3d+AoPoyc5/lfn2kbFNJDfFojVXdj5DgdHACuzvIQDzx4K4qy9TGHKQf6sJrEbT9S
- auJ3b59SA==;
-Received: from j217100.upc-j.chello.nl ([24.132.217.100]
- helo=hirez.programming.kicks-ass.net)
- by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtF0k-0005pj-Bv; Mon, 11 Feb 2019 17:04:50 +0000
-Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
- id 5DC0D20D0E3C8; Mon, 11 Feb 2019 18:04:47 +0100 (CET)
-Date: Mon, 11 Feb 2019 18:04:47 +0100
-From: Peter Zijlstra <peterz@infradead.org>
-To: Waiman Long <longman@redhat.com>
-Subject: Re: [PATCH] locking/rwsem: Remove arch specific rwsem files
-Message-ID: <20190211170447.GO32477@hirez.programming.kicks-ass.net>
-References: <1549850450-10171-1-git-send-email-longman@redhat.com>
- <20190211115833.GY32511@hirez.programming.kicks-ass.net>
- <e470384d-fb7b-132d-253b-23c495e7c285@redhat.com>
+ id 1gtF8J-0007sU-8K
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 17:12:40 +0000
+Received: from [127.0.0.1] (localhost [127.0.0.1])
+ (Authenticated sender: ezequiel) with ESMTPSA id 081BB260491
+Message-ID: <209bafb880bd9410f875f5e6f16923e38ec76df4.camel@collabora.com>
+Subject: Re: [PATCH v3 1/2] media: uapi: Add H264 low-level decoder API
+ compound controls.
+From: Ezequiel Garcia <ezequiel@collabora.com>
+To: nicolas.dufresne@collabora.com, tfiga@chromium.org,
+ posciak@chromium.org,  Maxime Ripard <maxime.ripard@bootlin.com>,
+ hans.verkuil@cisco.com, acourbot@chromium.org, 
+ sakari.ailus@linux.intel.com, Laurent Pinchart
+ <laurent.pinchart@ideasonboard.com>
+Date: Mon, 11 Feb 2019 14:12:25 -0300
+In-Reply-To: <562aefcd53a1a30d034e97f177096d70fb705f2b.1549895062.git-series.maxime.ripard@bootlin.com>
+References: <cover.d3bb4d93da91ed5668025354ee1fca656e7d5b8b.1549895062.git-series.maxime.ripard@bootlin.com>
+ <562aefcd53a1a30d034e97f177096d70fb705f2b.1549895062.git-series.maxime.ripard@bootlin.com>
+Organization: Collabora
+User-Agent: Evolution 3.30.5-1 
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <e470384d-fb7b-132d-253b-23c495e7c285@redhat.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190211_091239_423806_776E72C8 
+X-CRM114-Status: UNSURE (   9.73  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,84 +70,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, linux-xtensa@linux-xtensa.org,
- Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
- Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
- linux-sh@vger.kernel.org, linux-hexagon@vger.kernel.org, x86@kernel.org,
- Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- Linus Torvalds <torvalds@linux-foundation.org>, Ingo Molnar <mingo@redhat.com>,
- Borislav Petkov <bp@alien8.de>, "H. Peter Anvin" <hpa@zytor.com>,
- linux-alpha@vger.kernel.org, sparclinux@vger.kernel.org,
- Thomas Gleixner <tglx@linutronix.de>, linuxppc-dev@lists.ozlabs.org,
- Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: jonas@kwiboo.se, linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org,
+ jernej.skrabec@gmail.com, Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Chen-Yu Tsai <wens@csie.org>, jenskuske@gmail.com,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Guenter Roeck <groeck@chromium.org>, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 11:35:24AM -0500, Waiman Long wrote:
-> On 02/11/2019 06:58 AM, Peter Zijlstra wrote:
-> > Which is clearly worse. Now we can write that as:
-> >
-> >   int __down_read_trylock2(unsigned long *l)
-> >   {
-> > 	  long tmp = READ_ONCE(*l);
-> >
-> > 	  while (tmp >= 0) {
-> > 		  if (try_cmpxchg(l, &tmp, tmp + 1))
-> > 			  return 1;
-> > 	  }
-> >
-> > 	  return 0;
-> >   }
-> >
-> > which generates:
-> >
-> >   0000000000000030 <__down_read_trylock2>:
-> >   30:   48 8b 07                mov    (%rdi),%rax
-> >   33:   48 85 c0                test   %rax,%rax
-> >   36:   78 18                   js     50 <__down_read_trylock2+0x20>
-> >   38:   48 8d 50 01             lea    0x1(%rax),%rdx
-> >   3c:   f0 48 0f b1 17          lock cmpxchg %rdx,(%rdi)
-> >   41:   75 f0                   jne    33 <__down_read_trylock2+0x3>
-> >   43:   b8 01 00 00 00          mov    $0x1,%eax
-> >   48:   c3                      retq
-> >   49:   0f 1f 80 00 00 00 00    nopl   0x0(%rax)
-> >   50:   31 c0                   xor    %eax,%eax
-> >   52:   c3                      retq
-> >
-> > Which is a lot better; but not quite there yet.
-> >
-> >
-> > I've tried quite a bit, but I can't seem to get GCC to generate the:
-> >
-> > 	add $1,%rdx
-> > 	jle
-> >
-> > required; stuff like:
-> >
-> > 	new = old + 1;
-> > 	if (new <= 0)
-> >
-> > generates:
-> >
-> > 	lea 0x1(%rax),%rdx
-> > 	test %rdx, %rdx
-> > 	jle
+On Mon, 2019-02-11 at 15:39 +0100, Maxime Ripard wrote:
 > 
-> Thanks for the suggested code snippet. So you want to replace "lea
-> 0x1(%rax), %rdx" by "add $1,%rdx"?
-> 
-> I think the compiler is doing that so as to use the address generation
-> unit for addition instead of using the ALU. That will leave the ALU
-> available for doing other arithmetic operation in parallel. I don't
-> think it is a good idea to override the compiler and force it to use
-> ALU. So I am not going to try doing that. It is only 1 or 2 more of
-> codes anyway.
+> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> index d6eed479c3a6..6fc955926bdb 100644
+> --- a/include/uapi/linux/videodev2.h
+> +++ b/include/uapi/linux/videodev2.h
+> @@ -645,6 +645,7 @@ struct v4l2_pix_format {
+>  #define V4L2_PIX_FMT_H264     v4l2_fourcc('H', '2', '6', '4') /* H264 with start codes */
+>  #define V4L2_PIX_FMT_H264_NO_SC v4l2_fourcc('A', 'V', 'C', '1') /* H264 without start codes */
+>  #define V4L2_PIX_FMT_H264_MVC v4l2_fourcc('M', '2', '6', '4') /* H264 MVC */
+> +#define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H264 parsed slices */
 
-Yeah, I was trying to see what I could make it do.. #2 really should be
-good enough, but you know how it is once you're poking at it :-)
+Nicolas and I have discussed the pixel format, and came up with
+the following proposal.
+
+Given this format represents H264 parsed slices, without any start code,
+perhpaps we name it as:
+
+V4L2_PIX_FMT_H264_SLICE_RAW
+
+Then, we'd also add:
+
+V4L2_PIX_FMT_H264_SLICE_ANNEX_B
+
+To represent H264 parsed slices with annex B (3- or 4-byte) start code.
+This one is what the Rockchip VPU driver would expose.
+
+Ideas?
+
 
 _______________________________________________
 linux-arm-kernel mailing list
