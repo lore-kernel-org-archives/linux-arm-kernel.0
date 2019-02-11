@@ -2,81 +2,78 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4F6F1C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 08:34:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 524D3C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 08:45:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1E5DD20863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 08:34:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 18D9021736
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 08:45:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BDXCmMxX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E5DD20863
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ofKATLQl";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Lt8y2bnm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 18D9021736
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qFWM6sT42hawjIRKmeM4mOcAyVtzlNhOPHn/0HqwfNQ=; b=BDXCmMxXyEW4xr
-	fWmrRYwTQQ9+hIa9FP4KjmoyK5U68X1s/+4Nz9g5KIDGiO+V7Mc1IDqxw5eKIHFwgzqhqOECwXEIA
-	ec7RP/k/F0Y0wE4op0BrjA9yF8Ydckxz0K6cJx3lH0RSPGcQlY9IkzMGfmzgc4jzBdmj88mULbswh
-	62/kpGzSQQhuWPRUWgzglfAepYU18/ql9hTgn6jLvyAyl2Dz1K9MLfKVme60yztzQrR8FSs2FWFg0
-	1rI6ywEosUcb5gv+Ib0dthlQxX1obPIvFFq1GB/A/toEfm57s2Kd8OOKOqHLVlmILinKJfOGDG97s
-	LgNrOzH4l3V5ANQIviUw==;
+	List-Owner; bh=AyYto2HEU6nOPyKzouq3elHhCnvt2soD58lte3MIkXc=; b=ofKATLQl4q5wgn
+	FQhT70G8jMDne4piXV0lTz4EVhYCOWajfi/c3SAqUAGeF2dTVM/8QJ/oerGBNQ7/pSvpjrP2HHt68
+	Bf9Kje7zzmwU/2TdZ7C+FQO5awrGi1M6QmYUXgVj7CrJmEd4xFRKsddO1DtCOCIcrqP1AVKMG0EHv
+	v2qw0LDYpPchJbF/qUecGy1kru36m10+fiyiXPtLT5y1ksDu0jUDz3NEdgJjsYnab1ohEuVRXG8wp
+	2LUiCGU1uEjDnvusJTmhFaF0oRiOL3NK2+whsVV0aP7ylzNwbJSG3fXWYgxxwRIMcuMUebxhZjUxm
+	m81qVp5Yhd9TwoG1L9Ng==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt72T-0006R0-QG; Mon, 11 Feb 2019 08:34:05 +0000
-Received: from mail-lf1-f66.google.com ([209.85.167.66])
+	id 1gt7Dq-0002jw-4X; Mon, 11 Feb 2019 08:45:50 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt72N-0006OH-2T; Mon, 11 Feb 2019 08:34:00 +0000
-Received: by mail-lf1-f66.google.com with SMTP id b20so7026755lfa.12;
- Mon, 11 Feb 2019 00:33:58 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=DXRBrZfleR9tkrKooKw/mjJvBRgchmBHV3mJTc0H0Cg=;
- b=jdMPyr1g75xe5oiftcIFejea8oCa2I8YnNfAXm6wxxehpw0m8+DBgq5sF7pWqQWDW6
- 3e3USB85Rl2cforwX87MFoO2m0weAy0kUzokrJa8BMDFKAzpo0zNrlcIRh9P+kUdXJuO
- /Pw6yR+geIMPu3UvqOVv+Hx7DWEBLrguRoZ+H5OrNuCkURLQQ2B1RmbbWiEGCWq916xG
- e7ZrY5Fo7dxHs7OIIY3DjisVhfndf2aBYCWbpH2sho2IbY3jZW5owaFHiQ6vS0FHvglh
- gAOmcRtWGRspyeBkrdWsjffgba9MdDmXYmpSrBB9S8z2786MIDI9ItFhWYmp/RMn9/Vm
- UD8w==
-X-Gm-Message-State: AHQUAuY6FigrHeQoQGAslGWglACblcC4YjmWneG35meQFsGe294TsB6e
- ypVvNq1r05hTRWUmZG8k5P0=
-X-Google-Smtp-Source: AHgI3IaNzz58l1AYM1ozG1ZRxrZUYIsaYnBjmzsNy8Hca5hFmaq3Y8kJKEr03zDF3SLJc4PJJE5ejQ==
-X-Received: by 2002:a19:ee13:: with SMTP id g19mr10611671lfb.72.1549874036291; 
- Mon, 11 Feb 2019 00:33:56 -0800 (PST)
-Received: from xi.terra (c-74bee655.07-184-6d6c6d4.bbcust.telenor.se.
- [85.230.190.116])
- by smtp.gmail.com with ESMTPSA id z6sm2138830lfa.87.2019.02.11.00.33.55
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 11 Feb 2019 00:33:55 -0800 (PST)
-Received: from johan by xi.terra with local (Exim 4.91)
- (envelope-from <johan@kernel.org>)
- id 1gt72D-0004pO-Rw; Mon, 11 Feb 2019 09:33:49 +0100
-Date: Mon, 11 Feb 2019 09:33:49 +0100
-From: Johan Hovold <johan@kernel.org>
-To: Loys Ollivier <lollivier@baylibre.com>
-Subject: Re: [PATCH v2 2/4] dt-bindings: gnss: add mediatek binding
-Message-ID: <20190211083349.GU4686@localhost>
-References: <1547744074-28308-1-git-send-email-lollivier@baylibre.com>
- <1547744074-28308-3-git-send-email-lollivier@baylibre.com>
- <20190125090755.GB3691@localhost> <867eeo7pjm.fsf@baylibre.com>
+ id 1gt7Dl-0002jD-Rm
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 08:45:48 +0000
+Received: from mail-lj1-f173.google.com (mail-lj1-f173.google.com
+ [209.85.208.173])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 9B7152176F
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 11 Feb 2019 08:45:43 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549874744;
+ bh=aNjOHNDg94ZkKvA1xr9xCksj4QuuBPIf/hPN1+P9Vu4=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=Lt8y2bnmqI+8Px1Nw6Wk9vC5j4asaD4QJYuNedGmNWvFlXaUBWA/JrKj8IwmHP+HD
+ uD/EbB3LJqv4o9zCyHVRiZlofwG8wT0+Cqx4+iJjEstZ0gghWd/SlfOuZZK1yJQFga
+ haDqVi1VJzENoWO6mhecjWHlsZ5MqKcND8i0C+VA=
+Received: by mail-lj1-f173.google.com with SMTP id v12-v6so3299889ljc.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 11 Feb 2019 00:45:43 -0800 (PST)
+X-Gm-Message-State: AHQUAuaCIOkvZov8K2u8HYGLZCvncrfWjezrQXG+RelMq33C+vOd7C0Q
+ 8iC8qWpxN0oOhb+I9SXkhQisPDlzqDiClZ4BnAo=
+X-Google-Smtp-Source: AHgI3IbzeKeYkKpuAfCg0dy/z/dT38QKh18bso1sBal8m+g0p0o2lxo+lLo4eccrdIB8UXtjJABSI3/qlbQRij3PWoQ=
+X-Received: by 2002:a2e:81da:: with SMTP id
+ s26-v6mr21000889ljg.183.1549874741764; 
+ Mon, 11 Feb 2019 00:45:41 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <867eeo7pjm.fsf@baylibre.com>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+References: <20190210225114.20110-1-stuart.menefy@mathembedded.com>
+In-Reply-To: <20190210225114.20110-1-stuart.menefy@mathembedded.com>
+From: Krzysztof Kozlowski <krzk@kernel.org>
+Date: Mon, 11 Feb 2019 09:45:30 +0100
+X-Gmail-Original-Message-ID: <CAJKOXPe+G_gPNLQcaE5kvXFLFzhXo538w8-34k3gcK7yNL8txA@mail.gmail.com>
+Message-ID: <CAJKOXPe+G_gPNLQcaE5kvXFLFzhXo538w8-34k3gcK7yNL8txA@mail.gmail.com>
+Subject: Re: [PATCH 0/2] Subject: [PATCH 0/2] clocksource: exynos_mct: Clear
+ timer interrupt when shutting down
+To: Stuart Menefy <stuart.menefy@mathembedded.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_003359_157144_8F43A5E4 
-X-CRM114-Status: GOOD (  21.37  )
+X-CRM114-CacheID: sfid-20190211_004545_923096_784E1922 
+X-CRM114-Status: GOOD (  15.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,89 +85,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Kevin Hilman <khilman@baylibre.com>, Johan Hovold <johan@kernel.org>,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-mediatek@lists.infradead.org, linux-amlogic@lists.infradead.org,
+Cc: "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
+ Kukjin Kim <kgene@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 28, 2019 at 04:46:53PM +0100, Loys Ollivier wrote:
-> 
-> On Fri 25 Jan 2019 at 09:07, Johan Hovold wrote:
-> 
-> > On Thu, Jan 17, 2019 at 05:54:32PM +0100, Loys Ollivier wrote:
-> >> Add binding for Mediatek-based GNSS receivers.
-> >> 
-> >> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
-> >> ---
-> >> 
-> >> v2:
-> >> Renamed bindings from Globaltop/gtop to Mediatek/mtk.
-> >> Moved current-speed as an optional propertie.
-> >> Removed the status line in the example.
-> >> Added "mediatek,mt3339" compatible.
+On Sun, 10 Feb 2019 at 23:51, Stuart Menefy
+<stuart.menefy@mathembedded.com> wrote:
+>
+> When debugging suspend problems on Exynos 5260, I had a large number
+> of debugging prints going to the serial port after interrupts
+> had been disabled but before the timer interrupt was shutdown. This
+> was long enough for a timer tick to occur, but as interrupts were
+> disabled the ISR didn't run, and so the interrupt wasn't cleared.
+> Later when the timer was shutdown the interrupt was left asserted and
+> so the wfi at the heart of the suspend code didn't wait, causing
+> the suspend to fail.
+>
+> Currently the code which stops the timer when it is on one-shot mode
+> and the interrupt occurs is in exynos4_mct_tick_clear(), meaning if we
+> called this from the shutdown code exynos4_mct_tick_stop() could be
+> called twice. So first restructure the existing code, so the check for
+> one-shot mode and stopping the timer is moved to the ISR, leaving
+> exynos4_mct_tick_clear() just clearing the interrupt flag.
+>
+> Once this has been done simply call exynos4_mct_tick_clear() from
+> set_state_shutdown().
 
-> >> +++ b/Documentation/devicetree/bindings/gnss/mediatek.txt
-> >> @@ -0,0 +1,39 @@
-> >> +Mediatek-based GNSS Receiver DT binding
-> >> +
-> >> +Mediatek chipsets are used in GNSS-receiver modules produced by several
-> >> +vendors and can use UART, SPI or I2C interfaces.
-> >> +
-> >> +Please see Documentation/devicetree/bindings/gnss/gnss.txt for generic
-> >> +properties.
-> >> +
-> >> +Required properties:
-> >> +
-> >> +- compatible	: Must be one of
-> >> +
-> >> +			"globaltop,pa6h"
-> >> +			"mediatek,mt3339"
-> >
-> > I'm not sure it makes sense to add the GPS chip itself as it cannot be
-> > used stand-alone AFAIU, and either not way would require a lot more
-> > resources to be defined than what you add to this binding.
-> 
-> OK, I find it a bit confusing to have Mediatek bindings but no
-> compatible Mediatek SoCs.
-> But it is true that it can't be used stand-alone. I will remove this
-> reference and also remove it from the mtk.c driver code from this patch
-> serie.
+For sending the corrected version. This is second revision of the
+patchset so please remember to add v2 to the title and changelog in
+cover letter. v2 can be easily added with format-patch (-v2).
 
-> >> +Required properties (I2C):
-> >> +- reg		: I2C slave address
-> >> +
-> >> +Required properties (SPI):
-> >> +- reg		: SPI chip select address
-> >
-> > While the mt3339 appears to support these interfaces, the globaltop one
-> > does not.
-> >
-> > Have you looked around for a small sample of mt3339-based receivers, to
-> > see whether anyone actually provides these?
-> 
-> Again I'm confused by the fact that it is the Mediatek bindings.
-> Hence why I have added it and why it was not present in the v1 that was
-> only for Globaltop.
-
-This is no different from the sirfstar driver for receivers based on
-those chipsets but manufactured by various other vendors.
-
-> I find it odd mentionning the chipset but not all its interfaces.
-> I will remove these sections and only list supported interfaces (i.e.
-> UART). Other interfaces can be added afterward if one finds a board that
-> provides them.
-
-Right, but please do look around for other receivers using this chipset
-so that we can make the binding generic enough to cover those as well
-(e.g. by choosing representative resource names).
-
-Johan
+Best regards,
+Krzysztof
 
 _______________________________________________
 linux-arm-kernel mailing list
