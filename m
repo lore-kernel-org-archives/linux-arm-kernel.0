@@ -2,83 +2,108 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 15592C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:50:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A16BEC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:53:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D802D20844
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:50:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 715C3218D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:53:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LBP6zBuk";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="HHUuqiOo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D802D20844
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lSMW1OHB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 715C3218D8
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8+/MBNAMBl/ikNYQDhdWNbKICnaryeVz9LJF7zQxjxE=; b=LBP6zBuksJUJw/
-	N1UUtN0cJpPpUCodJAWqC8PnblFyTp7vHD560F6yqVYaskljI5oqp5rCB1SO9oGDHqsn8OwvJO0IO
-	HAjcSUMtF8iIta0mwWYZMVybViPpVBQ/iVOhTOHqiw5FHTr054ulN0cDw+4q3ZBbp0pvF9UEpGyv6
-	mSd1BtQybsfOHCNudJyz1VYGRPeKtXnACdEn0VhFX8TEmMXSDpB6mr5F7F+Ev9hTAajqeK5G2XN6O
-	sYkvU2ccuPICk46sQovY8XgePtjJK3eaFsuYi/zOZrolD+asy00taNoFZjCuRHH3Bog1wGVpgEuKD
-	bXbo9CFM6Pcw4WBCEoSQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Q8CDo2Ma+/fAJVm/pZ4GORc/yCAypuSHoH4BwKkzdNc=; b=lSMW1OHBLkkIxi
+	HMCcG375ZwIgn86wj0NmgS5ex0p5oz57ZBbf9fe3ABAgqUVF5GnljLi/H1pVKWZFDpbBq4ZLVNEMf
+	UjliY91tZjH0Re+1ie6kZ9Aa9HvqVfrP6tSQOgeVSbwFo0B88Kt997P9m/L8C8QHke3maCZ7AVry0
+	yGbn4Wu0W4vmkHT8wMwROEfD78oIeB91oZSG8xTdx1YnBwe+sFSHIYPAB2j8OOq7DoPssMWzBeID7
+	anQx0J41dxJOTAdhmSyPfsvZwYFKOEGulOnxtDkyq7YinnvGtAKM86varJFl3Mx6y5epWEq4YEQ7T
+	NA/cSTNLPGJl4XoxhN+g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtA6E-0006L2-Hq; Mon, 11 Feb 2019 11:50:10 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtA6B-0005jx-I0
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 11:50:08 +0000
-Received: by mail-pf1-x441.google.com with SMTP id q1so5145408pfi.5
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 03:50:06 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=XU49PgCv4RL4RMGCazRuBER6V4Ggwit8dUrBrWUroqw=;
- b=HHUuqiOoeKfoeVO8hnOkhpT2F59MwVnqpiM0JPJqy0sQSc1oh42kbDF8hYsYrUiBtB
- XeQCa3FVpxXLYDvsCVjSSDMK30H9q44SfaZjkv+Vkw1AcV1KsUPaLC5Ag1Dfwh/k5San
- whtnTjPHtudE6bfNBbIx0wULGYNx/qbf7yk5C8XviNl69N00lArSfEOR9BdgpZrXtix6
- zEGT27c5wYbexzHGULnj1yKeE9QPJWO9KniqBU+0PC7jnZjeNFJPR2nbzipjGmVnq6Cd
- iifuHgUWB9LL8nRJIe1RPCKhmzxcHwXgo+Auxg6EPo8kfRaM5nUgf8mFLeRwyBQ78e/Q
- 6FBA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=XU49PgCv4RL4RMGCazRuBER6V4Ggwit8dUrBrWUroqw=;
- b=G2UPlh6UILK0G5rluUQDa3dYJRwhc+yWxzxU48KbWShdTs95fHwiWkoOOYjoiJkh3x
- oe/+OpzFBM2YTkUHpgXJdbFrquub7gimme8suFb+Jwo4ihWKW/gowv7M622ZMaSEMzZs
- vq8rcDyfKadRB1HD0SPziDLKCCzvOCpWbxUmpAUxmyYCjc4jD8AW/BR6dIclTXiyrVZI
- gfpIUWpGCPyWoztqymMVcCayoUVr515gwnUBgh+MeVemeDxl3UTeFu/hHdrDnkaqgpGN
- zUNwE/FDa3PcoanS4LYiN1bMfaxc8Jk1qv5njDkhIkxe+/QAAD1aOUsiYjg23mW/qj7N
- 2R2A==
-X-Gm-Message-State: AHQUAuad2Cac75CiPGYOe2cxG2UzQnYGoAn/Ha4rWURdfgw08yxbJDJv
- fb73T+ljxEwTdl+Hi+22mQ/zAGNgYBT/sMHA388=
-X-Google-Smtp-Source: AHgI3Ia6ajnFnMVIOuZweBtgscHaivYNLDJxZeSjYG5wtTZaM9lvactiu9hk+HNCEQeXuJfaFx+dhqHw3ig2QRQQNh4=
-X-Received: by 2002:a62:5e41:: with SMTP id s62mr35994658pfb.232.1549885806138; 
- Mon, 11 Feb 2019 03:50:06 -0800 (PST)
+	id 1gtA94-0006lk-Iz; Mon, 11 Feb 2019 11:53:06 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtA90-0006lO-Nn
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 11:53:04 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DDBE380D;
+ Mon, 11 Feb 2019 03:53:01 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ E7B8C3F557; Mon, 11 Feb 2019 03:52:59 -0800 (PST)
+Subject: Re: [PATCH] arm64/io: Don't use WZR in writel
+To: Will Deacon <will.deacon@arm.com>,
+ AngeloGioacchino Del Regno <kholk11@gmail.com>
+References: <68b71c15f32341468a868f6418e4fcb375bc49ba.camel@gmail.com>
+ <20190211105755.GB30880@fuggles.cambridge.arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <38d8965a-cd41-17cf-1b95-8dd58c079be4@arm.com>
+Date: Mon, 11 Feb 2019 11:52:52 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <20190110175845.1203986-1-lkundrak@v3.sk>
- <16ce7d18e3b9a2232bd30c7d7741873d0d2d855a.camel@v3.sk>
-In-Reply-To: <16ce7d18e3b9a2232bd30c7d7741873d0d2d855a.camel@v3.sk>
-From: Andy Shevchenko <andy.shevchenko@gmail.com>
-Date: Mon, 11 Feb 2019 13:49:55 +0200
-Message-ID: <CAHp75VdUCxx=Hybv8nyd9nTUJ4+8FLeaRM3bCxezAFvdSN0EkQ@mail.gmail.com>
-Subject: Re: [PATCH v5 0/10] Add support for OLPC XO 1.75 Embedded Controller
-To: Lubomir Rintel <lkundrak@v3.sk>
+In-Reply-To: <20190211105755.GB30880@fuggles.cambridge.arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_035007_626490_702DC4A2 
-X-CRM114-Status: GOOD (  12.99  )
+X-CRM114-CacheID: sfid-20190211_035302_789103_B886872D 
+X-CRM114-Status: GOOD (  20.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,36 +115,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>, Linux PM <linux-pm@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Russell King <linux@armlinux.org.uk>,
- Platform Driver <platform-driver-x86@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>,
- linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>,
- Darren Hart <dvhart@infradead.org>, Andy Shevchenko <andy@infradead.org>
+Cc: Jens Axboe <axboe@kernel.dk>, Catalin Marinas <catalin.marinas@arm.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-arm-msm@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 1:46 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
+On 11/02/2019 10:57, Will Deacon wrote:
+> On Sat, Feb 09, 2019 at 07:34:53PM +0100, AngeloGioacchino Del Regno wrote:
+>> From 33fb6d036de273bb71ac1c67d7a91b7a5148e659 Mon Sep 17 00:00:00 2001
+>> From: "Angelo G. Del Regno" <kholk11@gmail.com>
+>> Date: Sat, 9 Feb 2019 18:56:46 +0100
+>> Subject: [PATCH] arm64/io: Don't use WZR in writel
+>>
+>> This is a partial revert of commit ee5e41b5f21a
+>> ("arm64/io: Allow I/O writes to use {W,X}ZR")
+>>
+>> When we try to use the zero register directly on some SoCs,
+>> their security will make them freeze due to a firmware bug.>> This behavior is seen with the arm-smmu driver freezing on
+>> TLBI and TLBSYNC on MSM8996, MSM8998, SDM630, SDM660.
 
-> Hello Andy & Darren,
->
-> I'm wondering if there's anything more I need to do in order for the
-> patches 01-07 to be queued for 5.1? I believe I addressed the issues
-> that were pointed out and I believe the patch set is already in a good
-> shape.
+This looks similar to the issue these SoCs have with GICv3, worked
+around in 9c8114c20d18.
 
-I remember Darren did some review and according to patch work he is in charge.
+> Hmm, this sounds very fragile. I hope they're not trapping and emulating
+> MMIO accesses and treating the zero register as the stack pointer...
 
-I dunno what Darren's plans are, but if I need to look at this series,
-it will require some time and may miss v5.1.
+I bet this is the case. The same bug was there in both KVM and Xen. The
+only difference is that we fixed it back in December 2015 (at least for
+KVM), while some of these SoCs were announced in 2017, and are still
+shipping. Great stuff.
 
--- 
-With Best Regards,
-Andy Shevchenko
+> 
+> Wouldn't this also be triggerable from userspace by mmap()ing either
+> /dev/mem or e.g. a PCI bar via sysfs?
+> 
+>> Allocating a temporary register to store the zero for the
+>> write actually solves the issue on these SoCs.
+> 
+> I don't think this catches all MMIO accesses, so I think we need to
+> understand more about the actual issue here. For example, is it only the
+> SMMU that causes this problem? Also, any workaround should be specific to
+> the broken SoCs.
+
+Also, nothing would prevent a compiler from generating these accesses.
+
+	M.
+
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
