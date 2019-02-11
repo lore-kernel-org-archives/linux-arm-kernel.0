@@ -2,51 +2,84 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 98A06C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:39:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3351EC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:40:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6B8E521B24
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:39:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E453C21B24
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:40:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S3e9jUlf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B8E521B24
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="beNVAij/";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dWlBTld9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E453C21B24
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=a5D7yfbg8TOIDzJLDcq2t0qeh3AnAArT7ZSGUG/RIO8=; b=S3e9jUlf2R2zbY
-	3pgVEZqIjn93pvbi6DG1RBxVsz1VJJOmTVZrMd/Y50sSyp+FEc34KU7hPDzWTe1H4Y7Ll4TlnmshN
-	/hg7zkIuASL+Ei54eWxTp2lChG3B7X5SMF+/n+cTpujRLYQhEkvPFWXvOKb1qrdnzp7o9Dzs8ed8W
-	pkj6ZMvxeygpQ3zpXuhJS75U585dzyTLmLqeU6afleM/PG2Vy+6Imo7QV67JqTqOGCaSYi9tedTjg
-	hZEg/9KTmPPtorTOPZmRaR+Tjtuy2W9LvwDor/HqDt7/GY6F58V+HWD/Yd6W5sCsT6lHYC+e6k7Re
-	i6JUKF9Elx+ABw+ivqiw==;
+	List-Owner; bh=ZOQGfTF7sBHZec+THrlhgXDGCw/yssVqcPna4idYzoQ=; b=beNVAij/zC3IiC
+	15EGjR4DurewYY+XaGngtQ/bYYTfLSdwQ5ZHPNhKrb0RcZKJrrolDiXoI9gWrFauW9ORhmsIafSIX
+	sl6+rDc/MpYrxc0WQi3eKmJWEqpS7eHN+LIujOX3SnznQj0XG3BFKScZqqC7JRdqD3l0BY1UZ1Fid
+	wSqgC8LLJdgs8XR+3KDCsJjooeg+C175MOKLeSwsECI6E1D9+mavtKf34LObS4iwbcETqNpfCNAUG
+	m4LjoRCzVWVzBWoYn0Aog1cl0wXeLIORl2QpjvzXf9rD77tD6/DZx9yBAnAJJ7QJidB+0hG/eNq9k
+	2oBztV4dakvDwv8UOiYw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtBoJ-0003Qj-8i; Mon, 11 Feb 2019 13:39:47 +0000
-Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
- helo=localhost)
- by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtBlA-0000WC-MV; Mon, 11 Feb 2019 13:36:33 +0000
-From: Christoph Hellwig <hch@lst.de>
-To: iommu@lists.linux-foundation.org
-Subject: [PATCH 12/12] dma-mapping: remove dma_assign_coherent_memory
-Date: Mon, 11 Feb 2019 14:35:54 +0100
-Message-Id: <20190211133554.30055-13-hch@lst.de>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190211133554.30055-1-hch@lst.de>
-References: <20190211133554.30055-1-hch@lst.de>
+	id 1gtBok-0004EA-Ey; Mon, 11 Feb 2019 13:40:14 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtBlX-0000rN-Id
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 13:37:23 +0000
+Received: by mail-wm1-x342.google.com with SMTP id j125so2320685wmj.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 11 Feb 2019 05:36:54 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=oqBNnbIu4ogAFHQv0IkubaNotkX2xJx7RZvZ6dahxA0=;
+ b=dWlBTld9j8T52lCHFf1Ji9Oq9JA3yqNuZYTfA0CidfToNWajVNFt+SqVtGK8FZGIGS
+ dA7Zc26RNnFiDFZbMKadqPTEJvebkib38hlO0bTffDmt2zKmpj8YPtRVy3GyVWBSXRmn
+ 5EknEw6wOsqXbSwRGAZURYB9Mh0VIxwYIRa+ViTmqxTOFxZGTu1rm8Fm5Vu1TFX3QNDO
+ 32t/nYBTJiweu0/hYuvVvTWbnIxtk/BoZ+3jxcZ8RBGdqFeQKHEJB/llZQVJuknf6wHw
+ bevQJtKjc1OKoCQ/wUNTU8UnPP1AMyOFmO9rBW7v5YbTFqAmdhz5tixs407i2QbTEXl0
+ JDkg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=oqBNnbIu4ogAFHQv0IkubaNotkX2xJx7RZvZ6dahxA0=;
+ b=ea4CdFGNs8+DRE/Tc6qxXNpyrXUQA7hAGA/F1hjaCthyPjppSG6pBYq7V6nmoTps26
+ LGzCtHbyeLfe6wwrk7OgmoMNr8yp0jb3lGmjYhxm7I1n0A7Oy7CzdPeh2/v9xbEnGghs
+ 37OF3kWQ9G8kBXWc/LmCiioFB5bca2+FkvspohAOXAhlG5RPv7JOQnFAed1aKZN4lWvk
+ Q9fXDiPgUnjOBzxskYSd1nizm9H/vFiHweip1Ziup6uNJpiylPHvFquenbGyJ0rW45lM
+ 0qREYbxnxIms8L69x2Yo5w5NJ58CLXwNExeGnXuGTngj/3I3OJseFjdVjNaszRNBzxUQ
+ a/Mg==
+X-Gm-Message-State: AHQUAuburbDZGS/bm6eCxXDZWUe92vKoVmVCcfRD9Z3EtVKUjryo6MES
+ coGMmVw1v6FlWh8qfBPPWrOn51wC5xbwnIzTdRo=
+X-Google-Smtp-Source: AHgI3IZepcynd+Hv6C7k9ZWYerJsqdBdRwCbYM4kp8mARDKItdDCOe9hcRBOaK0i7Z7lpyAruqQFHGPkWDC3gLSxo/A=
+X-Received: by 2002:a05:600c:211a:: with SMTP id
+ u26mr9215345wml.142.1549892213289; 
+ Mon, 11 Feb 2019 05:36:53 -0800 (PST)
 MIME-Version: 1.0
+References: <20190208104046.21817-1-thomas.petazzoni@bootlin.com>
+In-Reply-To: <20190208104046.21817-1-thomas.petazzoni@bootlin.com>
+From: Shubhrajyoti Datta <shubhrajyoti.datta@gmail.com>
+Date: Mon, 11 Feb 2019 19:06:42 +0530
+Message-ID: <CAKfKVtFu0V7GVrZJ_THHAm-gAddp37iKv=JQQaWt_C+xZJEEWw@mail.gmail.com>
+Subject: Re: [PATCH] gpio: zynq: properly support runtime PM for GPIO used as
+ interrupts
+To: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190211_053656_328762_AF7FBED4 
+X-CRM114-Status: GOOD (  13.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -58,107 +91,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-xtensa@linux-xtensa.org, linuxppc-dev@lists.ozlabs.org,
- linux-sh@vger.kernel.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- x86@kernel.org, linux-mips@vger.kernel.org, linux-kernel@vger.kernel.org,
- devicetree@vger.kernel.org, linux-riscv@lists.infradead.org,
- linux-snps-arc@lists.infradead.org, Lee Jones <lee.jones@linaro.org>,
+Cc: linux-gpio@vger.kernel.org, Linus Walleij <linus.walleij@linaro.org>,
+ linux-kernel@vger.kernel.org, Michal Simek <michal.simek@xilinx.com>,
+ Bartosz Golaszewski <bgolaszewski@baylibre.com>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The only useful bit in this function was the already assigned check.
-Once that is moved to dma_init_coherent_memory thee rest can easily
-be handled in the two callers.
+Hi Thomas,
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- kernel/dma/coherent.c | 47 +++++++++++++------------------------------
- 1 file changed, 14 insertions(+), 33 deletions(-)
+Thanks for the patch.
 
-diff --git a/kernel/dma/coherent.c b/kernel/dma/coherent.c
-index d7a27008f228..1e3ce71cd993 100644
---- a/kernel/dma/coherent.c
-+++ b/kernel/dma/coherent.c
-@@ -41,6 +41,9 @@ static int dma_init_coherent_memory(phys_addr_t phys_addr,
- 	int bitmap_size = BITS_TO_LONGS(pages) * sizeof(long);
- 	int ret;
- 
-+	if (*mem)
-+		return -EBUSY;
-+
- 	if (!size) {
- 		ret = -EINVAL;
- 		goto out;
-@@ -88,33 +91,11 @@ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
- 	kfree(mem);
- }
- 
--static int dma_assign_coherent_memory(struct device *dev,
--				      struct dma_coherent_mem *mem)
--{
--	if (!dev)
--		return -ENODEV;
--
--	if (dev->dma_mem)
--		return -EBUSY;
--
--	dev->dma_mem = mem;
--	return 0;
--}
--
- int dma_declare_coherent_memory(struct device *dev, phys_addr_t phys_addr,
- 				dma_addr_t device_addr, size_t size)
- {
--	struct dma_coherent_mem *mem;
--	int ret;
--
--	ret = dma_init_coherent_memory(phys_addr, device_addr, size, &mem);
--	if (ret)
--		return ret;
--
--	ret = dma_assign_coherent_memory(dev, mem);
--	if (ret)
--		dma_release_coherent_memory(mem);
--	return ret;
-+	return dma_init_coherent_memory(phys_addr, device_addr, size,
-+					&dev->dma_mem);
- }
- EXPORT_SYMBOL(dma_declare_coherent_memory);
- 
-@@ -238,18 +219,18 @@ static int rmem_dma_device_init(struct reserved_mem *rmem, struct device *dev)
- 	struct dma_coherent_mem *mem = rmem->priv;
- 	int ret;
- 
--	if (!mem) {
--		ret = dma_init_coherent_memory(rmem->base, rmem->base,
--					       rmem->size, &mem);
--		if (ret) {
--			pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
--				&rmem->base, (unsigned long)rmem->size / SZ_1M);
--			return ret;
--		}
-+	ret = dma_init_coherent_memory(rmem->base, rmem->base, rmem->size,
-+			&mem);
-+	if (ret && ret != -EBUSY) {
-+		pr_err("Reserved memory: failed to init DMA memory pool at %pa, size %ld MiB\n",
-+			&rmem->base, (unsigned long)rmem->size / SZ_1M);
-+		return ret;
- 	}
-+
- 	mem->use_dev_dma_pfn_offset = true;
-+	if (dev)
-+		dev->dma_mem = mem;
- 	rmem->priv = mem;
--	dma_assign_coherent_memory(dev, mem);
- 	return 0;
- }
- 
--- 
-2.20.1
-
+On Fri, Feb 8, 2019 at 4:13 PM Thomas Petazzoni
+<thomas.petazzoni@bootlin.com> wrote:
+>
+> The Zynq GPIO driver currently implements runtime PM by:
+>
+>  - Enabling runtime PM support in ->probe() and letting the runtime PM
+>    reference counter drop to zero at the end of ->probe().
+>
+>  - Increasing the runtime PM reference counter in ->request() and
+>    decreasing it in ->free().
+>
+> However, the latter is not sufficient: when a GPIO is used as an
+> interrupt, ->request() and ->free() are not called. Due to this, the
+> runtime PM counter remains to zero when the only GPIOs in use are used
+> as interrupts, causing them to simply not work.
+>
+> To address this problem, this commit implement the
+> ->irq_request_resources() and ->irq_release_resources() hooks,
+> ensuring that the runtime PM counter is properly
+> incremented/decremented. Since we override the default hooks, we keep
+> the existing behavior by making sure they call gpiochip_reqres_irq() /
+> gpiochip_relres_irq() respectively.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+> ---
+Reviewed-by: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
