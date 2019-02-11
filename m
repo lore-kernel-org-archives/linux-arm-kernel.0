@@ -2,122 +2,109 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C7CCAC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:43:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 46F94C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:50:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 94E6F218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:43:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 09565218A6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 12:50:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PKU5Y0ux";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="tWqeMaYd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 94E6F218A6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nPCW6IAn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 09565218A6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Cc:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DsYZ7ziFsyrYQbKUoe8ITb8os1v/hi+OregeDZAftNo=; b=PKU5Y0uxe/3Fu3
-	IjLtcKWyLbNuJoYGPfjGWmX9rTTX4k3+KtfpEE2gJwqmbDowlB/6btdnDacZyPp0qM1ypDhbnx7/u
-	u53hVtuOpvE1nksNeFrFxjOW0k6yI/hwJYlYOvx5vKYEa9WoWKYpwE6bhSHCD6kRXyUkyNUIoDvU8
-	TaYZgx0Pj1iApiBKC3BlmHUuYJmwwaNP5bLL0aUT+YTbg3FCX3qJeU1f8PSZe0bTIzFOFHfR6+dKz
-	fRj+VOQepIyaBQuxu5PmrRNLuUHoiKO3KmnBNOXCpzRIcZSoQj239zRFjMu6wSDA3tJMxwN21rrn3
-	nEKLJ5jHv8el6gDQgjTQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Yf0LIb+Q9vWKmJrQ9K9esnZ+oizkkrcoYhLu39T7oe8=; b=nPCW6IAnQ6YCCT
+	gqRhK5k9alHMnuGuK72NY8wRvp0aP3J7gugmhq6DoTy5ASAq1rSa8H02VKxdRcq/cHvZQ3UlGn4Sf
+	LvwNxrUF8c3v8Bx674C/dSzB3SiRZDmzUVimmg0f+YJ9Ua6Z8OASAQOhfVpTGu3L22Zo31ZhaS45n
+	PUsgPvzPZ/nJgeK3xj/sL6045JGpkCczicDjhiZsVOsuZllIuarlqVe2EnXFhgwG/COXjLGLKGKcT
+	ne0m/QTVZZ16dNlVCcS8FIvjdPn/78OexCyYoDc0RdBzircd3O0CcKbXDO2cY/GrNtUHOTji4MdRl
+	dA9vDLJT+JTNl0TkrYDA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtAwC-0006UW-0I; Mon, 11 Feb 2019 12:43:52 +0000
-Received: from mail-eopbgr750082.outbound.protection.outlook.com
- ([40.107.75.82] helo=NAM02-BL2-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtAva-0005wJ-33
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 12:43:47 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=IRQug7SNBHkzR+3IOWQr3TkGbMFynznZ47ufNM7EJ00=;
- b=tWqeMaYdEjIhB82lHlZy/XUWufu20yg09k1I8YbQC0ndYXMf8MgH9bRgALdHIydmJ5qBXyFPx/XQ6KL/8MIT3m35QDCICbvn+Bn32QKQzo4qPEHKMz2oYbAExyof0CiMyAUgTxEJR3jrs2fX4gp5qnw66EFskpKhR7VAt+TzbyQ=
-Received: from CY4PR02MB2709.namprd02.prod.outlook.com (10.175.80.9) by
- CY4PR02MB2472.namprd02.prod.outlook.com (10.173.40.135) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.21; Mon, 11 Feb 2019 12:43:08 +0000
-Received: from CY4PR02MB2709.namprd02.prod.outlook.com
- ([fe80::bc8d:c1a1:e7d9:2983]) by CY4PR02MB2709.namprd02.prod.outlook.com
- ([fe80::bc8d:c1a1:e7d9:2983%10]) with mapi id 15.20.1601.023; Mon, 11 Feb
- 2019 12:43:08 +0000
-From: Vishal Sagar <vsagar@xilinx.com>
-To: Luca Ceresoli <luca@lucaceresoli.net>, Vishal Sagar
- <vishal.sagar@xilinx.com>, Hyun Kwon <hyunk@xilinx.com>,
- "laurent.pinchart@ideasonboard.com" <laurent.pinchart@ideasonboard.com>,
- "mchehab@kernel.org" <mchehab@kernel.org>, "robh+dt@kernel.org"
- <robh+dt@kernel.org>, "mark.rutland@arm.com" <mark.rutland@arm.com>, Michal
- Simek <michals@xilinx.com>, "linux-media@vger.kernel.org"
- <linux-media@vger.kernel.org>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "sakari.ailus@linux.intel.com"
- <sakari.ailus@linux.intel.com>, "hans.verkuil@cisco.com"
- <hans.verkuil@cisco.com>, "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>, Dinesh Kumar <dineshk@xilinx.com>, Sandip
- Kothari <sandipk@xilinx.com>
-Subject: RE: [PATCH v3 2/2] media: v4l: xilinx: Add Xilinx MIPI CSI-2 Rx
- Subsystem
-Thread-Topic: [PATCH v3 2/2] media: v4l: xilinx: Add Xilinx MIPI CSI-2 Rx
- Subsystem
-Thread-Index: AQHUui2l5ecr9Ru5u0itGn9PqazmdqXaeJcAgAADeXA=
-Date: Mon, 11 Feb 2019 12:43:08 +0000
-Message-ID: <CY4PR02MB2709000898D5E290B5EE99F4A7640@CY4PR02MB2709.namprd02.prod.outlook.com>
-References: <1549025766-135037-1-git-send-email-vishal.sagar@xilinx.com>
- <1549025766-135037-3-git-send-email-vishal.sagar@xilinx.com>
- <3923069f-7c69-c601-0ded-f7629696ef9b@lucaceresoli.net>
-In-Reply-To: <3923069f-7c69-c601-0ded-f7629696ef9b@lucaceresoli.net>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=vsagar@xilinx.com; 
-x-originating-ip: [149.199.50.133]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; CY4PR02MB2472;
- 6:YbjDiExMJRZOu7d6+OcVPirfWNudjt9zg5dtHrQohLL1BIcwLJVrTeMsKRalgQimw+y+mlKRaX1XW07ajXf797r5mi9tR+DYVOEallXANQtT3oCrrVq8qBZBofuW34B4Nbxi2920qnQYYsdnsZBzpXYPtk612VpygrBYpxbny7KBADvpYfWRiVwcSpk47mdgvc+MhccNSsTvbGKB2oZbEAnVTvm8DnaC3sDfvtWES3+/tifAGaz8eoRsa+gyiGF8a7ePeZeqX1a9htdhFhALCTFM5wiEvd8SZItWs4zBtBEtoXxF1OBe0k2FGOLz0gbekPpLmChQBGAxA3exr3T3nlX7HAESBNl3QRrjl1KDo5Upb/gLfDqeKBT6rvM2n45eQvtgrRiUqYv1oeTIM/SAAZMO5SLGnK/JDB4GfIc6IpfCv4gt7zkZ8P6+7XsKNP3AwOiuUU9bPtINKks6/yWCiw==;
- 5:t3pEbVa6dDC4aiOSptFL0wrJbYwo4IkGLTm4fmoZffCC0OvG5ZLdIvCWnFxDneZ+QMIiKAXYojh87gp3envXKGrdeqoz9rvFcl32N9mCbs+S8fFARbFBkkjCowQJiAaQD3cgteGv7f/3gvuivHjKbEdRVhz07Rz28/yMtWDGh9ZZrCuGcnbzEUDnmgT/E4AMq5HihHWr/PP2/bSxHKI2qw==;
- 7:6/Yldqf+C30Xf40+rjQhdD3Z5+moK2PEha7penII7rdOBosTCIopTOQmLxZHP7GPjH0piWjwIUL7I5QX651cv+gerigT2ku2UgnXacMuiE9ys5C2p3v1VLTj7w0Dr81I9rYC82jbU/1bIprYpXYSkg==
-x-ms-office365-filtering-correlation-id: 02193727-3ba2-40c8-70df-08d6901e79c5
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:CY4PR02MB2472; 
-x-ms-traffictypediagnostic: CY4PR02MB2472:
-x-microsoft-antispam-prvs: <CY4PR02MB2472B678AF11656D1C6DCA81A7640@CY4PR02MB2472.namprd02.prod.outlook.com>
-x-forefront-prvs: 0945B0CC72
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(346002)(376002)(39860400002)(366004)(396003)(199004)(189003)(13464003)(76176011)(97736004)(6436002)(99286004)(2501003)(55016002)(66066001)(7416002)(9686003)(6246003)(316002)(86362001)(229853002)(7696005)(2201001)(81166006)(53546011)(81156014)(6506007)(33656002)(8936002)(6116002)(26005)(6636002)(305945005)(106356001)(7736002)(8676002)(11346002)(476003)(486006)(71200400001)(71190400001)(74316002)(14454004)(102836004)(25786009)(256004)(110136005)(53936002)(2906002)(105586002)(446003)(478600001)(68736007)(3846002)(186003)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:CY4PR02MB2472;
- H:CY4PR02MB2709.namprd02.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: xilinx.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: guKH8VzbTD9gnT81mZpdhe+HpxUCjnYHnE9Xmg7A+5YzB7AvZNx7q/1fzvfr9sJVr1BVJunVz9zZosQDZEwNDRBOEZWJrtv0wmSTg+RiSxziokpHeT4KLaTDA4JAynUcga3VgFRaZxlG/A6mwfjC4DJtOwY2pDqxtEHN1KCxwl629kvDQU1zXu3e2phAjLhg7BnHKrJ1mmpn6H2DksMzEriwOpsDJ6CkeJtb9TKxS3Vux99NwXSa291pOVqpBrQg/pkH1oQ24Yi+yCnxnFXW6aAeR/Q3S57w1ogQqxJ21SIjvmBgW5REoOL6vDRei432ngvT8k/amxgxsWPZOdigKG4tkJkTjwajU8dQCczdhAQipk+VfQhz6lxcrhJp/CUYV0Ra2o+VlS6Hnig/z4LP8BZgVIvM4Cy9WrYYGDdnN8A=
+	id 1gtB2l-0001qx-Ff; Mon, 11 Feb 2019 12:50:39 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtB2h-0001qL-GR
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 12:50:37 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E840E80D;
+ Mon, 11 Feb 2019 04:50:32 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ D87F93F557; Mon, 11 Feb 2019 04:50:30 -0800 (PST)
+Subject: Re: [RESEND PATCH v2 03/33] ARM: davinci: select
+ GENERIC_IRQ_MULTI_HANDLER
+To: Bartosz Golaszewski <brgl@bgdev.pl>, Sekhar Nori <nsekhar@ti.com>,
+ Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ Jason Cooper <jason@lakedaemon.net>, David Lechner <david@lechnology.com>
+References: <20190211122606.8662-1-brgl@bgdev.pl>
+ <20190211122606.8662-4-brgl@bgdev.pl>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <0220fbc8-a73f-0f40-2b62-14bec019ac7c@arm.com>
+Date: Mon, 11 Feb 2019 12:50:21 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-OriginatorOrg: xilinx.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 02193727-3ba2-40c8-70df-08d6901e79c5
-X-MS-Exchange-CrossTenant-originalarrivaltime: 11 Feb 2019 12:43:08.4974 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 657af505-d5df-48d0-8300-c31994686c5c
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR02MB2472
+In-Reply-To: <20190211122606.8662-4-brgl@bgdev.pl>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_044315_208914_AA37C754 
-X-CRM114-Status: GOOD (  21.69  )
+X-CRM114-CacheID: sfid-20190211_045035_558701_CE0F11CD 
+X-CRM114-Status: GOOD (  26.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -129,120 +116,183 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Luca,
+On 11/02/2019 12:25, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> In order to support SPARSE_IRQ we first need to make davinci use the
+> generic irq handler for ARM. Translate the legacy assembly to C and
+> put the irq handlers into their respective drivers (aintc and cp-intc).
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/Kconfig                              |  1 +
+>  arch/arm/mach-davinci/cp_intc.c               | 28 +++++++++++++
+>  .../mach-davinci/include/mach/entry-macro.S   | 39 -------------------
+>  arch/arm/mach-davinci/irq.c                   | 23 +++++++++++
+>  4 files changed, 52 insertions(+), 39 deletions(-)
+>  delete mode 100644 arch/arm/mach-davinci/include/mach/entry-macro.S
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 664e918e2624..f7770fdcad68 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -589,6 +589,7 @@ config ARCH_DAVINCI
+>  	select GENERIC_ALLOCATOR
+>  	select GENERIC_CLOCKEVENTS
+>  	select GENERIC_IRQ_CHIP
+> +	select GENERIC_IRQ_MULTI_HANDLER
+>  	select GPIOLIB
+>  	select HAVE_IDE
+>  	select PM_GENERIC_DOMAINS if PM
+> diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
+> index 67805ca74ff8..4a372add8cf9 100644
+> --- a/arch/arm/mach-davinci/cp_intc.c
+> +++ b/arch/arm/mach-davinci/cp_intc.c
+> @@ -19,9 +19,13 @@
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+>  
+> +#include <asm/exception.h>
+>  #include <mach/common.h>
+>  #include "cp_intc.h"
+>  
+> +#define DAVINCI_CP_INTC_PRI_INDX_MASK		GENMASK(9, 0)
+> +#define DAVINCI_CP_INTC_GPIR_NONE		BIT(31)
+> +
+>  static inline unsigned int cp_intc_read(unsigned offset)
+>  {
+>  	return __raw_readl(davinci_intc_base + offset);
+> @@ -97,6 +101,28 @@ static struct irq_chip cp_intc_irq_chip = {
+>  
+>  static struct irq_domain *cp_intc_domain;
+>  
+> +static asmlinkage void __exception_irq_entry
+> +cp_intc_handle_irq(struct pt_regs *regs)
+> +{
+> +	int gpir, irqnr, none;
+> +
+> +	/*
+> +	 * The interrupt number is in first ten bits. The NONE field set to 1
+> +	 * indicates a spurious irq.
+> +	 */
+> +
+> +	gpir = cp_intc_read(CP_INTC_PRIO_IDX);
+> +	irqnr = gpir & DAVINCI_CP_INTC_PRI_INDX_MASK;
+> +	none = gpir & DAVINCI_CP_INTC_GPIR_NONE;
+> +
+> +	if (unlikely(none)) {
+> +		pr_err_once("%s: spurious irq!\n", __func__);
+> +		return;
+> +	}
+> +
+> +	handle_domain_irq(cp_intc_domain, irqnr, regs);
+> +}
+> +
+>  static int cp_intc_host_map(struct irq_domain *h, unsigned int virq,
+>  			  irq_hw_number_t hw)
+>  {
+> @@ -196,6 +222,8 @@ int __init cp_intc_of_init(struct device_node *node, struct device_node *parent)
+>  		return -EINVAL;
+>  	}
+>  
+> +	set_handle_irq(cp_intc_handle_irq);
+> +
+>  	/* Enable global interrupt */
+>  	cp_intc_write(1, CP_INTC_GLOBAL_ENABLE);
+>  
+> diff --git a/arch/arm/mach-davinci/include/mach/entry-macro.S b/arch/arm/mach-davinci/include/mach/entry-macro.S
+> deleted file mode 100644
+> index cf5f573eb5fd..000000000000
+> --- a/arch/arm/mach-davinci/include/mach/entry-macro.S
+> +++ /dev/null
+> @@ -1,39 +0,0 @@
+> -/*
+> - * Low-level IRQ helper macros for TI DaVinci-based platforms
+> - *
+> - * Author: Kevin Hilman, MontaVista Software, Inc. <source@mvista.com>
+> - *
+> - * 2007 (c) MontaVista Software, Inc. This file is licensed under
+> - * the terms of the GNU General Public License version 2. This program
+> - * is licensed "as is" without any warranty of any kind, whether express
+> - * or implied.
+> - */
+> -#include <mach/irqs.h>
+> -
+> -		.macro  get_irqnr_preamble, base, tmp
+> -		ldr \base, =davinci_intc_base
+> -		ldr \base, [\base]
+> -		.endm
+> -
+> -		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+> -#if defined(CONFIG_AINTC) && defined(CONFIG_CP_INTC)
+> -		ldr \tmp, =davinci_intc_type
+> -		ldr \tmp, [\tmp]
+> -		cmp \tmp, #DAVINCI_INTC_TYPE_CP_INTC
+> -		beq 1001f
+> -#endif
+> -#if defined(CONFIG_AINTC)
+> -		ldr \tmp, [\base, #0x14]
+> -		movs \tmp, \tmp, lsr #2
+> -		sub \irqnr, \tmp, #1
+> -		b 1002f
+> -#endif
+> -#if defined(CONFIG_CP_INTC)
+> -1001:		ldr \irqnr, [\base, #0x80] /* get irq number */
+> -		mov \tmp, \irqnr, lsr #31
+> -		and \irqnr, \irqnr, #0xff  /* irq is in bits 0-9 */
+> -		and \tmp, \tmp, #0x1
+> -		cmp \tmp, #0x1
+> -#endif
+> -1002:
+> -		.endm
+> diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
+> index 07d8ef8037e4..3ce821a06e52 100644
+> --- a/arch/arm/mach-davinci/irq.c
+> +++ b/arch/arm/mach-davinci/irq.c
+> @@ -29,11 +29,13 @@
+>  #include <mach/cputype.h>
+>  #include <mach/common.h>
+>  #include <asm/mach/irq.h>
+> +#include <asm/exception.h>
+>  
+>  #define FIQ_REG0_OFFSET		0x0000
+>  #define FIQ_REG1_OFFSET		0x0004
+>  #define IRQ_REG0_OFFSET		0x0008
+>  #define IRQ_REG1_OFFSET		0x000C
+> +#define IRQ_IRQENTRY_OFFSET	0x0014
+>  #define IRQ_ENT_REG0_OFFSET	0x0018
+>  #define IRQ_ENT_REG1_OFFSET	0x001C
+>  #define IRQ_INCTL_REG_OFFSET	0x0020
+> @@ -48,6 +50,11 @@ static inline void davinci_irq_writel(unsigned long value, int offset)
+>  	__raw_writel(value, davinci_intc_base + offset);
+>  }
+>  
+> +static inline unsigned long davinci_irq_readl(int offset)
+> +{
+> +	return __raw_readl(davinci_intc_base + offset);
 
-Thanks for reviewing this. 
+I appreciate that you're converting assembly code dating from a while
+back, but if we're going to do this correctly, I don't think we should
+entertain the use of __raw_readl().
 
-> -----Original Message-----
-> From: Luca Ceresoli [mailto:luca@lucaceresoli.net]
-> Sent: Monday, February 11, 2019 4:12 PM
-> To: Vishal Sagar <vishal.sagar@xilinx.com>; Hyun Kwon <hyunk@xilinx.com>;
-> laurent.pinchart@ideasonboard.com; mchehab@kernel.org;
-> robh+dt@kernel.org; mark.rutland@arm.com; Michal Simek
-> <michals@xilinx.com>; linux-media@vger.kernel.org;
-> devicetree@vger.kernel.org; sakari.ailus@linux.intel.com;
-> hans.verkuil@cisco.com; linux-arm-kernel@lists.infradead.org; linux-
-> kernel@vger.kernel.org; Dinesh Kumar <dineshk@xilinx.com>; Sandip Kothari
-> <sandipk@xilinx.com>
-> Subject: Re: [PATCH v3 2/2] media: v4l: xilinx: Add Xilinx MIPI CSI-2 Rx
-> Subsystem
-> 
-> EXTERNAL EMAIL
-> 
-> Hi Vishal,
-> 
-> On 01/02/19 13:56, Vishal Sagar wrote:
-> > The Xilinx MIPI CSI-2 Rx Subsystem soft IP is used to capture images
-> > from MIPI CSI-2 camera sensors and output AXI4-Stream video data ready
-> > for image processing. Please refer to PG232 for details.
-> 
-> For those unused to Xilinx documentation I'd use the full document name
-> ("MIPI CSI-2 Receiver Subsystem v4.0") or, even better, a stable URL if
-> available.
-> 
+Surely the bus has a fixed endianness (and I'd assume it to be LE). Why
+aren't you using readl_relaxed() instead, which will have the exact same
+generated code with an LE kernel, and will do the right thing should you
+run a BE kernel.
 
-Ok. I will add the full documentation name here and URL.
+Thanks,
 
-> > The driver is used to set the number of active lanes, if enabled
-> > in hardware. The CSI2 Rx controller filters out all packets except for
-> > the packets with data type fixed in hardware. RAW8 packets are always
-> > allowed to pass through.
-> >
-> > It is also used to setup and handle interrupts and enable the core. It
-> > logs all the events in respective counters between streaming on and off.
-> > The generic short packets received are notified to application via
-> > v4l2_events.
-> >
-> > The driver supports only the video format bridge enabled configuration.
-> > Some data types like YUV 422 10bpc, RAW16, RAW20 are supported when
-> the
-> > CSI v2.0 feature is enabled in design. When the VCX feature is enabled,
-> > the maximum number of virtual channels becomes 16 from 4.
-> >
-> > Signed-off-by: Vishal Sagar <vishal.sagar@xilinx.com>
-> 
-> ...
-> 
-> > +/**
-> > + * xcsi2rxss_reset - Does a soft reset of the MIPI CSI2 Rx Subsystem
-> > + * @core: Core Xilinx CSI2 Rx Subsystem structure pointer
-> > + *
-> > + * Core takes less than 100 video clock cycles to reset.
-> > + * So a larger timeout value is chosen for margin.
-> > + *
-> > + * Return: 0 - on success OR -ETIME if reset times out
-> > + */
-> > +static int xcsi2rxss_reset(struct xcsi2rxss_core *core)
-> > +{
-> > +     u32 timeout = XCSI_TIMEOUT_VAL;
-> 
-> The comment about the timeout is duplicated here and at the #define
-> line. Why not removing the define above and just putting
-> 
->   u32 timeout = 1000; /* us */
-> 
-> here? It would make the entire timeout logic appear in a unique place.
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
 
-Agree. It was kept like that as the timeout value was being used in some other place in earlier patch versions.
-I will do as suggested in next version.
-
-> > +static int xcsi2rxss_start_stream(struct xcsi2rxss_state *state)
-> > +{
-> > +     struct xcsi2rxss_core *core = &state->core;
-> > +     int ret = 0;
-> > +
-> > +     xcsi2rxss_enable(core);
-> > +
-> > +     ret = xcsi2rxss_reset(core);
-> > +     if (ret < 0) {
-> > +             state->streaming = false;
-> > +             return ret;
-> > +     }
-> > +
-> > +     xcsi2rxss_intr_enable(core);
-> > +     state->streaming = true;
-> 
-> Shouldn't you propagate s_stream to the upstream subdev here calling
-> v4l2_subdev_call(..., ..., s_stream, 1)?
-> 
-
-This is done by the xvip_pipeline_start_stop() in xilinx-dma.c for Xilinx Video pipeline.
-
-> > +     return ret;
-> > +}
-> 
-> 
-> --
-> Luca
-
-Regards
-Vishal Sagar
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
