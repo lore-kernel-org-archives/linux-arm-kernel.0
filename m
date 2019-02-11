@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 645E5C282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:59:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8AE49C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 16:01:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 336F9218D8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 15:59:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 58D00218D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 16:01:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HPC64TU5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 336F9218D8
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pf0AsnJY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 58D00218D8
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,37 +24,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CaO5hHrxuTOWMzasmOAeww4h35NDJ4MahOvA7xyf118=; b=HPC64TU5mgRZGp
-	WDlI0yHgVSaYLeIh87pAqBfaB+HbVnPictH/IGBVku1Yo27vqKWfoq2qQe4hoATygi/u9alWKTO+4
-	vlz3x9Kr8jSMDkFH1qZBlxIxFYwxOTUu8M0GC2/HCq8/qxRXIb1D1FK7z2HVvCdjUQWLXw6rD0S9p
-	hEQJwhK+4c9CvVyHcs+lRVfHDfwN+Ha106QUHPW8ql0zFfJgjramodSpjNy6GfQVD/By7B4e9gLap
-	EZGIv0JZUlb4Ih9eHdnqhPC6OvGff1stDJB90mMhUos7+DPPaV+N+TcjobIMrbh6xEIg2QuIorg0v
-	K6FpVx+QL1Mw3wYMTqaA==;
+	List-Owner; bh=E//gttO9gqzRaCR7eJQsYmmu/kuRuodAqwK/pwDcCD0=; b=pf0AsnJYNHUPIm
+	01i6yKry2VrTWnQLdDK7lUn7rBS0hr+5P4Xsld0Q2Y/YZ+v8kHFvJEzRqz5bzRKW0Pa0xAZi2gMnB
+	xnptWUkPTKtrrekVfIPrprDVgNHgi0Ve+R0RpjINwk/X9bFG8ZZQAb5L0gzp9f3VBzJj7gXmuXPyu
+	O8bxD/nh4LYdp2g4LzFtg/C4QZOtyM4qz340TkS25UQzqFS9q3LfBuxJc3pAIZR72t1xKz94NzZLz
+	Cu5qI2KC4AqGi3Q2suciYxsLbb1YokVerwrEdzgOZ/1cWSwUdn13tUJpfXtBkstl2x5ndd4h1io/M
+	oHQKXvR47Fqtl2V3pPug==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtDzj-0004SK-V7; Mon, 11 Feb 2019 15:59:43 +0000
+	id 1gtE1P-0006B2-7N; Mon, 11 Feb 2019 16:01:27 +0000
 Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtDzh-0004Rc-8Z
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 15:59:42 +0000
+ id 1gtE0q-00068C-FP
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 16:00:58 +0000
 Received: by newverein.lst.de (Postfix, from userid 2407)
- id 5762868DD6; Mon, 11 Feb 2019 16:59:38 +0100 (CET)
-Date: Mon, 11 Feb 2019 16:59:38 +0100
+ id 19EF668DD6; Mon, 11 Feb 2019 17:00:50 +0100 (CET)
+Date: Mon, 11 Feb 2019 17:00:49 +0100
 From: Christoph Hellwig <hch@lst.de>
 To: Robin Murphy <robin.murphy@arm.com>
-Subject: Re: [PATCH 02/19] dma-iommu: cleanup dma-iommu.h
-Message-ID: <20190211155938.GA27745@lst.de>
+Subject: Re: [PATCH 03/19] dma-iommu: don't use a scatterlist in
+ iommu_dma_alloc
+Message-ID: <20190211160049.GB27745@lst.de>
 References: <20190114094159.27326-1-hch@lst.de>
- <20190114094159.27326-3-hch@lst.de>
- <3f78b779-4360-1204-e942-39a8a81759c7@arm.com> <20190201161305.GI6532@lst.de>
- <5bf081c2-2b8c-d3d1-c93e-468c8f3cef67@arm.com>
+ <20190114094159.27326-4-hch@lst.de>
+ <5145b2f7-6fc8-6ed9-4cf2-9b7e1d33b0fe@arm.com> <20190201161638.GJ6532@lst.de>
+ <f59852aa-394c-3165-f7c0-fa6cdcea059f@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <5bf081c2-2b8c-d3d1-c93e-468c8f3cef67@arm.com>
+In-Reply-To: <f59852aa-394c-3165-f7c0-fa6cdcea059f@arm.com>
 User-Agent: Mutt/1.5.17 (2007-11-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_075941_446191_21C70DDC 
-X-CRM114-Status: GOOD (  10.72  )
+X-CRM114-CacheID: sfid-20190211_080052_664620_8D99CE5F 
+X-CRM114-Status: GOOD (  13.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,16 +77,27 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 06, 2019 at 03:08:26PM +0000, Robin Murphy wrote:
-> Other than dma-iommu.c itself, none of them *require* it - only arch/arm64 
-> selects it (the one from MTK_IOMMU is just bogus), and a lot of the drivers 
-> also build for at least one other architecture (and/or arm64 with 
-> !IOMMU_API).
+On Wed, Feb 06, 2019 at 03:28:28PM +0000, Robin Murphy wrote:
+> Because if iommu_map() only gets called at PAGE_SIZE granularity, then the 
+> IOMMU PTEs will be created at PAGE_SIZE (or smaller) granularity, so any 
+> effort to get higher-order allocations matching larger IOMMU block sizes is 
+> wasted, and we may as well have just done this:
 >
-> Either way, I have no vehement objection to the change, I just don't see 
-> any positive value in it.
+> 	for (i = 0; i < count; i++) {
+> 		struct page *page = alloc_page(gfp);
+> 		...
+> 		iommu_map(..., page_to_phys(page), PAGE_SIZE, ...);
+> 	}
 
-I've moved the idef back down below the includes.
+True.  I've dropped this patch.
+
+> Really, it's a shame we have to split huge pages for the CPU remap, since 
+> in the common case the CPU MMU will have a matching block size, but IIRC 
+> there was something in vmap() or thereabouts that explicitly chokes on 
+> them.
+
+That just needs a volunteer to fix the implementation, as there is no
+fundamental reason not to remap large pages.
 
 _______________________________________________
 linux-arm-kernel mailing list
