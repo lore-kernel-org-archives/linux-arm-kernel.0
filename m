@@ -2,23 +2,21 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BF5D1C282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:31:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9C755C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:35:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 87D1B214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:31:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6B0F9214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:35:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qyRp+3NF";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="CuWdPgao"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87D1B214DA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OZgwM5UC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B0F9214DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,67 +24,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=V4zlTrj3P8LjL+GYCKkhw9+9xQjVROkVcA+w/7vbouo=; b=qyRp+3NF2H5KoR
-	Jm5AbDOTaFz44MPlbL5/CWNHkDGIiHwYDX9gLJzaI8YCPCASj31spw4mF1UkHrxVTSBxlhD7I1QBk
-	QxL4//OXahF1F+9axnr35aaBJwQdsqhKXyWJwjbQV7M1DcySuRwcSFBvXT1aQg4zBxqtfGR1q2SLh
-	1oZdvkftv82ILlh31xmbEZeMolQzzR5ogExgkqW8o3ULlskr0QvIRBTrA60tGlAlpOAG4xnLO7vPB
-	/9+yUixRya5wGjGVu17f8bohErzIbTsxgj3PEURYOW9ut6lW9/6ezzaH+gor1l/8u3QuFK4H6fZi6
-	O8yO+tlzkwWFrX90BEbA==;
+	List-Owner; bh=e6hOP/YsFzqs1kSZUh35gwOaUszwu8YqfgwEXfQB3fk=; b=OZgwM5UCLErXpn
+	cHjAEcLpddLT2xT/wiURV1IzjSNabMEoRvKh9od4lL8NR4a6XZ/4EbAIH7b8sQtcPOvCAIohU0afh
+	gE1E3x7P0hXcxlds2xDiR5V0Z81suCvSDccKNSoNx+tmVKnTPpNDr9xcPx4O6hP9os1uzKl5mYROF
+	ETGAylW1BBpm0Z696mYDzGIK47yapcMb2+o9X+UmFi8JZuc4QoWXqD50ZE2O8wMu/5a+cLX5wvVE3
+	gmPs7Dd1a6Qz/pGjr/vC4uY2ioqRgdKrPQ4Oz28m5eaq3niwRvqxX9md61szJ0Y9Bw2F3O1M/sMI2
+	6/CDJ4dfh5GdKe1oMUYg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt9oM-0006sC-On; Mon, 11 Feb 2019 11:31:42 +0000
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt9oI-0006rQ-IB
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 11:31:40 +0000
-Received: by mail-pf1-x442.google.com with SMTP id n22so2379929pfa.3
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 03:31:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=1JEsM2JroaIkgmQdl0RF583/B2IH0sbtfKhWqOtEjUs=;
- b=CuWdPgao3jxTWpC42B3xsZEZDyFAk2lPD1KD1eLGUXz1wc548X8a22ZQNNAyOUn3qA
- 30fi/Bu55C3jAfB7dd83OJgWKTQ9y5EDTgtFYgxcMu6PlGKLtu8vT4u477weNfva54dY
- RfC5ID5AcVPQ2QdQBfY0ADLMQ+cFHlOsbo8qGnsFns07cOQOgYuYwwPsc3Gy8QjCfa1q
- oGnzM1D7tOKLibD8SLJIemPnHZuwtxJKU9LO+4+blkYA7L8cyN6r5BAX4fDWd08yzfEP
- CoYT1dyIspgxBp8PRi5jqPuuet9jNvwTgKgOUl+0RaBOrIgDEU9BGnPP03QnZtFEgIqj
- mNUg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=1JEsM2JroaIkgmQdl0RF583/B2IH0sbtfKhWqOtEjUs=;
- b=rMm/M3qqOimBKECnfSYYhGqymYvDeRS99OWiaoMRr8vsN7QvYrmGNcHx84PGihT7E2
- /iahPw79eQTZc31P08I0ODhoo8Xey1b620UjqC8tX7rUyXhrpIB1PuUTCWP3SGaZ7R5K
- 0kheXdt44ndz/M6bJwhdp/kbDvr0GU/Ju4FOEuvu/tAMZRxca8sRR9yFpCGQyw9/nti7
- tB+lV+5bgpAdkzlHwRLiLUD+/IcjnTEnSl7dNpMrHd6Jco/8Qd5jVrXXBCeyu4/nNmvX
- I3evn/URHAQgn3wOKr/vE79sKPHqU0T3r0J28t1SQ6WgUa02RVR+8PPq3yIhh8/+dwvV
- 5VpA==
-X-Gm-Message-State: AHQUAuZzNr3CXfGd5hzNY8LYeTlvTGdGe7VMDNeSWFET7tDVsTo6mDAQ
- UiWpXXHd2b6c6pNtEGEADs0e
-X-Google-Smtp-Source: AHgI3IZZuo9rgU7o3ot5BBMRbdYb73AQNCudhwnF1oIxRzD93E9ZK/P4t2XDoT8ubAU4REJBl3WKZg==
-X-Received: by 2002:a65:6242:: with SMTP id q2mr33334510pgv.245.1549884697128; 
- Mon, 11 Feb 2019 03:31:37 -0800 (PST)
-Received: from mani ([103.59.133.81])
- by smtp.gmail.com with ESMTPSA id e21sm48408047pfh.45.2019.02.11.03.31.33
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 11 Feb 2019 03:31:36 -0800 (PST)
-Date: Mon, 11 Feb 2019 17:01:28 +0530
-From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-To: Peter Robinson <pbrobinson@gmail.com>
-Subject: Re: [PATCH] arm64: dts: rockchip: Add on-board WiFi/BT support for
- Rock960 boards
-Message-ID: <20190211113128.GA22843@mani>
-References: <20190207055349.27919-1-manivannan.sadhasivam@linaro.org>
- <CALeDE9MNa+CDJR8bvS05f2UTKrhwMRo8jzdS5o8Ndu7H8V8Ldg@mail.gmail.com>
+	id 1gt9rS-0007NF-Bn; Mon, 11 Feb 2019 11:34:54 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gt9rO-0007Mt-U0
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 11:34:52 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6A25080D;
+ Mon, 11 Feb 2019 03:34:50 -0800 (PST)
+Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BFAC33F557;
+ Mon, 11 Feb 2019 03:34:48 -0800 (PST)
+Date: Mon, 11 Feb 2019 11:34:46 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: "kassey@126.com" <kassey@126.com>
+Subject: Re: Re: arm64: copy_from_user access the last page of ddr has
+ problem on 4.14 kernel
+Message-ID: <20190211113446.GB32385@fuggles.cambridge.arm.com>
+References: <CAKwPUowmzZ2BNi-RmJm3=ENrZ5sxPf1SeT+b9A9iHHSCUQQAUw@mail.gmail.com>
+ <20190116164817.GG1910@brain-police>
+ <CAKwPUoyWy64-o2NgB5iPXNs4UR7bmYjmKk3Ub0X6DND40fCtPA@mail.gmail.com>
+ <20190120020829.GA28576@brain-police>
+ <201902011746430858184@126.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CALeDE9MNa+CDJR8bvS05f2UTKrhwMRo8jzdS5o8Ndu7H8V8Ldg@mail.gmail.com>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+In-Reply-To: <201902011746430858184@126.com>
+User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_033138_609760_0EC8013D 
-X-CRM114-Status: GOOD (  22.80  )
+X-CRM114-CacheID: sfid-20190211_033450_967361_4B534E00 
+X-CRM114-Status: GOOD (  13.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,230 +73,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: heiko@sntech.de, mani@kernel.org, linux-kernel@vger.kernel.org,
- dev@vamrs.com, linux-rockchip@lists.infradead.org, ezequiel@collabora.com,
- linux-arm-kernel@lists.infradead.org, tom@vamrs.com
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "mark.rutland" <mark.rutland@arm.com>,
+ "ard.biesheuvel" <ard.biesheuvel@linaro.org>,
+ "catalin.marinas" <catalin.marinas@arm.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>, willy <willy@infradead.org>,
+ "kassey1216@gmail.com" <kassey1216@gmail.com>,
+ "robin.murphy" <robin.murphy@arm.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Peter,
+On Fri, Feb 01, 2019 at 05:46:44PM +0800, kassey@126.com wrote:
+> =A0 =A0 =A0sorry for late response.=A0
+> =A0 =A0 =A0we did have process in userspace doing mmap.=A0
+> =A0 =A0 =A0mult device can reprocued this issue, so we do not suspect the=
+ ddr
+> not stable.=A0
 
-On Fri, Feb 08, 2019 at 04:45:01PM +0000, Peter Robinson wrote:
-> Hi Mani,
-> 
-> On Thu, Feb 7, 2019 at 5:54 AM Manivannan Sadhasivam
-> <manivannan.sadhasivam@linaro.org> wrote:
-> >
-> > Add on-board WiFi/BT support for Rock960 boards such as Rock960 based
-> > on AP6356S and Ficus based on AP6354 wireless modules.
-> >
-> > Firmwares for the respective boards are available here:
-> >
-> > http://people.linaro.org/~manivannan.sadhasivam/rock960_wifi/
-> > http://people.linaro.org/~manivannan.sadhasivam/ficus_wifi/
-> >
-> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> 
-> There's some warnings on building these I noticed in testing this on Fedora:
-> 
->   DTC     arch/arm64/boot/dts/rockchip/rk3399-ficus.dtb
-> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi:490.3-13: Warning
-> (reg_format): /dwmmc@fe310000/wifi@1:reg: property has invalid length
-> (4 bytes) (#address-cells == 2, #size-cells == 1)
-> arch/arm64/boot/dts/rockchip/rk3399-ficus.dtb: Warning
-> (pci_device_bus_num): Failed prerequisite 'reg_format'
-> arch/arm64/boot/dts/rockchip/rk3399-ficus.dtb: Warning (i2c_bus_reg):
-> Failed prerequisite 'reg_format'
-> arch/arm64/boot/dts/rockchip/rk3399-ficus.dtb: Warning (spi_bus_reg):
-> Failed prerequisite 'reg_format'
-> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi:488.16-496.4: Warning
-> (avoid_default_addr_size): /dwmmc@fe310000/wifi@1: Relying on default
-> #address-cells value
-> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi:488.16-496.4: Warning
-> (avoid_default_addr_size): /dwmmc@fe310000/wifi@1: Relying on default
-> #size-cells value
-> 
->   DTC     arch/arm64/boot/dts/rockchip/rk3399-rock960.dtb
-> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi:490.3-13: Warning
-> (reg_format): /dwmmc@fe310000/wifi@1:reg: property has invalid length
-> (4 bytes) (#address-cells == 2, #size-cells == 1)
-> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtb: Warning
-> (pci_device_bus_num): Failed prerequisite 'reg_format'
-> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtb: Warning
-> (i2c_bus_reg): Failed prerequisite 'reg_format'
-> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtb: Warning
-> (spi_bus_reg): Failed prerequisite 'reg_format'
-> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi:488.16-496.4: Warning
-> (avoid_default_addr_size): /dwmmc@fe310000/wifi@1: Relying on default
-> #address-cells value
-> arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi:488.16-496.4: Warning
-> (avoid_default_addr_size): /dwmmc@fe310000/wifi@1: Relying on default
-> #size-cells value
-> 
+Multiple devices of the same SoC?
 
-Hmm. Since the parent node "sdio0" is missing the address/size cells
-property, the default value has been used by the DTC. I think it would
-make sense to just drop the reg property from "wifi" node instead of
-modifying the parent "sdio0" node.
+> =A0 =A0 =A0can you help review =A0below patch to against with such issue,=
+ because
+> we find if enable kasan , issue not seen.
 
-If no one has any issue over this, I'll send out another revision with the
-reg property removed.
+Unfortunately, I'm not sure what more we can do with this unless we have a
+reliable way to reproduce the problem. What is the output that you're
+expecting to see in the page? You said that you're seeing the problem in
+sel_write_load(), but afaict that /is/ dealing with binary policy data for
+SELinux, which may well look like the corruption you describe.
 
-Thanks,
-Mani
+Did you run memtest as I suggested?
 
-> > ---
-> >  .../boot/dts/rockchip/rk3399-rock960.dtsi     | 96 ++++++++++++++++++-
-> >  1 file changed, 95 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-> > index 56abbb08c133..1b2f7cd82244 100644
-> > --- a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-> > +++ b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-> > @@ -9,6 +9,15 @@
-> >  #include "rk3399-opp.dtsi"
-> >
-> >  / {
-> > +       sdio_pwrseq: sdio-pwrseq {
-> > +               compatible = "mmc-pwrseq-simple";
-> > +               clocks = <&rk808 1>;
-> > +               clock-names = "ext_clock";
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&wifi_enable_h>;
-> > +               reset-gpios = <&gpio0 RK_PB2 GPIO_ACTIVE_LOW>;
-> > +       };
-> > +
-> >         vcc1v8_s0: vcc1v8-s0 {
-> >                 compatible = "regulator-fixed";
-> >                 regulator-name = "vcc1v8_s0";
-> > @@ -362,6 +371,20 @@
-> >  };
-> >
-> >  &pinctrl {
-> > +       bt {
-> > +               bt_enable_h: bt-enable-h {
-> > +                       rockchip,pins = <0 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
-> > +               };
-> > +
-> > +               bt_host_wake_l: bt-host-wake-l {
-> > +                       rockchip,pins = <0 RK_PA4 RK_FUNC_GPIO &pcfg_pull_none>;
-> > +               };
-> > +
-> > +               bt_wake_l: bt-wake-l {
-> > +                       rockchip,pins = <2 RK_PD3 RK_FUNC_GPIO &pcfg_pull_none>;
-> > +               };
-> > +       };
-> > +
-> >         sdmmc {
-> >                 sdmmc_bus1: sdmmc-bus1 {
-> >                         rockchip,pins =
-> > @@ -387,6 +410,26 @@
-> >                 };
-> >         };
-> >
-> > +       sdio0 {
-> > +               sdio0_bus4: sdio0-bus4 {
-> > +                       rockchip,pins =
-> > +                               <2 20 RK_FUNC_1 &pcfg_pull_up_20ma>,
-> > +                               <2 21 RK_FUNC_1 &pcfg_pull_up_20ma>,
-> > +                               <2 22 RK_FUNC_1 &pcfg_pull_up_20ma>,
-> > +                               <2 23 RK_FUNC_1 &pcfg_pull_up_20ma>;
-> > +               };
-> > +
-> > +               sdio0_cmd: sdio0-cmd {
-> > +                       rockchip,pins =
-> > +                               <2 24 RK_FUNC_1 &pcfg_pull_up_20ma>;
-> > +               };
-> > +
-> > +               sdio0_clk: sdio0-clk {
-> > +                       rockchip,pins =
-> > +                               <2 25 RK_FUNC_1 &pcfg_pull_none_20ma>;
-> > +               };
-> > +       };
-> > +
-> >         pmic {
-> >                 pmic_int_l: pmic-int-l {
-> >                         rockchip,pins =
-> > @@ -403,6 +446,19 @@
-> >                                 <1 14 RK_FUNC_GPIO &pcfg_pull_down>;
-> >                 };
-> >         };
-> > +
-> > +       sdio-pwrseq {
-> > +               wifi_enable_h: wifi-enable-h {
-> > +                       rockchip,pins =
-> > +                               <0 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
-> > +               };
-> > +       };
-> > +
-> > +       wifi {
-> > +               wifi_host_wake_l: wifi-host-wake-l {
-> > +                       rockchip,pins = <0 RK_PA3 RK_FUNC_GPIO &pcfg_pull_none>;
-> > +               };
-> > +       };
-> >  };
-> >
-> >  &pwm2 {
-> > @@ -413,6 +469,33 @@
-> >         status = "okay";
-> >  };
-> >
-> > +&sdio0 {
-> > +       clock-frequency = <50000000>;
-> > +       bus-width = <4>;
-> > +       cap-sdio-irq;
-> > +       cap-sd-highspeed;
-> > +       no-emmc;
-> > +       keep-power-in-suspend;
-> > +       mmc-pwrseq = <&sdio_pwrseq>;
-> > +       non-removable;
-> > +       num-slots = <1>;
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
-> > +       sd-uhs-sdr104;
-> > +
-> > +       status = "okay";
-> > +
-> > +       brcmf: wifi@1 {
-> > +               compatible = "brcm,bcm4329-fmac";
-> > +               reg = <1>;
-> > +               interrupt-parent = <&gpio0>;
-> > +               interrupts = <RK_PA3 GPIO_ACTIVE_HIGH>;
-> > +               interrupt-names = "host-wake";
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&wifi_host_wake_l>;
-> > +       };
-> > +};
-> > +
-> >  &sdhci {
-> >         bus-width = <8>;
-> >         mmc-hs400-1_8v;
-> > @@ -439,8 +522,19 @@
-> >
-> >  &uart0 {
-> >         pinctrl-names = "default";
-> > -       pinctrl-0 = <&uart0_xfer &uart0_cts>;
-> > +       pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
-> >         status = "okay";
-> > +
-> > +       bluetooth {
-> > +               compatible = "brcm,bcm43438-bt";
-> > +               clocks = <&rk808 1>;
-> > +               clock-names = "ext_clock";
-> > +               device-wakeup-gpios = <&gpio2 RK_PD3 GPIO_ACTIVE_HIGH>;
-> > +               host-wakeup-gpios = <&gpio0 RK_PA4 GPIO_ACTIVE_HIGH>;
-> > +               shutdown-gpios = <&gpio0 RK_PB1 GPIO_ACTIVE_HIGH>;
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&bt_host_wake_l &bt_wake_l &bt_enable_h>;
-> > +       };
-> >  };
-> >
-> >  &uart2 {
-> > --
-> > 2.17.1
-> >
+Will
+=A0
+> The corruption you have is reasonably regular:
+> =A0
+> > 0079c00 6d6d 7061 0000 0000 0848 fd8f 0001 0000
+> > 0079c10 0048 fd8f 0001 0000 0001 0000 0003 0000
+> > 0079c20 2000 fd83 0001 0000 1fff fd86 0001 0000
+> > 0079c30 0000 0000 0000 0000 700f 0000 0000 0000
+> =A0
+> Here's "mmap" again, but the record is twice as long:
+> =A0
+> > 0079c40 6d6d 7061 0000 0000 f448 ffff 0001 0000
+> > 0079c50 f748 ffff 0001 0000 0001 0000 0004 0000
+> > 0079c60 3000 fd8c 0001 0000 2fff fd8e 0001 0000
+> > 0079c70 0000 0000 0000 0000 700f 0000 0000 0000
+> > 0079c80 c103 0606 0100 be00 1009 3b00 3b07 0607
+> > 0079c90 0100 5700 1006 e800 8c03 3103 0100 0a00
+> > 0079ca0 0000 cf00 bf08 0a00 0100 5700 1006 3700
+> > 0079cb0 3906 0606 0100 1600 0004 4700 9902 0207
+> =A0
+> And then the whole structure repeats:
+> =A0
+> > 0079cc0 6d6d 7061 0000 0000 f808 ffff 0001 0000
+> > 0079cd0 f1c8 ffff 0001 0000 0001 0000 0005 0000
+> > 0079ce0 d000 fff8 0001 0000 efff fffa 0001 0000
+> > 0079cf0 0000 0000 0000 0000 700f 0000 0000 0000
+> =A0
+> > 0079d00 6d6d 7061 0000 0000 f1c8 ffff 0001 0000
+> > 0079d10 f388 ffff 0001 0000 0001 0000 0003 0000
+> > 0079d20 c000 ffdf 0001 0000 6fff fff8 0001 0000
+> > 0079d30 0000 0000 0000 0000 700f 0000 0000 0000
+> > 0079d40 9407 0901 0100 5300 0204 b400 d503 0a04
+> > 0079d50 0100 0000 0001 0200 7309 0202 0100 0200
+> > 0079d60 5000 0200 7309 0202 0400 ff00 f7ff 94ff
+> > 0079d70 b400 0208 0100 dc00 0000 b400 5803 0607
+> > 0079d80 6d6d 7061 0000 0000 f7c8 ffff 0001 0000
 
 _______________________________________________
 linux-arm-kernel mailing list
