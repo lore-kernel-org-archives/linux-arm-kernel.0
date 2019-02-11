@@ -2,98 +2,64 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 11DD6C169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:23:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 50A8CC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:26:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D547A214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:23:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0CA89214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 11:26:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="COkbQmP5";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="HZ68djD0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D547A214DA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q2xoqxhS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CA89214DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Cc:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=zl3YsMg/ZeYv12dX04WhnteXTN+hyH1YvO8/RVLD+BA=; b=COkbQmP5kCjNDJS7hHMUPuDmvP
-	j+14KSlyNxo8j2cOgPaM/fETEO6BpypqM2GtD81VXYvevqptt4IMSpfyM0cEXNXuV+IEYvc8m1p8H
-	+TTs4AviDryP3JvfwNZrWFm8n40x+zZgcwr3Mji0uKpaEA+lo1L7x4SNh1TNGiOmUObWzUFlFl5c+
-	0HfpaZwkfuS7th04YvPwWu64kgEHZcgKhkT3ftfTNLh3ls27Y1/sKx3PSjLZkx6uMUSC+4eEHlq3M
-	Vr8Tg772K74v3vnCV75sWPUpIh8PP20SFMSWRqqBe4D8u1M+muRwUXO9PgOfto1OayfS+L/PKCBwH
-	KEbjUyrg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=hC4Qa+sWNzgcPcc1d1QRmX9y7QPsPecZSo6qjeYwOcY=; b=q2xoqxhSkiIv/o
+	cZWSi+6bLUhX1CegW7Qzs06bvlyx8pAmCyGrbl3uD7KExiYVirpL1CUL7iOD8xCPUS5U6+SwR5oqp
+	ruj624sFdtVYx5dVodkPtFa8jjcJudZ2QzKfqSz6wj+5DAqWzNytjktN8dBzIYkyAe7gayGFtrpmh
+	9Fo9sQYTRy6dUlO4uobGJGW/MvSxy4d4yqyHOHi/CFIrl2knGqvMdTGMquBnNOEwNQHLHSL0Pbw5N
+	wEvwhZmU3RC3RzwsX8R9B1R7BLalLaNCuHld74vcamPbPdXcK7rcLl97OOSuyv50yivgHp3mHHbUM
+	2yDhh5juoN4SyiT4w5pw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt9gP-00036I-5M; Mon, 11 Feb 2019 11:23:29 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt9gK-00035Z-Ke
- for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 11:23:26 +0000
-Received: by mail-wm1-x343.google.com with SMTP id b11so17182796wmj.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 03:23:23 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=subject:to:references:from:message-id:date:user-agent:mime-version
- :in-reply-to:content-language:content-transfer-encoding;
- bh=1j8bbri+HycsAw075of8V538dATVxD2rYwR0snuO0hQ=;
- b=HZ68djD0khJp7NqjFVusFF7uYDgrF1G9z0vyIMxB/DAx4aDZ2JjkywosAfGts5cceW
- +SVb4+RH58RAoiVt8rznPdRKGDVtoUlWnXgU7mK628VyABLx4bmpQl9yWo4Zd+2bgWgr
- 5zDVR7pSFA7Gk/wJEJzgdagoEmzR5efLefBq/1fCKd/W6RyCYDHXLO98RH4zQemg2uI/
- oktf8nhGnl61Gq8EIvYlucYmbQH2EpDZmuFXbR6Wr9DSWyQ/sLIMdPwDZq68lZJAitGS
- tTk47U2e7eihwe8BJzH65uOvOi7YfDdxcQcJuxeXwELHQOsv9ffscw7nssEEpJJUr1Os
- gHiA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=1j8bbri+HycsAw075of8V538dATVxD2rYwR0snuO0hQ=;
- b=Dn7hNHaPNq+fGVZVtty4+2CAaNIiqm9i97OmPR4OCM56dUTJjPcQX7+f1ONnG5RUi7
- X7cMFyHDYIYY0f5MsB3ySVYPOVe8/NsplkwM5G4eda3x+PeCPLoRUNQWkOPRzh349Fee
- 5qR5Mwb2OlFmAFXsR7bfkhHZwHWT2/AfsEEVzHH8QuImEn8ZL2+V/t/LwbcqbsoN79RP
- C+1hp4qLWddt9nCR53UL0GkCqt7IVo4Jds/XvMxs00Wzp/WQ+pAvH113s9U+y0k5WEw7
- sf6U5QpTR8+s05+17MrkhKHh6T6fN2XKwEF2I1gv5r/V/oeeOvMHowkRsjeHq1gCOLzj
- 55Og==
-X-Gm-Message-State: AHQUAuavkkCfWOK2cogtqxNi0JP6jbUNDtMOaXhfYRV4vkWiCXlrLHGk
- OlJ3VZA99uo6wf2ewkp2SYv3hGjD9uo=
-X-Google-Smtp-Source: AHgI3IbRwgJ0aPz+iUuzS5rkHVHBVKHu2InhZwU9uVT2jruPLroczSXeTIObS5eZpH9nbPtUUPPRWQ==
-X-Received: by 2002:a5d:4e8c:: with SMTP id e12mr17846964wru.21.1549884202298; 
- Mon, 11 Feb 2019 03:23:22 -0800 (PST)
-Received: from [192.168.0.41] (13.50.92.92.rev.sfr.net. [92.92.50.13])
- by smtp.googlemail.com with ESMTPSA id o18sm14814644wrg.40.2019.02.11.03.23.20
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 11 Feb 2019 03:23:21 -0800 (PST)
-Subject: Re: [PATCH 0/2] Subject: [PATCH 0/2] clocksource: exynos_mct: Clear
- timer interrupt when shutting down
-To: Marek Szyprowski <m.szyprowski@samsung.com>,
- Stuart Menefy <stuart.menefy@mathembedded.com>,
- linux-samsung-soc@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
- Kukjin Kim <kgene@kernel.org>, Krzysztof Kozlowski <krzk@kernel.org>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-References: <CGME20190210225147epcas3p4cedebfc5692274bc6135ceabbcf2642d@epcas3p4.samsung.com>
- <20190210225114.20110-1-stuart.menefy@mathembedded.com>
- <e22c175a-d88a-81a7-9faa-42bb4fe09a22@samsung.com>
-From: Daniel Lezcano <daniel.lezcano@linaro.org>
-Message-ID: <e3637f0f-1e72-db3a-f744-ade0e878cfc5@linaro.org>
-Date: Mon, 11 Feb 2019 12:23:20 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gt9jQ-0004er-8s; Mon, 11 Feb 2019 11:26:36 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gt9jM-0004eW-7a
+ for linux-arm-kernel@lists.infradead.org; Mon, 11 Feb 2019 11:26:33 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C13EAA78;
+ Mon, 11 Feb 2019 03:26:30 -0800 (PST)
+Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 22E5C3F557;
+ Mon, 11 Feb 2019 03:26:28 -0800 (PST)
+Date: Mon, 11 Feb 2019 11:26:19 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Andrew Murray <andrew.murray@arm.com>
+Subject: Re: [PATCH v10 4/5] arm64: arm_pmu: Add support for
+ exclude_host/exclude_guest attributes
+Message-ID: <20190211112619.GA32385@fuggles.cambridge.arm.com>
+References: <1547482308-29839-1-git-send-email-andrew.murray@arm.com>
+ <1547482308-29839-5-git-send-email-andrew.murray@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <e22c175a-d88a-81a7-9faa-42bb4fe09a22@samsung.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <1547482308-29839-5-git-send-email-andrew.murray@arm.com>
+User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_032324_706711_99BFFA8B 
-X-CRM114-Status: GOOD (  16.56  )
+X-CRM114-CacheID: sfid-20190211_032632_277249_1F23BF42 
+X-CRM114-Status: GOOD (  19.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,39 +71,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Julien Thierry <julien.thierry@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMTEvMDIvMjAxOSAwODoxNCwgTWFyZWsgU3p5cHJvd3NraSB3cm90ZToKPiBIaSBTdHVhcnQK
-PiAKPiBPbiAyMDE5LTAyLTEwIDIzOjUxLCBTdHVhcnQgTWVuZWZ5IHdyb3RlOgo+PiBXaGVuIGRl
-YnVnZ2luZyBzdXNwZW5kIHByb2JsZW1zIG9uIEV4eW5vcyA1MjYwLCBJIGhhZCBhIGxhcmdlIG51
-bWJlcgo+PiBvZiBkZWJ1Z2dpbmcgcHJpbnRzIGdvaW5nIHRvIHRoZSBzZXJpYWwgcG9ydCBhZnRl
-ciBpbnRlcnJ1cHRzCj4+IGhhZCBiZWVuIGRpc2FibGVkIGJ1dCBiZWZvcmUgdGhlIHRpbWVyIGlu
-dGVycnVwdCB3YXMgc2h1dGRvd24uIFRoaXMKPj4gd2FzIGxvbmcgZW5vdWdoIGZvciBhIHRpbWVy
-IHRpY2sgdG8gb2NjdXIsIGJ1dCBhcyBpbnRlcnJ1cHRzIHdlcmUKPj4gZGlzYWJsZWQgdGhlIElT
-UiBkaWRuJ3QgcnVuLCBhbmQgc28gdGhlIGludGVycnVwdCB3YXNuJ3QgY2xlYXJlZC4KPj4gTGF0
-ZXIgd2hlbiB0aGUgdGltZXIgd2FzIHNodXRkb3duIHRoZSBpbnRlcnJ1cHQgd2FzIGxlZnQgYXNz
-ZXJ0ZWQgYW5kCj4+IHNvIHRoZSB3ZmkgYXQgdGhlIGhlYXJ0IG9mIHRoZSBzdXNwZW5kIGNvZGUg
-ZGlkbid0IHdhaXQsIGNhdXNpbmcKPj4gdGhlIHN1c3BlbmQgdG8gZmFpbC4KPj4KPj4gQ3VycmVu
-dGx5IHRoZSBjb2RlIHdoaWNoIHN0b3BzIHRoZSB0aW1lciB3aGVuIGl0IGlzIG9uIG9uZS1zaG90
-IG1vZGUKPj4gYW5kIHRoZSBpbnRlcnJ1cHQgb2NjdXJzIGlzIGluIGV4eW5vczRfbWN0X3RpY2tf
-Y2xlYXIoKSwgbWVhbmluZyBpZiB3ZQo+PiBjYWxsZWQgdGhpcyBmcm9tIHRoZSBzaHV0ZG93biBj
-b2RlIGV4eW5vczRfbWN0X3RpY2tfc3RvcCgpIGNvdWxkIGJlCj4+IGNhbGxlZCB0d2ljZS4gU28g
-Zmlyc3QgcmVzdHJ1Y3R1cmUgdGhlIGV4aXN0aW5nIGNvZGUsIHNvIHRoZSBjaGVjayBmb3IKPj4g
-b25lLXNob3QgbW9kZSBhbmQgc3RvcHBpbmcgdGhlIHRpbWVyIGlzIG1vdmVkIHRvIHRoZSBJU1Is
-IGxlYXZpbmcKPj4gZXh5bm9zNF9tY3RfdGlja19jbGVhcigpIGp1c3QgY2xlYXJpbmcgdGhlIGlu
-dGVycnVwdCBmbGFnLgo+Pgo+PiBPbmNlIHRoaXMgaGFzIGJlZW4gZG9uZSBzaW1wbHkgY2FsbCBl
-eHlub3M0X21jdF90aWNrX2NsZWFyKCkgZnJvbQo+PiBzZXRfc3RhdGVfc2h1dGRvd24oKS4KPiAK
-PiBUaGlzIGFsc28gZml4ZXMgbXlzdGVyaW91cyBzdXNwZW5kIGZhaWx1cmVzIG9uIE9kcm9pZCBY
-VTMvWFU0L0hDMSA6KQo+IAo+IFRlc3RlZC1ieTogTWFyZWsgU3p5cHJvd3NraSA8bS5zenlwcm93
-c2tpQHNhbXN1bmcuY29tPgoKQXBwbGllZC4gU2hhbGwgSSBhZGQgdGhlIHN0YWJsZUAgdGFnPwoK
-Ci0tIAogPGh0dHA6Ly93d3cubGluYXJvLm9yZy8+IExpbmFyby5vcmcg4pSCIE9wZW4gc291cmNl
-IHNvZnR3YXJlIGZvciBBUk0gU29DcwoKRm9sbG93IExpbmFybzogIDxodHRwOi8vd3d3LmZhY2Vi
-b29rLmNvbS9wYWdlcy9MaW5hcm8+IEZhY2Vib29rIHwKPGh0dHA6Ly90d2l0dGVyLmNvbS8jIS9s
-aW5hcm9vcmc+IFR3aXR0ZXIgfAo8aHR0cDovL3d3dy5saW5hcm8ub3JnL2xpbmFyby1ibG9nLz4g
-QmxvZwoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxp
-bnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFk
-ZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4
-LWFybS1rZXJuZWwK
+Hi Andrew,
+
+On Mon, Jan 14, 2019 at 04:11:47PM +0000, Andrew Murray wrote:
+> Add support for the :G and :H attributes in perf by handling the
+> exclude_host/exclude_guest event attributes.
+> 
+> We notify KVM of counters that we wish to be enabled or disabled on
+> guest entry/exit and thus defer from starting or stopping :G events
+> as per the events exclude_host attribute.
+> 
+> With both VHE and non-VHE we switch the counters between host/guest
+> at EL2. We are able to eliminate counters counting host events on
+> the boundaries of guest entry/exit when using :G by filtering out
+> EL2 for exclude_host. However when using :H unless exclude_hv is set
+> on non-VHE then there is a small blackout window at the guest
+> entry/exit where host events are not captured.
+> 
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/kernel/perf_event.c | 53 ++++++++++++++++++++++++++++++++++++------
+>  1 file changed, 46 insertions(+), 7 deletions(-)
+
+[...]
+
+>  static inline int armv8pmu_enable_intens(int idx)
+> @@ -824,16 +851,25 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+>  	 * Therefore we ignore exclude_hv in this configuration, since
+>  	 * there's no hypervisor to sample anyway. This is consistent
+>  	 * with other architectures (x86 and Power).
+> +	 *
+> +	 * To eliminate counting host events on the boundaries of
+> +	 * guest entry/exit we ensure EL2 is not included in hyp mode
+> +	 * with !exclude_host.
+>  	 */
+>  	if (is_kernel_in_hyp_mode()) {
+> -		if (!attr->exclude_kernel)
+> +		if (!attr->exclude_kernel && !attr->exclude_host)
+>  			config_base |= ARMV8_PMU_INCLUDE_EL2;
+>  	} else {
+> -		if (attr->exclude_kernel)
+> -			config_base |= ARMV8_PMU_EXCLUDE_EL1;
+>  		if (!attr->exclude_hv)
+>  			config_base |= ARMV8_PMU_INCLUDE_EL2;
+>  	}
+> +
+> +	/*
+> +	 * Filter out !VHE kernels and guest kernels
+> +	 */
+> +	if (attr->exclude_kernel)
+> +		config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> +
+
+This series needs acks from the KVM folks, but I'd also like Christoffer to
+confirm that he's happy with the way these checks ended up because I lost
+track of where we got to on that.
+
+Will
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
