@@ -2,71 +2,71 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D720DC282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 07:17:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9D958C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 07:18:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A51BC20836
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 07:17:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6F4CB20836
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 07:18:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cL0XYBgc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A51BC20836
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JBx+s/pU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F4CB20836
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=S7P6M3WHI4OjhdIiUuvJNlNI00oQfPno+dHC5AsoUtk=; b=cL0XYBgcqRgOsu
-	/tQRstHKbchd1npsvDPlqrM2nrzo5W0L3lr/PjE77UQPRLS4rS71nxoDCYODwJIq0ye2f2Pn8cs7c
-	do0/TTak/0D3yXYL1Pp4qlYoyxE7koo6NH5MBTjAct6+txT3LLL2DDEFJJk6zlwCrd85x9+4F5s4E
-	/9BoYxG2MiOmsj6zvnBgFSwkpo2/wPT3KwgsIwwr4o+4TKGzaMSj4K2n54GvPCl6sTnPyLSJJC9uL
-	h63kpacU99mBsq0gfTL6r4gFz+l2VooXp8L7x0xsBFIqkXtj+LFpUkmTz+mDWs2qzX9fwkmUxSibJ
-	nvgClretn3HlFyxUgDyQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=2dR8n/UNnib0HEjwyU3xzeKckePaZSOZxeJrvfnzLg4=; b=JBx+s/pUt2TgTu
+	0g7yMeXXssDw90JroKXtEJycyNqOGxN4MwAJqWZ4d/bzah2QoSL0AGZWvn1h0ZDcksIbVqoHd+QRZ
+	go9AiiPOC9T1qjbvsRFCS6Z6bvaw3s3e10PQ5fHWWDot8jSvrDAnDXUdCWenmYhV6/33FwGA/tJUD
+	ShNBM/ASBXPKCShi4emvR07oL8HQ2P7r+ZsKqHLvy8nb1NTpMoRc2OzrNEWKrMwL/MXgyj8uCLG9E
+	zANAVXYqwHLErMKXsgHCu2f4KAtzfh13GA/NJeF3aDU1kcwWFZ9YlbiZuxHtZz0KMlANqzsYr/f/i
+	DigsOAePXbeWjh32iPVQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gt5qX-0001IN-0G; Mon, 11 Feb 2019 07:17:41 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gt5qp-0001bS-Mw; Mon, 11 Feb 2019 07:17:59 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gt5qT-0001Hp-AD; Mon, 11 Feb 2019 07:17:38 +0000
-X-UUID: 9628415cab294592928a223e83de0690-20190210
-X-UUID: 9628415cab294592928a223e83de0690-20190210
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
+ id 1gt5qi-0001TZ-Vx; Mon, 11 Feb 2019 07:17:55 +0000
+X-UUID: b81607002d6747eda26633ae9da93a2c-20190210
+X-UUID: b81607002d6747eda26633ae9da93a2c-20190210
+Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
  (envelope-from <seiya.wang@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 336559588; Sun, 10 Feb 2019 23:17:35 -0800
+ with ESMTP id 278735624; Sun, 10 Feb 2019 23:17:46 -0800
 Received: from mtkmbs08n1.mediatek.inc (172.21.101.55) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Sun, 10 Feb 2019 23:17:33 -0800
+ MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Sun, 10 Feb 2019 23:17:45 -0800
 Received: from mtkcas07.mediatek.inc (172.21.101.84) by
  mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 11 Feb 2019 15:17:32 +0800
+ 15.0.1395.4; Mon, 11 Feb 2019 15:17:43 +0800
 Received: from mtksdccf07.mediatek.inc (172.21.84.99) by mtkcas07.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
- Frontend Transport; Mon, 11 Feb 2019 15:17:32 +0800
+ Frontend Transport; Mon, 11 Feb 2019 15:17:43 +0800
 From: Seiya Wang <seiya.wang@mediatek.com>
 To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Matthias Brugger <matthias.bgg@gmail.com>, Michael Turquette
  <mturquette@baylibre.com>, Stephen Boyd <sboyd@kernel.org>
-Subject: [PATCH v1 1/2] arm64: dts: mt8173: correct cpu type of cpu2 and cpu3
- to cortex-a72
-Date: Mon, 11 Feb 2019 15:15:54 +0800
-Message-ID: <20190211071555.31430-1-seiya.wang@mediatek.com>
+Subject: [PATCH v1 2/2] clk: mediatek: correct cpu clock name for MT8173 SoC
+Date: Mon, 11 Feb 2019 15:15:55 +0800
+Message-ID: <20190211071555.31430-2-seiya.wang@mediatek.com>
 X-Mailer: git-send-email 2.14.1
+In-Reply-To: <20190211071555.31430-1-seiya.wang@mediatek.com>
+References: <20190211071555.31430-1-seiya.wang@mediatek.com>
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190210_231737_360020_BD15D0B5 
-X-CRM114-Status: UNSURE (   9.38  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190210_231753_551516_B9CAE409 
+X-CRM114-Status: GOOD (  10.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,47 +86,49 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The cpu type of cpu2 and cpu3 should be cortex-a72, not cortex-a57.
+Change cpu clock name from ca57 to ca72 since MT8173 does use cortex-a72.
 
 Signed-off-by: Seiya Wang <seiya.wang@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/clk/mediatek/clk-mt8173.c      | 4 ++--
+ include/dt-bindings/clock/mt8173-clk.h | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 44374c506a1c..99675c51577a 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -178,12 +178,12 @@
+diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+index 96c292c3e440..deedeb3ea33b 100644
+--- a/drivers/clk/mediatek/clk-mt8173.c
++++ b/drivers/clk/mediatek/clk-mt8173.c
+@@ -533,7 +533,7 @@ static const char * const ca53_parents[] __initconst = {
+ 	"univpll"
+ };
  
- 		cpu2: cpu@100 {
- 			device_type = "cpu";
--			compatible = "arm,cortex-a57";
-+			compatible = "arm,cortex-a72";
- 			reg = <0x100>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SLEEP_0>;
- 			#cooling-cells = <2>;
--			clocks = <&infracfg CLK_INFRA_CA57SEL>,
-+			clocks = <&infracfg CLK_INFRA_CA72SEL>,
- 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 			clock-names = "cpu", "intermediate";
- 			operating-points-v2 = <&cluster1_opp>;
-@@ -191,12 +191,12 @@
+-static const char * const ca57_parents[] __initconst = {
++static const char * const ca72_parents[] __initconst = {
+ 	"clk26m",
+ 	"armca15pll",
+ 	"mainpll",
+@@ -542,7 +542,7 @@ static const char * const ca57_parents[] __initconst = {
  
- 		cpu3: cpu@101 {
- 			device_type = "cpu";
--			compatible = "arm,cortex-a57";
-+			compatible = "arm,cortex-a72";
- 			reg = <0x101>;
- 			enable-method = "psci";
- 			cpu-idle-states = <&CPU_SLEEP_0>;
- 			#cooling-cells = <2>;
--			clocks = <&infracfg CLK_INFRA_CA57SEL>,
-+			clocks = <&infracfg CLK_INFRA_CA72SEL>,
- 				 <&apmixedsys CLK_APMIXED_MAINPLL>;
- 			clock-names = "cpu", "intermediate";
- 			operating-points-v2 = <&cluster1_opp>;
+ static const struct mtk_composite cpu_muxes[] __initconst = {
+ 	MUX(CLK_INFRA_CA53SEL, "infra_ca53_sel", ca53_parents, 0x0000, 0, 2),
+-	MUX(CLK_INFRA_CA57SEL, "infra_ca57_sel", ca57_parents, 0x0000, 2, 2),
++	MUX(CLK_INFRA_CA72SEL, "infra_ca72_sel", ca72_parents, 0x0000, 2, 2),
+ };
+ 
+ static const struct mtk_composite top_muxes[] __initconst = {
+diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
+index 8aea623dd518..f7e5356fd602 100644
+--- a/include/dt-bindings/clock/mt8173-clk.h
++++ b/include/dt-bindings/clock/mt8173-clk.h
+@@ -194,7 +194,7 @@
+ #define CLK_INFRA_PMICWRAP		11
+ #define CLK_INFRA_CLK_13M		12
+ #define CLK_INFRA_CA53SEL               13
+-#define CLK_INFRA_CA57SEL               14
++#define CLK_INFRA_CA72SEL               14
+ #define CLK_INFRA_NR_CLK                15
+ 
+ /* PERI_SYS */
 -- 
 2.14.1
 
