@@ -2,52 +2,73 @@ Return-Path: <SRS0=sCCJ=QS=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2AA11C282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:52:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 40DB7C169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:52:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E38D321B18
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:52:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0FC4321B18
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 11 Feb 2019 13:52:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B28P8uiP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E38D321B18
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NIyeHtpH";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="hVozEyWS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0FC4321B18
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=90iVKeC08ajbnGYeo9u8S3lqM2GAean6wrmHCI7IeoY=; b=B28P8uiPSTSDo3
-	5bymeFXxo1j8X19x4SAoIkDk3rOmKuhMlFjOMzqynenTynild3MFuxB434t1SGQtsqAjnnAg7deCF
-	vpuNc3iAnAUiorGangNKNPo7yOPLU/PaOB7RY8lRfbLHigsp3fHSuccVUUHPwk25MlPbM98ivsIpn
-	AxZXThh0vNmR7n00d5dWZV8pu7Edq5z/sbbvqCwhPBCTELzxuX5W0iYGlho/D5bdTYNdvobYy26YE
-	PrKkgBT367cbVLtxY1h0F1GJ4ptvVN4UgiSIppGyBPQvS1EUFlxVjeAmlzevcVOBnLUd9yKQLh+J5
-	8YR5ytBSxu0FXIopzbRQ==;
+	List-Owner; bh=Xni7SreYWRvrKEK92fn1merq5g5auVdLzUMg1261Qps=; b=NIyeHtpHSOYb1f
+	z6ed1vYB0kk8STz1+5Ib1HYGFWfbAEEwVjA8Ub68qSDu7NI2iyjKjKmZfYvJpo5BXeHbCfR5fdK6g
+	1A8fbr+iTF1BK/CPa23rX9mXhrpb/92EHZ4Ig8oozT2BFi+joOMYnY9wxvlR6uaZlqgNcbr8p6dfp
+	jVLwYpPdVXDHkuM+MvA8SZdvCUP3WxaF4lD8dEQ2jjRqh0bb/6qWhKGa3BOKgefhFkcdRm9bWIJMP
+	Zvig4iIvSYUcZg4PewbTBEgkhIzA5fBmtjB5fe9O2AQ30f+8yMQBGWU4XbxbO5B/hRkagSmh7y8uI
+	MB91Cjn0AB5HRKe7I2RA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtC0E-0000tN-1Y; Mon, 11 Feb 2019 13:52:06 +0000
-Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
- helo=localhost)
- by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtBl7-0000Nh-SH; Mon, 11 Feb 2019 13:36:30 +0000
-From: Christoph Hellwig <hch@lst.de>
-To: iommu@lists.linux-foundation.org
-Subject: [PATCH 11/12] dma-mapping: handle per-device coherent memory mmap in
- common code
-Date: Mon, 11 Feb 2019 14:35:53 +0100
-Message-Id: <20190211133554.30055-12-hch@lst.de>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190211133554.30055-1-hch@lst.de>
-References: <20190211133554.30055-1-hch@lst.de>
+	id 1gtC0I-00011i-Nf; Mon, 11 Feb 2019 13:52:10 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtC0D-0000uZ-5S
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 11 Feb 2019 13:52:05 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=eWj3rusOmVs9VU5WrUyV3EmRPWyzvShi15z9JJNii/c=; b=hVozEyWSFnyoOUQcnRc2RCaV3
+ 0J398ZZndorxm7wOPboATWk4jdD5UWzPHAioDvqYGGE0Wjv9fM0yM2c5HYQNuYcN9JCUMghQbSGAG
+ 27EkDEEZ5evdFr/qh4DMiB+hDqXvw0NKCvIJ8mOuy8AI0Z3kasJTwW4aiwpNZ0Vu0C5Q4xSQC+u1t
+ g18qOJswBz/38yhkgoC6NOYTycWKjYT9+11vOq15BHHlISuq970oi7W4X3xuAfZldikevC1tOs0Bh
+ B4lMnEBsQnx3IMx0UzhVcMlMnacF0JUWtGfVPaqYH40L4SpkXsXR2MY6hg5PidRJqkizqPXON2DyG
+ mCppZU+lw==;
+Received: from j217100.upc-j.chello.nl ([24.132.217.100]
+ helo=hirez.programming.kicks-ass.net)
+ by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtC09-0001XH-J4; Mon, 11 Feb 2019 13:52:01 +0000
+Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
+ id 3C2032370CE11; Mon, 11 Feb 2019 14:51:59 +0100 (CET)
+Date: Mon, 11 Feb 2019 14:51:59 +0100
+From: Peter Zijlstra <peterz@infradead.org>
+To: Ingo Molnar <mingo@kernel.org>
+Subject: Re: [PATCH v3 3/4] uaccess: Check no rescheduling function is called
+ in unsafe region
+Message-ID: <20190211135159.GC32511@hirez.programming.kicks-ass.net>
+References: <1547560709-56207-1-git-send-email-julien.thierry@arm.com>
+ <1547560709-56207-4-git-send-email-julien.thierry@arm.com>
+ <20190211134527.GA121589@gmail.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190211134527.GA121589@gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -59,241 +80,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-xtensa@linux-xtensa.org, linuxppc-dev@lists.ozlabs.org,
- linux-sh@vger.kernel.org, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- x86@kernel.org, linux-mips@vger.kernel.org, linux-kernel@vger.kernel.org,
- devicetree@vger.kernel.org, linux-riscv@lists.infradead.org,
- linux-snps-arc@lists.infradead.org, Lee Jones <lee.jones@linaro.org>,
+Cc: Julien Thierry <julien.thierry@arm.com>, catalin.marinas@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, mingo@redhat.com,
+ james.morse@arm.com, hpa@zytor.com, valentin.schneider@arm.com,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-We handle allocation and freeing in common code, so we should handle
-mmap the same way.  Also all users of per-device coherent memory are
-exclusive, that is if we can't allocate from the per-device pool we
-can't use the system memory either.  Unfold the current
-dma_mmap_from_dev_coherent implementation and always use the
-per-device pool if it exists.
+On Mon, Feb 11, 2019 at 02:45:27PM +0100, Ingo Molnar wrote:
+> > diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+> > index a674c7db..b1bb7e9 100644
+> > --- a/kernel/sched/core.c
+> > +++ b/kernel/sched/core.c
+> > @@ -3289,6 +3289,14 @@ static inline void schedule_debug(struct task_struct *prev)
+> >  		__schedule_bug(prev);
+> >  		preempt_count_set(PREEMPT_DISABLED);
+> >  	}
+> > +
+> > +	if (IS_ENABLED(CONFIG_DEBUG_UACCESS_SLEEP) &&
+> > +	    unlikely(unsafe_user_region_active())) {
+> > +		printk(KERN_ERR "BUG: scheduling while user_access enabled: %s/%d/0x%08x\n",
+> > +		       prev->comm, prev->pid, preempt_count());
+> > +		dump_stack();
+> > +	}
+> > +
+> >  	rcu_sleep_check();
+> > 
+> >  	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
+> > @@ -6151,6 +6159,20 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
+> >  EXPORT_SYMBOL(___might_sleep);
+> >  #endif
+> > 
+> > +#ifdef CONFIG_DEBUG_UACCESS_SLEEP
+> > +void __might_resched(const char *file, int line)
+> > +{
+> > +	if (!unsafe_user_region_active())
+> > +		return;
+> 
+> Could you please more clearly explain why you want/need an exception from 
+> the __might_resched() debug warning?
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- arch/arm/mm/dma-mapping-nommu.c |  7 ++--
- arch/arm/mm/dma-mapping.c       |  3 --
- arch/arm64/mm/dma-mapping.c     |  3 --
- include/linux/dma-mapping.h     | 11 ++-----
- kernel/dma/coherent.c           | 58 ++++++++-------------------------
- kernel/dma/internal.h           |  2 ++
- kernel/dma/mapping.c            |  8 ++---
- 7 files changed, 24 insertions(+), 68 deletions(-)
+In specific; how is the addition in schedule_debug() not triggering on
+PREEMPT=y kernels?
 
-diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
-index c72f024f1e82..4eeb7e5d9c07 100644
---- a/arch/arm/mm/dma-mapping-nommu.c
-+++ b/arch/arm/mm/dma-mapping-nommu.c
-@@ -80,11 +80,8 @@ static int arm_nommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 			      void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 			      unsigned long attrs)
- {
--	int ret;
--
--	if (dma_mmap_from_global_coherent(vma, cpu_addr, size, &ret))
--		return ret;
--
-+	if (!(attrs & DMA_ATTR_NON_CONSISTENT))
-+		return dma_mmap_from_global_coherent(vma, cpu_addr, size);
- 	return dma_common_mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
- }
- 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 3c8534904209..e2993e5a7166 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -830,9 +830,6 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 	unsigned long pfn = dma_to_pfn(dev, dma_addr);
- 	unsigned long off = vma->vm_pgoff;
- 
--	if (dma_mmap_from_dev_coherent(dev, vma, cpu_addr, size, &ret))
--		return ret;
--
- 	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
- 		ret = remap_pfn_range(vma, vma->vm_start,
- 				      pfn + off,
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 78c0a72f822c..a55be91c1d1a 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -246,9 +246,6 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
- 
- 	vma->vm_page_prot = arch_dma_mmap_pgprot(dev, vma->vm_page_prot, attrs);
- 
--	if (dma_mmap_from_dev_coherent(dev, vma, cpu_addr, size, &ret))
--		return ret;
--
- 	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
- 		/*
- 		 * DMA_ATTR_FORCE_CONTIGUOUS allocations are always remapped,
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index 018e37a0870e..ae6fe66f97b7 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -158,17 +158,12 @@ static inline int is_device_dma_capable(struct device *dev)
-  * These three functions are only for dma allocator.
-  * Don't use them in device drivers.
-  */
--int dma_mmap_from_dev_coherent(struct device *dev, struct vm_area_struct *vma,
--			    void *cpu_addr, size_t size, int *ret);
--
- void *dma_alloc_from_global_coherent(size_t size, dma_addr_t *dma_handle);
- void dma_release_from_global_coherent(size_t size, void *vaddr);
- int dma_mmap_from_global_coherent(struct vm_area_struct *vma, void *cpu_addr,
--				  size_t size, int *ret);
-+				  size_t size);
- 
- #else
--#define dma_mmap_from_dev_coherent(dev, vma, vaddr, order, ret) (0)
--
- static inline void *dma_alloc_from_global_coherent(size_t size,
- 						   dma_addr_t *dma_handle)
- {
-@@ -177,12 +172,10 @@ static inline void *dma_alloc_from_global_coherent(size_t size,
- 
- static inline void dma_release_from_global_coherent(size_t size, void *vaddr)
- {
--	return 0;
- }
- 
- static inline int dma_mmap_from_global_coherent(struct vm_area_struct *vma,
--						void *cpu_addr, size_t size,
--						int *ret)
-+						void *cpu_addr, size_t size)
- {
- 	return 0;
- }
-diff --git a/kernel/dma/coherent.c b/kernel/dma/coherent.c
-index d1da1048e470..d7a27008f228 100644
---- a/kernel/dma/coherent.c
-+++ b/kernel/dma/coherent.c
-@@ -197,60 +197,30 @@ void dma_release_from_global_coherent(size_t size, void *vaddr)
- 	__dma_release_from_coherent(dma_coherent_default_memory, size, vaddr);
- }
- 
--static int __dma_mmap_from_coherent(struct dma_coherent_mem *mem,
--		struct vm_area_struct *vma, void *vaddr, size_t size, int *ret)
-+int __dma_mmap_from_coherent(struct dma_coherent_mem *mem,
-+		struct vm_area_struct *vma, void *vaddr, size_t size)
- {
--	if (mem && vaddr >= mem->virt_base && vaddr + size <=
--		   (mem->virt_base + (mem->size << PAGE_SHIFT))) {
--		unsigned long off = vma->vm_pgoff;
--		int start = (vaddr - mem->virt_base) >> PAGE_SHIFT;
--		int user_count = vma_pages(vma);
--		int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
--
--		*ret = -ENXIO;
--		if (off < count && user_count <= count - off) {
--			unsigned long pfn = mem->pfn_base + start + off;
--			*ret = remap_pfn_range(vma, vma->vm_start, pfn,
--					       user_count << PAGE_SHIFT,
--					       vma->vm_page_prot);
--		}
--		return 1;
--	}
--	return 0;
--}
-+	unsigned long off = vma->vm_pgoff;
-+	int start = (vaddr - mem->virt_base) >> PAGE_SHIFT;
-+	int user_count = vma_pages(vma);
-+	int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
- 
--/**
-- * dma_mmap_from_dev_coherent() - mmap memory from the device coherent pool
-- * @dev:	device from which the memory was allocated
-- * @vma:	vm_area for the userspace memory
-- * @vaddr:	cpu address returned by dma_alloc_from_dev_coherent
-- * @size:	size of the memory buffer allocated
-- * @ret:	result from remap_pfn_range()
-- *
-- * This checks whether the memory was allocated from the per-device
-- * coherent memory pool and if so, maps that memory to the provided vma.
-- *
-- * Returns 1 if @vaddr belongs to the device coherent pool and the caller
-- * should return @ret, or 0 if they should proceed with mapping memory from
-- * generic areas.
-- */
--int dma_mmap_from_dev_coherent(struct device *dev, struct vm_area_struct *vma,
--			   void *vaddr, size_t size, int *ret)
--{
--	struct dma_coherent_mem *mem = dev_get_coherent_memory(dev);
--
--	return __dma_mmap_from_coherent(mem, vma, vaddr, size, ret);
-+	if (WARN_ON_ONCE(!dma_in_coherent_range(mem, size, vaddr)))
-+		return -ENXIO;
-+	if (off >= count || user_count > count - off)
-+		return -ENXIO;
-+	return remap_pfn_range(vma, vma->vm_start, mem->pfn_base + start + off,
-+			user_count << PAGE_SHIFT, vma->vm_page_prot);
- }
--EXPORT_SYMBOL(dma_mmap_from_dev_coherent);
- 
- int dma_mmap_from_global_coherent(struct vm_area_struct *vma, void *vaddr,
--				   size_t size, int *ret)
-+				   size_t size)
- {
- 	if (!dma_coherent_default_memory)
- 		return 0;
- 
- 	return __dma_mmap_from_coherent(dma_coherent_default_memory, vma,
--					vaddr, size, ret);
-+					vaddr, size);
- }
- 
- /*
-diff --git a/kernel/dma/internal.h b/kernel/dma/internal.h
-index 48a0a71487b1..651a0991777f 100644
---- a/kernel/dma/internal.h
-+++ b/kernel/dma/internal.h
-@@ -15,5 +15,7 @@ void *__dma_alloc_from_coherent(struct dma_coherent_mem *mem, size_t size,
- 		dma_addr_t *dma_handle);
- void __dma_release_from_coherent(struct dma_coherent_mem *mem, size_t size,
- 		void *vaddr);
-+int __dma_mmap_from_coherent(struct dma_coherent_mem *mem,
-+		struct vm_area_struct *vma, void *vaddr, size_t size);
- 
- #endif /* _DMA_INTERNAL_H */
-diff --git a/kernel/dma/mapping.c b/kernel/dma/mapping.c
-index d3c4363b2143..5f28dc8f9bf4 100644
---- a/kernel/dma/mapping.c
-+++ b/kernel/dma/mapping.c
-@@ -158,13 +158,9 @@ int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
- 	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
- 	unsigned long off = vma->vm_pgoff;
- 	unsigned long pfn;
--	int ret = -ENXIO;
- 
- 	vma->vm_page_prot = arch_dma_mmap_pgprot(dev, vma->vm_page_prot, attrs);
- 
--	if (dma_mmap_from_dev_coherent(dev, vma, cpu_addr, size, &ret))
--		return ret;
--
- 	if (off >= count || user_count > count - off)
- 		return -ENXIO;
- 
-@@ -201,6 +197,10 @@ int dma_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
- 		unsigned long attrs)
- {
- 	const struct dma_map_ops *ops = get_dma_ops(dev);
-+	struct dma_coherent_mem *mem = dev_get_coherent_memory(dev);
-+
-+	if (mem)
-+		return __dma_mmap_from_coherent(mem, vma, cpu_addr, size);
- 
- 	if (!dma_is_direct(ops) && ops->mmap)
- 		return ops->mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
--- 
-2.20.1
-
+If code is preemptible, you can (get) schedule(d). If it is not
+preemptible; you do not need these additional tests.
 
 _______________________________________________
 linux-arm-kernel mailing list
