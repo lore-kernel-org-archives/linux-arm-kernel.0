@@ -2,75 +2,114 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9809AC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 21:19:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D8C8C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 21:21:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 311C32081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 21:19:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CC75B222BE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 21:21:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U9lBzGur";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="QdssbfCL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 311C32081B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WQ6GhatW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC75B222BE
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SnTYGT6ZiAUV9GYHLBe0fLjEb0+CQr1N2M6Lfi6FiWs=; b=U9lBzGurI/cwP2
-	ETMXuHOxeeO9eD3Y90KqGVweujtBX5Kj0I7K0NJq/e7E3KdCh5WJr927ysqDbSWLa/UGrQD+dC9eQ
-	IRbzVqOP3IBHVd+NUzpAiZ+8YChzYK55V73qSx86ECwmNW4up103J9y7nZH4S1VGv72gaX9IVLGVe
-	Ksmv6OFbAV1LnQC2vbXysYlOQqWE8oyiAf4uovyPt//OK7tZRtnJ7gRMzeVR/D/t+8AX2MDgjpywz
-	0FD2cXmQqTILbPjf9BzazEx8o7pg21ooUIQmm6zgkF+9aDhckHdEskObn6nF5ky4VBHpXapzrVGLy
-	RuvGi61aRW1WX9YLnJXw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=IFME7aB8qabSR9yvftisL8ScAj2hoGvP0OslJHZcC6Q=; b=WQ6GhatW/LEtTG
+	v336sHSXQCF5qM8ISz1Ga81Hncp2fY5VXDjqikUhm/5HfZz3R5E3PSZx4EtTz7QwJdSVzHHs99Wk9
+	IWGUwBqU69zLb2Ms4jHJtfFFFHtXa3uGcT0r4o3EitI33P5uSx3qnwsDbcm26ikXyGvdVyQo0TbXA
+	ZLdgkW9TLrB6frKUUhgpjEmrT19mZiRZzl/eT6aTnUid7yLs9RpYPT4Z3SzZECjYTIgu5Au0Wsaik
+	seiLw5qxkPVz3ZRXuYA+NVyooI+D3ud+yckOO7osrKiwRt+XaNn2GjLGCbXg/MVUglByJWqpso7e/
+	3LwfvKye4Gr6S5UuRzGA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtfSN-0007Qi-Hv; Tue, 12 Feb 2019 21:19:07 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gtfUc-0000zw-Di; Tue, 12 Feb 2019 21:21:26 +0000
+Received: from mx1.redhat.com ([209.132.183.28])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtfSG-0007LO-U2; Tue, 12 Feb 2019 21:19:03 +0000
-Received: from mail-qk1-f177.google.com (mail-qk1-f177.google.com
- [209.85.222.177])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ id 1gtfUX-0000zR-O4
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 21:21:23 +0000
+Received: from smtp.corp.redhat.com (int-mx03.intmail.prod.int.phx2.redhat.com
+ [10.5.11.13])
+ (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 245582075C;
- Tue, 12 Feb 2019 21:19:00 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550006340;
- bh=b8USUSrg3lJKX89ykkFcbjrdlAPDyKVL3G6hd2eIKTM=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=QdssbfCLQx+1NjM8RrOrm7erZtinwVjJSa4a+r6GZrAp0tadbkmNAFQKP8lDSnx2t
- /fk514a292jF6WGM0psVno9umMFG/65mLK8EARg2npiOQmvQdMy1Q8UhhgODYecGFV
- vxO9Ieagwq/6/nV2T08oKRAQ1CVyeaZ5HjX38sIw=
-Received: by mail-qk1-f177.google.com with SMTP id w204so110405qka.2;
- Tue, 12 Feb 2019 13:19:00 -0800 (PST)
-X-Gm-Message-State: AHQUAuapfLCbCr7tOV8lV8bhS7tXmb0z1/Zp6TA8XWB46f4YuxDOPFo4
- C3IwYvG+pKW8uAVSAw9mKc2R3kZx4nk3hkJSTw==
-X-Google-Smtp-Source: AHgI3IbGBC5HehArOZY6ed9XOuq2/9Lb4TpJX6nU6mD811cwtyzYbz48P+dF9MwrYsEa7CmR2h8pY4pkQsvgQAsxg2c=
-X-Received: by 2002:a37:5686:: with SMTP id k128mr3941140qkb.29.1550006339312; 
- Tue, 12 Feb 2019 13:18:59 -0800 (PST)
+ by mx1.redhat.com (Postfix) with ESMTPS id E8A7559448;
+ Tue, 12 Feb 2019 21:21:19 +0000 (UTC)
+Received: from llong.remote.csb (ovpn-121-56.rdu2.redhat.com [10.10.121.56])
+ by smtp.corp.redhat.com (Postfix) with ESMTP id A32D67D8C4;
+ Tue, 12 Feb 2019 21:21:16 +0000 (UTC)
+Subject: Re: [PATCH v2 2/2] locking/rwsem: Optimize down_read_trylock()
+To: Linus Torvalds <torvalds@linux-foundation.org>
+References: <1549913486-16799-1-git-send-email-longman@redhat.com>
+ <1549913486-16799-3-git-send-email-longman@redhat.com>
+ <CAHk-=wjTmSg6zX=xKFSPZor7FWi3s4D0dy-hz_M=yeF_6478QA@mail.gmail.com>
+From: Waiman Long <longman@redhat.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=longman@redhat.com; prefer-encrypt=mutual; keydata=
+ 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
+ weim8xU=
+Organization: Red Hat
+Message-ID: <ef66f262-d68e-58ea-34f6-15b88803cf71@redhat.com>
+Date: Tue, 12 Feb 2019 16:21:10 -0500
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
 MIME-Version: 1.0
-References: <1548693481-1162-1-git-send-email-lollivier@baylibre.com>
- <1548693481-1162-3-git-send-email-lollivier@baylibre.com>
- <20190130155016.GA26536@bogus> <20190211092251.GV4686@localhost>
-In-Reply-To: <20190211092251.GV4686@localhost>
-From: Rob Herring <robh@kernel.org>
-Date: Tue, 12 Feb 2019 15:18:46 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqJPhuDDsEMvpVizewTuehOZTc84d+8Hq7o8C+O4UrBjYw@mail.gmail.com>
-Message-ID: <CAL_JsqJPhuDDsEMvpVizewTuehOZTc84d+8Hq7o8C+O4UrBjYw@mail.gmail.com>
-Subject: Re: [PATCH v3 2/4] dt-bindings: gnss: add mediatek binding
-To: Johan Hovold <johan@kernel.org>
+In-Reply-To: <CAHk-=wjTmSg6zX=xKFSPZor7FWi3s4D0dy-hz_M=yeF_6478QA@mail.gmail.com>
+Content-Language: en-US
+X-Scanned-By: MIMEDefang 2.79 on 10.5.11.13
+X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
+ (mx1.redhat.com [10.5.110.39]); Tue, 12 Feb 2019 21:21:21 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_131901_276152_6A068F02 
-X-CRM114-Status: GOOD (  23.58  )
+X-CRM114-CacheID: sfid-20190212_132121_821475_BAC6F087 
+X-CRM114-Status: GOOD (  31.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,100 +121,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Kevin Hilman <khilman@baylibre.com>, Loys Ollivier <lollivier@baylibre.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
- linux-amlogic@lists.infradead.org,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: linux-arch <linux-arch@vger.kernel.org>, linux-xtensa@linux-xtensa.org,
+ Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
+ Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
+ Linux-sh list <linux-sh@vger.kernel.org>,
+ Peter Zijlstra <peterz@infradead.org>, linux-hexagon@vger.kernel.org,
+ the arch/x86 maintainers <x86@kernel.org>, Will Deacon <will.deacon@arm.com>,
+ Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ "H. Peter Anvin" <hpa@zytor.com>, linux-alpha@vger.kernel.org,
+ sparclinux@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
+ linuxppc-dev@lists.ozlabs.org, Andrew Morton <akpm@linux-foundation.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 3:23 AM Johan Hovold <johan@kernel.org> wrote:
+On 02/12/2019 02:58 PM, Linus Torvalds wrote:
+> On Mon, Feb 11, 2019 at 11:31 AM Waiman Long <longman@redhat.com> wrote:
+>> Modify __down_read_trylock() to make it generate slightly better code
+>> (smaller and maybe a tiny bit faster).
+> This looks good, but I would ask you to try one slightly different approach.
 >
-> On Wed, Jan 30, 2019 at 09:50:16AM -0600, Rob Herring wrote:
-> > On Mon, Jan 28, 2019 at 05:37:59PM +0100, Loys Ollivier wrote:
-> > > Add binding for Mediatek-based GNSS receivers.
-> > >
-> > > Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
-> > > ---
-> > >
-> > > v3:
-> > > Removed the I2C and SPI interfaces references.
-> > > Removed the "mediatek,mt3339" compatible line.
-> > > Added the optional propertied (reset, fix)
-> > > Added the pin names for the optional properties.
-> > >
-> > > v2:
-> > > Renamed bindings from Globaltop/gtop to Mediatek/mtk.
-> > > Moved current-speed as an optional propertie.
-> > > Removed the status line in the example.
-> > > Added "mediatek,mt3339" compatible.
-> > >
-> > >  .../devicetree/bindings/gnss/mediatek.txt          | 37 ++++++++++++++++++++++
-> > >  1 file changed, 37 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/gnss/mediatek.txt
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/gnss/mediatek.txt b/Documentation/devicetree/bindings/gnss/mediatek.txt
-> > > new file mode 100644
-> > > index 000000000000..00650d81c5c8
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/gnss/mediatek.txt
-> > > @@ -0,0 +1,37 @@
-> > > +Mediatek-based GNSS Receiver DT binding
-> > > +
-> > > +Mediatek chipsets are used in GNSS-receiver modules produced by several
-> > > +vendors and can use an UART interface.
+> Instead of this:
 >
-> s/an/a/
+>>        long tmp = atomic_long_read(&sem->count);
+>>
+>>        while (tmp >= 0) {
+>>                if (atomic_long_try_cmpxchg_acquire(&sem->count, &tmp,
+>>                                        tmp + RWSEM_ACTIVE_READ_BIAS)) {
+>>                        return 1;
+>>                }
+>>        }
+> try doing this instead:
 >
-> > > +
-> > > +Please see Documentation/devicetree/bindings/gnss/gnss.txt for generic
-> > > +properties.
-> > > +
-> > > +Required properties:
-> > > +
-> > > +- compatible       : Must be
-> > > +
-> > > +                   "globaltop,pa6h"
-> > > +
-> > > +- vcc-supply       : Main voltage regulator (pin name: VCC)
-> > > +
-> > > +Optional properties:
-> > > +
-> > > +- gtop,reset-gpios : GPIO used to reset the device
-> > > +                     (pin name: RESET, NRESET)
-> >
-> > reset-gpios is the standard name.
-> >
-> > > +- gtop,fix-gpios   : GPIO used to determine device position fix state
-> > > +                     (pin name: FIX, 3D_FIX)
+>         long tmp = 0;
 >
-> I'm thinking we might need a standard name for fix-gpios as well. This
-> isn't a feature that is globaltop (or mediatek) specific, and other
-> manufacturers provide similar functionality through pins named UI_FIX,
-> or even LCKIND (lock indicator).
+>         do {
+>                 if (atomic_long_try_cmpxchg_acquire(&sem->count, &tmp,
+>                                         tmp + RWSEM_ACTIVE_READ_BIAS)) {
+>                         return 1;
+>         } while (tmp >= 0);
+>         return 0;
 >
-> The pin is typically used to drive an indicator LED AFAIU, but the
-> characteristics of the signal varies from device to device (fw to fw),
-> for example, pulse when no lock and low otherwise, or pulse when a 2d or
-> 3d-fix is acquired, etc.
+> because especially when it comes to locking, it's usually better to
+> just *guess* that the lock is unlocked, than it is to actually read
+> from the line to see what the state is.
 >
-> I'm not sure how useful the pulsing would be for software, but someone
-> might find a use for it in some form.
+> Often - but certainly not always - the lock is the first access to the
+> target cacheline, and assuming the trylock is successful (which I
+> think is the case we want to optimize for), we're much better off
+> causing that first access to be a read-for-ownership, rather than a
+> read-for-sharing.
 >
-> Rob, is this something we want to keep in the binding, and if so, how
-> about using a generic name such as "gnss-fix-gpios"?
+> Because if you first read from the line, and then do a cmpxchg, and if
+> the line was not in the cache, your cache coherency protocol will
+> generally go through two states: first shared (for the initial read)
+> and then exclusive-dirty (for the cmpxchg).
+>
+> Now, this is obviously very micro-architecture dependent, and in fact
+> the microarchitecture could even see the "predict fallthrough to a
+> cmpxchg with the same address" and turn the first read into a
+> read-for-ownership, but we've done this at some point before, and the
+> "guess unlocked" was actually the one that performed better.
+>
+> Of course, the downside is that it might be worse when the guess is
+> incorrect - either because of a nested read lock or due to an actual
+> conflict with a write, but on the whole those *should* be the rare
+> cases, and not the cases where we necessarily optimize for latency of
+> the operation.
+>
+> Hmm?
 
-Sure. As long as details like being a pulse and when the pulse occurs
-are implied by compatible string. So we don't get an endless addition
-of properties to describe those.
+I looked at the assembly code in arch/x86/include/asm/rwsem.h. For both
+trylocks (read & write), the count is read first before attempting to
+lock it. We did the same for all trylock functions in other locks.
+Depending on how the trylock is used and how contended the lock is, it
+may help or hurt performance. Changing down_read_trylock to do an
+unconditional cmpxchg will change the performance profile of existing
+code. So I would prefer keeping the current code.
 
-Rob
+I do notice now that the generic down_write_trylock() code is doing an
+unconditional compxchg. So I wonder if we should change it to read the
+lock first like other trylocks or just leave it as it is.
+
+Cheers,
+Longman
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
