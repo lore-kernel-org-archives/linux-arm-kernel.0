@@ -2,71 +2,108 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 352A2C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 06:20:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4CAE6C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 06:39:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EE35020863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 06:20:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 126B3217FA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 06:39:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rEAk3cKu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE35020863
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h/eE2KmL";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="i4hWbnn3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 126B3217FA
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=jT5womp9PbXzQeIcoU8zPtbDGrGED591NrZiQW2fNU0=; b=rEAk3cKuB0alub
-	0QmYyarrHAc7t/ZbqyQ63x32WqmpYxIPCp8EtDJtJAWICIRdIYTA0GsuJjCECOjoDR5zv6GN8KXGR
-	RVtgwI25E3srEN250ciNsdBCQhVRIbP2nDYWo0bvWmMgpWjRcthXSFYIdZXUic7x40Wo/6/3cwjEQ
-	fOI1bWcZZbKq/2iotLhUPwLUiI3ReHjRUeSArcLKLbV6TUXtbiIAjRT8C7PGm2kk4xHYnF4zhgiqY
-	DPm/5xDWxm5WjpPuMgXUBMuGnk5xqHiCe9RPIrRxncKQ+GzUob1z/LPhEHE/6pUZjYYO/QgLdVkVu
-	uTClzGk23UFZXZJaqFew==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=SmLIoy4JyB1SzeyGMX00jW0xEic/9Lp7epKFHyesd0w=; b=h/eE2KmLSyH5oY
+	ypWdwI2qBfi3N1tHuxKU7hTUgepcmCfTKDRqWDMS4HZ7kdsJkuF1OmMxsSzSdQ+tNcuQRvMqKK29d
+	CLYuPTQNrrnspcJWGb2fO9CUxQ+eHA0tOKr9k9H/pjfqvXfTYkOU0nL5edQblsbC/TBrCkuHfzu2W
+	CKA3QS9ddiDKKi0aV5kJJ8FWv2MAxZP+TACn4PLWxeKHRoFkVcKPZrOtu7+hN0fanEjv0cBVrzH+k
+	AollSRnCjA3MjAHVhFRLm3NJT1OyZVzAi3ZdWJG9LjXdRS+i+wagaROCvvT6v/oRJBxMY1wvlcBIG
+	whrC4PJXjj7e67EIt1AQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtRQP-0007hA-DF; Tue, 12 Feb 2019 06:20:09 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gtRjH-0005mq-04; Tue, 12 Feb 2019 06:39:39 +0000
+Received: from mail-eopbgr80057.outbound.protection.outlook.com ([40.107.8.57]
+ helo=EUR04-VI1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtRQI-0006xs-BF; Tue, 12 Feb 2019 06:20:05 +0000
-X-UUID: e1dc279819444dd382f4706ef6e648ad-20190211
-X-UUID: e1dc279819444dd382f4706ef6e648ad-20190211
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
- (envelope-from <jitao.shi@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 52648680; Mon, 11 Feb 2019 22:19:39 -0800
-Received: from MTKMBS33N1.mediatek.inc (172.27.4.75) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 11 Feb 2019 22:19:37 -0800
-Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS33N1.mediatek.inc
- (172.27.4.75) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Tue, 12 Feb 2019 14:19:34 +0800
-Received: from mszsdclx1018.gcn.mediatek.inc (10.16.6.18) by
- MTKCAS36.mediatek.inc (172.27.4.170) with Microsoft SMTP Server id
- 15.0.1395.4 via Frontend Transport; Tue, 12 Feb 2019 14:19:33 +0800
-From: Jitao Shi <jitao.shi@mediatek.com>
-To: Rob Herring <robh+dt@kernel.org>, Pawel Moll <pawel.moll@arm.com>, "Mark
- Rutland" <mark.rutland@arm.com>, Ian Campbell
- <ijc+devicetree@hellion.org.uk>, Kumar Gala <galak@codeaurora.org>,
- <linux-pwm@vger.kernel.org>, David Airlie <airlied@linux.ie>, Matthias
- Brugger <matthias.bgg@gmail.com>
-Subject: [PATCH] drm/mediatek: add mipi_tx driver for mt8183
-Date: Tue, 12 Feb 2019 14:19:01 +0800
-Message-ID: <20190212061901.116564-1-jitao.shi@mediatek.com>
-X-Mailer: git-send-email 2.20.1
+ id 1gtRjC-0005mE-MU
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 06:39:36 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=XLb6Mu0utcaaQnsldY2/uqTyYhEktHsN6JKRO3Bs7lM=;
+ b=i4hWbnn30SC8C2eORVWXuscpzccC/mih00dg7oy29Puzl5Cmxy9L8m82MdmP8b9vcz0EtSeF/V65LgQZCyqSYLjQdY0+MeH2/mrbR6W4zQTkuRLdrDq/nSbTOHuEo+3l8Z8WSeNsOVW+UTsSpHXY3GvQw93ed7zdYOnHSX04tLM=
+Received: from VI1PR04MB4543.eurprd04.prod.outlook.com (20.177.55.90) by
+ VI1PR04MB5775.eurprd04.prod.outlook.com (20.178.127.205) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1601.21; Tue, 12 Feb 2019 06:39:30 +0000
+Received: from VI1PR04MB4543.eurprd04.prod.outlook.com
+ ([fe80::958f:1823:dcd4:4f49]) by VI1PR04MB4543.eurprd04.prod.outlook.com
+ ([fe80::958f:1823:dcd4:4f49%2]) with mapi id 15.20.1601.023; Tue, 12 Feb 2019
+ 06:39:30 +0000
+From: Robin Gong <yibin.gong@nxp.com>
+To: =?utf-8?B?UGV0ciDFoHRldGlhcg==?= <ynezz@true.cz>, Vinod Koul
+ <vkoul@kernel.org>
+Subject: RE: imx-uart DMA transaction error leading to OOPS on 4.14.95
+Thread-Topic: imx-uart DMA transaction error leading to OOPS on 4.14.95
+Thread-Index: AQHUwgI4Iq4P2RBHr0ywDNm8KpGj2aXaVDwAgAExGGCAADGbgA==
+Date: Tue, 12 Feb 2019 06:39:30 +0000
+Message-ID: <VI1PR04MB4543B9D3A40D6BCD3E83959B89650@VI1PR04MB4543.eurprd04.prod.outlook.com>
+References: <20190206081310.GP26426@meh.true.cz>
+ <20190211120616.GT4296@vkoul-mobl> <20190211092820.GS26426@meh.true.cz>
+ <VI1PR04MB454392326A1394AA678090F289650@VI1PR04MB4543.eurprd04.prod.outlook.com>
+In-Reply-To: <VI1PR04MB454392326A1394AA678090F289650@VI1PR04MB4543.eurprd04.prod.outlook.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=yibin.gong@nxp.com; 
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; VI1PR04MB5775;
+ 6:yVf2dke8sBLldhkwtRTKin+S0aP2+aO7Jou7trrDGaUHpq68KUs+BB/wPhqTu1BRHSoIi15qr8EgO3ZQ1MVm/A6rVAWAC/ivKVQvjysTr3gQLQ4qe4kOo5n1OezdVrHP/9VwYAlJIC1+iOIApT+cDa5Z/AkIlbP4cGK3t/hqJRi5Om2P0i4gE9kL/zsjfPFJKs0fJPW5aZaAGhlua5KGrl+4D2vh0nPYC6cdzESDdsI7aQ3TRA2ofFBWo3z5wIC23WjslKUgA/1deLZS6X9Tccl+Td9Ri2jva1fPhVxmJALocaiRS3mv6TP8+CkQExDhit1FABoPtiV9kqlxgMap009BtP96vt1WnqJvHCmxwVEFaaK0O6t4yQn420pvdTW2OWn1TnMIl+sNqQ7GHt7dSO6/r9lI7Kn+cTgUvI4FPsdtaiU3KGVaWrA5Y/pSx2k6VuzgqFZraDBaH6RrsL0EvA==;
+ 5:crHsz7GVgCbH8tSUFEeTT+o3anKDtun2qtLY0EN+GNSu72W8Ho0K1ydR45xV0GKEqBE/AeRMC8SRa9X6Ign06PcaqEMGgdUsPIbQhyKVlR9qcdAtOqNoVzT/C5hXeGs5YceKU28UQKnzbfmK5zn5d9TVgUlc/QBYuID+o1q1GFrKg+XqV+dzjm8f1DcwK82sjGlAXjkMdyUzvKtqr49Pyw==;
+ 7:6j5Kbskuc9f9+kIOozuSJc3eFvMEwLAqzRu2RHkFGxB+LvVEUe9gBCNtU9R1aHpex94rogOJcfKN1E20j01VK2/JxyLCtcyFw09Fq06g1s9ONdzW/z+LNFJ1cadY/fkmf7gvawwG0C5ho1P/0m7+qw==
+x-ms-office365-filtering-correlation-id: eba01351-ac9c-4dea-b1a3-08d690b4d7de
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB5775; 
+x-ms-traffictypediagnostic: VI1PR04MB5775:
+x-ms-exchange-purlcount: 1
+x-microsoft-antispam-prvs: <VI1PR04MB57757154DC6207F9A235F2FE89650@VI1PR04MB5775.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0946DC87A1
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(39860400002)(396003)(136003)(346002)(366004)(189003)(199004)(13464003)(476003)(66066001)(486006)(53546011)(6436002)(86362001)(186003)(446003)(105586002)(25786009)(6506007)(11346002)(55016002)(106356001)(102836004)(4326008)(6116002)(3846002)(99286004)(26005)(229853002)(256004)(2940100002)(8936002)(71200400001)(14454004)(81166006)(81156014)(7736002)(8676002)(305945005)(33656002)(6246003)(97736004)(93156006)(14444005)(2906002)(93886005)(316002)(478600001)(68736007)(6306002)(54906003)(9686003)(66574012)(110136005)(7696005)(74316002)(53936002)(76176011)(966005)(71190400001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB5775;
+ H:VI1PR04MB4543.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: iczyOgvYZXZgeuRzLbkJ/ieMZDqPOlmgklxOvWt/Wy3l+RngVAtfEr5ZT69VuGxwUWEV8HFUdvyCyj2EB8yH9VTIy2c0mtFbINZjURVZvDIAhCyrwHF8oCncFAKn+UQVHkpKkqLjufvuiNb8LbSxiiEI/wABKnpUvowFkWuf5n1lLNh7SMQKwIy2my9sRjMQjSeE+X0by/SbNOyJMCQa+4RRHgqhsgU5NG7yYIYNl00mi8WvAyv454SDY+VgNHzixnbPb9MhksAUtwEu1YlxllFTNNCq+cGxtE4QwZoBw2rv9MB9rRaNa8UyMsDH0YcUsyv1kInLSA7qLVpthkdvrVrb7qg2/sUtSEE68HCYLUNvMNq0ft20tMJN6Gh0AI5nM7wjxrCMt2FOI4BO3L6vQp39alvx78fRVnWSnAS5meE=
 MIME-Version: 1.0
-X-MTK: N
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: eba01351-ac9c-4dea-b1a3-08d690b4d7de
+X-MS-Exchange-CrossTenant-originalarrivaltime: 12 Feb 2019 06:39:30.8461 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB5775
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_222002_450511_97B61E3C 
-X-CRM114-Status: GOOD (  14.28  )
+X-CRM114-CacheID: sfid-20190211_223934_791226_BF8D5F04 
+X-CRM114-Status: GOOD (  23.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,1056 +115,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: stonea168@163.com, dri-devel@lists.freedesktop.org,
- Andy Yan <andy.yan@rock-chips.com>, Ajay Kumar <ajaykumar.rs@samsung.com>,
- Vincent Palatin <vpalatin@chromium.org>, cawa.cheng@mediatek.com,
- bibby.hsieh@mediatek.com, ck.hu@mediatek.com,
- Russell King <rmk+kernel@arm.linux.org.uk>,
- Thierry Reding <treding@nvidia.com>, devicetree@vger.kernel.org,
- Jitao Shi <jitao.shi@mediatek.com>, Philipp Zabel <p.zabel@pengutronix.de>,
- Inki Dae <inki.dae@samsung.com>, linux-mediatek@lists.infradead.org,
- yingjoe.chen@mediatek.com, eddie.huang@mediatek.com,
- linux-arm-kernel@lists.infradead.org, Rahul Sharma <rahul.sharma@samsung.com>,
- srv_heupstream@mediatek.com, linux-kernel@vger.kernel.org,
- Sascha Hauer <kernel@pengutronix.de>, Sean Paul <seanpaul@chromium.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "dmaengine@vger.kernel.org" <dmaengine@vger.kernel.org>,
+ Fabio Estevam <festevam@gmail.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ Lucas Stach <l.stach@pengutronix.de>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds mipi tx driver support for mt8183.
-
-Mipi_tx of mt8183 is very different to mt8173.
-1.Separate mipi tx setting to mtk_mt8173_mipi_tx.c for mt8173
-2.Separate mipi tx setting to mtk_mt8183_mipi_tx.c for mt8183
-3.To reuse the common code, make the common functions in mtk_mipi_tx.c
-
-Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
----
- drivers/gpu/drm/mediatek/Makefile             |   2 +
- drivers/gpu/drm/mediatek/mtk_mipi_tx.c        | 352 ++----------------
- drivers/gpu/drm/mediatek/mtk_mipi_tx.h        |  52 +++
- drivers/gpu/drm/mediatek/mtk_mt8173_mipi_tx.c | 290 +++++++++++++++
- drivers/gpu/drm/mediatek/mtk_mt8183_mipi_tx.c | 168 +++++++++
- 5 files changed, 549 insertions(+), 315 deletions(-)
- create mode 100644 drivers/gpu/drm/mediatek/mtk_mipi_tx.h
- create mode 100644 drivers/gpu/drm/mediatek/mtk_mt8173_mipi_tx.c
- create mode 100644 drivers/gpu/drm/mediatek/mtk_mt8183_mipi_tx.c
-
-diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
-index 82ae49c64221..8067a4be8311 100644
---- a/drivers/gpu/drm/mediatek/Makefile
-+++ b/drivers/gpu/drm/mediatek/Makefile
-@@ -12,6 +12,8 @@ mediatek-drm-y := mtk_disp_color.o \
- 		  mtk_drm_plane.o \
- 		  mtk_dsi.o \
- 		  mtk_mipi_tx.o \
-+		  mtk_mt8173_mipi_tx.o \
-+		  mtk_mt8183_mipi_tx.o \
- 		  mtk_dpi.o
- 
- obj-$(CONFIG_DRM_MEDIATEK) += mediatek-drm.o
-diff --git a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
-index 90e913108950..7591a38ca565 100644
---- a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
-+++ b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
-@@ -11,292 +11,45 @@
-  * GNU General Public License for more details.
-  */
- 
--#include <linux/clk.h>
--#include <linux/clk-provider.h>
--#include <linux/delay.h>
--#include <linux/io.h>
--#include <linux/module.h>
--#include <linux/of_device.h>
--#include <linux/platform_device.h>
--#include <linux/phy/phy.h>
--
--#define MIPITX_DSI_CON		0x00
--#define RG_DSI_LDOCORE_EN		BIT(0)
--#define RG_DSI_CKG_LDOOUT_EN		BIT(1)
--#define RG_DSI_BCLK_SEL			(3 << 2)
--#define RG_DSI_LD_IDX_SEL		(7 << 4)
--#define RG_DSI_PHYCLK_SEL		(2 << 8)
--#define RG_DSI_DSICLK_FREQ_SEL		BIT(10)
--#define RG_DSI_LPTX_CLMP_EN		BIT(11)
--
--#define MIPITX_DSI_CLOCK_LANE	0x04
--#define MIPITX_DSI_DATA_LANE0	0x08
--#define MIPITX_DSI_DATA_LANE1	0x0c
--#define MIPITX_DSI_DATA_LANE2	0x10
--#define MIPITX_DSI_DATA_LANE3	0x14
--#define RG_DSI_LNTx_LDOOUT_EN		BIT(0)
--#define RG_DSI_LNTx_CKLANE_EN		BIT(1)
--#define RG_DSI_LNTx_LPTX_IPLUS1		BIT(2)
--#define RG_DSI_LNTx_LPTX_IPLUS2		BIT(3)
--#define RG_DSI_LNTx_LPTX_IMINUS		BIT(4)
--#define RG_DSI_LNTx_LPCD_IPLUS		BIT(5)
--#define RG_DSI_LNTx_LPCD_IMINUS		BIT(6)
--#define RG_DSI_LNTx_RT_CODE		(0xf << 8)
--
--#define MIPITX_DSI_TOP_CON	0x40
--#define RG_DSI_LNT_INTR_EN		BIT(0)
--#define RG_DSI_LNT_HS_BIAS_EN		BIT(1)
--#define RG_DSI_LNT_IMP_CAL_EN		BIT(2)
--#define RG_DSI_LNT_TESTMODE_EN		BIT(3)
--#define RG_DSI_LNT_IMP_CAL_CODE		(0xf << 4)
--#define RG_DSI_LNT_AIO_SEL		(7 << 8)
--#define RG_DSI_PAD_TIE_LOW_EN		BIT(11)
--#define RG_DSI_DEBUG_INPUT_EN		BIT(12)
--#define RG_DSI_PRESERVE			(7 << 13)
--
--#define MIPITX_DSI_BG_CON	0x44
--#define RG_DSI_BG_CORE_EN		BIT(0)
--#define RG_DSI_BG_CKEN			BIT(1)
--#define RG_DSI_BG_DIV			(0x3 << 2)
--#define RG_DSI_BG_FAST_CHARGE		BIT(4)
--#define RG_DSI_VOUT_MSK			(0x3ffff << 5)
--#define RG_DSI_V12_SEL			(7 << 5)
--#define RG_DSI_V10_SEL			(7 << 8)
--#define RG_DSI_V072_SEL			(7 << 11)
--#define RG_DSI_V04_SEL			(7 << 14)
--#define RG_DSI_V032_SEL			(7 << 17)
--#define RG_DSI_V02_SEL			(7 << 20)
--#define RG_DSI_BG_R1_TRIM		(0xf << 24)
--#define RG_DSI_BG_R2_TRIM		(0xf << 28)
--
--#define MIPITX_DSI_PLL_CON0	0x50
--#define RG_DSI_MPPLL_PLL_EN		BIT(0)
--#define RG_DSI_MPPLL_DIV_MSK		(0x1ff << 1)
--#define RG_DSI_MPPLL_PREDIV		(3 << 1)
--#define RG_DSI_MPPLL_TXDIV0		(3 << 3)
--#define RG_DSI_MPPLL_TXDIV1		(3 << 5)
--#define RG_DSI_MPPLL_POSDIV		(7 << 7)
--#define RG_DSI_MPPLL_MONVC_EN		BIT(10)
--#define RG_DSI_MPPLL_MONREF_EN		BIT(11)
--#define RG_DSI_MPPLL_VOD_EN		BIT(12)
--
--#define MIPITX_DSI_PLL_CON1	0x54
--#define RG_DSI_MPPLL_SDM_FRA_EN		BIT(0)
--#define RG_DSI_MPPLL_SDM_SSC_PH_INIT	BIT(1)
--#define RG_DSI_MPPLL_SDM_SSC_EN		BIT(2)
--#define RG_DSI_MPPLL_SDM_SSC_PRD	(0xffff << 16)
--
--#define MIPITX_DSI_PLL_CON2	0x58
--
--#define MIPITX_DSI_PLL_TOP	0x64
--#define RG_DSI_MPPLL_PRESERVE		(0xff << 8)
--
--#define MIPITX_DSI_PLL_PWR	0x68
--#define RG_DSI_MPPLL_SDM_PWR_ON		BIT(0)
--#define RG_DSI_MPPLL_SDM_ISO_EN		BIT(1)
--#define RG_DSI_MPPLL_SDM_PWR_ACK	BIT(8)
--
--#define MIPITX_DSI_SW_CTRL	0x80
--#define SW_CTRL_EN			BIT(0)
--
--#define MIPITX_DSI_SW_CTRL_CON0	0x84
--#define SW_LNTC_LPTX_PRE_OE		BIT(0)
--#define SW_LNTC_LPTX_OE			BIT(1)
--#define SW_LNTC_LPTX_P			BIT(2)
--#define SW_LNTC_LPTX_N			BIT(3)
--#define SW_LNTC_HSTX_PRE_OE		BIT(4)
--#define SW_LNTC_HSTX_OE			BIT(5)
--#define SW_LNTC_HSTX_ZEROCLK		BIT(6)
--#define SW_LNT0_LPTX_PRE_OE		BIT(7)
--#define SW_LNT0_LPTX_OE			BIT(8)
--#define SW_LNT0_LPTX_P			BIT(9)
--#define SW_LNT0_LPTX_N			BIT(10)
--#define SW_LNT0_HSTX_PRE_OE		BIT(11)
--#define SW_LNT0_HSTX_OE			BIT(12)
--#define SW_LNT0_LPRX_EN			BIT(13)
--#define SW_LNT1_LPTX_PRE_OE		BIT(14)
--#define SW_LNT1_LPTX_OE			BIT(15)
--#define SW_LNT1_LPTX_P			BIT(16)
--#define SW_LNT1_LPTX_N			BIT(17)
--#define SW_LNT1_HSTX_PRE_OE		BIT(18)
--#define SW_LNT1_HSTX_OE			BIT(19)
--#define SW_LNT2_LPTX_PRE_OE		BIT(20)
--#define SW_LNT2_LPTX_OE			BIT(21)
--#define SW_LNT2_LPTX_P			BIT(22)
--#define SW_LNT2_LPTX_N			BIT(23)
--#define SW_LNT2_HSTX_PRE_OE		BIT(24)
--#define SW_LNT2_HSTX_OE			BIT(25)
--
--struct mtk_mipitx_data {
--	const u32 mppll_preserve;
--};
--
--struct mtk_mipi_tx {
--	struct device *dev;
--	void __iomem *regs;
--	u32 data_rate;
--	const struct mtk_mipitx_data *driver_data;
--	struct clk_hw pll_hw;
--	struct clk *pll;
--};
-+#include "mtk_mipi_tx.h"
- 
--static inline struct mtk_mipi_tx *mtk_mipi_tx_from_clk_hw(struct clk_hw *hw)
-+inline struct mtk_mipi_tx *mtk_mipi_tx_from_clk_hw(struct clk_hw *hw)
- {
- 	return container_of(hw, struct mtk_mipi_tx, pll_hw);
- }
- 
--static void mtk_mipi_tx_clear_bits(struct mtk_mipi_tx *mipi_tx, u32 offset,
--				   u32 bits)
-+void mtk_mipi_tx_clear_bits(struct mtk_mipi_tx *mipi_tx, u32 offset,
-+			    u32 bits)
- {
- 	u32 temp = readl(mipi_tx->regs + offset);
- 
- 	writel(temp & ~bits, mipi_tx->regs + offset);
- }
- 
--static void mtk_mipi_tx_set_bits(struct mtk_mipi_tx *mipi_tx, u32 offset,
--				 u32 bits)
-+void mtk_mipi_tx_set_bits(struct mtk_mipi_tx *mipi_tx, u32 offset,
-+			  u32 bits)
- {
- 	u32 temp = readl(mipi_tx->regs + offset);
- 
- 	writel(temp | bits, mipi_tx->regs + offset);
- }
- 
--static void mtk_mipi_tx_update_bits(struct mtk_mipi_tx *mipi_tx, u32 offset,
--				    u32 mask, u32 data)
-+void mtk_mipi_tx_update_bits(struct mtk_mipi_tx *mipi_tx, u32 offset,
-+			     u32 mask, u32 data)
- {
- 	u32 temp = readl(mipi_tx->regs + offset);
- 
- 	writel((temp & ~mask) | (data & mask), mipi_tx->regs + offset);
- }
- 
--static int mtk_mipi_tx_pll_prepare(struct clk_hw *hw)
--{
--	struct mtk_mipi_tx *mipi_tx = mtk_mipi_tx_from_clk_hw(hw);
--	u8 txdiv, txdiv0, txdiv1;
--	u64 pcw;
--
--	dev_dbg(mipi_tx->dev, "prepare: %u Hz\n", mipi_tx->data_rate);
--
--	if (mipi_tx->data_rate >= 500000000) {
--		txdiv = 1;
--		txdiv0 = 0;
--		txdiv1 = 0;
--	} else if (mipi_tx->data_rate >= 250000000) {
--		txdiv = 2;
--		txdiv0 = 1;
--		txdiv1 = 0;
--	} else if (mipi_tx->data_rate >= 125000000) {
--		txdiv = 4;
--		txdiv0 = 2;
--		txdiv1 = 0;
--	} else if (mipi_tx->data_rate > 62000000) {
--		txdiv = 8;
--		txdiv0 = 2;
--		txdiv1 = 1;
--	} else if (mipi_tx->data_rate >= 50000000) {
--		txdiv = 16;
--		txdiv0 = 2;
--		txdiv1 = 2;
--	} else {
--		return -EINVAL;
--	}
--
--	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_BG_CON,
--				RG_DSI_VOUT_MSK |
--				RG_DSI_BG_CKEN | RG_DSI_BG_CORE_EN,
--				(4 << 20) | (4 << 17) | (4 << 14) |
--				(4 << 11) | (4 << 8) | (4 << 5) |
--				RG_DSI_BG_CKEN | RG_DSI_BG_CORE_EN);
--
--	usleep_range(30, 100);
--
--	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_TOP_CON,
--				RG_DSI_LNT_IMP_CAL_CODE | RG_DSI_LNT_HS_BIAS_EN,
--				(8 << 4) | RG_DSI_LNT_HS_BIAS_EN);
--
--	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_DSI_CON,
--			     RG_DSI_CKG_LDOOUT_EN | RG_DSI_LDOCORE_EN);
--
--	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_PWR,
--				RG_DSI_MPPLL_SDM_PWR_ON |
--				RG_DSI_MPPLL_SDM_ISO_EN,
--				RG_DSI_MPPLL_SDM_PWR_ON);
--
--	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_PLL_CON0,
--			       RG_DSI_MPPLL_PLL_EN);
--
--	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_CON0,
--				RG_DSI_MPPLL_TXDIV0 | RG_DSI_MPPLL_TXDIV1 |
--				RG_DSI_MPPLL_PREDIV,
--				(txdiv0 << 3) | (txdiv1 << 5));
--
--	/*
--	 * PLL PCW config
--	 * PCW bit 24~30 = integer part of pcw
--	 * PCW bit 0~23 = fractional part of pcw
--	 * pcw = data_Rate*4*txdiv/(Ref_clk*2);
--	 * Post DIV =4, so need data_Rate*4
--	 * Ref_clk is 26MHz
--	 */
--	pcw = div_u64(((u64)mipi_tx->data_rate * 2 * txdiv) << 24,
--		      26000000);
--	writel(pcw, mipi_tx->regs + MIPITX_DSI_PLL_CON2);
--
--	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_DSI_PLL_CON1,
--			     RG_DSI_MPPLL_SDM_FRA_EN);
--
--	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_DSI_PLL_CON0, RG_DSI_MPPLL_PLL_EN);
--
--	usleep_range(20, 100);
--
--	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_PLL_CON1,
--			       RG_DSI_MPPLL_SDM_SSC_EN);
--
--	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_TOP,
--				RG_DSI_MPPLL_PRESERVE,
--				mipi_tx->driver_data->mppll_preserve);
--
--	return 0;
--}
--
--static void mtk_mipi_tx_pll_unprepare(struct clk_hw *hw)
--{
--	struct mtk_mipi_tx *mipi_tx = mtk_mipi_tx_from_clk_hw(hw);
--
--	dev_dbg(mipi_tx->dev, "unprepare\n");
--
--	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_PLL_CON0,
--			       RG_DSI_MPPLL_PLL_EN);
--
--	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_TOP,
--				RG_DSI_MPPLL_PRESERVE, 0);
--
--	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_PWR,
--				RG_DSI_MPPLL_SDM_ISO_EN |
--				RG_DSI_MPPLL_SDM_PWR_ON,
--				RG_DSI_MPPLL_SDM_ISO_EN);
--
--	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_TOP_CON,
--			       RG_DSI_LNT_HS_BIAS_EN);
--
--	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_CON,
--			       RG_DSI_CKG_LDOOUT_EN | RG_DSI_LDOCORE_EN);
--
--	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_BG_CON,
--			       RG_DSI_BG_CKEN | RG_DSI_BG_CORE_EN);
--
--	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_PLL_CON0,
--			       RG_DSI_MPPLL_DIV_MSK);
--}
--
--static long mtk_mipi_tx_pll_round_rate(struct clk_hw *hw, unsigned long rate,
--				       unsigned long *prate)
-+long mtk_mipi_tx_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *prate)
- {
- 	return clamp_val(rate, 50000000, 1250000000);
- }
- 
--static int mtk_mipi_tx_pll_set_rate(struct clk_hw *hw, unsigned long rate,
--				    unsigned long parent_rate)
-+int mtk_mipi_tx_pll_set_rate(struct clk_hw *hw, unsigned long rate,
-+			     unsigned long parent_rate)
- {
- 	struct mtk_mipi_tx *mipi_tx = mtk_mipi_tx_from_clk_hw(hw);
- 
-@@ -307,37 +60,14 @@ static int mtk_mipi_tx_pll_set_rate(struct clk_hw *hw, unsigned long rate,
- 	return 0;
- }
- 
--static unsigned long mtk_mipi_tx_pll_recalc_rate(struct clk_hw *hw,
--						 unsigned long parent_rate)
-+unsigned long mtk_mipi_tx_pll_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate)
- {
- 	struct mtk_mipi_tx *mipi_tx = mtk_mipi_tx_from_clk_hw(hw);
- 
- 	return mipi_tx->data_rate;
- }
- 
--static const struct clk_ops mtk_mipi_tx_pll_ops = {
--	.prepare = mtk_mipi_tx_pll_prepare,
--	.unprepare = mtk_mipi_tx_pll_unprepare,
--	.round_rate = mtk_mipi_tx_pll_round_rate,
--	.set_rate = mtk_mipi_tx_pll_set_rate,
--	.recalc_rate = mtk_mipi_tx_pll_recalc_rate,
--};
--
--static int mtk_mipi_tx_power_on_signal(struct phy *phy)
--{
--	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
--	u32 reg;
--
--	for (reg = MIPITX_DSI_CLOCK_LANE;
--	     reg <= MIPITX_DSI_DATA_LANE3; reg += 4)
--		mtk_mipi_tx_set_bits(mipi_tx, reg, RG_DSI_LNTx_LDOOUT_EN);
--
--	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_TOP_CON,
--			       RG_DSI_PAD_TIE_LOW_EN);
--
--	return 0;
--}
--
- static int mtk_mipi_tx_power_on(struct phy *phy)
- {
- 	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
-@@ -349,30 +79,16 @@ static int mtk_mipi_tx_power_on(struct phy *phy)
- 		return ret;
- 
- 	/* Enable DSI Lane LDO outputs, disable pad tie low */
--	mtk_mipi_tx_power_on_signal(phy);
--
-+	mipi_tx->driver_data->mipi_tx_enable_signal(phy);
- 	return 0;
- }
- 
--static void mtk_mipi_tx_power_off_signal(struct phy *phy)
--{
--	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
--	u32 reg;
--
--	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_DSI_TOP_CON,
--			     RG_DSI_PAD_TIE_LOW_EN);
--
--	for (reg = MIPITX_DSI_CLOCK_LANE;
--	     reg <= MIPITX_DSI_DATA_LANE3; reg += 4)
--		mtk_mipi_tx_clear_bits(mipi_tx, reg, RG_DSI_LNTx_LDOOUT_EN);
--}
--
- static int mtk_mipi_tx_power_off(struct phy *phy)
- {
- 	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
- 
- 	/* Enable pad tie low, disable DSI Lane LDO outputs */
--	mtk_mipi_tx_power_off_signal(phy);
-+	mipi_tx->driver_data->mipi_tx_disable_signal(phy);
- 
- 	/* Disable PLL and power down core */
- 	clk_disable_unprepare(mipi_tx->pll);
-@@ -386,15 +102,23 @@ static const struct phy_ops mtk_mipi_tx_ops = {
- 	.owner = THIS_MODULE,
- };
- 
-+static void mtk_mipi_tx_clk_get_ops(struct mtk_mipi_tx *mipi_tx,
-+				    const struct clk_ops **ops)
-+{
-+	if (mipi_tx && mipi_tx->driver_data &&
-+	    mipi_tx->driver_data->mipi_tx_clk_ops)
-+		*ops = mipi_tx->driver_data->mipi_tx_clk_ops;
-+	else
-+		dev_err(mipi_tx->dev, "Failed to get clk ops of phy\n");
-+}
-+
- static int mtk_mipi_tx_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct mtk_mipi_tx *mipi_tx;
- 	struct resource *mem;
--	struct clk *ref_clk;
- 	const char *ref_clk_name;
- 	struct clk_init_data clk_init = {
--		.ops = &mtk_mipi_tx_pll_ops,
- 		.num_parents = 1,
- 		.parent_names = (const char * const *)&ref_clk_name,
- 		.flags = CLK_SET_RATE_GATE,
-@@ -408,6 +132,7 @@ static int mtk_mipi_tx_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	mipi_tx->driver_data = of_device_get_match_data(dev);
-+
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	mipi_tx->regs = devm_ioremap_resource(dev, mem);
- 	if (IS_ERR(mipi_tx->regs)) {
-@@ -416,13 +141,14 @@ static int mtk_mipi_tx_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	ref_clk = devm_clk_get(dev, NULL);
--	if (IS_ERR(ref_clk)) {
--		ret = PTR_ERR(ref_clk);
-+	mipi_tx->ref_clk = devm_clk_get(dev, "ref_clk");
-+	if (IS_ERR(mipi_tx->ref_clk)) {
-+		ret = PTR_ERR(mipi_tx->ref_clk);
- 		dev_err(dev, "Failed to get reference clock: %d\n", ret);
- 		return ret;
- 	}
--	ref_clk_name = __clk_get_name(ref_clk);
-+
-+	ref_clk_name = __clk_get_name(mipi_tx->ref_clk);
- 
- 	ret = of_property_read_string(dev->of_node, "clock-output-names",
- 				      &clk_init.name);
-@@ -431,6 +157,8 @@ static int mtk_mipi_tx_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	mtk_mipi_tx_clk_get_ops(mipi_tx, &clk_init.ops);
-+
- 	mipi_tx->pll_hw.init = &clk_init;
- 	mipi_tx->pll = devm_clk_register(dev, &mipi_tx->pll_hw);
- 	if (IS_ERR(mipi_tx->pll)) {
-@@ -465,20 +193,14 @@ static int mtk_mipi_tx_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static const struct mtk_mipitx_data mt2701_mipitx_data = {
--	.mppll_preserve = (3 << 8)
--};
--
--static const struct mtk_mipitx_data mt8173_mipitx_data = {
--	.mppll_preserve = (0 << 8)
--};
--
- static const struct of_device_id mtk_mipi_tx_match[] = {
- 	{ .compatible = "mediatek,mt2701-mipi-tx",
- 	  .data = &mt2701_mipitx_data },
- 	{ .compatible = "mediatek,mt8173-mipi-tx",
- 	  .data = &mt8173_mipitx_data },
--	{},
-+	{ .compatible = "mediatek,mt8183-mipi-tx",
-+	  .data = &mt8183_mipitx_data },
-+	{ },
- };
- 
- struct platform_driver mtk_mipi_tx_driver = {
-diff --git a/drivers/gpu/drm/mediatek/mtk_mipi_tx.h b/drivers/gpu/drm/mediatek/mtk_mipi_tx.h
-new file mode 100644
-index 000000000000..af83023e81cf
---- /dev/null
-+++ b/drivers/gpu/drm/mediatek/mtk_mipi_tx.h
-@@ -0,0 +1,52 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright (c) 2019 MediaTek Inc.
-+ * Author: Jitao Shi <jitao.shi@mediatek.com>
-+ */
-+
-+#ifndef _MTK_MIPI_TX_H
-+#define _MTK_MIPI_TX_H
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/phy/phy.h>
-+
-+struct mtk_mipitx_data {
-+	const u32 mppll_preserve;
-+	const struct clk_ops *mipi_tx_clk_ops;
-+	void (*mipi_tx_enable_signal)(struct phy *phy);
-+	void (*mipi_tx_disable_signal)(struct phy *phy);
-+};
-+
-+struct mtk_mipi_tx {
-+	struct device *dev;
-+	void __iomem *regs;
-+	u32 data_rate;
-+	struct clk *ref_clk;
-+	const struct mtk_mipitx_data *driver_data;
-+	struct clk_hw pll_hw;
-+	struct clk *pll;
-+};
-+
-+struct mtk_mipi_tx *mtk_mipi_tx_from_clk_hw(struct clk_hw *hw);
-+void mtk_mipi_tx_clear_bits(struct mtk_mipi_tx *mipi_tx, u32 offset, u32 bits);
-+void mtk_mipi_tx_set_bits(struct mtk_mipi_tx *mipi_tx, u32 offset, u32 bits);
-+void mtk_mipi_tx_update_bits(struct mtk_mipi_tx *mipi_tx, u32 offset, u32 mask,
-+			     u32 data);
-+long mtk_mipi_tx_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *prate);
-+int mtk_mipi_tx_pll_set_rate(struct clk_hw *hw, unsigned long rate,
-+			     unsigned long parent_rate);
-+unsigned long mtk_mipi_tx_pll_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate);
-+
-+extern const struct mtk_mipitx_data mt2701_mipitx_data;
-+extern const struct mtk_mipitx_data mt8173_mipitx_data;
-+extern const struct mtk_mipitx_data mt8183_mipitx_data;
-+
-+#endif
-diff --git a/drivers/gpu/drm/mediatek/mtk_mt8173_mipi_tx.c b/drivers/gpu/drm/mediatek/mtk_mt8173_mipi_tx.c
-new file mode 100644
-index 000000000000..8e57cdf85b06
---- /dev/null
-+++ b/drivers/gpu/drm/mediatek/mtk_mt8173_mipi_tx.c
-@@ -0,0 +1,290 @@
-+/*
-+ * Copyright (c) 2015 MediaTek Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "mtk_mipi_tx.h"
-+
-+#define MIPITX_DSI_CON		0x00
-+#define RG_DSI_LDOCORE_EN		BIT(0)
-+#define RG_DSI_CKG_LDOOUT_EN		BIT(1)
-+#define RG_DSI_BCLK_SEL			(3 << 2)
-+#define RG_DSI_LD_IDX_SEL		(7 << 4)
-+#define RG_DSI_PHYCLK_SEL		(2 << 8)
-+#define RG_DSI_DSICLK_FREQ_SEL		BIT(10)
-+#define RG_DSI_LPTX_CLMP_EN		BIT(11)
-+
-+#define MIPITX_DSI_CLOCK_LANE	0x04
-+#define MIPITX_DSI_DATA_LANE0	0x08
-+#define MIPITX_DSI_DATA_LANE1	0x0c
-+#define MIPITX_DSI_DATA_LANE2	0x10
-+#define MIPITX_DSI_DATA_LANE3	0x14
-+#define RG_DSI_LNTx_LDOOUT_EN		BIT(0)
-+#define RG_DSI_LNTx_CKLANE_EN		BIT(1)
-+#define RG_DSI_LNTx_LPTX_IPLUS1		BIT(2)
-+#define RG_DSI_LNTx_LPTX_IPLUS2		BIT(3)
-+#define RG_DSI_LNTx_LPTX_IMINUS		BIT(4)
-+#define RG_DSI_LNTx_LPCD_IPLUS		BIT(5)
-+#define RG_DSI_LNTx_LPCD_IMINUS		BIT(6)
-+#define RG_DSI_LNTx_RT_CODE		(0xf << 8)
-+
-+#define MIPITX_DSI_TOP_CON	0x40
-+#define RG_DSI_LNT_INTR_EN		BIT(0)
-+#define RG_DSI_LNT_HS_BIAS_EN		BIT(1)
-+#define RG_DSI_LNT_IMP_CAL_EN		BIT(2)
-+#define RG_DSI_LNT_TESTMODE_EN		BIT(3)
-+#define RG_DSI_LNT_IMP_CAL_CODE		(0xf << 4)
-+#define RG_DSI_LNT_AIO_SEL		(7 << 8)
-+#define RG_DSI_PAD_TIE_LOW_EN		BIT(11)
-+#define RG_DSI_DEBUG_INPUT_EN		BIT(12)
-+#define RG_DSI_PRESERVE			(7 << 13)
-+
-+#define MIPITX_DSI_BG_CON	0x44
-+#define RG_DSI_BG_CORE_EN		BIT(0)
-+#define RG_DSI_BG_CKEN			BIT(1)
-+#define RG_DSI_BG_DIV			(0x3 << 2)
-+#define RG_DSI_BG_FAST_CHARGE		BIT(4)
-+#define RG_DSI_VOUT_MSK			(0x3ffff << 5)
-+#define RG_DSI_V12_SEL			(7 << 5)
-+#define RG_DSI_V10_SEL			(7 << 8)
-+#define RG_DSI_V072_SEL			(7 << 11)
-+#define RG_DSI_V04_SEL			(7 << 14)
-+#define RG_DSI_V032_SEL			(7 << 17)
-+#define RG_DSI_V02_SEL			(7 << 20)
-+#define RG_DSI_BG_R1_TRIM		(0xf << 24)
-+#define RG_DSI_BG_R2_TRIM		(0xf << 28)
-+
-+#define MIPITX_DSI_PLL_CON0	0x50
-+#define RG_DSI_MPPLL_PLL_EN		BIT(0)
-+#define RG_DSI_MPPLL_DIV_MSK		(0x1ff << 1)
-+#define RG_DSI_MPPLL_PREDIV		(3 << 1)
-+#define RG_DSI_MPPLL_TXDIV0		(3 << 3)
-+#define RG_DSI_MPPLL_TXDIV1		(3 << 5)
-+#define RG_DSI_MPPLL_POSDIV		(7 << 7)
-+#define RG_DSI_MPPLL_MONVC_EN		BIT(10)
-+#define RG_DSI_MPPLL_MONREF_EN		BIT(11)
-+#define RG_DSI_MPPLL_VOD_EN		BIT(12)
-+
-+#define MIPITX_DSI_PLL_CON1	0x54
-+#define RG_DSI_MPPLL_SDM_FRA_EN		BIT(0)
-+#define RG_DSI_MPPLL_SDM_SSC_PH_INIT	BIT(1)
-+#define RG_DSI_MPPLL_SDM_SSC_EN		BIT(2)
-+#define RG_DSI_MPPLL_SDM_SSC_PRD	(0xffff << 16)
-+
-+#define MIPITX_DSI_PLL_CON2	0x58
-+
-+#define MIPITX_DSI_PLL_TOP	0x64
-+#define RG_DSI_MPPLL_PRESERVE		(0xff << 8)
-+
-+#define MIPITX_DSI_PLL_PWR	0x68
-+#define RG_DSI_MPPLL_SDM_PWR_ON		BIT(0)
-+#define RG_DSI_MPPLL_SDM_ISO_EN		BIT(1)
-+#define RG_DSI_MPPLL_SDM_PWR_ACK	BIT(8)
-+
-+#define MIPITX_DSI_SW_CTRL	0x80
-+#define SW_CTRL_EN			BIT(0)
-+
-+#define MIPITX_DSI_SW_CTRL_CON0	0x84
-+#define SW_LNTC_LPTX_PRE_OE		BIT(0)
-+#define SW_LNTC_LPTX_OE			BIT(1)
-+#define SW_LNTC_LPTX_P			BIT(2)
-+#define SW_LNTC_LPTX_N			BIT(3)
-+#define SW_LNTC_HSTX_PRE_OE		BIT(4)
-+#define SW_LNTC_HSTX_OE			BIT(5)
-+#define SW_LNTC_HSTX_ZEROCLK		BIT(6)
-+#define SW_LNT0_LPTX_PRE_OE		BIT(7)
-+#define SW_LNT0_LPTX_OE			BIT(8)
-+#define SW_LNT0_LPTX_P			BIT(9)
-+#define SW_LNT0_LPTX_N			BIT(10)
-+#define SW_LNT0_HSTX_PRE_OE		BIT(11)
-+#define SW_LNT0_HSTX_OE			BIT(12)
-+#define SW_LNT0_LPRX_EN			BIT(13)
-+#define SW_LNT1_LPTX_PRE_OE		BIT(14)
-+#define SW_LNT1_LPTX_OE			BIT(15)
-+#define SW_LNT1_LPTX_P			BIT(16)
-+#define SW_LNT1_LPTX_N			BIT(17)
-+#define SW_LNT1_HSTX_PRE_OE		BIT(18)
-+#define SW_LNT1_HSTX_OE			BIT(19)
-+#define SW_LNT2_LPTX_PRE_OE		BIT(20)
-+#define SW_LNT2_LPTX_OE			BIT(21)
-+#define SW_LNT2_LPTX_P			BIT(22)
-+#define SW_LNT2_LPTX_N			BIT(23)
-+#define SW_LNT2_HSTX_PRE_OE		BIT(24)
-+#define SW_LNT2_HSTX_OE			BIT(25)
-+
-+static int mtk_mipi_tx_pll_prepare(struct clk_hw *hw)
-+{
-+	struct mtk_mipi_tx *mipi_tx = mtk_mipi_tx_from_clk_hw(hw);
-+	u8 txdiv, txdiv0, txdiv1;
-+	u64 pcw;
-+
-+	dev_dbg(mipi_tx->dev, "prepare: %u Hz\n", mipi_tx->data_rate);
-+
-+	if (mipi_tx->data_rate >= 500000000) {
-+		txdiv = 1;
-+		txdiv0 = 0;
-+		txdiv1 = 0;
-+	} else if (mipi_tx->data_rate >= 250000000) {
-+		txdiv = 2;
-+		txdiv0 = 1;
-+		txdiv1 = 0;
-+	} else if (mipi_tx->data_rate >= 125000000) {
-+		txdiv = 4;
-+		txdiv0 = 2;
-+		txdiv1 = 0;
-+	} else if (mipi_tx->data_rate > 62000000) {
-+		txdiv = 8;
-+		txdiv0 = 2;
-+		txdiv1 = 1;
-+	} else if (mipi_tx->data_rate >= 50000000) {
-+		txdiv = 16;
-+		txdiv0 = 2;
-+		txdiv1 = 2;
-+	} else {
-+		return -EINVAL;
-+	}
-+
-+	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_BG_CON,
-+				RG_DSI_VOUT_MSK |
-+				RG_DSI_BG_CKEN | RG_DSI_BG_CORE_EN,
-+				(4 << 20) | (4 << 17) | (4 << 14) |
-+				(4 << 11) | (4 << 8) | (4 << 5) |
-+				RG_DSI_BG_CKEN | RG_DSI_BG_CORE_EN);
-+
-+	usleep_range(30, 100);
-+
-+	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_TOP_CON,
-+				RG_DSI_LNT_IMP_CAL_CODE | RG_DSI_LNT_HS_BIAS_EN,
-+				(8 << 4) | RG_DSI_LNT_HS_BIAS_EN);
-+
-+	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_DSI_CON,
-+			     RG_DSI_CKG_LDOOUT_EN | RG_DSI_LDOCORE_EN);
-+
-+	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_PWR,
-+				RG_DSI_MPPLL_SDM_PWR_ON |
-+				RG_DSI_MPPLL_SDM_ISO_EN,
-+				RG_DSI_MPPLL_SDM_PWR_ON);
-+
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_PLL_CON0,
-+			       RG_DSI_MPPLL_PLL_EN);
-+
-+	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_CON0,
-+				RG_DSI_MPPLL_TXDIV0 | RG_DSI_MPPLL_TXDIV1 |
-+				RG_DSI_MPPLL_PREDIV,
-+				(txdiv0 << 3) | (txdiv1 << 5));
-+
-+	/*
-+	 * PLL PCW config
-+	 * PCW bit 24~30 = integer part of pcw
-+	 * PCW bit 0~23 = fractional part of pcw
-+	 * pcw = data_Rate*4*txdiv/(Ref_clk*2);
-+	 * Post DIV =4, so need data_Rate*4
-+	 * Ref_clk is 26MHz
-+	 */
-+	pcw = div_u64(((u64)mipi_tx->data_rate * 2 * txdiv) << 24,
-+		      26000000);
-+	writel(pcw, mipi_tx->regs + MIPITX_DSI_PLL_CON2);
-+
-+	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_DSI_PLL_CON1,
-+			     RG_DSI_MPPLL_SDM_FRA_EN);
-+
-+	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_DSI_PLL_CON0, RG_DSI_MPPLL_PLL_EN);
-+
-+	usleep_range(20, 100);
-+
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_PLL_CON1,
-+			       RG_DSI_MPPLL_SDM_SSC_EN);
-+
-+	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_TOP,
-+				RG_DSI_MPPLL_PRESERVE,
-+				mipi_tx->driver_data->mppll_preserve);
-+
-+	return 0;
-+}
-+
-+static void mtk_mipi_tx_pll_unprepare(struct clk_hw *hw)
-+{
-+	struct mtk_mipi_tx *mipi_tx = mtk_mipi_tx_from_clk_hw(hw);
-+
-+	dev_dbg(mipi_tx->dev, "unprepare\n");
-+
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_PLL_CON0,
-+			       RG_DSI_MPPLL_PLL_EN);
-+
-+	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_TOP,
-+				RG_DSI_MPPLL_PRESERVE, 0);
-+
-+	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_DSI_PLL_PWR,
-+				RG_DSI_MPPLL_SDM_ISO_EN |
-+				RG_DSI_MPPLL_SDM_PWR_ON,
-+				RG_DSI_MPPLL_SDM_ISO_EN);
-+
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_TOP_CON,
-+			       RG_DSI_LNT_HS_BIAS_EN);
-+
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_CON,
-+			       RG_DSI_CKG_LDOOUT_EN | RG_DSI_LDOCORE_EN);
-+
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_BG_CON,
-+			       RG_DSI_BG_CKEN | RG_DSI_BG_CORE_EN);
-+
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_PLL_CON0,
-+			       RG_DSI_MPPLL_DIV_MSK);
-+}
-+
-+static const struct clk_ops mtk_mipi_tx_pll_ops = {
-+	.prepare = mtk_mipi_tx_pll_prepare,
-+	.unprepare = mtk_mipi_tx_pll_unprepare,
-+	.round_rate = mtk_mipi_tx_pll_round_rate,
-+	.set_rate = mtk_mipi_tx_pll_set_rate,
-+	.recalc_rate = mtk_mipi_tx_pll_recalc_rate,
-+};
-+
-+static void mtk_mipi_tx_power_on_signal(struct phy *phy)
-+{
-+	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
-+	u32 reg;
-+
-+	for (reg = MIPITX_DSI_CLOCK_LANE;
-+	     reg <= MIPITX_DSI_DATA_LANE3; reg += 4)
-+		mtk_mipi_tx_set_bits(mipi_tx, reg, RG_DSI_LNTx_LDOOUT_EN);
-+
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_DSI_TOP_CON,
-+			       RG_DSI_PAD_TIE_LOW_EN);
-+}
-+
-+static void mtk_mipi_tx_power_off_signal(struct phy *phy)
-+{
-+	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
-+	u32 reg;
-+
-+	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_DSI_TOP_CON,
-+			     RG_DSI_PAD_TIE_LOW_EN);
-+
-+	for (reg = MIPITX_DSI_CLOCK_LANE;
-+	     reg <= MIPITX_DSI_DATA_LANE3; reg += 4)
-+		mtk_mipi_tx_clear_bits(mipi_tx, reg, RG_DSI_LNTx_LDOOUT_EN);
-+}
-+
-+const struct mtk_mipitx_data mt2701_mipitx_data = {
-+	.mppll_preserve = (3 << 8),
-+	.mipi_tx_clk_ops = &mtk_mipi_tx_pll_ops,
-+	.mipi_tx_enable_signal = mtk_mipi_tx_power_on_signal,
-+	.mipi_tx_disable_signal = mtk_mipi_tx_power_off_signal,
-+};
-+
-+const struct mtk_mipitx_data mt8173_mipitx_data = {
-+	.mppll_preserve = (0 << 8),
-+	.mipi_tx_clk_ops = &mtk_mipi_tx_pll_ops,
-+	.mipi_tx_enable_signal = mtk_mipi_tx_power_on_signal,
-+	.mipi_tx_disable_signal = mtk_mipi_tx_power_off_signal,
-+};
-+
-diff --git a/drivers/gpu/drm/mediatek/mtk_mt8183_mipi_tx.c b/drivers/gpu/drm/mediatek/mtk_mt8183_mipi_tx.c
-new file mode 100644
-index 000000000000..07f70a3cad13
---- /dev/null
-+++ b/drivers/gpu/drm/mediatek/mtk_mt8183_mipi_tx.c
-@@ -0,0 +1,168 @@
-+/*
-+ * Copyright (c) 2015 MediaTek Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "mtk_mipi_tx.h"
-+
-+#define MIPITX_LANE_CON		0x000c
-+#define RG_DSI_CPHY_T1DRV_EN	BIT(0)
-+#define RG_DSI_ANA_CK_SEL	BIT(1)
-+#define RG_DSI_PHY_CK_SEL	BIT(2)
-+#define RG_DSI_CPHY_EN	BIT(3)
-+#define RG_DSI_PHYCK_INV_EN	BIT(4)
-+#define RG_DSI_PWR04_EN	BIT(5)
-+#define RG_DSI_BG_LPF_EN	BIT(6)
-+#define RG_DSI_BG_CORE_EN	BIT(7)
-+#define RG_DSI_PAD_TIEL_SEL	BIT(8)
-+
-+#define MIPITX_PLL_PWR		0x0028
-+#define MIPITX_PLL_CON0		0x002c
-+#define MIPITX_PLL_CON1		0x0030
-+#define MIPITX_PLL_CON2		0x0034
-+#define MIPITX_PLL_CON3		0x0038
-+#define MIPITX_PLL_CON4		0x003c
-+#define RG_DSI_PLL_IBIAS	(3 << 10)
-+
-+#define MIPITX_D2_SW_CTL_EN	0x0144
-+#define MIPITX_D0_SW_CTL_EN	0x0244
-+#define MIPITX_CK_CKMODE_EN	0x0328
-+#define DSI_CK_CKMODE_EN	BIT(0)
-+#define MIPITX_CK_SW_CTL_EN	0x0344
-+#define MIPITX_D1_SW_CTL_EN	0x0444
-+#define MIPITX_D3_SW_CTL_EN	0x0544
-+#define DSI_SW_CTL_EN		BIT(0)
-+#define AD_DSI_PLL_SDM_PWR_ON	BIT(0)
-+#define AD_DSI_PLL_SDM_ISO_EN	BIT(1)
-+
-+#define RG_DSI_PLL_EN		BIT(4)
-+#define RG_DSI_PLL_POSDIV	(0x7 << 8)
-+
-+static int mtk_mipi_tx_pll_prepare(struct clk_hw *hw)
-+{
-+	struct mtk_mipi_tx *mipi_tx = mtk_mipi_tx_from_clk_hw(hw);
-+	unsigned int txdiv, txdiv0, txdiv1;
-+	u64 pcw;
-+	int ret;
-+
-+	dev_dbg(mipi_tx->dev, "prepare: %u bps\n", mipi_tx->data_rate);
-+
-+	if (mipi_tx->data_rate >= 2000000000) {
-+		txdiv = 1;
-+		txdiv0 = 0;
-+		txdiv1 = 0;
-+	} else if (mipi_tx->data_rate >= 1000000000) {
-+		txdiv = 2;
-+		txdiv0 = 1;
-+		txdiv1 = 0;
-+	} else if (mipi_tx->data_rate >= 500000000) {
-+		txdiv = 4;
-+		txdiv0 = 2;
-+		txdiv1 = 0;
-+	} else if (mipi_tx->data_rate > 250000000) {
-+		txdiv = 8;
-+		txdiv0 = 3;
-+		txdiv1 = 0;
-+	} else if (mipi_tx->data_rate >= 125000000) {
-+		txdiv = 16;
-+		txdiv0 = 4;
-+		txdiv1 = 0;
-+	} else {
-+		return -EINVAL;
-+	}
-+
-+	ret = clk_prepare_enable(mipi_tx->ref_clk);
-+	if (ret < 0) {
-+		dev_err(mipi_tx->dev, "can't mipi_tx ref_clk %d\n", ret);
-+		return ret;
-+	}
-+
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_PLL_CON4, RG_DSI_PLL_IBIAS);
-+
-+	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_PLL_PWR, AD_DSI_PLL_SDM_PWR_ON);
-+	usleep_range(30, 100);
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_PLL_PWR, AD_DSI_PLL_SDM_ISO_EN);
-+	pcw = div_u64(((u64)mipi_tx->data_rate * txdiv) << 24, 26000000);
-+	writel(pcw, mipi_tx->regs + MIPITX_PLL_CON0);
-+	mtk_mipi_tx_update_bits(mipi_tx, MIPITX_PLL_CON1, RG_DSI_PLL_POSDIV,
-+				txdiv0 << 8);
-+	usleep_range(1000, 2000);
-+	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_PLL_CON1, RG_DSI_PLL_EN);
-+
-+	return 0;
-+}
-+
-+static void mtk_mipi_tx_pll_unprepare(struct clk_hw *hw)
-+{
-+	struct mtk_mipi_tx *mipi_tx = mtk_mipi_tx_from_clk_hw(hw);
-+
-+	dev_dbg(mipi_tx->dev, "unprepare\n");
-+
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_PLL_CON1, RG_DSI_PLL_EN);
-+	/* step 1: SDM_RWR_ON / SDM_ISO_EN */
-+
-+	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_PLL_PWR, AD_DSI_PLL_SDM_ISO_EN);
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_PLL_PWR, AD_DSI_PLL_SDM_PWR_ON);
-+	clk_disable_unprepare(mipi_tx->ref_clk);
-+}
-+
-+static const struct clk_ops mtk_mipi_tx_pll_ops = {
-+	.prepare = mtk_mipi_tx_pll_prepare,
-+	.unprepare = mtk_mipi_tx_pll_unprepare,
-+	.round_rate = mtk_mipi_tx_pll_round_rate,
-+	.set_rate = mtk_mipi_tx_pll_set_rate,
-+	.recalc_rate = mtk_mipi_tx_pll_recalc_rate,
-+};
-+
-+static void mtk_mipi_tx_power_on_signal(struct phy *phy)
-+{
-+	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
-+
-+	/* BG_LPF_EN / BG_CORE_EN */
-+	writel(RG_DSI_PAD_TIEL_SEL | RG_DSI_BG_CORE_EN,
-+	       mipi_tx->regs + MIPITX_LANE_CON);
-+	usleep_range(30, 100);
-+	writel(RG_DSI_BG_CORE_EN | RG_DSI_BG_LPF_EN,
-+	       mipi_tx->regs + MIPITX_LANE_CON);
-+
-+	/* Switch OFF each Lane */
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_D0_SW_CTL_EN, DSI_SW_CTL_EN);
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_D1_SW_CTL_EN, DSI_SW_CTL_EN);
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_D2_SW_CTL_EN, DSI_SW_CTL_EN);
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_D3_SW_CTL_EN, DSI_SW_CTL_EN);
-+	mtk_mipi_tx_clear_bits(mipi_tx, MIPITX_CK_SW_CTL_EN, DSI_SW_CTL_EN);
-+
-+	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_CK_CKMODE_EN, DSI_CK_CKMODE_EN);
-+}
-+
-+static void mtk_mipi_tx_power_off_signal(struct phy *phy)
-+{
-+	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
-+
-+	/* Switch ON each Lane */
-+	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_D0_SW_CTL_EN, DSI_SW_CTL_EN);
-+	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_D1_SW_CTL_EN, DSI_SW_CTL_EN);
-+	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_D2_SW_CTL_EN, DSI_SW_CTL_EN);
-+	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_D3_SW_CTL_EN, DSI_SW_CTL_EN);
-+	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_CK_SW_CTL_EN, DSI_SW_CTL_EN);
-+
-+	/* step 2 */
-+	writel(RG_DSI_PAD_TIEL_SEL | RG_DSI_BG_CORE_EN,
-+	       mipi_tx->regs + MIPITX_LANE_CON);
-+	writel(RG_DSI_PAD_TIEL_SEL, mipi_tx->regs + MIPITX_LANE_CON);
-+}
-+
-+const struct mtk_mipitx_data mt8183_mipitx_data = {
-+	.mipi_tx_clk_ops = &mtk_mipi_tx_pll_ops,
-+	.mipi_tx_enable_signal = mtk_mipi_tx_power_on_signal,
-+	.mipi_tx_disable_signal = mtk_mipi_tx_power_off_signal,
-+};
-+
--- 
-2.20.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+U29ycnksIHBsZWFzZSBpZ25vcmUgbXkgaW5mb3JtYXRpb24sIHNkbWEgZGlkbid0IHVzZSB2aXJ0
+LWRtYSBvbiA0LjE0Li4uLg0KDQo+IC0tLS0tT3JpZ2luYWwgTWVzc2FnZS0tLS0tDQo+IEZyb206
+IFJvYmluIEdvbmcNCj4gU2VudDogMjAxOeW5tDLmnIgxMuaXpSAxMTo0Mg0KPiBUbzogJ1BldHIg
+xaB0ZXRpYXInIDx5bmV6ekB0cnVlLmN6PjsgVmlub2QgS291bCA8dmtvdWxAa2VybmVsLm9yZz4N
+Cj4gQ2M6IEZhYmlvIEVzdGV2YW0gPGZlc3RldmFtQGdtYWlsLmNvbT47IEx1Y2FzIFN0YWNoDQo+
+IDxsLnN0YWNoQHBlbmd1dHJvbml4LmRlPjsgZG1hZW5naW5lQHZnZXIua2VybmVsLm9yZzsNCj4g
+bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnDQo+IFN1YmplY3Q6IFJFOiBpbXgt
+dWFydCBETUEgdHJhbnNhY3Rpb24gZXJyb3IgbGVhZGluZyB0byBPT1BTIG9uIDQuMTQuOTUNCj4g
+DQo+IEhpIFBldHIsDQo+IAlDb3VsZCB5b3UgY2hlY2sgdGhlIGJlbG93IHBhdGNoIHNldCB3aGlj
+aCBpcyBub3QgaW4gdjQuMTQuOTg/DQo+IGh0dHBzOi8vcGF0Y2h3b3JrLmtlcm5lbC5vcmcvcGF0
+Y2gvMTAwNTc3OTEvDQo+IA0KPiA+IC0tLS0tT3JpZ2luYWwgTWVzc2FnZS0tLS0tDQo+ID4gRnJv
+bTogUGV0ciDFoHRldGlhciA8eW5lenpAdHJ1ZS5jej4NCj4gPiBTZW50OiAyMDE55bm0MuaciDEx
+5pelIDE3OjI4DQo+ID4gVG86IFZpbm9kIEtvdWwgPHZrb3VsQGtlcm5lbC5vcmc+DQo+ID4gQ2M6
+IEZhYmlvIEVzdGV2YW0gPGZlc3RldmFtQGdtYWlsLmNvbT47IEx1Y2FzIFN0YWNoDQo+ID4gPGwu
+c3RhY2hAcGVuZ3V0cm9uaXguZGU+OyBSb2JpbiBHb25nIDx5aWJpbi5nb25nQG54cC5jb20+Ow0K
+PiA+IGRtYWVuZ2luZUB2Z2VyLmtlcm5lbC5vcmc7IGxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5m
+cmFkZWFkLm9yZw0KPiA+IFN1YmplY3Q6IFJlOiBpbXgtdWFydCBETUEgdHJhbnNhY3Rpb24gZXJy
+b3IgbGVhZGluZyB0byBPT1BTIG9uIDQuMTQuOTUNCj4gPg0KPiA+IFZpbm9kIEtvdWwgPHZrb3Vs
+QGtlcm5lbC5vcmc+IFsyMDE5LTAyLTExIDE3OjM2OjE2XToNCj4gPg0KPiA+IEhpLA0KPiA+DQo+
+ID4gPiA+IEkndmUganVzdCBlbmNvdW50ZXJlZCBmb2xsb3dpbmcgT09QUyBvbiA0LjE0Ljk1Og0K
+PiA+ID4gPg0KPiA+ID4gPiAgIGlteC11YXJ0IDIxZjAwMDAuc2VyaWFsOiBETUEgdHJhbnNhY3Rp
+b24gZXJyb3IuDQo+ID4gPg0KPiA+ID4gRG8geW91IHNlZSB0aGlzIG9uIG1haW5saW5lIGFzIHdl
+bGwsIGJpdCBvZiBmaXhlcyB3ZW50IGludG8gdGhpcw0KPiA+ID4gZHJpdmVyIHJlY2VudGx5Li4u
+DQo+ID4NCj4gPiBJJ3ZlIGhpdCBpdCBvbmx5IG9uY2Ugb24gNC4xNCBzbyBmYXIsIGl0J3MgcXVp
+dGUgaGFyZCB0byByZXByb2R1Y2UgaXQsDQo+ID4gc28gbm8gYmlnIGRlYWwsIGJ1dCBJJ3ZlIGp1
+c3QgdGhvdWdodCwgdGhhdCBzb21lb25lIG1pZ2h0IGJlDQo+ID4gaW50ZXJlc3RlZC4gT25jZSBJ
+IGZpbmQgc29tZSB3YXkgdG8gcmVwcm9kdWNlIGl0LCBJJ2xsIHRyeSB0byB0ZXN0IGl0IG9uIHNv
+bWUNCj4gcmVjZW50IGtlcm5lbC4NCj4gPg0KPiA+IEJUVywgYW55IGlkZWEgd2hpY2ggb2YgdGhv
+c2UgZml4ZXMgbWlnaHQgYmUgcmVsYXRlZCB0byB0aGlzIE9vcHMgYW5kDQo+ID4gbWlnaHQgYmUg
+d29ydGggYmFja3BvcnRpbmcgdG8gNC4xND8NCj4gPg0KPiA+ID4gPiAgIFVuYWJsZSB0byBoYW5k
+bGUga2VybmVsIHBhZ2luZyByZXF1ZXN0IGF0IHZpcnR1YWwgYWRkcmVzcyBhMGVlNTAxYQ0KPiA+
+ID4gPiAgIHBnZCA9IDlkN2Q0MDAwDQo+ID4gPiA+ICAgW2EwZWU1MDFhXSAqcGdkPTJkOGQxODEx
+LCAqcHRlPTAwMDAwMDAwLCAqcHB0ZT0wMDAwMDAwMA0KPiA+ID4gPiAgIEludGVybmFsIGVycm9y
+OiBPb3BzOiA3IFsjMV0gU01QIEFSTQ0KPiA+IC4uLg0KPiA+ID4gPiAgIENQVTogMCBQSUQ6IDI1
+MzYgQ29tbTogc2ggTm90IHRhaW50ZWQgNC4xNC45NSAjMA0KPiA+ID4gPiAgIEhhcmR3YXJlIG5h
+bWU6IEZyZWVzY2FsZSBpLk1YNiBRdWFkL0R1YWxMaXRlIChEZXZpY2UgVHJlZSkNCj4gPiA+ID4g
+ICB0YXNrOiA5ZjY3Y2EwMCB0YXNrLnN0YWNrOiA5YjY0MjAwMA0KPiA+ID4gPiAgIFBDIGlzIGF0
+IHNkbWFfaW50X2hhbmRsZXIrMHg3Yy8weDE3Yw0KPiA+ID4NCj4gPiA+IFNvIHdlIGdldCBhbiBp
+bnRlcnJ1cHQgd2hpbGUgZG9pbmcgc2h1dGRvd24uLiBUaGF0IGlzIGludGVyZXN0aW5nLi4NCj4g
+Pg0KPiA+IEknbSB1c2luZyBzZXJpYWwgY29uc29sZSBvbiB0dHlteGMwICgxMTUyMDAsOG4xKSBh
+bmQgVUhGIFJGSUQgcmVhZGVyDQo+ID4gb24NCj4gPiB0dHlteGMzKDkyMTYwMCw4bjEpIHdoaWNo
+IGlzIHNlbmRpbmcgcmVwb3J0cyBhc3luY2hyb25vdXNseSBhbmQgaXQgd2FzDQo+ID4gYWN0aXZl
+IGR1cmluZyB0aGUgc2h1dGRvd24gYXMgSSB3YXMgdGVzdGluZyBuZXcgaGFyZHdhcmUgcmV2aXNp
+b24gZHVyaW5nDQo+IHRoYXQgdGltZS4NCj4gPg0KPiA+ID4gPiAgIFBDIGlzIGF0IHNkbWFfaW50
+X2hhbmRsZXIrMHg3Yy8weDE3Yw0KPiA+ID4gPiAgIExSIGlzIGF0IGNvbnNvbGVfdW5sb2NrKzB4
+NDgwLzB4NGVjDQo+ID4NCj4gPiBJJ20gbm90IHN1cmUgaG93IHRvIGludGVycHJldCB0aGlzLCBi
+dXQgaXMgaXQgcG9zc2libGUsIHRoYXQgdGhlcmUNCj4gPiBtaWdodCBiZSBzb21lIHJhY2Ugd2hp
+bGUgc2RtYV9pbnRfaGFuZGxlciBjb3VsZCBiZSBwcm9jZXNzaW5nDQo+ID4gaW50ZXJydXB0IG9u
+IHR0eW14YzMgd2hpbGUgdGhlIHN5c3RlbSBpcyBkb2luZyBzb21lIGNvbnNvbGUgb3V0cHV0IG9u
+DQo+ID4gdHR5bXhjMD8gSSBqdXN0IHVzZSB0aGUgY29uc29sZSBmb3Igb2JzZXJ2YXRpb24sIHNv
+IEkgd2Fzbid0IHR5cGluZyBvcg0KPiA+IG90aGVyd2lzZSB1dGlsaXppbmcgaXQsIHNvIHByb2Jh
+Ymx5IG5vIHJlYXNvbiBmb3IgaW50ZXJydXB0IGZyb20gdHR5bXhjMC4NCj4gPg0KPiA+IC0tIHlu
+ZXp6DQpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51
+eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVh
+ZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1h
+cm0ta2VybmVsCg==
