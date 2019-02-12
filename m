@@ -2,70 +2,93 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C3ADC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:47:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 82478C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:58:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 11FA9222C1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:47:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4AB56222C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:58:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ndu+ok+S";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="WfaLrreB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 11FA9222C1
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G/bwXugD";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linux-foundation.org header.i=@linux-foundation.org header.b="D253Chez"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4AB56222C4
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-foundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=INbgDxmuPJ8FAMfhROfIgXPANb+Y7GszMVEQmYaV9J8=; b=ndu+ok+S2G83bx
-	cb3ewG+cWkdv6/SSlrDDh1cWhwfNB22A1+uFJgeCk5pCDC95g1gFkP/SbN4SvUy+NxrnPerZSw41U
-	K1fvGYQ/7Nnhui1DKHKrgS4LsDt8QaPy6WBiL5STVBzKxjIoON2qH7vDlopXgSS5zXX/FfXbel2T0
-	RkJ520FXcjQNvXOcYHb5cwryCSe/JVYdkpy1BPIllIJdnkEecdegb42m4sb56DxOQInJjz7uUTRvR
-	JoK3UP1SjxHFrd+ZY2n7MrxoYwTdZwOAuP89Jt+eCmwvM4kD1/nJzBkQnffhK/Mf/u+q5HM/c7oF9
-	9xfVL7+qPWPc/y7ohUSA==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=PE4UXnLFAHviSw3ls7BdzXsr3l0tFKrRIuAN6zFmzVo=; b=G/bwXugDttlp5L
+	1ZdwVeygOeWmZPuBjm6qCP4pk2ptWcSYTiWWFdV8tx/zprSy2JaAnsiKv/2riDNVh75flm3WZIwRO
+	Lv1+1jVmskbLK1XvWU/nYUsrcfzRBh22FpkdLKgmp+K7dIaORCw/qtgYGukmE2lL8HNwj6RRUxtVF
+	AovdkYm5jHk31miNhBrwSb2MgDvr3slPHpQaFpx344/ljrvC5hSNwWcttJpChDCdI6YjosSmiQR+k
+	Gf29pVYEGj7wk8zlJzNZ5eVbD+kJXVwC9QHlyuClleqyJm8OxtKysRFEZXQiIqCbK8sc9gcjLEhh/
+	ZP10YmOUQJ5KI5UD1PpQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gte1D-0005QH-Pa; Tue, 12 Feb 2019 19:46:59 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+	id 1gteCL-00021B-8I; Tue, 12 Feb 2019 19:58:29 +0000
+Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gte1A-0005Pu-M0
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 19:46:58 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=Content-Transfer-Encoding:
- MIME-Version:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:Content-Type:
- Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:
- Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=+t43Pjuo/NHKUrfGXrgu7Cq6cmnYI5b5l+1d1VB/cZU=; b=WfaLrreBm2bQ6xKhoFAzBQhdi
- oyX8fhL1PFdEEPZI8laviquVNcR3HWdvnTsNSg+wOr6h6iqZ+37m5bqmSJZ2PGwN8Dq5X4nnwXjxR
- qvWYGXymb8/P49FbavZrDfLwOqu75Shj5rpWttqZXfUfUd9QhHuJLeN5bL1n8tTUtck1U=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gte10-0006aG-El; Tue, 12 Feb 2019 19:46:46 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id 4FB381125B06; Tue, 12 Feb 2019 19:46:45 +0000 (GMT)
-From: Mark Brown <broonie@kernel.org>
-To: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>
-Subject: [PATCH] arm64: crypto: Disable xor-neon build when using clang
-Date: Tue, 12 Feb 2019 19:46:45 +0000
-Message-Id: <20190212194645.32504-1-broonie@kernel.org>
-X-Mailer: git-send-email 2.20.1
+ id 1gteCG-00020e-Uq
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 19:58:26 +0000
+Received: by mail-lf1-x144.google.com with SMTP id b20so2964012lfa.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 12 Feb 2019 11:58:24 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linux-foundation.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=/n+2vOYomTB5BLs+7tL7KTaBHH30/oos+ud6/cnVnSI=;
+ b=D253Chez2iaEQIcdy2TZNsUlaqMRm9VIwWrpW4fWK//FTDXCKKfklGuD0o642xmL34
+ Mp7YirjzpQRotbrv0djWXVT+vJS5/MLsACCfzpkJ9An4MiWd9dVmmIgjhdo9yVZ3/bHH
+ 9o6+1iNpzzKTb5pLfsCFl4j2YHGc18WAFp/jg=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=/n+2vOYomTB5BLs+7tL7KTaBHH30/oos+ud6/cnVnSI=;
+ b=bVwr5fgn3qu3coulScMyNMAos1TOYA5/tcaPZdwvsKWQVyolBXWrsYhxvMuCLoevE9
+ +DqNC7AZMDI3IcmmP41wC8XKJx/69HIOu5J3Hsybx/NZ3v/vf1NyK4zBzgd79J8lo6zp
+ /I/Jh78V7zIPa3gXoKTdzFor9YyD9F9YOyf2vh48MPAma1wJMDHOnoOSVLjZ9s9v0yQW
+ 9n2P2KSCchlfH/SyzNIZfBoUDEZ4d5cmsbP2hyJFTo4JKH+mg6olMBm4JJH8YwrmD6o0
+ ohT0Ker+77laevEPqUmO6oeqzGW/ZeMBb6VUPn8T2hihaatT6ily8+debsoMCmScAnyL
+ EAbA==
+X-Gm-Message-State: AHQUAubgmtBf2FI8lzVxmnRe3NEPm5j586pImJNvVybPA9NK9uPDg5F3
+ nfukD9c+s1GLyuoxxh81YoelDc3l+7c=
+X-Google-Smtp-Source: AHgI3IYsYoUsySPn2tlkvt/a2oB03wm73MTIBFpO4PD4VA2ZtgakvdtPDq+9HNKPAqNId1kuWDBr2g==
+X-Received: by 2002:a19:ab09:: with SMTP id u9mr3438626lfe.149.1550001502164; 
+ Tue, 12 Feb 2019 11:58:22 -0800 (PST)
+Received: from mail-lj1-f181.google.com (mail-lj1-f181.google.com.
+ [209.85.208.181])
+ by smtp.gmail.com with ESMTPSA id c140sm1801737lfd.36.2019.02.12.11.58.19
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 12 Feb 2019 11:58:20 -0800 (PST)
+Received: by mail-lj1-f181.google.com with SMTP id q128so3130442ljb.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 12 Feb 2019 11:58:19 -0800 (PST)
+X-Received: by 2002:a2e:7316:: with SMTP id
+ o22-v6mr1693665ljc.82.1550001499483; 
+ Tue, 12 Feb 2019 11:58:19 -0800 (PST)
 MIME-Version: 1.0
+References: <1549913486-16799-1-git-send-email-longman@redhat.com>
+ <1549913486-16799-3-git-send-email-longman@redhat.com>
+In-Reply-To: <1549913486-16799-3-git-send-email-longman@redhat.com>
+From: Linus Torvalds <torvalds@linux-foundation.org>
+Date: Tue, 12 Feb 2019 11:58:03 -0800
+X-Gmail-Original-Message-ID: <CAHk-=wjTmSg6zX=xKFSPZor7FWi3s4D0dy-hz_M=yeF_6478QA@mail.gmail.com>
+Message-ID: <CAHk-=wjTmSg6zX=xKFSPZor7FWi3s4D0dy-hz_M=yeF_6478QA@mail.gmail.com>
+Subject: Re: [PATCH v2 2/2] locking/rwsem: Optimize down_read_trylock()
+To: Waiman Long <longman@redhat.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_114656_875401_C130970F 
-X-CRM114-Status: GOOD (  14.57  )
+X-CRM114-CacheID: sfid-20190212_115825_030778_7E4F0A45 
+X-CRM114-Status: GOOD (  18.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,91 +100,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Kevin Hilman <khilman@baylibre.com>, Jackie Liu <liuyun01@kylinos.cn>,
- ndesaulniers@google.com, Mark Brown <broonie@kernel.org>,
- Nathan Chancellor <natechancellor@gmail.com>,
+Cc: linux-arch <linux-arch@vger.kernel.org>, linux-xtensa@linux-xtensa.org,
+ Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
+ Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
+ Linux-sh list <linux-sh@vger.kernel.org>,
+ Peter Zijlstra <peterz@infradead.org>, linux-hexagon@vger.kernel.org,
+ the arch/x86 maintainers <x86@kernel.org>, Will Deacon <will.deacon@arm.com>,
+ Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ "H. Peter Anvin" <hpa@zytor.com>, linux-alpha@vger.kernel.org,
+ sparclinux@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
+ linuxppc-dev@lists.ozlabs.org, Andrew Morton <akpm@linux-foundation.org>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Currently clang is able to build an arm64 defconfig or allmodconfig
-using the release branch for clang 8 apart from a series of errors in
-xor-neon.c in the form:
+On Mon, Feb 11, 2019 at 11:31 AM Waiman Long <longman@redhat.com> wrote:
+>
+> Modify __down_read_trylock() to make it generate slightly better code
+> (smaller and maybe a tiny bit faster).
 
-  arch/arm64/lib/xor-neon.c:27:28: error: incompatible pointer types assigning to 'const unsigned long *' from 'uint64_t *' (aka 'unsigned long long *') [-Werror,-Wincompatible-pointer-types]
+This looks good, but I would ask you to try one slightly different approach.
 
-This issue has been extensively discussed between various interested
-parties but it is still unclear what if any the best solution is in the
-compiler and there are concerns about just disabling the warning with a
-pragma in the header due to the potential for masking other serious
-issues.  Details of the discussion can be followed here:
+Instead of this:
 
-   https://github.com/ClangBuiltLinux/linux/issues/283
+>        long tmp = atomic_long_read(&sem->count);
+>
+>        while (tmp >= 0) {
+>                if (atomic_long_try_cmpxchg_acquire(&sem->count, &tmp,
+>                                        tmp + RWSEM_ACTIVE_READ_BIAS)) {
+>                        return 1;
+>                }
+>        }
 
-In order to avoid the issue and facilitate further clang work and
-testing for the time being just disable the use of xor-neon.c if we are
-building with clang.  Obviously this is not actually resolving the
-problem and is not something that should be with us for the long term
-but since it only affects clang and enables people working on that to
-work directly with upstream it seems like a useful tradeoff.
+try doing this instead:
 
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
+        long tmp = 0;
 
-It would also be possible to achieve the same effect by using either a
-Makefile change or a pragma to disable the warning for this specific
-file, I can send a patch for those approaches if that's OK and
-preferable.  Disabling the acceleration entirely seemed safer and less
-likely to be forgotten to me.
+        do {
+                if (atomic_long_try_cmpxchg_acquire(&sem->count, &tmp,
+                                        tmp + RWSEM_ACTIVE_READ_BIAS)) {
+                        return 1;
+        } while (tmp >= 0);
+        return 0;
 
-We've got some KernelCI support for clang in the middle of getting
-deployed:
+because especially when it comes to locking, it's usually better to
+just *guess* that the lock is unlocked, than it is to actually read
+from the line to see what the state is.
 
-   https://staging.kernelci.org/job/next-clang/branch/master/
+Often - but certainly not always - the lock is the first access to the
+target cacheline, and assuming the trylock is successful (which I
+think is the case we want to optimize for), we're much better off
+causing that first access to be a read-for-ownership, rather than a
+read-for-sharing.
 
-so being able to build and run upstream kernels directly would be
-enormously helpful.
+Because if you first read from the line, and then do a cmpxchg, and if
+the line was not in the cache, your cache coherency protocol will
+generally go through two states: first shared (for the initial read)
+and then exclusive-dirty (for the cmpxchg).
 
- arch/arm64/include/asm/xor.h | 2 +-
- arch/arm64/lib/Makefile      | 2 ++
- 2 files changed, 3 insertions(+), 1 deletion(-)
+Now, this is obviously very micro-architecture dependent, and in fact
+the microarchitecture could even see the "predict fallthrough to a
+cmpxchg with the same address" and turn the first read into a
+read-for-ownership, but we've done this at some point before, and the
+"guess unlocked" was actually the one that performed better.
 
-diff --git a/arch/arm64/include/asm/xor.h b/arch/arm64/include/asm/xor.h
-index 856386ad076c..971b8336d2d2 100644
---- a/arch/arm64/include/asm/xor.h
-+++ b/arch/arm64/include/asm/xor.h
-@@ -14,7 +14,7 @@
- #include <asm/hwcap.h>
- #include <asm/neon.h>
- 
--#ifdef CONFIG_KERNEL_MODE_NEON
-+#if defined(CONFIG_KERNEL_MODE_NEON) && !defined(CONFIG_CC_IS_CLANG)
- 
- extern struct xor_block_template const xor_block_inner_neon;
- 
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 5540a1638baf..b2a5b8d56354 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -6,10 +6,12 @@ lib-y		:= clear_user.o delay.o copy_from_user.o		\
- 		   strchr.o strrchr.o tishift.o
- 
- ifeq ($(CONFIG_KERNEL_MODE_NEON), y)
-+ifneq ($(CONFIG_CC_IS_CLANG), y)
- obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
- CFLAGS_REMOVE_xor-neon.o	+= -mgeneral-regs-only
- CFLAGS_xor-neon.o		+= -ffreestanding
- endif
-+endif
- 
- # Tell the compiler to treat all general purpose registers (with the
- # exception of the IP registers, which are already handled by the caller
--- 
-2.20.1
+Of course, the downside is that it might be worse when the guess is
+incorrect - either because of a nested read lock or due to an actual
+conflict with a write, but on the whole those *should* be the rare
+cases, and not the cases where we necessarily optimize for latency of
+the operation.
 
+Hmm?
+
+                    Linus
 
 _______________________________________________
 linux-arm-kernel mailing list
