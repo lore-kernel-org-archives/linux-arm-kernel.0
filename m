@@ -2,66 +2,69 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D3499C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:02:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 25EDCC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:03:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A5CE52084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:02:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EBC8F2084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:03:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g/RMEvZt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A5CE52084E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cRhbvZlo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EBC8F2084E
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=xZ7OitOV/GCNzVi3kkehjA2TAGtYu/TkPb9GOsm+36Q=; b=g/RMEvZtFsHrz8tf3IxKJdNBh
-	ZgC4AyxRwDc++UWQ65ebiJAXuOFFy28nbcjWZDP7D6KtVzouAsVk2U5gxVMc8c0CHYfu/4itlWIzr
-	B1tOOoolBIYGkkYrn7Syy3I6SRt/I63oDdc+rr7XD0HGb9HzXbieyg/R2iZ5eOn0bO7C6fLVU5WXw
-	hGbViw60nnHmrLyI5rAJQI9HXkeG0wui752d5MHXDtRQp35DSd53ILkZXE7EUR3+KuDEZ+La29d/b
-	Sw4Fsb4gxq6akMaT3OxTB+bBOcV2c53fYOq7TRLhKNQWeI0CdV1j0u4J6saHIschTPmXBrUgKVu+F
-	J/5i2XVAQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=bjm3MoZShZlEyUEij9LBuhuoChinK7Mc+iF7NCzmLD0=; b=cRhbvZlo4lG2IB
+	2xZxbiZZy65kk47eykEAh6AXlJEZhshEGR7zDJwZ7ogCv1CwMdF24O+eXJ+xuYelFm7HDYUu7aWIW
+	t1SFNbQqdxhWlCgFe6yNFh88ifnUa8E1ZNBoDcY48mJhaJKTY91/bdyjncTpnb1fNaLiV29S1Abk4
+	rG7BfSPaEkCrAaIVnthJJrQ9K9TQNdNNSBTyb5IeV5EVfUP40UiPkSGrDqRcKXNvH2lgVx1wx0UE7
+	yWKsaV7fhFVdBm4flTT67NTOfAHe7k4P9cRfz2f3ywym/6Uis0i0ILl0MvBw6K8Q56rqrrSGprRha
+	KaLP3CLedv/vS02/fgRg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtcOL-00034n-0r; Tue, 12 Feb 2019 18:02:45 +0000
+	id 1gtcOd-0003Jd-8V; Tue, 12 Feb 2019 18:03:03 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtcO8-00030F-3O
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 18:02:42 +0000
+ id 1gtcO9-00030d-Rh
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 18:02:46 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6F0BBA78;
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 70F181596;
  Tue, 12 Feb 2019 10:02:31 -0800 (PST)
-Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 2EEFF3F774;
- Tue, 12 Feb 2019 10:02:29 -0800 (PST)
-Subject: Re: [PATCH v3 3/7] of: address: Add parent pointer to the
- __of_translate_address args
-To: Maxime Ripard <maxime.ripard@bootlin.com>,
- Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh+dt@kernel.org>,
- Frank Rowand <frowand.list@gmail.com>, Chen-Yu Tsai <wens@csie.org>
-References: <cover.f2e5fbb4d21384168973fa32377a33d627768146.1549897336.git-series.maxime.ripard@bootlin.com>
- <57fa05909120919f33590fed11bd4041467a09f5.1549897336.git-series.maxime.ripard@bootlin.com>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <fbac5719-5d76-e7f4-5e5e-2d5167783106@arm.com>
-Date: Tue, 12 Feb 2019 18:02:27 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+Received: from arrakis.emea.arm.com (arrakis.cambridge.arm.com [10.1.196.78])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ BDEF33F675; Tue, 12 Feb 2019 10:02:26 -0800 (PST)
+Date: Tue, 12 Feb 2019 18:02:24 +0000
+From: Catalin Marinas <catalin.marinas@arm.com>
+To: Evgenii Stepanov <eugenis@google.com>
+Subject: Re: [RFC][PATCH 0/3] arm64 relaxed ABI
+Message-ID: <20190212180223.GD199333@arrakis.emea.arm.com>
+References: <cover.1544445454.git.andreyknvl@google.com>
+ <20181210143044.12714-1-vincenzo.frascino@arm.com>
+ <CAAeHK+xPZ-Z9YUAq=3+hbjj4uyJk32qVaxZkhcSAHYC4mHAkvQ@mail.gmail.com>
+ <20181212150230.GH65138@arrakis.emea.arm.com>
+ <CAAeHK+zxYJDJ7DJuDAOuOMgGvckFwMAoVUTDJzb6MX3WsXhRTQ@mail.gmail.com>
+ <20181218175938.GD20197@arrakis.emea.arm.com>
+ <20181219125249.GB22067@e103592.cambridge.arm.com>
+ <9bbacb1b-6237-f0bb-9bec-b4cf8d42bfc5@arm.com>
+ <CAFKCwrhH5R3e5ntX0t-gxcE6zzbCNm06pzeFfYEN2K13c5WLTg@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <57fa05909120919f33590fed11bd4041467a09f5.1549897336.git-series.maxime.ripard@bootlin.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <CAFKCwrhH5R3e5ntX0t-gxcE6zzbCNm06pzeFfYEN2K13c5WLTg@mail.gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_100232_523453_DE3ADBF9 
-X-CRM114-Status: GOOD (  27.77  )
+X-CRM114-CacheID: sfid-20190212_100240_271591_86E003B1 
+X-CRM114-Status: GOOD (  47.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,147 +76,208 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Yong Deng <yong.deng@magewell.com>,
- Arnd Bergmann <arnd@arndb.de>, dri-devel@lists.freedesktop.org,
- Dave Martin <dave.martin@arm.com>,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Georgi Djakov <georgi.djakov@linaro.org>, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Kate Stewart <kstewart@linuxfoundation.org>,
+ "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
+ Will Deacon <will.deacon@arm.com>, Kostya Serebryany <kcc@google.com>,
+ "open list:KERNEL SELFTEST FRAMEWORK" <linux-kselftest@vger.kernel.org>,
+ Chintan Pandya <cpandya@codeaurora.org>,
+ Vincenzo Frascino <vincenzo.frascino@arm.com>, Shuah Khan <shuah@kernel.org>,
+ Ingo Molnar <mingo@kernel.org>, linux-arch <linux-arch@vger.kernel.org>,
+ Jacob Bramley <Jacob.Bramley@arm.com>, Dmitry Vyukov <dvyukov@google.com>,
+ Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
+ Dave Martin <Dave.Martin@arm.com>, Kees Cook <keescook@chromium.org>,
+ Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
+ Andrey Konovalov <andreyknvl@google.com>,
+ Kevin Brodsky <kevin.brodsky@arm.com>,
+ Alexander Viro <viro@zeniv.linux.org.uk>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Linux Memory Management List <linux-mm@kvack.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ LKML <linux-kernel@vger.kernel.org>,
+ Luc Van Oostenryck <luc.vanoostenryck@gmail.com>,
+ Lee Smith <Lee.Smith@arm.com>, Andrew Morton <akpm@linux-foundation.org>,
+ Robin Murphy <robin.murphy@arm.com>,
+ "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 11/02/2019 15:02, Maxime Ripard wrote:
-> The __of_translate_address function is used to translate the device tree
-> addresses to physical addresses using the various ranges property to create
-> the offset.
+On Mon, Feb 11, 2019 at 12:32:55PM -0800, Evgenii Stepanov wrote:
+> On Mon, Feb 11, 2019 at 9:28 AM Kevin Brodsky <kevin.brodsky@arm.com> wrote:
+> > On 19/12/2018 12:52, Dave Martin wrote:
+> > > Really, the kernel should do the expected thing with all "non-weird"
+> > > memory.
+> > >
+> > > In lieu of a proper definition of "non-weird", I think we should have
+> > > some lists of things that are explicitly included, and also excluded:
+> > >
+> > > OK:
+> > >       kernel-allocated process stack
+> > >       brk area
+> > >       MAP_ANONYMOUS | MAP_PRIVATE
+> > >       MAP_PRIVATE mappings of /dev/zero
+> > >
+> > > Not OK:
+> > >       MAP_SHARED
+> > >       mmaps of non-memory-like devices
+> > >       mmaps of anything that is not a regular file
+> > >       the VDSO
+> > >       ...
+> > >
+> > > In general, userspace can tag memory that it "owns", and we do not assume
+> > > a transfer of ownership except in the "OK" list above.  Otherwise, it's
+> > > the kernel's memory, or the owner is simply not well defined.
+> >
+> > Agreed on the general idea: a process should be able to pass tagged pointers at the
+> > syscall interface, as long as they point to memory privately owned by the process. I
+> > think it would be possible to simplify the definition of "non-weird" memory by using
+> > only this "OK" list:
+> > - mmap() done by the process itself, where either:
+> >    * flags = MAP_PRIVATE | MAP_ANONYMOUS
+> >    * flags = MAP_PRIVATE and fd refers to a regular file or a well-defined list of
+> > device files (like /dev/zero)
+> > - brk() done by the process itself
+> > - Any memory mapped by the kernel in the new process's address space during execve(),
+> > with the same restrictions as above ([vdso]/[vvar] are therefore excluded)
+
+Sounds reasonable.
+
+> > >   * Userspace should set tags at the point of allocation only.
+> >
+> > Yes, tags are only supposed to be set at the point of either allocation or
+> > deallocation/reallocation. However, allocators can in principle be nested, so an
+> > allocator could  take a region allocated by malloc() as input and subdivide it
+> > (changing tags in the process). That said, this suballocator must not free() that
+> > region until all the suballocations themselves have been freed (thereby restoring the
+> > tags initially set by malloc()).
+> >
+> > >   * If you don't know how an object was allocated, you cannot modify the
+> > >     tag, period.
+> >
+> > Agreed, allocators that tag memory can only operate on memory with a well-defined
+> > provenance (for instance anonymous mmap() or malloc()).
+> >
+> > >   * A single C object should be accessed using a single, fixed pointer tag
+> > >     throughout its entire lifetime.
+> >
+> > Agreed. Allocators themselves may need to be excluded though, depending on how they
+> > represent their managed memory.
+> >
+> > >   * Tags can be changed only when there are no outstanding pointers to
+> > >     the affected object or region that may be used to access the object
+> > >     or region (i.e., if the object were allocated from the C heap and
+> > >     is it safe to realloc() it, then it is safe to change the tag; for
+> > >     other types of allocation, analogous arguments can be applied).
+> >
+> > Tags can only be changed at the point of deallocation/reallocation. Pointers to the
+> > object become invalid and cannot be used after it has been deallocated; memory
+> > tagging allows to catch such invalid usage.
+
+All the above sound well but that's mostly a guideline on what a C
+library can do. It doesn't help much with defining the kernel ABI.
+Anyway, it's good to clarify the use-cases.
+
+> > >   * When the kernel dereferences a pointer on userspace's behalf, it
+> > >     shall behave equivalently to userspace dereferencing the same pointer,
+> > >     including use of the same tag (where passed by userspace).
+> > >
+> > >   * Where the pointer tag affects pointer dereference behaviour (i.e.,
+> > >     with hardware memory colouring) the kernel makes no guarantee to
+> > >     honour pointer tags correctly for every location a buffer based on a
+> > >     pointer passed by userspace to the kernel.
+> > >
+> > >     (This means for example that for a read(fd, buf, size), we can check
+> > >     the tag for a single arbitrary location in *(char (*)[size])buf
+> > >     before passing the buffer to get_user_pages().  Hopefully this could
+> > >     be done in get_user_pages() itself rather than hunting call sites.
+> > >     For userspace, it means that you're on your own if you ask the
+> > >     kernel to operate on a buffer than spans multiple, independently-
+> > >     allocated objects, or a deliberately striped single object.)
+> >
+> > I think both points are reasonable. It is very valuable for the kernel to access
+> > userspace memory using the user-provided tag, because it enables kernel accesses to
+> > be checked in the same way as user accesses, allowing to detect bugs that are
+> > potentially hard to find. For instance, if a pointer to an object is passed to the
+> > kernel after it has been deallocated, this is invalid and should be detected.
+> > However, you are absolutely right that the kernel cannot *guarantee* that such a
+> > check is carried out for the entire memory range (or in fact at all); it should be a
+> > best-effort approach.
 > 
-> However, it's shared between the CPU addresses (based on the ranges
-> property) and the DMA addresses (based on dma-ranges). Since we're going to
-> add support for a DMA parent node that is not the DT parent node, we need
-> to change the logic a bit to have an optional parent node that we should
-> use.
+> It would also be valuable to narrow down the set of "relaxed" (i.e.
+> not tag-checking) syscalls as reasonably possible. We would want to
+> provide tag-checking userspace wrappers for any important calls that
+> are not checked in the kernel. Is it correct to assume that anything
+> that goes through copy_from_user  / copy_to_user is checked?
+
+I lost track of the context of this thread but if it's just about
+relaxing the ABI for hwasan, the kernel has no idea of the compiler
+generated structures in user space, so nothing is checked.
+
+If we talk about tags in the context of MTE, than yes, with the current
+proposal the tag would be checked by copy_*_user() functions.
+
+> > >   * The kernel shall not extend the lifetime of user pointers in ways
+> > >     that are not clear from the specification of the syscall or
+> > >     interface to which the pointer is passed (and in any case shall not
+> > >     extend pointer lifetimes without good reason).
+> > >
+> > >     So no clever transparent caching between syscalls, unless it _really_
+> > >     is transparent in the presence of tags.
+> >
+> > Do you have any particular case in mind? If such caching is really valuable, it is
+> > always possible to access the object while ignoring the tag. For sure, the
+> > user-provided tag can only be used during the syscall handling itself, not
+> > asynchronously later on, unless otherwise specified.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->   drivers/of/address.c | 21 ++++++++++++---------
->   1 file changed, 12 insertions(+), 9 deletions(-)
+> For aio* operations it would be nice if the tag was checked at the
+> time of the actual userspace read/write, either instead of or in
+> addition to at the time of the system call.
+
+With aio* (and synchronous iovec-based syscalls), the kernel may access
+the memory while the corresponding user process is scheduled out. Given
+that such access is not done in the context of the user process (and
+using the user VA like copy_*_user), the kernel cannot handle potential
+tag faults. Moreover, the transfer may be done by DMA and the device
+does not understand tags.
+
+I'd like to keep tags as a property of the pointer in a specific virtual
+address space. The moment you convert it to a different address space
+(e.g. kernel linear map, physical address), the tag property is stripped
+and I don't think we should re-build it (and have it checked).
+
+> > >   * For purposes other than dereference, the kernel shall accept any
+> > >     legitimately tagged pointer (according to the above rules) as
+> > >     identifying the associated memory location.
+> > >
+> > >     So, mprotect(some_page_aligned_object, ...); is valid irrespective
+> > >     of where page_aligned_object() came from.  There is no implicit
+> > >     derefence by the kernel here, hence no tag check.
+> > >
+> > >     The kernel does not guarantee to work correctly if the wrong tag
+> > >     is used, but there is not always a well-defined "right" tag, so
+> > >     we can't really guarantee to check it.  So a pointer derived by
+> > >     any reasonable means by userspace has to be treated as equally
+> > >     valid.
+> >
+> > This is a disputed point :) In my opinion, this is the the most reasonable approach.
 > 
-> diff --git a/drivers/of/address.c b/drivers/of/address.c
-> index 2270373b30ab..4c5dc21c71ca 100644
-> --- a/drivers/of/address.c
-> +++ b/drivers/of/address.c
-> @@ -569,10 +569,10 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
->    * relative to that node.
->    */
->   static u64 __of_translate_address(struct device_node *dev,
-> +				  struct device_node *parent,
->   				  const __be32 *in_addr, const char *rprop,
->   				  struct device_node **host)
->   {
-> -	struct device_node *parent = NULL;
->   	struct of_bus *bus, *pbus;
->   	__be32 addr[OF_MAX_ADDR_CELLS];
->   	int na, ns, pna, pns;
-> @@ -583,11 +583,14 @@ static u64 __of_translate_address(struct device_node *dev,
->   	/* Increase refcount at current level */
->   	of_node_get(dev);
->   
-> -	*host = NULL;
-> -	/* Get parent & match bus type */
-> -	parent = of_get_parent(dev);
-> -	if (parent == NULL)
-> -		goto bail;
-> +	if (!parent) {
+> Yes, it would be nice if the kernel explicitly promised, ex.
+> mprotect() over a range of differently tagged pages to be allowed
+> (i.e. address tag should be unchecked).
 
-I would have suggested having the callers make the of_get_parent() call 
-themselves, but having pulled up the code for a look at the whole 
-function, there's a bigger issue at play. The parent traversal happens 
-within the main translation loop as well, and topologies could quite 
-feasibly exist where that makes a difference, e.g.:
+I don't think mprotect() over differently tagged pages was ever a
+problem. I originally asked that mprotect() and friends do not accept
+tagged pointers since these functions deal with memory ranges rather
+than dereferencing such pointer (the reason being minimal kernel
+changes). However, given how complicated it is to specify an ABI, I came
+to the conclusion that a pointer passed to such function should be
+allowed to have non-zero top byte. It would be the kernel's
+responsibility to strip it out as appropriate.
 
-	icc {
-		#interconnect-cells = <0>;
-		dma-ranges = <...>;
-	};
-
-	subsystem {
-		interconnects = <&icc>;
-		interconnect-names = "dma";
-
-		intermediate-bus {
-			dma-ranges;
-
-			device {
-				...
-			};
-		};
-	};
-
-or:
-
-	icc2 {
-		#interconnect-cells = <0>;
-		dma-ranges = <...>;
-	};
-
-	icc1 {
-		#interconnect-cells = <0>;
-		dma-ranges = <...>;
-		interconnects = <&icc2>;
-		interconnect-names = "dma";
-	};
-
-	device {
-		interconnects = <&icc1>;
-		interconnect-names = "dma";
-		...
-	};
-
-So I guess the answer is to switch this over to using a callback and 
-have the callers pass of_get_parent/of_get_dma_parent in as appropriate.
-
-Robin.
-
-> +		*host = NULL;
-> +		/* Get parent & match bus type */
-> +		parent = of_get_parent(dev);
-> +		if (parent == NULL)
-> +			goto bail;
-> +	}
-> +
->   	bus = of_match_bus(parent);
->   
->   	/* Count address cells & copy address locally */
-> @@ -665,7 +668,7 @@ u64 of_translate_address(struct device_node *dev, const __be32 *in_addr)
->   	struct device_node *host;
->   	u64 ret;
->   
-> -	ret = __of_translate_address(dev, in_addr, "ranges", &host);
-> +	ret = __of_translate_address(dev, NULL, in_addr, "ranges", &host);
->   	if (host) {
->   		of_node_put(host);
->   		return OF_BAD_ADDR;
-> @@ -680,7 +683,7 @@ u64 of_translate_dma_address(struct device_node *dev, const __be32 *in_addr)
->   	struct device_node *host;
->   	u64 ret;
->   
-> -	ret = __of_translate_address(dev, in_addr, "dma-ranges", &host);
-> +	ret = __of_translate_address(dev, NULL, in_addr, "dma-ranges", &host);
->   
->   	if (host) {
->   		of_node_put(host);
-> @@ -736,7 +739,7 @@ static u64 of_translate_ioport(struct device_node *dev, const __be32 *in_addr,
->   	unsigned long port;
->   	struct device_node *host;
->   
-> -	taddr = __of_translate_address(dev, in_addr, "ranges", &host);
-> +	taddr = __of_translate_address(dev, NULL, in_addr, "ranges", &host);
->   	if (host) {
->   		/* host-specific port access */
->   		port = logic_pio_trans_hwaddr(&host->fwnode, taddr, size);
-> 
+-- 
+Catalin
 
 _______________________________________________
 linux-arm-kernel mailing list
