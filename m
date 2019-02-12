@@ -2,67 +2,70 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2AEA9C282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:43:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F2CC5C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:43:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F0F8F21773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:43:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BEE1521773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:43:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JS7CMmas";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="t0hYTQeG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F0F8F21773
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ywsh+5bZ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="aGOU+vqF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BEE1521773
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=QH7JoLg6rRkYCdLt1k7z1bCWdLeOKFUL/oD0FyWxjVk=; b=JS7CMmasVk72hT
-	TYSqygvKw3LhFSkI2gc4Uq8tYww1o779zcV3XNcvy1sZfiX4XNx1rqQktTsaW9sbB0M4eqTb0xmet
-	RhY0BCIBuwQZW77rTKNnbvNfc5sJvXzvKQfYEvVvlDWncMfZf2mRi3F6BHvEx4hP5pE3ksDBmCXr9
-	AWGjpcfQ+GpFesYfFpUSFPz4GASnHHMjiNf9HbIaeFBAMUjexH+jEtMX+wqJsUr0NRxRSwNRAFbJp
-	K/1kLUv4F6fPCwfZfaLZMQ13vTNTYFxD9Hayybw810n+Y6yyDgsn1cJoLpf4C1yF9vg/2pVmUp2NA
-	COuvR8aS+/ThFWYzZ3hQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=v0BiUjqS9UKwGGRnRVjRzRGw7rjzoFnOZcvR88CBgLE=; b=Ywsh+5bZaNYfRU
+	rP3dkSqeM0ofJ+12lBKvk3x2iTDsaQKbz/TNhK1PKgtgN1bFNExd3eieFXoQwaWWWE8taigQOPAlK
+	3qGC9KqoPqzY0drE3/iYfD9hcJNjZzLp7roYwR1mpb4FWv81CC+hCo1+KKvaaLvVTi5gN5LJQZrN/
+	XGp+xOfLvIac/cCY5tLoxpd5nAkD0ZsxArC6hs3iNP/N+YWjtEFbdiDfM/U19FRgHvsXeEvuSet5v
+	dJMm0wLk1AGu7kCQZV4TIFOfv0Du5cZ7vTs+ZDJFZY19fDo50zle215ZZpuH08qwwDC1blT9PEu+9
+	UuB8zQN6FhPEddGo/3Sg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtaDS-0005sB-3A; Tue, 12 Feb 2019 15:43:22 +0000
+	id 1gtaDt-0006Ec-TU; Tue, 12 Feb 2019 15:43:49 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtaDO-0005qs-ET
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:43:19 +0000
+ id 1gtaDq-0006Cg-2i
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:43:47 +0000
 Received: from localhost.localdomain (NE2965lan1.rev.em-net.ne.jp
  [210.141.244.193])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 14B6E21773;
- Tue, 12 Feb 2019 15:43:15 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 7CA0C21773;
+ Tue, 12 Feb 2019 15:43:44 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549986197;
- bh=Fl6g9cx+KTVtRS/rzj8ZyrdfdE1bg1TwwE1uUnu9KIQ=;
- h=From:To:Cc:Subject:Date:From;
- b=t0hYTQeGGGbEmbH6bWWM75e0pn5rp51r8KgHA5esbPESJLJrPA09YzgA8QLFFfNLl
- uTH2bvblww1t9exvAdOHLcua3zo6XYpqK7SNnn/kl6JPeGnpkfhEgynluJiqN1M6Cn
- YwNA8Cy6ugwBl1gDq1/kV8HW+kkMTxgb8Lclb/M0=
+ s=default; t=1549986225;
+ bh=0W/75YHGlmESdSfdJlB9JnspyeIkW8XqMvb/1p+GSmE=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=aGOU+vqFPOKSbJWqILXjb50J6gHsBXFUaB73jmnJfUhp4jq3igTdXIR3oFnC0etsJ
+ lsFAFUcA/cdHEaCRnsl7i6s/99+6kpvsxr36mkxk7O0hm/PSG+ENQDeI7W8FXuIBwq
+ VOKx0jiDt2wUvr8dlAs/WJNpOt2xZwbmHq+UdaOU=
 From: Masami Hiramatsu <mhiramat@kernel.org>
 To: Catalin Marinas <catalin.marinas@arm.com>,
  Will Deacon <will.deacon@arm.com>
-Subject: [PATCH v3 0/4] arm64: kprobes: Update blacklist checking on arm64
-Date: Wed, 13 Feb 2019 00:42:53 +0900
-Message-Id: <154998617300.21869.11457765723750331236.stgit@devbox>
+Subject: [PATCH v3 1/4] arm64: kprobes: Move extable address check into
+ arch_prepare_kprobe()
+Date: Wed, 13 Feb 2019 00:43:22 +0900
+Message-Id: <154998620258.21869.8971320076728831126.stgit@devbox>
 X-Mailer: git-send-email 2.13.6
+In-Reply-To: <154998617300.21869.11457765723750331236.stgit@devbox>
+References: <154998617300.21869.11457765723750331236.stgit@devbox>
 User-Agent: StGit/0.17.1-dirty
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_074318_509587_F7CDA694 
-X-CRM114-Status: GOOD (  10.78  )
+X-CRM114-CacheID: sfid-20190212_074346_238379_EA0838C8 
+X-CRM114-Status: GOOD (  11.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,46 +86,48 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello,
+Move extable address check into arch_prepare_kprobe() from
+arch_within_kprobe_blacklist().
+The blacklist is exposed via debugfs as a list of symbols.
+The extable entries are smaller, so must be filtered out
+by arch_prepare_kprobe().
 
-Here is the v3 series of update of the kprobe blacklist
-checking on arm64.
-
-I found that some blacklist checking code were mis-placed in
-arch_prepare_kprobe() and arch_within_kprobe_blacklist().
-Since the blacklist just filters by symbol, smaller than the
-symbol, like extable must be checked in arch_prepare_kprobe().
-Also, all function (symbol) level check must be done by blacklist.
-
-For arm64, it checks the extable entry address in blacklist
-and exception/irqentry function in arch_prepare_kprobe().
-And, RODATA check is unneeded since kernel/kprobes.c
-already ensures the probe address is in kernel-text area.
-
-In v3, I rebased on the latest arm64 kernel which includes
-James' KVM/HYP fixes for kprobes, and fix a reported bugs
-in [4/4].
-
-Changes in v3:
- - [4/4] Fixes to remove redundant blacklist of kprobe_text
-   and add blacklist on exception_text.
-
-Thank you,
-
+Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+Reviewed-by: James Morse <james.morse@arm.com>
 ---
+ Update in v2:
+  - Update commit message.
+  - Add Reviewed-by from James.
+---
+ arch/arm64/kernel/probes/kprobes.c |    7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-Masami Hiramatsu (4):
-      arm64: kprobes: Move extable address check into arch_prepare_kprobe()
-      arm64: kprobes: Remove unneeded RODATA check
-      arm64: kprobes: Move exception_text check in blacklist
-      arm64: kprobes: Use arch_populate_kprobe_blacklist()
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index f17afb99890c..9989ec9baa11 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -102,6 +102,10 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+ 
+ 	if (in_exception_text(probe_addr))
+ 		return -EINVAL;
++
++	if (search_exception_tables(probe_addr))
++		return -EINVAL;
++
+ 	if (probe_addr >= (unsigned long) __start_rodata &&
+ 	    probe_addr <= (unsigned long) __end_rodata)
+ 		return -EINVAL;
+@@ -479,8 +483,7 @@ bool arch_within_kprobe_blacklist(unsigned long addr)
+ 	    (addr >= (unsigned long)__idmap_text_start &&
+ 	    addr < (unsigned long)__idmap_text_end) ||
+ 	    (addr >= (unsigned long)__hyp_text_start &&
+-	    addr < (unsigned long)__hyp_text_end) ||
+-	    !!search_exception_tables(addr))
++	    addr < (unsigned long)__hyp_text_end))
+ 		return true;
+ 
+ 	if (!is_kernel_in_hyp_mode()) {
 
-
- arch/arm64/kernel/probes/kprobes.c |   52 +++++++++++++++++++-----------------
- 1 file changed, 27 insertions(+), 25 deletions(-)
-
---
-Masami Hiramatsu (Linaro) <mhiramat@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
