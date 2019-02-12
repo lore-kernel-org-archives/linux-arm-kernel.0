@@ -2,74 +2,70 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-14.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EE490C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:38:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C3ADC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:47:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BC8EA222C6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:38:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 11FA9222C1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:47:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o47KTVxi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC8EA222C6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ccbib.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ndu+ok+S";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="WfaLrreB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 11FA9222C1
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:Content-ID:MIME-Version
-	:References:In-reply-to:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mjaHgvT0NfqzaEDfK7aWfsU6dTWt2TdljQFY9/YNlRY=; b=o47KTVxiryfPBR
-	YlpmRzQGcRYQ0U6ES4jehMU/GHOuFt7ns4Xqik0LO4QH7/Hf7PGKrL3kHqyN+4gpYSO2Lp57l99Ri
-	kZNznvTvHgmmt3hX524lpatRvaB4ATJRrDLu7IQRzM/x7nU3taZMEDFpN42YokFRjp0p5D5uLvWhB
-	7qZrUYUMPSQovbAMNHxlLs1KBCNep+Ix5+fKlcj0jOHd5wjffDEAeFSVss87FlOp8HbrDj1BMmYkG
-	Qnfx4fvN5mG2bNthH+65wAWDDvwqyfwmDW3cWlcs+v1Pna1cdnfRUUVTqodgqDqRLk109gnUF10bE
-	Bzn+J1a+EpakrzQVkRRg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=INbgDxmuPJ8FAMfhROfIgXPANb+Y7GszMVEQmYaV9J8=; b=ndu+ok+S2G83bx
+	cb3ewG+cWkdv6/SSlrDDh1cWhwfNB22A1+uFJgeCk5pCDC95g1gFkP/SbN4SvUy+NxrnPerZSw41U
+	K1fvGYQ/7Nnhui1DKHKrgS4LsDt8QaPy6WBiL5STVBzKxjIoON2qH7vDlopXgSS5zXX/FfXbel2T0
+	RkJ520FXcjQNvXOcYHb5cwryCSe/JVYdkpy1BPIllIJdnkEecdegb42m4sb56DxOQInJjz7uUTRvR
+	JoK3UP1SjxHFrd+ZY2n7MrxoYwTdZwOAuP89Jt+eCmwvM4kD1/nJzBkQnffhK/Mf/u+q5HM/c7oF9
+	9xfVL7+qPWPc/y7ohUSA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtdsX-0002K1-7C; Tue, 12 Feb 2019 19:38:01 +0000
-Received: from mail.cosmopool.net ([2a01:4f8:160:20c1::10:107])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtdsO-0002GN-0g
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 19:37:59 +0000
-Received: from localhost (localhost [127.0.0.1])
- by mail.cosmopool.net (Postfix) with ESMTP id E5E7390266C;
- Tue, 12 Feb 2019 20:37:46 +0100 (CET)
-Received: from mail.cosmopool.net ([127.0.0.1])
- by localhost (mail.b.radempa.de [127.0.0.1]) (amavisd-new, port 10024)
- with ESMTP id qwt8DU8kiFAx; Tue, 12 Feb 2019 20:37:43 +0100 (CET)
-Received: from stardust.g4.wien.funkfeuer.at
- (178.112.157.99.wireless.dyn.drei.com [178.112.157.99])
- by mail.cosmopool.net (Postfix) with ESMTPSA id 473DD902666;
- Tue, 12 Feb 2019 20:37:43 +0100 (CET)
-Received: from lambda by stardust.g4.wien.funkfeuer.at with local (Exim 4.89)
- (envelope-from <harald@ccbib.org>)
- id 1gtds8-0000NB-Re; Tue, 12 Feb 2019 20:37:36 +0100
-From: Harald Geyer <harald@ccbib.org>
-To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: Re: [PATCH RFC] arm64: dts: allwinner: a64: teres-i: Enable audio
-In-reply-to: <20190212100929.iqsxu443qrkl6myf@flea>
-References: <20190211111245.GA18147@lst.de>
- <E1gtBlV-0000Wl-Cv@stardust.g4.wien.funkfeuer.at>
- <20190211153945.e34fpwkuk67l7lc6@flea>
- <E1gtHJj-0000iY-G8@stardust.g4.wien.funkfeuer.at>
- <20190212083850.7genwc6ipnxtl7eo@flea>
- <E1gtUZn-0000NW-MA@stardust.g4.wien.funkfeuer.at>
- <20190212100929.iqsxu443qrkl6myf@flea>
-Comments: In-reply-to Maxime Ripard <maxime.ripard@bootlin.com>
- message dated "Tue, 12 Feb 2019 11:09:29 +0100."
+	id 1gte1D-0005QH-Pa; Tue, 12 Feb 2019 19:46:59 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gte1A-0005Pu-M0
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 19:46:58 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=Content-Transfer-Encoding:
+ MIME-Version:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:Content-Type:
+ Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:
+ Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=+t43Pjuo/NHKUrfGXrgu7Cq6cmnYI5b5l+1d1VB/cZU=; b=WfaLrreBm2bQ6xKhoFAzBQhdi
+ oyX8fhL1PFdEEPZI8laviquVNcR3HWdvnTsNSg+wOr6h6iqZ+37m5bqmSJZ2PGwN8Dq5X4nnwXjxR
+ qvWYGXymb8/P49FbavZrDfLwOqu75Shj5rpWttqZXfUfUd9QhHuJLeN5bL1n8tTUtck1U=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=debutante.sirena.org.uk)
+ by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1gte10-0006aG-El; Tue, 12 Feb 2019 19:46:46 +0000
+Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
+ id 4FB381125B06; Tue, 12 Feb 2019 19:46:45 +0000 (GMT)
+From: Mark Brown <broonie@kernel.org>
+To: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>
+Subject: [PATCH] arm64: crypto: Disable xor-neon build when using clang
+Date: Tue, 12 Feb 2019 19:46:45 +0000
+Message-Id: <20190212194645.32504-1-broonie@kernel.org>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-Content-ID: <1435.1550000256.1@stardust.g4.wien.funkfeuer.at>
-Date: Tue, 12 Feb 2019 20:37:36 +0100
-Message-Id: <E1gtds8-0000NB-Re@stardust.g4.wien.funkfeuer.at>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_113752_453742_A26113B9 
-X-CRM114-Status: GOOD (  27.63  )
+X-CRM114-CacheID: sfid-20190212_114656_875401_C130970F 
+X-CRM114-Status: GOOD (  14.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,96 +77,91 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- info@olimex.com, Mark Brown <broonie@kernel.org>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, ibu@radempa.de,
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Kevin Hilman <khilman@baylibre.com>, Jackie Liu <liuyun01@kylinos.cn>,
+ ndesaulniers@google.com, Mark Brown <broonie@kernel.org>,
+ Nathan Chancellor <natechancellor@gmail.com>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Maxime!
+Currently clang is able to build an arm64 defconfig or allmodconfig
+using the release branch for clang 8 apart from a series of errors in
+xor-neon.c in the form:
 
-Maxime Ripard writes:
-> > > And pinctrl can be used dynamically as well if you need to
-> >
-> > Can you explain or point me to the relevant explanation in the docs? I
-> > don't seem to know about it.
-> 
-> pinctrl_select_state is what you would want to call,
-> you would have a good example of that runtime change in
-> drivers/i2c/muxes/i2c-mux-pinctrl.c.
+  arch/arm64/lib/xor-neon.c:27:28: error: incompatible pointer types assigning to 'const unsigned long *' from 'uint64_t *' (aka 'unsigned long long *') [-Werror,-Wincompatible-pointer-types]
 
-I believe we have misunderstood each other somewhere. The above example
-seems to be about one device (mux driver) requesting a set of pins and then
-switching between different pinconfig states thereby activating
-different subsets of pins. I don't see a way to have two devices
-request the same set of pins. I could write gpio-mux-pinctrl, but I
-don't see how this helps much either.
+This issue has been extensively discussed between various interested
+parties but it is still unclear what if any the best solution is in the
+compiler and there are concerns about just disabling the warning with a
+pragma in the header due to the potential for masking other serious
+issues.  Details of the discussion can be followed here:
 
-> > > > Instead I just got the original patch working, by implementing
-> > > > "output-high" DT property in sunxi-pinctrl. I'll send a patch for
-> > > > review soon.
-> > >
-> > > What do you want to do with output-high exactly?
-> >
-> > Exactly what I do in the patch that started this thread. (I'll resend
-> > when wens' cpvdd patch is available for me to rebase onto.)
-> 
-> There's a few issues with that approach as well:
-> 
->   - We're actively trying to remove the pinctrl nodes for the GPIOs
+   https://github.com/ClangBuiltLinux/linux/issues/283
 
-For what reason? Maybe it doesn't apply to this usecase?
+In order to avoid the issue and facilitate further clang work and
+testing for the time being just disable the use of xor-neon.c if we are
+building with clang.  Obviously this is not actually resolving the
+problem and is not something that should be with us for the long term
+but since it only affects clang and enables people working on that to
+work directly with upstream it seems like a useful tradeoff.
 
->   - It's completely static: if one only wants to use the UART all the
->   time, they would have to change the DTB, which might or might not be
->   possible. Note that this could be trickier: why would you prevent the
->   console from working for example if the audio support isn't built in?
->   or as a module that might or might not be loaded?
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
 
-No, it's not that static:
-* Before the audio device probes, UART is active. (You want UART all the
-  time: Just prevent the audio module from loading.)
-* When you have used audio and suddenly want to have UART instead: Just
-  unbind the audio device and set the gpio to low or input from userspace.
-  (I intended unbinding to be sufficient, but it seems pinctrl doesn't
-   set the pin back to input when it is freed and I don't see a straight
-   forward way to force that. I guess it is okay however: Somebody
-   switching between UART and audio regularly has to know about the
-   details anyway.)
+It would also be possible to achieve the same effect by using either a
+Makefile change or a pragma to disable the warning for this specific
+file, I can send a patch for those approaches if that's OK and
+preferable.  Disabling the acceleration entirely seemed safer and less
+likely to be forgotten to me.
 
-I also tested suspend/resume/poweroff and it mostly works. The only
-glitch is, that during suspend there is a short period of UART noise
-on the HP. (But no such problem during resume or poweroff.) I suspect
-the regulator supplying the gpio bank is shut down quite early when
-suspending. It doesn't matter for this discussion: There likely would
-be the same behaviour with any other approach too.
+We've got some KernelCI support for clang in the middle of getting
+deployed:
 
-I think the real downside of this approach is, that using the UART
-makes the internal speakers/mic unuseable too. But we need a way to
-control the mux from userspace and aside from unbinding the ideas
-proposed thus far are:
-a) control the gpio directly
-b) control the gpio via leds-gpio
+   https://staging.kernelci.org/job/next-clang/branch/master/
 
-(a) was dismissed because we can't set a default from DT
-(b) was dismissed because some rogue app might try to blink it
+so being able to build and run upstream kernels directly would be
+enormously helpful.
 
-The clean solution might be to write mux-gpio, which is actually
-identical to leds-gpio but lives in /sys/class/mux_switches/ and
-uses different filenames. But that's going down the "invent a new
-subsystem road", which I believe is overkill for what is a debugging
-facility for a single board.
+ arch/arm64/include/asm/xor.h | 2 +-
+ arch/arm64/lib/Makefile      | 2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-Harald
-
+diff --git a/arch/arm64/include/asm/xor.h b/arch/arm64/include/asm/xor.h
+index 856386ad076c..971b8336d2d2 100644
+--- a/arch/arm64/include/asm/xor.h
++++ b/arch/arm64/include/asm/xor.h
+@@ -14,7 +14,7 @@
+ #include <asm/hwcap.h>
+ #include <asm/neon.h>
+ 
+-#ifdef CONFIG_KERNEL_MODE_NEON
++#if defined(CONFIG_KERNEL_MODE_NEON) && !defined(CONFIG_CC_IS_CLANG)
+ 
+ extern struct xor_block_template const xor_block_inner_neon;
+ 
+diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
+index 5540a1638baf..b2a5b8d56354 100644
+--- a/arch/arm64/lib/Makefile
++++ b/arch/arm64/lib/Makefile
+@@ -6,10 +6,12 @@ lib-y		:= clear_user.o delay.o copy_from_user.o		\
+ 		   strchr.o strrchr.o tishift.o
+ 
+ ifeq ($(CONFIG_KERNEL_MODE_NEON), y)
++ifneq ($(CONFIG_CC_IS_CLANG), y)
+ obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
+ CFLAGS_REMOVE_xor-neon.o	+= -mgeneral-regs-only
+ CFLAGS_xor-neon.o		+= -ffreestanding
+ endif
++endif
+ 
+ # Tell the compiler to treat all general purpose registers (with the
+ # exception of the IP registers, which are already handled by the caller
 -- 
-If you want to support my work:
-see http://friends.ccbib.org/harald/supporting/
-or donate via CLAM to xASPBtezLNqj4cUe8MT5nZjthRSEjrRQXN
-or via peercoin to P98LRdhit3gZbHDBe7ta5jtXrMJUms4p7w
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
