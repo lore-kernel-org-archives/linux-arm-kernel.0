@@ -2,75 +2,88 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D085AC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 09:37:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5261EC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 09:39:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9EB52218A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 09:37:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1DA4F2077B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 09:39:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HKxAuw9X"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9EB52218A3
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bMTbyBnn";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="Dg2K8f6W"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1DA4F2077B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PLI7gn0DhKv8Hk5AgPeB9f2VyUKrMnXS8cXLqHbebRs=; b=HKxAuw9X+z7/JG
-	Gzfl6Ha1mAv5456Vv10JMYkbJYVs1bVNhHdWLdw15Ss6UZ1rdMGhxyKNK5eOxqYOi3NXzppID1yhj
-	5XEnxGiDgKIj0x6tIWBbEWtNMl6kKj4k+8xegJeydoI51nN5hUuGJgv2aLUWwSBlD4yLDHfLoBxLO
-	Fsr6480fAfxKvQdTPBbRw6SIP9XKQqYH1iWcsGYA92vL4BlMXv+FR80zs/oPYKJ5+WZnuRRXozfja
-	rBIkb4jZpBDlUaLh92D9xYUa439Cu2Tl9ANLMA71QtMG86Og1/lUdB5bBPTw3gUs8UdgN0Gu9MvOe
-	JvjAGExbZCuWCX4o8gBA==;
+	List-Owner; bh=f3avEapqZHHgu5wX5ghUBUWNsJykvh0vfIOGbmlH7Zg=; b=bMTbyBnnY7e93/
+	zeBe0+WcZ0wPfRBjJhOCY0IQl8l/OB1ctwXkR286XiBcqK5Vu636pkRGd6meeDqklmhD9mk1YJV9k
+	YsIaVzlUTiGs0Yz706QtIK4xqNE5jmcO/nu9ZUBmp95zwP6O6LkSERxsbUKic+P9gJ+39+oZOQ4BQ
+	NOX71HOyBmbPlMmLKTsCOOkF2tQF4cRhnp/Vmc93Y+JO9kxzxYU2Sjyg0fZ05usb0NT+kxc7rrN+g
+	+d9la5YXOMram4JSdtfrBR5Wb03vIGVvTFUp9vRXTXwzFIV5JwmCOMHTFfy0RtPIHCj7V9+A5nzi2
+	Aal+JoobhZ5lTAKwq/hg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtUVY-0007s8-JQ; Tue, 12 Feb 2019 09:37:40 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gtUWx-0008Rv-Dl; Tue, 12 Feb 2019 09:39:07 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtUVT-0007rL-Rd; Tue, 12 Feb 2019 09:37:37 +0000
-X-UUID: ffa62dec5ce74f39b644ea8f59be9c38-20190212
-X-UUID: ffa62dec5ce74f39b644ea8f59be9c38-20190212
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
- (envelope-from <frederic.chen@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 329086531; Tue, 12 Feb 2019 01:37:26 -0800
-Received: from MTKMBS01N2.mediatek.inc (172.21.101.79) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 12 Feb 2019 01:37:25 -0800
-Received: from mtkcas08.mediatek.inc (172.21.101.126) by
- mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 12 Feb 2019 17:37:22 +0800
-Received: from [172.21.84.99] (172.21.84.99) by mtkcas08.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 12 Feb 2019 17:37:22 +0800
-Message-ID: <1549964242.27207.11.camel@mtksdccf07>
-Subject: Re: [RFC PATCH V0 1/7] [media] dt-bindings: mt8183: Add binding for
- DIP shared memory
-From: Frederic Chen <frederic.chen@mediatek.com>
-To: Laurent Pinchart <laurent.pinchart@ideasonboard.com>, Sakari Ailus
- <sakari.ailus@iki.fi>
-Date: Tue, 12 Feb 2019 17:37:22 +0800
-In-Reply-To: <20190209181705.GB4505@pendragon.ideasonboard.com>
-References: <1549020091-42064-1-git-send-email-frederic.chen@mediatek.com>
- <1549020091-42064-2-git-send-email-frederic.chen@mediatek.com>
- <20190209155907.rbgwbdablndcesid@valkosipuli.retiisi.org.uk>
- <20190209181705.GB4505@pendragon.ideasonboard.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gtUWs-0008RQ-9p
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 09:39:04 +0000
+Received: by mail-it1-x141.google.com with SMTP id a6so5894639itl.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 12 Feb 2019 01:39:01 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=bx0SWtCVYNhMsgT+/3xpxQyRdrWmQnAUimVTnL97zN8=;
+ b=Dg2K8f6WvquE3VP5MEIjVtRcIM7hGpjWt+JunD6DbH/uMMgLHzBQK/CmDODLL8DnuZ
+ EZWtvRyKwfsxLfX6WBD6kmSwFa+SagEl/+JAg5BICV5tQ1DPlJRAFRKe7wjS9yll2cH0
+ kKGes4Y/rnO9RCebww9+sBL1LmPNbYdDqt8ZM=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=bx0SWtCVYNhMsgT+/3xpxQyRdrWmQnAUimVTnL97zN8=;
+ b=bCJ2t2UA5oOlwe1rIXTKWPsaHyniv2xnW1HJZUJDSWR0m6dg/1csqdjM9oRvV9dgkS
+ K3OjXdtDhJ596LOXCi9vwX3JzZ8AZnA/4uP73iczKXFvwY5u1hu0YuIq+xIRE2GnYM5n
+ S/VeJDExVh1Q1TJjcXFjWMYFQ6yhUgzCoJhUJh2F1+EYWBtcjk08j0OSrIHBFJQFfkmW
+ FLeoXhL8S6RZX39fwhZlXqzGlymQ3hv9pVJ2xXeNrLoo6oZ5fL/eRfCtqFFqInh6Udgo
+ cKa6FgqHUTWtcN4IDneudsbXK9Ss7Ke3i+pIC12qIezVX5R02eBIuLlQ3VYIZyg9ukj/
+ NZ3A==
+X-Gm-Message-State: AHQUAuabVupmcLEcOfI6iKDWFrfQZTma1jwGOEVImpB0Gh4pkl/mA5Nl
+ GuYAKUq6DrHwOkrGK5QdQ6HsEbVVghwPl4jNV7SHCw==
+X-Google-Smtp-Source: AHgI3IZJ1DlzEWvch5GtS2pU95olM1KNqtqS9Ub4Tnfgs5cS8rZuzilnAoFMifYHrRPFpOfU51zOz3/aqfN6T1DLGV0=
+X-Received: by 2002:a24:385:: with SMTP id e127mr1337604ite.32.1549964340828; 
+ Tue, 12 Feb 2019 01:39:00 -0800 (PST)
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 15DFA9F8853A480109641174D41DD23EE4B87532B6C53798FB2B77326F4856F52000:8
-X-MTK: N
+References: <20190124195900.22620-1-jagan@amarulasolutions.com>
+ <20190124195900.22620-12-jagan@amarulasolutions.com>
+ <20190125212433.ni2jg3wvpyjazlxf@flea>
+ <CAMty3ZAsH2iZ+JEqTE3D58aXfGuhMSg9YoO56ZhhOeE4c4yQHQ@mail.gmail.com>
+ <20190129151348.mh27btttsqcmeban@flea>
+ <CAMty3ZAjAoti8Zu80c=OyCA+u-jtQnkidsKSNz_c2OaRswqc3w@mail.gmail.com>
+ <20190201143102.rcvrxstc365mezvx@flea>
+ <CAMty3ZAgJMy+qOW0eO5U_MDUPw0Zaq7tLDi8zwUxw=B6UiFS9w@mail.gmail.com>
+ <20190212093028.kulsqiai7dsnmbu2@flea>
+In-Reply-To: <20190212093028.kulsqiai7dsnmbu2@flea>
+From: Jagan Teki <jagan@amarulasolutions.com>
+Date: Tue, 12 Feb 2019 15:08:49 +0530
+Message-ID: <CAMty3ZCqBLyYqdYG+WPErYpM6yZEnwAtg_ocztqRahywVqVjaw@mail.gmail.com>
+Subject: Re: [PATCH v6 11/22] clk: sunxi-ng: a64: Add minimum rate for PLL_MIPI
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_013735_897921_F8C0C83E 
-X-CRM114-Status: GOOD (  24.27  )
+X-CRM114-CacheID: sfid-20190212_013902_805271_A706B143 
+X-CRM114-Status: GOOD (  37.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,84 +95,174 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Sean.Cheng@mediatek.com,
- laurent.pinchart+renesas@ideasonboard.com, Rynn.Wu@mediatek.com,
- christie.yu@mediatek.com, srv_heupstream@mediatek.com,
- holmes.chiou@mediatek.com, linux-mediatek@lists.infradead.org,
- Jerry-ch.Chen@mediatek.com, tfiga@chromium.org, jungo.lin@mediatek.com,
- sj.huang@mediatek.com, hans.verkuil@cisco.com, matthias.bgg@gmail.com,
- Sakari Ailus <sakari.ailus@iki.fi>, mchehab@kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, David Airlie <airlied@linux.ie>,
+ Michael Turquette <mturquette@baylibre.com>,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Daniel Vetter <daniel@ffwll.ch>,
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-RGVhciBMYXVyZW50IGFuZCBTYWthcmksCgpJIGFwcHJlY2lhdGUgeW91ciBtZXNzYWdlcy4KCk9u
-IFNhdCwgMjAxOS0wMi0wOSBhdCAyMDoxNyArMDIwMCwgTGF1cmVudCBQaW5jaGFydCB3cm90ZToK
-PiBPbiBTYXQsIEZlYiAwOSwgMjAxOSBhdCAwNTo1OTowN1BNICswMjAwLCBTYWthcmkgQWlsdXMg
-d3JvdGU6Cj4gPiBIaSBGcmVkZXJpYywKPiA+IAo+ID4gQ291bGQgeW91IGNjIHRoZSBkZXZpY2V0
-cmVlIGxpc3QsIHBsZWFzZT8KPiA+IAo+ID4gT24gRnJpLCBGZWIgMDEsIDIwMTkgYXQgMDc6MjE6
-MjVQTSArMDgwMCwgRnJlZGVyaWMgQ2hlbiB3cm90ZToKPiA+ID4gVGhpcyBwYXRjaCBhZGRzIHRo
-ZSBiaW5kaW5nIGZvciBkZXNjcmliaW5nIHRoZSBzaGFyZWQgbWVtb3J5Cj4gPiA+IHVzZWQgdG8g
-ZXhjaGFuZ2UgY29uZmlndXJhdGlvbiBhbmQgdHVuaW5nIGRhdGEgYmV0d2VlbiB0aGUKPiA+ID4g
-Y28tcHJvY2Vzc29yIGFuZCBEaWdpdGFsIEltYWdlIFByb2Nlc3NpbmcgKERJUCkgdW5pdCBvZiB0
-aGUKPiA+ID4gY2FtZXJhIElTUCBzeXN0ZW0gb24gTWVkaWF0ZWsgU29Dcy4KPiA+ID4gCj4gPiA+
-IFNpZ25lZC1vZmYtYnk6IEZyZWRlcmljIENoZW4gPGZyZWRlcmljLmNoZW5AbWVkaWF0ZWsuY29t
-Pgo+ID4gPiAtLS0KPiA+ID4gIC4uLi9tZWRpYXRlayxyZXNlcnZlLW1lbW9yeS1kaXBfc21lbS50
-eHQgICAgICAgICAgIHwgNDUgKysrKysrKysrKysrKysrKysrKysrKwo+ID4gPiAgMSBmaWxlIGNo
-YW5nZWQsIDQ1IGluc2VydGlvbnMoKykKPiA+ID4gIGNyZWF0ZSBtb2RlIDEwMDY0NCBEb2N1bWVu
-dGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvcmVzZXJ2ZWQtbWVtb3J5L21lZGlhdGVrLHJlc2Vy
-dmUtbWVtb3J5LWRpcF9zbWVtLnR4dAo+ID4gPiAKPiA+ID4gZGlmZiAtLWdpdCBhL0RvY3VtZW50
-YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9yZXNlcnZlZC1tZW1vcnkvbWVkaWF0ZWsscmVzZXJ2
-ZS1tZW1vcnktZGlwX3NtZW0udHh0IGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdz
-L3Jlc2VydmVkLW1lbW9yeS9tZWRpYXRlayxyZXNlcnZlLW1lbW9yeS1kaXBfc21lbS50eHQKPiA+
-ID4gbmV3IGZpbGUgbW9kZSAxMDA2NDQKPiA+ID4gaW5kZXggMDAwMDAwMC4uMGRlZDQ3OAo+ID4g
-PiAtLS0gL2Rldi9udWxsCj4gPiA+ICsrKyBiL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5k
-aW5ncy9yZXNlcnZlZC1tZW1vcnkvbWVkaWF0ZWsscmVzZXJ2ZS1tZW1vcnktZGlwX3NtZW0udHh0
-Cj4gPiA+IEBAIC0wLDAgKzEsNDUgQEAKPiA+ID4gK01lZGlhdGVrIERJUCBTaGFyZWQgTWVtb3J5
-IGJpbmRpbmcKPiA+ID4gKwo+ID4gPiArVGhpcyBiaW5kaW5nIGRlc2NyaWJlcyB0aGUgc2hhcmVk
-IG1lbW9yeSwgd2hpY2ggc2VydmVzIHRoZSBwdXJwb3NlIG9mCj4gPiA+ICtkZXNjcmliaW5nIHRo
-ZSBzaGFyZWQgbWVtb3J5IHJlZ2lvbiB1c2VkIHRvIGV4Y2hhbmdlIGRhdGEgYmV0d2VlbiBEaWdp
-dGFsCj4gPiA+ICtJbWFnZSBQcm9jZXNzaW5nIChESVApIGFuZCBjby1wcm9jZXNzb3IgaW4gTWVk
-aWF0ZWsgU29Dcy4KPiA+ID4gKwo+ID4gPiArVGhlIGNvLXByb2Nlc3NvciBkb2Vzbid0IGhhdmUg
-dGhlIGlvbW11IHNvIHdlIG5lZWQgdG8gdXNlIHRoZSBwaHlzaWNhbAo+ID4gPiArYWRkcmVzcyB0
-byBhY2Nlc3MgdGhlIHNoYXJlZCBidWZmZXIgaW4gdGhlIGZpcm13YXJlLgo+ID4gPiArCj4gPiA+
-ICtUaGUgRGlnaXRhbCBJbWFnZSBQcm9jZXNzaW5nIChESVApIGNhbiBhY2Nlc3MgbWVtb3J5IHRo
-cm91Z2ggbXQ4MTgzIElPTU1VIHNvCj4gPiA+ICtpdCBjYW4gdXNlIGRtYSBhZGRyZXNzIHRvIGFj
-Y2VzcyB0aGUgbWVtb3J5IHJlZ2lvbi4KPiA+ID4gKyhTZWUgaW9tbXUvbWVkaWF0ZWssaW9tbXUu
-dHh0IGZvciB0aGUgZGV0YWlsZWQgZGVzY3JpcHRpb24gb2YgTWVkaWF0ZWsgSU9NTVUpCj4gPiAK
-PiA+IFdoYXQga2luZCBvZiBwdXJwb3NlIGlzIHRoZSBtZW1vcnkgdXNlZCBmb3I/IEJ1ZmZlcnMg
-Y29udGFpbmluZyB2aWRlbyBkYXRhLAo+ID4gb3Igc29tZXRoaW5nIGVsc2U/IENvdWxkIHRoZSBi
-dWZmZXIgb2JqZWN0cyBiZSBtYXBwZWQgb24gdGhlIGRldmljZXMKPiA+IGJhc2VkIG9uIHRoZSBu
-ZWVkIGluc3RlYWQ/CgpUaGUgbWVtb3J5IGJ1ZmZlcnMgY29udGFpbiBjYW1lcmEgM0EgdHVuaW5n
-IGRhdGEsIHdoaWNoIGFyZSB1c2VkIGJ5IHRoZQpjby1wcm9jZXNzb3IgYW5kIERJUCBJUC4gQWJv
-dXQgbWFwcGluZyB0aGUgYnVmZmVyIGJhc2VkIG9uIHRoZSBuZWVkCmluc3RlYWQsIEnigJltIG5v
-dCBzdXJlIEkgdW5kZXJzdGFuZCB0aGlzIHBvaW50LiBEbyB5b3UgbWVhbiB0aGF0CmFsbG9jYXRp
-bmcgYW5kIG1hcHBpbmcgdGhlIG1lbW9yeSBkeW5hbWljYWxseT8KCj4gCj4gQW5kIGNvdWxkIENN
-QSBiZSB1c2VkIHdoZW4gcGh5c2ljYWxseSBjb250aWd1b3VzIG1lbW9yeSBpcyBuZWVkZWQgPwoK
-RElQIGRyaXZlciBkb2VzIG5vdCB1c2UgQ01BIG5vdywgYmVjYXVzZSB0aGUgZmlyc3QgdmVyc2lv
-biB3aWxsIGJlIHVzZWQKYnkgQ3JPUyBidXQgQ3JPUyB3b27igJl0IGVuYWJsZSBDTUEuCgo+IAo+
-ID4gPiArCj4gPiA+ICsKPiA+ID4gK1JlcXVpcmVkIHByb3BlcnRpZXM6Cj4gPiA+ICsKPiA+ID4g
-Ky0gY29tcGF0aWJsZTogbXVzdCBiZSAibWVkaWF0ZWsscmVzZXJ2ZS1tZW1vcnktZGlwX3NtZW0i
-Cj4gPiA+ICsKPiA+ID4gKy0gcmVnOiByZXF1aXJlZCBmb3Igc3RhdGljIGFsbG9jYXRpb24gKHNl
-ZSByZXNlcnZlZC1tZW1vcnkudHh0IGZvcgo+ID4gPiArICB0aGUgZGV0YWlsZWQgdXNhZ2UpCj4g
-PiA+ICsKPiA+ID4gKy0gYWxsb2MtcmFuZ2U6IHJlcXVpcmVkIGZvciBkeW5hbWljIGFsbG9jYXRp
-b24uIFRoZSByYW5nZSBtdXN0Cj4gPiA+ICsgIGJldHdlZW4gMHgwMDAwMDQwMCBhbmQgMHgxMDAw
-MDAwMDAgZHVlIHRvIHRoZSBjby1wcm9jZXNzZXIncwo+ID4gPiArICBhZGRyZXNzaW5nIGxpbWl0
-YXRpb24KPiA+ID4gKwo+ID4gPiArLSBzaXplOiByZXF1aXJlZCBmb3IgZHluYW1pYyBhbGxvY2F0
-aW9uLiBUaGUgdW5pdCBpcyBieXRlcy4KPiA+ID4gKyAgSWYgeW91IHdhbnQgdG8gZW5hYmxlIHRo
-ZSBmdWxsIGZlYXR1cmUgb2YgRGlnaXRhbCBQcm9jZXNzaW5nIFVuaXQsCj4gPiA+ICsgIHlvdSBu
-ZWVkIDIwIE1CIGF0IGxlYXN0Lgo+ID4gPiArCj4gPiA+ICsKPiA+ID4gK0V4YW1wbGU6Cj4gPiA+
-ICsKPiA+ID4gK1RoZSBmb2xsb3dpbmcgZXhhbXBsZSBzaG93cyB0aGUgRElQIHNoYXJlZCBtZW1v
-cnkgc2V0dXAgZm9yIE1UODE4My4KPiA+ID4gKwo+ID4gPiArCXJlc2VydmVkLW1lbW9yeSB7Cj4g
-PiA+ICsJCSNhZGRyZXNzLWNlbGxzID0gPDI+Owo+ID4gPiArCQkjc2l6ZS1jZWxscyA9IDwyPjsK
-PiA+ID4gKwkJcmFuZ2VzOwo+ID4gPiArCQlyZXNlcnZlLW1lbW9yeS1pc3Bfc21lbSB7Cj4gPiA+
-ICsJCQljb21wYXRpYmxlID0gIm1lZGlhdGVrLHJlc2VydmUtbWVtb3J5LWRpcF9zbWVtIjsKPiA+
-ID4gKwkJCXNpemUgPSA8MCAweDE0MDAwMDA+Owo+ID4gPiArCQkJYWxpZ25tZW50ID0gPDAgMHgx
-MDAwPjsKPiA+ID4gKwkJCWFsbG9jLXJhbmdlcyA9IDwwIDB4NDAwMDAwMDAgMCAweDUwMDAwMDAw
-PjsKPiA+ID4gKwkJfTsKPiA+ID4gKwl9Owo+IAoKU2luY2VyZWx5LAoKRnJlZGVyaWMgQ2hlbgoK
-CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1h
-cm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5v
-cmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0t
-a2VybmVsCg==
+On Tue, Feb 12, 2019 at 3:00 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> On Mon, Feb 11, 2019 at 07:37:57PM +0530, Jagan Teki wrote:
+> > Hi Maxime,
+> >
+> > On Fri, Feb 1, 2019 at 8:01 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > >
+> > > On Tue, Jan 29, 2019 at 11:01:31PM +0530, Jagan Teki wrote:
+> > > > On Tue, Jan 29, 2019 at 8:43 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > > > >
+> > > > > On Mon, Jan 28, 2019 at 03:06:10PM +0530, Jagan Teki wrote:
+> > > > > > On Sat, Jan 26, 2019 at 2:54 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > > > > > >
+> > > > > > > On Fri, Jan 25, 2019 at 01:28:49AM +0530, Jagan Teki wrote:
+> > > > > > > > Minimum PLL used for MIPI is 500MHz, as per manual, but
+> > > > > > > > lowering the min rate by 300MHz can result proper working
+> > > > > > > > nkms divider with the help of desired dclock rate from
+> > > > > > > > panel driver.
+> > > > > > > >
+> > > > > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > > > > > > > Acked-by: Stephen Boyd <sboyd@kernel.org>
+> > > > > > >
+> > > > > > > Going 200MHz below the minimum doesn't seem really reasonable. What
+> > > > > > > is the issue that you are trying to fix here?
+> > > > > > >
+> > > > > > > It looks like it's picking bad dividers, but if that's the case, this
+> > > > > > > isn't the proper fix.
+> > > > > >
+> > > > > > As I stated in earlier patches, the whole idea is pick the desired
+> > > > > > dclk divider based dclk rate. So the dotclock, sun4i_dclk_round_rate
+> > > > > > is unable to get the proper dclk divider at the end, so it eventually
+> > > > > > picking up wrong divider value and fired vblank timeout.
+> > > > > >
+> > > > > > So, we come-up with optimal and working min_rate 300MHz in pll-mipi to
+> > > > > > get the desired clock something like below.
+> > > > > > [    2.415773] [drm] No driver support for vblank timestamp query.
+> > > > > > [    2.424116] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
+> > > > > > [    2.424172] ideal = 220000000, rounded = 0
+> > > > > > [    2.424176] ideal = 275000000, rounded = 0
+> > > > > > [    2.424194] ccu_nkm_round_rate: rate = 330000000
+> > > > > > [    2.424197] ideal = 330000000, rounded = 330000000
+> > > > > > [    2.424201] sun4i_dclk_round_rate: div = 6 rate = 55000000
+> > > > > > [    2.424205] sun4i_dclk_round_rate: min_div = 4 max_div = 127, rate = 55000000
+> > > > > > [    2.424209] ideal = 220000000, rounded = 0
+> > > > > > [    2.424213] ideal = 275000000, rounded = 0
+> > > > > > [    2.424230] ccu_nkm_round_rate: rate = 330000000
+> > > > > > [    2.424233] ideal = 330000000, rounded = 330000000
+> > > > > > [    2.424236] sun4i_dclk_round_rate: div = 6 rate = 55000000
+> > > > > > [    2.424253] ccu_nkm_round_rate: rate = 330000000
+> > > > > > [    2.424270] ccu_nkm_round_rate: rate = 330000000
+> > > > > > [    2.424278] sun4i_dclk_recalc_rate: val = 1, rate = 330000000
+> > > > > > [    2.424281] sun4i_dclk_recalc_rate: val = 1, rate = 330000000
+> > > > > > [    2.424306] ccu_nkm_set_rate: rate = 330000000, parent_rate = 297000000
+> > > > > > [    2.424309] ccu_nkm_set_rate: _nkm.n = 5
+> > > > > > [    2.424311] ccu_nkm_set_rate: _nkm.k = 2
+> > > > > > [    2.424313] ccu_nkm_set_rate: _nkm.m = 9
+> > > > > > [    2.424661] sun4i_dclk_set_rate div 6
+> > > > > > [    2.424668] sun4i_dclk_recalc_rate: val = 6, rate = 55000000
+> > > > > >
+> > > > > > But look like this wouldn't valid for all other dclock rates, say BPI
+> > > > > > panel has 30MHz clock that would failed with this logic.
+> > > > > >
+> > > > > > On the other side Allwinner BSP calculating dclk divider based on the
+> > > > > > SoC's. for A33 [1] it is fixed dclk divider of 4 and for A64 is is
+> > > > > > calculated based on the bpp/lanes.
+> > > > >
+> > > > > It looks like the A64 has the same divider of 4:
+> > > > > https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c#L12
+> > > > >
+> > > > > I think you're confusing it with the ratio between the pixel clock and
+> > > > > the dotclock, called dsi_div:
+> > > > > https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/disp_al.c#L198
+> > > >
+> > > > Ahh.. I thought this initially but as far as DSI clock computation is
+> > > > concern, the L12 tcon_div is local variable which is used for edge0
+> > > > computation in burst mode and not for the dsi clock computation. Since
+> > > > the BSP is unable to get the tcon_div during edge0 computation, they
+> > > > defined it locally I think.
+> > > >
+> > > > You can see the lcd_clk_config() code [2], where we can see DSI clock
+> > > > computation using dsi_div value.
+> > > >
+> > > > Here is dump after the in Line 792 which is after computation[3]
+> > > > [   10.800737] lcd_clk_config: dsi_div = 6, tcon_div = 4, lcd_div = 1
+> > > > [   10.800743] lcd_clk_config: lcd_dclk_freq = 55, dclk_rate = 55000000
+> > > > [   10.800749] lcd_clk_config: lcd_rate = 330000000, pll_rate = 330000000
+> > > >
+> > > > The above dump the lcd_rate 330MHz is computed with panel clock, 55MHz
+> > > > into dsi_div 6. So this can be our actual divider values dclk_min_div,
+> > > > dclk_max_div in sun4i_dclk_round_rate (from
+> > > > drivers/gpu/drm/sun4i/sun4i_dotclock.c)
+> > >
+> > > I wish it was in your commit log in the first place, instead of having
+> > > to exchange multiple mails over this.
+> > >
+> > > However, I don't think that's quite true, and it might be a bug in
+> > > Allwinner's implementation (or rather something quite confusing).
+> > >
+> > > You're right that the lcd_rate and pll_rate seem to be generated from
+> > > the pixel clock, and it indeed looks like the ratio between the pixel
+> > > clock and the TCON dotclock is defined through the number of bits per
+> > > lanes.
+> > >
+> > > However, in this case, dsi_rate is actually the same than lcd_rate,
+> > > since pll_rate is going to be divided by dsi_div:
+> > > https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c#L791
+> > >
+> > > Since lcd_div is 1, it also means that in this case, dsi_rate ==
+> > > dclk_rate.
+> > >
+> > > The DSI module clock however, is always set to 148.5 MHz. Indeed, if
+> > > we look at:
+> > > https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c#L804
+> > >
+> > > We can see that the rate in clk_info is used if it's different than
+> > > 0. This is filled by disp_al_lcd_get_clk_info, which, in the case of a
+> > > DSI panel, will hardcode it to 148.5 MHz:
+> > > https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/disp_al.c#L164
+> > >
+> > > So, the DSI clock is set to this here:
+> > > https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c#L805
+> > >
+> > > The TCON *module* clock (the one in the clock controller) has been set
+> > > to lcd_rate (so the pixel clock times the number of bits per lane) here:
+> > > https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c#L800
+> > >
+> > > And the PLL has been set to the same rate here:
+> > > https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c#L794
+> > >
+> > > Let's take a step back now: that function we were looking at,
+> > > lcd_clk_config, is called by lcd_clk_enable, which is in turn called
+> > > by disp_lcd_enable here:
+> > > https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c#L1328
+> > >
+> > > The next function being called is disp_al_lcd_cfg, and that function
+> > > will hardcode the TCON dotclock divider to 4, here:
+> > > https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/disp_al.c#L240
+> > >
+> > > So, in the end, the dotclock divider is always 4, the DSI module clock
+> > > is set to 148.5 MHz, and the TCON module clock is set to 330MHz. Since
+> > > the TCON module clock doesn't have a divider, the PLL is set at that
+> > > same value but this is redundant.
+> > >
+> > > I'll experiment with this and try to see how it works on the A33.
+> >
+> > How is it with A33?
+>
+> The conclusions are the one I sent in my last series
+
+In this series?
+[PATCH v3 0/8] drm/sun4i: dsi: Add burst mode support
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
