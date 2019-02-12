@@ -4,18 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F3313C282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:46:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C1C2C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:53:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C342E2190B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:46:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5D442222BE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:53:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aRTnxxIM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C342E2190B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="puD+LTK9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D442222BE
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,43 +25,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=k1c51ZtuAqo4zZLUL71gXXNgZtuiCIvvI9/hy7oIiv4=; b=aRTnxxIMi9+Uy/emONOPNb61R
-	+DTa74AZXjDgG0sQwyy0oePgv6103AB0V4pwK95UXwwz0D1c4lXMTk2BaJo+TP+8NZZJe5r5oONhI
-	KSJn5icWA9r5Qg3ruwPF6ktq+N94/4DenIWE5n413rL06NzTWnf5cs2TMfeO2IRpdRd/RwFNdXeOX
-	tDhwo1WfHi/nZ8Sfq9CguyuMBbWmpCfozGaoYHGVkSUXPfrof1ivBoeRYS7shu9RSYv2kH3eBprL6
-	YNleeutBXf9xsOaEcnN66qovHSonm+jhAkHO8iBaaLcxm4+3zJSE5qDMhzd1icg7WruASq4kIvkTU
-	tBhpYCqHA==;
+	 bh=S9XMMv2ACUqlt1Sbjj+7CyRiq4PTjoXyHqkqG6uBDQA=; b=puD+LTK96dqy8Qrwlim9GyOSF
+	MuXP5IOmOX6SFq1BrORVk3zFwmsjigg3SLGskQc5Ngcj0NqnYyvgyQvecOXf6UNWZChyjoL9u+jQB
+	R4C7DiDKBNa0wFtG59tcB5+NjUb7wsxioV5PvCfO3YYnMiARxim09xRcZhFb2aF5RGJbPzPPzGdJ8
+	RFOYJLP1m5Fe7nQ7Pnn15UHpmlBDjEQI/7BNra0+YM/E28oWaucfR13mZsRGvhfhyx7CGBlLUOryS
+	sbO/ok5Ey0Ogo1277jjvnBU22YNSNMKAe89ru9xH5jbsW/k+CaRtVx0rQpNulOXwq9U3GHun8k2Dp
+	QRQZyQrXQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtd4z-0005cz-5w; Tue, 12 Feb 2019 18:46:49 +0000
+	id 1gtdBI-0001yG-7x; Tue, 12 Feb 2019 18:53:20 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtd4v-0005bm-9R
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 18:46:47 +0000
+ id 1gtdBE-0001xp-Kz
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 18:53:17 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 625C1A78;
- Tue, 12 Feb 2019 10:46:44 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 35DB5A78;
+ Tue, 12 Feb 2019 10:53:15 -0800 (PST)
 Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EF2313F575;
- Tue, 12 Feb 2019 10:46:41 -0800 (PST)
-Subject: Re: [PATCH v3 5/7] drm/sun4i: Rely on dma interconnect for our RAM
- offset
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EF9193F575;
+ Tue, 12 Feb 2019 10:53:12 -0800 (PST)
+Subject: Re: [PATCH v3 2/7] dt-bindings: bus: Add binding for the Allwinner
+ MBUS controller
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh+dt@kernel.org>,
  Frank Rowand <frowand.list@gmail.com>, Chen-Yu Tsai <wens@csie.org>
 References: <cover.f2e5fbb4d21384168973fa32377a33d627768146.1549897336.git-series.maxime.ripard@bootlin.com>
- <dfbdedf89c6a36f6fe5564e7c518664fa9e828c0.1549897336.git-series.maxime.ripard@bootlin.com>
+ <43f965dae8b0ba8dffd3af478c2836c17feaa18b.1549897336.git-series.maxime.ripard@bootlin.com>
 From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <16cb9f67-6b10-fbc3-6222-5364e718721b@arm.com>
-Date: Tue, 12 Feb 2019 18:46:40 +0000
+Message-ID: <76a7fe92-6847-b668-2d0e-1eee1d291fc3@arm.com>
+Date: Tue, 12 Feb 2019 18:53:11 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <dfbdedf89c6a36f6fe5564e7c518664fa9e828c0.1549897336.git-series.maxime.ripard@bootlin.com>
+In-Reply-To: <43f965dae8b0ba8dffd3af478c2836c17feaa18b.1549897336.git-series.maxime.ripard@bootlin.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_104645_341360_CA2ABB39 
-X-CRM114-Status: GOOD (  28.14  )
+X-CRM114-CacheID: sfid-20190212_105316_690691_BA866B5D 
+X-CRM114-Status: GOOD (  21.54  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,8 +74,8 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: devicetree@vger.kernel.org, Yong Deng <yong.deng@magewell.com>,
- Arnd Bergmann <arnd@arndb.de>, Daniel Vetter <daniel.vetter@ffwll.ch>,
- dri-devel@lists.freedesktop.org, Dave Martin <dave.martin@arm.com>,
+ Arnd Bergmann <arnd@arndb.de>, dri-devel@lists.freedesktop.org,
+ Dave Martin <dave.martin@arm.com>,
  Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
  Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
  Georgi Djakov <georgi.djakov@linaro.org>, linux-arm-kernel@lists.infradead.org
@@ -84,72 +85,65 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 On 11/02/2019 15:02, Maxime Ripard wrote:
-> Now that we can express our DMA topology, rely on those property instead of
-> hardcoding an offset from the dma_addr_t which wasn't really great.
+> The MBUS controller drives the MBUS that other devices in the SoC will
+> use to perform DMA. It also has a register interface that allows to
+> monitor and control the bandwidth and priorities for masters on that
+> bus.
 > 
-> We still need to add some code to deal with the old DT that would lack that
-> property, but we move the offset to the DRM device dma_pfn_offset to be
-> able to rely on just the dma_addr_t associated to the GEM object.
-> 
-> Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 > ---
->   drivers/gpu/drm/sun4i/sun4i_backend.c | 28 +++++++++++++++++++++-------
->   1 file changed, 21 insertions(+), 7 deletions(-)
+>   Documentation/devicetree/bindings/arm/sunxi/sunxi-mbus.txt | 36 +++++++-
+>   1 file changed, 36 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/arm/sunxi/sunxi-mbus.txt
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> index 9e9255ee59cd..1846a1b30fea 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> @@ -383,13 +383,6 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
->   	paddr = drm_fb_cma_get_gem_addr(fb, state, 0);
->   	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
->   
-> -	/*
-> -	 * backend DMA accesses DRAM directly, bypassing the system
-> -	 * bus. As such, the address range is different and the buffer
-> -	 * address needs to be corrected.
-> -	 */
-> -	paddr -= PHYS_OFFSET;
-> -
->   	if (fb->format->is_yuv)
->   		return sun4i_backend_update_yuv_buffer(backend, fb, paddr);
->   
-> @@ -835,6 +828,27 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
->   	dev_set_drvdata(dev, backend);
->   	spin_lock_init(&backend->frontend_lock);
->   
-> +	if (of_find_property(dev->of_node, "interconnects", NULL)) {
-> +		/*
-> +		 * This assume we have the same DMA constraints for all our the
-> +		 * devices in our pipeline (all the backends, but also the
-> +		 * frontends). This sounds bad, but it has always been the case
-> +		 * for us, and DRM doesn't do per-device allocation either, so
-> +		 * we would need to fix DRM first...
-> +		 */
-> +		ret = of_dma_configure(drm->dev, dev->of_node, true);
+> diff --git a/Documentation/devicetree/bindings/arm/sunxi/sunxi-mbus.txt b/Documentation/devicetree/bindings/arm/sunxi/sunxi-mbus.txt
+> new file mode 100644
+> index 000000000000..e72b7ac9e359
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/sunxi/sunxi-mbus.txt
+> @@ -0,0 +1,36 @@
+> +Allwinner Memory Bus (MBUS) controller
+> +
+> +The MBUS controller drives the MBUS that other devices in the SoC will
+> +use to perform DMA. It also has a register interface that allows to
+> +monitor and control the bandwidth and priorities for masters on that
+> +bus.
+> +
+> +Required properties:
+> + - compatible: Must be one of:
+> +	- allwinner,sun5i-a13-mbus
+> + - reg: Offset and length of the register set for the controller
+> + - clocks: phandle to the clock driving the controller
+> + - dma-ranges: see booting-without-of.txt
 
-It would be even nicer if we could ensure that drm->dev originates from 
-a DT node which has the appropriate interconnects property itself, such 
-that we can assume it's already configured correctly.
+Nit: this is a standard property in DTSpec, so it's probably better to 
+refer to that rather than Linux-specific documentation.
 
 Robin.
 
-> +		if (ret)
-> +			return ret;
-> +	} else {
-> +		/*
-> +		 * If we don't have the interconnect property, most likely
-> +		 * because of an old DT, we need to set the DMA offset by hand
-> +		 * on our device since the RAM mapping is at 0 for the DMA bus,
-> +		 * unlike the CPU.
-> +		 */
-> +		drm->dev->dma_pfn_offset = PHYS_PFN_OFFSET;
-> +	}
+> + - #interconnect-cells: Must be one, with the argument being the MBUS
+> +   port ID
 > +
->   	backend->engine.node = dev->of_node;
->   	backend->engine.ops = &sun4i_backend_engine_ops;
->   	backend->engine.id = sun4i_backend_of_get_id(dev->of_node);
+> +Each device having to perform their DMA through the MBUS must have the
+> +interconnects and interconnect-names properties set to the MBUS
+> +controller and with "dma" as the interconnect name.
+> +
+> +Example:
+> +
+> +mbus: dram-controller@1c01000 {
+> +	compatible = "allwinner,sun5i-a13-mbus";
+> +	reg = <0x01c01000 0x1000>;
+> +	clocks = <&ccu CLK_MBUS>;
+> +	dma-ranges = <0x00000000 0x40000000 0x20000000>;
+> +	#interconnect-cells = <1>;
+> +};
+> +
+> +fe0: display-frontend@1e00000 {
+> +	compatible = "allwinner,sun5i-a13-display-frontend";
+> +	...
+> +	interconnects = <&mbus 19>;
+> +	interconnect-names = "dma";
+> +};
 > 
 
 _______________________________________________
