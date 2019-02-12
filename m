@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C47AC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:46:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ED4B7C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:54:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CA25421773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:46:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9630E20842
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:54:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jOzPuC9f";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="JGDUCiQb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CA25421773
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rBwqgKJy";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="wcoAN6Vm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9630E20842
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,72 +26,72 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:MIME-Version:Date:Message-ID:From:References:To:Subject:Reply-To:
 	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=TRH6dHOxRFiBNA/3ABgfmfM2zn4HwW6TLa2ot/QQvJk=; b=jOzPuC9f/As5e9IBlzelKTjg4
-	IPhgM8itiM2BzSKsNVMNpUodP5vI3BL9bGoR0gKul2pEHQhqanadkFUrHduVH8LPCBJLZMaaiCMi7
-	w3u9Qa2BvP7rAjxmbIOFk5gTufksJHxSXzMqrp6FCOGMvgNoycRrrJmgJeSpnMUH9R1mB1UtRsmS0
-	pAo8EXpfLldmbuudaV195mQkZUNAIrPzVgXaz/czoAG2u/PRgtJveWB37VZz1K+o34KxMCrSEijUI
-	F/ZhJvYCev4jGlKwAJr3/xBWqibzJ64UgY94S/udUsRntbmhwf0zeJKjbMCM9Rs3lOJFJqtB2vv2T
-	uldetY+eQ==;
+	 bh=dXH/LC5Nn1fRJOU1yDrU8+yc3sufznq71JJvNH5seRE=; b=rBwqgKJyUII4K49DPiVMquYIJ
+	XPUGHPSkBWxCgmb1jcAsPfGEfNxILa1/zxmNnRjyBRQFHxvoVmpgYJGwmUXrfwWPtQW5cR/wV2cov
+	5lZLgOAWA9WYAl0YESVJv8wEZmDutl8WNDehiRwPREnjof9AEd6X8C1dE0ODSp+xESG9OrUAHceZQ
+	Kq6g47IgNnNX/Z0CnDYqsn5qjq52CRXsqkO4Yx1WFe41g+fpovH6+HPnvDt8dVlRUe8p/CMCeznLb
+	MWL4tv8pf/9/0ogvVygofk5oaEQaulbuWJElV0FckTLPiCB6S4MVrZiaqFmQE3eAjGIBkNjD6UL8q
+	McvYCLyaw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtaGM-0000Tg-2Q; Tue, 12 Feb 2019 15:46:22 +0000
-Received: from aserp2130.oracle.com ([141.146.126.79])
+	id 1gtaO5-0002dW-10; Tue, 12 Feb 2019 15:54:21 +0000
+Received: from userp2130.oracle.com ([156.151.31.86])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtaGI-0000TI-N2
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:46:20 +0000
-Received: from pps.filterd (aserp2130.oracle.com [127.0.0.1])
- by aserp2130.oracle.com (8.16.0.27/8.16.0.27) with SMTP id x1CFcc8d089975;
- Tue, 12 Feb 2019 15:45:53 GMT
+ id 1gtaO1-0002dB-9S
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:54:19 +0000
+Received: from pps.filterd (userp2130.oracle.com [127.0.0.1])
+ by userp2130.oracle.com (8.16.0.27/8.16.0.27) with SMTP id x1CFn7Hi093071;
+ Tue, 12 Feb 2019 15:52:57 GMT
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
  h=subject : to : cc :
  references : from : message-id : date : mime-version : in-reply-to :
  content-type; s=corp-2018-07-02;
- bh=eMhNDOH++cdlbrqr2EGPEiewoTfXsUm8w7p7ZcMdX40=;
- b=JGDUCiQb/xJpqX0PjPgd7bAHaBgqPfkR/GezmtFYiDvY/U9Imbx/6mBdZnYHsOnRVJgy
- pV+jWhyrwNmBshdjBKFzVZt8M4ffSvq4w0rTQcoHbzfU2UrEYjVuAm8HVVHfXBESt46R
- sCSX0boiqaZeVJ5xg/foScJYudYByFbKxY7iWWlQewZj9/4lpC6Lg0CdpLT9JGDZgIu8
- zh7hlEDSlk/TmkWxdW/D7QWVmUB/REMoaW2BgoE3sH2Ne/VhhA2aZlWJ5pDUWkhA/gMj
- pfSggcLPK2Cw/tcLNAnn7ctrMCZRpmidKEuPmEDU3nx0N/lu61Ol7QmBtAolcF+6d3jS fA== 
-Received: from userv0021.oracle.com (userv0021.oracle.com [156.151.31.71])
- by aserp2130.oracle.com with ESMTP id 2qhre5cpvn-1
+ bh=byLhuTWcAJtsD+8gN5cbHsUplgXHJ5TjR9BbBHliQDY=;
+ b=wcoAN6Vmo2y18k2tcw0tBVfKea4IGHuY3FK8HEZhfNhCzsfckC6V94Vzr+ZewIt+MpGQ
+ nc8gIJANFXP/n4+kExJYa2Kr6jpsc4vf1RVR/MD0VWtruSTKmhvvXhwJ5+bUlQUT91zh
+ S2YaKMEyuY9lPBRgjlqZIR12LUsNtv9yO9AB1NYgK5JstyppWaIws+o6YUMZX9dsCm96
+ ZoFWqbNRQmg7bAPK9TWF1VzpWsrHGVt6bbS8pnXi7S6ze7xhW38YenwqrwdOPvoHwZPG
+ J+iTsqlWY6dszf7Te/iANEQg7brXIVZMcQCG5NjzoW7oItcRRXwAG9MHWJxAENRorMJB Wg== 
+Received: from aserv0021.oracle.com (aserv0021.oracle.com [141.146.126.233])
+ by userp2130.oracle.com with ESMTP id 2qhrekcry6-1
  (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Tue, 12 Feb 2019 15:45:53 +0000
-Received: from userv0121.oracle.com (userv0121.oracle.com [156.151.31.72])
- by userv0021.oracle.com (8.14.4/8.14.4) with ESMTP id x1CFjlfn026656
+ Tue, 12 Feb 2019 15:52:57 +0000
+Received: from aserv0122.oracle.com (aserv0122.oracle.com [141.146.126.236])
+ by aserv0021.oracle.com (8.14.4/8.14.4) with ESMTP id x1CFquPt031138
  (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Tue, 12 Feb 2019 15:45:47 GMT
-Received: from abhmp0019.oracle.com (abhmp0019.oracle.com [141.146.116.25])
- by userv0121.oracle.com (8.14.4/8.13.8) with ESMTP id x1CFjiHA008994;
- Tue, 12 Feb 2019 15:45:45 GMT
+ Tue, 12 Feb 2019 15:52:56 GMT
+Received: from abhmp0016.oracle.com (abhmp0016.oracle.com [141.146.116.22])
+ by aserv0122.oracle.com (8.14.4/8.14.4) with ESMTP id x1CFqsMl011172;
+ Tue, 12 Feb 2019 15:52:55 GMT
 Received: from [192.168.1.16] (/24.9.64.241)
  by default (Oracle Beehive Gateway v4.0)
- with ESMTP ; Tue, 12 Feb 2019 07:45:44 -0800
+ with ESMTP ; Tue, 12 Feb 2019 07:52:54 -0800
 Subject: Re: [RFC PATCH v7 05/16] arm64/mm: Add support for XPFO
 To: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 References: <cover.1547153058.git.khalid.aziz@oracle.com>
  <89f03091af87f5ab27bd6cafb032236d5bd81d65.1547153058.git.khalid.aziz@oracle.com>
- <20190123142047.GB19289@Konrads-MacBook-Pro.local>
+ <20190123142410.GC19289@Konrads-MacBook-Pro.local>
 From: Khalid Aziz <khalid.aziz@oracle.com>
 Organization: Oracle Corp
-Message-ID: <0ea68b21-ac03-e9d1-3285-14e6084e10fa@oracle.com>
-Date: Tue, 12 Feb 2019 08:45:41 -0700
+Message-ID: <4dfba458-1bf6-25ff-df4c-b96a1221cd95@oracle.com>
+Date: Tue, 12 Feb 2019 08:52:51 -0700
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <20190123142047.GB19289@Konrads-MacBook-Pro.local>
-Content-Type: multipart/mixed; boundary="------------CE9BD2F746D7F2667607891B"
+In-Reply-To: <20190123142410.GC19289@Konrads-MacBook-Pro.local>
+Content-Type: multipart/mixed; boundary="------------E60D98927E4F6B22818A3147"
 Content-Language: en-US
 X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9165
  signatures=668683
 X-Proofpoint-Spam-Details: rule=notspam policy=default score=0
  priorityscore=1501 malwarescore=0
- suspectscore=0 phishscore=0 bulkscore=0 spamscore=0 clxscore=1011
+ suspectscore=0 phishscore=0 bulkscore=0 spamscore=0 clxscore=1015
  lowpriorityscore=0 mlxscore=0 impostorscore=0 mlxlogscore=999 adultscore=0
  classifier=spam adjust=0 reason=mlx scancount=1 engine=8.0.1-1810050000
- definitions=main-1902120111
+ definitions=main-1902120112
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_074618_887657_8FFD41CA 
-X-CRM114-Status: GOOD (  22.46  )
+X-CRM114-CacheID: sfid-20190212_075417_469368_4F31160E 
+X-CRM114-Status: GOOD (  23.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -118,11 +118,11 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 This is a multi-part message in MIME format.
---------------CE9BD2F746D7F2667607891B
+--------------E60D98927E4F6B22818A3147
 Content-Type: text/plain; charset=utf-8
 Content-Transfer-Encoding: quoted-printable
 
-On 1/23/19 7:20 AM, Konrad Rzeszutek Wilk wrote:
+On 1/23/19 7:24 AM, Konrad Rzeszutek Wilk wrote:
 > On Thu, Jan 10, 2019 at 02:09:37PM -0700, Khalid Aziz wrote:
 >> From: Juerg Haefliger <juerg.haefliger@canonical.com>
 >>
@@ -200,21 +200,67 @@ nter to
 >> + * the entry. Based on x86 tree.
 >> + */
 >> +static pte_t *lookup_address(unsigned long addr)
+>> +{
+>> +	pgd_t *pgd;
+>> +	pud_t *pud;
+>> +	pmd_t *pmd;
+>> +
+>> +	pgd =3D pgd_offset_k(addr);
+>> +	if (pgd_none(*pgd))
+>> +		return NULL;
+>> +
+>> +	pud =3D pud_offset(pgd, addr);
+>> +	if (pud_none(*pud))
+>> +		return NULL;
+>> +
+>> +	pmd =3D pmd_offset(pud, addr);
+>> +	if (pmd_none(*pmd))
+>> +		return NULL;
+>> +
+>> +	return pte_offset_kernel(pmd, addr);
+>> +}
+>> +
+>> +/* Update a single kernel page table entry */
+>> +inline void set_kpte(void *kaddr, struct page *page, pgprot_t prot)
+>> +{
+>> +	pte_t *pte =3D lookup_address((unsigned long)kaddr);
+>> +
+>> +	set_pte(pte, pfn_pte(page_to_pfn(page), prot));
 >=20
-> The x86 also has level. Would it make sense to include that in here?
->=20
+> Thought on the other hand.. what if the page is PMD? Do you really want=
 
-Possibly. ARM64 does not define page levels (as in the enum for page
-levels) at this time but that can be added easily. Adding level to
-lookup_address() for arm will make it uniform with x86 but is there any
-other rationale besides that? Do you see a future use for this
-information? The only other architecture I could see that defines
-lookup_address() is sh but it uses it for trapped io only.
+> to do this?
+>=20
+> What if 'pte' is NULL?
+>> +}
+>> +
+>> +inline void xpfo_flush_kernel_tlb(struct page *page, int order)
+>> +{
+>> +	unsigned long kaddr =3D (unsigned long)page_address(page);
+>> +	unsigned long size =3D PAGE_SIZE;
+>> +
+>> +	flush_tlb_kernel_range(kaddr, kaddr + (1 << order) * size);
+>=20
+> Ditto here. You are assuming it is PTE, but it may be PMD or such.
+> Or worts - the lookup_address could be NULL.
+>=20
+>> +}
+>> --=20
+>> 2.17.1
+>>
+
+Hi Konrad,
+
+This makes sense. x86 version of set_kpte() checks pte for NULL and also
+checks if the page is PMD. Now what you said about adding level to
+lookup_address() for arm makes more sense.
+
+Can someone with knowledge of arm64 mmu make recommendations here?
 
 Thanks,
 Khalid
 
---------------CE9BD2F746D7F2667607891B
+--------------E60D98927E4F6B22818A3147
 Content-Type: application/pgp-keys;
  name="pEpkey.asc"
 Content-Transfer-Encoding: quoted-printable
@@ -263,7 +309,7 @@ E6wtYze9oihz8mbNHY3jtUGajTsv/F7Jl42rmnbeukwfN2H/4gTDV1sB/D8z5G1+
 =3DnPqY
 -----END PGP PUBLIC KEY BLOCK-----
 
---------------CE9BD2F746D7F2667607891B
+--------------E60D98927E4F6B22818A3147
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -274,5 +320,5 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---------------CE9BD2F746D7F2667607891B--
+--------------E60D98927E4F6B22818A3147--
 
