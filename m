@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3D3D1C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:44:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1BD14C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:44:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0865121773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:44:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DF2CF21773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:44:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bwW+fw2g";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="Pq2FDpp7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0865121773
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bgiKSUC5";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="YfMfzuh3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF2CF21773
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,46 +25,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QUvhZTceWVuoY1cgiJibrYOTmz5UjZzrOgylr36X4qs=; b=bwW+fw2gdB5uii
-	8zwpPITdPnMEh91gH+z8vxgs8/JScK4jKrNWQ7QJUrqVrjdqxOTZajgje/k9h2DI4Xy8/QpqsL1ku
-	ijlR4/drK8tj2abFE45csN6ig9NZ7myANO6ZfA5VK/k7tNNTvtLnUdmovOAkney4EB6LYimeCfV5r
-	avvj9lDAWVQhZQIaYeofui23KCdaWfaVVCbPwsmtOYdOafS0bIGhejm7a8gnEdDP09US10bi1KW5i
-	+/njVQHzZM2Ovm7H3wkBG6aNIPCzpJF5ozW10RanCUVmw4dGsdmDh0uj5GDlcM33qNpe5cOoj3N5X
-	ULo/sKx5SNZq+YNPh4MA==;
+	List-Owner; bh=OFTjJFJbfZL2LcQX+jZNlmY0Eb7CZWaMtKWWLj8qRWM=; b=bgiKSUC5+sSB84
+	uPrZiVg0FkBXVjPIH23W3XNHYaCp2KMH0zNW2ryMTQnBGZykfNeKz+ZbNvkKQIWkWWST5SwTDFAdI
+	1idD/uWDfa1wkU06Cr1m9kZAnDCuAc0oyJ/Q9DzymsZXrFQau2ypOsLA5A9AetwjEz/dc87duS6FH
+	pcRZtvUE7MuheWWYgdeCIxwKeNSTcLEOsLtcsqUwlRgn2KKhKKTe7b5IvDbJcLLWLT2Z5ez7//bWt
+	R5LSFCcs0KnUwAPoLpjyJuGgYc8lY2/ED9zInPY6iEzttEMGEWQ4HdYksQWPZ3AaYQ0XdDOv8c/gT
+	xTuZ+GlUBP2Hc7ELaypQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtaEL-0006X2-Dv; Tue, 12 Feb 2019 15:44:17 +0000
+	id 1gtaEo-0006nd-6X; Tue, 12 Feb 2019 15:44:46 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtaEI-0006We-Gw
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:44:16 +0000
+ id 1gtaEl-0006n6-06
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:44:44 +0000
 Received: from localhost.localdomain (NE2965lan1.rev.em-net.ne.jp
  [210.141.244.193])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id F181721773;
- Tue, 12 Feb 2019 15:44:12 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 79B6721773;
+ Tue, 12 Feb 2019 15:44:41 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549986254;
- bh=sozzUq5udjjfXAJamYZwgE+8GtztlIavIM+cKXa/iww=;
+ s=default; t=1549986282;
+ bh=cOkRumOfvL1eFJehoxj9QVbXEqGehq/bppBluJ7ALYs=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=Pq2FDpp7szFKKhOQOARBg/KLBThPob7NRfIWGjhiTSrZY8G5t95BsRivD9gYI+Tgn
- c+VGDTH51gvD8Z06pnanuUcrq80oRbnn5OTNr2lPE2vHiZeVf4BfcQFbopH16Sd8PL
- jyyCK53ztWZFzMtPg2fkC2kn18C6EuwHyo1sdT/w=
+ b=YfMfzuh38/J16K+MtphMf6srnr1Z1IgO3uGeDgtAPJi+v3HMr3C6XIuLhiqTwMJsc
+ AsNim30goU8qLCIYeMWuFeXE/dHghMQ2pJbEhIMoDgA17dwqEUJ0uvIsGvWlV7Xu/i
+ e6qJmmfoou+P97aufw3gbnxNZWb8C+J5aruSfDio=
 From: Masami Hiramatsu <mhiramat@kernel.org>
 To: Catalin Marinas <catalin.marinas@arm.com>,
  Will Deacon <will.deacon@arm.com>
-Subject: [PATCH v3 2/4] arm64: kprobes: Remove unneeded RODATA check
-Date: Wed, 13 Feb 2019 00:43:51 +0900
-Message-Id: <154998623104.21869.15264079902544102514.stgit@devbox>
+Subject: [PATCH v3 3/4] arm64: kprobes: Move exception_text check in blacklist
+Date: Wed, 13 Feb 2019 00:44:19 +0900
+Message-Id: <154998625948.21869.8505204111913908807.stgit@devbox>
 X-Mailer: git-send-email 2.13.6
 In-Reply-To: <154998617300.21869.11457765723750331236.stgit@devbox>
 References: <154998617300.21869.11457765723750331236.stgit@devbox>
 User-Agent: StGit/0.17.1-dirty
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_074414_671823_E513536D 
-X-CRM114-Status: GOOD (  10.50  )
+X-CRM114-CacheID: sfid-20190212_074443_055147_550E31ED 
+X-CRM114-Status: GOOD (  11.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,42 +85,41 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Remove unneeded RODATA check from arch_prepare_kprobe().
+Move exception/irqentry text address check in blacklist,
+since those are symbol based rejection.
 
-Since check_kprobe_address_safe() already ensured that
-the probe address is in kernel text, we don't need to
-check whether the address in RODATA or not. That must
-be always false.
+If we prohibit probing on the symbols in exception_text,
+those should be blacklisted.
 
 Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
 ---
- arch/arm64/kernel/probes/kprobes.c |    6 ------
- 1 file changed, 6 deletions(-)
+ arch/arm64/kernel/probes/kprobes.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-index 9989ec9baa11..bd06b4b13fa9 100644
+index bd06b4b13fa9..194262fca5cd 100644
 --- a/arch/arm64/kernel/probes/kprobes.c
 +++ b/arch/arm64/kernel/probes/kprobes.c
-@@ -91,8 +91,6 @@ static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
- int __kprobes arch_prepare_kprobe(struct kprobe *p)
- {
- 	unsigned long probe_addr = (unsigned long)p->addr;
--	extern char __start_rodata[];
--	extern char __end_rodata[];
+@@ -98,9 +98,6 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+ 	/* copy instruction */
+ 	p->opcode = le32_to_cpu(*p->addr);
  
- 	if (probe_addr & 0x3)
- 		return -EINVAL;
-@@ -106,10 +104,6 @@ int __kprobes arch_prepare_kprobe(struct kprobe *p)
+-	if (in_exception_text(probe_addr))
+-		return -EINVAL;
+-
  	if (search_exception_tables(probe_addr))
  		return -EINVAL;
  
--	if (probe_addr >= (unsigned long) __start_rodata &&
--	    probe_addr <= (unsigned long) __end_rodata)
--		return -EINVAL;
--
- 	/* decode instruction */
- 	switch (arm_kprobe_decode_insn(p->addr, &p->ainsn)) {
- 	case INSN_REJECTED:	/* insn not supported */
+@@ -477,7 +474,8 @@ bool arch_within_kprobe_blacklist(unsigned long addr)
+ 	    (addr >= (unsigned long)__idmap_text_start &&
+ 	    addr < (unsigned long)__idmap_text_end) ||
+ 	    (addr >= (unsigned long)__hyp_text_start &&
+-	    addr < (unsigned long)__hyp_text_end))
++	    addr < (unsigned long)__hyp_text_end) ||
++	    in_exception_text(addr))
+ 		return true;
+ 
+ 	if (!is_kernel_in_hyp_mode()) {
 
 
 _______________________________________________
