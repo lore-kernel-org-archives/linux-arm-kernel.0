@@ -2,60 +2,64 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D095BC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 16:23:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D0891C4151A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 16:25:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9DB9D21773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 16:23:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9AC8621773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 16:25:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q9gKjeta"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9DB9D21773
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YK/mWaRw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9AC8621773
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3tVqteUYwHDvMw7zqd4MklRSTDct35dANBofvZYLaAM=; b=q9gKjetahxa1jQ
-	y4QuxRLWvSO79IdTtNUN7ktUjVsqvZZ4snzzBgURI2XQ7/q4LmAVj24dLS1v4dZ5Rpcb1CMCgjB/T
-	IYahtxFko0niCgdPa9ca3bHx4TONB5JcG1wCNEvtBTO4Tp16LjjY1o9M/g3YQF2fn4CAoJttzIXS3
-	sKPp8rM004LesafWmelZUC9YcTYqGbDc9QUWBjlTzElP7oy6w1ypglRXZmIJNRg5Wlem02Xs3RSlo
-	tWsLa6le058WyGjsJXoaxoEIoB7KouAsgecGt9k/Ct8ytBHXf+w2o3fNK4FU5vy8dqbK+4JjJMZsw
-	/FibSzfffFNnkWEsHAYw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=vxbU5XAX5BaUomgRjfj/fCnAKyak02wuemnKkNamtOU=; b=YK/
+	mWaRw89/5sJ22AuJ6exFT0+TkQ15xt5TRAi9tI+zacXvA9I6n3xrQ/buSEu4bh69ICZYtfEXZ1oZU
+	Q0rNKVHMSn8Gx7fQOtcDBOdl2W6aLBbREovsPgYkLGWEGQQ//OpuSLyQUwApe/6mmmmvej2hnChgG
+	KK+hwZx6WLkOFPFDJoDtcVUsd0Rz9tboiO+n7LHo6pxWDiZlESNHElTcTBxa6Y4DqFjZCMmn+iqW/
+	9jABv3vRbfnOU0xEFAGBoc1DWV1YiFEWMKMPRYOMd2tsFsdWwCaqXD7k2O/mNWGyeFnA6FDPjZ3RY
+	PIC/JFV8b6jR1xXoOG4AXJsQx3UYbMQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtapj-00050K-4A; Tue, 12 Feb 2019 16:22:55 +0000
-Received: from muru.com ([72.249.23.125])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtapf-0004zx-Oc
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 16:22:53 +0000
-Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id 2625E803A;
- Tue, 12 Feb 2019 16:23:00 +0000 (UTC)
-Date: Tue, 12 Feb 2019 08:22:47 -0800
-From: Tony Lindgren <tony@atomide.com>
-To: Lokesh Vutla <lokeshvutla@ti.com>
-Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-Message-ID: <20190212162247.GK5720@atomide.com>
-References: <20190212074237.2875-1-lokeshvutla@ti.com>
- <20190212074237.2875-6-lokeshvutla@ti.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190212074237.2875-6-lokeshvutla@ti.com>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+	id 1gtarz-0006Z2-SB; Tue, 12 Feb 2019 16:25:15 +0000
+Received: from mga12.intel.com ([192.55.52.136])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtarw-0006QT-E0
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 16:25:14 +0000
+X-Amp-Result: SKIPPED(no attachment in message)
+X-Amp-File-Uploaded: False
+Received: from fmsmga006.fm.intel.com ([10.253.24.20])
+ by fmsmga106.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 12 Feb 2019 08:25:08 -0800
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.58,362,1544515200"; d="scan'208";a="318387067"
+Received: from joyceboo-mobl4.gar.corp.intel.com (HELO ubuntu.localdomain)
+ ([10.255.147.184])
+ by fmsmga006.fm.intel.com with ESMTP; 12 Feb 2019 08:25:05 -0800
+From: "Ooi, Joyce" <joyce.ooi@intel.com>
+To: Giuseppe Cavallaro <peppe.cavallaro@st.com>,
+ Alexandre Torgue <alexandre.torgue@st.com>,
+ Jose Abreu <joabreu@synopsys.com>, "David S. Miller" <davem@davemloft.net>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Subject: [PATCH] net: stmmac: Add SMC support for EMAC System Manager register
+Date: Tue, 12 Feb 2019 08:24:52 -0800
+Message-Id: <1549988692-4124-1-git-send-email-joyce.ooi@intel.com>
+X-Mailer: git-send-email 1.9.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_082251_845312_23B408E3 
-X-CRM114-Status: UNSURE (   7.74  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190212_082512_488822_2A6C6D8A 
+X-CRM114-Status: GOOD (  15.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,47 +71,204 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>,
- Device Tree Mailing List <devicetree@vger.kernel.org>, jason@lakedaemon.net,
- Peter Ujfalusi <peter.ujfalusi@ti.com>, marc.zyngier@arm.com,
- Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
- Tero Kristo <t-kristo@ti.com>, Rob Herring <robh+dt@kernel.org>,
- Santosh Shilimkar <ssantosh@kernel.org>, tglx@linutronix.de,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Cc: netdev@vger.kernel.org, See Chin Liang <chin.liang.see@intel.com>,
+ linux-kernel@vger.kernel.org, Joyce Ooi <joyce.ooi@intel.com>,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+As there is restriction to access to EMAC System Manager registers in
+the kernel for Intel Stratix10, the use of SMC calls are required and
+added in dwmac-socfpga driver.
 
-* Lokesh Vutla <lokeshvutla@ti.com> [190212 07:43]:
-> +Example:
-> +--------
-> +The following example demonstrates both interrupt router node and the consumer
-> +node(main gpio) on the AM654 SoC:
-> +
-> +main_intr: interrupt-controller0 {
-> +	compatible = "ti,sci-intr";
-> +	interrupt-controller;
-> +	interrupt-parent = <&gic500>;
-> +	#interrupt-cells = <4>;
-> +	ti,sci = <&dmsc>;
-> +	ti,sci-dst-id = <56>;
-> +	ti,sci-rm-range-girq = <0x1>;
-> +};
+Signed-off-by: Ooi, Joyce <joyce.ooi@intel.com>
+---
+ .../net/ethernet/stmicro/stmmac/dwmac-socfpga.c    |  101 ++++++++++++++++++++
+ 1 files changed, 101 insertions(+), 0 deletions(-)
 
-Can you describe a bit what the "ti,sci-dst-id" is above?
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c
+index 5b3b06a..55cce97 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c
+@@ -15,6 +15,10 @@
+  * Adopted from dwmac-sti.c
+  */
+ 
++#if defined CONFIG_HAVE_ARM_SMCCC && defined CONFIG_ARCH_STRATIX10
++#include <linux/arm-smccc.h>
++#include <linux/firmware/intel/stratix10-smc.h>
++#endif
+ #include <linux/mfd/syscon.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+@@ -52,6 +56,9 @@ struct socfpga_dwmac {
+ 	int	interface;
+ 	u32	reg_offset;
+ 	u32	reg_shift;
++#if defined CONFIG_HAVE_ARM_SMCCC && defined CONFIG_ARCH_STRATIX10
++	u32	sysmgr_reg;
++#endif
+ 	struct	device *dev;
+ 	struct regmap *sys_mgr_base_addr;
+ 	struct reset_control *stmmac_rst;
+@@ -61,6 +68,63 @@ struct socfpga_dwmac {
+ 	struct tse_pcs pcs;
+ };
+ 
++#if defined CONFIG_HAVE_ARM_SMCCC && defined CONFIG_ARCH_STRATIX10
++/**************** Stratix 10 EMAC Memory Controller Functions ************/
++
++/* s10_protected_reg_write
++ * Write to a protected SMC register.
++ * @context: Not used
++ * @reg: Address of register
++ * @value: Value to write
++ * Return: INTEL_SIP_SMC_STATUS_OK (0) on success
++ *         INTEL_SIP_SMC_REG_ERROR on error
++ *         INTEL_SIP_SMC_RETURN_UNKNOWN_FUNCTION if not supported
++ */
++static int s10_protected_reg_write(void *context, unsigned int reg,
++				   unsigned int val)
++{
++	struct arm_smccc_res result;
++
++	arm_smccc_smc(INTEL_SIP_SMC_REG_WRITE, reg, val, 0, 0,
++		      0, 0, 0, &result);
++
++	return (int)result.a0;
++}
++
++/* s10_protected_reg_read
++ * Read the status of a protected SMC register
++ * @context: Not used
++ * @reg: Address of register
++ * @value: Value read.
++ * Return: INTEL_SIP_SMC_STATUS_OK (0) on success
++ *         INTEL_SIP_SMC_REG_ERROR on error
++ *         INTEL_SIP_SMC_RETURN_UNKNOWN_FUNCTION if not supported
++ */
++static int s10_protected_reg_read(void *context, unsigned int reg,
++				  unsigned int *val)
++{
++	struct arm_smccc_res result;
++
++	arm_smccc_smc(INTEL_SIP_SMC_REG_READ, reg, 0, 0, 0,
++		      0, 0, 0, &result);
++
++	*val = (unsigned int)result.a1;
++
++	return (int)result.a0;
++}
++
++static const struct regmap_config s10_emac_regmap_cfg = {
++	.name = "s10_emac",
++	.reg_bits = 32,
++	.val_bits = 32,
++	.max_register = 0xffffffff,
++	.reg_read = s10_protected_reg_read,
++	.reg_write = s10_protected_reg_write,
++	.use_single_read = true,
++	.use_single_write = true,
++};
++#endif
++
+ static void socfpga_dwmac_fix_mac_speed(void *priv, unsigned int speed)
+ {
+ 	struct socfpga_dwmac *dwmac = (struct socfpga_dwmac *)priv;
+@@ -105,20 +169,43 @@ static int socfpga_dwmac_parse_data(struct socfpga_dwmac *dwmac, struct device *
+ 	struct device_node *np = dev->of_node;
+ 	struct regmap *sys_mgr_base_addr;
+ 	u32 reg_offset, reg_shift;
++#if defined CONFIG_HAVE_ARM_SMCCC && defined CONFIG_ARCH_STRATIX10
++	u32 sysmgr_reg = 0;
++#endif
+ 	int ret, index;
+ 	struct device_node *np_splitter = NULL;
+ 	struct device_node *np_sgmii_adapter = NULL;
++#if defined CONFIG_HAVE_ARM_SMCCC && defined CONFIG_ARCH_STRATIX10
++	struct device_node *np_sysmgr = NULL;
++#endif
+ 	struct resource res_splitter;
+ 	struct resource res_tse_pcs;
+ 	struct resource res_sgmii_adapter;
+ 
+ 	dwmac->interface = of_get_phy_mode(np);
+ 
++#if defined CONFIG_HAVE_ARM_SMCCC && defined CONFIG_ARCH_STRATIX10
++	sys_mgr_base_addr = devm_regmap_init(dev, NULL, (void *)dwmac,
++					     &s10_emac_regmap_cfg);
++	if (IS_ERR(sys_mgr_base_addr))
++		return PTR_ERR(sys_mgr_base_addr);
++
++	np_sysmgr = of_parse_phandle(np, "altr,sysmgr-syscon", 0);
++	if (np_sysmgr) {
++		ret = of_property_read_u32_index(np_sysmgr, "reg", 0,
++						 &sysmgr_reg);
++		if (ret) {
++			dev_info(dev, "Could not read sysmgr register address\n");
++			return -EINVAL;
++		}
++	}
++#else
+ 	sys_mgr_base_addr = syscon_regmap_lookup_by_phandle(np, "altr,sysmgr-syscon");
+ 	if (IS_ERR(sys_mgr_base_addr)) {
+ 		dev_info(dev, "No sysmgr-syscon node found\n");
+ 		return PTR_ERR(sys_mgr_base_addr);
+ 	}
++#endif
+ 
+ 	ret = of_property_read_u32_index(np, "altr,sysmgr-syscon", 1, &reg_offset);
+ 	if (ret) {
+@@ -222,6 +309,9 @@ static int socfpga_dwmac_parse_data(struct socfpga_dwmac *dwmac, struct device *
+ 	dwmac->reg_offset = reg_offset;
+ 	dwmac->reg_shift = reg_shift;
+ 	dwmac->sys_mgr_base_addr = sys_mgr_base_addr;
++#if defined CONFIG_HAVE_ARM_SMCCC && defined CONFIG_ARCH_STRATIX10
++	dwmac->sysmgr_reg = sysmgr_reg;
++#endif
+ 	dwmac->dev = dev;
+ 	of_node_put(np_sgmii_adapter);
+ 
+@@ -238,6 +328,9 @@ static int socfpga_dwmac_set_phy_mode(struct socfpga_dwmac *dwmac)
+ 	int phymode = dwmac->interface;
+ 	u32 reg_offset = dwmac->reg_offset;
+ 	u32 reg_shift = dwmac->reg_shift;
++#if defined CONFIG_HAVE_ARM_SMCCC && defined CONFIG_ARCH_STRATIX10
++	u32 sysmgr_reg = dwmac->sysmgr_reg;
++#endif
+ 	u32 ctrl, val, module;
+ 
+ 	switch (phymode) {
+@@ -266,7 +359,11 @@ static int socfpga_dwmac_set_phy_mode(struct socfpga_dwmac *dwmac)
+ 	reset_control_assert(dwmac->stmmac_ocp_rst);
+ 	reset_control_assert(dwmac->stmmac_rst);
+ 
++#if defined CONFIG_HAVE_ARM_SMCCC && defined CONFIG_ARCH_STRATIX10
++	regmap_read(sys_mgr_base_addr, sysmgr_reg + reg_offset, &ctrl);
++#else
+ 	regmap_read(sys_mgr_base_addr, reg_offset, &ctrl);
++#endif
+ 	ctrl &= ~(SYSMGR_EMACGRP_CTRL_PHYSEL_MASK << reg_shift);
+ 	ctrl |= val << reg_shift;
+ 
+@@ -284,7 +381,11 @@ static int socfpga_dwmac_set_phy_mode(struct socfpga_dwmac *dwmac)
+ 		ctrl &= ~(SYSMGR_EMACGRP_CTRL_PTP_REF_CLK_MASK << (reg_shift / 2));
+ 	}
+ 
++#if defined CONFIG_HAVE_ARM_SMCCC && defined CONFIG_ARCH_STRATIX10
++	regmap_write(sys_mgr_base_addr, sysmgr_reg + reg_offset, ctrl);
++#else
+ 	regmap_write(sys_mgr_base_addr, reg_offset, ctrl);
++#endif
+ 
+ 	/* Deassert reset for the phy configuration to be sampled by
+ 	 * the enet controller, and operation to start in requested mode
+-- 
+1.7.1
 
-These IDs seem to be listed at at [0] below, but is it really a property
-of the hardware? Or is it some enumeration of SoC devices in the firmware?
-
-Regards,
-
-Tony
-
-
-[0] http://downloads.ti.com/tisci/esd/latest/5_soc_doc/am6x/irq_dsts.html
 
 _______________________________________________
 linux-arm-kernel mailing list
