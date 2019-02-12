@@ -2,88 +2,74 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 209BFC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:37:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EE490C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:38:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DF771222C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:37:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BC8EA222C6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:38:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uO1u7jiN";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="e2fFmqVT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF771222C0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o47KTVxi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BC8EA222C6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ccbib.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:Content-ID:MIME-Version
+	:References:In-reply-to:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ppYjuuD2rZcrpBuxAMhp6XEMZvWNeHgU02EATqeeS+c=; b=uO1u7jiNS/849Z
-	cDcoA2UDPn659fD4f/mAeYPCTieoZVDGEd9z45nMoF0fLN/oyZIcy0XojjZKiR1h/numfhDnHMD13
-	VxA5MRDWawPzJcfXNDgTxyNm4rlAP2hKqTA9ktCLFFgt2s2vbXi6W/yrMr+Tr/c955OJ156Xoi3oA
-	0VPEWpTSsEpBEmGsw2nIvSiS79yvIERF1knbEi97FleB11eUfxdQdMviQITsLYDcgGacZeqLLvAIc
-	sedIq+UYdlgl7t6LnnmEkpgDy9ty8e0hKuHjOYXRBNHnQDg7Ucl0p0URwHJMZ6X6mmWw/8nFiDEsj
-	hpi8LJbK0ZlDP3TO3HHg==;
+	List-Owner; bh=mjaHgvT0NfqzaEDfK7aWfsU6dTWt2TdljQFY9/YNlRY=; b=o47KTVxiryfPBR
+	YlpmRzQGcRYQ0U6ES4jehMU/GHOuFt7ns4Xqik0LO4QH7/Hf7PGKrL3kHqyN+4gpYSO2Lp57l99Ri
+	kZNznvTvHgmmt3hX524lpatRvaB4ATJRrDLu7IQRzM/x7nU3taZMEDFpN42YokFRjp0p5D5uLvWhB
+	7qZrUYUMPSQovbAMNHxlLs1KBCNep+Ix5+fKlcj0jOHd5wjffDEAeFSVss87FlOp8HbrDj1BMmYkG
+	Qnfx4fvN5mG2bNthH+65wAWDDvwqyfwmDW3cWlcs+v1Pna1cdnfRUUVTqodgqDqRLk109gnUF10bE
+	Bzn+J1a+EpakrzQVkRRg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtds7-00023W-OD; Tue, 12 Feb 2019 19:37:35 +0000
-Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtds4-00022y-Hx
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 19:37:34 +0000
-Received: by mail-ot1-x342.google.com with SMTP id z19so6505885otm.2
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 11:37:31 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=qh8jXx9ibl84fm0TlhJ9Ot1OoKWuqLrxObimfZxMuQk=;
- b=e2fFmqVTst9k54mscSZoNvZFtyO2UOA4SXGrFUpA6ORORAV+C1v81iu/gjEIClGde6
- Hbfo8P+4CcZJjH3tN9gLQjZIA1+/F3FpajNmKUAGz3HkanvpI2H6UNsC7SJYcOlb/CuG
- gPIjybczMXPAHcoutR2jMt0QBM5N4YHBPwHF82+K5geDnc/fynzmhgeRyCk+QYjmiB71
- yuo7YA2Mp623gIS0IjU/nyGuEiDray7QOrI6w6b6o5N12Be+VF9xvS5J4bffw7O8Jp87
- vg+0B2/1qLNx3HkcYZ4h6nPBZyv0EKF7XiyBWLV9CazBgDvQ21mYsb1FagJfQs8WBcM/
- HtaA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=qh8jXx9ibl84fm0TlhJ9Ot1OoKWuqLrxObimfZxMuQk=;
- b=b11mRqwF9rklL7lrybRlwrVUIDEgLmdihHAAToUv2C1vqaecUYnB4Hfd+K/nurG4JQ
- v+bMUxvugCuSyg81PffouZYVEYaz6pCJ85TdnmOAAB+Cz21zw5/hx2zk6ctJt1v/NJVN
- HNyIisqBjz5rdWu3xEFfR+e/BA360IVI5GBF3ePkT1Ej2sh1DXso00AfE3ycd136vLoT
- GZK8RgihmjGa8HmjmxAA453xO2925QcRS9wjIxo49+seBmlsRCxGtjdeC/TMr4fcRdOI
- JUASIl6V1BtHY4sIVNWj4s88HzGYHhp2vGo9eRFBKcfTHuu5bI8AHIhiPkSabBzJVa7P
- bnJw==
-X-Gm-Message-State: AHQUAuY/xVU4Q1EcxtUZY4f+D/wGFA4wM9htxVSyHLIu7BRiNjEnCxoz
- mXXCznoLKrUe5VF4yLhW/hhsJrmLCc9P4Y0fRDE=
-X-Google-Smtp-Source: AHgI3IZg2Tty+buZahU39fVemS7bKOvdrXaVps2KARCkUXOgrYO7IyQYHaP2MOm0efGPapfwkQseadgme6cLNbkJ30o=
-X-Received: by 2002:a9d:64c8:: with SMTP id n8mr5692051otl.115.1550000250644; 
- Tue, 12 Feb 2019 11:37:30 -0800 (PST)
+	id 1gtdsX-0002K1-7C; Tue, 12 Feb 2019 19:38:01 +0000
+Received: from mail.cosmopool.net ([2a01:4f8:160:20c1::10:107])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtdsO-0002GN-0g
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 19:37:59 +0000
+Received: from localhost (localhost [127.0.0.1])
+ by mail.cosmopool.net (Postfix) with ESMTP id E5E7390266C;
+ Tue, 12 Feb 2019 20:37:46 +0100 (CET)
+Received: from mail.cosmopool.net ([127.0.0.1])
+ by localhost (mail.b.radempa.de [127.0.0.1]) (amavisd-new, port 10024)
+ with ESMTP id qwt8DU8kiFAx; Tue, 12 Feb 2019 20:37:43 +0100 (CET)
+Received: from stardust.g4.wien.funkfeuer.at
+ (178.112.157.99.wireless.dyn.drei.com [178.112.157.99])
+ by mail.cosmopool.net (Postfix) with ESMTPSA id 473DD902666;
+ Tue, 12 Feb 2019 20:37:43 +0100 (CET)
+Received: from lambda by stardust.g4.wien.funkfeuer.at with local (Exim 4.89)
+ (envelope-from <harald@ccbib.org>)
+ id 1gtds8-0000NB-Re; Tue, 12 Feb 2019 20:37:36 +0100
+From: Harald Geyer <harald@ccbib.org>
+To: Maxime Ripard <maxime.ripard@bootlin.com>
+Subject: Re: [PATCH RFC] arm64: dts: allwinner: a64: teres-i: Enable audio
+In-reply-to: <20190212100929.iqsxu443qrkl6myf@flea>
+References: <20190211111245.GA18147@lst.de>
+ <E1gtBlV-0000Wl-Cv@stardust.g4.wien.funkfeuer.at>
+ <20190211153945.e34fpwkuk67l7lc6@flea>
+ <E1gtHJj-0000iY-G8@stardust.g4.wien.funkfeuer.at>
+ <20190212083850.7genwc6ipnxtl7eo@flea>
+ <E1gtUZn-0000NW-MA@stardust.g4.wien.funkfeuer.at>
+ <20190212100929.iqsxu443qrkl6myf@flea>
+Comments: In-reply-to Maxime Ripard <maxime.ripard@bootlin.com>
+ message dated "Tue, 12 Feb 2019 11:09:29 +0100."
 MIME-Version: 1.0
-References: <20190107132226.16216-1-stefan@agner.ch>
- <20190107132226.16216-2-stefan@agner.ch>
- <1549573243.3075.72.camel@impinj.com> <20190211012305.GA21496@dragon>
- <1549916056.3075.102.camel@impinj.com>
- <CAOMZO5BrTLyg7Q51tPcHbN8S2VmA4HAENOVzNhw+Yx7Nniz3Gg@mail.gmail.com>
- <1549923727.3075.103.camel@impinj.com>
-In-Reply-To: <1549923727.3075.103.camel@impinj.com>
-From: Fabio Estevam <festevam@gmail.com>
-Date: Tue, 12 Feb 2019 17:37:18 -0200
-Message-ID: <CAOMZO5Ccovx2hMU0SmPm9ToZDNXOdLWkoQ8QT7EOhLocL7GAEQ@mail.gmail.com>
-Subject: Re: [PATCH 2/2] ARM: dts: imx7: add DMA properties for ECSPI
-To: Trent Piepho <tpiepho@impinj.com>
+Content-ID: <1435.1550000256.1@stardust.g4.wien.funkfeuer.at>
+Date: Tue, 12 Feb 2019 20:37:36 +0100
+Message-Id: <E1gtds8-0000NB-Re@stardust.g4.wien.funkfeuer.at>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_113732_619385_E47DB450 
-X-CRM114-Status: UNSURE (   9.04  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190212_113752_453742_A26113B9 
+X-CRM114-Status: GOOD (  27.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,30 +81,96 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "stefan@agner.ch" <stefan@agner.ch>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
- "linux-imx@nxp.com" <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "fabio.estevam@nxp.com" <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ info@olimex.com, Mark Brown <broonie@kernel.org>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, ibu@radempa.de,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 8:22 PM Trent Piepho <tpiepho@impinj.com> wrote:
+Hi Maxime!
 
-> > Just trying to understand if the SDMA firmware plays a role on this
-> > behavior or not.
->
-> The ROM firmware only.
+Maxime Ripard writes:
+> > > And pinctrl can be used dynamically as well if you need to
+> >
+> > Can you explain or point me to the relevant explanation in the docs? I
+> > don't seem to know about it.
+> 
+> pinctrl_select_state is what you would want to call,
+> you would have a good example of that runtime change in
+> drivers/i2c/muxes/i2c-mux-pinctrl.c.
 
-Does the problem also happen if the external SDMA firmware is used?
-Just trying to narrow it down.
+I believe we have misunderstood each other somewhere. The above example
+seems to be about one device (mux driver) requesting a set of pins and then
+switching between different pinconfig states thereby activating
+different subsets of pins. I don't see a way to have two devices
+request the same set of pins. I could write gpio-mux-pinctrl, but I
+don't see how this helps much either.
+
+> > > > Instead I just got the original patch working, by implementing
+> > > > "output-high" DT property in sunxi-pinctrl. I'll send a patch for
+> > > > review soon.
+> > >
+> > > What do you want to do with output-high exactly?
+> >
+> > Exactly what I do in the patch that started this thread. (I'll resend
+> > when wens' cpvdd patch is available for me to rebase onto.)
+> 
+> There's a few issues with that approach as well:
+> 
+>   - We're actively trying to remove the pinctrl nodes for the GPIOs
+
+For what reason? Maybe it doesn't apply to this usecase?
+
+>   - It's completely static: if one only wants to use the UART all the
+>   time, they would have to change the DTB, which might or might not be
+>   possible. Note that this could be trickier: why would you prevent the
+>   console from working for example if the audio support isn't built in?
+>   or as a module that might or might not be loaded?
+
+No, it's not that static:
+* Before the audio device probes, UART is active. (You want UART all the
+  time: Just prevent the audio module from loading.)
+* When you have used audio and suddenly want to have UART instead: Just
+  unbind the audio device and set the gpio to low or input from userspace.
+  (I intended unbinding to be sufficient, but it seems pinctrl doesn't
+   set the pin back to input when it is freed and I don't see a straight
+   forward way to force that. I guess it is okay however: Somebody
+   switching between UART and audio regularly has to know about the
+   details anyway.)
+
+I also tested suspend/resume/poweroff and it mostly works. The only
+glitch is, that during suspend there is a short period of UART noise
+on the HP. (But no such problem during resume or poweroff.) I suspect
+the regulator supplying the gpio bank is shut down quite early when
+suspending. It doesn't matter for this discussion: There likely would
+be the same behaviour with any other approach too.
+
+I think the real downside of this approach is, that using the UART
+makes the internal speakers/mic unuseable too. But we need a way to
+control the mux from userspace and aside from unbinding the ideas
+proposed thus far are:
+a) control the gpio directly
+b) control the gpio via leds-gpio
+
+(a) was dismissed because we can't set a default from DT
+(b) was dismissed because some rogue app might try to blink it
+
+The clean solution might be to write mux-gpio, which is actually
+identical to leds-gpio but lives in /sys/class/mux_switches/ and
+uses different filenames. But that's going down the "invent a new
+subsystem road", which I believe is overkill for what is a debugging
+facility for a single board.
+
+Harald
+
+-- 
+If you want to support my work:
+see http://friends.ccbib.org/harald/supporting/
+or donate via CLAM to xASPBtezLNqj4cUe8MT5nZjthRSEjrRQXN
+or via peercoin to P98LRdhit3gZbHDBe7ta5jtXrMJUms4p7w
 
 _______________________________________________
 linux-arm-kernel mailing list
