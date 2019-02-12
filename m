@@ -6,54 +6,78 @@ X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 02E2DC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 22:15:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F343AC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 23:05:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C557A222C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 22:15:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BBD4F222C7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 23:05:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f9r/YIAi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C557A222C7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=rjwysocki.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eswIPm8u"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BBD4F222C7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ab.jp.nec.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+1R0z5wTCg1sJWcJjLcbC1sgs249/oo5+7UL3dDdkHU=; b=f9r/YIAiZ4bACh
-	H/jMbgQopt2gNGHvb2hLxW7c5GxOpH/rnKmQaSFateWyLse5foVDYqEJFOnqrgyNOe6lHTItoXyXV
-	73zCK/hPG7GUhm8YSmevS363ytcI0BXwpQLWJZoLQKjEC5rkw1SEcLWAae7hmdeirzLpjMG3XGkww
-	DqQIkqpFt8856CyWuEHukYyoCAkJgrJ/BuQ4FrlOvhV7M8PpcwrG41+0RjTWuT4YvV9bcQwDKMcx6
-	Nsqnh4qYM5A8a2YdXrRDzRmmVUpDMWQiH9zsZBpgSXy4fof9Uv12SVMGoY/yQbXyYfnXqXy89PFoN
-	OYGmckkj+6NosAeaQrDQ==;
+	List-Owner; bh=1dQS6kYvALIyCDuty8IygeiTrWS7RKy+cNm3YuHqnD8=; b=eswIPm8u6Wduz2
+	oNGTH9JlzuQlO1GgMha/bu8qawg74nLUkXypFWA6PLFGtiv478r2rJckiWJXtjEOURd4yHenNZ94M
+	eGJ0Rzyja8lVzJQPtDkw5C7LrOWjymujPRycqnUEFq9qU0LNaPnhIEBPfXf+1rK9I6cmQpCtMrwYO
+	YXYCCcyDvwQluuvxPI7qncYEyjR0ujhzBXQomjFfyjuMSD6354L5esl0RILc+D+wCXg22O+jMGqdX
+	g9W7/ICwoIOYxlHcp238A9qto6Pt+pHLAlKDTx9tYmst8qTdjrxo78JRslHPkjm2JsLwUuthxw92x
+	K8abnMOIW7eMRUOHYTWg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtgLB-0003x3-Hj; Tue, 12 Feb 2019 22:15:45 +0000
-Received: from cloudserver094114.home.pl ([79.96.170.134])
+	id 1gth77-0003qX-Nf; Tue, 12 Feb 2019 23:05:17 +0000
+Received: from tyo162.gate.nec.co.jp ([114.179.232.162])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtgL8-0003wR-2e
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 22:15:44 +0000
-Received: from 79.184.254.36.ipv4.supernova.orange.pl (79.184.254.36) (HELO
- aspire.rjw.lan)
- by serwer1319399.home.pl (79.96.170.134) with SMTP (IdeaSmtpServer 0.83.183)
- id 1561d8aff315dca9; Tue, 12 Feb 2019 23:15:36 +0100
-From: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-To: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v8 00/26] APEI in_nmi() rework and SDEI wire-up
-Date: Tue, 12 Feb 2019 23:14:18 +0100
-Message-ID: <2507221.Jg8xd6amJ7@aspire.rjw.lan>
-In-Reply-To: <f561e55c-3560-6a5a-bd23-5d687227e257@arm.com>
-References: <20190129184902.102850-1-james.morse@arm.com>
- <CAJZ5v0ibUO7F=+_GBbhEz4nc0jtC=UaK+cOcLCBrXd2pfc0iLg@mail.gmail.com>
- <f561e55c-3560-6a5a-bd23-5d687227e257@arm.com>
+ id 1gth74-0003k4-7R; Tue, 12 Feb 2019 23:05:16 +0000
+Received: from mailgate01.nec.co.jp ([114.179.233.122])
+ by tyo162.gate.nec.co.jp (8.15.1/8.15.1) with ESMTPS id x1CN4rMO001098
+ (version=TLSv1.2 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
+ Wed, 13 Feb 2019 08:04:53 +0900
+Received: from mailsv01.nec.co.jp (mailgate-v.nec.co.jp [10.204.236.94])
+ by mailgate01.nec.co.jp (8.15.1/8.15.1) with ESMTP id x1CN4rYH004424;
+ Wed, 13 Feb 2019 08:04:53 +0900
+Received: from mail01b.kamome.nec.co.jp (mail01b.kamome.nec.co.jp [10.25.43.2])
+ by mailsv01.nec.co.jp (8.15.1/8.15.1) with ESMTP id x1CN47JL023191;
+ Wed, 13 Feb 2019 08:04:53 +0900
+Received: from bpxc99gp.gisp.nec.co.jp ([10.38.151.135] [10.38.151.135]) by
+ mail03.kamome.nec.co.jp with ESMTP id BT-MMP-2334655;
+ Wed, 13 Feb 2019 08:03:14 +0900
+Received: from BPXM09GP.gisp.nec.co.jp ([10.38.151.201]) by
+ BPXC07GP.gisp.nec.co.jp ([10.38.151.135]) with mapi id 14.03.0319.002; Wed,
+ 13 Feb 2019 08:03:13 +0900
+From: Kazuhito Hagio <k-hagio@ab.jp.nec.com>
+To: Bhupesh Sharma <bhsharma@redhat.com>, Dave Young <dyoung@redhat.com>
+Subject: RE: [PATCH] arm64, vmcoreinfo : Append 'MAX_USER_VA_BITS' and
+ 'MAX_PHYSMEM_BITS' to vmcoreinfo
+Thread-Topic: [PATCH] arm64, vmcoreinfo : Append 'MAX_USER_VA_BITS' and
+ 'MAX_PHYSMEM_BITS' to vmcoreinfo
+Thread-Index: AQHUuQb/BT+pA4VdFkyjzG4/innmbKXP0wNAgAzVznSAAC8oAA==
+Date: Tue, 12 Feb 2019 23:03:13 +0000
+Message-ID: <4AE2DC15AC0B8543882A74EA0D43DBEC035683DB@BPXM09GP.gisp.nec.co.jp>
+References: <1548850991-11879-1-git-send-email-bhsharma@redhat.com>
+ <20190131014800.GB15785@dhcp-128-65.nay.redhat.com>
+ <4AE2DC15AC0B8543882A74EA0D43DBEC03567AA3@BPXM09GP.gisp.nec.co.jp>
+ <d7d50b5a-3577-448e-d928-7898016a38fb@redhat.com>
+ <20190212104407.GA17022@dhcp-128-65.nay.redhat.com>
+ <CACi5LpOAADU8s+3e6=fO7FT+VtAmWYNeZN9COF+4Gt6twLWYaA@mail.gmail.com>
+In-Reply-To: <CACi5LpOAADU8s+3e6=fO7FT+VtAmWYNeZN9COF+4Gt6twLWYaA@mail.gmail.com>
+Accept-Language: ja-JP, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [143.101.133.73]
 MIME-Version: 1.0
+X-TM-AS-MML: disable
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_141542_283533_885D0AC1 
-X-CRM114-Status: GOOD (  26.12  )
+X-CRM114-CacheID: sfid-20190212_150514_496608_BB620DDA 
+X-CRM114-Status: GOOD (  11.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,131 +89,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Tony Luck <tony.luck@intel.com>, Xie XiuQi <xiexiuqi@huawei.com>,
- ACPI Devel Maling List <linux-acpi@vger.kernel.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- "Rafael J. Wysocki" <rafael@kernel.org>, Will Deacon <will.deacon@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>,
- Dongjiu Geng <gengdongjiu@huawei.com>,
- Linux Memory Management List <linux-mm@kvack.org>,
- Borislav Petkov <bp@alien8.de>, Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>,
- kvmarm@lists.cs.columbia.edu, Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Len Brown <lenb@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "lijiang@redhat.com" <lijiang@redhat.com>, "bhe@redhat.com" <bhe@redhat.com>,
+ "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
+ "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
+ "kexec@lists.infradead.org" <kexec@lists.infradead.org>,
+ Will Deacon <will.deacon@arm.com>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>,
+ James Morse <james.morse@arm.com>, Borislav Petkov <bp@alien8.de>,
+ "anderson@redhat.com" <anderson@redhat.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Monday, February 11, 2019 7:35:03 PM CET James Morse wrote:
-> Hi Rafael,
-> 
-> On 11/02/2019 11:05, Rafael J. Wysocki wrote:
-> > On Fri, Feb 8, 2019 at 3:13 PM James Morse <james.morse@arm.com> wrote:
-> >> On 08/02/2019 11:40, Rafael J. Wysocki wrote:
-> >>> On Tuesday, January 29, 2019 7:48:36 PM CET James Morse wrote:
-> >>>> This series aims to wire-up arm64's fancy new software-NMI notifications
-> >>>> for firmware-first RAS. These need to use the estatus-queue, which is
-> >>>> also needed for notifications via emulated-SError. All of these
-> >>>> things take the 'in_nmi()' path through ghes_copy_tofrom_phys(), and
-> >>>> so will deadlock if they can interact, which they might.
-> >>
-> >>>> Known issues:
-> >>>>  * ghes_copy_tofrom_phys() already takes a lock in NMI context, this
-> >>>>    series moves that around, and makes sure we never try to take the
-> >>>>    same lock from different NMIlike notifications. Since the switch to
-> >>>>    queued spinlocks it looks like the kernel can only be 4 context's
-> >>>>    deep in spinlock, which arm64 could exceed as it doesn't have a
-> >>>>    single architected NMI. This would be fixed by dropping back to
-> >>>>    test-and-set when the nesting gets too deep:
-> >>>>  lore.kernel.org/r/1548215351-18896-1-git-send-email-longman@redhat.com
-> >>>>
-> >>>> * Taking an NMI from a KVM guest on arm64 with VHE leaves HCR_EL2.TGE
-> >>>>   clear, meaning AT and TLBI point at the guest, and PAN/UAO are squiffy.
-> >>>>   Only TLBI matters for APEI, and this is fixed by Julien's patch:
-> >>>>  http://lore.kernel.org/r/1548084825-8803-2-git-send-email-julien.thierry@arm.com
-> >>>>
-> >>>> * Linux ignores the physical address mask, meaning it doesn't call
-> >>>>   memory_failure() on all the affected pages if firmware or hypervisor
-> >>>>   believe in a different page size. Easy to hit on arm64, (easy to fix too,
-> >>>>   it just conflicts with this series)
-> >>
-> >>
-> >>>> James Morse (26):
-> >>>>   ACPI / APEI: Don't wait to serialise with oops messages when
-> >>>>     panic()ing
-> >>>>   ACPI / APEI: Remove silent flag from ghes_read_estatus()
-> >>>>   ACPI / APEI: Switch estatus pool to use vmalloc memory
-> >>>>   ACPI / APEI: Make hest.c manage the estatus memory pool
-> >>>>   ACPI / APEI: Make estatus pool allocation a static size
-> >>>>   ACPI / APEI: Don't store CPER records physical address in struct ghes
-> >>>>   ACPI / APEI: Remove spurious GHES_TO_CLEAR check
-> >>>>   ACPI / APEI: Don't update struct ghes' flags in read/clear estatus
-> >>>>   ACPI / APEI: Generalise the estatus queue's notify code
-> >>>>   ACPI / APEI: Don't allow ghes_ack_error() to mask earlier errors
-> >>>>   ACPI / APEI: Move NOTIFY_SEA between the estatus-queue and NOTIFY_NMI
-> >>>>   ACPI / APEI: Switch NOTIFY_SEA to use the estatus queue
-> >>>>   KVM: arm/arm64: Add kvm_ras.h to collect kvm specific RAS plumbing
-> >>>>   arm64: KVM/mm: Move SEA handling behind a single 'claim' interface
-> >>>>   ACPI / APEI: Move locking to the notification helper
-> >>>>   ACPI / APEI: Let the notification helper specify the fixmap slot
-> >>>>   ACPI / APEI: Pass ghes and estatus separately to avoid a later copy
-> >>>>   ACPI / APEI: Make GHES estatus header validation more user friendly
-> >>>>   ACPI / APEI: Split ghes_read_estatus() to allow a peek at the CPER
-> >>>>     length
-> >>>>   ACPI / APEI: Only use queued estatus entry during
-> >>>>     in_nmi_queue_one_entry()
-> >>>>   ACPI / APEI: Use separate fixmap pages for arm64 NMI-like
-> >>>>     notifications
-> >>>>   mm/memory-failure: Add memory_failure_queue_kick()
-> >>>>   ACPI / APEI: Kick the memory_failure() queue for synchronous errors
-> >>>>   arm64: acpi: Make apei_claim_sea() synchronise with APEI's irq work
-> >>>>   firmware: arm_sdei: Add ACPI GHES registration helper
-> >>>>   ACPI / APEI: Add support for the SDEI GHES Notification type
-> >>
-> >>
-> >>> I can apply patches in this series up to and including patch [21/26].
-> >>>
-> >>> Do you want me to do that?
-> >>
-> >> 9-12, 17-19, 21 are missing any review/ack tags, so I wouldn't ask, but as
-> >> you're offering, yes please!
-> >>
-> >>
-> >>> Patch [22/26] requires an ACK from mm people.
-> >>>
-> >>> Patch [23/26] has a problem that randconfig can generate a configuration
-> >>> in which memory_failure_queue_kick() is not present, so it is necessary
-> >>> to add a CONFIG_MEMORY_FAILURE dependency somewhere for things to
-> >>> work (or define an empty stub for that function in case the symbol is
-> >>> not set).
-> >>
-> >> Damn-it! Thanks, I was just trying to work that report out...
-> >>
-> >>
-> >>> If patches [24-26/26] don't depend on the previous two, I can try to
-> >>> apply them either, so please let me know.
-> >>
-> >> 22-24 depend on each other. Merging 24 without the other two is no-improvement,
-> >> so I'd like them to be kept together.
-> >>
-> >> 25-26 don't depend on 22-24, but came later so that they weren't affected by the
-> >> same race.
-> >> (note to self: describe that in the cover letter next time.)
-> >>
-> >>
-> >> If I apply the tag's and Boris' changes and post a tested v9 as 1-21, 25-26, is
-> >> that easier, or does it cause extra work?
-> > 
-> > Actually, I went ahead and applied them, since I had the 1-21 ready anyway.
-> 
-> > I applied the Boris' fixups manually which led to a bit of rebasing,
-> > so please check my linux-next branch.
-> 
-> Looks okay to me, and I ran your branch through the POLL/SEA/SDEI tests I've
-> been doing for each version so far.
 
-Thanks for the confirmation!
+On 2/12/2019 2:59 PM, Bhupesh Sharma wrote:
+> BTW, in the makedumpfile enablement patch thread for ARMv8.2 LVA
+> (which I sent out for 52-bit User space VA enablement) (see [0]), Kazu
+> mentioned that the changes look necessary.
+> 
+> [0]. http://lists.infradead.org/pipermail/kexec/2019-February/022431.html
 
+> > > The increased 'PTRS_PER_PGD' value for such cases needs to be then
+> > > calculated as is done by the underlying kernel (see
+> > > 'arch/arm64/include/asm/pgtable-hwdef.h' for details):
+> > >
+> > > #define PTRS_PER_PGD          (1 << (MAX_USER_VA_BITS - PGDIR_SHIFT))
+
+Yes, this is the reason why makedumpfile needs the MAX_USER_VA_BITS.
+It is used for pgd_index() also in makedumpfile to walk page tables.
+
+/* to find an entry in a page-table-directory */
+#define pgd_index(addr)         (((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+
+Thanks,
+Kazu
+
+> > >
+> > > Also, note that 'arch/arm64/include/asm/memory.h' defines 'MAX_USER_VA_BITS'
+> > > as 'VA_BITS' in case 'CONFIG_ARM64_USER_VA_BITS_52' is set to 'n':
+> > >
+> > > #ifdef CONFIG_ARM64_USER_VA_BITS_52
+> > > #define MAX_USER_VA_BITS      52
+> > > #else
+> > > #define MAX_USER_VA_BITS      VA_BITS
+> > > #endif
+> > >
+> > > So, makedumpfile will need this symbol exported in vmcore to make the above
+> > > determination.
+> > >
+> > > [0]. http://lists.infradead.org/pipermail/kexec/2019-February/022425.html
+> > >
+> > > Thanks,
+> > > Bhupesh
+> >
+> > Thanks
+> > Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
