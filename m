@@ -4,69 +4,84 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EB13DC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:20:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 81547C4151A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:21:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A62612081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:20:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 54D71218D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:21:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c/3dGwzT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A62612081B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DiarS4Tk";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="G8woGgtw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 54D71218D8
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=TxRGpLP4xxTKvCrkd7FvHgp3eQWoXC8P9u4iiBQMcjM=; b=c/3dGwzTrIA4Jj
-	S/Hv3xsBjJI0p9ABv9fnOU52krxyHvsVCtWqsODnPg3zeP/CY//Owm6c0mbpwqmpX7I3jdIggYqSl
-	5h3LMcn6fW3WqhLlRV0AoIYOQJB+SiWgK9uZjcXx502RsknaUuYgHvb1Ao1DTsKgZ7XTYyT34blU5
-	WyS7jkg5gmBTmc5xvAlOCihvYhKnYm4hjEzdFmfwzdmVARig4QoX+le/nu0qWPtiumYsntehvIgQO
-	66M9itRTLWDd0pbV5/7BioK7lALUAYol+BFVKbv4c44G7C7Ric0ukc7LtxHjxczfHgS6iySQf7p+7
-	ho3uPcktVLwsZXjNg30g==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=4Awl+lYF4XNgPqK1RtaGQnmoR6fRNJaKpWO4/BTaSxk=; b=DiarS4Tk7pg12U
+	Ix8B1aVceYSso8eQSDsHmivRAJmCH8NNlnEVOLadQtuJPjHi/aM4szbOXqf8zBJOm7/RqolIQPSr5
+	0UKFIt9FAKURK0EfWjE7AwPnto7vLuAfgxFf3eqjfTSvqxJe0GyeKJb3Itm1OtWm+izzLsjdr6hZm
+	w4FeWGDm4/9sP12H+iEx/ylp3q0zuI4BXh4PPFR0vt/sjVgvXFdmxoMl82dacK4xxDefO4wmifmJO
+	oUiMvqbkX6VsoqU8eiy4fZfFOxTk6eKo6AmWW1CuznSSaAfh4R8TX1Okq+5/SoLXdmPu7BJpX/HO+
+	BSdNvS9zFbtC0oUHCL0Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtTIu-0006UJ-ME; Tue, 12 Feb 2019 08:20:32 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gtTJT-0006mh-Q3; Tue, 12 Feb 2019 08:21:07 +0000
+Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtTIq-0006SX-4s; Tue, 12 Feb 2019 08:20:29 +0000
-X-UUID: 7dc3fd23a88d4b6a98d3bdada6dcf646-20190212
-X-UUID: 7dc3fd23a88d4b6a98d3bdada6dcf646-20190212
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
- (envelope-from <michael.kao@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1909137393; Tue, 12 Feb 2019 00:20:16 -0800
-Received: from mtkmbs03n1.mediatek.inc (172.21.101.181) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 12 Feb 2019 00:20:14 -0800
-Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs03n1.mediatek.inc (172.21.101.181) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 12 Feb 2019 16:20:13 +0800
-Received: from [172.21.84.99] (172.21.84.99) by mtkcas09.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 12 Feb 2019 16:20:13 +0800
-Message-ID: <1549959613.22716.6.camel@mtksdccf07>
-Subject: Re: [PATCH 1/7] thermal: mediatek: fix register index error
-From: Michael Kao <michael.kao@mediatek.com>
-To: Matthias Brugger <matthias.bgg@gmail.com>
-Date: Tue, 12 Feb 2019 16:20:13 +0800
-In-Reply-To: <6496b13f-57e4-af86-bb59-91a4705d91b0@gmail.com>
-References: <1549006693-11659-1-git-send-email-michael.kao@mediatek.com>
- <1549006693-11659-2-git-send-email-michael.kao@mediatek.com>
- <6496b13f-57e4-af86-bb59-91a4705d91b0@gmail.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gtTJQ-0006mH-Ie
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 08:21:06 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1C8L0uK017793;
+ Tue, 12 Feb 2019 02:21:00 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1549959660;
+ bh=h6nS8KEQuvXeKjc1JlLi0g/d54xykSlMo2wQ9Y5khW8=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=G8woGgtwnBgQJHWLUihd0zPqGXIvr9SWe1bcsMxAOIp+HkcIKbruECEQk96pOL0Xg
+ DP+XUgnHtARTSgNjioexGfpmpJrhiwT2+e29nYqXcdjNMKyxa1d+Al83cnU7k+03nI
+ WCYMFb8rnHszLjN3ZM7h8s12yR59oPiRfOa3G+Lk=
+Received: from DFLE108.ent.ti.com (dfle108.ent.ti.com [10.64.6.29])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1C8L0Kb103259
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Tue, 12 Feb 2019 02:21:00 -0600
+Received: from DFLE112.ent.ti.com (10.64.6.33) by DFLE108.ent.ti.com
+ (10.64.6.29) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 12
+ Feb 2019 02:21:00 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE112.ent.ti.com
+ (10.64.6.33) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Tue, 12 Feb 2019 02:21:00 -0600
+Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1C8KtGQ015182;
+ Tue, 12 Feb 2019 02:20:56 -0600
+Subject: Re: [PATCH v2 5/8] usb: ohci-da8xx: add vbus and overcurrent gpios
+To: Bartosz Golaszewski <brgl@bgdev.pl>, Kevin Hilman <khilman@kernel.org>,
+ Alan Stern <stern@rowland.harvard.edu>, Greg Kroah-Hartman
+ <gregkh@linuxfoundation.org>
+References: <20190211103702.4277-1-brgl@bgdev.pl>
+ <20190211103702.4277-6-brgl@bgdev.pl>
+From: Sekhar Nori <nsekhar@ti.com>
+Message-ID: <39ef1cac-85d3-9307-7d17-faf0ac196bf3@ti.com>
+Date: Tue, 12 Feb 2019 13:50:55 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-MTK: N
+In-Reply-To: <20190211103702.4277-6-brgl@bgdev.pl>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_002028_198122_54791C73 
-X-CRM114-Status: GOOD (  19.39  )
+X-CRM114-CacheID: sfid-20190212_002104_703782_9C9B7441 
+X-CRM114-Status: GOOD (  18.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,71 +93,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: =Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- srv_heupstream@mediatek.com, linux-pm@vger.kernel.org,
- =Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
- =Eduardo Valentin <edubezval@gmail.com>, =Rob Herring <robh+dt@kernel.org>,
- linux-mediatek@lists.infradead.org, =Zhang Rui <rui.zhang@intel.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Linus Walleij <linus.walleij@linaro.org>, linux-usb@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 2019-02-04 at 18:24 +0100, Matthias Brugger wrote:
+On 11/02/19 4:06 PM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> On 01/02/2019 08:38, michael.kao@mediatek.com wrote:
-> > From: Michael Kao <michael.kao@mediatek.com>
-> > 
-> > The index of msr and adcpnp should match the sensor
-> > which belongs to the selected bank in the for loop.
-> > 
+> There are two users upstream which register external callbacks for
+> switching the port power on/off and overcurrent protection. Both
+> users only use two GPIOs for that. Instead of having that functionality
+> in the board files, move the logic into the OHCI driver - including
+> the interrupt handler for overcurrent detection.
 > 
-> If I get that right, this fixes
-> b7cf0053738c ("thermal: Add Mediatek thermal driver for mt2701.")
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> ---
+>  drivers/usb/host/ohci-da8xx.c | 99 ++++++++++++++++++-----------------
+>  1 file changed, 50 insertions(+), 49 deletions(-)
 > 
-> So please add a fixes tag to the commit.
+> diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
+> index e8ede0b5e3f0..80c23307fbfe 100644
+> --- a/drivers/usb/host/ohci-da8xx.c
+> +++ b/drivers/usb/host/ohci-da8xx.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/io.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/jiffies.h>
+> +#include <linux/gpio/consumer.h>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
 
-It is true that the patch is fix b7cf0053738c.
-I will add 
-Fixes: b7cf0053738c ("thermal: Add Mediatek thermal driver for mt2701.")
-to the commit message of next version.
+Added the new include in alphabetical order. With that minor fix, series
+is applied to my v5.1/soc branch.
 
-> Thanks,
-> Matthias
-> 
-> > Signed-off-by: Michael Kao <michael.kao@mediatek.com>
-> > ---
-> >  drivers/thermal/mtk_thermal.c | 6 ++++--
-> >  1 file changed, 4 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/thermal/mtk_thermal.c b/drivers/thermal/mtk_thermal.c
-> > index 0691f26..f646436 100644
-> > --- a/drivers/thermal/mtk_thermal.c
-> > +++ b/drivers/thermal/mtk_thermal.c
-> > @@ -431,7 +431,8 @@ static int mtk_thermal_bank_temperature(struct mtk_thermal_bank *bank)
-> >  	u32 raw;
-> >  
-> >  	for (i = 0; i < conf->bank_data[bank->id].num_sensors; i++) {
-> > -		raw = readl(mt->thermal_base + conf->msr[i]);
-> > +		raw = readl(mt->thermal_base +
-> > +			    conf->msr[conf->bank_data[bank->id].sensors[i]]);
-> >  
-> >  		temp = raw_to_mcelsius(mt,
-> >  				       conf->bank_data[bank->id].sensors[i],
-> > @@ -568,7 +569,8 @@ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
-> >  
-> >  	for (i = 0; i < conf->bank_data[num].num_sensors; i++)
-> >  		writel(conf->sensor_mux_values[conf->bank_data[num].sensors[i]],
-> > -		       mt->thermal_base + conf->adcpnp[i]);
-> > +		       mt->thermal_base +
-> > +		       conf->adcpnp[conf->bank_data[num].sensors[i]]);
-> >  
-> >  	writel((1 << conf->bank_data[num].num_sensors) - 1,
-> >  	       mt->thermal_base + TEMP_MONCTL0);
-> > 
-
-
+Thanks,
+Sekhar
 
 _______________________________________________
 linux-arm-kernel mailing list
