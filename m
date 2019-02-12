@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B40A3C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:44:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AA99AC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:44:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3393220863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:44:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5EFC420863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:44:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gE4GNdbm";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="gfgHhJCI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3393220863
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="vBDjC7K4";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="EPlsrLlw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5EFC420863
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,69 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Sp9Xnisle8jwTzFrs8EBRE0aH967VvXKqBQ2Cj9nAFI=; b=gE4GNdbmEzEG4n
-	AnJkJi3pWKqZZHY0DZvO5mK+36U0GcDxMCjV0krAo1Wjyc5c8ukE8jrExPhUVwj8Ta0SCqPP/oTas
-	atqXegRR2R4LsoLiUI4CD/lmaDNeBK7PVzWsZ4wSAnTRMvn9ZVjTpPoKcFYZK0qv7tmhhsw5NPpNu
-	aJpMKdVeM0X2LKYxL++O09hemlaY/13mHybd+jvrllhvgCVLlQLeYI/xaEdGAX6k2cCRRNhPWOet7
-	86/GceRsEDFbwkJa2GBm/OMvRpokoSrj4vqon78fQyMH3W9r48RNWlKdJFa1drx/Lo70p/VRM2Nzq
-	eWLrSBFKwtoFSVUqdt8g==;
+	List-Owner; bh=t1AG5DKq3AWUSAq1zDGpxm1LLcmySCrGnyCVnLJJeF8=; b=vBDjC7K4iGCS2q
+	4mtMSuoGSGkH5wV3L1zJ3DpMtV0Xh6JdiqBNLAsCaPnnKPYvBZIhpba2hE2dYd63RpiAK1FsieZau
+	3BpSdHXVRNJaYb+EHJrl903jEzAhnPEeADDn2B1/axCg0gzHLKrc62l9Eup4TJ9PZMgxjhcvMrHlp
+	ZJ6cfTxNN0Zc0sa1iBNX8FQpsPgduHfhQc3cuK5zlYnTn9ngiNBCR2Ky3h8OItaDcPi8jcNn6qZq9
+	lpFM6MRAcOBgAPODgzqWlDc4hLgLGyV4oZGGsJ++0boVcJ/qR6Y+QYzqvygn0jznQ2/mCLEZMd8zz
+	WAGVhSTH1Ks/Gr7fOsIA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtVY0-0003Oc-Eu; Tue, 12 Feb 2019 10:44:16 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gtVYF-0003hg-ND; Tue, 12 Feb 2019 10:44:31 +0000
+Received: from mail-wr1-f65.google.com ([209.85.221.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtVTE-0006D5-Lw
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 10:39:38 +0000
-Received: by mail-wr1-x443.google.com with SMTP id l9so2047617wrt.13
+ id 1gtVTM-0006Kg-1a
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 10:39:48 +0000
+Received: by mail-wr1-f65.google.com with SMTP id o17so2110738wrw.3
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 02:39:20 -0800 (PST)
+ Tue, 12 Feb 2019 02:39:27 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=3Hwye1NlQfpROfiatGP4AAPQ8WZ+X3wpSFiN169P8MI=;
- b=gfgHhJCIMdwQyiwFGV1QkFfJAo/DDHvP+0/W4htvK6gnnLaReXahhbh5X74EFkBBfr
- sKc4L8uQ2ODt66SDQXUryWorKbMbxWYx0Vpi5SNsosTd3CsR4t75neGvePx2UBLCA78C
- ipcJlrHYVRryoueriLI/jIT36jpGFvy6z1GXJHmOgE4JE+kryJa+aAjgAD4PfU+exRDT
- QuMf+gGATYsaB0uHAY5L95hFytaZNmdkEblwyLBD0WfFf92WPlSf5Y82Q5iI1TtipcS7
- 6TX+OTLvfQ4WURPzfgC9Dg2WeQ/j5AUUaCoBgui3yfzWCYus2dqshT2nDPiupSI2FWHO
- dj7Q==
+ bh=qhFqkmsXZyuazPofYbQWZL9RcZ7Ca/je+Dz4MrjLFaI=;
+ b=EPlsrLlwIM5eQ6qCbBM/iLWsiNRq1swEAhorrsdQfx5Nz7e9/7PIzUL39IrYxQG/cP
+ VQVS28KgHXP9Azk2pU5hxDSOi8GnHfaSFmcbuxpTf2evpuaVUCO01JF79PV3CzCFlmOa
+ /CKumZ5ZdyTuwh2Q5pLkbskmGRaYpXBVJ8+Nb3TP55db2tno4A3ML9lqqMRnJ5UWZ4MC
+ YfJimjI4/n6N4aGczwo+aEAf3iPM3V80mma8+jXkHS712XIhb//qFjCu0PQjRFOh8h5B
+ 8cyxZe+/ncF/jxiS1baSZxc2hMpp5XHW+tMug5qB3fhYtLpi7l2jIuyUPhebQs8B6MgO
+ r45A==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=3Hwye1NlQfpROfiatGP4AAPQ8WZ+X3wpSFiN169P8MI=;
- b=Jgl/bnZkHQWou0GpG4sW/95SBGDaKSIPfrWmRtg82c/UivMngGkIsxVYjdzYxh+z43
- lE/XbGmTKNbZQHTb6WtqmRNXlWj3orGgo5ExrSRJrlH8zccP0Uom7IIkoFS4PQI7CSZA
- B8Cx1zXLcr6AlG+WRMqc8l5ke+RazDT6AjCTBR/Noz7I+rU3ShGSNudXAWClkByzdvwx
- c1zon/9eh7nHkLCVif5yoK5fB0bt1HtZuk9IqgfwqbhjzVaygZAGY4d1g2hAPdF1hrKS
- VjfjPK7vxGbbIMvS6U4a62H8+JIGedw7MzN0SVIazHta/gVo85/tKCBS0N5TgzpkqW0J
- YKFQ==
-X-Gm-Message-State: AHQUAubPYVJ3OH2Fe2J9aPtBscXyssSL6yaYcSv47LU/U0Qpj5pBVJGb
- FsvZbOTUYoSnD838XRGoh9+1kg==
-X-Google-Smtp-Source: AHgI3IZzJrN9VqLpqD7nqk+Dht2iIf2+d7+v4HQuiBiFinrky53GVdpUqe79GPK45WLE4hPlxLlhsA==
-X-Received: by 2002:a5d:42c3:: with SMTP id t3mr2257680wrr.232.1549967959188; 
- Tue, 12 Feb 2019 02:39:19 -0800 (PST)
+ bh=qhFqkmsXZyuazPofYbQWZL9RcZ7Ca/je+Dz4MrjLFaI=;
+ b=rgZS73WbLY/qXvfvRlUKMgMlOegEOkiwUZdd7TK8+ndU3fWGj9wYksjhPqwAIKjYNS
+ aGRURx3qXqmondLercnFKHWJJk02kydJHtnzYPMun6dpdPaN+vBsNWA1enpjM6xaDqR9
+ yhHsyS/e7EdY3jhnUphpzCWoHykfkCj3CPo4DjCe5DJSMZDqnaZU0IAheAXn9Z1yPtfu
+ 39xQ7RK/LEXUItjo47pUBLDT8VloejCdf6JyRltzPyQ+z/guNvc+JOpy2L17h2qU2smf
+ FCOg5BB7f3gaDY1g4kpJQCKFNecNub/Bcu0q9bEyRd86/Lxgw1VqwwMnVdCBOT9zLfbg
+ wS1Q==
+X-Gm-Message-State: AHQUAubCRgsTkCOVW/DoIo2txBJp1yDtbcPWR0Q9jPvD5nDyMGA0G9nw
+ eFLtWmJ+A4IZMyRrq841YObs7w==
+X-Google-Smtp-Source: AHgI3IaHYJQXAFGCW6IoU/bSVxGT/oCXiB6qrYsPXsWCvUatBlekF+zInG72x6L84+RgvwAbRGoNug==
+X-Received: by 2002:adf:e5c5:: with SMTP id a5mr2318947wrn.13.1549967966020;
+ Tue, 12 Feb 2019 02:39:26 -0800 (PST)
 Received: from localhost.localdomain
  (aputeaux-684-1-38-32.w90-86.abo.wanadoo.fr. [90.86.93.32])
- by smtp.gmail.com with ESMTPSA id c14sm3708656wrn.12.2019.02.12.02.39.18
+ by smtp.gmail.com with ESMTPSA id c14sm3708656wrn.12.2019.02.12.02.39.24
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 12 Feb 2019 02:39:18 -0800 (PST)
+ Tue, 12 Feb 2019 02:39:25 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
  Marc Zyngier <marc.zyngier@arm.com>, David Lechner <david@lechnology.com>
-Subject: [PATCH v3 19/37] ARM: davinci: aintc: request memory region before
- remapping it
-Date: Tue, 12 Feb 2019 11:38:17 +0100
-Message-Id: <20190212103835.7768-20-brgl@bgdev.pl>
+Subject: [PATCH v3 25/37] irqchip: davinci-cp-intc: add a new config structure
+Date: Tue, 12 Feb 2019 11:38:23 +0100
+Message-Id: <20190212103835.7768-26-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190212103835.7768-1-brgl@bgdev.pl>
 References: <20190212103835.7768-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_023921_516467_4FF80EBA 
-X-CRM114-Status: GOOD (  11.84  )
+X-CRM114-CacheID: sfid-20190212_023929_011614_E0AFB656 
+X-CRM114-Status: GOOD (  13.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,37 +108,44 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Add a missing call to request_mem_region() before calling ioremap() to
-make sure the region is not being used by anyone else.
+Add a config structure that will be used by cp-intc-based platforms.
+It contains the register range resource and the number of interrupts.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/irq.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ include/linux/irqchip/irq-davinci-cp-intc.h | 23 +++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 include/linux/irqchip/irq-davinci-cp-intc.h
 
-diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
-index 2afaf19dc46c..2b6943731af9 100644
---- a/arch/arm/mach-davinci/irq.c
-+++ b/arch/arm/mach-davinci/irq.c
-@@ -86,9 +86,18 @@ davinci_aintc_handle_irq(struct pt_regs *regs)
- void __init davinci_aintc_init(const struct davinci_aintc_config *config)
- {
- 	unsigned int irq_off, reg_off, prio, shift;
-+	void __iomem *req;
- 	int ret, irq_base;
- 	const u8 *prios;
- 
-+	req = request_mem_region(config->reg.start,
-+				 resource_size(&config->reg),
-+				 "davinci-cp-intc");
-+	if (!req) {
-+		pr_err("%s: register range busy\n", __func__);
-+		return;
-+	}
+diff --git a/include/linux/irqchip/irq-davinci-cp-intc.h b/include/linux/irqchip/irq-davinci-cp-intc.h
+new file mode 100644
+index 000000000000..2270a6167b98
+--- /dev/null
++++ b/include/linux/irqchip/irq-davinci-cp-intc.h
+@@ -0,0 +1,23 @@
++/* SPDX-License-Identifier: GPL-2.0-or-later */
++/*
++ * Copyright (C) 2019 Texas Instruments
++ */
 +
- 	davinci_aintc_base = ioremap(config->reg.start,
- 				     resource_size(&config->reg));
- 	if (!davinci_aintc_base) {
++#ifndef _LINUX_IRQ_DAVINCI_CP_INTC_
++#define _LINUX_IRQ_DAVINCI_CP_INTC_
++
++#include <linux/ioport.h>
++
++/**
++ * struct davinci_cp_intc_config - configuration data for davinci-cp-intc
++ *                                 driver.
++ *
++ * @reg: register range to map
++ * @num_irqs: number of HW interrupts supported by the controller
++ */
++struct davinci_cp_intc_config {
++	struct resource reg;
++	unsigned int num_irqs;
++};
++
++#endif /* _LINUX_IRQ_DAVINCI_CP_INTC_ */
 -- 
 2.20.1
 
