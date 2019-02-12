@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 21775C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:28:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4A4EEC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:28:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DB2982083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:28:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 082912186A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:28:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nFIRdZx9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB2982083B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BwohJYzv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 082912186A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=21uxw8wzoS0IpgwF/L2aD2cCRN2EJ7zj9wcQMZ8yRGA=; b=nFIRdZx9LUQu4D
-	P41ES5+irSREvDjO3p2niCYJgNUfCpR7v9rD+TwIRTxEcNtuaHLhm1+O6371zWgCn6r2p/H3pDmLh
-	CEp5tb+aJ0kHz5dE9uSWRI08U1FzKoGdQD6QzHAQc5yRJ77HiFy0lhqJnE4I71j4bxJYf3qVPYDda
-	q7Q2lwOK95q3gEMz9S+ionZk3oZiHGa4gNwXpt9VJPVFOcKluqog5dmbIKENlX5pMDvpd24fPYPcS
-	khm/cqXnqt+xMzyyxjhuuql0pPwqdVKVYxpgX13THhisEJ529qK+585bpdZmUmcFru2Mc4QPvccfr
-	cUiaDWcyBk1lhdz9R9Qw==;
+	List-Owner; bh=PbmgsyhLy8s2QyIHgNvsHOOKrzERyshrvWe5H6msqfw=; b=BwohJYzvFeVFBb
+	QaQ4boRqEP8HlyLzLxbJDuaY6y7rhT4K8MmNWzkE8f8k03ddj32IexOAjQ37tqQbg2D2/YolhEEOF
+	nM21rhNIDonlcEbrl6vNUg1VoKUjKA/RBctUrUHxt0g7iSWz9nNPn/V4oAwXuzerEeLScJAdJIV9t
+	aDNfGcKP5lGCH6lsQWa4pL0eEqdX8oHiCPbTh7tHCbGzAJtigrwtxs0h4wsHMIIUIXdR52fwbitxW
+	jwOgphCM0CFSynOv675CcAxxIKFdd5WWn41E8c/MTZkkcmjGfzJ3bTYnz47QcTIKPg6Uf3wJHgy8O
+	G67dln3E+TiS27PGMwZA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtSU5-0004qa-FP; Tue, 12 Feb 2019 07:28:01 +0000
+	id 1gtSUO-0005Cp-Jo; Tue, 12 Feb 2019 07:28:20 +0000
 Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtSS3-0002iH-Gu; Tue, 12 Feb 2019 07:25:55 +0000
+ id 1gtSS6-0002lW-2f; Tue, 12 Feb 2019 07:25:58 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: Ulf Hansson <ulf.hansson@linaro.org>
-Subject: [PATCH 09/14] mmc: s3cmci: handle chained sglists
-Date: Tue, 12 Feb 2019 08:25:23 +0100
-Message-Id: <20190212072528.13167-10-hch@lst.de>
+Subject: [PATCH 10/14] mmc: mvsdio: handle highmem pages
+Date: Tue, 12 Feb 2019 08:25:24 +0100
+Message-Id: <20190212072528.13167-11-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190212072528.13167-1-hch@lst.de>
 References: <20190212072528.13167-1-hch@lst.de>
@@ -68,71 +68,117 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use the proper sg_next() helper to move to the next scatterlist element
-to support chained scatterlists.
+Instead of setting up a kernel pointer to track the current PIO address,
+track the offset in the current page, and do an atomic kmap for the page
+while doing the actual PIO operations.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- drivers/mmc/host/s3cmci.c | 19 +++++++++----------
- drivers/mmc/host/s3cmci.h |  2 +-
- 2 files changed, 10 insertions(+), 11 deletions(-)
+ drivers/mmc/host/mvsdio.c | 33 +++++++++++++++++++++------------
+ 1 file changed, 21 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index 989fefea19f1..df7c27f78abf 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -319,20 +319,19 @@ static void s3cmci_check_sdio_irq(struct s3cmci_host *host)
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index e22bbff89c8d..d04c78125a4d 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -42,7 +42,8 @@ struct mvsd_host {
+ 	unsigned int intr_en;
+ 	unsigned int ctrl;
+ 	unsigned int pio_size;
+-	void *pio_ptr;
++	struct scatterlist *pio_sg;
++	unsigned int pio_offset; /* offset in words into the segment */
+ 	unsigned int sg_frags;
+ 	unsigned int ns_per_clk;
+ 	unsigned int clock;
+@@ -96,9 +97,9 @@ static int mvsd_setup_data(struct mvsd_host *host, struct mmc_data *data)
+ 	if (tmout_index > MVSD_HOST_CTRL_TMOUT_MAX)
+ 		tmout_index = MVSD_HOST_CTRL_TMOUT_MAX;
  
- static inline int get_data_buffer(struct s3cmci_host *host)
+-	dev_dbg(host->dev, "data %s at 0x%08x: blocks=%d blksz=%d tmout=%u (%d)\n",
++	dev_dbg(host->dev, "data %s at 0x%08llx: blocks=%d blksz=%d tmout=%u (%d)\n",
+ 		(data->flags & MMC_DATA_READ) ? "read" : "write",
+-		(u32)sg_virt(data->sg), data->blocks, data->blksz,
++		(u64)sg_phys(data->sg), data->blocks, data->blksz,
+ 		tmout, tmout_index);
+ 
+ 	host->ctrl &= ~MVSD_HOST_CTRL_TMOUT_MASK;
+@@ -118,10 +119,11 @@ static int mvsd_setup_data(struct mvsd_host *host, struct mmc_data *data)
+ 		 * boundary.
+ 		 */
+ 		host->pio_size = data->blocks * data->blksz;
+-		host->pio_ptr = sg_virt(data->sg);
++		host->pio_sg = data->sg;
++		host->pio_offset = data->sg->offset / 2;
+ 		if (!nodma)
+-			dev_dbg(host->dev, "fallback to PIO for data at 0x%p size %d\n",
+-				host->pio_ptr, host->pio_size);
++			dev_dbg(host->dev, "fallback to PIO for data at 0x%x size %d\n",
++				host->pio_offset, host->pio_size);
+ 		return 1;
+ 	} else {
+ 		dma_addr_t phys_addr;
+@@ -291,8 +293,9 @@ static u32 mvsd_finish_data(struct mvsd_host *host, struct mmc_data *data,
  {
--	if (host->pio_sgptr >= host->mrq->data->sg_len) {
--		dbg(host, dbg_debug, "no more buffers (%i/%i)\n",
--		      host->pio_sgptr, host->mrq->data->sg_len);
-+	if (!host->next_sg) {
-+		dbg(host, dbg_debug, "no more buffers (%i)\n",
-+		      host->mrq->data->sg_len);
- 		return -EBUSY;
+ 	void __iomem *iobase = host->base;
+ 
+-	if (host->pio_ptr) {
+-		host->pio_ptr = NULL;
++	if (host->pio_sg) {
++		host->pio_sg = NULL;
++		host->pio_offset = 0;
+ 		host->pio_size = 0;
+ 	} else {
+ 		dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->sg_frags,
+@@ -376,8 +379,10 @@ static irqreturn_t mvsd_irq(int irq, void *dev)
+ 	if (host->pio_size &&
+ 	    (intr_status & host->intr_en &
+ 	     (MVSD_NOR_RX_READY | MVSD_NOR_RX_FIFO_8W))) {
+-		u16 *p = host->pio_ptr;
++		u16 *base = sg_kmap_atomic(host->pio_sg);
++		u16 *p = base + host->pio_offset;
+ 		int s = host->pio_size;
++
+ 		while (s >= 32 && (intr_status & MVSD_NOR_RX_FIFO_8W)) {
+ 			readsw(iobase + MVSD_FIFO, p, 16);
+ 			p += 16;
+@@ -416,13 +421,15 @@ static irqreturn_t mvsd_irq(int irq, void *dev)
+ 		}
+ 		dev_dbg(host->dev, "pio %d intr 0x%04x hw_state 0x%04x\n",
+ 			s, intr_status, mvsd_read(MVSD_HW_STATE));
+-		host->pio_ptr = p;
++		host->pio_offset = p - base;
+ 		host->pio_size = s;
++		sg_kunmap_atomic(host->pio_sg, base);
+ 		irq_handled = 1;
+ 	} else if (host->pio_size &&
+ 		   (intr_status & host->intr_en &
+ 		    (MVSD_NOR_TX_AVAIL | MVSD_NOR_TX_FIFO_8W))) {
+-		u16 *p = host->pio_ptr;
++		u16 *base = sg_kmap_atomic(host->pio_sg);
++		u16 *p = base + host->pio_offset;
+ 		int s = host->pio_size;
+ 		/*
+ 		 * The TX_FIFO_8W bit is unreliable. When set, bursting
+@@ -453,8 +460,9 @@ static irqreturn_t mvsd_irq(int irq, void *dev)
+ 		}
+ 		dev_dbg(host->dev, "pio %d intr 0x%04x hw_state 0x%04x\n",
+ 			s, intr_status, mvsd_read(MVSD_HW_STATE));
+-		host->pio_ptr = p;
++		host->pio_offset = p - base;
+ 		host->pio_size = s;
++		sg_kunmap_atomic(host->pio_sg, base);
+ 		irq_handled = 1;
  	}
--	host->cur_sg = &host->mrq->data->sg[host->pio_sgptr];
-+	host->cur_sg = host->next_sg;
-+	host->next_sg = sg_next(host->next_sg);
  
- 	host->pio_bytes = host->cur_sg->length;
- 	host->pio_offset = host->cur_sg->offset;
+@@ -737,6 +745,7 @@ static int mvsd_probe(struct platform_device *pdev)
+ 	clk_prepare_enable(host->clk);
  
--	host->pio_sgptr++;
--
--	dbg(host, dbg_sg, "new buffer (%i/%i)\n",
--	    host->pio_sgptr, host->mrq->data->sg_len);
-+	dbg(host, dbg_sg, "new buffer (%i)\n",
-+	    host->mrq->data->sg_len);
+ 	mmc->ops = &mvsd_ops;
++	mmc->need_kmap = 1;
  
- 	return 0;
- }
-@@ -1051,8 +1050,8 @@ static int s3cmci_prepare_pio(struct s3cmci_host *host, struct mmc_data *data)
+ 	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
  
- 	BUG_ON((data->flags & BOTH_DIR) == BOTH_DIR);
- 
--	host->pio_sgptr = 0;
--	host->cur_sg = &host->mrq->data->sg[host->pio_sgptr];
-+	host->cur_sg = host->mrq->data->sg;
-+	host->next_sg = sg_next(host->cur_sg);
- 	host->pio_bytes = 0;
- 	host->pio_count = 0;
- 	host->pio_active = rw ? XFER_WRITE : XFER_READ;
-diff --git a/drivers/mmc/host/s3cmci.h b/drivers/mmc/host/s3cmci.h
-index 4320f7d832dc..caf1078d07d1 100644
---- a/drivers/mmc/host/s3cmci.h
-+++ b/drivers/mmc/host/s3cmci.h
-@@ -51,7 +51,7 @@ struct s3cmci_host {
- 	int			dma_complete;
- 
- 	struct scatterlist	*cur_sg;
--	u32			pio_sgptr;
-+	struct scatterlist	*next_sg;
- 	u32			pio_bytes;
- 	u32			pio_count;
- 	u32			pio_offset;
 -- 
 2.20.1
 
