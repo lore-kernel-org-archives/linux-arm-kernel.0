@@ -2,61 +2,67 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8EBD0C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:41:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2AEA9C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:43:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5873A217FA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:41:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F0F8F21773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:43:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k1/zjXGu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5873A217FA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JS7CMmas";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="t0hYTQeG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F0F8F21773
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=y27m4sLxqXSPi8WyDwrKCHajLcqZPF+MA+rf1jlSoMk=; b=k1/zjXGu5hcnA1
-	KKtYoRVehjiBvNay/Z2xYyvFy6XWLiyizFXwvz+0aXfL4hzqnk3xmxuIQFLJUj4JfArH22gAfcJWN
-	KtJP6ZzVSX7/kOmLiT7rNCvtZFFjViVXDIvlxhRBpd6WQUIJo6K0p1WF2ORxV1KzlwJW1e3jgBjIl
-	VcU3967tX7Nc1Elew/akyw3dyuuGVy4uE+IAUTno7UTEZzqipqGsJDMTSV3YRpigP4ri0sZQxhFpj
-	A9iAStski/lOKXcbbWuTjD8RweGO08QOgZpM21olH7Abv8b7qJEmoB83G/x4tuVyPRCh9eNr2tY4B
-	OkF7uUgw1p2kllEC9gjQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=QH7JoLg6rRkYCdLt1k7z1bCWdLeOKFUL/oD0FyWxjVk=; b=JS7CMmasVk72hT
+	TYSqygvKw3LhFSkI2gc4Uq8tYww1o779zcV3XNcvy1sZfiX4XNx1rqQktTsaW9sbB0M4eqTb0xmet
+	RhY0BCIBuwQZW77rTKNnbvNfc5sJvXzvKQfYEvVvlDWncMfZf2mRi3F6BHvEx4hP5pE3ksDBmCXr9
+	AWGjpcfQ+GpFesYfFpUSFPz4GASnHHMjiNf9HbIaeFBAMUjexH+jEtMX+wqJsUr0NRxRSwNRAFbJp
+	K/1kLUv4F6fPCwfZfaLZMQ13vTNTYFxD9Hayybw810n+Y6yyDgsn1cJoLpf4C1yF9vg/2pVmUp2NA
+	COuvR8aS+/ThFWYzZ3hQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtaBe-0005V6-Gj; Tue, 12 Feb 2019 15:41:30 +0000
-Received: from relay2-d.mail.gandi.net ([217.70.183.194])
+	id 1gtaDS-0005sB-3A; Tue, 12 Feb 2019 15:43:22 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtaBa-0005Ug-QK
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:41:28 +0000
-X-Originating-IP: 90.88.30.68
-Received: from aptenodytes (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr
- [90.88.30.68]) (Authenticated sender: paul.kocialkowski@bootlin.com)
- by relay2-d.mail.gandi.net (Postfix) with ESMTPSA id 3D54340004;
- Tue, 12 Feb 2019 15:41:23 +0000 (UTC)
-Message-ID: <ff43713a1f2e491608296b48ae8c867949c70fbd.camel@bootlin.com>
-Subject: Re: [PATCH v3 4/8] drm/sun4i: dsi: Fix front vs back porch calculation
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>, Maarten Lankhorst
- <maarten.lankhorst@linux.intel.com>, Sean Paul <seanpaul@chromium.org>
-Date: Tue, 12 Feb 2019 16:41:22 +0100
-In-Reply-To: <90c2375b8a853cae0dcc135cedb47edbc26168d8.1549896081.git-series.maxime.ripard@bootlin.com>
-References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
- <90c2375b8a853cae0dcc135cedb47edbc26168d8.1549896081.git-series.maxime.ripard@bootlin.com>
-Organization: Bootlin
-User-Agent: Evolution 3.30.5 
+ id 1gtaDO-0005qs-ET
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:43:19 +0000
+Received: from localhost.localdomain (NE2965lan1.rev.em-net.ne.jp
+ [210.141.244.193])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 14B6E21773;
+ Tue, 12 Feb 2019 15:43:15 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549986197;
+ bh=Fl6g9cx+KTVtRS/rzj8ZyrdfdE1bg1TwwE1uUnu9KIQ=;
+ h=From:To:Cc:Subject:Date:From;
+ b=t0hYTQeGGGbEmbH6bWWM75e0pn5rp51r8KgHA5esbPESJLJrPA09YzgA8QLFFfNLl
+ uTH2bvblww1t9exvAdOHLcua3zo6XYpqK7SNnn/kl6JPeGnpkfhEgynluJiqN1M6Cn
+ YwNA8Cy6ugwBl1gDq1/kV8HW+kkMTxgb8Lclb/M0=
+From: Masami Hiramatsu <mhiramat@kernel.org>
+To: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>
+Subject: [PATCH v3 0/4] arm64: kprobes: Update blacklist checking on arm64
+Date: Wed, 13 Feb 2019 00:42:53 +0900
+Message-Id: <154998617300.21869.11457765723750331236.stgit@devbox>
+X-Mailer: git-send-email 2.13.6
+User-Agent: StGit/0.17.1-dirty
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_074127_013456_E12FC208 
-X-CRM114-Status: GOOD (  13.94  )
+X-CRM114-CacheID: sfid-20190212_074318_509587_F7CDA694 
+X-CRM114-Status: GOOD (  10.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,74 +74,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: bbrezillon@kernel.org, dri-devel@lists.freedesktop.org,
- Chen-Yu Tsai <wens@csie.org>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Jagan Teki <jagan@openedev.com>, linux-arm-kernel@lists.infradead.org
+Cc: Pratyush Anand <panand@redhat.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>, James Morse <james.morse@arm.com>,
+ Masami Hiramatsu <mhiramat@kernel.org>, linux-arm-kernel@lists.infradead.org,
+ "David A . Long" <dave.long@linaro.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+Hello,
 
-On Mon, 2019-02-11 at 15:41 +0100, Maxime Ripard wrote:
-> Since I always confuse the back and front porches, a few miscalculation
-> slipped through. Fix them.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Here is the v3 series of update of the kprobe blacklist
+checking on arm64.
 
-Food for thoughts: everything indicates that backporch does not count
-sync length for the DSI registers (while it does for TCON). So all
-these changes look good!
+I found that some blacklist checking code were mis-placed in
+arch_prepare_kprobe() and arch_within_kprobe_blacklist().
+Since the blacklist just filters by symbol, smaller than the
+symbol, like extable must be checked in arch_prepare_kprobe().
+Also, all function (symbol) level check must be done by blacklist.
 
-Reviewed-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+For arm64, it checks the extable entry address in blacklist
+and exception/irqentry function in arch_prepare_kprobe().
+And, RODATA check is unneeded since kernel/kprobes.c
+already ensures the probe address is in kernel-text area.
 
-Cheers,
+In v3, I rebased on the latest arm64 kernel which includes
+James' KVM/HYP fixes for kprobes, and fix a reported bugs
+in [4/4].
 
-Paul
+Changes in v3:
+ - [4/4] Fixes to remove redundant blacklist of kprobe_text
+   and add blacklist on exception_text.
 
-> ---
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> index 506f2e8cf454..2518a0d7567c 100644
-> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> @@ -477,7 +477,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
->  	 */
->  #define HBP_PACKET_OVERHEAD	6
->  	hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
-> -		  (mode->hsync_start - mode->hdisplay) * Bpp - HBP_PACKET_OVERHEAD);
-> +		  (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
->  
->  	/*
->  	 * The frontporch is set using a blanking packet (4 bytes +
-> @@ -485,7 +485,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
->  	 */
->  #define HFP_PACKET_OVERHEAD	6
->  	hfp = max((unsigned int)HFP_PACKET_OVERHEAD,
-> -		  (mode->htotal - mode->hsync_end) * Bpp - HFP_PACKET_OVERHEAD);
-> +		  (mode->hsync_start - mode->hdisplay) * Bpp - HFP_PACKET_OVERHEAD);
->  
->  	/*
->  	 * hblk seems to be the line + porches length.
-> @@ -531,8 +531,8 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
->  	regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE0_REG,
->  		     SUN6I_DSI_BASIC_SIZE0_VSA(mode->vsync_end -
->  					       mode->vsync_start) |
-> -		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vsync_start -
-> -					       mode->vdisplay));
-> +		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vtotal -
-> +					       mode->vsync_end));
->  
->  	regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE1_REG,
->  		     SUN6I_DSI_BASIC_SIZE1_VACT(mode->vdisplay) |
--- 
-Paul Kocialkowski, Bootlin
-Embedded Linux and kernel engineering
-https://bootlin.com
+Thank you,
 
+---
+
+Masami Hiramatsu (4):
+      arm64: kprobes: Move extable address check into arch_prepare_kprobe()
+      arm64: kprobes: Remove unneeded RODATA check
+      arm64: kprobes: Move exception_text check in blacklist
+      arm64: kprobes: Use arch_populate_kprobe_blacklist()
+
+
+ arch/arm64/kernel/probes/kprobes.c |   52 +++++++++++++++++++-----------------
+ 1 file changed, 27 insertions(+), 25 deletions(-)
+
+--
+Masami Hiramatsu (Linaro) <mhiramat@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
