@@ -4,21 +4,21 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D89C5C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:59:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6E146C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:59:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9F5AC21773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:59:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3D94B21773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:59:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oY5VB3I2";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="AhdXnDe6";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="e8tCp+4c"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9F5AC21773
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Zajk/YEy";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="e+lGlduM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="MzSRwCjL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3D94B21773
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,77 +27,77 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=f8iFewZ/5KToS0sADLOHQWh71+DnsEX8ODsMXQnupS0=; b=oY5VB3I22XM45n
-	rxTpsrfvvDyYAWMAfrvieTCo/OPITtviPIgNC44uFaOTMbd2YVxU2gD2jKSyu5BSSv/JHO3YULhM9
-	lDAZrbAtC+1A2vmfH9BNWJdAdxyI5K1op25XVdBH9vkP5DvPwvQChJDRG4lagpWSaDGfhj20Y1STw
-	IuJ+llaWGnEyLkd4Fu7BT8LbrfejPrcDMdybdSfEeccAiYVfxgqHz8bRND7r7JpVz+y5l2cUaqoyb
-	iw6QELuXhuHhhZx0qLkZ+GR4q3xgQFrkz8FDOSj9NTsCbCZrR6u4c1dpGGdlO13kV/ry+JrxSqrv7
-	Pxw1NDxfFTgBugkJXEWw==;
+	List-Owner; bh=CThsJ7zG2Fvj4Xtk5njZHVq/hXKthqJBBcrNntfe2Mo=; b=Zajk/YEyb79Nou
+	ejHidDyJon4uvlrRtDJyUX3ooq4pXp3kFAOVgZOe2WGLZGAINfZDoXw43eUGdJ5Y8U2jzsJnpUUtZ
+	PO9hsMleuUebMTUllY1g26C+yK8YnuIDjL+mURRnmswV6QY4bWdrXDCMUmK9o9jUgSschfxn5qFic
+	c9T3pzubEpXUmdaDXzzd+2cq/MUZ2bspy1AGzyGgKKbYMLxpNIpIk+Y9/3syxM3up3zn0AtIMnjgl
+	BZ1+cBaUfpnuM6HgVQyEBJat9yvfFaTLgWwSah6rVVfryqpi7ERkF3eRlWNgXX/IaStKpfPT3OZF8
+	37BLCxLpfUOf5YBPp7iA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtSyf-0004Rh-Ls; Tue, 12 Feb 2019 07:59:37 +0000
+	id 1gtSys-0004ds-5i; Tue, 12 Feb 2019 07:59:50 +0000
 Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtSyd-0004Pg-9b
- for linux-arm-kernel@bombadil.infradead.org; Tue, 12 Feb 2019 07:59:35 +0000
+ id 1gtSye-0004Pg-9p
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 12 Feb 2019 07:59:36 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=casper.20170209; h=Content-Type:Content-Transfer-Encoding:
  MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:CC:To:From:Sender
  :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=p8DoSGbnagOTgtMc5WkCFpNMdJdrvnQTvwNp+0R+n58=; b=AhdXnDe6/aKCQom08BLdBRx7jz
- GgWdfVC16YtYJHG4xZc9vg/8OEEdXiEGFz4mXUiJi4j8j8hIIc7AB7rUPgByMODppuEF9geGYe8sD
- yUAMTPs3vnApTfXRrGovWu175rMuc1I8PWfPcQgQ/D7T9jssgfK/RTuWsShQ+n7Q3pFpPqiDoN0PX
- FJCVwTXT1Qi/7TB5aVz8rXZ5JfTcE3t7LZI3pY6uKIW7lN3i8ZtzSGt1NN6CtBU/RpNYh4ppx7ON9
- qWmM8JQjpex9jF9NYRiivehW1qyXZQs8mYU+WEiGoz5NsSEZ/1YD9xvXoISr9yIOSegCtSe+Ct1Og
- 115cw3eg==;
+ bh=cLFSJbtEF080CABAE546omquJje2oJ1MPGnKrPKE10E=; b=e+lGlduM2r+vjGKEgbfVMC411I
+ zL+NoNF4m+K8obqJNptbHoeLAiot6s3XdSkAqUIiY+R4MSKDbvsoeOT5KHk7lDAaAqrM+AKQojKgw
+ N1YpMoyPBUpTH0rkWISO9Bt1LEgqhzaOIcj8JZp6+jOITR8k7D7+yEAtM8o1huVblj0yFI9LBtWAB
+ CHg6CQLiZFPjJ8t5XfdvzRRnTl4JRPSWm1ckqPFeT07KXJ1flempNvntVeoTJKV0jFCvZ+Jrs6qvq
+ kyL+r/YB5bPTJmI0lXFitnTVWym7HFV4cjhGrXN80ToT3LsV+kVbNGzSbgtYQ6EjsBRhmWrkq4TB6
+ mCMCy3jw==;
 Received: from fllv0016.ext.ti.com ([198.47.19.142])
  by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtSjZ-0006Ls-81
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 07:44:02 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1C7hfIw005417;
- Tue, 12 Feb 2019 01:43:41 -0600
+ id 1gtSjT-0006Lh-1g
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 07:43:57 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1C7hbmP005402;
+ Tue, 12 Feb 2019 01:43:37 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549957421;
- bh=p8DoSGbnagOTgtMc5WkCFpNMdJdrvnQTvwNp+0R+n58=;
+ s=ti-com-17Q1; t=1549957417;
+ bh=cLFSJbtEF080CABAE546omquJje2oJ1MPGnKrPKE10E=;
  h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=e8tCp+4cUSlb/0GrtWsuo2kXxK9Lc3uLSyfhUo9+z4iHx7sjMBxHIOj+FANWisS82
- fVemnlr4m9YY11oN5fqdLjZiReV/6cF9I3S2vTX4TAvMUmcxK0WK9sQkPVTmEA640T
- VBiQYST7SsNpq3BC9Rp0BWj1OCbi4TjNzp5UuWfE=
-Received: from DFLE104.ent.ti.com (dfle104.ent.ti.com [10.64.6.25])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1C7hfx1020279
+ b=MzSRwCjLIHj44PNCYsFSVjdaMpRBc/zWKrOukOOz4Tdh5ikj7VlPZ4sA79bX+SG/V
+ Y05VkGIIz3F5ph440+JMz5V2FzL6whoD3IxWogKwNlvb/6OUuSpQiUbaj3MfU9g9aP
+ VJAI3VDv1WCrGjOdmJiV/cgCLtZvnPISDIM8An20=
+Received: from DFLE103.ent.ti.com (dfle103.ent.ti.com [10.64.6.24])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1C7hbXJ058279
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 12 Feb 2019 01:43:41 -0600
-Received: from DFLE103.ent.ti.com (10.64.6.24) by DFLE104.ent.ti.com
- (10.64.6.25) with Microsoft SMTP Server (version=TLS1_2,
+ Tue, 12 Feb 2019 01:43:37 -0600
+Received: from DFLE107.ent.ti.com (10.64.6.28) by DFLE103.ent.ti.com
+ (10.64.6.24) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 12
- Feb 2019 01:43:41 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE103.ent.ti.com
- (10.64.6.24) with Microsoft SMTP Server (version=TLS1_0,
+ Feb 2019 01:43:37 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE107.ent.ti.com
+ (10.64.6.28) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 12 Feb 2019 01:43:41 -0600
+ Tue, 12 Feb 2019 01:43:37 -0600
 Received: from uda0131933.india.ti.com (ileax41-snat.itg.ti.com
  [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1C7gss6000385;
- Tue, 12 Feb 2019 01:43:37 -0600
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1C7gss5000385;
+ Tue, 12 Feb 2019 01:43:33 -0600
 From: Lokesh Vutla <lokeshvutla@ti.com>
 To: <marc.zyngier@arm.com>, Tony Lindgren <tony@atomide.com>, Nishanth Menon
  <nm@ti.com>, Santosh Shilimkar <ssantosh@kernel.org>, Rob Herring
  <robh+dt@kernel.org>, <tglx@linutronix.de>, <jason@lakedaemon.net>
-Subject: [PATCH v5 10/10] soc: ti: am6: Enable interrupt controller drivers
-Date: Tue, 12 Feb 2019 13:12:37 +0530
-Message-ID: <20190212074237.2875-11-lokeshvutla@ti.com>
+Subject: [PATCH v5 09/10] soc: ti: Add MSI domain support for K3 Interrupt
+ Aggregator
+Date: Tue, 12 Feb 2019 13:12:36 +0530
+Message-ID: <20190212074237.2875-10-lokeshvutla@ti.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20190212074237.2875-1-lokeshvutla@ti.com>
 References: <20190212074237.2875-1-lokeshvutla@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_074401_402538_BBD7770C 
-X-CRM114-Status: UNSURE (   8.54  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190212_074355_385712_5F024738 
+X-CRM114-Status: GOOD (  23.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -119,33 +119,275 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Select all the TISCI dependent interrupt controller drivers
-for AM6 SoC.
+With the system coprocessor managing the range allocation of the
+inputs to Interrupt Aggregator, it is difficult to represent
+the device IRQs from DT.
 
-Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
+The suggestion is to use MSI in such cases where devices wants
+to allocate and group interrupts dynamically.
+
+Create a MSI domain bus layer that allocates and frees MSIs for
+a device.
+
+APIs that are implemented are:
+- inta_msi_create_irq_domain() that creates a MSI domain
+- inta_msi_domain_alloc_irqs() that creates MSIs for the
+  specified device and source indexes.
+- inta_msi_domain_free_irqs() frees the grouped irqs.
+
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
 Changes since v4:
-- None
- drivers/soc/ti/Kconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+- Dropped support for creating allocation of single MSI.
+- Use the existing MSI apis for allocating IRQs
+
+ drivers/soc/ti/Kconfig             |   6 ++
+ drivers/soc/ti/Makefile            |   1 +
+ drivers/soc/ti/k3_inta_msi.c       | 143 +++++++++++++++++++++++++++++
+ include/linux/irqdomain.h          |   1 +
+ include/linux/msi.h                |   7 ++
+ include/linux/soc/ti/k3_inta_msi.h |  21 +++++
+ 6 files changed, 179 insertions(+)
+ create mode 100644 drivers/soc/ti/k3_inta_msi.c
+ create mode 100644 include/linux/soc/ti/k3_inta_msi.h
 
 diff --git a/drivers/soc/ti/Kconfig b/drivers/soc/ti/Kconfig
-index 7640490c2a6a..145b701a3d96 100644
+index be4570baad96..7640490c2a6a 100644
 --- a/drivers/soc/ti/Kconfig
 +++ b/drivers/soc/ti/Kconfig
-@@ -5,6 +5,11 @@ if ARCH_K3
+@@ -73,4 +73,10 @@ config TI_SCI_PM_DOMAINS
+ 	  called ti_sci_pm_domains. Note this is needed early in boot before
+ 	  rootfs may be available.
  
- config ARCH_K3_AM6_SOC
- 	bool "K3 AM6 SoC"
-+	select MAILBOX
-+	select TI_MESSAGE_MANAGER
-+	select TI_SCI_PROTOCOL
-+	select TI_SCI_INTR_IRQCHIP
-+	select TI_SCI_INTA_IRQCHIP
- 	help
- 	  Enable support for TI's AM6 SoC Family support
++config K3_INTA_MSI_DOMAIN
++	bool
++	select GENERIC_MSI_IRQ_DOMAIN
++	help
++	  Driver to enable Interrupt Aggregator specific MSI Domain.
++
+ endif # SOC_TI
+diff --git a/drivers/soc/ti/Makefile b/drivers/soc/ti/Makefile
+index a22edc0b258a..152b195273ee 100644
+--- a/drivers/soc/ti/Makefile
++++ b/drivers/soc/ti/Makefile
+@@ -8,3 +8,4 @@ obj-$(CONFIG_KEYSTONE_NAVIGATOR_DMA)	+= knav_dma.o
+ obj-$(CONFIG_AMX3_PM)			+= pm33xx.o
+ obj-$(CONFIG_WKUP_M3_IPC)		+= wkup_m3_ipc.o
+ obj-$(CONFIG_TI_SCI_PM_DOMAINS)		+= ti_sci_pm_domains.o
++obj-$(CONFIG_K3_INTA_MSI_DOMAIN)	+= k3_inta_msi.o
+diff --git a/drivers/soc/ti/k3_inta_msi.c b/drivers/soc/ti/k3_inta_msi.c
+new file mode 100644
+index 000000000000..ffce1a7541e2
+--- /dev/null
++++ b/drivers/soc/ti/k3_inta_msi.c
+@@ -0,0 +1,143 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Texas Instruments' K3 Interrupt Aggregator MSI bus
++ *
++ * Copyright (C) 2018-2019 Texas Instruments Incorporated - http://www.ti.com/
++ *	Lokesh Vutla <lokeshvutla@ti.com>
++ */
++
++#include <linux/of_device.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/msi.h>
++#include <linux/soc/ti/k3_inta_msi.h>
++
++static void inta_msi_write_msg(struct irq_data *data, struct msi_msg *msg)
++{
++	/* Nothing to do */
++}
++
++static void inta_msi_compose_msi_msg(struct irq_data *data,
++				     struct msi_msg *msg)
++{
++	/* Nothing to do */
++}
++
++static void inta_msi_update_chip_ops(struct msi_domain_info *info)
++{
++	struct irq_chip *chip = info->chip;
++
++	BUG_ON(!chip);
++	if (!chip->irq_mask)
++		chip->irq_mask = irq_chip_mask_parent;
++	if (!chip->irq_unmask)
++		chip->irq_unmask = irq_chip_unmask_parent;
++	if (!chip->irq_eoi)
++		chip->irq_eoi = irq_chip_eoi_parent;
++	if (!chip->irq_write_msi_msg)
++		chip->irq_write_msi_msg = inta_msi_write_msg;
++	if (!chip->irq_compose_msi_msg)
++		chip->irq_compose_msi_msg = inta_msi_compose_msi_msg;
++}
++
++struct irq_domain *inta_msi_create_irq_domain(struct fwnode_handle *fwnode,
++					      struct msi_domain_info *info,
++					      struct irq_domain *parent)
++{
++	struct irq_domain *domain;
++
++	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
++		inta_msi_update_chip_ops(info);
++
++	domain = msi_create_irq_domain(fwnode, info, parent);
++	if (domain)
++		irq_domain_update_bus_token(domain, DOMAIN_BUS_K3_INTA_MSI);
++
++	return domain;
++}
++EXPORT_SYMBOL_GPL(inta_msi_create_irq_domain);
++
++static void inta_msi_free_descs(struct device *dev)
++{
++	struct msi_desc *desc, *tmp;
++
++	list_for_each_entry_safe(desc, tmp, dev_to_msi_list(dev), list) {
++		list_del(&desc->list);
++		free_msi_entry(desc);
++	}
++}
++
++static int inta_msi_alloc_descs(struct device *dev, u32 dev_id, int nvec,
++				u32 *arr_index, bool share)
++{
++	struct msi_desc *msi_desc;
++	int i;
++
++	for (i = 0; i < nvec; i++) {
++		msi_desc = alloc_msi_entry(dev, 1, NULL);
++		if (!msi_desc)
++			break;
++
++		msi_desc->inta.index = arr_index[i];
++		msi_desc->inta.dev_id = dev_id;
++		msi_desc->inta.share = share;
++		INIT_LIST_HEAD(&msi_desc->list);
++		list_add_tail(&msi_desc->list, dev_to_msi_list(dev));
++	};
++
++	if (i != nvec) {
++		inta_msi_free_descs(dev);
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++int inta_msi_domain_alloc_irqs(struct device *dev, u32 dev_id, int nvec,
++			       u32 *arr_index, bool share)
++{
++	struct irq_domain *msi_domain;
++	int ret;
++
++	msi_domain = dev_get_msi_domain(dev);
++	if (!msi_domain)
++		return -EINVAL;
++
++	ret = inta_msi_alloc_descs(dev, dev_id, nvec, arr_index, share);
++	if (ret)
++		return ret;
++
++	ret = msi_domain_alloc_irqs(msi_domain, dev, nvec);
++	if (ret) {
++		dev_err(dev, "Failed to allocate IRQs\n");
++		goto cleanup;
++	}
++
++	return 0;
++
++cleanup:
++	inta_msi_free_descs(dev);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(inta_msi_domain_alloc_irqs);
++
++void inta_msi_domain_free_irqs(struct device *dev)
++{
++	msi_domain_free_irqs(dev->msi_domain, dev);
++	inta_msi_free_descs(dev);
++}
++EXPORT_SYMBOL_GPL(inta_msi_domain_free_irqs);
++
++unsigned int inta_msi_get_virq(struct device *dev, u32 dev_id, u32 index)
++{
++	struct msi_desc *desc;
++
++	for_each_msi_entry(desc, dev)
++		if (desc->inta.index == index && desc->inta.dev_id == dev_id)
++			return desc->irq;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(inta_msi_get_virq);
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index 35965f41d7be..05afb25062cf 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -82,6 +82,7 @@ enum irq_domain_bus_token {
+ 	DOMAIN_BUS_NEXUS,
+ 	DOMAIN_BUS_IPI,
+ 	DOMAIN_BUS_FSL_MC_MSI,
++	DOMAIN_BUS_K3_INTA_MSI,
+ };
  
+ /**
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 784fb52b9900..7e8a8786308e 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -47,6 +47,12 @@ struct fsl_mc_msi_desc {
+ 	u16				msi_index;
+ };
+ 
++struct inta_msi_desc {
++	u16	dev_id;
++	u16	index;
++	bool share;
++};
++
+ /**
+  * struct msi_desc - Descriptor structure for MSI based interrupts
+  * @list:	List head for management
+@@ -106,6 +112,7 @@ struct msi_desc {
+ 		 */
+ 		struct platform_msi_desc platform;
+ 		struct fsl_mc_msi_desc fsl_mc;
++		struct inta_msi_desc inta;
+ 	};
+ };
+ 
+diff --git a/include/linux/soc/ti/k3_inta_msi.h b/include/linux/soc/ti/k3_inta_msi.h
+new file mode 100644
+index 000000000000..7fc8c9946cdc
+--- /dev/null
++++ b/include/linux/soc/ti/k3_inta_msi.h
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Texas Instruments' K3 INTA MSI helper
++ *
++ * Copyright (C) 2018-2019 Texas Instruments Incorporated - http://www.ti.com/
++ *	Lokesh Vutla <lokeshvutla@ti.com>
++ */
++
++#ifndef __INCLUDE_LINUX_K3_INTA_MSI_H
++#define __INCLUDE_LINUX_K3_INTA_MSI_H
++
++#include <linux/msi.h>
++
++struct irq_domain *inta_msi_create_irq_domain(struct fwnode_handle *fwnode,
++					      struct msi_domain_info *info,
++					      struct irq_domain *parent);
++int inta_msi_domain_alloc_irqs(struct device *dev, u32 dev_id, int nvec,
++			       u32 *arr_index, bool share);
++void inta_msi_domain_free_irqs(struct device *dev);
++unsigned int inta_msi_get_virq(struct device *dev, u32 dev_id, u32 index);
++#endif /* __INCLUDE_LINUX_IRQCHIP_TI_SCI_INTA_H */
 -- 
 2.19.2
 
